@@ -239,12 +239,11 @@ char *strerror(int errnum);
 ffi.cdef[[
 int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
-
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 int fsync(int fd);
 int fdatasync(int fd);
-
+int unlink(const char *pathname);
 ]]
 
 
@@ -323,8 +322,7 @@ function L.read(d, buf, len) return retint(ffi.C.read(getfd(d), buf, len)) end
 function L.write(d, buf, len) return retint(ffi.C.write(getfd(d), buf, len)) end
 function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
 function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
-
-
+function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 
 return L
 

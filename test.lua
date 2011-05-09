@@ -66,7 +66,8 @@ assert(L.close(fd))
 
 assert(L.O_CREAT == 64, "wrong octal value for O_CREAT")
 
-fd, err, errno = L.creat("./XXXXYYYYZZZ4521", L.S_IRWXU)
+tmpfile = "./XXXXYYYYZZZ4521"
+fd, err, errno = L.creat(tmpfile, L.S_IRWXU)
 assert(err == nil, err)
 
 -- test fsync
@@ -74,5 +75,16 @@ assert(L.fsync(fd))
 
 -- test fdatasync
 assert(L.fdatasync(fd))
+
+assert(L.close(fd))
+
+fd, err, errno = L.open(tmpfile, L.O_RDWR)
+assert(err == nil, "file should have been created")
+assert(L.close(fd))
+
+assert(L.unlink(tmpfile))
+fd, err, errno = L.open(tmpfile, L.O_RDWR)
+assert(err ~= nil, "expected open to fail on file not found")
+
 
 
