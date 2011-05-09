@@ -103,27 +103,55 @@ local L = {} -- our module exported functions
 
 -- for our purposes, we will therefore make the long ones depend on arch, rest are fixed
 
-L.O_ACCMODE = 0x0003
-L.O_RDONLY = 0x00
-L.O_WRONLY = 0x01
-L.O_RDWR = 0x02
-L.O_CREAT = 0x0100
-L.O_EXCL = 0x0200
-L.O_NOCTTY = 0x0400
-L.O_TRUNC = 0x01000
-L.O_APPEND = 0x02000
-L.O_NONBLOCK = 0x04000
+function octal(s)
+  local p = 1
+  local o = 0
+  local z = string.byte("0")
+  for i = #s, 1, -1 do
+    o = o + (string.byte(s, i) - z) * p
+    p = p * 8
+  end
+  return o
+end
+
+-- 
+L.O_ACCMODE = octal('0003')
+L.O_RDONLY = octal('00')
+L.O_WRONLY = octal('01')
+L.O_RDWR = octal('02')
+L.O_CREAT = octal('0100')
+L.O_EXCL = octal('0200')
+L.O_NOCTTY = octal('0400')
+L.O_TRUNC = octal('01000')
+L.O_APPEND = octal('02000')
+L.O_NONBLOCK = octal('04000')
 L.O_NDELAY = L.O_NONBLOCK
-L.O_SYNC = 0x04010000
+L.O_SYNC = octal('04010000')
 L.O_FSYNC = L.O_SYNC
-L.O_ASYNC = 0x020000
-L.O_DIRECTORY = 0x0200000
-L.O_NOFOLLOW = 0x0400000
-L.O_CLOEXEC = 0x02000000
-L.O_DIRECT = 0x040000
-L.O_NOATIME = 0x01000000
-L.O_DSYNC = 0x010000
+L.O_ASYNC = octal('020000')
+L.O_DIRECTORY = octal('0200000')
+L.O_NOFOLLOW = octal('0400000')
+L.O_CLOEXEC = octal('02000000')
+L.O_DIRECT = octal('040000')
+L.O_NOATIME = octal('01000000')
+L.O_DSYNC = octal('010000')
 L.O_RSYNC = L.O_SYNC
+
+-- modes
+L.S_IRWXU = octal('00700') -- user (file owner) has read, write and execute permission
+L.S_IRUSR = octal('00400') -- user has read permission
+L.S_IWUSR = octal('00200') -- user has write permission
+L.S_IXUSR = octal('00100') -- user has execute permission
+L.S_IRWXG = octal('00070') -- group has read, write and execute permission
+L.S_IRGRP = octal('00040') -- group has read permission
+L.S_IWGRP = octal('00020') -- group has write permission
+L.S_IXGRP = octal('00010') -- group has execute permission
+L.S_IRWXO = octal('00007') -- others have read, write and execute permission
+L.S_IROTH = octal('00004') -- others have read permission
+L.S_IWOTH = octal('00002') -- others have write permission
+L.S_IXOTH = octal('00001') -- others have execute permission
+
+
 
 if ffi.abi('32bit') then L.O_LARGEFILE = 0x0100000 else L.O_LARGEFILE = 0x0 end
 
@@ -211,10 +239,17 @@ char *strerror(int errnum);
 ffi.cdef[[
 int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
+
 ssize_t read(int fd, void *buf, size_t count);
+ssize_t write(int fd, const void *buf, size_t count);
+int fsync(int fd);
+int fdatasync(int fd);
+
+]]
 
 
-int creat(const char *pathname, mode_t mode);
+--[[ -- not defined yet
+ int creat(const char *pathname, mode_t mode); -- defined using open instead
 ]]
 
 
@@ -226,7 +261,7 @@ function errorret()
 end
 
 -- for int returns
-function intret(ret)
+function retint(ret)
   if ret == -1 then
     return errorret()
   end
@@ -234,8 +269,7 @@ function intret(ret)
 end
 
 -- used for no return value in Lua
--- not used!
-function bret(ret)
+function retbool(ret)
   if ret == -1 then
     return errorret()
   end
@@ -284,17 +318,11 @@ function L.open(pathname, flags, mode)
   return fd
 end
 
-function L.read(d, buf, len)
-  local fd = getfd(d)
-
-  if d == nil then return nil, "Invalid file descriptor" end
-
-  -- if no buffer provided, we could allocate one and return a Lua string instead
-  
-  ret = ffi.C.read(fd, buf, len)
-
-  return intret(ret)
-end
+function L.creat(pathname, mode) return L.open(pathname, bit.bor(L.O_CREAT, L.O_WRONLY, L.O_TRUNC), mode) end
+function L.read(d, buf, len) return retint(ffi.C.read(getfd(d), buf, len)) end
+function L.write(d, buf, len) return retint(ffi.C.write(getfd(d), buf, len)) end
+function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
+function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 
 
 

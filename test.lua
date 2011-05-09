@@ -24,10 +24,7 @@ assert(err == nil, "should be able to open /dev/zero")
 assert(fd2[0] == 4, "should get file descriptor 4 back from second open")
 
 -- normal close
-ok, err, errno = L.close(fd)
-assert(ok, "should not get error closing valid fd")
-assert(err == nil, "should be able to close valid fd")
-assert(errno == nil, "errno should not be set closing valid fd")
+assert(L.close(fd))
 
 -- test double close fd
 fd, err, errno = L.close(3)
@@ -37,11 +34,16 @@ assert(L.symerror[errno] == 'EBADF', "expect EBADF from invalid numberic fd")
 size = 128
 buf = ffi.new("char[?]", size) -- allocate buffer for read
 for i = 0, size - 1 do buf[i] = 255 end -- make sure overwritten
+-- test read
 n, err, errno = L.read(fd2, buf, size)
 assert(err == nil, "should be able to read from /dev/zero")
 assert(n >= 0, "should not get error reading from /dev/zero")
 assert(n == size, "should not get truncated read from /dev/zero") -- technically allowed!
 for i = 0, size - 1 do assert(buf[i] == 0, "should read zero bytes from /dev/zero") end
+-- test writing to read only file fails
+n, err, errno = L.write(fd2, buf, size)
+assert(err, "should not be able to write to file opened read only")
+assert(L.symerror[errno] == 'EBADF', "expect EBADF when writing read only file")
 
 -- test gc of file handle
 fd2 = nil
@@ -52,5 +54,28 @@ n, err, errno = L.read(4, buf, size)
 assert(not n, "should not be able to read from fd 4 after gc")
 assert(L.symerror[errno] == 'EBADF', "expect EBADF from already closed fd")
 
+-- another open
+fd, err, errno = L.open("/dev/zero", L.O_RDWR)
+assert(err == nil, "should be able to open /dev/zero read write")
+-- test write
+n, err, errno = L.write(fd, buf, size)
+assert(err == nil, "should be able to write to /dev/zero")
+assert(n >= 0, "should not get error writing to /dev/zero")
+assert(n == size, "should not get truncated write to /dev/zero") -- technically allowed!
+assert(L.close(fd))
+
+assert(L.O_CREAT == 64, "wrong octal value for O_CREAT")
+
+fd, err, errno = L.creat("./XXXXYYYYZZZ4521", L.S_IRWXU)
+assert(err == nil, err)
+
+-- test fsync
+ok, err, errno = L.fsync(fd)
+assert(err == nil, "should be able to fsync")
+--assert(L.fsync(fd))
+
+-- test fdatasync
+ok, err, errno = L.fdatasync(fd)
+assert(err == nil, "should be able to fdatasync")
 
 
