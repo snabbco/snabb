@@ -70,12 +70,9 @@ fd, err, errno = L.creat("./XXXXYYYYZZZ4521", L.S_IRWXU)
 assert(err == nil, err)
 
 -- test fsync
-ok, err, errno = L.fsync(fd)
-assert(err == nil, "should be able to fsync")
---assert(L.fsync(fd))
+assert(L.fsync(fd))
 
 -- test fdatasync
-ok, err, errno = L.fdatasync(fd)
-assert(err == nil, "should be able to fdatasync")
+assert(L.fdatasync(fd))
 
 
