@@ -222,7 +222,7 @@ typedef uint32_t mode_t;
 if ffi.abi('32bit') then
 ffi.cdef[[
 typedef uint32_t size_t;
-typedef int32_t ssize_t
+typedef int32_t ssize_t;
 ]]
 else ffi.cdef[[
 typedef uint64_t size_t;
