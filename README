@@ -6,7 +6,7 @@ Why? Making a C library for everything you want to bind is a pain, so I thought 
 
 Linux only? Easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library (that applies also to any non glibc library too), and test. Patches accepted.
 
-
+Requirements: Needs git head of LuaJIT (or next release 2.0.0-beta8 when it is out).
 
 API
 
