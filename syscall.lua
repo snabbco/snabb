@@ -264,15 +264,12 @@ int unlink(const char *pathname);
 ]]
 
 
-
-
-
-
+local fd_t = ffi.typeof("struct {int fd;}")
 
 --get fd from standard string, integer, or cdata
 function getfd(d)
   if type(d) == 'number' then return d end
-  if type(d) == 'cdata' then return d[0] end -- use ffi type test when have special type
+  if ffi.istype(fd_t, d) then return d.fd end
   if type(d) == 'string' then
     if d == 'stdin' or d == 'STDIN_FILENO' then return 0 end
     if d == 'stdout' or d == 'STDOUT_FILENO' then return 1 end
@@ -283,15 +280,13 @@ end
 function L.close(d)
   local fd = getfd(d)
 
-  if d == nil then return nil, "Invalid file descriptor" end
-
   local ret = ffi.C.close(fd)
 
   if ret == -1 then
     return errorret()
   end
 
-  if type(d) == 'cdata' then
+  if ffi.istype(fd_t, d) then
     ffi.gc(d, nil) -- remove gc finalizer as now closed; should we also remove if get EBADF?
   end
 
@@ -299,14 +294,11 @@ function L.close(d)
 end
 
 function L.open(pathname, flags, mode)
-  local errno, s = nil, nil
   local ret = ffi.C.open(pathname, flags, mode or 0)
   if ret == -1 then
     return errorret()
   end
-  local fd = ffi.gc(ffi.new("int[1]"), L.close)
-  fd[0] = ret
-  return fd
+  return ffi.gc(ffi.new(fd_t, ret), L.close)
 end
 
 function L.creat(pathname, mode) return L.open(pathname, bit.bor(L.O_CREAT, L.O_WRONLY, L.O_TRUNC), mode) end

@@ -16,12 +16,12 @@ fd, err, errno = L.open("/dev/null", L.O_RDONLY)
 assert(err == nil, "should be able to open /dev/null")
 assert(errno == nil, "errno should not be set opening /dev/null")
 assert(type(fd) == 'cdata', "should get a cdata object back from open")
-assert(fd[0] == 3, "should get file descriptor 3 back from first open")
+assert(fd.fd == 3, "should get file descriptor 3 back from first open")
 
 -- another open
 fd2, err, errno = L.open("/dev/zero", L.O_RDONLY)
 assert(err == nil, "should be able to open /dev/zero")
-assert(fd2[0] == 4, "should get file descriptor 4 back from second open")
+assert(fd2.fd == 4, "should get file descriptor 4 back from second open")
 
 -- normal close
 assert(L.close(fd))
