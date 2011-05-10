@@ -26,4 +26,5 @@ You do not need to use the numbered versions of functions, eg dup can do dup2 or
 
 Note that pipe returns two file descriptors, rather than passing an array as in C, so fd0, fd1, err = L.pipe()
 
+getcwd returns the result in a buffer if one is passed, or as a Lua string otherwise, ie if called with no parameters/
 

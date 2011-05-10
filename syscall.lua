@@ -206,6 +206,14 @@ function retbool(ret)
   return true
 end
 
+-- used for pointer returns, null is failure
+-- not used
+function retptr(ret)
+  if ret == nil then
+     return errorret()
+  end
+  return ret
+end
 
 -- typedefs for word size independent types
 ffi.cdef[[
@@ -248,9 +256,17 @@ int pipe2(int pipefd[2], int flags);
 
 int unlink(const char *pathname);
 int access(const char *pathname, int mode);
-
+char *getcwd(char *buf, size_t size);
 ]]
 
+-- functions from libc that are also exported as a convenience
+ffi.cdef[[
+void *calloc(size_t nmemb, size_t size);
+void *malloc(size_t size);
+void free(void *ptr);
+void *realloc(void *ptr, size_t size);
+
+]]
 
 --[[ -- not defined yet
  int creat(const char *pathname, mode_t mode); -- defined using open instead
@@ -331,6 +347,22 @@ function L.lseek(fd, offset, whence) return retint(ffi.C.lseek(getfd(fd), offset
 function L.fchdir(fd) return retbool(ffi.C.fchdir(getfd(fd))) end
 function L.fsync(fd) return retbool(ffi.C.fsync(getfd(fd))) end
 function L.fdatasync(fd) return retbool(ffi.C.fdatasync(getfd(fd))) end
+
+function L.getcwd(buf, size)
+  local ret = ffi.C.getcwd(buf, size or 0)
+
+  if buf == nil then -- Linux will allocate buffer here, return Lua string and free
+    if ret == nil then return errorret() end
+    local s = ffi.string(ret)
+    ffi.C.free(ret)
+    return s
+  end
+
+  -- user allocated buffer
+  if ret == nil then return errorret() end
+
+  return true -- no point returning the pointer as it is just the passed buffer
+end
 
 -- not system functions
 function L.nogc(d) ffi.gc(d, nil) end

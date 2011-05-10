@@ -141,6 +141,11 @@ fd, err = L.open("/")
 assert(err == nil, err)
 assert(fd:fchdir())
 
+assert(L.getcwd(buf, size))
+assert(ffi.string(buf) == "/", "expect cwd to be /")
+s, err = L.getcwd()
+assert(err == nil, err)
+assert(s == "/", "expect cwd to be /")
 
 
 
