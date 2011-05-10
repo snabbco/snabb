@@ -81,14 +81,17 @@ assert(fd2:close())
 
 fd2, err, errno = fd:dup2(17)
 assert(err == nil, "should be able to dup2 fd")
+assert(fd2.fd == 17, "dup2,3 should set file id as specified")
 assert(L.close(17))
 
 fd2, err, errno = fd:dup3(17, L.O_CLOEXEC)
 assert(err == nil, "should be able to dup3 fd")
+assert(fd2.fd == 17, "dup2,3 should set file id as specified")
 assert(L.close(17))
 
 fd2, err, errno = fd:dup(17, L.O_CLOEXEC)
 assert(err == nil, "should be able to use dup as dup3")
+assert(fd2.fd == 17, "dup2,3 should set file id as specified")
 assert(L.close(17))
 
 assert(L.close(fd))
