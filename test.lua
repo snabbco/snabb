@@ -110,7 +110,7 @@ assert(L.close(fd))
 assert(L.O_CREAT == 64, "wrong octal value for O_CREAT")
 
 tmpfile = "./XXXXYYYYZZZ4521"
-fd, err, errno = L.creat(tmpfile, L.S_IRWXU)
+fd, err = L.creat(tmpfile, L.S_IRWXU)
 assert(err == nil, err)
 
 -- test fsync
@@ -123,7 +123,7 @@ assert(L.unlink(tmpfile), "should be able to unlink file")
 
 assert(L.close(fd))
 
-fd, err, errno = L.open(tmpfile, L.O_RDWR)
+fd, err = L.open(tmpfile, L.O_RDWR)
 assert(err ~= nil, "expected open to fail on file not found")
 
 fd0, fd1, err, errno = L.pipe(99999) -- invalid flags to test error handling
@@ -134,7 +134,7 @@ assert(fd0.fd == 3 and fd1.fd == 4, "expect file handles 3 and 4 for pipe")
 fd0, fd1 = nil, nil
 
 assert(L.chdir("/"))
-fd, err, errno = L.open("/")
+fd, err = L.open("/")
 assert(err == nil, err)
 assert(fd:fchdir())
 
