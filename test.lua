@@ -62,6 +62,14 @@ n, err, errno = L.write(fd, buf, size)
 assert(err == nil, "should be able to write to /dev/zero")
 assert(n >= 0, "should not get error writing to /dev/zero")
 assert(n == size, "should not get truncated write to /dev/zero") -- technically allowed!
+
+local offset = 1
+n, err, errno = fd:pread(buf, size, offset)
+assert(err == nil, "should be able to pread /dev/zero")
+n, err, errno = fd:pwrite(buf, size, offset)
+assert(err == nil, "should be able to pwrite /dev/zero")
+
+
 assert(L.close(fd))
 
 assert(L.O_CREAT == 64, "wrong octal value for O_CREAT")

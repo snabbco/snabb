@@ -151,9 +151,7 @@ L.S_IROTH = octal('00004') -- others have read permission
 L.S_IWOTH = octal('00002') -- others have write permission
 L.S_IXOTH = octal('00001') -- others have execute permission
 
-
-
-if ffi.abi('32bit') then L.O_LARGEFILE = 0x0100000 else L.O_LARGEFILE = 0x0 end
+if ffi.abi('32bit') then L.O_LARGEFILE = octal('0100000') else L.O_LARGEFILE = 0 end
 
 L.symerror = {
 'EPERM',
@@ -235,11 +233,11 @@ typedef uint32_t mode_t;
 
 ]]
 
--- typedefs based on word length, using int/uint as these are word sized
+-- typedefs based on word length, using int/uint or long as these are both word sized
 ffi.cdef[[
 typedef unsigned int size_t;
 typedef int ssize_t;
-
+typedef long off_t;
 ]]
 
 -- functions only used internally
@@ -251,11 +249,20 @@ char *strerror(int errnum);
 ffi.cdef[[
 int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
+
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
+
+ssize_t pread(int fd, void *buf, size_t count, off_t offset);
+ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
+
+
 int fsync(int fd);
 int fdatasync(int fd);
+
 int unlink(const char *pathname);
+
+
 ]]
 
 
@@ -302,14 +309,21 @@ end
 function L.creat(pathname, mode) return L.open(pathname, bit.bor(L.O_CREAT, L.O_WRONLY, L.O_TRUNC), mode) end
 function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 
-function L.read(d, buf, len) return retint(ffi.C.read(getfd(d), buf, len)) end
-function L.write(d, buf, len) return retint(ffi.C.write(getfd(d), buf, len)) end
+function L.read(d, buf, count) return retint(ffi.C.read(getfd(d), buf, count)) end
+function L.write(d, buf, count) return retint(ffi.C.write(getfd(d), buf, count)) end
+function L.pread(d, buf, count, offset) return retint(ffi.C.pread(getfd(d), buf, count, offset)) end
+function L.pwrite(d, buf, count, offset) return retint(ffi.C.pwrite(getfd(d), buf, count, offset)) end
+
 function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
 function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 
 -- methods on an fd
 -- add __gc method here, and remove gc function
-local fmeth = {close = L.close, read = L.read, write = L.write, fsync = L.fsync, fdatasync = L.fdatasync}
+
+local fdmethods = {'close', 'read', 'write', 'pread', 'pwrite', 'fsync', 'fdatasync'}
+local fmeth = {}
+for i, v in ipairs(fdmethods) do fmeth[v] = L[v] end
+
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth})
 
 return L
