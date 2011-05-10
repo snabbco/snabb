@@ -167,32 +167,19 @@ L.symerror = {
 'EDOM',   'ERANGE'
 }
 
-rsymerror = {}
-for i, v in ipairs(L.symerror) do rsymerror[v] = i end -- reverse mapping
-
-local ecache = {}
-
--- caching version of strerror to save interning
 function L.strerror(errno)
-  local s = ecache[errno]
-  if s == nil then
-    s = ffi.string(ffi.C.strerror(errno))
-    ecache[errno] = s
-  end
-  return s, errno
+  return ffi.string(ffi.C.strerror(errno)), errno
 end
+
+local errorret, retint, retbool, retptr, retfd
 
 -- standard error return
 function errorret()
   return nil, L.strerror(ffi.errno())
 end
 
--- for int returns -- tests against -1LL on 64 bit arch
-local minus1
-if ffi.abi('32bit') then minus1 = -1 else minus1 = -1LL end
-
 function retint(ret)
-  if ret == minus1 then
+  if ret == -1 then
     return errorret()
   end
   return ret
@@ -226,6 +213,7 @@ ffi.cdef[[
 typedef unsigned int size_t;
 typedef int ssize_t;
 typedef long off_t;
+typedef long time_t;
 ]]
 
 -- functions only used internally
@@ -275,6 +263,12 @@ void *realloc(void *ptr, size_t size);
 
 local fd_t -- type for a file descriptor
 local fd2_t = ffi.typeof("int[2]")
+--[[local timespec_t = ffi.typeof[[
+struct timespec {
+  time_t tv_sec;        /* seconds */
+  long   tv_nsec;       /* nanoseconds */
+};
+]]
 
 --get fd from standard string, integer, or cdata
 function getfd(fd)
@@ -291,7 +285,7 @@ function retfd(ret)
   if ret == -1 then
     return errorret()
   end
-  return ffi.new(fd_t, ret)
+  return fd_t(ret)
 end
 
 function L.open(pathname, flags, mode)
@@ -306,14 +300,14 @@ L.dup2 = L.dup -- flags optional, so do not need new function
 L.dup3 = L.dup -- conditional on newfd set
 
 function L.pipe(flags)
-  local fd2 = ffi.new(fd2_t)
+  local fd2 = fd2_t()
   local ret = ffi.C.pipe2(fd2, flags or 0)
 
   if ret == -1 then
     return nil, errorret() -- extra nil as we return two fds normally
   end
 
-  return ffi.new(fd_t, fd2[0]), ffi.new(fd_t, fd2[1])
+  return fd_t(fd2[0]), fd_t(fd2[1])
 end
 L.pipe2 = L.pipe
 
@@ -331,7 +325,7 @@ function L.close(fd)
   return true
 end
 
-function L.creat(pathname, mode) return L.open(pathname, bit.bor(L.O_CREAT, L.O_WRONLY, L.O_TRUNC), mode) end
+function L.creat(pathname, mode) return L.open(pathname, L.O_CREAT + L.O_WRONLY + L.O_TRUNC, mode) end
 function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 function L.access(pathname, mode) return retbool(ffi.C.access(pathname, mode)) end
 function L.chdir(path) return retbool(ffi.C.chdir(path)) end
@@ -353,14 +347,13 @@ function L.getcwd(buf, size)
 
   if buf == nil then -- Linux will allocate buffer here, return Lua string and free
     if ret == nil then return errorret() end
-    local s = ffi.string(ret)
+    local s = ffi.string(ret) -- guaranteed to be zero terminated if no error
     ffi.C.free(ret)
     return s
   end
 
   -- user allocated buffer
   if ret == nil then return errorret() end
-
   return true -- no point returning the pointer as it is just the passed buffer
 end
 
@@ -372,6 +365,9 @@ local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pre
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = L[v] end
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = L.close})
+
+-- types
+L.types = {fd = fd_t, timespec = timespec_t}
 
 return L
 
