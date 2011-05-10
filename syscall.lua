@@ -202,27 +202,20 @@ function retptr(ret)
   return ret
 end
 
--- typedefs for word size independent types
 ffi.cdef[[
+// typedefs for word size independent types
 typedef uint32_t mode_t;
 
-]]
-
--- typedefs based on word length, using int/uint or long as these are both word sized
-ffi.cdef[[
+// typedefs based on word length, using int/uint or long as these are both word sized
 typedef unsigned int size_t;
 typedef int ssize_t;
 typedef long off_t;
 typedef long time_t;
-]]
 
--- functions only used internally
-ffi.cdef[[
+// functions only used internally
 char *strerror(int errnum);
-]]
 
--- exported functions
-ffi.cdef[[
+// exported functions
 int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
 int chdir(const char *path);
@@ -245,10 +238,8 @@ int pipe2(int pipefd[2], int flags);
 int unlink(const char *pathname);
 int access(const char *pathname, int mode);
 char *getcwd(char *buf, size_t size);
-]]
 
--- functions from libc that could be exported as a convenience
-ffi.cdef[[
+// functions from libc that could be exported as a convenience
 void *calloc(size_t nmemb, size_t size);
 void *malloc(size_t size);
 void free(void *ptr);
