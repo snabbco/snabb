@@ -302,16 +302,16 @@ function L.open(pathname, flags, mode)
 end
 
 function L.creat(pathname, mode) return L.open(pathname, bit.bor(L.O_CREAT, L.O_WRONLY, L.O_TRUNC), mode) end
+function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
+
 function L.read(d, buf, len) return retint(ffi.C.read(getfd(d), buf, len)) end
 function L.write(d, buf, len) return retint(ffi.C.write(getfd(d), buf, len)) end
 function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
 function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
-function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 
---local fd_t = ffi.typeof("struct {int fd;}")
-local fmeth = {close = L.close}
-local mt = {__index = fmeth}
-fd_t = ffi.metatype("struct {int fd;}", mt)
+-- methods on an fd
+local fmeth = {close = L.close, read = L.read, write = L.write, fsync = L.fsync, fdatasync = L.fdatasync}
+fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth})
 
 return L
 

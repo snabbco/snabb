@@ -41,7 +41,7 @@ assert(n >= 0, "should not get error reading from /dev/zero")
 assert(n == size, "should not get truncated read from /dev/zero") -- technically allowed!
 for i = 0, size - 1 do assert(buf[i] == 0, "should read zero bytes from /dev/zero") end
 -- test writing to read only file fails
-n, err, errno = L.write(fd2, buf, size)
+n, err, errno = fd2:write(buf, size)
 assert(err, "should not be able to write to file opened read only")
 assert(L.symerror[errno] == 'EBADF', "expect EBADF when writing read only file")
 
@@ -71,10 +71,10 @@ fd, err, errno = L.creat(tmpfile, L.S_IRWXU)
 assert(err == nil, err)
 
 -- test fsync
-assert(L.fsync(fd))
+assert(fd:fsync())
 
 -- test fdatasync
-assert(L.fdatasync(fd))
+assert(fd:fdatasync())
 
 -- test method of fd
 assert(fd:close())
