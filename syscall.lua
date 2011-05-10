@@ -277,10 +277,16 @@ function getfd(d)
   end
 end
 
-function L.close(d)
-  local fd = getfd(d)
+function L.open(pathname, flags, mode)
+  local ret = ffi.C.open(pathname, flags, mode or 0)
+  if ret == -1 then
+    return errorret()
+  end
+  return ffi.gc(ffi.new(fd_t, ret), L.close)
+end
 
-  local ret = ffi.C.close(fd)
+function L.close(d)
+  local ret = ffi.C.close(getfd(d))
 
   if ret == -1 then
     return errorret()
@@ -293,14 +299,6 @@ function L.close(d)
   return true
 end
 
-function L.open(pathname, flags, mode)
-  local ret = ffi.C.open(pathname, flags, mode or 0)
-  if ret == -1 then
-    return errorret()
-  end
-  return ffi.gc(ffi.new(fd_t, ret), L.close)
-end
-
 function L.creat(pathname, mode) return L.open(pathname, bit.bor(L.O_CREAT, L.O_WRONLY, L.O_TRUNC), mode) end
 function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 
@@ -310,6 +308,7 @@ function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
 function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 
 -- methods on an fd
+-- add __gc method here, and remove gc function
 local fmeth = {close = L.close, read = L.read, write = L.write, fsync = L.fsync, fdatasync = L.fdatasync}
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth})
 

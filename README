@@ -18,5 +18,7 @@ File descriptors are returned as a type not an integer. This is because they are
 
 Add: operation to remove gc. 
 
-String conversions are not done automatically, you get a buffer back, you have to force a conversion.
+String conversions are not done automatically, you get a buffer back, you have to force a conversion. This is because interning strings is expensive if you do not need it.
+
+
 
