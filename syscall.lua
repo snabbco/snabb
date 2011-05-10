@@ -197,6 +197,7 @@ for i, v in ipairs(L.symerror) do rsymerror[v] = i end -- reverse mapping
 
 local ecache = {}
 
+-- caching version of strerror to save interning
 function L.strerror(errno)
   local s = ecache[errno]
   if s == nil then
@@ -206,28 +207,40 @@ function L.strerror(errno)
   return s, errno
 end
 
---not used
-function strerror2(name)
-  return L.strerror(rsymerror[name])
+-- standard error return
+function errorret()
+  return nil, L.strerror(ffi.errno())
 end
+
+-- for int returns -- fix to make sure tests against 64 bit -1 on 64 bit arch
+function retint(ret)
+  if ret == -1 then
+    return errorret()
+  end
+  return ret
+end
+
+-- used for no return value, return true for use of assert
+function retbool(ret)
+  if ret == -1 then
+    return errorret()
+  end
+  return true
+end
+
 
 -- typedefs for word size independent types
 ffi.cdef[[
 typedef uint32_t mode_t;
 
-
-
 ]]
 
 -- typedefs based on word length, using int/uint as these are word sized
-
 ffi.cdef[[
 typedef unsigned int size_t;
 typedef int ssize_t;
 
 ]]
-
-
 
 -- functions only used internally
 ffi.cdef[[
@@ -252,26 +265,7 @@ int unlink(const char *pathname);
 
 
 
--- handle errors.
-function errorret()
-  return nil, L.strerror(ffi.errno())
-end
 
--- for int returns -- fix to make sure tests against 64 bit -1 on 64 bit arch
-function retint(ret)
-  if ret == -1 then
-    return errorret()
-  end
-  return ret
-end
-
--- used for no return value in Lua
-function retbool(ret)
-  if ret == -1 then
-    return errorret()
-  end
-  return true
-end
 
 
 
