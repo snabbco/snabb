@@ -1,7 +1,7 @@
 local ffi = require "ffi"
-local bit = require "bit"
+--local bit = require "bit"
 
-local L = {} -- our module exported functions
+local S = {} -- our module exported functions
 
 
 -- from bits/typesizes.h - underlying types, create as typedefs, mostly fix size.
@@ -106,56 +106,56 @@ local L = {} -- our module exported functions
 function octal(s) return tonumber(s, 8) end
 
 -- 
-L.O_ACCMODE = octal('0003')
-L.O_RDONLY = octal('00')
-L.O_WRONLY = octal('01')
-L.O_RDWR = octal('02')
-L.O_CREAT = octal('0100')
-L.O_EXCL = octal('0200')
-L.O_NOCTTY = octal('0400')
-L.O_TRUNC = octal('01000')
-L.O_APPEND = octal('02000')
-L.O_NONBLOCK = octal('04000')
-L.O_NDELAY = L.O_NONBLOCK
-L.O_SYNC = octal('04010000')
-L.O_FSYNC = L.O_SYNC
-L.O_ASYNC = octal('020000')
-L.O_DIRECTORY = octal('0200000')
-L.O_NOFOLLOW = octal('0400000')
-L.O_CLOEXEC = octal('02000000')
-L.O_DIRECT = octal('040000')
-L.O_NOATIME = octal('01000000')
-L.O_DSYNC = octal('010000')
-L.O_RSYNC = L.O_SYNC
+S.O_ACCMODE = octal('0003')
+S.O_RDONLY = octal('00')
+S.O_WRONLY = octal('01')
+S.O_RDWR = octal('02')
+S.O_CREAT = octal('0100')
+S.O_EXCL = octal('0200')
+S.O_NOCTTY = octal('0400')
+S.O_TRUNC = octal('01000')
+S.O_APPEND = octal('02000')
+S.O_NONBLOCK = octal('04000')
+S.O_NDELAY = S.O_NONBLOCK
+S.O_SYNC = octal('04010000')
+S.O_FSYNC = S.O_SYNC
+S.O_ASYNC = octal('020000')
+S.O_DIRECTORY = octal('0200000')
+S.O_NOFOLLOW = octal('0400000')
+S.O_CLOEXEC = octal('02000000')
+S.O_DIRECT = octal('040000')
+S.O_NOATIME = octal('01000000')
+S.O_DSYNC = octal('010000')
+S.O_RSYNC = S.O_SYNC
 
 -- modes
-L.S_IRWXU = octal('00700') -- user (file owner) has read, write and execute permission
-L.S_IRUSR = octal('00400') -- user has read permission
-L.S_IWUSR = octal('00200') -- user has write permission
-L.S_IXUSR = octal('00100') -- user has execute permission
-L.S_IRWXG = octal('00070') -- group has read, write and execute permission
-L.S_IRGRP = octal('00040') -- group has read permission
-L.S_IWGRP = octal('00020') -- group has write permission
-L.S_IXGRP = octal('00010') -- group has execute permission
-L.S_IRWXO = octal('00007') -- others have read, write and execute permission
-L.S_IROTH = octal('00004') -- others have read permission
-L.S_IWOTH = octal('00002') -- others have write permission
-L.S_IXOTH = octal('00001') -- others have execute permission
+S.S_IRWXU = octal('00700') -- user (file owner) has read, write and execute permission
+S.S_IRUSR = octal('00400') -- user has read permission
+S.S_IWUSR = octal('00200') -- user has write permission
+S.S_IXUSR = octal('00100') -- user has execute permission
+S.S_IRWXG = octal('00070') -- group has read, write and execute permission
+S.S_IRGRP = octal('00040') -- group has read permission
+S.S_IWGRP = octal('00020') -- group has write permission
+S.S_IXGRP = octal('00010') -- group has execute permission
+S.S_IRWXO = octal('00007') -- others have read, write and execute permission
+S.S_IROTH = octal('00004') -- others have read permission
+S.S_IWOTH = octal('00002') -- others have write permission
+S.S_IXOTH = octal('00001') -- others have execute permission
 
-if ffi.abi('32bit') then L.O_LARGEFILE = octal('0100000') else L.O_LARGEFILE = 0 end
+if ffi.abi('32bit') then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end
 
 -- seek
-L.SEEK_SET = 0       -- Seek from beginning of file.
-L.SEEK_CUR = 1       -- Seek from current position.
-L.SEEK_END = 2       -- Seek from end of file.
+S.SEEK_SET = 0       -- Seek from beginning of file.
+S.SEEK_CUR = 1       -- Seek from current position.
+S.SEEK_END = 2       -- Seek from end of file.
 
 -- access
-L.R_OK = 4               -- Test for read permission.
-L.W_OK = 2               -- Test for write permission.
-L.X_OK = 1               -- Test for execute permission.
-L.F_OK = 0               -- Test for existence.
+S.R_OK = 4               -- Test for read permission.
+S.W_OK = 2               -- Test for write permission.
+S.X_OK = 1               -- Test for execute permission.
+S.F_OK = 0               -- Test for existence.
 
-L.symerror = {
+S.symerror = {
 'EPERM',  'ENOENT', 'ESRCH',   'EINTR',
 'EIO',    'ENXIO',  'E2BIG',   'ENOEXEC',
 'EBADF',  'ECHILD', 'EAGAIN',  'ENOMEM',
@@ -167,7 +167,7 @@ L.symerror = {
 'EDOM',   'ERANGE'
 }
 
-function L.strerror(errno)
+function S.strerror(errno)
   return ffi.string(ffi.C.strerror(errno)), errno
 end
 
@@ -175,7 +175,7 @@ local errorret, retint, retbool, retptr, retfd
 
 -- standard error return
 function errorret()
-  return nil, L.strerror(ffi.errno())
+  return nil, S.strerror(ffi.errno())
 end
 
 function retint(ret)
@@ -279,18 +279,18 @@ function retfd(ret)
   return fd_t(ret)
 end
 
-function L.open(pathname, flags, mode)
+function S.open(pathname, flags, mode)
   return retfd(ffi.C.open(pathname, flags or 0, mode or 0))
 end
 
-function L.dup(oldfd, newfd, flags)
+function S.dup(oldfd, newfd, flags)
   if newfd == nil then return retfd(ffi.C.dup(getfd(oldfd))) end
   return retfd(ffi.C.dup3(getfd(oldfd), getfd(newfd), flags or 0))
 end
-L.dup2 = L.dup -- flags optional, so do not need new function
-L.dup3 = L.dup -- conditional on newfd set
+S.dup2 = S.dup -- flags optional, so do not need new function
+S.dup3 = S.dup -- conditional on newfd set
 
-function L.pipe(flags)
+function S.pipe(flags)
   local fd2 = fd2_t()
   local ret = ffi.C.pipe2(fd2, flags or 0)
 
@@ -300,9 +300,9 @@ function L.pipe(flags)
 
   return fd_t(fd2[0]), fd_t(fd2[1])
 end
-L.pipe2 = L.pipe
+S.pipe2 = S.pipe
 
-function L.close(fd)
+function S.close(fd)
   local ret = ffi.C.close(getfd(fd))
 
   if ret == -1 then
@@ -316,24 +316,24 @@ function L.close(fd)
   return true
 end
 
-function L.creat(pathname, mode) return L.open(pathname, L.O_CREAT + L.O_WRONLY + L.O_TRUNC, mode) end
-function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
-function L.access(pathname, mode) return retbool(ffi.C.access(pathname, mode)) end
-function L.chdir(path) return retbool(ffi.C.chdir(path)) end
-function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
-function L.acct(filename) return retbool(ffi.C.acct(filename)) end
+function S.creat(pathname, mode) return S.open(pathname, S.O_CREAT + S.O_WRONLY + S.O_TRUNC, mode) end
+function S.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
+function S.access(pathname, mode) return retbool(ffi.C.access(pathname, mode)) end
+function S.chdir(path) return retbool(ffi.C.chdir(path)) end
+function S.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
+function S.acct(filename) return retbool(ffi.C.acct(filename)) end
 
-function L.read(fd, buf, count) return retint(ffi.C.read(getfd(fd), buf, count)) end
-function L.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count)) end
-function L.pread(fd, buf, count, offset) return retint(ffi.C.pread(getfd(fd), buf, count, offset)) end
-function L.pwrite(fd, buf, count, offset) return retint(ffi.C.pwrite(getfd(fd), buf, count, offset)) end
-function L.lseek(fd, offset, whence) return retint(ffi.C.lseek(getfd(fd), offset, whence)) end
+function S.read(fd, buf, count) return retint(ffi.C.read(getfd(fd), buf, count)) end
+function S.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count)) end
+function S.pread(fd, buf, count, offset) return retint(ffi.C.pread(getfd(fd), buf, count, offset)) end
+function S.pwrite(fd, buf, count, offset) return retint(ffi.C.pwrite(getfd(fd), buf, count, offset)) end
+function S.lseek(fd, offset, whence) return retint(ffi.C.lseek(getfd(fd), offset, whence)) end
 
-function L.fchdir(fd) return retbool(ffi.C.fchdir(getfd(fd))) end
-function L.fsync(fd) return retbool(ffi.C.fsync(getfd(fd))) end
-function L.fdatasync(fd) return retbool(ffi.C.fdatasync(getfd(fd))) end
+function S.fchdir(fd) return retbool(ffi.C.fchdir(getfd(fd))) end
+function S.fsync(fd) return retbool(ffi.C.fsync(getfd(fd))) end
+function S.fdatasync(fd) return retbool(ffi.C.fdatasync(getfd(fd))) end
 
-function L.getcwd(buf, size)
+function S.getcwd(buf, size)
   local ret = ffi.C.getcwd(buf, size or 0)
 
   if buf == nil then -- Linux will allocate buffer here, return Lua string and free
@@ -349,17 +349,17 @@ function L.getcwd(buf, size)
 end
 
 -- not system functions
-function L.nogc(d) ffi.gc(d, nil) end
+function S.nogc(d) ffi.gc(d, nil) end
 
 -- methods on an fd
 local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
 local fmeth = {}
-for i, v in ipairs(fdmethods) do fmeth[v] = L[v] end
-fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = L.close})
+for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
+fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 
 -- types
---L.types = {fd = fd_t, timespec = timespec_t}
+--S.types = {fd = fd_t, timespec = timespec_t}
 
-return L
+return S
 
 
