@@ -158,6 +158,12 @@ L.SEEK_SET = 0       -- Seek from beginning of file.
 L.SEEK_CUR = 1       -- Seek from current position.
 L.SEEK_END = 2       -- Seek from end of file.
 
+-- access
+L.R_OK = 4               -- Test for read permission.
+L.W_OK = 2               -- Test for write permission.
+L.X_OK = 1               -- Test for execute permission.
+L.F_OK = 0               -- Test for existence.
+
 L.symerror = {
 'EPERM',  'ENOENT', 'ESRCH',   'EINTR',
 'EIO',    'ENXIO',  'E2BIG',   'ENOEXEC',
@@ -190,7 +196,7 @@ function errorret()
   return nil, L.strerror(ffi.errno())
 end
 
--- for int returns -- fix to make sure tests against 64 bit -1 on 64 bit arch
+-- for int returns -- fix to make sure tests against -1LL on 64 bit arch
 function retint(ret)
   if ret == -1 then
     return errorret()
@@ -240,7 +246,7 @@ int fsync(int fd);
 int fdatasync(int fd);
 
 int unlink(const char *pathname);
-
+int access(const char *pathname, int mode);
 
 ]]
 
@@ -287,6 +293,7 @@ end
 
 function L.creat(pathname, mode) return L.open(pathname, bit.bor(L.O_CREAT, L.O_WRONLY, L.O_TRUNC), mode) end
 function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
+function L.access(pathname, mode) return retbool(ffi.C.access(pathname, mode)) end
 
 function L.read(d, buf, count) return retint(ffi.C.read(getfd(d), buf, count)) end
 function L.write(d, buf, count) return retint(ffi.C.write(getfd(d), buf, count)) end

@@ -31,6 +31,8 @@ fd, err, errno = L.close(3)
 assert(err, "expected to fail on close already closed fd")
 assert(L.symerror[errno] == 'EBADF', "expect EBADF from invalid numberic fd")
 
+assert(L.access("/dev/null", L.R_OK), "expect access to say can read /dev/null")
+
 size = 128
 buf = ffi.new("char[?]", size) -- allocate buffer for read
 for i = 0, size - 1 do buf[i] = 255 end -- make sure overwritten
