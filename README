@@ -1,0 +1,22 @@
+Linux system calls for LuaJIT
+
+What? An FFI implementation of the Linux system calls for LuaJIT.
+
+Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua.
+
+Linux only? Easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library (that applies also to any non glibc library too). Patches accepted.
+
+
+
+API
+
+Basically what you expect, with the following notes.
+
+All functions return three values, the return value, or true if there is not one other than success, then an error string, then the errno. The string and errno will be nil if there is no error. This makes it easy to write things like assert(fd:close()).
+
+File descriptors are returned as a type not an integer. This is because they are garbage collected by default, ie if they go out of scope the file is closed. You can get the file descriptor using the fd field. They also have methods for operations that take an fd, like close, fsync, read. You can use this type where an fd is required, or a numeric fd, or a string like "stderr".
+
+Add: operation to remove gc. 
+
+String conversions are not done automatically, you get a buffer back, you have to force a conversion.
+
