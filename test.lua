@@ -56,6 +56,17 @@ n, err, errno = L.read(4, buf, size)
 assert(not n, "should not be able to read from fd 4 after gc")
 assert(L.symerror[errno] == 'EBADF', "expect EBADF from already closed fd")
 
+-- test with gc turned off
+fd, err, errno = L.open("/dev/zero", L.O_RDONLY)
+assert(err == nil, err)
+assert(fd.fd == 3, "fd should be 3")
+fd:nogc()
+fd = nil
+collectgarbage("collect")
+n, err, errno = L.read(3, buf, size)
+assert(err == nil, "should be able to read as gc disabled")
+assert(L.close(3))
+
 -- another open
 fd, err, errno = L.open("/dev/zero", L.O_RDWR)
 assert(err == nil, "should be able to open /dev/zero read write")

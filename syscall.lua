@@ -329,7 +329,7 @@ function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 local fdmethods = {'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = L[v] end
-
+fmeth['nogc'] = function(d) ffi.gc(d, nil) end
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = L.close})
 
 return L
