@@ -284,20 +284,10 @@ function retfd(ret)
 end
 
 function L.open(pathname, flags, mode)
-  local ret = ffi.C.open(pathname, flags, mode or 0)
-  if ret == -1 then
-    return errorret()
-  end
-  return ffi.new(fd_t, ret)
+  return retfd(ffi.C.open(pathname, flags, mode or 0))
 end
 
-function L.dup(d)
-  local ret = ffi.C.dup(getfd(d))
-  if ret == -1 then
-    return errorret()
-  end
-  return ffi.new(fd_t, ret)
-end
+function L.dup(d) return retfd(ffi.C.dup(getfd(d))) end
 
 function L.close(d)
   local ret = ffi.C.close(getfd(d))
