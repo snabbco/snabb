@@ -257,13 +257,13 @@ int access(const char *pathname, int mode);
 local fd_t -- type for a file descriptor
 
 --get fd from standard string, integer, or cdata
-function getfd(d)
-  if type(d) == 'number' then return d end
-  if ffi.istype(fd_t, d) then return d.fd end
-  if type(d) == 'string' then
-    if d == 'stdin' or d == 'STDIN_FILENO' then return 0 end
-    if d == 'stdout' or d == 'STDOUT_FILENO' then return 1 end
-    if d == 'stderr' or d == 'STDERR_FILENO' then return 2 end
+function getfd(fd)
+  if type(fd) == 'number' then return fd end
+  if ffi.istype(fd_t, fd) then return fd.fd end
+  if type(fd) == 'string' then
+    if fd == 'stdin' or fd == 'STDIN_FILENO' then return 0 end
+    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
+    if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
   end
 end
 
@@ -285,15 +285,15 @@ end
 L.dup2 = L.dup -- flags optional, so do not need new function
 L.dup3 = L.dup -- conditional on newfd set
 
-function L.close(d)
-  local ret = ffi.C.close(getfd(d))
+function L.close(fd)
+  local ret = ffi.C.close(getfd(fd))
 
   if ret == -1 then
     return errorret()
   end
 
-  if ffi.istype(fd_t, d) then
-    ffi.gc(d, nil) -- remove gc finalizer as now closed; should we also remove if get EBADF?
+  if ffi.istype(fd_t, fd) then
+    ffi.gc(fd, nil) -- remove gc finalizer as now closed; should we also remove if get EBADF?
   end
 
   return true
@@ -306,15 +306,15 @@ function L.chdir(path) return retbool(ffi.C.chdir(path)) end
 function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 function L.acct(filename) return retbool(ffi.C.acct(filename)) end
 
-function L.read(d, buf, count) return retint(ffi.C.read(getfd(d), buf, count)) end
-function L.write(d, buf, count) return retint(ffi.C.write(getfd(d), buf, count)) end
-function L.pread(d, buf, count, offset) return retint(ffi.C.pread(getfd(d), buf, count, offset)) end
-function L.pwrite(d, buf, count, offset) return retint(ffi.C.pwrite(getfd(d), buf, count, offset)) end
-function L.lseek(d, offset, whence) return retint(ffi.C.lseek(getfd(d), offset, whence)) end
+function L.read(fd, buf, count) return retint(ffi.C.read(getfd(fd), buf, count)) end
+function L.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count)) end
+function L.pread(fd, buf, count, offset) return retint(ffi.C.pread(getfd(fd), buf, count, offset)) end
+function L.pwrite(fd, buf, count, offset) return retint(ffi.C.pwrite(getfd(fd), buf, count, offset)) end
+function L.lseek(fd, offset, whence) return retint(ffi.C.lseek(getfd(fd), offset, whence)) end
 
-function L.fchdir(d) return retbool(ffi.C.fchdir(getfd(d))) end
-function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
-function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
+function L.fchdir(fd) return retbool(ffi.C.fchdir(getfd(fd))) end
+function L.fsync(fd) return retbool(ffi.C.fsync(getfd(fd))) end
+function L.fdatasync(fd) return retbool(ffi.C.fdatasync(getfd(fd))) end
 
 -- not system functions
 function L.nogc(d) ffi.gc(d, nil) end
