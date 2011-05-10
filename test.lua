@@ -100,5 +100,8 @@ assert(L.unlink(tmpfile))
 fd, err, errno = L.open(tmpfile, L.O_RDWR)
 assert(err ~= nil, "expected open to fail on file not found")
 
+assert(L.chdir("/"), "should be able to chdir to /")
+-- missing test for fchdir, need to do dir ops
+
 
 
