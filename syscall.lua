@@ -358,7 +358,7 @@ for i, v in ipairs(fdmethods) do fmeth[v] = L[v] end
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = L.close})
 
 -- types
-L.types = {fd = fd_t, timespec = timespec_t}
+--L.types = {fd = fd_t, timespec = timespec_t}
 
 return L
 
