@@ -103,16 +103,7 @@ local L = {} -- our module exported functions
 
 -- for our purposes, we will therefore make the long ones depend on arch, rest are fixed
 
-function octal(s)
-  local p = 1
-  local o = 0
-  local z = string.byte("0")
-  for i = #s, 1, -1 do
-    o = o + (string.byte(s, i) - z) * p
-    p = p * 8
-  end
-  return o
-end
+function octal(s) return tonumber(s, 8) end
 
 -- 
 L.O_ACCMODE = octal('0003')
@@ -326,7 +317,7 @@ function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
 function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 
 -- not system functions
-function L.nogc = function(d) ffi.gc(d, nil) end
+function L.nogc(d) ffi.gc(d, nil) end
 
 -- methods on an fd
 local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
