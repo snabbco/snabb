@@ -103,6 +103,8 @@ local S = {} -- our module exported functions
 
 -- for our purposes, we will therefore make the long ones depend on arch, rest are fixed
 
+local octal
+
 function octal(s) return tonumber(s, 8) end
 
 -- 
@@ -171,7 +173,7 @@ function S.strerror(errno)
   return ffi.string(ffi.C.strerror(errno)), errno
 end
 
-local errorret, retint, retbool, retptr, retfd
+local errorret, retint, retbool, retptr, retfd, getfd
 
 -- standard error return
 function errorret()
@@ -254,7 +256,7 @@ void *realloc(void *ptr, size_t size);
 
 local fd_t -- type for a file descriptor
 local fd2_t = ffi.typeof("int[2]")
---[[local timespec_t = ffi.typeof[[
+--[[local timespec_t = ffi.typeof[ [
 struct timespec {
   time_t tv_sec;        /* seconds */
   long   tv_nsec;       /* nanoseconds */
