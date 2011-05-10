@@ -236,12 +236,12 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 off_t lseek(int fd, off_t offset, int whence);
 int dup(int oldfd);
-int dup2(int oldfd, int newfd);
 int dup3(int oldfd, int newfd, int flags);
-
 int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
+
+int pipe2(int pipefd[2], int flags);
 
 int unlink(const char *pathname);
 int access(const char *pathname, int mode);
@@ -255,6 +255,7 @@ int access(const char *pathname, int mode);
 
 
 local fd_t -- type for a file descriptor
+local fd2_t = ffi.typeof("int[2]")
 
 --get fd from standard string, integer, or cdata
 function getfd(fd)
@@ -284,6 +285,18 @@ function L.dup(oldfd, newfd, flags)
 end
 L.dup2 = L.dup -- flags optional, so do not need new function
 L.dup3 = L.dup -- conditional on newfd set
+
+function L.pipe(flags)
+  local fd2 = ffi.new(fd2_t)
+  local ret = ffi.C.pipe2(fd2, flags or 0)
+
+  if ret == -1 then
+    return nil, errorret() -- extra nil as we return two fds normally
+  end
+
+  return ffi.new(fd_t, fd2[0]), ffi.new(fd_t, fd2[1])
+end
+L.pipe2 = L.pipe
 
 function L.close(fd)
   local ret = ffi.C.close(getfd(fd))
