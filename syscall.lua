@@ -153,41 +153,21 @@ L.S_IXOTH = octal('00001') -- others have execute permission
 
 if ffi.abi('32bit') then L.O_LARGEFILE = octal('0100000') else L.O_LARGEFILE = 0 end
 
+-- seek
+L.SEEK_SET = 0       -- Seek from beginning of file.
+L.SEEK_CUR = 1       -- Seek from current position.
+L.SEEK_END = 2       -- Seek from end of file.
+
 L.symerror = {
-'EPERM',
-'ENOENT',
-'ESRCH',
-'EINTR',
-'EIO',
-'ENXIO',
-'E2BIG',
-'ENOEXEC',
-'EBADF',
-'ECHILD',
-'EAGAIN',
-'ENOMEM',
-'EACCES',
-'EFAULT',
-'ENOTBLK',
-'EBUSY',
-'EEXIST',
-'EXDEV',
-'ENODEV',
-'ENOTDIR',
-'EISDIR',
-'EINVAL',
-'ENFILE',
-'EMFILE',
-'ENOTTY',
-'ETXTBSY',
-'EFBIG',
-'ENOSPC',
-'ESPIPE',
-'EROFS',
-'EMLINK',
-'EPIPE',
-'EDOM',
-'ERANGE'
+'EPERM',  'ENOENT', 'ESRCH',   'EINTR',
+'EIO',    'ENXIO',  'E2BIG',   'ENOEXEC',
+'EBADF',  'ECHILD', 'EAGAIN',  'ENOMEM',
+'EACCES', 'EFAULT', 'ENOTBLK', 'EBUSY',
+'EEXIST', 'EXDEV',  'ENODEV',  'ENOTDIR',
+'EISDIR', 'EINVAL', 'ENFILE',  'EMFILE',
+'ENOTTY', 'ETXTBSY','EFBIG',   'ENOSPC',
+'ESPIPE', 'EROFS',  'EMLINK',  'EPIPE',
+'EDOM',   'ERANGE'
 }
 
 rsymerror = {}
@@ -252,10 +232,9 @@ int open(const char *pathname, int flags, mode_t mode);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
-
 ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
-
+off_t lseek(int fd, off_t offset, int whence);
 
 int fsync(int fd);
 int fdatasync(int fd);
@@ -313,6 +292,7 @@ function L.read(d, buf, count) return retint(ffi.C.read(getfd(d), buf, count)) e
 function L.write(d, buf, count) return retint(ffi.C.write(getfd(d), buf, count)) end
 function L.pread(d, buf, count, offset) return retint(ffi.C.pread(getfd(d), buf, count, offset)) end
 function L.pwrite(d, buf, count, offset) return retint(ffi.C.pwrite(getfd(d), buf, count, offset)) end
+function L.lseek(d, offset, whence) return retint(ffi.C.lseek(getfd(d), offset, whence)) end
 
 function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
 function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
@@ -320,7 +300,7 @@ function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 -- methods on an fd
 -- add __gc method here, and remove gc function
 
-local fdmethods = {'close', 'read', 'write', 'pread', 'pwrite', 'fsync', 'fdatasync'}
+local fdmethods = {'close', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fsync', 'fdatasync'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = L[v] end
 

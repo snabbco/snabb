@@ -18,8 +18,11 @@ File descriptors are returned as a type not an integer. This is because they are
 
 Add: operation to remove gc. 
 
-String conversions are not done automatically, you get a buffer back, you have to force a conversion. This is because interning strings is expensive if you do not need it.
+String conversions are not done automatically, you get a buffer back, you have to force a conversion. This is because interning strings is expensive if you do not need it. Nor are conversions from 64 bit values to Lua numbers, as that would be lossy.
 
 Not yet supporting the 64 bit file operations for 32 bit architectures (lseek64 etc).
+
+Constants should all be available, eg L.SEEK_SET etc. You will need to use bitwise operations to combine them. May add some string parsing later.
+
 
 
