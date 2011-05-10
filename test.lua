@@ -133,8 +133,12 @@ assert(err == nil and errno == nil, "should be able to open pipe")
 assert(fd0.fd == 3 and fd1.fd == 4, "expect file handles 3 and 4 for pipe")
 fd0, fd1 = nil, nil
 
-assert(L.chdir("/"), "should be able to chdir to /")
--- missing test for fchdir, need to do dir ops
+assert(L.chdir("/"))
+fd, err, errno = L.open("/")
+assert(err == nil, err)
+assert(fd:fchdir())
+
+
 
 
 

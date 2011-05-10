@@ -279,7 +279,7 @@ function retfd(ret)
 end
 
 function L.open(pathname, flags, mode)
-  return retfd(ffi.C.open(pathname, flags, mode or 0))
+  return retfd(ffi.C.open(pathname, flags or 0, mode or 0))
 end
 
 function L.dup(oldfd, newfd, flags)
