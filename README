@@ -24,4 +24,6 @@ Constants should all be available, eg L.SEEK_SET etc. You will need to use bitwi
 
 You do not need to use the numbered versions of functions, eg dup can do dup2 or dup3 by adding more arguments
 
+Note that pipe returns two file descriptors, rather than passing an array as in C, so fd0, fd1, err = L.pipe()
+
 

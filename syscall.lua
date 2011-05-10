@@ -187,9 +187,12 @@ function errorret()
   return nil, L.strerror(ffi.errno())
 end
 
--- for int returns -- fix to make sure tests against -1LL on 64 bit arch
+-- for int returns -- tests against -1LL on 64 bit arch
+local minus1
+if ffi.abi('32bit') then minus1 = -1 else minus1 = -1LL end
+
 function retint(ret)
-  if ret == -1 then
+  if ret == minus1 then
     return errorret()
   end
   return ret
