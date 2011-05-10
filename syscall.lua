@@ -236,7 +236,8 @@ ffi.cdef[[
 int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
 int chdir(const char *path);
-
+int unlink(const char *pathname);
+int acct(const char *filename);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -298,6 +299,8 @@ function L.creat(pathname, mode) return L.open(pathname, bit.bor(L.O_CREAT, L.O_
 function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 function L.access(pathname, mode) return retbool(ffi.C.access(pathname, mode)) end
 function L.chdir(path) return retbool(ffi.C.chdir(path)) end
+function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
+function L.acct(filename) return retbool(ffi.C.acct(filename)) end
 
 function L.read(d, buf, count) return retint(ffi.C.read(getfd(d), buf, count)) end
 function L.write(d, buf, count) return retint(ffi.C.write(getfd(d), buf, count)) end

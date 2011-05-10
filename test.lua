@@ -89,14 +89,10 @@ assert(fd:fsync())
 -- test fdatasync
 assert(fd:fdatasync())
 
--- test method of fd
-assert(fd:close())
+assert(L.unlink(tmpfile), "should be able to unlink file")
 
-fd, err, errno = L.open(tmpfile, L.O_RDWR)
-assert(err == nil, "file should have been created")
 assert(L.close(fd))
 
-assert(L.unlink(tmpfile))
 fd, err, errno = L.open(tmpfile, L.O_RDWR)
 assert(err ~= nil, "expected open to fail on file not found")
 
