@@ -244,6 +244,9 @@ ssize_t write(int fd, const void *buf, size_t count);
 ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 off_t lseek(int fd, off_t offset, int whence);
+int dup(int oldfd);
+int dup2(int oldfd, int newfd);
+int dup3(int oldfd, int newfd, int flags);
 
 int fchdir(int fd);
 int fsync(int fd);
@@ -278,7 +281,7 @@ function L.open(pathname, flags, mode)
   if ret == -1 then
     return errorret()
   end
-  return ffi.gc(ffi.new(fd_t, ret), L.close)
+  return ffi.new(fd_t, ret)
 end
 
 function L.close(d)
@@ -313,13 +316,12 @@ function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
 function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 
 -- methods on an fd
--- add __gc method here, and remove gc function
 
 local fdmethods = {'close', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = L[v] end
 
-fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth})
+fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = L.close})
 
 return L
 
