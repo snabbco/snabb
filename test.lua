@@ -81,13 +81,6 @@ n, err, errno = fd:pread(buf, size, offset)
 assert(err == nil, "should be able to pread /dev/zero")
 n, err, errno = fd:pwrite(buf, size, offset)
 assert(err == nil, "should be able to pwrite /dev/zero")
---n, err, errno = fd:lseek(offset, L.SEEK_SET)
-n, err, errno = L.lseek(fd, offset, L.SEEK_SET)
-assert(err == nil, "should be able to seek /dev/zero")
---assert(n == offset, "seek should position at set position " .. offset ..", is at " .. tonumber(n)) ----!!!! failing, why???
-n, err, errno = L.lseek(fd, offset, L.SEEK_CUR)
-assert(err == nil, "should be able to seek /dev/zero")
---assert(n == offset + offset, "seek should position at set position " .. offset + offset ..", is at " .. tonumber(n)) ----!!!! failing, why???
 
 fd2, err, errno = fd:dup()
 assert(err == nil, "should be able to dup fd")
@@ -121,6 +114,15 @@ assert(fd:fsync())
 
 -- test fdatasync
 assert(fd:fdatasync())
+
+--n, err, errno = fd:lseek(offset, L.SEEK_SET)
+n, err, errno = L.lseek(fd, offset, L.SEEK_SET)
+assert(err == nil, "should be able to seek file")
+assert(n == offset, "seek should position at set position")
+n, err, errno = L.lseek(fd, offset, L.SEEK_CUR)
+assert(err == nil, "should be able to seek file")
+assert(n == offset + offset, "seek should position at set position")
+
 
 assert(L.unlink(tmpfile), "should be able to unlink file")
 

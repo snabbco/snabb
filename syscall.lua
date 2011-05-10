@@ -259,7 +259,7 @@ int access(const char *pathname, int mode);
 char *getcwd(char *buf, size_t size);
 ]]
 
--- functions from libc that are also exported as a convenience
+-- functions from libc that could be exported as a convenience
 ffi.cdef[[
 void *calloc(size_t nmemb, size_t size);
 void *malloc(size_t size);
