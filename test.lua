@@ -87,6 +87,10 @@ fd2, err, errno = fd:dup3(17, L.O_CLOEXEC)
 assert(err == nil, "should be able to dup3 fd")
 assert(L.close(17))
 
+fd2, err, errno = fd:dup(17, L.O_CLOEXEC)
+assert(err == nil, "should be able to use dup as dup3")
+assert(L.close(17))
+
 assert(L.close(fd))
 
 assert(L.O_CREAT == 64, "wrong octal value for O_CREAT")

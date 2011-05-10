@@ -287,9 +287,12 @@ function L.open(pathname, flags, mode)
   return retfd(ffi.C.open(pathname, flags, mode or 0))
 end
 
-function L.dup(d) return retfd(ffi.C.dup(getfd(d))) end
-function L.dup2(oldfd, newfd) return retfd(ffi.C.dup2(getfd(oldfd), getfd(newfd))) end
-function L.dup3(oldfd, newfd, flags) return retfd(ffi.C.dup3(getfd(oldfd), getfd(newfd), flags or 0)) end
+function L.dup(oldfd, newfd, flags)
+  if newfd == nil then return retfd(ffi.C.dup(getfd(oldfd))) end
+  return retfd(ffi.C.dup3(getfd(oldfd), getfd(newfd), flags or 0))
+end
+L.dup2 = L.dup -- flags optional, so do not need new function
+L.dup3 = L.dup -- conditional on newfd set
 
 function L.close(d)
   local ret = ffi.C.close(getfd(d))
@@ -323,7 +326,6 @@ function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
 function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 
 -- methods on an fd
-
 local fdmethods = {'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = L[v] end

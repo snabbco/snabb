@@ -24,5 +24,6 @@ Not yet supporting the 64 bit file operations for 32 bit architectures (lseek64 
 
 Constants should all be available, eg L.SEEK_SET etc. You will need to use bitwise operations to combine them. May add some string parsing later.
 
+You do not need to use the numbered versions of functions, eg dup can do dup2 or dup3 by adding more arguments
 
 
