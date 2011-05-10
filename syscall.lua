@@ -325,11 +325,13 @@ function L.fchdir(d) return retbool(ffi.C.fchdir(getfd(d))) end
 function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
 function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 
+-- not system functions
+function L.nogc = function(d) ffi.gc(d, nil) end
+
 -- methods on an fd
-local fdmethods = {'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
+local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = L[v] end
-fmeth['nogc'] = function(d) ffi.gc(d, nil) end
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = L.close})
 
 return L
