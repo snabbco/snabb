@@ -276,8 +276,23 @@ function getfd(d)
   end
 end
 
+function retfd(ret)
+  if ret == -1 then
+    return errorret()
+  end
+  return ffi.new(fd_t, ret)
+end
+
 function L.open(pathname, flags, mode)
   local ret = ffi.C.open(pathname, flags, mode or 0)
+  if ret == -1 then
+    return errorret()
+  end
+  return ffi.new(fd_t, ret)
+end
+
+function L.dup(d)
+  local ret = ffi.C.dup(getfd(d))
   if ret == -1 then
     return errorret()
   end
@@ -317,7 +332,7 @@ function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 
 -- methods on an fd
 
-local fdmethods = {'close', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
+local fdmethods = {'close', 'dup', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = L[v] end
 
