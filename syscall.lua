@@ -219,16 +219,15 @@ typedef uint32_t mode_t;
 
 ]]
 
-if ffi.abi('32bit') then
+-- typedefs based on word length, using int/uint as these are word sized
+
 ffi.cdef[[
-typedef uint32_t size_t;
-typedef int32_t ssize_t;
+typedef unsigned int size_t;
+typedef int ssize_t;
+
 ]]
-else ffi.cdef[[
-typedef uint64_t size_t;
-typedef int64_t ssize_t;
-]]
-end
+
+
 
 -- functions only used internally
 ffi.cdef[[
@@ -253,13 +252,12 @@ int unlink(const char *pathname);
 
 
 
--- handle errors. do we need to be careful with non int return values eg pointers?? probably yes!
-
+-- handle errors.
 function errorret()
   return nil, L.strerror(ffi.errno())
 end
 
--- for int returns
+-- for int returns -- fix to make sure tests against 64 bit -1 on 64 bit arch
 function retint(ret)
   if ret == -1 then
     return errorret()
