@@ -30,3 +30,7 @@ Note that pipe returns two file descriptors, rather than passing an array as in 
 
 getcwd returns the result in a buffer if one is passed, or as a Lua string otherwise, ie if called with no parameters/
 
+Testing
+
+The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM and amd64.
+
