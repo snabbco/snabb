@@ -264,7 +264,7 @@ int unlink(const char *pathname);
 ]]
 
 
-local fd_t = ffi.typeof("struct {int fd;}")
+local fd_t -- type for a file descriptor
 
 --get fd from standard string, integer, or cdata
 function getfd(d)
@@ -307,6 +307,11 @@ function L.write(d, buf, len) return retint(ffi.C.write(getfd(d), buf, len)) end
 function L.fsync(d) return retbool(ffi.C.fsync(getfd(d))) end
 function L.fdatasync(d) return retbool(ffi.C.fdatasync(getfd(d))) end
 function L.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
+
+--local fd_t = ffi.typeof("struct {int fd;}")
+local fmeth = {close = L.close}
+local mt = {__index = fmeth}
+fd_t = ffi.metatype("struct {int fd;}", mt)
 
 return L
 

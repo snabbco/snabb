@@ -76,7 +76,8 @@ assert(L.fsync(fd))
 -- test fdatasync
 assert(L.fdatasync(fd))
 
-assert(L.close(fd))
+-- test method of fd
+assert(fd:close())
 
 fd, err, errno = L.open(tmpfile, L.O_RDWR)
 assert(err == nil, "file should have been created")
