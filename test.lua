@@ -151,6 +151,11 @@ s, err = S.getcwd()
 assert(err == nil, err)
 assert(s == "/", "expect cwd to be /")
 
+local rem
+rem, err, errno = S.nanosleep(S.t.timespec(0, 1000000))
+assert(err == nil, err)
+assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
+
 
 
 

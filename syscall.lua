@@ -246,6 +246,8 @@ int unlink(const char *pathname);
 int access(const char *pathname, int mode);
 char *getcwd(char *buf, size_t size);
 
+int nanosleep(const struct timespec *req, struct timespec *rem);
+
 // functions from libc that could be exported as a convenience
 void *calloc(size_t nmemb, size_t size);
 void *malloc(size_t size);
@@ -351,6 +353,13 @@ function S.getcwd(buf, size)
   return true -- no point returning the pointer as it is just the passed buffer
 end
 
+function S.nanosleep(req)
+  local rem = timespec_t()
+  local ret = ffi.C.nanosleep(req, rem)
+  if ret == -1 then return errorret() end
+  return rem
+end
+
 -- not system functions
 function S.nogc(d) ffi.gc(d, nil) end
 
@@ -367,6 +376,7 @@ fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 local buffer_t = ffi.typeof("char[?]")
 S.string = ffi.string -- convenience for converting buffers
 
+-- we could just return as S.timespec_t etc, not sure which is nicer?
 S.t = {fd = fd_t, timespec = timespec_t, buffer = buffer_t}
 
 return S

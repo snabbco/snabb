@@ -12,7 +12,7 @@ Requirements: Needs git head of LuaJIT (or next release 2.0.0-beta8 when it is o
 
 API
 
-Basically what you expect, with the following notes.
+Basically what you expect, with the following notes. In general we explicitly return return parameters as it is more idiomatic.
 
 All functions return three values, the return value, or true if there is not one other than success, then an error string, then the errno. The string and errno will be nil if there is no error. This makes it easy to write things like assert(fd:close()).
 
