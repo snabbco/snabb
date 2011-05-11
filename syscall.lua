@@ -474,8 +474,17 @@ for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 
 -- note that major and minor are macros, gnu provides these real symbols, wlse you might have to parse yourself
-local smeth = {major = function(st) return ffi.C.gnu_dev_major(st.st_rdev) end, minor = function(st) return ffi.C.gnu_dev_minor(st.st_rdev) end}
---stat_t = ffi.typeof("struct stat")
+-- cannot see any way with ffi to attach the major and minor methods to the actual fields.
+local smeth = {
+major = function(st) return ffi.C.gnu_dev_major(st.st_rdev) end,
+minor = function(st) return ffi.C.gnu_dev_minor(st.st_rdev) end,
+dev_major = function(st) return ffi.C.gnu_dev_major(st.st_dev) end,
+dev_minor = function(st) return ffi.C.gnu_dev_minor(st.st_dev) end,
+}
+smeth.rdev_major = smeth.major
+smeth.rdev_minor = smeth.minor
+
+stat_t = ffi.typeof("struct stat")
 stat_t = ffi.metatype("struct stat", {__index = smeth})
 
 -- add char buffer type
