@@ -157,12 +157,18 @@ assert(err == nil, err)
 assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
 
 local stat
-stat, err, errno = S.fstat(fd) -- stat "/"
-assert(err == nil, err)
-assert(stat.st_uid == 0, "expect / to be owned by uid 0")
-assert(stat.st_size == 4096, "expect / to be size 4096") -- might not be
+
 stat, err, errno = S.lstat("/dev/zero")
 assert(err == nil, err)
+assert(stat.st_nlink == 1, "expect link count on /dev/zero to be 1")
+
+stat, err, errno = S.fstat(fd) -- stat "/"
+assert(err == nil, err)
+
+assert(stat.st_size == 4096, "expect / to be size 4096") -- might not be
+assert(stat.st_gid == 0, "expect / to be gid 0 is " .. tonumber(stat.st_gid))
+assert(stat.st_uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
+
 stat, err, errno = S.stat("/dev/zero")
 assert(err == nil, err)
 

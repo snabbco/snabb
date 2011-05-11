@@ -203,139 +203,82 @@ function retptr(ret)
   return ret
 end
 
--- stat structure is architecture dependent in Linux
--- this is the way glibc versions stat via __xstat, may need to change for other libc, eg if define stat as a non inline function
-local STAT_VER_LINUX
-
-if ffi.arch == "x86" then
-STAT_VER_LINUX = 3
-ffi.cdef[[
-struct stat {
-        unsigned long  st_dev;
-        unsigned long  st_ino;
-        unsigned short st_mode;
-        unsigned short st_nlink;
-        unsigned short st_uid;
-        unsigned short st_gid;
-        unsigned long  st_rdev;
-        unsigned long  st_size;
-        unsigned long  st_blksize;
-        unsigned long  st_blocks;
-        unsigned long  st_atime;
-        unsigned long  st_atime_nsec;
-        unsigned long  st_mtime;
-        unsigned long  st_mtime_nsec;
-        unsigned long  st_ctime;
-        unsigned long  st_ctime_nsec;
-        unsigned long  __unused4;
-        unsigned long  __unused5;
-};
-]] end
-if ffi.arch == "x64" then
-STAT_VER_LINUX = 1
-ffi.cdef[[
-struct stat {
-        unsigned long   st_dev;
-        unsigned long   st_ino;
-        unsigned long   st_nlink;
-
-        unsigned int    st_mode;
-        unsigned int    st_uid;
-        unsigned int    st_gid;
-        unsigned int    __pad0;
-        unsigned long   st_rdev;
-        long            st_size;
-        long            st_blksize;
-        long            st_blocks;
-
-        unsigned long   st_atime;
-        unsigned long   st_atime_nsec;
-        unsigned long   st_mtime;
-        unsigned long   st_mtime_nsec;
-        unsigned long   st_ctime;
-        unsigned long   st_ctime_nsec;
-        long            __unused[3];
-};
-]]
-end
-if ffi.arch == "arm" and ffi.abi("le") then
-STAT_VER_LINUX = 3
-ffi.cdef[[
-struct stat {
-        unsigned long  st_dev;
-        unsigned long  st_ino;
-        unsigned short st_mode;
-        unsigned short st_nlink;
-        unsigned short st_uid;
-        unsigned short st_gid;
-        unsigned long  st_rdev;
-        unsigned long  st_size;
-        unsigned long  st_blksize;
-        unsigned long  st_blocks;
-        unsigned long  st_atime;
-        unsigned long  st_atime_nsec;
-        unsigned long  st_mtime;
-        unsigned long  st_mtime_nsec;
-        unsigned long  st_ctime;
-        unsigned long  st_ctime_nsec;
-        unsigned long  __unused4;
-        unsigned long  __unused5;
-};
-]]
-end
-if ffi.arch == "arm" and ffi.abi("be") then -- untested
-STAT_VER_LINUX = 3
-ffi.cdef[[
-struct stat {
-        unsigned short st_dev;
-        unsigned short __pad1;
-        unsigned long  st_ino;
-        unsigned short st_mode;
-        unsigned short st_nlink;
-        unsigned short st_uid;
-        unsigned short st_gid;
-        unsigned short st_rdev;
-        unsigned short __pad2;
-        unsigned long  st_size;
-        unsigned long  st_blksize;
-        unsigned long  st_blocks;
-        unsigned long  st_atime;
-        unsigned long  st_atime_nsec;
-        unsigned long  st_mtime;
-        unsigned long  st_mtime_nsec;
-        unsigned long  st_ctime;
-        unsigned long  st_ctime_nsec;
-        unsigned long  __unused4;
-        unsigned long  __unused5;
-};
-]]
-end
--- all other architectures (currently ppc) undefined, will abort as undefined
-
-
+-- define types
 ffi.cdef[[
 // typedefs for word size independent types
 typedef uint32_t mode_t;
-typedef uint64_t dev_t;
 typedef uint32_t uid_t;
 typedef uint32_t gid_t;
 
-// typedefs based on word length, using int/uint or long as these are both word sized
-typedef unsigned int size_t;
-typedef int ssize_t;
+typedef uint64_t dev_t;
+
+// typedefs which are word length
+typedef unsigned long size_t;
+typedef long ssize_t;
 typedef long off_t;
 typedef long time_t;
-//typedef unsigned long ino_t;
-//typedef unsigned int nlink_t;
-//typedef long blksize_t;
-//typedef long blkcnt_t;
+typedef unsigned long ino_t;
+typedef unsigned long nlink_t;
+typedef long blksize_t;
+typedef long blkcnt_t;
 
 // structs
 struct timespec {
   time_t tv_sec;        /* seconds */
   long   tv_nsec;       /* nanoseconds */
 };
+]]
 
+-- stat structure is architecture dependent in Linux
+-- this is the way glibc versions stat via __xstat, may need to change for other libc, eg if define stat as a non inline function
+local STAT_VER_LINUX
+
+if ffi.abi("32bit") then
+STAT_VER_LINUX = 3
+ffi.cdef[[
+struct stat {
+  dev_t st_dev;                       /* Device.  */
+  unsigned short int __pad1;
+  ino_t __st_ino;                     /* 32bit file serial number.    */
+  mode_t st_mode;                     /* File mode.  */
+  nlink_t st_nlink;                   /* Link count.  */
+  uid_t st_uid;                       /* User ID of the file's owner. */
+  gid_t st_gid;                       /* Group ID of the file's group.*/
+  dev_t st_rdev;                      /* Device number, if device.  */
+  unsigned short int __pad2;
+  off_t st_size;                      /* Size of file, in bytes.  */
+  blksize_t st_blksize;               /* Optimal block size for I/O.  */
+  blkcnt_t st_blocks;                 /* Number 512-byte blocks allocated. */
+  struct timespec st_atim;            /* Time of last access.  */
+  struct timespec st_mtim;            /* Time of last modification.  */
+  struct timespec st_ctim;            /* Time of last status change.  */   unsigned long int __unused4;
+  unsigned long int __unused5;
+};
+]]
+else -- 64 bit arch
+STAT_VER_LINUX = 1
+ffi.cdef[[
+struct stat {
+  dev_t st_dev;             /* Device.  */
+  ino_t st_ino;             /* File serial number.  */
+  nlink_t st_nlink;         /* Link count.  */
+  mode_t st_mode;           /* File mode.  */
+  uid_t st_uid;             /* User ID of the file's owner. */
+  gid_t st_gid;             /* Group ID of the file's group.*/
+  int __pad0;
+  dev_t st_rdev;            /* Device number, if device.  */
+  off_t st_size;            /* Size of file, in bytes.  */
+  blksize_t st_blksize;     /* Optimal block size for I/O.  */
+  blkcnt_t st_blocks;       /* Number 512-byte blocks allocated. */
+  struct timespec st_atim;  /* Time of last access.  */
+  struct timespec st_mtim;  /* Time of last modification.  */
+  struct timespec st_ctim;  /* Time of last status change.  */
+  long int __unused[3];
+};
+]]
+end
+
+ffi.cdef[[
 // functions only used internally
 char *strerror(int errnum);
 
@@ -356,17 +299,19 @@ int dup3(int oldfd, int newfd, int flags);
 int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
-int __fxstat(int ver, int fd, struct stat *buf);
 
 int pipe2(int pipefd[2], int flags);
 
 int unlink(const char *pathname);
 int access(const char *pathname, int mode);
-int __xstat(int ver, const char *path, struct stat *buf);
-int __lxstat(int ver, const char *path, struct stat *buf);
 char *getcwd(char *buf, size_t size);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
+
+// stat glibc internal functions
+int __fxstat(int ver, int fd, struct stat *buf);
+int __xstat(int ver, const char *path, struct stat *buf);
+int __lxstat(int ver, const char *path, struct stat *buf);
 
 // functions from libc that could be exported as a convenience
 void *calloc(size_t nmemb, size_t size);
