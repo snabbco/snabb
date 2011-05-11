@@ -108,27 +108,27 @@ local octal
 function octal(s) return tonumber(s, 8) end
 
 -- 
-S.O_ACCMODE = octal('0003')
-S.O_RDONLY = octal('00')
-S.O_WRONLY = octal('01')
-S.O_RDWR = octal('02')
-S.O_CREAT = octal('0100')
-S.O_EXCL = octal('0200')
-S.O_NOCTTY = octal('0400')
-S.O_TRUNC = octal('01000')
-S.O_APPEND = octal('02000')
-S.O_NONBLOCK = octal('04000')
-S.O_NDELAY = S.O_NONBLOCK
-S.O_SYNC = octal('04010000')
-S.O_FSYNC = S.O_SYNC
-S.O_ASYNC = octal('020000')
+S.O_ACCMODE   = octal('0003')
+S.O_RDONLY    = octal('00')
+S.O_WRONLY    = octal('01')
+S.O_RDWR      = octal('02')
+S.O_CREAT     = octal('0100')
+S.O_EXCL      = octal('0200')
+S.O_NOCTTY    = octal('0400')
+S.O_TRUNC     = octal('01000')
+S.O_APPEND    = octal('02000')
+S.O_NONBLOCK  = octal('04000')
+S.O_NDELAY    = S.O_NONBLOCK
+S.O_SYNC      = octal('04010000')
+S.O_FSYNC     = S.O_SYNC
+S.O_ASYNC     = octal('020000')
 S.O_DIRECTORY = octal('0200000')
-S.O_NOFOLLOW = octal('0400000')
-S.O_CLOEXEC = octal('02000000')
-S.O_DIRECT = octal('040000')
-S.O_NOATIME = octal('01000000')
-S.O_DSYNC = octal('010000')
-S.O_RSYNC = S.O_SYNC
+S.O_NOFOLLOW  = octal('0400000')
+S.O_CLOEXEC   = octal('02000000')
+S.O_DIRECT    = octal('040000')
+S.O_NOATIME   = octal('01000000')
+S.O_DSYNC     = octal('010000')
+S.O_RSYNC     = S.O_SYNC
 
 -- modes
 S.S_IFMT   = octal('0170000') -- bit mask for the file type bit fields
@@ -464,7 +464,7 @@ end
 
 -- 'macros' and helper functions etc
 
--- note that major and minor are macros, gnu provides these real symbols, else you might have to parse yourself
+-- note that major and minor are inline in glibc, gnu provides these real symbols, else you might have to parse yourself
 function S.major(dev) return ffi.C.gnu_dev_major(dev) end
 function S.minor(dev) return ffi.C.gnu_dev_minor(dev) end
 
