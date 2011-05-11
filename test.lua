@@ -179,4 +179,16 @@ stat, err, errno = S.lstat("/etc/passwd")
 assert(err == nil, err)
 assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
 
+local mem
+size = 4096
+mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0)
+assert(err == nil, err)
+assert(S.munmap(mem, size))
+mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0)
+assert(err == nil, err)
+mem = nil -- gc memory, should be munmapped
+collectgarbage("collect")
+mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS + S.MAP_FIXED, -1, 0) -- MAP_FIXED should fail here!
+assert(mem == nil, "expect mmap MAP_FIXED to fail")
+
 

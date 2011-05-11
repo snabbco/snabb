@@ -1,8 +1,7 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-local S = {} -- our module exported functions
-
+local S = {} -- exported functions
 
 -- from bits/typesizes.h - underlying types, create as typedefs, mostly fix size.
 --[[
@@ -107,7 +106,7 @@ local octal
 
 function octal(s) return tonumber(s, 8) end
 
--- 
+-- open
 S.O_ACCMODE   = octal('0003')
 S.O_RDONLY    = octal('00')
 S.O_WRONLY    = octal('01')
@@ -168,6 +167,71 @@ S.R_OK = 4               -- Test for read permission.
 S.W_OK = 2               -- Test for write permission.
 S.X_OK = 1               -- Test for execute permission.
 S.F_OK = 0               -- Test for existence.
+
+--mmap
+S.PROT_READ  = 0x1             -- Page can be read.
+S.PROT_WRITE = 0x2             -- Page can be written.
+S.PROT_EXEC  = 0x4             -- Page can be executed.
+S.PROT_NONE  = 0x0             -- Page can not be accessed.
+S.PROT_GROWSDOWN = 0x01000000  -- Extend change to start of growsdown vma (mprotect only).
+S.PROT_GROWSUP   = 0x02000000  -- Extend change to start of growsup vma (mprotect only).
+
+-- Sharing types (must choose one and only one of these).
+S.MAP_SHARED  = 0x01            -- Share changes.
+S.MAP_PRIVATE = 0x02            -- Changes are private.
+S.MAP_TYPE    = 0x0f            -- Mask for type of mapping.
+
+S.MAP_FIXED     = 0x10             -- Interpret addr exactly.
+S.MAP_FILE      = 0
+S.MAP_ANONYMOUS = 0x20             -- Don't use a file.
+S.MAP_ANON      = S.MAP_ANONYMOUS
+S.MAP_32BIT     = 0x40             -- Only give out 32-bit addresses.
+
+-- These are Linux-specific.
+S.MAP_GROWSDOWN  = 0x00100         -- Stack-like segment.
+S.MAP_DENYWRITE  = 0x00800         -- ETXTBSY
+S.MAP_EXECUTABLE = 0x01000         -- Mark it as an executable.
+S.MAP_LOCKED     = 0x02000         -- Lock the mapping.
+S.MAP_NORESERVE  = 0x04000         -- Don't check for reservations.
+S.MAP_POPULATE   = 0x08000         -- Populate (prefault) pagetables.
+S.MAP_NONBLOCK   = 0x10000         -- Do not block on IO.
+S.MAP_STACK      = 0x20000         -- Allocation is for a stack.
+S.MAP_HUGETLB    = 0x40000         -- Create huge page mapping.
+
+-- Flags to `msync'.
+S.MS_ASYNC       = 1               -- Sync memory asynchronously.
+S.MS_SYNC        = 4               -- Synchronous memory sync.
+S.MS_INVALIDATE  = 2               -- Invalidate the caches.
+
+-- Flags for `mlockall'.
+S.MCL_CURRENT    = 1               -- Lock all currently mapped pages.
+S.MCL_FUTURE     = 2               -- Lock all additions to address space.
+
+-- Flags for `mremap'.
+S.MREMAP_MAYMOVE = 1
+S.MREMAP_FIXED   = 2
+
+-- Advice to `madvise'.
+S.MADV_NORMAL      = 0     -- No further special treatment.
+S.MADV_RANDOM      = 1     -- Expect random page references.
+S.MADV_SEQUENTIAL  = 2     -- Expect sequential page references.
+S.MADV_WILLNEED    = 3     -- Will need these pages.
+S.MADV_DONTNEED    = 4     -- Don't need these pages.
+S.MADV_REMOVE      = 9     -- Remove these pages and resources.
+S.MADV_DONTFORK    = 10    -- Do not inherit across fork.
+S.MADV_DOFORK      = 11    -- Do inherit across fork.
+S.MADV_MERGEABLE   = 12    -- KSM may merge identical pages.
+S.MADV_UNMERGEABLE = 13    -- KSM may not merge identical pages.
+S.MADV_HUGEPAGE    = 14    -- Worth backing with hugepages.
+S.MADV_NOHUGEPAGE  = 15    -- Not worth backing with hugepages.
+S.MADV_HWPOISON    = 100   -- Poison a page for testing.
+
+-- The POSIX people had to invent similar names for the same things.
+S.POSIX_MADV_NORMAL      = 0 -- No further special treatment.
+S.POSIX_MADV_RANDOM      = 1 -- Expect random page references.
+S.POSIX_MADV_SEQUENTIAL  = 2 -- Expect sequential page references.
+S.POSIX_MADV_WILLNEED    = 3 -- Will need these pages.
+S.POSIX_MADV_DONTNEED    = 4 -- Don't need these pages.
 
 S.symerror = {
 'EPERM',  'ENOENT', 'ESRCH',   'EINTR',
@@ -313,6 +377,9 @@ int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
 
+void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+int munmap(void *addr, size_t length);
+
 int pipe2(int pipefd[2], int flags);
 
 int unlink(const char *pathname);
@@ -442,14 +509,12 @@ end
 
 function S.getcwd(buf, size)
   local ret = ffi.C.getcwd(buf, size or 0)
-
   if buf == nil then -- Linux will allocate buffer here, return Lua string and free
     if ret == nil then return errorret() end
     local s = ffi.string(ret) -- guaranteed to be zero terminated if no error
     ffi.C.free(ret)
     return s
   end
-
   -- user allocated buffer
   if ret == nil then return errorret() end
   return true -- no point returning the pointer as it is just the passed buffer
@@ -460,6 +525,21 @@ function S.nanosleep(req)
   local ret = ffi.C.nanosleep(req, rem)
   if ret == -1 then return errorret() end
   return rem
+end
+
+--local MAP_FAILED = ffi.new("void *", -1)
+--local MAP_FAILED = ffi.new("void *")
+--local MAP_FAILED = ffi.cast("void *", ffi.new("void *") - 1LL)
+--ffi.fill(MAP_FAILED, ffi.sizeof("void *"), 0xff)
+local MAP_FAILED = nil -- wrong!
+
+function S.mmap(addr, length, prot, flags, fd, offset)
+  local ret = ffi.C.mmap(addr, length, prot, flags, getfd(fd), offset)
+  if ret == MAP_FAILED then return errorret() end
+  return ffi.gc(ret, function(addr) ffi.C.munmap(addr, length) end) -- add munmap to gc
+end
+function S.munmap(addr, length)
+  return retbool(ffi.C.munmap(ffi.gc(addr, nil), length))
 end
 
 -- 'macros' and helper functions etc
