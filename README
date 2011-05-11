@@ -30,7 +30,7 @@ Note that pipe returns two file descriptors, rather than passing an array as in 
 
 getcwd returns the result in a buffer if one is passed, or as a Lua string otherwise, ie if called with no parameters/
 
-The stat type adds convenience methods corresponding to the standard macros, note the methods are on the overall type, not on the methods, eg stat:major() to get major number of device.
+Standard convenience macros are also provided, eg S.major(dev) to extract a major number from a device number.
 
 Testing
 
