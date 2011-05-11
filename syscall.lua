@@ -203,15 +203,132 @@ function retptr(ret)
   return ret
 end
 
+-- stat structure is architecture dependent in Linux
+-- this is the way glibc versions stat via __xstat, may need to change for other libc, eg if define stat as a non inline function
+local STAT_VER_LINUX
+
+if ffi.arch == "x86" then
+STAT_VER_LINUX = 3
+ffi.cdef[[
+struct stat {
+        unsigned long  st_dev;
+        unsigned long  st_ino;
+        unsigned short st_mode;
+        unsigned short st_nlink;
+        unsigned short st_uid;
+        unsigned short st_gid;
+        unsigned long  st_rdev;
+        unsigned long  st_size;
+        unsigned long  st_blksize;
+        unsigned long  st_blocks;
+        unsigned long  st_atime;
+        unsigned long  st_atime_nsec;
+        unsigned long  st_mtime;
+        unsigned long  st_mtime_nsec;
+        unsigned long  st_ctime;
+        unsigned long  st_ctime_nsec;
+        unsigned long  __unused4;
+        unsigned long  __unused5;
+};
+]] end
+if ffi.arch == "x64" then
+STAT_VER_LINUX = 1
+ffi.cdef[[
+struct stat {
+        unsigned long   st_dev;
+        unsigned long   st_ino;
+        unsigned long   st_nlink;
+
+        unsigned int    st_mode;
+        unsigned int    st_uid;
+        unsigned int    st_gid;
+        unsigned int    __pad0;
+        unsigned long   st_rdev;
+        long            st_size;
+        long            st_blksize;
+        long            st_blocks;
+
+        unsigned long   st_atime;
+        unsigned long   st_atime_nsec;
+        unsigned long   st_mtime;
+        unsigned long   st_mtime_nsec;
+        unsigned long   st_ctime;
+        unsigned long   st_ctime_nsec;
+        long            __unused[3];
+};
+]]
+end
+if ffi.arch == "arm" and ffi.abi("le") then
+STAT_VER_LINUX = 3
+ffi.cdef[[
+struct stat {
+        unsigned long  st_dev;
+        unsigned long  st_ino;
+        unsigned short st_mode;
+        unsigned short st_nlink;
+        unsigned short st_uid;
+        unsigned short st_gid;
+        unsigned long  st_rdev;
+        unsigned long  st_size;
+        unsigned long  st_blksize;
+        unsigned long  st_blocks;
+        unsigned long  st_atime;
+        unsigned long  st_atime_nsec;
+        unsigned long  st_mtime;
+        unsigned long  st_mtime_nsec;
+        unsigned long  st_ctime;
+        unsigned long  st_ctime_nsec;
+        unsigned long  __unused4;
+        unsigned long  __unused5;
+};
+]]
+end
+if ffi.arch == "arm" and ffi.abi("be") then -- untested
+STAT_VER_LINUX = 3
+ffi.cdef[[
+struct stat {
+        unsigned short st_dev;
+        unsigned short __pad1;
+        unsigned long  st_ino;
+        unsigned short st_mode;
+        unsigned short st_nlink;
+        unsigned short st_uid;
+        unsigned short st_gid;
+        unsigned short st_rdev;
+        unsigned short __pad2;
+        unsigned long  st_size;
+        unsigned long  st_blksize;
+        unsigned long  st_blocks;
+        unsigned long  st_atime;
+        unsigned long  st_atime_nsec;
+        unsigned long  st_mtime;
+        unsigned long  st_mtime_nsec;
+        unsigned long  st_ctime;
+        unsigned long  st_ctime_nsec;
+        unsigned long  __unused4;
+        unsigned long  __unused5;
+};
+]]
+end
+-- all other architectures (currently ppc) undefined, will abort as undefined
+
+
 ffi.cdef[[
 // typedefs for word size independent types
 typedef uint32_t mode_t;
+typedef uint64_t dev_t;
+typedef uint32_t uid_t;
+typedef uint32_t gid_t;
 
 // typedefs based on word length, using int/uint or long as these are both word sized
 typedef unsigned int size_t;
 typedef int ssize_t;
 typedef long off_t;
 typedef long time_t;
+//typedef unsigned long ino_t;
+//typedef unsigned int nlink_t;
+//typedef long blksize_t;
+//typedef long blkcnt_t;
 
 // structs
 struct timespec {
@@ -239,11 +356,14 @@ int dup3(int oldfd, int newfd, int flags);
 int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
+int __fxstat(int ver, int fd, struct stat *buf);
 
 int pipe2(int pipefd[2], int flags);
 
 int unlink(const char *pathname);
 int access(const char *pathname, int mode);
+int __xstat(int ver, const char *path, struct stat *buf);
+int __lxstat(int ver, const char *path, struct stat *buf);
 char *getcwd(char *buf, size_t size);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
@@ -265,6 +385,7 @@ void *realloc(void *ptr, size_t size);
 local fd_t -- type for a file descriptor
 local fd2_t = ffi.typeof("int[2]")
 local timespec_t = ffi.typeof("struct timespec")
+local stat_t = ffi.typeof("struct stat")
 
 --get fd from standard string, integer, or cdata
 function getfd(fd)
@@ -338,6 +459,25 @@ function S.fchdir(fd) return retbool(ffi.C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(ffi.C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(ffi.C.fdatasync(getfd(fd))) end
 
+function S.stat(path)
+  local buf = stat_t()
+  local ret = ffi.C.__xstat(STAT_VER_LINUX, path, buf)
+  if ret == -1 then return errorret() end
+  return buf
+end
+function S.lstat(path)
+  local buf = stat_t()
+  local ret = ffi.C.__lxstat(STAT_VER_LINUX, path, buf)
+  if ret == -1 then return errorret() end
+  return buf
+end
+function S.fstat(fd)
+  local buf = stat_t()
+  local ret = ffi.C.__fxstat(STAT_VER_LINUX, getfd(fd), buf)
+  if ret == -1 then return errorret() end
+  return buf
+end
+
 function S.getcwd(buf, size)
   local ret = ffi.C.getcwd(buf, size or 0)
 
@@ -366,7 +506,7 @@ function S.nogc(d) ffi.gc(d, nil) end
 -- types
 
 -- methods on an fd
-local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
+local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
@@ -377,7 +517,7 @@ local buffer_t = ffi.typeof("char[?]")
 S.string = ffi.string -- convenience for converting buffers
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
-S.t = {fd = fd_t, timespec = timespec_t, buffer = buffer_t}
+S.t = {fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t}
 
 return S
 

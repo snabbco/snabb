@@ -156,6 +156,15 @@ rem, err, errno = S.nanosleep(S.t.timespec(0, 1000000))
 assert(err == nil, err)
 assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
 
+local stat
+stat, err, errno = S.fstat(fd) -- stat "/"
+assert(err == nil, err)
+assert(stat.st_uid == 0, "expect / to be owned by uid 0")
+assert(stat.st_size == 4096, "expect / to be size 4096") -- might not be
+stat, err, errno = S.lstat("/dev/zero")
+assert(err == nil, err)
+stat, err, errno = S.stat("/dev/zero")
+assert(err == nil, err)
 
 
 
