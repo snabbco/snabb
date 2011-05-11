@@ -363,8 +363,7 @@ for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 
-
--- add char buffer type with string method, remove use of ffi from test suite
+-- add char buffer type
 local buffer_t = ffi.typeof("char[?]")
 S.string = ffi.string -- convenience for converting buffers
 
