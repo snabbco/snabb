@@ -1,4 +1,5 @@
 local ffi = require "ffi"
+local bit = require "bit"
 
 local S = {} -- our module exported functions
 
@@ -466,6 +467,14 @@ end
 -- note that major and minor are macros, gnu provides these real symbols, else you might have to parse yourself
 function S.major(dev) return ffi.C.gnu_dev_major(dev) end
 function S.minor(dev) return ffi.C.gnu_dev_minor(dev) end
+
+function S.S_ISREG(m)  return bit.band(m, S.S_IFREG)  ~= 0 end
+function S.S_ISDIR(m)  return bit.band(m, S.S_IFDIR)  ~= 0 end
+function S.S_ISCHR(m)  return bit.band(m, S.S_IFCHR)  ~= 0 end
+function S.S_ISBLK(m)  return bit.band(m, S.S_IFBLK)  ~= 0 end
+function S.S_ISFIFO(m) return bit.band(m, S.S_IFFIFO) ~= 0 end
+function S.S_ISLNK(m)  return bit.band(m, S.S_IFLNK)  ~= 0 end
+function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 
 -- not system functions
 function S.nogc(d) ffi.gc(d, nil) end

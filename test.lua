@@ -167,11 +167,16 @@ assert(err == nil, err)
 assert(stat.st_size == 4096, "expect / to be size 4096") -- might not be
 assert(stat.st_gid == 0, "expect / to be gid 0 is " .. tonumber(stat.st_gid))
 assert(stat.st_uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
+assert(S.S_ISDIR(stat.st_mode), "expect / to be a directory")
 
 stat, err, errno = S.stat("/dev/zero")
 assert(err == nil, err)
 assert(S.major(stat.st_rdev) == 1, "expect major number of /dev/zero to be 1")
 assert(S.minor(stat.st_rdev) == 5, "expect minor number of /dev/zero to be 5")
+assert(S.S_ISCHR(stat.st_mode), "expect /dev/zero to be a character device")
 
+stat, err, errno = S.lstat("/etc/passwd")
+assert(err == nil, err)
+assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
 
 
