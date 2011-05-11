@@ -1,6 +1,8 @@
 local S = require "syscall"
 local ffi = require "ffi"
 
+local fd, fd2, n, s, err, errno
+
 -- test open non existent file
 fd, err, errno = S.open("/tmp/file/does/not/exist", S.O_RDONLY)
 assert(err ~= nil, "expected open to fail on file not found")
@@ -33,8 +35,8 @@ assert(S.symerror[errno] == 'EBADF', "expect EBADF from invalid numberic fd")
 
 assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
 
-size = 128
-buf = ffi.new("char[?]", size) -- allocate buffer for read
+local size = 128
+local buf = ffi.new("char[?]", size) -- allocate buffer for read
 for i = 0, size - 1 do buf[i] = 255 end -- make sure overwritten
 -- test read
 n, err, errno = S.read(fd2, buf, size)
@@ -105,7 +107,7 @@ assert(S.close(fd))
 
 assert(S.O_CREAT == 64, "wrong octal value for O_CREAT")
 
-tmpfile = "./XXXXYYYYZZZ4521"
+local tmpfile = "./XXXXYYYYZZZ4521"
 fd, err = S.creat(tmpfile, S.S_IRWXU)
 assert(err == nil, err)
 

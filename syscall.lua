@@ -1,5 +1,4 @@
 local ffi = require "ffi"
---local bit = require "bit"
 
 local S = {} -- our module exported functions
 
@@ -359,6 +358,7 @@ local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 
+-- add char buffer type with string method, remove use of ffi from test suite
 -- types
 --S.types = {fd = fd_t, timespec = timespec_t}
 
