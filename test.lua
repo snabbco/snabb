@@ -1,6 +1,6 @@
 local S = require "syscall"
 
-local fd, fd2, n, s, err, errno
+local fd, fd0, fd1, fd2, n, s, err, errno
 
 -- test open non existent file
 fd, err, errno = S.open("/tmp/file/does/not/exist", S.O_RDONLY)
