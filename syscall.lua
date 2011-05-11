@@ -130,6 +130,18 @@ S.O_DSYNC = octal('010000')
 S.O_RSYNC = S.O_SYNC
 
 -- modes
+S.S_IFMT   = octal('0170000') -- bit mask for the file type bit fields
+S.S_IFSOCK = octal('0140000') -- socket
+S.S_IFLNK  = octal('0120000') -- symbolic link
+S.S_IFREG  = octal('0100000') -- regular file
+S.S_IFBLK  = octal('0060000') -- block device
+S.S_IFDIR  = octal('0040000') -- directory
+S.S_IFCHR  = octal('0020000') -- character device
+S.S_IFIFO  = octal('0010000') -- FIFO
+S.S_ISUID  = octal('0004000') -- set UID bit
+S.S_ISGID  = octal('0002000') -- set-group-ID bit
+S.S_ISVTX  = octal('0001000') -- sticky bit
+
 S.S_IRWXU = octal('00700') -- user (file owner) has read, write and execute permission
 S.S_IRUSR = octal('00400') -- user has read permission
 S.S_IWUSR = octal('00200') -- user has write permission
