@@ -30,9 +30,9 @@ Note that pipe returns two file descriptors, rather than passing an array as in 
 
 getcwd returns the result in a buffer if one is passed, or as a Lua string otherwise, ie if called with no parameters/
 
-
+The stat type adds convenience methods corresponding to the standard macros, note the methods are on the overall type, not on the methods, eg stat:major() to get major number of device.
 
 Testing
 
-The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM and amd64.
+The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86.
 

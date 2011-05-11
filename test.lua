@@ -171,6 +171,8 @@ assert(stat.st_uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
 
 stat, err, errno = S.stat("/dev/zero")
 assert(err == nil, err)
+assert(stat:major() == 1, "expect major number of /dev/zero to be 1")
+assert(stat:minor() == 5, "expect minor number of /dev/zero to be 5")
 
 
 

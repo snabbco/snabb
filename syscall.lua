@@ -312,6 +312,10 @@ int nanosleep(const struct timespec *req, struct timespec *rem);
 int __fxstat(int ver, int fd, struct stat *buf);
 int __xstat(int ver, const char *path, struct stat *buf);
 int __lxstat(int ver, const char *path, struct stat *buf);
+int gnu_dev_major(dev_t dev);
+int gnu_dev_minor(dev_t dev);
+
+
 
 // functions from libc that could be exported as a convenience
 void *calloc(size_t nmemb, size_t size);
@@ -330,7 +334,7 @@ void *realloc(void *ptr, size_t size);
 local fd_t -- type for a file descriptor
 local fd2_t = ffi.typeof("int[2]")
 local timespec_t = ffi.typeof("struct timespec")
-local stat_t = ffi.typeof("struct stat")
+local stat_t
 
 --get fd from standard string, integer, or cdata
 function getfd(fd)
@@ -456,6 +460,11 @@ local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
+
+-- note that major and minor are macros, gnu provides these real symbols, wlse you might have to parse yourself
+local smeth = {major = function(st) return ffi.C.gnu_dev_major(st.st_rdev) end, minor = function(st) return ffi.C.gnu_dev_minor(st.st_rdev) end}
+--stat_t = ffi.typeof("struct stat")
+stat_t = ffi.metatype("struct stat", {__index = smeth})
 
 -- add char buffer type
 local buffer_t = ffi.typeof("char[?]")
