@@ -213,6 +213,12 @@ typedef int ssize_t;
 typedef long off_t;
 typedef long time_t;
 
+// structs
+struct timespec {
+  time_t tv_sec;        /* seconds */
+  long   tv_nsec;       /* nanoseconds */
+};
+
 // functions only used internally
 char *strerror(int errnum);
 
@@ -246,6 +252,7 @@ void *malloc(size_t size);
 void free(void *ptr);
 void *realloc(void *ptr, size_t size);
 
+
 ]]
 
 --[[ -- not defined yet
@@ -255,12 +262,7 @@ void *realloc(void *ptr, size_t size);
 
 local fd_t -- type for a file descriptor
 local fd2_t = ffi.typeof("int[2]")
---[[local timespec_t = ffi.typeof[ [
-struct timespec {
-  time_t tv_sec;        /* seconds */
-  long   tv_nsec;       /* nanoseconds */
-};
-]]
+local timespec_t = ffi.typeof("struct timespec")
 
 --get fd from standard string, integer, or cdata
 function getfd(fd)
@@ -352,15 +354,21 @@ end
 -- not system functions
 function S.nogc(d) ffi.gc(d, nil) end
 
+-- types
+
 -- methods on an fd
 local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
+
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 
+
 -- add char buffer type with string method, remove use of ffi from test suite
--- types
---S.types = {fd = fd_t, timespec = timespec_t}
+local buffer_t = ffi.typeof("char[?]")
+S.string = ffi.string -- convenience for converting buffers
+
+S.t = {fd = fd_t, timespec = timespec_t, buffer = buffer_t}
 
 return S
 

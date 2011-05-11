@@ -1,5 +1,4 @@
 local S = require "syscall"
-local ffi = require "ffi"
 
 local fd, fd2, n, s, err, errno
 
@@ -36,7 +35,8 @@ assert(S.symerror[errno] == 'EBADF', "expect EBADF from invalid numberic fd")
 assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
 
 local size = 128
-local buf = ffi.new("char[?]", size) -- allocate buffer for read
+local buf = S.t.buffer(size) -- allocate buffer for read
+
 for i = 0, size - 1 do buf[i] = 255 end -- make sure overwritten
 -- test read
 n, err, errno = S.read(fd2, buf, size)
@@ -146,7 +146,7 @@ assert(err == nil, err)
 assert(fd:fchdir())
 
 assert(S.getcwd(buf, size))
-assert(ffi.string(buf) == "/", "expect cwd to be /")
+assert(S.string(buf) == "/", "expect cwd to be /")
 s, err = S.getcwd()
 assert(err == nil, err)
 assert(s == "/", "expect cwd to be /")
