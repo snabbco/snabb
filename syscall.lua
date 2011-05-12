@@ -1,6 +1,8 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
+-- note should wrap more conditionals around stuff that might not be there
+
 local S = {} -- exported functions
 
 -- from bits/typesizes.h - underlying types, create as typedefs, mostly fix size.
@@ -420,11 +422,21 @@ end
 -- define types
 ffi.cdef[[
 // typedefs for word size independent types
+
+// 16 bit
+typedef uint16_t in_port_t;
+
+// 32 bit
 typedef uint32_t mode_t;
 typedef uint32_t uid_t;
 typedef uint32_t gid_t;
+typedef uint32_t socklen_t;
 
+// 64 bit
 typedef uint64_t dev_t;
+
+// posix standards
+typedef unsigned short int sa_family_t;
 
 // typedefs which are word length
 typedef unsigned long size_t;
@@ -441,6 +453,22 @@ struct timespec {
   time_t tv_sec;        /* seconds */
   long   tv_nsec;       /* nanoseconds */
 };
+struct sockaddr {
+  sa_family_t sa_family;
+  char sa_data[14];
+};
+// ipv4 sockets
+struct in_addr {
+  uint32_t       s_addr;
+};
+struct sockaddr_in {
+  sa_family_t    sin_family; /* address family: AF_INET */
+  in_port_t      sin_port;   /* port in network byte order */
+  struct in_addr sin_addr;   /* internet address */
+  unsigned char sin_zero[8]; /* padding, should not vary by arch */
+};
+
+
 ]]
 
 -- stat structure is architecture dependent in Linux
@@ -516,7 +544,7 @@ int fdatasync(int fd);
 int fcntl(int fd, int cmd, long arg); /* arg can be a pointer though */
 
 int socket(int domain, int type, int protocol);
-
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
@@ -545,13 +573,11 @@ int gnu_dev_minor(dev_t dev);
 
 
 
-// functions from libc that could be exported as a convenience
+// functions from libc that could be exported as a convenience, used internally
 void *calloc(size_t nmemb, size_t size);
 void *malloc(size_t size);
 void free(void *ptr);
 void *realloc(void *ptr, size_t size);
-
-
 ]]
 
 --[[ -- not defined yet
@@ -563,6 +589,16 @@ local fd_t -- type for a file descriptor
 local fd2_t = ffi.typeof("int[2]")
 local timespec_t = ffi.typeof("struct timespec")
 local stat_t
+
+-- endian conversion
+if ffi.abi("be") then -- nothing to do
+function S.htonl(b) return b end
+else
+function S.htonl(b) return bit.bswap(b) end
+function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
+end
+S.ntohl = S.htonl -- reverse is the same
+S.ntohs = S.htons
 
 --get fd from standard string, integer, or cdata
 function getfd(fd)
@@ -680,6 +716,21 @@ function S.madvise(addr, length, advice) return retbool(ffi.C.madvise(addr, leng
 
 function S.socket(domain, stype, protocol) return retfd(ffi.C.socket(domain, stype, protocol or 0)) end
 
+-- address types
+local sockaddr_t = ffi.typeof("struct sockaddr")
+local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
+local in_addr_t = ffi.typeof("struct in_addr")
+S.INADDR_ANY = in_addr_t() -- is this best way? harder to compare against, for example
+
+function S.bind(sockfd, addr, addrlen)
+  if addrlen == nil then -- we can compute this, for known address types
+    if ffi.istype(sockaddr_t, addr) then addrlen = ffi.sizeof(sockaddr_t)
+    elseif ffi.istype(sockaddr_in_t, addr) then addrlen = ffi.sizeof(sockaddr_in_t)
+    end
+  end
+  return retbool(ffi.C.bind(getfd(sockfd), ffi.cast("struct sockaddr *", addr), addrlen))
+end
+
 function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
   local ret = ffi.C.fcntl(getfd(fd), cmd, arg or 0)
@@ -709,7 +760,7 @@ function S.nogc(d) S.gc(d, nil) end
 -- types
 
 -- methods on an fd
-local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl'}
+local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'bind'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
@@ -719,9 +770,10 @@ stat_t = ffi.typeof("struct stat")
 -- add char buffer type
 local buffer_t = ffi.typeof("char[?]")
 S.string = ffi.string -- convenience for converting buffers
+S.sizeof = ffi.sizeof -- convenience so user need not require ffi
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
-S.t = {fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t}
+S.t = {fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t}
 
 return S
 

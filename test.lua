@@ -213,6 +213,12 @@ fl, err = s:fcntl(S.F_GETFL)
 assert(err == nil, err)
 assert(s:fcntl(S.F_SETFL, bit.bor(fl, S.O_NONBLOCK)))
 
+assert(S.sizeof(S.t.sockaddr) == S.sizeof(S.t.sockaddr_in), "inet socket addresses should be padded to same as sockaddr")
+
+local a
+a = S.t.sockaddr_in(S.AF_INET, S.htons(1234), S.INADDR_ANY) -- fix constructor to be more useful
+assert(s:bind(a))
+
 assert(S.close(s))
 
 

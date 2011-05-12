@@ -34,6 +34,8 @@ getcwd returns the result in a buffer if one is passed, or as a Lua string other
 
 Standard convenience macros are also provided, eg S.major(dev) to extract a major number from a device number.
 
+bind does not require a length for the address type length, as it can work this out dynamically.
+
 Testing
 
 The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86.
