@@ -380,6 +380,10 @@ int fdatasync(int fd);
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
 int msync(void *addr, size_t length, int flags);
+int mlock(const void *addr, size_t len);
+int munlock(const void *addr, size_t len);
+int mlockall(int flags);
+int munlockall(void);
 
 int pipe2(int pipefd[2], int flags);
 
@@ -537,6 +541,10 @@ function S.munmap(addr, length)
   return retbool(ffi.C.munmap(ffi.gc(addr, nil), length))
 end
 function S.msync(addr, length, flags) return retbool(ffi.C.msync(addr, length, flags)) end
+function S.mlock(addr, len) return retbool(ffi.C.mlock(addr, len)) end
+function S.munlock(addr, len) return retbool(ffi.C.munlock(addr, len)) end
+function S.mlockall(flags) return retbool(ffi.C.mlockall(flags)) end
+function S.munlockall() return retbool(ffi.C.munlockall()) end
 
 -- 'macros' and helper functions etc
 
