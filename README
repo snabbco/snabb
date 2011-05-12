@@ -36,6 +36,8 @@ Standard convenience macros are also provided, eg S.major(dev) to extract a majo
 
 bind does not require a length for the address type length, as it can work this out dynamically.
 
+uname returns a Lua table with the returned strings in it.
+
 Testing
 
 The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86.

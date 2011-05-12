@@ -453,6 +453,16 @@ struct timespec {
   time_t tv_sec;        /* seconds */
   long   tv_nsec;       /* nanoseconds */
 };
+// for uname. may well differ by OS
+struct utsname {
+  char sysname[65];
+  char nodename[65];
+  char release[65];
+  char version[65];
+  char machine[65];
+  char domainname[65];
+};
+
 struct sockaddr {
   sa_family_t sa_family;
   char sa_data[14];
@@ -521,15 +531,13 @@ struct stat {
 end
 
 ffi.cdef[[
-// functions only used internally
-char *strerror(int errnum);
-
-// exported functions
 int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
 int chdir(const char *path);
 int unlink(const char *pathname);
 int acct(const char *filename);
+
+int uname(struct utsname *buf);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -578,6 +586,7 @@ void *calloc(size_t nmemb, size_t size);
 void *malloc(size_t size);
 void free(void *ptr);
 void *realloc(void *ptr, size_t size);
+char *strerror(int errnum);
 ]]
 
 --[[ -- not defined yet
@@ -740,6 +749,15 @@ function S.fcntl(fd, cmd, arg)
   return retbool(ret)
 end
 
+local utsname_t = ffi.typeof("struct utsname")
+function S.uname()
+  local u = utsname_t()
+  local ret = ffi.C.uname(u)
+  if ret == -1 then return errorret() end
+  return {sysname = ffi.string(u.sysname), nodename = ffi.string(u.nodename), release = ffi.string(u.release),
+          version = ffi.string(u.version), machine = ffi.string(u.machine), domainname = ffi.string(u.domainname)}
+end
+
 -- 'macros' and helper functions etc
 
 -- note that major and minor are inline in glibc, gnu provides these real symbols, else you might have to parse yourself
@@ -773,7 +791,11 @@ S.string = ffi.string -- convenience for converting buffers
 S.sizeof = ffi.sizeof -- convenience so user need not require ffi
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
-S.t = {fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t}
+S.t = {
+fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t,
+sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t,
+utsname = utsname_t
+}
 
 return S
 
