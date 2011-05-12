@@ -192,39 +192,38 @@ S.F_GETPIPE_SZ  = 1032
 S.F_DUPFD_CLOEXEC = 1030 
 
 --mmap
-S.PROT_READ  = 0x1             -- Page can be read.
-S.PROT_WRITE = 0x2             -- Page can be written.
-S.PROT_EXEC  = 0x4             -- Page can be executed.
-S.PROT_NONE  = 0x0             -- Page can not be accessed.
-S.PROT_GROWSDOWN = 0x01000000  -- Extend change to start of growsdown vma (mprotect only).
-S.PROT_GROWSUP   = 0x02000000  -- Extend change to start of growsup vma (mprotect only).
+S.PROT_READ  = 0x1
+S.PROT_WRITE = 0x2
+S.PROT_EXEC  = 0x4
+S.PROT_NONE  = 0x0
+S.PROT_GROWSDOWN = 0x01000000
+S.PROT_GROWSUP   = 0x02000000
 
--- Sharing types (must choose one and only one of these).
-S.MAP_SHARED  = 0x01            -- Share changes.
-S.MAP_PRIVATE = 0x02            -- Changes are private.
-S.MAP_TYPE    = 0x0f            -- Mask for type of mapping.
-
-S.MAP_FIXED     = 0x10             -- Interpret addr exactly.
+-- Sharing types
+S.MAP_SHARED  = 0x01
+S.MAP_PRIVATE = 0x02
+S.MAP_TYPE    = 0x0f
+S.MAP_FIXED     = 0x10
 S.MAP_FILE      = 0
-S.MAP_ANONYMOUS = 0x20             -- Don't use a file.
+S.MAP_ANONYMOUS = 0x20
 S.MAP_ANON      = S.MAP_ANONYMOUS
-S.MAP_32BIT     = 0x40             -- Only give out 32-bit addresses.
+S.MAP_32BIT     = 0x40
 
 -- These are Linux-specific.
-S.MAP_GROWSDOWN  = 0x00100         -- Stack-like segment.
-S.MAP_DENYWRITE  = 0x00800         -- ETXTBSY
-S.MAP_EXECUTABLE = 0x01000         -- Mark it as an executable.
-S.MAP_LOCKED     = 0x02000         -- Lock the mapping.
-S.MAP_NORESERVE  = 0x04000         -- Don't check for reservations.
-S.MAP_POPULATE   = 0x08000         -- Populate (prefault) pagetables.
-S.MAP_NONBLOCK   = 0x10000         -- Do not block on IO.
-S.MAP_STACK      = 0x20000         -- Allocation is for a stack.
-S.MAP_HUGETLB    = 0x40000         -- Create huge page mapping.
+S.MAP_GROWSDOWN  = 0x00100
+S.MAP_DENYWRITE  = 0x00800
+S.MAP_EXECUTABLE = 0x01000
+S.MAP_LOCKED     = 0x02000
+S.MAP_NORESERVE  = 0x04000
+S.MAP_POPULATE   = 0x08000
+S.MAP_NONBLOCK   = 0x10000
+S.MAP_STACK      = 0x20000
+S.MAP_HUGETLB    = 0x40000
 
 -- Flags to `msync'.
-S.MS_ASYNC       = 1               -- Sync memory asynchronously.
-S.MS_SYNC        = 4               -- Synchronous memory sync.
-S.MS_INVALIDATE  = 2               -- Invalidate the caches.
+S.MS_ASYNC       = 1
+S.MS_SYNC        = 4
+S.MS_INVALIDATE  = 2
 
 -- Flags for `mlockall'.
 S.MCL_CURRENT    = 1
