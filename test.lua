@@ -125,16 +125,17 @@ assert(fd:fsync())
 -- test fdatasync
 assert(fd:fdatasync())
 
---n, err, errno = fd:lseek(offset, S.SEEK_SET)
-n, err, errno = S.lseek(fd, offset, S.SEEK_SET)
+n, err, errno = fd:lseek(offset, S.SEEK_SET)
 assert(err == nil, "should be able to seek file")
 assert(n == offset, "seek should position at set position")
-n, err, errno = S.lseek(fd, offset, S.SEEK_CUR)
+n, err, errno = fd:lseek(offset, S.SEEK_CUR)
 assert(err == nil, "should be able to seek file")
 assert(n == offset + offset, "seek should position at set position")
 
-
 assert(S.unlink(tmpfile), "should be able to unlink file")
+
+assert(S.mkdir(tmpfile, S.S_IRWXU))
+assert(S.rmdir(tmpfile))
 
 assert(S.close(fd))
 
