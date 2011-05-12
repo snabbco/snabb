@@ -206,9 +206,13 @@ assert(err == nil, err)
 assert(S.munmap(mem2, size2))
 
 -- sockets
-local s
+local s, fl
 s, err = S.socket(S.AF_INET, S.SOCK_STREAM, 0)
 assert(err == nil, err)
+fl, err = s:fcntl(S.F_GETFL)
+assert(err == nil, err)
+assert(s:fcntl(S.F_SETFL, bit.bor(fl, S.O_NONBLOCK)))
+
 assert(S.close(s))
 
 

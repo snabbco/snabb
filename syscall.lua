@@ -100,13 +100,11 @@ local S = {} -- exported functions
 # define __U64_TYPE             unsigned long int
 ]]
 
--- for our purposes, we will therefore make the long ones depend on arch, rest are fixed
+-- should we allow constants as strings as well, put in table and have function to look up? Not useful??
 
-local octal
+local octal = function (s) return tonumber(s, 8) end
 
-function octal(s) return tonumber(s, 8) end
-
--- open
+-- open, fcntl
 S.O_ACCMODE   = octal('0003')
 S.O_RDONLY    = octal('00')
 S.O_WRONLY    = octal('01')
@@ -167,6 +165,31 @@ S.R_OK = 4               -- Test for read permission.
 S.W_OK = 2               -- Test for write permission.
 S.X_OK = 1               -- Test for execute permission.
 S.F_OK = 0               -- Test for existence.
+
+-- fcntl second argument
+S.F_DUPFD       = 0
+S.F_GETFD       = 1
+S.F_SETFD       = 2
+S.F_GETFL       = 3
+S.F_SETFL       = 4
+S.F_GETLK       = 5
+S.F_SETLK       = 6
+S.F_SETLKW      = 7
+--S.F_GETLK64    = 12      -- 64 on 32 file ops still TODO
+--S.F_SETLK64    = 13
+--S.F_SETLKW64   = 14
+S.F_SETOWN      = 8
+S.F_GETOWN      = 9
+S.F_SETSIG      = 10
+S.F_GETSIG      = 11
+S.F_SETOWN_EX   = 15
+S.F_GETOWN_EX   = 16
+S.F_SETLEASE    = 1024
+S.F_GETLEASE    = 1025
+S.F_NOTIFY      = 1026
+S.F_SETPIPE_SZ  = 1031
+S.F_GETPIPE_SZ  = 1032
+S.F_DUPFD_CLOEXEC = 1030 
 
 --mmap
 S.PROT_READ  = 0x1             -- Page can be read.
@@ -491,6 +514,7 @@ int dup3(int oldfd, int newfd, int flags);
 int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
+int fcntl(int fd, int cmd, long arg); /* arg can be a pointer though */
 
 int socket(int domain, int type, int protocol);
 
@@ -553,9 +577,7 @@ function getfd(fd)
 end
 
 function retfd(ret)
-  if ret == -1 then
-    return errorret()
-  end
+  if ret == -1 then return errorret() end
   return fd_t(ret)
 end
 
@@ -659,6 +681,15 @@ function S.madvise(addr, length, advice) return retbool(ffi.C.madvise(addr, leng
 
 function S.socket(domain, stype, protocol) return retfd(ffi.C.socket(domain, stype, protocol or 0)) end
 
+function S.fcntl(fd, cmd, arg)
+  -- some uses have arg as a pointer, need handling
+  local ret = ffi.C.fcntl(getfd(fd), cmd, arg or 0)
+  -- return values differ, some special handling needed
+  if cmd == S.F_DUPFD then return retfd(ret) end
+  if cmd == S.F_GETFD or cmd == S.F_GETFL or cmd == S.F_GETLEASE or cmd == S.F_GETOWN or cmd == S.F_GETSIG or cmd == S.F_GETPIPE_SZ then return retint(ret) end
+  return retbool(ret)
+end
+
 -- 'macros' and helper functions etc
 
 -- note that major and minor are inline in glibc, gnu provides these real symbols, else you might have to parse yourself
@@ -679,7 +710,7 @@ function S.nogc(d) S.gc(d, nil) end
 -- types
 
 -- methods on an fd
-local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat'}
+local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
