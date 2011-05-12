@@ -119,10 +119,10 @@ local tmpfile = "./XXXXYYYYZZZ4521"
 fd, err = S.creat(tmpfile, S.S_IRWXU)
 assert(err == nil, err)
 
--- test fsync
-assert(fd:fsync())
+assert(fd:fchmod(S.S_IRUSR + S.S_IWUSR))
+assert(S.chmod(tmpfile, S.S_IRUSR + S.S_IWUSR))
 
--- test fdatasync
+assert(fd:fsync())
 assert(fd:fdatasync())
 
 n, err, errno = fd:lseek(offset, S.SEEK_SET)

@@ -538,7 +538,8 @@ int mkdir(const char *pathname, mode_t mode);
 int rmdir(const char *pathname);
 int unlink(const char *pathname);
 int acct(const char *filename);
-
+int chmod(const char *path, mode_t mode);
+mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
 
 ssize_t read(int fd, void *buf, size_t count);
@@ -552,7 +553,7 @@ int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
 int fcntl(int fd, int cmd, long arg); /* arg can be a pointer though */
-mode_t umask(mode_t mask);
+int fchmod(int fd, mode_t mode);
 
 int socket(int domain, int type, int protocol);
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
@@ -665,6 +666,7 @@ function S.rmdir(path) return retbool(ffi.C.rmdir(path)) end
 function S.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 function S.acct(filename) return retbool(ffi.C.acct(filename)) end
 function S.umask(mask) return ffi.C.umask(mask) end -- never fails
+function S.chmod(path, mode) return retbool(ffi.C.chmod(path, mode)) end
 
 function S.read(fd, buf, count) return retint(ffi.C.read(getfd(fd), buf, count)) end
 function S.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count)) end
@@ -675,6 +677,7 @@ function S.lseek(fd, offset, whence) return retint(ffi.C.lseek(getfd(fd), offset
 function S.fchdir(fd) return retbool(ffi.C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(ffi.C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(ffi.C.fdatasync(getfd(fd))) end
+function S.fchmod(fd, mode) return retbool(ffi.C.fchmod(getfd(fd), mode)) end
 
 function S.stat(path)
   local buf = stat_t()
@@ -784,7 +787,8 @@ function S.nogc(d) ffi.gc(d, nil) end -- use ffi.gc not S.gc here
 -- types
 
 -- methods on an fd
-local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite', 'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'bind'}
+local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
+                   'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'bind', 'fchmod'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
