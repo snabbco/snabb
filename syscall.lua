@@ -331,6 +331,18 @@ S.AF_CAIF       = S.PF_CAIF
 S.AF_ALG        = S.PF_ALG
 S.AF_MAX        = S.PF_MAX
 
+-- misc socket constants
+S.SOL_RAW        = 255
+S.SOL_DECNET     = 261
+S.SOL_X25        = 262
+S.SOL_PACKET     = 263
+S.SOL_ATM        = 264
+S.SOL_AAL        = 265
+S.SOL_IRDA       = 266
+
+-- Maximum queue length specifiable by listen.
+S.SOMAXCONN = 128
+
 S.symerror = { -- symbolic error names, indexed by errno
 'EPERM',  'ENOENT', 'ESRCH',   'EINTR',
 'EIO',    'ENXIO',  'E2BIG',   'ENOEXEC',
