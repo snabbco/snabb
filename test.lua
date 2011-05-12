@@ -239,12 +239,34 @@ assert(s:bind(a))
 assert(S.close(s))
 
 
-
-local pid = S.getpid()
-assert(pid > 1, "expecting my pid to be larger than 1")
+-- can test better when do fork
+local pid, pid0, status
+pid0 = S.getpid()
+assert(pid0 > 1, "expecting my pid to be larger than 1")
 local ppid = S.getppid()
 assert(ppid > 1, "expecting my parent pid to be larger than 1")
 
+pid, err = S.fork()
+assert(err == nil, err)
+if (pid == 0) then -- child
+  assert(S.getppid() == pid0, "parent pid should be previous pid")
+  S.exit()
+else -- parent
+  pid0, status, err = S.wait()
+  assert(err == nil)
+  assert(pid == pid0, "expect fork to return same pid as wait")
+end
+pid, err = S.fork()
+assert(err == nil, err)
+if (pid == 0) then -- child
+  S.exit()
+else -- parent
+  pid0, status, err = S.waitpid(-1)
+  assert(err == nil)
+  assert(pid == pid0, "expect fork to return same pid as wait")
+end
 
 
+
+S.exit(S.EXIT_SUCCESS)
 

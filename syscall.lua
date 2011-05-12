@@ -367,6 +367,20 @@ S.SOL_IRDA       = 266
 -- Maximum queue length specifiable by listen.
 S.SOMAXCONN = 128
 
+-- exit
+S.EXIT_SUCCESS = 0
+S.EXIT_FAILURE = 1
+
+-- waitpid 3rd arg
+S.WNOHANG       = 1
+S.WUNTRACED     = 2
+
+--waitid 4th arg
+S.WSTOPPED      = 2
+S.WEXITED       = 4
+S.WCONTINUED    = 8
+S.WNOWAIT       = 0x01000000
+
 S.symerror = { -- symbolic error names, indexed by errno
 'EPERM',  'ENOENT', 'ESRCH',   'EINTR',
 'EIO',    'ENXIO',  'E2BIG',   'ENOEXEC',
@@ -545,6 +559,10 @@ mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
 pid_t getpid(void);
 pid_t getppid(void);
+pid_t fork(void);
+pid_t wait(int *status);
+pid_t waitpid(pid_t pid, int *status, int options);
+void _exit(int status);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -588,6 +606,8 @@ int gnu_dev_major(dev_t dev);
 int gnu_dev_minor(dev_t dev);
 
 
+// functions from libc ie man 3 not man 2
+void exit(int status);
 
 // functions from libc that could be exported as a convenience, used internally
 void *calloc(size_t nmemb, size_t size);
@@ -609,10 +629,10 @@ local stat_t
 
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
-function S.htonl(b) return b end
+  function S.htonl(b) return b end
 else
-function S.htonl(b) return bit.bswap(b) end
-function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
+  function S.htonl(b) return bit.bswap(b) end
+  function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
 end
 S.ntohl = S.htonl -- reverse is the same
 S.ntohs = S.htons
@@ -674,6 +694,21 @@ function S.chmod(path, mode) return retbool(ffi.C.chmod(path, mode)) end
 function S.link(oldpath, newpath) return retbool(ffi.C.link(oldpath, newpath)) end
 function S.getpid() return ffi.C.getpid() end
 function S.getppid() return ffi.C.getppid() end
+function S.fork() return retint(ffi.C.fork()) end
+function S.wait() -- we always get and return the status value, need to add helpers
+  local status = ffi.new("int[1]")
+  local ret = ffi.C.wait(status)
+  if ret == -1 then return nil, errorret() end -- extra padding where we would return status
+  return ret, status[0]
+end
+function S.waitpid(pid, options) -- we always get and return the status value, need to add helpers
+  local status = ffi.new("int[1]")
+  local ret = ffi.C.waitpid(pid, status, options or 0)
+  if ret == -1 then return nil, errorret() end -- extra padding where we would return status
+  return ret, status[0]
+end
+function S._exit(status) ffi.C._exit(status or 0) end
+function S.exit(status) ffi.C.exit(status or 0) end
 
 function S.read(fd, buf, count) return retint(ffi.C.read(getfd(fd), buf, count)) end
 function S.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count)) end
