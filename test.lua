@@ -191,6 +191,8 @@ mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0
 assert(err == nil, err)
 -- test msync
 assert(S.msync(mem, size, S.MS_SYNC))
+-- test madvise
+assert(S.madvise(mem, size, S.MADV_RANDOM))
 mem = nil -- gc memory, should be munmapped
 collectgarbage("collect")
 mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS + S.MAP_FIXED, -1, 0) -- MAP_FIXED should fail here!

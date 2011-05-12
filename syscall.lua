@@ -392,6 +392,7 @@ int munlock(const void *addr, size_t len);
 int mlockall(int flags);
 int munlockall(void);
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
+int madvise(void *addr, size_t length, int advice);
 
 int pipe2(int pipefd[2], int flags);
 
@@ -552,6 +553,7 @@ function S.munlock(addr, len) return retbool(ffi.C.munlock(addr, len)) end
 function S.mlockall(flags) return retbool(ffi.C.mlockall(flags)) end
 function S.munlockall() return retbool(ffi.C.munlockall()) end
 function S.mremap(old_address, old_size, new_size, flags, new_address) return retptr(ffi.C.mremap(old_address, old_size, new_size, flags, new_address)) end
+function S.madvise(addr, length, advice) return retbool(ffi.C.madvise(addr, length, advice)) end
 
 -- 'macros' and helper functions etc
 
