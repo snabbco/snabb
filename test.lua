@@ -116,8 +116,13 @@ assert(S.close(fd))
 assert(S.O_CREAT == 64, "wrong octal value for O_CREAT")
 
 local tmpfile = "./XXXXYYYYZZZ4521"
+local tmpfile2 = "./666666DDDDDFFFF"
+
 fd, err = S.creat(tmpfile, S.S_IRWXU)
 assert(err == nil, err)
+
+assert(S.link(tmpfile, tmpfile2))
+assert(S.unlink(tmpfile2))
 
 assert(fd:fchmod(S.S_IRUSR + S.S_IWUSR))
 assert(S.chmod(tmpfile, S.S_IRUSR + S.S_IWUSR))

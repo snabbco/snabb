@@ -539,6 +539,7 @@ int rmdir(const char *pathname);
 int unlink(const char *pathname);
 int acct(const char *filename);
 int chmod(const char *path, mode_t mode);
+int link(const char *oldpath, const char *newpath);
 mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
 
@@ -667,6 +668,7 @@ function S.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 function S.acct(filename) return retbool(ffi.C.acct(filename)) end
 function S.umask(mask) return ffi.C.umask(mask) end -- never fails
 function S.chmod(path, mode) return retbool(ffi.C.chmod(path, mode)) end
+function S.link(oldpath, newpath) return retbool(ffi.C.link(oldpath, newpath)) end
 
 function S.read(fd, buf, count) return retint(ffi.C.read(getfd(fd), buf, count)) end
 function S.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count)) end
