@@ -527,15 +527,9 @@ function S.nanosleep(req)
   return rem
 end
 
---local MAP_FAILED = ffi.new("void *", -1)
---local MAP_FAILED = ffi.new("void *")
---local MAP_FAILED = ffi.cast("void *", ffi.new("void *") - 1LL)
---ffi.fill(MAP_FAILED, ffi.sizeof("void *"), 0xff)
-local MAP_FAILED = nil -- wrong!
-
 function S.mmap(addr, length, prot, flags, fd, offset)
   local ret = ffi.C.mmap(addr, length, prot, flags, getfd(fd), offset)
-  if ret == MAP_FAILED then return errorret() end
+  if ffi.cast("long", ret) == -1 then return errorret() end
   return ffi.gc(ret, function(addr) ffi.C.munmap(addr, length) end) -- add munmap to gc
 end
 function S.munmap(addr, length)
