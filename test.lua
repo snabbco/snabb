@@ -240,5 +240,11 @@ assert(S.close(s))
 
 
 
+local pid = S.getpid()
+assert(pid > 1, "expecting my pid to be larger than 1")
+local ppid = S.getppid()
+assert(ppid > 1, "expecting my parent pid to be larger than 1")
+
+
 
 

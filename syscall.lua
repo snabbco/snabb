@@ -155,7 +155,7 @@ S.S_IROTH = octal('00004') -- others have read permission
 S.S_IWOTH = octal('00002') -- others have write permission
 S.S_IXOTH = octal('00001') -- others have execute permission
 
-if ffi.abi('32bit') then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end
+if ffi.abi('32bit') then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end -- not supported yet
 
 -- seek
 S.SEEK_SET = 0       -- Seek from beginning of file.
@@ -431,6 +431,7 @@ typedef uint32_t mode_t;
 typedef uint32_t uid_t;
 typedef uint32_t gid_t;
 typedef uint32_t socklen_t;
+typedef int32_t pid_t;
 
 // 64 bit
 typedef uint64_t dev_t;
@@ -542,6 +543,8 @@ int chmod(const char *path, mode_t mode);
 int link(const char *oldpath, const char *newpath);
 mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
+pid_t getpid(void);
+pid_t getppid(void);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -669,6 +672,8 @@ function S.acct(filename) return retbool(ffi.C.acct(filename)) end
 function S.umask(mask) return ffi.C.umask(mask) end -- never fails
 function S.chmod(path, mode) return retbool(ffi.C.chmod(path, mode)) end
 function S.link(oldpath, newpath) return retbool(ffi.C.link(oldpath, newpath)) end
+function S.getpid() return ffi.C.getpid() end
+function S.getppid() return ffi.C.getppid() end
 
 function S.read(fd, buf, count) return retint(ffi.C.read(getfd(fd), buf, count)) end
 function S.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count)) end
