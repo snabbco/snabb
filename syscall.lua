@@ -158,15 +158,15 @@ S.S_IXOTH = octal('00001') -- others have execute permission
 if ffi.abi('32bit') then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end -- not supported yet
 
 -- seek
-S.SEEK_SET = 0       -- Seek from beginning of file.
-S.SEEK_CUR = 1       -- Seek from current position.
-S.SEEK_END = 2       -- Seek from end of file.
+S.SEEK_SET = 0
+S.SEEK_CUR = 1
+S.SEEK_END = 2
 
 -- access
-S.R_OK = 4               -- Test for read permission.
-S.W_OK = 2               -- Test for write permission.
-S.X_OK = 1               -- Test for execute permission.
-S.F_OK = 0               -- Test for existence.
+S.R_OK = 4
+S.W_OK = 2
+S.X_OK = 1
+S.F_OK = 0
 
 -- fcntl second argument
 S.F_DUPFD       = 0

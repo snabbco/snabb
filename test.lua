@@ -238,8 +238,7 @@ assert(s:bind(a))
 
 assert(S.close(s))
 
-
--- can test better when do fork
+-- fork and related methods
 local pid, pid0, status
 pid0 = S.getpid()
 assert(pid0 > 1, "expecting my pid to be larger than 1")
