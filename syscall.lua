@@ -578,7 +578,7 @@ end
 
 function retfd(ret)
   if ret == -1 then return errorret() end
-  return fd_t(ret)
+  return S.gc(fd_t(ret), S.close)
 end
 
 function S.open(pathname, flags, mode) return retfd(ffi.C.open(pathname, flags or 0, mode or 0)) end
@@ -682,7 +682,7 @@ function S.madvise(addr, length, advice) return retbool(ffi.C.madvise(addr, leng
 function S.socket(domain, stype, protocol) return retfd(ffi.C.socket(domain, stype, protocol or 0)) end
 
 function S.fcntl(fd, cmd, arg)
-  -- some uses have arg as a pointer, need handling
+  -- some uses have arg as a pointer, need handling TODO
   local ret = ffi.C.fcntl(getfd(fd), cmd, arg or 0)
   -- return values differ, some special handling needed
   if cmd == S.F_DUPFD then return retfd(ret) end
@@ -714,7 +714,7 @@ local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pre
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
-fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
+fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth})
 stat_t = ffi.typeof("struct stat")
 
 -- add char buffer type
