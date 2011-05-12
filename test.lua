@@ -212,6 +212,11 @@ mem = nil
 assert(err == nil, err)
 assert(S.munmap(mem2, size2))
 
+local mask
+mask = S.umask(S.S_IWGRP + S.S_IWOTH)
+mask = S.umask(S.S_IWGRP + S.S_IWOTH)
+assert(mask == S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
+
 -- sockets
 local s, fl
 s, err = S.socket(S.AF_INET, S.SOCK_STREAM, 0)

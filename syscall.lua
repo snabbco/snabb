@@ -552,6 +552,7 @@ int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
 int fcntl(int fd, int cmd, long arg); /* arg can be a pointer though */
+mode_t umask(mode_t mask);
 
 int socket(int domain, int type, int protocol);
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
@@ -663,6 +664,7 @@ function S.mkdir(path, mode) return retbool(ffi.C.mkdir(path, mode)) end
 function S.rmdir(path) return retbool(ffi.C.rmdir(path)) end
 function S.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 function S.acct(filename) return retbool(ffi.C.acct(filename)) end
+function S.umask(mask) return ffi.C.umask(mask) end -- never fails
 
 function S.read(fd, buf, count) return retint(ffi.C.read(getfd(fd), buf, count)) end
 function S.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count)) end
