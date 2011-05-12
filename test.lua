@@ -181,7 +181,7 @@ stat, err, errno = S.lstat("/etc/passwd")
 assert(err == nil, err)
 assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
 
--- mmap test
+-- mmap and related functions
 local mem, mem2
 size = 4096
 mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0)
@@ -189,9 +189,7 @@ assert(err == nil, err)
 assert(S.munmap(mem, size))
 mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0)
 assert(err == nil, err)
--- test msync
 assert(S.msync(mem, size, S.MS_SYNC))
--- test madvise
 assert(S.madvise(mem, size, S.MADV_RANDOM))
 mem = nil -- gc memory, should be munmapped
 collectgarbage("collect")
@@ -206,4 +204,14 @@ mem2, err = S.mremap(mem, size, size2, S.MREMAP_MAYMOVE)
 mem = nil
 assert(err == nil, err)
 assert(S.munmap(mem2, size2))
+
+-- sockets
+local s
+s, err = S.socket(S.AF_INET, S.SOCK_STREAM, 0)
+assert(err == nil, err)
+assert(S.close(s))
+
+
+
+
 

@@ -204,36 +204,134 @@ S.MS_SYNC        = 4               -- Synchronous memory sync.
 S.MS_INVALIDATE  = 2               -- Invalidate the caches.
 
 -- Flags for `mlockall'.
-S.MCL_CURRENT    = 1               -- Lock all currently mapped pages.
-S.MCL_FUTURE     = 2               -- Lock all additions to address space.
+S.MCL_CURRENT    = 1
+S.MCL_FUTURE     = 2
 
 -- Flags for `mremap'.
 S.MREMAP_MAYMOVE = 1
 S.MREMAP_FIXED   = 2
 
 -- Advice to `madvise'.
-S.MADV_NORMAL      = 0     -- No further special treatment.
-S.MADV_RANDOM      = 1     -- Expect random page references.
-S.MADV_SEQUENTIAL  = 2     -- Expect sequential page references.
-S.MADV_WILLNEED    = 3     -- Will need these pages.
-S.MADV_DONTNEED    = 4     -- Don't need these pages.
-S.MADV_REMOVE      = 9     -- Remove these pages and resources.
-S.MADV_DONTFORK    = 10    -- Do not inherit across fork.
-S.MADV_DOFORK      = 11    -- Do inherit across fork.
-S.MADV_MERGEABLE   = 12    -- KSM may merge identical pages.
-S.MADV_UNMERGEABLE = 13    -- KSM may not merge identical pages.
-S.MADV_HUGEPAGE    = 14    -- Worth backing with hugepages.
-S.MADV_NOHUGEPAGE  = 15    -- Not worth backing with hugepages.
-S.MADV_HWPOISON    = 100   -- Poison a page for testing.
+S.MADV_NORMAL      = 0
+S.MADV_RANDOM      = 1
+S.MADV_SEQUENTIAL  = 2
+S.MADV_WILLNEED    = 3
+S.MADV_DONTNEED    = 4
+S.MADV_REMOVE      = 9
+S.MADV_DONTFORK    = 10
+S.MADV_DOFORK      = 11
+S.MADV_MERGEABLE   = 12
+S.MADV_UNMERGEABLE = 13
+S.MADV_HUGEPAGE    = 14
+S.MADV_NOHUGEPAGE  = 15
+S.MADV_HWPOISON    = 100
 
--- The POSIX people had to invent similar names for the same things.
-S.POSIX_MADV_NORMAL      = 0 -- No further special treatment.
-S.POSIX_MADV_RANDOM      = 1 -- Expect random page references.
-S.POSIX_MADV_SEQUENTIAL  = 2 -- Expect sequential page references.
-S.POSIX_MADV_WILLNEED    = 3 -- Will need these pages.
-S.POSIX_MADV_DONTNEED    = 4 -- Don't need these pages.
+-- POSIX madvise names
+S.POSIX_MADV_NORMAL      = 0
+S.POSIX_MADV_RANDOM      = 1
+S.POSIX_MADV_SEQUENTIAL  = 2
+S.POSIX_MADV_WILLNEED    = 3
+S.POSIX_MADV_DONTNEED    = 4
 
-S.symerror = {
+-- sockets
+S.SOCK_STREAM    = 1
+S.SOCK_DGRAM     = 2
+S.SOCK_RAW       = 3
+S.SOCK_RDM       = 4
+S.SOCK_SEQPACKET = 5
+S.SOCK_DCCP      = 6
+S.SOCK_PACKET    = 10
+
+S.SOCK_CLOEXEC = octal('02000000')      -- Atomically set close-on-exec flag for the new descriptor(s).  */
+S.SOCK_NONBLOCK = octal('04000')        -- Atomically mark descriptor(s) as non-blocking.  */
+
+-- Protocol families.
+S.PF_UNSPEC     = 0
+S.PF_LOCAL      = 1
+S.PF_UNIX       = S.PF_LOCAL
+S.PF_FILE       = S.PF_LOCAL
+S.PF_INET       = 2
+S.PF_AX25       = 3
+S.PF_IPX        = 4
+S.PF_APPLETALK  = 5
+S.PF_NETROM     = 6
+S.PF_BRIDGE     = 7
+S.PF_ATMPVC     = 8
+S.PF_X25        = 9
+S.PF_INET6      = 10
+S.PF_ROSE       = 11
+S.PF_DECnet     = 12
+S.PF_NETBEUI    = 13
+S.PF_SECURITY   = 14
+S.PF_KEY        = 15 
+S.PF_NETLINK    = 16
+S.PF_ROUTE      = S.PF_NETLINK
+S.PF_PACKET     = 17
+S.PF_ASH        = 18
+S.PF_ECONET     = 19
+S.PF_ATMSVC     = 20
+S.PF_RDS        = 21
+S.PF_SNA        = 22
+S.PF_IRDA       = 23
+S.PF_PPPOX      = 24
+S.PF_WANPIPE    = 25
+S.PF_LLC        = 26
+S.PF_CAN        = 29
+S.PF_TIPC       = 30
+S.PF_BLUETOOTH  = 31
+S.PF_IUCV       = 32
+S.PF_RXRPC      = 33
+S.PF_ISDN       = 34
+S.PF_PHONET     = 35
+S.PF_IEEE802154 = 36
+S.PF_CAIF       = 37
+S.PF_ALG        = 38
+S.PF_MAX        = 39
+
+-- address families
+S.AF_UNSPEC     = S.PF_UNSPEC
+S.AF_LOCAL      = S.PF_LOCAL
+S.AF_UNIX       = S.PF_UNIX
+S.AF_FILE       = S.PF_FILE
+S.AF_INET       = S.PF_INET
+S.AF_AX25       = S.PF_AX25
+S.AF_IPX        = S.PF_IPX
+S.AF_APPLETALK  = S.PF_APPLETALK
+S.AF_NETROM     = S.PF_NETROM
+S.AF_BRIDGE     = S.PF_BRIDGE
+S.AF_ATMPVC     = S.PF_ATMPVC
+S.AF_X25        = S.PF_X25
+S.AF_INET6      = S.PF_INET6
+S.AF_ROSE       = S.PF_ROSE
+S.AF_DECnet     = S.PF_DECnet
+S.AF_NETBEUI    = S.PF_NETBEUI
+S.AF_SECURITY   = S.PF_SECURITY
+S.AF_KEY        = S.PF_KEY
+S.AF_NETLINK    = S.PF_NETLINK
+S.AF_ROUTE      = S.PF_ROUTE
+S.AF_PACKET     = S.PF_PACKET
+S.AF_ASH        = S.PF_ASH
+S.AF_ECONET     = S.PF_ECONET
+S.AF_ATMSVC     = S.PF_ATMSVC
+S.AF_RDS        = S.PF_RDS
+S.AF_SNA        = S.PF_SNA
+S.AF_IRDA       = S.PF_IRDA
+S.AF_PPPOX      = S.PF_PPPOX
+S.AF_WANPIPE    = S.PF_WANPIPE
+S.AF_LLC        = S.PF_LLC
+S.AF_CAN        = S.PF_CAN
+S.AF_TIPC       = S.PF_TIPC
+S.AF_BLUETOOTH  = S.PF_BLUETOOTH
+S.AF_IUCV       = S.PF_IUCV
+S.AF_RXRPC      = S.PF_RXRPC
+S.AF_ISDN       = S.PF_ISDN
+S.AF_PHONET     = S.PF_PHONET
+S.AF_IEEE802154 = S.PF_IEEE802154
+S.AF_CAIF       = S.PF_CAIF
+S.AF_ALG        = S.PF_ALG
+S.AF_MAX        = S.PF_MAX
+
+S.symerror = { -- symbolic error names, indexed by errno
 'EPERM',  'ENOENT', 'ESRCH',   'EINTR',
 'EIO',    'ENXIO',  'E2BIG',   'ENOEXEC',
 'EBADF',  'ECHILD', 'EAGAIN',  'ENOMEM',
@@ -252,11 +350,9 @@ local nogc = function(d, f) return d end
 
 function S.gcollect(bool) if bool then S.gc = ffi.gc else S.gc = nogc end end
 
-function S.strerror(errno)
-  return ffi.string(ffi.C.strerror(errno)), errno
-end
-
 local errorret, retint, retbool, retptr, retfd, getfd
+
+function S.strerror(errno) return ffi.string(ffi.C.strerror(errno)), errno end
 
 -- standard error return
 function errorret()
@@ -384,6 +480,9 @@ int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
 
+int socket(int domain, int type, int protocol);
+
+
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
 int msync(void *addr, size_t length, int flags);
@@ -448,9 +547,7 @@ function retfd(ret)
   return fd_t(ret)
 end
 
-function S.open(pathname, flags, mode)
-  return retfd(ffi.C.open(pathname, flags or 0, mode or 0))
-end
+function S.open(pathname, flags, mode) return retfd(ffi.C.open(pathname, flags or 0, mode or 0)) end
 
 function S.dup(oldfd, newfd, flags)
   if newfd == nil then return retfd(ffi.C.dup(getfd(oldfd))) end
@@ -462,26 +559,19 @@ S.dup3 = S.dup -- conditional on newfd set
 function S.pipe(flags)
   local fd2 = fd2_t()
   local ret = ffi.C.pipe2(fd2, flags or 0)
-
   if ret == -1 then
     return nil, errorret() -- extra nil as we return two fds normally
   end
-
   return fd_t(fd2[0]), fd_t(fd2[1])
 end
 S.pipe2 = S.pipe
 
 function S.close(fd)
   local ret = ffi.C.close(getfd(fd))
-
-  if ret == -1 then
-    return errorret()
-  end
-
+  if ret == -1 then return errorret() end
   if ffi.istype(fd_t, fd) then
     S.gc(fd, nil) -- remove gc finalizer as now closed; should we also remove if get EBADF?
   end
-
   return true
 end
 
@@ -538,7 +628,7 @@ function S.nanosleep(req)
   local rem = timespec_t()
   local ret = ffi.C.nanosleep(req, rem)
   if ret == -1 then return errorret() end
-  return rem
+  return rem -- return second argument, Lua style
 end
 
 function S.mmap(addr, length, prot, flags, fd, offset)
@@ -554,6 +644,8 @@ function S.mlockall(flags) return retbool(ffi.C.mlockall(flags)) end
 function S.munlockall() return retbool(ffi.C.munlockall()) end
 function S.mremap(old_address, old_size, new_size, flags, new_address) return retptr(ffi.C.mremap(old_address, old_size, new_size, flags, new_address)) end
 function S.madvise(addr, length, advice) return retbool(ffi.C.madvise(addr, length, advice)) end
+
+function S.socket(domain, stype, protocol) return retfd(ffi.C.socket(domain, stype, protocol or 0)) end
 
 -- 'macros' and helper functions etc
 
