@@ -379,6 +379,7 @@ int fdatasync(int fd);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
+int msync(void *addr, size_t length, int flags);
 
 int pipe2(int pipefd[2], int flags);
 
@@ -535,6 +536,7 @@ end
 function S.munmap(addr, length)
   return retbool(ffi.C.munmap(ffi.gc(addr, nil), length))
 end
+function S.msync(addr, length, flags) return retbool(ffi.C.msync(addr, length, flags)) end
 
 -- 'macros' and helper functions etc
 
