@@ -180,7 +180,7 @@ assert(err == nil, err)
 assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
 
 -- mmap test
-local mem
+local mem, mem2
 size = 4096
 mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0)
 assert(err == nil, err)
@@ -194,4 +194,12 @@ collectgarbage("collect")
 mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS + S.MAP_FIXED, -1, 0) -- MAP_FIXED should fail here!
 assert(mem == nil, "expect mmap MAP_FIXED to fail")
 
+local size2 = size * 2
+mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0)
+assert(err == nil, err)
+S.nogc(mem)
+mem2, err = S.mremap(mem, size, size2, S.MREMAP_MAYMOVE)
+mem = nil
+assert(err == nil, err)
+assert(S.munmap(mem2, size2))
 
