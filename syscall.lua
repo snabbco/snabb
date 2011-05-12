@@ -266,8 +266,8 @@ S.SOCK_SEQPACKET = 5
 S.SOCK_DCCP      = 6
 S.SOCK_PACKET    = 10
 
-S.SOCK_CLOEXEC = octal('02000000')      -- Atomically set close-on-exec flag for the new descriptor(s).  */
-S.SOCK_NONBLOCK = octal('04000')        -- Atomically mark descriptor(s) as non-blocking.  */
+S.SOCK_CLOEXEC = octal('02000000')
+S.SOCK_NONBLOCK = octal('04000')
 
 -- Protocol families.
 S.PF_UNSPEC     = 0
@@ -755,7 +755,7 @@ function S.S_ISLNK(m)  return bit.band(m, S.S_IFLNK)  ~= 0 end
 function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 
 -- not system functions
-function S.nogc(d) S.gc(d, nil) end
+function S.nogc(d) ffi.gc(d, nil) end -- use ffi.gc not S.gc here
 
 -- types
 
