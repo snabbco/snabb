@@ -278,12 +278,12 @@ function retbool(ret)
   return true
 end
 
--- used for pointer returns, null is failure
--- not used
-function retptr(ret)
-  if ret == nil then
+-- used for pointer returns, -1 is failure, optional gc function
+function retptr(ret, f)
+  if ffi.cast("long", ret) == -1 then
      return errorret()
   end
+  if f then return S.gc(ret, f) end
   return ret
 end
 
@@ -541,12 +541,10 @@ function S.nanosleep(req)
 end
 
 function S.mmap(addr, length, prot, flags, fd, offset)
-  local ret = ffi.C.mmap(addr, length, prot, flags, getfd(fd), offset)
-  if ffi.cast("long", ret) == -1 then return errorret() end
-  return S.gc(ret, function(addr) ffi.C.munmap(addr, length) end) -- add munmap to gc
+  return retptr(ffi.C.mmap(addr, length, prot, flags, getfd(fd), offset), function(addr) ffi.C.munmap(addr, length) end) -- add munmap gc
 end
 function S.munmap(addr, length)
-  return retbool(ffi.C.munmap(S.gc(addr, nil), length))
+  return retbool(ffi.C.munmap(S.gc(addr, nil), length)) -- remove gc on unmap
 end
 function S.msync(addr, length, flags) return retbool(ffi.C.msync(addr, length, flags)) end
 function S.mlock(addr, len) return retbool(ffi.C.mlock(addr, len)) end
