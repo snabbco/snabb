@@ -245,6 +245,13 @@ S.symerror = {
 'EDOM',   'ERANGE'
 }
 
+-- optional garbage collection support
+S.gc = ffi.gc
+
+local nogc = function(d, f) return d end
+
+function S.gcollect(bool) if bool then S.gc = ffi.gc else S.gc = nogc end end
+
 function S.strerror(errno)
   return ffi.string(ffi.C.strerror(errno)), errno
 end
@@ -471,7 +478,7 @@ function S.close(fd)
   end
 
   if ffi.istype(fd_t, fd) then
-    ffi.gc(fd, nil) -- remove gc finalizer as now closed; should we also remove if get EBADF?
+    S.gc(fd, nil) -- remove gc finalizer as now closed; should we also remove if get EBADF?
   end
 
   return true
@@ -536,10 +543,10 @@ end
 function S.mmap(addr, length, prot, flags, fd, offset)
   local ret = ffi.C.mmap(addr, length, prot, flags, getfd(fd), offset)
   if ffi.cast("long", ret) == -1 then return errorret() end
-  return ffi.gc(ret, function(addr) ffi.C.munmap(addr, length) end) -- add munmap to gc
+  return S.gc(ret, function(addr) ffi.C.munmap(addr, length) end) -- add munmap to gc
 end
 function S.munmap(addr, length)
-  return retbool(ffi.C.munmap(ffi.gc(addr, nil), length))
+  return retbool(ffi.C.munmap(S.gc(addr, nil), length))
 end
 function S.msync(addr, length, flags) return retbool(ffi.C.msync(addr, length, flags)) end
 function S.mlock(addr, len) return retbool(ffi.C.mlock(addr, len)) end
@@ -563,7 +570,7 @@ function S.S_ISLNK(m)  return bit.band(m, S.S_IFLNK)  ~= 0 end
 function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 
 -- not system functions
-function S.nogc(d) ffi.gc(d, nil) end
+function S.nogc(d) S.gc(d, nil) end
 
 -- types
 

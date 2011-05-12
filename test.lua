@@ -2,6 +2,8 @@ local S = require "syscall"
 
 local fd, fd0, fd1, fd2, n, s, err, errno
 
+S.gcollect(true)
+
 -- test open non existent file
 fd, err, errno = S.open("/tmp/file/does/not/exist", S.O_RDONLY)
 assert(err ~= nil, "expected open to fail on file not found")
