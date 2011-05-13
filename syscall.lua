@@ -486,6 +486,7 @@ int fchmod(int fd, mode_t mode);
 
 int socket(enum AF domain, enum SOCK type, int protocol);
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int listen(int sockfd, int backlog);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
@@ -608,6 +609,8 @@ function S.chmod(path, mode) return retbool(ffi.C.chmod(path, mode)) end
 function S.link(oldpath, newpath) return retbool(ffi.C.link(oldpath, newpath)) end
 
 function S.fork() return retint(ffi.C.fork()) end
+
+-- cleanup wait, waitpid to return one value, but need to work out what exactly...
 function S.wait() -- we always get and return the status value, need to add helpers
   local status = int1_t()
   local ret = ffi.C.wait(status)
@@ -620,6 +623,7 @@ function S.waitpid(pid, options) -- we always get and return the status value, n
   if ret == -1 then return nil, errorret() end -- extra padding where we would return status
   return ret, status[0]
 end
+
 function S._exit(status) ffi.C._exit(status or 0) end
 function S.exit(status) ffi.C.exit(status or 0) end
 
@@ -698,6 +702,8 @@ function S.bind(sockfd, addr, addrlen)
   return retbool(ffi.C.bind(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), addrlen))
 end
 
+function S.listen(sockfd, backlog) return retbool(ffi.C.listen(getfd(sockfd), backlog or 0)) end
+
 function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
   local ret = ffi.C.fcntl(getfd(fd), cmd, arg or 0)
@@ -751,7 +757,8 @@ function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 
 -- methods on an fd
 local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
-                   'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'bind', 'fchmod'}
+                   'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
+                   'bind', 'listen'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 

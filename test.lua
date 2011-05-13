@@ -133,7 +133,6 @@ assert(err, "expected open to fail on file not found")
 fd, err, errno = S.pipe(99999) -- invalid flags
 assert(fd == nil and S.symerror[errno] == 'EINVAL', "should be EINVAL with bad flags to pipe2")
 
--- cant use idiomatic assert here, should we return table?
 fd = assert(S.pipe())
 assert(fd[1].fd == 3 and fd[2].fd == 4, "expect file handles 3 and 4 for pipe")
 assert(fd[1]:close())
@@ -211,8 +210,8 @@ sa = assert(S.sockaddr_in(1234, loop), "bad sockaddr")
 assert(S.inet_ntoa(sa.sin_addr) == loop, "expect address converted back to string to still be same")
 
 assert(s:bind(sa))
-
-assert(S.close(s))
+assert(s:listen())
+assert(s:close())
 
 -- fork and related methods
 local pid, pid0, status
