@@ -2,8 +2,6 @@ local S = require "syscall"
 
 local fd, fd0, fd1, fd2, n, s, err, errno, ok
 
-S.gcollect(true)
-
 -- print uname info
 local u = assert(S.uname())
 print(u.nodename .. " " .. u.sysname .. " " .. u.release .. " " .. u.version)
@@ -234,12 +232,12 @@ ok, err, errno = c:connect(sa)
 assert(not ok, "connect should fail here")
 assert(err ~= S.errno('EINPROGRESS'), "have not accepted should get Operation in progress")
 
-local fd = assert(s:accept())
+local a = assert(s:accept())
 assert(c:connect(sa)) -- able to connect now we have accepted
 
 n = assert(c:write(string))
 assert(n == #string, "should be able to write out short string")
-n = assert(fd:read(buf, size))
+n = assert(a.fd:read(buf, size))
 assert(n == #string, "should read back string into buffer")
 assert(S.string(buf, n) == string, "we should read back the same string that was sent")
 

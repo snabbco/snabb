@@ -142,12 +142,8 @@ S.WNOWAIT       = 0x01000000
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
--- optional garbage collection support
-S.gc = ffi.gc -- enabled by default
-local nogc = function(d, f) return d end
-function S.gcollect(bool) if bool then S.gc = ffi.gc else S.gc = nogc end end
-function S.nogc(d) ffi.gc(d, nil) end -- use ffi.gc not S.gc here
-
+-- misc
+function S.nogc(d) ffi.gc(d, nil) end
 local errorret, retint, retbool, retptr, retfd, getfd
 
 function S.strerror(errno) return ffi.string(ffi.C.strerror(errno)), errno end
@@ -177,7 +173,7 @@ function retptr(ret, f)
   if ffi.cast("long", ret) == -1 then
      return errorret()
   end
-  if f then return S.gc(ret, f) end
+  if f then return ffi.gc(ret, f) end
   return ret
 end
 
@@ -188,6 +184,7 @@ local buffer_t = ffi.typeof("char[?]")
 
 S.string = ffi.string -- convenience for converting buffers
 S.sizeof = ffi.sizeof -- convenience so user need not require ffi
+S.cast = ffi.cast -- convenience so user need not require ffi
 
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
@@ -212,7 +209,7 @@ end
 
 function retfd(ret)
   if ret == -1 then return errorret() end
-  return S.gc(fd_t(ret), S.close)
+  return fd_t(ret)
 end
 
 -- define C types
@@ -669,7 +666,7 @@ char *strerror(enum E errnum);
 ]]
 
 --[[ -- not defined yet
- int creat(const char *pathname, mode_t mode); -- defined using open instead
+ int creat(const char *pathname, mode_t mode); -- defined using open instead, should use creat
 ]]
 
 -- Lua type constructors corresponding to defined types
@@ -750,7 +747,7 @@ function S.close(fd)
   local ret = ffi.C.close(getfd(fd))
   if ret == -1 then return errorret() end
   if ffi.istype(fd_t, fd) then
-    S.gc(fd, nil) -- remove gc finalizer as now closed; should we also remove if get EBADF?
+    ffi.gc(fd, nil) -- remove gc finalizer as now closed; should we also remove if get EBADF?
   end
   return true
 end
@@ -840,7 +837,7 @@ function S.mmap(addr, length, prot, flags, fd, offset)
   return retptr(ffi.C.mmap(addr, length, prot, flags, getfd(fd), offset), function(addr) ffi.C.munmap(addr, length) end) -- add munmap gc
 end
 function S.munmap(addr, length)
-  return retbool(ffi.C.munmap(S.gc(addr, nil), length)) -- remove gc on unmap
+  return retbool(ffi.C.munmap(ffi.gc(addr, nil), length)) -- remove gc on unmap
 end
 function S.msync(addr, length, flags) return retbool(ffi.C.msync(addr, length, flags)) end
 function S.mlock(addr, len) return retbool(ffi.C.mlock(addr, len)) end
@@ -861,14 +858,14 @@ function S.connect(sockfd, addr, addrlen)
   return retbool(ffi.C.connect(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), getaddrlen(addr, addrlen)))
 end
 
--- not working if addr, addrlen not nil!!!!!
-function S.accept(sockfd, addr, addrlen, flags)
-  if flags then -- accept4 variant
-    return retfd(ffi.C.accept4(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), getaddrlen(addr, addrlen), flags))
-  end
-  return retfd(ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), getaddrlen(addr, addrlen)))
+function S.accept(sockfd)
+  local addr = sockaddr_storage_t()
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  local ret = ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), addrlen)
+  if ret == -1 then return errorret() end
+  return {fd = fd_t(ret), addr = addr}
 end
-S.accept4 = S.accept
+--S.accept4 = S.accept -- need to add support for flags argument TODO
 
 function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
@@ -928,7 +925,7 @@ local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pre
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
-fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth})
+fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
 S.t = {
