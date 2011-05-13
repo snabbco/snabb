@@ -198,19 +198,29 @@ local a, sa
 a = S.inet_aton("error")
 assert(not a, "should get invalid IP address")
 
-local s, fl
-s = assert(S.socket("AF_INET", "SOCK_STREAM", 0))
+local s, fl, c
+s = assert(S.socket("AF_INET", "SOCK_STREAM"))
 fl = assert(s:fcntl("F_GETFL"))
 assert(s:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK)))
 
 local loop = "127.0.0.1"
 sa = S.sockaddr_in(1234, "error")
 assert(not sa, "expect nil socket address from invalid ip string")
-sa = assert(S.sockaddr_in(1234, loop), "bad sockaddr")
+
+
+sa = assert(S.sockaddr_in(1234, loop))
 assert(S.inet_ntoa(sa.sin_addr) == loop, "expect address converted back to string to still be same")
+assert(sa.sin_family == 2, "expect family on inet socket to be AF_INET=2")
 
 assert(s:bind(sa))
 assert(s:listen())
+
+c = assert(S.socket("AF_INET", "SOCK_STREAM")) -- client socket
+fl = assert(c:fcntl("F_GETFL"))
+assert(c:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK)))
+
+assert(c:connect(sa)) -- connect to our server address
+
 assert(s:close())
 
 -- fork and related methods

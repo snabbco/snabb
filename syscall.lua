@@ -487,6 +487,7 @@ int fchmod(int fd, mode_t mode);
 int socket(enum AF domain, enum SOCK type, int protocol);
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int listen(int sockfd, int backlog);
+int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
@@ -541,8 +542,19 @@ local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
 local in_addr_t = ffi.typeof("struct in_addr")
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
+local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
+
+-- helper function to make setting addrlen optional
+local getaddrlen
+function getaddrlen(addr, addrlen)
+  if addrlen == nil then
+    if ffi.istype(sockaddr_t, addr) then return ffi.sizeof(sockaddr_t) end
+    if ffi.istype(sockaddr_in_t, addr) then return ffi.sizeof(sockaddr_in_t) end
+  end
+  return addrlen
+end
 
 -- functions from section 3 that we use for ip addresses
 function S.inet_aton(s)
@@ -559,7 +571,7 @@ function S.inet_ntoa(addr) return ffi.string(ffi.C.inet_ntoa(addr)) end
 function S.sockaddr_in(port, addr)
   if type(addr) == 'string' then addr = S.inet_aton(addr) end
   if not addr then return nil end
-  return sockaddr_in_t(ffi.cast(sa_family_t, "AF_INET"), S.htons(port), addr)
+  return sockaddr_in_t(enumAF_t("AF_INET"), S.htons(port), addr)
 end
 
 -- constants
@@ -694,15 +706,13 @@ function S.madvise(addr, length, advice) return retbool(ffi.C.madvise(addr, leng
 function S.socket(domain, stype, protocol) return retfd(ffi.C.socket(domain, stype, protocol or 0)) end
 
 function S.bind(sockfd, addr, addrlen)
-  if addrlen == nil then -- we can compute this, for known address types
-    if ffi.istype(sockaddr_t, addr) then addrlen = ffi.sizeof(sockaddr_t)
-    elseif ffi.istype(sockaddr_in_t, addr) then addrlen = ffi.sizeof(sockaddr_in_t)
-    end
-  end
-  return retbool(ffi.C.bind(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), addrlen))
+  return retbool(ffi.C.bind(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), getaddrlen(addr, addrlen)))
 end
 
 function S.listen(sockfd, backlog) return retbool(ffi.C.listen(getfd(sockfd), backlog or 0)) end
+function S.connect(sockfd, addr, addrlen)
+  return retbool(ffi.C.connect(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), getaddrlen(addr, addrlen)))
+end
 
 function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
@@ -758,7 +768,7 @@ function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 -- methods on an fd
 local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
-                   'bind', 'listen'}
+                   'bind', 'listen', 'connect'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
