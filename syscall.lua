@@ -679,9 +679,9 @@ function S.pipe(flags)
   local fd2 = int2_t()
   local ret = ffi.C.pipe2(fd2, flags or 0)
   if ret == -1 then
-    return nil, errorret() -- extra nil as we return two fds normally
+    return errorret()
   end
-  return fd_t(fd2[0]), fd_t(fd2[1])
+  return {fd_t(fd2[0]), fd_t(fd2[1])}
 end
 S.pipe2 = S.pipe
 
@@ -858,7 +858,7 @@ fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth})
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
 S.t = {
-  fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if initialiser for fd useful
+  fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t,
 }
 

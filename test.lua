@@ -130,14 +130,14 @@ assert(S.close(fd))
 fd, err = S.open(tmpfile, S.O_RDWR)
 assert(err, "expected open to fail on file not found")
 
-fd0, fd1, err, errno = S.pipe(99999) -- invalid flags
-assert(fd0 == nil and fd1 == nil and S.symerror[errno] == 'EINVAL', "should be EINVAL with bad flags to pipe2")
+fd, err, errno = S.pipe(99999) -- invalid flags
+assert(fd == nil and S.symerror[errno] == 'EINVAL', "should be EINVAL with bad flags to pipe2")
 
 -- cant use idiomatic assert here, should we return table?
-fd0, fd1, err, errno = S.pipe()
-assert(err == nil and errno == nil, "should be able to open pipe")
-assert(fd0.fd == 3 and fd1.fd == 4, "expect file handles 3 and 4 for pipe")
-fd0, fd1 = nil, nil
+fd = assert(S.pipe())
+assert(fd[1].fd == 3 and fd[2].fd == 4, "expect file handles 3 and 4 for pipe")
+assert(fd[1]:close())
+assert(fd[2]:close())
 
 assert(S.chdir("/"))
 fd = assert(S.open("/"))
