@@ -216,49 +216,6 @@ S.SOCK_PACKET    = 10
 S.SOCK_CLOEXEC = octal('02000000') -- flag
 S.SOCK_NONBLOCK = octal('04000')   -- flag
 
--- address families. -- should be able to just use enum, once fix type initialisation, need not export, but used internally
-S.AF_UNSPEC     = 0
-S.AF_LOCAL      = 1
-S.AF_UNIX       = S.PF_LOCAL
-S.AF_FILE       = S.PF_LOCAL
-S.AF_INET       = 2
-S.AF_AX25       = 3
-S.AF_IPX        = 4
-S.AF_APPLETALK  = 5
-S.AF_NETROM     = 6
-S.AF_BRIDGE     = 7
-S.AF_ATMPVC     = 8
-S.AF_X25        = 9
-S.AF_INET6      = 10
-S.AF_ROSE       = 11
-S.AF_DECnet     = 12
-S.AF_NETBEUI    = 13
-S.AF_SECURITY   = 14
-S.AF_KEY        = 15 
-S.AF_NETLINK    = 16
-S.AF_ROUTE      = S.PF_NETLINK
-S.AF_PACKET     = 17
-S.AF_ASH        = 18
-S.AF_ECONET     = 19
-S.AF_ATMSVC     = 20
-S.AF_RDS        = 21
-S.AF_SNA        = 22
-S.AF_IRDA       = 23
-S.AF_PPPOX      = 24
-S.AF_WANPIPE    = 25
-S.AF_LLC        = 26
-S.AF_CAN        = 29
-S.AF_TIPC       = 30
-S.AF_BLUETOOTH  = 31
-S.AF_IUCV       = 32
-S.AF_RXRPC      = 33
-S.AF_ISDN       = 34
-S.AF_PHONET     = 35
-S.AF_IEEE802154 = 36
-S.AF_CAIF       = 37
-S.AF_ALG        = 38
-S.AF_MAX        = 39
-
 -- misc socket constants -- move to enum??
 S.SOL_RAW        = 255
 S.SOL_DECNET     = 261
@@ -705,7 +662,7 @@ S.INADDR_ANY = in_addr_t()
 S.INADDR_LOOPBACK = assert(S.inet_aton("127.0.0.1"))
 S.INADDR_BROADCAST = assert(S.inet_aton("255.255.255.255"))
 
--- definitions start here
+-- main definitions start here
 function S.open(pathname, flags, mode) return retfd(ffi.C.open(pathname, flags or 0, mode or 0)) end
 
 function S.dup(oldfd, newfd, flags)
