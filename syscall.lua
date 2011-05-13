@@ -294,14 +294,13 @@ S.symerror = { -- symbolic error names, indexed by errno
 }
 
 -- constants
-local HOST_NAME_MAX = 64 -- Linux
+local HOST_NAME_MAX = 64 -- Linux. should we export?
 
 -- optional garbage collection support
-S.gc = ffi.gc
-
+S.gc = ffi.gc -- enabled by default
 local nogc = function(d, f) return d end
-
 function S.gcollect(bool) if bool then S.gc = ffi.gc else S.gc = nogc end end
+function S.nogc(d) ffi.gc(d, nil) end -- use ffi.gc not S.gc here
 
 local errorret, retint, retbool, retptr, retfd, getfd
 
@@ -336,7 +335,42 @@ function retptr(ret, f)
   return ret
 end
 
--- define types
+local fd_t -- type for a file descriptor
+local fd2_t = ffi.typeof("int[2]")
+
+-- char buffer type
+local buffer_t = ffi.typeof("char[?]")
+
+S.string = ffi.string -- convenience for converting buffers
+S.sizeof = ffi.sizeof -- convenience so user need not require ffi
+
+-- endian conversion
+if ffi.abi("be") then -- nothing to do
+  function S.htonl(b) return b end
+else
+  function S.htonl(b) return bit.bswap(b) end
+  function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
+end
+S.ntohl = S.htonl -- reverse is the same
+S.ntohs = S.htons -- reverse is the same
+
+--get fd from standard string, integer, or cdata
+function getfd(fd)
+  if type(fd) == 'number' then return fd end
+  if ffi.istype(fd_t, fd) then return fd.fd end
+  if type(fd) == 'string' then
+    if fd == 'stdin' or fd == 'STDIN_FILENO' then return 0 end
+    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
+    if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
+  end
+end
+
+function retfd(ret)
+  if ret == -1 then return errorret() end
+  return S.gc(fd_t(ret), S.close)
+end
+
+-- define C types
 ffi.cdef[[
 // typedefs for word size independent types
 
@@ -636,44 +670,11 @@ char *strerror(int errnum);
  int creat(const char *pathname, mode_t mode); -- defined using open instead
 ]]
 
-
-local fd_t -- type for a file descriptor
-local fd2_t = ffi.typeof("int[2]")
+-- Lua type constructors corresponding to defined types
 local timespec_t = ffi.typeof("struct timespec")
 local stat_t = ffi.typeof("struct stat")
 
--- add char buffer type
-local buffer_t = ffi.typeof("char[?]")
-
-S.string = ffi.string -- convenience for converting buffers
-S.sizeof = ffi.sizeof -- convenience so user need not require ffi
-
--- endian conversion
-if ffi.abi("be") then -- nothing to do
-  function S.htonl(b) return b end
-else
-  function S.htonl(b) return bit.bswap(b) end
-  function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
-end
-S.ntohl = S.htonl -- reverse is the same
-S.ntohs = S.htons
-
---get fd from standard string, integer, or cdata
-function getfd(fd)
-  if type(fd) == 'number' then return fd end
-  if ffi.istype(fd_t, fd) then return fd.fd end
-  if type(fd) == 'string' then
-    if fd == 'stdin' or fd == 'STDIN_FILENO' then return 0 end
-    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
-    if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
-  end
-end
-
-function retfd(ret)
-  if ret == -1 then return errorret() end
-  return S.gc(fd_t(ret), S.close)
-end
-
+-- definitions start here
 function S.open(pathname, flags, mode) return retfd(ffi.C.open(pathname, flags or 0, mode or 0)) end
 
 function S.dup(oldfd, newfd, flags)
@@ -861,9 +862,6 @@ function S.S_ISBLK(m)  return bit.band(m, S.S_IFBLK)  ~= 0 end
 function S.S_ISFIFO(m) return bit.band(m, S.S_IFFIFO) ~= 0 end
 function S.S_ISLNK(m)  return bit.band(m, S.S_IFLNK)  ~= 0 end
 function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
-
--- not system functions
-function S.nogc(d) ffi.gc(d, nil) end -- use ffi.gc not S.gc here
 
 -- methods on an fd
 local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
