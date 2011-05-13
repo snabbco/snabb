@@ -505,21 +505,22 @@ if ffi.abi("32bit") then
 STAT_VER_LINUX = 3
 ffi.cdef[[
 struct stat {
-  dev_t st_dev;                       /* Device.  */
+  dev_t st_dev;
   unsigned short int __pad1;
-  ino_t __st_ino;                     /* 32bit file serial number.    */
-  mode_t st_mode;                     /* File mode.  */
-  nlink_t st_nlink;                   /* Link count.  */
-  uid_t st_uid;                       /* User ID of the file's owner. */
-  gid_t st_gid;                       /* Group ID of the file's group.*/
-  dev_t st_rdev;                      /* Device number, if device.  */
+  ino_t __st_ino;
+  mode_t st_mode;
+  nlink_t st_nlink;
+  uid_t st_uid;
+  gid_t st_gid;
+  dev_t st_rdev;
   unsigned short int __pad2;
-  off_t st_size;                      /* Size of file, in bytes.  */
-  blksize_t st_blksize;               /* Optimal block size for I/O.  */
-  blkcnt_t st_blocks;                 /* Number 512-byte blocks allocated. */
-  struct timespec st_atim;            /* Time of last access.  */
-  struct timespec st_mtim;            /* Time of last modification.  */
-  struct timespec st_ctim;            /* Time of last status change.  */   unsigned long int __unused4;
+  off_t st_size;
+  blksize_t st_blksize;
+  blkcnt_t st_blocks;
+  struct timespec st_atim;
+  struct timespec st_mtim;
+  struct timespec st_ctim;
+  unsigned long int __unused4;
   unsigned long int __unused5;
 };
 ]]
@@ -527,20 +528,20 @@ else -- 64 bit arch
 STAT_VER_LINUX = 1
 ffi.cdef[[
 struct stat {
-  dev_t st_dev;             /* Device.  */
-  ino_t st_ino;             /* File serial number.  */
-  nlink_t st_nlink;         /* Link count.  */
-  mode_t st_mode;           /* File mode.  */
-  uid_t st_uid;             /* User ID of the file's owner. */
-  gid_t st_gid;             /* Group ID of the file's group.*/
+  dev_t st_dev;
+  ino_t st_ino;
+  nlink_t st_nlink;
+  mode_t st_mode;
+  uid_t st_uid;
+  gid_t st_gid;
   int __pad0;
-  dev_t st_rdev;            /* Device number, if device.  */
-  off_t st_size;            /* Size of file, in bytes.  */
-  blksize_t st_blksize;     /* Optimal block size for I/O.  */
-  blkcnt_t st_blocks;       /* Number 512-byte blocks allocated. */
-  struct timespec st_atim;  /* Time of last access.  */
-  struct timespec st_mtim;  /* Time of last modification.  */
-  struct timespec st_ctim;  /* Time of last status change.  */
+  dev_t st_rdev;
+  off_t st_size;
+  blksize_t st_blksize;
+  blkcnt_t st_blocks;
+  struct timespec st_atim;
+  struct timespec st_mtim;
+  struct timespec st_ctim;
   long int __unused[3];
 };
 ]]
