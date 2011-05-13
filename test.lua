@@ -221,7 +221,10 @@ assert(c:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK)))
 
 --assert(c:connect(sa)) -- connect to our server address
 ok, err, errno = c:connect(sa)
-if not ok then print(err, errno) end
+assert(not ok, "connect should fail here")
+assert(err ~= S.errno('EINPROGRESS'), "have not accepted should get Operation in progress")
+
+
 
 assert(s:close())
 
