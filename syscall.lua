@@ -293,7 +293,6 @@ function retptr(ret, f)
 end
 
 local fd_t -- type for a file descriptor
-local fd2_t = ffi.typeof("int[2]")
 
 -- char buffer type
 local buffer_t = ffi.typeof("char[?]")
@@ -634,9 +633,12 @@ char *strerror(int errnum);
 local timespec_t = ffi.typeof("struct timespec")
 local stat_t = ffi.typeof("struct stat")
 local sockaddr_t = ffi.typeof("struct sockaddr")
+local sockaddr_p_t = ffi.typeof("struct sockaddr *")
 local sa_family_t = ffi.typeof("sa_family_t")
 local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
 local in_addr_t = ffi.typeof("struct in_addr")
+local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
+local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
 
@@ -674,7 +676,7 @@ S.dup2 = S.dup -- flags optional, so do not need new function
 S.dup3 = S.dup -- conditional on newfd set
 
 function S.pipe(flags)
-  local fd2 = fd2_t()
+  local fd2 = int2_t()
   local ret = ffi.C.pipe2(fd2, flags or 0)
   if ret == -1 then
     return nil, errorret() -- extra nil as we return two fds normally
@@ -706,13 +708,13 @@ function S.link(oldpath, newpath) return retbool(ffi.C.link(oldpath, newpath)) e
 
 function S.fork() return retint(ffi.C.fork()) end
 function S.wait() -- we always get and return the status value, need to add helpers
-  local status = ffi.new("int[1]")
+  local status = int1_t()
   local ret = ffi.C.wait(status)
   if ret == -1 then return nil, errorret() end -- extra padding where we would return status
   return ret, status[0]
 end
 function S.waitpid(pid, options) -- we always get and return the status value, need to add helpers
-  local status = ffi.new("int[1]")
+  local status = int1_t()
   local ret = ffi.C.waitpid(pid, status, options or 0)
   if ret == -1 then return nil, errorret() end -- extra padding where we would return status
   return ret, status[0]
@@ -792,7 +794,7 @@ function S.bind(sockfd, addr, addrlen)
     elseif ffi.istype(sockaddr_in_t, addr) then addrlen = ffi.sizeof(sockaddr_in_t)
     end
   end
-  return retbool(ffi.C.bind(getfd(sockfd), ffi.cast("struct sockaddr *", addr), addrlen))
+  return retbool(ffi.C.bind(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), addrlen))
 end
 
 function S.fcntl(fd, cmd, arg)
