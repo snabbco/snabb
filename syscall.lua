@@ -658,7 +658,7 @@ int gnu_dev_minor(dev_t dev);
 // functions from libc ie man 3 not man 2
 void exit(enum EXIT status);
 int inet_aton(const char *cp, struct in_addr *inp);
-
+char *inet_ntoa(struct in_addr in);
 
 // functions from libc that could be exported as a convenience, used internally
 void *calloc(size_t nmemb, size_t size);
@@ -680,7 +680,7 @@ local sa_family_t = ffi.typeof("sa_family_t")
 local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
 local in_addr_t = ffi.typeof("struct in_addr")
 
-assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t), "inet socket addresses should be padded to same as sockaddr")
+assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
 
 -- functions from section 3 that we use for ip addresses
 function S.inet_aton(s)
@@ -689,6 +689,8 @@ function S.inet_aton(s)
   if ret == 0 then return nil end
   return addr
 end
+
+function S.inet_ntoa(addr) return ffi.string(ffi.C.inet_ntoa(addr)) end
 
 -- initialisers
 -- need to set first field. Corrects byte order on port, constructor for addr will do that for addr.

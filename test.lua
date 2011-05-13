@@ -204,9 +204,12 @@ s = assert(S.socket("AF_INET", "SOCK_STREAM", 0))
 fl = assert(s:fcntl("F_GETFL"))
 assert(s:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK)))
 
+local loop = "127.0.0.1"
 sa = S.sockaddr_in(1234, "error")
 assert(not sa, "expect nil socket address from invalid ip string")
-sa = assert(S.sockaddr_in(1234, "127.0.0.1"), "bad sockaddr")
+sa = assert(S.sockaddr_in(1234, loop), "bad sockaddr")
+assert(S.inet_ntoa(sa.sin_addr) == loop, "expect address converted back to string to still be same")
+
 assert(s:bind(sa))
 
 assert(S.close(s))
