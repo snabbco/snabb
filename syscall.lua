@@ -246,6 +246,10 @@ typedef long blksize_t;
 typedef long blkcnt_t;
 
 // structs
+struct timeval {
+  long    tv_sec;         /* seconds */
+  long    tv_usec;        /* microseconds */
+};
 struct timespec {
   time_t tv_sec;        /* seconds */
   long   tv_nsec;       /* nanoseconds */
