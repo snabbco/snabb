@@ -243,5 +243,11 @@ assert(S.munmap(mem, size))
 assert(S.mlockall(S.MCL_CURRENT))
 assert(S.munlockall())
 
+local hh = "testhostname"
+h = assert(S.gethostname())
+assert(S.sethostname(hh))
+assert(hh == assert(S.gethostname()))
+assert(S.sethostname(h))
+
 S.exit("EXIT_SUCCESS")
 

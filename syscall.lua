@@ -837,6 +837,10 @@ function S.gethostname()
   return ffi.string(buf)
 end
 
+function S.sethostname(s) -- only accept Lua string, do not see use case for buffer as well
+  return retbool(ffi.C.sethostname(s, #s))
+end
+
 -- straight passthroughs, as no failure possible
 S.getuid = ffi.C.getuid
 S.geteuid = ffi.C.geteuid
