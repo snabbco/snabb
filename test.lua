@@ -7,6 +7,8 @@ S.gcollect(true)
 -- print uname info
 local u = assert(S.uname())
 print(u.nodename .. " " .. u.sysname .. " " .. u.release .. " " .. u.version)
+local h = assert(S.gethostname())
+assert(h == u.nodename, "gethostname did not return nodename")
 
 -- test open non existent file
 fd, err, errno = S.open("/tmp/file/does/not/exist", S.O_RDONLY)

@@ -293,6 +293,9 @@ S.symerror = { -- symbolic error names, indexed by errno
 'EDOM',   'ERANGE'
 }
 
+-- constants
+local HOST_NAME_MAX = 64 -- Linux
+
 -- optional garbage collection support
 S.gc = ffi.gc
 
@@ -635,7 +638,13 @@ char *strerror(int errnum);
 local fd_t -- type for a file descriptor
 local fd2_t = ffi.typeof("int[2]")
 local timespec_t = ffi.typeof("struct timespec")
-local stat_t
+local stat_t = ffi.typeof("struct stat")
+
+-- add char buffer type
+local buffer_t = ffi.typeof("char[?]")
+
+S.string = ffi.string -- convenience for converting buffers
+S.sizeof = ffi.sizeof -- convenience so user need not require ffi
 
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
@@ -819,6 +828,14 @@ function S.uname()
           version = ffi.string(u.version), machine = ffi.string(u.machine), domainname = ffi.string(u.domainname)}
 end
 
+function S.gethostname()
+  local buf = buffer_t(HOST_NAME_MAX + 1)
+  local ret = ffi.C.gethostname(buf, HOST_NAME_MAX + 1)
+  if ret == -1 then return errorret() end
+  buf[HOST_NAME_MAX] = 0 -- paranoia here to make sure null terminated, which could happen if HOST_NAME_MAX was incorrect
+  return ffi.string(buf)
+end
+
 -- 'macros' and helper functions etc
 
 -- note that major and minor are inline in glibc, gnu provides these real symbols, else you might have to parse yourself
@@ -836,8 +853,6 @@ function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 -- not system functions
 function S.nogc(d) ffi.gc(d, nil) end -- use ffi.gc not S.gc here
 
--- types
-
 -- methods on an fd
 local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'bind', 'fchmod'}
@@ -845,12 +860,6 @@ local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth})
-stat_t = ffi.typeof("struct stat")
-
--- add char buffer type
-local buffer_t = ffi.typeof("char[?]")
-S.string = ffi.string -- convenience for converting buffers
-S.sizeof = ffi.sizeof -- convenience so user need not require ffi
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
 S.t = {
