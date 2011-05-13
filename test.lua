@@ -74,9 +74,13 @@ assert(S.close(3))
 -- another open
 fd = assert(S.open("/dev/zero", S.O_RDWR))
 -- test write
-n = assert(S.write(fd, buf, size))
+n = assert(fd:write(buf, size))
 assert(n >= 0, "should not get error writing to /dev/zero")
 assert(n == size, "should not get truncated write to /dev/zero") -- technically allowed!
+
+local string = "test string"
+n = assert(fd:write(string)) -- should be able to write a string, length is automatic
+assert(n == #string, "write on a string should write out its length")
 
 local offset = 1
 n = assert(fd:pread(buf, size, offset))
@@ -224,8 +228,17 @@ ok, err, errno = c:connect(sa)
 assert(not ok, "connect should fail here")
 assert(err ~= S.errno('EINPROGRESS'), "have not accepted should get Operation in progress")
 
+local fd = assert(s:accept())
+assert(c:connect(sa)) -- able to connect now we have accepted
 
+n = assert(c:write(string))
+assert(n == #string, "should be able to write out short string")
+n = assert(fd:read(buf, size))
+assert(n == #string, "should read back string into buffer")
+assert(S.string(buf, n) == string, "we should read back the same string that was sent")
 
+assert(fd:close())
+assert(c:close())
 assert(s:close())
 
 -- fork and related methods

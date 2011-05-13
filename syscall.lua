@@ -498,7 +498,6 @@ enum E {
   ECONNREFUSED   = 111,
   EHOSTDOWN      = 112,
   EHOSTUNREACH   = 113,
-  EALREADY       = 114,
   EINPROGRESS    = 115,
   ESTALE         = 116,
   EUCLEAN        = 117,
@@ -600,6 +599,7 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 off_t lseek(int fd, off_t offset, enum SEEK whence); 
 
 int dup(int oldfd);
+int dup2(int oldfd, int newfd);
 int dup3(int oldfd, int newfd, int flags);
 int fchdir(int fd);
 int fsync(int fd);
@@ -611,6 +611,8 @@ int socket(enum AF domain, enum SOCK type, int protocol);
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int listen(int sockfd, int backlog);
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
@@ -711,10 +713,11 @@ function S.open(pathname, flags, mode) return retfd(ffi.C.open(pathname, flags o
 
 function S.dup(oldfd, newfd, flags)
   if newfd == nil then return retfd(ffi.C.dup(getfd(oldfd))) end
-  return retfd(ffi.C.dup3(getfd(oldfd), getfd(newfd), flags or 0))
+  if flags == nil then return retfd(ffi.C.dup2(getfd(oldfd), getfd(newfd))) end
+  return retfd(ffi.C.dup3(getfd(oldfd), getfd(newfd), flags))
 end
-S.dup2 = S.dup -- flags optional, so do not need new function
-S.dup3 = S.dup -- conditional on newfd set
+S.dup2 = S.dup
+S.dup3 = S.dup
 
 function S.pipe(flags)
   local fd2 = int2_t()
@@ -767,7 +770,7 @@ function S._exit(status) ffi.C._exit(status or 0) end
 function S.exit(status) ffi.C.exit(status or 0) end
 
 function S.read(fd, buf, count) return retint(ffi.C.read(getfd(fd), buf, count)) end
-function S.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count)) end
+function S.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count or #buf)) end
 function S.pread(fd, buf, count, offset) return retint(ffi.C.pread(getfd(fd), buf, count, offset)) end
 function S.pwrite(fd, buf, count, offset) return retint(ffi.C.pwrite(getfd(fd), buf, count, offset)) end
 function S.lseek(fd, offset, whence) return retint(ffi.C.lseek(getfd(fd), offset, whence)) end
@@ -841,6 +844,15 @@ function S.connect(sockfd, addr, addrlen)
   return retbool(ffi.C.connect(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), getaddrlen(addr, addrlen)))
 end
 
+-- not working if addr, addrlen not nil!!!!!
+function S.accept(sockfd, addr, addrlen, flags)
+  if flags then -- accept4 variant
+    return retfd(ffi.C.accept4(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), getaddrlen(addr, addrlen), flags))
+  end
+  return retfd(ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), getaddrlen(addr, addrlen)))
+end
+S.accept4 = S.accept
+
 function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
   local ret = ffi.C.fcntl(getfd(fd), cmd, arg or 0)
@@ -895,7 +907,7 @@ function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 -- methods on an fd
 local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
-                   'bind', 'listen', 'connect'}
+                   'bind', 'listen', 'connect', 'accept'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
