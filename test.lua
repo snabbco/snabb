@@ -130,10 +130,10 @@ assert(S.chmod(tmpfile, S.S_IRUSR + S.S_IWUSR))
 assert(fd:fsync())
 assert(fd:fdatasync())
 
-n, err, errno = fd:lseek(offset, S.SEEK_SET)
+n, err, errno = fd:lseek(offset, 'SEEK_SET')
 assert(err == nil, "should be able to seek file")
 assert(n == offset, "seek should position at set position")
-n, err, errno = fd:lseek(offset, S.SEEK_CUR)
+n, err, errno = fd:lseek(offset, 'SEEK_CUR')
 assert(err == nil, "should be able to seek file")
 assert(n == offset + offset, "seek should position at set position")
 

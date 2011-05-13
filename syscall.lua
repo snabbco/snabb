@@ -157,7 +157,7 @@ S.S_IXOTH = octal('00001') -- others have execute permission
 
 if ffi.abi('32bit') then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end -- not supported yet
 
--- seek
+-- seek (also enum)
 S.SEEK_SET = 0
 S.SEEK_CUR = 1
 S.SEEK_END = 2
@@ -493,6 +493,12 @@ struct sockaddr_in {
   unsigned char sin_zero[8]; /* padding, should not vary by arch */
 };
 
+// enums, LuaJIT will allow strings to be used, so we provide for appropriate parameters
+enum SEEK {
+  SEEK_SET = 0,
+  SEEK_CUR = 1,
+  SEEK_END = 2
+};
 
 ]]
 
@@ -557,6 +563,8 @@ int chmod(const char *path, mode_t mode);
 int link(const char *oldpath, const char *newpath);
 mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
+int gethostname(char *name, size_t len);
+int sethostname(const char *name, size_t len);
 pid_t getpid(void);
 pid_t getppid(void);
 pid_t fork(void);
@@ -568,7 +576,8 @@ ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
-off_t lseek(int fd, off_t offset, int whence);
+off_t lseek(int fd, off_t offset, enum SEEK whence); // enum available
+
 int dup(int oldfd);
 int dup3(int oldfd, int newfd, int flags);
 int fchdir(int fd);
