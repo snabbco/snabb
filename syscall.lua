@@ -157,41 +157,11 @@ S.S_IXOTH = octal('00001') -- others have execute permission
 
 if ffi.abi('32bit') then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end -- not supported yet
 
--- seek (also enum)
-S.SEEK_SET = 0
-S.SEEK_CUR = 1
-S.SEEK_END = 2
-
 -- access
 S.R_OK = 4
 S.W_OK = 2
 S.X_OK = 1
 S.F_OK = 0
-
--- fcntl second argument
-S.F_DUPFD       = 0
-S.F_GETFD       = 1
-S.F_SETFD       = 2
-S.F_GETFL       = 3
-S.F_SETFL       = 4
-S.F_GETLK       = 5
-S.F_SETLK       = 6
-S.F_SETLKW      = 7
---S.F_GETLK64    = 12      -- 64 on 32 file ops still TODO
---S.F_SETLK64    = 13
---S.F_SETLKW64   = 14
-S.F_SETOWN      = 8
-S.F_GETOWN      = 9
-S.F_SETSIG      = 10
-S.F_GETSIG      = 11
-S.F_SETOWN_EX   = 15
-S.F_GETOWN_EX   = 16
-S.F_SETLEASE    = 1024
-S.F_GETLEASE    = 1025
-S.F_NOTIFY      = 1026
-S.F_SETPIPE_SZ  = 1031
-S.F_GETPIPE_SZ  = 1032
-S.F_DUPFD_CLOEXEC = 1030 
 
 --mmap
 S.PROT_READ  = 0x1
@@ -210,7 +180,6 @@ S.MAP_FILE      = 0
 S.MAP_ANONYMOUS = 0x20
 S.MAP_ANON      = S.MAP_ANONYMOUS
 S.MAP_32BIT     = 0x40
-
 -- These are Linux-specific.
 S.MAP_GROWSDOWN  = 0x00100
 S.MAP_DENYWRITE  = 0x00800
@@ -235,29 +204,7 @@ S.MCL_FUTURE     = 2
 S.MREMAP_MAYMOVE = 1
 S.MREMAP_FIXED   = 2
 
--- Advice to `madvise'.
-S.MADV_NORMAL      = 0
-S.MADV_RANDOM      = 1
-S.MADV_SEQUENTIAL  = 2
-S.MADV_WILLNEED    = 3
-S.MADV_DONTNEED    = 4
-S.MADV_REMOVE      = 9
-S.MADV_DONTFORK    = 10
-S.MADV_DOFORK      = 11
-S.MADV_MERGEABLE   = 12
-S.MADV_UNMERGEABLE = 13
-S.MADV_HUGEPAGE    = 14
-S.MADV_NOHUGEPAGE  = 15
-S.MADV_HWPOISON    = 100
-
--- POSIX madvise names
-S.POSIX_MADV_NORMAL      = 0
-S.POSIX_MADV_RANDOM      = 1
-S.POSIX_MADV_SEQUENTIAL  = 2
-S.POSIX_MADV_WILLNEED    = 3
-S.POSIX_MADV_DONTNEED    = 4
-
--- sockets
+-- sockets -- linux has flags against this, so provided as enum and constants
 S.SOCK_STREAM    = 1
 S.SOCK_DGRAM     = 2
 S.SOCK_RAW       = 3
@@ -266,96 +213,53 @@ S.SOCK_SEQPACKET = 5
 S.SOCK_DCCP      = 6
 S.SOCK_PACKET    = 10
 
-S.SOCK_CLOEXEC = octal('02000000')
-S.SOCK_NONBLOCK = octal('04000')
+S.SOCK_CLOEXEC = octal('02000000') -- flag
+S.SOCK_NONBLOCK = octal('04000')   -- flag
 
--- Protocol families.
-S.PF_UNSPEC     = 0
-S.PF_LOCAL      = 1
-S.PF_UNIX       = S.PF_LOCAL
-S.PF_FILE       = S.PF_LOCAL
-S.PF_INET       = 2
-S.PF_AX25       = 3
-S.PF_IPX        = 4
-S.PF_APPLETALK  = 5
-S.PF_NETROM     = 6
-S.PF_BRIDGE     = 7
-S.PF_ATMPVC     = 8
-S.PF_X25        = 9
-S.PF_INET6      = 10
-S.PF_ROSE       = 11
-S.PF_DECnet     = 12
-S.PF_NETBEUI    = 13
-S.PF_SECURITY   = 14
-S.PF_KEY        = 15 
-S.PF_NETLINK    = 16
-S.PF_ROUTE      = S.PF_NETLINK
-S.PF_PACKET     = 17
-S.PF_ASH        = 18
-S.PF_ECONET     = 19
-S.PF_ATMSVC     = 20
-S.PF_RDS        = 21
-S.PF_SNA        = 22
-S.PF_IRDA       = 23
-S.PF_PPPOX      = 24
-S.PF_WANPIPE    = 25
-S.PF_LLC        = 26
-S.PF_CAN        = 29
-S.PF_TIPC       = 30
-S.PF_BLUETOOTH  = 31
-S.PF_IUCV       = 32
-S.PF_RXRPC      = 33
-S.PF_ISDN       = 34
-S.PF_PHONET     = 35
-S.PF_IEEE802154 = 36
-S.PF_CAIF       = 37
-S.PF_ALG        = 38
-S.PF_MAX        = 39
+-- address families. -- should be able to just use enum, once fix type initialisation
+S.AF_UNSPEC     = 0
+S.AF_LOCAL      = 1
+S.AF_UNIX       = S.PF_LOCAL
+S.AF_FILE       = S.PF_LOCAL
+S.AF_INET       = 2
+S.AF_AX25       = 3
+S.AF_IPX        = 4
+S.AF_APPLETALK  = 5
+S.AF_NETROM     = 6
+S.AF_BRIDGE     = 7
+S.AF_ATMPVC     = 8
+S.AF_X25        = 9
+S.AF_INET6      = 10
+S.AF_ROSE       = 11
+S.AF_DECnet     = 12
+S.AF_NETBEUI    = 13
+S.AF_SECURITY   = 14
+S.AF_KEY        = 15 
+S.AF_NETLINK    = 16
+S.AF_ROUTE      = S.PF_NETLINK
+S.AF_PACKET     = 17
+S.AF_ASH        = 18
+S.AF_ECONET     = 19
+S.AF_ATMSVC     = 20
+S.AF_RDS        = 21
+S.AF_SNA        = 22
+S.AF_IRDA       = 23
+S.AF_PPPOX      = 24
+S.AF_WANPIPE    = 25
+S.AF_LLC        = 26
+S.AF_CAN        = 29
+S.AF_TIPC       = 30
+S.AF_BLUETOOTH  = 31
+S.AF_IUCV       = 32
+S.AF_RXRPC      = 33
+S.AF_ISDN       = 34
+S.AF_PHONET     = 35
+S.AF_IEEE802154 = 36
+S.AF_CAIF       = 37
+S.AF_ALG        = 38
+S.AF_MAX        = 39
 
--- address families
-S.AF_UNSPEC     = S.PF_UNSPEC
-S.AF_LOCAL      = S.PF_LOCAL
-S.AF_UNIX       = S.PF_UNIX
-S.AF_FILE       = S.PF_FILE
-S.AF_INET       = S.PF_INET
-S.AF_AX25       = S.PF_AX25
-S.AF_IPX        = S.PF_IPX
-S.AF_APPLETALK  = S.PF_APPLETALK
-S.AF_NETROM     = S.PF_NETROM
-S.AF_BRIDGE     = S.PF_BRIDGE
-S.AF_ATMPVC     = S.PF_ATMPVC
-S.AF_X25        = S.PF_X25
-S.AF_INET6      = S.PF_INET6
-S.AF_ROSE       = S.PF_ROSE
-S.AF_DECnet     = S.PF_DECnet
-S.AF_NETBEUI    = S.PF_NETBEUI
-S.AF_SECURITY   = S.PF_SECURITY
-S.AF_KEY        = S.PF_KEY
-S.AF_NETLINK    = S.PF_NETLINK
-S.AF_ROUTE      = S.PF_ROUTE
-S.AF_PACKET     = S.PF_PACKET
-S.AF_ASH        = S.PF_ASH
-S.AF_ECONET     = S.PF_ECONET
-S.AF_ATMSVC     = S.PF_ATMSVC
-S.AF_RDS        = S.PF_RDS
-S.AF_SNA        = S.PF_SNA
-S.AF_IRDA       = S.PF_IRDA
-S.AF_PPPOX      = S.PF_PPPOX
-S.AF_WANPIPE    = S.PF_WANPIPE
-S.AF_LLC        = S.PF_LLC
-S.AF_CAN        = S.PF_CAN
-S.AF_TIPC       = S.PF_TIPC
-S.AF_BLUETOOTH  = S.PF_BLUETOOTH
-S.AF_IUCV       = S.PF_IUCV
-S.AF_RXRPC      = S.PF_RXRPC
-S.AF_ISDN       = S.PF_ISDN
-S.AF_PHONET     = S.PF_PHONET
-S.AF_IEEE802154 = S.PF_IEEE802154
-S.AF_CAIF       = S.PF_CAIF
-S.AF_ALG        = S.PF_ALG
-S.AF_MAX        = S.PF_MAX
-
--- misc socket constants
+-- misc socket constants -- move to enum??
 S.SOL_RAW        = 255
 S.SOL_DECNET     = 261
 S.SOL_X25        = 262
@@ -366,10 +270,6 @@ S.SOL_IRDA       = 266
 
 -- Maximum queue length specifiable by listen.
 S.SOMAXCONN = 128
-
--- exit
-S.EXIT_SUCCESS = 0
-S.EXIT_FAILURE = 1
 
 -- waitpid 3rd arg
 S.WNOHANG       = 1
@@ -495,11 +395,112 @@ struct sockaddr_in {
 
 // enums, LuaJIT will allow strings to be used, so we provide for appropriate parameters
 enum SEEK {
-  SEEK_SET = 0,
-  SEEK_CUR = 1,
-  SEEK_END = 2
+  SEEK_SET,
+  SEEK_CUR,
+  SEEK_END
 };
-
+enum EXIT {
+  EXIT_SUCCESS,
+  EXIT_FAILURE
+};
+enum F {
+  F_DUPFD       = 0,
+  F_GETFD       = 1,
+  F_SETFD       = 2,
+  F_GETFL       = 3,
+  F_SETFL       = 4,
+  F_GETLK       = 5,
+  F_SETLK       = 6,
+  F_SETLKW      = 7,
+  F_SETOWN      = 8,
+  F_GETOWN      = 9,
+  F_SETSIG      = 10,
+  F_GETSIG      = 11,
+//F_GETLK64     = 12,      -- 64 on 32 file ops still TODO
+//F_SETLK64     = 13,      -- 64 on 32 file ops still TODO
+//F_SETLKW64    = 14,      -- 64 on 32 file ops still TODO
+  F_SETOWN_EX   = 15,
+  F_GETOWN_EX   = 16,
+  F_SETLEASE    = 1024,
+  F_GETLEASE    = 1025,
+  F_NOTIFY      = 1026,
+  F_SETPIPE_SZ  = 1031,
+  F_GETPIPE_SZ  = 1032,
+  F_DUPFD_CLOEXEC = 1030
+};
+enum MADV {
+  MADV_NORMAL      = 0,
+  MADV_RANDOM      = 1,
+  MADV_SEQUENTIAL  = 2,
+  MADV_WILLNEED    = 3,
+  MADV_DONTNEED    = 4,
+  MADV_REMOVE      = 9,
+  MADV_DONTFORK    = 10,
+  MADV_DOFORK      = 11,
+  MADV_MERGEABLE   = 12,
+  MADV_UNMERGEABLE = 13,
+  MADV_HUGEPAGE    = 14,
+  MADV_NOHUGEPAGE  = 15,
+  MADV_HWPOISON    = 100,
+  // POSIX madvise names
+  POSIX_MADV_NORMAL      = 0,
+  POSIX_MADV_RANDOM      = 1,
+  POSIX_MADV_SEQUENTIAL  = 2,
+  POSIX_MADV_WILLNEED    = 3,
+  POSIX_MADV_DONTNEED    = 4,
+};
+enum SOCK {
+  SOCK_STREAM    = 1,
+  SOCK_DGRAM     = 2,
+  SOCK_RAW       = 3,
+  SOCK_RDM       = 4,
+  SOCK_SEQPACKET = 5,
+  SOCK_DCCP      = 6,
+  SOCK_PACKET    = 10,
+};
+enum AF {
+  AF_UNSPEC     = 0,
+  AF_LOCAL      = 1,
+  AF_UNIX       = AF_LOCAL,
+  AF_FILE       = AF_LOCAL,
+  AF_INET       = 2,
+  AF_AX25       = 3,
+  AF_IPX        = 4,
+  AF_APPLETALK  = 5,
+  AF_NETROM     = 6,
+  AF_BRIDGE     = 7,
+  AF_ATMPVC     = 8,
+  AF_X25        = 9,
+  AF_INET6      = 10,
+  AF_ROSE       = 11,
+  AF_DECnet     = 12,
+  AF_NETBEUI    = 13,
+  AF_SECURITY   = 14,
+  AF_KEY        = 15,
+  AF_NETLINK    = 16,
+  AF_ROUTE      = AF_NETLINK,
+  AF_PACKET     = 17,
+  AF_ASH        = 18,
+  AF_ECONET     = 19,
+  AF_ATMSVC     = 20,
+  AF_RDS        = 21,
+  AF_SNA        = 22,
+  AF_IRDA       = 23,
+  AF_PPPOX      = 24,
+  AF_WANPIPE    = 25,
+  AF_LLC        = 26,
+  AF_CAN        = 29,
+  AF_TIPC       = 30,
+  AF_BLUETOOTH  = 31,
+  AF_IUCV       = 32,
+  AF_RXRPC      = 33,
+  AF_ISDN       = 34,
+  AF_PHONET     = 35,
+  AF_IEEE802154 = 36,
+  AF_CAIF       = 37,
+  AF_ALG        = 38,
+  AF_MAX        = 39,
+};
 ]]
 
 -- stat structure is architecture dependent in Linux
@@ -570,23 +571,23 @@ pid_t getppid(void);
 pid_t fork(void);
 pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);
-void _exit(int status);
+void _exit(enum EXIT status);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
-off_t lseek(int fd, off_t offset, enum SEEK whence); // enum available
+off_t lseek(int fd, off_t offset, enum SEEK whence); 
 
 int dup(int oldfd);
 int dup3(int oldfd, int newfd, int flags);
 int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
-int fcntl(int fd, int cmd, long arg); /* arg can be a pointer though */
+int fcntl(int fd, enum F cmd, long arg); /* arg can be a pointer though */
 int fchmod(int fd, mode_t mode);
 
-int socket(int domain, int type, int protocol);
+int socket(enum AF domain, enum SOCK type, int protocol);
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
@@ -597,7 +598,7 @@ int munlock(const void *addr, size_t len);
 int mlockall(int flags);
 int munlockall(void);
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
-int madvise(void *addr, size_t length, int advice);
+int madvise(void *addr, size_t length, enum MADV advice);
 
 int pipe2(int pipefd[2], int flags);
 
@@ -616,7 +617,7 @@ int gnu_dev_minor(dev_t dev);
 
 
 // functions from libc ie man 3 not man 2
-void exit(int status);
+void exit(enum EXIT status);
 
 // functions from libc that could be exported as a convenience, used internally
 void *calloc(size_t nmemb, size_t size);
@@ -804,8 +805,8 @@ function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
   local ret = ffi.C.fcntl(getfd(fd), cmd, arg or 0)
   -- return values differ, some special handling needed
-  if cmd == S.F_DUPFD then return retfd(ret) end
-  if cmd == S.F_GETFD or cmd == S.F_GETFL or cmd == S.F_GETLEASE or cmd == S.F_GETOWN or cmd == S.F_GETSIG or cmd == S.F_GETPIPE_SZ then return retint(ret) end
+  if cmd == "F_DUPFD" or cmd == "F_DUPFD_CLOEXEC" then return retfd(ret) end
+  if cmd == "F_GETFD" or cmd == "F_GETFL" or cmd == "F_GETLEASE" or cmd == "F_GETOWN" or cmd == "F_GETSIG" or cmd == "F_GETPIPE_SZ" then return retint(ret) end
   return retbool(ret)
 end
 

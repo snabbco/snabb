@@ -202,7 +202,7 @@ assert(S.munmap(mem, size))
 mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0)
 assert(err == nil, err)
 assert(S.msync(mem, size, S.MS_SYNC))
-assert(S.madvise(mem, size, S.MADV_RANDOM))
+assert(S.madvise(mem, size, "MADV_RANDOM"))
 mem = nil -- gc memory, should be munmapped
 collectgarbage("collect")
 mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS + S.MAP_FIXED, -1, 0) -- MAP_FIXED should fail here!
@@ -224,11 +224,11 @@ assert(mask == S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
 
 -- sockets
 local s, fl
-s, err = S.socket(S.AF_INET, S.SOCK_STREAM, 0)
+s, err = S.socket(S.AF_INET, "SOCK_STREAM", 0)
 assert(err == nil, err)
-fl, err = s:fcntl(S.F_GETFL)
+fl, err = s:fcntl("F_GETFL")
 assert(err == nil, err)
-assert(s:fcntl(S.F_SETFL, bit.bor(fl, S.O_NONBLOCK)))
+assert(s:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK)))
 
 assert(S.sizeof(S.t.sockaddr) == S.sizeof(S.t.sockaddr_in), "inet socket addresses should be padded to same as sockaddr")
 
@@ -266,6 +266,5 @@ else -- parent
 end
 
 
-
-S.exit(S.EXIT_SUCCESS)
+S.exit("EXIT_SUCCESS")
 
