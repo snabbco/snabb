@@ -211,13 +211,19 @@ local loop = "127.0.0.1"
 sa = S.sockaddr_in(1234, "error")
 assert(not sa, "expect nil socket address from invalid ip string")
 
-
 sa = assert(S.sockaddr_in(1234, loop))
 assert(S.inet_ntoa(sa.sin_addr) == loop, "expect address converted back to string to still be same")
 assert(sa.sin_family == 2, "expect family on inet socket to be AF_INET=2")
 
-assert(s:bind(sa))
-assert(s:listen())
+-- find a free port
+local port
+for i = 1024, 2048 do
+  port = i
+  sa.sin_port = S.htons(port)
+  if s:bind(sa) then break end
+end
+
+assert(s:listen()) -- will fail if we did not bind
 
 c = assert(S.socket("AF_INET", "SOCK_STREAM")) -- client socket
 fl = assert(c:fcntl("F_GETFL"))

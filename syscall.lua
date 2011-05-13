@@ -524,6 +524,7 @@ enum E {
 ]]
 
 -- stat structure is architecture dependent in Linux
+-- also sockaddr_storage (just about), due to way it forces alignment
 -- this is the way glibc versions stat via __xstat, may need to change for other libc, eg if define stat as a non inline function
 local STAT_VER_LINUX
 
@@ -549,6 +550,11 @@ struct stat {
   unsigned long int __unused4;
   unsigned long int __unused5;
 };
+struct sockaddr_storage {
+  sa_family_t ss_family;
+  unsigned long int __ss_align;
+  char __ss_padding[120];
+};
 ]]
 else -- 64 bit arch
 STAT_VER_LINUX = 1
@@ -569,6 +575,11 @@ struct stat {
   struct timespec st_mtim;
   struct timespec st_ctim;
   long int __unused[3];
+};
+struct sockaddr_storage {
+  sa_family_t ss_family;
+  unsigned long int __ss_align;
+  char __ss_padding[112];
 };
 ]]
 end
@@ -666,6 +677,7 @@ local timespec_t = ffi.typeof("struct timespec")
 local stat_t = ffi.typeof("struct stat")
 local sockaddr_t = ffi.typeof("struct sockaddr")
 local sockaddr_p_t = ffi.typeof("struct sockaddr *")
+local sockaddr_storage_t = ffi.typeof("struct sockaddr_storage")
 local sa_family_t = ffi.typeof("sa_family_t")
 local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
 local in_addr_t = ffi.typeof("struct in_addr")
@@ -675,6 +687,7 @@ local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
 
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
+assert(ffi.sizeof(sockaddr_storage_t) == 128) -- this is the required size
 
 -- convert error symbolic name to errno
 function S.errno(name) return tonumber(enumE_t(name)) end
