@@ -224,7 +224,7 @@ assert(mask == S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
 
 -- sockets
 local s, fl
-s, err = S.socket(S.AF_INET, "SOCK_STREAM", 0)
+s, err = S.socket("AF_INET", "SOCK_STREAM", 0)
 assert(err == nil, err)
 fl, err = s:fcntl("F_GETFL")
 assert(err == nil, err)
