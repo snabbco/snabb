@@ -1,6 +1,6 @@
 local S = require "syscall"
 
-local fd, fd0, fd1, fd2, n, s, err, errno
+local fd, fd0, fd1, fd2, n, s, err, errno, ok
 
 S.gcollect(true)
 
@@ -13,12 +13,12 @@ assert(h == u.nodename, "gethostname did not return nodename")
 -- test open non existent file
 fd, err, errno = S.open("/tmp/file/does/not/exist", S.O_RDONLY)
 assert(err, "expected open to fail on file not found")
-assert(S.symerror[errno] == 'ENOENT', "expect ENOENT from open non existent file")
+assert(err == S.strerror('ENOENT'), "expect ENOENT from open non existent file")
 
 -- test close invalid fd
 fd, err, errno = S.close(4)
 assert(err, "expected to fail on close invalid fd")
-assert(S.symerror[errno] == 'EBADF', "expect EBADF from invalid numberic fd")
+assert(errno == S.errno('EBADF'), "expect EBADF from invalid numberic fd") -- test the error functions other way
 
 -- test open and close valid file
 fd = assert(S.open("/dev/null", S.O_RDONLY))
@@ -33,9 +33,9 @@ assert(fd2.fd == 4, "should get file descriptor 4 back from second open")
 assert(S.close(fd))
 
 -- test double close fd
-fd, err, errno = S.close(3)
+fd, err = S.close(3)
 assert(err, "expected to fail on close already closed fd")
-assert(S.symerror[errno] == 'EBADF', "expect EBADF from invalid numberic fd")
+assert(err == S.strerror('EBADF'), "expect EBADF from invalid numberic fd")
 
 assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
 
@@ -51,16 +51,16 @@ for i = 0, size - 1 do assert(buf[i] == 0, "should read zero bytes from /dev/zer
 -- test writing to read only file fails
 n, err, errno = fd2:write(buf, size)
 assert(err, "should not be able to write to file opened read only")
-assert(S.symerror[errno] == 'EBADF', "expect EBADF when writing read only file")
+assert(errno == S.errno('EBADF'), "expect EBADF when writing read only file")
 
 -- test gc of file handle
 fd2 = nil
 collectgarbage("collect")
 
 -- test file has been closed after garbage collection
-n, err, errno = S.read(4, buf, size)
+n, err = S.read(4, buf, size)
 assert(err, "should not be able to read from fd 4 after gc")
-assert(S.symerror[errno] == 'EBADF', "expect EBADF from already closed fd")
+assert(err == S.strerror('EBADF'), "expect EBADF from already closed fd")
 
 -- test with gc turned off
 fd = assert(S.open("/dev/zero", S.O_RDONLY))
@@ -131,7 +131,7 @@ fd, err = S.open(tmpfile, S.O_RDWR)
 assert(err, "expected open to fail on file not found")
 
 fd, err, errno = S.pipe(99999) -- invalid flags
-assert(fd == nil and S.symerror[errno] == 'EINVAL', "should be EINVAL with bad flags to pipe2")
+assert(fd == nil and errno == S.errno('EINVAL'), "should be EINVAL with bad flags to pipe2")
 
 fd = assert(S.pipe())
 assert(fd[1].fd == 3 and fd[2].fd == 4, "expect file handles 3 and 4 for pipe")
@@ -219,7 +219,9 @@ c = assert(S.socket("AF_INET", "SOCK_STREAM")) -- client socket
 fl = assert(c:fcntl("F_GETFL"))
 assert(c:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK)))
 
-assert(c:connect(sa)) -- connect to our server address
+--assert(c:connect(sa)) -- connect to our server address
+ok, err, errno = c:connect(sa)
+if not ok then print(err, errno) end
 
 assert(s:close())
 
