@@ -657,6 +657,8 @@ int gnu_dev_minor(dev_t dev);
 
 // functions from libc ie man 3 not man 2
 void exit(enum EXIT status);
+int inet_aton(const char *cp, struct in_addr *inp);
+
 
 // functions from libc that could be exported as a convenience, used internally
 void *calloc(size_t nmemb, size_t size);
@@ -680,12 +682,26 @@ local in_addr_t = ffi.typeof("struct in_addr")
 
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t), "inet socket addresses should be padded to same as sockaddr")
 
+-- functions from section 3 that we use for ip addresses
+function S.inet_aton(s)
+  local addr = in_addr_t()
+  local ret = ffi.C.inet_aton(s, addr)
+  if ret == 0 then return nil end
+  return addr
+end
+
 -- initialisers
 -- need to set first field. Corrects byte order on port, constructor for addr will do that for addr.
-function S.sockaddr_in(port, addr) return sockaddr_in_t(ffi.cast(sa_family_t, "AF_INET"), S.htons(port), addr) end
+function S.sockaddr_in(port, addr)
+  if type(addr) == 'string' then addr = S.inet_aton(addr) end
+  if not addr then return nil end
+  return sockaddr_in_t(ffi.cast(sa_family_t, "AF_INET"), S.htons(port), addr)
+end
 
 -- constants
 S.INADDR_ANY = in_addr_t()
+S.INADDR_LOOPBACK = assert(S.inet_aton("127.0.0.1"))
+S.INADDR_BROADCAST = assert(S.inet_aton("255.255.255.255"))
 
 -- definitions start here
 function S.open(pathname, flags, mode) return retfd(ffi.C.open(pathname, flags or 0, mode or 0)) end

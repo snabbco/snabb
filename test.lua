@@ -195,13 +195,19 @@ mask = S.umask(S.S_IWGRP + S.S_IWOTH)
 assert(mask == S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
 
 -- sockets
+local a, sa
+a = S.inet_aton("error")
+assert(not a, "should get invalid IP address")
+
 local s, fl
 s = assert(S.socket("AF_INET", "SOCK_STREAM", 0))
 fl = assert(s:fcntl("F_GETFL"))
 assert(s:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK)))
 
-local a = S.sockaddr_in(1234, S.INADDR_ANY) -- allow pass as string
-assert(s:bind(a))
+sa = S.sockaddr_in(1234, "error")
+assert(not sa, "expect nil socket address from invalid ip string")
+sa = assert(S.sockaddr_in(1234, "127.0.0.1"), "bad sockaddr")
+assert(s:bind(sa))
 
 assert(S.close(s))
 
