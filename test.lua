@@ -181,8 +181,6 @@ assert(S.msync(mem, size, S.MS_SYNC))
 assert(S.madvise(mem, size, "MADV_RANDOM"))
 mem = nil -- gc memory, should be munmapped
 collectgarbage("collect")
-mem, err = S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS + S.MAP_FIXED, -1, 0) -- MAP_FIXED should fail here!
-assert(err, "expect mmap MAP_FIXED to fail")
 
 local size2 = size * 2
 mem = assert(S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0))
@@ -233,6 +231,17 @@ else -- parent
   assert(pid == pid0, "expect fork to return same pid as wait")
 end
 
+if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
+
+assert(S.acct())
+
+mem = assert(S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0))
+assert(S.mlock(mem, size))
+assert(S.munlock(mem, size))
+assert(S.munmap(mem, size))
+
+assert(S.mlockall(S.MCL_CURRENT))
+assert(S.munlockall())
 
 S.exit("EXIT_SUCCESS")
 

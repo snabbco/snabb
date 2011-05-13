@@ -569,6 +569,8 @@ mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
 int gethostname(char *name, size_t len);
 int sethostname(const char *name, size_t len);
+uid_t getuid(void);
+uid_t geteuid(void);
 pid_t getpid(void);
 pid_t getppid(void);
 pid_t fork(void);
@@ -700,7 +702,8 @@ function S.close(fd)
   return true
 end
 
-function S.creat(pathname, mode) return S.open(pathname, S.O_CREAT + S.O_WRONLY + S.O_TRUNC, mode) end
+function S.creat(pathname, mode) return S.open(pathname, S.O_CREAT + S.O_WRONLY + S.O_TRUNC, mode) end -- maybe dont do this?
+
 function S.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 function S.access(pathname, mode) return retbool(ffi.C.access(pathname, mode)) end
 function S.chdir(path) return retbool(ffi.C.chdir(path)) end
@@ -708,11 +711,9 @@ function S.mkdir(path, mode) return retbool(ffi.C.mkdir(path, mode)) end
 function S.rmdir(path) return retbool(ffi.C.rmdir(path)) end
 function S.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 function S.acct(filename) return retbool(ffi.C.acct(filename)) end
-function S.umask(mask) return ffi.C.umask(mask) end -- never fails
 function S.chmod(path, mode) return retbool(ffi.C.chmod(path, mode)) end
 function S.link(oldpath, newpath) return retbool(ffi.C.link(oldpath, newpath)) end
-function S.getpid() return ffi.C.getpid() end
-function S.getppid() return ffi.C.getppid() end
+
 function S.fork() return retint(ffi.C.fork()) end
 function S.wait() -- we always get and return the status value, need to add helpers
   local status = ffi.new("int[1]")
@@ -835,6 +836,13 @@ function S.gethostname()
   buf[HOST_NAME_MAX] = 0 -- paranoia here to make sure null terminated, which could happen if HOST_NAME_MAX was incorrect
   return ffi.string(buf)
 end
+
+-- straight passthroughs, as no failure possible
+S.getuid = ffi.C.getuid
+S.geteuid = ffi.C.geteuid
+S.getpid = ffi.C.getpid
+S.getppid = ffi.C.getppid
+S.umask = ffi.C.umask
 
 -- 'macros' and helper functions etc
 
