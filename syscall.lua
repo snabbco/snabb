@@ -216,7 +216,7 @@ S.SOCK_PACKET    = 10
 S.SOCK_CLOEXEC = octal('02000000') -- flag
 S.SOCK_NONBLOCK = octal('04000')   -- flag
 
--- address families. -- should be able to just use enum, once fix type initialisation
+-- address families. -- should be able to just use enum, once fix type initialisation, need not export, but used internally
 S.AF_UNSPEC     = 0
 S.AF_LOCAL      = 1
 S.AF_UNIX       = S.PF_LOCAL
@@ -424,10 +424,10 @@ struct in_addr {
   uint32_t       s_addr;
 };
 struct sockaddr_in {
-  sa_family_t    sin_family; /* address family: AF_INET */
-  in_port_t      sin_port;   /* port in network byte order */
-  struct in_addr sin_addr;   /* internet address */
-  unsigned char sin_zero[8]; /* padding, should not vary by arch */
+  sa_family_t    sin_family;  /* address family: AF_INET */
+  in_port_t      sin_port;    /* port in network byte order */
+  struct in_addr sin_addr;    /* internet address */
+  unsigned char  sin_zero[8]; /* padding, should not vary by arch */
 };
 
 // enums, LuaJIT will allow strings to be used, so we provide for appropriate parameters
@@ -674,11 +674,18 @@ char *strerror(int errnum);
 local timespec_t = ffi.typeof("struct timespec")
 local stat_t = ffi.typeof("struct stat")
 local sockaddr_t = ffi.typeof("struct sockaddr")
+local sa_family_t = ffi.typeof("sa_family_t")
 local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
 local in_addr_t = ffi.typeof("struct in_addr")
 
+assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t), "inet socket addresses should be padded to same as sockaddr")
+
+-- initialisers
+-- need to set first field. Corrects byte order on port, constructor for addr will do that for addr.
+function S.sockaddr_in(port, addr) return sockaddr_in_t(ffi.cast(sa_family_t, "AF_INET"), S.htons(port), addr) end
+
 -- constants
-S.INADDR_ANY = in_addr_t() -- is this best way? harder to compare against, for example
+S.INADDR_ANY = in_addr_t()
 
 -- definitions start here
 function S.open(pathname, flags, mode) return retfd(ffi.C.open(pathname, flags or 0, mode or 0)) end
@@ -873,9 +880,8 @@ fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth})
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
 S.t = {
-fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t,
-sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t,
-utsname = utsname_t
+  fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if initialiser for fd useful
+  sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t,
 }
 
 return S
