@@ -673,6 +673,12 @@ char *strerror(int errnum);
 -- Lua type constructors corresponding to defined types
 local timespec_t = ffi.typeof("struct timespec")
 local stat_t = ffi.typeof("struct stat")
+local sockaddr_t = ffi.typeof("struct sockaddr")
+local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
+local in_addr_t = ffi.typeof("struct in_addr")
+
+-- constants
+S.INADDR_ANY = in_addr_t() -- is this best way? harder to compare against, for example
 
 -- definitions start here
 function S.open(pathname, flags, mode) return retfd(ffi.C.open(pathname, flags or 0, mode or 0)) end
@@ -796,12 +802,6 @@ function S.mremap(old_address, old_size, new_size, flags, new_address) return re
 function S.madvise(addr, length, advice) return retbool(ffi.C.madvise(addr, length, advice)) end
 
 function S.socket(domain, stype, protocol) return retfd(ffi.C.socket(domain, stype, protocol or 0)) end
-
--- address types
-local sockaddr_t = ffi.typeof("struct sockaddr")
-local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
-local in_addr_t = ffi.typeof("struct in_addr")
-S.INADDR_ANY = in_addr_t() -- is this best way? harder to compare against, for example
 
 function S.bind(sockfd, addr, addrlen)
   if addrlen == nil then -- we can compute this, for known address types
