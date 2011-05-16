@@ -673,7 +673,6 @@ char *strerror(enum E errnum);
 local timespec_t = ffi.typeof("struct timespec")
 local stat_t = ffi.typeof("struct stat")
 local sockaddr_t = ffi.typeof("struct sockaddr")
-local sockaddr_p_t = ffi.typeof("struct sockaddr *")
 local sockaddr_storage_t = ffi.typeof("struct sockaddr_storage")
 local sa_family_t = ffi.typeof("sa_family_t")
 local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
@@ -683,8 +682,66 @@ local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
 
+-- need these for casting back
+local sockaddr_pt = ffi.typeof("struct sockaddr *")
+local sockaddr_in_pt = ffi.typeof("struct sockaddr_in *")
+
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
 assert(ffi.sizeof(sockaddr_storage_t) == 128) -- this is the required size
+assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_t))
+assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in_t))
+
+-- initialisers
+-- need to set first field. Corrects byte order on port, constructor for addr will do that for addr.
+function S.sockaddr_in(port, addr)
+  if type(addr) == 'string' then addr = S.inet_aton(addr) end
+  if not addr then return nil end
+  return sockaddr_in_t(enumAF_t("AF_INET"), S.htons(port), addr)
+end
+
+local n = function(s) return tonumber(enumAF_t(s)) end -- convert to Lua number, as tables indexed by number
+
+-- map from socket family to data type
+local socket_type = {}
+-- AF_UNSPEC
+--  AF_LOCAL
+--  AF_INET
+socket_type[n("AF_INET")] = sockaddr_in_t
+--  AF_AX25
+--  AF_IPX
+--  AF_APPLETALK
+--  AF_NETROM
+--  AF_BRIDGE
+--  AF_ATMPVC
+--  AF_X25
+--  AF_INET6
+--  AF_ROSE
+--  AF_DECnet
+--  AF_NETBEUI
+--  AF_SECURITY
+--  AF_KEY
+--  AF_NETLINK
+--  AF_PACKET
+--  AF_ASH
+--  AF_ECONET
+--  AF_ATMSVC
+--  AF_RDS
+--  AF_SNA
+--  AF_IRDA
+--  AF_PPPOX
+--  AF_WANPIPE
+--  AF_LLC
+--  AF_CAN
+--  AF_TIPC
+--  AF_BLUETOOTH
+--  AF_IUCV
+--  AF_RXRPC
+--  AF_ISDN
+--  AF_PHONET
+--  AF_IEEE802154
+--  AF_CAIF
+--  AF_ALG
+--  AF_MAX
 
 -- convert error symbolic name to errno
 function S.errno(name) return tonumber(enumE_t(name)) end
@@ -708,14 +765,6 @@ function S.inet_aton(s)
 end
 
 function S.inet_ntoa(addr) return ffi.string(ffi.C.inet_ntoa(addr)) end
-
--- initialisers
--- need to set first field. Corrects byte order on port, constructor for addr will do that for addr.
-function S.sockaddr_in(port, addr)
-  if type(addr) == 'string' then addr = S.inet_aton(addr) end
-  if not addr then return nil end
-  return sockaddr_in_t(enumAF_t("AF_INET"), S.htons(port), addr)
-end
 
 -- constants
 S.INADDR_ANY = in_addr_t()
@@ -850,20 +899,27 @@ function S.madvise(addr, length, advice) return retbool(ffi.C.madvise(addr, leng
 function S.socket(domain, stype, protocol) return retfd(ffi.C.socket(domain, stype, protocol or 0)) end
 
 function S.bind(sockfd, addr, addrlen)
-  return retbool(ffi.C.bind(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), getaddrlen(addr, addrlen)))
+  return retbool(ffi.C.bind(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
 function S.listen(sockfd, backlog) return retbool(ffi.C.listen(getfd(sockfd), backlog or 0)) end
 function S.connect(sockfd, addr, addrlen)
-  return retbool(ffi.C.connect(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), getaddrlen(addr, addrlen)))
+  return retbool(ffi.C.connect(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
 function S.accept(sockfd)
-  local addr = sockaddr_storage_t()
+  local ssaddr = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  local ret = ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_p_t, addr), addrlen)
+  local ret = ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, ssaddr), addrlen)
   if ret == -1 then return errorret() end
-  return {fd = fd_t(ret), addr = addr}
+  local afamily = tonumber(ssaddr.ss_family)
+  local atype = socket_type[afamily]
+  local addr -- left as nil if unknown family
+  if (type(atype)) ~= nil then
+    addr = atype()
+    ffi.copy(addr, ssaddr, addrlen[0]) -- note we copy rather than cast so it is safe for ss to be garbage collected.
+  end
+  return {fd = fd_t(ret), addr = addr, addrlen = addrlen[0], sa_family = afamily, ssaddr = ssaddr}
 end
 --S.accept4 = S.accept -- need to add support for flags argument TODO
 
