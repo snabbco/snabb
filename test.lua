@@ -248,6 +248,13 @@ assert(fd:close())
 assert(c:close())
 assert(s:close())
 
+-- unix domain sockets
+sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
+assert(sv[1]:nonblock())
+assert(sv[2]:nonblock())
+assert(sv[1]:close())
+assert(sv[2]:close())
+
 -- fork and related methods
 local pid, pid0, status
 pid0 = S.getpid()

@@ -620,6 +620,7 @@ int fcntl(int fd, enum F cmd, long arg); /* arg can be a pointer though */
 int fchmod(int fd, mode_t mode);
 
 int socket(enum AF domain, enum SOCK type, int protocol);
+int socketpair(enum AF domain, enum SOCK type, int protocol, int sv[2]);
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int listen(int sockfd, int backlog);
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
@@ -897,6 +898,12 @@ function S.mremap(old_address, old_size, new_size, flags, new_address) return re
 function S.madvise(addr, length, advice) return retbool(ffi.C.madvise(addr, length, advice)) end
 
 function S.socket(domain, stype, protocol) return retfd(ffi.C.socket(domain, stype, protocol or 0)) end
+function S.socketpair(domain, stype, protocol)
+  local sv2 = int2_t()
+  local ret = ffi.C.socketpair(domain, stype, protocol or 0, sv2)
+  if ret == -1 then return errorret() end
+  return {fd_t(sv2[0]), fd_t(sv2[1])}
+end
 
 function S.bind(sockfd, addr, addrlen)
   return retbool(ffi.C.bind(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
@@ -974,8 +981,18 @@ function S.S_ISFIFO(m) return bit.band(m, S.S_IFFIFO) ~= 0 end
 function S.S_ISLNK(m)  return bit.band(m, S.S_IFLNK)  ~= 0 end
 function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 
+-- non standard helpers
+function S.nonblock(s)
+  local fl, err, errno = assert(s:fcntl("F_GETFL"))
+  if not fl then return nil, err, errno end
+  fl, err, errno = s:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK))
+  if not fl then return nil, err, errno end
+  return true
+end
+
 -- methods on an fd
-local fdmethods = {'nogc', 'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
+local fdmethods = {'nogc', 'nonblock', 
+                   'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept'}
 local fmeth = {}
