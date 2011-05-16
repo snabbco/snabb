@@ -625,6 +625,9 @@ ssize_t write(int fd, const void *buf, size_t count);
 ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 off_t lseek(int fd, off_t offset, enum SEEK whence); 
+ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
+ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -864,6 +867,7 @@ function S.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count
 function S.pread(fd, buf, count, offset) return retint(ffi.C.pread(getfd(fd), buf, count, offset)) end
 function S.pwrite(fd, buf, count, offset) return retint(ffi.C.pwrite(getfd(fd), buf, count, offset)) end
 function S.lseek(fd, offset, whence) return retint(ffi.C.lseek(getfd(fd), offset, whence)) end
+function S.send(fd, buf, count, flags) return retint(ffi.C.send(getfd(fd), buf, count or #buf, flags or 0)) end
 
 function S.fchdir(fd) return retbool(ffi.C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(ffi.C.fsync(getfd(fd))) end
@@ -1049,7 +1053,7 @@ end
 local fdmethods = {'nogc', 'nonblock', 
                    'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
-                   'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername'}
+                   'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername', 'send'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
