@@ -275,6 +275,15 @@ struct iovec {
   void *iov_base;
   size_t iov_len;
 };
+struct msghdr {
+  void *msg_name;
+  socklen_t msg_namelen;
+  struct iovec *msg_iov;
+  size_t msg_iovlen;
+  void *msg_control;
+  size_t msg_controllen;
+  int msg_flags;
+};
 struct sockaddr {
   sa_family_t sa_family;
   char sa_data[14];
@@ -349,6 +358,10 @@ enum MADV {
   POSIX_MADV_SEQUENTIAL  = 2,
   POSIX_MADV_WILLNEED    = 3,
   POSIX_MADV_DONTNEED    = 4,
+};
+enum SCM {
+  SCM_RIGHTS = 0x01,
+  SCM_CREDENTIALS = 0x02
 };
 enum SOCK {
   SOCK_STREAM    = 1,
@@ -705,6 +718,7 @@ local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
 local in_addr_t = ffi.typeof("struct in_addr")
 local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
 local iovec_t = ffi.typeof("struct iovec[?]")
+local msghdr_t = ffi.typeof("struct msghdr")
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
@@ -1097,7 +1111,7 @@ fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
-  iovec = iovec_t
+  iovec = iovec_t, msghdr = msghdr_t
 }
 
 return S

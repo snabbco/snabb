@@ -252,24 +252,17 @@ assert(n == #string, "should read back string into buffer")
 assert(S.string(buf, n) == string, "we should read back the same string that was sent")
 
 -- test scatter gather
-local io = S.t.iovec(2)
 local b0 = S.t.buffer(4, "test")
 local b1 = S.t.buffer(3, "ing")
-io[0].iov_base = b0
-io[0].iov_len = 4
-io[1].iov_base = b1
-io[1].iov_len = 3
+local io = S.t.iovec(2, {iov_base = b0, iov_len = 4}, {iov_base = b1, iov_len = 3})
 n = assert(s:writev(io, 2))
 assert(n == 7, "expect writev to write 7 bytes")
 b0 = S.t.buffer(3)
 b1 = S.t.buffer(4)
-io[0].iov_base = b0
-io[0].iov_len = 3
-io[1].iov_base = b1
-io[1].iov_len = 4
+io = S.t.iovec(2, {iov_base = b0, iov_len = 3}, {iov_base = b1, iov_len = 4})
 n = assert(c:readv(io, 2))
 assert(n == 7, "expect readv to read 7 bytes")
-assert(S.string(b0) == "tes"and S.string(b1) == "ting", "expect t get back same stuff")
+assert(S.string(b0) == "tes" and S.string(b1) == "ting", "expect t get back same stuff")
 
 assert(fd:close())
 assert(c:close())
@@ -277,9 +270,14 @@ assert(s:close())
 
 -- unix domain sockets
 sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
-assert(sv[1]:nonblock())
-assert(sv[2]:nonblock())
--- test sending fd
+
+function sendfds(s, fds)
+  local buf = S.t.buffer(1) -- need to send one byte
+  local io = S.t.iovec(1, {iov_base = buf, iov_len = 1})
+  local hdr = msghdr_t{msg_iov = io, msg_iovlen = 1}
+end
+
+
 assert(sv[1]:close())
 assert(sv[2]:close())
 
