@@ -221,11 +221,13 @@ for i = 1024, 2048 do
   if s:bind(sa) then break end
 end
 
+local ba = assert(s:getsockname())
+assert(sa.sin_family == 2, "expect family on getsockname to be AF_INET=2")
+
 assert(s:listen()) -- will fail if we did not bind
 
 c = assert(S.socket("AF_INET", "SOCK_STREAM")) -- client socket
-fl = assert(c:fcntl("F_GETFL"))
-assert(c:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK)))
+assert(c:nonblock())
 
 --assert(c:connect(sa)) -- connect to our server address
 ok, err, errno = c:connect(sa)

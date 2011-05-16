@@ -630,6 +630,7 @@ int listen(int sockfd, int backlog);
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
+int getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
@@ -930,9 +931,21 @@ function S.accept(sockfd)
     addr = atype()
     ffi.copy(addr, ss, addrlen[0]) -- note we copy rather than cast so it is safe for ss to be garbage collected.
   end
-  return {fd = fd_t(ret), addr = addr, addrlen = addrlen[0], sa_family = afamily, ss = ss}
+  return {fd = fd_t(ret), addr = addr, addrlen = tonumber(addrlen[0]), sa_family = afamily, ss = ss}
 end
 --S.accept4 = S.accept -- need to add support for flags argument TODO
+
+function S.getsockname(sockfd)
+  local ss = sockaddr_storage_t()
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  local ret = ffi.C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
+  if ret == -1 then return errorret() end
+  local atype = socket_type[tonumber(ss.ss_family)]
+  if (type(atype)) == nil then return ss end
+  local addr = atype()
+  ffi.copy(addr, ss, addrlen[0]) -- copy not cast as ss will be garbage collected
+  return addr
+end
 
 function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
@@ -998,7 +1011,7 @@ end
 local fdmethods = {'nogc', 'nonblock', 
                    'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
-                   'bind', 'listen', 'connect', 'accept'}
+                   'bind', 'listen', 'connect', 'accept', 'getsockname'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
