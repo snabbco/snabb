@@ -186,16 +186,6 @@ S.string = ffi.string -- convenience for converting buffers
 S.sizeof = ffi.sizeof -- convenience so user need not require ffi
 S.cast = ffi.cast -- convenience so user need not require ffi
 
--- endian conversion
-if ffi.abi("be") then -- nothing to do
-  function S.htonl(b) return b end
-else
-  function S.htonl(b) return bit.bswap(b) end
-  function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
-end
-S.ntohl = S.htonl -- reverse is the same
-S.ntohs = S.htons -- reverse is the same
-
 --get fd from standard string, integer, or cdata
 function getfd(fd)
   if type(fd) == 'number' then return fd end
@@ -631,6 +621,7 @@ int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
 int getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
@@ -697,6 +688,19 @@ assert(ffi.sizeof(sockaddr_storage_t) == 128) -- this is the required size
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_un_t))
+
+-- endian conversion
+if ffi.abi("be") then -- nothing to do
+  function S.htonl(b) return b end
+else
+  function S.htonl(b)
+  if ffi.istype(in_addr_t, b) then return in_addr_t(bit.bswap(b.s_addr)) end -- not sure we need this, actually not using this function
+  return bit.bswap(b)
+end
+  function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
+end
+S.ntohl = S.htonl -- reverse is the same
+S.ntohs = S.htons -- reverse is the same
 
 -- initialisers
 -- need to set first field. Corrects byte order on port, constructor for addr will do that for addr.
@@ -929,6 +933,17 @@ saret = function(ret, ss, addrlen, flag) -- return socket address structure
     local addr = atype()
     ffi.copy(addr, ss, addrlen) -- note we copy rather than cast so it is safe for ss to be garbage collected.
     rets.addr = addr
+    -- helpers to make it easier to get peer info
+    if ffi.istype(sockaddr_un_t, addr) then
+      local namelen = addrlen - ffi.sizeof(sa_family_t)
+      if namelen > 0 then
+        rets.name = ffi.string(addr.sun_path, namelen)
+        if addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
+      end
+    elseif ffi.istype(sockaddr_in_t, addr) then
+      rets.port = S.ntohs(addr.sin_port)
+      rets.ipv4 = addr.sin_addr
+    end
   end
   if flag then rets.fd = fd_t(ret) end
   return rets
@@ -945,6 +960,12 @@ function S.getsockname(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
   return saret(ffi.C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen), ss, addrlen[0], false)
+end
+
+function S.getpeername(sockfd)
+  local ss = sockaddr_storage_t()
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  return saret(ffi.C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen), ss, addrlen[0], false)
 end
 
 function S.fcntl(fd, cmd, arg)
@@ -1011,7 +1032,7 @@ end
 local fdmethods = {'nogc', 'nonblock', 
                    'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
-                   'bind', 'listen', 'connect', 'accept', 'getsockname'}
+                   'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 

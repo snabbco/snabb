@@ -240,6 +240,11 @@ assert(a.addr.sin_family == 2, "expect ipv4 connection")
 
 assert(c:connect(sa)) -- able to connect now we have accepted
 
+ba = assert(c:getpeername())
+assert(ba.addr.sin_family == 2, "expect ipv4 connection")
+assert(S.inet_ntoa(ba.ipv4) == "127.0.0.1", "expect peer on localhost")
+assert(ba.ipv4.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
+
 n = assert(c:write(string))
 assert(n == #string, "should be able to write out short string")
 n = assert(a.fd:read(buf, size))
