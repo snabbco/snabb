@@ -222,7 +222,7 @@ for i = 1024, 2048 do
 end
 
 local ba = assert(s:getsockname())
-assert(sa.sin_family == 2, "expect family on getsockname to be AF_INET=2")
+assert(ba.addr.sin_family == 2, "expect family on getsockname to be AF_INET=2")
 
 assert(s:listen()) -- will fail if we did not bind
 

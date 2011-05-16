@@ -919,32 +919,32 @@ function S.connect(sockfd, addr, addrlen)
   return retbool(ffi.C.connect(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
-function S.accept(sockfd)
-  local ss = sockaddr_storage_t()
-  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  local ret = ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
+local saret
+saret = function(ret, ss, addrlen, flag) -- return socket address structure
   if ret == -1 then return errorret() end
   local afamily = tonumber(ss.ss_family)
   local atype = socket_type[afamily]
   local addr -- left as nil if unknown family
   if (type(atype)) ~= nil then
     addr = atype()
-    ffi.copy(addr, ss, addrlen[0]) -- note we copy rather than cast so it is safe for ss to be garbage collected.
+    ffi.copy(addr, ss, addrlen) -- note we copy rather than cast so it is safe for ss to be garbage collected.
   end
-  return {fd = fd_t(ret), addr = addr, addrlen = tonumber(addrlen[0]), sa_family = afamily, ss = ss}
+  local rets = {fd = fd_t(ret), addr = addr, addrlen = addrlen, sa_family = afamily, ss = ss}
+  if flag then rets.fd = fd_t(ret) end
+  return rets
 end
+
+function S.accept(sockfd)
+  local ss = sockaddr_storage_t()
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  return saret(ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen), ss, addrlen[0], true)
+  end
 --S.accept4 = S.accept -- need to add support for flags argument TODO
 
 function S.getsockname(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  local ret = ffi.C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
-  if ret == -1 then return errorret() end
-  local atype = socket_type[tonumber(ss.ss_family)]
-  if (type(atype)) == nil then return ss end
-  local addr = atype()
-  ffi.copy(addr, ss, addrlen[0]) -- copy not cast as ss will be garbage collected
-  return addr
+  return saret(ffi.C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen), ss, addrlen[0], false)
 end
 
 function S.fcntl(fd, cmd, arg)
