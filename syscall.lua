@@ -275,6 +275,10 @@ struct sockaddr_in {
   struct in_addr sin_addr;    /* internet address */
   unsigned char  sin_zero[8]; /* padding, should not vary by arch */
 };
+struct sockaddr_un {
+  sa_family_t sun_family;     /* AF_UNIX */
+  char        sun_path[108];  /* pathname */
+};
 
 // enums, LuaJIT will allow strings to be used, so we provide for appropriate parameters
 enum SEEK {
@@ -678,19 +682,20 @@ local sockaddr_storage_t = ffi.typeof("struct sockaddr_storage")
 local sa_family_t = ffi.typeof("sa_family_t")
 local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
 local in_addr_t = ffi.typeof("struct in_addr")
+local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
 
--- need these for casting back
+-- need these for casts
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
-local sockaddr_in_pt = ffi.typeof("struct sockaddr_in *")
 
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
 assert(ffi.sizeof(sockaddr_storage_t) == 128) -- this is the required size
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in_t))
+assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_un_t))
 
 -- initialisers
 -- need to set first field. Corrects byte order on port, constructor for addr will do that for addr.
@@ -705,8 +710,7 @@ local n = function(s) return tonumber(enumAF_t(s)) end -- convert to Lua number,
 -- map from socket family to data type
 local socket_type = {}
 -- AF_UNSPEC
---  AF_LOCAL
---  AF_INET
+socket_type[n("AF_LOCAL")] = sockaddr_un_t
 socket_type[n("AF_INET")] = sockaddr_in_t
 --  AF_AX25
 --  AF_IPX
