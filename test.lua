@@ -259,8 +259,26 @@ assert(s:close())
 sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
 assert(sv[1]:nonblock())
 assert(sv[2]:nonblock())
+-- test sending fd
 assert(sv[1]:close())
 assert(sv[2]:close())
+
+-- udp socket
+s = assert(S.socket("AF_INET", "SOCK_DGRAM"))
+c = assert(S.socket("AF_INET", "SOCK_DGRAM"))
+assert(s:nonblock())
+local sa = assert(S.sockaddr_in(0, loop))
+local ca = assert(S.sockaddr_in(0, loop))
+assert(s:bind(sa))
+assert(c:bind(sa))
+
+local bca = c:getsockname().addr -- find bound address
+
+n = assert(s:sendto(string, nil, 0, bca))
+n = assert(c:recv(buf, size))
+
+assert(s:close())
+assert(c:close())
 
 -- fork and related methods
 local pid, pid0, status

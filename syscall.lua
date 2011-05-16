@@ -628,6 +628,9 @@ off_t lseek(int fd, off_t offset, enum SEEK whence);
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
+ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
+ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -780,11 +783,12 @@ function S.errno(name) return tonumber(enumE_t(name)) end
 -- helper function to make setting addrlen optional
 local getaddrlen
 function getaddrlen(addr, addrlen)
+  if not addr then return 0 end
   if addrlen == nil then
     if ffi.istype(sockaddr_t, addr) then return ffi.sizeof(sockaddr_t) end
     if ffi.istype(sockaddr_in_t, addr) then return ffi.sizeof(sockaddr_in_t) end
   end
-  return addrlen
+  return addrlen or 0
 end
 
 -- functions from section 3 that we use for ip addresses
@@ -868,6 +872,12 @@ function S.pread(fd, buf, count, offset) return retint(ffi.C.pread(getfd(fd), bu
 function S.pwrite(fd, buf, count, offset) return retint(ffi.C.pwrite(getfd(fd), buf, count, offset)) end
 function S.lseek(fd, offset, whence) return retint(ffi.C.lseek(getfd(fd), offset, whence)) end
 function S.send(fd, buf, count, flags) return retint(ffi.C.send(getfd(fd), buf, count or #buf, flags or 0)) end
+function S.sendto(fd, buf, count, flags, addr, addrlen)
+  return retint(ffi.C.sendto(getfd(fd), buf, count or #buf, flags or 0, ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
+end
+
+function S.recv(fd, buf, count, flags) return retint(ffi.C.recv(getfd(fd), buf, count or #buf, flags or 0)) end
+
 
 function S.fchdir(fd) return retbool(ffi.C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(ffi.C.fsync(getfd(fd))) end
@@ -895,7 +905,7 @@ end
 
 function S.getcwd(buf, size)
   local ret = ffi.C.getcwd(buf, size or 0)
-  if buf == nil then -- Linux will allocate buffer here, return Lua string and free
+  if not buf then -- Linux will allocate buffer here, return Lua string and free
     if ret == nil then return errorret() end
     local s = ffi.string(ret) -- guaranteed to be zero terminated if no error
     ffi.C.free(ret)
@@ -950,7 +960,7 @@ saret = function(ret, ss, addrlen, flag) -- return socket address structure, wit
   local afamily = tonumber(ss.ss_family)
   local rets = {addrlen = addrlen, sa_family = afamily, ss = ss}
   local atype = socket_type[afamily]
-  if (type(atype)) ~= nil then
+  if atype then
     local addr = atype()
     ffi.copy(addr, ss, addrlen) -- note we copy rather than cast so it is safe for ss to be garbage collected.
     rets.addr = addr
@@ -1053,7 +1063,8 @@ end
 local fdmethods = {'nogc', 'nonblock', 
                    'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
-                   'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername', 'send'}
+                   'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
+                   'send', 'sendto', 'recv'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
