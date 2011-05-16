@@ -908,18 +908,18 @@ function S.connect(sockfd, addr, addrlen)
 end
 
 function S.accept(sockfd)
-  local ssaddr = sockaddr_storage_t()
+  local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  local ret = ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, ssaddr), addrlen)
+  local ret = ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
-  local afamily = tonumber(ssaddr.ss_family)
+  local afamily = tonumber(ss.ss_family)
   local atype = socket_type[afamily]
   local addr -- left as nil if unknown family
   if (type(atype)) ~= nil then
     addr = atype()
-    ffi.copy(addr, ssaddr, addrlen[0]) -- note we copy rather than cast so it is safe for ss to be garbage collected.
+    ffi.copy(addr, ss, addrlen[0]) -- note we copy rather than cast so it is safe for ss to be garbage collected.
   end
-  return {fd = fd_t(ret), addr = addr, addrlen = addrlen[0], sa_family = afamily, ssaddr = ssaddr}
+  return {fd = fd_t(ret), addr = addr, addrlen = addrlen[0], sa_family = afamily, ss = ss}
 end
 --S.accept4 = S.accept -- need to add support for flags argument TODO
 
