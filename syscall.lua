@@ -923,13 +923,13 @@ local saret
 saret = function(ret, ss, addrlen, flag) -- return socket address structure
   if ret == -1 then return errorret() end
   local afamily = tonumber(ss.ss_family)
+  local rets = {addrlen = addrlen, sa_family = afamily, ss = ss}
   local atype = socket_type[afamily]
-  local addr -- left as nil if unknown family
   if (type(atype)) ~= nil then
-    addr = atype()
+    local addr = atype()
     ffi.copy(addr, ss, addrlen) -- note we copy rather than cast so it is safe for ss to be garbage collected.
+    rets.addr = addr
   end
-  local rets = {fd = fd_t(ret), addr = addr, addrlen = addrlen, sa_family = afamily, ss = ss}
   if flag then rets.fd = fd_t(ret) end
   return rets
 end
