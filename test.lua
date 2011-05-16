@@ -273,9 +273,12 @@ assert(s:bind(sa))
 assert(c:bind(sa))
 
 local bca = c:getsockname().addr -- find bound address
+local serverport = s:getsockname().port -- find bound port
 
 n = assert(s:sendto(string, nil, 0, bca))
-n = assert(c:recv(buf, size))
+local f = assert(c:recvfrom(buf, size))
+assert(f.count == #string, "should get the whole string back")
+assert(f.port == serverport, "should be able to get server port in recvfrom")
 
 assert(s:close())
 assert(c:close())

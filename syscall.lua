@@ -791,6 +791,35 @@ function getaddrlen(addr, addrlen)
   return addrlen or 0
 end
 
+-- helper function for returning socket address types
+local saret
+saret = function(ss, addrlen, rets) -- return socket address structure, additional values to return in rets
+  if ret == -1 then return errorret() end
+  if not rets then rets = {} end
+  local afamily = tonumber(ss.ss_family)
+  rets.addrlen = addrlen
+  rets.sa_family = afamily
+  rets.ss = ss
+  local atype = socket_type[afamily]
+  if atype then
+    local addr = atype()
+    ffi.copy(addr, ss, addrlen) -- note we copy rather than cast so it is safe for ss to be garbage collected.
+    rets.addr = addr
+    -- helpers to make it easier to get peer info
+    if ffi.istype(sockaddr_un_t, addr) then
+      local namelen = addrlen - ffi.sizeof(sa_family_t)
+      if namelen > 0 then
+        rets.name = ffi.string(addr.sun_path, namelen)
+        if addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
+      end
+    elseif ffi.istype(sockaddr_in_t, addr) then
+      rets.port = S.ntohs(addr.sin_port)
+      rets.ipv4 = addr.sin_addr
+    end
+  end
+  return rets
+end
+
 -- functions from section 3 that we use for ip addresses
 function S.inet_aton(s)
   local addr = in_addr_t()
@@ -877,7 +906,13 @@ function S.sendto(fd, buf, count, flags, addr, addrlen)
 end
 
 function S.recv(fd, buf, count, flags) return retint(ffi.C.recv(getfd(fd), buf, count or #buf, flags or 0)) end
-
+function S.recvfrom(fd, buf, count, flags)
+  local ss = sockaddr_storage_t()
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  local ret = ffi.C.recvfrom(getfd(fd), buf, count, flags or 0, ffi.cast(sockaddr_pt, ss), addrlen)
+  if ret == -1 then return errorret() end
+  return saret(ss, addrlen[0], {count = ret})
+end
 
 function S.fchdir(fd) return retbool(ffi.C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(ffi.C.fsync(getfd(fd))) end
@@ -954,49 +989,29 @@ function S.connect(sockfd, addr, addrlen)
   return retbool(ffi.C.connect(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
-local saret
-saret = function(ret, ss, addrlen, flag) -- return socket address structure, with fd if flag true
-  if ret == -1 then return errorret() end
-  local afamily = tonumber(ss.ss_family)
-  local rets = {addrlen = addrlen, sa_family = afamily, ss = ss}
-  local atype = socket_type[afamily]
-  if atype then
-    local addr = atype()
-    ffi.copy(addr, ss, addrlen) -- note we copy rather than cast so it is safe for ss to be garbage collected.
-    rets.addr = addr
-    -- helpers to make it easier to get peer info
-    if ffi.istype(sockaddr_un_t, addr) then
-      local namelen = addrlen - ffi.sizeof(sa_family_t)
-      if namelen > 0 then
-        rets.name = ffi.string(addr.sun_path, namelen)
-        if addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
-      end
-    elseif ffi.istype(sockaddr_in_t, addr) then
-      rets.port = S.ntohs(addr.sin_port)
-      rets.ipv4 = addr.sin_addr
-    end
-  end
-  if flag then rets.fd = fd_t(ret) end
-  return rets
-end
-
 function S.accept(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  return saret(ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen), ss, addrlen[0], true)
-  end
+  local ret = ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
+  if ret == -1 then return errorret() end
+  return saret(ss, addrlen[0], {fd = fd_t(ret)})
+end
 --S.accept4 = S.accept -- need to add support for flags argument TODO
 
 function S.getsockname(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  return saret(ffi.C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen), ss, addrlen[0], false)
+  local ret = ffi.C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
+  if ret == -1 then return errorret() end
+  return saret(ss, addrlen[0])
 end
 
 function S.getpeername(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  return saret(ffi.C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen), ss, addrlen[0], false)
+  local ret = ffi.C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
+  if ret == -1 then return errorret() end
+  return saret(ss, addrlen[0])
 end
 
 function S.fcntl(fd, cmd, arg)
@@ -1064,7 +1079,7 @@ local fdmethods = {'nogc', 'nonblock',
                    'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
-                   'send', 'sendto', 'recv'}
+                   'send', 'sendto', 'recv', 'recvfrom'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
