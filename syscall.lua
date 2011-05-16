@@ -271,7 +271,10 @@ struct utsname {
   char machine[65];
   char domainname[65];
 };
-
+struct iovec {
+  void *iov_base;
+  size_t iov_len;
+};
 struct sockaddr {
   sa_family_t sa_family;
   char sa_data[14];
@@ -631,6 +634,8 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
 ssize_t recv(int sockfd, void *buf, size_t len, int flags);
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
+ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
+ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -699,6 +704,7 @@ local sa_family_t = ffi.typeof("sa_family_t")
 local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
 local in_addr_t = ffi.typeof("struct in_addr")
 local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
+local iovec_t = ffi.typeof("struct iovec[?]")
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
@@ -904,6 +910,8 @@ function S.send(fd, buf, count, flags) return retint(ffi.C.send(getfd(fd), buf, 
 function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retint(ffi.C.sendto(getfd(fd), buf, count or #buf, flags or 0, ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
 end
+function S.readv(fd, iov, iovcnt) return retint(ffi.C.readv(getfd(fd), iov, iovcnt)) end
+function S.writev(fd, iov, iovcnt) return retint(ffi.C.writev(getfd(fd), iov, iovcnt)) end
 
 function S.recv(fd, buf, count, flags) return retint(ffi.C.recv(getfd(fd), buf, count or #buf, flags or 0)) end
 function S.recvfrom(fd, buf, count, flags)
@@ -1079,7 +1087,7 @@ local fdmethods = {'nogc', 'nonblock',
                    'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
-                   'send', 'sendto', 'recv', 'recvfrom'}
+                   'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
@@ -1088,7 +1096,8 @@ fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 -- we could just return as S.timespec_t etc, not sure which is nicer?
 S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
-  sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t,
+  sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
+  iovec = iovec_t
 }
 
 return S

@@ -251,6 +251,26 @@ n = assert(a.fd:read(buf, size))
 assert(n == #string, "should read back string into buffer")
 assert(S.string(buf, n) == string, "we should read back the same string that was sent")
 
+-- test scatter gather
+local io = S.t.iovec(2)
+local b0 = S.t.buffer(4, "test")
+local b1 = S.t.buffer(3, "ing")
+io[0].iov_base = b0
+io[0].iov_len = 4
+io[1].iov_base = b1
+io[1].iov_len = 3
+n = assert(s:writev(io, 2))
+assert(n == 7, "expect writev to write 7 bytes")
+b0 = S.t.buffer(3)
+b1 = S.t.buffer(4)
+io[0].iov_base = b0
+io[0].iov_len = 3
+io[1].iov_base = b1
+io[1].iov_len = 4
+n = assert(c:readv(io, 2))
+assert(n == 7, "expect readv to read 7 bytes")
+assert(S.string(b0) == "tes"and S.string(b1) == "ting", "expect t get back same stuff")
+
 assert(fd:close())
 assert(c:close())
 assert(s:close())
