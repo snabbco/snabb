@@ -578,6 +578,7 @@ end
 ffi.cdef[[
 int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
+int creat(const char *pathname, mode_t mode);
 int chdir(const char *path);
 int mkdir(const char *pathname, mode_t mode);
 int rmdir(const char *pathname);
@@ -660,10 +661,6 @@ void *malloc(size_t size);
 void free(void *ptr);
 void *realloc(void *ptr, size_t size);
 char *strerror(enum E errnum);
-]]
-
---[[ -- not defined yet
- int creat(const char *pathname, mode_t mode); -- defined using open instead, should use creat
 ]]
 
 -- Lua type constructors corresponding to defined types
@@ -811,8 +808,7 @@ function S.close(fd)
   return true
 end
 
-function S.creat(pathname, mode) return S.open(pathname, S.O_CREAT + S.O_WRONLY + S.O_TRUNC, mode) end -- maybe dont do this?
-
+function S.creat(pathname, mode) return retfd(ffi.C.creat(pathname, mode or 0)) end
 function S.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
 function S.access(pathname, mode) return retbool(ffi.C.access(pathname, mode)) end
 function S.chdir(path) return retbool(ffi.C.chdir(path)) end
