@@ -139,6 +139,27 @@ S.WEXITED       = 4
 S.WCONTINUED    = 8
 S.WNOWAIT       = 0x01000000
 
+-- send, recv etc
+S.MSG_OOB             = 0x01
+S.MSG_PEEK            = 0x02
+S.MSG_DONTROUTE       = 0x04
+S.MSG_TRYHARD         = MSG_DONTROUTE
+S.MSG_CTRUNC          = 0x08
+S.MSG_PROXY           = 0x10
+S.MSG_TRUNC           = 0x20
+S.MSG_DONTWAIT        = 0x40
+S.MSG_EOR             = 0x80
+S.MSG_WAITALL         = 0x100
+S.MSG_FIN             = 0x200
+S.MSG_SYN             = 0x400
+S.MSG_CONFIRM         = 0x800
+S.MSG_RST             = 0x1000
+S.MSG_ERRQUEUE        = 0x2000
+S.MSG_NOSIGNAL        = 0x4000
+S.MSG_MORE            = 0x8000
+S.MSG_WAITFORONE      = 0x10000
+S.MSG_CMSG_CLOEXEC    = 0x40000000
+
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
@@ -920,7 +941,7 @@ function S.connect(sockfd, addr, addrlen)
 end
 
 local saret
-saret = function(ret, ss, addrlen, flag) -- return socket address structure
+saret = function(ret, ss, addrlen, flag) -- return socket address structure, with fd if flag true
   if ret == -1 then return errorret() end
   local afamily = tonumber(ss.ss_family)
   local rets = {addrlen = addrlen, sa_family = afamily, ss = ss}
