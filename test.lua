@@ -311,7 +311,6 @@ assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
 
 pid = assert(S.fork())
 if (pid == 0) then -- child
-  print("child")
   assert(S.getppid() == pid0, "parent pid should be previous pid")
   S.exit()
 else -- parent
@@ -322,7 +321,6 @@ end
 local efile = "/tmp/tmpXXYYY.sh"
 pid = assert(S.fork())
 if (pid == 0) then -- child
-  print("child")
   S.unlink(efile)
   fd = assert(S.creat(efile, S.S_IRWXU))
 local script = [[
@@ -338,7 +336,7 @@ env
 n = fd:write(script)
 assert(n == #script, "write all script at once")
 assert(fd:close())
-assert(S.execve(efile, {"test", "ing"}, {"PATH=/bin:/usr/bin"}))
+assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param overwritten
 
   S.exit()
 else -- parent
@@ -348,7 +346,6 @@ else -- parent
   assert(S.unlink(efile))
 end
 
-print("exit!")
 S.exit()
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
