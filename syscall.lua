@@ -947,7 +947,7 @@ function S.link(oldpath, newpath) return retbool(ffi.C.link(oldpath, newpath)) e
 function S.fork() return retint(ffi.C.fork()) end
 function S.execve(filename, argv, envp)
   local cargv = string_array_t(#argv + 1, argv)
-  cargv[#argv] = nil -- not entirely clear why not initialised to zero
+  cargv[#argv] = nil -- LuaJIT does not zero rest of a VLA
   local cenvp = string_array_t(#envp + 1, envp)
   cenvp[#envp] = nil
   return retbool(ffi.C.execve(filename, cargv, cenvp))

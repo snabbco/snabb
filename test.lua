@@ -323,30 +323,27 @@ pid = assert(S.fork())
 if (pid == 0) then -- child
   S.unlink(efile)
   fd = assert(S.creat(efile, S.S_IRWXU))
-local script = [[
+  local script = [[
 #!/bin/sh
 
-echo $0
-echo $1
-echo $2
+[ $1 = "test" ] || (echo "shell assert $1"; exit 1)
 
-env
+[ $2 = "ing" ] || (echo "shell assert $2"; exit 1)
+
+[ $PATH = "/bin:/usr/bin" ] || (echo "shell assert $PATH"; exit 1)
 
 ]]
-n = fd:write(script)
-assert(n == #script, "write all script at once")
-assert(fd:close())
-assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param overwritten
-
-  S.exit()
+  n = fd:write(script)
+  assert(n == #script, "write all script at once")
+  assert(fd:close())
+  assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
+  -- never reach here
 else -- parent
   pid0, status, err = S.waitpid(-1) -- non idiomatic return.
   assert(err == nil)
   assert(pid == pid0, "expect fork to return same pid as wait")
   assert(S.unlink(efile))
 end
-
-S.exit()
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 
