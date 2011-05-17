@@ -8,6 +8,8 @@ print(u.nodename .. " " .. u.sysname .. " " .. u.release .. " " .. u.version)
 local h = assert(S.gethostname())
 assert(h == u.nodename, "gethostname did not return nodename")
 
+assert(S.signal("SIGPIPE", "SIG_IGN"))
+
 -- test open non existent file
 fd, err, errno = S.open("/tmp/file/does/not/exist", S.O_RDONLY)
 assert(err, "expected open to fail on file not found")
@@ -255,23 +257,23 @@ assert(S.string(buf, n) == string, "we should read back the same string that was
 local b0 = S.t.buffer(4, "test")
 local b1 = S.t.buffer(3, "ing")
 local io = S.t.iovec(2, {iov_base = b0, iov_len = 4}, {iov_base = b1, iov_len = 3})
-n = assert(s:writev(io, 2))
+n = assert(c:writev(io, 2))
 assert(n == 7, "expect writev to write 7 bytes")
 b0 = S.t.buffer(3)
 b1 = S.t.buffer(4)
 io = S.t.iovec(2, {iov_base = b0, iov_len = 3}, {iov_base = b1, iov_len = 4})
-n = assert(c:readv(io, 2))
+n = assert(a.fd:readv(io, 2))
 assert(n == 7, "expect readv to read 7 bytes")
-assert(S.string(b0) == "tes" and S.string(b1) == "ting", "expect t get back same stuff")
+assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get back same stuff")
 
 assert(fd:close())
 assert(c:close())
-assert(s:close())
+assert(a.fd:close())
 
 -- unix domain sockets
 sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
 
-function sendfds(s, fds)
+function sendfds(s, fd) -- expand to allow more fds
   local buf = S.t.buffer(1) -- need to send one byte
   local io = S.t.iovec(1, {iov_base = buf, iov_len = 1})
   local hdr = msghdr_t{msg_iov = io, msg_iovlen = 1}
@@ -309,6 +311,7 @@ assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
 
 pid = assert(S.fork())
 if (pid == 0) then -- child
+  print("child")
   assert(S.getppid() == pid0, "parent pid should be previous pid")
   S.exit()
 else -- parent
@@ -316,14 +319,37 @@ else -- parent
   assert(err == nil)
   assert(pid == pid0, "expect fork to return same pid as wait")
 end
+local efile = "/tmp/tmpXXYYY.sh"
 pid = assert(S.fork())
 if (pid == 0) then -- child
+  print("child")
+  S.unlink(efile)
+  fd = assert(S.creat(efile, S.S_IRWXU))
+local script = [[
+#!/bin/sh
+
+echo $0
+echo $1
+echo $2
+
+env
+
+]]
+n = fd:write(script)
+assert(n == #script, "write all script at once")
+assert(fd:close())
+assert(S.execve(efile, {"test", "ing"}, {"PATH=/bin:/usr/bin"}))
+
   S.exit()
 else -- parent
   pid0, status, err = S.waitpid(-1) -- non idiomatic return.
   assert(err == nil)
   assert(pid == pid0, "expect fork to return same pid as wait")
+  assert(S.unlink(efile))
 end
+
+print("exit!")
+S.exit()
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 

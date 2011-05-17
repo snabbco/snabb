@@ -253,6 +253,9 @@ typedef unsigned long nlink_t;
 typedef long blksize_t;
 typedef long blkcnt_t;
 
+// misc
+typedef void (*sighandler_t) (int);
+
 // structs
 struct timeval {
   long    tv_sec;         /* seconds */
@@ -358,6 +361,49 @@ enum MADV {
   POSIX_MADV_SEQUENTIAL  = 2,
   POSIX_MADV_WILLNEED    = 3,
   POSIX_MADV_DONTNEED    = 4,
+};
+enum SIG_ { /* maybe not te clearest name */
+  SIG_ERR = -1,
+  SIG_DFL =  0,
+  SIG_IGN =  1,
+  SIG_HOLD = 2,
+};
+enum SIG {
+  SIGHUP        = 1,
+  SIGINT        = 2,
+  SIGQUIT       = 3,
+  SIGILL        = 4,
+  SIGTRAP       = 5,
+  SIGABRT       = 6,
+  SIGIOT        = 6,
+  SIGBUS        = 7,
+  SIGFPE        = 8,
+  SIGKILL       = 9,
+  SIGUSR1       = 10,
+  SIGSEGV       = 11,
+  SIGUSR2       = 12,
+  SIGPIPE       = 13,
+  SIGALRM       = 14,
+  SIGTERM       = 15,
+  SIGSTKFLT     = 16,
+  SIGCHLD       = 17,
+  SIGCLD        = SIGCHLD,
+  SIGCONT       = 18,
+  SIGSTOP       = 19,
+  SIGTSTP       = 20,
+  SIGTTIN       = 21,
+  SIGTTOU       = 22,
+  SIGURG        = 23,
+  SIGXCPU       = 24,
+  SIGXFSZ       = 25,
+  SIGVTALRM     = 26,
+  SIGPROF       = 27,
+  SIGWINCH      = 28,
+  SIGIO         = 29,
+  SIGPOLL       = SIGIO,
+  SIGPWR        = 30,
+  SIGSYS        = 31,
+  SIGUNUSED     = 31
 };
 enum SCM {
   SCM_RIGHTS = 0x01,
@@ -632,9 +678,11 @@ uid_t geteuid(void);
 pid_t getpid(void);
 pid_t getppid(void);
 pid_t fork(void);
+int execve(const char *filename, const char *argv[], const char *envp[]);
 pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);
 void _exit(enum EXIT status);
+enum SIG_ signal(enum SIG signum, enum SIG_ handler); /* although deprecated, just using to set SIG_ values */
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -723,7 +771,7 @@ local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
-
+local string_array_t = ffi.typeof("const char *[?]")
 -- need these for casts
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
 
@@ -897,6 +945,13 @@ function S.chmod(path, mode) return retbool(ffi.C.chmod(path, mode)) end
 function S.link(oldpath, newpath) return retbool(ffi.C.link(oldpath, newpath)) end
 
 function S.fork() return retint(ffi.C.fork()) end
+function S.execve(filename, argv, envp)
+  local cargv = string_array_t(#argv + 1, argv)
+  cargv[#argv] = nil -- not entirely clear why not initialised to zero
+  local cenvp = string_array_t(#envp + 1, envp)
+  cenvp[#envp] = nil
+  return retbool(ffi.C.execve(filename, cargv, cenvp))
+end
 
 -- cleanup wait, waitpid to return one value, but need to work out what exactly...
 function S.wait() -- we always get and return the status value, need to add helpers
@@ -1065,6 +1120,8 @@ end
 function S.sethostname(s) -- only accept Lua string, do not see use case for buffer as well
   return retbool(ffi.C.sethostname(s, #s))
 end
+
+function S.signal(signum, handler) return retbool(ffi.C.signal(signum, handler)) end
 
 -- straight passthroughs, as no failure possible
 S.getuid = ffi.C.getuid
