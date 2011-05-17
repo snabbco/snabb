@@ -304,7 +304,7 @@ assert(s:close())
 assert(c:close())
 
 -- fork and related methods
-local pid, pid0, status
+local pid, pid0, w
 pid0 = S.getpid()
 assert(pid0 > 1, "expecting my pid to be larger than 1")
 assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
@@ -312,11 +312,12 @@ assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
 pid = assert(S.fork())
 if (pid == 0) then -- child
   assert(S.getppid() == pid0, "parent pid should be previous pid")
-  S.exit()
+  S.exit(23)
 else -- parent
-  pid0, status, err = S.wait() -- non idiomatic return.
-  assert(err == nil)
-  assert(pid == pid0, "expect fork to return same pid as wait")
+  w = assert(S.wait())
+  assert(w.pid == pid, "expect fork to return same pid as wait")
+  assert(w.WIFEXITED, "process should have exited normally")
+    assert(w.EXITSTATUS == 23, "exit should be 23")
 end
 local efile = "/tmp/tmpXXYYY.sh"
 pid = assert(S.fork())
@@ -339,9 +340,10 @@ if (pid == 0) then -- child
   assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
   -- never reach here
 else -- parent
-  pid0, status, err = S.waitpid(-1) -- non idiomatic return.
-  assert(err == nil)
-  assert(pid == pid0, "expect fork to return same pid as wait")
+  w = assert(S.waitpid(-1))
+  assert(w.pid == pid, "expect fork to return same pid as wait")
+  assert(w.WIFEXITED, "process should have exited normally")
+  assert(w.EXITSTATUS == 0, "exit should be 0")
   assert(S.unlink(efile))
 end
 

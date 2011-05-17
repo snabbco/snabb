@@ -953,18 +953,28 @@ function S.execve(filename, argv, envp)
   return retbool(ffi.C.execve(filename, cargv, cenvp))
 end
 
--- cleanup wait, waitpid to return one value, but need to work out what exactly...
-function S.wait() -- we always get and return the status value, need to add helpers
-  local status = int1_t()
-  local ret = ffi.C.wait(status)
-  if ret == -1 then return nil, errorret() end -- extra padding where we would return status
-  return ret, status[0]
+local retwait
+function retwait(ret, status)
+  if ret == -1 then return errorret() end
+  local w = {pid = ret, status = status}
+  local WTERMSIG = bit.band(status, 0x7f)
+  local EXITSTATUS = bit.rshift(bit.band(status, 0xff00), 8)
+  w.WIFEXITED = WTERMSIG == 0
+  if w.WIFEXITED then w.EXITSTATUS = EXITSTATUS end
+  w.WIFSTOPPED = bit.band(status, 0xff) == 0x7f
+  if w.WIFSTOPPED then w.WSTOPSIG = EXITSTATUS end
+  w.WIFSIGNALED = not w.WIFEXITED and bit.band(status, 0x7f) ~= 0x7f -- I think this is right?????
+  if w.WIFSIGNALED then w.WTERMSIG = WTERMSIG end
+  return w
 end
-function S.waitpid(pid, options) -- we always get and return the status value, need to add helpers
+
+function S.wait()
   local status = int1_t()
-  local ret = ffi.C.waitpid(pid, status, options or 0)
-  if ret == -1 then return nil, errorret() end -- extra padding where we would return status
-  return ret, status[0]
+  return retwait(ffi.C.wait(status), status[0])
+end
+function S.waitpid(pid, options)
+  local status = int1_t()
+  return retwait(ffi.C.waitpid(pid, status, options or 0), status[0])
 end
 
 function S._exit(status) ffi.C._exit(status or 0) end
