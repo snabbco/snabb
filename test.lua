@@ -273,12 +273,11 @@ assert(a.fd:close())
 -- unix domain sockets
 sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
 
-function sendfds(s, fd) -- expand to allow more fds
+function sendfds(s, fd) -- expand to allow more fds  -- TODO finish
   local buf = S.t.buffer(1) -- need to send one byte
   local io = S.t.iovec(1, {iov_base = buf, iov_len = 1})
   local hdr = msghdr_t{msg_iov = io, msg_iovlen = 1}
 end
-
 
 assert(sv[1]:close())
 assert(sv[2]:close())
@@ -317,7 +316,7 @@ else -- parent
   w = assert(S.wait())
   assert(w.pid == pid, "expect fork to return same pid as wait")
   assert(w.WIFEXITED, "process should have exited normally")
-    assert(w.EXITSTATUS == 23, "exit should be 23")
+  assert(w.EXITSTATUS == 23, "exit should be 23")
 end
 local efile = "/tmp/tmpXXYYY.sh"
 pid = assert(S.fork())
@@ -328,9 +327,7 @@ if (pid == 0) then -- child
 #!/bin/sh
 
 [ $1 = "test" ] || (echo "shell assert $1"; exit 1)
-
 [ $2 = "ing" ] || (echo "shell assert $2"; exit 1)
-
 [ $PATH = "/bin:/usr/bin" ] || (echo "shell assert $PATH"; exit 1)
 
 ]]

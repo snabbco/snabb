@@ -2,6 +2,7 @@ local ffi = require "ffi"
 local bit = require "bit"
 
 -- note should wrap more conditionals around stuff that might not be there
+-- possibly generate more of this from C program, depending on where it differs.
 
 local S = {} -- exported functions
 
@@ -31,30 +32,30 @@ S.O_DSYNC     = octal('010000')
 S.O_RSYNC     = S.O_SYNC
 
 -- modes
-S.S_IFMT   = octal('0170000') -- bit mask for the file type bit fields
-S.S_IFSOCK = octal('0140000') -- socket
-S.S_IFLNK  = octal('0120000') -- symbolic link
-S.S_IFREG  = octal('0100000') -- regular file
-S.S_IFBLK  = octal('0060000') -- block device
-S.S_IFDIR  = octal('0040000') -- directory
-S.S_IFCHR  = octal('0020000') -- character device
-S.S_IFIFO  = octal('0010000') -- FIFO
-S.S_ISUID  = octal('0004000') -- set UID bit
-S.S_ISGID  = octal('0002000') -- set-group-ID bit
-S.S_ISVTX  = octal('0001000') -- sticky bit
+S.S_IFMT   = octal('0170000')
+S.S_IFSOCK = octal('0140000')
+S.S_IFLNK  = octal('0120000')
+S.S_IFREG  = octal('0100000')
+S.S_IFBLK  = octal('0060000')
+S.S_IFDIR  = octal('0040000')
+S.S_IFCHR  = octal('0020000')
+S.S_IFIFO  = octal('0010000')
+S.S_ISUID  = octal('0004000')
+S.S_ISGID  = octal('0002000')
+S.S_ISVTX  = octal('0001000')
 
-S.S_IRWXU = octal('00700') -- user (file owner) has read, write and execute permission
-S.S_IRUSR = octal('00400') -- user has read permission
-S.S_IWUSR = octal('00200') -- user has write permission
-S.S_IXUSR = octal('00100') -- user has execute permission
-S.S_IRWXG = octal('00070') -- group has read, write and execute permission
-S.S_IRGRP = octal('00040') -- group has read permission
-S.S_IWGRP = octal('00020') -- group has write permission
-S.S_IXGRP = octal('00010') -- group has execute permission
-S.S_IRWXO = octal('00007') -- others have read, write and execute permission
-S.S_IROTH = octal('00004') -- others have read permission
-S.S_IWOTH = octal('00002') -- others have write permission
-S.S_IXOTH = octal('00001') -- others have execute permission
+S.S_IRWXU = octal('00700')
+S.S_IRUSR = octal('00400')
+S.S_IWUSR = octal('00200')
+S.S_IXUSR = octal('00100')
+S.S_IRWXG = octal('00070')
+S.S_IRGRP = octal('00040')
+S.S_IWGRP = octal('00020')
+S.S_IXGRP = octal('00010')
+S.S_IRWXO = octal('00007')
+S.S_IROTH = octal('00004')
+S.S_IWOTH = octal('00002')
+S.S_IXOTH = octal('00001')
 
 if ffi.abi('32bit') then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end -- not supported yet
 
@@ -286,6 +287,12 @@ struct msghdr {
   void *msg_control;
   size_t msg_controllen;
   int msg_flags;
+};
+struct cmsghdr {
+  size_t cmsg_len;            /* Length of data in cmsg_data plus length of cmsghdr structure. */
+  int cmsg_level;             /* Originating protocol.  */
+  int cmsg_type;              /* Protocol specific type.  */
+  unsigned char cmsg_data[];  /* Ancillary data. note VLA in glibc, but macros to access for compatibility */
 };
 struct sockaddr {
   sa_family_t sa_family;
