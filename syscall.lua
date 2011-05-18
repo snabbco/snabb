@@ -134,6 +134,30 @@ S.SOL_ATM        = 264
 S.SOL_AAL        = 265
 S.SOL_IRDA       = 266
 
+S.SO_DEBUG       = 1
+S.SO_REUSEADDR   = 2
+S.SO_TYPE        = 3
+S.SO_ERROR       = 4
+S.SO_DONTROUTE   = 5
+S.SO_BROADCAST   = 6
+S.SO_SNDBUF      = 7
+S.SO_RCVBUF      = 8
+S.SO_SNDBUFFORCE = 32
+S.SO_RCVBUFFORCE = 33
+S.SO_KEEPALIVE   = 9
+S.SO_OOBINLINE   = 10
+S.SO_NO_CHECK    = 11
+S.SO_PRIORITY    = 12
+S.SO_LINGER      = 13
+S.SO_BSDCOMPAT   = 14
+assert(ffi.arch ~= "ppc", "need to fix the values below for ppc")
+S.SO_PASSCRED    = 16 -- below here differs for ppc!
+S.SO_PEERCRED    = 17
+S.SO_RCVLOWAT    = 18
+S.SO_SNDLOWAT    = 19
+S.SO_RCVTIMEO    = 20
+S.SO_SNDTIMEO    = 21
+
 -- Maximum queue length specifiable by listen.
 S.SOMAXCONN = 128
 
@@ -706,6 +730,8 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
+int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
+int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -1016,6 +1042,15 @@ function S.recvfrom(fd, buf, count, flags)
   return saret(ss, addrlen[0], {count = ret})
 end
 
+function S.setsockopt(fd, level, optname, optval, optlen)
+   -- allocate buffer for user, from Lua type if know how, int so far
+  if not optlen and type(optval) == 'number' then
+    optval = int1_t(optval)
+    optlen = ffi.sizeof(int1_t)
+  end
+  return retbool(C.setsockopt(getfd(fd), level, optname, optval, optlen))
+end
+
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
@@ -1188,8 +1223,8 @@ function cmsg_firsthdr(msg)
   return ffi.cast(cmsghdr_pt, msg.msg_control)
 end
 
-function S.sendfds(s, fd) -- expand to allow more fds  -- TODO finish
-  local buf1 = buffer_t(1) -- need to send one byte
+function S.sendfds(s, fd) -- TODO expand to allow more fds
+  local buf1 = buffer_t(1, 0) -- need to send one byte
   local io = iovec_t(1, {iov_base = buf1, iov_len = 1})
 
   local fa = ints_t(1, getfd(fd)) -- allow more, varargs
@@ -1202,7 +1237,7 @@ function S.sendfds(s, fd) -- expand to allow more fds  -- TODO finish
 
   cmsg.cmsg_level = S.SOL_SOCKET
   cmsg.cmsg_type = S.SCM_RIGHTS
-  cmsg.cmsg_len = buflen -- could set from constructor
+  cmsg.cmsg_len = buflen -- could set from a constructor
   ffi.copy(cmsg.cmsg_data, fa, fasize)
   msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
   return S.sendmsg(s, msg, 0)
@@ -1249,7 +1284,9 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds',
                    'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
-                   'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg'}
+                   'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
+                   'setsockopt'
+                   }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 

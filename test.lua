@@ -274,6 +274,7 @@ fd = assert(S.open("/dev/zero"))
 -- unix domain sockets
 sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
 
+assert(sv[1]:setsockopt(S.SOL_SOCKET, S.SO_PASSCRED, 1))
 assert(sv[1]:sendfds(fd))
 
 assert(sv[1]:close())
