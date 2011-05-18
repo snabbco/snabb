@@ -294,20 +294,25 @@ struct cmsghdr {
   size_t cmsg_len;            /* Length of data in cmsg_data plus length of cmsghdr structure. */
   int cmsg_level;             /* Originating protocol.  */
   int cmsg_type;              /* Protocol specific type.  */
-  unsigned char cmsg_data[];  /* Ancillary data. note VLA in glibc, but macros to access for compatibility */
+  unsigned char cmsg_data[?]; /* Ancillary data. note VLA in glibc, but macros to access for compatibility */
 };
 struct sockaddr {
   sa_family_t sa_family;
   char sa_data[14];
+};
+struct sockaddr_storage {
+  sa_family_t ss_family;
+  unsigned long int __ss_align;
+  char __ss_padding[128 - 2 * sizeof(unsigned long int)]; /* total length 128 */
 };
 // ipv4 sockets
 struct in_addr {
   uint32_t       s_addr;
 };
 struct sockaddr_in {
-  sa_family_t    sin_family;  /* address family: AF_INET */
-  in_port_t      sin_port;    /* port in network byte order */
-  struct in_addr sin_addr;    /* internet address */
+  sa_family_t    sin_family;
+  in_port_t      sin_port;
+  struct in_addr sin_addr;
   unsigned char  sin_zero[8]; /* padding, should not vary by arch */
 };
 struct sockaddr_un {
@@ -633,11 +638,6 @@ struct stat {
   unsigned long int __unused4;
   unsigned long int __unused5;
 };
-struct sockaddr_storage {
-  sa_family_t ss_family;
-  unsigned long int __ss_align;
-  char __ss_padding[120];
-};
 ]]
 else -- 64 bit arch
 STAT_VER_LINUX = 1
@@ -658,11 +658,6 @@ struct stat {
   struct timespec st_mtim;
   struct timespec st_ctim;
   long int __unused[3];
-};
-struct sockaddr_storage {
-  sa_family_t ss_family;
-  unsigned long int __ss_align;
-  char __ss_padding[112];
 };
 ]]
 end
@@ -776,11 +771,13 @@ local in_addr_t = ffi.typeof("struct in_addr")
 local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
 local iovec_t = ffi.typeof("struct iovec[?]")
 local msghdr_t = ffi.typeof("struct msghdr")
+local cmsghdr_t = ffi.typeof("struct cmsghdr")
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
 local string_array_t = ffi.typeof("const char *[?]")
+
 -- need these for casts
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
 
@@ -1187,7 +1184,7 @@ fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
-  iovec = iovec_t, msghdr = msghdr_t
+  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t
 }
 
 return S
