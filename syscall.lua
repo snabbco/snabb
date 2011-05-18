@@ -1240,7 +1240,7 @@ function S.sendfds(s, fd) -- TODO expand to allow more fds
   cmsg.cmsg_len = buflen -- could set from a constructor
   ffi.copy(cmsg.cmsg_data, fa, fasize)
   msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
-  return S.sendmsg(s, msg, 0)
+  return retbool(S.sendmsg(s, msg, 0))
 end
 
 -- define types, cmsg struct has __data but exposes data which sets?
