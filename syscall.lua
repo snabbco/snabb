@@ -1,6 +1,8 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
+local C = ffi.C
+
 -- note should wrap more conditionals around stuff that might not be there
 -- possibly generate more of this from C program, depending on where it differs.
 
@@ -168,7 +170,7 @@ local HOST_NAME_MAX = 64 -- Linux. should we export?
 function S.nogc(d) ffi.gc(d, nil) end
 local errorret, retint, retbool, retptr, retfd, getfd
 
-function S.strerror(errno) return ffi.string(ffi.C.strerror(errno)), errno end
+function S.strerror(errno) return ffi.string(C.strerror(errno)), errno end
 
 -- standard error return
 function errorret()
@@ -898,12 +900,12 @@ end
 -- functions from section 3 that we use for ip addresses
 function S.inet_aton(s)
   local addr = in_addr_t()
-  local ret = ffi.C.inet_aton(s, addr)
+  local ret = C.inet_aton(s, addr)
   if ret == 0 then return nil end
   return addr
 end
 
-function S.inet_ntoa(addr) return ffi.string(ffi.C.inet_ntoa(addr)) end
+function S.inet_ntoa(addr) return ffi.string(C.inet_ntoa(addr)) end
 
 -- constants
 S.INADDR_ANY = in_addr_t()
@@ -911,19 +913,19 @@ S.INADDR_LOOPBACK = assert(S.inet_aton("127.0.0.1"))
 S.INADDR_BROADCAST = assert(S.inet_aton("255.255.255.255"))
 
 -- main definitions start here
-function S.open(pathname, flags, mode) return retfd(ffi.C.open(pathname, flags or 0, mode or 0)) end
+function S.open(pathname, flags, mode) return retfd(C.open(pathname, flags or 0, mode or 0)) end
 
 function S.dup(oldfd, newfd, flags)
-  if newfd == nil then return retfd(ffi.C.dup(getfd(oldfd))) end
-  if flags == nil then return retfd(ffi.C.dup2(getfd(oldfd), getfd(newfd))) end
-  return retfd(ffi.C.dup3(getfd(oldfd), getfd(newfd), flags))
+  if newfd == nil then return retfd(C.dup(getfd(oldfd))) end
+  if flags == nil then return retfd(C.dup2(getfd(oldfd), getfd(newfd))) end
+  return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags))
 end
 S.dup2 = S.dup
 S.dup3 = S.dup
 
 function S.pipe(flags)
   local fd2 = int2_t()
-  local ret = ffi.C.pipe2(fd2, flags or 0)
+  local ret = C.pipe2(fd2, flags or 0)
   if ret == -1 then
     return errorret()
   end
@@ -932,7 +934,7 @@ end
 S.pipe2 = S.pipe
 
 function S.close(fd)
-  local ret = ffi.C.close(getfd(fd))
+  local ret = C.close(getfd(fd))
   if ret == -1 then return errorret() end
   if ffi.istype(fd_t, fd) then
     ffi.gc(fd, nil) -- remove gc finalizer as now closed; should we also remove if get EBADF?
@@ -940,24 +942,24 @@ function S.close(fd)
   return true
 end
 
-function S.creat(pathname, mode) return retfd(ffi.C.creat(pathname, mode or 0)) end
-function S.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
-function S.access(pathname, mode) return retbool(ffi.C.access(pathname, mode)) end
-function S.chdir(path) return retbool(ffi.C.chdir(path)) end
-function S.mkdir(path, mode) return retbool(ffi.C.mkdir(path, mode)) end
-function S.rmdir(path) return retbool(ffi.C.rmdir(path)) end
-function S.unlink(pathname) return retbool(ffi.C.unlink(pathname)) end
-function S.acct(filename) return retbool(ffi.C.acct(filename)) end
-function S.chmod(path, mode) return retbool(ffi.C.chmod(path, mode)) end
-function S.link(oldpath, newpath) return retbool(ffi.C.link(oldpath, newpath)) end
+function S.creat(pathname, mode) return retfd(C.creat(pathname, mode or 0)) end
+function S.unlink(pathname) return retbool(C.unlink(pathname)) end
+function S.access(pathname, mode) return retbool(C.access(pathname, mode)) end
+function S.chdir(path) return retbool(C.chdir(path)) end
+function S.mkdir(path, mode) return retbool(C.mkdir(path, mode)) end
+function S.rmdir(path) return retbool(C.rmdir(path)) end
+function S.unlink(pathname) return retbool(C.unlink(pathname)) end
+function S.acct(filename) return retbool(C.acct(filename)) end
+function S.chmod(path, mode) return retbool(C.chmod(path, mode)) end
+function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 
-function S.fork() return retint(ffi.C.fork()) end
+function S.fork() return retint(C.fork()) end
 function S.execve(filename, argv, envp)
   local cargv = string_array_t(#argv + 1, argv)
   cargv[#argv] = nil -- LuaJIT does not zero rest of a VLA
   local cenvp = string_array_t(#envp + 1, envp)
   cenvp[#envp] = nil
-  return retbool(ffi.C.execve(filename, cargv, cenvp))
+  return retbool(C.execve(filename, cargv, cenvp))
 end
 
 local retwait
@@ -977,67 +979,67 @@ end
 
 function S.wait()
   local status = int1_t()
-  return retwait(ffi.C.wait(status), status[0])
+  return retwait(C.wait(status), status[0])
 end
 function S.waitpid(pid, options)
   local status = int1_t()
-  return retwait(ffi.C.waitpid(pid, status, options or 0), status[0])
+  return retwait(C.waitpid(pid, status, options or 0), status[0])
 end
 
-function S._exit(status) ffi.C._exit(status or 0) end
-function S.exit(status) ffi.C.exit(status or 0) end
+function S._exit(status) C._exit(status or 0) end
+function S.exit(status) C.exit(status or 0) end
 
-function S.read(fd, buf, count) return retint(ffi.C.read(getfd(fd), buf, count)) end
-function S.write(fd, buf, count) return retint(ffi.C.write(getfd(fd), buf, count or #buf)) end
-function S.pread(fd, buf, count, offset) return retint(ffi.C.pread(getfd(fd), buf, count, offset)) end
-function S.pwrite(fd, buf, count, offset) return retint(ffi.C.pwrite(getfd(fd), buf, count, offset)) end
-function S.lseek(fd, offset, whence) return retint(ffi.C.lseek(getfd(fd), offset, whence)) end
-function S.send(fd, buf, count, flags) return retint(ffi.C.send(getfd(fd), buf, count or #buf, flags or 0)) end
+function S.read(fd, buf, count) return retint(C.read(getfd(fd), buf, count)) end
+function S.write(fd, buf, count) return retint(C.write(getfd(fd), buf, count or #buf)) end
+function S.pread(fd, buf, count, offset) return retint(C.pread(getfd(fd), buf, count, offset)) end
+function S.pwrite(fd, buf, count, offset) return retint(C.pwrite(getfd(fd), buf, count, offset)) end
+function S.lseek(fd, offset, whence) return retint(C.lseek(getfd(fd), offset, whence)) end
+function S.send(fd, buf, count, flags) return retint(C.send(getfd(fd), buf, count or #buf, flags or 0)) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
-  return retint(ffi.C.sendto(getfd(fd), buf, count or #buf, flags or 0, ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
+  return retint(C.sendto(getfd(fd), buf, count or #buf, flags or 0, ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
 end
-function S.readv(fd, iov, iovcnt) return retint(ffi.C.readv(getfd(fd), iov, iovcnt)) end
-function S.writev(fd, iov, iovcnt) return retint(ffi.C.writev(getfd(fd), iov, iovcnt)) end
+function S.readv(fd, iov, iovcnt) return retint(C.readv(getfd(fd), iov, iovcnt)) end
+function S.writev(fd, iov, iovcnt) return retint(C.writev(getfd(fd), iov, iovcnt)) end
 
-function S.recv(fd, buf, count, flags) return retint(ffi.C.recv(getfd(fd), buf, count or #buf, flags or 0)) end
+function S.recv(fd, buf, count, flags) return retint(C.recv(getfd(fd), buf, count or #buf, flags or 0)) end
 function S.recvfrom(fd, buf, count, flags)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  local ret = ffi.C.recvfrom(getfd(fd), buf, count, flags or 0, ffi.cast(sockaddr_pt, ss), addrlen)
+  local ret = C.recvfrom(getfd(fd), buf, count, flags or 0, ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0], {count = ret})
 end
 
-function S.fchdir(fd) return retbool(ffi.C.fchdir(getfd(fd))) end
-function S.fsync(fd) return retbool(ffi.C.fsync(getfd(fd))) end
-function S.fdatasync(fd) return retbool(ffi.C.fdatasync(getfd(fd))) end
-function S.fchmod(fd, mode) return retbool(ffi.C.fchmod(getfd(fd), mode)) end
+function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
+function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
+function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
+function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), mode)) end
 
 function S.stat(path)
   local buf = stat_t()
-  local ret = ffi.C.__xstat(STAT_VER_LINUX, path, buf)
+  local ret = C.__xstat(STAT_VER_LINUX, path, buf)
   if ret == -1 then return errorret() end
   return buf
 end
 function S.lstat(path)
   local buf = stat_t()
-  local ret = ffi.C.__lxstat(STAT_VER_LINUX, path, buf)
+  local ret = C.__lxstat(STAT_VER_LINUX, path, buf)
   if ret == -1 then return errorret() end
   return buf
 end
 function S.fstat(fd)
   local buf = stat_t()
-  local ret = ffi.C.__fxstat(STAT_VER_LINUX, getfd(fd), buf)
+  local ret = C.__fxstat(STAT_VER_LINUX, getfd(fd), buf)
   if ret == -1 then return errorret() end
   return buf
 end
 
 function S.getcwd(buf, size)
-  local ret = ffi.C.getcwd(buf, size or 0)
+  local ret = C.getcwd(buf, size or 0)
   if not buf then -- Linux will allocate buffer here, return Lua string and free
     if ret == nil then return errorret() end
     local s = ffi.string(ret) -- guaranteed to be zero terminated if no error
-    ffi.C.free(ret)
+    C.free(ret)
     return s
   end
   -- user allocated buffer
@@ -1047,46 +1049,46 @@ end
 
 function S.nanosleep(req)
   local rem = timespec_t()
-  local ret = ffi.C.nanosleep(req, rem)
+  local ret = C.nanosleep(req, rem)
   if ret == -1 then return errorret() end
   return rem -- return second argument, Lua style
 end
 
 function S.mmap(addr, length, prot, flags, fd, offset)
-  return retptr(ffi.C.mmap(addr, length, prot, flags, getfd(fd), offset), function(addr) ffi.C.munmap(addr, length) end) -- add munmap gc
+  return retptr(C.mmap(addr, length, prot, flags, getfd(fd), offset), function(addr) C.munmap(addr, length) end) -- add munmap gc
 end
 function S.munmap(addr, length)
-  return retbool(ffi.C.munmap(ffi.gc(addr, nil), length)) -- remove gc on unmap
+  return retbool(C.munmap(ffi.gc(addr, nil), length)) -- remove gc on unmap
 end
-function S.msync(addr, length, flags) return retbool(ffi.C.msync(addr, length, flags)) end
-function S.mlock(addr, len) return retbool(ffi.C.mlock(addr, len)) end
-function S.munlock(addr, len) return retbool(ffi.C.munlock(addr, len)) end
-function S.mlockall(flags) return retbool(ffi.C.mlockall(flags)) end
-function S.munlockall() return retbool(ffi.C.munlockall()) end
-function S.mremap(old_address, old_size, new_size, flags, new_address) return retptr(ffi.C.mremap(old_address, old_size, new_size, flags, new_address)) end
-function S.madvise(addr, length, advice) return retbool(ffi.C.madvise(addr, length, advice)) end
+function S.msync(addr, length, flags) return retbool(C.msync(addr, length, flags)) end
+function S.mlock(addr, len) return retbool(C.mlock(addr, len)) end
+function S.munlock(addr, len) return retbool(C.munlock(addr, len)) end
+function S.mlockall(flags) return retbool(C.mlockall(flags)) end
+function S.munlockall() return retbool(C.munlockall()) end
+function S.mremap(old_address, old_size, new_size, flags, new_address) return retptr(C.mremap(old_address, old_size, new_size, flags, new_address)) end
+function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, advice)) end
 
-function S.socket(domain, stype, protocol) return retfd(ffi.C.socket(domain, stype, protocol or 0)) end
+function S.socket(domain, stype, protocol) return retfd(C.socket(domain, stype, protocol or 0)) end
 function S.socketpair(domain, stype, protocol)
   local sv2 = int2_t()
-  local ret = ffi.C.socketpair(domain, stype, protocol or 0, sv2)
+  local ret = C.socketpair(domain, stype, protocol or 0, sv2)
   if ret == -1 then return errorret() end
   return {fd_t(sv2[0]), fd_t(sv2[1])}
 end
 
 function S.bind(sockfd, addr, addrlen)
-  return retbool(ffi.C.bind(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
+  return retbool(C.bind(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
-function S.listen(sockfd, backlog) return retbool(ffi.C.listen(getfd(sockfd), backlog or 0)) end
+function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or 0)) end
 function S.connect(sockfd, addr, addrlen)
-  return retbool(ffi.C.connect(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
+  return retbool(C.connect(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
 function S.accept(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  local ret = ffi.C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
+  local ret = C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0], {fd = fd_t(ret)})
 end
@@ -1095,7 +1097,7 @@ end
 function S.getsockname(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  local ret = ffi.C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
+  local ret = C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
 end
@@ -1103,14 +1105,14 @@ end
 function S.getpeername(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  local ret = ffi.C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
+  local ret = C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
 end
 
 function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
-  local ret = ffi.C.fcntl(getfd(fd), cmd, arg or 0)
+  local ret = C.fcntl(getfd(fd), cmd, arg or 0)
   -- return values differ, some special handling needed
   if cmd == "F_DUPFD" or cmd == "F_DUPFD_CLOEXEC" then return retfd(ret) end
   if cmd == "F_GETFD" or cmd == "F_GETFL" or cmd == "F_GETLEASE" or cmd == "F_GETOWN" or cmd == "F_GETSIG" or cmd == "F_GETPIPE_SZ" then return retint(ret) end
@@ -1120,7 +1122,7 @@ end
 local utsname_t = ffi.typeof("struct utsname")
 function S.uname()
   local u = utsname_t()
-  local ret = ffi.C.uname(u)
+  local ret = C.uname(u)
   if ret == -1 then return errorret() end
   return {sysname = ffi.string(u.sysname), nodename = ffi.string(u.nodename), release = ffi.string(u.release),
           version = ffi.string(u.version), machine = ffi.string(u.machine), domainname = ffi.string(u.domainname)}
@@ -1128,30 +1130,30 @@ end
 
 function S.gethostname()
   local buf = buffer_t(HOST_NAME_MAX + 1)
-  local ret = ffi.C.gethostname(buf, HOST_NAME_MAX + 1)
+  local ret = C.gethostname(buf, HOST_NAME_MAX + 1)
   if ret == -1 then return errorret() end
   buf[HOST_NAME_MAX] = 0 -- paranoia here to make sure null terminated, which could happen if HOST_NAME_MAX was incorrect
   return ffi.string(buf)
 end
 
 function S.sethostname(s) -- only accept Lua string, do not see use case for buffer as well
-  return retbool(ffi.C.sethostname(s, #s))
+  return retbool(C.sethostname(s, #s))
 end
 
-function S.signal(signum, handler) return retbool(ffi.C.signal(signum, handler)) end
+function S.signal(signum, handler) return retbool(C.signal(signum, handler)) end
 
 -- straight passthroughs, as no failure possible
-S.getuid = ffi.C.getuid
-S.geteuid = ffi.C.geteuid
-S.getpid = ffi.C.getpid
-S.getppid = ffi.C.getppid
-S.umask = ffi.C.umask
+S.getuid = C.getuid
+S.geteuid = C.geteuid
+S.getpid = C.getpid
+S.getppid = C.getppid
+S.umask = C.umask
 
 -- 'macros' and helper functions etc
 
 -- note that major and minor are inline in glibc, gnu provides these real symbols, else you might have to parse yourself
-function S.major(dev) return ffi.C.gnu_dev_major(dev) end
-function S.minor(dev) return ffi.C.gnu_dev_minor(dev) end
+function S.major(dev) return C.gnu_dev_major(dev) end
+function S.minor(dev) return C.gnu_dev_minor(dev) end
 
 function S.S_ISREG(m)  return bit.band(m, S.S_IFREG)  ~= 0 end
 function S.S_ISDIR(m)  return bit.band(m, S.S_IFDIR)  ~= 0 end
