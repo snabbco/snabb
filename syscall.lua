@@ -1223,11 +1223,13 @@ function cmsg_firsthdr(msg)
   return ffi.cast(cmsghdr_pt, msg.msg_control)
 end
 
-function S.sendfds(s, fd) -- TODO expand to allow more fds
+function S.sendfds(s, ...)
+  local fds = {}
+  for i, v in ipairs{...} do fds[i] = getfd(v) end
   local buf1 = buffer_t(1, 0) -- need to send one byte
   local io = iovec_t(1, {iov_base = buf1, iov_len = 1})
 
-  local fa = ints_t(1, getfd(fd)) -- allow more, varargs
+  local fa = ints_t(#fds, fds) -- allow more, varargs
   local fasize = ffi.sizeof(fa)
   local bufsize = cmsg_space(fasize)
   local buflen = cmsg_len(fasize)
