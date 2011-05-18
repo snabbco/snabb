@@ -120,7 +120,12 @@ S.SOCK_PACKET    = 10
 S.SOCK_CLOEXEC = octal('02000000') -- flag
 S.SOCK_NONBLOCK = octal('04000')   -- flag
 
--- misc socket constants -- move to enum??
+-- misc socket constants
+S.SCM_RIGHTS = 0x01
+S.SCM_CREDENTIALS = 0x02
+
+S.SOL_SOCKET     = 1
+
 S.SOL_RAW        = 255
 S.SOL_DECNET     = 261
 S.SOL_X25        = 262
@@ -296,6 +301,11 @@ struct cmsghdr {
   int cmsg_type;              /* Protocol specific type.  */
   unsigned char cmsg_data[?]; /* Ancillary data. note VLA in glibc, but macros to access for compatibility */
 };
+struct cmsghdr0 {     /* empty data, just for casts */
+  size_t cmsg_len;
+  int cmsg_level;
+  int cmsg_type;
+};
 struct sockaddr {
   sa_family_t sa_family;
   char sa_data[14];
@@ -418,10 +428,6 @@ enum SIG {
   SIGPWR        = 30,
   SIGSYS        = 31,
   SIGUNUSED     = 31
-};
-enum SCM {
-  SCM_RIGHTS = 0x01,
-  SCM_CREDENTIALS = 0x02
 };
 enum SOCK {
   SOCK_STREAM    = 1,
@@ -612,7 +618,6 @@ enum E {
 ]]
 
 -- stat structure is architecture dependent in Linux
--- also sockaddr_storage (just about), due to way it forces alignment
 -- this is the way glibc versions stat via __xstat, may need to change for other libc, eg if define stat as a non inline function
 local STAT_VER_LINUX
 
@@ -772,14 +777,17 @@ local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
 local iovec_t = ffi.typeof("struct iovec[?]")
 local msghdr_t = ffi.typeof("struct msghdr")
 local cmsghdr_t = ffi.typeof("struct cmsghdr")
+local cmsghdr0_t = ffi.typeof("struct cmsghdr0")
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
+local ints_t = ffi.typeof("int[?]") -- array of ints
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
 local string_array_t = ffi.typeof("const char *[?]")
 
 -- need these for casts
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
+local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
 
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
 assert(ffi.sizeof(sockaddr_storage_t) == 128) -- this is the required size
@@ -969,7 +977,7 @@ function retwait(ret, status)
   if w.WIFEXITED then w.EXITSTATUS = EXITSTATUS end
   w.WIFSTOPPED = bit.band(status, 0xff) == 0x7f
   if w.WIFSTOPPED then w.WSTOPSIG = EXITSTATUS end
-  w.WIFSIGNALED = not w.WIFEXITED and bit.band(status, 0x7f) ~= 0x7f -- I think this is right?????
+  w.WIFSIGNALED = not w.WIFEXITED and bit.band(status, 0x7f) ~= 0x7f -- I think this is right????? TODO recheck, cleanup
   if w.WIFSIGNALED then w.WTERMSIG = WTERMSIG end
   return w
 end
@@ -995,6 +1003,7 @@ function S.send(fd, buf, count, flags) return retint(C.send(getfd(fd), buf, coun
 function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retint(C.sendto(getfd(fd), buf, count or #buf, flags or 0, ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
 end
+function S.sendmsg(fd, msg, flags) return retbool(C.sendmsg(getfd(fd), msg, flags or 0)) end
 function S.readv(fd, iov, iovcnt) return retint(C.readv(getfd(fd), iov, iovcnt)) end
 function S.writev(fd, iov, iovcnt) return retint(C.writev(getfd(fd), iov, iovcnt)) end
 
@@ -1160,6 +1169,72 @@ function S.S_ISFIFO(m) return bit.band(m, S.S_IFFIFO) ~= 0 end
 function S.S_ISLNK(m)  return bit.band(m, S.S_IFLNK)  ~= 0 end
 function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 
+-- cmsg functions, try to hide some of this nasty stuff from the user
+local cmsg_align, cmsg_space, cmsg_len, cmsg_firsthdr
+local cmsg_hdrsize = ffi.sizeof(cmsghdr0_t)
+if ffi.abi('32bit') then
+  function cmsg_align(len) return bit.band(len + 3, bit.bnot(3)) end
+else
+  function cmsg_align(len) return bit.band(len + 7, bit.bnot(7)) end
+end
+local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
+function cmsg_space(len) return cmsg_align(len) + cmsg_ahdr end
+function cmsg_len(len) return cmsg_align(cmsg_hdrsize + len) end
+
+-- msg_control is a bunch of cmsg structs, but these are all different lengths, as they have variable size arrays
+
+function cmsg_firsthdr(msg)
+  if msg.msg_controllen < cmsg_hdrsize then return nil end
+  return ffi.cast(cmsghdr_pt, msg.msg_control)
+end
+
+function S.sendfds(s, fd) -- expand to allow more fds  -- TODO finish
+  local buf1 = buffer_t(1) -- need to send one byte
+  local io = iovec_t(1, {iov_base = buf1, iov_len = 1})
+
+  local fa = ints_t(1, getfd(fd)) -- allow more, varargs
+  local fasize = ffi.sizeof(fa)
+  local bufsize = cmsg_space(fasize)
+  local buflen = cmsg_len(fasize)
+  local buf = buffer_t(bufsize) -- this is our cmsg buffer
+  local msg = msghdr_t{msg_name = nil, msg_namelen = 0, msg_iov = io, msg_iovlen = 1, msg_control = buf, msg_controllen = bufsize, msg_flags = 0}
+  local cmsg = cmsg_firsthdr(msg) -- this is just buf, cast to cmsg type, in fact
+
+  cmsg.cmsg_level = S.SOL_SOCKET
+  cmsg.cmsg_type = S.SCM_RIGHTS
+  cmsg.cmsg_len = buflen -- could set from constructor
+  ffi.copy(cmsg.cmsg_data, fa, fasize)
+  msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
+  return S.sendmsg(s, msg, 0)
+end
+
+-- define types, cmsg struct has __data but exposes data which sets?
+
+--[[
+#define CMSG_FIRSTHDR(mhdr) \
+  ((size_t) (mhdr)->msg_controllen >= sizeof (struct cmsghdr)                 \
+   ? (struct cmsghdr *) (mhdr)->msg_control : (struct cmsghdr *) 0)
+
+_EXTERN_INLINE struct cmsghdr *
+__NTH (__cmsg_nxthdr (struct msghdr *__mhdr, struct cmsghdr *__cmsg))
+{
+  if ((size_t) __cmsg->cmsg_len < sizeof (struct cmsghdr))
+    /* The kernel header does this so there may be a reason.  */
+    return 0;
+
+  __cmsg = (struct cmsghdr *) ((unsigned char *) __cmsg
+                               + CMSG_ALIGN (__cmsg->cmsg_len));
+  if ((unsigned char *) (__cmsg + 1) > ((unsigned char *) __mhdr->msg_control
+                                        + __mhdr->msg_controllen)
+      || ((unsigned char *) __cmsg + CMSG_ALIGN (__cmsg->cmsg_len)
+          > ((unsigned char *) __mhdr->msg_control + __mhdr->msg_controllen)))
+    /* No more entries.  */
+    return 0;
+  return __cmsg;
+}
+
+]]
+
 -- non standard helpers
 function S.nonblock(s)
   local fl, err, errno = assert(s:fcntl("F_GETFL"))
@@ -1170,11 +1245,11 @@ function S.nonblock(s)
 end
 
 -- methods on an fd
-local fdmethods = {'nogc', 'nonblock', 
+local fdmethods = {'nogc', 'nonblock', 'sendfds',
                    'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
-                   'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev'}
+                   'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg'}
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 

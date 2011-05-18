@@ -270,17 +270,11 @@ assert(fd:close())
 assert(c:close())
 assert(a.fd:close())
 
+fd = assert(S.open("/dev/zero"))
 -- unix domain sockets
 sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
 
-function sendfds(s, fd) -- expand to allow more fds  -- TODO finish
-  local buf = S.t.buffer(1) -- need to send one byte
-  local io = S.t.iovec(1, {iov_base = buf, iov_len = 1})
-  local hdr = S.t.msghdr{msg_iov = io, msg_iovlen = 1}
-  local cm = S.t.cmsghdr(5)
-end
-
-sendfds()
+assert(sv[1]:sendfds(fd))
 
 assert(sv[1]:close())
 assert(sv[2]:close())
