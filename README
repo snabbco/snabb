@@ -24,11 +24,9 @@ String conversions are not done automatically, you get a buffer back, you have t
 
 Not yet supporting the 64 bit file operations for 32 bit architectures (lseek64 etc).
 
-Constants should all be available, eg L.SEEK_SET etc. You can usually add to combine them. May add some string parsing later.
+Constants should all be available, eg L.SEEK_SET etc. You can usually add to combine them. Some available as strings, if defined as enums.
 
 You do not need to use the numbered versions of functions, eg dup can do dup2 or dup3 by adding more arguments
-
-Note that pipe returns two file descriptors, rather than passing an array as in C, so fd0, fd1, err = L.pipe()
 
 getcwd returns the result in a buffer if one is passed, or as a Lua string otherwise, ie if called with no parameters/
 
@@ -39,6 +37,8 @@ bind does not require a length for the address type length, as it can work this 
 uname returns a Lua table with the returned strings in it.
 
 Some parameters are defined as enums rather than ints, which means that you use string names, eg fd:lseek(offset, "SEEK_SET"). These are in the cases where there is a single value to be set, which cannot be combined with anything else, so not bitmap arguments. In a few cases both are provided, for example Linux adds socket flags as well as the normal enumerated types, so posix applications can use the enum as expected. Other string parameters are optionally available, such as "stdin", meaning the 0 file descriptor.
+
+The test cases are good examples until I do better documentation!
 
 Testing
 
