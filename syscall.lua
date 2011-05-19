@@ -175,7 +175,7 @@ S.WNOWAIT       = 0x01000000
 S.MSG_OOB             = 0x01
 S.MSG_PEEK            = 0x02
 S.MSG_DONTROUTE       = 0x04
-S.MSG_TRYHARD         = MSG_DONTROUTE
+S.MSG_TRYHARD         = S.MSG_DONTROUTE
 S.MSG_CTRUNC          = 0x08
 S.MSG_PROXY           = 0x10
 S.MSG_TRUNC           = 0x20
@@ -310,6 +310,11 @@ struct iovec {
   void *iov_base;
   size_t iov_len;
 };
+struct ucred { /* this is Linux specific */
+  pid_t pid;
+  uid_t uid;
+  gid_t gid;
+};
 struct msghdr {
   void *msg_name;
   socklen_t msg_namelen;
@@ -324,11 +329,6 @@ struct cmsghdr {
   int cmsg_level;             /* Originating protocol.  */
   int cmsg_type;              /* Protocol specific type.  */
   unsigned char cmsg_data[?]; /* Ancillary data. note VLA in glibc, but macros to access for compatibility */
-};
-struct cmsghdr0 {     /* empty data, just for casts */
-  size_t cmsg_len;
-  int cmsg_level;
-  int cmsg_type;
 };
 struct sockaddr {
   sa_family_t sa_family;
@@ -803,7 +803,8 @@ local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
 local iovec_t = ffi.typeof("struct iovec[?]")
 local msghdr_t = ffi.typeof("struct msghdr")
 local cmsghdr_t = ffi.typeof("struct cmsghdr")
-local cmsghdr0_t = ffi.typeof("struct cmsghdr0")
+local ucred_t = ffi.typeof("struct ucred")
+
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local ints_t = ffi.typeof("int[?]") -- array of ints
@@ -814,6 +815,7 @@ local string_array_t = ffi.typeof("const char *[?]")
 -- need these for casts
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
 local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
+local uchar_pt = ffi.typeof("unsigned char *")
 
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
 assert(ffi.sizeof(sockaddr_storage_t) == 128) -- this is the required size
@@ -902,7 +904,6 @@ end
 -- helper function for returning socket address types
 local saret
 saret = function(ss, addrlen, rets) -- return socket address structure, additional values to return in rets
-  if ret == -1 then return errorret() end
   if not rets then rets = {} end
   local afamily = tonumber(ss.ss_family)
   rets.addrlen = addrlen
@@ -1205,12 +1206,12 @@ function S.S_ISLNK(m)  return bit.band(m, S.S_IFLNK)  ~= 0 end
 function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
-local cmsg_align, cmsg_space, cmsg_len, cmsg_firsthdr
-local cmsg_hdrsize = ffi.sizeof(cmsghdr0_t)
+local cmsg_align, cmsg_space, cmsg_len, cmsg_firsthdr, cmsg_nxthdr
+local cmsg_hdrsize = ffi.sizeof(cmsghdr_t(0))
 if ffi.abi('32bit') then
-  function cmsg_align(len) return bit.band(len + 3, bit.bnot(3)) end
+  function cmsg_align(len) return bit.band(tonumber(len) + 3, bit.bnot(3)) end
 else
-  function cmsg_align(len) return bit.band(len + 7, bit.bnot(7)) end
+  function cmsg_align(len) return bit.band(tonumber(len) + 7, bit.bnot(7)) end
 end
 local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
 function cmsg_space(len) return cmsg_align(len) + cmsg_ahdr end
@@ -1223,18 +1224,80 @@ function cmsg_firsthdr(msg)
   return ffi.cast(cmsghdr_pt, msg.msg_control)
 end
 
-function S.sendfds(s, ...)
+function cmsg_nxthdr(msg, cmsg)
+  if cmsg.cmsg_len < cmsg_hdrsize then return nil end
+
+  print("align of len is " .. tonumber(cmsg_align(cmsg.cmsg_len)))
+
+  print(cmsg, ffi.cast(uchar_pt, cmsg), msg.msg_control)
+  print(tonumber(cmsg), tonumber(ffi.cast(uchar_pt, cmsg)), tonumber(msg.msg_control))
+
+  cmsg = ffi.cast(cmsghdr_pt, ffi.cast(uchar_pt, cmsg) + cmsg_align(cmsg.cmsg_len)) -- find next cmsg
+
+  local lastptr = ffi.cast(uchar_pt, msg.msg_control) + msg.msg_controllen
+
+  if ffi.cast(uchar_pt, cmsg) + cmsg_hdrsize > lastptr then print(ffi.cast(uchar_pt, cmsg) + cmsg_hdrsize, lastptr); return nil end
+
+  if tonumber(ffi.cast(uchar_pt, cmsg) + cmsg_align(cmsg.cmsg_len)) > lastptr then return nil end
+  return cmsg
+end
+
+function S.recvmsg(fd, io, iolen, flags, bufsize) -- takes iovec, or nil in which case assume want to receive cmsg
+  if not io then 
+    local buf1 = buffer_t(1) -- need to receive one byte
+    io = iovec_t(1)
+    io[0].iov_base = buf1
+    io[0].iov_len = 1
+    iolen = 1
+  end
+  bufsize = bufsize or 512 -- reasonable default
+  local buf = buffer_t(bufsize)
+  local msg = msghdr_t()
+  msg.msg_iov = io
+  msg.msg_iovlen = iolen
+  msg.msg_control = buf
+  msg.msg_controllen = bufsize
+  local ret = C.recvmsg(getfd(fd), msg, flags or 0)
+  if ret == -1 then return errorret() end
+  local ret = {count = ret} -- thats the basic return value
+  local cmsg = cmsg_firsthdr(msg)
+  while cmsg do
+    if cmsg.cmsg_level == S.SOL_SOCKET then
+      if cmsg.cmsg_type == S.SCM_CREDENTIALS then
+        local cred = ucred_t()
+        ffi.copy(cred, cmsg.cmsg_data, ffi.sizeof(ucred_t))
+        ret.pid = cred.pid
+        ret.uid = cred.uid
+        ret.gid = cred.gid
+print("getting creds")
+      elseif cmsg.cmsg_type == S.SCM_RIGHTS then
+print("getting rights")
+      end -- add other SOL_SOCKET messages
+    end -- add other processing for different types
+    cmsg = cmsg_nxthdr(msg, cmsg)
+  end
+  return ret
+end
+
+function S.sendfds(fd, ...)
   local fds = {}
   for i, v in ipairs{...} do fds[i] = getfd(v) end
-  local buf1 = buffer_t(1, 0) -- need to send one byte
-  local io = iovec_t(1, {iov_base = buf1, iov_len = 1})
-
+  local buf1 = buffer_t(1) -- need to send one byte
+  local io = iovec_t(1)
+  io[0].iov_base = buf1
+  io[0].iov_len = 1
+  local iolen = 1
   local fa = ints_t(#fds, fds) -- allow more, varargs
   local fasize = ffi.sizeof(fa)
   local bufsize = cmsg_space(fasize)
   local buflen = cmsg_len(fasize)
   local buf = buffer_t(bufsize) -- this is our cmsg buffer
-  local msg = msghdr_t{msg_name = nil, msg_namelen = 0, msg_iov = io, msg_iovlen = 1, msg_control = buf, msg_controllen = bufsize, msg_flags = 0}
+  -- assume socket connected and so does not need address
+  local msg = msghdr_t()
+  msg.msg_iov = io
+  msg.msg_iovlen = iolen
+  msg.msg_control = buf
+  msg.msg_controllen = bufsize
   local cmsg = cmsg_firsthdr(msg) -- this is just buf, cast to cmsg type, in fact
 
   cmsg.cmsg_level = S.SOL_SOCKET
@@ -1242,16 +1305,10 @@ function S.sendfds(s, ...)
   cmsg.cmsg_len = buflen -- could set from a constructor
   ffi.copy(cmsg.cmsg_data, fa, fasize)
   msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
-  return retbool(S.sendmsg(s, msg, 0))
+  return S.sendmsg(fd, msg, 0)
 end
 
--- define types, cmsg struct has __data but exposes data which sets?
-
 --[[
-#define CMSG_FIRSTHDR(mhdr) \
-  ((size_t) (mhdr)->msg_controllen >= sizeof (struct cmsghdr)                 \
-   ? (struct cmsghdr *) (mhdr)->msg_control : (struct cmsghdr *) 0)
-
 _EXTERN_INLINE struct cmsghdr *
 __NTH (__cmsg_nxthdr (struct msghdr *__mhdr, struct cmsghdr *__cmsg))
 {
@@ -1287,7 +1344,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
-                   'setsockopt'
+                   'recvmsg', 'setsockopt'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end

@@ -204,8 +204,7 @@ assert(not a, "should get invalid IP address")
 
 local s, fl, c
 s = assert(S.socket("AF_INET", "SOCK_STREAM"))
-fl = assert(s:fcntl("F_GETFL"))
-assert(s:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK)))
+assert(s:nonblock())
 
 local loop = "127.0.0.1"
 sa = S.sockaddr_in(1234, "error")
@@ -272,10 +271,12 @@ assert(a.fd:close())
 
 fd = assert(S.open("/dev/zero"))
 -- unix domain sockets
-sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
+local sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
 
 assert(sv[1]:setsockopt(S.SOL_SOCKET, S.SO_PASSCRED, 1))
 assert(sv[1]:sendfds(fd))
+local r = assert(sv[2]:recvmsg())
+assert(r.pid == S.getpid(), "should get my pid from sent credentals")
 
 assert(sv[1]:close())
 assert(sv[2]:close())
