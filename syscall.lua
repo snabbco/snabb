@@ -978,12 +978,10 @@ function S.inet_ntop(af, src)
   return ffi.string(dst)
 end
 
-local addr_type = {}
-addr_type[fam("AF_INET")] = in_addr_t
-addr_type[fam("AF_INET6")] = in6_addr_t
-
 function S.inet_pton(af, src)
-  local addr = addr_type[fam(af)]() -- maybe test for nil!, could remove table actually
+  local addr
+  if fam(af) == fam("AF_INET") then addr = in_addr_t()
+  elseif fam(af) == fam("AF_INET6") then addr = in6_addr_t() end
   local ret = C.inet_pton(af, src, addr)
   if ret == -1 then errorret() end
   if ret == 0 then return nil end -- maybe return string
