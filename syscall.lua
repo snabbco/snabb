@@ -1240,7 +1240,18 @@ function cmsg_nxthdr(msg, mc, cmsg)
   return mc, cmsg
 end
 
-function S.sendmsg(fd, msg, flags) return retbool(C.sendmsg(getfd(fd), msg, flags or 0)) end
+function S.sendmsg(fd, msg, flags)
+  if not msg then -- send a single byte message, eg enough to send credentials
+    msg = msghdr_t()
+    local buf1 = buffer_t(1)
+    io = iovec_t(1)
+    io[0].iov_base = buf1
+    io[0].iov_len = 1
+    msg.msg_iov = io
+    msg.msg_iovlen = 1
+  end
+  return retbool(C.sendmsg(getfd(fd), msg, flags or 0))
+end
 
 function S.recvmsg(fd, io, iolen, flags, bufsize) -- takes iovec, or nil in which case assume want to receive cmsg
   if not io then 
@@ -1282,7 +1293,7 @@ function S.recvmsg(fd, io, iolen, flags, bufsize) -- takes iovec, or nil in whic
   return ret
 end
 
-function S.sendcred(fd, pid, uid, gid) -- a lot of repetition with sendfds, but be careful about gc if refactor
+function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect credentials?
   if not pid then pid = C.getpid() end
   if not uid then uid = C.getuid() end
   if not gid then gid = C.getgid() end
