@@ -272,7 +272,7 @@ assert(a.fd:close())
 -- unix domain sockets
 local sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
 
-assert(sv[2]:setsockopt(S.SOL_SOCKET, S.SO_PASSCRED, 1)) -- enable receive creds
+assert(sv[2]:setsockopt(S.SOL_SOCKET, S.SO_PASSCRED, true)) -- enable receive creds
 
 assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
 local r = assert(sv[2]:recvmsg())
