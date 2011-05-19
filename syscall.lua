@@ -342,11 +342,21 @@ struct sockaddr_storage {
 struct in_addr {
   uint32_t       s_addr;
 };
+struct in6_addr {
+  unsigned char  s6_addr[16];
+};
 struct sockaddr_in {
   sa_family_t    sin_family;
   in_port_t      sin_port;
   struct in_addr sin_addr;
   unsigned char  sin_zero[8]; /* padding, should not vary by arch */
+};
+struct sockaddr_in6 {
+  sa_family_t    sin6_family;
+  in_port_t sin6_port;
+  uint32_t sin6_flowinfo;
+  struct in6_addr sin6_addr;
+  uint32_t sin6_scope_id;
 };
 struct sockaddr_un {
   sa_family_t sun_family;     /* AF_UNIX */
@@ -783,6 +793,8 @@ int gnu_dev_minor(dev_t dev);
 void exit(enum EXIT status);
 int inet_aton(const char *cp, struct in_addr *inp);
 char *inet_ntoa(struct in_addr in);
+int inet_pton(enum AF, const char *src, void *dst);
+const char *inet_ntop(enum AF, const void *src, char *dst, socklen_t size);
 
 // functions from libc that could be exported as a convenience, used internally
 void *calloc(size_t nmemb, size_t size);
@@ -799,7 +811,9 @@ local sockaddr_t = ffi.typeof("struct sockaddr")
 local sockaddr_storage_t = ffi.typeof("struct sockaddr_storage")
 local sa_family_t = ffi.typeof("sa_family_t")
 local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
+local sockaddr_in6_t = ffi.typeof("struct sockaddr_in6")
 local in_addr_t = ffi.typeof("struct in_addr")
+local in6_addr_t = ffi.typeof("struct in6_addr")
 local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
 local iovec_t = ffi.typeof("struct iovec[?]")
 local msghdr_t = ffi.typeof("struct msghdr")
@@ -820,9 +834,10 @@ local uchar_pt = ffi.typeof("unsigned char *")
 local intptr_t = ffi.typeof("int *")
 
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
-assert(ffi.sizeof(sockaddr_storage_t) == 128) -- this is the required size
+assert(ffi.sizeof(sockaddr_storage_t) == 128) -- this is the required size in Linux
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in_t))
+assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in6_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_un_t))
 
 -- endian conversion
@@ -839,20 +854,30 @@ S.ntohl = S.htonl -- reverse is the same
 S.ntohs = S.htons -- reverse is the same
 
 -- initialisers
--- need to set first field. Corrects byte order on port, constructor for addr will do that for addr.
+-- need to set first field for sockaddr. Corrects byte order on port, constructor for addr will do that for addr.
 function S.sockaddr_in(port, addr)
   if type(addr) == 'string' then addr = S.inet_aton(addr) end
   if not addr then return nil end
   return sockaddr_in_t(enumAF_t("AF_INET"), S.htons(port), addr)
 end
+--function S.sockaddr_in6(port, addr) -- need to write this
+--  if type(addr) == 'string' then addr = S.inet_aton(addr) end
+--  if not addr then return nil end
+--  return sockaddr_in_t(enumAF_t("AF_INET6"), S.htons(port), addr)
+--end
+function S.sockaddr_un() -- actually, not using this, not sure it is useful for unix sockets
+  local addr = sockaddr_in_t()
+  addr.sun_fanily = enumAF_t("AF_UNIX")
+  return addr
+end
 
-local n = function(s) return tonumber(enumAF_t(s)) end -- convert to Lua number, as tables indexed by number
+local fam = function(s) return tonumber(enumAF_t(s)) end -- convert to Lua number, as tables indexed by number
 
 -- map from socket family to data type
 local socket_type = {}
 -- AF_UNSPEC
-socket_type[n("AF_LOCAL")] = sockaddr_un_t
-socket_type[n("AF_INET")] = sockaddr_in_t
+socket_type[fam("AF_LOCAL")] = sockaddr_un_t
+socket_type[fam("AF_INET")] = sockaddr_in_t
 --  AF_AX25
 --  AF_IPX
 --  AF_APPLETALK
@@ -860,7 +885,7 @@ socket_type[n("AF_INET")] = sockaddr_in_t
 --  AF_BRIDGE
 --  AF_ATMPVC
 --  AF_X25
---  AF_INET6
+socket_type[fam("AF_INET6")] = sockaddr_in6_t
 --  AF_ROSE
 --  AF_DECnet
 --  AF_NETBEUI
@@ -899,6 +924,7 @@ function getaddrlen(addr, addrlen)
   if addrlen == nil then
     if ffi.istype(sockaddr_t, addr) then return ffi.sizeof(sockaddr_t) end
     if ffi.istype(sockaddr_in_t, addr) then return ffi.sizeof(sockaddr_in_t) end
+    if ffi.istype(sockaddr_in6_t, addr) then return ffi.sizeof(sockaddr_in6_t) end
   end
   return addrlen or 0
 end
@@ -941,10 +967,36 @@ end
 
 function S.inet_ntoa(addr) return ffi.string(C.inet_ntoa(addr)) end
 
+local INET6_ADDRSTRLEN = 46
+local INET_ADDRSTRLEN = 16
+
+function S.inet_ntop(af, src)
+  local len = INET6_ADDRSTRLEN -- could shorten for ipv4
+  local dst = buffer_t(len)
+  local ret = C.inet_ntop(af, src, dst, len)
+  if ret == nil then return errorret() end
+  return ffi.string(dst)
+end
+
+local addr_type = {}
+addr_type[fam("AF_INET")] = in_addr_t
+addr_type[fam("AF_INET6")] = in6_addr_t
+
+function S.inet_pton(af, src)
+  local addr = addr_type[fam(af)]() -- maybe test for nil!, could remove table actually
+  local ret = C.inet_pton(af, src, addr)
+  if ret == -1 then errorret() end
+  if ret == 0 then return nil end -- maybe return string
+  return addr
+end
+
 -- constants
 S.INADDR_ANY = in_addr_t()
 S.INADDR_LOOPBACK = assert(S.inet_aton("127.0.0.1"))
 S.INADDR_BROADCAST = assert(S.inet_aton("255.255.255.255"))
+-- ipv6 versions
+S.in6addr_any = in6_addr_t()
+S.in6addr_loopback = assert(S.inet_pton("AF_INET6", "::1"))
 
 -- main definitions start here
 function S.open(pathname, flags, mode) return retfd(C.open(pathname, flags or 0, mode or 0)) end
