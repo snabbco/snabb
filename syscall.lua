@@ -3,6 +3,8 @@ local bit = require "bit"
 
 local C = ffi.C
 
+local rt = ffi.load("rt")
+
 -- note should wrap more conditionals around stuff that might not be there
 -- possibly generate more of this from C program, depending on where it differs.
 
@@ -268,6 +270,7 @@ typedef uint32_t uid_t;
 typedef uint32_t gid_t;
 typedef uint32_t socklen_t;
 typedef int32_t pid_t;
+typedef int32_t clockid_t;
 
 // 64 bit
 typedef uint64_t dev_t;
@@ -514,7 +517,15 @@ enum AF {
   AF_ALG        = 38,
   AF_MAX        = 39,
 };
-
+enum CLOCK {
+  CLOCK_REALTIME = 0,
+  CLOCK_MONOTONIC = 1,
+  CLOCK_PROCESS_CPUTIME_ID = 2,
+  CLOCK_THREAD_CPUTIME_ID = 3,
+  CLOCK_MONOTONIC_RAW = 4,
+  CLOCK_REALTIME_COARSE = 5,
+  CLOCK_MONOTONIC_COARSE = 6,
+};
 enum E {
   EPERM          =  1,
   ENOENT         =  2,
@@ -730,6 +741,9 @@ enum SIG_ signal(enum SIG signum, enum SIG_ handler); /* although deprecated, ju
 int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
 int settimeofday(const struct timeval *tv, const void *tz);
 time_t time(time_t *t);
+int clock_getres(clockid_t clk_id, struct timespec *res);
+int clock_gettime(clockid_t clk_id, struct timespec *tp);
+int clock_settime(clockid_t clk_id, const struct timespec *tp);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -829,6 +843,7 @@ local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local ints_t = ffi.typeof("int[?]") -- array of ints
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
+local enumCLOCK_t = ffi.typeof("enum CLOCK") -- for clockids
 local string_array_t = ffi.typeof("const char *[?]")
 
 -- need these for casts
@@ -1252,10 +1267,30 @@ function S.gettimeofday(tv)
   return tv
 end
 
+function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
+
 function S.time()
   -- local ret = C.time(nil)
   -- if ret == -1 then return errorret() end -- impossible with nil argument
   return tonumber(C.time(nil))
+end
+
+if rt then -- real time functions not in glibc, check if available
+  function S.clock_getres(clk_id, ts)
+    if not ts then ts = timespec_t() end
+    local ret = rt.clock_getres(enumCLOCK_t(clk_id), ts)
+    if ret == -1 then return errorret() end
+    return ts
+  end
+
+  function S.clock_gettime(clk_id, ts)
+    if not ts then ts = timespec_t() end
+    local ret = rt.clock_gettime(enumCLOCK_t(clk_id), ts)
+    if ret == -1 then return errorret() end
+    return ts
+  end
+
+  function S.clock_settime(clk_id, ts) return retbool(rt.clock_settime(enumCLOCK_t(clk_id), ts)) end
 end
 
 -- straight passthroughs, as no failure possible
