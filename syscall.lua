@@ -727,6 +727,8 @@ pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);
 void _exit(enum EXIT status);
 enum SIG_ signal(enum SIG signum, enum SIG_ handler); /* although deprecated, just using to set SIG_ values */
+int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
+int settimeofday(const struct timeval *tv, const void *tz);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -806,6 +808,7 @@ char *strerror(enum E errnum);
 
 -- Lua type constructors corresponding to defined types
 local timespec_t = ffi.typeof("struct timespec")
+local timeval_t = ffi.typeof("struct timeval")
 local stat_t = ffi.typeof("struct stat")
 local sockaddr_t = ffi.typeof("struct sockaddr")
 local sockaddr_storage_t = ffi.typeof("struct sockaddr_storage")
@@ -987,7 +990,7 @@ function S.inet_pton(af, src)
   if fam(af) == fam("AF_INET") then addr = in_addr_t()
   elseif fam(af) == fam("AF_INET6") then addr = in6_addr_t() end
   local ret = C.inet_pton(af, src, addr)
-  if ret == -1 then errorret() end
+  if ret == -1 then return errorret() end
   if ret == 0 then return nil end -- maybe return string
   return addr
 end
@@ -1241,6 +1244,13 @@ end
 
 function S.signal(signum, handler) return retbool(C.signal(signum, handler)) end
 
+function S.gettimeofday(tv)
+  if not tv then tv = timeval_t() end -- note it is faster to pass your own tv if you call a lot
+  local ret = C.gettimeofday(tv, nil)
+  if ret == -1 then return errorret() end
+  return tv
+end
+
 -- straight passthroughs, as no failure possible
 S.getuid = C.getuid
 S.geteuid = C.geteuid
@@ -1429,10 +1439,11 @@ for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
+-- think we are missing some, as not really using them
 S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
-  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t
+  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t
 }
 
 return S

@@ -365,6 +365,8 @@ else -- parent
   assert(S.unlink(efile))
 end
 
+local tv = assert(S.gettimeofday())
+
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 
 assert(S.acct())
