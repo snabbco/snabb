@@ -10,10 +10,6 @@ local rt = ffi.load("rt")
 
 local S = {} -- exported functions
 
--- glibc does not have a stat symbol, has its own struct stat and way of calling
-local use_gnu_stat
-if pcall(function () local t = C.stat end) then use_gnu_stat = false else use_gnu_stat = true end
-
 local octal = function (s) return tonumber(s, 8) end
 
 -- open, fcntl
@@ -894,6 +890,10 @@ void free(void *ptr);
 void *realloc(void *ptr, size_t size);
 char *strerror(enum E errnum);
 ]]
+
+-- glibc does not have a stat symbol, has its own struct stat and way of calling
+local use_gnu_stat
+if pcall(function () local t = C.stat end) then use_gnu_stat = false else use_gnu_stat = true end
 
 -- Lua type constructors corresponding to defined types
 local timespec_t = ffi.typeof("struct timespec")

@@ -146,7 +146,7 @@ assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanos
 
 local stat
 
-stat = assert(S.lstat("/dev/zero"))
+stat = assert(S.stat("/dev/zero"))
 assert(stat.st_nlink == 1, "expect link count on /dev/zero to be 1")
 
 stat = assert(fd:fstat()) -- stat "/"
@@ -160,7 +160,7 @@ assert(S.major(stat.st_rdev) == 1, "expect major number of /dev/zero to be 1")
 assert(S.minor(stat.st_rdev) == 5, "expect minor number of /dev/zero to be 5")
 assert(S.S_ISCHR(stat.st_mode), "expect /dev/zero to be a character device")
 
-stat = assert(S.lstat("/etc/passwd"))
+stat = assert(S.stat("/etc/passwd"))
 assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
 
 -- mmap and related functions
