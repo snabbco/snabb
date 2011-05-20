@@ -1035,7 +1035,7 @@ S.INADDR_LOOPBACK = assert(S.inet_aton("127.0.0.1"))
 S.INADDR_BROADCAST = assert(S.inet_aton("255.255.255.255"))
 -- ipv6 versions
 S.in6addr_any = in6_addr_t()
-S.in6addr_loopback = assert(S.inet_pton("AF_INET6", "::1"))
+S.in6addr_loopback = S.inet_pton("AF_INET6", "::1") -- no assert, may fail if no inet6 support
 
 -- main definitions start here
 function S.open(pathname, flags, mode) return retfd(C.open(pathname, flags or 0, mode or 0)) end

@@ -93,14 +93,6 @@ fd2 = assert(fd:dup2(17))
 assert(fd2.fd == 17, "dup2 should set file id as specified")
 assert(S.close(17))
 
-fd2 = assert(fd:dup3(17, S.O_CLOEXEC))
-assert(fd2.fd == 17, "dup3 should set file id as specified")
-assert(S.close(17))
-
-fd2 = assert(fd:dup(17, S.O_CLOEXEC))
-assert(fd2.fd == 17, "dup2,3 should set file id as specified")
-assert(S.close(17))
-
 assert(S.close(fd))
 
 assert(S.O_CREAT == 64, "wrong octal value for O_CREAT")
