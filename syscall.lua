@@ -318,6 +318,22 @@ struct ucred { /* this is Linux specific */
   uid_t uid;
   gid_t gid;
 };
+struct sysinfo { /* Linux only */
+        long uptime;
+        unsigned long loads[3];
+        unsigned long totalram;
+        unsigned long freeram;
+        unsigned long sharedram;
+        unsigned long bufferram;
+        unsigned long totalswap;
+        unsigned long freeswap;
+        unsigned short procs;
+        unsigned short pad;
+        unsigned long totalhigh;
+        unsigned long freehigh;
+        unsigned int mem_unit;
+        char _f[20-2*sizeof(long)-sizeof(int)];
+};
 struct msghdr {
   void *msg_name;
   socklen_t msg_namelen;
@@ -741,12 +757,10 @@ enum SIG_ signal(enum SIG signum, enum SIG_ handler); /* although deprecated, ju
 int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
 int settimeofday(const struct timeval *tv, const void *tz);
 time_t time(time_t *t);
-//int clock_getres(clockid_t clk_id, struct timespec *res);
-//int clock_gettime(clockid_t clk_id, struct timespec *tp);
-//int clock_settime(clockid_t clk_id, const struct timespec *tp);
-int clock_getres(enum CLOCK clk_id, struct timespec *res);
-int clock_gettime(enum CLOCK clk_id, struct timespec *tp);
-int clock_settime(enum CLOCK clk_id, const struct timespec *tp);
+int clock_getres(enum CLOCK clk_id, struct timespec *res); // was clockid_t clk_id
+int clock_gettime(enum CLOCK clk_id, struct timespec *tp); // was clockid_t clk_id
+int clock_settime(enum CLOCK clk_id, const struct timespec *tp); // was clockid_t clk_id
+int sysinfo(struct sysinfo *info);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -840,6 +854,7 @@ local iovec_t = ffi.typeof("struct iovec[?]")
 local msghdr_t = ffi.typeof("struct msghdr")
 local cmsghdr_t = ffi.typeof("struct cmsghdr")
 local ucred_t = ffi.typeof("struct ucred")
+local sysinfo_t = ffi.typeof("struct sysinfo")
 
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
@@ -1278,6 +1293,13 @@ function S.time()
   return tonumber(C.time(nil))
 end
 
+function S.sysinfo(info)
+  if not info then info = sysinfo_t() end
+  local ret = C.sysinfo(info)
+  if ret == -1 then return errorret() end
+  return info
+end
+
 if rt then -- real time functions not in glibc, check if available
   function S.clock_getres(clk_id, ts)
     if not ts then ts = timespec_t() end
@@ -1488,7 +1510,7 @@ fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
-  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t
+  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t
 }
 
 return S

@@ -369,6 +369,7 @@ local tv = assert(S.gettimeofday())
 local t = S.time()
 local t = assert(S.clock_getres("CLOCK_REALTIME"))
 local t = assert(S.clock_gettime("CLOCK_REALTIME"))
+local i = assert(S.sysinfo())
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 
