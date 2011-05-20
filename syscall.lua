@@ -820,6 +820,11 @@ int nanosleep(const struct timespec *req, struct timespec *rem);
 int __fxstat(int ver, int fd, struct stat *buf);
 int __xstat(int ver, const char *path, struct stat *buf);
 int __lxstat(int ver, const char *path, struct stat *buf);
+// real stat functions, might not exist
+int stat(const char *path, struct stat *buf);
+int fstat(int fd, struct stat *buf);
+int lstat(const char *path, struct stat *buf);
+// non standard. should probably just implement ourselves
 int gnu_dev_major(dev_t dev);
 int gnu_dev_minor(dev_t dev);
 
@@ -1150,21 +1155,33 @@ function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), mode)) end
 
-function S.stat(path)
-  local buf = stat_t()
-  local ret = C.__xstat(STAT_VER_LINUX, path, buf)
+-- glibc does not have these directly
+local stat, lstat, fstat
+if pcall(function () local t = C.stat end) then
+  stat = C.stat
+  lstat = C.lstat
+  fstat = C.fstat
+else
+  function stat(path, buf) return C.__xstat(STAT_VER_LINUX, path, buf) end
+  function lstat(path, buf) return C.__lxstat(STAT_VER_LINUX, path, buf) end
+  function fstat(fd, buf) return C.__fxstat(STAT_VER_LINUX, fd, buf) end
+end
+
+function S.stat(path, buf)
+  if not buf then buf = stat_t() end
+  local ret = stat(path, buf)
   if ret == -1 then return errorret() end
   return buf
 end
-function S.lstat(path)
-  local buf = stat_t()
-  local ret = C.__lxstat(STAT_VER_LINUX, path, buf)
+function S.lstat(path, buf)
+  if not buf then buf = stat_t() end
+  local ret = lstat(path, buf)
   if ret == -1 then return errorret() end
   return buf
 end
-function S.fstat(fd)
-  local buf = stat_t()
-  local ret = C.__fxstat(STAT_VER_LINUX, getfd(fd), buf)
+function S.fstat(fd, buf)
+  if not buf then buf = stat_t() end
+  local ret = fstat(getfd(fd), buf)
   if ret == -1 then return errorret() end
   return buf
 end

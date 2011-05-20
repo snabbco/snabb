@@ -149,7 +149,7 @@ local stat
 stat = assert(S.lstat("/dev/zero"))
 assert(stat.st_nlink == 1, "expect link count on /dev/zero to be 1")
 
-stat = assert(fd:fstat(fd)) -- stat "/"
+stat = assert(fd:fstat()) -- stat "/"
 assert(stat.st_size == 4096, "expect / to be size 4096") -- might not be
 assert(stat.st_gid == 0, "expect / to be gid 0 is " .. tonumber(stat.st_gid))
 assert(stat.st_uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
