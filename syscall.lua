@@ -1420,27 +1420,18 @@ function S.major(dev)
   return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)));
 end
 
+-- minor and makedev assume minor numbers 20 bit so all in low byte, currently true
+-- would be easier to fix if LuaJIT had native 64 bit bitops
 function S.minor(dev)
   h, l = b64(dev)
-  return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff))); -- currently correct as minor numbers 20 bit so all in l.
+  return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
 end
 
-function makedev(major, minor)
+function S.makedev(major, minor)
   local dev = int64_t()
-  --dev = bit.bor(bit.band(minor, 0xff), 
-  -- TODO !!!!
+  dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000LL * bit.band(major, bit.bnot(0xfff))
+  return dev
 end
---[[
-__NTH (gnu_dev_makedev (unsigned int __major, unsigned int __minor))
-{
-  return ((__minor & 0xff) | ((__major & 0xfff) << 8)
-          | (((unsigned long long int) (__minor & ~0xff)) << 12)
-          | (((unsigned long long int) (__major & ~0xfff)) << 32));
-}
-
-]]
-
-
 
 function S.S_ISREG(m)  return bit.band(m, S.S_IFREG)  ~= 0 end
 function S.S_ISDIR(m)  return bit.band(m, S.S_IFDIR)  ~= 0 end

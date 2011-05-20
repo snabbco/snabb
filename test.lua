@@ -159,8 +159,9 @@ stat = assert(S.stat("/dev/zero"))
 assert(S.major(stat.st_rdev) == 1, "expect major number of /dev/zero to be 1")
 assert(S.minor(stat.st_rdev) == 5, "expect minor number of /dev/zero to be 5")
 assert(S.S_ISCHR(stat.st_mode), "expect /dev/zero to be a character device")
+assert(stat.st_rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
 
-stat = assert(S.stat("/etc/passwd"))
+stat = assert(S.lstat("/etc/passwd"))
 assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
 
 -- mmap and related functions
