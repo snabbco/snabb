@@ -741,9 +741,12 @@ enum SIG_ signal(enum SIG signum, enum SIG_ handler); /* although deprecated, ju
 int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
 int settimeofday(const struct timeval *tv, const void *tz);
 time_t time(time_t *t);
-int clock_getres(clockid_t clk_id, struct timespec *res);
-int clock_gettime(clockid_t clk_id, struct timespec *tp);
-int clock_settime(clockid_t clk_id, const struct timespec *tp);
+//int clock_getres(clockid_t clk_id, struct timespec *res);
+//int clock_gettime(clockid_t clk_id, struct timespec *tp);
+//int clock_settime(clockid_t clk_id, const struct timespec *tp);
+int clock_getres(enum CLOCK clk_id, struct timespec *res);
+int clock_gettime(enum CLOCK clk_id, struct timespec *tp);
+int clock_settime(enum CLOCK clk_id, const struct timespec *tp);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -1278,19 +1281,19 @@ end
 if rt then -- real time functions not in glibc, check if available
   function S.clock_getres(clk_id, ts)
     if not ts then ts = timespec_t() end
-    local ret = rt.clock_getres(enumCLOCK_t(clk_id), ts)
+    local ret = rt.clock_getres(clk_id, ts)
     if ret == -1 then return errorret() end
     return ts
   end
 
   function S.clock_gettime(clk_id, ts)
     if not ts then ts = timespec_t() end
-    local ret = rt.clock_gettime(enumCLOCK_t(clk_id), ts)
+    local ret = rt.clock_gettime(clk_id, ts)
     if ret == -1 then return errorret() end
     return ts
   end
 
-  function S.clock_settime(clk_id, ts) return retbool(rt.clock_settime(enumCLOCK_t(clk_id), ts)) end
+  function S.clock_settime(clk_id, ts) return retbool(rt.clock_settime(clk_id, ts)) end
 end
 
 -- straight passthroughs, as no failure possible
