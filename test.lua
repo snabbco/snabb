@@ -366,6 +366,7 @@ else -- parent
 end
 
 local tv = assert(S.gettimeofday())
+local t = S.time()
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 

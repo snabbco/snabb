@@ -729,6 +729,7 @@ void _exit(enum EXIT status);
 enum SIG_ signal(enum SIG signum, enum SIG_ handler); /* although deprecated, just using to set SIG_ values */
 int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
 int settimeofday(const struct timeval *tv, const void *tz);
+time_t time(time_t *t);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -1249,6 +1250,12 @@ function S.gettimeofday(tv)
   local ret = C.gettimeofday(tv, nil)
   if ret == -1 then return errorret() end
   return tv
+end
+
+function S.time()
+  -- local ret = C.time(nil)
+  -- if ret == -1 then return errorret() end -- impossible with nil argument
+  return tonumber(C.time(nil))
 end
 
 -- straight passthroughs, as no failure possible
