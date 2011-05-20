@@ -10,6 +10,10 @@ local rt = ffi.load("rt")
 
 local S = {} -- exported functions
 
+-- glibc does not have a stat symbol, has its own struct stat and way of calling
+local use_gnu_stat
+if pcall(function () local t = C.stat end) then use_gnu_stat = false else use_gnu_stat = true end
+
 local octal = function (s) return tonumber(s, 8) end
 
 -- open, fcntl
@@ -319,20 +323,20 @@ struct ucred { /* this is Linux specific */
   gid_t gid;
 };
 struct sysinfo { /* Linux only */
-        long uptime;
-        unsigned long loads[3];
-        unsigned long totalram;
-        unsigned long freeram;
-        unsigned long sharedram;
-        unsigned long bufferram;
-        unsigned long totalswap;
-        unsigned long freeswap;
-        unsigned short procs;
-        unsigned short pad;
-        unsigned long totalhigh;
-        unsigned long freehigh;
-        unsigned int mem_unit;
-        char _f[20-2*sizeof(long)-sizeof(int)];
+  long uptime;
+  unsigned long loads[3];
+  unsigned long totalram;
+  unsigned long freeram;
+  unsigned long sharedram;
+  unsigned long bufferram;
+  unsigned long totalswap;
+  unsigned long freeswap;
+  unsigned short procs;
+  unsigned short pad;
+  unsigned long totalhigh;
+  unsigned long freehigh;
+  unsigned int mem_unit;
+  char _f[20-2*sizeof(long)-sizeof(int)];
 };
 struct msghdr {
   void *msg_name;
@@ -679,12 +683,14 @@ enum E {
 
 -- stat structure is architecture dependent in Linux
 -- this is the way glibc versions stat via __xstat, may need to change for other libc, eg if define stat as a non inline function
+-- use gstat as the GNU one, struct stat will be kernel structure
+-- could just use the syscall!
 local STAT_VER_LINUX
 
 if ffi.abi("32bit") then
 STAT_VER_LINUX = 3
 ffi.cdef[[
-struct stat {
+struct gstat {
   dev_t st_dev;
   unsigned short int __pad1;
   ino_t __st_ino;
@@ -707,7 +713,7 @@ struct stat {
 else -- 64 bit arch
 STAT_VER_LINUX = 1
 ffi.cdef[[
-struct stat {
+struct gstat {
   dev_t st_dev;
   ino_t st_ino;
   nlink_t st_nlink;
@@ -723,6 +729,55 @@ struct stat {
   struct timespec st_mtim;
   struct timespec st_ctim;
   long int __unused[3];
+};
+]]
+end
+
+-- are there issues with 32 on 64, __old_kernel_stat?
+if ffi.arch == 'x86' then
+ffi.cdef[[
+struct stat {
+  unsigned long  st_dev;
+  unsigned long  st_ino;
+  unsigned short st_mode;
+  unsigned short st_nlink;
+  unsigned short st_uid;
+  unsigned short st_gid;
+  unsigned long  st_rdev;
+  unsigned long  st_size;
+  unsigned long  st_blksize;
+  unsigned long  st_blocks;
+  unsigned long  st_atime;
+  unsigned long  st_atime_nsec;
+  unsigned long  st_mtime;
+  unsigned long  st_mtime_nsec;
+  unsigned long  st_ctime;
+  unsigned long  st_ctime_nsec;
+  unsigned long  __unused4;
+  unsigned long  __unused5;
+};
+]]
+else -- all architectures except x86 the same
+ffi.cdef [[
+struct stat {
+  unsigned long   st_dev;
+  unsigned long   st_ino;
+  unsigned long   st_nlink;
+  unsigned int    st_mode;
+  unsigned int    st_uid;
+  unsigned int    st_gid;
+  unsigned int    __pad0;
+  unsigned long   st_rdev;
+  long            st_size;
+  long            st_blksize;
+  long            st_blocks;
+  unsigned long   st_atime;
+  unsigned long   st_atime_nsec;
+  unsigned long   st_mtime;
+  unsigned long   st_mtime_nsec;
+  unsigned long   st_ctime;
+  unsigned long   st_ctime_nsec;
+  long            __unused[3];
 };
 ]]
 end
@@ -816,18 +871,14 @@ char *getcwd(char *buf, size_t size);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
 
-// stat glibc internal functions
-int __fxstat(int ver, int fd, struct stat *buf);
-int __xstat(int ver, const char *path, struct stat *buf);
-int __lxstat(int ver, const char *path, struct stat *buf);
+// stat glibc internal functions, gstat is the structure
+int __fxstat(int ver, int fd, struct gstat *buf);
+int __xstat(int ver, const char *path, struct gstat *buf);
+int __lxstat(int ver, const char *path, struct gstat *buf);
 // real stat functions, might not exist
 int stat(const char *path, struct stat *buf);
 int fstat(int fd, struct stat *buf);
 int lstat(const char *path, struct stat *buf);
-// non standard. should probably just implement ourselves
-int gnu_dev_major(dev_t dev);
-int gnu_dev_minor(dev_t dev);
-
 
 // functions from libc ie man 3 not man 2
 void exit(enum EXIT status);
@@ -847,7 +898,6 @@ char *strerror(enum E errnum);
 -- Lua type constructors corresponding to defined types
 local timespec_t = ffi.typeof("struct timespec")
 local timeval_t = ffi.typeof("struct timeval")
-local stat_t = ffi.typeof("struct stat")
 local sockaddr_t = ffi.typeof("struct sockaddr")
 local sockaddr_storage_t = ffi.typeof("struct sockaddr_storage")
 local sa_family_t = ffi.typeof("sa_family_t")
@@ -862,9 +912,15 @@ local cmsghdr_t = ffi.typeof("struct cmsghdr")
 local ucred_t = ffi.typeof("struct ucred")
 local sysinfo_t = ffi.typeof("struct sysinfo")
 
+local stat_t
+if use_gnu_stat then stat_t = ffi.typeof("struct gstat") else stat_t = ffi.typeof("struct stat") end
+
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local ints_t = ffi.typeof("int[?]") -- array of ints
+local int64_t = ffi.typeof("int64_t")
+local int32_pt = ffi.typeof("int32_t *")
+local int64_1t = ffi.typeof("int64_t[1]")
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
 local enumCLOCK_t = ffi.typeof("enum CLOCK") -- for clockids
@@ -1157,14 +1213,15 @@ function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), mode)) end
 
 -- glibc does not have these directly
 local stat, lstat, fstat
-if pcall(function () local t = C.stat end) then
-  stat = C.stat
-  lstat = C.lstat
-  fstat = C.fstat
-else
+
+if use_gnu_stat then
   function stat(path, buf) return C.__xstat(STAT_VER_LINUX, path, buf) end
   function lstat(path, buf) return C.__lxstat(STAT_VER_LINUX, path, buf) end
   function fstat(fd, buf) return C.__fxstat(STAT_VER_LINUX, fd, buf) end
+else
+  stat = C.stat
+  lstat = C.lstat
+  fstat = C.fstat
 end
 
 function S.stat(path, buf)
@@ -1345,10 +1402,45 @@ S.getegid = C.getegid
 S.umask = C.umask
 
 -- 'macros' and helper functions etc
+-- LuaJIT does not provide 64 bit bitops at the moment
 
--- note that major and minor are inline in glibc, gnu provides these real symbols, else you might have to parse yourself
-function S.major(dev) return C.gnu_dev_major(dev) end
-function S.minor(dev) return C.gnu_dev_minor(dev) end
+local b64
+function b64(n)
+  local t64 = int64_1t(n)
+  local t32 = ffi.cast(int32_pt, t64)
+  if ffi.abi("le") then
+    return tonumber(t32[1]), tonumber(t32[0]) -- return high, low
+  else
+    return tonumber(t32[0]), tonumber(t32[1])
+  end
+end
+
+function S.major(dev)
+  h, l = b64(dev)
+  return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)));
+end
+
+function S.minor(dev)
+  h, l = b64(dev)
+  return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff))); -- currently correct as minor numbers 20 bit so all in l.
+end
+
+function makedev(major, minor)
+  local dev = int64_t()
+  --dev = bit.bor(bit.band(minor, 0xff), 
+  -- TODO !!!!
+end
+--[[
+__NTH (gnu_dev_makedev (unsigned int __major, unsigned int __minor))
+{
+  return ((__minor & 0xff) | ((__major & 0xfff) << 8)
+          | (((unsigned long long int) (__minor & ~0xff)) << 12)
+          | (((unsigned long long int) (__major & ~0xfff)) << 32));
+}
+
+]]
+
+
 
 function S.S_ISREG(m)  return bit.band(m, S.S_IFREG)  ~= 0 end
 function S.S_ISDIR(m)  return bit.band(m, S.S_IFDIR)  ~= 0 end
