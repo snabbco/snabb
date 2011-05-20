@@ -126,9 +126,6 @@ assert(S.close(fd))
 fd, err = S.open(tmpfile, S.O_RDWR)
 assert(err, "expected open to fail on file not found")
 
-fd, err, errno = S.pipe(99999) -- invalid flags
-assert(fd == nil and errno == S.errno('EINVAL'), "should be EINVAL with bad flags to pipe2")
-
 fd = assert(S.pipe())
 assert(fd[1].fd == 3 and fd[2].fd == 4, "expect file handles 3 and 4 for pipe")
 assert(fd[1]:close())
