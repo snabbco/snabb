@@ -308,18 +308,20 @@ assert(s:close())
 assert(c:close())
 
 --ipv6 socket
-s = assert(S.socket("AF_INET6", "SOCK_DGRAM"))
-c = assert(S.socket("AF_INET6", "SOCK_DGRAM"))
-local sa = assert(S.sockaddr_in6(0, S.in6addr_any))
-local ca = assert(S.sockaddr_in6(0, S.in6addr_any))
-assert(s:bind(sa))
-assert(c:bind(sa))
-local bca = c:getsockname().addr -- find bound address
-local serverport = s:getsockname().port -- find bound port
-n = assert(s:sendto(string, nil, 0, bca))
-local f = assert(c:recvfrom(buf, size))
-assert(f.count == #string, "should get the whole string back")
-assert(f.port == serverport, "should be able to get server port in recvfrom")
+s, err, errno = S.socket("AF_INET6", "SOCK_DGRAM")
+if s then 
+  c = assert(S.socket("AF_INET6", "SOCK_DGRAM"))
+  local sa = assert(S.sockaddr_in6(0, S.in6addr_any))
+  local ca = assert(S.sockaddr_in6(0, S.in6addr_any))
+  assert(s:bind(sa))
+  assert(c:bind(sa))
+  local bca = c:getsockname().addr -- find bound address
+  local serverport = s:getsockname().port -- find bound port
+  n = assert(s:sendto(string, nil, 0, bca))
+  local f = assert(c:recvfrom(buf, size))
+  assert(f.count == #string, "should get the whole string back")
+  assert(f.port == serverport, "should be able to get server port in recvfrom")
+else assert(errno == S.errno('EAFNOSUPPORT'), err) end -- ok to not have ipv6 in kernel
 
 -- fork and related methods
 local pid, pid0, w
