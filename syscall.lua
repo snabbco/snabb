@@ -807,6 +807,7 @@ int munlockall(void);
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
 int madvise(void *addr, size_t length, enum MADV advice);
 
+int pipe(int pipefd[2]);
 int pipe2(int pipefd[2], int flags);
 
 int unlink(const char *pathname);
@@ -1050,10 +1051,9 @@ S.dup3 = S.dup
 
 function S.pipe(flags)
   local fd2 = int2_t()
-  local ret = C.pipe2(fd2, flags or 0)
-  if ret == -1 then
-    return errorret()
-  end
+  local ret
+  if flags then ret = C.pipe2(fd2, flags) else ret = C.pipe(fd2) end
+  if ret == -1 then return errorret() end
   return {fd_t(fd2[0]), fd_t(fd2[1])}
 end
 S.pipe2 = S.pipe
