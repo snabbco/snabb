@@ -290,7 +290,7 @@ assert(sv[2]:close())
 -- udp socket
 s = assert(S.socket("AF_INET", "SOCK_DGRAM"))
 c = assert(S.socket("AF_INET", "SOCK_DGRAM"))
-assert(s:nonblock())
+
 local sa = assert(S.sockaddr_in(0, loop))
 local ca = assert(S.sockaddr_in(0, loop))
 assert(s:bind(sa))
@@ -306,6 +306,20 @@ assert(f.port == serverport, "should be able to get server port in recvfrom")
 
 assert(s:close())
 assert(c:close())
+
+--ipv6 socket
+s = assert(S.socket("AF_INET6", "SOCK_DGRAM"))
+c = assert(S.socket("AF_INET6", "SOCK_DGRAM"))
+local sa = assert(S.sockaddr_in6(0, S.in6addr_any))
+local ca = assert(S.sockaddr_in6(0, S.in6addr_any))
+assert(s:bind(sa))
+assert(c:bind(sa))
+local bca = c:getsockname().addr -- find bound address
+local serverport = s:getsockname().port -- find bound port
+n = assert(s:sendto(string, nil, 0, bca))
+local f = assert(c:recvfrom(buf, size))
+assert(f.count == #string, "should get the whole string back")
+assert(f.port == serverport, "should be able to get server port in recvfrom")
 
 -- fork and related methods
 local pid, pid0, w
@@ -369,5 +383,5 @@ assert(S.sethostname(h))
 
 S.exit("EXIT_SUCCESS")
 
--- note tests missing whether setting SIG_IGN works. TODO
+-- note tests missing whether setting SIG_IGN works. Also ipv6 sockets. TODO
 

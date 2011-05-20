@@ -860,11 +860,15 @@ function S.sockaddr_in(port, addr)
   if not addr then return nil end
   return sockaddr_in_t(enumAF_t("AF_INET"), S.htons(port), addr)
 end
---function S.sockaddr_in6(port, addr) -- need to write this
---  if type(addr) == 'string' then addr = S.inet_aton(addr) end
---  if not addr then return nil end
---  return sockaddr_in_t(enumAF_t("AF_INET6"), S.htons(port), addr)
---end
+function S.sockaddr_in6(port, addr)
+  if type(addr) == 'string' then addr = S.inet_pton("INET6", addr) end
+  if not addr then return nil end
+  local sa = sockaddr_in6_t()
+  sa.sin6_family = enumAF_t("AF_INET6")
+  sa.sin6_port = S.htons(port)
+  ffi.copy(sa.sin6_addr, addr, ffi.sizeof(in6_addr_t))
+  return sa
+end
 function S.sockaddr_un() -- actually, not using this, not sure it is useful for unix sockets
   local addr = sockaddr_in_t()
   addr.sun_fanily = enumAF_t("AF_UNIX")
