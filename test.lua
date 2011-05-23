@@ -291,7 +291,7 @@ assert(c:bind(sa))
 local bca = c:getsockname().addr -- find bound address
 local serverport = s:getsockname().port -- find bound port
 
-local sel = assert(S.select({c, s}, nil, nil))
+local sel = assert(S.select({c, s}, nil, nil, S.t.timeval(0,0)))
 assert(sel.count == 0, "nothing to read select now")
 
 n = assert(s:sendto(string, nil, 0, bca))

@@ -287,7 +287,10 @@ typedef unsigned long ino_t;
 typedef unsigned long nlink_t;
 typedef long blksize_t;
 typedef long blkcnt_t;
-typedef long fd_mask;
+
+// should be a word, but we use 32 bits as bitops are 32 bit in LuaJIT at the moment
+typedef uint32_t fd_mask;
+
 // misc
 typedef void (*sighandler_t) (int);
 
@@ -1390,25 +1393,24 @@ function S.sysinfo(info)
   return info
 end
 
-local nfdbits = ffi.sizeof(fdmask_t) * 8 -- change ops on this to bitmasks
 local mkfdset, fdisset
 function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
   local set = fdset_t()
   for i, v in ipairs(fds) do
     local fd = getfd(v)
     if fd + 1 > nfds then nfds = fd + 1 end
-    local fdelt = div(fd, nfdbits)
-    set.fds_bits[fdelt] = bit.bor(set.fds_bits[fdelt], bit.lshift(1, fd % nfdbits))
+    local fdelt = bit.rshift(fd, 5) -- always 32 bits
+    set.fds_bits[fdelt] = bit.bor(set.fds_bits[fdelt], bit.lshift(1, fd % 32)) -- always 32 bit words
   end
   return set, nfds
 end
 
-function fdisset(set, fds)
+function fdisset(fds, set)
   local f = {}
   for i, v in ipairs(fds) do
     local fd = getfd(v)
-    local fdelt = div(fd, nfdbits)
-    if bit.band(set.fds_bits[fdelt], bit.lshift(1, fd % nfdbits)) ~= 0 then table.insert(f, v) end -- careful not to duplicate fd objects
+    local fdelt = bit.rshift(fd, 5) -- always 32 bits
+    if bit.band(set.fds_bits[fdelt], bit.lshift(1, fd % 32)) ~= 0 then table.insert(f, v) end -- careful not to duplicate fd objects
   end
   return f
 end
@@ -1419,13 +1421,12 @@ function S.select(readfds, writefds, exceptfds, timeout, nfds) -- note param ord
      (not exceptfds or ffi.istype(fdset_t, exceptfds)) then
     return retint(C.select(nfds, readfds, writefds, exceptfds, timeout)) end -- user has used native types
   local r, w, e
-  if not nfds then nfds = 0 end
-  r, nfds = mkfdset(readfds, nfds)
-  w, nfds = mkfdset(writefds, nfds)
-  e, nfds = mkfdset(exceptfds, nfds)
+  r, nfds = mkfdset(readfds or {}, nfds or 0)
+  w, nfds = mkfdset(writefds or {}, nfds)
+  e, nfds = mkfdset(exceptfds or {}, nfds)
   local ret = C.select(nfds, r, w, e, timeout)
   if ret == -1 then return errorret() end
-  return {readfds = fdisset(readfds, r), writefds = fdisset(writefds, w), exceptfds = fdisset(exceptfds, e), count = tonumber(ret)}
+  return {readfds = fdisset(readfds or {}, r), writefds = fdisset(writefds or {}, w), exceptfds = fdisset(exceptfds or {}, e), count = tonumber(ret)}
 end
 
 if rt then -- real time functions not in glibc, check if available
