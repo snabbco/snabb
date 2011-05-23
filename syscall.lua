@@ -915,7 +915,7 @@ local msghdr_t = ffi.typeof("struct msghdr")
 local cmsghdr_t = ffi.typeof("struct cmsghdr")
 local ucred_t = ffi.typeof("struct ucred")
 local sysinfo_t = ffi.typeof("struct sysinfo")
-local fdset_t = ffi.typeof("struct fdset")
+local fdset_t = ffi.typeof("fd_set")
 local fdmask_t = ffi.typeof("fd_mask")
 
 local stat_t
@@ -946,7 +946,7 @@ assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in6_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_un_t))
 
 -- misc
-local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- only for positive numbers!
+local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- only for positive numbers! -- change to shift!
 
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
@@ -1184,7 +1184,14 @@ end
 function S._exit(status) C._exit(status or 0) end
 function S.exit(status) C.exit(status or 0) end
 
-function S.read(fd, buf, count) return retint(C.read(getfd(fd), buf, count)) end
+function S.read(fd, buf, count)
+  if buf then return retint(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
+  local buf = buffer_t(count)
+  local ret = C.read(getfd(fd), buf, count)
+  if ret == -1 then return errorret() end
+  return ffi.string(buf, ret) -- user gets a string back, can get length from #string
+end
+
 function S.write(fd, buf, count) return retint(C.write(getfd(fd), buf, count or #buf)) end
 function S.pread(fd, buf, count, offset) return retint(C.pread(getfd(fd), buf, count, offset)) end
 function S.pwrite(fd, buf, count, offset) return retint(C.pwrite(getfd(fd), buf, count, offset)) end
@@ -1385,7 +1392,7 @@ end
 
 local mkfdset, fdisset
 function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
-  local set = fdset()
+  local set = fdset_t()
   for i, v in ipairs(fds) do
     local fd = getfd(v)
     if fd + 1 > nfds then nfds = fd + 1 end
@@ -1406,12 +1413,12 @@ function S.select(readfds, writefds, exceptfds, timeout, nfds) -- note param ord
   if (not readfds or ffi.istype(fdset_t, readfds)) and
      (not writefds or ffi.istype(fdset_t, writefds)) and
      (not exceptfds or ffi.istype(fdset_t, exceptfds)) then
-    return retint(C.select(nfds, readfds2, writefds2, exceptfds2, timeout)) -- user has used native types
+    return retint(C.select(nfds, readfds2, writefds2, exceptfds2, timeout)) end -- user has used native types
 
   if not nfds then nfds = 0 end
-  readfds, nfds = mkfdset(readfds, nfds) end
-  writefds, nfds = mkfdset(writefds, nfds) end
-  exceptfds, nfds = mkfdset(exceptfds, nfds) end
+  readfds, nfds = mkfdset(readfds, nfds)
+  writefds, nfds = mkfdset(writefds, nfds)
+  exceptfds, nfds = mkfdset(exceptfds, nfds)
   local ret = C.select(nfds, readfds, writefds, exceptfds, timeout)
   if ret == -1 then return errorret() end
   return {readfds = fdisset(readfds, nfds), writefds = fdisset(writefds, nfds), exceptfds = fdisset(exceptfds, nfds), count = tonumber(ret)}

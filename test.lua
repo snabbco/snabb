@@ -48,6 +48,8 @@ n = assert(S.read(fd2, buf, size))
 assert(n >= 0, "should not get error reading from /dev/zero")
 assert(n == size, "should not get truncated read from /dev/zero") -- technically allowed!
 for i = 0, size - 1 do assert(buf[i] == 0, "should read zero bytes from /dev/zero") end
+local string = assert(fd2:read(nil, 10)) -- test read to string
+assert(#string == 10, "string returned from read should be length 10")
 -- test writing to read only file fails
 n, err, errno = fd2:write(buf, size)
 assert(err, "should not be able to write to file opened read only")
