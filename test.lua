@@ -30,7 +30,7 @@ fd2 = assert(S.open("/dev/zero", S.O_RDONLY))
 assert(fd2.fd == 4, "should get file descriptor 4 back from second open")
 
 -- normal close
-assert(S.close(fd))
+assert(fd:close())
 
 -- test double close fd
 fd, err = S.close(3)
@@ -44,7 +44,7 @@ local buf = S.t.buffer(size) -- allocate buffer for read
 
 for i = 0, size - 1 do buf[i] = 255 end -- make sure overwritten
 -- test read
-n = assert(S.read(fd2, buf, size))
+n = assert(fd2:read(buf, size))
 assert(n >= 0, "should not get error reading from /dev/zero")
 assert(n == size, "should not get truncated read from /dev/zero") -- technically allowed!
 for i = 0, size - 1 do assert(buf[i] == 0, "should read zero bytes from /dev/zero") end
@@ -291,7 +291,14 @@ assert(c:bind(sa))
 local bca = c:getsockname().addr -- find bound address
 local serverport = s:getsockname().port -- find bound port
 
+local sel = assert(S.select({c, s}, nil, nil))
+assert(sel.count == 0, "nothing to read select now")
+
 n = assert(s:sendto(string, nil, 0, bca))
+
+sel = assert(S.select({c, s}, nil, nil))
+assert(sel.count == 1, "one fd available for read now")
+
 local f = assert(c:recvfrom(buf, size))
 assert(f.count == #string, "should get the whole string back")
 assert(f.port == serverport, "should be able to get server port in recvfrom")

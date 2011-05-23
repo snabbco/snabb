@@ -946,7 +946,7 @@ assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in6_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_un_t))
 
 -- misc
-local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- only for positive numbers! -- change to shift!
+local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
@@ -1390,22 +1390,26 @@ function S.sysinfo(info)
   return info
 end
 
+local nfdbits = ffi.sizeof(fdmask_t) * 8 -- change ops on this to bitmasks
 local mkfdset, fdisset
 function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
   local set = fdset_t()
   for i, v in ipairs(fds) do
     local fd = getfd(v)
     if fd + 1 > nfds then nfds = fd + 1 end
-    local nfdbits = ffi.sizeof(fdmask_t) * 8
-    local fdelt = div(fd, nfdbits) -- replace div with shift
-    set.fdmask[fdelt] = bit.bor(set.fdmask[fdelt], bit.lshift(1, fd % nfdbits))
+    local fdelt = div(fd, nfdbits)
+    set.fds_bits[fdelt] = bit.bor(set.fds_bits[fdelt], bit.lshift(1, fd % nfdbits))
   end
   return set, nfds
 end
 
-function fdisset(set, nfds)
+function fdisset(set, fds)
   local f = {}
-  
+  for i, v in ipairs(fds) do
+    local fd = getfd(v)
+    local fdelt = div(fd, nfdbits)
+    if bit.band(set.fds_bits[fdelt], bit.lshift(1, fd % nfdbits)) ~= 0 then table.insert(f, v) end -- careful not to duplicate fd objects
+  end
   return f
 end
 
@@ -1413,15 +1417,15 @@ function S.select(readfds, writefds, exceptfds, timeout, nfds) -- note param ord
   if (not readfds or ffi.istype(fdset_t, readfds)) and
      (not writefds or ffi.istype(fdset_t, writefds)) and
      (not exceptfds or ffi.istype(fdset_t, exceptfds)) then
-    return retint(C.select(nfds, readfds2, writefds2, exceptfds2, timeout)) end -- user has used native types
-
+    return retint(C.select(nfds, readfds, writefds, exceptfds, timeout)) end -- user has used native types
+  local r, w, e
   if not nfds then nfds = 0 end
-  readfds, nfds = mkfdset(readfds, nfds)
-  writefds, nfds = mkfdset(writefds, nfds)
-  exceptfds, nfds = mkfdset(exceptfds, nfds)
-  local ret = C.select(nfds, readfds, writefds, exceptfds, timeout)
+  r, nfds = mkfdset(readfds, nfds)
+  w, nfds = mkfdset(writefds, nfds)
+  e, nfds = mkfdset(exceptfds, nfds)
+  local ret = C.select(nfds, r, w, e, timeout)
   if ret == -1 then return errorret() end
-  return {readfds = fdisset(readfds, nfds), writefds = fdisset(writefds, nfds), exceptfds = fdisset(exceptfds, nfds), count = tonumber(ret)}
+  return {readfds = fdisset(readfds, r), writefds = fdisset(writefds, w), exceptfds = fdisset(exceptfds, e), count = tonumber(ret)}
 end
 
 if rt then -- real time functions not in glibc, check if available
