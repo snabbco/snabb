@@ -1415,12 +1415,15 @@ function fdisset(fds, set)
   return f
 end
 
-function S.select(readfds, writefds, exceptfds, timeout, nfds) -- note param order different from syscall
+function S.select(readfds, writefds, exceptfds, timeout) -- note param order different from syscall
   local r, w, e
+  local nfds = 0
+  local timeout2
+  if timeout then timeout2 = timeval_t(timeout.tv_sec, timeout.tv_usec) end -- copy so never updated
   r, nfds = mkfdset(readfds or {}, nfds or 0)
   w, nfds = mkfdset(writefds or {}, nfds)
   e, nfds = mkfdset(exceptfds or {}, nfds)
-  local ret = C.select(nfds, r, w, e, timeout)
+  local ret = C.select(nfds, r, w, e, timeout2)
   if ret == -1 then return errorret() end
   return {readfds = fdisset(readfds or {}, r), writefds = fdisset(writefds or {}, w), exceptfds = fdisset(exceptfds or {}, e), count = tonumber(ret)}
 end
