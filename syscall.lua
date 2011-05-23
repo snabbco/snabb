@@ -287,7 +287,7 @@ typedef unsigned long ino_t;
 typedef unsigned long nlink_t;
 typedef long blksize_t;
 typedef long blkcnt_t;
-
+typedef long fd_mask;
 // misc
 typedef void (*sighandler_t) (int);
 
@@ -313,6 +313,9 @@ struct iovec {
   void *iov_base;
   size_t iov_len;
 };
+typedef struct { /* based on Linux/FreeBSD FD_SETSIZE = 1024, the kernel can do more, so can increase, but bad performance so dont! */
+  fd_mask fds_bits[1024 / (sizeof (fd_mask) * 8)];
+} fd_set;
 struct ucred { /* this is Linux specific */
   pid_t pid;
   uid_t uid;
@@ -828,6 +831,7 @@ ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
+int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -911,6 +915,8 @@ local msghdr_t = ffi.typeof("struct msghdr")
 local cmsghdr_t = ffi.typeof("struct cmsghdr")
 local ucred_t = ffi.typeof("struct ucred")
 local sysinfo_t = ffi.typeof("struct sysinfo")
+local fdset_t = ffi.typeof("struct fdset")
+local fdmask_t = ffi.typeof("fd_mask")
 
 local stat_t
 if use_gnu_stat then stat_t = ffi.typeof("struct gstat") else stat_t = ffi.typeof("struct stat") end
@@ -938,6 +944,9 @@ assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in6_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_un_t))
+
+-- misc
+local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- only for positive numbers!
 
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
@@ -1374,6 +1383,40 @@ function S.sysinfo(info)
   return info
 end
 
+local mkfdset, fdisset
+function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
+  local set = fdset()
+  for i, v in ipairs(fds) do
+    local fd = getfd(v)
+    if fd + 1 > nfds then nfds = fd + 1 end
+    local nfdbits = ffi.sizeof(fdmask_t) * 8
+    local fdelt = div(fd, nfdbits) -- replace div with shift
+    set.fdmask[fdelt] = bit.bor(set.fdmask[fdelt], bit.lshift(1, fd % nfdbits))
+  end
+  return set, nfds
+end
+
+function fdisset(set, nfds)
+  local f = {}
+  
+  return f
+end
+
+function S.select(readfds, writefds, exceptfds, timeout, nfds) -- note param order different from syscall
+  if (not readfds or ffi.istype(fdset_t, readfds)) and
+     (not writefds or ffi.istype(fdset_t, writefds)) and
+     (not exceptfds or ffi.istype(fdset_t, exceptfds)) then
+    return retint(C.select(nfds, readfds2, writefds2, exceptfds2, timeout)) -- user has used native types
+
+  if not nfds then nfds = 0 end
+  readfds, nfds = mkfdset(readfds, nfds) end
+  writefds, nfds = mkfdset(writefds, nfds) end
+  exceptfds, nfds = mkfdset(exceptfds, nfds) end
+  local ret = C.select(nfds, readfds, writefds, exceptfds, timeout)
+  if ret == -1 then return errorret() end
+  return {readfds = fdisset(readfds, nfds), writefds = fdisset(writefds, nfds), exceptfds = fdisset(exceptfds, nfds), count = tonumber(ret)}
+end
+
 if rt then -- real time functions not in glibc, check if available
   function S.clock_getres(clk_id, ts)
     if not ts then ts = timespec_t() end
@@ -1402,8 +1445,8 @@ S.getegid = C.getegid
 S.umask = C.umask
 
 -- 'macros' and helper functions etc
--- LuaJIT does not provide 64 bit bitops at the moment
 
+-- LuaJIT does not provide 64 bit bitops at the moment
 local b64
 function b64(n)
   local t64 = int64_1t(n)
@@ -1514,7 +1557,7 @@ function S.recvmsg(fd, io, iolen, flags, bufsize) -- takes iovec, or nil in whic
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
       local fda = ffi.cast(intptr_t, cmsg.cmsg_data)
-      local fdc = math.floor(tonumber((cmsg.cmsg_len - cmsg_ahdr) / ffi.sizeof(int1_t)))
+      local fdc = div(cmsg.cmsg_len - cmsg_ahdr, ffi.sizeof(int1_t))
       ret.fd = {}
       for i = 1, fdc do ret.fd[i] = fd_t(fda[i - 1]) end
 
@@ -1610,7 +1653,7 @@ fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
-  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t
+  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t
 }
 
 return S
