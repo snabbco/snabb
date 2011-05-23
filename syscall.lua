@@ -1416,10 +1416,6 @@ function fdisset(fds, set)
 end
 
 function S.select(readfds, writefds, exceptfds, timeout, nfds) -- note param order different from syscall
-  if (not readfds or ffi.istype(fdset_t, readfds)) and
-     (not writefds or ffi.istype(fdset_t, writefds)) and
-     (not exceptfds or ffi.istype(fdset_t, exceptfds)) then
-    return retint(C.select(nfds, readfds, writefds, exceptfds, timeout)) end -- user has used native types
   local r, w, e
   r, nfds = mkfdset(readfds or {}, nfds or 0)
   w, nfds = mkfdset(writefds or {}, nfds)
