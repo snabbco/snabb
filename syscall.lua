@@ -685,14 +685,14 @@ enum E {
 
 -- stat structure is architecture dependent in Linux
 -- this is the way glibc versions stat via __xstat, may need to change for other libc, eg if define stat as a non inline function
--- use gstat as the GNU one, struct stat will be kernel structure
+-- uclibc seems to use gnu stat now though, but without versioning
 -- could just use the syscall!
 local STAT_VER_LINUX
 
 if ffi.abi("32bit") then
 STAT_VER_LINUX = 3
 ffi.cdef[[
-struct gstat {
+struct stat {
   dev_t st_dev;
   unsigned short int __pad1;
   ino_t __st_ino;
@@ -715,7 +715,7 @@ struct gstat {
 else -- 64 bit arch
 STAT_VER_LINUX = 1
 ffi.cdef[[
-struct gstat {
+struct stat {
   dev_t st_dev;
   ino_t st_ino;
   nlink_t st_nlink;
@@ -735,8 +735,8 @@ struct gstat {
 ]]
 end
 
--- are there issues with 32 on 64, __old_kernel_stat?
-if ffi.arch == 'x86' then
+-- are there issues with 32 on 64, __old_kernel_stat? -- seems that uclibc does not use this
+--[[if ffi.arch == 'x86' then
 ffi.cdef[[
 struct stat {
   unsigned long  st_dev;
@@ -759,7 +759,7 @@ struct stat {
   unsigned long  __unused5;
 };
 ]]
-else -- all architectures except x86 the same
+--[[else -- all architectures except x86 the same
 ffi.cdef [[
 struct stat {
   unsigned long   st_dev;
@@ -782,7 +782,7 @@ struct stat {
   long            __unused[3];
 };
 ]]
-end
+--end
 
 ffi.cdef[[
 int close(int fd);
@@ -874,10 +874,10 @@ char *getcwd(char *buf, size_t size);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
 
-// stat glibc internal functions, gstat is the structure
-int __fxstat(int ver, int fd, struct gstat *buf);
-int __xstat(int ver, const char *path, struct gstat *buf);
-int __lxstat(int ver, const char *path, struct gstat *buf);
+// stat glibc internal functions
+int __fxstat(int ver, int fd, struct stat *buf);
+int __xstat(int ver, const char *path, struct stat *buf);
+int __lxstat(int ver, const char *path, struct stat *buf);
 // real stat functions, might not exist
 int stat(const char *path, struct stat *buf);
 int fstat(int fd, struct stat *buf);
@@ -921,8 +921,24 @@ local sysinfo_t = ffi.typeof("struct sysinfo")
 local fdset_t = ffi.typeof("fd_set")
 local fdmask_t = ffi.typeof("fd_mask")
 
-local stat_t
-if use_gnu_stat then stat_t = ffi.typeof("struct gstat") else stat_t = ffi.typeof("struct stat") end
+local stat_t = ffi.typeof("struct stat")
+--if use_gnu_stat then stat_t = ffi.typeof("struct gstat") else stat_t = ffi.typeof("struct stat") end
+
+
+--[[ -- used to generate tests, will refactor into test code later
+print("eq (sizeof(struct timespec), " .. ffi.sizeof(timespec_t) .. ");")
+print("eq (sizeof(struct timeval), " .. ffi.sizeof(timeval_t) .. ");")
+print("eq (sizeof(struct sockaddr_storage), " .. ffi.sizeof(sockaddr_storage_t) .. ");")
+print("eq (sizeof(struct sockaddr_in), " .. ffi.sizeof(sockaddr_in_t) .. ");")
+print("eq (sizeof(struct sockaddr_in6), " .. ffi.sizeof(sockaddr_in6_t) .. ");")
+print("eq (sizeof(struct sockaddr_un), " .. ffi.sizeof(sockaddr_un_t) .. ");")
+print("eq (sizeof(struct iovec), " .. ffi.sizeof(iovec_t(1)) .. ");")
+print("eq (sizeof(struct msghdr), " .. ffi.sizeof(msghdr_t) .. ");")
+print("eq (sizeof(struct cmsghdr), " .. ffi.sizeof(cmsghdr_t(0)) .. ");")
+print("eq (sizeof(struct sysinfo), " .. ffi.sizeof(sysinfo_t) .. ");")
+]]
+--print(ffi.sizeof("struct stat"))
+--print(ffi.sizeof("struct gstat"))
 
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
