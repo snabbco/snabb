@@ -387,6 +387,12 @@ struct sockaddr_un {
   sa_family_t sun_family;     /* AF_UNIX */
   char        sun_path[108];  /* pathname */
 };
+struct sockaddr_nl {
+  sa_family_t     nl_family;      /* AF_NETLINK   */
+  unsigned short  nl_pad;         /* zero         */
+  uint32_t        nl_pid;         /* port ID      */
+  uint32_t        nl_groups;      /* multicast groups mask */
+};
 
 // enums, LuaJIT will allow strings to be used, so we provide for appropriate parameters
 enum SEEK {
@@ -547,6 +553,28 @@ enum CLOCK {
   CLOCK_MONOTONIC_RAW = 4,
   CLOCK_REALTIME_COARSE = 5,
   CLOCK_MONOTONIC_COARSE = 6,
+};
+enum NETLINK {
+  NETLINK_ROUTE         = 0,
+  NETLINK_UNUSED        = 1,
+  NETLINK_USERSOCK      = 2,
+  NETLINK_FIREWALL      = 3,
+  NETLINK_INET_DIAG     = 4,
+  NETLINK_NFLOG         = 5,
+  NETLINK_XFRM          = 6,
+  NETLINK_SELINUX       = 7,
+  NETLINK_ISCSI         = 8,
+  NETLINK_AUDIT         = 9,
+  NETLINK_FIB_LOOKUP    = 10,      
+  NETLINK_CONNECTOR     = 11,
+  NETLINK_NETFILTER     = 12,
+  NETLINK_IP6_FW        = 13,
+  NETLINK_DNRTMSG       = 14,
+  NETLINK_KOBJECT_UEVENT= 15,
+  NETLINK_GENERIC       = 16,
+/* leave room for NETLINK_DM (DM Events) */
+  NETLINK_SCSITRANSPORT = 18,
+  NETLINK_ECRYPTFS      = 19,
 };
 enum E {
   EPERM          =  1,
@@ -913,6 +941,7 @@ local sockaddr_in6_t = ffi.typeof("struct sockaddr_in6")
 local in_addr_t = ffi.typeof("struct in_addr")
 local in6_addr_t = ffi.typeof("struct in6_addr")
 local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
+local sockaddr_nl_t = ffi.typeof("struct sockaddr_nl")
 local iovec_t = ffi.typeof("struct iovec[?]")
 local msghdr_t = ffi.typeof("struct msghdr")
 local cmsghdr_t = ffi.typeof("struct cmsghdr")
@@ -946,10 +975,13 @@ local ints_t = ffi.typeof("int[?]") -- array of ints
 local int64_t = ffi.typeof("int64_t")
 local int32_pt = ffi.typeof("int32_t *")
 local int64_1t = ffi.typeof("int64_t[1]")
+local string_array_t = ffi.typeof("const char *[?]")
+
+-- enums, not sure if there is a betetr way to convert
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
 local enumCLOCK_t = ffi.typeof("enum CLOCK") -- for clockids
-local string_array_t = ffi.typeof("const char *[?]")
+local enumNETTLINK = ffi.typeof("enum NETLINK") -- netlink socket protocols
 
 -- need these for casts
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
@@ -963,7 +995,7 @@ assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in6_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_un_t))
-
+assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_nl_t))
 -- misc
 local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
@@ -998,9 +1030,10 @@ function S.sockaddr_in6(port, addr)
 end
 function S.sockaddr_un() -- actually, not using this, not sure it is useful for unix sockets
   local addr = sockaddr_in_t()
-  addr.sun_fanily = enumAF_t("AF_UNIX")
+  addr.sun_family = enumAF_t("AF_UNIX")
   return addr
 end
+-- do we need for netlink?
 
 local fam = function(s) return tonumber(enumAF_t(s)) end -- convert to Lua number, as tables indexed by number
 
@@ -1022,7 +1055,7 @@ socket_type[fam("AF_INET6")] = sockaddr_in6_t
 --  AF_NETBEUI
 --  AF_SECURITY
 --  AF_KEY
---  AF_NETLINK
+socket_type[fam("AF_NETLINK")] = sockaddr_nl_t
 --  AF_PACKET
 --  AF_ASH
 --  AF_ECONET
@@ -1056,6 +1089,7 @@ function getaddrlen(addr, addrlen)
     if ffi.istype(sockaddr_t, addr) then return ffi.sizeof(sockaddr_t) end
     if ffi.istype(sockaddr_in_t, addr) then return ffi.sizeof(sockaddr_in_t) end
     if ffi.istype(sockaddr_in6_t, addr) then return ffi.sizeof(sockaddr_in6_t) end
+    if ffi.istype(sockaddr_nl_t, addr) then return ffi.sizeof(sockaddr_nl_t) end
   end
   return addrlen or 0
 end
@@ -1083,6 +1117,9 @@ saret = function(ss, addrlen, rets) -- return socket address structure, addition
     elseif ffi.istype(sockaddr_in_t, addr) then
       rets.port = S.ntohs(addr.sin_port)
       rets.ipv4 = addr.sin_addr
+    elseif ffi.istype(sockaddr_nl_t, addr) then
+      rets.pid = addr.nl_pid
+      rets.groups = addr.nl_groups
     end
   end
   return rets
@@ -1312,10 +1349,17 @@ function S.munlockall() return retbool(C.munlockall()) end
 function S.mremap(old_address, old_size, new_size, flags, new_address) return retptr(C.mremap(old_address, old_size, new_size, flags, new_address)) end
 function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, advice)) end
 
-function S.socket(domain, stype, protocol) return retfd(C.socket(domain, stype, protocol or 0)) end
+local sproto
+function sproto(domain, protocol) -- helper function to cast protocol type depending on domain
+  if not protcol then return 0 end
+  if domain == "AF_NETLINK" then return emumNETLINK(protocol) end
+  return protocol
+end
+
+function S.socket(domain, stype, protocol) return retfd(C.socket(domain, stype, sproto(domain, protocol))) end
 function S.socketpair(domain, stype, protocol)
   local sv2 = int2_t()
-  local ret = C.socketpair(domain, stype, protocol or 0, sv2)
+  local ret = C.socketpair(domain, stype, sproto(domain, protocol), sv2)
   if ret == -1 then return errorret() end
   return {fd_t(sv2[0]), fd_t(sv2[1])}
 end
@@ -1680,7 +1724,8 @@ fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
-  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t
+  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t,
+  sockaddr_nl = sockaddr_nl_t
 }
 
 return S

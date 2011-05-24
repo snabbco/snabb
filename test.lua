@@ -370,6 +370,11 @@ local t = assert(S.clock_getres("CLOCK_REALTIME"))
 local t = assert(S.clock_gettime("CLOCK_REALTIME"))
 local i = assert(S.sysinfo())
 
+-- netlink sockets, Linux only
+s = assert(S.socket("AF_NETLINK", "SOCK_RAW", "NETLINK_ROUTE"))
+
+assert(s:close())
+
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 
 assert(S.acct())
