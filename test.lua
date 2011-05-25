@@ -372,7 +372,8 @@ local i = assert(S.sysinfo())
 
 -- netlink sockets, Linux only
 s = assert(S.socket("AF_NETLINK", "SOCK_RAW", "NETLINK_ROUTE"))
-
+a = S.sockaddr_nl()
+assert(s:bind(a))
 assert(s:close())
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root

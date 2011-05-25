@@ -1033,7 +1033,13 @@ function S.sockaddr_un() -- actually, not using this, not sure it is useful for 
   addr.sun_family = enumAF_t("AF_UNIX")
   return addr
 end
--- do we need for netlink?
+function S.sockaddr_nl(pid, groups)
+  local addr = sockaddr_nl_t()
+  addr.nl_family = enumAF_t("AF_NETLINK")
+  if pid then addr.nl_pid = pid end -- optional, kernel will set
+  if groups then addr.nl_groups = groups end
+  return addr
+end
 
 local fam = function(s) return tonumber(enumAF_t(s)) end -- convert to Lua number, as tables indexed by number
 
