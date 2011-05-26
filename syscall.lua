@@ -1792,12 +1792,32 @@ function S.sendfds(fd, ...)
   return S.sendmsg(fd, msg, 0)
 end
 
--- non standard helpers
 function S.nonblock(s)
   local fl, err, errno = assert(s:fcntl("F_GETFL"))
   if not fl then return nil, err, errno end
   fl, err, errno = s:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK))
   if not fl then return nil, err, errno end
+  return true
+end
+
+function S.readfile(name, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
+  local f, err, errno = S.open(name, S.O_RDONLY)
+  if not f then return nil, err, errno end
+  local r, err, errno = f:read(nil, length or 4096)
+  if not r then return nil, err, errno end
+  local t, err, errno = f:close()
+  if not t then return nil, err, errno end
+  return r
+end
+
+function S.writefile(name, string, mode) -- write string to named file. specify mode if want to create file, silently ignore short writes
+  local f, err, errno
+  if mode then f, err, errno = S.creat(name, mode) else f, err, errno = S.open(name, S.O_WRONLY) end
+  if not f then return nil, err, errno end
+  local n, err, errno = f:write(string)
+  if not n then return nil, err, errno end
+  local t, err, errno = f:close()
+  if not t then return nil, err, errno end
   return true
 end
 

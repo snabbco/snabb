@@ -128,6 +128,11 @@ assert(S.close(fd))
 fd, err = S.open(tmpfile, S.O_RDWR)
 assert(err, "expected open to fail on file not found")
 
+-- test readfile, writefile
+assert(S.writefile(tmpfile, "this is a string", S.S_IRWXU))
+local ss = assert(S.readfile(tmpfile))
+assert(ss == "this is a string", "readfile should get back what writefile wrote")
+
 fd = assert(S.pipe())
 assert(fd[1].fd == 3 and fd[2].fd == 4, "expect file handles 3 and 4 for pipe")
 assert(fd[1]:close())
