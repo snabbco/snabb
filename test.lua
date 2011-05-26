@@ -291,13 +291,25 @@ assert(c:bind(sa))
 local bca = c:getsockname().addr -- find bound address
 local serverport = s:getsockname().port -- find bound port
 
-local sel = assert(S.select({c, s}, nil, nil, S.t.timeval(0,0)))
+-- test select and epoll
+local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
 assert(sel.count == 0, "nothing to read select now")
+
+local ep = assert(S.epoll_create())
+assert(ep:epoll_ctl("EPOLL_CTL_ADD", c, S.EPOLLIN))
+
+local r
+r = assert(ep:epoll_wait())
+assert(r.count == 0, "no events yet")
 
 n = assert(s:sendto(string, nil, 0, bca))
 
-sel = assert(S.select({c, s}, nil, nil))
+sel = assert(S.select{readfds = {c, s}})
 assert(sel.count == 1, "one fd available for read now")
+
+r = assert(ep:epoll_wait())
+assert(r.count == 1, "one event now")
+assert(ep:close())
 
 local f = assert(c:recvfrom(buf, size))
 assert(f.count == #string, "should get the whole string back")

@@ -3,7 +3,8 @@ local bit = require "bit"
 
 local C = ffi.C
 
-local rt = ffi.load("rt")
+local rt
+if pcall(function () rt = ffi.load("rt") end) then end
 
 -- note should wrap more conditionals around stuff that might not be there
 -- possibly generate more of this from C program, depending on where it differs.
@@ -194,6 +195,24 @@ S.MSG_MORE            = 0x8000
 S.MSG_WAITFORONE      = 0x10000
 S.MSG_CMSG_CLOEXEC    = 0x40000000
 
+-- epoll
+S.EPOLL_CLOEXEC = 02000000
+S.EPOLL_NONBLOCK = 04000
+
+S.EPOLLIN = 0x001
+S.EPOLLPRI = 0x002
+S.EPOLLOUT = 0x004
+S.EPOLLRDNORM = 0x040
+S.EPOLLRDBAND = 0x080
+S.EPOLLWRNORM = 0x100
+S.EPOLLWRBAND = 0x200
+S.EPOLLMSG = 0x400
+S.EPOLLERR = 0x008
+S.EPOLLHUP = 0x010
+S.EPOLLRDHUP = 0x2000
+S.EPOLLONESHOT = bit.lshift(1, 30)
+S.EPOLLET = bit.lshift(1, 31)
+
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
@@ -257,6 +276,17 @@ function retfd(ret)
   return fd_t(ret)
 end
 
+-- OS specific stuff, eg constants
+if ffi.os == "Linux" then
+ffi.cdef[[
+static const int _UTSNAME_LENGTH = 65
+]]
+elseif ffi.os == "OSX" then
+ffi.cdef[[
+static const int _UTSNAME_LENGTH = 256
+]]
+end
+
 -- define C types
 ffi.cdef[[
 // typedefs for word size independent types
@@ -303,14 +333,14 @@ struct timespec {
   time_t tv_sec;        /* seconds */
   long   tv_nsec;       /* nanoseconds */
 };
-// for uname. may well differ by OS
+// for uname.
 struct utsname {
-  char sysname[65];
-  char nodename[65];
-  char release[65];
-  char version[65];
-  char machine[65];
-  char domainname[65];
+  char sysname[_UTSNAME_LENGTH];
+  char nodename[_UTSNAME_LENGTH];
+  char release[_UTSNAME_LENGTH];
+  char version[_UTSNAME_LENGTH];
+  char machine[_UTSNAME_LENGTH];
+  char domainname[_UTSNAME_LENGTH]; // may not exist
 };
 struct iovec {
   void *iov_base;
@@ -393,6 +423,19 @@ struct sockaddr_nl {
   uint32_t        nl_pid;         /* port ID      */
   uint32_t        nl_groups;      /* multicast groups mask */
 };
+typedef union epoll_data {
+  void *ptr;
+  int fd;
+  uint32_t u32;
+  uint64_t u64;
+} epoll_data_t;
+#pragma pack(push)  /* we need to align these to replace gcc packed attribute */
+#pragma pack(4) 
+struct epoll_event {
+  uint32_t events;      /* Epoll events */
+  epoll_data_t data;    /* User data variable */
+};   // __attribute__ ((__packed__));
+#pragma pack(pop)
 
 // enums, LuaJIT will allow strings to be used, so we provide for appropriate parameters
 enum SEEK {
@@ -575,6 +618,11 @@ enum NETLINK {
 /* leave room for NETLINK_DM (DM Events) */
   NETLINK_SCSITRANSPORT = 18,
   NETLINK_ECRYPTFS      = 19,
+};
+enum EPOLL {
+  EPOLL_CTL_ADD = 1,
+  EPOLL_CTL_DEL = 2,
+  EPOLL_CTL_MOD = 3,
 };
 enum E {
   EPERM          =  1,
@@ -863,6 +911,9 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+int epoll_create1(int flags);
+int epoll_ctl(int epfd, enum EPOLL op, int fd, struct epoll_event *event);
+int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -949,10 +1000,9 @@ local ucred_t = ffi.typeof("struct ucred")
 local sysinfo_t = ffi.typeof("struct sysinfo")
 local fdset_t = ffi.typeof("fd_set")
 local fdmask_t = ffi.typeof("fd_mask")
-
 local stat_t = ffi.typeof("struct stat")
---if use_gnu_stat then stat_t = ffi.typeof("struct gstat") else stat_t = ffi.typeof("struct stat") end
-
+local epoll_event_t = ffi.typeof("struct epoll_event")
+local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 
 --[[ -- used to generate tests, will refactor into test code later
 print("eq (sizeof(struct timespec), " .. ffi.sizeof(timespec_t) .. ");")
@@ -1481,20 +1531,58 @@ function fdisset(fds, set)
   return f
 end
 
-function S.select(readfds, writefds, exceptfds, timeout) -- note param order different from syscall
+function S.select(s) -- note same structure as returned
   local r, w, e
   local nfds = 0
   local timeout2
-  if timeout then timeout2 = timeval_t(timeout.tv_sec, timeout.tv_usec) end -- copy so never updated
-  r, nfds = mkfdset(readfds or {}, nfds or 0)
-  w, nfds = mkfdset(writefds or {}, nfds)
-  e, nfds = mkfdset(exceptfds or {}, nfds)
+  if s.timeout then timeout2 = timeval_t(s.timeout.tv_sec, s.timeout.tv_usec) end -- copy so never updated
+  r, nfds = mkfdset(s.readfds or {}, nfds or 0)
+  w, nfds = mkfdset(s.writefds or {}, nfds)
+  e, nfds = mkfdset(s.exceptfds or {}, nfds)
   local ret = C.select(nfds, r, w, e, timeout2)
   if ret == -1 then return errorret() end
-  return {readfds = fdisset(readfds or {}, r), writefds = fdisset(writefds or {}, w), exceptfds = fdisset(exceptfds or {}, e), count = tonumber(ret)}
+  return {readfds = fdisset(s.readfds or {}, r), writefds = fdisset(s.writefds or {}, w),
+          exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
 end
 
-if rt then -- real time functions not in glibc, check if available
+-- Linux only. use epoll1
+function S.epoll_create(flags)
+  return retfd(C.epoll_create1(flags or 0))
+end
+
+function S.epoll_ctl(epfd, op, fd, events, data)
+  local event = epoll_event_t()
+  event.events = events
+  if data then event.data.u64 = data else event.data.fd = getfd(fd) end
+  return retbool(C.epoll_ctl(getfd(epfd), op, getfd(fd), event))
+end
+
+local getflags -- make more generic and use elsewhere, and for constructing
+function getflags(e)
+  local r= {}
+  for i, f in ipairs{"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"} do
+    if bit.band(e, S[f]) ~= 0 then r[f] = true end
+  end
+  return r
+end
+
+function S.epoll_wait(epfd, events, maxevents, timeout)
+  if not maxevents then maxevents = 1 end
+  if not events then events = epoll_events_t(maxevents) end
+  local ret = C.epoll_wait(getfd(epfd), events, maxevents, timeout or 0)
+  if ret == -1 then return errorret() end
+  local r = {count = tonumber(ret)}
+  for i = 1, ret do -- put in Lua array
+    local e = events[i - 1]
+    local rr = getflags(e.events)
+    rr.fd = e.data.fd
+    rr.data = e.data.u64
+    r[i] = rr
+  end
+  return r
+end
+
+if rt then -- real time functions not in glibc in Linux, check if available. N/A on OSX.
   function S.clock_getres(clk_id, ts)
     if not ts then ts = timespec_t() end
     local ret = rt.clock_getres(clk_id, ts)
@@ -1645,6 +1733,7 @@ function S.recvmsg(fd, io, iolen, flags, bufsize) -- takes iovec, or nil in whic
   return ret
 end
 
+-- helper functions
 function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect credentials?
   if not pid then pid = C.getpid() end
   if not uid then uid = C.getuid() end
@@ -1718,7 +1807,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
-                   'recvmsg', 'setsockopt'
+                   'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait"
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
