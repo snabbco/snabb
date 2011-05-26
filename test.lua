@@ -300,7 +300,7 @@ assert(ep:epoll_ctl("EPOLL_CTL_ADD", c, S.EPOLLIN))
 
 local r
 r = assert(ep:epoll_wait())
-assert(r.count == 0, "no events yet")
+assert(#r == 0, "no events yet")
 
 n = assert(s:sendto(string, nil, 0, bca))
 
@@ -308,7 +308,8 @@ sel = assert(S.select{readfds = {c, s}})
 assert(sel.count == 1, "one fd available for read now")
 
 r = assert(ep:epoll_wait())
-assert(r.count == 1, "one event now")
+assert(#r == 1, "one event now")
+assert(r[1].EPOLLIN, "read event")
 assert(ep:close())
 
 local f = assert(c:recvfrom(buf, size))

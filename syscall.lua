@@ -1571,7 +1571,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout)
   if not events then events = epoll_events_t(maxevents) end
   local ret = C.epoll_wait(getfd(epfd), events, maxevents, timeout or 0)
   if ret == -1 then return errorret() end
-  local r = {count = tonumber(ret)}
+  local r = {}
   for i = 1, ret do -- put in Lua array
     local e = events[i - 1]
     local rr = getflags(e.events)
