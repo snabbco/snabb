@@ -914,6 +914,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 int epoll_create1(int flags);
 int epoll_ctl(int epfd, enum EPOLL op, int fd, struct epoll_event *event);
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
+ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -1003,6 +1004,7 @@ local fdmask_t = ffi.typeof("fd_mask")
 local stat_t = ffi.typeof("struct stat")
 local epoll_event_t = ffi.typeof("struct epoll_event")
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
+local off_t = ffi.typeof("off_t")
 
 --[[ -- used to generate tests, will refactor into test code later
 print("eq (sizeof(struct timespec), " .. ffi.sizeof(timespec_t) .. ");")
@@ -1019,6 +1021,7 @@ print("eq (sizeof(struct sysinfo), " .. ffi.sizeof(sysinfo_t) .. ");")
 --print(ffi.sizeof("struct stat"))
 --print(ffi.sizeof("struct gstat"))
 
+local off1_t = ffi.typeof("off_t[1]") -- used to pass off_t to sendfile etc
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local ints_t = ffi.typeof("int[?]") -- array of ints
@@ -1582,6 +1585,15 @@ function S.epoll_wait(epfd, events, maxevents, timeout)
   return r
 end
 
+function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two different return types...
+  if not offset then return retint(C.sendfile(getfd(out_fd), getfd(in_fd), nil, count)) end
+  local off = off1_t()
+  off[0] = offset
+  local ret = C.sendfile(getfd(out_fd), getfd(in_fd), off, count)
+  if ret == -1 then return errorret() end
+  return {count = tonumber(ret), offset = off[0]}
+end
+
 if rt then -- real time functions not in glibc in Linux, check if available. N/A on OSX.
   function S.clock_getres(clk_id, ts)
     if not ts then ts = timespec_t() end
@@ -1827,7 +1839,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
-                   'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait"
+                   'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile"
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
@@ -1839,7 +1851,7 @@ fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
-  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t,
+  iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
   sockaddr_nl = sockaddr_nl_t
 }
 

@@ -262,6 +262,13 @@ n = assert(a.fd:readv(io, 2))
 assert(n == 7, "expect readv to read 7 bytes")
 assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get back same stuff")
 
+-- test sendfile
+local f = assert(S.open("/etc/passwd", S.O_RDONLY))
+local off = 0
+n = assert(c:sendfile(f, off, 16))
+assert(n.count == 16 and tonumber(n.offset) == 16, "sendfile should send 16 bytes")
+assert(f:close())
+
 assert(fd:close())
 assert(c:close())
 assert(a.fd:close())
