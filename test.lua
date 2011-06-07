@@ -406,7 +406,6 @@ local d = assert(S.dirfile("/dev"))
 assert(d.zero, "expect to find /dev/zero")
 assert(d["."], "expect to find .")
 assert(d[".."], "expect to find ..")
-fd:close()
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 
