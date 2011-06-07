@@ -407,6 +407,8 @@ assert(d.zero, "expect to find /dev/zero")
 assert(d["."], "expect to find .")
 assert(d[".."], "expect to find ..")
 assert(d.zero.DT_CHR, "/dev/zero is a character device")
+assert(d["."].DT_DIR, ". is a directory")
+assert(d[".."].DT_DIR, ".. is a directory")
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 
