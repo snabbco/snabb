@@ -221,6 +221,17 @@ S.EPOLLRDHUP = 0x2000
 S.EPOLLONESHOT = bit.lshift(1, 30)
 S.EPOLLET = bit.lshift(1, 31)
 
+-- file types in directory
+S.DT_UNKNOWN = 0
+S.DT_FIFO = 1
+S.DT_CHR = 2
+S.DT_DIR = 4
+S.DT_BLK = 6
+S.DT_REG = 8
+S.DT_LNK = 10
+S.DT_SOCK = 12
+S.DT_WHT = 14
+
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
@@ -1332,8 +1343,13 @@ function S.getdents(fd, buf, size)
     local i = 0
     while i < ret do
       local dp = ffi.cast(linux_dirent_pt, buf + i)
+      local t = buf[i + dp.d_reclen - 1]
+      local dd = {inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off)}
+      for _, f in ipairs{"DT_UNKNOWN", "DT_FIFO", "DT_CHR", "DT_DIR", "DT_BLK", "DT_REG", "DT_LNK", "DT_SOCK", "DT_WHT"} do
+        if bit.band(t, S[f]) ~= 0 then dd[f] = true end
+      end
+      d[ffi.string(dp.d_name)] = dd
       i = i + dp.d_reclen
-      d[ffi.string(dp.d_name)] = {inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off)}
     end
   until ret == 0
   return d

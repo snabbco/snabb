@@ -406,6 +406,7 @@ local d = assert(S.dirfile("/dev"))
 assert(d.zero, "expect to find /dev/zero")
 assert(d["."], "expect to find .")
 assert(d[".."], "expect to find ..")
+assert(d.zero.DT_CHR, "/dev/zero is a character device")
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 
