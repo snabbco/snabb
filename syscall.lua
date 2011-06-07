@@ -423,6 +423,12 @@ struct sockaddr_nl {
   uint32_t        nl_pid;         /* port ID      */
   uint32_t        nl_groups;      /* multicast groups mask */
 };
+struct linux_dirent {
+  long           d_ino;
+  off_t          d_off;
+  unsigned short d_reclen;
+  char           d_name[];
+};
 typedef union epoll_data {
   void *ptr;
   int fd;
@@ -493,7 +499,7 @@ enum MADV {
   POSIX_MADV_WILLNEED    = 3,
   POSIX_MADV_DONTNEED    = 4,
 };
-enum SIG_ { /* maybe not te clearest name */
+enum SIG_ { /* maybe not the clearest name */
   SIG_ERR = -1,
   SIG_DFL =  0,
   SIG_IGN =  1,
@@ -860,6 +866,24 @@ struct stat {
 ]]
 --end
 
+-- completely arch dependent stuff. Note not defining all the syscalls yet
+-- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
+if ffi.abi("32bit") and (ffi.arch == "x86" or (ffi.arch == "arm" and ffi.abi("eabi"))) then
+ffi.cdef[[
+enum SYS {
+  SYS_getdents = 141,
+};
+]]
+elseif ffi.abi("64bit") and ffi.arch == "x64" then
+ffi.cdef[[
+enum SYS {
+  SYS_getdents = 78,
+};
+]]
+end
+
+-- shared code
+
 ffi.cdef[[
 int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
@@ -954,6 +978,8 @@ char *getcwd(char *buf, size_t size);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
 
+int syscall(enum SYS number, ...);
+
 // stat glibc internal functions
 int __fxstat(int ver, int fd, struct stat *buf);
 int __xstat(int ver, const char *path, struct stat *buf);
@@ -1021,6 +1047,8 @@ print("eq (sizeof(struct sysinfo), " .. ffi.sizeof(sysinfo_t) .. ");")
 --print(ffi.sizeof("struct stat"))
 --print(ffi.sizeof("struct gstat"))
 
+local int_t = ffi.typeof("int")
+local uint_t = ffi.typeof("unsigned int")
 local off1_t = ffi.typeof("off_t[1]") -- used to pass off_t to sendfile etc
 local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
@@ -1040,7 +1068,8 @@ local enumNETTLINK = ffi.typeof("enum NETLINK") -- netlink socket protocols
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
 local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
 local uchar_pt = ffi.typeof("unsigned char *")
-local intptr_t = ffi.typeof("int *")
+local int_pt = ffi.typeof("int *")
+local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
 
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
 assert(ffi.sizeof(sockaddr_storage_t) == 128) -- this is the required size in Linux
@@ -1049,6 +1078,7 @@ assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_in6_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_un_t))
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_nl_t))
+
 -- misc
 local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
@@ -1270,6 +1300,35 @@ function S.execve(filename, argv, envp)
   local cenvp = string_array_t(#envp + 1, envp)
   cenvp[#envp] = nil
   return retbool(C.execve(filename, cargv, cenvp))
+end
+
+-- best to call C.syscall directly? do not export?
+function S.syscall(num, ...)
+  -- call with the right types, use at your own risk
+  local a, b, c, d, e, f = ...
+  local ret = C.syscall(num, a, b, c, d, e, f)
+  if ret < 0 then return nil, -ret, S.strerror(-ret) end
+  return ret
+end
+
+function S.getdents(fd, buf, size)
+  if not buf then
+    size = size or 4096
+    buf = buffer_t(size)
+  end
+  local d = {}
+  local ret
+  repeat
+    ret = C.syscall("SYS_getdents", uint_t(getfd(fd)), buf, uint_t(size))
+    if ret < 0 then return nil, -ret, S.strerror(-ret) end
+    local i = 0
+    while i < ret do
+      local dp = ffi.cast(linux_dirent_pt, buf + i)
+      i = i + dp.d_reclen
+      d[ffi.string(dp.d_name)] = {inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off)}
+    end
+  until ret == 0
+  return d
 end
 
 local retwait
@@ -1733,7 +1792,7 @@ function S.recvmsg(fd, io, iolen, flags, bufsize) -- takes iovec, or nil in whic
         ret.uid = cred.uid
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
-      local fda = ffi.cast(intptr_t, cmsg.cmsg_data)
+      local fda = ffi.cast(int_pt, cmsg.cmsg_data)
       local fdc = div(cmsg.cmsg_len - cmsg_ahdr, ffi.sizeof(int1_t))
       ret.fd = {}
       for i = 1, fdc do ret.fd[i] = fd_t(fda[i - 1]) end
@@ -1839,7 +1898,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
-                   'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile"
+                   'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents"
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
