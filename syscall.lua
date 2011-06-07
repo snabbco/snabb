@@ -1346,7 +1346,7 @@ function S.getdents(fd, buf, size)
       local t = buf[i + dp.d_reclen - 1]
       local dd = {inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off)}
       for _, f in ipairs{"DT_UNKNOWN", "DT_FIFO", "DT_CHR", "DT_DIR", "DT_BLK", "DT_REG", "DT_LNK", "DT_SOCK", "DT_WHT"} do
-        if bit.band(t, S[f]) ~= 0 then dd[f] = true end
+        if t == S[f] then dd[f] = true end
       end
       d[ffi.string(dp.d_name)] = dd
       i = i + dp.d_reclen
