@@ -28,13 +28,21 @@ S.O_NDELAY    = S.O_NONBLOCK
 S.O_SYNC      = octal('04010000')
 S.O_FSYNC     = S.O_SYNC
 S.O_ASYNC     = octal('020000')
-S.O_DIRECTORY = octal('0200000')
-S.O_NOFOLLOW  = octal('0400000')
 S.O_CLOEXEC   = octal('02000000')
-S.O_DIRECT    = octal('040000')
 S.O_NOATIME   = octal('01000000')
 S.O_DSYNC     = octal('010000')
 S.O_RSYNC     = S.O_SYNC
+
+-- these are arch dependent!
+if ffi.arch == "x86" or ffi.arch="x64" then
+  S.O_DIRECTORY = octal('0200000')
+  S.O_NOFOLLOW  = octal('0400000')
+  S.O_DIRECT    = octal('040000')
+elseif ffi.arch == "arm" then
+  S.O_DIRECTORY = octal('040000')
+  S.O_NOFOLLOW  = octal('0100000')
+  S.O_DIRECT    = octal('0200000')
+end
 
 -- modes
 S.S_IFMT   = octal('0170000')
