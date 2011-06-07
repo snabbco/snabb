@@ -1900,6 +1900,17 @@ function S.writefile(name, string, mode) -- write string to named file. specify 
   return true
 end
 
+function S.dirfile(name) -- return the directory entries in a file
+  local fd, d, _, err, errno
+  fd, err, errno = S.open(name, S.O_DIRECTORY + S.O_RDONLY)
+  if err then return nil, err, errno end
+  d, err, errno = fd:getdents()
+  if err then return nil, err, errno end
+  _, err, errno = fd:close()
+  if err then return nil, err, errno end
+  return d
+end
+
 -- methods on an fd
 local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',

@@ -401,9 +401,8 @@ a = S.sockaddr_nl()
 assert(s:bind(a))
 assert(s:close())
 
--- getdents, Linux only
-fd = assert(S.open("/dev", S.O_DIRECTORY + S.O_RDONLY))
-local d = assert(fd:getdents())
+-- getdents, Linux only, via dirfile interface
+local d = assert(S.dirfile("/dev"))
 assert(d.zero, "expect to find /dev/zero")
 assert(d["."], "expect to find .")
 assert(d[".."], "expect to find ..")
