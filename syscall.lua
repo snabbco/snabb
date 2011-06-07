@@ -34,7 +34,7 @@ S.O_DSYNC     = octal('010000')
 S.O_RSYNC     = S.O_SYNC
 
 -- these are arch dependent!
-if ffi.arch == "x86" or ffi.arch="x64" then
+if ffi.arch == "x86" or ffi.arch == "x64" then
   S.O_DIRECTORY = octal('0200000')
   S.O_NOFOLLOW  = octal('0400000')
   S.O_DIRECT    = octal('040000')
