@@ -252,12 +252,12 @@ assert(S.string(buf, n) == string, "we should read back the same string that was
 -- test scatter gather
 local b0 = S.t.buffer(4, "test")
 local b1 = S.t.buffer(3, "ing")
-local io = S.t.iovec(2, {iov_base = b0, iov_len = 4}, {iov_base = b1, iov_len = 3})
+local io = S.t.iovec(2, {{iov_base = b0, iov_len = 4}, {iov_base = b1, iov_len = 3}})
 n = assert(c:writev(io, 2))
 assert(n == 7, "expect writev to write 7 bytes")
 b0 = S.t.buffer(3)
 b1 = S.t.buffer(4)
-io = S.t.iovec(2, {iov_base = b0, iov_len = 3}, {iov_base = b1, iov_len = 4})
+io = S.t.iovec(2, {{iov_base = b0, iov_len = 3}, {iov_base = b1, iov_len = 4}})
 n = assert(a.fd:readv(io, 2))
 assert(n == 7, "expect readv to read 7 bytes")
 assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get back same stuff")
@@ -397,8 +397,28 @@ local i = assert(S.sysinfo())
 
 -- netlink sockets, Linux only
 s = assert(S.socket("AF_NETLINK", "SOCK_RAW", "NETLINK_ROUTE"))
-a = S.sockaddr_nl()
+a = S.sockaddr_nl() -- kernel will fill in address
 assert(s:bind(a))
+local k = S.sockaddr_nl() -- kernel destination
+local buf, len, hdr, gen = S.tbuffer("struct nlmsghdr", "struct rtgenmsg") -- allocates buffer for named types and returns cast pointers
+
+hdr.nlmsg_len = len
+hdr.nlmsg_type = S.RTM_GETLINK
+hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_DUMP
+hdr.nlmsg_seq = 1
+hdr.nlmsg_pid = S.getpid()
+gen.rtgen_family = S.AF_PACKET
+
+local io = S.t.iovec(1, {{iov_base = buf, iov_len = len}})
+
+local m = S.t.msghdr()
+m.msg_iov = io
+m.msg_iovlen = 1
+m.msg_name = k
+m.msg_namelen = S.sizeof(k)
+
+assert(s:sendmsg(m))
+
 assert(s:close())
 
 -- getdents, Linux only, via dirfile interface

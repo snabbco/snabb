@@ -232,6 +232,112 @@ S.DT_LNK = 10
 S.DT_SOCK = 12
 S.DT_WHT = 14
 
+-- netlink
+S.NLM_F_REQUEST = 1
+S.NLM_F_MULTI   = 2
+S.NLM_F_ACK     = 4
+S.NLM_F_ECHO    = 8
+
+S.NLM_F_ROOT    = 0x100
+S.NLM_F_MATCH   = 0x200
+S.NLM_F_ATOMIC  = 0x400
+S.NLM_F_DUMP    = bit.bor(S.NLM_F_ROOT, S.NLM_F_MATCH)
+
+S.NLM_F_REPLACE = 0x100
+S.NLM_F_EXCL    = 0x200
+S.NLM_F_CREATE  = 0x400
+S.NLM_F_APPEND  = 0x800
+
+-- generic types. not defined as enums as overloaded for different protocols, and need to be 16 bit
+S.NLMSG_NOOP     = 0x1
+S.NLMSG_ERROR    = 0x2
+S.NLMSG_DONE     = 0x3
+S.NLMSG_OVERRUN  = 0x4
+-- routing
+S.RTM_NEWLINK     = 16
+S.RTM_DELLINK     = 17
+S.RTM_GETLINK     = 18
+S.RTM_SETLINK     = 19
+S.RTM_NEWADDR     = 20
+S.RTM_DELADDR     = 21
+S.RTM_GETADDR     = 22
+S.RTM_NEWROUTE    = 24
+S.RTM_DELROUTE    = 25
+S.RTM_GETROUTE    = 26
+S.RTM_NEWNEIGH    = 28
+S.RTM_DELNEIGH    = 29
+S.RTM_GETNEIGH    = 30
+S.RTM_NEWRULE     = 32
+S.RTM_DELRULE     = 33
+S.RTM_GETRULE     = 34
+S.RTM_NEWQDISC    = 36
+S.RTM_DELQDISC    = 37
+S.RTM_GETQDISC    = 38
+S.RTM_NEWTCLASS   = 40
+S.RTM_DELTCLASS   = 41
+S.RTM_GETTCLASS   = 42
+S.RTM_NEWTFILTER  = 44
+S.RTM_DELTFILTER  = 45
+S.RTM_GETTFILTER  = 46
+S.RTM_NEWACTION   = 48
+S.RTM_DELACTION   = 49
+S.RTM_GETACTION   = 50
+S.RTM_NEWPREFIX   = 52
+S.RTM_GETMULTICAST = 58
+S.RTM_GETANYCAST  = 62
+S.RTM_NEWNEIGHTBL = 64
+S.RTM_GETNEIGHTBL = 66
+S.RTM_SETNEIGHTBL = 67
+S.RTM_NEWNDUSEROPT = 68
+S.RTM_NEWADDRLABEL = 72
+S.RTM_DELADDRLABEL = 73
+S.RTM_GETADDRLABEL = 74
+S.RTM_GETDCB = 78
+S.RTM_SETDCB = 79
+
+-- need address families as constants too (? derive from enums?)
+S.AF_UNSPEC     = 0
+S.AF_LOCAL      = 1
+S.AF_UNIX       = S.AF_LOCAL
+S.AF_FILE       = S.AF_LOCAL
+S.AF_INET       = 2
+S.AF_AX25       = 3
+S.AF_IPX        = 4
+S.AF_APPLETALK  = 5
+S.AF_NETROM     = 6
+S.AF_BRIDGE     = 7
+S.AF_ATMPVC     = 8
+S.AF_X25        = 9
+S.AF_INET6      = 10
+S.AF_ROSE       = 11
+S.AF_DECnet     = 12
+S.AF_NETBEUI    = 13
+S.AF_SECURITY   = 14
+S.AF_KEY        = 15
+S.AF_NETLINK    = 16
+S.AF_ROUTE      = S.AF_NETLINK
+S.AF_PACKET     = 17
+S.AF_ASH        = 18
+S.AF_ECONET     = 19
+S.AF_ATMSVC     = 20
+S.AF_RDS        = 21
+S.AF_SNA        = 22
+S.AF_IRDA       = 23
+S.AF_PPPOX      = 24
+S.AF_WANPIPE    = 25
+S.AF_LLC        = 26
+S.AF_CAN        = 29
+S.AF_TIPC       = 30
+S.AF_BLUETOOTH  = 31
+S.AF_IUCV       = 32
+S.AF_RXRPC      = 33
+S.AF_ISDN       = 34
+S.AF_PHONET     = 35
+S.AF_IEEE802154 = 36
+S.AF_CAIF       = 37
+S.AF_ALG        = 38
+S.AF_MAX        = 39
+
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
@@ -433,14 +539,24 @@ struct sockaddr_in6 {
   uint32_t sin6_scope_id;
 };
 struct sockaddr_un {
-  sa_family_t sun_family;     /* AF_UNIX */
-  char        sun_path[108];  /* pathname */
+  sa_family_t sun_family;
+  char        sun_path[108];
 };
 struct sockaddr_nl {
-  sa_family_t     nl_family;      /* AF_NETLINK   */
-  unsigned short  nl_pad;         /* zero         */
-  uint32_t        nl_pid;         /* port ID      */
-  uint32_t        nl_groups;      /* multicast groups mask */
+  sa_family_t     nl_family;
+  unsigned short  nl_pad;
+  uint32_t        nl_pid;
+  uint32_t        nl_groups;
+};
+struct nlmsghdr {
+  uint32_t           nlmsg_len;
+  uint16_t           nlmsg_type;
+  uint16_t           nlmsg_flags;
+  uint32_t           nlmsg_seq;
+  uint32_t           nlmsg_pid;
+};
+struct rtgenmsg {
+  unsigned char           rtgen_family;
 };
 struct linux_dirent {
   long           d_ino;
@@ -1050,6 +1166,8 @@ local stat_t = ffi.typeof("struct stat")
 local epoll_event_t = ffi.typeof("struct epoll_event")
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 local off_t = ffi.typeof("off_t")
+local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
+local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
 
 --[[ -- used to generate tests, will refactor into test code later
 print("eq (sizeof(struct timespec), " .. ffi.sizeof(timespec_t) .. ");")
@@ -1775,6 +1893,10 @@ function cmsg_nxthdr(msg, mc, cmsg)
   return mc, cmsg
 end
 
+-- similar functions for netlink messages
+-- nlmsg_length is just length, as the header is already a multiple of the alignment
+ 
+
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
     msg = msghdr_t()
@@ -1927,6 +2049,22 @@ function S.dirfile(name) -- return the directory entries in a file
   return d
 end
 
+-- use string types for now
+local threc -- helper for returning varargs
+function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
+  if not t then return nil end
+  if select("#", ...) == 0 then return ffi.cast(ffi.typeof(t .. "*"), buf + offset) end
+  return ffi.cast(ffi.typeof(t .. "*"), buf + offset), threc(buf, offset + ffi.sizeof(t), ...)
+end
+function S.tbuffer(...) -- helper function for sequence of types in a buffer
+  local len = 0
+  for i, t in ipairs{...} do
+    len = len + ffi.sizeof(ffi.typeof(t)) -- alignment issues, need to round up to minimum alignment
+  end
+  local buf = buffer_t(len)
+  return buf, len, threc(buf, 0, ...)
+end
+
 -- methods on an fd
 local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
@@ -1946,7 +2084,7 @@ S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
   iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
-  sockaddr_nl = sockaddr_nl_t
+  sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t
 }
 
 return S
