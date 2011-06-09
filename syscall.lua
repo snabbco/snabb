@@ -1091,6 +1091,8 @@ int fsync(int fd);
 int fdatasync(int fd);
 int fcntl(int fd, enum F cmd, long arg); /* arg can be a pointer though */
 int fchmod(int fd, mode_t mode);
+int truncate(const char *path, off_t length);
+int ftruncate(int fd, off_t length);
 
 int socket(enum AF domain, enum SOCK type, int protocol);
 int socketpair(enum AF domain, enum SOCK type, int protocol, int sv[2]);
@@ -1440,6 +1442,8 @@ function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.acct(filename) return retbool(C.acct(filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, mode)) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
+function S.truncate(path, length) return retbool(C.truncate(path, length)) end
+function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 
 function S.fork() return retint(C.fork()) end
 function S.execve(filename, argv, envp)
@@ -2112,7 +2116,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
-                   'eventfd_read', 'eventfd_write'
+                   'eventfd_read', 'eventfd_write', 'ftruncate'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end

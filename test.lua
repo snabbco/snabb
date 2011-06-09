@@ -134,11 +134,12 @@ local ss = assert(S.readfile(tmpfile))
 assert(ss == "this is a string", "readfile should get back what writefile wrote")
 assert(S.unlink(tmpfile))
 
-
 fd = assert(S.pipe())
 assert(fd[1].fd == 3 and fd[2].fd == 4, "expect file handles 3 and 4 for pipe")
 assert(fd[1]:close())
 assert(fd[2]:close())
+
+local cwd = assert(S.getcwd())
 
 assert(S.chdir("/"))
 fd = assert(S.open("/"))
@@ -146,12 +147,10 @@ assert(fd:fchdir())
 
 assert(S.getcwd(buf, size))
 assert(S.string(buf) == "/", "expect cwd to be /")
-s= assert(S.getcwd())
+s = assert(S.getcwd())
 assert(s == "/", "expect cwd to be /")
 
-local rem
-rem = assert(S.nanosleep(S.t.timespec(0, 1000000)))
-assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
+assert(S.chdir(cwd)) -- return to original directory
 
 local stat
 
@@ -163,6 +162,7 @@ assert(stat.st_size == 4096, "expect / to be size 4096") -- might not be
 assert(stat.st_gid == 0, "expect / to be gid 0 is " .. tonumber(stat.st_gid))
 assert(stat.st_uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
 assert(S.S_ISDIR(stat.st_mode), "expect / to be a directory")
+assert(fd:close())
 
 stat = assert(S.stat("/dev/zero"))
 assert(S.major(stat.st_rdev) == 1, "expect major number of /dev/zero to be 1")
@@ -172,6 +172,25 @@ assert(stat.st_rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
 
 stat = assert(S.lstat("/etc/passwd"))
 assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
+
+-- test truncate
+local s = "this is a string"
+assert(S.writefile(tmpfile, s, S.S_IRWXU))
+stat = assert(S.stat(tmpfile))
+assert(stat.st_size == #s, "expect to get size of written string")
+assert(S.truncate(tmpfile, 1))
+stat = assert(S.stat(tmpfile))
+assert(stat.st_size == 1, "expect get truncated size")
+fd = assert(S.open(tmpfile, S.O_RDWR))
+assert(fd:ftruncate(1024))
+stat = assert(fd:fstat())
+assert(stat.st_size == 1024, "expect get truncated size")
+assert(S.unlink(tmpfile))
+assert(fd:close())
+
+local rem
+rem = assert(S.nanosleep(S.t.timespec(0, 1000000)))
+assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
 
 -- mmap and related functions
 local mem, mem2
