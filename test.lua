@@ -430,6 +430,9 @@ s = assert(S.socket("AF_NETLINK", "SOCK_RAW", "NETLINK_ROUTE"))
 a = S.sockaddr_nl() -- kernel will fill in address
 assert(s:bind(a))
 local k = S.sockaddr_nl() -- kernel destination
+
+-- we should be adding padding at the end of size nlmsg_alignto (4), (and in middle but 0) or will have issues if try to send more messages.
+-- so need to add pad size to tbuffer function
 local buf, len, hdr, gen = S.tbuffer("struct nlmsghdr", "struct rtgenmsg") -- allocates buffer for named types and returns cast pointers
 
 hdr.nlmsg_len = len

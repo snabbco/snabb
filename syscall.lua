@@ -2060,14 +2060,18 @@ function S.S_ISFIFO(m) return bit.band(m, S.S_IFFIFO) ~= 0 end
 function S.S_ISLNK(m)  return bit.band(m, S.S_IFLNK)  ~= 0 end
 function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 
+local align
+function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
+
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsg_align, cmsg_space, cmsg_len, cmsg_firsthdr, cmsg_nxthdr
 local cmsg_hdrsize = ffi.sizeof(cmsghdr_t(0))
 if ffi.abi('32bit') then
-  function cmsg_align(len) return bit.band(tonumber(len) + 3, bit.bnot(3)) end
+  function cmsg_align(len) return align(len, 4) end
 else
-  function cmsg_align(len) return bit.band(tonumber(len) + 7, bit.bnot(7)) end
+  function cmsg_align(len) return align(len, 8) end
 end
+
 local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
 function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
 function cmsg_len(len) return cmsg_ahdr + len end
@@ -2082,24 +2086,28 @@ function cmsg_firsthdr(msg)
   return mc, cmsg
 end
 
-function cmsg_nxthdr(msg, mc, cmsg)
+function cmsg_nxthdr(msg, buf, cmsg)
   if cmsg.cmsg_len < cmsg_hdrsize then return nil end -- invalid cmsg
-  mc = mc + cmsg_align(cmsg.cmsg_len) -- find next cmsg
-  if mc + cmsg_hdrsize > msg.msg_control + msg.msg_controllen then return nil end -- header would not fit
-  cmsg = ffi.cast(cmsghdr_pt, mc)
-  if mc + cmsg_align(cmsg.cmsg_len) > msg.msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
-  return mc, cmsg
+  buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
+  if buf + cmsg_hdrsize > msg.msg_control + msg.msg_controllen then return nil end -- header would not fit
+  cmsg = ffi.cast(cmsghdr_pt, buf)
+  if buf + cmsg_align(cmsg.cmsg_len) > msg.msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
+  return buf, cmsg
 end
 
 -- similar functions for netlink messages
--- nlmsg_length is just length, as the header is already a multiple of the alignment
+local nlmsg_align = function(len) return align(len, 4) end
+local nlmsg_hdrlen = nlmsg_align(ffi.sizeof(nlmsghdr_t))
+local nlmsg_length = function(len) return len + nlmsg_hdrlen end -- not really needed.
 
 local nlmsg_ok = function(msg, len)
-  return len >= ffi.sizeof(nlmsghdr_t) and msg.nlmsg_len >= ffi.sizeof(nlmsghdr_t) and msg.nlmsg_len <= len
+  return len >= nlmsg_hdrlen and msg.nlmsg_len >= nlmsg_hdrlen and msg.nlmsg_len <= len
 end
 
-
-
+local nlmsg_next = function(msg, buf, len)
+  local inc = nlmsg_align(msg.nlmsg_len)
+  return ffi.cast(nlmsghdr_pt, buf + inc), buf + inc, len - inc
+end
 
 -- exposed to users to retrieve netlink messages from a buffer
 function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that useful
@@ -2111,37 +2119,20 @@ function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that 
     local r = {mtype = t, seq = tonumber(msg.nlmsg_seq), pid = tonumber(msg.nlmsg_pid), flags = tonumber(msg.nlmsg_flags)}
     if nlmsgtypes[t] then r[nlmsgtypes[t]] = true end
 
+    if msg.nlmsg_len - nlmsg_hdrlen > 0 then
+      r.payload = buffer_t(msg.nlmsg_len - nlmsg_hdrlen)
+      ffi.copy(r.payload, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen)
+    end
+
     if r.RTM_NEWLINK then print("got newlink msg") end
 
     ret[#ret + 1] = r
     if r.NLMSG_DONE then done = true end
     print("got one")
-    break;
+    msg, buffer, len = nlmsg_next(msg, buffer, len)
   end
   return ret
 end
---[[
- if (len)
-    {
-      for (msg_ptr = (struct nlmsghdr *) reply; NLMSG_OK(msg_ptr, len); msg_ptr = NLMSG_NEXT(msg_ptr, len))
-        {
-          switch(msg_ptr->nlmsg_type)
-          {
-        case 3:        /* this is the NLMSG_DONE end msg */
-          end++;
-          break;
-        case 16:    /* this is the RTM_NEWLINK msg */
-          rtnl_print_link(msg_ptr);
-          break;
-        default:    /* for education only,
-                   should not happen here */
-          printf("message type %d, length %d\n", msg_ptr->nlmsg_type, msg_ptr->nlmsg_len);
-          break;
-          }
-        }
-    }
-]]
-
 
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
