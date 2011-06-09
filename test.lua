@@ -484,7 +484,8 @@ assert(n == 0, "eventfd should return 0 again")
 
 assert(fd:close())
 
-
+local syslog = assert(S.klogctl(3))
+assert(#syslog > 20, "should be something in syslog")
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 

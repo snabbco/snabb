@@ -1100,6 +1100,7 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 int eventfd(unsigned int initval, int flags);
 int reboot(enum LINUX_REBOOT_CMD cmd);
+int klogctl(int type, char *bufp, int len);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -1873,6 +1874,22 @@ function S.eventfd_write(fd, value)
   if not value then value = 1 end
   if type(value) == "number" then value = uint64_1t(value) end
   return retbool(C.write(getfd(fd), value, 8))
+end
+
+-- this is the glibc name for the syslog syscall
+function S.klogctl(t, buf, len)
+  if not buf and (t == 2 or t == 3 or t == 4) then
+    if not len then
+      len = C.klogctl(10, nil, 0) -- get size so we can allocate buffer
+      if len == -1 then return errorret() end
+    end
+    buf = buffer_t(len)
+  end
+  local ret = C.klogctl(t, buf or nil, len or 0)
+  if ret == -1 then return errorret() end
+  if t == 9 or t == 10 then return tonumber(ret) end
+  if t == 2 or t == 3 or t == 4 then return ffi.string(buf, ret) end
+  return true
 end
 
 if rt then -- real time functions not in glibc in Linux, check if available. N/A on OSX.
