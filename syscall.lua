@@ -1444,7 +1444,7 @@ function S.syscall(num, ...)
   -- call with the right types, use at your own risk
   local a, b, c, d, e, f = ...
   local ret = C.syscall(num, a, b, c, d, e, f)
-  if ret < 0 then return nil, -ret, S.strerror(-ret) end
+  if ret == -1 then return errorret() end
   return ret
 end
 
@@ -1457,7 +1457,7 @@ function S.getdents(fd, buf, size)
   local ret
   repeat
     ret = C.syscall("SYS_getdents", uint_t(getfd(fd)), buf, uint_t(size))
-    if ret < 0 then return nil, -ret, S.strerror(-ret) end
+    if ret == -1 then return errorret() end
     local i = 0
     while i < ret do
       local dp = ffi.cast(linux_dirent_pt, buf + i)

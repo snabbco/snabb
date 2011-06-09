@@ -419,6 +419,9 @@ m.msg_namelen = S.sizeof(k)
 
 assert(s:sendmsg(m))
 
+
+
+
 assert(s:close())
 
 -- getdents, Linux only, via dirfile interface
@@ -429,6 +432,12 @@ assert(d[".."], "expect to find ..")
 assert(d.zero.DT_CHR, "/dev/zero is a character device")
 assert(d["."].DT_DIR, ". is a directory")
 assert(d[".."].DT_DIR, ".. is a directory")
+
+-- add test for failing system call to check return values
+fd = assert(S.open("/etc/passwd", S.O_RDONLY))
+local d, err, errno = fd:getdents()
+assert(errno == S.errno("ENOTDIR"), "/etc/passwd should give a not directory error")
+
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 
