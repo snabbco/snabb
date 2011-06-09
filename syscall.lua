@@ -1069,6 +1069,7 @@ int clock_getres(enum CLOCK clk_id, struct timespec *res); // was clockid_t clk_
 int clock_gettime(enum CLOCK clk_id, struct timespec *tp); // was clockid_t clk_id
 int clock_settime(enum CLOCK clk_id, const struct timespec *tp); // was clockid_t clk_id
 int sysinfo(struct sysinfo *info);
+void sync(void);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -1880,6 +1881,7 @@ S.getppid = C.getppid
 S.getgid = C.getgid
 S.getegid = C.getegid
 S.umask = C.umask
+S.sync = C.sync
 
 -- 'macros' and helper functions etc
 

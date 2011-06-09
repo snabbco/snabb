@@ -32,6 +32,8 @@ assert(fd2.fd == 4, "should get file descriptor 4 back from second open")
 -- normal close
 assert(fd:close())
 
+S.sync() -- cannot fail...
+
 -- test double close fd
 fd, err = S.close(3)
 assert(err, "expected to fail on close already closed fd")
