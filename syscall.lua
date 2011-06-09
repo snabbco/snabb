@@ -1093,6 +1093,7 @@ int fcntl(int fd, enum F cmd, long arg); /* arg can be a pointer though */
 int fchmod(int fd, mode_t mode);
 int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
+int pause(void);
 
 int socket(enum AF domain, enum SOCK type, int protocol);
 int socketpair(enum AF domain, enum SOCK type, int protocol, int sv[2]);
@@ -1444,6 +1445,7 @@ function S.chmod(path, mode) return retbool(C.chmod(path, mode)) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
+function S.pause() return retbool(C.pause()) end
 
 function S.fork() return retint(C.fork()) end
 function S.execve(filename, argv, envp)
