@@ -11,7 +11,7 @@ assert(h == u.nodename, "gethostname did not return nodename")
 assert(S.signal("SIGPIPE", "SIG_IGN"))
 
 -- test open non existent file
-fd, err, errno = S.open("/tmp/file/does/not/exist", S.O_RDONLY)
+fd, err, errno = S.open("/tmp/file/does/not/exist", "rdonly")
 assert(err, "expected open to fail on file not found")
 assert(err == S.strerror('ENOENT'), "expect ENOENT from open non existent file")
 
@@ -21,12 +21,12 @@ assert(err, "expected to fail on close invalid fd")
 assert(errno == S.errno('EBADF'), "expect EBADF from invalid numberic fd") -- test the error functions other way
 
 -- test open and close valid file
-fd = assert(S.open("/dev/null", S.O_RDONLY))
+fd = assert(S.open("/dev/null", "rdonly"))
 assert(type(fd) == 'cdata', "should get a cdata object back from open")
 assert(fd.fd == 3, "should get file descriptor 3 back from first open")
 
 -- another open
-fd2 = assert(S.open("/dev/zero", S.O_RDONLY))
+fd2 = assert(S.open("/dev/zero", "RDONLY"))
 assert(fd2.fd == 4, "should get file descriptor 4 back from second open")
 
 -- normal close
@@ -76,7 +76,7 @@ n = assert(S.read(3, buf, size))
 assert(S.close(3))
 
 -- another open
-fd = assert(S.open("/dev/zero", S.O_RDWR))
+fd = assert(S.open("/dev/zero", "RDWR"))
 -- test write
 n = assert(fd:write(buf, size))
 assert(n >= 0, "should not get error writing to /dev/zero")

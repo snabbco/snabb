@@ -1314,6 +1314,7 @@ end
 -- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
 local stringflags
 function stringflags(str, prefix)
+  if not str then return 0 end
   if type(str) ~= "string" then return str end
   local f = 0
   local a = split(",", str)
@@ -1499,7 +1500,7 @@ S.in6addr_any = in6_addr_t()
 S.in6addr_loopback = S.inet_pton("AF_INET6", "::1") -- no assert, may fail if no inet6 support
 
 -- main definitions start here
-function S.open(pathname, flags, mode) return retfd(C.open(pathname, flags or 0, mode or 0)) end
+function S.open(pathname, flags, mode) return retfd(C.open(pathname, stringflags(flags, "O_"), mode or 0)) end
 
 function S.dup(oldfd, newfd, flags)
   if newfd == nil then return retfd(C.dup(getfd(oldfd))) end
@@ -1884,7 +1885,7 @@ function S.select(s) -- note same structure as returned
 end
 
 function S.mount(source, target, filesystemtype, mountflags, data)
-  return retbool(C.mount(source, target, filesystemtype, stringflags(mountflags, "MS_") or 0, data or nil))
+  return retbool(C.mount(source, target, filesystemtype, stringflags(mountflags, "MS_"), data or nil))
 end
 
 function S.umount(target, flags)
