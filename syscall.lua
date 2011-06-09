@@ -1050,6 +1050,7 @@ int unlink(const char *pathname);
 int acct(const char *filename);
 int chmod(const char *path, mode_t mode);
 int link(const char *oldpath, const char *newpath);
+int symlink(const char *oldpath, const char *newpath);
 int chroot(const char *path);
 mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
@@ -1463,6 +1464,7 @@ function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.acct(filename) return retbool(C.acct(filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, mode)) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
+function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 function S.pause() return retbool(C.pause()) end
