@@ -419,7 +419,7 @@ m.msg_namelen = S.sizeof(k)
 
 assert(s:sendmsg(m))
 
-
+-- finish this
 
 
 assert(s:close())
@@ -437,7 +437,7 @@ assert(d[".."].DT_DIR, ".. is a directory")
 fd = assert(S.open("/etc/passwd", S.O_RDONLY))
 local d, err, errno = fd:getdents()
 assert(errno == S.errno("ENOTDIR"), "/etc/passwd should give a not directory error")
-
+assert(fd:close())
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 
@@ -457,7 +457,9 @@ assert(S.sethostname(hh))
 assert(hh == assert(S.gethostname()))
 assert(S.sethostname(h))
 
+assert(S.chroot("/"))
+
 S.exit("EXIT_SUCCESS")
 
--- note tests missing whether setting SIG_IGN works. setting time TODO
+-- note tests missing whether setting SIG_IGN works. setting time, ioctl TODO
 

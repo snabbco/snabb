@@ -1030,6 +1030,7 @@ int unlink(const char *pathname);
 int acct(const char *filename);
 int chmod(const char *path, mode_t mode);
 int link(const char *oldpath, const char *newpath);
+int chroot(const char *path);
 mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
 int gethostname(char *name, size_t len);
@@ -1113,6 +1114,8 @@ char *getcwd(char *buf, size_t size);
 int nanosleep(const struct timespec *req, struct timespec *rem);
 
 int syscall(enum SYS number, ...);
+
+int ioctl(int d, int request, void *argp); /* void* easiest here */
 
 // stat glibc internal functions
 int __fxstat(int ver, int fd, struct stat *buf);
@@ -1447,6 +1450,14 @@ function S.syscall(num, ...)
   return ret
 end
 
+-- do not export?
+function S.ioctl(d, request, argp)
+  local ret = C.ioctl(d, request, argp)
+  if ret == -1 then return errorret() end
+  -- some different return types may need to be handled
+  return true
+end
+
 function S.getdents(fd, buf, size)
   if not buf then
     size = size or 4096
@@ -1573,6 +1584,8 @@ function S.fstat(fd, buf)
   if ret == -1 then return errorret() end
   return buf
 end
+
+function S.chroot(path) return retbool(C.chroot(path)) end
 
 function S.getcwd(buf, size)
   local ret = C.getcwd(buf, size or 0)
