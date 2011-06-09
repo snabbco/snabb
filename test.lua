@@ -311,6 +311,8 @@ assert(#r.fd == 1, "expect to get one file descriptor back")
 assert(r.fd[1]:close())
 assert(r.pid == S.getpid(), "should get my pid from sent credentals")
 
+assert(sv[1]:shutdown("SHUT_RDWR"))
+
 assert(sv[1]:close())
 assert(sv[2]:close())
 

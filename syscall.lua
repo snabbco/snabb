@@ -691,6 +691,11 @@ enum SOCK {
   SOCK_DCCP      = 6,
   SOCK_PACKET    = 10,
 };
+enum SHUT {
+  SHUT_RD = 0,
+  SHUT_WR,
+  SHUT_RDWR
+};
 enum AF {
   AF_UNSPEC     = 0,
   AF_LOCAL      = 1,
@@ -1116,6 +1121,7 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
 int getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+int shutdown(int sockfd, enum SHUT how);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
@@ -1674,6 +1680,8 @@ function S.connect(sockfd, addr, addrlen)
   return retbool(C.connect(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
+function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), how)) end
+
 function S.accept(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
@@ -2133,7 +2141,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
-                   'eventfd_read', 'eventfd_write', 'ftruncate'
+                   'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
