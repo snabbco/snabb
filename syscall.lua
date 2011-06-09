@@ -1734,10 +1734,10 @@ end
 function S.munmap(addr, length)
   return retbool(C.munmap(ffi.gc(addr, nil), length)) -- remove gc on unmap
 end
-function S.msync(addr, length, flags) return retbool(C.msync(addr, length, flags)) end
+function S.msync(addr, length, flags) return retbool(C.msync(addr, length, stringflags(flags, "MS_"))) end
 function S.mlock(addr, len) return retbool(C.mlock(addr, len)) end
 function S.munlock(addr, len) return retbool(C.munlock(addr, len)) end
-function S.mlockall(flags) return retbool(C.mlockall(flags)) end
+function S.mlockall(flags) return retbool(C.mlockall(stringflags(flags, "MCL_"))) end
 function S.munlockall() return retbool(C.munlockall()) end
 function S.mremap(old_address, old_size, new_size, flags, new_address) return retptr(C.mremap(old_address, old_size, new_size, flags, new_address)) end
 function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, advice)) end

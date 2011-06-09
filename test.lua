@@ -202,7 +202,7 @@ size = 4096
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 assert(S.munmap(mem, size))
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-assert(S.msync(mem, size, S.MS_SYNC))
+assert(S.msync(mem, size, "sync"))
 assert(S.madvise(mem, size, "MADV_RANDOM"))
 mem = nil -- gc memory, should be munmapped
 collectgarbage("collect")
@@ -396,7 +396,7 @@ local efile = "/tmp/tmpXXYYY.sh"
 pid = assert(S.fork())
 if (pid == 0) then -- child
   S.unlink(efile)
-  fd = assert(S.creat(efile, S.S_IRWXU))
+  fd = assert(S.creat(efile, "IRWXU"))
   local script = [[
 #!/bin/sh
 
@@ -504,7 +504,7 @@ assert(S.mlock(mem, size))
 assert(S.munlock(mem, size))
 assert(S.munmap(mem, size))
 
-assert(S.mlockall(S.MCL_CURRENT))
+assert(S.mlockall("current"))
 assert(S.munlockall())
 
 local hh = "testhostname"
