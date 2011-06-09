@@ -610,6 +610,14 @@ struct nlmsghdr {
 struct rtgenmsg {
   unsigned char           rtgen_family;
 };
+struct ifinfomsg {
+  unsigned char   ifi_family;
+  unsigned char   __ifi_pad;
+  unsigned short  ifi_type;
+  int             ifi_index;
+  unsigned        ifi_flags;
+  unsigned        ifi_change;
+};
 struct linux_dirent {
   long           d_ino;
   off_t          d_off;
@@ -1251,6 +1259,7 @@ local off_t = ffi.typeof("off_t")
 local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
 local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
+local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
 
 --[[ -- used to generate tests, will refactor into test code later
 print("eq (sizeof(struct timespec), " .. ffi.sizeof(timespec_t) .. ");")
@@ -2112,33 +2121,12 @@ end
 local nlmsg_data_decode = {}
 nlmsg_data_decode["RTM_NEWLINK"] = function(r)
   print("got newlink msg")
+
+  local iface = ffi.cast(ifinfomsg_pt, r.data)
+
+  
   return r
 end
-
--- exposed to users to retrieve netlink messages from a buffer
-function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that useful
-  local ret = {}
-  local msg = ffi.cast(nlmsghdr_pt, buffer)
-  local done = false
-  while not done and nlmsg_ok(msg, len) do
-    local t = tonumber(msg.nlmsg_type)
-    local r = {mtype = t, seq = tonumber(msg.nlmsg_seq), pid = tonumber(msg.nlmsg_pid), flags = tonumber(msg.nlmsg_flags)}
-    if nlmsgtypes[t] then r[nlmsgtypes[t]] = true end
-
-    if msg.nlmsg_len - nlmsg_hdrlen > 0 then
-      r.data = buffer_t(msg.nlmsg_len - nlmsg_hdrlen)
-      ffi.copy(r.data, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) -- raw payload data
-    end
-
-    if nlmsg_data_decode[nlmsgtypes[t]] then r = nlmsg_data_decode[nlmsgtypes[t]](r) end
-
-    ret[#ret + 1] = r
-    if r.NLMSG_DONE then done = true end
-    msg, buffer, len = nlmsg_next(msg, buffer, len)
-  end
-  return ret
-end
-
 
 --[[
 void
@@ -2166,6 +2154,31 @@ rtnl_print_link(struct nlmsghdr *h)
 ]]
 
 
+
+-- exposed to users to retrieve netlink messages from a buffer
+function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that useful
+  local ret = {}
+  local msg = ffi.cast(nlmsghdr_pt, buffer)
+  local done = false
+  while not done and nlmsg_ok(msg, len) do
+    local t = tonumber(msg.nlmsg_type)
+    local r = {mtype = t, seq = tonumber(msg.nlmsg_seq), pid = tonumber(msg.nlmsg_pid), flags = tonumber(msg.nlmsg_flags)}
+    if nlmsgtypes[t] then r[nlmsgtypes[t]] = true end
+
+    r.datalen = msg.nlmsg_len - nlmsg_hdrlen
+    if r.datalen > 0 then
+      r.data = buffer_t(r.datalen)
+      ffi.copy(r.data, buffer + nlmsg_hdrlen, r.datalen) -- raw payload data
+    end
+
+    if nlmsg_data_decode[nlmsgtypes[t]] then r = nlmsg_data_decode[nlmsgtypes[t]](r) end
+
+    ret[#ret + 1] = r
+    if r.NLMSG_DONE then done = true end
+    msg, buffer, len = nlmsg_next(msg, buffer, len)
+  end
+  return ret
+end
 
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
