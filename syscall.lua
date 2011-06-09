@@ -1290,6 +1290,43 @@ assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_nl_t))
 -- misc
 local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
+local split, trim
+function split(delimiter, text)
+  if delimiter == "" then return text end
+  local list = {}
+  local pos = 1
+  while true do
+    local first, last = text:find(delimiter, pos)
+    if first then
+      list[#list + 1] = text:sub(pos, first - 1)
+      pos = last + 1
+    else
+      list[#list + 1] = text:sub(pos)
+      break
+    end
+  end
+  return list
+end
+function trim (s)
+  return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
+-- take a bunch of flags in a string and return a number
+-- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
+local stringflags
+function stringflags(str, prefix)
+  if type(str) ~= "string" then return str end
+  local f = 0
+  local a = split(",", str)
+  for i, v in ipairs(a) do
+    local s = trim(v)
+    if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
+    local val = S[s:upper()]
+    if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
+  end
+  return f
+end
+
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
   function S.htonl(b) return b end
@@ -1847,7 +1884,7 @@ function S.select(s) -- note same structure as returned
 end
 
 function S.mount(source, target, filesystemtype, mountflags, data)
-  return retbool(C.mount(source, target, filesystemtype, mountflags or 0, data or nil))
+  return retbool(C.mount(source, target, filesystemtype, stringflags(mountflags, "MS_") or 0, data or nil))
 end
 
 function S.umount(target, flags)
