@@ -1571,7 +1571,7 @@ end
 
 function S.reboot(cmd) return retbool(C.reboot(cmd)) end
 
-function S.getdents(fd, buf, size)
+function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
   if not buf then
     size = size or 4096
     buf = buffer_t(size)
@@ -1592,7 +1592,7 @@ function S.getdents(fd, buf, size)
       d[ffi.string(dp.d_name)] = dd
       i = i + dp.d_reclen
     end
-  until ret == 0
+  until noiter or ret == 0
   return d
 end
 
