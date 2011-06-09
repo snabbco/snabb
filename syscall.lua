@@ -1225,6 +1225,8 @@ local uint64_t = ffi.typeof("uint64_t")
 local int32_pt = ffi.typeof("int32_t *")
 local int64_1t = ffi.typeof("int64_t[1]")
 local uint64_1t = ffi.typeof("uint64_t[1]")
+local socklen1_t = ffi.typeof("socklen_t[1]")
+
 local string_array_t = ffi.typeof("const char *[?]")
 
 -- enums, not sure if there is a betetr way to convert
@@ -1581,6 +1583,14 @@ function S.setsockopt(fd, level, optname, optval, optlen)
     optlen = ffi.sizeof(int1_t)
   end
   return retbool(C.setsockopt(getfd(fd), level, optname, optval, optlen))
+end
+
+function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool options
+  local optval, optlen = int1_t(), socklen1_t()
+  optlen[0] = ffi.sizeof(int1_t)
+  local ret = C.getsockopt(getfd(fd), level, optname, optval, optlen)
+  if ret == -1 then return errorret() end
+  return tonumber(optval[0]) -- no special case for bool
 end
 
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
@@ -2141,7 +2151,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
-                   'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown'
+                   'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end

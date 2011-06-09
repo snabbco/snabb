@@ -300,6 +300,8 @@ assert(a.fd:close())
 local sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
 
 assert(sv[2]:setsockopt(S.SOL_SOCKET, S.SO_PASSCRED, true)) -- enable receive creds
+local so = assert(sv[2]:getsockopt(S.SOL_SOCKET, S.SO_PASSCRED))
+assert(so == 1, "getsockopt should have updated value")
 
 assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
 local r = assert(sv[2]:recvmsg())
