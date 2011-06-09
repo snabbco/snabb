@@ -500,5 +500,6 @@ assert(S.chroot("/"))
 
 S.exit("EXIT_SUCCESS")
 
--- note tests missing whether setting SIG_IGN works. setting time, ioctl, pause TODO
+-- note tests missing whether setting SIG_IGN works. setting time, ioctl TODO
+-- note have tested pause, reboot but not in tests
 

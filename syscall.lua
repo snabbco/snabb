@@ -770,6 +770,16 @@ enum EPOLL {
   EPOLL_CTL_DEL = 2,
   EPOLL_CTL_MOD = 3,
 };
+enum LINUX_REBOOT_CMD {
+  LINUX_REBOOT_CMD_RESTART      =  0x01234567,
+  LINUX_REBOOT_CMD_HALT         =  0xCDEF0123,
+  LINUX_REBOOT_CMD_CAD_ON       =  0x89ABCDEF,
+  LINUX_REBOOT_CMD_CAD_OFF      =  0x00000000,
+  LINUX_REBOOT_CMD_POWER_OFF    =  0x4321FEDC,
+  LINUX_REBOOT_CMD_RESTART2     =  0xA1B2C3D4,
+  LINUX_REBOOT_CMD_SW_SUSPEND   =  0xD000FCE2,
+  LINUX_REBOOT_CMD_KEXEC        =  0x45584543,
+};
 enum E {
   EPERM          =  1,
   ENOENT         =  2,
@@ -1082,6 +1092,7 @@ int epoll_ctl(int epfd, enum EPOLL op, int fd, struct epoll_event *event);
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 int eventfd(unsigned int initval, int flags);
+int reboot(enum LINUX_REBOOT_CMD cmd);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -1472,6 +1483,8 @@ function S.ioctl(d, request, argp)
   -- some different return types may need to be handled
   return true
 end
+
+function S.reboot(cmd) return retbool(C.reboot(cmd)) end
 
 function S.getdents(fd, buf, size)
   if not buf then
