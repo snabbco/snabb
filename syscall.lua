@@ -2109,6 +2109,12 @@ local nlmsg_next = function(msg, buf, len)
   return ffi.cast(nlmsghdr_pt, buf + inc), buf + inc, len - inc
 end
 
+local nlmsg_data_decode = {}
+nlmsg_data_decode["RTM_NEWLINK"] = function(r)
+  print("got newlink msg")
+  return r
+end
+
 -- exposed to users to retrieve netlink messages from a buffer
 function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that useful
   local ret = {}
@@ -2120,19 +2126,46 @@ function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that 
     if nlmsgtypes[t] then r[nlmsgtypes[t]] = true end
 
     if msg.nlmsg_len - nlmsg_hdrlen > 0 then
-      r.payload = buffer_t(msg.nlmsg_len - nlmsg_hdrlen)
-      ffi.copy(r.payload, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen)
+      r.data = buffer_t(msg.nlmsg_len - nlmsg_hdrlen)
+      ffi.copy(r.data, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) -- raw payload data
     end
 
-    if r.RTM_NEWLINK then print("got newlink msg") end
+    if nlmsg_data_decode[nlmsgtypes[t]] then r = nlmsg_data_decode[nlmsgtypes[t]](r) end
 
     ret[#ret + 1] = r
     if r.NLMSG_DONE then done = true end
-    print("got one")
     msg, buffer, len = nlmsg_next(msg, buffer, len)
   end
   return ret
 end
+
+
+--[[
+void
+rtnl_print_link(struct nlmsghdr *h)
+{
+  struct ifinfomsg *iface;
+  struct rtattr *attribute;
+  int len;
+
+  iface = NLMSG_DATA(h);
+  len = h->nlmsg_len - NLMSG_LENGTH(sizeof(*iface));
+
+  for (attribute = IFLA_RTA(iface); RTA_OK(attribute, len); attribute = RTA_NEXT(attribute, len))
+    {
+      switch(attribute->rta_type)
+      {
+        case IFLA_IFNAME: 
+          printf("Interface %d : %s\n", iface->ifi_index, (char *) RTA_DATA(attribute));
+          break;
+        default:
+          break;
+      }
+    }
+}
+]]
+
+
 
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
