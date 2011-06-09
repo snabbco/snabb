@@ -132,6 +132,8 @@ assert(err, "expected open to fail on file not found")
 assert(S.writefile(tmpfile, "this is a string", S.S_IRWXU))
 local ss = assert(S.readfile(tmpfile))
 assert(ss == "this is a string", "readfile should get back what writefile wrote")
+assert(S.unlink(tmpfile))
+
 
 fd = assert(S.pipe())
 assert(fd[1].fd == 3 and fd[2].fd == 4, "expect file handles 3 and 4 for pipe")
@@ -438,6 +440,24 @@ fd = assert(S.open("/etc/passwd", S.O_RDONLY))
 local d, err, errno = fd:getdents()
 assert(errno == S.errno("ENOTDIR"), "/etc/passwd should give a not directory error")
 assert(fd:close())
+
+-- eventfd, Linux only
+fd = assert(S.eventfd())
+assert(fd:nonblock())
+
+local n = assert(fd:eventfd_read())
+assert(n == 0, "eventfd should return 0 initially")
+assert(fd:eventfd_write(3))
+assert(fd:eventfd_write(6))
+assert(fd:eventfd_write(1))
+n = assert(fd:eventfd_read())
+assert(n == 10, "eventfd should return 10")
+n = assert(fd:eventfd_read())
+assert(n == 0, "eventfd should return 0 again")
+
+assert(fd:close())
+
+
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 

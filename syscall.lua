@@ -338,6 +338,11 @@ S.AF_CAIF       = 37
 S.AF_ALG        = 38
 S.AF_MAX        = 39
 
+-- eventfd
+S.EFD_SEMAPHORE = 1
+S.EFD_CLOEXEC = octal("02000000")
+S.EFD_NONBLOCK = octal("04000")
+
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
@@ -1071,10 +1076,12 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+
 int epoll_create1(int flags);
 int epoll_ctl(int epfd, enum EPOLL op, int fd, struct epoll_event *event);
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
+int eventfd(unsigned int initval, int flags);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -1193,8 +1200,10 @@ local int1_t = ffi.typeof("int[1]") -- used to pass pointer to int
 local int2_t = ffi.typeof("int[2]") -- pair of ints, eg for pipe
 local ints_t = ffi.typeof("int[?]") -- array of ints
 local int64_t = ffi.typeof("int64_t")
+local uint64_t = ffi.typeof("uint64_t")
 local int32_pt = ffi.typeof("int32_t *")
 local int64_1t = ffi.typeof("int64_t[1]")
+local uint64_1t = ffi.typeof("uint64_t[1]")
 local string_array_t = ffi.typeof("const char *[?]")
 
 -- enums, not sure if there is a betetr way to convert
@@ -1807,6 +1816,25 @@ function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two differen
   return {count = tonumber(ret), offset = off[0]}
 end
 
+function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, flags or 0)) end
+-- eventfd read and write helpers, as in glibc but Lua friendly. Note returns 0 for EAGAIN, as 0 never returned directly
+-- returns Lua number - if you need all 64 bits, pass your own value in and use that for the exact result
+function S.eventfd_read(fd, value)
+  if not value then value = uint64_1t() end
+  local ret = C.read(getfd(fd), value, 8)
+  if ret == -1 and ffi.errno() == S.errno("EAGAIN") then
+    value[0] = 0
+    return 0
+  end
+  if ret == -1 then return errorret() end
+  return tonumber(value[0])
+end
+function S.eventfd_write(fd, value)
+  if not value then value = 1 end
+  if type(value) == "number" then value = uint64_1t(value) end
+  return retbool(C.write(getfd(fd), value, 8))
+end
+
 if rt then -- real time functions not in glibc in Linux, check if available. N/A on OSX.
   function S.clock_getres(clk_id, ts)
     if not ts then ts = timespec_t() end
@@ -2083,7 +2111,8 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
-                   'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents"
+                   'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
+                   'eventfd_read', 'eventfd_write'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
@@ -2096,7 +2125,7 @@ S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
   iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
-  sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t
+  sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t, uint64 = uint64_t
 }
 
 return S
