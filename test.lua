@@ -489,6 +489,14 @@ assert(#syslog > 20, "should be something in syslog")
 
 if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
 
+assert(S.mkdir(tmpfile))
+assert(S.mount("none", tmpfile, "tmpfs"))
+
+--print(S.readfile("/proc/mounts"))
+
+assert(S.umount(tmpfile))
+assert(S.rmdir(tmpfile))
+
 assert(S.acct())
 
 mem = assert(S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0))

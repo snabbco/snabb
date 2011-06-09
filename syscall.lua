@@ -343,6 +343,38 @@ S.EFD_SEMAPHORE = 1
 S.EFD_CLOEXEC = octal("02000000")
 S.EFD_NONBLOCK = octal("04000")
 
+-- mount and umount
+S.MS_RDONLY = 1
+S.MS_NOSUID = 2
+S.MS_NODEV = 4
+S.MS_NOEXEC = 8
+S.MS_SYNCHRONOUS = 16
+S.MS_REMOUNT = 32
+S.MS_MANDLOCK = 64
+S.MS_DIRSYNC = 128
+S.MS_NOATIME = 1024
+S.MS_NODIRATIME = 2048
+S.MS_BIND = 4096
+S.MS_MOVE = 8192
+S.MS_REC = 16384
+S.MS_SILENT = 32768
+S.MS_POSIXACL = bit.lshift(1, 16)
+S.MS_UNBINDABLE = bit.lshift(1, 17)
+S.MS_PRIVATE = bit.lshift(1, 18)
+S.MS_SLAVE = bit.lshift(1, 19)
+S.MS_SHARED = bit.lshift(1, 20)
+S.MS_RELATIME = bit.lshift(1, 21)
+S.MS_KERNMOUNT = bit.lshift(1, 22)
+S.MS_I_VERSION = bit.lshift(1, 23)
+S.MS_STRICTATIME = bit.lshift(1, 24)
+S.MS_ACTIVE = bit.lshift(1, 30)
+S.MS_NOUSER = bit.lshift(1, 31)
+
+S.MNT_FORCE = 1
+S.MNT_DETACH = 2
+S.MNT_EXPIRE = 4
+S.UMOUNT_NOFOLLOW = 8
+
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
@@ -1137,6 +1169,9 @@ int madvise(void *addr, size_t length, enum MADV advice);
 
 int pipe(int pipefd[2]);
 int pipe2(int pipefd[2], int flags);
+int mount(const char *source, const char *target, const char *filesystemtype, unsigned long mountflags, const void *data);
+int umount(const char *target);
+int umount2(const char *target, int flags);
 
 int access(const char *pathname, int mode);
 char *getcwd(char *buf, size_t size);
@@ -1459,7 +1494,7 @@ function S.creat(pathname, mode) return retfd(C.creat(pathname, mode or 0)) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.access(pathname, mode) return retbool(C.access(pathname, mode)) end
 function S.chdir(path) return retbool(C.chdir(path)) end
-function S.mkdir(path, mode) return retbool(C.mkdir(path, mode)) end
+function S.mkdir(path, mode) return retbool(C.mkdir(path, mode or 0)) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.acct(filename) return retbool(C.acct(filename)) end
@@ -1809,6 +1844,15 @@ function S.select(s) -- note same structure as returned
   if ret == -1 then return errorret() end
   return {readfds = fdisset(s.readfds or {}, r), writefds = fdisset(s.writefds or {}, w),
           exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
+end
+
+function S.mount(source, target, filesystemtype, mountflags, data)
+  return retbool(C.mount(source, target, filesystemtype, mountflags or 0, data or nil))
+end
+
+function S.umount(target, flags)
+  if flags then return retbool(C.umount2(target, flags)) end
+  return retbool(C.umount(target))
 end
 
 -- Linux only. use epoll1
