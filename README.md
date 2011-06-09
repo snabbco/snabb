@@ -1,4 +1,4 @@
-Linux system calls for LuaJIT
+# Linux system calls for LuaJIT
 
 Unfinished! Many syscalls missing, work in progress!
 
@@ -10,7 +10,21 @@ Linux only? Easy to port to other Unixes, you need to check the types and consta
 
 Requirements: Needs git head of LuaJIT (or next release 2.0.0-beta8 when it is out).
 
-API
+## What is implemented?
+
+### System calls (84)
+
+open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname, gethostname, sethostname, getuid, geteuid, getpid, getppid, getgid, getegid, fork, execve, wait, waitpid, _exit, signal, gettimeofday, settimeofday, time, clock_getres, clock_gettime, clock_settime, sysinfo, read, write, pread, pwrite, lseek, send, sendto, sendmsg, recv, recvfrom, recvmsg, readv, writev, getsockopt, setsockopt, select, epoll_create, epoll_ctl, epoll_wait, sendfile, dup, fchdir, fsync, fdatasync, fcntl, fchmod, socket, socketpair, bind, listen, connect, accept, getsockname, getpeername, mmap, munmap, msync, mlock, munlock, mlockall, munlockall, mremap, madvise, pipe, access, getcwd, nanosleep, syscall, stat, fstat, lstat
+
+### Other functions
+
+exit, inet_aton, inet_ntoa, inet_pton, inet_ntop
+
+### Socket types
+
+inet, inet6, unix, netlink (partial support, in progress)
+
+### API
 
 Basically what you expect, with the following notes. In general we explicitly return return parameters as it is more idiomatic.
 
@@ -34,18 +48,17 @@ Standard convenience macros are also provided, eg S.major(dev) to extract a majo
 
 bind does not require a length for the address type length, as it can work this out dynamically.
 
-uname returns a Lua table with the returned strings in it.
+uname returns a Lua table with the returned strings in it. Similarly getdents returns directory entries as a table.
 
 Some parameters are defined as enums rather than ints, which means that you use string names, eg fd:lseek(offset, "SEEK_SET"). These are in the cases where there is a single value to be set, which cannot be combined with anything else, so not bitmap arguments. In a few cases both are provided, for example Linux adds socket flags as well as the normal enumerated types, so posix applications can use the enum as expected. Other string parameters are optionally available, such as "stdin", meaning the 0 file descriptor.
 
 The test cases are good examples until I do better documentation!
 
-Testing
+### Testing
 
 The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86.
 
-Initial testing on uclibc, works on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible.
+Initial testing on uclibc, works on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes.
 
-Other C libraries may need more changes.
 
 

@@ -1107,7 +1107,6 @@ int madvise(void *addr, size_t length, enum MADV advice);
 int pipe(int pipefd[2]);
 int pipe2(int pipefd[2], int flags);
 
-int unlink(const char *pathname);
 int access(const char *pathname, int mode);
 char *getcwd(char *buf, size_t size);
 
