@@ -50,7 +50,7 @@ bind does not require a length for the address type length, as it can work this 
 
 uname returns a Lua table with the returned strings in it. Similarly getdents returns directory entries as a table.
 
-Some parameters are defined as enums rather than ints, which means that you use string names, eg fd:lseek(offset, "SEEK_SET"). These are in the cases where there is a single value to be set, which cannot be combined with anything else, so not bitmap arguments. In a few cases both are provided, for example Linux adds socket flags as well as the normal enumerated types, so posix applications can use the enum as expected. Other string parameters are optionally available, such as "stdin", meaning the 0 file descriptor. And now, in a further improvement, flags are being parsed as strings, so you can write S.open(name, "creat, wronly, trunc").
+Some parameters are defined as enums rather than ints, which means that you use string names, eg fd:lseek(offset, "SEEK_SET"). These are in the cases where there is a single value to be set, which cannot be combined with anything else, so not bitmap arguments. In a few cases both are provided, for example Linux adds socket flags as well as the normal enumerated types, so posix applications can use the enum as expected. Other string parameters are optionally available, such as "stdin", meaning the 0 file descriptor. And now, in a further improvement, flags are being parsed as strings, so you can write S.open(name, "creat, wronly, trunc"). There is a slight inconsistency between these different methods, will clear up over time.
 
 The test cases are good examples until I do better documentation!
 

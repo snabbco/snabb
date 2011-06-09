@@ -1500,7 +1500,7 @@ S.in6addr_any = in6_addr_t()
 S.in6addr_loopback = S.inet_pton("AF_INET6", "::1") -- no assert, may fail if no inet6 support
 
 -- main definitions start here
-function S.open(pathname, flags, mode) return retfd(C.open(pathname, stringflags(flags, "O_"), mode or 0)) end
+function S.open(pathname, flags, mode) return retfd(C.open(pathname, stringflags(flags, "O_"), stringflags(mode, "S_"))) end
 
 function S.dup(oldfd, newfd, flags)
   if newfd == nil then return retfd(C.dup(getfd(oldfd))) end
@@ -1528,11 +1528,11 @@ function S.close(fd)
   return true
 end
 
-function S.creat(pathname, mode) return retfd(C.creat(pathname, mode or 0)) end
+function S.creat(pathname, mode) return retfd(C.creat(pathname, stringflags(mode, "S_"))) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.access(pathname, mode) return retbool(C.access(pathname, mode)) end
 function S.chdir(path) return retbool(C.chdir(path)) end
-function S.mkdir(path, mode) return retbool(C.mkdir(path, mode or 0)) end
+function S.mkdir(path, mode) return retbool(C.mkdir(path, stringflags(mode, "S_"))) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.acct(filename) return retbool(C.acct(filename)) end
@@ -1728,8 +1728,8 @@ function S.nanosleep(req)
   return rem -- return second argument, Lua style
 end
 
-function S.mmap(addr, length, prot, flags, fd, offset)
-  return retptr(C.mmap(addr, length, prot, flags, getfd(fd), offset), function(addr) C.munmap(addr, length) end) -- add munmap gc
+function S.mmap(addr, length, prot, flags, fd, offset) -- adds munmap gc
+  return retptr(C.mmap(addr, length, stringflags(prot, "PROT_"), stringflags(flags, "MAP_"), getfd(fd), offset), function(addr) C.munmap(addr, length) end)
 end
 function S.munmap(addr, length)
   return retbool(C.munmap(ffi.gc(addr, nil), length)) -- remove gc on unmap
@@ -1795,6 +1795,7 @@ end
 
 function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
+  if cmd == "F_SETFL" then arg = stringflags(arg, "O_") end
   local ret = C.fcntl(getfd(fd), cmd, arg or 0)
   -- return values differ, some special handling needed
   if cmd == "F_DUPFD" or cmd == "F_DUPFD_CLOEXEC" then return retfd(ret) end
@@ -1999,8 +2000,9 @@ S.getpid = C.getpid
 S.getppid = C.getppid
 S.getgid = C.getgid
 S.getegid = C.getegid
-S.umask = C.umask
 S.sync = C.sync
+
+function S.umask(mask) return C.umask(stringflags(mask, "S_")) end
 
 -- 'macros' and helper functions etc
 

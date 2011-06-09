@@ -67,7 +67,7 @@ assert(err, "should not be able to read from fd 4 after gc")
 assert(err == S.strerror('EBADF'), "expect EBADF from already closed fd")
 
 -- test with gc turned off
-fd = assert(S.open("/dev/zero", S.O_RDONLY))
+fd = assert(S.open("/dev/zero", "RDONLY"))
 assert(fd.fd == 3, "fd should be 3")
 fd:nogc()
 fd = nil
@@ -99,7 +99,7 @@ assert(S.close(17))
 
 assert(S.close(fd))
 
-assert(S.O_CREAT == 64, "wrong octal value for O_CREAT")
+assert(S.O_CREAT == 64, "wrong octal value for O_CREAT") -- test our octal converter!
 
 local tmpfile = "./XXXXYYYYZZZ4521"
 local tmpfile2 = "./666666DDDDDFFFF"
@@ -124,16 +124,16 @@ assert(n == offset + offset, "seek should position at set position")
 
 assert(S.unlink(tmpfile))
 
-assert(S.mkdir(tmpfile, S.S_IRWXU))
+assert(S.mkdir(tmpfile, "IRWXU"))
 assert(S.rmdir(tmpfile))
 
 assert(S.close(fd))
 
-fd, err = S.open(tmpfile, S.O_RDWR)
+fd, err = S.open(tmpfile, "RDWR")
 assert(err, "expected open to fail on file not found")
 
 -- test readfile, writefile
-assert(S.writefile(tmpfile, "this is a string", S.S_IRWXU))
+assert(S.writefile(tmpfile, "this is a string", "IRWXU"))
 local ss = assert(S.readfile(tmpfile))
 assert(ss == "this is a string", "readfile should get back what writefile wrote")
 assert(S.unlink(tmpfile))
@@ -179,13 +179,13 @@ assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
 
 -- test truncate
 local s = "this is a string"
-assert(S.writefile(tmpfile, s, S.S_IRWXU))
+assert(S.writefile(tmpfile, s, "IRWXU"))
 stat = assert(S.stat(tmpfile))
 assert(stat.st_size == #s, "expect to get size of written string")
 assert(S.truncate(tmpfile, 1))
 stat = assert(S.stat(tmpfile))
 assert(stat.st_size == 1, "expect get truncated size")
-fd = assert(S.open(tmpfile, S.O_RDWR))
+fd = assert(S.open(tmpfile, "RDWR"))
 assert(fd:ftruncate(1024))
 stat = assert(fd:fstat())
 assert(stat.st_size == 1024, "expect get truncated size")
@@ -199,24 +199,24 @@ assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanos
 -- mmap and related functions
 local mem, mem2
 size = 4096
-mem = assert(S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0))
+mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 assert(S.munmap(mem, size))
-mem = assert(S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0))
+mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 assert(S.msync(mem, size, S.MS_SYNC))
 assert(S.madvise(mem, size, "MADV_RANDOM"))
 mem = nil -- gc memory, should be munmapped
 collectgarbage("collect")
 
 local size2 = size * 2
-mem = assert(S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0))
+mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 S.nogc(mem)
 mem2 = assert(S.mremap(mem, size, size2, S.MREMAP_MAYMOVE))
 mem = nil
 assert(S.munmap(mem2, size2))
 
 local mask
-mask = S.umask(S.S_IWGRP + S.S_IWOTH)
-mask = S.umask(S.S_IWGRP + S.S_IWOTH)
+mask = S.umask("IWGRP, IWOTH")
+mask = S.umask("IWGRP, IWOTH")
 assert(mask == S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
 
 -- sockets
@@ -288,7 +288,7 @@ assert(n == 7, "expect readv to read 7 bytes")
 assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get back same stuff")
 
 -- test sendfile
-local f = assert(S.open("/etc/passwd", S.O_RDONLY))
+local f = assert(S.open("/etc/passwd", "RDONLY"))
 local off = 0
 n = assert(c:sendfile(f, off, 16))
 assert(n.count == 16 and tonumber(n.offset) == 16, "sendfile should send 16 bytes")
@@ -463,7 +463,7 @@ assert(d["."].DT_DIR, ". is a directory")
 assert(d[".."].DT_DIR, ".. is a directory")
 
 -- add test for failing system call to check return values
-fd = assert(S.open("/etc/passwd", S.O_RDONLY))
+fd = assert(S.open("/etc/passwd", "RDONLY"))
 local d, err, errno = fd:getdents()
 assert(errno == S.errno("ENOTDIR"), "/etc/passwd should give a not directory error")
 assert(fd:close())
@@ -499,7 +499,7 @@ assert(S.rmdir(tmpfile))
 
 assert(S.acct())
 
-mem = assert(S.mmap(nil, size, S.PROT_READ, S.MAP_PRIVATE + S.MAP_ANONYMOUS, -1, 0))
+mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 assert(S.mlock(mem, size))
 assert(S.munlock(mem, size))
 assert(S.munmap(mem, size))
