@@ -1,7 +1,5 @@
 # Linux system calls for LuaJIT
 
-Unfinished! Many syscalls missing, work in progress!
-
 What? An FFI implementation of the Linux system calls for LuaJIT.
 
 Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua.
@@ -11,6 +9,8 @@ Linux only? Easy to port to other Unixes, you need to check the types and consta
 Requirements: Needs git head of LuaJIT (or next release 2.0.0-beta8 when it is out).
 
 ## What is implemented?
+
+Unfinished! Some syscalls missing, work in progress! Let me know if you need some that are not there.
 
 ### System calls (95)
 
