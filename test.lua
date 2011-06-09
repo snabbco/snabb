@@ -277,12 +277,12 @@ assert(S.string(buf, n) == string, "we should read back the same string that was
 -- test scatter gather
 local b0 = S.t.buffer(4, "test")
 local b1 = S.t.buffer(3, "ing")
-local io = S.t.iovec(2, {{iov_base = b0, iov_len = 4}, {iov_base = b1, iov_len = 3}})
+local io = S.t.iovec(2, {{b0, 4}, {b1, 3}})
 n = assert(c:writev(io, 2))
 assert(n == 7, "expect writev to write 7 bytes")
 b0 = S.t.buffer(3)
 b1 = S.t.buffer(4)
-io = S.t.iovec(2, {{iov_base = b0, iov_len = 3}, {iov_base = b1, iov_len = 4}})
+io = S.t.iovec(2, {{b0, 3}, {b1, 4}})
 n = assert(a.fd:readv(io, 2))
 assert(n == 7, "expect readv to read 7 bytes")
 assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get back same stuff")
@@ -425,6 +425,7 @@ local t = assert(S.clock_gettime("CLOCK_REALTIME"))
 local i = assert(S.sysinfo())
 
 -- netlink sockets, Linux only
+-- will make this a helper function
 s = assert(S.socket("AF_NETLINK", "SOCK_RAW", "NETLINK_ROUTE"))
 a = S.sockaddr_nl() -- kernel will fill in address
 assert(s:bind(a))
@@ -434,22 +435,24 @@ local buf, len, hdr, gen = S.tbuffer("struct nlmsghdr", "struct rtgenmsg") -- al
 hdr.nlmsg_len = len
 hdr.nlmsg_type = S.RTM_GETLINK
 hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_DUMP
-hdr.nlmsg_seq = 1
-hdr.nlmsg_pid = S.getpid()
+hdr.nlmsg_seq = 1          -- we should attach a sequence number to the file descriptor and use this
+hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
 gen.rtgen_family = S.AF_PACKET
 
-local io = S.t.iovec(1, {{iov_base = buf, iov_len = len}})
-
-local m = S.t.msghdr()
-m.msg_iov = io
-m.msg_iovlen = 1
-m.msg_name = k
-m.msg_namelen = S.sizeof(k)
+local ios = S.t.iovec(1, {{buf, len}})
+local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}
 
 assert(s:sendmsg(m))
 
--- finish this
+local repsize = 4096
+local reply = S.t.buffer(repsize)
+local ior = S.t.iovec(1, {{reply, repsize}})
 
+m = S.t.msghdr{msg_iov = ior, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}
+
+n = assert(s:recvmsg(m))
+
+S.nlmsg(reply, n.count)
 
 assert(s:close())
 

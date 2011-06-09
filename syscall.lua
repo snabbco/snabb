@@ -295,6 +295,21 @@ S.RTM_GETADDRLABEL = 74
 S.RTM_GETDCB = 78
 S.RTM_SETDCB = 79
 
+local nlmsglist = {
+"NLMSG_NOOP", "NLMSG_ERROR", "NLMSG_DONE", "NLMSG_OVERRUN",
+"RTM_NEWLINK", "RTM_DELLINK", "RTM_GETLINK", "RTM_SETLINK", "RTM_NEWADDR", "RTM_DELADDR", "RTM_GETADDR", "RTM_NEWROUTE", "RTM_DELROUTE", 
+"RTM_GETROUTE", "RTM_NEWNEIGH", "RTM_DELNEIGH", "RTM_GETNEIGH", "RTM_NEWRULE", "RTM_DELRULE", "RTM_GETRULE", "RTM_NEWQDISC", 
+"RTM_DELQDISC", "RTM_GETQDISC", "RTM_NEWTCLASS", "RTM_DELTCLASS", "RTM_GETTCLASS", "RTM_NEWTFILTER", "RTM_DELTFILTER", 
+"RTM_GETTFILTER", "RTM_NEWACTION", "RTM_DELACTION", "RTM_GETACTION", "RTM_NEWPREFIX", "RTM_GETMULTICAST", "RTM_GETANYCAST", 
+"RTM_NEWNEIGHTBL", "RTM_GETNEIGHTBL", "RTM_SETNEIGHTBL", "RTM_NEWNDUSEROPT", "RTM_NEWADDRLABEL", "RTM_DELADDRLABEL", "RTM_GETADDRLABEL",
+"RTM_GETDCB", "RTM_SETDCB"
+}
+local nlmsgtypes = {} -- lookup table by value
+for _, v in ipairs(nlmsglist) do
+  assert(S[v], "message " .. v .. " should exist")
+  nlmsgtypes[S[v]] = v
+end
+
 -- need address families as constants too (? derive from enums?)
 S.AF_UNSPEC     = 0
 S.AF_LOCAL      = 1
@@ -1004,10 +1019,10 @@ struct stat {
 ]]
 end
 
--- are there issues with 32 on 64, __old_kernel_stat? -- seems that uclibc does not use this
---[[if ffi.arch == 'x86' then
+-- not currently used, but may switch
+if ffi.arch == 'x86' then
 ffi.cdef[[
-struct stat {
+struct linux_stat {
   unsigned long  st_dev;
   unsigned long  st_ino;
   unsigned short st_mode;
@@ -1028,9 +1043,9 @@ struct stat {
   unsigned long  __unused5;
 };
 ]]
---[[else -- all architectures except x86 the same
+else -- all architectures except x86 the same
 ffi.cdef [[
-struct stat {
+struct linux_stat {
   unsigned long   st_dev;
   unsigned long   st_ino;
   unsigned long   st_nlink;
@@ -1051,7 +1066,7 @@ struct stat {
   long            __unused[3];
 };
 ]]
---end
+end
 
 -- completely arch dependent stuff. Note not defining all the syscalls yet
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
@@ -1234,6 +1249,7 @@ local epoll_event_t = ffi.typeof("struct epoll_event")
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 local off_t = ffi.typeof("off_t")
 local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
+local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
 
 --[[ -- used to generate tests, will refactor into test code later
@@ -1270,7 +1286,7 @@ local string_array_t = ffi.typeof("const char *[?]")
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
 local enumCLOCK_t = ffi.typeof("enum CLOCK") -- for clockids
-local enumNETTLINK = ffi.typeof("enum NETLINK") -- netlink socket protocols
+local enumNETLINK = ffi.typeof("enum NETLINK") -- netlink socket protocols
 
 -- need these for casts
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
@@ -1744,8 +1760,8 @@ function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, 
 
 local sproto
 function sproto(domain, protocol) -- helper function to cast protocol type depending on domain
-  if not protcol then return 0 end
-  if domain == "AF_NETLINK" then return emumNETLINK(protocol) end
+  if not protocol then return 0 end
+  if domain == "AF_NETLINK" then return enumNETLINK(protocol) end
   return protocol
 end
 
@@ -2019,14 +2035,14 @@ function b64(n)
 end
 
 function S.major(dev)
-  h, l = b64(dev)
+  local h, l = b64(dev)
   return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)));
 end
 
 -- minor and makedev assume minor numbers 20 bit so all in low byte, currently true
 -- would be easier to fix if LuaJIT had native 64 bit bitops
 function S.minor(dev)
-  h, l = b64(dev)
+  local h, l = b64(dev)
   return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
 end
 
@@ -2077,39 +2093,77 @@ end
 
 -- similar functions for netlink messages
 -- nlmsg_length is just length, as the header is already a multiple of the alignment
- 
+
+local nlmsg_ok = function(msg, len)
+  return len >= ffi.sizeof(nlmsghdr_t) and msg.nlmsg_len >= ffi.sizeof(nlmsghdr_t) and msg.nlmsg_len <= len
+end
+
+
+
+
+-- exposed to users to retrieve netlink messages from a buffer
+function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that useful
+  local ret = {}
+  local msg = ffi.cast(nlmsghdr_pt, buffer)
+  local done = false
+  while not done and nlmsg_ok(msg, len) do
+    local t = tonumber(msg.nlmsg_type)
+    local r = {mtype = t, seq = tonumber(msg.nlmsg_seq), pid = tonumber(msg.nlmsg_pid), flags = tonumber(msg.nlmsg_flags)}
+    if nlmsgtypes[t] then r[nlmsgtypes[t]] = true end
+
+    if r.RTM_NEWLINK then print("got newlink msg") end
+
+    ret[#ret + 1] = r
+    if r.NLMSG_DONE then done = true end
+    print("got one")
+    break;
+  end
+  return ret
+end
+--[[
+ if (len)
+    {
+      for (msg_ptr = (struct nlmsghdr *) reply; NLMSG_OK(msg_ptr, len); msg_ptr = NLMSG_NEXT(msg_ptr, len))
+        {
+          switch(msg_ptr->nlmsg_type)
+          {
+        case 3:        /* this is the NLMSG_DONE end msg */
+          end++;
+          break;
+        case 16:    /* this is the RTM_NEWLINK msg */
+          rtnl_print_link(msg_ptr);
+          break;
+        default:    /* for education only,
+                   should not happen here */
+          printf("message type %d, length %d\n", msg_ptr->nlmsg_type, msg_ptr->nlmsg_len);
+          break;
+          }
+        }
+    }
+]]
+
 
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
-    msg = msghdr_t()
     local buf1 = buffer_t(1)
-    io = iovec_t(1)
-    io[0].iov_base = buf1
-    io[0].iov_len = 1
-    msg.msg_iov = io
-    msg.msg_iovlen = 1
+    local io = iovec_t(1, {{buf1, 1}})
+    msg = msghdr_t{msg_iov = io, msg_iovlen = 1}
   end
   return retbool(C.sendmsg(getfd(fd), msg, flags or 0))
 end
 
-function S.recvmsg(fd, io, iolen, flags, bufsize) -- takes iovec, or nil in which case assume want to receive cmsg
-  if not io then 
-    local buf1 = buffer_t(1) -- if no iovec, assume user wants to receive single byte
-    io = iovec_t(1)
-    io[0].iov_base = buf1
-    io[0].iov_len = 1
-    iolen = 1
+-- if no msg provided, assume want to receive cmsg
+function S.recvmsg(fd, msg, flags)
+  if not msg then 
+    local buf1 = buffer_t(1) -- assume user wants to receive single byte to get cmsg
+    local io = iovec_t(1, {{buf1, 1}})
+    local bufsize = 1024 -- sane default, build your own structure otherwise
+    local buf = buffer_t(bufsize)
+    msg = msghdr_t{msg_iov = io, msg_iovlen = 1, msg_control = buf, msg_controllen = bufsize}
   end
-  bufsize = bufsize or 512 -- reasonable default
-  local buf = buffer_t(bufsize)
-  local msg = msghdr_t()
-  msg.msg_iov = io
-  msg.msg_iovlen = iolen
-  msg.msg_control = buf
-  msg.msg_controllen = bufsize
   local ret = C.recvmsg(getfd(fd), msg, flags or 0)
   if ret == -1 then return errorret() end
-  local ret = {count = ret, iovec = io} -- thats the basic return value, and the iovec
+  local ret = {count = ret, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
   local mc, cmsg = cmsg_firsthdr(msg)
   while cmsg do
     if cmsg.cmsg_level == S.SOL_SOCKET then
