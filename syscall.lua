@@ -478,6 +478,16 @@ S.MNT_DETACH = 2
 S.MNT_EXPIRE = 4
 S.UMOUNT_NOFOLLOW = 8
 
+-- reboot
+S.LINUX_REBOOT_CMD_RESTART      =  0x01234567
+S.LINUX_REBOOT_CMD_HALT         =  0xCDEF0123
+S.LINUX_REBOOT_CMD_CAD_ON       =  0x89ABCDEF
+S.LINUX_REBOOT_CMD_CAD_OFF      =  0x00000000
+S.LINUX_REBOOT_CMD_POWER_OFF    =  0x4321FEDC
+S.LINUX_REBOOT_CMD_RESTART2     =  0xA1B2C3D4
+S.LINUX_REBOOT_CMD_SW_SUSPEND   =  0xD000FCE2
+S.LINUX_REBOOT_CMD_KEXEC        =  0x45584543
+
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
@@ -816,16 +826,6 @@ enum NETLINK {
 /* leave room for NETLINK_DM (DM Events) */
   NETLINK_SCSITRANSPORT = 18,
   NETLINK_ECRYPTFS      = 19,
-};
-enum LINUX_REBOOT_CMD {
-  LINUX_REBOOT_CMD_RESTART      =  0x01234567,
-  LINUX_REBOOT_CMD_HALT         =  0xCDEF0123,
-  LINUX_REBOOT_CMD_CAD_ON       =  0x89ABCDEF,
-  LINUX_REBOOT_CMD_CAD_OFF      =  0x00000000,
-  LINUX_REBOOT_CMD_POWER_OFF    =  0x4321FEDC,
-  LINUX_REBOOT_CMD_RESTART2     =  0xA1B2C3D4,
-  LINUX_REBOOT_CMD_SW_SUSPEND   =  0xD000FCE2,
-  LINUX_REBOOT_CMD_KEXEC        =  0x45584543,
 };
 enum E {
   EPERM          =  1,
@@ -1641,7 +1641,7 @@ function S.ioctl(d, request, argp)
   return true
 end
 
-function S.reboot(cmd) return retbool(C.reboot(cmd)) end
+function S.reboot(cmd) return retbool(C.reboot(stringflag(cmd, "LINUX_REBOOT_CMD_"))) end
 
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
   if not buf then
