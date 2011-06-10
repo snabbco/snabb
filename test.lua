@@ -418,10 +418,15 @@ else -- parent
   assert(S.unlink(efile))
 end
 
+n = assert(S.getpriority("process"))
+assert (n == 0, "process should start at priority 0")
 assert(S.nice(1))
+assert(S.setpriority("process", 0, 1)) -- sets to 1, which it already is
 if S.geteuid() ~= 0 then
   n, err, errno = S.nice(-2)
-  assert(err == S.strerror("EPERM"), "non root user should not be able to set negative nice")
+  assert(err, "non root user should not be able to set negative priority")
+  n, err, errno = S.setpriority("process", 0, -1)
+  assert(err, "non root user should not be able to set negative priority")
 end
 
 local tv = assert(S.gettimeofday())

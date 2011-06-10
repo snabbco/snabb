@@ -119,6 +119,11 @@ S.MCL_FUTURE     = 2
 S.MREMAP_MAYMOVE = 1
 S.MREMAP_FIXED   = 2
 
+-- getpriority, setpriority flags
+S.PRIO_PROCESS = 0
+S.PRIO_PGRP = 1
+S.PRIO_USER = 2
+
 -- sockets -- linux has flags against this, so provided as enum and constants
 S.SOCK_STREAM    = 1
 S.SOCK_DGRAM     = 2
@@ -1571,13 +1576,19 @@ function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 function S.pause() return retbool(C.pause()) end
 
-function S.nice(inc)
-  ffi.errno(0) -- returns nice value which could be -1 (actually Linux syscall does not, but glibc does)
-  local ret = C.nice(inc)
+local retinte
+function retinte(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
+  ffi.errno(0)
+  local ret = f(...)
   if ffi.errno() ~= 0 then return errorret() end
   return ret
 end
 
+function S.nice(inc) return retinte(C.nice, inc) end
+-- NB glibc is shifting these values from what strace shows, as per man page, kernel adds 20 to make these values positive...
+-- might cause issues with other C libraries in which case may shift to using system call
+function S.getpriority(which, who) return retinte(C.getpriority, stringflags(which, "PRIO_"), who or 0) end
+function S.setpriority(which, who, prio) return retinte(C.setpriority, stringflags(which, "PRIO_"), who or 0, prio) end
 
 function S.fork() return retint(C.fork()) end
 function S.execve(filename, argv, envp)
