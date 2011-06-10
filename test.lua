@@ -296,7 +296,7 @@ assert(c:close())
 assert(a.fd:close())
 
 -- unix domain sockets
-local sv = assert(S.socketpair("AF_UNIX", "SOCK_STREAM"))
+local sv = assert(S.socketpair("AF_UNIX", "stream"))
 
 assert(sv[2]:setsockopt(S.SOL_SOCKET, S.SO_PASSCRED, true)) -- enable receive creds
 local so = assert(sv[2]:getsockopt(S.SOL_SOCKET, S.SO_PASSCRED))
@@ -322,7 +322,6 @@ n, err, errno = sv[1]:write("will get sigpipe")
 assert(err == S.strerror("EPIPE"), "should get sigpipe")
 
 assert(sv[1]:close())
-
 
 assert(S.kill(S.getpid(), "pipe")) -- should be ignored
 
@@ -492,8 +491,7 @@ assert(errno == S.errno("ENOTDIR"), "/etc/passwd should give a not directory err
 assert(fd:close())
 
 -- eventfd, Linux only
-fd = assert(S.eventfd())
-assert(fd:nonblock())
+fd = assert(S.eventfd(0, "nonblock"))
 
 local n = assert(fd:eventfd_read())
 assert(n == 0, "eventfd should return 0 initially")
