@@ -1354,6 +1354,32 @@ function stringflag(str, prefix) -- single value only
   return val
 end
 
+-- reverse flag operations
+local getflag, getflags -- should be used elsewhere
+function getflags(e, prefix, values)
+  local r= {}
+  for _, f in ipairs(values) do
+    if bit.band(e, S[f]) ~= 0 then
+      r[f] = true
+      r[f:lower()] = true
+      r[f:sub(#prefix + 1):lower()] = true -- ie set r.in, r.out etc as well
+    end
+  end
+  return r
+end
+
+function getflag(e, prefix, values)
+  local r= {}
+  for _, f in ipairs(values) do
+    if e == S[f] then
+      r[f] = true
+      r[f:lower()] = true
+      r[f:sub(#prefix + 1):lower()] = true -- ie set r.in, r.out etc as well
+    end
+  end
+  return r
+end
+
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
   function S.htonl(b) return b end
@@ -1625,10 +1651,9 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     while i < ret do
       local dp = ffi.cast(linux_dirent_pt, buf + i)
       local t = buf[i + dp.d_reclen - 1]
-      local dd = {inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off)}
-      for _, f in ipairs{"DT_UNKNOWN", "DT_FIFO", "DT_CHR", "DT_DIR", "DT_BLK", "DT_REG", "DT_LNK", "DT_SOCK", "DT_WHT"} do
-        if t == S[f] then dd[f] = true end
-      end
+      local dd = getflag(t, "DT_", {"DT_UNKNOWN", "DT_FIFO", "DT_CHR", "DT_DIR", "DT_BLK", "DT_REG", "DT_LNK", "DT_SOCK", "DT_WHT"})
+      dd.inode = tonumber(dp.d_ino)
+      dd.offset = tonumber(dp.d_off)
       d[ffi.string(dp.d_name)] = dd
       i = i + dp.d_reclen
     end
@@ -1945,19 +1970,6 @@ function S.epoll_ctl(epfd, op, fd, events, data)
   local event = epoll_event_t{events = stringflags(events, "EPOLL")}
   if data then event.data.u64 = data else event.data.fd = getfd(fd) end
   return retbool(C.epoll_ctl(getfd(epfd), stringflag(op, "EPOLL_CTL_"), getfd(fd), event))
-end
-
-local getflags
-function getflags(e, prefix, values)
-  local r= {}
-  for i, f in ipairs(values) do
-    if bit.band(e, S[f]) ~= 0 then
-      r[f] = true
-      r[f:lower()] = true
-      r[f:sub(#prefix):lower()] = true -- ie set r.in, r.out etc as well
-    end
-  end
-  return r
 end
 
 function S.epoll_wait(epfd, events, maxevents, timeout)

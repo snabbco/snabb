@@ -360,9 +360,9 @@ assert(s:close())
 assert(c:close())
 
 --ipv6 socket
-s, err, errno = S.socket("AF_INET6", "SOCK_DGRAM")
+s, err, errno = S.socket("AF_INET6", "dgram")
 if s then 
-  c = assert(S.socket("AF_INET6", "SOCK_DGRAM"))
+  c = assert(S.socket("AF_INET6", "dgram"))
   local sa = assert(S.sockaddr_in6(0, S.in6addr_any))
   local ca = assert(S.sockaddr_in6(0, S.in6addr_any))
   assert(s:bind(sa))
@@ -474,9 +474,9 @@ local d = assert(S.dirfile("/dev"))
 assert(d.zero, "expect to find /dev/zero")
 assert(d["."], "expect to find .")
 assert(d[".."], "expect to find ..")
-assert(d.zero.DT_CHR, "/dev/zero is a character device")
-assert(d["."].DT_DIR, ". is a directory")
-assert(d[".."].DT_DIR, ".. is a directory")
+assert(d.zero.chr, "/dev/zero is a character device")
+assert(d["."].dir, ". is a directory")
+assert(d[".."].dir, ".. is a directory")
 
 -- add test for failing system call to check return values
 fd = assert(S.open("/etc/passwd", "RDONLY"))
