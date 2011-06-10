@@ -1328,15 +1328,22 @@ end
 -- take a bunch of flags in a string and return a number
 -- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
 local stringflag, stringflags
-function stringflags(str, prefix) -- allows multiple comma sep flags that are ORed
+function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags that are ORed
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   local f = 0
   local a = split(",", str)
+  local ts, s, val
   for i, v in ipairs(a) do
-    local s = trim(v)
+    ts = trim(v)
+    s = ts
     if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
-    local val = S[s:upper()]
+    val = S[s:upper()]
+    if prefix2 and not val then
+      s = ts
+      if s:sub(1, #prefix2) ~= prefix2 then s = prefix2 .. s end -- prefix optional
+      val = S[s:upper()]
+    end
     if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
   end
@@ -1957,7 +1964,7 @@ function S.mount(source, target, filesystemtype, mountflags, data)
 end
 
 function S.umount(target, flags)
-  if flags then return retbool(C.umount2(target, flags)) end
+  if flags then return retbool(C.umount2(target, stringflags(flags, "MNT_", "UMOUNT_"))) end
   return retbool(C.umount(target))
 end
 

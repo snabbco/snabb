@@ -515,7 +515,7 @@ assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
 
 --print(S.readfile("/proc/mounts"))
 
-assert(S.umount(tmpfile))
+assert(S.umount(tmpfile, "detach, nofollow"))
 assert(S.rmdir(tmpfile))
 
 assert(S.acct())
