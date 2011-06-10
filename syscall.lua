@@ -1346,6 +1346,7 @@ end
 function stringflag(str, prefix) -- single value only
   if not str then return 0 end
   if type(str) ~= "string" then return str end
+  if #str == 0 then return 0 end
   local s = trim(str)
   if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
   local val = S[s:upper()]
@@ -1699,18 +1700,18 @@ function S.write(fd, buf, count) return retint(C.write(getfd(fd), buf, count or 
 function S.pread(fd, buf, count, offset) return retint(C.pread(getfd(fd), buf, count, offset)) end
 function S.pwrite(fd, buf, count, offset) return retint(C.pwrite(getfd(fd), buf, count, offset)) end
 function S.lseek(fd, offset, whence) return retint(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
-function S.send(fd, buf, count, flags) return retint(C.send(getfd(fd), buf, count or #buf, flags or 0)) end
+function S.send(fd, buf, count, flags) return retint(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
-  return retint(C.sendto(getfd(fd), buf, count or #buf, flags or 0, ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
+  return retint(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
 end
 function S.readv(fd, iov, iovcnt) return retint(C.readv(getfd(fd), iov, iovcnt)) end
 function S.writev(fd, iov, iovcnt) return retint(C.writev(getfd(fd), iov, iovcnt)) end
 
-function S.recv(fd, buf, count, flags) return retint(C.recv(getfd(fd), buf, count or #buf, flags or 0)) end
+function S.recv(fd, buf, count, flags) return retint(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.recvfrom(fd, buf, count, flags)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
-  local ret = C.recvfrom(getfd(fd), buf, count, flags or 0, ffi.cast(sockaddr_pt, ss), addrlen)
+  local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0], {count = ret})
 end
@@ -2217,7 +2218,7 @@ function S.sendmsg(fd, msg, flags)
     local io = iovec_t(1, {{buf1, 1}})
     msg = msghdr_t{msg_iov = io, msg_iovlen = 1}
   end
-  return retbool(C.sendmsg(getfd(fd), msg, flags or 0))
+  return retbool(C.sendmsg(getfd(fd), msg, stringflags(flags, "MSG_")))
 end
 
 -- if no msg provided, assume want to receive cmsg
@@ -2229,7 +2230,7 @@ function S.recvmsg(fd, msg, flags)
     local buf = buffer_t(bufsize)
     msg = msghdr_t{msg_iov = io, msg_iovlen = 1, msg_control = buf, msg_controllen = bufsize}
   end
-  local ret = C.recvmsg(getfd(fd), msg, flags or 0)
+  local ret = C.recvmsg(getfd(fd), msg, stringflags(flags, "MSG_"))
   if ret == -1 then return errorret() end
   local ret = {count = ret, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
   local mc, cmsg = cmsg_firsthdr(msg)
