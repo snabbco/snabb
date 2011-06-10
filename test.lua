@@ -248,6 +248,7 @@ assert(s:listen()) -- will fail if we did not bind
 
 c = assert(S.socket("AF_INET", "SOCK_STREAM")) -- client socket
 assert(c:nonblock())
+assert(c:fcntl("setfd", "cloexec"))
 
 --assert(c:connect(sa)) -- connect to our server address
 ok, err = c:connect(sa)

@@ -78,6 +78,32 @@ S.W_OK = 2
 S.X_OK = 1
 S.F_OK = 0
 
+S.F_DUPFD       = 0
+S.F_GETFD       = 1
+S.F_SETFD       = 2
+S.F_GETFL       = 3
+S.F_SETFL       = 4
+S.F_GETLK       = 5
+S.F_SETLK       = 6
+S.F_SETLKW      = 7
+S.F_SETOWN      = 8
+S.F_GETOWN      = 9
+S.F_SETSIG      = 10
+S.F_GETSIG      = 11
+S.F_GETLK64     = 12      -- 64 on 32 file ops still TODO
+S.F_SETLK64     = 13      -- 64 on 32 file ops still TODO
+S.F_SETLKW64    = 14      -- 64 on 32 file ops still TODO
+S.F_SETOWN_EX   = 15
+S.F_GETOWN_EX   = 16
+S.F_SETLEASE    = 1024
+S.F_GETLEASE    = 1025
+S.F_NOTIFY      = 1026
+S.F_SETPIPE_SZ  = 1031
+S.F_GETPIPE_SZ  = 1032
+S.F_DUPFD_CLOEXEC = 1030
+
+S.FD_CLOEXEC = 1
+
 --mmap
 S.PROT_READ  = 0x1
 S.PROT_WRITE = 0x2
@@ -898,31 +924,7 @@ struct epoll_event {
 #pragma pack(pop)
 
 // enums, LuaJIT will allow strings to be used, so we provide for appropriate parameters - removing these though
-enum F {
-  F_DUPFD       = 0,
-  F_GETFD       = 1,
-  F_SETFD       = 2,
-  F_GETFL       = 3,
-  F_SETFL       = 4,
-  F_GETLK       = 5,
-  F_SETLK       = 6,
-  F_SETLKW      = 7,
-  F_SETOWN      = 8,
-  F_GETOWN      = 9,
-  F_SETSIG      = 10,
-  F_GETSIG      = 11,
-//F_GETLK64     = 12,      -- 64 on 32 file ops still TODO
-//F_SETLK64     = 13,      -- 64 on 32 file ops still TODO
-//F_SETLKW64    = 14,      -- 64 on 32 file ops still TODO
-  F_SETOWN_EX   = 15,
-  F_GETOWN_EX   = 16,
-  F_SETLEASE    = 1024,
-  F_GETLEASE    = 1025,
-  F_NOTIFY      = 1026,
-  F_SETPIPE_SZ  = 1031,
-  F_GETPIPE_SZ  = 1032,
-  F_DUPFD_CLOEXEC = 1030
-};
+
 enum AF {
   AF_UNSPEC     = 0,
   AF_LOCAL      = 1,
@@ -1160,7 +1162,7 @@ int dup3(int oldfd, int newfd, int flags);
 int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
-int fcntl(int fd, enum F cmd, long arg); /* arg can be a pointer though */
+int fcntl(int fd, int cmd, long arg); /* arg can be a pointer though */
 int fchmod(int fd, mode_t mode);
 int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
@@ -1868,12 +1870,15 @@ end
 
 function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
-  if cmd == "F_SETFL" then arg = stringflags(arg, "O_") end
+  cmd = stringflag(cmd, "F_")
+  if cmd == S.F_SETFL then arg = stringflags(arg, "O_")
+  elseif cmd == S.F_SETFD then arg = stringflag(arg, "FD_")
+  end
   local ret = C.fcntl(getfd(fd), cmd, arg or 0)
   -- return values differ, some special handling needed
-  if cmd == "F_DUPFD" or cmd == "F_DUPFD_CLOEXEC" then return retfd(ret) end
-  if cmd == "F_GETFD" or cmd == "F_GETFL" or cmd == "F_GETLEASE" or cmd == "F_GETOWN" or
-     cmd == "F_GETSIG" or cmd == "F_GETPIPE_SZ" then return retint(ret) end
+  if cmd == S.F_DUPFD or cmd == S.F_DUPFD_CLOEXEC then return retfd(ret) end
+  if cmd == S.F_GETFD or cmd == S.F_GETFL or cmd == S.F_GETLEASE or cmd == S.F_GETOWN or
+     cmd == S.F_GETSIG or cmd == S.F_GETPIPE_SZ then return retint(ret) end
   return retbool(ret)
 end
 
@@ -2322,9 +2327,9 @@ function S.sendfds(fd, ...)
 end
 
 function S.nonblock(s)
-  local fl, err = s:fcntl("F_GETFL")
+  local fl, err = s:fcntl(S.F_GETFL)
   if not fl then return nil, err end
-  fl, err = s:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK))
+  fl, err = s:fcntl(S.F_SETFL, bit.bor(fl, S.O_NONBLOCK))
   if not fl then return nil, err end
   return true
 end
