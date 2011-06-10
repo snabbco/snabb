@@ -742,15 +742,6 @@ enum SIG {
   SIGSYS        = 31,
   SIGUNUSED     = 31
 };
-enum SOCK {
-  SOCK_STREAM    = 1,
-  SOCK_DGRAM     = 2,
-  SOCK_RAW       = 3,
-  SOCK_RDM       = 4,
-  SOCK_SEQPACKET = 5,
-  SOCK_DCCP      = 6,
-  SOCK_PACKET    = 10,
-};
 enum SHUT {
   SHUT_RD = 0,
   SHUT_WR,
@@ -1177,8 +1168,8 @@ int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
 int pause(void);
 
-int socket(enum AF domain, enum SOCK type, int protocol);
-int socketpair(enum AF domain, enum SOCK type, int protocol, int sv[2]);
+int socket(enum AF domain, int type, int protocol);
+int socketpair(enum AF domain, int type, int protocol, int sv[2]);
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int listen(int sockfd, int backlog);
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
@@ -1299,7 +1290,7 @@ local socklen1_t = ffi.typeof("socklen_t[1]")
 
 local string_array_t = ffi.typeof("const char *[?]")
 
--- enums, not sure if there is a betetr way to convert
+-- enums, not sure if there is a better way to convert - starting to phase out
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
 local enumCLOCK_t = ffi.typeof("enum CLOCK") -- for clockids
@@ -1796,10 +1787,10 @@ function sproto(domain, protocol) -- helper function to cast protocol type depen
   return protocol
 end
 
-function S.socket(domain, stype, protocol) return retfd(C.socket(domain, stype, sproto(domain, protocol))) end
+function S.socket(domain, stype, protocol) return retfd(C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol))) end
 function S.socketpair(domain, stype, protocol)
   local sv2 = int2_t()
-  local ret = C.socketpair(domain, stype, sproto(domain, protocol), sv2)
+  local ret = C.socketpair(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol), sv2)
   if ret == -1 then return errorret() end
   return {fd_t(sv2[0]), fd_t(sv2[1])}
 end

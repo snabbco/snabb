@@ -225,8 +225,7 @@ a = S.inet_aton("error")
 assert(not a, "should get invalid IP address")
 
 local s, fl, c
-s = assert(S.socket("AF_INET", "SOCK_STREAM"))
-assert(s:nonblock())
+s = assert(S.socket("AF_INET", "stream, nonblock")) -- adding flags to socket type is Linux only
 
 local loop = "127.0.0.1"
 sa = S.sockaddr_in(1234, "error")
