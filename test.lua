@@ -203,14 +203,14 @@ mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 assert(S.munmap(mem, size))
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 assert(S.msync(mem, size, "sync"))
-assert(S.madvise(mem, size, "MADV_RANDOM"))
+assert(S.madvise(mem, size, "random"))
 mem = nil -- gc memory, should be munmapped
 collectgarbage("collect")
 
 local size2 = size * 2
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 S.nogc(mem)
-mem2 = assert(S.mremap(mem, size, size2, S.MREMAP_MAYMOVE))
+mem2 = assert(S.mremap(mem, size, size2, "maymove"))
 mem = nil
 assert(S.munmap(mem2, size2))
 

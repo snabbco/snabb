@@ -106,18 +106,33 @@ S.MAP_NONBLOCK   = 0x10000
 S.MAP_STACK      = 0x20000
 S.MAP_HUGETLB    = 0x40000
 
--- Flags to `msync'.
+-- flags to `msync'.
 S.MS_ASYNC       = 1
 S.MS_SYNC        = 4
 S.MS_INVALIDATE  = 2
 
--- Flags for `mlockall'.
+-- flags for `mlockall'.
 S.MCL_CURRENT    = 1
 S.MCL_FUTURE     = 2
 
--- Flags for `mremap'.
+-- flags for `mremap'.
 S.MREMAP_MAYMOVE = 1
 S.MREMAP_FIXED   = 2
+
+-- madvise advice parameter
+S.MADV_NORMAL      = 0
+S.MADV_RANDOM      = 1
+S.MADV_SEQUENTIAL  = 2
+S.MADV_WILLNEED    = 3
+S.MADV_DONTNEED    = 4
+S.MADV_REMOVE      = 9
+S.MADV_DONTFORK    = 10
+S.MADV_DOFORK      = 11
+S.MADV_MERGEABLE   = 12
+S.MADV_UNMERGEABLE = 13
+S.MADV_HUGEPAGE    = 14
+S.MADV_NOHUGEPAGE  = 15
+S.MADV_HWPOISON    = 100
 
 -- getpriority, setpriority flags
 S.PRIO_PROCESS = 0
@@ -678,27 +693,6 @@ enum F {
   F_GETPIPE_SZ  = 1032,
   F_DUPFD_CLOEXEC = 1030
 };
-enum MADV {
-  MADV_NORMAL      = 0,
-  MADV_RANDOM      = 1,
-  MADV_SEQUENTIAL  = 2,
-  MADV_WILLNEED    = 3,
-  MADV_DONTNEED    = 4,
-  MADV_REMOVE      = 9,
-  MADV_DONTFORK    = 10,
-  MADV_DOFORK      = 11,
-  MADV_MERGEABLE   = 12,
-  MADV_UNMERGEABLE = 13,
-  MADV_HUGEPAGE    = 14,
-  MADV_NOHUGEPAGE  = 15,
-  MADV_HWPOISON    = 100,
-  // POSIX madvise names
-  POSIX_MADV_NORMAL      = 0,
-  POSIX_MADV_RANDOM      = 1,
-  POSIX_MADV_SEQUENTIAL  = 2,
-  POSIX_MADV_WILLNEED    = 3,
-  POSIX_MADV_DONTNEED    = 4,
-};
 enum SIG_ { /* maybe not the clearest name */
   SIG_ERR = -1,
   SIG_DFL =  0,
@@ -1187,7 +1181,7 @@ int munlock(const void *addr, size_t len);
 int mlockall(int flags);
 int munlockall(void);
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
-int madvise(void *addr, size_t length, enum MADV advice);
+int madvise(void *addr, size_t length, int advice);
 
 int pipe(int pipefd[2]);
 int pipe2(int pipefd[2], int flags);
@@ -1336,8 +1330,8 @@ function trim (s)
 end
 -- take a bunch of flags in a string and return a number
 -- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
-local stringflags
-function stringflags(str, prefix)
+local stringflag, stringflags
+function stringflags(str, prefix) -- allows multiple comma sep flags that are ORed
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   local f = 0
@@ -1350,6 +1344,15 @@ function stringflags(str, prefix)
     f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
   end
   return f
+end
+function stringflag(str, prefix) -- single value only
+  if not str then return 0 end
+  if type(str) ~= "string" then return str end
+  local s = trim(str)
+  if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
+  local val = S[s:upper()]
+  if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+  return val
 end
 
 -- endian conversion
@@ -1777,8 +1780,10 @@ function S.mlock(addr, len) return retbool(C.mlock(addr, len)) end
 function S.munlock(addr, len) return retbool(C.munlock(addr, len)) end
 function S.mlockall(flags) return retbool(C.mlockall(stringflags(flags, "MCL_"))) end
 function S.munlockall() return retbool(C.munlockall()) end
-function S.mremap(old_address, old_size, new_size, flags, new_address) return retptr(C.mremap(old_address, old_size, new_size, flags, new_address)) end
-function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, advice)) end
+function S.mremap(old_address, old_size, new_size, flags, new_address)
+  return retptr(C.mremap(old_address, old_size, new_size, stringflags(flags, "MREMAP_"), new_address))
+end
+function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, stringflag(advice, "MADV_"))) end
 
 local sproto
 function sproto(domain, protocol) -- helper function to cast protocol type depending on domain
