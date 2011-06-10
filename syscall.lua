@@ -321,6 +321,26 @@ S.DT_SOCK = 12
 S.DT_WHT = 14
 
 -- netlink
+S.NETLINK_ROUTE         = 0
+S.NETLINK_UNUSED        = 1
+S.NETLINK_USERSOCK      = 2
+S.NETLINK_FIREWALL      = 3
+S.NETLINK_INET_DIAG     = 4
+S.NETLINK_NFLOG         = 5
+S.NETLINK_XFRM          = 6
+S.NETLINK_SELINUX       = 7
+S.NETLINK_ISCSI         = 8
+S.NETLINK_AUDIT         = 9
+S.NETLINK_FIB_LOOKUP    = 10      
+S.NETLINK_CONNECTOR     = 11
+S.NETLINK_NETFILTER     = 12
+S.NETLINK_IP6_FW        = 13
+S.NETLINK_DNRTMSG       = 14
+S.NETLINK_KOBJECT_UEVENT= 15
+S.NETLINK_GENERIC       = 16
+S.NETLINK_SCSITRANSPORT = 18
+S.NETLINK_ECRYPTFS      = 19
+
 S.NLM_F_REQUEST = 1
 S.NLM_F_MULTI   = 2
 S.NLM_F_ACK     = 4
@@ -336,7 +356,7 @@ S.NLM_F_EXCL    = 0x200
 S.NLM_F_CREATE  = 0x400
 S.NLM_F_APPEND  = 0x800
 
--- generic types. not defined as enums as overloaded for different protocols, and need to be 16 bit
+-- generic types.
 S.NLMSG_NOOP     = 0x1
 S.NLMSG_ERROR    = 0x2
 S.NLMSG_DONE     = 0x3
@@ -946,28 +966,6 @@ enum AF {
   AF_ALG        = 38,
   AF_MAX        = 39,
 };
-enum NETLINK {
-  NETLINK_ROUTE         = 0,
-  NETLINK_UNUSED        = 1,
-  NETLINK_USERSOCK      = 2,
-  NETLINK_FIREWALL      = 3,
-  NETLINK_INET_DIAG     = 4,
-  NETLINK_NFLOG         = 5,
-  NETLINK_XFRM          = 6,
-  NETLINK_SELINUX       = 7,
-  NETLINK_ISCSI         = 8,
-  NETLINK_AUDIT         = 9,
-  NETLINK_FIB_LOOKUP    = 10,      
-  NETLINK_CONNECTOR     = 11,
-  NETLINK_NETFILTER     = 12,
-  NETLINK_IP6_FW        = 13,
-  NETLINK_DNRTMSG       = 14,
-  NETLINK_KOBJECT_UEVENT= 15,
-  NETLINK_GENERIC       = 16,
-/* leave room for NETLINK_DM (DM Events) */
-  NETLINK_SCSITRANSPORT = 18,
-  NETLINK_ECRYPTFS      = 19,
-};
 ]]
 
 -- stat structure is architecture dependent in Linux
@@ -1292,7 +1290,6 @@ local string_array_t = ffi.typeof("const char *[?]")
 
 -- enums, not sure if there is a better way to convert - starting to phase out
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
-local enumNETLINK = ffi.typeof("enum NETLINK") -- netlink socket protocols
 
 -- need these for casts
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
@@ -1363,7 +1360,7 @@ function stringflag(str, prefix) -- single value only
   local s = trim(str)
   if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
   local val = S[s:upper()]
-  if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+  if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions, better than silent ignore
   return val
 end
 
@@ -1411,25 +1408,25 @@ S.ntohs = S.htons -- reverse is the same
 function S.sockaddr_in(port, addr)
   if type(addr) == 'string' then addr = S.inet_aton(addr) end
   if not addr then return nil end
-  return sockaddr_in_t(enumAF_t("AF_INET"), S.htons(port), addr)
+  return sockaddr_in_t(S.AF_INET, S.htons(port), addr)
 end
 function S.sockaddr_in6(port, addr)
   if type(addr) == 'string' then addr = S.inet_pton("INET6", addr) end
   if not addr then return nil end
   local sa = sockaddr_in6_t()
-  sa.sin6_family = enumAF_t("AF_INET6")
+  sa.sin6_family = S.AF_INET6
   sa.sin6_port = S.htons(port)
   ffi.copy(sa.sin6_addr, addr, ffi.sizeof(in6_addr_t))
   return sa
 end
 function S.sockaddr_un() -- actually, not using this, not sure it is useful for unix sockets
   local addr = sockaddr_in_t()
-  addr.sun_family = enumAF_t("AF_UNIX")
+  addr.sun_family = S.AF_UNIX
   return addr
 end
 function S.sockaddr_nl(pid, groups)
   local addr = sockaddr_nl_t()
-  addr.nl_family = enumAF_t("AF_NETLINK")
+  addr.nl_family = S.AF_NETLINK
   if pid then addr.nl_pid = pid end -- optional, kernel will set
   if groups then addr.nl_groups = groups end
   return addr
@@ -1820,10 +1817,9 @@ end
 function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, stringflag(advice, "MADV_"))) end
 
 local sproto
-function sproto(domain, protocol) -- helper function to cast protocol type depending on domain
-  if not protocol then return 0 end
-  if domain == "AF_NETLINK" then return enumNETLINK(protocol) end
-  return protocol
+function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain
+  if domain == S.AF_NETLINK then return stringflag(protocol, "NETLINK_") end
+  return protocol or 0
 end
 
 function S.socket(domain, stype, protocol) return retfd(C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol))) end

@@ -442,7 +442,7 @@ local i = assert(S.sysinfo())
 
 -- netlink sockets, Linux only
 -- will make this a helper function
-s = assert(S.socket("AF_NETLINK", "raw", "NETLINK_ROUTE"))
+s = assert(S.socket(S.AF_NETLINK, "raw", "route")) -- should be "netlink" for first param soon
 a = S.sockaddr_nl() -- kernel will fill in address
 assert(s:bind(a))
 local k = S.sockaddr_nl() -- kernel destination
