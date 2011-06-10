@@ -139,6 +139,15 @@ S.PRIO_PROCESS = 0
 S.PRIO_PGRP = 1
 S.PRIO_USER = 2
 
+-- lseek
+S.SEEK_SET = 0
+S.SEEK_CUR = 1
+S.SEEK_END = 2
+
+-- exit
+S.EXIT_SUCCESS = 0
+S.EXIT_FAILURE = 1
+
 -- sockets -- linux has flags against this
 S.SOCK_STREAM    = 1
 S.SOCK_DGRAM     = 2
@@ -667,16 +676,7 @@ struct epoll_event {
 };   // __attribute__ ((__packed__));
 #pragma pack(pop)
 
-// enums, LuaJIT will allow strings to be used, so we provide for appropriate parameters
-enum SEEK {
-  SEEK_SET,
-  SEEK_CUR,
-  SEEK_END
-};
-enum EXIT {
-  EXIT_SUCCESS,
-  EXIT_FAILURE
-};
+// enums, LuaJIT will allow strings to be used, so we provide for appropriate parameters - removing these though
 enum F {
   F_DUPFD       = 0,
   F_GETFD       = 1,
@@ -1110,7 +1110,7 @@ pid_t fork(void);
 int execve(const char *filename, const char *argv[], const char *envp[]);
 pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);
-void _exit(enum EXIT status);
+void _exit(int status);
 enum SIG_ signal(enum SIG signum, enum SIG_ handler); /* although deprecated, just using to set SIG_ values */
 int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
 int settimeofday(const struct timeval *tv, const void *tz);
@@ -1128,7 +1128,7 @@ ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
-off_t lseek(int fd, off_t offset, enum SEEK whence); 
+off_t lseek(int fd, off_t offset, int whence); 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
@@ -1207,7 +1207,7 @@ int fstat(int fd, struct stat *buf);
 int lstat(const char *path, struct stat *buf);
 
 // functions from libc ie man 3 not man 2
-void exit(enum EXIT status);
+void exit(int status);
 int inet_aton(const char *cp, struct in_addr *inp);
 char *inet_ntoa(struct in_addr in);
 int inet_pton(enum AF, const char *src, void *dst);
@@ -1685,8 +1685,8 @@ function S.waitpid(pid, options)
   return retwait(C.waitpid(pid, status, options or 0), status[0])
 end
 
-function S._exit(status) C._exit(status or 0) end
-function S.exit(status) C.exit(status or 0) end
+function S._exit(status) C._exit(stringflag(status, "EXIT_")) end
+function S.exit(status) C.exit(stringflag(status, "EXIT_")) end
 
 function S.read(fd, buf, count)
   if buf then return retint(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
@@ -1699,7 +1699,7 @@ end
 function S.write(fd, buf, count) return retint(C.write(getfd(fd), buf, count or #buf)) end
 function S.pread(fd, buf, count, offset) return retint(C.pread(getfd(fd), buf, count, offset)) end
 function S.pwrite(fd, buf, count, offset) return retint(C.pwrite(getfd(fd), buf, count, offset)) end
-function S.lseek(fd, offset, whence) return retint(C.lseek(getfd(fd), offset, whence)) end
+function S.lseek(fd, offset, whence) return retint(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
 function S.send(fd, buf, count, flags) return retint(C.send(getfd(fd), buf, count or #buf, flags or 0)) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retint(C.sendto(getfd(fd), buf, count or #buf, flags or 0, ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))

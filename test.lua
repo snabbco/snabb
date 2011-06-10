@@ -104,7 +104,7 @@ assert(S.O_CREAT == 64, "wrong octal value for O_CREAT") -- test our octal conve
 local tmpfile = "./XXXXYYYYZZZ4521"
 local tmpfile2 = "./666666DDDDDFFFF"
 
-fd = assert(S.creat(tmpfile, S.S_IRWXU))
+fd = assert(S.creat(tmpfile, "IRWXU"))
 
 assert(S.link(tmpfile, tmpfile2))
 assert(S.unlink(tmpfile2))
@@ -117,9 +117,9 @@ assert(S.chmod(tmpfile, "IRUSR, IWUSR"))
 assert(fd:fsync())
 assert(fd:fdatasync())
 
-n = assert(fd:lseek(offset, 'SEEK_SET'))
+n = assert(fd:lseek(offset, "set"))
 assert(n == offset, "seek should position at set position")
-n = assert(fd:lseek(offset, 'SEEK_CUR'))
+n = assert(fd:lseek(offset, "cur"))
 assert(n == offset + offset, "seek should position at set position")
 
 assert(S.unlink(tmpfile))
@@ -503,7 +503,7 @@ assert(fd:close())
 local syslog = assert(S.klogctl(3))
 assert(#syslog > 20, "should be something in syslog")
 
-if S.geteuid() ~= 0 then S.exit("EXIT_SUCCESS") end -- cannot execute some tests if not root
+if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
 assert(S.mkdir(tmpfile))
 assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
@@ -531,7 +531,7 @@ assert(S.sethostname(h))
 
 assert(S.chroot("/"))
 
-S.exit("EXIT_SUCCESS")
+S.exit("success")
 
 -- note tests missing whether setting SIG_IGN works. setting time, ioctl TODO
 -- note have tested pause, reboot but not in tests
