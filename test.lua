@@ -320,8 +320,8 @@ assert(sv[1]:close())
 assert(sv[2]:close())
 
 -- udp socket
-s = assert(S.socket("AF_INET", "SOCK_DGRAM"))
-c = assert(S.socket("AF_INET", "SOCK_DGRAM"))
+s = assert(S.socket("AF_INET", "dgram"))
+c = assert(S.socket("AF_INET", "dgram"))
 
 local sa = assert(S.sockaddr_in(0, loop))
 local ca = assert(S.sockaddr_in(0, loop))
@@ -336,7 +336,7 @@ local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
 assert(sel.count == 0, "nothing to read select now")
 
 local ep = assert(S.epoll_create())
-assert(ep:epoll_ctl("EPOLL_CTL_ADD", c, S.EPOLLIN))
+assert(ep:epoll_ctl("add", c, S.EPOLLIN))
 
 local r
 r = assert(ep:epoll_wait())

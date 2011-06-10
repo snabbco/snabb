@@ -241,6 +241,10 @@ S.EPOLLRDHUP = 0x2000
 S.EPOLLONESHOT = bit.lshift(1, 30)
 S.EPOLLET = bit.lshift(1, 31)
 
+S.EPOLL_CTL_ADD = 1
+S.EPOLL_CTL_DEL = 2
+S.EPOLL_CTL_MOD = 3
+
 -- file types in directory
 S.DT_UNKNOWN = 0
 S.DT_FIFO = 1
@@ -815,11 +819,6 @@ enum NETLINK {
   NETLINK_SCSITRANSPORT = 18,
   NETLINK_ECRYPTFS      = 19,
 };
-enum EPOLL {
-  EPOLL_CTL_ADD = 1,
-  EPOLL_CTL_DEL = 2,
-  EPOLL_CTL_MOD = 3,
-};
 enum LINUX_REBOOT_CMD {
   LINUX_REBOOT_CMD_RESTART      =  0x01234567,
   LINUX_REBOOT_CMD_HALT         =  0xCDEF0123,
@@ -1143,7 +1142,7 @@ int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 
 int epoll_create1(int flags);
-int epoll_ctl(int epfd, enum EPOLL op, int fd, struct epoll_event *event);
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 int eventfd(unsigned int initval, int flags);
@@ -1946,7 +1945,7 @@ function S.epoll_ctl(epfd, op, fd, events, data)
   local event = epoll_event_t()
   event.events = events
   if data then event.data.u64 = data else event.data.fd = getfd(fd) end
-  return retbool(C.epoll_ctl(getfd(epfd), op, getfd(fd), event))
+  return retbool(C.epoll_ctl(getfd(epfd), stringflag(op, "EPOLL_CTL_"), getfd(fd), event))
 end
 
 local getflags -- make more generic and use elsewhere, and for constructing
