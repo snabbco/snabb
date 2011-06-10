@@ -111,8 +111,8 @@ assert(S.unlink(tmpfile2))
 assert(S.symlink(tmpfile, tmpfile2))
 assert(S.unlink(tmpfile2))
 
-assert(fd:fchmod(S.S_IRUSR + S.S_IWUSR))
-assert(S.chmod(tmpfile, S.S_IRUSR + S.S_IWUSR))
+assert(fd:fchmod("IRUSR, IWUSR"))
+assert(S.chmod(tmpfile, "IRUSR, IWUSR"))
 
 assert(fd:fsync())
 assert(fd:fdatasync())

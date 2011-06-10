@@ -1588,7 +1588,7 @@ function S.mkdir(path, mode) return retbool(C.mkdir(path, stringflags(mode, "S_"
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.acct(filename) return retbool(C.acct(filename)) end
-function S.chmod(path, mode) return retbool(C.chmod(path, mode)) end
+function S.chmod(path, mode) return retbool(C.chmod(path, stringflags(mode, "S_"))) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
@@ -1737,7 +1737,7 @@ end
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
-function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), mode)) end
+function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), stringflags(mode, "S_"))) end
 
 -- glibc does not have these directly
 local stat, lstat, fstat
