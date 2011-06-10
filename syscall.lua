@@ -491,37 +491,178 @@ S.LINUX_REBOOT_CMD_KEXEC        =  0x45584543
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
+-- errors. In a subtable unlike other constants
+S.E = {}
+
+S.E.EPERM          =  1
+S.E.ENOENT         =  2
+S.E.ESRCH          =  3
+S.E.EINTR          =  4
+S.E.EIO            =  5
+S.E.ENXIO          =  6
+S.E.E2BIG          =  7
+S.E.ENOEXEC        =  8
+S.E.EBADF          =  9
+S.E.ECHILD         = 10
+S.E.EAGAIN         = 11
+S.E.ENOMEM         = 12
+S.E.EACCES         = 13
+S.E.EFAULT         = 14
+S.E.ENOTBLK        = 15
+S.E.EBUSY          = 16
+S.E.EEXIST         = 17
+S.E.EXDEV          = 18
+S.E.ENODEV         = 19
+S.E.ENOTDIR        = 20
+S.E.EISDIR         = 21
+S.E.EINVAL         = 22
+S.E.ENFILE         = 23
+S.E.EMFILE         = 24
+S.E.ENOTTY         = 25
+S.E.ETXTBSY        = 26
+S.E.EFBIG          = 27
+S.E.ENOSPC         = 28
+S.E.ESPIPE         = 29
+S.E.EROFS          = 30
+S.E.EMLINK         = 31
+S.E.EPIPE          = 32
+S.E.EDOM           = 33
+S.E.ERANGE         = 34
+S.E.EDEADLK        = 35
+S.E.ENAMETOOLONG   = 36
+S.E.ENOLCK         = 37
+S.E.ENOSYS         = 38
+S.E.ENOTEMPTY      = 39
+S.E.ELOOP          = 40
+S.E.EWOULDBLOCK    = S.E.EAGAIN
+S.E.ENOMSG         = 42
+S.E.EIDRM          = 43
+S.E.ECHRNG         = 44
+S.E.EL2NSYNC       = 45
+S.E.EL3HLT         = 46
+S.E.EL3RST         = 47
+S.E.ELNRNG         = 48
+S.E.EUNATCH        = 49
+S.E.ENOCSI         = 50
+S.E.EL2HLT         = 51
+S.E.EBADE          = 52
+S.E.EBADR          = 53
+S.E.EXFULL         = 54
+S.E.ENOANO         = 55
+S.E.EBADRQC        = 56
+S.E.EBADSLT        = 57
+S.E.EDEADLOCK      = S.E.EDEADLK
+S.E.EBFONT         = 59
+S.E.ENOSTR         = 60
+S.E.ENODATA        = 61
+S.E.ETIME          = 62
+S.E.ENOSR          = 63
+S.E.ENONET         = 64
+S.E.ENOPKG         = 65
+S.E.EREMOTE        = 66
+S.E.ENOLINK        = 67
+S.E.EADV           = 68
+S.E.ESRMNT         = 69
+S.E.ECOMM          = 70
+S.E.EPROTO         = 71
+S.E.EMULTIHOP      = 72
+S.E.EDOTDOT        = 73
+S.E.EBADMSG        = 74
+S.E.EOVERFLOW      = 75
+S.E.ENOTUNIQ       = 76
+S.E.EBADFD         = 77
+S.E.EREMCHG        = 78
+S.E.ELIBACC        = 79
+S.E.ELIBBAD        = 80
+S.E.ELIBSCN        = 81
+S.E.ELIBMAX        = 82
+S.E.ELIBEXEC       = 83
+S.E.EILSEQ         = 84
+S.E.ERESTART       = 85
+S.E.ESTRPIPE       = 86
+S.E.EUSERS         = 87
+S.E.ENOTSOCK       = 88
+S.E.EDESTADDRREQ   = 89
+S.E.EMSGSIZE       = 90
+S.E.EPROTOTYPE     = 91
+S.E.ENOPROTOOPT    = 92
+S.E.EPROTONOSUPPORT= 93
+S.E.ESOCKTNOSUPPORT= 94
+S.E.EOPNOTSUPP     = 95
+S.E.EPFNOSUPPORT   = 96
+S.E.EAFNOSUPPORT   = 97
+S.E.EADDRINUSE     = 98
+S.E.EADDRNOTAVAIL  = 99
+S.E.ENETDOWN       = 100
+S.E.ENETUNREACH    = 101
+S.E.ENETRESET      = 102
+S.E.ECONNABORTED   = 103
+S.E.ECONNRESET     = 104
+S.E.ENOBUFS        = 105
+S.E.EISCONN        = 106
+S.E.ENOTCONN       = 107
+S.E.ESHUTDOWN      = 108
+S.E.ETOOMANYREFS   = 109
+S.E.ETIMEDOUT      = 110
+S.E.ECONNREFUSED   = 111
+S.E.EHOSTDOWN      = 112
+S.E.EHOSTUNREACH   = 113
+S.E.EINPROGRESS    = 115
+S.E.ESTALE         = 116
+S.E.EUCLEAN        = 117
+S.E.ENOTNAM        = 118
+S.E.ENAVAIL        = 119
+S.E.EISNAM         = 120
+S.E.EREMOTEIO      = 121
+S.E.EDQUOT         = 122
+S.E.ENOMEDIUM      = 123
+S.E.EMEDIUMTYPE    = 124
+S.E.ECANCELED      = 125
+S.E.ENOKEY         = 126
+S.E.EKEYEXPIRED    = 127
+S.E.EKEYREVOKED    = 128
+S.E.EKEYREJECTED   = 129
+S.E.EOWNERDEAD     = 130
+S.E.ENOTRECOVERABLE= 131
+S.E.ERFKILL        = 132
+
+local errors = {}
+
+local emt = {__tostring = function(e) return S.strerror(e.errno) end}
+
+for i, v in pairs(S.E) do
+  local e = {errno = v, sym = i}
+  e[i] = true
+  e[i:sub(2):lower()] = true
+  setmetatable(e, emt)
+  errors[v] = e
+end
+
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
 local errorret, retint, retbool, retptr, retfd, getfd
 
-function S.strerror(errno) return ffi.string(C.strerror(errno)), errno end
+function S.strerror(errno) return ffi.string(C.strerror(errno)) end
 
 -- standard error return
 function errorret()
-  return nil, S.strerror(ffi.errno())
+  return nil, errors[ffi.errno()]
 end
 
 function retint(ret)
-  if ret == -1 then
-    return errorret()
-  end
+  if ret == -1 then return errorret() end
   return ret
 end
 
 -- used for no return value, return true for use of assert
 function retbool(ret)
-  if ret == -1 then
-    return errorret()
-  end
+  if ret == -1 then return errorret() end
   return true
 end
 
 -- used for pointer returns, -1 is failure, optional gc function
 function retptr(ret, f)
-  if ffi.cast("long", ret) == -1 then
-     return errorret()
-  end
+  if ffi.cast("long", ret) == -1 then return errorret() end
   if f then return ffi.gc(ret, f) end
   return ret
 end
@@ -827,139 +968,6 @@ enum NETLINK {
   NETLINK_SCSITRANSPORT = 18,
   NETLINK_ECRYPTFS      = 19,
 };
-enum E {
-  EPERM          =  1,
-  ENOENT         =  2,
-  ESRCH          =  3,
-  EINTR          =  4,
-  EIO            =  5,
-  ENXIO          =  6,
-  E2BIG          =  7,
-  ENOEXEC        =  8,
-  EBADF          =  9,
-  ECHILD         = 10,
-  EAGAIN         = 11,
-  ENOMEM         = 12,
-  EACCES         = 13,
-  EFAULT         = 14,
-  ENOTBLK        = 15,
-  EBUSY          = 16,
-  EEXIST         = 17,
-  EXDEV          = 18,
-  ENODEV         = 19,
-  ENOTDIR        = 20,
-  EISDIR         = 21,
-  EINVAL         = 22,
-  ENFILE         = 23,
-  EMFILE         = 24,
-  ENOTTY         = 25,
-  ETXTBSY        = 26,
-  EFBIG          = 27,
-  ENOSPC         = 28,
-  ESPIPE         = 29,
-  EROFS          = 30,
-  EMLINK         = 31,
-  EPIPE          = 32,
-  EDOM           = 33,
-  ERANGE         = 34,
-  EDEADLK        = 35,
-  ENAMETOOLONG   = 36,
-  ENOLCK         = 37,
-  ENOSYS         = 38,
-  ENOTEMPTY      = 39,
-  ELOOP          = 40,
-  EWOULDBLOCK    = EAGAIN,
-  ENOMSG         = 42,
-  EIDRM          = 43,
-  ECHRNG         = 44,
-  EL2NSYNC       = 45,
-  EL3HLT         = 46,
-  EL3RST         = 47,
-  ELNRNG         = 48,
-  EUNATCH        = 49,
-  ENOCSI         = 50,
-  EL2HLT         = 51,
-  EBADE          = 52,
-  EBADR          = 53,
-  EXFULL         = 54,
-  ENOANO         = 55,
-  EBADRQC        = 56,
-  EBADSLT        = 57,
-  EDEADLOCK      = EDEADLK,
-  EBFONT         = 59,
-  ENOSTR         = 60,
-  ENODATA        = 61,
-  ETIME          = 62,
-  ENOSR          = 63,
-  ENONET         = 64,
-  ENOPKG         = 65,
-  EREMOTE        = 66,
-  ENOLINK        = 67,
-  EADV           = 68,
-  ESRMNT         = 69,
-  ECOMM          = 70,
-  EPROTO         = 71,
-  EMULTIHOP      = 72,
-  EDOTDOT        = 73,
-  EBADMSG        = 74,
-  EOVERFLOW      = 75,
-  ENOTUNIQ       = 76,
-  EBADFD         = 77,
-  EREMCHG        = 78,
-  ELIBACC        = 79,
-  ELIBBAD        = 80,
-  ELIBSCN        = 81,
-  ELIBMAX        = 82,
-  ELIBEXEC       = 83,
-  EILSEQ         = 84,
-  ERESTART       = 85,
-  ESTRPIPE       = 86,
-  EUSERS         = 87,
-  ENOTSOCK       = 88,
-  EDESTADDRREQ   = 89,
-  EMSGSIZE       = 90,
-  EPROTOTYPE     = 91,
-  ENOPROTOOPT    = 92,
-  EPROTONOSUPPORT= 93,
-  ESOCKTNOSUPPORT= 94,
-  EOPNOTSUPP     = 95,
-  EPFNOSUPPORT   = 96,
-  EAFNOSUPPORT   = 97,
-  EADDRINUSE     = 98,
-  EADDRNOTAVAIL  = 99,
-  ENETDOWN       = 100,
-  ENETUNREACH    = 101,
-  ENETRESET      = 102,
-  ECONNABORTED   = 103,
-  ECONNRESET     = 104,
-  ENOBUFS        = 105,
-  EISCONN        = 106,
-  ENOTCONN       = 107,
-  ESHUTDOWN      = 108,
-  ETOOMANYREFS   = 109,
-  ETIMEDOUT      = 110,
-  ECONNREFUSED   = 111,
-  EHOSTDOWN      = 112,
-  EHOSTUNREACH   = 113,
-  EINPROGRESS    = 115,
-  ESTALE         = 116,
-  EUCLEAN        = 117,
-  ENOTNAM        = 118,
-  ENAVAIL        = 119,
-  EISNAM         = 120,
-  EREMOTEIO      = 121,
-  EDQUOT         = 122,
-  ENOMEDIUM      = 123,
-  EMEDIUMTYPE    = 124,
-  ECANCELED      = 125,
-  ENOKEY         = 126,
-  EKEYEXPIRED    = 127,
-  EKEYREVOKED    = 128,
-  EKEYREJECTED   = 129,
-  EOWNERDEAD     = 130,
-  ENOTRECOVERABLE= 131,
-  ERFKILL        = 132,
-};
 ]]
 
 -- stat structure is architecture dependent in Linux
@@ -1217,7 +1225,7 @@ void *calloc(size_t nmemb, size_t size);
 void *malloc(size_t size);
 void free(void *ptr);
 void *realloc(void *ptr, size_t size);
-char *strerror(enum E errnum);
+char *strerror(int);
 ]]
 
 -- glibc does not have a stat symbol, has its own struct stat and way of calling
@@ -1284,7 +1292,6 @@ local string_array_t = ffi.typeof("const char *[?]")
 
 -- enums, not sure if there is a better way to convert - starting to phase out
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
-local enumE_t = ffi.typeof("enum E") -- used for converting error names
 local enumNETLINK = ffi.typeof("enum NETLINK") -- netlink socket protocols
 
 -- need these for casts
@@ -1470,9 +1477,6 @@ socket_type[fam("AF_NETLINK")] = sockaddr_nl_t
 --  AF_CAIF
 --  AF_ALG
 --  AF_MAX
-
--- convert error symbolic name to errno
-function S.errno(name) return tonumber(enumE_t(name)) end
 
 -- helper function to make setting addrlen optional
 local getaddrlen
@@ -2010,7 +2014,7 @@ function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, stringfl
 function S.eventfd_read(fd, value)
   if not value then value = uint64_1t() end
   local ret = C.read(getfd(fd), value, 8)
-  if ret == -1 and ffi.errno() == S.errno("EAGAIN") then
+  if ret == -1 and ffi.errno() == S.E.EAGAIN then
     value[0] = 0
     return 0
   end
@@ -2322,42 +2326,42 @@ function S.sendfds(fd, ...)
 end
 
 function S.nonblock(s)
-  local fl, err, errno = assert(s:fcntl("F_GETFL"))
-  if not fl then return nil, err, errno end
-  fl, err, errno = s:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK))
-  if not fl then return nil, err, errno end
+  local fl, err = s:fcntl("F_GETFL")
+  if not fl then return nil, err end
+  fl, err = s:fcntl("F_SETFL", bit.bor(fl, S.O_NONBLOCK))
+  if not fl then return nil, err end
   return true
 end
 
 function S.readfile(name, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
-  local f, err, errno = S.open(name, S.O_RDONLY)
-  if not f then return nil, err, errno end
-  local r, err, errno = f:read(nil, length or 4096)
-  if not r then return nil, err, errno end
-  local t, err, errno = f:close()
-  if not t then return nil, err, errno end
+  local f, err = S.open(name, S.O_RDONLY)
+  if not f then return nil, err end
+  local r, err = f:read(nil, length or 4096)
+  if not r then return nil, err end
+  local t, err = f:close()
+  if not t then return nil, err end
   return r
 end
 
 function S.writefile(name, string, mode) -- write string to named file. specify mode if want to create file, silently ignore short writes
-  local f, err, errno
-  if mode then f, err, errno = S.creat(name, mode) else f, err, errno = S.open(name, S.O_WRONLY) end
-  if not f then return nil, err, errno end
-  local n, err, errno = f:write(string)
-  if not n then return nil, err, errno end
-  local t, err, errno = f:close()
-  if not t then return nil, err, errno end
+  local f, err
+  if mode then f, err = S.creat(name, mode) else f, err = S.open(name, S.O_WRONLY) end
+  if not f then return nil, err end
+  local n, err = f:write(string)
+  if not n then return nil, err end
+  local t, err = f:close()
+  if not t then return nil, err end
   return true
 end
 
 function S.dirfile(name) -- return the directory entries in a file
-  local fd, d, _, err, errno
-  fd, err, errno = S.open(name, S.O_DIRECTORY + S.O_RDONLY)
-  if err then return nil, err, errno end
-  d, err, errno = fd:getdents()
-  if err then return nil, err, errno end
-  _, err, errno = fd:close()
-  if err then return nil, err, errno end
+  local fd, d, _, err
+  fd, err = S.open(name, S.O_DIRECTORY + S.O_RDONLY)
+  if err then return nil, err end
+  d, err = fd:getdents()
+  if err then return nil, err end
+  _, err = fd:close()
+  if err then return nil, err end
   return d
 end
 

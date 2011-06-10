@@ -9,14 +9,14 @@ local h = assert(S.gethostname())
 assert(h == u.nodename, "gethostname did not return nodename")
 
 -- test open non existent file
-fd, err, errno = S.open("/tmp/file/does/not/exist", "rdonly")
+fd, err = S.open("/tmp/file/does/not/exist", "rdonly")
 assert(err, "expected open to fail on file not found")
-assert(err == S.strerror('ENOENT'), "expect ENOENT from open non existent file")
+assert(err.ENOENT, "expect ENOENT from open non existent file")
 
 -- test close invalid fd
-fd, err, errno = S.close(4)
+fd, err = S.close(4)
 assert(err, "expected to fail on close invalid fd")
-assert(errno == S.errno('EBADF'), "expect EBADF from invalid numberic fd") -- test the error functions other way
+assert(err.errno == S.E.EBADF, "expect EBADF from invalid numberic fd") -- test the error functions other way
 
 -- test open and close valid file
 fd = assert(S.open("/dev/null", "rdonly"))
@@ -35,7 +35,7 @@ S.sync() -- cannot fail...
 -- test double close fd
 fd, err = S.close(3)
 assert(err, "expected to fail on close already closed fd")
-assert(err == S.strerror('EBADF'), "expect EBADF from invalid numberic fd")
+assert(err.badf, "expect EBADF from invalid numberic fd")
 
 assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
 
@@ -51,9 +51,9 @@ for i = 0, size - 1 do assert(buf[i] == 0, "should read zero bytes from /dev/zer
 local string = assert(fd2:read(nil, 10)) -- test read to string
 assert(#string == 10, "string returned from read should be length 10")
 -- test writing to read only file fails
-n, err, errno = fd2:write(buf, size)
+n, err = fd2:write(buf, size)
 assert(err, "should not be able to write to file opened read only")
-assert(errno == S.errno('EBADF'), "expect EBADF when writing read only file")
+assert(err.EBADF, "expect EBADF when writing read only file")
 
 -- test gc of file handle
 fd2 = nil
@@ -62,7 +62,7 @@ collectgarbage("collect")
 -- test file has been closed after garbage collection
 n, err = S.read(4, buf, size)
 assert(err, "should not be able to read from fd 4 after gc")
-assert(err == S.strerror('EBADF'), "expect EBADF from already closed fd")
+assert(err.EBADF, "expect EBADF from already closed fd")
 
 -- test with gc turned off
 fd = assert(S.open("/dev/zero", "RDONLY"))
@@ -250,9 +250,9 @@ c = assert(S.socket("AF_INET", "SOCK_STREAM")) -- client socket
 assert(c:nonblock())
 
 --assert(c:connect(sa)) -- connect to our server address
-ok, err, errno = c:connect(sa)
+ok, err = c:connect(sa)
 assert(not ok, "connect should fail here")
-assert(err ~= S.errno('EINPROGRESS'), "have not accepted should get Operation in progress")
+assert(err.EINPROGRESS, "have not accepted should get Operation in progress")
 
 local a = assert(s:accept())
 -- a is a table with the fd, but also the inbound connection details
@@ -318,8 +318,8 @@ assert(S.signal("pipe", "ign"))
 
 assert(sv[2]:close())
 
-n, err, errno = sv[1]:write("will get sigpipe")
-assert(err == S.strerror("EPIPE"), "should get sigpipe")
+n, err = sv[1]:write("will get sigpipe")
+assert(err.EPIPE, "should get sigpipe")
 
 assert(sv[1]:close())
 
@@ -366,7 +366,7 @@ assert(s:close())
 assert(c:close())
 
 --ipv6 socket
-s, err, errno = S.socket("AF_INET6", "dgram")
+s, err = S.socket("AF_INET6", "dgram")
 if s then 
   c = assert(S.socket("AF_INET6", "dgram"))
   local sa = assert(S.sockaddr_in6(0, S.in6addr_any))
@@ -379,7 +379,7 @@ if s then
   local f = assert(c:recvfrom(buf, size))
   assert(f.count == #string, "should get the whole string back")
   assert(f.port == serverport, "should be able to get server port in recvfrom")
-else assert(errno == S.errno('EAFNOSUPPORT'), err) end -- ok to not have ipv6 in kernel
+else assert(err.EAFNOSUPPORT, err) end -- ok to not have ipv6 in kernel
 
 -- fork and related methods
 local pid, pid0, w
@@ -428,9 +428,9 @@ assert (n == 0, "process should start at priority 0")
 assert(S.nice(1))
 assert(S.setpriority("process", 0, 1)) -- sets to 1, which it already is
 if S.geteuid() ~= 0 then
-  n, err, errno = S.nice(-2)
+  n, err = S.nice(-2)
   assert(err, "non root user should not be able to set negative priority")
-  n, err, errno = S.setpriority("process", 0, -1)
+  n, err = S.setpriority("process", 0, -1)
   assert(err, "non root user should not be able to set negative priority")
 end
 
@@ -486,8 +486,8 @@ assert(d[".."].dir, ".. is a directory")
 
 -- add test for failing system call to check return values
 fd = assert(S.open("/etc/passwd", "RDONLY"))
-local d, err, errno = fd:getdents()
-assert(errno == S.errno("ENOTDIR"), "/etc/passwd should give a not directory error")
+local d, err = fd:getdents()
+assert(err.notdir, "/etc/passwd should give a not directory error")
 assert(fd:close())
 
 -- eventfd, Linux only
