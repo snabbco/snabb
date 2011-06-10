@@ -436,7 +436,7 @@ local i = assert(S.sysinfo())
 
 -- netlink sockets, Linux only
 -- will make this a helper function
-s = assert(S.socket("AF_NETLINK", "SOCK_RAW", "NETLINK_ROUTE"))
+s = assert(S.socket("AF_NETLINK", "raw", "NETLINK_ROUTE"))
 a = S.sockaddr_nl() -- kernel will fill in address
 assert(s:bind(a))
 local k = S.sockaddr_nl() -- kernel destination

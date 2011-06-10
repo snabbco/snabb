@@ -37,11 +37,11 @@ File descriptors are returned as a type not an integer. This is because they are
 
 As well as garbage collections of file descriptors, mmap regions are also unmapped if they go out of scope.
 
-String conversions are not done automatically, you get a buffer back, you have to force a conversion. This is because interning strings is expensive if you do not need it. Nor are conversions from 64 bit values to Lua numbers, as that would be lossy.
+String conversions are not done automatically, you get a buffer back, you have to force a conversion. This is because interning strings is expensive if you do not need it. Nor are conversions from 64 bit values to Lua numbers, as that would be lossy (actually some are, need to make consistent). However if you do not supply a buffer for the return value, you will get a string from some functions. Again need to make more consistent.
 
 Not yet supporting the 64 bit file operations for 32 bit architectures (lseek64 etc).
 
-Constants should all be available, eg L.SEEK_SET etc. You can usually add to combine them. Some available as strings, if defined as enums.
+Constants should all be available, eg `L.SEEK_SET` etc. You can add to combine them. They are also available as strings, so "SEEK_SET" will be converted to S.SEEK_SET. You can miss off the "SEEK_" prefix, and they are not case sensitive, so you can just use `fd:lseek(offset, "set")` for more concise and readable use. If multiple flags are allowed, they can be comma separated for logical OR, such as `S.mmap(nil, size, "read", "private, anonymous", -1, 0)`.
 
 You do not need to use the numbered versions of functions, eg dup can do dup2 or dup3 by adding more arguments
 
@@ -51,9 +51,7 @@ Standard convenience macros are also provided, eg S.major(dev) to extract a majo
 
 bind does not require a length for the address type length, as it can work this out dynamically.
 
-uname returns a Lua table with the returned strings in it. Similarly getdents returns directory entries as a table.
-
-Some parameters are defined as enums rather than ints, which means that you use string names, eg fd:lseek(offset, "SEEK_SET"). These are in the cases where there is a single value to be set, which cannot be combined with anything else, so not bitmap arguments. In a few cases both are provided, for example Linux adds socket flags as well as the normal enumerated types, so posix applications can use the enum as expected. Other string parameters are optionally available, such as "stdin", meaning the 0 file descriptor. And now, in a further improvement, flags are being parsed as strings, so you can write S.open(name, "creat, wronly, trunc"). There is a slight inconsistency between these different methods, will clear up over time, I may remove the enums and replace with string parsing which is compatible.
+uname returns a Lua table with the returned strings in it. Similarly getdents returns directory entries as a table. All functions that return multiple arguments return tables in general.
 
 The test cases are good examples until I do better documentation!
 
