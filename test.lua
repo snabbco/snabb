@@ -430,8 +430,8 @@ end
 
 local tv = assert(S.gettimeofday())
 local t = S.time()
-local t = assert(S.clock_getres("CLOCK_REALTIME"))
-local t = assert(S.clock_gettime("CLOCK_REALTIME"))
+local t = assert(S.clock_getres("realtime"))
+local t = assert(S.clock_gettime("realtime"))
 local i = assert(S.sysinfo())
 
 -- netlink sockets, Linux only

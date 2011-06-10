@@ -216,6 +216,15 @@ S.WEXITED       = 4
 S.WCONTINUED    = 8
 S.WNOWAIT       = 0x01000000
 
+-- clocks
+S.CLOCK_REALTIME = 0
+S.CLOCK_MONOTONIC = 1
+S.CLOCK_PROCESS_CPUTIME_ID = 2
+S.CLOCK_THREAD_CPUTIME_ID = 3
+S.CLOCK_MONOTONIC_RAW = 4
+S.CLOCK_REALTIME_COARSE = 5
+S.CLOCK_MONOTONIC_COARSE = 6
+
 -- send, recv etc
 S.MSG_OOB             = 0x01
 S.MSG_PEEK            = 0x02
@@ -788,15 +797,6 @@ enum AF {
   AF_ALG        = 38,
   AF_MAX        = 39,
 };
-enum CLOCK {
-  CLOCK_REALTIME = 0,
-  CLOCK_MONOTONIC = 1,
-  CLOCK_PROCESS_CPUTIME_ID = 2,
-  CLOCK_THREAD_CPUTIME_ID = 3,
-  CLOCK_MONOTONIC_RAW = 4,
-  CLOCK_REALTIME_COARSE = 5,
-  CLOCK_MONOTONIC_COARSE = 6,
-};
 enum NETLINK {
   NETLINK_ROUTE         = 0,
   NETLINK_UNUSED        = 1,
@@ -1115,9 +1115,9 @@ enum SIG_ signal(enum SIG signum, enum SIG_ handler); /* although deprecated, ju
 int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
 int settimeofday(const struct timeval *tv, const void *tz);
 time_t time(time_t *t);
-int clock_getres(enum CLOCK clk_id, struct timespec *res); // was clockid_t clk_id
-int clock_gettime(enum CLOCK clk_id, struct timespec *tp); // was clockid_t clk_id
-int clock_settime(enum CLOCK clk_id, const struct timespec *tp); // was clockid_t clk_id
+int clock_getres(clockid_t clk_id, struct timespec *res);
+int clock_gettime(clockid_t clk_id, struct timespec *tp);
+int clock_settime(clockid_t clk_id, const struct timespec *tp);
 int sysinfo(struct sysinfo *info);
 void sync(void);
 int nice(int inc);
@@ -1286,7 +1286,6 @@ local string_array_t = ffi.typeof("const char *[?]")
 -- enums, not sure if there is a better way to convert - starting to phase out
 local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 local enumE_t = ffi.typeof("enum E") -- used for converting error names
-local enumCLOCK_t = ffi.typeof("enum CLOCK") -- for clockids
 local enumNETLINK = ffi.typeof("enum NETLINK") -- netlink socket protocols
 
 -- need these for casts
@@ -2035,19 +2034,19 @@ end
 if rt then -- real time functions not in glibc in Linux, check if available. N/A on OSX.
   function S.clock_getres(clk_id, ts)
     if not ts then ts = timespec_t() end
-    local ret = rt.clock_getres(clk_id, ts)
+    local ret = rt.clock_getres(stringflag(clk_id, "CLOCK_"), ts)
     if ret == -1 then return errorret() end
     return ts
   end
 
   function S.clock_gettime(clk_id, ts)
     if not ts then ts = timespec_t() end
-    local ret = rt.clock_gettime(clk_id, ts)
+    local ret = rt.clock_gettime(stringflag(clk_id, "CLOCK_"), ts)
     if ret == -1 then return errorret() end
     return ts
   end
 
-  function S.clock_settime(clk_id, ts) return retbool(rt.clock_settime(clk_id, ts)) end
+  function S.clock_settime(clk_id, ts) return retbool(rt.clock_settime(stringflag(clk_id, "CLOCK_"), ts)) end
 end
 
 -- straight passthroughs, as no failure possible
