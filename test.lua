@@ -246,7 +246,7 @@ assert(ba.addr.sin_family == 2, "expect family on getsockname to be AF_INET=2")
 
 assert(s:listen()) -- will fail if we did not bind
 
-c = assert(S.socket("AF_INET", "SOCK_STREAM")) -- client socket
+c = assert(S.socket("AF_INET", "stream")) -- client socket
 assert(c:nonblock())
 assert(c:fcntl("setfd", "cloexec"))
 

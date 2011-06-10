@@ -534,6 +534,14 @@ S.LINUX_REBOOT_CMD_RESTART2     =  0xA1B2C3D4
 S.LINUX_REBOOT_CMD_SW_SUSPEND   =  0xD000FCE2
 S.LINUX_REBOOT_CMD_KEXEC        =  0x45584543
 
+-- syscalls, filling in as used at the minute
+-- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
+if ffi.abi("32bit") and (ffi.arch == "x86" or (ffi.arch == "arm" and ffi.abi("eabi"))) then
+  S.SYS_getdents = 141
+elseif ffi.abi("64bit") and ffi.arch == "x64" then
+  S.SYS_getdents = 78
+end
+
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
@@ -1071,24 +1079,7 @@ struct linux_stat {
 ]]
 end
 
--- completely arch dependent stuff. Note not defining all the syscalls yet
--- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
-if ffi.abi("32bit") and (ffi.arch == "x86" or (ffi.arch == "arm" and ffi.abi("eabi"))) then
-ffi.cdef[[
-enum SYS {
-  SYS_getdents = 141,
-};
-]]
-elseif ffi.abi("64bit") and ffi.arch == "x64" then
-ffi.cdef[[
-enum SYS {
-  SYS_getdents = 78,
-};
-]]
-end
-
 -- shared code
-
 ffi.cdef[[
 int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
@@ -1200,7 +1191,7 @@ char *getcwd(char *buf, size_t size);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
 
-int syscall(enum SYS number, ...);
+int syscall(int number, ...);
 
 int ioctl(int d, int request, void *argp); /* void* easiest here */
 
@@ -1631,7 +1622,7 @@ end
 function S.syscall(num, ...)
   -- call with the right types, use at your own risk
   local a, b, c, d, e, f = ...
-  local ret = C.syscall(num, a, b, c, d, e, f)
+  local ret = C.syscall(stringflag(num, "SYS_"), a, b, c, d, e, f)
   if ret == -1 then return errorret() end
   return ret
 end
@@ -1654,7 +1645,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   local d = {}
   local ret
   repeat
-    ret = C.syscall("SYS_getdents", uint_t(getfd(fd)), buf, uint_t(size))
+    ret = C.syscall(S.SYS_getdents, uint_t(getfd(fd)), buf, uint_t(size))
     if ret == -1 then return errorret() end
     local i = 0
     while i < ret do
