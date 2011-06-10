@@ -1942,17 +1942,20 @@ function S.epoll_create(flags)
 end
 
 function S.epoll_ctl(epfd, op, fd, events, data)
-  local event = epoll_event_t()
-  event.events = events
+  local event = epoll_event_t{events = stringflags(events, "EPOLL")}
   if data then event.data.u64 = data else event.data.fd = getfd(fd) end
   return retbool(C.epoll_ctl(getfd(epfd), stringflag(op, "EPOLL_CTL_"), getfd(fd), event))
 end
 
-local getflags -- make more generic and use elsewhere, and for constructing
-function getflags(e)
+local getflags
+function getflags(e, prefix, values)
   local r= {}
-  for i, f in ipairs{"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"} do
-    if bit.band(e, S[f]) ~= 0 then r[f] = true end
+  for i, f in ipairs(values) do
+    if bit.band(e, S[f]) ~= 0 then
+      r[f] = true
+      r[f:lower()] = true
+      r[f:sub(#prefix):lower()] = true -- ie set r.in, r.out etc as well
+    end
   end
   return r
 end
@@ -1965,7 +1968,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout)
   local r = {}
   for i = 1, ret do -- put in Lua array
     local e = events[i - 1]
-    local rr = getflags(e.events)
+    local rr = getflags(e.events, "EPOLL", {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"})
     rr.fd = e.data.fd
     rr.data = e.data.u64
     r[i] = rr

@@ -336,7 +336,7 @@ local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
 assert(sel.count == 0, "nothing to read select now")
 
 local ep = assert(S.epoll_create())
-assert(ep:epoll_ctl("add", c, S.EPOLLIN))
+assert(ep:epoll_ctl("add", c, "in, err, hup")) -- actually dont need to set err, hup
 
 local r
 r = assert(ep:epoll_wait())
@@ -349,7 +349,7 @@ assert(sel.count == 1, "one fd available for read now")
 
 r = assert(ep:epoll_wait())
 assert(#r == 1, "one event now")
-assert(r[1].EPOLLIN, "read event")
+assert(r[1].epollin, "read event")
 assert(ep:close())
 
 local f = assert(c:recvfrom(buf, size))
