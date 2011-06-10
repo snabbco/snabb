@@ -139,7 +139,7 @@ S.PRIO_PROCESS = 0
 S.PRIO_PGRP = 1
 S.PRIO_USER = 2
 
--- sockets -- linux has flags against this, so provided as enum and constants
+-- sockets -- linux has flags against this
 S.SOCK_STREAM    = 1
 S.SOCK_DGRAM     = 2
 S.SOCK_RAW       = 3
@@ -191,6 +191,11 @@ S.SO_SNDTIMEO    = 21
 
 -- Maximum queue length specifiable by listen.
 S.SOMAXCONN = 128
+
+-- shutdown
+S.SHUT_RD = 0
+S.SHUT_WR = 1
+S.SHUT_RDWR = 2
 
 -- waitpid 3rd arg
 S.WNOHANG       = 1
@@ -740,11 +745,6 @@ enum SIG {
   SIGSYS        = 31,
   SIGUNUSED     = 31
 };
-enum SHUT {
-  SHUT_RD = 0,
-  SHUT_WR,
-  SHUT_RDWR
-};
 enum AF {
   AF_UNSPEC     = 0,
   AF_LOCAL      = 1,
@@ -1170,7 +1170,7 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
 int getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-int shutdown(int sockfd, enum SHUT how);
+int shutdown(int sockfd, int how);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 int munmap(void *addr, size_t length);
@@ -1808,7 +1808,7 @@ function S.connect(sockfd, addr, addrlen)
   return retbool(C.connect(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
-function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), how)) end
+function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), stringflag(how, "SHUT_"))) end
 
 function S.accept(sockfd)
   local ss = sockaddr_storage_t()
