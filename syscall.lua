@@ -444,7 +444,7 @@ for _, v in ipairs(nlmsglist) do
   nlmsgtypes[S[v]] = v
 end
 
--- need address families as constants too (? derive from enums?)
+-- address families
 S.AF_UNSPEC     = 0
 S.AF_LOCAL      = 1
 S.AF_UNIX       = S.AF_LOCAL
@@ -930,52 +930,6 @@ struct epoll_event {
   epoll_data_t data;    /* User data variable */
 };   // __attribute__ ((__packed__));
 #pragma pack(pop)
-
-// enums, LuaJIT will allow strings to be used, so we provide for appropriate parameters - removing these though
-
-enum AF {
-  AF_UNSPEC     = 0,
-  AF_LOCAL      = 1,
-  AF_UNIX       = AF_LOCAL,
-  AF_FILE       = AF_LOCAL,
-  AF_INET       = 2,
-  AF_AX25       = 3,
-  AF_IPX        = 4,
-  AF_APPLETALK  = 5,
-  AF_NETROM     = 6,
-  AF_BRIDGE     = 7,
-  AF_ATMPVC     = 8,
-  AF_X25        = 9,
-  AF_INET6      = 10,
-  AF_ROSE       = 11,
-  AF_DECnet     = 12,
-  AF_NETBEUI    = 13,
-  AF_SECURITY   = 14,
-  AF_KEY        = 15,
-  AF_NETLINK    = 16,
-  AF_ROUTE      = AF_NETLINK,
-  AF_PACKET     = 17,
-  AF_ASH        = 18,
-  AF_ECONET     = 19,
-  AF_ATMSVC     = 20,
-  AF_RDS        = 21,
-  AF_SNA        = 22,
-  AF_IRDA       = 23,
-  AF_PPPOX      = 24,
-  AF_WANPIPE    = 25,
-  AF_LLC        = 26,
-  AF_CAN        = 29,
-  AF_TIPC       = 30,
-  AF_BLUETOOTH  = 31,
-  AF_IUCV       = 32,
-  AF_RXRPC      = 33,
-  AF_ISDN       = 34,
-  AF_PHONET     = 35,
-  AF_IEEE802154 = 36,
-  AF_CAIF       = 37,
-  AF_ALG        = 38,
-  AF_MAX        = 39,
-};
 ]]
 
 -- stat structure is architecture dependent in Linux
@@ -1144,7 +1098,7 @@ int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 int eventfd(unsigned int initval, int flags);
-int reboot(enum LINUX_REBOOT_CMD cmd);
+int reboot(int cmd);
 int klogctl(int type, char *bufp, int len);
 
 int dup(int oldfd);
@@ -1159,8 +1113,8 @@ int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
 int pause(void);
 
-int socket(enum AF domain, int type, int protocol);
-int socketpair(enum AF domain, int type, int protocol, int sv[2]);
+int socket(int domain, int type, int protocol);
+int socketpair(int domain, int type, int protocol, int sv[2]);
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int listen(int sockfd, int backlog);
 int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
@@ -1208,8 +1162,8 @@ int lstat(const char *path, struct stat *buf);
 void exit(int status);
 int inet_aton(const char *cp, struct in_addr *inp);
 char *inet_ntoa(struct in_addr in);
-int inet_pton(enum AF, const char *src, void *dst);
-const char *inet_ntop(enum AF, const void *src, char *dst, socklen_t size);
+int inet_pton(int af, const char *src, void *dst);
+const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 
 // functions from libc that could be exported as a convenience, used internally
 void *calloc(size_t nmemb, size_t size);
@@ -1280,9 +1234,6 @@ local uint64_1t = ffi.typeof("uint64_t[1]")
 local socklen1_t = ffi.typeof("socklen_t[1]")
 
 local string_array_t = ffi.typeof("const char *[?]")
-
--- enums, not sure if there is a better way to convert - starting to phase out
-local enumAF_t = ffi.typeof("enum AF") -- used for converting enum
 
 -- need these for casts
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
@@ -1404,7 +1355,7 @@ function S.sockaddr_in(port, addr)
   return sockaddr_in_t(S.AF_INET, S.htons(port), addr)
 end
 function S.sockaddr_in6(port, addr)
-  if type(addr) == 'string' then addr = S.inet_pton("INET6", addr) end
+  if type(addr) == 'string' then addr = S.inet_pton(S.AF_INET6, addr) end
   if not addr then return nil end
   local sa = sockaddr_in6_t()
   sa.sin6_family = S.AF_INET6
@@ -1425,13 +1376,12 @@ function S.sockaddr_nl(pid, groups)
   return addr
 end
 
-local fam = function(s) return tonumber(enumAF_t(s)) end -- convert to Lua number, as tables indexed by number
-
 -- map from socket family to data type
-local socket_type = {}
+local socket_type, address_type = {}, {}
 -- AF_UNSPEC
-socket_type[fam("AF_LOCAL")] = sockaddr_un_t
-socket_type[fam("AF_INET")] = sockaddr_in_t
+socket_type[S.AF_LOCAL] = sockaddr_un_t
+socket_type[S.AF_INET] = sockaddr_in_t
+address_type[S.AF_INET] = in_addr_t
 --  AF_AX25
 --  AF_IPX
 --  AF_APPLETALK
@@ -1439,13 +1389,14 @@ socket_type[fam("AF_INET")] = sockaddr_in_t
 --  AF_BRIDGE
 --  AF_ATMPVC
 --  AF_X25
-socket_type[fam("AF_INET6")] = sockaddr_in6_t
+socket_type[S.AF_INET6] = sockaddr_in6_t
+address_type[S.AF_INET6] = in6_addr_t
 --  AF_ROSE
 --  AF_DECnet
 --  AF_NETBEUI
 --  AF_SECURITY
 --  AF_KEY
-socket_type[fam("AF_NETLINK")] = sockaddr_nl_t
+socket_type[S.AF_NETLINK] = sockaddr_nl_t
 --  AF_PACKET
 --  AF_ASH
 --  AF_ECONET
@@ -1526,6 +1477,7 @@ local INET6_ADDRSTRLEN = 46
 local INET_ADDRSTRLEN = 16
 
 function S.inet_ntop(af, src)
+  af = stringflag(af, "AF_")
   local len = INET6_ADDRSTRLEN -- could shorten for ipv4
   local dst = buffer_t(len)
   local ret = C.inet_ntop(af, src, dst, len)
@@ -1534,9 +1486,8 @@ function S.inet_ntop(af, src)
 end
 
 function S.inet_pton(af, src)
-  local addr
-  if fam(af) == fam("AF_INET") then addr = in_addr_t()
-  elseif fam(af) == fam("AF_INET6") then addr = in6_addr_t() end
+  af = stringflag(af, "AF_")
+  local addr = address_type[af]()
   local ret = C.inet_pton(af, src, addr)
   if ret == -1 then return errorret() end
   if ret == 0 then return nil end -- maybe return string
@@ -1549,7 +1500,7 @@ S.INADDR_LOOPBACK = assert(S.inet_aton("127.0.0.1"))
 S.INADDR_BROADCAST = assert(S.inet_aton("255.255.255.255"))
 -- ipv6 versions
 S.in6addr_any = in6_addr_t()
-S.in6addr_loopback = S.inet_pton("AF_INET6", "::1") -- no assert, may fail if no inet6 support
+S.in6addr_loopback = S.inet_pton(S.AF_INET6, "::1") -- no assert, may fail if no inet6 support
 
 -- main definitions start here
 function S.open(pathname, flags, mode) return retfd(C.open(pathname, stringflags(flags, "O_"), stringflags(mode, "S_"))) end
@@ -1815,8 +1766,12 @@ function sproto(domain, protocol) -- helper function to lookup protocol type dep
   return protocol or 0
 end
 
-function S.socket(domain, stype, protocol) return retfd(C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol))) end
+function S.socket(domain, stype, protocol)
+  domain = stringflag(domain, "AF_")
+  return retfd(C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol)))
+end
 function S.socketpair(domain, stype, protocol)
+  domain = stringflag(domain, "AF_")
   local sv2 = int2_t()
   local ret = C.socketpair(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol), sv2)
   if ret == -1 then return errorret() end

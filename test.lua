@@ -223,7 +223,7 @@ a = S.inet_aton("error")
 assert(not a, "should get invalid IP address")
 
 local s, fl, c
-s = assert(S.socket("AF_INET", "stream, nonblock")) -- adding flags to socket type is Linux only
+s = assert(S.socket("inet", "stream, nonblock")) -- adding flags to socket type is Linux only
 
 local loop = "127.0.0.1"
 sa = S.sockaddr_in(1234, "error")
@@ -246,7 +246,7 @@ assert(ba.addr.sin_family == 2, "expect family on getsockname to be AF_INET=2")
 
 assert(s:listen()) -- will fail if we did not bind
 
-c = assert(S.socket("AF_INET", "stream")) -- client socket
+c = assert(S.socket("inet", "stream")) -- client socket
 assert(c:nonblock())
 assert(c:fcntl("setfd", "cloexec"))
 
@@ -297,7 +297,7 @@ assert(c:close())
 assert(a.fd:close())
 
 -- unix domain sockets
-local sv = assert(S.socketpair("AF_UNIX", "stream"))
+local sv = assert(S.socketpair("unix", "stream"))
 
 assert(sv[2]:setsockopt(S.SOL_SOCKET, S.SO_PASSCRED, true)) -- enable receive creds
 local so = assert(sv[2]:getsockopt(S.SOL_SOCKET, S.SO_PASSCRED))
@@ -327,8 +327,8 @@ assert(sv[1]:close())
 assert(S.kill(S.getpid(), "pipe")) -- should be ignored
 
 -- udp socket
-s = assert(S.socket("AF_INET", "dgram"))
-c = assert(S.socket("AF_INET", "dgram"))
+s = assert(S.socket("inet", "dgram"))
+c = assert(S.socket("inet", "dgram"))
 
 local sa = assert(S.sockaddr_in(0, loop))
 local ca = assert(S.sockaddr_in(0, loop))
@@ -443,7 +443,7 @@ local i = assert(S.sysinfo())
 
 -- netlink sockets, Linux only
 -- will make this a helper function
-s = assert(S.socket(S.AF_NETLINK, "raw", "route")) -- should be "netlink" for first param soon
+s = assert(S.socket("netlink", "raw", "route"))
 a = S.sockaddr_nl() -- kernel will fill in address
 assert(s:bind(a))
 local k = S.sockaddr_nl() -- kernel destination
