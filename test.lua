@@ -418,6 +418,12 @@ else -- parent
   assert(S.unlink(efile))
 end
 
+assert(S.nice(1))
+if S.geteuid() ~= 0 then
+  n, err, errno = S.nice(-2)
+  assert(err == S.strerror("EPERM"), "non root user should not be able to set negative nice")
+end
+
 local tv = assert(S.gettimeofday())
 local t = S.time()
 local t = assert(S.clock_getres("CLOCK_REALTIME"))

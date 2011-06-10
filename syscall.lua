@@ -1131,6 +1131,9 @@ int clock_gettime(enum CLOCK clk_id, struct timespec *tp); // was clockid_t clk_
 int clock_settime(enum CLOCK clk_id, const struct timespec *tp); // was clockid_t clk_id
 int sysinfo(struct sysinfo *info);
 void sync(void);
+int nice(int inc);
+int getpriority(int which, int who);
+int setpriority(int which, int who, int prio);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -1567,6 +1570,14 @@ function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath))
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 function S.pause() return retbool(C.pause()) end
+
+function S.nice(inc)
+  ffi.errno(0) -- returns nice value which could be -1 (actually Linux syscall does not, but glibc does)
+  local ret = C.nice(inc)
+  if ffi.errno() ~= 0 then return errorret() end
+  return ret
+end
+
 
 function S.fork() return retint(C.fork()) end
 function S.execve(filename, argv, envp)
@@ -2120,7 +2131,7 @@ end
 
 local nlmsg_data_decode = {}
 nlmsg_data_decode["RTM_NEWLINK"] = function(r)
-  print("got newlink msg")
+  --print("got newlink msg")
 
   local iface = ffi.cast(ifinfomsg_pt, r.data)
 
