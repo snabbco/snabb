@@ -8,8 +8,6 @@ print(u.nodename .. " " .. u.sysname .. " " .. u.release .. " " .. u.version)
 local h = assert(S.gethostname())
 assert(h == u.nodename, "gethostname did not return nodename")
 
-assert(S.signal("SIGPIPE", "SIG_IGN"))
-
 -- test open non existent file
 fd, err, errno = S.open("/tmp/file/does/not/exist", "rdonly")
 assert(err, "expected open to fail on file not found")
@@ -314,10 +312,19 @@ assert(#r.fd == 1, "expect to get one file descriptor back")
 assert(r.fd[1]:close())
 assert(r.pid == S.getpid(), "should get my pid from sent credentals")
 
-assert(sv[1]:shutdown("rdwr"))
+assert(sv[1]:shutdown("rd"))
+
+assert(S.signal("pipe", "ign"))
+
+assert(sv[2]:close())
+
+n, err, errno = sv[1]:write("will get sigpipe")
+assert(err == S.strerror("EPIPE"), "should get sigpipe")
 
 assert(sv[1]:close())
-assert(sv[2]:close())
+
+
+assert(S.kill(S.getpid(), "pipe")) -- should be ignored
 
 -- udp socket
 s = assert(S.socket("AF_INET", "dgram"))
@@ -533,6 +540,6 @@ assert(S.chroot("/"))
 
 S.exit("success")
 
--- note tests missing whether setting SIG_IGN works. setting time, ioctl TODO
+-- note tests missing tests for setting time, ioctl TODO
 -- note have tested pause, reboot but not in tests
 

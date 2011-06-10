@@ -148,7 +148,48 @@ S.SEEK_END = 2
 S.EXIT_SUCCESS = 0
 S.EXIT_FAILURE = 1
 
--- sockets -- linux has flags against this
+S.SIG_ERR = -1
+S.SIG_DFL =  0
+S.SIG_IGN =  1
+S.SIG_HOLD = 2
+
+S.SIGHUP        = 1
+S.SIGINT        = 2
+S.SIGQUIT       = 3
+S.SIGILL        = 4
+S.SIGTRAP       = 5
+S.SIGABRT       = 6
+S.SIGIOT        = 6
+S.SIGBUS        = 7
+S.SIGFPE        = 8
+S.SIGKILL       = 9
+S.SIGUSR1       = 10
+S.SIGSEGV       = 11
+S.SIGUSR2       = 12
+S.SIGPIPE       = 13
+S.SIGALRM       = 14
+S.SIGTERM       = 15
+S.SIGSTKFLT     = 16
+S.SIGCHLD       = 17
+S.SIGCLD        = S.SIGCHLD
+S.SIGCONT       = 18
+S.SIGSTOP       = 19
+S.SIGTSTP       = 20
+S.SIGTTIN       = 21
+S.SIGTTOU       = 22
+S.SIGURG        = 23
+S.SIGXCPU       = 24
+S.SIGXFSZ       = 25
+S.SIGVTALRM     = 26
+S.SIGPROF       = 27
+S.SIGWINCH      = 28
+S.SIGIO         = 29
+S.SIGPOLL       = S.SIGIO
+S.SIGPWR        = 30
+S.SIGSYS        = 31
+S.SIGUNUSED     = 31
+
+-- sockets
 S.SOCK_STREAM    = 1
 S.SOCK_DGRAM     = 2
 S.SOCK_RAW       = 3
@@ -711,49 +752,6 @@ enum F {
   F_GETPIPE_SZ  = 1032,
   F_DUPFD_CLOEXEC = 1030
 };
-enum SIG_ { /* maybe not the clearest name */
-  SIG_ERR = -1,
-  SIG_DFL =  0,
-  SIG_IGN =  1,
-  SIG_HOLD = 2,
-};
-enum SIG {
-  SIGHUP        = 1,
-  SIGINT        = 2,
-  SIGQUIT       = 3,
-  SIGILL        = 4,
-  SIGTRAP       = 5,
-  SIGABRT       = 6,
-  SIGIOT        = 6,
-  SIGBUS        = 7,
-  SIGFPE        = 8,
-  SIGKILL       = 9,
-  SIGUSR1       = 10,
-  SIGSEGV       = 11,
-  SIGUSR2       = 12,
-  SIGPIPE       = 13,
-  SIGALRM       = 14,
-  SIGTERM       = 15,
-  SIGSTKFLT     = 16,
-  SIGCHLD       = 17,
-  SIGCLD        = SIGCHLD,
-  SIGCONT       = 18,
-  SIGSTOP       = 19,
-  SIGTSTP       = 20,
-  SIGTTIN       = 21,
-  SIGTTOU       = 22,
-  SIGURG        = 23,
-  SIGXCPU       = 24,
-  SIGXFSZ       = 25,
-  SIGVTALRM     = 26,
-  SIGPROF       = 27,
-  SIGWINCH      = 28,
-  SIGIO         = 29,
-  SIGPOLL       = SIGIO,
-  SIGPWR        = 30,
-  SIGSYS        = 31,
-  SIGUNUSED     = 31
-};
 enum AF {
   AF_UNSPEC     = 0,
   AF_LOCAL      = 1,
@@ -1111,7 +1109,8 @@ int execve(const char *filename, const char *argv[], const char *envp[]);
 pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);
 void _exit(int status);
-enum SIG_ signal(enum SIG signum, enum SIG_ handler); /* although deprecated, just using to set SIG_ values */
+int signal(int signum, int handler); /* although deprecated, just using to set SIG_ values */
+int kill(pid_t pid, int sig);
 int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
 int settimeofday(const struct timeval *tv, const void *tz);
 time_t time(time_t *t);
@@ -1892,7 +1891,8 @@ function S.sethostname(s) -- only accept Lua string, do not see use case for buf
   return retbool(C.sethostname(s, #s))
 end
 
-function S.signal(signum, handler) return retbool(C.signal(signum, handler)) end
+function S.signal(signum, handler) return retbool(C.signal(stringflag(signum, "SIG"), stringflag(handler, "SIG_"))) end
+function S.kill(pid, sig) return retbool(C.kill(pid, stringflag(sig, "SIG"))) end
 
 function S.gettimeofday(tv)
   if not tv then tv = timeval_t() end -- note it is faster to pass your own tv if you call a lot
