@@ -12,6 +12,7 @@ assert(h == u.nodename, "gethostname did not return nodename")
 fd, err = S.open("/tmp/file/does/not/exist", "rdonly")
 assert(err, "expected open to fail on file not found")
 assert(err.ENOENT, "expect ENOENT from open non existent file")
+assert(tostring(err) == "No such file or directory", "should get string error message")
 
 -- test close invalid fd
 fd, err = S.close(4)

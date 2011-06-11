@@ -680,27 +680,32 @@ S.E.EOWNERDEAD     = 130
 S.E.ENOTRECOVERABLE= 131
 S.E.ERFKILL        = 132
 
-local errors = {}
+function S.strerror(errno) return ffi.string(C.strerror(errno)) end
 
 local emt = {__tostring = function(e) return S.strerror(e.errno) end}
 
+local errsyms = {}
+
 for i, v in pairs(S.E) do
-  local e = {errno = v, sym = i}
-  e[i] = true
-  e[i:sub(2):lower()] = true
+  errsyms[v] = i
+end
+
+local mkerror = function(errno)
+  local sym = errsyms[errno]
+  local e = {errno = errno, sym = sym}
+  e[sym] = true
+  e[sym:sub(2):lower()] = true
   setmetatable(e, emt)
-  errors[v] = e
+  return e
 end
 
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
 local errorret, retint, retbool, retptr, retfd, getfd
 
-function S.strerror(errno) return ffi.string(C.strerror(errno)) end
-
 -- standard error return
 function errorret()
-  return nil, errors[ffi.errno()]
+  return nil, mkerror(ffi.errno())
 end
 
 function retint(ret)
