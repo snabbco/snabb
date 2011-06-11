@@ -314,8 +314,8 @@ S.MSG_WAITFORONE      = 0x10000
 S.MSG_CMSG_CLOEXEC    = 0x40000000
 
 -- epoll
-S.EPOLL_CLOEXEC = 02000000
-S.EPOLL_NONBLOCK = 04000
+S.EPOLL_CLOEXEC = octal("02000000")
+S.EPOLL_NONBLOCK = octal("04000")
 
 S.EPOLLIN = 0x001
 S.EPOLLPRI = 0x002
@@ -1925,8 +1925,8 @@ function S.umount(target, flags)
 end
 
 -- Linux only. use epoll1
-function S.epoll_create(flags)
-  return retfd(C.epoll_create1(flags or 0))
+function S.epoll_create(flags) print(stringflags(flags, "EPOLL_"))
+  return retfd(C.epoll_create1(stringflags(flags, "EPOLL_")))
 end
 
 function S.epoll_ctl(epfd, op, fd, events, data)

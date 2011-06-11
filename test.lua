@@ -2,6 +2,11 @@ local S = require "syscall"
 
 local fd, fd0, fd1, fd2, n, s, err, errno, ok
 
+local oldassert = assert
+function assert(c, s)
+  return oldassert(c, tostring(s)) -- annoyingly, assert does not call tostring!
+end
+
 -- print uname info
 local u = assert(S.uname())
 print(u.nodename .. " " .. u.sysname .. " " .. u.release .. " " .. u.version)
@@ -343,7 +348,7 @@ local serverport = s:getsockname().port -- find bound port
 local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
 assert(sel.count == 0, "nothing to read select now")
 
-local ep = assert(S.epoll_create())
+local ep = assert(S.epoll_create("cloexec"))
 assert(ep:epoll_ctl("add", c, "in, err, hup")) -- actually dont need to set err, hup
 
 local r
