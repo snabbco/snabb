@@ -539,6 +539,12 @@ assert(n == "test", "name should be as set")
 n = assert(S.readfile("/proc/self/comm"))
 assert(n == "test\n", "comm should be as set")
 
+local e = S.environ()
+assert(e.PATH, "expect PATH to be set in environment")
+assert(S.getenv("USER"), "expect USER to be set in environment")
+assert(S.setenv("XXXXYYYYZZZZZZZZ", "test"))
+assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env vars")
+
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
 assert(S.mkdir(tmpfile))

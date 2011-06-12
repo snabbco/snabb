@@ -1238,6 +1238,12 @@ void *malloc(size_t size);
 void free(void *ptr);
 void *realloc(void *ptr, size_t size);
 char *strerror(int);
+// env. dont support putenv, as does not copy which is an issue
+extern char **environ;
+int setenv(const char *name, const char *value, int overwrite);
+int unsetenv(const char *name);
+int clearenv(void);
+char *getenv(const char *name);
 ]]
 
 -- glibc does not have a stat symbol, has its own struct stat and way of calling
@@ -2142,6 +2148,32 @@ S.getegid = C.getegid
 S.sync = C.sync
 
 function S.umask(mask) return C.umask(stringflags(mask, "S_")) end
+
+-- handle environment (Lua only provides os.getenv). Could add metatable to make more Lualike.
+function S.environ() -- return whole environment as table
+  local environ = ffi.C.environ
+  if not environ then return nil end
+  local r = {}
+  local i = 0
+  while environ[i] ~= nil do
+    local e = ffi.string(environ[i])
+    local eq = e:find('=')
+    if eq then
+      r[e:sub(1, eq - 1)] = e:sub(eq + 1)
+    end
+    i = i + 1
+  end
+  return r
+end
+function S.getenv(name)
+  return S.environ()[name]
+end
+function S.unsetenv(name) return retbool(C.unsetenv(name)) end
+function S.setenv(name, value, overwrite)
+  if type(overwrite) == 'boolean' and overwrite then overwrite = 1 end
+  return retbool(C.setenv(name, value, overwrite or 0))
+end
+function S.clearenv() return retbool(C.clearenv()) end
 
 -- 'macros' and helper functions etc
 
