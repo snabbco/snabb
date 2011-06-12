@@ -539,6 +539,12 @@ assert(n == "test", "name should be as set")
 n = assert(S.readfile("/proc/self/comm"))
 assert(n == "test\n", "comm should be as set")
 
+n = assert(S.readfile("/proc/self/cmdline"))
+print(n)
+assert(S.setcmdline("test", "1", "2", "3"))
+n = assert(S.readfile("/proc/self/cmdline"))
+print(n)
+
 local e = S.environ()
 assert(e.PATH, "expect PATH to be set in environment")
 assert(S.getenv("USER"), "expect USER to be set in environment")

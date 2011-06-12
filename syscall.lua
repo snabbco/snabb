@@ -1316,6 +1316,8 @@ local uchar_pt = ffi.typeof("unsigned char *")
 local int_pt = ffi.typeof("int *")
 local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
 
+local pointersize = ffi.sizeof("char *")
+
 assert(ffi.sizeof(sockaddr_t) == ffi.sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
 assert(ffi.sizeof(sockaddr_storage_t) == 128) -- this is the required size in Linux
 assert(ffi.sizeof(sockaddr_storage_t) >= ffi.sizeof(sockaddr_t))
@@ -2174,6 +2176,40 @@ function S.setenv(name, value, overwrite)
   return retbool(C.setenv(name, value, overwrite or 0))
 end
 function S.clearenv() return retbool(C.clearenv()) end
+
+local oldcmdline, cmdstart
+
+function S.setcmdline(...) -- this sets /proc/self/cmdline, use prctl to set /proc/self/comm as well
+  -- note code makes memory layout assumptions that are not necessarily portable
+  -- call this before modifying environment, as we cannot actually get real argv pointer right now, so deduce
+  -- will probably segfault otherwise!
+
+  if not oldcmdline then
+    oldcmdline = S.readfile("/proc/self/cmdline")
+    cmdstart = C.environ[0] - #oldcmdline -- this is where Linux stores the command line
+  end
+
+  local e = S.environ() -- keep copy to reconstruct later
+
+  local size = 0
+  local me = ffi.cast("char *", C.environ)
+
+  if not me then return nil end -- in normal use you should get a pointer to one null pointer as minimum
+
+  local new = table.concat({...}, '\0')
+
+  if #new <= #oldcmdline then
+    print("shorter")
+    ffi.copy(cmdstart, new)
+    ffi.fill(cmdstart + #new, #oldcmdline - #new)
+
+    return true
+  end
+
+  error("TODO")
+
+  return true
+end
 
 -- 'macros' and helper functions etc
 
