@@ -544,6 +544,8 @@ assert(e.PATH, "expect PATH to be set in environment")
 assert(S.getenv("USER"), "expect USER to be set in environment")
 assert(S.setenv("XXXXYYYYZZZZZZZZ", "test"))
 assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env vars")
+assert(S.unsetenv("XXXXYYYYZZZZZZZZ"))
+assert(S.environ().XXXXYYYYZZZZZZZZ == nil, "expect to be able to unset env vars")
 
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
