@@ -200,6 +200,9 @@ local rem
 rem = assert(S.nanosleep(S.t.timespec(0, 1000000)))
 assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
 
+assert(S.signal("alrm", "ign"))
+assert(S.alarm(1)) -- will actually ignore signal so nothing happens
+
 -- mmap and related functions
 local mem, mem2
 size = 4096
@@ -540,10 +543,9 @@ n = assert(S.readfile("/proc/self/comm"))
 assert(n == "test\n", "comm should be as set")
 
 n = assert(S.readfile("/proc/self/cmdline"))
-print(n)
-assert(S.setcmdline("test", "1", "2", "3"))
+assert(S.setcmdline("test"))
 n = assert(S.readfile("/proc/self/cmdline"))
-print(n)
+assert(n:sub(1, 5) == "test\0", "command line should be set")
 
 local e = S.environ()
 assert(e.PATH, "expect PATH to be set in environment")

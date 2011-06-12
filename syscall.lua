@@ -1136,6 +1136,7 @@ time_t time(time_t *t);
 int clock_getres(clockid_t clk_id, struct timespec *res);
 int clock_gettime(clockid_t clk_id, struct timespec *tp);
 int clock_settime(clockid_t clk_id, const struct timespec *tp);
+unsigned int alarm(unsigned int seconds);
 int sysinfo(struct sysinfo *info);
 void sync(void);
 int nice(int inc);
@@ -2148,6 +2149,7 @@ S.getppid = C.getppid
 S.getgid = C.getgid
 S.getegid = C.getegid
 S.sync = C.sync
+S.alarm = C.alarm
 
 function S.umask(mask) return C.umask(stringflags(mask, "S_")) end
 
@@ -2199,7 +2201,6 @@ function S.setcmdline(...) -- this sets /proc/self/cmdline, use prctl to set /pr
   local new = table.concat({...}, '\0')
 
   if #new <= #oldcmdline then
-    print("shorter")
     ffi.copy(cmdstart, new)
     ffi.fill(cmdstart + #new, #oldcmdline - #new)
 
