@@ -515,6 +515,30 @@ assert(fd:close())
 local syslog = assert(S.klogctl(3))
 assert(#syslog > 20, "should be something in syslog")
 
+-- prctl, Linux only
+--PR_CAPBSET_READ -- need to define capabilities flags
+n = assert(S.prctl("get_dumpable"))
+assert(n == 1, "process dumpable by default")
+assert(S.prctl("set_dumpable", 0))
+n = assert(S.prctl("get_dumpable"))
+assert(n == 0, "process not dumpable after change")
+assert(S.prctl("set_dumpable", 1))
+n = assert(S.prctl("get_keepcaps"))
+assert(n == 0, "process keepcaps defaults to 0")
+n = assert(S.prctl("get_pdeathsig"))
+assert(n == 0, "process pdeathsig defaults to 0")
+assert(S.prctl("set_pdeathsig", "winch"))
+n = assert(S.prctl("get_pdeathsig"))
+assert(n == S.SIGWINCH, "process pdeathsig should now be set to winch")
+assert(S.prctl("set_pdeathsig")) -- reset
+n = assert(S.prctl("get_name"))
+assert(n:sub(1, 3) == 'lua', "expect our name to be lua/luajit/luajit...")
+assert(S.prctl("set_name", "test"))
+n = assert(S.prctl("get_name"))
+assert(n == "test", "name should be as set")
+n = assert(S.readfile("/proc/self/comm"))
+assert(n == "test\n", "comm should be as set")
+
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
 assert(S.mkdir(tmpfile))

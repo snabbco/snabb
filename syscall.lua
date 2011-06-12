@@ -534,6 +534,67 @@ S.LINUX_REBOOT_CMD_RESTART2     =  0xA1B2C3D4
 S.LINUX_REBOOT_CMD_SW_SUSPEND   =  0xD000FCE2
 S.LINUX_REBOOT_CMD_KEXEC        =  0x45584543
 
+--prctl
+S.PR_SET_PDEATHSIG = 1
+S.PR_GET_PDEATHSIG = 2
+S.PR_GET_DUMPABLE  = 3
+S.PR_SET_DUMPABLE  = 4
+S.PR_GET_UNALIGN   = 5
+S.PR_SET_UNALIGN   = 6
+S.PR_UNALIGN_NOPRINT   = 1
+S.PR_UNALIGN_SIGBUS    = 2
+S.PR_GET_KEEPCAPS  = 7
+S.PR_SET_KEEPCAPS  = 8
+S.PR_GET_FPEMU     = 9
+S.PR_SET_FPEMU     = 10
+S.PR_FPEMU_NOPRINT     = 1
+S.PR_FPEMU_SIGFPE      = 2
+S.PR_GET_FPEXC     = 11
+S.PR_SET_FPEXC     = 12
+S.PR_FP_EXC_SW_ENABLE  = 0x80
+S.PR_FP_EXC_DIV        = 0x010000
+S.PR_FP_EXC_OVF        = 0x020000
+S.PR_FP_EXC_UND        = 0x040000
+S.PR_FP_EXC_RES        = 0x080000
+S.PR_FP_EXC_INV        = 0x100000
+S.PR_FP_EXC_DISABLED   = 0
+S.PR_FP_EXC_NONRECOV   = 1
+S.PR_FP_EXC_ASYNC      = 2
+S.PR_FP_EXC_PRECISE    = 3
+S.PR_GET_TIMING    = 13
+S.PR_SET_TIMING    = 14
+S.PR_TIMING_STATISTICAL= 0
+S.PR_TIMING_TIMESTAMP  = 1
+S.PR_SET_NAME      = 15
+S.PR_GET_NAME      = 16
+S.PR_GET_ENDIAN    = 19
+S.PR_SET_ENDIAN    = 20
+S.PR_ENDIAN_BIG         = 0
+S.PR_ENDIAN_LITTLE      = 1
+S.PR_ENDIAN_PPC_LITTLE  = 2
+S.PR_GET_SECCOMP   = 21
+S.PR_SET_SECCOMP   = 22
+S.PR_CAPBSET_READ  = 23
+S.PR_CAPBSET_DROP  = 24
+S.PR_GET_TSC       = 25
+S.PR_SET_TSC       = 26
+S.PR_TSC_ENABLE         = 1
+S.PR_TSC_SIGSEGV        = 2
+S.PR_GET_SECUREBITS= 27
+S.PR_SET_SECUREBITS= 28
+S.PR_SET_TIMERSLACK= 29
+S.PR_GET_TIMERSLACK= 30
+S.PR_TASK_PERF_EVENTS_DISABLE=31
+S.PR_TASK_PERF_EVENTS_ENABLE=32
+S.PR_MCE_KILL      = 33
+S.PR_MCE_KILL_CLEAR     = 0
+S.PR_MCE_KILL_SET       = 1
+S.PR_MCE_KILL_LATE         = 0
+S.PR_MCE_KILL_EARLY        = 1
+S.PR_MCE_KILL_DEFAULT      = 2
+S.PR_MCE_KILL_GET  = 34
+S.PR_SET_PTRACER   = 0x59616d61 -- Ubuntu extension
+
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
 if ffi.abi("32bit") and (ffi.arch == "x86" or (ffi.arch == "arm" and ffi.abi("eabi"))) then
@@ -1080,6 +1141,7 @@ void sync(void);
 int nice(int inc);
 int getpriority(int which, int who);
 int setpriority(int which, int who, int prio);
+int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -1237,6 +1299,7 @@ local int32_pt = ffi.typeof("int32_t *")
 local int64_1t = ffi.typeof("int64_t[1]")
 local uint64_1t = ffi.typeof("uint64_t[1]")
 local socklen1_t = ffi.typeof("socklen_t[1]")
+local ulong_t = ffi.typeof("unsigned long")
 
 local string_array_t = ffi.typeof("const char *[?]")
 
@@ -1925,7 +1988,7 @@ function S.umount(target, flags)
 end
 
 -- Linux only. use epoll1
-function S.epoll_create(flags) print(stringflags(flags, "EPOLL_"))
+function S.epoll_create(flags)
   return retfd(C.epoll_create1(stringflags(flags, "EPOLL_")))
 end
 
@@ -1977,6 +2040,62 @@ function S.eventfd_write(fd, value)
   if not value then value = 1 end
   if type(value) == "number" then value = uint64_1t(value) end
   return retbool(C.write(getfd(fd), value, 8))
+end
+
+-- map for valid options for arg2
+local prctlmap = {}
+prctlmap[S.PR_CAPBSET_READ] = "CAP_"
+prctlmap[S.PR_CAPBSET_DROP] = "CAP_"
+prctlmap[S.PR_SET_ENDIAN] = "PR_ENDIAN"
+prctlmap[S.PR_SET_FPEMU] = "PR_FPEMU_"
+prctlmap[S.PR_SET_FPEXC] = "PR_FP_EXC_"
+prctlmap[S.PR_SET_PDEATHSIG] = "SIG"
+prctlmap[S.PR_SET_SECUREBITS] = "SECBIT_"
+prctlmap[S.PR_SET_TIMING] = "PR_TIMING_"
+prctlmap[S.PR_SET_TSC] = "PR_TSC_"
+prctlmap[S.PR_SET_UNALIGN] = "PR_UNALIGN_"
+prctlmap[S.PR_MCE_KILL] = "PR_MCE_KILL_"
+
+local prctlrint = {} -- returns an integer directly
+prctlrint[S.PR_GET_DUMPABLE] = true
+prctlrint[S.PR_GET_KEEPCAPS] = true
+prctlrint[S.PR_CAPBSET_READ] = true
+prctlrint[S.PR_GET_TIMING] = true 
+prctlrint[S.PR_GET_SECUREBITS] = true
+prctlrint[S.PR_MCE_KILL_GET] = true
+prctlrint[S.PR_GET_SECCOMP] = true
+
+local prctlpint = {} -- returns result in a location pointed to by arg2
+prctlpint[S.PR_GET_ENDIAN] = true
+prctlpint[S.PR_GET_FPEMU] = true
+prctlpint[S.PR_GET_FPEXC] = true
+prctlpint[S.PR_GET_PDEATHSIG] = true
+prctlpint[S.PR_GET_UNALIGN] = true
+
+function S.prctl(option, arg2, arg3, arg4, arg5)
+  local i, name
+  option = stringflag(option, "PR_") -- actually not all PR_ prefixed options ok some are for other args, could be more specific
+  local m = prctlmap[option]
+  if m then arg2 = stringflag(arg2, m) end
+  if option == S.PR_MCE_KILL and arg2 == S.PR_MCE_KILL_SET then arg3 = stringflag(arg3, "PR_MCE_KILL_")
+  elseif prctlpint[option] then
+    i = int1_t()
+    arg2 = ffi.cast(ulong_t, i)
+  elseif option == S.PR_GET_NAME then
+    name = buffer_t(16)
+    arg2 = ffi.cast(ulong_t, name)
+  elseif option == S.PR_SET_NAME then
+    if type(arg2) == "string" then arg2 = ffi.cast(ulong_t, arg2) end
+  end
+  local ret = C.prctl(option, arg2 or 0, arg3 or 0, arg4 or 0, arg5 or 0)
+  if ret == -1 then return errorret() end
+  if prctlrint[option] then return ret end
+  if prctlpint[option] then return i[0] end
+  if option == S.PR_GET_NAME then
+    if name[15] ~= 0 then return ffi.string(name, 16) end -- actually, 15 bytes seems to be longest, aways 0 terminated
+    return ffi.string(name)
+  end
+  return true
 end
 
 -- this is the glibc name for the syslog syscall
