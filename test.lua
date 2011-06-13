@@ -40,8 +40,6 @@ fd3 = assert(S.open("/dev/zero"))
 ok, err = fd:close() -- this should not close fd 3 again
 assert(fd3:close()) -- this should succeed
 
-os.exit()
-
 S.sync() -- cannot fail...
 
 -- test double close fd
@@ -239,7 +237,6 @@ a = S.inet_aton("error")
 assert(not a, "should get invalid IP address")
 
 --local s, fl, c
-print("s1")
 s = assert(S.socket("inet", "stream, nonblock")) -- adding flags to socket type is Linux only
 
 local loop = "127.0.0.1"
@@ -307,10 +304,9 @@ local off = 0
 n = assert(c:sendfile(f, off, 16))
 assert(n.count == 16 and tonumber(n.offset) == 16, "sendfile should send 16 bytes")
 assert(f:close())
-
-assert(fd:close()) -----!!!!!!!--- bug
 assert(c:close())
 assert(a.fd:close())
+assert(s:close())
 
 -- unix domain sockets
 local sv = assert(S.socketpair("unix", "stream"))
@@ -341,13 +337,6 @@ assert(err.EPIPE, "should get sigpipe")
 assert(sv[1]:close())
 
 assert(S.kill(S.getpid(), "pipe")) -- should be ignored
-print("nil")
-s = nil
---c = nil
-collectgarbage("collect")
-ffff = S.open("/dev/zero")
-
-
 
 -- udp socket
 s = assert(S.socket("inet", "dgram"))
@@ -388,12 +377,6 @@ assert(f.port == serverport, "should be able to get server port in recvfrom")
 
 assert(s:close())
 assert(c:close())
-
-
-print("collect") ----------------
-collectgarbage("collect")
-print("colelcted")
-os.exit(0)
 
 --ipv6 socket
 s, err = S.socket("AF_INET6", "dgram")
