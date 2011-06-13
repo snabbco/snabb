@@ -591,6 +591,44 @@ S.LINUX_REBOOT_CMD_RESTART2     =  0xA1B2C3D4
 S.LINUX_REBOOT_CMD_SW_SUSPEND   =  0xD000FCE2
 S.LINUX_REBOOT_CMD_KEXEC        =  0x45584543
 
+-- inotify
+-- flags
+S.IN_CLOEXEC = octal("02000000")
+S.IN_NONBLOCK = octal("04000")
+
+-- events
+S.IN_ACCESS        = 0x00000001
+S.IN_MODIFY        = 0x00000002
+S.IN_ATTRIB        = 0x00000004
+S.IN_CLOSE_WRITE   = 0x00000008
+S.IN_CLOSE_NOWRITE = 0x00000010
+S.IN_OPEN          = 0x00000020
+S.IN_MOVED_FROM    = 0x00000040
+S.IN_MOVED_TO      = 0x00000080
+S.IN_CREATE        = 0x00000100
+S.IN_DELETE        = 0x00000200
+S.IN_DELETE_SELF   = 0x00000400
+S.IN_MOVE_SELF     = 0x00000800
+
+S.IN_UNMOUNT       = 0x00002000
+S.IN_Q_OVERFLOW    = 0x00004000
+S.IN_IGNORED       = 0x00008000
+
+S.IN_CLOSE         = S.IN_CLOSE_WRITE + S.IN_CLOSE_NOWRITE
+S.IN_MOVE          = S.IN_MOVED_FROM + S.IN_MOVED_TO
+
+S.IN_ONLYDIR       = 0x01000000
+S.IN_DONT_FOLLOW   = 0x02000000
+S.IN_EXCL_UNLINK   = 0x04000000
+S.IN_MASK_ADD      = 0x20000000
+S.IN_ISDIR         = 0x40000000
+S.IN_ONESHOT       = 0x80000000
+
+S.IN_ALL_EVENTS    = S.IN_ACCESS + S.IN_MODIFY + S.IN_ATTRIB + S.IN_CLOSE_WRITE
+                       + S.IN_CLOSE_NOWRITE + S.IN_OPEN + S.IN_MOVED_FROM
+                       + S.IN_MOVED_TO + S.IN_CREATE + S.IN_DELETE
+                       + S.IN_DELETE_SELF + S.IN_MOVE_SELF
+
 --prctl
 S.PR_SET_PDEATHSIG = 1
 S.PR_GET_PDEATHSIG = 2
@@ -1042,6 +1080,13 @@ struct ifinfomsg {
   unsigned        ifi_flags;
   unsigned        ifi_change;
 };
+struct inotify_event {
+  int wd;
+  uint32_t mask;
+  uint32_t cookie;
+  uint32_t len;
+  char name[?];
+};
 struct linux_dirent {
   long           d_ino;
   off_t          d_off;
@@ -1294,6 +1339,9 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 int eventfd(unsigned int initval, int flags);
 int reboot(int cmd);
 int klogctl(int type, char *bufp, int len);
+int inotify_init1(int flags);
+int inotify_add_watch(int fd, const char *pathname, uint32_t mask);
+int inotify_rm_watch(int fd, uint32_t wd);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -2198,6 +2246,10 @@ function S.epoll_wait(epfd, events, maxevents, timeout)
   return r
 end
 
+function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "IN_"))) end
+function S.inotify_add_watch(fd, pathname, mask) return retint(C.inotify_add_watch(getfd(fd), pathname, stringflags(mask, "IN_"))) end
+function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd), wd)) end
+
 function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two different return types...
   if not offset then return retint(C.sendfile(getfd(out_fd), getfd(in_fd), nil, count)) end
   local off = off1_t()
@@ -2712,7 +2764,8 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
-                   'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt'
+                   'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
+                   'inotify_add_watch', 'inotify_rm_watch'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end

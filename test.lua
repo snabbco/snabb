@@ -575,6 +575,13 @@ assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env var
 assert(S.unsetenv("XXXXYYYYZZZZZZZZ"))
 assert(S.environ().XXXXYYYYZZZZZZZZ == nil, "expect to be able to unset env vars")
 
+-- test inotify, Linux only
+fd = assert(S.inotify_init("cloexec, nonblock"))
+wd = assert(fd:inotify_add_watch(".", "create, delete"))
+
+assert(fd:inotify_rm_watch(wd))
+assert(fd:close())
+
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
 assert(S.mkdir(tmpfile))

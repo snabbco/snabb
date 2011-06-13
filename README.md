@@ -14,10 +14,10 @@ Unfinished! Some syscalls missing, work in progress! Let me know if you need som
 
 No support for 64 bit file operations on a 32 bit system yet. 
 
-### System calls (100)
+### System calls (103)
 
 open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname, gethostname, sethostname, getuid, geteuid, getpid, getppid, getgid, getegid, fork, execve, wait, waitpid, _exit, signal, gettimeofday, settimeofday, time, clock_getres, clock_gettime, clock_settime, sysinfo, read, write, pread, pwrite, lseek, send, sendto, sendmsg, recv, recvfrom, recvmsg, readv, writev, getsockopt, setsockopt, select, epoll_create, epoll_ctl, epoll_wait, sendfile, dup, fchdir, fsync, fdatasync, fcntl, fchmod, socket, socketpair, bind, listen, connect, accept, getsockname, getpeername, mmap, munmap, msync, mlock, munlock, mlockall, munlockall, mremap, madvise, pipe, access, getcwd, nanosleep, syscall, stat, fstat, lstat, ioctl, eventfd, truncate, ftruncate, pause, reboot, sync, shutdown, ksyslogctl, mount, umount,
-nice, getpriority, setpriority, prctl, alarm, waitid
+nice, getpriority, setpriority, prctl, alarm, waitid, inotify_init, inotify_add_watch, inotify_rm_watch
 
 ### Other functions
 
@@ -59,7 +59,7 @@ The test cases are good examples until I do better documentation!
 
 LuaJIT FFI cannot yet create callbacks. This causes issues in a few places, we cannot set a signal handler to be a Lua function, or use clone. This means some functions cannot yet usefully be implemented: sigaction (you can use signal just to set ignore, default behaviour), clone, getitimer/setitimer.
 
-Some functions are returning raw structures, probably will change to return tables? waitid, stat, ...
+Some functions are returning raw structures, some tables. I think this is ok, single return value of structure, but if multiple values must create table. Add metamethods to structures if necessary. Need to recheck these.
 
 Managing constants a lot of work, may divide into subtables
 
