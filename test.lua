@@ -20,7 +20,7 @@ assert(err.ENOENT, "expect ENOENT from open non existent file")
 assert(tostring(err) == "No such file or directory", "should get string error message")
 
 -- test close invalid fd
-fd, err = S.close(4)
+ok, err = S.close(4)
 assert(err, "expected to fail on close invalid fd")
 assert(err.errno == S.E.EBADF, "expect EBADF from invalid numberic fd") -- test the error functions other way
 

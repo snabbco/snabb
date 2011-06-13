@@ -1727,9 +1727,16 @@ end
 S.pipe2 = S.pipe
 
 function S.close(fd)
-  if ffi.istype(fd_t, fd) then ffi.gc(fd, nil) end -- remove gc finalizer
   local ret = C.close(getfd(fd))
-  if ret == -1 then return errorret() end
+  if ret == -1 then
+    local errno = ffi.errno()
+    if ffi.istype(fd_t, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
+      ffi.gc(fd, nil)
+      fd.fd = -1 -- make sure cannot accidentally close this fd object again
+    end
+    return errorret()
+  end
+  if ffi.istype(fd_t, fd) then fd.fd = -1 end -- make sure cannot accidentally close this fd object again
   return true
 end
 
