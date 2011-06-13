@@ -1527,6 +1527,8 @@ local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
 local uchar_pt = ffi.typeof("unsigned char *")
 local int_pt = ffi.typeof("int *")
 local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
+local inotify_event_pt = ffi.typeof("struct inotify_event *")
+local inotify_event_t = ffi.typeof("struct inotify_event")
 
 local pointersize = ffi.sizeof("char *")
 
@@ -2250,6 +2252,31 @@ function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "
 function S.inotify_add_watch(fd, pathname, mask) return retint(C.inotify_add_watch(getfd(fd), pathname, stringflags(mask, "IN_"))) end
 function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd), wd)) end
 
+local in_recv_ev = {"IN_ACCESS", "IN_ATTRIB", "IN_CLOSE_WRITE", "IN_CLOSE_NOWRITE", "IN_CREATE", "IN_DELETE", "IN_DELETE_SELF", "IN_MODIFY",
+                    "IN_MOVE_SELF", "IN_MOVED_FROM", "IN_MOVED_TO", "IN_OPEN",
+                    "IN_CLOSE", "IN_MOVE" -- combined ops
+                   }
+
+-- helper function to read inotify structs as table from inotfy fd
+function S.inotify_read(fd, buffer, len)
+  if not len then len = 1024 end
+  if not buffer then buffer = buffer_t(len) end
+  local ret, err = S.read(fd, buffer, len)
+  if not ret then return nil, err end
+  local off, ee = 0, {}
+  while off < ret do
+    local ev = ffi.cast(inotify_event_pt, buffer + off)
+    local le = getflags(ev.mask, "IN_", in_recv_ev)
+    le.wd = tonumber(ev.wd)
+    le.mask = tonumber(ev.mask)
+    le.cookie = tonumber(ev.cookie)
+    if ev.len > 0 then le.name = ffi.string(ev.name) end
+    ee[#ee + 1] = le
+    off = off + ffi.sizeof(inotify_event_t(ev.len))
+  end
+  return ee
+end
+
 function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two different return types...
   if not offset then return retint(C.sendfile(getfd(out_fd), getfd(in_fd), nil, count)) end
   local off = off1_t()
@@ -2765,7 +2792,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
                    'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
-                   'inotify_add_watch', 'inotify_rm_watch'
+                   'inotify_add_watch', 'inotify_rm_watch', 'inotify_read'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end

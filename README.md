@@ -63,6 +63,8 @@ Some functions are returning raw structures, some tables. I think this is ok, si
 
 Managing constants a lot of work, may divide into subtables
 
+Should add friendly permissions naming, eg "rw" to mode flags.
+
 ### Testing
 
 The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86.
