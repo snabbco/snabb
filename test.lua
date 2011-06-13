@@ -1,6 +1,6 @@
 local S = require "syscall"
 
-local fd, fd0, fd1, fd2, n, s, err, errno, ok
+local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 
 local oldassert = assert
 function assert(c, s)
@@ -35,6 +35,12 @@ assert(fd2.fd == 4, "should get file descriptor 4 back from second open")
 
 -- normal close
 assert(fd:close())
+
+fd3 = assert(S.open("/dev/zero"))
+ok, err = fd:close() -- this should not close fd 3 again
+assert(fd3:close()) -- this should succeed
+
+os.exit()
 
 S.sync() -- cannot fail...
 
@@ -71,6 +77,7 @@ assert(err, "should not be able to read from fd 4 after gc")
 assert(err.EBADF, "expect EBADF from already closed fd")
 
 -- test with gc turned off
+
 fd = assert(S.open("/dev/zero", "RDONLY"))
 assert(fd.fd == 3, "fd should be 3")
 fd:nogc()
@@ -99,9 +106,9 @@ assert(fd2:close())
 
 fd2 = assert(fd:dup2(17))
 assert(fd2.fd == 17, "dup2 should set file id as specified")
-assert(S.close(17))
+assert(fd2:close())
 
-assert(S.close(fd))
+assert(fd:close())
 
 assert(S.O_CREAT == 64, "wrong octal value for O_CREAT") -- test our octal converter!
 
@@ -131,7 +138,7 @@ assert(S.unlink(tmpfile))
 assert(S.mkdir(tmpfile, "IRWXU"))
 assert(S.rmdir(tmpfile))
 
-assert(S.close(fd))
+assert(fd:close())
 
 fd, err = S.open(tmpfile, "RDWR")
 assert(err, "expected open to fail on file not found")
@@ -155,8 +162,8 @@ assert(fd:fchdir())
 
 assert(S.getcwd(buf, size))
 assert(S.string(buf) == "/", "expect cwd to be /")
-s = assert(S.getcwd())
-assert(s == "/", "expect cwd to be /")
+local nd = assert(S.getcwd())
+assert(nd == "/", "expect cwd to be /")
 
 assert(S.chdir(cwd)) -- return to original directory
 
@@ -182,10 +189,10 @@ stat = assert(S.lstat("/etc/passwd"))
 assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
 
 -- test truncate
-local s = "this is a string"
-assert(S.writefile(tmpfile, s, "IRWXU"))
+local ss = "this is a string"
+assert(S.writefile(tmpfile, ss, "IRWXU"))
 stat = assert(S.stat(tmpfile))
-assert(stat.st_size == #s, "expect to get size of written string")
+assert(stat.st_size == #ss, "expect to get size of written string")
 assert(S.truncate(tmpfile, 1))
 stat = assert(S.stat(tmpfile))
 assert(stat.st_size == 1, "expect get truncated size")
@@ -201,7 +208,7 @@ rem = assert(S.nanosleep(S.t.timespec(0, 1000000)))
 assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
 
 assert(S.signal("alrm", "ign"))
-assert(S.alarm(1)) -- will actually ignore signal so nothing happens
+assert(S.alarm(10)) -- will actually ignore signal so nothing happens, set to 10 so does not interrupt anything
 
 -- mmap and related functions
 local mem, mem2
@@ -231,7 +238,8 @@ local a, sa
 a = S.inet_aton("error")
 assert(not a, "should get invalid IP address")
 
-local s, fl, c
+--local s, fl, c
+print("s1")
 s = assert(S.socket("inet", "stream, nonblock")) -- adding flags to socket type is Linux only
 
 local loop = "127.0.0.1"
@@ -259,7 +267,6 @@ c = assert(S.socket("inet", "stream")) -- client socket
 assert(c:nonblock())
 assert(c:fcntl("setfd", "cloexec"))
 
---assert(c:connect(sa)) -- connect to our server address
 ok, err = c:connect(sa)
 assert(not ok, "connect should fail here")
 assert(err.EINPROGRESS, "have not accepted should get Operation in progress")
@@ -301,7 +308,7 @@ n = assert(c:sendfile(f, off, 16))
 assert(n.count == 16 and tonumber(n.offset) == 16, "sendfile should send 16 bytes")
 assert(f:close())
 
-assert(fd:close())
+assert(fd:close()) -----!!!!!!!--- bug
 assert(c:close())
 assert(a.fd:close())
 
@@ -334,6 +341,13 @@ assert(err.EPIPE, "should get sigpipe")
 assert(sv[1]:close())
 
 assert(S.kill(S.getpid(), "pipe")) -- should be ignored
+print("nil")
+s = nil
+--c = nil
+collectgarbage("collect")
+ffff = S.open("/dev/zero")
+
+
 
 -- udp socket
 s = assert(S.socket("inet", "dgram"))
@@ -375,6 +389,12 @@ assert(f.port == serverport, "should be able to get server port in recvfrom")
 assert(s:close())
 assert(c:close())
 
+
+print("collect") ----------------
+collectgarbage("collect")
+print("colelcted")
+os.exit(0)
+
 --ipv6 socket
 s, err = S.socket("AF_INET6", "dgram")
 if s then 
@@ -389,6 +409,8 @@ if s then
   local f = assert(c:recvfrom(buf, size))
   assert(f.count == #string, "should get the whole string back")
   assert(f.port == serverport, "should be able to get server port in recvfrom")
+  assert(c:close())
+  assert(s:close())
 else assert(err.EAFNOSUPPORT, err) end -- ok to not have ipv6 in kernel
 
 -- fork and related methods
@@ -407,11 +429,22 @@ else -- parent
   assert(w.WIFEXITED, "process should have exited normally")
   assert(w.EXITSTATUS == 23, "exit should be 23")
 end
+
+pid = assert(S.fork())
+if (pid == 0) then -- child
+  assert(S.getppid() == pid0, "parent pid should be previous pid")
+  S.exit(23)
+else -- parent
+  w = assert(S.waitid("all", 0, "exited, stopped, continued"))
+  assert(w.si_signo == S.SIGCHLD, "waitid to return SIGCHLD")
+  assert(w.sifields.sigchld.si_status == 23, "exit should be 23")
+  assert(w.si_code == S.CLD_EXITED, "normal exit expected")
+end
+
 local efile = "/tmp/tmpXXYYY.sh"
 pid = assert(S.fork())
 if (pid == 0) then -- child
   S.unlink(efile)
-  fd = assert(S.creat(efile, "IRWXU"))
   local script = [[
 #!/bin/sh
 
@@ -420,11 +453,10 @@ if (pid == 0) then -- child
 [ $PATH = "/bin:/usr/bin" ] || (echo "shell assert $PATH"; exit 1)
 
 ]]
-  n = fd:write(script)
-  assert(n == #script, "write all script at once")
-  assert(fd:close())
+  S.writefile(efile, script, "IRWXU")
   assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
   -- never reach here
+  os.exit()
 else -- parent
   w = assert(S.waitpid(-1))
   assert(w.pid == pid, "expect fork to return same pid as wait")

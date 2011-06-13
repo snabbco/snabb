@@ -17,7 +17,7 @@ No support for 64 bit file operations on a 32 bit system yet.
 ### System calls (100)
 
 open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname, gethostname, sethostname, getuid, geteuid, getpid, getppid, getgid, getegid, fork, execve, wait, waitpid, _exit, signal, gettimeofday, settimeofday, time, clock_getres, clock_gettime, clock_settime, sysinfo, read, write, pread, pwrite, lseek, send, sendto, sendmsg, recv, recvfrom, recvmsg, readv, writev, getsockopt, setsockopt, select, epoll_create, epoll_ctl, epoll_wait, sendfile, dup, fchdir, fsync, fdatasync, fcntl, fchmod, socket, socketpair, bind, listen, connect, accept, getsockname, getpeername, mmap, munmap, msync, mlock, munlock, mlockall, munlockall, mremap, madvise, pipe, access, getcwd, nanosleep, syscall, stat, fstat, lstat, ioctl, eventfd, truncate, ftruncate, pause, reboot, sync, shutdown, ksyslogctl, mount, umount,
-nice, getpriority, setpriority, prctl, alarm
+nice, getpriority, setpriority, prctl, alarm, waitid
 
 ### Other functions
 
@@ -54,6 +54,14 @@ bind does not require a length for the address type length, as it can work this 
 uname returns a Lua table with the returned strings in it. Similarly getdents returns directory entries as a table. All functions that return multiple arguments return tables in general.
 
 The test cases are good examples until I do better documentation!
+
+### Issues
+
+LuaJIT FFI cannot yet create callbacks. This causes issues in a few places, we cannot set a signal handler to be a Lua function, or use clone. This means some functions cannot yet usefully be implemented: sigaction (you can use signal just to set ignore, default behaviour), clone, getitimer/setitimer.
+
+Some functions are returning raw structures, probably will change to return tables? waitid, stat, ...
+
+Managing constants a lot of work, may divide into subtables
 
 ### Testing
 

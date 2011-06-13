@@ -277,11 +277,68 @@ S.SHUT_RDWR = 2
 S.WNOHANG       = 1
 S.WUNTRACED     = 2
 
---waitid 4th arg
+-- waitid
+S.P_ALL  = 0
+S.P_PID  = 1
+S.P_PGID = 2
+
 S.WSTOPPED      = 2
 S.WEXITED       = 4
 S.WCONTINUED    = 8
 S.WNOWAIT       = 0x01000000
+
+-- struct siginfo, eg waitid
+S.SI_ASYNCNL = -60
+S.SI_TKILL = -6
+S.SI_SIGIO = -5
+S.SI_ASYNCIO = -4
+S.SI_MESGQ = -3
+S.SI_TIMER = -2
+S.SI_QUEUE = -1
+S.SI_USER = 0
+S.SI_KERNEL = 0x80
+
+S.ILL_ILLOPC = 1
+S.ILL_ILLOPN = 2
+S.ILL_ILLADR = 3
+S.ILL_ILLTRP = 4
+S.ILL_PRVOPC = 5
+S.ILL_PRVREG = 6
+S.ILL_COPROC = 7
+S.ILL_BADSTK = 8
+
+S.FPE_INTDIV = 1
+S.FPE_INTOVF = 2
+S.FPE_FLTDIV = 3
+S.FPE_FLTOVF = 4
+S.FPE_FLTUND = 5
+S.FPE_FLTRES = 6
+S.FPE_FLTINV = 7
+S.FPE_FLTSUB = 8
+
+S.SEGV_MAPERR = 1
+S.SEGV_ACCERR = 2
+
+S.BUS_ADRALN = 1
+S.BUS_ADRERR = 2
+S.BUS_OBJERR = 3
+
+S.TRAP_BRKPT = 1
+S.TRAP_TRACE = 2
+
+S.CLD_EXITED    = 1
+S.CLD_KILLED    = 2
+S.CLD_DUMPED    = 3
+S.CLD_TRAPPED   = 4
+S.CLD_STOPPED   = 5
+S.CLD_CONTINUED = 6
+
+S.POLL_IN  = 1
+S.POLL_OUT = 2
+S.POLL_MSG = 3
+S.POLL_ERR = 4
+S.POLL_PRI = 5
+S.POLL_HUP = 6
 
 -- clocks
 S.CLOCK_REALTIME = 0
@@ -835,6 +892,7 @@ typedef uint32_t mode_t;
 typedef uint32_t uid_t;
 typedef uint32_t gid_t;
 typedef uint32_t socklen_t;
+typedef uint32_t id_t;
 typedef int32_t pid_t;
 typedef int32_t clockid_t;
 
@@ -853,9 +911,12 @@ typedef unsigned long ino_t;
 typedef unsigned long nlink_t;
 typedef long blksize_t;
 typedef long blkcnt_t;
+typedef long clock_t;
 
 // should be a word, but we use 32 bits as bitops are 32 bit in LuaJIT at the moment
 typedef uint32_t fd_mask;
+
+typedef int idtype_t; /* defined as enum */
 
 // misc
 typedef void (*sighandler_t) (int);
@@ -906,6 +967,10 @@ struct sysinfo { /* Linux only */
   unsigned int mem_unit;
   char _f[20-2*sizeof(long)-sizeof(int)];
 };
+typedef union sigval {
+  int sival_int;
+  void *sival_ptr;
+} sigval_t;
 struct msghdr {
   void *msg_name;
   socklen_t msg_namelen;
@@ -996,6 +1061,66 @@ struct epoll_event {
   epoll_data_t data;    /* User data variable */
 };   // __attribute__ ((__packed__));
 #pragma pack(pop)
+]]
+
+-- Linux struct siginfo padding depends on architecture
+if ffi.abi("64bit") then
+ffi.cdef[[
+static const int SI_MAX_SIZE = 128;
+static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 4;
+]]
+else
+ffi.cdef[[
+static const int SI_MAX_SIZE = 128;
+static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 3;
+]]
+end
+
+-- note we might make a metatype with the short names (eg si_pid) defined in bits/siginfo.h TODO
+ffi.cdef[[
+typedef struct siginfo {
+  int si_signo;
+  int si_errno;
+  int si_code;
+
+  union {
+    int _pad[SI_PAD_SIZE];
+
+    struct {
+      pid_t si_pid;
+      uid_t si_uid;
+    } kill;
+
+    struct {
+      int si_tid;
+      int si_overrun;
+      sigval_t si_sigval;
+    } timer;
+
+    struct {
+      pid_t si_pid;
+      uid_t si_uid;
+      sigval_t si_sigval;
+    } rt;
+
+    struct {
+      pid_t si_pid;
+      uid_t si_uid;
+      int si_status;
+      clock_t si_utime;
+      clock_t si_stime;
+    } sigchld;
+
+    struct {
+      void *si_addr;
+    } sigfault;
+
+    struct {
+      long int si_band;   /* Band event for SIGPOLL.  */
+       int si_fd;
+    } sigpoll;
+  } sifields;
+} siginfo_t;
 ]]
 
 -- stat structure is architecture dependent in Linux
@@ -1127,6 +1252,7 @@ pid_t fork(void);
 int execve(const char *filename, const char *argv[], const char *envp[]);
 pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);
+int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 void _exit(int status);
 int signal(int signum, int handler); /* although deprecated, just using to set SIG_ values */
 int kill(pid_t pid, int sig);
@@ -1278,6 +1404,7 @@ local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
 local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
 local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
+local siginfo_t = ffi.typeof("struct siginfo")
 
 --[[ -- used to generate tests, will refactor into test code later
 print("eq (sizeof(struct timespec), " .. ffi.sizeof(timespec_t) .. ");")
@@ -1600,11 +1727,9 @@ end
 S.pipe2 = S.pipe
 
 function S.close(fd)
+  if ffi.istype(fd_t, fd) then ffi.gc(fd, nil) end -- remove gc finalizer
   local ret = C.close(getfd(fd))
   if ret == -1 then return errorret() end
-  if ffi.istype(fd_t, fd) then
-    ffi.gc(fd, nil) -- remove gc finalizer as now closed; should we also remove if get EBADF?
-  end
   return true
 end
 
@@ -1711,6 +1836,13 @@ end
 function S.waitpid(pid, options)
   local status = int1_t()
   return retwait(C.waitpid(pid, status, options or 0), status[0])
+end
+function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
+  if not infop then infop = siginfo_t() end
+  infop.sifields.kill.si_pid = 0 -- see notes on man page
+  local ret = C.waitid(stringflag(idtype, "P_"), id or 0, infop, stringflags(options, "W"))
+  if ret == -1 then return errorret() end
+  return infop -- return table here?
 end
 
 function S._exit(status) C._exit(stringflag(status, "EXIT_")) end
@@ -2238,9 +2370,10 @@ function S.minor(dev)
   return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
 end
 
+local two32 = int64_t(0xffffffff) + 1 -- 0x100000000LL -- hack to get luac to parse this for checking
 function S.makedev(major, minor)
   local dev = int64_t()
-  dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000LL * bit.band(major, bit.bnot(0xfff))
+  dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + two32 * bit.band(major, bit.bnot(0xfff))
   return dev
 end
 
@@ -2475,11 +2608,11 @@ end
 
 function S.readfile(name, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
   local f, err = S.open(name, S.O_RDONLY)
-  if not f then return nil, err end
+  if not f then print("open"); return nil, err end
   local r, err = f:read(nil, length or 4096)
-  if not r then return nil, err end
+  if not r then print("read"); return nil, err end
   local t, err = f:close()
-  if not t then return nil, err end
+  if not t then print("close"); return nil, err end
   return r
 end
 
