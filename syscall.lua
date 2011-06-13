@@ -1404,7 +1404,43 @@ local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
 local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
 local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
-local siginfo_t = ffi.typeof("struct siginfo")
+
+-- siginfo needs some metamethods
+local siginfo_get = {
+  si_pid     = function(s) return s.sifields.kill.si_pid end,
+  si_uid     = function(s) return s.sifields.kill.si_uid end,
+  si_timerid = function(s) return s.sifields.timer.si_tid end,
+  si_overrun = function(s) return s.sifields.timer.si_overrun end,
+  si_status  = function(s) return s.sifields.sigchld.si_status end,
+  si_utime   = function(s) return s.sifields.sigchld.si_utime end,
+  si_stime   = function(s) return s.sifields.sigchld.si_stime end,
+  si_value   = function(s) return s.sifields.rt.si_sigval end,
+  si_int     = function(s) return s.sifields.rt.si_sigval.sival_int end,
+  si_ptr     = function(s) return s.sifields.rt.si_sigval.sival_ptr end,
+  si_addr    = function(s) return s.sifields.sigfault.si_addr end,
+  si_band    = function(s) return s.sifields.sigpoll.si_band end,
+  si_fd      = function(s) return s.sifields.sigpoll.si_fd end,
+}
+
+local siginfo_set = {
+  si_pid     = function(s, v) s.sifields.kill.si_pid = v end,
+  si_uid     = function(s, v) s.sifields.kill.si_uid = v end,
+  si_timerid = function(s, v) s.sifields.timer.si_tid = v end,
+  si_overrun = function(s, v) s.sifields.timer.si_overrun = v end,
+  si_status  = function(s, v) s.sifields.sigchld.si_status = v end,
+  si_utime   = function(s, v) s.sifields.sigchld.si_utime = v end,
+  si_stime   = function(s, v) s.sifields.sigchld.si_stime = v end,
+  si_value   = function(s, v) s.sifields.rt.si_sigval = v end,
+  si_int     = function(s, v) s.sifields.rt.si_sigval.sival_int = v end,
+  si_ptr     = function(s, v) s.sifields.rt.si_sigval.sival_ptr = v end,
+  si_addr    = function(s, v) s.sifields.sigfault.si_addr = v end,
+  si_band    = function(s, v) s.sifields.sigpoll.si_band = v end,
+  si_fd      = function(s, v) s.sifields.sigpoll.si_fd = v end,
+}
+local siginfo_t = ffi.metatype("struct siginfo",{
+  __index = function(t, k) if siginfo_get[k] then return siginfo_get[k](t) end end,
+  __newindex = function(t, k, v) if siginfo_set[k] then siginfo_set[k](t, v) end end,
+})
 
 --[[ -- used to generate tests, will refactor into test code later
 print("eq (sizeof(struct timespec), " .. ffi.sizeof(timespec_t) .. ");")
@@ -1846,7 +1882,7 @@ function S.waitpid(pid, options)
 end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
   if not infop then infop = siginfo_t() end
-  infop.sifields.kill.si_pid = 0 -- see notes on man page
+  infop.si_pid = 0 -- see notes on man page
   local ret = C.waitid(stringflag(idtype, "P_"), id or 0, infop, stringflags(options, "W"))
   if ret == -1 then return errorret() end
   return infop -- return table here?

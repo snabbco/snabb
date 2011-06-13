@@ -420,7 +420,7 @@ if (pid == 0) then -- child
 else -- parent
   w = assert(S.waitid("all", 0, "exited, stopped, continued"))
   assert(w.si_signo == S.SIGCHLD, "waitid to return SIGCHLD")
-  assert(w.sifields.sigchld.si_status == 23, "exit should be 23")
+  assert(w.si_status == 23, "exit should be 23")
   assert(w.si_code == S.CLD_EXITED, "normal exit expected")
 end
 
