@@ -557,10 +557,15 @@ assert(n == "test", "name should be as set")
 n = assert(S.readfile("/proc/self/comm"))
 assert(n == "test\n", "comm should be as set")
 
-n = assert(S.readfile("/proc/self/cmdline"))
+oldcmd = assert(S.readfile("/proc/self/cmdline"))
 assert(S.setcmdline("test"))
 n = assert(S.readfile("/proc/self/cmdline"))
 assert(n:sub(1, 5) == "test\0", "command line should be set")
+ss = "test1234567890123456789012345678901234567890"
+assert(S.setcmdline(ss))
+n = assert(S.readfile("/proc/self/cmdline"))
+assert(n:sub(1,#ss) == ss, "long command line should be set")
+assert(S.setcmdline(oldcmd))
 
 local e = S.environ()
 assert(e.PATH, "expect PATH to be set in environment")
