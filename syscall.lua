@@ -2420,6 +2420,8 @@ function S.sigpending()
  return getsigset(set)
 end
 
+function S.sigsuspend(mask) return retbool(C.sigsuspend(mksigset(mask))) end
+
 function S.select(s) -- note same structure as returned
   local r, w, e
   local nfds = 0
