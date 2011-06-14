@@ -583,11 +583,14 @@ n, err = fd:inotify_read()
 assert(err.again, "no inotify events yet")
 
 assert(S.writefile(tmpfile, "test", "IRWXU"))
+assert(S.unlink(tmpfile))
 
 n = assert(fd:inotify_read())
-assert(#n == 1, "expect 1 event now")
+assert(#n == 2, "expect 2 events now")
 assert(n[1].create, "file created")
 assert(n[1].name == tmpfile, "created file should have same name")
+assert(n[2].delete, "file deleted")
+assert(n[2].name == tmpfile, "created file should have same name")
 
 assert(fd:inotify_rm_watch(wd))
 assert(fd:close())
