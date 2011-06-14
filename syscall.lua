@@ -1005,6 +1005,34 @@ struct sysinfo { /* Linux only */
   unsigned int mem_unit;
   char _f[20-2*sizeof(long)-sizeof(int)];
 };
+struct timex {
+  unsigned int modes;
+  long int offset;
+  long int freq;
+  long int maxerror;
+  long int esterror;
+  int status;
+  long int constant;
+  long int precision;
+  long int tolerance;
+  struct timeval time;
+  long int tick;
+
+  long int ppsfreq;
+  long int jitter;
+  int shift;
+  long int stabil;
+  long int jitcnt;
+  long int calcnt;
+  long int errcnt;
+  long int stbcnt;
+
+  int tai;
+
+  int  :32; int  :32; int  :32; int  :32;
+  int  :32; int  :32; int  :32; int  :32;
+  int  :32; int  :32; int  :32;
+};
 typedef union sigval {
   int sival_int;
   void *sival_ptr;
@@ -1342,6 +1370,7 @@ int klogctl(int type, char *bufp, int len);
 int inotify_init1(int flags);
 int inotify_add_watch(int fd, const char *pathname, uint32_t mask);
 int inotify_rm_watch(int fd, uint32_t wd);
+int adjtimex(struct timex *buf);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -1452,6 +1481,7 @@ local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
 local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
 local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
+local timex_t = ffi.typeof("struct timex")
 
 -- siginfo needs some metamethods
 local siginfo_get = {
@@ -2202,7 +2232,9 @@ function S.select(s) -- note same structure as returned
   local r, w, e
   local nfds = 0
   local timeout2
-  if s.timeout then timeout2 = timeval_t(s.timeout.tv_sec, s.timeout.tv_usec) end -- copy so never updated
+  if s.timeout then
+    if ffi.istype(timeval_t, s.timeout) then timeout2 = s.timeout else timeout2 = timeval_t(s.timeout) end
+  end
   r, nfds = mkfdset(s.readfds or {}, nfds or 0)
   w, nfds = mkfdset(s.writefds or {}, nfds)
   e, nfds = mkfdset(s.exceptfds or {}, nfds)
@@ -2375,6 +2407,15 @@ function S.klogctl(t, buf, len)
   if t == 9 or t == 10 then return tonumber(ret) end
   if t == 2 or t == 3 or t == 4 then return ffi.string(buf, ret) end
   return true
+end
+
+function S.adjtimex(t)
+  if not t then t = timex_t() end
+  if type(t) == 'table' then
+    if t.modes then t.modes = stringflags(t.modes, "ADJ_") end
+    t = timex_t(t)
+  end
+  return retint(C.adjtimex(t))
 end
 
 if rt then -- real time functions not in glibc in Linux, check if available. N/A on OSX.

@@ -61,6 +61,8 @@ LuaJIT FFI cannot yet create callbacks. This causes issues in a few places, we c
 
 Some functions are returning raw structures, some tables. I think this is ok, single return value of structure, but if multiple values must create table. Add metamethods to structures if necessary. Need to recheck these.
 
+Other consistency issues: accepting tables for structs like adjtimex does is a nice model, use in other places.
+
 Managing constants a lot of work, may divide into subtables
 
 Should add friendly permissions naming, eg "rw" to mode flags.

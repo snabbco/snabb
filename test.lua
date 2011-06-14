@@ -338,6 +338,33 @@ assert(sv[1]:close())
 
 assert(S.kill(S.getpid(), "pipe")) -- should be ignored
 
+local sv = assert(S.socketpair("unix", "stream"))
+c, s = sv[1], sv[2]
+
+-- test select and epoll
+local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
+assert(sel.count == 0, "nothing to read select now")
+
+local ep = assert(S.epoll_create("cloexec"))
+assert(ep:epoll_ctl("add", c, "in, err, hup")) -- actually dont need to set err, hup
+
+local r = assert(ep:epoll_wait())
+assert(#r == 0, "no events yet")
+
+n = assert(s:write(string))
+
+sel = assert(S.select{readfds = {c, s}, timeout = {0, 0}})
+
+assert(sel.count == 1, "one fd available for read now")
+
+r = assert(ep:epoll_wait())
+assert(#r == 1, "one event now")
+assert(r[1].epollin, "read event")
+assert(ep:close())
+
+assert(s:close())
+assert(c:close())
+
 -- udp socket
 s = assert(S.socket("inet", "dgram"))
 c = assert(S.socket("inet", "dgram"))
@@ -350,30 +377,9 @@ assert(c:bind(sa))
 local bca = c:getsockname().addr -- find bound address
 local serverport = s:getsockname().port -- find bound port
 
--- test select and epoll
-local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
-assert(sel.count == 0, "nothing to read select now")
-
-local ep = assert(S.epoll_create("cloexec"))
-assert(ep:epoll_ctl("add", c, "in, err, hup")) -- actually dont need to set err, hup
-
-local r
-r = assert(ep:epoll_wait())
-assert(#r == 0, "no events yet")
-
 n = assert(s:sendto(string, nil, 0, bca))
 
-sel = assert(S.select{readfds = {c, s}})
-assert(sel.count == 1, "one fd available for read now")
-
-r = assert(ep:epoll_wait())
-assert(#r == 1, "one event now")
-assert(r[1].epollin, "read event")
-assert(ep:close())
-
-local f = assert(c:recvfrom(buf, size))
-assert(f.count == #string, "should get the whole string back")
-assert(f.port == serverport, "should be able to get server port in recvfrom")
+local f = c:recvfrom(buf, size)
 
 assert(s:close())
 assert(c:close())
@@ -594,6 +600,9 @@ assert(n[2].name == tmpfile, "created file should have same name")
 
 assert(fd:inotify_rm_watch(wd))
 assert(fd:close())
+
+local t = assert(S.adjtimex())
+
 
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
