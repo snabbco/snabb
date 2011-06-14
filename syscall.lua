@@ -409,6 +409,25 @@ S.MSG_MORE            = 0x8000
 S.MSG_WAITFORONE      = 0x10000
 S.MSG_CMSG_CLOEXEC    = 0x40000000
 
+-- rlimit
+S.RLIMIT_CPU = 0
+S.RLIMIT_FSIZE = 1
+S.RLIMIT_DATA = 2
+S.RLIMIT_STACK = 3
+S.RLIMIT_CORE = 4
+S.RLIMIT_RSS = 5
+S.RLIMIT_NPROC = 6
+S.RLIMIT_NOFILE = 7
+S.RLIMIT_OFILE = S.RLIMIT_NOFILE
+S.RLIMIT_MEMLOCK = 8
+S.RLIMIT_AS = 9
+S.RLIMIT_LOCKS = 10
+S.RLIMIT_SIGPENDING = 11
+S.RLIMIT_MSGQUEUE = 12
+S.RLIMIT_NICE = 13
+S.RLIMIT_RTPRIO = 14
+S.RLIMIT_NLIMITS = 15
+
 -- epoll
 S.EPOLL_CLOEXEC = octal("02000000")
 S.EPOLL_NONBLOCK = octal("04000")
@@ -984,11 +1003,12 @@ typedef unsigned long size_t;
 typedef long ssize_t;
 typedef long off_t;
 typedef long time_t;
-typedef unsigned long ino_t;
-typedef unsigned long nlink_t;
 typedef long blksize_t;
 typedef long blkcnt_t;
 typedef long clock_t;
+typedef unsigned long ino_t;
+typedef unsigned long nlink_t;
+typedef unsigned long rlim_t;
 
 // should be a word, but we use 32 bits as bitops are 32 bit in LuaJIT at the moment
 typedef uint32_t fd_mask;
@@ -1020,6 +1040,7 @@ struct iovec {
   void *iov_base;
   size_t iov_len;
 };
+
 typedef struct { /* based on Linux/FreeBSD FD_SETSIZE = 1024, the kernel can do more, so can increase, but bad performance so dont! */
   fd_mask fds_bits[1024 / (sizeof (fd_mask) * 8)];
 } fd_set;
@@ -1027,6 +1048,10 @@ struct ucred { /* this is Linux specific */
   pid_t pid;
   uid_t uid;
   gid_t gid;
+};
+struct rlimit {
+  rlim_t rlim_cur;
+  rlim_t rlim_max;
 };
 struct sysinfo { /* Linux only */
   long uptime;
@@ -1422,6 +1447,8 @@ int fchmod(int fd, mode_t mode);
 int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
 int pause(void);
+int getrlimit(int resource, struct rlimit *rlim);
+int setrlimit(int resource, const struct rlimit *rlim);
 
 int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);
@@ -1522,6 +1549,9 @@ local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
 local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
 local timex_t = ffi.typeof("struct timex")
 local utsname_t = ffi.typeof("struct utsname")
+local rlimit_t = ffi.typeof("struct rlimit")
+
+S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
 -- siginfo needs some metamethods
 local siginfo_get = {
@@ -2288,6 +2318,19 @@ end
 function S.umount(target, flags)
   if flags then return retbool(C.umount2(target, stringflags(flags, "MNT_", "UMOUNT_"))) end
   return retbool(C.umount(target))
+end
+
+function S.getrlimit(resource)
+  rlim = rlimit_t()
+  local ret = C.getrlimit(stringflag(resource, "RLIMIT_"), rlim)
+  if ret == -1 then return errorret() end
+  return rlim
+end
+
+function S.setrlimit(resource, rlim, rlim2) -- can pass table, struct, or just both the parameters
+  if rlim and rlim2 then rlim = rlimit_t(rlim, rlim2)
+  elseif type(rlim) == 'table' then rlim = rlimit_t(rlim) end
+  return retbool(C.setrlimit(stringflag(resource, "RLIMIT_"), rlim))
 end
 
 -- Linux only. use epoll1

@@ -603,6 +603,14 @@ assert(fd:close())
 
 local t = assert(S.adjtimex())
 
+local r = assert(S.getrlimit("nofile"))
+assert(S.setrlimit("nofile", 0, r.rlim_max))
+fd, err = S.open("/dev/zero", "rdonly")
+assert(err.EMFILE, "should be over rlimit")
+assert(S.setrlimit("nofile", r.rlim_cur, r.rlim_max)) -- reset
+fd = assert(S.open("/dev/zero", "rdonly"))
+assert(fd:close())
+
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
 assert(S.mkdir(tmpfile))
