@@ -349,6 +349,45 @@ S.CLOCK_MONOTONIC_RAW = 4
 S.CLOCK_REALTIME_COARSE = 5
 S.CLOCK_MONOTONIC_COARSE = 6
 
+-- adjtimex
+S.ADJ_OFFSET             = 0x0001
+S.ADJ_FREQUENCY          = 0x0002
+S.ADJ_MAXERROR           = 0x0004
+S.ADJ_ESTERROR           = 0x0008
+S.ADJ_STATUS             = 0x0010
+S.ADJ_TIMECONST          = 0x0020
+S.ADJ_TAI                = 0x0080
+S.ADJ_MICRO              = 0x1000
+S.ADJ_NANO               = 0x2000
+S.ADJ_TICK               = 0x4000
+S.ADJ_OFFSET_SINGLESHOT  = 0x8001
+S.ADJ_OFFSET_SS_READ     = 0xa001
+
+S.STA_PLL         = 0x0001
+S.STA_PPSFREQ     = 0x0002
+S.STA_PPSTIME     = 0x0004
+S.STA_FLL         = 0x0008
+S.STA_INS         = 0x0010
+S.STA_DEL         = 0x0020
+S.STA_UNSYNC      = 0x0040
+S.STA_FREQHOLD    = 0x0080
+S.STA_PPSSIGNAL   = 0x0100
+S.STA_PPSJITTER   = 0x0200
+S.STA_PPSWANDER   = 0x0400
+S.STA_PPSERROR    = 0x0800
+S.STA_CLOCKERR    = 0x1000
+S.STA_NANO        = 0x2000
+S.STA_MODE        = 0x4000
+S.STA_CLK         = 0x8000
+
+S.TIME_OK         = 0
+S.TIME_INS        = 1
+S.TIME_DEL        = 2
+S.TIME_OOP        = 3
+S.TIME_WAIT       = 4
+S.TIME_ERROR      = 5
+S.TIME_BAD        = S.TIME_ERROR
+
 -- send, recv etc
 S.MSG_OOB             = 0x01
 S.MSG_PEEK            = 0x02
@@ -1482,6 +1521,7 @@ local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
 local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
 local timex_t = ffi.typeof("struct timex")
+local utsname_t = ffi.typeof("struct utsname")
 
 -- siginfo needs some metamethods
 local siginfo_get = {
@@ -1630,8 +1670,8 @@ end
 
 -- reverse flag operations
 local getflag, getflags -- should be used elsewhere
-function getflags(e, prefix, values)
-  local r= {}
+function getflags(e, prefix, values, r)
+  if not r then r = {} end
   for _, f in ipairs(values) do
     if bit.band(e, S[f]) ~= 0 then
       r[f] = true
@@ -1816,11 +1856,11 @@ end
 
 -- constants
 S.INADDR_ANY = in_addr_t()
-S.INADDR_LOOPBACK = assert(S.inet_aton("127.0.0.1"))
-S.INADDR_BROADCAST = assert(S.inet_aton("255.255.255.255"))
+S.INADDR_LOOPBACK = S.inet_aton("127.0.0.1")
+S.INADDR_BROADCAST = S.inet_aton("255.255.255.255")
 -- ipv6 versions
 S.in6addr_any = in6_addr_t()
-S.in6addr_loopback = S.inet_pton(S.AF_INET6, "::1") -- no assert, may fail if no inet6 support
+S.in6addr_loopback = S.inet_pton(S.AF_INET6, "::1")
 
 -- main definitions start here
 function S.open(pathname, flags, mode) return retfd(C.open(pathname, stringflags(flags, "O_"), stringflags(mode, "S_"))) end
@@ -1830,8 +1870,6 @@ function S.dup(oldfd, newfd, flags)
   if flags == nil then return retfd(C.dup2(getfd(oldfd), getfd(newfd))) end
   return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags))
 end
-S.dup2 = S.dup
-S.dup3 = S.dup
 
 function S.pipe(flags)
   local fd2 = int2_t()
@@ -2160,7 +2198,6 @@ function S.fcntl(fd, cmd, arg)
   return retbool(ret)
 end
 
-local utsname_t = ffi.typeof("struct utsname")
 function S.uname()
   local u = utsname_t()
   local ret = C.uname(u)
@@ -2272,10 +2309,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout)
   local r = {}
   for i = 1, ret do -- put in Lua array
     local e = events[i - 1]
-    local rr = getflags(e.events, "EPOLL", {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"})
-    rr.fd = e.data.fd
-    rr.data = e.data.u64
-    r[i] = rr
+    r[i] = getflags(e.events, "EPOLL", {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"}, {fd = e.data.fd, data = e.data.u64})
   end
   return r
 end
@@ -2298,10 +2332,7 @@ function S.inotify_read(fd, buffer, len)
   local off, ee = 0, {}
   while off < ret do
     local ev = ffi.cast(inotify_event_pt, buffer + off)
-    local le = getflags(ev.mask, "IN_", in_recv_ev)
-    le.wd = tonumber(ev.wd)
-    le.mask = tonumber(ev.mask)
-    le.cookie = tonumber(ev.cookie)
+    local le = getflags(ev.mask, "IN_", in_recv_ev, {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)})
     if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
     off = off + ffi.sizeof(inotify_event_t(ev.len))
@@ -2413,9 +2444,14 @@ function S.adjtimex(t)
   if not t then t = timex_t() end
   if type(t) == 'table' then
     if t.modes then t.modes = stringflags(t.modes, "ADJ_") end
+    if t.status then t.status = stringflags(t.status, "STA_") end
     t = timex_t(t)
   end
-  return retint(C.adjtimex(t))
+  local ret = C.adjtimex(t)
+  if ret == -1 then return errorret() end
+  -- we need to return a table, as we need to return both ret and the struct timex. should probably put timex fields in table
+  local r = getflags(ret, "TIME_", {"TIME_OK", "TIME_INS", "TIME_DEL", "TIME_OOP", "TIME_WAIT", "TIME_BAD"}, {timex = t})
+  return r
 end
 
 if rt then -- real time functions not in glibc in Linux, check if available. N/A on OSX.
@@ -2827,7 +2863,7 @@ end
 
 -- methods on an fd
 local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
-                   'close', 'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
+                   'close', 'dup', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',

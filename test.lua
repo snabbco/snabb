@@ -102,7 +102,7 @@ n = assert(fd:pwrite(buf, size, offset))
 fd2 = assert(fd:dup())
 assert(fd2:close())
 
-fd2 = assert(fd:dup2(17))
+fd2 = assert(fd:dup(17))
 assert(fd2.fd == 17, "dup2 should set file id as specified")
 assert(fd2:close())
 
@@ -379,7 +379,7 @@ local serverport = s:getsockname().port -- find bound port
 
 n = assert(s:sendto(string, nil, 0, bca))
 
-local f = c:recvfrom(buf, size)
+local f = c:recvfrom(buf, size) -- do not test as drops data!
 
 assert(s:close())
 assert(c:close())
@@ -602,7 +602,6 @@ assert(fd:inotify_rm_watch(wd))
 assert(fd:close())
 
 local t = assert(S.adjtimex())
-
 
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
