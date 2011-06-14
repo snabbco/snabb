@@ -523,7 +523,10 @@ m = S.t.msghdr{msg_iov = ior, msg_iovlen = 1, msg_name = k, msg_namelen = S.size
 
 n = assert(s:recvmsg(m))
 
-S.nlmsg(reply, n.count)
+local i = S.nlmsg(reply, n.count)
+print(#i[1].ifaces)
+print(i[1].iface.eth0.name)
+assert(#i[1].ifaces >= 2, "expect at least two interfaces")
 
 assert(s:close())
 

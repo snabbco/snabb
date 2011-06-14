@@ -580,6 +580,36 @@ for _, v in ipairs(nlmsglist) do
   nlmsgtypes[S[v]] = v
 end
 
+-- linux/if_link.h
+S.IFLA_UNSPEC    = 0
+S.IFLA_ADDRESS   = 1
+S.IFLA_BROADCAST = 2
+S.IFLA_IFNAME    = 3
+S.IFLA_MTU       = 4
+S.IFLA_LINK      = 5
+S.IFLA_QDISC     = 6
+S.IFLA_STATS     = 7
+S.IFLA_COST      = 8
+S.IFLA_PRIORITY  = 9
+S.IFLA_MASTER    = 10
+S.IFLA_WIRELESS  = 11
+S.IFLA_PROTINFO  = 12
+S.IFLA_TXQLEN    = 13
+S.IFLA_MAP       = 14
+S.IFLA_WEIGHT    = 15
+S.IFLA_OPERSTATE = 16
+S.IFLA_LINKMODE  = 17
+S.IFLA_LINKINFO  = 18
+S.IFLA_NET_NS_PID= 19
+S.IFLA_IFALIAS   = 20
+S.IFLA_NUM_VF    = 21
+S.IFLA_VFINFO_LIST = 22
+S.IFLA_STATS64   = 23
+S.IFLA_VF_PORTS  = 24
+S.IFLA_PORT_SELF = 25
+S.IFLA_AF_SPEC   = 26
+S.__IFLA_MAX     = 27
+
 -- address families
 S.AF_UNSPEC     = 0
 S.AF_LOCAL      = 1
@@ -2832,6 +2862,7 @@ local nlmsg_next = function(msg, buf, len)
 end
 
 local rta_align = nlmsg_align -- also 4 byte align
+local rta_length = function(len) return len + rta_align(sizeof(rtattr_t)) end
 local rta_ok = function(msg, len)
   return len >= sizeof(rtattr_t) and msg.rta_len >= sizeof(rtattr_t) and msg.rta_len <= len
 end
@@ -2840,55 +2871,37 @@ local rta_next = function(msg, buf, len)
   return cast(rtattr_pt, buf + inc), buf + inc, len - inc
 end
 
+local ifla_decode = {}
+ifla_decode[S.IFLA_IFNAME] = function(r, buf, len)
+  r.name = string(buf + rta_length(0))
+  return r
+end
+
 local nlmsg_data_decode = {}
-nlmsg_data_decode["RTM_NEWLINK"] = function(r)
-  print("got newlink msg")
-
-
-  local buf, len = r.data, r.datalen
+nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
 
   local iface = cast(ifinfomsg_pt, buf)
+
   buf = buf + nlmsg_align(sizeof(ifinfomsg_t))
   len = len - nlmsg_align(sizeof(ifinfomsg_t))
 
   local rtattr = cast(rtattr_pt, buf)
+  local ir = {index = iface.ifi_index} -- info about interface
   while rta_ok(rtattr, len) do
-
-    print(".")
-
+    if ifla_decode[rtattr.rta_type] then ir = ifla_decode[rtattr.rta_type](ir, buf, len) end
     rtattr, buf, len = rta_next(rtattr, buf, len)
   end
 
+  if not r.ifaces then r.ifaces = {} end -- array
+  if not r.iface then r.iface = {} end -- table
+
+  print(iface.ifi_index, ir.name)
+
+  r.ifaces[iface.ifi_index] = ir
+  if ir.name then r.iface[ir.name] = ir end
 
   return r
 end
-
---[[
-void
-rtnl_print_link(struct nlmsghdr *h)
-{
-  struct ifinfomsg *iface;
-  struct rtattr *attribute;
-  int len;
-
-  iface = NLMSG_DATA(h);
-  len = h->nlmsg_len - NLMSG_LENGTH(sizeof(*iface));
-
-  for (attribute = IFLA_RTA(iface); RTA_OK(attribute, len); attribute = RTA_NEXT(attribute, len))
-    {
-      switch(attribute->rta_type)
-      {
-        case IFLA_IFNAME: 
-          printf("Interface %d : %s\n", iface->ifi_index, (char *) RTA_DATA(attribute));
-          break;
-        default:
-          break;
-      }
-    }
-}
-]]
-
-
 
 -- exposed to users to retrieve netlink messages from a buffer
 function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that useful
@@ -2900,13 +2913,7 @@ function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that 
     local r = {mtype = t, seq = tonumber(msg.nlmsg_seq), pid = tonumber(msg.nlmsg_pid), flags = tonumber(msg.nlmsg_flags)}
     if nlmsgtypes[t] then r[nlmsgtypes[t]] = true end
 
-    r.datalen = msg.nlmsg_len - nlmsg_hdrlen
-    if r.datalen > 0 then
-      r.data = buffer_t(r.datalen)
-      ffi.copy(r.data, buffer + nlmsg_hdrlen, r.datalen) -- raw payload data
-    end
-
-    if nlmsg_data_decode[nlmsgtypes[t]] then r = nlmsg_data_decode[nlmsgtypes[t]](r) end
+    if nlmsg_data_decode[t] then r = nlmsg_data_decode[t](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) end
 
     ret[#ret + 1] = r
     if r.NLMSG_DONE then done = true end
