@@ -20,20 +20,21 @@ assert(err.ENOENT, "expect ENOENT from open non existent file")
 assert(tostring(err) == "No such file or directory", "should get string error message")
 
 -- test close invalid fd
-ok, err = S.close(4)
+ok, err = S.close(127)
 assert(err, "expected to fail on close invalid fd")
 assert(err.errno == S.E.EBADF, "expect EBADF from invalid numberic fd") -- test the error functions other way
 
 -- test open and close valid file
 fd = assert(S.open("/dev/null", "rdonly"))
 assert(type(fd) == 'cdata', "should get a cdata object back from open")
-assert(fd.fd == 3, "should get file descriptor 3 back from first open")
+assert(fd.fd >= 3, "should get file descriptor of at least 3 back from first open")
 
 -- another open
 fd2 = assert(S.open("/dev/zero", "RDONLY"))
-assert(fd2.fd == 4, "should get file descriptor 4 back from second open")
+assert(fd2.fd >= 4, "should get file descriptor of at least 4 back from second open")
 
 -- normal close
+local fdfd = fd.fd
 assert(fd:close())
 
 fd3 = assert(S.open("/dev/zero"))
@@ -43,7 +44,7 @@ assert(fd3:close()) -- this should succeed
 S.sync() -- cannot fail...
 
 -- test double close fd
-fd, err = S.close(3)
+fd, err = S.close(fdfd)
 assert(err, "expected to fail on close already closed fd")
 assert(err.badf, "expect EBADF from invalid numberic fd")
 
@@ -77,12 +78,12 @@ assert(err.EBADF, "expect EBADF from already closed fd")
 -- test with gc turned off
 
 fd = assert(S.open("/dev/zero", "RDONLY"))
-assert(fd.fd == 3, "fd should be 3")
+fdfd = fd.fd
 fd:nogc()
 fd = nil
 collectgarbage("collect")
-n = assert(S.read(3, buf, size))
-assert(S.close(3))
+n = assert(S.read(fdfd, buf, size))
+assert(S.close(fdfd))
 
 -- another open
 fd = assert(S.open("/dev/zero", "RDWR"))
@@ -148,7 +149,6 @@ assert(ss == "this is a string", "readfile should get back what writefile wrote"
 assert(S.unlink(tmpfile))
 
 fd = assert(S.pipe())
-assert(fd[1].fd == 3 and fd[2].fd == 4, "expect file handles 3 and 4 for pipe")
 assert(fd[1]:close())
 assert(fd[2]:close())
 

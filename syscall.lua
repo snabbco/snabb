@@ -2566,19 +2566,21 @@ function S.setcmdline(...) -- this sets /proc/self/cmdline, use prctl to set /pr
     cmdstart = C.environ[0] - #oldcmdline -- this is where Linux stores the command line
   end
 
-  local e = S.environ() -- keep copy to reconstruct later
-
   local me = ffi.cast("char *", C.environ)
 
   if not me then return nil end -- in normal use you should get a pointer to one null pointer as minimum
 
   local new = table.concat({...}, '\0')
 
-  if #new <= #oldcmdline then
+  if #new <= #oldcmdline then -- do not need to move environment
     ffi.copy(cmdstart, new)
     ffi.fill(cmdstart + #new, #oldcmdline - #new)
     return true
   end
+
+  local e = S.environ() -- keep copy to reconstruct
+
+  -- we should have a guaranteed space, larger than env, but segfaulting...
 
   local elen = 0
   for k, v in pairs(e) do elen = elen + #v + 1 end
