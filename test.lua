@@ -426,6 +426,9 @@ pid0 = S.getpid()
 assert(pid0 > 1, "expecting my pid to be larger than 1")
 assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
 
+assert(S.getsid())
+S.setsid() -- may well fail
+
 pid = assert(S.fork())
 if (pid == 0) then -- child
   assert(S.getppid() == pid0, "parent pid should be previous pid")

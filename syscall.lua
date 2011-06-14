@@ -1402,6 +1402,8 @@ pid_t getpid(void);
 pid_t getppid(void);
 gid_t getgid(void);
 gid_t getegid(void);
+pid_t getsid(pid_t pid);
+pid_t setsid(void);
 pid_t fork(void);
 int execve(const char *filename, const char *argv[], const char *envp[]);
 pid_t wait(int *status);
@@ -2653,6 +2655,9 @@ S.sync = C.sync
 S.alarm = C.alarm
 
 function S.umask(mask) return C.umask(stringflags(mask, "S_")) end
+
+function S.getsid(pid) return retint(C.getsid(pid or 0)) end
+function S.setsid() return retint(C.setsid()) end
 
 -- handle environment (Lua only provides os.getenv). Could add metatable to make more Lualike.
 function S.environ() -- return whole environment as table
