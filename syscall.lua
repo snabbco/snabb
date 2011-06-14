@@ -215,6 +215,8 @@ S.SIGPWR        = 30
 S.SIGSYS        = 31
 S.SIGUNUSED     = 31
 
+S.NSIG          = 32
+
 -- sockets
 S.SOCK_STREAM    = 1
 S.SOCK_DGRAM     = 2
@@ -2580,7 +2582,7 @@ function S.setcmdline(...) -- this sets /proc/self/cmdline, use prctl to set /pr
 
   local e = S.environ() -- keep copy to reconstruct
 
-  -- we should have a guaranteed space, larger than env, but segfaulting...
+  -- we should have a guaranteed space, larger than env, but segfaulting... 
 
   local elen = 0
   for k, v in pairs(e) do elen = elen + #v + 1 end
