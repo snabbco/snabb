@@ -1189,6 +1189,10 @@ struct ifinfomsg {
   unsigned        ifi_flags;
   unsigned        ifi_change;
 };
+struct rtattr {
+  unsigned short  rta_len;
+  unsigned short  rta_type;
+};
 struct inotify_event {
   int wd;
   uint32_t mask;
@@ -1568,7 +1572,10 @@ local off_t = ffi.typeof("off_t")
 local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
 local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
+local ifinfomsg_t = ffi.typeof("struct ifinfomsg")
 local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
+local rtattr_t = ffi.typeof("struct rtattr")
+local rtattr_pt = ffi.typeof("struct rtattr *")
 local timex_t = ffi.typeof("struct timex")
 local utsname_t = ffi.typeof("struct utsname")
 local sigset_t = ffi.typeof("sigset_t")
@@ -2807,24 +2814,44 @@ end
 -- similar functions for netlink messages
 local nlmsg_align = function(len) return align(len, 4) end
 local nlmsg_hdrlen = nlmsg_align(ffi.sizeof(nlmsghdr_t))
-local nlmsg_length = function(len) return len + nlmsg_hdrlen end -- not really needed.
-
+local nlmsg_length = function(len) return len + nlmsg_hdrlen end
 local nlmsg_ok = function(msg, len)
   return len >= nlmsg_hdrlen and msg.nlmsg_len >= nlmsg_hdrlen and msg.nlmsg_len <= len
 end
-
 local nlmsg_next = function(msg, buf, len)
   local inc = nlmsg_align(msg.nlmsg_len)
   return ffi.cast(nlmsghdr_pt, buf + inc), buf + inc, len - inc
 end
 
+local rta_align = nlmsg_align -- also 4 byte align
+local rta_ok = function(msg, len)
+  return len >= ffi.sizeof(rtattr_t) and msg.rta_len >= ffi.sizeof(rtattr_t) and msg.rta_len <= len
+end
+local rta_next = function(msg, buf, len)
+  local inc = rta_align(msg.rta_len)
+  return ffi.cast(rtattr_pt, buf + inc), buf + inc, len - inc
+end
+
 local nlmsg_data_decode = {}
 nlmsg_data_decode["RTM_NEWLINK"] = function(r)
-  --print("got newlink msg")
+  print("got newlink msg")
 
-  local iface = ffi.cast(ifinfomsg_pt, r.data)
 
-  
+  local buf, len = r.data, r.datalen
+
+  local iface = ffi.cast(ifinfomsg_pt, buf)
+  buf = buf + nlmsg_align(ffi.sizeof(ifinfomsg_t))
+  len = len - nlmsg_align(ffi.sizeof(ifinfomsg_t))
+
+  local rtattr = ffi.cast(rtattr_pt, buf)
+  while rta_ok(rtattr, len) do
+
+    print(".")
+
+    rtattr, buf, len = rta_next(rtattr, buf, len)
+  end
+
+
   return r
 end
 
