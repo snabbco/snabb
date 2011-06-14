@@ -186,7 +186,6 @@ signals = {
 "SIGILL",
 "SIGTRAP",
 "SIGABRT",
-"SIGIOT",
 "SIGBUS",
 "SIGFPE",
 "SIGKILL",
@@ -215,7 +214,9 @@ signals = {
 }
 
 for i, v in ipairs(signals) do S[v] = i end
+assert(S.SIGSYS == 31)
 
+S.SIGIOT = 6
 S.SIGUNUSED     = 31
 S.SIGCLD        = S.SIGCHLD
 S.SIGPOLL       = S.SIGIO
@@ -1568,6 +1569,7 @@ local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
 local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
 local timex_t = ffi.typeof("struct timex")
 local utsname_t = ffi.typeof("struct utsname")
+local sigset_t = ffi.typeof("sigset_t")
 local rlimit_t = ffi.typeof("struct rlimit")
 
 S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
@@ -2317,11 +2319,12 @@ function fdisset(fds, set)
 end
 
 -- signal set handlers
-local mksigset, getsigset, sigismember, sigaddset, sigdelset
+local mksigset, getsigset, sigismember, sigaddset, sigdelset, sigaddsets, sigdelsets, sigsetmt
+
 function mksigset(str)
   if not str then return sigset_t() end
+  if ffi.istype(sigset_t, str) then return str end
   if type(str) == "table" then return str.sigset end
-  if type(str) ~= "string" then return str end
   local f = sigset_t()
   local a = split(",", str)
   for i, v in ipairs(a) do
@@ -2336,37 +2339,65 @@ function mksigset(str)
   return f
 end
 
-function sigisember(set, sig)
+function sigismember(set, sig)
   local d = bit.rshift(sig, 5) -- always 32 bits
   return bit.band(set.val[d], bit.lshift(1, sig % 32)) ~= 0
 end
 function sigaddset(set, sig)
-  set = mksigset(set).sigset -- bit odd, but means can use string or table too
+  set = mksigset(set)
   local d = bit.rshift(sig, 5)
   set.val[d] = bit.bor(set.val[d], bit.lshift(1, sig % 32))
-  return getsigset(set)
+  return set
 end
 function sigdelset(set, sig)
-  set = mksigset(set).sigset -- bit odd, but means can use string or table too
+  set = mksigset(set)
   local d = bit.rshift(sig, 5)
   set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, sig % 32)))
+  return set
+end
+
+function sigaddsets(set, sigs) -- allow multiple
+  if type(sigs) ~= "string" then return getsigset(sigaddset(set, sigs)) end
+  set = mksigset(set)
+  local a = split(",", sigs)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    sigaddset(set, sig)
+  end
   return getsigset(set)
 end
 
-local getsigset
+function sigdelsets(set, sigs) -- allow multiple
+  if type(sigs) ~= "string" then return getsigset(sigdelset(set, sigs)) end
+  set = mksigset(set)
+  local a = split(",", sigs)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    sigdelset(set, sig)
+  end
+  return getsigset(set)
+end
+
+sigsetmt = {__index = {add = sigaddsets, del = sigdelsets}}
+
 function getsigset(set)
   local f = {sigset = set}
   local isemptyset = true
   for i = 1, S.NSIG do
     if sigismember(set, i) then
-      f[signal[i]] = true
-      f[signal[i]:lower():sub(4)] = true
+      f[signals[i]] = true
+      f[signals[i]:lower():sub(4)] = true
       isemptyset = false
     end
   end
   f.isemptyset = isemptyset
-  f.add = sigaddset
-  f.del = sigdelset
+  setmetatable(f, sigsetmt)
   return f
 end
 
@@ -2377,6 +2408,13 @@ function S.sigprocmask(how, set)
   local ret = C.sigprocmask(how, set, oldset)
   if ret == -1 then return errorret() end
   return getsigset(oldset)
+end
+
+function S.sigpending()
+  local set = sigset_t()
+  local ret = C.sigpending(set)
+  if ret == -1 then return errorret() end
+  return getsigset(set)
 end
 
 function S.select(s) -- note same structure as returned
