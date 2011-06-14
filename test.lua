@@ -524,9 +524,8 @@ m = S.t.msghdr{msg_iov = ior, msg_iovlen = 1, msg_name = k, msg_namelen = S.size
 n = assert(s:recvmsg(m))
 
 local i = S.nlmsg(reply, n.count)
-print(#i.ifaces)
-print(i.iface.eth0.name)
 assert(#i.ifaces >= 2, "expect at least two interfaces")
+assert(i.iface.lo, "expect a loopback interface")
 
 assert(s:close())
 

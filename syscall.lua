@@ -2895,8 +2895,6 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
   if not r.ifaces then r.ifaces = {} end -- array
   if not r.iface then r.iface = {} end -- table
 
-  print(iface.ifi_index, ir.name)
-
   r.ifaces[iface.ifi_index] = ir
   if ir.name then r.iface[ir.name] = ir end
 
@@ -2910,7 +2908,6 @@ function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that 
   local done = false
   while not done and nlmsg_ok(msg, len) do
     local t = tonumber(msg.nlmsg_type)
-    --local r = {mtype = t, seq = tonumber(msg.nlmsg_seq), pid = tonumber(msg.nlmsg_pid), flags = tonumber(msg.nlmsg_flags)}
     if nlmsgtypes[t] then r[nlmsgtypes[t]] = true end
 
     if nlmsg_data_decode[t] then r = nlmsg_data_decode[t](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) end
