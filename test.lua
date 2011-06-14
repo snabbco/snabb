@@ -350,6 +350,10 @@ m = m:add("winch")
 m = assert(S.sigprocmask("block", m))
 assert(m.isemptyset, "expect old sigprocmask to be empty")
 
+assert(S.kill(S.getpid(), "winch")) -- should be blocked but pending
+m = assert(S.sigpending())
+assert(m.winch, "expect pending winch")
+
 local sv = assert(S.socketpair("unix", "stream"))
 c, s = sv[1], sv[2]
 

@@ -1941,7 +1941,10 @@ function S.close(fd)
     end
     return errorret()
   end
-  if ffi.istype(fd_t, fd) then fd.fd = -1 end -- make sure cannot accidentally close this fd object again
+  if ffi.istype(fd_t, fd) then
+    ffi.gc(fd, nil)
+    fd.fd = -1 -- make sure cannot accidentally close this fd object again
+  end
   return true
 end
 
@@ -2333,26 +2336,26 @@ function mksigset(str)
     local sig = S[s]
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
 
-    local d = bit.rshift(sig, 5) -- always 32 bits
-    f.val[d] = bit.bor(f.val[d], bit.lshift(1, sig % 32))
+    local d = bit.rshift(sig - 1, 5) -- always 32 bits
+    f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
   end
   return f
 end
 
 function sigismember(set, sig)
-  local d = bit.rshift(sig, 5) -- always 32 bits
-  return bit.band(set.val[d], bit.lshift(1, sig % 32)) ~= 0
+  local d = bit.rshift(sig - 1, 5) -- always 32 bits
+  return bit.band(set.val[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
 end
 function sigaddset(set, sig)
   set = mksigset(set)
-  local d = bit.rshift(sig, 5)
-  set.val[d] = bit.bor(set.val[d], bit.lshift(1, sig % 32))
+  local d = bit.rshift(sig - 1, 5)
+  set.val[d] = bit.bor(set.val[d], bit.lshift(1, (sig - 1) % 32))
   return set
 end
 function sigdelset(set, sig)
   set = mksigset(set)
-  local d = bit.rshift(sig, 5)
-  set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, sig % 32)))
+  local d = bit.rshift(sig - 1, 5)
+  set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
   return set
 end
 
@@ -2414,7 +2417,7 @@ function S.sigpending()
   local set = sigset_t()
   local ret = C.sigpending(set)
   if ret == -1 then return errorret() end
-  return getsigset(set)
+ return getsigset(set)
 end
 
 function S.select(s) -- note same structure as returned
