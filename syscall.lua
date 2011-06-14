@@ -179,43 +179,53 @@ S.SIG_DFL =  0
 S.SIG_IGN =  1
 S.SIG_HOLD = 2
 
-S.SIGHUP        = 1
-S.SIGINT        = 2
-S.SIGQUIT       = 3
-S.SIGILL        = 4
-S.SIGTRAP       = 5
-S.SIGABRT       = 6
-S.SIGIOT        = 6
-S.SIGBUS        = 7
-S.SIGFPE        = 8
-S.SIGKILL       = 9
-S.SIGUSR1       = 10
-S.SIGSEGV       = 11
-S.SIGUSR2       = 12
-S.SIGPIPE       = 13
-S.SIGALRM       = 14
-S.SIGTERM       = 15
-S.SIGSTKFLT     = 16
-S.SIGCHLD       = 17
-S.SIGCLD        = S.SIGCHLD
-S.SIGCONT       = 18
-S.SIGSTOP       = 19
-S.SIGTSTP       = 20
-S.SIGTTIN       = 21
-S.SIGTTOU       = 22
-S.SIGURG        = 23
-S.SIGXCPU       = 24
-S.SIGXFSZ       = 25
-S.SIGVTALRM     = 26
-S.SIGPROF       = 27
-S.SIGWINCH      = 28
-S.SIGIO         = 29
-S.SIGPOLL       = S.SIGIO
-S.SIGPWR        = 30
-S.SIGSYS        = 31
+signals = {
+"SIGHUP",
+"SIGINT",
+"SIGQUIT",
+"SIGILL",
+"SIGTRAP",
+"SIGABRT",
+"SIGIOT",
+"SIGBUS",
+"SIGFPE",
+"SIGKILL",
+"SIGUSR1",
+"SIGSEGV",
+"SIGUSR2",
+"SIGPIPE",
+"SIGALRM",
+"SIGTERM",
+"SIGSTKFLT",
+"SIGCHLD",
+"SIGCONT",
+"SIGSTOP",
+"SIGTSTP",
+"SIGTTIN",
+"SIGTTOU",
+"SIGURG",
+"SIGXCPU",
+"SIGXFSZ",
+"SIGVTALRM",
+"SIGPROF",
+"SIGWINCH",
+"SIGIO",
+"SIGPWR",
+"SIGSYS",
+}
+
+for i, v in ipairs(signals) do S[v] = i end
+
 S.SIGUNUSED     = 31
+S.SIGCLD        = S.SIGCHLD
+S.SIGPOLL       = S.SIGIO
 
 S.NSIG          = 32
+
+-- sigprocmask
+S.SIG_BLOCK     = 0
+S.SIG_UNBLOCK   = 1
+S.SIG_SETMASK   = 2
 
 -- sockets
 S.SOCK_STREAM    = 1
@@ -1012,8 +1022,12 @@ typedef unsigned long ino_t;
 typedef unsigned long nlink_t;
 typedef unsigned long rlim_t;
 
-// should be a word, but we use 32 bits as bitops are 32 bit in LuaJIT at the moment
-typedef uint32_t fd_mask;
+// should be a word, but we use 32 bits as bitops are signed 32 bit in LuaJIT at the moment
+typedef int32_t fd_mask;
+
+typedef struct {
+  int32_t val[1024 / (8 * sizeof (int32_t))];
+} sigset_t;
 
 typedef int idtype_t; /* defined as enum */
 
@@ -1408,6 +1422,9 @@ int nice(int inc);
 int getpriority(int which, int who);
 int setpriority(int which, int who, int prio);
 int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5);
+int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+int sigpending(sigset_t *set);
+int sigsuspend(const sigset_t *mask);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -2252,6 +2269,7 @@ end
 
 function S.signal(signum, handler) return retbool(C.signal(stringflag(signum, "SIG"), stringflag(handler, "SIG_"))) end
 function S.kill(pid, sig) return retbool(C.kill(pid, stringflag(sig, "SIG"))) end
+function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 
 function S.gettimeofday(tv)
   if not tv then tv = timeval_t() end -- note it is faster to pass your own tv if you call a lot
@@ -2275,6 +2293,7 @@ function S.sysinfo(info)
   return info
 end
 
+-- fdset handlers
 local mkfdset, fdisset
 function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
   local set = fdset_t()
@@ -2295,6 +2314,69 @@ function fdisset(fds, set)
     if bit.band(set.fds_bits[fdelt], bit.lshift(1, fd % 32)) ~= 0 then table.insert(f, v) end -- careful not to duplicate fd objects
   end
   return f
+end
+
+-- signal set handlers
+local mksigset, getsigset, sigismember, sigaddset, sigdelset
+function mksigset(str)
+  if not str then return sigset_t() end
+  if type(str) == "table" then return str.sigset end
+  if type(str) ~= "string" then return str end
+  local f = sigset_t()
+  local a = split(",", str)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+
+    local d = bit.rshift(sig, 5) -- always 32 bits
+    f.val[d] = bit.bor(f.val[d], bit.lshift(1, sig % 32))
+  end
+  return f
+end
+
+function sigisember(set, sig)
+  local d = bit.rshift(sig, 5) -- always 32 bits
+  return bit.band(set.val[d], bit.lshift(1, sig % 32)) ~= 0
+end
+function sigaddset(set, sig)
+  set = mksigset(set).sigset -- bit odd, but means can use string or table too
+  local d = bit.rshift(sig, 5)
+  set.val[d] = bit.bor(set.val[d], bit.lshift(1, sig % 32))
+  return getsigset(set)
+end
+function sigdelset(set, sig)
+  set = mksigset(set).sigset -- bit odd, but means can use string or table too
+  local d = bit.rshift(sig, 5)
+  set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, sig % 32)))
+  return getsigset(set)
+end
+
+local getsigset
+function getsigset(set)
+  local f = {sigset = set}
+  local isemptyset = true
+  for i = 1, S.NSIG do
+    if sigismember(set, i) then
+      f[signal[i]] = true
+      f[signal[i]:lower():sub(4)] = true
+      isemptyset = false
+    end
+  end
+  f.isemptyset = isemptyset
+  f.add = sigaddset
+  f.del = sigdelset
+  return f
+end
+
+function S.sigprocmask(how, set)
+  how = stringflag(how, "SIG_")
+  set = mksigset(set)
+  oldset = sigset_t()
+  local ret = C.sigprocmask(how, set, oldset)
+  if ret == -1 then return errorret() end
+  return getsigset(oldset)
 end
 
 function S.select(s) -- note same structure as returned

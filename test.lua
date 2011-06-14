@@ -338,6 +338,17 @@ assert(sv[1]:close())
 
 assert(S.kill(S.getpid(), "pipe")) -- should be ignored
 
+local m = assert(S.sigprocmask())
+assert(m.isemptyset, "expect initial sigprocmask to be empty")
+m:add("winch")
+assert(m.winch, "expect to have added SIGWINCH")
+m:del("SIGWINCH")
+assert(not m.winch, "expect set empty again")
+assert(m.isemptyset, "expect initial sigprocmask to be empty")
+m:add("winch")
+m = assert(S.sigprocmask(m))
+assert(m.isemptyset, "expect old sigprocmask to be empty")
+
 local sv = assert(S.socketpair("unix", "stream"))
 c, s = sv[1], sv[2]
 
