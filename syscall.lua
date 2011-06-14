@@ -2905,21 +2905,20 @@ end
 
 -- exposed to users to retrieve netlink messages from a buffer
 function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that useful
-  local ret = {}
+  local r = {}
   local msg = cast(nlmsghdr_pt, buffer)
   local done = false
   while not done and nlmsg_ok(msg, len) do
     local t = tonumber(msg.nlmsg_type)
-    local r = {mtype = t, seq = tonumber(msg.nlmsg_seq), pid = tonumber(msg.nlmsg_pid), flags = tonumber(msg.nlmsg_flags)}
+    --local r = {mtype = t, seq = tonumber(msg.nlmsg_seq), pid = tonumber(msg.nlmsg_pid), flags = tonumber(msg.nlmsg_flags)}
     if nlmsgtypes[t] then r[nlmsgtypes[t]] = true end
 
     if nlmsg_data_decode[t] then r = nlmsg_data_decode[t](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) end
 
-    ret[#ret + 1] = r
     if r.NLMSG_DONE then done = true end
     msg, buffer, len = nlmsg_next(msg, buffer, len)
   end
-  return ret
+  return r
 end
 
 function S.sendmsg(fd, msg, flags)
