@@ -2854,6 +2854,8 @@ local nlmsg_align = function(len) return align(len, 4) end
 local nlmsg_hdrlen = nlmsg_align(sizeof(nlmsghdr_t))
 local nlmsg_length = function(len) return len + nlmsg_hdrlen end
 local nlmsg_ok = function(msg, len)
+
+  print(msg.nlmsg_len, len)
   return len >= nlmsg_hdrlen and msg.nlmsg_len >= nlmsg_hdrlen and msg.nlmsg_len <= len
 end
 local nlmsg_next = function(msg, buf, len)
@@ -2874,11 +2876,16 @@ end
 local ifla_decode = {}
 ifla_decode[S.IFLA_IFNAME] = function(r, buf, len)
   r.name = string(buf + rta_length(0))
+
+io.write(r.name)
+
   return r
 end
 
 local nlmsg_data_decode = {}
 nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
+
+  io.write("*")
 
   local iface = cast(ifinfomsg_pt, buf)
 
@@ -2889,6 +2896,9 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
   local ir = {index = iface.ifi_index} -- info about interface
   while rta_ok(rtattr, len) do
     if ifla_decode[rtattr.rta_type] then ir = ifla_decode[rtattr.rta_type](ir, buf, len) end
+  io.write("(" .. rtattr.rta_type .. ")")
+  io.write(".")
+
     rtattr, buf, len = rta_next(rtattr, buf, len)
   end
 
@@ -2908,11 +2918,12 @@ function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that 
   local done = false
   while not done and nlmsg_ok(msg, len) do
     local t = tonumber(msg.nlmsg_type)
-    if nlmsgtypes[t] then r[nlmsgtypes[t]] = true end
+
+io.write("@")
 
     if nlmsg_data_decode[t] then r = nlmsg_data_decode[t](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) end
 
-    if r.NLMSG_DONE then done = true end
+    if t == NLMSG_DONE then done = true end
     msg, buffer, len = nlmsg_next(msg, buffer, len)
   end
   return r

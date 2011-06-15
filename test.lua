@@ -521,13 +521,13 @@ local ior = S.t.iovec(1, {{reply, repsize}})
 
 m = S.t.msghdr{msg_iov = ior, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}
 
-n = assert(s:recvmsg(m))
+n = assert(s:recvmsg(m)) -- rewrite, more than one recvmsg needed to get all interfaces!
 
 local i = S.nlmsg(reply, n.count)
 assert(#i.ifaces >= 2, "expect at least two interfaces")
 assert(i.iface.lo, "expect a loopback interface")
 
-for k, v in ipairs(i.ifaces) do print(v.name) end
+--for k, v in ipairs(i.ifaces) do print(v.name) end
 
 assert(s:close())
 
