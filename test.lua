@@ -508,14 +508,14 @@ hdr.nlmsg_type = S.RTM_GETLINK
 hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_DUMP
 hdr.nlmsg_seq = 1          -- we should attach a sequence number to the file descriptor and use this
 hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
-gen.rtgen_family = S.AF_PACKET
+gen.rtgen_family = S.AF_PACKET -- or AF_UNSPEC?
 
 local ios = S.t.iovec(1, {{buf, len}})
 local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}
 
 assert(s:sendmsg(m))
 
-local repsize = 4096
+local repsize = 8192
 local reply = S.t.buffer(repsize)
 local ior = S.t.iovec(1, {{reply, repsize}})
 
@@ -527,7 +527,11 @@ local i = S.nlmsg(reply, n.count)
 assert(#i.ifaces >= 2, "expect at least two interfaces")
 assert(i.iface.lo, "expect a loopback interface")
 
+for k, v in ipairs(i.ifaces) do print(v.name) end
+
 assert(s:close())
+
+os.exit(1) -- tmp
 
 -- getdents, Linux only, via dirfile interface
 local d = assert(S.dirfile("/dev"))
