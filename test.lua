@@ -515,23 +515,18 @@ local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = 
 
 assert(s:sendmsg(m))
 
-local repsize = 8192
-local reply = S.t.buffer(repsize)
-local ior = S.t.iovec(1, {{reply, repsize}})
+local i = S.nlmsg_read(s, k)
 
-m = S.t.msghdr{msg_iov = ior, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}
-
-n = assert(s:recvmsg(m)) -- rewrite, more than one recvmsg needed to get all interfaces!
-
-local i = S.nlmsg(reply, n.count)
-assert(#i.ifaces >= 2, "expect at least two interfaces")
-assert(i.iface.lo, "expect a loopback interface")
+local df = 0
+for k, v in pairs(S.dirfile("/sys/class/net")) do if k ~= "." and k ~= ".." then df = df + 1 end end
 
 --for k, v in ipairs(i.ifaces) do print(v.name) end
 
-assert(s:close())
+assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
 
-os.exit(1) -- tmp
+assert(i.iface.lo, "expect a loopback interface")
+
+assert(s:close())
 
 -- getdents, Linux only, via dirfile interface
 local d = assert(S.dirfile("/dev"))

@@ -2854,8 +2854,6 @@ local nlmsg_align = function(len) return align(len, 4) end
 local nlmsg_hdrlen = nlmsg_align(sizeof(nlmsghdr_t))
 local nlmsg_length = function(len) return len + nlmsg_hdrlen end
 local nlmsg_ok = function(msg, len)
-
-  print(msg.nlmsg_len, len)
   return len >= nlmsg_hdrlen and msg.nlmsg_len >= nlmsg_hdrlen and msg.nlmsg_len <= len
 end
 local nlmsg_next = function(msg, buf, len)
@@ -2877,15 +2875,11 @@ local ifla_decode = {}
 ifla_decode[S.IFLA_IFNAME] = function(r, buf, len)
   r.name = string(buf + rta_length(0))
 
-io.write(r.name)
-
   return r
 end
 
 local nlmsg_data_decode = {}
 nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
-
-  io.write("*")
 
   local iface = cast(ifinfomsg_pt, buf)
 
@@ -2896,8 +2890,6 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
   local ir = {index = iface.ifi_index} -- info about interface
   while rta_ok(rtattr, len) do
     if ifla_decode[rtattr.rta_type] then ir = ifla_decode[rtattr.rta_type](ir, buf, len) end
-  io.write("(" .. rtattr.rta_type .. ")")
-  io.write(".")
 
     rtattr, buf, len = rta_next(rtattr, buf, len)
   end
@@ -2905,27 +2897,40 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
   if not r.ifaces then r.ifaces = {} end -- array
   if not r.iface then r.iface = {} end -- table
 
-  r.ifaces[iface.ifi_index] = ir
+  r.ifaces[#r.ifaces + 1] = ir -- cant use interface index as holes.
   if ir.name then r.iface[ir.name] = ir end
 
   return r
 end
 
--- exposed to users to retrieve netlink messages from a buffer
-function S.nlmsg(buffer, len) -- note could expand to take iovec, not sure that useful
+function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
+
+  local bufsize = 8192
+  local reply = buffer_t(bufsize)
+  local ior = iovec_t(1, {{reply, bufsize}})
+  local m = msghdr_t{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = sizeof(addr)}
+
+  local done = false -- what should we do if we get a done message but there is some extra buffer? could be next message...
   local r = {}
-  local msg = cast(nlmsghdr_pt, buffer)
-  local done = false
-  while not done and nlmsg_ok(msg, len) do
-    local t = tonumber(msg.nlmsg_type)
 
-io.write("@")
+  while not done do
+    local n, err = s:recvmsg(m)
+    if not n then return nil, err end
+    local len = n.count
+    local buffer = reply
 
-    if nlmsg_data_decode[t] then r = nlmsg_data_decode[t](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) end
+    local msg = cast(nlmsghdr_pt, buffer)
 
-    if t == NLMSG_DONE then done = true end
-    msg, buffer, len = nlmsg_next(msg, buffer, len)
+    while not done and nlmsg_ok(msg, len) do
+      local t = tonumber(msg.nlmsg_type)
+
+      if nlmsg_data_decode[t] then r = nlmsg_data_decode[t](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) end
+
+      if t == S.NLMSG_DONE then done = true end
+      msg, buffer, len = nlmsg_next(msg, buffer, len)
+    end
   end
+
   return r
 end
 
