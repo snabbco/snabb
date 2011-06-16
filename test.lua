@@ -288,13 +288,13 @@ assert(S.string(buf, n) == string, "we should read back the same string that was
 -- test scatter gather
 local b0 = S.t.buffer(4, "test")
 local b1 = S.t.buffer(3, "ing")
-local io = S.t.iovec(2, {{b0, 4}, {b1, 3}})
-n = assert(c:writev(io, 2))
+local iov = S.t.iovec(2, {{b0, 4}, {b1, 3}})
+n = assert(c:writev(iov, 2))
 assert(n == 7, "expect writev to write 7 bytes")
 b0 = S.t.buffer(3)
 b1 = S.t.buffer(4)
-io = S.t.iovec(2, {{b0, 3}, {b1, 4}})
-n = assert(a.fd:readv(io, 2))
+iov = S.t.iovec(2, {{b0, 3}, {b1, 4}})
+n = assert(a.fd:readv(iov, 2))
 assert(n == 7, "expect readv to read 7 bytes")
 assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get back same stuff")
 
@@ -495,8 +495,7 @@ local i = assert(S.sysinfo())
 -- netlink sockets, Linux only
 local i = S.get_interfaces()
 
-local df = 0
-for k, v in pairs(S.dirfile("/sys/class/net")) do if k ~= "." and k ~= ".." then df = df + 1 end end
+local df = #assert(S.ls("/sys/class/net", true))
 
 --for k, v in ipairs(i.ifaces) do print(v.name) end
 
@@ -669,6 +668,8 @@ if l then
 end
 assert(S.unlink(tmpfile))
 
+local b = assert(S.bridge_list())
+
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
 assert(S.mkdir(tmpfile))
@@ -701,6 +702,9 @@ assert(ok or err.ENOPKG, "bridge add should succeed unless bridging not enabled"
 if ok then
   assert(S.stat("/sys/class/net/br999"))
   --assert(S.bridge_add_interface("br999", "eth0")) -- failing on test machine as already in another bridge!
+
+  local b = assert(S.bridge_list())
+  assert(b.br999 and b.br999.root_id, "expect to find bridge in list")
 
   assert(S.bridge_del("br999"))
   ok = S.stat("/sys/class/net/br999")

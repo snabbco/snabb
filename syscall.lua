@@ -3283,11 +3283,11 @@ end
 
 function S.readfile(name, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
   local f, err = S.open(name, S.O_RDONLY)
-  if not f then print("open"); return nil, err end
+  if not f then return nil, err end
   local r, err = f:read(nil, length or 4096)
-  if not r then print("read"); return nil, err end
+  if not r then return nil, err end
   local t, err = f:close()
-  if not t then print("close"); return nil, err end
+  if not t then return nil, err end
   return r
 end
 
@@ -3302,15 +3302,27 @@ function S.writefile(name, string, mode) -- write string to named file. specify 
   return true
 end
 
-function S.dirfile(name) -- return the directory entries in a file
+function S.dirfile(name, nodots) -- return the directory entries in a file, remove . and .. if nodots true
   local fd, d, _, err
   fd, err = S.open(name, S.O_DIRECTORY + S.O_RDONLY)
   if err then return nil, err end
   d, err = fd:getdents()
   if err then return nil, err end
+  if nodots then
+    d["."] = nil
+    d[".."] = nil
+  end
   _, err = fd:close()
   if err then return nil, err end
   return d
+end
+
+function S.ls(name, nodots) -- return just the list, no other data, cwd if no directory specified
+  if not name then name = S.getcwd() end
+  local ds = S.dirfile(name, nodots)
+  local l = {}
+  for k, _ in pairs(ds) do l[#l + 1] = k end
+  return l
 end
 
 local if_nametoindex
@@ -3370,12 +3382,33 @@ function bridge_if_ioctl(io, bridge, dev)
   return true
 end
 
-function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRADDIF, bridge, dev)
-function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRDELIF, bridge, dev)
+function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRADDIF, bridge, dev) end
+function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRDELIF, bridge, dev) end
 
--- brctl show lists /sysclass/net/* then stats /sys/class/net/DEV/bridge to see if bridge, if this exists then prints /sys/class/net/DEV/bridge/*
+-- brctl show lists /sys/class/net/* then stats /sys/class/net/DEV/bridge to see if bridge, if this exists then prints /sys/class/net/DEV/bridge/*
 -- can also set some of these parameters, this is done by writing to sysfs
 -- so pretty easy to interface...
+
+function S.bridge_list()
+  local dir, err = S.dirfile("/sys/class/net", true)
+  if not dir then return nil, err end
+  local b = {}
+  for d, _ in pairs(dir) do
+    local bd = "/sys/class/net/" .. d .. "/bridge"
+    if S.stat(bd) then -- congratulations, it's a bridge
+      local info = {}
+      local fs = S.dirfile(bd, true)
+      if fs then
+        for f, _ in pairs(fs) do
+          local s = S.readfile(bd .. "/" .. f)
+          if s then info[f] = s:sub(1, #s - 1) end -- remove newline at end
+        end
+      end
+      b[d] = info
+    end
+  end
+  return b
+end
 
 -- use string types for now
 local threc -- helper for returning varargs
