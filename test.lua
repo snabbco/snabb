@@ -493,29 +493,7 @@ local t = assert(S.clock_gettime("realtime"))
 local i = assert(S.sysinfo())
 
 -- netlink sockets, Linux only
--- will make this a helper function
-s = assert(S.socket("netlink", "raw", "route"))
-a = S.sockaddr_nl() -- kernel will fill in address
-assert(s:bind(a))
-local k = S.sockaddr_nl() -- kernel destination
-
--- we should be adding padding at the end of size nlmsg_alignto (4), (and in middle but 0) or will have issues if try to send more messages.
--- so need to add pad size to tbuffer function
-local buf, len, hdr, gen = S.tbuffer("struct nlmsghdr", "struct rtgenmsg") -- allocates buffer for named types and returns cast pointers
-
-hdr.nlmsg_len = len
-hdr.nlmsg_type = S.RTM_GETLINK
-hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_DUMP
-hdr.nlmsg_seq = 1          -- we should attach a sequence number to the file descriptor and use this
-hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
-gen.rtgen_family = S.AF_PACKET
-
-local ios = S.t.iovec(1, {{buf, len}})
-local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}
-
-assert(s:sendmsg(m))
-
-local i = S.nlmsg_read(s, k)
+local i = S.get_interfaces()
 
 local df = 0
 for k, v in pairs(S.dirfile("/sys/class/net")) do if k ~= "." and k ~= ".." then df = df + 1 end end
@@ -525,8 +503,6 @@ for k, v in pairs(S.dirfile("/sys/class/net")) do if k ~= "." and k ~= ".." then
 assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
 
 assert(i.iface.lo, "expect a loopback interface")
-
-assert(s:close())
 
 -- getdents, Linux only, via dirfile interface
 local d = assert(S.dirfile("/dev"))

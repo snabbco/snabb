@@ -3043,6 +3043,39 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
   return r
 end
 
+-- read interfaces and details. not very generic yet...
+function S.get_interfaces()
+  local s, err = S.socket("netlink", "raw", "route")
+  if not s then return nil, err end
+  local a = S.sockaddr_nl() -- kernel will fill in address
+  local ok, err = s:bind(a)
+  if not ok then return nil, err end -- gc will take care of closing socket...
+  local k = S.sockaddr_nl() -- kernel destination
+
+  -- we should be adding padding at the end of size nlmsg_alignto (4), (and in middle but 0) or will have issues if try to send more messages.
+  -- so need to add pad size to tbuffer function
+  local buf, len, hdr, gen = S.tbuffer("struct nlmsghdr", "struct rtgenmsg") -- allocates buffer for named types and returns cast pointers
+
+  hdr.nlmsg_len = len
+  hdr.nlmsg_type = S.RTM_GETLINK
+  hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_DUMP
+  hdr.nlmsg_seq = 1          -- we should attach a sequence number to the file descriptor and use this
+  hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
+  gen.rtgen_family = S.AF_PACKET
+
+  local ios = S.t.iovec(1, {{buf, len}})
+  local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}
+
+  local n, err = s:sendmsg(m)
+  if not n then return nil, err end 
+
+  local i = S.nlmsg_read(s, k)
+  local ok, err = s:close()
+  if not ok then return nil, err end
+
+  return i
+end
+
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
     local buf1 = buffer_t(1)
