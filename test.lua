@@ -679,7 +679,7 @@ assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
 assert(S.umount(tmpfile, "detach, nofollow"))
 assert(S.rmdir(tmpfile))
 
-assert(S.acct())
+S.acct() -- may not be configured
 
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 assert(S.mlock(mem, size))
