@@ -642,7 +642,7 @@ if l then
   assert(#l == 0, "expect no xattr on new file")
   l = assert(S.llistxattr(tmpfile))
   assert(#l == 0, "expect no xattr on new file")
-  l = assert(fd:flistxattr(tmpfile))
+  l = assert(fd:flistxattr())
   assert(#l == 0, "expect no xattr on new file")
   ok, err = S.setxattr(tmpfile, "user.test", "42", "create")
   if ok then -- likely to get err.ENOTSUP here if fs not mounted with user_xattr

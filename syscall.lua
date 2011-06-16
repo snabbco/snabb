@@ -2390,9 +2390,9 @@ local lattrbuf = function(...)
   return split('\0', s)
 end
 
-function S.listxattr(path, list, size) return lattrbuf(C.listxattr, path) end
-function S.llistxattr(path, list, size) return lattrbuf(C.llistxattr, path) end
-function S.flistxattr(fd, list, size) return lattrbuf(C.flistxattr, getfd(fd)) end
+function S.listxattr(path) return lattrbuf(C.listxattr, path) end
+function S.llistxattr(path) return lattrbuf(C.llistxattr, path) end
+function S.flistxattr(fd) return lattrbuf(C.flistxattr, getfd(fd)) end
 
 function S.setxattr(path, name, value, flags)
   return retbool(C.setxattr(path, name, value, #value + 1, stringflag(flags, "XATTR_")))
@@ -2407,6 +2407,8 @@ end
 function S.getxattr(path, name) return growattrbuf(C.getxattr, path, name) end
 function S.lgetxattr(path, name) return growattrbuf(C.lgetxattr, path, name) end
 function S.fgetxattr(fd, name) return growattrbuf(C.fgetxattr, getfd(fd), name) end
+
+
 
 -- fdset handlers
 local mkfdset, fdisset
