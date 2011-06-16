@@ -3373,6 +3373,10 @@ end
 function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRADDIF, bridge, dev)
 function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRDELIF, bridge, dev)
 
+-- brctl show lists /sysclass/net/* then stats /sys/class/net/DEV/bridge to see if bridge, if this exists then prints /sys/class/net/DEV/bridge/*
+-- can also set some of these parameters, this is done by writing to sysfs
+-- so pretty easy to interface...
+
 -- use string types for now
 local threc -- helper for returning varargs
 function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
