@@ -812,6 +812,8 @@ elseif ffi.abi("64bit") and arch == "x64" then
 end
 
 -- ioctls, filling in as needed
+S.SIOCGIFINDEX   = 0x8933
+
 S.SIOCBRADDBR    = 0x89a0
 S.SIOCBRDELBR    = 0x89a1
 S.SIOCBRADDIF    = 0x89a2
@@ -2323,11 +2325,20 @@ function S.getcwd(buf, size)
   return true -- no point returning the pointer as it is just the passed buffer
 end
 
-function S.nanosleep(req)
+function S.nanosleep(req, ns) -- construct timespec if given two args, or table
+  if type(req) == "table" then req = timespec_t(req)
+  elseif type(req) == "number" then req = timespec_t(req, ns or 0)
+  end
   local rem = timespec_t()
   local ret = C.nanosleep(req, rem)
   if ret == -1 then return errorret() end
   return rem -- return second argument, Lua style
+end
+
+function S.sleep(sec) -- standard libc function
+  local rem, err = S.nanosleep(sec, 0)
+  if not rem then return nil, err end
+  return rem.tv_sec
 end
 
 function S.mmap(addr, length, prot, flags, fd, offset) -- adds munmap gc
@@ -3303,10 +3314,25 @@ function S.dirfile(name) -- return the directory entries in a file
   return d
 end
 
-function S.if_nametoindex(name) -- in some libc implementations, but not all. May be better ways to implement, but this should work for now.
-  local i = S.get_interfaces().iface[name]
-  if not i then return nil end
-  return i.index
+local if_nametoindex
+function if_nametoindex(name, s) -- internal version when already have socket for ioctl
+  local ifr = ifreq_t()
+  len = #name + 1
+  if len > IFNAMSIZ then len = IFNAMSIZ end
+  ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
+  local ret = C.ioctl(getfd(s), S.SIOCGIFINDEX, ifr)
+  if ret == -1 then return errorret() end
+  return ifr.ifr_ifru.ifru_ivalue
+end
+
+function S.if_nametoindex(name) -- standard function in some libc versions
+  local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
+  if not s then return nil, err end
+  local i, err = if_nametoindex(name, s)
+  if not i then return nil, err end
+  local ok, err = s:close()
+  if not ok then return nil, err end
+  return i
 end
 
 -- bridge functions, could be in utility library. in error cases use gc to close file.
@@ -3325,18 +3351,21 @@ function S.bridge_add(name) return bridge_ioctl(S.SIOCBRADDBR, name) end
 function S.bridge_del(name) return bridge_ioctl(S.SIOCBRDELBR, name) end
 
 function S.bridge_add_interface(bridge, dev)
-  local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
+  local err, s, ifr, len, ret, ok
+  s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
-  if type(dev) == "string" then dev = S.if_nametoindex(dev) end
-  if not dev then return errorret(S.E.NODEV) end
-  local ifr = ifreq_t()
+  if type(dev) == "string" then
+    dev, err = if_nametoindex(dev, s)
+    if not dev then return nil, err end
+  end
+  ifr = ifreq_t()
   len = #bridge + 1
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, bridge, len) -- note not using the short forms as no metatable defined yet...
   ifr.ifr_ifru.ifru_ivalue = dev
-  local ret = C.ioctl(getfd(s), S.SIOCBRADDIF, ifr);
+  ret = C.ioctl(getfd(s), S.SIOCBRADDIF, ifr);
   if ret == -1 then return errorret() end
-  local ok, err = s:close()
+  ok, err = s:close()
   if not ok then return nil, err end
   return true
 end
