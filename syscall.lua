@@ -3349,7 +3349,8 @@ end
 function S.bridge_add(name) return bridge_ioctl(S.SIOCBRADDBR, name) end
 function S.bridge_del(name) return bridge_ioctl(S.SIOCBRDELBR, name) end
 
-function S.bridge_add_interface(bridge, dev)
+local bridge_if_ioctl
+function bridge_if_ioctl(io, bridge, dev)
   local err, s, ifr, len, ret, ok
   s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
@@ -3362,12 +3363,15 @@ function S.bridge_add_interface(bridge, dev)
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, bridge, len) -- note not using the short forms as no metatable defined yet...
   ifr.ifr_ifru.ifru_ivalue = dev
-  ret = C.ioctl(getfd(s), S.SIOCBRADDIF, ifr);
+  ret = C.ioctl(getfd(s), io, ifr);
   if ret == -1 then return errorret() end
   ok, err = s:close()
   if not ok then return nil, err end
   return true
 end
+
+function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRADDIF, bridge, dev)
+function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRDELIF, bridge, dev)
 
 -- use string types for now
 local threc -- helper for returning varargs
