@@ -69,6 +69,7 @@ Should add friendly permissions naming, eg "rw" to mode flags.
 Netlink sockets need more friendly API. There is a bug in the current version, as it only lists first three interfaces.
 
 Should build more high level API, eg net.eth0:ip() etc. Like sysfs but with native methods I guess, and create etc. eg net:bridge("br0"). net.br0.ip = ....
+Should add some tostring methods for some of these structures...
 
 Should split out more of the stuff that is not just system calls into utility package.
 

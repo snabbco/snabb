@@ -3317,11 +3317,19 @@ function S.dirfile(name, nodots) -- return the directory entries in a file, remo
   return d
 end
 
+local ls_mt = {
+  __tostring = function(t)
+    table.sort(t)
+    return table.concat(t, "\n")
+    end
+}
+
 function S.ls(name, nodots) -- return just the list, no other data, cwd if no directory specified
   if not name then name = S.getcwd() end
   local ds = S.dirfile(name, nodots)
   local l = {}
   for k, _ in pairs(ds) do l[#l + 1] = k end
+  setmetatable(l, ls_mt)
   return l
 end
 
@@ -3385,27 +3393,34 @@ end
 function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRADDIF, bridge, dev) end
 function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRDELIF, bridge, dev) end
 
--- brctl show lists /sys/class/net/* then stats /sys/class/net/DEV/bridge to see if bridge, if this exists then prints /sys/class/net/DEV/bridge/*
--- can also set some of these parameters, this is done by writing to sysfs
--- so pretty easy to interface...
+local brinfo = function(d)
+  local bd = "/sys/class/net/" .. d .. "/bridge"
+  if not S.stat(bd) then return nil end
+  local bridge = {}
+  local fs = S.dirfile(bd, true)
+  if not fs then return nil end
+  for f, _ in pairs(fs) do
+    local s = S.readfile(bd .. "/" .. f)
+    if s then
+      s = s:sub(1, #s - 1) -- remove newline at end
+      if f == "group_addr" or f == "root_id" or f == "bridge_id" then -- string values
+        bridge[f] = s
+      else
+        bridge[f] = tonumber(s) -- not correct, most are timevals
+      end
+    end
+  end
+  local brif, err = S.ls("/sys/class/net/" .. d .. "/brif", true)
+  if not brif then return nil end
+  return {bridge = bridge, brif = brif}
+end
 
 function S.bridge_list()
   local dir, err = S.dirfile("/sys/class/net", true)
   if not dir then return nil, err end
   local b = {}
   for d, _ in pairs(dir) do
-    local bd = "/sys/class/net/" .. d .. "/bridge"
-    if S.stat(bd) then -- congratulations, it's a bridge
-      local info = {}
-      local fs = S.dirfile(bd, true)
-      if fs then
-        for f, _ in pairs(fs) do
-          local s = S.readfile(bd .. "/" .. f)
-          if s then info[f] = s:sub(1, #s - 1) end -- remove newline at end
-        end
-      end
-      b[d] = info
-    end
+    b[d] = brinfo(d)
   end
   return b
 end

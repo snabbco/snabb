@@ -698,13 +698,15 @@ assert(S.sethostname(h))
 
 -- test bridge functions
 ok, err = S.bridge_add("br999")
-assert(ok or err.ENOPKG, "bridge add should succeed unless bridging not enabled")
+assert(ok or err.ENOPKG, err)
 if ok then
   assert(S.stat("/sys/class/net/br999"))
   --assert(S.bridge_add_interface("br999", "eth0")) -- failing on test machine as already in another bridge!
 
   local b = assert(S.bridge_list())
-  assert(b.br999 and b.br999.root_id, "expect to find bridge in list")
+  assert(b.br999 and b.br999.bridge.root_id, "expect to find bridge in list")
+
+  --for k, v in pairs(b.br999.bridge) do print(k, v) end
 
   assert(S.bridge_del("br999"))
   ok = S.stat("/sys/class/net/br999")
