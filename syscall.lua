@@ -18,7 +18,6 @@ local cast = ffi.cast
 local sizeof = ffi.sizeof
 local istype = ffi.istype
 local arch = ffi.arch
-local string = ffi.string
 local typeof = ffi.typeof
 
 -- open, fcntl
@@ -819,6 +818,13 @@ S.SIOCBRDELBR    = 0x89a1
 S.SIOCBRADDIF    = 0x89a2
 S.SIOCBRDELIF    = 0x89a3
 
+-- sysfs values
+S.SYSFS_BRIDGE_ATTR        = "bridge"
+S.SYSFS_BRIDGE_FDB         = "brforward"
+S.SYSFS_BRIDGE_PORT_SUBDIR = "brif"
+S.SYSFS_BRIDGE_PORT_ATTR   = "brport"
+S.SYSFS_BRIDGE_PORT_LINK   = "bridge"
+
 -- sizes -- Linux. should we export?
 local HOST_NAME_MAX = 64
 local IFNAMSIZ      = 16
@@ -959,7 +965,7 @@ S.E.EOWNERDEAD     = 130
 S.E.ENOTRECOVERABLE= 131
 S.E.ERFKILL        = 132
 
-function S.strerror(errno) return string(C.strerror(errno)) end
+function S.strerror(errno) return ffi.string(C.strerror(errno)) end
 
 local emt = {__tostring = function(e) return S.strerror(e.errno) end}
 
@@ -1014,7 +1020,7 @@ local fd_t -- type for a file descriptor
 -- char buffer type
 local buffer_t = typeof("char[?]")
 
-S.string = string -- convenience for converting buffers
+S.string = ffi.string -- convenience for converting buffers
 S.sizeof = sizeof -- convenience so user need not require ffi
 S.cast = cast -- convenience so user need not require ffi
 
@@ -1328,6 +1334,15 @@ struct ifreq {
     void *  ifru_data;
     struct  if_settings ifru_settings;
   } ifr_ifru;
+};
+struct fdb_entry {
+  uint8_t mac_addr[6];
+  uint8_t port_no;
+  uint8_t is_local;
+  uint32_t ageing_timer_value;
+  uint8_t port_hi;
+  uint8_t pad0;
+  uint16_t unused;
 };
 struct inotify_event {
   int wd;
@@ -1729,6 +1744,8 @@ local timex_t = typeof("struct timex")
 local utsname_t = typeof("struct utsname")
 local sigset_t = typeof("sigset_t")
 local rlimit_t = typeof("struct rlimit")
+local fdb_entry_t = typeof("struct fdb_entry")
+local fdb_entry_pt = typeof("struct fdb_entry *")
 
 S.RLIM_INFINITY = cast("rlim_t", -1)
 
@@ -1769,8 +1786,18 @@ local siginfo_t = ffi.metatype("struct siginfo",{
   __newindex = function(t, k, v) if siginfo_set[k] then siginfo_set[k](t, v) end end,
 })
 
--- may need metamethods for struct ifreq see /usr/include/linux/if.h
+-- could use metamethods for struct ifreq see /usr/include/linux/if.h
 local ifreq_t = typeof("struct ifreq")
+
+local macaddr_t = ffi.metatype("struct {uint8_t mac_addr[6];}", {
+  __tostring = function(m)
+    local t = {}
+    for i = 1, 6 do
+      t[i] = string.format("%02x", m.mac_addr[i - 1])
+    end
+    return table.concat(t, ":")
+  end
+})
 
 --[[ -- used to generate tests, will refactor into test code later
 print("eq (sizeof(struct timespec), " .. sizeof(timespec_t) .. ");")
@@ -2023,7 +2050,7 @@ saret = function(ss, addrlen, rets) -- return socket address structure, addition
     if istype(sockaddr_un_t, addr) then
       local namelen = addrlen - sizeof(sa_family_t)
       if namelen > 0 then
-        rets.name = string(addr.sun_path, namelen)
+        rets.name = ffi.string(addr.sun_path, namelen)
         if addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
       end
     elseif istype(sockaddr_in_t, addr) then
@@ -2045,7 +2072,7 @@ function S.inet_aton(s)
   return addr
 end
 
-function S.inet_ntoa(addr) return string(C.inet_ntoa(addr)) end
+function S.inet_ntoa(addr) return ffi.string(C.inet_ntoa(addr)) end
 
 local INET6_ADDRSTRLEN = 46
 local INET_ADDRSTRLEN = 16
@@ -2056,7 +2083,7 @@ function S.inet_ntop(af, src)
   local dst = buffer_t(len)
   local ret = C.inet_ntop(af, src, dst, len)
   if ret == nil then return errorret() end
-  return string(dst)
+  return ffi.string(dst)
 end
 
 function S.inet_pton(af, src)
@@ -2185,7 +2212,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
       local dd = getflag(t, "DT_", {"DT_UNKNOWN", "DT_FIFO", "DT_CHR", "DT_DIR", "DT_BLK", "DT_REG", "DT_LNK", "DT_SOCK", "DT_WHT"})
       dd.inode = tonumber(dp.d_ino)
       dd.offset = tonumber(dp.d_off)
-      d[string(dp.d_name)] = dd
+      d[ffi.string(dp.d_name)] = dd
       i = i + dp.d_reclen
     end
   until noiter or ret == 0
@@ -2231,7 +2258,7 @@ function S.read(fd, buf, count)
   local buf = buffer_t(count)
   local ret = C.read(getfd(fd), buf, count)
   if ret == -1 then return errorret() end
-  return string(buf, ret) -- user gets a string back, can get length from #string
+  return ffi.string(buf, ret) -- user gets a string back, can get length from #string
 end
 
 function S.write(fd, buf, count) return retint(C.write(getfd(fd), buf, count or #buf)) end
@@ -2315,7 +2342,7 @@ function S.getcwd(buf, size)
   local ret = C.getcwd(buf, size or 0)
   if not buf then -- Linux will allocate buffer here, return Lua string and free
     if ret == nil then return errorret() end
-    local s = string(ret) -- guaranteed to be zero terminated if no error
+    local s = ffi.string(ret) -- guaranteed to be zero terminated if no error
     C.free(ret)
     return s
   end
@@ -2428,8 +2455,8 @@ function S.uname()
   local u = utsname_t()
   local ret = C.uname(u)
   if ret == -1 then return errorret() end
-  return {sysname = string(u.sysname), nodename = string(u.nodename), release = string(u.release),
-          version = string(u.version), machine = string(u.machine), domainname = string(u.domainname)}
+  return {sysname = ffi.string(u.sysname), nodename = ffi.string(u.nodename), release = ffi.string(u.release),
+          version = ffi.string(u.version), machine = ffi.string(u.machine), domainname = ffi.string(u.domainname)}
 end
 
 function S.gethostname()
@@ -2437,7 +2464,7 @@ function S.gethostname()
   local ret = C.gethostname(buf, HOST_NAME_MAX + 1)
   if ret == -1 then return errorret() end
   buf[HOST_NAME_MAX] = 0 -- paranoia here to make sure null terminated, which could happen if HOST_NAME_MAX was incorrect
-  return string(buf)
+  return ffi.string(buf)
 end
 
 function S.sethostname(s) -- only accept Lua string, do not see use case for buffer as well
@@ -2486,7 +2513,7 @@ function growattrbuf(f, a1, a2)
 
   if ret > 0 then ret = ret - 1 end -- has trailing \0
 
-  return string(buffer, ret)
+  return ffi.string(buffer, ret)
 end
 
 local lattrbuf = function(...)
@@ -2754,7 +2781,7 @@ function S.inotify_read(fd, buffer, len)
   while off < ret do
     local ev = cast(inotify_event_pt, buffer + off)
     local le = getflags(ev.mask, "IN_", in_recv_ev, {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)})
-    if ev.len > 0 then le.name = string(ev.name) end
+    if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
     off = off + sizeof(inotify_event_t(ev.len))
   end
@@ -2839,8 +2866,8 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
   if prctlrint[option] then return ret end
   if prctlpint[option] then return i[0] end
   if option == S.PR_GET_NAME then
-    if name[15] ~= 0 then return string(name, 16) end -- actually, 15 bytes seems to be longest, aways 0 terminated
-    return string(name)
+    if name[15] ~= 0 then return ffi.string(name, 16) end -- actually, 15 bytes seems to be longest, aways 0 terminated
+    return ffi.string(name)
   end
   return true
 end
@@ -2857,7 +2884,7 @@ function S.klogctl(t, buf, len)
   local ret = C.klogctl(t, buf or nil, len or 0)
   if ret == -1 then return errorret() end
   if t == 9 or t == 10 then return tonumber(ret) end
-  if t == 2 or t == 3 or t == 4 then return string(buf, ret) end
+  if t == 2 or t == 3 or t == 4 then return ffi.string(buf, ret) end
   return true
 end
 
@@ -2915,7 +2942,7 @@ function S.environ() -- return whole environment as table
   local r = {}
   local i = 0
   while environ[i] ~= nil do
-    local e = string(environ[i])
+    local e = ffi.string(environ[i])
     local eq = e:find('=')
     if eq then
       r[e:sub(1, eq - 1)] = e:sub(eq + 1)
@@ -3077,7 +3104,7 @@ end
 
 local ifla_decode = {}
 ifla_decode[S.IFLA_IFNAME] = function(r, buf, len)
-  r.name = string(buf + rta_length(0))
+  r.name = ffi.string(buf + rta_length(0))
 
   return r
 end
@@ -3281,21 +3308,22 @@ function S.nonblock(s)
   return true
 end
 
-function S.readfile(name, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
+-- TODO fix short reads, add a loop
+function S.readfile(name, buffer, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
   local f, err = S.open(name, S.O_RDONLY)
   if not f then return nil, err end
-  local r, err = f:read(nil, length or 4096)
+  local r, err = f:read(buffer, length or 4096)
   if not r then return nil, err end
   local t, err = f:close()
   if not t then return nil, err end
   return r
 end
 
-function S.writefile(name, string, mode) -- write string to named file. specify mode if want to create file, silently ignore short writes
+function S.writefile(name, str, mode) -- write string to named file. specify mode if want to create file, silently ignore short writes
   local f, err
   if mode then f, err = S.creat(name, mode) else f, err = S.open(name, S.O_WRONLY) end
   if not f then return nil, err end
-  local n, err = f:write(string)
+  local n, err = f:write(str)
   if not n then return nil, err end
   local t, err = f:close()
   if not t then return nil, err end
@@ -3393,8 +3421,10 @@ end
 function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRADDIF, bridge, dev) end
 function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRDELIF, bridge, dev) end
 
-local brinfo = function(d)
-  local bd = "/sys/class/net/" .. d .. "/bridge"
+-- should probably have constant for "/sys/class/net"
+
+local brinfo = function(d) -- can be used as subpart of general interface info
+  local bd = "/sys/class/net/" .. d .. "/" .. S.SYSFS_BRIDGE_ATTR
   if not S.stat(bd) then return nil end
   local bridge = {}
   local fs = S.dirfile(bd, true)
@@ -3405,14 +3435,44 @@ local brinfo = function(d)
       s = s:sub(1, #s - 1) -- remove newline at end
       if f == "group_addr" or f == "root_id" or f == "bridge_id" then -- string values
         bridge[f] = s
+      elseif f == "stp_state" then -- bool
+        bridge[f] = s == 1
       else
-        bridge[f] = tonumber(s) -- not correct, most are timevals
+        bridge[f] = tonumber(s) -- not quite correct, most are timevals TODO
       end
     end
   end
-  local brif, err = S.ls("/sys/class/net/" .. d .. "/brif", true)
+
+  local brif, err = S.ls("/sys/class/net/" .. d .. "/" .. S.SYSFS_BRIDGE_PORT_SUBDIR, true)
   if not brif then return nil end
-  return {bridge = bridge, brif = brif}
+
+  local fdb = "/sys/class/net/" .. d .. "/" .. S.SYSFS_BRIDGE_FDB
+  local s = S.stat(fdb) -- no THIS DOES NOT WORK. need to rwad until get 0....
+  if not s then return nil end
+  local sl = tonumber(s.st_size)
+  local buffer = buffer_t(sl)
+  
+  local ok, err = S.readfile(fdb, buffer, sl)
+  if not ok then return nil end
+
+  local fdbs = cast(fdb_entry_pt, buffer)
+  local brforward = {}
+
+  print(d, sl, sizeof(fdb_entry_t))
+
+  for i = 0, sl / sizeof(fdb_entry_t) do
+    local fdb = fdbs[i]
+    local mac = macaddr_t()
+    ffi.copy(mac, fdb.mac_addr, IFHWADDRLEN)
+
+print(d, tonumber(fdb.port_no), fdb.is_local ~= 0, tostring(mac), #brforward, brforward)
+
+    -- TODO ageing_timer_value is not an int, time, float
+    brforward[#brforward + 1] = {mac_addr = mac, port_no = tonumber(fdb.port_no), is_local = fdb.is_local ~= 0, ageing_timer_value = tonumber(fdb.ageing_timer_value)}
+brforward[#brforward + 1] = 2
+  end
+
+  return {bridge = bridge, brif = brif, brforward = brforward}
 end
 
 function S.bridge_list()
@@ -3463,7 +3523,7 @@ S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
   iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
-  sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t, uint64 = uint64_t
+  sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t, uint64 = uint64_t, macaddr = macaddr_t
 }
 
 return S
