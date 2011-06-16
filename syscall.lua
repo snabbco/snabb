@@ -1518,6 +1518,9 @@ ssize_t fgetxattr (int filedes, const char *name, void *value, size_t size);
 int setxattr (const char *path, const char *name, const void *value, size_t size, int flags);
 int lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags);
 int fsetxattr (int filedes, const char *name, const void *value, size_t size, int flags);
+int removexattr (const char *path, const char *name);
+int lremovexattr (const char *path, const char *name);
+int fremovexattr (int filedes, const char *name);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -2408,7 +2411,24 @@ function S.getxattr(path, name) return growattrbuf(C.getxattr, path, name) end
 function S.lgetxattr(path, name) return growattrbuf(C.lgetxattr, path, name) end
 function S.fgetxattr(fd, name) return growattrbuf(C.fgetxattr, getfd(fd), name) end
 
+function S.removexattr(path, name) return retbool(C.removexattr(path, name)) end
+function S.lremovexattr(path, name) return retbool(C.lremovexattr(path, name)) end
+function S.fremovexattr(fd, name) return retbool(C.fremovexattr(getfd(fd), name)) end
 
+-- helper function to set and return attributes in tables
+function S.xattr(path, t)
+  if not t then -- no table, so read
+    local r = {}
+    local l, err = S.listxattr(path)
+    if not l then return nil, err end
+    for _, name in ipairs(l) do
+      r[name] = S.getxattr(path, name) -- ignore errors
+    end
+    return r
+  end
+  -- write
+  
+end
 
 -- fdset handlers
 local mkfdset, fdisset
@@ -3167,7 +3187,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
                    'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
-                   'fsetxattr', 'fgetxattr'
+                   'fsetxattr', 'fgetxattr', 'fremovexattr'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end

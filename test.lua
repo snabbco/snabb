@@ -660,6 +660,12 @@ if l then
     assert(s == "42", "expect to read set value of xattr")
     s, err = fd:fgetxattr("user.test3")
     assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from non existent xattr")
+    s = assert(S.removexattr(tmpfile, "user.test"))
+    s = assert(S.lremovexattr(tmpfile, "user.test2"))
+    l = assert(S.listxattr(tmpfile))
+    assert(#l == 0, "expect no xattr now")
+    s, err = fd:fremovexattr("user.test3")
+    assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from remove non existent xattr")
   end
   assert(fd:close())
 end
