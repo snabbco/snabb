@@ -375,7 +375,7 @@ sel = assert(S.select{readfds = {c, s}, timeout = {0, 0}})
 
 assert(sel.count == 1, "one fd available for read now")
 
-r = assert(ep:epoll_wait())
+r = assert(ep:epoll_wait(nil, 1, 100, "winch, hup"))
 assert(#r == 1, "one event now")
 assert(r[1].epollin, "read event")
 assert(ep:close())
@@ -508,7 +508,7 @@ hdr.nlmsg_type = S.RTM_GETLINK
 hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_DUMP
 hdr.nlmsg_seq = 1          -- we should attach a sequence number to the file descriptor and use this
 hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
-gen.rtgen_family = S.AF_PACKET -- or AF_UNSPEC?
+gen.rtgen_family = S.AF_PACKET
 
 local ios = S.t.iovec(1, {{buf, len}})
 local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}

@@ -1491,6 +1491,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 int epoll_create1(int flags);
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
+int epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *sigmask);
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 int eventfd(unsigned int initval, int flags);
 int reboot(int cmd);
@@ -2518,10 +2519,11 @@ function S.epoll_ctl(epfd, op, fd, events, data)
   return retbool(C.epoll_ctl(getfd(epfd), stringflag(op, "EPOLL_CTL_"), getfd(fd), event))
 end
 
-function S.epoll_wait(epfd, events, maxevents, timeout)
+function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes optional epoll_pwait functionality
   if not maxevents then maxevents = 1 end
   if not events then events = epoll_events_t(maxevents) end
-  local ret = C.epoll_wait(getfd(epfd), events, maxevents, timeout or 0)
+  if sigmask then sigmask = mksigset(sigmask) end
+  local ret = C.epoll_pwait(getfd(epfd), events, maxevents, timeout or 0, sigmask)
   if ret == -1 then return errorret() end
   local r = {}
   for i = 1, ret do -- put in Lua array
