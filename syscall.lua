@@ -2416,19 +2416,34 @@ function S.lremovexattr(path, name) return retbool(C.lremovexattr(path, name)) e
 function S.fremovexattr(fd, name) return retbool(C.fremovexattr(getfd(fd), name)) end
 
 -- helper function to set and return attributes in tables
-function S.xattr(path, t)
+function xattr(list, get, set, remove, path, t)
+  local l, err = list(path)
+  if not l then return nil, err end
   if not t then -- no table, so read
     local r = {}
-    local l, err = S.listxattr(path)
-    if not l then return nil, err end
     for _, name in ipairs(l) do
-      r[name] = S.getxattr(path, name) -- ignore errors
+      r[name] = get(path, name) -- ignore errors
     end
     return r
   end
   -- write
-  
+  for _, name in ipairs(l) do
+    if t[name] then
+      set(path, name, t[name]) -- ignore errors, replace
+      t[name] = nil
+    else
+      remove(path, name)
+    end
+  end
+  for name, value in pairs(t) do
+    set(path, name, value) -- ignore errors, create
+  end
+  return true
 end
+
+function S.xattr(path, t) return xattr(S.listxattr, S.getxattr, S.setxattr, S.removexattr, path, t) end
+function S.lxattr(path, t) return xattr(S.llistxattr, S.lgetxattr, S.lsetxattr, S.lremovexattr, path, t) end
+function S.fxattr(fd, t) return xattr(S.flistxattr, S.fgetxattr, S.fsetxattr, S.fremovexattr, fd, t) end
 
 -- fdset handlers
 local mkfdset, fdisset
@@ -3187,7 +3202,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
                    'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
-                   'fsetxattr', 'fgetxattr', 'fremovexattr'
+                   'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end

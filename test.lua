@@ -666,6 +666,27 @@ if l then
     assert(#l == 0, "expect no xattr now")
     s, err = fd:fremovexattr("user.test3")
     assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from remove non existent xattr")
+    -- table helpers
+    t = assert(S.xattr(tmpfile))
+    n = 0
+    for k, v in pairs(t) do n = n + 1 end
+    assert(n == 0, "expect no xattr now")
+    t = {}
+    for k, v in pairs{test = "42", test2 = "44"} do t["user." .. k] = v end
+    assert(S.xattr(tmpfile, t))
+    t = assert(S.lxattr(tmpfile))
+    assert(t["user.test2"] == "44" and t["user.test"] == "42", "expect to return values set")
+    n = 0
+    for k, v in pairs(t) do n = n + 1 end
+    assert(n == 2, "expect 2 xattr now")
+    t = {}
+    for k, v in pairs{test = "42", test2 = "44", test3="hello"} do t["user." .. k] = v end
+    assert(fd:fxattr(t))
+    t = assert(fd:fxattr())
+    assert(t["user.test2"] == "44" and t["user.test"] == "42" and t["user.test3"] == "hello", "expect to return values set")
+    n = 0
+    for k, v in pairs(t) do n = n + 1 end
+    assert(n == 3, "expect 3 xattr now")
   end
   assert(fd:close())
 end
