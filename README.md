@@ -36,8 +36,6 @@ All functions return two values, the return value, or true if there is not one o
 
 File descriptors are returned as a type not an integer. This is because they are garbage collected by default, ie if they go out of scope the file is closed. You can get the file descriptor using the fd field. To disable the garbage collection you can call fd:nogc(), in which case you need to close the descriptors by hand. They also have methods for operations that take an fd, like close, fsync, read. You can use this type where an fd is required, or a numeric fd, or a string like "stderr". 
 
-As well as garbage collections of file descriptors, mmap regions are also unmapped if they go out of scope.
-
 String conversions are not done automatically, you get a buffer back, you have to force a conversion. This is because interning strings is expensive if you do not need it. Nor are conversions from 64 bit values to Lua numbers, as that would be lossy (actually some are, need to make consistent). However if you do not supply a buffer for the return value, you will get a string from some functions. Again need to make more consistent.
 
 Not yet supporting the 64 bit file operations for 32 bit architectures (lseek64 etc).

@@ -1003,10 +1003,9 @@ function retbool(ret)
   return true
 end
 
--- used for pointer returns, -1 is failure, optional gc function
-function retptr(ret, f)
+-- used for pointer returns, -1 is failure; removed gc for mem
+function retptr(ret)
   if cast("long", ret) == -1 then return errorret() end
-  if f then return ffi.gc(ret, f) end
   return ret
 end
 
@@ -2341,11 +2340,11 @@ function S.sleep(sec) -- standard libc function
   return rem.tv_sec
 end
 
-function S.mmap(addr, length, prot, flags, fd, offset) -- adds munmap gc
-  return retptr(C.mmap(addr, length, stringflags(prot, "PROT_"), stringflags(flags, "MAP_"), getfd(fd), offset), function(addr) C.munmap(addr, length) end)
+function S.mmap(addr, length, prot, flags, fd, offset)
+  return retptr(C.mmap(addr, length, stringflags(prot, "PROT_"), stringflags(flags, "MAP_"), getfd(fd), offset))
 end
 function S.munmap(addr, length)
-  return retbool(C.munmap(ffi.gc(addr, nil), length)) -- remove gc on unmap
+  return retbool(C.munmap(addr, length))
 end
 function S.msync(addr, length, flags) return retbool(C.msync(addr, length, stringflags(flags, "MS_"))) end
 function S.mlock(addr, len) return retbool(C.mlock(addr, len)) end
