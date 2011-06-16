@@ -2416,6 +2416,7 @@ function S.lremovexattr(path, name) return retbool(C.lremovexattr(path, name)) e
 function S.fremovexattr(fd, name) return retbool(C.fremovexattr(getfd(fd), name)) end
 
 -- helper function to set and return attributes in tables
+local xattr
 function xattr(list, get, set, remove, path, t)
   local l, err = list(path)
   if not l then return nil, err end
