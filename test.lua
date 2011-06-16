@@ -648,7 +648,7 @@ if l then
   if ok then -- likely to get err.ENOTSUP here if fs not mounted with user_xattr
     l = assert(S.listxattr(tmpfile))
     assert(#l == 1 and l[1] == "user.test", "expect to list attribute that was set")
-    assert(S.lsetxattr(tmpfile, "user.test", "44"))
+    assert(S.lsetxattr(tmpfile, "user.test", "44", "replace"))
     assert(fd:fsetxattr("user.test2", "42"))
     l = assert(S.listxattr(tmpfile))
     assert(#l == 2 and l[1] == "user.test" and l[2] == "user.test2", "expect to list attributes that were set")
