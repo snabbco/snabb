@@ -409,6 +409,10 @@ S.TIME_WAIT       = 4
 S.TIME_ERROR      = 5
 S.TIME_BAD        = S.TIME_ERROR
 
+-- xattr
+S.XATTR_CREATE = 1
+S.XATTR_REPLACE = 2
+
 -- send, recv etc
 S.MSG_OOB             = 0x01
 S.MSG_PEEK            = 0x02
@@ -2370,12 +2374,24 @@ function growattrbuf(f, ...)
     end
   until ret >= 0
 
+  if ret > 0 then ret = ret - 1 end -- has trailing \0
+
   return split('\0', string(buffer, ret))
 end
 
 function S.listxattr(path, list, size) return growattrbuf(C.listxattr, path) end
 function S.llistxattr(path, list, size) return growattrbuf(C.llistxattr, path) end
 function S.flistxattr(fd, list, size) return growattrbuf(C.flistxattr, getfd(fd)) end
+
+function S.setxattr(path, name, value, flags)
+  return retbool(C.setxattr(path, name, value, #value + 1, stringflag(flags, "XATTR_")))
+end
+function S.lsetxattr(path, name, value, flags)
+  return retbool(C.lsetxattr(path, name, value, #value + 1, stringflag(flags, "XATTR_")))
+end
+function S.fsetxattr(fd, name, value, flags)
+  return retbool(C.fsetxattr(getfd(fd), name, value, #value + 1, stringflag(flags, "XATTR_")))
+end
 
 -- fdset handlers
 local mkfdset, fdisset
@@ -3133,7 +3149,8 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
                    'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
-                   'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr'
+                   'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
+                   'fsetxattr'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
