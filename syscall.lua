@@ -857,7 +857,7 @@ S.E.ENOLCK         = 37
 S.E.ENOSYS         = 38
 S.E.ENOTEMPTY      = 39
 S.E.ELOOP          = 40
-S.E.EWOULDBLOCK    = S.E.EAGAIN
+
 S.E.ENOMSG         = 42
 S.E.EIDRM          = 43
 S.E.ECHRNG         = 44
@@ -874,7 +874,7 @@ S.E.EXFULL         = 54
 S.E.ENOANO         = 55
 S.E.EBADRQC        = 56
 S.E.EBADSLT        = 57
-S.E.EDEADLOCK      = S.E.EDEADLK
+
 S.E.EBFONT         = 59
 S.E.ENOSTR         = 60
 S.E.ENODATA        = 61
@@ -958,6 +958,11 @@ local errsyms = {}
 for i, v in pairs(S.E) do
   errsyms[v] = i
 end
+
+-- alternate names
+S.E.EWOULDBLOCK    = S.E.EAGAIN
+S.E.EDEADLOCK      = S.E.EDEADLK
+S.E.ENOATTR        = S.E.ENODATA
 
 local mkerror = function(errno)
   local sym = errsyms[errno]
@@ -2361,12 +2366,12 @@ function S.sysinfo(info)
 end
 
 local growattrbuf
-function growattrbuf(f, ...)
+function growattrbuf(f, a1, a2)
   local len = 512
   local buffer = buffer_t(len)
   local ret
   repeat
-    ret = f(..., buffer, len)
+    if a2 then ret = f(a1, a2, buffer, len) else ret = f(a1, buffer, len) end
     if ret == -1 and ffi.errno ~= S.E.ERANGE then return errorret() end
     if ret == -1 then
       len = len * 2
@@ -2376,12 +2381,18 @@ function growattrbuf(f, ...)
 
   if ret > 0 then ret = ret - 1 end -- has trailing \0
 
-  return split('\0', string(buffer, ret))
+  return string(buffer, ret)
 end
 
-function S.listxattr(path, list, size) return growattrbuf(C.listxattr, path) end
-function S.llistxattr(path, list, size) return growattrbuf(C.llistxattr, path) end
-function S.flistxattr(fd, list, size) return growattrbuf(C.flistxattr, getfd(fd)) end
+local lattrbuf = function(...)
+  local s, err = growattrbuf(...)
+  if not s then return nil, err end
+  return split('\0', s)
+end
+
+function S.listxattr(path, list, size) return lattrbuf(C.listxattr, path) end
+function S.llistxattr(path, list, size) return lattrbuf(C.llistxattr, path) end
+function S.flistxattr(fd, list, size) return lattrbuf(C.flistxattr, getfd(fd)) end
 
 function S.setxattr(path, name, value, flags)
   return retbool(C.setxattr(path, name, value, #value + 1, stringflag(flags, "XATTR_")))
@@ -2392,6 +2403,10 @@ end
 function S.fsetxattr(fd, name, value, flags)
   return retbool(C.fsetxattr(getfd(fd), name, value, #value + 1, stringflag(flags, "XATTR_")))
 end
+
+function S.getxattr(path, name) return growattrbuf(C.getxattr, path, name) end
+function S.lgetxattr(path, name) return growattrbuf(C.lgetxattr, path, name) end
+function S.fgetxattr(fd, name) return growattrbuf(C.fgetxattr, getfd(fd), name) end
 
 -- fdset handlers
 local mkfdset, fdisset
@@ -3150,7 +3165,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
                    'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
-                   'fsetxattr'
+                   'fsetxattr', 'fgetxattr'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end

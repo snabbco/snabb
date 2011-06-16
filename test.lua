@@ -652,8 +652,16 @@ if l then
     assert(fd:fsetxattr("user.test2", "42"))
     l = assert(S.listxattr(tmpfile))
     assert(#l == 2 and l[1] == "user.test" and l[2] == "user.test2", "expect to list attributes that were set")
-
+    s = assert(S.getxattr(tmpfile, "user.test"))
+    assert(s == "44", "expect to read set value of xattr")
+    s = assert(S.lgetxattr(tmpfile, "user.test"))
+    assert(s == "44", "expect to read set value of xattr")
+    s = assert(fd:fgetxattr("user.test2"))
+    assert(s == "42", "expect to read set value of xattr")
+    s, err = fd:fgetxattr("user.test3")
+    assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from non existent xattr")
   end
+  assert(fd:close())
 end
 assert(S.unlink(tmpfile))
 
