@@ -1500,6 +1500,15 @@ int inotify_init1(int flags);
 int inotify_add_watch(int fd, const char *pathname, uint32_t mask);
 int inotify_rm_watch(int fd, uint32_t wd);
 int adjtimex(struct timex *buf);
+ssize_t listxattr (const char *path, char *list, size_t size);
+ssize_t llistxattr (const char *path, char *list, size_t size);
+ssize_t flistxattr (int filedes, char *list, size_t size);
+ssize_t getxattr (const char *path, const char *name, void *value, size_t size);
+ssize_t lgetxattr (const char *path, const char *name, void *value, size_t size);
+ssize_t fgetxattr (int filedes, const char *name, void *value, size_t size);
+int setxattr (const char *path, const char *name, const void *value, size_t size, int flags);
+int lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags);
+int fsetxattr (int filedes, const char *name, const void *value, size_t size, int flags);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -1714,7 +1723,8 @@ local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- w
 
 local split, trim
 function split(delimiter, text)
-  if delimiter == "" then return text end
+  if delimiter == "" then return {text} end
+  if #text == 0 then return {} end
   local list = {}
   local pos = 1
   while true do
@@ -2345,6 +2355,27 @@ function S.sysinfo(info)
   if ret == -1 then return errorret() end
   return info
 end
+
+local growattrbuf
+function growattrbuf(f, ...)
+  local len = 512
+  local buffer = buffer_t(len)
+  local ret
+  repeat
+    ret = f(..., buffer, len)
+    if ret == -1 and ffi.errno ~= S.E.ERANGE then return errorret() end
+    if ret == -1 then
+      len = len * 2
+      buffer = buffer_t(len)
+    end
+  until ret >= 0
+
+  return split('\0', string(buffer, ret))
+end
+
+function S.listxattr(path, list, size) return growattrbuf(C.listxattr, path) end
+function S.llistxattr(path, list, size) return growattrbuf(C.llistxattr, path) end
+function S.flistxattr(fd, list, size) return growattrbuf(C.flistxattr, getfd(fd)) end
 
 -- fdset handlers
 local mkfdset, fdisset
@@ -3102,7 +3133,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
                    'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
-                   'inotify_add_watch', 'inotify_rm_watch', 'inotify_read'
+                   'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end

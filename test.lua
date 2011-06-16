@@ -633,6 +633,21 @@ assert(S.setrlimit("nofile", r.rlim_cur, r.rlim_max)) -- reset
 fd = assert(S.open("/dev/zero", "rdonly"))
 assert(fd:close())
 
+-- xattr support
+assert(S.writefile(tmpfile, "test", "IRWXU"))
+local l, err = S.listxattr(tmpfile)
+assert(l or err.ENOTSUP, "expect to get xattr or not supported on fs")
+if l then
+  fd = assert(S.open(tmpfile, "rdwr"))
+  assert(#l == 0, "expect no xattr on new file")
+  l = assert(S.llistxattr(tmpfile))
+  assert(#l == 0, "expect no xattr on new file")
+  l = assert(fd:flistxattr(tmpfile))
+  assert(#l == 0, "expect no xattr on new file")
+
+end
+assert(S.unlink(tmpfile))
+
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
 assert(S.mkdir(tmpfile))
