@@ -719,10 +719,19 @@ assert(S.sethostname(hh))
 assert(hh == assert(S.gethostname()))
 assert(S.sethostname(h))
 
+-- test bridge functions
+assert(S.bridge_add("br999"))
+assert(S.stat("/sys/class/net/br999"))
+
+assert(S.bridge_del("br999"))
+ok = S.stat("/sys/class/net/br999")
+assert(not ok, "bridge should be gone")
+
+-- chroot
 assert(S.chroot("/"))
 
 S.exit("success")
 
--- note tests missing tests for setting time, ioctl TODO
+-- note tests missing tests for setting time TODO
 -- note have tested pause, reboot but not in tests
 

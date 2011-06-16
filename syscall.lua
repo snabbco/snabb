@@ -811,6 +811,12 @@ elseif ffi.abi("64bit") and arch == "x64" then
   S.SYS_getdents = 78
 end
 
+-- ioctls, filling in as needed
+S.SIOCBRADDBR    = 0x89a0
+S.SIOCBRDELBR    = 0x89a1
+S.SIOCBRADDIF    = 0x89a2
+S.SIOCBRDELIF    = 0x89a3
+
 -- constants
 local HOST_NAME_MAX = 64 -- Linux. should we export?
 
@@ -978,8 +984,8 @@ function S.nogc(d) ffi.gc(d, nil) end
 local errorret, retint, retbool, retptr, retfd, getfd
 
 -- standard error return
-function errorret()
-  return nil, mkerror(ffi.errno())
+function errorret(errno)
+  return nil, mkerror(errno or ffi.errno())
 end
 
 function retint(ret)
@@ -1715,6 +1721,7 @@ local string_array_t = typeof("const char *[?]")
 local sockaddr_pt = typeof("struct sockaddr *")
 local cmsghdr_pt = typeof("struct cmsghdr *")
 local uchar_pt = typeof("unsigned char *")
+local char_pt = typeof("char *")
 local int_pt = typeof("int *")
 local linux_dirent_pt = typeof("struct linux_dirent *")
 local inotify_event_pt = typeof("struct inotify_event *")
@@ -3177,6 +3184,25 @@ function S.dirfile(name) -- return the directory entries in a file
   if err then return nil, err end
   return d
 end
+
+-- bridge functions, could be in utility library
+local bridge_ioctl
+function bridge_ioctl(io, name)
+  local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
+  if not s then return nil, err end
+  local ret = C.ioctl(getfd(s), io, cast(char_pt, name))
+  if ret == -1 then
+    local errno = ffi.errno()
+    s:close()
+    return errorret(errno)
+  end
+  local ok, err = s:close()
+  if not ok then return nil, err end
+  return true
+end
+
+function S.bridge_add(name) return bridge_ioctl(S.SIOCBRADDBR, name) end
+function S.bridge_del(name) return bridge_ioctl(S.SIOCBRDELBR, name) end
 
 -- use string types for now
 local threc -- helper for returning varargs
