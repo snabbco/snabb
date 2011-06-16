@@ -699,6 +699,10 @@ assert(S.sethostname(h))
 assert(S.bridge_add("br999"))
 assert(S.stat("/sys/class/net/br999"))
 
+assert(S.bridge_add_interface("br99", "eth0")) -- might fail if you don't have eth0, will fix later...
+
+S.pause()
+
 assert(S.bridge_del("br999"))
 ok = S.stat("/sys/class/net/br999")
 assert(not ok, "bridge should be gone")

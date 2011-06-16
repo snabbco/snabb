@@ -817,8 +817,10 @@ S.SIOCBRDELBR    = 0x89a1
 S.SIOCBRADDIF    = 0x89a2
 S.SIOCBRDELIF    = 0x89a3
 
--- constants
-local HOST_NAME_MAX = 64 -- Linux. should we export?
+-- sizes -- Linux. should we export?
+local HOST_NAME_MAX = 64
+local IFNAMSIZ      = 16
+local IFHWADDRLEN   = 6
 
 -- errors. In a subtable unlike other constants
 S.E = {}
@@ -1245,6 +1247,86 @@ struct ifinfomsg {
 struct rtattr {
   unsigned short  rta_len;
   unsigned short  rta_type;
+};
+
+static const int IFNAMSIZ = 16;
+
+struct ifmap {
+  unsigned long mem_start;
+  unsigned long mem_end;
+  unsigned short base_addr; 
+  unsigned char irq;
+  unsigned char dma;
+  unsigned char port;
+};
+typedef struct { 
+  unsigned int clock_rate;
+  unsigned int clock_type;
+  unsigned short loopback;
+} sync_serial_settings;
+typedef struct { 
+  unsigned int clock_rate;
+  unsigned int clock_type;
+  unsigned short loopback;
+  unsigned int slot_map;
+} te1_settings;
+typedef struct {
+  unsigned short encoding;
+  unsigned short parity;
+} raw_hdlc_proto;
+typedef struct {
+  unsigned int t391;
+  unsigned int t392;
+  unsigned int n391;
+  unsigned int n392;
+  unsigned int n393;
+  unsigned short lmi;
+  unsigned short dce;
+} fr_proto;
+typedef struct {
+  unsigned int dlci;
+} fr_proto_pvc;
+typedef struct {
+  unsigned int dlci;
+  char master[IFNAMSIZ];
+} fr_proto_pvc_info;
+typedef struct {
+  unsigned int interval;
+  unsigned int timeout;
+} cisco_proto;
+struct if_settings {
+  unsigned int type;
+  unsigned int size;
+  union {
+    raw_hdlc_proto          *raw_hdlc;
+    cisco_proto             *cisco;
+    fr_proto                *fr;
+    fr_proto_pvc            *fr_pvc;
+    fr_proto_pvc_info       *fr_pvc_info;
+
+    sync_serial_settings    *sync;
+    te1_settings            *te1;
+  } ifs_ifsu;
+};
+struct ifreq {
+  union {
+    char ifrn_name[IFNAMSIZ];
+  } ifr_ifrn;
+  union {
+    struct  sockaddr ifru_addr;
+    struct  sockaddr ifru_dstaddr;
+    struct  sockaddr ifru_broadaddr;
+    struct  sockaddr ifru_netmask;
+    struct  sockaddr ifru_hwaddr;
+    short   ifru_flags;
+    int     ifru_ivalue;
+    int     ifru_mtu;
+    struct  ifmap ifru_map;
+    char    ifru_slave[IFNAMSIZ];
+    char    ifru_newname[IFNAMSIZ];
+    void *  ifru_data;
+    struct  if_settings ifru_settings;
+  } ifr_ifru;
 };
 struct inotify_event {
   int wd;
@@ -1685,6 +1767,9 @@ local siginfo_t = ffi.metatype("struct siginfo",{
   __index = function(t, k) if siginfo_get[k] then return siginfo_get[k](t) end end,
   __newindex = function(t, k, v) if siginfo_set[k] then siginfo_set[k](t, v) end end,
 })
+
+-- may need metamethods for struct ifreq see /usr/include/linux/if.h
+local ifreq_t = typeof("struct ifreq")
 
 --[[ -- used to generate tests, will refactor into test code later
 print("eq (sizeof(struct timespec), " .. sizeof(timespec_t) .. ");")
@@ -3218,17 +3303,19 @@ function S.dirfile(name) -- return the directory entries in a file
   return d
 end
 
--- bridge functions, could be in utility library
+function S.if_nametoindex(name) -- in some libc implementations, but not all. May be better ways to implement, but this should work for now.
+  local i = S.get_interfaces().iface[name]
+  if not i then return nil end
+  return i.index
+end
+
+-- bridge functions, could be in utility library. in error cases use gc to close file.
 local bridge_ioctl
 function bridge_ioctl(io, name)
   local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
   local ret = C.ioctl(getfd(s), io, cast(char_pt, name))
-  if ret == -1 then
-    local errno = ffi.errno()
-    s:close()
-    return errorret(errno)
-  end
+  if ret == -1 then return errorret() end
   local ok, err = s:close()
   if not ok then return nil, err end
   return true
@@ -3236,6 +3323,23 @@ end
 
 function S.bridge_add(name) return bridge_ioctl(S.SIOCBRADDBR, name) end
 function S.bridge_del(name) return bridge_ioctl(S.SIOCBRDELBR, name) end
+
+function S.bridge_add_interface(bridge, dev)
+  local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
+  if not s then return nil, err end
+  if type(dev) == "string" then dev = S.if_nametoindex(dev) end
+  if not dev then return errorret(S.E.NODEV) end
+  local ifr = ifreq_t()
+  len = #bridge + 1
+  if len > IFNAMSIZ then len = IFNAMSIZ end
+  ffi.copy(ifr.ifr_ifrn.ifrn_name, bridge, len) -- note not using the short forms as no metatable defined yet...
+  ifr.ifr_ifru.ifru_ivalue = dev
+  local ret = C.ioctl(getfd(s), S.SIOCBRADDIF, ifr);
+  if ret == -1 then return errorret() end
+  local ok, err = s:close()
+  if not ok then return nil, err end
+  return true
+end
 
 -- use string types for now
 local threc -- helper for returning varargs
