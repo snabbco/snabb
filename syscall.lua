@@ -1605,6 +1605,7 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 
 int epoll_create1(int flags);
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
@@ -2157,6 +2158,21 @@ function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath))
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 function S.pause() return retbool(C.pause()) end
+
+function S.readlink(path) -- note no idea if name truncated except return value is buffer len, so have to reallocate
+  local size = 256
+  local buffer, ret
+  repeat
+    buffer = buffer_t(size)
+    ret = C.readlink(path, buffer, size)
+    if ret == -1 then return errorret() end
+    if ret == size then -- possibly truncated
+      buffer = nil
+      size = size * 2
+    end
+  until buffer
+  return ffi.string(buffer, ret)
+end
 
 local retnume
 function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return

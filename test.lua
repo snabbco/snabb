@@ -119,6 +119,8 @@ fd = assert(S.creat(tmpfile, "IRWXU"))
 assert(S.link(tmpfile, tmpfile2))
 assert(S.unlink(tmpfile2))
 assert(S.symlink(tmpfile, tmpfile2))
+local s = assert(S.readlink(tmpfile2))
+assert(s == tmpfile, "should be able to read symlink")
 assert(S.unlink(tmpfile2))
 
 assert(fd:fchmod("IRUSR, IWUSR"))
