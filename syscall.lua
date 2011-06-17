@@ -2351,9 +2351,11 @@ function S.getcwd(buf, size)
   return true -- no point returning the pointer as it is just the passed buffer
 end
 
-function S.nanosleep(req, ns) -- construct timespec if given two args, or table
+function S.nanosleep(req) -- construct timespec if given two args, or table
   if type(req) == "table" then req = timespec_t(req)
-  elseif type(req) == "number" then req = timespec_t(req, ns or 0)
+  elseif type(req) == "number" then
+    local i, f = math.modf(req)
+    req = timespec_t(i, math.floor(f * 1000000000))
   end
   local rem = timespec_t()
   local ret = C.nanosleep(req, rem)
@@ -2362,7 +2364,7 @@ function S.nanosleep(req, ns) -- construct timespec if given two args, or table
 end
 
 function S.sleep(sec) -- standard libc function
-  local rem, err = S.nanosleep(sec, 0)
+  local rem, err = S.nanosleep(sec)
   if not rem then return nil, err end
   return rem.tv_sec
 end
@@ -3447,7 +3449,7 @@ local brinfo = function(d) -- can be used as subpart of general interface info
   if not brif then return nil end
 
   local fdb = "/sys/class/net/" .. d .. "/" .. S.SYSFS_BRIDGE_FDB
-  local s = S.stat(fdb) -- no THIS DOES NOT WORK. need to rwad until get 0....
+  local s = S.stat(fdb) -- no THIS DOES NOT WORK. need to read until get 0....
   if not s then return nil end
   local sl = tonumber(s.st_size)
   local buffer = buffer_t(sl)
