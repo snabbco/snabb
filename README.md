@@ -74,6 +74,8 @@ Should add some tostring methods for some of these structures... just done ls so
 
 Should split out more of the stuff that is not just system calls into utility package.
 
+Could be more helpful in returning Lua numbers - eg while read() returns a 64 bit number in theory, in practise it doesn't return number outside range of Lua numbers, and you just need to call tonumber to iterate anyway. Split to have retnum and retint, as eg lseek does return a large offset.
+
 ### Missing functions
 
 readlink

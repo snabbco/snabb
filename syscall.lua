@@ -3449,30 +3449,34 @@ local brinfo = function(d) -- can be used as subpart of general interface info
   if not brif then return nil end
 
   local fdb = "/sys/class/net/" .. d .. "/" .. S.SYSFS_BRIDGE_FDB
-  local s = S.stat(fdb) -- no THIS DOES NOT WORK. need to read until get 0....
-  if not s then return nil end
-  local sl = tonumber(s.st_size)
+  if not S.stat(fdb) then return nil end
+  local sl = 2048
   local buffer = buffer_t(sl)
-  
-  local ok, err = S.readfile(fdb, buffer, sl)
-  if not ok then return nil end
-
-  local fdbs = cast(fdb_entry_pt, buffer)
+  local fd = S.open(fdb, S.O_RDONLY)
+  if not fd then return nil end
   local brforward = {}
 
-  print(d, sl, sizeof(fdb_entry_t))
+  repeat
+    local n = tonumber(fd:read(buffer, sl)) -- TODO fix read to return number
+    if not n then return nil end
 
-  for i = 0, sl / sizeof(fdb_entry_t) do
-    local fdb = fdbs[i]
-    local mac = macaddr_t()
-    ffi.copy(mac, fdb.mac_addr, IFHWADDRLEN)
+    local fdbs = cast(fdb_entry_pt, buffer)
 
-print(d, tonumber(fdb.port_no), fdb.is_local ~= 0, tostring(mac), #brforward, brforward)
+    for i = 1, n / sizeof(fdb_entry_t) do
+      local fdb = fdbs[i - 1]
+      local mac = macaddr_t()
+      ffi.copy(mac, fdb.mac_addr, IFHWADDRLEN)
 
-    -- TODO ageing_timer_value is not an int, time, float
-    brforward[#brforward + 1] = {mac_addr = mac, port_no = tonumber(fdb.port_no), is_local = fdb.is_local ~= 0, ageing_timer_value = tonumber(fdb.ageing_timer_value)}
-brforward[#brforward + 1] = 2
-  end
+      -- TODO ageing_timer_value is not an int, time, float
+      brforward[#brforward + 1] = {
+        mac_addr = mac, port_no = tonumber(fdb.port_no),
+        is_local = fdb.is_local ~= 0,
+        ageing_timer_value = tonumber(fdb.ageing_timer_value)
+      }
+    end
+
+  until n == 0
+  if not fd:close() then return nil end
 
   return {bridge = bridge, brif = brif, brforward = brforward}
 end

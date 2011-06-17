@@ -706,7 +706,7 @@ if ok then
   local b = assert(S.bridge_list())
   assert(b.br999 and b.br999.bridge.root_id, "expect to find bridge in list")
 
-  print(b.br0.brforward[1].mac_addr, b.br0.brforward[2], b.br0.brforward[3])
+  --print(b.br0.brforward[1].mac_addr, b.br0.brforward[2].mac_addr, b.br0.brforward[3].mac_addr)
 
   --for k, v in pairs(b.br999.bridge) do print(k, v) end
 
