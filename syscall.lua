@@ -1368,13 +1368,10 @@ typedef union epoll_data {
   uint32_t u32;
   uint64_t u64;
 } epoll_data_t;
-#pragma pack(push)  /* we need to align these to replace gcc packed attribute */
-#pragma pack(4) 
 struct epoll_event {
   uint32_t events;      /* Epoll events */
   epoll_data_t data;    /* User data variable */
-};   // __attribute__ ((__packed__));
-#pragma pack(pop)
+}  __attribute__ ((packed));
 ]]
 
 -- Linux struct siginfo padding depends on architecture
