@@ -74,7 +74,7 @@ Should add some tostring methods for some of these structures... just done ls so
 
 Should split out more of the stuff that is not just system calls into utility package.
 
-Could be more helpful in returning Lua numbers - eg while read() returns a 64 bit number in theory, in practise it doesn't return number outside range of Lua numbers, and you just need to call tonumber to iterate anyway. Split to have retnum and retint, as eg lseek does return a large offset.
+Could be more helpful in returning Lua numbers - made big changes as file operations do not need native 64 bit numbers, should never have to use tonumber, only 64 bit for things that are really 64 bit native numbers. Where we return native structs, like stat, you don't get native numbers, so maybe returning tables would be helpful.
 
 ### Missing functions
 

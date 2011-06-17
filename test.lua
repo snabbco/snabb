@@ -302,7 +302,7 @@ assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get ba
 local f = assert(S.open("/etc/passwd", "RDONLY"))
 local off = 0
 n = assert(c:sendfile(f, off, 16))
-assert(n.count == 16 and tonumber(n.offset) == 16, "sendfile should send 16 bytes")
+assert(n.count == 16 and n.offset == 16, "sendfile should send 16 bytes")
 assert(f:close())
 assert(c:close())
 assert(a.fd:close())

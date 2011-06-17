@@ -991,16 +991,21 @@ end
 
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
-local errorret, retint, retbool, retptr, retfd, getfd
+local errorret, retint, retnum, retbool, retptr, retfd, getfd
 
 -- standard error return
 function errorret(errno)
   return nil, mkerror(errno or ffi.errno())
 end
 
-function retint(ret)
+function retint(ret) -- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet...
   if ret == -1 then return errorret() end
   return ret
+end
+
+function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
+  if ret == -1 then return errorret() end
+  return tonumber(ret)
 end
 
 -- used for no return value, return true for use of assert
@@ -2153,21 +2158,21 @@ function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 function S.pause() return retbool(C.pause()) end
 
-local retinte
-function retinte(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
+local retnume
+function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
   ffi.errno(0)
   local ret = f(...)
   if ffi.errno() ~= 0 then return errorret() end
   return ret
 end
 
-function S.nice(inc) return retinte(C.nice, inc) end
+function S.nice(inc) return retnume(C.nice, inc) end
 -- NB glibc is shifting these values from what strace shows, as per man page, kernel adds 20 to make these values positive...
 -- might cause issues with other C libraries in which case may shift to using system call
-function S.getpriority(which, who) return retinte(C.getpriority, stringflags(which, "PRIO_"), who or 0) end
-function S.setpriority(which, who, prio) return retinte(C.setpriority, stringflags(which, "PRIO_"), who or 0, prio) end
+function S.getpriority(which, who) return retnume(C.getpriority, stringflags(which, "PRIO_"), who or 0) end
+function S.setpriority(which, who, prio) return retnume(C.setpriority, stringflags(which, "PRIO_"), who or 0, prio) end
 
-function S.fork() return retint(C.fork()) end
+function S.fork() return retnum(C.fork()) end
 function S.execve(filename, argv, envp)
   local cargv = string_array_t(#argv + 1, argv)
   cargv[#argv] = nil -- LuaJIT does not zero rest of a VLA
@@ -2254,31 +2259,31 @@ function S._exit(status) C._exit(stringflag(status, "EXIT_")) end
 function S.exit(status) C.exit(stringflag(status, "EXIT_")) end
 
 function S.read(fd, buf, count)
-  if buf then return retint(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
+  if buf then return retnum(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
   local buf = buffer_t(count)
   local ret = C.read(getfd(fd), buf, count)
   if ret == -1 then return errorret() end
   return ffi.string(buf, ret) -- user gets a string back, can get length from #string
 end
 
-function S.write(fd, buf, count) return retint(C.write(getfd(fd), buf, count or #buf)) end
-function S.pread(fd, buf, count, offset) return retint(C.pread(getfd(fd), buf, count, offset)) end
-function S.pwrite(fd, buf, count, offset) return retint(C.pwrite(getfd(fd), buf, count, offset)) end
-function S.lseek(fd, offset, whence) return retint(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
-function S.send(fd, buf, count, flags) return retint(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
+function S.write(fd, buf, count) return retnum(C.write(getfd(fd), buf, count or #buf)) end
+function S.pread(fd, buf, count, offset) return retnum(C.pread(getfd(fd), buf, count, offset)) end
+function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf, count, offset)) end
+function S.lseek(fd, offset, whence) return retnum(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
+function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
-  return retint(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), cast(sockaddr_pt, addr), getaddrlen(addr)))
+  return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), cast(sockaddr_pt, addr), getaddrlen(addr)))
 end
-function S.readv(fd, iov, iovcnt) return retint(C.readv(getfd(fd), iov, iovcnt)) end
-function S.writev(fd, iov, iovcnt) return retint(C.writev(getfd(fd), iov, iovcnt)) end
+function S.readv(fd, iov, iovcnt) return retnum(C.readv(getfd(fd), iov, iovcnt)) end
+function S.writev(fd, iov, iovcnt) return retnum(C.writev(getfd(fd), iov, iovcnt)) end
 
-function S.recv(fd, buf, count, flags) return retint(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
+function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.recvfrom(fd, buf, count, flags)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(sizeof(sockaddr_storage_t))
   local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
-  return saret(ss, addrlen[0], {count = ret})
+  return saret(ss, addrlen[0], {count = tonumber(ret)})
 end
 
 function S.setsockopt(fd, level, optname, optval, optlen)
@@ -2449,7 +2454,7 @@ function S.fcntl(fd, cmd, arg)
   -- return values differ, some special handling needed
   if cmd == S.F_DUPFD or cmd == S.F_DUPFD_CLOEXEC then return retfd(ret) end
   if cmd == S.F_GETFD or cmd == S.F_GETFL or cmd == S.F_GETLEASE or cmd == S.F_GETOWN or
-     cmd == S.F_GETSIG or cmd == S.F_GETPIPE_SZ then return retint(ret) end
+     cmd == S.F_GETSIG or cmd == S.F_GETPIPE_SZ then return retnum(ret) end
   return retbool(ret)
 end
 
@@ -2765,7 +2770,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
 end
 
 function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "IN_"))) end
-function S.inotify_add_watch(fd, pathname, mask) return retint(C.inotify_add_watch(getfd(fd), pathname, stringflags(mask, "IN_"))) end
+function S.inotify_add_watch(fd, pathname, mask) return retnum(C.inotify_add_watch(getfd(fd), pathname, stringflags(mask, "IN_"))) end
 function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd), wd)) end
 
 local in_recv_ev = {"IN_ACCESS", "IN_ATTRIB", "IN_CLOSE_WRITE", "IN_CLOSE_NOWRITE", "IN_CREATE", "IN_DELETE", "IN_DELETE_SELF", "IN_MODIFY",
@@ -2791,12 +2796,12 @@ function S.inotify_read(fd, buffer, len)
 end
 
 function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two different return types...
-  if not offset then return retint(C.sendfile(getfd(out_fd), getfd(in_fd), nil, count)) end
+  if not offset then return retnum(C.sendfile(getfd(out_fd), getfd(in_fd), nil, count)) end
   local off = off1_t()
   off[0] = offset
   local ret = C.sendfile(getfd(out_fd), getfd(in_fd), off, count)
   if ret == -1 then return errorret() end
-  return {count = tonumber(ret), offset = off[0]}
+  return {count = tonumber(ret), offset = tonumber(off[0])}
 end
 
 function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, stringflags(flags, "EFD_"))) end
@@ -2934,8 +2939,8 @@ S.alarm = C.alarm
 
 function S.umask(mask) return C.umask(stringflags(mask, "S_")) end
 
-function S.getsid(pid) return retint(C.getsid(pid or 0)) end
-function S.setsid() return retint(C.setsid()) end
+function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
+function S.setsid() return retnum(C.setsid()) end
 
 -- handle environment (Lua only provides os.getenv). Could add metatable to make more Lualike.
 function S.environ() -- return whole environment as table
@@ -3457,7 +3462,7 @@ local brinfo = function(d) -- can be used as subpart of general interface info
   local brforward = {}
 
   repeat
-    local n = tonumber(fd:read(buffer, sl)) -- TODO fix read to return number
+    local n = fd:read(buffer, sl)
     if not n then return nil end
 
     local fdbs = cast(fdb_entry_pt, buffer)
