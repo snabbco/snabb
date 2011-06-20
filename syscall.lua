@@ -1387,7 +1387,6 @@ static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 3;
 ]]
 end
 
--- note we might make a metatype with the short names (eg si_pid) defined in bits/siginfo.h TODO
 ffi.cdef[[
 typedef struct siginfo {
   int si_signo;
@@ -1714,8 +1713,6 @@ local use_gnu_stat
 if pcall(function () local t = C.stat end) then use_gnu_stat = false else use_gnu_stat = true end
 
 -- Lua type constructors corresponding to defined types
-local timespec_t = typeof("struct timespec")
-local timeval_t = typeof("struct timeval")
 local sockaddr_t = typeof("struct sockaddr")
 local sockaddr_storage_t = typeof("struct sockaddr_storage")
 local sa_family_t = typeof("sa_family_t")
@@ -1751,6 +1748,15 @@ local fdb_entry_t = typeof("struct fdb_entry")
 local fdb_entry_pt = typeof("struct fdb_entry *")
 
 S.RLIM_INFINITY = cast("rlim_t", -1)
+
+-- types with metamethods
+local timespec_t = ffi.metatype("struct timespec", {
+  __index = {tonumber = function(ts) return tonumber(ts.tv_sec) + tonumber(ts.tv_nsec) / 1000000000 end}
+})
+
+local timeval_t = ffi.metatype("struct timeval", {
+  __index = {tonumber = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end}
+})
 
 -- siginfo needs some metamethods
 local siginfo_get = {

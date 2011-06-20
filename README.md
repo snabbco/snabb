@@ -77,8 +77,11 @@ Should split out more of the stuff that is not just system calls into utility pa
 
 Could be more helpful in returning Lua numbers - made big changes as file operations do not need native 64 bit numbers, should never have to use tonumber, only 64 bit for things that are really 64 bit native numbers. Where we return native structs, like stat, you don't get native numbers, so maybe returning tables would be helpful.
 
+Add proper iterator support to fd, bridge etc. So bridge.bridges is an iterator? name issues if you can call bridge.br0() to create etc.
+
 ### Missing functions
 
+clock_nanosleep, timer_create
 faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  mkdirat(2),  mknodat(2),
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 ...

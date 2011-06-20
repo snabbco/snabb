@@ -489,6 +489,7 @@ if S.geteuid() ~= 0 then
 end
 
 local tv = assert(S.gettimeofday())
+assert(math.floor(tv:tonumber()) == tonumber(tv.tv_sec), "should be able to convert timeval to number")
 local t = S.time()
 local t = assert(S.clock_getres("realtime"))
 local t = assert(S.clock_gettime("realtime"))
