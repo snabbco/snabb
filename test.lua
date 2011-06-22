@@ -601,6 +601,16 @@ assert(n[2].name == tmpfile, "created file should have same name")
 assert(fd:inotify_rm_watch(wd))
 assert(fd:close())
 
+-- tee, splice, vmsplice Linux only
+local p = assert(S.pipe("nonblock"))
+local s = assert(S.socketpair("unix", "stream, nonblock"))
+--local fd = S.open
+
+assert(p[1]:close())
+assert(p[2]:close())
+assert(s[1]:close())
+assert(s[2]:close())
+
 local t = assert(S.adjtimex())
 
 local r = assert(S.getrlimit("nofile"))

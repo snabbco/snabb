@@ -2135,11 +2135,10 @@ end
 function S.pipe(flags)
   local fd2 = int2_t()
   local ret
-  if flags then ret = C.pipe2(fd2, flags) else ret = C.pipe(fd2) end
+  if flags then ret = C.pipe2(fd2, stringflags(flags, "O_")) else ret = C.pipe(fd2) end
   if ret == -1 then return errorret() end
   return {fd_t(fd2[0]), fd_t(fd2[1])}
 end
-S.pipe2 = S.pipe
 
 function S.close(fd)
   local ret = C.close(getfd(fd))
@@ -2802,15 +2801,15 @@ end
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
   if off_in and not typeof(loff_t, off_in) then off_in = loff_t(off_in) end
   if off_out and not typeof(loff_t, off_out) then off_out = loff_t(off_out) end
-  return retnum(C.splice(getfd(fd_in), off_in, getfd(fd_out), off_out, len, stringflags("SPLICE_F_", flags)))
+  return retnum(C.splice(getfd(fd_in), off_in, getfd(fd_out), off_out, len, stringflags(flags, "SPLICE_F_")))
 end
 
 function S.vmsplice(fd, iov, nr_segs, flags)
-  return retnum(C.vmslice(getfd(fd), iov, nr_segs, stringflags("SPLICE_F_", flags)))
+  return retnum(C.vmslice(getfd(fd), iov, nr_segs, stringflags(flags, "SPLICE_F_")))
 end
 
 function S.tee(fd_in, fd_out, len, flags)
-  return retnum(C.tee(getfd(fd_in), getfd(fd_out), len, stringflags("SPLICE_F_", flags)))
+  return retnum(C.tee(getfd(fd_in), getfd(fd_out), len, stringflags(flags, "SPLICE_F_")))
 end
 
 function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "IN_"))) end
@@ -3565,7 +3564,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
                    'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
-                   'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr'
+                   'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee'
                    }
 local fmeth = {}
 for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
