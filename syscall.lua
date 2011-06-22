@@ -474,6 +474,12 @@ S.EPOLL_CTL_ADD = 1
 S.EPOLL_CTL_DEL = 2
 S.EPOLL_CTL_MOD = 3
 
+-- splice etc
+S.SPLICE_F_MOVE         = 1
+S.SPLICE_F_NONBLOCK     = 2
+S.SPLICE_F_MORE         = 4
+S.SPLICE_F_GIFT         = 8
+
 -- file types in directory
 S.DT_UNKNOWN = 0
 S.DT_FIFO = 1
@@ -1074,6 +1080,7 @@ typedef int32_t clockid_t;
 
 // 64 bit
 typedef uint64_t dev_t;
+typedef uint64_t loff_t;
 
 // posix standards
 typedef unsigned short int sa_family_t;
@@ -1609,6 +1616,9 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 int epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *sigmask);
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 int eventfd(unsigned int initval, int flags);
+ssize_t splice(int fd_in, loff_t *off_in, int fd_out, loff_t *off_out, size_t len, unsigned int flags);
+ssize_t vmsplice(int fd, const struct iovec *iov, unsigned long nr_segs, unsigned int flags);
+ssize_t tee(int fd_in, int fd_out, size_t len, unsigned int flags);
 int reboot(int cmd);
 int klogctl(int type, char *bufp, int len);
 int inotify_init1(int flags);
@@ -1836,6 +1846,7 @@ local int64_1t = typeof("int64_t[1]")
 local uint64_1t = typeof("uint64_t[1]")
 local socklen1_t = typeof("socklen_t[1]")
 local ulong_t = typeof("unsigned long")
+local loff_t = typeof("loff_t")
 
 local string_array_t = typeof("const char *[?]")
 
@@ -2788,6 +2799,20 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   return r
 end
 
+function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
+  if off_in and not typeof(loff_t, off_in) then off_in = loff_t(off_in) end
+  if off_out and not typeof(loff_t, off_out) then off_out = loff_t(off_out) end
+  return retnum(C.splice(getfd(fd_in), off_in, getfd(fd_out), off_out, len, stringflags("SPLICE_F_", flags)))
+end
+
+function S.vmsplice(fd, iov, nr_segs, flags)
+  return retnum(C.vmslice(getfd(fd), iov, nr_segs, stringflags("SPLICE_F_", flags)))
+end
+
+function S.tee(fd_in, fd_out, len, flags)
+  return retnum(C.tee(getfd(fd_in), getfd(fd_out), len, stringflags("SPLICE_F_", flags)))
+end
+
 function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "IN_"))) end
 function S.inotify_add_watch(fd, pathname, mask) return retnum(C.inotify_add_watch(getfd(fd), pathname, stringflags(mask, "IN_"))) end
 function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd), wd)) end
@@ -3211,7 +3236,7 @@ function S.get_interfaces()
   hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
   gen.rtgen_family = S.AF_PACKET
 
-  local ios = S.t.iovec(1, {{buf, len}})
+  local ios = iovec_t(1, {{buf, len}})
   local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}
 
   local n, err = s:sendmsg(m)

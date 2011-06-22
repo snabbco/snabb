@@ -432,7 +432,7 @@ assert(S.getsid())
 S.setsid() -- may well fail
 
 pid = assert(S.fork())
-if (pid == 0) then -- child
+if pid == 0 then -- child
   assert(S.getppid() == pid0, "parent pid should be previous pid")
   S.exit(23)
 else -- parent

@@ -14,12 +14,12 @@ Unfinished! Some syscalls missing, work in progress! Let me know if you need som
 
 No support for 64 bit file operations on a 32 bit system yet. 
 
-### System calls (124)
+### System calls (127)
 
 open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname, gethostname, sethostname, getuid, geteuid, getpid, getppid, getgid, getegid, fork, execve, wait, waitpid, _exit, signal, gettimeofday, settimeofday, time, clock_getres, clock_gettime, clock_settime, sysinfo, read, write, pread, pwrite, lseek, send, sendto, sendmsg, recv, recvfrom, recvmsg, readv, writev, getsockopt, setsockopt, select, epoll_create, epoll_ctl, epoll_wait, sendfile, dup, fchdir, fsync, fdatasync, fcntl, fchmod, socket, socketpair, bind, listen, connect, accept, getsockname, getpeername, mmap, munmap, msync, mlock, munlock, mlockall, munlockall, mremap, madvise, pipe, access, getcwd, nanosleep, syscall, stat, fstat, lstat, ioctl, eventfd, truncate, ftruncate, pause, reboot, sync, shutdown, ksyslogctl, mount, umount,
 nice, getpriority, setpriority, prctl, alarm, waitid, inotify_init, inotify_add_watch, inotify_rm_watch, adjtimex, getrlimit, setrlimit, sigprocmask, sigpending,
 sigsuspend, getsid, setsid, listxattr, llistxattr, flistxattr, setxattr, lsetxattr, fsetxattr, getxattr, lgetxattr, fgetxattr, removexattr, lremovexattr, fremovexattr,
-readlink
+readlink, splice, vmsplice, tee
 
 ### Other functions
 
@@ -78,6 +78,7 @@ Should split out more of the stuff that is not just system calls into utility pa
 Could be more helpful in returning Lua numbers - made big changes as file operations do not need native 64 bit numbers, should never have to use tonumber, only 64 bit for things that are really 64 bit native numbers. Where we return native structs, like stat, you don't get native numbers, so maybe returning tables would be helpful.
 
 Add proper iterator support to fd, bridge etc. So bridge.bridges is an iterator? name issues if you can call bridge.br0() to create etc.
+Also need more support for dealing with signals on syscalls.
 
 ### Missing functions
 
