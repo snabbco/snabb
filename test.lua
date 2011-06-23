@@ -349,6 +349,8 @@ assert(sv[1]:close())
 
 assert(S.kill(S.getpid(), "pipe")) -- should be ignored
 
+assert(S.SIGSYS == 31) -- test numbers correct (Linux)
+
 local m = assert(S.sigprocmask())
 assert(m.isemptyset, "expect initial sigprocmask to be empty")
 assert(not m.winch, "expect set empty")

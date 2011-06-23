@@ -226,7 +226,6 @@ signals = {
 }
 
 for i, v in ipairs(signals) do S[v] = i end
-assert(S.SIGSYS == 31)
 
 S.SIGIOT = 6
 S.SIGUNUSED     = 31
