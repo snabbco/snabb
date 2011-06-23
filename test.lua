@@ -358,7 +358,7 @@ assert(p.winch, "expect pending winch")
 
 -- assert(S.sigsuspend(m)) -- we cannot test this without being able to set a signal handler
 
--- signalfd. Useful as we cannot set real signal handlers. ANd it is a nice interface
+-- signalfd. Useful as we cannot set real signal handlers. And it is a nice interface, as can mix with events.
 local ss = "winch, pipe, usr1, usr2"
 fd = assert(signalfd(ss, "nonblock"))
 assert(S.sigprocmask("block", ss))
