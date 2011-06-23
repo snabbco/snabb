@@ -644,7 +644,17 @@ assert(n == #str)
 n = assert(s[2]:read())
 assert(#n == #str)
 
+local buf = S.t.buffer(#str)
+S.copy(buf, str, #str)
 
+n = assert(S.vmsplice(p[2], S.t.iovec(1, {{buf, #str}}), 1, "nonblock")) -- write our memory into pipe
+assert(n == #str)
+
+n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice out to socket
+assert(n == #str)
+
+n = assert(s[2]:read())
+assert(#n == #str)
 
 assert(fd:close())
 assert(p[1]:close())

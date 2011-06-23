@@ -20,6 +20,11 @@ local istype = ffi.istype
 local arch = ffi.arch
 local typeof = ffi.typeof
 
+S.string = ffi.string -- convenience for converting buffers
+S.sizeof = sizeof -- convenience so user need not require ffi
+S.cast = cast -- convenience so user need not require ffi
+S.copy = ffi.copy
+
 -- open, fcntl
 S.O_ACCMODE   = octal('0003')
 S.O_RDONLY    = octal('00')
@@ -1076,10 +1081,6 @@ local fd_t -- type for a file descriptor
 
 -- char buffer type
 local buffer_t = typeof("char[?]")
-
-S.string = ffi.string -- convenience for converting buffers
-S.sizeof = sizeof -- convenience so user need not require ffi
-S.cast = cast -- convenience so user need not require ffi
 
 --get fd from standard string, integer, or cdata
 function getfd(fd)
@@ -2889,7 +2890,7 @@ function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
 end
 
 function S.vmsplice(fd, iov, nr_segs, flags)
-  return retnum(C.vmslice(getfd(fd), iov, nr_segs, stringflags(flags, "SPLICE_F_")))
+  return retnum(C.vmsplice(getfd(fd), iov, nr_segs, stringflags(flags, "SPLICE_F_")))
 end
 
 function S.tee(fd_in, fd_out, len, flags)
