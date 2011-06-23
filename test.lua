@@ -358,6 +358,18 @@ assert(p.winch, "expect pending winch")
 
 -- assert(S.sigsuspend(m)) -- we cannot test this without being able to set a signal handler
 
+-- signalfd. Useful as we cannot set real signal handlers. ANd it is a nice interface
+local ss = "winch, pipe, usr1, usr2"
+fd = assert(signalfd(ss, "nonblock"))
+assert(S.sigprocmask("block", ss))
+assert(S.kill(S.getpid(), "usr1"))
+local ss = assert(fd:signalfd_read())
+assert(#ss == 2, "expect to read two signals") -- previous pending winch, plus USR1
+assert((ss[1].winch and ss[2].usr1) or (ss[2].winch and ss[1].usr1), "expect a winch and a usr1 signal") -- unordered
+assert(ss[1].user, "signal sent by user")
+assert(ss[2].user, "signal sent by user")
+assert(fd:close())
+
 local sv = assert(S.socketpair("unix", "stream"))
 c, s = sv[1], sv[2]
 
@@ -604,8 +616,13 @@ assert(fd:close())
 -- tee, splice, vmsplice Linux only
 local p = assert(S.pipe("nonblock"))
 local s = assert(S.socketpair("unix", "stream, nonblock"))
---local fd = S.open
+local fd = assert(S.open(tmpfile, "rdwr, creat", "IRWXU"))
+assert(S.unlink(tmpfile))
 
+----- TODO
+
+
+assert(fd:close())
 assert(p[1]:close())
 assert(p[2]:close())
 assert(s[1]:close())

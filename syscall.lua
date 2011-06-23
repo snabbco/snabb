@@ -235,6 +235,10 @@ S.SIG_BLOCK     = 0
 S.SIG_UNBLOCK   = 1
 S.SIG_SETMASK   = 2
 
+-- signalfd
+S.SFD_CLOEXEC  = octal('02000000')
+S.SFD_NONBLOCK = octal('04000')
+
 -- sockets
 S.SOCK_STREAM    = 1
 S.SOCK_DGRAM     = 2
@@ -244,8 +248,8 @@ S.SOCK_SEQPACKET = 5
 S.SOCK_DCCP      = 6
 S.SOCK_PACKET    = 10
 
-S.SOCK_CLOEXEC = octal('02000000') -- flag
-S.SOCK_NONBLOCK = octal('04000')   -- flag
+S.SOCK_CLOEXEC  = octal('02000000')
+S.SOCK_NONBLOCK = octal('04000')
 
 -- misc socket constants
 S.SCM_RIGHTS = 0x01
@@ -308,6 +312,9 @@ S.WCONTINUED    = 8
 S.WNOWAIT       = 0x01000000
 
 -- struct siginfo, eg waitid
+local signal_reasons_gen = {}
+local signal_reasons = {}
+
 S.SI_ASYNCNL = -60
 S.SI_TKILL = -6
 S.SI_SIGIO = -5
@@ -318,6 +325,10 @@ S.SI_QUEUE = -1
 S.SI_USER = 0
 S.SI_KERNEL = 0x80
 
+for _, v in ipairs{"SI_ASYNCNL", "SI_TKILL", "SI_SIGIO", "SI_ASYNCIO", "SI_MESGQ", "SI_TIMER", "SI_QUEUE", "SI_USER", "SI_KERNEL"} do
+  signal_reasons_gen[S[v]] = v
+end
+
 S.ILL_ILLOPC = 1
 S.ILL_ILLOPN = 2
 S.ILL_ILLADR = 3
@@ -326,6 +337,11 @@ S.ILL_PRVOPC = 5
 S.ILL_PRVREG = 6
 S.ILL_COPROC = 7
 S.ILL_BADSTK = 8
+
+signal_reasons[S.SIGILL] = {}
+for _, v in ipairs{"ILL_ILLOPC", "ILL_ILLOPN", "ILL_ILLADR", "ILL_ILLTRP", "ILL_PRVOPC", "ILL_PRVREG", "ILL_COPROC", "ILL_BADSTK"} do
+  signal_reasons[S.SIGILL][S[v]] = v
+end
 
 S.FPE_INTDIV = 1
 S.FPE_INTOVF = 2
@@ -336,15 +352,35 @@ S.FPE_FLTRES = 6
 S.FPE_FLTINV = 7
 S.FPE_FLTSUB = 8
 
+signal_reasons[S.SIGFPE] = {}
+for _, v in ipairs{"FPE_INTDIV", "FPE_INTOVF", "FPE_FLTDIV", "FPE_FLTOVF", "FPE_FLTUND", "FPE_FLTRES", "FPE_FLTINV", "FPE_FLTSUB"} do
+  signal_reasons[S.SIGFPE][S[v]] = v
+end
+
 S.SEGV_MAPERR = 1
 S.SEGV_ACCERR = 2
+
+signal_reasons[S.SIGSEGV] = {}
+for _, v in ipairs{"SEGV_MAPERR", "SEGV_ACCERR"} do
+  signal_reasons[S.SIGSEGV][S[v]] = v
+end
 
 S.BUS_ADRALN = 1
 S.BUS_ADRERR = 2
 S.BUS_OBJERR = 3
 
+signal_reasons[S.SIGBUS] = {}
+for _, v in ipairs{"BUS_ADRALN", "BUS_ADRERR", "BUS_OBJERR"} do
+  signal_reasons[S.SIGBUS][S[v]] = v
+end
+
 S.TRAP_BRKPT = 1
 S.TRAP_TRACE = 2
+
+signal_reasons[S.SIGTRAP] = {}
+for _, v in ipairs{"TRAP_BRKPT", "TRAP_TRACE"} do
+  signal_reasons[S.SIGTRAP][S[v]] = v
+end
 
 S.CLD_EXITED    = 1
 S.CLD_KILLED    = 2
@@ -353,12 +389,22 @@ S.CLD_TRAPPED   = 4
 S.CLD_STOPPED   = 5
 S.CLD_CONTINUED = 6
 
+signal_reasons[S.SIGCHLD] = {}
+for _, v in ipairs{"CLD_EXITED", "CLD_KILLED", "CLD_DUMPED", "CLD_TRAPPED", "CLD_STOPPED", "CLD_CONTINUED"} do
+  signal_reasons[S.SIGCHLD][S[v]] = v
+end
+
 S.POLL_IN  = 1
 S.POLL_OUT = 2
 S.POLL_MSG = 3
 S.POLL_ERR = 4
 S.POLL_PRI = 5
 S.POLL_HUP = 6
+
+signal_reasons[S.SIGPOLL] = {}
+for _, v in ipairs{"POLL_IN", "POLL_OUT", "POLL_MSG", "POLL_ERR", "POLL_PRI", "POLL_HUP"} do
+  signal_reasons[S.SIGPOLL][S[v]] = v
+end
 
 -- clocks
 S.CLOCK_REALTIME = 0
@@ -1379,6 +1425,25 @@ struct epoll_event {
   uint32_t events;      /* Epoll events */
   epoll_data_t data;    /* User data variable */
 }  __attribute__ ((packed));
+struct signalfd_siginfo {
+  uint32_t ssi_signo;
+  int32_t ssi_errno;
+  int32_t ssi_code;
+  uint32_t ssi_pid;
+  uint32_t ssi_uid;
+  int32_t ssi_fd;
+  uint32_t ssi_tid;
+  uint32_t ssi_band;
+  uint32_t ssi_overrun;
+  uint32_t ssi_trapno;
+  int32_t ssi_status;
+  int32_t ssi_int;
+  uint64_t ssi_ptr;
+  uint64_t ssi_utime;
+  uint64_t ssi_stime;
+  uint64_t ssi_addr;
+  uint8_t __pad[48];
+};
 ]]
 
 -- Linux struct siginfo padding depends on architecture
@@ -1591,6 +1656,7 @@ int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4
 int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 int sigpending(sigset_t *set);
 int sigsuspend(const sigset_t *mask);
+int signalfd(int fd, const sigset_t *mask, int flags);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -1756,6 +1822,8 @@ local sigset_t = typeof("sigset_t")
 local rlimit_t = typeof("struct rlimit")
 local fdb_entry_t = typeof("struct fdb_entry")
 local fdb_entry_pt = typeof("struct fdb_entry *")
+local signalfd_siginfo_t = typeof("struct signalfd_siginfo")
+local signalfd_siginfo_pt = typeof("struct signalfd_siginfo *")
 
 S.RLIM_INFINITY = cast("rlim_t", -1)
 
@@ -2735,6 +2803,13 @@ end
 
 function S.sigsuspend(mask) return retbool(C.sigsuspend(mksigset(mask))) end
 
+function signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
+  if fd then fd = getfd(fd) else fd = -1 end
+  set = mksigset(set)
+  flags = stringflags(flags, "SFD_")
+  return retfd(C.signalfd(fd, set, flags))
+end
+
 function S.select(s) -- note same structure as returned
   local r, w, e
   local nfds = 0
@@ -2821,7 +2896,7 @@ local in_recv_ev = {"IN_ACCESS", "IN_ATTRIB", "IN_CLOSE_WRITE", "IN_CLOSE_NOWRIT
                     "IN_CLOSE", "IN_MOVE" -- combined ops
                    }
 
--- helper function to read inotify structs as table from inotfy fd
+-- helper function to read inotify structs as table from inotify fd
 function S.inotify_read(fd, buffer, len)
   if not len then len = 1024 end
   if not buffer then buffer = buffer_t(len) end
@@ -2864,6 +2939,40 @@ function S.eventfd_write(fd, value)
   if not value then value = 1 end
   if type(value) == "number" then value = uint64_1t(value) end
   return retbool(C.write(getfd(fd), value, 8))
+end
+
+-- note this code could be used for sigaction too, but we can't yet use that due to not having callbacks
+local sigcode = function(s, signo, code)
+  s.code = code
+  s.signo = signo
+  local name = signals[s.signo]
+  s[name] = true
+  s[name:lower():sub(4)] = true
+  local rname = signal_reasons_gen[code]
+  if not rname and signal_reasons[signo] then rname = signal_reasons[signo][code] end
+  if rname then
+    s[rname] = true
+    s[rname:sub(rname:find("_") + 1):lower()] = true
+  end
+end
+
+function S.signalfd_read(fd, buffer, len)
+  if not len then len = sizeof(signalfd_siginfo_t) * 4 end
+  if not buffer then buffer = buffer_t(len) end
+  local ret, err = S.read(fd, buffer, len)
+  if ret == 0 or (err and err.EAGAIN) then return {} end
+  if not ret then return nil, err end
+  local offset, ss = 0, {}
+  while offset < ret do
+    local ssi = cast(signalfd_siginfo_pt, buffer + offset)
+    local s = {}
+    s.errno = tonumber(ssi.ssi_errno)
+    sigcode(s, tonumber(ssi.ssi_signo), tonumber(ssi.ssi_code))
+   
+    ss[#ss + 1] = s
+    offset = offset + sizeof(signalfd_siginfo_t)
+  end
+  return ss
 end
 
 -- map for valid options for arg2
@@ -3564,10 +3673,11 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
                    'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
-                   'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee'
+                   'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee',
+                   'signalfd_read'
                    }
 local fmeth = {}
-for i, v in ipairs(fdmethods) do fmeth[v] = S[v] end
+for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
 fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
 
