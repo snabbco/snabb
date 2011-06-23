@@ -234,6 +234,15 @@ mask = S.umask("IWGRP, IWOTH")
 assert(mask == S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
 
 -- sockets
+
+assert(S.sizeof(S.t.sockaddr) == S.sizeof(S.t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
+assert(S.sizeof(S.t.sockaddr_storage) == 128) -- this is the required size in Linux
+assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr))
+assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_in))
+assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_in6))
+assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_un))
+assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_nl))
+
 local a, sa
 a = S.inet_aton("error")
 assert(not a, "should get invalid IP address")
@@ -626,13 +635,13 @@ local str = "this is a test string"
 n = assert(fd:write(str))
 assert(n == #str)
 
-n = assert(S.splice(fd, 0, p[2], nil, #str, "nonblock"))
+n = assert(S.splice(fd, 0, p[2], nil, #str, "nonblock")) -- splice file at offset 0 into pipe
 assert(n == #str)
 
-n = assert(S.tee(p[1], pp[2], #str, "nonblock"))
+n = assert(S.tee(p[1], pp[2], #str, "nonblock")) -- clone our pipe
 assert(n == #str)
 
-n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock"))
+n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice to socket
 assert(n == #str)
 
 n = assert(s[2]:read())

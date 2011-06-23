@@ -1932,14 +1932,6 @@ local inotify_event_t = typeof("struct inotify_event")
 
 local pointersize = sizeof("char *")
 
-assert(sizeof(sockaddr_t) == sizeof(sockaddr_in_t)) -- inet socket addresses should be padded to same as sockaddr
-assert(sizeof(sockaddr_storage_t) == 128) -- this is the required size in Linux
-assert(sizeof(sockaddr_storage_t) >= sizeof(sockaddr_t))
-assert(sizeof(sockaddr_storage_t) >= sizeof(sockaddr_in_t))
-assert(sizeof(sockaddr_storage_t) >= sizeof(sockaddr_in6_t))
-assert(sizeof(sockaddr_storage_t) >= sizeof(sockaddr_un_t))
-assert(sizeof(sockaddr_storage_t) >= sizeof(sockaddr_nl_t))
-
 -- misc
 local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
@@ -3720,7 +3712,8 @@ S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
   iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
-  sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t, uint64 = uint64_t, macaddr = macaddr_t
+  sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t, uint64 = uint64_t, macaddr = macaddr_t,
+  sockaddr_storage = sockaddr_storage_t, sockaddr_in6 = sockaddr_in6_t
 }
 
 return S

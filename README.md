@@ -67,7 +67,7 @@ Managing constants a lot of work, may divide into subtables
 
 Should add friendly permissions naming, eg "rw" to mode flags.
 
-Netlink sockets need more friendly API. There is a bug in the current version, as it only lists first three interfaces.
+Netlink sockets need more friendly API.
 
 Should build more high level API, eg net.eth0:ip() etc. Like sysfs but with native methods I guess, and create etc. eg net:bridge("br0"). net.br0.ip = ....
 
@@ -80,12 +80,15 @@ Could be more helpful in returning Lua numbers - made big changes as file operat
 Add proper iterator support to fd, bridge etc. So bridge.bridges is an iterator? name issues if you can call bridge.br0() to create etc.
 Also need more support for dealing with signals on syscalls.
 
+buffer_t could take string as initialiser, would have to be function.
+
 ### Missing functions
 
 clock_nanosleep, timer_create, timer_getoverrun
 faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  mkdirat(2),  mknodat(2),
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue
+io_cancel(2), io_destroy(2), io_setup(2), io_submit(2), ...
 ...
 
 ### Testing
