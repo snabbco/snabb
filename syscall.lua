@@ -2968,7 +2968,30 @@ function S.signalfd_read(fd, buffer, len)
     local s = {}
     s.errno = tonumber(ssi.ssi_errno)
     sigcode(s, tonumber(ssi.ssi_signo), tonumber(ssi.ssi_code))
-   
+
+    if s.SI_USER or s.SI_QUEUE then
+      s.pid = tonumber(ssi.ssi_pid)
+      s.uid = tonumber(ssi.ssi_uid)
+      s.int = tonumber(ssi.ssi_int)
+      s.ptr = uint64_t(ssi.ssi_ptr)
+    elseif s.SI_TIMER then
+      s.overrun = tonumber(ssi.ssi_overrun)
+      s.timerid = tonumber(ssi.ssi_tid)
+    end
+
+    if s.SIGCHLD then 
+      s.pid = tonumber(ssi.ssi_pid)
+      s.uid = tonumber(ssi.ssi_uid)
+      s.status = tonumber(ssi.ssi_status)
+      s.utime = tonumber(ssi.ssi_utime) / 1000000 -- convert to seconds
+      s.stime = tonumber(ssi.ssi_stime) / 1000000
+    elseif s.SIGILL or S.SIGFPE or s.SIGSEGV or s.SIGBUS or s.SIGTRAP then
+      s.addr = uint64_t(ssi.ssi_addr)
+    elseif s.SIGIO or s.SIGPOLL then
+      s.band = tonumber(ssi.ssi_band) -- should split this up, is events from poll, TODO when we implement poll
+      s.fd = tonumber(ssi.ssi_fd)
+    end
+
     ss[#ss + 1] = s
     offset = offset + sizeof(signalfd_siginfo_t)
   end

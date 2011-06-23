@@ -82,9 +82,10 @@ Also need more support for dealing with signals on syscalls.
 
 ### Missing functions
 
-clock_nanosleep, timer_create
+clock_nanosleep, timer_create, timer_getoverrun
 faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  mkdirat(2),  mknodat(2),
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
+sigqueue
 ...
 
 ### Testing
