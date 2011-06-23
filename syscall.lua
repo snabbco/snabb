@@ -860,10 +860,24 @@ S.PR_SET_PTRACER   = 0x59616d61 -- Ubuntu extension
 
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
-if ffi.abi("32bit") and (arch == "x86" or (arch == "arm" and ffi.abi("eabi"))) then
+if arch == "x86" then
   S.SYS_getdents = 141
-elseif ffi.abi("64bit") and arch == "x64" then
+  S.SYS_clock_settime    = 264
+  S.SYS_clock_gettime    = 265
+  S.SYS_clock_getres     = 266
+  S.SYS_clock_nanosleep  = 267
+elseif arch == "x64" then
   S.SYS_getdents = 78
+  S.SYS_clock_settime    = 227
+  S.SYS_clock_gettime    = 228
+  S.SYS_clock_getres     = 229
+  S.SYS_clock_nanosleep  = 230
+elseif arch == "arm" and ffi.abi("eabi")
+  S.SYS_getdents = 141
+  S.SYS_clock_settime    = 262
+  S.SYS_clock_gettime    = 263
+  S.SYS_clock_getres     = 264
+  S.SYS_clock_nanosleep  = 265
 end
 
 -- ioctls, filling in as needed
@@ -3694,7 +3708,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
-                   'recvmsg', 'setsockopt', "epoll_ctl", "epoll_wait", "sendfile", "getdents",
+                   'recvmsg', 'setsockopt', 'epoll_ctl', 'epoll_wait', 'sendfile', 'getdents',
                    'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
                    'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee',
