@@ -2358,6 +2358,7 @@ function S.exit(status) C.exit(stringflag(status, "EXIT_")) end
 
 function S.read(fd, buf, count)
   if buf then return retnum(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
+  if not count then count = 4096 end
   local buf = buffer_t(count)
   local ret = C.read(getfd(fd), buf, count)
   if ret == -1 then return errorret() end

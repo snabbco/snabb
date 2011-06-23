@@ -617,6 +617,7 @@ assert(fd:close())
 
 -- tee, splice, vmsplice Linux only
 local p = assert(S.pipe("nonblock"))
+local pp = assert(S.pipe("nonblock"))
 local s = assert(S.socketpair("unix", "stream, nonblock"))
 local fd = assert(S.open(tmpfile, "rdwr, creat", "IRWXU"))
 assert(S.unlink(tmpfile))
@@ -625,9 +626,24 @@ local str = "this is a test string"
 n = assert(fd:write(str))
 assert(n == #str)
 
---n = assert(s[1]:write(str))
---assert(n == #str)
 n = assert(S.splice(fd, 0, p[2], nil, #str, "nonblock"))
+assert(n == #str)
+
+n = assert(S.tee(p[1], pp[2], #str, "nonblock"))
+assert(n == #str)
+
+n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock"))
+assert(n == #str)
+
+n = assert(s[2]:read())
+assert(#n == #str)
+
+n = assert(S.splice(pp[1], nil, s[1], nil, #str, "nonblock")) -- splice the tee'd pipe into our socket
+assert(n == #str)
+
+n = assert(s[2]:read())
+assert(#n == #str)
+
 
 
 assert(fd:close())
