@@ -1915,6 +1915,7 @@ local uint64_1t = typeof("uint64_t[1]")
 local socklen1_t = typeof("socklen_t[1]")
 local ulong_t = typeof("unsigned long")
 local loff_t = typeof("loff_t")
+local loff_1t = typeof("loff_t[1]")
 
 local string_array_t = typeof("const char *[?]")
 
@@ -2874,9 +2875,16 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
 end
 
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
-  if off_in and not typeof(loff_t, off_in) then off_in = loff_t(off_in) end
-  if off_out and not typeof(loff_t, off_out) then off_out = loff_t(off_out) end
-  return retnum(C.splice(getfd(fd_in), off_in, getfd(fd_out), off_out, len, stringflags(flags, "SPLICE_F_")))
+  local offin, offout = off_in, off_out
+  if off_in and not istype(loff_1t, off_in) then
+    offin = loff_1t()
+    offin[1] = off_in
+  end
+  if off_out and not istype(loff_1t, off_out) then
+    offout = loff_1t()
+    offout[1] = off_out
+  end
+  return retnum(C.splice(getfd(fd_in), offin, getfd(fd_out), offout, len, stringflags(flags, "SPLICE_F_")))
 end
 
 function S.vmsplice(fd, iov, nr_segs, flags)

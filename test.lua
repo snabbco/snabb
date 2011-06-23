@@ -368,6 +368,8 @@ assert(#ss == 2, "expect to read two signals") -- previous pending winch, plus U
 assert((ss[1].winch and ss[2].usr1) or (ss[2].winch and ss[1].usr1), "expect a winch and a usr1 signal") -- unordered
 assert(ss[1].user, "signal sent by user")
 assert(ss[2].user, "signal sent by user")
+assert(ss[1].pid == S.getpid(), "signal sent by my pid")
+assert(ss[2].pid == S.getpid(), "signal sent by my pid")
 assert(fd:close())
 
 local sv = assert(S.socketpair("unix", "stream"))
@@ -619,7 +621,13 @@ local s = assert(S.socketpair("unix", "stream, nonblock"))
 local fd = assert(S.open(tmpfile, "rdwr, creat", "IRWXU"))
 assert(S.unlink(tmpfile))
 
------ TODO
+local str = "this is a test string"
+n = assert(fd:write(str))
+assert(n == #str)
+
+--n = assert(s[1]:write(str))
+--assert(n == #str)
+n = assert(S.splice(fd, 0, p[2], nil, #str, "nonblock"))
 
 
 assert(fd:close())
