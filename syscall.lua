@@ -3,9 +3,6 @@ local bit = require "bit"
 
 local C = ffi.C
 
-local rt
-if pcall(function () rt = ffi.load("rt") end) then end
-
 -- note should wrap more conditionals around stuff that might not be there
 -- possibly generate more of this from C program, depending on where it differs.
 
@@ -2225,7 +2222,9 @@ function S.pipe(flags)
 end
 
 function S.close(fd)
-  local ret = C.close(getfd(fd))
+  local afd = getfd(fd)
+  if afd == -1 then return true end -- already closed
+  local ret = C.close(afd)
   if ret == -1 then
     local errno = ffi.errno()
     if istype(fd_t, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
@@ -2457,17 +2456,18 @@ end
 
 function S.chroot(path) return retbool(C.chroot(path)) end
 
-function S.getcwd(buf, size)
-  local ret = C.getcwd(buf, size or 0)
-  if not buf then -- Linux will allocate buffer here, return Lua string and free
-    if ret == nil then return errorret() end
-    local s = ffi.string(ret) -- guaranteed to be zero terminated if no error
-    C.free(ret)
-    return s
-  end
-  -- user allocated buffer
-  if ret == nil then return errorret() end
-  return true -- no point returning the pointer as it is just the passed buffer
+function S.getcwd()
+  local size = 64
+  local buf
+  repeat
+    buf = buffer_t(size)
+    local ret = C.getcwd(buf, size)
+    if not ret then 
+      local errno = ffi.errno()
+      if errno == S.E.RANGE then size = size * 2 else return errorret(errno) end
+    end
+  until ret
+  return ffi.string(buf)
 end
 
 function S.nanosleep(req) -- construct timespec if given two args, or table
@@ -3105,24 +3105,21 @@ function S.adjtimex(t)
   return r
 end
 
-if rt then -- real time functions not in glibc in Linux, check if available. N/A on OSX.
-  function S.clock_getres(clk_id, ts)
-    ts = getts(ts)
-    local ret = rt.clock_getres(stringflag(clk_id, "CLOCK_"), ts)
-    if ret == -1 then return errorret() end
-    return ts
-  end
-
-  function S.clock_gettime(clk_id, ts)
-    ts = getts(ts)
-    --local ret = C.syscall(S.SYS_clock_gettime, stringflag(clk_id, "CLOCK_"), ts) -- TODO fix syscall
-    local ret = rt.clock_gettime(stringflag(clk_id, "CLOCK_"), ts)
-    if ret == -1 then return errorret() end
-    return ts
-  end
-
-  function S.clock_settime(clk_id, ts) return retbool(rt.clock_settime(stringflag(clk_id, "CLOCK_"), getts(ts))) end
+function S.clock_getres(clk_id, ts)
+  ts = getts(ts)
+  local ret = C.syscall(S.SYS_clock_getres, stringflag(clk_id, "CLOCK_"), ts)
+  if ret == -1 then return errorret() end
+  return ts
 end
+
+function S.clock_gettime(clk_id, ts)
+  ts = getts(ts)
+  local ret = C.syscall(S.SYS_clock_gettime, stringflag(clk_id, "CLOCK_"), ts)
+  if ret == -1 then return errorret() end
+  return ts
+end
+
+function S.clock_settime(clk_id, ts) return retbool(C.syscall(S.SYS_clock_settime, stringflag(clk_id, "CLOCK_"), getts(ts))) end
 
 -- straight passthroughs, as no failure possible
 S.getuid = C.getuid

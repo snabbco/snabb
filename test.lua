@@ -160,8 +160,6 @@ assert(S.chdir("/"))
 fd = assert(S.open("/"))
 assert(fd:fchdir())
 
-assert(S.getcwd(buf, size))
-assert(S.string(buf) == "/", "expect cwd to be /")
 local nd = assert(S.getcwd())
 assert(nd == "/", "expect cwd to be /")
 
@@ -211,22 +209,19 @@ assert(S.signal("alrm", "ign"))
 assert(S.alarm(10)) -- will actually ignore signal so nothing happens, set to 10 so does not interrupt anything
 
 -- mmap and related functions
-local mem, mem2
+local mem
 size = 4096
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 assert(S.munmap(mem, size))
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 assert(S.msync(mem, size, "sync"))
 assert(S.madvise(mem, size, "random"))
-mem = nil -- gc memory, should be munmapped
-collectgarbage("collect")
+assert(S.munmap(mem, size))
 
 local size2 = size * 2
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-S.nogc(mem)
-mem2 = assert(S.mremap(mem, size, size2, "maymove"))
-mem = nil
-assert(S.munmap(mem2, size2))
+mem = assert(S.mremap(mem, size, size2, "maymove"))
+assert(S.munmap(mem, size2))
 
 local mask
 mask = S.umask("IWGRP, IWOTH")
@@ -447,6 +442,7 @@ if s then
   assert(s:close())
 else assert(err.EAFNOSUPPORT, err) end -- ok to not have ipv6 in kernel
 
+
 -- fork and related methods
 local pid, pid0, w
 pid0 = S.getpid()
@@ -501,6 +497,11 @@ else -- parent
   assert(w.EXITSTATUS == 0, "exit should be 0")
   assert(S.unlink(efile))
 end
+
+
+print("in")
+collectgarbage("collect")
+print("out")
 
 n = assert(S.getpriority("process"))
 assert (n == 0, "process should start at priority 0")
