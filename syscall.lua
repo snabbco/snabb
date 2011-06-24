@@ -872,7 +872,7 @@ elseif arch == "x64" then
   S.SYS_clock_gettime    = 228
   S.SYS_clock_getres     = 229
   S.SYS_clock_nanosleep  = 230
-elseif arch == "arm" and ffi.abi("eabi")
+elseif arch == "arm" and ffi.abi("eabi") then
   S.SYS_getdents = 141
   S.SYS_clock_settime    = 262
   S.SYS_clock_gettime    = 263
@@ -1061,7 +1061,7 @@ end
 
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
-local errorret, retint, retnum, retbool, retptr, retfd, getfd
+local errorret, retint, retnum, retbool, retptr, retfd, getfd, getts
 
 -- standard error return
 function errorret(errno)
@@ -1846,6 +1846,14 @@ local timespec_t = ffi.metatype("struct timespec", {
   __index = {tonumber = function(ts) return tonumber(ts.tv_sec) + tonumber(ts.tv_nsec) / 1000000000 end}
 })
 
+function getts(ts) -- get a timespec eg from a number
+  if not ts then return timespec_t() end
+  if istype(timespec_t, ts) then return ts end
+  if type(req) == "table" then req = timespec_t(req) end
+  local i, f = math.modf(ts)
+  return timespec_t(i, math.floor(f * 1000000000))
+end
+
 local timeval_t = ffi.metatype("struct timeval", {
   __index = {tonumber = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end}
 })
@@ -1971,9 +1979,10 @@ function trim (s)
 end
 -- take a bunch of flags in a string and return a number
 -- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
+-- also forcing to return an int now - TODO find all the 64 bit flags we are using and fix to use new function
 local stringflag, stringflags
 function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags that are ORed
-  if not str then return 0 end
+  if not str then return int_t(0) end
   if type(str) ~= "string" then return str end
   local f = 0
   local a = split(",", str)
@@ -1991,17 +2000,17 @@ function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags th
     if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
   end
-  return f
+  return int_t(f)
 end
 function stringflag(str, prefix) -- single value only
-  if not str then return 0 end
+  if not str then return int_t(0) end
   if type(str) ~= "string" then return str end
-  if #str == 0 then return 0 end
+  if #str == 0 then return int_t(0) end
   local s = trim(str)
   if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
   local val = S[s:upper()]
   if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions, better than silent ignore
-  return val
+  return int_t(val)
 end
 
 -- reverse flag operations
@@ -2462,11 +2471,7 @@ function S.getcwd(buf, size)
 end
 
 function S.nanosleep(req) -- construct timespec if given two args, or table
-  if type(req) == "table" then req = timespec_t(req)
-  elseif type(req) == "number" then
-    local i, f = math.modf(req)
-    req = timespec_t(i, math.floor(f * 1000000000))
-  end
+  req = getts(req)
   local rem = timespec_t()
   local ret = C.nanosleep(req, rem)
   if ret == -1 then return errorret() end
@@ -3046,10 +3051,11 @@ prctlpint[S.PR_GET_UNALIGN] = true
 function S.prctl(option, arg2, arg3, arg4, arg5)
   local i, name
   option = stringflag(option, "PR_") -- actually not all PR_ prefixed options ok some are for other args, could be more specific
-  local m = prctlmap[option]
+  noption = tonumber(option)
+  local m = prctlmap[noption]
   if m then arg2 = stringflag(arg2, m) end
   if option == S.PR_MCE_KILL and arg2 == S.PR_MCE_KILL_SET then arg3 = stringflag(arg3, "PR_MCE_KILL_")
-  elseif prctlpint[option] then
+  elseif prctlpint[noption] then
     i = int1_t()
     arg2 = cast(ulong_t, i)
   elseif option == S.PR_GET_NAME then
@@ -3060,8 +3066,8 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
   end
   local ret = C.prctl(option, arg2 or 0, arg3 or 0, arg4 or 0, arg5 or 0)
   if ret == -1 then return errorret() end
-  if prctlrint[option] then return ret end
-  if prctlpint[option] then return i[0] end
+  if prctlrint[noption] then return ret end
+  if prctlpint[noption] then return i[0] end
   if option == S.PR_GET_NAME then
     if name[15] ~= 0 then return ffi.string(name, 16) end -- actually, 15 bytes seems to be longest, aways 0 terminated
     return ffi.string(name)
@@ -3101,20 +3107,21 @@ end
 
 if rt then -- real time functions not in glibc in Linux, check if available. N/A on OSX.
   function S.clock_getres(clk_id, ts)
-    if not ts then ts = timespec_t() end
+    ts = getts(ts)
     local ret = rt.clock_getres(stringflag(clk_id, "CLOCK_"), ts)
     if ret == -1 then return errorret() end
     return ts
   end
 
   function S.clock_gettime(clk_id, ts)
-    if not ts then ts = timespec_t() end
+    ts = getts(ts)
+    --local ret = C.syscall(S.SYS_clock_gettime, stringflag(clk_id, "CLOCK_"), ts) -- TODO fix syscall
     local ret = rt.clock_gettime(stringflag(clk_id, "CLOCK_"), ts)
     if ret == -1 then return errorret() end
     return ts
   end
 
-  function S.clock_settime(clk_id, ts) return retbool(rt.clock_settime(stringflag(clk_id, "CLOCK_"), ts)) end
+  function S.clock_settime(clk_id, ts) return retbool(rt.clock_settime(stringflag(clk_id, "CLOCK_"), getts(ts))) end
 end
 
 -- straight passthroughs, as no failure possible
