@@ -2246,7 +2246,6 @@ function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.access(pathname, mode) return retbool(C.access(pathname, mode)) end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, stringflags(mode, "S_"))) end
-
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.acct(filename) return retbool(C.acct(filename)) end

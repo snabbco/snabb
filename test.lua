@@ -1,6 +1,9 @@
 local S = require "syscall"
 
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
+local teststring = "this is a test string"
+local size = 512
+local buf = S.t.buffer(size)
 
 local oldassert = assert
 function assert(c, s)
@@ -50,17 +53,14 @@ assert(err.badf, "expect EBADF from invalid numberic fd")
 
 assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
 
-local size = 128
-local buf = S.t.buffer(size) -- allocate buffer for read
-
 for i = 0, size - 1 do buf[i] = 255 end -- make sure overwritten
 -- test read
 n = assert(fd2:read(buf, size))
 assert(n >= 0, "should not get error reading from /dev/zero")
 assert(n == size, "should not get truncated read from /dev/zero") -- technically allowed!
 for i = 0, size - 1 do assert(buf[i] == 0, "should read zero bytes from /dev/zero") end
-local string = assert(fd2:read(nil, 10)) -- test read to string
-assert(#string == 10, "string returned from read should be length 10")
+local str = assert(fd2:read(nil, 10)) -- test read to string
+assert(#str == 10, "string returned from read should be length 10")
 -- test writing to read only file fails
 n, err = fd2:write(buf, size)
 assert(err, "should not be able to write to file opened read only")
@@ -92,9 +92,8 @@ n = assert(fd:write(buf, size))
 assert(n >= 0, "should not get error writing to /dev/zero")
 assert(n == size, "should not get truncated write to /dev/zero") -- technically allowed!
 
-local string = "test string"
-n = assert(fd:write(string)) -- should be able to write a string, length is automatic
-assert(n == #string, "write on a string should write out its length")
+n = assert(fd:write(teststring)) -- should be able to write a string, length is automatic
+assert(n == #teststring, "write on a string should write out its length")
 
 local offset = 1
 n = assert(fd:pread(buf, size, offset))
@@ -145,9 +144,9 @@ fd, err = S.open(tmpfile, "RDWR")
 assert(err, "expected open to fail on file not found")
 
 -- test readfile, writefile
-assert(S.writefile(tmpfile, "this is a string", "IRWXU"))
+assert(S.writefile(tmpfile, teststring, "IRWXU"))
 local ss = assert(S.readfile(tmpfile))
-assert(ss == "this is a string", "readfile should get back what writefile wrote")
+assert(ss == teststring, "readfile should get back what writefile wrote")
 assert(S.unlink(tmpfile))
 
 fd = assert(S.pipe())
@@ -187,10 +186,9 @@ stat = assert(S.lstat("/etc/passwd"))
 assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
 
 -- test truncate
-local ss = "this is a string"
-assert(S.writefile(tmpfile, ss, "IRWXU"))
+assert(S.writefile(tmpfile, teststring, "IRWXU"))
 stat = assert(S.stat(tmpfile))
-assert(stat.st_size == #ss, "expect to get size of written string")
+assert(stat.st_size == #teststring, "expect to get size of written string")
 assert(S.truncate(tmpfile, 1))
 stat = assert(S.stat(tmpfile))
 assert(stat.st_size == 1, "expect get truncated size")
@@ -285,18 +283,22 @@ assert(ba.addr.sin_family == 2, "expect ipv4 connection")
 assert(S.inet_ntoa(ba.ipv4) == "127.0.0.1", "expect peer on localhost")
 assert(ba.ipv4.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
 
-n = assert(c:send(string))
-assert(n == #string, "should be able to write out short string")
+n = assert(c:send(teststring))
+assert(n == #teststring, "should be able to write out short string")
 n = assert(a.fd:read(buf, size))
-assert(n == #string, "should read back string into buffer")
-assert(S.string(buf, n) == string, "we should read back the same string that was sent")
+assert(n == #teststring, "should read back string into buffer")
+assert(S.string(buf, n) == teststring, "we should read back the same string that was sent")
 
 -- test scatter gather
-local b0 = S.t.buffer(4, "test")
-local b1 = S.t.buffer(3, "ing")
+local b0 = S.t.buffer(4)
+local b1 = S.t.buffer(3)
+S.copy(b0, "test", 4) -- string init adds trailing 0 byte
+S.copy(b1, "ing", 3)
+
 local iov = S.t.iovec(2, {{b0, 4}, {b1, 3}})
 n = assert(c:writev(iov, 2))
 assert(n == 7, "expect writev to write 7 bytes")
+
 b0 = S.t.buffer(3)
 b1 = S.t.buffer(4)
 iov = S.t.iovec(2, {{b0, 3}, {b1, 4}})
@@ -362,10 +364,6 @@ assert(S.kill(S.getpid(), "winch")) -- should be blocked but pending
 local p = assert(S.sigpending())
 assert(p.winch, "expect pending winch")
 
-print("gc")
-collectgarbage("collect")
-
-
 -- assert(S.sigsuspend(m)) -- we cannot test this without being able to set a signal handler
 
 -- signalfd. Useful as we cannot set real signal handlers. And it is a nice interface, as can mix with events.
@@ -395,7 +393,7 @@ assert(ep:epoll_ctl("add", c, "in, err, hup")) -- actually dont need to set err,
 local r = assert(ep:epoll_wait())
 assert(#r == 0, "no events yet")
 
-n = assert(s:write(string))
+n = assert(s:write(teststring))
 
 sel = assert(S.select{readfds = {c, s}, timeout = {0, 0}})
 
@@ -421,7 +419,7 @@ assert(c:bind(sa))
 local bca = c:getsockname().addr -- find bound address
 local serverport = s:getsockname().port -- find bound port
 
-n = assert(s:sendto(string, nil, 0, bca))
+n = assert(s:sendto(teststring, nil, 0, bca))
 
 local f = c:recvfrom(buf, size) -- do not test as drops data!
 
@@ -438,9 +436,9 @@ if s then
   assert(c:bind(sa))
   local bca = c:getsockname().addr -- find bound address
   local serverport = s:getsockname().port -- find bound port
-  n = assert(s:sendto(string, nil, 0, bca))
+  n = assert(s:sendto(teststring, nil, 0, bca))
   local f = assert(c:recvfrom(buf, size))
-  assert(f.count == #string, "should get the whole string back")
+  assert(f.count == #teststring, "should get the whole string back")
   assert(f.port == serverport, "should be able to get server port in recvfrom")
   assert(c:close())
   assert(s:close())
@@ -587,7 +585,6 @@ assert(n == "test", "name should be as set")
 n = assert(S.readfile("/proc/self/comm"))
 assert(n == "test\n", "comm should be as set")
 
---[[
 oldcmd = assert(S.readfile("/proc/self/cmdline"))
 assert(S.setcmdline("test"))
 n = assert(S.readfile("/proc/self/cmdline"))
@@ -605,7 +602,6 @@ assert(S.setenv("XXXXYYYYZZZZZZZZ", "test"))
 assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env vars")
 assert(S.unsetenv("XXXXYYYYZZZZZZZZ"))
 assert(S.environ().XXXXYYYYZZZZZZZZ == nil, "expect to be able to unset env vars")
-]]
 
 -- test inotify, Linux only
 assert(S.mkdir(tmpfile, "IRWXU")) -- do in directory so ok to run in parallel
@@ -635,14 +631,12 @@ assert(S.chdir(".."))
 assert(S.rmdir(tmpfile))
 
 -- tee, splice, vmsplice Linux only
---[[
 local p = assert(S.pipe("nonblock"))
 local pp = assert(S.pipe("nonblock"))
 local s = assert(S.socketpair("unix", "stream, nonblock"))
 local fd = assert(S.open(tmpfile, "rdwr, creat", "IRWXU"))
 assert(S.unlink(tmpfile))
 
-local str = "this is a test string"
 n = assert(fd:write(str))
 assert(n == #str)
 
@@ -664,10 +658,10 @@ assert(n == #str)
 n = assert(s[2]:read())
 assert(#n == #str)
 
-local buf = S.t.buffer(#str)
-S.copy(buf, str, #str)
+local buf2 = S.t.buffer(#str)
+S.copy(buf2, str, #str)
 
-n = assert(S.vmsplice(p[2], S.t.iovec(1, {{buf, #str}}), 1, "nonblock")) -- write our memory into pipe
+n = assert(S.vmsplice(p[2], S.t.iovec(1, {{buf2, #str}}), 1, "nonblock")) -- write our memory into pipe
 assert(n == #str)
 
 n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice out to socket
@@ -681,7 +675,7 @@ assert(p[1]:close())
 assert(p[2]:close())
 assert(s[1]:close())
 assert(s[2]:close())
-]]
+
 local t = assert(S.adjtimex())
 
 local r = assert(S.getrlimit("nofile"))
