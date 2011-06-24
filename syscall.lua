@@ -1101,6 +1101,7 @@ function getfd(fd)
     if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
     if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
   end
+  return nil
 end
 
 function retfd(ret)
@@ -1976,7 +1977,7 @@ function trim (s)
 end
 -- take a bunch of flags in a string and return a number
 -- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
--- also forcing to return an int now - TODO find all the 64 bit flags we are using and fix to use new function
+-- also forcing to return an int now - TODO find any 64 bit flags we are using and fix to use new function
 local stringflag, stringflags
 function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags that are ORed
   if not str then return int_t(0) end
@@ -2245,6 +2246,7 @@ function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.access(pathname, mode) return retbool(C.access(pathname, mode)) end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, stringflags(mode, "S_"))) end
+
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.acct(filename) return retbool(C.acct(filename)) end
@@ -2817,10 +2819,7 @@ end
 function S.sigsuspend(mask) return retbool(C.sigsuspend(mksigset(mask))) end
 
 function signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
-  if fd then fd = getfd(fd) else fd = -1 end
-  set = mksigset(set)
-  flags = stringflags(flags, "SFD_")
-  return retfd(C.signalfd(fd, set, flags))
+  return retfd(C.signalfd(getfd(fd) or -1, mksigset(set), stringflags(flags, "SFD_")))
 end
 
 function S.select(s) -- note same structure as returned
@@ -3093,9 +3092,9 @@ end
 
 function S.adjtimex(t)
   if not t then t = timex_t() end
-  if type(t) == 'table' then
-    if t.modes then t.modes = stringflags(t.modes, "ADJ_") end
-    if t.status then t.status = stringflags(t.status, "STA_") end
+  if type(t) == 'table' then  -- TODO pull this out to general initialiser for timex_t
+    if t.modes then t.modes = tonumber(stringflags(t.modes, "ADJ_")) end
+    if t.status then t.status = tonumber(stringflags(t.status, "STA_")) end
     t = timex_t(t)
   end
   local ret = C.adjtimex(t)
