@@ -3,9 +3,6 @@ local bit = require "bit"
 
 local C = ffi.C
 
--- note should wrap more conditionals around stuff that might not be there
--- possibly generate more of this from C program, depending on where it differs.
-
 local S = {} -- exported functions
 
 local octal = function (s) return tonumber(s, 8) end
@@ -17,9 +14,10 @@ local istype = ffi.istype
 local arch = ffi.arch
 local typeof = ffi.typeof
 
-S.string = ffi.string -- convenience for converting buffers
-S.sizeof = sizeof -- convenience so user need not require ffi
-S.cast = cast -- convenience so user need not require ffi
+-- convenience so user need not require ffi
+S.string = ffi.string
+S.sizeof = sizeof
+S.cast = cast
 S.copy = ffi.copy
 
 -- open, fcntl
@@ -498,6 +496,12 @@ S.RLIMIT_MSGQUEUE = 12
 S.RLIMIT_NICE = 13
 S.RLIMIT_RTPRIO = 14
 S.RLIMIT_NLIMITS = 15
+
+-- timerfd
+S.TFD_CLOEXEC = octal("02000000")
+S.TFD_NONBLOCK = octal("04000")
+
+S.TFD_TIMER_ABSTIME = 1
 
 -- epoll
 S.EPOLL_CLOEXEC = octal("02000000")
@@ -1176,6 +1180,10 @@ struct timespec {
   time_t tv_sec;        /* seconds */
   long   tv_nsec;       /* nanoseconds */
 };
+struct itimerspec {
+  struct timespec it_interval;
+  struct timespec it_value;
+};
 // for uname.
 struct utsname {
   char sysname[_UTSNAME_LENGTH];
@@ -1669,6 +1677,9 @@ int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 int sigpending(sigset_t *set);
 int sigsuspend(const sigset_t *mask);
 int signalfd(int fd, const sigset_t *mask, int flags);
+int timerfd_create(int clockid, int flags);
+int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value);
+int timerfd_gettime(int fd, struct itimerspec *curr_value);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -1836,6 +1847,7 @@ local fdb_entry_t = typeof("struct fdb_entry")
 local fdb_entry_pt = typeof("struct fdb_entry *")
 local signalfd_siginfo_t = typeof("struct signalfd_siginfo")
 local signalfd_siginfo_pt = typeof("struct signalfd_siginfo *")
+local itimerspec_t = typeof("struct itimerspec")
 
 S.RLIM_INFINITY = cast("rlim_t", -1)
 
@@ -1928,6 +1940,7 @@ local int1_t = typeof("int[1]") -- used to pass pointer to int
 local int2_t = typeof("int[2]") -- pair of ints, eg for pipe
 local ints_t = typeof("int[?]") -- array of ints
 local int64_t = typeof("int64_t")
+local int64_pt = typeof("int64_t *")
 local uint64_t = typeof("uint64_t")
 local int32_pt = typeof("int32_t *")
 local int64_1t = typeof("int64_t[1]")
@@ -3016,6 +3029,38 @@ function S.signalfd_read(fd, buffer, len)
   return ss
 end
 
+function S.timerfd_create(clockid, flags)
+  return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
+end
+
+function getitimer(interval, value)
+  if istype(itimerspec_t, interval) then return interval end
+  return itimerspec_t(getts(interval), getts(value))
+end
+
+function S.timerfd_settime(fd, flags, interval, value)
+  local oldtime = itimerspec_t()
+  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), getitimer(interval, value), oldtime)
+  if ret == -1 then return errorret() end
+  return oldtime
+end
+
+function S.timerfd_gettime(fd, curr_value)
+  if not curr_value then curr_value = itimerspec_t() end
+  local ret = C.timerfd_gettime(getfd(fd), curr_value)
+  return curr_value
+end
+
+function S.timerfd_read(fd, buffer, size)
+  if not size then size = 8 end -- only sensible size!
+  if not buffer then buffer = buffer_t(size) end
+  local ret, err = S.read(fd, buffer, size)
+  if not ret and err.EAGAIN then return 0 end -- will never actually return 0
+  if not ret then return nil, err end
+  local i = cast(int64_pt, buffer)
+  return tonumber(i[0])
+end
+
 -- map for valid options for arg2
 local prctlmap = {}
 prctlmap[S.PR_CAPBSET_READ] = "CAP_"
@@ -3507,6 +3552,15 @@ function S.nonblock(s)
   return true
 end
 
+function S.block(s)
+  local fl, err = s:fcntl(S.F_GETFL)
+  if not fl then return nil, err end
+  fl, err = s:fcntl(S.F_SETFL, bit.band(fl, bit.bnot(S.O_NONBLOCK)))
+  if not fl then return nil, err end
+  return true
+end
+
+
 -- TODO fix short reads, add a loop
 function S.readfile(name, buffer, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
   local f, err = S.open(name, S.O_RDONLY)
@@ -3705,7 +3759,7 @@ function S.tbuffer(...) -- helper function for sequence of types in a buffer
 end
 
 -- methods on an fd
-local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
+local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    'close', 'dup', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
@@ -3714,7 +3768,7 @@ local fdmethods = {'nogc', 'nonblock', 'sendfds', 'sendcred',
                    'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
                    'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee',
-                   'signalfd_read'
+                   'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end

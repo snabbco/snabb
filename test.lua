@@ -559,6 +559,24 @@ assert(n == 0, "eventfd should return 0 again")
 
 assert(fd:close())
 
+-- timerfd, Linux only
+fd = assert(S.timerfd_create("monotonic", "nonblock, cloexec"))
+
+n = assert(fd:timerfd_read())
+assert(n == 0, "no timer events yet")
+
+assert(fd:block())
+
+local o = assert(fd:timerfd_settime(nil, 0, 0.000001))
+
+--assert(tonumber(o.it_interval) == 0 and tonumber(o.it_value) == 0, "old timer values zero") -- needs metamethods
+
+n = assert(fd:timerfd_read())
+assert(n == 1, "should have exactly one timer expiry")
+
+assert(fd:close())
+
+
 local syslog = assert(S.klogctl(3))
 assert(#syslog > 20, "should be something in syslog")
 
