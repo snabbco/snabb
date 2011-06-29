@@ -2505,12 +2505,12 @@ function S.getcwd()
   return ffi.string(buf)
 end
 
-function S.nanosleep(req) -- construct timespec if given two args, or table
+function S.nanosleep(req)
   req = getts(req)
   local rem = timespec_t()
   local ret = C.nanosleep(req, rem)
   if ret == -1 then return errorret() end
-  return rem -- return second argument, Lua style
+  return rem
 end
 
 function S.sleep(sec) -- standard libc function

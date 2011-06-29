@@ -14,12 +14,12 @@ Unfinished! Some syscalls missing, work in progress! Let me know if you need som
 
 No support for 64 bit file operations on a 32 bit system yet. 
 
-### System calls (131)
+### System calls (134)
 
 open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname, gethostname, sethostname, getuid, geteuid, getpid, getppid, getgid, getegid, fork, execve, wait, waitpid, _exit, signal, gettimeofday, settimeofday, time, clock_getres, clock_gettime, clock_settime, sysinfo, read, write, pread, pwrite, lseek, send, sendto, sendmsg, recv, recvfrom, recvmsg, readv, writev, getsockopt, setsockopt, select, epoll_create, epoll_ctl, epoll_wait, sendfile, dup, fchdir, fsync, fdatasync, fcntl, fchmod, socket, socketpair, bind, listen, connect, accept, getsockname, getpeername, mmap, munmap, msync, mlock, munlock, mlockall, munlockall, mremap, madvise, pipe, access, getcwd, nanosleep, syscall, stat, fstat, lstat, ioctl, eventfd, truncate, ftruncate, pause, reboot, sync, shutdown, ksyslogctl, mount, umount,
 nice, getpriority, setpriority, prctl, alarm, waitid, inotify_init, inotify_add_watch, inotify_rm_watch, adjtimex, getrlimit, setrlimit, sigprocmask, sigpending,
 sigsuspend, getsid, setsid, listxattr, llistxattr, flistxattr, setxattr, lsetxattr, fsetxattr, getxattr, lgetxattr, fgetxattr, removexattr, lremovexattr, fremovexattr,
-readlink, splice, vmsplice, tee, signalfd, timerfd_create, timerfd_settime, timerfd_gettime
+readlink, splice, vmsplice, tee, signalfd, timerfd_create, timerfd_settime, timerfd_gettime, posix_fadvise, fallocate, readahead
 
 ### Other functions
 
@@ -93,7 +93,7 @@ faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue
 io_cancel(2), io_destroy(2), io_setup(2), io_submit(2), ...
-readahead, sync_file_range(2)
+sync_file_range(2)
 ...
 
 ### Testing
