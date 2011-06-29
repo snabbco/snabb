@@ -84,7 +84,7 @@ Also need more support for dealing with signals on syscalls.
 
 buffer_t could take string as initialiser, would have to be function.
 
-itimerspec should have some metamethods to get numberic times out of it.
+itimerspec should have some metamethods to get numeric times out of it.
 
 ### Missing functions
 

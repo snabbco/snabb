@@ -548,6 +548,19 @@ S.SPLICE_F_NONBLOCK     = 2
 S.SPLICE_F_MORE         = 4
 S.SPLICE_F_GIFT         = 8
 
+-- aio
+S.IOCB_CMD_PREAD = 0
+S.IOCB_CMD_PWRITE = 1
+S.IOCB_CMD_FSYNC = 2
+S.IOCB_CMD_FDSYNC = 3
+--S.IOCB_CMD_PREADX = 4
+--S.IOCB_CMD_POLL = 5
+S.IOCB_CMD_NOOP = 6
+S.IOCB_CMD_PREADV = 7
+S.IOCB_CMD_PWRITEV = 8
+
+S.IOCB_FLAG_RESFD = 1
+
 -- file types in directory
 S.DT_UNKNOWN = 0
 S.DT_FIFO = 1
@@ -1176,6 +1189,7 @@ typedef long clock_t;
 typedef unsigned long ino_t;
 typedef unsigned long nlink_t;
 typedef unsigned long rlim_t;
+typedef unsigned long aio_context_t;
 
 // should be a word, but we use 32 bits as bitops are signed 32 bit in LuaJIT at the moment
 typedef int32_t fd_mask;
@@ -1644,6 +1658,51 @@ struct linux_stat {
 ]]
 end
 
+-- endian dependent
+if ffi.abi("le") then
+ffi.cdef[[
+struct iocb {
+  uint64_t   aio_data;
+  uint32_t   aio_key, aio_reserved1
+
+  uint16_t   aio_lio_opcode;
+  int16_t    aio_reqprio;
+  uint32_t   aio_fildes;
+
+  uint64_t   aio_buf;
+  uint64_t   aio_nbytes;
+  int64_t    aio_offset;
+
+  uint64_t   aio_reserved2;
+
+  uint32_t   aio_flags;
+
+  uint32_t   aio_resfd;
+};
+]]
+else
+ffi.cdef[[
+struct iocb {
+  uint64_t   aio_data;
+  uint32_t   aio_reserved1, aio_key
+
+  uint16_t   aio_lio_opcode;
+  int16_t    aio_reqprio;
+  uint32_t   aio_fildes;
+
+  uint64_t   aio_buf;
+  uint64_t   aio_nbytes;
+  int64_t    aio_offset;
+
+  uint64_t   aio_reserved2;
+
+  uint32_t   aio_flags;
+
+  uint32_t   aio_resfd;
+};
+]]
+end
+
 -- shared code
 ffi.cdef[[
 int close(int fd);
@@ -1815,10 +1874,6 @@ int inet_pton(int af, const char *src, void *dst);
 const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 
 // functions from libc that could be exported as a convenience, used internally
-void *calloc(size_t nmemb, size_t size);
-void *malloc(size_t size);
-void free(void *ptr);
-void *realloc(void *ptr, size_t size);
 char *strerror(int);
 // env. dont support putenv, as does not copy which is an issue
 extern char **environ;
