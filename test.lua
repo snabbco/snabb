@@ -226,6 +226,10 @@ mask = S.umask("IWGRP, IWOTH")
 mask = S.umask("IWGRP, IWOTH")
 assert(mask == S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
 
+fd = assert(S.open("/dev/zero", "rdonly"))
+assert(fd:posix_fadvise("random"))
+assert(fd:close())
+
 -- sockets
 
 assert(S.sizeof(S.t.sockaddr) == S.sizeof(S.t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr

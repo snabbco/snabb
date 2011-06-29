@@ -55,6 +55,8 @@ uname returns a Lua table with the returned strings in it. Similarly getdents re
 
 The test cases are good examples until I do better documentation!
 
+A few functions have arguments in a different order to make optional ones easier. This is a bit confusing, so avoid in general (always?)
+
 ### Issues
 
 LuaJIT FFI cannot yet create callbacks. This causes issues in a few places, we cannot set a signal handler to be a Lua function, or use clone. This means some functions cannot yet usefully be implemented: sigaction (you can use signal just to set ignore, default behaviour), clone, getitimer/setitimer. Note you can use signalfd for signals instead. Can probably implement clone using a different Lua state, amd timers can be used with signalfd, so should be able to fix this.
@@ -91,6 +93,7 @@ faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue
 io_cancel(2), io_destroy(2), io_setup(2), io_submit(2), ...
+readahead, sync_file_range(2), posix_fallocate(3)
 ...
 
 ### Testing
