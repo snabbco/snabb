@@ -226,8 +226,11 @@ mask = S.umask("IWGRP, IWOTH")
 mask = S.umask("IWGRP, IWOTH")
 assert(mask == S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
 
-fd = assert(S.open("/dev/zero", "rdonly"))
+fd = assert(S.creat(tmpfile, "IRWXU"))
+assert(S.unlink(tmpfile))
 assert(fd:posix_fadvise("random"))
+assert(fd:fallocate("keep_size", 0, 4096))
+assert(fd:posix_fallocate(0, 8192))
 assert(fd:close())
 
 -- sockets
