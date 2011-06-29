@@ -892,19 +892,34 @@ S.PR_SET_PTRACER   = 0x59616d61 -- Ubuntu extension
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
 if arch == "x86" then
-  S.SYS_getdents = 141
+  S.SYS_getdents         = 141
+  S.SYS_io_setup         = 245
+  S.SYS_io_destroy       = 246
+  S.SYS_io_getevents     = 247
+  S.SYS_io_submit        = 248
+  S.SYS_io_cancel        = 249
   S.SYS_clock_settime    = 264
   S.SYS_clock_gettime    = 265
   S.SYS_clock_getres     = 266
   S.SYS_clock_nanosleep  = 267
 elseif arch == "x64" then
-  S.SYS_getdents = 78
+  S.SYS_getdents         = 78
+  S.SYS_io_setup         = 206
+  S.SYS_io_destroy       = 207
+  S.SYS_io_getevents     = 208
+  S.SYS_io_submit        = 209
+  S.SYS_io_cancel        = 210
   S.SYS_clock_settime    = 227
   S.SYS_clock_gettime    = 228
   S.SYS_clock_getres     = 229
   S.SYS_clock_nanosleep  = 230
 elseif arch == "arm" and ffi.abi("eabi") then
-  S.SYS_getdents = 141
+  S.SYS_getdents         = 141
+  S.SYS_io_setup         = 243
+  S.SYS_io_destroy       = 244
+  S.SYS_io_getevents     = 245
+  S.SYS_io_submit        = 246
+  S.SYS_io_cancel        = 247
   S.SYS_clock_settime    = 262
   S.SYS_clock_gettime    = 263
   S.SYS_clock_getres     = 264
@@ -1496,6 +1511,12 @@ struct signalfd_siginfo {
   uint64_t ssi_addr;
   uint8_t __pad[48];
 };
+struct io_event {
+  uint64_t           data;
+  uint64_t           obj;
+  int64_t            res;
+  int64_t            res2;
+};
 ]]
 
 -- Linux struct siginfo padding depends on architecture
@@ -1663,7 +1684,7 @@ if ffi.abi("le") then
 ffi.cdef[[
 struct iocb {
   uint64_t   aio_data;
-  uint32_t   aio_key, aio_reserved1
+  uint32_t   aio_key, aio_reserved1;
 
   uint16_t   aio_lio_opcode;
   int16_t    aio_reqprio;
@@ -1684,7 +1705,7 @@ else
 ffi.cdef[[
 struct iocb {
   uint64_t   aio_data;
-  uint32_t   aio_reserved1, aio_key
+  uint32_t   aio_reserved1, aio_key;
 
   uint16_t   aio_lio_opcode;
   int16_t    aio_reqprio;
@@ -2025,6 +2046,9 @@ local socklen1_t = typeof("socklen_t[1]")
 local ulong_t = typeof("unsigned long")
 local loff_t = typeof("loff_t")
 local loff_1t = typeof("loff_t[1]")
+
+local aio_context_t
+local aio_context_1t = typeof("aio_context_t[1]")
 
 local string_array_t = typeof("const char *[?]")
 
@@ -3146,6 +3170,22 @@ function S.timerfd_read(fd, buffer, size)
   local i = cast(int64_pt, buffer)
   return tonumber(i[0])
 end
+
+-- aio functions
+function S.io_setup(nr_events)
+  local ctxp = aio_context_1t()
+  local ret = C.syscall(S.SYS_io_setup, cast(uint_t, nr_events), ctxp)
+  if ret == -1 then return errorret() end
+  return aio_context_t(ctxp[0])
+end
+
+function S.io_destroy(ctx)
+  return retbool(C.syscall(S.SYS_io_destroy, ctx.ctx))
+end
+
+local ameth = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel}
+aio_context_t = ffi.metatype("struct {aio_context_t ctx;}", {__index = ameth, __gc = S.io_destroy})
+
 
 -- map for valid options for arg2
 local prctlmap = {}

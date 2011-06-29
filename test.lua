@@ -774,8 +774,15 @@ assert(S.unlink(tmpfile))
 
 local b = assert(S.bridge_list())
 
-
-
+-- aio, Linux only
+local ctx = assert(S.io_setup(8))
+assert(ctx:destroy())
+local ctx = assert(S.io_setup(8))
+local ctx2 = {ctx = ctx.ctx} -- copy context
+ctx = nil
+collectgarbage("collect")
+ok, err = S.io_destroy(ctx2)
+assert(not ok, "should have closed aio ctx")
 
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
