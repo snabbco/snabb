@@ -892,6 +892,9 @@ S.PR_SET_PTRACER   = 0x59616d61 -- Ubuntu extension
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
 if arch == "x86" then
+  S.SYS_stat             = 106
+  S.SYS_fstat            = 108
+  S.SYS_lstat            = 107
   S.SYS_getdents         = 141
   S.SYS_io_setup         = 245
   S.SYS_io_destroy       = 246
@@ -903,6 +906,9 @@ if arch == "x86" then
   S.SYS_clock_getres     = 266
   S.SYS_clock_nanosleep  = 267
 elseif arch == "x64" then
+  S.SYS_stat             = 4
+  S.SYS_fstat            = 5
+  S.SYS_lstat            = 6
   S.SYS_getdents         = 78
   S.SYS_io_setup         = 206
   S.SYS_io_destroy       = 207
@@ -914,6 +920,9 @@ elseif arch == "x64" then
   S.SYS_clock_getres     = 229
   S.SYS_clock_nanosleep  = 230
 elseif arch == "arm" and ffi.abi("eabi") then
+  S.SYS_stat             = 106
+  S.SYS_fstat            = 108
+  S.SYS_lstat            = 107
   S.SYS_getdents         = 141
   S.SYS_io_setup         = 243
   S.SYS_io_destroy       = 244
@@ -1105,6 +1114,18 @@ local mkerror = function(errno)
   return e
 end
 
+-- integer types
+local int_t = typeof("int")
+local uint_t = typeof("unsigned int")
+local int1_t = typeof("int[1]")
+local int2_t = typeof("int[2]")
+local ints_t = typeof("int[?]")
+local int64_t = typeof("int64_t")
+local int64_pt = typeof("int64_t *")
+local uint64_t = typeof("uint64_t")
+local int32_pt = typeof("int32_t *")
+local int64_1t = typeof("int64_t[1]")
+
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
 local errorret, retint, retnum, retbool, retptr, retfd, getfd, getts
@@ -1143,12 +1164,12 @@ local buffer_t = typeof("char[?]")
 
 --get fd from standard string, integer, or cdata
 function getfd(fd)
-  if type(fd) == 'number' then return fd end
-  if istype(fd_t, fd) then return fd.fd end
+  if type(fd) == 'number' then return int_t(fd) end
+  if istype(fd_t, fd) then return int_t(fd.fd) end
   if type(fd) == 'string' then
-    if fd == 'stdin' or fd == 'STDIN_FILENO' then return 0 end
-    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
-    if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
+    if fd == 'stdin' or fd == 'STDIN_FILENO' then return int_t(0) end
+    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return int_t(1) end
+    if fd == 'stderr' or fd == 'STDERR_FILENO' then return int_t(2) end
   end
   return nil
 end
@@ -1161,7 +1182,7 @@ end
 -- define C types
 ffi.cdef[[
 
-static const int UTSNAME_LENGTH = 65
+static const int UTSNAME_LENGTH = 65;
 
 // typedefs for word size independent types
 
@@ -1571,58 +1592,7 @@ typedef struct siginfo {
 ]]
 
 -- stat structure is architecture dependent in Linux
--- this is the way glibc versions stat via __xstat, may need to change for other libc, eg if define stat as a non inline function
--- uclibc seems to use gnu stat now though, but without versioning
--- could just use the syscall!
-local STAT_VER_LINUX
 
-if ffi.abi("32bit") then
-STAT_VER_LINUX = 3
-ffi.cdef[[
-struct stat {
-  dev_t st_dev;
-  unsigned short int __pad1;
-  ino_t __st_ino;
-  mode_t st_mode;
-  nlink_t st_nlink;
-  uid_t st_uid;
-  gid_t st_gid;
-  dev_t st_rdev;
-  unsigned short int __pad2;
-  off_t st_size;
-  blksize_t st_blksize;
-  blkcnt_t st_blocks;
-  struct timespec st_atim;
-  struct timespec st_mtim;
-  struct timespec st_ctim;
-  unsigned long int __unused4;
-  unsigned long int __unused5;
-};
-]]
-else -- 64 bit arch
-STAT_VER_LINUX = 1
-ffi.cdef[[
-struct stat {
-  dev_t st_dev;
-  ino_t st_ino;
-  nlink_t st_nlink;
-  mode_t st_mode;
-  uid_t st_uid;
-  gid_t st_gid;
-  int __pad0;
-  dev_t st_rdev;
-  off_t st_size;
-  blksize_t st_blksize;
-  blkcnt_t st_blocks;
-  struct timespec st_atim;
-  struct timespec st_mtim;
-  struct timespec st_ctim;
-  long int __unused[3];
-};
-]]
-end
-
--- not currently used, but may switch
 if arch == 'x86' then
 ffi.cdef[[
 struct linux_stat {
@@ -1870,15 +1840,6 @@ int syscall(int number, ...);
 
 int ioctl(int d, int request, void *argp); /* void* easiest here */
 
-// stat glibc internal functions
-int __fxstat(int ver, int fd, struct stat *buf);
-int __xstat(int ver, const char *path, struct stat *buf);
-int __lxstat(int ver, const char *path, struct stat *buf);
-// real stat functions, might not exist
-int stat(const char *path, struct stat *buf);
-int fstat(int fd, struct stat *buf);
-int lstat(const char *path, struct stat *buf);
-
 // functions from libc ie man 3 not man 2
 void exit(int status);
 int inet_aton(const char *cp, struct in_addr *inp);
@@ -1895,10 +1856,6 @@ int unsetenv(const char *name);
 int clearenv(void);
 char *getenv(const char *name);
 ]]
-
--- glibc does not have a stat symbol, has its own struct stat and way of calling
-local use_gnu_stat
-if pcall(function () local t = C.stat end) then use_gnu_stat = false else use_gnu_stat = true end
 
 -- Lua type constructors corresponding to defined types
 local sockaddr_t = typeof("struct sockaddr")
@@ -1917,7 +1874,7 @@ local ucred_t = typeof("struct ucred")
 local sysinfo_t = typeof("struct sysinfo")
 local fdset_t = typeof("fd_set")
 local fdmask_t = typeof("fd_mask")
-local stat_t = typeof("struct stat")
+local stat_t = typeof("struct linux_stat")
 local epoll_event_t = typeof("struct epoll_event")
 local epoll_events_t = typeof("struct epoll_event[?]")
 local off_t = typeof("off_t")
@@ -2020,22 +1977,11 @@ print("eq (sizeof(struct cmsghdr), " .. sizeof(cmsghdr_t(0)) .. ");")
 print("eq (sizeof(struct sysinfo), " .. sizeof(sysinfo_t) .. ");")
 ]]
 --print(sizeof("struct stat"))
---print(sizeof("struct gstat"))
 
-local int_t = typeof("int")
-local uint_t = typeof("unsigned int")
-local off1_t = typeof("off_t[1]") -- used to pass off_t to sendfile etc
-local int1_t = typeof("int[1]") -- used to pass pointer to int
-local int2_t = typeof("int[2]") -- pair of ints, eg for pipe
-local ints_t = typeof("int[?]") -- array of ints
-local int64_t = typeof("int64_t")
-local int64_pt = typeof("int64_t *")
-local uint64_t = typeof("uint64_t")
-local int32_pt = typeof("int32_t *")
-local int64_1t = typeof("int64_t[1]")
 local uint64_1t = typeof("uint64_t[1]")
 local socklen1_t = typeof("socklen_t[1]")
 local ulong_t = typeof("unsigned long")
+local off1_t = typeof("off_t[1]")
 local loff_t = typeof("loff_t")
 local loff_1t = typeof("loff_t[1]")
 
@@ -2528,34 +2474,21 @@ function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), stringflags(mode, "S_"))) end
 
--- glibc does not have these directly
-local stat, lstat, fstat
-
-if use_gnu_stat then
-  function stat(path, buf) return C.__xstat(STAT_VER_LINUX, path, buf) end
-  function lstat(path, buf) return C.__lxstat(STAT_VER_LINUX, path, buf) end
-  function fstat(fd, buf) return C.__fxstat(STAT_VER_LINUX, fd, buf) end
-else
-  stat = C.stat
-  lstat = C.lstat
-  fstat = C.fstat
-end
-
 function S.stat(path, buf)
   if not buf then buf = stat_t() end
-  local ret = stat(path, buf)
+  local ret = C.syscall(S.SYS_stat, path, buf)
   if ret == -1 then return errorret() end
   return buf
 end
 function S.lstat(path, buf)
   if not buf then buf = stat_t() end
-  local ret = lstat(path, buf)
+  local ret = C.syscall(S.SYS_lstat, path, buf)
   if ret == -1 then return errorret() end
   return buf
 end
 function S.fstat(fd, buf)
   if not buf then buf = stat_t() end
-  local ret = fstat(getfd(fd), buf)
+  local ret = C.syscall(S.SYS_fstat, getfd(fd), buf)
   if ret == -1 then return errorret() end
   return buf
 end
@@ -2813,7 +2746,7 @@ local mkfdset, fdisset
 function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
   local set = fdset_t()
   for i, v in ipairs(fds) do
-    local fd = getfd(v)
+    local fd = tonumber(getfd(v))
     if fd + 1 > nfds then nfds = fd + 1 end
     local fdelt = bit.rshift(fd, 5) -- always 32 bits
     set.fds_bits[fdelt] = bit.bor(set.fds_bits[fdelt], bit.lshift(1, fd % 32)) -- always 32 bit words
@@ -2824,7 +2757,7 @@ end
 function fdisset(fds, set)
   local f = {}
   for i, v in ipairs(fds) do
-    local fd = getfd(v)
+    local fd = tonumber(getfd(v))
     local fdelt = bit.rshift(fd, 5) -- always 32 bits
     if bit.band(set.fds_bits[fdelt], bit.lshift(1, fd % 32)) ~= 0 then table.insert(f, v) end -- careful not to duplicate fd objects
   end
