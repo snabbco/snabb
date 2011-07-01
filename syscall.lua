@@ -1595,7 +1595,7 @@ typedef struct siginfo {
 
 if arch == 'x86' then
 ffi.cdef[[
-struct linux_stat {
+struct stat {
   unsigned long  st_dev;
   unsigned long  st_ino;
   unsigned short st_mode;
@@ -1618,7 +1618,7 @@ struct linux_stat {
 ]]
 elseif arch == 'x64' then
 ffi.cdef [[
-struct linux_stat {
+struct stat {
   unsigned long   st_dev;
   unsigned long   st_ino;
   unsigned long   st_nlink;
@@ -1920,7 +1920,7 @@ local ucred_t = typeof("struct ucred")
 local sysinfo_t = typeof("struct sysinfo")
 local fdset_t = typeof("fd_set")
 local fdmask_t = typeof("fd_mask")
-local stat_t = typeof("struct linux_stat")
+local stat_t = typeof("struct stat")
 local epoll_event_t = typeof("struct epoll_event")
 local epoll_events_t = typeof("struct epoll_event[?]")
 local off_t = typeof("off_t")
