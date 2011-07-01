@@ -1642,6 +1642,7 @@ struct stat {
 elseif arch == 'arm' then
   if ffi.abi("le") then
     ffi.cdef [[
+      struct stat {
         unsigned long  st_dev;
         unsigned long  st_ino;
         unsigned short st_mode;
@@ -1660,9 +1661,11 @@ elseif arch == 'arm' then
         unsigned long  st_ctime_nsec;
         unsigned long  __unused4;
         unsigned long  __unused5;
+      };
     ]]
   else
     ffi.cdef [[
+      struct stat {
         unsigned long  st_dev;
         unsigned short __pad1;
         unsigned long  st_ino;
@@ -1683,6 +1686,7 @@ elseif arch == 'arm' then
         unsigned long  st_ctime_nsec;
         unsigned long  __unused4;
         unsigned long  __unused5;
+      };
     ]]  
   end
 end
