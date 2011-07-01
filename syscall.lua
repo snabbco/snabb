@@ -3097,6 +3097,8 @@ function S.timerfd_read(fd, buffer, size)
 end
 
 -- aio functions
+local getctx = function(ctx) return ulong_t(ctx.ctx) end -- aio_context_t is really unsigned long
+
 function S.io_setup(nr_events)
   local ctxp = aio_context_1t()
   local ret = C.syscall(S.SYS_io_setup, cast(uint_t, nr_events), ctxp)
@@ -3105,7 +3107,7 @@ function S.io_setup(nr_events)
 end
 
 function S.io_destroy(ctx)
-  return retbool(C.syscall(S.SYS_io_destroy, ctx.ctx))
+  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx)))
 end
 
 local ameth = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel}
