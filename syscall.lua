@@ -1616,7 +1616,7 @@ struct linux_stat {
   unsigned long  __unused5;
 };
 ]]
-else -- all architectures except x86 the same
+elseif arch == 'x64' then
 ffi.cdef [[
 struct linux_stat {
   unsigned long   st_dev;
@@ -1639,6 +1639,52 @@ struct linux_stat {
   long            __unused[3];
 };
 ]]
+elseif arch == 'arm' then
+  if ffi.abi("le") then
+    ffi.cdef [[
+        unsigned long  st_dev;
+        unsigned long  st_ino;
+        unsigned short st_mode;
+        unsigned short st_nlink;
+        unsigned short st_uid;
+        unsigned short st_gid;
+        unsigned long  st_rdev;
+        unsigned long  st_size;
+        unsigned long  st_blksize;
+        unsigned long  st_blocks;
+        unsigned long  st_atime;
+        unsigned long  st_atime_nsec;
+        unsigned long  st_mtime;
+        unsigned long  st_mtime_nsec;
+        unsigned long  st_ctime;
+        unsigned long  st_ctime_nsec;
+        unsigned long  __unused4;
+        unsigned long  __unused5;
+    ]]
+  else
+    ffi.cdef [[
+        unsigned long  st_dev;
+        unsigned short __pad1;
+        unsigned long  st_ino;
+        unsigned short st_mode;
+        unsigned short st_nlink;
+        unsigned short st_uid;
+        unsigned short st_gid;
+        unsigned long  st_rdev;
+        unsigned short __pad2;
+        unsigned long  st_size;
+        unsigned long  st_blksize;
+        unsigned long  st_blocks;
+        unsigned long  st_atime;
+        unsigned long  st_atime_nsec;
+        unsigned long  st_mtime;
+        unsigned long  st_mtime_nsec;
+        unsigned long  st_ctime;
+        unsigned long  st_ctime_nsec;
+        unsigned long  __unused4;
+        unsigned long  __unused5;
+    ]]  
+  end
 end
 
 -- endian dependent
