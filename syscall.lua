@@ -520,6 +520,21 @@ S.TFD_NONBLOCK = octal("04000")
 
 S.TFD_TIMER_ABSTIME = 1
 
+-- poll
+S.POLLIN          = 0x001
+S.POLLPRI         = 0x002
+S.POLLOUT         = 0x004
+S.POLLRDNORM      = 0x040
+S.POLLRDBAND      = 0x080
+S.POLLWRNORM      = 0x100
+S.POLLWRBAND      = 0x200
+S.POLLMSG         = 0x400
+S.POLLREMOVE      = 0x1000
+S.POLLRDHUP       = 0x2000
+S.POLLERR         = 0x008
+S.POLLHUP         = 0x010
+S.POLLNVAL        = 0x020
+
 -- epoll
 S.EPOLL_CLOEXEC = octal("02000000")
 S.EPOLL_NONBLOCK = octal("04000")
@@ -1218,6 +1233,7 @@ typedef unsigned long ino_t;
 typedef unsigned long nlink_t;
 typedef unsigned long rlim_t;
 typedef unsigned long aio_context_t;
+typedef unsigned long nfds_t;
 
 // should be a word, but we use 32 bits as bitops are signed 32 bit in LuaJIT at the moment
 typedef int32_t fd_mask;
@@ -1257,7 +1273,11 @@ struct iovec {
   void *iov_base;
   size_t iov_len;
 };
-
+struct pollfd {
+  int fd;
+  short int events;
+  short int revents;
+};
 typedef struct { /* based on Linux/FreeBSD FD_SETSIZE = 1024, the kernel can do more, so can increase, but bad performance so dont! */
   fd_mask fds_bits[1024 / (sizeof (fd_mask) * 8)];
 } fd_set;
@@ -1807,6 +1827,7 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 
 int epoll_create1(int flags);
@@ -1944,6 +1965,11 @@ local fdb_entry_pt = typeof("struct fdb_entry *")
 local signalfd_siginfo_t = typeof("struct signalfd_siginfo")
 local signalfd_siginfo_pt = typeof("struct signalfd_siginfo *")
 local itimerspec_t = typeof("struct itimerspec")
+local iocb_t = typeof("struct iocb")
+local iocbs_t = typeof("struct iocb[?]")
+local iocbs_pt = typeof("struct iocb *[?]")
+local pollfds_t = typeof("struct pollfd [?]")
+local pollfd_pt = typeof("struct pollfd *")
 
 S.RLIM_INFINITY = cast("rlim_t", -1)
 
@@ -2935,6 +2961,22 @@ function S.select(s) -- note same structure as returned
           exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
 end
 
+local pollflags = {"POLLIN", "POLLOUT", "POLLPRI", "POLLRDHUP", "POLLERR", "POLLHUP", "POLLNVAL", "POLLRDNORM", "POLLRDBAND", "POLLWRNORM", "POLLWRBAND", "POLLMSG"}
+
+function S.poll(fds, nfds, timeout)
+  local ret = C.poll(fds, nfds, timeout or -1)
+  if ret == -1 then return erroret() end
+  local r = {}
+  for i = 0, ret - 1 do
+    if fds[i].revents ~= 0 then
+      r[#r + 1] = getflags(fds[i].revents, "POLL", pollflags, {fd = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)})
+    end
+  end
+  return r
+end
+
+--r[i] = getflags(e.events, "EPOLL", {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"}, {fd = e.data.fd, data = e.data.u64})
+
 function S.mount(source, target, filesystemtype, mountflags, data)
   return retbool(C.mount(source, target, filesystemtype, stringflags(mountflags, "MS_"), data or nil))
 end
@@ -3158,6 +3200,17 @@ end
 
 function S.io_destroy(ctx)
   return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx)))
+end
+
+--[[
+local iocb_t = typeof("struct iocb")
+local iocbs_t = typeof("struct iocb[?]")
+local iocbs_pt = typeof("struct iocb *[?]")
+]]
+function S.io_submit(ctx, nr, iocb) -- takes an array of pointers to iocb
+
+
+  return retnum(C.syscall(S.SYS_io_submit, getctx(ctx), long_t(nr), iocb))
 end
 
 local ameth = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel}
@@ -3886,7 +3939,7 @@ S.t = {
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
   iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
   sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t, uint64 = uint64_t, macaddr = macaddr_t,
-  sockaddr_storage = sockaddr_storage_t, sockaddr_in6 = sockaddr_in6_t
+  sockaddr_storage = sockaddr_storage_t, sockaddr_in6 = sockaddr_in6_t, pollfds = pollfds_t
 }
 
 return S

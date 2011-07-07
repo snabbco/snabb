@@ -88,6 +88,7 @@ itimerspec should have some metamethods to get numeric times out of it.
 
 ### Missing functions
 
+pselect, ppoll
 clock_nanosleep, timer_create, timer_getoverrun
 faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  mkdirat(2),  mknodat(2),
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
@@ -102,5 +103,6 @@ The test script is quite comprehensive, though it does not test all the syscalls
 
 Initial testing on uclibc, works on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes.
 
+Test script needs cleanup.
 
 

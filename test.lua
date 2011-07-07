@@ -393,7 +393,7 @@ assert(fd:close())
 local sv = assert(S.socketpair("unix", "stream"))
 c, s = sv[1], sv[2]
 
--- test select and epoll
+-- test select, poll and epoll
 local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
 assert(sel.count == 0, "nothing to read select now")
 
@@ -413,6 +413,17 @@ r = assert(ep:epoll_wait(nil, 1, 100, "winch, hup"))
 assert(#r == 1, "one event now")
 assert(r[1].epollin, "read event")
 assert(ep:close())
+
+n = assert(c:read()) -- clear event
+
+local pfds = S.t.pollfds(1, {{fd = c.fd, events = S.POLLIN, revents = 0}})
+local p = assert(S.poll(pfds, 1, 0))
+assert(#p == 0, "no events now")
+
+n = assert(s:write(teststring))
+
+local p = assert(S.poll(pfds, 1, 0))
+assert(#p == 1 and p[1].fd == c.fd and p[1].POLLIN, "one event now")
 
 assert(s:close())
 assert(c:close())
