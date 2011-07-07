@@ -2967,7 +2967,7 @@ function S.poll(fds, nfds, timeout)
   local ret = C.poll(fds, nfds, timeout or -1)
   if ret == -1 then return erroret() end
   local r = {}
-  for i = 0, ret - 1 do
+  for i = 0, nfds - 1 do
     if fds[i].revents ~= 0 then
       r[#r + 1] = getflags(fds[i].revents, "POLL", pollflags, {fd = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)})
     end
