@@ -1348,10 +1348,10 @@ struct msghdr {
   int msg_flags;
 };
 struct cmsghdr {
-  size_t cmsg_len;            /* Length of data in cmsg_data plus length of cmsghdr structure. */
-  int cmsg_level;             /* Originating protocol.  */
-  int cmsg_type;              /* Protocol specific type.  */
-  unsigned char cmsg_data[?]; /* Ancillary data. note VLA in glibc, but macros to access for compatibility */
+  size_t cmsg_len;
+  int cmsg_level;
+  int cmsg_type;
+  unsigned char cmsg_data[?];
 };
 struct sockaddr {
   sa_family_t sa_family;
