@@ -30,14 +30,14 @@ assert(err.errno == S.E.EBADF, "expect EBADF from invalid numberic fd") -- test 
 -- test open and close valid file
 fd = assert(S.open("/dev/null", "rdonly"))
 assert(type(fd) == 'cdata', "should get a cdata object back from open")
-assert(fd.fd >= 3, "should get file descriptor of at least 3 back from first open")
+assert(fd.fileno >= 3, "should get file descriptor of at least 3 back from first open")
 
 -- another open
 fd2 = assert(S.open("/dev/zero", "RDONLY"))
-assert(fd2.fd >= 4, "should get file descriptor of at least 4 back from second open")
+assert(fd2.fileno >= 4, "should get file descriptor of at least 4 back from second open")
 
 -- normal close
-local fdfd = fd.fd
+local fileno = fd.fileno
 assert(fd:close())
 
 fd3 = assert(S.open("/dev/zero"))
@@ -47,7 +47,7 @@ assert(fd3:close()) -- this should succeed
 S.sync() -- cannot fail...
 
 -- test double close fd
-fd, err = S.close(fdfd)
+fd, err = S.close(fileno)
 assert(err, "expected to fail on close already closed fd")
 assert(err.badf, "expect EBADF from invalid numberic fd")
 
@@ -78,12 +78,12 @@ assert(err.EBADF, "expect EBADF from already closed fd")
 -- test with gc turned off
 
 fd = assert(S.open("/dev/zero", "RDONLY"))
-fdfd = fd.fd
+local fileno = fd.fileno
 fd:nogc()
 fd = nil
 collectgarbage("collect")
-n = assert(S.read(fdfd, buf, size))
-assert(S.close(fdfd))
+n = assert(S.read(fileno, buf, size))
+assert(S.close(fileno))
 
 -- another open
 fd = assert(S.open("/dev/zero", "RDWR"))
@@ -103,7 +103,7 @@ fd2 = assert(fd:dup())
 assert(fd2:close())
 
 fd2 = assert(fd:dup(17))
-assert(fd2.fd == 17, "dup2 should set file id as specified")
+assert(fd2.fileno == 17, "dup2 should set file id as specified")
 assert(fd2:close())
 
 assert(fd:close())
@@ -416,14 +416,14 @@ assert(ep:close())
 
 n = assert(c:read()) -- clear event
 
-local pfds = S.t.pollfds(1, {{fd = c.fd, events = S.POLLIN, revents = 0}})
+local pfds = S.t.pollfds(1, {{fd = c.fileno, events = S.POLLIN, revents = 0}})
 local p = assert(S.poll(pfds, 1, 0))
 assert(#p == 0, "no events now")
 
 n = assert(s:write(teststring))
 
 local p = assert(S.poll(pfds, 1, 0))
-assert(#p == 1 and p[1].fd == c.fd and p[1].POLLIN, "one event now")
+assert(#p == 1 and p[1].fileno == c.fileno and p[1].POLLIN, "one event now")
 
 assert(s:close())
 assert(c:close())

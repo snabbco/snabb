@@ -1180,7 +1180,7 @@ local buffer_t = typeof("char[?]")
 --get fd from standard string, integer, or cdata
 function getfd(fd)
   if type(fd) == 'number' then return int_t(fd) end
-  if istype(fd_t, fd) then return int_t(fd.fd) end
+  if istype(fd_t, fd) then return int_t(fd.fileno) end
   if type(fd) == 'string' then
     if fd == 'stdin' or fd == 'STDIN_FILENO' then return int_t(0) end
     if fd == 'stdout' or fd == 'STDOUT_FILENO' then return int_t(1) end
@@ -2357,13 +2357,13 @@ function S.close(fd)
     local errno = ffi.errno()
     if istype(fd_t, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
       ffi.gc(fd, nil)
-      fd.fd = -1 -- make sure cannot accidentally close this fd object again
+      fd.fileno = -1 -- make sure cannot accidentally close this fd object again
     end
     return errorret()
   end
   if istype(fd_t, fd) then
     ffi.gc(fd, nil)
-    fd.fd = -1 -- make sure cannot accidentally close this fd object again
+    fd.fileno = -1 -- make sure cannot accidentally close this fd object again
   end
   return true
 end
@@ -2972,7 +2972,7 @@ function S.poll(fds, nfds, timeout)
   local r = {}
   for i = 0, nfds - 1 do
     if fds[i].revents ~= 0 then
-      r[#r + 1] = getflags(fds[i].revents, "POLL", pollflags, {fd = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)})
+      r[#r + 1] = getflags(fds[i].revents, "POLL", pollflags, {fileno = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)})
     end
   end
   return r
@@ -3933,7 +3933,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
-fd_t = ffi.metatype("struct {int fd;}", {__index = fmeth, __gc = S.close})
+fd_t = ffi.metatype("struct {int fileno;}", {__index = fmeth, __gc = S.close})
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
 -- think we are missing some, as not really using them
