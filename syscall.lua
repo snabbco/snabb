@@ -2654,14 +2654,17 @@ end
 
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), stringflag(how, "SHUT_"))) end
 
-function S.accept(sockfd)
+function S.accept(sockfd, flags)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(sizeof(sockaddr_storage_t))
-  local ret = C.accept(getfd(sockfd), cast(sockaddr_pt, ss), addrlen)
+  local ret
+  if not flags
+    then ret = C.accept(getfd(sockfd), cast(sockaddr_pt, ss), addrlen)
+    else ret = C.accept4(getfd(sockfd), cast(sockaddr_pt, ss), addrlen, stringflags(flags, "SOCK_"))
+  end
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0], {fd = fd_t(ret)})
 end
---S.accept4 = S.accept -- need to add support for flags argument TODO
 
 function S.getsockname(sockfd)
   local ss = sockaddr_storage_t()
