@@ -1109,10 +1109,11 @@ function S.strerror(errno) return ffi.string(C.strerror(errno)) end
 
 local emt = {__tostring = function(e) return S.strerror(e.errno) end}
 
-local errsyms = {}
+local errsyms, errlsyms = {}, {}
 
-for i, v in pairs(S.E) do
-  errsyms[v] = i
+for k, v in pairs(S.E) do
+  errsyms[v] = k
+  errlsyms[v] = k:sub(2):lower()
 end
 
 -- alternate names
@@ -1122,9 +1123,10 @@ S.E.ENOATTR        = S.E.ENODATA
 
 local mkerror = function(errno)
   local sym = errsyms[errno]
-  local e = {errno = errno, sym = sym}
+  local lsym = errlsyms[errno]
+  local e = {errno = errno, sym = sym, lsym = lsym}
   e[sym] = true
-  e[sym:sub(2):lower()] = true
+  e[lsym] = true
   setmetatable(e, emt)
   return e
 end
