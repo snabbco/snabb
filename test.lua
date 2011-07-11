@@ -400,7 +400,7 @@ assert(sel.count == 0, "nothing to read select now")
 local ep = assert(S.epoll_create("cloexec"))
 assert(ep:epoll_ctl("add", c, "in, err, hup")) -- actually dont need to set err, hup
 
-local r = assert(ep:epoll_wait())
+local r = assert(ep:epoll_wait(nil, 1, 0))
 assert(#r == 0, "no events yet")
 
 n = assert(s:write(teststring))
