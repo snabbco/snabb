@@ -3167,7 +3167,9 @@ function S.io_setup(nr_events)
   local ctxp = aio_context_1t()
   local ret = C.syscall(S.SYS_io_setup, cast(uint_t, nr_events), ctxp)
   if ret == -1 then return errorret() end
-  return aio_context_t(ctxp[0])
+  local ctx = aio_context_t()
+  ffi.copy(ctx, ctxp, sizeof(aio_context_t))
+  return ctx
 end
 
 function S.io_destroy(ctx)
