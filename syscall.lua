@@ -2207,49 +2207,6 @@ function S.sockaddr_nl(pid, groups)
   return addr
 end
 
--- map from socket family to data type
-local socket_type, address_type = {}, {}
--- AF_UNSPEC
-socket_type[S.AF_LOCAL] = sockaddr_un_t
-socket_type[S.AF_INET] = sockaddr_in_t
-address_type[S.AF_INET] = in_addr_t
---  AF_AX25
---  AF_IPX
---  AF_APPLETALK
---  AF_NETROM
---  AF_BRIDGE
---  AF_ATMPVC
---  AF_X25
-socket_type[S.AF_INET6] = sockaddr_in6_t
-address_type[S.AF_INET6] = in6_addr_t
---  AF_ROSE
---  AF_DECnet
---  AF_NETBEUI
---  AF_SECURITY
---  AF_KEY
-socket_type[S.AF_NETLINK] = sockaddr_nl_t
---  AF_PACKET
---  AF_ASH
---  AF_ECONET
---  AF_ATMSVC
---  AF_RDS
---  AF_SNA
---  AF_IRDA
---  AF_PPPOX
---  AF_WANPIPE
---  AF_LLC
---  AF_CAN
---  AF_TIPC
---  AF_BLUETOOTH
---  AF_IUCV
---  AF_RXRPC
---  AF_ISDN
---  AF_PHONET
---  AF_IEEE802154
---  AF_CAIF
---  AF_ALG
---  AF_MAX
-
 -- helper function to make setting addrlen optional
 local getaddrlen
 function getaddrlen(addr, addrlen)
@@ -2271,26 +2228,30 @@ saret = function(ss, addrlen, rets) -- return socket address structure, addition
   rets.addrlen = addrlen
   rets.sa_family = afamily
   rets.ss = ss
-  local atype = socket_type[afamily]
-  if atype then
-    local addr = atype()
-    ffi.copy(addr, ss, addrlen) -- note we copy rather than cast so it is safe for ss to be garbage collected.
-    rets.addr = addr
-    -- helpers to make it easier to get peer info
-    if istype(sockaddr_un_t, addr) then
-      local namelen = addrlen - sizeof(sa_family_t)
-      if namelen > 0 then
-        rets.name = ffi.string(addr.sun_path, namelen)
-        if addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
-      end
-    elseif istype(sockaddr_in_t, addr) then
-      rets.port = S.ntohs(addr.sin_port)
-      rets.ipv4 = addr.sin_addr
-    elseif istype(sockaddr_nl_t, addr) then
-      rets.pid = addr.nl_pid
-      rets.groups = addr.nl_groups
+
+  if afamily == S.AF_LOCAL then
+    rets.addr = sockaddr_un_t()
+    ffi.copy(rets.addr, ss, addrlen)
+    local namelen = addrlen - sizeof(sa_family_t)
+    if namelen > 0 then
+      rets.name = ffi.string(rets.addr.sun_path, namelen)
+      if addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
     end
+  elseif afamily == S.AF_INET then
+    rets.addr = sockaddr_in_t()
+    ffi.copy(rets.addr, ss, addrlen)
+    rets.port = S.ntohs(rets.addr.sin_port)
+  elseif afamily == S.AF_INET6 then
+    rets.addr = sockaddr_in6_t()
+    ffi.copy(rets.addr, ss, addrlen)
+    rets.port = S.ntohs(rets.addr.sin6_port)
+  elseif afamily == S.AF_NETLINK then
+    rets.addr = sockaddr_nl_t()
+    ffi.copy(rets.addr, ss, addrlen)
+    rets.pid = tonumber(rets.addr.nl_pid)
+    rets.groups = tonumber(rets.addr.nl_groups)
   end
+
   return rets
 end
 
@@ -2318,7 +2279,8 @@ end
 
 function S.inet_pton(af, src)
   af = stringflag(af, "AF_")
-  local addr = address_type[af]()
+  local addr
+  if af == AF_INET6 then addr = in6_addr_t() else addr = in_addr_t() end
   local ret = C.inet_pton(af, src, addr)
   if ret == -1 then return errorret() end
   if ret == 0 then return nil end -- maybe return string

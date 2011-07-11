@@ -290,8 +290,8 @@ assert(c:connect(sa)) -- able to connect now we have accepted
 
 ba = assert(c:getpeername())
 assert(ba.addr.sin_family == 2, "expect ipv4 connection")
-assert(S.inet_ntoa(ba.ipv4) == "127.0.0.1", "expect peer on localhost")
-assert(ba.ipv4.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
+assert(S.inet_ntoa(ba.addr.sin_addr) == "127.0.0.1", "expect peer on localhost")
+assert(ba.addr.sin_addr.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
 
 n = assert(c:send(teststring))
 assert(n == #teststring, "should be able to write out short string")
