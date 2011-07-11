@@ -99,6 +99,7 @@ readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue
 io_cancel(2), io_destroy(2), io_setup(2), io_submit(2), ...
 sync_file_range(2)
+getitimer, setitimer
 ...
 
 ### Testing

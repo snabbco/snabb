@@ -203,7 +203,7 @@ S.SIG_DFL =  0
 S.SIG_IGN =  1
 S.SIG_HOLD = 2
 
-signals = {
+local signals = {
 "SIGHUP",
 "SIGINT",
 "SIGQUIT",
@@ -1140,6 +1140,7 @@ local int64_pt = typeof("int64_t *")
 local uint64_t = typeof("uint64_t")
 local int32_pt = typeof("int32_t *")
 local int64_1t = typeof("int64_t[1]")
+local long_t = typeof("long")
 
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
@@ -1180,6 +1181,7 @@ local buffer_t = typeof("char[?]")
 --get fd from standard string, integer, or cdata
 function getfd(fd)
   if not fd then return nil end
+  if istype(int_t, fd) then return fd end
   if type(fd) == 'number' then return int_t(fd) end
   if fd.fileno then return int_t(fd.fileno) end
   if type(fd) == 'string' then
@@ -1982,7 +1984,7 @@ local timespec_t = ffi.metatype("struct timespec", {
 function getts(ts) -- get a timespec eg from a number
   if not ts then return timespec_t() end
   if istype(timespec_t, ts) then return ts end
-  if type(req) == "table" then req = timespec_t(req) end
+  if type(ts) == "table" then ts = timespec_t(ts) end
   local i, f = math.modf(ts)
   return timespec_t(i, math.floor(f * 1000000000))
 end
@@ -2235,7 +2237,7 @@ saret = function(ss, addrlen, rets) -- return socket address structure, addition
     local namelen = addrlen - sizeof(sa_family_t)
     if namelen > 0 then
       rets.name = ffi.string(rets.addr.sun_path, namelen)
-      if addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
+      if rets.addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
     end
   elseif afamily == S.AF_INET then
     rets.addr = sockaddr_in_t()
@@ -2280,7 +2282,7 @@ end
 function S.inet_pton(af, src)
   af = stringflag(af, "AF_")
   local addr
-  if af == AF_INET6 then addr = in6_addr_t() else addr = in_addr_t() end
+  if af == S.AF_INET6 then addr = in6_addr_t() else addr = in_addr_t() end
   local ret = C.inet_pton(af, src, addr)
   if ret == -1 then return errorret() end
   if ret == 0 then return nil end -- maybe return string
@@ -2313,9 +2315,9 @@ function S.pipe(flags)
 end
 
 function S.close(fd)
-  local afd = getfd(fd)
-  if afd == -1 then return true end -- already closed
-  local ret = C.close(afd)
+  local fileno = getfd(fd)
+  if fileno == -1 then return true end -- already closed
+  local ret = C.close(fileno)
   if ret == -1 then
     local errno = ffi.errno()
     if istype(fd_t, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
@@ -2892,7 +2894,7 @@ end
 function S.sigprocmask(how, set)
   how = stringflag(how, "SIG_")
   set = mksigset(set)
-  oldset = sigset_t()
+  local oldset = sigset_t()
   local ret = C.sigprocmask(how, set, oldset)
   if ret == -1 then return errorret() end
   return getsigset(oldset)
@@ -2907,7 +2909,7 @@ end
 
 function S.sigsuspend(mask) return retbool(C.sigsuspend(mksigset(mask))) end
 
-function signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
+function S.signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
   return retfd(C.signalfd(getfd(fd) or -1, mksigset(set), stringflags(flags, "SFD_")))
 end
 
@@ -2931,7 +2933,7 @@ local pollflags = {"POLLIN", "POLLOUT", "POLLPRI", "POLLRDHUP", "POLLERR", "POLL
 
 function S.poll(fds, nfds, timeout)
   local ret = C.poll(fds, nfds, timeout or -1)
-  if ret == -1 then return erroret() end
+  if ret == -1 then return errorret() end
   local r = {}
   for i = 0, nfds - 1 do
     if fds[i].revents ~= 0 then
@@ -2953,7 +2955,7 @@ function S.umount(target, flags)
 end
 
 function S.getrlimit(resource)
-  rlim = rlimit_t()
+  local rlim = rlimit_t()
   local ret = C.getrlimit(stringflag(resource, "RLIMIT_"), rlim)
   if ret == -1 then return errorret() end
   return rlim
@@ -3130,14 +3132,14 @@ function S.timerfd_create(clockid, flags)
   return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
 end
 
-function getitimer(interval, value)
+local function getit(interval, value)
   if istype(itimerspec_t, interval) then return interval end
   return itimerspec_t(getts(interval), getts(value))
 end
 
 function S.timerfd_settime(fd, flags, interval, value)
   local oldtime = itimerspec_t()
-  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), getitimer(interval, value), oldtime)
+  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), getit(interval, value), oldtime)
   if ret == -1 then return errorret() end
   return oldtime
 end
@@ -3220,7 +3222,7 @@ prctlpint[S.PR_GET_UNALIGN] = true
 function S.prctl(option, arg2, arg3, arg4, arg5)
   local i, name
   option = stringflag(option, "PR_") -- actually not all PR_ prefixed options ok some are for other args, could be more specific
-  noption = tonumber(option)
+  local noption = tonumber(option)
   local m = prctlmap[noption]
   if m then arg2 = stringflag(arg2, m) end
   if option == S.PR_MCE_KILL and arg2 == S.PR_MCE_KILL_SET then arg3 = stringflag(arg3, "PR_MCE_KILL_")
@@ -3740,10 +3742,9 @@ function S.ls(name, nodots) -- return just the list, no other data, cwd if no di
   return l
 end
 
-local if_nametoindex
-function if_nametoindex(name, s) -- internal version when already have socket for ioctl
+local function if_nametoindex(name, s) -- internal version when already have socket for ioctl
   local ifr = ifreq_t()
-  len = #name + 1
+  local len = #name + 1
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
   local ret = C.ioctl(getfd(s), S.SIOCGIFINDEX, ifr)
@@ -3762,8 +3763,7 @@ function S.if_nametoindex(name) -- standard function in some libc versions
 end
 
 -- bridge functions, could be in utility library. in error cases use gc to close file.
-local bridge_ioctl
-function bridge_ioctl(io, name)
+local function bridge_ioctl(io, name)
   local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
   local ret = C.ioctl(getfd(s), io, cast(char_pt, name))

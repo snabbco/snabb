@@ -378,7 +378,7 @@ assert(p.winch, "expect pending winch")
 
 -- signalfd. Useful as we cannot set real signal handlers. And it is a nice interface, as can mix with events.
 local ss = "winch, pipe, usr1, usr2"
-fd = assert(signalfd(ss, "nonblock"))
+fd = assert(S.signalfd(ss, "nonblock"))
 assert(S.sigprocmask("block", ss))
 assert(S.kill(S.getpid(), "usr1"))
 local ss = assert(fd:signalfd_read())
