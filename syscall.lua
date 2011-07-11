@@ -2142,26 +2142,23 @@ function stringflag(str, prefix) -- single value only
 end
 
 -- reverse flag operations
-local getflag, getflags -- should be used elsewhere
-function getflags(e, prefix, values, r)
+local function getflags(e, prefix, values, lvalues, r)
   if not r then r = {} end
-  for _, f in ipairs(values) do
+  for i, f in ipairs(values) do
     if bit.band(e, S[f]) ~= 0 then
       r[f] = true
-      r[f:lower()] = true
-      r[f:sub(#prefix + 1):lower()] = true -- ie set r.in, r.out etc as well
+      r[lvalues[i]] = true
     end
   end
   return r
 end
 
-function getflag(e, prefix, values)
+local function getflag(e, prefix, values, lvalues)
   local r= {}
-  for _, f in ipairs(values) do
+  for i, f in ipairs(values) do
     if e == S[f] then
       r[f] = true
-      r[f:lower()] = true
-      r[f:sub(#prefix + 1):lower()] = true -- ie set r.in, r.out etc as well
+      r[lvalues[i]] = true
     end
   end
   return r
@@ -2416,6 +2413,17 @@ end
 
 function S.reboot(cmd) return retbool(C.reboot(stringflag(cmd, "LINUX_REBOOT_CMD_"))) end
 
+function lflag(prefix, t)
+  local l = {}
+  for i, v in ipairs(t) do
+    l[i] = v:sub(#prefix + 1):lower()
+  end
+  return l
+end
+
+local dt_flags = {"DT_UNKNOWN", "DT_FIFO", "DT_CHR", "DT_DIR", "DT_BLK", "DT_REG", "DT_LNK", "DT_SOCK", "DT_WHT"}
+local dt_lflags = lflag("DT_", dt_flags)
+
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
   if not buf then
     size = size or 4096
@@ -2430,7 +2438,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     while i < ret do
       local dp = cast(linux_dirent_pt, buf + i)
       local t = buf[i + dp.d_reclen - 1]
-      local dd = getflag(t, "DT_", {"DT_UNKNOWN", "DT_FIFO", "DT_CHR", "DT_DIR", "DT_BLK", "DT_REG", "DT_LNK", "DT_SOCK", "DT_WHT"})
+      local dd = getflag(t, "DT_", dt_flags, dt_lflags)
       dd.inode = tonumber(dp.d_ino)
       dd.offset = tonumber(dp.d_off)
       d[ffi.string(dp.d_name)] = dd
@@ -2940,7 +2948,8 @@ function S.select(s) -- note same structure as returned
           exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
 end
 
-local pollflags = {"POLLIN", "POLLOUT", "POLLPRI", "POLLRDHUP", "POLLERR", "POLLHUP", "POLLNVAL", "POLLRDNORM", "POLLRDBAND", "POLLWRNORM", "POLLWRBAND", "POLLMSG"}
+local poll_flags = {"POLLIN", "POLLOUT", "POLLPRI", "POLLRDHUP", "POLLERR", "POLLHUP", "POLLNVAL", "POLLRDNORM", "POLLRDBAND", "POLLWRNORM", "POLLWRBAND", "POLLMSG"}
+local poll_lflags = lflag("POLL", poll_flags)
 
 function S.poll(fds, nfds, timeout)
   local ret = C.poll(fds, nfds, timeout or -1)
@@ -2948,13 +2957,11 @@ function S.poll(fds, nfds, timeout)
   local r = {}
   for i = 0, nfds - 1 do
     if fds[i].revents ~= 0 then
-      r[#r + 1] = getflags(fds[i].revents, "POLL", pollflags, {fileno = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)})
+      r[#r + 1] = getflags(fds[i].revents, "POLL", poll_flags, poll_lflags, {fileno = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)})
     end
   end
   return r
 end
-
---r[i] = getflags(e.events, "EPOLL", {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"}, {fd = e.data.fd, data = e.data.u64})
 
 function S.mount(source, target, filesystemtype, mountflags, data)
   return retbool(C.mount(source, target, filesystemtype, stringflags(mountflags, "MS_"), data or nil))
@@ -2993,6 +3000,9 @@ function S.epoll_ctl(epfd, op, fd, event, data)
   return retbool(C.epoll_ctl(getfd(epfd), stringflag(op, "EPOLL_CTL_"), getfd(fd), event))
 end
 
+local epoll_flags = {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"}
+local epoll_lflags = lflag("EPOLL", epoll_flags)
+
 function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes optional epoll_pwait functionality
   if not maxevents then maxevents = 1 end
   if not events then events = epoll_events_t(maxevents) end
@@ -3002,7 +3012,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   local r = {}
   for i = 1, ret do -- put in Lua array
     local e = events[i - 1]
-    r[i] = getflags(e.events, "EPOLL", {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"}, {fileno = e.data.fd, data = e.data.u64})
+    r[i] = getflags(e.events, "EPOLL", epoll_flags, epoll_lflags, {fileno = e.data.fd, data = e.data.u64})
   end
   return r
 end
@@ -3036,6 +3046,7 @@ local in_recv_ev = {"IN_ACCESS", "IN_ATTRIB", "IN_CLOSE_WRITE", "IN_CLOSE_NOWRIT
                     "IN_MOVE_SELF", "IN_MOVED_FROM", "IN_MOVED_TO", "IN_OPEN",
                     "IN_CLOSE", "IN_MOVE" -- combined ops
                    }
+local in_recv_lev = lflag("IN_", in_recv_ev)
 
 -- helper function to read inotify structs as table from inotify fd
 function S.inotify_read(fd, buffer, len)
@@ -3046,7 +3057,7 @@ function S.inotify_read(fd, buffer, len)
   local off, ee = 0, {}
   while off < ret do
     local ev = cast(inotify_event_pt, buffer + off)
-    local le = getflags(ev.mask, "IN_", in_recv_ev, {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)})
+    local le = getflags(ev.mask, "IN_", in_recv_ev, in_recv_lev, {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)})
     if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
     off = off + sizeof(inotify_event_t(ev.len))
@@ -3275,6 +3286,9 @@ function S.klogctl(t, buf, len)
   return true
 end
 
+local time_flags = {"TIME_OK", "TIME_INS", "TIME_DEL", "TIME_OOP", "TIME_WAIT", "TIME_BAD"}
+local time_lflags = lflag("TIME_", time_flags)
+
 function S.adjtimex(t)
   if not t then t = timex_t() end
   if type(t) == 'table' then  -- TODO pull this out to general initialiser for timex_t
@@ -3285,7 +3299,7 @@ function S.adjtimex(t)
   local ret = C.adjtimex(t)
   if ret == -1 then return errorret() end
   -- we need to return a table, as we need to return both ret and the struct timex. should probably put timex fields in table
-  local r = getflags(ret, "TIME_", {"TIME_OK", "TIME_INS", "TIME_DEL", "TIME_OOP", "TIME_WAIT", "TIME_BAD"}, {timex = t})
+  local r = getflags(ret, "TIME_", time_flags, time_lflags, {timex = t})
   return r
 end
 

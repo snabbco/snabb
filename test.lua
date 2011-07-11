@@ -411,7 +411,7 @@ assert(sel.count == 1, "one fd available for read now")
 
 r = assert(ep:epoll_wait(nil, 1, 100, "winch, hup"))
 assert(#r == 1, "one event now")
-assert(r[1].epollin, "read event")
+assert(r[1].EPOLLIN, "read event")
 assert(ep:close())
 
 n = assert(c:read()) -- clear event
