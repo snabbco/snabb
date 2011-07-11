@@ -3017,7 +3017,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   if not maxevents then maxevents = 1 end
   if not events then events = epoll_events_t(maxevents) end
   if sigmask then sigmask = mksigset(sigmask) end
-  local ret = C.epoll_pwait(getfd(epfd), events, maxevents, timeout or 0, sigmask)
+  local ret = C.epoll_pwait(getfd(epfd), events, maxevents, timeout or -1, sigmask)
   if ret == -1 then return errorret() end
   local r = {}
   for i = 1, ret do -- put in Lua array
