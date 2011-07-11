@@ -329,7 +329,7 @@ assert(s:close())
 -- unix domain sockets
 local sv = assert(S.socketpair("unix", "stream"))
 
-assert(sv[2]:setsockopt(S.SOL_SOCKET, S.SO_PASSCRED, true)) -- enable receive creds
+assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
 local so = assert(sv[2]:getsockopt(S.SOL_SOCKET, S.SO_PASSCRED))
 assert(so == 1, "getsockopt should have updated value")
 

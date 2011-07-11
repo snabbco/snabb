@@ -88,6 +88,8 @@ itimerspec should have some metamethods to get numeric times out of it.
 
 accept should return fd-like structure, but with extra fields? Added a fileno field, so can use like fd, but does not have methods...
 
+getsockopt should return table of flags
+
 ### Missing functions
 
 pselect, ppoll

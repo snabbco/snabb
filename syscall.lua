@@ -2535,7 +2535,7 @@ function S.setsockopt(fd, level, optname, optval, optlen)
     optval = int1_t(optval)
     optlen = sizeof(int1_t)
   end
-  return retbool(C.setsockopt(getfd(fd), level, optname, optval, optlen))
+  return retbool(C.setsockopt(getfd(fd), stringflag(level, "SOL_"), stringflag(optname, "SO_"), optval, optlen))
 end
 
 function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool options
@@ -2648,7 +2648,7 @@ function S.bind(sockfd, addr, addrlen)
   return retbool(C.bind(getfd(sockfd), cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
-function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or 0)) end
+function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or S.SOMAXCONN)) end
 function S.connect(sockfd, addr, addrlen)
   return retbool(C.connect(getfd(sockfd), cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
