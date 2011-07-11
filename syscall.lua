@@ -2100,7 +2100,7 @@ function split(delimiter, text)
   end
   return list
 end
-function trim (s)
+function trim(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 -- take a bunch of flags in a string and return a number
@@ -2970,9 +2970,13 @@ function S.epoll_create(flags)
   return retfd(C.epoll_create1(stringflags(flags, "EPOLL_")))
 end
 
-function S.epoll_ctl(epfd, op, fd, events, data)
-  local event = epoll_event_t{events = stringflags(events, "EPOLL")}
-  if data then event.data.u64 = data else event.data.fd = getfd(fd) end
+function S.epoll_ctl(epfd, op, fd, event, data)
+  if not istype(epoll_event_t, event) then
+    local events = stringflags(event, "EPOLL")
+    event = epoll_event_t()
+    event.events = events
+    if data then event.data.u64 = data else event.data.fd = getfd(fd) end
+  end
   return retbool(C.epoll_ctl(getfd(epfd), stringflag(op, "EPOLL_CTL_"), getfd(fd), event))
 end
 
