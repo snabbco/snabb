@@ -1179,8 +1179,9 @@ local buffer_t = typeof("char[?]")
 
 --get fd from standard string, integer, or cdata
 function getfd(fd)
+  if not fd then return nil end
   if type(fd) == 'number' then return int_t(fd) end
-  if istype(fd_t, fd) then return int_t(fd.fileno) end
+  if fd.fileno then return int_t(fd.fileno) end
   if type(fd) == 'string' then
     if fd == 'stdin' or fd == 'STDIN_FILENO' then return int_t(0) end
     if fd == 'stdout' or fd == 'STDOUT_FILENO' then return int_t(1) end
@@ -2663,7 +2664,7 @@ function S.accept(sockfd, flags)
     else ret = C.accept4(getfd(sockfd), cast(sockaddr_pt, ss), addrlen, stringflags(flags, "SOCK_"))
   end
   if ret == -1 then return errorret() end
-  return saret(ss, addrlen[0], {fd = fd_t(ret)})
+  return saret(ss, addrlen[0], {fd = fd_t(ret), fileno = tonumber(ret)})
 end
 
 function S.getsockname(sockfd)
