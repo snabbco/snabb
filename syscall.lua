@@ -2331,13 +2331,11 @@ function S.close(fd)
   if ret == -1 then
     local errno = ffi.errno()
     if istype(fd_t, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
-      ffi.gc(fd, nil)
       fd.fileno = -1 -- make sure cannot accidentally close this fd object again
     end
     return errorret()
   end
   if istype(fd_t, fd) then
-    ffi.gc(fd, nil)
     fd.fileno = -1 -- make sure cannot accidentally close this fd object again
   end
   return true
@@ -2649,6 +2647,7 @@ function S.accept(sockfd, flags, addr, addrlen)
     else ret = C.accept4(getfd(sockfd), cast(sockaddr_pt, addr), addrlen, stringflags(flags, "SOCK_"))
   end
   if ret == -1 then return errorret() end
+  --if ret == -1 then return nil, "testing accept error return" end
   return saret(addr, addrlen[0], {fd = fd_t(ret), fileno = tonumber(ret)})
 end
 
