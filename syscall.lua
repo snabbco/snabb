@@ -2647,8 +2647,8 @@ function S.accept(sockfd, flags, addr, addrlen)
     then ret = C.accept(getfd(sockfd), cast(sockaddr_pt, addr), addrlen)
     else ret = C.accept4(getfd(sockfd), cast(sockaddr_pt, addr), addrlen, stringflags(flags, "SOCK_"))
   end
-  --if ret == -1 then return errorret() end
-  if ret == -1 then return nil, "testing accept error return" end
+  if ret == -1 then return errorret() end
+  --if ret == -1 then return nil, "testing accept error return" end -- small performance improvement
   return saret(addr, addrlen[0], {fd = fd_t(ret), fileno = tonumber(ret)})
 end
 
