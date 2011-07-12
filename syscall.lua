@@ -2646,8 +2646,8 @@ function S.accept(sockfd, flags, addr, addrlen)
     then ret = C.accept(getfd(sockfd), cast(sockaddr_pt, addr), addrlen)
     else ret = C.accept4(getfd(sockfd), cast(sockaddr_pt, addr), addrlen, stringflags(flags, "SOCK_"))
   end
-  if ret == -1 then return errorret() end
-  --if ret == -1 then return nil, "testing accept error return" end
+  --if ret == -1 then return errorret() end
+  if ret == -1 then return nil, "testing accept error return" end
   return saret(addr, addrlen[0], {fd = fd_t(ret), fileno = tonumber(ret)})
 end
 
@@ -3184,19 +3184,17 @@ function S.timerfd_read(fd, buffer, size)
 end
 
 -- aio functions
-local getctx = function(ctx) return ulong_t(ctx.ctx) end -- aio_context_t is really unsigned long
+local function getctx(ctx) return ulong_t(ctx.ctx) end -- aio_context_t is really unsigned long
 
 function S.io_setup(nr_events)
-  local ctxp = aio_context_1t()
-  local ret = C.syscall(S.SYS_io_setup, cast(uint_t, nr_events), ctxp)
-  if ret == -1 then return errorret() end
   local ctx = aio_context_t()
-  ffi.copy(ctx, ctxp, sizeof(aio_context_t))
+  local ret = C.syscall(S.SYS_io_setup, uint_t(nr_events), ctx)
+  if ret == -1 then return errorret() end
   return ctx
 end
 
 function S.io_destroy(ctx)
-  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx)))
+  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close to zero and not redo.
 end
 
 --[[
@@ -3938,7 +3936,7 @@ S.t = {
   iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
   sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t, uint64 = uint64_t, macaddr = macaddr_t,
   sockaddr_storage = sockaddr_storage_t, sockaddr_in6 = sockaddr_in6_t, pollfds = pollfds_t, epoll_events = epoll_events_t,
-  epoll_event = epoll_event_t
+  epoll_event = epoll_event_t, ulong = ulong_t, aio_context = aio_context_t
 }
 
 return S

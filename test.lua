@@ -791,7 +791,8 @@ local b = assert(S.bridge_list())
 local ctx = assert(S.io_setup(8))
 assert(ctx:destroy())
 local ctx = assert(S.io_setup(8))
-local ctx2 = {ctx = tonumber(ctx.ctx)} -- copy context
+local ctx2 = S.t.aio_context()
+S.copy(ctx2, ctx, S.sizeof(S.t.aio_context))
 ctx = nil
 collectgarbage("collect")
 ok, err = S.io_destroy(ctx2)
