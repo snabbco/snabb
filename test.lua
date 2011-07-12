@@ -597,7 +597,6 @@ assert(n == 1, "should have exactly one timer expiry")
 
 assert(fd:close())
 
-
 local syslog = assert(S.klogctl(3))
 assert(#syslog > 20, "should be something in syslog")
 
@@ -712,6 +711,8 @@ assert(#n == #str)
 assert(fd:close())
 assert(p[1]:close())
 assert(p[2]:close())
+assert(pp[1]:close())
+assert(pp[2]:close())
 assert(s[1]:close())
 assert(s[2]:close())
 

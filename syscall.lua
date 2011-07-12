@@ -1230,6 +1230,7 @@ typedef unsigned short int sa_family_t;
 typedef unsigned long size_t;
 typedef long ssize_t;
 typedef long off_t;
+typedef long kernel_off_t;
 typedef long time_t;
 typedef long blksize_t;
 typedef long blkcnt_t;
@@ -1516,9 +1517,9 @@ struct inotify_event {
 };
 struct linux_dirent {
   long           d_ino;
-  off_t          d_off;
+  kernel_off_t   d_off;
   unsigned short d_reclen;
-  char           d_name[];
+  char           d_name[256];
 };
 typedef union epoll_data {
   void *ptr;
@@ -2413,7 +2414,7 @@ end
 
 function S.reboot(cmd) return retbool(C.reboot(stringflag(cmd, "LINUX_REBOOT_CMD_"))) end
 
-function lflag(prefix, t)
+local function lflag(prefix, t)
   local l = {}
   for i, v in ipairs(t) do
     l[i] = v:sub(#prefix + 1):lower()
@@ -2432,7 +2433,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   local d = {}
   local ret
   repeat
-    ret = C.syscall(S.SYS_getdents, uint_t(getfd(fd)), buf, uint_t(size))
+    ret = C.syscall(S.SYS_getdents, getfd(fd), buf, uint_t(size))
     if ret == -1 then return errorret() end
     local i = 0
     while i < ret do
@@ -2441,7 +2442,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
       local dd = getflag(t, "DT_", dt_flags, dt_lflags)
       dd.inode = tonumber(dp.d_ino)
       dd.offset = tonumber(dp.d_off)
-      d[ffi.string(dp.d_name)] = dd
+      d[ffi.string(dp.d_name)] = dd -- could calculate length
       i = i + dp.d_reclen
     end
   until noiter or ret == 0
@@ -3022,11 +3023,11 @@ function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
   local offin, offout = off_in, off_out
   if off_in and not istype(loff_1t, off_in) then
     offin = loff_1t()
-    offin[1] = off_in
+    offin[0] = off_in
   end
   if off_out and not istype(loff_1t, off_out) then
     offout = loff_1t()
-    offout[1] = off_out
+    offout[0] = off_out
   end
   return retnum(C.splice(getfd(fd_in), offin, getfd(fd_out), offout, len, stringflags(flags, "SPLICE_F_")))
 end
@@ -3738,7 +3739,7 @@ function S.writefile(name, str, mode) -- write string to named file. specify mod
 end
 
 function S.dirfile(name, nodots) -- return the directory entries in a file, remove . and .. if nodots true
-  local fd, d, _, err
+  local fd, d, ok, err
   fd, err = S.open(name, S.O_DIRECTORY + S.O_RDONLY)
   if err then return nil, err end
   d, err = fd:getdents()
@@ -3747,8 +3748,8 @@ function S.dirfile(name, nodots) -- return the directory entries in a file, remo
     d["."] = nil
     d[".."] = nil
   end
-  _, err = fd:close()
-  if err then return nil, err end
+  ok, err = fd:close()
+  if not ok then return nil, err end
   return d
 end
 
