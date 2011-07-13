@@ -412,6 +412,7 @@ assert(sel.count == 1, "one fd available for read now")
 r = assert(ep:epoll_wait(nil, 1, 100, "winch, hup"))
 assert(#r == 1, "one event now")
 assert(r[1].EPOLLIN, "read event")
+assert(r[1].fileno == c.fileno, "expect to get fileno of ready file back") -- by default our epoll_ctl sets this
 assert(ep:close())
 
 n = assert(c:read()) -- clear event
