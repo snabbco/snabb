@@ -3216,7 +3216,7 @@ function S.io_setup(nr_events)
 end
 
 function S.io_destroy(ctx)
-  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close to zero and not redo.
+  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close to zero and not redo, unclear what an invalid value is (0?)
 end
 
 --[[
@@ -3224,9 +3224,20 @@ local iocb_t = typeof("struct iocb")
 local iocbs_t = typeof("struct iocb[?]")
 local iocbs_pt = typeof("struct iocb *[?]")
 ]]
-function S.io_submit(ctx, nr, iocb) -- takes an array of pointers to iocb
-
-
+function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
+  if not istype(iocbs_pt, iocb)
+    local io = iocb
+    nr = #io
+    iocb = iocbs_pt(nr)
+    iocba = iocbs_t[nr]
+    for i = 0, nr - 1 do
+      local ioi = io[i + 1]
+      iocb[i] = iocba + i -- do we need to cast?
+      iocba[i] = iocb_t()
+      iocba[i].aio_lio_opcode = getflag(ioi.cmd, "IOCB_CMD_")
+      --- rest of fields missing
+    end
+  end
   return retnum(C.syscall(S.SYS_io_submit, getctx(ctx), long_t(nr), iocb))
 end
 
