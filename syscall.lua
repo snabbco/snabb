@@ -1527,10 +1527,6 @@ typedef union epoll_data {
   uint32_t u32;
   uint64_t u64;
 } epoll_data_t;
-struct epoll_event {
-  uint32_t events;      /* Epoll events */
-  epoll_data_t data;    /* User data variable */
-}  __attribute__ ((packed));
 struct signalfd_siginfo {
   uint32_t ssi_signo;
   int32_t ssi_errno;
@@ -1717,6 +1713,23 @@ elseif arch == 'arm' then
   end
 end
 
+-- epoll packed on x86_64 only (so same as x86)
+if ffi.arch == "x64" then
+ffi.cdef[[
+struct epoll_event {
+  uint32_t events;      /* Epoll events */
+  epoll_data_t data;    /* User data variable */
+}  __attribute__ ((packed));
+]]
+else
+ffi.cdef[[
+struct epoll_event {
+  uint32_t events;      /* Epoll events */
+  epoll_data_t data;    /* User data variable */
+};
+]]
+end
+
 -- endian dependent
 if ffi.abi("le") then
 ffi.cdef[[
@@ -1837,6 +1850,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 
 int epoll_create1(int flags);
+int epoll_create(int size);
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
 int epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *sigmask);
@@ -3006,7 +3020,7 @@ local epoll_flags = {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR"
 local epoll_lflags = lflag("EPOLL", epoll_flags)
 
 function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes optional epoll_pwait functionality
-  if not maxevents then maxevents = 1 end
+  if not maxevents then maxevents = 16 end
   if not events then events = epoll_events_t(maxevents) end
   if sigmask then sigmask = mksigset(sigmask) end
   local ret
@@ -3019,7 +3033,9 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   local r = {}
   for i = 1, ret do -- put in Lua array
     local e = events[i - 1]
-    r[i] = getflags(e.events, "EPOLL", epoll_flags, epoll_lflags, {fileno = tonumber(e.data.fd), data = e.data.u64})
+    r[i] = getflags(e.events, "EPOLL", epoll_flags, epoll_lflags)
+    r[i].fileno = tonumber(e.data.fd)
+    r[i].data = uint64_t(e.data.u64)
   end
   return r
 end
