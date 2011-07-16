@@ -3225,7 +3225,7 @@ local iocbs_t = typeof("struct iocb[?]")
 local iocbs_pt = typeof("struct iocb *[?]")
 ]]
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
-  if not istype(iocbs_pt, iocb)
+  if not istype(iocbs_pt, iocb) then
     local io = iocb
     nr = #io
     iocb = iocbs_pt(nr)
