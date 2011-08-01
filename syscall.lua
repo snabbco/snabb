@@ -2508,7 +2508,7 @@ end
 
 function S.write(fd, buf, count) return retnum(C.write(getfd(fd), buf, count or #buf)) end
 function S.pread(fd, buf, count, offset) return retnum(C.pread(getfd(fd), buf, count, offset)) end
-function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf, count, offset)) end
+function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf, count or #buf, offset)) end
 function S.lseek(fd, offset, whence) return retnum(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
@@ -2968,6 +2968,17 @@ local poll_flags = {"POLLIN", "POLLOUT", "POLLPRI", "POLLRDHUP", "POLLERR", "POL
 local poll_lflags = lflag("POLL", poll_flags)
 
 function S.poll(fds, nfds, timeout)
+  if type(fds) ~= "cdata" then
+    local pf = fds
+    nfds = #pf
+    fds = pollfds_t(nfds)
+    for i = 0, nfds - 1 do
+      local p = pf[i + 1]
+      fds[i].fd = getfd(p.fd)
+      fds[i].events = stringflags(p.events, "POLL")
+      fds[i].revents = 0
+    end
+  end
   local ret = C.poll(fds, nfds, timeout or -1)
   if ret == -1 then return errorret() end
   local r = {}
@@ -3225,7 +3236,7 @@ local iocbs_t = typeof("struct iocb[?]")
 local iocbs_pt = typeof("struct iocb *[?]")
 ]]
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
-  if not istype(iocbs_pt, iocb) then
+  if type(iocb) ~= "cdata" then
     local io = iocb
     nr = #io
     iocb = iocbs_pt(nr)

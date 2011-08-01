@@ -803,9 +803,12 @@ assert(not ok, "should have closed aio ctx")
 
 fd = S.creat(tmpfile, "IRWXU")
 assert(S.unlink(tmpfile))
+assert(fd:pwrite(teststring, nil, 0))
+local efd = assert(S.eventfd())
 local ctx = assert(S.io_setup(8))
-assert(ctx:submit{opcode = "pread", data = 42, fd = fd, buf = buffer, nbytes = 10, offset = 0})
-
+assert(ctx:submit{opcode = "pread", data = 42, fd = fd, buf = buf, nbytes = #teststring, offset = 0, resfd = efd})
+local p = assert(S.poll({fd = efd, events = "in"}, 0, 1000))
+assert(#p == 1, "expect one event available from poll")
 assert(ctx:destroy())
 assert(fd:close())
 
