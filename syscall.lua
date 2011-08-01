@@ -3229,13 +3229,22 @@ function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note 
     local io = iocb
     nr = #io
     iocb = iocbs_pt(nr)
-    iocba = iocbs_t[nr]
+    iocba = iocbs_t(nr)
     for i = 0, nr - 1 do
       local ioi = io[i + 1]
       iocb[i] = iocba + i -- do we need to cast?
       iocba[i] = iocb_t()
       iocba[i].aio_lio_opcode = getflag(ioi.cmd, "IOCB_CMD_")
-      --- rest of fields missing
+      iocba[i].aio_data = ioi.data or 0
+      iocba[i].aio_reqprio = ioi.reqprio or 0
+      iocba[i].aio_fildes = getfd(ioi.fd)
+      iocba[i].aio_buf = ioi.buf
+      iocba[i].aio_nbytes = ioi.nbytes
+      iocba[i].aio_offset = ioi.offset
+      if ioi.resfd then
+        iocba[i].aio_flags = iocba[i].aio_flags + S.IOCB_FLAG_RESFD
+        iocba[i].aio_resfd = getfd(ioi.resfd)
+      end
     end
   end
   return retnum(C.syscall(S.SYS_io_submit, getctx(ctx), long_t(nr), iocb))

@@ -801,6 +801,14 @@ collectgarbage("collect")
 ok, err = S.io_destroy(ctx2)
 assert(not ok, "should have closed aio ctx")
 
+fd = S.creat(tmpfile, "IRWXU")
+assert(S.unlink(tmpfile))
+local ctx = assert(S.io_setup(8))
+assert(ctx:submit{opcode = "pread", data = 42, fd = fd, buf = buffer, nbytes = 10, offset = 0})
+
+assert(ctx:destroy())
+assert(fd:close())
+
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
 assert(S.mkdir(tmpfile))

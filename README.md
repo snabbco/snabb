@@ -90,6 +90,8 @@ accept should return fd-like structure, but with extra fields? Added a fileno fi
 
 getsockopt should return table of flags
 
+Generate C coe to test size and offset of each struct
+
 ### Missing functions
 
 pselect, ppoll
@@ -100,6 +102,7 @@ sigqueue
 io_cancel(2), io_destroy(2), io_setup(2), io_submit(2), ...
 sync_file_range(2)
 getitimer, setitimer
+capset, capget
 ...
 
 ### Testing
