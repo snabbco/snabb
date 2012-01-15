@@ -976,26 +976,44 @@ S.VT0    = octal('0000000')
 S.VT1    = octal('0040000')
 S.XTABS  = octal('0014000')
 
+local bits_speed_map = { }
+local speed_bits_map = { }
+local function defspeed(speed, bits)
+  bits = octal(bits)
+  bits_speed_map[bits] = speed
+  speed_bits_map[speed] = bits
+  S['B'..speed] = bits
+end
+local function bits_to_speed(bits)
+  local speed = bits_speed_map[bits]
+  if not speed then error("unknown speedbits: " .. bits) end
+  return speed
+end
+local function speed_to_bits(speed)
+  local bits = speed_bits_map[speed]
+  if not bits then error("unknown speed: " .. speed) end
+  return bits
+end
 -- termios - c_cflag bit meaning
 S.CBAUD      = octal('0010017')
-S.B0         = octal('0000000') -- hang up
-S.B50        = octal('0000001')
-S.B75        = octal('0000002')
-S.B110       = octal('0000003')
-S.B134       = octal('0000004')
-S.B150       = octal('0000005')
-S.B200       = octal('0000006')
-S.B300       = octal('0000007')
-S.B600       = octal('0000010')
-S.B1200      = octal('0000011')
-S.B1800      = octal('0000012')
-S.B2400      = octal('0000013')
-S.B4800      = octal('0000014')
-S.B9600      = octal('0000015')
-S.B19200     = octal('0000016')
-S.B38400     = octal('0000017')
-S.EXTA       = octal('B19200')
-S.EXTB       = octal('B38400')
+defspeed(0, '0000000') -- hang up
+defspeed(50, '0000001')
+defspeed(75, '0000002')
+defspeed(110, '0000003')
+defspeed(134, '0000004')
+defspeed(150, '0000005')
+defspeed(200, '0000006')
+defspeed(300, '0000007')
+defspeed(600, '0000010')
+defspeed(1200, '0000011')
+defspeed(1800, '0000012')
+defspeed(2400, '0000013')
+defspeed(4800, '0000014')
+defspeed(9600, '0000015')
+defspeed(19200, '0000016')
+defspeed(38400, '0000017')
+S.EXTA       = S.B19200
+S.EXTB       = S.B38400
 S.CSIZE      = octal('0000060')
 S.CS5        = octal('0000000')
 S.CS6        = octal('0000020')
@@ -1008,21 +1026,21 @@ S.PARODD     = octal('0001000')
 S.HUPCL      = octal('0002000')
 S.CLOCAL     = octal('0004000')
 S.CBAUDEX    = octal('0010000')
-S.B57600     = octal('0010001')
-S.B115200    = octal('0010002')
-S.B230400    = octal('0010003')
-S.B460800    = octal('0010004')
-S.B500000    = octal('0010005')
-S.B576000    = octal('0010006')
-S.B921600    = octal('0010007')
-S.B1000000   = octal('0010010')
-S.B1152000   = octal('0010011')
-S.B1500000   = octal('0010012')
-S.B2000000   = octal('0010013')
-S.B2500000   = octal('0010014')
-S.B3000000   = octal('0010015')
-S.B3500000   = octal('0010016')
-S.B4000000   = octal('0010017')
+defspeed(57600, '0010001')
+defspeed(115200, '0010002')
+defspeed(230400, '0010003')
+defspeed(460800, '0010004')
+defspeed(500000, '0010005')
+defspeed(576000, '0010006')
+defspeed(921600, '0010007')
+defspeed(1000000, '0010010')
+defspeed(1152000, '0010011')
+defspeed(1500000, '0010012')
+defspeed(2000000, '0010013')
+defspeed(2500000, '0010014')
+defspeed(3000000, '0010015')
+defspeed(3500000, '0010016')
+defspeed(4000000, '0010017')
 S.__MAX_BAUD = S.B4000000
 S.CIBAUD     = octal('002003600000') -- input baud rate (not used)
 S.CMSPAR     = octal('010000000000') -- mark or space (stick) parity
@@ -4140,23 +4158,27 @@ function S.cfmakeraw(termios)
 end
 
 function S.cfgetispeed(termios)
-  return retnum(C.cfgetispeed(termios))
+  local bits = C.cfgetispeed(termios)
+  if bits == -1 then return errorret() end
+  return bits_to_speed(bits)
 end
 
 function S.cfgetospeed(termios)
-  return retnum(C.cfgetospeed(termios))
+  local bits = C.cfgetospeed(termios)
+  if bits == -1 then return errorret() end
+  return bits_to_speed(bits)
 end
 
 function S.cfsetispeed(termios, speed)
-  return retbool(C.cfsetispeed(termios, speed))
+  return retbool(C.cfsetispeed(termios, speed_to_bits(speed)))
 end
 
 function S.cfsetospeed(termios, speed)
-  return retbool(C.cfsetospeed(termios, speed))
+  return retbool(C.cfsetospeed(termios, speed_to_bits(speed)))
 end
 
 function S.cfsetspeed(termios, speed)
-  return retbool(C.cfsetspeed(termios, speed))
+  return retbool(C.cfsetspeed(termios, speed_to_bits(speed)))
 end
 
 local termios_t = ffi.metatype("struct termios", {
