@@ -904,6 +904,163 @@ S.PR_MCE_KILL_DEFAULT      = 2
 S.PR_MCE_KILL_GET  = 34
 S.PR_SET_PTRACER   = 0x59616d61 -- Ubuntu extension
 
+-- termios
+S.NCCS = 32
+
+-- termios - c_cc characters
+S.VINTR    = 0
+S.VQUIT    = 1
+S.VERASE   = 2
+S.VKILL    = 3
+S.VEOF     = 4
+S.VTIME    = 5
+S.VMIN     = 6
+S.VSWTC    = 7
+S.VSTART   = 8
+S.VSTOP    = 9
+S.VSUSP    = 10
+S.VEOL     = 11
+S.VREPRINT = 12
+S.VDISCARD = 13
+S.VWERASE  = 14
+S.VLNEXT   = 15
+S.VEOL2    = 16
+
+-- termios - c_iflag bits
+S.IGNBRK  = octal('0000001')
+S.BRKINT  = octal('0000002')
+S.IGNPAR  = octal('0000004')
+S.PARMRK  = octal('0000010')
+S.INPCK   = octal('0000020')
+S.ISTRIP  = octal('0000040')
+S.INLCR   = octal('0000100')
+S.IGNCR   = octal('0000200')
+S.ICRNL   = octal('0000400')
+S.IUCLC   = octal('0001000')
+S.IXON    = octal('0002000')
+S.IXANY   = octal('0004000')
+S.IXOFF   = octal('0010000')
+S.IMAXBEL = octal('0020000')
+S.IUTF8   = octal('0040000')
+
+-- termios - c_oflag bits
+S.OPOST  = octal('0000001')
+S.OLCUC  = octal('0000002')
+S.ONLCR  = octal('0000004')
+S.OCRNL  = octal('0000010')
+S.ONOCR  = octal('0000020')
+S.ONLRET = octal('0000040')
+S.OFILL  = octal('0000100')
+S.OFDEL  = octal('0000200')
+S.NLDLY  = octal('0000400')
+S.NL0    = octal('0000000')
+S.NL1    = octal('0000400')
+S.CRDLY  = octal('0003000')
+S.CR0    = octal('0000000')
+S.CR1    = octal('0001000')
+S.CR2    = octal('0002000')
+S.CR3    = octal('0003000')
+S.TABDLY = octal('0014000')
+S.TAB0   = octal('0000000')
+S.TAB1   = octal('0004000')
+S.TAB2   = octal('0010000')
+S.TAB3   = octal('0014000')
+S.BSDLY  = octal('0020000')
+S.BS0    = octal('0000000')
+S.BS1    = octal('0020000')
+S.FFDLY  = octal('0100000')
+S.FF0    = octal('0000000')
+S.FF1    = octal('0100000')
+S.VTDLY  = octal('0040000')
+S.VT0    = octal('0000000')
+S.VT1    = octal('0040000')
+S.XTABS  = octal('0014000')
+
+-- termios - c_cflag bit meaning
+S.CBAUD      = octal('0010017')
+S.B0         = octal('0000000') -- hang up
+S.B50        = octal('0000001')
+S.B75        = octal('0000002')
+S.B110       = octal('0000003')
+S.B134       = octal('0000004')
+S.B150       = octal('0000005')
+S.B200       = octal('0000006')
+S.B300       = octal('0000007')
+S.B600       = octal('0000010')
+S.B1200      = octal('0000011')
+S.B1800      = octal('0000012')
+S.B2400      = octal('0000013')
+S.B4800      = octal('0000014')
+S.B9600      = octal('0000015')
+S.B19200     = octal('0000016')
+S.B38400     = octal('0000017')
+S.EXTA       = octal('B19200')
+S.EXTB       = octal('B38400')
+S.CSIZE      = octal('0000060')
+S.CS5        = octal('0000000')
+S.CS6        = octal('0000020')
+S.CS7        = octal('0000040')
+S.CS8        = octal('0000060')
+S.CSTOPB     = octal('0000100')
+S.CREAD      = octal('0000200')
+S.PARENB     = octal('0000400')
+S.PARODD     = octal('0001000')
+S.HUPCL      = octal('0002000')
+S.CLOCAL     = octal('0004000')
+S.CBAUDEX    = octal('0010000')
+S.B57600     = octal('0010001')
+S.B115200    = octal('0010002')
+S.B230400    = octal('0010003')
+S.B460800    = octal('0010004')
+S.B500000    = octal('0010005')
+S.B576000    = octal('0010006')
+S.B921600    = octal('0010007')
+S.B1000000   = octal('0010010')
+S.B1152000   = octal('0010011')
+S.B1500000   = octal('0010012')
+S.B2000000   = octal('0010013')
+S.B2500000   = octal('0010014')
+S.B3000000   = octal('0010015')
+S.B3500000   = octal('0010016')
+S.B4000000   = octal('0010017')
+S.__MAX_BAUD = S.B4000000
+S.CIBAUD     = octal('002003600000') -- input baud rate (not used)
+S.CMSPAR     = octal('010000000000') -- mark or space (stick) parity
+S.CRTSCTS    = octal('020000000000') -- flow control
+
+-- termios - c_lflag bits
+S.ISIG    = octal('0000001')
+S.ICANON  = octal('0000002')
+S.XCASE   = octal('0000004')
+S.ECHO    = octal('0000010')
+S.ECHOE   = octal('0000020')
+S.ECHOK   = octal('0000040')
+S.ECHONL  = octal('0000100')
+S.NOFLSH  = octal('0000200')
+S.TOSTOP  = octal('0000400')
+S.ECHOCTL = octal('0001000')
+S.ECHOPRT = octal('0002000')
+S.ECHOKE  = octal('0004000')
+S.FLUSHO  = octal('0010000')
+S.PENDIN  = octal('0040000')
+S.IEXTEN  = octal('0100000')
+
+-- termios - tcflow() and TCXONC use these
+S.TCOOFF = 0
+S.TCOON  = 1
+S.TCIOFF = 2
+S.TCION  = 3
+
+-- termios - tcflush() and TCFLSH use these
+S.TCIFLUSH  = 0
+S.TCOFLUSH  = 1
+S.TCIOFLUSH = 2
+
+-- termios - tcsetattr uses these
+S.TCSANOW   = 0
+S.TCSADRAIN = 1
+S.TCSAFLUSH = 2
+
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
 if arch == "x86" then
@@ -1552,6 +1709,22 @@ struct io_event {
   int64_t            res;
   int64_t            res2;
 };
+
+/* termios */
+typedef unsigned char	cc_t;
+typedef unsigned int	speed_t;
+typedef unsigned int	tcflag_t;
+struct termios
+  {
+    tcflag_t c_iflag;		/* input mode flags */
+    tcflag_t c_oflag;		/* output mode flags */
+    tcflag_t c_cflag;		/* control mode flags */
+    tcflag_t c_lflag;		/* local mode flags */
+    cc_t c_line;			/* line discipline */
+    cc_t c_cc[32];		/* control characters */
+    speed_t c_ispeed;		/* input speed */
+    speed_t c_ospeed;		/* output speed */
+  };
 ]]
 
 -- Linux struct siginfo padding depends on architecture
@@ -1946,6 +2119,20 @@ int setenv(const char *name, const char *value, int overwrite);
 int unsetenv(const char *name);
 int clearenv(void);
 char *getenv(const char *name);
+
+int tcgetattr(int fd, struct termios *termios_p);
+int tcsetattr(int fd, int optional_actions, const struct termios *termios_p);
+int tcsendbreak(int fd, int duration);
+int tcdrain(int fd);
+int tcflush(int fd, int queue_selector);
+int tcflow(int fd, int action);
+void cfmakeraw(struct termios *termios_p);
+speed_t cfgetispeed(const struct termios *termios_p);
+speed_t cfgetospeed(const struct termios *termios_p);
+int cfsetispeed(struct termios *termios_p, speed_t speed);
+int cfsetospeed(struct termios *termios_p, speed_t speed);
+int cfsetspeed(struct termios *termios_p, speed_t speed);
+pid_t tcgetsid(int fd);
 ]]
 
 -- Lua type constructors corresponding to defined types
@@ -3947,6 +4134,70 @@ function S.bridge_list()
   return b
 end
 
+function S.cfmakeraw(termios)
+  C.cfmakeraw(termios)
+  return true
+end
+
+function S.cfgetispeed(termios)
+  return retnum(C.cfgetispeed(termios))
+end
+
+function S.cfgetospeed(termios)
+  return retnum(C.cfgetospeed(termios))
+end
+
+function S.cfsetispeed(termios, speed)
+  return retbool(C.cfsetispeed(termios, speed))
+end
+
+function S.cfsetospeed(termios, speed)
+  return retbool(C.cfsetospeed(termios, speed))
+end
+
+function S.cfsetspeed(termios, speed)
+  return retbool(C.cfsetspeed(termios, speed))
+end
+
+local termios_t = ffi.metatype("struct termios", {
+  __index = {
+    cfmakeraw = S.cfmakeraw,
+    cfgetispeed = S.cfgetispeed,
+    cfgetospeed = S.cfgetospeed,
+    cfsetispeed = S.cfsetispeed,
+    cfsetospeed = S.cfsetospeed,
+    cfsetspeed = S.cfsetspeed
+  }
+})
+
+function S.tcgetattr(fd)
+  local termios = termios_t()
+  local ret = C.tcgetattr(getfd(fd), termios)
+  if ret == -1 then return errorret() end
+  return termios
+end
+
+function S.tcsetattr(fd, optional_actions, termios)
+  return retbool(C.tcsetattr(getfd(fd), stringflag(optional_actions, "TCSA"),
+                             termios))
+end
+
+function S.tcsendbreak(fd, duration)
+  return retbool(C.tcsendbreak(getfd(fd), duration))
+end
+
+function S.tcdrain(fd)
+  return retbool(C.tcdrain(getfd(fd)))
+end
+
+function S.tcflush(fd, queue_selector)
+  return retbool(C.tcflush(getfd(fd), stringflag(queue_selector, "TC")))
+end
+
+function S.tcflow(fd, action)
+  return retbool(C.tcflow(getfd(fd), stringflag(action, "TC")))
+end
+
 -- use string types for now
 local threc -- helper for returning varargs
 function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
@@ -3974,7 +4225,8 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
                    'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee',
                    'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
-                   'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead'
+                   'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
+                   'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
@@ -3989,7 +4241,7 @@ S.t = {
   iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
   sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t, uint64 = uint64_t, macaddr = macaddr_t,
   sockaddr_storage = sockaddr_storage_t, sockaddr_in6 = sockaddr_in6_t, pollfds = pollfds_t, epoll_events = epoll_events_t,
-  epoll_event = epoll_event_t, ulong = ulong_t, aio_context = aio_context_t
+  epoll_event = epoll_event_t, ulong = ulong_t, aio_context = aio_context_t, termios = termios_t
 }
 
 return S
