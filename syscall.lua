@@ -16,9 +16,10 @@ local typeof = ffi.typeof
 
 -- convenience so user need not require ffi
 S.string = ffi.string
-S.sizeof = sizeof
-S.cast = cast
+S.sizeof = ffi.sizeof
+S.cast = ffi.cast
 S.copy = ffi.copy
+S.fill = ffi.fill
 
 -- open, fcntl
 S.O_ACCMODE   = octal('0003')
@@ -563,7 +564,7 @@ S.SPLICE_F_NONBLOCK     = 2
 S.SPLICE_F_MORE         = 4
 S.SPLICE_F_GIFT         = 8
 
--- aio
+-- aio - see /usr/include/linux/aio_abi.h
 S.IOCB_CMD_PREAD = 0
 S.IOCB_CMD_PWRITE = 1
 S.IOCB_CMD_FSYNC = 2
@@ -3227,14 +3228,16 @@ function S.io_setup(nr_events)
 end
 
 function S.io_destroy(ctx)
-  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close to zero and not redo, unclear what an invalid value is (0?)
+  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close to zero and not redo, unclear what an invalid value is (0?) else gc calls more than once after close.
 end
 
 --[[
-local iocb_t = typeof("struct iocb")
-local iocbs_t = typeof("struct iocb[?]")
-local iocbs_pt = typeof("struct iocb *[?]")
+function S.io_cancel(ctx, iocb, result) {
+}
 ]]
+
+--function S.op_getevents()
+
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
   if type(iocb) ~= "cdata" then
     local io = iocb
@@ -3243,13 +3246,12 @@ function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note 
     iocba = iocbs_t(nr)
     for i = 0, nr - 1 do
       local ioi = io[i + 1]
-      iocb[i] = iocba + i -- do we need to cast?
-      iocba[i] = iocb_t()
-      iocba[i].aio_lio_opcode = getflag(ioi.cmd, "IOCB_CMD_")
+      iocb[i] = iocba + i
+      iocba[i].aio_lio_opcode = stringflags(ioi.cmd, "IOCB_CMD_")
       iocba[i].aio_data = ioi.data or 0
       iocba[i].aio_reqprio = ioi.reqprio or 0
       iocba[i].aio_fildes = getfd(ioi.fd)
-      iocba[i].aio_buf = ioi.buf
+      iocba[i].aio_buf = cast(int64_t, ioi.buf)
       iocba[i].aio_nbytes = ioi.nbytes
       iocba[i].aio_offset = ioi.offset
       if ioi.resfd then
