@@ -91,7 +91,9 @@ accept should return fd-like structure, but with extra fields? Added a fileno fi
 
 getsockopt should return table of flags
 
-Generate C coe to test size and offset of each struct
+Generate C code to test size and offset of each struct
+
+Siginfo support in sigaction not there yet, as confused by the kernel API.
 
 ### Missing functions
 
@@ -102,7 +104,6 @@ readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue
 io_cancel(2), io_destroy(2), io_setup(2), io_submit(2), ...
 sync_file_range(2)
-getitimer, setitimer
 capset, capget
 ...
 

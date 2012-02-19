@@ -423,6 +423,18 @@ for _, v in ipairs{"POLL_IN", "POLL_OUT", "POLL_MSG", "POLL_ERR", "POLL_PRI", "P
   signal_reasons[S.SIGPOLL][S[v]] = v
 end
 
+-- sigaction
+S.SA_NOCLDSTOP = 0x00000001
+S.SA_NOCLDWAIT = 0x00000002
+S.SA_SIGINFO   = 0x00000004
+S.SA_ONSTACK   = 0x08000000
+S.SA_RESTART   = 0x10000000
+S.SA_NODEFER   = 0x40000000
+S.SA_RESETHAND = 0x80000000
+S.SA_NOMASK = SA_NODEFER
+S.SA_ONESHOT = SA_RESETHAND
+S.SA_RESTORER = 0x04000000
+
 -- timers
 S.ITIMER_REAL = 0
 S.ITIMER_VIRTUAL = 1
@@ -1563,6 +1575,33 @@ struct io_event {
 };
 ]]
 
+-- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
+-- it appears that there is no kernel sigaction in non x86 architectures? Need to check source.
+-- presumably does not care, but the types are a bit of a pain.
+-- temporarily just going to implement sighandler support
+if arch == 'x86' then
+ffi.cdef[[
+struct sigaction {
+  union {
+    sighandler_t sa_handler;
+    void (*sa_sigaction)(int, struct siginfo *, void *);
+  };
+  sigset_t sa_mask;
+  unsigned long sa_flags;
+  void (*sa_restorer)(void);
+};
+]]
+else
+ffi.cdef[[
+struct sigaction {
+  sighandler_t sa_handler;
+  unsigned long sa_flags;
+  void (*sa_restorer)(void);
+  sigset_t sa_mask;
+};
+]]
+end
+
 -- Linux struct siginfo padding depends on architecture
 if ffi.abi("64bit") then
 ffi.cdef[[
@@ -1817,6 +1856,7 @@ pid_t waitpid(pid_t pid, int *status, int options);
 int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 void _exit(int status);
 int signal(int signum, int handler); /* although deprecated, just using to set SIG_ values */
+int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
 int kill(pid_t pid, int sig);
 int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
 int settimeofday(const struct timeval *tv, const void *tz);
@@ -2002,6 +2042,8 @@ local iocbs_t = typeof("struct iocb[?]")
 local iocbs_pt = typeof("struct iocb *[?]")
 local pollfds_t = typeof("struct pollfd [?]")
 local pollfd_pt = typeof("struct pollfd *")
+local sighandler_t = typeof("sighandler_t")
+local sigaction_t = typeof("struct sigaction")
 
 S.RLIM_INFINITY = cast("rlim_t", -1)
 
@@ -2736,7 +2778,113 @@ function S.sethostname(s) -- only accept Lua string, do not see use case for buf
   return retbool(C.sethostname(s, #s))
 end
 
+-- signal set handlers
+local getsigset
+
+local function mksigset(str)
+  if not str then return sigset_t() end
+  if istype(sigset_t, str) then return str end
+  if type(str) == "table" then return str.sigset end
+  local f = sigset_t()
+  local a = split(",", str)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+
+    local d = bit.rshift(sig - 1, 5) -- always 32 bits
+    f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
+  end
+  return f
+end
+
+local function sigismember(set, sig)
+  local d = bit.rshift(sig - 1, 5) -- always 32 bits
+  return bit.band(set.val[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
+end
+
+local function sigaddset(set, sig)
+  set = mksigset(set)
+  local d = bit.rshift(sig - 1, 5)
+  set.val[d] = bit.bor(set.val[d], bit.lshift(1, (sig - 1) % 32))
+  return set
+end
+
+local function sigdelset(set, sig)
+  set = mksigset(set)
+  local d = bit.rshift(sig - 1, 5)
+  set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
+  return set
+end
+
+local function sigaddsets(set, sigs) -- allow multiple
+  if type(sigs) ~= "string" then return getsigset(sigaddset(set, sigs)) end
+  set = mksigset(set)
+  local a = split(",", sigs)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    sigaddset(set, sig)
+  end
+  return getsigset(set)
+end
+
+local function sigdelsets(set, sigs) -- allow multiple
+  if type(sigs) ~= "string" then return getsigset(sigdelset(set, sigs)) end
+  set = mksigset(set)
+  local a = split(",", sigs)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    sigdelset(set, sig)
+  end
+  return getsigset(set)
+end
+
+local sigsetmt = {__index = {add = sigaddsets, del = sigdelsets}}
+
+function getsigset(set)
+  local f = {sigset = set}
+  local isemptyset = true
+  for i = 1, S.NSIG do
+    if sigismember(set, i) then
+      f[signals[i]] = true
+      f[signals[i]:lower():sub(4)] = true
+      isemptyset = false
+    end
+  end
+  f.isemptyset = isemptyset
+  setmetatable(f, sigsetmt)
+  return f
+end
+
+-- does not support passing a function as a handler, use sigaction instead
+-- actualy glibc does not call the syscall anyway, defines in terms of sigaction; we could too
 function S.signal(signum, handler) return retbool(C.signal(stringflag(signum, "SIG"), stringflag(handler, "SIG_"))) end
+
+-- missing siginfo functionality for now, only supports getting signum TODO
+function S.sigaction(signum, handler, mask, flags)
+  local sa
+  if istype(sigaction_t, handler) then sa = handler
+  else
+    if type(handler) == 'string' then
+      handler = cast(sighandler_t, stringflag(handler, "SIG_"))
+    elseif
+      type(handler) == 'function' then handler = cast(sighandler_t, handler)
+    end
+    sa = sigaction_t{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = stringflags(flags, "SA_")}
+  end
+  local old = sigaction_t()
+  local ret = C.sigaction(stringflag(signum, "SIG"), sa, old)
+  if ret == -1 then return errorret() end
+  return old
+end
+
 function S.kill(pid, sig) return retbool(C.kill(pid, stringflag(sig, "SIG"))) end
 function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 
@@ -2860,89 +3008,6 @@ function fdisset(fds, set)
     local fdelt = bit.rshift(fd, 5) -- always 32 bits
     if bit.band(set.fds_bits[fdelt], bit.lshift(1, fd % 32)) ~= 0 then table.insert(f, v) end -- careful not to duplicate fd objects
   end
-  return f
-end
-
--- signal set handlers
-local mksigset, getsigset, sigismember, sigaddset, sigdelset, sigaddsets, sigdelsets, sigsetmt
-
-function mksigset(str)
-  if not str then return sigset_t() end
-  if istype(sigset_t, str) then return str end
-  if type(str) == "table" then return str.sigset end
-  local f = sigset_t()
-  local a = split(",", str)
-  for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
-    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-
-    local d = bit.rshift(sig - 1, 5) -- always 32 bits
-    f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
-  end
-  return f
-end
-
-function sigismember(set, sig)
-  local d = bit.rshift(sig - 1, 5) -- always 32 bits
-  return bit.band(set.val[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
-end
-function sigaddset(set, sig)
-  set = mksigset(set)
-  local d = bit.rshift(sig - 1, 5)
-  set.val[d] = bit.bor(set.val[d], bit.lshift(1, (sig - 1) % 32))
-  return set
-end
-function sigdelset(set, sig)
-  set = mksigset(set)
-  local d = bit.rshift(sig - 1, 5)
-  set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
-  return set
-end
-
-function sigaddsets(set, sigs) -- allow multiple
-  if type(sigs) ~= "string" then return getsigset(sigaddset(set, sigs)) end
-  set = mksigset(set)
-  local a = split(",", sigs)
-  for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
-    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    sigaddset(set, sig)
-  end
-  return getsigset(set)
-end
-
-function sigdelsets(set, sigs) -- allow multiple
-  if type(sigs) ~= "string" then return getsigset(sigdelset(set, sigs)) end
-  set = mksigset(set)
-  local a = split(",", sigs)
-  for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
-    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    sigdelset(set, sig)
-  end
-  return getsigset(set)
-end
-
-sigsetmt = {__index = {add = sigaddsets, del = sigdelsets}}
-
-function getsigset(set)
-  local f = {sigset = set}
-  local isemptyset = true
-  for i = 1, S.NSIG do
-    if sigismember(set, i) then
-      f[signals[i]] = true
-      f[signals[i]:lower():sub(4)] = true
-      isemptyset = false
-    end
-  end
-  f.isemptyset = isemptyset
-  setmetatable(f, sigsetmt)
   return f
 end
 
@@ -3146,7 +3211,6 @@ function S.eventfd_write(fd, value)
   return retbool(C.write(getfd(fd), value, 8))
 end
 
--- note this code could be used for sigaction too, but we can't yet use that due to not having callbacks
 local sigcode = function(s, signo, code)
   s.code = code
   s.signo = signo
@@ -3193,7 +3257,7 @@ function S.signalfd_read(fd, buffer, len)
     elseif s.SIGILL or S.SIGFPE or s.SIGSEGV or s.SIGBUS or s.SIGTRAP then
       s.addr = uint64_t(ssi.ssi_addr)
     elseif s.SIGIO or s.SIGPOLL then
-      s.band = tonumber(ssi.ssi_band) -- should split this up, is events from poll, TODO when we implement poll
+      s.band = tonumber(ssi.ssi_band) -- should split this up, is events from poll, TODO
       s.fd = tonumber(ssi.ssi_fd)
     end
 

@@ -204,13 +204,22 @@ rem = assert(S.nanosleep(S.t.timespec(0, 1000000)))
 assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
 
 -- timers and alarms
+assert(S.signal("alrm", "ign"))
+assert(S.sigaction("alrm", "ign")) -- should do same as above
+assert(S.alarm(10))
+assert(S.alarm(0)) -- cancel again
 
 local t = S.getitimer("real")
 assert(t.it_interval.tv_sec == 0, "expect timer not set")
 
-assert(S.signal("alrm", "ign"))
-assert(S.setitimer("real", 0, 0.001))
-assert(S.alarm(10)) -- will actually ignore signal so nothing happens, set to 10 so does not interrupt anything
+assert(S.signal("alrm", "dfl"))
+local exp = S.SIGALRM
+assert(S.sigaction("alrm", function(s) assert(s == exp, "expected alarm"); exp = 0 end))
+assert(exp == S.SIGALRM, "sigaction handler should not have run")
+assert(S.setitimer("real", 0, 0.0001))
+
+S.nanosleep(1) -- nanosleep does not interact with signals, should be interrupted
+assert(exp == 0, "sigaction handler should have run")
 
 -- mmap and related functions
 local mem
