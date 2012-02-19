@@ -405,11 +405,9 @@ assert(#r == 0, "no events yet")
 
 n = assert(s:write(teststring))
 
---sel = assert(S.select{readfds = {c, s}, timeout = {0, 0}})
+sel = assert(S.select{readfds = {c, s}, timeout = {0, 0}})
+assert(sel.count == 1, "one fd available for read now")
 
---assert(sel.count == 1, "one fd available for read now")
-
---r = assert(ep:epoll_wait(nil, nil, nil, "winch, hup"))
 r = assert(ep:epoll_wait())
 assert(#r == 1, "one event now")
 assert(r[1].EPOLLIN, "read event")

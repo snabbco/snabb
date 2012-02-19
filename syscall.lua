@@ -3013,7 +3013,6 @@ function S.setrlimit(resource, rlim, rlim2) -- can pass table, struct, or just b
   return retbool(C.setrlimit(stringflag(resource, "RLIMIT_"), rlim))
 end
 
--- Linux only. use epoll1
 function S.epoll_create(flags)
   return retfd(C.epoll_create1(stringflags(flags, "EPOLL_")))
 end
