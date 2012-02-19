@@ -203,7 +203,13 @@ local rem
 rem = assert(S.nanosleep(S.t.timespec(0, 1000000)))
 assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
 
+-- timers and alarms
+
+local t = S.getitimer("real")
+assert(t.it_interval.tv_sec == 0, "expect timer not set")
+
 assert(S.signal("alrm", "ign"))
+assert(S.setitimer("real", 0, 0.001))
 assert(S.alarm(10)) -- will actually ignore signal so nothing happens, set to 10 so does not interrupt anything
 
 -- mmap and related functions
@@ -398,7 +404,7 @@ local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
 assert(sel.count == 0, "nothing to read select now")
 
 local ep = assert(S.epoll_create("cloexec"))
-assert(ep:epoll_ctl("add", c, "in, err, hup")) -- actually dont need to set err, hup
+assert(ep:epoll_ctl("add", c, "in"))
 
 local r = assert(ep:epoll_wait(nil, 1, 0))
 assert(#r == 0, "no events yet")

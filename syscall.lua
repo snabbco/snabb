@@ -423,6 +423,11 @@ for _, v in ipairs{"POLL_IN", "POLL_OUT", "POLL_MSG", "POLL_ERR", "POLL_PRI", "P
   signal_reasons[S.SIGPOLL][S[v]] = v
 end
 
+-- timers
+S.ITIMER_REAL = 0
+S.ITIMER_VIRTUAL = 1
+S.ITIMER_PROF = 2
+
 -- clocks
 S.CLOCK_REALTIME = 0
 S.CLOCK_MONOTONIC = 1
@@ -1147,31 +1152,30 @@ local long_t = typeof("long")
 
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
-local errorret, retint, retnum, retbool, retptr, retfd, getfd, getts
 
 -- standard error return
-function errorret(errno)
+local function errorret(errno)
   return nil, mkerror(errno or ffi.errno())
 end
 
-function retint(ret) -- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet...
+local function retint(ret) -- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet...
   if ret == -1 then return errorret() end
   return ret
 end
 
-function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
+local function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
   if ret == -1 then return errorret() end
   return tonumber(ret)
 end
 
 -- used for no return value, return true for use of assert
-function retbool(ret)
+local function retbool(ret)
   if ret == -1 then return errorret() end
   return true
 end
 
 -- used for pointer returns, -1 is failure; removed gc for mem
-function retptr(ret)
+local function retptr(ret)
   if cast("long", ret) == -1 then return errorret() end
   return ret
 end
@@ -1182,7 +1186,7 @@ local fd_t -- type for a file descriptor
 local buffer_t = typeof("char[?]")
 
 --get fd from standard string, integer, or cdata
-function getfd(fd)
+local function getfd(fd)
   if not fd then return nil end
   if istype(int_t, fd) then return fd end
   if type(fd) == 'number' then return int_t(fd) end
@@ -1195,7 +1199,7 @@ function getfd(fd)
   return nil
 end
 
-function retfd(ret)
+local function retfd(ret)
   if ret == -1 then return errorret() end
   return fd_t(ret)
 end
@@ -1266,6 +1270,10 @@ struct timespec {
 struct itimerspec {
   struct timespec it_interval;
   struct timespec it_value;
+};
+struct itimerval {
+  struct timeval it_interval;
+  struct timeval it_value;
 };
 // for uname.
 struct utsname {
@@ -1812,6 +1820,8 @@ int signal(int signum, int handler); /* although deprecated, just using to set S
 int kill(pid_t pid, int sig);
 int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
 int settimeofday(const struct timeval *tv, const void *tz);
+int getitimer(int which, struct itimerval *curr_value);
+int setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value);
 time_t time(time_t *t);
 int clock_getres(clockid_t clk_id, struct timespec *res);
 int clock_gettime(clockid_t clk_id, struct timespec *tp);
@@ -1986,6 +1996,7 @@ local fdb_entry_pt = typeof("struct fdb_entry *")
 local signalfd_siginfo_t = typeof("struct signalfd_siginfo")
 local signalfd_siginfo_pt = typeof("struct signalfd_siginfo *")
 local itimerspec_t = typeof("struct itimerspec")
+local itimerval_t = typeof("struct itimerval")
 local iocb_t = typeof("struct iocb")
 local iocbs_t = typeof("struct iocb[?]")
 local iocbs_pt = typeof("struct iocb *[?]")
@@ -1999,10 +2010,10 @@ local timespec_t = ffi.metatype("struct timespec", {
   __index = {tonumber = function(ts) return tonumber(ts.tv_sec) + tonumber(ts.tv_nsec) / 1000000000 end}
 })
 
-function getts(ts) -- get a timespec eg from a number
+local function getts(ts) -- get a timespec eg from a number
   if not ts then return timespec_t() end
   if istype(timespec_t, ts) then return ts end
-  if type(ts) == "table" then ts = timespec_t(ts) end
+  if type(ts) == "table" then return timespec_t(ts) end
   local i, f = math.modf(ts)
   return timespec_t(i, math.floor(f * 1000000000))
 end
@@ -2010,6 +2021,14 @@ end
 local timeval_t = ffi.metatype("struct timeval", {
   __index = {tonumber = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end}
 })
+
+local function gettv(tv) 
+  if not tv then return timeval_t() end
+  if istype(timeval_t, tv) then return tv end
+  if type(tv) == "table" then return timeval_t(tv) end
+  local i, f = math.modf(tv)
+  return timeval_t(i, math.floor(f * 1000000))
+end
 
 -- siginfo needs some metamethods
 local siginfo_get = {
@@ -3184,18 +3203,37 @@ function S.signalfd_read(fd, buffer, len)
   return ss
 end
 
+local function getitimerval(interval, value)
+  if istype(itimerval_t, interval) then return interval end
+  return itimerval_t(gettv(interval), gettv(value))
+end
+
+function S.getitimer(which, value)
+  if not value then value = itimerval_t() end
+  local ret = C.getitimer(stringflag(which, "ITIMER_"), value)
+  if ret == -1 then return errorret() end
+  return value
+end
+
+function S.setitimer(which, interval, value)
+  local oldtime = itimerval_t()
+  local ret = C.setitimer(stringflag(which, "ITIMER_"), getitimerval(interval, value), oldtime)
+  if ret == -1 then return errorret() end
+  return oldtime
+end
+
 function S.timerfd_create(clockid, flags)
   return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
 end
 
-local function getit(interval, value)
+local function getitimerspec(interval, value)
   if istype(itimerspec_t, interval) then return interval end
   return itimerspec_t(getts(interval), getts(value))
 end
 
 function S.timerfd_settime(fd, flags, interval, value)
   local oldtime = itimerspec_t()
-  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), getit(interval, value), oldtime)
+  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), getitimerspec(interval, value), oldtime)
   if ret == -1 then return errorret() end
   return oldtime
 end
@@ -3203,6 +3241,7 @@ end
 function S.timerfd_gettime(fd, curr_value)
   if not curr_value then curr_value = itimerspec_t() end
   local ret = C.timerfd_gettime(getfd(fd), curr_value)
+  if ret == -1 then return errorret() end
   return curr_value
 end
 
