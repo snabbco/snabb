@@ -1079,6 +1079,19 @@ S.TCSANOW   = 0
 S.TCSADRAIN = 1
 S.TCSAFLUSH = 2
 
+-- TIOCM ioctls
+S.TIOCM_LE  = 0x001
+S.TIOCM_DTR = 0x002
+S.TIOCM_RTS = 0x004
+S.TIOCM_ST  = 0x008
+S.TIOCM_SR  = 0x010
+S.TIOCM_CTS = 0x020
+S.TIOCM_CAR = 0x040
+S.TIOCM_RNG = 0x080
+S.TIOCM_DSR = 0x100
+S.TIOCM_CD  = S.TIOCM_CAR
+S.TIOCM_RI  = S.TIOCM_RNG
+
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
 if arch == "x86" then
@@ -1132,6 +1145,11 @@ S.SIOCBRADDBR    = 0x89a0
 S.SIOCBRDELBR    = 0x89a1
 S.SIOCBRADDIF    = 0x89a2
 S.SIOCBRDELIF    = 0x89a3
+
+S.TIOCMGET       = 0x5415
+S.TIOCMBIS       = 0x5416
+S.TIOCMBIC       = 0x5417
+S.TIOCMSET       = 0x5418
 
 -- sysfs values
 S.SYSFS_BRIDGE_ATTR        = "bridge"
