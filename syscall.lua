@@ -2044,6 +2044,7 @@ local pollfds_t = typeof("struct pollfd [?]")
 local pollfd_pt = typeof("struct pollfd *")
 local sighandler_t = typeof("sighandler_t")
 local sigaction_t = typeof("struct sigaction")
+local clockid_t = typeof("clockid_t")
 
 S.RLIM_INFINITY = cast("rlim_t", -1)
 
@@ -2189,7 +2190,7 @@ end
 -- also forcing to return an int now - TODO find any 64 bit flags we are using and fix to use new function
 local stringflag, stringflags
 function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags that are ORed
-  if not str then return int_t(0) end
+  if not str then return 0 end
   if type(str) ~= "string" then return str end
   local f = 0
   local a = split(",", str)
@@ -2207,17 +2208,18 @@ function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags th
     if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
   end
-  return int_t(f)
+  return f
 end
+
 function stringflag(str, prefix) -- single value only
-  if not str then return int_t(0) end
+  if not str then return 0 end
   if type(str) ~= "string" then return str end
-  if #str == 0 then return int_t(0) end
+  if #str == 0 then return 0 end
   local s = trim(str)
   if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
   local val = S[s:upper()]
   if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions, better than silent ignore
-  return int_t(val)
+  return val
 end
 
 -- reverse flag operations
@@ -3461,14 +3463,14 @@ end
 
 function S.clock_getres(clk_id, ts)
   ts = getts(ts)
-  local ret = C.syscall(S.SYS_clock_getres, stringflag(clk_id, "CLOCK_"), ts)
+  local ret = C.syscall(S.SYS_clock_getres, clockid_t(stringflag(clk_id, "CLOCK_")), ts)
   if ret == -1 then return errorret() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
   ts = getts(ts)
-  local ret = C.syscall(S.SYS_clock_gettime, stringflag(clk_id, "CLOCK_"), ts)
+  local ret = C.syscall(S.SYS_clock_gettime, clockid_t(stringflag(clk_id, "CLOCK_")), ts)
   if ret == -1 then return errorret() end
   return ts
 end
