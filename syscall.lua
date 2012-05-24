@@ -1201,12 +1201,12 @@ local buffer_t = typeof("char[?]")
 local function getfd(fd)
   if not fd then return nil end
   if istype(int_t, fd) then return fd end
-  if type(fd) == 'number' then return int_t(fd) end
-  if fd.fileno then return int_t(fd.fileno) end
+  if type(fd) == 'number' then return fd end
+  if fd.fileno then return fd.fileno end
   if type(fd) == 'string' then
-    if fd == 'stdin' or fd == 'STDIN_FILENO' then return int_t(0) end
-    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return int_t(1) end
-    if fd == 'stderr' or fd == 'STDERR_FILENO' then return int_t(2) end
+    if fd == 'stdin' or fd == 'STDIN_FILENO' then return 0 end
+    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
+    if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
   end
   return nil
 end
@@ -2511,7 +2511,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   local d = {}
   local ret
   repeat
-    ret = C.syscall(S.SYS_getdents, getfd(fd), buf, uint_t(size))
+    ret = C.syscall(S.SYS_getdents, int_t(getfd(fd)), buf, uint_t(size))
     if ret == -1 then return errorret() end
     local i = 0
     while i < ret do
@@ -2627,7 +2627,7 @@ function S.lstat(path, buf)
 end
 function S.fstat(fd, buf)
   if not buf then buf = stat_t() end
-  local ret = C.syscall(S.SYS_fstat, getfd(fd), buf)
+  local ret = C.syscall(S.SYS_fstat, int_t(getfd(fd)), buf)
   if ret == -1 then return errorret() end
   return buf
 end
