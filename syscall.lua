@@ -2235,7 +2235,7 @@ S.t.sockaddr_un = ffi.typeof("struct sockaddr_un")
 S.t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
 S.t.iovec = ffi.typeof("struct iovec[?]")
 S.t.msghdr = ffi.typeof("struct msghdr")
-local cmsghdr_t = ffi.typeof("struct cmsghdr")
+S.t.cmsghdr = ffi.typeof("struct cmsghdr")
 local ucred_t = ffi.typeof("struct ucred")
 local sysinfo_t = ffi.typeof("struct sysinfo")
 local fdset_t = ffi.typeof("fd_set")
@@ -3832,7 +3832,7 @@ function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) e
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsg_align, cmsg_space, cmsg_len, cmsg_firsthdr, cmsg_nxthdr
-local cmsg_hdrsize = ffi.sizeof(cmsghdr_t(0))
+local cmsg_hdrsize = ffi.sizeof(S.t.cmsghdr(0))
 if ffi.abi('32bit') then
   function cmsg_align(len) return align(len, 4) end
 else
