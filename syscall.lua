@@ -1329,7 +1329,7 @@ S.E.EWOULDBLOCK    = S.E.EAGAIN
 S.E.EDEADLOCK      = S.E.EDEADLK
 S.E.ENOATTR        = S.E.ENODATA
 
-local mkerror = function(errno)
+local function mkerror(errno)
   local sym = errsyms[errno]
   local lsym = errlsyms[errno]
   local e = {errno = errno, sym = sym, lsym = lsym}
@@ -2386,7 +2386,7 @@ print("eq (sizeof(struct sysinfo), " .. sizeof(S.sysinfo) .. ");")
 --print(sizeof("struct stat"))
 
 -- misc
-local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
+local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
 local split, trim
 function split(delimiter, text)
@@ -2526,8 +2526,7 @@ local function getaddrlen(addr, addrlen)
 end
 
 -- helper function for returning socket address types
-local saret
-saret = function(addr, addrlen, rets) -- return socket address structure, additional values to return in rets
+local function saret(addr, addrlen, rets) -- return socket address structure, additional values to return in rets
   if not rets then rets = {} end
   local sa = ffi.cast(sockaddr_pt, addr)
   local afamily = tonumber(sa.sa_family)
@@ -3155,7 +3154,7 @@ function growattrbuf(f, a1, a2)
   return ffi.string(buffer, ret)
 end
 
-local lattrbuf = function(...)
+local function lattrbuf(...)
   local s, err = growattrbuf(...)
   if not s then return nil, err end
   return split('\0', s)
@@ -3437,7 +3436,7 @@ function S.eventfd_write(fd, value)
   return retbool(C.write(getfd(fd), value, 8))
 end
 
-local sigcode = function(s, signo, code)
+local function sigcode(s, signo, code)
   s.code = code
   s.signo = signo
   local name = signals[s.signo]
@@ -3862,6 +3861,7 @@ function cmsg_nxthdr(msg, buf, cmsg)
 end
 
 -- similar functions for netlink messages
+-- TODO use local function not anonymous
 local nlmsg_align = function(len) return align(len, 4) end
 local nlmsg_hdrlen = nlmsg_align(ffi.sizeof(S.t.nlmsghdr))
 local nlmsg_length = function(len) return len + nlmsg_hdrlen end
