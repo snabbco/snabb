@@ -2229,8 +2229,8 @@ S.t.sockaddr_storage = ffi.typeof("struct sockaddr_storage")
 S.t.sa_family = ffi.typeof("sa_family_t")
 S.t.sockaddr_in = ffi.typeof("struct sockaddr_in")
 S.t.sockaddr_in6 = ffi.typeof("struct sockaddr_in6")
-local in_addr_t = ffi.typeof("struct in_addr")
-local in6_addr_t = ffi.typeof("struct in6_addr")
+S.t.in_addr = ffi.typeof("struct in_addr")
+S.t.in6_addr = ffi.typeof("struct in6_addr")
 S.t.sockaddr_un = ffi.typeof("struct sockaddr_un")
 S.t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
 S.t.iovec = ffi.typeof("struct iovec[?]")
@@ -2473,7 +2473,7 @@ if ffi.abi("be") then -- nothing to do
   function S.htonl(b) return b end
 else
   function S.htonl(b)
-  if ffi.istype(in_addr_t, b) then return in_addr_t(bit.bswap(b.s_addr)) end -- not sure we need this, actually not using this function
+  if ffi.istype(S.t.in_addr, b) then return S.t.in_addr(bit.bswap(b.s_addr)) end -- not sure we need this, actually not using this function
   return bit.bswap(b)
 end
   function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
@@ -2494,7 +2494,7 @@ function S.sockaddr_in6(port, addr)
   local sa = S.t.sockaddr_in6()
   sa.sin6_family = S.AF_INET6
   sa.sin6_port = S.htons(port)
-  ffi.copy(sa.sin6_addr, addr, ffi.sizeof(in6_addr_t))
+  ffi.copy(sa.sin6_addr, addr, ffi.sizeof(S.t.in6_addr))
   return sa
 end
 function S.sockaddr_un() -- actually, not using this, not sure it is useful for unix sockets
@@ -2571,7 +2571,7 @@ end
 
 -- functions from section 3 that we use for ip addresses
 function S.inet_aton(s)
-  local addr = in_addr_t()
+  local addr = S.t.in_addr()
   local ret = C.inet_aton(s, addr)
   if ret == 0 then return nil end
   return addr
@@ -2594,7 +2594,7 @@ end
 function S.inet_pton(af, src)
   af = stringflag(af, "AF_")
   local addr
-  if af == S.AF_INET6 then addr = in6_addr_t() else addr = in_addr_t() end
+  if af == S.AF_INET6 then addr = S.t.in6_addr() else addr = S.t.in_addr() end
   local ret = C.inet_pton(af, src, addr)
   if ret == -1 then return errorret() end
   if ret == 0 then return nil end -- maybe return string
@@ -2602,11 +2602,11 @@ function S.inet_pton(af, src)
 end
 
 -- constants
-S.INADDR_ANY = in_addr_t()
+S.INADDR_ANY = S.t.in_addr()
 S.INADDR_LOOPBACK = S.inet_aton("127.0.0.1")
 S.INADDR_BROADCAST = S.inet_aton("255.255.255.255")
 -- ipv6 versions
-S.in6addr_any = in6_addr_t()
+S.in6addr_any = S.t.in6_addr()
 S.in6addr_loopback = S.inet_pton(S.AF_INET6, "::1")
 
 -- main definitions start here
