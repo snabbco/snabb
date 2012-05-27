@@ -1350,6 +1350,7 @@ local uint64_t = ffi.typeof("uint64_t")
 local int32_pt = ffi.typeof("int32_t *")
 local int64_1t = ffi.typeof("int64_t[1]")
 local long_t = ffi.typeof("long")
+local ulong_t = ffi.typeof("unsigned long")
 
 -- char buffer type
 S.t.buffer = ffi.typeof("char[?]")
@@ -2265,7 +2266,6 @@ S.t.ifreq = ffi.typeof("struct ifreq")
 
 local uint64_1t = ffi.typeof("uint64_t[1]")
 local socklen1_t = ffi.typeof("socklen_t[1]")
-local ulong_t = ffi.typeof("unsigned long")
 local off1_t = ffi.typeof("off_t[1]")
 local loff_t = ffi.typeof("loff_t")
 local loff_1t = ffi.typeof("loff_t[1]")
