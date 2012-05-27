@@ -2231,7 +2231,6 @@ S.t.in_addr = ffi.typeof("struct in_addr")
 S.t.in6_addr = ffi.typeof("struct in6_addr")
 S.t.sockaddr_un = ffi.typeof("struct sockaddr_un")
 S.t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
-S.t.iovec = ffi.typeof("struct iovec[?]")
 S.t.msghdr = ffi.typeof("struct msghdr")
 S.t.cmsghdr = ffi.typeof("struct cmsghdr")
 S.t.ucred = ffi.typeof("struct ucred")
@@ -2258,6 +2257,8 @@ local sighandler_t = ffi.typeof("sighandler_t")
 local sigaction_t = ffi.typeof("struct sigaction")
 local clockid_t = ffi.typeof("clockid_t")
 local inotify_event_t = ffi.typeof("struct inotify_event")
+
+S.t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
 
 -- could use metamethods for struct ifreq see /usr/include/linux/if.h
 S.t.ifreq = ffi.typeof("struct ifreq")
