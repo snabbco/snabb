@@ -2251,7 +2251,7 @@ local utsname_t = ffi.typeof("struct utsname")
 local sigset_t = ffi.typeof("sigset_t")
 local rlimit_t = ffi.typeof("struct rlimit")
 local fdb_entry_t = ffi.typeof("struct fdb_entry")
-local signalfd_siginfo_t = ffi.typeof("struct signalfd_siginfo")
+S.t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
 local itimerspec_t = ffi.typeof("struct itimerspec")
 local itimerval_t = ffi.typeof("struct itimerval")
 local iocb_t = ffi.typeof("struct iocb")
@@ -3447,7 +3447,7 @@ local sigcode = function(s, signo, code)
 end
 
 function S.signalfd_read(fd, buffer, len)
-  if not len then len = ffi.sizeof(signalfd_siginfo_t) * 4 end
+  if not len then len = ffi.sizeof(S.t.signalfd_siginfo) * 4 end
   if not buffer then buffer = S.t.buffer(len) end
   local ret, err = S.read(fd, buffer, len)
   if ret == 0 or (err and err.EAGAIN) then return {} end
@@ -3483,7 +3483,7 @@ function S.signalfd_read(fd, buffer, len)
     end
 
     ss[#ss + 1] = s
-    offset = offset + ffi.sizeof(signalfd_siginfo_t)
+    offset = offset + ffi.sizeof(S.t.signalfd_siginfo)
   end
   return ss
 end
