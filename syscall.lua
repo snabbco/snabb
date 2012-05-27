@@ -1342,7 +1342,7 @@ end
 -- integer types
 S.t.int = ffi.typeof("int")
 S.t.uint = ffi.typeof("unsigned int")
-local int64_t = ffi.typeof("int64_t")
+S.t.int64 = ffi.typeof("int64_t")
 local uint64_t = ffi.typeof("uint64_t")
 local long_t = ffi.typeof("long")
 local ulong_t = ffi.typeof("unsigned long")
@@ -3579,7 +3579,7 @@ function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note 
       iocba[i].aio_data = ioi.data or 0
       iocba[i].aio_reqprio = ioi.reqprio or 0
       iocba[i].aio_fildes = getfd(ioi.fd)
-      iocba[i].aio_buf = ffi.cast(int64_t, ioi.buf)
+      iocba[i].aio_buf = ffi.cast(S.t.int64, ioi.buf)
       iocba[i].aio_nbytes = ioi.nbytes
       iocba[i].aio_offset = ioi.offset
       if ioi.resfd then
@@ -3811,9 +3811,9 @@ function S.minor(dev)
   return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
 end
 
-local two32 = int64_t(0xffffffff) + 1 -- 0x100000000LL -- hack to get luac to parse this for checking
+local two32 = S.t.int64(0xffffffff) + 1 -- 0x100000000LL -- hack to get luac to parse this for checking
 function S.makedev(major, minor)
-  local dev = int64_t()
+  local dev = S.t.int64()
   dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + two32 * bit.band(major, bit.bnot(0xfff))
   return dev
 end
