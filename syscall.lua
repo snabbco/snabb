@@ -2382,8 +2382,6 @@ print("eq (sizeof(struct sysinfo), " .. sizeof(S.sysinfo) .. ");")
 ]]
 --print(sizeof("struct stat"))
 
-local pointersize = ffi.sizeof("char *")
-
 -- misc
 local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
