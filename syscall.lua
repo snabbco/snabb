@@ -2253,7 +2253,7 @@ S.t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
 S.t.itimerspec = ffi.typeof("struct itimerspec")
 S.t.itimerval = ffi.typeof("struct itimerval")
 S.t.iocb = ffi.typeof("struct iocb")
-local sighandler_t = ffi.typeof("sighandler_t")
+S.t.sighandler = ffi.typeof("sighandler_t")
 local sigaction_t = ffi.typeof("struct sigaction")
 local clockid_t = ffi.typeof("clockid_t")
 local inotify_event_t = ffi.typeof("struct inotify_event")
@@ -3096,9 +3096,9 @@ function S.sigaction(signum, handler, mask, flags)
   if ffi.istype(sigaction_t, handler) then sa = handler
   else
     if type(handler) == 'string' then
-      handler = ffi.cast(sighandler_t, stringflag(handler, "SIG_"))
+      handler = ffi.cast(S.t.sighandler, stringflag(handler, "SIG_"))
     elseif
-      type(handler) == 'function' then handler = ffi.cast(sighandler_t, handler)
+      type(handler) == 'function' then handler = ffi.cast(S.t.sighandler, handler)
     end
     sa = sigaction_t{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = stringflags(flags, "SA_")}
   end
