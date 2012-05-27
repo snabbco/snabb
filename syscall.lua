@@ -2368,7 +2368,6 @@ local off1_t = ffi.typeof("off_t[1]")
 local loff_t = ffi.typeof("loff_t")
 local loff_1t = ffi.typeof("loff_t[1]")
 
-local aio_context_t
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
 local string_array_t = ffi.typeof("const char *[?]")
@@ -3549,7 +3548,7 @@ end
 local function getctx(ctx) return ulong_t(ctx.ctx) end -- aio_context_t is really unsigned long
 
 function S.io_setup(nr_events)
-  local ctx = aio_context_t()
+  local ctx = S.t.aio_context()
   local ret = C.syscall(S.SYS_io_setup, uint_t(nr_events), ctx)
   if ret == -1 then return errorret() end
   return ctx
@@ -3592,7 +3591,7 @@ function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note 
 end
 
 local ameth = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel}
-aio_context_t = ffi.metatype("struct {aio_context_t ctx;}", {__index = ameth, __gc = S.io_destroy})
+S.t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {__index = ameth, __gc = S.io_destroy})
 
 
 -- map for valid options for arg2
