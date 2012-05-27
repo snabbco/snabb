@@ -1,9 +1,11 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-local C = ffi.C
-
 local S = {} -- exported functions
+
+local function syscall()
+
+local C = ffi.C
 
 local octal = function (s) return tonumber(s, 8) end
 
@@ -4099,5 +4101,9 @@ S.t = {
 }
 
 return S
+
+end
+
+return syscall()
 
 
