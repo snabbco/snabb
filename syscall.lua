@@ -2256,7 +2256,7 @@ S.t.iocb = ffi.typeof("struct iocb")
 S.t.sighandler = ffi.typeof("sighandler_t")
 S.t.sigaction = ffi.typeof("struct sigaction")
 S.t.clockid = ffi.typeof("clockid_t")
-local inotify_event_t = ffi.typeof("struct inotify_event")
+S.t.inotify_event = ffi.typeof("struct inotify_event")
 
 S.t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
 
@@ -3401,7 +3401,7 @@ function S.inotify_read(fd, buffer, len)
     local le = getflags(ev.mask, "IN_", in_recv_ev, in_recv_lev, {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)})
     if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
-    off = off + ffi.sizeof(inotify_event_t(ev.len))
+    off = off + ffi.sizeof(S.t.inotify_event(ev.len))
   end
   return ee
 end
