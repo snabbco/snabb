@@ -1147,6 +1147,7 @@ end
 -- integer types
 S.t = {}
 S.t.int = ffi.typeof("int")
+local int_t = S.t.int
 local uint_t = ffi.typeof("unsigned int")
 local int1_t = ffi.typeof("int[1]")
 local int2_t = ffi.typeof("int[2]")
