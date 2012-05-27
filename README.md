@@ -6,27 +6,27 @@ Why? Making a C library for everything you want to bind is a pain, so I thought 
 
 Linux only? Easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library (that applies also to any non glibc library too), and test. Patches accepted.
 
-Requirements: Needs git head of LuaJIT (or next release 2.0.0-beta8 when it is out).
+Requirements: Needs LuaJIT 2.0.0-beta9 or later. Generally tested using git head.
 
 ## What is implemented?
 
-Unfinished! Some syscalls missing, work in progress! Let me know if you need some that are not there.
+Unfinished! Some syscalls missing, work in progress! The majority of calls are now there, let me know if you need some that is not.
 
 No support for 64 bit file operations on a 32 bit system yet. 
 
 ### System calls (135)
 
-open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname, gethostname, sethostname, getuid, geteuid, getpid, getppid, getgid, getegid, fork, execve, wait, waitpid, _exit, signal, gettimeofday, settimeofday, time, clock_getres, clock_gettime, clock_settime, sysinfo, read, write, pread, pwrite, lseek, send, sendto, sendmsg, recv, recvfrom, recvmsg, readv, writev, getsockopt, setsockopt, select, epoll_create, epoll_ctl, epoll_wait, sendfile, dup, fchdir, fsync, fdatasync, fcntl, fchmod, socket, socketpair, bind, listen, connect, accept, getsockname, getpeername, mmap, munmap, msync, mlock, munlock, mlockall, munlockall, mremap, madvise, pipe, access, getcwd, nanosleep, syscall, stat, fstat, lstat, ioctl, eventfd, truncate, ftruncate, pause, reboot, sync, shutdown, ksyslogctl, mount, umount,
-nice, getpriority, setpriority, prctl, alarm, waitid, inotify_init, inotify_add_watch, inotify_rm_watch, adjtimex, getrlimit, setrlimit, sigprocmask, sigpending,
+open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname, gethostname, sethostname, getuid, geteuid, getpid, getppid, getgid, getegid, fork, execve, wait, waitpid, \_exit, signal, gettimeofday, settimeofday, time, clock\_getres, clock\_gettime, clock\_settime, sysinfo, read, write, pread, pwrite, lseek, send, sendto, sendmsg, recv, recvfrom, recvmsg, readv, writev, getsockopt, setsockopt, select, epoll\_create, epoll\_ctl, epoll_wait, sendfile, dup, fchdir, fsync, fdatasync, fcntl, fchmod, socket, socketpair, bind, listen, connect, accept, getsockname, getpeername, mmap, munmap, msync, mlock, munlock, mlockall, munlockall, mremap, madvise, pipe, access, getcwd, nanosleep, syscall, stat, fstat, lstat, ioctl, eventfd, truncate, ftruncate, pause, reboot, sync, shutdown, ksyslogctl, mount, umount,
+nice, getpriority, setpriority, prctl, alarm, waitid, inotify\_init, inotify\_add\_watch, inotify\_rm\_watch, adjtimex, getrlimit, setrlimit, sigprocmask, sigpending,
 sigsuspend, getsid, setsid, listxattr, llistxattr, flistxattr, setxattr, lsetxattr, fsetxattr, getxattr, lgetxattr, fgetxattr, removexattr, lremovexattr, fremovexattr,
-readlink, splice, vmsplice, tee, signalfd, timerfd_create, timerfd_settime, timerfd_gettime, posix_fadvise, fallocate, readahead, poll,
+readlink, splice, vmsplice, tee, signalfd, timerfd\_create, timerfd\_settime, timerfd\_gettime, posix\_fadvise, fallocate, readahead, poll,
+getitimer, setitimer,
 tcgetattr, tcsetattr, tcsendbreak, tcdrain, tcflush, tcflow, tcgetsid,
-posix_openpt, grantpt, unlockpt, ptsname
-
+posix\_openpt, grantpt, unlockpt, ptsname
 
 ### Other functions
 
-exit, inet_aton, inet_ntoa, inet_pton, inet_ntop,
+exit, inet\_aton, inet\_ntoa, inet\_pton, inet\_ntop,
 cfgetispeed, cfgetospeed, cfsetispeed, cfsetospeed, cfsetspeed
 
 ### Socket types
@@ -55,7 +55,7 @@ Standard convenience macros are also provided, eg S.major(dev) to extract a majo
 
 bind does not require a length for the address type length, as it can work this out dynamically.
 
-uname returns a Lua table with the returned strings in it. Similarly getdents returns directory entries as a table. All functions that return multiple arguments return tables in general.
+`uname` returns a Lua table with the returned strings in it. Similarly `getdents` returns directory entries as a table. All functions that return multiple arguments return tables in general.
 
 The test cases are good examples until I do better documentation!
 
@@ -63,7 +63,7 @@ A few functions have arguments in a different order to make optional ones easier
 
 ### Issues
 
-LuaJIT FFI cannot yet create callbacks. This causes issues in a few places, we cannot set a signal handler to be a Lua function, or use clone. This means some functions cannot yet usefully be implemented: sigaction (you can use signal just to set ignore, default behaviour), clone, getitimer/setitimer. Note you can use signalfd for signals instead. Can probably implement clone using a different Lua state, amd timers can be used with signalfd, so should be able to fix this.
+BEING FIXED: LuaJIT FFI cannot yet create callbacks. This causes issues in a few places, we cannot set a signal handler to be a Lua function, or use clone. This means some functions cannot yet usefully be implemented: sigaction (you can use signal just to set ignore, default behaviour), clone, getitimer/setitimer. Note you can use signalfd for signals instead. Can probably implement clone using a different Lua state, amd timers can be used with signalfd, so should be able to fix this.
 
 Some functions are returning raw structures, some tables. I think this is ok, single return value of structure, but if multiple values must create table. Add metamethods to structures if necessary. Need to recheck these.
 
@@ -94,7 +94,9 @@ accept should return fd-like structure, but with extra fields? Added a fileno fi
 
 getsockopt should return table of flags
 
-Generate C coe to test size and offset of each struct
+Generate C code to test size and offset of each struct
+
+Siginfo support in sigaction not there yet, as confused by the kernel API.
 
 ### Missing functions
 
@@ -105,7 +107,6 @@ readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue
 io_cancel(2), io_destroy(2), io_setup(2), io_submit(2), ...
 sync_file_range(2)
-getitimer, setitimer
 capset, capget
 ...
 

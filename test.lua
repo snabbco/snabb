@@ -204,8 +204,23 @@ local rem
 rem = assert(S.nanosleep(S.t.timespec(0, 1000000)))
 assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
 
+-- timers and alarms
 assert(S.signal("alrm", "ign"))
-assert(S.alarm(10)) -- will actually ignore signal so nothing happens, set to 10 so does not interrupt anything
+assert(S.sigaction("alrm", "ign")) -- should do same as above
+assert(S.alarm(10))
+assert(S.alarm(0)) -- cancel again
+
+local t = S.getitimer("real")
+assert(t.it_interval.tv_sec == 0, "expect timer not set")
+
+assert(S.signal("alrm", "dfl"))
+local exp = S.SIGALRM
+assert(S.sigaction("alrm", function(s) assert(s == exp, "expected alarm"); exp = 0 end))
+assert(exp == S.SIGALRM, "sigaction handler should not have run")
+assert(S.setitimer("real", 0, 0.0001))
+
+S.nanosleep(1) -- nanosleep does not interact with signals, should be interrupted
+assert(exp == 0, "sigaction handler should have run")
 
 -- mmap and related functions
 local mem
@@ -399,18 +414,16 @@ local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
 assert(sel.count == 0, "nothing to read select now")
 
 local ep = assert(S.epoll_create("cloexec"))
-assert(ep:epoll_ctl("add", c, "in, err, hup")) -- actually dont need to set err, hup
+assert(ep:epoll_ctl("add", c, "in"))
 
 local r = assert(ep:epoll_wait(nil, 1, 0))
 assert(#r == 0, "no events yet")
 
 n = assert(s:write(teststring))
 
---sel = assert(S.select{readfds = {c, s}, timeout = {0, 0}})
+sel = assert(S.select{readfds = {c, s}, timeout = {0, 0}})
+assert(sel.count == 1, "one fd available for read now")
 
---assert(sel.count == 1, "one fd available for read now")
-
---r = assert(ep:epoll_wait(nil, nil, nil, "winch, hup"))
 r = assert(ep:epoll_wait())
 assert(#r == 1, "one event now")
 assert(r[1].EPOLLIN, "read event")
@@ -831,16 +844,28 @@ collectgarbage("collect")
 ok, err = S.io_destroy(ctx2)
 assert(not ok, "should have closed aio ctx")
 
-fd = S.creat(tmpfile, "IRWXU")
+-- need aligned buffer for O_DIRECT
+local abuf = assert(S.mmap(nil, 4096, "read,write", "private, anonymous", -1, 0))
+S.copy(abuf, teststring)
+fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
 assert(S.unlink(tmpfile))
-assert(fd:pwrite(teststring, nil, 0))
+assert(fd:pwrite(abuf, 4096, 0))
+S.fill(abuf, 4096, 0)
 local efd = assert(S.eventfd())
 local ctx = assert(S.io_setup(8))
-assert(ctx:submit{opcode = "pread", data = 42, fd = fd, buf = buf, nbytes = #teststring, offset = 0, resfd = efd})
-local p = assert(S.poll({fd = efd, events = "in"}, 0, 1000))
-assert(#p == 1, "expect one event available from poll, got " .. #p)
+assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}} == 1)
+
+-- test for data, io_getevents
+
+
+--assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0, resfd = efd}} == 1)
+--local p = assert(S.poll({fd = efd, events = "in"}, 0, 1000))
+--assert(#p == 1, "expect one event available from poll, got " .. #p)
+
+
 assert(ctx:destroy())
 assert(fd:close())
+assert(S.munmap(abuf, 4096))
 
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 

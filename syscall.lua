@@ -1,24 +1,20 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-local C = ffi.C
-
 local S = {} -- exported functions
+
+local function syscall()
+
+local C = ffi.C
 
 local octal = function (s) return tonumber(s, 8) end
 
--- cleaner to read
-local cast = ffi.cast
-local sizeof = ffi.sizeof
-local istype = ffi.istype
-local arch = ffi.arch
-local typeof = ffi.typeof
-
 -- convenience so user need not require ffi
 S.string = ffi.string
-S.sizeof = sizeof
-S.cast = cast
+S.sizeof = ffi.sizeof
+S.cast = ffi.cast
 S.copy = ffi.copy
+S.fill = ffi.fill
 
 -- open, fcntl
 S.O_ACCMODE   = octal('0003')
@@ -41,11 +37,11 @@ S.O_DSYNC     = octal('010000')
 S.O_RSYNC     = S.O_SYNC
 
 -- these are arch dependent!
-if arch == "x86" or arch == "x64" then
+if ffi.arch == "x86" or ffi.arch == "x64" then
   S.O_DIRECTORY = octal('0200000')
   S.O_NOFOLLOW  = octal('0400000')
   S.O_DIRECT    = octal('040000')
-elseif arch == "arm" then
+elseif ffi.arch == "arm" then
   S.O_DIRECTORY = octal('040000')
   S.O_NOFOLLOW  = octal('0100000')
   S.O_DIRECT    = octal('0200000')
@@ -297,7 +293,7 @@ S.SO_NO_CHECK    = 11
 S.SO_PRIORITY    = 12
 S.SO_LINGER      = 13
 S.SO_BSDCOMPAT   = 14
-assert(arch ~= "ppc", "need to fix the values below for ppc")
+assert(ffi.arch ~= "ppc", "need to fix the values below for ppc")
 S.SO_PASSCRED    = 16 -- below here differs for ppc!
 S.SO_PEERCRED    = 17
 S.SO_RCVLOWAT    = 18
@@ -421,6 +417,23 @@ signal_reasons[S.SIGPOLL] = {}
 for _, v in ipairs{"POLL_IN", "POLL_OUT", "POLL_MSG", "POLL_ERR", "POLL_PRI", "POLL_HUP"} do
   signal_reasons[S.SIGPOLL][S[v]] = v
 end
+
+-- sigaction
+S.SA_NOCLDSTOP = 0x00000001
+S.SA_NOCLDWAIT = 0x00000002
+S.SA_SIGINFO   = 0x00000004
+S.SA_ONSTACK   = 0x08000000
+S.SA_RESTART   = 0x10000000
+S.SA_NODEFER   = 0x40000000
+S.SA_RESETHAND = 0x80000000
+S.SA_NOMASK = SA_NODEFER
+S.SA_ONESHOT = SA_RESETHAND
+S.SA_RESTORER = 0x04000000
+
+-- timers
+S.ITIMER_REAL = 0
+S.ITIMER_VIRTUAL = 1
+S.ITIMER_PROF = 2
 
 -- clocks
 S.CLOCK_REALTIME = 0
@@ -563,7 +576,7 @@ S.SPLICE_F_NONBLOCK     = 2
 S.SPLICE_F_MORE         = 4
 S.SPLICE_F_GIFT         = 8
 
--- aio
+-- aio - see /usr/include/linux/aio_abi.h
 S.IOCB_CMD_PREAD = 0
 S.IOCB_CMD_PWRITE = 1
 S.IOCB_CMD_FSYNC = 2
@@ -1094,7 +1107,7 @@ S.TIOCM_RI  = S.TIOCM_RNG
 
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
-if arch == "x86" then
+if ffi.arch == "x86" then
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
@@ -1108,7 +1121,7 @@ if arch == "x86" then
   S.SYS_clock_gettime    = 265
   S.SYS_clock_getres     = 266
   S.SYS_clock_nanosleep  = 267
-elseif arch == "x64" then
+elseif ffi.arch == "x64" then
   S.SYS_stat             = 4
   S.SYS_fstat            = 5
   S.SYS_lstat            = 6
@@ -1122,7 +1135,7 @@ elseif arch == "x64" then
   S.SYS_clock_gettime    = 228
   S.SYS_clock_getres     = 229
   S.SYS_clock_nanosleep  = 230
-elseif arch == "arm" and ffi.abi("eabi") then
+elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
@@ -1325,69 +1338,68 @@ local mkerror = function(errno)
 end
 
 -- integer types
-local int_t = typeof("int")
-local uint_t = typeof("unsigned int")
-local int1_t = typeof("int[1]")
-local int2_t = typeof("int[2]")
-local ints_t = typeof("int[?]")
-local int64_t = typeof("int64_t")
-local int64_pt = typeof("int64_t *")
-local uint64_t = typeof("uint64_t")
-local int32_pt = typeof("int32_t *")
-local int64_1t = typeof("int64_t[1]")
-local long_t = typeof("long")
+local int_t = ffi.typeof("int")
+local uint_t = ffi.typeof("unsigned int")
+local int1_t = ffi.typeof("int[1]")
+local int2_t = ffi.typeof("int[2]")
+local ints_t = ffi.typeof("int[?]")
+local int64_t = ffi.typeof("int64_t")
+local int64_pt = ffi.typeof("int64_t *")
+local uint64_t = ffi.typeof("uint64_t")
+local int32_pt = ffi.typeof("int32_t *")
+local int64_1t = ffi.typeof("int64_t[1]")
+local long_t = ffi.typeof("long")
 
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
-local errorret, retint, retnum, retbool, retptr, retfd, getfd, getts
 
 -- standard error return
-function errorret(errno)
+local function errorret(errno)
   return nil, mkerror(errno or ffi.errno())
 end
 
-function retint(ret) -- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet...
+local function retint(ret) -- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet...
   if ret == -1 then return errorret() end
   return ret
 end
 
-function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
+local function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
   if ret == -1 then return errorret() end
   return tonumber(ret)
 end
 
 -- used for no return value, return true for use of assert
-function retbool(ret)
+local function retbool(ret)
   if ret == -1 then return errorret() end
   return true
 end
 
 -- used for pointer returns, -1 is failure; removed gc for mem
-function retptr(ret)
-  if cast("long", ret) == -1 then return errorret() end
+local function retptr(ret)
+  if ffi.cast("long", ret) == -1 then return errorret() end
   return ret
 end
 
 local fd_t -- type for a file descriptor
 
 -- char buffer type
-local buffer_t = typeof("char[?]")
+local buffer_t = ffi.typeof("char[?]")
 
 --get fd from standard string, integer, or cdata
-function getfd(fd)
+local function getfd(fd)
   if not fd then return nil end
-  if istype(int_t, fd) then return fd end
-  if type(fd) == 'number' then return int_t(fd) end
-  if fd.fileno then return int_t(fd.fileno) end
+  if ffi.istype(int_t, fd) then return fd end
+  if type(fd) == 'number' then return fd end
+  if fd.fileno then return fd.fileno end
   if type(fd) == 'string' then
-    if fd == 'stdin' or fd == 'STDIN_FILENO' then return int_t(0) end
-    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return int_t(1) end
-    if fd == 'stderr' or fd == 'STDERR_FILENO' then return int_t(2) end
+    if fd == 'stdin' or fd == 'STDIN_FILENO' then return 0 end
+    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
+    if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
   end
   return nil
 end
 
-function retfd(ret)
+local function retfd(ret)
   if ret == -1 then return errorret() end
   return fd_t(ret)
 end
@@ -1458,6 +1470,10 @@ struct timespec {
 struct itimerspec {
   struct timespec it_interval;
   struct timespec it_value;
+};
+struct itimerval {
+  struct timeval it_interval;
+  struct timeval it_value;
 };
 // for uname.
 struct utsname {
@@ -1763,6 +1779,33 @@ struct termios
   };
 ]]
 
+-- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
+-- it appears that there is no kernel sigaction in non x86 architectures? Need to check source.
+-- presumably does not care, but the types are a bit of a pain.
+-- temporarily just going to implement sighandler support
+if ffi.arch == 'x86' then
+ffi.cdef[[
+struct sigaction {
+  union {
+    sighandler_t sa_handler;
+    void (*sa_sigaction)(int, struct siginfo *, void *);
+  };
+  sigset_t sa_mask;
+  unsigned long sa_flags;
+  void (*sa_restorer)(void);
+};
+]]
+else
+ffi.cdef[[
+struct sigaction {
+  sighandler_t sa_handler;
+  unsigned long sa_flags;
+  void (*sa_restorer)(void);
+  sigset_t sa_mask;
+};
+]]
+end
+
 -- Linux struct siginfo padding depends on architecture
 if ffi.abi("64bit") then
 ffi.cdef[[
@@ -1824,7 +1867,7 @@ typedef struct siginfo {
 
 -- stat structure is architecture dependent in Linux
 
-if arch == 'x86' then
+if ffi.arch == 'x86' then
 ffi.cdef[[
 struct stat {
   unsigned long  st_dev;
@@ -1847,7 +1890,7 @@ struct stat {
   unsigned long  __unused5;
 };
 ]]
-elseif arch == 'x64' then
+elseif ffi.arch == 'x64' then
 ffi.cdef [[
 struct stat {
   unsigned long   st_dev;
@@ -1870,7 +1913,7 @@ struct stat {
   long            __unused[3];
 };
 ]]
-elseif arch == 'arm' then
+elseif ffi.arch == 'arm' then
   if ffi.abi("le") then
     ffi.cdef [[
       struct stat {
@@ -2017,9 +2060,12 @@ pid_t waitpid(pid_t pid, int *status, int options);
 int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 void _exit(int status);
 int signal(int signum, int handler); /* although deprecated, just using to set SIG_ values */
+int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
 int kill(pid_t pid, int sig);
 int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
 int settimeofday(const struct timeval *tv, const void *tz);
+int getitimer(int which, struct itimerval *curr_value);
+int setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value);
 time_t time(time_t *t);
 int clock_getres(clockid_t clk_id, struct timespec *res);
 int clock_gettime(clockid_t clk_id, struct timespec *tp);
@@ -2177,59 +2223,63 @@ int ptsname_r(int fd, char *buf, size_t buflen);
 ]]
 
 -- Lua type constructors corresponding to defined types
-local sockaddr_t = typeof("struct sockaddr")
-local sockaddr_storage_t = typeof("struct sockaddr_storage")
-local sa_family_t = typeof("sa_family_t")
-local sockaddr_in_t = typeof("struct sockaddr_in")
-local sockaddr_in6_t = typeof("struct sockaddr_in6")
-local in_addr_t = typeof("struct in_addr")
-local in6_addr_t = typeof("struct in6_addr")
-local sockaddr_un_t = typeof("struct sockaddr_un")
-local sockaddr_nl_t = typeof("struct sockaddr_nl")
-local iovec_t = typeof("struct iovec[?]")
-local msghdr_t = typeof("struct msghdr")
-local cmsghdr_t = typeof("struct cmsghdr")
-local ucred_t = typeof("struct ucred")
-local sysinfo_t = typeof("struct sysinfo")
-local fdset_t = typeof("fd_set")
-local fdmask_t = typeof("fd_mask")
-local stat_t = typeof("struct stat")
-local epoll_event_t = typeof("struct epoll_event")
-local epoll_events_t = typeof("struct epoll_event[?]")
-local off_t = typeof("off_t")
-local nlmsghdr_t = typeof("struct nlmsghdr")
-local nlmsghdr_pt = typeof("struct nlmsghdr *")
-local rtgenmsg_t = typeof("struct rtgenmsg")
-local ifinfomsg_t = typeof("struct ifinfomsg")
-local ifinfomsg_pt = typeof("struct ifinfomsg *")
-local rtattr_t = typeof("struct rtattr")
-local rtattr_pt = typeof("struct rtattr *")
-local timex_t = typeof("struct timex")
-local utsname_t = typeof("struct utsname")
-local sigset_t = typeof("sigset_t")
-local rlimit_t = typeof("struct rlimit")
-local fdb_entry_t = typeof("struct fdb_entry")
-local fdb_entry_pt = typeof("struct fdb_entry *")
-local signalfd_siginfo_t = typeof("struct signalfd_siginfo")
-local signalfd_siginfo_pt = typeof("struct signalfd_siginfo *")
-local itimerspec_t = typeof("struct itimerspec")
-local iocb_t = typeof("struct iocb")
-local iocbs_t = typeof("struct iocb[?]")
-local iocbs_pt = typeof("struct iocb *[?]")
-local pollfds_t = typeof("struct pollfd [?]")
-local pollfd_pt = typeof("struct pollfd *")
+local sockaddr_t = ffi.typeof("struct sockaddr")
+local sockaddr_storage_t = ffi.typeof("struct sockaddr_storage")
+local sa_family_t = ffi.typeof("sa_family_t")
+local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
+local sockaddr_in6_t = ffi.typeof("struct sockaddr_in6")
+local in_addr_t = ffi.typeof("struct in_addr")
+local in6_addr_t = ffi.typeof("struct in6_addr")
+local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
+local sockaddr_nl_t = ffi.typeof("struct sockaddr_nl")
+local iovec_t = ffi.typeof("struct iovec[?]")
+local msghdr_t = ffi.typeof("struct msghdr")
+local cmsghdr_t = ffi.typeof("struct cmsghdr")
+local ucred_t = ffi.typeof("struct ucred")
+local sysinfo_t = ffi.typeof("struct sysinfo")
+local fdset_t = ffi.typeof("fd_set")
+local fdmask_t = ffi.typeof("fd_mask")
+local stat_t = ffi.typeof("struct stat")
+local epoll_event_t = ffi.typeof("struct epoll_event")
+local epoll_events_t = ffi.typeof("struct epoll_event[?]")
+local off_t = ffi.typeof("off_t")
+local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
+local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
+local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
+local ifinfomsg_t = ffi.typeof("struct ifinfomsg")
+local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
+local rtattr_t = ffi.typeof("struct rtattr")
+local rtattr_pt = ffi.typeof("struct rtattr *")
+local timex_t = ffi.typeof("struct timex")
+local utsname_t = ffi.typeof("struct utsname")
+local sigset_t = ffi.typeof("sigset_t")
+local rlimit_t = ffi.typeof("struct rlimit")
+local fdb_entry_t = ffi.typeof("struct fdb_entry")
+local fdb_entry_pt = ffi.typeof("struct fdb_entry *")
+local signalfd_siginfo_t = ffi.typeof("struct signalfd_siginfo")
+local signalfd_siginfo_pt = ffi.typeof("struct signalfd_siginfo *")
+local itimerspec_t = ffi.typeof("struct itimerspec")
+local itimerval_t = ffi.typeof("struct itimerval")
+local iocb_t = ffi.typeof("struct iocb")
+local iocbs_t = ffi.typeof("struct iocb[?]")
+local iocbs_pt = ffi.typeof("struct iocb *[?]")
+local pollfds_t = ffi.typeof("struct pollfd [?]")
+local pollfd_pt = ffi.typeof("struct pollfd *")
+local sighandler_t = ffi.typeof("sighandler_t")
+local sigaction_t = ffi.typeof("struct sigaction")
+local clockid_t = ffi.typeof("clockid_t")
 
-S.RLIM_INFINITY = cast("rlim_t", -1)
+S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
 -- types with metamethods
 local timespec_t = ffi.metatype("struct timespec", {
   __index = {tonumber = function(ts) return tonumber(ts.tv_sec) + tonumber(ts.tv_nsec) / 1000000000 end}
 })
 
-function getts(ts) -- get a timespec eg from a number
+local function getts(ts) -- get a timespec eg from a number
   if not ts then return timespec_t() end
-  if istype(timespec_t, ts) then return ts end
-  if type(ts) == "table" then ts = timespec_t(ts) end
+  if ffi.istype(timespec_t, ts) then return ts end
+  if type(ts) == "table" then return timespec_t(ts) end
   local i, f = math.modf(ts)
   return timespec_t(i, math.floor(f * 1000000000))
 end
@@ -2237,6 +2287,14 @@ end
 local timeval_t = ffi.metatype("struct timeval", {
   __index = {tonumber = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end}
 })
+
+local function gettv(tv) 
+  if not tv then return timeval_t() end
+  if ffi.istype(timeval_t, tv) then return tv end
+  if type(tv) == "table" then return timeval_t(tv) end
+  local i, f = math.modf(tv)
+  return timeval_t(i, math.floor(f * 1000000))
+end
 
 -- siginfo needs some metamethods
 local siginfo_get = {
@@ -2276,7 +2334,7 @@ local siginfo_t = ffi.metatype("struct siginfo",{
 })
 
 -- could use metamethods for struct ifreq see /usr/include/linux/if.h
-local ifreq_t = typeof("struct ifreq")
+local ifreq_t = ffi.typeof("struct ifreq")
 
 local macaddr_t = ffi.metatype("struct {uint8_t mac_addr[6];}", {
   __tostring = function(m)
@@ -2302,29 +2360,29 @@ print("eq (sizeof(struct sysinfo), " .. sizeof(sysinfo_t) .. ");")
 ]]
 --print(sizeof("struct stat"))
 
-local uint64_1t = typeof("uint64_t[1]")
-local socklen1_t = typeof("socklen_t[1]")
-local ulong_t = typeof("unsigned long")
-local off1_t = typeof("off_t[1]")
-local loff_t = typeof("loff_t")
-local loff_1t = typeof("loff_t[1]")
+local uint64_1t = ffi.typeof("uint64_t[1]")
+local socklen1_t = ffi.typeof("socklen_t[1]")
+local ulong_t = ffi.typeof("unsigned long")
+local off1_t = ffi.typeof("off_t[1]")
+local loff_t = ffi.typeof("loff_t")
+local loff_1t = ffi.typeof("loff_t[1]")
 
 local aio_context_t
-local aio_context_1t = typeof("aio_context_t[1]")
+local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
-local string_array_t = typeof("const char *[?]")
+local string_array_t = ffi.typeof("const char *[?]")
 
 -- need these for casts
-local sockaddr_pt = typeof("struct sockaddr *")
-local cmsghdr_pt = typeof("struct cmsghdr *")
-local uchar_pt = typeof("unsigned char *")
-local char_pt = typeof("char *")
-local int_pt = typeof("int *")
-local linux_dirent_pt = typeof("struct linux_dirent *")
-local inotify_event_pt = typeof("struct inotify_event *")
-local inotify_event_t = typeof("struct inotify_event")
+local sockaddr_pt = ffi.typeof("struct sockaddr *")
+local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
+local uchar_pt = ffi.typeof("unsigned char *")
+local char_pt = ffi.typeof("char *")
+local int_pt = ffi.typeof("int *")
+local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
+local inotify_event_pt = ffi.typeof("struct inotify_event *")
+local inotify_event_t = ffi.typeof("struct inotify_event")
 
-local pointersize = sizeof("char *")
+local pointersize = ffi.sizeof("char *")
 
 -- misc
 local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
@@ -2355,7 +2413,7 @@ end
 -- also forcing to return an int now - TODO find any 64 bit flags we are using and fix to use new function
 local stringflag, stringflags
 function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags that are ORed
-  if not str then return int_t(0) end
+  if not str then return 0 end
   if type(str) ~= "string" then return str end
   local f = 0
   local a = split(",", str)
@@ -2373,17 +2431,18 @@ function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags th
     if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
   end
-  return int_t(f)
+  return f
 end
+
 function stringflag(str, prefix) -- single value only
-  if not str then return int_t(0) end
+  if not str then return 0 end
   if type(str) ~= "string" then return str end
-  if #str == 0 then return int_t(0) end
+  if #str == 0 then return 0 end
   local s = trim(str)
   if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
   local val = S[s:upper()]
   if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions, better than silent ignore
-  return int_t(val)
+  return val
 end
 
 -- reverse flag operations
@@ -2414,7 +2473,7 @@ if ffi.abi("be") then -- nothing to do
   function S.htonl(b) return b end
 else
   function S.htonl(b)
-  if istype(in_addr_t, b) then return in_addr_t(bit.bswap(b.s_addr)) end -- not sure we need this, actually not using this function
+  if ffi.istype(in_addr_t, b) then return in_addr_t(bit.bswap(b.s_addr)) end -- not sure we need this, actually not using this function
   return bit.bswap(b)
 end
   function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
@@ -2435,7 +2494,7 @@ function S.sockaddr_in6(port, addr)
   local sa = sockaddr_in6_t()
   sa.sin6_family = S.AF_INET6
   sa.sin6_port = S.htons(port)
-  ffi.copy(sa.sin6_addr, addr, sizeof(in6_addr_t))
+  ffi.copy(sa.sin6_addr, addr, ffi.sizeof(in6_addr_t))
   return sa
 end
 function S.sockaddr_un() -- actually, not using this, not sure it is useful for unix sockets
@@ -2455,12 +2514,12 @@ end
 local function getaddrlen(addr, addrlen)
   if not addr then return 0 end
   if addrlen == nil then
-    if istype(sockaddr_t, addr) then return sizeof(sockaddr_t) end
-    if istype(sockaddr_un_t, addr) then return sizeof(sockaddr_un_t) end
-    if istype(sockaddr_in_t, addr) then return sizeof(sockaddr_in_t) end
-    if istype(sockaddr_in6_t, addr) then return sizeof(sockaddr_in6_t) end
-    if istype(sockaddr_nl_t, addr) then return sizeof(sockaddr_nl_t) end
-    if istype(sockaddr_storage_t, addr) then return sizeof(sockaddr_storage_t) end
+    if ffi.istype(sockaddr_t, addr) then return ffi.sizeof(sockaddr_t) end
+    if ffi.istype(sockaddr_un_t, addr) then return ffi.sizeof(sockaddr_un_t) end
+    if ffi.istype(sockaddr_in_t, addr) then return ffi.sizeof(sockaddr_in_t) end
+    if ffi.istype(sockaddr_in6_t, addr) then return ffi.sizeof(sockaddr_in6_t) end
+    if ffi.istype(sockaddr_nl_t, addr) then return ffi.sizeof(sockaddr_nl_t) end
+    if ffi.istype(sockaddr_storage_t, addr) then return ffi.sizeof(sockaddr_storage_t) end
   end
   return addrlen or 0
 end
@@ -2477,29 +2536,29 @@ saret = function(addr, addrlen, rets) -- return socket address structure, additi
   -- should check here that addrlen is correct?
 
   if afamily == S.AF_LOCAL then
-    if not istype(sockaddr_un_t, addr) then
+    if not ffi.istype(sockaddr_un_t, addr) then
       rets.addr = sockaddr_un_t()
       ffi.copy(rets.addr, addr, addrlen)
     end
-    local namelen = addrlen - sizeof(sa_family_t)
+    local namelen = addrlen - ffi.sizeof(sa_family_t)
     if namelen > 0 then
       rets.name = ffi.string(rets.addr.sun_path, namelen)
       if rets.addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
     end
   elseif afamily == S.AF_INET then
-    if not istype(sockaddr_in_t, addr) then
+    if not ffi.istype(sockaddr_in_t, addr) then
       rets.addr = sockaddr_in_t()
       ffi.copy(rets.addr, addr, addrlen)
     end
     rets.port = S.ntohs(rets.addr.sin_port)
   elseif afamily == S.AF_INET6 then
-    if not istype(sockaddr_in6_t, addr) then
+    if not ffi.istype(sockaddr_in6_t, addr) then
       rets.addr = sockaddr_in6_t()
       ffi.copy(rets.addr, addr, addrlen)
     end
     rets.port = S.ntohs(rets.addr.sin6_port)
   elseif afamily == S.AF_NETLINK then
-    if not istype(sockaddr_nl_t, addr) then
+    if not ffi.istype(sockaddr_nl_t, addr) then
       rets.addr = sockaddr_nl_t()
       ffi.copy(rets.addr, addr, addrlen)
     end
@@ -2573,12 +2632,12 @@ function S.close(fd)
   local ret = C.close(fileno)
   if ret == -1 then
     local errno = ffi.errno()
-    if istype(fd_t, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
+    if ffi.istype(fd_t, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
       fd.fileno = -1 -- make sure cannot accidentally close this fd object again
     end
     return errorret()
   end
-  if istype(fd_t, fd) then
+  if ffi.istype(fd_t, fd) then
     fd.fileno = -1 -- make sure cannot accidentally close this fd object again
   end
   return true
@@ -2675,11 +2734,11 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   local d = {}
   local ret
   repeat
-    ret = C.syscall(S.SYS_getdents, getfd(fd), buf, uint_t(size))
+    ret = C.syscall(S.SYS_getdents, int_t(getfd(fd)), buf, uint_t(size))
     if ret == -1 then return errorret() end
     local i = 0
     while i < ret do
-      local dp = cast(linux_dirent_pt, buf + i)
+      local dp = ffi.cast(linux_dirent_pt, buf + i)
       local t = buf[i + dp.d_reclen - 1]
       local dd = getflag(t, "DT_", dt_flags, dt_lflags)
       dd.inode = tonumber(dp.d_ino)
@@ -2740,7 +2799,7 @@ function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf,
 function S.lseek(fd, offset, whence) return retnum(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
-  return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), cast(sockaddr_pt, addr), getaddrlen(addr)))
+  return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
 end
 function S.readv(fd, iov, iovcnt) return retnum(C.readv(getfd(fd), iov, iovcnt)) end
 function S.writev(fd, iov, iovcnt) return retnum(C.writev(getfd(fd), iov, iovcnt)) end
@@ -2748,8 +2807,8 @@ function S.writev(fd, iov, iovcnt) return retnum(C.writev(getfd(fd), iov, iovcnt
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.recvfrom(fd, buf, count, flags)
   local ss = sockaddr_storage_t()
-  local addrlen = int1_t(sizeof(sockaddr_storage_t))
-  local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), cast(sockaddr_pt, ss), addrlen)
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0], {count = tonumber(ret)})
 end
@@ -2759,14 +2818,14 @@ function S.setsockopt(fd, level, optname, optval, optlen)
   if not optlen and type(optval) == 'boolean' then if optval then optval = 1 else optval = 0 end end
   if not optlen and type(optval) == 'number' then
     optval = int1_t(optval)
-    optlen = sizeof(int1_t)
+    optlen = ffi.sizeof(int1_t)
   end
   return retbool(C.setsockopt(getfd(fd), stringflag(level, "SOL_"), stringflag(optname, "SO_"), optval, optlen))
 end
 
 function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool options
   local optval, optlen = int1_t(), socklen1_t()
-  optlen[0] = sizeof(int1_t)
+  optlen[0] = ffi.sizeof(int1_t)
   local ret = C.getsockopt(getfd(fd), level, optname, optval, optlen)
   if ret == -1 then return errorret() end
   return tonumber(optval[0]) -- no special case for bool
@@ -2791,7 +2850,7 @@ function S.lstat(path, buf)
 end
 function S.fstat(fd, buf)
   if not buf then buf = stat_t() end
-  local ret = C.syscall(S.SYS_fstat, getfd(fd), buf)
+  local ret = C.syscall(S.SYS_fstat, int_t(getfd(fd)), buf)
   if ret == -1 then return errorret() end
   return buf
 end
@@ -2871,12 +2930,12 @@ function S.socketpair(domain, stype, protocol)
 end
 
 function S.bind(sockfd, addr, addrlen)
-  return retbool(C.bind(getfd(sockfd), cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
+  return retbool(C.bind(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
 function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or S.SOMAXCONN)) end
 function S.connect(sockfd, addr, addrlen)
-  return retbool(C.connect(getfd(sockfd), cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
+  return retbool(C.connect(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), stringflag(how, "SHUT_"))) end
@@ -2886,8 +2945,8 @@ function S.accept(sockfd, flags, addr, addrlen)
   if not addrlen then addrlen = int1_t(getaddrlen(addr, addrlen)) end
   local ret
   if not flags
-    then ret = C.accept(getfd(sockfd), cast(sockaddr_pt, addr), addrlen)
-    else ret = C.accept4(getfd(sockfd), cast(sockaddr_pt, addr), addrlen, stringflags(flags, "SOCK_"))
+    then ret = C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, addr), addrlen)
+    else ret = C.accept4(getfd(sockfd), ffi.cast(sockaddr_pt, addr), addrlen, stringflags(flags, "SOCK_"))
   end
   if ret == -1 then return errorret() end
   --if ret == -1 then return nil, "testing accept error return" end -- small performance improvement
@@ -2896,16 +2955,16 @@ end
 
 function S.getsockname(sockfd)
   local ss = sockaddr_storage_t()
-  local addrlen = int1_t(sizeof(sockaddr_storage_t))
-  local ret = C.getsockname(getfd(sockfd), cast(sockaddr_pt, ss), addrlen)
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  local ret = C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
 end
 
 function S.getpeername(sockfd)
   local ss = sockaddr_storage_t()
-  local addrlen = int1_t(sizeof(sockaddr_storage_t))
-  local ret = C.getpeername(getfd(sockfd), cast(sockaddr_pt, ss), addrlen)
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  local ret = C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
 end
@@ -2944,7 +3003,113 @@ function S.sethostname(s) -- only accept Lua string, do not see use case for buf
   return retbool(C.sethostname(s, #s))
 end
 
+-- signal set handlers
+local getsigset
+
+local function mksigset(str)
+  if not str then return sigset_t() end
+  if ffi.istype(sigset_t, str) then return str end
+  if type(str) == "table" then return str.sigset end
+  local f = sigset_t()
+  local a = split(",", str)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+
+    local d = bit.rshift(sig - 1, 5) -- always 32 bits
+    f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
+  end
+  return f
+end
+
+local function sigismember(set, sig)
+  local d = bit.rshift(sig - 1, 5) -- always 32 bits
+  return bit.band(set.val[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
+end
+
+local function sigaddset(set, sig)
+  set = mksigset(set)
+  local d = bit.rshift(sig - 1, 5)
+  set.val[d] = bit.bor(set.val[d], bit.lshift(1, (sig - 1) % 32))
+  return set
+end
+
+local function sigdelset(set, sig)
+  set = mksigset(set)
+  local d = bit.rshift(sig - 1, 5)
+  set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
+  return set
+end
+
+local function sigaddsets(set, sigs) -- allow multiple
+  if type(sigs) ~= "string" then return getsigset(sigaddset(set, sigs)) end
+  set = mksigset(set)
+  local a = split(",", sigs)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    sigaddset(set, sig)
+  end
+  return getsigset(set)
+end
+
+local function sigdelsets(set, sigs) -- allow multiple
+  if type(sigs) ~= "string" then return getsigset(sigdelset(set, sigs)) end
+  set = mksigset(set)
+  local a = split(",", sigs)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    sigdelset(set, sig)
+  end
+  return getsigset(set)
+end
+
+local sigsetmt = {__index = {add = sigaddsets, del = sigdelsets}}
+
+function getsigset(set)
+  local f = {sigset = set}
+  local isemptyset = true
+  for i = 1, S.NSIG do
+    if sigismember(set, i) then
+      f[signals[i]] = true
+      f[signals[i]:lower():sub(4)] = true
+      isemptyset = false
+    end
+  end
+  f.isemptyset = isemptyset
+  setmetatable(f, sigsetmt)
+  return f
+end
+
+-- does not support passing a function as a handler, use sigaction instead
+-- actualy glibc does not call the syscall anyway, defines in terms of sigaction; we could too
 function S.signal(signum, handler) return retbool(C.signal(stringflag(signum, "SIG"), stringflag(handler, "SIG_"))) end
+
+-- missing siginfo functionality for now, only supports getting signum TODO
+function S.sigaction(signum, handler, mask, flags)
+  local sa
+  if ffi.istype(sigaction_t, handler) then sa = handler
+  else
+    if type(handler) == 'string' then
+      handler = ffi.cast(sighandler_t, stringflag(handler, "SIG_"))
+    elseif
+      type(handler) == 'function' then handler = ffi.cast(sighandler_t, handler)
+    end
+    sa = sigaction_t{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = stringflags(flags, "SA_")}
+  end
+  local old = sigaction_t()
+  local ret = C.sigaction(stringflag(signum, "SIG"), sa, old)
+  if ret == -1 then return errorret() end
+  return old
+end
+
 function S.kill(pid, sig) return retbool(C.kill(pid, stringflag(sig, "SIG"))) end
 function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 
@@ -3071,89 +3236,6 @@ function fdisset(fds, set)
   return f
 end
 
--- signal set handlers
-local mksigset, getsigset, sigismember, sigaddset, sigdelset, sigaddsets, sigdelsets, sigsetmt
-
-function mksigset(str)
-  if not str then return sigset_t() end
-  if istype(sigset_t, str) then return str end
-  if type(str) == "table" then return str.sigset end
-  local f = sigset_t()
-  local a = split(",", str)
-  for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
-    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-
-    local d = bit.rshift(sig - 1, 5) -- always 32 bits
-    f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
-  end
-  return f
-end
-
-function sigismember(set, sig)
-  local d = bit.rshift(sig - 1, 5) -- always 32 bits
-  return bit.band(set.val[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
-end
-function sigaddset(set, sig)
-  set = mksigset(set)
-  local d = bit.rshift(sig - 1, 5)
-  set.val[d] = bit.bor(set.val[d], bit.lshift(1, (sig - 1) % 32))
-  return set
-end
-function sigdelset(set, sig)
-  set = mksigset(set)
-  local d = bit.rshift(sig - 1, 5)
-  set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
-  return set
-end
-
-function sigaddsets(set, sigs) -- allow multiple
-  if type(sigs) ~= "string" then return getsigset(sigaddset(set, sigs)) end
-  set = mksigset(set)
-  local a = split(",", sigs)
-  for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
-    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    sigaddset(set, sig)
-  end
-  return getsigset(set)
-end
-
-function sigdelsets(set, sigs) -- allow multiple
-  if type(sigs) ~= "string" then return getsigset(sigdelset(set, sigs)) end
-  set = mksigset(set)
-  local a = split(",", sigs)
-  for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
-    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    sigdelset(set, sig)
-  end
-  return getsigset(set)
-end
-
-sigsetmt = {__index = {add = sigaddsets, del = sigdelsets}}
-
-function getsigset(set)
-  local f = {sigset = set}
-  local isemptyset = true
-  for i = 1, S.NSIG do
-    if sigismember(set, i) then
-      f[signals[i]] = true
-      f[signals[i]:lower():sub(4)] = true
-      isemptyset = false
-    end
-  end
-  f.isemptyset = isemptyset
-  setmetatable(f, sigsetmt)
-  return f
-end
-
 function S.sigprocmask(how, set)
   how = stringflag(how, "SIG_")
   set = mksigset(set)
@@ -3181,7 +3263,7 @@ function S.select(s) -- note same structure as returned
   local nfds = 0
   local timeout2
   if s.timeout then
-    if istype(timeval_t, s.timeout) then timeout2 = s.timeout else timeout2 = timeval_t(s.timeout) end
+    if ffi.istype(timeval_t, s.timeout) then timeout2 = s.timeout else timeout2 = timeval_t(s.timeout) end
   end
   r, nfds = mkfdset(s.readfds or {}, nfds or 0)
   w, nfds = mkfdset(s.writefds or {}, nfds)
@@ -3240,13 +3322,12 @@ function S.setrlimit(resource, rlim, rlim2) -- can pass table, struct, or just b
   return retbool(C.setrlimit(stringflag(resource, "RLIMIT_"), rlim))
 end
 
--- Linux only. use epoll1
 function S.epoll_create(flags)
   return retfd(C.epoll_create1(stringflags(flags, "EPOLL_")))
 end
 
 function S.epoll_ctl(epfd, op, fd, event, data)
-  if not istype(epoll_event_t, event) then
+  if not ffi.istype(epoll_event_t, event) then
     local events = stringflags(event, "EPOLL")
     event = epoll_event_t()
     event.events = events
@@ -3281,11 +3362,11 @@ end
 
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
   local offin, offout = off_in, off_out
-  if off_in and not istype(loff_1t, off_in) then
+  if off_in and not ffi.istype(loff_1t, off_in) then
     offin = loff_1t()
     offin[0] = off_in
   end
-  if off_out and not istype(loff_1t, off_out) then
+  if off_out and not ffi.istype(loff_1t, off_out) then
     offout = loff_1t()
     offout[0] = off_out
   end
@@ -3318,11 +3399,11 @@ function S.inotify_read(fd, buffer, len)
   if not ret then return nil, err end
   local off, ee = 0, {}
   while off < ret do
-    local ev = cast(inotify_event_pt, buffer + off)
+    local ev = ffi.cast(inotify_event_pt, buffer + off)
     local le = getflags(ev.mask, "IN_", in_recv_ev, in_recv_lev, {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)})
     if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
-    off = off + sizeof(inotify_event_t(ev.len))
+    off = off + ffi.sizeof(inotify_event_t(ev.len))
   end
   return ee
 end
@@ -3355,7 +3436,6 @@ function S.eventfd_write(fd, value)
   return retbool(C.write(getfd(fd), value, 8))
 end
 
--- note this code could be used for sigaction too, but we can't yet use that due to not having callbacks
 local sigcode = function(s, signo, code)
   s.code = code
   s.signo = signo
@@ -3371,14 +3451,14 @@ local sigcode = function(s, signo, code)
 end
 
 function S.signalfd_read(fd, buffer, len)
-  if not len then len = sizeof(signalfd_siginfo_t) * 4 end
+  if not len then len = ffi.sizeof(signalfd_siginfo_t) * 4 end
   if not buffer then buffer = buffer_t(len) end
   local ret, err = S.read(fd, buffer, len)
   if ret == 0 or (err and err.EAGAIN) then return {} end
   if not ret then return nil, err end
   local offset, ss = 0, {}
   while offset < ret do
-    local ssi = cast(signalfd_siginfo_pt, buffer + offset)
+    local ssi = ffi.cast(signalfd_siginfo_pt, buffer + offset)
     local s = {}
     s.errno = tonumber(ssi.ssi_errno)
     sigcode(s, tonumber(ssi.ssi_signo), tonumber(ssi.ssi_code))
@@ -3402,28 +3482,47 @@ function S.signalfd_read(fd, buffer, len)
     elseif s.SIGILL or S.SIGFPE or s.SIGSEGV or s.SIGBUS or s.SIGTRAP then
       s.addr = uint64_t(ssi.ssi_addr)
     elseif s.SIGIO or s.SIGPOLL then
-      s.band = tonumber(ssi.ssi_band) -- should split this up, is events from poll, TODO when we implement poll
+      s.band = tonumber(ssi.ssi_band) -- should split this up, is events from poll, TODO
       s.fd = tonumber(ssi.ssi_fd)
     end
 
     ss[#ss + 1] = s
-    offset = offset + sizeof(signalfd_siginfo_t)
+    offset = offset + ffi.sizeof(signalfd_siginfo_t)
   end
   return ss
+end
+
+local function getitimerval(interval, value)
+  if ffi.istype(itimerval_t, interval) then return interval end
+  return itimerval_t(gettv(interval), gettv(value))
+end
+
+function S.getitimer(which, value)
+  if not value then value = itimerval_t() end
+  local ret = C.getitimer(stringflag(which, "ITIMER_"), value)
+  if ret == -1 then return errorret() end
+  return value
+end
+
+function S.setitimer(which, interval, value)
+  local oldtime = itimerval_t()
+  local ret = C.setitimer(stringflag(which, "ITIMER_"), getitimerval(interval, value), oldtime)
+  if ret == -1 then return errorret() end
+  return oldtime
 end
 
 function S.timerfd_create(clockid, flags)
   return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
 end
 
-local function getit(interval, value)
-  if istype(itimerspec_t, interval) then return interval end
+local function getitimerspec(interval, value)
+  if ffi.istype(itimerspec_t, interval) then return interval end
   return itimerspec_t(getts(interval), getts(value))
 end
 
 function S.timerfd_settime(fd, flags, interval, value)
   local oldtime = itimerspec_t()
-  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), getit(interval, value), oldtime)
+  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), getitimerspec(interval, value), oldtime)
   if ret == -1 then return errorret() end
   return oldtime
 end
@@ -3431,6 +3530,7 @@ end
 function S.timerfd_gettime(fd, curr_value)
   if not curr_value then curr_value = itimerspec_t() end
   local ret = C.timerfd_gettime(getfd(fd), curr_value)
+  if ret == -1 then return errorret() end
   return curr_value
 end
 
@@ -3440,7 +3540,7 @@ function S.timerfd_read(fd, buffer, size)
   local ret, err = S.read(fd, buffer, size)
   if not ret and err.EAGAIN then return 0 end -- will never actually return 0
   if not ret then return nil, err end
-  local i = cast(int64_pt, buffer)
+  local i = ffi.cast(int64_pt, buffer)
   return tonumber(i[0])
 end
 
@@ -3455,14 +3555,16 @@ function S.io_setup(nr_events)
 end
 
 function S.io_destroy(ctx)
-  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close to zero and not redo, unclear what an invalid value is (0?)
+  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close to zero and not redo, unclear what an invalid value is (0?) else gc calls more than once after close.
 end
 
 --[[
-local iocb_t = typeof("struct iocb")
-local iocbs_t = typeof("struct iocb[?]")
-local iocbs_pt = typeof("struct iocb *[?]")
+function S.io_cancel(ctx, iocb, result) {
+}
 ]]
+
+--function S.op_getevents()
+
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
   if type(iocb) ~= "cdata" then
     local io = iocb
@@ -3471,13 +3573,12 @@ function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note 
     iocba = iocbs_t(nr)
     for i = 0, nr - 1 do
       local ioi = io[i + 1]
-      iocb[i] = iocba + i -- do we need to cast?
-      iocba[i] = iocb_t()
-      iocba[i].aio_lio_opcode = getflag(ioi.cmd, "IOCB_CMD_")
+      iocb[i] = iocba + i
+      iocba[i].aio_lio_opcode = stringflags(ioi.cmd, "IOCB_CMD_")
       iocba[i].aio_data = ioi.data or 0
       iocba[i].aio_reqprio = ioi.reqprio or 0
       iocba[i].aio_fildes = getfd(ioi.fd)
-      iocba[i].aio_buf = ioi.buf
+      iocba[i].aio_buf = ffi.cast(int64_t, ioi.buf)
       iocba[i].aio_nbytes = ioi.nbytes
       iocba[i].aio_offset = ioi.offset
       if ioi.resfd then
@@ -3532,12 +3633,12 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
   if option == S.PR_MCE_KILL and arg2 == S.PR_MCE_KILL_SET then arg3 = stringflag(arg3, "PR_MCE_KILL_")
   elseif prctlpint[noption] then
     i = int1_t()
-    arg2 = cast(ulong_t, i)
+    arg2 = ffi.cast(ulong_t, i)
   elseif option == S.PR_GET_NAME then
     name = buffer_t(16)
-    arg2 = cast(ulong_t, name)
+    arg2 = ffi.cast(ulong_t, name)
   elseif option == S.PR_SET_NAME then
-    if type(arg2) == "string" then arg2 = cast(ulong_t, arg2) end
+    if type(arg2) == "string" then arg2 = ffi.cast(ulong_t, arg2) end
   end
   local ret = C.prctl(option, arg2 or 0, arg3 or 0, arg4 or 0, arg5 or 0)
   if ret == -1 then return errorret() end
@@ -3585,14 +3686,14 @@ end
 
 function S.clock_getres(clk_id, ts)
   ts = getts(ts)
-  local ret = C.syscall(S.SYS_clock_getres, stringflag(clk_id, "CLOCK_"), ts)
+  local ret = C.syscall(S.SYS_clock_getres, clockid_t(stringflag(clk_id, "CLOCK_")), ts)
   if ret == -1 then return errorret() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
   ts = getts(ts)
-  local ret = C.syscall(S.SYS_clock_gettime, stringflag(clk_id, "CLOCK_"), ts)
+  local ret = C.syscall(S.SYS_clock_gettime, clockid_t(stringflag(clk_id, "CLOCK_")), ts)
   if ret == -1 then return errorret() end
   return ts
 end
@@ -3653,7 +3754,7 @@ function S.setcmdline(...) -- this sets /proc/self/cmdline, use prctl to set /pr
     cmdstart = C.environ[0] - #oldcmdline -- this is where Linux stores the command line
   end
 
-  local me = cast("char *", C.environ)
+  local me = ffi.cast("char *", C.environ)
 
   if not me then return nil end -- in normal use you should get a pointer to one null pointer as minimum
 
@@ -3689,7 +3790,7 @@ end
 local b64
 function b64(n)
   local t64 = int64_1t(n)
-  local t32 = cast(int32_pt, t64)
+  local t32 = ffi.cast(int32_pt, t64)
   if ffi.abi("le") then
     return tonumber(t32[1]), tonumber(t32[0]) -- return high, low
   else
@@ -3729,7 +3830,7 @@ function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) e
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsg_align, cmsg_space, cmsg_len, cmsg_firsthdr, cmsg_nxthdr
-local cmsg_hdrsize = sizeof(cmsghdr_t(0))
+local cmsg_hdrsize = ffi.sizeof(cmsghdr_t(0))
 if ffi.abi('32bit') then
   function cmsg_align(len) return align(len, 4) end
 else
@@ -3746,7 +3847,7 @@ function cmsg_len(len) return cmsg_ahdr + len end
 function cmsg_firsthdr(msg)
   if msg.msg_controllen < cmsg_hdrsize then return nil end
   local mc = msg.msg_control
-  local cmsg = cast(cmsghdr_pt, mc)
+  local cmsg = ffi.cast(cmsghdr_pt, mc)
   return mc, cmsg
 end
 
@@ -3754,31 +3855,31 @@ function cmsg_nxthdr(msg, buf, cmsg)
   if cmsg.cmsg_len < cmsg_hdrsize then return nil end -- invalid cmsg
   buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
   if buf + cmsg_hdrsize > msg.msg_control + msg.msg_controllen then return nil end -- header would not fit
-  cmsg = cast(cmsghdr_pt, buf)
+  cmsg = ffi.cast(cmsghdr_pt, buf)
   if buf + cmsg_align(cmsg.cmsg_len) > msg.msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
   return buf, cmsg
 end
 
 -- similar functions for netlink messages
 local nlmsg_align = function(len) return align(len, 4) end
-local nlmsg_hdrlen = nlmsg_align(sizeof(nlmsghdr_t))
+local nlmsg_hdrlen = nlmsg_align(ffi.sizeof(nlmsghdr_t))
 local nlmsg_length = function(len) return len + nlmsg_hdrlen end
 local nlmsg_ok = function(msg, len)
   return len >= nlmsg_hdrlen and msg.nlmsg_len >= nlmsg_hdrlen and msg.nlmsg_len <= len
 end
 local nlmsg_next = function(msg, buf, len)
   local inc = nlmsg_align(msg.nlmsg_len)
-  return cast(nlmsghdr_pt, buf + inc), buf + inc, len - inc
+  return ffi.cast(nlmsghdr_pt, buf + inc), buf + inc, len - inc
 end
 
 local rta_align = nlmsg_align -- also 4 byte align
-local rta_length = function(len) return len + rta_align(sizeof(rtattr_t)) end
+local rta_length = function(len) return len + rta_align(ffi.sizeof(rtattr_t)) end
 local rta_ok = function(msg, len)
-  return len >= sizeof(rtattr_t) and msg.rta_len >= sizeof(rtattr_t) and msg.rta_len <= len
+  return len >= ffi.sizeof(rtattr_t) and msg.rta_len >= ffi.sizeof(rtattr_t) and msg.rta_len <= len
 end
 local rta_next = function(msg, buf, len)
   local inc = rta_align(msg.rta_len)
-  return cast(rtattr_pt, buf + inc), buf + inc, len - inc
+  return ffi.cast(rtattr_pt, buf + inc), buf + inc, len - inc
 end
 
 local ifla_decode = {}
@@ -3791,12 +3892,12 @@ end
 local nlmsg_data_decode = {}
 nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
 
-  local iface = cast(ifinfomsg_pt, buf)
+  local iface = ffi.cast(ifinfomsg_pt, buf)
 
-  buf = buf + nlmsg_align(sizeof(ifinfomsg_t))
-  len = len - nlmsg_align(sizeof(ifinfomsg_t))
+  buf = buf + nlmsg_align(ffi.sizeof(ifinfomsg_t))
+  len = len - nlmsg_align(ffi.sizeof(ifinfomsg_t))
 
-  local rtattr = cast(rtattr_pt, buf)
+  local rtattr = ffi.cast(rtattr_pt, buf)
   local ir = {index = iface.ifi_index} -- info about interface
   while rta_ok(rtattr, len) do
     if ifla_decode[rtattr.rta_type] then ir = ifla_decode[rtattr.rta_type](ir, buf, len) end
@@ -3818,7 +3919,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
   local bufsize = 8192
   local reply = buffer_t(bufsize)
   local ior = iovec_t(1, {{reply, bufsize}})
-  local m = msghdr_t{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = sizeof(addr)}
+  local m = msghdr_t{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
 
   local done = false -- what should we do if we get a done message but there is some extra buffer? could be next message...
   local r = {}
@@ -3829,7 +3930,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
     local len = n.count
     local buffer = reply
 
-    local msg = cast(nlmsghdr_pt, buffer)
+    local msg = ffi.cast(nlmsghdr_pt, buffer)
 
     while not done and nlmsg_ok(msg, len) do
       local t = tonumber(msg.nlmsg_type)
@@ -3865,7 +3966,7 @@ function S.get_interfaces()
   gen.rtgen_family = S.AF_PACKET
 
   local ios = iovec_t(1, {{buf, len}})
-  local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}
+  local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = ffi.sizeof(k)}
 
   local n, err = s:sendmsg(m)
   if not n then return nil, err end 
@@ -3903,13 +4004,13 @@ function S.recvmsg(fd, msg, flags)
     if cmsg.cmsg_level == S.SOL_SOCKET then
       if cmsg.cmsg_type == S.SCM_CREDENTIALS then
         local cred = ucred_t() -- could just cast to ucred pointer
-        ffi.copy(cred, cmsg.cmsg_data, sizeof(ucred_t))
+        ffi.copy(cred, cmsg.cmsg_data, ffi.sizeof(ucred_t))
         ret.pid = cred.pid
         ret.uid = cred.uid
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
-      local fda = cast(int_pt, cmsg.cmsg_data)
-      local fdc = div(cmsg.cmsg_len - cmsg_ahdr, sizeof(int1_t))
+      local fda = ffi.cast(int_pt, cmsg.cmsg_data)
+      local fdc = div(cmsg.cmsg_len - cmsg_ahdr, ffi.sizeof(int1_t))
       ret.fd = {}
       for i = 1, fdc do ret.fd[i] = fd_t(fda[i - 1]) end
 
@@ -3934,7 +4035,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   io[0].iov_base = buf1
   io[0].iov_len = 1
   local iolen = 1
-  local usize = sizeof(ucred_t)
+  local usize = ffi.sizeof(ucred_t)
   local bufsize = cmsg_space(usize)
   local buflen = cmsg_len(usize)
   local buf = buffer_t(bufsize) -- this is our cmsg buffer
@@ -3961,7 +4062,7 @@ function S.sendfds(fd, ...)
   local fds = {}
   for i, v in ipairs{...} do fds[i] = getfd(v) end
   local fa = ints_t(#fds, fds)
-  local fasize = sizeof(fa)
+  local fasize = ffi.sizeof(fa)
   local bufsize = cmsg_space(fasize)
   local buflen = cmsg_len(fasize)
   local buf = buffer_t(bufsize) -- this is our cmsg buffer
@@ -4073,7 +4174,7 @@ end
 local function bridge_ioctl(io, name)
   local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
-  local ret = C.ioctl(getfd(s), io, cast(char_pt, name))
+  local ret = C.ioctl(getfd(s), io, ffi.cast(char_pt, name))
   if ret == -1 then return errorret() end
   local ok, err = s:close()
   if not ok then return nil, err end
@@ -4144,9 +4245,9 @@ local brinfo = function(d) -- can be used as subpart of general interface info
     local n = fd:read(buffer, sl)
     if not n then return nil end
 
-    local fdbs = cast(fdb_entry_pt, buffer)
+    local fdbs = ffi.cast(fdb_entry_pt, buffer)
 
-    for i = 1, n / sizeof(fdb_entry_t) do
+    for i = 1, n / ffi.sizeof(fdb_entry_t) do
       local fdb = fdbs[i - 1]
       local mac = macaddr_t()
       ffi.copy(mac, fdb.mac_addr, IFHWADDRLEN)
@@ -4271,16 +4372,16 @@ function S.ptsname(fd)
 end
 
 -- use string types for now
-local threc -- helper for returning varargs
-function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
+-- helper for returning varargs
+local function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
   if not t then return nil end
-  if select("#", ...) == 0 then return cast(typeof(t .. "*"), buf + offset) end
-  return cast(typeof(t .. "*"), buf + offset), threc(buf, offset + sizeof(t), ...)
+  if select("#", ...) == 0 then return ffi.cast(ffi.typeof(t .. "*"), buf + offset) end
+  return ffi.cast(ffi.typeof(t .. "*"), buf + offset), threc(buf, offset + ffi.sizeof(t), ...)
 end
 function S.tbuffer(...) -- helper function for sequence of types in a buffer
   local len = 0
   for i, t in ipairs{...} do
-    len = len + sizeof(typeof(t)) -- alignment issues, need to round up to minimum alignment
+    len = len + ffi.sizeof(ffi.typeof(t)) -- alignment issues, need to round up to minimum alignment
   end
   local buf = buffer_t(len)
   return buf, len, threc(buf, 0, ...)
@@ -4318,5 +4419,9 @@ S.t = {
 }
 
 return S
+
+end
+
+return syscall()
 
 
