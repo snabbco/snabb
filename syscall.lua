@@ -10,7 +10,6 @@ local C = ffi.C
 local octal = function (s) return tonumber(s, 8) end
 
 -- cleaner to read
-local arch = ffi.arch
 local typeof = ffi.typeof
 
 -- convenience so user need not require ffi
@@ -41,11 +40,11 @@ S.O_DSYNC     = octal('010000')
 S.O_RSYNC     = S.O_SYNC
 
 -- these are arch dependent!
-if arch == "x86" or arch == "x64" then
+if ffi.arch == "x86" or ffi.arch == "x64" then
   S.O_DIRECTORY = octal('0200000')
   S.O_NOFOLLOW  = octal('0400000')
   S.O_DIRECT    = octal('040000')
-elseif arch == "arm" then
+elseif ffi.arch == "arm" then
   S.O_DIRECTORY = octal('040000')
   S.O_NOFOLLOW  = octal('0100000')
   S.O_DIRECT    = octal('0200000')
@@ -297,7 +296,7 @@ S.SO_NO_CHECK    = 11
 S.SO_PRIORITY    = 12
 S.SO_LINGER      = 13
 S.SO_BSDCOMPAT   = 14
-assert(arch ~= "ppc", "need to fix the values below for ppc")
+assert(ffi.arch ~= "ppc", "need to fix the values below for ppc")
 S.SO_PASSCRED    = 16 -- below here differs for ppc!
 S.SO_PEERCRED    = 17
 S.SO_RCVLOWAT    = 18
@@ -923,7 +922,7 @@ S.PR_SET_PTRACER   = 0x59616d61 -- Ubuntu extension
 
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
-if arch == "x86" then
+if ffi.arch == "x86" then
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
@@ -937,7 +936,7 @@ if arch == "x86" then
   S.SYS_clock_gettime    = 265
   S.SYS_clock_getres     = 266
   S.SYS_clock_nanosleep  = 267
-elseif arch == "x64" then
+elseif ffi.arch == "x64" then
   S.SYS_stat             = 4
   S.SYS_fstat            = 5
   S.SYS_lstat            = 6
@@ -951,7 +950,7 @@ elseif arch == "x64" then
   S.SYS_clock_gettime    = 228
   S.SYS_clock_getres     = 229
   S.SYS_clock_nanosleep  = 230
-elseif arch == "arm" and ffi.abi("eabi") then
+elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
@@ -1578,7 +1577,7 @@ struct io_event {
 -- it appears that there is no kernel sigaction in non x86 architectures? Need to check source.
 -- presumably does not care, but the types are a bit of a pain.
 -- temporarily just going to implement sighandler support
-if arch == 'x86' then
+if ffi.arch == 'x86' then
 ffi.cdef[[
 struct sigaction {
   union {
@@ -1662,7 +1661,7 @@ typedef struct siginfo {
 
 -- stat structure is architecture dependent in Linux
 
-if arch == 'x86' then
+if ffi.arch == 'x86' then
 ffi.cdef[[
 struct stat {
   unsigned long  st_dev;
@@ -1685,7 +1684,7 @@ struct stat {
   unsigned long  __unused5;
 };
 ]]
-elseif arch == 'x64' then
+elseif ffi.arch == 'x64' then
 ffi.cdef [[
 struct stat {
   unsigned long   st_dev;
@@ -1708,7 +1707,7 @@ struct stat {
   long            __unused[3];
 };
 ]]
-elseif arch == 'arm' then
+elseif ffi.arch == 'arm' then
   if ffi.abi("le") then
     ffi.cdef [[
       struct stat {
