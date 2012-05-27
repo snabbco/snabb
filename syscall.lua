@@ -2242,7 +2242,7 @@ S.t.epoll_event = ffi.typeof("struct epoll_event")
 S.t.off = ffi.typeof("off_t")
 S.t.nlmsghdr = ffi.typeof("struct nlmsghdr")
 S.t.rtgenmsg = ffi.typeof("struct rtgenmsg")
-local ifinfomsg_t = ffi.typeof("struct ifinfomsg")
+S.t.ifinfomsg = ffi.typeof("struct ifinfomsg")
 local rtattr_t = ffi.typeof("struct rtattr")
 local timex_t = ffi.typeof("struct timex")
 local utsname_t = ffi.typeof("struct utsname")
@@ -3892,8 +3892,8 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
 
   local iface = ffi.cast(ifinfomsg_pt, buf)
 
-  buf = buf + nlmsg_align(ffi.sizeof(ifinfomsg_t))
-  len = len - nlmsg_align(ffi.sizeof(ifinfomsg_t))
+  buf = buf + nlmsg_align(ffi.sizeof(S.t.ifinfomsg))
+  len = len - nlmsg_align(ffi.sizeof(S.t.ifinfomsg))
 
   local rtattr = ffi.cast(rtattr_pt, buf)
   local ir = {index = iface.ifi_index} -- info about interface
