@@ -2246,7 +2246,7 @@ S.t.ifinfomsg = ffi.typeof("struct ifinfomsg")
 S.t.rtattr = ffi.typeof("struct rtattr")
 S.t.timex = ffi.typeof("struct timex")
 S.t.utsname = ffi.typeof("struct utsname")
-local sigset_t = ffi.typeof("sigset_t")
+S.t.sigset = ffi.typeof("sigset_t")
 local rlimit_t = ffi.typeof("struct rlimit")
 local fdb_entry_t = ffi.typeof("struct fdb_entry")
 S.t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
@@ -3005,10 +3005,10 @@ end
 local getsigset
 
 local function mksigset(str)
-  if not str then return sigset_t() end
-  if ffi.istype(sigset_t, str) then return str end
+  if not str then return S.t.sigset() end
+  if ffi.istype(S.t.sigset, str) then return str end
   if type(str) == "table" then return str.sigset end
-  local f = sigset_t()
+  local f = S.t.sigset()
   local a = split(",", str)
   for i, v in ipairs(a) do
     local s = trim(v:upper())
@@ -3237,14 +3237,14 @@ end
 function S.sigprocmask(how, set)
   how = stringflag(how, "SIG_")
   set = mksigset(set)
-  local oldset = sigset_t()
+  local oldset = S.t.sigset()
   local ret = C.sigprocmask(how, set, oldset)
   if ret == -1 then return errorret() end
   return getsigset(oldset)
 end
 
 function S.sigpending()
-  local set = sigset_t()
+  local set = S.t.sigset()
   local ret = C.sigpending(set)
   if ret == -1 then return errorret() end
  return getsigset(set)
