@@ -1351,8 +1351,6 @@ local int32_pt = ffi.typeof("int32_t *")
 local int64_1t = ffi.typeof("int64_t[1]")
 local long_t = ffi.typeof("long")
 
-local fd_t -- type for a file descriptor
-
 -- char buffer type
 S.t.buffer = ffi.typeof("char[?]")
 
@@ -1402,7 +1400,7 @@ end
 
 local function retfd(ret)
   if ret == -1 then return errorret() end
-  return fd_t(ret)
+  return S.t.fd(ret)
 end
 
 -- define C types
@@ -2621,7 +2619,7 @@ function S.pipe(flags)
   local ret
   if flags then ret = C.pipe2(fd2, stringflags(flags, "O_")) else ret = C.pipe(fd2) end
   if ret == -1 then return errorret() end
-  return {fd_t(fd2[0]), fd_t(fd2[1])}
+  return {S.t.fd(fd2[0]), S.t.fd(fd2[1])}
 end
 
 function S.close(fd)
@@ -2630,12 +2628,12 @@ function S.close(fd)
   local ret = C.close(fileno)
   if ret == -1 then
     local errno = ffi.errno()
-    if ffi.istype(fd_t, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
+    if ffi.istype(S.t.fd, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
       fd.fileno = -1 -- make sure cannot accidentally close this fd object again
     end
     return errorret()
   end
-  if ffi.istype(fd_t, fd) then
+  if ffi.istype(S.t.fd, fd) then
     fd.fileno = -1 -- make sure cannot accidentally close this fd object again
   end
   return true
@@ -2924,7 +2922,7 @@ function S.socketpair(domain, stype, protocol)
   local sv2 = int2_t()
   local ret = C.socketpair(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol), sv2)
   if ret == -1 then return errorret() end
-  return {fd_t(sv2[0]), fd_t(sv2[1])}
+  return {S.t.fd(sv2[0]), S.t.fd(sv2[1])}
 end
 
 function S.bind(sockfd, addr, addrlen)
@@ -2948,7 +2946,7 @@ function S.accept(sockfd, flags, addr, addrlen)
   end
   if ret == -1 then return errorret() end
   --if ret == -1 then return nil, "testing accept error return" end -- small performance improvement
-  return saret(addr, addrlen[0], {fd = fd_t(ret), fileno = tonumber(ret)})
+  return saret(addr, addrlen[0], {fd = S.t.fd(ret), fileno = tonumber(ret)})
 end
 
 function S.getsockname(sockfd)
@@ -4010,7 +4008,7 @@ function S.recvmsg(fd, msg, flags)
       local fda = ffi.cast(int_pt, cmsg.cmsg_data)
       local fdc = div(cmsg.cmsg_len - cmsg_ahdr, ffi.sizeof(int1_t))
       ret.fd = {}
-      for i = 1, fdc do ret.fd[i] = fd_t(fda[i - 1]) end
+      for i = 1, fdc do ret.fd[i] = S.t.fd(fda[i - 1]) end
 
       end -- add other SOL_SOCKET messages
     end -- add other processing for different types
@@ -4403,7 +4401,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
-fd_t = ffi.metatype("struct {int fileno;}", {__index = fmeth, __gc = S.close})
+S.t.fd = ffi.metatype("struct {int fileno;}", {__index = fmeth, __gc = S.close})
 
 return S
 
