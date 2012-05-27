@@ -4086,15 +4086,15 @@ fd_t = ffi.metatype("struct {int fileno;}", {__index = fmeth, __gc = S.close})
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
 -- think we are missing some, as not really using them
---[[S.t = {
-  fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
+S.t = {
+  int = int_t, fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
   iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
   sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t, uint64 = uint64_t, macaddr = macaddr_t,
   sockaddr_storage = sockaddr_storage_t, sockaddr_in6 = sockaddr_in6_t, pollfds = pollfds_t, epoll_events = epoll_events_t,
   epoll_event = epoll_event_t, ulong = ulong_t, aio_context = aio_context_t
 }
-]]
+
 return S
 
 end
