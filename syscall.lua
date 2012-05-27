@@ -2243,7 +2243,7 @@ S.t.off = ffi.typeof("off_t")
 S.t.nlmsghdr = ffi.typeof("struct nlmsghdr")
 S.t.rtgenmsg = ffi.typeof("struct rtgenmsg")
 S.t.ifinfomsg = ffi.typeof("struct ifinfomsg")
-local rtattr_t = ffi.typeof("struct rtattr")
+S.t.rtattr = ffi.typeof("struct rtattr")
 local timex_t = ffi.typeof("struct timex")
 local utsname_t = ffi.typeof("struct utsname")
 local sigset_t = ffi.typeof("sigset_t")
@@ -3871,9 +3871,9 @@ local nlmsg_next = function(msg, buf, len)
 end
 
 local rta_align = nlmsg_align -- also 4 byte align
-local rta_length = function(len) return len + rta_align(ffi.sizeof(rtattr_t)) end
+local rta_length = function(len) return len + rta_align(ffi.sizeof(S.t.rtattr)) end
 local rta_ok = function(msg, len)
-  return len >= ffi.sizeof(rtattr_t) and msg.rta_len >= ffi.sizeof(rtattr_t) and msg.rta_len <= len
+  return len >= ffi.sizeof(S.t.rtattr) and msg.rta_len >= ffi.sizeof(S.t.rtattr) and msg.rta_len <= len
 end
 local rta_next = function(msg, buf, len)
   local inc = rta_align(msg.rta_len)
