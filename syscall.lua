@@ -2348,7 +2348,7 @@ local siginfo_set = {
   si_band    = function(s, v) s.sifields.sigpoll.si_band = v end,
   si_fd      = function(s, v) s.sifields.sigpoll.si_fd = v end,
 }
-local siginfo_t = ffi.metatype("struct siginfo",{
+S.t.siginfo = ffi.metatype("struct siginfo",{
   __index = function(t, k) if siginfo_get[k] then return siginfo_get[k](t) end end,
   __newindex = function(t, k, v) if siginfo_set[k] then siginfo_set[k](t, v) end end,
 })
@@ -2770,7 +2770,7 @@ function S.waitpid(pid, options)
   return retwait(C.waitpid(pid, status, options or 0), status[0])
 end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
-  if not infop then infop = siginfo_t() end
+  if not infop then infop = S.t.siginfo() end
   infop.si_pid = 0 -- see notes on man page
   local ret = C.waitid(stringflag(idtype, "P_"), id or 0, infop, stringflags(options, "W"))
   if ret == -1 then return errorret() end
