@@ -1,18 +1,26 @@
 # Linux system calls for LuaJIT
 
-What? An FFI implementation of the Linux system calls for LuaJIT.
+What? An FFI implementation of the Linux kernel ABI for LuaJIT.
 
 Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua.
 
 Linux only? Easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library (that applies also to any non glibc library too), and test. Patches accepted.
 
-Requirements: Needs LuaJIT 2.0.0-beta9 or later. Generally tested using git head.
+Requirements: Needs LuaJIT 2.0.0-beta9 or later. Generally tested using git head. Working on support for [luaffi](https://github.com/jmckaskill/luaffi) so you can use with standard Lua; there are some issues but should be fixable.
 
 ## What is implemented?
 
 Unfinished! Some syscalls missing, work in progress! The majority of calls are now there, let me know if you need some that is not.
 
-No support for 64 bit file operations on a 32 bit system yet. 
+No support for 64 bit file operations on a 32 bit system yet.
+
+## What will be implemented?
+
+The aim is to implement the Linux kernel interfaces. This includes the system calls, the most obvious API, but also all the other parts: netlink communication used for configuring network interfaces and similar (started, but most still to do), and the ioctl based interfaces, of which the termios and pty interfaces have been done so far, thanks to [bdowning](https://github.com/bdowning). The aim is to provide helpers that look more familiar than the native interfaces for the complex stuff.
+
+## Note on man(3)
+
+There are some commands that call libc interfaces in man(3). These include some helper functions (eg inet_aton) that should be rewritten in Lua at some point as they are fairly trivial, will be done soon. Also includes the termios stuff, where these are functions that are mostly just ioctl commands and using the pts mux, but glibc does do quite a bit of other stuff if you look at the strace output, and there may be reasons for rewriting these in Lua using system calls directly, not sure yet. If so this would not affect the exposed interfaces.
 
 ### System calls (135)
 
@@ -20,14 +28,14 @@ open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname
 nice, getpriority, setpriority, prctl, alarm, waitid, inotify\_init, inotify\_add\_watch, inotify\_rm\_watch, adjtimex, getrlimit, setrlimit, sigprocmask, sigpending,
 sigsuspend, getsid, setsid, listxattr, llistxattr, flistxattr, setxattr, lsetxattr, fsetxattr, getxattr, lgetxattr, fgetxattr, removexattr, lremovexattr, fremovexattr,
 readlink, splice, vmsplice, tee, signalfd, timerfd\_create, timerfd\_settime, timerfd\_gettime, posix\_fadvise, fallocate, readahead, poll,
-getitimer, setitimer,
-tcgetattr, tcsetattr, tcsendbreak, tcdrain, tcflush, tcflow, tcgetsid,
-posix\_openpt, grantpt, unlockpt, ptsname
+getitimer, setitimer
 
 ### Other functions
 
 exit, inet\_aton, inet\_ntoa, inet\_pton, inet\_ntop,
-cfgetispeed, cfgetospeed, cfsetispeed, cfsetospeed, cfsetspeed
+cfgetispeed, cfgetospeed, cfsetispeed, cfsetospeed, cfsetspeed,
+tcgetattr, tcsetattr, tcsendbreak, tcdrain, tcflush, tcflow, tcgetsid,
+posix\_openpt, grantpt, unlockpt, ptsname
 
 ### Socket types
 
@@ -101,18 +109,18 @@ Siginfo support in sigaction not there yet, as confused by the kernel API.
 ### Missing functions
 
 pselect, ppoll
-clock_nanosleep, timer_create, timer_getoverrun
+clock_\nanosleep, timer_\create, timer_\getoverrun
 faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  mkdirat(2),  mknodat(2),
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue
-io_cancel(2), io_destroy(2), io_setup(2), io_submit(2), ...
+io_\cancel(2), io_\destroy(2), io_\setup(2), io_\submit(2), ...
 sync_file_range(2)
 capset, capget
 ...
 
 ### Testing
 
-The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86.
+The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86. Intend to get my ppc build machine back up one day, if you want this supported please ask. I do not currently have a mips box, if you want this can you suggest a suitable dev box.
 
 Initial testing on uclibc, works on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes.
 
