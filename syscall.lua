@@ -2262,6 +2262,9 @@ local sigaction_t = ffi.typeof("struct sigaction")
 local clockid_t = ffi.typeof("clockid_t")
 local inotify_event_t = ffi.typeof("struct inotify_event")
 
+-- could use metamethods for struct ifreq see /usr/include/linux/if.h
+S.t.ifreq = ffi.typeof("struct ifreq")
+
 local uint64_1t = ffi.typeof("uint64_t[1]")
 local socklen1_t = ffi.typeof("socklen_t[1]")
 local ulong_t = ffi.typeof("unsigned long")
@@ -2352,9 +2355,6 @@ S.t.siginfo = ffi.metatype("struct siginfo",{
   __index = function(t, k) if siginfo_get[k] then return siginfo_get[k](t) end end,
   __newindex = function(t, k, v) if siginfo_set[k] then siginfo_set[k](t, v) end end,
 })
-
--- could use metamethods for struct ifreq see /usr/include/linux/if.h
-local ifreq_t = ffi.typeof("struct ifreq")
 
 local macaddr_t = ffi.metatype("struct {uint8_t mac_addr[6];}", {
   __tostring = function(m)
@@ -4147,7 +4147,7 @@ function S.ls(name, nodots) -- return just the list, no other data, cwd if no di
 end
 
 local function if_nametoindex(name, s) -- internal version when already have socket for ioctl
-  local ifr = ifreq_t()
+  local ifr = S.t.ifreq()
   local len = #name + 1
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
@@ -4189,7 +4189,7 @@ function bridge_if_ioctl(io, bridge, dev)
     dev, err = if_nametoindex(dev, s)
     if not dev then return nil, err end
   end
-  ifr = ifreq_t()
+  ifr = S.t.ifreq()
   len = #bridge + 1
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, bridge, len) -- note not using the short forms as no metatable defined yet...
