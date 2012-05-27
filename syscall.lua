@@ -1145,7 +1145,8 @@ local mkerror = function(errno)
 end
 
 -- integer types
-local int_t = ffi.typeof("int")
+S.t = {}
+S.t.int = ffi.typeof("int")
 local uint_t = ffi.typeof("unsigned int")
 local int1_t = ffi.typeof("int[1]")
 local int2_t = ffi.typeof("int[2]")
@@ -1195,7 +1196,7 @@ local buffer_t = ffi.typeof("char[?]")
 --get fd from standard string, integer, or cdata
 local function getfd(fd)
   if not fd then return nil end
-  if ffi.istype(int_t, fd) then return fd end
+  if ffi.istype(S.t.int, fd) then return fd end
   if type(fd) == 'number' then return fd end
   if fd.fileno then return fd.fileno end
   if type(fd) == 'string' then
@@ -2506,7 +2507,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   local d = {}
   local ret
   repeat
-    ret = C.syscall(S.SYS_getdents, int_t(getfd(fd)), buf, uint_t(size))
+    ret = C.syscall(S.SYS_getdents, S.t.int(getfd(fd)), buf, uint_t(size))
     if ret == -1 then return errorret() end
     local i = 0
     while i < ret do
@@ -2622,7 +2623,7 @@ function S.lstat(path, buf)
 end
 function S.fstat(fd, buf)
   if not buf then buf = stat_t() end
-  local ret = C.syscall(S.SYS_fstat, int_t(getfd(fd)), buf)
+  local ret = C.syscall(S.SYS_fstat, S.t.int(getfd(fd)), buf)
   if ret == -1 then return errorret() end
   return buf
 end
@@ -4084,7 +4085,7 @@ fd_t = ffi.metatype("struct {int fileno;}", {__index = fmeth, __gc = S.close})
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
 -- think we are missing some, as not really using them
-S.t = {
+--[[S.t = {
   fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
   iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
@@ -4092,7 +4093,7 @@ S.t = {
   sockaddr_storage = sockaddr_storage_t, sockaddr_in6 = sockaddr_in6_t, pollfds = pollfds_t, epoll_events = epoll_events_t,
   epoll_event = epoll_event_t, ulong = ulong_t, aio_context = aio_context_t
 }
-
+]]
 return S
 
 end
