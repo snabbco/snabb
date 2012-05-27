@@ -1344,8 +1344,8 @@ S.t.int = ffi.typeof("int")
 S.t.uint = ffi.typeof("unsigned int")
 S.t.int64 = ffi.typeof("int64_t")
 S.t.uint64 = ffi.typeof("uint64_t")
-local long_t = ffi.typeof("long")
-local ulong_t = ffi.typeof("unsigned long")
+S.t.long = ffi.typeof("long")
+S.t.ulong = ffi.typeof("unsigned long")
 
 local int1_t = ffi.typeof("int[1]")
 local int2_t = ffi.typeof("int[2]")
@@ -3546,7 +3546,7 @@ function S.timerfd_read(fd, buffer, size)
 end
 
 -- aio functions
-local function getctx(ctx) return ulong_t(ctx.ctx) end -- aio_context_t is really unsigned long
+local function getctx(ctx) return S.t.ulong(ctx.ctx) end -- aio_context_t is really unsigned long
 
 function S.io_setup(nr_events)
   local ctx = S.t.aio_context()
@@ -3588,7 +3588,7 @@ function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note 
       end
     end
   end
-  return retnum(C.syscall(S.SYS_io_submit, getctx(ctx), long_t(nr), iocb))
+  return retnum(C.syscall(S.SYS_io_submit, getctx(ctx), S.t.long(nr), iocb))
 end
 
 local ameth = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel}
@@ -3634,12 +3634,12 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
   if option == S.PR_MCE_KILL and arg2 == S.PR_MCE_KILL_SET then arg3 = stringflag(arg3, "PR_MCE_KILL_")
   elseif prctlpint[noption] then
     i = int1_t()
-    arg2 = ffi.cast(ulong_t, i)
+    arg2 = ffi.cast(S.t.ulong, i)
   elseif option == S.PR_GET_NAME then
     name = S.t.buffer(16)
-    arg2 = ffi.cast(ulong_t, name)
+    arg2 = ffi.cast(S.t.ulong, name)
   elseif option == S.PR_SET_NAME then
-    if type(arg2) == "string" then arg2 = ffi.cast(ulong_t, arg2) end
+    if type(arg2) == "string" then arg2 = ffi.cast(S.t.ulong, arg2) end
   end
   local ret = C.prctl(option, arg2 or 0, arg3 or 0, arg4 or 0, arg5 or 0)
   if ret == -1 then return errorret() end
