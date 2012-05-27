@@ -2233,7 +2233,7 @@ local in_addr_t = ffi.typeof("struct in_addr")
 local in6_addr_t = ffi.typeof("struct in6_addr")
 S.t.sockaddr_un = ffi.typeof("struct sockaddr_un")
 S.t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
-local iovec_t = ffi.typeof("struct iovec[?]")
+S.t.iovec = ffi.typeof("struct iovec[?]")
 local msghdr_t = ffi.typeof("struct msghdr")
 local cmsghdr_t = ffi.typeof("struct cmsghdr")
 local ucred_t = ffi.typeof("struct ucred")
@@ -3919,7 +3919,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
 
   local bufsize = 8192
   local reply = S.t.buffer(bufsize)
-  local ior = iovec_t(1, {{reply, bufsize}})
+  local ior = S.t.iovec(1, {{reply, bufsize}})
   local m = msghdr_t{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
 
   local done = false -- what should we do if we get a done message but there is some extra buffer? could be next message...
@@ -3966,7 +3966,7 @@ function S.get_interfaces()
   hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
   gen.rtgen_family = S.AF_PACKET
 
-  local ios = iovec_t(1, {{buf, len}})
+  local ios = S.t.iovec(1, {{buf, len}})
   local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = ffi.sizeof(k)}
 
   local n, err = s:sendmsg(m)
@@ -3982,7 +3982,7 @@ end
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
     local buf1 = S.t.buffer(1)
-    local io = iovec_t(1, {{buf1, 1}})
+    local io = S.t.iovec(1, {{buf1, 1}})
     msg = msghdr_t{msg_iov = io, msg_iovlen = 1}
   end
   return retbool(C.sendmsg(getfd(fd), msg, stringflags(flags, "MSG_")))
@@ -3992,7 +3992,7 @@ end
 function S.recvmsg(fd, msg, flags)
   if not msg then 
     local buf1 = S.t.buffer(1) -- assume user wants to receive single byte to get cmsg
-    local io = iovec_t(1, {{buf1, 1}})
+    local io = S.t.iovec(1, {{buf1, 1}})
     local bufsize = 1024 -- sane default, build your own structure otherwise
     local buf = S.t.buffer(bufsize)
     msg = msghdr_t{msg_iov = io, msg_iovlen = 1, msg_control = buf, msg_controllen = bufsize}
@@ -4032,7 +4032,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   ucred.uid = uid
   ucred.gid = gid
   local buf1 = S.t.buffer(1) -- need to send one byte
-  local io = iovec_t(1)
+  local io = S.t.iovec(1)
   io[0].iov_base = buf1
   io[0].iov_len = 1
   local iolen = 1
@@ -4056,7 +4056,7 @@ end
 
 function S.sendfds(fd, ...)
   local buf1 = S.t.buffer(1) -- need to send one byte
-  local io = iovec_t(1)
+  local io = S.t.iovec(1)
   io[0].iov_base = buf1
   io[0].iov_len = 1
   local iolen = 1
