@@ -2237,7 +2237,7 @@ S.t.iovec = ffi.typeof("struct iovec[?]")
 S.t.msghdr = ffi.typeof("struct msghdr")
 S.t.cmsghdr = ffi.typeof("struct cmsghdr")
 S.t.ucred = ffi.typeof("struct ucred")
-local sysinfo_t = ffi.typeof("struct sysinfo")
+S.t.sysinfo = ffi.typeof("struct sysinfo")
 local fdset_t = ffi.typeof("fd_set")
 local fdmask_t = ffi.typeof("fd_mask")
 S.t.stat = ffi.typeof("struct stat")
@@ -3131,7 +3131,7 @@ function S.time()
 end
 
 function S.sysinfo(info)
-  if not info then info = sysinfo_t() end
+  if not info then info = S.t.sysinfo() end
   local ret = C.sysinfo(info)
   if ret == -1 then return errorret() end
   return info
