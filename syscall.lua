@@ -1343,7 +1343,7 @@ end
 S.t.int = ffi.typeof("int")
 S.t.uint = ffi.typeof("unsigned int")
 S.t.int64 = ffi.typeof("int64_t")
-local uint64_t = ffi.typeof("uint64_t")
+S.t.uint64 = ffi.typeof("uint64_t")
 local long_t = ffi.typeof("long")
 local ulong_t = ffi.typeof("unsigned long")
 
@@ -2261,6 +2261,7 @@ S.t.sighandler = ffi.typeof("sighandler_t")
 S.t.sigaction = ffi.typeof("struct sigaction")
 S.t.clockid = ffi.typeof("clockid_t")
 S.t.inotify_event = ffi.typeof("struct inotify_event")
+local loff_t = ffi.typeof("loff_t")
 
 S.t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
 
@@ -2270,7 +2271,6 @@ S.t.ifreq = ffi.typeof("struct ifreq")
 local uint64_1t = ffi.typeof("uint64_t[1]")
 local socklen1_t = ffi.typeof("socklen_t[1]")
 local off1_t = ffi.typeof("off_t[1]")
-local loff_t = ffi.typeof("loff_t")
 local loff_1t = ffi.typeof("loff_t[1]")
 
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
@@ -3356,7 +3356,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
     local e = events[i - 1]
     r[i] = getflags(e.events, "EPOLL", epoll_flags, epoll_lflags)
     r[i].fileno = tonumber(e.data.fd)
-    r[i].data = uint64_t(e.data.u64)
+    r[i].data = S.t.uint64(e.data.u64)
   end
   return r
 end
@@ -3468,7 +3468,7 @@ function S.signalfd_read(fd, buffer, len)
       s.pid = tonumber(ssi.ssi_pid)
       s.uid = tonumber(ssi.ssi_uid)
       s.int = tonumber(ssi.ssi_int)
-      s.ptr = uint64_t(ssi.ssi_ptr)
+      s.ptr = S.t.uint64(ssi.ssi_ptr)
     elseif s.SI_TIMER then
       s.overrun = tonumber(ssi.ssi_overrun)
       s.timerid = tonumber(ssi.ssi_tid)
@@ -3481,7 +3481,7 @@ function S.signalfd_read(fd, buffer, len)
       s.utime = tonumber(ssi.ssi_utime) / 1000000 -- convert to seconds
       s.stime = tonumber(ssi.ssi_stime) / 1000000
     elseif s.SIGILL or S.SIGFPE or s.SIGSEGV or s.SIGBUS or s.SIGTRAP then
-      s.addr = uint64_t(ssi.ssi_addr)
+      s.addr = S.t.uint64(ssi.ssi_addr)
     elseif s.SIGIO or s.SIGPOLL then
       s.band = tonumber(ssi.ssi_band) -- should split this up, is events from poll, TODO
       s.fd = tonumber(ssi.ssi_fd)
