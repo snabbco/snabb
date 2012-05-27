@@ -10,7 +10,6 @@ local C = ffi.C
 local octal = function (s) return tonumber(s, 8) end
 
 -- cleaner to read
-local cast = ffi.cast
 local sizeof = ffi.sizeof
 local istype = ffi.istype
 local arch = ffi.arch
@@ -1190,7 +1189,7 @@ end
 
 -- used for pointer returns, -1 is failure; removed gc for mem
 local function retptr(ret)
-  if cast("long", ret) == -1 then return errorret() end
+  if ffi.cast("long", ret) == -1 then return errorret() end
   return ret
 end
 
@@ -2048,7 +2047,7 @@ local sighandler_t = typeof("sighandler_t")
 local sigaction_t = typeof("struct sigaction")
 local clockid_t = typeof("clockid_t")
 
-S.RLIM_INFINITY = cast("rlim_t", -1)
+S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
 -- types with metamethods
 local timespec_t = ffi.metatype("struct timespec", {
@@ -2517,7 +2516,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     if ret == -1 then return errorret() end
     local i = 0
     while i < ret do
-      local dp = cast(linux_dirent_pt, buf + i)
+      local dp = ffi.cast(linux_dirent_pt, buf + i)
       local t = buf[i + dp.d_reclen - 1]
       local dd = getflag(t, "DT_", dt_flags, dt_lflags)
       dd.inode = tonumber(dp.d_ino)
@@ -2578,7 +2577,7 @@ function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf,
 function S.lseek(fd, offset, whence) return retnum(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
-  return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), cast(sockaddr_pt, addr), getaddrlen(addr)))
+  return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
 end
 function S.readv(fd, iov, iovcnt) return retnum(C.readv(getfd(fd), iov, iovcnt)) end
 function S.writev(fd, iov, iovcnt) return retnum(C.writev(getfd(fd), iov, iovcnt)) end
@@ -2587,7 +2586,7 @@ function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, coun
 function S.recvfrom(fd, buf, count, flags)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(sizeof(sockaddr_storage_t))
-  local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), cast(sockaddr_pt, ss), addrlen)
+  local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0], {count = tonumber(ret)})
 end
@@ -2709,12 +2708,12 @@ function S.socketpair(domain, stype, protocol)
 end
 
 function S.bind(sockfd, addr, addrlen)
-  return retbool(C.bind(getfd(sockfd), cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
+  return retbool(C.bind(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
 function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or S.SOMAXCONN)) end
 function S.connect(sockfd, addr, addrlen)
-  return retbool(C.connect(getfd(sockfd), cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
+  return retbool(C.connect(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
 end
 
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), stringflag(how, "SHUT_"))) end
@@ -2724,8 +2723,8 @@ function S.accept(sockfd, flags, addr, addrlen)
   if not addrlen then addrlen = int1_t(getaddrlen(addr, addrlen)) end
   local ret
   if not flags
-    then ret = C.accept(getfd(sockfd), cast(sockaddr_pt, addr), addrlen)
-    else ret = C.accept4(getfd(sockfd), cast(sockaddr_pt, addr), addrlen, stringflags(flags, "SOCK_"))
+    then ret = C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, addr), addrlen)
+    else ret = C.accept4(getfd(sockfd), ffi.cast(sockaddr_pt, addr), addrlen, stringflags(flags, "SOCK_"))
   end
   if ret == -1 then return errorret() end
   --if ret == -1 then return nil, "testing accept error return" end -- small performance improvement
@@ -2735,7 +2734,7 @@ end
 function S.getsockname(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(sizeof(sockaddr_storage_t))
-  local ret = C.getsockname(getfd(sockfd), cast(sockaddr_pt, ss), addrlen)
+  local ret = C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
 end
@@ -2743,7 +2742,7 @@ end
 function S.getpeername(sockfd)
   local ss = sockaddr_storage_t()
   local addrlen = int1_t(sizeof(sockaddr_storage_t))
-  local ret = C.getpeername(getfd(sockfd), cast(sockaddr_pt, ss), addrlen)
+  local ret = C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
 end
@@ -2877,9 +2876,9 @@ function S.sigaction(signum, handler, mask, flags)
   if istype(sigaction_t, handler) then sa = handler
   else
     if type(handler) == 'string' then
-      handler = cast(sighandler_t, stringflag(handler, "SIG_"))
+      handler = ffi.cast(sighandler_t, stringflag(handler, "SIG_"))
     elseif
-      type(handler) == 'function' then handler = cast(sighandler_t, handler)
+      type(handler) == 'function' then handler = ffi.cast(sighandler_t, handler)
     end
     sa = sigaction_t{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = stringflags(flags, "SA_")}
   end
@@ -3178,7 +3177,7 @@ function S.inotify_read(fd, buffer, len)
   if not ret then return nil, err end
   local off, ee = 0, {}
   while off < ret do
-    local ev = cast(inotify_event_pt, buffer + off)
+    local ev = ffi.cast(inotify_event_pt, buffer + off)
     local le = getflags(ev.mask, "IN_", in_recv_ev, in_recv_lev, {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)})
     if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
@@ -3237,7 +3236,7 @@ function S.signalfd_read(fd, buffer, len)
   if not ret then return nil, err end
   local offset, ss = 0, {}
   while offset < ret do
-    local ssi = cast(signalfd_siginfo_pt, buffer + offset)
+    local ssi = ffi.cast(signalfd_siginfo_pt, buffer + offset)
     local s = {}
     s.errno = tonumber(ssi.ssi_errno)
     sigcode(s, tonumber(ssi.ssi_signo), tonumber(ssi.ssi_code))
@@ -3319,7 +3318,7 @@ function S.timerfd_read(fd, buffer, size)
   local ret, err = S.read(fd, buffer, size)
   if not ret and err.EAGAIN then return 0 end -- will never actually return 0
   if not ret then return nil, err end
-  local i = cast(int64_pt, buffer)
+  local i = ffi.cast(int64_pt, buffer)
   return tonumber(i[0])
 end
 
@@ -3357,7 +3356,7 @@ function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note 
       iocba[i].aio_data = ioi.data or 0
       iocba[i].aio_reqprio = ioi.reqprio or 0
       iocba[i].aio_fildes = getfd(ioi.fd)
-      iocba[i].aio_buf = cast(int64_t, ioi.buf)
+      iocba[i].aio_buf = ffi.cast(int64_t, ioi.buf)
       iocba[i].aio_nbytes = ioi.nbytes
       iocba[i].aio_offset = ioi.offset
       if ioi.resfd then
@@ -3412,12 +3411,12 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
   if option == S.PR_MCE_KILL and arg2 == S.PR_MCE_KILL_SET then arg3 = stringflag(arg3, "PR_MCE_KILL_")
   elseif prctlpint[noption] then
     i = int1_t()
-    arg2 = cast(ulong_t, i)
+    arg2 = ffi.cast(ulong_t, i)
   elseif option == S.PR_GET_NAME then
     name = buffer_t(16)
-    arg2 = cast(ulong_t, name)
+    arg2 = ffi.cast(ulong_t, name)
   elseif option == S.PR_SET_NAME then
-    if type(arg2) == "string" then arg2 = cast(ulong_t, arg2) end
+    if type(arg2) == "string" then arg2 = ffi.cast(ulong_t, arg2) end
   end
   local ret = C.prctl(option, arg2 or 0, arg3 or 0, arg4 or 0, arg5 or 0)
   if ret == -1 then return errorret() end
@@ -3533,7 +3532,7 @@ function S.setcmdline(...) -- this sets /proc/self/cmdline, use prctl to set /pr
     cmdstart = C.environ[0] - #oldcmdline -- this is where Linux stores the command line
   end
 
-  local me = cast("char *", C.environ)
+  local me = ffi.cast("char *", C.environ)
 
   if not me then return nil end -- in normal use you should get a pointer to one null pointer as minimum
 
@@ -3569,7 +3568,7 @@ end
 local b64
 function b64(n)
   local t64 = int64_1t(n)
-  local t32 = cast(int32_pt, t64)
+  local t32 = ffi.cast(int32_pt, t64)
   if ffi.abi("le") then
     return tonumber(t32[1]), tonumber(t32[0]) -- return high, low
   else
@@ -3626,7 +3625,7 @@ function cmsg_len(len) return cmsg_ahdr + len end
 function cmsg_firsthdr(msg)
   if msg.msg_controllen < cmsg_hdrsize then return nil end
   local mc = msg.msg_control
-  local cmsg = cast(cmsghdr_pt, mc)
+  local cmsg = ffi.cast(cmsghdr_pt, mc)
   return mc, cmsg
 end
 
@@ -3634,7 +3633,7 @@ function cmsg_nxthdr(msg, buf, cmsg)
   if cmsg.cmsg_len < cmsg_hdrsize then return nil end -- invalid cmsg
   buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
   if buf + cmsg_hdrsize > msg.msg_control + msg.msg_controllen then return nil end -- header would not fit
-  cmsg = cast(cmsghdr_pt, buf)
+  cmsg = ffi.cast(cmsghdr_pt, buf)
   if buf + cmsg_align(cmsg.cmsg_len) > msg.msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
   return buf, cmsg
 end
@@ -3648,7 +3647,7 @@ local nlmsg_ok = function(msg, len)
 end
 local nlmsg_next = function(msg, buf, len)
   local inc = nlmsg_align(msg.nlmsg_len)
-  return cast(nlmsghdr_pt, buf + inc), buf + inc, len - inc
+  return ffi.cast(nlmsghdr_pt, buf + inc), buf + inc, len - inc
 end
 
 local rta_align = nlmsg_align -- also 4 byte align
@@ -3658,7 +3657,7 @@ local rta_ok = function(msg, len)
 end
 local rta_next = function(msg, buf, len)
   local inc = rta_align(msg.rta_len)
-  return cast(rtattr_pt, buf + inc), buf + inc, len - inc
+  return ffi.cast(rtattr_pt, buf + inc), buf + inc, len - inc
 end
 
 local ifla_decode = {}
@@ -3671,12 +3670,12 @@ end
 local nlmsg_data_decode = {}
 nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
 
-  local iface = cast(ifinfomsg_pt, buf)
+  local iface = ffi.cast(ifinfomsg_pt, buf)
 
   buf = buf + nlmsg_align(sizeof(ifinfomsg_t))
   len = len - nlmsg_align(sizeof(ifinfomsg_t))
 
-  local rtattr = cast(rtattr_pt, buf)
+  local rtattr = ffi.cast(rtattr_pt, buf)
   local ir = {index = iface.ifi_index} -- info about interface
   while rta_ok(rtattr, len) do
     if ifla_decode[rtattr.rta_type] then ir = ifla_decode[rtattr.rta_type](ir, buf, len) end
@@ -3709,7 +3708,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
     local len = n.count
     local buffer = reply
 
-    local msg = cast(nlmsghdr_pt, buffer)
+    local msg = ffi.cast(nlmsghdr_pt, buffer)
 
     while not done and nlmsg_ok(msg, len) do
       local t = tonumber(msg.nlmsg_type)
@@ -3788,7 +3787,7 @@ function S.recvmsg(fd, msg, flags)
         ret.uid = cred.uid
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
-      local fda = cast(int_pt, cmsg.cmsg_data)
+      local fda = ffi.cast(int_pt, cmsg.cmsg_data)
       local fdc = div(cmsg.cmsg_len - cmsg_ahdr, sizeof(int1_t))
       ret.fd = {}
       for i = 1, fdc do ret.fd[i] = fd_t(fda[i - 1]) end
@@ -3953,7 +3952,7 @@ end
 local function bridge_ioctl(io, name)
   local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
-  local ret = C.ioctl(getfd(s), io, cast(char_pt, name))
+  local ret = C.ioctl(getfd(s), io, ffi.cast(char_pt, name))
   if ret == -1 then return errorret() end
   local ok, err = s:close()
   if not ok then return nil, err end
@@ -4024,7 +4023,7 @@ local brinfo = function(d) -- can be used as subpart of general interface info
     local n = fd:read(buffer, sl)
     if not n then return nil end
 
-    local fdbs = cast(fdb_entry_pt, buffer)
+    local fdbs = ffi.cast(fdb_entry_pt, buffer)
 
     for i = 1, n / sizeof(fdb_entry_t) do
       local fdb = fdbs[i - 1]
@@ -4059,8 +4058,8 @@ end
 local threc -- helper for returning varargs
 function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
   if not t then return nil end
-  if select("#", ...) == 0 then return cast(typeof(t .. "*"), buf + offset) end
-  return cast(typeof(t .. "*"), buf + offset), threc(buf, offset + sizeof(t), ...)
+  if select("#", ...) == 0 then return ffi.cast(typeof(t .. "*"), buf + offset) end
+  return ffi.cast(typeof(t .. "*"), buf + offset), threc(buf, offset + sizeof(t), ...)
 end
 function S.tbuffer(...) -- helper function for sequence of types in a buffer
   local len = 0
