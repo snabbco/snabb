@@ -2244,7 +2244,7 @@ S.t.nlmsghdr = ffi.typeof("struct nlmsghdr")
 S.t.rtgenmsg = ffi.typeof("struct rtgenmsg")
 S.t.ifinfomsg = ffi.typeof("struct ifinfomsg")
 S.t.rtattr = ffi.typeof("struct rtattr")
-local timex_t = ffi.typeof("struct timex")
+S.t.timex = ffi.typeof("struct timex")
 local utsname_t = ffi.typeof("struct utsname")
 local sigset_t = ffi.typeof("sigset_t")
 local rlimit_t = ffi.typeof("struct rlimit")
@@ -3669,11 +3669,11 @@ local time_flags = {"TIME_OK", "TIME_INS", "TIME_DEL", "TIME_OOP", "TIME_WAIT", 
 local time_lflags = lflag("TIME_", time_flags)
 
 function S.adjtimex(t)
-  if not t then t = timex_t() end
-  if type(t) == 'table' then  -- TODO pull this out to general initialiser for timex_t
+  if not t then t = S.t.timex() end
+  if type(t) == 'table' then  -- TODO pull this out to general initialiser for S.t.timex
     if t.modes then t.modes = tonumber(stringflags(t.modes, "ADJ_")) end
     if t.status then t.status = tonumber(stringflags(t.status, "STA_")) end
-    t = timex_t(t)
+    t = S.t.timex(t)
   end
   local ret = C.adjtimex(t)
   if ret == -1 then return errorret() end
