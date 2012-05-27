@@ -2247,7 +2247,7 @@ S.t.rtattr = ffi.typeof("struct rtattr")
 S.t.timex = ffi.typeof("struct timex")
 S.t.utsname = ffi.typeof("struct utsname")
 S.t.sigset = ffi.typeof("sigset_t")
-local rlimit_t = ffi.typeof("struct rlimit")
+S.t.rlimit = ffi.typeof("struct rlimit")
 local fdb_entry_t = ffi.typeof("struct fdb_entry")
 S.t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
 local itimerspec_t = ffi.typeof("struct itimerspec")
@@ -3308,15 +3308,15 @@ function S.umount(target, flags)
 end
 
 function S.getrlimit(resource)
-  local rlim = rlimit_t()
+  local rlim = S.t.rlimit()
   local ret = C.getrlimit(stringflag(resource, "RLIMIT_"), rlim)
   if ret == -1 then return errorret() end
   return rlim
 end
 
 function S.setrlimit(resource, rlim, rlim2) -- can pass table, struct, or just both the parameters
-  if rlim and rlim2 then rlim = rlimit_t(rlim, rlim2)
-  elseif type(rlim) == 'table' then rlim = rlimit_t(rlim) end
+  if rlim and rlim2 then rlim = S.t.rlimit(rlim, rlim2)
+  elseif type(rlim) == 'table' then rlim = S.t.rlimit(rlim) end
   return retbool(C.setrlimit(stringflag(resource, "RLIMIT_"), rlim))
 end
 
