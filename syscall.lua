@@ -2248,7 +2248,7 @@ S.t.timex = ffi.typeof("struct timex")
 S.t.utsname = ffi.typeof("struct utsname")
 S.t.sigset = ffi.typeof("sigset_t")
 S.t.rlimit = ffi.typeof("struct rlimit")
-local fdb_entry_t = ffi.typeof("struct fdb_entry")
+S.t.fdb_entry = ffi.typeof("struct fdb_entry")
 S.t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
 local itimerspec_t = ffi.typeof("struct itimerspec")
 local itimerval_t = ffi.typeof("struct itimerval")
@@ -4245,7 +4245,7 @@ local brinfo = function(d) -- can be used as subpart of general interface info
 
     local fdbs = ffi.cast(fdb_entry_pt, buffer)
 
-    for i = 1, n / ffi.sizeof(fdb_entry_t) do
+    for i = 1, n / ffi.sizeof(S.t.fdb_entry) do
       local fdb = fdbs[i - 1]
       local mac = S.t.macaddr()
       ffi.copy(mac, fdb.mac_addr, IFHWADDRLEN)
