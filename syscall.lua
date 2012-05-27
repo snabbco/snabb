@@ -3825,11 +3825,10 @@ function S.S_ISFIFO(m) return bit.band(m, S.S_IFFIFO) ~= 0 end
 function S.S_ISLNK(m)  return bit.band(m, S.S_IFLNK)  ~= 0 end
 function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
 
-local align
-function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
+local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
-local cmsg_align, cmsg_space, cmsg_len, cmsg_firsthdr, cmsg_nxthdr
+local cmsg_align
 local cmsg_hdrsize = ffi.sizeof(S.t.cmsghdr(0))
 if ffi.abi('32bit') then
   function cmsg_align(len) return align(len, 4) end
@@ -3838,20 +3837,20 @@ else
 end
 
 local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
-function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
-function cmsg_len(len) return cmsg_ahdr + len end
+local function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
+local function cmsg_len(len) return cmsg_ahdr + len end
 
 -- msg_control is a bunch of cmsg structs, but these are all different lengths, as they have variable size arrays
 
 -- these functions also take and return a raw char pointer to msg_control, to make life easier, as well as the cast cmsg
-function cmsg_firsthdr(msg)
+local function cmsg_firsthdr(msg)
   if msg.msg_controllen < cmsg_hdrsize then return nil end
   local mc = msg.msg_control
   local cmsg = ffi.cast(cmsghdr_pt, mc)
   return mc, cmsg
 end
 
-function cmsg_nxthdr(msg, buf, cmsg)
+local function cmsg_nxthdr(msg, buf, cmsg)
   if cmsg.cmsg_len < cmsg_hdrsize then return nil end -- invalid cmsg
   buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
   if buf + cmsg_hdrsize > msg.msg_control + msg.msg_controllen then return nil end -- header would not fit
