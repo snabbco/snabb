@@ -1340,7 +1340,6 @@ end
 -- integer types
 S.t = {}
 S.t.int = ffi.typeof("int")
-local int_t = S.t.int
 local uint_t = ffi.typeof("unsigned int")
 local int1_t = ffi.typeof("int[1]")
 local int2_t = ffi.typeof("int[2]")
@@ -1351,6 +1350,11 @@ local uint64_t = ffi.typeof("uint64_t")
 local int32_pt = ffi.typeof("int32_t *")
 local int64_1t = ffi.typeof("int64_t[1]")
 local long_t = ffi.typeof("long")
+
+local fd_t -- type for a file descriptor
+
+-- char buffer type
+S.t.buffer = ffi.typeof("char[?]")
 
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
@@ -1381,11 +1385,6 @@ local function retptr(ret)
   if ffi.cast("long", ret) == -1 then return errorret() end
   return ret
 end
-
-local fd_t -- type for a file descriptor
-
--- char buffer type
-local buffer_t = ffi.typeof("char[?]")
 
 --get fd from standard string, integer, or cdata
 local function getfd(fd)
@@ -2274,16 +2273,16 @@ local clockid_t = ffi.typeof("clockid_t")
 S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
 -- types with metamethods
-local timespec_t = ffi.metatype("struct timespec", {
+S.t.timespec = ffi.metatype("struct timespec", {
   __index = {tonumber = function(ts) return tonumber(ts.tv_sec) + tonumber(ts.tv_nsec) / 1000000000 end}
 })
 
 local function getts(ts) -- get a timespec eg from a number
-  if not ts then return timespec_t() end
-  if ffi.istype(timespec_t, ts) then return ts end
-  if type(ts) == "table" then return timespec_t(ts) end
+  if not ts then return S.t.timespec() end
+  if ffi.istype(S.t.timespec, ts) then return ts end
+  if type(ts) == "table" then return S.t.timespec(ts) end
   local i, f = math.modf(ts)
-  return timespec_t(i, math.floor(f * 1000000000))
+  return S.t.timespec(i, math.floor(f * 1000000000))
 end
 
 local timeval_t = ffi.metatype("struct timeval", {
@@ -2349,7 +2348,7 @@ local macaddr_t = ffi.metatype("struct {uint8_t mac_addr[6];}", {
 })
 
 --[[ -- used to generate tests, will refactor into test code later
-print("eq (sizeof(struct timespec), " .. sizeof(timespec_t) .. ");")
+print("eq (sizeof(struct timespec), " .. sizeof(S.t.timespec) .. ");")
 print("eq (sizeof(struct timeval), " .. sizeof(timeval_t) .. ");")
 print("eq (sizeof(struct sockaddr_storage), " .. sizeof(sockaddr_storage_t) .. ");")
 print("eq (sizeof(struct sockaddr_in), " .. sizeof(sockaddr_in_t) .. ");")
@@ -2587,7 +2586,7 @@ local INET_ADDRSTRLEN = 16
 function S.inet_ntop(af, src)
   af = stringflag(af, "AF_")
   local len = INET6_ADDRSTRLEN -- could shorten for ipv4
-  local dst = buffer_t(len)
+  local dst = S.t.buffer(len)
   local ret = C.inet_ntop(af, src, dst, len)
   if ret == nil then return errorret() end
   return ffi.string(dst)
@@ -2664,7 +2663,7 @@ function S.readlink(path) -- note no idea if name truncated except return value 
   local size = 256
   local buffer, ret
   repeat
-    buffer = buffer_t(size)
+    buffer = S.t.buffer(size)
     ret = C.readlink(path, buffer, size)
     if ret == -1 then return errorret() end
     if ret == size then -- possibly truncated
@@ -2731,7 +2730,7 @@ local dt_lflags = lflag("DT_", dt_flags)
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
   if not buf then
     size = size or 4096
-    buf = buffer_t(size)
+    buf = S.t.buffer(size)
   end
   local d = {}
   local ret
@@ -2789,7 +2788,7 @@ function S.exit(status) C.exit(stringflag(status, "EXIT_")) end
 function S.read(fd, buf, count)
   if buf then return retnum(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
   if not count then count = 4096 end
-  local buf = buffer_t(count)
+  local buf = S.t.buffer(count)
   local ret = C.read(getfd(fd), buf, count)
   if ret == -1 then return errorret() end
   return ffi.string(buf, ret) -- user gets a string back, can get length from #string
@@ -2863,7 +2862,7 @@ function S.getcwd()
   local size = 64
   local buf
   repeat
-    buf = buffer_t(size)
+    buf = S.t.buffer(size)
     local ret = C.getcwd(buf, size)
     if not ret then 
       local errno = ffi.errno()
@@ -2875,7 +2874,7 @@ end
 
 function S.nanosleep(req)
   req = getts(req)
-  local rem = timespec_t()
+  local rem = S.t.timespec()
   local ret = C.nanosleep(req, rem)
   if ret == -1 then return errorret() end
   return rem
@@ -2994,7 +2993,7 @@ function S.uname()
 end
 
 function S.gethostname()
-  local buf = buffer_t(HOST_NAME_MAX + 1)
+  local buf = S.t.buffer(HOST_NAME_MAX + 1)
   local ret = C.gethostname(buf, HOST_NAME_MAX + 1)
   if ret == -1 then return errorret() end
   buf[HOST_NAME_MAX] = 0 -- paranoia here to make sure null terminated, which could happen if HOST_NAME_MAX was incorrect
@@ -3140,14 +3139,14 @@ end
 local growattrbuf
 function growattrbuf(f, a1, a2)
   local len = 512
-  local buffer = buffer_t(len)
+  local buffer = S.t.buffer(len)
   local ret
   repeat
     if a2 then ret = f(a1, a2, buffer, len) else ret = f(a1, buffer, len) end
     if ret == -1 and ffi.errno ~= S.E.ERANGE then return errorret() end
     if ret == -1 then
       len = len * 2
-      buffer = buffer_t(len)
+      buffer = S.t.buffer(len)
     end
   until ret >= 0
 
@@ -3396,7 +3395,7 @@ local in_recv_lev = lflag("IN_", in_recv_ev)
 -- helper function to read inotify structs as table from inotify fd
 function S.inotify_read(fd, buffer, len)
   if not len then len = 1024 end
-  if not buffer then buffer = buffer_t(len) end
+  if not buffer then buffer = S.t.buffer(len) end
   local ret, err = S.read(fd, buffer, len)
   if not ret then return nil, err end
   local off, ee = 0, {}
@@ -3454,7 +3453,7 @@ end
 
 function S.signalfd_read(fd, buffer, len)
   if not len then len = ffi.sizeof(signalfd_siginfo_t) * 4 end
-  if not buffer then buffer = buffer_t(len) end
+  if not buffer then buffer = S.t.buffer(len) end
   local ret, err = S.read(fd, buffer, len)
   if ret == 0 or (err and err.EAGAIN) then return {} end
   if not ret then return nil, err end
@@ -3538,7 +3537,7 @@ end
 
 function S.timerfd_read(fd, buffer, size)
   if not size then size = 8 end -- only sensible size!
-  if not buffer then buffer = buffer_t(size) end
+  if not buffer then buffer = S.t.buffer(size) end
   local ret, err = S.read(fd, buffer, size)
   if not ret and err.EAGAIN then return 0 end -- will never actually return 0
   if not ret then return nil, err end
@@ -3637,7 +3636,7 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
     i = int1_t()
     arg2 = ffi.cast(ulong_t, i)
   elseif option == S.PR_GET_NAME then
-    name = buffer_t(16)
+    name = S.t.buffer(16)
     arg2 = ffi.cast(ulong_t, name)
   elseif option == S.PR_SET_NAME then
     if type(arg2) == "string" then arg2 = ffi.cast(ulong_t, arg2) end
@@ -3660,7 +3659,7 @@ function S.klogctl(t, buf, len)
       len = C.klogctl(10, nil, 0) -- get size so we can allocate buffer
       if len == -1 then return errorret() end
     end
-    buf = buffer_t(len)
+    buf = S.t.buffer(len)
   end
   local ret = C.klogctl(t, buf or nil, len or 0)
   if ret == -1 then return errorret() end
@@ -3919,7 +3918,7 @@ end
 function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
 
   local bufsize = 8192
-  local reply = buffer_t(bufsize)
+  local reply = S.t.buffer(bufsize)
   local ior = iovec_t(1, {{reply, bufsize}})
   local m = msghdr_t{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
 
@@ -3982,7 +3981,7 @@ end
 
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
-    local buf1 = buffer_t(1)
+    local buf1 = S.t.buffer(1)
     local io = iovec_t(1, {{buf1, 1}})
     msg = msghdr_t{msg_iov = io, msg_iovlen = 1}
   end
@@ -3992,10 +3991,10 @@ end
 -- if no msg provided, assume want to receive cmsg
 function S.recvmsg(fd, msg, flags)
   if not msg then 
-    local buf1 = buffer_t(1) -- assume user wants to receive single byte to get cmsg
+    local buf1 = S.t.buffer(1) -- assume user wants to receive single byte to get cmsg
     local io = iovec_t(1, {{buf1, 1}})
     local bufsize = 1024 -- sane default, build your own structure otherwise
-    local buf = buffer_t(bufsize)
+    local buf = S.t.buffer(bufsize)
     msg = msghdr_t{msg_iov = io, msg_iovlen = 1, msg_control = buf, msg_controllen = bufsize}
   end
   local ret = C.recvmsg(getfd(fd), msg, stringflags(flags, "MSG_"))
@@ -4032,7 +4031,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   ucred.pid = pid
   ucred.uid = uid
   ucred.gid = gid
-  local buf1 = buffer_t(1) -- need to send one byte
+  local buf1 = S.t.buffer(1) -- need to send one byte
   local io = iovec_t(1)
   io[0].iov_base = buf1
   io[0].iov_len = 1
@@ -4040,7 +4039,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   local usize = ffi.sizeof(ucred_t)
   local bufsize = cmsg_space(usize)
   local buflen = cmsg_len(usize)
-  local buf = buffer_t(bufsize) -- this is our cmsg buffer
+  local buf = S.t.buffer(bufsize) -- this is our cmsg buffer
   local msg = msghdr_t() -- assume socket connected and so does not need address
   msg.msg_iov = io
   msg.msg_iovlen = iolen
@@ -4056,7 +4055,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
 end
 
 function S.sendfds(fd, ...)
-  local buf1 = buffer_t(1) -- need to send one byte
+  local buf1 = S.t.buffer(1) -- need to send one byte
   local io = iovec_t(1)
   io[0].iov_base = buf1
   io[0].iov_len = 1
@@ -4067,7 +4066,7 @@ function S.sendfds(fd, ...)
   local fasize = ffi.sizeof(fa)
   local bufsize = cmsg_space(fasize)
   local buflen = cmsg_len(fasize)
-  local buf = buffer_t(bufsize) -- this is our cmsg buffer
+  local buf = S.t.buffer(bufsize) -- this is our cmsg buffer
   local msg = msghdr_t() -- assume socket connected and so does not need address
   msg.msg_iov = io
   msg.msg_iovlen = iolen
@@ -4238,7 +4237,7 @@ local brinfo = function(d) -- can be used as subpart of general interface info
   local fdb = "/sys/class/net/" .. d .. "/" .. S.SYSFS_BRIDGE_FDB
   if not S.stat(fdb) then return nil end
   local sl = 2048
-  local buffer = buffer_t(sl)
+  local buffer = S.t.buffer(sl)
   local fd = S.open(fdb, S.O_RDONLY)
   if not fd then return nil end
   local brforward = {}
@@ -4364,7 +4363,7 @@ end
 
 function S.ptsname(fd)
   local count = 32
-  local buf = buffer_t(count)
+  local buf = S.t.buffer(count)
   local ret = C.ptsname_r(getfd(fd), buf, count)
   if ret == 0 then
     return ffi.string(buf)
@@ -4385,7 +4384,7 @@ function S.tbuffer(...) -- helper function for sequence of types in a buffer
   for i, t in ipairs{...} do
     len = len + ffi.sizeof(ffi.typeof(t)) -- alignment issues, need to round up to minimum alignment
   end
-  local buf = buffer_t(len)
+  local buf = S.t.buffer(len)
   return buf, len, threc(buf, 0, ...)
 end
 
@@ -4411,6 +4410,7 @@ fd_t = ffi.metatype("struct {int fileno;}", {__index = fmeth, __gc = S.close})
 
 -- we could just return as S.timespec_t etc, not sure which is nicer?
 -- think we are missing some, as not really using them
+--[[
 S.t = {
   int = int_t, fd = fd_t, timespec = timespec_t, buffer = buffer_t, stat = stat_t, -- not clear if type for fd useful
   sockaddr = sockaddr_t, sockaddr_in = sockaddr_in_t, in_addr = in_addr_t, utsname = utsname_t, sockaddr_un = sockaddr_un_t,
@@ -4419,7 +4419,7 @@ S.t = {
   sockaddr_storage = sockaddr_storage_t, sockaddr_in6 = sockaddr_in6_t, pollfds = pollfds_t, epoll_events = epoll_events_t,
   epoll_event = epoll_event_t, ulong = ulong_t, aio_context = aio_context_t, termios = termios_t
 }
-
+]]
 return S
 
 end
