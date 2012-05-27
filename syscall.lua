@@ -2272,7 +2272,7 @@ local loff_1t = ffi.typeof("loff_t[1]")
 
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 local iocbs_t = ffi.typeof("struct iocb[?]")
-local pollfds_t = ffi.typeof("struct pollfd [?]")
+S.t.pollfds = ffi.typeof("struct pollfd [?]")
 
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
@@ -3279,7 +3279,7 @@ function S.poll(fds, nfds, timeout)
   if type(fds) ~= "cdata" then
     local pf = fds
     nfds = #pf
-    fds = pollfds_t(nfds)
+    fds = S.t.pollfds(nfds)
     for i = 0, nfds - 1 do
       local p = pf[i + 1]
       fds[i].fd = getfd(p.fd)
