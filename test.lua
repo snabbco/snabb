@@ -1,4 +1,5 @@
 local S = require "syscall"
+local bit = require "bit"
 
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 local teststring = "this is a test string"
@@ -802,6 +803,35 @@ end
 assert(S.unlink(tmpfile))
 
 local b = assert(S.bridge_list())
+
+-- pts/termios
+local ptm = assert(S.posix_openpt("rdwr, noctty"))
+assert(ptm:grantpt())
+assert(ptm:unlockpt())
+local pts_name = assert(ptm:ptsname())
+local pts = assert(S.open(pts_name, "rdwr, noctty"))
+
+local termios = assert(pts:tcgetattr())
+assert(termios:cfgetospeed() ~= 115200)
+termios:cfsetspeed(115200)
+assert(termios:cfgetispeed() == 115200)
+assert(termios:cfgetospeed() == 115200)
+assert(bit.band(termios.c_lflag, S.ICANON) ~= 0)
+termios:cfmakeraw()
+assert(bit.band(termios.c_lflag, S.ICANON) == 0)
+assert(pts:tcsetattr("now", termios))
+
+termios = assert(pts:tcgetattr())
+assert(termios:cfgetospeed() == 115200)
+assert(bit.band(termios.c_lflag, S.ICANON) == 0)
+
+assert(pts:tcsendbreak(0))
+assert(pts:tcdrain())
+assert(pts:tcflush('ioflush'))
+assert(pts:tcflow('ooff'))
+assert(pts:tcflow('ioff'))
+assert(pts:tcflow('oon'))
+assert(pts:tcflow('ion'))
 
 -- aio, Linux only
 local ctx = assert(S.io_setup(8))

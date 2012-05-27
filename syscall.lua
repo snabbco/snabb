@@ -917,6 +917,194 @@ S.PR_MCE_KILL_DEFAULT      = 2
 S.PR_MCE_KILL_GET  = 34
 S.PR_SET_PTRACER   = 0x59616d61 -- Ubuntu extension
 
+-- termios
+S.NCCS = 32
+
+-- termios - c_cc characters
+S.VINTR    = 0
+S.VQUIT    = 1
+S.VERASE   = 2
+S.VKILL    = 3
+S.VEOF     = 4
+S.VTIME    = 5
+S.VMIN     = 6
+S.VSWTC    = 7
+S.VSTART   = 8
+S.VSTOP    = 9
+S.VSUSP    = 10
+S.VEOL     = 11
+S.VREPRINT = 12
+S.VDISCARD = 13
+S.VWERASE  = 14
+S.VLNEXT   = 15
+S.VEOL2    = 16
+
+-- termios - c_iflag bits
+S.IGNBRK  = octal('0000001')
+S.BRKINT  = octal('0000002')
+S.IGNPAR  = octal('0000004')
+S.PARMRK  = octal('0000010')
+S.INPCK   = octal('0000020')
+S.ISTRIP  = octal('0000040')
+S.INLCR   = octal('0000100')
+S.IGNCR   = octal('0000200')
+S.ICRNL   = octal('0000400')
+S.IUCLC   = octal('0001000')
+S.IXON    = octal('0002000')
+S.IXANY   = octal('0004000')
+S.IXOFF   = octal('0010000')
+S.IMAXBEL = octal('0020000')
+S.IUTF8   = octal('0040000')
+
+-- termios - c_oflag bits
+S.OPOST  = octal('0000001')
+S.OLCUC  = octal('0000002')
+S.ONLCR  = octal('0000004')
+S.OCRNL  = octal('0000010')
+S.ONOCR  = octal('0000020')
+S.ONLRET = octal('0000040')
+S.OFILL  = octal('0000100')
+S.OFDEL  = octal('0000200')
+S.NLDLY  = octal('0000400')
+S.NL0    = octal('0000000')
+S.NL1    = octal('0000400')
+S.CRDLY  = octal('0003000')
+S.CR0    = octal('0000000')
+S.CR1    = octal('0001000')
+S.CR2    = octal('0002000')
+S.CR3    = octal('0003000')
+S.TABDLY = octal('0014000')
+S.TAB0   = octal('0000000')
+S.TAB1   = octal('0004000')
+S.TAB2   = octal('0010000')
+S.TAB3   = octal('0014000')
+S.BSDLY  = octal('0020000')
+S.BS0    = octal('0000000')
+S.BS1    = octal('0020000')
+S.FFDLY  = octal('0100000')
+S.FF0    = octal('0000000')
+S.FF1    = octal('0100000')
+S.VTDLY  = octal('0040000')
+S.VT0    = octal('0000000')
+S.VT1    = octal('0040000')
+S.XTABS  = octal('0014000')
+
+local bits_speed_map = { }
+local speed_bits_map = { }
+local function defspeed(speed, bits)
+  bits = octal(bits)
+  bits_speed_map[bits] = speed
+  speed_bits_map[speed] = bits
+  S['B'..speed] = bits
+end
+local function bits_to_speed(bits)
+  local speed = bits_speed_map[bits]
+  if not speed then error("unknown speedbits: " .. bits) end
+  return speed
+end
+local function speed_to_bits(speed)
+  local bits = speed_bits_map[speed]
+  if not bits then error("unknown speed: " .. speed) end
+  return bits
+end
+-- termios - c_cflag bit meaning
+S.CBAUD      = octal('0010017')
+defspeed(0, '0000000') -- hang up
+defspeed(50, '0000001')
+defspeed(75, '0000002')
+defspeed(110, '0000003')
+defspeed(134, '0000004')
+defspeed(150, '0000005')
+defspeed(200, '0000006')
+defspeed(300, '0000007')
+defspeed(600, '0000010')
+defspeed(1200, '0000011')
+defspeed(1800, '0000012')
+defspeed(2400, '0000013')
+defspeed(4800, '0000014')
+defspeed(9600, '0000015')
+defspeed(19200, '0000016')
+defspeed(38400, '0000017')
+S.EXTA       = S.B19200
+S.EXTB       = S.B38400
+S.CSIZE      = octal('0000060')
+S.CS5        = octal('0000000')
+S.CS6        = octal('0000020')
+S.CS7        = octal('0000040')
+S.CS8        = octal('0000060')
+S.CSTOPB     = octal('0000100')
+S.CREAD      = octal('0000200')
+S.PARENB     = octal('0000400')
+S.PARODD     = octal('0001000')
+S.HUPCL      = octal('0002000')
+S.CLOCAL     = octal('0004000')
+S.CBAUDEX    = octal('0010000')
+defspeed(57600, '0010001')
+defspeed(115200, '0010002')
+defspeed(230400, '0010003')
+defspeed(460800, '0010004')
+defspeed(500000, '0010005')
+defspeed(576000, '0010006')
+defspeed(921600, '0010007')
+defspeed(1000000, '0010010')
+defspeed(1152000, '0010011')
+defspeed(1500000, '0010012')
+defspeed(2000000, '0010013')
+defspeed(2500000, '0010014')
+defspeed(3000000, '0010015')
+defspeed(3500000, '0010016')
+defspeed(4000000, '0010017')
+S.__MAX_BAUD = S.B4000000
+S.CIBAUD     = octal('002003600000') -- input baud rate (not used)
+S.CMSPAR     = octal('010000000000') -- mark or space (stick) parity
+S.CRTSCTS    = octal('020000000000') -- flow control
+
+-- termios - c_lflag bits
+S.ISIG    = octal('0000001')
+S.ICANON  = octal('0000002')
+S.XCASE   = octal('0000004')
+S.ECHO    = octal('0000010')
+S.ECHOE   = octal('0000020')
+S.ECHOK   = octal('0000040')
+S.ECHONL  = octal('0000100')
+S.NOFLSH  = octal('0000200')
+S.TOSTOP  = octal('0000400')
+S.ECHOCTL = octal('0001000')
+S.ECHOPRT = octal('0002000')
+S.ECHOKE  = octal('0004000')
+S.FLUSHO  = octal('0010000')
+S.PENDIN  = octal('0040000')
+S.IEXTEN  = octal('0100000')
+
+-- termios - tcflow() and TCXONC use these
+S.TCOOFF = 0
+S.TCOON  = 1
+S.TCIOFF = 2
+S.TCION  = 3
+
+-- termios - tcflush() and TCFLSH use these
+S.TCIFLUSH  = 0
+S.TCOFLUSH  = 1
+S.TCIOFLUSH = 2
+
+-- termios - tcsetattr uses these
+S.TCSANOW   = 0
+S.TCSADRAIN = 1
+S.TCSAFLUSH = 2
+
+-- TIOCM ioctls
+S.TIOCM_LE  = 0x001
+S.TIOCM_DTR = 0x002
+S.TIOCM_RTS = 0x004
+S.TIOCM_ST  = 0x008
+S.TIOCM_SR  = 0x010
+S.TIOCM_CTS = 0x020
+S.TIOCM_CAR = 0x040
+S.TIOCM_RNG = 0x080
+S.TIOCM_DSR = 0x100
+S.TIOCM_CD  = S.TIOCM_CAR
+S.TIOCM_RI  = S.TIOCM_RNG
+
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
 if ffi.arch == "x86" then
@@ -970,6 +1158,11 @@ S.SIOCBRADDBR    = 0x89a0
 S.SIOCBRDELBR    = 0x89a1
 S.SIOCBRADDIF    = 0x89a2
 S.SIOCBRDELIF    = 0x89a3
+
+S.TIOCMGET       = 0x5415
+S.TIOCMBIS       = 0x5416
+S.TIOCMBIC       = 0x5417
+S.TIOCMSET       = 0x5418
 
 -- sysfs values
 S.SYSFS_BRIDGE_ATTR        = "bridge"
@@ -1570,6 +1763,22 @@ struct io_event {
   int64_t            res;
   int64_t            res2;
 };
+
+/* termios */
+typedef unsigned char	cc_t;
+typedef unsigned int	speed_t;
+typedef unsigned int	tcflag_t;
+struct termios
+  {
+    tcflag_t c_iflag;		/* input mode flags */
+    tcflag_t c_oflag;		/* output mode flags */
+    tcflag_t c_cflag;		/* control mode flags */
+    tcflag_t c_lflag;		/* local mode flags */
+    cc_t c_line;			/* line discipline */
+    cc_t c_cc[32];		/* control characters */
+    speed_t c_ispeed;		/* input speed */
+    speed_t c_ospeed;		/* output speed */
+  };
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
@@ -1994,6 +2203,25 @@ int setenv(const char *name, const char *value, int overwrite);
 int unsetenv(const char *name);
 int clearenv(void);
 char *getenv(const char *name);
+
+int tcgetattr(int fd, struct termios *termios_p);
+int tcsetattr(int fd, int optional_actions, const struct termios *termios_p);
+int tcsendbreak(int fd, int duration);
+int tcdrain(int fd);
+int tcflush(int fd, int queue_selector);
+int tcflow(int fd, int action);
+void cfmakeraw(struct termios *termios_p);
+speed_t cfgetispeed(const struct termios *termios_p);
+speed_t cfgetospeed(const struct termios *termios_p);
+int cfsetispeed(struct termios *termios_p, speed_t speed);
+int cfsetospeed(struct termios *termios_p, speed_t speed);
+int cfsetspeed(struct termios *termios_p, speed_t speed);
+pid_t tcgetsid(int fd);
+
+int posix_openpt(int flags);
+int grantpt(int fd);
+int unlockpt(int fd);
+int ptsname_r(int fd, char *buf, size_t buflen);
 ]]
 
 -- Lua type constructors corresponding to defined types
@@ -4050,6 +4278,101 @@ function S.bridge_list()
   return b
 end
 
+function S.cfmakeraw(termios)
+  C.cfmakeraw(termios)
+  return true
+end
+
+function S.cfgetispeed(termios)
+  local bits = C.cfgetispeed(termios)
+  if bits == -1 then return errorret() end
+  return bits_to_speed(bits)
+end
+
+function S.cfgetospeed(termios)
+  local bits = C.cfgetospeed(termios)
+  if bits == -1 then return errorret() end
+  return bits_to_speed(bits)
+end
+
+function S.cfsetispeed(termios, speed)
+  return retbool(C.cfsetispeed(termios, speed_to_bits(speed)))
+end
+
+function S.cfsetospeed(termios, speed)
+  return retbool(C.cfsetospeed(termios, speed_to_bits(speed)))
+end
+
+function S.cfsetspeed(termios, speed)
+  return retbool(C.cfsetspeed(termios, speed_to_bits(speed)))
+end
+
+local termios_t = ffi.metatype("struct termios", {
+  __index = {
+    cfmakeraw = S.cfmakeraw,
+    cfgetispeed = S.cfgetispeed,
+    cfgetospeed = S.cfgetospeed,
+    cfsetispeed = S.cfsetispeed,
+    cfsetospeed = S.cfsetospeed,
+    cfsetspeed = S.cfsetspeed
+  }
+})
+
+function S.tcgetattr(fd)
+  local termios = termios_t()
+  local ret = C.tcgetattr(getfd(fd), termios)
+  if ret == -1 then return errorret() end
+  return termios
+end
+
+function S.tcsetattr(fd, optional_actions, termios)
+  return retbool(C.tcsetattr(getfd(fd), stringflag(optional_actions, "TCSA"),
+                             termios))
+end
+
+function S.tcsendbreak(fd, duration)
+  return retbool(C.tcsendbreak(getfd(fd), duration))
+end
+
+function S.tcdrain(fd)
+  return retbool(C.tcdrain(getfd(fd)))
+end
+
+function S.tcflush(fd, queue_selector)
+  return retbool(C.tcflush(getfd(fd), stringflag(queue_selector, "TC")))
+end
+
+function S.tcflow(fd, action)
+  return retbool(C.tcflow(getfd(fd), stringflag(action, "TC")))
+end
+
+function S.tcgetsid(fd)
+  return retint(C.tcgetsid(getfd(fd)))
+end
+
+function S.posix_openpt(flags)
+  return retfd(C.posix_openpt(stringflags(flags, "O_")))
+end
+
+function S.grantpt(fd)
+  return retbool(C.grantpt(getfd(fd)))
+end
+
+function S.unlockpt(fd)
+  return retbool(C.unlockpt(getfd(fd)))
+end
+
+function S.ptsname(fd)
+  local count = 32
+  local buf = buffer_t(count)
+  local ret = C.ptsname_r(getfd(fd), buf, count)
+  if ret == 0 then
+    return ffi.string(buf)
+  else
+    return retbool(ret)
+  end
+end
+
 -- use string types for now
 -- helper for returning varargs
 local function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
@@ -4077,7 +4400,9 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
                    'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee',
                    'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
-                   'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead'
+                   'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
+                   'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
+                   'grantpt', 'unlockpt', 'ptsname',
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
@@ -4092,7 +4417,7 @@ S.t = {
   iovec = iovec_t, msghdr = msghdr_t, cmsghdr = cmsghdr_t, timeval = timeval_t, sysinfo = sysinfo_t, fdset = fdset_t, off = off_t,
   sockaddr_nl = sockaddr_nl_t, nlmsghdr = nlmsghdr_t, rtgenmsg = rtgenmsg_t, uint64 = uint64_t, macaddr = macaddr_t,
   sockaddr_storage = sockaddr_storage_t, sockaddr_in6 = sockaddr_in6_t, pollfds = pollfds_t, epoll_events = epoll_events_t,
-  epoll_event = epoll_event_t, ulong = ulong_t, aio_context = aio_context_t
+  epoll_event = epoll_event_t, ulong = ulong_t, aio_context = aio_context_t, termios = termios_t
 }
 
 return S
