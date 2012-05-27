@@ -2254,8 +2254,6 @@ S.t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
 local itimerspec_t = ffi.typeof("struct itimerspec")
 local itimerval_t = ffi.typeof("struct itimerval")
 local iocb_t = ffi.typeof("struct iocb")
-local iocbs_t = ffi.typeof("struct iocb[?]")
-S.t.pollfds = ffi.typeof("struct pollfd [?]")
 local sighandler_t = ffi.typeof("sighandler_t")
 local sigaction_t = ffi.typeof("struct sigaction")
 local clockid_t = ffi.typeof("clockid_t")
@@ -2272,6 +2270,8 @@ local loff_t = ffi.typeof("loff_t")
 local loff_1t = ffi.typeof("loff_t[1]")
 
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
+local iocbs_t = ffi.typeof("struct iocb[?]")
+local pollfds_t = ffi.typeof("struct pollfd [?]")
 
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
@@ -3278,7 +3278,7 @@ function S.poll(fds, nfds, timeout)
   if type(fds) ~= "cdata" then
     local pf = fds
     nfds = #pf
-    fds = S.t.pollfds(nfds)
+    fds = pollfds_t(nfds)
     for i = 0, nfds - 1 do
       local p = pf[i + 1]
       fds[i].fd = getfd(p.fd)
