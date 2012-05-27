@@ -20,7 +20,8 @@ open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname
 nice, getpriority, setpriority, prctl, alarm, waitid, inotify_init, inotify_add_watch, inotify_rm_watch, adjtimex, getrlimit, setrlimit, sigprocmask, sigpending,
 sigsuspend, getsid, setsid, listxattr, llistxattr, flistxattr, setxattr, lsetxattr, fsetxattr, getxattr, lgetxattr, fgetxattr, removexattr, lremovexattr, fremovexattr,
 readlink, splice, vmsplice, tee, signalfd, timerfd_create, timerfd_settime, timerfd_gettime, posix_fadvise, fallocate, readahead, poll,
-tcgetattr, tcsetattr, tcsendbreak, tcdrain, tcflush, tcflow, tcgetsid
+tcgetattr, tcsetattr, tcsendbreak, tcdrain, tcflush, tcflow, tcgetsid,
+posix_openpt, grantpt, unlockpt, ptsname
 
 
 ### Other functions

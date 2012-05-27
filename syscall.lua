@@ -2169,6 +2169,11 @@ int cfsetispeed(struct termios *termios_p, speed_t speed);
 int cfsetospeed(struct termios *termios_p, speed_t speed);
 int cfsetspeed(struct termios *termios_p, speed_t speed);
 pid_t tcgetsid(int fd);
+
+int posix_openpt(int flags);
+int grantpt(int fd);
+int unlockpt(int fd);
+int ptsname_r(int fd, char *buf, size_t buflen);
 ]]
 
 -- Lua type constructors corresponding to defined types
@@ -4242,6 +4247,29 @@ function S.tcgetsid(fd)
   return retint(C.tcgetsid(getfd(fd)))
 end
 
+function S.posix_openpt(flags)
+  return retfd(C.posix_openpt(stringflags(flags, "O_")))
+end
+
+function S.grantpt(fd)
+  return retbool(C.grantpt(getfd(fd)))
+end
+
+function S.unlockpt(fd)
+  return retbool(C.unlockpt(getfd(fd)))
+end
+
+function S.ptsname(fd)
+  local count = 32
+  local buf = buffer_t(count)
+  local ret = C.ptsname_r(getfd(fd), buf, count)
+  if ret == 0 then
+    return ffi.string(buf)
+  else
+    return retbool(ret)
+  end
+end
+
 -- use string types for now
 local threc -- helper for returning varargs
 function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
@@ -4271,6 +4299,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
+                   'grantpt', 'unlockpt', 'ptsname',
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
