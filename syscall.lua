@@ -1341,7 +1341,7 @@ end
 
 -- integer types
 S.t.int = ffi.typeof("int")
-local uint_t = ffi.typeof("unsigned int")
+S.t.uint = ffi.typeof("unsigned int")
 local int64_t = ffi.typeof("int64_t")
 local uint64_t = ffi.typeof("uint64_t")
 local long_t = ffi.typeof("long")
@@ -2735,7 +2735,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   local d = {}
   local ret
   repeat
-    ret = C.syscall(S.SYS_getdents, S.t.int(getfd(fd)), buf, uint_t(size))
+    ret = C.syscall(S.SYS_getdents, S.t.int(getfd(fd)), buf, S.t.uint(size))
     if ret == -1 then return errorret() end
     local i = 0
     while i < ret do
@@ -3550,7 +3550,7 @@ local function getctx(ctx) return ulong_t(ctx.ctx) end -- aio_context_t is reall
 
 function S.io_setup(nr_events)
   local ctx = S.t.aio_context()
-  local ret = C.syscall(S.SYS_io_setup, uint_t(nr_events), ctx)
+  local ret = C.syscall(S.SYS_io_setup, S.t.uint(nr_events), ctx)
   if ret == -1 then return errorret() end
   return ctx
 end
