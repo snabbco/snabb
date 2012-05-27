@@ -4185,8 +4185,7 @@ end
 function S.bridge_add(name) return bridge_ioctl(S.SIOCBRADDBR, name) end
 function S.bridge_del(name) return bridge_ioctl(S.SIOCBRDELBR, name) end
 
-local bridge_if_ioctl
-function bridge_if_ioctl(io, bridge, dev)
+local function bridge_if_ioctl(io, bridge, dev)
   local err, s, ifr, len, ret, ok
   s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
