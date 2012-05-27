@@ -4305,7 +4305,7 @@ function S.cfsetspeed(termios, speed)
   return retbool(C.cfsetspeed(termios, speed_to_bits(speed)))
 end
 
-local termios_t = ffi.metatype("struct termios", {
+S.t.termios = ffi.metatype("struct termios", {
   __index = {
     cfmakeraw = S.cfmakeraw,
     cfgetispeed = S.cfgetispeed,
@@ -4317,7 +4317,7 @@ local termios_t = ffi.metatype("struct termios", {
 })
 
 function S.tcgetattr(fd)
-  local termios = termios_t()
+  local termios = S.t.termios()
   local ret = C.tcgetattr(getfd(fd), termios)
   if ret == -1 then return errorret() end
   return termios
