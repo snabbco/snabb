@@ -10,7 +10,6 @@ local C = ffi.C
 local octal = function (s) return tonumber(s, 8) end
 
 -- cleaner to read
-local istype = ffi.istype
 local arch = ffi.arch
 local typeof = ffi.typeof
 
@@ -1200,7 +1199,7 @@ local buffer_t = typeof("char[?]")
 --get fd from standard string, integer, or cdata
 local function getfd(fd)
   if not fd then return nil end
-  if istype(int_t, fd) then return fd end
+  if ffi.istype(int_t, fd) then return fd end
   if type(fd) == 'number' then return fd end
   if fd.fileno then return fd.fileno end
   if type(fd) == 'string' then
@@ -2055,7 +2054,7 @@ local timespec_t = ffi.metatype("struct timespec", {
 
 local function getts(ts) -- get a timespec eg from a number
   if not ts then return timespec_t() end
-  if istype(timespec_t, ts) then return ts end
+  if ffi.istype(timespec_t, ts) then return ts end
   if type(ts) == "table" then return timespec_t(ts) end
   local i, f = math.modf(ts)
   return timespec_t(i, math.floor(f * 1000000000))
@@ -2067,7 +2066,7 @@ local timeval_t = ffi.metatype("struct timeval", {
 
 local function gettv(tv) 
   if not tv then return timeval_t() end
-  if istype(timeval_t, tv) then return tv end
+  if ffi.istype(timeval_t, tv) then return tv end
   if type(tv) == "table" then return timeval_t(tv) end
   local i, f = math.modf(tv)
   return timeval_t(i, math.floor(f * 1000000))
@@ -2250,7 +2249,7 @@ if ffi.abi("be") then -- nothing to do
   function S.htonl(b) return b end
 else
   function S.htonl(b)
-  if istype(in_addr_t, b) then return in_addr_t(bit.bswap(b.s_addr)) end -- not sure we need this, actually not using this function
+  if ffi.istype(in_addr_t, b) then return in_addr_t(bit.bswap(b.s_addr)) end -- not sure we need this, actually not using this function
   return bit.bswap(b)
 end
   function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
@@ -2291,12 +2290,12 @@ end
 local function getaddrlen(addr, addrlen)
   if not addr then return 0 end
   if addrlen == nil then
-    if istype(sockaddr_t, addr) then return ffi.sizeof(sockaddr_t) end
-    if istype(sockaddr_un_t, addr) then return ffi.sizeof(sockaddr_un_t) end
-    if istype(sockaddr_in_t, addr) then return ffi.sizeof(sockaddr_in_t) end
-    if istype(sockaddr_in6_t, addr) then return ffi.sizeof(sockaddr_in6_t) end
-    if istype(sockaddr_nl_t, addr) then return ffi.sizeof(sockaddr_nl_t) end
-    if istype(sockaddr_storage_t, addr) then return ffi.sizeof(sockaddr_storage_t) end
+    if ffi.istype(sockaddr_t, addr) then return ffi.sizeof(sockaddr_t) end
+    if ffi.istype(sockaddr_un_t, addr) then return ffi.sizeof(sockaddr_un_t) end
+    if ffi.istype(sockaddr_in_t, addr) then return ffi.sizeof(sockaddr_in_t) end
+    if ffi.istype(sockaddr_in6_t, addr) then return ffi.sizeof(sockaddr_in6_t) end
+    if ffi.istype(sockaddr_nl_t, addr) then return ffi.sizeof(sockaddr_nl_t) end
+    if ffi.istype(sockaddr_storage_t, addr) then return ffi.sizeof(sockaddr_storage_t) end
   end
   return addrlen or 0
 end
@@ -2313,7 +2312,7 @@ saret = function(addr, addrlen, rets) -- return socket address structure, additi
   -- should check here that addrlen is correct?
 
   if afamily == S.AF_LOCAL then
-    if not istype(sockaddr_un_t, addr) then
+    if not ffi.istype(sockaddr_un_t, addr) then
       rets.addr = sockaddr_un_t()
       ffi.copy(rets.addr, addr, addrlen)
     end
@@ -2323,19 +2322,19 @@ saret = function(addr, addrlen, rets) -- return socket address structure, additi
       if rets.addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
     end
   elseif afamily == S.AF_INET then
-    if not istype(sockaddr_in_t, addr) then
+    if not ffi.istype(sockaddr_in_t, addr) then
       rets.addr = sockaddr_in_t()
       ffi.copy(rets.addr, addr, addrlen)
     end
     rets.port = S.ntohs(rets.addr.sin_port)
   elseif afamily == S.AF_INET6 then
-    if not istype(sockaddr_in6_t, addr) then
+    if not ffi.istype(sockaddr_in6_t, addr) then
       rets.addr = sockaddr_in6_t()
       ffi.copy(rets.addr, addr, addrlen)
     end
     rets.port = S.ntohs(rets.addr.sin6_port)
   elseif afamily == S.AF_NETLINK then
-    if not istype(sockaddr_nl_t, addr) then
+    if not ffi.istype(sockaddr_nl_t, addr) then
       rets.addr = sockaddr_nl_t()
       ffi.copy(rets.addr, addr, addrlen)
     end
@@ -2409,12 +2408,12 @@ function S.close(fd)
   local ret = C.close(fileno)
   if ret == -1 then
     local errno = ffi.errno()
-    if istype(fd_t, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
+    if ffi.istype(fd_t, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
       fd.fileno = -1 -- make sure cannot accidentally close this fd object again
     end
     return errorret()
   end
-  if istype(fd_t, fd) then
+  if ffi.istype(fd_t, fd) then
     fd.fileno = -1 -- make sure cannot accidentally close this fd object again
   end
   return true
@@ -2785,7 +2784,7 @@ local getsigset
 
 local function mksigset(str)
   if not str then return sigset_t() end
-  if istype(sigset_t, str) then return str end
+  if ffi.istype(sigset_t, str) then return str end
   if type(str) == "table" then return str.sigset end
   local f = sigset_t()
   local a = split(",", str)
@@ -2872,7 +2871,7 @@ function S.signal(signum, handler) return retbool(C.signal(stringflag(signum, "S
 -- missing siginfo functionality for now, only supports getting signum TODO
 function S.sigaction(signum, handler, mask, flags)
   local sa
-  if istype(sigaction_t, handler) then sa = handler
+  if ffi.istype(sigaction_t, handler) then sa = handler
   else
     if type(handler) == 'string' then
       handler = ffi.cast(sighandler_t, stringflag(handler, "SIG_"))
@@ -3040,7 +3039,7 @@ function S.select(s) -- note same structure as returned
   local nfds = 0
   local timeout2
   if s.timeout then
-    if istype(timeval_t, s.timeout) then timeout2 = s.timeout else timeout2 = timeval_t(s.timeout) end
+    if ffi.istype(timeval_t, s.timeout) then timeout2 = s.timeout else timeout2 = timeval_t(s.timeout) end
   end
   r, nfds = mkfdset(s.readfds or {}, nfds or 0)
   w, nfds = mkfdset(s.writefds or {}, nfds)
@@ -3104,7 +3103,7 @@ function S.epoll_create(flags)
 end
 
 function S.epoll_ctl(epfd, op, fd, event, data)
-  if not istype(epoll_event_t, event) then
+  if not ffi.istype(epoll_event_t, event) then
     local events = stringflags(event, "EPOLL")
     event = epoll_event_t()
     event.events = events
@@ -3139,11 +3138,11 @@ end
 
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
   local offin, offout = off_in, off_out
-  if off_in and not istype(loff_1t, off_in) then
+  if off_in and not ffi.istype(loff_1t, off_in) then
     offin = loff_1t()
     offin[0] = off_in
   end
-  if off_out and not istype(loff_1t, off_out) then
+  if off_out and not ffi.istype(loff_1t, off_out) then
     offout = loff_1t()
     offout[0] = off_out
   end
@@ -3270,7 +3269,7 @@ function S.signalfd_read(fd, buffer, len)
 end
 
 local function getitimerval(interval, value)
-  if istype(itimerval_t, interval) then return interval end
+  if ffi.istype(itimerval_t, interval) then return interval end
   return itimerval_t(gettv(interval), gettv(value))
 end
 
@@ -3293,7 +3292,7 @@ function S.timerfd_create(clockid, flags)
 end
 
 local function getitimerspec(interval, value)
-  if istype(itimerspec_t, interval) then return interval end
+  if ffi.istype(itimerspec_t, interval) then return interval end
   return itimerspec_t(getts(interval), getts(value))
 end
 
