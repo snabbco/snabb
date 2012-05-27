@@ -2239,8 +2239,7 @@ S.t.sysinfo = ffi.typeof("struct sysinfo")
 S.t.fdset = ffi.typeof("fd_set")
 S.t.fdmask = ffi.typeof("fd_mask")
 S.t.stat = ffi.typeof("struct stat")
-local epoll_event_t = ffi.typeof("struct epoll_event")
-local epoll_events_t = ffi.typeof("struct epoll_event[?]")
+S.t.epoll_event = ffi.typeof("struct epoll_event")
 S.t.off = ffi.typeof("off_t")
 local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
 local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
@@ -2271,6 +2270,8 @@ local ulong_t = ffi.typeof("unsigned long")
 local off1_t = ffi.typeof("off_t[1]")
 local loff_t = ffi.typeof("loff_t")
 local loff_1t = ffi.typeof("loff_t[1]")
+
+local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
@@ -3323,9 +3324,9 @@ function S.epoll_create(flags)
 end
 
 function S.epoll_ctl(epfd, op, fd, event, data)
-  if not ffi.istype(epoll_event_t, event) then
+  if not ffi.istype(S.t.epoll_event, event) then
     local events = stringflags(event, "EPOLL")
-    event = epoll_event_t()
+    event = S.t.epoll_event()
     event.events = events
     if data then event.data.u64 = data else event.data.fd = getfd(fd) end
   end
