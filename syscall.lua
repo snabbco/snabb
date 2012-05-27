@@ -2234,7 +2234,7 @@ local in6_addr_t = ffi.typeof("struct in6_addr")
 S.t.sockaddr_un = ffi.typeof("struct sockaddr_un")
 S.t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
 S.t.iovec = ffi.typeof("struct iovec[?]")
-local msghdr_t = ffi.typeof("struct msghdr")
+S.t.msghdr = ffi.typeof("struct msghdr")
 local cmsghdr_t = ffi.typeof("struct cmsghdr")
 local ucred_t = ffi.typeof("struct ucred")
 local sysinfo_t = ffi.typeof("struct sysinfo")
@@ -3920,7 +3920,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
   local bufsize = 8192
   local reply = S.t.buffer(bufsize)
   local ior = S.t.iovec(1, {{reply, bufsize}})
-  local m = msghdr_t{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
+  local m = S.t.msghdr{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
 
   local done = false -- what should we do if we get a done message but there is some extra buffer? could be next message...
   local r = {}
@@ -3983,7 +3983,7 @@ function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
     local buf1 = S.t.buffer(1)
     local io = S.t.iovec(1, {{buf1, 1}})
-    msg = msghdr_t{msg_iov = io, msg_iovlen = 1}
+    msg = S.t.msghdr{msg_iov = io, msg_iovlen = 1}
   end
   return retbool(C.sendmsg(getfd(fd), msg, stringflags(flags, "MSG_")))
 end
@@ -3995,7 +3995,7 @@ function S.recvmsg(fd, msg, flags)
     local io = S.t.iovec(1, {{buf1, 1}})
     local bufsize = 1024 -- sane default, build your own structure otherwise
     local buf = S.t.buffer(bufsize)
-    msg = msghdr_t{msg_iov = io, msg_iovlen = 1, msg_control = buf, msg_controllen = bufsize}
+    msg = S.t.msghdr{msg_iov = io, msg_iovlen = 1, msg_control = buf, msg_controllen = bufsize}
   end
   local ret = C.recvmsg(getfd(fd), msg, stringflags(flags, "MSG_"))
   if ret == -1 then return errorret() end
@@ -4040,7 +4040,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   local bufsize = cmsg_space(usize)
   local buflen = cmsg_len(usize)
   local buf = S.t.buffer(bufsize) -- this is our cmsg buffer
-  local msg = msghdr_t() -- assume socket connected and so does not need address
+  local msg = S.t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io
   msg.msg_iovlen = iolen
   msg.msg_control = buf
@@ -4067,7 +4067,7 @@ function S.sendfds(fd, ...)
   local bufsize = cmsg_space(fasize)
   local buflen = cmsg_len(fasize)
   local buf = S.t.buffer(bufsize) -- this is our cmsg buffer
-  local msg = msghdr_t() -- assume socket connected and so does not need address
+  local msg = S.t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io
   msg.msg_iovlen = iolen
   msg.msg_control = buf
