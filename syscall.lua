@@ -2224,15 +2224,15 @@ int ptsname_r(int fd, char *buf, size_t buflen);
 ]]
 
 -- Lua type constructors corresponding to defined types
-local sockaddr_t = ffi.typeof("struct sockaddr")
-local sockaddr_storage_t = ffi.typeof("struct sockaddr_storage")
+S.t.sockaddr = ffi.typeof("struct sockaddr")
+S.t.sockaddr_storage = ffi.typeof("struct sockaddr_storage")
 local sa_family_t = ffi.typeof("sa_family_t")
-local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
-local sockaddr_in6_t = ffi.typeof("struct sockaddr_in6")
+S.t.sockaddr_in = ffi.typeof("struct sockaddr_in")
+S.t.sockaddr_in6 = ffi.typeof("struct sockaddr_in6")
 local in_addr_t = ffi.typeof("struct in_addr")
 local in6_addr_t = ffi.typeof("struct in6_addr")
-local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
-local sockaddr_nl_t = ffi.typeof("struct sockaddr_nl")
+S.t.sockaddr_un = ffi.typeof("struct sockaddr_un")
+S.t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
 local iovec_t = ffi.typeof("struct iovec[?]")
 local msghdr_t = ffi.typeof("struct msghdr")
 local cmsghdr_t = ffi.typeof("struct cmsghdr")
@@ -2349,15 +2349,15 @@ local macaddr_t = ffi.metatype("struct {uint8_t mac_addr[6];}", {
 
 --[[ -- used to generate tests, will refactor into test code later
 print("eq (sizeof(struct timespec), " .. sizeof(S.t.timespec) .. ");")
-print("eq (sizeof(struct timeval), " .. sizeof(timeval_t) .. ");")
-print("eq (sizeof(struct sockaddr_storage), " .. sizeof(sockaddr_storage_t) .. ");")
-print("eq (sizeof(struct sockaddr_in), " .. sizeof(sockaddr_in_t) .. ");")
-print("eq (sizeof(struct sockaddr_in6), " .. sizeof(sockaddr_in6_t) .. ");")
-print("eq (sizeof(struct sockaddr_un), " .. sizeof(sockaddr_un_t) .. ");")
-print("eq (sizeof(struct iovec), " .. sizeof(iovec_t(1)) .. ");")
-print("eq (sizeof(struct msghdr), " .. sizeof(msghdr_t) .. ");")
-print("eq (sizeof(struct cmsghdr), " .. sizeof(cmsghdr_t(0)) .. ");")
-print("eq (sizeof(struct sysinfo), " .. sizeof(sysinfo_t) .. ");")
+print("eq (sizeof(struct timeval), " .. sizeof(S.t.timeval) .. ");")
+print("eq (sizeof(struct sockaddr_storage), " .. sizeof(S.t.sockaddr_storage) .. ");")
+print("eq (sizeof(struct sockaddr_in), " .. sizeof(S.t.sockaddr_in) .. ");")
+print("eq (sizeof(struct sockaddr_in6), " .. sizeof(S.t.sockaddr_in6) .. ");")
+print("eq (sizeof(struct sockaddr_un), " .. sizeof(S.t.sockaddr_un) .. ");")
+print("eq (sizeof(struct iovec), " .. sizeof(S.t.iovec(1)) .. ");")
+print("eq (sizeof(struct msghdr), " .. sizeof(S.t.msghdr) .. ");")
+print("eq (sizeof(struct cmsghdr), " .. sizeof(S.cmsghdr(0)) .. ");")
+print("eq (sizeof(struct sysinfo), " .. sizeof(S.sysinfo) .. ");")
 ]]
 --print(sizeof("struct stat"))
 
@@ -2487,24 +2487,24 @@ S.ntohs = S.htons -- reverse is the same
 function S.sockaddr_in(port, addr)
   if type(addr) == 'string' then addr = S.inet_aton(addr) end
   if not addr then return nil end
-  return sockaddr_in_t(S.AF_INET, S.htons(port), addr)
+  return S.t.sockaddr_in(S.AF_INET, S.htons(port), addr)
 end
 function S.sockaddr_in6(port, addr)
   if type(addr) == 'string' then addr = S.inet_pton(S.AF_INET6, addr) end
   if not addr then return nil end
-  local sa = sockaddr_in6_t()
+  local sa = S.t.sockaddr_in6()
   sa.sin6_family = S.AF_INET6
   sa.sin6_port = S.htons(port)
   ffi.copy(sa.sin6_addr, addr, ffi.sizeof(in6_addr_t))
   return sa
 end
 function S.sockaddr_un() -- actually, not using this, not sure it is useful for unix sockets
-  local addr = sockaddr_in_t()
+  local addr = S.t.sockaddr_un()
   addr.sun_family = S.AF_UNIX
   return addr
 end
 function S.sockaddr_nl(pid, groups)
-  local addr = sockaddr_nl_t()
+  local addr = S.t.sockaddr_nl()
   addr.nl_family = S.AF_NETLINK
   if pid then addr.nl_pid = pid end -- optional, kernel will set
   if groups then addr.nl_groups = groups end
@@ -2515,12 +2515,12 @@ end
 local function getaddrlen(addr, addrlen)
   if not addr then return 0 end
   if addrlen == nil then
-    if ffi.istype(sockaddr_t, addr) then return ffi.sizeof(sockaddr_t) end
-    if ffi.istype(sockaddr_un_t, addr) then return ffi.sizeof(sockaddr_un_t) end
-    if ffi.istype(sockaddr_in_t, addr) then return ffi.sizeof(sockaddr_in_t) end
-    if ffi.istype(sockaddr_in6_t, addr) then return ffi.sizeof(sockaddr_in6_t) end
-    if ffi.istype(sockaddr_nl_t, addr) then return ffi.sizeof(sockaddr_nl_t) end
-    if ffi.istype(sockaddr_storage_t, addr) then return ffi.sizeof(sockaddr_storage_t) end
+    if ffi.istype(S.t.sockaddr, addr) then return ffi.sizeof(S.t.sockaddr) end
+    if ffi.istype(S.t.sockaddr_un, addr) then return ffi.sizeof(S.t.sockaddr_un) end
+    if ffi.istype(S.t.sockaddr_in, addr) then return ffi.sizeof(S.t.sockaddr_in) end
+    if ffi.istype(S.t.sockaddr_in6, addr) then return ffi.sizeof(S.t.sockaddr_in6) end
+    if ffi.istype(S.t.sockaddr_nl, addr) then return ffi.sizeof(S.t.sockaddr_nl) end
+    if ffi.istype(S.t.sockaddr_storage, addr) then return ffi.sizeof(S.t.sockaddr_storage) end
   end
   return addrlen or 0
 end
@@ -2537,8 +2537,8 @@ saret = function(addr, addrlen, rets) -- return socket address structure, additi
   -- should check here that addrlen is correct?
 
   if afamily == S.AF_LOCAL then
-    if not ffi.istype(sockaddr_un_t, addr) then
-      rets.addr = sockaddr_un_t()
+    if not ffi.istype(S.t.sockaddr_un, addr) then
+      rets.addr = S.t.sockaddr_un()
       ffi.copy(rets.addr, addr, addrlen)
     end
     local namelen = addrlen - ffi.sizeof(sa_family_t)
@@ -2547,20 +2547,20 @@ saret = function(addr, addrlen, rets) -- return socket address structure, additi
       if rets.addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
     end
   elseif afamily == S.AF_INET then
-    if not ffi.istype(sockaddr_in_t, addr) then
-      rets.addr = sockaddr_in_t()
+    if not ffi.istype(S.t.sockaddr_in, addr) then
+      rets.addr = S.t.sockaddr_in()
       ffi.copy(rets.addr, addr, addrlen)
     end
     rets.port = S.ntohs(rets.addr.sin_port)
   elseif afamily == S.AF_INET6 then
-    if not ffi.istype(sockaddr_in6_t, addr) then
-      rets.addr = sockaddr_in6_t()
+    if not ffi.istype(S.t.sockaddr_in6, addr) then
+      rets.addr = S.t.sockaddr_in6()
       ffi.copy(rets.addr, addr, addrlen)
     end
     rets.port = S.ntohs(rets.addr.sin6_port)
   elseif afamily == S.AF_NETLINK then
-    if not ffi.istype(sockaddr_nl_t, addr) then
-      rets.addr = sockaddr_nl_t()
+    if not ffi.istype(S.t.sockaddr_nl, addr) then
+      rets.addr = S.t.sockaddr_nl()
       ffi.copy(rets.addr, addr, addrlen)
     end
     rets.pid = tonumber(rets.addr.nl_pid)
@@ -2807,8 +2807,8 @@ function S.writev(fd, iov, iovcnt) return retnum(C.writev(getfd(fd), iov, iovcnt
 
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.recvfrom(fd, buf, count, flags)
-  local ss = sockaddr_storage_t()
-  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  local ss = S.t.sockaddr_storage()
+  local addrlen = int1_t(ffi.sizeof(S.t.sockaddr_storage))
   local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0], {count = tonumber(ret)})
@@ -2942,7 +2942,7 @@ end
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), stringflag(how, "SHUT_"))) end
 
 function S.accept(sockfd, flags, addr, addrlen)
-  if not addr then addr = sockaddr_storage_t() end
+  if not addr then addr = S.t.sockaddr_storage() end
   if not addrlen then addrlen = int1_t(getaddrlen(addr, addrlen)) end
   local ret
   if not flags
@@ -2955,16 +2955,16 @@ function S.accept(sockfd, flags, addr, addrlen)
 end
 
 function S.getsockname(sockfd)
-  local ss = sockaddr_storage_t()
-  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  local ss = S.t.sockaddr_storage()
+  local addrlen = int1_t(ffi.sizeof(S.t.sockaddr_storage))
   local ret = C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
 end
 
 function S.getpeername(sockfd)
-  local ss = sockaddr_storage_t()
-  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
+  local ss = S.t.sockaddr_storage()
+  local addrlen = int1_t(ffi.sizeof(S.t.sockaddr_storage))
   local ret = C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
