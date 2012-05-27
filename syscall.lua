@@ -2264,6 +2264,17 @@ local sigaction_t = ffi.typeof("struct sigaction")
 local clockid_t = ffi.typeof("clockid_t")
 local inotify_event_t = ffi.typeof("struct inotify_event")
 
+local uint64_1t = ffi.typeof("uint64_t[1]")
+local socklen1_t = ffi.typeof("socklen_t[1]")
+local ulong_t = ffi.typeof("unsigned long")
+local off1_t = ffi.typeof("off_t[1]")
+local loff_t = ffi.typeof("loff_t")
+local loff_1t = ffi.typeof("loff_t[1]")
+
+local aio_context_1t = ffi.typeof("aio_context_t[1]")
+
+local string_array_t = ffi.typeof("const char *[?]")
+
 -- pointer types. use another table?
 local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtattr_pt = ffi.typeof("struct rtattr *")
@@ -2370,17 +2381,6 @@ print("eq (sizeof(struct cmsghdr), " .. sizeof(S.cmsghdr(0)) .. ");")
 print("eq (sizeof(struct sysinfo), " .. sizeof(S.sysinfo) .. ");")
 ]]
 --print(sizeof("struct stat"))
-
-local uint64_1t = ffi.typeof("uint64_t[1]")
-local socklen1_t = ffi.typeof("socklen_t[1]")
-local ulong_t = ffi.typeof("unsigned long")
-local off1_t = ffi.typeof("off_t[1]")
-local loff_t = ffi.typeof("loff_t")
-local loff_1t = ffi.typeof("loff_t[1]")
-
-local aio_context_1t = ffi.typeof("aio_context_t[1]")
-
-local string_array_t = ffi.typeof("const char *[?]")
 
 local pointersize = ffi.sizeof("char *")
 
