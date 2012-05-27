@@ -2255,7 +2255,7 @@ S.t.itimerval = ffi.typeof("struct itimerval")
 S.t.iocb = ffi.typeof("struct iocb")
 S.t.sighandler = ffi.typeof("sighandler_t")
 S.t.sigaction = ffi.typeof("struct sigaction")
-local clockid_t = ffi.typeof("clockid_t")
+S.t.clockid = ffi.typeof("clockid_t")
 local inotify_event_t = ffi.typeof("struct inotify_event")
 
 S.t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
@@ -3684,14 +3684,14 @@ end
 
 function S.clock_getres(clk_id, ts)
   ts = getts(ts)
-  local ret = C.syscall(S.SYS_clock_getres, clockid_t(stringflag(clk_id, "CLOCK_")), ts)
+  local ret = C.syscall(S.SYS_clock_getres, S.t.clockid(stringflag(clk_id, "CLOCK_")), ts)
   if ret == -1 then return errorret() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
   ts = getts(ts)
-  local ret = C.syscall(S.SYS_clock_gettime, clockid_t(stringflag(clk_id, "CLOCK_")), ts)
+  local ret = C.syscall(S.SYS_clock_gettime, S.t.clockid(stringflag(clk_id, "CLOCK_")), ts)
   if ret == -1 then return errorret() end
   return ts
 end
