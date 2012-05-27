@@ -2356,7 +2356,7 @@ S.t.siginfo = ffi.metatype("struct siginfo",{
   __newindex = function(t, k, v) if siginfo_set[k] then siginfo_set[k](t, v) end end,
 })
 
-local macaddr_t = ffi.metatype("struct {uint8_t mac_addr[6];}", {
+S.t.macaddr = ffi.metatype("struct {uint8_t mac_addr[6];}", {
   __tostring = function(m)
     local t = {}
     for i = 1, 6 do
@@ -4245,7 +4245,7 @@ local brinfo = function(d) -- can be used as subpart of general interface info
 
     for i = 1, n / ffi.sizeof(fdb_entry_t) do
       local fdb = fdbs[i - 1]
-      local mac = macaddr_t()
+      local mac = S.t.macaddr()
       ffi.copy(mac, fdb.mac_addr, IFHWADDRLEN)
 
       -- TODO ageing_timer_value is not an int, time, float
