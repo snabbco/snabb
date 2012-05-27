@@ -2236,7 +2236,7 @@ S.t.msghdr = ffi.typeof("struct msghdr")
 S.t.cmsghdr = ffi.typeof("struct cmsghdr")
 S.t.ucred = ffi.typeof("struct ucred")
 S.t.sysinfo = ffi.typeof("struct sysinfo")
-local fdset_t = ffi.typeof("fd_set")
+S.t.fdset = ffi.typeof("fd_set")
 local fdmask_t = ffi.typeof("fd_mask")
 S.t.stat = ffi.typeof("struct stat")
 local epoll_event_t = ffi.typeof("struct epoll_event")
@@ -3212,7 +3212,7 @@ function S.fxattr(fd, t) return xattr(S.flistxattr, S.fgetxattr, S.fsetxattr, S.
 -- fdset handlers
 local mkfdset, fdisset
 function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
-  local set = fdset_t()
+  local set = S.t.fdset()
   for i, v in ipairs(fds) do
     local fd = tonumber(getfd(v))
     if fd + 1 > nfds then nfds = fd + 1 end
