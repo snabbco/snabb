@@ -2245,7 +2245,7 @@ S.t.rtgenmsg = ffi.typeof("struct rtgenmsg")
 S.t.ifinfomsg = ffi.typeof("struct ifinfomsg")
 S.t.rtattr = ffi.typeof("struct rtattr")
 S.t.timex = ffi.typeof("struct timex")
-local utsname_t = ffi.typeof("struct utsname")
+S.t.utsname = ffi.typeof("struct utsname")
 local sigset_t = ffi.typeof("sigset_t")
 local rlimit_t = ffi.typeof("struct rlimit")
 local fdb_entry_t = ffi.typeof("struct fdb_entry")
@@ -2982,7 +2982,7 @@ function S.fcntl(fd, cmd, arg)
 end
 
 function S.uname()
-  local u = utsname_t()
+  local u = S.t.utsname()
   local ret = C.uname(u)
   if ret == -1 then return errorret() end
   return {sysname = ffi.string(u.sysname), nodename = ffi.string(u.nodename), release = ffi.string(u.release),
