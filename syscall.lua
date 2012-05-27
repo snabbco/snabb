@@ -4211,7 +4211,7 @@ function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(S.SIOCBRDELI
 
 -- should probably have constant for "/sys/class/net"
 
-local brinfo = function(d) -- can be used as subpart of general interface info
+local function brinfo(d) -- can be used as subpart of general interface info
   local bd = "/sys/class/net/" .. d .. "/" .. S.SYSFS_BRIDGE_ATTR
   if not S.stat(bd) then return nil end
   local bridge = {}
