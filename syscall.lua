@@ -4238,6 +4238,10 @@ function S.tcflow(fd, action)
   return retbool(C.tcflow(getfd(fd), stringflag(action, "TC")))
 end
 
+function S.tcgetsid(fd)
+  return retint(C.tcgetsid(getfd(fd)))
+end
+
 -- use string types for now
 local threc -- helper for returning varargs
 function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
@@ -4266,7 +4270,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee',
                    'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
-                   'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow'
+                   'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
