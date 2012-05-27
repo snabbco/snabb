@@ -10,7 +10,6 @@ local C = ffi.C
 local octal = function (s) return tonumber(s, 8) end
 
 -- cleaner to read
-local sizeof = ffi.sizeof
 local istype = ffi.istype
 local arch = ffi.arch
 local typeof = ffi.typeof
@@ -2160,7 +2159,7 @@ local linux_dirent_pt = typeof("struct linux_dirent *")
 local inotify_event_pt = typeof("struct inotify_event *")
 local inotify_event_t = typeof("struct inotify_event")
 
-local pointersize = sizeof("char *")
+local pointersize = ffi.sizeof("char *")
 
 -- misc
 local div = function(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
@@ -2272,7 +2271,7 @@ function S.sockaddr_in6(port, addr)
   local sa = sockaddr_in6_t()
   sa.sin6_family = S.AF_INET6
   sa.sin6_port = S.htons(port)
-  ffi.copy(sa.sin6_addr, addr, sizeof(in6_addr_t))
+  ffi.copy(sa.sin6_addr, addr, ffi.sizeof(in6_addr_t))
   return sa
 end
 function S.sockaddr_un() -- actually, not using this, not sure it is useful for unix sockets
@@ -2292,12 +2291,12 @@ end
 local function getaddrlen(addr, addrlen)
   if not addr then return 0 end
   if addrlen == nil then
-    if istype(sockaddr_t, addr) then return sizeof(sockaddr_t) end
-    if istype(sockaddr_un_t, addr) then return sizeof(sockaddr_un_t) end
-    if istype(sockaddr_in_t, addr) then return sizeof(sockaddr_in_t) end
-    if istype(sockaddr_in6_t, addr) then return sizeof(sockaddr_in6_t) end
-    if istype(sockaddr_nl_t, addr) then return sizeof(sockaddr_nl_t) end
-    if istype(sockaddr_storage_t, addr) then return sizeof(sockaddr_storage_t) end
+    if istype(sockaddr_t, addr) then return ffi.sizeof(sockaddr_t) end
+    if istype(sockaddr_un_t, addr) then return ffi.sizeof(sockaddr_un_t) end
+    if istype(sockaddr_in_t, addr) then return ffi.sizeof(sockaddr_in_t) end
+    if istype(sockaddr_in6_t, addr) then return ffi.sizeof(sockaddr_in6_t) end
+    if istype(sockaddr_nl_t, addr) then return ffi.sizeof(sockaddr_nl_t) end
+    if istype(sockaddr_storage_t, addr) then return ffi.sizeof(sockaddr_storage_t) end
   end
   return addrlen or 0
 end
@@ -2318,7 +2317,7 @@ saret = function(addr, addrlen, rets) -- return socket address structure, additi
       rets.addr = sockaddr_un_t()
       ffi.copy(rets.addr, addr, addrlen)
     end
-    local namelen = addrlen - sizeof(sa_family_t)
+    local namelen = addrlen - ffi.sizeof(sa_family_t)
     if namelen > 0 then
       rets.name = ffi.string(rets.addr.sun_path, namelen)
       if rets.addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
@@ -2585,7 +2584,7 @@ function S.writev(fd, iov, iovcnt) return retnum(C.writev(getfd(fd), iov, iovcnt
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.recvfrom(fd, buf, count, flags)
   local ss = sockaddr_storage_t()
-  local addrlen = int1_t(sizeof(sockaddr_storage_t))
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
   local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0], {count = tonumber(ret)})
@@ -2596,14 +2595,14 @@ function S.setsockopt(fd, level, optname, optval, optlen)
   if not optlen and type(optval) == 'boolean' then if optval then optval = 1 else optval = 0 end end
   if not optlen and type(optval) == 'number' then
     optval = int1_t(optval)
-    optlen = sizeof(int1_t)
+    optlen = ffi.sizeof(int1_t)
   end
   return retbool(C.setsockopt(getfd(fd), stringflag(level, "SOL_"), stringflag(optname, "SO_"), optval, optlen))
 end
 
 function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool options
   local optval, optlen = int1_t(), socklen1_t()
-  optlen[0] = sizeof(int1_t)
+  optlen[0] = ffi.sizeof(int1_t)
   local ret = C.getsockopt(getfd(fd), level, optname, optval, optlen)
   if ret == -1 then return errorret() end
   return tonumber(optval[0]) -- no special case for bool
@@ -2733,7 +2732,7 @@ end
 
 function S.getsockname(sockfd)
   local ss = sockaddr_storage_t()
-  local addrlen = int1_t(sizeof(sockaddr_storage_t))
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
   local ret = C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
@@ -2741,7 +2740,7 @@ end
 
 function S.getpeername(sockfd)
   local ss = sockaddr_storage_t()
-  local addrlen = int1_t(sizeof(sockaddr_storage_t))
+  local addrlen = int1_t(ffi.sizeof(sockaddr_storage_t))
   local ret = C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
@@ -3181,7 +3180,7 @@ function S.inotify_read(fd, buffer, len)
     local le = getflags(ev.mask, "IN_", in_recv_ev, in_recv_lev, {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)})
     if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
-    off = off + sizeof(inotify_event_t(ev.len))
+    off = off + ffi.sizeof(inotify_event_t(ev.len))
   end
   return ee
 end
@@ -3229,7 +3228,7 @@ local sigcode = function(s, signo, code)
 end
 
 function S.signalfd_read(fd, buffer, len)
-  if not len then len = sizeof(signalfd_siginfo_t) * 4 end
+  if not len then len = ffi.sizeof(signalfd_siginfo_t) * 4 end
   if not buffer then buffer = buffer_t(len) end
   local ret, err = S.read(fd, buffer, len)
   if ret == 0 or (err and err.EAGAIN) then return {} end
@@ -3265,7 +3264,7 @@ function S.signalfd_read(fd, buffer, len)
     end
 
     ss[#ss + 1] = s
-    offset = offset + sizeof(signalfd_siginfo_t)
+    offset = offset + ffi.sizeof(signalfd_siginfo_t)
   end
   return ss
 end
@@ -3608,7 +3607,7 @@ function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) e
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsg_align, cmsg_space, cmsg_len, cmsg_firsthdr, cmsg_nxthdr
-local cmsg_hdrsize = sizeof(cmsghdr_t(0))
+local cmsg_hdrsize = ffi.sizeof(cmsghdr_t(0))
 if ffi.abi('32bit') then
   function cmsg_align(len) return align(len, 4) end
 else
@@ -3640,7 +3639,7 @@ end
 
 -- similar functions for netlink messages
 local nlmsg_align = function(len) return align(len, 4) end
-local nlmsg_hdrlen = nlmsg_align(sizeof(nlmsghdr_t))
+local nlmsg_hdrlen = nlmsg_align(ffi.sizeof(nlmsghdr_t))
 local nlmsg_length = function(len) return len + nlmsg_hdrlen end
 local nlmsg_ok = function(msg, len)
   return len >= nlmsg_hdrlen and msg.nlmsg_len >= nlmsg_hdrlen and msg.nlmsg_len <= len
@@ -3651,9 +3650,9 @@ local nlmsg_next = function(msg, buf, len)
 end
 
 local rta_align = nlmsg_align -- also 4 byte align
-local rta_length = function(len) return len + rta_align(sizeof(rtattr_t)) end
+local rta_length = function(len) return len + rta_align(ffi.sizeof(rtattr_t)) end
 local rta_ok = function(msg, len)
-  return len >= sizeof(rtattr_t) and msg.rta_len >= sizeof(rtattr_t) and msg.rta_len <= len
+  return len >= ffi.sizeof(rtattr_t) and msg.rta_len >= ffi.sizeof(rtattr_t) and msg.rta_len <= len
 end
 local rta_next = function(msg, buf, len)
   local inc = rta_align(msg.rta_len)
@@ -3672,8 +3671,8 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
 
   local iface = ffi.cast(ifinfomsg_pt, buf)
 
-  buf = buf + nlmsg_align(sizeof(ifinfomsg_t))
-  len = len - nlmsg_align(sizeof(ifinfomsg_t))
+  buf = buf + nlmsg_align(ffi.sizeof(ifinfomsg_t))
+  len = len - nlmsg_align(ffi.sizeof(ifinfomsg_t))
 
   local rtattr = ffi.cast(rtattr_pt, buf)
   local ir = {index = iface.ifi_index} -- info about interface
@@ -3697,7 +3696,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
   local bufsize = 8192
   local reply = buffer_t(bufsize)
   local ior = iovec_t(1, {{reply, bufsize}})
-  local m = msghdr_t{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = sizeof(addr)}
+  local m = msghdr_t{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
 
   local done = false -- what should we do if we get a done message but there is some extra buffer? could be next message...
   local r = {}
@@ -3744,7 +3743,7 @@ function S.get_interfaces()
   gen.rtgen_family = S.AF_PACKET
 
   local ios = iovec_t(1, {{buf, len}})
-  local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = S.sizeof(k)}
+  local m = S.t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = ffi.sizeof(k)}
 
   local n, err = s:sendmsg(m)
   if not n then return nil, err end 
@@ -3782,13 +3781,13 @@ function S.recvmsg(fd, msg, flags)
     if cmsg.cmsg_level == S.SOL_SOCKET then
       if cmsg.cmsg_type == S.SCM_CREDENTIALS then
         local cred = ucred_t() -- could just cast to ucred pointer
-        ffi.copy(cred, cmsg.cmsg_data, sizeof(ucred_t))
+        ffi.copy(cred, cmsg.cmsg_data, ffi.sizeof(ucred_t))
         ret.pid = cred.pid
         ret.uid = cred.uid
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
       local fda = ffi.cast(int_pt, cmsg.cmsg_data)
-      local fdc = div(cmsg.cmsg_len - cmsg_ahdr, sizeof(int1_t))
+      local fdc = div(cmsg.cmsg_len - cmsg_ahdr, ffi.sizeof(int1_t))
       ret.fd = {}
       for i = 1, fdc do ret.fd[i] = fd_t(fda[i - 1]) end
 
@@ -3813,7 +3812,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   io[0].iov_base = buf1
   io[0].iov_len = 1
   local iolen = 1
-  local usize = sizeof(ucred_t)
+  local usize = ffi.sizeof(ucred_t)
   local bufsize = cmsg_space(usize)
   local buflen = cmsg_len(usize)
   local buf = buffer_t(bufsize) -- this is our cmsg buffer
@@ -3840,7 +3839,7 @@ function S.sendfds(fd, ...)
   local fds = {}
   for i, v in ipairs{...} do fds[i] = getfd(v) end
   local fa = ints_t(#fds, fds)
-  local fasize = sizeof(fa)
+  local fasize = ffi.sizeof(fa)
   local bufsize = cmsg_space(fasize)
   local buflen = cmsg_len(fasize)
   local buf = buffer_t(bufsize) -- this is our cmsg buffer
@@ -4025,7 +4024,7 @@ local brinfo = function(d) -- can be used as subpart of general interface info
 
     local fdbs = ffi.cast(fdb_entry_pt, buffer)
 
-    for i = 1, n / sizeof(fdb_entry_t) do
+    for i = 1, n / ffi.sizeof(fdb_entry_t) do
       local fdb = fdbs[i - 1]
       local mac = macaddr_t()
       ffi.copy(mac, fdb.mac_addr, IFHWADDRLEN)
@@ -4059,12 +4058,12 @@ local threc -- helper for returning varargs
 function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
   if not t then return nil end
   if select("#", ...) == 0 then return ffi.cast(typeof(t .. "*"), buf + offset) end
-  return ffi.cast(typeof(t .. "*"), buf + offset), threc(buf, offset + sizeof(t), ...)
+  return ffi.cast(typeof(t .. "*"), buf + offset), threc(buf, offset + ffi.sizeof(t), ...)
 end
 function S.tbuffer(...) -- helper function for sequence of types in a buffer
   local len = 0
   for i, t in ipairs{...} do
-    len = len + sizeof(typeof(t)) -- alignment issues, need to round up to minimum alignment
+    len = len + ffi.sizeof(typeof(t)) -- alignment issues, need to round up to minimum alignment
   end
   local buf = buffer_t(len)
   return buf, len, threc(buf, 0, ...)
