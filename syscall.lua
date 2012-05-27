@@ -2261,7 +2261,7 @@ S.t.sighandler = ffi.typeof("sighandler_t")
 S.t.sigaction = ffi.typeof("struct sigaction")
 S.t.clockid = ffi.typeof("clockid_t")
 S.t.inotify_event = ffi.typeof("struct inotify_event")
-local loff_t = ffi.typeof("loff_t")
+S.t.loff = ffi.typeof("loff_t")
 
 S.t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
 
