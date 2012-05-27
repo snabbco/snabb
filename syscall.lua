@@ -2236,7 +2236,7 @@ S.t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
 S.t.iovec = ffi.typeof("struct iovec[?]")
 S.t.msghdr = ffi.typeof("struct msghdr")
 S.t.cmsghdr = ffi.typeof("struct cmsghdr")
-local ucred_t = ffi.typeof("struct ucred")
+S.t.ucred = ffi.typeof("struct ucred")
 local sysinfo_t = ffi.typeof("struct sysinfo")
 local fdset_t = ffi.typeof("fd_set")
 local fdmask_t = ffi.typeof("fd_mask")
@@ -4005,8 +4005,8 @@ function S.recvmsg(fd, msg, flags)
   while cmsg do
     if cmsg.cmsg_level == S.SOL_SOCKET then
       if cmsg.cmsg_type == S.SCM_CREDENTIALS then
-        local cred = ucred_t() -- could just cast to ucred pointer
-        ffi.copy(cred, cmsg.cmsg_data, ffi.sizeof(ucred_t))
+        local cred = S.t.ucred() -- could just cast to ucred pointer
+        ffi.copy(cred, cmsg.cmsg_data, ffi.sizeof(S.t.ucred))
         ret.pid = cred.pid
         ret.uid = cred.uid
         ret.gid = cred.gid
@@ -4028,7 +4028,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   if not pid then pid = C.getpid() end
   if not uid then uid = C.getuid() end
   if not gid then gid = C.getgid() end
-  local ucred = ucred_t()
+  local ucred = S.t.ucred()
   ucred.pid = pid
   ucred.uid = uid
   ucred.gid = gid
@@ -4037,7 +4037,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   io[0].iov_base = buf1
   io[0].iov_len = 1
   local iolen = 1
-  local usize = ffi.sizeof(ucred_t)
+  local usize = ffi.sizeof(S.t.ucred)
   local bufsize = cmsg_space(usize)
   local buflen = cmsg_len(usize)
   local buf = S.t.buffer(bufsize) -- this is our cmsg buffer
