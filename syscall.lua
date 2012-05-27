@@ -2285,16 +2285,16 @@ local function getts(ts) -- get a timespec eg from a number
   return S.t.timespec(i, math.floor(f * 1000000000))
 end
 
-local timeval_t = ffi.metatype("struct timeval", {
+S.t.timeval = ffi.metatype("struct timeval", {
   __index = {tonumber = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end}
 })
 
 local function gettv(tv) 
-  if not tv then return timeval_t() end
-  if ffi.istype(timeval_t, tv) then return tv end
-  if type(tv) == "table" then return timeval_t(tv) end
+  if not tv then return S.t.timeval() end
+  if ffi.istype(S.t.timeval, tv) then return tv end
+  if type(tv) == "table" then return S.t.timeval(tv) end
   local i, f = math.modf(tv)
-  return timeval_t(i, math.floor(f * 1000000))
+  return S.t.timeval(i, math.floor(f * 1000000))
 end
 
 -- siginfo needs some metamethods
@@ -3115,7 +3115,7 @@ function S.kill(pid, sig) return retbool(C.kill(pid, stringflag(sig, "SIG"))) en
 function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 
 function S.gettimeofday(tv)
-  if not tv then tv = timeval_t() end -- note it is faster to pass your own tv if you call a lot
+  if not tv then tv = S.t.timeval() end -- note it is faster to pass your own tv if you call a lot
   local ret = C.gettimeofday(tv, nil)
   if ret == -1 then return errorret() end
   return tv
@@ -3264,7 +3264,7 @@ function S.select(s) -- note same structure as returned
   local nfds = 0
   local timeout2
   if s.timeout then
-    if ffi.istype(timeval_t, s.timeout) then timeout2 = s.timeout else timeout2 = timeval_t(s.timeout) end
+    if ffi.istype(S.t.timeval, s.timeout) then timeout2 = s.timeout else timeout2 = S.t.timeval(s.timeout) end
   end
   r, nfds = mkfdset(s.readfds or {}, nfds or 0)
   w, nfds = mkfdset(s.writefds or {}, nfds)
