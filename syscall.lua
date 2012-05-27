@@ -2250,7 +2250,7 @@ S.t.sigset = ffi.typeof("sigset_t")
 S.t.rlimit = ffi.typeof("struct rlimit")
 S.t.fdb_entry = ffi.typeof("struct fdb_entry")
 S.t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
-local itimerspec_t = ffi.typeof("struct itimerspec")
+S.t.itimerspec = ffi.typeof("struct itimerspec")
 local itimerval_t = ffi.typeof("struct itimerval")
 local iocb_t = ffi.typeof("struct iocb")
 local sighandler_t = ffi.typeof("sighandler_t")
@@ -3514,19 +3514,19 @@ function S.timerfd_create(clockid, flags)
 end
 
 local function getitimerspec(interval, value)
-  if ffi.istype(itimerspec_t, interval) then return interval end
-  return itimerspec_t(getts(interval), getts(value))
+  if ffi.istype(S.t.itimerspec, interval) then return interval end
+  return S.t.itimerspec(getts(interval), getts(value))
 end
 
 function S.timerfd_settime(fd, flags, interval, value)
-  local oldtime = itimerspec_t()
+  local oldtime = S.t.itimerspec()
   local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), getitimerspec(interval, value), oldtime)
   if ret == -1 then return errorret() end
   return oldtime
 end
 
 function S.timerfd_gettime(fd, curr_value)
-  if not curr_value then curr_value = itimerspec_t() end
+  if not curr_value then curr_value = S.t.itimerspec() end
   local ret = C.timerfd_gettime(getfd(fd), curr_value)
   if ret == -1 then return errorret() end
   return curr_value
