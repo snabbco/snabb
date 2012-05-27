@@ -2272,6 +2272,13 @@ local fdb_entry_pt = ffi.typeof("struct fdb_entry *")
 local pollfd_pt = ffi.typeof("struct pollfd *")
 local iocbs_pt = ffi.typeof("struct iocb *[?]")
 local signalfd_siginfo_pt = ffi.typeof("struct signalfd_siginfo *")
+local sockaddr_pt = ffi.typeof("struct sockaddr *")
+local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
+local uchar_pt = ffi.typeof("unsigned char *")
+local char_pt = ffi.typeof("char *")
+local int_pt = ffi.typeof("int *")
+local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
+local inotify_event_pt = ffi.typeof("struct inotify_event *")
 
 S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
@@ -2374,15 +2381,6 @@ local loff_1t = ffi.typeof("loff_t[1]")
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
 local string_array_t = ffi.typeof("const char *[?]")
-
--- need these for casts
-local sockaddr_pt = ffi.typeof("struct sockaddr *")
-local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
-local uchar_pt = ffi.typeof("unsigned char *")
-local char_pt = ffi.typeof("char *")
-local int_pt = ffi.typeof("int *")
-local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
-local inotify_event_pt = ffi.typeof("struct inotify_event *")
 
 local pointersize = ffi.sizeof("char *")
 
