@@ -2254,7 +2254,7 @@ S.t.itimerspec = ffi.typeof("struct itimerspec")
 S.t.itimerval = ffi.typeof("struct itimerval")
 S.t.iocb = ffi.typeof("struct iocb")
 S.t.sighandler = ffi.typeof("sighandler_t")
-local sigaction_t = ffi.typeof("struct sigaction")
+S.t.sigaction = ffi.typeof("struct sigaction")
 local clockid_t = ffi.typeof("clockid_t")
 local inotify_event_t = ffi.typeof("struct inotify_event")
 
@@ -3093,16 +3093,16 @@ function S.signal(signum, handler) return retbool(C.signal(stringflag(signum, "S
 -- missing siginfo functionality for now, only supports getting signum TODO
 function S.sigaction(signum, handler, mask, flags)
   local sa
-  if ffi.istype(sigaction_t, handler) then sa = handler
+  if ffi.istype(S.t.sigaction, handler) then sa = handler
   else
     if type(handler) == 'string' then
       handler = ffi.cast(S.t.sighandler, stringflag(handler, "SIG_"))
     elseif
       type(handler) == 'function' then handler = ffi.cast(S.t.sighandler, handler)
     end
-    sa = sigaction_t{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = stringflags(flags, "SA_")}
+    sa = S.t.sigaction{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = stringflags(flags, "SA_")}
   end
-  local old = sigaction_t()
+  local old = S.t.sigaction()
   local ret = C.sigaction(stringflag(signum, "SIG"), sa, old)
   if ret == -1 then return errorret() end
   return old
