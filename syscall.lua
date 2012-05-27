@@ -2226,7 +2226,7 @@ int ptsname_r(int fd, char *buf, size_t buflen);
 -- Lua type constructors corresponding to defined types
 S.t.sockaddr = ffi.typeof("struct sockaddr")
 S.t.sockaddr_storage = ffi.typeof("struct sockaddr_storage")
-local sa_family_t = ffi.typeof("sa_family_t")
+S.t.sa_family = ffi.typeof("sa_family_t")
 S.t.sockaddr_in = ffi.typeof("struct sockaddr_in")
 S.t.sockaddr_in6 = ffi.typeof("struct sockaddr_in6")
 local in_addr_t = ffi.typeof("struct in_addr")
@@ -2540,7 +2540,7 @@ saret = function(addr, addrlen, rets) -- return socket address structure, additi
       rets.addr = S.t.sockaddr_un()
       ffi.copy(rets.addr, addr, addrlen)
     end
-    local namelen = addrlen - ffi.sizeof(sa_family_t)
+    local namelen = addrlen - ffi.sizeof(S.t.sa_family)
     if namelen > 0 then
       rets.name = ffi.string(rets.addr.sun_path, namelen)
       if rets.addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
