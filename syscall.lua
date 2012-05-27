@@ -9,6 +9,8 @@ local C = ffi.C
 
 local octal = function (s) return tonumber(s, 8) end
 
+S.t = {} -- types table
+
 -- convenience so user need not require ffi
 S.string = ffi.string
 S.sizeof = ffi.sizeof
@@ -1338,19 +1340,20 @@ local mkerror = function(errno)
 end
 
 -- integer types
-S.t = {}
 S.t.int = ffi.typeof("int")
 local uint_t = ffi.typeof("unsigned int")
+local int64_t = ffi.typeof("int64_t")
+local uint64_t = ffi.typeof("uint64_t")
+local long_t = ffi.typeof("long")
+local ulong_t = ffi.typeof("unsigned long")
+
 local int1_t = ffi.typeof("int[1]")
 local int2_t = ffi.typeof("int[2]")
 local ints_t = ffi.typeof("int[?]")
-local int64_t = ffi.typeof("int64_t")
-local int64_pt = ffi.typeof("int64_t *")
-local uint64_t = ffi.typeof("uint64_t")
-local int32_pt = ffi.typeof("int32_t *")
 local int64_1t = ffi.typeof("int64_t[1]")
-local long_t = ffi.typeof("long")
-local ulong_t = ffi.typeof("unsigned long")
+
+local int64_pt = ffi.typeof("int64_t *")
+local int32_pt = ffi.typeof("int32_t *")
 
 -- char buffer type
 S.t.buffer = ffi.typeof("char[?]")
