@@ -2264,7 +2264,7 @@ local itimerval_t = ffi.typeof("struct itimerval")
 local iocb_t = ffi.typeof("struct iocb")
 local iocbs_t = ffi.typeof("struct iocb[?]")
 local iocbs_pt = ffi.typeof("struct iocb *[?]")
-local pollfds_t = ffi.typeof("struct pollfd [?]")
+S.t.pollfds = ffi.typeof("struct pollfd [?]")
 local pollfd_pt = ffi.typeof("struct pollfd *")
 local sighandler_t = ffi.typeof("sighandler_t")
 local sigaction_t = ffi.typeof("struct sigaction")
@@ -3282,7 +3282,7 @@ function S.poll(fds, nfds, timeout)
   if type(fds) ~= "cdata" then
     local pf = fds
     nfds = #pf
-    fds = pollfds_t(nfds)
+    fds = S.t.pollfds(nfds)
     for i = 0, nfds - 1 do
       local p = pf[i + 1]
       fds[i].fd = getfd(p.fd)
