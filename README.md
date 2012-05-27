@@ -20,7 +20,7 @@ The aim is to implement the Linux kernel interfaces. This includes the system ca
 
 ## Note on man(3)
 
-There are some commands that call libc interfaces in man(3). These include some helper functions (eg inet_aton) that should be rewritten in Lua at some point as they are fairly trivial, will be done soon. Also includes the termios stuff, where these are functions that are mostly just ioctl commands and using the pts mux, but glibc does do quite a bit of other stuff if you look at the strace output, and there may be reasons for rewriting these in Lua using system calls directly, not sure yet. If so this would not affect the exposed interfaces.
+There are some commands that call libc interfaces in man(3). These include some helper functions (eg inet_aton) that should be rewritten in Lua at some point as they are fairly trivial, will be done soon. Also includes the termios stuff, where these are functions that are mostly just ioctl commands and using the pts mux, but glibc does do quite a bit of other stuff if you look at the strace output, and there may be reasons for rewriting these in Lua using system calls directly, not sure yet. If so this would not affect the exposed interfaces. This also applies to some calls in man(2) that glibc does not just do exactly what the syscall does, and we may use the underlying syscall directly.
 
 ### System calls (135)
 
