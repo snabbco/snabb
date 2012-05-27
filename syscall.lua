@@ -2240,7 +2240,7 @@ S.t.fdmask = ffi.typeof("fd_mask")
 S.t.stat = ffi.typeof("struct stat")
 S.t.epoll_event = ffi.typeof("struct epoll_event")
 S.t.off = ffi.typeof("off_t")
-local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
+S.t.nlmsghdr = ffi.typeof("struct nlmsghdr")
 local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
 local ifinfomsg_t = ffi.typeof("struct ifinfomsg")
 local rtattr_t = ffi.typeof("struct rtattr")
@@ -3860,7 +3860,7 @@ end
 
 -- similar functions for netlink messages
 local nlmsg_align = function(len) return align(len, 4) end
-local nlmsg_hdrlen = nlmsg_align(ffi.sizeof(nlmsghdr_t))
+local nlmsg_hdrlen = nlmsg_align(ffi.sizeof(S.t.nlmsghdr))
 local nlmsg_length = function(len) return len + nlmsg_hdrlen end
 local nlmsg_ok = function(msg, len)
   return len >= nlmsg_hdrlen and msg.nlmsg_len >= nlmsg_hdrlen and msg.nlmsg_len <= len
