@@ -2251,7 +2251,7 @@ S.t.rlimit = ffi.typeof("struct rlimit")
 S.t.fdb_entry = ffi.typeof("struct fdb_entry")
 S.t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
 S.t.itimerspec = ffi.typeof("struct itimerspec")
-local itimerval_t = ffi.typeof("struct itimerval")
+S.t.itimerval = ffi.typeof("struct itimerval")
 local iocb_t = ffi.typeof("struct iocb")
 local sighandler_t = ffi.typeof("sighandler_t")
 local sigaction_t = ffi.typeof("struct sigaction")
@@ -3491,19 +3491,19 @@ function S.signalfd_read(fd, buffer, len)
 end
 
 local function getitimerval(interval, value)
-  if ffi.istype(itimerval_t, interval) then return interval end
-  return itimerval_t(gettv(interval), gettv(value))
+  if ffi.istype(S.t.itimerval, interval) then return interval end
+  return S.t.itimerval(gettv(interval), gettv(value))
 end
 
 function S.getitimer(which, value)
-  if not value then value = itimerval_t() end
+  if not value then value = S.t.itimerval() end
   local ret = C.getitimer(stringflag(which, "ITIMER_"), value)
   if ret == -1 then return errorret() end
   return value
 end
 
 function S.setitimer(which, interval, value)
-  local oldtime = itimerval_t()
+  local oldtime = S.t.itimerval()
   local ret = C.setitimer(stringflag(which, "ITIMER_"), getitimerval(interval, value), oldtime)
   if ret == -1 then return errorret() end
   return oldtime
