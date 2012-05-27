@@ -2240,7 +2240,7 @@ local ucred_t = ffi.typeof("struct ucred")
 local sysinfo_t = ffi.typeof("struct sysinfo")
 local fdset_t = ffi.typeof("fd_set")
 local fdmask_t = ffi.typeof("fd_mask")
-local stat_t = ffi.typeof("struct stat")
+S.t.stat = ffi.typeof("struct stat")
 local epoll_event_t = ffi.typeof("struct epoll_event")
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 local off_t = ffi.typeof("off_t")
@@ -2837,19 +2837,19 @@ function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), stringflags(mode, "S_"))) end
 
 function S.stat(path, buf)
-  if not buf then buf = stat_t() end
+  if not buf then buf = S.t.stat() end
   local ret = C.syscall(S.SYS_stat, path, buf)
   if ret == -1 then return errorret() end
   return buf
 end
 function S.lstat(path, buf)
-  if not buf then buf = stat_t() end
+  if not buf then buf = S.t.stat() end
   local ret = C.syscall(S.SYS_lstat, path, buf)
   if ret == -1 then return errorret() end
   return buf
 end
 function S.fstat(fd, buf)
-  if not buf then buf = stat_t() end
+  if not buf then buf = S.t.stat() end
   local ret = C.syscall(S.SYS_fstat, S.t.int(getfd(fd)), buf)
   if ret == -1 then return errorret() end
   return buf
