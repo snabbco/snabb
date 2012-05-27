@@ -833,8 +833,6 @@ assert(pts:tcflow('ioff'))
 assert(pts:tcflow('oon'))
 assert(pts:tcflow('ion'))
 
-S.exit(0)
-
 -- aio, Linux only
 local ctx = assert(S.io_setup(8))
 assert(ctx:destroy())
