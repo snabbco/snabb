@@ -9,9 +9,6 @@ local C = ffi.C
 
 local octal = function (s) return tonumber(s, 8) end
 
--- cleaner to read
-local typeof = ffi.typeof
-
 -- convenience so user need not require ffi
 S.string = ffi.string
 S.sizeof = ffi.sizeof
@@ -1148,17 +1145,17 @@ local mkerror = function(errno)
 end
 
 -- integer types
-local int_t = typeof("int")
-local uint_t = typeof("unsigned int")
-local int1_t = typeof("int[1]")
-local int2_t = typeof("int[2]")
-local ints_t = typeof("int[?]")
-local int64_t = typeof("int64_t")
-local int64_pt = typeof("int64_t *")
-local uint64_t = typeof("uint64_t")
-local int32_pt = typeof("int32_t *")
-local int64_1t = typeof("int64_t[1]")
-local long_t = typeof("long")
+local int_t = ffi.typeof("int")
+local uint_t = ffi.typeof("unsigned int")
+local int1_t = ffi.typeof("int[1]")
+local int2_t = ffi.typeof("int[2]")
+local ints_t = ffi.typeof("int[?]")
+local int64_t = ffi.typeof("int64_t")
+local int64_pt = ffi.typeof("int64_t *")
+local uint64_t = ffi.typeof("uint64_t")
+local int32_pt = ffi.typeof("int32_t *")
+local int64_1t = ffi.typeof("int64_t[1]")
+local long_t = ffi.typeof("long")
 
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
@@ -1193,7 +1190,7 @@ end
 local fd_t -- type for a file descriptor
 
 -- char buffer type
-local buffer_t = typeof("char[?]")
+local buffer_t = ffi.typeof("char[?]")
 
 --get fd from standard string, integer, or cdata
 local function getfd(fd)
@@ -1998,51 +1995,51 @@ char *getenv(const char *name);
 ]]
 
 -- Lua type constructors corresponding to defined types
-local sockaddr_t = typeof("struct sockaddr")
-local sockaddr_storage_t = typeof("struct sockaddr_storage")
-local sa_family_t = typeof("sa_family_t")
-local sockaddr_in_t = typeof("struct sockaddr_in")
-local sockaddr_in6_t = typeof("struct sockaddr_in6")
-local in_addr_t = typeof("struct in_addr")
-local in6_addr_t = typeof("struct in6_addr")
-local sockaddr_un_t = typeof("struct sockaddr_un")
-local sockaddr_nl_t = typeof("struct sockaddr_nl")
-local iovec_t = typeof("struct iovec[?]")
-local msghdr_t = typeof("struct msghdr")
-local cmsghdr_t = typeof("struct cmsghdr")
-local ucred_t = typeof("struct ucred")
-local sysinfo_t = typeof("struct sysinfo")
-local fdset_t = typeof("fd_set")
-local fdmask_t = typeof("fd_mask")
-local stat_t = typeof("struct stat")
-local epoll_event_t = typeof("struct epoll_event")
-local epoll_events_t = typeof("struct epoll_event[?]")
-local off_t = typeof("off_t")
-local nlmsghdr_t = typeof("struct nlmsghdr")
-local nlmsghdr_pt = typeof("struct nlmsghdr *")
-local rtgenmsg_t = typeof("struct rtgenmsg")
-local ifinfomsg_t = typeof("struct ifinfomsg")
-local ifinfomsg_pt = typeof("struct ifinfomsg *")
-local rtattr_t = typeof("struct rtattr")
-local rtattr_pt = typeof("struct rtattr *")
-local timex_t = typeof("struct timex")
-local utsname_t = typeof("struct utsname")
-local sigset_t = typeof("sigset_t")
-local rlimit_t = typeof("struct rlimit")
-local fdb_entry_t = typeof("struct fdb_entry")
-local fdb_entry_pt = typeof("struct fdb_entry *")
-local signalfd_siginfo_t = typeof("struct signalfd_siginfo")
-local signalfd_siginfo_pt = typeof("struct signalfd_siginfo *")
-local itimerspec_t = typeof("struct itimerspec")
-local itimerval_t = typeof("struct itimerval")
-local iocb_t = typeof("struct iocb")
-local iocbs_t = typeof("struct iocb[?]")
-local iocbs_pt = typeof("struct iocb *[?]")
-local pollfds_t = typeof("struct pollfd [?]")
-local pollfd_pt = typeof("struct pollfd *")
-local sighandler_t = typeof("sighandler_t")
-local sigaction_t = typeof("struct sigaction")
-local clockid_t = typeof("clockid_t")
+local sockaddr_t = ffi.typeof("struct sockaddr")
+local sockaddr_storage_t = ffi.typeof("struct sockaddr_storage")
+local sa_family_t = ffi.typeof("sa_family_t")
+local sockaddr_in_t = ffi.typeof("struct sockaddr_in")
+local sockaddr_in6_t = ffi.typeof("struct sockaddr_in6")
+local in_addr_t = ffi.typeof("struct in_addr")
+local in6_addr_t = ffi.typeof("struct in6_addr")
+local sockaddr_un_t = ffi.typeof("struct sockaddr_un")
+local sockaddr_nl_t = ffi.typeof("struct sockaddr_nl")
+local iovec_t = ffi.typeof("struct iovec[?]")
+local msghdr_t = ffi.typeof("struct msghdr")
+local cmsghdr_t = ffi.typeof("struct cmsghdr")
+local ucred_t = ffi.typeof("struct ucred")
+local sysinfo_t = ffi.typeof("struct sysinfo")
+local fdset_t = ffi.typeof("fd_set")
+local fdmask_t = ffi.typeof("fd_mask")
+local stat_t = ffi.typeof("struct stat")
+local epoll_event_t = ffi.typeof("struct epoll_event")
+local epoll_events_t = ffi.typeof("struct epoll_event[?]")
+local off_t = ffi.typeof("off_t")
+local nlmsghdr_t = ffi.typeof("struct nlmsghdr")
+local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
+local rtgenmsg_t = ffi.typeof("struct rtgenmsg")
+local ifinfomsg_t = ffi.typeof("struct ifinfomsg")
+local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
+local rtattr_t = ffi.typeof("struct rtattr")
+local rtattr_pt = ffi.typeof("struct rtattr *")
+local timex_t = ffi.typeof("struct timex")
+local utsname_t = ffi.typeof("struct utsname")
+local sigset_t = ffi.typeof("sigset_t")
+local rlimit_t = ffi.typeof("struct rlimit")
+local fdb_entry_t = ffi.typeof("struct fdb_entry")
+local fdb_entry_pt = ffi.typeof("struct fdb_entry *")
+local signalfd_siginfo_t = ffi.typeof("struct signalfd_siginfo")
+local signalfd_siginfo_pt = ffi.typeof("struct signalfd_siginfo *")
+local itimerspec_t = ffi.typeof("struct itimerspec")
+local itimerval_t = ffi.typeof("struct itimerval")
+local iocb_t = ffi.typeof("struct iocb")
+local iocbs_t = ffi.typeof("struct iocb[?]")
+local iocbs_pt = ffi.typeof("struct iocb *[?]")
+local pollfds_t = ffi.typeof("struct pollfd [?]")
+local pollfd_pt = ffi.typeof("struct pollfd *")
+local sighandler_t = ffi.typeof("sighandler_t")
+local sigaction_t = ffi.typeof("struct sigaction")
+local clockid_t = ffi.typeof("clockid_t")
 
 S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
@@ -2109,7 +2106,7 @@ local siginfo_t = ffi.metatype("struct siginfo",{
 })
 
 -- could use metamethods for struct ifreq see /usr/include/linux/if.h
-local ifreq_t = typeof("struct ifreq")
+local ifreq_t = ffi.typeof("struct ifreq")
 
 local macaddr_t = ffi.metatype("struct {uint8_t mac_addr[6];}", {
   __tostring = function(m)
@@ -2135,27 +2132,27 @@ print("eq (sizeof(struct sysinfo), " .. sizeof(sysinfo_t) .. ");")
 ]]
 --print(sizeof("struct stat"))
 
-local uint64_1t = typeof("uint64_t[1]")
-local socklen1_t = typeof("socklen_t[1]")
-local ulong_t = typeof("unsigned long")
-local off1_t = typeof("off_t[1]")
-local loff_t = typeof("loff_t")
-local loff_1t = typeof("loff_t[1]")
+local uint64_1t = ffi.typeof("uint64_t[1]")
+local socklen1_t = ffi.typeof("socklen_t[1]")
+local ulong_t = ffi.typeof("unsigned long")
+local off1_t = ffi.typeof("off_t[1]")
+local loff_t = ffi.typeof("loff_t")
+local loff_1t = ffi.typeof("loff_t[1]")
 
 local aio_context_t
-local aio_context_1t = typeof("aio_context_t[1]")
+local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
-local string_array_t = typeof("const char *[?]")
+local string_array_t = ffi.typeof("const char *[?]")
 
 -- need these for casts
-local sockaddr_pt = typeof("struct sockaddr *")
-local cmsghdr_pt = typeof("struct cmsghdr *")
-local uchar_pt = typeof("unsigned char *")
-local char_pt = typeof("char *")
-local int_pt = typeof("int *")
-local linux_dirent_pt = typeof("struct linux_dirent *")
-local inotify_event_pt = typeof("struct inotify_event *")
-local inotify_event_t = typeof("struct inotify_event")
+local sockaddr_pt = ffi.typeof("struct sockaddr *")
+local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
+local uchar_pt = ffi.typeof("unsigned char *")
+local char_pt = ffi.typeof("char *")
+local int_pt = ffi.typeof("int *")
+local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
+local inotify_event_pt = ffi.typeof("struct inotify_event *")
+local inotify_event_t = ffi.typeof("struct inotify_event")
 
 local pointersize = ffi.sizeof("char *")
 
@@ -4052,16 +4049,16 @@ function S.bridge_list()
 end
 
 -- use string types for now
-local threc -- helper for returning varargs
-function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
+-- helper for returning varargs
+local function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
   if not t then return nil end
-  if select("#", ...) == 0 then return ffi.cast(typeof(t .. "*"), buf + offset) end
-  return ffi.cast(typeof(t .. "*"), buf + offset), threc(buf, offset + ffi.sizeof(t), ...)
+  if select("#", ...) == 0 then return ffi.cast(ffi.typeof(t .. "*"), buf + offset) end
+  return ffi.cast(ffi.typeof(t .. "*"), buf + offset), threc(buf, offset + ffi.sizeof(t), ...)
 end
 function S.tbuffer(...) -- helper function for sequence of types in a buffer
   local len = 0
   for i, t in ipairs{...} do
-    len = len + ffi.sizeof(typeof(t)) -- alignment issues, need to round up to minimum alignment
+    len = len + ffi.sizeof(ffi.typeof(t)) -- alignment issues, need to round up to minimum alignment
   end
   local buf = buffer_t(len)
   return buf, len, threc(buf, 0, ...)
