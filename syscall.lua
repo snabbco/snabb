@@ -1388,17 +1388,17 @@ local function retptr(ret)
   return ret
 end
 
---get fd from standard string, integer, or cdata
+--get fd from standard string, integer, or cdata, or fd type
 local function getfd(fd)
   if not fd then return nil end
-  if ffi.istype(S.t.int, fd) then return fd end
+  if ffi.istype(S.t.int, fd) then return tonumber(fd) end
   if type(fd) == 'number' then return fd end
-  if fd.fileno then return fd.fileno end
   if type(fd) == 'string' then
     if fd == 'stdin' or fd == 'STDIN_FILENO' then return 0 end
     if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
     if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
   end
+  if fd.fileno then return tonumber(fd.fileno) end
   return nil
 end
 
