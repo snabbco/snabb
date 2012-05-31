@@ -2667,7 +2667,7 @@ function S.readlink(path) -- note no idea if name truncated except return value 
   local buffer, ret
   repeat
     buffer = S.t.buffer(size)
-    ret = C.readlink(path, buffer, size)
+    ret = tonumber(C.readlink(path, buffer, size))
     if ret == -1 then return errorret() end
     if ret == size then -- possibly truncated
       buffer = nil
