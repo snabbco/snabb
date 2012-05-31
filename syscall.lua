@@ -1372,8 +1372,9 @@ local function retint(ret) -- straight passthrough, only needed for real 64 bit 
 end
 
 local function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
+  ret = tonumber(ret)
   if ret == -1 then return errorret() end
-  return tonumber(ret)
+  return ret
 end
 
 -- used for no return value, return true for use of assert
