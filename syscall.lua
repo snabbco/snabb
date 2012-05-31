@@ -2794,9 +2794,9 @@ function S.read(fd, buf, count)
   if buf then return retnum(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
   if not count then count = 4096 end
   local buf = S.t.buffer(count)
-  local ret = tonumber(C.read(getfd(fd), buf, count))
+  local ret = C.read(getfd(fd), buf, count)
   if ret == -1 then return errorret() end
-  return ffi.string(buf, ret) -- user gets a string back, can get length from #string
+  return ffi.string(buf, tonumber(ret)) -- user gets a string back, can get length from #string
 end
 
 function S.write(fd, buf, count) return retnum(C.write(getfd(fd), buf, count or #buf)) end
