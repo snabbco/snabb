@@ -1404,7 +1404,7 @@ end
 
 local function retfd(ret)
   if ret == -1 then return errorret() end
-  return S.t.fd(ret)
+  return S.t.fd{ret}
 end
 
 -- define C types
