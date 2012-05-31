@@ -1,13 +1,16 @@
-local ffi = require "ffi"
-local bit = require "bit"
-
-local S = {} -- exported functions
 
 local function syscall()
 
+local S = {} -- exported functions
+
+S.tonumber = tonumber -- luaffi breaks tonumber with two args at the moment, so save before require
+
+local ffi = require "ffi"
+local bit = require "bit"
+
 local C = ffi.C
 
-local octal = function (s) return tonumber(s, 8) end
+local octal = function (s) return S.tonumber(s, 8) end 
 
 S.t = {} -- types table
 
