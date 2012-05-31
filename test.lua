@@ -30,7 +30,6 @@ assert(err.errno == S.E.EBADF, "expect EBADF from invalid numberic fd") -- test 
 
 -- test open and close valid file
 fd = assert(S.open("/dev/null", "rdonly"))
-assert(type(fd) == 'cdata', "should get a cdata object back from open")
 assert(fd.fileno >= 3, "should get file descriptor of at least 3 back from first open")
 
 -- another open
