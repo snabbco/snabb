@@ -14,6 +14,8 @@ local octal = function (s) return S.tonumber(s, 8) end
 
 S.t = {} -- types table
 
+S.t.void = ffi.typeof("void *") -- luaffi needs structs cast to void on varargs functions
+
 -- convenience so user need not require ffi
 S.string = ffi.string
 S.sizeof = ffi.sizeof
@@ -2842,7 +2844,7 @@ function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), stringflags(mode,
 
 function S.stat(path, buf)
   if not buf then buf = S.t.stat() end
-  local ret = C.syscall(S.SYS_stat, path, buf)
+  local ret = C.syscall(S.SYS_stat, path, S.t.void(buf))
   if ret == -1 then return errorret() end
   return buf
 end
