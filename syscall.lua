@@ -2627,7 +2627,7 @@ function S.pipe(flags)
   local ret
   if flags then ret = C.pipe2(fd2, stringflags(flags, "O_")) else ret = C.pipe(fd2) end
   if ret == -1 then return errorret() end
-  return {S.t.fd(fd2[0]), S.t.fd(fd2[1])}
+  return {S.t.fd{fd2[0]}, S.t.fd{fd2[1]}}
 end
 
 function S.close(fd)
