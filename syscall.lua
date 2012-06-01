@@ -3153,7 +3153,7 @@ function S.sigaction(signum, handler, mask, flags)
   if ffi.istype(S.t.sigaction, handler) then sa = handler
   else
     if type(handler) == 'string' then
-      handler = ffi.cast(S.t.sighandler, stringflag(handler, "SIG_"))
+      handler = ffi.cast(S.t.sighandler, int1_t{stringflag(handler, "SIG_")})
     elseif
       type(handler) == 'function' then handler = ffi.cast(S.t.sighandler, handler)
     end
