@@ -1564,7 +1564,7 @@ struct msghdr {
   socklen_t msg_namelen;
   struct iovec *msg_iov;
   size_t msg_iovlen;
-  unsigned char *msg_control; /* changed from void* to simplify casts */
+  void *msg_control;
   size_t msg_controllen;
   int msg_flags;
 };
@@ -3917,10 +3917,12 @@ end
 
 local function cmsg_nxthdr(msg, buf, cmsg)
   if cmsg.cmsg_len < cmsg_hdrsize then return nil end -- invalid cmsg
+  buf = ffi.cast(char_pt, buf)
+  local msg_control = ffi.cast(char_pt, msg.msg_control)
   buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
-  if buf + cmsg_hdrsize > msg.msg_control + msg.msg_controllen then return nil end -- header would not fit
+  if buf + cmsg_hdrsize > msg_control + msg.msg_controllen then return nil end -- header would not fit
   cmsg = ffi.cast(cmsghdr_pt, buf)
-  if buf + cmsg_align(cmsg.cmsg_len) > msg.msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
+  if buf + cmsg_align(cmsg.cmsg_len) > msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
   return buf, cmsg
 end
 
