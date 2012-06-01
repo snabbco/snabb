@@ -2283,6 +2283,7 @@ local iocbs_t = ffi.typeof("struct iocb[?]")
 S.t.pollfds = ffi.typeof("struct pollfd [?]")
 
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
+local socklen_1t = ffi.typeof("socklen_t[1]")
 
 local string_array_t = ffi.typeof("const char *[?]")
 
@@ -2999,7 +3000,7 @@ function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), string
 
 function S.accept(sockfd, flags, addr, addrlen)
   if not addr then addr = S.t.sockaddr_storage() end
-  if not addrlen then addrlen = int1_t(getaddrlen(addr, addrlen)) end
+  if not addrlen then addrlen = socklen1_t{getaddrlen(addr, addrlen)} end
   local ret
   if not flags
     then ret = C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, addr), addrlen)
@@ -3012,7 +3013,7 @@ end
 
 function S.getsockname(sockfd)
   local ss = S.t.sockaddr_storage()
-  local addrlen = int1_t(ffi.sizeof(S.t.sockaddr_storage))
+  local addrlen = socklen1_t{ffi.sizeof(S.t.sockaddr_storage)}
   local ret = C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
@@ -3020,7 +3021,7 @@ end
 
 function S.getpeername(sockfd)
   local ss = S.t.sockaddr_storage()
-  local addrlen = int1_t(ffi.sizeof(S.t.sockaddr_storage))
+  local addrlen = socklen1_t(ffi.sizeof(S.t.sockaddr_storage))
   local ret = C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
