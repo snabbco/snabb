@@ -2320,7 +2320,7 @@ local function gettv(tv)
   if ffi.istype(S.t.timeval, tv) then return tv end
   if type(tv) == "table" then return S.t.timeval(tv) end
   local i, f = math.modf(tv)
-  return S.t.timeval(i, math.floor(f * 1000000))
+  return S.t.timeval{i, math.floor(f * 1000000)}
 end
 
 -- siginfo needs some metamethods
