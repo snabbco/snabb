@@ -3863,8 +3863,6 @@ function S.minor(dev)
   return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
 end
 
-local two32 = S.t.int64(0xffffffff) + 1 -- 0x100000000LL -- hack to get luac to parse this for checking
-
 function S.makedev(major, minor)
   return bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff))
 end
