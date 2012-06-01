@@ -2486,7 +2486,7 @@ S.ntohs = S.htons -- reverse is the same
 function S.sockaddr_in(port, addr)
   if type(addr) == 'string' then addr = S.inet_aton(addr) end
   if not addr then return nil end
-  return S.t.sockaddr_in(S.AF_INET, S.htons(port), addr)
+  return S.t.sockaddr_in{S.AF_INET, S.htons(port), addr}
 end
 function S.sockaddr_in6(port, addr)
   if type(addr) == 'string' then addr = S.inet_pton(S.AF_INET6, addr) end
