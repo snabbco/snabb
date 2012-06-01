@@ -3008,7 +3008,7 @@ function S.accept(sockfd, flags, addr, addrlen)
   end
   if ret == -1 then return errorret() end
   --if ret == -1 then return nil, "testing accept error return" end -- small performance improvement
-  return saret(addr, addrlen[0], {fd = S.t.fd(ret), fileno = tonumber(ret)})
+  return saret(addr, addrlen[0], {fd = S.t.fd{ret}, fileno = tonumber(ret)})
 end
 
 function S.getsockname(sockfd)
