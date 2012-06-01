@@ -3909,7 +3909,7 @@ local function cmsg_len(len) return cmsg_ahdr + len end
 
 -- these functions also take and return a raw char pointer to msg_control, to make life easier, as well as the cast cmsg
 local function cmsg_firsthdr(msg)
-  if msg.msg_controllen < cmsg_hdrsize then return nil end
+  if tonumber(msg.msg_controllen) < cmsg_hdrsize then return nil end
   local mc = msg.msg_control
   local cmsg = ffi.cast(cmsghdr_pt, mc)
   return mc, cmsg
