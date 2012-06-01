@@ -3021,7 +3021,7 @@ end
 
 function S.getpeername(sockfd)
   local ss = S.t.sockaddr_storage()
-  local addrlen = socklen1_t(ffi.sizeof(S.t.sockaddr_storage))
+  local addrlen = socklen1_t{ffi.sizeof(S.t.sockaddr_storage)}
   local ret = C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
