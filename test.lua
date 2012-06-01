@@ -223,7 +223,9 @@ assert(exp == 0, "sigaction handler should have run")
 
 -- mmap and related functions
 local mem
-size = 4096
+local size = 4096
+mem, err = S.mmap(S.cast("char *", 1), size, "read", "fixed", -1, 0)
+assert(err, "expect non aligned fixed map to fail")
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 assert(S.munmap(mem, size))
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
