@@ -167,18 +167,18 @@ assert(S.chdir(cwd)) -- return to original directory
 local stat
 
 stat = assert(S.stat("/dev/zero"))
-assert(stat.st_nlink == 1, "expect link count on /dev/zero to be 1")
+assert(stat.st_nlink == 1 and stat.nlink == 1, "expect link count on /dev/zero to be 1")
 
 stat = assert(fd:fstat()) -- stat "/"
-assert(stat.st_size == 4096, "expect / to be size 4096") -- might not be
-assert(stat.st_gid == 0, "expect / to be gid 0 is " .. tonumber(stat.st_gid))
-assert(stat.st_uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
+assert(stat.size == 4096, "expect / to be size 4096") -- might not be
+assert(stat.gid == 0, "expect / to be gid 0 is " .. tonumber(stat.st_gid))
+assert(stat.uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
 assert(S.S_ISDIR(stat.st_mode), "expect / to be a directory")
 assert(fd:close())
 
 stat = assert(S.stat("/dev/zero"))
-assert(S.major(stat.st_rdev) == 1, "expect major number of /dev/zero to be 1")
-assert(S.minor(stat.st_rdev) == 5, "expect minor number of /dev/zero to be 5")
+assert(S.major(stat.st_rdev) == 1 and stat.major == 1 , "expect major number of /dev/zero to be 1")
+assert(S.minor(stat.st_rdev) == 5 and stat.minor == 5, "expect minor number of /dev/zero to be 5")
 assert(S.S_ISCHR(stat.st_mode), "expect /dev/zero to be a character device")
 assert(stat.st_rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
 

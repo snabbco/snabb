@@ -2842,23 +2842,77 @@ function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), stringflags(mode, "S_"))) end
 
+local function retstat(st) -- return table rather than struct stat unless called with one, as more friendly types etc
+  local s = {dev = tonumber(st.st_dev),
+             ino = tonumber(st.st_ino),
+             mode = tonumber(st.st_mode),
+             nlink = tonumber(st.st_nlink),
+             uid = tonumber(st.st_uid),
+             gid = tonumber(st.st_gid),
+             rdev = tonumber(st.st_rdev),
+             size = tonumber(st.st_size),
+             blksize = tonumber(st.st_blksize),
+             blocks = tonumber(st.st_blocks),
+             atime = tonumber(st.st_atime),
+             ctime = tonumber(st.st_ctime),
+             mtime = tonumber(st.st_mtime),
+            }
+  s.st_dev = s.dev
+  s.st_ino = s.ino
+  s.st_mode = s.mode
+  s.st_nlink = s.nlink
+  s.st_uid = s.uid
+  s.st_gid = s.gid
+  s.st_rdev = s.rdev
+  s.st_size = s.size
+  s.st_blksize = s.blksize
+  s.st_blocks = s.blocks
+  s.st_atime = s.atime
+  s.st_ctime = s.ctime
+  s.st_mtime = s.mtime
+
+  s.major = S.major(s.rdev)
+  s.minor = S.minor(s.rdev)
+
+  return s
+end
+
 function S.stat(path, buf)
-  if not buf then buf = S.t.stat() end
+  local ret
+  if buf then
+    ret = C.syscall(S.SYS_stat, path, S.t.void(buf))
+    if ret == -1 then return errorret() end
+    return buf
+  end
+  buf = S.t.stat()
   local ret = C.syscall(S.SYS_stat, path, S.t.void(buf))
   if ret == -1 then return errorret() end
-  return buf
+  return retstat(buf)
 end
+
 function S.lstat(path, buf)
-  if not buf then buf = S.t.stat() end
-  local ret = C.syscall(S.SYS_lstat, path, buf)
+  local ret
+  if buf then
+    ret = C.syscall(S.SYS_lstat, path, S.t.void(buf))
+    if ret == -1 then return errorret() end
+    return buf
+  end
+  buf = S.t.stat()
+  local ret = C.syscall(S.SYS_lstat, path, S.t.void(buf))
   if ret == -1 then return errorret() end
-  return buf
+  return retstat(buf)
 end
 function S.fstat(fd, buf)
-  if not buf then buf = S.t.stat() end
-  local ret = C.syscall(S.SYS_fstat, S.t.int(getfd(fd)), buf)
+  local ret
+  if buf then
+    ret = C.syscall(S.SYS_fstat, S.t.int(getfd(fd)), S.t.void(buf))
+    if ret == -1 then return errorret() end
+    return buf
+  end
+  buf = S.t.stat()
+  local ret = C.syscall(S.SYS_fstat, S.t.int(getfd(fd)), S.t.void(buf))
   if ret == -1 then return errorret() end
-  return buf
+  return retstat(buf)
 end
 
 function S.chroot(path) return retbool(C.chroot(path)) end
