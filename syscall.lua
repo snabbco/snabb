@@ -2984,7 +2984,7 @@ function S.socketpair(domain, stype, protocol)
   local sv2 = int2_t()
   local ret = C.socketpair(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol), sv2)
   if ret == -1 then return errorret() end
-  return {S.t.fd(sv2[0]), S.t.fd(sv2[1])}
+  return {S.t.fd{sv2[0]}, S.t.fd{sv2[1]}}
 end
 
 function S.bind(sockfd, addr, addrlen)
