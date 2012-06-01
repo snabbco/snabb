@@ -6,7 +6,9 @@ Why? Making a C library for everything you want to bind is a pain, so I thought 
 
 Linux only? Not so easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library (that applies also to any non glibc library too), and test. Patches accepted, but will probably need to restructure for maintainability. However you may well be better off using [LuaPosix](https://github.com/rrthomas/luaposix) if you want to write portable Unix code.
 
-Requirements: Needs LuaJIT 2.0.0-beta9 or later. Generally tested using git head. Working on support for [luaffi](https://github.com/jmckaskill/luaffi) so you can use with standard Lua; there are some issues but should be fixable.
+Requirements: Needs LuaJIT 2.0.0-beta9 or later. Generally tested using git head.
+
+Working on support for [luaffi](https://github.com/jmckaskill/luaffi) so you can use with standard Lua; much of it is now working, but there are still some issues still and not all tests are passing. However you can probably start using it if you like, but you may need to submit issues when you run into problems.
 
 ## What is implemented?
 
