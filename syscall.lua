@@ -1357,9 +1357,6 @@ local int2_t = ffi.typeof("int[2]")
 local ints_t = ffi.typeof("int[?]")
 local int64_1t = ffi.typeof("int64_t[1]")
 
-local int64_pt = ffi.typeof("int64_t *")
-local int32_pt = ffi.typeof("int32_t *")
-
 -- char buffer type
 S.t.buffer = ffi.typeof("char[?]")
 
@@ -2304,6 +2301,8 @@ local char_pt = ffi.typeof("char *")
 local int_pt = ffi.typeof("int *")
 local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
 local inotify_event_pt = ffi.typeof("struct inotify_event *")
+local int64_pt = ffi.typeof("int64_t *")
+local int32_pt = ffi.typeof("int32_t *")
 
 S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
@@ -2576,7 +2575,10 @@ function S.inet_aton(s)
   return addr
 end
 
-function S.inet_ntoa(addr) return ffi.string(C.inet_ntoa(addr)) end
+function S.inet_ntoa(addr)
+  local b = ffi.cast(char_pt, addr)
+  return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
+end
 
 local INET6_ADDRSTRLEN = 46
 local INET_ADDRSTRLEN = 16
