@@ -2819,7 +2819,7 @@ function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far
   if not optlen and type(optval) == 'boolean' then if optval then optval = 1 else optval = 0 end end
   if not optlen and type(optval) == 'number' then
-    optval = int1_t(optval)
+    optval = int1_t{optval}
     optlen = ffi.sizeof(int1_t)
   end
   return retbool(C.setsockopt(getfd(fd), stringflag(level, "SOL_"), stringflag(optname, "SO_"), optval, optlen))
