@@ -200,7 +200,7 @@ assert(S.unlink(tmpfile))
 assert(fd:close())
 
 local rem
-rem = assert(S.nanosleep(S.t.timespec(0, 1000000)))
+rem = assert(S.nanosleep(0.001))
 assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
 
 -- timers and alarms

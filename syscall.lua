@@ -2315,7 +2315,7 @@ local function getts(ts) -- get a timespec eg from a number
   if ffi.istype(S.t.timespec, ts) then return ts end
   if type(ts) == "table" then return S.t.timespec(ts) end
   local i, f = math.modf(ts)
-  return S.t.timespec(i, math.floor(f * 1000000000))
+  return S.t.timespec{i, math.floor(f * 1000000000)}
 end
 
 S.t.timeval = ffi.metatype("struct timeval", {
