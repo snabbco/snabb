@@ -3555,7 +3555,7 @@ end
 
 local function getitimerval(interval, value)
   if ffi.istype(S.t.itimerval, interval) then return interval end
-  return S.t.itimerval(gettv(interval), gettv(value))
+  return S.t.itimerval{gettv(interval), gettv(value)}
 end
 
 local function retitv(value)
