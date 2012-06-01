@@ -3168,13 +3168,17 @@ end
 function S.kill(pid, sig) return retbool(C.kill(pid, stringflag(sig, "SIG"))) end
 function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 
+local function rettv(tv)
+  return {tv = tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000,
+          sec = tonumber(tv.tv_sec), tv_sec = tonumber(tv.tv_sec),
+          usec = tonumber(tv.tv_usec), tv_usec = tonumber(tv.tv_usec)}
+end
+
 function S.gettimeofday(tv)
   if not tv then tv = S.t.timeval() end -- note it is faster to pass your own tv if you call a lot
   local ret = C.gettimeofday(tv, nil)
   if ret == -1 then return errorret() end
-  return {tv = tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000,
-          sec = tonumber(tv.tv_sec), tv_sec = tonumber(tv.tv_sec),
-          usec = tonumber(tv.tv_usec), tv_usec = tonumber(tv.tv_usec)}
+  return rettv(tv)
 end
 
 function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
@@ -3554,18 +3558,29 @@ local function getitimerval(interval, value)
   return S.t.itimerval(gettv(interval), gettv(value))
 end
 
+local function retitv(value)
+  local i, v = rettv(value.it_interval), rettv(value.it_value)
+  return {interval = i, it_interval = i, value = v, it_value = v}
+end
+
 function S.getitimer(which, value)
-  if not value then value = S.t.itimerval() end
+  local ret
+  if value then
+    ret = C.getitimer(stringflag(which, "ITIMER_"), value)
+    if ret == -1 then return errorret() end
+    return value
+  end
+  value = S.t.itimerval()
   local ret = C.getitimer(stringflag(which, "ITIMER_"), value)
   if ret == -1 then return errorret() end
-  return value
+  return retitv(value)
 end
 
 function S.setitimer(which, interval, value)
   local oldtime = S.t.itimerval()
   local ret = C.setitimer(stringflag(which, "ITIMER_"), getitimerval(interval, value), oldtime)
   if ret == -1 then return errorret() end
-  return oldtime
+  return retitv(oldtime)
 end
 
 function S.timerfd_create(clockid, flags)
