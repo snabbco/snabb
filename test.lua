@@ -222,6 +222,7 @@ S.nanosleep(1) -- nanosleep does not interact with signals, should be interrupte
 assert(exp == 0, "sigaction handler should have run")
 
 -- mmap and related functions
+--[[
 local mem
 local size = 4096
 mem, err = S.mmap(S.cast("char *", 1), size, "read", "fixed", -1, 0)
@@ -237,6 +238,7 @@ local size2 = size * 2
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
 mem = assert(S.mremap(mem, size, size2, "maymove"))
 assert(S.munmap(mem, size2))
+]]
 
 local mask
 mask = S.umask("IWGRP, IWOTH")
