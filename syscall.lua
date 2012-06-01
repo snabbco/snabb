@@ -3866,9 +3866,7 @@ end
 local two32 = S.t.int64(0xffffffff) + 1 -- 0x100000000LL -- hack to get luac to parse this for checking
 
 function S.makedev(major, minor)
-  local dev = S.t.int64()
-  dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + two32 * bit.band(major, bit.bnot(0xfff))
-  return dev
+  return bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff))
 end
 
 function S.S_ISREG(m)  return bit.band(m, S.S_IFREG)  ~= 0 end
