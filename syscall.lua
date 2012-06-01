@@ -2871,8 +2871,8 @@ local function retstat(st) -- return table rather than struct stat unless called
   s.st_ctime = s.ctime
   s.st_mtime = s.mtime
 
-  s.major = S.major(s.rdev)
-  s.minor = S.minor(s.rdev)
+  s.major = S.major(st.st_rdev)
+  s.minor = S.minor(st.st_rdev)
 
   return s
 end
@@ -3847,15 +3847,8 @@ end
 -- 'macros' and helper functions etc
 
 -- LuaJIT does not provide 64 bit bitops at the moment
-local b64
-function b64(n)
-  local t64 = int64_1t(n)
-  local t32 = ffi.cast(int32_pt, t64)
-  if ffi.abi("le") then
-    return tonumber(t32[1]), tonumber(t32[0]) -- return high, low
-  else
-    return tonumber(t32[0]), tonumber(t32[1])
-  end
+local function b64(n)
+  return math.floor(tonumber(n) / 0x100000000), tonumber(n) % 0x100000000
 end
 
 function S.major(dev)
@@ -3871,6 +3864,7 @@ function S.minor(dev)
 end
 
 local two32 = S.t.int64(0xffffffff) + 1 -- 0x100000000LL -- hack to get luac to parse this for checking
+
 function S.makedev(major, minor)
   local dev = S.t.int64()
   dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + two32 * bit.band(major, bit.bnot(0xfff))
