@@ -201,7 +201,7 @@ assert(fd:close())
 
 local rem
 rem = assert(S.nanosleep(0.001))
-assert(rem.tv_sec == 0 and rem.tv_nsec == 0, "expect no elapsed time after nanosleep")
+assert(rem.tv_sec == 0 and rem.tv_nsec == 0 and rem.rem == 0, "expect no elapsed time after nanosleep")
 
 -- timers and alarms
 assert(S.signal("alrm", "ign"))
@@ -548,7 +548,7 @@ if S.geteuid() ~= 0 then
 end
 
 local tv = assert(S.gettimeofday())
-assert(math.floor(tv:tonumber()) == tonumber(tv.tv_sec), "should be able to convert timeval to number")
+assert(math.floor(tv.tv) == tonumber(tv.tv_sec), "should be able to get float time from timeval")
 local t = S.time()
 local t = assert(S.clock_getres("realtime"))
 local t = assert(S.clock_gettime("realtime"))

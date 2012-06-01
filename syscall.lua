@@ -2268,6 +2268,8 @@ S.t.sigaction = ffi.typeof("struct sigaction")
 S.t.clockid = ffi.typeof("clockid_t")
 S.t.inotify_event = ffi.typeof("struct inotify_event")
 S.t.loff = ffi.typeof("loff_t")
+S.t.timespec = ffi.typeof("struct timespec")
+S.t.timeval = ffi.typeof("struct timeval")
 
 S.t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
 
@@ -2305,11 +2307,6 @@ local inotify_event_pt = ffi.typeof("struct inotify_event *")
 
 S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
--- types with metamethods
-S.t.timespec = ffi.metatype("struct timespec", {
-  __index = {tonumber = function(ts) return tonumber(ts.tv_sec) + tonumber(ts.tv_nsec) / 1000000000 end}
-})
-
 local function getts(ts) -- get a timespec eg from a number
   if not ts then return S.t.timespec() end
   if ffi.istype(S.t.timespec, ts) then return ts end
@@ -2317,10 +2314,6 @@ local function getts(ts) -- get a timespec eg from a number
   local i, f = math.modf(ts)
   return S.t.timespec{i, math.floor(f * 1000000000)}
 end
-
-S.t.timeval = ffi.metatype("struct timeval", {
-  __index = {tonumber = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end}
-})
 
 local function gettv(tv) 
   if not tv then return S.t.timeval() end
@@ -2936,13 +2929,15 @@ function S.nanosleep(req)
   local rem = S.t.timespec()
   local ret = C.nanosleep(req, rem)
   if ret == -1 then return errorret() end
-  return rem
+  return {rem = tonumber(rem.tv_sec) + tonumber(rem.tv_nsec) / 1000000000,
+          sec = tonumber(rem.tv_sec), tv_sec = tonumber(rem.tv_sec),
+          nsec = tonumber(rem.tv_nsec), tv_nsec = tonumber(rem.tv_nsec)}
 end
 
 function S.sleep(sec) -- standard libc function
   local rem, err = S.nanosleep(sec)
   if not rem then return nil, err end
-  return rem.tv_sec
+  return tonumber(rem.tv_sec)
 end
 
 function S.mmap(addr, length, prot, flags, fd, offset)
@@ -3177,7 +3172,9 @@ function S.gettimeofday(tv)
   if not tv then tv = S.t.timeval() end -- note it is faster to pass your own tv if you call a lot
   local ret = C.gettimeofday(tv, nil)
   if ret == -1 then return errorret() end
-  return tv
+  return {tv = tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000,
+          sec = tonumber(tv.tv_sec), tv_sec = tonumber(tv.tv_sec),
+          usec = tonumber(tv.tv_usec), tv_usec = tonumber(tv.tv_usec)}
 end
 
 function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
