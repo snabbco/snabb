@@ -2244,7 +2244,6 @@ S.t.ucred = ffi.typeof("struct ucred")
 S.t.sysinfo = ffi.typeof("struct sysinfo")
 S.t.fdset = ffi.typeof("fd_set")
 S.t.fdmask = ffi.typeof("fd_mask")
-S.t.stat = ffi.typeof("struct stat")
 S.t.epoll_event = ffi.typeof("struct epoll_event")
 S.t.off = ffi.typeof("off_t")
 S.t.nlmsghdr = ffi.typeof("struct nlmsghdr")
@@ -2304,6 +2303,30 @@ local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
 local inotify_event_pt = ffi.typeof("struct inotify_event *")
 local int64_pt = ffi.typeof("int64_t *")
 local int32_pt = ffi.typeof("int32_t *")
+
+-- types with metatypes
+S.t.stat = ffi.metatype("struct stat", {
+  __index = function(st, k)
+  local meth = {
+    dev = function(st) return tonumber(st.st_dev) end,
+    ino = function(st) return tonumber(st.st_ino) end,
+    mode = function(st) return tonumber(st.st_mode) end,
+    nlink = function(st) return tonumber(st.st_nlink) end,
+    uid = function(st) return tonumber(st.st_uid) end,
+    gid = function(st) return tonumber(st.st_gid) end,
+    rdev = function(st) return tonumber(st.st_rdev) end,
+    size = function(st) return tonumber(st.st_size) end,
+    blksize = function(st) return tonumber(st.st_blksize) end,
+    blocks = function(st) return tonumber(st.st_blocks) end,
+    atime = function(st) return tonumber(st.st_atime) end,
+    ctime = function(st) return tonumber(st.st_ctime) end,
+    mtime = function(st) return tonumber(st.st_mtime) end,
+    major = function(st) return S.major(st.st_rdev) end,
+    minor = function(st) return S.minor(st.st_rdev) end
+  }
+  return meth[k](st)
+  end
+})
 
 S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
@@ -2838,77 +2861,25 @@ function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), stringflags(mode, "S_"))) end
 
-local function retstat(st) -- return table rather than struct stat unless called with one, as more friendly types etc
-  local s = {dev = tonumber(st.st_dev),
-             ino = tonumber(st.st_ino),
-             mode = tonumber(st.st_mode),
-             nlink = tonumber(st.st_nlink),
-             uid = tonumber(st.st_uid),
-             gid = tonumber(st.st_gid),
-             rdev = tonumber(st.st_rdev),
-             size = tonumber(st.st_size),
-             blksize = tonumber(st.st_blksize),
-             blocks = tonumber(st.st_blocks),
-             atime = tonumber(st.st_atime),
-             ctime = tonumber(st.st_ctime),
-             mtime = tonumber(st.st_mtime),
-            }
-  s.st_dev = s.dev
-  s.st_ino = s.ino
-  s.st_mode = s.mode
-  s.st_nlink = s.nlink
-  s.st_uid = s.uid
-  s.st_gid = s.gid
-  s.st_rdev = s.rdev
-  s.st_size = s.size
-  s.st_blksize = s.blksize
-  s.st_blocks = s.blocks
-  s.st_atime = s.atime
-  s.st_ctime = s.ctime
-  s.st_mtime = s.mtime
-
-  s.major = S.major(st.st_rdev)
-  s.minor = S.minor(st.st_rdev)
-
-  return s
-end
-
 function S.stat(path, buf)
-  local ret
-  if buf then
-    ret = C.syscall(S.SYS_stat, path, S.t.void(buf))
-    if ret == -1 then return errorret() end
-    return buf
-  end
-  buf = S.t.stat()
+  if not buf then buf = S.t.stat() end
   local ret = C.syscall(S.SYS_stat, path, S.t.void(buf))
   if ret == -1 then return errorret() end
-  return retstat(buf)
+  return buf
 end
 
 function S.lstat(path, buf)
-  local ret
-  if buf then
-    ret = C.syscall(S.SYS_lstat, path, S.t.void(buf))
-    if ret == -1 then return errorret() end
-    return buf
-  end
-  buf = S.t.stat()
+  if not buf then buf = S.t.stat() end
   local ret = C.syscall(S.SYS_lstat, path, S.t.void(buf))
   if ret == -1 then return errorret() end
-  return retstat(buf)
+  return buf
 end
+
 function S.fstat(fd, buf)
-  local ret
-  if buf then
-    ret = C.syscall(S.SYS_fstat, S.t.int(getfd(fd)), S.t.void(buf))
-    if ret == -1 then return errorret() end
-    return buf
-  end
-  buf = S.t.stat()
+  if not buf then buf = S.t.stat() end
   local ret = C.syscall(S.SYS_fstat, S.t.int(getfd(fd)), S.t.void(buf))
   if ret == -1 then return errorret() end
-  return retstat(buf)
+  return buf
 end
 
 function S.chroot(path) return retbool(C.chroot(path)) end

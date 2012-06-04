@@ -167,7 +167,7 @@ assert(S.chdir(cwd)) -- return to original directory
 local stat
 
 stat = assert(S.stat("/dev/zero"))
-assert(stat.st_nlink == 1 and stat.nlink == 1, "expect link count on /dev/zero to be 1")
+assert(stat.nlink == 1, "expect link count on /dev/zero to be 1")
 
 stat = assert(fd:fstat()) -- stat "/"
 assert(stat.size == 4096, "expect / to be size 4096") -- might not be
@@ -177,10 +177,10 @@ assert(S.S_ISDIR(stat.st_mode), "expect / to be a directory")
 assert(fd:close())
 
 stat = assert(S.stat("/dev/zero"))
-assert(S.major(stat.st_rdev) == 1 and stat.major == 1 , "expect major number of /dev/zero to be 1")
-assert(S.minor(stat.st_rdev) == 5 and stat.minor == 5, "expect minor number of /dev/zero to be 5")
+assert(stat.major == 1 , "expect major number of /dev/zero to be 1")
+assert(stat.minor == 5, "expect minor number of /dev/zero to be 5")
 assert(S.S_ISCHR(stat.st_mode), "expect /dev/zero to be a character device")
-assert(stat.st_rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
+assert(stat.rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
 
 stat = assert(S.lstat("/etc/passwd"))
 assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
@@ -188,14 +188,14 @@ assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
 -- test truncate
 assert(S.writefile(tmpfile, teststring, "IRWXU"))
 stat = assert(S.stat(tmpfile))
-assert(stat.st_size == #teststring, "expect to get size of written string")
+assert(stat.size == #teststring, "expect to get size of written string")
 assert(S.truncate(tmpfile, 1))
 stat = assert(S.stat(tmpfile))
-assert(stat.st_size == 1, "expect get truncated size")
+assert(stat.size == 1, "expect get truncated size")
 fd = assert(S.open(tmpfile, "RDWR"))
 assert(fd:ftruncate(1024))
 stat = assert(fd:fstat())
-assert(stat.st_size == 1024, "expect get truncated size")
+assert(stat.size == 1024, "expect get truncated size")
 assert(S.unlink(tmpfile))
 assert(fd:close())
 
