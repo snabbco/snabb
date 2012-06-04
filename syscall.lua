@@ -2419,8 +2419,7 @@ end
 -- misc
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
-local split, trim
-function split(delimiter, text)
+local function split(delimiter, text)
   if delimiter == "" then return {text} end
   if #text == 0 then return {} end
   local list = {}
@@ -2437,9 +2436,10 @@ function split(delimiter, text)
   end
   return list
 end
-function trim(s)
+local function trim(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
+
 -- take a bunch of flags in a string and return a number
 -- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
 -- also forcing to return an int now - TODO find any 64 bit flags we are using and fix to use new function
