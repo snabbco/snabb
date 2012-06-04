@@ -2465,8 +2465,7 @@ end
 -- take a bunch of flags in a string and return a number
 -- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
 -- also forcing to return an int now - TODO find any 64 bit flags we are using and fix to use new function
-local stringflag, stringflags
-function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags that are ORed
+local function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags that are ORed
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   local f = 0
@@ -2488,7 +2487,7 @@ function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags th
   return f
 end
 
-function stringflag(str, prefix) -- single value only
+local function stringflag(str, prefix) -- single value only
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   if #str == 0 then return 0 end
