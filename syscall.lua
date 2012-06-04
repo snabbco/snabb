@@ -2322,7 +2322,14 @@ t.stat = ffi.metatype("struct stat", {
     ctime = function(st) return tonumber(st.st_ctime) end,
     mtime = function(st) return tonumber(st.st_mtime) end,
     major = function(st) return S.major(st.st_rdev) end,
-    minor = function(st) return S.minor(st.st_rdev) end
+    minor = function(st) return S.minor(st.st_rdev) end,
+    isreg = function(st) return S.S_ISREG(st.st_mode) end,
+    isdir = function(st) return S.S_ISDIR(st.st_mode) end,
+    ischr = function(st) return S.S_ISCHR(st.st_mode) end,
+    isblk = function(st) return S.S_ISBLK(st.st_mode) end,
+    isfifo = function(st) return S.S_ISFIFO(st.st_mode) end,
+    islnk = function(st) return S.S_ISLNK(st.st_mode) end,
+    issock = function(st) return S.S_ISSOCK(st.st_mode) end
   }
   return meth[k](st)
   end

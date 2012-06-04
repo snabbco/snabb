@@ -173,17 +173,17 @@ stat = assert(fd:fstat()) -- stat "/"
 assert(stat.size == 4096, "expect / to be size 4096") -- might not be
 assert(stat.gid == 0, "expect / to be gid 0 is " .. tonumber(stat.st_gid))
 assert(stat.uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
-assert(S.S_ISDIR(stat.st_mode), "expect / to be a directory")
+assert(stat.isdir, "expect / to be a directory")
 assert(fd:close())
 
 stat = assert(S.stat("/dev/zero"))
 assert(stat.major == 1 , "expect major number of /dev/zero to be 1")
 assert(stat.minor == 5, "expect minor number of /dev/zero to be 5")
-assert(S.S_ISCHR(stat.st_mode), "expect /dev/zero to be a character device")
+assert(stat.ischr, "expect /dev/zero to be a character device")
 assert(stat.rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
 
 stat = assert(S.lstat("/etc/passwd"))
-assert(S.S_ISREG(stat.st_mode), "expect /etc/passwd to be a regular file")
+assert(stat.isreg, "expect /etc/passwd to be a regular file")
 
 -- test truncate
 assert(S.writefile(tmpfile, teststring, "IRWXU"))
