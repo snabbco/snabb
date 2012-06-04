@@ -201,7 +201,7 @@ assert(fd:close())
 
 local rem
 rem = assert(S.nanosleep(0.001))
-assert(rem.tv_sec == 0 and rem.tv_nsec == 0 and rem.rem == 0, "expect no elapsed time after nanosleep")
+assert(rem.sec == 0 and rem.nsec == 0 and rem.time == 0, "expect no elapsed time after nanosleep")
 
 -- timers and alarms
 assert(S.signal("alrm", "ign"))
@@ -210,7 +210,7 @@ assert(S.alarm(10))
 assert(S.alarm(0)) -- cancel again
 
 local t = S.getitimer("real")
-assert(t.it_interval.tv_sec == 0, "expect timer not set")
+assert(t.it_interval.sec == 0, "expect timer not set")
 
 assert(S.signal("alrm", "dfl"))
 local exp = S.SIGALRM
@@ -550,7 +550,7 @@ if S.geteuid() ~= 0 then
 end
 
 local tv = assert(S.gettimeofday())
-assert(math.floor(tv.tv) == tonumber(tv.tv_sec), "should be able to get float time from timeval")
+assert(math.floor(tv.time) == tv.sec, "should be able to get float time from timeval")
 local t = S.time()
 local t = assert(S.clock_getres("realtime"))
 local t = assert(S.clock_gettime("realtime"))

@@ -2257,15 +2257,12 @@ S.t.rlimit = ffi.typeof("struct rlimit")
 S.t.fdb_entry = ffi.typeof("struct fdb_entry")
 S.t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
 S.t.itimerspec = ffi.typeof("struct itimerspec")
-S.t.itimerval = ffi.typeof("struct itimerval")
 S.t.iocb = ffi.typeof("struct iocb")
 S.t.sighandler = ffi.typeof("sighandler_t")
 S.t.sigaction = ffi.typeof("struct sigaction")
 S.t.clockid = ffi.typeof("clockid_t")
 S.t.inotify_event = ffi.typeof("struct inotify_event")
 S.t.loff = ffi.typeof("loff_t")
-S.t.timespec = ffi.typeof("struct timespec")
-S.t.timeval = ffi.typeof("struct timeval")
 
 S.t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
 
@@ -2379,12 +2376,37 @@ S.t.macaddr = ffi.metatype("struct {uint8_t mac_addr[6];}", {
   end
 })
 
---[[
-  return {rem = tonumber(rem.tv_sec) + tonumber(rem.tv_nsec) / 1000000000,
-          sec = tonumber(rem.tv_sec), tv_sec = tonumber(rem.tv_sec),
-          nsec = tonumber(rem.tv_nsec), tv_nsec = tonumber(rem.tv_nsec)}
-]]
+S.t.timeval = ffi.metatype("struct timeval", {
+  __index = function(tv, k)
+  local meth = {
+    time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end,
+    sec = function(tv) return tonumber(tv.tv_sec) end,
+    nsec = function(tv) return tonumber(tv.tv_usec) end
+  }
+  return meth[k](tv)
+  end
+})
 
+S.t.timespec = ffi.metatype("struct timespec", {
+  __index = function(tv, k)
+  local meth = {
+    time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_nsec) / 1000000000 end,
+    sec = function(tv) return tonumber(tv.tv_sec) end,
+    nsec = function(tv) return tonumber(tv.tv_nsec) end
+  }
+  return meth[k](tv)
+  end
+})
+
+S.t.itimerval = ffi.metatype("struct itimerval", {
+  __index = function(it, k)
+  local meth = {
+    interval = function(it) return it.it_interval end,
+    value = function(it) return it.it_value end
+  }
+  return meth[k](tv)
+  end
+})
 
 --[[ -- used to generate tests, will refactor into test code later
 print("eq (sizeof(struct timespec), " .. sizeof(S.t.timespec) .. ");")
@@ -2912,9 +2934,7 @@ function S.nanosleep(req)
   local rem = S.t.timespec()
   local ret = C.nanosleep(req, rem)
   if ret == -1 then return errorret() end
-  return {rem = tonumber(rem.tv_sec) + tonumber(rem.tv_nsec) / 1000000000,
-          sec = tonumber(rem.tv_sec), tv_sec = tonumber(rem.tv_sec),
-          nsec = tonumber(rem.tv_nsec), tv_nsec = tonumber(rem.tv_nsec)}
+  return rem
 end
 
 function S.sleep(sec) -- standard libc function
@@ -3150,17 +3170,11 @@ end
 function S.kill(pid, sig) return retbool(C.kill(pid, stringflag(sig, "SIG"))) end
 function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 
-local function rettv(tv)
-  return {tv = tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000,
-          sec = tonumber(tv.tv_sec), tv_sec = tonumber(tv.tv_sec),
-          usec = tonumber(tv.tv_usec), tv_usec = tonumber(tv.tv_usec)}
-end
-
 function S.gettimeofday(tv)
   if not tv then tv = S.t.timeval() end -- note it is faster to pass your own tv if you call a lot
   local ret = C.gettimeofday(tv, nil)
   if ret == -1 then return errorret() end
-  return rettv(tv)
+  return tv
 end
 
 function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
@@ -3540,8 +3554,10 @@ local function getitimerval(interval, value)
   return S.t.itimerval(gettv(interval), gettv(value))
 end
 
+-- in this case we do return a table as we want the metamethods on the timevals
 local function retitv(value)
-  local i, v = rettv(value.it_interval), rettv(value.it_value)
+  --local i, v = S.t.timeval(value.it_interval), S.t.timeval(value.it_value)
+  local i, v = value.it_interval, value.it_value
   return {interval = i, it_interval = i, value = v, it_value = v}
 end
 
