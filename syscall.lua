@@ -1407,7 +1407,7 @@ end
 
 local function retfd(ret)
   if ret == -1 then return errorret() end
-  return S.t.fd{ret}
+  return S.t.fd(ret)
 end
 
 -- define C types
@@ -2625,7 +2625,7 @@ function S.pipe(flags)
   local ret
   if flags then ret = C.pipe2(fd2, stringflags(flags, "O_")) else ret = C.pipe(fd2) end
   if ret == -1 then return errorret() end
-  return {S.t.fd{fd2[0]}, S.t.fd{fd2[1]}}
+  return {S.t.fd(fd2[0]), S.t.fd(fd2[1])}
 end
 
 function S.close(fd)
@@ -2984,7 +2984,7 @@ function S.socketpair(domain, stype, protocol)
   local sv2 = int2_t()
   local ret = C.socketpair(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol), sv2)
   if ret == -1 then return errorret() end
-  return {S.t.fd{sv2[0]}, S.t.fd{sv2[1]}}
+  return {S.t.fd(sv2[0]), S.t.fd(sv2[1])}
 end
 
 function S.bind(sockfd, addr, addrlen)
@@ -3008,7 +3008,7 @@ function S.accept(sockfd, flags, addr, addrlen)
   end
   if ret == -1 then return errorret() end
   --if ret == -1 then return nil, "testing accept error return" end -- small performance improvement
-  return saret(addr, addrlen[0], {fd = S.t.fd{ret}, fileno = tonumber(ret)})
+  return saret(addr, addrlen[0], {fd = S.t.fd(ret), fileno = tonumber(ret)})
 end
 
 function S.getsockname(sockfd)
