@@ -834,7 +834,7 @@ assert(pts:tcflow('ioff'))
 assert(pts:tcflow('oon'))
 assert(pts:tcflow('ion'))
 
--- aio, Linux only
+-- aio
 local ctx = assert(S.io_setup(8))
 assert(ctx:destroy())
 local ctx = assert(S.io_setup(8))

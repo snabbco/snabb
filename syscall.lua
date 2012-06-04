@@ -2304,6 +2304,8 @@ local inotify_event_pt = ffi.typeof("struct inotify_event *")
 local int64_pt = ffi.typeof("int64_t *")
 local int32_pt = ffi.typeof("int32_t *")
 
+S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
+
 -- types with metatypes
 S.t.stat = ffi.metatype("struct stat", {
   __index = function(st, k)
@@ -2328,7 +2330,75 @@ S.t.stat = ffi.metatype("struct stat", {
   end
 })
 
-S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
+S.t.siginfo = ffi.metatype("struct siginfo", {
+  __index = function(t, k)
+  local siginfo_get = {
+    si_pid     = function(s) return s.sifields.kill.si_pid end,
+    si_uid     = function(s) return s.sifields.kill.si_uid end,
+    si_timerid = function(s) return s.sifields.timer.si_tid end,
+    si_overrun = function(s) return s.sifields.timer.si_overrun end,
+    si_status  = function(s) return s.sifields.sigchld.si_status end,
+    si_utime   = function(s) return s.sifields.sigchld.si_utime end,
+    si_stime   = function(s) return s.sifields.sigchld.si_stime end,
+    si_value   = function(s) return s.sifields.rt.si_sigval end,
+    si_int     = function(s) return s.sifields.rt.si_sigval.sival_int end,
+    si_ptr     = function(s) return s.sifields.rt.si_sigval.sival_ptr end,
+    si_addr    = function(s) return s.sifields.sigfault.si_addr end,
+    si_band    = function(s) return s.sifields.sigpoll.si_band end,
+    si_fd      = function(s) return s.sifields.sigpoll.si_fd end,
+  }
+  return siginfo_get[k](t)
+  end,
+  __newindex = function(t, k, v)
+  local siginfo_set = {
+    si_pid     = function(s, v) s.sifields.kill.si_pid = v end,
+    si_uid     = function(s, v) s.sifields.kill.si_uid = v end,
+    si_timerid = function(s, v) s.sifields.timer.si_tid = v end,
+    si_overrun = function(s, v) s.sifields.timer.si_overrun = v end,
+    si_status  = function(s, v) s.sifields.sigchld.si_status = v end,
+    si_utime   = function(s, v) s.sifields.sigchld.si_utime = v end,
+    si_stime   = function(s, v) s.sifields.sigchld.si_stime = v end,
+    si_value   = function(s, v) s.sifields.rt.si_sigval = v end,
+    si_int     = function(s, v) s.sifields.rt.si_sigval.sival_int = v end,
+    si_ptr     = function(s, v) s.sifields.rt.si_sigval.sival_ptr = v end,
+    si_addr    = function(s, v) s.sifields.sigfault.si_addr = v end,
+    si_band    = function(s, v) s.sifields.sigpoll.si_band = v end,
+    si_fd      = function(s, v) s.sifields.sigpoll.si_fd = v end,
+  }
+  siginfo_set[k](t, v)
+  end
+})
+
+S.t.macaddr = ffi.metatype("struct {uint8_t mac_addr[6];}", {
+  __tostring = function(m)
+    local t = {}
+    for i = 1, 6 do
+      t[i] = string.format("%02x", m.mac_addr[i - 1])
+    end
+    return table.concat(t, ":")
+  end
+})
+
+--[[
+  return {rem = tonumber(rem.tv_sec) + tonumber(rem.tv_nsec) / 1000000000,
+          sec = tonumber(rem.tv_sec), tv_sec = tonumber(rem.tv_sec),
+          nsec = tonumber(rem.tv_nsec), tv_nsec = tonumber(rem.tv_nsec)}
+]]
+
+
+--[[ -- used to generate tests, will refactor into test code later
+print("eq (sizeof(struct timespec), " .. sizeof(S.t.timespec) .. ");")
+print("eq (sizeof(struct timeval), " .. sizeof(S.t.timeval) .. ");")
+print("eq (sizeof(struct sockaddr_storage), " .. sizeof(S.t.sockaddr_storage) .. ");")
+print("eq (sizeof(struct sockaddr_in), " .. sizeof(S.t.sockaddr_in) .. ");")
+print("eq (sizeof(struct sockaddr_in6), " .. sizeof(S.t.sockaddr_in6) .. ");")
+print("eq (sizeof(struct sockaddr_un), " .. sizeof(S.t.sockaddr_un) .. ");")
+print("eq (sizeof(struct iovec), " .. sizeof(S.t.iovec(1)) .. ");")
+print("eq (sizeof(struct msghdr), " .. sizeof(S.t.msghdr) .. ");")
+print("eq (sizeof(struct cmsghdr), " .. sizeof(S.cmsghdr(0)) .. ");")
+print("eq (sizeof(struct sysinfo), " .. sizeof(S.sysinfo) .. ");")
+]]
+--print(sizeof("struct stat"))
 
 local function getts(ts) -- get a timespec eg from a number
   if not ts then return S.t.timespec() end
@@ -2345,67 +2415,6 @@ local function gettv(tv)
   local i, f = math.modf(tv)
   return S.t.timeval(i, math.floor(f * 1000000))
 end
-
--- siginfo needs some metamethods
-local siginfo_get = {
-  si_pid     = function(s) return s.sifields.kill.si_pid end,
-  si_uid     = function(s) return s.sifields.kill.si_uid end,
-  si_timerid = function(s) return s.sifields.timer.si_tid end,
-  si_overrun = function(s) return s.sifields.timer.si_overrun end,
-  si_status  = function(s) return s.sifields.sigchld.si_status end,
-  si_utime   = function(s) return s.sifields.sigchld.si_utime end,
-  si_stime   = function(s) return s.sifields.sigchld.si_stime end,
-  si_value   = function(s) return s.sifields.rt.si_sigval end,
-  si_int     = function(s) return s.sifields.rt.si_sigval.sival_int end,
-  si_ptr     = function(s) return s.sifields.rt.si_sigval.sival_ptr end,
-  si_addr    = function(s) return s.sifields.sigfault.si_addr end,
-  si_band    = function(s) return s.sifields.sigpoll.si_band end,
-  si_fd      = function(s) return s.sifields.sigpoll.si_fd end,
-}
-
-local siginfo_set = {
-  si_pid     = function(s, v) s.sifields.kill.si_pid = v end,
-  si_uid     = function(s, v) s.sifields.kill.si_uid = v end,
-  si_timerid = function(s, v) s.sifields.timer.si_tid = v end,
-  si_overrun = function(s, v) s.sifields.timer.si_overrun = v end,
-  si_status  = function(s, v) s.sifields.sigchld.si_status = v end,
-  si_utime   = function(s, v) s.sifields.sigchld.si_utime = v end,
-  si_stime   = function(s, v) s.sifields.sigchld.si_stime = v end,
-  si_value   = function(s, v) s.sifields.rt.si_sigval = v end,
-  si_int     = function(s, v) s.sifields.rt.si_sigval.sival_int = v end,
-  si_ptr     = function(s, v) s.sifields.rt.si_sigval.sival_ptr = v end,
-  si_addr    = function(s, v) s.sifields.sigfault.si_addr = v end,
-  si_band    = function(s, v) s.sifields.sigpoll.si_band = v end,
-  si_fd      = function(s, v) s.sifields.sigpoll.si_fd = v end,
-}
-S.t.siginfo = ffi.metatype("struct siginfo",{
-  __index = function(t, k) if siginfo_get[k] then return siginfo_get[k](t) end end,
-  __newindex = function(t, k, v) if siginfo_set[k] then siginfo_set[k](t, v) end end,
-})
-
-S.t.macaddr = ffi.metatype("struct {uint8_t mac_addr[6];}", {
-  __tostring = function(m)
-    local t = {}
-    for i = 1, 6 do
-      t[i] = string.format("%02x", m.mac_addr[i - 1])
-    end
-    return table.concat(t, ":")
-  end
-})
-
---[[ -- used to generate tests, will refactor into test code later
-print("eq (sizeof(struct timespec), " .. sizeof(S.t.timespec) .. ");")
-print("eq (sizeof(struct timeval), " .. sizeof(S.t.timeval) .. ");")
-print("eq (sizeof(struct sockaddr_storage), " .. sizeof(S.t.sockaddr_storage) .. ");")
-print("eq (sizeof(struct sockaddr_in), " .. sizeof(S.t.sockaddr_in) .. ");")
-print("eq (sizeof(struct sockaddr_in6), " .. sizeof(S.t.sockaddr_in6) .. ");")
-print("eq (sizeof(struct sockaddr_un), " .. sizeof(S.t.sockaddr_un) .. ");")
-print("eq (sizeof(struct iovec), " .. sizeof(S.t.iovec(1)) .. ");")
-print("eq (sizeof(struct msghdr), " .. sizeof(S.t.msghdr) .. ");")
-print("eq (sizeof(struct cmsghdr), " .. sizeof(S.cmsghdr(0)) .. ");")
-print("eq (sizeof(struct sysinfo), " .. sizeof(S.sysinfo) .. ");")
-]]
---print(sizeof("struct stat"))
 
 -- misc
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
@@ -3635,10 +3644,6 @@ function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note 
   return retnum(C.syscall(S.SYS_io_submit, getctx(ctx), S.t.long(nr), iocb))
 end
 
-local ameth = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel}
-S.t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {__index = ameth, __gc = S.io_destroy})
-
-
 -- map for valid options for arg2
 local prctlmap = {}
 prctlmap[S.PR_CAPBSET_READ] = "CAP_"
@@ -4423,6 +4428,7 @@ function S.tbuffer(...) -- helper function for sequence of types in a buffer
   return buf, len, threc(buf, 0, ...)
 end
 
+-- additional metatypes that need functions defined
 -- methods on an fd
 local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    'close', 'dup', 'read', 'write', 'pread', 'pwrite',
@@ -4442,6 +4448,11 @@ local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
 
 S.t.fd = ffi.metatype("struct {int fileno;}", {__index = fmeth, __gc = S.close})
+
+S.t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
+  __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel},
+  __gc = S.io_destroy
+})
 
 return S
 
