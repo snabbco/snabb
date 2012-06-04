@@ -210,7 +210,7 @@ assert(S.alarm(10))
 assert(S.alarm(0)) -- cancel again
 
 local t = S.getitimer("real")
-assert(t.it_interval.sec == 0, "expect timer not set")
+assert(t.interval.sec == 0, "expect timer not set")
 
 assert(S.signal("alrm", "dfl"))
 local exp = S.SIGALRM
