@@ -2969,8 +2969,7 @@ function S.readahead(fd, offset, count)
   return retbool(C.readahead(getfd(fd), offset, count))
 end
 
-local sproto
-function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain
+local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain
   if domain == S.AF_NETLINK then return stringflag(protocol, "NETLINK_") end
   return protocol or 0
 end
@@ -3180,8 +3179,6 @@ end
 function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
 
 function S.time()
-  -- local ret = C.time(nil)
-  -- if ret == -1 then return errorret() end -- impossible with nil argument
   return tonumber(C.time(nil))
 end
 
@@ -3240,8 +3237,7 @@ function S.lremovexattr(path, name) return retbool(C.lremovexattr(path, name)) e
 function S.fremovexattr(fd, name) return retbool(C.fremovexattr(getfd(fd), name)) end
 
 -- helper function to set and return attributes in tables
-local xattr
-function xattr(list, get, set, remove, path, t)
+local function xattr(list, get, set, remove, path, t)
   local l, err = list(path)
   if not l then return nil, err end
   if not t then -- no table, so read
@@ -3271,8 +3267,7 @@ function S.lxattr(path, t) return xattr(S.llistxattr, S.lgetxattr, S.lsetxattr, 
 function S.fxattr(fd, t) return xattr(S.flistxattr, S.fgetxattr, S.fsetxattr, S.fremovexattr, fd, t) end
 
 -- fdset handlers
-local mkfdset, fdisset
-function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
+local function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
   local set = S.t.fdset()
   for i, v in ipairs(fds) do
     local fd = tonumber(getfd(v))
@@ -3283,7 +3278,7 @@ function mkfdset(fds, nfds) -- should probably check fd is within range (1024), 
   return set, nfds
 end
 
-function fdisset(fds, set)
+local function fdisset(fds, set)
   local f = {}
   for i, v in ipairs(fds) do
     local fd = tonumber(getfd(v))
