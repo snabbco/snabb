@@ -75,10 +75,6 @@ A few functions have arguments in a different order to make optional ones easier
 
 ### Issues
 
-BEING FIXED: LuaJIT FFI cannot yet create callbacks. This causes issues in a few places, we cannot set a signal handler to be a Lua function, or use clone. This means some functions cannot yet usefully be implemented: sigaction (you can use signal just to set ignore, default behaviour), clone, getitimer/setitimer. Note you can use signalfd for signals instead. Can probably implement clone using a different Lua state, amd timers can be used with signalfd, so should be able to fix this.
-
-Some functions are returning raw structures, some tables. I think this is ok, single return value of structure, but if multiple values must create table. Add metamethods to structures if necessary. Need to recheck these.
-
 Other consistency issues: accepting tables for structs like adjtimex does is a nice model, use in other places.
 
 Managing constants a lot of work, may divide into subtables
@@ -92,8 +88,6 @@ Should build more high level API, eg net.eth0:ip() etc. Like sysfs but with nati
 Should add some tostring methods for some of these structures... just done ls so far.
 
 Should split out more of the stuff that is not just system calls into utility package.
-
-Could be more helpful in returning Lua numbers - made big changes as file operations do not need native 64 bit numbers, should never have to use tonumber, only 64 bit for things that are really 64 bit native numbers. Where we return native structs, like stat, you don't get native numbers, so maybe returning tables would be helpful.
 
 Add proper iterator support to fd, bridge etc. So bridge.bridges is an iterator? name issues if you can call bridge.br0() to create etc.
 Also need more support for dealing with signals on syscalls.
@@ -113,12 +107,12 @@ Siginfo support in sigaction not there yet, as confused by the kernel API.
 ### Missing functions
 
 pselect, ppoll
-clock_\nanosleep, timer_\create, timer_\getoverrun
+clock\_nanosleep, timer\_create, timer\_getoverrun
 faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  mkdirat(2),  mknodat(2),
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue
-io_\cancel(2), io_\destroy(2), io_\setup(2), io_\submit(2), ...
-sync_file_range(2)
+io\_cancel(2), io\_destroy(2), io\_setup(2), io\_submit(2), ...
+sync\_file_range(2)
 capset, capget
 ...
 
@@ -126,7 +120,7 @@ capset, capget
 
 The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86. Intend to get my ppc build machine back up one day, if you want this supported please ask. I do not currently have a mips box, if you want this can you suggest a suitable dev box.
 
-Initial testing on uclibc, works on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes.
+Initial testing on uclibc, works on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes; I intend to test musl libc once I have a working build.
 
 Test script needs cleanup.
 
