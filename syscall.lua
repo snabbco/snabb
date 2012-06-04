@@ -12,8 +12,6 @@ local octal = function (s) return tonumber(s, 8) end
 
 S.t = {} -- types table
 
-S.t.void = ffi.typeof("void *") -- luaffi needs structs cast to void on varargs functions
-
 -- convenience so user need not require ffi
 S.string = ffi.string
 S.sizeof = ffi.sizeof
@@ -1342,13 +1340,17 @@ local function mkerror(errno)
   return e
 end
 
--- integer types
+-- basic types
 S.t.int = ffi.typeof("int")
 S.t.uint = ffi.typeof("unsigned int")
 S.t.int64 = ffi.typeof("int64_t")
 S.t.uint64 = ffi.typeof("uint64_t")
 S.t.long = ffi.typeof("long")
 S.t.ulong = ffi.typeof("unsigned long")
+S.t.uintptr = ffi.typeof("uintptr_t")
+S.t.void = ffi.typeof("void *")
+
+function S.t.pointer(i) return ffi.cast(S.t.void, ffi.cast(S.t.uintptr, i)) end -- luaffi needs some help casting number to pointer
 
 local int1_t = ffi.typeof("int[1]")
 local int2_t = ffi.typeof("int[2]")
@@ -1385,7 +1387,7 @@ end
 
 -- used for pointer returns, -1 is failure; removed gc for mem
 local function retptr(ret)
-  if ffi.cast("long", ret) == -1 then return errorret() end
+  if ret == S.t.pointer(-1) then return errorret() end
   return ret
 end
 
