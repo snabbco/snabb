@@ -2368,11 +2368,11 @@ S.t.siginfo = ffi.metatype("struct siginfo", {
 
 S.t.macaddr = ffi.metatype("struct {uint8_t mac_addr[6];}", {
   __tostring = function(m)
-    local t = {}
+    local hex = {}
     for i = 1, 6 do
-      t[i] = string.format("%02x", m.mac_addr[i - 1])
+      hex[i] = string.format("%02x", m.mac_addr[i - 1])
     end
-    return table.concat(t, ":")
+    return table.concat(hex, ":")
   end
 })
 
@@ -2794,8 +2794,8 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     local i = 0
     while i < ret do
       local dp = ffi.cast(linux_dirent_pt, buf + i)
-      local t = buf[i + dp.d_reclen - 1]
-      local dd = getflag(t, "DT_", dt_flags, dt_lflags)
+      local tt = buf[i + dp.d_reclen - 1]
+      local dd = getflag(tt, "DT_", dt_flags, dt_lflags)
       dd.inode = tonumber(dp.d_ino)
       dd.offset = tonumber(dp.d_off)
       d[ffi.string(dp.d_name)] = dd -- could calculate length
@@ -3985,11 +3985,11 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
     local msg = ffi.cast(nlmsghdr_pt, buffer)
 
     while not done and nlmsg_ok(msg, len) do
-      local t = tonumber(msg.nlmsg_type)
+      local tp = tonumber(msg.nlmsg_type)
 
-      if nlmsg_data_decode[t] then r = nlmsg_data_decode[t](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) end
+      if nlmsg_data_decode[tp] then r = nlmsg_data_decode[tp](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) end
 
-      if t == S.NLMSG_DONE then done = true end
+      if tp == S.NLMSG_DONE then done = true end
       msg, buffer, len = nlmsg_next(msg, buffer, len)
     end
   end
@@ -4155,8 +4155,8 @@ function S.readfile(name, buffer, length) -- convenience for reading short files
   if not f then return nil, err end
   local r, err = f:read(buffer, length or 4096)
   if not r then return nil, err end
-  local t, err = f:close()
-  if not t then return nil, err end
+  local ok, err = f:close()
+  if not ok then return nil, err end
   return r
 end
 
@@ -4166,8 +4166,8 @@ function S.writefile(name, str, mode) -- write string to named file. specify mod
   if not f then return nil, err end
   local n, err = f:write(str)
   if not n then return nil, err end
-  local t, err = f:close()
-  if not t then return nil, err end
+  local ok, err = f:close()
+  if not ok then return nil, err end
   return true
 end
 
