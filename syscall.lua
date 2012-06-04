@@ -2312,7 +2312,7 @@ local function getts(ts) -- get a timespec eg from a number
   if ffi.istype(S.t.timespec, ts) then return ts end
   if type(ts) == "table" then return S.t.timespec(ts) end
   local i, f = math.modf(ts)
-  return S.t.timespec{i, math.floor(f * 1000000000)}
+  return S.t.timespec(i, math.floor(f * 1000000000))
 end
 
 local function gettv(tv) 
@@ -2320,7 +2320,7 @@ local function gettv(tv)
   if ffi.istype(S.t.timeval, tv) then return tv end
   if type(tv) == "table" then return S.t.timeval(tv) end
   local i, f = math.modf(tv)
-  return S.t.timeval{i, math.floor(f * 1000000)}
+  return S.t.timeval(i, math.floor(f * 1000000))
 end
 
 -- siginfo needs some metamethods
@@ -2486,7 +2486,7 @@ S.ntohs = S.htons -- reverse is the same
 function S.sockaddr_in(port, addr)
   if type(addr) == 'string' then addr = S.inet_aton(addr) end
   if not addr then return nil end
-  return S.t.sockaddr_in{S.AF_INET, S.htons(port), addr}
+  return S.t.sockaddr_in(S.AF_INET, S.htons(port), addr)
 end
 function S.sockaddr_in6(port, addr)
   if type(addr) == 'string' then addr = S.inet_pton(S.AF_INET6, addr) end
@@ -2819,7 +2819,7 @@ function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far
   if not optlen and type(optval) == 'boolean' then if optval then optval = 1 else optval = 0 end end
   if not optlen and type(optval) == 'number' then
-    optval = int1_t{optval}
+    optval = int1_t(optval)
     optlen = ffi.sizeof(int1_t)
   end
   return retbool(C.setsockopt(getfd(fd), stringflag(level, "SOL_"), stringflag(optname, "SO_"), optval, optlen))
@@ -3000,7 +3000,7 @@ function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), string
 
 function S.accept(sockfd, flags, addr, addrlen)
   if not addr then addr = S.t.sockaddr_storage() end
-  if not addrlen then addrlen = socklen1_t{getaddrlen(addr, addrlen)} end
+  if not addrlen then addrlen = socklen1_t(getaddrlen(addr, addrlen)) end
   local ret
   if not flags
     then ret = C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, addr), addrlen)
@@ -3012,7 +3012,7 @@ end
 
 function S.getsockname(sockfd)
   local ss = S.t.sockaddr_storage()
-  local addrlen = socklen1_t{ffi.sizeof(S.t.sockaddr_storage)}
+  local addrlen = socklen1_t(ffi.sizeof(S.t.sockaddr_storage))
   local ret = C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
@@ -3020,7 +3020,7 @@ end
 
 function S.getpeername(sockfd)
   local ss = S.t.sockaddr_storage()
-  local addrlen = socklen1_t{ffi.sizeof(S.t.sockaddr_storage)}
+  local addrlen = socklen1_t(ffi.sizeof(S.t.sockaddr_storage))
   local ret = C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0])
@@ -3557,7 +3557,7 @@ end
 
 local function getitimerval(interval, value)
   if ffi.istype(S.t.itimerval, interval) then return interval end
-  return S.t.itimerval{gettv(interval), gettv(value)}
+  return S.t.itimerval(gettv(interval), gettv(value))
 end
 
 local function retitv(value)
