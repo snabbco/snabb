@@ -3789,7 +3789,7 @@ function S.environ() -- return whole environment as table
   if not environ then return nil end
   local r = {}
   local i = 0
-  while environ[i] ~= nil do
+  while environ[i] ~= t.pointer(0) do
     local e = ffi.string(environ[i])
     local eq = e:find('=')
     if eq then
@@ -3799,6 +3799,7 @@ function S.environ() -- return whole environment as table
   end
   return r
 end
+
 function S.getenv(name)
   return S.environ()[name]
 end
