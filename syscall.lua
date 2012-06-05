@@ -3987,7 +3987,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
   while not done do
     local n, err = s:recvmsg(m)
     if not n then return nil, err end
-    local len = n.count
+    local len = tonumber(n.count)
     local buffer = reply
 
     local msg = ffi.cast(nlmsghdr_pt, buffer)
