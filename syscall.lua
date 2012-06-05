@@ -2870,7 +2870,7 @@ function S.writev(fd, iov, iovcnt) return retnum(C.writev(getfd(fd), iov, iovcnt
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.recvfrom(fd, buf, count, flags)
   local ss = t.sockaddr_storage()
-  local addrlen = int1_t(ffi.sizeof(t.sockaddr_storage))
+  local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
   local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return errorret() end
   return saret(ss, addrlen[0], {count = tonumber(ret)})
