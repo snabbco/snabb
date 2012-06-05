@@ -1573,7 +1573,7 @@ struct cmsghdr {
   size_t cmsg_len;
   int cmsg_level;
   int cmsg_type;
-  unsigned char cmsg_data[?];
+  //unsigned char cmsg_data[?]; /* causes issues with luaffi, pre C99 */
 };
 struct sockaddr {
   sa_family_t sa_family;
@@ -3909,7 +3909,7 @@ local function cmsg_firsthdr(msg)
 end
 
 local function cmsg_nxthdr(msg, buf, cmsg)
-  if cmsg.cmsg_len < cmsg_hdrsize then return nil end -- invalid cmsg
+  if tonumber(cmsg.cmsg_len) < cmsg_hdrsize then return nil end -- invalid cmsg
   buf = ffi.cast(char_pt, buf)
   local msg_control = ffi.cast(char_pt, msg.msg_control)
   buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
@@ -4063,17 +4063,15 @@ function S.recvmsg(fd, msg, flags)
   while cmsg do
     if cmsg.cmsg_level == S.SOL_SOCKET then
       if cmsg.cmsg_type == S.SCM_CREDENTIALS then
-        local cred = t.ucred() -- could just cast to ucred pointer
-        ffi.copy(cred, cmsg.cmsg_data, ffi.sizeof(t.ucred))
+        local cred = ffi.cast("struct ucred *", cmsg + 1) -- cmsg_data
         ret.pid = cred.pid
         ret.uid = cred.uid
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
-      local fda = ffi.cast(int_pt, cmsg.cmsg_data)
-      local fdc = div(cmsg.cmsg_len - cmsg_ahdr, ffi.sizeof(int1_t))
-      ret.fd = {}
-      for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
-
+        local fda = ffi.cast(int_pt, cmsg + 1) -- cmsg_data
+        local fdc = div(cmsg.cmsg_len - cmsg_ahdr, ffi.sizeof(int1_t))
+        ret.fd = {}
+        for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
       end -- add other SOL_SOCKET messages
     end -- add other processing for different types
     mc, cmsg = cmsg_nxthdr(msg, mc, cmsg)
@@ -4135,7 +4133,7 @@ function S.sendfds(fd, ...)
   cmsg.cmsg_level = S.SOL_SOCKET
   cmsg.cmsg_type = S.SCM_RIGHTS
   cmsg.cmsg_len = buflen -- could set from a constructor
-  ffi.copy(cmsg.cmsg_data, fa, fasize)
+  ffi.copy(cmsg + 1, fa, fasize) -- cmsg_data
   msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
   return S.sendmsg(fd, msg, 0)
 end
