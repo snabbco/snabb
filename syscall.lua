@@ -3754,14 +3754,14 @@ end
 
 function S.clock_getres(clk_id, ts)
   ts = getts(ts)
-  local ret = C.syscall(S.SYS_clock_getres, t.clockid(stringflag(clk_id, "CLOCK_")), ts)
+  local ret = C.syscall(S.SYS_clock_getres, t.clockid(stringflag(clk_id, "CLOCK_")), t.void(ts))
   if ret == -1 then return errorret() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
   ts = getts(ts)
-  local ret = C.syscall(S.SYS_clock_gettime, t.clockid(stringflag(clk_id, "CLOCK_")), ts)
+  local ret = C.syscall(S.SYS_clock_gettime, t.clockid(stringflag(clk_id, "CLOCK_")), t.void(ts))
   if ret == -1 then return errorret() end
   return ts
 end
