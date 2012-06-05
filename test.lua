@@ -868,10 +868,10 @@ assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096,
 --r = assert(ctx:getevents(1, 1))
 --assert(#r == 0, "expect no aio events")
 
+-- TODO this is not working either
 --assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0, resfd = efd}} == 1)
 --local p = assert(S.poll({fd = efd, events = "in"}, 0, 1000))
 --assert(#p == 1, "expect one event available from poll, got " .. #p)
-
 
 assert(ctx:destroy())
 assert(fd:close())

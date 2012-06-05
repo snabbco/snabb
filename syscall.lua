@@ -3677,7 +3677,7 @@ local function getiocb(ioi, iocb)
   iocb.aio_nbytes = ioi.nbytes
   iocb.aio_offset = ioi.offset
   if ioi.resfd then
-    iocb.aio_flags = iocba[i].aio_flags + S.IOCB_FLAG_RESFD
+    iocb.aio_flags = iocb.aio_flags + S.IOCB_FLAG_RESFD
     iocb.aio_resfd = getfd(ioi.resfd)
   end
   return iocb
