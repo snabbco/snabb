@@ -4069,7 +4069,7 @@ function S.recvmsg(fd, msg, flags)
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
         local fda = ffi.cast(int_pt, cmsg + 1) -- cmsg_data
-        local fdc = div(cmsg.cmsg_len - cmsg_ahdr, ffi.sizeof(int1_t))
+        local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, ffi.sizeof(int1_t))
         ret.fd = {}
         for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
       end -- add other SOL_SOCKET messages
