@@ -30,7 +30,8 @@ open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname
 nice, getpriority, setpriority, prctl, alarm, waitid, inotify\_init, inotify\_add\_watch, inotify\_rm\_watch, adjtimex, getrlimit, setrlimit, sigprocmask, sigpending,
 sigsuspend, getsid, setsid, listxattr, llistxattr, flistxattr, setxattr, lsetxattr, fsetxattr, getxattr, lgetxattr, fgetxattr, removexattr, lremovexattr, fremovexattr,
 readlink, splice, vmsplice, tee, signalfd, timerfd\_create, timerfd\_settime, timerfd\_gettime, posix\_fadvise, fallocate, readahead, poll,
-getitimer, setitimer
+getitimer, setitimer,
+io\_cancel, io\_destroy, io\_setup, io\_submit, io\_getevents
 
 ### Other functions
 
@@ -104,15 +105,16 @@ Generate C code to test size and offset of each struct
 
 Siginfo support in sigaction not there yet, as confused by the kernel API.
 
+only some of aio is working, needs some debugging before being used.
+
 ### Missing functions
 
 pselect, ppoll
 clock\_nanosleep, timer\_create, timer\_getoverrun
 faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  mkdirat(2),  mknodat(2),
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
-sigqueue
-io\_cancel(2), io\_destroy(2), io\_setup(2), io\_submit(2), ...
-sync\_file\_range(2)
+sigqueue,
+sync\_file\_range(2),
 capset, capget
 ...
 
