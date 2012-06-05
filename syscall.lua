@@ -4437,7 +4437,7 @@ function S.tcflow(fd, action)
 end
 
 function S.tcgetsid(fd)
-  return retint(C.tcgetsid(getfd(fd)))
+  return retnum(C.tcgetsid(getfd(fd)))
 end
 
 function S.posix_openpt(flags)
