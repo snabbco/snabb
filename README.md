@@ -112,7 +112,7 @@ faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue
 io\_cancel(2), io\_destroy(2), io\_setup(2), io\_submit(2), ...
-sync\_file_range(2)
+sync\_file\_range(2)
 capset, capget
 ...
 

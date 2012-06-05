@@ -854,13 +854,13 @@ S.copy(abuf, teststring)
 fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
 assert(S.unlink(tmpfile))
 assert(fd:pwrite(abuf, 4096, 0))
-S.fill(abuf, 4096, 0)
+S.fill(abuf, 4096)
 local efd = assert(S.eventfd())
 local ctx = assert(S.io_setup(8))
 assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}} == 1)
 
--- test for data, io_getevents
-
+local r = assert(ctx:getevents(1, 1))
+assert(#r == 1, "expect one aio event")
 
 --assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0, resfd = efd}} == 1)
 --local p = assert(S.poll({fd = efd, events = "in"}, 0, 1000))

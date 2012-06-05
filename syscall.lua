@@ -2300,6 +2300,7 @@ t.sigaction = ffi.typeof("struct sigaction")
 t.clockid = ffi.typeof("clockid_t")
 t.inotify_event = ffi.typeof("struct inotify_event")
 t.loff = ffi.typeof("loff_t")
+t.io_event = ffi.typeof("struct io_event")
 
 t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
 
@@ -2316,6 +2317,7 @@ local iocbs_t = ffi.typeof("struct iocb[?]")
 t.pollfds = ffi.typeof("struct pollfd [?]")
 
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
+local io_events_t = ffi.typeof("struct io_event[?]")
 local socklen_1t = ffi.typeof("socklen_t[1]")
 
 local string_array_t = ffi.typeof("const char *[?]")
@@ -3662,7 +3664,7 @@ function S.io_setup(nr_events)
 end
 
 function S.io_destroy(ctx)
-  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close to zero and not redo, unclear what an invalid value is (0?) else gc calls more than once after close.
+  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close() to zero and not redo, unclear what an invalid value is (0?) else gc calls more than once after close.
 end
 
 --[[
@@ -3670,10 +3672,24 @@ function S.io_cancel(ctx, iocb, result) {
 }
 ]]
 
---function S.op_getevents()
+function S.io_getevents(ctx, min, nr, timeout, events)
+  if not events then events = io_events_t(nr) end
+  if timeout then timeout = getts(timeout) end
+  local ret = C.syscall(S.SYS_io_getevents, getctx(ctx), t.long(min), t.long(nr), events, timeout)
+  if ret == -1 then return errorret() end
+  -- need to think more about how to return these, eg metatype for io_event?
+  local r = {}
+  for i = 0, nr - 1 do
+    r[i + 1] = events[i]
+  end
+  r.timeout = timeout
+  r.events = events
+  r.count = tonumber(ret)
+  return r
+end
 
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
-  if type(iocb) ~= "cdata" then
+  if type(iocb) == "table" then
     local io = iocb
     nr = #io
     iocb = iocbs_pt(nr)
