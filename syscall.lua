@@ -3830,7 +3830,7 @@ function S.setcmdline(...) -- this sets /proc/self/cmdline, use prctl to set /pr
 
   if #new <= #oldcmdline then -- do not need to move environment
     ffi.copy(cmdstart, new)
-    ffi.fill(cmdstart + #new, #oldcmdline - #new, 0)
+    ffi.fill(cmdstart + #new, #oldcmdline - #new)
     return true
   end
 
@@ -3845,7 +3845,7 @@ function S.setcmdline(...) -- this sets /proc/self/cmdline, use prctl to set /pr
   C.environ = nil -- kill the old environ
 
   ffi.copy(cmdstart, new)
-  ffi.fill(cmdstart + #new, #oldcmdline + elen - #new, 0)
+  ffi.fill(cmdstart + #new, #oldcmdline + elen - #new)
 
   for k, v in pairs(e) do S.setenv(k, v) end -- restore environment
 
