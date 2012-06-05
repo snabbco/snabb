@@ -1391,7 +1391,8 @@ local function errorret(errno)
   return nil, mkerror(errno or ffi.errno())
 end
 
-local function retint(ret) -- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet...
+ -- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet... not used at present
+local function retint(ret)
   if ret == -1 then return errorret() end
   return ret
 end
