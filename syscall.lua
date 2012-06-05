@@ -3337,7 +3337,7 @@ local poll_flags = {"POLLIN", "POLLOUT", "POLLPRI", "POLLRDHUP", "POLLERR", "POL
 local poll_lflags = lflag("POLL", poll_flags)
 
 function S.poll(fds, nfds, timeout)
-  if type(fds) ~= "cdata" then
+  if type(fds) == "table" then
     local pf = fds
     nfds = #pf
     fds = t.pollfds(nfds)
