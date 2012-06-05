@@ -1715,6 +1715,13 @@ struct ifreq {
     struct  if_settings ifru_settings;
   } ifr_ifru;
 };
+struct ifaddrmsg {
+  uint8_t  ifa_family;
+  uint8_t  ifa_prefixlen;
+  uint8_t  ifa_flags;
+  uint8_t  ifa_scope;
+  uint32_t ifa_index;
+};
 struct fdb_entry {
   uint8_t mac_addr[6];
   uint8_t port_no;
