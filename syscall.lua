@@ -1744,6 +1744,12 @@ struct ifaddrmsg {
   uint8_t  ifa_scope;
   uint32_t ifa_index;
 };
+struct ifa_cacheinfo {
+  uint32_t ifa_prefered;
+  uint32_t ifa_valid;
+  uint32_t cstamp;
+  uint32_t tstamp;
+};
 struct fdb_entry {
   uint8_t mac_addr[6];
   uint8_t port_no;
