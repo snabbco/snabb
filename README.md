@@ -8,7 +8,7 @@ Linux only? Not so easy to port to other Unixes, you need to check the types and
 
 Requirements: Needs LuaJIT 2.0.0-beta9 or later. Generally tested using git head.
 
-Working on support for [luaffi](https://github.com/jmckaskill/luaffi) so you can use with standard Lua; much of it is now working, but there are still some issues still and not all tests are passing. However you can probably start using it if you like, but you may need to submit issues when you run into problems.
+Also supports [luaffi](https://github.com/jmckaskill/luaffi) so you can use with standard Lua; all the tests now pass, have added some workarounds to support current issues in luaffi which could be removed but these are not performance critical or important now as all the major issues have been resolved.
 
 ## What is implemented?
 
