@@ -3196,13 +3196,12 @@ function S.sysinfo(info)
   return info
 end
 
-local growattrbuf
-function growattrbuf(f, a1, a2)
+local function growattrbuf(f, a1, a2)
   local len = 512
   local buffer = t.buffer(len)
   local ret
   repeat
-    if a2 then ret = f(a1, a2, buffer, len) else ret = f(a1, buffer, len) end
+    if a2 then ret = tonumber(f(a1, a2, buffer, len)) else ret = tonumber(f(a1, buffer, len)) end
     if ret == -1 and ffi.errno ~= S.E.ERANGE then return errorret() end
     if ret == -1 then
       len = len * 2
