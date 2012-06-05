@@ -3667,10 +3667,44 @@ function S.io_destroy(ctx)
   return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close() to zero and not redo, unclear what an invalid value is (0?) else gc calls more than once after close.
 end
 
---[[
-function S.io_cancel(ctx, iocb, result) {
-}
-]]
+local function getiocb(ioi, iocb)
+  if not iocb then iocb = t.iocb() end
+  iocb.aio_lio_opcode = stringflags(ioi.cmd, "IOCB_CMD_")
+  iocb.aio_data = ioi.data or 0
+  iocb.aio_reqprio = ioi.reqprio or 0
+  iocb.aio_fildes = getfd(ioi.fd)
+  iocb.aio_buf = ffi.cast(t.int64, ioi.buf)
+  iocb.aio_nbytes = ioi.nbytes
+  iocb.aio_offset = ioi.offset
+  if ioi.resfd then
+    iocb.aio_flags = iocba[i].aio_flags + S.IOCB_FLAG_RESFD
+    iocb.aio_resfd = getfd(ioi.resfd)
+  end
+  return iocb
+end
+
+local function getiocbs(iocb, nr)
+  if type(iocb) == "table" then
+    local io = iocb
+    nr = #io
+    iocb = iocbs_pt(nr)
+    iocba = iocbs_t(nr)
+    for i = 0, nr - 1 do
+      local ioi = io[i + 1]
+      iocb[i] = iocba + i
+      getiocb(ioi, iocba[i])
+    end
+  end
+  return iocb, nr
+end
+
+function S.io_cancel(ctx, iocb, result)
+  iocb = getiocb(iocb)
+  if not result then result = t.io_event() end
+  local ret = C.syscall(S.SYS_io_cancel, getctx(ctx), iocb, result)
+  if ret == -1 then return errorret() end
+  return ret
+end
 
 function S.io_getevents(ctx, min, nr, timeout, events)
   if not events then events = io_events_t(nr) end
@@ -3689,27 +3723,7 @@ function S.io_getevents(ctx, min, nr, timeout, events)
 end
 
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
-  if type(iocb) == "table" then
-    local io = iocb
-    nr = #io
-    iocb = iocbs_pt(nr)
-    iocba = iocbs_t(nr)
-    for i = 0, nr - 1 do
-      local ioi = io[i + 1]
-      iocb[i] = iocba + i
-      iocba[i].aio_lio_opcode = stringflags(ioi.cmd, "IOCB_CMD_")
-      iocba[i].aio_data = ioi.data or 0
-      iocba[i].aio_reqprio = ioi.reqprio or 0
-      iocba[i].aio_fildes = getfd(ioi.fd)
-      iocba[i].aio_buf = ffi.cast(t.int64, ioi.buf)
-      iocba[i].aio_nbytes = ioi.nbytes
-      iocba[i].aio_offset = ioi.offset
-      if ioi.resfd then
-        iocba[i].aio_flags = iocba[i].aio_flags + S.IOCB_FLAG_RESFD
-        iocba[i].aio_resfd = getfd(ioi.resfd)
-      end
-    end
-  end
+  iocb, nr = getiocbs(iocb)
   return retnum(C.syscall(S.SYS_io_submit, getctx(ctx), t.long(nr), iocb))
 end
 
