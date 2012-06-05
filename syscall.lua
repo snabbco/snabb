@@ -3620,7 +3620,7 @@ local function getctx(ctx) return t.ulong(ctx.ctx) end -- aio_context_t is reall
 
 function S.io_setup(nr_events)
   local ctx = t.aio_context()
-  local ret = C.syscall(S.SYS_io_setup, t.uint(nr_events), ctx)
+  local ret = C.syscall(S.SYS_io_setup, t.uint(nr_events), t.void(ctx))
   if ret == -1 then return errorret() end
   return ctx
 end
