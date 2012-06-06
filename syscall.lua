@@ -2550,6 +2550,9 @@ local function stringflag(str, prefix) -- single value only
   return val
 end
 
+-- useful for comparing modes etc
+function S.mode(mode) return stringflags(mode, "S_") end
+
 -- reverse flag operations
 local function getflags(e, prefix, values, lvalues, r)
   if not r then r = {} end
@@ -2717,7 +2720,7 @@ S.in6addr_any = t.in6_addr()
 S.in6addr_loopback = S.inet_pton(S.AF_INET6, "::1")
 
 -- main definitions start here
-function S.open(pathname, flags, mode) return retfd(C.open(pathname, stringflags(flags, "O_"), stringflags(mode, "S_"))) end
+function S.open(pathname, flags, mode) return retfd(C.open(pathname, stringflags(flags, "O_"), S.mode(mode))) end
 
 function S.dup(oldfd, newfd, flags)
   if newfd == nil then return retfd(C.dup(getfd(oldfd))) end
@@ -2750,14 +2753,14 @@ function S.close(fd)
   return true
 end
 
-function S.creat(pathname, mode) return retfd(C.creat(pathname, stringflags(mode, "S_"))) end
+function S.creat(pathname, mode) return retfd(C.creat(pathname, S.mode(mode))) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.chdir(path) return retbool(C.chdir(path)) end
-function S.mkdir(path, mode) return retbool(C.mkdir(path, stringflags(mode, "S_"))) end
+function S.mkdir(path, mode) return retbool(C.mkdir(path, S.mode(mode))) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.acct(filename) return retbool(C.acct(filename)) end
-function S.chmod(path, mode) return retbool(C.chmod(path, stringflags(mode, "S_"))) end
+function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
@@ -2957,7 +2960,7 @@ end
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
-function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), stringflags(mode, "S_"))) end
+function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), S.mode(mode))) end
 function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.sync_file_range(getfd(fd), offset, count, stringflags(flags, "SYNC_FILE_RANGE_")))
 end
@@ -3868,7 +3871,7 @@ S.getegid = C.getegid
 S.sync = C.sync
 S.alarm = C.alarm
 
-function S.umask(mask) return C.umask(stringflags(mask, "S_")) end
+function S.umask(mask) return C.umask(S.mode(mask)) end
 
 function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
 function S.setsid() return retnum(C.setsid()) end
@@ -4553,6 +4556,12 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
+
+-- allow calling without leading f
+fmeth.stat = S.fstat
+fmeth.chdir = S.fchdir
+fmeth.sync = S.fsync
+fmeth.datasync = S.fdatasync
 
 t.fd = ffi.metatype("struct {int fileno;}", {__index = fmeth, __gc = S.close})
 

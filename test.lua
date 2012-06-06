@@ -186,13 +186,15 @@ test_file_operations = {
   end,
   test_fchmod = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
-    assert(fd:fchmod("IRUSR, IWUSR")) -- TODO test if worked with stat
+    assert(fd:fchmod("IRUSR, IWUSR"))
+    local st = fd:stat()
+    assert_equal(st.mode, S.mode("IRUSR, IWUSR"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
   test_chmod = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
-    assert(S.chmod(tmpfile, "IRUSR, IWUSR")) -- TODO test if worked with stat
+    assert(S.chmod(tmpfile, "IRUSR, IWUSR"))
     assert(S.access(tmpfile, "rw"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
