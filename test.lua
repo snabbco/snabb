@@ -14,6 +14,14 @@ local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 local teststring = "this is a test string"
 local size = 512
 local buf = S.t.buffer(size)
+local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
+local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
+
+test_basic = {
+  test_octal = function()
+    assert_equal(S.O_CREAT, 64, "wrong octal value for O_CREAT")
+  end
+}
 
 test_uname_hostname = {
   test_uname = function()
@@ -157,11 +165,6 @@ test_dup = {
 }
 
 
-
-assert(S.O_CREAT == 64, "wrong octal value for O_CREAT") -- test our octal converter!
-
-local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
-local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 
 fd = assert(S.creat(tmpfile, "IRWXU"))
 
