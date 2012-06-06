@@ -1,18 +1,17 @@
 local S = require "syscall"
 local bit = require "bit"
+
+local oldassert = assert
+function assert(c, s)
+  return oldassert(c, tostring(s)) -- annoyingly, assert does not call tostring!
+end
+
 local luaunit = require "luaunit"
 
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 local teststring = "this is a test string"
 local size = 512
 local buf = S.t.buffer(size)
-
---[[
-local oldassert = assert
-function assert(c, s)
-  return oldassert(c, tostring(s)) -- annoyingly, assert does not call tostring!
-end
-]]
 
 test_uname = {
   description = "uname, gethostname",
@@ -92,8 +91,6 @@ test_open_close = {
     assert(S.close(fileno))
   end
 }
-
-luaunit:run()
 
 local fd2 = assert(S.open("/dev/zero"))
 
@@ -903,6 +900,10 @@ assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096,
 assert(ctx:destroy())
 assert(fd:close())
 assert(S.munmap(abuf, 4096))
+
+
+luaunit:run()
+
 
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
