@@ -2752,7 +2752,6 @@ end
 
 function S.creat(pathname, mode) return retfd(C.creat(pathname, stringflags(mode, "S_"))) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
-function S.access(pathname, mode) return retbool(C.access(pathname, mode)) end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, stringflags(mode, "S_"))) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
@@ -2764,6 +2763,23 @@ function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath))
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 function S.pause() return retbool(C.pause()) end
+
+local function accessflags(s) -- allow "rwx"
+  if not s then return 0 end
+  if type(s) ~= "string" then return s end
+  s = trim(s:upper())
+  local flag = 0
+  for i = 1, #s do
+    local c = s:sub(i, i + 1)
+    if     c == 'R' then flag = bit.bor(flag, S.R_OK)
+    elseif c == 'W' then flag = bit.bor(flag, S.W_OK)
+    elseif c == 'X' then flag = bit.bor(flag, S.X_OK)
+    end
+  end
+  return flag
+end
+
+function S.access(pathname, mode) return retbool(C.access(pathname, accessflags(mode))) end
 
 function S.readlink(path) -- note no idea if name truncated except return value is buffer len, so have to reallocate
   local size = 256

@@ -65,9 +65,12 @@ test_open_close = {
     local fd = assert(S.open("/dev/null", "rdonly"))
     local fileno = fd.fileno
     assert(fd:close())
-    fd, err = S.close(fileno)
+    local fd, err = S.close(fileno)
     assert(err, "expected to fail on close already closed fd")
     assert(err.badf, "expect EBADF from invalid numberic fd")
+  end,
+  test_access = function(self)
+    assert(S.access("/dev/null", "r_ok"), "expect access to say can read /dev/null")
   end
 }
 
