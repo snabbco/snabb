@@ -267,6 +267,20 @@ test_file_operations = {
     local stat = assert(S.lstat(tmpfile))
     assert(stat.islnk, "expect lstat to stat the symlink")
     assert(S.unlink(tmpfile))
+  end,
+  test_truncate = function()
+    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    local stat = assert(S.stat(tmpfile))
+    assert_equal(stat.size, #teststring, "expect to get size of written string")
+    assert(S.truncate(tmpfile, 1))
+    stat = assert(S.stat(tmpfile))
+    assert_equal(stat.size, 1, "expect get truncated size")
+    local fd = assert(S.open(tmpfile, "RDWR"))
+    assert(fd:truncate(1024))
+    stat = assert(fd:stat())
+    assert_equal(stat.size, 1024, "expect get truncated size")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
   end
 }
 
@@ -278,19 +292,6 @@ assert(fd[2]:close())
 local stat
 
 
--- test truncate
-assert(S.writefile(tmpfile, teststring, "IRWXU"))
-stat = assert(S.stat(tmpfile))
-assert(stat.size == #teststring, "expect to get size of written string")
-assert(S.truncate(tmpfile, 1))
-stat = assert(S.stat(tmpfile))
-assert(stat.size == 1, "expect get truncated size")
-fd = assert(S.open(tmpfile, "RDWR"))
-assert(fd:ftruncate(1024))
-stat = assert(fd:fstat())
-assert(stat.size == 1024, "expect get truncated size")
-assert(S.unlink(tmpfile))
-assert(fd:close())
 
 local rem
 rem = assert(S.nanosleep(0.001))
