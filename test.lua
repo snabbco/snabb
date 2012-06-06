@@ -145,6 +145,12 @@ test_read_write = {
     n = assert(fd:pwrite(buf, size, offset))
     assert_equal(n, size, "should not get truncated pwrite on /dev/zero")
     assert(fd:close())
+  end,
+  test_readfile_writefile = function()
+    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    local ss = assert(S.readfile(tmpfile))
+    assert_equal(ss, teststring, "readfile should get back what writefile wrote")
+    assert(S.unlink(tmpfile))
   end
 }
 
@@ -198,11 +204,6 @@ assert(fd:close())
 fd, err = S.open(tmpfile, "RDWR")
 assert(err, "expected open to fail on file not found")
 
--- test readfile, writefile
-assert(S.writefile(tmpfile, teststring, "IRWXU"))
-local ss = assert(S.readfile(tmpfile))
-assert(ss == teststring, "readfile should get back what writefile wrote")
-assert(S.unlink(tmpfile))
 
 fd = assert(S.pipe())
 assert(fd[1]:close())
