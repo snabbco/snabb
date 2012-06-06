@@ -16,14 +16,14 @@ end
 
 test_uname = {
   description = "uname, gethostname",
-  test_uname = function(self)
+  test_uname = function()
     local u = assert(S.uname())
     assert_string(u.nodename)
     assert_string(u.sysname)
     assert_string(u.release)
     assert_string(u.version)
   end,
-  test_hostname = function(self)
+  test_hostname = function()
     local h = assert(S.gethostname())
     local u = assert(S.uname())
     assert(h == u.nodename, "gethostname did not return nodename")
@@ -32,18 +32,18 @@ test_uname = {
 
 test_open_close = {
   description = "basic open, close on files",
-  test_open_nofile = function(self)
+  test_open_nofile = function()
     local fd, err = S.open("/tmp/file/does/not/exist", "rdonly")
     assert(err, "expected open to fail on file not found")
     assert(err.ENOENT, "expect ENOENT from open non existent file")
     assert(tostring(err) == "No such file or directory", "should get string error message")
   end,
-  test_close_invalid_fd = function(self)
+  test_close_invalid_fd = function()
     local ok, err = S.close(127)
     assert(err, "expected to fail on close invalid fd")
     assert_equals(err.errno, S.E.EBADF, "expect EBADF from invalid numberic fd")
   end,
-  test_open_valid = function(self)
+  test_open_valid = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
     assert(fd.fileno >= 3, "should get file descriptor of at least 3 back from first open")
     local fd2 = assert(S.open("/dev/zero", "RDONLY"))
@@ -51,17 +51,17 @@ test_open_close = {
     assert(fd:close())
     assert(fd2:close())
   end,
-  test_sync = function(self)
+  test_sync = function()
     S.sync() -- cannot fail...
   end,
-  test_fd_cleared_on_close = function(self)
+  test_fd_cleared_on_close = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
     assert(fd:close())
     local fd2 = assert(S.open("/dev/zero")) -- reuses same fd
     local ok, err = fd:close() -- this should not fd again
     assert(fd2:close()) -- this should succeed
   end,
-  test_double_close = function(self)
+  test_double_close = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
     local fileno = fd.fileno
     assert(fd:close())
@@ -69,16 +69,33 @@ test_open_close = {
     assert(err, "expected to fail on close already closed fd")
     assert(err.badf, "expect EBADF from invalid numberic fd")
   end,
-  test_access = function(self)
+  test_access = function()
     assert(S.access("/dev/null", "r"), "expect access to say can read /dev/null")
     assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
+  end,
+  test_fd_gc = function()
+    local fd = assert(S.open("/dev/null", "rdonly"))
+    local fileno = fd.fileno
+    fd = nil
+    collectgarbage("collect")
+    local _, err = S.read(fileno, buf, size)
+    assert(err, "should not be able to read from fd after gc")
+    assert(err.EBADF, "expect EBADF from already closed fd")
+  end,
+  test_fd_nogc = function()
+    local fd = assert(S.open("/dev/zero", "RDONLY"))
+    local fileno = fd.fileno
+    fd:nogc()
+    fd = nil
+    collectgarbage("collect")
+    local n = assert(S.read(fileno, buf, size))
+    assert(S.close(fileno))
   end
 }
 
 luaunit:run()
 
 local fd2 = assert(S.open("/dev/zero"))
-assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
 
 for i = 0, size - 1 do buf[i] = 255 end -- make sure overwritten
 -- test read
@@ -93,24 +110,6 @@ n, err = fd2:write(buf, size)
 assert(err, "should not be able to write to file opened read only")
 assert(err.EBADF, "expect EBADF when writing read only file")
 
--- test gc of file handle
-fd2 = nil
-collectgarbage("collect")
-
--- test file has been closed after garbage collection
-n, err = S.read(4, buf, size)
-assert(err, "should not be able to read from fd 4 after gc")
-assert(err.EBADF, "expect EBADF from already closed fd")
-
--- test with gc turned off
-
-fd = assert(S.open("/dev/zero", "RDONLY"))
-local fileno = fd.fileno
-fd:nogc()
-fd = nil
-collectgarbage("collect")
-n = assert(S.read(fileno, buf, size))
-assert(S.close(fileno))
 
 -- another open
 fd = assert(S.open("/dev/zero", "RDWR"))
