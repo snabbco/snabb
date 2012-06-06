@@ -100,18 +100,20 @@ test_read_write = {
     assert(n >= 0, "should not get error reading from /dev/zero")
     assert_equal(n, size, "should not get truncated read from /dev/zero")
     for i = 0, size - 1 do assert(buf[i] == 0, "should read zeroes from /dev/zero") end
+  end,
+  test_read_to_string = function()
+    local fd = assert(S.open("/dev/zero"))
+    local str = assert(fd:read(nil, 10))
+    assert_equal(#str, 10, "string returned from read should be length 10")
+  end,
+  test_write_ro = function()
+    local fd = assert(S.open("/dev/zero"))
+    n, err = fd2:write(buf, size)
+    assert(err, "should not be able to write to file opened read only")
+    assert(err.EBADF, "expect EBADF when writing read only file")
   end
 }
 
-local fd2 = assert(S.open("/dev/zero"))
-
-
-local str = assert(fd2:read(nil, 10)) -- test read to string
-assert(#str == 10, "string returned from read should be length 10")
--- test writing to read only file fails
-n, err = fd2:write(buf, size)
-assert(err, "should not be able to write to file opened read only")
-assert(err.EBADF, "expect EBADF when writing read only file")
 
 
 -- another open
@@ -724,6 +726,8 @@ local pp = assert(S.pipe("nonblock"))
 local s = assert(S.socketpair("unix", "stream, nonblock"))
 local fd = assert(S.open(tmpfile, "rdwr, creat", "IRWXU"))
 assert(S.unlink(tmpfile))
+
+local str = teststring
 
 n = assert(fd:write(str))
 assert(n == #str)
