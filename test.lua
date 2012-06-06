@@ -223,6 +223,15 @@ test_file_operations = {
   test_mkdir_rmdir = function()
     assert(S.mkdir(tmpfile, "IRWXU"))
     assert(S.rmdir(tmpfile))
+  end,
+  test_chdir = function()
+    local cwd = assert(S.getcwd())
+    assert(S.chdir("/"))
+    local fd = assert(S.open("/"))
+    assert(fd:fchdir())
+    local nd = assert(S.getcwd())
+    assert(nd == "/", "expect cwd to be /")
+    assert(S.chdir(cwd)) -- return to original directory
   end
 }
 
@@ -233,19 +242,10 @@ fd = assert(S.pipe())
 assert(fd[1]:close())
 assert(fd[2]:close())
 
-local cwd = assert(S.getcwd())
-
-assert(S.chdir("/"))
-fd = assert(S.open("/"))
-assert(fd:fchdir())
-
-local nd = assert(S.getcwd())
-assert(nd == "/", "expect cwd to be /")
-
-assert(S.chdir(cwd)) -- return to original directory
 
 local stat
 
+local fd = assert(S.open("/"))
 stat = assert(S.stat("/dev/zero"))
 assert(stat.nlink == 1, "expect link count on /dev/zero to be 1")
 
