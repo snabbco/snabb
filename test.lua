@@ -1,56 +1,79 @@
 local S = require "syscall"
 local bit = require "bit"
+local luaunit = require "luaunit"
 
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 local teststring = "this is a test string"
 local size = 512
 local buf = S.t.buffer(size)
 
+--[[
 local oldassert = assert
 function assert(c, s)
   return oldassert(c, tostring(s)) -- annoyingly, assert does not call tostring!
 end
+]]
 
--- print uname info
-local u = assert(S.uname())
-print(u.nodename .. " " .. u.sysname .. " " .. u.release .. " " .. u.version)
-local h = assert(S.gethostname())
-assert(h == u.nodename, "gethostname did not return nodename")
+test_uname = {
+  description = "uname, gethostname",
+  test_uname = function(self)
+    local u = assert(S.uname())
+    assert_string(u.nodename)
+    assert_string(u.sysname)
+    assert_string(u.release)
+    assert_string(u.version)
+  end,
+  test_hostname = function(self)
+    local h = assert(S.gethostname())
+    local u = assert(S.uname())
+    assert(h == u.nodename, "gethostname did not return nodename")
+  end
+}
 
--- test open non existent file
-fd, err = S.open("/tmp/file/does/not/exist", "rdonly")
-assert(err, "expected open to fail on file not found")
-assert(err.ENOENT, "expect ENOENT from open non existent file")
-assert(tostring(err) == "No such file or directory", "should get string error message")
+test_open_close = {
+  description = "basic open, close on files",
+  test_open_nofile = function(self)
+    local fd, err = S.open("/tmp/file/does/not/exist", "rdonly")
+    assert(err, "expected open to fail on file not found")
+    assert(err.ENOENT, "expect ENOENT from open non existent file")
+    assert(tostring(err) == "No such file or directory", "should get string error message")
+  end,
+  test_close_invalid_fd = function(self)
+    local ok, err = S.close(127)
+    assert(err, "expected to fail on close invalid fd")
+    assert_equals(err.errno, S.E.EBADF, "expect EBADF from invalid numberic fd")
+  end,
+  test_open_valid = function(self)
+    local fd = assert(S.open("/dev/null", "rdonly"))
+    assert(fd.fileno >= 3, "should get file descriptor of at least 3 back from first open")
+    local fd2 = assert(S.open("/dev/zero", "RDONLY"))
+    assert(fd2.fileno >= 4, "should get file descriptor of at least 4 back from second open")
+    assert(fd:close())
+    assert(fd2:close())
+  end,
+  test_sync = function(self)
+    S.sync() -- cannot fail...
+  end,
+  test_fd_cleared_on_close = function(self)
+    local fd = assert(S.open("/dev/null", "rdonly"))
+    assert(fd:close())
+    local fd2 = assert(S.open("/dev/zero")) -- reuses same fd
+    local ok, err = fd:close() -- this should not fd again
+    assert(fd2:close()) -- this should succeed
+  end,
+  test_double_close = function(self)
+    local fd = assert(S.open("/dev/null", "rdonly"))
+    local fileno = fd.fileno
+    assert(fd:close())
+    fd, err = S.close(fileno)
+    assert(err, "expected to fail on close already closed fd")
+    assert(err.badf, "expect EBADF from invalid numberic fd")
+  end
+}
 
--- test close invalid fd
-ok, err = S.close(127)
-assert(err, "expected to fail on close invalid fd")
-assert(err.errno == S.E.EBADF, "expect EBADF from invalid numberic fd") -- test the error functions other way
+luaunit:run()
 
--- test open and close valid file
-fd = assert(S.open("/dev/null", "rdonly"))
-assert(fd.fileno >= 3, "should get file descriptor of at least 3 back from first open")
-
--- another open
-fd2 = assert(S.open("/dev/zero", "RDONLY"))
-assert(fd2.fileno >= 4, "should get file descriptor of at least 4 back from second open")
-
--- normal close
-local fileno = fd.fileno
-assert(fd:close())
-
-fd3 = assert(S.open("/dev/zero"))
-ok, err = fd:close() -- this should not close fd 3 again
-assert(fd3:close()) -- this should succeed
-
-S.sync() -- cannot fail...
-
--- test double close fd
-fd, err = S.close(fileno)
-assert(err, "expected to fail on close already closed fd")
-assert(err.badf, "expect EBADF from invalid numberic fd")
-
+local fd2 = assert(S.open("/dev/zero"))
 assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
 
 for i = 0, size - 1 do buf[i] = 255 end -- make sure overwritten
@@ -586,7 +609,7 @@ local d, err = fd:getdents()
 assert(err.notdir, "/etc/passwd should give a not directory error")
 assert(fd:close())
 
--- eventfd, Linux only
+-- eventfd
 fd = assert(S.eventfd(0, "nonblock"))
 
 local n = assert(fd:eventfd_read())
@@ -601,7 +624,7 @@ assert(n == 0, "eventfd should return 0 again")
 
 assert(fd:close())
 
--- timerfd, Linux only
+-- timerfd
 fd = assert(S.timerfd_create("monotonic", "nonblock, cloexec"))
 
 n = assert(fd:timerfd_read())
