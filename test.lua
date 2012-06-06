@@ -188,7 +188,7 @@ test_file_operations = {
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(fd:fchmod("IRUSR, IWUSR"))
     local st = fd:stat()
-    assert_equal(st.mode, S.mode("IRUSR, IWUSR"))
+    assert_equal(st.mode, S.mode("IFREG, IRUSR, IWUSR"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
