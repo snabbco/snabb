@@ -25,14 +25,12 @@ local setup = function()
 end
 
 test_basic = {
-  setup = setup,
   test_octal = function()
     assert_equal(S.O_CREAT, 64, "wrong octal value for O_CREAT")
   end
 }
 
 test_uname_hostname = {
-  setup = setup,
   test_uname = function()
     local u = assert(S.uname())
     assert_string(u.nodename)
@@ -287,7 +285,6 @@ test_file_operations = {
 }
 
 test_sockets_pipes = {
-  setup = setup,
   test_pipe = function()
     local fd = assert(S.pipe())
     assert(fd[1]:close())
@@ -295,10 +292,15 @@ test_sockets_pipes = {
   end
 }
 
+test_timers = {
+  test_nanosleep = function()
+    local rem = assert(S.nanosleep(0.001))
+    assert_equal(rem.sec, 0, "expect no elapsed time after nanosleep")
+    assert_equal(rem.nsec, 0, "expect no elapsed time after nanosleep")
+    assert_equal(rem.time, 0, "expect no elapsed time after nanosleep")
+  end
+}
 
-local rem
-rem = assert(S.nanosleep(0.001))
-assert(rem.sec == 0 and rem.nsec == 0 and rem.time == 0, "expect no elapsed time after nanosleep")
 
 -- timers and alarms
 assert(S.signal("alrm", "ign"))
