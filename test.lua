@@ -8,13 +8,14 @@ end
 
 local luaunit = require "luaunit"
 
+local assert_equal = assert_equals
+
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 local teststring = "this is a test string"
 local size = 512
 local buf = S.t.buffer(size)
 
-test_uname = {
-  description = "uname, gethostname",
+test_uname_hostname = {
   test_uname = function()
     local u = assert(S.uname())
     assert_string(u.nodename)
@@ -30,7 +31,6 @@ test_uname = {
 }
 
 test_open_close = {
-  description = "basic open, close on files",
   test_open_nofile = function()
     local fd, err = S.open("/tmp/file/does/not/exist", "rdonly")
     assert(err, "expected open to fail on file not found")
@@ -40,7 +40,7 @@ test_open_close = {
   test_close_invalid_fd = function()
     local ok, err = S.close(127)
     assert(err, "expected to fail on close invalid fd")
-    assert_equals(err.errno, S.E.EBADF, "expect EBADF from invalid numberic fd")
+    assert_equal(err.errno, S.E.EBADF, "expect EBADF from invalid numberic fd")
   end,
   test_open_valid = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
@@ -92,14 +92,20 @@ test_open_close = {
   end
 }
 
+test_read_write = {
+  test_read = function()
+    local fd = assert(S.open("/dev/zero"))
+    for i = 0, size - 1 do buf[i] = 255 end
+    local n = assert(fd:read(buf, size))
+    assert(n >= 0, "should not get error reading from /dev/zero")
+    assert_equal(n, size, "should not get truncated read from /dev/zero")
+    for i = 0, size - 1 do assert(buf[i] == 0, "should read zeroes from /dev/zero") end
+  end
+}
+
 local fd2 = assert(S.open("/dev/zero"))
 
-for i = 0, size - 1 do buf[i] = 255 end -- make sure overwritten
--- test read
-n = assert(fd2:read(buf, size))
-assert(n >= 0, "should not get error reading from /dev/zero")
-assert(n == size, "should not get truncated read from /dev/zero") -- technically allowed!
-for i = 0, size - 1 do assert(buf[i] == 0, "should read zero bytes from /dev/zero") end
+
 local str = assert(fd2:read(nil, 10)) -- test read to string
 assert(#str == 10, "string returned from read should be length 10")
 -- test writing to read only file fails
