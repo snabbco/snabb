@@ -206,31 +206,27 @@ test_file_operations = {
     assert(fd:sync()) -- synonym
     assert(fd:datasync()) -- synonym
     assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
+    assert(S.unlink(tmpfile))
     assert(fd:close())
+  end,
+  test_seek = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local offset = 1
+    local n
+    n = assert(fd:lseek(offset, "set"))
+    assert_equal(n, offset, "seek should position at set position")
+    n = assert(fd:lseek(offset, "cur"))
+    assert_equal(n, offset + offset, "seek should position at set position")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_mkdir_rmdir = function()
+    assert(S.mkdir(tmpfile, "IRWXU"))
+    assert(S.rmdir(tmpfile))
   end
 }
 
 
-
-fd = assert(S.creat(tmpfile, "IRWXU"))
-
-
-
-local offset = 1
-n = assert(fd:lseek(offset, "set"))
-assert(n == offset, "seek should position at set position")
-n = assert(fd:lseek(offset, "cur"))
-assert(n == offset + offset, "seek should position at set position")
-
-assert(S.unlink(tmpfile))
-
-assert(S.mkdir(tmpfile, "IRWXU"))
-assert(S.rmdir(tmpfile))
-
-assert(fd:close())
-
-fd, err = S.open(tmpfile, "RDWR")
-assert(err, "expected open to fail on file not found")
 
 
 fd = assert(S.pipe())
