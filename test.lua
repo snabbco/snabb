@@ -183,6 +183,12 @@ test_file_operations = {
     assert(S.unlink(tmpfile2))
     assert(S.unlink(tmpfile))
     assert(fd:close())
+  end,
+  test_fchmod = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    assert(fd:fchmod("IRUSR, IWUSR"))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
   end
 }
 
@@ -191,8 +197,6 @@ test_file_operations = {
 fd = assert(S.creat(tmpfile, "IRWXU"))
 
 
-
-assert(fd:fchmod("IRUSR, IWUSR"))
 assert(S.chmod(tmpfile, "IRUSR, IWUSR"))
 
 assert(fd:fsync())
