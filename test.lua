@@ -100,44 +100,63 @@ test_read_write = {
     assert(n >= 0, "should not get error reading from /dev/zero")
     assert_equal(n, size, "should not get truncated read from /dev/zero")
     for i = 0, size - 1 do assert(buf[i] == 0, "should read zeroes from /dev/zero") end
+    assert(fd:close())
   end,
   test_read_to_string = function()
     local fd = assert(S.open("/dev/zero"))
     local str = assert(fd:read(nil, 10))
     assert_equal(#str, 10, "string returned from read should be length 10")
+    assert(fd:close())
   end,
   test_write_ro = function()
     local fd = assert(S.open("/dev/zero"))
-    n, err = fd2:write(buf, size)
+    local n, err = fd:write(buf, size)
     assert(err, "should not be able to write to file opened read only")
     assert(err.EBADF, "expect EBADF when writing read only file")
+    assert(fd:close())
+  end,
+  test_write = function()
+    fd = assert(S.open("/dev/zero", "RDWR"))
+    local n = assert(fd:write(buf, size))
+    assert(n >= 0, "should not get error writing to /dev/zero")
+    assert_equal(n, size, "should not get truncated write to /dev/zero")
+    assert(fd:close())
+  end,
+  test_write_string = function()
+    fd = assert(S.open("/dev/zero", "RDWR"))
+    local n = assert(fd:write(teststring))
+    assert_equal(n, #teststring, "write on a string should write out its length")
+    assert(fd:close())
+  end,
+  test_pread_pwrite = function()
+    fd = assert(S.open("/dev/zero", "RDWR"))
+    local offset = 1
+    local n
+    n = assert(fd:pread(buf, size, offset))
+    assert_equal(n, size, "should not get truncated pread on /dev/zero")
+    n = assert(fd:pwrite(buf, size, offset))
+    assert_equal(n, size, "should not get truncated pwrite on /dev/zero")
+    assert(fd:close())
+  end
+}
+
+test_dup = {
+  test_dup = function()
+    local fd = assert(S.open("/dev/zero"))
+    local fd2 = assert(fd:dup())
+    assert(fd2:close())
+    assert(fd:close())
+  end,
+  test_dup_to_number = function()
+    local fd = assert(S.open("/dev/zero"))
+    local fd2 = assert(fd:dup(17))
+    assert_equal(fd2.fileno, 17, "dup2 should set file id as specified")
+    assert(fd2:close())
+    assert(fd:close())
   end
 }
 
 
-
--- another open
-fd = assert(S.open("/dev/zero", "RDWR"))
--- test write
-n = assert(fd:write(buf, size))
-assert(n >= 0, "should not get error writing to /dev/zero")
-assert(n == size, "should not get truncated write to /dev/zero") -- technically allowed!
-
-n = assert(fd:write(teststring)) -- should be able to write a string, length is automatic
-assert(n == #teststring, "write on a string should write out its length")
-
-local offset = 1
-n = assert(fd:pread(buf, size, offset))
-n = assert(fd:pwrite(buf, size, offset))
-
-fd2 = assert(fd:dup())
-assert(fd2:close())
-
-fd2 = assert(fd:dup(17))
-assert(fd2.fileno == 17, "dup2 should set file id as specified")
-assert(fd2:close())
-
-assert(fd:close())
 
 assert(S.O_CREAT == 64, "wrong octal value for O_CREAT") -- test our octal converter!
 
@@ -160,6 +179,7 @@ assert(fd:fsync())
 assert(fd:fdatasync())
 assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
 
+local offset = 1
 n = assert(fd:lseek(offset, "set"))
 assert(n == offset, "seek should position at set position")
 n = assert(fd:lseek(offset, "cur"))
