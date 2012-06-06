@@ -10,6 +10,14 @@ Requirements: Needs LuaJIT 2.0.0-beta9 or later. Generally tested using git head
 
 Also supports [luaffi](https://github.com/jmckaskill/luaffi) so you can use with standard Lua; all the tests now pass, have added some workarounds to support current issues in luaffi which could be removed but these are not performance critical or important now as all the major issues have been resolved. There may still be a few issues in code that is not exercised by the tests, but actually luaffi has fixed most of the issues that were coming up anyway now. This is now tested and working with Lua 5.1 and 5.2.
 
+### Testing
+
+The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86. Intend to get my ppc build machine back up one day, if you want this supported please ask. I do not currently have a mips box, if you want this can you suggest a suitable dev box.
+
+Initial testing on uclibc, works on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes; I intend to test musl libc once I have a working build.
+
+Reworking the test script, it is a copy of my fork of [luaunit](https://github.com/justincormack/luaunit) which is updated to work on Lua 5.1 and 5.2. To avoid dependencies I am just copying and updating this into this repo.
+
 ## What is implemented?
 
 Unfinished! Some syscalls missing, work in progress! The majority of calls are now there, let me know if you need some that is not.
@@ -117,12 +125,5 @@ sigqueue,
 capset, capget
 ...
 
-### Testing
-
-The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86. Intend to get my ppc build machine back up one day, if you want this supported please ask. I do not currently have a mips box, if you want this can you suggest a suitable dev box.
-
-Initial testing on uclibc, works on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes; I intend to test musl libc once I have a working build.
-
-Test script needs cleanup - in progress.
 
 
