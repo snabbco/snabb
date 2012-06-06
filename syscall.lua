@@ -4562,6 +4562,9 @@ fmeth.stat = S.fstat
 fmeth.chdir = S.fchdir
 fmeth.sync = S.fsync
 fmeth.datasync = S.fdatasync
+fmeth.chmod = S.fchmod
+fmeth.setxattr = S.fsetxattr
+fmeth.getxattr = S.gsetxattr
 
 t.fd = ffi.metatype("struct {int fileno;}", {__index = fmeth, __gc = S.close})
 
