@@ -17,13 +17,20 @@ local buf = S.t.buffer(size)
 local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 
+local setup = function()
+  S.unlink(tmpfile)
+  S.unlink(tmpfile2)
+end
+
 test_basic = {
+  setup = setup,
   test_octal = function()
     assert_equal(S.O_CREAT, 64, "wrong octal value for O_CREAT")
   end
 }
 
 test_uname_hostname = {
+  setup = setup,
   test_uname = function()
     local u = assert(S.uname())
     assert_string(u.nodename)
@@ -39,6 +46,7 @@ test_uname_hostname = {
 }
 
 test_open_close = {
+  setup = setup,
   test_open_nofile = function()
     local fd, err = S.open("/tmp/file/does/not/exist", "rdonly")
     assert(err, "expected open to fail on file not found")
@@ -101,6 +109,7 @@ test_open_close = {
 }
 
 test_read_write = {
+  setup = setup,
   test_read = function()
     local fd = assert(S.open("/dev/zero"))
     for i = 0, size - 1 do buf[i] = 255 end
@@ -155,6 +164,7 @@ test_read_write = {
 }
 
 test_file_operations = {
+  setup = setup,
   test_dup = function()
     local fd = assert(S.open("/dev/zero"))
     local fd2 = assert(fd:dup())
@@ -232,11 +242,33 @@ test_file_operations = {
     local nd = assert(S.getcwd())
     assert(nd == "/", "expect cwd to be /")
     assert(S.chdir(cwd)) -- return to original directory
+  end,
+  test_stat = function()
+    local stat = assert(S.stat("/dev/zero"))
+    assert(stat.nlink == 1, "expect link count on /dev/zero to be 1")
+    assert(stat.major == 1 , "expect major number of /dev/zero to be 1")
+    assert(stat.minor == 5, "expect minor number of /dev/zero to be 5")
+    assert(stat.ischr, "expect /dev/zero to be a character device")
+    assert(stat.rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
+  end,
+  test_stat_directory = function()
+    local fd = assert(S.open("/"))
+    local stat = assert(fd:stat())
+    assert(stat.size == 4096, "expect / to be size 4096") -- might not be
+    assert(stat.gid == 0, "expect / to be gid 0 is " .. tonumber(stat.st_gid))
+    assert(stat.uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
+    assert(stat.isdir, "expect / to be a directory")
+    assert(fd:close())
+  end,
+  test_lstat = function()
+    assert(S.symlink("/etc/passwd", tmpfile))
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.isreg, "expect /etc/passwd to be a regular file")
+    local stat = assert(S.lstat(tmpfile))
+    assert(stat.islnk, "expect lstat to stat the symlink")
+    assert(S.unlink(tmpfile))
   end
 }
-
-
-
 
 fd = assert(S.pipe())
 assert(fd[1]:close())
@@ -245,25 +277,6 @@ assert(fd[2]:close())
 
 local stat
 
-local fd = assert(S.open("/"))
-stat = assert(S.stat("/dev/zero"))
-assert(stat.nlink == 1, "expect link count on /dev/zero to be 1")
-
-stat = assert(fd:fstat()) -- stat "/"
-assert(stat.size == 4096, "expect / to be size 4096") -- might not be
-assert(stat.gid == 0, "expect / to be gid 0 is " .. tonumber(stat.st_gid))
-assert(stat.uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
-assert(stat.isdir, "expect / to be a directory")
-assert(fd:close())
-
-stat = assert(S.stat("/dev/zero"))
-assert(stat.major == 1 , "expect major number of /dev/zero to be 1")
-assert(stat.minor == 5, "expect minor number of /dev/zero to be 5")
-assert(stat.ischr, "expect /dev/zero to be a character device")
-assert(stat.rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
-
-stat = assert(S.lstat("/etc/passwd"))
-assert(stat.isreg, "expect /etc/passwd to be a regular file")
 
 -- test truncate
 assert(S.writefile(tmpfile, teststring, "IRWXU"))
