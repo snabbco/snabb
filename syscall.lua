@@ -604,6 +604,11 @@ S.DT_LNK = 10
 S.DT_SOCK = 12
 S.DT_WHT = 14
 
+-- sync file range
+S.SYNC_FILE_RANGE_WAIT_BEFORE = 1
+S.SYNC_FILE_RANGE_WRITE       = 2
+S.SYNC_FILE_RANGE_WAIT_AFTER  = 4
+
 -- netlink
 S.NETLINK_ROUTE         = 0
 S.NETLINK_UNUSED        = 1
@@ -2163,6 +2168,7 @@ int inotify_init1(int flags);
 int inotify_add_watch(int fd, const char *pathname, uint32_t mask);
 int inotify_rm_watch(int fd, uint32_t wd);
 int adjtimex(struct timex *buf);
+int sync_file_range(int fd, loff_t offset, loff_t count, unsigned int flags);
 ssize_t listxattr (const char *path, char *list, size_t size);
 ssize_t llistxattr (const char *path, char *list, size_t size);
 ssize_t flistxattr (int filedes, char *list, size_t size);
@@ -2936,6 +2942,9 @@ function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), stringflags(mode, "S_"))) end
+function S.sync_file_range(fd, offset, count, flags)
+  return retbool(C.sync_file_range(getfd(fd), offset, count, stringflags(flags, "SYNC_FILE_RANGE_")))
+end
 
 function S.stat(path, buf)
   if not buf then buf = t.stat() end
@@ -4524,7 +4533,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
-                   'grantpt', 'unlockpt', 'ptsname',
+                   'grantpt', 'unlockpt', 'ptsname', 'sync_file_range'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end

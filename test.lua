@@ -127,6 +127,7 @@ assert(S.chmod(tmpfile, "IRUSR, IWUSR"))
 
 assert(fd:fsync())
 assert(fd:fdatasync())
+assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
 
 n = assert(fd:lseek(offset, "set"))
 assert(n == offset, "seek should position at set position")

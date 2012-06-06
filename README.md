@@ -30,7 +30,7 @@ open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname
 nice, getpriority, setpriority, prctl, alarm, waitid, inotify\_init, inotify\_add\_watch, inotify\_rm\_watch, adjtimex, getrlimit, setrlimit, sigprocmask, sigpending,
 sigsuspend, getsid, setsid, listxattr, llistxattr, flistxattr, setxattr, lsetxattr, fsetxattr, getxattr, lgetxattr, fgetxattr, removexattr, lremovexattr, fremovexattr,
 readlink, splice, vmsplice, tee, signalfd, timerfd\_create, timerfd\_settime, timerfd\_gettime, posix\_fadvise, fallocate, readahead, poll,
-getitimer, setitimer,
+getitimer, setitimer, sync\_file\_range,
 io\_cancel, io\_destroy, io\_setup, io\_submit, io\_getevents
 
 ### Other functions
@@ -114,7 +114,6 @@ clock\_nanosleep, timer\_create, timer\_getoverrun
 faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  mkdirat(2),  mknodat(2),
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue,
-sync\_file\_range(2),
 capset, capget
 ...
 
