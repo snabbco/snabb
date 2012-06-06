@@ -70,7 +70,8 @@ test_open_close = {
     assert(err.badf, "expect EBADF from invalid numberic fd")
   end,
   test_access = function(self)
-    assert(S.access("/dev/null", "r_ok"), "expect access to say can read /dev/null")
+    assert(S.access("/dev/null", "r"), "expect access to say can read /dev/null")
+    assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
   end
 }
 

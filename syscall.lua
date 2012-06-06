@@ -2774,7 +2774,7 @@ local function accessflags(s) -- allow "rwx"
     if     c == 'R' then flag = bit.bor(flag, S.R_OK)
     elseif c == 'W' then flag = bit.bor(flag, S.W_OK)
     elseif c == 'X' then flag = bit.bor(flag, S.X_OK)
-    end
+    else error("invalid access flag") end
   end
   return flag
 end
