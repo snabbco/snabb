@@ -11,6 +11,8 @@ local luaunit = require "luaunit"
 local assert_equal = assert_equals
 
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
+local stat
+
 local teststring = "this is a test string"
 local size = 512
 local buf = S.t.buffer(size)
@@ -284,13 +286,14 @@ test_file_operations = {
   end
 }
 
-fd = assert(S.pipe())
-assert(fd[1]:close())
-assert(fd[2]:close())
-
-
-local stat
-
+test_sockets_pipes = {
+  setup = setup,
+  test_pipe = function()
+    local fd = assert(S.pipe())
+    assert(fd[1]:close())
+    assert(fd[2]:close())
+  end
+}
 
 
 local rem
