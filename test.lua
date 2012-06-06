@@ -154,7 +154,7 @@ test_read_write = {
   end
 }
 
-test_dup = {
+test_file_operations = {
   test_dup = function()
     local fd = assert(S.open("/dev/zero"))
     local fd2 = assert(fd:dup())
@@ -167,6 +167,22 @@ test_dup = {
     assert_equal(fd2.fileno, 17, "dup2 should set file id as specified")
     assert(fd2:close())
     assert(fd:close())
+  end,
+  test_link = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    assert(S.link(tmpfile, tmpfile2))
+    assert(S.unlink(tmpfile2))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_symlink = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    assert(S.symlink(tmpfile, tmpfile2))
+    local s = assert(S.readlink(tmpfile2))
+    assert_equal(s, tmpfile, "should be able to read symlink")
+    assert(S.unlink(tmpfile2))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
   end
 }
 
@@ -174,12 +190,7 @@ test_dup = {
 
 fd = assert(S.creat(tmpfile, "IRWXU"))
 
-assert(S.link(tmpfile, tmpfile2))
-assert(S.unlink(tmpfile2))
-assert(S.symlink(tmpfile, tmpfile2))
-local s = assert(S.readlink(tmpfile2))
-assert(s == tmpfile, "should be able to read symlink")
-assert(S.unlink(tmpfile2))
+
 
 assert(fd:fchmod("IRUSR, IWUSR"))
 assert(S.chmod(tmpfile, "IRUSR, IWUSR"))
