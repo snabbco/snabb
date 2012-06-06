@@ -193,6 +193,7 @@ test_file_operations = {
   test_chmod = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(S.chmod(tmpfile, "IRUSR, IWUSR")) -- TODO test if worked with stat
+    assert(S.access(tmpfile, "rw"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end

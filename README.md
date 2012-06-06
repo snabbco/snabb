@@ -123,6 +123,6 @@ The test script is quite comprehensive, though it does not test all the syscalls
 
 Initial testing on uclibc, works on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes; I intend to test musl libc once I have a working build.
 
-Test script needs cleanup.
+Test script needs cleanup - in progress.
 
 

@@ -2770,7 +2770,7 @@ local function accessflags(s) -- allow "rwx"
   s = trim(s:upper())
   local flag = 0
   for i = 1, #s do
-    local c = s:sub(i, i + 1)
+    local c = s:sub(i, i)
     if     c == 'R' then flag = bit.bor(flag, S.R_OK)
     elseif c == 'W' then flag = bit.bor(flag, S.W_OK)
     elseif c == 'X' then flag = bit.bor(flag, S.X_OK)
