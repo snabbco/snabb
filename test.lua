@@ -198,6 +198,15 @@ test_file_operations = {
     assert(S.access(tmpfile, "rw"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
+  end,
+  test_sync = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    assert(fd:fsync())
+    assert(fd:fdatasync())
+    assert(fd:sync()) -- synonym
+    assert(fd:datasync()) -- synonym
+    assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
+    assert(fd:close())
   end
 }
 
@@ -206,9 +215,6 @@ test_file_operations = {
 fd = assert(S.creat(tmpfile, "IRWXU"))
 
 
-assert(fd:fsync())
-assert(fd:fdatasync())
-assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
 
 local offset = 1
 n = assert(fd:lseek(offset, "set"))
