@@ -369,6 +369,19 @@ test_misc = {
   end
 }
 
+test_sockets = {
+  test_socket_sizes = function()
+    assert(S.sizeof(S.t.sockaddr) == S.sizeof(S.t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
+    assert(S.sizeof(S.t.sockaddr_storage) == 128) -- this is the required size in Linux
+    assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr))
+    assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_in))
+    assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_in6))
+    assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_un))
+    assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_nl))
+  end
+
+}
+
 -- legacy tests not yet converted to test framework
 
 test_legacy = {
@@ -380,13 +393,6 @@ local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 
 -- sockets
 
-assert(S.sizeof(S.t.sockaddr) == S.sizeof(S.t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
-assert(S.sizeof(S.t.sockaddr_storage) == 128) -- this is the required size in Linux
-assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr))
-assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_in))
-assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_in6))
-assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_un))
-assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_nl))
 
 local a, sa
 a = S.inet_aton("error")
