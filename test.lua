@@ -292,6 +292,21 @@ test_file_operations = {
     assert(ok or err.EOPNOTSUPP, "expect posix_fallocate to succeed if supported")
     assert(fd:readahead(0, 4096))
     assert(fd:close())
+  end,
+  test_getdents_dirfile = function()
+    local d = assert(S.dirfile("/dev")) -- tests getdents from higher level interface
+    assert(d.zero, "expect to find /dev/zero")
+    assert(d["."], "expect to find .")
+    assert(d[".."], "expect to find ..")
+    assert(d.zero.chr, "/dev/zero is a character device")
+    assert(d["."].dir, ". is a directory")
+    assert(d[".."].dir, ".. is a directory")
+  end,
+  test_getdents_error = function()
+    local fd = assert(S.open("/etc/passwd", "RDONLY"))
+    local d, err = fd:getdents()
+    assert(err.notdir, "/etc/passwd should give a not directory error")
+    assert(fd:close())
   end
 }
 
@@ -533,10 +548,6 @@ local a, sa
 local loop = "127.0.0.1"
 
 
-
--- assert(S.sigsuspend(m)) -- needs to be tested in fork.
-
-
 local sv = assert(S.socketpair("unix", "stream"))
 c, s = sv[1], sv[2]
 
@@ -697,21 +708,6 @@ assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
 
 assert(i.iface.lo, "expect a loopback interface")
 
--- getdents, Linux only, via dirfile interface
-local d = assert(S.dirfile("/dev"))
-assert(d.zero, "expect to find /dev/zero")
-assert(d["."], "expect to find .")
-assert(d[".."], "expect to find ..")
-assert(d.zero.chr, "/dev/zero is a character device")
-assert(d["."].dir, ". is a directory")
-assert(d[".."].dir, ".. is a directory")
-
--- add test for failing system call to check return values
-fd = assert(S.open("/etc/passwd", "RDONLY"))
-local d, err = fd:getdents()
-assert(err.notdir, "/etc/passwd should give a not directory error")
-assert(fd:close())
-
 -- eventfd
 fd = assert(S.eventfd(0, "nonblock"))
 
@@ -747,7 +743,7 @@ assert(fd:close())
 local syslog = assert(S.klogctl(3))
 assert(#syslog > 20, "should be something in syslog")
 
--- prctl, Linux only
+-- prctl
 --PR_CAPBSET_READ -- need to define capabilities flags
 n = assert(S.prctl("get_dumpable"))
 assert(n == 1, "process dumpable by default")
@@ -815,7 +811,7 @@ assert(fd:close())
 assert(S.chdir(".."))
 assert(S.rmdir(tmpfile))
 
--- tee, splice, vmsplice Linux only
+-- tee, splice, vmsplice
 local p = assert(S.pipe("nonblock"))
 local pp = assert(S.pipe("nonblock"))
 local s = assert(S.socketpair("unix", "stream, nonblock"))
@@ -1065,4 +1061,7 @@ S.exit("success")
 
 -- note tests missing tests for setting time TODO
 -- note have tested pause, reboot but not in tests
+
+-- assert(S.sigsuspend(m)) -- needs to be tested in fork.
+
 
