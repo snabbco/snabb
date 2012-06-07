@@ -613,6 +613,35 @@ test_sockets = {
   end
 }
 
+test_termios = {
+  test_pts_termios = function()
+    local ptm = assert(S.posix_openpt("rdwr, noctty"))
+    assert(ptm:grantpt())
+    assert(ptm:unlockpt())
+    local pts_name = assert(ptm:ptsname())
+    local pts = assert(S.open(pts_name, "rdwr, noctty"))
+    local termios = assert(pts:tcgetattr())
+    assert(termios:cfgetospeed() ~= 115200)
+    termios:cfsetspeed(115200)
+    assert_equal(termios:cfgetispeed(), 115200, "expect input speed as set")
+    assert_equal(termios:cfgetospeed(), 115200, "expect output speed as set")
+    assert(bit.band(termios.c_lflag, S.ICANON) ~= 0)
+    termios:cfmakeraw()
+    assert(bit.band(termios.c_lflag, S.ICANON) == 0)
+    assert(pts:tcsetattr("now", termios))
+    termios = assert(pts:tcgetattr())
+    assert(termios:cfgetospeed() == 115200)
+    assert(bit.band(termios.c_lflag, S.ICANON) == 0)
+    assert(pts:tcsendbreak(0))
+    assert(pts:tcdrain())
+    assert(pts:tcflush('ioflush'))
+    assert(pts:tcflow('ooff'))
+    assert(pts:tcflow('ioff'))
+    assert(pts:tcflow('oon'))
+    assert(pts:tcflow('ion'))
+  end
+}
+
 test_events = {
   test_eventfd = function()
     local fd = assert(S.eventfd(0, "nonblock"))
@@ -941,34 +970,6 @@ assert(S.unlink(tmpfile))
 
 local b = assert(S.bridge_list())
 
--- pts/termios
-local ptm = assert(S.posix_openpt("rdwr, noctty"))
-assert(ptm:grantpt())
-assert(ptm:unlockpt())
-local pts_name = assert(ptm:ptsname())
-local pts = assert(S.open(pts_name, "rdwr, noctty"))
-
-local termios = assert(pts:tcgetattr())
-assert(termios:cfgetospeed() ~= 115200)
-termios:cfsetspeed(115200)
-assert(termios:cfgetispeed() == 115200)
-assert(termios:cfgetospeed() == 115200)
-assert(bit.band(termios.c_lflag, S.ICANON) ~= 0)
-termios:cfmakeraw()
-assert(bit.band(termios.c_lflag, S.ICANON) == 0)
-assert(pts:tcsetattr("now", termios))
-
-termios = assert(pts:tcgetattr())
-assert(termios:cfgetospeed() == 115200)
-assert(bit.band(termios.c_lflag, S.ICANON) == 0)
-
-assert(pts:tcsendbreak(0))
-assert(pts:tcdrain())
-assert(pts:tcflush('ioflush'))
-assert(pts:tcflow('ooff'))
-assert(pts:tcflow('ioff'))
-assert(pts:tcflow('oon'))
-assert(pts:tcflow('ion'))
 
 -- aio
 local ctx = assert(S.io_setup(8))
