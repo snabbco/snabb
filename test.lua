@@ -430,6 +430,17 @@ test_mmap = {
     local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
     mem = assert(S.mremap(mem, size, size2, "maymove"))
     assert(S.munmap(mem, size2))
+  end,
+  test_mlock = function()
+    local size = 4096
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    assert(S.mlock(mem, size))
+    assert(S.munlock(mem, size))
+    assert(S.munmap(mem, size))
+    local ok, err = S.mlockall("current")
+    assert(ok or err.nomem, "expect mlockall to succeed, or fail due to rlimit")
+    assert(S.munlockall())
+    assert(S.munmap(mem, size))
   end
 }
 
@@ -1018,13 +1029,6 @@ assert(S.rmdir(tmpfile))
 
 S.acct() -- may not be configured
 
-mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-assert(S.mlock(mem, size))
-assert(S.munlock(mem, size))
-assert(S.munmap(mem, size))
-
-assert(S.mlockall("current"))
-assert(S.munlockall())
 
 local hh = "testhostname"
 h = assert(S.gethostname())
