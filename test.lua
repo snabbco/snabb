@@ -613,6 +613,16 @@ test_sockets = {
   end
 }
 
+test_netlink = {
+  test_get_interfaces = function()
+    local i = S.get_interfaces()
+    local df = #assert(S.ls("/sys/class/net", true))
+    --for k, v in ipairs(i.ifaces) do print(v.name) end
+    assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
+    assert(i.iface.lo, "expect a loopback interface")
+  end
+}
+
 test_termios = {
   test_pts_termios = function()
     local ptm = assert(S.posix_openpt("rdwr, noctty"))
@@ -784,18 +794,6 @@ assert(math.floor(tv.time) == tv.sec, "should be able to get float time from tim
 local t = S.time()
 local t = assert(S.clock_getres("realtime"))
 local t = assert(S.clock_gettime("realtime"))
-
--- netlink sockets, Linux only
-local i = S.get_interfaces()
-
-local df = #assert(S.ls("/sys/class/net", true))
-
---for k, v in ipairs(i.ifaces) do print(v.name) end
-
-assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
-
-assert(i.iface.lo, "expect a loopback interface")
-
 
 -- timerfd
 fd = assert(S.timerfd_create("monotonic", "nonblock, cloexec"))
