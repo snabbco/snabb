@@ -545,6 +545,24 @@ test_sockets = {
     local f = assert(c:recvfrom(buf, size)) -- do not test as can drop data
     assert(s:close())
     assert(c:close())
+  end,
+  test_ipv6_socket = function()
+    local s, err = S.socket("AF_INET6", "dgram")
+    if s then 
+      local c = assert(S.socket("AF_INET6", "dgram"))
+      local sa = assert(S.sockaddr_in6(0, S.in6addr_any))
+      local ca = assert(S.sockaddr_in6(0, S.in6addr_any))
+      assert(s:bind(sa))
+      assert(c:bind(sa))
+      local bca = c:getsockname().addr -- find bound address
+      local serverport = s:getsockname().port -- find bound port
+      local n = assert(s:sendto(teststring, nil, 0, bca))
+      local f = assert(c:recvfrom(buf, size))
+      assert(f.count == #teststring, "should get the whole string back")
+      assert(f.port == serverport, "should be able to get server port in recvfrom")
+      assert(c:close())
+      assert(s:close())
+    else assert(err.EAFNOSUPPORT, err) end -- fairly common to not have ipv6 in kernel
   end
 }
 
@@ -617,25 +635,6 @@ assert(#p == 1 and p[1].fileno == c.fileno and p[1].POLLIN, "one event now")
 assert(s:close())
 assert(c:close())
 
-
-
---ipv6 socket
-s, err = S.socket("AF_INET6", "dgram")
-if s then 
-  c = assert(S.socket("AF_INET6", "dgram"))
-  local sa = assert(S.sockaddr_in6(0, S.in6addr_any))
-  local ca = assert(S.sockaddr_in6(0, S.in6addr_any))
-  assert(s:bind(sa))
-  assert(c:bind(sa))
-  local bca = c:getsockname().addr -- find bound address
-  local serverport = s:getsockname().port -- find bound port
-  n = assert(s:sendto(teststring, nil, 0, bca))
-  local f = assert(c:recvfrom(buf, size))
-  assert(f.count == #teststring, "should get the whole string back")
-  assert(f.port == serverport, "should be able to get server port in recvfrom")
-  assert(c:close())
-  assert(s:close())
-else assert(err.EAFNOSUPPORT, err) end -- ok to not have ipv6 in kernel
 
 
 -- fork and related methods
