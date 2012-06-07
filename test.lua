@@ -332,6 +332,36 @@ test_timers_signals = {
     assert(S.signal("pipe", "ign"))
     assert(S.kill(S.getpid(), "pipe")) -- should be ignored
     assert(S.signal("pipe", "dfl"))
+  end,
+  test_sigprocmask = function()
+    local m = assert(S.sigprocmask())
+    assert(m.isemptyset, "expect initial sigprocmask to be empty")
+    assert(not m.winch, "expect set empty")
+    m = m:add(S.SIGWINCH)
+    assert(m.winch, "expect to have added SIGWINCH")
+    m = m:del("SIGWINCH, pipe")
+    assert(not m.winch, "expect set empty again")
+    assert(m.isemptyset, "expect initial sigprocmask to be empty")
+    m = m:add("winch")
+    m = assert(S.sigprocmask("block", m))
+    assert(m.isemptyset, "expect old sigprocmask to be empty")
+    assert(S.kill(S.getpid(), "winch")) -- should be blocked but pending
+    local p = assert(S.sigpending())
+    assert(p.winch, "expect pending winch")
+
+    -- signalfd. TODO Should be in another test
+    local ss = "winch, pipe, usr1, usr2"
+    local fd = assert(S.signalfd(ss, "nonblock"))
+    assert(S.sigprocmask("block", ss))
+    assert(S.kill(S.getpid(), "usr1"))
+    local ss = assert(fd:signalfd_read())
+    assert(#ss == 2, "expect to read two signals") -- previous pending winch, plus USR1
+    assert((ss[1].winch and ss[2].usr1) or (ss[2].winch and ss[1].usr1), "expect a winch and a usr1 signal") -- unordered
+    assert(ss[1].user, "signal sent by user")
+    assert(ss[2].user, "signal sent by user")
+    assert(ss[1].pid == S.getpid(), "signal sent by my pid")
+    assert(ss[2].pid == S.getpid(), "signal sent by my pid")
+    assert(fd:close())
   end
 }
 
@@ -503,41 +533,9 @@ local a, sa
 local loop = "127.0.0.1"
 
 
--- unix domain sockets
 
+-- assert(S.sigsuspend(m)) -- needs to be tested in fork.
 
-
-local m = assert(S.sigprocmask())
-assert(m.isemptyset, "expect initial sigprocmask to be empty")
-assert(not m.winch, "expect set empty")
-m = m:add(S.SIGWINCH)
-assert(m.winch, "expect to have added SIGWINCH")
-m = m:del("SIGWINCH, pipe")
-assert(not m.winch, "expect set empty again")
-assert(m.isemptyset, "expect initial sigprocmask to be empty")
-m = m:add("winch")
-m = assert(S.sigprocmask("block", m))
-assert(m.isemptyset, "expect old sigprocmask to be empty")
-
-assert(S.kill(S.getpid(), "winch")) -- should be blocked but pending
-local p = assert(S.sigpending())
-assert(p.winch, "expect pending winch")
-
--- assert(S.sigsuspend(m)) -- we cannot test this without being able to set a signal handler
-
--- signalfd. Useful as we cannot set real signal handlers. And it is a nice interface, as can mix with events.
-local ss = "winch, pipe, usr1, usr2"
-fd = assert(S.signalfd(ss, "nonblock"))
-assert(S.sigprocmask("block", ss))
-assert(S.kill(S.getpid(), "usr1"))
-local ss = assert(fd:signalfd_read())
-assert(#ss == 2, "expect to read two signals") -- previous pending winch, plus USR1
-assert((ss[1].winch and ss[2].usr1) or (ss[2].winch and ss[1].usr1), "expect a winch and a usr1 signal") -- unordered
-assert(ss[1].user, "signal sent by user")
-assert(ss[2].user, "signal sent by user")
-assert(ss[1].pid == S.getpid(), "signal sent by my pid")
-assert(ss[2].pid == S.getpid(), "signal sent by my pid")
-assert(fd:close())
 
 local sv = assert(S.socketpair("unix", "stream"))
 c, s = sv[1], sv[2]
