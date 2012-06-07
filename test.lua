@@ -24,6 +24,9 @@ end
 test_basic = {
   test_octal = function()
     assert_equal(S.O_CREAT, 64, "wrong octal value for O_CREAT")
+  end,
+  test_signals = function()
+    assert_equal(S.SIGSYS, 31) -- test numbers correct
   end
 }
 
@@ -324,6 +327,11 @@ test_timers_signals = {
     local rem, err = S.nanosleep(1) -- nanosleep does not interact with signals, should be interrupted
     assert(err.EINTR, "expect nanosleep to be interrupted by timer expiry")
     assert(exp == 0, "sigaction handler should have run")
+  end,
+  test_kill_ignored = function()
+    assert(S.signal("pipe", "ign"))
+    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
+    assert(S.signal("pipe", "dfl"))
   end
 }
 
@@ -500,9 +508,6 @@ assert(err.EPIPE, "should get sigpipe")
 
 assert(sv[1]:close())
 
-assert(S.kill(S.getpid(), "pipe")) -- should be ignored
-
-assert(S.SIGSYS == 31) -- test numbers correct (Linux)
 
 local m = assert(S.sigprocmask())
 assert(m.isemptyset, "expect initial sigprocmask to be empty")
