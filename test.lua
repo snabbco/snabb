@@ -278,6 +278,17 @@ test_file_operations = {
     assert_equal(stat.size, 1024, "expect get truncated size")
     assert(S.unlink(tmpfile))
     assert(fd:close())
+  end,
+  test_fadvise_etc = function() -- could split
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
+    assert(S.unlink(tmpfile))
+    assert(fd:posix_fadvise("random"))
+    local ok, err = fd:fallocate("keep_size", 0, 4096)
+    assert(ok or err.EOPNOTSUPP, "expect fallocate to succeed if supported")
+    ok, err = fd:posix_fallocate(0, 8192)
+    assert(ok or err.EOPNOTSUPP, "expect posix_fallocate to succeed if supported")
+    assert(fd:readahead(0, 4096))
+    assert(fd:close())
   end
 }
 
@@ -366,16 +377,6 @@ test_legacy = {
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 
 
-
-fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
-assert(S.unlink(tmpfile))
-assert(fd:posix_fadvise("random"))
-ok, err = fd:fallocate("keep_size", 0, 4096)
-assert(ok or err.EOPNOTSUPP, "expect fallocate to succeed if supported")
-ok, err = fd:posix_fallocate(0, 8192)
-assert(ok or err.EOPNOTSUPP, "expect posix_fallocate to succeed if supported")
-assert(fd:readahead(0, 4096))
-assert(fd:close())
 
 -- sockets
 
