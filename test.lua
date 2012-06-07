@@ -446,6 +446,15 @@ test_misc = {
   test_sysctl = function()
     local syslog = assert(S.klogctl(3))
     assert(#syslog > 20, "should be something in syslog")
+  end,
+  test_environ = function()
+    local e = S.environ()
+    assert(e.PATH, "expect PATH to be set in environment")
+    assert(S.getenv("USER"), "expect USER to be set in environment")
+    assert(S.setenv("XXXXYYYYZZZZZZZZ", "test"))
+    assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env vars")
+    assert(S.unsetenv("XXXXYYYYZZZZZZZZ"))
+    assert_nil(S.environ().XXXXYYYYZZZZZZZZ, "expect to be able to unset env vars")
   end
 }
 
@@ -797,14 +806,6 @@ assert(S.setcmdline(ss))
 n = assert(S.readfile("/proc/self/cmdline"))
 --assert(n:sub(1,#ss) == ss, "long command line should be set: ")
 assert(S.setcmdline(oldcmd))
-
-local e = S.environ()
-assert(e.PATH, "expect PATH to be set in environment")
-assert(S.getenv("USER"), "expect USER to be set in environment")
-assert(S.setenv("XXXXYYYYZZZZZZZZ", "test"))
-assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env vars")
-assert(S.unsetenv("XXXXYYYYZZZZZZZZ"))
-assert(S.environ().XXXXYYYYZZZZZZZZ == nil, "expect to be able to unset env vars")
 
 
 -- tee, splice, vmsplice
