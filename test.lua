@@ -466,6 +466,15 @@ test_misc = {
     assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env vars")
     assert(S.unsetenv("XXXXYYYYZZZZZZZZ"))
     assert_nil(S.environ().XXXXYYYYZZZZZZZZ, "expect to be able to unset env vars")
+  end,
+  test_rlimit = function()
+    local r = assert(S.getrlimit("nofile"))
+    assert(S.setrlimit("nofile", 0, r.rlim_max))
+    local fd, err = S.open("/dev/zero", "rdonly")
+    assert(err.EMFILE, "should be over rlimit")
+    assert(S.setrlimit("nofile", r.rlim_cur, r.rlim_max)) -- reset
+    fd = assert(S.open("/dev/zero", "rdonly"))
+    assert(fd:close())
   end
 }
 
@@ -898,13 +907,6 @@ assert(s[2]:close())
 
 local t = assert(S.adjtimex())
 
-local r = assert(S.getrlimit("nofile"))
-assert(S.setrlimit("nofile", 0, r.rlim_max))
-fd, err = S.open("/dev/zero", "rdonly")
-assert(err.EMFILE, "should be over rlimit")
-assert(S.setrlimit("nofile", r.rlim_cur, r.rlim_max)) -- reset
-fd = assert(S.open("/dev/zero", "rdonly"))
-assert(fd:close())
 
 -- xattr support
 assert(S.writefile(tmpfile, "test", "IRWXU"))
