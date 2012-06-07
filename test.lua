@@ -349,6 +349,15 @@ test_mmap = {
   end
 }
 
+test_misc = {
+  test_umask = function()
+    local mask
+    mask = S.umask("IWGRP, IWOTH")
+    mask = S.umask("IWGRP, IWOTH")
+    assert_equal(mask, S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
+  end
+}
+
 -- legacy tests not yet converted to test framework
 
 test_legacy = {
@@ -357,15 +366,6 @@ test_legacy = {
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 
 
--- mmap and related functions
-local mem
-local size = 4096
-
-
-local mask
-mask = S.umask("IWGRP, IWOTH")
-mask = S.umask("IWGRP, IWOTH")
-assert(mask == S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
 
 fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
 assert(S.unlink(tmpfile))
