@@ -2315,7 +2315,6 @@ t.sockaddr_storage = ffi.typeof("struct sockaddr_storage")
 t.sa_family = ffi.typeof("sa_family_t")
 t.sockaddr_in = ffi.typeof("struct sockaddr_in")
 t.sockaddr_in6 = ffi.typeof("struct sockaddr_in6")
-t.in_addr = ffi.typeof("struct in_addr")
 t.in6_addr = ffi.typeof("struct in6_addr")
 t.sockaddr_un = ffi.typeof("struct sockaddr_un")
 t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
@@ -2748,14 +2747,6 @@ function S.inet_pton(af, src)
   if ret == 0 then return nil end -- maybe return string
   return addr
 end
-
--- constants
-S.INADDR_ANY = t.in_addr()
-S.INADDR_LOOPBACK = S.inet_aton("127.0.0.1")
-S.INADDR_BROADCAST = S.inet_aton("255.255.255.255")
--- ipv6 versions
-S.in6addr_any = t.in6_addr()
-S.in6addr_loopback = S.inet_pton(S.AF_INET6, "::1")
 
 -- main definitions start here
 function S.open(pathname, flags, mode) return retfd(C.open(pathname, stringflags(flags, "O_"), S.mode(mode))) end
@@ -4577,6 +4568,21 @@ function S.tbuffer(...) -- helper function for sequence of types in a buffer
 end
 
 -- additional metatypes that need functions defined
+
+
+--t.in_addr = ffi.typeof("struct in_addr")
+t.in_addr = ffi.metatype("struct in_addr", {
+  __tostring = S.inet_ntoa
+})
+
+-- constants
+S.INADDR_ANY = t.in_addr()
+S.INADDR_LOOPBACK = S.inet_aton("127.0.0.1")
+S.INADDR_BROADCAST = S.inet_aton("255.255.255.255")
+-- ipv6 versions
+S.in6addr_any = t.in6_addr()
+S.in6addr_loopback = S.inet_pton(S.AF_INET6, "::1")
+
 -- methods on an fd
 local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    'close', 'dup', 'read', 'write', 'pread', 'pwrite',

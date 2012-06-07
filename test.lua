@@ -525,7 +525,8 @@ test_sockets = {
     local s = assert(S.socket("inet", "stream, nonblock")) -- adding flags to socket type is Linux only
     local loop = "127.0.0.1"
     local sa = assert(S.sockaddr_in(1234, loop))
-    assert(S.inet_ntoa(sa.sin_addr) == loop, "expect address converted back to string to still be same")
+    assert_equal(S.inet_ntoa(sa.sin_addr), loop, "expect address converted back to string to still be same")
+    assert_equal(tostring(sa.sin_addr), loop, "expect address converted back to string to still be same")
     assert(sa.sin_family == 2, "expect family on inet socket to be AF_INET=2")
     -- find a free port
     local port
