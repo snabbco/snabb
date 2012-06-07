@@ -475,6 +475,9 @@ test_misc = {
     assert(S.setrlimit("nofile", r.rlim_cur, r.rlim_max)) -- reset
     fd = assert(S.open("/dev/zero", "rdonly"))
     assert(fd:close())
+  end,
+  test_adjtimex = function()
+    local t = assert(S.adjtimex())
   end
 }
 
@@ -951,7 +954,6 @@ assert(pp[2]:close())
 assert(s[1]:close())
 assert(s[2]:close())
 
-local t = assert(S.adjtimex())
 
 
 -- xattr support
