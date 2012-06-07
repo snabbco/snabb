@@ -337,8 +337,15 @@ test_mmap = {
   test_madvise = function()
     local size = 4096
     local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-   assert(S.madvise(mem, size, "random"))
+    assert(S.madvise(mem, size, "random"))
     assert(S.munmap(mem, size))
+  end,
+  test_mremap = function()
+    local size = 4096
+    local size2 = size * 2
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    mem = assert(S.mremap(mem, size, size2, "maymove"))
+    assert(S.munmap(mem, size2))
   end
 }
 
@@ -354,10 +361,6 @@ local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 local mem
 local size = 4096
 
-local size2 = size * 2
-mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-mem = assert(S.mremap(mem, size, size2, "maymove"))
-assert(S.munmap(mem, size2))
 
 local mask
 mask = S.umask("IWGRP, IWOTH")
