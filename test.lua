@@ -30,21 +30,6 @@ test_basic = {
   end
 }
 
-test_uname_hostname = {
-  test_uname = function()
-    local u = assert(S.uname())
-    assert_string(u.nodename)
-    assert_string(u.sysname)
-    assert_string(u.release)
-    assert_string(u.version)
-  end,
-  test_hostname = function()
-    local h = assert(S.gethostname())
-    local u = assert(S.uname())
-    assert(h == u.nodename, "gethostname did not return nodename")
-  end
-}
-
 test_open_close = {
   setup = setup,
   test_open_nofile = function()
@@ -503,6 +488,18 @@ test_misc = {
     assert(n == "test", "name should be as set")
     n = assert(S.readfile("/proc/self/comm"))
     assert(n == "test\n", "comm should be as set")
+  end,
+  test_uname = function()
+    local u = assert(S.uname())
+    assert_string(u.nodename)
+    assert_string(u.sysname)
+    assert_string(u.release)
+    assert_string(u.version)
+  end,
+  test_hostname = function()
+    local h = assert(S.gethostname())
+    local u = assert(S.uname())
+    assert(h == u.nodename, "gethostname did not return nodename")
   end
 }
 
