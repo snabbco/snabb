@@ -445,6 +445,13 @@ test_sockets = {
     assert(c:close())
     assert(a.fd:close())
     assert(s:close())
+  end,
+  test_unix_socket = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(sv[1]:sendmsg())
+    assert(sv[2]:recvmsg())
+    assert(sv[1]:close())
+    assert(sv[2]:close())
   end
 }
 
@@ -460,14 +467,11 @@ local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 -- sockets
 
 local a, sa
-    local loop = "127.0.0.1"
+local loop = "127.0.0.1"
 
 
 -- unix domain sockets
 local sv = assert(S.socketpair("unix", "stream"))
-
-assert(sv[1]:sendmsg())
-assert(sv[2]:recvmsg())
 
 assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
 local so = assert(sv[2]:getsockopt(S.SOL_SOCKET, S.SO_PASSCRED))
