@@ -476,6 +476,15 @@ test_sockets = {
     assert(r.pid == S.getpid(), "should get my pid from sent credentals")
     assert(sv[1]:close())
     assert(sv[2]:close())
+  end,
+  test_sigpipe = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(sv[1]:shutdown("rd"))
+    assert(S.signal("pipe", "ign"))
+    assert(sv[2]:close())
+    local n, err = sv[1]:write("will get sigpipe")
+    assert(err.EPIPE, "should get sigpipe")
+    assert(sv[1]:close())
   end
 }
 
@@ -495,18 +504,7 @@ local loop = "127.0.0.1"
 
 
 -- unix domain sockets
-local sv = assert(S.socketpair("unix", "stream"))
 
-assert(sv[1]:shutdown("rd"))
-
-assert(S.signal("pipe", "ign"))
-
-assert(sv[2]:close())
-
-n, err = sv[1]:write("will get sigpipe")
-assert(err.EPIPE, "should get sigpipe")
-
-assert(sv[1]:close())
 
 
 local m = assert(S.sigprocmask())
