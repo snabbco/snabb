@@ -548,6 +548,22 @@ test_sockets = {
   end
 }
 
+test_events = {
+  test_eventfd = function()
+    local fd = assert(S.eventfd(0, "nonblock"))
+    local n = assert(fd:eventfd_read())
+    assert_equal(n, 0, "eventfd should return 0 initially")
+    assert(fd:eventfd_write(3))
+    assert(fd:eventfd_write(6))
+    assert(fd:eventfd_write(1))
+    n = assert(fd:eventfd_read())
+    assert_equal(n, 10, "eventfd should return 10")
+    n = assert(fd:eventfd_read())
+    assert(n, 0, "eventfd should return 0 again")
+    assert(fd:close())
+  end
+}
+
 -- legacy tests not yet converted to test framework
 
 test_legacy = {
@@ -706,20 +722,6 @@ assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
 
 assert(i.iface.lo, "expect a loopback interface")
 
--- eventfd
-fd = assert(S.eventfd(0, "nonblock"))
-
-local n = assert(fd:eventfd_read())
-assert(n == 0, "eventfd should return 0 initially")
-assert(fd:eventfd_write(3))
-assert(fd:eventfd_write(6))
-assert(fd:eventfd_write(1))
-n = assert(fd:eventfd_read())
-assert(n == 10, "eventfd should return 10")
-n = assert(fd:eventfd_read())
-assert(n == 0, "eventfd should return 0 again")
-
-assert(fd:close())
 
 -- timerfd
 fd = assert(S.timerfd_create("monotonic", "nonblock, cloexec"))
