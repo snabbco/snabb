@@ -316,26 +316,43 @@ test_timers_signals = {
   end
 }
 
+test_mmap = {
+  test_mmap_fail = function()
+    local size = 4096
+    local mem, err = S.mmap(S.t.pointer(1), size, "read", "fixed, anonymous", -1, 0)
+    assert(err, "expect non aligned fixed map to fail")
+    assert(err.EINVAL, "expect non aligned map to return EINVAL")
+  end,
+  test_mmap = function()
+    local size = 4096
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    assert(S.munmap(mem, size))
+  end,
+  test_msync = function()
+    local size = 4096
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    assert(S.msync(mem, size, "sync"))
+    assert(S.munmap(mem, size))
+  end,
+  test_madvise = function()
+    local size = 4096
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+   assert(S.madvise(mem, size, "random"))
+    assert(S.munmap(mem, size))
+  end
+}
+
 -- legacy tests not yet converted to test framework
 
 test_legacy = {
   test_legacy = function()
 
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
-local stat
 
 
 -- mmap and related functions
 local mem
 local size = 4096
-mem, err = S.mmap(S.t.pointer(1), size, "read", "fixed", -1, 0)
-assert(err, "expect non aligned fixed map to fail")
-mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-assert(S.munmap(mem, size))
-mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-assert(S.msync(mem, size, "sync"))
-assert(S.madvise(mem, size, "random"))
-assert(S.munmap(mem, size))
 
 local size2 = size * 2
 mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
@@ -986,7 +1003,7 @@ assert(S.munmap(abuf, 4096))
 end
 }
 
-luaunit:run()
+if arg[1] then luaunit:run(arg[1]) else luaunit:run() end
 
 -- these should be set up to allow skipping them.
 
