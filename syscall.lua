@@ -759,6 +759,51 @@ S.IFA_F_DEPRECATED  = 0x20
 S.IFA_F_TENTATIVE   = 0x40
 S.IFA_F_PERMANENT   = 0x80
 
+-- interface flags
+S.IFF_UP         = 0x1
+S.IFF_BROADCAST  = 0x2
+S.IFF_DEBUG      = 0x4
+S.IFF_LOOPBACK   = 0x8
+S.IFF_POINTOPOINT= 0x10
+S.IFF_NOTRAILERS = 0x20
+S.IFF_RUNNING    = 0x40
+S.IFF_NOARP      = 0x80
+S.IFF_PROMISC    = 0x100
+S.IFF_ALLMULTI   = 0x200
+S.IFF_MASTER     = 0x400
+S.IFF_SLAVE      = 0x800
+S.IFF_MULTICAST  = 0x1000
+S.IFF_PORTSEL    = 0x2000
+S.IFF_AUTOMEDIA  = 0x4000
+S.IFF_DYNAMIC    = 0x8000
+S.IFF_LOWER_UP   = 0x10000
+S.IFF_DORMANT    = 0x20000
+S.IFF_ECHO       = 0x40000
+
+S.IFF_SLAVE_NEEDARP = 0x40
+S.IFF_ISATAP        = 0x80
+S.IFF_MASTER_ARPMON = 0x100
+S.IFF_WAN_HDLC      = 0x200
+S.IFF_XMIT_DST_RELEASE = 0x400
+S.IFF_DONT_BRIDGE   = 0x800
+S.IFF_DISABLE_NETPOLL    = 0x1000
+S.IFF_MACVLAN_PORT       = 0x2000
+S.IFF_BRIDGE_PORT = 0x4000
+S.IFF_OVS_DATAPATH       = 0x8000
+S.IFF_TX_SKB_SHARING     = 0x10000
+S.IFF_UNICAST_FLT = 0x20000
+
+-- Private (from user) interface flags (netdevice->priv_flags)
+S.IFF_802_1Q_VLAN = 0x1
+S.IFF_EBRIDGE     = 0x2
+S.IFF_SLAVE_INACTIVE     = 0x4
+S.IFF_MASTER_8023AD      = 0x8
+S.IFF_MASTER_ALB  = 0x10
+S.IFF_BONDING     = 0x20
+
+S.IFF_VOLATILE = S.IFF_LOOPBACK + S.IFF_POINTOPOINT + S.IFF_BROADCAST + S.IFF_ECHO +
+                 S.IFF_MASTER + S.IFF_SLAVE + S.IFF_RUNNING + S.IFF_LOWER_UP + S.IFF_DORMANT
+
 -- address families
 S.AF_UNSPEC     = 0
 S.AF_LOCAL      = 1
@@ -4067,9 +4112,9 @@ end
 local ifla_decode = {}
 ifla_decode[S.IFLA_IFNAME] = function(r, buf, len)
   r.name = ffi.string(buf + rta_length(0))
-
   return r
 end
+
 
 local nlmsg_data_decode = {}
 nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
