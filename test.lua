@@ -422,6 +422,10 @@ test_misc = {
   end,
   test_sysinfo = function()
     local i = assert(S.sysinfo()) -- TODO test values returned for some sanity
+  end,
+  test_sysctl = function()
+    local syslog = assert(S.klogctl(3))
+    assert(#syslog > 20, "should be something in syslog")
   end
 }
 
@@ -740,9 +744,6 @@ n = assert(fd:timerfd_read())
 assert(n == 1, "should have exactly one timer expiry")
 
 assert(fd:close())
-
-local syslog = assert(S.klogctl(3))
-assert(#syslog > 20, "should be something in syslog")
 
 -- prctl
 --PR_CAPBSET_READ -- need to define capabilities flags
