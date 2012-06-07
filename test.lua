@@ -452,6 +452,22 @@ test_sockets = {
     assert(sv[2]:recvmsg())
     assert(sv[1]:close())
     assert(sv[2]:close())
+  end,
+  test_sendcred = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
+    local so = assert(sv[2]:getsockopt(S.SOL_SOCKET, S.SO_PASSCRED))
+    assert(so == 1, "getsockopt should have updated value")
+    assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
+    local r = assert(sv[2]:recvmsg())
+    assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
+    assert(sv[1]:sendfds("stdin"))
+    local r = assert(sv[2]:recvmsg())
+    assert(#r.fd == 1, "expect to get one file descriptor back")
+    assert(r.fd[1]:close())
+    assert(r.pid == S.getpid(), "should get my pid from sent credentals")
+    assert(sv[1]:close())
+    assert(sv[2]:close())
   end
 }
 
@@ -472,20 +488,6 @@ local loop = "127.0.0.1"
 
 -- unix domain sockets
 local sv = assert(S.socketpair("unix", "stream"))
-
-assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
-local so = assert(sv[2]:getsockopt(S.SOL_SOCKET, S.SO_PASSCRED))
-assert(so == 1, "getsockopt should have updated value")
-
-assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
-local r = assert(sv[2]:recvmsg())
-assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
-
-assert(sv[1]:sendfds("stdin"))
-local r = assert(sv[2]:recvmsg())
-assert(#r.fd == 1, "expect to get one file descriptor back")
-assert(r.fd[1]:close())
-assert(r.pid == S.getpid(), "should get my pid from sent credentals")
 
 assert(sv[1]:shutdown("rd"))
 
