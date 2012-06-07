@@ -10,9 +10,6 @@ local luaunit = require "luaunit"
 
 local assert_equal = assert_equals
 
-local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
-local stat
-
 local teststring = "this is a test string"
 local size = 512
 local buf = S.t.buffer(size)
@@ -301,6 +298,13 @@ test_timers = {
   end
 }
 
+-- legacy tests not yet converted to test framework
+
+test_legacy = {
+  test_legacy = function()
+
+local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
+local stat
 
 -- timers and alarms
 assert(S.signal("alrm", "ign"))
@@ -978,9 +982,12 @@ assert(ctx:destroy())
 assert(fd:close())
 assert(S.munmap(abuf, 4096))
 
+end
+}
 
 luaunit:run()
 
+-- these should be set up to allow skipping them.
 
 if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
 
