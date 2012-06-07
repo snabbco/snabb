@@ -530,6 +530,21 @@ test_sockets = {
     local n, err = sv[1]:write("will get sigpipe")
     assert(err.EPIPE, "should get sigpipe")
     assert(sv[1]:close())
+  end,
+  test_udp_socket = function()
+    local loop = "127.0.0.1"
+    local s = assert(S.socket("inet", "dgram"))
+    local c = assert(S.socket("inet", "dgram"))
+    local sa = assert(S.sockaddr_in(0, loop))
+    local ca = assert(S.sockaddr_in(0, loop))
+    assert(s:bind(sa))
+    assert(c:bind(sa))
+    local bca = c:getsockname().addr -- find bound address
+    local serverport = s:getsockname().port -- find bound port
+    local n = assert(s:sendto(teststring, nil, 0, bca))
+    local f = assert(c:recvfrom(buf, size)) -- do not test as can drop data
+    assert(s:close())
+    assert(c:close())
   end
 }
 
@@ -586,24 +601,7 @@ assert(#p == 1 and p[1].fileno == c.fileno and p[1].POLLIN, "one event now")
 assert(s:close())
 assert(c:close())
 
--- udp socket
-s = assert(S.socket("inet", "dgram"))
-c = assert(S.socket("inet", "dgram"))
 
-local sa = assert(S.sockaddr_in(0, loop))
-local ca = assert(S.sockaddr_in(0, loop))
-assert(s:bind(sa))
-assert(c:bind(sa))
-
-local bca = c:getsockname().addr -- find bound address
-local serverport = s:getsockname().port -- find bound port
-
-n = assert(s:sendto(teststring, nil, 0, bca))
-
-local f = c:recvfrom(buf, size) -- do not test as drops data!
-
-assert(s:close())
-assert(c:close())
 
 --ipv6 socket
 s, err = S.socket("AF_INET6", "dgram")
