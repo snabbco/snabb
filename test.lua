@@ -680,6 +680,49 @@ test_events = {
   end
 }
 
+test_aio = {
+  setup = setup,
+  test_aio_setup = function()
+    local ctx = assert(S.io_setup(8))
+    assert(ctx:destroy())
+  end,
+  test_aio_ctx_gc = function()
+    local ctx = assert(S.io_setup(8))
+    local ctx2 = S.t.aio_context()
+    S.copy(ctx2, ctx, S.sizeof(S.t.aio_context))
+    ctx = nil
+    collectgarbage("collect")
+    local ok, err = S.io_destroy(ctx2)
+    assert(not ok, "should have closed aio ctx")
+  end,
+  test_aio = function() -- split this up
+    -- need aligned buffer for O_DIRECT
+    local abuf = assert(S.mmap(nil, 4096, "read,write", "private, anonymous", -1, 0))
+    S.copy(abuf, teststring)
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
+    assert(S.unlink(tmpfile))
+    assert(fd:pwrite(abuf, 4096, 0))
+    S.fill(abuf, 4096)
+    local efd = assert(S.eventfd())
+    local ctx = assert(S.io_setup(8))
+    assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}} == 1)
+    local r = assert(ctx:getevents(1, 1))
+    assert(#r == 1, "expect one aio event") -- should also test what is returned
+    assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}} == 1)
+    -- TODO this is erroring, not sure why, needs debugging
+    --r, err = ctx:cancel({cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0})
+    --r = assert(ctx:getevents(1, 1))
+    --assert(#r == 0, "expect no aio events")
+    -- TODO this is not working either
+    --assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0, resfd = efd}} == 1)
+    --local p = assert(S.poll({fd = efd, events = "in"}, 0, 1000))
+    --assert(#p == 1, "expect one event available from poll, got " .. #p)
+    assert(ctx:destroy())
+    assert(fd:close())
+    assert(S.munmap(abuf, 4096))
+  end
+}
+
 -- legacy tests not yet converted to test framework
 
 test_legacy = {
@@ -972,46 +1015,6 @@ end
 assert(S.unlink(tmpfile))
 
 
-
--- aio
-local ctx = assert(S.io_setup(8))
-assert(ctx:destroy())
-local ctx = assert(S.io_setup(8))
-local ctx2 = S.t.aio_context()
-S.copy(ctx2, ctx, S.sizeof(S.t.aio_context))
-ctx = nil
-collectgarbage("collect")
-ok, err = S.io_destroy(ctx2)
-assert(not ok, "should have closed aio ctx")
-
--- need aligned buffer for O_DIRECT
-local abuf = assert(S.mmap(nil, 4096, "read,write", "private, anonymous", -1, 0))
-S.copy(abuf, teststring)
-fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
-assert(S.unlink(tmpfile))
-assert(fd:pwrite(abuf, 4096, 0))
-S.fill(abuf, 4096)
-local efd = assert(S.eventfd())
-local ctx = assert(S.io_setup(8))
-assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}} == 1)
-
-local r = assert(ctx:getevents(1, 1))
-assert(#r == 1, "expect one aio event") -- should also test what is returned
-
-assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}} == 1)
--- TODO this is erroring, not sure why, needs debugging
---r, err = ctx:cancel({cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0})
---r = assert(ctx:getevents(1, 1))
---assert(#r == 0, "expect no aio events")
-
--- TODO this is not working either
---assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0, resfd = efd}} == 1)
---local p = assert(S.poll({fd = efd, events = "in"}, 0, 1000))
---assert(#p == 1, "expect one event available from poll, got " .. #p)
-
-assert(ctx:destroy())
-assert(fd:close())
-assert(S.munmap(abuf, 4096))
 
 end
 }
