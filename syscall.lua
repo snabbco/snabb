@@ -2315,7 +2315,6 @@ t.sockaddr_storage = ffi.typeof("struct sockaddr_storage")
 t.sa_family = ffi.typeof("sa_family_t")
 t.sockaddr_in = ffi.typeof("struct sockaddr_in")
 t.sockaddr_in6 = ffi.typeof("struct sockaddr_in6")
-t.in6_addr = ffi.typeof("struct in6_addr")
 t.sockaddr_un = ffi.typeof("struct sockaddr_un")
 t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
 t.msghdr = ffi.typeof("struct msghdr")
@@ -4569,10 +4568,12 @@ end
 
 -- additional metatypes that need functions defined
 
-
---t.in_addr = ffi.typeof("struct in_addr")
 t.in_addr = ffi.metatype("struct in_addr", {
   __tostring = S.inet_ntoa
+})
+
+t.in6_addr = ffi.metatype("struct in6_addr", {
+  __tostring = function(a) return S.inet_ntop(S.AF_INET6, a) end
 })
 
 -- constants
