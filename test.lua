@@ -289,12 +289,30 @@ test_sockets_pipes = {
   end
 }
 
-test_timers = {
+test_timers_signals = {
   test_nanosleep = function()
     local rem = assert(S.nanosleep(0.001))
     assert_equal(rem.sec, 0, "expect no elapsed time after nanosleep")
     assert_equal(rem.nsec, 0, "expect no elapsed time after nanosleep")
     assert_equal(rem.time, 0, "expect no elapsed time after nanosleep")
+  end,
+  test_alarm = function()
+    assert(S.signal("alrm", "ign"))
+    assert(S.sigaction("alrm", "ign")) -- should do same as above
+    assert(S.alarm(10))
+    assert(S.alarm(0)) -- cancel again
+    assert(S.signal("alrm", "dfl"))
+  end,
+  test_itimer = function()
+    local t = S.getitimer("real")
+    assert(t.interval.sec == 0, "expect timer not set")
+    local exp = S.SIGALRM
+    assert(S.sigaction("alrm", function(s) assert(s == exp, "expected alarm"); exp = 0 end))
+    assert(exp == S.SIGALRM, "sigaction handler should not have run")
+    assert(S.setitimer("real", 0, 0.0001))
+    local rem, err = S.nanosleep(1) -- nanosleep does not interact with signals, should be interrupted
+    assert(err.EINTR, "expect nanosleep to be interrupted by timer expiry")
+    assert(exp == 0, "sigaction handler should have run")
   end
 }
 
@@ -306,23 +324,6 @@ test_legacy = {
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 local stat
 
--- timers and alarms
-assert(S.signal("alrm", "ign"))
-assert(S.sigaction("alrm", "ign")) -- should do same as above
-assert(S.alarm(10))
-assert(S.alarm(0)) -- cancel again
-
-local t = S.getitimer("real")
-assert(t.interval.sec == 0, "expect timer not set")
-
-assert(S.signal("alrm", "dfl"))
-local exp = S.SIGALRM
-assert(S.sigaction("alrm", function(s) assert(s == exp, "expected alarm"); exp = 0 end))
-assert(exp == S.SIGALRM, "sigaction handler should not have run")
-assert(S.setitimer("real", 0, 0.0001))
-
-S.nanosleep(1) -- nanosleep does not interact with signals, should be interrupted
-assert(exp == 0, "sigaction handler should have run")
 
 -- mmap and related functions
 local mem
