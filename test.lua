@@ -307,6 +307,26 @@ test_file_operations = {
     local d, err = fd:getdents()
     assert(err.notdir, "/etc/passwd should give a not directory error")
     assert(fd:close())
+  end,
+  test_inotify = function()
+    assert(S.mkdir(tmpfile, "IRWXU")) -- do in directory so ok to run in parallel
+    local fd = assert(S.inotify_init("cloexec, nonblock"))
+    local wd = assert(fd:inotify_add_watch(tmpfile, "create, delete"))
+    assert(S.chdir(tmpfile))
+    local n, err = fd:inotify_read()
+    assert(err.again, "no inotify events yet")
+    assert(S.writefile(tmpfile, "test", "IRWXU"))
+    assert(S.unlink(tmpfile))
+    n = assert(fd:inotify_read())
+    assert_equal(#n, 2, "expect 2 events now")
+    assert(n[1].create, "file created")
+    assert_equal(n[1].name, tmpfile, "created file should have same name")
+    assert(n[2].delete, "file deleted")
+    assert_equal(n[2].name, tmpfile, "created file should have same name")
+    assert(fd:inotify_rm_watch(wd))
+    assert(fd:close())
+    assert(S.chdir(".."))
+    assert(S.rmdir(tmpfile))
   end
 }
 
@@ -786,32 +806,6 @@ assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env var
 assert(S.unsetenv("XXXXYYYYZZZZZZZZ"))
 assert(S.environ().XXXXYYYYZZZZZZZZ == nil, "expect to be able to unset env vars")
 
--- test inotify, Linux only
-assert(S.mkdir(tmpfile, "IRWXU")) -- do in directory so ok to run in parallel
-
-fd = assert(S.inotify_init("cloexec, nonblock"))
-wd = assert(fd:inotify_add_watch(tmpfile, "create, delete"))
-
-assert(S.chdir(tmpfile))
-
-n, err = fd:inotify_read()
-assert(err.again, "no inotify events yet")
-
-assert(S.writefile(tmpfile, "test", "IRWXU"))
-assert(S.unlink(tmpfile))
-
-n = assert(fd:inotify_read())
-assert(#n == 2, "expect 2 events now")
-assert(n[1].create, "file created")
-assert(n[1].name == tmpfile, "created file should have same name")
-assert(n[2].delete, "file deleted")
-assert(n[2].name == tmpfile, "created file should have same name")
-
-assert(fd:inotify_rm_watch(wd))
-assert(fd:close())
-
-assert(S.chdir(".."))
-assert(S.rmdir(tmpfile))
 
 -- tee, splice, vmsplice
 local p = assert(S.pipe("nonblock"))
