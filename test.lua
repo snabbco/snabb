@@ -629,6 +629,9 @@ test_netlink = {
     --for k, v in ipairs(i.ifaces) do print(v.name) end
     assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
     assert(i.iface.lo, "expect a loopback interface")
+  end,
+  test_bridge_list = function()
+    local b = assert(S.bridge_list())
   end
 }
 
@@ -968,7 +971,6 @@ if l then
 end
 assert(S.unlink(tmpfile))
 
-local b = assert(S.bridge_list())
 
 
 -- aio
