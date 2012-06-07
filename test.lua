@@ -378,8 +378,74 @@ test_sockets = {
     assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_in6))
     assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_un))
     assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_nl))
+  end,
+  test_inet_aton_error = function()
+    local a = S.inet_aton("error")
+    assert(not a, "should get invalid IP address")
+  end,
+  test_sockaddr_in_error = function()
+    local sa = S.sockaddr_in(1234, "error")
+    assert(not sa, "expect nil socket address from invalid ip string")
+  end,
+  test_inet_socket = function() -- should break this test up
+    local s = assert(S.socket("inet", "stream, nonblock")) -- adding flags to socket type is Linux only
+    local loop = "127.0.0.1"
+    local sa = assert(S.sockaddr_in(1234, loop))
+    assert(S.inet_ntoa(sa.sin_addr) == loop, "expect address converted back to string to still be same")
+    assert(sa.sin_family == 2, "expect family on inet socket to be AF_INET=2")
+    -- find a free port
+    local port
+    for i = 1024, 2048 do
+      port = i
+      sa.sin_port = S.htons(port)
+      if s:bind(sa) then break end
+    end
+    local ba = assert(s:getsockname())
+    assert(ba.addr.sin_family == 2, "expect family on getsockname to be AF_INET=2")
+    assert(s:listen()) -- will fail if we did not bind
+    local c = assert(S.socket("inet", "stream")) -- client socket
+    assert(c:nonblock())
+    assert(c:fcntl("setfd", "cloexec"))
+    local ok, err = c:connect(sa)
+    assert(not ok, "connect should fail here")
+    assert(err.EINPROGRESS, "have not accepted should get Operation in progress")
+    local a = assert(s:accept())
+    -- a is a table with the fd, but also the inbound connection details
+    assert(a.addr.sin_family == 2, "expect ipv4 connection")
+    assert(c:connect(sa)) -- able to connect now we have accepted
+    local ba = assert(c:getpeername())
+    assert(ba.addr.sin_family == 2, "expect ipv4 connection")
+    assert(S.inet_ntoa(ba.addr.sin_addr) == "127.0.0.1", "expect peer on localhost")
+    assert(ba.addr.sin_addr.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
+    local n = assert(c:send(teststring))
+    assert(n == #teststring, "should be able to write out short string")
+    n = assert(a.fd:read(buf, size))
+    assert(n == #teststring, "should read back string into buffer")
+    assert(S.string(buf, n) == teststring, "we should read back the same string that was sent")
+    -- test scatter gather
+    local b0 = S.t.buffer(4)
+    local b1 = S.t.buffer(3)
+    S.copy(b0, "test", 4) -- string init adds trailing 0 byte
+    S.copy(b1, "ing", 3)
+    local iov = S.t.iovec(2, {{b0, 4}, {b1, 3}})
+    n = assert(c:writev(iov, 2))
+    assert(n == 7, "expect writev to write 7 bytes")
+    b0 = S.t.buffer(3)
+    b1 = S.t.buffer(4)
+    local iov = S.t.iovec(2, {{b0, 3}, {b1, 4}})
+    n = assert(a.fd:readv(iov, 2))
+    assert_equal(n, 7, "expect readv to read 7 bytes")
+    assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get back same stuff")
+    -- test sendfile
+    local f = assert(S.open("/etc/passwd", "RDONLY"))
+    local off = 0
+    n = assert(c:sendfile(f, off, 16))
+    assert(n.count == 16 and n.offset == 16, "sendfile should send 16 bytes")
+    assert(f:close())
+    assert(c:close())
+    assert(a.fd:close())
+    assert(s:close())
   end
-
 }
 
 -- legacy tests not yet converted to test framework
@@ -393,86 +459,9 @@ local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 
 -- sockets
 
-
 local a, sa
-a = S.inet_aton("error")
-assert(not a, "should get invalid IP address")
+    local loop = "127.0.0.1"
 
---local s, fl, c
-s = assert(S.socket("inet", "stream, nonblock")) -- adding flags to socket type is Linux only
-
-local loop = "127.0.0.1"
-sa = S.sockaddr_in(1234, "error")
-assert(not sa, "expect nil socket address from invalid ip string")
-
-sa = assert(S.sockaddr_in(1234, loop))
-assert(S.inet_ntoa(sa.sin_addr) == loop, "expect address converted back to string to still be same")
-assert(sa.sin_family == 2, "expect family on inet socket to be AF_INET=2")
-
--- find a free port
-local port
-for i = 1024, 2048 do
-  port = i
-  sa.sin_port = S.htons(port)
-  if s:bind(sa) then break end
-end
-
-local ba = assert(s:getsockname())
-assert(ba.addr.sin_family == 2, "expect family on getsockname to be AF_INET=2")
-
-assert(s:listen()) -- will fail if we did not bind
-
-c = assert(S.socket("inet", "stream")) -- client socket
-assert(c:nonblock())
-assert(c:fcntl("setfd", "cloexec"))
-
-ok, err = c:connect(sa)
-assert(not ok, "connect should fail here")
-assert(err.EINPROGRESS, "have not accepted should get Operation in progress")
-
-local a = assert(s:accept())
--- a is a table with the fd, but also the inbound connection details
-assert(a.addr.sin_family == 2, "expect ipv4 connection")
-
-assert(c:connect(sa)) -- able to connect now we have accepted
-
-ba = assert(c:getpeername())
-assert(ba.addr.sin_family == 2, "expect ipv4 connection")
-assert(S.inet_ntoa(ba.addr.sin_addr) == "127.0.0.1", "expect peer on localhost")
-assert(ba.addr.sin_addr.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
-
-n = assert(c:send(teststring))
-assert(n == #teststring, "should be able to write out short string")
-n = assert(a.fd:read(buf, size))
-assert(n == #teststring, "should read back string into buffer")
-assert(S.string(buf, n) == teststring, "we should read back the same string that was sent")
-
--- test scatter gather
-local b0 = S.t.buffer(4)
-local b1 = S.t.buffer(3)
-S.copy(b0, "test", 4) -- string init adds trailing 0 byte
-S.copy(b1, "ing", 3)
-
-local iov = S.t.iovec(2, {{b0, 4}, {b1, 3}})
-n = assert(c:writev(iov, 2))
-assert(n == 7, "expect writev to write 7 bytes")
-
-b0 = S.t.buffer(3)
-b1 = S.t.buffer(4)
-iov = S.t.iovec(2, {{b0, 3}, {b1, 4}})
-n = assert(a.fd:readv(iov, 2))
-assert(n == 7, "expect readv to read 7 bytes")
-assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get back same stuff")
-
--- test sendfile
-local f = assert(S.open("/etc/passwd", "RDONLY"))
-local off = 0
-n = assert(c:sendfile(f, off, 16))
-assert(n.count == 16 and n.offset == 16, "sendfile should send 16 bytes")
-assert(f:close())
-assert(c:close())
-assert(a.fd:close())
-assert(s:close())
 
 -- unix domain sockets
 local sv = assert(S.socketpair("unix", "stream"))
