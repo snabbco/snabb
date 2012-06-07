@@ -419,6 +419,9 @@ test_misc = {
     mask = S.umask("IWGRP, IWOTH")
     mask = S.umask("IWGRP, IWOTH")
     assert_equal(mask, S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
+  end,
+  test_sysinfo = function()
+    local i = assert(S.sysinfo()) -- TODO test values returned for some sanity
   end
 }
 
@@ -708,7 +711,6 @@ assert(math.floor(tv.time) == tv.sec, "should be able to get float time from tim
 local t = S.time()
 local t = assert(S.clock_getres("realtime"))
 local t = assert(S.clock_gettime("realtime"))
-local i = assert(S.sysinfo())
 
 -- netlink sockets, Linux only
 local i = S.get_interfaces()
