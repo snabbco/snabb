@@ -4122,7 +4122,6 @@ ifla_decode[S.IFLA_IFNAME] = function(ir, buf, len)
   return ir
 end
 
-
 local nlmsg_data_decode = {}
 nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
 
@@ -4134,8 +4133,11 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
   local rtattr = ffi.cast(rtattr_pt, buf)
 
   local ir = { -- interface details
+    family = iface.ifi_family,
+    ifi_type = iface.ifi_type, -- cannot find documentation of these...
     index = iface.ifi_index,
-    flags = getflags(iface.ifi_flags, "IFF_", iff_flags, iff_lflags)
+    flags = getflags(iface.ifi_flags, "IFF_", iff_flags, iff_lflags),
+    change = iface.ifi_change
   }
 
   ir.flags.flags = iface.ifi_flags
