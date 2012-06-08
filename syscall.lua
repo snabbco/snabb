@@ -630,6 +630,14 @@ S.DT_LNK = 10
 S.DT_SOCK = 12
 S.DT_WHT = 14
 
+mt.dents = {
+  __index = function(t, k)
+    local prefix = "DT_"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.type, S[k]) ~= 0
+  end
+}
+
 -- sync file range
 S.SYNC_FILE_RANGE_WAIT_BEFORE = 1
 S.SYNC_FILE_RANGE_WRITE       = 2
@@ -3009,8 +3017,6 @@ end
 
 function S.reboot(cmd) return retbool(C.reboot(stringflag(cmd, "LINUX_REBOOT_CMD_"))) end
 
-local dt_flags = {"DT_UNKNOWN", "DT_FIFO", "DT_CHR", "DT_DIR", "DT_BLK", "DT_REG", "DT_LNK", "DT_SOCK", "DT_WHT"}
-
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
   if not buf then
     size = size or 4096
@@ -3024,10 +3030,9 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     local i = 0
     while i < ret do
       local dp = ffi.cast(linux_dirent_pt, buf + i)
-      local tt = buf[i + dp.d_reclen - 1]
-      local dd = getflag(tt, "DT_", dt_flags)
-      dd.inode = tonumber(dp.d_ino)
-      dd.offset = tonumber(dp.d_off)
+      local type = buf[i + dp.d_reclen - 1] -- see man getdents(2) not named in struct as added later
+      local dd = {inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off), type = type}
+      setmetatable(dd, mt.dents)
       d[ffi.string(dp.d_name)] = dd -- could calculate length
       i = i + dp.d_reclen
     end
