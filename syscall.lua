@@ -2740,16 +2740,6 @@ end
 function S.mode(mode) return stringflags(mode, "S_") end
 
 -- reverse flag operations
-local function getflags(e, prefix, values, r)
-  if not r then r = {} end
-  for i, f in ipairs(values) do
-    if bit.band(e, S[f]) ~= 0 then
-      r[f] = true
-      r[f:lower():sub(#prefix + 1)] = true
-    end
-  end
-  return r
-end
 
 local function getflag(e, prefix, values)
   local r= {}
