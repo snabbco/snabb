@@ -2648,7 +2648,7 @@ end
 function S.mode(mode) return stringflags(mode, "S_") end
 
 -- reverse flag operations
---broken - does not use prefix! TODO fix
+-- does not use prefix! TODO cleanup, probably remove parameter
 local function getflags(e, prefix, values, lvalues, r)
   if not r then r = {} end
   for i, f in ipairs(values) do
