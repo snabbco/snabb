@@ -666,7 +666,7 @@ test_netlink = {
     if eth then
       assert(eth.flags.broadcast, "ethernet interface should be broadcast")
       assert(eth.flags.multicast, "ethernet interface should be multicast")
-      assert_equal(eth.ifi_type, S.ARPHRD_ETHER, "loopback interface type should be loopback")
+      assert_equal(eth.ifi_type, S.ARPHRD_ETHER, "ethernet interface type should be ether")
     end
   end,
   test_bridge_list = function()
