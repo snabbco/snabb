@@ -737,6 +737,17 @@ test_events = {
     assert(c:read())
     assert(s:close())
     assert(c:close())
+  end,
+  test_select = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    local c, s = sv[1], sv[2]
+    local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
+    assert(sel.count == 0, "nothing to read select now")
+    assert(s:write(teststring))
+    sel = assert(S.select{readfds = {c, s}, timeout = {0, 0}})
+    assert(sel.count == 1, "one fd available for read now")
+    assert(s:close())
+    assert(c:close())
   end
 }
 
@@ -797,13 +808,12 @@ local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 local a, sa
 local loop = "127.0.0.1"
 
+-- test select, poll and epoll
+
+
 
 local sv = assert(S.socketpair("unix", "stream"))
 c, s = sv[1], sv[2]
-
--- test select, poll and epoll
-local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
-assert(sel.count == 0, "nothing to read select now")
 
 local ep = assert(S.epoll_create("cloexec"))
 assert(ep:epoll_ctl("add", c, "in"))
@@ -812,9 +822,6 @@ local r = assert(ep:epoll_wait(nil, 1, 0))
 assert(#r == 0, "no events yet")
 
 n = assert(s:write(teststring))
-
-sel = assert(S.select{readfds = {c, s}, timeout = {0, 0}})
-assert(sel.count == 1, "one fd available for read now")
 
 r = assert(ep:epoll_wait())
 assert(#r == 1, "one event now")
