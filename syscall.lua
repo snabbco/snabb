@@ -13,6 +13,8 @@ local octal = function (s) return tonumber(s, 8) end
 local t = {} -- types table
 S.t = t
 
+local mt = {} -- metatables
+
 -- convenience so user need not require ffi
 S.string = ffi.string
 S.sizeof = ffi.sizeof
@@ -780,9 +782,13 @@ S.IFF_LOWER_UP   = 0x10000
 S.IFF_DORMANT    = 0x20000
 S.IFF_ECHO       = 0x40000
 
-local iff_flags = {"IFF_UP", "IFF_BROADCAST", "IFF_DEBUG", "IFF_LOOPBACK", "IFF_POINTOPOINT", "IFF_NOTRAILERS", "IFF_RUNNING",
-                   "IFF_NOARP", "IFF_PROMISC", "IFF_ALLMULTI", "IFF_MASTER", "IFF_SLAVE", "IFF_MULTICAST", "IFF_PORTSEL",
-                   "IFF_AUTOMEDIA", "IFF_DYNAMIC", "IFF_LOWER_UP", "IFF_DORMANT", "IFF_ECHO"}
+mt.iff = {
+  __index = function(t, k)
+    local prefix = "IFF_"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.flags, S[k]) ~= 0
+  end
+}
 
 S.IFF_SLAVE_NEEDARP = 0x40
 S.IFF_ISATAP        = 0x80
@@ -4188,10 +4194,12 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
     family = iface.ifi_family,
     type = iface.ifi_type,
     index = iface.ifi_index,
-    flags = getflags(iface.ifi_flags, "IFF_", iff_flags),
+    flags = {},
     change = iface.ifi_change
   }
   -- TODO add getflag for type.
+
+  setmetatable(ir.flags, mt.iff)
   ir.flags.flags = iface.ifi_flags
 
   while rta_ok(rtattr, len) do
