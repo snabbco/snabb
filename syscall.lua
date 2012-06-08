@@ -562,14 +562,6 @@ S.POLLERR         = 0x008
 S.POLLHUP         = 0x010
 S.POLLNVAL        = 0x020
 
-mt.poll = {
-  __index = function(t, k)
-    local prefix = "POLL"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.revents, S[k]) ~= 0
-  end
-}
-
 -- epoll
 S.EPOLL_CLOEXEC = octal("02000000")
 S.EPOLL_NONBLOCK = octal("04000")
@@ -3560,11 +3552,30 @@ function S.select(s) -- note same structure as returned
           exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
 end
 
+--[[
+mt.poll = {
+  __index = function(t, k)
+    local prefix = "POLL"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.revents, S[k]) ~= 0
+  end
+}
+]]
+
+t.pollfd = ffi.metatype("struct pollfd", {
+  __index = function(t, k)
+    if k == 'fileno' then return t.fd end
+    local prefix = "POLL"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.revents, S[k]) ~= 0
+  end
+})
+
 function S.poll(fds, nfds, timeout)
   if type(fds) == "table" then
     local pf = fds
     nfds = #pf
-    fds = t.pollfds(nfds)
+    fds = ffi.new("struct pollfd[" .. nfds .."]") -- can't use varargs as want user to be able to iterate.
     for i = 0, nfds - 1 do
       local p = pf[i + 1]
       fds[i].fd = getfd(p.fd)
@@ -3574,6 +3585,7 @@ function S.poll(fds, nfds, timeout)
   end
   local ret = C.poll(fds, nfds, timeout or -1)
   if ret == -1 then return errorret() end
+--[[
   local r = {}
   for i = 0, nfds - 1 do
     if fds[i].revents ~= 0 then
@@ -3583,6 +3595,8 @@ function S.poll(fds, nfds, timeout)
     end
   end
   return r
+]]
+  return fds
 end
 
 function S.mount(source, target, filesystemtype, mountflags, data)

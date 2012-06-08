@@ -811,14 +811,16 @@ assert(ep:close())
 
 n = assert(c:read()) -- clear event
 
-local pfds = S.t.pollfds(1, {{fd = c.fileno, events = S.POLLIN, revents = 0}})
+local pfds = {{fd = c, events = S.POLLIN}}
 local p = assert(S.poll(pfds, 1, 0))
-assert(#p == 0, "no events now")
+
+assert(p[0].fd == c.fileno and p[0].revents == 0, "one event now")
 
 n = assert(s:write(teststring))
 
 local p = assert(S.poll(pfds, 1, 0))
-assert(#p == 1 and p[1].fileno == c.fileno and p[1].POLLIN, "one event now")
+
+assert(p[0].fd == c.fileno and p[0].POLLIN, "one event now")
 
 assert(s:close())
 assert(c:close())
