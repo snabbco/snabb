@@ -1548,7 +1548,7 @@ S.E.ERFKILL        = 132
 
 function S.strerror(errno) return ffi.string(C.strerror(errno)) end
 
-local emt = {__tostring = function(e) return S.strerror(e.errno) end}
+mt.error= {__tostring = function(e) return S.strerror(e.errno) end}
 
 local errsyms, errlsyms = {}, {}
 
@@ -1568,7 +1568,7 @@ local function mkerror(errno)
   local e = {errno = errno, sym = sym, lsym = lsym}
   e[sym] = true
   e[lsym] = true
-  setmetatable(e, emt)
+  setmetatable(e, mt.error)
   return e
 end
 
@@ -4451,7 +4451,7 @@ function S.dirfile(name, nodots) -- return the directory entries in a file, remo
   return d
 end
 
-local ls_mt = {
+mt.ls = {
   __tostring = function(t)
     table.sort(t)
     return table.concat(t, "\n")
@@ -4463,7 +4463,7 @@ function S.ls(name, nodots) -- return just the list, no other data, cwd if no di
   local ds = S.dirfile(name, nodots)
   local l = {}
   for k, _ in pairs(ds) do l[#l + 1] = k end
-  setmetatable(l, ls_mt)
+  setmetatable(l, mt.ls)
   return l
 end
 
