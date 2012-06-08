@@ -860,6 +860,69 @@ S.AF_CAIF       = 37
 S.AF_ALG        = 38
 S.AF_MAX        = 39
 
+-- arp types, which are also interface types for ifi_type
+S.ARPHRD_NETROM   = 0
+S.ARPHRD_ETHER    = 1
+S.ARPHRD_EETHER   = 2
+S.ARPHRD_AX25     = 3
+S.ARPHRD_PRONET   = 4
+S.ARPHRD_CHAOS    = 5
+S.ARPHRD_IEEE802  = 6
+S.ARPHRD_ARCNET   = 7
+S.ARPHRD_APPLETLK = 8
+S.ARPHRD_DLCI     = 15
+S.ARPHRD_ATM      = 19
+S.ARPHRD_METRICOM = 23
+S.ARPHRD_IEEE1394 = 24
+S.ARPHRD_EUI64    = 27
+S.ARPHRD_INFINIBAND = 32
+S.ARPHRD_SLIP     = 256
+S.ARPHRD_CSLIP    = 257
+S.ARPHRD_SLIP6    = 258
+S.ARPHRD_CSLIP6   = 259
+S.ARPHRD_RSRVD    = 260
+S.ARPHRD_ADAPT    = 264
+S.ARPHRD_ROSE     = 270
+S.ARPHRD_X25      = 271
+S.ARPHRD_HWX25    = 272
+S.ARPHRD_CAN      = 280
+S.ARPHRD_PPP      = 512
+S.ARPHRD_CISCO    = 513
+S.ARPHRD_HDLC     = ARPHRD_CISCO
+S.ARPHRD_LAPB     = 516
+S.ARPHRD_DDCMP    = 517
+S.ARPHRD_RAWHDLC  = 518
+S.ARPHRD_TUNNEL   = 768
+S.ARPHRD_TUNNEL6  = 769
+S.ARPHRD_FRAD     = 770
+S.ARPHRD_SKIP     = 771
+S.ARPHRD_LOOPBACK = 772
+S.ARPHRD_LOCALTLK = 773
+S.ARPHRD_FDDI     = 774
+S.ARPHRD_BIF      = 775
+S.ARPHRD_SIT      = 776
+S.ARPHRD_IPDDP    = 777
+S.ARPHRD_IPGRE    = 778
+S.ARPHRD_PIMREG   = 779
+S.ARPHRD_HIPPI    = 780
+S.ARPHRD_ASH      = 781
+S.ARPHRD_ECONET   = 782
+S.ARPHRD_IRDA     = 783
+S.ARPHRD_FCPP     = 784
+S.ARPHRD_FCAL     = 785
+S.ARPHRD_FCPL     = 786
+S.ARPHRD_FCFABRIC = 787
+S.ARPHRD_IEEE802_TR = 800
+S.ARPHRD_IEEE80211 = 801
+S.ARPHRD_IEEE80211_PRISM = 802
+S.ARPHRD_IEEE80211_RADIOTAP = 803
+S.ARPHRD_IEEE802154         = 804
+S.ARPHRD_PHONET   = 820
+S.ARPHRD_PHONET_PIPE = 821
+S.ARPHRD_CAIF     = 822
+S.ARPHRD_VOID     = 0xFFFF
+S.ARPHRD_NONE     = 0xFFFE
+
 -- eventfd
 S.EFD_SEMAPHORE = 1
 S.EFD_CLOEXEC = octal("02000000")
@@ -4121,6 +4184,10 @@ ifla_decode[S.IFLA_IFNAME] = function(ir, buf, len)
   ir.name = ffi.string(buf + rta_length(0))
   return ir
 end
+ifla_decode[S.IFLA_ADDRESS] = function(ir, buf, len)
+  --print("address", len)
+  return ir
+end
 
 local nlmsg_data_decode = {}
 nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
@@ -4134,7 +4201,7 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
 
   local ir = { -- interface details
     family = iface.ifi_family,
-    ifi_type = iface.ifi_type, -- cannot find documentation of these...
+    ifi_type = iface.ifi_type, -- cannot find documentation of these... FOUND
     index = iface.ifi_index,
     flags = getflags(iface.ifi_flags, "IFF_", iff_flags, iff_lflags),
     change = iface.ifi_change

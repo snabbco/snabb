@@ -656,7 +656,6 @@ test_netlink = {
     assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
     assert(i.iface.lo, "expect a loopback interface")
     local lo = i.iface.lo
-    print(lo.flags.flags)
     assert(lo.flags.up, "loopback interface should be up")
     assert(lo.flags.loopback, "loopback interface should be marked as loopback")
     assert(lo.flags.running, "loopback interface should be running")
