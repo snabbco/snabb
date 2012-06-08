@@ -580,6 +580,14 @@ S.EPOLLRDHUP = 0x2000
 S.EPOLLONESHOT = bit.lshift(1, 30)
 S.EPOLLET = bit.lshift(1, 31)
 
+mt.epoll = {
+  __index = function(t, k)
+    local prefix = "EPOLL"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.events, S[k]) ~= 0
+  end
+}
+
 S.EPOLL_CTL_ADD = 1
 S.EPOLL_CTL_DEL = 2
 S.EPOLL_CTL_MOD = 3
@@ -3620,9 +3628,9 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   local r = {}
   for i = 1, ret do -- put in Lua array
     local e = events[i - 1]
-    r[i] = getflags(e.events, "EPOLL", epoll_flags)
-    r[i].fileno = tonumber(e.data.fd)
-    r[i].data = t.uint64(e.data.u64)
+    local ev = {fileno = tonumber(e.data.fd), data = t.uint64(e.data.u64), events = e.events}
+    setmetatable(ev, mt.epoll)
+    r[i] = ev
   end
   return r
 end
