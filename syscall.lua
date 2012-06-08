@@ -20,14 +20,6 @@ S.cast = ffi.cast
 S.copy = ffi.copy
 S.fill = ffi.fill
 
-local function lflag(prefix, t) -- lower case flag table
-  local l = {}
-  for i, v in ipairs(t) do
-    l[i] = v:sub(#prefix + 1):lower()
-  end
-  return l
-end
-
 -- open, fcntl
 S.O_ACCMODE   = octal('0003')
 S.O_RDONLY    = octal('00')
@@ -791,7 +783,6 @@ S.IFF_ECHO       = 0x40000
 local iff_flags = {"IFF_UP", "IFF_BROADCAST", "IFF_DEBUG", "IFF_LOOPBACK", "IFF_POINTOPOINT", "IFF_NOTRAILERS", "IFF_RUNNING",
                    "IFF_NOARP", "IFF_PROMISC", "IFF_ALLMULTI", "IFF_MASTER", "IFF_SLAVE", "IFF_MULTICAST", "IFF_PORTSEL",
                    "IFF_AUTOMEDIA", "IFF_DYNAMIC", "IFF_LOWER_UP", "IFF_DORMANT", "IFF_ECHO"}
-local iff_lflags = lflag("IFF_", iff_flags) 
 
 S.IFF_SLAVE_NEEDARP = 0x40
 S.IFF_ISATAP        = 0x80
@@ -2713,23 +2704,23 @@ function S.mode(mode) return stringflags(mode, "S_") end
 -- reverse flag operations
 -- does not use prefix! TODO cleanup, probably remove parameter
 -- also getflag. maybe use to create lflag?
-local function getflags(e, prefix, values, lvalues, r)
+local function getflags(e, prefix, values, r)
   if not r then r = {} end
   for i, f in ipairs(values) do
     if bit.band(e, S[f]) ~= 0 then
       r[f] = true
-      r[lvalues[i]] = true
+      r[f:lower():sub(#prefix + 1)] = true
     end
   end
   return r
 end
 
-local function getflag(e, prefix, values, lvalues)
+local function getflag(e, prefix, values)
   local r= {}
   for i, f in ipairs(values) do
     if e == S[f] then
       r[f] = true
-      r[lvalues[i]] = true
+      r[f:lower():sub(#prefix + 1)] = true
     end
   end
   return r
@@ -2993,7 +2984,6 @@ end
 function S.reboot(cmd) return retbool(C.reboot(stringflag(cmd, "LINUX_REBOOT_CMD_"))) end
 
 local dt_flags = {"DT_UNKNOWN", "DT_FIFO", "DT_CHR", "DT_DIR", "DT_BLK", "DT_REG", "DT_LNK", "DT_SOCK", "DT_WHT"}
-local dt_lflags = lflag("DT_", dt_flags)
 
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
   if not buf then
@@ -3009,7 +2999,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     while i < ret do
       local dp = ffi.cast(linux_dirent_pt, buf + i)
       local tt = buf[i + dp.d_reclen - 1]
-      local dd = getflag(tt, "DT_", dt_flags, dt_lflags)
+      local dd = getflag(tt, "DT_", dt_flags)
       dd.inode = tonumber(dp.d_ino)
       dd.offset = tonumber(dp.d_off)
       d[ffi.string(dp.d_name)] = dd -- could calculate length
@@ -3542,7 +3532,6 @@ function S.select(s) -- note same structure as returned
 end
 
 local poll_flags = {"POLLIN", "POLLOUT", "POLLPRI", "POLLRDHUP", "POLLERR", "POLLHUP", "POLLNVAL", "POLLRDNORM", "POLLRDBAND", "POLLWRNORM", "POLLWRBAND", "POLLMSG"}
-local poll_lflags = lflag("POLL", poll_flags)
 
 function S.poll(fds, nfds, timeout)
   if type(fds) == "table" then
@@ -3561,7 +3550,8 @@ function S.poll(fds, nfds, timeout)
   local r = {}
   for i = 0, nfds - 1 do
     if fds[i].revents ~= 0 then
-      r[#r + 1] = getflags(fds[i].revents, "POLL", poll_flags, poll_lflags, {fileno = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)})
+      r[#r + 1] = getflags(fds[i].revents, "POLL", poll_flags,
+                           {fileno = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)})
     end
   end
   return r
@@ -3604,7 +3594,6 @@ function S.epoll_ctl(epfd, op, fd, event, data)
 end
 
 local epoll_flags = {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"}
-local epoll_lflags = lflag("EPOLL", epoll_flags)
 
 function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes optional epoll_pwait functionality
   if not maxevents then maxevents = 16 end
@@ -3620,7 +3609,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   local r = {}
   for i = 1, ret do -- put in Lua array
     local e = events[i - 1]
-    r[i] = getflags(e.events, "EPOLL", epoll_flags, epoll_lflags)
+    r[i] = getflags(e.events, "EPOLL", epoll_flags)
     r[i].fileno = tonumber(e.data.fd)
     r[i].data = t.uint64(e.data.u64)
   end
@@ -3656,7 +3645,6 @@ local in_recv_ev = {"IN_ACCESS", "IN_ATTRIB", "IN_CLOSE_WRITE", "IN_CLOSE_NOWRIT
                     "IN_MOVE_SELF", "IN_MOVED_FROM", "IN_MOVED_TO", "IN_OPEN",
                     "IN_CLOSE", "IN_MOVE" -- combined ops
                    }
-local in_recv_lev = lflag("IN_", in_recv_ev)
 
 -- helper function to read inotify structs as table from inotify fd
 function S.inotify_read(fd, buffer, len)
@@ -3972,7 +3960,6 @@ function S.klogctl(tp, buf, len)
 end
 
 local time_flags = {"TIME_OK", "TIME_INS", "TIME_DEL", "TIME_OOP", "TIME_WAIT", "TIME_BAD"}
-local time_lflags = lflag("TIME_", time_flags)
 
 function S.adjtimex(a)
   if not a then a = t.timex() end
@@ -3984,7 +3971,7 @@ function S.adjtimex(a)
   local ret = C.adjtimex(a)
   if ret == -1 then return errorret() end
   -- we need to return a table, as we need to return both ret and the struct timex. should probably put timex fields in table
-  local r = getflags(ret, "TIME_", time_flags, time_lflags, {timex = a})
+  local r = getflags(ret, "TIME_", time_flags, {timex = a})
   return r
 end
 
@@ -4201,12 +4188,12 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
 
   local ir = { -- interface details
     family = iface.ifi_family,
-    type = iface.ifi_type, -- cannot find documentation of these... FOUND
+    type = iface.ifi_type,
     index = iface.ifi_index,
-    flags = getflags(iface.ifi_flags, "IFF_", iff_flags, iff_lflags),
+    flags = getflags(iface.ifi_flags, "IFF_", iff_flags),
     change = iface.ifi_change
   }
-
+  -- TODO add getflag for type.
   ir.flags.flags = iface.ifi_flags
 
   while rta_ok(rtattr, len) do
