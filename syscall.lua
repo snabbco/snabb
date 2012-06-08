@@ -2501,7 +2501,6 @@ t.ifinfomsg = ffi.typeof("struct ifinfomsg")
 t.rtattr = ffi.typeof("struct rtattr")
 t.timex = ffi.typeof("struct timex")
 t.utsname = ffi.typeof("struct utsname")
-t.sigset = ffi.typeof("sigset_t")
 t.rlimit = ffi.typeof("struct rlimit")
 t.fdb_entry = ffi.typeof("struct fdb_entry")
 t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
@@ -3296,12 +3295,13 @@ function S.sethostname(s) -- only accept Lua string, do not see use case for buf
 end
 
 -- signal set handlers
+-- TODO needs more tests
 local getsigset
 
 local function mksigset(str)
   if not str then return t.sigset() end
-  if ffi.istype(t.sigset, str) then return str end
-  if type(str) == "table" then return str.sigset end
+  if ffi.istype(t.sigset, str) then return str end -- TODO if not string instead
+  if type(str) == "table" then return str.sigset end -- TODO remove once using metatype
   local f = t.sigset()
   local a = split(",", str)
   for i, v in ipairs(a) do
@@ -3319,6 +3319,13 @@ end
 local function sigismember(set, sig)
   local d = bit.rshift(sig - 1, 5) -- always 32 bits
   return bit.band(set.val[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
+end
+
+local function sigemptyset(set)
+  for i = 1, ffi.sizeof(t.sigset) / 4 do
+    if set[i] ~= 0 then return false end
+  end
+  return true
 end
 
 local function sigaddset(set, sig)
@@ -3363,22 +3370,31 @@ local function sigdelsets(set, sigs) -- allow multiple
   return getsigset(set)
 end
 
-mt.sigset = {__index = {add = sigaddsets, del = sigdelsets}}
+mt.sigset = {__index = {add = sigaddsets, del = sigdelsets, isemptyset = sigemptyset}}
 
 function getsigset(set)
   local f = {sigset = set}
-  local isemptyset = true
   for i = 1, S.NSIG do
     if sigismember(set, i) then
       f[signals[i]] = true
       f[signals[i]:lower():sub(4)] = true
-      isemptyset = false
     end
   end
-  f.isemptyset = isemptyset
   setmetatable(f, mt.sigset)
   return f
 end
+
+t.sigset = ffi.typeof("sigset_t")
+
+--[[
+t.sigset = ffi.metatype("sigset_t", {
+  __index = function(t, k)
+    if k == 'add' then return sigaddsets(t, k) end
+    if k == 'del' then return sigdelsets(t, k) end
+
+  end
+})
+]]
 
 -- does not support passing a function as a handler, use sigaction instead
 -- actualy glibc does not call the syscall anyway, defines in terms of sigaction; we could too
