@@ -3295,16 +3295,10 @@ function S.sethostname(s) -- only accept Lua string, do not see use case for buf
 end
 
 -- signal set handlers
--- TODO needs more tests
---local getsigset
-local function getsigset(set)
-  return set
-end
 
 local function mksigset(str)
   if not str then return t.sigset() end
-  if ffi.istype(t.sigset, str) then return str end -- TODO if not string instead
-  if type(str) == "table" then return str.sigset end -- TODO remove once using metatype
+  if type(str) ~= 'string' then return str end
   local f = t.sigset()
   local a = split(",", str)
   for i, v in ipairs(a) do
@@ -3346,7 +3340,7 @@ local function sigdelset(set, sig)
 end
 
 local function sigaddsets(set, sigs) -- allow multiple
-  if type(sigs) ~= "string" then return getsigset(sigaddset(set, sigs)) end
+  if type(sigs) ~= "string" then return sigaddset(set, sigs) end
   set = mksigset(set)
   local a = split(",", sigs)
   for i, v in ipairs(a) do
@@ -3356,11 +3350,11 @@ local function sigaddsets(set, sigs) -- allow multiple
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     sigaddset(set, sig)
   end
-  return getsigset(set)
+  return set
 end
 
 local function sigdelsets(set, sigs) -- allow multiple
-  if type(sigs) ~= "string" then return getsigset(sigdelset(set, sigs)) end
+  if type(sigs) ~= "string" then return sigdelset(set, sigs) end
   set = mksigset(set)
   local a = split(",", sigs)
   for i, v in ipairs(a) do
@@ -3370,7 +3364,7 @@ local function sigdelsets(set, sigs) -- allow multiple
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     sigdelset(set, sig)
   end
-  return getsigset(set)
+  return set
 end
 
 t.sigset = ffi.metatype("sigset_t", {
@@ -3534,14 +3528,14 @@ function S.sigprocmask(how, set)
   local oldset = t.sigset()
   local ret = C.sigprocmask(how, set, oldset)
   if ret == -1 then return errorret() end
-  return getsigset(oldset)
+  return oldset
 end
 
 function S.sigpending()
   local set = t.sigset()
   local ret = C.sigpending(set)
   if ret == -1 then return errorret() end
- return getsigset(set)
+ return set
 end
 
 function S.sigsuspend(mask) return retbool(C.sigsuspend(mksigset(mask))) end
