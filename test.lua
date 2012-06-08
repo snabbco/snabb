@@ -748,6 +748,23 @@ test_events = {
     assert(sel.count == 1, "one fd available for read now")
     assert(s:close())
     assert(c:close())
+  end,
+  test_epoll = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    local c, s = sv[1], sv[2]
+    local ep = assert(S.epoll_create("cloexec"))
+    assert(ep:epoll_ctl("add", c, "in"))
+    local r = assert(ep:epoll_wait(nil, 1, 0))
+    assert(#r == 0, "no events yet")
+    assert(s:write(teststring))
+    r = assert(ep:epoll_wait())
+    assert(#r == 1, "one event now")
+    assert(r[1].EPOLLIN, "read event")
+    assert(r[1].fileno == c.fileno, "expect to get fileno of ready file back") -- by default our epoll_ctl sets this
+    assert(ep:close())
+    assert(c:read()) -- clear event
+    assert(s:close())
+    assert(c:close())
   end
 }
 
@@ -800,44 +817,6 @@ test_legacy = {
   test_legacy = function()
 
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
-
-
-
--- sockets
-
-local a, sa
-local loop = "127.0.0.1"
-
--- test select, poll and epoll
-
-
-
-local sv = assert(S.socketpair("unix", "stream"))
-c, s = sv[1], sv[2]
-
-local ep = assert(S.epoll_create("cloexec"))
-assert(ep:epoll_ctl("add", c, "in"))
-
-local r = assert(ep:epoll_wait(nil, 1, 0))
-assert(#r == 0, "no events yet")
-
-n = assert(s:write(teststring))
-
-r = assert(ep:epoll_wait())
-assert(#r == 1, "one event now")
-assert(r[1].EPOLLIN, "read event")
-assert(r[1].fileno == c.fileno, "expect to get fileno of ready file back") -- by default our epoll_ctl sets this
-assert(ep:close())
-
-n = assert(c:read()) -- clear event
-
-
-assert(s:close())
-assert(c:close())
-
-
-
-
 
 
 -- fork and related methods
