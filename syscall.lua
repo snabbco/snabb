@@ -2747,19 +2747,6 @@ end
 -- useful for comparing modes etc
 function S.mode(mode) return stringflags(mode, "S_") end
 
--- reverse flag operations
-
-local function getflag(e, prefix, values)
-  local r= {}
-  for i, f in ipairs(values) do
-    if e == S[f] then
-      r[f] = true
-      r[f:lower():sub(#prefix + 1)] = true
-    end
-  end
-  return r
-end
-
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
   function S.htonl(b) return b end
@@ -4218,7 +4205,7 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
     flags = {},
     change = iface.ifi_change
   }
-  -- TODO add getflag for type.
+  -- TODO add metatable for type.
 
   setmetatable(ir.flags, mt.iff)
   ir.flags.flags = iface.ifi_flags
