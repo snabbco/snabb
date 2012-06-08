@@ -952,6 +952,14 @@ S.ARPHRD_CAIF     = 822
 S.ARPHRD_VOID     = 0xFFFF
 S.ARPHRD_NONE     = 0xFFFE
 
+mt.arphrd = {
+  __index = function(t, k)
+    local prefix = "ARPHRD_"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return t.type == S[k]
+  end
+}
+
 -- eventfd
 S.EFD_SEMAPHORE = 1
 S.EFD_CLOEXEC = octal("02000000")
@@ -4205,7 +4213,7 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
     flags = {},
     change = iface.ifi_change
   }
-  -- TODO add metatable for type.
+  setmetatable(ir, mt.arphrd)
 
   setmetatable(ir.flags, mt.iff)
   ir.flags.flags = iface.ifi_flags
