@@ -1546,28 +1546,32 @@ S.E.EOWNERDEAD     = 130
 S.E.ENOTRECOVERABLE= 131
 S.E.ERFKILL        = 132
 
-function S.strerror(errno) return ffi.string(C.strerror(errno)) end
-
-mt.error= {__tostring = function(e) return S.strerror(e.errno) end}
-
-local errsyms, errlsyms = {}, {}
-
-for k, v in pairs(S.E) do
-  errsyms[v] = k
-  errlsyms[v] = k:sub(2):lower()
-end
-
 -- alternate names
 S.E.EWOULDBLOCK    = S.E.EAGAIN
 S.E.EDEADLOCK      = S.E.EDEADLK
 S.E.ENOATTR        = S.E.ENODATA
 
+function S.strerror(errno) return ffi.string(C.strerror(errno)) end
+
+local errsyms = {} -- reverse lookup
+
+for k, v in pairs(S.E) do
+  errsyms[v] = k
+end
+
+mt.error= {
+  __tostring = function(e) return S.strerror(e.errno) end,
+  __index = function(t, k)
+    if k == 'sym' then return errsyms[t.errno] end
+    if k == 'lsym' then return errsyms[t.errno]:sub(2):lower() end
+    if S.E[k] then return S.E[k] == t.errno end
+    local uk = S.E['E' .. k:upper()]
+    if uk then return uk == t.errno end
+  end
+}
+
 local function mkerror(errno)
-  local sym = errsyms[errno]
-  local lsym = errlsyms[errno]
-  local e = {errno = errno, sym = sym, lsym = lsym}
-  e[sym] = true
-  e[lsym] = true
+  local e = {errno = errno}
   setmetatable(e, mt.error)
   return e
 end
