@@ -3363,7 +3363,7 @@ local function sigdelsets(set, sigs) -- allow multiple
   return getsigset(set)
 end
 
-local sigsetmt = {__index = {add = sigaddsets, del = sigdelsets}}
+mt.sigset = {__index = {add = sigaddsets, del = sigdelsets}}
 
 function getsigset(set)
   local f = {sigset = set}
@@ -3376,7 +3376,7 @@ function getsigset(set)
     end
   end
   f.isemptyset = isemptyset
-  setmetatable(f, sigsetmt)
+  setmetatable(f, mt.sigset)
   return f
 end
 
