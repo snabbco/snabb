@@ -661,16 +661,16 @@ test_netlink = {
     assert(lo.flags.running, "loopback interface should be running")
     assert(not lo.flags.broadcast, "loopback interface should not be broadcast")
     assert(not lo.flags.multicast, "loopback interface should not be multicast")
-    assert_equal(lo.ifi_type, S.ARPHRD_LOOPBACK, "loopback interface type should be loopback") -- TODO add getflag
+    assert_equal(lo.type, S.ARPHRD_LOOPBACK, "loopback interface type should be loopback") -- TODO add getflag
     local eth = i.iface.eth0 or i.iface.eth1 -- may not exist
     if eth then
       assert(eth.flags.broadcast, "ethernet interface should be broadcast")
       assert(eth.flags.multicast, "ethernet interface should be multicast")
-      assert_equal(eth.ifi_type, S.ARPHRD_ETHER, "ethernet interface type should be ether")
+      assert_equal(eth.type, S.ARPHRD_ETHER, "ethernet interface type should be ether")
     end
     local wlan = i.iface.wlan0
     if wlan then
-      assert_equal(wlan.ifi_type, S.ARPHRD_ETHER, "wlan interface type should be ether")
+      assert_equal(wlan.type, S.ARPHRD_ETHER, "wlan interface type should be ether")
     end
   end,
   test_bridge_list = function()
