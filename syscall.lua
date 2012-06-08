@@ -20,6 +20,14 @@ S.cast = ffi.cast
 S.copy = ffi.copy
 S.fill = ffi.fill
 
+local function lflag(prefix, t) -- lower case flag table
+  local l = {}
+  for i, v in ipairs(t) do
+    l[i] = v:sub(#prefix + 1):lower()
+  end
+  return l
+end
+
 -- open, fcntl
 S.O_ACCMODE   = octal('0003')
 S.O_RDONLY    = octal('00')
@@ -779,6 +787,11 @@ S.IFF_DYNAMIC    = 0x8000
 S.IFF_LOWER_UP   = 0x10000
 S.IFF_DORMANT    = 0x20000
 S.IFF_ECHO       = 0x40000
+
+local iff_flags = {"IFF_UP", "IFF_BROADCAST", "IFF_DEBUG", "IFF_LOOPBACK", "IFF_POINTOPOINT", "IFF_NOTRAILERS", "IFF_RUNNING",
+                   "IFF_NOARP", "IFF_PROMISC", "IFF_ALLMULTI", "IFF_MASTER", "IFF_SLAVE", "IFF_MULTICAST", "IFF_PORTSEL",
+                   "IFF_AUTOMEDIA", "IFF_DYNAMIC", "IFF_LOWER_UP", "IFF_DORMANT", "IFF_ECHO"}
+local iff_lflags = lflag("IFF_", iff_flags) 
 
 S.IFF_SLAVE_NEEDARP = 0x40
 S.IFF_ISATAP        = 0x80
@@ -2635,6 +2648,7 @@ end
 function S.mode(mode) return stringflags(mode, "S_") end
 
 -- reverse flag operations
+--broken - does not use prefix! TODO fix
 local function getflags(e, prefix, values, lvalues, r)
   if not r then r = {} end
   for i, f in ipairs(values) do
@@ -2913,14 +2927,6 @@ function S.ioctl(d, request, argp)
 end
 
 function S.reboot(cmd) return retbool(C.reboot(stringflag(cmd, "LINUX_REBOOT_CMD_"))) end
-
-local function lflag(prefix, t)
-  local l = {}
-  for i, v in ipairs(t) do
-    l[i] = v:sub(#prefix + 1):lower()
-  end
-  return l
-end
 
 local dt_flags = {"DT_UNKNOWN", "DT_FIFO", "DT_CHR", "DT_DIR", "DT_BLK", "DT_REG", "DT_LNK", "DT_SOCK", "DT_WHT"}
 local dt_lflags = lflag("DT_", dt_flags)
@@ -4110,9 +4116,9 @@ local rta_next = function(msg, buf, len)
 end
 
 local ifla_decode = {}
-ifla_decode[S.IFLA_IFNAME] = function(r, buf, len)
-  r.name = ffi.string(buf + rta_length(0))
-  return r
+ifla_decode[S.IFLA_IFNAME] = function(ir, buf, len)
+  ir.name = ffi.string(buf + rta_length(0))
+  return ir
 end
 
 
@@ -4125,7 +4131,14 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
   len = len - nlmsg_align(ffi.sizeof(t.ifinfomsg))
 
   local rtattr = ffi.cast(rtattr_pt, buf)
-  local ir = {index = iface.ifi_index} -- info about interface
+
+  local ir = { -- interface details
+    index = iface.ifi_index,
+    flags = getflags(iface.ifi_flags, "IFF_", iff_flags, iff_lflags)
+  }
+
+  ir.flags.flags = iface.ifi_flags
+
   while rta_ok(rtattr, len) do
     if ifla_decode[rtattr.rta_type] then ir = ifla_decode[rtattr.rta_type](ir, buf, len) end
 

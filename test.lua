@@ -655,6 +655,13 @@ test_netlink = {
     --for k, v in ipairs(i.ifaces) do print(v.name) end
     assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
     assert(i.iface.lo, "expect a loopback interface")
+    local lo = i.iface.lo
+    print(lo.flags.flags)
+    assert(lo.flags.up, "loopback interface should be up")
+    assert(lo.flags.loopback, "loopback interface should be marked as loopback")
+    assert(lo.flags.running, "loopback interface should be running")
+    assert(not lo.flags.broadcast, "loopback interface should not be broadcast")
+    assert(not lo.flags.multicast, "loopback interface should not be multicast")
   end,
   test_bridge_list = function()
     local b = assert(S.bridge_list())
