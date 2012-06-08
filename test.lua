@@ -285,6 +285,9 @@ test_file_operations = {
     assert(d[".."], "expect to find ..")
     assert(d.zero.chr, "/dev/zero is a character device")
     assert(d["."].dir, ". is a directory")
+    assert(not d["."].chr, ". is not a character device")
+    assert(not d["."].sock, ". is not a socket")
+    assert(not d["."].lnk, ". is not a synlink")
     assert(d[".."].dir, ".. is a directory")
   end,
   test_getdents_error = function()

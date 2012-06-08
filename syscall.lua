@@ -634,7 +634,7 @@ mt.dents = {
   __index = function(t, k)
     local prefix = "DT_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.type, S[k]) ~= 0
+    return t.type == S[k]
   end
 }
 
