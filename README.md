@@ -115,6 +115,8 @@ Siginfo support in sigaction not there yet, as confused by the kernel API.
 
 only some of aio is working, needs some debugging before being used.
 
+The getflag/getflags stuff could be more efficient if in metatables rather than populating table directly.
+
 ### Missing functions
 
 pselect, ppoll
