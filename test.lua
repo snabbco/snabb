@@ -724,6 +724,19 @@ test_events = {
     n = assert(fd:eventfd_read())
     assert(n, 0, "eventfd should return 0 again")
     assert(fd:close())
+  end,
+  test_poll = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    local c, s = sv[1], sv[2]
+    local pev = {{fd = c, events = S.POLLIN}}
+    local p = assert(S.poll(pev, 1, 0))
+    assert(p[0].fd == c.fileno and p[0].revents == 0, "one event now")
+    assert(s:write(teststring))
+    local p = assert(S.poll(pev, 1, 0))
+    assert(p[0].fd == c.fileno and p[0].POLLIN, "one event now")
+    assert(c:read())
+    assert(s:close())
+    assert(c:close())
   end
 }
 
@@ -811,19 +824,12 @@ assert(ep:close())
 
 n = assert(c:read()) -- clear event
 
-local pfds = {{fd = c, events = S.POLLIN}}
-local p = assert(S.poll(pfds, 1, 0))
-
-assert(p[0].fd == c.fileno and p[0].revents == 0, "one event now")
-
-n = assert(s:write(teststring))
-
-local p = assert(S.poll(pfds, 1, 0))
-
-assert(p[0].fd == c.fileno and p[0].POLLIN, "one event now")
 
 assert(s:close())
 assert(c:close())
+
+
+
 
 
 
