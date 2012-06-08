@@ -668,6 +668,10 @@ test_netlink = {
       assert(eth.flags.multicast, "ethernet interface should be multicast")
       assert_equal(eth.ifi_type, S.ARPHRD_ETHER, "ethernet interface type should be ether")
     end
+    local wlan = i.iface.wlan0
+    if wlan then
+      assert_equal(wlan.ifi_type, S.ARPHRD_ETHER, "wlan interface type should be ether")
+    end
   end,
   test_bridge_list = function()
     local b = assert(S.bridge_list())
