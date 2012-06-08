@@ -554,6 +554,14 @@ S.POLLERR         = 0x008
 S.POLLHUP         = 0x010
 S.POLLNVAL        = 0x020
 
+mt.poll = {
+  __index = function(t, k)
+    local prefix = "POLL"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.revents, S[k]) ~= 0
+  end
+}
+
 -- epoll
 S.EPOLL_CLOEXEC = octal("02000000")
 S.EPOLL_NONBLOCK = octal("04000")
@@ -3535,8 +3543,6 @@ function S.select(s) -- note same structure as returned
           exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
 end
 
-local poll_flags = {"POLLIN", "POLLOUT", "POLLPRI", "POLLRDHUP", "POLLERR", "POLLHUP", "POLLNVAL", "POLLRDNORM", "POLLRDBAND", "POLLWRNORM", "POLLWRBAND", "POLLMSG"}
-
 function S.poll(fds, nfds, timeout)
   if type(fds) == "table" then
     local pf = fds
@@ -3554,8 +3560,9 @@ function S.poll(fds, nfds, timeout)
   local r = {}
   for i = 0, nfds - 1 do
     if fds[i].revents ~= 0 then
-      r[#r + 1] = getflags(fds[i].revents, "POLL", poll_flags,
-                           {fileno = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)})
+      local p = {fileno = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)}
+      setmetatable(p, mt.poll)
+      r[#r + 1] = p
     end
   end
   return r
