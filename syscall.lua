@@ -489,6 +489,14 @@ S.TIME_WAIT       = 4
 S.TIME_ERROR      = 5
 S.TIME_BAD        = S.TIME_ERROR
 
+mt.timex = {
+  __index = function(t, k)
+    local prefix = "TIME_"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.state, S[k]) ~= 0
+  end
+}
+
 -- xattr
 S.XATTR_CREATE = 1
 S.XATTR_REPLACE = 2
@@ -3982,8 +3990,6 @@ function S.klogctl(tp, buf, len)
   return true
 end
 
-local time_flags = {"TIME_OK", "TIME_INS", "TIME_DEL", "TIME_OOP", "TIME_WAIT", "TIME_BAD"}
-
 function S.adjtimex(a)
   if not a then a = t.timex() end
   if type(a) == 'table' then  -- TODO pull this out to general initialiser for t.timex
@@ -3994,7 +4000,8 @@ function S.adjtimex(a)
   local ret = C.adjtimex(a)
   if ret == -1 then return errorret() end
   -- we need to return a table, as we need to return both ret and the struct timex. should probably put timex fields in table
-  local r = getflags(ret, "TIME_", time_flags, {timex = a})
+  local r = {state = ret, timex = a}
+  setmetatable(r, mt.timex)
   return r
 end
 
