@@ -3296,7 +3296,10 @@ end
 
 -- signal set handlers
 -- TODO needs more tests
-local getsigset
+--local getsigset
+local function getsigset(set)
+  return set
+end
 
 local function mksigset(str)
   if not str then return t.sigset() end
@@ -3322,8 +3325,8 @@ local function sigismember(set, sig)
 end
 
 local function sigemptyset(set)
-  for i = 1, ffi.sizeof(t.sigset) / 4 do
-    if set[i] ~= 0 then return false end
+  for i = 0, ffi.sizeof(t.sigset) / 4 - 1 do
+    if set.val[i] ~= 0 then return false end
   end
   return true
 end
@@ -3370,31 +3373,17 @@ local function sigdelsets(set, sigs) -- allow multiple
   return getsigset(set)
 end
 
-mt.sigset = {__index = {add = sigaddsets, del = sigdelsets, isemptyset = sigemptyset}}
-
-function getsigset(set)
-  local f = {sigset = set}
-  for i = 1, S.NSIG do
-    if sigismember(set, i) then
-      f[signals[i]] = true
-      f[signals[i]:lower():sub(4)] = true
-    end
-  end
-  setmetatable(f, mt.sigset)
-  return f
-end
-
-t.sigset = ffi.typeof("sigset_t")
-
---[[
 t.sigset = ffi.metatype("sigset_t", {
-  __index = function(t, k)
-    if k == 'add' then return sigaddsets(t, k) end
-    if k == 'del' then return sigdelsets(t, k) end
-
+  __index = function(set, k)
+    if k == 'add' then return sigaddsets end
+    if k == 'del' then return sigdelsets end
+    if k == 'isemptyset' then return sigemptyset(set) end
+    local prefix = "SIG"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    local sig = S[k]
+    if sig then return sigismember(set, sig) end
   end
 })
-]]
 
 -- does not support passing a function as a handler, use sigaction instead
 -- actualy glibc does not call the syscall anyway, defines in terms of sigaction; we could too

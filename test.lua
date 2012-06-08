@@ -361,6 +361,7 @@ test_timers_signals = {
     assert(m.isemptyset, "expect initial sigprocmask to be empty")
     assert(not m.winch, "expect set empty")
     m = m:add(S.SIGWINCH)
+    assert(not m.isemptyset, "expect set not empty")
     assert(m.winch, "expect to have added SIGWINCH")
     m = m:del("SIGWINCH, pipe")
     assert(not m.winch, "expect set empty again")
