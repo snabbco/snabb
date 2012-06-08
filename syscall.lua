@@ -1021,6 +1021,14 @@ S.IN_ALL_EVENTS    = S.IN_ACCESS + S.IN_MODIFY + S.IN_ATTRIB + S.IN_CLOSE_WRITE
                        + S.IN_MOVED_TO + S.IN_CREATE + S.IN_DELETE
                        + S.IN_DELETE_SELF + S.IN_MOVE_SELF
 
+mt.inotify = {
+  __index = function(t, k)
+    local prefix = "IN_"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.mask, S[k]) ~= 0
+  end
+}
+
 --prctl
 S.PR_SET_PDEATHSIG = 1
 S.PR_GET_PDEATHSIG = 2
@@ -3660,11 +3668,6 @@ function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "
 function S.inotify_add_watch(fd, pathname, mask) return retnum(C.inotify_add_watch(getfd(fd), pathname, stringflags(mask, "IN_"))) end
 function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd), wd)) end
 
-local in_recv_ev = {"IN_ACCESS", "IN_ATTRIB", "IN_CLOSE_WRITE", "IN_CLOSE_NOWRITE", "IN_CREATE", "IN_DELETE", "IN_DELETE_SELF", "IN_MODIFY",
-                    "IN_MOVE_SELF", "IN_MOVED_FROM", "IN_MOVED_TO", "IN_OPEN",
-                    "IN_CLOSE", "IN_MOVE" -- combined ops
-                   }
-
 -- helper function to read inotify structs as table from inotify fd
 function S.inotify_read(fd, buffer, len)
   if not len then len = 1024 end
@@ -3674,7 +3677,8 @@ function S.inotify_read(fd, buffer, len)
   local off, ee = 0, {}
   while off < ret do
     local ev = ffi.cast(inotify_event_pt, buffer + off)
-    local le = getflags(ev.mask, "IN_", in_recv_ev, in_recv_lev, {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)})
+    local le = {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)}
+    setmetatable(le, mt.inotify)
     if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
     off = off + ffi.sizeof(t.inotify_event(ev.len))
