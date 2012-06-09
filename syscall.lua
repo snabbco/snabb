@@ -4656,8 +4656,7 @@ function S.tcgetattr(fd)
 end
 
 function S.tcsetattr(fd, optional_actions, termios)
-  return retbool(C.tcsetattr(getfd(fd), stringflag(optional_actions, "TCSA"),
-                             termios))
+  return retbool(C.tcsetattr(getfd(fd), stringflag(optional_actions, "TCSA"), termios))
 end
 
 function S.tcsendbreak(fd, duration)
