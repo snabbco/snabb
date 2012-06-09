@@ -1552,7 +1552,6 @@ for k, v in pairs(S.E) do
 end
 
 t.error = ffi.metatype("struct {int errno;}", {
---mt.error= {
   __tostring = function(e) return S.strerror(e.errno) end,
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
@@ -1564,8 +1563,6 @@ t.error = ffi.metatype("struct {int errno;}", {
 })
 
 local function mkerror(errno)
-  --local e = {errno = errno}
-  --setmetatable(e, mt.error)
   local e = t.error(errno)
   return e
 end
