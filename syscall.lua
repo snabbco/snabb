@@ -2511,7 +2511,7 @@ local loff_1t = ffi.typeof("loff_t[1]")
 
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 local iocbs_t = ffi.typeof("struct iocb[?]")
-t.pollfds = ffi.typeof("struct pollfd [?]")
+local pollfds_t = ffi.typeof("struct pollfd [?]")
 
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
 local io_events_t = ffi.typeof("struct io_event[?]")
@@ -3569,7 +3569,7 @@ function S.poll(fds, nfds, timeout)
   if type(fds) == "table" then
     local pf = fds
     nfds = #pf
-    fds = ffi.new("struct pollfd[" .. nfds .."]") -- can't use varargs as want user to be able to iterate.
+    fds = pollfds_t(nfds)
     for i = 0, nfds - 1 do
       local p = pf[i + 1]
       fds[i].fd = getfd(p.fd)
