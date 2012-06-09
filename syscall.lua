@@ -1590,11 +1590,6 @@ t.buffer = ffi.typeof("char[?]")
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
 
--- standard error return
-local function errorret(errno)
-  return nil, mkerror(errno or ffi.errno())
-end
-
  -- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet... not used at present
 local function retint(ret)
   if ret == -1 then return nil, t.error(ffi.errno()) end
@@ -2964,11 +2959,11 @@ function S.readlink(path) -- note no idea if name truncated except return value 
   return ffi.string(buffer, ret)
 end
 
-local retnume
-function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
+local function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
   ffi.errno(0)
   local ret = f(...)
-  if ffi.errno() ~= 0 then return errorret() end
+  local errno = ffi.errno()
+  if errno ~= 0 then return nil, t.error(ffi.errno()) end
   return ret
 end
 
@@ -3149,7 +3144,7 @@ function S.getcwd()
     local ret = C.getcwd(buf, size)
     if not ret then 
       local errno = ffi.errno()
-      if errno == S.E.RANGE then size = size * 2 else return errorret(errno) end
+      if errno == S.E.RANGE then size = size * 2 else return nil, t.error(errno) end
     end
   until ret
   return ffi.string(buf)
