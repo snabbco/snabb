@@ -66,21 +66,21 @@ Many functions that return structs return metatypes exposing additional methods,
 
 Not yet supporting the 64 bit file operations for 32 bit architectures (lseek64 etc).
 
-Constants should all be available, eg `L.SEEK_SET` etc. You can add to combine them. They are also available as strings, so "SEEK_SET" will be converted to S.SEEK_SET. You can miss off the "SEEK_" prefix, and they are not case sensitive, so you can just use `fd:lseek(offset, "set")` for more concise and readable use. If multiple flags are allowed, they can be comma separated for logical OR, such as `S.mmap(nil, size, "read", "private, anonymous", -1, 0)`.
+Constants should all be available, eg `L.SEEK_SET` etc. You can add to combine them. They are also available as strings, so "SEEK\_SET" will be converted to S.SEEK\_SET. You can miss off the "SEEK\_" prefix, and they are not case sensitive, so you can just use `fd:lseek(offset, "set")` for more concise and readable use. If multiple flags are allowed, they can be comma separated for logical OR, such as `S.mmap(nil, size, "read", "private, anonymous", -1, 0)`.
 
 You do not need to use the numbered versions of functions, eg dup can do dup2 or dup3 by adding more arguments
 
-getcwd returns the result in a buffer if one is passed, or as a Lua string otherwise, ie if called with no parameters/
+getcwd returns the result in a buffer if one is passed, or as a Lua string otherwise, ie if called with no parameters.
 
 Standard convenience macros are also provided, eg S.major(dev) to extract a major number from a device number.
 
 bind does not require a length for the address type length, as it can work this out dynamically.
 
-`uname` returns a Lua table with the returned strings in it. Similarly `getdents` returns directory entries as a table. All functions that return multiple arguments return tables in general.
+`uname` returns a Lua table with the returned strings in it. Similarly `getdents` returns directory entries as a table. However I am moving more to returning native ffi structures with metamethods as this is less overhead than converting to tables, so long as I can provide the same functionality. If you want a higher level interface you can add a wrapper.
 
 The test cases are good examples until I do better documentation!
 
-A few functions have arguments in a different order to make optional ones easier. This is a bit confusing, so avoid in general (always?)
+A few functions have arguments in a different order to make optional ones easier. This is a bit confusing sometimes, so check the examples or source code.
 
 ### Issues
 
@@ -94,7 +94,7 @@ Netlink sockets need more friendly API.
 
 Should build more high level API, eg net.eth0:ip() etc. Like sysfs but with native methods I guess, and create etc. eg net:bridge("br0"). net.br0.ip = ....
 
-Should add some tostring methods for some of these structures... just done ls so far.
+Should add some tostring methods for some of these structures... just done ls so far. eg network interfaces should look like ip/ifconfig output.
 
 Should split out more of the stuff that is not just system calls into utility package.
 
@@ -114,8 +114,6 @@ Generate C code to test size and offset of each struct
 Siginfo support in sigaction not there yet, as confused by the kernel API.
 
 only some of aio is working, needs some debugging before being used.
-
-The getflag/getflags stuff could be more efficient if in metatables rather than populating table directly.
 
 ### Missing functions
 
