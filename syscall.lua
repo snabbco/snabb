@@ -2518,7 +2518,7 @@ t.clockid = ffi.typeof("clockid_t")
 t.inotify_event = ffi.typeof("struct inotify_event")
 t.loff = ffi.typeof("loff_t")
 t.io_event = ffi.typeof("struct io_event")
-t.seccmp_data = ffi.typeof("struct seccomp_data")
+t.seccomp_data = ffi.typeof("struct seccomp_data")
 
 t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
 
