@@ -1144,6 +1144,20 @@ S.CAP_MAC_ADMIN = 33
 S.CAP_SYSLOG = 34
 S.CAP_WAKE_ALARM = 35
 
+-- new SECCOMP modes, now there is filter as well as strict
+S.SECCOMP_MODE_DISABLED = 0
+S.SECCOMP_MODE_STRICT   = 1
+S.SECCOMP_MODE_FILTER   = 2
+
+S.SECCOMP_RET_KILL      = 0x00000000
+S.SECCOMP_RET_TRAP      = 0x00030000
+S.SECCOMP_RET_ERRNO     = 0x00050000
+S.SECCOMP_RET_TRACE     = 0x7ff00000
+S.SECCOMP_RET_ALLOW     = 0x7fff0000
+
+S.SECCOMP_RET_ACTION    = 0xffff0000 -- note unsigned 
+S.SECCOMP_RET_DATA      = 0x0000ffff
+
 -- termios
 S.NCCS = 32
 
@@ -2003,6 +2017,12 @@ struct io_event {
   int64_t            res;
   int64_t            res2;
 };
+struct seccomp_data {
+  int nr;
+  uint32_t arch;
+  uint64_t instruction_pointer;
+  uint64_t args[6];
+};
 
 /* termios */
 typedef unsigned char	cc_t;
@@ -2498,6 +2518,7 @@ t.clockid = ffi.typeof("clockid_t")
 t.inotify_event = ffi.typeof("struct inotify_event")
 t.loff = ffi.typeof("loff_t")
 t.io_event = ffi.typeof("struct io_event")
+t.seccmp_data = ffi.typeof("struct seccomp_data")
 
 t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
 
@@ -3931,8 +3952,9 @@ prctlmap[S.PR_SET_TIMING] = "PR_TIMING_"
 prctlmap[S.PR_SET_TSC] = "PR_TSC_"
 prctlmap[S.PR_SET_UNALIGN] = "PR_UNALIGN_"
 prctlmap[S.PR_MCE_KILL] = "PR_MCE_KILL_"
+prctlmap[S.PR_SET_SECCOMP] = "SECCOMP_MODE_"
 
-local prctlrint = {} -- returns an integer directly
+local prctlrint = {} -- returns an integer directly TODO add metatables to set names
 prctlrint[S.PR_GET_DUMPABLE] = true
 prctlrint[S.PR_GET_KEEPCAPS] = true
 prctlrint[S.PR_CAPBSET_READ] = true
