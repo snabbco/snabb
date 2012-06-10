@@ -16,7 +16,7 @@ local buf = S.t.buffer(size)
 local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 
-local setup = function()
+local clean = function()
   S.unlink(tmpfile)
   S.unlink(tmpfile2)
 end
@@ -31,7 +31,7 @@ test_basic = {
 }
 
 test_open_close = {
-  setup = setup,
+  teardown = clean,
   test_open_nofile = function()
     local fd, err = S.open("/tmp/file/does/not/exist", "rdonly")
     assert(err, "expected open to fail on file not found")
@@ -94,7 +94,7 @@ test_open_close = {
 }
 
 test_read_write = {
-  setup = setup,
+  teardown = clean,
   test_read = function()
     local fd = assert(S.open("/dev/zero"))
     for i = 0, size - 1 do buf[i] = 255 end
@@ -149,7 +149,7 @@ test_read_write = {
 }
 
 test_file_operations = {
-  setup = setup,
+  teardown = clean,
   test_dup = function()
     local fd = assert(S.open("/dev/zero"))
     local fd2 = assert(fd:dup())
@@ -769,7 +769,7 @@ test_events = {
 }
 
 test_aio = {
-  setup = setup,
+  teardown = clean,
   test_aio_setup = function()
     local ctx = assert(S.io_setup(8))
     assert(ctx:destroy())
