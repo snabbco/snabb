@@ -2529,14 +2529,12 @@ local uint64_1t = ffi.typeof("uint64_t[1]")
 local socklen1_t = ffi.typeof("socklen_t[1]")
 local off1_t = ffi.typeof("off_t[1]")
 local loff_1t = ffi.typeof("loff_t[1]")
+local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 local iocbs_t = ffi.typeof("struct iocb[?]")
 local pollfds_t = ffi.typeof("struct pollfd [?]")
-
-local aio_context_1t = ffi.typeof("aio_context_t[1]")
 local io_events_t = ffi.typeof("struct io_event[?]")
-local socklen_1t = ffi.typeof("socklen_t[1]")
 
 local string_array_t = ffi.typeof("const char *[?]")
 
