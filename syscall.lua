@@ -2808,18 +2808,18 @@ end
 -- helper function to make setting addrlen optional
 local function getaddrlen(addr, addrlen)
   if not addr then return 0 end
-  if addrlen == nil then
-    if ffi.istype(t.sockaddr, addr) then return ffi.sizeof(t.sockaddr) end
-    if ffi.istype(t.sockaddr_un, addr) then return ffi.sizeof(t.sockaddr_un) end
-    if ffi.istype(t.sockaddr_in, addr) then return ffi.sizeof(t.sockaddr_in) end
-    if ffi.istype(t.sockaddr_in6, addr) then return ffi.sizeof(t.sockaddr_in6) end
-    if ffi.istype(t.sockaddr_nl, addr) then return ffi.sizeof(t.sockaddr_nl) end
-    if ffi.istype(t.sockaddr_storage, addr) then return ffi.sizeof(t.sockaddr_storage) end
-  end
-  return addrlen or 0
+  if addrlen then return addrlen end
+  if ffi.istype(t.sockaddr, addr) then return ffi.sizeof(t.sockaddr) end
+  if ffi.istype(t.sockaddr_un, addr) then return ffi.sizeof(t.sockaddr_un) end
+  if ffi.istype(t.sockaddr_in, addr) then return ffi.sizeof(t.sockaddr_in) end
+  if ffi.istype(t.sockaddr_in6, addr) then return ffi.sizeof(t.sockaddr_in6) end
+  if ffi.istype(t.sockaddr_nl, addr) then return ffi.sizeof(t.sockaddr_nl) end
+  if ffi.istype(t.sockaddr_storage, addr) then return ffi.sizeof(t.sockaddr_storage) end
 end
 
 -- helper function for returning socket address types
+-- TODO rework. should not need to copy, can just cast to right type.
+-- TODO maybe two functions, one plain, one with additional data
 local function saret(addr, addrlen, rets) -- return socket address structure, additional values to return in rets
   if not rets then rets = {} end
   local sa = ffi.cast(sockaddr_pt, addr)
@@ -2837,7 +2837,7 @@ local function saret(addr, addrlen, rets) -- return socket address structure, ad
     local namelen = addrlen - ffi.sizeof(t.sa_family)
     if namelen > 0 then
       rets.name = ffi.string(rets.addr.sun_path, namelen)
-      if rets.addr.sun_path[0] == 0 then rets.abstract = true end -- Linux only
+      if rets.addr.sun_path[0] == 0 then rets.abstract = true end -- TODO put in metatype
     end
   elseif afamily == S.AF_INET then
     if not ffi.istype(t.sockaddr_in, addr) then

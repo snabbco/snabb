@@ -84,6 +84,8 @@ A few functions have arguments in a different order to make optional ones easier
 
 ### Issues
 
+Rework socket address returns, should not need to copy structure, just cast.
+
 Other consistency issues: accepting tables for structs like adjtimex does is a nice model, use in other places.
 
 Managing constants a lot of work, may divide into subtables
