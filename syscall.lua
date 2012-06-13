@@ -2817,6 +2817,46 @@ local function getaddrlen(addr, addrlen)
   if ffi.istype(t.sockaddr_storage, addr) then return ffi.sizeof(t.sockaddr_storage) end
 end
 
+-- cast socket address to actual type based on family
+local samap = {}
+samap[S.AF_UNIX] = t.sockaddr_un
+samap[S.AF_INET] = t.sockaddr_in
+samap[S.AF_INET6] = t.sockaddr_in6
+samap[S.AF_NETLINK] = t.sockaddr_nl
+
+-- TODO add tests
+mt.sockaddr_un = {
+  __index = function(un, k)
+    local sa = un.addr
+    if k == 'sun_family' then return sa.sa_family end
+    if k == 'family' then return tonumber(sa.sa_family) end
+    local namelen = un.addrlen - ffi.sizeof(t.sa_family)
+    if namelen > 0 then
+      if sa.sun_path[0] == 0 then
+        if k == 'abstract' then return true end
+        if k == 'name' then return ffi.string(rets.addr.sun_path, namelen) end -- should we also remove leading \0?
+      else
+        if k == 'name' then return ffi.string(rets.addr.sun_path) end
+      end
+    else
+      if k == 'unnamed' then return true end
+    end
+  end
+}
+
+local function sacast(addr, addrlen)
+  local sa = ffi.cast(t.sockaddr, addr) -- in case is sockadr_storage
+  local family = tonumber(sa.sa_family)
+  if family == S.AF_UNIX then -- we return Lua metatable not metatype, as need length to decode
+    local sa = ffi.cast(samap[family], addr)
+    local un = {addr = sa, addrlen = addrlen}
+    setmetatable(un, mt.sockaddr_un)
+    return un
+  end
+  if samap[family] then return ffi.cast(samap[family], addr) end
+  return addr
+end
+
 -- helper function for returning socket address types
 -- TODO rework. should not need to copy, can just cast to right type.
 -- TODO maybe two functions, one plain, one with additional data
