@@ -2853,8 +2853,10 @@ local function sacast(addr, addrlen)
     setmetatable(un, mt.sockaddr_un)
     return un
   end
-  if samap[family] then return ffi.cast(samap[family], addr) end
-  return addr
+  --if samap[family] then return ffi.cast(samap[family], addr) end
+  local a = samap[family]()
+  ffi.copy(a, addr, sizeof(samap[family])) -- copy not cast, save memory.
+  return a
 end
 
 -- helper function for returning socket address types
