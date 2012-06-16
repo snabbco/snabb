@@ -2850,8 +2850,7 @@ local function sacast(addr, addrlen)
   local family = tonumber(sa.sa_family)
   if family == S.AF_UNIX then -- we return Lua metatable not metatype, as need length to decode
     local sa = ffi.cast(samap[family], addr)
-    local un = {addr = sa, addrlen = addrlen}
-    return setmetatable(un, mt.sockaddr_un)
+    return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
   end
   --if samap[family] then return ffi.cast(samap[family], addr) end
   local a = samap[family]()
@@ -4063,9 +4062,7 @@ function S.adjtimex(a)
   local ret = C.adjtimex(a)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   -- we need to return a table, as we need to return both ret and the struct timex. should probably put timex fields in table
-  local r = {state = ret, timex = a}
-  setmetatable(r, mt.timex)
-  return r
+  return setmetatable({state = ret, timex = a}, mt.timex)
 end
 
 function S.clock_getres(clk_id, ts)
