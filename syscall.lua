@@ -2486,10 +2486,7 @@ int ptsname_r(int fd, char *buf, size_t buflen);
 ]]
 
 -- Lua type constructors corresponding to defined types
-t.sockaddr = ffi.typeof("struct sockaddr")
-t.sockaddr_storage = ffi.typeof("struct sockaddr_storage")
 t.sockaddr_un = ffi.typeof("struct sockaddr_un")
-t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
 t.sa_family = ffi.typeof("sa_family_t")
 t.msghdr = ffi.typeof("struct msghdr")
 t.cmsghdr = ffi.typeof("struct cmsghdr")
@@ -2559,6 +2556,18 @@ S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
 -- types with metatypes
 
+t.sockaddr = ffi.metatype("struct sockaddr", {
+  __index = function(sa, k)
+    if k == "family" then return tonumber(sa.sa_family) end
+  end
+})
+
+t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
+  __index = function(sa, k)
+    if k == "family" then return tonumber(sa.ss_family) end
+  end
+})
+
 t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
   __index = function(sa, k)
     if k == "family" then return tonumber(sa.sin_family) end
@@ -2576,6 +2585,12 @@ t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
   end,
   __newindex = function(sa, k, v)
     if k == "port" then sa.sin6_port = S.htons(v) end
+  end
+})
+
+t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
+  __index = function(sa, k)
+    if k == "family" then return tonumber(sa.nl_family) end
   end
 })
 
@@ -2865,7 +2880,7 @@ mt.sockaddr_un = {
 }
 
 local function sa(addr, addrlen)
-  local family = tonumber(ffi.cast(sockaddr_pt, addr).sa_family) -- TODO change to addr.family once have metamethods for all
+  local family = addr.family
   if family == S.AF_UNIX then -- we return Lua metatable not metatype, as need length to decode
     local sa = ffi.cast(samap[family], addr)
     return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
