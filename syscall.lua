@@ -4283,17 +4283,13 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
 
   local rtattr = ffi.cast(rtattr_pt, buf)
 
-  local ir = { -- interface details
+  local ir = setmetatable({ -- interface details
     family = iface.ifi_family,
     type = iface.ifi_type,
     index = iface.ifi_index,
-    flags = {},
+    flags = setmetatable({flags = iface.ifi_flags}, mt.iff),
     change = iface.ifi_change
-  }
-  setmetatable(ir, mt.arphrd)
-
-  setmetatable(ir.flags, mt.iff)
-  ir.flags.flags = iface.ifi_flags
+  }, mt.arphrd)
 
   while rta_ok(rtattr, len) do
     if ifla_decode[rtattr.rta_type] then ir = ifla_decode[rtattr.rta_type](ir, buf, len) end
