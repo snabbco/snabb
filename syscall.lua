@@ -3981,35 +3981,38 @@ function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note 
 end
 
 -- map for valid options for arg2
-local prctlmap = {}
-prctlmap[S.PR_CAPBSET_READ] = "CAP_"
-prctlmap[S.PR_CAPBSET_DROP] = "CAP_"
-prctlmap[S.PR_SET_ENDIAN] = "PR_ENDIAN"
-prctlmap[S.PR_SET_FPEMU] = "PR_FPEMU_"
-prctlmap[S.PR_SET_FPEXC] = "PR_FP_EXC_"
-prctlmap[S.PR_SET_PDEATHSIG] = "SIG"
-prctlmap[S.PR_SET_SECUREBITS] = "SECBIT_"
-prctlmap[S.PR_SET_TIMING] = "PR_TIMING_"
-prctlmap[S.PR_SET_TSC] = "PR_TSC_"
-prctlmap[S.PR_SET_UNALIGN] = "PR_UNALIGN_"
-prctlmap[S.PR_MCE_KILL] = "PR_MCE_KILL_"
-prctlmap[S.PR_SET_SECCOMP] = "SECCOMP_MODE_"
+local prctlmap = {
+  [S.PR_CAPBSET_READ] = "CAP_",
+  [S.PR_CAPBSET_DROP] = "CAP_",
+  [S.PR_SET_ENDIAN] = "PR_ENDIAN",
+  [S.PR_SET_FPEMU] = "PR_FPEMU_",
+  [S.PR_SET_FPEXC] = "PR_FP_EXC_",
+  [S.PR_SET_PDEATHSIG] = "SIG",
+  [S.PR_SET_SECUREBITS] = "SECBIT_",
+  [S.PR_SET_TIMING] = "PR_TIMING_",
+  [S.PR_SET_TSC] = "PR_TSC_",
+  [S.PR_SET_UNALIGN] = "PR_UNALIGN_",
+  [S.PR_MCE_KILL] = "PR_MCE_KILL_",
+  [S.PR_SET_SECCOMP] = "SECCOMP_MODE_",
+}
 
-local prctlrint = {} -- returns an integer directly TODO add metatables to set names
-prctlrint[S.PR_GET_DUMPABLE] = true
-prctlrint[S.PR_GET_KEEPCAPS] = true
-prctlrint[S.PR_CAPBSET_READ] = true
-prctlrint[S.PR_GET_TIMING] = true 
-prctlrint[S.PR_GET_SECUREBITS] = true
-prctlrint[S.PR_MCE_KILL_GET] = true
-prctlrint[S.PR_GET_SECCOMP] = true
+local prctlrint = { -- returns an integer directly TODO add metatables to set names
+  [S.PR_GET_DUMPABLE] = true,
+  [S.PR_GET_KEEPCAPS] = true,
+  [S.PR_CAPBSET_READ] = true,
+  [S.PR_GET_TIMING] = true,
+  [S.PR_GET_SECUREBITS] = true,
+  [S.PR_MCE_KILL_GET] = true,
+  [S.PR_GET_SECCOMP] = true,
+}
 
-local prctlpint = {} -- returns result in a location pointed to by arg2
-prctlpint[S.PR_GET_ENDIAN] = true
-prctlpint[S.PR_GET_FPEMU] = true
-prctlpint[S.PR_GET_FPEXC] = true
-prctlpint[S.PR_GET_PDEATHSIG] = true
-prctlpint[S.PR_GET_UNALIGN] = true
+local prctlpint = { -- returns result in a location pointed to by arg2
+  [S.PR_GET_ENDIAN] = true,
+  [S.PR_GET_FPEMU] = true,
+  [S.PR_GET_FPEXC] = true,
+  [S.PR_GET_PDEATHSIG] = true,
+  [S.PR_GET_UNALIGN] = true,
+}
 
 function S.prctl(option, arg2, arg3, arg4, arg5)
   local i, name
