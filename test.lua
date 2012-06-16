@@ -566,12 +566,12 @@ test_sockets = {
     local b1 = S.t.buffer(3)
     S.copy(b0, "test", 4) -- string init adds trailing 0 byte
     S.copy(b1, "ing", 3)
-    local iov = S.t.iovec(2, {{b0, 4}, {b1, 3}})
-    n = assert(c:writev(iov, 2))
+    --local iov = S.t.iovec(2, {{b0, 4}, {b1, 3}})
+    n = assert(c:writev({{b0, 4}, {b1, 3}}, 2))
     assert(n == 7, "expect writev to write 7 bytes")
     b0 = S.t.buffer(3)
     b1 = S.t.buffer(4)
-    local iov = S.t.iovec(2, {{b0, 3}, {b1, 4}})
+    local iov = S.iovec{{b0, 3}, {b1, 4}}
     n = assert(a.fd:readv(iov, 2))
     assert_equal(n, 7, "expect readv to read 7 bytes")
     assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get back same stuff")
@@ -952,7 +952,7 @@ assert(#n == #str)
 local buf2 = S.t.buffer(#str)
 S.copy(buf2, str, #str)
 
-n = assert(S.vmsplice(p[2], S.t.iovec(1, {{buf2, #str}}), 1, "nonblock")) -- write our memory into pipe
+n = assert(S.vmsplice(p[2], S.iovec{{buf2, #str}}, 1, "nonblock")) -- write our memory into pipe
 assert(n == #str)
 
 n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice out to socket

@@ -2519,8 +2519,10 @@ t.inotify_event = ffi.typeof("struct inotify_event")
 t.loff = ffi.typeof("loff_t")
 t.io_event = ffi.typeof("struct io_event")
 t.seccomp_data = ffi.typeof("struct seccomp_data")
+t.iovec = ffi.typeof("struct iovec")
 
-t.iovec = ffi.typeof("struct iovec[?]") -- inconsistent usage, maybe call iovecs
+local iovecs_t = ffi.typeof("struct iovec[?]")
+local iocbs_pt = ffi.typeof("struct iocb *[?]")
 
 -- could use metamethods for struct ifreq see /usr/include/linux/if.h
 t.ifreq = ffi.typeof("struct ifreq")
@@ -2544,7 +2546,6 @@ local rtattr_pt = ffi.typeof("struct rtattr *")
 local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
 local fdb_entry_pt = ffi.typeof("struct fdb_entry *")
 local pollfd_pt = ffi.typeof("struct pollfd *")
-local iocbs_pt = ffi.typeof("struct iocb *[?]")
 local signalfd_siginfo_pt = ffi.typeof("struct signalfd_siginfo *")
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
 local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
@@ -3134,8 +3135,34 @@ function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, coun
 function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
 end
+
+function S.iovec(iov, iovcnt) -- helper to construct iovecs, both for read and write TODO more tests
+  if not iov then iov = {} end
+  if type(iov) ~= 'table' then return iov, iovcnt end
+  if not iovcnt then iovcnt = #iov end
+  local tt = iov
+  iov = iovecs_t(iovcnt)
+  for n = 0, iovcnt - 1 do -- slightly more complex than luajit initializers
+    i = tt[n + 1]
+    if type(i) == 'string' then
+      iov[n].iov_base = i
+      iov[n].iov_len = #i
+    elseif type(i) == 'number' then
+      iov[n].iov_base = t.buffer(i)
+      iov[n].iov_len = i
+    else
+      local j = t.iovec(i) -- allows initializers
+      ffi.copy(iov[n], j, ffi.sizeof(t.iovec))
+    end
+  end
+  return iov, iovcnt
+end
+
 function S.readv(fd, iov, iovcnt) return retnum(C.readv(getfd(fd), iov, iovcnt)) end
-function S.writev(fd, iov, iovcnt) return retnum(C.writev(getfd(fd), iov, iovcnt)) end
+function S.writev(fd, iov, iovcnt)
+  iov, iovcnt = S.iovec(iov, iovcnt)
+  return retnum(C.writev(getfd(fd), iov, iovcnt))
+end
 
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.recvfrom(fd, buf, count, flags)
@@ -4303,7 +4330,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
 
   local bufsize = 8192
   local reply = t.buffer(bufsize)
-  local ior = t.iovec(1, {{reply, bufsize}})
+  local ior = iovecs_t(1, {{reply, bufsize}})
   local m = t.msghdr{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
 
   local done = false -- what should we do if we get a done message but there is some extra buffer? could be next message...
@@ -4350,7 +4377,7 @@ function S.get_interfaces()
   hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
   gen.rtgen_family = S.AF_PACKET
 
-  local ios = t.iovec(1, {{buf, len}})
+  local ios = iovecs_t(1, {{buf, len}})
   local m = t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = ffi.sizeof(k)}
 
   local n, err = s:sendmsg(m)
@@ -4366,7 +4393,7 @@ end
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
     local buf1 = t.buffer(1)
-    local io = t.iovec(1, {{buf1, 1}})
+    local io = iovecs_t(1, {{buf1, 1}})
     msg = t.msghdr{msg_iov = io, msg_iovlen = 1}
   end
   return retbool(C.sendmsg(getfd(fd), msg, stringflags(flags, "MSG_")))
@@ -4376,7 +4403,7 @@ end
 function S.recvmsg(fd, msg, flags)
   if not msg then 
     local buf1 = t.buffer(1) -- assume user wants to receive single byte to get cmsg
-    local io = t.iovec(1, {{buf1, 1}})
+    local io = iovecs_t(1, {{buf1, 1}})
     local bufsize = 1024 -- sane default, build your own structure otherwise
     local buf = t.buffer(bufsize)
     msg = t.msghdr{msg_iov = io, msg_iovlen = 1, msg_control = buf, msg_controllen = bufsize}
@@ -4414,7 +4441,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   ucred.uid = uid
   ucred.gid = gid
   local buf1 = t.buffer(1) -- need to send one byte
-  local io = t.iovec(1)
+  local io = iovecs_t(1)
   io[0].iov_base = buf1
   io[0].iov_len = 1
   local iolen = 1
@@ -4438,7 +4465,7 @@ end
 
 function S.sendfds(fd, ...)
   local buf1 = t.buffer(1) -- need to send one byte
-  local io = t.iovec(1)
+  local io = iovecs_t(1)
   io[0].iov_base = buf1
   io[0].iov_len = 1
   local iolen = 1
