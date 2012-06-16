@@ -2591,6 +2591,8 @@ t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
 t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
   __index = function(sa, k)
     if k == "family" then return tonumber(sa.nl_family) end
+    if k == "pid" then return tonumber(sa.nl_pid) end
+    if k == "groups" then return tonumber(sa.nl_groups) end
   end
 })
 
@@ -2891,52 +2893,6 @@ local function sa(addr, addrlen)
   return a
 end
 
--- helper function for returning socket address types
--- TODO rework. should not need to copy, can just cast to right type.
--- TODO maybe two functions, one plain, one with additional data
-local function saret(addr, addrlen, rets) -- return socket address structure, additional values to return in rets
-  if not rets then rets = {} end
-  local sa = ffi.cast(sockaddr_pt, addr)
-  local afamily = tonumber(sa.sa_family)
-  rets.addrlen = addrlen
-  rets.sa_family = afamily
-  rets.addr = addr
-  -- should check here that addrlen is correct?
-
-  if afamily == S.AF_LOCAL then
-    if not ffi.istype(t.sockaddr_un, addr) then
-      rets.addr = t.sockaddr_un()
-      ffi.copy(rets.addr, addr, addrlen)
-    end
-    local namelen = addrlen - ffi.sizeof(t.sa_family)
-    if namelen > 0 then
-      rets.name = ffi.string(rets.addr.sun_path, namelen)
-      if rets.addr.sun_path[0] == 0 then rets.abstract = true end -- TODO put in metatype
-    end
-  elseif afamily == S.AF_INET then
-    if not ffi.istype(t.sockaddr_in, addr) then
-      rets.addr = t.sockaddr_in()
-      ffi.copy(rets.addr, addr, addrlen)
-    end
-    rets.port = S.ntohs(rets.addr.sin_port)
-  elseif afamily == S.AF_INET6 then
-    if not ffi.istype(t.sockaddr_in6, addr) then
-      rets.addr = t.sockaddr_in6()
-      ffi.copy(rets.addr, addr, addrlen)
-    end
-    rets.port = S.ntohs(rets.addr.sin6_port)
-  elseif afamily == S.AF_NETLINK then
-    if not ffi.istype(t.sockaddr_nl, addr) then
-      rets.addr = t.sockaddr_nl()
-      ffi.copy(rets.addr, addr, addrlen)
-    end
-    rets.pid = tonumber(rets.addr.nl_pid)
-    rets.groups = tonumber(rets.addr.nl_groups)
-  end
-
-  return rets
-end
-
 -- functions from section 3 that we use for ip addresses
 function S.inet_aton(s)
   local addr = t.in_addr()
@@ -3202,7 +3158,7 @@ function S.recvfrom(fd, buf, count, flags)
   local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
   local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return nil, t.error(ffi.errno()) end
-  return saret(ss, addrlen[0], {count = tonumber(ret)})
+  return {count = tonumber(ret), addr = sa(ss, addrlen[0])}
 end
 
 function S.setsockopt(fd, level, optname, optval, optlen)
@@ -3345,7 +3301,7 @@ function S.accept(sockfd, flags, addr, addrlen)
     else ret = C.accept4(getfd(sockfd), ffi.cast(sockaddr_pt, addr), addrlen, stringflags(flags, "SOCK_"))
   end
   if ret == -1 then return nil, t.error(ffi.errno()) end
-  return saret(addr, addrlen[0], {fd = t.fd(ret), fileno = tonumber(ret)})
+  return {fd = t.fd(ret), addr = sa(addr, addrlen[0])}
 end
 
 function S.getsockname(sockfd)

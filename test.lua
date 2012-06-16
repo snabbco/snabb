@@ -645,7 +645,7 @@ test_sockets = {
       local n = assert(s:sendto(teststring, nil, 0, bca))
       local f = assert(c:recvfrom(buf, size))
       assert(f.count == #teststring, "should get the whole string back")
-      assert(f.port == serverport, "should be able to get server port in recvfrom")
+      assert(f.addr.port == serverport, "should be able to get server port in recvfrom")
       assert(c:close())
       assert(s:close())
     else assert(err.EAFNOSUPPORT, err) end -- fairly common to not have ipv6 in kernel
