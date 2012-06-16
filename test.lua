@@ -536,11 +536,11 @@ test_sockets = {
     local port
     for i = 1024, 2048 do
       port = i
-      sa.sin_port = S.htons(port)
+      sa.sin_port = S.htons(port) -- TODO metamethod for port that does conversion
       if s:bind(sa) then break end
     end
     local ba = assert(s:getsockname())
-    assert(ba.addr.sin_family == 2, "expect family on getsockname to be AF_INET=2")
+    assert(ba.sin_family == 2, "expect family on getsockname to be AF_INET=2")
     assert(s:listen()) -- will fail if we did not bind
     local c = assert(S.socket("inet", "stream")) -- client socket
     assert(c:nonblock())
@@ -553,9 +553,9 @@ test_sockets = {
     assert(a.addr.sin_family == 2, "expect ipv4 connection")
     assert(c:connect(sa)) -- able to connect now we have accepted
     local ba = assert(c:getpeername())
-    assert(ba.addr.sin_family == 2, "expect ipv4 connection")
-    assert(S.inet_ntoa(ba.addr.sin_addr) == "127.0.0.1", "expect peer on localhost")
-    assert(ba.addr.sin_addr.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
+    assert(ba.sin_family == 2, "expect ipv4 connection")
+    assert(S.inet_ntoa(ba.sin_addr) == "127.0.0.1", "expect peer on localhost")
+    assert(ba.sin_addr.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
     local n = assert(c:send(teststring))
     assert(n == #teststring, "should be able to write out short string")
     n = assert(a.fd:read(buf, size))
@@ -625,7 +625,7 @@ test_sockets = {
     local ca = assert(S.sockaddr_in(0, loop))
     assert(s:bind(sa))
     assert(c:bind(sa))
-    local bca = c:getsockname().addr -- find bound address
+    local bca = c:getsockname() -- find bound address
     local serverport = s:getsockname().port -- find bound port
     local n = assert(s:sendto(teststring, nil, 0, bca))
     local f = assert(c:recvfrom(buf, size)) -- do not test as can drop data
@@ -640,7 +640,7 @@ test_sockets = {
       local ca = assert(S.sockaddr_in6(0, S.in6addr_any))
       assert(s:bind(sa))
       assert(c:bind(sa))
-      local bca = c:getsockname().addr -- find bound address
+      local bca = c:getsockname() -- find bound address
       local serverport = s:getsockname().port -- find bound port
       local n = assert(s:sendto(teststring, nil, 0, bca))
       local f = assert(c:recvfrom(buf, size))

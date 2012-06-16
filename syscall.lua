@@ -2488,11 +2488,9 @@ int ptsname_r(int fd, char *buf, size_t buflen);
 -- Lua type constructors corresponding to defined types
 t.sockaddr = ffi.typeof("struct sockaddr")
 t.sockaddr_storage = ffi.typeof("struct sockaddr_storage")
-t.sa_family = ffi.typeof("sa_family_t")
-t.sockaddr_in = ffi.typeof("struct sockaddr_in")
-t.sockaddr_in6 = ffi.typeof("struct sockaddr_in6")
 t.sockaddr_un = ffi.typeof("struct sockaddr_un")
 t.sockaddr_nl = ffi.typeof("struct sockaddr_nl")
+t.sa_family = ffi.typeof("sa_family_t")
 t.msghdr = ffi.typeof("struct msghdr")
 t.cmsghdr = ffi.typeof("struct cmsghdr")
 t.ucred = ffi.typeof("struct ucred")
@@ -2521,9 +2519,6 @@ t.io_event = ffi.typeof("struct io_event")
 t.seccomp_data = ffi.typeof("struct seccomp_data")
 t.iovec = ffi.typeof("struct iovec")
 
-local iovecs_t = ffi.typeof("struct iovec[?]")
-local iocbs_pt = ffi.typeof("struct iocb *[?]")
-
 -- could use metamethods for struct ifreq see /usr/include/linux/if.h
 t.ifreq = ffi.typeof("struct ifreq")
 
@@ -2532,6 +2527,9 @@ local socklen1_t = ffi.typeof("socklen_t[1]")
 local off1_t = ffi.typeof("off_t[1]")
 local loff_1t = ffi.typeof("loff_t[1]")
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
+
+local iovecs_t = ffi.typeof("struct iovec[?]")
+local iocbs_pt = ffi.typeof("struct iocb *[?]")
 
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 local iocbs_t = ffi.typeof("struct iocb[?]")
@@ -2560,6 +2558,27 @@ local int32_pt = ffi.typeof("int32_t *")
 S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
 -- types with metatypes
+
+t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
+  __index = function(sa, k)
+    if k == "family" then return tonumber(sa.sin_family) end
+    if k == "port" then return S.ntohs(sa.sin_port) end
+  end,
+  __newindex = function(sa, k, v)
+    if k == "port" then sa.sin_port = S.htons(v) end
+  end
+})
+
+t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
+  __index = function(sa, k)
+    if k == "family" then return tonumber(sa.sin6_family) end
+    if k == "port" then return S.ntohs(sa.sin6_port) end
+  end,
+  __newindex = function(sa, k, v)
+    if k == "port" then sa.sin6_port = S.htons(v) end
+  end
+})
+
 t.stat = ffi.metatype("struct stat", {
   __index = function(st, k)
   local meth = {
@@ -2808,7 +2827,6 @@ end
 
 -- helper function to make setting addrlen optional
 local function getaddrlen(addr, addrlen)
-  if not addr then return 0 end
   if addrlen then return addrlen end
   if ffi.istype(t.sockaddr, addr) then return ffi.sizeof(t.sockaddr) end
   if ffi.istype(t.sockaddr_un, addr) then return ffi.sizeof(t.sockaddr_un) end
@@ -2846,16 +2864,15 @@ mt.sockaddr_un = {
   end
 }
 
-local function sacast(addr, addrlen)
-  local sa = ffi.cast(t.sockaddr, addr) -- in case is sockadr_storage
-  local family = tonumber(sa.sa_family)
+local function sa(addr, addrlen)
+  local family = tonumber(ffi.cast(sockaddr_pt, addr).sa_family) -- TODO change to addr.family once have metamethods for all
   if family == S.AF_UNIX then -- we return Lua metatable not metatype, as need length to decode
     local sa = ffi.cast(samap[family], addr)
     return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
   end
-  --if samap[family] then return ffi.cast(samap[family], addr) end
-  local a = samap[family]()
-  ffi.copy(a, addr, sizeof(samap[family])) -- copy not cast, save memory.
+  local st = samap[family]
+  local a = st()
+  ffi.copy(a, addr, ffi.sizeof(st)) -- copy not cast, save memory.
   return a
 end
 
@@ -3321,7 +3338,7 @@ function S.getsockname(sockfd)
   local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
   local ret = C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return nil, t.error(ffi.errno()) end
-  return saret(ss, addrlen[0])
+  return sa(ss, addrlen[0])
 end
 
 function S.getpeername(sockfd)
@@ -3329,7 +3346,7 @@ function S.getpeername(sockfd)
   local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
   local ret = C.getpeername(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
   if ret == -1 then return nil, t.error(ffi.errno()) end
-  return saret(ss, addrlen[0])
+  return sa(ss, addrlen[0])
 end
 
 function S.fcntl(fd, cmd, arg)
