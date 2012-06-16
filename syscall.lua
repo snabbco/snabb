@@ -1412,7 +1412,7 @@ S.SYSFS_BRIDGE_PORT_SUBDIR = "brif"
 S.SYSFS_BRIDGE_PORT_ATTR   = "brport"
 S.SYSFS_BRIDGE_PORT_LINK   = "bridge"
 
--- sizes -- Linux. should we export?
+-- sizes -- should we export?
 local HOST_NAME_MAX = 64
 local IFNAMSIZ      = 16
 local IFHWADDRLEN   = 6
@@ -1604,7 +1604,7 @@ t.buffer = ffi.typeof("char[?]")
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
 
- -- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet... not used at present
+-- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet... not used at present
 local function retint(ret)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   return ret
@@ -2818,11 +2818,12 @@ local function getaddrlen(addr, addrlen)
 end
 
 -- cast socket address to actual type based on family
-local samap = {}
-samap[S.AF_UNIX] = t.sockaddr_un
-samap[S.AF_INET] = t.sockaddr_in
-samap[S.AF_INET6] = t.sockaddr_in6
-samap[S.AF_NETLINK] = t.sockaddr_nl
+local samap = {
+  [S.AF_UNIX] = t.sockaddr_un,
+  [S.AF_INET] = t.sockaddr_in,
+  [S.AF_INET6] = t.sockaddr_in6,
+  [S.AF_NETLINK] = t.sockaddr_nl,
+}
 
 -- TODO add tests
 mt.sockaddr_un = {
