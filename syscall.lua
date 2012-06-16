@@ -2851,8 +2851,7 @@ local function sacast(addr, addrlen)
   if family == S.AF_UNIX then -- we return Lua metatable not metatype, as need length to decode
     local sa = ffi.cast(samap[family], addr)
     local un = {addr = sa, addrlen = addrlen}
-    setmetatable(un, mt.sockaddr_un)
-    return un
+    return setmetatable(un, mt.sockaddr_un)
   end
   --if samap[family] then return ffi.cast(samap[family], addr) end
   local a = samap[family]()
@@ -3077,8 +3076,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     while i < ret do
       local dp = ffi.cast(linux_dirent_pt, buf + i)
       local type = buf[i + dp.d_reclen - 1] -- see man getdents(2) not named in struct as added later
-      local dd = {inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off), type = type}
-      setmetatable(dd, mt.dents)
+      local dd = setmetatable({inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off), type = type}, mt.dents)
       d[ffi.string(dp.d_name)] = dd -- could calculate length
       i = i + dp.d_reclen
     end
@@ -3707,8 +3705,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   local r = {}
   for i = 1, ret do -- put in Lua array
     local e = events[i - 1]
-    local ev = {fileno = tonumber(e.data.fd), data = t.uint64(e.data.u64), events = e.events}
-    setmetatable(ev, mt.epoll)
+    local ev = setmetatable({fileno = tonumber(e.data.fd), data = t.uint64(e.data.u64), events = e.events}, mt.epoll)
     r[i] = ev
   end
   return r
@@ -3748,8 +3745,7 @@ function S.inotify_read(fd, buffer, len)
   local off, ee = 0, {}
   while off < ret do
     local ev = ffi.cast(inotify_event_pt, buffer + off)
-    local le = {wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)}
-    setmetatable(le, mt.inotify)
+    local le = setmetatable({wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)}, mt.inotify)
     if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
     off = off + ffi.sizeof(t.inotify_event(ev.len))
@@ -4536,8 +4532,7 @@ function S.ls(name, nodots) -- return just the list, no other data, cwd if no di
   local ds = S.dirfile(name, nodots)
   local l = {}
   for k, _ in pairs(ds) do l[#l + 1] = k end
-  setmetatable(l, mt.ls)
-  return l
+  return setmetatable(l, mt.ls)
 end
 
 local function if_nametoindex(name, s) -- internal version when already have socket for ioctl
