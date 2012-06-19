@@ -656,7 +656,6 @@ test_netlink = {
   test_get_interfaces = function()
     local i = S.get_interfaces()
     local df = #assert(S.ls("/sys/class/net", true))
-    --for k, v in ipairs(i.ifaces) do print(v.name) end
     assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
     assert(i.iface.lo, "expect a loopback interface")
     local lo = i.iface.lo
@@ -686,6 +685,12 @@ test_netlink = {
       local mac = assert(S.readfile("/sys/class/net/" .. wlan.name .. "/address"), "expect wlan to have address file in /sys")
       assert_equal(tostring(wlan.macaddr) .. '\n', mac, "mac address hsould match that from /sys")
     end
+  end,
+  test_get_interfaces_ipv4 = function()
+    local a = S.getaddr("inet")
+  end,
+  test_get_interfaces_ipv6 = function()
+    local a = S.getaddr("inet6")
   end,
   test_bridge_list = function()
     local b = assert(S.bridge_list())

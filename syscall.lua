@@ -2524,6 +2524,7 @@ t.off = ffi.typeof("off_t")
 t.nlmsghdr = ffi.typeof("struct nlmsghdr")
 t.rtgenmsg = ffi.typeof("struct rtgenmsg")
 t.ifinfomsg = ffi.typeof("struct ifinfomsg")
+t.ifaddrmsg = ffi.typeof("struct ifaddrmsg")
 t.rtattr = ffi.typeof("struct rtattr")
 t.timex = ffi.typeof("struct timex")
 t.utsname = ffi.typeof("struct utsname")
@@ -2570,6 +2571,7 @@ local int32_pt = ffi.typeof("int32_t *")
 local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtattr_pt = ffi.typeof("struct rtattr *")
 local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
+local ifaddrmsg_pt = ffi.typeof("struct ifaddrmsg *")
 local fdb_entry_pt = ffi.typeof("struct fdb_entry *")
 local pollfd_pt = ffi.typeof("struct pollfd *")
 local signalfd_siginfo_pt = ffi.typeof("struct signalfd_siginfo *")
@@ -4337,42 +4339,48 @@ local ifla_decode = {
   end
 }
 
-local nlmsg_data_decode = {}
-nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
+local nlmsg_data_decode = {
+  [S.NLMSG_DONE] = function(r, buf, len) return r end,
+  [S.RTM_NEWADDR] = function(r, buf, len)
+    local addr = ffi.cast(ifaddrmsg_pt, buf)
+    buf = buf + nlmsg_align(ffi.sizeof(t.ifaddrmsg))
+    len = len - nlmsg_align(ffi.sizeof(t.ifaddrmsg))
+    local rtattr = ffi.cast(rtattr_pt, buf)
 
-  local iface = ffi.cast(ifinfomsg_pt, buf)
+ --print(tonumber(addr.ifa_index))
 
-  buf = buf + nlmsg_align(ffi.sizeof(t.ifinfomsg))
-  len = len - nlmsg_align(ffi.sizeof(t.ifinfomsg))
+  end,
+  [S.RTM_NEWLINK] = function(r, buf, len)
+    local iface = ffi.cast(ifinfomsg_pt, buf)
+    buf = buf + nlmsg_align(ffi.sizeof(t.ifinfomsg))
+    len = len - nlmsg_align(ffi.sizeof(t.ifinfomsg))
+    local rtattr = ffi.cast(rtattr_pt, buf)
+    local ir = setmetatable({ -- interface details
+      family = iface.ifi_family,
+      type = iface.ifi_type,
+      index = iface.ifi_index,
+      flags = setmetatable({flags = iface.ifi_flags}, mt.iff),
+      change = iface.ifi_change
+    }, mt.arphrd)
 
-  local rtattr = ffi.cast(rtattr_pt, buf)
-
-  local ir = setmetatable({ -- interface details
-    family = iface.ifi_family,
-    type = iface.ifi_type,
-    index = iface.ifi_index,
-    flags = setmetatable({flags = iface.ifi_flags}, mt.iff),
-    change = iface.ifi_change
-  }, mt.arphrd)
-
-  while rta_ok(rtattr, len) do
-    if ifla_decode[rtattr.rta_type] then
-      ir = ifla_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
+    while rta_ok(rtattr, len) do
+      if ifla_decode[rtattr.rta_type] then
+        ir = ifla_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
+      end
+      rtattr, buf, len = rta_next(rtattr, buf, len)
     end
-    rtattr, buf, len = rta_next(rtattr, buf, len)
+
+    if not r.ifaces then r.ifaces = {} end -- array
+    if not r.iface then r.iface = {} end -- table
+
+    r.ifaces[#r.ifaces + 1] = ir -- cant use interface index as holes.
+    if ir.name then r.iface[ir.name] = ir end
+
+    return r
   end
-
-  if not r.ifaces then r.ifaces = {} end -- array
-  if not r.iface then r.iface = {} end -- table
-
-  r.ifaces[#r.ifaces + 1] = ir -- cant use interface index as holes.
-  if ir.name then r.iface[ir.name] = ir end
-
-  return r
-end
+}
 
 function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
-
   local bufsize = 8192
   local reply = t.buffer(bufsize)
   local ior = iovecs_t(1, {{reply, bufsize}})
@@ -4392,7 +4400,10 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
     while not done and nlmsg_ok(msg, len) do
       local tp = tonumber(msg.nlmsg_type)
 
-      if nlmsg_data_decode[tp] then r = nlmsg_data_decode[tp](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen) end
+      if nlmsg_data_decode[tp] then
+        r = nlmsg_data_decode[tp](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen)
+      else error("unknown data " .. tp)
+      end
 
       if tp == S.NLMSG_DONE then done = true end
       msg, buffer, len = nlmsg_next(msg, buffer, len)
@@ -4400,6 +4411,39 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
   end
 
   return r
+end
+
+-- read addresses on interfaces. see also notes in get_interfaces, should reuse code as mostly duplicated!
+function S.getaddr(af)
+  af = stringflag(af, "AF_")
+  local s, err = S.socket("netlink", "raw", "route")
+  if not s then return nil, err end
+  local a = S.sockaddr_nl() -- kernel will fill in address
+  local ok, err = s:bind(a)
+  if not ok then return nil, err end -- gc will take care of closing socket...
+  local k = S.sockaddr_nl() -- kernel destination
+
+  local buf, len, hdr, ifaddr = S.tbuffer("struct nlmsghdr", "struct ifaddrmsg") -- TODO can now take ctypes, using new luajit feature
+
+  hdr.nlmsg_len = len
+  hdr.nlmsg_type = S.RTM_GETADDR
+  hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_ROOT
+  hdr.nlmsg_seq = 1          -- we should attach a sequence number to the file descriptor and use this
+  hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
+
+  ifaddr.ifa_family = af
+
+  local ios = iovecs_t(1, {{buf, len}})
+  local m = t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = ffi.sizeof(k)}
+
+  local n, err = s:sendmsg(m)
+  if not n then return nil, err end 
+
+  local i = S.nlmsg_read(s, k)
+  local ok, err = s:close()
+  if not ok then return nil, err end
+
+  return i
 end
 
 -- read interfaces and details. not very generic yet...
