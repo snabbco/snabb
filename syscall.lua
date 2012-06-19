@@ -4304,38 +4304,31 @@ end
 local ifla_decode = {
   [S.IFLA_IFNAME] = function(ir, buf, len)
     ir.name = ffi.string(buf)
-    return ir
   end,
   [S.IFLA_ADDRESS] = function(ir, buf, len)
     ir.addrlen = #ffi.string(buf) -- always appears to be zero terminated so ok. could check no longer than len
     ir.macaddr = t.macaddr()
     ffi.copy(ir.macaddr, buf, ir.addrlen)
-    return ir
   end,
   [S.IFLA_BROADCAST] = function(ir, buf, len)
     ir.braddrlen = #ffi.string(buf) -- always appears to be zero terminated so ok. could check no longer than len
     ir.broadcast = t.macaddr()
     ffi.copy(ir.broadcast, buf, ir.addrlen)
-    return ir
   end,
   [S.IFLA_MTU] = function(ir, buf, len)
     local u = ffi.cast(uint_pt, buf)
     ir.mtu = tonumber(u[0])
-    return ir
   end,
   [S.IFLA_LINK] = function(ir, buf, len)
     local i = ffi.cast(int_pt, buf)
     ir.link = tonumber(i[0])
-    return ir
   end,
   [S.IFLA_QDISC] = function(ir, buf, len)
     ir.qdisc = ffi.string(buf)
-    return ir
   end,
   [S.IFLA_STATS] = function(ir, buf, len)
     --ir.stats = t.net_device_stats() -- does not seem to be this struct as too long
     --ffi.copy(ir.stats, buf, ffi.sizeof(t.net_device_stats))
-    return ir
   end
 }
 
@@ -4347,7 +4340,15 @@ local nlmsg_data_decode = {
     len = len - nlmsg_align(ffi.sizeof(t.ifaddrmsg))
     local rtattr = ffi.cast(rtattr_pt, buf)
 
- --print(tonumber(addr.ifa_index))
+    local ir = {
+      family = tonumber(addr.ifa_family),
+      prefixlen = tonumber(addr.ifa_prefixlen),
+      flags = tonumber(addr.ifa_flags),
+      scope = tonumber(addr.ifa_scope),
+      index = tonumber(addr.ifa_index),
+    } -- TODO setmetatable for flags (secondary, permanent)
+
+    -- ifa_decode, add to r
 
   end,
   [S.RTM_NEWLINK] = function(r, buf, len)
@@ -4356,16 +4357,16 @@ local nlmsg_data_decode = {
     len = len - nlmsg_align(ffi.sizeof(t.ifinfomsg))
     local rtattr = ffi.cast(rtattr_pt, buf)
     local ir = setmetatable({ -- interface details
-      family = iface.ifi_family,
-      type = iface.ifi_type,
-      index = iface.ifi_index,
+      family = tonumber(iface.ifi_family),
+      type = tonumber(iface.ifi_type),
+      index = tonumber(iface.ifi_index),
       flags = setmetatable({flags = iface.ifi_flags}, mt.iff),
-      change = iface.ifi_change
+      change = tonumber(iface.ifi_change)
     }, mt.arphrd)
 
     while rta_ok(rtattr, len) do
       if ifla_decode[rtattr.rta_type] then
-        ir = ifla_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
+        ifla_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
       end
       rtattr, buf, len = rta_next(rtattr, buf, len)
     end
