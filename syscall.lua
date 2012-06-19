@@ -4271,15 +4271,16 @@ local rta_next = function(msg, buf, len)
   return ffi.cast(rtattr_pt, buf + inc), buf + inc, len - inc
 end
 
-local ifla_decode = {}
-ifla_decode[S.IFLA_IFNAME] = function(ir, buf, len)
-  ir.name = ffi.string(buf + rta_length(0))
-  return ir
-end
-ifla_decode[S.IFLA_ADDRESS] = function(ir, buf, len)
-  --print("address", len)
-  return ir
-end
+local ifla_decode = {
+  [S.IFLA_IFNAME] = function(ir, buf, len)
+    ir.name = ffi.string(buf + rta_length(0))
+    return ir
+  end,
+  [S.IFLA_ADDRESS] = function(ir, buf, len)
+    --print("address", len)
+    return ir
+  end
+}
 
 local nlmsg_data_decode = {}
 nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
