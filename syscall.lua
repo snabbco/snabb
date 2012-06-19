@@ -4277,12 +4277,17 @@ local ifla_decode = {
     return ir
   end,
   [S.IFLA_ADDRESS] = function(ir, buf, len)
-    --if ir.loopback then error("len" .. len);return ir end
     ir.addrlen = #ffi.string(buf) -- always appears to be zero terminated so ok. could check no longer than len
     ir.macaddr = t.macaddr()
     ffi.copy(ir.macaddr, buf, ir.addrlen)
     return ir
-  end
+  end,
+  [S.IFLA_BROADCAST] = function(ir, buf, len)
+    ir.braddrlen = #ffi.string(buf) -- always appears to be zero terminated so ok. could check no longer than len
+    ir.broadcast = t.macaddr()
+    ffi.copy(ir.broadcast, buf, ir.addrlen)
+    return ir
+  end,
 }
 
 local nlmsg_data_decode = {}

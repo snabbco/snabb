@@ -675,6 +675,7 @@ test_netlink = {
       assert_equal(eth.addrlen, 6, "ethernet hardware address length is 6")
       local mac = assert(S.readfile("/sys/class/net/" .. eth.name .. "/address"), "expect eth to have address file in /sys")
       assert_equal(tostring(eth.macaddr) .. '\n', mac, "mac address hsould match that from /sys")
+      assert_equal(tostring(eth.broadcast), 'ff:ff:ff:ff:ff:ff', "ethernet broadcast mac")
     end
     local wlan = i.iface.wlan0
     if wlan then
