@@ -665,16 +665,23 @@ test_netlink = {
     assert(lo.flags.running, "loopback interface should be running")
     assert(not lo.flags.broadcast, "loopback interface should not be broadcast")
     assert(not lo.flags.multicast, "loopback interface should not be multicast")
+    assert(not lo.macaddr, "no hardware address no loopback")
     assert(lo.loopback, "loopback interface type should be loopback") -- TODO add getflag
     local eth = i.iface.eth0 or i.iface.eth1 -- may not exist
     if eth then
       assert(eth.flags.broadcast, "ethernet interface should be broadcast")
       assert(eth.flags.multicast, "ethernet interface should be multicast")
       assert(eth.ether, "ethernet interface type should be ether")
+      assert_equal(eth.addrlen, 6, "ethernet hardware address length is 6")
+      local mac = assert(S.readfile("/sys/class/net/" .. eth.name .. "/address"), "expect eth to have address file in /sys")
+      assert_equal(tostring(eth.macaddr) .. '\n', mac, "mac address hsould match that from /sys")
     end
     local wlan = i.iface.wlan0
     if wlan then
       assert(wlan.ether, "wlan interface type should be ether")
+      assert_equal(wlan.addrlen, 6, "wireless hardware address length is 6")
+      local mac = assert(S.readfile("/sys/class/net/" .. wlan.name .. "/address"), "expect wlan to have address file in /sys")
+      assert_equal(tostring(wlan.macaddr) .. '\n', mac, "mac address hsould match that from /sys")
     end
   end,
   test_bridge_list = function()

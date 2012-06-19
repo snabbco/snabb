@@ -4273,11 +4273,14 @@ end
 
 local ifla_decode = {
   [S.IFLA_IFNAME] = function(ir, buf, len)
-    ir.name = ffi.string(buf + rta_length(0))
+    ir.name = ffi.string(buf)
     return ir
   end,
   [S.IFLA_ADDRESS] = function(ir, buf, len)
-    --print("address", len)
+    if ir.loopback then return ir end
+    ir.addrlen = #ffi.string(buf) -- always appears to be zero terminated so ok. could check no longer than len
+    ir.macaddr = t.macaddr()
+    ffi.copy(ir.macaddr, buf, ir.addrlen)
     return ir
   end
 }
@@ -4301,8 +4304,9 @@ nlmsg_data_decode[S.RTM_NEWLINK] = function(r, buf, len)
   }, mt.arphrd)
 
   while rta_ok(rtattr, len) do
-    if ifla_decode[rtattr.rta_type] then ir = ifla_decode[rtattr.rta_type](ir, buf, len) end
-
+    if ifla_decode[rtattr.rta_type] then
+      ir = ifla_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
+    end
     rtattr, buf, len = rta_next(rtattr, buf, len)
   end
 
