@@ -667,6 +667,7 @@ test_netlink = {
     assert(not lo.flags.multicast, "loopback interface should not be multicast")
     assert_equal(tostring(lo.macaddr), "00:00:00:00:00:00", "null hardware address on loopback")
     assert(lo.loopback, "loopback interface type should be loopback") -- TODO add getflag
+    assert_equal(lo.mtu, 16436, "expect lo MTU is 16436")
     local eth = i.iface.eth0 or i.iface.eth1 -- may not exist
     if eth then
       assert(eth.flags.broadcast, "ethernet interface should be broadcast")
@@ -676,6 +677,7 @@ test_netlink = {
       local mac = assert(S.readfile("/sys/class/net/" .. eth.name .. "/address"), "expect eth to have address file in /sys")
       assert_equal(tostring(eth.macaddr) .. '\n', mac, "mac address hsould match that from /sys")
       assert_equal(tostring(eth.broadcast), 'ff:ff:ff:ff:ff:ff', "ethernet broadcast mac")
+      --assert_equal(eth.mtu, 1500, "expect ethernet MTU is 1500") -- might not be
     end
     local wlan = i.iface.wlan0
     if wlan then

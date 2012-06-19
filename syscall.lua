@@ -2536,6 +2536,11 @@ local io_events_t = ffi.typeof("struct io_event[?]")
 local string_array_t = ffi.typeof("const char *[?]")
 
 -- pointer types. use another table?
+local int_pt = ffi.typeof("int *")
+local uint_pt = ffi.typeof("unsigned int *")
+local int64_pt = ffi.typeof("int64_t *")
+local int32_pt = ffi.typeof("int32_t *")
+
 local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtattr_pt = ffi.typeof("struct rtattr *")
 local ifinfomsg_pt = ffi.typeof("struct ifinfomsg *")
@@ -2546,11 +2551,8 @@ local sockaddr_pt = ffi.typeof("struct sockaddr *")
 local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
 local uchar_pt = ffi.typeof("unsigned char *")
 local char_pt = ffi.typeof("char *")
-local int_pt = ffi.typeof("int *")
 local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
 local inotify_event_pt = ffi.typeof("struct inotify_event *")
-local int64_pt = ffi.typeof("int64_t *")
-local int32_pt = ffi.typeof("int32_t *")
 
 S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
@@ -4286,6 +4288,11 @@ local ifla_decode = {
     ir.braddrlen = #ffi.string(buf) -- always appears to be zero terminated so ok. could check no longer than len
     ir.broadcast = t.macaddr()
     ffi.copy(ir.broadcast, buf, ir.addrlen)
+    return ir
+  end,
+  [S.IFLA_MTU] = function(ir, buf, len)
+    local u = ffi.cast(uint_pt, buf)
+    ir.mtu = tonumber(u[0])
     return ir
   end,
 }
