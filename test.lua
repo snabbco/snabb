@@ -665,7 +665,7 @@ test_netlink = {
     assert(lo.flags.running, "loopback interface should be running")
     assert(not lo.flags.broadcast, "loopback interface should not be broadcast")
     assert(not lo.flags.multicast, "loopback interface should not be multicast")
-    assert(not lo.macaddr, "no hardware address no loopback")
+    assert_equal(tostring(lo.macaddr), "00:00:00:00:00:00", "null hardware address on loopback")
     assert(lo.loopback, "loopback interface type should be loopback") -- TODO add getflag
     local eth = i.iface.eth0 or i.iface.eth1 -- may not exist
     if eth then

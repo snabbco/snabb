@@ -4277,7 +4277,7 @@ local ifla_decode = {
     return ir
   end,
   [S.IFLA_ADDRESS] = function(ir, buf, len)
-    if ir.loopback then return ir end
+    --if ir.loopback then error("len" .. len);return ir end
     ir.addrlen = #ffi.string(buf) -- always appears to be zero terminated so ok. could check no longer than len
     ir.macaddr = t.macaddr()
     ffi.copy(ir.macaddr, buf, ir.addrlen)
