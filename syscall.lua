@@ -4295,6 +4295,15 @@ local ifla_decode = {
     ir.mtu = tonumber(u[0])
     return ir
   end,
+  [S.IFLA_LINK] = function(ir, buf, len)
+    local i = ffi.cast(int_pt, buf)
+    ir.link = tonumber(i[0])
+    return ir
+  end,
+  [S.IFLA_QDISC] = function(ir, buf, len)
+    ir.qdisc = ffi.string(buf)
+    return ir
+  end,
 }
 
 local nlmsg_data_decode = {}

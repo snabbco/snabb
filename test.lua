@@ -677,7 +677,7 @@ test_netlink = {
       local mac = assert(S.readfile("/sys/class/net/" .. eth.name .. "/address"), "expect eth to have address file in /sys")
       assert_equal(tostring(eth.macaddr) .. '\n', mac, "mac address hsould match that from /sys")
       assert_equal(tostring(eth.broadcast), 'ff:ff:ff:ff:ff:ff', "ethernet broadcast mac")
-      --assert_equal(eth.mtu, 1500, "expect ethernet MTU is 1500") -- might not be
+      --assert_equal(eth.mtu, 1500, "expect ethernet MTU is 1500") -- might not be, could check from /sys
     end
     local wlan = i.iface.wlan0
     if wlan then
