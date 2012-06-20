@@ -2607,6 +2607,13 @@ t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
   end,
   __newindex = function(sa, k, v)
     if k == "port" then sa.sin_port = S.htons(v) end
+  end,
+  __new = function(tp, port, addr)
+    if type(addr) == 'string' then
+      addr = S.inet_aton(addr)
+      if not addr then return end
+    end
+    return ffi.new(tp, S.AF_INET, S.htons(port or 0), addr or t.in_addr())
   end
 })
 
@@ -2845,13 +2852,15 @@ end
 S.ntohl = S.htonl -- reverse is the same
 S.ntohs = S.htons -- reverse is the same
 
--- initialisers
+-- initialisers TODO use ffi __new instead
 -- need to set first field for sockaddr. Corrects byte order on port, constructor for addr will do that for addr.
+--[[
 function S.sockaddr_in(port, addr)
   if type(addr) == 'string' then addr = S.inet_aton(addr) end
   if not addr then return nil end
   return t.sockaddr_in(S.AF_INET, S.htons(port), addr)
 end
+]]
 function S.sockaddr_in6(port, addr)
   if type(addr) == 'string' then addr = S.inet_pton(S.AF_INET6, addr) end
   if not addr then return nil end
@@ -2874,7 +2883,7 @@ function S.sockaddr_nl(pid, groups)
   return addr
 end
 
--- helper function to make setting addrlen optional
+-- helper function to make setting addrlen optional. could use table and address family? need to initialize with family first
 local function getaddrlen(addr, addrlen)
   if addrlen then return addrlen end
   if ffi.istype(t.sockaddr, addr) then return ffi.sizeof(t.sockaddr) end
@@ -3157,6 +3166,7 @@ function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), addr, getaddrlen(addr)))
 end
 
+-- cant see how could use ffi __new to do this because of needing length
 function S.iovec(iov, iovcnt) -- helper to construct iovecs, both for read and write TODO more tests
   if not iov then iov = {} end
   if type(iov) ~= 'table' then return iov, iovcnt end

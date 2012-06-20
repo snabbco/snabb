@@ -20,6 +20,8 @@ local buf = S.t.buffer(size)
 local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 
+local t = S.t
+
 local clean = function()
   S.unlink(tmpfile)
   S.unlink(tmpfile2)
@@ -526,13 +528,13 @@ test_sockets = {
     assert(not a, "should get invalid IP address")
   end,
   test_sockaddr_in_error = function()
-    local sa = S.sockaddr_in(1234, "error")
+    local sa = t.sockaddr_in(1234, "error")
     assert(not sa, "expect nil socket address from invalid ip string")
   end,
   test_inet_socket = function() -- should break this test up
     local s = assert(S.socket("inet", "stream, nonblock")) -- adding flags to socket type is Linux only
     local loop = "127.0.0.1"
-    local sa = assert(S.sockaddr_in(1234, loop))
+    local sa = assert(t.sockaddr_in(1234, loop))
     assert_equal(S.inet_ntoa(sa.sin_addr), loop, "expect address converted back to string to still be same")
     assert_equal(tostring(sa.sin_addr), loop, "expect address converted back to string to still be same")
     assert(sa.sin_family == 2, "expect family on inet socket to be AF_INET=2")
@@ -625,8 +627,8 @@ test_sockets = {
     local loop = "127.0.0.1"
     local s = assert(S.socket("inet", "dgram"))
     local c = assert(S.socket("inet", "dgram"))
-    local sa = assert(S.sockaddr_in(0, loop))
-    local ca = assert(S.sockaddr_in(0, loop))
+    local sa = assert(t.sockaddr_in(0, loop))
+    local ca = assert(t.sockaddr_in(0, loop))
     assert(s:bind(sa))
     assert(c:bind(sa))
     local bca = c:getsockname() -- find bound address
