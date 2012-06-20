@@ -2881,9 +2881,9 @@ local samap = {
 mt.sockaddr_un = {
   __index = function(un, k)
     local sa = un.addr
-    if k == 'sun_family' then return sa.sa_family end
-    if k == 'family' then return tonumber(sa.sa_family) end
-    local namelen = un.addrlen - ffi.sizeof(t.sa_family)
+    if k == 'sun_family' then return sa.sun_family end
+    if k == 'family' then return tonumber(sa.sun_family) end
+    local namelen = un.addrlen - ffi.sizeof(t.sun_family)
     if namelen > 0 then
       if sa.sun_path[0] == 0 then
         if k == 'abstract' then return true end
