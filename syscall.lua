@@ -3960,7 +3960,10 @@ function S.io_setup(nr_events)
 end
 
 function S.io_destroy(ctx)
-  return retbool(C.syscall(S.SYS_io_destroy, getctx(ctx))) -- should fix up like close() to zero and not redo, unclear what an invalid value is (0?) else gc calls more than once after close.
+  if ctx.ctx == 0 then return end
+  local ret = retbool(C.syscall(S.SYS_io_destroy, getctx(ctx)))
+  ctx.ctx = 0 -- assume this is correct nil value
+  return ret
 end
 
 local function getiocb(ioi, iocb)
