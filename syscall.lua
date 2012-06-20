@@ -2513,7 +2513,6 @@ int ptsname_r(int fd, char *buf, size_t buflen);
 ]]
 
 -- Lua type constructors corresponding to defined types
-t.sockaddr_un = ffi.typeof("struct sockaddr_un")
 t.sa_family = ffi.typeof("sa_family_t")
 t.msghdr = ffi.typeof("struct msghdr")
 t.cmsghdr = ffi.typeof("struct cmsghdr")
@@ -2636,11 +2635,23 @@ t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
   end
 })
 
+t.sockaddr_un = ffi.metatype("struct sockaddr_un", {
+  __index = function(sa, k)
+    if k == "family" then return tonumber(sa.un_family) end
+  end,
+  __new = function(tp)
+    return ffi.new(tp, S.AF_UNIX)
+  end
+})
+
 t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
   __index = function(sa, k)
     if k == "family" then return tonumber(sa.nl_family) end
     if k == "pid" then return tonumber(sa.nl_pid) end
     if k == "groups" then return tonumber(sa.nl_groups) end
+  end,
+  __new = function(tp, pid, groups)
+    return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0)
   end
 })
 
@@ -2857,37 +2868,6 @@ else
 end
 S.ntohl = S.htonl -- reverse is the same
 S.ntohs = S.htons -- reverse is the same
-
--- initialisers TODO use ffi __new instead
--- need to set first field for sockaddr. Corrects byte order on port, constructor for addr will do that for addr.
---[[
-function S.sockaddr_in(port, addr)
-  if type(addr) == 'string' then addr = S.inet_aton(addr) end
-  if not addr then return nil end
-  return t.sockaddr_in(S.AF_INET, S.htons(port), addr)
-end
-function S.sockaddr_in6(port, addr)
-  if type(addr) == 'string' then addr = S.inet_pton(S.AF_INET6, addr) end
-  if not addr then return nil end
-  local sa = t.sockaddr_in6()
-  sa.sin6_family = S.AF_INET6
-  sa.sin6_port = S.htons(port)
-  ffi.copy(sa.sin6_addr, addr, ffi.sizeof(t.in6_addr))
-  return sa
-end
-]]
-function S.sockaddr_un() -- actually, not using this, not sure it is useful for unix sockets
-  local addr = t.sockaddr_un()
-  addr.sun_family = S.AF_UNIX
-  return addr
-end
-function S.sockaddr_nl(pid, groups)
-  local addr = t.sockaddr_nl()
-  addr.nl_family = S.AF_NETLINK
-  if pid then addr.nl_pid = pid end -- optional, kernel will set
-  if groups then addr.nl_groups = groups end
-  return addr
-end
 
 -- helper function to make setting addrlen optional. could use table and address family? need to initialize with family first
 local function getaddrlen(addr, addrlen)
@@ -4440,10 +4420,10 @@ function S.getaddr(af)
   af = stringflag(af, "AF_")
   local s, err = S.socket("netlink", "raw", "route")
   if not s then return nil, err end
-  local a = S.sockaddr_nl() -- kernel will fill in address
+  local a = t.sockaddr_nl() -- kernel will fill in address
   local ok, err = s:bind(a)
   if not ok then return nil, err end -- gc will take care of closing socket...
-  local k = S.sockaddr_nl() -- kernel destination
+  local k = t.sockaddr_nl() -- kernel destination
 
   local buf, len, hdr, ifaddr = S.tbuffer("struct nlmsghdr", "struct ifaddrmsg") -- TODO can now take ctypes, using new luajit feature
 
@@ -4472,10 +4452,10 @@ end
 function S.get_interfaces()
   local s, err = S.socket("netlink", "raw", "route")
   if not s then return nil, err end
-  local a = S.sockaddr_nl() -- kernel will fill in address
+  local a = t.sockaddr_nl() -- kernel will fill in address
   local ok, err = s:bind(a)
   if not ok then return nil, err end -- gc will take care of closing socket...
-  local k = S.sockaddr_nl() -- kernel destination
+  local k = t.sockaddr_nl() -- kernel destination
 
   -- we should be adding padding at the end of size nlmsg_alignto (4), (and in middle but 0) or will have issues if try to send more messages.
   -- so need to add pad size to tbuffer function
