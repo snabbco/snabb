@@ -350,7 +350,7 @@ test_timers_signals = {
     local exp = S.SIGALRM
     assert(S.sigaction("alrm", function(s) assert(s == exp, "expected alarm"); exp = 0 end))
     assert(exp == S.SIGALRM, "sigaction handler should not have run")
-    assert(S.setitimer("real", 0, 0.0001))
+    assert(S.setitimer("real", 0, 0.01))
     local rem, err = S.nanosleep(1) -- nanosleep does not interact with signals, should be interrupted
     assert(err and err.EINTR, "expect nanosleep to be interrupted by timer expiry")
     assert(exp == 0, "sigaction handler should have run")
