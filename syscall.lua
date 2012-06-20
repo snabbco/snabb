@@ -2379,11 +2379,11 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 off_t lseek(int fd, off_t offset, int whence); 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
-// for sendto use void poointer not const struct sockaddr * to avoid casting
+// for sendto and recvfrom use void poointer not const struct sockaddr * to avoid casting
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const void *dest_addr, socklen_t addrlen);
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, void *src_addr, socklen_t *addrlen);
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
 ssize_t recv(int sockfd, void *buf, size_t len, int flags);
-ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
@@ -3189,7 +3189,7 @@ function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, coun
 function S.recvfrom(fd, buf, count, flags)
   local ss = t.sockaddr_storage()
   local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
-  local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, ss), addrlen)
+  local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ss, addrlen)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   return {count = tonumber(ret), addr = sa(ss, addrlen[0])}
 end
