@@ -4896,11 +4896,11 @@ t.in6_addr = ffi.metatype("struct in6_addr", {
 
 -- constants
 S.INADDR_ANY = t.in_addr()
-S.INADDR_LOOPBACK = S.inet_aton("127.0.0.1")
-S.INADDR_BROADCAST = S.inet_aton("255.255.255.255")
+S.INADDR_LOOPBACK = t.in_addr("127.0.0.1")
+S.INADDR_BROADCAST = t.in_addr("255.255.255.255")
 -- ipv6 versions
 S.in6addr_any = t.in6_addr()
-S.in6addr_loopback = S.inet_pton(S.AF_INET6, "::1")
+S.in6addr_loopback = t.in6_addr("::1")
 
 -- methods on an fd
 local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
