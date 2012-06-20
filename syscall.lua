@@ -2604,12 +2604,13 @@ t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
   __index = function(sa, k)
     if k == "family" then return tonumber(sa.sin_family) end
     if k == "port" then return S.ntohs(sa.sin_port) end
+    if k == "addr" then return sa.sin_addr end
   end,
   __newindex = function(sa, k, v)
     if k == "port" then sa.sin_port = S.htons(v) end
   end,
   __new = function(tp, port, addr)
-    if type(addr) == 'string' then
+    if type(addr) == 'string' then -- TODO move to t.in_addr()
       addr = S.inet_aton(addr)
       if not addr then return end
     end
@@ -2621,11 +2622,31 @@ t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
   __index = function(sa, k)
     if k == "family" then return tonumber(sa.sin6_family) end
     if k == "port" then return S.ntohs(sa.sin6_port) end
+    if k == "addr" then return sa.sin6_addr end
   end,
   __newindex = function(sa, k, v)
     if k == "port" then sa.sin6_port = S.htons(v) end
+  end,
+  __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers. should we allow table init too?
+    if type(addr) == 'string' then
+      addr = S.inet_pton(S.AF_INET6, addr)
+      if not addr then return end
+    end
+    return ffi.new(tp, S.AF_INET6, S.htons(port or 0), flowinfo or 0, addr or t.in6_addr(), scope_id or 0)
   end
 })
+
+--[[
+function S.sockaddr_in6(port, addr)
+  if type(addr) == 'string' then addr = S.inet_pton(S.AF_INET6, addr) end
+  if not addr then return nil end
+  local sa = t.sockaddr_in6()
+  sa.sin6_family = S.AF_INET6
+  sa.sin6_port = S.htons(port)
+  ffi.copy(sa.sin6_addr, addr, ffi.sizeof(t.in6_addr))
+  return sa
+end
+]]
 
 t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
   __index = function(sa, k)
@@ -2860,7 +2881,6 @@ function S.sockaddr_in(port, addr)
   if not addr then return nil end
   return t.sockaddr_in(S.AF_INET, S.htons(port), addr)
 end
-]]
 function S.sockaddr_in6(port, addr)
   if type(addr) == 'string' then addr = S.inet_pton(S.AF_INET6, addr) end
   if not addr then return nil end
@@ -2870,6 +2890,7 @@ function S.sockaddr_in6(port, addr)
   ffi.copy(sa.sin6_addr, addr, ffi.sizeof(t.in6_addr))
   return sa
 end
+]]
 function S.sockaddr_un() -- actually, not using this, not sure it is useful for unix sockets
   local addr = t.sockaddr_un()
   addr.sun_family = S.AF_UNIX

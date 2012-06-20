@@ -642,8 +642,9 @@ test_sockets = {
     local s, err = S.socket("AF_INET6", "dgram")
     if s then 
       local c = assert(S.socket("AF_INET6", "dgram"))
-      local sa = assert(S.sockaddr_in6(0, S.in6addr_any))
-      local ca = assert(S.sockaddr_in6(0, S.in6addr_any))
+      local sa = assert(t.sockaddr_in6(0, S.in6addr_any))
+      local ca = assert(t.sockaddr_in6(0, S.in6addr_any))
+      assert_equal(tostring(sa.sin6_addr), "::", "expect :: for in6addr_any")
       assert(s:bind(sa))
       assert(c:bind(sa))
       local bca = c:getsockname() -- find bound address
@@ -655,6 +656,11 @@ test_sockets = {
       assert(c:close())
       assert(s:close())
     else assert(err.EAFNOSUPPORT, err) end -- fairly common to not have ipv6 in kernel
+  end,
+  test_ipv6_names = function()
+    local sa = assert(t.sockaddr_in6(1234, "2002::4:5"))
+    assert_equal(sa.port, 1234, "want same port back")
+    assert_equal(tostring(sa.sin6_addr), "2002::4:5", "expect same address back")
   end
 }
 
