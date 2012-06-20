@@ -2636,18 +2636,6 @@ t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
   end
 })
 
---[[
-function S.sockaddr_in6(port, addr)
-  if type(addr) == 'string' then addr = S.inet_pton(S.AF_INET6, addr) end
-  if not addr then return nil end
-  local sa = t.sockaddr_in6()
-  sa.sin6_family = S.AF_INET6
-  sa.sin6_port = S.htons(port)
-  ffi.copy(sa.sin6_addr, addr, ffi.sizeof(t.in6_addr))
-  return sa
-end
-]]
-
 t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
   __index = function(sa, k)
     if k == "family" then return tonumber(sa.nl_family) end
@@ -2864,10 +2852,7 @@ function S.mode(mode) return stringflags(mode, "S_") end
 if ffi.abi("be") then -- nothing to do
   function S.htonl(b) return b end
 else
-  function S.htonl(b)
-  if ffi.istype(t.in_addr, b) then return t.in_addr(bit.bswap(b.s_addr)) end -- not sure we need this, actually not using this function
-  return bit.bswap(b)
-end
+  function S.htonl(b) return bit.bswap(b) end
   function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
 end
 S.ntohl = S.htonl -- reverse is the same
