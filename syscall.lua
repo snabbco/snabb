@@ -2869,17 +2869,6 @@ end
 S.ntohl = S.htonl -- reverse is the same
 S.ntohs = S.htons -- reverse is the same
 
--- helper function to make setting addrlen optional. could use table and address family? need to initialize with family first
-local function getaddrlen(addr, addrlen)
-  if addrlen then return addrlen end
-  if ffi.istype(t.sockaddr, addr) then return ffi.sizeof(t.sockaddr) end
-  if ffi.istype(t.sockaddr_un, addr) then return ffi.sizeof(t.sockaddr_un) end
-  if ffi.istype(t.sockaddr_in, addr) then return ffi.sizeof(t.sockaddr_in) end
-  if ffi.istype(t.sockaddr_in6, addr) then return ffi.sizeof(t.sockaddr_in6) end
-  if ffi.istype(t.sockaddr_nl, addr) then return ffi.sizeof(t.sockaddr_nl) end
-  if ffi.istype(t.sockaddr_storage, addr) then return ffi.sizeof(t.sockaddr_storage) end
-end
-
 -- cast socket address to actual type based on family
 local samap = {
   [S.AF_UNIX] = t.sockaddr_un,
@@ -3148,7 +3137,7 @@ function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf,
 function S.lseek(fd, offset, whence) return retnum(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
-  return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), addr, getaddrlen(addr)))
+  return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), addr, addrlen or ffi.sizeof(addr)))
 end
 
 -- cant see how could use ffi __new to do this because of needing length
@@ -3310,19 +3299,19 @@ function S.socketpair(domain, stype, protocol)
 end
 
 function S.bind(sockfd, addr, addrlen)
-  return retbool(C.bind(getfd(sockfd), addr, getaddrlen(addr, addrlen)))
+  return retbool(C.bind(getfd(sockfd), addr, addrlen or ffi.sizeof(addr)))
 end
 
 function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or S.SOMAXCONN)) end
 function S.connect(sockfd, addr, addrlen)
-  return retbool(C.connect(getfd(sockfd), addr, getaddrlen(addr, addrlen)))
+  return retbool(C.connect(getfd(sockfd), addr, addrlen or ffi.sizeof(addr)))
 end
 
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), stringflag(how, "SHUT_"))) end
 
 function S.accept(sockfd, flags, addr, addrlen)
   if not addr then addr = t.sockaddr_storage() end
-  if not addrlen then addrlen = socklen1_t(getaddrlen(addr, addrlen)) end
+  if not addrlen then addrlen = socklen1_t(addrlen or ffi.sizeof(addr)) end
   local ret
   if not flags
     then ret = C.accept(getfd(sockfd), addr, addrlen)
