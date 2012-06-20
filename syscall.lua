@@ -2379,7 +2379,8 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 off_t lseek(int fd, off_t offset, int whence); 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
-ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
+// for sendto use void poointer not const struct sockaddr * to avoid casting
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const void *dest_addr, socklen_t addrlen);
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
 ssize_t recv(int sockfd, void *buf, size_t len, int flags);
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
@@ -3153,7 +3154,7 @@ function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf,
 function S.lseek(fd, offset, whence) return retnum(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
-  return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), ffi.cast(sockaddr_pt, addr), getaddrlen(addr)))
+  return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), addr, getaddrlen(addr)))
 end
 
 function S.iovec(iov, iovcnt) -- helper to construct iovecs, both for read and write TODO more tests
