@@ -3484,7 +3484,7 @@ function S.sigaction(signum, handler, mask, flags)
     if type(handler) == 'string' then
       handler = ffi.cast(t.sighandler, int1_t{stringflag(handler, "SIG_")})
     elseif
-      type(handler) == 'function' then handler = ffi.cast(t.sighandler, handler)
+      type(handler) == 'function' then handler = ffi.cast(t.sighandler, handler) -- TODO check if gc problem here? need to copy?
     end
     sa = t.sigaction{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = stringflags(flags, "SA_")}
   end
@@ -4871,7 +4871,7 @@ function S.ptsname(fd)
   end
 end
 
--- use string types for now
+-- use string types for now TODO fix with new API
 -- helper for returning varargs
 local function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
   if not t then return nil end
@@ -4881,7 +4881,7 @@ end
 function S.tbuffer(...) -- helper function for sequence of types in a buffer
   local len = 0
   for i, t in ipairs{...} do
-    len = len + ffi.sizeof(ffi.typeof(t)) -- alignment issues, need to round up to minimum alignment
+    len = len + ffi.sizeof(ffi.typeof(t)) -- TODO alignment issues, need to round up to minimum alignment
   end
   local buf = t.buffer(len)
   return buf, len, threc(buf, 0, ...)

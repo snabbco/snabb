@@ -3,6 +3,7 @@ local bit = require "bit"
 
 local oldassert = assert
 function assert(c, s)
+  collectgarbage("collect") -- force gc, to test for bugs
   return oldassert(c, tostring(s)) -- annoyingly, assert does not call tostring!
 end
 
