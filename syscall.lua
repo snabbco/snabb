@@ -2610,11 +2610,11 @@ t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
     if k == "port" then sa.sin_port = S.htons(v) end
   end,
   __new = function(tp, port, addr)
-    if type(addr) == 'string' then -- TODO move to t.in_addr()
-      addr = S.inet_aton(addr)
+    if not ffi.istype(t.in_addr, addr) then
+      addr = t.in_addr(addr)
       if not addr then return end
     end
-    return ffi.new(tp, S.AF_INET, S.htons(port or 0), addr or t.in_addr())
+    return ffi.new(tp, S.AF_INET, S.htons(port or 0), addr)
   end
 })
 
@@ -2942,8 +2942,8 @@ local function sa(addr, addrlen)
 end
 
 -- functions from section 3 that we use for ip addresses
-function S.inet_aton(s)
-  local addr = t.in_addr()
+function S.inet_aton(s, addr)
+  if not addr then addr = t.in_addr() end
   local ret = C.inet_aton(s, addr)
   if ret == 0 then return nil end
   return addr
@@ -4909,7 +4909,12 @@ end
 -- additional metatypes that need functions defined
 
 t.in_addr = ffi.metatype("struct in_addr", {
-  __tostring = S.inet_ntoa
+  __tostring = S.inet_ntoa,
+  __new = function(tp, s)
+    local addr = ffi.new(tp)
+    if s then addr = S.inet_aton(s, addr) end
+    return addr
+  end
 })
 
 t.in6_addr = ffi.metatype("struct in6_addr", {
