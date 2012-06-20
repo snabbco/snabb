@@ -1591,7 +1591,8 @@ t.ulong = ffi.typeof("unsigned long")
 t.uintptr = ffi.typeof("uintptr_t")
 t.void = ffi.typeof("void *")
 
-function t.pointer(i) return ffi.cast(t.void, ffi.cast(t.uintptr, i)) end -- luaffi needs some help casting number to pointer
+-- luaffi needs some help casting number to pointer. maybe fixed now, check.
+function t.pointer(i) return ffi.cast(t.void, ffi.cast(t.uintptr, i)) end
 
 local int1_t = ffi.typeof("int[1]")
 local int2_t = ffi.typeof("int[2]")
@@ -2914,7 +2915,8 @@ mt.sockaddr_un = {
 local function sa(addr, addrlen)
   local family = addr.family
   if family == S.AF_UNIX then -- we return Lua metatable not metatype, as need length to decode
-    local sa = ffi.cast(samap[family], addr)
+    local sa = t.sockaddr_un()
+    ffi.copy(sa, addr, addrlen)
     return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
   end
   local st = samap[family]
