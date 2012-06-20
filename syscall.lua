@@ -2628,11 +2628,11 @@ t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
     if k == "port" then sa.sin6_port = S.htons(v) end
   end,
   __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers. should we allow table init too?
-    if type(addr) == 'string' then
-      addr = S.inet_pton(S.AF_INET6, addr)
+    if not ffi.istype(t.in6_addr, addr) then
+      addr = t.in6_addr(addr)
       if not addr then return end
     end
-    return ffi.new(tp, S.AF_INET6, S.htons(port or 0), flowinfo or 0, addr or t.in6_addr(), scope_id or 0)
+    return ffi.new(tp, S.AF_INET6, S.htons(port or 0), flowinfo or 0, addr, scope_id or 0)
   end
 })
 
@@ -2966,10 +2966,9 @@ function S.inet_ntop(af, src)
   return ffi.string(dst)
 end
 
-function S.inet_pton(af, src)
+function S.inet_pton(af, src, addr)
   af = stringflag(af, "AF_")
-  local addr
-  if af == S.AF_INET6 then addr = t.in6_addr() else addr = t.in_addr() end
+  if not addr then if af == S.AF_INET6 then addr = t.in6_addr() else addr = t.in_addr() end end
   local ret = C.inet_pton(af, src, addr)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   if ret == 0 then return nil end -- maybe return string
@@ -4918,7 +4917,12 @@ t.in_addr = ffi.metatype("struct in_addr", {
 })
 
 t.in6_addr = ffi.metatype("struct in6_addr", {
-  __tostring = function(a) return S.inet_ntop(S.AF_INET6, a) end
+  __tostring = function(a) return S.inet_ntop(S.AF_INET6, a) end,
+  __new = function(tp, s)
+    local addr = ffi.new(tp)
+    if s then addr = S.inet_pton(S.AF_INET6, s, addr) end
+    return addr
+  end
 })
 
 -- constants
