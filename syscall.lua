@@ -2439,13 +2439,13 @@ int setrlimit(int resource, const struct rlimit *rlim);
 
 int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);
-int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int bind(int sockfd, const void *addr, socklen_t addrlen); // void not struct
 int listen(int sockfd, int backlog);
-int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-int accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags);
-int getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+int connect(int sockfd, const void *addr, socklen_t addrlen);
+int accept(int sockfd, void *addr, socklen_t *addrlen);
+int accept4(int sockfd, void *addr, socklen_t *addrlen, int flags);
+int getsockname(int sockfd, void *addr, socklen_t *addrlen);
+int getpeername(int sockfd, void *addr, socklen_t *addrlen);
 int shutdown(int sockfd, int how);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
@@ -3315,12 +3315,12 @@ function S.socketpair(domain, stype, protocol)
 end
 
 function S.bind(sockfd, addr, addrlen)
-  return retbool(C.bind(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
+  return retbool(C.bind(getfd(sockfd), addr, getaddrlen(addr, addrlen)))
 end
 
 function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or S.SOMAXCONN)) end
 function S.connect(sockfd, addr, addrlen)
-  return retbool(C.connect(getfd(sockfd), ffi.cast(sockaddr_pt, addr), getaddrlen(addr, addrlen)))
+  return retbool(C.connect(getfd(sockfd), addr, getaddrlen(addr, addrlen)))
 end
 
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), stringflag(how, "SHUT_"))) end
@@ -3330,8 +3330,8 @@ function S.accept(sockfd, flags, addr, addrlen)
   if not addrlen then addrlen = socklen1_t(getaddrlen(addr, addrlen)) end
   local ret
   if not flags
-    then ret = C.accept(getfd(sockfd), ffi.cast(sockaddr_pt, addr), addrlen)
-    else ret = C.accept4(getfd(sockfd), ffi.cast(sockaddr_pt, addr), addrlen, stringflags(flags, "SOCK_"))
+    then ret = C.accept(getfd(sockfd), addr, addrlen)
+    else ret = C.accept4(getfd(sockfd), addr, addrlen, stringflags(flags, "SOCK_"))
   end
   if ret == -1 then return nil, t.error(ffi.errno()) end
   return {fd = t.fd(ret), addr = sa(addr, addrlen[0])}
@@ -3340,7 +3340,7 @@ end
 function S.getsockname(sockfd)
   local ss = t.sockaddr_storage()
   local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
-  local ret = C.getsockname(getfd(sockfd), ffi.cast(sockaddr_pt, ss), addrlen)
+  local ret = C.getsockname(getfd(sockfd), ss, addrlen)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   return sa(ss, addrlen[0])
 end
