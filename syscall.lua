@@ -2906,7 +2906,7 @@ local function sa(addr, addrlen)
   end
   local st = samap[family]
   local a = st()
-  ffi.copy(a, addr, ffi.sizeof(st)) -- copy not cast, save memory.
+  ffi.copy(a, addr, ffi.sizeof(st))
   return a
 end
 
