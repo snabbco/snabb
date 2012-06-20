@@ -62,7 +62,7 @@ test_open_close = {
     local fd = assert(S.open("/dev/null", "rdonly"))
     assert(fd:close())
     local fd2 = assert(S.open("/dev/zero")) -- reuses same fd
-    local ok, err = fd:close() -- this should not fd again
+    local ok, err = assert(fd:close()) -- this should not close fd again, but no error as does nothing
     assert(fd2:close()) -- this should succeed
   end,
   test_double_close = function()
