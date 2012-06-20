@@ -10,6 +10,8 @@ Requirements: Needs LuaJIT 2.0.0-beta9 or later. Generally tested using git head
 
 Also supports [luaffi](https://github.com/jmckaskill/luaffi) so you can use with standard Lua; all the tests now pass, have added some workarounds to support current issues in luaffi which could be removed but these are not performance critical or important now as all the major issues have been resolved. There may still be a few issues in code that is not exercised by the tests, but actually luaffi has fixed most of the issues that were coming up anyway now. This is now tested and working with Lua 5.1 and 5.2.
 
+Releases after tag 0.3 do not currently work with luaffi, please use that until fixed. Using new ffi features to simplify code.
+
 ### Testing
 
 The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86. Intend to get my ppc build machine back up one day, if you want this supported please ask. I do not currently have a mips box, if you want this can you suggest a suitable dev box.
