@@ -9,7 +9,10 @@ end
 
 local luaunit = require "luaunit"
 
-local assert_equal = assert_equals
+local function assert_equal(...)
+  collectgarbage("collect") -- force gc, to test for bugs
+  return assert_equals(...)
+end
 
 local teststring = "this is a test string"
 local size = 512
