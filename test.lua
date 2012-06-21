@@ -717,7 +717,9 @@ test_netlink = {
     assert_equal(tostring(as[i.iface.lo.index].addr[1]), "127.0.0.1", "loopback ipv4 on lo")
   end,
   test_get_addresses_in6 = function()
-    S.getaddr("inet6")
+    local as = assert(S.getaddr("inet6"))
+    local i = S.get_interfaces()
+    assert_equal(tostring(as[i.iface.lo.index].addr[1]), "::1", "loopback ipv6 on lo (probably)") -- allow fail if no ipv6
   end
 }
 
