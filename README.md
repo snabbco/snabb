@@ -119,7 +119,7 @@ Siginfo support in sigaction not there yet, as confused by the kernel API.
 
 only some of aio is working, needs some debugging before being used.
 
-### Missing functions
+### Missing functions etc
 
 pselect, ppoll
 clock\_nanosleep, timer\_create, timer\_getoverrun
@@ -129,5 +129,6 @@ sigqueue,
 capset, capget
 ...
 
+ps (using /proc)
 
 
