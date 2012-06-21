@@ -4325,11 +4325,15 @@ local ifla_decode = {
 local ifa_decode = {
   [S.IFA_ADDRESS] = function(ir, buf, len)
     if ir.family == S.AF_INET then
-      ir.addr = t.in_addr()
-      ffi.copy(ir.addr, buf, ffi.sizeof(t.in_addr))
+      local addr = t.in_addr()
+      ffi.copy(addr, buf, ffi.sizeof(t.in_addr))
+      if not ir.addr then ir.addr = {} end
+      ir.addr[#ir.addr + 1] = addr
     elseif ir.family == S.AF_INET6 then
-      ir.addr = t.in6_addr()
-      ffi.copy(ir.addr, buf, ffi.sizeof(t.in6_addr))
+      local addr = t.in6_addr()
+      ffi.copy(addr, buf, ffi.sizeof(t.in6_addr))
+      if not ir.addr then ir.addr = {} end
+      ir.addr[#ir.addr + 1] = addr
     end
   end
 }
@@ -4357,8 +4361,8 @@ local nlmsg_data_decode = {
       rtattr, buf, len = rta_next(rtattr, buf, len)
     end
 
-   --  add to r
-
+   r[ir.index] = ir
+   return r
   end,
   [S.RTM_NEWLINK] = function(r, buf, len)
     local iface = ffi.cast(ifinfomsg_pt, buf)
@@ -4383,7 +4387,7 @@ local nlmsg_data_decode = {
     if not r.ifaces then r.ifaces = {} end -- array
     if not r.iface then r.iface = {} end -- table
 
-    r.ifaces[#r.ifaces + 1] = ir -- cant use interface index as holes.
+    r.ifaces[#r.ifaces + 1] = ir -- cant use interface index as holes. -- actually do here, create array after.
     if ir.name then r.iface[ir.name] = ir end
 
     return r

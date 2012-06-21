@@ -708,17 +708,13 @@ test_netlink = {
       assert_equal(tostring(wlan.macaddr) .. '\n', mac, "mac address hsould match that from /sys")
     end
   end,
-  test_get_interfaces_ipv4 = function()
-    local a = S.getaddr("inet")
-  end,
-  test_get_interfaces_ipv6 = function()
-    local a = S.getaddr("inet6")
-  end,
   test_bridge_list = function()
     local b = assert(S.bridge_list())
   end,
   test_get_addresses_in = function()
-    S.getaddr("inet")
+    local as = assert(S.getaddr("inet"))
+    local i = S.get_interfaces()
+    assert_equal(tostring(as[i.iface.lo.index].addr[1]), "127.0.0.1", "loopback ipv4 on lo")
   end,
   test_get_addresses_in6 = function()
     S.getaddr("inet6")
