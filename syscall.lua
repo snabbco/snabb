@@ -4782,12 +4782,40 @@ mt.proc = {
       if not ret then return nil, err end
       return ret
     end
+    -- TODO directories
+  end,
+  __tostring = function(p) -- TODO decide what to print
+    local c = p.cmdline
+    if #c == 0 and p.comm and #p.comm > 0 then c = '[' .. p.comm:sub(1, -2) .. ']' end 
+    return p.pid .. '  ' .. c
   end
 }
 
 function S.proc(pid)
-  if not pid then pid = "self" end
+  if not pid then pid = S.getpid() end
   return setmetatable({pid = pid, dir = "/proc/" .. pid .. "/"}, mt.proc)
+end
+
+mt.ps = {
+  __tostring = function(ps)
+    local s = {}
+    for i = 1, #ps do
+      s[#s + 1] = tostring(ps[i])
+    end
+    return table.concat(s, '\n')
+  end
+}
+
+function S.ps()
+  local ls = S.ls("/proc")
+  local ps = {}
+  for i = 1, #ls do
+    if not string.match(ls[i], '[^%d]') then
+      local p = S.proc(tonumber(ls[i]))
+      if p then ps[#ps + 1] = p end
+    end
+  end
+  return setmetatable(ps, mt.ps)
 end
 
 function S.cfmakeraw(termios)
