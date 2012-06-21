@@ -4764,6 +4764,27 @@ function S.bridge_list()
   return b
 end
 
+mt.proc = {
+  __index = function(p, k)
+    local name = p.dir .. k
+    local st, err = S.lstat(name)
+    if not st then return nil, t.error(err) end
+    if st.isreg then
+      local fd, err = S.open(p.dir .. k, "rdonly")
+      if not fd then return nil, t.error(err) end
+      local ret, err = fd:read() -- read defaults to 4k, sufficient?
+      if not ret then return nil, t.error(err) end
+      fd:close()
+      return ret
+    end
+  end
+}
+
+function S.proc(pid)
+  if not pid then pid = "self" end
+  return setmetatable({pid = pid, dir = "/proc/" .. pid .. "/"}, mt.proc)
+end
+
 function S.cfmakeraw(termios)
   C.cfmakeraw(termios)
   return true

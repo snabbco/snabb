@@ -838,6 +838,18 @@ test_aio = {
   end
 }
 
+test_proc = {
+  test_proc_self = function()
+    local p = S.proc()
+    assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
+  end,
+  test_proc_init = function()
+    local p = S.proc(1)
+    assert(p and p.cmdline, "expect init to have cmdline")
+    assert_equal(p.cmdline, "/sbin/init", "expect /sbin/init to be process 1 usually")
+  end
+}
+
 -- legacy tests not yet converted to test framework
 
 test_legacy = {
