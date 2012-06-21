@@ -2919,7 +2919,7 @@ function S.inet_aton(s, addr)
 end
 
 function S.inet_ntoa(addr)
-  local b = ffi.cast(char_pt, addr)
+  local b = ffi.cast(uchar_pt, addr)
   return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
 end
 
