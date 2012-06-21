@@ -4768,15 +4768,23 @@ mt.proc = {
   __index = function(p, k)
     local name = p.dir .. k
     local st, err = S.lstat(name)
-    if not st then return nil, t.error(err) end
+    if not st then return nil, err end
     if st.isreg then
       local fd, err = S.open(p.dir .. k, "rdonly")
-      if not fd then return nil, t.error(err) end
+      if not fd then return nil, err end
       local ret, err = fd:read() -- read defaults to 4k, sufficient?
-      if not ret then return nil, t.error(err) end
+      if not ret then return nil, err end
       fd:close()
+      return ret -- TODO many could usefully do with some parsing
+    end
+--[[
+    if st.islnk then
+      local ret, err = S.readlink(name)
+      if not ret then return nil, err end
       return ret
     end
+]]
+
   end
 }
 

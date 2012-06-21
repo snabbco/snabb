@@ -840,8 +840,11 @@ test_aio = {
 
 test_proc = {
   test_proc_self = function()
-    local p = S.proc()
+    local p = assert(S.proc())
+    --assert(not p.wrongname, "test non existent files")
     assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
+    assert(p.exe and #p.exe > 1, "expect an executable")
+    --assert_equal(p.root, "/", "expect our root to be / usually")
   end,
   test_proc_init = function()
     local p = S.proc(1)
