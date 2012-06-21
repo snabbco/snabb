@@ -4777,14 +4777,11 @@ mt.proc = {
       fd:close()
       return ret -- TODO many could usefully do with some parsing
     end
---[[
     if st.islnk then
       local ret, err = S.readlink(name)
       if not ret then return nil, err end
       return ret
     end
-]]
-
   end
 }
 
