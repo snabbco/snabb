@@ -4815,6 +4815,7 @@ function S.ps()
       if p then ps[#ps + 1] = p end
     end
   end
+  table.sort(ps, function(a, b) return a.pid < b.pid end)
   return setmetatable(ps, mt.ps)
 end
 
