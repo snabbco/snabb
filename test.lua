@@ -255,8 +255,10 @@ test_file_operations = {
     assert(S.symlink("/etc/passwd", tmpfile))
     local stat = assert(S.stat(tmpfile))
     assert(stat.isreg, "expect /etc/passwd to be a regular file")
+    assert(not stat.islnk, "should not be symlink")
     local stat = assert(S.lstat(tmpfile))
     assert(stat.islnk, "expect lstat to stat the symlink")
+    assert(not stat.isreg, "lstat should find symlink not regular file")
     assert(S.unlink(tmpfile))
   end,
   test_truncate = function()
