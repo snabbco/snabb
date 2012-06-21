@@ -520,6 +520,10 @@ test_misc = {
 }
 
 test_sockets = {
+  test_ipv4_print = function()
+    assert_equal(tostring(t.in_addr("127.0.0.1")), "127.0.0.1", "print ipv4")
+    assert_equal(tostring(t.in_addr("255.255.255.255")), "255.255.255.255", "print ipv4")
+  end,
   test_socket_sizes = function()
     assert(S.sizeof(S.t.sockaddr) == S.sizeof(S.t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
     assert(S.sizeof(S.t.sockaddr_storage) == 128) -- this is the required size in Linux
