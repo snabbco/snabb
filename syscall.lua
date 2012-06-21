@@ -4224,13 +4224,13 @@ function S.makedev(major, minor)
   return bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff))
 end
 
-function S.S_ISREG(m)  return bit.band(m, S.S_IFREG)  ~= 0 end
-function S.S_ISDIR(m)  return bit.band(m, S.S_IFDIR)  ~= 0 end
-function S.S_ISCHR(m)  return bit.band(m, S.S_IFCHR)  ~= 0 end
-function S.S_ISBLK(m)  return bit.band(m, S.S_IFBLK)  ~= 0 end
-function S.S_ISFIFO(m) return bit.band(m, S.S_IFFIFO) ~= 0 end
-function S.S_ISLNK(m)  return bit.band(m, S.S_IFLNK)  ~= 0 end
-function S.S_ISSOCK(m) return bit.band(m, S.S_IFSOCK) ~= 0 end
+function S.S_ISREG(m)  return bit.band(m, S.S_IFMT) == S.S_IFREG  end
+function S.S_ISDIR(m)  return bit.band(m, S.S_IFMT) == S.S_IFDIR  end
+function S.S_ISCHR(m)  return bit.band(m, S.S_IFMT) == S.S_IFCHR  end
+function S.S_ISBLK(m)  return bit.band(m, S.S_IFMT) == S.S_IFBLK  end
+function S.S_ISFIFO(m) return bit.band(m, S.S_IFMT) == S.S_IFFIFO end
+function S.S_ISLNK(m)  return bit.band(m, S.S_IFMT) == S.S_IFLNK  end
+function S.S_ISSOCK(m) return bit.band(m, S.S_IFMT) == S.S_IFSOCK end
 
 local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
 
