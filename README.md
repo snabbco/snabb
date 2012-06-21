@@ -129,6 +129,3 @@ sigqueue,
 capset, capget
 ...
 
-ps (using /proc)
-
-
