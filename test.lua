@@ -712,6 +712,12 @@ test_netlink = {
   end,
   test_bridge_list = function()
     local b = assert(S.bridge_list())
+  end,
+  test_get_addresses_in = function()
+    S.getaddr("inet")
+  end,
+  test_get_addresses_in6 = function()
+    S.getaddr("inet6")
   end
 }
 

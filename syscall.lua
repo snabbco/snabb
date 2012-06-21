@@ -4322,6 +4322,12 @@ local ifla_decode = {
   end
 }
 
+local ifa_decode = {
+  [S.IFA_ADDRESS] = function(ir, buf, len)
+    --print(ir.family, len)
+  end
+}
+
 local nlmsg_data_decode = {
   [S.NLMSG_DONE] = function(r, buf, len) return r end,
   [S.RTM_NEWADDR] = function(r, buf, len)
@@ -4338,7 +4344,14 @@ local nlmsg_data_decode = {
       index = tonumber(addr.ifa_index),
     } -- TODO setmetatable for flags (secondary, permanent)
 
-    -- ifa_decode, add to r
+    while rta_ok(rtattr, len) do
+      if ifa_decode[rtattr.rta_type] then
+        ifa_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
+      end
+      rtattr, buf, len = rta_next(rtattr, buf, len)
+    end
+
+   --  add to r
 
   end,
   [S.RTM_NEWLINK] = function(r, buf, len)
