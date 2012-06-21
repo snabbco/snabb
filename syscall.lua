@@ -4324,7 +4324,13 @@ local ifla_decode = {
 
 local ifa_decode = {
   [S.IFA_ADDRESS] = function(ir, buf, len)
-    --print(ir.family, len)
+    if ir.family == S.AF_INET then
+      ir.addr = t.in_addr()
+      ffi.copy(ir.addr, buf, ffi.sizeof(t.in_addr))
+    elseif ir.family == S.AF_INET6 then
+      ir.addr = t.in6_addr()
+      ffi.copy(ir.addr, buf, ffi.sizeof(t.in6_addr))
+    end
   end
 }
 
