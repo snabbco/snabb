@@ -1605,9 +1605,9 @@ t.buffer = ffi.typeof("char[?]")
 -- misc
 function S.nogc(d) ffi.gc(d, nil) end
 
--- straight passthrough, only needed for real 64 bit quantities. Even files are not 52 bits long yet... not used at present
-local function retint(ret)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+-- straight passthrough, only needed for real 64 bit quantities. Used eg for seek (file might have giant holes!)
+local function ret64(ret)
+  if ret == t.uint64(-1) then return nil, t.error(ffi.errno()) end
   return ret
 end
 
@@ -2377,7 +2377,7 @@ ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
-off_t lseek(int fd, off_t offset, int whence); 
+loff_t llseek(int fd, loff_t offset, int whence);  /* note could use _llseek the syscall instead */
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
 // for sendto and recvfrom use void poointer not const struct sockaddr * to avoid casting
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const void *dest_addr, socklen_t addrlen);
@@ -3147,7 +3147,7 @@ end
 function S.write(fd, buf, count) return retnum(C.write(getfd(fd), buf, count or #buf)) end
 function S.pread(fd, buf, count, offset) return retnum(C.pread(getfd(fd), buf, count, offset)) end
 function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf, count or #buf, offset)) end
-function S.lseek(fd, offset, whence) return retnum(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
+function S.lseek(fd, offset, whence) return ret64(C.llseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), addr, addrlen or ffi.sizeof(addr)))
