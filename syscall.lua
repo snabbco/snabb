@@ -79,7 +79,7 @@ S.S_IROTH = octal('00004')
 S.S_IWOTH = octal('00002')
 S.S_IXOTH = octal('00001')
 
-if ffi.abi('32bit') then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end -- not supported yet
+if ffi.abi('32bit') then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end -- never required
 
 -- access
 S.R_OK = 4
@@ -99,9 +99,9 @@ S.F_SETOWN      = 8
 S.F_GETOWN      = 9
 S.F_SETSIG      = 10
 S.F_GETSIG      = 11
-S.F_GETLK64     = 12      -- 64 on 32 file ops still TODO
-S.F_SETLK64     = 13      -- 64 on 32 file ops still TODO
-S.F_SETLKW64    = 14      -- 64 on 32 file ops still TODO
+S.F_GETLK64     = 12
+S.F_SETLK64     = 13
+S.F_SETLKW64    = 14
 S.F_SETOWN_EX   = 15
 S.F_GETOWN_EX   = 16
 S.F_SETLEASE    = 1024
