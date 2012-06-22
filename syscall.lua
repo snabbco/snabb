@@ -1389,7 +1389,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_stat64           = 195
   S.SYS_lstat64          = 196
   S.SYS_fstat64          = 197
-  S.SYS_getdents64       = 220
+  S.SYS_getdents64       = 217
   S.SYS_io_setup         = 243
   S.SYS_io_destroy       = 244
   S.SYS_io_getevents     = 245
