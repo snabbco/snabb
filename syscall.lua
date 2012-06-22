@@ -2433,6 +2433,8 @@ int fcntl(int fd, int cmd, long arg); /* arg can be a pointer though */
 int fchmod(int fd, mode_t mode);
 int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
+int truncate64(const char *path, loff_t length);
+int ftruncate64(int fd, loff_t length);
 int pause(void);
 int getrlimit(int resource, struct rlimit *rlim);
 int setrlimit(int resource, const struct rlimit *rlim);
@@ -2511,6 +2513,16 @@ int grantpt(int fd);
 int unlockpt(int fd);
 int ptsname_r(int fd, char *buf, size_t buflen);
 ]]
+
+-- use 64 bit fileops on 32 bit always TODO finish
+local C64 = {}
+if ffi.abi("64bit") then
+  C64.truncate = C.truncate
+  C64.ftruncate = C.ftruncate
+else
+  C64.truncate = C.truncate64
+  C64.ftruncate = C.ftruncate64
+end
 
 -- Lua type constructors corresponding to defined types
 t.sa_family = ffi.typeof("sa_family_t")
@@ -2988,9 +3000,10 @@ function S.acct(filename) return retbool(C.acct(filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
-function S.truncate(path, length) return retbool(C.truncate(path, length)) end
-function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 function S.pause() return retbool(C.pause()) end
+
+function S.truncate(path, length) return retbool(C64.truncate(path, length)) end
+function S.ftruncate(fd, length) return retbool(C64.ftruncate(getfd(fd), length)) end
 
 local function accessflags(s) -- allow "rwx"
   if not s then return 0 end
