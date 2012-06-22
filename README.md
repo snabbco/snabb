@@ -133,7 +133,7 @@ faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue,
 capset, capget
-statfs(64), fstatfs
+statfs(64), fstatfs, ustat
 ...
 
 ### 64 bit fileops on 32 bit
