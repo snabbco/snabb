@@ -221,6 +221,11 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_seek_error = function()
+    local s, err = S.lseek(-1, 0, "set")
+    assert(not s, "seek should fail with invalid fd")
+    assert(err.badf, "bad file descriptor")
+  end,
   test_mkdir_rmdir = function()
     assert(S.mkdir(tmpfile, "IRWXU"))
     assert(S.rmdir(tmpfile))
