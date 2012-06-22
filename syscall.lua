@@ -1353,6 +1353,7 @@ if ffi.arch == "x86" then
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
   S.SYS_getdents         = 141
+  S.SYS_getdents64       = 220
   S.SYS_io_setup         = 245
   S.SYS_io_destroy       = 246
   S.SYS_io_getevents     = 247
@@ -1372,6 +1373,7 @@ elseif ffi.arch == "x64" then
   S.SYS_io_getevents     = 208
   S.SYS_io_submit        = 209
   S.SYS_io_cancel        = 210
+  S.SYS_getdents64       = 217
   S.SYS_clock_settime    = 227
   S.SYS_clock_gettime    = 228
   S.SYS_clock_getres     = 229
@@ -1381,6 +1383,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
   S.SYS_getdents         = 141
+  S.SYS_getdents64       = 220
   S.SYS_io_setup         = 243
   S.SYS_io_destroy       = 244
   S.SYS_io_getevents     = 245
@@ -2012,6 +2015,13 @@ struct linux_dirent {
   unsigned short d_reclen;
   char           d_name[256];
 };
+struct linux_dirent64 {
+  uint64_t             d_ino;
+  int64_t              d_off;
+  unsigned short  d_reclen;
+  unsigned char   d_type;
+  char            d_name[0];
+};
 typedef union epoll_data {
   void *ptr;
   int fd;
@@ -2593,6 +2603,7 @@ local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
 local uchar_pt = ffi.typeof("unsigned char *")
 local char_pt = ffi.typeof("char *")
 local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
+local linux_dirent64_pt = ffi.typeof("struct linux_dirent64 *")
 local inotify_event_pt = ffi.typeof("struct inotify_event *")
 
 S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
@@ -3087,13 +3098,12 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   local d = {}
   local ret
   repeat
-    ret = C.syscall(S.SYS_getdents, t.int(getfd(fd)), buf, t.uint(size))
+    ret = C.syscall(S.SYS_getdents64, t.int(getfd(fd)), buf, t.uint(size))
     if ret == -1 then return nil, t.error(ffi.errno()) end
     local i = 0
     while i < ret do
-      local dp = ffi.cast(linux_dirent_pt, buf + i)
-      local type = buf[i + dp.d_reclen - 1] -- see man getdents(2) not named in struct as added later
-      local dd = setmetatable({inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off), type = type}, mt.dents)
+      local dp = ffi.cast(linux_dirent64_pt, buf + i)
+      local dd = setmetatable({inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off), type = tonumber(dp.d_type)}, mt.dents)
       d[ffi.string(dp.d_name)] = dd -- could calculate length
       i = i + dp.d_reclen
     end
