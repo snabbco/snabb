@@ -125,6 +125,7 @@ faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue,
 capset, capget
+statfs(64), fstatfs
 ...
 
 ### 64 bit fileops on 32 bit
@@ -136,8 +137,9 @@ fcntl64(2), ftruncate64(2),getdents64(2), stat64(2), statfs64(2), and their anal
 Note these do not exist on 64 bit archs, so need to choose right one.
 
 ### uid size.
-Check this, may need to fix.
-
 Linux 2.4 increased the size of user and group IDs from 16 to 32 bits.  Tosupport this change, a range of system calls were added (e.g., chown32(2),getuid32(2), getgroups32(2), setresuid32(2)), superseding earlier calls ofthe same name without the "32" suffix.
+
+The glibc wrappers hide this, and call the 32 bit calls anyway, so should be ok.
+
 
 
