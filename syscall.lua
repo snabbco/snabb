@@ -1353,6 +1353,9 @@ if ffi.arch == "x86" then
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
   S.SYS_getdents         = 141
+  S.SYS_stat64           = 195
+  S.SYS_lstat64          = 196
+  S.SYS_fstat64          = 197
   S.SYS_getdents64       = 220
   S.SYS_io_setup         = 245
   S.SYS_io_destroy       = 246
@@ -1383,6 +1386,9 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
   S.SYS_getdents         = 141
+  S.SYS_stat64           = 195
+  S.SYS_lstat64          = 196
+  S.SYS_fstat64          = 197
   S.SYS_getdents64       = 220
   S.SYS_io_setup         = 243
   S.SYS_io_destroy       = 244
@@ -2022,6 +2028,27 @@ struct linux_dirent64 {
   unsigned char   d_type;
   char            d_name[0];
 };
+struct stat64 { /* only for 32 bit architectures */
+  unsigned long long      st_dev;
+  unsigned char   __pad0[4];
+  unsigned long   __st_ino;
+  unsigned int    st_mode;
+  unsigned int    st_nlink;
+  unsigned long   st_uid;
+  unsigned long   st_gid;
+  unsigned long long      st_rdev;
+  unsigned char   __pad3[4];
+  long long       st_size;
+  unsigned long   st_blksize;
+  unsigned long long      st_blocks;
+  unsigned long   st_atime;
+  unsigned long   st_atime_nsec;
+  unsigned long   st_mtime;
+  unsigned int    st_mtime_nsec;
+  unsigned long   st_ctime;
+  unsigned long   st_ctime_nsec;
+  unsigned long long      st_ino;
+};
 typedef union epoll_data {
   void *ptr;
   int fd;
@@ -2164,7 +2191,7 @@ typedef struct siginfo {
 ]]
 
 -- stat structure is architecture dependent in Linux
-
+-- however can remove as will use tsat64 on 32 bit archs
 if ffi.arch == 'x86' then
 ffi.cdef[[
 struct stat {
@@ -2524,14 +2551,23 @@ int unlockpt(int fd);
 int ptsname_r(int fd, char *buf, size_t buflen);
 ]]
 
--- use 64 bit fileops on 32 bit always TODO finish
-local C64 = {}
+-- use 64 bit fileops on 32 bit always
+local C64, stattypename
 if ffi.abi("64bit") then
-  C64.truncate = C.truncate
-  C64.ftruncate = C.ftruncate
+  stattypename = "struct stat"
+  C64 = {
+    truncate = C.truncate,
+    ftruncate = C.ftruncate,
+  }
 else
-  C64.truncate = C.truncate64
-  C64.ftruncate = C.ftruncate64
+  stattypename = "struct stat64"
+  S.SYS_stat = S.SYS_stat64
+  S.SYS_lstat = S.SYS_lstat64
+  S.SYS_fstat = S.SYS_fstat64
+  C64 = {
+    truncate = C.truncate64,
+    ftruncate = C.ftruncate64,
+  }
 end
 
 -- Lua type constructors corresponding to defined types
@@ -2678,7 +2714,7 @@ t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
   end
 })
 
-t.stat = ffi.metatype("struct stat", {
+t.stat = ffi.metatype(stattypename, { -- either struct stat on 64 bit or struct stat64 on 32 bit
   __index = function(st, k)
   local meth = {
     dev = function(st) return tonumber(st.st_dev) end,
@@ -2801,7 +2837,6 @@ print("eq (sizeof(struct msghdr), " .. sizeof(t.msghdr) .. ");")
 print("eq (sizeof(struct cmsghdr), " .. sizeof(S.cmsghdr(0)) .. ");")
 print("eq (sizeof(struct sysinfo), " .. sizeof(S.sysinfo) .. ");")
 ]]
---print(sizeof("struct stat"))
 
 local function getts(ts) -- get a timespec eg from a number
   if not ts then return t.timespec() end
