@@ -141,5 +141,7 @@ Linux 2.4 increased the size of user and group IDs from 16 to 32 bits.  Tosuppor
 
 The glibc wrappers hide this, and call the 32 bit calls anyway, so should be ok.
 
+## file locking
+Some helper functions for fcntl file locking should be added?
 
 
