@@ -335,6 +335,25 @@ test_file_operations = {
   end
 }
 
+test_largefile = {
+  test_seek64 = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local loff = t.loff(2^34)
+    local offset = 2^34 -- should work with Lua numbers up to 56 bits, above that need explicit 64 bit type.
+    local n
+    n = assert(fd:lseek(loff, "set"))
+    assert_equal(n, loff, "seek should position at set position")
+    n = assert(fd:lseek(loff, "cur"))
+    assert_equal(n, loff + loff, "seek should position at set position")
+    n = assert(fd:lseek(offset, "set"))
+    assert_equal(n, offset, "seek should position at set position")
+    n = assert(fd:lseek(offset, "cur"))
+    assert_equal(n, offset + offset, "seek should position at set position")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+}
+
 test_sockets_pipes = {
   test_pipe = function()
     local fd = assert(S.pipe())
