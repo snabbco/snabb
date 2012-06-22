@@ -127,3 +127,17 @@ sigqueue,
 capset, capget
 ...
 
+### 64 bit fileops on 32 bit
+
+Should migrate to these. Should be using SYS\_stat64, should be more consistent than current sys\_stat.
+
+fcntl64(2), ftruncate64(2),getdents64(2), stat64(2), statfs64(2), and their analogs that work with file descriptors or symbolic links. 
+
+Note these do not exist on 64 bit archs, so need to choose right one.
+
+### uid size.
+Check this, may need to fix.
+
+Linux 2.4 increased the size of user and group IDs from 16 to 32 bits.  Tosupport this change, a range of system calls were added (e.g., chown32(2),getuid32(2), getgroups32(2), setresuid32(2)), superseding earlier calls ofthe same name without the "32" suffix.
+
+
