@@ -2028,6 +2028,26 @@ struct linux_dirent64 {
   unsigned char   d_type;
   char            d_name[0];
 };
+struct stat {  /* only used on 64 bit architectures */
+  unsigned long   st_dev;
+  unsigned long   st_ino;
+  unsigned long   st_nlink;
+  unsigned int    st_mode;
+  unsigned int    st_uid;
+  unsigned int    st_gid;
+  unsigned int    __pad0;
+  unsigned long   st_rdev;
+  long            st_size;
+  long            st_blksize;
+  long            st_blocks;
+  unsigned long   st_atime;
+  unsigned long   st_atime_nsec;
+  unsigned long   st_mtime;
+  unsigned long   st_mtime_nsec;
+  unsigned long   st_ctime;
+  unsigned long   st_ctime_nsec;
+  long            __unused[3];
+};
 struct stat64 { /* only for 32 bit architectures */
   unsigned long long      st_dev;
   unsigned char   __pad0[4];
@@ -2189,106 +2209,6 @@ typedef struct siginfo {
   } sifields;
 } siginfo_t;
 ]]
-
--- stat structure is architecture dependent in Linux
--- however can remove as will use tsat64 on 32 bit archs
-if ffi.arch == 'x86' then
-ffi.cdef[[
-struct stat {
-  unsigned long  st_dev;
-  unsigned long  st_ino;
-  unsigned short st_mode;
-  unsigned short st_nlink;
-  unsigned short st_uid;
-  unsigned short st_gid;
-  unsigned long  st_rdev;
-  unsigned long  st_size;
-  unsigned long  st_blksize;
-  unsigned long  st_blocks;
-  unsigned long  st_atime;
-  unsigned long  st_atime_nsec;
-  unsigned long  st_mtime;
-  unsigned long  st_mtime_nsec;
-  unsigned long  st_ctime;
-  unsigned long  st_ctime_nsec;
-  unsigned long  __unused4;
-  unsigned long  __unused5;
-};
-]]
-elseif ffi.arch == 'x64' then
-ffi.cdef [[
-struct stat {
-  unsigned long   st_dev;
-  unsigned long   st_ino;
-  unsigned long   st_nlink;
-  unsigned int    st_mode;
-  unsigned int    st_uid;
-  unsigned int    st_gid;
-  unsigned int    __pad0;
-  unsigned long   st_rdev;
-  long            st_size;
-  long            st_blksize;
-  long            st_blocks;
-  unsigned long   st_atime;
-  unsigned long   st_atime_nsec;
-  unsigned long   st_mtime;
-  unsigned long   st_mtime_nsec;
-  unsigned long   st_ctime;
-  unsigned long   st_ctime_nsec;
-  long            __unused[3];
-};
-]]
-elseif ffi.arch == 'arm' then
-  if ffi.abi("le") then
-    ffi.cdef [[
-      struct stat {
-        unsigned long  st_dev;
-        unsigned long  st_ino;
-        unsigned short st_mode;
-        unsigned short st_nlink;
-        unsigned short st_uid;
-        unsigned short st_gid;
-        unsigned long  st_rdev;
-        unsigned long  st_size;
-        unsigned long  st_blksize;
-        unsigned long  st_blocks;
-        unsigned long  st_atime;
-        unsigned long  st_atime_nsec;
-        unsigned long  st_mtime;
-        unsigned long  st_mtime_nsec;
-        unsigned long  st_ctime;
-        unsigned long  st_ctime_nsec;
-        unsigned long  __unused4;
-        unsigned long  __unused5;
-      };
-    ]]
-  else
-    ffi.cdef [[
-      struct stat {
-        unsigned long  st_dev;
-        unsigned short __pad1;
-        unsigned long  st_ino;
-        unsigned short st_mode;
-        unsigned short st_nlink;
-        unsigned short st_uid;
-        unsigned short st_gid;
-        unsigned long  st_rdev;
-        unsigned short __pad2;
-        unsigned long  st_size;
-        unsigned long  st_blksize;
-        unsigned long  st_blocks;
-        unsigned long  st_atime;
-        unsigned long  st_atime_nsec;
-        unsigned long  st_mtime;
-        unsigned long  st_mtime_nsec;
-        unsigned long  st_ctime;
-        unsigned long  st_ctime_nsec;
-        unsigned long  __unused4;
-        unsigned long  __unused5;
-      };
-    ]]  
-  end
-end
 
 -- epoll packed on x86_64 only (so same as x86)
 if ffi.arch == "x64" then
