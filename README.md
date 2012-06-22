@@ -30,7 +30,7 @@ Some work on the netlink API now included, in particular some bridge code and a 
 
 The aim is to implement the Linux kernel interfaces. This includes the system calls, the most obvious API, but also all the other parts: netlink communication used for configuring network interfaces and similar (started, but most still to do), and the ioctl based interfaces, of which the termios and pty interfaces have been done so far, thanks to [bdowning](https://github.com/bdowning). The aim is to provide helpers that look more familiar than the native interfaces for the complex stuff.
 
-Current roadmap priorities: 64 bit files on 32 bit to be completed, write interface for network interfaces. Please let me know if you want other stuff though.
+Current roadmap priorities: write interface for network interfaces. Please let me know if you want other stuff though.
 
 ## Note on libc
 
@@ -73,8 +73,6 @@ File descriptors are returned as a type not an integer. This is because they are
 String conversions are not done automatically, you get a buffer back, you have to force a conversion. This is because interning strings is expensive if you do not need it. However if you do not supply a buffer for the return value, you will get a string in general as more useful.
 
 Many functions that return structs return metatypes exposing additional methods, so you get the raw values eg `st_size` and a Lua number as `size`, and possibly some extra helpful methods, like `major` and `minor` from stat. As these are metamethods they have no overhead, so more can be added to make the interfaces easier to use.
-
-Not yet supporting the 64 bit file operations for 32 bit architectures (lseek64 etc).
 
 Constants should all be available, eg `L.SEEK_SET` etc. You can add to combine them. They are also available as strings, so "SEEK\_SET" will be converted to S.SEEK\_SET. You can miss off the "SEEK\_" prefix, and they are not case sensitive, so you can just use `fd:lseek(offset, "set")` for more concise and readable use. If multiple flags are allowed, they can be comma separated for logical OR, such as `S.mmap(nil, size, "read", "private, anonymous", -1, 0)`.
 
@@ -138,11 +136,10 @@ statfs(64), fstatfs, ustat
 
 ### 64 bit fileops on 32 bit
 
-Migration to these in process. Note that fcntl64 has not been changed, as we have not defined the flock structure which is the change, and it is wrapped by glibc.
+These now work and have tests, the 64 bit operations are always used on 32 bit architectures.
 
-Should always be using SYS\_stat64, should be more consistent than current sys\_stat.
-
-TODO: fcntl64(2), stat64(2), statfs64(2), and the stat variants
+Note that fcntl64 has not been changed, as we have not defined the flock structure which is the change, and it is wrapped by glibc.
+TODO: fcntl64(2), statfs64(2).
 
 ### uid size.
 Linux 2.4 increased the size of user and group IDs from 16 to 32 bits.  Tosupport this change, a range of system calls were added (e.g., chown32(2),getuid32(2), getgroups32(2), setresuid32(2)), superseding earlier calls ofthe same name without the "32" suffix.
