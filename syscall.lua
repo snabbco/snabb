@@ -4291,19 +4291,31 @@ local rta_next = function(msg, buf, len)
   return ffi.cast(rtattr_pt, buf + inc), buf + inc, len - inc
 end
 
+local addrlenmap = { -- map interface type to length of hardware address
+  [S.ARPHRD_ETHER] = 6,
+  [S.ARPHRD_EETHER] = 6,
+  [S.ARPHRD_LOOPBACK] = 6,
+}
+
 local ifla_decode = {
   [S.IFLA_IFNAME] = function(ir, buf, len)
     ir.name = ffi.string(buf)
   end,
   [S.IFLA_ADDRESS] = function(ir, buf, len)
-    ir.addrlen = #ffi.string(buf) -- always appears to be zero terminated so ok. could check no longer than len
-    ir.macaddr = t.macaddr()
-    ffi.copy(ir.macaddr, buf, ir.addrlen)
+    local addrlen = addrlenmap[ir.type]
+    if (addrlen) then
+      ir.addrlen = addrlen
+      ir.macaddr = t.macaddr()
+      ffi.copy(ir.macaddr, buf, addrlen)
+    end
   end,
   [S.IFLA_BROADCAST] = function(ir, buf, len)
-    ir.braddrlen = #ffi.string(buf) -- always appears to be zero terminated so ok. could check no longer than len
-    ir.broadcast = t.macaddr()
-    ffi.copy(ir.broadcast, buf, ir.addrlen)
+    local addrlen = addrlenmap[ir.type]
+    if (addrlen) then
+      ir.braddrlen = addrlen
+      ir.broadcast = t.macaddr()
+      ffi.copy(ir.broadcast, buf, addrlen)
+    end
   end,
   [S.IFLA_MTU] = function(ir, buf, len)
     local u = ffi.cast(uint_pt, buf)
