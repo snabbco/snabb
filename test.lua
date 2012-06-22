@@ -352,13 +352,20 @@ test_largefile = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_ftruncate64 = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local offset = 2^35
+    assert(fd:truncate(offset), "64 bit ftruncate should be ok")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
   test_truncate64 = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     local offset = 2^35
-    assert(fd:truncate(offset), "64 bit truncate should be ok")
+    assert(S.truncate(tmpfile, offset), "64 bit truncate should be ok")
     assert(S.unlink(tmpfile))
     assert(fd:close())
-  end
+  end,
 }
 
 test_sockets_pipes = {
