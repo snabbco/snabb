@@ -24,11 +24,19 @@ Reworking the test script, it is a copy of my fork of [luaunit](https://github.c
 
 Unfinished! Some syscalls missing, work in progress! The majority of calls are now there, let me know if you need some that is not.
 
-No support for 64 bit file operations on a 32 bit system yet.
+Some work on the netlink API now included, in particular some bridge code and a lot of the code for reading network interfaces.
 
 ## What will be implemented?
 
 The aim is to implement the Linux kernel interfaces. This includes the system calls, the most obvious API, but also all the other parts: netlink communication used for configuring network interfaces and similar (started, but most still to do), and the ioctl based interfaces, of which the termios and pty interfaces have been done so far, thanks to [bdowning](https://github.com/bdowning). The aim is to provide helpers that look more familiar than the native interfaces for the complex stuff.
+
+Current roadmap priorities: 64 bit files on 32 bit to be completed, write interface for network interfaces. Please let me know if you want other stuff though.
+
+## Note on libc
+
+Lots of system calls have glibc wrappers, some of these are trivial some less so. In particular some of them expose different ABIs, so we try to avoid, just using kernel ABIs as these have long term support.
+
+Currently I have done little testing on other C libraries that will help iron out these differences, but I intend to support at least uclibc and Musl eventually, which should help remove any glibc-isms.
 
 ## Note on man(3)
 
@@ -134,7 +142,7 @@ Migration to these in process. Note that fcntl64 has not been changed, as we hav
 
 Should always be using SYS\_stat64, should be more consistent than current sys\_stat.
 
-fcntl64(2), ftruncate64(2),getdents64(2), stat64(2), statfs64(2), and their analogs that work with file descriptors or symbolic links. 
+TODO: fcntl64(2), stat64(2), statfs64(2), and the stat variants
 
 ### uid size.
 Linux 2.4 increased the size of user and group IDs from 16 to 32 bits.  Tosupport this change, a range of system calls were added (e.g., chown32(2),getuid32(2), getgroups32(2), setresuid32(2)), superseding earlier calls ofthe same name without the "32" suffix.
