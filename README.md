@@ -149,5 +149,7 @@ The glibc wrappers hide this, and call the 32 bit calls anyway, so should be ok.
 ## fcntl
 Some helper functions for fcntl features such as file locking should be added?
 
+## sysctl
+Need a trivial sysctl wrapper (write to /proc/sys)
 
 
