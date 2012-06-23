@@ -2531,7 +2531,6 @@ local off1_t = ffi.typeof("off_t[1]")
 local loff_1t = ffi.typeof("loff_t[1]")
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
-local iovecs_t = ffi.typeof("struct iovec[?]")
 local iocbs_pt = ffi.typeof("struct iocb *[?]")
 
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
@@ -2745,18 +2744,31 @@ t.itimerval = ffi.metatype("struct itimerval", {
   end
 })
 
---[[ -- used to generate tests, will refactor into test code later
-print("eq (sizeof(struct timespec), " .. sizeof(t.timespec) .. ");")
-print("eq (sizeof(struct timeval), " .. sizeof(t.timeval) .. ");")
-print("eq (sizeof(struct sockaddr_storage), " .. sizeof(t.sockaddr_storage) .. ");")
-print("eq (sizeof(struct sockaddr_in), " .. sizeof(t.sockaddr_in) .. ");")
-print("eq (sizeof(struct sockaddr_in6), " .. sizeof(t.sockaddr_in6) .. ");")
-print("eq (sizeof(struct sockaddr_un), " .. sizeof(t.sockaddr_un) .. ");")
-print("eq (sizeof(struct iovec), " .. sizeof(t.iovec(1)) .. ");")
-print("eq (sizeof(struct msghdr), " .. sizeof(t.msghdr) .. ");")
-print("eq (sizeof(struct cmsghdr), " .. sizeof(S.cmsghdr(0)) .. ");")
-print("eq (sizeof(struct sysinfo), " .. sizeof(S.sysinfo) .. ");")
-]]
+mt.iovecs = {
+  __new = function(tp, is)
+    if type(is) == 'number' then return ffi.new(t.iovecs, is, is) end
+    local count = #is
+    local iov = ffi.new(t.iovecs, count, count)
+    for n = 0, count - 1 do
+      local i = is[n + 1]
+      if type(i) == 'string' then
+        local buf = t.buffer(#i)
+        ffi.copy(buf, i, #i)
+        iov.iov[n].iov_base = buf
+        iov.iov[n].iov_len = #i
+      elseif type(i) == 'number' then
+        iov.iov[n].iov_base = t.buffer(i)
+        iov.iov[n].iov_len = i
+      else
+        local j = t.iovec(i) -- allows initializers
+        ffi.copy(iov.iov[n], j, ffi.sizeof(t.iovec))
+      end
+    end
+    return iov
+  end
+}
+
+t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs)
 
 local function getts(ts) -- get a timespec eg from a number
   if not ts then return t.timespec() end
@@ -3118,33 +3130,19 @@ function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), addr, addrlen or ffi.sizeof(addr)))
 end
 
--- cant see how could use ffi __new to do this because of needing length
-function S.iovec(iov, iovcnt) -- helper to construct iovecs, both for read and write TODO more tests
-  if not iov then iov = {} end
-  if type(iov) ~= 'table' then return iov, iovcnt end
-  if not iovcnt then iovcnt = #iov end
-  local tt = iov
-  iov = iovecs_t(iovcnt)
-  for n = 0, iovcnt - 1 do -- slightly more complex than luajit initializers
-    i = tt[n + 1]
-    if type(i) == 'string' then
-      iov[n].iov_base = i
-      iov[n].iov_len = #i
-    elseif type(i) == 'number' then
-      iov[n].iov_base = t.buffer(i)
-      iov[n].iov_len = i
-    else
-      local j = t.iovec(i) -- allows initializers
-      ffi.copy(iov[n], j, ffi.sizeof(t.iovec))
-    end
-  end
-  return iov, iovcnt
+local function getiov(iov)
+  if ffi.istype(t.iovecs, iov) then return iov end
+  return t.iovecs(iov)
+ end
+
+function S.readv(fd, iov)
+  iov = getiov(iov)
+  return retnum(C.readv(getfd(fd), iov.iov, iov.count))
 end
 
-function S.readv(fd, iov, iovcnt) return retnum(C.readv(getfd(fd), iov, iovcnt)) end
-function S.writev(fd, iov, iovcnt)
-  iov, iovcnt = S.iovec(iov, iovcnt)
-  return retnum(C.writev(getfd(fd), iov, iovcnt))
+function S.writev(fd, iov)
+  iov = getiov(iov)
+  return retnum(C.writev(getfd(fd), iov.iov, iov.count))
 end
 
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
@@ -3733,8 +3731,9 @@ function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
   return retnum(C.splice(getfd(fd_in), offin, getfd(fd_out), offout, len, stringflags(flags, "SPLICE_F_")))
 end
 
-function S.vmsplice(fd, iov, nr_segs, flags)
-  return retnum(C.vmsplice(getfd(fd), iov, nr_segs, stringflags(flags, "SPLICE_F_")))
+function S.vmsplice(fd, iov, flags)
+  iov = getiov(iov)
+  return retnum(C.vmsplice(getfd(fd), iov.iov, iov.count, stringflags(flags, "SPLICE_F_")))
 end
 
 function S.tee(fd_in, fd_out, len, flags)
@@ -4387,8 +4386,8 @@ local nlmsg_data_decode = {
 function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
   local bufsize = 8192
   local reply = t.buffer(bufsize)
-  local ior = iovecs_t(1, {{reply, bufsize}})
-  local m = t.msghdr{msg_iov = ior, msg_iovlen = 1, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
+  local ior = t.iovecs{{reply, bufsize}}
+  local m = t.msghdr{msg_iov = ior.iov, msg_iovlen = ior.count, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
 
   local done = false -- what should we do if we get a done message but there is some extra buffer? could be next message...
   local r = {}
@@ -4419,7 +4418,6 @@ end
 
 -- read addresses on interfaces. see also notes in get_interfaces, should reuse code as mostly duplicated!
 function S.getaddr(af)
-  af = stringflag(af, "AF_")
   local s, err = S.socket("netlink", "raw", "route")
   if not s then return nil, err end
   local a = t.sockaddr_nl() -- kernel will fill in address
@@ -4435,15 +4433,16 @@ function S.getaddr(af)
   hdr.nlmsg_seq = 1          -- we should attach a sequence number to the file descriptor and use this
   hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
 
-  ifaddr.ifa_family = af
+  ifaddr.ifa_family = stringflag(af, "AF_")
 
-  local ios = iovecs_t(1, {{buf, len}})
-  local m = t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = ffi.sizeof(k)}
+  local ios = t.iovecs{{buf, len}}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = ios.count, msg_name = k, msg_namelen = ffi.sizeof(k)}
 
   local n, err = s:sendmsg(m)
   if not n then return nil, err end 
 
   local i = S.nlmsg_read(s, k)
+
   local ok, err = s:close()
   if not ok then return nil, err end
 
@@ -4470,8 +4469,8 @@ function S.get_interfaces()
   hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
   gen.rtgen_family = S.AF_PACKET
 
-  local ios = iovecs_t(1, {{buf, len}})
-  local m = t.msghdr{msg_iov = ios, msg_iovlen = 1, msg_name = k, msg_namelen = ffi.sizeof(k)}
+  local ios = t.iovecs{{buf, len}}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = ios.count, msg_name = k, msg_namelen = ffi.sizeof(k)}
 
   local n, err = s:sendmsg(m)
   if not n then return nil, err end 
@@ -4486,8 +4485,8 @@ end
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
     local buf1 = t.buffer(1)
-    local io = iovecs_t(1, {{buf1, 1}})
-    msg = t.msghdr{msg_iov = io, msg_iovlen = 1}
+    local io = t.iovecs{{buf1, 1}}
+    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = io.count}
   end
   return retbool(C.sendmsg(getfd(fd), msg, stringflags(flags, "MSG_")))
 end
@@ -4496,10 +4495,10 @@ end
 function S.recvmsg(fd, msg, flags)
   if not msg then 
     local buf1 = t.buffer(1) -- assume user wants to receive single byte to get cmsg
-    local io = iovecs_t(1, {{buf1, 1}})
+    local io = t.iovecs{{buf1, 1}}
     local bufsize = 1024 -- sane default, build your own structure otherwise
     local buf = t.buffer(bufsize)
-    msg = t.msghdr{msg_iov = io, msg_iovlen = 1, msg_control = buf, msg_controllen = bufsize}
+    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = io.count, msg_control = buf, msg_controllen = bufsize}
   end
   local ret = C.recvmsg(getfd(fd), msg, stringflags(flags, "MSG_"))
   if ret == -1 then return nil, t.error(ffi.errno()) end
@@ -4534,17 +4533,14 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   ucred.uid = uid
   ucred.gid = gid
   local buf1 = t.buffer(1) -- need to send one byte
-  local io = iovecs_t(1)
-  io[0].iov_base = buf1
-  io[0].iov_len = 1
-  local iolen = 1
+  local io = t.iovecs{{buf1, 1}}
   local usize = ffi.sizeof(t.ucred)
   local bufsize = cmsg_space(usize)
   local buflen = cmsg_len(usize)
   local buf = t.buffer(bufsize) -- this is our cmsg buffer
   local msg = t.msghdr() -- assume socket connected and so does not need address
-  msg.msg_iov = io
-  msg.msg_iovlen = iolen
+  msg.msg_iov = io.iov
+  msg.msg_iovlen = io.count
   msg.msg_control = buf
   msg.msg_controllen = bufsize
   local mc, cmsg = cmsg_firsthdr(msg)
@@ -4558,10 +4554,7 @@ end
 
 function S.sendfds(fd, ...)
   local buf1 = t.buffer(1) -- need to send one byte
-  local io = iovecs_t(1)
-  io[0].iov_base = buf1
-  io[0].iov_len = 1
-  local iolen = 1
+  local io = t.iovecs{{buf1, 1}}
   local fds = {}
   for i, v in ipairs{...} do fds[i] = getfd(v) end
   local fa = ints_t(#fds, fds)
@@ -4570,8 +4563,8 @@ function S.sendfds(fd, ...)
   local buflen = cmsg_len(fasize)
   local buf = t.buffer(bufsize) -- this is our cmsg buffer
   local msg = t.msghdr() -- assume socket connected and so does not need address
-  msg.msg_iov = io
-  msg.msg_iovlen = iolen
+  msg.msg_iov = io.iov
+  msg.msg_iovlen = io.count
   msg.msg_control = buf
   msg.msg_controllen = bufsize
   local mc, cmsg = cmsg_firsthdr(msg)
