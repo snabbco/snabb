@@ -2745,23 +2745,29 @@ t.itimerval = ffi.metatype("struct itimerval", {
 })
 
 mt.iovecs = {
+  __index = function(io, k)
+    return io.iov[k - 1]
+  end,
+  __newindex = function(io, k, v)
+    if not ffi.istype(t.iovec, v) then v = t.iovec(v) end
+    ffi.copy(io.iov[k - 1], v, ffi.sizeof(t.iovec))
+  end,
   __new = function(tp, is)
     if type(is) == 'number' then return ffi.new(t.iovecs, is, is) end
     local count = #is
     local iov = ffi.new(t.iovecs, count, count)
-    for n = 0, count - 1 do
-      local i = is[n + 1]
+    for n = 1, count do
+      local i = is[n]
       if type(i) == 'string' then
         local buf = t.buffer(#i)
         ffi.copy(buf, i, #i)
-        iov.iov[n].iov_base = buf
-        iov.iov[n].iov_len = #i
+        iov[n].iov_base = buf
+        iov[n].iov_len = #i
       elseif type(i) == 'number' then
-        iov.iov[n].iov_base = t.buffer(i)
-        iov.iov[n].iov_len = i
+        iov[n].iov_base = t.buffer(i)
+        iov[n].iov_len = i
       else
-        local j = t.iovec(i) -- allows initializers
-        ffi.copy(iov.iov[n], j, ffi.sizeof(t.iovec))
+        iov[n] = i
       end
     end
     return iov
