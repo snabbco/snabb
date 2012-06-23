@@ -905,7 +905,7 @@ test_proc = {
   test_proc_init = function()
     local p = S.proc(1)
     assert(p and p.cmdline, "expect init to have cmdline")
-    assert_equal(p.cmdline, "/sbin/init", "expect /sbin/init to be process 1 usually")
+    assert(p.cmdline:find("init"), "expect init to be process 1 usually")
   end,
   test_ps = function()
     local ps = S.ps()
@@ -913,7 +913,7 @@ test_proc = {
     local found = false
     for i = 1, #ps do
       if ps[i].pid == 1 then
-        assert_equal(ps[i].cmdline, "/sbin/init", "expect /sbin/init to be process 1 usually")
+        assert(ps[i].cmdline:find("init"), "expect init to be process 1 usually")
       end
       if ps[i].pid == me then found = true end
     end

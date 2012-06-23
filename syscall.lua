@@ -1389,7 +1389,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_stat64           = 195
   S.SYS_lstat64          = 196
   S.SYS_fstat64          = 197
-  S.SYS_getdents64       = 220
+  S.SYS_getdents64       = 217
   S.SYS_io_setup         = 243
   S.SYS_io_destroy       = 244
   S.SYS_io_getevents     = 245
@@ -2332,8 +2332,8 @@ int timerfd_gettime(int fd, struct itimerspec *curr_value);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
-ssize_t pread(int fd, void *buf, size_t count, off_t offset);
-ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
+ssize_t pread64(int fd, void *buf, size_t count, loff_t offset);
+ssize_t pwrite64(int fd, const void *buf, size_t count, loff_t offset);
 loff_t llseek(int fd, loff_t offset, int whence);  /* note could use _llseek the syscall instead */
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
 // for sendto and recvfrom use void poointer not const struct sockaddr * to avoid casting
@@ -3122,8 +3122,8 @@ function S.read(fd, buf, count)
 end
 
 function S.write(fd, buf, count) return retnum(C.write(getfd(fd), buf, count or #buf)) end
-function S.pread(fd, buf, count, offset) return retnum(C.pread(getfd(fd), buf, count, offset)) end
-function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf, count or #buf, offset)) end
+function S.pread(fd, buf, count, offset) return retnum(C.pread64(getfd(fd), buf, count, offset)) end
+function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite64(getfd(fd), buf, count or #buf, offset)) end
 function S.lseek(fd, offset, whence) return ret64(C.llseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
