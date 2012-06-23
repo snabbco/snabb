@@ -2752,6 +2752,7 @@ mt.iovecs = {
     if not ffi.istype(t.iovec, v) then v = t.iovec(v) end
     ffi.copy(io.iov[k - 1], v, ffi.sizeof(t.iovec))
   end,
+  __len = function(io) return io.count end,
   __new = function(tp, is)
     if type(is) == 'number' then return ffi.new(t.iovecs, is, is) end
     local count = #is
@@ -3143,12 +3144,12 @@ local function getiov(iov)
 
 function S.readv(fd, iov)
   iov = getiov(iov)
-  return retnum(C.readv(getfd(fd), iov.iov, iov.count))
+  return retnum(C.readv(getfd(fd), iov.iov, #iov))
 end
 
 function S.writev(fd, iov)
   iov = getiov(iov)
-  return retnum(C.writev(getfd(fd), iov.iov, iov.count))
+  return retnum(C.writev(getfd(fd), iov.iov, #iov))
 end
 
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
@@ -3739,7 +3740,7 @@ end
 
 function S.vmsplice(fd, iov, flags)
   iov = getiov(iov)
-  return retnum(C.vmsplice(getfd(fd), iov.iov, iov.count, stringflags(flags, "SPLICE_F_")))
+  return retnum(C.vmsplice(getfd(fd), iov.iov, #iov, stringflags(flags, "SPLICE_F_")))
 end
 
 function S.tee(fd_in, fd_out, len, flags)
@@ -4393,7 +4394,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
   local bufsize = 8192
   local reply = t.buffer(bufsize)
   local ior = t.iovecs{{reply, bufsize}}
-  local m = t.msghdr{msg_iov = ior.iov, msg_iovlen = ior.count, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
+  local m = t.msghdr{msg_iov = ior.iov, msg_iovlen = #ior, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
 
   local done = false -- what should we do if we get a done message but there is some extra buffer? could be next message...
   local r = {}
@@ -4442,7 +4443,7 @@ function S.getaddr(af)
   ifaddr.ifa_family = stringflag(af, "AF_")
 
   local ios = t.iovecs{{buf, len}}
-  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = ios.count, msg_name = k, msg_namelen = ffi.sizeof(k)}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = ffi.sizeof(k)}
 
   local n, err = s:sendmsg(m)
   if not n then return nil, err end 
@@ -4476,7 +4477,7 @@ function S.get_interfaces()
   gen.rtgen_family = S.AF_PACKET
 
   local ios = t.iovecs{{buf, len}}
-  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = ios.count, msg_name = k, msg_namelen = ffi.sizeof(k)}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = ffi.sizeof(k)}
 
   local n, err = s:sendmsg(m)
   if not n then return nil, err end 
@@ -4492,7 +4493,7 @@ function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
     local buf1 = t.buffer(1)
     local io = t.iovecs{{buf1, 1}}
-    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = io.count}
+    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io}
   end
   return retbool(C.sendmsg(getfd(fd), msg, stringflags(flags, "MSG_")))
 end
@@ -4504,7 +4505,7 @@ function S.recvmsg(fd, msg, flags)
     local io = t.iovecs{{buf1, 1}}
     local bufsize = 1024 -- sane default, build your own structure otherwise
     local buf = t.buffer(bufsize)
-    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = io.count, msg_control = buf, msg_controllen = bufsize}
+    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io, msg_control = buf, msg_controllen = bufsize}
   end
   local ret = C.recvmsg(getfd(fd), msg, stringflags(flags, "MSG_"))
   if ret == -1 then return nil, t.error(ffi.errno()) end
@@ -4546,7 +4547,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   local buf = t.buffer(bufsize) -- this is our cmsg buffer
   local msg = t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io.iov
-  msg.msg_iovlen = io.count
+  msg.msg_iovlen = #io
   msg.msg_control = buf
   msg.msg_controllen = bufsize
   local mc, cmsg = cmsg_firsthdr(msg)
@@ -4570,7 +4571,7 @@ function S.sendfds(fd, ...)
   local buf = t.buffer(bufsize) -- this is our cmsg buffer
   local msg = t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io.iov
-  msg.msg_iovlen = io.count
+  msg.msg_iovlen = #io
   msg.msg_control = buf
   msg.msg_controllen = bufsize
   local mc, cmsg = cmsg_firsthdr(msg)
