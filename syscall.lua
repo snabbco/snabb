@@ -944,14 +944,6 @@ S.ARPHRD_CAIF     = 822
 S.ARPHRD_VOID     = 0xFFFF
 S.ARPHRD_NONE     = 0xFFFE
 
-mt.arphrd = {
-  __index = function(t, k)
-    local prefix = "ARPHRD_"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return t.type == S[k]
-  end
-}
-
 -- eventfd
 S.EFD_SEMAPHORE = 1
 S.EFD_CLOEXEC = octal("02000000")
@@ -4354,6 +4346,22 @@ local ifa_decode = {
   end
 }
 
+mt.link = {
+  __index = function(t, k)
+    local meth = {
+      family = function(t) return tonumber(t.ifinfo.ifi_family) end,
+      type = function(t) return tonumber(t.ifinfo.ifi_type) end,
+      index = function(t) return tonumber(t.ifinfo.ifi_index) end,
+      flags = function(t) return setmetatable({flags = t.ifinfo.ifi_flags}, mt.iff) end,
+      change = function(t) return tonumber(t.ifinfo.ifi_change) end
+    }
+    if meth[k] then return meth[k](t) end
+    local prefix = "ARPHRD_"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return t.ifinfo.ifi_type == S[k]
+  end
+}
+
 local nlmsg_data_decode = {
   [S.NLMSG_DONE] = function(r, buf, len) return r end,
   [S.RTM_NEWADDR] = function(r, buf, len)
@@ -4385,13 +4393,8 @@ local nlmsg_data_decode = {
     buf = buf + nlmsg_align(ffi.sizeof(t.ifinfomsg))
     len = len - nlmsg_align(ffi.sizeof(t.ifinfomsg))
     local rtattr = ffi.cast(rtattr_pt, buf)
-    local ir = setmetatable({ -- interface details
-      family = tonumber(iface.ifi_family),
-      type = tonumber(iface.ifi_type),
-      index = tonumber(iface.ifi_index),
-      flags = setmetatable({flags = iface.ifi_flags}, mt.iff),
-      change = tonumber(iface.ifi_change)
-    }, mt.arphrd)
+    local ir = setmetatable({ifinfo = t.ifinfomsg()}, mt.link)
+    ffi.copy(ir.ifinfo, iface, ffi.sizeof(t.ifinfomsg))
 
     while rta_ok(rtattr, len) do
       if ifla_decode[rtattr.rta_type] then
