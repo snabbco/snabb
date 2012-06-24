@@ -806,14 +806,6 @@ S.IFF_LOWER_UP   = 0x10000
 S.IFF_DORMANT    = 0x20000
 S.IFF_ECHO       = 0x40000
 
-mt.iff = {
-  __index = function(t, k)
-    local prefix = "IFF_"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.flags, S[k]) ~= 0
-  end
-}
-
 S.IFF_SLAVE_NEEDARP = 0x40
 S.IFF_ISATAP        = 0x80
 S.IFF_MASTER_ARPMON = 0x100
@@ -4346,13 +4338,21 @@ local ifa_decode = {
   end
 }
 
+mt.iff = {
+  __index = function(t, k)
+    local prefix = "IFF_"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.flags, S[k]) ~= 0
+  end
+}
+
 mt.link = {
   __index = function(t, k)
     local meth = {
       family = function(t) return tonumber(t.ifinfo.ifi_family) end,
       type = function(t) return tonumber(t.ifinfo.ifi_type) end,
       index = function(t) return tonumber(t.ifinfo.ifi_index) end,
-      flags = function(t) return setmetatable({flags = t.ifinfo.ifi_flags}, mt.iff) end,
+      flags = function(t) return setmetatable({flags = tonumber(t.ifinfo.ifi_flags)}, mt.iff) end,
       change = function(t) return tonumber(t.ifinfo.ifi_change) end
     }
     if meth[k] then return meth[k](t) end
