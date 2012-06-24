@@ -2783,6 +2783,14 @@ t.timeval = ffi.metatype("struct timeval", {
     nsec = function(tv) return tonumber(tv.tv_usec) end
   }
   return meth[k](tv)
+  end,
+  __new = function(tp, v)
+    if not v then v = {0, 0} end
+    if type(v) == "number" then
+      local i, f = math.modf(v)
+      v = {i, math.floor(f * 1000000)}
+    end
+    return ffi.new(t.timeval, v)
   end
 })
 
@@ -2794,6 +2802,14 @@ t.timespec = ffi.metatype("struct timespec", {
     nsec = function(tv) return tonumber(tv.tv_nsec) end
   }
   return meth[k](tv)
+  end,
+  __new = function(tp, v)
+    if not v then v = {0, 0} end
+    if type(v) == "number" then
+      local i, f = math.modf(v)
+      v = {i, math.floor(f * 1000000000)}
+    end
+    return ffi.new(t.timespec, v)
   end
 })
 
@@ -2872,23 +2888,6 @@ mt.pollfds = {
 }
 
 t.pollfds = ffi.metatype("struct { int count; struct pollfd pfd[?];}", mt.pollfds)
-
-local function getts(ts) -- get a timespec eg from a number
-  if not ts then return t.timespec() end
-  if ffi.istype(t.timespec, ts) then return ts end
-  if type(ts) == "table" then return t.timespec(ts) end
-  local i, f = math.modf(ts)
-  return t.timespec(i, math.floor(f * 1000000000))
-end
-
-local function gettv(tv) 
-  if not tv then return t.timeval() end
-  if ffi.istype(t.timeval, tv) then return tv end
-  if type(tv) == "table" then return t.timeval(tv) end
-  local i, f = math.modf(tv)
-  return t.timeval(i, math.floor(f * 1000000))
-end
-
 
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
@@ -3088,7 +3087,6 @@ function S.syscall(num, ...)
   return ret
 end
 
--- do not export?
 function S.ioctl(d, request, argp)
   local ret = C.ioctl(d, request, argp)
   if ret == -1 then return nil, t.error(ffi.errno()) end
@@ -3098,6 +3096,7 @@ end
 
 function S.reboot(cmd) return retbool(C.reboot(stringflag(cmd, "LINUX_REBOOT_CMD_"))) end
 
+-- ffi metatype on linux_dirent?
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
   if not buf then
     size = size or 4096
@@ -3119,8 +3118,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   return d
 end
 
-local retwait
-function retwait(ret, status)
+local function retwait(ret, status)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   local w = {pid = ret, status = status}
   local WTERMSIG = bit.band(status, 0x7f)
@@ -3254,7 +3252,7 @@ function S.getcwd()
 end
 
 function S.nanosleep(req)
-  req = getts(req)
+  if not ffi.istype(t.timespec, req) then req = t.timespec(req) end
   local rem = t.timespec()
   local ret = C.nanosleep(req, rem)
   if ret == -1 then return nil, t.error(ffi.errno()) end
@@ -3633,6 +3631,7 @@ function S.signalfd(set, flags, fd) -- note different order of args, as fd usual
   return retfd(C.signalfd(getfd(fd) or -1, mksigset(set), stringflags(flags, "SFD_")))
 end
 
+-- TODO convert to metatype?
 function S.select(s) -- note same structure as returned
   local r, w, e
   local nfds = 0
@@ -3843,7 +3842,9 @@ end
 
 local function getitimerval(interval, value)
   if ffi.istype(t.itimerval, interval) then return interval end
-  return t.itimerval(gettv(interval), gettv(value))
+  if not ffi.istype(t.timeval, interval) then interval = t.timeval(interval) end
+  if not ffi.istype(t.timeval, value) then value = t.timeval(value) end
+  return t.itimerval(interval, value)
 end
 
 -- in this case we do return a table as we want the metamethods on the timevals
@@ -3877,9 +3878,12 @@ function S.timerfd_create(clockid, flags)
   return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
 end
 
+-- TODO convert to metatype
 local function getitimerspec(interval, value)
   if ffi.istype(t.itimerspec, interval) then return interval end
-  return t.itimerspec(getts(interval), getts(value))
+  if not ffi.istype(t.timespec, interval) then interval = t.timespec(interval) end
+  if not ffi.istype(t.timespec, value) then value = t.timespec(value) end
+  return t.itimerspec(interval, value)
 end
 
 function S.timerfd_settime(fd, flags, interval, value)
@@ -3964,7 +3968,7 @@ end
 
 function S.io_getevents(ctx, min, nr, timeout, events)
   if not events then events = io_events_t(nr) end
-  if timeout then timeout = getts(timeout) end
+  if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
   local ret = C.syscall(S.SYS_io_getevents, getctx(ctx), t.long(min), t.long(nr), events, timeout)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   -- need to think more about how to return these, eg metatype for io_event?
@@ -4074,14 +4078,14 @@ function S.adjtimex(a)
 end
 
 function S.clock_getres(clk_id, ts)
-  ts = getts(ts)
+  if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
   local ret = C.syscall(S.SYS_clock_getres, t.clockid(stringflag(clk_id, "CLOCK_")), t.void(ts))
   if ret == -1 then return nil, t.error(ffi.errno()) end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
-  ts = getts(ts)
+  if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
   local ret = C.syscall(S.SYS_clock_gettime, t.clockid(stringflag(clk_id, "CLOCK_")), t.void(ts))
   if ret == -1 then return nil, t.error(ffi.errno()) end
   return ts
