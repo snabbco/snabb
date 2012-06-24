@@ -78,13 +78,11 @@ Constants should all be available, eg `L.SEEK_SET` etc. You can add to combine t
 
 You do not need to use the numbered versions of functions, eg dup can do dup2 or dup3 by adding more arguments
 
-getcwd returns the result in a buffer if one is passed, or as a Lua string otherwise, ie if called with no parameters.
-
 Standard convenience macros are also provided, eg S.major(dev) to extract a major number from a device number.
 
 bind does not require a length for the address type length, as it can work this out dynamically.
 
-`uname` returns a Lua table with the returned strings in it. Similarly `getdents` returns directory entries as a table. However I am moving more to returning native ffi structures with metamethods as this is less overhead than converting to tables, so long as I can provide the same functionality. If you want a higher level interface you can add a wrapper.
+`uname` returns a Lua table with the returned strings in it. Similarly `getdents` returns directory entries as a table. Other functions such as `poll` return an ffi metatype that behaves like a Lua array, ie is 1-indexed and has a `#` length method, which wraps the underlying C structure.
 
 The test cases are good examples until I do better documentation!
 
