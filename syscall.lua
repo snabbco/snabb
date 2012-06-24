@@ -2490,6 +2490,70 @@ else
   }
 end
 
+-- misc
+local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
+
+local function split(delimiter, text)
+  if delimiter == "" then return {text} end
+  if #text == 0 then return {} end
+  local list = {}
+  local pos = 1
+  while true do
+    local first, last = text:find(delimiter, pos)
+    if first then
+      list[#list + 1] = text:sub(pos, first - 1)
+      pos = last + 1
+    else
+      list[#list + 1] = text:sub(pos)
+      break
+    end
+  end
+  return list
+end
+
+local function trim(s)
+  return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
+
+-- take a bunch of flags in a string and return a number
+-- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
+-- also forcing to return an int now - TODO find any 64 bit flags we are using and fix to use new function
+local function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags that are ORed
+  if not str then return 0 end
+  if type(str) ~= "string" then return str end
+  local f = 0
+  local a = split(",", str)
+  local ts, s, val
+  for i, v in ipairs(a) do
+    ts = trim(v)
+    s = ts
+    if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
+    val = S[s:upper()]
+    if prefix2 and not val then
+      s = ts
+      if s:sub(1, #prefix2) ~= prefix2 then s = prefix2 .. s end -- prefix optional
+      val = S[s:upper()]
+    end
+    if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
+  end
+  return f
+end
+
+local function stringflag(str, prefix) -- single value only
+  if not str then return 0 end
+  if type(str) ~= "string" then return str end
+  if #str == 0 then return 0 end
+  local s = trim(str)
+  if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
+  local val = S[s:upper()]
+  if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions, better than silent ignore
+  return val
+end
+
+-- useful for comparing modes etc
+function S.mode(mode) return stringflags(mode, "S_") end
+
 -- Lua type constructors corresponding to defined types
 t.sa_family = ffi.typeof("sa_family_t")
 t.msghdr = ffi.typeof("struct msghdr")
@@ -2535,7 +2599,6 @@ local iocbs_pt = ffi.typeof("struct iocb *[?]")
 
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 local iocbs_t = ffi.typeof("struct iocb[?]")
-local pollfds_t = ffi.typeof("struct pollfd [?]")
 local io_events_t = ffi.typeof("struct io_event[?]")
 
 local string_array_t = ffi.typeof("const char *[?]")
@@ -2754,9 +2817,9 @@ mt.iovecs = {
   end,
   __len = function(io) return io.count end,
   __new = function(tp, is)
-    if type(is) == 'number' then return ffi.new(t.iovecs, is, is) end
+    if type(is) == 'number' then return ffi.new(tp, is, is) end
     local count = #is
-    local iov = ffi.new(t.iovecs, count, count)
+    local iov = ffi.new(tp, count, count)
     for n = 1, count do
       local i = is[n]
       if type(i) == 'string' then
@@ -2777,6 +2840,39 @@ mt.iovecs = {
 
 t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs)
 
+t.pollfd = ffi.metatype("struct pollfd", {
+  __index = function(t, k)
+    if k == 'fileno' then return t.fd end
+    local prefix = "POLL"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.revents, S[k]) ~= 0
+  end
+})
+
+mt.pollfds = {
+  __index = function(p, k)
+    return p.pfd[k - 1]
+  end,
+  __newindex = function(p, k, v)
+    if not ffi.istype(t.pollfd, v) then v = t.pollfd(v) end
+    ffi.copy(p.pfd[k - 1], v, ffi.sizeof(t.pollfd))
+  end,
+  __len = function(p) return p.count end,
+  __new = function(tp, ps)
+    if type(ps) == 'number' then return ffi.new(tp, ps, ps) end
+    local count = #ps
+    local fds = ffi.new(tp, count, count)
+    for n = 1, count do
+      fds[n].fd = getfd(ps[n].fd)
+      fds[n].events = stringflags(ps[n].events, "POLL")
+      fds[n].revents = 0
+    end
+    return fds
+  end
+}
+
+t.pollfds = ffi.metatype("struct { int count; struct pollfd pfd[?];}", mt.pollfds)
+
 local function getts(ts) -- get a timespec eg from a number
   if not ts then return t.timespec() end
   if ffi.istype(t.timespec, ts) then return ts end
@@ -2793,68 +2889,6 @@ local function gettv(tv)
   return t.timeval(i, math.floor(f * 1000000))
 end
 
--- misc
-local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
-
-local function split(delimiter, text)
-  if delimiter == "" then return {text} end
-  if #text == 0 then return {} end
-  local list = {}
-  local pos = 1
-  while true do
-    local first, last = text:find(delimiter, pos)
-    if first then
-      list[#list + 1] = text:sub(pos, first - 1)
-      pos = last + 1
-    else
-      list[#list + 1] = text:sub(pos)
-      break
-    end
-  end
-  return list
-end
-local function trim(s)
-  return (s:gsub("^%s*(.-)%s*$", "%1"))
-end
-
--- take a bunch of flags in a string and return a number
--- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
--- also forcing to return an int now - TODO find any 64 bit flags we are using and fix to use new function
-local function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags that are ORed
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  local f = 0
-  local a = split(",", str)
-  local ts, s, val
-  for i, v in ipairs(a) do
-    ts = trim(v)
-    s = ts
-    if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
-    val = S[s:upper()]
-    if prefix2 and not val then
-      s = ts
-      if s:sub(1, #prefix2) ~= prefix2 then s = prefix2 .. s end -- prefix optional
-      val = S[s:upper()]
-    end
-    if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
-  end
-  return f
-end
-
-local function stringflag(str, prefix) -- single value only
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  if #str == 0 then return 0 end
-  local s = trim(str)
-  if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
-  local val = S[s:upper()]
-  if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions, better than silent ignore
-  return val
-end
-
--- useful for comparing modes etc
-function S.mode(mode) return stringflags(mode, "S_") end
 
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
@@ -3137,18 +3171,13 @@ function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), addr, addrlen or ffi.sizeof(addr)))
 end
 
-local function getiov(iov)
-  if ffi.istype(t.iovecs, iov) then return iov end
-  return t.iovecs(iov)
- end
-
 function S.readv(fd, iov)
-  iov = getiov(iov)
+  if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
   return retnum(C.readv(getfd(fd), iov.iov, #iov))
 end
 
 function S.writev(fd, iov)
-  iov = getiov(iov)
+  if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
   return retnum(C.writev(getfd(fd), iov.iov, #iov))
 end
 
@@ -3620,50 +3649,10 @@ function S.select(s) -- note same structure as returned
           exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
 end
 
---[[
-mt.poll = {
-  __index = function(t, k)
-    local prefix = "POLL"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.revents, S[k]) ~= 0
-  end
-}
-]]
-
-t.pollfd = ffi.metatype("struct pollfd", {
-  __index = function(t, k)
-    if k == 'fileno' then return t.fd end
-    local prefix = "POLL"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.revents, S[k]) ~= 0
-  end
-})
-
-function S.poll(fds, nfds, timeout)
-  if type(fds) == "table" then
-    local pf = fds
-    nfds = #pf
-    fds = pollfds_t(nfds)
-    for i = 0, nfds - 1 do
-      local p = pf[i + 1]
-      fds[i].fd = getfd(p.fd)
-      fds[i].events = stringflags(p.events, "POLL")
-      fds[i].revents = 0
-    end
-  end
-  local ret = C.poll(fds, nfds, timeout or -1)
+function S.poll(fds, timeout)
+  if not ffi.istype(t.pollfds, fds) then fds = t.pollfds(fds) end
+  local ret = C.poll(fds.pfd, #fds, timeout or -1)
   if ret == -1 then return nil, t.error(ffi.errno()) end
---[[
-  local r = {}
-  for i = 0, nfds - 1 do
-    if fds[i].revents ~= 0 then
-      local p = {fileno = fds[i].fd, events = tonumber(fds[i].events), revents = tonumber(fds[i].revents)}
-      setmetatable(p, mt.poll)
-      r[#r + 1] = p
-    end
-  end
-  return r
-]]
   return fds
 end
 
@@ -3739,7 +3728,7 @@ function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
 end
 
 function S.vmsplice(fd, iov, flags)
-  iov = getiov(iov)
+  if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
   return retnum(C.vmsplice(getfd(fd), iov.iov, #iov, stringflags(flags, "SPLICE_F_")))
 end
 

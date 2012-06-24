@@ -812,11 +812,11 @@ test_events = {
     local sv = assert(S.socketpair("unix", "stream"))
     local c, s = sv[1], sv[2]
     local pev = {{fd = c, events = S.POLLIN}}
-    local p = assert(S.poll(pev, 1, 0))
-    assert(p[0].fd == c.fileno and p[0].revents == 0, "one event now")
+    local p = assert(S.poll(pev, 0))
+    assert(p[1].fd == c.fileno and p[1].revents == 0, "one event now")
     assert(s:write(teststring))
-    local p = assert(S.poll(pev, 1, 0))
-    assert(p[0].fd == c.fileno and p[0].POLLIN, "one event now")
+    local p = assert(S.poll(pev, 0))
+    assert(p[1].fd == c.fileno and p[1].POLLIN, "one event now")
     assert(c:read())
     assert(s:close())
     assert(c:close())
