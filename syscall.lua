@@ -845,7 +845,7 @@ S.AF_ATMPVC     = 8
 S.AF_X25        = 9
 S.AF_INET6      = 10
 S.AF_ROSE       = 11
-S.AF_DECnet     = 12
+S.AF_DECNET     = 12
 S.AF_NETBEUI    = 13
 S.AF_SECURITY   = 14
 S.AF_KEY        = 15
@@ -2991,14 +2991,9 @@ function S.inet_ntop(af, src)
   return ffi.string(dst)
 end
 
-local addrtype = {
-  [S.AF_INET] = t.in_addr,
-  [S.AF_INET6] = t.in6_addr,
-}
-
 function S.inet_pton(af, src, addr)
   af = stringflag(af, "AF_")
-  if not addr then addr = addrtype(af)() end
+  if not addr then addr = S.addrtype[af]() end
   local ret = C.inet_pton(af, src, addr)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   if ret == 0 then return nil end -- maybe return string
@@ -4329,17 +4324,10 @@ local ifla_decode = {
 
 local ifa_decode = {
   [S.IFA_ADDRESS] = function(ir, buf, len)
-    if ir.family == S.AF_INET then
-      local addr = t.in_addr()
-      ffi.copy(addr, buf, ffi.sizeof(t.in_addr))
-      if not ir.addr then ir.addr = {} end
-      ir.addr[#ir.addr + 1] = addr
-    elseif ir.family == S.AF_INET6 then
-      local addr = t.in6_addr()
-      ffi.copy(addr, buf, ffi.sizeof(t.in6_addr))
-      if not ir.addr then ir.addr = {} end
-      ir.addr[#ir.addr + 1] = addr
-    end
+    local addr = S.addrtype[ir.family]()
+    ffi.copy(addr, buf, ffi.sizeof(addr))
+    if not ir.addr then ir.addr = {} end
+    ir.addr[#ir.addr + 1] = addr
   end,
   [S.IFA_LOCAL] = function(ir, buf, len)
 
@@ -5054,6 +5042,11 @@ t.in6_addr = ffi.metatype("struct in6_addr", {
     return addr
   end
 })
+
+S.addrtype = {
+  [S.AF_INET] = t.in_addr,
+  [S.AF_INET6] = t.in6_addr,
+}
 
 -- constants
 S.INADDR_ANY = t.in_addr()
