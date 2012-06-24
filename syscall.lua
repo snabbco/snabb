@@ -493,7 +493,8 @@ mt.timex = {
   __index = function(t, k)
     local prefix = "TIME_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.state, S[k]) ~= 0
+    if S[k] then return bit.band(t.state, S[k]) ~= 0 end
+    error("unknown method")
   end
 }
 
@@ -584,7 +585,8 @@ mt.epoll = {
   __index = function(t, k)
     local prefix = "EPOLL"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.events, S[k]) ~= 0
+    if S[k] then return bit.band(t.events, S[k]) ~= 0 end
+    error("unknown method")
   end
 }
 
@@ -626,7 +628,8 @@ mt.dents = {
   __index = function(t, k)
     local prefix = "DT_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return t.type == S[k]
+    if S[k] then return t.type == S[k] end
+    error("unknown method")
   end
 }
 
@@ -1025,7 +1028,8 @@ mt.inotify = {
   __index = function(t, k)
     local prefix = "IN_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.mask, S[k]) ~= 0
+    if S[k] then return bit.band(t.mask, S[k]) ~= 0 end
+    error("unknown method")
   end
 }
 
@@ -4342,7 +4346,8 @@ mt.iff = {
   __index = function(t, k)
     local prefix = "IFF_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.flags, S[k]) ~= 0
+    if S[k] then return bit.band(t.flags, S[k]) ~= 0 end
+    error("unknown method")
   end
 }
 
@@ -4358,7 +4363,8 @@ mt.iflink = {
     if meth[k] then return meth[k](t) end
     local prefix = "ARPHRD_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return t.ifinfo.ifi_type == S[k]
+    if S[k] then return t.ifinfo.ifi_type == S[k] end
+    error("unknown method")
   end
 }
 
@@ -4374,7 +4380,8 @@ mt.ifaddr = {
     if meth[k] then return meth[k](t) end
     local prefix = "IFA_F_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.ifaddr.ifa_flags, S[k]) ~= 0
+    if S[k] then return bit.band(t.ifaddr.ifa_flags, S[k]) ~= 0 end
+    error("unknown method")
   end
 }
 
