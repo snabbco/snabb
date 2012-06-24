@@ -4486,7 +4486,7 @@ function S.getaddr(af)
   ifaddr.ifa_family = stringflag(af, "AF_")
 
   local ios = t.iovecs{{buf, len}}
-  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = ffi.sizeof(k)}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = ffi.sizeof(t.sockaddr_nl)}
 
   local n, err = s:sendmsg(m)
   if not n then return nil, err end 
@@ -4522,7 +4522,7 @@ function S.get_interfaces()
   gen.rtgen_family = S.AF_PACKET
 
   local ios = t.iovecs{{buf, len}}
-  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = ffi.sizeof(k)}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = ffi.sizeof(t.sockaddr_nl)}
 
   local n, err = s:sendmsg(m)
   if not n then return nil, err end 
