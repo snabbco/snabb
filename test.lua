@@ -400,7 +400,7 @@ test_timers_signals = {
     local exp = S.SIGALRM
     assert(S.sigaction("alrm", function(s) assert(s == exp, "expected alarm"); exp = 0 end))
     assert(exp == S.SIGALRM, "sigaction handler should not have run")
-    assert(S.setitimer("real", 0, 0.01))
+    assert(S.setitimer("real", {0, 0.01}))
     local rem, err = S.nanosleep(1) -- nanosleep does not interact with signals, should be interrupted
     assert(err and err.EINTR, "expect nanosleep to be interrupted by timer expiry")
     assert(exp == 0, "sigaction handler should have run")
@@ -439,6 +439,17 @@ test_timers_signals = {
     assert(ss[2].user, "signal sent by user")
     assert(ss[1].pid == S.getpid(), "signal sent by my pid")
     assert(ss[2].pid == S.getpid(), "signal sent by my pid")
+    assert(fd:close())
+  end,
+  test_timerfd = function()
+    local fd = assert(S.timerfd_create("monotonic", "nonblock, cloexec"))
+    local n = assert(fd:timerfd_read())
+    assert(n == 0, "no timer events yet")
+    assert(fd:block())
+    local o = assert(fd:timerfd_settime(nil, {0, 0.000001}))
+    assert(o.interval.time == 0 and o.value.time == 0, "old timer values zero")
+    n = assert(fd:timerfd_read())
+    assert(n == 1, "should have exactly one timer expiry")
     assert(fd:close())
   end
 }
@@ -1001,23 +1012,6 @@ assert(math.floor(tv.time) == tv.sec, "should be able to get float time from tim
 local t = S.time()
 local t = assert(S.clock_getres("realtime"))
 local t = assert(S.clock_gettime("realtime"))
-
--- timerfd
-fd = assert(S.timerfd_create("monotonic", "nonblock, cloexec"))
-
-n = assert(fd:timerfd_read())
-assert(n == 0, "no timer events yet")
-
-assert(fd:block())
-
-local o = assert(fd:timerfd_settime(nil, 0, 0.000001))
-
---assert(tonumber(o.it_interval) == 0 and tonumber(o.it_value) == 0, "old timer values zero") -- needs metamethods
-
-n = assert(fd:timerfd_read())
-assert(n == 1, "should have exactly one timer expiry")
-
-assert(fd:close())
 
 oldcmd = assert(S.readfile("/proc/self/cmdline"))
 assert(S.setcmdline("test"))

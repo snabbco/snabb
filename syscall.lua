@@ -2812,33 +2812,58 @@ t.timespec = ffi.metatype("struct timespec", {
   end
 })
 
-mt.itimer = {
+local function itnormal(v)
+  if not v then v = {{0, 0}, {0, 0}} end
+  if v.interval then
+    v.it_interval = v.interval
+    v.interval = nil
+  end
+  if v.value then
+    v.it_value = v.value
+    v.value = nil
+  end
+  if not v.it_interval then
+    v.it_interval = v[1]
+    v[1] = nil
+  end
+  if not v.it_value then
+    v.it_value = v[2]
+    v[2] = nil
+  end
+  return v
+end
+
+t.itimerspec = ffi.metatype("struct itimerspec", {
   __index = function(it, k)
   local meth = {
     interval = function(it) return it.it_interval end,
     value = function(it) return it.it_value end
   }
   return meth[k](it)
+  end,
+  __new = function(tp, v)
+    v = itnormal(v)
+    if not ffi.istype(t.timespec, v.it_interval) then v.it_interval = t.timespec(v.it_interval) end
+    if not ffi.istype(t.timespec, v.it_value) then v.it_value = t.timespec(v.it_value) end
+    return ffi.new(tp, v)
   end
-}
+})
 
-t.itimerspec = ffi.metatype("struct itimerspec", mt.itimer)
-t.itimerval = ffi.metatype("struct itimerval", mt.itimer)
-
--- TODO convert to metatype
-local function getitimerspec(interval, value)
-  if ffi.istype(t.itimerspec, interval) then return interval end
-  if not ffi.istype(t.timespec, interval) then interval = t.timespec(interval) end
-  if not ffi.istype(t.timespec, value) then value = t.timespec(value) end
-  return t.itimerspec(interval, value)
-end
-
-local function getitimerval(interval, value)
-  if ffi.istype(t.itimerval, interval) then return interval end
-  if not ffi.istype(t.timeval, interval) then interval = t.timeval(interval) end
-  if not ffi.istype(t.timeval, value) then value = t.timeval(value) end
-  return t.itimerval(interval, value)
-end
+t.itimerval = ffi.metatype("struct itimerval", {
+  __index = function(it, k)
+  local meth = {
+    interval = function(it) return it.it_interval end,
+    value = function(it) return it.it_value end
+  }
+  return meth[k](it)
+  end,
+  __new = function(tp, v)
+    v = itnormal(v)
+   if not ffi.istype(t.timeval, v.it_interval) then v.it_interval = t.timeval(v.it_interval) end
+    if not ffi.istype(t.timeval, v.it_value) then v.it_value = t.timeval(v.it_value) end
+    return ffi.new(tp, v)
+  end
+})
 
 mt.iovecs = {
   __index = function(io, k)
@@ -3858,21 +3883,16 @@ function S.signalfd_read(fd, buffer, len)
 end
 
 function S.getitimer(which, value)
-  local ret
-  if value then
-    ret = C.getitimer(stringflag(which, "ITIMER_"), value)
-    if ret == -1 then return nil, t.error(ffi.errno()) end
-    return value
-  end
-  value = t.itimerval()
+  if not value then value = t.itimerval() end
   local ret = C.getitimer(stringflag(which, "ITIMER_"), value)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   return value
 end
 
-function S.setitimer(which, interval, value)
+function S.setitimer(which, it)
+  if not ffi.istype(t.itimerval, it) then it = t.itimerval(it) end
   local oldtime = t.itimerval()
-  local ret = C.setitimer(stringflag(which, "ITIMER_"), getitimerval(interval, value), oldtime)
+  local ret = C.setitimer(stringflag(which, "ITIMER_"), it, oldtime)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   return oldtime
 end
@@ -3881,9 +3901,10 @@ function S.timerfd_create(clockid, flags)
   return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
 end
 
-function S.timerfd_settime(fd, flags, interval, value)
+function S.timerfd_settime(fd, flags, it)
   local oldtime = t.itimerspec()
-  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), getitimerspec(interval, value), oldtime)
+  if not ffi.istype(t.itimerspec, it) then it = t.itimerspec(it) end
+  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), it, oldtime)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   return oldtime
 end
