@@ -2574,7 +2574,6 @@ t.utsname = ffi.typeof("struct utsname")
 t.rlimit = ffi.typeof("struct rlimit")
 t.fdb_entry = ffi.typeof("struct fdb_entry")
 t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
-t.itimerspec = ffi.typeof("struct itimerspec")
 t.iocb = ffi.typeof("struct iocb")
 t.sighandler = ffi.typeof("sighandler_t")
 t.sigaction = ffi.typeof("struct sigaction")
@@ -2813,15 +2812,33 @@ t.timespec = ffi.metatype("struct timespec", {
   end
 })
 
-t.itimerval = ffi.metatype("struct itimerval", {
+mt.itimer = {
   __index = function(it, k)
   local meth = {
     interval = function(it) return it.it_interval end,
     value = function(it) return it.it_value end
   }
-  return meth[k](tv)
+  return meth[k](it)
   end
-})
+}
+
+t.itimerspec = ffi.metatype("struct itimerspec", mt.itimer)
+t.itimerval = ffi.metatype("struct itimerval", mt.itimer)
+
+-- TODO convert to metatype
+local function getitimerspec(interval, value)
+  if ffi.istype(t.itimerspec, interval) then return interval end
+  if not ffi.istype(t.timespec, interval) then interval = t.timespec(interval) end
+  if not ffi.istype(t.timespec, value) then value = t.timespec(value) end
+  return t.itimerspec(interval, value)
+end
+
+local function getitimerval(interval, value)
+  if ffi.istype(t.itimerval, interval) then return interval end
+  if not ffi.istype(t.timeval, interval) then interval = t.timeval(interval) end
+  if not ffi.istype(t.timeval, value) then value = t.timeval(value) end
+  return t.itimerval(interval, value)
+end
 
 mt.iovecs = {
   __index = function(io, k)
@@ -3840,20 +3857,6 @@ function S.signalfd_read(fd, buffer, len)
   return ss
 end
 
-local function getitimerval(interval, value)
-  if ffi.istype(t.itimerval, interval) then return interval end
-  if not ffi.istype(t.timeval, interval) then interval = t.timeval(interval) end
-  if not ffi.istype(t.timeval, value) then value = t.timeval(value) end
-  return t.itimerval(interval, value)
-end
-
--- in this case we do return a table as we want the metamethods on the timevals
-local function retitv(value)
-  --local i, v = t.timeval(value.it_interval), t.timeval(value.it_value)
-  local i, v = value.it_interval, value.it_value
-  return {interval = i, it_interval = i, value = v, it_value = v}
-end
-
 function S.getitimer(which, value)
   local ret
   if value then
@@ -3864,26 +3867,18 @@ function S.getitimer(which, value)
   value = t.itimerval()
   local ret = C.getitimer(stringflag(which, "ITIMER_"), value)
   if ret == -1 then return nil, t.error(ffi.errno()) end
-  return retitv(value)
+  return value
 end
 
 function S.setitimer(which, interval, value)
   local oldtime = t.itimerval()
   local ret = C.setitimer(stringflag(which, "ITIMER_"), getitimerval(interval, value), oldtime)
   if ret == -1 then return nil, t.error(ffi.errno()) end
-  return retitv(oldtime)
+  return oldtime
 end
 
 function S.timerfd_create(clockid, flags)
   return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
-end
-
--- TODO convert to metatype
-local function getitimerspec(interval, value)
-  if ffi.istype(t.itimerspec, interval) then return interval end
-  if not ffi.istype(t.timespec, interval) then interval = t.timespec(interval) end
-  if not ffi.istype(t.timespec, value) then value = t.timespec(value) end
-  return t.itimerspec(interval, value)
 end
 
 function S.timerfd_settime(fd, flags, interval, value)
