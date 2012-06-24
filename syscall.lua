@@ -4324,13 +4324,16 @@ local ifla_decode = {
 
 local ifa_decode = {
   [S.IFA_ADDRESS] = function(ir, buf, len)
-    local addr = S.addrtype[ir.family]()
-    ffi.copy(addr, buf, ffi.sizeof(addr))
-    if not ir.addr then ir.addr = {} end
-    ir.addr[#ir.addr + 1] = addr
+    ir.addr = S.addrtype[ir.family]()
+    ffi.copy(ir.addr, buf, ffi.sizeof(ir.addr))
   end,
   [S.IFA_LOCAL] = function(ir, buf, len)
-
+    ir.loc = S.addrtype[ir.family]()
+    ffi.copy(ir.loc, buf, ffi.sizeof(ir.loc))
+  end,
+  [S.IFA_BROADCAST] = function(ir, buf, len)
+    ir.broadcast = S.addrtype[ir.family]()
+    ffi.copy(ir.broadcast, buf, ffi.sizeof(ir.broadcast))
   end,
   [S.IFA_LABEL] = function(ir, buf, len)
     ir.label = ffi.string(buf)
@@ -4427,7 +4430,7 @@ local nlmsg_data_decode = {
       rtattr, buf, len = rta_next(rtattr, buf, len)
     end
 
-   r[ir.index] = ir
+   r[#r + 1] = ir
 
    return r
   end,
@@ -4562,13 +4565,24 @@ function S.get_interfaces() -- returns with address info too.
   if not addr4 then return nil, err end
   local addr6, err = S.getaddr(S.AF_INET6)
   if not addr6 then return nil, err end
-  for _, v in pairs(ifs) do
+  local indexmap = {}
+  for i, v in pairs(ifs) do
     v.inet, v.inet6 = {}, {}
-    if addr4[v.index] then v.inet = addr4[v.index].addr end
-    if addr6[v.index] then v.inet6 = addr6[v.index].addr end
+    indexmap[v.index] = i
+  end
+  for i = 1, #addr4 do
+    local v = ifs[indexmap[addr4[i].index]]
+    v.inet[#v.inet + 1] = addr4[i].addr
+  end
+  for i = 1, #addr6 do
+    local v = ifs[indexmap[addr6[i].index]]
+    v.inet6[#v.inet6 + 1] = addr6[i].addr
   end
   return setmetatable(ifs, mt.iflinks)
 end
+
+--    if addr4[v.index] then v.inet = addr4[v.index].addr end
+--    if addr6[v.index] then v.inet6 = addr6[v.index].addr end
 
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
