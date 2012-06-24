@@ -3342,6 +3342,7 @@ function S.socket(domain, stype, protocol)
   domain = stringflag(domain, "AF_")
   return retfd(C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol)))
 end
+
 function S.socketpair(domain, stype, protocol)
   domain = stringflag(domain, "AF_")
   local sv2 = int2_t()
