@@ -730,9 +730,11 @@ test_netlink = {
   test_get_interfaces = function()
     local i = S.get_interfaces()
     local df = #assert(S.ls("/sys/class/net", true))
-    assert(df == #i.ifaces, "expect same interfaces as /sys/class/net")
-    assert(i.iface.lo, "expect a loopback interface")
-    local lo = i.iface.lo
+    local count = 0
+    for _ in pairs(i) do count = count + 1 end
+    assert_equal(df, count, "expect same number of interfaces as /sys/class/net")
+    assert(i.lo, "expect a loopback interface")
+    local lo = i.lo
     assert(lo.flags.up, "loopback interface should be up")
     assert(lo.flags.loopback, "loopback interface should be marked as loopback")
     assert(lo.flags.running, "loopback interface should be running")
@@ -741,7 +743,7 @@ test_netlink = {
     assert_equal(tostring(lo.macaddr), "00:00:00:00:00:00", "null hardware address on loopback")
     assert(lo.loopback, "loopback interface type should be loopback") -- TODO add getflag
     assert_equal(lo.mtu, 16436, "expect lo MTU is 16436")
-    local eth = i.iface.eth0 or i.iface.eth1 -- may not exist
+    local eth = i.eth0 or i.eth1 -- may not exist
     if eth then
       assert(eth.flags.broadcast, "ethernet interface should be broadcast")
       assert(eth.flags.multicast, "ethernet interface should be multicast")
@@ -753,7 +755,7 @@ test_netlink = {
       local mtu = assert(S.readfile("/sys/class/net/" .. eth.name .. "/mtu"), "expect eth to have mtu in /sys")
       assert_equal(eth.mtu, tonumber(mtu), "expect ethernet MTU to match /sys")
     end
-    local wlan = i.iface.wlan0
+    local wlan = i.wlan0
     if wlan then
       assert(wlan.ether, "wlan interface type should be ether")
       assert_equal(wlan.addrlen, 6, "wireless hardware address length is 6")
@@ -767,12 +769,12 @@ test_netlink = {
   test_get_addresses_in = function()
     local as = assert(S.getaddr("inet"))
     local i = S.get_interfaces()
-    assert_equal(tostring(as[i.iface.lo.index].addr[1]), "127.0.0.1", "loopback ipv4 on lo")
+    assert_equal(tostring(as[i.lo.index].addr[1]), "127.0.0.1", "loopback ipv4 on lo")
   end,
   test_get_addresses_in6 = function()
     local as = assert(S.getaddr("inet6"))
     local i = S.get_interfaces()
-    assert_equal(tostring(as[i.iface.lo.index].addr[1]), "::1", "loopback ipv6 on lo (probably)") -- allow fail if no ipv6
+    assert_equal(tostring(as[i.lo.index].addr[1]), "::1", "loopback ipv6 on lo (probably)") -- allow fail if no ipv6
   end
 }
 

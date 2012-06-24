@@ -4414,11 +4414,7 @@ local nlmsg_data_decode = {
       rtattr, buf, len = rta_next(rtattr, buf, len)
     end
 
-    if not r.ifaces then r.ifaces = {} end -- array
-    if not r.iface then r.iface = {} end -- table
-
-    r.ifaces[#r.ifaces + 1] = ir -- cant use interface index as holes. -- actually do here, create array after.
-    if ir.name then r.iface[ir.name] = ir end
+    r[ir.index] = ir
 
     return r
   end
@@ -4492,8 +4488,8 @@ function S.getaddr(af)
   return i
 end
 
--- read interfaces and details. not very generic yet...
-function S.get_interfaces()
+-- read interfaces and details.
+function S.getlink()
   local s, err = S.socket("netlink", "raw", "route")
   if not s then return nil, err end
   local a = t.sockaddr_nl() -- kernel will fill in address
@@ -4525,6 +4521,16 @@ function S.get_interfaces()
   if not ok then return nil, err end
 
   return i
+end
+
+function S.get_interfaces() -- returns by name rather than by index
+  local ifs, err = S.getlink()
+  if not ifs then return nil, err end
+  local r = {}
+  for _, v in pairs(ifs) do
+    r[v.name] = v
+  end
+  return r
 end
 
 function S.sendmsg(fd, msg, flags)
