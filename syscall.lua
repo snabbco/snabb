@@ -2991,9 +2991,14 @@ function S.inet_ntop(af, src)
   return ffi.string(dst)
 end
 
+local addrtype = {
+  [S.AF_INET] = t.in_addr,
+  [S.AF_INET6] = t.in6_addr,
+}
+
 function S.inet_pton(af, src, addr)
   af = stringflag(af, "AF_")
-  if not addr then if af == S.AF_INET6 then addr = t.in6_addr() else addr = t.in_addr() end end
+  if not addr then addr = addrtype(af)() end
   local ret = C.inet_pton(af, src, addr)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   if ret == 0 then return nil end -- maybe return string
@@ -4336,8 +4341,11 @@ local ifa_decode = {
       ir.addr[#ir.addr + 1] = addr
     end
   end,
+  [S.IFA_LOCAL] = function(ir, buf, len)
+
+  end,
   [S.IFA_LABEL] = function(ir, buf, len)
-    ir.name = ffi.string(buf)
+    ir.label = ffi.string(buf)
   end
 }
 
@@ -4351,7 +4359,7 @@ mt.iff = {
 
 S.encapnames = {
   [S.ARPHRD_ETHER] = "Ethernet",
-  [S.ARPHRD_LOOPBACK] = "Local",
+  [S.ARPHRD_LOOPBACK] = "Local Loopback",
 }
 
 mt.iflinks = {
