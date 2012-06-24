@@ -4450,6 +4450,8 @@ function S.getaddr(af)
   local a = t.sockaddr_nl() -- kernel will fill in address
   local ok, err = s:bind(a)
   if not ok then return nil, err end -- gc will take care of closing socket...
+  a = s:getsockname() -- to get bound address
+  if not a then return nil, err end -- gc will take care of closing socket...
   local k = t.sockaddr_nl() -- kernel destination
 
   local buf, len, hdr, ifaddr = S.tbuffer("struct nlmsghdr", "struct ifaddrmsg") -- TODO can now take ctypes, using new luajit feature
@@ -4458,7 +4460,7 @@ function S.getaddr(af)
   hdr.nlmsg_type = S.RTM_GETADDR
   hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_ROOT
   hdr.nlmsg_seq = s:seq()
-  hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
+  hdr.nlmsg_pid = a.pid
 
   ifaddr.ifa_family = stringflag(af, "AF_")
 
@@ -4483,6 +4485,8 @@ function S.get_interfaces()
   local a = t.sockaddr_nl() -- kernel will fill in address
   local ok, err = s:bind(a)
   if not ok then return nil, err end -- gc will take care of closing socket...
+  a, err = s:getsockname() -- to get bound address
+  if not a then return nil, err end -- gc will take care of closing socket...
   local k = t.sockaddr_nl() -- kernel destination
 
   -- we should be adding padding at the end of size nlmsg_alignto (4), (and in middle but 0) or will have issues if try to send more messages.
@@ -4493,7 +4497,7 @@ function S.get_interfaces()
   hdr.nlmsg_type = S.RTM_GETLINK
   hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_DUMP
   hdr.nlmsg_seq = s:seq()
-  hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
+  hdr.nlmsg_pid = a.pid
   gen.rtgen_family = S.AF_PACKET
 
   local ios = t.iovecs{{buf, len}}
