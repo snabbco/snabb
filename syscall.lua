@@ -4342,26 +4342,26 @@ local ifa_decode = {
 }
 
 mt.iff = {
-  __index = function(t, k)
+  __index = function(f, k)
     local prefix = "IFF_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(t.flags, S[k]) ~= 0 end
+    if S[k] then return bit.band(f.flags, S[k]) ~= 0 end
   end
 }
 
 mt.iflink = {
-  __index = function(t, k)
+  __index = function(i, k)
     local meth = {
-      family = function(t) return tonumber(t.ifinfo.ifi_family) end,
-      type = function(t) return tonumber(t.ifinfo.ifi_type) end,
-      index = function(t) return tonumber(t.ifinfo.ifi_index) end,
-      flags = function(t) return setmetatable({flags = tonumber(t.ifinfo.ifi_flags)}, mt.iff) end,
-      change = function(t) return tonumber(t.ifinfo.ifi_change) end
+      family = function(i) return tonumber(i.ifinfo.ifi_family) end,
+      type = function(i) return tonumber(i.ifinfo.ifi_type) end,
+      index = function(i) return tonumber(i.ifinfo.ifi_index) end,
+      flags = function(i) return setmetatable({flags = tonumber(i.ifinfo.ifi_flags)}, mt.iff) end,
+      change = function(i) return tonumber(i.ifinfo.ifi_change) end
     }
-    if meth[k] then return meth[k](t) end
+    if meth[k] then return meth[k](i) end
     local prefix = "ARPHRD_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return t.ifinfo.ifi_type == S[k] end
+    if S[k] then return i.ifinfo.ifi_type == S[k] end
   end,
   __tostring = function(i)
     return i.name
@@ -4369,18 +4369,18 @@ mt.iflink = {
 }
 
 mt.ifaddr = {
-  __index = function(t, k)
+  __index = function(i, k)
     local meth = {
-      family = function(t) return tonumber(t.ifaddr.ifa_family) end,
-      prefixlen = function(t) return tonumber(t.ifaddr.ifa_prefixlen) end,
-      index = function(t) return tonumber(t.ifaddr.ifa_index) end,
-      flags = function(t) return tonumber(t.ifaddr.ifa_flags) end,
-      scope = function(t) return tonumber(t.ifaddr.ifa_scope) end
+      family = function(i) return tonumber(i.ifaddr.ifa_family) end,
+      prefixlen = function(i) return tonumber(i.ifaddr.ifa_prefixlen) end,
+      index = function(i) return tonumber(i.ifaddr.ifa_index) end,
+      flags = function(i) return tonumber(i.ifaddr.ifa_flags) end,
+      scope = function(i) return tonumber(i.ifaddr.ifa_scope) end
     }
-    if meth[k] then return meth[k](t) end
+    if meth[k] then return meth[k](i) end
     local prefix = "IFA_F_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(t.ifaddr.ifa_flags, S[k]) ~= 0 end
+    if S[k] then return bit.band(i.ifaddr.ifa_flags, S[k]) ~= 0 end
   end
 }
 
