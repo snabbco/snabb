@@ -786,8 +786,8 @@ test_netlink = {
   end,
   test_get_interfaces = function()
     local i = S.get_interfaces()
-    assert_equal(tostring(i.lo.inet[1]), "127.0.0.1", "loopback ipv4 on lo")
-    assert_equal(tostring(i.lo.inet6[1]), "::1", "loopback ipv6 on lo (probably)")
+    assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
+    assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo (probably)")
   end
 }
 

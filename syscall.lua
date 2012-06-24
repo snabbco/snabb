@@ -4387,10 +4387,10 @@ mt.iflink = {
     local s = i.name .. '\n' ..
       '          ' .. 'Link encap:' .. i.typename .. hw .. '\n'
     for a = 1, #i.inet do
-      s = s .. '          ' .. 'inet addr:' .. tostring(i.inet[a]) .. '\n'
+      s = s .. '          ' .. 'inet addr:' .. tostring(i.inet[a].addr) .. '\n'
     end
     for a = 1, #i.inet6 do
-      s = s .. '          ' .. 'inet6 addr: ' .. tostring(i.inet6[a]) .. '\n'
+      s = s .. '          ' .. 'inet6 addr: ' .. tostring(i.inet6[a].addr) .. '\n'
     end
     return s
   end
@@ -4572,11 +4572,11 @@ function S.get_interfaces() -- returns with address info too.
   end
   for i = 1, #addr4 do
     local v = ifs[indexmap[addr4[i].index]]
-    v.inet[#v.inet + 1] = addr4[i].addr
+    v.inet[#v.inet + 1] = addr4[i]
   end
   for i = 1, #addr6 do
     local v = ifs[indexmap[addr6[i].index]]
-    v.inet6[#v.inet6 + 1] = addr6[i].addr
+    v.inet6[#v.inet6 + 1] = addr6[i]
   end
   return setmetatable(ifs, mt.iflinks)
 end
