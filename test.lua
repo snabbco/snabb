@@ -728,13 +728,9 @@ test_sockets = {
 
 test_netlink = {
   test_getlink = function()
-    local ifs = assert(S.getlink())
-    local i = {}
+    local i = assert(S.getlink())
     local count = 0
-    for _, v in pairs(ifs) do
-      i[v.name] = v
-      count = count + 1
-    end
+    for _, v in pairs(i) do count = count + 1 end
     local df = #assert(S.ls("/sys/class/net", true))
     assert_equal(df, count, "expect same number of interfaces as /sys/class/net")
     assert(i.lo, "expect a loopback interface")
@@ -772,18 +768,12 @@ test_netlink = {
   end,
   test_get_addresses_in = function()
     local as = assert(S.getaddr("inet"))
-    local i = assert(S.getlink())
-    local lo
-    for _, v in pairs(i) do if v.name == 'lo' then lo = v end end
-    assert(lo, "expect loopback interface")
+    local lo = assert(S.getlink()).lo
     assert_equal(tostring(as[lo.index].addr[1]), "127.0.0.1", "loopback ipv4 on lo")
   end,
   test_get_addresses_in6 = function()
     local as = assert(S.getaddr("inet6"))
-    local i = assert(S.getlink())
-    local lo
-    for _, v in pairs(i) do if v.name == 'lo' then lo = v end end
-    assert(lo, "expect loopback interface")
+    local lo = assert(S.getlink()).lo
     assert_equal(tostring(as[lo.index].addr[1]), "::1", "loopback ipv6 on lo (probably)") -- allow fail if no ipv6
   end
 }

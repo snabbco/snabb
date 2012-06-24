@@ -4335,6 +4335,9 @@ local ifa_decode = {
       if not ir.addr then ir.addr = {} end
       ir.addr[#ir.addr + 1] = addr
     end
+  end,
+  [S.IFA_LABEL] = function(ir, buf, len)
+    ir.name = ffi.string(buf)
   end
 }
 
@@ -4397,6 +4400,7 @@ local nlmsg_data_decode = {
     end
 
    r[ir.index] = ir
+
    return r
   end,
   [S.RTM_NEWLINK] = function(r, buf, len)
@@ -4414,7 +4418,7 @@ local nlmsg_data_decode = {
       rtattr, buf, len = rta_next(rtattr, buf, len)
     end
 
-    r[ir.index] = ir
+    r[ir.name] = ir
 
     return r
   end
@@ -4526,6 +4530,8 @@ end
 function S.get_interfaces() -- returns by name rather than by index
   local ifs, err = S.getlink()
   if not ifs then return nil, err end
+  local addrs, err = S.getaddr()
+  if not addrs then return nil, err end
   local r = {}
   for _, v in pairs(ifs) do
     r[v.name] = v
