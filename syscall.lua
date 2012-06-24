@@ -4362,6 +4362,9 @@ mt.iflink = {
     local prefix = "ARPHRD_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return t.ifinfo.ifi_type == S[k] end
+  end,
+  __tostring = function(i)
+    return i.name
   end
 }
 
