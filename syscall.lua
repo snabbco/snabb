@@ -4346,7 +4346,7 @@ mt.iff = {
   end
 }
 
-mt.link = {
+mt.iflink = {
   __index = function(t, k)
     local meth = {
       family = function(t) return tonumber(t.ifinfo.ifi_family) end,
@@ -4362,6 +4362,20 @@ mt.link = {
   end
 }
 
+mt.ifaddr = {
+  __index = function(t, k)
+    local meth = {
+      family = function(t) return tonumber(t.ifaddr.ifa_family) end,
+      prefixlen = function(t) return tonumber(t.ifaddr.ifa_prefixlen) end,
+      index = function(t) return tonumber(t.ifaddr.ifa_index) end,
+      flags = function(t) return tonumber(t.ifaddr.ifa_flags) end,
+      scope = function(t) return tonumber(t.ifaddr.ifa_scope) end
+    }
+    if meth[k] then return meth[k](t) end
+    -- TODO temp, perm flags
+  end
+}
+
 local nlmsg_data_decode = {
   [S.NLMSG_DONE] = function(r, buf, len) return r end,
   [S.RTM_NEWADDR] = function(r, buf, len)
@@ -4370,13 +4384,8 @@ local nlmsg_data_decode = {
     len = len - nlmsg_align(ffi.sizeof(t.ifaddrmsg))
     local rtattr = ffi.cast(rtattr_pt, buf)
 
-    local ir = {
-      family = tonumber(addr.ifa_family),
-      prefixlen = tonumber(addr.ifa_prefixlen),
-      flags = tonumber(addr.ifa_flags),
-      scope = tonumber(addr.ifa_scope),
-      index = tonumber(addr.ifa_index),
-    } -- TODO setmetatable for flags (secondary, permanent)
+    local ir = setmetatable({ifaddr = t.ifaddrmsg()}, mt.ifaddr)
+    ffi.copy(ir.ifaddr, addr, ffi.sizeof(t.ifaddrmsg))
 
     while rta_ok(rtattr, len) do
       if ifa_decode[rtattr.rta_type] then
@@ -4393,7 +4402,7 @@ local nlmsg_data_decode = {
     buf = buf + nlmsg_align(ffi.sizeof(t.ifinfomsg))
     len = len - nlmsg_align(ffi.sizeof(t.ifinfomsg))
     local rtattr = ffi.cast(rtattr_pt, buf)
-    local ir = setmetatable({ifinfo = t.ifinfomsg()}, mt.link)
+    local ir = setmetatable({ifinfo = t.ifinfomsg()}, mt.iflink)
     ffi.copy(ir.ifinfo, iface, ffi.sizeof(t.ifinfomsg))
 
     while rta_ok(rtattr, len) do
