@@ -494,7 +494,6 @@ mt.timex = {
     local prefix = "TIME_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return bit.band(t.state, S[k]) ~= 0 end
-    error("unknown method")
   end
 }
 
@@ -586,7 +585,6 @@ mt.epoll = {
     local prefix = "EPOLL"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return bit.band(t.events, S[k]) ~= 0 end
-    error("unknown method")
   end
 }
 
@@ -629,7 +627,6 @@ mt.dents = {
     local prefix = "DT_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return t.type == S[k] end
-    error("unknown method")
   end
 }
 
@@ -1029,7 +1026,6 @@ mt.inotify = {
     local prefix = "IN_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return bit.band(t.mask, S[k]) ~= 0 end
-    error("unknown method")
   end
 }
 
@@ -4347,7 +4343,6 @@ mt.iff = {
     local prefix = "IFF_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return bit.band(t.flags, S[k]) ~= 0 end
-    error("unknown method")
   end
 }
 
@@ -4364,7 +4359,6 @@ mt.iflink = {
     local prefix = "ARPHRD_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return t.ifinfo.ifi_type == S[k] end
-    error("unknown method")
   end
 }
 
@@ -4381,7 +4375,6 @@ mt.ifaddr = {
     local prefix = "IFA_F_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return bit.band(t.ifaddr.ifa_flags, S[k]) ~= 0 end
-    error("unknown method")
   end
 }
 
@@ -4489,7 +4482,7 @@ function S.getaddr(af)
   local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = ffi.sizeof(t.sockaddr_nl)}
 
   local n, err = s:sendmsg(m)
-  if not n then return nil, err end 
+  if not n then return nil, err end
 
   local i = S.nlmsg_read(s, k)
 
