@@ -727,11 +727,15 @@ test_sockets = {
 }
 
 test_netlink = {
-  test_get_interfaces = function()
-    local i = S.get_interfaces()
-    local df = #assert(S.ls("/sys/class/net", true))
+  test_getlink = function()
+    local ifs = assert(S.getlink())
+    local i = {}
     local count = 0
-    for _ in pairs(i) do count = count + 1 end
+    for _, v in pairs(ifs) do
+      i[v.name] = v
+      count = count + 1
+    end
+    local df = #assert(S.ls("/sys/class/net", true))
     assert_equal(df, count, "expect same number of interfaces as /sys/class/net")
     assert(i.lo, "expect a loopback interface")
     local lo = i.lo
