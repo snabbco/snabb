@@ -3017,12 +3017,19 @@ function S.inet_pton(af, src, addr)
 end
 
 -- main definitions start here
-function S.open(pathname, flags, mode) return retfd(C.open(pathname, stringflags(flags, "O_"), S.mode(mode))) end
+function S.open(pathname, flags, mode)
+  local ret = C.open(pathname, stringflags(flags, "O_"), S.mode(mode))
+  if ret == -1 then return nil, t.error(ffi.errno()) end
+  return t.fd(ret)
+end
 
 function S.dup(oldfd, newfd, flags)
-  if newfd == nil then return retfd(C.dup(getfd(oldfd))) end
-  if flags == nil then return retfd(C.dup2(getfd(oldfd), getfd(newfd))) end
-  return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags))
+  local ret
+  if newfd == nil then ret = C.dup(getfd(oldfd))
+  elseif flags == nil then ret = C.dup2(getfd(oldfd), getfd(newfd))
+  else ret = C.dup3(getfd(oldfd), getfd(newfd), flags) end
+  if ret == -1 then return nil, t.error(ffi.errno()) end
+  return t.fd(ret)
 end
 
 function S.pipe(flags)
@@ -3340,7 +3347,9 @@ end
 
 function S.socket(domain, stype, protocol)
   domain = stringflag(domain, "AF_")
-  return retfd(C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol)))
+  local ret = C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol))
+  if ret == -1 then return nil, t.error(ffi.errno()) end
+  return t.fd(ret)
 end
 
 function S.socketpair(domain, stype, protocol)
@@ -3397,11 +3406,12 @@ function S.fcntl(fd, cmd, arg)
   elseif cmd == S.F_SETFD then arg = stringflag(arg, "FD_")
   end
   local ret = C.fcntl(getfd(fd), cmd, arg or 0)
+  if ret == -1 then return nil, t.error(ffi.errno()) end
   -- return values differ, some special handling needed
-  if cmd == S.F_DUPFD or cmd == S.F_DUPFD_CLOEXEC then return retfd(ret) end
+  if cmd == S.F_DUPFD or cmd == S.F_DUPFD_CLOEXEC then return t.fd(ret) end
   if cmd == S.F_GETFD or cmd == S.F_GETFL or cmd == S.F_GETLEASE or cmd == S.F_GETOWN or
-     cmd == S.F_GETSIG or cmd == S.F_GETPIPE_SZ then return retnum(ret) end
-  return retbool(ret)
+     cmd == S.F_GETSIG or cmd == S.F_GETPIPE_SZ then return tonumber(ret) end
+  return true
 end
 
 function S.uname()
