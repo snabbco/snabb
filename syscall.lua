@@ -4349,11 +4349,30 @@ mt.iff = {
   end
 }
 
+S.encapnames = {
+  [S.ARPHRD_ETHER] = "Ethernet",
+  [S.ARPHRD_LOOPBACK] = "Local",
+}
+
+mt.iflinks = {
+  __tostring = function(is)
+    local s = {}
+    for _, v in pairs(is) do
+      s[#s + 1] = tostring(v)
+    end
+    return table.concat(s, '\n\n')
+  end
+}
+
 mt.iflink = {
   __index = function(i, k)
     local meth = {
       family = function(i) return tonumber(i.ifinfo.ifi_family) end,
       type = function(i) return tonumber(i.ifinfo.ifi_type) end,
+      typename = function(i)
+        local n = S.encapnames[i.type]
+        return n or 'unknown ' ..i.type
+      end,
       index = function(i) return tonumber(i.ifinfo.ifi_index) end,
       flags = function(i) return setmetatable({flags = tonumber(i.ifinfo.ifi_flags)}, mt.iff) end,
       change = function(i) return tonumber(i.ifinfo.ifi_change) end
@@ -4364,7 +4383,10 @@ mt.iflink = {
     if S[k] then return i.ifinfo.ifi_type == S[k] end
   end,
   __tostring = function(i)
-    return i.name
+    local hw = ''
+    if not i.loopback and i.macaddr then hw = ' HWaddr ' .. tostring(i.macaddr) end
+    return i.name .. '\n' ..
+      '          ' .. 'Link encap:' .. i.typename .. hw .. '\n'
   end
 }
 
@@ -4541,7 +4563,7 @@ function S.get_interfaces() -- returns with address info too.
     if addr4[v.index] then v.inet = addr4[v.index].addr end
     if addr6[v.index] then v.inet6 = addr6[v.index].addr end
   end
-  return ifs
+  return setmetatable(ifs, mt.iflinks)
 end
 
 function S.sendmsg(fd, msg, flags)
