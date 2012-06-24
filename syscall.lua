@@ -4360,7 +4360,7 @@ mt.iflinks = {
     for _, v in pairs(is) do
       s[#s + 1] = tostring(v)
     end
-    return table.concat(s, '\n\n')
+    return table.concat(s, '\n')
   end
 }
 
@@ -4385,8 +4385,15 @@ mt.iflink = {
   __tostring = function(i)
     local hw = ''
     if not i.loopback and i.macaddr then hw = ' HWaddr ' .. tostring(i.macaddr) end
-    return i.name .. '\n' ..
+    local s = i.name .. '\n' ..
       '          ' .. 'Link encap:' .. i.typename .. hw .. '\n'
+    for a = 1, #i.inet do
+      s = s .. '          ' .. 'inet addr:' .. tostring(i.inet[a]) .. '\n'
+    end
+    for a = 1, #i.inet6 do
+      s = s .. '          ' .. 'inet6 addr: ' .. tostring(i.inet6[a]) .. '\n'
+    end
+    return s
   end
 }
 
@@ -4560,6 +4567,7 @@ function S.get_interfaces() -- returns with address info too.
   local addr6, err = S.getaddr(S.AF_INET6)
   if not addr6 then return nil, err end
   for _, v in pairs(ifs) do
+    v.inet, v.inet6 = {}, {}
     if addr4[v.index] then v.inet = addr4[v.index].addr end
     if addr6[v.index] then v.inet6 = addr6[v.index].addr end
   end
