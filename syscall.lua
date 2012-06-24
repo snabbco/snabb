@@ -4457,7 +4457,7 @@ function S.getaddr(af)
   hdr.nlmsg_len = len
   hdr.nlmsg_type = S.RTM_GETADDR
   hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_ROOT
-  hdr.nlmsg_seq = 1          -- we should attach a sequence number to the file descriptor and use this
+  hdr.nlmsg_seq = s:seq()
   hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
 
   ifaddr.ifa_family = stringflag(af, "AF_")
@@ -4492,7 +4492,7 @@ function S.get_interfaces()
   hdr.nlmsg_len = len
   hdr.nlmsg_type = S.RTM_GETLINK
   hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_DUMP
-  hdr.nlmsg_seq = 1          -- we should attach a sequence number to the file descriptor and use this
+  hdr.nlmsg_seq = s:seq()
   hdr.nlmsg_pid = S.getpid() -- note this should better be got from the bound address of the socket
   gen.rtgen_family = S.AF_PACKET
 
@@ -5018,7 +5018,14 @@ fmeth.setxattr = S.fsetxattr
 fmeth.getxattr = S.gsetxattr
 fmeth.truncate = S.ftruncate
 
-t.fd = ffi.metatype("struct {int fileno;}", {__index = fmeth, __gc = S.close})
+-- sequence number used by netlink messages
+
+fmeth.seq = function(fd)
+  fd.sequence = fd.sequence + 1
+  return fd.sequence
+end
+
+t.fd = ffi.metatype("struct {int fileno; int sequence;}", {__index = fmeth, __gc = S.close})
 
 t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
   __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel},
