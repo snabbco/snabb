@@ -4527,16 +4527,18 @@ function S.getlink()
   return i
 end
 
-function S.get_interfaces() -- returns by name rather than by index
+function S.get_interfaces() -- returns with address info too.
   local ifs, err = S.getlink()
   if not ifs then return nil, err end
-  local addrs, err = S.getaddr()
-  if not addrs then return nil, err end
-  local r = {}
+  local addr4, err = S.getaddr(S.AF_INET)
+  if not addr4 then return nil, err end
+  local addr6, err = S.getaddr(S.AF_INET6)
+  if not addr6 then return nil, err end
   for _, v in pairs(ifs) do
-    r[v.name] = v
+    if addr4[v.index] then v.inet = addr4[v.index].addr end
+    if addr6[v.index] then v.inet6 = addr6[v.index].addr end
   end
-  return r
+  return ifs
 end
 
 function S.sendmsg(fd, msg, flags)
