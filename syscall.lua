@@ -4372,7 +4372,9 @@ mt.ifaddr = {
       scope = function(t) return tonumber(t.ifaddr.ifa_scope) end
     }
     if meth[k] then return meth[k](t) end
-    -- TODO temp, perm flags
+    local prefix = "IFA_F_"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    return bit.band(t.ifaddr.ifa_flags, S[k]) ~= 0
   end
 }
 
@@ -4384,7 +4386,7 @@ local nlmsg_data_decode = {
     len = len - nlmsg_align(ffi.sizeof(t.ifaddrmsg))
     local rtattr = ffi.cast(rtattr_pt, buf)
 
-    local ir = setmetatable({ifaddr = t.ifaddrmsg()}, mt.ifaddr)
+    local ir = setmetatable({ifaddr = t.ifaddrmsg(), addr = {}}, mt.ifaddr)
     ffi.copy(ir.ifaddr, addr, ffi.sizeof(t.ifaddrmsg))
 
     while rta_ok(rtattr, len) do
