@@ -1601,6 +1601,10 @@ t.error = ffi.metatype("struct {int errno;}", {
     if S.E[k] then return S.E[k] == t.errno end
     local uk = S.E['E' .. k:upper()]
     if uk then return uk == t.errno end
+  end,
+  __new = function(tp, errno)
+    if not errno then errno = ffi.errno() end
+    return ffi.new(tp, errno)
   end
 })
 
@@ -2965,30 +2969,30 @@ function S.nogc(d) ffi.gc(d, nil) end
 
 -- straight passthrough, only needed for real 64 bit quantities. Used eg for seek (file might have giant holes!)
 local function ret64(ret)
-  if ret == t.uint64(-1) then return nil, t.error(ffi.errno()) end
+  if ret == t.uint64(-1) then return nil, t.error() end
   return ret
 end
 
 local function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
   ret = tonumber(ret)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return ret
 end
 
 local function retfd(ret)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return t.fd(ret)
 end
 
 -- used for no return value, return true for use of assert
 local function retbool(ret)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return true
 end
 
 -- used for pointer returns, -1 is failure; removed gc for mem
 local function retptr(ret)
-  if ret == t.pointer(-1) then return nil, t.error(ffi.errno()) end
+  if ret == t.pointer(-1) then return nil, t.error() end
   return ret
 end
 
@@ -3064,7 +3068,7 @@ function S.inet_ntop(af, src)
   local len = INET6_ADDRSTRLEN -- could shorten for ipv4
   local dst = t.buffer(len)
   local ret = C.inet_ntop(af, src, dst, len)
-  if ret == nil then return nil, t.error(ffi.errno()) end
+  if ret == nil then return nil, t.error() end
   return ffi.string(dst)
 end
 
@@ -3072,7 +3076,7 @@ function S.inet_pton(af, src, addr)
   af = stringflag(af, "AF_")
   if not addr then addr = S.addrtype[af]() end
   local ret = C.inet_pton(af, src, addr)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   if ret == 0 then return nil end -- maybe return string
   return addr
 end
@@ -3080,7 +3084,7 @@ end
 -- main definitions start here
 function S.open(pathname, flags, mode)
   local ret = C.open(pathname, stringflags(flags, "O_"), S.mode(mode))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return t.fd(ret)
 end
 
@@ -3089,7 +3093,7 @@ function S.dup(oldfd, newfd, flags)
   if newfd == nil then ret = C.dup(getfd(oldfd))
   elseif flags == nil then ret = C.dup2(getfd(oldfd), getfd(newfd))
   else ret = C.dup3(getfd(oldfd), getfd(newfd), flags) end
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return t.fd(ret)
 end
 
@@ -3097,7 +3101,7 @@ function S.pipe(flags)
   local fd2 = int2_t()
   local ret
   if flags then ret = C.pipe2(fd2, stringflags(flags, "O_")) else ret = C.pipe(fd2) end
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return {t.fd(fd2[0]), t.fd(fd2[1])}
 end
 
@@ -3110,7 +3114,7 @@ function S.close(fd)
     if ffi.istype(t.fd, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
       fd.fileno = -1 -- make sure cannot accidentally close this fd object again
     end
-    return nil, t.error(ffi.errno())
+    return nil, t.error()
   end
   if ffi.istype(t.fd, fd) then
     fd.fileno = -1 -- make sure cannot accidentally close this fd object again
@@ -3141,7 +3145,7 @@ function S.readlink(path) -- note no idea if name truncated except return value 
   repeat
     buffer = t.buffer(size)
     ret = tonumber(C.readlink(path, buffer, size))
-    if ret == -1 then return nil, t.error(ffi.errno()) end
+    if ret == -1 then return nil, t.error() end
     if ret == size then -- possibly truncated
       buffer = nil
       size = size * 2
@@ -3154,7 +3158,7 @@ local function retnume(f, ...) -- for cases where need to explicitly set and che
   ffi.errno(0)
   local ret = f(...)
   local errno = ffi.errno()
-  if errno ~= 0 then return nil, t.error(ffi.errno()) end
+  if errno ~= 0 then return nil, t.error() end
   return ret
 end
 
@@ -3178,13 +3182,13 @@ function S.syscall(num, ...)
   -- call with the right types, use at your own risk
   local a, b, c, d, e, f = ...
   local ret = C.syscall(stringflag(num, "SYS_"), a, b, c, d, e, f)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return ret
 end
 
 function S.ioctl(d, request, argp)
   local ret = C.ioctl(d, request, argp)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   -- some different return types may need to be handled
   return true
 end
@@ -3201,7 +3205,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   local ret
   repeat
     ret = C.syscall(S.SYS_getdents64, t.int(getfd(fd)), buf, t.uint(size))
-    if ret == -1 then return nil, t.error(ffi.errno()) end
+    if ret == -1 then return nil, t.error() end
     local i = 0
     while i < ret do
       local dp = ffi.cast(linux_dirent64_pt, buf + i)
@@ -3214,7 +3218,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
 end
 
 local function retwait(ret, status)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   local w = {pid = ret, status = status}
   local WTERMSIG = bit.band(status, 0x7f)
   local EXITSTATUS = bit.rshift(bit.band(status, 0xff00), 8)
@@ -3239,7 +3243,7 @@ function S.waitid(idtype, id, options, infop) -- note order of args, as usually 
   if not infop then infop = t.siginfo() end
   infop.si_pid = 0 -- see notes on man page
   local ret = C.waitid(stringflag(idtype, "P_"), id or 0, infop, stringflags(options, "W"))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return infop -- return table here?
 end
 
@@ -3251,7 +3255,7 @@ function S.read(fd, buf, count)
   if not count then count = 4096 end
   local buf = t.buffer(count)
   local ret = C.read(getfd(fd), buf, count)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return ffi.string(buf, tonumber(ret)) -- user gets a string back, can get length from #string
 end
 
@@ -3279,7 +3283,7 @@ function S.recvfrom(fd, buf, count, flags)
   local ss = t.sockaddr_storage()
   local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
   local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ss, addrlen)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return {count = tonumber(ret), addr = sa(ss, addrlen[0])}
 end
 
@@ -3297,7 +3301,7 @@ function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool o
   local optval, optlen = int1_t(), socklen1_t()
   optlen[0] = ffi.sizeof(int1_t)
   local ret = C.getsockopt(getfd(fd), level, optname, optval, optlen)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return tonumber(optval[0]) -- no special case for bool
 end
 
@@ -3312,21 +3316,21 @@ end
 function S.stat(path, buf)
   if not buf then buf = t.stat() end
   local ret = C.syscall(S.SYS_stat, path, t.void(buf))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return buf
 end
 
 function S.lstat(path, buf)
   if not buf then buf = t.stat() end
   local ret = C.syscall(S.SYS_lstat, path, t.void(buf))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return buf
 end
 
 function S.fstat(fd, buf)
   if not buf then buf = t.stat() end
   local ret = C.syscall(S.SYS_fstat, t.int(getfd(fd)), t.void(buf))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return buf
 end
 
@@ -3349,21 +3353,21 @@ end
 function S.ustat(dev) -- note deprecated, use statfs instead
   local u = t.ustat()
   local ret = C.ustat(dev, u)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return u
 end
 
 function S.statfs(path)
   local st = t.statfs()
   local ret = C.statfs(path, st)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return st
 end
 
 function S.fstatfs(fd)
   local st = t.statfs()
   local ret = C.fstatfs(getfd(fd), st)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return st
 end
 
@@ -3371,7 +3375,7 @@ function S.nanosleep(req)
   if not ffi.istype(t.timespec, req) then req = t.timespec(req) end
   local rem = t.timespec()
   local ret = C.nanosleep(req, rem)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return rem
 end
 
@@ -3415,7 +3419,7 @@ end
 function S.socket(domain, stype, protocol)
   domain = stringflag(domain, "AF_")
   local ret = C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return t.fd(ret)
 end
 
@@ -3423,7 +3427,7 @@ function S.socketpair(domain, stype, protocol)
   domain = stringflag(domain, "AF_")
   local sv2 = int2_t()
   local ret = C.socketpair(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol), sv2)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return {t.fd(sv2[0]), t.fd(sv2[1])}
 end
 
@@ -3446,7 +3450,7 @@ function S.accept(sockfd, flags, addr, addrlen)
     then ret = C.accept(getfd(sockfd), addr, addrlen)
     else ret = C.accept4(getfd(sockfd), addr, addrlen, stringflags(flags, "SOCK_"))
   end
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return {fd = t.fd(ret), addr = sa(addr, addrlen[0])}
 end
 
@@ -3454,7 +3458,7 @@ function S.getsockname(sockfd)
   local ss = t.sockaddr_storage()
   local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
   local ret = C.getsockname(getfd(sockfd), ss, addrlen)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return sa(ss, addrlen[0])
 end
 
@@ -3462,7 +3466,7 @@ function S.getpeername(sockfd)
   local ss = t.sockaddr_storage()
   local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
   local ret = C.getpeername(getfd(sockfd), ss, addrlen)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return sa(ss, addrlen[0])
 end
 
@@ -3473,7 +3477,7 @@ function S.fcntl(fd, cmd, arg)
   elseif cmd == S.F_SETFD then arg = stringflag(arg, "FD_")
   end
   local ret = C.fcntl(getfd(fd), cmd, arg or 0)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   -- return values differ, some special handling needed
   if cmd == S.F_DUPFD or cmd == S.F_DUPFD_CLOEXEC then return t.fd(ret) end
   if cmd == S.F_GETFD or cmd == S.F_GETFL or cmd == S.F_GETLEASE or cmd == S.F_GETOWN or
@@ -3484,7 +3488,7 @@ end
 function S.uname()
   local u = t.utsname()
   local ret = C.uname(u)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return {sysname = ffi.string(u.sysname), nodename = ffi.string(u.nodename), release = ffi.string(u.release),
           version = ffi.string(u.version), machine = ffi.string(u.machine), domainname = ffi.string(u.domainname)}
 end
@@ -3492,7 +3496,7 @@ end
 function S.gethostname()
   local buf = t.buffer(HOST_NAME_MAX + 1)
   local ret = C.gethostname(buf, HOST_NAME_MAX + 1)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   buf[HOST_NAME_MAX] = 0 -- paranoia here to make sure null terminated, which could happen if HOST_NAME_MAX was incorrect
   return ffi.string(buf)
 end
@@ -3604,7 +3608,7 @@ function S.sigaction(signum, handler, mask, flags)
   end
   local old = t.sigaction()
   local ret = C.sigaction(stringflag(signum, "SIG"), sa, old)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return old
 end
 
@@ -3614,7 +3618,7 @@ function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 function S.gettimeofday(tv)
   if not tv then tv = t.timeval() end -- note it is faster to pass your own tv if you call a lot
   local ret = C.gettimeofday(tv, nil)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return tv
 end
 
@@ -3627,7 +3631,7 @@ end
 function S.sysinfo(info)
   if not info then info = t.sysinfo() end
   local ret = C.sysinfo(info)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return info
 end
 
@@ -3637,7 +3641,7 @@ local function growattrbuf(f, a1, a2)
   local ret
   repeat
     if a2 then ret = tonumber(f(a1, a2, buffer, len)) else ret = tonumber(f(a1, buffer, len)) end
-    if ret == -1 and ffi.errno ~= S.E.ERANGE then return nil, t.error(ffi.errno()) end
+    if ret == -1 and ffi.errno ~= S.E.ERANGE then return nil, t.error() end
     if ret == -1 then
       len = len * 2
       buffer = t.buffer(len)
@@ -3734,14 +3738,14 @@ function S.sigprocmask(how, set)
   set = mksigset(set)
   local oldset = t.sigset()
   local ret = C.sigprocmask(how, set, oldset)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return oldset
 end
 
 function S.sigpending()
   local set = t.sigset()
   local ret = C.sigpending(set)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
  return set
 end
 
@@ -3763,7 +3767,7 @@ function S.select(s) -- note same structure as returned
   w, nfds = mkfdset(s.writefds or {}, nfds)
   e, nfds = mkfdset(s.exceptfds or {}, nfds)
   local ret = C.select(nfds, r, w, e, timeout2)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return {readfds = fdisset(s.readfds or {}, r), writefds = fdisset(s.writefds or {}, w),
           exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
 end
@@ -3771,7 +3775,7 @@ end
 function S.poll(fds, timeout)
   if not ffi.istype(t.pollfds, fds) then fds = t.pollfds(fds) end
   local ret = C.poll(fds.pfd, #fds, timeout or -1)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return fds
 end
 
@@ -3790,7 +3794,7 @@ S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 function S.getrlimit(resource)
   local rlim = t.rlimit()
   local ret = C.getrlimit(stringflag(resource, "RLIMIT_"), rlim)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return rlim
 end
 
@@ -3826,7 +3830,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   else
     ret = C.epoll_wait(getfd(epfd), events, maxevents, timeout or -1)
   end
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   local r = {}
   for i = 1, ret do -- put in Lua array
     local e = events[i - 1]
@@ -3884,7 +3888,7 @@ function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two differen
   local off = off1_t()
   off[0] = offset
   local ret = C.sendfile(getfd(out_fd), getfd(in_fd), off, count)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return {count = tonumber(ret), offset = tonumber(off[0])}
 end
 
@@ -3898,7 +3902,7 @@ function S.eventfd_read(fd, value)
     value[0] = 0
     return 0
   end
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return tonumber(value[0])
 end
 function S.eventfd_write(fd, value)
@@ -3966,7 +3970,7 @@ end
 function S.getitimer(which, value)
   if not value then value = t.itimerval() end
   local ret = C.getitimer(stringflag(which, "ITIMER_"), value)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return value
 end
 
@@ -3974,7 +3978,7 @@ function S.setitimer(which, it)
   if not ffi.istype(t.itimerval, it) then it = t.itimerval(it) end
   local oldtime = t.itimerval()
   local ret = C.setitimer(stringflag(which, "ITIMER_"), it, oldtime)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return oldtime
 end
 
@@ -3986,14 +3990,14 @@ function S.timerfd_settime(fd, flags, it)
   local oldtime = t.itimerspec()
   if not ffi.istype(t.itimerspec, it) then it = t.itimerspec(it) end
   local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), it, oldtime)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return oldtime
 end
 
 function S.timerfd_gettime(fd, curr_value)
   if not curr_value then curr_value = t.itimerspec() end
   local ret = C.timerfd_gettime(getfd(fd), curr_value)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return curr_value
 end
 
@@ -4013,7 +4017,7 @@ local function getctx(ctx) return t.ulong(ctx.ctx) end -- aio_context_t is reall
 function S.io_setup(nr_events)
   local ctx = t.aio_context()
   local ret = C.syscall(S.SYS_io_setup, t.uint(nr_events), t.void(ctx))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return ctx
 end
 
@@ -4059,7 +4063,7 @@ function S.io_cancel(ctx, iocb, result)
   iocb = getiocb(iocb)
   if not result then result = t.io_event() end
   local ret = C.syscall(S.SYS_io_cancel, getctx(ctx), iocb, result)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return ret
 end
 
@@ -4067,7 +4071,7 @@ function S.io_getevents(ctx, min, nr, timeout, events)
   if not events then events = io_events_t(nr) end
   if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
   local ret = C.syscall(S.SYS_io_getevents, getctx(ctx), t.long(min), t.long(nr), events, timeout)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   -- need to think more about how to return these, eg metatype for io_event?
   local r = {}
   for i = 0, nr - 1 do
@@ -4135,7 +4139,7 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
     if type(arg2) == "string" then arg2 = ffi.cast(t.ulong, arg2) end
   end
   local ret = C.prctl(option, arg2 or 0, arg3 or 0, arg4 or 0, arg5 or 0)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   if prctlrint[noption] then return ret end
   if prctlpint[noption] then return i[0] end
   if option == S.PR_GET_NAME then
@@ -4150,12 +4154,12 @@ function S.klogctl(tp, buf, len)
   if not buf and (tp == 2 or tp == 3 or tp == 4) then
     if not len then
       len = C.klogctl(10, nil, 0) -- get size so we can allocate buffer
-      if len == -1 then return nil, t.error(ffi.errno()) end
+      if len == -1 then return nil, t.error() end
     end
     buf = t.buffer(len)
   end
   local ret = C.klogctl(tp, buf or nil, len or 0)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   if tp == 9 or tp == 10 then return tonumber(ret) end
   if tp == 2 or tp == 3 or tp == 4 then return ffi.string(buf, ret) end
   return true
@@ -4169,7 +4173,7 @@ function S.adjtimex(a)
     a = t.timex(a)
   end
   local ret = C.adjtimex(a)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   -- we need to return a table, as we need to return both ret and the struct timex. should probably put timex fields in table
   return setmetatable({state = ret, timex = a}, mt.timex)
 end
@@ -4177,14 +4181,14 @@ end
 function S.clock_getres(clk_id, ts)
   if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
   local ret = C.syscall(S.SYS_clock_getres, t.clockid(stringflag(clk_id, "CLOCK_")), t.void(ts))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
   if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
   local ret = C.syscall(S.SYS_clock_gettime, t.clockid(stringflag(clk_id, "CLOCK_")), t.void(ts))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return ts
 end
 
@@ -4689,7 +4693,7 @@ function S.recvmsg(fd, msg, flags)
     msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io, msg_control = buf, msg_controllen = bufsize}
   end
   local ret = C.recvmsg(getfd(fd), msg, stringflags(flags, "MSG_"))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   local ret = {count = ret, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
   local mc, cmsg = cmsg_firsthdr(msg)
   while cmsg do
@@ -4839,7 +4843,7 @@ local function if_nametoindex(name, s) -- internal version when already have soc
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
   local ret = C.ioctl(getfd(s), S.SIOCGIFINDEX, ifr)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return ifr.ifr_ifru.ifru_ivalue
 end
 
@@ -4858,7 +4862,7 @@ local function bridge_ioctl(io, name)
   local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
   local ret = C.ioctl(getfd(s), io, ffi.cast(char_pt, name))
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   local ok, err = s:close()
   if not ok then return nil, err end
   return true
@@ -4881,7 +4885,7 @@ local function bridge_if_ioctl(io, bridge, dev)
   ffi.copy(ifr.ifr_ifrn.ifrn_name, bridge, len) -- note not using the short forms as no metatable defined yet...
   ifr.ifr_ifru.ifru_ivalue = dev
   ret = C.ioctl(getfd(s), io, ifr);
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   ok, err = s:close()
   if not ok then return nil, err end
   return true
@@ -5020,13 +5024,13 @@ end
 
 function S.cfgetispeed(termios)
   local bits = C.cfgetispeed(termios)
-  if bits == -1 then return nil, t.error(ffi.errno()) end
+  if bits == -1 then return nil, t.error() end
   return bits_to_speed(bits)
 end
 
 function S.cfgetospeed(termios)
   local bits = C.cfgetospeed(termios)
-  if bits == -1 then return nil, t.error(ffi.errno()) end
+  if bits == -1 then return nil, t.error() end
   return bits_to_speed(bits)
 end
 
@@ -5056,7 +5060,7 @@ t.termios = ffi.metatype("struct termios", {
 function S.tcgetattr(fd)
   local termios = t.termios()
   local ret = C.tcgetattr(getfd(fd), termios)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
+  if ret == -1 then return nil, t.error() end
   return termios
 end
 
