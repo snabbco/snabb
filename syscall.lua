@@ -1585,8 +1585,6 @@ S.E.EWOULDBLOCK    = S.E.EAGAIN
 S.E.EDEADLOCK      = S.E.EDEADLK
 S.E.ENOATTR        = S.E.ENODATA
 
-function S.strerror(errno) return ffi.string(C.strerror(errno)) end
-
 local errsyms = {} -- reverse lookup
 
 for k, v in pairs(S.E) do
@@ -3047,7 +3045,9 @@ local function sa(addr, addrlen)
   return a
 end
 
--- functions from section 3 that we use for ip addresses
+-- functions from section 3 that we use for ip addresses etc
+function S.strerror(errno) return ffi.string(C.strerror(errno)) end
+
 function S.inet_aton(s, addr)
   if not addr then addr = t.in_addr() end
   local ret = C.inet_aton(s, addr)
