@@ -2173,16 +2173,18 @@ struct sigaction {
 ]]
 end
 
--- Linux struct siginfo padding depends on architecture
+-- Linux struct siginfo padding depends on architecture, also statfs
 if ffi.abi("64bit") then
 ffi.cdef[[
 static const int SI_MAX_SIZE = 128;
 static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 4;
+typedef long statfs_word;
 ]]
 else
 ffi.cdef[[
 static const int SI_MAX_SIZE = 128;
 static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 3;
+typedef uint32_t statfs_word;
 ]]
 end
 
@@ -2230,6 +2232,25 @@ typedef struct siginfo {
     } sigpoll;
   } sifields;
 } siginfo_t;
+
+typedef struct {
+  int     val[2];
+} kernel_fsid_t;
+
+struct statfs64 {
+  statfs_word f_type;
+  statfs_word f_bsize;
+  uint64_t f_blocks;
+  uint64_t f_bfree;
+  uint64_t f_bavail;
+  uint64_t f_files;
+  uint64_t f_ffree;
+  kernel_fsid_t f_fsid;
+  statfs_word f_namelen;
+  statfs_word f_frsize;
+  statfs_word f_flags;
+  statfs_word f_spare[4];
+};
 ]]
 
 -- epoll packed on x86_64 only (so same as x86)
@@ -2448,11 +2469,12 @@ int mount(const char *source, const char *target, const char *filesystemtype, un
 int umount(const char *target);
 int umount2(const char *target, int flags);
 
+int nanosleep(const struct timespec *req, struct timespec *rem);
 int access(const char *pathname, int mode);
 char *getcwd(char *buf, size_t size);
 int ustat(dev_t dev, struct ustat *ubuf);
-
-int nanosleep(const struct timespec *req, struct timespec *rem);
+int statfs(const char *path, struct statfs64 *buf); /* this is statfs64 syscall, but glibc wraps */
+int fstatfs(int fd, struct statfs64 *buf);          /* this too */
 
 int syscall(int number, ...);
 
@@ -2608,6 +2630,7 @@ t.seccomp_data = ffi.typeof("struct seccomp_data")
 t.iovec = ffi.typeof("struct iovec")
 t.net_device_stats = ffi.typeof("struct net_device_stats")
 t.ustat = ffi.typeof("struct ustat")
+t.statfs = ffi.typeof("struct statfs64")
 
 -- could use metamethods for struct ifreq see /usr/include/linux/if.h
 t.ifreq = ffi.typeof("struct ifreq")
@@ -3329,6 +3352,20 @@ function S.ustat(dev) -- note deprecated, use statfs instead
   local ret = C.ustat(dev, u)
   if ret == -1 then return nil, t.error(ffi.errno()) end
   return u
+end
+
+function S.statfs(path)
+  local st = t.statfs()
+  local ret = C.statfs(path, st)
+  if ret == -1 then return nil, t.error(ffi.errno()) end
+  return st
+end
+
+function S.fstatfs(fd)
+  local st = t.statfs()
+  local ret = C.fstatfs(getfd(fd), st)
+  if ret == -1 then return nil, t.error(ffi.errno()) end
+  return st
 end
 
 function S.nanosleep(req)
@@ -5130,7 +5167,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
-                   'grantpt', 'unlockpt', 'ptsname', 'sync_file_range'
+                   'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
@@ -5144,6 +5181,7 @@ fmeth.chmod = S.fchmod
 fmeth.setxattr = S.fsetxattr
 fmeth.getxattr = S.gsetxattr
 fmeth.truncate = S.ftruncate
+fmeth.statfs = S.fstatfs
 
 -- sequence number used by netlink messages
 

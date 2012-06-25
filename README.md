@@ -136,7 +136,7 @@ statfs(64), fstatfs, ustat
 
 These now work and have tests, the 64 bit operations are always used on 32 bit architectures.
 
-Note that fcntl64 has not been changed, as we have not defined the flock structure which is the change, and it is wrapped by glibc.
+Note that fcntl64 has not been changed yet, as we have not defined the flock structure which is the change, and it is wrapped by glibc.
 TODO: fcntl64(2), statfs64(2).
 
 ### uid size.

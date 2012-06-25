@@ -954,6 +954,16 @@ test_filesystem = {
     local u = assert(S.ustat(st.dev))
     assert(u.f_tfree > 0 and u.f_tinode > 0, "expect some free blocks and inodes")
   end,
+  test_statfs = function()
+    local st = assert(S.statfs("."))
+    assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
+  end,
+  test_fstatfs = function()
+    local fd = assert(S.open(".", "rdonly"))
+    local st = assert(fd:statfs())
+    assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
+    assert(fd:close())
+  end,
 }
 
 -- legacy tests not yet converted to test framework
