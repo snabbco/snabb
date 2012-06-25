@@ -2618,7 +2618,6 @@ t.uint64_1 = ffi.typeof("uint64_t[1]")
 t.socklen1 = ffi.typeof("socklen_t[1]")
 t.off1 = ffi.typeof("off_t[1]")
 t.loff1 = ffi.typeof("loff_t[1]")
-local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
 -- types with metatypes
 t.error = ffi.metatype("struct {int errno;}", {
