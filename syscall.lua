@@ -3045,7 +3045,7 @@ local function tbuffer(...) -- helper function for sequence of types in a buffer
   end
   local len = 0
   for _, tp in ipairs{...} do
-    len = len + ffi.sizeof(tp) -- TODO alignment issues, need to round up to minimum alignment
+    len = len + ffi.sizeof(tp) -- TODO alignment issues, need to round up to minimum alignment, or as supplied
   end
   local buf = t.buffer(len)
   return buf, len, threc(buf, 0, ...)
