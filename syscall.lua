@@ -501,6 +501,10 @@ mt.timex = {
 S.XATTR_CREATE = 1
 S.XATTR_REPLACE = 2
 
+-- utime
+S.UTIME_NOW  = bit.lshift(1, 30) - 1
+S.UTIME_OMIT = bit.lshift(1, 30) - 2
+
 -- send, recv etc
 S.MSG_OOB             = 0x01
 S.MSG_PEEK            = 0x02
@@ -2475,6 +2479,7 @@ char *getcwd(char *buf, size_t size);
 int ustat(dev_t dev, struct ustat *ubuf);
 int statfs(const char *path, struct statfs64 *buf); /* this is statfs64 syscall, but glibc wraps */
 int fstatfs(int fd, struct statfs64 *buf);          /* this too */
+int futimens(int fd, const struct timespec times[2]);
 
 int syscall(int number, ...);
 
