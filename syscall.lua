@@ -1586,31 +1586,9 @@ S.E.EDEADLOCK      = S.E.EDEADLK
 S.E.ENOATTR        = S.E.ENODATA
 
 local errsyms = {} -- reverse lookup
-
 for k, v in pairs(S.E) do
   errsyms[v] = k
 end
-
--- basic types
-t.int = ffi.typeof("int")
-t.uint = ffi.typeof("unsigned int")
-t.int64 = ffi.typeof("int64_t")
-t.uint64 = ffi.typeof("uint64_t")
-t.long = ffi.typeof("long")
-t.ulong = ffi.typeof("unsigned long")
-t.uintptr = ffi.typeof("uintptr_t")
-t.void = ffi.typeof("void *")
-
--- luaffi needs some help casting number to pointer. maybe fixed now, check.
-function t.pointer(i) return ffi.cast(t.void, ffi.cast(t.uintptr, i)) end
-
-local int1_t = ffi.typeof("int[1]")
-local int2_t = ffi.typeof("int[2]")
-local ints_t = ffi.typeof("int[?]")
-local int64_1t = ffi.typeof("int64_t[1]")
-
--- char buffer type
-t.buffer = ffi.typeof("char[?]")
 
 -- define C types
 ffi.cdef[[
@@ -2569,6 +2547,27 @@ end
 function S.mode(mode) return stringflags(mode, "S_") end
 
 -- Lua type constructors corresponding to defined types
+-- basic types
+t.int = ffi.typeof("int")
+t.uint = ffi.typeof("unsigned int")
+t.int64 = ffi.typeof("int64_t")
+t.uint64 = ffi.typeof("uint64_t")
+t.long = ffi.typeof("long")
+t.ulong = ffi.typeof("unsigned long")
+t.uintptr = ffi.typeof("uintptr_t")
+t.void = ffi.typeof("void *")
+
+-- luaffi needs some help casting number to pointer. maybe fixed now, check.
+function t.pointer(i) return ffi.cast(t.void, ffi.cast(t.uintptr, i)) end
+
+local int1_t = ffi.typeof("int[1]")
+local int2_t = ffi.typeof("int[2]")
+local ints_t = ffi.typeof("int[?]")
+local int64_1t = ffi.typeof("int64_t[1]")
+
+-- char buffer type
+t.buffer = ffi.typeof("char[?]")
+
 t.sa_family = ffi.typeof("sa_family_t")
 t.msghdr = ffi.typeof("struct msghdr")
 t.cmsghdr = ffi.typeof("struct cmsghdr")
