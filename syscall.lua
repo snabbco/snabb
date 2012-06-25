@@ -4004,14 +4004,12 @@ function S.timerfd_gettime(fd, curr_value)
   return curr_value
 end
 
-function S.timerfd_read(fd, buffer, size)
-  if not size then size = 8 end -- only sensible size!
-  if not buffer then buffer = t.buffer(size) end
-  local ret, err = S.read(fd, buffer, size)
+function S.timerfd_read(fd, buffer)
+  if not buffer then buffer = uint64_1t() end
+  local ret, err = S.read(fd, buffer, 8)
   if not ret and err.EAGAIN then return 0 end -- will never actually return 0
   if not ret then return nil, err end
-  local i = ffi.cast(int64_pt, buffer)
-  return tonumber(i[0])
+  return tonumber(buffer[0])
 end
 
 -- aio functions
