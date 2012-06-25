@@ -2938,11 +2938,17 @@ mt.pollfds = {
 
 t.pollfds = ffi.metatype("struct { int count; struct pollfd pfd[?];}", mt.pollfds)
 
--- pointer types.
-pt.uchar = ffi.typeof("unsigned char *")
-pt.char = ffi.typeof("char *")
-pt.int = ffi.typeof("int *")
-pt.uint = ffi.typeof("unsigned int *")
+-- cast to pointer to a type. could generate for all types.
+
+local function ptt(tp)
+  local ptp = ffi.typeof("$ *", tp)
+  return function(x) return ffi.cast(ptp, x) end
+end
+
+pt.uchar = ptt(t.uchar)
+pt.char = ptt(t.char)
+pt.int = ptt(t.int)
+pt.uint = ptt(t.uint)
 
 pt.nlmsghdr = ffi.typeof("struct nlmsghdr *")
 pt.rtattr = ffi.typeof("struct rtattr *")
@@ -3054,7 +3060,7 @@ function S.inet_aton(s, addr)
 end
 
 function S.inet_ntoa(addr)
-  local b = ffi.cast(pt.uchar, addr)
+  local b = pt.uchar(addr)
   return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
 end
 
@@ -4334,8 +4340,8 @@ end
 
 local function cmsg_nxthdr(msg, buf, cmsg)
   if tonumber(cmsg.cmsg_len) < cmsg_hdrsize then return nil end -- invalid cmsg
-  buf = ffi.cast(pt.char, buf)
-  local msg_control = ffi.cast(pt.char, msg.msg_control)
+  buf = pt.char(buf)
+  local msg_control = pt.char(msg.msg_control)
   buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
   if buf + cmsg_hdrsize > msg_control + msg.msg_controllen then return nil end -- header would not fit
   cmsg = ffi.cast(pt.cmsghdr, buf)
@@ -4393,11 +4399,11 @@ local ifla_decode = {
     end
   end,
   [S.IFLA_MTU] = function(ir, buf, len)
-    local u = ffi.cast(pt.uint, buf)
+    local u = pt.uint(buf)
     ir.mtu = tonumber(u[0])
   end,
   [S.IFLA_LINK] = function(ir, buf, len)
-    local i = ffi.cast(pt.int, buf)
+    local i = pt.int(buf)
     ir.link = tonumber(i[0])
   end,
   [S.IFLA_QDISC] = function(ir, buf, len)
@@ -4701,7 +4707,7 @@ function S.recvmsg(fd, msg, flags)
         ret.uid = cred.uid
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
-        local fda = ffi.cast(pt.int, cmsg + 1) -- cmsg_data
+        local fda = pt.int(cmsg + 1) -- cmsg_data
         local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, ffi.sizeof(int1_t))
         ret.fd = {}
         for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
@@ -4858,7 +4864,7 @@ end
 local function bridge_ioctl(io, name)
   local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
-  local ret = C.ioctl(getfd(s), io, ffi.cast(pt.char, name))
+  local ret = C.ioctl(getfd(s), io, pt.char(name))
   if ret == -1 then return nil, t.error() end
   local ok, err = s:close()
   if not ok then return nil, err end
