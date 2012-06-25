@@ -4014,19 +4014,17 @@ function S.timerfd_read(fd, buffer)
 end
 
 -- aio functions
-local function getctx(ctx) return t.ulong(ctx.ctx) end -- aio_context_t is really unsigned long
-
 function S.io_setup(nr_events)
   local ctx = t.aio_context()
-  local ret = C.syscall(S.SYS_io_setup, t.uint(nr_events), t.void(ctx))
+  local ret = C.syscall(S.SYS_io_setup, t.uint(nr_events), ctx)
   if ret == -1 then return nil, t.error() end
   return ctx
 end
 
 function S.io_destroy(ctx)
   if ctx.ctx == 0 then return end
-  local ret = retbool(C.syscall(S.SYS_io_destroy, getctx(ctx)))
-  ctx.ctx = 0 -- assume this is correct nil value
+  local ret = retbool(C.syscall(S.SYS_io_destroy, ctx:n()))
+  ctx.ctx = 0
   return ret
 end
 
@@ -4065,7 +4063,7 @@ end
 function S.io_cancel(ctx, iocb, result)
   iocb = getiocb(iocb)
   if not result then result = t.io_event() end
-  local ret = C.syscall(S.SYS_io_cancel, getctx(ctx), iocb, result)
+  local ret = C.syscall(S.SYS_io_cancel, ctx:n(), iocb, result)
   if ret == -1 then return nil, t.error() end
   return ret
 end
@@ -4073,7 +4071,7 @@ end
 function S.io_getevents(ctx, min, nr, timeout, events)
   if not events then events = io_events_t(nr) end
   if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
-  local ret = C.syscall(S.SYS_io_getevents, getctx(ctx), t.long(min), t.long(nr), events, timeout)
+  local ret = C.syscall(S.SYS_io_getevents, ctx:n(), t.long(min), t.long(nr), events, timeout)
   if ret == -1 then return nil, t.error() end
   -- need to think more about how to return these, eg metatype for io_event?
   local r = {}
@@ -4088,7 +4086,7 @@ end
 
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
   iocb, nr = getiocbs(iocb)
-  return retnum(C.syscall(S.SYS_io_submit, getctx(ctx), t.long(nr), iocb))
+  return retnum(C.syscall(S.SYS_io_submit, ctx:n(), t.long(nr), iocb))
 end
 
 -- map for valid options for arg2
@@ -5202,7 +5200,8 @@ end
 t.fd = ffi.metatype("struct {int fileno; int sequence;}", {__index = fmeth, __gc = S.close})
 
 t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
-  __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel},
+  __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel,
+             n = function(ctx) return t.ulong(ctx.ctx) end},
   __gc = S.io_destroy
 })
 

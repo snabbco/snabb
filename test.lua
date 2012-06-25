@@ -907,7 +907,7 @@ test_aio = {
     assert(#r == 1, "expect one aio event") -- should also test what is returned
     assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}} == 1)
     -- TODO this is erroring, not sure why, needs debugging
-    --r, err = ctx:cancel({cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0})
+    -- r, err = assert(ctx:cancel({cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}))
     --r = assert(ctx:getevents(1, 1))
     --assert(#r == 0, "expect no aio events")
     -- TODO this is not working either
