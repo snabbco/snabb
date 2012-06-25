@@ -948,6 +948,14 @@ test_proc = {
   end
 }
 
+test_filesystem = {
+  test_ustat = function()
+    local st = assert(S.stat("."))
+    local u = assert(S.ustat(st.dev))
+    assert(u.f_tfree > 0 and u.f_tinode > 0, "expect some free blocks and inodes")
+  end,
+}
+
 -- legacy tests not yet converted to test framework
 
 test_legacy = {

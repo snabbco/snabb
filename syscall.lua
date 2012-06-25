@@ -1690,6 +1690,7 @@ typedef uint32_t socklen_t;
 typedef uint32_t id_t;
 typedef int32_t pid_t;
 typedef int32_t clockid_t;
+typedef int32_t daddr_t;
 
 // 64 bit
 typedef uint64_t dev_t;
@@ -2121,6 +2122,12 @@ struct seccomp_data {
   uint64_t instruction_pointer;
   uint64_t args[6];
 };
+struct ustat {
+  daddr_t f_tfree;
+  ino_t f_tinode;
+  char f_fname[6];
+  char f_fpack[6];
+};
 
 /* termios */
 typedef unsigned char	cc_t;
@@ -2443,6 +2450,7 @@ int umount2(const char *target, int flags);
 
 int access(const char *pathname, int mode);
 char *getcwd(char *buf, size_t size);
+int ustat(dev_t dev, struct ustat *ubuf);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
 
@@ -2599,6 +2607,7 @@ t.io_event = ffi.typeof("struct io_event")
 t.seccomp_data = ffi.typeof("struct seccomp_data")
 t.iovec = ffi.typeof("struct iovec")
 t.net_device_stats = ffi.typeof("struct net_device_stats")
+t.ustat = ffi.typeof("struct ustat")
 
 -- could use metamethods for struct ifreq see /usr/include/linux/if.h
 t.ifreq = ffi.typeof("struct ifreq")
@@ -3313,6 +3322,13 @@ function S.getcwd()
     end
   until ret
   return ffi.string(buf)
+end
+
+function S.ustat(dev) -- note deprecated, use statfs instead
+  local u = t.ustat()
+  local ret = C.ustat(dev, u)
+  if ret == -1 then return nil, t.error(ffi.errno()) end
+  return u
 end
 
 function S.nanosleep(req)
