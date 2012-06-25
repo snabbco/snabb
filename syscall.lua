@@ -1630,52 +1630,6 @@ local int64_1t = ffi.typeof("int64_t[1]")
 -- char buffer type
 t.buffer = ffi.typeof("char[?]")
 
--- misc
-function S.nogc(d) ffi.gc(d, nil) end
-
--- straight passthrough, only needed for real 64 bit quantities. Used eg for seek (file might have giant holes!)
-local function ret64(ret)
-  if ret == t.uint64(-1) then return nil, t.error(ffi.errno()) end
-  return ret
-end
-
-local function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
-  ret = tonumber(ret)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
-  return ret
-end
-
--- used for no return value, return true for use of assert
-local function retbool(ret)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
-  return true
-end
-
--- used for pointer returns, -1 is failure; removed gc for mem
-local function retptr(ret)
-  if ret == t.pointer(-1) then return nil, t.error(ffi.errno()) end
-  return ret
-end
-
---get fd from standard string, integer, or cdata, or fd type
-local function getfd(fd)
-  if not fd then return nil end
-  if ffi.istype(t.int, fd) then return tonumber(fd) end
-  if type(fd) == 'number' then return fd end
-  if type(fd) == 'string' then
-    if fd == 'stdin' or fd == 'STDIN_FILENO' then return 0 end
-    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
-    if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
-  end
-  if fd.fileno then return tonumber(fd.fileno) end
-  return nil
-end
-
-local function retfd(ret)
-  if ret == -1 then return nil, t.error(ffi.errno()) end
-  return t.fd(ret)
-end
-
 -- define C types
 ffi.cdef[[
 
@@ -2542,6 +2496,53 @@ end
 
 -- misc
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
+
+function S.nogc(d) ffi.gc(d, nil) end
+
+-- return helpers. not so much needed any more, often not using
+
+-- straight passthrough, only needed for real 64 bit quantities. Used eg for seek (file might have giant holes!)
+local function ret64(ret)
+  if ret == t.uint64(-1) then return nil, t.error(ffi.errno()) end
+  return ret
+end
+
+local function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
+  ret = tonumber(ret)
+  if ret == -1 then return nil, t.error(ffi.errno()) end
+  return ret
+end
+
+-- used for no return value, return true for use of assert
+local function retbool(ret)
+  if ret == -1 then return nil, t.error(ffi.errno()) end
+  return true
+end
+
+-- used for pointer returns, -1 is failure; removed gc for mem
+local function retptr(ret)
+  if ret == t.pointer(-1) then return nil, t.error(ffi.errno()) end
+  return ret
+end
+
+--get fd from standard string, integer, or cdata, or fd type
+local function getfd(fd)
+  if not fd then return nil end
+  if ffi.istype(t.int, fd) then return tonumber(fd) end
+  if type(fd) == 'number' then return fd end
+  if type(fd) == 'string' then
+    if fd == 'stdin' or fd == 'STDIN_FILENO' then return 0 end
+    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
+    if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
+  end
+  if fd.fileno then return tonumber(fd.fileno) end
+  return nil
+end
+
+local function retfd(ret)
+  if ret == -1 then return nil, t.error(ffi.errno()) end
+  return t.fd(ret)
+end
 
 local function split(delimiter, text)
   if delimiter == "" then return {text} end
