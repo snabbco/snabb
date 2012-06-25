@@ -2560,13 +2560,6 @@ t.uint64 = ffi.typeof("uint64_t")
 t.long = ffi.typeof("long")
 t.ulong = ffi.typeof("unsigned long")
 t.uintptr = ffi.typeof("uintptr_t")
-t.void = ffi.typeof("void *")
-
--- luaffi needs some help casting number to pointer. maybe fixed now, check.
-function t.pointer(i) return ffi.cast(t.void, ffi.cast(t.uintptr, i)) end
-
--- char buffer type
-t.buffer = ffi.typeof("char[?]")
 
 t.sa_family = ffi.typeof("sa_family_t")
 t.msghdr = ffi.typeof("struct msghdr")
@@ -2610,6 +2603,7 @@ t.iocb_ptrs = ffi.typeof("struct iocb *[?]")
 t.string_array = ffi.typeof("const char *[?]")
 
 t.ints = ffi.typeof("int[?]")
+t.buffer = ffi.typeof("char[?]")
 
 t.int1 = ffi.typeof("int[1]")
 t.int2 = ffi.typeof("int[2]")
@@ -2961,7 +2955,17 @@ pt.signalfd_siginfo = ptt(t.signalfd_siginfo)
 pt.linux_dirent64 = ptt(t.linux_dirent64)
 pt.inotify_event = ptt(t.inotify_event)
 
+pt.void = function(x)
+  local vp = ffi.typeof("void *")
+  return ffi.cast(vp, x)
+end
+
 -- misc
+
+-- luaffi did need some help casting number to pointer. maybe fixed now, check.
+--S.pointer = function(i) return pt.void(ffi.cast(t.uintptr, i)) end
+S.pointer = pt.void
+
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
 function S.nogc(d) ffi.gc(d, nil) end
@@ -2993,7 +2997,7 @@ end
 
 -- used for pointer returns, -1 is failure; removed gc for mem
 local function retptr(ret)
-  if ret == t.pointer(-1) then return nil, t.error() end
+  if ret == S.pointer(-1) then return nil, t.error() end
   return ret
 end
 
@@ -3318,21 +3322,21 @@ end
 
 function S.stat(path, buf)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS_stat, path, t.void(buf))
+  local ret = C.syscall(S.SYS_stat, path, pt.void(buf))
   if ret == -1 then return nil, t.error() end
   return buf
 end
 
 function S.lstat(path, buf)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS_lstat, path, t.void(buf))
+  local ret = C.syscall(S.SYS_lstat, path, pt.void(buf))
   if ret == -1 then return nil, t.error() end
   return buf
 end
 
 function S.fstat(fd, buf)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS_fstat, t.int(getfd(fd)), t.void(buf))
+  local ret = C.syscall(S.SYS_fstat, t.int(getfd(fd)), pt.void(buf))
   if ret == -1 then return nil, t.error() end
   return buf
 end
@@ -4180,14 +4184,14 @@ end
 
 function S.clock_getres(clk_id, ts)
   if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
-  local ret = C.syscall(S.SYS_clock_getres, t.clockid(stringflag(clk_id, "CLOCK_")), t.void(ts))
+  local ret = C.syscall(S.SYS_clock_getres, t.clockid(stringflag(clk_id, "CLOCK_")), pt.void(ts))
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
   if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
-  local ret = C.syscall(S.SYS_clock_gettime, t.clockid(stringflag(clk_id, "CLOCK_")), t.void(ts))
+  local ret = C.syscall(S.SYS_clock_gettime, t.clockid(stringflag(clk_id, "CLOCK_")), pt.void(ts))
   if ret == -1 then return nil, t.error() end
   return ts
 end
@@ -4215,7 +4219,7 @@ function S.environ() -- return whole environment as table
   if not environ then return nil end
   local r = {}
   local i = 0
-  while environ[i] ~= t.pointer(0) do
+  while environ[i] ~= S.pointer(0) do
     local e = ffi.string(environ[i])
     local eq = e:find('=')
     if eq then
