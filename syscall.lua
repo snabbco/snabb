@@ -1591,21 +1591,6 @@ for k, v in pairs(S.E) do
   errsyms[v] = k
 end
 
-t.error = ffi.metatype("struct {int errno;}", {
-  __tostring = function(e) return S.strerror(e.errno) end,
-  __index = function(t, k)
-    if k == 'sym' then return errsyms[t.errno] end
-    if k == 'lsym' then return errsyms[t.errno]:sub(2):lower() end
-    if S.E[k] then return S.E[k] == t.errno end
-    local uk = S.E['E' .. k:upper()]
-    if uk then return uk == t.errno end
-  end,
-  __new = function(tp, errno)
-    if not errno then errno = ffi.errno() end
-    return ffi.new(tp, errno)
-  end
-})
-
 -- basic types
 t.int = ffi.typeof("int")
 t.uint = ffi.typeof("unsigned int")
@@ -2653,6 +2638,20 @@ local inotify_event_pt = ffi.typeof("struct inotify_event *")
 local iocbs_pt = ffi.typeof("struct iocb *[?]")
 
 -- types with metatypes
+t.error = ffi.metatype("struct {int errno;}", {
+  __tostring = function(e) return S.strerror(e.errno) end,
+  __index = function(t, k)
+    if k == 'sym' then return errsyms[t.errno] end
+    if k == 'lsym' then return errsyms[t.errno]:sub(2):lower() end
+    if S.E[k] then return S.E[k] == t.errno end
+    local uk = S.E['E' .. k:upper()]
+    if uk then return uk == t.errno end
+  end,
+  __new = function(tp, errno)
+    if not errno then errno = ffi.errno() end
+    return ffi.new(tp, errno)
+  end
+})
 
 t.sockaddr = ffi.metatype("struct sockaddr", {
   __index = function(sa, k)
