@@ -4048,7 +4048,7 @@ local function getiocb(ioi, iocb)
   iocb.aio_data = ioi.data or 0
   iocb.aio_reqprio = ioi.reqprio or 0
   iocb.aio_fildes = getfd(ioi.fd)
-  iocb.aio_buf = ffi.cast(t.int64, ioi.buf)
+  iocb.aio_buf = ffi.cast(t.int64, ioi.buf) -- TODO check, looks wrong
   iocb.aio_nbytes = ioi.nbytes
   iocb.aio_offset = ioi.offset
   if ioi.resfd then
@@ -4263,7 +4263,7 @@ function S.setcmdline(...) -- this sets /proc/self/cmdline, use prctl to set /pr
     cmdstart = C.environ[0] - #oldcmdline -- this is where Linux stores the command line
   end
 
-  local me = ffi.cast("char *", C.environ)
+  local me = pt.char(C.environ)
 
   if not me then return nil end -- in normal use you should get a pointer to one null pointer as minimum
 
