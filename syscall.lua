@@ -2636,9 +2636,11 @@ t.iovec = ffi.typeof("struct iovec")
 t.net_device_stats = ffi.typeof("struct net_device_stats")
 t.ustat = ffi.typeof("struct ustat")
 t.statfs = ffi.typeof("struct statfs64")
-
--- could use metamethods for struct ifreq see /usr/include/linux/if.h
 t.ifreq = ffi.typeof("struct ifreq")
+
+local epoll_events_t = ffi.typeof("struct epoll_event[?]")
+local iocbs_t = ffi.typeof("struct iocb[?]")
+local io_events_t = ffi.typeof("struct io_event[?]")
 
 local uint64_1t = ffi.typeof("uint64_t[1]")
 local socklen1_t = ffi.typeof("socklen_t[1]")
@@ -2646,15 +2648,11 @@ local off1_t = ffi.typeof("off_t[1]")
 local loff_1t = ffi.typeof("loff_t[1]")
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
-local iocbs_pt = ffi.typeof("struct iocb *[?]")
-
-local epoll_events_t = ffi.typeof("struct epoll_event[?]")
-local iocbs_t = ffi.typeof("struct iocb[?]")
-local io_events_t = ffi.typeof("struct io_event[?]")
-
 local string_array_t = ffi.typeof("const char *[?]")
 
 -- pointer types. use another table?
+local uchar_pt = ffi.typeof("unsigned char *")
+local char_pt = ffi.typeof("char *")
 local int_pt = ffi.typeof("int *")
 local uint_pt = ffi.typeof("unsigned int *")
 local int64_pt = ffi.typeof("int64_t *")
@@ -2669,11 +2667,11 @@ local pollfd_pt = ffi.typeof("struct pollfd *")
 local signalfd_siginfo_pt = ffi.typeof("struct signalfd_siginfo *")
 local sockaddr_pt = ffi.typeof("struct sockaddr *")
 local cmsghdr_pt = ffi.typeof("struct cmsghdr *")
-local uchar_pt = ffi.typeof("unsigned char *")
-local char_pt = ffi.typeof("char *")
 local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
 local linux_dirent64_pt = ffi.typeof("struct linux_dirent64 *")
 local inotify_event_pt = ffi.typeof("struct inotify_event *")
+
+local iocbs_pt = ffi.typeof("struct iocb *[?]")
 
 -- types with metatypes
 
