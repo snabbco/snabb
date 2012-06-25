@@ -2623,8 +2623,6 @@ pt.uchar = ffi.typeof("unsigned char *")
 pt.char = ffi.typeof("char *")
 pt.int = ffi.typeof("int *")
 pt.uint = ffi.typeof("unsigned int *")
-local int64_pt = ffi.typeof("int64_t *")
-local uint64_pt = ffi.typeof("uint64_t *")
 
 local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtattr_pt = ffi.typeof("struct rtattr *")
