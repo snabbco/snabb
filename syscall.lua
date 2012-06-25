@@ -2494,7 +2494,9 @@ else
   }
 end
 
---get fd from standard string, integer, or cdata, or fd type
+-- functions we need for metatypes
+
+-- get fd from standard string, integer, or cdata, or fd type
 local function getfd(fd)
   if not fd then return nil end
   if ffi.istype(t.int, fd) then return tonumber(fd) end
@@ -2564,6 +2566,21 @@ local function stringflag(str, prefix) -- single value only
   local val = S[s:upper()]
   if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions, better than silent ignore
   return val
+end
+
+local function accessflags(s) -- allow "rwx"
+  if not s then return 0 end
+  if type(s) ~= "string" then return s end
+  s = trim(s:upper())
+  local flag = 0
+  for i = 1, #s do
+    local c = s:sub(i, i)
+    if     c == 'R' then flag = bit.bor(flag, S.R_OK)
+    elseif c == 'W' then flag = bit.bor(flag, S.W_OK)
+    elseif c == 'X' then flag = bit.bor(flag, S.X_OK)
+    else error("invalid access flag") end
+  end
+  return flag
 end
 
 -- useful for comparing modes etc
@@ -3120,21 +3137,6 @@ function S.pause() return retbool(C.pause()) end
 
 function S.truncate(path, length) return retbool(C64.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C64.ftruncate(getfd(fd), length)) end
-
-local function accessflags(s) -- allow "rwx"
-  if not s then return 0 end
-  if type(s) ~= "string" then return s end
-  s = trim(s:upper())
-  local flag = 0
-  for i = 1, #s do
-    local c = s:sub(i, i)
-    if     c == 'R' then flag = bit.bor(flag, S.R_OK)
-    elseif c == 'W' then flag = bit.bor(flag, S.W_OK)
-    elseif c == 'X' then flag = bit.bor(flag, S.X_OK)
-    else error("invalid access flag") end
-  end
-  return flag
-end
 
 function S.access(pathname, mode) return retbool(C.access(pathname, accessflags(mode))) end
 
