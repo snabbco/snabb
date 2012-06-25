@@ -3001,6 +3001,30 @@ local function retptr(ret)
   return ret
 end
 
+mt.wait = {
+  __index = function(w, k)
+    local WTERMSIG = bit.band(w.status, 0x7f)
+    local EXITSTATUS = bit.rshift(bit.band(w.status, 0xff00), 8)
+    local WIFEXITED = (WTERMSIG == 0)
+    local tab = {
+      WIFEXITED = WIFEXITED,
+      WIFSTOPPED = bit.band(w.status, 0xff) == 0x7f,
+      WIFSIGNALED = not WIFEXITED and bit.band(w.status, 0x7f) ~= 0x7f -- I think this is right????? TODO recheck, cleanup
+    }
+    if tab.WIFEXITED then tab.EXITSTATUS = EXITSTATUS end
+    if tab.WIFSTOPPED then tab.WSTOPSIG = EXITSTATUS end
+    if tab.WIFSIGNALED then tab.WTERMSIG = WTERMSIG end
+    if tab[k] then return tab[k] end
+    local uc = 'W' .. k:upper()
+    if tab[uc] then return tab[uc] end
+  end
+}
+
+local function retwait(ret, status)
+  if ret == -1 then return nil, t.error() end
+  return setmetatable({pid = ret, status = status}, mt.wait)
+end
+
 -- endian conversion
 if ffi.abi("be") then -- nothing to do
   function S.htonl(b) return b end
@@ -3222,20 +3246,6 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     end
   until noiter or ret == 0
   return d
-end
-
-local function retwait(ret, status)
-  if ret == -1 then return nil, t.error() end
-  local w = {pid = ret, status = status}
-  local WTERMSIG = bit.band(status, 0x7f)
-  local EXITSTATUS = bit.rshift(bit.band(status, 0xff00), 8)
-  w.WIFEXITED = WTERMSIG == 0
-  if w.WIFEXITED then w.EXITSTATUS = EXITSTATUS end
-  w.WIFSTOPPED = bit.band(status, 0xff) == 0x7f
-  if w.WIFSTOPPED then w.WSTOPSIG = EXITSTATUS end
-  w.WIFSIGNALED = not w.WIFEXITED and bit.band(status, 0x7f) ~= 0x7f -- I think this is right????? TODO recheck, cleanup
-  if w.WIFSIGNALED then w.WTERMSIG = WTERMSIG end
-  return w
 end
 
 function S.wait()
