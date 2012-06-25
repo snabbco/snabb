@@ -2560,11 +2560,6 @@ t.void = ffi.typeof("void *")
 -- luaffi needs some help casting number to pointer. maybe fixed now, check.
 function t.pointer(i) return ffi.cast(t.void, ffi.cast(t.uintptr, i)) end
 
-local int1_t = ffi.typeof("int[1]")
-local int2_t = ffi.typeof("int[2]")
-local ints_t = ffi.typeof("int[?]")
-local int64_1t = ffi.typeof("int64_t[1]")
-
 -- char buffer type
 t.buffer = ffi.typeof("char[?]")
 
@@ -2604,7 +2599,11 @@ t.ifreq = ffi.typeof("struct ifreq")
 local epoll_events_t = ffi.typeof("struct epoll_event[?]")
 local iocbs_t = ffi.typeof("struct iocb[?]")
 local io_events_t = ffi.typeof("struct io_event[?]")
+local ints_t = ffi.typeof("int[?]")
 
+local int1_t = ffi.typeof("int[1]")
+local int2_t = ffi.typeof("int[2]")
+local int64_1t = ffi.typeof("int64_t[1]")
 local uint64_1t = ffi.typeof("uint64_t[1]")
 local socklen1_t = ffi.typeof("socklen_t[1]")
 local off1_t = ffi.typeof("off_t[1]")
