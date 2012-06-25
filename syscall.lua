@@ -2603,13 +2603,13 @@ t.ifreq = ffi.typeof("struct ifreq")
 t.linux_dirent64 = ffi.typeof("struct linux_dirent64")
 
 t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
+t.io_events = ffi.typeof("struct io_event[?]")
+t.iocbs = ffi.typeof("struct iocb[?]")
 
 t.iocb_ptrs = ffi.typeof("struct iocb *[?]")
-local string_array_t = ffi.typeof("const char *[?]")
+t.string_array = ffi.typeof("const char *[?]")
 
-local iocbs_t = ffi.typeof("struct iocb[?]")
-local io_events_t = ffi.typeof("struct io_event[?]")
-local ints_t = ffi.typeof("int[?]")
+t.ints = ffi.typeof("int[?]")
 
 t.int1 = ffi.typeof("int[1]")
 t.int2 = ffi.typeof("int[2]")
@@ -3173,9 +3173,9 @@ function S.setpriority(which, who, prio) return retnume(C.setpriority, stringfla
 
 function S.fork() return retnum(C.fork()) end
 function S.execve(filename, argv, envp)
-  local cargv = string_array_t(#argv + 1, argv)
+  local cargv = t.string_array(#argv + 1, argv)
   cargv[#argv] = nil -- LuaJIT does not zero rest of a VLA
-  local cenvp = string_array_t(#envp + 1, envp)
+  local cenvp = t.string_array(#envp + 1, envp)
   cenvp[#envp] = nil
   return retbool(C.execve(filename, cargv, cenvp))
 end
@@ -4049,7 +4049,7 @@ local function getiocbs(iocb, nr)
     local io = iocb
     nr = #io
     iocb = t.iocb_ptrs(nr)
-    iocba = iocbs_t(nr)
+    iocba = t.iocbs(nr)
     for i = 0, nr - 1 do
       local ioi = io[i + 1]
       iocb[i] = iocba + i
@@ -4068,7 +4068,7 @@ function S.io_cancel(ctx, iocb, result)
 end
 
 function S.io_getevents(ctx, min, nr, timeout, events)
-  if not events then events = io_events_t(nr) end
+  if not events then events = t.io_events(nr) end
   if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
   local ret = C.syscall(S.SYS_io_getevents, ctx:n(), t.long(min), t.long(nr), events, timeout)
   if ret == -1 then return nil, t.error() end
@@ -4749,7 +4749,7 @@ function S.sendfds(fd, ...)
   local io = t.iovecs{{buf1, 1}}
   local fds = {}
   for i, v in ipairs{...} do fds[i] = getfd(v) end
-  local fa = ints_t(#fds, fds)
+  local fa = t.ints(#fds, fds)
   local fasize = ffi.sizeof(fa)
   local bufsize = cmsg_space(fasize)
   local buflen = cmsg_len(fasize)
