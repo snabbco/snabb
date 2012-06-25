@@ -2954,6 +2954,7 @@ pt.fdb_entry = ptt(t.fdb_entry)
 pt.signalfd_siginfo = ptt(t.signalfd_siginfo)
 pt.linux_dirent64 = ptt(t.linux_dirent64)
 pt.inotify_event = ptt(t.inotify_event)
+pt.ucred = ptt(t.ucred)
 
 pt.void = function(x)
   local vp = ffi.typeof("void *")
@@ -3034,6 +3035,22 @@ else
 end
 S.ntohl = S.htonl -- reverse is the same
 S.ntohs = S.htons -- reverse is the same
+
+-- use string types for now TODO fix with new API
+-- helper for returning varargs
+local function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
+  if not t then return nil end
+  if select("#", ...) == 0 then return ffi.cast(ffi.typeof(t .. "*"), buf + offset) end
+  return ffi.cast(ffi.typeof(t .. "*"), buf + offset), threc(buf, offset + ffi.sizeof(t), ...)
+end
+function S.tbuffer(...) -- helper function for sequence of types in a buffer
+  local len = 0
+  for i, t in ipairs{...} do
+    len = len + ffi.sizeof(ffi.typeof(t)) -- TODO alignment issues, need to round up to minimum alignment
+  end
+  local buf = t.buffer(len)
+  return buf, len, threc(buf, 0, ...)
+end
 
 -- cast socket address to actual type based on family
 local samap = {
@@ -3522,8 +3539,7 @@ function S.sethostname(s) -- only accept Lua string, do not see use case for buf
   return retbool(C.sethostname(s, #s))
 end
 
--- signal set handlers
-
+-- signal set handlers TODO replace with metatypes
 local function mksigset(str)
   if not str then return t.sigset() end
   if type(str) ~= 'string' then return str end
@@ -3942,6 +3958,7 @@ local function sigcode(s, signo, code)
   end
 end
 
+-- TODO use metatypes
 function S.signalfd_read(fd, buffer, len)
   if not len then len = ffi.sizeof(t.signalfd_siginfo) * 4 end
   if not buffer then buffer = t.buffer(len) end
@@ -4713,7 +4730,7 @@ function S.recvmsg(fd, msg, flags)
   while cmsg do
     if cmsg.cmsg_level == S.SOL_SOCKET then
       if cmsg.cmsg_type == S.SCM_CREDENTIALS then
-        local cred = ffi.cast("struct ucred *", cmsg + 1) -- cmsg_data
+        local cred = pt.ucred(cmsg + 1) -- cmsg_data
         ret.pid = cred.pid
         ret.uid = cred.uid
         ret.gid = cred.gid
@@ -5123,22 +5140,6 @@ function S.ptsname(fd)
   else
     return retbool(ret)
   end
-end
-
--- use string types for now TODO fix with new API
--- helper for returning varargs
-local function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
-  if not t then return nil end
-  if select("#", ...) == 0 then return ffi.cast(ffi.typeof(t .. "*"), buf + offset) end
-  return ffi.cast(ffi.typeof(t .. "*"), buf + offset), threc(buf, offset + ffi.sizeof(t), ...)
-end
-function S.tbuffer(...) -- helper function for sequence of types in a buffer
-  local len = 0
-  for i, t in ipairs{...} do
-    len = len + ffi.sizeof(ffi.typeof(t)) -- TODO alignment issues, need to round up to minimum alignment
-  end
-  local buf = t.buffer(len)
-  return buf, len, threc(buf, 0, ...)
 end
 
 -- additional metatypes that need functions defined
