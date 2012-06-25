@@ -2618,24 +2618,6 @@ local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
 local string_array_t = ffi.typeof("const char *[?]")
 
--- pointer types.
-pt.uchar = ffi.typeof("unsigned char *")
-pt.char = ffi.typeof("char *")
-pt.int = ffi.typeof("int *")
-pt.uint = ffi.typeof("unsigned int *")
-
-pt.nlmsghdr = ffi.typeof("struct nlmsghdr *")
-pt.rtattr = ffi.typeof("struct rtattr *")
-pt.ifinfomsg = ffi.typeof("struct ifinfomsg *")
-pt.ifaddrmsg = ffi.typeof("struct ifaddrmsg *")
-pt.cmsghdr = ffi.typeof("struct cmsghdr *")
-pt.fdb_entry = ffi.typeof("struct fdb_entry *")
-pt.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo *")
-pt.linux_dirent64 = ffi.typeof("struct linux_dirent64 *")
-pt.inotify_event = ffi.typeof("struct inotify_event *")
-
-pt.iocbs = ffi.typeof("struct iocb *[?]")
-
 -- types with metatypes
 t.error = ffi.metatype("struct {int errno;}", {
   __tostring = function(e) return S.strerror(e.errno) end,
@@ -2955,6 +2937,24 @@ mt.pollfds = {
 }
 
 t.pollfds = ffi.metatype("struct { int count; struct pollfd pfd[?];}", mt.pollfds)
+
+-- pointer types.
+pt.uchar = ffi.typeof("unsigned char *")
+pt.char = ffi.typeof("char *")
+pt.int = ffi.typeof("int *")
+pt.uint = ffi.typeof("unsigned int *")
+
+pt.nlmsghdr = ffi.typeof("struct nlmsghdr *")
+pt.rtattr = ffi.typeof("struct rtattr *")
+pt.ifinfomsg = ffi.typeof("struct ifinfomsg *")
+pt.ifaddrmsg = ffi.typeof("struct ifaddrmsg *")
+pt.cmsghdr = ffi.typeof("struct cmsghdr *")
+pt.fdb_entry = ffi.typeof("struct fdb_entry *")
+pt.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo *")
+pt.linux_dirent64 = ffi.typeof("struct linux_dirent64 *")
+pt.inotify_event = ffi.typeof("struct inotify_event *")
+
+pt.iocbs = ffi.typeof("struct iocb *[?]")
 
 -- misc
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
