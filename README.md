@@ -119,7 +119,7 @@ Generate C code to test size and offset of each struct
 
 Siginfo support in sigaction not there yet, as confused by the kernel API.
 
-only some of aio is working, needs some debugging before being used.
+only some of aio is working, needs some debugging before being used. Also all the iocb functions should be replaced wit hmetatypes eg getiocb, getiocbs
 
 ### Missing functions etc
 

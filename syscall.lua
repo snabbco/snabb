@@ -10,8 +10,9 @@ local C = ffi.C
 
 local octal = function (s) return tonumber(s, 8) end 
 
-local t = {} -- types table
+local t, pt = {}, {} -- types and pointer types tables
 S.t = t
+S.pt = pt
 
 local mt = {} -- metatables
 
@@ -2548,8 +2549,12 @@ function S.mode(mode) return stringflags(mode, "S_") end
 
 -- Lua type constructors corresponding to defined types
 -- basic types
+t.char = ffi.typeof("char")
+t.uchar = ffi.typeof("unsigned char")
 t.int = ffi.typeof("int")
 t.uint = ffi.typeof("unsigned int")
+t.int32 = ffi.typeof("int32_t")
+t.uint32 = ffi.typeof("uint32_t")
 t.int64 = ffi.typeof("int64_t")
 t.uint64 = ffi.typeof("uint64_t")
 t.long = ffi.typeof("long")
@@ -2596,7 +2601,8 @@ t.ustat = ffi.typeof("struct ustat")
 t.statfs = ffi.typeof("struct statfs64")
 t.ifreq = ffi.typeof("struct ifreq")
 
-local epoll_events_t = ffi.typeof("struct epoll_event[?]")
+t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
+
 local iocbs_t = ffi.typeof("struct iocb[?]")
 local io_events_t = ffi.typeof("struct io_event[?]")
 local ints_t = ffi.typeof("int[?]")
@@ -2612,13 +2618,13 @@ local aio_context_1t = ffi.typeof("aio_context_t[1]")
 
 local string_array_t = ffi.typeof("const char *[?]")
 
--- pointer types. use another table?
-local uchar_pt = ffi.typeof("unsigned char *")
-local char_pt = ffi.typeof("char *")
-local int_pt = ffi.typeof("int *")
-local uint_pt = ffi.typeof("unsigned int *")
+-- pointer types.
+pt.uchar = ffi.typeof("unsigned char *")
+pt.char = ffi.typeof("char *")
+pt.int = ffi.typeof("int *")
+pt.uint = ffi.typeof("unsigned int *")
 local int64_pt = ffi.typeof("int64_t *")
-local int32_pt = ffi.typeof("int32_t *")
+local uint64_pt = ffi.typeof("uint64_t *")
 
 local nlmsghdr_pt = ffi.typeof("struct nlmsghdr *")
 local rtattr_pt = ffi.typeof("struct rtattr *")
@@ -3053,7 +3059,7 @@ function S.inet_aton(s, addr)
 end
 
 function S.inet_ntoa(addr)
-  local b = ffi.cast(uchar_pt, addr)
+  local b = ffi.cast(pt.uchar, addr)
   return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
 end
 
@@ -3819,7 +3825,7 @@ local epoll_flags = {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR"
 
 function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes optional epoll_pwait functionality
   if not maxevents then maxevents = 16 end
-  if not events then events = epoll_events_t(maxevents) end
+  if not events then events = t.epoll_events(maxevents) end
   if sigmask then sigmask = mksigset(sigmask) end
   local ret
   if sigmask then
@@ -4025,6 +4031,7 @@ function S.io_destroy(ctx)
   return ret
 end
 
+-- TODO replace these functions with metatypes
 local function getiocb(ioi, iocb)
   if not iocb then iocb = t.iocb() end
   iocb.aio_lio_opcode = stringflags(ioi.cmd, "IOCB_CMD_")
@@ -4334,8 +4341,8 @@ end
 
 local function cmsg_nxthdr(msg, buf, cmsg)
   if tonumber(cmsg.cmsg_len) < cmsg_hdrsize then return nil end -- invalid cmsg
-  buf = ffi.cast(char_pt, buf)
-  local msg_control = ffi.cast(char_pt, msg.msg_control)
+  buf = ffi.cast(pt.char, buf)
+  local msg_control = ffi.cast(pt.char, msg.msg_control)
   buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
   if buf + cmsg_hdrsize > msg_control + msg.msg_controllen then return nil end -- header would not fit
   cmsg = ffi.cast(cmsghdr_pt, buf)
@@ -4393,11 +4400,11 @@ local ifla_decode = {
     end
   end,
   [S.IFLA_MTU] = function(ir, buf, len)
-    local u = ffi.cast(uint_pt, buf)
+    local u = ffi.cast(pt.uint, buf)
     ir.mtu = tonumber(u[0])
   end,
   [S.IFLA_LINK] = function(ir, buf, len)
-    local i = ffi.cast(int_pt, buf)
+    local i = ffi.cast(pt.int, buf)
     ir.link = tonumber(i[0])
   end,
   [S.IFLA_QDISC] = function(ir, buf, len)
@@ -4701,7 +4708,7 @@ function S.recvmsg(fd, msg, flags)
         ret.uid = cred.uid
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
-        local fda = ffi.cast(int_pt, cmsg + 1) -- cmsg_data
+        local fda = ffi.cast(pt.int, cmsg + 1) -- cmsg_data
         local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, ffi.sizeof(int1_t))
         ret.fd = {}
         for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
@@ -4858,7 +4865,7 @@ end
 local function bridge_ioctl(io, name)
   local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
-  local ret = C.ioctl(getfd(s), io, ffi.cast(char_pt, name))
+  local ret = C.ioctl(getfd(s), io, ffi.cast(pt.char, name))
   if ret == -1 then return nil, t.error() end
   local ok, err = s:close()
   if not ok then return nil, err end
