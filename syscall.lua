@@ -2600,6 +2600,7 @@ t.net_device_stats = ffi.typeof("struct net_device_stats")
 t.ustat = ffi.typeof("struct ustat")
 t.statfs = ffi.typeof("struct statfs64")
 t.ifreq = ffi.typeof("struct ifreq")
+t.linux_dirent64 = ffi.typeof("struct linux_dirent64")
 
 t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
 
@@ -2950,15 +2951,15 @@ pt.char = ptt(t.char)
 pt.int = ptt(t.int)
 pt.uint = ptt(t.uint)
 
-pt.nlmsghdr = ffi.typeof("struct nlmsghdr *")
-pt.rtattr = ffi.typeof("struct rtattr *")
-pt.ifinfomsg = ffi.typeof("struct ifinfomsg *")
-pt.ifaddrmsg = ffi.typeof("struct ifaddrmsg *")
-pt.cmsghdr = ffi.typeof("struct cmsghdr *")
-pt.fdb_entry = ffi.typeof("struct fdb_entry *")
-pt.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo *")
-pt.linux_dirent64 = ffi.typeof("struct linux_dirent64 *")
-pt.inotify_event = ffi.typeof("struct inotify_event *")
+pt.nlmsghdr = ptt(t.nlmsghdr)
+pt.rtattr = ptt(t.rtattr)
+pt.ifinfomsg = ptt(t.ifinfomsg)
+pt.ifaddrmsg = ptt(t.ifaddrmsg)
+pt.cmsghdr = ptt(t.cmsghdr)
+pt.fdb_entry = ptt(t.fdb_entry)
+pt.signalfd_siginfo = ptt(t.signalfd_siginfo)
+pt.linux_dirent64 = ptt(t.linux_dirent64)
+pt.inotify_event = ptt(t.inotify_event)
 
 pt.iocbs = ffi.typeof("struct iocb *[?]")
 
@@ -3212,7 +3213,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     if ret == -1 then return nil, t.error() end
     local i = 0
     while i < ret do
-      local dp = ffi.cast(pt.linux_dirent64, buf + i)
+      local dp = pt.linux_dirent64(buf + i)
       local dd = setmetatable({inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off), type = tonumber(dp.d_type)}, mt.dents)
       d[ffi.string(dp.d_name)] = dd -- could calculate length
       i = i + dp.d_reclen
@@ -3878,7 +3879,7 @@ function S.inotify_read(fd, buffer, len)
   if not ret then return nil, err end
   local off, ee = 0, {}
   while off < ret do
-    local ev = ffi.cast(pt.inotify_event, buffer + off)
+    local ev = pt.inotify_event(buffer + off)
     local le = setmetatable({wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)}, mt.inotify)
     if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
@@ -3937,7 +3938,7 @@ function S.signalfd_read(fd, buffer, len)
   if not ret then return nil, err end
   local offset, ss = 0, {}
   while offset < ret do
-    local ssi = ffi.cast(pt.signalfd_siginfo, buffer + offset)
+    local ssi = pt.signalfd_siginfo(buffer + offset)
     local s = {}
     s.errno = tonumber(ssi.ssi_errno)
     sigcode(s, tonumber(ssi.ssi_signo), tonumber(ssi.ssi_code))
@@ -4334,7 +4335,7 @@ local function cmsg_len(len) return cmsg_ahdr + len end
 local function cmsg_firsthdr(msg)
   if tonumber(msg.msg_controllen) < cmsg_hdrsize then return nil end
   local mc = msg.msg_control
-  local cmsg = ffi.cast(pt.cmsghdr, mc)
+  local cmsg = pt.cmsghdr(mc)
   return mc, cmsg
 end
 
@@ -4344,7 +4345,7 @@ local function cmsg_nxthdr(msg, buf, cmsg)
   local msg_control = pt.char(msg.msg_control)
   buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
   if buf + cmsg_hdrsize > msg_control + msg.msg_controllen then return nil end -- header would not fit
-  cmsg = ffi.cast(pt.cmsghdr, buf)
+  cmsg = pt.cmsghdr(buf)
   if buf + cmsg_align(cmsg.cmsg_len) > msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
   return buf, cmsg
 end
@@ -4359,7 +4360,7 @@ local nlmsg_ok = function(msg, len)
 end
 local nlmsg_next = function(msg, buf, len)
   local inc = nlmsg_align(msg.nlmsg_len)
-  return ffi.cast(pt.nlmsghdr, buf + inc), buf + inc, len - inc
+  return pt.nlmsghdr(buf + inc), buf + inc, len - inc
 end
 
 local rta_align = nlmsg_align -- also 4 byte align
@@ -4369,7 +4370,7 @@ local rta_ok = function(msg, len)
 end
 local rta_next = function(msg, buf, len)
   local inc = rta_align(msg.rta_len)
-  return ffi.cast(pt.rtattr, buf + inc), buf + inc, len - inc
+  return pt.rtattr(buf + inc), buf + inc, len - inc
 end
 
 local addrlenmap = { -- map interface type to length of hardware address
@@ -4508,10 +4509,10 @@ mt.ifaddr = {
 local nlmsg_data_decode = {
   [S.NLMSG_DONE] = function(r, buf, len) return r end,
   [S.RTM_NEWADDR] = function(r, buf, len)
-    local addr = ffi.cast(pt.ifaddrmsg, buf)
+    local addr = pt.ifaddrmsg(buf)
     buf = buf + nlmsg_align(ffi.sizeof(t.ifaddrmsg))
     len = len - nlmsg_align(ffi.sizeof(t.ifaddrmsg))
-    local rtattr = ffi.cast(pt.rtattr, buf)
+    local rtattr = pt.rtattr(buf)
 
     local ir = setmetatable({ifaddr = t.ifaddrmsg(), addr = {}}, mt.ifaddr)
     ffi.copy(ir.ifaddr, addr, ffi.sizeof(t.ifaddrmsg))
@@ -4528,10 +4529,10 @@ local nlmsg_data_decode = {
    return r
   end,
   [S.RTM_NEWLINK] = function(r, buf, len)
-    local iface = ffi.cast(pt.ifinfomsg, buf)
+    local iface = pt.ifinfomsg(buf)
     buf = buf + nlmsg_align(ffi.sizeof(t.ifinfomsg))
     len = len - nlmsg_align(ffi.sizeof(t.ifinfomsg))
-    local rtattr = ffi.cast(pt.rtattr, buf)
+    local rtattr = pt.rtattr(buf)
     local ir = setmetatable({ifinfo = t.ifinfomsg()}, mt.iflink)
     ffi.copy(ir.ifinfo, iface, ffi.sizeof(t.ifinfomsg))
 
@@ -4563,7 +4564,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
     local len = tonumber(n.count)
     local buffer = reply
 
-    local msg = ffi.cast(pt.nlmsghdr, buffer)
+    local msg = pt.nlmsghdr(buffer)
 
     while not done and nlmsg_ok(msg, len) do
       local tp = tonumber(msg.nlmsg_type)
@@ -4934,7 +4935,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
     local n = fd:read(buffer, sl)
     if not n then return nil end
 
-    local fdbs = ffi.cast(pt.fdb_entry, buffer)
+    local fdbs = pt.fdb_entry(buffer)
 
     for i = 1, n / ffi.sizeof(t.fdb_entry) do
       local fdb = fdbs[i - 1]
