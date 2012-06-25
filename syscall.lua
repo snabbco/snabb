@@ -2675,8 +2675,6 @@ local linux_dirent_pt = ffi.typeof("struct linux_dirent *")
 local linux_dirent64_pt = ffi.typeof("struct linux_dirent64 *")
 local inotify_event_pt = ffi.typeof("struct inotify_event *")
 
-S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
-
 -- types with metatypes
 
 t.sockaddr = ffi.metatype("struct sockaddr", {
@@ -3789,6 +3787,9 @@ function S.umount(target, flags)
   if flags then return retbool(C.umount2(target, stringflags(flags, "MNT_", "UMOUNT_"))) end
   return retbool(C.umount(target))
 end
+
+-- unlimited value. TODO metatype should return this to Lua.
+S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
 
 function S.getrlimit(resource)
   local rlim = t.rlimit()
