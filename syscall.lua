@@ -1604,11 +1604,6 @@ t.error = ffi.metatype("struct {int errno;}", {
   end
 })
 
-local function mkerror(errno)
-  local e = t.error(errno)
-  return e
-end
-
 -- basic types
 t.int = ffi.typeof("int")
 t.uint = ffi.typeof("unsigned int")
