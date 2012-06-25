@@ -2604,20 +2604,21 @@ t.linux_dirent64 = ffi.typeof("struct linux_dirent64")
 
 t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
 
+t.iocb_ptrs = ffi.typeof("struct iocb *[?]")
+local string_array_t = ffi.typeof("const char *[?]")
+
 local iocbs_t = ffi.typeof("struct iocb[?]")
 local io_events_t = ffi.typeof("struct io_event[?]")
 local ints_t = ffi.typeof("int[?]")
 
-local int1_t = ffi.typeof("int[1]")
-local int2_t = ffi.typeof("int[2]")
-local int64_1t = ffi.typeof("int64_t[1]")
-local uint64_1t = ffi.typeof("uint64_t[1]")
-local socklen1_t = ffi.typeof("socklen_t[1]")
-local off1_t = ffi.typeof("off_t[1]")
-local loff_1t = ffi.typeof("loff_t[1]")
+t.int1 = ffi.typeof("int[1]")
+t.int2 = ffi.typeof("int[2]")
+t.int64_1 = ffi.typeof("int64_t[1]")
+t.uint64_1 = ffi.typeof("uint64_t[1]")
+t.socklen1 = ffi.typeof("socklen_t[1]")
+t.off1 = ffi.typeof("off_t[1]")
+t.loff1 = ffi.typeof("loff_t[1]")
 local aio_context_1t = ffi.typeof("aio_context_t[1]")
-
-local string_array_t = ffi.typeof("const char *[?]")
 
 -- types with metatypes
 t.error = ffi.metatype("struct {int errno;}", {
@@ -2961,8 +2962,6 @@ pt.signalfd_siginfo = ptt(t.signalfd_siginfo)
 pt.linux_dirent64 = ptt(t.linux_dirent64)
 pt.inotify_event = ptt(t.inotify_event)
 
-pt.iocbs = ffi.typeof("struct iocb *[?]")
-
 -- misc
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
@@ -3103,7 +3102,7 @@ function S.dup(oldfd, newfd, flags)
 end
 
 function S.pipe(flags)
-  local fd2 = int2_t()
+  local fd2 = t.int2()
   local ret
   if flags then ret = C.pipe2(fd2, stringflags(flags, "O_")) else ret = C.pipe(fd2) end
   if ret == -1 then return nil, t.error() end
@@ -3237,11 +3236,11 @@ local function retwait(ret, status)
 end
 
 function S.wait()
-  local status = int1_t()
+  local status = t.int1()
   return retwait(C.wait(status), status[0])
 end
 function S.waitpid(pid, options)
-  local status = int1_t()
+  local status = t.int1()
   return retwait(C.waitpid(pid, status, options or 0), status[0])
 end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
@@ -3286,7 +3285,7 @@ end
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.recvfrom(fd, buf, count, flags)
   local ss = t.sockaddr_storage()
-  local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
+  local addrlen = t.socklen1(ffi.sizeof(t.sockaddr_storage))
   local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return {count = tonumber(ret), addr = sa(ss, addrlen[0])}
@@ -3296,15 +3295,15 @@ function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far
   if not optlen and type(optval) == 'boolean' then if optval then optval = 1 else optval = 0 end end
   if not optlen and type(optval) == 'number' then
-    optval = int1_t(optval)
-    optlen = ffi.sizeof(int1_t)
+    optval = t.int1(optval)
+    optlen = ffi.sizeof(t.int1)
   end
   return retbool(C.setsockopt(getfd(fd), stringflag(level, "SOL_"), stringflag(optname, "SO_"), optval, optlen))
 end
 
 function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool options
-  local optval, optlen = int1_t(), socklen1_t()
-  optlen[0] = ffi.sizeof(int1_t)
+  local optval, optlen = t.int1(), t.socklen1()
+  optlen[0] = ffi.sizeof(t.int1)
   local ret = C.getsockopt(getfd(fd), level, optname, optval, optlen)
   if ret == -1 then return nil, t.error() end
   return tonumber(optval[0]) -- no special case for bool
@@ -3430,7 +3429,7 @@ end
 
 function S.socketpair(domain, stype, protocol)
   domain = stringflag(domain, "AF_")
-  local sv2 = int2_t()
+  local sv2 = t.int2()
   local ret = C.socketpair(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol), sv2)
   if ret == -1 then return nil, t.error() end
   return {t.fd(sv2[0]), t.fd(sv2[1])}
@@ -3449,7 +3448,7 @@ function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), string
 
 function S.accept(sockfd, flags, addr, addrlen)
   if not addr then addr = t.sockaddr_storage() end
-  if not addrlen then addrlen = socklen1_t(addrlen or ffi.sizeof(addr)) end
+  if not addrlen then addrlen = t.socklen1(addrlen or ffi.sizeof(addr)) end
   local ret
   if not flags
     then ret = C.accept(getfd(sockfd), addr, addrlen)
@@ -3461,7 +3460,7 @@ end
 
 function S.getsockname(sockfd)
   local ss = t.sockaddr_storage()
-  local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
+  local addrlen = t.socklen1(ffi.sizeof(t.sockaddr_storage))
   local ret = C.getsockname(getfd(sockfd), ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return sa(ss, addrlen[0])
@@ -3469,7 +3468,7 @@ end
 
 function S.getpeername(sockfd)
   local ss = t.sockaddr_storage()
-  local addrlen = socklen1_t(ffi.sizeof(t.sockaddr_storage))
+  local addrlen = t.socklen1(ffi.sizeof(t.sockaddr_storage))
   local ret = C.getpeername(getfd(sockfd), ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return sa(ss, addrlen[0])
@@ -3605,7 +3604,7 @@ function S.sigaction(signum, handler, mask, flags)
   if ffi.istype(t.sigaction, handler) then sa = handler
   else
     if type(handler) == 'string' then
-      handler = ffi.cast(t.sighandler, int1_t{stringflag(handler, "SIG_")})
+      handler = ffi.cast(t.sighandler, t.int1(stringflag(handler, "SIG_")))
     elseif
       type(handler) == 'function' then handler = ffi.cast(t.sighandler, handler) -- TODO check if gc problem here? need to copy?
     end
@@ -3847,12 +3846,12 @@ end
 
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
   local offin, offout = off_in, off_out
-  if off_in and not ffi.istype(loff_1t, off_in) then
-    offin = loff_1t()
+  if off_in and not ffi.istype(t.loff1, off_in) then
+    offin = t.loff1()
     offin[0] = off_in
   end
-  if off_out and not ffi.istype(loff_1t, off_out) then
-    offout = loff_1t()
+  if off_out and not ffi.istype(t.loff1, off_out) then
+    offout = t.loff1()
     offout[0] = off_out
   end
   return retnum(C.splice(getfd(fd_in), offin, getfd(fd_out), offout, len, stringflags(flags, "SPLICE_F_")))
@@ -3890,7 +3889,7 @@ end
 
 function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two different return types...
   if not offset then return retnum(C.sendfile(getfd(out_fd), getfd(in_fd), nil, count)) end
-  local off = off1_t()
+  local off = t.off1()
   off[0] = offset
   local ret = C.sendfile(getfd(out_fd), getfd(in_fd), off, count)
   if ret == -1 then return nil, t.error() end
@@ -3901,7 +3900,7 @@ function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, stringfl
 -- eventfd read and write helpers, as in glibc but Lua friendly. Note returns 0 for EAGAIN, as 0 never returned directly
 -- returns Lua number - if you need all 64 bits, pass your own value in and use that for the exact result
 function S.eventfd_read(fd, value)
-  if not value then value = uint64_1t() end
+  if not value then value = t.uint64_1() end
   local ret = C.read(getfd(fd), value, 8)
   if ret == -1 and ffi.errno() == S.E.EAGAIN then
     value[0] = 0
@@ -3912,7 +3911,7 @@ function S.eventfd_read(fd, value)
 end
 function S.eventfd_write(fd, value)
   if not value then value = 1 end
-  if type(value) == "number" then value = uint64_1t(value) end
+  if type(value) == "number" then value = t.uint64_1(value) end
   return retbool(C.write(getfd(fd), value, 8))
 end
 
@@ -4007,7 +4006,7 @@ function S.timerfd_gettime(fd, curr_value)
 end
 
 function S.timerfd_read(fd, buffer)
-  if not buffer then buffer = uint64_1t() end
+  if not buffer then buffer = t.uint64_1() end
   local ret, err = S.read(fd, buffer, 8)
   if not ret and err.EAGAIN then return 0 end -- will never actually return 0
   if not ret then return nil, err end
@@ -4052,7 +4051,7 @@ local function getiocbs(iocb, nr)
   if type(iocb) == "table" then
     local io = iocb
     nr = #io
-    iocb = pt.iocbs(nr)
+    iocb = t.iocb_ptrs(nr)
     iocba = iocbs_t(nr)
     for i = 0, nr - 1 do
       local ioi = io[i + 1]
@@ -4134,7 +4133,7 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
   if m then arg2 = stringflag(arg2, m) end
   if option == S.PR_MCE_KILL and arg2 == S.PR_MCE_KILL_SET then arg3 = stringflag(arg3, "PR_MCE_KILL_")
   elseif prctlpint[noption] then
-    i = int1_t()
+    i = t.int1()
     arg2 = ffi.cast(t.ulong, i)
   elseif option == S.PR_GET_NAME then
     name = t.buffer(16)
@@ -4709,7 +4708,7 @@ function S.recvmsg(fd, msg, flags)
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
         local fda = pt.int(cmsg + 1) -- cmsg_data
-        local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, ffi.sizeof(int1_t))
+        local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, ffi.sizeof(t.int1))
         ret.fd = {}
         for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
       end -- add other SOL_SOCKET messages
