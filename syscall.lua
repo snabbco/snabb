@@ -3036,17 +3036,16 @@ end
 S.ntohl = S.htonl -- reverse is the same
 S.ntohs = S.htons -- reverse is the same
 
--- use string types for now TODO fix with new API
--- helper for returning varargs
-local function threc(buf, offset, t, ...) -- alignment issues, need to round up to minimum alignment
-  if not t then return nil end
-  if select("#", ...) == 0 then return ffi.cast(ffi.typeof(t .. "*"), buf + offset) end
-  return ffi.cast(ffi.typeof(t .. "*"), buf + offset), threc(buf, offset + ffi.sizeof(t), ...)
-end
-function S.tbuffer(...) -- helper function for sequence of types in a buffer
+local function tbuffer(...) -- helper function for sequence of types in a buffer
+  local function threc(buf, offset, tp, ...) -- alignment issues, need to round up to minimum alignment
+    if not tp then return nil end
+    local p = ptt(tp)
+    if select("#", ...) == 0 then return p(buf + offset) end
+    return p(buf + offset), threc(buf, offset + ffi.sizeof(tp), ...)
+  end
   local len = 0
-  for i, t in ipairs{...} do
-    len = len + ffi.sizeof(ffi.typeof(t)) -- TODO alignment issues, need to round up to minimum alignment
+  for _, tp in ipairs{...} do
+    len = len + ffi.sizeof(tp) -- TODO alignment issues, need to round up to minimum alignment
   end
   local buf = t.buffer(len)
   return buf, len, threc(buf, 0, ...)
@@ -4620,7 +4619,7 @@ function S.getaddr(af)
   if not a then return nil, err end -- gc will take care of closing socket...
   local k = t.sockaddr_nl() -- kernel destination
 
-  local buf, len, hdr, ifaddr = S.tbuffer("struct nlmsghdr", "struct ifaddrmsg") -- TODO can now take ctypes, using new luajit feature
+  local buf, len, hdr, ifaddr = tbuffer(t.nlmsghdr, t.ifaddrmsg)
 
   hdr.nlmsg_len = len
   hdr.nlmsg_type = S.RTM_GETADDR
@@ -4657,7 +4656,7 @@ function S.getlink()
 
   -- we should be adding padding at the end of size nlmsg_alignto (4), (and in middle but 0) or will have issues if try to send more messages.
   -- so need to add pad size to tbuffer function
-  local buf, len, hdr, gen = S.tbuffer("struct nlmsghdr", "struct rtgenmsg") -- allocates buffer for named types and returns cast pointers
+  local buf, len, hdr, gen = tbuffer(t.nlmsghdr, t.rtgenmsg) -- allocates buffer for named types and returns cast pointers
 
   hdr.nlmsg_len = len
   hdr.nlmsg_type = S.RTM_GETLINK
