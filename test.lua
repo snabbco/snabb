@@ -386,6 +386,20 @@ test_timers_signals = {
     assert_equal(ts.time, 1)
     assert_equal(ts.sec, 1)
     assert_equal(ts.nsec, 0)
+    local ts = t.timespec{1, 0}
+    assert_equal(ts.time, 1)
+    assert_equal(ts.sec, 1)
+    assert_equal(ts.nsec, 0)
+  end,
+  test_timeval = function()
+    local ts = t.timeval(1)
+    assert_equal(ts.time, 1)
+    assert_equal(ts.sec, 1)
+    assert_equal(ts.usec, 0)
+    local ts = t.timeval{1, 0}
+    assert_equal(ts.time, 1)
+    assert_equal(ts.sec, 1)
+    assert_equal(ts.usec, 0)
   end,
   test_nanosleep = function()
     local rem = assert(S.nanosleep(0.001))
