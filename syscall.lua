@@ -2464,14 +2464,9 @@ end
 -- get fd from standard string, integer, or cdata, or fd type
 local function getfd(fd)
   if not fd then return nil end
-  if ffi.istype(t.int, fd) then return tonumber(fd) end
+  if ffi.istype(t.int, fd) then return fd end
   if type(fd) == 'number' then return fd end
-  if type(fd) == 'string' then
-    if fd == 'stdin' then return 0 end
-    if fd == 'stdout' then return 1 end
-    if fd == 'stderr' then return 2 end
-  end
-  if fd.fileno then return tonumber(fd.fileno) end
+  if fd.fileno then return fd.fileno end
 end
 
 local function split(delimiter, text)
@@ -5250,6 +5245,10 @@ t.fd = ffi.metatype("struct {int fileno; int sequence;}", {
   __index = fmeth,
   __gc = S.close,
 })
+
+S.stdin = ffi.gc(t.fd(S.STDIN_FILENO), nil)
+S.stdout = ffi.gc(t.fd(S.STDOUT_FILENO), nil)
+S.stderr = ffi.gc(t.fd(S.STDERR_FILENO), nil)
 
 t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
   __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel,

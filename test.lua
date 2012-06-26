@@ -688,7 +688,7 @@ test_sockets = {
     assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
     local r = assert(sv[2]:recvmsg())
     assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
-    assert(sv[1]:sendfds("stdin"))
+    assert(sv[1]:sendfds(S.stdin))
     local r = assert(sv[2]:recvmsg())
     assert(#r.fd == 1, "expect to get one file descriptor back")
     assert(r.fd[1]:close())
