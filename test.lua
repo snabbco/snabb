@@ -381,6 +381,12 @@ test_sockets_pipes = {
 }
 
 test_timers_signals = {
+  test_timespec = function()
+    local ts = t.timespec(1)
+    assert_equal(ts.time, 1)
+    assert_equal(ts.sec, 1)
+    assert_equal(ts.nsec, 0)
+  end,
   test_nanosleep = function()
     local rem = assert(S.nanosleep(0.001))
     assert_equal(rem.sec, 0, "expect no elapsed time after nanosleep")

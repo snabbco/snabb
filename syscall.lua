@@ -2785,7 +2785,7 @@ t.timeval = ffi.metatype("struct timeval", {
     sec = function(tv) return tonumber(tv.tv_sec) end,
     nsec = function(tv) return tonumber(tv.tv_usec) end
   }
-  return meth[k](tv)
+  if meth[k] then return meth[k](tv) end
   end,
   __new = function(tp, v)
     if not v then v = {0, 0} end
@@ -2799,20 +2799,30 @@ t.timeval = ffi.metatype("struct timeval", {
 
 t.timespec = ffi.metatype("struct timespec", {
   __index = function(tv, k)
-  local meth = {
-    time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_nsec) / 1000000000 end,
-    sec = function(tv) return tonumber(tv.tv_sec) end,
-    nsec = function(tv) return tonumber(tv.tv_nsec) end
-  }
-  return meth[k](tv)
+    local meth = {
+      time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_nsec) / 1000000000 end,
+      sec = function(tv) return tonumber(tv.tv_sec) end,
+      nsec = function(tv) return tonumber(tv.tv_nsec) end
+    }
+  if meth[k] then return meth[k](tv) end
+  end,
+  __newindex = function(tv, k, v)
+    local meth = {
+      time = function(tv, v)
+        local i, f = math.modf(v)
+        tv.tv_sec, tv.tv_nsec = i, math.floor(f * 1000000000)
+      end,
+      sec = function(tv, v) tv.tv_sec = v end,
+      nsec = function(tv, v) tv.tv_nsec = v end
+    }
+    if meth[k] then meth[k](tv, v) end
   end,
   __new = function(tp, v)
     if not v then v = {0, 0} end
-    if type(v) == "number" then
-      local i, f = math.modf(v)
-      v = {i, math.floor(f * 1000000000)}
-    end
-    return ffi.new(t.timespec, v)
+    if type(v) ~= "number" then return ffi.new(tp, v) end
+    local ts = ffi.new(tp)
+    ts.time = v
+    return ts
   end
 })
 
