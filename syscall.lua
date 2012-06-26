@@ -2950,8 +2950,30 @@ mt.pollfds = {
 
 t.pollfds = ffi.metatype("struct { int count; struct pollfd pfd[?];}", mt.pollfds)
 
--- cast to pointer to a type. could generate for all types.
+t.in_addr = ffi.metatype("struct in_addr", {
+  __tostring = function(a) return S.inet_ntoa(a) end,
+  __new = function(tp, s)
+    local addr = ffi.new(tp)
+    if s then addr = S.inet_aton(s, addr) end
+    return addr
+  end
+})
 
+t.in6_addr = ffi.metatype("struct in6_addr", {
+  __tostring = function(a) return S.inet_ntop(S.AF_INET6, a) end,
+  __new = function(tp, s)
+    local addr = ffi.new(tp)
+    if s then addr = S.inet_pton(S.AF_INET6, s, addr) end
+    return addr
+  end
+})
+
+S.addrtype = {
+  [S.AF_INET] = t.in_addr,
+  [S.AF_INET6] = t.in6_addr,
+}
+
+-- cast to pointer to a type. could generate for all types.
 local function ptt(tp)
   local ptp = ffi.typeof("$ *", tp)
   return function(x) return ffi.cast(ptp, x) end
@@ -5168,31 +5190,6 @@ function S.ptsname(fd)
   end
 end
 
--- additional metatypes that need functions defined
-
-t.in_addr = ffi.metatype("struct in_addr", {
-  __tostring = S.inet_ntoa,
-  __new = function(tp, s)
-    local addr = ffi.new(tp)
-    if s then addr = S.inet_aton(s, addr) end
-    return addr
-  end
-})
-
-t.in6_addr = ffi.metatype("struct in6_addr", {
-  __tostring = function(a) return S.inet_ntop(S.AF_INET6, a) end,
-  __new = function(tp, s)
-    local addr = ffi.new(tp)
-    if s then addr = S.inet_pton(S.AF_INET6, s, addr) end
-    return addr
-  end
-})
-
-S.addrtype = {
-  [S.AF_INET] = t.in_addr,
-  [S.AF_INET6] = t.in6_addr,
-}
-
 -- constants
 S.INADDR_ANY = t.in_addr()
 S.INADDR_LOOPBACK = t.in_addr("127.0.0.1")
@@ -5232,7 +5229,6 @@ fmeth.statfs = S.fstatfs
 fmeth.utimens = S.futimens
 
 -- sequence number used by netlink messages
-
 fmeth.seq = function(fd)
   fd.sequence = fd.sequence + 1
   return fd.sequence
