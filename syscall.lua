@@ -2589,6 +2589,7 @@ t.ustat = ffi.typeof("struct ustat")
 t.statfs = ffi.typeof("struct statfs64")
 t.ifreq = ffi.typeof("struct ifreq")
 t.linux_dirent64 = ffi.typeof("struct linux_dirent64")
+t.ifa_cacheinfo = ffi.typeof("struct ifa_cacheinfo")
 
 t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
 t.io_events = ffi.typeof("struct io_event[?]")
@@ -4506,10 +4507,25 @@ local ifa_decode = {
   end,
   [S.IFA_LABEL] = function(ir, buf, len)
     ir.label = ffi.string(buf)
+  end,
+  [S.IFA_ANYCAST] = function(ir, buf, len)
+    ir.anycast = S.addrtype[ir.family]()
+    ffi.copy(ir.anycast, buf, ffi.sizeof(ir.anycast))
+  end,
+  [S.IFA_CACHEINFO] = function(ir, buf, len)
+    ir.cacheinfo = t.ifa_cacheinfo()
+    ffi.copy(ir.cacheinfo, buf, ffi.sizeof(t.ifa_cacheinfo))
   end
 }
 
 mt.iff = {
+  __tostring = function(f)
+    local s = {}
+    local flags = {"UP", "BROADCAST", "DEBUG", "LOOPBACK", "POINTOPOINT", "NOTRAILERS", "RUNNING", "NOARP", "PROMISC",
+                   "ALLMULTI", "MASTER", "SLAVE", "MULTICAST", "PORTSEL", "AUTOMEDIA", "DYNAMIC", "LOWER_UP", "DORMANT", "ECHO"}
+    for _, i in pairs(flags) do if f[i] then s[#s + 1] = i end end
+    return table.concat(s, ' ')
+  end,
   __index = function(f, k)
     local prefix = "IFF_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
@@ -4561,6 +4577,7 @@ mt.iflink = {
     for a = 1, #i.inet6 do
       s = s .. '          ' .. 'inet6 addr: ' .. tostring(i.inet6[a].addr) .. '/' .. i.inet6[a].prefixlen .. '\n'
     end
+      s = s .. '          ' .. tostring(i.flags) .. '  MTU: ' .. i.mtu
     return s
   end
 }
@@ -4572,7 +4589,7 @@ mt.ifaddr = {
       prefixlen = function(i) return tonumber(i.ifaddr.ifa_prefixlen) end,
       index = function(i) return tonumber(i.ifaddr.ifa_index) end,
       flags = function(i) return tonumber(i.ifaddr.ifa_flags) end,
-      scope = function(i) return tonumber(i.ifaddr.ifa_scope) end
+      scope = function(i) return tonumber(i.ifaddr.ifa_scope) end,
     }
     if meth[k] then return meth[k](i) end
     local prefix = "IFA_F_"
