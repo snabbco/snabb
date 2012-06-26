@@ -4569,8 +4569,7 @@ mt.iflink = {
   __tostring = function(i)
     local hw = ''
     if not i.loopback and i.macaddr then hw = '  HWaddr ' .. tostring(i.macaddr) end
-    local s = i.name .. '\n' ..
-      '          ' .. 'Link encap:' .. i.typename .. hw .. '\n'
+    local s = i.name .. string.rep(' ', 10 - #i.name) .. 'Link encap:' .. i.typename .. hw .. '\n'
     for a = 1, #i.inet do
       s = s .. '          ' .. 'inet addr: ' .. tostring(i.inet[a].addr) .. '/' .. i.inet[a].prefixlen .. '\n'
     end
