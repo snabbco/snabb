@@ -4559,7 +4559,7 @@ mt.iflink = {
       s = s .. '          ' .. 'inet addr:' .. tostring(i.inet[a].addr) .. '\n'
     end
     for a = 1, #i.inet6 do
-      s = s .. '          ' .. 'inet6 addr: ' .. tostring(i.inet6[a].addr) .. '\n'
+      s = s .. '          ' .. 'inet6 addr: ' .. tostring(i.inet6[a].addr) .. '/' .. i.inet6[a].prefixlen .. '\n'
     end
     return s
   end
@@ -4749,9 +4749,6 @@ function S.get_interfaces() -- returns with address info too.
   end
   return setmetatable(ifs, mt.iflinks)
 end
-
---    if addr4[v.index] then v.inet = addr4[v.index].addr end
---    if addr6[v.index] then v.inet6 = addr6[v.index].addr end
 
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
