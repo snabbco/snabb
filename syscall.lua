@@ -4568,7 +4568,7 @@ mt.iflink = {
   end,
   __tostring = function(i)
     local hw = ''
-    if not i.loopback and i.macaddr then hw = ' HWaddr ' .. tostring(i.macaddr) end
+    if not i.loopback and i.macaddr then hw = '  HWaddr ' .. tostring(i.macaddr) end
     local s = i.name .. '\n' ..
       '          ' .. 'Link encap:' .. i.typename .. hw .. '\n'
     for a = 1, #i.inet do
@@ -4577,10 +4577,17 @@ mt.iflink = {
     for a = 1, #i.inet6 do
       s = s .. '          ' .. 'inet6 addr: ' .. tostring(i.inet6[a].addr) .. '/' .. i.inet6[a].prefixlen .. '\n'
     end
-      s = s .. '          ' .. tostring(i.flags) .. '  MTU: ' .. i.mtu
+      s = s .. '          ' .. tostring(i.flags) .. '  MTU: ' .. i.mtu .. '\n'
+      s = s .. '          ' .. 'RX packets:' .. i.stats.rx_packets .. ' errors:' .. i.stats.rx_errors .. ' dropped:' .. i.stats.rx_dropped .. '\n'
+      s = s .. '          ' .. 'TX packets:' .. i.stats.tx_packets .. ' errors:' .. i.stats.tx_errors .. ' dropped:' .. i.stats.tx_dropped .. '\n'
     return s
   end
 }
+
+--[[
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+]]
 
 mt.ifaddr = {
   __index = function(i, k)
