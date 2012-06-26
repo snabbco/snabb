@@ -964,6 +964,16 @@ test_filesystem = {
     assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
     assert(fd:close())
   end,
+  test_futimens = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    assert(fd:futimens())
+    local st1 = fd:stat()
+    assert(fd:futimens{"omit", "omit"})
+    local st2 = fd:stat()
+    assert(st1.atime == st2.atime and st1.mtime == st2.mtime, "atime and mtime unchanged")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
 }
 
 -- legacy tests not yet converted to test framework

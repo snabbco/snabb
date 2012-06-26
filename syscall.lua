@@ -2606,12 +2606,14 @@ t.ints = ffi.typeof("int[?]")
 t.buffer = ffi.typeof("char[?]")
 
 t.int1 = ffi.typeof("int[1]")
-t.int2 = ffi.typeof("int[2]")
 t.int64_1 = ffi.typeof("int64_t[1]")
 t.uint64_1 = ffi.typeof("uint64_t[1]")
 t.socklen1 = ffi.typeof("socklen_t[1]")
 t.off1 = ffi.typeof("off_t[1]")
 t.loff1 = ffi.typeof("loff_t[1]")
+
+t.int2 = ffi.typeof("int[2]")
+t.timespec2 = ffi.typeof("struct timespec[2]")
 
 -- types with metatypes
 t.error = ffi.metatype("struct {int errno;}", {
@@ -3365,6 +3367,16 @@ function S.fstat(fd, buf)
   local ret = C.syscall(S.SYS_fstat, t.int(getfd(fd)), pt.void(buf))
   if ret == -1 then return nil, t.error() end
   return buf
+end
+
+function S.futimens(fd, ts)
+  if ts and (not ffi.istype(t.timespec2, ts)) then
+    s1, s2 = ts[1], ts[2]
+    ts = t.timespec2()
+    if type(s1) == 'string' then ts[0].tv_nsec = stringflag(s1, "UTIME_") else ts[0] = t.timespec(s1) end
+    if type(s2) == 'string' then ts[1].tv_nsec = stringflag(s2, "UTIME_") else ts[1] = t.timespec(s2) end
+  end
+  return retbool(C.futimens(getfd(fd), ts))
 end
 
 function S.chroot(path) return retbool(C.chroot(path)) end
@@ -5187,7 +5199,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
                    'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
-                   'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs'
+                   'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
@@ -5202,6 +5214,7 @@ fmeth.setxattr = S.fsetxattr
 fmeth.getxattr = S.gsetxattr
 fmeth.truncate = S.ftruncate
 fmeth.statfs = S.fstatfs
+fmeth.utimens = S.futimens
 
 -- sequence number used by netlink messages
 
