@@ -2461,12 +2461,9 @@ end
 
 -- functions we need for metatypes
 
--- get fd from standard string, integer, or cdata, or fd type
 local function getfd(fd)
-  if not fd then return nil end
-  if ffi.istype(t.int, fd) then return fd end
-  if type(fd) == 'number' then return fd end
-  if fd.fileno then return fd.fileno end
+  if ffi.istype(t.fd, fd) then return fd.fileno end
+  return fd
 end
 
 local function split(delimiter, text)
