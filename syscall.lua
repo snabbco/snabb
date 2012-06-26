@@ -23,6 +23,10 @@ S.cast = ffi.cast
 S.copy = ffi.copy
 S.fill = ffi.fill
 
+S.STDIN_FILENO = 0
+S.STDOUT_FILENO = 1
+S.STDERR_FILENO = 2
+
 -- open, fcntl
 S.O_ACCMODE   = octal('0003')
 S.O_RDONLY    = octal('00')
@@ -2463,9 +2467,9 @@ local function getfd(fd)
   if ffi.istype(t.int, fd) then return tonumber(fd) end
   if type(fd) == 'number' then return fd end
   if type(fd) == 'string' then
-    if fd == 'stdin' or fd == 'STDIN_FILENO' then return 0 end
-    if fd == 'stdout' or fd == 'STDOUT_FILENO' then return 1 end
-    if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
+    if fd == 'stdin' then return 0 end
+    if fd == 'stdout' then return 1 end
+    if fd == 'stderr' then return 2 end
   end
   if fd.fileno then return tonumber(fd.fileno) end
 end
