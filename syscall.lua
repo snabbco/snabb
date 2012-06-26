@@ -2468,7 +2468,6 @@ local function getfd(fd)
     if fd == 'stderr' or fd == 'STDERR_FILENO' then return 2 end
   end
   if fd.fileno then return tonumber(fd.fileno) end
-  return nil
 end
 
 local function split(delimiter, text)
@@ -5243,7 +5242,10 @@ fmeth.seq = function(fd)
   return fd.sequence
 end
 
-t.fd = ffi.metatype("struct {int fileno; int sequence;}", {__index = fmeth, __gc = S.close})
+t.fd = ffi.metatype("struct {int fileno; int sequence;}", {
+  __index = fmeth,
+  __gc = S.close,
+})
 
 t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
   __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel,
