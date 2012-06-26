@@ -4556,7 +4556,7 @@ mt.iflink = {
     local s = i.name .. '\n' ..
       '          ' .. 'Link encap:' .. i.typename .. hw .. '\n'
     for a = 1, #i.inet do
-      s = s .. '          ' .. 'inet addr:' .. tostring(i.inet[a].addr) .. '\n'
+      s = s .. '          ' .. 'inet addr: ' .. tostring(i.inet[a].addr) .. '/' .. i.inet[a].prefixlen .. '\n'
     end
     for a = 1, #i.inet6 do
       s = s .. '          ' .. 'inet6 addr: ' .. tostring(i.inet6[a].addr) .. '/' .. i.inet6[a].prefixlen .. '\n'
