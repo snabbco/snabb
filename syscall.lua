@@ -4427,24 +4427,23 @@ local function cmsg_nxthdr(msg, buf, cmsg)
 end
 
 -- similar functions for netlink messages
--- TODO use local function not anonymous
-local nlmsg_align = function(len) return align(len, 4) end
+local function nlmsg_align(len) return align(len, 4) end
 local nlmsg_hdrlen = nlmsg_align(ffi.sizeof(t.nlmsghdr))
-local nlmsg_length = function(len) return len + nlmsg_hdrlen end
-local nlmsg_ok = function(msg, len)
+local function nlmsg_length(len) return len + nlmsg_hdrlen end
+local function nlmsg_ok(msg, len)
   return len >= nlmsg_hdrlen and msg.nlmsg_len >= nlmsg_hdrlen and msg.nlmsg_len <= len
 end
-local nlmsg_next = function(msg, buf, len)
+local function nlmsg_next(msg, buf, len)
   local inc = nlmsg_align(msg.nlmsg_len)
   return pt.nlmsghdr(buf + inc), buf + inc, len - inc
 end
 
 local rta_align = nlmsg_align -- also 4 byte align
-local rta_length = function(len) return len + rta_align(ffi.sizeof(t.rtattr)) end
-local rta_ok = function(msg, len)
+local function rta_length(len) return len + rta_align(ffi.sizeof(t.rtattr)) end
+local function rta_ok(msg, len)
   return len >= ffi.sizeof(t.rtattr) and msg.rta_len >= ffi.sizeof(t.rtattr) and msg.rta_len <= len
 end
-local rta_next = function(msg, buf, len)
+local function rta_next(msg, buf, len)
   local inc = rta_align(msg.rta_len)
   return pt.rtattr(buf + inc), buf + inc, len - inc
 end
