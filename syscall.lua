@@ -4683,6 +4683,7 @@ function S.getaddr(af)
   if not ok then return nil, err end -- gc will take care of closing socket...
   a = s:getsockname() -- to get bound address
   if not a then return nil, err end -- gc will take care of closing socket...
+
   local k = t.sockaddr_nl() -- kernel destination
 
   local buf, len, hdr, ifaddr = tbuffer(t.nlmsghdr, t.ifaddrmsg)
@@ -4718,6 +4719,7 @@ function S.getlink()
   if not ok then return nil, err end -- gc will take care of closing socket...
   a, err = s:getsockname() -- to get bound address
   if not a then return nil, err end -- gc will take care of closing socket...
+
   local k = t.sockaddr_nl() -- kernel destination
 
   -- we should be adding padding at the end of size nlmsg_alignto (4), (and in middle but 0) or will have issues if try to send more messages.
