@@ -3076,6 +3076,7 @@ end
 S.ntohl = S.htonl -- reverse is the same
 S.ntohs = S.htons -- reverse is the same
 
+-- we should be adding padding at the end of size nlmsg_alignto (4), (and in middle but 0) or will have issues if try to send more messages. So need to pass align function.
 local function tbuffer(...) -- helper function for sequence of types in a buffer
   local function threc(buf, offset, tp, ...) -- alignment issues, need to round up to minimum alignment
     if not tp then return nil end
@@ -4722,9 +4723,7 @@ function S.getlink()
 
   local k = t.sockaddr_nl() -- kernel destination
 
-  -- we should be adding padding at the end of size nlmsg_alignto (4), (and in middle but 0) or will have issues if try to send more messages.
-  -- so need to add pad size to tbuffer function
-  local buf, len, hdr, gen = tbuffer(t.nlmsghdr, t.rtgenmsg) -- allocates buffer for named types and returns cast pointers
+  local buf, len, hdr, gen = tbuffer(t.nlmsghdr, t.rtgenmsg)
 
   hdr.nlmsg_len = len
   hdr.nlmsg_type = S.RTM_GETLINK
