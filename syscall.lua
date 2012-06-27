@@ -4716,44 +4716,11 @@ function S.getaddr(af)
   return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, t.ifaddrmsg, {ifa_family = stringflag(af, "AF_")})
 end
 
+-- read interfaces and details.
 function S.getlink()
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, t.rtgenmsg, {rtgen_family = S.AF_PACKET})
 end
--- read interfaces and details.
---[[
-function S.getlink()
-  local s, err = S.socket("netlink", "raw", "route")
-  if not s then return nil, err end
-  local a = t.sockaddr_nl() -- kernel will fill in address
-  local ok, err = s:bind(a)
-  if not ok then return nil, err end -- gc will take care of closing socket...
-  a, err = s:getsockname() -- to get bound address
-  if not a then return nil, err end -- gc will take care of closing socket...
 
-  local k = t.sockaddr_nl() -- kernel destination
-
-  local buf, len, hdr, gen = tbuffer(t.nlmsghdr, t.rtgenmsg)
-
-  hdr.nlmsg_len = len
-  hdr.nlmsg_type = S.RTM_GETLINK
-  hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_DUMP
-  hdr.nlmsg_seq = s:seq()
-  hdr.nlmsg_pid = a.pid
-  gen.rtgen_family = S.AF_PACKET
-
-  local ios = t.iovecs{{buf, len}}
-  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = ffi.sizeof(t.sockaddr_nl)}
-
-  local n, err = s:sendmsg(m)
-  if not n then return nil, err end 
-
-  local i = S.nlmsg_read(s, k)
-  local ok, err = s:close()
-  if not ok then return nil, err end
-
-  return i
-end
-]]
 function S.get_interfaces() -- returns with address info too.
   local ifs, err = S.getlink()
   if not ifs then return nil, err end
