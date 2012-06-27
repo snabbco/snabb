@@ -4582,11 +4582,6 @@ mt.iflink = {
   end
 }
 
---[[
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-]]
-
 mt.ifaddr = {
   __index = function(i, k)
     local meth = {
