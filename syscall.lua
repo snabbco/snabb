@@ -4675,7 +4675,48 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
   return r
 end
 
+-- initial abstraction, expand later
+local function nlmsg(ntype, flags, tp, init)
+  local s, err = S.socket("netlink", "raw", "route")
+  if not s then return nil, err end
+  local a = t.sockaddr_nl() -- kernel will fill in address
+  local ok, err = s:bind(a)
+  if not ok then return nil, err end -- gc will take care of closing socket...
+  a = s:getsockname() -- to get bound address
+  if not a then return nil, err end -- gc will take care of closing socket...
+
+  local k = t.sockaddr_nl() -- kernel destination
+
+  local buf, len, hdr, struct = tbuffer(t.nlmsghdr, tp)
+
+  hdr.nlmsg_len = len
+  hdr.nlmsg_type = ntype
+  hdr.nlmsg_flags = flags
+  hdr.nlmsg_seq = s:seq()
+  hdr.nlmsg_pid = a.pid
+
+  for k, v in pairs(init) do struct[k] = v end
+
+  local ios = t.iovecs{{buf, len}}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = ffi.sizeof(t.sockaddr_nl)}
+
+  local n, err = s:sendmsg(m)
+  if not n then return nil, err end
+
+  local i = S.nlmsg_read(s, k)
+
+  local ok, err = s:close()
+  if not ok then return nil, err end
+
+  return i
+end
+
+function S.getaddr(af)
+  return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, t.ifaddrmsg, {ifa_family = stringflag(af, "AF_")})
+end
+
 -- read addresses on interfaces. see also notes in get_interfaces, should reuse code as mostly duplicated!
+--[[
 function S.getaddr(af)
   local s, err = S.socket("netlink", "raw", "route")
   if not s then return nil, err end
@@ -4710,6 +4751,7 @@ function S.getaddr(af)
 
   return i
 end
+]]
 
 -- read interfaces and details.
 function S.getlink()
