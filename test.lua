@@ -1162,6 +1162,19 @@ test_processes = {
       assert(S.unlink(efile))
     end
   end,
+  test_clone = function()
+    local pid0 = S.getpid()
+    local p = assert(S.clone()) -- no flags, should be much like fork.
+    if p == 0 then -- child
+      assert(S.getppid() == pid0, "parent pid should be previous pid")
+      S.exit(23)
+    else -- parent
+      local w = assert(S.waitpid(-1, "clone"))
+      assert_equal(w.pid, p, "expect clone to return same pid as wait")
+      assert(w.WIFEXITED, "process should have exited normally")
+      assert(w.EXITSTATUS == 23, "exit should be 23")
+    end
+  end,
 }
 
 test_filesystem = {

@@ -334,6 +334,11 @@ S.WEXITED       = 4
 S.WCONTINUED    = 8
 S.WNOWAIT       = 0x01000000
 
+S.__WNOTHREAD    = 0x20000000
+S.__WALL         = 0x40000000
+S.__WCLONE       = 0x80000000
+S.NOTHREAD, S.WALL, S.WCLONE = S.__WNOTHREAD, S.__WALL, S.__WCLONE
+
 -- struct siginfo, eg waitid
 local signal_reasons_gen = {}
 local signal_reasons = {}
@@ -3283,8 +3288,9 @@ function S.nice(inc) return retnume(C.nice, inc) end
 function S.getpriority(which, who) return retnume(C.getpriority, stringflags(which, "PRIO_"), who or 0) end
 function S.setpriority(which, who, prio) return retnume(C.setpriority, stringflags(which, "PRIO_"), who or 0, prio) end
 
-function S.clone(flags, stack, ptid, tls, ctid) -- we could allocate ptid, ctid, tls if required in flags instead
-  retnum(C.syscall(stringflag(flags, "CLONE_"), stack, ptid, tls, ctid))
+ -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
+function S.clone(flags, signal, stack, ptid, tls, ctid)
+  return retnum(C.syscall(S.SYS_clone, stringflags(flags, "CLONE_") + stringflag(signal, "SIG"), stack or 0, ptid, tls, ctid))
 end
 
 function S.fork() return retnum(C.fork()) end
@@ -3342,7 +3348,7 @@ function S.wait()
 end
 function S.waitpid(pid, options)
   local status = t.int1()
-  return retwait(C.waitpid(pid, status, options or 0), status[0])
+  return retwait(C.waitpid(pid, status, stringflags(options, "W")), status[0])
 end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
   if not infop then infop = t.siginfo() end
