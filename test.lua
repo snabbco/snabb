@@ -996,6 +996,52 @@ test_filesystem = {
   end,
 }
 
+-- note at present we check for uid 0, but could check capabilities instead.
+test_root = {
+  test_mount = function()
+    if S.geteuid() ~= 0 then return end
+    assert(S.mkdir(tmpfile))
+    assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
+    assert(S.umount(tmpfile, "detach, nofollow"))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_acct = function()
+    S.acct() -- may not be configured
+  end,
+  test_sethostname = function()
+    if S.geteuid() ~= 0 then return end
+    local hh = "testhostname"
+    local h = assert(S.gethostname())
+    assert(S.sethostname(hh))
+    assert(hh == assert(S.gethostname()))
+    assert(S.sethostname(h))
+  end,
+  test_bridge = function()
+    if S.geteuid() ~= 0 then return end
+    local ok, err = S.bridge_add("br999")
+    assert(ok or err.ENOPKG, err)
+    if ok then
+      assert(S.stat("/sys/class/net/br999"))
+      --assert(S.bridge_add_interface("br999", "eth0")) -- failing on test machine as already in another bridge!
+
+      local b = assert(S.bridge_list())
+      assert(b.br999 and b.br999.bridge.root_id, "expect to find bridge in list")
+
+      --print(b.br0.brforward[1].mac_addr, b.br0.brforward[2].mac_addr, b.br0.brforward[3].mac_addr)
+
+      --for k, v in pairs(b.br999.bridge) do print(k, v) end
+
+      assert(S.bridge_del("br999"))
+      ok = S.stat("/sys/class/net/br999")
+      assert(not ok, "bridge should be gone")
+    end
+  end,
+  test_chroot = function()
+    if S.geteuid() ~= 0 then return end
+    assert(S.chroot("/"))
+  end,
+}
+
 -- legacy tests not yet converted to test framework
 
 test_legacy = {
@@ -1206,48 +1252,6 @@ end
 
 if arg[1] then luaunit:run(arg[1]) else luaunit:run() end
 
--- these should be set up to allow skipping them.
-
-if S.geteuid() ~= 0 then S.exit("success") end -- cannot execute some tests if not root
-
-assert(S.mkdir(tmpfile))
-assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
-
---print(S.readfile("/proc/mounts"))
-
-assert(S.umount(tmpfile, "detach, nofollow"))
-assert(S.rmdir(tmpfile))
-
-S.acct() -- may not be configured
-
-
-local hh = "testhostname"
-h = assert(S.gethostname())
-assert(S.sethostname(hh))
-assert(hh == assert(S.gethostname()))
-assert(S.sethostname(h))
-
--- test bridge functions
-ok, err = S.bridge_add("br999")
-assert(ok or err.ENOPKG, err)
-if ok then
-  assert(S.stat("/sys/class/net/br999"))
-  --assert(S.bridge_add_interface("br999", "eth0")) -- failing on test machine as already in another bridge!
-
-  local b = assert(S.bridge_list())
-  assert(b.br999 and b.br999.bridge.root_id, "expect to find bridge in list")
-
-  --print(b.br0.brforward[1].mac_addr, b.br0.brforward[2].mac_addr, b.br0.brforward[3].mac_addr)
-
-  --for k, v in pairs(b.br999.bridge) do print(k, v) end
-
-  assert(S.bridge_del("br999"))
-  ok = S.stat("/sys/class/net/br999")
-  assert(not ok, "bridge should be gone")
-end
-
--- chroot
-assert(S.chroot("/"))
 
 S.exit("success")
 
