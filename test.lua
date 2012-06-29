@@ -332,7 +332,67 @@ test_file_operations = {
     assert(fd:close())
     assert(S.chdir(".."))
     assert(S.rmdir(tmpfile))
-  end
+  end,
+  test_xattr = function()
+    assert(S.writefile(tmpfile, "test", "IRWXU"))
+    local l, err = S.listxattr(tmpfile)
+    assert(l or err.ENOTSUP, "expect to get xattr or not supported on fs")
+    if l then
+      local fd = assert(S.open(tmpfile, "rdwr"))
+      assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
+      l = assert(S.llistxattr(tmpfile))
+      assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
+      l = assert(fd:flistxattr())
+      assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
+      local nn = #l
+      local ok, err = S.setxattr(tmpfile, "user.test", "42", "create")
+      if ok then -- likely to get err.ENOTSUP here if fs not mounted with user_xattr
+        l = assert(S.listxattr(tmpfile))
+        assert(#l == nn + 1, "expect another attribute set")
+        assert(S.lsetxattr(tmpfile, "user.test", "44", "replace"))
+        assert(fd:fsetxattr("user.test2", "42"))
+        l = assert(S.listxattr(tmpfile))
+        assert(#l == nn + 2, "expect another attribute set")
+        local s = assert(S.getxattr(tmpfile, "user.test"))
+        assert(s == "44", "expect to read set value of xattr")
+        s = assert(S.lgetxattr(tmpfile, "user.test"))
+        assert(s == "44", "expect to read set value of xattr")
+        s = assert(fd:fgetxattr("user.test2"))
+        assert(s == "42", "expect to read set value of xattr")
+        local s, err = fd:fgetxattr("user.test3")
+        assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from non existent xattr")
+        s = assert(S.removexattr(tmpfile, "user.test"))
+        s = assert(S.lremovexattr(tmpfile, "user.test2"))
+        l = assert(S.listxattr(tmpfile))
+        assert(#l == nn, "expect no xattr now")
+        local s, err = fd:fremovexattr("user.test3")
+        assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from remove non existent xattr")
+        -- table helpers
+        local tt = assert(S.xattr(tmpfile))
+        local n = 0
+        for k, v in pairs(tt) do n = n + 1 end
+        assert(n == nn, "expect no xattr now")
+        tt = {}
+        for k, v in pairs{test = "42", test2 = "44"} do tt["user." .. k] = v end
+        assert(S.xattr(tmpfile, tt))
+        tt = assert(S.lxattr(tmpfile))
+        assert(tt["user.test2"] == "44" and tt["user.test"] == "42", "expect to return values set")
+        n = 0
+        for k, v in pairs(tt) do n = n + 1 end
+        assert(n == nn + 2, "expect 2 xattr now")
+        tt = {}
+        for k, v in pairs{test = "42", test2 = "44", test3="hello"} do tt["user." .. k] = v end
+        assert(fd:fxattr(tt))
+        tt = assert(fd:fxattr())
+        assert(tt["user.test2"] == "44" and tt["user.test"] == "42" and tt["user.test3"] == "hello", "expect to return values set")
+        n = 0
+        for k, v in pairs(tt) do n = n + 1 end
+        assert(n == nn + 3, "expect 3 xattr now")
+      end
+      assert(fd:close())
+    end
+    assert(S.unlink(tmpfile))
+  end,
 }
 
 test_largefile = {
@@ -1191,65 +1251,6 @@ assert(s[2]:close())
 
 
 
--- xattr support
-assert(S.writefile(tmpfile, "test", "IRWXU"))
-local l, err = S.listxattr(tmpfile)
-assert(l or err.ENOTSUP, "expect to get xattr or not supported on fs")
-if l then
-  fd = assert(S.open(tmpfile, "rdwr"))
-  assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
-  l = assert(S.llistxattr(tmpfile))
-  assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
-  l = assert(fd:flistxattr())
-  assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
-  local nn = #l
-  ok, err = S.setxattr(tmpfile, "user.test", "42", "create")
-  if ok then -- likely to get err.ENOTSUP here if fs not mounted with user_xattr
-    l = assert(S.listxattr(tmpfile))
-    assert(#l == nn + 1, "expect another attribute set")
-    assert(S.lsetxattr(tmpfile, "user.test", "44", "replace"))
-    assert(fd:fsetxattr("user.test2", "42"))
-    l = assert(S.listxattr(tmpfile))
-    assert(#l == nn + 2, "expect another attribute set")
-    s = assert(S.getxattr(tmpfile, "user.test"))
-    assert(s == "44", "expect to read set value of xattr")
-    s = assert(S.lgetxattr(tmpfile, "user.test"))
-    assert(s == "44", "expect to read set value of xattr")
-    s = assert(fd:fgetxattr("user.test2"))
-    assert(s == "42", "expect to read set value of xattr")
-    s, err = fd:fgetxattr("user.test3")
-    assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from non existent xattr")
-    s = assert(S.removexattr(tmpfile, "user.test"))
-    s = assert(S.lremovexattr(tmpfile, "user.test2"))
-    l = assert(S.listxattr(tmpfile))
-    assert(#l == nn, "expect no xattr now")
-    s, err = fd:fremovexattr("user.test3")
-    assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from remove non existent xattr")
-    -- table helpers
-    tt = assert(S.xattr(tmpfile))
-    n = 0
-    for k, v in pairs(tt) do n = n + 1 end
-    assert(n == nn, "expect no xattr now")
-    tt = {}
-    for k, v in pairs{test = "42", test2 = "44"} do tt["user." .. k] = v end
-    assert(S.xattr(tmpfile, tt))
-    tt = assert(S.lxattr(tmpfile))
-    assert(tt["user.test2"] == "44" and tt["user.test"] == "42", "expect to return values set")
-    n = 0
-    for k, v in pairs(tt) do n = n + 1 end
-    assert(n == nn + 2, "expect 2 xattr now")
-    tt = {}
-    for k, v in pairs{test = "42", test2 = "44", test3="hello"} do tt["user." .. k] = v end
-    assert(fd:fxattr(tt))
-    tt = assert(fd:fxattr())
-    assert(tt["user.test2"] == "44" and tt["user.test"] == "42" and tt["user.test3"] == "hello", "expect to return values set")
-    n = 0
-    for k, v in pairs(tt) do n = n + 1 end
-    assert(n == nn + 3, "expect 3 xattr now")
-  end
-  assert(fd:close())
-end
-assert(S.unlink(tmpfile))
 
 
 
