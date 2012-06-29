@@ -1023,6 +1023,30 @@ S.LINUX_REBOOT_CMD_RESTART2     =  0xA1B2C3D4
 S.LINUX_REBOOT_CMD_SW_SUSPEND   =  0xD000FCE2
 S.LINUX_REBOOT_CMD_KEXEC        =  0x45584543
 
+-- clone
+S.CLONE_VM      = 0x00000100
+S.CLONE_FS      = 0x00000200
+S.CLONE_FILES   = 0x00000400
+S.CLONE_SIGHAND = 0x00000800
+S.CLONE_PTRACE  = 0x00002000
+S.CLONE_VFORK   = 0x00004000
+S.CLONE_PARENT  = 0x00008000
+S.CLONE_THREAD  = 0x00010000
+S.CLONE_NEWNS   = 0x00020000
+S.CLONE_SYSVSEM = 0x00040000
+S.CLONE_SETTLS  = 0x00080000
+S.CLONE_PARENT_SETTID  = 0x00100000
+S.CLONE_CHILD_CLEARTID = 0x00200000
+S.CLONE_DETACHED = 0x00400000
+S.CLONE_UNTRACED = 0x00800000
+S.CLONE_CHILD_SETTID = 0x01000000
+S.CLONE_NEWUTS   = 0x04000000
+S.CLONE_NEWIPC   = 0x08000000
+S.CLONE_NEWUSER  = 0x10000000
+S.CLONE_NEWPID   = 0x20000000
+S.CLONE_NEWNET   = 0x40000000
+S.CLONE_IO       = 0x80000000
+
 -- inotify
 -- flags
 S.IN_CLOEXEC = octal("02000000")
@@ -1376,6 +1400,7 @@ if ffi.arch == "x86" then
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
+  S.SYS_clone            = 120
   S.SYS_getdents         = 141
   S.SYS_stat64           = 195
   S.SYS_lstat64          = 196
@@ -1394,6 +1419,7 @@ elseif ffi.arch == "x64" then
   S.SYS_stat             = 4
   S.SYS_fstat            = 5
   S.SYS_lstat            = 6
+  S.SYS_clone            = 56
   S.SYS_getdents         = 78
   S.SYS_io_setup         = 206
   S.SYS_io_destroy       = 207
@@ -1409,6 +1435,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
+  S.SYS_clone            = 120
   S.SYS_getdents         = 141
   S.SYS_stat64           = 195
   S.SYS_lstat64          = 196
@@ -3255,6 +3282,10 @@ function S.nice(inc) return retnume(C.nice, inc) end
 -- might cause issues with other C libraries in which case may shift to using system call
 function S.getpriority(which, who) return retnume(C.getpriority, stringflags(which, "PRIO_"), who or 0) end
 function S.setpriority(which, who, prio) return retnume(C.setpriority, stringflags(which, "PRIO_"), who or 0, prio) end
+
+function S.clone(flags, stack, ptid, tls, ctid) -- we could allocate ptid, ctid, tls if required in flags instead
+  retnum(C.syscall(stringflag(flags, "CLONE_"), stack, ptid, tls, ctid))
+end
 
 function S.fork() return retnum(C.fork()) end
 function S.execve(filename, argv, envp)
