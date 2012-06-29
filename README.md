@@ -121,4 +121,7 @@ Some helper functions for fcntl features such as file locking should be added?
 ## sysctl
 Need a trivial sysctl wrapper (write to /proc/sys)
 
+## cgroups
+
+Need a cgroup interface.
 
