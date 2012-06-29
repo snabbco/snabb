@@ -3290,7 +3290,7 @@ function S.setpriority(which, who, prio) return retnume(C.setpriority, stringfla
 
  -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
 function S.clone(flags, signal, stack, ptid, tls, ctid)
-  return retnum(C.syscall(S.SYS_clone, stringflags(flags, "CLONE_") + stringflag(signal, "SIG"), stack or 0, ptid, tls, ctid))
+  return retnum(C.syscall(S.SYS_clone, t.int64(stringflags(flags, "CLONE_") + stringflag(signal, "SIG")), stack or 0, ptid, tls, ctid))
 end
 
 function S.fork() return retnum(C.fork()) end
@@ -4674,6 +4674,7 @@ local nlmsg_data_decode = {
     end
 
     r[ir.name] = ir
+    r[#r + 1] = ir -- array and names
 
     return r
   end

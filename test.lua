@@ -879,10 +879,8 @@ test_sockets = {
 test_netlink = {
   test_getlink = function()
     local i = assert(S.getlink())
-    local count = 0
-    for _, v in pairs(i) do count = count + 1 end
-    local df = #assert(S.ls("/sys/class/net", true))
-    assert_equal(df, count, "expect same number of interfaces as /sys/class/net")
+    local df = assert(S.ls("/sys/class/net", true))
+    assert_equal(#df, #i, "expect same number of interfaces as /sys/class/net")
     assert(i.lo, "expect a loopback interface")
     local lo = i.lo
     assert(lo.flags.up, "loopback interface should be up")
@@ -1175,6 +1173,20 @@ test_processes = {
       assert(w.EXITSTATUS == 23, "exit should be 23")
     end
   end,
+}
+
+test_namespaces = {
+  test_netns = function()
+    local p, err = S.clone("newnet")
+    if err and err.perm then return end -- needs root
+    if p == 0 then
+      local i = assert(S.get_interfaces())
+      assert(#i == 1 and i.lo and not i.lo.up, "expect new network ns only has down lo interface")
+      S.exit()
+    else
+      assert(S.waitpid(-1, "clone"))
+    end
+  end
 }
 
 test_filesystem = {
