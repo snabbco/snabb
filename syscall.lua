@@ -1402,6 +1402,7 @@ S.TIOCM_RI  = S.TIOCM_RNG
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
 if ffi.arch == "x86" then
+  S.SYS_getpid           = 20
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
@@ -1424,6 +1425,7 @@ elseif ffi.arch == "x64" then
   S.SYS_stat             = 4
   S.SYS_fstat            = 5
   S.SYS_lstat            = 6
+  S.SYS_getpid           = 39
   S.SYS_clone            = 56
   S.SYS_getdents         = 78
   S.SYS_io_setup         = 206
@@ -1437,6 +1439,7 @@ elseif ffi.arch == "x64" then
   S.SYS_clock_getres     = 229
   S.SYS_clock_nanosleep  = 230
 elseif ffi.arch == "arm" and ffi.abi("eabi") then
+  S.SYS_getpid           = 20
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
@@ -4316,12 +4319,15 @@ function S.clock_settime(clk_id, ts) return retbool(C.syscall(S.SYS_clock_settim
 -- straight passthroughs, as no failure possible
 S.getuid = C.getuid
 S.geteuid = C.geteuid
-S.getpid = C.getpid
 S.getppid = C.getppid
 S.getgid = C.getgid
 S.getegid = C.getegid
 S.sync = C.sync
 S.alarm = C.alarm
+
+function S.getpid()
+  return C.syscall(S.SYS_getpid) -- bypass glibc caching of pids
+end
 
 function S.umask(mask) return C.umask(S.mode(mask)) end
 

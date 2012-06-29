@@ -1186,6 +1186,16 @@ test_namespaces = {
     else
       assert(S.waitpid(-1, "clone"))
     end
+  end,
+  test_pidns = function()
+    local p, err = S.clone("newpid")
+    if err and err.perm then return end -- needs root
+    if p == 0 then
+      assert_equal(S.getpid(), 1, "expec our pid to be 1 new new process namespace")
+      S.exit()
+    else
+      assert(S.waitpid(-1, "clone"))
+    end
   end
 }
 
