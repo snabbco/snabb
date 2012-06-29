@@ -2757,7 +2757,7 @@ t.stat = ffi.metatype(stattypename, { -- either struct stat on 64 bit or struct 
     islnk = function(st) return S.S_ISLNK(st.st_mode) end,
     issock = function(st) return S.S_ISSOCK(st.st_mode) end
   }
-  return meth[k](st)
+  if meth[k] then return meth[k](st) end
   end
 })
 
@@ -2778,7 +2778,7 @@ t.siginfo = ffi.metatype("struct siginfo", {
     si_band    = function(s) return s.sifields.sigpoll.si_band end,
     si_fd      = function(s) return s.sifields.sigpoll.si_fd end,
   }
-  return siginfo_get[k](t)
+  if siginfo_get[k] then return siginfo_get[k](t) end
   end,
   __newindex = function(t, k, v)
   local siginfo_set = {
@@ -2796,7 +2796,7 @@ t.siginfo = ffi.metatype("struct siginfo", {
     si_band    = function(s, v) s.sifields.sigpoll.si_band = v end,
     si_fd      = function(s, v) s.sifields.sigpoll.si_fd = v end,
   }
-  siginfo_set[k](t, v)
+  if siginfo_set[k] then siginfo_set[k](t, v) end
   end
 })
 
