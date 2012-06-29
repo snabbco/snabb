@@ -1187,6 +1187,18 @@ test_namespaces = {
       assert(S.waitpid(-1, "clone"))
     end
   end,
+  test_netns_unshare = function()
+    local p, err = S.clone()
+    if err and err.perm then return end -- needs root
+    if p == 0 then
+      S.unshare("newnet")
+      local i = assert(S.get_interfaces())
+      assert(#i == 1 and i.lo and not i.lo.up, "expect new network ns only has down lo interface")
+      S.exit()
+    else
+      assert(S.waitpid(-1, "clone"))
+    end
+  end,
   test_pidns = function()
     local p, err = S.clone("newpid")
     if err and err.perm then return end -- needs root
@@ -1196,7 +1208,7 @@ test_namespaces = {
     else
       assert(S.waitpid(-1, "clone"))
     end
-  end
+  end,
 }
 
 test_filesystem = {

@@ -2434,6 +2434,7 @@ int ustat(dev_t dev, struct ustat *ubuf);
 int statfs(const char *path, struct statfs64 *buf); /* this is statfs64 syscall, but glibc wraps */
 int fstatfs(int fd, struct statfs64 *buf);          /* this too */
 int futimens(int fd, const struct timespec times[2]);
+int unshare(int flags);
 
 int syscall(int number, ...);
 
@@ -3295,6 +3296,10 @@ function S.setpriority(which, who, prio) return retnume(C.setpriority, stringfla
 function S.clone(flags, signal, stack, ptid, tls, ctid)
   flags = t.int64(stringflags(flags, "CLONE_") + stringflag(signal, "SIG"))
   return retnum(C.syscall(S.SYS_clone, flags, pt.void(stack), pt.void(ptid), pt.void(tls), pt.void(ctid)))
+end
+
+function S.unshare(flags)
+  return retbool(C.unshare(stringflags(flags, "CLONE_")))
 end
 
 function S.fork() return retnum(C.fork()) end
