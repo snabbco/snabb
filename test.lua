@@ -989,6 +989,60 @@ test_processes = {
       assert(err, "non root user should not be able to set negative priority")
     end
   end,
+  test_fork = function() -- TODO split up
+    local pid0 = S.getpid()
+    assert(pid0 > 1, "expecting my pid to be larger than 1")
+    assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
+
+    assert(S.getsid())
+    S.setsid() -- may well fail
+
+    local pid = assert(S.fork())
+    if pid == 0 then -- child
+      assert(S.getppid() == pid0, "parent pid should be previous pid")
+      S.exit(23)
+    else -- parent
+      local w = assert(S.wait())
+      assert(w.pid == pid, "expect fork to return same pid as wait")
+      assert(w.WIFEXITED, "process should have exited normally")
+      assert(w.EXITSTATUS == 23, "exit should be 23")
+    end
+
+    pid = assert(S.fork())
+    if (pid == 0) then -- child
+      assert(S.getppid() == pid0, "parent pid should be previous pid")
+      S.exit(23)
+    else -- parent
+      local w = assert(S.waitid("all", 0, "exited, stopped, continued"))
+      assert(w.si_signo == S.SIGCHLD, "waitid to return SIGCHLD")
+      assert(w.si_status == 23, "exit should be 23")
+      assert(w.si_code == S.CLD_EXITED, "normal exit expected")
+    end
+
+    local efile = "/tmp/tmpXXYYY.sh"
+    pid = assert(S.fork())
+    if (pid == 0) then -- child
+      S.unlink(efile)
+      local script = [[
+#!/bin/sh
+
+[ $1 = "test" ] || (echo "shell assert $1"; exit 1)
+[ $2 = "ing" ] || (echo "shell assert $2"; exit 1)
+[ $PATH = "/bin:/usr/bin" ] || (echo "shell assert $PATH"; exit 1)
+
+]]
+      S.writefile(efile, script, "IRWXU")
+      assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
+      -- never reach here
+      os.exit()
+    else -- parent
+      local w = assert(S.waitpid(-1))
+      assert(w.pid == pid, "expect fork to return same pid as wait")
+      assert(w.WIFEXITED, "process should have exited normally")
+      assert(w.EXITSTATUS == 0, "exit should be 0")
+      assert(S.unlink(efile))
+    end
+  end,
 }
 
 test_filesystem = {
@@ -1073,60 +1127,6 @@ test_legacy = {
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 
 
--- fork and related methods
-local pid, pid0, w
-pid0 = S.getpid()
-assert(pid0 > 1, "expecting my pid to be larger than 1")
-assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
-
-assert(S.getsid())
-S.setsid() -- may well fail
-
-pid = assert(S.fork())
-if pid == 0 then -- child
-  assert(S.getppid() == pid0, "parent pid should be previous pid")
-  S.exit(23)
-else -- parent
-  w = assert(S.wait())
-  assert(w.pid == pid, "expect fork to return same pid as wait")
-  assert(w.WIFEXITED, "process should have exited normally")
-  assert(w.EXITSTATUS == 23, "exit should be 23")
-end
-
-pid = assert(S.fork())
-if (pid == 0) then -- child
-  assert(S.getppid() == pid0, "parent pid should be previous pid")
-  S.exit(23)
-else -- parent
-  w = assert(S.waitid("all", 0, "exited, stopped, continued"))
-  assert(w.si_signo == S.SIGCHLD, "waitid to return SIGCHLD")
-  assert(w.si_status == 23, "exit should be 23")
-  assert(w.si_code == S.CLD_EXITED, "normal exit expected")
-end
-
-local efile = "/tmp/tmpXXYYY.sh"
-pid = assert(S.fork())
-if (pid == 0) then -- child
-  S.unlink(efile)
-  local script = [[
-#!/bin/sh
-
-[ $1 = "test" ] || (echo "shell assert $1"; exit 1)
-[ $2 = "ing" ] || (echo "shell assert $2"; exit 1)
-[ $PATH = "/bin:/usr/bin" ] || (echo "shell assert $PATH"; exit 1)
-
-]]
-  S.writefile(efile, script, "IRWXU")
-  assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
-  -- never reach here
-  os.exit()
-else -- parent
-  w = assert(S.waitpid(-1))
-  assert(w.pid == pid, "expect fork to return same pid as wait")
-  assert(w.WIFEXITED, "process should have exited normally")
-  assert(w.EXITSTATUS == 0, "exit should be 0")
-  assert(S.unlink(efile))
-end
 
 oldcmd = assert(S.readfile("/proc/self/cmdline"))
 assert(S.setcmdline("test"))
