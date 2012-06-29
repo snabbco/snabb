@@ -471,7 +471,18 @@ test_timers_signals = {
     n = assert(fd:timerfd_read())
     assert(n == 1, "should have exactly one timer expiry")
     assert(fd:close())
-  end
+  end.
+  test_gettimeofday = function()
+    local tv = assert(S.gettimeofday())
+    assert(math.floor(tv.time) == tv.sec, "should be able to get float time from timeval")
+  end,
+  test_time = function()
+    local t = S.time()
+  end,
+  test_clock = function()
+    local t = assert(S.clock_getres("realtime"))
+    local t = assert(S.clock_gettime("realtime"))
+  end,
 }
 
 test_mmap = {
@@ -1115,12 +1126,6 @@ if S.geteuid() ~= 0 then
   n, err = S.setpriority("process", 0, -1)
   assert(err, "non root user should not be able to set negative priority")
 end
-
-local tv = assert(S.gettimeofday())
-assert(math.floor(tv.time) == tv.sec, "should be able to get float time from timeval")
-local t = S.time()
-local t = assert(S.clock_getres("realtime"))
-local t = assert(S.clock_gettime("realtime"))
 
 oldcmd = assert(S.readfile("/proc/self/cmdline"))
 assert(S.setcmdline("test"))
