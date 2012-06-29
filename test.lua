@@ -660,6 +660,17 @@ test_misc = {
     local h = assert(S.gethostname())
     local u = assert(S.uname())
     assert(h == u.nodename, "gethostname did not return nodename")
+  end,
+  test_cmdline = function()
+    local oldcmd = assert(S.readfile("/proc/self/cmdline"))
+    assert(S.setcmdline("test"))
+    local n = assert(S.readfile("/proc/self/cmdline"))
+    --assert(n:sub(1, 5) == "test\0", "command line should be set") -- valgrind issues
+    local ss = "test1234567890123456789012345678901234567890"
+    assert(S.setcmdline(ss))
+    n = assert(S.readfile("/proc/self/cmdline"))
+    --assert(n:sub(1,#ss) == ss, "long command line should be set: ")
+    assert(S.setcmdline(oldcmd))
   end
 }
 
@@ -1187,16 +1198,6 @@ test_legacy = {
 local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
 
 
-
-oldcmd = assert(S.readfile("/proc/self/cmdline"))
-assert(S.setcmdline("test"))
-n = assert(S.readfile("/proc/self/cmdline"))
---assert(n:sub(1, 5) == "test\0", "command line should be set") -- valgrind issues
-ss = "test1234567890123456789012345678901234567890"
-assert(S.setcmdline(ss))
-n = assert(S.readfile("/proc/self/cmdline"))
---assert(n:sub(1,#ss) == ss, "long command line should be set: ")
-assert(S.setcmdline(oldcmd))
 
 
 -- tee, splice, vmsplice
