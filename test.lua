@@ -415,8 +415,8 @@ test_timers_signals = {
     assert(S.signal("alrm", "dfl"))
   end,
   test_itimer = function()
-    local t = S.getitimer("real")
-    assert(t.interval.sec == 0, "expect timer not set")
+    local tt = assert(S.getitimer("real"))
+    assert(tt.interval.sec == 0, "expect timer not set")
     local exp = S.SIGALRM
     assert(S.sigaction("alrm", function(s) assert(s == exp, "expected alarm"); exp = 0 end))
     assert(exp == S.SIGALRM, "sigaction handler should not have run")
@@ -471,17 +471,17 @@ test_timers_signals = {
     n = assert(fd:timerfd_read())
     assert(n == 1, "should have exactly one timer expiry")
     assert(fd:close())
-  end.
+  end,
   test_gettimeofday = function()
     local tv = assert(S.gettimeofday())
     assert(math.floor(tv.time) == tv.sec, "should be able to get float time from timeval")
   end,
   test_time = function()
-    local t = S.time()
+    local tt = S.time()
   end,
   test_clock = function()
-    local t = assert(S.clock_getres("realtime"))
-    local t = assert(S.clock_gettime("realtime"))
+    local tt = assert(S.clock_getres("realtime"))
+    local tt = assert(S.clock_gettime("realtime"))
   end,
 }
 
@@ -562,7 +562,7 @@ test_misc = {
     assert(fd:close())
   end,
   test_adjtimex = function()
-    local t = assert(S.adjtimex())
+    local tt = assert(S.adjtimex())
   end,
   test_prctl = function()
     local n
@@ -951,7 +951,7 @@ test_aio = {
   end
 }
 
-test_proc = {
+test_processes = {
   test_proc_self = function()
     local p = assert(S.proc())
     assert(not p.wrongname, "test non existent files")
@@ -976,7 +976,19 @@ test_proc = {
     end
     assert(found, "expect to find my process in ps")
     assert(tostring(ps), "can convert ps to string")
-  end
+  end,
+  test_nice = function()
+    local n = assert(S.getpriority("process"))
+    assert (n == 0, "process should start at priority 0")
+    assert(S.nice(1))
+    assert(S.setpriority("process", 0, 1)) -- sets to 1, which it already is
+    if S.geteuid() ~= 0 then
+      local n, err = S.nice(-2)
+      assert(err, "non root user should not be able to set negative priority")
+      local n, err = S.setpriority("process", 0, -1)
+      assert(err, "non root user should not be able to set negative priority")
+    end
+  end,
 }
 
 test_filesystem = {
@@ -1116,17 +1128,6 @@ else -- parent
   assert(S.unlink(efile))
 end
 
-n = assert(S.getpriority("process"))
-assert (n == 0, "process should start at priority 0")
-assert(S.nice(1))
-assert(S.setpriority("process", 0, 1)) -- sets to 1, which it already is
-if S.geteuid() ~= 0 then
-  n, err = S.nice(-2)
-  assert(err, "non root user should not be able to set negative priority")
-  n, err = S.setpriority("process", 0, -1)
-  assert(err, "non root user should not be able to set negative priority")
-end
-
 oldcmd = assert(S.readfile("/proc/self/cmdline"))
 assert(S.setcmdline("test"))
 n = assert(S.readfile("/proc/self/cmdline"))
@@ -1225,25 +1226,25 @@ if l then
     s, err = fd:fremovexattr("user.test3")
     assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from remove non existent xattr")
     -- table helpers
-    t = assert(S.xattr(tmpfile))
+    tt = assert(S.xattr(tmpfile))
     n = 0
-    for k, v in pairs(t) do n = n + 1 end
+    for k, v in pairs(tt) do n = n + 1 end
     assert(n == nn, "expect no xattr now")
-    t = {}
-    for k, v in pairs{test = "42", test2 = "44"} do t["user." .. k] = v end
-    assert(S.xattr(tmpfile, t))
-    t = assert(S.lxattr(tmpfile))
-    assert(t["user.test2"] == "44" and t["user.test"] == "42", "expect to return values set")
+    tt = {}
+    for k, v in pairs{test = "42", test2 = "44"} do tt["user." .. k] = v end
+    assert(S.xattr(tmpfile, tt))
+    tt = assert(S.lxattr(tmpfile))
+    assert(tt["user.test2"] == "44" and tt["user.test"] == "42", "expect to return values set")
     n = 0
-    for k, v in pairs(t) do n = n + 1 end
+    for k, v in pairs(tt) do n = n + 1 end
     assert(n == nn + 2, "expect 2 xattr now")
-    t = {}
-    for k, v in pairs{test = "42", test2 = "44", test3="hello"} do t["user." .. k] = v end
-    assert(fd:fxattr(t))
-    t = assert(fd:fxattr())
-    assert(t["user.test2"] == "44" and t["user.test"] == "42" and t["user.test3"] == "hello", "expect to return values set")
+    tt = {}
+    for k, v in pairs{test = "42", test2 = "44", test3="hello"} do tt["user." .. k] = v end
+    assert(fd:fxattr(tt))
+    tt = assert(fd:fxattr())
+    assert(tt["user.test2"] == "44" and tt["user.test"] == "42" and tt["user.test3"] == "hello", "expect to return values set")
     n = 0
-    for k, v in pairs(t) do n = n + 1 end
+    for k, v in pairs(tt) do n = n + 1 end
     assert(n == nn + 3, "expect 3 xattr now")
   end
   assert(fd:close())
