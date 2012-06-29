@@ -437,7 +437,48 @@ test_sockets_pipes = {
     local fd = assert(S.pipe())
     assert(fd[1]:close())
     assert(fd[2]:close())
-  end
+  end,
+  test_tee_splice = function()
+    local p = assert(S.pipe("nonblock"))
+    local pp = assert(S.pipe("nonblock"))
+    local s = assert(S.socketpair("unix", "stream, nonblock"))
+    local fd = assert(S.open(tmpfile, "rdwr, creat", "IRWXU"))
+    assert(S.unlink(tmpfile))
+
+    local str = teststring
+
+    local n = assert(fd:write(str))
+    assert(n == #str)
+    n = assert(S.splice(fd, 0, p[2], nil, #str, "nonblock")) -- splice file at offset 0 into pipe
+    assert(n == #str)
+    n = assert(S.tee(p[1], pp[2], #str, "nonblock")) -- clone our pipe
+    assert(n == #str)
+    n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice to socket
+    assert(n == #str)
+    n = assert(s[2]:read())
+    assert(#n == #str)
+    n = assert(S.splice(pp[1], nil, s[1], nil, #str, "nonblock")) -- splice the tee'd pipe into our socket
+    assert(n == #str)
+    n = assert(s[2]:read())
+    assert(#n == #str)
+    local buf2 = S.t.buffer(#str)
+    S.copy(buf2, str, #str)
+
+    n = assert(S.vmsplice(p[2], {{buf2, #str}}, "nonblock")) -- write our memory into pipe
+    assert(n == #str)
+    n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice out to socket
+    assert(n == #str)
+    n = assert(s[2]:read())
+    assert(#n == #str)
+
+    assert(fd:close())
+    assert(p[1]:close())
+    assert(p[2]:close())
+    assert(pp[1]:close())
+    assert(pp[2]:close())
+    assert(s[1]:close())
+    assert(s[2]:close())
+  end,
 }
 
 test_timers_signals = {
@@ -1188,74 +1229,6 @@ test_root = {
     if S.geteuid() ~= 0 then return end
     assert(S.chroot("/"))
   end,
-}
-
--- legacy tests not yet converted to test framework
-
-test_legacy = {
-  test_legacy = function()
-
-local fd, fd0, fd1, fd2, fd3, n, s, c, err, ok
-
-
-
-
--- tee, splice, vmsplice
-local p = assert(S.pipe("nonblock"))
-local pp = assert(S.pipe("nonblock"))
-local s = assert(S.socketpair("unix", "stream, nonblock"))
-local fd = assert(S.open(tmpfile, "rdwr, creat", "IRWXU"))
-assert(S.unlink(tmpfile))
-
-local str = teststring
-
-n = assert(fd:write(str))
-assert(n == #str)
-
-n = assert(S.splice(fd, 0, p[2], nil, #str, "nonblock")) -- splice file at offset 0 into pipe
-assert(n == #str)
-
-n = assert(S.tee(p[1], pp[2], #str, "nonblock")) -- clone our pipe
-assert(n == #str)
-
-n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice to socket
-assert(n == #str)
-
-n = assert(s[2]:read())
-assert(#n == #str)
-
-n = assert(S.splice(pp[1], nil, s[1], nil, #str, "nonblock")) -- splice the tee'd pipe into our socket
-assert(n == #str)
-
-n = assert(s[2]:read())
-assert(#n == #str)
-
-local buf2 = S.t.buffer(#str)
-S.copy(buf2, str, #str)
-
-n = assert(S.vmsplice(p[2], {{buf2, #str}}, "nonblock")) -- write our memory into pipe
-assert(n == #str)
-
-n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice out to socket
-assert(n == #str)
-
-n = assert(s[2]:read())
-assert(#n == #str)
-
-assert(fd:close())
-assert(p[1]:close())
-assert(p[2]:close())
-assert(pp[1]:close())
-assert(pp[2]:close())
-assert(s[1]:close())
-assert(s[2]:close())
-
-
-
-
-
-
-end
 }
 
 if arg[1] then luaunit:run(arg[1]) else luaunit:run() end
