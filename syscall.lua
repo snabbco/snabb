@@ -2665,24 +2665,35 @@ t.error = ffi.metatype("struct {int errno;}", {
 
 t.sockaddr = ffi.metatype("struct sockaddr", {
   __index = function(sa, k)
-    if k == "family" then return tonumber(sa.sa_family) end
+    local meth = {
+      family = function(sa) return tonumber(sa.sa_family) end,
+    }
+    if meth[k] then return meth[k](sa) end
   end
 })
 
 t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
   __index = function(sa, k)
-    if k == "family" then return tonumber(sa.ss_family) end
-  end
+    local meth = {
+      family = function(sa) return tonumber(sa.ss_family) end,
+    }
+    if meth[k] then return meth[k](sa) end  end
 })
 
 t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
   __index = function(sa, k)
-    if k == "family" then return tonumber(sa.sin_family) end
-    if k == "port" then return S.ntohs(sa.sin_port) end
-    if k == "addr" then return sa.sin_addr end
+    local meth = {
+      family = function(sa) return tonumber(sa.sin_family) end,
+      port = function(sa) return S.ntohs(sa.sin_port) end,
+      addr = function(sa) return sa.sin_addr end,
+    }
+    if meth[k] then return meth[k](sa) end
   end,
   __newindex = function(sa, k, v)
-    if k == "port" then sa.sin_port = S.htons(v) end
+    meth = {
+      port = function(sa, v) sa.sin_port = S.htons(v) end
+    }
+    if meth[k] then meth[k](sa, v) end
   end,
   __new = function(tp, port, addr)
     if not ffi.istype(t.in_addr, addr) then
@@ -2695,12 +2706,18 @@ t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
 
 t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
   __index = function(sa, k)
-    if k == "family" then return tonumber(sa.sin6_family) end
-    if k == "port" then return S.ntohs(sa.sin6_port) end
-    if k == "addr" then return sa.sin6_addr end
+    local meth = {
+      family = function(sa) return tonumber(sa.sin6_family) end,
+      port = function(sa) return S.ntohs(sa.sin6_port) end,
+      addr = function(sa) return sa.sin6_addr end,
+    }
+    if meth[k] then return meth[k](sa) end
   end,
   __newindex = function(sa, k, v)
-    if k == "port" then sa.sin6_port = S.htons(v) end
+    meth = {
+      port = function(sa, v) sa.sin6_port = S.htons(v) end
+    }
+    if meth[k] then meth[k](sa, v) end
   end,
   __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers. should we allow table init too?
     if not ffi.istype(t.in6_addr, addr) then
@@ -2713,7 +2730,10 @@ t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
 
 t.sockaddr_un = ffi.metatype("struct sockaddr_un", {
   __index = function(sa, k)
-    if k == "family" then return tonumber(sa.un_family) end
+    local meth = {
+      family = function(sa) return tonumber(sa.un_family) end,
+    }
+    if meth[k] then return meth[k](sa) end
   end,
   __new = function(tp)
     return ffi.new(tp, S.AF_UNIX)
@@ -2722,9 +2742,12 @@ t.sockaddr_un = ffi.metatype("struct sockaddr_un", {
 
 t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
   __index = function(sa, k)
-    if k == "family" then return tonumber(sa.nl_family) end
-    if k == "pid" then return tonumber(sa.nl_pid) end
-    if k == "groups" then return tonumber(sa.nl_groups) end
+    local meth = {
+      family = function(sa) return tonumber(sa.nl_family) end,
+      pid = function(sa) return tonumber(sa.nl_pid) end,
+      groups = function(sa) return tonumber(sa.nl_groups) end,
+    }
+    if meth[k] then return meth[k](sa) end
   end,
   __new = function(tp, pid, groups)
     return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0)
