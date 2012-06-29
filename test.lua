@@ -1,3 +1,10 @@
+-- test framework for ljsyscall. Tries to be comprehensive.
+
+-- note tests missing tests for setting time TODO
+-- note have tested pause, reboot but not in tests
+
+-- assert(S.sigsuspend(m)) -- needs to be tested in fork.
+
 local S = require "syscall"
 local bit = require "bit"
 
@@ -1226,19 +1233,15 @@ test_root = {
     end
   end,
   test_chroot = function()
-    if S.geteuid() ~= 0 then return end
+     if S.geteuid() ~= 0 then return end
     assert(S.chroot("/"))
-  end,
+ end,
 }
 
-if arg[1] then luaunit:run(arg[1]) else luaunit:run() end
+local f
+if arg[1] then f = luaunit:run(arg[1]) else f = luaunit:run() end
 
+if f == 0 then S.exit("success") else S.exit("failure") end
 
-S.exit("success")
-
--- note tests missing tests for setting time TODO
--- note have tested pause, reboot but not in tests
-
--- assert(S.sigsuspend(m)) -- needs to be tested in fork.
 
 
