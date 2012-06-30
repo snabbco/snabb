@@ -940,8 +940,8 @@ test_netlink = {
       end
     end
   end,
-  test_get_interfaces = function()
-    local i = S.get_interfaces()
+  test_interfaces = function()
+    local i = S.interfaces()
     assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
     assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
   end,
@@ -950,10 +950,10 @@ test_netlink = {
      if p == 0 then
       local ok, err = S.unshare("newnet")
       if err and err.perm then return end -- needs root
-      local i = fork_assert(S.get_interfaces())
+      local i = fork_assert(S.interfaces())
       fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       fork_assert(S.setlink(i.lo.index, "up"))
-      i = fork_assert(S.get_interfaces())
+      i = fork_assert(S.interfaces())
       fork_assert(#i == 1 and i.lo and i.lo.flags.up, "expect lo up now")
       S.exit()
     else
@@ -966,10 +966,10 @@ test_netlink = {
      if p == 0 then
       local ok, err = S.unshare("newnet")
       if err and err.perm then return end -- needs root
-      local i = fork_assert(S.get_interfaces())
+      local i = fork_assert(S.interfaces())
       fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       fork_assert(i.lo.setflags("up"))
-      i = fork_assert(S.get_interfaces())
+      i = fork_assert(S.interfaces())
       fork_assert(#i == 1 and i.lo and i.lo.flags.up, "expect lo up now")
       S.exit()
     else
@@ -1219,7 +1219,7 @@ test_namespaces = {
     local p, err = S.clone("newnet")
     if err and err.perm then return end -- needs root
     if p == 0 then
-      local i = assert(S.get_interfaces())
+      local i = assert(S.interfaces())
       assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       S.exit()
     else
@@ -1231,7 +1231,7 @@ test_namespaces = {
     if p == 0 then
       local ok, err = S.unshare("newnet")
       if err and err.perm then return end -- needs root
-      local i = assert(S.get_interfaces())
+      local i = assert(S.interfaces())
       assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       S.exit()
     else

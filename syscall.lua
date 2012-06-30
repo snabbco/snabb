@@ -4829,7 +4829,7 @@ function S.setlink(index, flags)
     {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff})
 end
 
-function S.get_interfaces() -- returns with address info too.
+function S.interfaces() -- returns with address info too.
   local ifs, err = S.getlink()
   if not ifs then return nil, err end
   local addr4, err = S.getaddr(S.AF_INET)
