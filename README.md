@@ -108,7 +108,7 @@ faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue,
 capset, capget
-pivot_root
+pivot\_root, init\_module, delete\_module, query\_module
 ...
 
 ### 64 bit fileops on 32 bit
@@ -137,5 +137,9 @@ Allow configuring and getting properties by name. Allow get for just one interfa
 Netlink documentation is pretty bad. Useful resources: [blog post](http://maz-programmersdiary.blogspot.co.uk/2011/09/netlink-sockets.html)
 
 Make commands that look more like `ip`, or as methods of the interface objects, or both. Currently adding metamethods, eg setflags.
+
+## modules
+
+`lsmod` needs to parse /proc/modules, the rest are syscalls, except depmod.
 
 
