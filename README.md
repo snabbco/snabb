@@ -127,8 +127,10 @@ Need a cgroup interface.
 
 ## netlink
 
-Allow configuring and getting peoperties by name. Allow get for just one interface.
+Allow configuring and getting properties by name. Allow get for just one interface.
 
 Netlink documentation is pretty bad. Useful resources: [blog post](http://maz-programmersdiary.blogspot.co.uk/2011/09/netlink-sockets.html)
+
+Make commands that look more like `ip`, or as methods of the interface objects, or both.
 
 
