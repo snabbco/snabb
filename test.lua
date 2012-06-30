@@ -936,7 +936,7 @@ test_netlink = {
     local lo = assert(S.getlink()).lo.index
     for i = 1, #as do
       if as[i].index == lo then
-        assert_equal(tostring(as[i].addr), "::1", "loopback ipv6 on lo (probably)") -- allow fail if no ipv6
+        assert_equal(tostring(as[i].addr), "::1", "loopback ipv6 on lo") -- allow fail if no ipv6
       end
     end
   end,
