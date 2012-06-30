@@ -4644,6 +4644,12 @@ mt.iflink = {
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return i.ifinfo.ifi_type == S[k] end
   end,
+  __newindex = function(i, k, v)
+    local meth = {
+      flags = function(i, v) return S.setlink(i.index, v) end,
+    }
+    if meth[k] then meth[k](i, v) end
+  end,
   __tostring = function(i)
     local hw = ''
     if not i.loopback and i.macaddr then hw = '  HWaddr ' .. tostring(i.macaddr) end

@@ -945,7 +945,7 @@ test_netlink = {
     assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
     assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
   end,
-  test_interface_up = function()
+  test_setlink = function()
     local p, err = S.clone()
      if p == 0 then
       local ok, err = S.unshare("newnet")
@@ -953,6 +953,22 @@ test_netlink = {
       local i = fork_assert(S.get_interfaces())
       fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       fork_assert(S.setlink(i.lo.index, "up"))
+      i = fork_assert(S.get_interfaces())
+      fork_assert(#i == 1 and i.lo and i.lo.flags.up, "expect lo up now")
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end
+  end,
+  test_interface_setflags = function()
+    local p, err = S.clone()
+     if p == 0 then
+      local ok, err = S.unshare("newnet")
+      if err and err.perm then return end -- needs root
+      local i = fork_assert(S.get_interfaces())
+      fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
+      fork_assert(i.lo.flags == "up")
       i = fork_assert(S.get_interfaces())
       fork_assert(#i == 1 and i.lo and i.lo.flags.up, "expect lo up now")
       S.exit()
