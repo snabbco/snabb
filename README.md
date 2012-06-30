@@ -16,9 +16,11 @@ Releases after tag 0.3 do not currently work with luaffi, please use that until 
 
 The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86. Intend to get my ppc build machine back up one day, if you want this supported please ask. I do not currently have a mips box, if you want this can you suggest a suitable dev box.
 
-Initial testing on uclibc, works on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes; I intend to test musl libc once I have a working build.
+Some tests need to be run as root to do anything. They don't fail, but they do not do anything. You cannot test a lot of stuff otherwise. However most of the testing is now done in isolated containers so should be harmless. Need to move the bridge tests to a container.
 
-Reworking the test script, it is a copy of my fork of [luaunit](https://github.com/justincormack/luaunit) which is updated to work on Lua 5.1 and 5.2. To avoid dependencies I am just copying and updating this into this repo.
+Initial testing on uclibc, at one point worked on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes; I intend to test musl libc once I have a working build.
+
+Reworking the test script, it is a copy of my fork of [luaunit](https://github.com/justincormack/luaunit) which is updated to work on Lua 5.1 and 5.2. To avoid dependencies I am just copying and updating this into this repo. Currently all my changes are upstream.
 
 ## What is implemented?
 
