@@ -4682,7 +4682,7 @@ local nlmsg_data_decode = {
   [S.NLMSG_NOOP] = function(r, buf, len) return r end,
   [S.NLMSG_ERROR] = function(r, buf, len)
     local e = pt.nlmsgerr(buf)
-    if e.error ~= 0 then r.error = e.error else r.ack = true end -- error zero is ACK
+    if e.error ~= 0 then r.error = t.error(-e.error) else r.ack = true end -- error zero is ACK, others negative
     return r
   end,
   [S.NLMSG_DONE] = function(r, buf, len) return r end,

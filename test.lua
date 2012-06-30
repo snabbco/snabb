@@ -977,6 +977,12 @@ test_netlink = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
+  test_setlink_error = function()
+    if S.geteuid() ~= 0 then return end -- needs root
+    ok, err = S.setlink(-1, "up")
+    assert(not ok, "expect bogus setlink to fail")
+    assert(err.EINVAL, "expect invalid value error")
+  end,
 }
 
 test_termios = {
