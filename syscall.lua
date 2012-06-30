@@ -4824,7 +4824,6 @@ function S.newlink()
 end
 
 function S.setlink(index, flags)
-print("flags ", stringflags(flags, "IFF_"))
   return nlmsg(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg,
     {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff})
 end
