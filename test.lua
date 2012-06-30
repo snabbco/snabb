@@ -946,7 +946,7 @@ test_netlink = {
     assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
   end,
   test_setlink = function()
-    local p, err = S.clone()
+    local p = assert(S.clone())
      if p == 0 then
       local ok, err = S.unshare("newnet")
       if err and err.perm then return end -- needs root
@@ -962,7 +962,7 @@ test_netlink = {
     end
   end,
   test_interface_setflags = function()
-    local p, err = S.clone()
+    local p = assert(S.clone())
      if p == 0 then
       local ok, err = S.unshare("newnet")
       if err and err.perm then return end -- needs root
@@ -1233,7 +1233,7 @@ test_namespaces = {
     end
   end,
   test_netns_unshare = function()
-    local p, err = S.clone()
+    local p = assert(S.clone())
     if p == 0 then
       local ok, err = S.unshare("newnet")
       if err and err.perm then return end -- needs root
