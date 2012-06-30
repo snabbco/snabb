@@ -90,7 +90,7 @@ The test cases are good examples until I do better documentation!
 
 A few functions have arguments in a different order to make optional ones easier. This is a bit confusing sometimes, so check the examples or source code.
 
-It would be nice to be API compatible with other projects, especially Luaposix, and luasocket.
+It would be nice to be API compatible with other projects, especially Luaposix, luasocket, nixio. I should have probably looked at these before I started, but things can be changed.
 
 ### Issues
 
