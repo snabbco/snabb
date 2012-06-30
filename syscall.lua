@@ -4852,6 +4852,12 @@ function S.interfaces() -- returns with address info too.
   return setmetatable(ifs, mt.iflinks)
 end
 
+function S.interface(i) -- could optimize just to retrieve info for one
+  local ifs, err = S.interfaces()
+  if not ifs then return nil, err end
+  return ifs[i]
+end
+  
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
     local buf1 = t.buffer(1)

@@ -953,8 +953,8 @@ test_netlink = {
       local i = fork_assert(S.interfaces())
       fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       fork_assert(S.setlink(i.lo.index, "up"))
-      i = fork_assert(S.interfaces())
-      fork_assert(#i == 1 and i.lo and i.lo.flags.up, "expect lo up now")
+      local lo = fork_assert(S.interface("lo"))
+      fork_assert(lo.flags.up, "expect lo up now")
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
@@ -969,8 +969,8 @@ test_netlink = {
       local i = fork_assert(S.interfaces())
       fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       fork_assert(i.lo.setflags("up"))
-      i = fork_assert(S.interfaces())
-      fork_assert(#i == 1 and i.lo and i.lo.flags.up, "expect lo up now")
+      local lo = fork_assert(S.interface("lo"))
+      fork_assert(lo.flags.up, "expect lo up now")
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
