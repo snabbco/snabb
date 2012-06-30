@@ -14,6 +14,14 @@ function assert(c, s)
   return oldassert(c, tostring(s)) -- annoyingly, assert does not call tostring!
 end
 
+function fork_assert(c, s) -- if we have forked we need to fail in main thread not fork
+  if not c then
+    print(tostring(s))
+    S.exit("failure")
+  end
+  return c, s
+end
+
 local luaunit = require "luaunit"
 
 local function assert_equal(...)
@@ -936,7 +944,24 @@ test_netlink = {
     local i = S.get_interfaces()
     assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
     assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo (probably)")
-  end
+  end,
+  test_interface_up = function()
+    local p, err = S.clone()
+     if p == 0 then
+      local ok, err = S.unshare("newnet")
+      if err and err.perm then return end -- needs root
+      local i = fork_assert(S.get_interfaces())
+      fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
+      fork_assert(S.setlink(i.lo.index, i.lo.flags.flags + S.IFF_UP))
+      i = fork_assert(S.get_interfaces())
+      fork_assert(#i == 1 and i.lo and i.lo.flags.up, "expect lo up now")
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end
+  end,
+
 }
 
 test_termios = {
@@ -1116,7 +1141,7 @@ test_processes = {
 
     local pid = assert(S.fork())
     if pid == 0 then -- child
-      assert(S.getppid() == pid0, "parent pid should be previous pid")
+      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
       local w = assert(S.wait())
@@ -1127,7 +1152,7 @@ test_processes = {
 
     pid = assert(S.fork())
     if (pid == 0) then -- child
-      assert(S.getppid() == pid0, "parent pid should be previous pid")
+      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
       local w = assert(S.waitid("all", 0, "exited, stopped, continued"))
@@ -1139,7 +1164,6 @@ test_processes = {
     local efile = "/tmp/tmpXXYYY.sh"
     pid = assert(S.fork())
     if (pid == 0) then -- child
-      S.unlink(efile)
       local script = [[
 #!/bin/sh
 
@@ -1148,8 +1172,8 @@ test_processes = {
 [ $PATH = "/bin:/usr/bin" ] || (echo "shell assert $PATH"; exit 1)
 
 ]]
-      S.writefile(efile, script, "IRWXU")
-      assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
+      fork_assert(S.writefile(efile, script, "IRWXU"))
+      fork_assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
       -- never reach here
       os.exit()
     else -- parent
@@ -1164,7 +1188,7 @@ test_processes = {
     local pid0 = S.getpid()
     local p = assert(S.clone()) -- no flags, should be much like fork.
     if p == 0 then -- child
-      assert(S.getppid() == pid0, "parent pid should be previous pid")
+      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
       local w = assert(S.waitpid(-1, "clone"))
@@ -1189,11 +1213,11 @@ test_namespaces = {
   end,
   test_netns_unshare = function()
     local p, err = S.clone()
-    if err and err.perm then return end -- needs root
     if p == 0 then
-      S.unshare("newnet")
+      local ok, err = S.unshare("newnet")
+      if err and err.perm then return end -- needs root
       local i = assert(S.get_interfaces())
-      assert(#i == 1 and i.lo and not i.lo.up, "expect new network ns only has down lo interface")
+      assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       S.exit()
     else
       assert(S.waitpid(-1, "clone"))

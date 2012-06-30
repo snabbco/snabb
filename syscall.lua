@@ -1855,6 +1855,10 @@ struct rtattr {
   unsigned short  rta_len;
   unsigned short  rta_type;
 };
+struct nlmsgerr {
+  int             error;
+  struct nlmsghdr msg;
+};
 
 static const int IFNAMSIZ = 16;
 
@@ -2606,6 +2610,7 @@ t.rtgenmsg = ffi.typeof("struct rtgenmsg")
 t.ifinfomsg = ffi.typeof("struct ifinfomsg")
 t.ifaddrmsg = ffi.typeof("struct ifaddrmsg")
 t.rtattr = ffi.typeof("struct rtattr")
+t.nlmsgerr = ffi.typeof("struct nlmsgerr")
 t.timex = ffi.typeof("struct timex")
 t.utsname = ffi.typeof("struct utsname")
 t.rlimit = ffi.typeof("struct rlimit")
@@ -3048,6 +3053,7 @@ pt.nlmsghdr = ptt(t.nlmsghdr)
 pt.rtattr = ptt(t.rtattr)
 pt.ifinfomsg = ptt(t.ifinfomsg)
 pt.ifaddrmsg = ptt(t.ifaddrmsg)
+pt.nlmsgerr = ptt(t.nlmsgerr)
 pt.cmsghdr = ptt(t.cmsghdr)
 pt.fdb_entry = ptt(t.fdb_entry)
 pt.signalfd_siginfo = ptt(t.signalfd_siginfo)
@@ -4672,7 +4678,17 @@ mt.ifaddr = {
 }
 
 local nlmsg_data_decode = {
+  [S.NLMSG_NOOP] = function(r, buf, len) return r end,
+  [S.NLMSG_ERROR] = function(r, buf, len)
+    local e = pt.nlmsgerr(buf)
+    if e.error ~= 0 then r.error = e.error else r.ack = true end -- error zero is ACK
+    return r
+  end,
   [S.NLMSG_DONE] = function(r, buf, len) return r end,
+  [S.NLMSG_OVERRUN] = function(r, buf, len)
+    r.overrun = true
+    return r
+  end,
   [S.RTM_NEWADDR] = function(r, buf, len)
     local addr = pt.ifaddrmsg(buf)
     buf = buf + nlmsg_align(ffi.sizeof(t.ifaddrmsg))
@@ -4715,8 +4731,8 @@ local nlmsg_data_decode = {
   end
 }
 
-function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
-  local bufsize = 8192
+function S.nlmsg_read(s, addr, bufsize) -- maybe we create the sockaddr?
+  if not bufsize then bufsize = 8192 end
   local reply = t.buffer(bufsize)
   local ior = t.iovecs{{reply, bufsize}}
   local m = t.msghdr{msg_iov = ior.iov, msg_iovlen = #ior, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
@@ -4737,6 +4753,11 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
 
       if nlmsg_data_decode[tp] then
         r = nlmsg_data_decode[tp](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen)
+
+        if r.overrun then return S.nlmsg_read(s, addr, bufsize * 2) end -- TODO add test
+        if r.error then return nil, r.error end -- not sure what the errors mean though!
+        if r.ack then done = true end
+
       else error("unknown data " .. tp)
       end
 
@@ -4749,7 +4770,7 @@ function S.nlmsg_read(s, addr) -- maybe we create the sockaddr?
 end
 
 -- initial abstraction, expand later
-local function nlmsg(ntype, flags, tp, init)
+local function nlmsg(ntype, flags, tp, init) -- will need more structures, possibly nested
   local s, err = S.socket("netlink", "raw", "route")
   if not s then return nil, err end
   local a = t.sockaddr_nl() -- kernel will fill in address
@@ -4776,12 +4797,16 @@ local function nlmsg(ntype, flags, tp, init)
   local n, err = s:sendmsg(m)
   if not n then return nil, err end
 
-  local i = S.nlmsg_read(s, k)
+  local r, err = S.nlmsg_read(s, k)
+  if not r then
+    S:close()
+    return nil, err
+  end
 
   local ok, err = s:close()
   if not ok then return nil, err end
 
-  return i
+  return r
 end
 
 -- read addresses on interfaces.
@@ -4798,8 +4823,10 @@ function S.newlink()
   --return nlmsg(S.RTM_NEWLINK, 
 end
 
-function S.setlink()
-
+function S.setlink(index, flags)
+print("flags ", stringflags(flags, "IFF_"))
+  return nlmsg(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg,
+    {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff})
 end
 
 function S.get_interfaces() -- returns with address info too.
