@@ -943,7 +943,7 @@ test_netlink = {
   test_get_interfaces = function()
     local i = S.get_interfaces()
     assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
-    assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo (probably)")
+    assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
   end,
   test_interface_up = function()
     local p, err = S.clone()
@@ -961,7 +961,6 @@ test_netlink = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
-
 }
 
 test_termios = {
