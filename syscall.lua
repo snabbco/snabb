@@ -4794,6 +4794,14 @@ function S.getlink()
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, t.rtgenmsg, {rtgen_family = S.AF_PACKET})
 end
 
+function S.newlink()
+  --return nlmsg(S.RTM_NEWLINK, 
+end
+
+function S.setlink()
+
+end
+
 function S.get_interfaces() -- returns with address info too.
   local ifs, err = S.getlink()
   if not ifs then return nil, err end
