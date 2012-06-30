@@ -108,7 +108,7 @@ faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  
 readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
 sigqueue,
 capset, capget
-pivot\_root, init\_module, delete\_module, query\_module
+pivot\_root, init\_module, delete\_module, query\_module, swapon, swapoff
 ...
 
 ### 64 bit fileops on 32 bit
@@ -141,5 +141,9 @@ Make commands that look more like `ip`, or as methods of the interface objects, 
 ## modules
 
 `lsmod` needs to parse /proc/modules, the rest are syscalls, except depmod.
+
+## selinux etc
+
+Have not looked yet at what support is needed, eg labelling. If you have selinux enabled, I guess some tests may fail.
 
 
