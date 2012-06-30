@@ -1205,7 +1205,7 @@ test_namespaces = {
     if err and err.perm then return end -- needs root
     if p == 0 then
       local i = assert(S.get_interfaces())
-      assert(#i == 1 and i.lo and not i.lo.up, "expect new network ns only has down lo interface")
+      assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       S.exit()
     else
       assert(S.waitpid(-1, "clone"))
