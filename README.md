@@ -78,13 +78,15 @@ You do not need to use the numbered versions of functions, eg dup can do dup2 or
 
 Standard convenience macros are also provided, eg S.major(dev) to extract a major number from a device number. Generally metamethods are also provided for these.
 
-bind does not require a length for the address type length, as it can work this out dynamically.
+`bind` does not require a length for the address type length, as it can work this out dynamically.
 
 `uname` returns a Lua table with the returned strings in it. Similarly `getdents` returns directory entries as a table. Other functions such as `poll` return an ffi metatype that behaves like a Lua array, ie is 1-indexed and has a `#` length method, which wraps the underlying C structure.
 
 The test cases are good examples until I do better documentation!
 
 A few functions have arguments in a different order to make optional ones easier. This is a bit confusing sometimes, so check the examples or source code.
+
+It would be nice to be API compatible with other projects, especially Luaposix, and luasocket.
 
 ### Issues
 
@@ -122,11 +124,9 @@ Some helper functions for fcntl features such as file locking should be added?
 Need a trivial sysctl wrapper (write to /proc/sys)
 
 ## cgroups
-
 Need a cgroup interface.
 
 ## netlink
-
 Allow configuring and getting properties by name. Allow get for just one interface.
 
 Netlink documentation is pretty bad. Useful resources: [blog post](http://maz-programmersdiary.blogspot.co.uk/2011/09/netlink-sockets.html)
