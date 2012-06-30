@@ -968,7 +968,7 @@ test_netlink = {
       if err and err.perm then return end -- needs root
       local i = fork_assert(S.get_interfaces())
       fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
-      fork_assert(i.lo.flags == "up")
+      fork_assert(i.lo.setflags("up"))
       i = fork_assert(S.get_interfaces())
       fork_assert(#i == 1 and i.lo and i.lo.flags.up, "expect lo up now")
       S.exit()

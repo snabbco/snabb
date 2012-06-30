@@ -4637,18 +4637,13 @@ mt.iflink = {
       end,
       index = function(i) return tonumber(i.ifinfo.ifi_index) end,
       flags = function(i) return setmetatable({flags = tonumber(i.ifinfo.ifi_flags)}, mt.iff) end,
-      change = function(i) return tonumber(i.ifinfo.ifi_change) end
+      change = function(i) return tonumber(i.ifinfo.ifi_change) end,
+      setflags = function(i) return function(v) return S.setlink(i.index, v) end end,
     }
     if meth[k] then return meth[k](i) end
     local prefix = "ARPHRD_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return i.ifinfo.ifi_type == S[k] end
-  end,
-  __newindex = function(i, k, v)
-    local meth = {
-      flags = function(i, v) return S.setlink(i.index, v) end,
-    }
-    if meth[k] then meth[k](i, v) end
   end,
   __tostring = function(i)
     local hw = ''
@@ -4805,7 +4800,7 @@ local function nlmsg(ntype, flags, tp, init) -- will need more structures, possi
 
   local r, err = S.nlmsg_read(s, k)
   if not r then
-    S:close()
+    s:close()
     return nil, err
   end
 
