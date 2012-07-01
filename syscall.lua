@@ -3473,7 +3473,7 @@ function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.sync_file_range(getfd(fd), offset, count, stringflags(flags, "SYNC_FILE_RANGE_")))
 end
 
-function S.stat(path, field, buf)
+function S.stat(path, field, buf) -- field is in here for nixio compatibility, not very nice interface
   if not buf then buf = t.stat() end
   local ret = C.syscall(S.SYS_stat, path, pt.void(buf))
   if ret == -1 then return nil, t.error() end
