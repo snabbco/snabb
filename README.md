@@ -110,7 +110,6 @@ sigqueue,
 capset, capget
 pivot\_root, init\_module, delete\_module, query\_module, swapon, swapoff
 ...
-note utime, utimes should be implemented with utimensat.
 
 ### 64 bit fileops on 32 bit
 
