@@ -110,6 +110,7 @@ sigqueue,
 capset, capget
 pivot\_root, init\_module, delete\_module, query\_module, swapon, swapoff
 ...
+note utime, utimes should be implemented with utimensat.
 
 ### 64 bit fileops on 32 bit
 
@@ -146,4 +147,7 @@ Make commands that look more like `ip`, or as methods of the interface objects, 
 
 Have not looked yet at what support is needed, eg labelling. If you have selinux enabled, I guess some tests may fail.
 
+## other commands
+
+Select appropriate shell commands that are useful, eg need them for tests. ping, etc. Also aliases like touch (uses utimensat).
 

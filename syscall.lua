@@ -515,6 +515,15 @@ S.XATTR_REPLACE = 2
 S.UTIME_NOW  = bit.lshift(1, 30) - 1
 S.UTIME_OMIT = bit.lshift(1, 30) - 2
 
+-- ...at commands
+S.AT_FDCWD = -100
+S.AT_SYMLINK_NOFOLLOW    = 0x100
+S.AT_REMOVEDIR           = 0x200
+S.AT_SYMLINK_FOLLOW      = 0x400
+S.AT_NO_AUTOMOUNT        = 0x800
+S.AT_EACCESS             = 0x200
+
+
 -- send, recv etc
 S.MSG_OOB             = 0x01
 S.MSG_PEEK            = 0x02
@@ -2438,6 +2447,8 @@ int ustat(dev_t dev, struct ustat *ubuf);
 int statfs(const char *path, struct statfs64 *buf); /* this is statfs64 syscall, but glibc wraps */
 int fstatfs(int fd, struct statfs64 *buf);          /* this too */
 int futimens(int fd, const struct timespec times[2]);
+int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
+
 int unshare(int flags);
 
 int syscall(int number, ...);
@@ -3483,14 +3494,22 @@ function S.fstat(fd, buf)
   return buf
 end
 
-function S.futimens(fd, ts)
+local function gettimespec2(ts)
   if ts and (not ffi.istype(t.timespec2, ts)) then
     s1, s2 = ts[1], ts[2]
     ts = t.timespec2()
     if type(s1) == 'string' then ts[0].tv_nsec = stringflag(s1, "UTIME_") else ts[0] = t.timespec(s1) end
     if type(s2) == 'string' then ts[1].tv_nsec = stringflag(s2, "UTIME_") else ts[1] = t.timespec(s2) end
   end
-  return retbool(C.futimens(getfd(fd), ts))
+  return ts
+end
+
+function S.futimens(fd, ts)
+  return retbool(C.futimens(getfd(fd), gettimespec2(ts)))
+end
+
+function S.utimensat(dirfd, path, ts, flags)
+  return retbool(C.utimensat(getfd(dirfd) or S.AT_FDCWD, path, gettimespec2(ts), stringflags(flags, "AT_")))
 end
 
 function S.chroot(path) return retbool(C.chroot(path)) end
@@ -5332,6 +5351,7 @@ fmeth.getxattr = S.gsetxattr
 fmeth.truncate = S.ftruncate
 fmeth.statfs = S.fstatfs
 fmeth.utimens = S.futimens
+fmeth.utime = S.futimens
 
 -- sequence number used by netlink messages
 fmeth.seq = function(fd)

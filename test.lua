@@ -1285,6 +1285,18 @@ test_filesystem = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_utimensat = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local dfd = assert(S.open("."))
+    assert(S.utimensat(nil, tmpfile))
+    local st1 = fd:stat()
+    assert(S.utimensat(dfd, tmpfile, {"omit", "omit"}))
+    local st2 = fd:stat()
+    assert(st1.atime == st2.atime and st1.mtime == st2.mtime, "atime and mtime unchanged")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+    assert(dfd:close())
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.
