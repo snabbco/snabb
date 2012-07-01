@@ -118,6 +118,10 @@ S.F_DUPFD_CLOEXEC = 1030
 
 S.FD_CLOEXEC = 1
 
+S.F_RDLCK = 0
+S.F_WRLCK = 1
+S.F_UNLCK = 2
+
 --mmap
 S.PROT_READ  = 0x1
 S.PROT_WRITE = 0x2
@@ -2407,7 +2411,7 @@ int dup3(int oldfd, int newfd, int flags);
 int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
-int fcntl(int fd, int cmd, long arg); /* arg can be a pointer though */
+int fcntl(int fd, int cmd, void *arg); /* arg is long or pointer */
 int fchmod(int fd, mode_t mode);
 int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
@@ -2649,6 +2653,7 @@ t.statfs = ffi.typeof("struct statfs64")
 t.ifreq = ffi.typeof("struct ifreq")
 t.linux_dirent64 = ffi.typeof("struct linux_dirent64")
 t.ifa_cacheinfo = ffi.typeof("struct ifa_cacheinfo")
+t.flock64 = ffi.typeof("struct flock64")
 
 t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
 t.io_events = ffi.typeof("struct io_event[?]")
@@ -3665,18 +3670,36 @@ function S.getpeername(sockfd)
   return sa(ss, addrlen[0])
 end
 
+local function getflock(arg)
+  if not arg then arg = t.flock64() end
+  if not ffi.istype(t.flock64, arg) then
+    for _, v in pairs {"type", "whence", "start", "len", "pid"} do -- allow use of short names
+      if arg[v] then
+        arg["l_" .. v] = arg[v]
+        arg[v] = nil
+      end
+    end
+    arg.l_type = stringflags(arg.l_type, "F_")
+    arg.l_whence = stringflag(arg.l_whence, "SEEK_")
+    arg = t.flock64(arg)
+  end
+  return arg
+end
+
 function S.fcntl(fd, cmd, arg)
-  -- some uses have arg as a pointer, need handling TODO
   cmd = stringflag(cmd, "F_")
 
   local m = {
     [S.F_SETFL] = function(arg) return stringflags(arg, "O_") end,
     [S.F_SETFD] = function(arg) return stringflag(arg, "FD_") end,
+    [S.F_GETLK] = getflock,
+    [S.F_SETLK] = getflock,
+    [S.F_SETLKW] = getflock,
   }
 
   if m[cmd] then arg = m[cmd](arg) end
 
-  local ret = C.fcntl(getfd(fd), cmd, arg or 0)
+  local ret = C.fcntl(getfd(fd), cmd, pt.void(arg or 0))
   if ret == -1 then return nil, t.error() end
 
   local r = {
@@ -3688,6 +3711,7 @@ function S.fcntl(fd, cmd, arg)
     [S.F_GETOWN] = tonumber,
     [S.F_GETSIG] = tonumber,
     [S.F_GETPIPE_SZ] = tonumber,
+    [S.F_GETLK] = function(ret) return arg end,
   }
 
   if r[cmd] then return r[cmd](ret) end

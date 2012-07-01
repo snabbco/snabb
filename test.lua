@@ -449,6 +449,16 @@ test_largefile = {
   end,
 }
 
+test_locking = {
+  test_fcntl_setlk = function()
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
+    assert(S.unlink(tmpfile))
+    assert(fd:truncate(4096))
+    assert(fd:fcntl("setlk", {type = "rdlck", whence = "set", start = 0, len = 4096}))
+    assert(fd:close())
+  end,
+}
+
 test_sockets_pipes = {
   test_pipe = function()
     local fds = assert(S.pipe())
