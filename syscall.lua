@@ -5000,10 +5000,6 @@ function S.block(s)
   return true
 end
 
-function S.setblocking(s, b) -- nixio compatibility
-  if b then return s:block() else return s:nonblock() end
-end
-
 -- TODO fix short reads, add a loop
 function S.readfile(name, buffer, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
   local f, err = S.open(name, S.O_RDONLY)
@@ -5330,6 +5326,11 @@ function S.ptsname(fd)
   end
 end
 
+-- Nixio compatibility to make porting easier, and useful functions (often man 3). Incomplete.
+function S.setblocking(s, b) if b then return s:block() else return s:nonblock() end end
+function S.tell(fd) return fd:lseek(0, S.SEEK_CUR) end
+
+
 -- constants
 S.INADDR_ANY = t.in_addr()
 S.INADDR_LOOPBACK = t.in_addr("127.0.0.1")
@@ -5340,7 +5341,7 @@ S.in6addr_loopback = t.in6_addr("::1")
 
 -- methods on an fd
 local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
-                   'close', 'dup', 'read', 'write', 'pread', 'pwrite',
+                   'close', 'dup', 'read', 'write', 'pread', 'pwrite', 'tell',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',

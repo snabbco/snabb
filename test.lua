@@ -233,6 +233,8 @@ test_file_operations = {
     assert_equal(n, offset, "seek should position at set position")
     n = assert(fd:lseek(offset, "cur"))
     assert_equal(n, offset + offset, "seek should position at set position")
+    local t = fd:tell()
+    assert_equal(t, n, "tell should return current offset")
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
@@ -449,9 +451,18 @@ test_largefile = {
 
 test_sockets_pipes = {
   test_pipe = function()
-    local fd = assert(S.pipe())
-    assert(fd[1]:close())
-    assert(fd[2]:close())
+    local fds = assert(S.pipe())
+    assert(fds[1]:close())
+    assert(fds[2]:close())
+  end,
+  test_nonblock = function()
+    local fds = assert(S.pipe())
+    assert(fds[1]:setblocking(false))
+    assert(fds[2]:setblocking(false))
+    local r, err = fds[1]:read()
+    assert(err.EAGAIN, "expect EAGAIN")
+    assert(fds[1]:close())
+    assert(fds[2]:close())
   end,
   test_tee_splice = function()
     local p = assert(S.pipe("nonblock"))
@@ -753,7 +764,7 @@ test_sockets = {
     assert(not sa, "expect nil socket address from invalid ip string")
   end,
   test_inet_socket = function() -- should break this test up
-    local s = assert(S.socket("inet", "stream, nonblock")) -- adding flags to socket type is Linux only
+    local s = assert(S.socket("inet", "stream, nonblock"))
     local loop = "127.0.0.1"
     local sa = assert(t.sockaddr_in(1234, loop))
     assert_equal(S.inet_ntoa(sa.sin_addr), loop, "expect address converted back to string to still be same")
