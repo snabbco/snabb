@@ -90,7 +90,7 @@ The test cases are good examples until I do better documentation!
 
 A few functions have arguments in a different order to make optional ones easier. This is a bit confusing sometimes, so check the examples or source code.
 
-It would be nice to be API compatible with other projects, especially Luaposix, luasocket, nixio. I should have probably looked at these before I started, but things can be changed.
+It would be nice to be API compatible with other projects, especially Luaposix, luasocket, nixio. I should have probably looked at these before I started, but things can be changed. Startde some nixio compatibility, in progress.
 
 ### Issues
 
@@ -150,4 +150,16 @@ Have not looked yet at what support is needed, eg labelling. If you have selinux
 
 Select appropriate shell commands that are useful, eg need them for tests. ping, etc. Also aliases like touch (uses utimensat).
 syslog.
+
+## nixio compatibility
+
+Started, but lots to do. Most file descriptor operations there, need to do locking (flock, using fcntl).
+
+The way that options are specified are different, so will need to change things there, or add a compatibility layer.
+
+Nixio does not seem to have a test suite.
+
+Some initial setup eg for signals. May do this in compatibility layer.
+
+Functions with EINTR return false not nil, need to support this.
 
