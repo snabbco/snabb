@@ -2513,7 +2513,7 @@ end
 -- functions we need for metatypes
 
 local function getfd(fd)
-  if ffi.istype(t.fd, fd) then return fd.fileno end
+  if ffi.istype(t.fd, fd) then return fd.filenum end
   return fd
 end
 
@@ -3276,12 +3276,12 @@ function S.close(fd)
   if ret == -1 then
     local errno = ffi.errno()
     if ffi.istype(t.fd, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
-      fd.fileno = -1 -- make sure cannot accidentally close this fd object again
+      fd.filenum = -1 -- make sure cannot accidentally close this fd object again
     end
     return nil, t.error()
   end
   if ffi.istype(t.fd, fd) then
-    fd.fileno = -1 -- make sure cannot accidentally close this fd object again
+    fd.filenum = -1 -- make sure cannot accidentally close this fd object again
   end
   return true
 end
@@ -5000,6 +5000,9 @@ function S.block(s)
   return true
 end
 
+function S.setblocking(s, b) -- nixio compatibility
+  if b then return s:block() else return s:nonblock() end
+end
 
 -- TODO fix short reads, add a loop
 function S.readfile(name, buffer, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
@@ -5336,7 +5339,7 @@ S.in6addr_any = t.in6_addr()
 S.in6addr_loopback = t.in6_addr("::1")
 
 -- methods on an fd
-local fdmethods = {'nogc', 'nonblock', 'block', 'sendfds', 'sendcred',
+local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
                    'close', 'dup', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
@@ -5365,6 +5368,7 @@ fmeth.truncate = S.ftruncate
 fmeth.statfs = S.fstatfs
 fmeth.utimens = S.futimens
 fmeth.utime = S.futimens
+fmeth.seek = S.lseek
 
 -- sequence number used by netlink messages
 fmeth.seq = function(fd)
@@ -5372,7 +5376,9 @@ fmeth.seq = function(fd)
   return fd.sequence
 end
 
-t.fd = ffi.metatype("struct {int fileno; int sequence;}", {
+fmeth.fileno = function(fd) return fd.filenum end
+
+t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   __index = fmeth,
   __gc = S.close,
 })

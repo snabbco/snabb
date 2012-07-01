@@ -149,4 +149,5 @@ Have not looked yet at what support is needed, eg labelling. If you have selinux
 ## other commands
 
 Select appropriate shell commands that are useful, eg need them for tests. ping, etc. Also aliases like touch (uses utimensat).
+syslog.
 

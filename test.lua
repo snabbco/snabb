@@ -66,9 +66,9 @@ test_open_close = {
   end,
   test_open_valid = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
-    assert(fd.fileno >= 3, "should get file descriptor of at least 3 back from first open")
+    assert(fd:fileno() >= 3, "should get file descriptor of at least 3 back from first open")
     local fd2 = assert(S.open("/dev/zero", "RDONLY"))
-    assert(fd2.fileno >= 4, "should get file descriptor of at least 4 back from second open")
+    assert(fd2:fileno() >= 4, "should get file descriptor of at least 4 back from second open")
     assert(fd:close())
     assert(fd2:close())
   end,
@@ -84,7 +84,7 @@ test_open_close = {
   end,
   test_double_close = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
-    local fileno = fd.fileno
+    local fileno = fd:fileno()
     assert(fd:close())
     local fd, err = S.close(fileno)
     assert(err, "expected to fail on close already closed fd")
@@ -96,7 +96,7 @@ test_open_close = {
   end,
   test_fd_gc = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
-    local fileno = fd.fileno
+    local fileno = fd:fileno()
     fd = nil
     collectgarbage("collect")
     local _, err = S.read(fileno, buf, size)
@@ -105,7 +105,7 @@ test_open_close = {
   end,
   test_fd_nogc = function()
     local fd = assert(S.open("/dev/zero", "RDONLY"))
-    local fileno = fd.fileno
+    local fileno = fd:fileno()
     fd:nogc()
     fd = nil
     collectgarbage("collect")
@@ -180,7 +180,7 @@ test_file_operations = {
   test_dup_to_number = function()
     local fd = assert(S.open("/dev/zero"))
     local fd2 = assert(fd:dup(17))
-    assert_equal(fd2.fileno, 17, "dup2 should set file id as specified")
+    assert_equal(fd2:fileno(), 17, "dup2 should set file id as specified")
     assert(fd2:close())
     assert(fd:close())
   end,
@@ -1035,10 +1035,10 @@ test_events = {
     local c, s = sv[1], sv[2]
     local pev = {{fd = c, events = S.POLLIN}}
     local p = assert(S.poll(pev, 0))
-    assert(p[1].fd == c.fileno and p[1].revents == 0, "one event now")
+    assert(p[1].fd == c:fileno() and p[1].revents == 0, "one event now")
     assert(s:write(teststring))
     local p = assert(S.poll(pev, 0))
-    assert(p[1].fd == c.fileno and p[1].POLLIN, "one event now")
+    assert(p[1].fd == c:fileno() and p[1].POLLIN, "one event now")
     assert(c:read())
     assert(s:close())
     assert(c:close())
@@ -1065,7 +1065,7 @@ test_events = {
     r = assert(ep:epoll_wait())
     assert(#r == 1, "one event now")
     assert(r[1].EPOLLIN, "read event")
-    assert(r[1].fileno == c.fileno, "expect to get fileno of ready file back") -- by default our epoll_ctl sets this
+    assert(r[1].fileno == c:fileno(), "expect to get fileno of ready file back") -- by default our epoll_ctl sets this
     assert(ep:close())
     assert(c:read()) -- clear event
     assert(s:close())
