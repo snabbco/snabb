@@ -1297,6 +1297,16 @@ test_filesystem = {
     assert(fd:close())
     assert(dfd:close())
   end,
+  test_utime = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local st1 = fd:stat()
+    assert(S.utime(tmpfile, 100, 200))
+    local st2 = fd:stat()
+    assert(st1.atime ~= st2.atime and st1.mtime ~= st2.mtime, "atime and mtime changed")
+    assert(st2.atime == 100 and st2.mtime == 200, "times as set")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.

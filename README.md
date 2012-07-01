@@ -105,7 +105,7 @@ There will no doubt be bugs, please report them if you find them.
 pselect, ppoll
 clock\_nanosleep, timer\_create, timer\_getoverrun
 faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  mkdirat(2),  mknodat(2),
-readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), utimensat(2), mkfifoat(3)
+readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), mkfifoat(3)
 sigqueue,
 capset, capget
 pivot\_root, init\_module, delete\_module, query\_module, swapon, swapoff

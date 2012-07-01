@@ -3512,6 +3512,15 @@ function S.utimensat(dirfd, path, ts, flags)
   return retbool(C.utimensat(getfd(dirfd) or S.AT_FDCWD, path, gettimespec2(ts), stringflags(flags, "AT_")))
 end
 
+-- because you can just pass floats to all the time functions, just use the same one, but provide different templates
+function S.utime(path, actime, modtime)
+  local ts
+  if actime and modtime then ts = {actime, modtime} end
+  return S.utimensat(nil, path, ts)
+end
+
+S.utimes = S.utime
+
 function S.chroot(path) return retbool(C.chroot(path)) end
 
 function S.getcwd()
