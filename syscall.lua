@@ -2056,6 +2056,13 @@ struct stat64 { /* only for 32 bit architectures */
   unsigned long   st_ctime_nsec;
   unsigned long long      st_ino;
 };
+struct flock64 {
+  short int l_type;
+  short int l_whence;
+  off64_t l_start;
+  off64_t l_len;
+  pid_t l_pid;
+};
 typedef union epoll_data {
   void *ptr;
   int fd;
@@ -3661,9 +3668,14 @@ end
 function S.fcntl(fd, cmd, arg)
   -- some uses have arg as a pointer, need handling TODO
   cmd = stringflag(cmd, "F_")
-  if cmd == S.F_SETFL then arg = stringflags(arg, "O_")
-  elseif cmd == S.F_SETFD then arg = stringflag(arg, "FD_")
-  end
+
+  local m = {
+    [S.F_SETFL] = function(arg) return stringflags(arg, "O_") end,
+    [S.F_SETFD] = function(arg) return stringflag(arg, "FD_") end,
+  }
+
+  if m[cmd] then arg = m[cmd](arg) end
+
   local ret = C.fcntl(getfd(fd), cmd, arg or 0)
   if ret == -1 then return nil, t.error() end
   -- return values differ, some special handling needed
