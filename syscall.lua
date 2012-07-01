@@ -4669,7 +4669,7 @@ mt.iflink = {
     }
     if meth[k] then return meth[k](i) end
     local fn = {
-      setflags = function(i, v) return S.setlink(i.index, v) end
+      setflags = S.setlink
     }
     if fn[k] then return fn[k] end
     local prefix = "ARPHRD_"
@@ -4856,6 +4856,7 @@ function S.newlink()
 end
 
 function S.setlink(index, flags)
+  if type(index) == 'table' then index = index.index end
   return nlmsg(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg,
     {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff})
 end
