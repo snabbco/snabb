@@ -3515,6 +3515,7 @@ end
 -- because you can just pass floats to all the time functions, just use the same one, but provide different templates
 function S.utime(path, actime, modtime)
   local ts
+  if not modtime then modtime = actime end
   if actime and modtime then ts = {actime, modtime} end
   return S.utimensat(nil, path, ts)
 end
