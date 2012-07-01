@@ -3678,10 +3678,20 @@ function S.fcntl(fd, cmd, arg)
 
   local ret = C.fcntl(getfd(fd), cmd, arg or 0)
   if ret == -1 then return nil, t.error() end
-  -- return values differ, some special handling needed
-  if cmd == S.F_DUPFD or cmd == S.F_DUPFD_CLOEXEC then return t.fd(ret) end
-  if cmd == S.F_GETFD or cmd == S.F_GETFL or cmd == S.F_GETLEASE or cmd == S.F_GETOWN or
-     cmd == S.F_GETSIG or cmd == S.F_GETPIPE_SZ then return tonumber(ret) end
+
+  local r = {
+    [S.F_DUPFD] = t.fd,
+    [S.F_DUPFD_CLOEXEC] = t.fd,
+    [S.F_GETFD] = tonumber,
+    [S.F_GETFL] = tonumber,
+    [S.F_GETLEASE] = tonumber,
+    [S.F_GETOWN] = tonumber,
+    [S.F_GETSIG] = tonumber,
+    [S.F_GETPIPE_SZ] = tonumber,
+  }
+
+  if r[cmd] then return r[cmd](ret) end
+
   return true
 end
 
