@@ -3473,25 +3473,25 @@ function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.sync_file_range(getfd(fd), offset, count, stringflags(flags, "SYNC_FILE_RANGE_")))
 end
 
-function S.stat(path, buf)
+function S.stat(path, field, buf)
   if not buf then buf = t.stat() end
   local ret = C.syscall(S.SYS_stat, path, pt.void(buf))
   if ret == -1 then return nil, t.error() end
-  return buf
+  if field then return buf[field] else return buf end
 end
 
-function S.lstat(path, buf)
+function S.lstat(path, field, buf)
   if not buf then buf = t.stat() end
   local ret = C.syscall(S.SYS_lstat, path, pt.void(buf))
   if ret == -1 then return nil, t.error() end
-  return buf
+  if field then return buf[field] else return buf end
 end
 
-function S.fstat(fd, buf)
+function S.fstat(fd, field, buf)
   if not buf then buf = t.stat() end
   local ret = C.syscall(S.SYS_fstat, t.int(getfd(fd)), pt.void(buf))
   if ret == -1 then return nil, t.error() end
-  return buf
+  if field then return buf[field] else return buf end
 end
 
 local function gettimespec2(ts)
