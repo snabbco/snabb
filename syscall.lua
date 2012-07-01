@@ -4666,9 +4666,12 @@ mt.iflink = {
       index = function(i) return tonumber(i.ifinfo.ifi_index) end,
       flags = function(i) return setmetatable({flags = tonumber(i.ifinfo.ifi_flags)}, mt.iff) end,
       change = function(i) return tonumber(i.ifinfo.ifi_change) end,
-      setflags = function(i) return function(i, v) return S.setlink(i.index, v) end end, -- ugh!
     }
     if meth[k] then return meth[k](i) end
+    local fn = {
+      setflags = function(i, v) return S.setlink(i.index, v) end
+    }
+    if fn[k] then return fn[k] end
     local prefix = "ARPHRD_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return i.ifinfo.ifi_type == S[k] end
