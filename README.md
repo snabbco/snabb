@@ -153,7 +153,7 @@ syslog.
 
 ## nixio compatibility
 
-Started, but lots to do. Most file descriptor operations there, need to do locking (flock, using fcntl).
+Started, but lots to do. Nixio.File done so far, but may need fixes.
 
 The way that options are specified are different, so will need to change things there, or add a compatibility layer.
 
