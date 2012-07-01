@@ -76,7 +76,7 @@ String conversions are not done automatically, you get a buffer back, you have t
 
 Many functions that return structs return metatypes exposing additional methods, so you get the raw values eg `st_size` and a Lua number as `size`, and possibly some extra helpful methods, like `major` and `minor` from stat. As these are metamethods they have no overhead, so more can be added to make the interfaces easier to use.
 
-Constants should all be available, eg `L.SEEK_SET` etc. You can add to combine them. They are also available as strings, so "SEEK\_SET" will be converted to S.SEEK\_SET. You can miss off the "SEEK\_" prefix, and they are not case sensitive, so you can just use `fd:lseek(offset, "set")` for more concise and readable use. If multiple flags are allowed, they can be comma separated for logical OR, such as `S.mmap(nil, size, "read", "private, anonymous", -1, 0)`.
+Constants should all be available, eg `L.SEEK_SET` etc. You can add to combine them. They are also available as strings, so "SEEK\_SET" will be converted to S.SEEK\_SET. You can miss off the "SEEK\_" prefix, and they are not case sensitive, so you can just use `fd:lseek(offset, "set")` for more concise and readable use. If multiple flags are allowed, they can be comma separated for logical OR, such as `S.mmap(nil, size, "read", "private, anonymous", -1, 0)`. Note that there is some namespacing overlap, so some invalid flags can be used. Perhaps we should define shorter sets as a table when this could happen.
 
 You do not need to use the numbered versions of functions, eg dup can do dup2 or dup3 by adding more arguments
 

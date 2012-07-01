@@ -122,6 +122,11 @@ S.F_RDLCK = 0
 S.F_WRLCK = 1
 S.F_UNLCK = 2
 
+S.F_ULOCK = 0
+S.F_LOCK  = 1
+S.F_TLOCK = 2
+S.F_TEST  = 3
+
 --mmap
 S.PROT_READ  = 0x1
 S.PROT_WRITE = 0x2
@@ -2653,7 +2658,7 @@ t.statfs = ffi.typeof("struct statfs64")
 t.ifreq = ffi.typeof("struct ifreq")
 t.linux_dirent64 = ffi.typeof("struct linux_dirent64")
 t.ifa_cacheinfo = ffi.typeof("struct ifa_cacheinfo")
-t.flock64 = ffi.typeof("struct flock64")
+t.flock = ffi.typeof("struct flock64")
 
 t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
 t.io_events = ffi.typeof("struct io_event[?]")
@@ -3671,8 +3676,8 @@ function S.getpeername(sockfd)
 end
 
 local function getflock(arg)
-  if not arg then arg = t.flock64() end
-  if not ffi.istype(t.flock64, arg) then
+  if not arg then arg = t.flock() end
+  if not ffi.istype(t.flock, arg) then
     for _, v in pairs {"type", "whence", "start", "len", "pid"} do -- allow use of short names
       if arg[v] then
         arg["l_" .. v] = arg[v]
@@ -3681,7 +3686,7 @@ local function getflock(arg)
     end
     arg.l_type = stringflags(arg.l_type, "F_")
     arg.l_whence = stringflag(arg.l_whence, "SEEK_")
-    arg = t.flock64(arg)
+    arg = t.flock(arg)
   end
   return arg
 end
@@ -5377,6 +5382,20 @@ end
 function S.setblocking(s, b) if b then return s:block() else return s:nonblock() end end
 function S.tell(fd) return fd:lseek(0, S.SEEK_CUR) end
 
+function S.lockf(fd, cmd, len)
+  cmd = stringflag(cmd, "F_")
+  if cmd == S.F_LOCK then
+    return S.fcntl(fd, "setlkw", {l_type = "wrlck", l_whence = "cur", l_start = 0, l_len = len})
+  elseif cmd == S.F_TLOCK then
+    return S.fcntl(fd, "setlk", {l_type = "wrlck", l_whence = "cur", l_start = 0, l_len = len})
+  elseif cmd == S.F_ULOCK then
+    return S.fcntl(fd, "setlk", {l_type = "unlck", l_whence = "cur", l_start = 0, l_len = len})
+  elseif cmd == S.F_TEST then
+    local ret, err = S.fcntl(fd, "getlk", {l_type = "wrlck", l_whence = "cur", l_start = 0, l_len = len})
+    if not ret then return nil, err end
+    return ret.l_type == S.F_UNLCK
+  end
+end
 
 -- constants
 S.INADDR_ANY = t.in_addr()
@@ -5388,7 +5407,7 @@ S.in6addr_loopback = t.in6_addr("::1")
 
 -- methods on an fd
 local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
-                   'close', 'dup', 'read', 'write', 'pread', 'pwrite', 'tell',
+                   'close', 'dup', 'read', 'write', 'pread', 'pwrite', 'tell', 'lockf',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
@@ -5417,6 +5436,7 @@ fmeth.statfs = S.fstatfs
 fmeth.utimens = S.futimens
 fmeth.utime = S.futimens
 fmeth.seek = S.lseek
+fmeth.lock = S.lockf
 
 -- sequence number used by netlink messages
 fmeth.seq = function(fd)
