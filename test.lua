@@ -970,7 +970,7 @@ test_netlink = {
       if err then S.exit("failure") end
       local i = fork_assert(S.interfaces())
       fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
-      fork_assert(i.lo.setflags("up"))
+      fork_assert(i.lo:setflags("up"))
       local lo = fork_assert(S.interface("lo"))
       fork_assert(lo.flags.up, "expect lo up now")
       S.exit()
