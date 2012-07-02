@@ -1,0 +1,8 @@
+#!/bin/bash
+fabric_dir=$(cd `dirname $0`/..; pwd)
+
+export LD_LIBRARY_PATH=$fabric_dir/src/c
+$fabric_dir/src/lua/main.lua "$@"
+
+
+
