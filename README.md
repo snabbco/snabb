@@ -151,6 +151,8 @@ Have not looked yet at what support is needed, eg labelling. If you have selinux
 Select appropriate shell commands that are useful, eg need them for tests. ping, etc. Also aliases like touch (uses utimensat).
 syslog.
 
+Need to work on iterators, eg for cat (readfile) etc.
+
 ## nixio compatibility
 
 Started, but lots to do. Nixio.File done so far, but may need fixes.
