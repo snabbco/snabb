@@ -3490,25 +3490,25 @@ function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.sync_file_range(getfd(fd), offset, count, stringflags(flags, "SYNC_FILE_RANGE_")))
 end
 
-function S.stat(path, field, buf) -- field is in here for nixio compatibility, not very nice interface
+function S.stat(path, buf)
   if not buf then buf = t.stat() end
   local ret = C.syscall(S.SYS_stat, path, pt.void(buf))
   if ret == -1 then return nil, t.error() end
-  if field then return buf[field] else return buf end
+  return buf
 end
 
-function S.lstat(path, field, buf)
+function S.lstat(path, buf)
   if not buf then buf = t.stat() end
   local ret = C.syscall(S.SYS_lstat, path, pt.void(buf))
   if ret == -1 then return nil, t.error() end
-  if field then return buf[field] else return buf end
+  return buf
 end
 
-function S.fstat(fd, field, buf)
+function S.fstat(fd, buf)
   if not buf then buf = t.stat() end
   local ret = C.syscall(S.SYS_fstat, t.int(getfd(fd)), pt.void(buf))
   if ret == -1 then return nil, t.error() end
-  if field then return buf[field] else return buf end
+  return buf
 end
 
 local function gettimespec2(ts)

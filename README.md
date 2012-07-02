@@ -163,3 +163,6 @@ Some initial setup eg for signals. May do this in compatibility layer.
 
 Functions with EINTR return false not nil, need to support this.
 
+Current plan is to have the same level of functionality, but not worry about except compatibility for now.
+
+
