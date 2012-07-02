@@ -995,11 +995,10 @@ test_netlink = {
     assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
     assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
   end,
-  test_setlink = function()
+  test_setlink_root = function()
     local p = assert(S.clone())
      if p == 0 then
       local ok, err = S.unshare("newnet")
-      if err and err.perm then S.exit() end -- needs root
       if err then S.exit("failure") end -- may happen with no kernel support
       local i = fork_assert(S.interfaces())
       fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
@@ -1012,11 +1011,10 @@ test_netlink = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
-  test_interface_setflags = function()
+  test_interface_setflags_root = function()
     local p = assert(S.clone())
      if p == 0 then
       local ok, err = S.unshare("newnet")
-      if err and err.perm then S.exit() end -- needs root
       if err then S.exit("failure") end
       local i = fork_assert(S.interfaces())
       fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
@@ -1029,8 +1027,7 @@ test_netlink = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
-  test_setlink_error = function()
-    if S.geteuid() ~= 0 then return end -- needs root
+  test_setlink_error_root = function()
     ok, err = S.setlink(-1, "up")
     assert(not ok, "expect bogus setlink to fail")
     assert(err.EINVAL, "expect invalid value error")
@@ -1272,13 +1269,12 @@ test_processes = {
   end,
 }
 
-test_namespaces = {
+test_namespaces_root = {
   test_netns = function()
-    local p, err = S.clone("newnet")
-    if err and err.perm then return end -- needs root
+    local p = assert(S.clone("newnet"))
     if p == 0 then
-      local i = assert(S.interfaces())
-      assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
+      local i = fork_assert(S.interfaces())
+      fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       S.exit()
     else
       assert(S.waitpid(-1, "clone"))
@@ -1287,21 +1283,18 @@ test_namespaces = {
   test_netns_unshare = function()
     local p = assert(S.clone())
     if p == 0 then
-      local ok, err = S.unshare("newnet")
-      if err and err.perm then S.exit() return end -- needs root
-      if err then S.exit("failure") end
-      local i = assert(S.interfaces())
-      assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
+      local ok = fork_assert(S.unshare("newnet"))
+      local i = fork_assert(S.interfaces())
+      fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       S.exit()
     else
       assert(S.waitpid(-1, "clone"))
     end
   end,
   test_pidns = function()
-    local p, err = S.clone("newpid")
-    if err and err.perm then return end -- needs root
+    local p = assert(S.clone("newpid"))
     if p == 0 then
-      assert_equal(S.getpid(), 1, "expec our pid to be 1 new new process namespace")
+      fork_assert(S.getpid() == 1, "expec our pid to be 1 new new process namespace")
       S.exit()
     else
       assert(S.waitpid(-1, "clone"))
@@ -1362,7 +1355,6 @@ test_filesystem = {
 -- note at present we check for uid 0, but could check capabilities instead.
 test_root = {
   test_mount = function()
-    if S.geteuid() ~= 0 then return end
     assert(S.mkdir(tmpfile))
     assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
     assert(S.umount(tmpfile, "detach, nofollow"))
@@ -1372,7 +1364,6 @@ test_root = {
     S.acct() -- may not be configured
   end,
   test_sethostname = function()
-    if S.geteuid() ~= 0 then return end
     local hh = "testhostname"
     local h = assert(S.gethostname())
     assert(S.sethostname(hh))
@@ -1380,7 +1371,6 @@ test_root = {
     assert(S.sethostname(h))
   end,
   test_bridge = function()
-    if S.geteuid() ~= 0 then return end
     local ok, err = S.bridge_add("br999")
     assert(ok or err.ENOPKG, err)
     if ok then
@@ -1400,10 +1390,23 @@ test_root = {
     end
   end,
   test_chroot = function()
-     if S.geteuid() ~= 0 then return end
     assert(S.chroot("/"))
  end,
 }
+
+if S.geteuid() ~= 0 then -- remove tests that need root
+  for k in pairs(_G) do
+    if k:match("test") then
+      if k:match("root")
+      then _G[k] = nil;
+      else
+        for j in pairs(_G[k]) do
+          if j:match("test") and j:match("root") then _G[k][j] = nil end
+        end
+      end
+    end
+  end
+end
 
 local f
 if arg[1] then f = luaunit:run(arg[1]) else f = luaunit:run() end
