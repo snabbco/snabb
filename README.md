@@ -1,4 +1,4 @@
-snabb-vnet
+snabb-fabric
 ==========
 
-Snabb Virtual Network
+Snabb Fabric.
