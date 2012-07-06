@@ -2,6 +2,7 @@
 -- Copyright 2012 Snabb Gmbh.
 
 local ffi = require("ffi")
+local C = ffi.C
 local fabric = ffi.load("fabric")
 
 ffi.cdef(io.open("/home/luke/hacking/QEMU/net/snabb-shm-dev.h"):read("*a"))
@@ -12,9 +13,29 @@ print(ffi.sizeof("struct snabb_shm_dev"))
 
 local shm = fabric.open_shm("/tmp/ba");
 
--- shm.tx_head = ffi.C.SHM_RING_SIZE
+-- Return true if `shm' is a valid shared memory packet device.
+function check_shm_file (shm)
+   return shm.magic == 0x57ABB000 and shm.version == 1
+end
 
-print(shm.magic)
+-- Return true if a packet is available.
+function available (shm)
+   return shm.tx_tail ~= shm.tx_head + 1 % C.SHM_RING_SIZE
+end
+
+-- Return the current shm_packet in the ring.
+function packet (shm)
+   return shm.tx_ring[shm.tx_head]
+end
+
+-- Advance to the next packet in the ring.
+function next (shm)
+   shm.tx_head = (shm.tx_head + 1) % C.SHM_RING_SIZE
+end
+
+-- shm.tx_head = C.SHM_RING_SIZE
+
+print("Ring valid: " .. tostring(check_shm_file(shm)))
 
 -- shm.tx_head = 0
 
@@ -22,18 +43,18 @@ print("head = " .. shm.tx_head .. " tail = " .. shm.tx_tail)
 
 -- Print availability
 
-print("available = " .. shm.tx_tail - shm.tx_head)
+print("available: " .. tostring(available(shm)))
 
 -- Print size of first packet
 
-print("size[" .. shm.tx_head .. "] = " .. shm.tx_ring[shm.tx_head].length)
+print("size[" .. shm.tx_head .. "] = " .. packet(shm).length)
 
-shm.tx_head = shm.tx_head + 1
+next(shm)
 
 -- Dump a packet out as pcap
 
 ffi.cdef[[
-struct pcap {
+struct pcap_file {
     /* file header */
     uint32_t magic_number;   /* magic number */
     uint16_t version_major;  /* major version number */
@@ -42,6 +63,9 @@ struct pcap {
     uint32_t sigfigs;        /* accuracy of timestamps */
     uint32_t snaplen;        /* max length of captured packets, in octets */
     uint32_t network;        /* data link type */
+}
+
+struct pcap_record {
     /* record header */
     uint32_t ts_sec;         /* timestamp seconds */
     uint32_t ts_usec;        /* timestamp microseconds */
@@ -50,21 +74,31 @@ struct pcap {
 }
 ]]
 
-local pcap = ffi.new("struct pcap")
-pcap.magic_number = 0xa1b2c3d4
-pcap.version_major = 2
-pcap.version_minor = 4
-pcap.snaplen = 65535
-pcap.network = 1
-pcap.incl_len = shm.tx_ring[shm.tx_head].length
-pcap.orig_len = pcap.incl_len
+local pcap_file = ffi.new("struct pcap_file")
+pcap_file.magic_number = 0xa1b2c3d4
+pcap_file.version_major = 2
+pcap_file.version_minor = 4
+pcap_file.snaplen = 65535
+pcap_file.network = 1
 
 print("writing pcap file..")
+file = io.open("/tmp/x.pcap", "w")
+file:write(ffi.string(pcap_file, ffi.sizeof(pcap_file)))
 
-io.output("/tmp/x.pcap", "w")
-io.write(ffi.string(pcap, ffi.sizeof(pcap)))
-io.write(ffi.string(shm.tx_ring[shm.tx_head].data, shm.tx_ring[shm.tx_head].length))
-io.close()
-
-
+local pcap_record = ffi.new("struct pcap_record")
+while true do
+   if available(shm) then
+      print("Writing a " .. packet(shm).length .. " byte packet..")
+      io.flush()
+      pcap_record.incl_len = shm.tx_ring[shm.tx_head].length
+      pcap_record.orig_len = pcap_record.incl_len
+      file:write(ffi.string(pcap_record, ffi.sizeof(pcap_record)))
+      file:write(ffi.string(shm.tx_ring[shm.tx_head].data, shm.tx_ring[shm.tx_head].length))
+      file:flush()
+      next(shm)
+   else
+      print("nuthin' doin' " .. shm.tx_head .. " " .. shm.tx_tail)
+   end
+end
+file:close()
 
