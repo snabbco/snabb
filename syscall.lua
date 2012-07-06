@@ -4990,7 +4990,7 @@ function S.recvmsg(fd, msg, flags)
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
         local fda = pt.int(cmsg + 1) -- cmsg_data
-        local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, ffi.sizeof(t.int1))
+        local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, s.int1)
         ret.fd = {}
         for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
       end -- add other SOL_SOCKET messages
@@ -5011,9 +5011,8 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   ucred.gid = gid
   local buf1 = t.buffer(1) -- need to send one byte
   local io = t.iovecs{{buf1, 1}}
-  local usize = ffi.sizeof(t.ucred)
-  local bufsize = cmsg_space(usize)
-  local buflen = cmsg_len(usize)
+  local bufsize = cmsg_space(s.ucred)
+  local buflen = cmsg_len(s.ucred)
   local buf = t.buffer(bufsize) -- this is our cmsg buffer
   local msg = t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io.iov
@@ -5024,7 +5023,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   cmsg.cmsg_level = S.SOL_SOCKET
   cmsg.cmsg_type = S.SCM_CREDENTIALS
   cmsg.cmsg_len = buflen
-  ffi.copy(cmsg.cmsg_data, ucred, usize)
+  ffi.copy(cmsg.cmsg_data, ucred, s.ucred)
   msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
   return S.sendmsg(fd, msg, 0)
 end
