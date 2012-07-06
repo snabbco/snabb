@@ -3298,7 +3298,6 @@ local samap = {
 mt.sockaddr_un = {
   __index = function(un, k)
     local sa = un.addr
-    if k == 'sun_family' then return sa.sun_family end
     if k == 'family' then return tonumber(sa.sun_family) end
     local namelen = un.addrlen - s.sun_family
     if namelen > 0 then
