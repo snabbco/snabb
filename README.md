@@ -95,7 +95,9 @@ It would be nice to be API compatible with other projects, especially Luaposix, 
 ### Performance
 
 If you want the highest performance, allocate and pass your own buffers, as obviously allocation is expensive. Also, use the constants, not string values, as these need parsing which is slow. Check the output of `luajit -jv` to see what is going on and let me know if there are any issues that need fixes for NYI functions. You should be able to get native C like performance.
- 
+
+There is an example epoll script that you can test with Apachebench here https://gist.github.com/1077040 but there are still some not implemented issues, working on them.
+
 ### Issues
 
 Siginfo support in sigaction not there yet, as confused by the kernel API.
