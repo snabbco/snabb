@@ -10,10 +10,10 @@ local C = ffi.C
 
 local octal = function (s) return tonumber(s, 8) end 
 
-local t, pt = {}, {} -- types and pointer types tables
+local t, pt, s = {}, {}, {} -- types, pointer types and sizes tables
 S.t = t
 S.pt = pt
-
+S.s = s
 local mt = {} -- metatables
 
 -- convenience so user need not require ffi
@@ -3066,6 +3066,90 @@ S.addrtype = {
   [S.AF_INET6] = t.in6_addr,
 }
 
+-- signal set handlers TODO replace with metatypes
+local function mksigset(str)
+  if not str then return t.sigset() end
+  if type(str) ~= 'string' then return str end
+  local f = t.sigset()
+  local a = split(",", str)
+  for i, v in ipairs(a) do
+    local st = trim(v:upper())
+    if st:sub(1, 3) ~= "SIG" then st = "SIG" .. st end
+    local sig = S[st]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+
+    local d = bit.rshift(sig - 1, 5) -- always 32 bits
+    f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
+  end
+  return f
+end
+
+local function sigismember(set, sig)
+  local d = bit.rshift(sig - 1, 5) -- always 32 bits
+  return bit.band(set.val[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
+end
+
+local function sigemptyset(set)
+  for i = 0, s.sigset / 4 - 1 do
+    if set.val[i] ~= 0 then return false end
+  end
+  return true
+end
+
+local function sigaddset(set, sig)
+  set = mksigset(set)
+  local d = bit.rshift(sig - 1, 5)
+  set.val[d] = bit.bor(set.val[d], bit.lshift(1, (sig - 1) % 32))
+  return set
+end
+
+local function sigdelset(set, sig)
+  set = mksigset(set)
+  local d = bit.rshift(sig - 1, 5)
+  set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
+  return set
+end
+
+local function sigaddsets(set, sigs) -- allow multiple
+  if type(sigs) ~= "string" then return sigaddset(set, sigs) end
+  set = mksigset(set)
+  local a = split(",", sigs)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    sigaddset(set, sig)
+  end
+  return set
+end
+
+local function sigdelsets(set, sigs) -- allow multiple
+  if type(sigs) ~= "string" then return sigdelset(set, sigs) end
+  set = mksigset(set)
+  local a = split(",", sigs)
+  for i, v in ipairs(a) do
+    local s = trim(v:upper())
+    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
+    local sig = S[s]
+    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    sigdelset(set, sig)
+  end
+  return set
+end
+
+t.sigset = ffi.metatype("sigset_t", {
+  __index = function(set, k)
+    if k == 'add' then return sigaddsets end
+    if k == 'del' then return sigdelsets end
+    if k == 'isemptyset' then return sigemptyset(set) end
+    local prefix = "SIG"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    local sig = S[k]
+    if sig then return sigismember(set, sig) end
+  end
+})
+
 -- cast to pointer to a type. could generate for all types.
 local function ptt(tp)
   local ptp = ffi.typeof("$ *", tp)
@@ -3095,7 +3179,6 @@ pt.void = function(x)
   return ffi.cast(voidp, x)
 end
 
-local s = {} -- type sizes
 for k, v in pairs(t) do
   local ignore = { -- these are not fixed size
     inotify_event = true,
@@ -3217,7 +3300,7 @@ mt.sockaddr_un = {
     local sa = un.addr
     if k == 'sun_family' then return sa.sun_family end
     if k == 'family' then return tonumber(sa.sun_family) end
-    local namelen = un.addrlen - ffi.sizeof(t.sun_family)
+    local namelen = un.addrlen - s.sun_family
     if namelen > 0 then
       if sa.sun_path[0] == 0 then
         if k == 'abstract' then return true end
@@ -3240,7 +3323,7 @@ local function sa(addr, addrlen)
   end
   local st = samap[family]
   local a = st()
-  ffi.copy(a, addr, ffi.sizeof(st))
+  ffi.copy(a, addr, addrlen)
   return a
 end
 
@@ -3476,7 +3559,7 @@ end
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.recvfrom(fd, buf, count, flags)
   local ss = t.sockaddr_storage()
-  local addrlen = t.socklen1(ffi.sizeof(t.sockaddr_storage))
+  local addrlen = t.socklen1(s.sockaddr_storage)
   local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return {count = tonumber(ret), addr = sa(ss, addrlen[0])}
@@ -3487,14 +3570,14 @@ function S.setsockopt(fd, level, optname, optval, optlen)
   if not optlen and type(optval) == 'boolean' then if optval then optval = 1 else optval = 0 end end
   if not optlen and type(optval) == 'number' then
     optval = t.int1(optval)
-    optlen = ffi.sizeof(t.int1)
+    optlen = s.int1
   end
   return retbool(C.setsockopt(getfd(fd), stringflag(level, "SOL_"), stringflag(optname, "SO_"), optval, optlen))
 end
 
 function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool options
   local optval, optlen = t.int1(), t.socklen1()
-  optlen[0] = ffi.sizeof(t.int1)
+  optlen[0] = s.int1
   local ret = C.getsockopt(getfd(fd), level, optname, optval, optlen)
   if ret == -1 then return nil, t.error() end
   return tonumber(optval[0]) -- no special case for bool
@@ -3679,7 +3762,7 @@ end
 
 function S.getsockname(sockfd)
   local ss = t.sockaddr_storage()
-  local addrlen = t.socklen1(ffi.sizeof(t.sockaddr_storage))
+  local addrlen = t.socklen1(s.sockaddr_storage)
   local ret = C.getsockname(getfd(sockfd), ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return sa(ss, addrlen[0])
@@ -3687,7 +3770,7 @@ end
 
 function S.getpeername(sockfd)
   local ss = t.sockaddr_storage()
-  local addrlen = t.socklen1(ffi.sizeof(t.sockaddr_storage))
+  local addrlen = t.socklen1(s.sockaddr_storage)
   local ret = C.getpeername(getfd(sockfd), ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return sa(ss, addrlen[0])
@@ -3761,90 +3844,6 @@ end
 function S.sethostname(s) -- only accept Lua string, do not see use case for buffer as well
   return retbool(C.sethostname(s, #s))
 end
-
--- signal set handlers TODO replace with metatypes
-local function mksigset(str)
-  if not str then return t.sigset() end
-  if type(str) ~= 'string' then return str end
-  local f = t.sigset()
-  local a = split(",", str)
-  for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
-    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-
-    local d = bit.rshift(sig - 1, 5) -- always 32 bits
-    f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
-  end
-  return f
-end
-
-local function sigismember(set, sig)
-  local d = bit.rshift(sig - 1, 5) -- always 32 bits
-  return bit.band(set.val[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
-end
-
-local function sigemptyset(set)
-  for i = 0, ffi.sizeof(t.sigset) / 4 - 1 do
-    if set.val[i] ~= 0 then return false end
-  end
-  return true
-end
-
-local function sigaddset(set, sig)
-  set = mksigset(set)
-  local d = bit.rshift(sig - 1, 5)
-  set.val[d] = bit.bor(set.val[d], bit.lshift(1, (sig - 1) % 32))
-  return set
-end
-
-local function sigdelset(set, sig)
-  set = mksigset(set)
-  local d = bit.rshift(sig - 1, 5)
-  set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
-  return set
-end
-
-local function sigaddsets(set, sigs) -- allow multiple
-  if type(sigs) ~= "string" then return sigaddset(set, sigs) end
-  set = mksigset(set)
-  local a = split(",", sigs)
-  for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
-    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    sigaddset(set, sig)
-  end
-  return set
-end
-
-local function sigdelsets(set, sigs) -- allow multiple
-  if type(sigs) ~= "string" then return sigdelset(set, sigs) end
-  set = mksigset(set)
-  local a = split(",", sigs)
-  for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
-    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    sigdelset(set, sig)
-  end
-  return set
-end
-
-t.sigset = ffi.metatype("sigset_t", {
-  __index = function(set, k)
-    if k == 'add' then return sigaddsets end
-    if k == 'del' then return sigdelsets end
-    if k == 'isemptyset' then return sigemptyset(set) end
-    local prefix = "SIG"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    local sig = S[k]
-    if sig then return sigismember(set, sig) end
-  end
-})
 
 -- does not support passing a function as a handler, use sigaction instead
 -- actualy glibc does not call the syscall anyway, defines in terms of sigaction; we could too
@@ -4183,7 +4182,7 @@ end
 
 -- TODO use metatypes
 function S.signalfd_read(fd, buffer, len)
-  if not len then len = ffi.sizeof(t.signalfd_siginfo) * 4 end
+  if not len then len = s.signalfd_siginfo * 4 end
   if not buffer then buffer = t.buffer(len) end
   local ret, err = S.read(fd, buffer, len)
   if ret == 0 or (err and err.EAGAIN) then return {} end
@@ -4191,35 +4190,35 @@ function S.signalfd_read(fd, buffer, len)
   local offset, ss = 0, {}
   while offset < ret do
     local ssi = pt.signalfd_siginfo(buffer + offset)
-    local s = {}
-    s.errno = tonumber(ssi.ssi_errno)
-    sigcode(s, tonumber(ssi.ssi_signo), tonumber(ssi.ssi_code))
+    local sig = {}
+    sig.errno = tonumber(ssi.ssi_errno)
+    sigcode(sig, tonumber(ssi.ssi_signo), tonumber(ssi.ssi_code))
 
-    if s.SI_USER or s.SI_QUEUE then
-      s.pid = tonumber(ssi.ssi_pid)
-      s.uid = tonumber(ssi.ssi_uid)
-      s.int = tonumber(ssi.ssi_int)
-      s.ptr = t.uint64(ssi.ssi_ptr)
-    elseif s.SI_TIMER then
-      s.overrun = tonumber(ssi.ssi_overrun)
-      s.timerid = tonumber(ssi.ssi_tid)
+    if sig.SI_USER or sig.SI_QUEUE then
+      sig.pid = tonumber(ssi.ssi_pid)
+      sig.uid = tonumber(ssi.ssi_uid)
+      sig.int = tonumber(ssi.ssi_int)
+      sig.ptr = t.uint64(ssi.ssi_ptr)
+    elseif sig.SI_TIMER then
+      sig.overrun = tonumber(ssi.ssi_overrun)
+      sig.timerid = tonumber(ssi.ssi_tid)
     end
 
-    if s.SIGCHLD then 
-      s.pid = tonumber(ssi.ssi_pid)
-      s.uid = tonumber(ssi.ssi_uid)
-      s.status = tonumber(ssi.ssi_status)
-      s.utime = tonumber(ssi.ssi_utime) / 1000000 -- convert to seconds
-      s.stime = tonumber(ssi.ssi_stime) / 1000000
-    elseif s.SIGILL or S.SIGFPE or s.SIGSEGV or s.SIGBUS or s.SIGTRAP then
-      s.addr = t.uint64(ssi.ssi_addr)
-    elseif s.SIGIO or s.SIGPOLL then
-      s.band = tonumber(ssi.ssi_band) -- should split this up, is events from poll, TODO
-      s.fd = tonumber(ssi.ssi_fd)
+    if sig.SIGCHLD then 
+      sig.pid = tonumber(ssi.ssi_pid)
+      sig.uid = tonumber(ssi.ssi_uid)
+      sig.status = tonumber(ssi.ssi_status)
+      sig.utime = tonumber(ssi.ssi_utime) / 1000000 -- convert to seconds
+      sig.stime = tonumber(ssi.ssi_stime) / 1000000
+    elseif sig.SIGILL or sig.SIGFPE or sig.SIGSEGV or sig.SIGBUS or sig.SIGTRAP then
+      sig.addr = t.uint64(ssi.ssi_addr)
+    elseif sig.SIGIO or sig.SIGPOLL then
+      sig.band = tonumber(ssi.ssi_band) -- should split this up, is events from poll, TODO
+      sig.fd = tonumber(ssi.ssi_fd)
     end
 
-    ss[#ss + 1] = s
-    offset = offset + ffi.sizeof(t.signalfd_siginfo)
+    ss[#ss + 1] = sig
+    offset = offset + s.signalfd_siginfo
   end
   return ss
 end
@@ -4605,7 +4604,7 @@ end
 
 -- similar functions for netlink messages
 local function nlmsg_align(len) return align(len, 4) end
-local nlmsg_hdrlen = nlmsg_align(ffi.sizeof(t.nlmsghdr))
+local nlmsg_hdrlen = nlmsg_align(s.nlmsghdr)
 local function nlmsg_length(len) return len + nlmsg_hdrlen end
 local function nlmsg_ok(msg, len)
   return len >= nlmsg_hdrlen and msg.nlmsg_len >= nlmsg_hdrlen and msg.nlmsg_len <= len
@@ -4616,9 +4615,9 @@ local function nlmsg_next(msg, buf, len)
 end
 
 local rta_align = nlmsg_align -- also 4 byte align
-local function rta_length(len) return len + rta_align(ffi.sizeof(t.rtattr)) end
+local function rta_length(len) return len + rta_align(s.rtattr) end
 local function rta_ok(msg, len)
-  return len >= ffi.sizeof(t.rtattr) and msg.rta_len >= ffi.sizeof(t.rtattr) and msg.rta_len <= len
+  return len >= s.rtattr and msg.rta_len >= s.rtattr and msg.rta_len <= len
 end
 local function rta_next(msg, buf, len)
   local inc = rta_align(msg.rta_len)
@@ -4664,7 +4663,7 @@ local ifla_decode = {
   end,
   [S.IFLA_STATS] = function(ir, buf, len)
     ir.stats = t.rtnl_link_stats() -- despite man page, this is what kernel uses. So only get 32 bit stats here.
-    ffi.copy(ir.stats, buf, ffi.sizeof(t.rtnl_link_stats))
+    ffi.copy(ir.stats, buf, s.rtnl_link_stats)
   end
 }
 
