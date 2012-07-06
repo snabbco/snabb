@@ -2723,7 +2723,7 @@ t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
   end,
   __newindex = function(sa, k, v)
     local meth = {
-      family = function(sa, v) sa.ss_family = v end,
+      family = function(sa, v) sa.ss_family = stringflag(v, "AF_") end,
     }
     if meth[k] then
       meth[k](sa, v)
