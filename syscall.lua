@@ -5216,7 +5216,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
 
     local fdbs = pt.fdb_entry(buffer)
 
-    for i = 1, n / ffi.sizeof(t.fdb_entry) do
+    for i = 1, n / s.fdb_entry do
       local fdb = fdbs[i - 1]
       local mac = t.macaddr()
       ffi.copy(mac, fdb.mac_addr, IFHWADDRLEN)
