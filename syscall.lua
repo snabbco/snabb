@@ -4812,11 +4812,11 @@ local nlmsg_data_decode = {
   end,
   [S.RTM_NEWLINK] = function(r, buf, len)
     local iface = pt.ifinfomsg(buf)
-    buf = buf + nlmsg_align(ffi.sizeof(t.ifinfomsg))
-    len = len - nlmsg_align(ffi.sizeof(t.ifinfomsg))
+    buf = buf + nlmsg_align(s.ifinfomsg)
+    len = len - nlmsg_align(s.ifinfomsg)
     local rtattr = pt.rtattr(buf)
     local ir = setmetatable({ifinfo = t.ifinfomsg()}, mt.iflink)
-    ffi.copy(ir.ifinfo, iface, ffi.sizeof(t.ifinfomsg))
+    ffi.copy(ir.ifinfo, iface, s.ifinfomsg)
 
     while rta_ok(rtattr, len) do
       if ifla_decode[rtattr.rta_type] then
@@ -4872,12 +4872,12 @@ end
 
 -- initial abstraction, expand later
 local function nlmsg(ntype, flags, tp, init) -- will need more structures, possibly nested
-  local s, err = S.socket("netlink", "raw", "route")
-  if not s then return nil, err end
+  local sock, err = S.socket("netlink", "raw", "route")
+  if not sock then return nil, err end
   local a = t.sockaddr_nl() -- kernel will fill in address
-  local ok, err = s:bind(a)
+  local ok, err = sock:bind(a)
   if not ok then return nil, err end -- gc will take care of closing socket...
-  a = s:getsockname() -- to get bound address
+  a = sock:getsockname() -- to get bound address
   if not a then return nil, err end -- gc will take care of closing socket...
 
   local k = t.sockaddr_nl() -- kernel destination
@@ -4887,24 +4887,24 @@ local function nlmsg(ntype, flags, tp, init) -- will need more structures, possi
   hdr.nlmsg_len = len
   hdr.nlmsg_type = ntype
   hdr.nlmsg_flags = flags
-  hdr.nlmsg_seq = s:seq()
+  hdr.nlmsg_seq = sock:seq()
   hdr.nlmsg_pid = a.pid
 
   for k, v in pairs(init) do struct[k] = v end
 
   local ios = t.iovecs{{buf, len}}
-  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = ffi.sizeof(t.sockaddr_nl)}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
 
-  local n, err = s:sendmsg(m)
+  local n, err = sock:sendmsg(m)
   if not n then return nil, err end
 
-  local r, err = S.nlmsg_read(s, k)
+  local r, err = S.nlmsg_read(sock, k)
   if not r then
-    s:close()
+    sock:close()
     return nil, err
   end
 
-  local ok, err = s:close()
+  local ok, err = sock:close()
   if not ok then return nil, err end
 
   return r
