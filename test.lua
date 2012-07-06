@@ -1411,6 +1411,8 @@ end
 local f
 if arg[1] then f = luaunit:run(arg[1]) else f = luaunit:run() end
 
+clean()
+
 if f == 0 then S.exit("success") else S.exit("failure") end
 
 
