@@ -4792,12 +4792,12 @@ local nlmsg_data_decode = {
   end,
   [S.RTM_NEWADDR] = function(r, buf, len)
     local addr = pt.ifaddrmsg(buf)
-    buf = buf + nlmsg_align(ffi.sizeof(t.ifaddrmsg))
-    len = len - nlmsg_align(ffi.sizeof(t.ifaddrmsg))
+    buf = buf + nlmsg_align(s.ifaddrmsg)
+    len = len - nlmsg_align(s.ifaddrmsg)
     local rtattr = pt.rtattr(buf)
 
     local ir = setmetatable({ifaddr = t.ifaddrmsg(), addr = {}}, mt.ifaddr)
-    ffi.copy(ir.ifaddr, addr, ffi.sizeof(t.ifaddrmsg))
+    ffi.copy(ir.ifaddr, addr, s.ifaddrmsg)
 
     while rta_ok(rtattr, len) do
       if ifa_decode[rtattr.rta_type] then
