@@ -2722,19 +2722,32 @@ t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
     end
   end,
   __newindex = function(sa, k, v)
-    local st = samap[tonumber(sa.ss_family)]
+    local meth = {
+      family = function(sa, v) sa.ss_family = v end,
+    }
+    if meth[k] then
+      meth[k](sa, v)
+      return
+    end
+    local st = samap2[tonumber(sa.ss_family)]
     if st then
-      local cs = ffi.cast(st, sa)
+      local cs = st(sa)
       cs[k] = v
     end
   end,
   __new = function(tp, init)
     local ss = ffi.new(tp)
+    local family
+    if init and init.family then family = stringflag(init.family, "AF_") end
     local st
-    if init and init.family then st = samap[tonumber(init.family)] end
+    if family then
+      st = samap2[tonumber(family)]
+      ss.ss_family = family
+      init.family = nil
+    end
     if st then
-      local cs = ffi.cast(st, sa)
-      for k, v in pairs(t) do
+      local cs = st(ss)
+      for k, v in pairs(init) do
         cs[k] = v
       end
     end
@@ -2811,9 +2824,16 @@ t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
     }
     if meth[k] then return meth[k](sa) end
   end,
+  __newindex = function(sa, k, v)
+    local meth = {
+      pid = function(sa, v) sa.nl_pid = v end,
+      groups = function(sa, v) sa.nl_groups = v end,
+    }
+    if meth[k] then meth[k](sa, v) end
+  end,
   __new = function(tp, pid, groups)
     return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0)
-  end
+  end,
 })
 
 samap = {

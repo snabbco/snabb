@@ -490,8 +490,8 @@ test_locking = {
 
 test_sockets_pipes = {
   test_sockaddr_storage = function()
-    --local sa = t.sockaddr_storage(
-
+    local sa = t.sockaddr_storage{family = "netlink", pid = 2}
+    assert_equal(sa.pid, 2, "should get pid back")
   end,
   test_pipe = function()
     local fds = assert(S.pipe())
