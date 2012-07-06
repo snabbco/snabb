@@ -2702,7 +2702,7 @@ local samap, samap2 = {}, {}
 t.sockaddr = ffi.metatype("struct sockaddr", {
   __index = function(sa, k)
     local meth = {
-      family = function(sa) return tonumber(sa.sa_family) end,
+      family = function(sa) return sa.sa_family end,
     }
     if meth[k] then return meth[k](sa) end
   end
