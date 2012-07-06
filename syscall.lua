@@ -3025,7 +3025,7 @@ mt.pollfds = {
   end,
   __newindex = function(p, k, v)
     if not ffi.istype(t.pollfd, v) then v = t.pollfd(v) end
-    ffi.copy(p.pfd[k - 1], v, ffi.sizeof(t.pollfd))
+    ffi.copy(p.pfd[k - 1], v, s.pollfd)
   end,
   __len = function(p) return p.count end,
   __new = function(tp, ps)
