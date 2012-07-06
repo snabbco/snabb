@@ -3556,9 +3556,9 @@ function S.writev(fd, iov)
 end
 
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
-function S.recvfrom(fd, buf, count, flags)
-  local ss = t.sockaddr_storage()
-  local addrlen = t.socklen1(s.sockaddr_storage)
+function S.recvfrom(fd, buf, count, flags, ss, addrlen)
+  ss = ss or t.sockaddr_storage()
+  addrlen = addrlen or t.socklen1(s.sockaddr_storage)
   local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return {count = tonumber(ret), addr = sa(ss, addrlen[0])}
