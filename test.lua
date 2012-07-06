@@ -489,6 +489,10 @@ test_locking = {
 }
 
 test_sockets_pipes = {
+  test_sockaddr_storage = function()
+    --local sa = t.sockaddr_storage(
+
+  end,
   test_pipe = function()
     local fds = assert(S.pipe())
     assert(fds[1]:close())

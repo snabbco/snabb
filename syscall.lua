@@ -2696,6 +2696,9 @@ t.error = ffi.metatype("struct {int errno;}", {
   end
 })
 
+-- cast socket address to actual type based on family
+local samap, samap2 = {}, {}
+
 t.sockaddr = ffi.metatype("struct sockaddr", {
   __index = function(sa, k)
     local meth = {
@@ -2705,12 +2708,38 @@ t.sockaddr = ffi.metatype("struct sockaddr", {
   end
 })
 
+-- experiment, see if we can use this as generic type, to avoid allocations.
 t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
   __index = function(sa, k)
     local meth = {
       family = function(sa) return tonumber(sa.ss_family) end,
     }
-    if meth[k] then return meth[k](sa) end  end
+    if meth[k] then return meth[k](sa) end
+    local st = samap2[tonumber(sa.ss_family)]
+    if st then
+      local cs = st(sa)
+      return cs[k]
+    end
+  end,
+  __newindex = function(sa, k, v)
+    local st = samap[tonumber(sa.ss_family)]
+    if st then
+      local cs = ffi.cast(st, sa)
+      cs[k] = v
+    end
+  end,
+  __new = function(tp, init)
+    local ss = ffi.new(tp)
+    local st
+    if init and init.family then st = samap[tonumber(init.family)] end
+    if st then
+      local cs = ffi.cast(st, sa)
+      for k, v in pairs(t) do
+        cs[k] = v
+      end
+    end
+  return ss
+  end,
 })
 
 t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
@@ -2786,6 +2815,13 @@ t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
     return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0)
   end
 })
+
+samap = {
+  [S.AF_UNIX] = t.sockaddr_un,
+  [S.AF_INET] = t.sockaddr_in,
+  [S.AF_INET6] = t.sockaddr_in6,
+  [S.AF_NETLINK] = t.sockaddr_nl,
+}
 
 t.stat = ffi.metatype(stattypename, { -- either struct stat on 64 bit or struct stat64 on 32 bit
   __index = function(st, k)
@@ -3172,12 +3208,23 @@ pt.signalfd_siginfo = ptt(t.signalfd_siginfo)
 pt.linux_dirent64 = ptt(t.linux_dirent64)
 pt.inotify_event = ptt(t.inotify_event)
 pt.ucred = ptt(t.ucred)
+pt.sockaddr_un = ptt(t.sockaddr_un)
+pt.sockaddr_in = ptt(t.sockaddr_in)
+pt.sockaddr_in6 = ptt(t.sockaddr_in6)
+pt.sockaddr_nl = ptt(t.sockaddr_nl)
 
 local voidp = ffi.typeof("void *")
 
 pt.void = function(x)
   return ffi.cast(voidp, x)
 end
+
+samap2 = {
+  [S.AF_UNIX] = pt.sockaddr_un,
+  [S.AF_INET] = pt.sockaddr_in,
+  [S.AF_INET6] = pt.sockaddr_in6,
+  [S.AF_NETLINK] = pt.sockaddr_nl,
+}
 
 for k, v in pairs(t) do
   local ignore = { -- these are not fixed size
@@ -3286,14 +3333,6 @@ local function tbuffer(...) -- helper function for sequence of types in a buffer
   return buf, len, threc(buf, 0, ...)
 end
 
--- cast socket address to actual type based on family
-local samap = {
-  [S.AF_UNIX] = t.sockaddr_un,
-  [S.AF_INET] = t.sockaddr_in,
-  [S.AF_INET6] = t.sockaddr_in6,
-  [S.AF_NETLINK] = t.sockaddr_nl,
-}
-
 -- TODO add tests
 mt.sockaddr_un = {
   __index = function(un, k)
@@ -3320,10 +3359,7 @@ local function sa(addr, addrlen)
     ffi.copy(sa, addr, addrlen)
     return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
   end
-  local st = samap[family]
-  local a = st()
-  ffi.copy(a, addr, addrlen)
-  return a
+  return addr
 end
 
 -- functions from section 3 that we use for ip addresses etc
