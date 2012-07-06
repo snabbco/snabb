@@ -3089,9 +3089,10 @@ pt.linux_dirent64 = ptt(t.linux_dirent64)
 pt.inotify_event = ptt(t.inotify_event)
 pt.ucred = ptt(t.ucred)
 
+local voidp = ffi.typeof("void *")
+
 pt.void = function(x)
-  local vp = ffi.typeof("void *")
-  return ffi.cast(vp, x)
+  return ffi.cast(voidp, x)
 end
 
 -- misc
