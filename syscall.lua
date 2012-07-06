@@ -2983,7 +2983,7 @@ mt.iovecs = {
   end,
   __newindex = function(io, k, v)
     if not ffi.istype(t.iovec, v) then v = t.iovec(v) end
-    ffi.copy(io.iov[k - 1], v, ffi.sizeof(t.iovec))
+    ffi.copy(io.iov[k - 1], v, s.iovec)
   end,
   __len = function(io) return io.count end,
   __new = function(tp, is)
