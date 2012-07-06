@@ -3095,6 +3095,23 @@ pt.void = function(x)
   return ffi.cast(voidp, x)
 end
 
+local s = {} -- type sizes
+for k, v in pairs(t) do
+  local ignore = { -- these are not fixed size
+    inotify_event = true,
+    string_array = true,
+    iocb_ptrs = true,
+    io_events = true,
+    ints = true,
+    iocbs = true,
+    iovecs = true,
+    epoll_events = true,
+    pollfds = true,
+    buffer = true,
+  }
+  if not ignore[k] then s[k] = ffi.sizeof(v) end
+end
+
 -- misc
 
 -- luaffi did need some help casting number to pointer. maybe fixed now, check.
