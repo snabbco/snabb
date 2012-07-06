@@ -2712,10 +2712,10 @@ t.sockaddr = ffi.metatype("struct sockaddr", {
 t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
   __index = function(sa, k)
     local meth = {
-      family = function(sa) return tonumber(sa.ss_family) end,
+      family = function(sa) return sa.ss_family end,
     }
     if meth[k] then return meth[k](sa) end
-    local st = samap2[tonumber(sa.ss_family)]
+    local st = samap2[sa.ss_family]
     if st then
       local cs = st(sa)
       return cs[k]
@@ -2729,7 +2729,7 @@ t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
       meth[k](sa, v)
       return
     end
-    local st = samap2[tonumber(sa.ss_family)]
+    local st = samap2[sa.ss_family]
     if st then
       local cs = st(sa)
       cs[k] = v
@@ -2741,7 +2741,7 @@ t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
     if init and init.family then family = stringflag(init.family, "AF_") end
     local st
     if family then
-      st = samap2[tonumber(family)]
+      st = samap2[family]
       ss.ss_family = family
       init.family = nil
     end
@@ -2758,7 +2758,7 @@ t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
 t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
   __index = function(sa, k)
     local meth = {
-      family = function(sa) return tonumber(sa.sin_family) end,
+      family = function(sa) return sa.sin_family end,
       port = function(sa) return S.ntohs(sa.sin_port) end,
       addr = function(sa) return sa.sin_addr end,
     }
@@ -2782,7 +2782,7 @@ t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
 t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
   __index = function(sa, k)
     local meth = {
-      family = function(sa) return tonumber(sa.sin6_family) end,
+      family = function(sa) return sa.sin6_family end,
       port = function(sa) return S.ntohs(sa.sin6_port) end,
       addr = function(sa) return sa.sin6_addr end,
     }
@@ -2806,7 +2806,7 @@ t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
 t.sockaddr_un = ffi.metatype("struct sockaddr_un", {
   __index = function(sa, k)
     local meth = {
-      family = function(sa) return tonumber(sa.un_family) end,
+      family = function(sa) return sa.un_family end,
     }
     if meth[k] then return meth[k](sa) end
   end,
@@ -2818,9 +2818,9 @@ t.sockaddr_un = ffi.metatype("struct sockaddr_un", {
 t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
   __index = function(sa, k)
     local meth = {
-      family = function(sa) return tonumber(sa.nl_family) end,
-      pid = function(sa) return tonumber(sa.nl_pid) end,
-      groups = function(sa) return tonumber(sa.nl_groups) end,
+      family = function(sa) return sa.nl_family end,
+      pid = function(sa) return sa.nl_pid end,
+      groups = function(sa) return sa.nl_groups end,
     }
     if meth[k] then return meth[k](sa) end
   end,
