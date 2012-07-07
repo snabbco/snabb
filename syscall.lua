@@ -2789,20 +2789,23 @@ t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
   end
 })
 
+meth.sockaddr_in6 = {
+  index = {
+    family = function(sa) return sa.sin6_family end,
+    port = function(sa) return S.ntohs(sa.sin6_port) end,
+    addr = function(sa) return sa.sin6_addr end,
+  },
+  newindex = {
+    port = function(sa, v) sa.sin6_port = S.htons(v) end
+  }
+}
+
 t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
   __index = function(sa, k)
-    local meth = {
-      family = function(sa) return sa.sin6_family end,
-      port = function(sa) return S.ntohs(sa.sin6_port) end,
-      addr = function(sa) return sa.sin6_addr end,
-    }
-    if meth[k] then return meth[k](sa) end
+    if meth.sockaddr_in6.index[k] then return meth.sockaddr_in6.index[k](sa) end
   end,
   __newindex = function(sa, k, v)
-    local meth = {
-      port = function(sa, v) sa.sin6_port = S.htons(v) end
-    }
-    if meth[k] then meth[k](sa, v) end
+    if meth.sockaddr_in6.newindex[k] then meth.sockaddr_in6.newindex[k](sa, v) end
   end,
   __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers. should we allow table init too?
     if not ffi.istype(t.in6_addr, addr) then
@@ -2813,12 +2816,15 @@ t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
   end
 })
 
+meth.sockaddr_un = {
+  index = {
+    family = function(sa) return sa.un_family end,
+  },
+}
+
 t.sockaddr_un = ffi.metatype("struct sockaddr_un", {
   __index = function(sa, k)
-    local meth = {
-      family = function(sa) return sa.un_family end,
-    }
-    if meth[k] then return meth[k](sa) end
+    if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end
   end,
   __new = function(tp)
     return ffi.new(tp, S.AF_UNIX)
