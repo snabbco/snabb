@@ -2707,9 +2707,7 @@ meth.sockaddr = {
 }
 
 t.sockaddr = ffi.metatype("struct sockaddr", {
-  __index = function(sa, k)
-    if meth.sockaddr.index[k] then return meth.sockaddr.index[k](sa) end
-  end
+  __index = function(sa, k) if meth.sockaddr.index[k] then return meth.sockaddr.index[k](sa) end end,
 })
 
 meth.sockaddr_storage = {
@@ -2774,12 +2772,8 @@ meth.sockaddr_in = {
 }
 
 t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
-  __index = function(sa, k)
-    if meth.sockaddr_in.index[k] then return meth.sockaddr_in.index[k](sa) end
-  end,
-  __newindex = function(sa, k, v)
-    if meth.sockaddr_in.newindex[k] then meth.sockaddr_in.newindex[k](sa, v) end
-  end,
+  __index = function(sa, k) if meth.sockaddr_in.index[k] then return meth.sockaddr_in.index[k](sa) end end,
+  __newindex = function(sa, k, v) if meth.sockaddr_in.newindex[k] then meth.sockaddr_in.newindex[k](sa, v) end end,
   __new = function(tp, port, addr)
     if not ffi.istype(t.in_addr, addr) then
       addr = t.in_addr(addr)
@@ -2801,12 +2795,8 @@ meth.sockaddr_in6 = {
 }
 
 t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
-  __index = function(sa, k)
-    if meth.sockaddr_in6.index[k] then return meth.sockaddr_in6.index[k](sa) end
-  end,
-  __newindex = function(sa, k, v)
-    if meth.sockaddr_in6.newindex[k] then meth.sockaddr_in6.newindex[k](sa, v) end
-  end,
+  __index = function(sa, k) if meth.sockaddr_in6.index[k] then return meth.sockaddr_in6.index[k](sa) end end,
+  __newindex = function(sa, k, v) if meth.sockaddr_in6.newindex[k] then meth.sockaddr_in6.newindex[k](sa, v) end end,
   __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers. should we allow table init too?
     if not ffi.istype(t.in6_addr, addr) then
       addr = t.in6_addr(addr)
@@ -2823,12 +2813,8 @@ meth.sockaddr_un = {
 }
 
 t.sockaddr_un = ffi.metatype("struct sockaddr_un", {
-  __index = function(sa, k)
-    if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end
-  end,
-  __new = function(tp)
-    return ffi.new(tp, S.AF_UNIX)
-  end
+  __index = function(sa, k) if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end end,
+  __new = function(tp) return ffi.new(tp, S.AF_UNIX) end,
 })
 
 meth.sockaddr_nl = {
@@ -2844,15 +2830,9 @@ meth.sockaddr_nl = {
 }
 
 t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
-  __index = function(sa, k)
-    if meth.sockaddr_nl.index[k] then return meth.sockaddr_nl.index[k](sa) end
-  end,
-  __newindex = function(sa, k, v)
-    if meth.sockaddr_nl.newindex[k] then meth.sockaddr_nl.newindex[k](sa, v) end
-  end,
-  __new = function(tp, pid, groups)
-    return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0)
-  end,
+  __index = function(sa, k) if meth.sockaddr_nl.index[k] then return meth.sockaddr_nl.index[k](sa) end end,
+  __newindex = function(sa, k, v) if meth.sockaddr_nl.newindex[k] then meth.sockaddr_nl.newindex[k](sa, v) end end,
+  __new = function(tp, pid, groups) return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0) end,
 })
 
 samap = {
@@ -2890,9 +2870,7 @@ meth.stat = {
 }
 
 t.stat = ffi.metatype(stattypename, { -- either struct stat on 64 bit or struct stat64 on 32 bit
-  __index = function(st, k)
-  if meth.stat.index[k] then return meth.stat.index[k](st) end
-  end
+  __index = function(st, k) if meth.stat.index[k] then return meth.stat.index[k](st) end end,
 })
 
 meth.siginfo = {
@@ -2929,12 +2907,8 @@ meth.siginfo = {
 }
 
 t.siginfo = ffi.metatype("struct siginfo", {
-  __index = function(t, k)
-    if meth.siginfo.index[k] then return meth.siginfo.index[k](t) end
-  end,
-  __newindex = function(t, k, v)
-    if meth.siginfo.newindex[k] then meth.siginfo.newindex[k](t, v) end
-  end
+  __index = function(t, k) if meth.siginfo.index[k] then return meth.siginfo.index[k](t) end end,
+  __newindex = function(t, k, v) if meth.siginfo.newindex[k] then meth.siginfo.newindex[k](t, v) end end,
 })
 
 t.macaddr = ffi.metatype("struct {uint8_t mac_addr[6];}", {
