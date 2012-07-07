@@ -2831,21 +2831,24 @@ t.sockaddr_un = ffi.metatype("struct sockaddr_un", {
   end
 })
 
+meth.sockaddr_nl = {
+  index = {
+    family = function(sa) return sa.nl_family end,
+    pid = function(sa) return sa.nl_pid end,
+    groups = function(sa) return sa.nl_groups end,
+  },
+  newindex = {
+    pid = function(sa, v) sa.nl_pid = v end,
+    groups = function(sa, v) sa.nl_groups = v end,
+  }
+}
+
 t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
   __index = function(sa, k)
-    local meth = {
-      family = function(sa) return sa.nl_family end,
-      pid = function(sa) return sa.nl_pid end,
-      groups = function(sa) return sa.nl_groups end,
-    }
-    if meth[k] then return meth[k](sa) end
+    if meth.sockaddr_nl.index[k] then return meth.sockaddr_nl.index[k](sa) end
   end,
   __newindex = function(sa, k, v)
-    local meth = {
-      pid = function(sa, v) sa.nl_pid = v end,
-      groups = function(sa, v) sa.nl_groups = v end,
-    }
-    if meth[k] then meth[k](sa, v) end
+    if meth.sockaddr_nl.newindex[k] then meth.sockaddr_nl.newindex[k](sa, v) end
   end,
   __new = function(tp, pid, groups)
     return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0)
