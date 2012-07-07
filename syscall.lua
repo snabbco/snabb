@@ -4978,7 +4978,7 @@ function S.newlink(index, msg, value)
 
   msg = stringflag(msg, "IFLA_")
 
-  local flags = "up"
+  local flags = "up" -- pass in existing flags
 
   local init = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
 
@@ -5003,7 +5003,7 @@ function S.newlink(index, msg, value)
   for k, v in pairs(init) do ifinfo[k] = v end
 
   rtattr.rta_type = msg
-  rtattr.rta_len = s.ifinfomsg + s.int -- align though, need to fix
+  rtattr.rta_len = s.rtattr + s.int
 
   int[0] = value
 

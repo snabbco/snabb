@@ -1049,7 +1049,6 @@ test_netlink = {
       fork_assert(S.newlink(i.lo.index, "mtu", 16000))
       local lo = fork_assert(S.interface("lo"))
       fork_assert(lo.flags.up, "expect lo up now")
-print(lo)
       fork_assert(lo.mtu == 16000, "expect MTU now 16000 is " .. lo.mtu)
       S.exit()
     else
