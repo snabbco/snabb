@@ -1039,6 +1039,25 @@ test_netlink = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
+  test_interface_newlink_mtu_root = function()
+    local p = assert(S.clone())
+     if p == 0 then
+      local ok, err = S.unshare("newnet")
+      if not ok then S.exit("failure") end
+      local i = fork_assert(S.interfaces())
+      fork_assert(i.lo, "expect new network ns has lo interface")
+      fork_assert(S.newlink(i.lo.index, "mtu", 16000))
+      local lo = fork_assert(S.interface("lo"))
+      fork_assert(lo.flags.up, "expect lo up now")
+print(lo)
+      fork_assert(lo.mtu == 16000, "expect MTU now 16000 is " .. lo.mtu)
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end
+  end,
+
   test_setlink_error_root = function()
     ok, err = S.setlink(-1, "up")
     assert(not ok, "expect bogus setlink to fail")
@@ -1286,7 +1305,7 @@ test_namespaces_root = {
     local p = assert(S.clone("newnet"))
     if p == 0 then
       local i = fork_assert(S.interfaces())
-      fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
+      fork_assert(i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       S.exit()
     else
       assert(S.waitpid(-1, "clone"))
@@ -1297,7 +1316,7 @@ test_namespaces_root = {
     if p == 0 then
       local ok = fork_assert(S.unshare("newnet"))
       local i = fork_assert(S.interfaces())
-      fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
+      fork_assert(i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       S.exit()
     else
       assert(S.waitpid(-1, "clone"))

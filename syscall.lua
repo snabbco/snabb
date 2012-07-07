@@ -4978,7 +4978,9 @@ function S.newlink(index, msg, value)
 
   msg = stringflag(msg, "IFLA_")
 
-  local init = {ifi_index = index, ifi_flags = 0, ifi_change = 0xffffffff}
+  local flags = "up"
+
+  local init = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
 
   local sock, err = S.socket("netlink", "raw", "route")
   if not sock then return nil, err end
