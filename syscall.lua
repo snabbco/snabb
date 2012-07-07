@@ -5021,7 +5021,7 @@ function S.newlink(index, flags, msg, value)
     tp = t.buffer(#value + 1)
   end
 
-  local buf, len, hdr, ifinfo, rtattr, val = tbuffer(t.nlmsghdr, t.ifinfomsg, t.rtattr, tp) -- only uint for MTU
+  local buf, len, hdr, ifinfo, rtattr, val = tbuffer(t.nlmsghdr, t.ifinfomsg, t.rtattr, tp)
 
   hdr.nlmsg_len = len
   hdr.nlmsg_type = S.RTM_NEWLINK
@@ -5034,7 +5034,12 @@ function S.newlink(index, flags, msg, value)
   rtattr.rta_type = msg
   rtattr.rta_len = s.rtattr + s.uint
 
-  val[0] = value
+  if not str then
+    if not ffi.istype(tp, value) then value = tp(value) end
+    val[0] = value
+  else
+    ffi.copy(val, value)
+  end
 
   local ios = t.iovecs{{buf, len}}
   local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
