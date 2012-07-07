@@ -4978,6 +4978,14 @@ function S.newlink(index, flags, msg, value)
 
   msg = stringflag(msg, "IFLA_")
 
+  local types = {
+    [S.IFLA_ADDRESS] = t.macaddr, -- correct type for most interface types at least
+    [S.IFLA_BROADCAST] = t.macaddr,
+    [S.IFLA_MTU] = t.uint,
+    [S.IFLA_LINK] = t.int,
+    [S.IFLA_IFNAME] = "asciiz",
+  }
+
   local init = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
 
   local sock, err = S.socket("netlink", "raw", "route")
@@ -4990,7 +4998,17 @@ function S.newlink(index, flags, msg, value)
 
   local k = t.sockaddr_nl() -- kernel destination
 
-  local buf, len, hdr, ifinfo, rtattr, int = tbuffer(t.nlmsghdr, t.ifinfomsg, t.rtattr, t.int) -- only int for MTU
+  local tp = types[msg]
+  if not tp then error("unknown message type") end
+
+  local str = false
+
+  if tp == "asciiz" then
+    str = true
+    tp = t.buffer(#value + 1)
+  end
+
+  local buf, len, hdr, ifinfo, rtattr, val = tbuffer(t.nlmsghdr, t.ifinfomsg, t.rtattr, tp) -- only uint for MTU
 
   hdr.nlmsg_len = len
   hdr.nlmsg_type = S.RTM_NEWLINK
@@ -5001,9 +5019,9 @@ function S.newlink(index, flags, msg, value)
   for k, v in pairs(init) do ifinfo[k] = v end
 
   rtattr.rta_type = msg
-  rtattr.rta_len = s.rtattr + s.int
+  rtattr.rta_len = s.rtattr + s.uint
 
-  int[0] = value
+  val[0] = value
 
   local ios = t.iovecs{{buf, len}}
   local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
