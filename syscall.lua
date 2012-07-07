@@ -3234,6 +3234,7 @@ pt.sockaddr_un = ptt(t.sockaddr_un)
 pt.sockaddr_in = ptt(t.sockaddr_in)
 pt.sockaddr_in6 = ptt(t.sockaddr_in6)
 pt.sockaddr_nl = ptt(t.sockaddr_nl)
+pt.macaddr = ptt(t.macaddr)
 
 local voidp = ffi.typeof("void *")
 
@@ -3261,7 +3262,9 @@ for k, v in pairs(t) do
     pollfds = true,
     buffer = true,
   }
-  if not ignore[k] then s[k] = ffi.sizeof(v) end
+  if not ignore[k] then
+    s[k] = ffi.sizeof(v)
+  end
 end
 
 -- misc
