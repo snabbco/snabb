@@ -2713,6 +2713,9 @@ meth.sockaddr_storage = {
   index = {
     family = function(sa) return sa.ss_family end,
   },
+  newindex = {
+    family = function(sa, v) sa.ss_family = stringflag(v, "AF_") end,
+  }
 }
 
 -- experiment, see if we can use this as generic type, to avoid allocations.
@@ -2726,11 +2729,8 @@ t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
     end
   end,
   __newindex = function(sa, k, v)
-    local meth = {
-      family = function(sa, v) sa.ss_family = stringflag(v, "AF_") end,
-    }
-    if meth[k] then
-      meth[k](sa, v)
+    if meth.sockaddr_storage.newindex[k] then
+      meth.sockaddr_storage.newindex[k](sa, v)
       return
     end
     local st = samap2[sa.ss_family]
