@@ -2862,10 +2862,9 @@ samap = {
   [S.AF_NETLINK] = t.sockaddr_nl,
 }
 
-t.stat = ffi.metatype(stattypename, { -- either struct stat on 64 bit or struct stat64 on 32 bit
-  __index = function(st, k)
-  local meth = {
-    dev = function(st) return tonumber(st.st_dev) end, -- TODO some of these tonumbers not needed
+meth.stat = {
+  index = {
+    dev = function(st) return tonumber(st.st_dev) end,
     ino = function(st) return tonumber(st.st_ino) end,
     mode = function(st) return tonumber(st.st_mode) end,
     nlink = function(st) return tonumber(st.st_nlink) end,
@@ -2886,15 +2885,18 @@ t.stat = ffi.metatype(stattypename, { -- either struct stat on 64 bit or struct 
     isblk = function(st) return S.S_ISBLK(st.st_mode) end,
     isfifo = function(st) return S.S_ISFIFO(st.st_mode) end,
     islnk = function(st) return S.S_ISLNK(st.st_mode) end,
-    issock = function(st) return S.S_ISSOCK(st.st_mode) end
+    issock = function(st) return S.S_ISSOCK(st.st_mode) end,
   }
-  if meth[k] then return meth[k](st) end
+}
+
+t.stat = ffi.metatype(stattypename, { -- either struct stat on 64 bit or struct stat64 on 32 bit
+  __index = function(st, k)
+  if meth.stat.index[k] then return meth.stat.index[k](st) end
   end
 })
 
-t.siginfo = ffi.metatype("struct siginfo", {
-  __index = function(t, k)
-  local siginfo_get = {
+meth.siginfo = {
+  index = {
     si_pid     = function(s) return s.sifields.kill.si_pid end,
     si_uid     = function(s) return s.sifields.kill.si_uid end,
     si_timerid = function(s) return s.sifields.timer.si_tid end,
@@ -2908,11 +2910,8 @@ t.siginfo = ffi.metatype("struct siginfo", {
     si_addr    = function(s) return s.sifields.sigfault.si_addr end,
     si_band    = function(s) return s.sifields.sigpoll.si_band end,
     si_fd      = function(s) return s.sifields.sigpoll.si_fd end,
-  }
-  if siginfo_get[k] then return siginfo_get[k](t) end
-  end,
-  __newindex = function(t, k, v)
-  local siginfo_set = {
+  },
+  newindex = {
     si_pid     = function(s, v) s.sifields.kill.si_pid = v end,
     si_uid     = function(s, v) s.sifields.kill.si_uid = v end,
     si_timerid = function(s, v) s.sifields.timer.si_tid = v end,
@@ -2927,7 +2926,14 @@ t.siginfo = ffi.metatype("struct siginfo", {
     si_band    = function(s, v) s.sifields.sigpoll.si_band = v end,
     si_fd      = function(s, v) s.sifields.sigpoll.si_fd = v end,
   }
-  if siginfo_set[k] then siginfo_set[k](t, v) end
+}
+
+t.siginfo = ffi.metatype("struct siginfo", {
+  __index = function(t, k)
+    if meth.siginfo.index[k] then return meth.siginfo.index[k](t) end
+  end,
+  __newindex = function(t, k, v)
+    if meth.siginfo.newindex[k] then meth.siginfo.newindex[k](t, v) end
   end
 })
 
