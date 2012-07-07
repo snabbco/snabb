@@ -2998,14 +2998,15 @@ local function itnormal(v)
   return v
 end
 
-t.itimerspec = ffi.metatype("struct itimerspec", {
-  __index = function(it, k)
-  local meth = {
+meth.itimerspec = {
+  index = {
     interval = function(it) return it.it_interval end,
-    value = function(it) return it.it_value end
+    value = function(it) return it.it_value end,
   }
-  return meth[k](it)
-  end,
+}
+
+t.itimerspec = ffi.metatype("struct itimerspec", {
+  __index = function(it, k) if meth.itimerspec.index[k] then return meth.itimerspec.index[k](it) end end,
   __new = function(tp, v)
     v = itnormal(v)
     if not ffi.istype(t.timespec, v.it_interval) then v.it_interval = t.timespec(v.it_interval) end
