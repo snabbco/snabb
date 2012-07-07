@@ -5032,7 +5032,7 @@ function S.newlink(index, flags, msg, value)
   for k, v in pairs(init) do ifinfo[k] = v end
 
   rtattr.rta_type = msg
-  rtattr.rta_len = s.rtattr + s.uint
+  rtattr.rta_len = s.rtattr + ffi.sizeof(tp)
 
   if not str then
     if not ffi.istype(tp, value) then value = tp(value) end
