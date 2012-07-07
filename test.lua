@@ -1376,11 +1376,18 @@ test_root = {
     S.acct() -- may not be configured
   end,
   test_sethostname = function()
-    local hh = "testhostname"
-    local h = assert(S.gethostname())
-    assert(S.sethostname(hh))
-    assert(hh == assert(S.gethostname()))
-    assert(S.sethostname(h))
+    local p = assert(S.clone())
+    if p == 0 then
+      local ok, err = S.unshare("newuts")
+      if not ok then S.exit("failure") end
+      local hh = "testhostname"
+      fork_assert(S.sethostname(hh))
+      fork_assert(hh == assert(S.gethostname()))
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end
   end,
   test_bridge = function()
     local ok, err = S.bridge_add("br999")
