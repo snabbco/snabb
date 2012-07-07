@@ -1012,7 +1012,7 @@ test_netlink = {
       local ok, err = S.unshare("newnet")
       if err then S.exit("failure") end -- may happen with no kernel support
       local i = fork_assert(S.interfaces())
-      fork_assert(#i == 1 and i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
+      fork_assert(i.lo and not i.lo.flags.up, "expect new network ns has down lo interface")
       fork_assert(S.setlink(i.lo.index, "up"))
       local lo = fork_assert(S.interface("lo"))
       fork_assert(lo.flags.up, "expect lo up now")
@@ -1028,8 +1028,6 @@ test_netlink = {
       local ok, err = S.unshare("newnet")
       if not ok then S.exit("failure") end
       local i = fork_assert(S.interfaces())
-      if #i ~= 1 then for _, v in ipairs(i) do print("saw interface " .. v.name) end end
-      fork_assert(#i == 1, "expect new network ns only has one interface")
       fork_assert(i.lo, "expect new network ns has lo interface")
       fork_assert(not i.lo.flags.up, "expect new network lo is down")
       fork_assert(i.lo:setflags("up"))
