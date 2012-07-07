@@ -496,6 +496,7 @@ test_sockets_pipes = {
     sa.pid = 3
     assert_equal(sa.pid, 3, "should get pid back")
     sa.family = "inet"
+    assert_equal(sa:family(), S.AF_INET, "inet family")
     sa.port = 4
     assert_equal(sa.port, 4, "should get port back")
   end,
