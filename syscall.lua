@@ -4973,12 +4973,10 @@ function S.getlink()
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, t.rtgenmsg, {rtgen_family = S.AF_PACKET})
 end
 
-function S.newlink(index, msg, value)
+function S.newlink(index, flags, msg, value)
   -- TODO merge into nlmsg once working, duplicated code for now.
 
   msg = stringflag(msg, "IFLA_")
-
-  local flags = "up" -- pass in existing flags
 
   local init = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
 

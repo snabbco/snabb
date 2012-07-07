@@ -1045,11 +1045,11 @@ test_netlink = {
       local ok, err = S.unshare("newnet")
       if not ok then S.exit("failure") end
       local i = fork_assert(S.interfaces())
-      fork_assert(i.lo, "expect new network ns has lo interface")
-      fork_assert(S.newlink(i.lo.index, "mtu", 16000))
+      fork_assert(i.lo and not i.lo.flags.up, "expect new network ns has down lo interface")
+      fork_assert(S.newlink(i.lo.index, "up", "mtu", 16000))
       local lo = fork_assert(S.interface("lo"))
       fork_assert(lo.flags.up, "expect lo up now")
-      fork_assert(lo.mtu == 16000, "expect MTU now 16000 is " .. lo.mtu)
+      fork_assert(lo.mtu == 16000, "expect MTU now 16000")
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
