@@ -2918,7 +2918,17 @@ t.macaddr = ffi.metatype("struct {uint8_t mac_addr[6];}", {
       hex[i] = string.format("%02x", m.mac_addr[i - 1])
     end
     return table.concat(hex, ":")
-  end
+  end,
+  __new = function(tp, str)
+    local mac = ffi.new(tp)
+    if str then
+      for i = 1, 6 do
+        local n = tonumber(str:sub(i * 3 - 2, i * 3 - 1), 16) -- TODO more checks on syntax
+        mac.mac_addr[i - 1] = n
+      end
+    end
+    return mac
+  end,
 })
 
 meth.timeval = {
