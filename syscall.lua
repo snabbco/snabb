@@ -2708,12 +2708,13 @@ t.sockaddr = ffi.metatype("struct sockaddr", {
   end
 })
 
+local meth = {
+  family = function(sa) return sa.ss_family end,
+}
+
 -- experiment, see if we can use this as generic type, to avoid allocations.
 t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
   __index = function(sa, k)
-    local meth = {
-      family = function(sa) return sa.ss_family end,
-    }
     if meth[k] then return meth[k](sa) end
     local st = samap2[sa.ss_family]
     if st then
