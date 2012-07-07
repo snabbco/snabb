@@ -2708,6 +2708,7 @@ t.sockaddr = ffi.metatype("struct sockaddr", {
   end
 })
 
+-- TODO more generic cleanup of these
 local meth = {
   family = function(sa) return sa.ss_family end,
 }
