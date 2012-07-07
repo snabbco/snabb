@@ -1,5 +1,8 @@
 #!/usr/bin/env luajit
--- Copyright 2012 Snabb Gmbh.
+-- Copyright 2012 Snabb GmbH
+
+module(..,package.seeall)
+require("pcap")
 
 local ffi = require("ffi")
 local C = ffi.C
@@ -82,7 +85,7 @@ pcap_file.snaplen = 65535
 pcap_file.network = 1
 
 print("writing pcap file..")
-file = io.open("/tmp/x.pcap", "w")
+file = io.open("/tmp/x.pcap", "w+")
 file:write(ffi.string(pcap_file, ffi.sizeof(pcap_file)))
 
 local pcap_record = ffi.new("struct pcap_record")
