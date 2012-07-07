@@ -2708,21 +2708,19 @@ t.sockaddr = ffi.metatype("struct sockaddr", {
   end
 })
 
--- TODO more generic cleanup of these
-local meth = {
-  family = function(sa) return sa.ss_family end,
-}
-
 -- experiment, see if we can use this as generic type, to avoid allocations.
 t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
-  __index = function(sa, k)
-    if meth[k] then return meth[k](sa) end
-    local st = samap2[sa.ss_family]
-    if st then
-      local cs = st(sa)
-      return cs[k]
+  __index = setmetatable({
+    family = function(sa) return sa.ss_family end,
+  }, {
+    __index = function(sa, k)
+      local st = samap2[sa.ss_family]
+      if st then
+        local cs = st(sa)
+        return cs[k]
+      end
     end
-  end,
+  }),
   __newindex = function(sa, k, v)
     local meth = {
       family = function(sa, v) sa.ss_family = stringflag(v, "AF_") end,
@@ -5324,7 +5322,7 @@ mt.proc = {
   end,
   __tostring = function(p) -- TODO decide what to print
     local c = p.cmdline
-    if #c == 0 and p.comm and #p.comm > 0 then c = '[' .. p.comm:sub(1, -2) .. ']' end 
+    if c and #c == 0 and p.comm and #p.comm > 0 then c = '[' .. p.comm:sub(1, -2) .. ']' end 
     return p.pid .. '  ' .. c
   end
 }
