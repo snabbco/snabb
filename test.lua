@@ -1390,23 +1390,26 @@ test_root = {
     end
   end,
   test_bridge = function()
-    local ok, err = S.bridge_add("br999")
-    assert(ok or err.ENOPKG, err)
-    if ok then
-      assert(S.stat("/sys/class/net/br999"))
-      --assert(S.bridge_add_interface("br999", "eth0")) -- failing on test machine as already in another bridge!
-
-      local b = assert(S.bridge_list())
-      assert(b.br999 and b.br999.bridge.root_id, "expect to find bridge in list")
-
-      --print(b.br0.brforward[1].mac_addr, b.br0.brforward[2].mac_addr, b.br0.brforward[3].mac_addr)
-
-      --for k, v in pairs(b.br999.bridge) do print(k, v) end
-
-      assert(S.bridge_del("br999"))
-      ok = S.stat("/sys/class/net/br999")
-      assert(not ok, "bridge should be gone")
-    end
+    local p = assert(S.clone())
+    if p == 0 then
+      local ok, err = S.unshare("newnet")
+      if not ok then S.exit("failure") end
+      ok, err = S.bridge_add("br999")
+      fork_assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
+      if ok then
+        local i = fork_assert(S.interfaces())
+        fork_assert(i.br999)
+        local b = fork_assert(S.bridge_list())
+        --fork_assert(b.br999 and b.br999.bridge.root_id, "expect to find bridge in list") -- not shown in this /sys mount
+        fork_assert(S.bridge_del("br999"))
+        i = fork_assert(S.interfaces())
+        fork_assert(not i.br999, "bridge should be gone")
+      end
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end  
   end,
   test_chroot = function()
     assert(S.chroot("/"))
