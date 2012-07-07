@@ -2708,19 +2708,23 @@ t.sockaddr = ffi.metatype("struct sockaddr", {
   end
 })
 
+local meth = {}
+meth.sockaddr_storage = {
+  index = {
+    family = function(sa) return sa.ss_family end,
+  },
+}
+
 -- experiment, see if we can use this as generic type, to avoid allocations.
 t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
-  __index = setmetatable({
-    family = function(sa) return sa.ss_family end,
-  }, {
-    __index = function(sa, k)
-      local st = samap2[sa.ss_family]
-      if st then
-        local cs = st(sa)
-        return cs[k]
-      end
+  __index = function(sa, k)
+    if meth.sockaddr_storage.index[k] then return meth.sockaddr_storage.index[k](sa) end
+    local st = samap2[sa.ss_family]
+    if st then
+      local cs = st(sa)
+      return cs[k]
     end
-  }),
+  end,
   __newindex = function(sa, k, v)
     local meth = {
       family = function(sa, v) sa.ss_family = stringflag(v, "AF_") end,
@@ -2765,7 +2769,7 @@ t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
     if meth[k] then return meth[k](sa) end
   end,
   __newindex = function(sa, k, v)
-    meth = {
+    local meth = {
       port = function(sa, v) sa.sin_port = S.htons(v) end
     }
     if meth[k] then meth[k](sa, v) end
@@ -2789,7 +2793,7 @@ t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
     if meth[k] then return meth[k](sa) end
   end,
   __newindex = function(sa, k, v)
-    meth = {
+    local meth = {
       port = function(sa, v) sa.sin6_port = S.htons(v) end
     }
     if meth[k] then meth[k](sa, v) end
