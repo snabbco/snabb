@@ -15,6 +15,7 @@ S.t = t
 S.pt = pt
 S.s = s
 local mt = {} -- metatables
+local meth = {}
 
 -- convenience so user need not require ffi
 S.string = ffi.string
@@ -2699,16 +2700,18 @@ t.error = ffi.metatype("struct {int errno;}", {
 -- cast socket address to actual type based on family
 local samap, samap2 = {}, {}
 
+meth.sockaddr = {
+  index = {
+    family = function(sa) return sa.sa_family end,
+  }
+}
+
 t.sockaddr = ffi.metatype("struct sockaddr", {
   __index = function(sa, k)
-    local meth = {
-      family = function(sa) return sa.sa_family end,
-    }
-    if meth[k] then return meth[k](sa) end
+    if meth.sockaddr.index[k] then return meth.sockaddr.index[k](sa) end
   end
 })
 
-local meth = {}
 meth.sockaddr_storage = {
   index = {
     family = function(sa) return sa.ss_family end,
@@ -2759,20 +2762,23 @@ t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
   end,
 })
 
+meth.sockaddr_in = {
+  index = {
+    family = function(sa) return sa.sin_family end,
+    port = function(sa) return S.ntohs(sa.sin_port) end,
+    addr = function(sa) return sa.sin_addr end,
+  },
+  newindex = {
+    port = function(sa, v) sa.sin_port = S.htons(v) end
+  }
+}
+
 t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
   __index = function(sa, k)
-    local meth = {
-      family = function(sa) return sa.sin_family end,
-      port = function(sa) return S.ntohs(sa.sin_port) end,
-      addr = function(sa) return sa.sin_addr end,
-    }
-    if meth[k] then return meth[k](sa) end
+    if meth.sockaddr_in.index[k] then return meth.sockaddr_in.index[k](sa) end
   end,
   __newindex = function(sa, k, v)
-    local meth = {
-      port = function(sa, v) sa.sin_port = S.htons(v) end
-    }
-    if meth[k] then meth[k](sa, v) end
+    if meth.sockaddr_in.newindex[k] then meth.sockaddr_in.newindex[k](sa, v) end
   end,
   __new = function(tp, port, addr)
     if not ffi.istype(t.in_addr, addr) then
