@@ -4973,8 +4973,54 @@ function S.getlink()
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, t.rtgenmsg, {rtgen_family = S.AF_PACKET})
 end
 
-function S.newlink()
-  --return nlmsg(S.RTM_NEWLINK, 
+function S.newlink(index, msg, value)
+  -- TODO merge into nlmsg once working, duplicated code for now.
+
+  msg = stringflag(msg, "IFLA_")
+
+  local init = {ifi_index = index, ifi_flags = 0, ifi_change = 0xffffffff}
+
+  local sock, err = S.socket("netlink", "raw", "route")
+  if not sock then return nil, err end
+  local a = t.sockaddr_nl() -- kernel will fill in address
+  local ok, err = sock:bind(a)
+  if not ok then return nil, err end -- gc will take care of closing socket...
+  a = sock:getsockname() -- to get bound address
+  if not a then return nil, err end -- gc will take care of closing socket...
+
+  local k = t.sockaddr_nl() -- kernel destination
+
+  local buf, len, hdr, ifinfo, rtattr, int = tbuffer(t.nlmsghdr, t.ifinfomsg, t.rtattr, t.int) -- only int for MTU
+
+  hdr.nlmsg_len = len
+  hdr.nlmsg_type = S.RTM_NEWLINK
+  hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_ACK
+  hdr.nlmsg_seq = sock:seq()
+  hdr.nlmsg_pid = a.pid
+
+  for k, v in pairs(init) do ifinfo[k] = v end
+
+  rtattr.rta_type = msg
+  rtattr.rta_len = s.ifinfomsg + s.int -- align though, need to fix
+
+  int[0] = value
+
+  local ios = t.iovecs{{buf, len}}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
+
+  local n, err = sock:sendmsg(m)
+  if not n then return nil, err end
+
+  local r, err = S.nlmsg_read(sock, k)
+  if not r then
+    sock:close()
+    return nil, err
+  end
+
+  local ok, err = sock:close()
+  if not ok then return nil, err end
+
+  return r
 end
 
 function S.setlink(index, flags)
