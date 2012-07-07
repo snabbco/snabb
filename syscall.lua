@@ -3016,16 +3016,10 @@ t.itimerspec = ffi.metatype("struct itimerspec", {
 })
 
 t.itimerval = ffi.metatype("struct itimerval", {
-  __index = function(it, k)
-  local meth = {
-    interval = function(it) return it.it_interval end,
-    value = function(it) return it.it_value end
-  }
-  return meth[k](it)
-  end,
+  __index = function(it, k) if meth.itimerspec.index[k] then return meth.itimerspec.index[k](it) end end, -- can use same meth
   __new = function(tp, v)
     v = itnormal(v)
-   if not ffi.istype(t.timeval, v.it_interval) then v.it_interval = t.timeval(v.it_interval) end
+    if not ffi.istype(t.timeval, v.it_interval) then v.it_interval = t.timeval(v.it_interval) end
     if not ffi.istype(t.timeval, v.it_value) then v.it_value = t.timeval(v.it_value) end
     return ffi.new(tp, v)
   end
@@ -4776,20 +4770,23 @@ mt.iflinks = {
   end
 }
 
+meth.iflink = {
+  index = {
+    family = function(i) return tonumber(i.ifinfo.ifi_family) end,
+    type = function(i) return tonumber(i.ifinfo.ifi_type) end,
+    typename = function(i)
+      local n = S.encapnames[i.type]
+      return n or 'unknown ' ..i.type
+    end,
+    index = function(i) return tonumber(i.ifinfo.ifi_index) end,
+    flags = function(i) return setmetatable({flags = tonumber(i.ifinfo.ifi_flags)}, mt.iff) end,
+    change = function(i) return tonumber(i.ifinfo.ifi_change) end,
+  }
+}
+
 mt.iflink = {
   __index = function(i, k)
-    local meth = {
-      family = function(i) return tonumber(i.ifinfo.ifi_family) end,
-      type = function(i) return tonumber(i.ifinfo.ifi_type) end,
-      typename = function(i)
-        local n = S.encapnames[i.type]
-        return n or 'unknown ' ..i.type
-      end,
-      index = function(i) return tonumber(i.ifinfo.ifi_index) end,
-      flags = function(i) return setmetatable({flags = tonumber(i.ifinfo.ifi_flags)}, mt.iff) end,
-      change = function(i) return tonumber(i.ifinfo.ifi_change) end,
-    }
-    if meth[k] then return meth[k](i) end
+    if meth.iflink.index[k] then return meth.iflink.index[k](i) end
     local fn = {
       setflags = S.setlink
     }
@@ -4815,16 +4812,19 @@ mt.iflink = {
   end
 }
 
+meth.ifaddr = {
+  index = {
+    family = function(i) return tonumber(i.ifaddr.ifa_family) end,
+    prefixlen = function(i) return tonumber(i.ifaddr.ifa_prefixlen) end,
+    index = function(i) return tonumber(i.ifaddr.ifa_index) end,
+    flags = function(i) return tonumber(i.ifaddr.ifa_flags) end,
+    scope = function(i) return tonumber(i.ifaddr.ifa_scope) end,
+  }
+}
+
 mt.ifaddr = {
   __index = function(i, k)
-    local meth = {
-      family = function(i) return tonumber(i.ifaddr.ifa_family) end,
-      prefixlen = function(i) return tonumber(i.ifaddr.ifa_prefixlen) end,
-      index = function(i) return tonumber(i.ifaddr.ifa_index) end,
-      flags = function(i) return tonumber(i.ifaddr.ifa_flags) end,
-      scope = function(i) return tonumber(i.ifaddr.ifa_scope) end,
-    }
-    if meth[k] then return meth[k](i) end
+    if meth.ifaddr.index[k] then return meth.ifaddr.index[k](i) end
     local prefix = "IFA_F_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return bit.band(i.ifaddr.ifa_flags, S[k]) ~= 0 end
