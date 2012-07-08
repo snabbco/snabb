@@ -5013,6 +5013,18 @@ function S.getlink()
   return nlmsg2(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, getlink_f)
 end
 
+-- this seems to work fine with NEWLINK, despite some people saying, so could merge in.
+local function setlink_f(index, flags)
+  if type(index) == 'table' then index = index.index end
+  local buf, len, hdr, ifinfomsg = nlmsgbuffer(t.ifinfomsg)
+  ifinfomsg[0] = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
+  return buf, len
+end
+
+function S.setlink(index, flags) 
+  return nlmsg2(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, setlink_f, index, flags)
+end
+
 -- newlink
 local function newlink_f(index, flags, msg, value)
   msg = stringflag(msg, "IFLA_")
@@ -5097,12 +5109,6 @@ local function nlmsg(ntype, flags, tp, init) -- will need more structures, possi
 end
 
 
--- this seems to work fine with NEWLINK, despite some people saying, so could merge in.
-function S.setlink(index, flags) 
-  if type(index) == 'table' then index = index.index end
-  return nlmsg(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg,
-    {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff})
-end
 
 --[[
 function S.newlink(index, flags, msg, value)
