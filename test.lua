@@ -1099,6 +1099,29 @@ test_netlink = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
+  test_interface_dellink_root = function()
+    -- using bridge to test this as no other interface in container yet
+    -- unfortunately netlink cannot delete bridges so no use.
+    -- TODO create some other kind of interface we can delete
+    local p = assert(S.clone())
+    if p == 0 then
+      local ok, err = S.unshare("newnet")
+      if not ok then S.exit("failure") end
+      ok, err = S.bridge_add("br0")
+      fork_assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
+      if ok then
+        local i = fork_assert(S.interfaces())
+        fork_assert(i.br0)
+        --fork_assert(S.dellink(i.br0.index))
+        i = fork_assert(S.interfaces())
+        --fork_assert(not i.br0, "expect interface deleted")
+      end
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end
+  end,
   test_setlink_error_root = function()
     local ok, err = S.setlink(-1, "up")
     assert(not ok, "expect bogus setlink to fail")

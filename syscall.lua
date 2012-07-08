@@ -4987,6 +4987,19 @@ function S.getlink()
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, t.rtgenmsg, {rtgen_family = S.AF_PACKET})
 end
 
+-- remove interface
+function S.dellink(index)
+  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg,
+    {ifi_index = index, ifi_flags = 0, ifi_change = 0xffffffff})
+end
+
+-- this seems to work fine with NEWLINK, despite some people saying, so could merge in.
+function S.setlink(index, flags) 
+  if type(index) == 'table' then index = index.index end
+  return nlmsg(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg,
+    {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff})
+end
+
 function S.newlink(index, flags, msg, value)
   -- TODO merge into nlmsg once working, duplicated code for now.
 
@@ -5058,12 +5071,6 @@ function S.newlink(index, flags, msg, value)
   if not ok then return nil, err end
 
   return r
-end
-
-function S.setlink(index, flags) -- this seems to work fine with NEWLINK, despite some people saying 
-  if type(index) == 'table' then index = index.index end
-  return nlmsg(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg,
-    {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff})
 end
 
 function S.interfaces() -- returns with address info too.
