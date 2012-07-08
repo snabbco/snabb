@@ -12,11 +12,12 @@ module(...,package.seeall)
 
 require("shm")
 
-local ffi = require("ffi")
+local ffi  = require("ffi")
 local fabric = ffi.load("fabric")
-local dev = fabric.open_shm("/tmp/ba")
-local c   = require("c")
-local C = ffi.C
+local dev  = fabric.open_shm("/tmp/ba")
+local c    = require("c")
+local port = require("port")
+local C    = ffi.C
 
 -- Ethernet frame format
 
@@ -31,8 +32,11 @@ ffi.cdef[[
 -- Counters
 
 -- Switch ports
-local ports = {fabric.open_shm("/tmp/a"),
-	       fabric.open_shm("/tmp/b")}
+local ports = { port.new("a", "/tmp/a"),
+		port.new("b", "/tmp/b") }
+
+ports[1]:trace("/tmp/a.pcap")
+ports[2]:trace("/tmp/b.pcap")
 
 -- Switch logic
 local fdb = {} -- { MAC -> [Port] }
@@ -41,21 +45,17 @@ function main ()
    while true do
       -- print("Main loop")
       for _,port in ipairs(ports) do
-	 local ring = port.vm2host
-	 if shm.available(ring) then
-	    local packet = makepacket(port,
-				      ring.packets[ring.head].length,
-				      ring.packets[ring.head].data)
+	 if port:available() then
+	    local frame = port:receive()
+	    local packet = makepacket(port, frame.data, frame.length)
 	    input(packet)
-	    shm.advance_head(ring)
 	 end
       end
       C.usleep(100000)
    end
 end
 
-function makepacket (inputport, length, data)
-   print "makepacket"
+function makepacket (inputport, data, length)
    return {inputport = inputport,
 	   length    = length,
 	   data      = data,
@@ -73,23 +73,7 @@ end
 function output (packet)
    print("Sending packet to " .. #fdb:lookup(packet))
    for _,port in ipairs(fdb:lookup(packet)) do
-      transmit(packet, port)
-   end
-end
-
--- Transmit PACKET onto PORT.
-function transmit (packet, port)
-   -- Make a full copy to keep it simple
-   local txring = port.host2vm
-   if not shm.full(txring) then
-      print "tx"
-      C.memcpy(txring.packets[txring.tail].data,
-	       packet.data,
-	       packet.length)
-      txring.packets[txring.tail].length = packet.length
-      shm.advance_tail(txring)
-   else
-      print "full"
+      if not port:transmit(packet, port) then print "TX overflow" end
    end
 end
 
@@ -105,14 +89,5 @@ function fdb:lookup (packet)
    else
       return ports
    end
-end
-
--- Utils
-
-function mac2string (mac)
-   return ((string.gsub(string, ".",
-                        function (c)
-                           return string.format("%02X:", string.byte(c))
-                        end)))
 end
 

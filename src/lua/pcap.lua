@@ -36,6 +36,7 @@ function write_file_header(file)
    pcap_file.snaplen = 65535
    pcap_file.network = 1
    file:write(ffi.string(pcap_file, ffi.sizeof(pcap_file)))
+   file:flush()
 end
 
 function write_record(file, ffi_buffer, length)
@@ -44,5 +45,6 @@ function write_record(file, ffi_buffer, length)
    pcap_record.orig_len = length
    file:write(ffi.string(pcap_record, ffi.sizeof(pcap_record)))
    file:write(ffi.string(ffi_buffer, length))
+   file:flush()
 end
 
