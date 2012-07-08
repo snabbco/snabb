@@ -4980,6 +4980,8 @@ local function nlmsg2(ntype, flags, f, ...)
   return r
 end
 
+-- TODO these should be renamed or made more general, or abstracted, as we add more functionality
+
 -- read addresses from interface
 local function getaddr_f(af)
   local buf, len, hdr, ifaddrmsg = nlmsgbuffer(t.ifaddrmsg)
