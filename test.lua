@@ -1079,7 +1079,7 @@ test_netlink = {
     end
   end,
   test_interface_newlink_macaddr_root = function()
-    -- using bridge to test this as no other interface in container yet and not sure you can rename lo
+    -- using bridge to test this as no other interface in container yet
     local p = assert(S.clone())
     if p == 0 then
       local ok, err = S.unshare("newnet")
