@@ -4991,6 +4991,17 @@ function S.getaddr(af)
   return nlmsg2(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, getaddr_f, af)
 end
 
+-- remove interface
+local function dellink_f(index)
+  local buf, len, hdr, ifinfomsg = nlmsgbuffer(t.ifinfomsg)
+  ifinfomsg[0] = {ifi_index = index, ifi_flags = 0, ifi_change = 0xffffffff}
+  return buf, len
+end
+
+function S.dellink(index)
+  return nlmsg2(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f)
+end
+
 -- read interfaces and details.
 local function getlink_f()
   local buf, len, hdr, rtgenmsg = nlmsgbuffer(t.rtgenmsg)
@@ -5000,6 +5011,49 @@ end
 
 function S.getlink()
   return nlmsg2(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, getlink_f)
+end
+
+-- newlink
+local function newlink_f(index, flags, msg, value)
+  msg = stringflag(msg, "IFLA_")
+
+  local types = {
+    [S.IFLA_ADDRESS] = t.macaddr, -- correct type for most interface types at least
+    [S.IFLA_BROADCAST] = t.macaddr,
+    [S.IFLA_MTU] = t.uint,
+    [S.IFLA_LINK] = t.int,
+    [S.IFLA_IFNAME] = "asciiz", -- TODO should be able to use t.buffer with some changes
+  }
+
+  local tp = types[msg]
+  if not tp then error("unknown message type") end
+
+  local str = false
+
+  if tp == "asciiz" then
+    str = true
+    tp = t.buffer(#value + 1)
+  end
+
+  local init = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
+
+  local buf, len, hdr, ifinfo, rtattr, val = nlmsgbuffer(t.ifinfomsg, t.rtattr, tp)
+
+  ifinfo[0] = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
+  rtattr[0] = {rta_type = msg, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
+
+  if not str then
+    if not ffi.istype(tp, value) then value = tp(value) end
+    val[0] = value
+  else
+    ffi.copy(val, value)
+  end
+
+  return buf, len
+end
+
+function S.newlink(index, flags, msg, value)
+  return nlmsg2(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, index, flags, msg, value)
 end
 
 -- initial abstraction, expand later
@@ -5042,11 +5096,6 @@ local function nlmsg(ntype, flags, tp, init) -- will need more structures, possi
   return r
 end
 
--- remove interface
-function S.dellink(index)
-  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg,
-    {ifi_index = index, ifi_flags = 0, ifi_change = 0xffffffff})
-end
 
 -- this seems to work fine with NEWLINK, despite some people saying, so could merge in.
 function S.setlink(index, flags) 
@@ -5055,6 +5104,7 @@ function S.setlink(index, flags)
     {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff})
 end
 
+--[[
 function S.newlink(index, flags, msg, value)
   -- TODO merge into nlmsg once working, duplicated code for now.
 
@@ -5126,6 +5176,7 @@ function S.newlink(index, flags, msg, value)
 
   return r
 end
+]]
 
 function S.interfaces() -- returns with address info too.
   local ifs, err = S.getlink()

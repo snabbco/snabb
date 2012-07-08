@@ -1099,7 +1099,7 @@ test_netlink = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
-  test_interface_dellink_root = function()
+  test_interface_dellink_fail_root = function()
     -- using bridge to test this as no other interface in container yet
     -- unfortunately netlink cannot delete bridges so no use.
     -- TODO create some other kind of interface we can delete
@@ -1112,7 +1112,8 @@ test_netlink = {
       if ok then
         local i = fork_assert(S.interfaces())
         fork_assert(i.br0)
-        --fork_assert(S.dellink(i.br0.index))
+        ok, err = S.dellink(i.br0.index) -- fails, cannot delete bridge
+        fork_assert(err.EINVAL, "expect cannot delete bridge")
         i = fork_assert(S.interfaces())
         --fork_assert(not i.br0, "expect interface deleted")
       end
