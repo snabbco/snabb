@@ -5049,8 +5049,6 @@ local function newlink_f(index, flags, msg, value)
     tp = t.buffer(#value + 1)
   end
 
-  local init = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
-
   local buf, len, hdr, ifinfo, rtattr, val = nlmsgbuffer(t.ifinfomsg, t.rtattr, tp)
 
   ifinfo[0] = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
