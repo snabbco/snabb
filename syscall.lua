@@ -4937,6 +4937,59 @@ function S.nlmsg_read(s, addr, bufsize) -- maybe we create the sockaddr?
   return r
 end
 
+local function nlmsgbuffer(...)
+  return tbuffer(nlmsg_align(1), t.nlmsghdr, ...)
+end
+
+local function nlmsg2(ntype, flags, f, ...)
+  local sock, err = S.socket("netlink", "raw", "route")
+  if not sock then return nil, err end
+  local a = t.sockaddr_nl() -- kernel will fill in address
+  local ok, err = sock:bind(a)
+  if not ok then return nil, err end -- gc will take care of closing socket...
+  a = sock:getsockname() -- to get bound address
+  if not a then return nil, err end -- gc will take care of closing socket...
+
+  local k = t.sockaddr_nl() -- kernel destination
+
+  local buf, len = f(...)
+
+  local hdr = pt.nlmsghdr(buf)
+
+  hdr.nlmsg_len = len
+  hdr.nlmsg_type = ntype
+  hdr.nlmsg_flags = flags
+  hdr.nlmsg_seq = sock:seq()
+  hdr.nlmsg_pid = a.pid
+
+  local ios = t.iovecs{{buf, len}}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
+
+  local n, err = sock:sendmsg(m)
+  if not n then return nil, err end
+
+  local r, err = S.nlmsg_read(sock, k)
+  if not r then
+    sock:close()
+    return nil, err
+  end
+
+  local ok, err = sock:close()
+  if not ok then return nil, err end
+
+  return r
+end
+
+local function getaddr_f(af)
+  local buf, len, hdr, ifaddrmsg = nlmsgbuffer(t.ifaddrmsg)
+  ifaddrmsg[0] = {ifa_family = stringflag(af, "AF_")}
+  return buf, len
+end
+
+function S.getaddr(af)
+  return nlmsg2(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, getaddr_f, af)
+end
+
 -- initial abstraction, expand later
 local function nlmsg(ntype, flags, tp, init) -- will need more structures, possibly nested
   local sock, err = S.socket("netlink", "raw", "route")
@@ -4978,9 +5031,11 @@ local function nlmsg(ntype, flags, tp, init) -- will need more structures, possi
 end
 
 -- read addresses on interfaces.
+--[[
 function S.getaddr(af)
   return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, t.ifaddrmsg, {ifa_family = stringflag(af, "AF_")})
 end
+]]
 
 -- read interfaces and details.
 function S.getlink()
