@@ -4957,7 +4957,7 @@ local function nlmsg(ntype, flags, tp, init) -- will need more structures, possi
   hdr.nlmsg_seq = sock:seq()
   hdr.nlmsg_pid = a.pid
 
-  for k, v in pairs(init) do struct[k] = v end
+  struct[0] = init
 
   local ios = t.iovecs{{buf, len}}
   local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
@@ -5013,7 +5013,18 @@ function S.newlink(index, flags, msg, value)
     [S.IFLA_IFNAME] = "asciiz", -- TODO should be able to use t.buffer with some changes
   }
 
+  local tp = types[msg]
+  if not tp then error("unknown message type") end
+
+  local str = false
+
+  if tp == "asciiz" then
+    str = true
+    tp = t.buffer(#value + 1)
+  end
+
   local init = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
+
 
   local sock, err = S.socket("netlink", "raw", "route")
   if not sock then return nil, err end
@@ -5025,16 +5036,6 @@ function S.newlink(index, flags, msg, value)
 
   local k = t.sockaddr_nl() -- kernel destination
 
-  local tp = types[msg]
-  if not tp then error("unknown message type") end
-
-  local str = false
-
-  if tp == "asciiz" then
-    str = true
-    tp = t.buffer(#value + 1)
-  end
-
   local buf, len, hdr, ifinfo, rtattr, val = tbuffer(nlmsg_align(1), t.nlmsghdr, t.ifinfomsg, t.rtattr, tp)
 
   hdr.nlmsg_len = len
@@ -5043,7 +5044,7 @@ function S.newlink(index, flags, msg, value)
   hdr.nlmsg_seq = sock:seq()
   hdr.nlmsg_pid = a.pid
 
-  for k, v in pairs(init) do ifinfo[k] = v end
+  ifinfo[0] = init
 
   rtattr.rta_type = msg
   rtattr.rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))
