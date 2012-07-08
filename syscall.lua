@@ -3344,17 +3344,18 @@ end
 S.ntohl = S.htonl -- reverse is the same
 S.ntohs = S.htons -- reverse is the same
 
--- we should be adding padding at the end of size nlmsg_alignto (4), (and in middle but 0) or will have issues if try to send more messages. So need to pass align function.
-local function tbuffer(...) -- helper function for sequence of types in a buffer
-  local function threc(buf, offset, tp, ...) -- alignment issues, need to round up to minimum alignment
+local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
+
+local function tbuffer(a, ...) -- helper function for sequence of types in a buffer
+  local function threc(buf, offset, tp, ...)
     if not tp then return nil end
     local p = ptt(tp)
     if select("#", ...) == 0 then return p(buf + offset) end
-    return p(buf + offset), threc(buf, offset + ffi.sizeof(tp), ...)
+    return p(buf + offset), threc(buf, offset + align(ffi.sizeof(tp), a), ...)
   end
   local len = 0
   for _, tp in ipairs{...} do
-    len = len + ffi.sizeof(tp) -- TODO alignment issues, need to round up to minimum alignment, or as supplied
+    len = len + align(ffi.sizeof(tp), a)
   end
   local buf = t.buffer(len)
   return buf, len, threc(buf, 0, ...)
@@ -4628,8 +4629,6 @@ function S.S_ISFIFO(m) return bit.band(m, S.S_IFMT) == S.S_IFFIFO end
 function S.S_ISLNK(m)  return bit.band(m, S.S_IFMT) == S.S_IFLNK  end
 function S.S_ISSOCK(m) return bit.band(m, S.S_IFMT) == S.S_IFSOCK end
 
-local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
-
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsg_align
 local cmsg_hdrsize = ffi.sizeof(t.cmsghdr(0))
@@ -4950,7 +4949,7 @@ local function nlmsg(ntype, flags, tp, init) -- will need more structures, possi
 
   local k = t.sockaddr_nl() -- kernel destination
 
-  local buf, len, hdr, struct = tbuffer(t.nlmsghdr, tp)
+  local buf, len, hdr, struct = tbuffer(nlmsg_align(1), t.nlmsghdr, tp)
 
   hdr.nlmsg_len = len
   hdr.nlmsg_type = ntype
@@ -5023,7 +5022,7 @@ function S.newlink(index, flags, msg, value)
     tp = t.buffer(#value + 1)
   end
 
-  local buf, len, hdr, ifinfo, rtattr, val = tbuffer(t.nlmsghdr, t.ifinfomsg, t.rtattr, tp)
+  local buf, len, hdr, ifinfo, rtattr, val = tbuffer(nlmsg_align(1), t.nlmsghdr, t.ifinfomsg, t.rtattr, tp)
 
   hdr.nlmsg_len = len
   hdr.nlmsg_type = S.RTM_NEWLINK
@@ -5034,7 +5033,7 @@ function S.newlink(index, flags, msg, value)
   for k, v in pairs(init) do ifinfo[k] = v end
 
   rtattr.rta_type = msg
-  rtattr.rta_len = s.rtattr + ffi.sizeof(tp)
+  rtattr.rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))
 
   if not str then
     if not ffi.istype(tp, value) then value = tp(value) end

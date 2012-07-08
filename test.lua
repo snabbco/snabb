@@ -17,6 +17,7 @@ end
 local function fork_assert(c, s) -- if we have forked we need to fail in main thread not fork
   if not c then
     print(tostring(s))
+    print(debug.traceback())
     S.exit("failure")
   end
   return c, s
@@ -1075,9 +1076,28 @@ test_netlink = {
     else
       local w = assert(S.waitpid(-1, "clone"))
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
-    end  
-
-
+    end
+  end,
+  test_interface_newlink_macaddr_root = function()
+    -- using bridge to test this as no other interface in container yet and not sure you can rename lo
+    local p = assert(S.clone())
+    if p == 0 then
+      local ok, err = S.unshare("newnet")
+      if not ok then S.exit("failure") end
+      ok, err = S.bridge_add("br0")
+      fork_assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
+      if ok then
+        local i = fork_assert(S.interfaces())
+        fork_assert(i.br0)
+        fork_assert(S.newlink(i.br0.index, "up", "address", "46:9d:c9:06:dd:dd"))
+        i = fork_assert(S.interfaces())
+        fork_assert(tostring(i.br0.macaddr) == "46:9d:c9:06:dd:dd", "interface should have new mac address")
+      end
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end
   end,
   test_setlink_error_root = function()
     local ok, err = S.setlink(-1, "up")
