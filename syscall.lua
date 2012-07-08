@@ -4980,6 +4980,7 @@ local function nlmsg2(ntype, flags, f, ...)
   return r
 end
 
+-- read addresses from interface
 local function getaddr_f(af)
   local buf, len, hdr, ifaddrmsg = nlmsgbuffer(t.ifaddrmsg)
   ifaddrmsg[0] = {ifa_family = stringflag(af, "AF_")}
@@ -4988,6 +4989,17 @@ end
 
 function S.getaddr(af)
   return nlmsg2(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, getaddr_f, af)
+end
+
+-- read interfaces and details.
+local function getlink_f()
+  local buf, len, hdr, rtgenmsg = nlmsgbuffer(t.rtgenmsg)
+  rtgenmsg[0] = {rtgen_family = S.AF_PACKET}
+  return buf, len
+end
+
+function S.getlink()
+  return nlmsg2(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, getlink_f)
 end
 
 -- initial abstraction, expand later
@@ -5028,18 +5040,6 @@ local function nlmsg(ntype, flags, tp, init) -- will need more structures, possi
   if not ok then return nil, err end
 
   return r
-end
-
--- read addresses on interfaces.
---[[
-function S.getaddr(af)
-  return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, t.ifaddrmsg, {ifa_family = stringflag(af, "AF_")})
-end
-]]
-
--- read interfaces and details.
-function S.getlink()
-  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, t.rtgenmsg, {rtgen_family = S.AF_PACKET})
 end
 
 -- remove interface
