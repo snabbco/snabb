@@ -5092,15 +5092,7 @@ function S.newlink(index, flags, msg, value)
   local k = t.sockaddr_nl() -- kernel destination
 
   local buf, len, hdr, ifinfo, rtattr, val = tbuffer(nlmsg_align(1), t.nlmsghdr, t.ifinfomsg, t.rtattr, tp)
-
-  hdr.nlmsg_len = len
-  hdr.nlmsg_type = S.RTM_NEWLINK
-  hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_ACK
-  hdr.nlmsg_seq = sock:seq()
-  hdr.nlmsg_pid = a.pid
-
   ifinfo[0] = init
-
   rtattr.rta_type = msg
   rtattr.rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))
 
@@ -5110,6 +5102,12 @@ function S.newlink(index, flags, msg, value)
   else
     ffi.copy(val, value)
   end
+
+  hdr.nlmsg_len = len
+  hdr.nlmsg_type = S.RTM_NEWLINK
+  hdr.nlmsg_flags = S.NLM_F_REQUEST + S.NLM_F_ACK
+  hdr.nlmsg_seq = sock:seq()
+  hdr.nlmsg_pid = a.pid
 
   local ios = t.iovecs{{buf, len}}
   local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
