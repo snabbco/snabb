@@ -1477,6 +1477,8 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_clock_gettime    = 263
   S.SYS_clock_getres     = 264
   S.SYS_clock_nanosleep  = 265
+else
+  error("unsupported architecture")
 end
 
 -- ioctls, filling in as needed
