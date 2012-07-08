@@ -4997,7 +4997,7 @@ function S.newlink(index, flags, msg, value)
     [S.IFLA_BROADCAST] = t.macaddr,
     [S.IFLA_MTU] = t.uint,
     [S.IFLA_LINK] = t.int,
-    [S.IFLA_IFNAME] = "asciiz",
+    [S.IFLA_IFNAME] = "asciiz", -- TODO should be able to use t.buffer with some changes
   }
 
   local init = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
@@ -5060,7 +5060,7 @@ function S.newlink(index, flags, msg, value)
   return r
 end
 
-function S.setlink(index, flags) -- this seems to work fine with NEWLINK, despite some people saying not
+function S.setlink(index, flags) -- this seems to work fine with NEWLINK, despite some people saying 
   if type(index) == 'table' then index = index.index end
   return nlmsg(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg,
     {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff})
