@@ -9,12 +9,12 @@ local S = require "syscall"
 local bit = require "bit"
 
 local oldassert = assert
-function assert(c, s)
+local function assert(c, s)
   collectgarbage("collect") -- force gc, to test for bugs
   return oldassert(c, tostring(s)) -- annoyingly, assert does not call tostring!
 end
 
-function fork_assert(c, s) -- if we have forked we need to fail in main thread not fork
+local function fork_assert(c, s) -- if we have forked we need to fail in main thread not fork
   if not c then
     print(tostring(s))
     S.exit("failure")
@@ -139,20 +139,20 @@ test_read_write = {
     assert(fd:close())
   end,
   test_write = function()
-    fd = assert(S.open("/dev/zero", "RDWR"))
+    local fd = assert(S.open("/dev/zero", "RDWR"))
     local n = assert(fd:write(buf, size))
     assert(n >= 0, "should not get error writing to /dev/zero")
     assert_equal(n, size, "should not get truncated write to /dev/zero")
     assert(fd:close())
   end,
   test_write_string = function()
-    fd = assert(S.open("/dev/zero", "RDWR"))
+    local fd = assert(S.open("/dev/zero", "RDWR"))
     local n = assert(fd:write(teststring))
     assert_equal(n, #teststring, "write on a string should write out its length")
     assert(fd:close())
   end,
   test_pread_pwrite = function()
-    fd = assert(S.open("/dev/zero", "RDWR"))
+    local fd = assert(S.open("/dev/zero", "RDWR"))
     local offset = 1
     local n
     n = assert(fd:pread(buf, size, offset))
@@ -1056,9 +1056,8 @@ test_netlink = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
-
   test_setlink_error_root = function()
-    ok, err = S.setlink(-1, "up")
+    local ok, err = S.setlink(-1, "up")
     assert(not ok, "expect bogus setlink to fail")
     assert(err.EINVAL, "expect invalid value error")
   end,
@@ -1447,6 +1446,8 @@ if S.geteuid() ~= 0 then -- remove tests that need root
     end
   end
 end
+
+setmetatable(_G, {__newindex = function(t, k, v) error("global! " .. k) end})
 
 local f
 if arg[1] then f = luaunit:run(arg[1]) else f = luaunit:run() end

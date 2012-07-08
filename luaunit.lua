@@ -149,11 +149,11 @@ local function orderedNext(t, state)
     if state == nil then
         -- the first time, generate the index
         t.__orderedIndex = __genOrderedIndex( t )
-        key = t.__orderedIndex[1]
+        local key = t.__orderedIndex[1]
         return key, t[key]
     end
     -- fetch the next value
-    key = nil
+    local key = nil
     for i = 1,#t.__orderedIndex do
         if t.__orderedIndex[i] == state then
             key = t.__orderedIndex[i+1]
@@ -296,7 +296,7 @@ local UnitResult = { -- class
 	end
 
 	function UnitResult:displayOneFailedTest(failure)
-		testName, errorMsg = unpack(failure)
+		local testName, errorMsg = unpack(failure)
 		print(">>> "..testName.." failed")
 		print(errorMsg)
 	end
@@ -318,7 +318,7 @@ local UnitResult = { -- class
 		else
 			failurePercent = 100 * self.failureCount / self.testCount
 		end
-		successCount = self.testCount - self.failureCount
+		local successCount = self.testCount - self.failureCount
 		print( string.format("Success : %d%% - %d / %d",
 			100-math.ceil(failurePercent), successCount, self.testCount) )
 		return self.failureCount
@@ -420,8 +420,8 @@ local LuaUnit = {
 	LuaUnit.WrapFunctions = LuaUnit.wrapFunctions
 
 	function LuaUnit.strip_luaunit_stack(stack_trace)
-		stack_list = LuaUnit.strsplit( "\n", stack_trace )
-		strip_end = nil
+		local stack_list = LuaUnit.strsplit( "\n", stack_trace )
+		local strip_end = nil
 		for i = #stack_list,1,-1 do
 			-- a bit rude but it works !
 			if string.find(stack_list[i],"[C]: in function `xpcall'",0,true)
@@ -432,7 +432,7 @@ local LuaUnit = {
 		if strip_end then
 			table.setn( stack_list, strip_end )
 		end
-		stack_trace = table.concat( stack_list, "\n" )
+		local stack_trace = table.concat( stack_list, "\n" )
 		return stack_trace
 	end
 
@@ -455,7 +455,7 @@ local LuaUnit = {
 		end
 
 		-- run testMethod()
-        ok, errorMsg = xpcall( aMethod, err_handler )
+        local ok, errorMsg = xpcall( aMethod, err_handler )
 		if not ok then
 			errorMsg  = self.strip_luaunit_stack(errorMsg)
 			LuaUnit.result:addFailure( errorMsg )
@@ -519,7 +519,7 @@ local LuaUnit = {
 		--
 		-- If arguments are passed, they must be strings of the class names 
 		-- that you want to run
-		args = {...}
+		local args = {...}
 		if #args > 0 then
                         for i, v in ipairs(args) do LuaUnit.runTestClassByName(i, v) end
 		else 

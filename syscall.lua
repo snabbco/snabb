@@ -3676,7 +3676,7 @@ end
 
 local function gettimespec2(ts)
   if ts and (not ffi.istype(t.timespec2, ts)) then
-    s1, s2 = ts[1], ts[2]
+    local s1, s2 = ts[1], ts[2]
     ts = t.timespec2()
     if type(s1) == 'string' then ts[0].tv_nsec = stringflag(s1, "UTIME_") else ts[0] = t.timespec(s1) end
     if type(s2) == 'string' then ts[1].tv_nsec = stringflag(s2, "UTIME_") else ts[1] = t.timespec(s2) end
@@ -4364,7 +4364,7 @@ local function getiocbs(iocb, nr)
     local io = iocb
     nr = #io
     iocb = t.iocb_ptrs(nr)
-    iocba = t.iocbs(nr)
+    local iocba = t.iocbs(nr)
     for i = 0, nr - 1 do
       local ioi = io[i + 1]
       iocb[i] = iocba + i
