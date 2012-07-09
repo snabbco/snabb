@@ -4941,7 +4941,7 @@ local function nlmsgbuffer(...)
   return tbuffer(nlmsg_align(1), t.nlmsghdr, ...)
 end
 
-local function nlmsg2(ntype, flags, f, ...)
+local function nlmsg(ntype, flags, f, ...)
   local sock, err = S.socket("netlink", "raw", "route")
   if not sock then return nil, err end
   local a = t.sockaddr_nl() -- kernel will fill in address
@@ -4990,7 +4990,7 @@ local function getaddr_f(af)
 end
 
 function S.getaddr(af)
-  return nlmsg2(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, getaddr_f, af)
+  return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, getaddr_f, af)
 end
 
 -- remove interface
@@ -5001,7 +5001,7 @@ local function dellink_f(index)
 end
 
 function S.dellink(index)
-  return nlmsg2(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f)
+  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f)
 end
 
 -- read interfaces and details.
@@ -5012,7 +5012,7 @@ local function getlink_f()
 end
 
 function S.getlink()
-  return nlmsg2(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, getlink_f)
+  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, getlink_f)
 end
 
 -- this seems to work fine with NEWLINK, despite some people saying, so could merge in.
@@ -5024,7 +5024,7 @@ local function setlink_f(index, flags)
 end
 
 function S.setlink(index, flags) 
-  return nlmsg2(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, setlink_f, index, flags)
+  return nlmsg(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, setlink_f, index, flags)
 end
 
 -- newlink
@@ -5065,7 +5065,7 @@ local function newlink_f(index, flags, msg, value)
 end
 
 function S.newlink(index, flags, msg, value)
-  return nlmsg2(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, index, flags, msg, value)
+  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, index, flags, msg, value)
 end
 
 function S.interfaces() -- returns with address info too.
