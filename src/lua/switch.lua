@@ -32,11 +32,10 @@ ffi.cdef[[
 -- Counters
 
 -- Switch ports
-local ports = { port.new("a", "/tmp/a"),
-		port.new("b", "/tmp/b") }
+local ports = { port.new(1, "/tmp/a"),
+		port.new(2, "/tmp/b") }
 
-ports[1]:trace("/tmp/a.pcap")
-ports[2]:trace("/tmp/b.pcap")
+port.trace("/tmp/switch.pcap")
 
 -- Switch logic
 local fdb = {} -- { MAC -> [Port] }

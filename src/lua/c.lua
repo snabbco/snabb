@@ -8,5 +8,11 @@ ffi.cdef[[
 
       // memcpy(3) - copy memory area
       void memcpy(void *dest, const void *src, size_t n);
+
+      // memset(3) - fill memory with a constant byte
+      void *memset(void *s, int c, size_t n);
+
+      // strncpy(3) - copy a string
+      char *strncpy(char *dest, const char *src, size_t n);
 ]]
 

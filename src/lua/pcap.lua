@@ -5,6 +5,7 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
+local c   = require("c")
 
 -- PCAP file format: http://wiki.wireshark.org/Development/LibpcapFileFormat/
 ffi.cdef[[
@@ -26,6 +27,13 @@ struct pcap_record {
     uint32_t incl_len;       /* number of octets of packet saved in file */
     uint32_t orig_len;       /* actual length of packet */
 }
+
+struct pcap_record_extra {
+   /* Extra metadata that we append to the pcap record, after the payload. */
+   uint32_t port_id; /* port the packet is captured on */
+   uint32_t flags;   /* bit 0 set means input, bit 0 clear means output */
+   uint64_t reserved0, reserved1, reserved2, reserved3;
+}
 ]]
 
 function write_file_header(file)
@@ -39,12 +47,25 @@ function write_file_header(file)
    file:flush()
 end
 
-function write_record(file, ffi_buffer, length)
+local pcap_extra = ffi.new("struct pcap_record_extra")
+ffi.C.memset(pcap_extra, 0, ffi.sizeof(pcap_extra))
+
+function write_record(file, ffi_buffer, length, port, input)
    local pcap_record = ffi.new("struct pcap_record")
-   pcap_record.incl_len = length
+   local incl_len = length;
+   if port ~= nil then
+      incl_len = incl_len + ffi.sizeof(pcap_extra)
+      pcap_extra.port_id = port
+      pcap_extra.flags = (input and 0) or 1
+   end
+   pcap_record.incl_len = incl_len
    pcap_record.orig_len = length
    file:write(ffi.string(pcap_record, ffi.sizeof(pcap_record)))
    file:write(ffi.string(ffi_buffer, length))
+   if port ~= nil then
+      print 'write extra bytes...'
+      file:write(ffi.string(pcap_extra, ffi.sizeof(pcap_extra)))
+   end
    file:flush()
 end
 

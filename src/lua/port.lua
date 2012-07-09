@@ -9,12 +9,16 @@ local shm = require("shm")
 local fabric = ffi.load("fabric")
 local C = ffi.C
 
+-- List of all ports.
 local ports = {}
+-- Port class.
 local Port = { id = nil, statistics = nil }
+-- Global TCPDUMP trace file.
+local tracefile = nil
 
 -- Create a new port with a meaningful identifier.
 function new (id, filename)
-   local self = { first = true }
+   local self = { id = id, first = true }
    setmetatable(self, {__index = Port})
    table.insert(ports, self)
    if filename then self:connect(filename) end
@@ -27,15 +31,15 @@ function Port:connect (shmfilename)
 end
 
 -- Enable tracing of packets to a file.
-function Port:trace (pcapfilename)
-   self.tracefile = io.open(pcapfilename, "w+")
-   pcap.write_file_header(self.tracefile)
+function trace (pcapfilename)
+   tracefile = io.open(pcapfilename, "w+")
+   pcap.write_file_header(tracefile)
 end
 
 -- Disable packet tracing.
-function Port:untrace ()
-   self.tracefile:close()
-   self.tracefile = nil
+function untrace ()
+   tracefile:close()
+   tracefile = nil
 end
 
 function Port:available()
@@ -56,7 +60,11 @@ function Port:receive ()
       else
 	 shm.advance_head(ring)
       end
-      return shm.packet(ring)
+      local packet = shm.packet(ring)
+      if tracefile then
+	 pcap.write_record(tracefile, packet.data, packet.length, self.id, true)
+      end
+      return packet
    end
 end
 
@@ -64,8 +72,8 @@ function Port:transmit (packet)
    if shm.full(self.shm.host2vm) then
       return false
    end
-   if self.tracefile then
-      pcap.write_record(self.tracefile, packet.data, packet.length)
+   if tracefile then
+      pcap.write_record(tracefile, packet.data, packet.length, self.id, false)
    end
    local ring = self.shm.host2vm
    C.memcpy(ring.packets[ring.tail].data, packet.data, packet.length)
