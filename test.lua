@@ -1101,7 +1101,7 @@ test_netlink = {
   end,
   test_interface_dellink_fail_root = function()
     -- using bridge to test this as no other interface in container yet
-    -- unfortunately netlink cannot delete bridges so no use.
+    -- unfortunately netlink cannot delete bridges created with ioctl, so no use.
     -- TODO create some other kind of interface we can delete
     local p = assert(S.clone())
     if p == 0 then

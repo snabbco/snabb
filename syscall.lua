@@ -4981,6 +4981,7 @@ local function nlmsg(ntype, flags, f, ...)
 end
 
 -- TODO these should be renamed or made more general, or abstracted, as we add more functionality
+-- TODO make more like the ip options
 
 -- read addresses from interface
 local function getaddr_f(af)
