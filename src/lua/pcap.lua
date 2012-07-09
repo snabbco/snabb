@@ -69,3 +69,37 @@ function write_record(file, ffi_buffer, length, port, input)
    file:flush()
 end
 
+-- Return an iterator for pcap records in FILENAME.
+function records (filename)
+   local file = io.open(filename, "r")
+   local pcap_file = readc(file, "struct pcap_file")
+   if pcap_file.magic_number == 0xD4C3B2A1 then
+      error("Endian mismatch in " .. filename)
+   elseif pcap_file.magic_number ~= 0xA1B2C3D4 then
+      error("Bad PCAP magic number in " .. filename)
+   end
+   local function pcap_records_it (t, i)
+      local record = readc(file, "struct pcap_record")
+      if record == nil then return nil end
+      local datalen = math.min(record.orig_len, record.incl_len)
+      local packet = file:read(datalen)
+      local extra = nil
+      if record.incl_len == #packet + ffi.sizeof("struct pcap_record_extra") then
+	 print "found extra data"
+	 extra = readc(file, "struct pcap_record_extra")
+      end
+      return packet, record, extra
+   end
+   return pcap_records_it, true, true
+end
+
+-- Read a C object of TYPE from FILE. Return a pointer to the result.
+function readc(file, type)
+   local string = file:read(ffi.sizeof(type))
+   if string == nil then return nil end
+   if #string ~= ffi.sizeof(type) then
+      error("short read of " .. type .. " from " .. tostring(file))
+   end
+   return ffi.cast(type.."*", string)
+end
+
