@@ -5025,7 +5025,7 @@ local function setlink_f(index, flags)
 end
 
 function S.setlink(index, flags) 
-  return nlmsg(S.RTM_SETLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, setlink_f, index, flags)
+  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, setlink_f, index, flags)
 end
 
 -- newlink

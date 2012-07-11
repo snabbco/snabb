@@ -1103,7 +1103,7 @@ test_netlink = {
   test_setlink_error_root = function()
     local ok, err = S.setlink(-1, "up")
     assert(not ok, "expect bogus setlink to fail")
-    assert(err.EINVAL, "expect invalid value error")
+    assert(err.NODEV, "expect no such device error")
   end,
 }
 
