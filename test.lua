@@ -978,7 +978,7 @@ test_netlink = {
       assert(wlan.ether, "wlan interface type should be ether")
       assert_equal(wlan.addrlen, 6, "wireless hardware address length is 6")
       local mac = assert(S.readfile("/sys/class/net/" .. wlan.name .. "/address"), "expect wlan to have address file in /sys")
-      assert_equal(tostring(wlan.macaddr) .. '\n', mac, "mac address hsould match that from /sys")
+      assert_equal(tostring(wlan.macaddr) .. '\n', mac, "mac address should match that from /sys")
     end
   end,
   test_bridge_list = function()
