@@ -825,7 +825,7 @@ test_sockets = {
     local port
     for i = 1024, 2048 do
       port = i
-      sa.sin_port = S.htons(port) -- TODO metamethod for port that does conversion
+      sa.port = port
       if s:bind(sa) then break end
     end
     local ba = assert(s:getsockname())
