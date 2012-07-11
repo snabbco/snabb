@@ -5016,7 +5016,7 @@ function S.getlink()
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, getlink_f)
 end
 
--- this seems to work fine with NEWLINK, despite some people saying, so could merge in.
+-- this seems to work fine with NEWLINK, despite some people saying, TODO merge in.
 local function setlink_f(index, flags)
   if type(index) == 'table' then index = index.index end
   local buf, len, hdr, ifinfomsg = nlmsgbuffer(t.ifinfomsg)
@@ -5037,7 +5037,7 @@ local function newlink_f(index, flags, msg, value)
     [S.IFLA_BROADCAST] = t.macaddr,
     [S.IFLA_MTU] = t.uint,
     [S.IFLA_LINK] = t.int,
-    [S.IFLA_IFNAME] = "asciiz", -- TODO should be able to use t.buffer with some changes
+    [S.IFLA_IFNAME] = "asciiz",
   }
 
   local tp = types[msg]
