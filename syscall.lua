@@ -4802,7 +4802,7 @@ mt.iflink = {
   __index = function(i, k)
     if meth.iflink.index[k] then return meth.iflink.index[k](i) end
     local fn = {
-      setflags = S.setlink
+      setflags = S.newlink
     }
     if fn[k] then return fn[k] end
     local prefix = "ARPHRD_"
@@ -5066,10 +5066,6 @@ end
 
 function S.newlink(index, flags, msg, value)
   return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, index, flags, msg, value)
-end
-
-function S.setlink(index, flags)
-  return S.newlink(index, flags)
 end
 
 function S.interfaces() -- returns with address info too.

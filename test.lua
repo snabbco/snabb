@@ -1007,14 +1007,14 @@ test_netlink = {
     assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
     assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
   end,
-  test_setlink_root = function()
+  test_newlink_flags_root = function()
     local p = assert(S.clone())
      if p == 0 then
       local ok, err = S.unshare("newnet")
       if err then S.exit("failure") end -- may happen with no kernel support
       local i = fork_assert(S.interfaces())
       fork_assert(i.lo and not i.lo.flags.up, "expect new network ns has down lo interface")
-      fork_assert(S.setlink(i.lo.index, "up"))
+      fork_assert(S.newlink(i.lo.index, "up"))
       local lo = fork_assert(S.interface("lo"))
       fork_assert(lo.flags.up, "expect lo up now")
       S.exit()
@@ -1100,9 +1100,9 @@ test_netlink = {
       assert(not i.br0, "expect interface deleted")
     end
   end,
-  test_setlink_error_root = function()
-    local ok, err = S.setlink(-1, "up")
-    assert(not ok, "expect bogus setlink to fail")
+  test_newlink_error_root = function()
+    local ok, err = S.newlink(-1, "up")
+    assert(not ok, "expect bogus newlink to fail")
     assert(err.NODEV, "expect no such device error")
   end,
 }
