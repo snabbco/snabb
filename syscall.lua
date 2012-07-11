@@ -5065,6 +5065,7 @@ local function newlink_f(index, flags, msg, value)
 end
 
 function S.newlink(index, flags, msg, value)
+  --mods = stringflag(mods, "NLM_F_") -- for replace, excl, create, append, TODO only allow 
   return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, index, flags, msg, value)
 end
 
