@@ -1080,47 +1080,32 @@ test_netlink = {
   end,
   test_interface_newlink_macaddr_root = function()
     -- using bridge to test this as no other interface in container yet
-    local p = assert(S.clone())
-    if p == 0 then
-      local ok, err = S.unshare("newnet")
-      if not ok then S.exit("failure") end
-      ok, err = S.bridge_add("br0")
-      fork_assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
-      if ok then
-        local i = fork_assert(S.interfaces())
-        fork_assert(i.br0)
-        fork_assert(S.newlink(i.br0.index, "up", "address", "46:9d:c9:06:dd:dd"))
-        i = fork_assert(S.interfaces())
-        fork_assert(tostring(i.br0.macaddr) == "46:9d:c9:06:dd:dd", "interface should have new mac address")
-      end
-      S.exit()
-    else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    local ok, err = S.bridge_add("br0")
+    assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
+    if ok then
+      local i = assert(S.interfaces())
+      assert(i.br0)
+      assert(S.newlink(i.br0.index, "up", "address", "46:9d:c9:06:dd:dd"))
+      i = fork_assert(S.interfaces())
+      assert(tostring(i.br0.macaddr) == "46:9d:c9:06:dd:dd", "interface should have new mac address")
+      assert(i.br0:setflags()) -- down
+      assert(S.bridge_del("br0"))
     end
   end,
   test_interface_dellink_fail_root = function()
     -- using bridge to test this as no other interface in container yet
     -- unfortunately netlink cannot delete bridges created with ioctl, so no use.
     -- TODO create some other kind of interface we can delete
-    local p = assert(S.clone())
-    if p == 0 then
-      local ok, err = S.unshare("newnet")
-      if not ok then S.exit("failure") end
-      ok, err = S.bridge_add("br0")
-      fork_assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
-      if ok then
-        local i = fork_assert(S.interfaces())
-        fork_assert(i.br0)
-        ok, err = S.dellink(i.br0.index) -- fails, cannot delete bridge
-        fork_assert(err.EINVAL, "expect cannot delete bridge")
-        i = fork_assert(S.interfaces())
-        --fork_assert(not i.br0, "expect interface deleted")
-      end
-      S.exit()
-    else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    local ok, err = S.bridge_add("br0")
+    assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
+    if ok then
+      local i = assert(S.interfaces())
+      assert(i.br0)
+      ok, err = S.dellink(i.br0.index) -- fails, cannot delete bridge
+      assert(err.EINVAL, "expect cannot delete bridge")
+      assert(S.bridge_del("br0"))
+      i = assert(S.interfaces())
+      assert(not i.br0, "expect interface deleted")
     end
   end,
   test_setlink_error_root = function()
@@ -1448,7 +1433,6 @@ test_filesystem = {
   end,
 }
 
--- note at present we check for uid 0, but could check capabilities instead.
 test_root = {
   test_mount = function()
     assert(S.mkdir(tmpfile))
@@ -1485,6 +1469,7 @@ test_root = {
  end,
 }
 
+-- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
   assert(S.unshare("newnet, newns, newuts")) -- do not interfere with anything on host during tests
   local i = assert(S.interfaces())
