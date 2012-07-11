@@ -1474,26 +1474,17 @@ test_root = {
     end
   end,
   test_bridge = function()
-    local p = assert(S.clone())
-    if p == 0 then
-      local ok, err = S.unshare("newnet")
-      if not ok then S.exit("failure") end
-      ok, err = S.bridge_add("br0")
-      fork_assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
-      if ok then
-        local i = fork_assert(S.interfaces())
-        fork_assert(i.br0)
-        local b = fork_assert(S.bridge_list())
-        --fork_assert(b.br0 and b.br0.bridge.root_id, "expect to find bridge in list") -- not shown in this /sys mount
-        fork_assert(S.bridge_del("br0"))
-        i = fork_assert(S.interfaces())
-        fork_assert(not i.br0, "bridge should be gone")
-      end
-      S.exit()
-    else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
-    end  
+    local ok, err = S.bridge_add("br0")
+    assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
+    if ok then
+      local i = assert(S.interfaces())
+      assert(i.br0)
+      local b = assert(S.bridge_list())
+      assert(b.br0 and b.br0.bridge.root_id, "expect to find bridge in list")
+      assert(S.bridge_del("br0"))
+      i = assert(S.interfaces())
+      assert(not i.br0, "bridge should be gone")
+    end
   end,
   test_chroot = function()
     assert(S.chroot("/"))
