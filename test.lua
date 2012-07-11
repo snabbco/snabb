@@ -1460,18 +1460,12 @@ test_root = {
     S.acct() -- may not be configured
   end,
   test_sethostname = function()
-    local p = assert(S.clone())
-    if p == 0 then
-      local ok, err = S.unshare("newuts")
-      if not ok then S.exit("failure") end
-      local hh = "testhostname"
-      fork_assert(S.sethostname(hh))
-      fork_assert(hh == assert(S.gethostname()))
-      S.exit()
-    else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
-    end
+    local h = S.gethostname()
+    local hh = "testhostname"
+    assert(S.sethostname(hh))
+    assert_equal(hh, assert(S.gethostname()))
+    assert(S.sethostname(h))
+    assert_equal(h, assert(S.gethostname()))
   end,
   test_bridge = function()
     local ok, err = S.bridge_add("br0")
@@ -1492,7 +1486,7 @@ test_root = {
 }
 
 if S.geteuid() == 0 then
-  assert(S.unshare("newnet, newns")) -- new net ns and mount ns to not interfere with anything during tests
+  assert(S.unshare("newnet, newns, newuts")) -- do not interfere with anything on host during tests
   local i = assert(S.interfaces())
   local lo = assert(i.lo)
   assert(lo:setflags("up"))
