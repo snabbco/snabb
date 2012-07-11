@@ -1059,23 +1059,15 @@ test_netlink = {
   end,
   test_interface_newlink_ifname_root = function()
     -- using bridge to test this as no other interface in container yet and not sure you can rename lo
-    local p = assert(S.clone())
-    if p == 0 then
-      local ok, err = S.unshare("newnet")
-      if not ok then S.exit("failure") end
-      ok, err = S.bridge_add("br0")
-      fork_assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
-      if ok then
-        local i = fork_assert(S.interfaces())
-        fork_assert(i.br0)
-        fork_assert(S.newlink(i.br0.index, i.br0.flags.flags, "ifname", "newname"))
-        i = fork_assert(S.interfaces())
-        fork_assert(i.newname, "interface should be renamed")
-      end
-      S.exit()
-    else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    local ok, err = S.bridge_add("br0")
+    assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
+    if ok then
+      local i = assert(S.interfaces())
+      assert(i.br0)
+      assert(S.newlink(i.br0.index, i.br0.flags.flags, "ifname", "newname"))
+      i = assert(S.interfaces())
+      assert(i.newname, "interface should be renamed")
+      assert(S.bridge_del("newname"))
     end
   end,
   test_interface_newlink_macaddr_root = function()
