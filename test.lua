@@ -1500,7 +1500,13 @@ test_root = {
  end,
 }
 
-if S.geteuid() ~= 0 then -- remove tests that need root
+if S.geteuid() == 0 then
+  assert(S.unshare("newnet, newns")) -- new net ns and mount ns to not interfere with anything during tests
+  local i = assert(S.interfaces())
+  local lo = assert(i.lo)
+  assert(lo:setflags("up"))
+  assert(S.mount("none", "/sys", "sysfs"))
+  else -- remove tests that need root
   for k in pairs(_G) do
     if k:match("test") then
       if k:match("root")
