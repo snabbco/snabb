@@ -5016,7 +5016,7 @@ function S.getlink()
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, getlink_f)
 end
 
--- newlink
+-- newlink TODO need to extend to more msg, values. plus they need to be nested...
 local function newlink_f(index, flags, msg, value)
   local buf, len, hdr, ifinfo
 
