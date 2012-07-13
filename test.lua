@@ -1023,6 +1023,15 @@ test_netlink = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
+  test_interface_up_down_root = function()
+    local i = assert(S.interfaces())
+    assert(i.lo:down())
+    i = assert(S.interfaces())
+    assert(not i.lo.flags.up, "expect lo down")
+    assert(i.lo:up())
+    i = assert(S.interfaces())
+    assert(i.lo.flags.up, "expect lo up now")
+  end,
   test_interface_setflags_root = function()
     local p = assert(S.clone())
      if p == 0 then
@@ -1466,7 +1475,7 @@ if S.geteuid() == 0 then
   assert(S.unshare("newnet, newns, newuts")) -- do not interfere with anything on host during tests
   local i = assert(S.interfaces())
   local lo = assert(i.lo)
-  assert(lo:setflags("up"))
+  assert(lo:up())
   assert(S.mount("none", "/sys", "sysfs"))
   else -- remove tests that need root
   for k in pairs(_G) do

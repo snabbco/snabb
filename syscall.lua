@@ -4795,16 +4795,19 @@ meth.iflink = {
     index = function(i) return tonumber(i.ifinfo.ifi_index) end,
     flags = function(i) return setmetatable({flags = tonumber(i.ifinfo.ifi_flags)}, mt.iff) end,
     change = function(i) return tonumber(i.ifinfo.ifi_change) end,
+  },
+  fn = {
+    setflags = function(i, flags) return S.newlink(i, flags) end,
+    up = function(i) return i:setflags("up") end,
+    down = function(i) return i:setflags() end,
   }
 }
 
+-- TODO update interface on update operations? or return new interface
 mt.iflink = {
   __index = function(i, k)
     if meth.iflink.index[k] then return meth.iflink.index[k](i) end
-    local fn = {
-      setflags = S.newlink
-    }
-    if fn[k] then return fn[k] end
+    if meth.iflink.fn[k] then return meth.iflink.fn[k] end
     local prefix = "ARPHRD_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return i.ifinfo.ifi_type == S[k] end
