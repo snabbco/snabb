@@ -2558,10 +2558,33 @@ local function trim(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
+local memo = {} -- memoize flags so faster looping
+
 -- take a bunch of flags in a string and return a number
 -- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
 -- also forcing to return an int now - TODO find any 64 bit flags we are using and fix to use new function
-local function stringflags(str, prefix, prefix2) -- allows multiple comma sep flags that are ORed
+local function stringflags(str, prefix) -- allows multiple comma sep flags that are ORed
+  if not str then return 0 end
+  if type(str) ~= "string" then return str end
+  if memo[prefix] and memo[prefix][str] then return memo[prefix][str] end
+  local f = 0
+  local a = split(",", str)
+  local ts, s, val
+  for i, v in ipairs(a) do
+    ts = trim(v)
+    s = ts
+    if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
+    val = S[s:upper()]
+    if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+    f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
+  end
+  if not memo[prefix] then memo[prefix] = {} end
+  memo[prefix][str] = f
+  return f
+end
+
+-- no memoization here, but currently only used for umount
+local function stringflags2(str, prefix, prefix2)
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   local f = 0
@@ -2587,10 +2610,13 @@ local function stringflag(str, prefix) -- single value only
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   if #str == 0 then return 0 end
+  if memo[prefix] and memo[prefix][str] then return memo[prefix][str] end
   local s = trim(str)
   if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
   local val = S[s:upper()]
   if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions, better than silent ignore
+  if not memo[prefix] then memo[prefix] = {} end
+  memo[prefix][str] = val
   return val
 end
 
@@ -4102,7 +4128,7 @@ function S.mount(source, target, filesystemtype, mountflags, data)
 end
 
 function S.umount(target, flags)
-  if flags then return retbool(C.umount2(target, stringflags(flags, "MNT_", "UMOUNT_"))) end
+  if flags then return retbool(C.umount2(target, stringflags2(flags, "MNT_", "UMOUNT_"))) end
   return retbool(C.umount(target))
 end
 
