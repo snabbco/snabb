@@ -794,7 +794,85 @@ S.IFLA_STATS64   = 23
 S.IFLA_VF_PORTS  = 24
 S.IFLA_PORT_SELF = 25
 S.IFLA_AF_SPEC   = 26
-S.IFLA_MAX       = 26
+S.IFLA_GROUP     = 27
+S.IFLA_NET_NS_FD = 28
+
+S.IFLA_INET_UNSPEC = 0
+S.IFLA_INET_CONF   = 1
+
+S.IFLA_INET6_UNSPEC = 0
+S.IFLA_INET6_FLAGS  = 1
+S.IFLA_INET6_CONF   = 2
+S.IFLA_INET6_STATS  = 3
+S.IFLA_INET6_MCAST  = 4
+S.IFLA_INET6_CACHEINFO  = 5
+S.IFLA_INET6_ICMP6STATS = 6
+
+S.IFLA_INFO_UNSPEC = 0
+S.IFLA_INFO_KIND   = 1
+S.IFLA_INFO_DATA   = 2
+S.IFLA_INFO_XSTATS = 3
+
+S.IFLA_VLAN_UNSPEC = 0
+S.IFLA_VLAN_ID     = 1
+S.IFLA_VLAN_FLAGS  = 2
+S.IFLA_VLAN_EGRESS_QOS  = 3
+S.IFLA_VLAN_INGRESS_QOS = 4
+
+S.IFLA_VLAN_QOS_UNSPEC  = 0
+S.IFLA_VLAN_QOS_MAPPING = 1
+
+S.IFLA_MACVLAN_UNSPEC = 0
+S.IFLA_MACVLAN_MODE   = 1
+
+S.MACVLAN_MODE_PRIVATE = 1
+S.MACVLAN_MODE_VEPA    = 2
+S.MACVLAN_MODE_BRIDGE  = 4
+S.MACVLAN_MODE_PASSTHRU = 8
+
+S.IFLA_VF_INFO_UNSPEC = 0
+S.IFLA_VF_INFO        = 1
+
+S.IFLA_VF_UNSPEC   = 0
+S.IFLA_VF_MAC      = 1
+S.IFLA_VF_VLAN     = 2
+S.IFLA_VF_TX_RATE  = 3
+S.IFLA_VF_SPOOFCHK = 4
+
+S.IFLA_VF_PORT_UNSPEC = 0
+S.IFLA_VF_PORT        = 1
+
+S.IFLA_PORT_UNSPEC    = 0
+S.IFLA_PORT_VF        = 1
+S.IFLA_PORT_PROFILE   = 2
+S.IFLA_PORT_VSI_TYPE  = 3
+S.IFLA_PORT_INSTANCE_UUID = 4
+S.IFLA_PORT_HOST_UUID = 5
+S.IFLA_PORT_REQUEST   = 6
+S.IFLA_PORT_RESPONSE  = 7
+
+S.PORT_PROFILE_MAX      =  40
+S.PORT_UUID_MAX         =  16
+S.PORT_SELF_VF          =  -1
+
+S.PORT_REQUEST_PREASSOCIATE    = 0
+S.PORT_REQUEST_PREASSOCIATE_RR = 1
+S.PORT_REQUEST_ASSOCIATE       = 2
+S.PORT_REQUEST_DISASSOCIATE    = 3
+
+S.PORT_VDP_RESPONSE_SUCCESS = 0
+S.PORT_VDP_RESPONSE_INVALID_FORMAT = 1
+S.PORT_VDP_RESPONSE_INSUFFICIENT_RESOURCES = 2
+S.PORT_VDP_RESPONSE_UNUSED_VTID = 3
+S.PORT_VDP_RESPONSE_VTID_VIOLATION = 4
+S.PORT_VDP_RESPONSE_VTID_VERSION_VIOALTION = 5
+S.PORT_VDP_RESPONSE_OUT_OF_SYNC = 6
+S.PORT_PROFILE_RESPONSE_SUCCESS = 0x100
+S.PORT_PROFILE_RESPONSE_INPROGRESS = 0x101
+S.PORT_PROFILE_RESPONSE_INVALID = 0x102
+S.PORT_PROFILE_RESPONSE_BADSTATE = 0x103
+S.PORT_PROFILE_RESPONSE_INSUFFICIENT_RESOURCES = 0x104
+S.PORT_PROFILE_RESPONSE_ERROR = 0x105
 
 -- from if_addr.h interface address types and flags
 S.IFA_UNSPEC    = 0
@@ -5055,15 +5133,66 @@ local function newlink_f(index, flags, msg, value)
     msg = stringflag(msg, "IFLA_")
 
     local types = {
-      [S.IFLA_ADDRESS] = t.macaddr, -- correct type for most interface types at least
+      [S.IFLA_ADDRESS] = t.macaddr,
       [S.IFLA_BROADCAST] = t.macaddr,
-      [S.IFLA_MTU] = t.uint,
-      [S.IFLA_LINK] = t.int,
       [S.IFLA_IFNAME] = "asciiz",
+      -- TODO IFLA_MAP
+      [S.IFLA_MTU] = t.uint32,
+      [S.IFLA_LINK] = t.uint32,
+      [S.IFLA_MASTER] = t.uint32,
+      [S.IFLA_TXQLEN] = t.uint32,
+      [S.IFLA_WEIGHT] = t.uint32,
+      [S.IFLA_OPERSTATE] = t.uint8,
+      [S.IFLA_LINKMODE] = t.uint8,
+      [S.IFLA_LINKINFO] = "nested",
+      [S.IFLA_NET_NS_PID] = t.uint32,
+      [S.IFLA_NET_NS_FD] = t.uint32,
+      [S.IFLA_IFALIAS] = "asciiz",
+      [S.IFLA_VFINFO_LIST] = "nested",
+      [S.IFLA_VF_PORTS] = "nested",
+      [S.IFLA_PORT_SELF] = "nested",
+      [S.IFLA_AF_SPEC] = "nested",
     }
+
+      -- for LINKINFO TODO in another table as share values
+--      [S.IFLA_INFO_KIND] = "asciiz",
+--      [S.IFLA_INFO_DATA] = "nested",
+
+--[[ TODO add
+static const struct nla_policy ifla_vfinfo_policy[IFLA_VF_INFO_MAX+1] = {
+        [IFLA_VF_INFO]          = { .type = NLA_NESTED },
+};
+
+static const struct nla_policy ifla_vf_policy[IFLA_VF_MAX+1] = {
+        [IFLA_VF_MAC]           = { .type = NLA_BINARY,
+                                    .len = sizeof(struct ifla_vf_mac) },
+        [IFLA_VF_VLAN]          = { .type = NLA_BINARY,
+                                    .len = sizeof(struct ifla_vf_vlan) },
+        [IFLA_VF_TX_RATE]       = { .type = NLA_BINARY,
+                                    .len = sizeof(struct ifla_vf_tx_rate) },
+        [IFLA_VF_SPOOFCHK]      = { .type = NLA_BINARY,
+                                    .len = sizeof(struct ifla_vf_spoofchk) },
+};
+
+static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
+        [IFLA_PORT_VF]          = { .type = NLA_U32 },
+        [IFLA_PORT_PROFILE]     = { .type = NLA_STRING,
+                                    .len = PORT_PROFILE_MAX },
+        [IFLA_PORT_VSI_TYPE]    = { .type = NLA_BINARY,
+                                    .len = sizeof(struct ifla_port_vsi)},
+        [IFLA_PORT_INSTANCE_UUID] = { .type = NLA_BINARY,
+                                      .len = PORT_UUID_MAX },
+        [IFLA_PORT_HOST_UUID]   = { .type = NLA_STRING,
+                                    .len = PORT_UUID_MAX },
+        [IFLA_PORT_REQUEST]     = { .type = NLA_U8, },
+        [IFLA_PORT_RESPONSE]    = { .type = NLA_U16, },
+};
+]]
 
     local tp = types[msg]
     if not tp then error("unknown message type") end
+
+print("val", value, tp, msg, types[1])
 
     local str = false
 

@@ -1087,9 +1087,9 @@ test_netlink = {
       local i = assert(S.interfaces())
       assert(i.br0)
       assert(S.newlink(i.br0.index, "up", "address", "46:9d:c9:06:dd:dd"))
-      i = fork_assert(S.interfaces())
-      assert(tostring(i.br0.macaddr) == "46:9d:c9:06:dd:dd", "interface should have new mac address")
-      assert(i.br0:setflags()) -- down
+      i = assert(S.interfaces())
+      assert_equal(tostring(i.br0.macaddr), "46:9d:c9:06:dd:dd", "interface should have new mac address")
+      assert(i.br0:down())
       assert(S.bridge_del("br0"))
     end
   end,
