@@ -4894,7 +4894,7 @@ meth.iflink = {
     type = function(i) return tonumber(i.ifinfo.ifi_type) end,
     typename = function(i)
       local n = S.encapnames[i.type]
-      return n or 'unknown ' ..i.type
+      return n or 'unknown ' .. i.type
     end,
     index = function(i) return tonumber(i.ifinfo.ifi_index) end,
     flags = function(i) return setmetatable({flags = tonumber(i.ifinfo.ifi_flags)}, mt.iff) end,
@@ -4904,6 +4904,13 @@ meth.iflink = {
     setflags = function(i, flags) return S.newlink(i, flags) end,
     up = function(i) return i:setflags("up") end,
     down = function(i) return i:setflags() end,
+    refresh = function(i)
+      local j, err = S.interface(i.name)
+      if not j then return nil, err end
+      for k, _ in pairs(i) do i[k] = nil end
+      for k, v in pairs(j) do i[k] = v end
+      return i
+    end,
   }
 }
 
