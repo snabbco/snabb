@@ -4928,6 +4928,11 @@ meth.iflink = {
       if not ok then return nil, err end
       return i:refresh()
     end,
+    setmac = function(i, mac)
+      local ok, err = S.newlink(i.index, i.flags.flags, "address", mac)
+      if not ok then return nil, err end
+      return i:refresh()
+    end,
     refresh = function(i)
       local j, err = S.interface(i.name)
       if not j then return nil, err end
