@@ -5123,38 +5123,29 @@ function S.getlink()
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, getlink_f)
 end
 
--- newlink TODO need to extend to more msg, values. Some types will have nested values.
-local function newlink_f(index, flags, msg, value)
-  local buf, len, hdr, ifinfo
+local newlink_msg_types = {
+  [S.IFLA_ADDRESS] = t.macaddr,
+  [S.IFLA_BROADCAST] = t.macaddr,
+  [S.IFLA_IFNAME] = "asciiz",
+  -- TODO IFLA_MAP
+  [S.IFLA_MTU] = t.uint32,
+  [S.IFLA_LINK] = t.uint32,
+  [S.IFLA_MASTER] = t.uint32,
+  [S.IFLA_TXQLEN] = t.uint32,
+  [S.IFLA_WEIGHT] = t.uint32,
+  [S.IFLA_OPERSTATE] = t.uint8,
+  [S.IFLA_LINKMODE] = t.uint8,
+  [S.IFLA_LINKINFO] = "nested",
+  [S.IFLA_NET_NS_PID] = t.uint32,
+  [S.IFLA_NET_NS_FD] = t.uint32,
+  [S.IFLA_IFALIAS] = "asciiz",
+  [S.IFLA_VFINFO_LIST] = "nested",
+  [S.IFLA_VF_PORTS] = "nested",
+  [S.IFLA_PORT_SELF] = "nested",
+  [S.IFLA_AF_SPEC] = "nested",
+}
 
-  if type(index) == 'table' then index = index.index end
-
-  if msg then
-    msg = stringflag(msg, "IFLA_")
-
-    local types = {
-      [S.IFLA_ADDRESS] = t.macaddr,
-      [S.IFLA_BROADCAST] = t.macaddr,
-      [S.IFLA_IFNAME] = "asciiz",
-      -- TODO IFLA_MAP
-      [S.IFLA_MTU] = t.uint32,
-      [S.IFLA_LINK] = t.uint32,
-      [S.IFLA_MASTER] = t.uint32,
-      [S.IFLA_TXQLEN] = t.uint32,
-      [S.IFLA_WEIGHT] = t.uint32,
-      [S.IFLA_OPERSTATE] = t.uint8,
-      [S.IFLA_LINKMODE] = t.uint8,
-      [S.IFLA_LINKINFO] = "nested",
-      [S.IFLA_NET_NS_PID] = t.uint32,
-      [S.IFLA_NET_NS_FD] = t.uint32,
-      [S.IFLA_IFALIAS] = "asciiz",
-      [S.IFLA_VFINFO_LIST] = "nested",
-      [S.IFLA_VF_PORTS] = "nested",
-      [S.IFLA_PORT_SELF] = "nested",
-      [S.IFLA_AF_SPEC] = "nested",
-    }
-
-      -- for LINKINFO TODO in another table as share values
+-- for LINKINFO TODO in another table as share values
 --      [S.IFLA_INFO_KIND] = "asciiz",
 --      [S.IFLA_INFO_DATA] = "nested",
 
@@ -5189,13 +5180,22 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
 };
 ]]
 
-    local tp = types[msg]
+-- newlink
+local function newlink_f(index, flags, msg, value)
+  local buf, len, hdr, ifinfo
+
+  if type(index) == 'table' then index = index.index end
+
+  if msg then
+    msg = stringflag(msg, "IFLA_")
+
+    local tp = newlink_msg_types[msg]
     if not tp then error("unknown message type") end
 
-    local str = false
+    local str
 
     if tp == "asciiz" then
-      str = true
+      str = tp
       tp = t.buffer(#value + 1)
     end
 
