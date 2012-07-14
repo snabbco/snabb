@@ -5182,14 +5182,14 @@ local newlink_msg_types = {
     [S.IFLA_NET_NS_PID] = t.uint32,
     [S.IFLA_NET_NS_FD] = t.uint32,
     [S.IFLA_IFALIAS] = "asciiz",
-    [S.IFLA_VFINFO_LIST] = "nested",
-    [S.IFLA_VF_PORTS] = "nested",
-    [S.IFLA_PORT_SELF] = "nested",
-    [S.IFLA_AF_SPEC] = "nested",
+    --[S.IFLA_VFINFO_LIST] = "nested",
+    --[S.IFLA_VF_PORTS] = "nested",
+    --[S.IFLA_PORT_SELF] = "nested",
+    --[S.IFLA_AF_SPEC] = "nested",
   },
   info = {
     [S.IFLA_INFO_KIND] = "asciiz",
-    [S.IFLA_INFO_DATA] = "nested",
+    --[S.IFLA_INFO_DATA] = "nested",
   }
 }
 
@@ -5232,11 +5232,8 @@ local function newlink_getmsg(args, messages, values, tab, lookup)
 
   local value, len
 
-  if tp == "nested" then error("NYI") end -- old way
-
   if type(tp) == "table" then
-
-    value = {rta_type = msg} -- missing len, but have reference and can fix
+    value = {rta_type = msg} -- missing rta_len, but have reference and can fix
 
     messages[#messages + 1] = t.rtattr
     values[#values + 1] = value
