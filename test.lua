@@ -1103,11 +1103,19 @@ test_netlink = {
     assert(not ok, "expect bogus newlink to fail")
     assert(err.NODEV, "expect no such device error")
   end,
-  test_newlink_newif_root = function()
+  test_newlink_newif_dummy_root = function()
     local ok, err = S.newlink_create(0, "", "linkinfo", "kind", "dummy", "ifname", "dummy0")
     local i = assert(S.interfaces())
     assert(i.dummy0, "expect dummy interface")
     assert(S.dellink(i.dummy0.index))
+  end,
+  test_newlink_newif_bridge_root = function()
+    local ok, err = S.newlink_create(0, "", "linkinfo", "kind", "bridge", "ifname", "br0")
+    local i = assert(S.interfaces())
+    assert(i.br0, "expect bridge interface")
+    local b = assert(S.bridge_list())
+    assert(b.br0, "expect to find new bridge")
+    assert(S.dellink(i.br0.index))
   end,
 }
 

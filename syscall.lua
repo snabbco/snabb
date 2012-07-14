@@ -4924,7 +4924,7 @@ meth.iflink = {
     up = function(i) return i:setflags("up") end,
     down = function(i) return i:setflags() end,
     setmtu = function(i, mtu)
-      local ok, err = S.newlink(i.index, i.flags.flags, "mtu", mtu)
+      local ok, err = S.newlink(i.index, i.flags.flags, "mtu", mtu) -- TODO filter flags? getting LOWER_UP set
       if not ok then return nil, err end
       return i:refresh()
     end,
@@ -5317,6 +5317,7 @@ function S.newlink(index, flags, ...)
   return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, index, flags, ...)
 end
 
+-- TODO add flags into newlink
 function S.newlink_create(index, flags, ...)
   return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + S.NLM_F_CREATE, newlink_f, index, flags, ...)
 end
