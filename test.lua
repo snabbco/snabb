@@ -1046,7 +1046,7 @@ test_netlink = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
-  test_interface_newlink_mtu_root = function()
+  test_interface_set_mtu_root = function()
     local i = assert(S.interfaces())
     local lo = assert(i.lo, "expect lo interface")
     assert(lo:up())
@@ -1056,20 +1056,20 @@ test_netlink = {
     assert_equal(lo.mtu, 16000, "expect MTU now 16000")
     assert(lo:setmtu(mtu))
   end,
-  test_interface_newlink_ifname_root = function()
+  test_interface_rename_root = function()
     -- using bridge to test this as no other interface in container yet and not sure you can rename lo
     local ok, err = S.bridge_add("br0")
     assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
     if ok then
       local i = assert(S.interfaces())
       assert(i.br0)
-      assert(S.newlink(i.br0.index, i.br0.flags.flags, "ifname", "newname"))
+      assert(i.br0:rename("newname"))
       assert(i:refresh())
-      assert(i.newname, "interface should be renamed")
+      assert(i.newname and not i.br0, "interface should be renamed")
       assert(S.bridge_del("newname"))
     end
   end,
-  test_interface_newlink_macaddr_root = function()
+  test_interface_set_macaddr_root = function()
     -- using bridge to test this as no other interface in container yet
     local ok, err = S.bridge_add("br0")
     assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel

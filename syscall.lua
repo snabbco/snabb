@@ -4933,6 +4933,12 @@ meth.iflink = {
       if not ok then return nil, err end
       return i:refresh()
     end,
+    rename = function(i, name)
+      local ok, err = S.newlink(i.index, i.flags.flags, "ifname", name)
+      if not ok then return nil, err end
+      i.name = name -- refresh not working otherwise as done by name TODO fix so by index
+      return i:refresh()
+    end,
     refresh = function(i)
       local j, err = S.interface(i.name)
       if not j then return nil, err end
