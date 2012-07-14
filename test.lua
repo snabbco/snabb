@@ -1074,7 +1074,7 @@ test_netlink = {
       local i = assert(S.interfaces())
       assert(i.br0)
       assert(S.newlink(i.br0.index, i.br0.flags.flags, "ifname", "newname"))
-      i = assert(S.interfaces())
+      assert(i:refresh())
       assert(i.newname, "interface should be renamed")
       assert(S.bridge_del("newname"))
     end

@@ -4878,7 +4878,22 @@ S.encapnames = {
   [S.ARPHRD_LOOPBACK] = "Local Loopback",
 }
 
+meth.iflinks = {
+  fn = {
+    refresh = function(i)
+      local j, err = S.interfaces()
+      if not j then return nil, err end
+      for k, _ in pairs(i) do i[k] = nil end
+      for k, v in pairs(j) do i[k] = v end
+      return i
+    end,
+  },
+}
+
 mt.iflinks = {
+  __index = function(i, k)
+    if meth.iflinks.fn[k] then return meth.iflinks.fn[k] end
+  end,
   __tostring = function(is)
     local s = {}
     for _, v in ipairs(is) do
