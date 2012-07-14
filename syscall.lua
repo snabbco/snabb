@@ -5180,6 +5180,33 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
 };
 ]]
 
+local function newlink_getmsg(args, messages)
+  local msg = table.remove(args, 1)
+  msg = stringflag(msg, "IFLA_")
+  local tp = newlink_msg_types[msg]
+  if not tp then error("unknown message type") end
+
+  messages[#messages + 1] = t.rtattr
+
+  local value
+
+  if tp == "nested" then
+    error("NYI")
+  else
+    if #args == 0 then error("not enough arguments") end
+    value = table.remove(args, 1)
+  end
+
+  if tp == "asciiz" then
+    --str = tp
+    tp = t.buffer(#value + 1)
+  end
+
+  messages[#messages + 1] = tp
+
+  return args, messages
+end
+
 -- newlink
 local function newlink_f(index, flags, msg, value)
   local tp, str
@@ -5203,10 +5230,13 @@ local function newlink_f(index, flags, msg, value)
 
   local results = {nlmsgbuffer(t.ifinfomsg, unpack(messages))}
 
-  local buf, len, hdr, ifinfo = results[1], results[2], results[3], results[4]
+  local buf, len, hdr = table.remove(results, 1), table.remove(results, 1), table.remove(results, 1)
 
-  if msg then
-    local rtattr, val = results[5], results[6]
+  local ifinfo = table.remove(results, 1)
+  ifinfo[0] = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
+
+  if #results ~= 0 then
+    local rtattr, val = table.remove(results, 1), table.remove(results, 1)
     rtattr[0] = {rta_type = msg, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
 
     if str then
@@ -5216,8 +5246,6 @@ local function newlink_f(index, flags, msg, value)
       val[0] = value
     end
   end
-
-  ifinfo[0] = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
 
   return buf, len
 end
