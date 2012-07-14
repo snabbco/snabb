@@ -5178,7 +5178,7 @@ local newlink_msg_types = {
     [S.IFLA_WEIGHT] = t.uint32,
     [S.IFLA_OPERSTATE] = t.uint8,
     [S.IFLA_LINKMODE] = t.uint8,
-    [S.IFLA_LINKINFO] = "nested",
+    [S.IFLA_LINKINFO] = {"info", "IFLA_INFO_"},
     [S.IFLA_NET_NS_PID] = t.uint32,
     [S.IFLA_NET_NS_FD] = t.uint32,
     [S.IFLA_IFALIAS] = "asciiz",
@@ -5224,43 +5224,30 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
 };
 ]]
 
-local function newlink_getmsg(args, messages, values)
+local function newlink_getmsg(args, messages, values, tab, lookup)
   local msg = table.remove(args, 1)
-  msg = stringflag(msg, "IFLA_")
-  local tp = newlink_msg_types.ifla[msg]
+  msg = stringflag(msg, lookup or "IFLA_")
+  local tp = newlink_msg_types[tab or "ifla"][msg]
   if not tp then error("unknown message type") end
 
-  local value
+  local value, len
 
-  if tp == "nested" then
-    if msg ~= S.IFLA_LINKINFO then error("NYI") end
+  if tp == "nested" then error("NYI") end -- old way
 
-    -- TODO we need to fill the value in with the length of the whole nested seq in a general recursive way
+  if type(tp) == "table" then
 
-    local nest = table.remove(args, 1)
-    local value = table.remove(args, 1)
-    if not nest or not value then error("not enough arguments") end
-
-    nest = stringflag(nest, "IFLA_INFO_")
-
-    tp = newlink_msg_types.info[nest]
-
-    if tp == "nested" then error("NYI") end
-
-    if tp == "asciiz" then
-      tp = t.buffer(#value + 1)
-    else
-      if not ffi.istype(tp, value) then value = tp(value) end
-    end
+    value = {rta_type = msg} -- missing len, but have reference and can fix
 
     messages[#messages + 1] = t.rtattr
-    messages[#messages + 1] = t.rtattr
-    messages[#messages + 1] = tp
-    values[#values + 1] = {rta_type = msg, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
-    values[#values + 1] = {rta_type = nest, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
     values[#values + 1] = value
 
-    return args, messages, values
+    len, args, messages, values = newlink_getmsg(args, messages, values, tp[1], tp[2])
+
+    len = nlmsg_align(s.rtattr) + len
+
+    value.rta_len = len
+
+    return len, args, messages, values
 
   else
     value = table.remove(args, 1)
@@ -5273,24 +5260,26 @@ local function newlink_getmsg(args, messages, values)
     if not ffi.istype(tp, value) then value = tp(value) end
   end
 
+  len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))
+
   messages[#messages + 1] = t.rtattr
   messages[#messages + 1] = tp
-  values[#values + 1] = {rta_type = msg, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
+  values[#values + 1] = {rta_type = msg, rta_len = len}
   values[#values + 1] = value
 
-  return args, messages, values
+  return len, args, messages, values
 end
 
 -- newlink
 local function newlink_f(index, flags, ...)
-  local tp
+  local tp, len
   local messages, values = {}, {}
 
   if type(index) == 'table' then index = index.index end
 
   local args = {...}
   while #args ~= 0 do
-    args, messages, values = newlink_getmsg(args, messages, values)
+    len, args, messages, values = newlink_getmsg(args, messages, values)
   end
 
   local results = {nlmsgbuffer(t.ifinfomsg, unpack(messages))}

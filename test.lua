@@ -1104,7 +1104,7 @@ test_netlink = {
     assert(err.NODEV, "expect no such device error")
   end,
   test_newlink_newif_dummy_root = function()
-    local ok, err = S.newlink(0, "create", "", "linkinfo", "kind", "dummy", "ifname", "dummy0")
+    local ok, err = S.newlink(0, "create", "", "ifname", "dummy0", "linkinfo", "kind", "dummy")
     local i = assert(S.interfaces())
     assert(i.dummy0, "expect dummy interface")
     assert(S.dellink(i.dummy0.index))
