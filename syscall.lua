@@ -5228,17 +5228,12 @@ local function newlink_f(index, flags, ...)
   local ifinfo = table.remove(results, 1)
   ifinfo[0] = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
 
-  if #results ~= 0 then
-
-    local v1, value = values[1], values[2] -- temporary
-
-    local rtattr, val = table.remove(results, 1), table.remove(results, 1)
-    rtattr[0] = v1
-
+  while #results ~= 0 do
+    local result, value = table.remove(results, 1), table.remove(values, 1)
     if type(value) == "string" then
-      ffi.copy(val, value)
+      ffi.copy(result, value)
     else
-      val[0] = value
+      result[0] = value
     end
   end
 
