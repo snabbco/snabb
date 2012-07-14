@@ -5192,8 +5192,6 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
     local tp = types[msg]
     if not tp then error("unknown message type") end
 
-print("val", value, tp, msg, types[1])
-
     local str = false
 
     if tp == "asciiz" then
