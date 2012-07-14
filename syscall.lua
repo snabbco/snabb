@@ -5217,7 +5217,7 @@ local function newlink_f(index, flags, ...)
   if type(index) == 'table' then index = index.index end
 
   local args = {...}
-  if #args ~= 0 then
+  while #args ~= 0 do
     args, messages, values = newlink_getmsg(args, messages, values)
   end
 
