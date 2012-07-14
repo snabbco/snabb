@@ -5182,37 +5182,39 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
 
 -- newlink
 local function newlink_f(index, flags, msg, value)
-  local buf, len, hdr, ifinfo
+  local tp, str
+  local messages = {}
 
   if type(index) == 'table' then index = index.index end
 
   if msg then
     msg = stringflag(msg, "IFLA_")
 
-    local tp = newlink_msg_types[msg]
+    tp = newlink_msg_types[msg]
     if not tp then error("unknown message type") end
-
-    local str
 
     if tp == "asciiz" then
       str = tp
       tp = t.buffer(#value + 1)
     end
 
-    local rtattr, val
-    buf, len, hdr, ifinfo, rtattr, val = nlmsgbuffer(t.ifinfomsg, t.rtattr, tp)
+    messages = {t.rtattr, tp}
+  end
 
+  local results = {nlmsgbuffer(t.ifinfomsg, unpack(messages))}
+
+  local buf, len, hdr, ifinfo = results[1], results[2], results[3], results[4]
+
+  if msg then
+    local rtattr, val = results[5], results[6]
     rtattr[0] = {rta_type = msg, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
 
-    if not str then
+    if str then
+      ffi.copy(val, value)
+    else
       if not ffi.istype(tp, value) then value = tp(value) end
       val[0] = value
-    else
-      ffi.copy(val, value)
     end
-
-  else
-    buf, len, hdr, ifinfo = nlmsgbuffer(t.ifinfomsg)
   end
 
   ifinfo[0] = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
