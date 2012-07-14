@@ -5210,25 +5210,15 @@ local function newlink_getmsg(args, messages, values)
 end
 
 -- newlink
-local function newlink_f(index, flags, msg, value)
+local function newlink_f(index, flags, ...)
   local tp
-  local messages = {}
+  local messages, values = {}, {}
 
   if type(index) == 'table' then index = index.index end
 
-  if msg then
-    msg = stringflag(msg, "IFLA_")
-
-    tp = newlink_msg_types[msg]
-    if not tp then error("unknown message type") end
-
-    if tp == "asciiz" then
-      tp = t.buffer(#value + 1)
-    else
-      if not ffi.istype(tp, value) then value = tp(value) end
-    end
-
-    messages = {t.rtattr, tp}
+  local args = {...}
+  if #args ~= 0 then
+    args, messages, values = newlink_getmsg(args, messages, values)
   end
 
   local results = {nlmsgbuffer(t.ifinfomsg, unpack(messages))}
@@ -5239,8 +5229,11 @@ local function newlink_f(index, flags, msg, value)
   ifinfo[0] = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
 
   if #results ~= 0 then
+
+    local v1, value = values[1], values[2] -- temporary
+
     local rtattr, val = table.remove(results, 1), table.remove(results, 1)
-    rtattr[0] = {rta_type = msg, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
+    rtattr[0] = v1
 
     if type(value) == "string" then
       ffi.copy(val, value)
