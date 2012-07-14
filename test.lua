@@ -1047,21 +1047,14 @@ test_netlink = {
     end
   end,
   test_interface_newlink_mtu_root = function()
-    local p = assert(S.clone())
-     if p == 0 then
-      local ok, err = S.unshare("newnet")
-      if not ok then S.exit("failure") end
-      local i = fork_assert(S.interfaces())
-      fork_assert(i.lo and not i.lo.flags.up, "expect new network ns has down lo interface")
-      fork_assert(S.newlink(i.lo.index, "up", "mtu", 16000))
-      local lo = fork_assert(S.interface("lo"))
-      fork_assert(lo.flags.up, "expect lo up now")
-      fork_assert(lo.mtu == 16000, "expect MTU now 16000")
-      S.exit()
-    else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
-    end
+    local i = assert(S.interfaces())
+    local lo = assert(i.lo, "expect lo interface")
+    assert(lo:up())
+    assert(lo.flags.up, "expect lo up now")
+    local mtu = lo.mtu
+    assert(lo:setmtu(16000))
+    assert_equal(lo.mtu, 16000, "expect MTU now 16000")
+    assert(lo:setmtu(mtu))
   end,
   test_interface_newlink_ifname_root = function()
     -- using bridge to test this as no other interface in container yet and not sure you can rename lo

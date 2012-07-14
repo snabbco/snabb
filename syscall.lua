@@ -4923,6 +4923,11 @@ meth.iflink = {
     end,
     up = function(i) return i:setflags("up") end,
     down = function(i) return i:setflags() end,
+    setmtu = function(i, mtu)
+      local ok, err = S.newlink(i.index, i.flags.flags, "mtu", mtu)
+      if not ok then return nil, err end
+      return i:refresh()
+    end,
     refresh = function(i)
       local j, err = S.interface(i.name)
       if not j then return nil, err end
