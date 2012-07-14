@@ -5180,13 +5180,11 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
 };
 ]]
 
-local function newlink_getmsg(args, messages)
+local function newlink_getmsg(args, messages, values)
   local msg = table.remove(args, 1)
   msg = stringflag(msg, "IFLA_")
   local tp = newlink_msg_types[msg]
   if not tp then error("unknown message type") end
-
-  messages[#messages + 1] = t.rtattr
 
   local value
 
@@ -5198,18 +5196,22 @@ local function newlink_getmsg(args, messages)
   end
 
   if tp == "asciiz" then
-    --str = tp
     tp = t.buffer(#value + 1)
+  else
+    if not ffi.istype(tp, value) then value = tp(value) end
   end
 
+  messages[#messages + 1] = t.rtattr
   messages[#messages + 1] = tp
+  values[#values + 1] = {rta_type = msg, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
+  values[#values + 1] = value
 
-  return args, messages
+  return args, messages, values
 end
 
 -- newlink
 local function newlink_f(index, flags, msg, value)
-  local tp, str
+  local tp
   local messages = {}
 
   if type(index) == 'table' then index = index.index end
@@ -5221,8 +5223,9 @@ local function newlink_f(index, flags, msg, value)
     if not tp then error("unknown message type") end
 
     if tp == "asciiz" then
-      str = tp
       tp = t.buffer(#value + 1)
+    else
+      if not ffi.istype(tp, value) then value = tp(value) end
     end
 
     messages = {t.rtattr, tp}
@@ -5239,10 +5242,9 @@ local function newlink_f(index, flags, msg, value)
     local rtattr, val = table.remove(results, 1), table.remove(results, 1)
     rtattr[0] = {rta_type = msg, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
 
-    if str then
+    if type(value) == "string" then
       ffi.copy(val, value)
     else
-      if not ffi.istype(tp, value) then value = tp(value) end
       val[0] = value
     end
   end
