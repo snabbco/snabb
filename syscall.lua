@@ -4917,24 +4917,24 @@ meth.iflink = {
   },
   fn = {
     setflags = function(i, flags)
-      local ok, err = S.newlink(i, flags)
+      local ok, err = S.newlink(i, 0, flags)
       if not ok then return nil, err end
       return i:refresh()
     end,
     up = function(i) return i:setflags("up") end,
     down = function(i) return i:setflags() end,
     setmtu = function(i, mtu)
-      local ok, err = S.newlink(i.index, i.flags.flags, "mtu", mtu) -- TODO filter flags? getting LOWER_UP set
+      local ok, err = S.newlink(i.index, 0, i.flags.flags, "mtu", mtu) -- TODO filter flags? getting LOWER_UP set
       if not ok then return nil, err end
       return i:refresh()
     end,
     setmac = function(i, mac)
-      local ok, err = S.newlink(i.index, i.flags.flags, "address", mac)
+      local ok, err = S.newlink(i.index, 0, i.flags.flags, "address", mac)
       if not ok then return nil, err end
       return i:refresh()
     end,
     rename = function(i, name)
-      local ok, err = S.newlink(i.index, i.flags.flags, "ifname", name)
+      local ok, err = S.newlink(i.index, 0, i.flags.flags, "ifname", name)
       if not ok then return nil, err end
       i.name = name -- refresh not working otherwise as done by name TODO fix so by index
       return i:refresh()
@@ -5312,14 +5312,9 @@ local function newlink_f(index, flags, ...)
   return buf, len
 end
 
-function S.newlink(index, flags, ...)
-  --mods = stringflag(mods, "NLM_F_") -- for replace, excl, create, append, TODO only allow 
-  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, index, flags, ...)
-end
-
--- TODO add flags into newlink
-function S.newlink_create(index, flags, ...)
-  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + S.NLM_F_CREATE, newlink_f, index, flags, ...)
+function S.newlink(index, flags, iflags, ...)
+  flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
+  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, newlink_f, index, iflags, ...)
 end
 
 function S.interfaces() -- returns with address info too.

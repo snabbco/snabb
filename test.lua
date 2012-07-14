@@ -1014,7 +1014,7 @@ test_netlink = {
       if err then S.exit("failure") end -- may happen with no kernel support
       local i = fork_assert(S.interfaces())
       fork_assert(i.lo and not i.lo.flags.up, "expect new network ns has down lo interface")
-      fork_assert(S.newlink(i.lo.index, "up"))
+      fork_assert(S.newlink(i.lo.index, 0, "up"))
       local lo = fork_assert(i.lo:refresh())
       fork_assert(lo.flags.up, "expect lo up now")
       S.exit()
@@ -1099,18 +1099,18 @@ test_netlink = {
     end
   end,
   test_newlink_error_root = function()
-    local ok, err = S.newlink(-1, "up")
+    local ok, err = S.newlink(-1, 0, "up")
     assert(not ok, "expect bogus newlink to fail")
     assert(err.NODEV, "expect no such device error")
   end,
   test_newlink_newif_dummy_root = function()
-    local ok, err = S.newlink_create(0, "", "linkinfo", "kind", "dummy", "ifname", "dummy0")
+    local ok, err = S.newlink(0, "create", "", "linkinfo", "kind", "dummy", "ifname", "dummy0")
     local i = assert(S.interfaces())
     assert(i.dummy0, "expect dummy interface")
     assert(S.dellink(i.dummy0.index))
   end,
   test_newlink_newif_bridge_root = function()
-    local ok, err = S.newlink_create(0, "", "linkinfo", "kind", "bridge", "ifname", "br0")
+    local ok, err = S.newlink(0, "create", "", "linkinfo", "kind", "bridge", "ifname", "br0")
     local i = assert(S.interfaces())
     assert(i.br0, "expect bridge interface")
     local b = assert(S.bridge_list())
