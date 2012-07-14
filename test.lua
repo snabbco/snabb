@@ -1092,7 +1092,7 @@ test_netlink = {
       local i = assert(S.interfaces())
       assert(i.br0)
       ok, err = S.dellink(i.br0.index) -- fails, cannot delete bridge
-      assert(err.EINVAL, "expect cannot delete bridge")
+      assert(err.EOPNOTSUPP, "expect cannot delete bridge")
       assert(S.bridge_del("br0"))
       i = assert(S.interfaces())
       assert(not i.br0, "expect interface deleted")
@@ -1102,6 +1102,12 @@ test_netlink = {
     local ok, err = S.newlink(-1, "up")
     assert(not ok, "expect bogus newlink to fail")
     assert(err.NODEV, "expect no such device error")
+  end,
+  test_newlink_newif_root = function()
+    local ok, err = S.newlink_create(0, "", "linkinfo", "kind", "dummy", "ifname", "dummy0")
+    local i = assert(S.interfaces())
+    assert(i.dummy0, "expect dummy interface")
+    assert(S.dellink(i.dummy0.index))
   end,
 }
 

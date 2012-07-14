@@ -5151,7 +5151,7 @@ local function dellink_f(index)
 end
 
 function S.dellink(index)
-  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f)
+  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f, index)
 end
 
 -- read interfaces and details.
@@ -5166,30 +5166,32 @@ function S.getlink()
 end
 
 local newlink_msg_types = {
-  [S.IFLA_ADDRESS] = t.macaddr,
-  [S.IFLA_BROADCAST] = t.macaddr,
-  [S.IFLA_IFNAME] = "asciiz",
-  -- TODO IFLA_MAP
-  [S.IFLA_MTU] = t.uint32,
-  [S.IFLA_LINK] = t.uint32,
-  [S.IFLA_MASTER] = t.uint32,
-  [S.IFLA_TXQLEN] = t.uint32,
-  [S.IFLA_WEIGHT] = t.uint32,
-  [S.IFLA_OPERSTATE] = t.uint8,
-  [S.IFLA_LINKMODE] = t.uint8,
-  [S.IFLA_LINKINFO] = "nested",
-  [S.IFLA_NET_NS_PID] = t.uint32,
-  [S.IFLA_NET_NS_FD] = t.uint32,
-  [S.IFLA_IFALIAS] = "asciiz",
-  [S.IFLA_VFINFO_LIST] = "nested",
-  [S.IFLA_VF_PORTS] = "nested",
-  [S.IFLA_PORT_SELF] = "nested",
-  [S.IFLA_AF_SPEC] = "nested",
+  ifla = {
+    [S.IFLA_ADDRESS] = t.macaddr,
+    [S.IFLA_BROADCAST] = t.macaddr,
+    [S.IFLA_IFNAME] = "asciiz",
+    -- TODO IFLA_MAP
+    [S.IFLA_MTU] = t.uint32,
+    [S.IFLA_LINK] = t.uint32,
+    [S.IFLA_MASTER] = t.uint32,
+    [S.IFLA_TXQLEN] = t.uint32,
+    [S.IFLA_WEIGHT] = t.uint32,
+    [S.IFLA_OPERSTATE] = t.uint8,
+    [S.IFLA_LINKMODE] = t.uint8,
+    [S.IFLA_LINKINFO] = "nested",
+    [S.IFLA_NET_NS_PID] = t.uint32,
+    [S.IFLA_NET_NS_FD] = t.uint32,
+    [S.IFLA_IFALIAS] = "asciiz",
+    [S.IFLA_VFINFO_LIST] = "nested",
+    [S.IFLA_VF_PORTS] = "nested",
+    [S.IFLA_PORT_SELF] = "nested",
+    [S.IFLA_AF_SPEC] = "nested",
+  },
+  info = {
+    [S.IFLA_INFO_KIND] = "asciiz",
+    [S.IFLA_INFO_DATA] = "nested",
+  }
 }
-
--- for LINKINFO TODO in another table as share values
---      [S.IFLA_INFO_KIND] = "asciiz",
---      [S.IFLA_INFO_DATA] = "nested",
 
 --[[ TODO add
 static const struct nla_policy ifla_vfinfo_policy[IFLA_VF_INFO_MAX+1] = {
@@ -5225,16 +5227,44 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
 local function newlink_getmsg(args, messages, values)
   local msg = table.remove(args, 1)
   msg = stringflag(msg, "IFLA_")
-  local tp = newlink_msg_types[msg]
+  local tp = newlink_msg_types.ifla[msg]
   if not tp then error("unknown message type") end
 
   local value
 
   if tp == "nested" then
-    error("NYI")
+    if msg ~= S.IFLA_LINKINFO then error("NYI") end
+
+    -- TODO we need to fill the value in with the length of the whole nested seq in a general recursive way
+
+    local nest = table.remove(args, 1)
+    local value = table.remove(args, 1)
+    if not nest or not value then error("not enough arguments") end
+
+    nest = stringflag(nest, "IFLA_INFO_")
+
+    tp = newlink_msg_types.info[nest]
+
+    if tp == "nested" then error("NYI") end
+
+    if tp == "asciiz" then
+      tp = t.buffer(#value + 1)
+    else
+      if not ffi.istype(tp, value) then value = tp(value) end
+    end
+
+    messages[#messages + 1] = t.rtattr
+    messages[#messages + 1] = t.rtattr
+    messages[#messages + 1] = tp
+    values[#values + 1] = {rta_type = msg, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
+    values[#values + 1] = {rta_type = nest, rta_len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))}
+    values[#values + 1] = value
+
+    return args, messages, values
+
   else
-    if #args == 0 then error("not enough arguments") end
     value = table.remove(args, 1)
+    if not value then error("not enough arguments") end
   end
 
   if tp == "asciiz" then
@@ -5282,9 +5312,13 @@ local function newlink_f(index, flags, ...)
   return buf, len
 end
 
-function S.newlink(index, flags, msg, value)
+function S.newlink(index, flags, ...)
   --mods = stringflag(mods, "NLM_F_") -- for replace, excl, create, append, TODO only allow 
-  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, index, flags, msg, value)
+  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, index, flags, ...)
+end
+
+function S.newlink_create(index, flags, ...)
+  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + S.NLM_F_CREATE, newlink_f, index, flags, ...)
 end
 
 function S.interfaces() -- returns with address info too.
