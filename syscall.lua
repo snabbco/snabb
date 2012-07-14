@@ -4916,7 +4916,11 @@ meth.iflink = {
     change = function(i) return tonumber(i.ifinfo.ifi_change) end,
   },
   fn = {
-    setflags = function(i, flags) return S.newlink(i, flags) end,
+    setflags = function(i, flags)
+      local ok, err = S.newlink(i, flags)
+      if not ok then return nil, err end
+      return i:refresh()
+    end,
     up = function(i) return i:setflags("up") end,
     down = function(i) return i:setflags() end,
     refresh = function(i)

@@ -1026,10 +1026,8 @@ test_netlink = {
   test_interface_up_down_root = function()
     local i = assert(S.interfaces())
     assert(i.lo:down())
-    i = assert(S.interfaces())
     assert(not i.lo.flags.up, "expect lo down")
     assert(i.lo:up())
-    assert(i:refresh())
     assert(i.lo.flags.up, "expect lo up now")
   end,
   test_interface_setflags_root = function()
@@ -1041,8 +1039,7 @@ test_netlink = {
       fork_assert(i.lo, "expect new network ns has lo interface")
       fork_assert(not i.lo.flags.up, "expect new network lo is down")
       fork_assert(i.lo:setflags("up"))
-      local lo = fork_assert(S.interface("lo"))
-      fork_assert(lo.flags.up, "expect lo up now")
+      fork_assert(i.lo.flags.up, "expect lo up now")
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
