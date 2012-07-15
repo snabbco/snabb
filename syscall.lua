@@ -5104,12 +5104,7 @@ local function nlmsg(ntype, flags, f, ...)
   local buf, len = f(...)
 
   local hdr = pt.nlmsghdr(buf)
-
-  hdr.nlmsg_len = len
-  hdr.nlmsg_type = ntype
-  hdr.nlmsg_flags = flags
-  hdr.nlmsg_seq = sock:seq()
-  hdr.nlmsg_pid = a.pid
+  hdr[0] = {nlmsg_len = len, nlmsg_type = ntype, nlmsg_flags = flags, nlmsg_seq = sock:seq(), nlmsg_pid = a.pid}
 
   local ios = t.iovecs{{buf, len}}
   local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
