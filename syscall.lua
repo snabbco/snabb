@@ -5134,15 +5134,16 @@ function S.getaddr(af)
 end
 
 -- remove interface TODO allow extra parameters so can do by name (check if number or string)
-local function dellink_f(index)
+local function dellink_f(ifv)
   local buf, len, hdr, ifinfomsg = nlmsgbuffer(t.ifinfomsg)
-  ifinfomsg[0] = {ifi_index = index, ifi_flags = 0, ifi_change = 0xffffffff}
+  ifinfomsg[0] = ifv
   return buf, len
 end
 
 -- TODO allow more arguments, eg for delete by name.
 function S.dellink(index)
-  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f, index)
+  local ifv = {ifi_index = index, ifi_flags = 0, ifi_change = S.IFI_ALL}
+  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f, ifv)
 end
 
 -- read interfaces and details. TODO add parameters so can read single interface
