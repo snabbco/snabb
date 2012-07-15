@@ -5294,18 +5294,11 @@ function S.newlink(index, flags, iflags, change, ...)
   return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, newlink_f, t.ifinfomsg, ifv, ...)
 end
 
--- remove interface TODO allow extra parameters so can do by name (check if number or string)
-local function dellink_f(ifv)
-  local buf, len, hdr, ifinfomsg = nlmsgbuffer(t.ifinfomsg)
-  ifinfomsg[0] = ifv
-  return buf, len
-end
-
 -- TODO allow more arguments, eg for delete by name.
 function S.dellink(index)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = 0, ifi_change = S.IFI_ALL}
-  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f, ifv)
+  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, t.ifinfomsg, ifv)
 end
 
 function S.interfaces() -- returns with address info too.
