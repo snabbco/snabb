@@ -5133,7 +5133,7 @@ function S.getaddr(af)
   return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, getaddr_f, af)
 end
 
--- remove interface
+-- remove interface TODO allow extra parameters so can do by name
 local function dellink_f(index)
   local buf, len, hdr, ifinfomsg = nlmsgbuffer(t.ifinfomsg)
   ifinfomsg[0] = {ifi_index = index, ifi_flags = 0, ifi_change = 0xffffffff}
@@ -5145,7 +5145,7 @@ function S.dellink(index)
   return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f, index)
 end
 
--- read interfaces and details.
+-- read interfaces and details. TODO add parameters so can read single interface
 local function getlink_f()
   local buf, len, hdr, rtgenmsg = nlmsgbuffer(t.rtgenmsg)
   rtgenmsg[0] = {rtgen_family = S.AF_PACKET}
