@@ -4920,7 +4920,7 @@ meth.iflink = {
     up = function(i) return i:setflags("up", "up") end,
     down = function(i) return i:setflags("", "up") end,
     setmtu = function(i, mtu)
-      local ok, err = S.newlink(i.index, 0, 0, 0, "mtu", mtu) -- TODO can remove flags, 0 should be ok
+      local ok, err = S.newlink(i.index, 0, 0, 0, "mtu", mtu)
       if not ok then return nil, err end
       return i:refresh()
     end,
