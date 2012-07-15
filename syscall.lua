@@ -5133,19 +5133,6 @@ function S.getaddr(af)
   return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, getaddr_f, af)
 end
 
--- remove interface TODO allow extra parameters so can do by name (check if number or string)
-local function dellink_f(ifv)
-  local buf, len, hdr, ifinfomsg = nlmsgbuffer(t.ifinfomsg)
-  ifinfomsg[0] = ifv
-  return buf, len
-end
-
--- TODO allow more arguments, eg for delete by name.
-function S.dellink(index)
-  local ifv = {ifi_index = index, ifi_flags = 0, ifi_change = S.IFI_ALL}
-  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f, ifv)
-end
-
 -- read interfaces and details. TODO add parameters so can read single interface
 local function getlink_f()
   local buf, len, hdr, rtgenmsg = nlmsgbuffer(t.rtgenmsg)
@@ -5305,6 +5292,20 @@ function S.newlink(index, flags, iflags, change, ...)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = stringflags(change, "IFF_")}
   return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, newlink_f, t.ifinfomsg, ifv, ...)
+end
+
+-- remove interface TODO allow extra parameters so can do by name (check if number or string)
+local function dellink_f(ifv)
+  local buf, len, hdr, ifinfomsg = nlmsgbuffer(t.ifinfomsg)
+  ifinfomsg[0] = ifv
+  return buf, len
+end
+
+-- TODO allow more arguments, eg for delete by name.
+function S.dellink(index)
+  if type(index) == 'table' then index = index.index end
+  local ifv = {ifi_index = index, ifi_flags = 0, ifi_change = S.IFI_ALL}
+  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f, ifv)
 end
 
 function S.interfaces() -- returns with address info too.
