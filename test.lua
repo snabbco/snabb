@@ -1059,12 +1059,11 @@ test_netlink = {
   test_interface_set_mtu_byname_root = function()
     local i = assert(S.interfaces())
     local lo = assert(i.lo, "expect lo interface")
-    assert(lo:up())
-    assert(lo.flags.up, "expect lo up now")
     local mtu = lo.mtu
     assert(S.newlink(0, 0, "up", "ifname", "lo", "mtu", 16000))
     assert(lo:refresh())
     assert_equal(lo.mtu, 16000, "expect MTU now 16000")
+    assert(lo.flags.up, "expect lo up now")
     assert(lo:setmtu(mtu))
   end,
 
