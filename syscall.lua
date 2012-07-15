@@ -5331,7 +5331,28 @@ function S.interface(i) -- could optimize just to retrieve info for one
   if not ifs then return nil, err end
   return ifs[i]
 end
-  
+
+local create_if_process = { -- TODO very incomplete
+  flags = function(args, v) end,
+  name = function(args, v)
+    args[#args + 1] = "ifname"
+    args[#args + 1] = v
+  end,
+  type = function(args, v)
+    args[#args + 1] = "linkinfo"
+    args[#args + 1] = "kind"
+    args[#args + 1] = v
+  end,
+}
+
+function S.create_interface(tab)
+  local args = {0, "create", tab.flags or ""}
+  for k, v in pairs(tab) do
+    if create_if_process[k] then create_if_process[k](args, v) end
+  end
+  return S.newlink(unpack(args))
+end
+
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
     local buf1 = t.buffer(1)

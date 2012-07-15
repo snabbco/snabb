@@ -1060,13 +1060,13 @@ test_netlink = {
     local i = assert(S.interfaces())
     local lo = assert(i.lo, "expect lo interface")
     local mtu = lo.mtu
+    assert(lo:up())
     assert(S.newlink(0, 0, "up", "ifname", "lo", "mtu", 16000))
     assert(lo:refresh())
     assert_equal(lo.mtu, 16000, "expect MTU now 16000")
     assert(lo.flags.up, "expect lo up now")
     assert(lo:setmtu(mtu))
   end,
-
   test_interface_rename_root = function()
     -- using bridge to test this as no other interface in container yet and not sure you can rename lo
     local ok, err = S.bridge_add("br0")
@@ -1115,13 +1115,13 @@ test_netlink = {
     assert(err.NODEV, "expect no such device error")
   end,
   test_newlink_newif_dummy_root = function()
-    local ok, err = S.newlink(0, "create", "", "ifname", "dummy0", "linkinfo", "kind", "dummy")
+    local ok, err = S.create_interface{name = "dummy0", type = "dummy"}
     local i = assert(S.interfaces())
     assert(i.dummy0, "expect dummy interface")
     assert(S.dellink(i.dummy0.index))
   end,
   test_newlink_newif_bridge_root = function()
-    local ok, err = S.newlink(0, "create", "", "linkinfo", "kind", "bridge", "ifname", "br0")
+    local ok, err = S.create_interface{name = "br0", type = "bridge"}
     local i = assert(S.interfaces())
     assert(i.br0, "expect bridge interface")
     local b = assert(S.bridge_list())
