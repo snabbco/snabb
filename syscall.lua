@@ -917,6 +917,10 @@ S.IFF_LOWER_UP   = 0x10000
 S.IFF_DORMANT    = 0x20000
 S.IFF_ECHO       = 0x40000
 
+S.IFF_ALL        = 0xffffffff
+S.IFF_NONE       = bit.bnot(0x7ffff) -- this is a bit of a fudge as zero should work, but does not for historical reasons see net/core/rtnetlink.c
+
+-- not sure if we need these
 S.IFF_SLAVE_NEEDARP = 0x40
 S.IFF_ISATAP        = 0x80
 S.IFF_MASTER_ARPMON = 0x100
@@ -929,14 +933,6 @@ S.IFF_BRIDGE_PORT = 0x4000
 S.IFF_OVS_DATAPATH       = 0x8000
 S.IFF_TX_SKB_SHARING     = 0x10000
 S.IFF_UNICAST_FLT = 0x20000
-
--- Private (from user) interface flags (netdevice->priv_flags)
-S.IFF_802_1Q_VLAN = 0x1
-S.IFF_EBRIDGE     = 0x2
-S.IFF_SLAVE_INACTIVE     = 0x4
-S.IFF_MASTER_8023AD      = 0x8
-S.IFF_MASTER_ALB  = 0x10
-S.IFF_BONDING     = 0x20
 
 S.IFF_VOLATILE = S.IFF_LOOPBACK + S.IFF_POINTOPOINT + S.IFF_BROADCAST + S.IFF_ECHO +
                  S.IFF_MASTER + S.IFF_SLAVE + S.IFF_RUNNING + S.IFF_LOWER_UP + S.IFF_DORMANT
@@ -4917,24 +4913,24 @@ meth.iflink = {
   },
   fn = {
     setflags = function(i, flags, change)
-      local ok, err = S.newlink(i, 0, flags, change)
+      local ok, err = S.newlink(i, 0, flags, change or S.IFF_ALL)
       if not ok then return nil, err end
       return i:refresh()
     end,
     up = function(i) return i:setflags("up", "up") end,
     down = function(i) return i:setflags("", "up") end,
     setmtu = function(i, mtu)
-      local ok, err = S.newlink(i.index, 0, i.flags.flags, 0, "mtu", mtu) -- TODO can remove flags, 0 should be ok
+      local ok, err = S.newlink(i.index, 0, 0, 0, "mtu", mtu) -- TODO can remove flags, 0 should be ok
       if not ok then return nil, err end
       return i:refresh()
     end,
     setmac = function(i, mac)
-      local ok, err = S.newlink(i.index, 0, i.flags.flags, 0, "address", mac)
+      local ok, err = S.newlink(i.index, 0, 0, 0, "address", mac)
       if not ok then return nil, err end
       return i:refresh()
     end,
     rename = function(i, name)
-      local ok, err = S.newlink(i.index, 0, i.flags.flags, 0, "ifname", name)
+      local ok, err = S.newlink(i.index, 0, 0, 0, "ifname", name)
       if not ok then return nil, err end
       i.name = name -- refresh not working otherwise as done by name TODO fix so by index
       return i:refresh()
@@ -5304,7 +5300,7 @@ local function newlink_f(...)
 end
 
 function S.newlink(index, flags, iflags, change, ...)
-  if not change then change = 0xffffffff end
+  if change == 0 then change = S.IFF_NONE end -- 0 should work, but does not
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = stringflags(change, "IFF_")}
@@ -5354,7 +5350,7 @@ local create_if_process = { -- TODO very incomplete
 }
 
 function S.create_interface(tab)
-  local args = {0, "create", tab.flags or "", tab.change or 0}
+  local args = {0, "create", tab.flags or 0, tab.change or 0}
   for k, v in pairs(tab) do
     if create_if_process[k] then create_if_process[k](args, v) end
   end
