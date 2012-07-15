@@ -4945,7 +4945,6 @@ meth.iflink = {
   }
 }
 
--- TODO update interface on update operations? or return new interface
 mt.iflink = {
   __index = function(i, k)
     if meth.iflink.index[k] then return meth.iflink.index[k](i) end
