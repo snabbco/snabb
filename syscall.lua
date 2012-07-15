@@ -5221,11 +5221,23 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
 
 local function ifla_getmsg(args, messages, values, tab, lookup)
   local msg = table.remove(args, 1)
-  msg = stringflag(msg, lookup or "IFLA_")
-  local tp = ifla_msg_types[tab or "ifla"][msg]
-  if not tp then error("unknown message type") end
-
   local value, len
+  local tp
+
+  if type(msg) == "cdata" then
+    tp = msg
+    value = table.remove(args, 1)
+    if not value then error("not enough arguments") end
+    if not ffi.istype(tp, value) then value = tp(value) end
+    len = ffi.sizeof(value)
+    messages[#messages + 1] = tp
+    values[#values + 1] = value
+    return len, args, messages, values
+  end
+
+  msg = stringflag(msg, lookup or "IFLA_")
+  tp = ifla_msg_types[tab or "ifla"][msg]
+  if not tp then error("unknown message type") end
 
   if type(tp) == "table" then
     value = {rta_type = msg} -- missing rta_len, but have reference and can fix
@@ -5265,23 +5277,18 @@ local function ifla_getmsg(args, messages, values, tab, lookup)
 end
 
 -- newlink
-local function newlink_f(index, flags, ...)
-  local tp, len
+local function newlink_f(...)
+  local len
   local messages, values = {}, {}
-
-  if type(index) == 'table' then index = index.index end
 
   local args = {...}
   while #args ~= 0 do
     len, args, messages, values = ifla_getmsg(args, messages, values)
   end
 
-  local results = {nlmsgbuffer(t.ifinfomsg, unpack(messages))}
+  local results = {nlmsgbuffer(unpack(messages))}
 
   local buf, len, hdr = table.remove(results, 1), table.remove(results, 1), table.remove(results, 1)
-
-  local ifinfo = table.remove(results, 1)
-  ifinfo[0] = {ifi_index = index, ifi_flags = stringflags(flags, "IFF_"), ifi_change = 0xffffffff}
 
   while #results ~= 0 do
     local result, value = table.remove(results, 1), table.remove(values, 1)
@@ -5297,7 +5304,9 @@ end
 
 function S.newlink(index, flags, iflags, ...)
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
-  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, newlink_f, index, iflags, ...)
+  if type(index) == 'table' then index = index.index end
+  local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = 0xffffffff}
+  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, newlink_f, t.ifinfomsg, ifv, ...)
 end
 
 function S.interfaces() -- returns with address info too.
