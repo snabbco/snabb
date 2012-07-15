@@ -5122,7 +5122,7 @@ end
 -- TODO these should be renamed or made more general, or abstracted, as we add more functionality
 -- TODO make more like the ip options
 
--- read addresses from interface
+-- read addresses from interface TODO add parameters so can read from just one interface, etc
 local function getaddr_f(af)
   local buf, len, hdr, ifaddrmsg = nlmsgbuffer(t.ifaddrmsg)
   ifaddrmsg[0] = {ifa_family = stringflag(af, "AF_")}
@@ -5133,7 +5133,7 @@ function S.getaddr(af)
   return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, getaddr_f, af)
 end
 
--- remove interface TODO allow extra parameters so can do by name
+-- remove interface TODO allow extra parameters so can do by name (check if number or string)
 local function dellink_f(index)
   local buf, len, hdr, ifinfomsg = nlmsgbuffer(t.ifinfomsg)
   ifinfomsg[0] = {ifi_index = index, ifi_flags = 0, ifi_change = 0xffffffff}
