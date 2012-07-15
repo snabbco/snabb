@@ -5293,11 +5293,10 @@ function S.newlink(index, flags, iflags, change, ...)
   return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, ifla_f, t.ifinfomsg, ifv, ...)
 end
 
--- TODO allow more arguments, eg for delete by name.
-function S.dellink(index)
+function S.dellink(index, ...)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = 0, ifi_change = S.IFI_ALL}
-  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, ifla_f, t.ifinfomsg, ifv)
+  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, ifla_f, t.ifinfomsg, ifv, ...)
 end
 
 function S.interfaces() -- returns with address info too.

@@ -1128,6 +1128,14 @@ test_netlink = {
     assert(b.br0, "expect to find new bridge")
     assert(S.dellink(i.br0.index))
   end,
+  test_dellink_by_name_root = function()
+    local ok, err = S.create_interface{name = "dummy0", type = "dummy"}
+    local i = assert(S.interfaces())
+    assert(i.dummy0, "expect dummy interface")
+    assert(S.dellink(0, "ifname", "dummy0"))
+    local i = assert(S.interfaces())
+    assert(not i.dummy0, "expect dummy interface gone")
+  end,
 }
 
 test_termios = {
