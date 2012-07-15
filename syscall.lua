@@ -5160,7 +5160,7 @@ function S.getlink()
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, getlink_f)
 end
 
-local newlink_msg_types = {
+local ifla_msg_types = {
   ifla = {
     [S.IFLA_ADDRESS] = t.macaddr,
     [S.IFLA_BROADCAST] = t.macaddr,
@@ -5219,10 +5219,10 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
 };
 ]]
 
-local function newlink_getmsg(args, messages, values, tab, lookup)
+local function ifla_getmsg(args, messages, values, tab, lookup)
   local msg = table.remove(args, 1)
   msg = stringflag(msg, lookup or "IFLA_")
-  local tp = newlink_msg_types[tab or "ifla"][msg]
+  local tp = ifla_msg_types[tab or "ifla"][msg]
   if not tp then error("unknown message type") end
 
   local value, len
@@ -5233,13 +5233,15 @@ local function newlink_getmsg(args, messages, values, tab, lookup)
     messages[#messages + 1] = t.rtattr
     values[#values + 1] = value
 
-    len, args, messages, values = newlink_getmsg(args, messages, values, tp[1], tp[2])
+    len, args, messages, values = ifla_getmsg(args, messages, values, tp[1], tp[2])
 
     len = nlmsg_align(s.rtattr) + len
 
     value.rta_len = len
 
     return len, args, messages, values
+
+  -- recursion base case, just a value, not nested
 
   else
     value = table.remove(args, 1)
@@ -5271,7 +5273,7 @@ local function newlink_f(index, flags, ...)
 
   local args = {...}
   while #args ~= 0 do
-    len, args, messages, values = newlink_getmsg(args, messages, values)
+    len, args, messages, values = ifla_getmsg(args, messages, values)
   end
 
   local results = {nlmsgbuffer(t.ifinfomsg, unpack(messages))}
