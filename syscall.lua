@@ -5260,8 +5260,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup)
   return len, args, messages, values
 end
 
--- newlink
-local function newlink_f(...)
+local function ifla_f(...)
   local len
   local messages, values = {}, {}
 
@@ -5291,14 +5290,14 @@ function S.newlink(index, flags, iflags, change, ...)
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = stringflags(change, "IFF_")}
-  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, newlink_f, t.ifinfomsg, ifv, ...)
+  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, ifla_f, t.ifinfomsg, ifv, ...)
 end
 
 -- TODO allow more arguments, eg for delete by name.
 function S.dellink(index)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = 0, ifi_change = S.IFI_ALL}
-  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, newlink_f, t.ifinfomsg, ifv)
+  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, ifla_f, t.ifinfomsg, ifv)
 end
 
 function S.interfaces() -- returns with address info too.
