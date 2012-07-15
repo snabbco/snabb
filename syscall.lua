@@ -5145,6 +5145,7 @@ local function dellink_f(index)
   return buf, len
 end
 
+-- TODO allow more arguments, eg for delete by name.
 function S.dellink(index)
   return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, dellink_f, index)
 end
