@@ -1014,7 +1014,7 @@ test_netlink = {
       if err then S.exit("failure") end -- may happen with no kernel support
       local i = fork_assert(S.interfaces())
       fork_assert(i.lo and not i.lo.flags.up, "expect new network ns has down lo interface")
-      fork_assert(S.newlink(i.lo.index, 0, "up"))
+      fork_assert(S.newlink(i.lo.index, 0, "up", "up"))
       local lo = fork_assert(i.lo:refresh())
       fork_assert(lo.flags.up, "expect lo up now")
       S.exit()
@@ -1061,7 +1061,7 @@ test_netlink = {
     local lo = assert(i.lo, "expect lo interface")
     local mtu = lo.mtu
     assert(lo:up())
-    assert(S.newlink(0, 0, "up", "ifname", "lo", "mtu", 16000))
+    assert(S.newlink(0, 0, "up", "up", "ifname", "lo", "mtu", 16000))
     assert(lo:refresh())
     assert_equal(lo.mtu, 16000, "expect MTU now 16000")
     assert(lo.flags.up, "expect lo up now")
@@ -1110,7 +1110,7 @@ test_netlink = {
     end
   end,
   test_newlink_error_root = function()
-    local ok, err = S.newlink(-1, 0, "up")
+    local ok, err = S.newlink(-1, 0, "up", "up")
     assert(not ok, "expect bogus newlink to fail")
     assert(err.NODEV, "expect no such device error")
   end,

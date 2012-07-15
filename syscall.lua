@@ -4916,25 +4916,25 @@ meth.iflink = {
     change = function(i) return tonumber(i.ifinfo.ifi_change) end,
   },
   fn = {
-    setflags = function(i, flags)
-      local ok, err = S.newlink(i, 0, flags)
+    setflags = function(i, flags, change)
+      local ok, err = S.newlink(i, 0, flags, change)
       if not ok then return nil, err end
       return i:refresh()
     end,
-    up = function(i) return i:setflags("up") end,
-    down = function(i) return i:setflags() end,
+    up = function(i) return i:setflags("up", "up") end,
+    down = function(i) return i:setflags("", "up") end,
     setmtu = function(i, mtu)
-      local ok, err = S.newlink(i.index, 0, i.flags.flags, "mtu", mtu) -- TODO filter flags? getting LOWER_UP set
+      local ok, err = S.newlink(i.index, 0, i.flags.flags, 0, "mtu", mtu) -- TODO can remove flags, 0 should be ok
       if not ok then return nil, err end
       return i:refresh()
     end,
     setmac = function(i, mac)
-      local ok, err = S.newlink(i.index, 0, i.flags.flags, "address", mac)
+      local ok, err = S.newlink(i.index, 0, i.flags.flags, 0, "address", mac)
       if not ok then return nil, err end
       return i:refresh()
     end,
     rename = function(i, name)
-      local ok, err = S.newlink(i.index, 0, i.flags.flags, "ifname", name)
+      local ok, err = S.newlink(i.index, 0, i.flags.flags, 0, "ifname", name)
       if not ok then return nil, err end
       i.name = name -- refresh not working otherwise as done by name TODO fix so by index
       return i:refresh()
@@ -5303,10 +5303,11 @@ local function newlink_f(...)
   return buf, len
 end
 
-function S.newlink(index, flags, iflags, ...)
+function S.newlink(index, flags, iflags, change, ...)
+  if not change then change = 0xffffffff end
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
   if type(index) == 'table' then index = index.index end
-  local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = 0xffffffff}
+  local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = stringflags(change, "IFF_")}
   return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, newlink_f, t.ifinfomsg, ifv, ...)
 end
 
@@ -5353,7 +5354,7 @@ local create_if_process = { -- TODO very incomplete
 }
 
 function S.create_interface(tab)
-  local args = {0, "create", tab.flags or ""}
+  local args = {0, "create", tab.flags or "", tab.change or 0}
   for k, v in pairs(tab) do
     if create_if_process[k] then create_if_process[k](args, v) end
   end
