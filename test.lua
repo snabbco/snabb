@@ -727,7 +727,6 @@ test_misc = {
   test_environ = function()
     local e = S.environ()
     assert(e.PATH, "expect PATH to be set in environment")
-    assert(S.getenv("USER"), "expect USER to be set in environment")
     assert(S.setenv("XXXXYYYYZZZZZZZZ", "test"))
     assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env vars")
     assert(S.unsetenv("XXXXYYYYZZZZZZZZ"))
