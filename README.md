@@ -42,7 +42,7 @@ The aim is to provide nice to use, Lua friendly interfaces where possible, but m
 
 Lots of system calls have glibc wrappers, some of these are trivial some less so, and some are broken. In particular some of them expose different ABIs, so we try to avoid these, just using kernel ABIs as these have long term support and we are not trying to be compatible as we are using a different language. `strace` is your friend.
 
-Currently I have done little testing on other C libraries that will help iron out these differences, but I intend to support at least uClibc and Musl eventually, which should help remove any glibc-isms. However I cannot currently (July 2012) build luajit head on uClibc, and it builds but segfaults most of the time under Musl.
+As well as eglibc and glibc, everything now runs on [Musl libc](http://www.etalabs.net/musl/). I use [sabotage](https://github.com/rofl0r/sabotage) as a build environment, which now includes luajit, although you may need to update to git head. Musl is much smaller than libc (700k vs 3M), while still implementing everything we need in easy to understand code. It is also BSD licensed, which may be useful as it matches the other licenses for LuaJIT and ljsyscall.
 
 ### System calls
 
