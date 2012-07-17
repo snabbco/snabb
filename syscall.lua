@@ -1496,6 +1496,7 @@ S.TIOCM_RI  = S.TIOCM_RNG
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
 if ffi.arch == "x86" then
   S.SYS_getpid           = 20
+  S.SYS_acct             = 51
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
@@ -1505,6 +1506,18 @@ if ffi.arch == "x86" then
   S.SYS_lstat64          = 196
   S.SYS_fstat64          = 197
   S.SYS_getdents64       = 220
+  S.SYS_setxattr         = 226
+  S.SYS_lsetxattr        = 227
+  S.SYS_fsetxattr        = 228
+  S.SYS_getxattr         = 229
+  S.SYS_lgetxattr        = 230
+  S.SYS_fgetxattr        = 231
+  S.SYS_listxattr        = 232
+  S.SYS_llistxattr       = 233
+  S.SYS_flistxattr       = 234
+  S.SYS_removexattr      = 235
+  S.SYS_lremovexattr     = 236
+  S.SYS_fremovexattr     = 237
   S.SYS_io_setup         = 245
   S.SYS_io_destroy       = 246
   S.SYS_io_getevents     = 247
@@ -1524,6 +1537,19 @@ elseif ffi.arch == "x64" then
   S.SYS_getpid           = 39
   S.SYS_clone            = 56
   S.SYS_getdents         = 78
+  S.SYS_acct             = 163
+  S.SYS_setxattr         = 188
+  S.SYS_lsetxattr        = 189
+  S.SYS_fsetxattr        = 190
+  S.SYS_getxattr         = 191
+  S.SYS_lgetxattr        = 192
+  S.SYS_fgetxattr        = 193
+  S.SYS_listxattr        = 194
+  S.SYS_llistxattr       = 195
+  S.SYS_flistxattr       = 196
+  S.SYS_removexattr      = 197
+  S.SYS_lremovexattr     = 198
+  S.SYS_fremovexattr     = 199
   S.SYS_io_setup         = 206
   S.SYS_io_destroy       = 207
   S.SYS_io_getevents     = 208
@@ -1539,6 +1565,7 @@ elseif ffi.arch == "x64" then
   S.SYS_timerfd_gettime	 = 287
 elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_getpid           = 20
+  S.SYS_acct             = 51
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
@@ -1548,6 +1575,18 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_lstat64          = 196
   S.SYS_fstat64          = 197
   S.SYS_getdents64       = 217
+  S.SYS_setxattr         = 226
+  S.SYS_lsetxattr        = 227
+  S.SYS_fsetxattr        = 228
+  S.SYS_getxattr         = 229
+  S.SYS_lgetxattr        = 230
+  S.SYS_fgetxattr        = 231
+  S.SYS_listxattr        = 232
+  S.SYS_llistxattr       = 233
+  S.SYS_flistxattr       = 234
+  S.SYS_removexattr      = 235
+  S.SYS_lremovexattr     = 236
+  S.SYS_fremovexattr     = 237
   S.SYS_io_setup         = 243
   S.SYS_io_destroy       = 244
   S.SYS_io_getevents     = 245
@@ -2483,18 +2522,6 @@ int inotify_add_watch(int fd, const char *pathname, uint32_t mask);
 int inotify_rm_watch(int fd, uint32_t wd);
 int adjtimex(struct timex *buf);
 int sync_file_range(int fd, loff_t offset, loff_t count, unsigned int flags);
-ssize_t listxattr (const char *path, char *list, size_t size);
-ssize_t llistxattr (const char *path, char *list, size_t size);
-ssize_t flistxattr (int filedes, char *list, size_t size);
-ssize_t getxattr (const char *path, const char *name, void *value, size_t size);
-ssize_t lgetxattr (const char *path, const char *name, void *value, size_t size);
-ssize_t fgetxattr (int filedes, const char *name, void *value, size_t size);
-int setxattr (const char *path, const char *name, const void *value, size_t size, int flags);
-int lsetxattr (const char *path, const char *name, const void *value, size_t size, int flags);
-int fsetxattr (int filedes, const char *name, const void *value, size_t size, int flags);
-int removexattr (const char *path, const char *name);
-int lremovexattr (const char *path, const char *name);
-int fremovexattr (int filedes, const char *name);
 
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
@@ -3582,7 +3609,7 @@ function S.chdir(path) return retbool(C.chdir(path)) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, S.mode(mode))) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
-function S.acct(filename) return retbool(C.acct(filename)) end
+function S.acct(filename) return retbool(C.syscall(S.SYS_acct, filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
@@ -4062,12 +4089,16 @@ function S.sysinfo(info)
   return info
 end
 
-local function growattrbuf(f, a1, a2)
+local function growattrbuf(sys, a, b)
   local len = 512
   local buffer = t.buffer(len)
   local ret
   repeat
-    if a2 then ret = tonumber(f(a1, a2, buffer, len)) else ret = tonumber(f(a1, buffer, len)) end
+    if b then
+      ret = tonumber(C.syscall(sys, a, b, pt.void(buffer), t.int(len)))
+    else
+      ret = tonumber(C.syscall(sys, a, pt.void(buffer), t.int(len)))
+    end
     if ret == -1 and ffi.errno ~= S.E.ERANGE then return nil, t.error() end
     if ret == -1 then
       len = len * 2
@@ -4080,33 +4111,33 @@ local function growattrbuf(f, a1, a2)
   return ffi.string(buffer, ret)
 end
 
-local function lattrbuf(...)
-  local s, err = growattrbuf(...)
+local function lattrbuf(sys, a)
+  local s, err = growattrbuf(sys, a)
   if not s then return nil, err end
   return split('\0', s)
 end
 
-function S.listxattr(path) return lattrbuf(C.listxattr, path) end
-function S.llistxattr(path) return lattrbuf(C.llistxattr, path) end
-function S.flistxattr(fd) return lattrbuf(C.flistxattr, getfd(fd)) end
+function S.listxattr(path) return lattrbuf(S.SYS_listxattr, path) end
+function S.llistxattr(path) return lattrbuf(S.SYS_llistxattr, path) end
+function S.flistxattr(fd) return lattrbuf(S.SYS_flistxattr, t.int(getfd(fd))) end
 
 function S.setxattr(path, name, value, flags)
-  return retbool(C.setxattr(path, name, value, #value + 1, stringflag(flags, "XATTR_")))
+  return retbool(C.syscall(S.SYS_setxattr, path, name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
 end
 function S.lsetxattr(path, name, value, flags)
-  return retbool(C.lsetxattr(path, name, value, #value + 1, stringflag(flags, "XATTR_")))
+  return retbool(C.syscall(S.SYS_lsetxattr, path, name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
 end
 function S.fsetxattr(fd, name, value, flags)
-  return retbool(C.fsetxattr(getfd(fd), name, value, #value + 1, stringflag(flags, "XATTR_")))
+  return retbool(C.syscall(S.SYS_fsetxattr, t.int(getfd(fd)), name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
 end
 
-function S.getxattr(path, name) return growattrbuf(C.getxattr, path, name) end
-function S.lgetxattr(path, name) return growattrbuf(C.lgetxattr, path, name) end
-function S.fgetxattr(fd, name) return growattrbuf(C.fgetxattr, getfd(fd), name) end
+function S.getxattr(path, name) return growattrbuf(S.SYS_getxattr, path, name) end
+function S.lgetxattr(path, name) return growattrbuf(S.SYS_lgetxattr, path, name) end
+function S.fgetxattr(fd, name) return growattrbuf(S.SYS_fgetxattr, t.int(getfd(fd)), name) end
 
-function S.removexattr(path, name) return retbool(C.removexattr(path, name)) end
-function S.lremovexattr(path, name) return retbool(C.lremovexattr(path, name)) end
-function S.fremovexattr(fd, name) return retbool(C.fremovexattr(getfd(fd), name)) end
+function S.removexattr(path, name) return retbool(C.syscall(S.SYS_removexattr, path, name)) end
+function S.lremovexattr(path, name) return retbool(C.syscall(S.SYS_lremovexattr, path, name)) end
+function S.fremovexattr(fd, name) return retbool(C.syscall(S.SYS_fremovexattr, t.int(getfd(fd)), name)) end
 
 -- helper function to set and return attributes in tables
 local function xattr(list, get, set, remove, path, t)

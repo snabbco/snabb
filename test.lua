@@ -782,7 +782,7 @@ test_misc = {
     local u = assert(S.uname())
     assert(h == u.nodename, "gethostname did not return nodename")
   end,
-  test_cmdline = function()
+  test_cmdline = function() -- TODO fix this so it is more portable
     --[[
     local oldcmd = assert(S.readfile("/proc/self/cmdline"))
     assert(S.setcmdline("test"))
