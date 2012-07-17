@@ -1531,6 +1531,7 @@ if ffi.arch == "x86" then
   S.SYS_timerfd_create	 = 322
   S.SYS_timerfd_settime  = 325
   S.SYS_timerfd_gettime	 = 326
+  S.SYS_pipe2            = 331
 elseif ffi.arch == "x64" then
   S.SYS_stat             = 4
   S.SYS_fstat            = 5
@@ -1565,6 +1566,7 @@ elseif ffi.arch == "x64" then
   S.SYS_timerfd_create	 = 283
   S.SYS_timerfd_settime  = 286
   S.SYS_timerfd_gettime	 = 287
+  S.SYS_pipe2            = 293
 elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_getpid           = 20
   S.SYS_acct             = 51
@@ -1602,6 +1604,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_timerfd_create	 = 350
   S.SYS_timerfd_settime  = 353
   S.SYS_timerfd_gettime	 = 354
+  S.SYS_pipe2            = 359
 else
   error("unsupported architecture")
 end
@@ -3584,7 +3587,7 @@ end
 function S.pipe(flags)
   local fd2 = t.int2()
   local ret
-  if flags then ret = C.pipe2(fd2, stringflags(flags, "O_")) else ret = C.pipe(fd2) end
+  if flags then ret = C.syscall(S.SYS_pipe2, pt.void(fd2), t.int(stringflags(flags, "O_"))) else ret = C.pipe(fd2) end
   if ret == -1 then return nil, t.error() end
   return {t.fd(fd2[0]), t.fd(fd2[1])}
 end
