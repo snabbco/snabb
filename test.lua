@@ -49,7 +49,7 @@ test_basic = {
   end,
   test_signals = function()
     assert_equal(S.SIGSYS, 31) -- test numbers correct
-  end
+  end,
 }
 
 test_open_close = {

@@ -1502,6 +1502,7 @@ if ffi.arch == "x86" then
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
   S.SYS_clone            = 120
+  S.SYS__llseek          = 140
   S.SYS_getdents         = 141
   S.SYS_stat64           = 195
   S.SYS_lstat64          = 196
@@ -1587,6 +1588,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
   S.SYS_clone            = 120
+  S.SYS__llseek          = 140
   S.SYS_getdents         = 141
   S.SYS_stat64           = 195
   S.SYS_lstat64          = 196
@@ -2513,7 +2515,6 @@ ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
 ssize_t pread64(int fd, void *buf, size_t count, loff_t offset);
 ssize_t pwrite64(int fd, const void *buf, size_t count, loff_t offset);
-loff_t llseek(int fd, loff_t offset, int whence);  /* note could use _llseek the syscall instead */
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
 // for sendto and recvfrom use void poointer not const struct sockaddr * to avoid casting
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const void *dest_addr, socklen_t addrlen);
@@ -2528,6 +2529,7 @@ int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
+off_t lseek(int fd, off_t offset, int whence); // only for 64 bit, else use _llseek
 
 int epoll_create1(int flags);
 int epoll_create(int size);
@@ -3438,6 +3440,8 @@ S.pointer = pt.void
 
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
+local function mod(a, b) return a - div(a, b) * b end
+
 function S.nogc(d) ffi.gc(d, nil) end
 
 -- return helpers. not so much needed any more, often not using
@@ -3764,7 +3768,21 @@ end
 function S.write(fd, buf, count) return retnum(C.write(getfd(fd), buf, count or #buf)) end
 function S.pread(fd, buf, count, offset) return retnum(C.pread64(getfd(fd), buf, count, offset)) end
 function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite64(getfd(fd), buf, count or #buf, offset)) end
-function S.lseek(fd, offset, whence) return ret64(C.llseek(getfd(fd), offset, stringflag(whence, "SEEK_"))) end
+
+if ffi.abi("64bit") then
+  function S.lseek(fd, offset, whence)
+    return ret64(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_")))
+  end
+else
+  function S.lseek(fd, offset, whence, result)
+    local offhigh, offlow = div(offset, 4294967296), mod(offset, 4294967296)
+    if not result then result = t.loff1() end
+    local ret = C.syscall(S.SYS__llseek, t.int(getfd(fd)), t.ulong(offhigh), t.ulong(offlow), pt.void(result), t.uint(stringflag(whence, "SEEK_")))
+    if ret == -1 then return nil, t.error() end
+    return result[0]
+  end
+end
+
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), addr, addrlen or ffi.sizeof(addr)))
