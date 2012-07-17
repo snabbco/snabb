@@ -1507,6 +1507,7 @@ if ffi.arch == "x86" then
   S.SYS_lstat64          = 196
   S.SYS_fstat64          = 197
   S.SYS_getdents64       = 220
+  S.SYS_readahead        = 225
   S.SYS_setxattr         = 226
   S.SYS_lsetxattr        = 227
   S.SYS_fsetxattr        = 228
@@ -1546,6 +1547,7 @@ elseif ffi.arch == "x64" then
   S.SYS_getdents         = 78
   S.SYS_ustat            = 136
   S.SYS_acct             = 163
+  S.SYS_readahead        = 187
   S.SYS_setxattr         = 188
   S.SYS_lsetxattr        = 189
   S.SYS_fsetxattr        = 190
@@ -1590,6 +1592,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_lstat64          = 196
   S.SYS_fstat64          = 197
   S.SYS_getdents64       = 217
+  S.SYS_readahead        = 225
   S.SYS_setxattr         = 226
   S.SYS_lsetxattr        = 227
   S.SYS_fsetxattr        = 228
@@ -2782,6 +2785,7 @@ t.uint64 = ffi.typeof("uint64_t")
 t.long = ffi.typeof("long")
 t.ulong = ffi.typeof("unsigned long")
 t.uintptr = ffi.typeof("uintptr_t")
+t.size = ffi.typeof("size_t")
 
 t.sa_family = ffi.typeof("sa_family_t")
 t.msghdr = ffi.typeof("struct msghdr")
@@ -3934,7 +3938,7 @@ function S.fallocate(fd, mode, offset, len)
 end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count)
-  return retbool(C.readahead(getfd(fd), offset, count))
+  return retbool(C.syscall(S.SYS_readahead, t.int(getfd(fd)), t.loff(offset), t.size(count)))
 end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain
