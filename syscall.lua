@@ -3805,7 +3805,7 @@ function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), S.mode(mode))) end
 function S.sync_file_range(fd, offset, count, flags)
-  return retbool(C.sync_file_range(getfd(fd), offset, count, stringflags(flags, "SYNC_FILE_RANGE_")))
+  return retbool(C.syscall(S.SYS_sync_file_range, t.int(getfd(fd)), t.loff(offset), t.loff(count), t.uint(stringflags(flags, "SYNC_FILE_RANGE_"))))
 end
 
 function S.stat(path, buf)
