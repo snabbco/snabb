@@ -1533,6 +1533,7 @@ if ffi.arch == "x86" then
   S.SYS_tee              = 315
   S.SYS_vmsplice         = 316
   S.SYS_timerfd_create	 = 322
+  S.SYS_fallocate        = 324
   S.SYS_timerfd_settime  = 325
   S.SYS_timerfd_gettime	 = 326
   S.SYS_pipe2            = 331
@@ -1572,6 +1573,7 @@ elseif ffi.arch == "x64" then
   S.SYS_sync_file_range  = 277
   S.SYS_vmsplice         = 278
   S.SYS_timerfd_create	 = 283
+  S.SYS_fallocate        = 285
   S.SYS_timerfd_settime  = 286
   S.SYS_timerfd_gettime	 = 287
   S.SYS_pipe2            = 293
@@ -1614,6 +1616,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_tee              = 342
   S.SYS_vmsplice         = 343
   S.SYS_timerfd_create	 = 350
+  S.SYS_fallocate        = 352
   S.SYS_timerfd_settime  = 353
   S.SYS_timerfd_gettime	 = 354
   S.SYS_pipe2            = 359
@@ -3927,7 +3930,7 @@ function S.posix_fadvise(fd, advice, offset, len) -- note argument order
   return retbool(C.posix_fadvise(getfd(fd), offset or 0, len or 0, stringflag(advice, "POSIX_FADV_")))
 end
 function S.fallocate(fd, mode, offset, len)
-  return retbool(C.fallocate(getfd(fd), stringflag(mode, "FALLOC_FL_"), offset or 0, len))
+  return retbool(C.syscall(S.SYS_fallocate, t.int(getfd(fd)), t.uint(stringflag(mode, "FALLOC_FL_")), t.loff(offset or 0), t.loff(len)))
 end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count)
