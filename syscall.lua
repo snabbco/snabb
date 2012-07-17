@@ -4738,49 +4738,6 @@ function S.setenv(name, value, overwrite)
 end
 function S.clearenv() return retbool(C.clearenv()) end
 
-local oldcmdline, cmdstart
-
-function S.setcmdline(...) -- this sets /proc/self/cmdline, use prctl to set /proc/self/comm as well
-  -- note code makes memory layout assumptions that are not necessarily portable
-  -- call this before modifying environment, as we cannot actually get real argv pointer right now, so deduce
-  -- will probably segfault otherwise!
-
-  if not oldcmdline then
-    oldcmdline = S.readfile("/proc/self/cmdline")
-    if not C.environ then return nil end -- nothing we can do
-    cmdstart = C.environ[0] - #oldcmdline -- this is where Linux stores the command line
-  end
-
-  local me = pt.char(C.environ)
-
-  if not me then return nil end -- in normal use you should get a pointer to one null pointer as minimum
-
-  local new = table.concat({...}, '\0')
-
-  if #new <= #oldcmdline then -- do not need to move environment
-    ffi.copy(cmdstart, new)
-    ffi.fill(cmdstart + #new, #oldcmdline - #new)
-    return true
-  end
-
-  local e = S.environ() -- keep copy to reconstruct
-
-  -- we should have a guaranteed space, larger than env, but segfaulting... 
-
-  local elen = 0
-  for k, v in pairs(e) do elen = elen + #v + 1 end
-
-  if #new > #oldcmdline + elen - 1 then new = new:sub(1, #oldcmdline + elen - 1) .. '\0' end
-  C.environ = nil -- kill the old environ
-
-  ffi.copy(cmdstart, new)
-  ffi.fill(cmdstart + #new, #oldcmdline + elen - #new)
-
-  for k, v in pairs(e) do S.setenv(k, v) end -- restore environment
-
-  return true
-end
-
 -- 'macros' and helper functions etc
 
 -- LuaJIT does not provide 64 bit bitops at the moment

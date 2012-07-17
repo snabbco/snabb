@@ -779,19 +779,6 @@ test_misc = {
     local u = assert(S.uname())
     assert(h == u.nodename, "gethostname did not return nodename")
   end,
-  test_cmdline = function() -- TODO fix this so it is more portable
-    --[[
-    local oldcmd = assert(S.readfile("/proc/self/cmdline"))
-    assert(S.setcmdline("test"))
-    local n = assert(S.readfile("/proc/self/cmdline"))
-    --assert(n:sub(1, 5) == "test\0", "command line should be set") -- valgrind issues
-    local ss = "test1234567890123456789012345678901234567890"
-    assert(S.setcmdline(ss))
-    n = assert(S.readfile("/proc/self/cmdline"))
-    --assert(n:sub(1,#ss) == ss, "long command line should be set: ")
-    assert(S.setcmdline(oldcmd))
-    ]]
-  end
 }
 
 test_sockets = {
