@@ -1497,6 +1497,7 @@ S.TIOCM_RI  = S.TIOCM_RNG
 if ffi.arch == "x86" then
   S.SYS_getpid           = 20
   S.SYS_acct             = 51
+  S.SYS_ustat            = 62
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
@@ -1537,6 +1538,7 @@ elseif ffi.arch == "x64" then
   S.SYS_getpid           = 39
   S.SYS_clone            = 56
   S.SYS_getdents         = 78
+  S.SYS_ustat            = 136
   S.SYS_acct             = 163
   S.SYS_setxattr         = 188
   S.SYS_lsetxattr        = 189
@@ -1566,6 +1568,7 @@ elseif ffi.arch == "x64" then
 elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_getpid           = 20
   S.SYS_acct             = 51
+  S.SYS_ustat            = 62
   S.SYS_stat             = 106
   S.SYS_fstat            = 108
   S.SYS_lstat            = 107
@@ -3857,7 +3860,7 @@ end
 
 function S.ustat(dev) -- note deprecated, use statfs instead
   local u = t.ustat()
-  local ret = C.ustat(dev, u)
+  local ret = C.syscall(S.SYS_ustat, t.int(dev), pt.void(u))
   if ret == -1 then return nil, t.error() end
   return u
 end
