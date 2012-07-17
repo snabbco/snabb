@@ -648,6 +648,9 @@ test_timers_signals = {
     assert(o.interval.time == 0 and o.value.time == 0, "old timer values zero")
     n = assert(fd:timerfd_read())
     assert(n == 1, "should have exactly one timer expiry")
+    local o = assert(fd:timerfd_gettime())
+    assert_equal(o.interval.time, 0, "expect 0 from gettime as expired")
+    assert_equal(o.value.time, 0, "expect 0 from gettime as expired")
     assert(fd:close())
   end,
   test_gettimeofday = function()

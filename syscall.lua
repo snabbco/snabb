@@ -1514,6 +1514,9 @@ if ffi.arch == "x86" then
   S.SYS_clock_gettime    = 265
   S.SYS_clock_getres     = 266
   S.SYS_clock_nanosleep  = 267
+  S.SYS_timerfd_create	 = 322
+  S.SYS_timerfd_settime  = 325
+  S.SYS_timerfd_gettime	 = 326
 elseif ffi.arch == "x64" then
   S.SYS_stat             = 4
   S.SYS_fstat            = 5
@@ -1531,6 +1534,9 @@ elseif ffi.arch == "x64" then
   S.SYS_clock_gettime    = 228
   S.SYS_clock_getres     = 229
   S.SYS_clock_nanosleep  = 230
+  S.SYS_timerfd_create	 = 283
+  S.SYS_timerfd_settime  = 286
+  S.SYS_timerfd_gettime	 = 287
 elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_getpid           = 20
   S.SYS_stat             = 106
@@ -1551,6 +1557,9 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_clock_gettime    = 263
   S.SYS_clock_getres     = 264
   S.SYS_clock_nanosleep  = 265
+  S.SYS_timerfd_create	 = 350
+  S.SYS_timerfd_settime  = 353
+  S.SYS_timerfd_gettime	 = 354
 else
   error("unsupported architecture")
 end
@@ -4402,20 +4411,20 @@ function S.setitimer(which, it)
 end
 
 function S.timerfd_create(clockid, flags)
-  return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
+  return retfd(C.syscall(S.SYS_timerfd_create, t.int(stringflag(clockid, "CLOCK_")), t.int(stringflags(flags, "TFD_"))))
 end
 
 function S.timerfd_settime(fd, flags, it)
   local oldtime = t.itimerspec()
   if not ffi.istype(t.itimerspec, it) then it = t.itimerspec(it) end
-  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), it, oldtime)
+  local ret = C.syscall(S.SYS_timerfd_settime, t.int(getfd(fd)), t.int(stringflag(flags, "TFD_TIMER_")), pt.void(it), pt.void(oldtime))
   if ret == -1 then return nil, t.error() end
   return oldtime
 end
 
 function S.timerfd_gettime(fd, curr_value)
   if not curr_value then curr_value = t.itimerspec() end
-  local ret = C.timerfd_gettime(getfd(fd), curr_value)
+  local ret = C.syscall(S.SYS_timerfd_gettime, t.int(getfd(fd)), pt.void(curr_value))
   if ret == -1 then return nil, t.error() end
   return curr_value
 end
