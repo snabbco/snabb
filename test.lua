@@ -269,8 +269,6 @@ test_file_operations = {
     local fd = assert(S.open("/"))
     local stat = assert(fd:stat())
     assert(stat.size == 4096, "expect / to be size 4096") -- might not be
-    assert(stat.gid == 0, "expect / to be gid 0 is " .. tonumber(stat.st_gid))
-    assert(stat.uid == 0, "expect / to be uid 0 is " .. tonumber(stat.st_uid))
     assert(stat.isdir, "expect / to be a directory")
     assert(fd:close())
   end,
