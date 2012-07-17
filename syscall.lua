@@ -1529,6 +1529,9 @@ if ffi.arch == "x86" then
   S.SYS_clock_getres     = 266
   S.SYS_clock_nanosleep  = 267
   S.SYS_splice           = 313
+  S.SYS_sync_file_range  = 314
+  S.SYS_tee              = 315
+  S.SYS_vmsplice         = 316
   S.SYS_timerfd_create	 = 322
   S.SYS_timerfd_settime  = 325
   S.SYS_timerfd_gettime	 = 326
@@ -1565,6 +1568,9 @@ elseif ffi.arch == "x64" then
   S.SYS_clock_getres     = 229
   S.SYS_clock_nanosleep  = 230
   S.SYS_splice           = 275
+  S.SYS_tee              = 276
+  S.SYS_sync_file_range  = 277
+  S.SYS_vmsplice         = 278
   S.SYS_timerfd_create	 = 283
   S.SYS_timerfd_settime  = 286
   S.SYS_timerfd_gettime	 = 287
@@ -1604,6 +1610,9 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_clock_getres     = 264
   S.SYS_clock_nanosleep  = 265
   S.SYS_splice           = 340
+  S.SYS_sync_file_range  = 341
+  S.SYS_tee              = 342
+  S.SYS_vmsplice         = 343
   S.SYS_timerfd_create	 = 350
   S.SYS_timerfd_settime  = 353
   S.SYS_timerfd_gettime	 = 354
@@ -4317,7 +4326,7 @@ function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
     offout = t.loff1()
     offout[0] = off_out
   end
-  return retnum(C.syscall(S.SYS_splice, t.int(getfd(fd_in)), pt.void(offin), t.int(getfd(fd_out)), pt.void(offout), t.int(len), t.int(stringflags(flags, "SPLICE_F_"))))
+  return retnum(C.syscall(S.SYS_splice, t.int(getfd(fd_in)), pt.void(offin), t.int(getfd(fd_out)), pt.void(offout), t.int(len), t.uint(stringflags(flags, "SPLICE_F_"))))
 end
 
 function S.vmsplice(fd, iov, flags)
@@ -4326,7 +4335,7 @@ function S.vmsplice(fd, iov, flags)
 end
 
 function S.tee(fd_in, fd_out, len, flags)
-  return retnum(C.tee(getfd(fd_in), getfd(fd_out), len, stringflags(flags, "SPLICE_F_")))
+  return retnum(C.syscall(S.SYS_tee, t.int(getfd(fd_in)), t.int(getfd(fd_out)), t.int(len), t.uint(stringflags(flags, "SPLICE_F_"))))
 end
 
 function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "IN_"))) end
