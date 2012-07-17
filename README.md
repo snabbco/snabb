@@ -16,7 +16,7 @@ Releases after tag 0.3 do not currently work with luaffi, please use that until 
 
 The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86. Intend to get my ppc build machine back up one day, if you want this supported please ask. I do not currently have a mips box, if you want this can you suggest a suitable dev box.
 
-Some tests need to be run as root to do anything. They don't fail, but they do not do anything. You cannot test a lot of stuff otherwise. However most of the testing is now done in isolated containers so should be harmless. Need to move the bridge tests to a container.
+Some tests need to be run as root, and will not be run otherwise. You cannot test a lot of stuff otherwise. However most of the testing is now done in isolated containers so should be harmless.
 
 Some tests may fail if you do not have kernel support for some feature (eg namespacing, ipv6, etc).
 
