@@ -3440,8 +3440,6 @@ S.pointer = pt.void
 
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
-local function mod(a, b) return a - div(a, b) * b end
-
 function S.nogc(d) ffi.gc(d, nil) end
 
 -- return helpers. not so much needed any more, often not using
@@ -3775,7 +3773,7 @@ if ffi.abi("64bit") then
   end
 else
   function S.lseek(fd, offset, whence, result)
-    local offhigh, offlow = div(offset, 4294967296), mod(offset, 4294967296)
+    local offhigh, offlow = t.int64(offset) / 4294967296LL, t.int64(offset) % 4294967296LL
     if not result then result = t.loff1() end
     local ret = C.syscall(S.SYS__llseek, t.int(getfd(fd)), t.ulong(offhigh), t.ulong(offlow), pt.void(result), t.uint(stringflag(whence, "SEEK_")))
     if ret == -1 then return nil, t.error() end

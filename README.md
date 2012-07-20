@@ -115,7 +115,7 @@ readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), mkfifoat(3)
 sigqueue,
 capset, capget
 pivot\_root, init\_module, delete\_module, query\_module, swapon, swapoff
-netns
+netns, iopl, ioperm
 ...
 
 ### 64 bit fileops on 32 bit
