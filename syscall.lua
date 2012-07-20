@@ -5161,6 +5161,11 @@ local ifla_msg_types = {
   ifa = {
     -- IFA_UNSPEC
     [S.IFA_ADDRESS] = generic_addr_type,
+    [S.IFA_LOCAL] = generic_addr_type,
+    [S.IFA_LABEL] = "asciiz",
+    [S.IFA_BROADCAST] = generic_addr_type,
+    [S.IFA_ANYCAST] = generic_addr_type,
+    -- IFA_CACHEINFO
   },
 }
 
