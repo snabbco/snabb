@@ -3284,6 +3284,14 @@ t.in6_addr = ffi.metatype("struct in6_addr", {
   end
 })
 
+local generic_addr_type = function(s)
+  if ffi.istype(t.in6_addr, s) then return t.in6_addr end
+  if ffi.istype(t.in_addr, s) then return t.in_addr end
+  local addr = t.in_addr(s)
+  if addr then return t.in_addr end
+  return t.in6_addr
+end
+
 S.addrtype = {
   [S.AF_INET] = t.in_addr,
   [S.AF_INET6] = t.in6_addr,
@@ -5125,6 +5133,7 @@ end
 
 local ifla_msg_types = {
   ifla = {
+    -- IFLA_UNSPEC
     [S.IFLA_ADDRESS] = t.macaddr,
     [S.IFLA_BROADCAST] = t.macaddr,
     [S.IFLA_IFNAME] = "asciiz",
@@ -5136,7 +5145,7 @@ local ifla_msg_types = {
     [S.IFLA_WEIGHT] = t.uint32,
     [S.IFLA_OPERSTATE] = t.uint8,
     [S.IFLA_LINKMODE] = t.uint8,
-    [S.IFLA_LINKINFO] = {"info", "IFLA_INFO_"},
+    [S.IFLA_LINKINFO] = {"ifla_info", "IFLA_INFO_"},
     [S.IFLA_NET_NS_PID] = t.uint32,
     [S.IFLA_NET_NS_FD] = t.uint32,
     [S.IFLA_IFALIAS] = "asciiz",
@@ -5145,10 +5154,14 @@ local ifla_msg_types = {
     --[S.IFLA_PORT_SELF] = "nested",
     --[S.IFLA_AF_SPEC] = "nested",
   },
-  info = {
+  ifla_info = {
     [S.IFLA_INFO_KIND] = "asciiz",
     --[S.IFLA_INFO_DATA] = "nested",
-  }
+  },
+  ifa = {
+    -- IFA_UNSPEC
+    [S.IFA_ADDRESS] = generic_addr_type,
+  },
 }
 
 --[[ TODO add
@@ -5226,7 +5239,12 @@ local function ifla_getmsg(args, messages, values, tab, lookup)
   if tp == "asciiz" then
     tp = t.buffer(#value + 1)
   else
-    if not ffi.istype(tp, value) then value = tp(value) end
+    if type(tp) == "function" then
+      tp = tp(value)
+    end
+    if not ffi.istype(tp, value) then
+      value = tp(value)
+    end
   end
 
   len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))
@@ -5265,6 +5283,15 @@ local function ifla_f(tab, lookup, ...)
   return buf, len
 end
 
+local rtpref = {
+  [S.RTM_NEWLINK] = {"ifla", "IFLA_"},
+  [S.RTM_GETLINK] = {"ifla", "IFLA_"},
+  [S.RTM_DELLINK] = {"ifla", "IFLA_"},
+  [S.RTM_NEWADDR] = {"ifa", "IFA_"},
+  [S.RTM_GETADDR] = {"ifa", "IFA_"},
+  [S.RTM_DELADDR] = {"ifa", "IFA_"},
+}
+
 local function nlmsg(ntype, flags, ...)
   local sock, err = S.socket("netlink", "raw", "route")
   if not sock then return nil, err end
@@ -5276,7 +5303,9 @@ local function nlmsg(ntype, flags, ...)
 
   local k = t.sockaddr_nl() -- kernel destination
 
-  local tab, lookup = "ifla", "IFLA_"
+  local tl = rtpref[ntype]
+  if not tl then error("NYI: ", ntype) end
+  local tab, lookup = tl[1], tl[2]
 
   local buf, len = ifla_f(tab, lookup, ...)
 
