@@ -3349,14 +3349,6 @@ t.in6_addr = ffi.metatype("struct in6_addr", {
   end
 })
 
-local generic_addr_type = function(s)
-  if ffi.istype(t.in6_addr, s) then return t.in6_addr end
-  if ffi.istype(t.in_addr, s) then return t.in_addr end
-  local addr = t.in_addr(s)
-  if addr then return t.in_addr end
-  return t.in6_addr
-end
-
 S.addrtype = {
   [S.AF_INET] = t.in_addr,
   [S.AF_INET6] = t.in6_addr,
@@ -5225,11 +5217,11 @@ local ifla_msg_types = {
   },
   ifa = {
     -- IFA_UNSPEC
-    [S.IFA_ADDRESS] = generic_addr_type,
-    [S.IFA_LOCAL] = generic_addr_type,
+    [S.IFA_ADDRESS] = "address",
+    [S.IFA_LOCAL] = "address",
     [S.IFA_LABEL] = "asciiz",
-    [S.IFA_BROADCAST] = generic_addr_type,
-    [S.IFA_ANYCAST] = generic_addr_type,
+    [S.IFA_BROADCAST] = "address",
+    [S.IFA_ANYCAST] = "address",
     -- IFA_CACHEINFO
   },
 }
@@ -5265,7 +5257,7 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
 };
 ]]
 
-local function ifla_getmsg(args, messages, values, tab, lookup)
+local function ifla_getmsg(args, messages, values, tab, lookup, af)
   local msg = table.remove(args, 1)
   local value, len
   local tp
@@ -5309,8 +5301,8 @@ local function ifla_getmsg(args, messages, values, tab, lookup)
   if tp == "asciiz" then
     tp = t.buffer(#value + 1)
   else
-    if type(tp) == "function" then
-      tp = tp(value)
+    if tp == "address" then
+      tp = S.addrtype[af]
     end
     if not ffi.istype(tp, value) then
       value = tp(value)
@@ -5327,14 +5319,13 @@ local function ifla_getmsg(args, messages, values, tab, lookup)
   return len, args, messages, values
 end
 
--- TODO as always used, probably need not pass as generic
-local function ifla_f(tab, lookup, ...)
+local function ifla_f(tab, lookup, af, ...)
   local len
   local messages, values = {}, {}
 
   local args = {...}
   while #args ~= 0 do
-    len, args, messages, values = ifla_getmsg(args, messages, values, tab, lookup)
+    len, args, messages, values = ifla_getmsg(args, messages, values, tab, lookup, af)
   end
 
   local results = {nlmsgbuffer(unpack(messages))}
@@ -5362,7 +5353,7 @@ local rtpref = {
   [S.RTM_DELADDR] = {"ifa", "IFA_"},
 }
 
-local function nlmsg(ntype, flags, ...)
+local function nlmsg(ntype, flags, af, ...)
   local sock, err = S.socket("netlink", "raw", "route")
   if not sock then return nil, err end
   local a = t.sockaddr_nl() -- kernel will fill in address
@@ -5377,7 +5368,7 @@ local function nlmsg(ntype, flags, ...)
   if not tl then error("NYI: ", ntype) end
   local tab, lookup = tl[1], tl[2]
 
-  local buf, len = ifla_f(tab, lookup, ...)
+  local buf, len = ifla_f(tab, lookup, af, ...)
 
   local hdr = pt.nlmsghdr(buf)
   hdr[0] = {nlmsg_len = len, nlmsg_type = ntype, nlmsg_flags = flags, nlmsg_seq = sock:seq(), nlmsg_pid = a.pid}
@@ -5405,24 +5396,25 @@ function S.newlink(index, flags, iflags, change, ...)
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = stringflags(change, "IFF_")}
-  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, t.ifinfomsg, ifv, ...)
+  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, nil, t.ifinfomsg, ifv, ...)
 end
 
 function S.dellink(index, ...)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = 0, ifi_change = S.IFI_ALL}
-  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg, ifv, ...)
+  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, nil, t.ifinfomsg, ifv, ...)
 end
 
 -- read interfaces and details.
 function S.getlink(...)
-  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, t.rtgenmsg, {rtgen_family = S.AF_PACKET}, ...)
+  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, nil, t.rtgenmsg, {rtgen_family = S.AF_PACKET}, ...)
 end
 
 -- read addresses from interface
 function S.getaddr(af, ...)
-  local ifav = {ifa_family = stringflag(af, "AF_")}
-  return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, t.ifaddrmsg, ifav, ...)
+  local family = stringflag(af, "AF_")
+  local ifav = {ifa_family = family}
+  return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, family, t.ifaddrmsg, ifav, ...)
 end
 
 -- TODO may need ifa_scope
@@ -5430,14 +5422,14 @@ function S.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
   local family = stringflag(af, "AF_")
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = stringflag(flags, "IFA_F_"), ifa_index = index}
-  return nlmsg(S.RTM_NEWADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifaddrmsg, ifav, ...)
+  return nlmsg(S.RTM_NEWADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
 function S.deladdr(index, af, prefixlen, ...)
   if type(index) == 'table' then index = index.index end
   local family = stringflag(af, "AF_")
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
-  return nlmsg(S.RTM_DELADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifaddrmsg, ifav, ...)
+  return nlmsg(S.RTM_DELADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
 function S.interfaces() -- returns with address info too.
