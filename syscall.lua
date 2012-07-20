@@ -5380,7 +5380,7 @@ local link_process = { -- TODO very incomplete
   end,
 }
 
--- TODO better name. even more general, not just newlink
+-- TODO better name. even more general, not just newlink. or make this the exposed newlink interface?
 function S.iplink(tab)
   local args = {tab.index or 0, tab.modifier or S.NLM_F_CREATE, tab.flags or 0, tab.change or 0}
   for k, v in pairs(tab) do
