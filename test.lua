@@ -1125,6 +1125,14 @@ test_netlink = {
     local i = assert(S.interfaces())
     assert(not i.dummy0, "expect dummy interface gone")
   end,
+  test_newaddr_root = function()
+    local lo = assert(S.interface("lo"))
+    --assert(S.newaddr(lo.index, "inet6", 0, "permanent", "address", t.in6_addr("::2")))
+
+    local lo = assert(S.interface("lo"))
+print(lo)
+--assert(1 == 2, "test")
+  end,
 }
 
 test_termios = {

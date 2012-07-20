@@ -5123,40 +5123,6 @@ local function nlmsgbuffer(...)
   return tbuffer(nlmsg_align(1), t.nlmsghdr, ...)
 end
 
-local function nlmsg(ntype, flags, f, ...)
-  local sock, err = S.socket("netlink", "raw", "route")
-  if not sock then return nil, err end
-  local a = t.sockaddr_nl() -- kernel will fill in address
-  local ok, err = sock:bind(a)
-  if not ok then return nil, err end -- gc will take care of closing socket...
-  a = sock:getsockname() -- to get bound address
-  if not a then return nil, err end -- gc will take care of closing socket...
-
-  local k = t.sockaddr_nl() -- kernel destination
-
-  local buf, len = f(...)
-
-  local hdr = pt.nlmsghdr(buf)
-  hdr[0] = {nlmsg_len = len, nlmsg_type = ntype, nlmsg_flags = flags, nlmsg_seq = sock:seq(), nlmsg_pid = a.pid}
-
-  local ios = t.iovecs{{buf, len}}
-  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
-
-  local n, err = sock:sendmsg(m)
-  if not n then return nil, err end
-
-  local r, err = S.nlmsg_read(sock, k)
-  if not r then
-    sock:close()
-    return nil, err
-  end
-
-  local ok, err = sock:close()
-  if not ok then return nil, err end
-
-  return r
-end
-
 local ifla_msg_types = {
   ifla = {
     [S.IFLA_ADDRESS] = t.macaddr,
@@ -5232,8 +5198,8 @@ local function ifla_getmsg(args, messages, values, tab, lookup)
     return len, args, messages, values
   end
 
-  msg = stringflag(msg, lookup or "IFLA_")
-  tp = ifla_msg_types[tab or "ifla"][msg]
+  msg = stringflag(msg, lookup)
+  tp = ifla_msg_types[tab][msg]
   if not tp then error("unknown message type") end
 
   if type(tp) == "table" then
@@ -5273,13 +5239,14 @@ local function ifla_getmsg(args, messages, values, tab, lookup)
   return len, args, messages, values
 end
 
-local function ifla_f(...)
+-- TODO as always used, probably need not pass as generic
+local function ifla_f(tab, lookup, ...)
   local len
   local messages, values = {}, {}
 
   local args = {...}
   while #args ~= 0 do
-    len, args, messages, values = ifla_getmsg(args, messages, values)
+    len, args, messages, values = ifla_getmsg(args, messages, values, tab, lookup)
   end
 
   local results = {nlmsgbuffer(unpack(messages))}
@@ -5298,29 +5265,74 @@ local function ifla_f(...)
   return buf, len
 end
 
+local function nlmsg(ntype, flags, ...)
+  local sock, err = S.socket("netlink", "raw", "route")
+  if not sock then return nil, err end
+  local a = t.sockaddr_nl() -- kernel will fill in address
+  local ok, err = sock:bind(a)
+  if not ok then return nil, err end -- gc will take care of closing socket...
+  a = sock:getsockname() -- to get bound address
+  if not a then return nil, err end -- gc will take care of closing socket...
+
+  local k = t.sockaddr_nl() -- kernel destination
+
+  local tab, lookup = "ifla", "IFLA_"
+
+  local buf, len = ifla_f(tab, lookup, ...)
+
+  local hdr = pt.nlmsghdr(buf)
+  hdr[0] = {nlmsg_len = len, nlmsg_type = ntype, nlmsg_flags = flags, nlmsg_seq = sock:seq(), nlmsg_pid = a.pid}
+
+  local ios = t.iovecs{{buf, len}}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
+
+  local n, err = sock:sendmsg(m)
+  if not n then return nil, err end
+
+  local r, err = S.nlmsg_read(sock, k)
+  if not r then
+    sock:close()
+    return nil, err
+  end
+
+  local ok, err = sock:close()
+  if not ok then return nil, err end
+
+  return r
+end
+
 function S.newlink(index, flags, iflags, change, ...)
   if change == 0 then change = S.IFF_NONE end -- 0 should work, but does not
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = stringflags(change, "IFF_")}
-  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, ifla_f, t.ifinfomsg, ifv, ...)
+  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, t.ifinfomsg, ifv, ...)
 end
 
 function S.dellink(index, ...)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = 0, ifi_change = S.IFI_ALL}
-  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, ifla_f, t.ifinfomsg, ifv, ...)
+  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifinfomsg, ifv, ...)
 end
 
 -- read interfaces and details.
 function S.getlink(...)
-  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, ifla_f, t.rtgenmsg, {rtgen_family = S.AF_PACKET}, ...)
+  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, t.rtgenmsg, {rtgen_family = S.AF_PACKET}, ...)
 end
 
 -- read addresses from interface
 function S.getaddr(af, ...)
   local ifav = {ifa_family = stringflag(af, "AF_")}
-  return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, ifla_f, t.ifaddrmsg, ifav, ...)
+  return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, t.ifaddrmsg, ifav, ...)
+end
+
+-- TODO may need ifa_scope
+function S.newaddr(index, af, prefix, flags, ...)
+  if type(index) == 'table' then index = index.index end
+  local family = stringflag(af, "AF_")
+  --if ffi.istype(t.in6_addr, addr) then family = S.AF_INET6 else family = S.AF_INET end
+  local ifav = {ifa_family = family, ifa_prefixlen = prefix or 0, ifa_flags = stringflag(flags, "IFA_F_"), ifa_index = index}
+  return nlmsg(S.RTM_NEWADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifaddrmsg, ifav, ...)
 end
 
 function S.interfaces() -- returns with address info too.
@@ -5367,6 +5379,7 @@ local link_process = { -- TODO very incomplete
 }
 
 -- TODO better name. even more general, not just newlink. or make this the exposed newlink interface?
+-- I think this is generally a nicer interface to expose.
 function S.iplink(tab)
   local args = {tab.index or 0, tab.modifier or S.NLM_F_CREATE, tab.flags or 0, tab.change or 0}
   for k, v in pairs(tab) do
