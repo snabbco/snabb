@@ -5171,17 +5171,6 @@ function S.getaddr(af)
   return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, getaddr_f, af)
 end
 
--- read interfaces and details. TODO add parameters so can read single interface
-local function getlink_f()
-  local buf, len, hdr, rtgenmsg = nlmsgbuffer(t.rtgenmsg)
-  rtgenmsg[0] = {rtgen_family = S.AF_PACKET}
-  return buf, len
-end
-
-function S.getlink()
-  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, getlink_f)
-end
-
 local ifla_msg_types = {
   ifla = {
     [S.IFLA_ADDRESS] = t.macaddr,
@@ -5335,6 +5324,11 @@ function S.dellink(index, ...)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = 0, ifi_change = S.IFI_ALL}
   return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, ifla_f, t.ifinfomsg, ifv, ...)
+end
+
+-- read interfaces and details.
+function S.getlink(...)
+  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, ifla_f, t.rtgenmsg, {rtgen_family = S.AF_PACKET}, ...)
 end
 
 function S.interfaces() -- returns with address info too.
