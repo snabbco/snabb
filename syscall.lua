@@ -5419,9 +5419,9 @@ local link_process = { -- TODO very incomplete
 }
 
 -- TODO better name. even more general, not just newlink. or make this the exposed newlink interface?
--- I think this is generally a nicer interface to expose.
+-- I think this is generally a nicer interface to expose than the ones above, for all functions
 function S.iplink(tab)
-  local args = {tab.index or 0, tab.modifier or S.NLM_F_CREATE, tab.flags or 0, tab.change or 0}
+  local args = {tab.index or 0, tab.modifier or 0, tab.flags or 0, tab.change or 0}
   for k, v in pairs(tab) do
     if link_process[k] then link_process[k](args, v) end
   end
@@ -5429,6 +5429,7 @@ function S.iplink(tab)
 end
 
 function S.create_interface(tab)
+  tab.modifier = S.NLM_F_CREATE
   return S.iplink(tab)
 end
 
