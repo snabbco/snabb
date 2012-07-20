@@ -5366,8 +5366,9 @@ function S.interface(i) -- could optimize just to retrieve info for one
   return ifs[i]
 end
 
-local create_if_process = { -- TODO very incomplete
+local link_process = { -- TODO very incomplete
   flags = function(args, v) end,
+  index = function(args, v) end,
   name = function(args, v)
     args[#args + 1] = "ifname"
     args[#args + 1] = v
@@ -5379,12 +5380,17 @@ local create_if_process = { -- TODO very incomplete
   end,
 }
 
-function S.create_interface(tab)
-  local args = {0, "create", tab.flags or 0, tab.change or 0}
+-- TODO better name. even more general, not just newlink
+function S.iplink(tab)
+  local args = {tab.index or 0, tab.modifier or S.NLM_F_CREATE, tab.flags or 0, tab.change or 0}
   for k, v in pairs(tab) do
-    if create_if_process[k] then create_if_process[k](args, v) end
+    if link_process[k] then link_process[k](args, v) end
   end
   return S.newlink(unpack(args))
+end
+
+function S.create_interface(tab)
+  return S.iplink(tab)
 end
 
 function S.sendmsg(fd, msg, flags)
