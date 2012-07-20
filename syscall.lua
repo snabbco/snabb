@@ -5157,20 +5157,6 @@ local function nlmsg(ntype, flags, f, ...)
   return r
 end
 
--- TODO these should be renamed or made more general, or abstracted, as we add more functionality
--- TODO make more like the ip options
-
--- read addresses from interface TODO add parameters so can read from just one interface, etc
-local function getaddr_f(af)
-  local buf, len, hdr, ifaddrmsg = nlmsgbuffer(t.ifaddrmsg)
-  ifaddrmsg[0] = {ifa_family = stringflag(af, "AF_")}
-  return buf, len
-end
-
-function S.getaddr(af)
-  return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, getaddr_f, af)
-end
-
 local ifla_msg_types = {
   ifla = {
     [S.IFLA_ADDRESS] = t.macaddr,
@@ -5329,6 +5315,12 @@ end
 -- read interfaces and details.
 function S.getlink(...)
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, ifla_f, t.rtgenmsg, {rtgen_family = S.AF_PACKET}, ...)
+end
+
+-- read addresses from interface
+function S.getaddr(af, ...)
+  local ifav = {ifa_family = stringflag(af, "AF_")}
+  return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, ifla_f, t.ifaddrmsg, ifav, ...)
 end
 
 function S.interfaces() -- returns with address info too.
