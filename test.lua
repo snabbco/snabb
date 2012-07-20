@@ -1127,15 +1127,19 @@ test_netlink = {
   end,
   test_newaddr_root = function()
     local lo = assert(S.interface("lo"))
-    assert(S.newaddr(lo.index, "inet6", 128, "permanent", "address", "::2"))
-    local lo = assert(S.interface("lo"))
+    assert(S.newaddr(lo, "inet6", 128, "permanent", "address", "::2"))
+    assert(lo:refresh())
     assert_equal(#lo.inet6, 2, "expect two inet6 addresses on lo now")
     if tostring(lo.inet6[1].addr) == "::1"
-      then assert(tostring(lo.inet6[2].addr) == "::2")
-      else assert(tostring(lo.inet6[1].addr) == "::2")
+      then assert_equal(tostring(lo.inet6[2].addr), "::2")
+      else assert_equal(tostring(lo.inet6[1].addr), "::2")
     end
     assert_equal(lo.inet6[2].prefixlen, 128, "expect /128")
     assert_equal(lo.inet6[1].prefixlen, 128, "expect /128")
+    assert(S.deladdr(lo.index, "inet6", 128, "address", "::2"))
+    assert(lo:refresh())
+    assert_equal(#lo.inet6, 1, "expect one inet6 addresses on lo now")
+    assert_equal(tostring(lo.inet6[1].addr), "::1", "expect only ::1 now")
   end,
 }
 

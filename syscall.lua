@@ -5361,12 +5361,18 @@ function S.getaddr(af, ...)
 end
 
 -- TODO may need ifa_scope
-function S.newaddr(index, af, prefix, flags, ...)
+function S.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
   local family = stringflag(af, "AF_")
-  --if ffi.istype(t.in6_addr, addr) then family = S.AF_INET6 else family = S.AF_INET end
-  local ifav = {ifa_family = family, ifa_prefixlen = prefix or 0, ifa_flags = stringflag(flags, "IFA_F_"), ifa_index = index}
+  local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = stringflag(flags, "IFA_F_"), ifa_index = index}
   return nlmsg(S.RTM_NEWADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifaddrmsg, ifav, ...)
+end
+
+function S.deladdr(index, af, prefixlen, ...)
+  if type(index) == 'table' then index = index.index end
+  local family = stringflag(af, "AF_")
+  local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
+  return nlmsg(S.RTM_DELADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, t.ifaddrmsg, ifav, ...)
 end
 
 function S.interfaces() -- returns with address info too.
