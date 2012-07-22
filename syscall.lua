@@ -2093,6 +2093,17 @@ struct nlmsgerr {
   int             error;
   struct nlmsghdr msg;
 };
+struct rtmsg {
+  unsigned char rtm_family;
+  unsigned char rtm_dst_len;
+  unsigned char rtm_src_len;
+  unsigned char rtm_tos;
+  unsigned char rtm_table;
+  unsigned char rtm_protocol;
+  unsigned char rtm_scope;
+  unsigned char rtm_type;
+  unsigned      rtm_flags;
+};
 
 static const int IFNAMSIZ = 16;
 
@@ -2865,6 +2876,7 @@ t.epoll_event = ffi.typeof("struct epoll_event")
 t.off = ffi.typeof("off_t")
 t.nlmsghdr = ffi.typeof("struct nlmsghdr")
 t.rtgenmsg = ffi.typeof("struct rtgenmsg")
+t.rtmsg = ffi.typeof("struct rtmsg")
 t.ifinfomsg = ffi.typeof("struct ifinfomsg")
 t.ifaddrmsg = ffi.typeof("struct ifaddrmsg")
 t.rtattr = ffi.typeof("struct rtattr")
@@ -5431,6 +5443,8 @@ function S.deladdr(index, af, prefixlen, ...)
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
   return nlmsg(S.RTM_DELADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end
+
+
 
 function S.interfaces() -- returns with address info too.
   local ifs, err = S.getlink()
