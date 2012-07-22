@@ -5592,7 +5592,7 @@ function S.getroute(af, tab, prot, ...)
   tab = stringflag(tab, "RT_TABLE_")
   prot = stringflag(prot, "RTPROT_")
   local r, err = nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg,
-                   {rtm_family = family, rtm_table = tab, rtm_protocol = prot})
+                   {rtm_family = family, rtm_table = tab, rtm_protocol = prot, rtm_scope = RT_SCOPE_UNIVERSE})
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
 end
