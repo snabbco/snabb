@@ -1141,15 +1141,17 @@ test_netlink = {
     assert_equal(#lo.inet6, 1, "expect one inet6 addresses on lo now")
     assert_equal(tostring(lo.inet6[1].addr), "::1", "expect only ::1 now")
   end,
-  test_getroute_inet = function()
+  test_getroute_inet = function() -- NB last test failing as root as retrieves interfaces for host not our netns!
     local r = assert(S.routes("inet"))
     local lor = assert(r["127.0.0.0/32"])
     assert_equal(tostring(lor.source), "0.0.0.0", "expect empty source route")
+    --assert_equal(lor.output, "lo", "expect to be on lo")
   end,
-  test_getroute_inet6 = function()
+  test_getroute_inet6 = function() -- NB last test failing as root as retrieves interfaces for host not our netns!
     local r = assert(S.routes("inet6"))
     local lor = assert(r["::1/128"])
     assert_equal(tostring(lor.source), "::", "expect empty source route")
+    --assert_equal(lor.output, "lo", "expect to be on lo")
   end,
 }
 

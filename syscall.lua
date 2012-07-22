@@ -5147,7 +5147,9 @@ meth.rtmsg = {
     family = function(i) return tonumber(i.rtmsg.rtm_family) end,
     dst_len = function(i) return tonumber(i.rtmsg.rtm_dst_len) end,
     src_len = function(i) return tonumber(i.rtmsg.rtm_src_len) end,
-    index = function(i) return tonumber(i.rtmsg.rtm_oif) end,
+    oif = function(i) return tonumber(i.rtm_oif) end,
+    iif = function(i) return tonumber(i.rtm_iif) end,
+    index = function(i) return tonumber(i.rtm_oif) end,
     dest = function(i) return i.dst or S.addrtype[i.family]() end,
     source = function(i) return i.src or S.addrtype[i.family]() end,
     gw = function(i) return i.gateway or S.addrtype[i.family]() end,
@@ -5160,7 +5162,7 @@ mt.rtmsg = {
     --if meth.rtmsg.fn[k] then return meth.rtmsg.fn[k] end
   end,
   __tostring = function(i) -- TODO how best to get interface names?
-    local s = "dst: " .. tostring(i.dest) .. "/" .. i.dst_len .. " gateway: " .. tostring(i.gw) .. " src: " .. tostring(i.source) .. "/" .. i.src_len
+    local s = "dst: " .. tostring(i.dest) .. "/" .. i.dst_len .. " gateway: " .. tostring(i.gw) .. " src: " .. tostring(i.source) .. "/" .. i.src_len .. " if: " .. (i.output or i.oif)
     return s
   end,
 }
@@ -5551,6 +5553,12 @@ end
 function S.routes(af, tab)
   local r, err = S.getroute(af)
   if not r then return nil, err end
+  local i, err = S.getlink()
+  if not i then return nil, err end
+  for _, v in ipairs(r) do
+    if i[v.iif] then v.input = i[v.iif].name end
+    if i[v.oif] then v.output = i[v.oif].name end
+  end
   return setmetatable(r, mt.routes)
 end
 
