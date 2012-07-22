@@ -1143,19 +1143,13 @@ test_netlink = {
   end,
   test_getroute_inet = function()
     local r = assert(S.routes("inet"))
-    local found = false
-    for _, v in ipairs(r) do
-      if tostring(v.dst) == "127.0.0.0" and v.dst_len == 32 and v.src == nil then found = true end 
-    end
-    assert(found, "expect route for 127.0.0.0/32")
+    local lor = assert(r["127.0.0.0/32"])
+    assert(not lor.src, "expect empty source route")
   end,
   test_getroute_inet6 = function()
     local r = assert(S.routes("inet6"))
-    local found = false
-    for _, v in ipairs(r) do
-      if tostring(v.dst) == "::1" and v.dst_len == 128 and v.src == nil then found = true end 
-    end
-    assert(found, "expect route for ::1/128")
+    local lor = assert(r["::1/128"])
+    assert(not lor.src, "expect empty source route")
   end,
 }
 

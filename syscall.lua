@@ -5147,6 +5147,7 @@ meth.rtmsg = {
     family = function(i) return tonumber(i.rtmsg.rtm_family) end,
     dst_len = function(i) return tonumber(i.rtmsg.rtm_dst_len) end,
     src_len = function(i) return tonumber(i.rtmsg.rtm_src_len) end,
+    index = function(i) return tonumber(i.rtmsg.rtm_oif) end,
   },
 }
 
@@ -5156,10 +5157,9 @@ mt.rtmsg = {
     --if meth.rtmsg.fn[k] then return meth.rtmsg.fn[k] end
   end,
   __tostring = function(i) -- TODO how best to get interface names?
-    local dst, gateway, src = tostring(i.dst), tostring(i.gateway), tostring(i.src)
-    if not i.dst then dst = "0.0.0.0" end
-    if not i.src then src = "0.0.0.0" end
-    if not i.gateway then gateway = "0.0.0.0" end
+    local dst = i.dst or S.addrtype[ir.family]()
+    local src = i.src or S.addrtype[ir.family]()
+    local gateway = i.gateway or S.addrtype[ir.family]()
     local s = "dst: " .. tostring(dst) .. "/" .. i.dst_len .. " gateway: " .. tostring(gateway) .. " src: " .. tostring(src) .. "/" .. i.src_len
     return s
   end,
@@ -5263,6 +5263,8 @@ local nlmsg_data_decode = {
     end
 
     r[#r + 1] = ir
+    local ix = tostring(ir.dst or S.addrtype[ir.family]()) .. "/" .. ir.dst_len
+    r[ix] = ir
 
     return r
   end,
