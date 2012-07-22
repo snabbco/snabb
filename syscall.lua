@@ -5203,10 +5203,8 @@ mt.rtmsg = {
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return bit.band(i.flags, S[k]) ~= 0 end
   end,
-  __tostring = function(i)
-    local fs = ""
-    for f, v in pairs(meth.rtmsg.flags) do if bit.band(i.flags, f) ~= 0 then fs = fs .. v end end
-    local s = "dst: " .. tostring(i.dest) .. "/" .. i.dst_len .. " gateway: " .. tostring(i.gw) .. " src: " .. tostring(i.source) .. "/" .. i.src_len .. " flags: " .. fs .. " if: " .. (i.output or i.oif)
+  __tostring = function(i) -- TODO make more like output of ip route
+    local s = "dst: " .. tostring(i.dest) .. "/" .. i.dst_len .. " gateway: " .. tostring(i.gw) .. " src: " .. tostring(i.source) .. "/" .. i.src_len .. " if: " .. (i.output or i.oif)
     return s
   end,
 }
@@ -5587,24 +5585,29 @@ function S.getlink(...)
 end
 
 -- read routes
-function S.getroute(af, tab, prot, ...)
+function S.getroute(af, tp, tab, prot, scope, ...)
   local family = stringflag(af, "AF_")
+  tp = stringflag(tp, "RTN_")
   tab = stringflag(tab, "RT_TABLE_")
   prot = stringflag(prot, "RTPROT_")
-  local r, err = nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg,
-                   {rtm_family = family, rtm_table = tab, rtm_protocol = prot, rtm_scope = RT_SCOPE_UNIVERSE})
+  scope = stringflag(scope, "RT_SCOPE_")
+  local r, err = nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, family, t.rtmsg,
+                   {rtm_family = family, rtm_table = tab, rtm_protocol = prot, rtm_type = tp, rtm_scope = scope})
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
 end
 
-function S.routes(af, tab, prot)
-  local r, err = S.getroute(af, tab, prot)
+function S.routes(af, tp, tab, prot, scope)
+  if not tp then tp = S.RTN_UNICAST end
+  tp = stringflag(tp, "RTN_")
+  local r, err = S.getroute(af, tp, tab, prot, scope)
   if not r then return nil, err end
   local i, err = S.getlink()
   if not i then return nil, err end
-  for _, v in ipairs(r) do
+  for k, v in ipairs(r) do
     if i[v.iif] then v.input = i[v.iif].name end
     if i[v.oif] then v.output = i[v.oif].name end
+    if tp > 0 and v.rtmsg.rtm_type ~= tp then r[k] = nil end -- filter unwanted routes
   end
   return r
 end
