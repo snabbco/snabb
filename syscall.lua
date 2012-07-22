@@ -5597,10 +5597,10 @@ function S.getroute(af, tp, tab, prot, scope, ...)
   return setmetatable(r, mt.routes)
 end
 
-function S.routes(af, tp, tab, prot, scope)
+function S.routes(af, tp)
   if not tp then tp = S.RTN_UNICAST end
   tp = stringflag(tp, "RTN_")
-  local r, err = S.getroute(af, tp, tab, prot, scope)
+  local r, err = S.getroute(af, tp)
   if not r then return nil, err end
   local i, err = S.getlink()
   if not i then return nil, err end
