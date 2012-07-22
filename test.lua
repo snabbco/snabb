@@ -1144,12 +1144,12 @@ test_netlink = {
   test_getroute_inet = function()
     local r = assert(S.routes("inet"))
     local lor = assert(r["127.0.0.0/32"])
-    assert(not lor.src, "expect empty source route")
+    assert_equal(tostring(lor.source), "0.0.0.0", "expect empty source route")
   end,
   test_getroute_inet6 = function()
     local r = assert(S.routes("inet6"))
     local lor = assert(r["::1/128"])
-    assert(not lor.src, "expect empty source route")
+    assert_equal(tostring(lor.source), "::", "expect empty source route")
   end,
 }
 
