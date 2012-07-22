@@ -2222,6 +2222,16 @@ struct ifa_cacheinfo {
   uint32_t cstamp;
   uint32_t tstamp;
 };
+struct rta_cacheinfo {
+  uint32_t rta_clntref;
+  uint32_t rta_lastuse;
+  uint32_t rta_expires;
+  uint32_t rta_error;
+  uint32_t rta_used;
+  uint32_t rta_id;
+  uint32_t rta_ts;
+  uint32_t rta_tsage;
+};
 struct fdb_entry {
   uint8_t mac_addr[6];
   uint8_t port_no;
@@ -2880,6 +2890,7 @@ t.rtmsg = ffi.typeof("struct rtmsg")
 t.ifinfomsg = ffi.typeof("struct ifinfomsg")
 t.ifaddrmsg = ffi.typeof("struct ifaddrmsg")
 t.rtattr = ffi.typeof("struct rtattr")
+t.rta_cacheinfo = ffi.typeof("struct rta_cacheinfo")
 t.nlmsgerr = ffi.typeof("struct nlmsgerr")
 t.timex = ffi.typeof("struct timex")
 t.utsname = ffi.typeof("struct utsname")
@@ -5008,6 +5019,10 @@ local rta_decode = {
     local i = pt.uint32(buf)
     ir.table = tonumber(i[0])
   end,
+  [S.RTA_CACHEINFO] = function(ir, buf, len)
+    ir.cacheinfo = t.rta_cacheinfo()
+    ffi.copy(ir.cacheinfo, buf, s.rta_cacheinfo)
+  end,
   -- TODO some missing
 }
 
@@ -5525,13 +5540,13 @@ function S.getlink(...)
 end
 
 -- read routes
-function S.getroute(af, ...) -- may need more params
+function S.getroute(af, ...) -- need more params
   local family = stringflag(af, "AF_")
   return nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg, {rtm_family = family})
 end
 
-function S.routes() -- do both address families
-  local r, err = S.getroute("inet")
+function S.routes(af) -- TODO not returning same as route/route -6
+  local r, err = S.getroute(af)
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
 end
