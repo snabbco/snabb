@@ -3460,6 +3460,7 @@ pt.uchar = ptt(t.uchar)
 pt.char = ptt(t.char)
 pt.int = ptt(t.int)
 pt.uint = ptt(t.uint)
+pt.uint32 = ptt(t.uint32)
 
 pt.nlmsghdr = ptt(t.nlmsghdr)
 pt.rtattr = ptt(t.rtattr)
@@ -3477,6 +3478,7 @@ pt.sockaddr_in = ptt(t.sockaddr_in)
 pt.sockaddr_in6 = ptt(t.sockaddr_in6)
 pt.sockaddr_nl = ptt(t.sockaddr_nl)
 pt.macaddr = ptt(t.macaddr)
+pt.rtmsg = ptt(t.rtmsg)
 
 local voidp = ffi.typeof("void *")
 
@@ -4966,7 +4968,47 @@ local ifa_decode = {
   [S.IFA_CACHEINFO] = function(ir, buf, len)
     ir.cacheinfo = t.ifa_cacheinfo()
     ffi.copy(ir.cacheinfo, buf, ffi.sizeof(t.ifa_cacheinfo))
-  end
+  end,
+}
+
+local rta_decode = {
+  [S.RTA_DST] = function(ir, buf, len)
+    ir.dst = S.addrtype[ir.family]()
+    ffi.copy(ir.dst, buf, ffi.sizeof(ir.dst))
+  end,
+  [S.RTA_SRC] = function(ir, buf, len)
+    ir.src = S.addrtype[ir.family]()
+    ffi.copy(ir.src, buf, ffi.sizeof(ir.src))
+  end,
+  [S.RTA_IIF] = function(ir, buf, len)
+    local i = pt.int(buf)
+    ir.iif = tonumber(i[0])
+  end,
+  [S.RTA_OIF] = function(ir, buf, len)
+    local i = pt.int(buf)
+    ir.oif = tonumber(i[0])
+  end,
+  [S.RTA_GATEWAY] = function(ir, buf, len)
+    ir.gateway = S.addrtype[ir.family]()
+    ffi.copy(ir.gateway, buf, ffi.sizeof(ir.gateway))
+  end,
+  [S.RTA_PRIORITY] = function(ir, buf, len)
+    local i = pt.int(buf)
+    ir.priority = tonumber(i[0])
+  end,
+  [S.RTA_PREFSRC] = function(ir, buf, len)
+    local i = pt.uint32(buf)
+    ir.prefsrc = tonumber(i[0])
+  end,
+  [S.RTA_METRICS] = function(ir, buf, len)
+    local i = pt.int(buf)
+    ir.metrics = tonumber(i[0])
+  end,
+  [S.RTA_TABLE] = function(ir, buf, len)
+    local i = pt.uint32(buf)
+    ir.table = tonumber(i[0])
+  end,
+  -- TODO some missing
 }
 
 mt.iff = {
@@ -5085,6 +5127,39 @@ mt.iflink = {
   end
 }
 
+meth.rtmsg = {
+  index = {
+    family = function(i) return tonumber(i.rtmsg.rtm_family) end,
+    dst_len = function(i) return tonumber(i.rtmsg.rtm_dst_len) end,
+    src_len = function(i) return tonumber(i.rtmsg.rtm_src_len) end,
+  },
+}
+
+mt.rtmsg = {
+  __index = function(i, k)
+    if meth.rtmsg.index[k] then return meth.rtmsg.index[k](i) end
+    --if meth.rtmsg.fn[k] then return meth.rtmsg.fn[k] end
+  end,
+  __tostring = function(i) -- TODO how best to get interface names?
+    local dst, gateway, src = tostring(i.dst), tostring(i.gateway), tostring(i.src)
+    if not i.dst then dst = "0.0.0.0" end
+    if not i.src then src = "0.0.0.0" end
+    if not i.gateway then gateway = "0.0.0.0" end
+    local s = "dst: " .. tostring(dst) .. "/" .. i.dst_len .. " gateway: " .. tostring(gateway) .. " src: " .. tostring(src) .. "/" .. i.src_len
+    return s
+  end,
+}
+
+mt.routes = {
+  __tostring = function(is)
+    local s = {}
+    for _, v in ipairs(is) do
+      s[#s + 1] = tostring(v)
+    end
+    return table.concat(s, '\n')
+  end,
+}
+
 meth.ifaddr = {
   index = {
     family = function(i) return tonumber(i.ifaddr.ifa_family) end,
@@ -5155,7 +5230,27 @@ local nlmsg_data_decode = {
     r[#r + 1] = ir -- array and names
 
     return r
-  end
+  end,
+  [S.RTM_NEWROUTE] = function(r, buf, len)
+    local rt = pt.rtmsg(buf)
+    buf = buf + nlmsg_align(s.rtmsg)
+    len = len - nlmsg_align(s.rtmsg)
+    local rtattr = pt.rtattr(buf)
+    local ir = setmetatable({rtmsg = t.rtmsg()}, mt.rtmsg)
+    ffi.copy(ir.rtmsg, rt, s.rtmsg)
+
+    while rta_ok(rtattr, len) do
+      if rta_decode[rtattr.rta_type] then
+        rta_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
+      else print("NYI", rtattr.rta_type)
+      end
+      rtattr, buf, len = rta_next(rtattr, buf, len)
+    end
+
+    r[#r + 1] = ir
+
+    return r
+  end,
 }
 
 function S.nlmsg_read(s, addr, bufsize) -- maybe we create the sockaddr?
@@ -5200,6 +5295,7 @@ local function nlmsgbuffer(...)
   return tbuffer(nlmsg_align(1), t.nlmsghdr, ...)
 end
 
+-- TODO share with read side
 local ifla_msg_types = {
   ifla = {
     -- IFLA_UNSPEC
@@ -5236,6 +5332,9 @@ local ifla_msg_types = {
     [S.IFA_ANYCAST] = "address",
     -- IFA_CACHEINFO
   },
+  rta = {
+
+  }
 }
 
 --[[ TODO add
@@ -5363,6 +5462,9 @@ local rtpref = {
   [S.RTM_NEWADDR] = {"ifa", "IFA_"},
   [S.RTM_GETADDR] = {"ifa", "IFA_"},
   [S.RTM_DELADDR] = {"ifa", "IFA_"},
+  [S.RTM_NEWROUTE] = {"rta", "RTA_"},
+  [S.RTM_GETROUTE] = {"rta", "RTA_"},
+  [S.RTM_DELROUTE] = {"rta", "RTA_"},
 }
 
 local function nlmsg(ntype, flags, af, ...)
@@ -5422,6 +5524,18 @@ function S.getlink(...)
   return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, nil, t.rtgenmsg, {rtgen_family = S.AF_PACKET}, ...)
 end
 
+-- read routes
+function S.getroute(af, ...) -- may need more params
+  local family = stringflag(af, "AF_")
+  return nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg, {rtm_family = family})
+end
+
+function S.routes() -- do both address families
+  local r, err = S.getroute("inet")
+  if not r then return nil, err end
+  return setmetatable(r, mt.routes)
+end
+
 -- read addresses from interface
 function S.getaddr(af, ...)
   local family = stringflag(af, "AF_")
@@ -5443,8 +5557,6 @@ function S.deladdr(index, af, prefixlen, ...)
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
   return nlmsg(S.RTM_DELADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end
-
-
 
 function S.interfaces() -- returns with address info too.
   local ifs, err = S.getlink()

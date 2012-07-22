@@ -1141,6 +1141,14 @@ test_netlink = {
     assert_equal(#lo.inet6, 1, "expect one inet6 addresses on lo now")
     assert_equal(tostring(lo.inet6[1].addr), "::1", "expect only ::1 now")
   end,
+  test_getroute_inet = function()
+    local r = assert(S.routes())
+    local found = false
+    for _, v in ipairs(r) do
+      if tostring(v.dst) == "127.0.0.0" and v.dst_len == 32 and v.src == nil then found = true end 
+    end
+    assert(found, "expect route for 127.0.0.0/32")
+  end,
 }
 
 test_termios = {
