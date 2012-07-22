@@ -961,6 +961,35 @@ S.RTA_MP_ALGO = 14
 S.RTA_TABLE = 15
 S.RTA_MARK = 16
 
+-- route flags
+S.RTF_UP          = 0x0001
+S.RTF_GATEWAY     = 0x0002
+S.RTF_HOST        = 0x0004
+S.RTF_REINSTATE   = 0x0008
+S.RTF_DYNAMIC     = 0x0010
+S.RTF_MODIFIED    = 0x0020
+S.RTF_MTU         = 0x0040
+S.RTF_MSS         = S.RTF_MTU
+S.RTF_WINDOW      = 0x0080
+S.RTF_IRTT        = 0x0100
+S.RTF_REJECT      = 0x0200
+
+-- ipv6 route flags
+S.RTF_DEFAULT     = 0x00010000
+S.RTF_ALLONLINK   = 0x00020000
+S.RTF_ADDRCONF    = 0x00040000
+S.RTF_PREFIX_RT   = 0x00080000
+S.RTF_ANYCAST     = 0x00100000
+S.RTF_NONEXTHOP   = 0x00200000
+S.RTF_EXPIRES     = 0x00400000
+S.RTF_ROUTEINFO   = 0x00800000
+S.RTF_CACHE       = 0x01000000
+S.RTF_FLOW        = 0x02000000
+S.RTF_POLICY      = 0x04000000
+--#define RTF_PREF(pref)  ((pref) << 27)
+--#define RTF_PREF_MASK   0x18000000
+S.RTF_LOCAL       = 0x80000000
+
 -- interface flags
 S.IFF_UP         = 0x1
 S.IFF_BROADCAST  = 0x2
@@ -2102,7 +2131,7 @@ struct rtmsg {
   unsigned char rtm_protocol;
   unsigned char rtm_scope;
   unsigned char rtm_type;
-  unsigned      rtm_flags;
+  unsigned int  rtm_flags;
 };
 
 static const int IFNAMSIZ = 16;
@@ -5150,19 +5179,34 @@ meth.rtmsg = {
     oif = function(i) return tonumber(i.rtm_oif) end,
     iif = function(i) return tonumber(i.rtm_iif) end,
     index = function(i) return tonumber(i.rtm_oif) end,
+    flags = function(i) return tonumber(i.rtmsg.rtm_flags) end,
     dest = function(i) return i.dst or S.addrtype[i.family]() end,
     source = function(i) return i.src or S.addrtype[i.family]() end,
     gw = function(i) return i.gateway or S.addrtype[i.family]() end,
   },
+  flags = { -- TODO rework so iterates in fixed order.
+    [S.RTF_UP] = "U",
+    [S.RTF_GATEWAY] = "G",
+    [S.RTF_HOST] = "H",
+    [S.RTF_REINSTATE] = "R",
+    [S.RTF_DYNAMIC] = "D",
+    [S.RTF_MODIFIED] = "M",
+    [S.RTF_REJECT] = "!",
+  }
 }
 
 mt.rtmsg = {
   __index = function(i, k)
     if meth.rtmsg.index[k] then return meth.rtmsg.index[k](i) end
     --if meth.rtmsg.fn[k] then return meth.rtmsg.fn[k] end
+    local prefix = "RTF_"
+    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
+    if S[k] then return bit.band(i.flags, S[k]) ~= 0 end
   end,
-  __tostring = function(i) -- TODO how best to get interface names?
-    local s = "dst: " .. tostring(i.dest) .. "/" .. i.dst_len .. " gateway: " .. tostring(i.gw) .. " src: " .. tostring(i.source) .. "/" .. i.src_len .. " if: " .. (i.output or i.oif)
+  __tostring = function(i)
+    local fs = ""
+    for f, v in pairs(meth.rtmsg.flags) do if bit.band(i.flags, f) ~= 0 then fs = fs .. v end end
+    local s = "dst: " .. tostring(i.dest) .. "/" .. i.dst_len .. " gateway: " .. tostring(i.gw) .. " src: " .. tostring(i.source) .. "/" .. i.src_len .. " flags: " .. fs .. " if: " .. (i.output or i.oif)
     return s
   end,
 }
@@ -5255,7 +5299,6 @@ local nlmsg_data_decode = {
     local rtattr = pt.rtattr(buf)
     local ir = setmetatable({rtmsg = t.rtmsg()}, mt.rtmsg)
     ffi.copy(ir.rtmsg, rt, s.rtmsg)
-
     while rta_ok(rtattr, len) do
       if rta_decode[rtattr.rta_type] then
         rta_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
@@ -5544,16 +5587,18 @@ function S.getlink(...)
 end
 
 -- read routes
-function S.getroute(af, tab, ...)
+function S.getroute(af, tab, prot, ...)
   local family = stringflag(af, "AF_")
   tab = stringflag(tab, "RT_TABLE_")
-  local r, err = nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg, {rtm_family = family, rtm_table = tab})
+  prot = stringflag(prot, "RTPROT_")
+  local r, err = nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg,
+                   {rtm_family = family, rtm_table = tab, rtm_protocol = prot})
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
 end
 
-function S.routes(af, tab)
-  local r, err = S.getroute(af)
+function S.routes(af, tab, prot)
+  local r, err = S.getroute(af, tab, prot)
   if not r then return nil, err end
   local i, err = S.getlink()
   if not i then return nil, err end
