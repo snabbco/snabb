@@ -5540,12 +5540,13 @@ function S.getlink(...)
 end
 
 -- read routes
-function S.getroute(af, ...) -- need more params
+function S.getroute(af, tab, ...)
   local family = stringflag(af, "AF_")
-  return nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg, {rtm_family = family})
+  tab = stringflag(tab, "RT_TABLE_")
+  return nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg, {rtm_family = family, rtm_table = tab})
 end
 
-function S.routes(af) -- TODO not returning same as route/route -6
+function S.routes(af, tab)
   local r, err = S.getroute(af)
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
