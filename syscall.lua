@@ -5547,7 +5547,9 @@ end
 function S.getroute(af, tab, ...)
   local family = stringflag(af, "AF_")
   tab = stringflag(tab, "RT_TABLE_")
-  return nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg, {rtm_family = family, rtm_table = tab})
+  local r, err = nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg, {rtm_family = family, rtm_table = tab})
+  if not r then return nil, err end
+  return setmetatable(r, mt.routes)
 end
 
 function S.routes(af, tab)
@@ -5559,7 +5561,7 @@ function S.routes(af, tab)
     if i[v.iif] then v.input = i[v.iif].name end
     if i[v.oif] then v.output = i[v.oif].name end
   end
-  return setmetatable(r, mt.routes)
+  return r
 end
 
 -- read addresses from interface
