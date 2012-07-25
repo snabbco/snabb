@@ -1,5 +1,7 @@
 # Linux system calls for LuaJIT
 
+_I will be giving a talk about this project at the [London Lua user group](http://www.londonlua.org/) in London on Thursday 2 August 2012 at 1800. You can [sign up here](http://skillsmatter.com/podcast/home/programming-linux-with-lua). Video and slides will be available after._
+
 What? An FFI implementation of the Linux kernel ABI for LuaJIT.
 
 Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua.
