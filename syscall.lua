@@ -3141,13 +3141,13 @@ meth.stat = {
     mtime = function(st) return tonumber(st.st_mtime) end,
     major = function(st) return S.major(st.st_rdev) end,
     minor = function(st) return S.minor(st.st_rdev) end,
-    isreg = function(st) return S.S_ISREG(st.st_mode) end,
-    isdir = function(st) return S.S_ISDIR(st.st_mode) end,
-    ischr = function(st) return S.S_ISCHR(st.st_mode) end,
-    isblk = function(st) return S.S_ISBLK(st.st_mode) end,
-    isfifo = function(st) return S.S_ISFIFO(st.st_mode) end,
-    islnk = function(st) return S.S_ISLNK(st.st_mode) end,
-    issock = function(st) return S.S_ISSOCK(st.st_mode) end,
+    isreg = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFREG end,
+    isdir = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFDIR end,
+    ischr = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFCHR end,
+    isblk = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFBLK end,
+    isfifo = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFFIFO end,
+    islnk = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFLNK end,
+    issock = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFSOCK end,
   }
 }
 
@@ -4877,14 +4877,6 @@ end
 function S.makedev(major, minor)
   return bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff))
 end
-
-function S.S_ISREG(m)  return bit.band(m, S.S_IFMT) == S.S_IFREG  end
-function S.S_ISDIR(m)  return bit.band(m, S.S_IFMT) == S.S_IFDIR  end
-function S.S_ISCHR(m)  return bit.band(m, S.S_IFMT) == S.S_IFCHR  end
-function S.S_ISBLK(m)  return bit.band(m, S.S_IFMT) == S.S_IFBLK  end
-function S.S_ISFIFO(m) return bit.band(m, S.S_IFMT) == S.S_IFFIFO end
-function S.S_ISLNK(m)  return bit.band(m, S.S_IFMT) == S.S_IFLNK  end
-function S.S_ISSOCK(m) return bit.band(m, S.S_IFMT) == S.S_IFSOCK end
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsg_align
