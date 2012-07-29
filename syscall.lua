@@ -4036,9 +4036,9 @@ function S.fstatfs(fd)
   return st
 end
 
-function S.nanosleep(req)
+function S.nanosleep(req, rem)
   if not ffi.istype(t.timespec, req) then req = t.timespec(req) end
-  local rem = t.timespec()
+  if not rem then rem = t.timespec() end
   local ret = C.nanosleep(req, rem)
   if ret == -1 then return nil, t.error() end
   return rem
