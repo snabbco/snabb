@@ -4040,13 +4040,17 @@ function S.nanosleep(req, rem)
   if not ffi.istype(t.timespec, req) then req = t.timespec(req) end
   if not rem then rem = t.timespec() end
   local ret = C.nanosleep(req, rem)
-  if ret == -1 then return nil, t.error() end
-  return rem
+  if ret == -1 then
+    if ffi.errno() == S.E.INTR then return rem end
+    return nil, t.error()
+  end
+  return true
 end
 
 function S.sleep(sec) -- standard libc function
   local rem, err = S.nanosleep(sec)
   if not rem then return nil, err end
+  if rem == true then return 0 end
   return tonumber(rem.tv_sec)
 end
 

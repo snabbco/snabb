@@ -579,9 +579,7 @@ test_timers_signals = {
   end,
   test_nanosleep = function()
     local rem = assert(S.nanosleep(0.001))
-    assert_equal(rem.sec, 0, "expect no elapsed time after nanosleep")
-    assert_equal(rem.nsec, 0, "expect no elapsed time after nanosleep")
-    assert_equal(rem.time, 0, "expect no elapsed time after nanosleep")
+    assert_equal(rem, true, "expect no elapsed time after nanosleep")
   end,
   test_alarm = function()
     assert(S.signal("alrm", "ign"))
