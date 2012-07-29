@@ -4041,8 +4041,7 @@ function S.nanosleep(req, rem)
   if not rem then rem = t.timespec() end
   local ret = C.nanosleep(req, rem)
   if ret == -1 then
-    if ffi.errno() == S.E.INTR then return rem end
-    return nil, t.error()
+    if ffi.errno() == S.E.INTR then return rem else return nil, t.error() end
   end
   return true
 end
