@@ -1559,13 +1559,20 @@ clean()
 
 debug.sethook()
 
+-- TODO iterate through all functions in S and add to active
+
 if arg[1] == "coverage" then
+  cov.covered = 0
+  cov.count = 0
+  for _ in pairs(cov.active) do cov.count = cov.count + 1 end
   for k, _ in pairs(cov.cov) do
     cov.active[k] = nil
+    cov.covered = cov.covered + 1
   end
-  for k, _ in pairs(cov.cov) do
+  for k, _ in pairs(cov.active) do
     print("no coverage of line " .. k)
   end
+  print("\ncoverage is " .. cov.covered .. " of " .. cov.count .. " " .. math.floor(cov.covered / cov.count * 100) .. "%")
 end
 
 if f == 0 then S.exit("success") else S.exit("failure") end
