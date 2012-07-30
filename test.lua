@@ -30,6 +30,28 @@ local function assert_equal(...)
   return assert_equals(...)
 end
 
+local sysfile = debug.getinfo(S.strerror).source
+local cov = {active = {}, cov = {}}
+
+print(sysfile)
+
+local function coverage(event, line)
+  local s = debug.getinfo(2, "nLlS")
+  if s.source ~= sysfile then return end
+  if event == "line" then
+    --print("line", s.source, s.name, s.func, line)
+    cov.cov[line] = true
+  elseif event == "call" then
+    --print("call", s.source, s.name, s.func, s.activelines)
+    --if s.what == "Lua" and s.func and not cov[s.func] then cov[s.func] = {active = s.activelines, cov = {}} end
+    if s.activelines then for k, _ in pairs(s.activelines) do cov.active[k] = true end end
+  else
+    --print("return")
+  end
+end
+
+if arg[1] == "coverage" then debug.sethook(coverage, "lcr") end
+
 local teststring = "this is a test string"
 local size = 512
 local buf = S.t.buffer(size)
@@ -1531,9 +1553,20 @@ end
 setmetatable(_G, {__newindex = function(t, k, v) error("global! " .. k) end})
 
 local f
-if arg[1] then f = luaunit:run(arg[1]) else f = luaunit:run() end
+if arg[1] and arg[1] ~= "coverage" then f = luaunit:run(arg[1]) else f = luaunit:run() end
 
 clean()
+
+debug.sethook()
+
+if arg[1] == "coverage" then
+  for k, _ in pairs(cov.cov) do
+    cov.active[k] = nil
+  end
+  for k, _ in pairs(cov.cov) do
+    print("no coverage of line " .. k)
+  end
+end
 
 if f == 0 then S.exit("success") else S.exit("failure") end
 

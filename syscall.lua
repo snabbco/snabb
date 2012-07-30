@@ -3754,7 +3754,6 @@ function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, S.mode(mode))) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
-function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.acct(filename) return retbool(C.syscall(S.SYS_acct, filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
