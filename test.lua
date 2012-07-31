@@ -50,12 +50,13 @@ local size = 512
 local buf = S.t.buffer(size)
 local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
-
+local longfile = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
 local t = S.t
 
 local clean = function()
   S.unlink(tmpfile)
   S.unlink(tmpfile2)
+  S.unlink(longfile)
 end
 
 test_basic = {
@@ -273,6 +274,15 @@ test_file_operations = {
     local nd = assert(S.getcwd())
     assert(nd == "/", "expect cwd to be /")
     assert(S.chdir(cwd)) -- return to original directory
+  end,
+  test_getcwd_long = function()
+    local cwd = assert(S.getcwd())
+    assert(S.mkdir(longfile, "IRWXU"))
+    assert(S.chdir(longfile))
+    local nd = assert(S.getcwd())
+    assert_equal(nd, cwd .. "/" .. longfile, "expect to get filename plus cwd")
+    assert(S.chdir(cwd))
+    assert(S.rmdir(longfile))
   end,
   test_stat = function()
     local stat = assert(S.stat("/dev/zero"))
@@ -1554,6 +1564,8 @@ clean()
 
 debug.sethook()
 
+if f ~= 0 then S.exit("failure") end
+
 -- TODO iterate through all functions in S and upvalues for active rather than trace
 -- also check for non interesting cases, eg fall through to end
 
@@ -1591,7 +1603,7 @@ if arg[1] == "coverage" then
   print("\ncoverage is " .. cov.covered .. " of " .. cov.count .. " " .. math.floor(cov.covered / cov.count * 100) .. "%")
 end
 
-if f == 0 then S.exit("success") else S.exit("failure") end
+S.exit("success")
 
 
 

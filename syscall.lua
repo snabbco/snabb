@@ -1598,6 +1598,7 @@ if ffi.arch == "x86" then
   S.SYS_clone            = 120
   S.SYS__llseek          = 140
   S.SYS_getdents         = 141
+  S.SYS_getcwd           = 183
   S.SYS_stat64           = 195
   S.SYS_lstat64          = 196
   S.SYS_fstat64          = 197
@@ -1640,6 +1641,7 @@ elseif ffi.arch == "x64" then
   S.SYS_getpid           = 39
   S.SYS_clone            = 56
   S.SYS_getdents         = 78
+  S.SYS_getcwd           = 79
   S.SYS_ustat            = 136
   S.SYS_acct             = 163
   S.SYS_readahead        = 187
@@ -1684,6 +1686,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_clone            = 120
   S.SYS__llseek          = 140
   S.SYS_getdents         = 141
+  S.SYS_getcwd           = 183
   S.SYS_stat64           = 195
   S.SYS_lstat64          = 196
   S.SYS_fstat64          = 197
@@ -4002,15 +4005,15 @@ function S.chroot(path) return retbool(C.chroot(path)) end
 
 function S.getcwd()
   local size = 64
-  local buf
+  local buf, ret
   repeat
     buf = t.buffer(size)
-    local ret = C.getcwd(buf, size)
-    if not ret then 
+    ret = C.syscall(S.SYS_getcwd, pt.void(buf), t.ulong(size))
+    if ret == -1 then 
       local errno = ffi.errno()
-      if errno == S.E.RANGE then size = size * 2 else return nil, t.error(errno) end
+      if errno == S.E.ERANGE then size = size * 2 else return nil, t.error(errno) end
     end
-  until ret
+  until ret ~= -1
   return ffi.string(buf)
 end
 
