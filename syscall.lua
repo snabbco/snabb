@@ -5304,7 +5304,7 @@ local nlmsg_data_decode = {
 
     r[#r + 1] = ir
     local ix = tostring(ir.dest) .. "/" .. ir.dst_len
-    r[ix] = ir
+    r[ix] = ir -- TODO can be duplicates. replace with route match function.
 
     return r
   end,
@@ -5613,11 +5613,16 @@ function S.routes(af, tp)
   tp = stringflag(tp, "RTN_")
   local r, err = S.getroute(af, tp)
   if not r then return nil, err end
-  local i, err = S.getlink()
-  if not i then return nil, err end
+  local ifs, err = S.getlink()
+  if not ifs then return nil, err end
+  local indexmap = {}
+  for i, v in pairs(ifs) do
+    v.inet, v.inet6 = {}, {}
+    indexmap[v.index] = i
+  end
   for k, v in ipairs(r) do
-    if i[v.iif] then v.input = i[v.iif].name end
-    if i[v.oif] then v.output = i[v.oif].name end
+    if ifs[indexmap[v.iif]] then v.input = ifs[indexmap[v.iif]].name end
+    if ifs[indexmap[v.oif]] then v.output = ifs[indexmap[v.oif]].name end
     if tp > 0 and v.rtmsg.rtm_type ~= tp then r[k] = nil end -- filter unwanted routes
   end
   return r
