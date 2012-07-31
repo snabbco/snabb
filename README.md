@@ -106,6 +106,8 @@ Siginfo support in sigaction not there yet, as confused by the kernel API.
 
 only some of aio is working, needs some debugging before being used. Also all the iocb functions should be replaced with metatypes eg getiocb, getiocbs.
 
+Routes are stored as array and also by destination, but destinations can clash. Use array, or a filter function.
+
 There will no doubt be bugs, please report them if you find them.
 
 ### Missing functions etc

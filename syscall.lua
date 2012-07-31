@@ -5304,7 +5304,7 @@ local nlmsg_data_decode = {
 
     r[#r + 1] = ir
     local ix = tostring(ir.dest) .. "/" .. ir.dst_len
-    r[ix] = ir -- TODO can be duplicates. replace with route match function.
+    r[ix] = ir -- TODO can be duplicates. replace with route match function, or use array.
 
     return r
   end,
