@@ -5623,28 +5623,37 @@ function S.routes(af, tp)
   return r
 end
 
--- this time experiment using table as so many params, plus they are just to init struct.
-function S.newroute(flags, tp, ...)
-  -- TODO if we use this can do generically based on prefix
-  if tp.family then tp.rtm_family = tp.family; tp.family = nil end
-  if tp.dst_len then tp.rtm_dst_len = tp.dst_len; tp.dst_len = nil end
-  if tp.src_len then tp.rtm_src_len = tp.src_len; tp.src_len = nil end
-  if tp.tos then tp.rtm_tos = tp.tos; tp.tos = nil end
-  if tp.table then tp.rtm_table = tp.table; tp.table = nil end
-  if tp.protocol then tp.rtm_protocol = tp.protocol; tp.protocol = nil end
-  if tp.scope then tp.rtm_scope = tp.scope; tp.scope = nil end
-  if tp.type then tp.rtm_type = tp.type; tp.type = nil end
-  if tp.flags then tp.rtm_flags = tp.flags; tp.flags = nil end
+local function preftable(tp, prefix)
+  for k, v in pairs(tp) do
+    if k:sub(1, #prefix) ~= prefix then
+      tp[prefix .. k] = v
+      tp[k] = nil
+    end
+  end
+  return tp
+end
 
+local function rtm_table(tp)
+  tp = preftable(tp, "rtm_")
   tp.rtm_family = stringflag(tp.rtm_family, "AF_")
   tp.rtm_protocol = stringflag(tp.rtm_protocol, "RTPROT_")
   tp.rtm_type = stringflag(tp.rtm_type, "RTN_")
   tp.rtm_scope = stringflag(tp.rtm_scope, "RT_SCOPE_")
   tp.rtm_flags = stringflag(tp.rtm_flags, "RTM_F_")
   tp.rtm_table = stringflag(tp.rtm_table, "RT_TABLE_")
+  return tp
+end
 
+-- this time experiment using table as so many params, plus they are just to init struct.
+function S.newroute(flags, tp, ...)
+  tp = rtm_table(tp)
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
   return nlmsg(S.RTM_NEWROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, tp.rtm_family, t.rtmsg, tp, ...)
+end
+
+function S.delroute(tp, ...)
+  tp = rtm_table(tp)
+  return nlmsg(S.RTM_DELROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK, tp.rtm_family, t.rtmsg, tp, ...)
 end
 
 -- read addresses from interface

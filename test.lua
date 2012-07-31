@@ -1165,6 +1165,7 @@ test_netlink = {
     assert(lo:refresh())
     assert_equal(#lo.inet6, 1, "expect one inet6 addresses on lo now")
     assert_equal(tostring(lo.inet6[1].addr), "::1", "expect only ::1 now")
+    -- TODO this leaves a route to ::2 which we should delete
   end,
   test_getroute_inet = function()
     local r = assert(S.routes("inet"))
@@ -1181,14 +1182,15 @@ test_netlink = {
   test_newroute_inet6_root = function()
     local r = assert(S.routes("inet6"))
     local lo = assert(S.interface("lo"))
-    assert(S.newroute(0, {family = "inet6", dst_len = 128}, "dst", "::2", "oif", lo.index))
+    assert(S.newroute(0, {family = "inet6", dst_len = 128}, "dst", "::3", "oif", lo.index))
     local r = assert(S.routes("inet6"))
-    local nr = r["::2/128"]
+    local nr = r["::3/128"]
     assert(nr, "expect to find new route")
     assert_equal(nr.oif, lo.index, "expect route on lo")
     assert_equal(nr.dst_len, 128, "expect /128")
-
-    --delete route
+    assert(S.delroute({family = "inet6", dst_len = 128}, "dst", "::3", "oif", lo.index))
+    local r = assert(S.routes("inet6"))
+    assert(not r["::3/128"], "expect route deleted")
   end,
 }
 
