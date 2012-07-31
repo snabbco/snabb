@@ -109,6 +109,8 @@ test_open_close = {
   test_access = function()
     assert(S.access("/dev/null", "r"), "expect access to say can read /dev/null")
     assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
+    assert(S.access("/dev/null", "w"), "expect access to say can write /dev/null")
+    assert(not S.access("/dev/null", "x"), "expect access to say cannot execute /dev/null")
   end,
   test_fd_gc = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
