@@ -22,7 +22,9 @@ Some tests may fail if you do not have kernel support for some feature (eg names
 
 Initial testing on uclibc, at one point worked on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes; I intend to test musl libc once I have a working build.
 
-Reworking the test script, it is a copy of my fork of [luaunit](https://github.com/justincormack/luaunit) which is updated to work on Lua 5.1 and 5.2. To avoid dependencies I am just copying and updating this into this repo. Currently all my changes are upstream.
+The test script is a copy of [luaunit](https://github.com/rjpcomputing/luaunit). I have pushed all my changes upstream, including Lua 5.2 support and fixes to not allocate globals.
+
+I have added initial coverage tests, which are over 90% (some functions may be missing, will update). Fixing the missing parts gradually (found some bugs from this).
 
 ## What is implemented?
 
