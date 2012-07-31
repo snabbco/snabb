@@ -149,6 +149,8 @@ Netlink documentation is pretty bad. Useful resources: [blog post](http://maz-pr
 
 Make commands that look more like `ip`, or as methods of the interface objects, or both. Currently adding metamethods, eg setflags.
 
+Currently support get, add and delete for interfaces, routes and addresses, although functionality not fully complete even for these, and API not finalized.
+
 ## modules
 
 `lsmod` needs to parse /proc/modules, the rest are syscalls, except depmod.
