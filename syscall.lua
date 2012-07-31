@@ -5209,7 +5209,7 @@ mt.rtmsg = {
 mt.routes = {
   __tostring = function(is)
     local s = {}
-    for _, v in pairs(is) do
+    for k, v in ipairs(is) do
       s[#s + 1] = tostring(v)
     end
     return table.concat(s, '\n')
