@@ -1178,6 +1178,18 @@ test_netlink = {
     assert_equal(tostring(lor.source), "::", "expect empty source route")
     --assert_equal(lor.output, "lo", "expect to be on lo")  -- NB fails as root as route on host if
   end,
+  test_newroute_inet6_root = function()
+    local r = assert(S.routes("inet6"))
+    local lo = assert(S.interface("lo"))
+    assert(S.newroute(0, {family = "inet6", dst_len = 128}, "dst", "::2", "oif", lo.index))
+    local r = assert(S.routes("inet6"))
+    local nr = r["::2/128"]
+    assert(nr, "expect to find new route")
+    assert_equal(nr.oif, lo.index, "expect route on lo")
+    assert_equal(nr.dst_len, 128, "expect /128")
+
+    --delete route
+  end,
 }
 
 test_termios = {

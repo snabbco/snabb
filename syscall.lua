@@ -5181,7 +5181,7 @@ meth.rtmsg = {
     source = function(i) return i.src or S.addrtype[i.family]() end,
     gw = function(i) return i.gateway or S.addrtype[i.family]() end,
   },
-  flags = { -- TODO rework so iterates in fixed order.
+  flags = { -- TODO rework so iterates in fixed order. Do not seem to be set.
     [S.RTF_UP] = "U",
     [S.RTF_GATEWAY] = "G",
     [S.RTF_HOST] = "H",
@@ -5209,7 +5209,7 @@ mt.rtmsg = {
 mt.routes = {
   __tostring = function(is)
     local s = {}
-    for _, v in ipairs(is) do
+    for _, v in pairs(is) do
       s[#s + 1] = tostring(v)
     end
     return table.concat(s, '\n')
@@ -5390,7 +5390,19 @@ local ifla_msg_types = {
     -- IFA_CACHEINFO
   },
   rta = {
-
+    -- RTA_UNSPEC
+    [S.RTA_DST] = "address",
+    [S.RTA_SRC] = "address",
+    [S.RTA_IIF] = t.uint32,
+    [S.RTA_OIF] = t.uint32,
+    [S.RTA_GATEWAY] = "address",
+    [S.RTA_PRIORITY] = t.uint32,
+    [S.RTA_METRICS] = t.uint32,
+    --          RTA_PREFSRC
+    --          RTA_MULTIPATH
+    --          RTA_PROTOINFO
+    --          RTA_FLOW
+    --          RTA_CACHEINFO
   }
 }
 
@@ -5562,6 +5574,8 @@ local function nlmsg(ntype, flags, af, ...)
   return r
 end
 
+-- TODO do not have all these different arguments for these functions, pass a table for initialization. See also iplink.
+
 function S.newlink(index, flags, iflags, change, ...)
   if change == 0 then change = S.IFF_NONE end -- 0 should work, but does not
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
@@ -5607,6 +5621,30 @@ function S.routes(af, tp)
     if tp > 0 and v.rtmsg.rtm_type ~= tp then r[k] = nil end -- filter unwanted routes
   end
   return r
+end
+
+-- this time experiment using table as so many params, plus they are just to init struct.
+function S.newroute(flags, tp, ...)
+  -- TODO if we use this can do generically based on prefix
+  if tp.family then tp.rtm_family = tp.family; tp.family = nil end
+  if tp.dst_len then tp.rtm_dst_len = tp.dst_len; tp.dst_len = nil end
+  if tp.src_len then tp.rtm_src_len = tp.src_len; tp.src_len = nil end
+  if tp.tos then tp.rtm_tos = tp.tos; tp.tos = nil end
+  if tp.table then tp.rtm_table = tp.table; tp.table = nil end
+  if tp.protocol then tp.rtm_protocol = tp.protocol; tp.protocol = nil end
+  if tp.scope then tp.rtm_scope = tp.scope; tp.scope = nil end
+  if tp.type then tp.rtm_type = tp.type; tp.type = nil end
+  if tp.flags then tp.rtm_flags = tp.flags; tp.flags = nil end
+
+  tp.rtm_family = stringflag(tp.rtm_family, "AF_")
+  tp.rtm_protocol = stringflag(tp.rtm_protocol, "RTPROT_")
+  tp.rtm_type = stringflag(tp.rtm_type, "RTN_")
+  tp.rtm_scope = stringflag(tp.rtm_scope, "RT_SCOPE_")
+  tp.rtm_flags = stringflag(tp.rtm_flags, "RTM_F_")
+  tp.rtm_table = stringflag(tp.rtm_table, "RT_TABLE_")
+
+  flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
+  return nlmsg(S.RTM_NEWROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, tp.rtm_family, t.rtmsg, tp, ...)
 end
 
 -- read addresses from interface
