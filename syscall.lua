@@ -5615,7 +5615,7 @@ function S.routes(af, tp)
   if not r then return nil, err end
   local ifs, err = S.getlink()
   if not ifs then return nil, err end
-  local indexmap = {}
+  local indexmap = {} -- TODO turn into metamethod as used elsewhere
   for i, v in pairs(ifs) do
     v.inet, v.inet6 = {}, {}
     indexmap[v.index] = i
@@ -5628,32 +5628,32 @@ function S.routes(af, tp)
   return r
 end
 
-local function preftable(tp, prefix)
-  for k, v in pairs(tp) do
+local function preftable(tab, prefix)
+  for k, v in pairs(tab) do
     if k:sub(1, #prefix) ~= prefix then
-      tp[prefix .. k] = v
-      tp[k] = nil
+      tab[prefix .. k] = v
+      tab[k] = nil
     end
   end
-  return tp
+  return tab
 end
 
-local function rtm_table(tp)
-  tp = preftable(tp, "rtm_")
-  tp.rtm_family = stringflag(tp.rtm_family, "AF_")
-  tp.rtm_protocol = stringflag(tp.rtm_protocol, "RTPROT_")
-  tp.rtm_type = stringflag(tp.rtm_type, "RTN_")
-  tp.rtm_scope = stringflag(tp.rtm_scope, "RT_SCOPE_")
-  tp.rtm_flags = stringflag(tp.rtm_flags, "RTM_F_")
-  tp.rtm_table = stringflag(tp.rtm_table, "RT_TABLE_")
-  return tp
+local function rtm_table(tab)
+  tab = preftable(tab, "rtm_")
+  tab.rtm_family = stringflag(tab.rtm_family, "AF_")
+  tab.rtm_protocol = stringflag(tab.rtm_protocol, "RTPROT_")
+  tab.rtm_type = stringflag(tab.rtm_type, "RTN_")
+  tab.rtm_scope = stringflag(tab.rtm_scope, "RT_SCOPE_")
+  tab.rtm_flags = stringflag(tab.rtm_flags, "RTM_F_")
+  tab.rtm_table = stringflag(tab.rtm_table, "RT_TABLE_")
+  return tab
 end
 
 -- this time experiment using table as so many params, plus they are just to init struct.
-function S.newroute(flags, tp, ...)
-  tp = rtm_table(tp)
+function S.newroute(flags, tab, ...)
+  tab = rtm_table(tab)
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
-  return nlmsg(S.RTM_NEWROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, tp.rtm_family, t.rtmsg, tp, ...)
+  return nlmsg(S.RTM_NEWROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, tab.rtm_family, t.rtmsg, tab, ...)
 end
 
 function S.delroute(tp, ...)
