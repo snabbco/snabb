@@ -5206,7 +5206,28 @@ mt.rtmsg = {
   end,
 }
 
+meth.routes = {
+  fn = {
+    match = function(rs, addr, len) -- match destination
+      if type(addr) == "string" then
+        local sl = addr:find("/", 1, true)
+        if sl then
+          len = tonumber(addr:sub(sl + 1))
+          addr = addr:sub(1, sl - 1)
+        end
+        -- parse. get type from first entry? or based on whether :
+      end
+
+-- TODO finish
+
+    end,
+  }
+}
+
 mt.routes = {
+  __index = function(i, k)
+    if meth.routes.fn[k] then return meth.routes.fn[k] end
+  end,
   __tostring = function(is)
     local s = {}
     for k, v in ipairs(is) do
