@@ -5234,6 +5234,12 @@ meth.routes = {
       matches.tp, matches.family = rs.tp, rs.family
       return setmetatable(matches, mt.routes)
     end,
+    refresh = function(rs)
+      local nr = S.routes(rs.family, rs.tp)
+      for k, _ in pairs(rs) do rs[k] = nil end
+      for k, v in pairs(nr) do rs[k] = v end
+      return rs
+    end,
   }
 }
 
