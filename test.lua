@@ -1184,7 +1184,7 @@ test_netlink = {
     local lo = assert(S.interface("lo"))
     assert(S.newroute(0, {family = "inet6", dst_len = 128}, "dst", "::3", "oif", lo.index))
     r = assert(S.routes("inet6", "unspec"))
-    local nr = r:xmatch("::3/128")
+    local nr = r:match("::3/128")
     assert_equal(#nr, 1, "expect to find new route")
     nr = nr[1]
     assert_equal(nr.oif, lo.index, "expect route on lo")
@@ -1192,7 +1192,7 @@ test_netlink = {
     assert_equal(nr.dst_len, 128, "expect /128")
     assert(S.delroute({family = "inet6", dst_len = 128}, "dst", "::3", "oif", lo.index))
     r = assert(S.routes("inet6", "unspec"))
-    local nr = r:xmatch("::3/128")
+    local nr = r:match("::3/128")
     assert_equal(#nr, 0, "expect route deleted")
   end,
 }
