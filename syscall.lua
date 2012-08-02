@@ -5215,7 +5215,7 @@ meth.routes = {
           len = tonumber(addr:sub(sl + 1))
           addr = addr:sub(1, sl - 1)
         end
-        if addr:find(":", 1, true) then addr = t.in6_addr(addr) else addr = t.in_addr(addr) end
+        if rs.family == S.AF_INET6 then addr = t.in6_addr(addr) else addr = t.in_addr(addr) end
       end
       local matches = {}
       for _, v in ipairs(rs) do
@@ -5628,18 +5628,19 @@ end
 
 -- read routes
 function S.getroute(af, tp, tab, prot, scope, ...)
-  local family = stringflag(af, "AF_")
+  af = stringflag(af, "AF_")
   tp = stringflag(tp, "RTN_")
   tab = stringflag(tab, "RT_TABLE_")
   prot = stringflag(prot, "RTPROT_")
   scope = stringflag(scope, "RT_SCOPE_")
-  local r, err = nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, family, t.rtmsg,
-                   {rtm_family = family, rtm_table = tab, rtm_protocol = prot, rtm_type = tp, rtm_scope = scope})
+  local r, err = nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg,
+                   {rtm_family = af, rtm_table = tab, rtm_protocol = prot, rtm_type = tp, rtm_scope = scope})
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
 end
 
 function S.routes(af, tp)
+  af = stringflag(af, "AF_")
   if not tp then tp = S.RTN_UNICAST end
   tp = stringflag(tp, "RTN_")
   local r, err = S.getroute(af, tp)
@@ -5656,6 +5657,8 @@ function S.routes(af, tp)
     if ifs[indexmap[v.oif]] then v.output = ifs[indexmap[v.oif]].name end
     if tp > 0 and v.rtmsg.rtm_type ~= tp then r[k] = nil end -- filter unwanted routes
   end
+  r.family = af
+  r.tp = tp
   return r
 end
 
