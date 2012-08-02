@@ -1083,45 +1083,36 @@ test_netlink = {
   end,
   test_interface_rename_root = function()
     -- using bridge to test this as no other interface in container yet and not sure you can rename lo
-    local ok, err = S.bridge_add("br0")
-    assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
-    if ok then
-      local i = assert(S.interfaces())
-      assert(i.br0)
-      assert(i.br0:rename("newname"))
-      assert(i:refresh())
-      assert(i.newname and not i.br0, "interface should be renamed")
-      assert(S.bridge_del("newname"))
-    end
+    assert(S.bridge_add("br0"))
+    local i = assert(S.interfaces())
+    assert(i.br0)
+    assert(i.br0:rename("newname"))
+    assert(i:refresh())
+    assert(i.newname and not i.br0, "interface should be renamed")
+    assert(S.bridge_del("newname"))
   end,
   test_interface_set_macaddr_root = function()
     -- using bridge to test this as no other interface in container yet
-    local ok, err = S.bridge_add("br0")
-    assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
-    if ok then
-      local i = assert(S.interfaces())
-      assert(i.br0)
-      assert(i.br0:setmac("46:9d:c9:06:dd:dd"))
-      assert_equal(tostring(i.br0.macaddr), "46:9d:c9:06:dd:dd", "interface should have new mac address")
-      assert(i.br0:down())
-      assert(S.bridge_del("br0"))
-    end
+    assert(S.bridge_add("br0"))
+    local i = assert(S.interfaces())
+    assert(i.br0)
+    assert(i.br0:setmac("46:9d:c9:06:dd:dd"))
+    assert_equal(tostring(i.br0.macaddr), "46:9d:c9:06:dd:dd", "interface should have new mac address")
+    assert(i.br0:down())
+    assert(S.bridge_del("br0"))
   end,
   test_interface_dellink_fail_root = function()
     -- using bridge to test this as no other interface in container yet
     -- unfortunately netlink cannot delete bridges created with ioctl, so no use.
-    -- TODO create some other kind of interface we can delete
-    local ok, err = S.bridge_add("br0")
-    assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
-    if ok then
-      local i = assert(S.interfaces())
-      assert(i.br0)
-      ok, err = S.dellink(i.br0.index) -- fails, cannot delete bridge
-      assert(err.EOPNOTSUPP, "expect cannot delete bridge")
-      assert(S.bridge_del("br0"))
-      i = assert(S.interfaces())
-      assert(not i.br0, "expect interface deleted")
-    end
+    -- TODO remove this as we will get bridge_add to use netlink
+    assert(S.bridge_add("br0"))
+    local i = assert(S.interfaces())
+    assert(i.br0)
+    local ok, err = S.dellink(i.br0.index) -- fails, cannot delete bridge
+    assert(err.EOPNOTSUPP, "expect cannot delete bridge")
+    assert(S.bridge_del("br0"))
+    i = assert(S.interfaces())
+    assert(not i.br0, "expect interface deleted")
   end,
   test_newlink_error_root = function()
     local ok, err = S.newlink(-1, 0, "up", "up")
