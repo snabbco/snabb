@@ -5231,6 +5231,7 @@ meth.routes = {
           end
         end
       end
+      matches.tp, matches.family = rs.tp, rs.family
       return setmetatable(matches, mt.routes)
     end,
   }
