@@ -1169,13 +1169,17 @@ test_netlink = {
   end,
   test_getroute_inet = function()
     local r = assert(S.routes("inet"))
-    local lor = assert(r["127.0.0.0/32"])
+    local nr = r:match("127.0.0.0/32")
+    assert_equal(#nr, 1, "expect 1 route")
+    local lor = nr[1]
     assert_equal(tostring(lor.source), "0.0.0.0", "expect empty source route")
     assert_equal(lor.output, "lo", "expect to be on lo")
   end,
   test_getroute_inet6 = function()
-    local r = assert(S.routes("inet6"))
-    local lor = assert(r["::1/128"])
+    local r = assert(S.routes("inet6", "unspec"))
+    local nr = r:match("::1/128")
+    assert_equal(#nr, 1, "expect one matched route")
+    local lor = nr[1]
     assert_equal(tostring(lor.source), "::", "expect empty source route")
     assert_equal(lor.output, "lo", "expect to be on lo")
   end,
