@@ -1024,8 +1024,7 @@ test_netlink = {
   test_newlink_flags_root = function()
     local p = assert(S.clone())
      if p == 0 then
-      local ok, err = S.unshare("newnet")
-      if err then S.exit("failure") end -- may happen with no kernel support
+      fork_assert(S.unshare("newnet"))
       local i = fork_assert(S.interfaces())
       fork_assert(i.lo and not i.lo.flags.up, "expect new network ns has down lo interface")
       fork_assert(S.newlink(i.lo.index, 0, "up", "up"))
@@ -1047,8 +1046,7 @@ test_netlink = {
   test_interface_setflags_root = function()
     local p = assert(S.clone())
      if p == 0 then
-      local ok, err = S.unshare("newnet")
-      if not ok then S.exit("failure") end
+      fork_assert(S.unshare("newnet"))
       local i = fork_assert(S.interfaces())
       fork_assert(i.lo, "expect new network ns has lo interface")
       fork_assert(not i.lo.flags.up, "expect new network lo is down")
