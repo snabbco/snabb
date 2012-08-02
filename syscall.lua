@@ -5206,6 +5206,29 @@ mt.rtmsg = {
   end,
 }
 
+local function addr_mask(addr, len)
+  local mask = bit.rshift(0xffffffff, 32 - len)
+  return bit.band(addr.s_addr, mask)
+end
+
+local function addr_mask6(i, addr, len)
+  local mask = bit.rshift(0xff, (128 - len) % 8)
+  return bit.band(addr.s6_addr[i], mask)
+end
+
+-- TODO seems buggy as route ::1/128 matches ::3/128
+local function mask_match(af, addr1, len1, addr2, len2)
+  if af == S.AF_INET then
+    local m1, m2 = addr_mask(addr1, len1), addr_mask(addr2, len2)
+    return bit.band(m1, m2) == m1
+  end
+  for i = 0, 15 do
+    local m1, m2 = addr_mask6(i, addr1, len1), addr_mask6(i, addr2, len2)
+    if bit.band(m1, m2) ~= m1 then return false end
+  end
+  return true
+end
+
 meth.routes = {
   fn = {
     match = function(rs, addr, len) -- match destination
@@ -5215,11 +5238,39 @@ meth.routes = {
           len = tonumber(addr:sub(sl + 1))
           addr = addr:sub(1, sl - 1)
         end
-        -- parse. get type from first entry? or based on whether :
+        if addr:find(":", 1, true) then addr = t.in6_addr(addr) else addr = t.in_addr(addr) end
       end
-
--- TODO finish
-
+      local matches = {}
+      for _, v in ipairs(rs) do
+        if mask_match(v.family, v.dest, v.dst_len, addr, len) then matches[#matches + 1] = v end
+      end
+      return setmetatable(matches, mt.routes)
+    end,
+    xmatch = function(rs, addr, len) -- exact match
+      if type(addr) == "string" then
+        local sl = addr:find("/", 1, true)
+        if sl then
+          len = tonumber(addr:sub(sl + 1))
+          addr = addr:sub(1, sl - 1)
+        end
+        if addr:find(":", 1, true) then addr = t.in6_addr(addr) else addr = t.in_addr(addr) end
+      end
+      local matches = {}
+      for _, v in ipairs(rs) do
+        if len == v.dst_len then
+          if v.family == S.INET then
+            if addr.s_addr == v.dest.s_addr then matches[#matches + 1] = v end
+          else
+            local match = true
+            for i = 0, 15 do
+              if addr.s6_addr[i] ~= v.dest.s6_addr[i] then match = false end
+            end
+            if match then matches[#matches + 1] = v end
+          end
+        end
+        --if mask_match(v.family, v.dest, v.dst_len, addr, len) then matches[#matches + 1] = v end
+      end
+      return setmetatable(matches, mt.routes)
     end,
   }
 }
