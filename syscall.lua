@@ -5220,7 +5220,7 @@ meth.routes = {
       local matches = {}
       for _, v in ipairs(rs) do
         if len == v.dst_len then
-          if v.family == S.INET then
+          if v.family == S.AF_INET then
             if addr.s_addr == v.dest.s_addr then matches[#matches + 1] = v end
           else
             local match = true
@@ -5230,7 +5230,6 @@ meth.routes = {
             if match then matches[#matches + 1] = v end
           end
         end
-        --if mask_match(v.family, v.dest, v.dst_len, addr, len) then matches[#matches + 1] = v end
       end
       return setmetatable(matches, mt.routes)
     end,
@@ -5337,8 +5336,6 @@ local nlmsg_data_decode = {
     end
 
     r[#r + 1] = ir
-    local ix = tostring(ir.dest) .. "/" .. ir.dst_len
-    r[ix] = ir -- TODO can be duplicates. replace with route match function, or use array.
 
     return r
   end,

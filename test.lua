@@ -1168,7 +1168,7 @@ test_netlink = {
     -- TODO this leaves a route to ::2 which we should delete
   end,
   test_getroute_inet = function()
-    local r = assert(S.routes("inet"))
+    local r = assert(S.routes("inet", "unspec"))
     local nr = r:match("127.0.0.0/32")
     assert_equal(#nr, 1, "expect 1 route")
     local lor = nr[1]
