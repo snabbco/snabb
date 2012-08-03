@@ -85,7 +85,6 @@ function records (filename)
       local packet = file:read(datalen)
       local extra = nil
       if record.incl_len == #packet + ffi.sizeof("struct pcap_record_extra") then
-	 print "found extra data"
 	 extra = readc(file, "struct pcap_record_extra")
       end
       return packet, record, extra
