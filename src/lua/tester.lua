@@ -22,7 +22,43 @@ local pcap_extra  = ffi.new("struct pcap_record_extra")
 print("filename = " .. arg[1] .. " " .. #arg)
 print(ffi.cast("struct pcap_file *", file:read(ffi.sizeof("struct pcap_file"))))
 
-for packet, header, extra in pcap.records(arg[1]) do
-   print(#packet, header, extra)
+function main ()
+   local input, outputs = nil, {}
+   for packet, header, extra in pcap.records(arg[1]) do
+      if extra.flags == 0 then
+	 if input ~= nil then
+	    check(input, outputs)
+	 end
+	 input = {port = extra.port_id, packet = packet}
+	 outputs = {}
+      else
+	 table.insert(outputs, {port = extra.port_id, packet = packet})
+      end
+--      print(#packet, header, extra, extra.port_id, extra.flags)
+   end
 end
+
+local success = 0
+
+function check (input, outputs)
+   check_no_loop(input, outputs)
+   success = success + 1
+end
+
+function check_no_loop (input, outputs)
+   for _,output in ipairs(outputs) do
+      if input.port == output.port then
+	 fail(input, outputs, "Loop error on port " .. input.port)
+      end
+   end
+end
+
+function fail (input, outputs, reason)
+   print(reason)
+--   os.exit(1)
+end
+
+main()
+
+print("Success! with " .. success .. " transaction(s)")
 
