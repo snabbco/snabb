@@ -39,13 +39,17 @@ function main ()
 end
 
 local success = 0
+local failed  = 0
 
 function check (input, outputs)
-   check_no_loop(input, outputs)
+   check_loop(input, outputs)
+   check_drop(input, outputs)
+   check_forward(input, outputs)
+   check_flood(input, outputs)
    success = success + 1
 end
 
-function check_no_loop (input, outputs)
+function check_loop (input, outputs)
    for _,output in ipairs(outputs) do
       if input.port == output.port then
 	 fail(input, outputs, "Loop error on port " .. input.port)
@@ -53,12 +57,53 @@ function check_no_loop (input, outputs)
    end
 end
 
+function check_drop (input, outputs)
+   if #outputs == 0 then
+      fail(input, outputs, "Dropped packet from " .. input.port)
+   end
+end
+
+local fdb = {}
+
+function check_forward (input, outputs)
+   local src = string.sub(input.packet, 1, 6)
+   local dst = string.sub(input.packet, 7, 12)
+   if fdb[dst] then
+      local found = false
+      for _,output in ipairs(outputs) do
+	 if output.port == fdb[dst] then
+	    found = true
+	    break
+	 end
+      end
+      if found == false then
+	 fail(input, outputs, "Forwarding failed, expected to " .. fdb[dst])
+      end
+   end
+   fdb[src] = input.port
+end
+
+local ports = {}
+
+function check_flood (input, outputs)
+   local multicast = string.byte(input.packet, 7) < 0x80
+   if multicast and #outputs < #ports then
+      fail(input, outputs, "Ethernet multicast not sent to enough ports")
+   end
+end
+
 function fail (input, outputs, reason)
    print(reason)
---   os.exit(1)
+   failed = failed + 1
 end
 
 main()
 
-print("Success! with " .. success .. " transaction(s)")
+if failed == 0 then
+   print("Success! " .. success .. " test(s) passed.")
+else
+   print("Failed! " .. failed .. "/" .. (success + failed) .. " tests failed.")
+   os.exit(1)
+end
+
 
