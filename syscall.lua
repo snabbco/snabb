@@ -4199,14 +4199,17 @@ end
 function S.signal(signum, handler) return retbool(C.signal(stringflag(signum, "SIG"), stringflag(handler, "SIG_"))) end
 
 -- missing siginfo functionality for now, only supports getting signum TODO
+-- NOTE I do not think it is safe to call this with a function argument as the jit compiler will not know when it is going to
+-- be called, so have removed this functionality again
+-- recommend using signalfd to handle signals if you need to do anything complex.
 function S.sigaction(signum, handler, mask, flags)
   local sa
   if ffi.istype(t.sigaction, handler) then sa = handler
   else
     if type(handler) == 'string' then
       handler = ffi.cast(t.sighandler, t.int1(stringflag(handler, "SIG_")))
-    elseif
-      type(handler) == 'function' then handler = ffi.cast(t.sighandler, handler) -- TODO check if gc problem here? need to copy?
+    --elseif
+    --  type(handler) == 'function' then handler = ffi.cast(t.sighandler, handler) -- TODO check if gc problem here? need to copy?
     end
     sa = t.sigaction{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = stringflags(flags, "SA_")}
   end
@@ -5501,10 +5504,10 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
     if not value then error("not enough arguments") end
   end
 
-  if type(tp) == "string" and tp == "asciiz" then
+  if tp == "asciiz" then
     tp = t.buffer(#value + 1)
   else
-    if type(tp) == "string" and tp == "address" then
+    if tp == "address" then
       tp = S.addrtype[af]
     end
     if not ffi.istype(tp, value) then
