@@ -618,13 +618,19 @@ test_timers_signals = {
   test_itimer = function()
     local tt = assert(S.getitimer("real"))
     assert(tt.interval.sec == 0, "expect timer not set")
-    local exp = S.SIGALRM
-    assert(S.sigaction("alrm", function(s) assert(s == exp, "expected alarm"); exp = 0 end))
-    assert(exp == S.SIGALRM, "sigaction handler should not have run")
+    local ss = "alrm"
+
+    local fd = assert(S.signalfd(ss, "nonblock"))
+    assert(S.sigprocmask("block", ss))
+
     assert(S.setitimer("real", {0, 0.01}))
-    local rem, err = S.nanosleep(1) -- nanosleep does not interact with signals, should be interrupted
-    assert(err and err.EINTR, "expect nanosleep to be interrupted by timer expiry")
-    assert(exp == 0, "sigaction handler should have run")
+    assert(S.nanosleep(0.1)) -- nanosleep does not interact with itimer
+    
+    local sig = assert(fd:signalfd_read())
+    assert(#sig == 1, "expect one signal")
+    assert(sig[1].alrm, "expect alarm clock to have rung")
+    assert(fd:close())
+    assert(S.sigprocmask("unblock", ss))
   end,
   test_kill_ignored = function()
     assert(S.signal("pipe", "ign"))
