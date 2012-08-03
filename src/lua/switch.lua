@@ -72,7 +72,9 @@ end
 function output (packet)
    print("Sending packet to " .. #fdb:lookup(packet))
    for _,port in ipairs(fdb:lookup(packet)) do
-      if not port:transmit(packet, port) then print "TX overflow" end
+      if port ~= packet.inputport then
+	 if not port:transmit(packet, port) then print "TX overflow" end
+      end
    end
 end
 
