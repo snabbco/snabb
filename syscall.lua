@@ -2378,12 +2378,6 @@ struct seccomp_data {
   uint64_t instruction_pointer;
   uint64_t args[6];
 };
-struct ustat {
-  daddr_t f_tfree;
-  ino_t f_tinode;
-  char f_fname[6];
-  char f_fpack[6];
-};
 
 /* termios */
 typedef unsigned char	cc_t;
@@ -2716,7 +2710,6 @@ int umount2(const char *target, int flags);
 int nanosleep(const struct timespec *req, struct timespec *rem);
 int access(const char *pathname, int mode);
 char *getcwd(char *buf, size_t size);
-int ustat(dev_t dev, struct ustat *ubuf);
 int statfs(const char *path, struct statfs64 *buf); /* this is statfs64 syscall, but glibc wraps */
 int fstatfs(int fd, struct statfs64 *buf);          /* this too */
 int futimens(int fd, const struct timespec times[2]);
@@ -2939,7 +2932,6 @@ t.io_event = ffi.typeof("struct io_event")
 t.seccomp_data = ffi.typeof("struct seccomp_data")
 t.iovec = ffi.typeof("struct iovec")
 t.rtnl_link_stats = ffi.typeof("struct rtnl_link_stats")
-t.ustat = ffi.typeof("struct ustat")
 t.statfs = ffi.typeof("struct statfs64")
 t.ifreq = ffi.typeof("struct ifreq")
 t.linux_dirent64 = ffi.typeof("struct linux_dirent64")
@@ -4015,13 +4007,6 @@ function S.getcwd()
     end
   until ret ~= -1
   return ffi.string(buf)
-end
-
-function S.ustat(dev) -- note deprecated, use statfs instead
-  local u = t.ustat()
-  local ret = C.syscall(S.SYS_ustat, t.int(dev), pt.void(u))
-  if ret == -1 then return nil, t.error() end
-  return u
 end
 
 function S.statfs(path)

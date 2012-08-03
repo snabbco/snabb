@@ -1459,11 +1459,6 @@ test_namespaces_root = {
 }
 
 test_filesystem = {
-  test_ustat = function()
-    local st = assert(S.stat("."))
-    local u = assert(S.ustat(st.dev))
-    assert(u.f_tfree > 0 and u.f_tinode > 0, "expect some free blocks and inodes")
-  end,
   test_statfs = function()
     local st = assert(S.statfs("."))
     assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
