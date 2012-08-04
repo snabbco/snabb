@@ -5,6 +5,7 @@
 
 -- assert(S.sigsuspend(m)) -- needs to be tested in fork.
 
+local strict = require "strict"
 local S = require "syscall"
 local bit = require "bit"
 
@@ -23,6 +24,7 @@ local function fork_assert(c, s) -- if we have forked we need to fail in main th
   return c, s
 end
 
+USE_EXPECTED_ACTUAL_IN_ASSERT_EQUALS = true -- strict wants this to be set
 local luaunit = require "luaunit"
 
 local function assert_equal(...)
@@ -1566,8 +1568,6 @@ if S.geteuid() == 0 then
     end
   end
 end
-
-setmetatable(_G, {__newindex = function(t, k, v) error("global! " .. k) end})
 
 local f
 if arg[1] and arg[1] ~= "coverage" then f = luaunit:run(arg[1]) else f = luaunit:run() end
