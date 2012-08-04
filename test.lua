@@ -701,7 +701,6 @@ test_mmap = {
   test_mmap_fail = function()
     local size = 4096
     local mem, err = S.mmap(pt.void(1), size, "read", "fixed, anonymous", -1, 0)
-print(mem, err); if err then print(err.errno) end
     assert(err, "expect non aligned fixed map to fail")
     assert(err.EINVAL, "expect non aligned map to return EINVAL")
   end,
