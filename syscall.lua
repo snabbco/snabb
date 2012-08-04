@@ -3581,11 +3581,9 @@ local function retbool(ret)
   return true
 end
 
--- used for pointer returns, -1 is failure; removed gc for mem
+-- used for pointer returns, -1 is failure
 local function retptr(ret)
-
-  if ret == errpointer then print("rp", ret, errpointer, ret == errpointer);return nil, t.error() end
-print("rp", ret, errpointer, ret == errpointer)
+  if ret == errpointer then return nil, t.error() end
   return ret
 end
 
