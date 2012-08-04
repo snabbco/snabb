@@ -1738,6 +1738,8 @@ S.TIOCMGET       = 0x5415
 S.TIOCMBIS       = 0x5416
 S.TIOCMBIC       = 0x5417
 S.TIOCMSET       = 0x5418
+S.TIOCGPTN	 = 0x80045430
+S.TIOCSPTLCK	 = 0x40045431
 
 -- sysfs values
 S.SYSFS_BRIDGE_ATTR        = "bridge"
@@ -2751,9 +2753,6 @@ int cfsetospeed(struct termios *termios_p, speed_t speed);
 int cfsetspeed(struct termios *termios_p, speed_t speed);
 pid_t tcgetsid(int fd);
 
-int posix_openpt(int flags);
-int grantpt(int fd);
-int unlockpt(int fd);
 int ptsname_r(int fd, char *buf, size_t buflen);
 ]]
 
@@ -6125,6 +6124,7 @@ function S.ps()
   return setmetatable(ps, mt.ps)
 end
 
+-- these functions are all just ioctls can do natively
 function S.cfmakeraw(termios)
   C.cfmakeraw(termios)
   return true
@@ -6200,14 +6200,16 @@ function S.posix_openpt(flags)
   return S.open("/dev/ptmx", flags);
 end
 
-function S.grantpt(fd)
-  return retbool(C.grantpt(getfd(fd)))
+function S.grantpt(fd) -- I don't think we need to do anything here (eg Musl libc does not)
+  return true
 end
 
 function S.unlockpt(fd)
-  return retbool(C.unlockpt(getfd(fd)))
+  local unlock = t.int1()
+  return retbool(C.ioctl(getfd(fd), S.TIOCSPTLCK, unlock))
 end
 
+-- TODO recode using syscall
 function S.ptsname(fd)
   local count = 32
   local buf = t.buffer(count)

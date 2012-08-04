@@ -1213,7 +1213,7 @@ test_netlink = {
 test_termios = {
   test_pts_termios = function()
     local ptm = assert(S.posix_openpt("rdwr, noctty"))
-    assert(ptm:grantpt()) -- TODO this causes valgrind to complain with glibc. redo ourselves so dont get glibc stuff.
+    assert(ptm:grantpt())
     assert(ptm:unlockpt())
     local pts_name = assert(ptm:ptsname())
     local pts = assert(S.open(pts_name, "rdwr, noctty"))
