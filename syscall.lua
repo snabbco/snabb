@@ -5504,7 +5504,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
     if not value then error("not enough arguments") end
   end
 
-  if tp == "asciiz" then
+  if type(tp) == "string" and tp == "asciiz" then
     tp = t.buffer(#value + 1)
   else
     if type(tp) == "string" and tp == "address" then
@@ -6079,8 +6079,13 @@ mt.proc = {
   end,
   __tostring = function(p) -- TODO decide what to print
     local c = p.cmdline
-    if c and #c == 0 and p.comm and #p.comm > 0 then
-      c = '[' .. p.comm:sub(1, -2) .. ']'
+    if c then
+      if #c == 0 then
+        local comm = p.comm
+        if comm and #comm > 0 then
+          c = '[' .. comm:sub(1, -2) .. ']'
+        end
+      end
       return p.pid .. '  ' .. c
     end
   end
