@@ -6079,8 +6079,10 @@ mt.proc = {
   end,
   __tostring = function(p) -- TODO decide what to print
     local c = p.cmdline
-    if c and #c == 0 and p.comm and #p.comm > 0 then c = '[' .. p.comm:sub(1, -2) .. ']' end 
-    return p.pid .. '  ' .. c
+    if c and #c == 0 and p.comm and #p.comm > 0 then
+      c = '[' .. p.comm:sub(1, -2) .. ']'
+      return p.pid .. '  ' .. c
+    end
   end
 }
 
