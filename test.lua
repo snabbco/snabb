@@ -1109,6 +1109,12 @@ test_netlink = {
     assert(i.br0:down())
     assert(S.bridge_del("br0"))
   end,
+  test_interface_set_macaddr_fail = function()
+    local i = assert(S.interfaces())
+    assert(i.lo, "expect to find lo")
+    local ok, err = i.lo:setmac("46:9d:c9:06:dd:dd")
+    assert(not ok and err and (err.EPERM or err.EOPNOTSUPP), "should not be able to change macaddr on lo")
+  end,
   test_interface_dellink_fail_root = function()
     -- using bridge to test this as no other interface in container yet
     -- unfortunately netlink cannot delete bridges created with ioctl, so no use.
