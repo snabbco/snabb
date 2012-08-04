@@ -1213,7 +1213,7 @@ test_netlink = {
 test_termios = {
   test_pts_termios = function()
     local ptm = assert(S.posix_openpt("rdwr, noctty"))
-    assert(ptm:grantpt())
+    assert(ptm:grantpt()) -- TODO this causes valgrind to complain with glibc. redo ourselves so dont get glibc stuff.
     assert(ptm:unlockpt())
     local pts_name = assert(ptm:ptsname())
     local pts = assert(S.open(pts_name, "rdwr, noctty"))
@@ -1236,6 +1236,8 @@ test_termios = {
     assert(pts:tcflow('ioff'))
     assert(pts:tcflow('oon'))
     assert(pts:tcflow('ion'))
+    assert(pts:close())
+    assert(ptm:close())
   end
 }
 
@@ -1522,7 +1524,7 @@ test_filesystem = {
   end,
 }
 
-test_root = {
+test_misc_root = {
   test_mount = function()
     assert(S.mkdir(tmpfile))
     assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
@@ -1624,6 +1626,8 @@ if arg[1] == "coverage" then
   end
   print("\ncoverage is " .. cov.covered .. " of " .. cov.count .. " " .. math.floor(cov.covered / cov.count * 100) .. "%")
 end
+
+collectgarbage("collect")
 
 S.exit("success")
 
