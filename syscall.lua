@@ -3911,8 +3911,10 @@ end
 
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
 function S.recvfrom(fd, buf, count, flags, ss, addrlen)
-  ss = ss or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(s.sockaddr_storage)
+  if not ss then
+    ss = t.sockaddr_storage()
+    addrlen = t.socklen1(s.sockaddr_storage)
+  end
   local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return {count = tonumber(ret), addr = sa(ss, addrlen[0])}
