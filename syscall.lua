@@ -3548,9 +3548,9 @@ end
 
 -- misc
 
--- luaffi did need some help casting number to pointer. maybe fixed now, check.
---S.pointer = function(i) return pt.void(ffi.cast(t.uintptr, i)) end
-S.pointer = pt.void
+-- typed values for pointer comparison
+local zeropointer = pt.void(0)
+local errpointer = pt.void(-1)
 
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
@@ -3583,7 +3583,9 @@ end
 
 -- used for pointer returns, -1 is failure; removed gc for mem
 local function retptr(ret)
-  if ret == S.pointer(-1) then return nil, t.error() end
+
+  if ret == errpointer then print("rp", ret, errpointer, ret == errpointer);return nil, t.error() end
+print("rp", ret, errpointer, ret == errpointer)
   return ret
 end
 
@@ -4827,7 +4829,7 @@ function S.environ() -- return whole environment as table
   if not environ then return nil end
   local r = {}
   local i = 0
-  while environ[i] ~= S.pointer(0) do
+  while environ[i] ~= zeropointer do
     local e = ffi.string(environ[i])
     local eq = e:find('=')
     if eq then

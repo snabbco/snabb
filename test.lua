@@ -52,7 +52,7 @@ local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 local longfile = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
 local efile = "/tmp/tmpXXYYY" .. S.getpid() .. ".sh"
-local t = S.t
+local t, pt = S.t, S.pt
 
 local clean = function()
   S.unlink(tmpfile)
@@ -700,7 +700,8 @@ test_timers_signals = {
 test_mmap = {
   test_mmap_fail = function()
     local size = 4096
-    local mem, err = S.mmap(S.pointer(1), size, "read", "fixed, anonymous", -1, 0)
+    local mem, err = S.mmap(pt.void(1), size, "read", "fixed, anonymous", -1, 0)
+print(mem, err); if err then print(err.errno) end
     assert(err, "expect non aligned fixed map to fail")
     assert(err.EINVAL, "expect non aligned map to return EINVAL")
   end,
