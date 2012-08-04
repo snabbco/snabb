@@ -3033,7 +3033,7 @@ t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
         cs[k] = v
       end
     end
-  return ss
+    return ss
   end,
 })
 
@@ -4109,17 +4109,21 @@ function S.accept(sockfd, flags, addr, addrlen)
   return {fd = t.fd(ret), addr = sa(addr, addrlen[0])}
 end
 
-function S.getsockname(sockfd)
-  local ss = t.sockaddr_storage()
-  local addrlen = t.socklen1(s.sockaddr_storage)
+function S.getsockname(sockfd, ss, addrlen)
+  if not ss then
+    ss = t.sockaddr_storage()
+    addrlen = t.socklen1(s.sockaddr_storage)
+  end
   local ret = C.getsockname(getfd(sockfd), ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return sa(ss, addrlen[0])
 end
 
-function S.getpeername(sockfd)
-  local ss = t.sockaddr_storage()
-  local addrlen = t.socklen1(s.sockaddr_storage)
+function S.getpeername(sockfd, ss, addrlen)
+  if not ss then
+    ss = t.sockaddr_storage()
+    addrlen = t.socklen1(s.sockaddr_storage)
+  end
   local ret = C.getpeername(getfd(sockfd), ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return sa(ss, addrlen[0])
