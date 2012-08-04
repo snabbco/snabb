@@ -6197,7 +6197,7 @@ function S.tcgetsid(fd)
 end
 
 function S.posix_openpt(flags)
-  return retfd(C.posix_openpt(stringflags(flags, "O_")))
+  return S.open("/dev/ptmx", flags);
 end
 
 function S.grantpt(fd)
