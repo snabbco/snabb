@@ -51,12 +51,14 @@ local buf = S.t.buffer(size)
 local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 local longfile = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
+local efile = "/tmp/tmpXXYYY" .. S.getpid() .. ".sh"
 local t = S.t
 
 local clean = function()
   S.unlink(tmpfile)
   S.unlink(tmpfile2)
   S.unlink(longfile)
+  S.unlink(efile)
 end
 
 test_basic = {
@@ -1393,7 +1395,6 @@ test_processes = {
       assert(w.si_code == S.CLD_EXITED, "normal exit expected")
     end
 
-    local efile = "/tmp/tmpXXYYY.sh"
     pid = assert(S.fork())
     if (pid == 0) then -- child
       local script = [[
