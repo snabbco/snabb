@@ -557,25 +557,29 @@ test_sockets_pipes = {
     assert(n == #str)
     n = assert(S.splice(fd, 0, p[2], nil, #str, "nonblock")) -- splice file at offset 0 into pipe
     assert(n == #str)
-    n = assert(S.tee(p[1], pp[2], #str, "nonblock")) -- clone our pipe
-    assert(n == #str)
-    n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice to socket
-    assert(n == #str)
-    n = assert(s[2]:read())
-    assert(#n == #str)
-    n = assert(S.splice(pp[1], nil, s[1], nil, #str, "nonblock")) -- splice the tee'd pipe into our socket
-    assert(n == #str)
-    n = assert(s[2]:read())
-    assert(#n == #str)
-    local buf2 = S.t.buffer(#str)
-    S.copy(buf2, str, #str)
+    local n, err = S.tee(p[1], pp[2], #str, "nonblock") -- clone our pipe
+    if n then
+      assert(n == #str)
+      n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice to socket
+      assert(n == #str)
+      n = assert(s[2]:read())
+      assert(#n == #str)
+      n = assert(S.splice(pp[1], nil, s[1], nil, #str, "nonblock")) -- splice the tee'd pipe into our socket
+      assert(n == #str)
+      n = assert(s[2]:read())
+      assert(#n == #str)
+      local buf2 = S.t.buffer(#str)
+      S.copy(buf2, str, #str)
 
-    n = assert(S.vmsplice(p[2], {{buf2, #str}}, "nonblock")) -- write our memory into pipe
-    assert(n == #str)
-    n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice out to socket
-    assert(n == #str)
-    n = assert(s[2]:read())
-    assert(#n == #str)
+      n = assert(S.vmsplice(p[2], {{buf2, #str}}, "nonblock")) -- write our memory into pipe
+      assert(n == #str)
+      n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice out to socket
+      assert(n == #str)
+      n = assert(s[2]:read())
+      assert(#n == #str)
+    else
+      assert(err.ENOSYS, "only allowed error is syscall not suported, as valgrind gives this")
+    end
 
     assert(fd:close())
     assert(p[1]:close())
