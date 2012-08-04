@@ -1738,8 +1738,8 @@ S.TIOCMGET       = 0x5415
 S.TIOCMBIS       = 0x5416
 S.TIOCMBIC       = 0x5417
 S.TIOCMSET       = 0x5418
-S.TIOCGPTN	 = 0x80045430
-S.TIOCSPTLCK	 = 0x40045431
+S.TIOCGPTN	 = 0x80045430LL
+S.TIOCSPTLCK	 = 0x40045431LL
 
 -- sysfs values
 S.SYSFS_BRIDGE_ATTR        = "bridge"
@@ -3816,6 +3816,7 @@ function S.syscall(num, ...)
   return ret
 end
 
+-- generally calling C.ioctl directly
 function S.ioctl(d, request, argp)
   local ret = C.ioctl(d, request, argp)
   if ret == -1 then return nil, t.error() end
@@ -6206,19 +6207,14 @@ end
 
 function S.unlockpt(fd)
   local unlock = t.int1()
-  return retbool(C.ioctl(getfd(fd), S.TIOCSPTLCK, unlock))
+  return retbool(C.ioctl(getfd(fd), S.TIOCSPTLCK, pt.void(unlock)))
 end
 
--- TODO recode using syscall
 function S.ptsname(fd)
-  local count = 32
-  local buf = t.buffer(count)
-  local ret = C.ptsname_r(getfd(fd), buf, count)
-  if ret == 0 then
-    return ffi.string(buf)
-  else
-    return retbool(ret)
-  end
+  local pts = t.int1()
+  local ret = C.ioctl(getfd(fd), S.TIOCGPTN, pt.void(pts))
+  if ret == -1 then return nil, t.error() end
+  return "/dev/pts/" .. tostring(pts[0])
 end
 
 -- Nixio compatibility to make porting easier, and useful functions (often man 3). Incomplete.
