@@ -1,0 +1,33 @@
+Here's a basic example of how tush should work.
+
+$ echo '$ echo hello world'  >test.tush
+
+$ tush-run test.tush
+| $ echo hello world
+| | hello world
+
+tush-check should fail because we omitted the expected output in our script:
+
+$ tush-check test.tush >/dev/null
+? 1
+
+Here, tail -n +3 skips the first lines from 'diff -u' which include dates
+that will vary from one run to the next:
+
+$ tush-check test.tush | tail -n +3
+| @@ -1 +1,2 @@
+|  $ echo hello world
+| +| hello world
+
+Using tush-bless we fix this test failure:
+
+$ tush-bless test.tush
+$ tush-check test.tush
+$ cat test.tush
+| $ echo hello world
+| | hello world
+
+There should be nothing else in this tush-scratch directory we're running in:
+
+$ ls
+| test.tush

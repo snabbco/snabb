@@ -1,0 +1,39 @@
+Some edge cases. First, empty input does nothing:
+
+$ tush-run </dev/null
+
+Input with no commands and no output is just echoed:
+
+$ echo  >text OK here we go
+$ echo >>text Move on. Nothing to see here.
+
+$ tush-run text
+| OK here we go
+| Move on. Nothing to see here.
+
+But output is dropped:
+
+$ echo >>text '| wheee'
+
+$ tush-run text
+| OK here we go
+| Move on. Nothing to see here.
+
+And lines that look like they might have been meant as commands
+provoke a warning:
+
+$ echo >>text ' | heee'
+$ echo >>text '   ? 42'
+$ echo >>text '  @ ouch'
+
+$ tush-run text
+| OK here we go
+| Move on. Nothing to see here.
+|  | heee
+|    ? 42
+|   @ ouch
+@ Warning: comment line that looks like a command
+@ Warning: comment line that looks like a command
+@ Warning: comment line that looks like a command
+
+(Really it ought to tell you *which* line it's warning about. Sorry.)

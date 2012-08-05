@@ -1,0 +1,15 @@
+tush can also check status codes and output on stderr.
+
+$ echo  >test1 '$ echo you fail >/dev/stderr'
+$ echo >>test1 ''
+$ echo >>test1 '$ exit 42'
+
+$ tush-run test1
+| $ echo you fail >/dev/stderr
+| @ you fail
+| 
+| $ exit 42
+| ? 42
+
+
+XXX can we give it an ill-formed input file and get some errors?

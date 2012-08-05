@@ -1,0 +1,14 @@
+#!/bin/sh
+# Copyright 2007 Darius Bacon under the MIT X license.
+
+# usage: tush-check [tush-script...]
+# Checking succeeds iff each script produces itself unaltered as output.
+
+output=tush-output
+
+for f in "$@"
+do
+    (tush-run ${f} >$output && diff -u ${f} $output) || exit 1
+done
+
+rm -f $output

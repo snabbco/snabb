@@ -1,0 +1,61 @@
+#!/bin/sh
+# Copyright 2007 Darius Bacon under the MIT X license.
+
+# usage: tush-run-raw [tush-script...]
+# Run a tush test script, producing its result on stdout. The result is
+# the same as the input except with its old output sections replaced by
+# new ones from rerunning each command.
+
+# This should be implemented as a #!/usr/bin/awk script instead of a 
+# silly sh script that just invokes awk. But every variant of that
+# that I've tried breaks on some system or other.
+
+awk '
+        BEGIN {
+# XXX commented version worked on OS x. TODO find a unified portable way.
+#          mktemp = "mktemp /tmp/tush.XXXXXX /tmp/tush.XXXXXX"
+          mktemp = "mktemp"
+          mktemp | getline capture_out; close(mktemp)
+          mktemp | getline capture_err; close(mktemp)
+        }
+
+        /^[|@?] /       { next }        # Skip old output.
+        /^[ \t]+[|@?$]/ { print "Warning: comment line that looks like" \
+                                " a command" >"/dev/stderr" }
+                        { print }
+        /^[$] /         { printf "%s", run(substr($0, 3)) }
+
+        END {
+# XXX more safeguards before this rm?
+          system("rm -f " capture_out " " capture_err)
+        }
+
+        # Produce decorated outputs and status from running command in the
+        # shell.
+        function run(command,   status, result) {
+          status = system("(" command "\n) >"capture_out " 2>"capture_err)
+          result = result prefix("| ", snarf(capture_out))
+          result = result prefix("@ ", snarf(capture_err))
+          result = result prefix("? ", status == 0 ? "" : status + "")
+          return result
+        }
+
+        # Return the contents of file f.
+        # (NB: the last line gets a \n whether it came with one or not.)
+        function snarf(f,   result, line) {
+          while ((getline line <f) > 0)
+            result = result line "\n"
+          close(f)
+          return result
+        }
+
+        # Prefix each line in string s with pre.
+        # (Incidentally forces it to end with a newline.)
+        function prefix(pre, s) {
+          if (s == "") 
+             return ""
+          sub(/\n$/, "", s)
+          gsub(/\n/, "\n" pre, s)
+          return pre s "\n"
+        }
+' "$@"

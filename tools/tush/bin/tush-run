@@ -1,0 +1,12 @@
+#!/bin/sh
+# Copyright 2007 Darius Bacon under the MIT X license.
+
+# usage: tush-run [tush-script...]
+
+# For test isolation, commands are run in a fresh scratch subdirectory
+# of the current directory.
+scratch=tush-scratch
+
+rm -rf $scratch
+mkdir $scratch &&
+cat "$@" | (cd $scratch; tush-run-raw) && rm -rf $scratch
