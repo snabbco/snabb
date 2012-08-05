@@ -66,7 +66,7 @@ posix\_openpt, grantpt, unlockpt, ptsname
 
 ### Socket types
 
-inet, inet6, unix, netlink (partial support, in progress)
+inet, inet6, unix, netlink.
 
 ### API
 
@@ -106,21 +106,22 @@ Siginfo support in sigaction not there yet, as confused by the kernel API.
 
 only some of aio is working, needs some debugging before being used. Also all the iocb functions should be replaced with metatypes eg getiocb, getiocbs.
 
-Routes are stored as array and also by destination, but destinations can clash. Use array, or a filter function.
-
 There will no doubt be bugs, please report them if you find them.
 
 ### Missing functions etc
 
 pselect, ppoll
 clock\_nanosleep, timer\_create, timer\_getoverrun
-faccessat(2), fchmodat(2), fchownat(2), fstatat(2),  futimesat(2),  linkat(2),  mkdirat(2),  mknodat(2),
-readlinkat(2), renameat(2), symlinkat(2), unlinkat(2), mkfifoat(3)
+faccessat, fchmodat, fchownat, fstatat,  futimesat,  linkat,  mkdirat,  mknodat,
+readlinkat, renameat, symlinkat, unlinkat
 sigqueue,
 capset, capget
 pivot\_root, init\_module, delete\_module, query\_module, swapon, swapoff
-netns, iopl, ioperm
+netns, iopl, ioperm, futex
 ...
+
+from elsewhere
+mkfifoat(3) - not actually a syscall.
 
 ### 64 bit fileops on 32 bit
 
@@ -133,15 +134,6 @@ Linux 2.4 increased the size of user and group IDs from 16 to 32 bits.  Tosuppor
 
 The glibc wrappers hide this, and call the 32 bit calls anyway, so should be ok.
 
-## fcntl
-Some helper functions for fcntl features such as file locking should be added?
-
-## sysctl
-Need a trivial sysctl wrapper (write to /proc/sys)
-
-## cgroups
-Need a cgroup interface.
-
 ## netlink
 Allow configuring and getting properties by name. Allow get for just one interface.
 
@@ -151,33 +143,31 @@ Make commands that look more like `ip`, or as methods of the interface objects, 
 
 Currently support get, add and delete for interfaces, routes and addresses, although functionality not fully complete even for these, and API not finalized.
 
-## modules
-
-`lsmod` needs to parse /proc/modules, the rest are syscalls, except depmod.
-
-## selinux etc
-
-Have not looked yet at what support is needed, eg labelling. If you have selinux enabled, I guess some tests may fail.
-
-## other commands
-
-Select appropriate shell commands that are useful, eg need them for tests. ping, etc. Also aliases like touch (uses utimensat).
-syslog.
-
-Need to work on iterators, eg for cat (readfile) etc.
-
 ## nixio compatibility
 
-Started, but lots to do. Nixio.File done so far, but may need fixes.
+Current plan is to have the same level of functionality, but not worry about except compatibility for now. I can't find a test suite, and the API choice does not seem very well thought out.
 
-The way that options are specified are different, so will need to change things there, or add a compatibility layer.
+## TODO
 
-Nixio does not seem to have a test suite.
+Misc list of ideas, no particular order
 
-Some initial setup eg for signals. May do this in compatibility layer.
-
-Functions with EINTR return false not nil, need to support this.
-
-Current plan is to have the same level of functionality, but not worry about except compatibility for now.
-
+1. non blocking netlink functions ie return EAGAIN but can resume.
+2. futex support. Needs some assembly support.
+3. Other atomic ops eg CAS - see https://lwn.net/Articles/509102/
+4. try using llvm to parse headers to get syscall numbers, or a C program. Generate headers by arch.
+5. evented coroutine example
+6. iterators eg for reading large files? (cat)
+7. ping support
+8. dhcp client
+9. misc shell commands eg touch
+10. syslog
+11. selinux
+12. seccomp
+13. insmod, lsmod, depmod
+14. decide on netlink interface, still experimenting
+15. netlink missing functionality: lots, including moving interfaces to new netns
+16. use netlink instead of bridge ioctls for create, destroy.
+17. sysctl wrapper (trivial write to /proc/sys)
+18. cgroups
+19. replace more of the man(3) stuff with native syscalls. More transparent.
 
