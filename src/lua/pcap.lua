@@ -50,7 +50,7 @@ end
 local pcap_extra = ffi.new("struct pcap_record_extra")
 ffi.C.memset(pcap_extra, 0, ffi.sizeof(pcap_extra))
 
-function write_record(file, ffi_buffer, length, port, input)
+function write_record(file, ffi_buffer, length,   port, input)
    local pcap_record = ffi.new("struct pcap_record")
    local incl_len = length;
    if port ~= nil then
@@ -63,7 +63,7 @@ function write_record(file, ffi_buffer, length, port, input)
    file:write(ffi.string(pcap_record, ffi.sizeof(pcap_record)))
    file:write(ffi.string(ffi_buffer, length))
    if port ~= nil then
-      print 'write extra bytes...'
+--      print 'write extra bytes...'
       file:write(ffi.string(pcap_extra, ffi.sizeof(pcap_extra)))
    end
    file:flush()
