@@ -102,10 +102,5 @@ end
 
 main()
 
-if failed == 0 then
-   print("Success! " .. tests .. " test(s) passed.")
-else
-   print("Failed! " .. failed .. "/" .. tests .. " tests failed.")
-   os.exit(1)
-end
+if failed > 0 then os.exit(1) end
 
