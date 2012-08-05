@@ -81,15 +81,16 @@ function check_forward (input, outputs)
 end
 
 local ports = {}
+local portcount = 0
 
 function check_flood (input, outputs)
    -- Learn ports
    if ports[input.port] == nil then
-      ports[input.port] = true -- Remember port
-      ports[#ports+1] = port   -- Make #ports match number of ports seen
+      ports[input.port] = true
+      portcount = portcount + 1
    end
-   local multicast = string.byte(input.packet, 7) < 0x80
-   if multicast and #outputs < #ports - 1 then
+   local multicast = string.byte(input.packet, 7) >= 0x80
+   if multicast and #outputs < portcount - 1 then
       fail(input, outputs, "flood failed: not sent to enough ports")
    end
 end
