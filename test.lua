@@ -1152,7 +1152,7 @@ test_netlink = {
     assert(S.dellink(i.br0.index))
   end,
   test_dellink_by_name_root = function()
-    local ok, err = S.create_interface{name = "dummy0", type = "dummy"}
+    assert(S.create_interface{name = "dummy0", type = "dummy"})
     local i = assert(S.interfaces())
     assert(i.dummy0, "expect dummy interface")
     assert(S.dellink(0, "ifname", "dummy0"))
@@ -1207,6 +1207,30 @@ test_netlink = {
     r:refresh()
     local nr = r:match("::3/128")
     assert_equal(#nr, 0, "expect route deleted")
+  end,
+  test_move_interface_ns_root = function()
+    local fds = assert(S.pipe())
+    assert(S.create_interface{name = "dummy0", type = "dummy"})
+    local i = assert(S.interfaces())
+    assert(i.dummy0, "expect dummy0 interface")
+    local p = assert(S.clone("newnet, files"))
+    if p == 0 then
+      fork_assert(fds[1]:read(nil, 1)) -- wait until interface moved. TODO wait for event from netlink listener instead?
+      local i = S.interfaces()
+      fork_assert(i.dummy0, "expect dummy0 interface in child")
+      fork_assert(S.dellink(0, "ifname", "dummy0"))
+      i:refresh()
+      fork_assert(not i.dummy0, "expect no dummy if")
+      S.exit()
+    else
+      assert(S.newlink(i.dummy0.index, 0, 0, 0, "net_ns_pid", p))
+      i:refresh()
+      assert(fds[2]:write(".")) -- say we are ready
+      assert(not i.dummy0, "dummy0 vanished")
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end
+
   end,
 }
 

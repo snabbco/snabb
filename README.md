@@ -165,7 +165,7 @@ Misc list of ideas, no particular order
 12. seccomp
 13. insmod, lsmod, depmod
 14. decide on netlink interface, still experimenting
-15. netlink missing functionality: lots, including moving interfaces to new netns
+15. netlink missing functionality and tests
 16. use netlink instead of bridge ioctls for create, destroy.
 17. sysctl wrapper (trivial write to /proc/sys)
 18. cgroups
