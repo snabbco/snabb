@@ -19,9 +19,6 @@ local pcap_file   = ffi.new("struct pcap_file")
 local pcap_record = ffi.new("struct pcap_record")
 local pcap_extra  = ffi.new("struct pcap_record_extra")
 
-print("filename = " .. arg[1] .. " " .. #arg)
-print(ffi.cast("struct pcap_file *", file:read(ffi.sizeof("struct pcap_file"))))
-
 function main ()
    local input, outputs = nil, {}
    for packet, header, extra in pcap.records(arg[1]) do
@@ -38,7 +35,7 @@ function main ()
    end
 end
 
-local success = 0
+local tests   = 0
 local failed  = 0
 
 function check (input, outputs)
@@ -46,20 +43,20 @@ function check (input, outputs)
    check_drop(input, outputs)
    check_forward(input, outputs)
    check_flood(input, outputs)
-   success = success + 1
+   tests = tests + 1
 end
 
 function check_loop (input, outputs)
    for _,output in ipairs(outputs) do
       if input.port == output.port then
-	 fail(input, outputs, "Loop error on port " .. input.port)
+	 fail(input, outputs, "loop failed on port " .. input.port)
       end
    end
 end
 
 function check_drop (input, outputs)
    if #outputs == 0 then
-      fail(input, outputs, "Dropped packet from " .. input.port)
+      fail(input, outputs, "drop failed on packet from " .. input.port)
    end
 end
 
@@ -77,7 +74,7 @@ function check_forward (input, outputs)
 	 end
       end
       if found == false then
-	 fail(input, outputs, "Forwarding failed, expected to " .. fdb[dst])
+	 fail(input, outputs, "forward failed, expected to " .. fdb[dst])
       end
    end
    fdb[src] = input.port
@@ -86,9 +83,14 @@ end
 local ports = {}
 
 function check_flood (input, outputs)
+   -- Learn ports
+   if ports[input.port] == nil then
+      ports[input.port] = true -- Remember port
+      ports[#ports+1] = port   -- Make #ports match number of ports seen
+   end
    local multicast = string.byte(input.packet, 7) < 0x80
-   if multicast and #outputs < #ports then
-      fail(input, outputs, "Ethernet multicast not sent to enough ports")
+   if multicast and #outputs < #ports - 1 then
+      fail(input, outputs, "flood failed: not sent to enough ports")
    end
 end
 
@@ -100,10 +102,9 @@ end
 main()
 
 if failed == 0 then
-   print("Success! " .. success .. " test(s) passed.")
+   print("Success! " .. tests .. " test(s) passed.")
 else
-   print("Failed! " .. failed .. "/" .. (success + failed) .. " tests failed.")
+   print("Failed! " .. failed .. "/" .. tests .. " tests failed.")
    os.exit(1)
 end
-
 
