@@ -1195,7 +1195,7 @@ test_netlink = {
   test_newroute_inet6_root = function()
     local r = assert(S.routes("inet6", "unspec"))
     local lo = assert(S.interface("lo"))
-    assert(S.newroute(0, {family = "inet6", dst_len = 128}, "dst", "::3", "oif", lo.index))
+    assert(S.newroute(0, {family = "inet6", dst_len = 128, type = "unicast", protocol = "static"}, "dst", "::3", "oif", lo.index))
     r:refresh()
     local nr = r:match("::3/128")
     assert_equal(#nr, 1, "expect to find new route")
