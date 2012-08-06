@@ -1230,7 +1230,6 @@ test_netlink = {
       local w = assert(S.waitpid(-1, "clone"))
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
-
   end,
 }
 
