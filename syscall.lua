@@ -5481,8 +5481,11 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
 
   if type(msg) == "table" then -- for nested attributes
     args = msg
+    len = 0
     while #args ~= 0 do
-      len, args, messages, values = ifla_getmsg(args, messages, values, tab, lookup, af)
+      local nlen
+      nlen, args, messages, values = ifla_getmsg(args, messages, values, tab, lookup, af)
+      len = len + nlen
     end
     return len, args, messages, values
   end
@@ -5510,7 +5513,6 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
     values[#values + 1] = value
 
     len, args, messages, values = ifla_getmsg(args, messages, values, tp[1], tp[2])
-
     len = nlmsg_align(s.rtattr) + len
 
     value.rta_len = len
