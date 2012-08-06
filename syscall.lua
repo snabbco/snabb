@@ -2890,6 +2890,7 @@ t.char = ffi.typeof("char")
 t.uchar = ffi.typeof("unsigned char")
 t.int = ffi.typeof("int")
 t.uint = ffi.typeof("unsigned int")
+t.uint16 = ffi.typeof("uint16_t")
 t.int32 = ffi.typeof("int32_t")
 t.uint32 = ffi.typeof("uint32_t")
 t.int64 = ffi.typeof("int64_t")
@@ -5410,7 +5411,11 @@ local ifla_msg_types = {
   },
   ifla_info = {
     [S.IFLA_INFO_KIND] = "asciiz",
-    --[S.IFLA_INFO_DATA] = "nested",
+    [S.IFLA_INFO_DATA] = {"ifla_vlan", "IFLA_VLAN_"},
+  },
+  ifla_vlan = {
+    [S.IFLA_VLAN_ID] = t.uint16,
+    -- other vlan params
   },
   ifa = {
     -- IFA_UNSPEC
@@ -5474,6 +5479,14 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
   local value, len
   local tp
 
+  if type(msg) == "table" then -- for nested attributes
+    args = msg
+    while #args ~= 0 do
+      len, args, messages, values = ifla_getmsg(args, messages, values, tab, lookup, af)
+    end
+    return len, args, messages, values
+  end
+
   if type(msg) == "cdata" then
     tp = msg
     value = table.remove(args, 1)
@@ -5485,9 +5498,10 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
     return len, args, messages, values
   end
 
+  local rawmsg = msg
   msg = stringflag(msg, lookup)
   tp = ifla_msg_types[tab][msg]
-  if not tp then error("unknown message type") end
+  if not tp then error("unknown message type " .. rawmsg .. " in " .. tab .. " lookup " .. lookup) end
 
   if type(tp) == "table" then
     value = {rta_type = msg} -- missing rta_len, but have reference and can fix
@@ -5748,16 +5762,28 @@ function S.interface(i) -- could optimize just to retrieve info for one
   return ifs[i]
 end
 
-local link_process = { -- TODO very incomplete
+local link_process = { -- TODO very incomplete. generate?
   flags = function(args, v) end,
   index = function(args, v) end,
+  modifier = function(args, v) end,
+  change = function(args, v) end,
   name = function(args, v)
     args[#args + 1] = "ifname"
+    args[#args + 1] = v
+  end,
+  link = function(args, v)
+    args[#args + 1] = "link"
     args[#args + 1] = v
   end,
   type = function(args, v)
     args[#args + 1] = "linkinfo"
     args[#args + 1] = "kind"
+    args[#args + 1] = v
+  end,
+  vlan = function(args, v)
+    args[#args + 1] = "linkinfo"
+    args[#args + 1] = "data"
+    args[#args + 1] = "id"
     args[#args + 1] = v
   end,
 }
