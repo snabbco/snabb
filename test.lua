@@ -1144,7 +1144,7 @@ test_netlink = {
     assert(S.dellink(i.dummy0.index))
   end,
   test_newlink_newif_bridge_root = function()
-    local ok, err = S.create_interface{name = "br0", type = "bridge"}
+    assert(S.create_interface{name = "br0", type = "bridge"})
     local i = assert(S.interfaces())
     assert(i.br0, "expect bridge interface")
     local b = assert(S.bridge_list())
