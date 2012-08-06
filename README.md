@@ -170,4 +170,5 @@ Misc list of ideas, no particular order
 17. sysctl wrapper (trivial write to /proc/sys)
 18. cgroups
 19. replace more of the man(3) stuff with native syscalls. More transparent.
+20. add functions to add and remove addresses to net interface 
 
