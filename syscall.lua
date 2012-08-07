@@ -5783,6 +5783,7 @@ function S.iplink(tab)
     if link_process[k] then
       local a = link_process[k](args, v)
       for i = 1, #a do args[#args + 1] = a[i] end
+    else error("bad iplink command " .. k)
     end
   end
   return S.newlink(unpack(args))
