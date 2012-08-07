@@ -2846,7 +2846,7 @@ local function stringflag(str, prefix) -- single value only
   return val
 end
 
-local function flaglist(str, ...) -- flags from a list. TODO memoize.
+local function flaglist(str, ...) -- flags from a list. TODO memoize. TODO needs prefix support too
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   local list = {...}
