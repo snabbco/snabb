@@ -2832,29 +2832,6 @@ local function stringflags(str, prefix) -- allows multiple comma sep flags that 
   return f
 end
 
--- no memoization here, but currently only used for umount
-local function stringflags2(str, prefix, prefix2)
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  local f = 0
-  local a = split(",", str)
-  local ts, s, val
-  for i, v in ipairs(a) do
-    ts = trim(v)
-    s = ts
-    if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
-    val = S[s:upper()]
-    if prefix2 and not val then
-      s = ts
-      if s:sub(1, #prefix2) ~= prefix2 then s = prefix2 .. s end -- prefix optional
-      val = S[s:upper()]
-    end
-    if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
-  end
-  return f
-end
-
 local function stringflag(str, prefix) -- single value only
   if not str then return 0 end
   if type(str) ~= "string" then return str end
@@ -2867,6 +2844,25 @@ local function stringflag(str, prefix) -- single value only
   if not memo[prefix] then memo[prefix] = {} end
   memo[prefix][str] = val
   return val
+end
+
+local function flaglist(str, ...) -- flags from a list. TODO memoize.
+  if not str then return 0 end
+  if type(str) ~= "string" then return str end
+  local list = {...}
+  local list2 = {}
+  for _, v in ipairs(list) do list2[v] = true end
+  local f = 0
+  local a = split(",", str)
+  local ts, s, val
+  for i, v in ipairs(a) do
+    ts = trim(v)
+    s = ts:upper()
+    val = S[s]
+    if not list2[s] or not val then error("invalid flag: " .. v) end
+    f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
+  end
+  return f
 end
 
 local function accessflags(s) -- allow "rwx"
@@ -4405,7 +4401,7 @@ function S.mount(source, target, filesystemtype, mountflags, data)
 end
 
 function S.umount(target, flags)
-  if flags then return retbool(C.umount2(target, stringflags2(flags, "MNT_", "UMOUNT_"))) end
+  if flags then return retbool(C.umount2(target, flaglist(flags, "MNT_FORCE", "MNT_DETACH", "MNT_EXPIRE", "UMOUNT_NOFOLLOW"))) end
   return retbool(C.umount(target))
 end
 
