@@ -701,6 +701,14 @@ test_timers_signals = {
     local tt = assert(S.clock_getres("realtime"))
     local tt = assert(S.clock_gettime("realtime"))
   end,
+  test_clock_nanosleep = function()
+    local rem = assert(S.clock_nanosleep("realtime", nil, 0.001))
+    assert_equal(rem, true, "expect no elapsed time after clock_nanosleep")
+  end,
+  test_clock_nanosleep_abs = function()
+    local rem = assert(S.clock_nanosleep("realtime", "abstime", 0)) -- in the past
+    assert_equal(rem, true, "expect no elapsed time after clock_nanosleep")
+  end,
 }
 
 test_mmap = {

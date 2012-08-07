@@ -470,6 +470,8 @@ S.CLOCK_MONOTONIC_RAW = 4
 S.CLOCK_REALTIME_COARSE = 5
 S.CLOCK_MONOTONIC_COARSE = 6
 
+S.TIMER_ABSTIME = 1
+
 -- adjtimex
 S.ADJ_OFFSET             = 0x0001
 S.ADJ_FREQUENCY          = 0x0002
@@ -2610,6 +2612,7 @@ time_t time(time_t *t);
 int clock_getres(clockid_t clk_id, struct timespec *res);
 int clock_gettime(clockid_t clk_id, struct timespec *tp);
 int clock_settime(clockid_t clk_id, const struct timespec *tp);
+int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *request, struct timespec *remain);
 unsigned int alarm(unsigned int seconds);
 int sysinfo(struct sysinfo *info);
 void sync(void);
@@ -4808,7 +4811,20 @@ function S.clock_gettime(clk_id, ts)
   return ts
 end
 
-function S.clock_settime(clk_id, ts) return retbool(C.syscall(S.SYS_clock_settime, stringflag(clk_id, "CLOCK_"), getts(ts))) end
+function S.clock_settime(clk_id, ts)
+  if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
+  return retbool(C.syscall(S.SYS_clock_settime, t.int(stringflag(clk_id, "CLOCK_")), pt.void(ts)))
+end
+
+function S.clock_nanosleep(clk_id, flags, req, rem)
+  if not ffi.istype(t.timespec, req) then req = t.timespec(req) end
+  if not rem then rem = t.timespec() end
+  local ret = C.syscall(S.SYS_clock_nanosleep, t.clockid(stringflag(clk_id, "CLOCK_")), t.int(stringflag(flags, "TIMER_")), pt.void(req), pt.void(rem))
+  if ret == -1 then
+    if ffi.errno() == S.E.INTR then return rem else return nil, t.error() end
+  end
+  return true
+end
 
 -- straight passthroughs, as no failure possible
 S.getuid = C.getuid
