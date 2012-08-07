@@ -115,7 +115,7 @@ There will no doubt be bugs, please report them if you find them.
 ### Missing functions etc
 
 pselect, ppoll
-clock\_nanosleep, timer\_create, timer\_getoverrun
+timer\_create, timer\_getoverrun
 faccessat, fchmodat, fchownat, fstatat,  futimesat,  linkat,  mkdirat,  mknodat,
 readlinkat, renameat, symlinkat, unlinkat
 sigqueue,
