@@ -12,7 +12,11 @@ Also supports [luaffi](https://github.com/jmckaskill/luaffi) so you can use with
 
 Releases after tag 0.3 do not currently work with luaffi, please use that until fixed. Using new ffi features to simplify code.
 
-### Testing
+## Examples
+
+Apart from the tests, there are now some examples at [ljsyscall-examples](https://github.com/justincormack/ljsyscall-examples). More to come.
+
+## Testing
 
 The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86. Intend to get my ppc build machine back up one day, if you want this supported please ask. I do not currently have a mips box, if you want this can you suggest a suitable dev box.
 
@@ -98,7 +102,7 @@ It would be nice to be API compatible with other projects, especially Luaposix, 
 
 If you want the highest performance, allocate and pass your own buffers, as obviously allocation is expensive. It is now fine to use the string flags for functions, as these are memoized. Check the output of `luajit -jv` to see what is going on and let me know if there are any issues that need fixes for NYI functions. You should be able to get native C like performance.
 
-There is an example epoll script that you can test with Apachebench here https://gist.github.com/1077040 which now has no NYI issues.
+There is an example epoll script that you can test with Apachebench (in the examples)[https://github.com/justincormack/ljsyscall-examples]. On my machine apachebench uses more CPU time than the script so the results are a bit low.
 
 ### Issues
 
