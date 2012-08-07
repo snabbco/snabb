@@ -18,9 +18,9 @@ end
 
 -- create
 
--- trying to do    ip link add link eth0 name eth0.42 type vlan id 42
---ok, err = S.create_interface{name = name, type = "vlan", link = ii.index, vlan = vlan}
-ok, err = S.newlink(0, S.NLM_F_CREATE, 0, 0, "link", ii.index, "ifname", name, "linkinfo", {"kind", "vlan", "data", "id", vlan})
+-- ip link add link eth0 name eth0.42 type vlan id 40
+ok, err = S.create_interface{name = name, link = ii.index, type = "vlan", id = vlan}
+--ok, err = S.newlink(0, S.NLM_F_CREATE, 0, 0, "link", ii.index, "ifname", name, "linkinfo", {"kind", "vlan", "data", "id", vlan})
 
 if not ok then
   print(err)
