@@ -1,8 +1,11 @@
+![Snabb: Quick solutions for big networks](http://www.snabb.co/snabb-big.png)
+
 # The Snabb Switch Project
 
-The Snabb Switch is a virtualized Ethernet switch for cloud computing.
-The switch connects all physical and virtual Ethernet ports in the
-server farm and enforces all the policies peculiar to your own network.
+The Snabb Switch Project is developing a virtualized Ethernet switch
+for cloud computing. The switch will connect all the physical and
+virtual Ethernet ports in the data center and enforces all the
+policies peculiar to your own network.
 
 The project is very young. Congratulations, you've found us early!
 
@@ -10,12 +13,12 @@ The project is very young. Congratulations, you've found us early!
 
 The Snabb Switch Project is motivated by the sense that there is a
 better way to do high-speed networking in the 21st-century. The
-project is a vehicle for discovering this way.
+project is a vehicle for discovering the way.
 
-The first steps in the implementation are to pay the price of entry to
-be a practical Ethernet switch. The moment this is done we will seek
-out niches where the Snabb Switch can solve important problems for
-people who're operating big networks.
+The first steps in the implementation are the absolute basics needed
+to be a practical Ethernet switch. The moment this is done we will
+seek out niches where the Snabb Switch can solve important problems
+for people who're operating big networks.
 
 ## Design
 
@@ -30,7 +33,7 @@ LuaJIT and C were chosen because they're technically suitable and
 they're readily accessible to a lot of people.
 
 The switch is purely user-space and it doesn't depend on networking
-functionality of the operating system. This buys us a lot of
+functionality from the operating system. This buys us a lot of
 flexibility that we need to put to good use. We'll also use nifty
 tricks to have performance that's at least as good as kernel-based
 switches.
@@ -42,7 +45,7 @@ clever as we'd hoped. Such is the joy of software development!
 
 ## Current status
 
-Just getting started. We have the beginnings of a switch, and the
+Just getting started. We have the beginnings of a switch and the
 beginnings of KVM/QEMU hypervisor integration.
 
 ## Software overview
@@ -61,7 +64,7 @@ functions as an efficient user-space shared-memory virtual ethernet.
 The support works. Here's an example of how to use it:
 
 ```
-kvm ... -net nic,vlan=1 -net snabb_shm,vlan=1,file=/tmp/a ...
+kvm ... -net nic,vlan=1 -net snabb_shm,vlan=1,file=/tmp/shmeth0 ...
 ```
 
 There's much potential for enhancement.
@@ -131,11 +134,8 @@ Snabb's development is hosted on Github:
 
 To contribute to the Snabb Switch, simply fork these repositories,
 make some improvements, and send in a pull request on Github. Let's
-start simple and tune the process over time.
-
-Ideally developers will collaborate mostly through the medium of code
-on Github. Maybe we won't even need a mailing list in the beginning.
-We shall see!
+start simple and tune the process over time. It will be interesting to
+get some experience with how versatile Github's tools are.
 
 ### Reddit
 
@@ -144,16 +144,9 @@ The Snabb Switch Project community reddit is at
 post and discuss links to anything that's relevant to the
 project.
 
-### Twitter
-
-Twitter is a handy way to become part of the Snabb universe.
-
-- `#snabb` hashtag: you can use this freely to say things about the project.
-- Links to [Gists](http://opensource.org/licenses/gpl-2.0.php) can be used for email-length comments.
-
 ### Mailing list
 
-Today there's no mailing list in active use. There may be one in the future if Github + Twitter aren't sufficient.
+Today there's no mailing list. Let's first see how much of what we need can be provided by Github.
 
 ## Who
 
@@ -161,21 +154,22 @@ The Snabb Switch project is founded by [Luke
 Gorrie](http://lukego.com/). Luke's company [Snabb
 GmbH](http://www.snabb.co/) has the mission to steward the Snabb
 software development, to provide both free and commercial services to
-the software's users, and to create opportunities for other people and
+Snabb Switch users, and to create opportunities for other people and
 companies to offer services too. Luke's goal is to create a happy
 ecosystem of mutually beneficial parties. You are welcome to join in.
 
 ## License
 
-The Snabb Switch is dual-licensed free software. Everybody is able to
-use the software under the terms of the [GNU General Public License
+The Snabb Switch is dual-licensed free software. Everybody is welcome
+to use the software under the terms of the [GNU General Public License
 v2](http://opensource.org/licenses/gpl-2.0.php). Snabb GmbH also
 offers commercial licenses to companies who want to integrate Snabb
-technology into their products, or people who want to create startup
-companies based on Snabb technology.
+technology into their products and to people who want to create
+startup companies based on Snabb technology.
 
-Contributions to the Snabb Switch use either joint copyright between
-Snabb GmbH and the author or are simply BSD licensed. This follows the
-example of projects such as OpenNMS, QT, MySQL, BerkeleyDB,
-VirtualBox, and so on.
+Contributions to the Snabb Switch either grant joint copyright to
+Snabb GmbH or are contributed under the [MIT
+license](http://opensource.org/licenses/mit-license.php/). This
+follows the example of projects such as OpenNMS, QT, MySQL,
+BerkeleyDB, VirtualBox, and so on.
 
