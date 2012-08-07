@@ -5765,29 +5765,14 @@ function S.interface(i) -- could optimize just to retrieve info for one
 end
 
 local link_process = { -- TODO very incomplete. generate?
-  flags = function(args, v) end,
-  index = function(args, v) end,
-  modifier = function(args, v) end,
-  change = function(args, v) end,
-  name = function(args, v)
-    args[#args + 1] = "ifname"
-    args[#args + 1] = v
-  end,
-  link = function(args, v)
-    args[#args + 1] = "link"
-    args[#args + 1] = v
-  end,
-  type = function(args, v)
-    args[#args + 1] = "linkinfo"
-    args[#args + 1] = "kind"
-    args[#args + 1] = v
-  end,
-  vlan = function(args, v)
-    args[#args + 1] = "linkinfo"
-    args[#args + 1] = "data"
-    args[#args + 1] = "id"
-    args[#args + 1] = v
-  end,
+  flags = function(args, v) return {} end,
+  index = function(args, v) return {} end,
+  modifier = function(args, v) return {} end,
+  change = function(args, v) return {} end,
+  name = function(args, v) return {"ifname", v} end,
+  link = function(args, v) return {"link", v} end,
+  type = function(args, v) return {"linkinfo", "kind", v} end,
+  vlan = function(args, v) return {"linkinfo", "data", "id", v} end,
 }
 
 -- TODO better name. even more general, not just newlink. or make this the exposed newlink interface?
@@ -5795,7 +5780,10 @@ local link_process = { -- TODO very incomplete. generate?
 function S.iplink(tab)
   local args = {tab.index or 0, tab.modifier or 0, tab.flags or 0, tab.change or 0}
   for k, v in pairs(tab) do
-    if link_process[k] then link_process[k](args, v) end
+    if link_process[k] then
+      local a = link_process[k](args, v)
+      for i = 1, #a do args[#args + 1] = a[i] end
+    end
   end
   return S.newlink(unpack(args))
 end
