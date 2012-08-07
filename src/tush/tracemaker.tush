@@ -1,0 +1,24 @@
+First create the test traces:
+$ snabb tracemaker
+
+This shouldn't fail:
+
+$ snabb checktrace passall.cap
+
+These should all fail:
+
+$ snabb checktrace failloop.cap
+| loop failed on port 0
+? 1
+
+$ snabb checktrace faildrop.cap
+| drop failed on packet from 0
+? 1
+
+$ snabb checktrace failforward.cap
+| forward failed, expected to 0
+? 1
+
+$ snabb checktrace failflood.cap
+| flood failed: not sent to enough ports
+? 1

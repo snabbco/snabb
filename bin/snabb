@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# Front-end script for driving the Snabb switch.
+
+export SNABB=$(cd `dirname $0`/..; pwd)
+export PATH="$SNABB/bin:$SNABB/tools/tush/bin:$PATH"
+export LD_LIBRARY_PATH=\"\$LD_LIBRARY_PATH:\$SNABB/src/c\"
+
+if [ $# -lt 1 -o ! -x $SNABB/src/scripts/$1 ]; then
+    cat >&2 <<EOF
+Usage: snabb <command> [args...]
+
+Available commands:
+  switch
+    Run the Snabb Switch.
+  test
+    Run the test suite.
+  checktrace <tracefile>
+    Check <tracefile> for switching behavior bugs.
+  maketraces [dir]
+    Create trace files for testing the 'checktrace' command.
+EOF
+    exit 1
+else
+    exec "$SNABB/src/scripts/$@"
+fi
+

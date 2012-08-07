@@ -1,14 +1,14 @@
--- tester.lua -- Test switch operation by post-processing trace files.
+-- checktrace.lua -- Check switch operation by post-processing trace files.
 -- Copright 2012 Snabb GmbH
 
-module("tester",package.seeall)
+module("checktrace",package.seeall)
 
 local ffi  = require("ffi")
 local pcap = require("pcap")
 local C    = ffi.C
 
 if #arg ~= 1 then
-   print "Usage: tester <pcapfile>"
+   print "Usage: checktrace <pcapfile>"
    print ""
    print "Test that the switching behaviour in pcapfile is correct."
    return
