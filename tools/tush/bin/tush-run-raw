@@ -23,7 +23,9 @@ awk '
         /^[ \t]+[|@?$]/ { print "Warning: comment line that looks like" \
                                 " a command" >"/dev/stderr" }
                         { print }
-        /^[$] /         { printf "%s", run(substr($0, 3)) }
+        /^[$] /         { print $0 >"/dev/stderr"
+                          ++num_commands;
+                          printf "%s", run(substr($0, 3)) }
 
         END {
 # XXX more safeguards before this rm?
