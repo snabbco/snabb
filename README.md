@@ -164,7 +164,7 @@ Misc list of ideas, no particular order
 7. ping support
 8. dhcp client
 9. misc shell commands eg touch
-10. syslog
+10. syslog? Not sure. Might do remote protocol.
 11. selinux
 12. seccomp
 13. insmod, lsmod, depmod
