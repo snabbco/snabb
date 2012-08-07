@@ -5765,25 +5765,32 @@ function S.interface(i) -- could optimize just to retrieve info for one
 end
 
 local link_process = { -- TODO very incomplete. generate?
-  flags = function(args, v) return {} end,
-  index = function(args, v) return {} end,
-  modifier = function(args, v) return {} end,
-  change = function(args, v) return {} end,
   name = function(args, v) return {"ifname", v} end,
   link = function(args, v) return {"link", v} end,
-  type = function(args, v) return {"linkinfo", "kind", v} end,
-  vlan = function(args, v) return {"linkinfo", "data", "id", v} end,
+  type = function(args, v, tab)
+    if v == "vlan" then
+      local id = tab.id
+      if id then
+        tab.id = nil
+        return {"linkinfo", {"kind", v, "data", "id", id}}
+     end
+    end
+    return {"linkinfo", "kind", v}
+  end,
 }
 
 -- TODO better name. even more general, not just newlink. or make this the exposed newlink interface?
 -- I think this is generally a nicer interface to expose than the ones above, for all functions
 function S.iplink(tab)
   local args = {tab.index or 0, tab.modifier or 0, tab.flags or 0, tab.change or 0}
-  for k, v in pairs(tab) do
-    if link_process[k] then
-      local a = link_process[k](args, v)
-      for i = 1, #a do args[#args + 1] = a[i] end
-    else error("bad iplink command " .. k)
+  for _, k in ipairs{"link", "name", "type"} do
+    local v = tab[k]
+    if v then
+      if link_process[k] then
+        local a = link_process[k](args, v, tab)
+        for i = 1, #a do args[#args + 1] = a[i] end
+      else error("bad iplink command " .. k)
+      end
     end
   end
   return S.newlink(unpack(args))
