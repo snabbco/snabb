@@ -19,8 +19,12 @@ local port = require("port")
 local medium = require("medium")
 local C    = ffi.C
 
-local tracefile = io.open("/tmp/switch.pcap", "w+")
-pcap.write_file_header(tracefile)
+local tracefile
+
+function trace (filename)
+   tracefile = io.open(filename, "w+")
+   pcap.write_file_header(tracefile)
+end
 
 -- Ethernet frame format
 
@@ -46,6 +50,16 @@ local ports = { [0] = port.Port:new(0, medium.Null),
 		[3] = port.Port:new(3, medium.Null) }
 
 local allports = { 0, 1, 2, 3}
+
+function addport(id, medium, ...)
+   local port = port.Port:new(id, medium, ...)
+   table.insert(ports, port)
+   table.insert(allports, #allports - 1)
+end
+
+function getport(id)
+   return ports[id]
+end
 
 -- testing data
 
@@ -89,10 +103,16 @@ function makepacket (inputport, data, length)
 	   dst       = ffi.string(data + 6, 6)}
 end
 
+function tracepacket (packet, direction)
+   if tracefile then
+      pcap.write_record(tracefile, packet.data, packet.length,
+			packet.inputport, direction == "input")
+   end
+end
+
 -- Input a packet into the switching logic.
 function input (packet)
-   pcap.write_record(tracefile, packet.data, packet.length,
-		     packet.inputport, true)
+   tracepacket(packet, "input")
    fdb:update(packet)
    output(packet)
 end
@@ -103,8 +123,7 @@ function output (packet)
    for _,port in ipairs(fdb:lookup(packet)) do
       if port ~= packet.inputport then
 	 if (ports[port]):transmit(packet) then
-	    pcap.write_record(tracefile, packet.data, packet.length,
-			      port, false)
+	    tracepacket(packet, "output")
 	 else
 	    print "TX overflow" end
       end
@@ -127,5 +146,5 @@ function fdb:lookup (packet)
    end
 end
 
-testmain()
+-- testmain()
 
