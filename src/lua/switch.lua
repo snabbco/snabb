@@ -8,16 +8,19 @@
 --   length    = number of bytes of data
 --   data      = pointer to memory buffer containing data
 
-module(...,package.seeall)
+module("switch",package.seeall)
 
 require("shm")
 
 local ffi  = require("ffi")
 local fabric = ffi.load("fabric")
-local dev  = fabric.open_shm("/tmp/ba")
 local c    = require("c")
 local port = require("port")
+local medium = require("medium")
 local C    = ffi.C
+
+local tracefile = io.open("/tmp/switch.pcap", "w+")
+pcap.write_file_header(tracefile)
 
 -- Ethernet frame format
 
@@ -32,10 +35,23 @@ ffi.cdef[[
 -- Counters
 
 -- Switch ports
-local ports = { port.new(1, "/tmp/a"),
-		port.new(2, "/tmp/b") }
+--local ports = { port.new(1, "/tmp/a"),
+--		port.new(2, "/tmp/b") }
 
-port.trace("/tmp/switch.pcap")
+-- local ports = { port.new(1), port.new(2), port.new(3) }
+
+local ports = { [0] = port.Port:new(0, medium.Null),
+		[1] = port.Port:new(1, medium.Null),
+		[2] = port.Port:new(2, medium.Null),
+		[3] = port.Port:new(3, medium.Null) }
+
+local allports = { 0, 1, 2, 3}
+
+-- testing data
+
+local pcap_file   = ffi.new("struct pcap_file")
+local pcap_record = ffi.new("struct pcap_record")
+local pcap_extra  = ffi.new("struct pcap_record_extra")
 
 -- Switch logic
 local fdb = {} -- { MAC -> [Port] }
@@ -44,13 +60,24 @@ function main ()
    while true do
       -- print("Main loop")
       for _,port in ipairs(ports) do
-	 if port:available() then
-	    local frame = port:receive()
+	 local frame = port:receive()
+	 if packet ~= nil then
 	    local packet = makepacket(port, frame.data, frame.length)
 	    input(packet)
 	 end
       end
       C.usleep(100000)
+   end
+end
+
+function testmain ()
+   local testfile = arg[1]
+   for data, header, extra in pcap.records(testfile) do
+      if extra.flags == 0 then
+	 local frame = ffi.cast("char *", data)
+	 local packet = makepacket(extra.port_id, frame, header.orig_len)
+	 input(packet)
+      end
    end
 end
 
@@ -64,6 +91,8 @@ end
 
 -- Input a packet into the switching logic.
 function input (packet)
+   pcap.write_record(tracefile, packet.data, packet.length,
+		     packet.inputport, true)
    fdb:update(packet)
    output(packet)
 end
@@ -73,7 +102,11 @@ function output (packet)
    print("Sending packet to " .. #fdb:lookup(packet))
    for _,port in ipairs(fdb:lookup(packet)) do
       if port ~= packet.inputport then
-	 if not port:transmit(packet, port) then print "TX overflow" end
+	 if (ports[port]):transmit(packet) then
+	    pcap.write_record(tracefile, packet.data, packet.length,
+			      port, false)
+	 else
+	    print "TX overflow" end
       end
    end
 end
@@ -81,14 +114,18 @@ end
 -- Forwarding database
 
 function fdb:update (packet)
+   print("inputport = " .. tostring(packet.inputport))
    self[packet.src] = packet.inputport
 end
 
 function fdb:lookup (packet)
-   if self[packet.dst] then
-      return {self[packet.dst]}
+   local out = self[packet.dst]
+   if out ~= nil and out ~= packet.inputport then
+      return {out}
    else
-      return ports
+      return allports
    end
 end
+
+testmain()
 
