@@ -63,8 +63,8 @@ end
 local fdb = {}
 
 function check_forward (input, outputs)
-   local src = string.sub(input.packet, 1, 6)
-   local dst = string.sub(input.packet, 7, 12)
+   local dst = string.sub(input.packet, 1, 6)
+   local src = string.sub(input.packet, 7, 12)
    if fdb[dst] then
       local found = false
       for _,output in ipairs(outputs) do

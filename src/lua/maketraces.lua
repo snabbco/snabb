@@ -23,51 +23,55 @@ local OUT = false
 
 local endtrace = {IN, 0, zero..zero..none}
 
+function eth (src, dst, type)
+   return dst..src..type
+end
+
 local traces = {
    -- FAILLOOP: Loop ethernet traffic illegally
    {"failloop", 
-    {{IN,  0, zero..one..none},
-     {OUT, 0, zero..one..none},
+    {{IN,  0, eth(zero,one,none)},
+     {OUT, 0, eth(zero,one,none)},
      endtrace}},
    -- FAILDROP: Drop input frame.
    {"faildrop",
-    {{IN,  0, zero..one..none},
+    {{IN,  0, eth(zero,one,none)},
      endtrace}},
    -- FAILFORWARD: Don't forward the frame to its rightful port.
    {"failforward",
-    {{IN,  0, zero..one..none},
-     {OUT, 1, zero..one..none},
-     {IN,  1, one..zero..none},
-     {OUT, 2, one..zero..none},
+    {{IN,  0, eth(zero,one,none)},
+     {OUT, 1, eth(zero,one,none)},
+     {IN,  1, eth(one,zero,none)},
+     {OUT, 2, eth(one,zero,none)},
      endtrace}},
    -- FAILFLOOD: Don't multicast to every port.
    {"failflood",
     -- Learn about ports 0,1,2
-    {{IN,  0, zero..one..none},
-     {OUT, 1, zero..one..none},
-     {IN,  1, one..two..none},
-     {OUT, 2, one..two..none},
-     {IN,  2, two..zero..none},
-     {OUT, 0, two..zero..none},
+    {{IN,  0, eth(zero,one,none)},
+     {OUT, 1, eth(zero,one,none)},
+     {IN,  1, eth(one,two,none)},
+     {OUT, 2, eth(one,two,none)},
+     {IN,  2, eth(two,zero,none)},
+     {OUT, 0, eth(two,zero,none)},
      -- Multicast only goes out one port
-     {IN,  0, zero..mcast..none},
-     {OUT, 1, zero..mcast..none},
+     {IN,  0, eth(zero,mcast,none)},
+     {OUT, 1, eth(zero,mcast,none)},
      endtrace}},
    {"passall",
-    {{IN,  0, zero..one..none},
-     {OUT, 1, zero..one..none},
-     {IN,  1, one..two..none},
-     {OUT, 2, one..two..none},
-     {IN,  2, two..zero..none},
-     {OUT, 0, two..zero..none},
+    {{IN,  0, eth(zero,one,none)},
+     {OUT, 1, eth(zero,one,none)},
+     {IN,  1, eth(one,two,none)},
+     {OUT, 2, eth(one,two,none)},
+     {IN,  2, eth(two,zero,none)},
+     {OUT, 0, eth(two,zero,none)},
      -- Multicast only goes out one port
-     {IN,  0, zero..mcast..none},
-     {OUT, 1, zero..mcast..none},
-     {OUT, 2, zero..mcast..none},
+     {IN,  0, eth(zero,mcast,none)},
+     {OUT, 1, eth(zero,mcast,none)},
+     {OUT, 2, eth(zero,mcast,none)},
      endtrace}}
 }
 
-local debug = false
+local debug = true
 
 function generate(name, packets)
    if debug then print("Creating "..name..".cap") end
