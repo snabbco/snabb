@@ -1,4 +1,3 @@
 #!/bin/bash
-exec luajit -e "package.path = package.path .. \";$SNABB/src/lua/?.lua\"" \
-            $SNABB/src/lua/switch.lua "$@"
+exec snabb lua $SNABB/src/lua/switch.lua "$@"
 
