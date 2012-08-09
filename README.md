@@ -116,7 +116,7 @@ There will no doubt be bugs, please report them if you find them.
 
 pselect, ppoll
 timer\_create, timer\_getoverrun
-faccessat, fchmodat, fchownat, futimesat, linkat,
+fchmodat, fchownat, futimesat, linkat,
 readlinkat, symlinkat
 sigqueue,
 capset, capget

@@ -2729,6 +2729,7 @@ int umount2(const char *target, int flags);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
 int access(const char *pathname, int mode);
+int faccessat(int dirfd, const char *pathname, int mode, int flags);
 char *getcwd(char *buf, size_t size);
 int statfs(const char *path, struct statfs64 *buf); /* this is statfs64 syscall, but glibc wraps */
 int fstatfs(int fd, struct statfs64 *buf);          /* this too */
@@ -3790,6 +3791,9 @@ function S.truncate(path, length) return retbool(C64.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C64.ftruncate(getfd(fd), length)) end
 
 function S.access(pathname, mode) return retbool(C.access(pathname, accessflags(mode))) end
+function S.faccessat(dirfd, pathname, mode, flags)
+  return retbool(C.faccessat(getfd_at(dirfd), pathname, accessflags(mode), flaglist(flags, "AT_", {"AT_EACCESS", "AT_SYMLINK_NOFOLLOW"})))
+end
 
 function S.readlink(path) -- note no idea if name truncated except return value is buffer len, so have to reallocate
   local size = 256
@@ -6340,7 +6344,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
-                   'fstatat', 'unlinkat', 'mkdirat', 'mknodat'
+                   'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end

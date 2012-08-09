@@ -117,6 +117,14 @@ test_open_close = {
     assert(S.access("/dev/null", "w"), "expect access to say can write /dev/null")
     assert(not S.access("/dev/null", "x"), "expect access to say cannot execute /dev/null")
   end,
+  test_faccessat = function()
+    local fd = S.open("/dev")
+    assert(fd:faccessat("null", "r"), "expect access to say can read /dev/null")
+    assert(fd:faccessat("null", S.R_OK), "expect access to say can read /dev/null")
+    assert(fd:faccessat("null", "w"), "expect access to say can write /dev/null")
+    assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
+    assert(fd:close())
+  end,
   test_fd_gc = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
     local fileno = fd:fileno()
@@ -477,7 +485,7 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
   end,
   test_mknod_chr_root = function()
-    assert(S.mknod(tmpfile, "ifchr,irwxu", S.device(1, 5)))
+    assert(S.mknod(tmpfile, "ifchr,irwxu", S.makedev(1, 5)))
     local stat = assert(S.stat(tmpfile))
     assert(stat.ischr, "expect to be a character device")
     assert_equal(stat.major, 1 , "expect major number to be 1")
