@@ -2579,6 +2579,7 @@ int open(const char *pathname, int flags, mode_t mode);
 int creat(const char *pathname, mode_t mode);
 int chdir(const char *path);
 int mkdir(const char *pathname, mode_t mode);
+int mkdirat(int dirfd, const char *pathname, mode_t mode);
 int rmdir(const char *pathname);
 int unlink(const char *pathname);
 int unlinkat(int dirfd, const char *pathname, int flags);
@@ -3761,6 +3762,7 @@ function S.unlinkat(fd, path, flags)
 end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, S.mode(mode))) end
+function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(getfd_at(fd), path, S.mode(mode))) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.acct(filename) return retbool(C.syscall(S.SYS_acct, filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
@@ -6315,7 +6317,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
-                   'fstatat', 'unlinkat'
+                   'fstatat', 'unlinkat', 'mkdirat'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end

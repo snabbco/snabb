@@ -288,9 +288,9 @@ test_file_operations = {
     assert(S.chdir(cwd))
     assert(S.rmdir(longfile))
   end,
-  test_unlinkat = function()
+  test_mkdirat_unlinkat = function()
     local fd = assert(S.open("."))
-    assert(S.mkdir(tmpfile, "IRWXU"))
+    assert(fd:mkdirat(tmpfile, "IRWXU"))
     assert(fd:unlinkat(tmpfile, "removedir"))
     assert(not fd:fstatat(tmpfile), "expect dir gone")
   end,
