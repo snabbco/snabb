@@ -117,7 +117,7 @@ There will no doubt be bugs, please report them if you find them.
 pselect, ppoll
 timer\_create, timer\_getoverrun
 faccessat, fchmodat, fchownat, futimesat,  linkat,  mkdirat,  mknodat,
-readlinkat, renameat, symlinkat, unlinkat
+readlinkat, renameat, symlinkat
 sigqueue,
 capset, capget
 pivot\_root, init\_module, delete\_module, query\_module, swapon, swapoff

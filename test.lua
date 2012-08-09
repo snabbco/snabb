@@ -288,6 +288,12 @@ test_file_operations = {
     assert(S.chdir(cwd))
     assert(S.rmdir(longfile))
   end,
+  test_unlinkat = function()
+    local fd = assert(S.open("."))
+    assert(S.mkdir(tmpfile, "IRWXU"))
+    assert(fd:unlinkat(tmpfile, "removedir"))
+    assert(not fd:fstatat(tmpfile), "expect dir gone")
+  end,
   test_stat = function()
     local stat = assert(S.stat("/dev/zero"))
     assert(stat.nlink == 1, "expect link count on /dev/zero to be 1")
