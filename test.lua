@@ -317,6 +317,20 @@ test_file_operations = {
     assert(not stat.isreg, "lstat should find symlink not regular file")
     assert(S.unlink(tmpfile))
   end,
+  test_fstatat = function()
+    local fd = assert(S.open("."))
+    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    local stat = assert(fd:fstatat(tmpfile))
+    assert(stat.size == #teststring, "expect length to br what was written")
+    assert(fd:close())
+    assert(S.unlink(tmpfile))
+  end,
+  test_fstatat_fdcwd = function()
+    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    local stat = assert(S.fstatat("fdcwd", tmpfile, nil, "no_automount, symlink_nofollow"))
+    assert(stat.size == #teststring, "expect length to br what was written")
+    assert(S.unlink(tmpfile))
+  end,
   test_truncate = function()
     assert(S.writefile(tmpfile, teststring, "IRWXU"))
     local stat = assert(S.stat(tmpfile))

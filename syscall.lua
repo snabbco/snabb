@@ -1627,6 +1627,7 @@ if ffi.arch == "x86" then
   S.SYS_clock_gettime    = 265
   S.SYS_clock_getres     = 266
   S.SYS_clock_nanosleep  = 267
+  S.SYS_fstatat64        = 300
   S.SYS_splice           = 313
   S.SYS_sync_file_range  = 314
   S.SYS_tee              = 315
@@ -1669,6 +1670,7 @@ elseif ffi.arch == "x64" then
   S.SYS_clock_gettime    = 228
   S.SYS_clock_getres     = 229
   S.SYS_clock_nanosleep  = 230
+  S.SYS_fstatat          = 262
   S.SYS_splice           = 275
   S.SYS_tee              = 276
   S.SYS_sync_file_range  = 277
@@ -1715,6 +1717,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_clock_gettime    = 263
   S.SYS_clock_getres     = 264
   S.SYS_clock_nanosleep  = 265
+  S.SYS_fstatat64        = 327
   S.SYS_splice           = 340
   S.SYS_sync_file_range  = 341
   S.SYS_tee              = 342
@@ -2772,6 +2775,7 @@ else
   S.SYS_stat = S.SYS_stat64
   S.SYS_lstat = S.SYS_lstat64
   S.SYS_fstat = S.SYS_fstat64
+  S.SYS_fstatat = S.SYS_fstatat64
   C64 = {
     truncate = C.truncate64,
     ftruncate = C.ftruncate64,
@@ -2779,11 +2783,6 @@ else
 end
 
 -- functions we need for metatypes
-
-local function getfd(fd)
-  if ffi.istype(t.fd, fd) then return fd.filenum end
-  return fd
-end
 
 local function split(delimiter, text)
   if delimiter == "" then return {text} end
@@ -2821,9 +2820,9 @@ local function stringflags(str, prefix) -- allows multiple comma sep flags that 
   local ts, s, val
   for i, v in ipairs(a) do
     ts = trim(v)
-    s = ts
+    s = ts:upper()
     if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
-    val = S[s:upper()]
+    val = S[s]
     if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
   end
@@ -2837,19 +2836,18 @@ local function stringflag(str, prefix) -- single value only
   if type(str) ~= "string" then return str end
   if #str == 0 then return 0 end
   if memo[prefix] and memo[prefix][str] then return memo[prefix][str] end
-  local s = trim(str)
+  local s = trim(str):upper()
   if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
-  local val = S[s:upper()]
+  local val = S[s]
   if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions, better than silent ignore
   if not memo[prefix] then memo[prefix] = {} end
   memo[prefix][str] = val
   return val
 end
 
-local function flaglist(str, ...) -- flags from a list. TODO memoize. TODO needs prefix support too
+local function flaglist(str, prefix, list) -- flags from a list. TODO memoize using table
   if not str then return 0 end
   if type(str) ~= "string" then return str end
-  local list = {...}
   local list2 = {}
   for _, v in ipairs(list) do list2[v] = true end
   local f = 0
@@ -2858,11 +2856,23 @@ local function flaglist(str, ...) -- flags from a list. TODO memoize. TODO needs
   for i, v in ipairs(a) do
     ts = trim(v)
     s = ts:upper()
+    if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
     val = S[s]
     if not list2[s] or not val then error("invalid flag: " .. v) end
     f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
   end
   return f
+end
+
+local function getfd(fd)
+  if ffi.istype(t.fd, fd) then return fd.filenum end
+  return fd
+end
+
+local function getfd_at(fd)
+  if not fd then return S.AT_FDCWD end
+  if type(fd) == "string" then return flaglist(fd, "AT_", {"AT_FDCWD"}) end
+  return getfd(fd)
 end
 
 local function accessflags(s) -- allow "rwx"
@@ -3967,6 +3977,13 @@ function S.fstat(fd, buf)
   return buf
 end
 
+function S.fstatat(fd, path, buf, flags)
+  if not buf then buf = t.stat() end
+  local ret = C.syscall(S.SYS_fstatat, t.int(getfd_at(fd)), path, pt.void(buf), t.int(flaglist(flags, "AT_", {"AT_NO_AUTOMOUNT", "AT_SYMLINK_NOFOLLOW"})))
+  if ret == -1 then return nil, t.error() end
+  return buf
+end
+
 local function gettimespec2(ts)
   if ts and (not ffi.istype(t.timespec2, ts)) then
     local s1, s2 = ts[1], ts[2]
@@ -3982,7 +3999,7 @@ function S.futimens(fd, ts)
 end
 
 function S.utimensat(dirfd, path, ts, flags)
-  return retbool(C.utimensat(getfd(dirfd) or S.AT_FDCWD, path, gettimespec2(ts), stringflags(flags, "AT_")))
+  return retbool(C.utimensat(getfd_at(dirfd), path, gettimespec2(ts), flaglist(flags, "AT_", {"AT_SYMLINK_NOFOLLOW"})))
 end
 
 -- because you can just pass floats to all the time functions, just use the same one, but provide different templates
@@ -4401,7 +4418,7 @@ function S.mount(source, target, filesystemtype, mountflags, data)
 end
 
 function S.umount(target, flags)
-  if flags then return retbool(C.umount2(target, flaglist(flags, "MNT_FORCE", "MNT_DETACH", "MNT_EXPIRE", "UMOUNT_NOFOLLOW"))) end
+  if flags then return retbool(C.umount2(target, flaglist(flags, "", {"MNT_FORCE", "MNT_DETACH", "MNT_EXPIRE", "UMOUNT_NOFOLLOW"}))) end
   return retbool(C.umount(target))
 end
 
@@ -6293,7 +6310,8 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
-                   'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens'
+                   'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
+                   'fstatat'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
