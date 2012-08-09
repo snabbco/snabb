@@ -316,7 +316,7 @@ test_file_operations = {
     assert(stat.ischr, "expect /dev/zero to be a character device")
     assert(stat.major == 1 , "expect major number of /dev/zero to be 1")
     assert(stat.minor == 5, "expect minor number of /dev/zero to be 5")
-    assert(stat.rdev == S.device(1, 5), "expect raw device to be device(1, 5)")
+    assert(stat.rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
   end,
   test_stat_directory = function()
     local fd = assert(S.open("/"))
@@ -482,7 +482,7 @@ test_file_operations = {
     assert(stat.ischr, "expect to be a character device")
     assert_equal(stat.major, 1 , "expect major number to be 1")
     assert_equal(stat.minor, 5, "expect minor number to be 5")
-    assert(stat.rdev == S.device(1, 5), "expect raw device to be device(1, 5)")
+    assert(stat.rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
     assert(S.unlink(tmpfile))
   end,
   test_mknodat_fifo = function()
