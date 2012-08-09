@@ -4925,14 +4925,14 @@ function S.major(dev)
   return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)));
 end
 
--- minor and makedev assume minor numbers 20 bit so all in low byte, currently true
+-- minor and device assume minor numbers 20 bit so all in low byte, currently true
 -- would be easier to fix if LuaJIT had native 64 bit bitops
 function S.minor(dev)
   local h, l = b64(dev)
   return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
 end
 
-function S.makedev(major, minor)
+function S.device(major, minor)
   return bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff))
 end
 
