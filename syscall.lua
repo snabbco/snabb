@@ -2583,6 +2583,8 @@ int mkdirat(int dirfd, const char *pathname, mode_t mode);
 int rmdir(const char *pathname);
 int unlink(const char *pathname);
 int unlinkat(int dirfd, const char *pathname, int flags);
+int rename(const char *oldpath, const char *newpath);
+int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
 int acct(const char *filename);
 int chmod(const char *path, mode_t mode);
 int link(const char *oldpath, const char *newpath);
@@ -3759,6 +3761,10 @@ function S.creat(pathname, mode) return retfd(C.creat(pathname, S.mode(mode))) e
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.unlinkat(fd, path, flags)
   return retbool(C.unlinkat(getfd_at(fd), path, flaglist(flags, "AT_", {"AT_REMOVEDIR"})))
+end
+function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
+function S.renameat(olddirfd, oldpath, newdirfd, newpath)
+  return retbool(C.renameat(getfd_at(olddirfd), oldpath, getfd_at(newdirfd), newpath))
 end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, S.mode(mode))) end

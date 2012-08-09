@@ -294,6 +294,22 @@ test_file_operations = {
     assert(fd:unlinkat(tmpfile, "removedir"))
     assert(not fd:fstatat(tmpfile), "expect dir gone")
   end,
+  test_rename = function()
+    assert(S.writefile(tmpfile, teststring, "IRWXU")) -- TODO just use touch instead
+    assert(S.rename(tmpfile, tmpfile2))
+    assert(not S.stat(tmpfile))
+    assert(S.stat(tmpfile2))
+    assert(S.unlink(tmpfile2))
+  end,
+  test_renameat = function()
+    local fd = assert(S.open("."))
+    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    assert(S.renameat(fd, tmpfile, fd, tmpfile2))
+    assert(not S.stat(tmpfile))
+    assert(S.stat(tmpfile2))
+    assert(fd:close())
+    assert(S.unlink(tmpfile2))
+  end,
   test_stat = function()
     local stat = assert(S.stat("/dev/zero"))
     assert(stat.nlink == 1, "expect link count on /dev/zero to be 1")
