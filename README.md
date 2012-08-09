@@ -116,7 +116,7 @@ There will no doubt be bugs, please report them if you find them.
 
 pselect, ppoll
 timer\_create, timer\_getoverrun
-faccessat, fchmodat, fchownat, futimesat, linkat, mknodat,
+faccessat, fchmodat, fchownat, futimesat, linkat,
 readlinkat, symlinkat
 sigqueue,
 capset, capget
@@ -125,7 +125,7 @@ netns, iopl, ioperm, futex
 ...
 
 from elsewhere
-mkfifoat(3) - not actually a syscall.
+mkdev (oops, using that name!), mkfifo, mkfifoat(3) - not actually syscalls.
 
 ### 64 bit fileops on 32 bit
 

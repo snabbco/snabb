@@ -1591,6 +1591,7 @@ S.TIOCM_RI  = S.TIOCM_RNG
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
 if ffi.arch == "x86" then
+  S.SYS_mknod            = 14
   S.SYS_getpid           = 20
   S.SYS_acct             = 51
   S.SYS_ustat            = 62
@@ -1627,6 +1628,7 @@ if ffi.arch == "x86" then
   S.SYS_clock_gettime    = 265
   S.SYS_clock_getres     = 266
   S.SYS_clock_nanosleep  = 267
+  S.SYS_mknodat          = 297
   S.SYS_fstatat64        = 300
   S.SYS_splice           = 313
   S.SYS_sync_file_range  = 314
@@ -1645,6 +1647,7 @@ elseif ffi.arch == "x64" then
   S.SYS_clone            = 56
   S.SYS_getdents         = 78
   S.SYS_getcwd           = 79
+  S.SYS_mknod            = 133
   S.SYS_ustat            = 136
   S.SYS_acct             = 163
   S.SYS_readahead        = 187
@@ -1670,6 +1673,7 @@ elseif ffi.arch == "x64" then
   S.SYS_clock_gettime    = 228
   S.SYS_clock_getres     = 229
   S.SYS_clock_nanosleep  = 230
+  S.SYS_mknodat          = 259
   S.SYS_fstatat          = 262
   S.SYS_splice           = 275
   S.SYS_tee              = 276
@@ -1681,6 +1685,7 @@ elseif ffi.arch == "x64" then
   S.SYS_timerfd_gettime	 = 287
   S.SYS_pipe2            = 293
 elseif ffi.arch == "arm" and ffi.abi("eabi") then
+  S.SYS_mknod            = 14
   S.SYS_getpid           = 20
   S.SYS_acct             = 51
   S.SYS_ustat            = 62
@@ -1717,6 +1722,7 @@ elseif ffi.arch == "arm" and ffi.abi("eabi") then
   S.SYS_clock_gettime    = 263
   S.SYS_clock_getres     = 264
   S.SYS_clock_nanosleep  = 265
+  S.SYS_mknodat          = 324
   S.SYS_fstatat64        = 327
   S.SYS_splice           = 340
   S.SYS_sync_file_range  = 341
@@ -2634,6 +2640,8 @@ int signalfd(int fd, const sigset_t *mask, int flags);
 int timerfd_create(int clockid, int flags);
 int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value);
 int timerfd_gettime(int fd, struct itimerspec *curr_value);
+int mknod(const char *pathname, mode_t mode, dev_t dev);
+int mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev);
 
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -2912,6 +2920,8 @@ t.long = ffi.typeof("long")
 t.ulong = ffi.typeof("unsigned long")
 t.uintptr = ffi.typeof("uintptr_t")
 t.size = ffi.typeof("size_t")
+t.mode = ffi.typeof("mode_t")
+t.dev = ffi.typeof("dev_t")
 
 t.sa_family = ffi.typeof("sa_family_t")
 t.msghdr = ffi.typeof("struct msghdr")
@@ -3153,7 +3163,7 @@ meth.stat = {
     isdir = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFDIR end,
     ischr = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFCHR end,
     isblk = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFBLK end,
-    isfifo = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFFIFO end,
+    isfifo = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFIFO end,
     islnk = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFLNK end,
     issock = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFSOCK end,
   }
@@ -3794,6 +3804,13 @@ function S.readlink(path) -- note no idea if name truncated except return value 
     end
   until buffer
   return ffi.string(buffer, ret)
+end
+
+function S.mknod(pathname, mode, dev)
+  return retbool(C.syscall(S.SYS_mknod, pathname, t.mode(stringflags(mode, "S_")), t.dev(dev or 0)))
+end
+function S.mknodat(fd, pathname, mode, dev)
+  return retbool(C.syscall(S.SYS_mknodat, t.int(getfd_at(fd)), pathname, t.mode(stringflags(mode, "S_")), t.dev(dev or 0)))
 end
 
 local function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
@@ -6323,7 +6340,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
-                   'fstatat', 'unlinkat', 'mkdirat'
+                   'fstatat', 'unlinkat', 'mkdirat', 'mknodat'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end

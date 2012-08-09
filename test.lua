@@ -476,6 +476,23 @@ test_file_operations = {
     end
     assert(S.unlink(tmpfile))
   end,
+  test_mknod_chr_root = function()
+    assert(S.mknod(tmpfile, "ifchr,irwxu", S.makedev(1, 5)))
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.ischr, "expect to be a character device")
+    assert_equal(stat.major, 1 , "expect major number to be 1")
+    assert_equal(stat.minor, 5, "expect minor number to be 5")
+    assert(stat.rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
+    assert(S.unlink(tmpfile))
+  end,
+  test_mknodat_fifo = function()
+    local fd = assert(S.open("."))
+    assert(fd:mknodat(tmpfile, "ififo,irwxu"))
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.isfifo, "expect to be a fifo")
+    assert(fd:close())
+    assert(S.unlink(tmpfile))
+  end,
 }
 
 test_largefile = {
