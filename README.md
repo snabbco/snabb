@@ -173,5 +173,5 @@ to accept your contribution we must ask you to do either one of two
 things:
 
 1. License your contribution under the liberal MIT License.
-2. Fill out the (Snabb Contributor Agreement)[http://www.snabb.co/SCA.pdf]. This can be done quickly online without paper. Contact luke@snabb.co.
+2. Fill out the [Snabb Contributor Agreement](http://www.snabb.co/SCA.pdf). This can be done quickly online without paper. Contact luke@snabb.co.
 
