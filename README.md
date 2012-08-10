@@ -1,24 +1,25 @@
-![Snabb: Quick solutions for big networks](http://www.snabb.co/snabb-big.png)
 
 # The Snabb Switch Project
 
-The Snabb Switch Project is developing a virtualized Ethernet switch
+<a href="http://www.snabb.co"><img align="right"
+src="http://www.snabb.co/snabb-tiger-medium.png"/></a> The Snabb
+Switch project is developing a virtualized hypervisor Ethernet switch
 for cloud computing. The switch will connect all the physical and
-virtual Ethernet ports in the data center and enforces all the
-policies peculiar to your own network.
+virtual Ethernet ports in the data center and enforce all the policies
+peculiar to your the network.
 
 The project is very young. Congratulations, you've found us early!
 
 ## Why the Snabb Switch Project?
 
-The Snabb Switch Project is motivated by the sense that there is a
+The Snabb Switch project is motivated by the sense that there is a
 better way to do high-speed networking in the 21st-century. The
 project is a vehicle for discovering the way.
 
 The first steps in the implementation are the absolute basics needed
 to be a practical Ethernet switch. The moment this is done we will
 seek out niches where the Snabb Switch can solve important problems
-for people who're operating big networks.
+for people who are operating big networks.
 
 ## Design
 
@@ -32,16 +33,16 @@ and a neat and stable interface will emerge.
 LuaJIT and C were chosen because they're technically suitable and
 they're readily accessible to a lot of people.
 
-The switch is purely user-space and it doesn't depend on networking
+The switch is purely user-space and it does not depend on networking
 functionality from the operating system. This buys us a lot of
-flexibility that we need to put to good use. We'll also use nifty
-tricks to have performance that's at least as good as kernel-based
+flexibility that we need to put to good use. We will also use nifty
+tricks to have performance that is at least as good as kernel-based
 switches.
 
 There will be a lot of churn of code and ideas in the early days of
 the project. Over time we will find the simplest and best ways to do
-everything. On the way we'll surely try things that don't turn out as
-clever as we'd hoped. Such is the joy of software development!
+everything. On the way we will surely try things that don't turn out
+as clever as we had hoped. Such is the joy of software development!
 
 ## Current status
 
@@ -71,19 +72,18 @@ There's much potential for enhancement.
 
 This software exists in the [`shm` branch of Snabb fork of QEMU](https://github.com/SnabbCo/QEMU/tree/shm). Check out the [diff](https://github.com/SnabbCo/QEMU/compare/master...shm) compared to QEMU.
 
-### `bin/snabb switch, src/lua/switch.lua`
+### `bin/snabb switch` [`src/lua/switch.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/switch.lua)
 
-Ethernet switch written mostly in LuaJIT. It uses snabb_shm shared
-memory ethernet interfaces (above) for packet I/O. Currently it's
-really low on functionality, mostly untested, and lacking interfaces
-towards the host OS or physical NICs.
+Ethernet switch logic in LuaJIT. Written as a library. Currently low
+on functionality, mostly untested, and lacking interfaces towards the
+host OS or physical NICs.
 
 There is support for dumping all switch traffic to a PCAP/tcpdump file
 for analysis and verification. The switch sneakily appends metadata to
 each packet in the trace declaring ingress vs. egress and switch port
 ID.
 
-### `bin/snabb checktrace, src/lua/checktrace.lua`
+### `bin/snabb checktrace` [`src/lua/checktrace.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/checktrace.lua)
 
 Switch functionality testing. Take a PCAP/tcpdump file for input and
 check it for correctness. That is: make sure packet's don't loop back
@@ -92,7 +92,13 @@ so on. This is the basis for the software testing strategy:
 post-processing to make sure the switch behaved well when bombarded
 with arbitrary workloads.
 
-### `bin/snabb tracemaker, src/lua/tracemaker.lua`
+### `bin/snabb replay <input> <output>` [`src/lua/checktrace.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/replay.lua)
+
+Test switch functionality by replaying packets from a recorded trace
+and recording the switch's behavior to an output trace. The output
+trace can later be checked with `checktrace`.
+
+### `bin/snabb maketraces` [`src/lua/tracemaker.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/tracemaker.lua)
 
 Create PCAP files exhibiting invalid switch behavior, e.g. dropped or
 looped packets. These files are used for testing the tester i.e.
@@ -101,24 +107,23 @@ making sure it detects the errors. They are essentially unit tests.
 ### `bin/snabb test, test/checker.tush, tools/tush`
 
 Top-level entry point to test the Snabb Switch. Uses Darius Bacon's
-'tush' program to execute the tracemaker and tester.
+'tush' program to execute the tracemaker and tester. Verify that a
+correct trace passes all tests, and that an incorrect trace for each
+error class fails.
 
 ## Roadmap
 
-The first major milestone will be stable and fast basic switching
-between hosts and hypervisors with a small and tight code base. The
-next features will be driven by the needs of the initial users, the
-people whose needs aren't met by the currently available switches.
+The rough roadmap for Snabb Switch now is:
 
-Here's a dreamed up list of potential features, just to give an idea:
+- Basic switching functionality.
+- Powerful testing framework.
+- Switch-to-Host integration.
+- Switch-to-NIC integration.
+- Optimized performance.
+- Distributed operation.
 
-- New platform support e.g. VirtualBox on Windows.
-- Integrated device driver for 10G networking e.g. Intel 82599 chip.
-- Switch-on-a-card deployment on Intel Cave Creek network processor PCIe cards.
-- Distributed operation with native L2-in-L3 tunneling.
-- OpenFlow support.
-
-We'll see what people really need. Should be wild fun :-).
+This will be heavily influenced by the early users and the reasons why
+they have found existing solutions such as Open vSwitch unsuitable.
 
 ## Get involved
 
@@ -151,25 +156,22 @@ Today there's no mailing list. Let's first see how much of what we need can be p
 ## Who
 
 The Snabb Switch project is founded by [Luke
-Gorrie](http://lukego.com/). Luke's company [Snabb
-GmbH](http://www.snabb.co/) has the mission to steward the Snabb
-software development, to provide both free and commercial services to
-Snabb Switch users, and to create opportunities for other people and
-companies to offer services too. Luke's goal is to create a happy
-ecosystem of mutually beneficial parties. You are welcome to join in.
+Gorrie](http://lukego.com/) and his company
+[Snabb](http://www.snabb.co/). You are welcome to participate in the
+community.
 
 ## License
 
-The Snabb Switch is dual-licensed free software. Everybody is welcome
-to use the software under the terms of the [GNU General Public License
-v2](http://opensource.org/licenses/gpl-2.0.php). Snabb GmbH also
-offers commercial licenses to companies who want to integrate Snabb
-technology into their products and to people who want to create
-startup companies based on Snabb technology.
+The Snabb Switch is dual-licensed free software. You can use it as
+free and open source software under the terms of the (Snabb
+License)[http://www.snabb.co/SnabbLicense.html] or you can buy a
+license for proprietary use from [Snabb](http://www.snabb.co/).
 
-Contributions to the Snabb Switch either grant joint copyright to
-Snabb GmbH or are contributed under the [MIT
-license](http://opensource.org/licenses/mit-license.php/). This
-follows the example of projects such as OpenNMS, QT, MySQL,
-BerkeleyDB, VirtualBox, and so on.
+Snabb has to be able to legally distribute contributions to both open
+source and proprietary users of Snabb Switch. This means that in order
+to accept your contribution we must ask you to do either one of two
+things:
+
+1. License your contribution under the liberal MIT License.
+2. Fill out the (Snabb Contributor Agreement)[http://www.snabb.co/SCA.pdf]. This can be done quickly online without paper. Contact luke@snabb.co.
 
