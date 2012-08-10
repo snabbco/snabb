@@ -5230,15 +5230,18 @@ meth.rtmsg = {
     family = function(i) return tonumber(i.rtmsg.rtm_family) end,
     dst_len = function(i) return tonumber(i.rtmsg.rtm_dst_len) end,
     src_len = function(i) return tonumber(i.rtmsg.rtm_src_len) end,
-    oif = function(i) return tonumber(i.rtm_oif) end,
-    iif = function(i) return tonumber(i.rtm_iif) end,
-    index = function(i) return tonumber(i.rtm_oif) end,
+    index = function(i) return tonumber(i.oif) end,
     flags = function(i) return tonumber(i.rtmsg.rtm_flags) end,
     dest = function(i) return i.dst or S.addrtype[i.family]() end,
     source = function(i) return i.src or S.addrtype[i.family]() end,
     gw = function(i) return i.gateway or S.addrtype[i.family]() end,
+    -- might not be set in Lua table, so return nil
+    iif = function() return nil end,
+    oif = function() return nil end,
+    src = function() return nil end,
+    dst = function() return nil end,
   },
-  flags = { -- TODO rework so iterates in fixed order. Do not seem to be set.
+  flags = { -- TODO rework so iterates in fixed order. TODO Do not seem to be set, find how to retrieve.
     [S.RTF_UP] = "U",
     [S.RTF_GATEWAY] = "G",
     [S.RTF_HOST] = "H",
@@ -5252,7 +5255,6 @@ meth.rtmsg = {
 mt.rtmsg = {
   __index = function(i, k)
     if meth.rtmsg.index[k] then return meth.rtmsg.index[k](i) end
-    --if meth.rtmsg.fn[k] then return meth.rtmsg.fn[k] end
     local prefix = "RTF_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return bit.band(i.flags, S[k]) ~= 0 end
@@ -5697,7 +5699,7 @@ end
 
 function S.dellink(index, ...)
   if type(index) == 'table' then index = index.index end
-  local ifv = {ifi_index = index, ifi_flags = 0, ifi_change = S.IFI_ALL}
+  local ifv = {ifi_index = index}
   return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, nil, t.ifinfomsg, ifv, ...)
 end
 

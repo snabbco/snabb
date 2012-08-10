@@ -9,6 +9,8 @@ local strict = require "strict"
 local S = require "syscall"
 local bit = require "bit"
 
+setmetatable(S, {__index = function() error("bad index access on S") end})
+
 local oldassert = assert
 local function assert(c, s)
   collectgarbage("collect") -- force gc, to test for bugs
