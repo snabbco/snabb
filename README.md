@@ -163,8 +163,8 @@ community.
 ## License
 
 The Snabb Switch is dual-licensed free software. You can use it as
-free and open source software under the terms of the (Snabb
-License)[http://www.snabb.co/SnabbLicense.html] or you can buy a
+free and open source software under the terms of the [Snabb
+License](http://www.snabb.co/SnabbLicense.html) or you can buy a
 license for proprietary use from [Snabb](http://www.snabb.co/).
 
 Snabb has to be able to legally distribute contributions to both open
