@@ -1589,148 +1589,148 @@ S.TIOCM_RI  = S.TIOCM_RNG
 S.SYS = {}
 
 if ffi.arch == "x86" then
-  S.SYS_mknod            = 14
-  S.SYS_getpid           = 20
-  S.SYS_acct             = 51
-  S.SYS_ustat            = 62
-  S.SYS_stat             = 106
-  S.SYS_fstat            = 108
-  S.SYS_lstat            = 107
-  S.SYS_clone            = 120
-  S.SYS__llseek          = 140
-  S.SYS_getdents         = 141
-  S.SYS_getcwd           = 183
-  S.SYS_stat64           = 195
-  S.SYS_lstat64          = 196
-  S.SYS_fstat64          = 197
-  S.SYS_getdents64       = 220
-  S.SYS_readahead        = 225
-  S.SYS_setxattr         = 226
-  S.SYS_lsetxattr        = 227
-  S.SYS_fsetxattr        = 228
-  S.SYS_getxattr         = 229
-  S.SYS_lgetxattr        = 230
-  S.SYS_fgetxattr        = 231
-  S.SYS_listxattr        = 232
-  S.SYS_llistxattr       = 233
-  S.SYS_flistxattr       = 234
-  S.SYS_removexattr      = 235
-  S.SYS_lremovexattr     = 236
-  S.SYS_fremovexattr     = 237
-  S.SYS_io_setup         = 245
-  S.SYS_io_destroy       = 246
-  S.SYS_io_getevents     = 247
-  S.SYS_io_submit        = 248
-  S.SYS_io_cancel        = 249
-  S.SYS_clock_settime    = 264
-  S.SYS_clock_gettime    = 265
-  S.SYS_clock_getres     = 266
-  S.SYS_clock_nanosleep  = 267
-  S.SYS_mknodat          = 297
-  S.SYS_fstatat64        = 300
-  S.SYS_splice           = 313
-  S.SYS_sync_file_range  = 314
-  S.SYS_tee              = 315
-  S.SYS_vmsplice         = 316
-  S.SYS_timerfd_create	 = 322
-  S.SYS_fallocate        = 324
-  S.SYS_timerfd_settime  = 325
-  S.SYS_timerfd_gettime	 = 326
-  S.SYS_pipe2            = 331
+  S.SYS.mknod            = 14
+  S.SYS.getpid           = 20
+  S.SYS.acct             = 51
+  S.SYS.ustat            = 62
+  S.SYS.stat             = 106
+  S.SYS.fstat            = 108
+  S.SYS.lstat            = 107
+  S.SYS.clone            = 120
+  S.SYS._llseek          = 140
+  S.SYS.getdents         = 141
+  S.SYS.getcwd           = 183
+  S.SYS.stat64           = 195
+  S.SYS.lstat64          = 196
+  S.SYS.fstat64          = 197
+  S.SYS.getdents64       = 220
+  S.SYS.readahead        = 225
+  S.SYS.setxattr         = 226
+  S.SYS.lsetxattr        = 227
+  S.SYS.fsetxattr        = 228
+  S.SYS.getxattr         = 229
+  S.SYS.lgetxattr        = 230
+  S.SYS.fgetxattr        = 231
+  S.SYS.listxattr        = 232
+  S.SYS.llistxattr       = 233
+  S.SYS.flistxattr       = 234
+  S.SYS.removexattr      = 235
+  S.SYS.lremovexattr     = 236
+  S.SYS.fremovexattr     = 237
+  S.SYS.io_setup         = 245
+  S.SYS.io_destroy       = 246
+  S.SYS.io_getevents     = 247
+  S.SYS.io_submit        = 248
+  S.SYS.io_cancel        = 249
+  S.SYS.clock_settime    = 264
+  S.SYS.clock_gettime    = 265
+  S.SYS.clock_getres     = 266
+  S.SYS.clock_nanosleep  = 267
+  S.SYS.mknodat          = 297
+  S.SYS.fstatat64        = 300
+  S.SYS.splice           = 313
+  S.SYS.sync_file_range  = 314
+  S.SYS.tee              = 315
+  S.SYS.vmsplice         = 316
+  S.SYS.timerfd_create	 = 322
+  S.SYS.fallocate        = 324
+  S.SYS.timerfd_settime  = 325
+  S.SYS.timerfd_gettime	 = 326
+  S.SYS.pipe2            = 331
 elseif ffi.arch == "x64" then
-  S.SYS_stat             = 4
-  S.SYS_fstat            = 5
-  S.SYS_lstat            = 6
-  S.SYS_getpid           = 39
-  S.SYS_clone            = 56
-  S.SYS_getdents         = 78
-  S.SYS_getcwd           = 79
-  S.SYS_mknod            = 133
-  S.SYS_ustat            = 136
-  S.SYS_acct             = 163
-  S.SYS_readahead        = 187
-  S.SYS_setxattr         = 188
-  S.SYS_lsetxattr        = 189
-  S.SYS_fsetxattr        = 190
-  S.SYS_getxattr         = 191
-  S.SYS_lgetxattr        = 192
-  S.SYS_fgetxattr        = 193
-  S.SYS_listxattr        = 194
-  S.SYS_llistxattr       = 195
-  S.SYS_flistxattr       = 196
-  S.SYS_removexattr      = 197
-  S.SYS_lremovexattr     = 198
-  S.SYS_fremovexattr     = 199
-  S.SYS_io_setup         = 206
-  S.SYS_io_destroy       = 207
-  S.SYS_io_getevents     = 208
-  S.SYS_io_submit        = 209
-  S.SYS_io_cancel        = 210
-  S.SYS_getdents64       = 217
-  S.SYS_clock_settime    = 227
-  S.SYS_clock_gettime    = 228
-  S.SYS_clock_getres     = 229
-  S.SYS_clock_nanosleep  = 230
-  S.SYS_mknodat          = 259
-  S.SYS_fstatat          = 262
-  S.SYS_splice           = 275
-  S.SYS_tee              = 276
-  S.SYS_sync_file_range  = 277
-  S.SYS_vmsplice         = 278
-  S.SYS_timerfd_create	 = 283
-  S.SYS_fallocate        = 285
-  S.SYS_timerfd_settime  = 286
-  S.SYS_timerfd_gettime	 = 287
-  S.SYS_pipe2            = 293
+  S.SYS.stat             = 4
+  S.SYS.fstat            = 5
+  S.SYS.lstat            = 6
+  S.SYS.getpid           = 39
+  S.SYS.clone            = 56
+  S.SYS.getdents         = 78
+  S.SYS.getcwd           = 79
+  S.SYS.mknod            = 133
+  S.SYS.ustat            = 136
+  S.SYS.acct             = 163
+  S.SYS.readahead        = 187
+  S.SYS.setxattr         = 188
+  S.SYS.lsetxattr        = 189
+  S.SYS.fsetxattr        = 190
+  S.SYS.getxattr         = 191
+  S.SYS.lgetxattr        = 192
+  S.SYS.fgetxattr        = 193
+  S.SYS.listxattr        = 194
+  S.SYS.llistxattr       = 195
+  S.SYS.flistxattr       = 196
+  S.SYS.removexattr      = 197
+  S.SYS.lremovexattr     = 198
+  S.SYS.fremovexattr     = 199
+  S.SYS.io_setup         = 206
+  S.SYS.io_destroy       = 207
+  S.SYS.io_getevents     = 208
+  S.SYS.io_submit        = 209
+  S.SYS.io_cancel        = 210
+  S.SYS.getdents64       = 217
+  S.SYS.clock_settime    = 227
+  S.SYS.clock_gettime    = 228
+  S.SYS.clock_getres     = 229
+  S.SYS.clock_nanosleep  = 230
+  S.SYS.mknodat          = 259
+  S.SYS.fstatat          = 262
+  S.SYS.splice           = 275
+  S.SYS.tee              = 276
+  S.SYS.sync_file_range  = 277
+  S.SYS.vmsplice         = 278
+  S.SYS.timerfd_create	 = 283
+  S.SYS.fallocate        = 285
+  S.SYS.timerfd_settime  = 286
+  S.SYS.timerfd_gettime	 = 287
+  S.SYS.pipe2            = 293
 elseif ffi.arch == "arm" and ffi.abi("eabi") then
-  S.SYS_mknod            = 14
-  S.SYS_getpid           = 20
-  S.SYS_acct             = 51
-  S.SYS_ustat            = 62
-  S.SYS_stat             = 106
-  S.SYS_fstat            = 108
-  S.SYS_lstat            = 107
-  S.SYS_clone            = 120
-  S.SYS__llseek          = 140
-  S.SYS_getdents         = 141
-  S.SYS_getcwd           = 183
-  S.SYS_stat64           = 195
-  S.SYS_lstat64          = 196
-  S.SYS_fstat64          = 197
-  S.SYS_getdents64       = 217
-  S.SYS_readahead        = 225
-  S.SYS_setxattr         = 226
-  S.SYS_lsetxattr        = 227
-  S.SYS_fsetxattr        = 228
-  S.SYS_getxattr         = 229
-  S.SYS_lgetxattr        = 230
-  S.SYS_fgetxattr        = 231
-  S.SYS_listxattr        = 232
-  S.SYS_llistxattr       = 233
-  S.SYS_flistxattr       = 234
-  S.SYS_removexattr      = 235
-  S.SYS_lremovexattr     = 236
-  S.SYS_fremovexattr     = 237
-  S.SYS_io_setup         = 243
-  S.SYS_io_destroy       = 244
-  S.SYS_io_getevents     = 245
-  S.SYS_io_submit        = 246
-  S.SYS_io_cancel        = 247
-  S.SYS_clock_settime    = 262
-  S.SYS_clock_gettime    = 263
-  S.SYS_clock_getres     = 264
-  S.SYS_clock_nanosleep  = 265
-  S.SYS_mknodat          = 324
-  S.SYS_fstatat64        = 327
-  S.SYS_splice           = 340
-  S.SYS_sync_file_range  = 341
-  S.SYS_tee              = 342
-  S.SYS_vmsplice         = 343
-  S.SYS_timerfd_create	 = 350
-  S.SYS_fallocate        = 352
-  S.SYS_timerfd_settime  = 353
-  S.SYS_timerfd_gettime	 = 354
-  S.SYS_pipe2            = 359
+  S.SYS.mknod            = 14
+  S.SYS.getpid           = 20
+  S.SYS.acct             = 51
+  S.SYS.ustat            = 62
+  S.SYS.stat             = 106
+  S.SYS.fstat            = 108
+  S.SYS.lstat            = 107
+  S.SYS.clone            = 120
+  S.SYS._llseek          = 140
+  S.SYS.getdents         = 141
+  S.SYS.getcwd           = 183
+  S.SYS.stat64           = 195
+  S.SYS.lstat64          = 196
+  S.SYS.fstat64          = 197
+  S.SYS.getdents64       = 217
+  S.SYS.readahead        = 225
+  S.SYS.setxattr         = 226
+  S.SYS.lsetxattr        = 227
+  S.SYS.fsetxattr        = 228
+  S.SYS.getxattr         = 229
+  S.SYS.lgetxattr        = 230
+  S.SYS.fgetxattr        = 231
+  S.SYS.listxattr        = 232
+  S.SYS.llistxattr       = 233
+  S.SYS.flistxattr       = 234
+  S.SYS.removexattr      = 235
+  S.SYS.lremovexattr     = 236
+  S.SYS.fremovexattr     = 237
+  S.SYS.io_setup         = 243
+  S.SYS.io_destroy       = 244
+  S.SYS.io_getevents     = 245
+  S.SYS.io_submit        = 246
+  S.SYS.io_cancel        = 247
+  S.SYS.clock_settime    = 262
+  S.SYS.clock_gettime    = 263
+  S.SYS.clock_getres     = 264
+  S.SYS.clock_nanosleep  = 265
+  S.SYS.mknodat          = 324
+  S.SYS.fstatat64        = 327
+  S.SYS.splice           = 340
+  S.SYS.sync_file_range  = 341
+  S.SYS.tee              = 342
+  S.SYS.vmsplice         = 343
+  S.SYS.timerfd_create	 = 350
+  S.SYS.fallocate        = 352
+  S.SYS.timerfd_settime  = 353
+  S.SYS.timerfd_gettime	 = 354
+  S.SYS.pipe2            = 359
 else
   error("unsupported architecture")
 end
@@ -2801,10 +2801,10 @@ if ffi.abi("64bit") then
   }
 else
   stattypename = "struct stat64"
-  S.SYS_stat = S.SYS_stat64
-  S.SYS_lstat = S.SYS_lstat64
-  S.SYS_fstat = S.SYS_fstat64
-  S.SYS_fstatat = S.SYS_fstatat64
+  S.SYS.stat = S.SYS.stat64
+  S.SYS.lstat = S.SYS.lstat64
+  S.SYS.fstat = S.SYS.fstat64
+  S.SYS.fstatat = S.SYS.fstatat64
   C64 = {
     truncate = C.truncate64,
     ftruncate = C.ftruncate64,
@@ -3763,7 +3763,7 @@ end
 function S.pipe(flags)
   local fd2 = t.int2()
   local ret
-  if flags then ret = C.syscall(S.SYS_pipe2, pt.void(fd2), t.int(stringflags(flags, "O_"))) else ret = C.pipe(fd2) end
+  if flags then ret = C.syscall(S.SYS.pipe2, pt.void(fd2), t.int(stringflags(flags, "O_"))) else ret = C.pipe(fd2) end
   if ret == -1 then return nil, t.error() end
   return {t.fd(fd2[0]), t.fd(fd2[1])}
 end
@@ -3798,7 +3798,7 @@ function S.chdir(path) return retbool(C.chdir(path)) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, S.mode(mode))) end
 function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(getfd_at(fd), path, S.mode(mode))) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
-function S.acct(filename) return retbool(C.syscall(S.SYS_acct, filename)) end
+function S.acct(filename) return retbool(C.syscall(S.SYS.acct, filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
@@ -3855,10 +3855,10 @@ function S.readlinkat(dirfd, path)
 end
 
 function S.mknod(pathname, mode, dev)
-  return retbool(C.syscall(S.SYS_mknod, pathname, t.mode(stringflags(mode, "S_")), t.dev(dev or 0)))
+  return retbool(C.syscall(S.SYS.mknod, pathname, t.mode(stringflags(mode, "S_")), t.dev(dev or 0)))
 end
 function S.mknodat(fd, pathname, mode, dev)
-  return retbool(C.syscall(S.SYS_mknodat, t.int(getfd_at(fd)), pathname, t.mode(stringflags(mode, "S_")), t.dev(dev or 0)))
+  return retbool(C.syscall(S.SYS.mknodat, t.int(getfd_at(fd)), pathname, t.mode(stringflags(mode, "S_")), t.dev(dev or 0)))
 end
 
 -- mkfifo is from man(3), add for convenience
@@ -3882,7 +3882,7 @@ function S.setpriority(which, who, prio) return retnume(C.setpriority, stringfla
  -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
 function S.clone(flags, signal, stack, ptid, tls, ctid)
   flags = t.int64(stringflags(flags, "CLONE_") + stringflag(signal, "SIG"))
-  return retnum(C.syscall(S.SYS_clone, flags, pt.void(stack), pt.void(ptid), pt.void(tls), pt.void(ctid)))
+  return retnum(C.syscall(S.SYS.clone, flags, pt.void(stack), pt.void(ptid), pt.void(tls), pt.void(ctid)))
 end
 
 function S.unshare(flags)
@@ -3929,7 +3929,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   local d = {}
   local ret
   repeat
-    ret = C.syscall(S.SYS_getdents64, t.int(getfd(fd)), buf, t.uint(size))
+    ret = C.syscall(S.SYS.getdents64, t.int(getfd(fd)), buf, t.uint(size))
     if ret == -1 then return nil, t.error() end
     local i = 0
     while i < ret do
@@ -3982,7 +3982,7 @@ else
   function S.lseek(fd, offset, whence, result)
     local offhigh, offlow = t.int64(offset) / 4294967296LL, t.int64(offset) % 4294967296LL
     if not result then result = t.loff1() end
-    local ret = C.syscall(S.SYS__llseek, t.int(getfd(fd)), t.ulong(offhigh), t.ulong(offlow), pt.void(result), t.uint(stringflag(whence, "SEEK_")))
+    local ret = C.syscall(S.SYS._llseek, t.int(getfd(fd)), t.ulong(offhigh), t.ulong(offlow), pt.void(result), t.uint(stringflag(whence, "SEEK_")))
     if ret == -1 then return nil, t.error() end
     return result[0]
   end
@@ -4040,33 +4040,33 @@ function S.fchmodat(dirfd, pathname, mode)
   return retbool(C.fchmodat(getfd_at(dirfd), pathname, S.mode(mode), 0)) -- no flags actually supported
 end
 function S.sync_file_range(fd, offset, count, flags)
-  return retbool(C.syscall(S.SYS_sync_file_range, t.int(getfd(fd)), t.loff(offset), t.loff(count), t.uint(stringflags(flags, "SYNC_FILE_RANGE_"))))
+  return retbool(C.syscall(S.SYS.sync_file_range, t.int(getfd(fd)), t.loff(offset), t.loff(count), t.uint(stringflags(flags, "SYNC_FILE_RANGE_"))))
 end
 
 function S.stat(path, buf)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS_stat, path, pt.void(buf))
+  local ret = C.syscall(S.SYS.stat, path, pt.void(buf))
   if ret == -1 then return nil, t.error() end
   return buf
 end
 
 function S.lstat(path, buf)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS_lstat, path, pt.void(buf))
+  local ret = C.syscall(S.SYS.lstat, path, pt.void(buf))
   if ret == -1 then return nil, t.error() end
   return buf
 end
 
 function S.fstat(fd, buf)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS_fstat, t.int(getfd(fd)), pt.void(buf))
+  local ret = C.syscall(S.SYS.fstat, t.int(getfd(fd)), pt.void(buf))
   if ret == -1 then return nil, t.error() end
   return buf
 end
 
 function S.fstatat(fd, path, buf, flags)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS_fstatat, t.int(getfd_at(fd)), path, pt.void(buf), t.int(flaglist(flags, "AT_", {"AT_NO_AUTOMOUNT", "AT_SYMLINK_NOFOLLOW"})))
+  local ret = C.syscall(S.SYS.fstatat, t.int(getfd_at(fd)), path, pt.void(buf), t.int(flaglist(flags, "AT_", {"AT_NO_AUTOMOUNT", "AT_SYMLINK_NOFOLLOW"})))
   if ret == -1 then return nil, t.error() end
   return buf
 end
@@ -4106,7 +4106,7 @@ function S.getcwd()
   local buf, ret
   repeat
     buf = t.buffer(size)
-    ret = C.syscall(S.SYS_getcwd, pt.void(buf), t.ulong(size))
+    ret = C.syscall(S.SYS.getcwd, pt.void(buf), t.ulong(size))
     if ret == -1 then 
       local errno = ffi.errno()
       if errno == S.E.ERANGE then size = size * 2 else return nil, t.error(errno) end
@@ -4165,11 +4165,11 @@ function S.posix_fadvise(fd, advice, offset, len) -- note argument order
   return retbool(C.posix_fadvise(getfd(fd), offset or 0, len or 0, stringflag(advice, "POSIX_FADV_")))
 end
 function S.fallocate(fd, mode, offset, len)
-  return retbool(C.syscall(S.SYS_fallocate, t.int(getfd(fd)), t.uint(stringflag(mode, "FALLOC_FL_")), t.loff(offset or 0), t.loff(len)))
+  return retbool(C.syscall(S.SYS.fallocate, t.int(getfd(fd)), t.uint(stringflag(mode, "FALLOC_FL_")), t.loff(offset or 0), t.loff(len)))
 end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count)
-  return retbool(C.syscall(S.SYS_readahead, t.int(getfd(fd)), t.loff(offset), t.size(count)))
+  return retbool(C.syscall(S.SYS.readahead, t.int(getfd(fd)), t.loff(offset), t.size(count)))
 end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain
@@ -4380,27 +4380,27 @@ local function lattrbuf(sys, a)
   return split('\0', s)
 end
 
-function S.listxattr(path) return lattrbuf(S.SYS_listxattr, path) end
-function S.llistxattr(path) return lattrbuf(S.SYS_llistxattr, path) end
-function S.flistxattr(fd) return lattrbuf(S.SYS_flistxattr, t.int(getfd(fd))) end
+function S.listxattr(path) return lattrbuf(S.SYS.listxattr, path) end
+function S.llistxattr(path) return lattrbuf(S.SYS.llistxattr, path) end
+function S.flistxattr(fd) return lattrbuf(S.SYS.flistxattr, t.int(getfd(fd))) end
 
 function S.setxattr(path, name, value, flags)
-  return retbool(C.syscall(S.SYS_setxattr, path, name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
+  return retbool(C.syscall(S.SYS.setxattr, path, name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
 end
 function S.lsetxattr(path, name, value, flags)
-  return retbool(C.syscall(S.SYS_lsetxattr, path, name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
+  return retbool(C.syscall(S.SYS.lsetxattr, path, name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
 end
 function S.fsetxattr(fd, name, value, flags)
-  return retbool(C.syscall(S.SYS_fsetxattr, t.int(getfd(fd)), name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
+  return retbool(C.syscall(S.SYS.fsetxattr, t.int(getfd(fd)), name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
 end
 
-function S.getxattr(path, name) return growattrbuf(S.SYS_getxattr, path, name) end
-function S.lgetxattr(path, name) return growattrbuf(S.SYS_lgetxattr, path, name) end
-function S.fgetxattr(fd, name) return growattrbuf(S.SYS_fgetxattr, t.int(getfd(fd)), name) end
+function S.getxattr(path, name) return growattrbuf(S.SYS.getxattr, path, name) end
+function S.lgetxattr(path, name) return growattrbuf(S.SYS.lgetxattr, path, name) end
+function S.fgetxattr(fd, name) return growattrbuf(S.SYS.fgetxattr, t.int(getfd(fd)), name) end
 
-function S.removexattr(path, name) return retbool(C.syscall(S.SYS_removexattr, path, name)) end
-function S.lremovexattr(path, name) return retbool(C.syscall(S.SYS_lremovexattr, path, name)) end
-function S.fremovexattr(fd, name) return retbool(C.syscall(S.SYS_fremovexattr, t.int(getfd(fd)), name)) end
+function S.removexattr(path, name) return retbool(C.syscall(S.SYS.removexattr, path, name)) end
+function S.lremovexattr(path, name) return retbool(C.syscall(S.SYS.lremovexattr, path, name)) end
+function S.fremovexattr(fd, name) return retbool(C.syscall(S.SYS.fremovexattr, t.int(getfd(fd)), name)) end
 
 -- helper function to set and return attributes in tables
 local function xattr(list, get, set, remove, path, t)
@@ -4571,16 +4571,16 @@ function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
     offout = t.loff1()
     offout[0] = off_out
   end
-  return retnum(C.syscall(S.SYS_splice, t.int(getfd(fd_in)), pt.void(offin), t.int(getfd(fd_out)), pt.void(offout), t.int(len), t.uint(stringflags(flags, "SPLICE_F_"))))
+  return retnum(C.syscall(S.SYS.splice, t.int(getfd(fd_in)), pt.void(offin), t.int(getfd(fd_out)), pt.void(offout), t.int(len), t.uint(stringflags(flags, "SPLICE_F_"))))
 end
 
 function S.vmsplice(fd, iov, flags)
   if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
-  return retnum(C.syscall(S.SYS_vmsplice, t.int(getfd(fd)), pt.void(iov.iov), t.int(#iov), t.uint(stringflags(flags, "SPLICE_F_"))))
+  return retnum(C.syscall(S.SYS.vmsplice, t.int(getfd(fd)), pt.void(iov.iov), t.int(#iov), t.uint(stringflags(flags, "SPLICE_F_"))))
 end
 
 function S.tee(fd_in, fd_out, len, flags)
-  return retnum(C.syscall(S.SYS_tee, t.int(getfd(fd_in)), t.int(getfd(fd_out)), t.int(len), t.uint(stringflags(flags, "SPLICE_F_"))))
+  return retnum(C.syscall(S.SYS.tee, t.int(getfd(fd_in)), t.int(getfd(fd_out)), t.int(len), t.uint(stringflags(flags, "SPLICE_F_"))))
 end
 
 function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "IN_"))) end
@@ -4705,20 +4705,20 @@ function S.setitimer(which, it)
 end
 
 function S.timerfd_create(clockid, flags)
-  return retfd(C.syscall(S.SYS_timerfd_create, t.int(stringflag(clockid, "CLOCK_")), t.int(stringflags(flags, "TFD_"))))
+  return retfd(C.syscall(S.SYS.timerfd_create, t.int(stringflag(clockid, "CLOCK_")), t.int(stringflags(flags, "TFD_"))))
 end
 
 function S.timerfd_settime(fd, flags, it)
   local oldtime = t.itimerspec()
   if not ffi.istype(t.itimerspec, it) then it = t.itimerspec(it) end
-  local ret = C.syscall(S.SYS_timerfd_settime, t.int(getfd(fd)), t.int(stringflag(flags, "TFD_TIMER_")), pt.void(it), pt.void(oldtime))
+  local ret = C.syscall(S.SYS.timerfd_settime, t.int(getfd(fd)), t.int(stringflag(flags, "TFD_TIMER_")), pt.void(it), pt.void(oldtime))
   if ret == -1 then return nil, t.error() end
   return oldtime
 end
 
 function S.timerfd_gettime(fd, curr_value)
   if not curr_value then curr_value = t.itimerspec() end
-  local ret = C.syscall(S.SYS_timerfd_gettime, t.int(getfd(fd)), pt.void(curr_value))
+  local ret = C.syscall(S.SYS.timerfd_gettime, t.int(getfd(fd)), pt.void(curr_value))
   if ret == -1 then return nil, t.error() end
   return curr_value
 end
@@ -4734,14 +4734,14 @@ end
 -- aio functions
 function S.io_setup(nr_events)
   local ctx = t.aio_context()
-  local ret = C.syscall(S.SYS_io_setup, t.uint(nr_events), ctx)
+  local ret = C.syscall(S.SYS.io_setup, t.uint(nr_events), ctx)
   if ret == -1 then return nil, t.error() end
   return ctx
 end
 
 function S.io_destroy(ctx)
   if ctx.ctx == 0 then return end
-  local ret = retbool(C.syscall(S.SYS_io_destroy, ctx:n()))
+  local ret = retbool(C.syscall(S.SYS.io_destroy, ctx:n()))
   ctx.ctx = 0
   return ret
 end
@@ -4781,7 +4781,7 @@ end
 function S.io_cancel(ctx, iocb, result)
   iocb = getiocb(iocb)
   if not result then result = t.io_event() end
-  local ret = C.syscall(S.SYS_io_cancel, ctx:n(), iocb, result)
+  local ret = C.syscall(S.SYS.io_cancel, ctx:n(), iocb, result)
   if ret == -1 then return nil, t.error() end
   return ret
 end
@@ -4789,7 +4789,7 @@ end
 function S.io_getevents(ctx, min, nr, timeout, events)
   if not events then events = t.io_events(nr) end
   if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
-  local ret = C.syscall(S.SYS_io_getevents, ctx:n(), t.long(min), t.long(nr), events, timeout)
+  local ret = C.syscall(S.SYS.io_getevents, ctx:n(), t.long(min), t.long(nr), events, timeout)
   if ret == -1 then return nil, t.error() end
   -- need to think more about how to return these, eg metatype for io_event?
   local r = {}
@@ -4804,7 +4804,7 @@ end
 
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
   iocb, nr = getiocbs(iocb)
-  return retnum(C.syscall(S.SYS_io_submit, ctx:n(), t.long(nr), iocb))
+  return retnum(C.syscall(S.SYS.io_submit, ctx:n(), t.long(nr), iocb))
 end
 
 -- map for valid options for arg2
@@ -4899,27 +4899,27 @@ end
 
 function S.clock_getres(clk_id, ts)
   if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
-  local ret = C.syscall(S.SYS_clock_getres, t.clockid(stringflag(clk_id, "CLOCK_")), pt.void(ts))
+  local ret = C.syscall(S.SYS.clock_getres, t.clockid(stringflag(clk_id, "CLOCK_")), pt.void(ts))
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
   if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
-  local ret = C.syscall(S.SYS_clock_gettime, t.clockid(stringflag(clk_id, "CLOCK_")), pt.void(ts))
+  local ret = C.syscall(S.SYS.clock_gettime, t.clockid(stringflag(clk_id, "CLOCK_")), pt.void(ts))
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_settime(clk_id, ts)
   if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
-  return retbool(C.syscall(S.SYS_clock_settime, t.int(stringflag(clk_id, "CLOCK_")), pt.void(ts)))
+  return retbool(C.syscall(S.SYS.clock_settime, t.int(stringflag(clk_id, "CLOCK_")), pt.void(ts)))
 end
 
 function S.clock_nanosleep(clk_id, flags, req, rem)
   if not ffi.istype(t.timespec, req) then req = t.timespec(req) end
   if not rem then rem = t.timespec() end
-  local ret = C.syscall(S.SYS_clock_nanosleep, t.clockid(stringflag(clk_id, "CLOCK_")), t.int(stringflag(flags, "TIMER_")), pt.void(req), pt.void(rem))
+  local ret = C.syscall(S.SYS.clock_nanosleep, t.clockid(stringflag(clk_id, "CLOCK_")), t.int(stringflag(flags, "TIMER_")), pt.void(req), pt.void(rem))
   if ret == -1 then
     if ffi.errno() == S.E.INTR then return rem else return nil, t.error() end
   end
@@ -4936,7 +4936,7 @@ S.sync = C.sync
 S.alarm = C.alarm
 
 function S.getpid()
-  return C.syscall(S.SYS_getpid) -- bypass glibc caching of pids
+  return C.syscall(S.SYS.getpid) -- bypass glibc caching of pids
 end
 
 function S.setuid(uid) return retbool(C.setuid(uid)) end
