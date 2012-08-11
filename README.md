@@ -118,9 +118,32 @@ pselect, ppoll
 timer\_create, timer\_getoverrun
 sigqueue,
 capset, capget
-pivot\_root, init\_module, delete\_module, query\_module, swapon, swapoff
-iopl, ioperm, futex
+pivot\_root, init\_module, delete\_module, query\_module, get_\kernel\_syms, swapon, swapoff
+iopl, ioperm
+futex, set\_robust\_list, get\_robust\_list
+getrusage, ptrace
+setuid, seteuid, setfsuid, setreuid, setgid, setegid, setregid
+setpgid, getpgid, setpgrp, getpgrp, setresgid, getresgid
+getgroups, setgroups
+vhangup
+recvmmsg
+msgctl, msgget, msgrcv, msgsnd, semctl, semget, semop, semtimedop, shmat, shmctl, shmdt, shmget
+mq\_open, mq\_close, mq\_getattr, mq\_notify, mq\_receive, mq\_send, mq\_unlink -- note glibc wraps these
+quotactl, ioprio\_set, ioprio\_get
+setdomainname, bdflush, kexec\_load
+mbind, get\_mpolicy, set\_mpolicy
+sysfs, mincore, remap\_file\_pages, set\_tid\_address
+add\_key, request\_key, keyctl (see libkeyutils wrappers)
+sched\_setaffinity, sched\_getaffinity, migrate\_pages, move\_pages
+perf\_event\_open  -- see http://web.eecs.utk.edu/~vweaver1/projects/perf-events/programming.html
+set\_thread\_area, get\_thread\_area, exit_group, tgkill
 ...
+
+probably not useful: brk, uselib, socketcall, idle, ipc, modify_ldt, personality, sigreturn, sigaltstack, lookup\_dcookie
+
+from man(3)
+clock_getcpuclockid
+getdomainname (from uname)
 
 ### 64 bit fileops on 32 bit
 
