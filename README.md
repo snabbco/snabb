@@ -82,7 +82,7 @@ Test switch functionality by replaying packets from a recorded trace
 and recording the switch's behavior to an output trace. The output
 trace can separately be checked with `checktrace`.
 
-### `bin/snabb maketraces` [`src/lua/tracemaker.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/tracemaker.lua)
+### `bin/snabb maketraces` [`src/lua/maketraces.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/maketraces.lua)
 
 Create PCAP files exhibiting invalid switch behavior, e.g. dropped or
 looped packets. These files are used for testing the tester i.e.
@@ -144,31 +144,12 @@ get some experience with how versatile Github's tools are.
 
 ### Development mailing list
 
-You are welcome to join the snabb development mailing list. The list
-is open to everybody, but only subscribers can post. This is the place
-for general technical discussions of Snabb Switch by the open source
-community. You can subscribe or unsubscribe using the form below or
-via the <a href="http://www.freelists.org/list/snabb">main mailing
-list page at freelists.org</a>.
-
-<form action="http://www.freelists.org/cgi-bin/subscription.cgi" method="post">
-<p>
-<input type="hidden" name="list" value="snabb">
-<input type="hidden" name="url_or_message" value="">
-<input type="hidden" name="action" value="subscribe">
-Enter your email address: <input type="text" name="email">
-<input type=submit value="Subscribe">
-</p>
-</form>
-<form action="http://www.freelists.org/cgi-bin/subscription.cgi" method="post">
-<p>
-<input type="hidden" name="list" value="snabb">
-<input type="hidden" name="url_or_message" value="">
-<input type="hidden" name="action" value="unsubscribe">
-Enter your email address: <input type="text" name="email">
-<input type=submit value="Unsubscribe">
-</p>
-</form>
+You are welcome to join the <a
+href="http://www.freelists.org/list/snabb">snabb development mailing
+list</a>. The list is open to everybody, but only subscribers can
+post. This is the place for general technical discussions of Snabb
+Switch by the open source community. The list is hosted by
+freelists.org - thanks!
 
 ### Reddit
 
