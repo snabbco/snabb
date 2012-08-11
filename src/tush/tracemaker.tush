@@ -1,5 +1,10 @@
 First create the test traces:
-$ snabb tracemaker
+$ snabb maketraces .
+| Creating failloop.cap
+| Creating faildrop.cap
+| Creating failforward.cap
+| Creating failflood.cap
+| Creating passall.cap
 
 This shouldn't fail:
 
@@ -20,5 +25,3 @@ $ snabb checktrace failforward.cap
 ? 1
 
 $ snabb checktrace failflood.cap
-| flood failed: not sent to enough ports
-? 1
