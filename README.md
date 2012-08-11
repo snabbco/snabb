@@ -119,7 +119,7 @@ timer\_create, timer\_getoverrun
 sigqueue,
 capset, capget
 pivot\_root, init\_module, delete\_module, query\_module, swapon, swapoff
-netns, iopl, ioperm, futex
+setns, iopl, ioperm, futex
 ...
 
 ### 64 bit fileops on 32 bit

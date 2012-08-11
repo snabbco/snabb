@@ -2745,6 +2745,7 @@ int futimens(int fd, const struct timespec times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 
 int unshare(int flags);
+int setns(int fd, int nstype);
 
 int syscall(int number, ...);
 
@@ -3878,6 +3879,9 @@ end
 
 function S.unshare(flags)
   return retbool(C.unshare(stringflags(flags, "CLONE_")))
+end
+function S.setns(fd, nstype)
+  return retbool(C.setns(getfd(fd), stringflag(nstype, "CLONE_")))
 end
 
 function S.fork() return retnum(C.fork()) end
@@ -6394,7 +6398,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
-                   'fchownat', 'readlinkat', 'mkfifoat', 'isatty'
+                   'fchownat', 'readlinkat', 'mkfifoat', 'isatty', 'setns'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end

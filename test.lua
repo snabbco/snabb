@@ -1663,6 +1663,16 @@ test_namespaces_root = {
       assert(S.waitpid(-1, "clone"))
     end
   end,
+  test_setns = function()
+    local fd = assert(S.open("/proc/self/ns/net"))
+    assert(fd:setns("newnet"))
+    assert(fd:close())
+  end,
+  test_setns_fail = function()
+    local fd = assert(S.open("/proc/self/ns/net"))
+    assert(not fd:setns("newipc"))
+    assert(fd:close())
+  end,
 }
 
 test_filesystem = {
