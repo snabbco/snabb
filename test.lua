@@ -1632,6 +1632,12 @@ test_processes = {
   end,
 }
 
+test_ids = {
+  test_setuid = function()
+    assert(S.setuid(S.getuid()))
+  end,
+}
+
 test_namespaces_root = {
   test_netns = function()
     local p = assert(S.clone("newnet"))
