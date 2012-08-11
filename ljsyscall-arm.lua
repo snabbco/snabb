@@ -57,5 +57,11 @@ arch.SYS = {
   pipe2            = 359
 }
 
+arch.oflags = function(S)
+  S.O_DIRECTORY = octal('040000')
+  S.O_NOFOLLOW  = octal('0100000')
+  S.O_DIRECT    = octal('0200000')
+end
+
 return arch
 
