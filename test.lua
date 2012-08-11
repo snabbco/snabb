@@ -257,7 +257,7 @@ test_file_operations = {
     assert(fd:close())
     assert(dirfd:close())
   end,
-  test_chown = function()
+  test_chown_root = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(S.chown(tmpfile, 66, 55))
     local stat = S.stat(tmpfile)
@@ -266,7 +266,13 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
-  test_fchown = function()
+  test_chown = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    assert(S.chown(tmpfile)) -- unchanged
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_fchown_root = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(fd:chown(66, 55))
     local stat = fd:stat()
@@ -275,6 +281,15 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_lchown_root = function()
+    assert(S.symlink("/dev/zero", tmpfile))
+    assert(S.lchown(tmpfile, 66, 55))
+    local stat = S.lstat(tmpfile)
+    assert_equal(stat.uid, 66, "expect uid changed")
+    assert_equal(stat.gid, 55, "expect gid changed")
+    assert(S.unlink(tmpfile))
+  end,
+
   test_sync = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(fd:fsync())

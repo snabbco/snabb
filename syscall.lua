@@ -3794,11 +3794,8 @@ function S.pause() return retbool(C.pause()) end
 
 function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
 function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
-
+function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
 --[[
-int chown(const char *path, uid_t owner, gid_t group);
-int fchown(int fd, uid_t owner, gid_t group);
-int lchown(const char *path, uid_t owner, gid_t group);
 int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
 ]]
 
