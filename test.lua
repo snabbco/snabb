@@ -224,6 +224,15 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_linkat = function()
+    local dirfd = assert(S.open("."))
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    assert(S.linkat(dirfd, tmpfile, dirfd, tmpfile2, "symlink_follow"))
+    assert(S.unlink(tmpfile2))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+    assert(dirfd:close())
+  end,
   test_symlink = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(S.symlink(tmpfile, tmpfile2))

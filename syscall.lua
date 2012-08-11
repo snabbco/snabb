@@ -2598,6 +2598,7 @@ int fchown(int fd, uid_t owner, gid_t group);
 int lchown(const char *path, uid_t owner, gid_t group);
 int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
 int link(const char *oldpath, const char *newpath);
+int linkat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags);
 int symlink(const char *oldpath, const char *newpath);
 int symlinkat(const char *oldpath, int newdirfd, const char *newpath);
 int chroot(const char *path);
@@ -3777,8 +3778,8 @@ end
 
 function S.creat(pathname, mode) return retfd(C.creat(pathname, S.mode(mode))) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
-function S.unlinkat(fd, path, flags)
-  return retbool(C.unlinkat(getfd_at(fd), path, flaglist(flags, "AT_", {"AT_REMOVEDIR"})))
+function S.unlinkat(dirfd, path, flags)
+  return retbool(C.unlinkat(getfd_at(dirfd), path, flaglist(flags, "AT_", {"AT_REMOVEDIR"})))
 end
 function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
 function S.renameat(olddirfd, oldpath, newdirfd, newpath)
@@ -3791,6 +3792,9 @@ function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.acct(filename) return retbool(C.syscall(S.SYS_acct, filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
+function S.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
+  return retbool(C.linkat(getfd_at(olddirfd), oldpath, getfd_at(newdirfd), newpath, flaglist(flags, "AT_", {"AT_SYMLINK_FOLLOW"})))
+end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 function S.symlinkat(oldpath, newdirfd, newpath) return retbool(C.symlinkat(oldpath, getfd_at(newdirfd), newpath)) end
 function S.pause() return retbool(C.pause()) end
