@@ -56,6 +56,45 @@ otherwise stated, these are all a part of the
 [`snabbswitch`](https://github.com/SnabbCo/snabbswitch) repository on
 github.
 
+### `bin/snabb switch` [`src/lua/switch.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/switch.lua)
+
+Ethernet switch logic in LuaJIT. Written as a library. Currently low
+on functionality, mostly untested, and lacking interfaces towards the
+host OS or physical NICs.
+
+There is support for dumping all switch traffic to a PCAP/tcpdump file
+for analysis and verification. The switch sneakily appends metadata to
+each packet in the trace declaring ingress vs. egress and switch port
+ID.
+
+### `bin/snabb checktrace <trace>` [`src/lua/checktrace.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/checktrace.lua)
+
+Verify switch functionality by post-processing a trace file. Takes a
+PCAP/tcpdump file for input and checks it for correctness. That is:
+make sure packets don't loop back to the port they come from, that
+multicasts flood out every port, and so on. This is the basis for the
+software testing strategy: post-processing to make sure the switch
+behaved well when bombarded with arbitrary workloads.
+
+### `bin/snabb replay <intrace> <outtrace>` [`src/lua/checktrace.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/replay.lua)
+
+Test switch functionality by replaying packets from a recorded trace
+and recording the switch's behavior to an output trace. The output
+trace can separately be checked with `checktrace`.
+
+### `bin/snabb maketraces` [`src/lua/tracemaker.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/tracemaker.lua)
+
+Create PCAP files exhibiting invalid switch behavior, e.g. dropped or
+looped packets. These files are used for testing the tester i.e.
+making sure it detects the errors. They are essentially unit tests.
+
+### `bin/snabb test` [`src/tush/tracemaker.tush`](https://github.com/SnabbCo/snabbswitch/blob/master/src/tush/tracemaker.tush) 
+
+Top-level entry point to test the Snabb Switch. Uses Darius Bacon's
+[`tush`](https://github.com/darius/tush) program to execute the
+tracemaker and tester. Verify that a correct trace passes all tests,
+and that an incorrect trace for each error class fails.
+
 ### KVM/QEMU snabb_shm support
 
 Backend for KVM/QEMU network devices to read/write ethernet frames to
@@ -71,45 +110,6 @@ kvm ... -net nic,vlan=1 -net snabb_shm,vlan=1,file=/tmp/shmeth0 ...
 There's much potential for enhancement.
 
 This software exists in the [`shm` branch of Snabb fork of QEMU](https://github.com/SnabbCo/QEMU/tree/shm). Check out the [diff](https://github.com/SnabbCo/QEMU/compare/master...shm) compared to QEMU.
-
-### `bin/snabb switch` [`src/lua/switch.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/switch.lua)
-
-Ethernet switch logic in LuaJIT. Written as a library. Currently low
-on functionality, mostly untested, and lacking interfaces towards the
-host OS or physical NICs.
-
-There is support for dumping all switch traffic to a PCAP/tcpdump file
-for analysis and verification. The switch sneakily appends metadata to
-each packet in the trace declaring ingress vs. egress and switch port
-ID.
-
-### `bin/snabb checktrace` [`src/lua/checktrace.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/checktrace.lua)
-
-Switch functionality testing. Take a PCAP/tcpdump file for input and
-check it for correctness. That is: make sure packet's don't loop back
-to the port they come from, that multicasts flood out every port, and
-so on. This is the basis for the software testing strategy:
-post-processing to make sure the switch behaved well when bombarded
-with arbitrary workloads.
-
-### `bin/snabb replay <input> <output>` [`src/lua/checktrace.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/replay.lua)
-
-Test switch functionality by replaying packets from a recorded trace
-and recording the switch's behavior to an output trace. The output
-trace can later be checked with `checktrace`.
-
-### `bin/snabb maketraces` [`src/lua/tracemaker.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/tracemaker.lua)
-
-Create PCAP files exhibiting invalid switch behavior, e.g. dropped or
-looped packets. These files are used for testing the tester i.e.
-making sure it detects the errors. They are essentially unit tests.
-
-### `bin/snabb test, test/checker.tush, tools/tush`
-
-Top-level entry point to test the Snabb Switch. Uses Darius Bacon's
-'tush' program to execute the tracemaker and tester. Verify that a
-correct trace passes all tests, and that an incorrect trace for each
-error class fails.
 
 ## Roadmap
 
@@ -157,8 +157,8 @@ Today there's no mailing list. Let's first see how much of what we need can be p
 
 The Snabb Switch project is founded by [Luke
 Gorrie](http://lukego.com/) and his company
-[Snabb](http://www.snabb.co/). You are welcome to participate in the
-community.
+[Snabb](http://www.snabb.co/). You are welcome to join and help to
+grow a mutually beneficial community.
 
 ## License
 
@@ -173,5 +173,5 @@ to accept your contribution we must ask you to do either one of two
 things:
 
 1. License your contribution under the liberal MIT License.
-2. Fill out the [Snabb Contributor Agreement](http://www.snabb.co/SCA.pdf). This can be done quickly online without paper. Contact luke@snabb.co.
+2. Fill out the [Snabb Contributor Agreement](http://www.snabb.co/SCA.pdf) to assign joint copyright. This can be done quickly online. Contact luke@snabb.co.
 
