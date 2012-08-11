@@ -237,7 +237,7 @@ test_file_operations = {
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(S.symlinkat(tmpfile, dirfd, tmpfile2))
-    local s = assert(S.readlink(tmpfile2))
+    local s = assert(S.readlinkat(dirfd, tmpfile2))
     assert_equal(s, tmpfile, "should be able to read symlink")
     assert(S.unlink(tmpfile2))
     assert(S.unlink(tmpfile))

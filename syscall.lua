@@ -2666,6 +2666,7 @@ int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
+int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
 off_t lseek(int fd, off_t offset, int whence); // only for 64 bit, else use _llseek
 
 int epoll_create1(int flags);
@@ -3815,6 +3816,22 @@ function S.readlink(path) -- note no idea if name truncated except return value 
   repeat
     buffer = t.buffer(size)
     ret = tonumber(C.readlink(path, buffer, size))
+    if ret == -1 then return nil, t.error() end
+    if ret == size then -- possibly truncated
+      buffer = nil
+      size = size * 2
+    end
+  until buffer
+  return ffi.string(buffer, ret)
+end
+
+function S.readlinkat(dirfd, path)
+  local size = 256
+  local buffer, ret
+  dirfd = getfd_at(dirfd)
+  repeat
+    buffer = t.buffer(size)
+    ret = tonumber(C.readlinkat(dirfd, path, buffer, size))
     if ret == -1 then return nil, t.error() end
     if ret == size then -- possibly truncated
       buffer = nil
@@ -6364,7 +6381,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
-                   'fchownat'
+                   'fchownat', 'readlinkat'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
