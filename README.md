@@ -143,6 +143,7 @@ probably not useful: brk, uselib, socketcall, idle, ipc, modify_ldt, personality
 from man(3)
 clock_getcpuclockid
 getdomainname (from uname)
+ftok
 
 ### 64 bit fileops on 32 bit
 
