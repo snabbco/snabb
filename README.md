@@ -122,9 +122,6 @@ pivot\_root, init\_module, delete\_module, query\_module, swapon, swapoff
 netns, iopl, ioperm, futex
 ...
 
-from elsewhere
-mkfifo, mkfifoat(3), isatty(3) - not actually syscalls.
-
 ### 64 bit fileops on 32 bit
 
 These now work and have tests, the 64 bit operations are always used on 32 bit architectures.

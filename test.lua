@@ -1397,6 +1397,7 @@ test_termios = {
     assert(ptm:unlockpt())
     local pts_name = assert(ptm:ptsname())
     local pts = assert(S.open(pts_name, "rdwr, noctty"))
+    assert(pts:isatty(), "should be a tty")
     local termios = assert(pts:tcgetattr())
     assert(termios:cfgetospeed() ~= 115200)
     termios:cfsetspeed(115200)
@@ -1418,7 +1419,12 @@ test_termios = {
     assert(pts:tcflow('ion'))
     assert(pts:close())
     assert(ptm:close())
-  end
+  end,
+  test_isatty_fail = function()
+    local fd = S.open("/dev/zero")
+    assert(not fd:isatty(), "not a tty")
+    assert(fd:close())
+  end,
 }
 
 test_events = {

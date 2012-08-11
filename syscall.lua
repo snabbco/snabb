@@ -6303,6 +6303,11 @@ function S.tcgetattr(fd)
   return termios
 end
 
+function S.isatty(fd)
+  local tc = S.tcgetattr(fd)
+  if tc then return true else return false end
+end
+
 function S.tcsetattr(fd, optional_actions, termios)
   return retbool(C.tcsetattr(getfd(fd), stringflag(optional_actions, "TCSA"), termios))
 end
@@ -6389,7 +6394,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
-                   'fchownat', 'readlinkat', 'mkfifoat'
+                   'fchownat', 'readlinkat', 'mkfifoat', 'isatty'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
