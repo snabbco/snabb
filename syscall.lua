@@ -310,13 +310,15 @@ S.SO_NO_CHECK    = 11
 S.SO_PRIORITY    = 12
 S.SO_LINGER      = 13
 S.SO_BSDCOMPAT   = 14
-assert(ffi.arch ~= "ppc", "need to fix the values below for ppc")
-S.SO_PASSCRED    = 16 -- below here differs for ppc!
-S.SO_PEERCRED    = 17
-S.SO_RCVLOWAT    = 18
-S.SO_SNDLOWAT    = 19
-S.SO_RCVTIMEO    = 20
-S.SO_SNDTIMEO    = 21
+if arch.socketoptions then arch.socketoptions(S)
+else
+  S.SO_PASSCRED    = 16
+  S.SO_PEERCRED    = 17
+  S.SO_RCVLOWAT    = 18
+  S.SO_SNDLOWAT    = 19
+  S.SO_RCVTIMEO    = 20
+  S.SO_SNDTIMEO    = 21
+end
 
 -- Maximum queue length specifiable by listen.
 S.SOMAXCONN = 128
