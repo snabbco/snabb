@@ -126,7 +126,6 @@ setfsuid, setfsgid
 setpgid, getpgid, setpgrp, getpgrp
 getgroups, setgroups
 recvmmsg
-msgctl, msgget, msgrcv, msgsnd, semctl, semget, semop, semtimedop, shmat, shmctl, shmdt, shmget
 mq\_open, mq\_close, mq\_getattr, mq\_notify, mq\_receive, mq\_send, mq\_unlink -- note glibc wraps these
 quotactl, ioprio\_set, ioprio\_get
 setdomainname, bdflush, kexec\_load
@@ -138,7 +137,8 @@ perf\_event\_open  -- see http://web.eecs.utk.edu/~vweaver1/projects/perf-events
 set\_thread\_area, get\_thread\_area, exit_group, tgkill
 ...
 
--- note we will probably implement the posix ipc not sysv, as functionality slightly better.
+note we will probably implement the posix ipc not sysv, as functionality slightly better.
+sys v ipc: msgctl, msgget, msgrcv, msgsnd, semctl, semget, semop, semtimedop, shmat, shmctl, shmdt, shmget
 
 probably not useful: brk, uselib, socketcall, idle, ipc, modify_ldt, personality, sigreturn, sigaltstack, lookup\_dcookie
 
@@ -146,6 +146,7 @@ from man(3)
 clock_getcpuclockid
 getdomainname (from uname)
 ftok
+shm_open and other posix functions (use /dev/shm)
 
 ### 64 bit fileops on 32 bit
 
