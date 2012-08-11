@@ -2616,6 +2616,8 @@ int setuid(uid_t uid);
 int setgid(gid_t gid);
 int seteuid(uid_t euid);
 int setegid(gid_t egid);
+int setreuid(uid_t ruid, uid_t euid);
+int setregid(gid_t rgid, gid_t egid);
 pid_t getsid(pid_t pid);
 pid_t setsid(void);
 pid_t fork(void);
@@ -4939,6 +4941,8 @@ function S.setuid(uid) return retbool(C.setuid(uid)) end
 function S.setgid(gid) return retbool(C.setgid(gid)) end
 function S.seteuid(uid) return retbool(C.seteuid(uid)) end
 function S.setegid(gid) return retbool(C.setegid(gid)) end
+function S.setreuid(ruid, euid) return retbool(C.setreuid(ruid, euid)) end
+function S.setregid(rgid, egid) return retbool(C.setregid(rgid, egid)) end
 
 function S.umask(mask) return C.umask(S.mode(mask)) end
 

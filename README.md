@@ -122,7 +122,7 @@ pivot\_root, init\_module, delete\_module, query\_module, get_\kernel\_syms, swa
 iopl, ioperm
 futex, set\_robust\_list, get\_robust\_list
 getrusage, ptrace
-setfsuid, setreuid, setregid
+setfsuid, setfsgid
 setpgid, getpgid, setpgrp, getpgrp, setresgid, getresgid
 getgroups, setgroups
 vhangup
