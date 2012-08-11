@@ -2593,6 +2593,10 @@ int rename(const char *oldpath, const char *newpath);
 int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
 int acct(const char *filename);
 int chmod(const char *path, mode_t mode);
+int chown(const char *path, uid_t owner, gid_t group);
+int fchown(int fd, uid_t owner, gid_t group);
+int lchown(const char *path, uid_t owner, gid_t group);
+int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
 int link(const char *oldpath, const char *newpath);
 int symlink(const char *oldpath, const char *newpath);
 int chroot(const char *path);
@@ -3787,6 +3791,14 @@ function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 function S.pause() return retbool(C.pause()) end
+
+function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
+--[[
+int chown(const char *path, uid_t owner, gid_t group);
+int fchown(int fd, uid_t owner, gid_t group);
+int lchown(const char *path, uid_t owner, gid_t group);
+int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
+]]
 
 function S.truncate(path, length) return retbool(C64.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C64.ftruncate(getfd(fd), length)) end
