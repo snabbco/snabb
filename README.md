@@ -138,6 +138,8 @@ perf\_event\_open  -- see http://web.eecs.utk.edu/~vweaver1/projects/perf-events
 set\_thread\_area, get\_thread\_area, exit_group, tgkill
 ...
 
+-- note we will probably implement the posix ipc not sysv, as functionality slightly better.
+
 probably not useful: brk, uselib, socketcall, idle, ipc, modify_ldt, personality, sigreturn, sigaltstack, lookup\_dcookie
 
 from man(3)
