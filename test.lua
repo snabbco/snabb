@@ -1672,6 +1672,16 @@ test_ids = {
   test_setregid = function()
     assert(S.setregid(S.getegid(), S.getgid()))
   end,
+  test_getresuid = function()
+    local u = assert(S.getresuid())
+    assert_equal(u.ruid, S.getuid(), "real uid same")
+    assert_equal(u.euid, S.geteuid(), "effective uid same")
+  end,
+  test_getresgid = function()
+    local g = assert(S.getresgid())
+    assert_equal(g.rgid, S.getgid(), "real gid same")
+    assert_equal(g.egid, S.getegid(), "effective gid same")
+  end,
 }
 
 test_namespaces_root = {

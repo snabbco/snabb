@@ -2618,6 +2618,8 @@ int seteuid(uid_t euid);
 int setegid(gid_t egid);
 int setreuid(uid_t ruid, uid_t euid);
 int setregid(gid_t rgid, gid_t egid);
+int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid);
+int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
 pid_t getsid(pid_t pid);
 pid_t setsid(void);
 pid_t fork(void);
@@ -2993,7 +2995,8 @@ t.uint64_1 = ffi.typeof("uint64_t[1]")
 t.socklen1 = ffi.typeof("socklen_t[1]")
 t.off1 = ffi.typeof("off_t[1]")
 t.loff1 = ffi.typeof("loff_t[1]")
-
+t.uid1 = ffi.typeof("uid_t[1]")
+t.gid1 = ffi.typeof("gid_t[1]")
 t.int2 = ffi.typeof("int[2]")
 t.timespec2 = ffi.typeof("struct timespec[2]")
 
@@ -4943,6 +4946,19 @@ function S.seteuid(uid) return retbool(C.seteuid(uid)) end
 function S.setegid(gid) return retbool(C.setegid(gid)) end
 function S.setreuid(ruid, euid) return retbool(C.setreuid(ruid, euid)) end
 function S.setregid(rgid, egid) return retbool(C.setregid(rgid, egid)) end
+
+function S.getresuid()
+  local ruid, euid, suid = t.uid1(), t.uid1(), t.uid1()
+  local ret = C.getresuid(ruid, euid, suid)
+  if ret == -1 then return nil, t.error() end
+  return {ruid = ruid[0], euid = euid[0], suid = suid[0]}
+end
+function S.getresgid()
+  local rgid, egid, sgid = t.gid1(), t.gid1(), t.gid1()
+  local ret = C.getresgid(rgid, egid, sgid)
+  if ret == -1 then return nil, t.error() end
+  return {rgid = rgid[0], egid = egid[0], sgid = sgid[0]}
+end
 
 function S.umask(mask) return C.umask(S.mode(mask)) end
 
