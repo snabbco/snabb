@@ -6,6 +6,10 @@ local S = {} -- exported functions
 local ffi = require "ffi"
 local bit = require "bit"
 
+local arch = require("ljsyscall-" .. ffi.arch)
+
+S.SYS = arch.SYS -- syscalls
+
 local C = ffi.C
 
 local octal = function (s) return tonumber(s, 8) end 
@@ -1582,158 +1586,6 @@ S.TIOCM_RNG = 0x080
 S.TIOCM_DSR = 0x100
 S.TIOCM_CD  = S.TIOCM_CAR
 S.TIOCM_RI  = S.TIOCM_RNG
-
--- syscalls, filling in as used at the minute
--- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
-
-S.SYS = {}
-
-if ffi.arch == "x86" then
-  S.SYS.mknod            = 14
-  S.SYS.getpid           = 20
-  S.SYS.acct             = 51
-  S.SYS.ustat            = 62
-  S.SYS.stat             = 106
-  S.SYS.fstat            = 108
-  S.SYS.lstat            = 107
-  S.SYS.clone            = 120
-  S.SYS._llseek          = 140
-  S.SYS.getdents         = 141
-  S.SYS.getcwd           = 183
-  S.SYS.stat64           = 195
-  S.SYS.lstat64          = 196
-  S.SYS.fstat64          = 197
-  S.SYS.getdents64       = 220
-  S.SYS.readahead        = 225
-  S.SYS.setxattr         = 226
-  S.SYS.lsetxattr        = 227
-  S.SYS.fsetxattr        = 228
-  S.SYS.getxattr         = 229
-  S.SYS.lgetxattr        = 230
-  S.SYS.fgetxattr        = 231
-  S.SYS.listxattr        = 232
-  S.SYS.llistxattr       = 233
-  S.SYS.flistxattr       = 234
-  S.SYS.removexattr      = 235
-  S.SYS.lremovexattr     = 236
-  S.SYS.fremovexattr     = 237
-  S.SYS.io_setup         = 245
-  S.SYS.io_destroy       = 246
-  S.SYS.io_getevents     = 247
-  S.SYS.io_submit        = 248
-  S.SYS.io_cancel        = 249
-  S.SYS.clock_settime    = 264
-  S.SYS.clock_gettime    = 265
-  S.SYS.clock_getres     = 266
-  S.SYS.clock_nanosleep  = 267
-  S.SYS.mknodat          = 297
-  S.SYS.fstatat64        = 300
-  S.SYS.splice           = 313
-  S.SYS.sync_file_range  = 314
-  S.SYS.tee              = 315
-  S.SYS.vmsplice         = 316
-  S.SYS.timerfd_create	 = 322
-  S.SYS.fallocate        = 324
-  S.SYS.timerfd_settime  = 325
-  S.SYS.timerfd_gettime	 = 326
-  S.SYS.pipe2            = 331
-elseif ffi.arch == "x64" then
-  S.SYS.stat             = 4
-  S.SYS.fstat            = 5
-  S.SYS.lstat            = 6
-  S.SYS.getpid           = 39
-  S.SYS.clone            = 56
-  S.SYS.getdents         = 78
-  S.SYS.getcwd           = 79
-  S.SYS.mknod            = 133
-  S.SYS.ustat            = 136
-  S.SYS.acct             = 163
-  S.SYS.readahead        = 187
-  S.SYS.setxattr         = 188
-  S.SYS.lsetxattr        = 189
-  S.SYS.fsetxattr        = 190
-  S.SYS.getxattr         = 191
-  S.SYS.lgetxattr        = 192
-  S.SYS.fgetxattr        = 193
-  S.SYS.listxattr        = 194
-  S.SYS.llistxattr       = 195
-  S.SYS.flistxattr       = 196
-  S.SYS.removexattr      = 197
-  S.SYS.lremovexattr     = 198
-  S.SYS.fremovexattr     = 199
-  S.SYS.io_setup         = 206
-  S.SYS.io_destroy       = 207
-  S.SYS.io_getevents     = 208
-  S.SYS.io_submit        = 209
-  S.SYS.io_cancel        = 210
-  S.SYS.getdents64       = 217
-  S.SYS.clock_settime    = 227
-  S.SYS.clock_gettime    = 228
-  S.SYS.clock_getres     = 229
-  S.SYS.clock_nanosleep  = 230
-  S.SYS.mknodat          = 259
-  S.SYS.fstatat          = 262
-  S.SYS.splice           = 275
-  S.SYS.tee              = 276
-  S.SYS.sync_file_range  = 277
-  S.SYS.vmsplice         = 278
-  S.SYS.timerfd_create	 = 283
-  S.SYS.fallocate        = 285
-  S.SYS.timerfd_settime  = 286
-  S.SYS.timerfd_gettime	 = 287
-  S.SYS.pipe2            = 293
-elseif ffi.arch == "arm" and ffi.abi("eabi") then
-  S.SYS.mknod            = 14
-  S.SYS.getpid           = 20
-  S.SYS.acct             = 51
-  S.SYS.ustat            = 62
-  S.SYS.stat             = 106
-  S.SYS.fstat            = 108
-  S.SYS.lstat            = 107
-  S.SYS.clone            = 120
-  S.SYS._llseek          = 140
-  S.SYS.getdents         = 141
-  S.SYS.getcwd           = 183
-  S.SYS.stat64           = 195
-  S.SYS.lstat64          = 196
-  S.SYS.fstat64          = 197
-  S.SYS.getdents64       = 217
-  S.SYS.readahead        = 225
-  S.SYS.setxattr         = 226
-  S.SYS.lsetxattr        = 227
-  S.SYS.fsetxattr        = 228
-  S.SYS.getxattr         = 229
-  S.SYS.lgetxattr        = 230
-  S.SYS.fgetxattr        = 231
-  S.SYS.listxattr        = 232
-  S.SYS.llistxattr       = 233
-  S.SYS.flistxattr       = 234
-  S.SYS.removexattr      = 235
-  S.SYS.lremovexattr     = 236
-  S.SYS.fremovexattr     = 237
-  S.SYS.io_setup         = 243
-  S.SYS.io_destroy       = 244
-  S.SYS.io_getevents     = 245
-  S.SYS.io_submit        = 246
-  S.SYS.io_cancel        = 247
-  S.SYS.clock_settime    = 262
-  S.SYS.clock_gettime    = 263
-  S.SYS.clock_getres     = 264
-  S.SYS.clock_nanosleep  = 265
-  S.SYS.mknodat          = 324
-  S.SYS.fstatat64        = 327
-  S.SYS.splice           = 340
-  S.SYS.sync_file_range  = 341
-  S.SYS.tee              = 342
-  S.SYS.vmsplice         = 343
-  S.SYS.timerfd_create	 = 350
-  S.SYS.fallocate        = 352
-  S.SYS.timerfd_settime  = 353
-  S.SYS.timerfd_gettime	 = 354
-  S.SYS.pipe2            = 359
-else
-  error("unsupported architecture")
-end
 
 -- ioctls, filling in as needed
 S.SIOCGIFINDEX   = 0x8933
