@@ -1,5 +1,4 @@
 #!/usr/bin/env luajit
--- Copyright 2012 Snabb GmbH
 
 module(..,package.seeall)
 require("pcap")

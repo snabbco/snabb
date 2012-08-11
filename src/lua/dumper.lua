@@ -1,3 +1,4 @@
+-- Copyright 2012 Snabb GmbH. See the file COPYING for license details.
 module(...,package.seeall)
 
 require("shm")

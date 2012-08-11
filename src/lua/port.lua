@@ -1,6 +1,5 @@
 -- port.lua -- Switch network port
--- Copyright 2012 Snabb GmbH.
--- Free software under MIT license. See http://opensource.org/licenses/MIT
+-- Copyright 2012 Snabb GmbH. See the file LICENSE.
 
 module(...,package.seeall)
 

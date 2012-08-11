@@ -1,5 +1,5 @@
 -- tracemaker.lua -- Create trace files for exercising the tester.
--- Copyright 2012 Snabb GmbH
+-- Copyright 2012 Snabb GmbH. See the file COPYING for license details.
 
 -- These are hand-written traces to debug the tester. It would be
 -- better to randomly generate these tests with something like

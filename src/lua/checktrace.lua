@@ -1,5 +1,5 @@
 -- checktrace.lua -- Check switch operation by post-processing trace files.
--- Copright 2012 Snabb GmbH
+-- Copyright 2012 Snabb GmbH. See the file COPYING for license details.
 
 module("checktrace",package.seeall)
 

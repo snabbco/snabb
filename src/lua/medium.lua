@@ -1,6 +1,5 @@
 -- medium.lua -- Network access medium.
---
--- Copyright 2012 Snabb GmbH. See the file LICENSE.
+-- Copyright 2012 Snabb GmbH. See the file COPYING for license details.
 
 module(...,package.seeall)
 

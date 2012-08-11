@@ -1,4 +1,4 @@
--- Copyright 2012 Snabb GmbH
+-- Copyright 2012 Snabb GmbH. See the file COPYING for license details.
 --
 -- Ethernet switch module.
 --

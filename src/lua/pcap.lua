@@ -1,6 +1,5 @@
 -- pcap.lua -- simple pcap file export
---
--- Copyright 2012 Snabb GmbH
+-- Copyright 2012 Snabb GmbH. See the file LICENSE.
 
 module(...,package.seeall)
 
