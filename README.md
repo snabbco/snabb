@@ -125,7 +125,6 @@ getrusage, ptrace
 setfsuid, setfsgid
 setpgid, getpgid, setpgrp, getpgrp
 getgroups, setgroups
-vhangup
 recvmmsg
 msgctl, msgget, msgrcv, msgsnd, semctl, semget, semop, semtimedop, shmat, shmctl, shmdt, shmget
 mq\_open, mq\_close, mq\_getattr, mq\_notify, mq\_receive, mq\_send, mq\_unlink -- note glibc wraps these

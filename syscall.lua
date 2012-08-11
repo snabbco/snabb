@@ -2790,8 +2790,7 @@ int cfsetispeed(struct termios *termios_p, speed_t speed);
 int cfsetospeed(struct termios *termios_p, speed_t speed);
 int cfsetspeed(struct termios *termios_p, speed_t speed);
 pid_t tcgetsid(int fd);
-
-int ptsname_r(int fd, char *buf, size_t buflen);
+int vhangup(void);
 ]]
 
 -- use 64 bit fileops on 32 bit always
@@ -4985,7 +4984,7 @@ function S.umask(mask) return C.umask(S.mode(mask)) end
 function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
 function S.setsid() return retnum(C.setsid()) end
 
--- handle environment (Lua only provides os.getenv). Could add metatable to make more Lualike.
+-- handle environment (Lua only provides os.getenv). TODO add metatable to make more Lualike.
 function S.environ() -- return whole environment as table
   local environ = ffi.C.environ
   if not environ then return nil end
@@ -6404,6 +6403,8 @@ function S.ptsname(fd)
   if ret == -1 then return nil, t.error() end
   return "/dev/pts/" .. tostring(pts[0])
 end
+
+function S.vhangup() return retbool(C.vhangup()) end
 
 -- Nixio compatibility to make porting easier, and useful functions (often man 3). Incomplete.
 function S.setblocking(s, b) if b then return s:block() else return s:nonblock() end end

@@ -1425,6 +1425,9 @@ test_termios = {
     assert(not fd:isatty(), "not a tty")
     assert(fd:close())
   end,
+  test_vhangup_root = function()
+    assert(S.vhangup())
+  end,
 }
 
 test_events = {
