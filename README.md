@@ -193,5 +193,5 @@ Misc list of ideas, no particular order
 19. replace more of the man(3) stuff with native syscalls. More transparent.
 20. add functions to add and remove addresses to net interface 
 21. Standard lua support, eventually. Might start with luasocket support for netlink, but there is a lot of work to do.
-22. make more modular, eg arch, netlink etc.
+22. make more modular, eg netlink etc.
 
