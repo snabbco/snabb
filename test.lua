@@ -575,6 +575,20 @@ test_file_operations = {
     assert(fd:close())
     assert(S.unlink(tmpfile))
   end,
+  test_mkfifoat = function()
+    local fd = assert(S.open("."))
+    assert(fd:mkfifoat(tmpfile, "irwxu"))
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.isfifo, "expect to be a fifo")
+    assert(fd:close())
+    assert(S.unlink(tmpfile))
+  end,
+  test_mkfifo = function()
+    assert(S.mkfifo(tmpfile, "irwxu"))
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.isfifo, "expect to be a fifo")
+    assert(S.unlink(tmpfile))
+  end,
 }
 
 test_largefile = {

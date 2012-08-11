@@ -3852,6 +3852,10 @@ function S.mknodat(fd, pathname, mode, dev)
   return retbool(C.syscall(S.SYS_mknodat, t.int(getfd_at(fd)), pathname, t.mode(stringflags(mode, "S_")), t.dev(dev or 0)))
 end
 
+-- mkfifo is from man(3), add for convenience
+function S.mkfifo(path, mode) return S.mknod(path, bit.bor(stringflags(mode, "S_"), S.S_IFIFO)) end
+function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(stringflags(mode, "S_"), S.S_IFIFO), 0) end
+
 local function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
   ffi.errno(0)
   local ret = f(...)
@@ -6385,7 +6389,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
-                   'fchownat', 'readlinkat'
+                   'fchownat', 'readlinkat', 'mkfifoat'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
