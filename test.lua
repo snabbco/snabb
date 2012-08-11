@@ -248,6 +248,15 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_fchmodat = function()
+    local dirfd = assert(S.open("."))
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    assert(dirfd:fchmodat(tmpfile, "IRUSR, IWUSR"))
+    assert(S.access(tmpfile, "rw"))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+    assert(dirfd:close())
+  end,
   test_sync = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(fd:fsync())

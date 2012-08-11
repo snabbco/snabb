@@ -2689,6 +2689,7 @@ int fsync(int fd);
 int fdatasync(int fd);
 int fcntl(int fd, int cmd, void *arg); /* arg is long or pointer */
 int fchmod(int fd, mode_t mode);
+int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
 int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
 int truncate64(const char *path, loff_t length);
@@ -3985,6 +3986,9 @@ function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), S.mode(mode))) end
+function S.fchmodat(dirfd, pathname, mode)
+  return retbool(C.fchmodat(getfd_at(dirfd), pathname, S.mode(mode), 0)) -- no flags actually supported
+end
 function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.syscall(S.SYS_sync_file_range, t.int(getfd(fd)), t.loff(offset), t.loff(count), t.uint(stringflags(flags, "SYNC_FILE_RANGE_"))))
 end
@@ -6346,7 +6350,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
-                   'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat'
+                   'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
