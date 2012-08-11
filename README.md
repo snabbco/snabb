@@ -142,16 +142,40 @@ make some improvements, and send in a pull request on Github. Let's
 start simple and tune the process over time. It will be interesting to
 get some experience with how versatile Github's tools are.
 
+### Development mailing list
+
+You are welcome to join the snabb development mailing list. The list
+is open to everybody, but only subscribers can post. This is the place
+for general technical discussions of Snabb Switch by the open source
+community. You can subscribe or unsubscribe using the form below or
+via the <a href="http://www.freelists.org/list/snabb">main mailing
+list page at freelists.org</a>.
+
+<form action="http://www.freelists.org/cgi-bin/subscription.cgi" method="post">
+<p>
+<input type="hidden" name="list" value="snabb">
+<input type="hidden" name="url_or_message" value="">
+<input type="hidden" name="action" value="subscribe">
+Enter your email address: <input type="text" name="email">
+<input type=submit value="Subscribe">
+</p>
+</form>
+<form action="http://www.freelists.org/cgi-bin/subscription.cgi" method="post">
+<p>
+<input type="hidden" name="list" value="snabb">
+<input type="hidden" name="url_or_message" value="">
+<input type="hidden" name="action" value="unsubscribe">
+Enter your email address: <input type="text" name="email">
+<input type=submit value="Unsubscribe">
+</p>
+</form>
+
 ### Reddit
 
 The Snabb Switch Project community reddit is at
 [snabb.reddit.com](http://snabb.reddit.com/). This is the place to
 post and discuss links to anything that's relevant to the
 project.
-
-### Mailing list
-
-Today there's no mailing list. Let's first see how much of what we need can be provided by Github.
 
 ## Who
 
