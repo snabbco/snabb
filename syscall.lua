@@ -6,7 +6,7 @@ local S = {} -- exported functions
 local ffi = require "ffi"
 local bit = require "bit"
 
-local arch = require("ljsyscall-" .. ffi.arch)
+local arch = require("ljsyscall-" .. ffi.arch) -- architecture specific code
 
 S.SYS = arch.SYS -- syscalls
 
@@ -2263,18 +2263,7 @@ struct termios
 -- it appears that there is no kernel sigaction in non x86 architectures? Need to check source.
 -- presumably does not care, but the types are a bit of a pain.
 -- temporarily just going to implement sighandler support
-if ffi.arch == 'x86' then
-ffi.cdef[[
-struct sigaction {
-  union {
-    sighandler_t sa_handler;
-    void (*sa_sigaction)(int, struct siginfo *, void *);
-  };
-  sigset_t sa_mask;
-  unsigned long sa_flags;
-  void (*sa_restorer)(void);
-};
-]]
+if arch.sigaction then arch.sigaction()
 else
 ffi.cdef[[
 struct sigaction {
