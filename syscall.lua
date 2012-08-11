@@ -2599,6 +2599,7 @@ int lchown(const char *path, uid_t owner, gid_t group);
 int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
 int link(const char *oldpath, const char *newpath);
 int symlink(const char *oldpath, const char *newpath);
+int symlinkat(const char *oldpath, int newdirfd, const char *newpath);
 int chroot(const char *path);
 mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
@@ -3790,6 +3791,7 @@ function S.acct(filename) return retbool(C.syscall(S.SYS_acct, filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
+function S.symlinkat(oldpath, newdirfd, newpath) return retbool(C.symlinkat(oldpath, getfd_at(newdirfd), newpath)) end
 function S.pause() return retbool(C.pause()) end
 
 function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
