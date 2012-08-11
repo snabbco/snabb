@@ -3795,9 +3795,9 @@ function S.pause() return retbool(C.pause()) end
 function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
 function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
 function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
---[[
-int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
-]]
+function S.fchownat(dirfd, path, owner, group, flags)
+  return retbool(C.fchownat(getfd_at(dirfd), path, owner or -1, group or -1, flaglist(flags, "AT_", {"AT_SYMLINK_NOFOLLOW"})))
+end
 
 function S.truncate(path, length) return retbool(C64.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C64.ftruncate(getfd(fd), length)) end
@@ -6361,7 +6361,8 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
-                   'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown'
+                   'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
+                   'fchownat'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
