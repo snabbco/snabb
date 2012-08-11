@@ -1585,6 +1585,9 @@ S.TIOCM_RI  = S.TIOCM_RNG
 
 -- syscalls, filling in as used at the minute
 -- note ARM EABI same syscall numbers as x86, not tested on non eabi arm, will need offset added
+
+S.SYS = {}
+
 if ffi.arch == "x86" then
   S.SYS_mknod            = 14
   S.SYS_getpid           = 20
