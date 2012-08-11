@@ -1682,6 +1682,32 @@ test_ids = {
     assert_equal(g.rgid, S.getgid(), "real gid same")
     assert_equal(g.egid, S.getegid(), "effective gid same")
   end,
+  test_setresuid = function()
+    local u = assert(S.getresuid())
+    assert(S.setresuid(u))
+  end,
+  test_resuid_root = function()
+    local u = assert(S.getresuid())
+    assert(S.setresuid(0, 33, 44))
+    local uu = assert(S.getresuid())
+    assert_equal(uu.ruid, 0, "real uid as set")
+    assert_equal(uu.euid, 33, "effective uid as set")
+    assert_equal(uu.suid, 44, "saved uid as set")
+    assert(S.setresuid(u))
+  end,
+  test_setresgid = function()
+    local g = assert(S.getresgid())
+    assert(S.setresgid(g))
+  end,
+  test_resgid_root = function()
+    local g = assert(S.getresgid())
+    assert(S.setresgid(0, 33, 44))
+    local gg = assert(S.getresgid())
+    assert_equal(gg.rgid, 0, "real gid as set")
+    assert_equal(gg.egid, 33, "effective gid as set")
+    assert_equal(gg.sgid, 44, "saved gid as set")
+    assert(S.setresgid(g))
+  end,
 }
 
 test_namespaces_root = {

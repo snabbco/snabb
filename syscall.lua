@@ -2620,6 +2620,8 @@ int setreuid(uid_t ruid, uid_t euid);
 int setregid(gid_t rgid, gid_t egid);
 int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid);
 int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
+int setresuid(uid_t ruid, uid_t euid, uid_t suid);
+int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
 pid_t getsid(pid_t pid);
 pid_t setsid(void);
 pid_t fork(void);
@@ -4958,6 +4960,24 @@ function S.getresgid()
   local ret = C.getresgid(rgid, egid, sgid)
   if ret == -1 then return nil, t.error() end
   return {rgid = rgid[0], egid = egid[0], sgid = sgid[0]}
+end
+function S.setresuid(ruid, euid, suid)
+  if type(ruid) == "table" then
+    local t = ruid
+    ruid = t.ruid
+    euid = t.euid
+    suid = t.suid
+  end
+  return retbool(C.setresuid(ruid, euid, suid))
+end
+function S.setresgid(rgid, egid, sgid)
+  if type(rgid) == "table" then
+    local t = rgid
+    rgid = t.rgid
+    egid = t.egid
+    sgid = t.sgid
+  end
+  return retbool(C.setresgid(rgid, egid, sgid))
 end
 
 function S.umask(mask) return C.umask(S.mode(mask)) end
