@@ -4937,6 +4937,8 @@ end
 
 function S.setuid(uid) return retbool(C.setuid(uid)) end
 function S.setgid(gid) return retbool(C.setgid(gid)) end
+function S.seteuid(uid) return retbool(C.seteuid(uid)) end
+function S.setegid(gid) return retbool(C.setegid(gid)) end
 
 function S.umask(mask) return C.umask(S.mode(mask)) end
 

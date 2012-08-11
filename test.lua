@@ -1646,6 +1646,26 @@ test_ids = {
     assert(S.setgid(gid))
     assert_equal(S.getgid(), gid, "gid should be as set")
   end,
+  test_seteuid = function()
+    assert(S.seteuid(S.geteuid()))
+  end,
+  test_seteuid_root = function()
+    local uid = S.geteuid()
+    assert(S.seteuid(66))
+    assert_equal(S.geteuid(), 66, "gid should be as set")
+    assert(S.seteuid(uid))
+    assert_equal(S.geteuid(), uid, "gid should be as set")
+  end,
+  test_setegid = function()
+    assert(S.setegid(S.getegid()))
+  end,
+  test_setegid_root = function()
+    local gid = S.getegid()
+    assert(S.setegid(66))
+    assert_equal(S.getegid(), 66, "gid should be as set")
+    assert(S.setegid(gid))
+    assert_equal(S.getegid(), gid, "gid should be as set")
+  end,
 }
 
 test_namespaces_root = {
