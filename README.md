@@ -124,7 +124,7 @@ netns, iopl, ioperm, futex
 ...
 
 from elsewhere
-mkfifo, mkfifoat(3) - not actually syscalls.
+mkfifo, mkfifoat(3), isatty(3) - not actually syscalls.
 
 ### 64 bit fileops on 32 bit
 
