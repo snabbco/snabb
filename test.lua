@@ -266,6 +266,15 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_fchown = function()
+    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    assert(fd:chown(66, 55))
+    local stat = fd:stat()
+    assert_equal(stat.uid, 66, "expect uid changed")
+    assert_equal(stat.gid, 55, "expect gid changed")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
   test_sync = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(fd:fsync())

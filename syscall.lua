@@ -3793,6 +3793,8 @@ function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath))
 function S.pause() return retbool(C.pause()) end
 
 function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
+function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
+
 --[[
 int chown(const char *path, uid_t owner, gid_t group);
 int fchown(int fd, uid_t owner, gid_t group);
@@ -6362,7 +6364,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
-                   'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat'
+                   'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
@@ -6381,6 +6383,7 @@ fmeth.utimens = S.futimens
 fmeth.utime = S.futimens
 fmeth.seek = S.lseek
 fmeth.lock = S.lockf
+fmeth.chown = S.fchown
 
 -- sequence number used by netlink messages
 fmeth.seq = function(fd)
