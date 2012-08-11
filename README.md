@@ -123,7 +123,7 @@ iopl, ioperm
 futex, set\_robust\_list, get\_robust\_list
 getrusage, ptrace
 setfsuid, setfsgid
-setpgid, getpgid, setpgrp, getpgrp, setresgid, getresgid
+setpgid, getpgid, setpgrp, getpgrp
 getgroups, setgroups
 vhangup
 recvmmsg
