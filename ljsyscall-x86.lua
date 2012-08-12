@@ -53,7 +53,7 @@ arch.SYS = {
   timerfd_settime  = 325,
   timerfd_gettime  = 326,
   pipe2            = 331,
-  setns            = 364,
+  setns            = 346,
 }
 
 -- x86 has a different sigaction

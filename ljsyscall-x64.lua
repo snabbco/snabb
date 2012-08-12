@@ -49,7 +49,7 @@ arch.SYS = {
   timerfd_settime  = 286,
   timerfd_gettime  = 287,
   pipe2            = 293,
-  setns            = 375,
+  setns            = 308,
 }
 
 arch.epoll = function()
