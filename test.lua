@@ -732,8 +732,7 @@ test_sockets_pipes = {
     assert(fd:close())
     assert(p:close())
     assert(pp:close())
-    assert(s[1]:close())
-    assert(s[2]:close())
+    assert(s:close())
   end,
 }
 
@@ -1059,8 +1058,7 @@ test_sockets = {
     local sv = assert(S.socketpair("unix", "stream"))
     assert(sv[1]:sendmsg())
     assert(sv[2]:recvmsg())
-    assert(sv[1]:close())
-    assert(sv[2]:close())
+    assert(sv:close())
   end,
   test_sendcred = function()
     local sv = assert(S.socketpair("unix", "stream"))
@@ -1075,8 +1073,7 @@ test_sockets = {
     assert(#r.fd == 1, "expect to get one file descriptor back")
     assert(r.fd[1]:close())
     assert(r.pid == S.getpid(), "should get my pid from sent credentals")
-    assert(sv[1]:close())
-    assert(sv[2]:close())
+    assert(sv:close())
   end,
   test_sigpipe = function()
     local sv = assert(S.socketpair("unix", "stream"))
