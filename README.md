@@ -56,11 +56,13 @@ otherwise stated, these are all a part of the
 [`snabbswitch`](https://github.com/SnabbCo/snabbswitch) repository on
 github.
 
-### `bin/snabb switch` [`src/lua/switch.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/switch.lua)
+### `bin/snabb run <config> ...` [`src/lua/switch.lua`](https://github.com/SnabbCo/snabbswitch/blob/master/src/lua/switch.lua)
 
-Ethernet switch logic in LuaJIT. Written as a library. Currently low
-on functionality, mostly untested, and lacking interfaces towards the
-host OS or physical NICs.
+Execute a switch defined by the Lua source file <config>. See examples in [`src/config/`](https://github.com/SnabbCo/snabbswitch/blob/master/src/config/).
+
+The switch logic is written in LuaJIT. Currently low on functionality,
+mostly untested, and lacking interfaces towards the host OS or
+physical NICs.
 
 There is support for dumping all switch traffic to a PCAP/tcpdump file
 for analysis and verification. The switch sneakily appends metadata to

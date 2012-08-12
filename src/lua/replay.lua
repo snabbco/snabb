@@ -6,10 +6,8 @@
 module("replay",package.seeall)
 
 local ffi    = require "ffi"
-
 local switch = require "switch"
 local port   = require "port"
-local Port   = port.Port
 
 function main ()
    if #arg ~= 2 then
