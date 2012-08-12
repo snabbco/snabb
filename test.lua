@@ -1702,6 +1702,9 @@ test_ids = {
     assert_equal(gg.sgid, 44, "saved gid as set")
     assert(S.setresgid(g))
   end,
+  test_getgroups = function()
+    assert(S.getgroups())
+  end,
 }
 
 test_namespaces_root = {

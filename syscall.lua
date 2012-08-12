@@ -2455,6 +2455,8 @@ int setresuid(uid_t ruid, uid_t euid, uid_t suid);
 int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
 pid_t getsid(pid_t pid);
 pid_t setsid(void);
+int getgroups(int size, gid_t list[]);
+int setgroups(size_t size, const gid_t *list);
 pid_t fork(void);
 int execve(const char *filename, const char *argv[], const char *envp[]);
 pid_t wait(int *status);
@@ -2820,6 +2822,7 @@ t.string_array = ffi.typeof("const char *[?]")
 
 t.ints = ffi.typeof("int[?]")
 t.buffer = ffi.typeof("char[?]")
+t.gids = ffi.typeof("gid_t[?]")
 
 t.int1 = ffi.typeof("int[1]")
 t.int64_1 = ffi.typeof("int64_t[1]")
@@ -3414,6 +3417,7 @@ for k, v in pairs(t) do
     epoll_events = true,
     pollfds = true,
     buffer = true,
+    gids = true
   }
   if not ignore[k] then
     s[k] = ffi.sizeof(v)
@@ -4878,6 +4882,15 @@ function S.setresgid(rgid, egid, sgid)
     sgid = t.sgid
   end
   return retbool(C.setresgid(rgid, egid, sgid))
+end
+
+function S.getgroups()
+  local size = C.getgroups(0, nil)
+  if size == -1 then return nil, t.error() end
+  local list = t.gids(size)
+  local ret = C.getgroups(size, list)
+  if ret == -1 then return nil, t.error() end
+  return list -- TODO make 1-based not 0-based with metatable
 end
 
 function S.umask(mask) return C.umask(S.mode(mask)) end
