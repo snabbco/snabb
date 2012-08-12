@@ -1703,7 +1703,8 @@ test_ids = {
     assert(S.setresgid(g))
   end,
   test_getgroups = function()
-    assert(S.getgroups())
+    local g = assert(S.getgroups())
+    assert(#g, "groups behaves like a table")
   end,
 }
 
