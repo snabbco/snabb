@@ -1706,6 +1706,15 @@ test_ids = {
     local g = assert(S.getgroups())
     assert(#g, "groups behaves like a table")
   end,
+  test_setgroups_root = function()
+    local og = assert(S.getgroups())
+    assert(S.setgroups{0, 1, 66, 77, 5})
+    local g = assert(S.getgroups())
+    assert_equal(#g, 5, "expect 5 groups now")
+    assert(S.setgroups(og))
+    local g = assert(S.getgroups())
+    assert_equal(#g, #og, "expect same number of groups as previously")
+  end,
 }
 
 test_namespaces_root = {

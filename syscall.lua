@@ -4892,7 +4892,7 @@ t.groups = ffi.metatype("struct {int count; gid_t list[?];}", {
   end,
   __new = function(tp, gs)
     if type(gs) == 'number' then return ffi.new(tp, gs, gs) end
-    return ffi.new(tp, #gs, gs)
+    return ffi.new(tp, #gs, #gs, gs)
   end,
   __len = function(g) return g.count end,
 })
@@ -4904,6 +4904,11 @@ function S.getgroups()
   local ret = C.getgroups(size, groups.list)
   if ret == -1 then return nil, t.error() end
   return groups
+end
+
+function S.setgroups(groups)
+  if type(groups) == "table" then groups = t.groups(groups) end
+  return retbool(C.setgroups(groups.count, groups.list))
 end
 
 function S.umask(mask) return C.umask(S.mode(mask)) end
