@@ -147,6 +147,7 @@ clock_getcpuclockid
 getdomainname (from uname)
 ftok
 shm_open and other posix functions (use /dev/shm)
+uuid
 
 ### 64 bit fileops on 32 bit
 
