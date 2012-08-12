@@ -4,13 +4,13 @@
 module(...,package.seeall)
 
 local ffi    = require("ffi")
-local fabric = ffi.load("fabric")
+local snabb  = ffi.load("snabb")
 
 -- Shared memory medium.
 SHM = {}
 
 function SHM:new (filename)
-   local new = { first = true, shm = fabric.open_shm(filename) }
+   local new = { first = true, shm = snabb.open_shm(filename) }
    setmetatable(new, {__index = self})
    return new
 end

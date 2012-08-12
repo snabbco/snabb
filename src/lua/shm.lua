@@ -5,10 +5,10 @@ require("pcap")
 
 local ffi = require("ffi")
 local C = ffi.C
-local fabric = ffi.load("fabric")
+local snabb = ffi.load("snabb")
 
 ffi.cdef(io.open(os.getenv("SNABB").."/../QEMU/net/snabb-shm-dev.h"):read("*a"))
-ffi.cdef(io.open(os.getenv("SNABB").."/src/c/fabric.h"):read("*a"))
+ffi.cdef(io.open(os.getenv("SNABB").."/src/c/snabb.h"):read("*a"))
 
 -- Return true if `shm' is a valid shared memory packet device.
 function check_shm_file (shm)

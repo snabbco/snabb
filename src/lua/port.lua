@@ -5,7 +5,6 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local shm = require("shm")
-local fabric = ffi.load("fabric")
 local C = ffi.C
 
 -- List of all ports.

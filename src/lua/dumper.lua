@@ -4,8 +4,8 @@ module(...,package.seeall)
 require("shm")
 
 local ffi = require("ffi")
-local fabric = ffi.load("fabric")
-local dev = fabric.open_shm("/tmp/ba")
+local snabb = ffi.load("snabb")
+local dev = snabb.open_shm("/tmp/ba")
 local rx = dev.vm2host
 local tx = dev.host2vm
 

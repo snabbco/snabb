@@ -13,7 +13,6 @@ module("switch",package.seeall)
 require("shm")
 
 local ffi  = require("ffi")
-local fabric = ffi.load("fabric")
 local c    = require("c")
 local port = require("port")
 local medium = require("medium")

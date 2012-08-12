@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "fabric.h"
+#include "snabb.h"
 #include <net/snabb-shm-dev.h>
 
 void test ()
