@@ -680,18 +680,17 @@ test_sockets_pipes = {
     assert_equal(sa.port, 4, "should get port back")
   end,
   test_pipe = function()
-    local fds = assert(S.pipe())
-    assert(fds[1]:close())
-    assert(fds[2]:close())
+    local p = assert(S.pipe())
+    assert(p:close())
+    assert_equal(p[1].filenum, -1)
+    assert_equal(p[2].filenum, -1)
   end,
   test_nonblock = function()
     local fds = assert(S.pipe())
-    assert(fds[1]:setblocking(false))
-    assert(fds[2]:setblocking(false))
-    local r, err = fds[1]:read()
+    assert(fds:setblocking(false))
+    local r, err = fds:read()
     assert(err.EAGAIN, "expect EAGAIN")
-    assert(fds[1]:close())
-    assert(fds[2]:close())
+    assert(fds:close())
   end,
   test_tee_splice = function()
     local p = assert(S.pipe("nonblock"))
@@ -731,10 +730,8 @@ test_sockets_pipes = {
     end
 
     assert(fd:close())
-    assert(p[1]:close())
-    assert(p[2]:close())
-    assert(pp[1]:close())
-    assert(pp[2]:close())
+    assert(p:close())
+    assert(pp:close())
     assert(s[1]:close())
     assert(s[2]:close())
   end,
