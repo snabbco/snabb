@@ -1364,7 +1364,7 @@ test_netlink = {
       assert(S.newlink(i.dummy0.index, 0, 0, 0, "net_ns_pid", p))
       i:refresh()
       assert(fds[2]:write(".")) -- say we are ready
-      assert(not i.dummy0, "dummy0 vanished")
+      assert(not i.dummy0, "expect dummy0 vanished")
       local w = assert(S.waitpid(-1, "clone"))
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
