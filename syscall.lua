@@ -3759,7 +3759,7 @@ function S.unshare(flags)
   return retbool(C.unshare(stringflags(flags, "CLONE_")))
 end
 function S.setns(fd, nstype)
-  return retbool(C.setns(getfd(fd), stringflag(nstype, "CLONE_")))
+  return retbool(C.syscall(S.SYS.setns, t.int(getfd(fd)), t.int(stringflag(nstype, "CLONE_"))))
 end
 
 function S.fork() return retnum(C.fork()) end
