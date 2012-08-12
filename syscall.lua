@@ -4883,7 +4883,7 @@ function S.setresgid(rgid, egid, sgid)
   return retbool(C.setresgid(rgid, egid, sgid))
 end
 
-t.gids = ffi.metatype("struct {int count; gid_t list[?];}", {
+t.groups = ffi.metatype("struct {int count; gid_t list[?];}", {
   __index = function(g, k)
     return g.list[k - 1]
   end,
@@ -4900,7 +4900,7 @@ t.gids = ffi.metatype("struct {int count; gid_t list[?];}", {
 function S.getgroups()
   local size = C.getgroups(0, nil)
   if size == -1 then return nil, t.error() end
-  local groups = t.gids(size)
+  local groups = t.groups(size)
   local ret = C.getgroups(size, groups.list)
   if ret == -1 then return nil, t.error() end
   return groups
