@@ -1270,19 +1270,6 @@ test_netlink = {
     local ok, err = S.newlink(i.lo.index, 0, 0, 0, "address", "46:9d:c9:06:dd:dd")
     assert(not ok and err and (err.EPERM or err.EOPNOTSUPP), "should not be able to change macaddr on lo")
   end,
-  test_interface_dellink_fail_root = function()
-    -- using bridge to test this as no other interface in container yet
-    -- unfortunately netlink cannot delete bridges created with ioctl, so no use.
-    -- TODO remove this as we will get bridge_add to use netlink
-    assert(S.bridge_add("br0"))
-    local i = assert(S.interfaces())
-    assert(i.br0)
-    local ok, err = S.dellink(i.br0.index) -- fails, cannot delete bridge
-    assert(err.EOPNOTSUPP, "expect cannot delete bridge")
-    assert(S.bridge_del("br0"))
-    i = assert(S.interfaces())
-    assert(not i.br0, "expect interface deleted")
-  end,
   test_newlink_error_root = function()
     local ok, err = S.newlink(-1, 0, "up", "up")
     assert(not ok, "expect bogus newlink to fail")
