@@ -135,6 +135,7 @@ add\_key, request\_key, keyctl (see libkeyutils wrappers)
 sched\_setaffinity, sched\_getaffinity, migrate\_pages, move\_pages
 perf\_event\_open  -- see http://web.eecs.utk.edu/~vweaver1/projects/perf-events/programming.html
 set\_thread\_area, get\_thread\_area, exit_group, tgkill
+open\_by\_handle\_at, name\_by\_handle\_at
 ...
 
 note we will probably implement the posix ipc not sysv, as functionality slightly better.
