@@ -1,3 +1,4 @@
 #!/bin/bash
-exec luajit -e "package.path = package.path .. \";$SNABB/src/lua/?.lua\"" "$@"
+exec luajit -e "package.path = package.path .. \";$SNABB/src/lua/?.lua\"" \
+            -l strict "$@"
 
