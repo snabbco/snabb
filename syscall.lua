@@ -11,6 +11,7 @@ local arch = require("ljsyscall-" .. ffi.arch) -- architecture specific code
 S.SYS = arch.SYS -- syscalls
 
 local C = ffi.C
+local CC = {} -- functions that might not be in C, may use syscalls
 
 local octal = function (s) return tonumber(s, 8) end 
 
@@ -3580,6 +3581,19 @@ function S.inet_pton(af, src, addr)
   return addr
 end
 
+-- these functions might not be in libc, so provide direct syscall fallbacks
+local function inlibc(f)
+  if pcall(C[f]) then return true else return false end
+end
+
+if inlibc("fallocate") then
+  CC.fallocate = C.fallocate
+else
+  function CC.fallocate(fd, mode, offset, len)
+    return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
+  end
+end
+
 -- main definitions start here
 function S.open(pathname, flags, mode)
   local ret = C.open(pathname, stringflags(flags, "O_"), S.mode(mode))
@@ -4038,7 +4052,7 @@ function S.posix_fadvise(fd, advice, offset, len) -- note argument order
   return retbool(C.posix_fadvise(getfd(fd), offset or 0, len or 0, stringflag(advice, "POSIX_FADV_")))
 end
 function S.fallocate(fd, mode, offset, len)
-  return retbool(C.syscall(S.SYS.fallocate, t.int(getfd(fd)), t.uint(stringflag(mode, "FALLOC_FL_")), t.loff(offset or 0), t.loff(len)))
+  return retbool(CC.fallocate(getfd(fd), stringflag(mode, "FALLOC_FL_"), offset or 0, len))
 end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count)
