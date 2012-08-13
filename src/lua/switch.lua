@@ -43,17 +43,13 @@ ffi.cdef[[
 
 -- local ports = { port.new(1), port.new(2), port.new(3) }
 
-local ports = { [0] = port.Port:new(0, medium.Null),
-		[1] = port.Port:new(1, medium.Null),
-		[2] = port.Port:new(2, medium.Null),
-		[3] = port.Port:new(3, medium.Null) }
-
-local allports = { 0, 1, 2, 3}
+local ports = {}
+local allports = {}
 
 function addport(id, medium, ...)
    local port = port.Port:new(id, medium, ...)
    table.insert(ports, port)
-   table.insert(allports, #allports - 1)
+   table.insert(allports, #allports + 1)
 end
 
 function getport(id)
@@ -74,7 +70,7 @@ function main ()
       -- print("Main loop")
       for _,port in ipairs(ports) do
 	 local frame = port:receive()
-	 if packet ~= nil then
+	 if frame ~= nil then
 	    local packet = makepacket(port, frame.data, frame.length)
 	    input(packet)
 	 end
@@ -105,7 +101,7 @@ end
 function tracepacket (packet, direction)
    if tracefile then
       pcap.write_record(tracefile, packet.data, packet.length,
-			packet.inputport, direction == "input")
+			packet.inputport.id, direction == "input")
    end
 end
 
@@ -120,7 +116,8 @@ end
 function output (packet)
    print("Sending packet to " .. #fdb:lookup(packet))
    for _,port in ipairs(fdb:lookup(packet)) do
-      if port ~= packet.inputport then
+      if port ~= packet.inputport.id then
+	 print(tostring(packet.inputport.id) .. " -> " .. tostring(port) .. " (" .. tostring(packet.length) .. ")")
 	 if (ports[port]):transmit(packet) then
 	    tracepacket(packet, "output")
 	 else
@@ -132,13 +129,13 @@ end
 -- Forwarding database
 
 function fdb:update (packet)
-   print("inputport = " .. tostring(packet.inputport))
-   self[packet.src] = packet.inputport
+   self[packet.src] = packet.inputport.id
 end
 
 function fdb:lookup (packet)
    local out = self[packet.dst]
    if out ~= nil and out ~= packet.inputport then
+      print("out = " .. tostring(out))
       return {out}
    else
       return allports

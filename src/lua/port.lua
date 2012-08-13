@@ -37,11 +37,11 @@ function untrace ()
 end
 
 function Port:receive ()
-   return self.medium.receive()
+   return self.medium:receive()
 end
 
 function Port:transmit (packet)
-   return self.medium.transmit(packet)
+   return self.medium:transmit(packet)
 end
 
 function allports ()
