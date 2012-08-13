@@ -2628,23 +2628,19 @@ int vhangup(void);
 ]]
 
 -- use 64 bit fileops on 32 bit always
-local C64, stattypename
+local stattypename
 if ffi.abi("64bit") then
   stattypename = "struct stat"
-  C64 = {
-    truncate = C.truncate,
-    ftruncate = C.ftruncate,
-  }
+  CC.truncate = C.truncate,
+  CC.ftruncate = C.ftruncate,
 else
   stattypename = "struct stat64"
   S.SYS.stat = S.SYS.stat64
   S.SYS.lstat = S.SYS.lstat64
   S.SYS.fstat = S.SYS.fstat64
   S.SYS.fstatat = S.SYS.fstatat64
-  C64 = {
-    truncate = C.truncate64,
-    ftruncate = C.ftruncate64,
-  }
+  CC.truncate = C.truncate64,
+  CC.ftruncate = C.ftruncate64,
 end
 
 -- functions we need for metatypes
@@ -3716,8 +3712,8 @@ function S.fchownat(dirfd, path, owner, group, flags)
   return retbool(C.fchownat(getfd_at(dirfd), path, owner or -1, group or -1, flaglist(flags, "AT_", {"AT_SYMLINK_NOFOLLOW"})))
 end
 
-function S.truncate(path, length) return retbool(C64.truncate(path, length)) end
-function S.ftruncate(fd, length) return retbool(C64.ftruncate(getfd(fd), length)) end
+function S.truncate(path, length) return retbool(CC.truncate(path, length)) end
+function S.ftruncate(fd, length) return retbool(CC.ftruncate(getfd(fd), length)) end
 
 function S.access(pathname, mode) return retbool(C.access(pathname, accessflags(mode))) end
 function S.faccessat(dirfd, pathname, mode, flags)
