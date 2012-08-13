@@ -2631,16 +2631,16 @@ int vhangup(void);
 local stattypename
 if ffi.abi("64bit") then
   stattypename = "struct stat"
-  CC.truncate = C.truncate,
-  CC.ftruncate = C.ftruncate,
+  CC.truncate = C.truncate
+  CC.ftruncate = C.ftruncate
 else
   stattypename = "struct stat64"
   S.SYS.stat = S.SYS.stat64
   S.SYS.lstat = S.SYS.lstat64
   S.SYS.fstat = S.SYS.fstat64
   S.SYS.fstatat = S.SYS.fstatat64
-  CC.truncate = C.truncate64,
-  CC.ftruncate = C.ftruncate64,
+  CC.truncate = C.truncate64
+  CC.ftruncate = C.ftruncate64
 end
 
 -- functions we need for metatypes
