@@ -19,6 +19,9 @@ Available commands:
     Check <tracefile> for switching behavior bugs.
   maketraces [dir]
     Create trace files for testing the 'checktrace' command.
+  dumpshm <shmfile> [vm2host host2vm]
+    Print the state of a shared memory ethernet file.
+    Optionally also dump the packet buffers to files.
 EOF
     exit 1
 else
