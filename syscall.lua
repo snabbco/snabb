@@ -3582,6 +3582,8 @@ local function inlibc(f)
   if pcall(C[f]) then return true else return false end
 end
 
+-- TODO move the other syscalls here
+
 -- note dev_t not passed as 64 bits
 function CC.mknod(pathname, mode, dev)
   return C.syscall(S.SYS.mknod, pathname, t.mode(mode), t.long(dev))
