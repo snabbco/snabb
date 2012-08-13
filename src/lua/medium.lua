@@ -10,7 +10,7 @@ local snabb  = ffi.load("snabb")
 SHM = {}
 
 function SHM:new (filename)
-   local new = { first = true, shm = snabb.open_shm(filename) }
+   local new = { shm = snabb.open_shm(filename) }
    setmetatable(new, {__index = self})
    return new
 end
@@ -30,12 +30,9 @@ end
 function SHM:receive ()
    local ring = self.shm.vm2host
    if shm.available(ring) then
-      if self.first then
-	 self.first = false
-      else
-	 shm.advance_head(ring)
-      end
-      return shm.packet(ring)
+      local result = ring.packets[ring.head]
+      shm.advance_head(ring)
+      return result
    else
       return nil
    end
