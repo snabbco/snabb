@@ -3586,19 +3586,24 @@ local function inlibc(f)
   if pcall(C[f]) then return true else return false end
 end
 
+-- note dev_t not passed as 64 bits
+function CC.mknod(pathname, mode, dev)
+  return C.syscall(S.SYS.mknod, pathname, t.mode(mode), t.long(dev))
+end
+function CC.mknodat(fd, pathname, mode, dev)
+  return C.syscall(S.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.long(dev))
+end
+
 if ffi.abi("64bit") then
   function CC.fallocate(fd, mode, offset, len)
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
   end
-
 else -- 32 bit uses splits for 64 bit args
   function CC.fallocate(fd, mode, offset, len)
     local off2, off1 = S.u64(offset)
     local len2, len1 = S.u64(len)
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
   end
-
-
 end
 
 if inlibc("fallocate") then CC.fallocate = C.fallocate end
@@ -3751,10 +3756,10 @@ function S.readlinkat(dirfd, path)
 end
 
 function S.mknod(pathname, mode, dev)
-  return retbool(C.syscall(S.SYS.mknod, pathname, t.mode(stringflags(mode, "S_")), t.dev(dev or 0)))
+  return retbool(CC.mknod(pathname, stringflags(mode, "S_"), dev or 0))
 end
 function S.mknodat(fd, pathname, mode, dev)
-  return retbool(C.syscall(S.SYS.mknodat, t.int(getfd_at(fd)), pathname, t.mode(stringflags(mode, "S_")), t.dev(dev or 0)))
+  return retbool(CC.mknodat(getfd_at(fd), pathname, stringflags(mode, "S_"), dev or 0))
 end
 
 -- mkfifo is from man(3), add for convenience
