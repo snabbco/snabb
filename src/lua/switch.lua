@@ -75,7 +75,7 @@ function main ()
 	    input(packet)
 	 end
       end
-      C.usleep(100000)
+      C.usleep(10000)
    end
 end
 
@@ -114,14 +114,14 @@ end
 
 -- Output `eth' to the appropriate ports.
 function output (packet)
-   print("Sending packet to " .. #fdb:lookup(packet))
    for _,port in ipairs(fdb:lookup(packet)) do
       if port ~= packet.inputport.id then
-	 print(tostring(packet.inputport.id) .. " -> " .. tostring(port) .. " (" .. tostring(packet.length) .. ")")
+	 -- print(tostring(packet.inputport.id) .. " -> " .. tostring(port) .. " (" .. tostring(packet.length) .. ")")
 	 if (ports[port]):transmit(packet) then
 	    tracepacket(packet, "output")
 	 else
-	    print "TX overflow" end
+	    -- print "TX overflow"
+	 end
       end
    end
 end
@@ -135,7 +135,7 @@ end
 function fdb:lookup (packet)
    local out = self[packet.dst]
    if out ~= nil and out ~= packet.inputport then
-      print("out = " .. tostring(out))
+      -- print("out = " .. tostring(out))
       return {out}
    else
       return allports
