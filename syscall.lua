@@ -3778,8 +3778,8 @@ function S.setpriority(which, who, prio) return retnume(C.setpriority, stringfla
 
  -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
 function S.clone(flags, signal, stack, ptid, tls, ctid)
-  flags = t.int64(stringflags(flags, "CLONE_") + stringflag(signal, "SIG"))
-  return retnum(C.syscall(S.SYS.clone, flags, pt.void(stack), pt.void(ptid), pt.void(tls), pt.void(ctid)))
+  flags = stringflags(flags, "CLONE_") + stringflag(signal, "SIG")
+  return retnum(C.syscall(S.SYS.clone, t.int(flags), pt.void(stack), pt.void(ptid), pt.void(tls), pt.void(ctid)))
 end
 
 function S.unshare(flags)
