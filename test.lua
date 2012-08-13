@@ -1366,20 +1366,21 @@ test_netlink = {
     assert(i.dummy0, "expect dummy0 interface")
     local p = assert(S.clone("newnet"))
     if p == 0 then
-      fork_assert(fds[1]:read(nil, 1)) -- wait until interface moved. TODO wait for event from netlink listener instead?
-      local i = S.interfaces()
+      fork_assert(fds:read(nil, 1)) -- wait until interface moved. TODO wait for event from netlink listener instead?
+      local i = fork_assert(S.interfaces())
       fork_assert(i.dummy0, "expect dummy0 interface in child")
       fork_assert(S.dellink(0, "ifname", "dummy0"))
-      i:refresh()
+      fork_assert(i:refresh())
       fork_assert(not i.dummy0, "expect no dummy if")
       S.exit()
     else
       assert(S.newlink(i.dummy0.index, 0, 0, 0, "net_ns_pid", p))
-      i:refresh()
-      assert(fds[2]:write(".")) -- say we are ready
+      assert(i:refresh())
+      assert(fds:write(".")) -- say we are ready
       assert(not i.dummy0, "expect dummy0 vanished")
       local w = assert(S.waitpid(-1, "clone"))
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+      assert(fds:close())
     end
   end,
 }
