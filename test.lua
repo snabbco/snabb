@@ -1364,7 +1364,7 @@ test_netlink = {
     assert(S.create_interface{name = "dummy0", type = "dummy"})
     local i = assert(S.interfaces())
     assert(i.dummy0, "expect dummy0 interface")
-    local p = assert(S.clone("newnet, files"))
+    local p = assert(S.clone("newnet"))
     if p == 0 then
       fork_assert(fds[1]:read(nil, 1)) -- wait until interface moved. TODO wait for event from netlink listener instead?
       local i = S.interfaces()
