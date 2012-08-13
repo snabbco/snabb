@@ -15,5 +15,12 @@ ffi.cdef[[
 
       // strncpy(3) - copy a string
       char *strncpy(char *dest, const char *src, size_t n);
+
+      // read(2) - read from a file descriptor
+      int     read(int fd, void *buf, size_t count);
+
+      // write(2) - write to a file descriptor
+      int     write(int fd, void *buf, size_t count);
+      
 ]]
 
