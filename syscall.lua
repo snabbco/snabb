@@ -6,7 +6,7 @@ local S = {} -- exported functions
 local ffi = require "ffi"
 local bit = require "bit"
 
-local arch = require("ljsyscall-" .. ffi.arch) -- architecture specific code
+local arch = require("syscall-" .. ffi.arch) -- architecture specific code
 
 S.SYS = arch.SYS -- syscalls
 
