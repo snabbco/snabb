@@ -3582,7 +3582,7 @@ local function inlibc(f)
   if pcall(C[f]) then return true else return false end
 end
 
--- TODO move the other syscalls here
+-- TODO move the other syscalls here, and checks to see if in libc
 
 -- note dev_t not passed as 64 bits
 function CC.mknod(pathname, mode, dev)

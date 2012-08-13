@@ -124,7 +124,6 @@ futex, set\_robust\_list, get\_robust\_list
 getrusage, ptrace
 setfsuid, setfsgid
 setpgid, getpgid, setpgrp, getpgrp
-getgroups, setgroups
 recvmmsg
 mq\_open, mq\_close, mq\_getattr, mq\_notify, mq\_receive, mq\_send, mq\_unlink -- note glibc wraps these
 quotactl, ioprio\_set, ioprio\_get
