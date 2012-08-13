@@ -73,10 +73,10 @@ test_basic = {
     assert_equal(S.SIGSYS, 31) -- test numbers correct
   end,
   test_b64 = function()
-    local h, l = S.b64(0xffffffffffffffffLL)
+    local h, l = S.i64(0xffffffffffffffffLL)
     assert_equal(h, bit.tobit(0xffffffff))
     assert_equal(l, bit.tobit(0xffffffff))
-    local h, l = S.b64(0xaffffffffffbffffLL)
+    local h, l = S.i64(0xaffffffffffbffffLL)
     assert_equal(h, bit.tobit(0xafffffff))
     assert_equal(l, bit.tobit(0xfffbffff))
   end,

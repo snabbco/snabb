@@ -3586,13 +3586,22 @@ local function inlibc(f)
   if pcall(C[f]) then return true else return false end
 end
 
-if inlibc("fallocate") then
-  CC.fallocate = C.fallocate
-else
+if ffi.abi("64bit") then
   function CC.fallocate(fd, mode, offset, len)
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
   end
+
+else -- 32 bit uses splits for 64 bit args
+  function CC.fallocate(fd, mode, offset, len)
+    local off2, off1 = S.u64(offset)
+    local len2, len1 = S.u64(len)
+    return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
+  end
+
+
 end
+
+if inlibc("fallocate") then CC.fallocate = C.fallocate end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
@@ -4960,26 +4969,36 @@ function S.clearenv() return retbool(C.clearenv()) end
 -- 'macros' and helper functions etc
 
 t.i6432 = ffi.typeof("union {int64_t i64; int32_t i32[2];}")
+t.u6432 = ffi.typeof("union {uint64_t i64; uint32_t i32[2];}")
 
 if ffi.abi("le") then
-  function S.b64(n)
+  function S.i64(n)
     local u = t.i6432(n)
     return u.i32[1], u.i32[0]
   end
+  function S.u64(n)
+    local u = t.u6432(n)
+    return u.i32[1], u.i32[0]
+  end
 else
-  function S.b64(n)
+  function S.i64(n)
     local u = t.i6432(n)
     return u.i32[0], u.i32[1]
   end
+  function S.u64(n)
+    local u = t.u6432(n)
+    return u.i32[0], u.i32[1]
+  end
+
 end
 
 function S.major(dev)
-  local h, l = S.b64(dev)
+  local h, l = S.i64(dev)
   return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)));
 end
 
 function S.minor(dev)
-  local h, l = S.b64(dev)
+  local h, l = S.i64(dev)
   return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
 end
 
