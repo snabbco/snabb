@@ -72,6 +72,19 @@ test_basic = {
   test_signals = function()
     assert_equal(S.SIGSYS, 31) -- test numbers correct
   end,
+  test_b64 = function()
+    local h, l = S.b64(0xffffffffffffffffLL)
+    assert_equal(h, bit.tobit(0xffffffff))
+    assert_equal(l, bit.tobit(0xffffffff))
+    local h, l = S.b64(0xaffffffffffbffffLL)
+    assert_equal(h, bit.tobit(0xafffffff))
+    assert_equal(l, bit.tobit(0xfffbffff))
+  end,
+  test_major_minor = function()
+    local d = S.makedev(2, 3)
+    assert_equal(S.major(d), 2)
+    assert_equal(S.minor(d), 3)
+  end,
 }
 
 test_open_close = {
@@ -394,11 +407,11 @@ test_file_operations = {
   end,
   test_stat = function()
     local stat = assert(S.stat("/dev/zero"))
-    assert(stat.nlink == 1, "expect link count on /dev/zero to be 1")
+    assert_equal(stat.nlink, 1, "expect link count on /dev/zero to be 1")
     assert(stat.ischr, "expect /dev/zero to be a character device")
-    assert(stat.major == 1 , "expect major number of /dev/zero to be 1")
-    assert(stat.minor == 5, "expect minor number of /dev/zero to be 5")
-    assert(stat.rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
+    assert_equal(stat.major, 1 , "expect major number of /dev/zero to be 1")
+    assert_equal(stat.minor, 5, "expect minor number of /dev/zero to be 5")
+    assert_equal(stat.rdev, S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
   end,
   test_stat_directory = function()
     local fd = assert(S.open("/"))

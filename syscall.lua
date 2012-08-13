@@ -4945,20 +4945,27 @@ function S.clearenv() return retbool(C.clearenv()) end
 
 -- 'macros' and helper functions etc
 
--- LuaJIT does not provide 64 bit bitops at the moment
-local function b64(n)
-  return math.floor(tonumber(n) / 0x100000000), tonumber(n) % 0x100000000
+t.i6432 = ffi.typeof("union {int64_t i64; int32_t i32[2];}")
+
+if ffi.abi("le") then
+  function S.b64(n)
+    local u = t.i6432(n)
+    return u.i32[1], u.i32[0]
+  end
+else
+  function S.b64(n)
+    local u = t.i6432(n)
+    return u.i32[0], u.i32[1]
+  end
 end
 
 function S.major(dev)
-  local h, l = b64(dev)
+  local h, l = S.b64(dev)
   return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)));
 end
 
--- minor and makedev assume minor numbers 20 bit so all in low byte, currently true
--- would be easier to fix if LuaJIT had native 64 bit bitops
 function S.minor(dev)
-  local h, l = b64(dev)
+  local h, l = S.b64(dev)
   return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
 end
 
