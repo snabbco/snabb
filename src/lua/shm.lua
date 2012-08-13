@@ -17,7 +17,7 @@ end
 
 -- Return true if a packet is available.
 function available (ring)
-   return ring.tail ~= (ring.head + 1) % C.SHM_RING_SIZE
+   return ring.tail ~= ring.head
 end
 
 function full (ring)
