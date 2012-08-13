@@ -18,7 +18,7 @@ end
 function SHM:transmit (packet)
    local ring = self.shm.host2vm
    if not shm.full(ring) then
-      C.memcpy(ring.packets[ring.tail].data, packet.data, packet.length)
+      ffi.C.memcpy(ring.packets[ring.tail].data, packet.data, packet.length)
       ring.packets[ring.tail].length = packet.length
       shm.advance_tail(ring)
       return true
@@ -57,5 +57,37 @@ end
 
 function Null:receive ()
    return nil
+end
+
+-- TAP medium.
+
+TAP = {}
+
+function TAP:new (interfacename)
+   local new = { fd = snabb.open_tap(interfacename or ""),
+		 nextbuf = newbuffer() }
+   assert(new.fd >= 0)
+   setmetatable(new, {__index = self})
+   return new
+end
+
+function TAP:transmit (packet)
+   local writelen = ffi.C.write(self.fd, packet.data, packet.length)
+   return writelen == packet.length
+end
+
+function TAP:receive (packet)
+   local readlen = ffi.C.read(self.fd, self.nextbuf, 65536)
+   if readlen > 0 then
+      local frame = { data = self.nextbuf, length = readlen }
+      self.nextbuf = newbuffer()
+      return frame
+   else
+      return nil
+   end
+end
+
+function newbuffer ()
+   return ffi.new("char[65536]")
 end
 
