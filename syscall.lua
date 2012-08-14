@@ -2588,6 +2588,19 @@ int fstatfs(int fd, struct statfs64 *buf);          /* this too */
 int futimens(int fd, const struct timespec times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 
+ssize_t listxattr(const char *path, char *list, size_t size);
+ssize_t llistxattr(const char *path, char *list, size_t size);
+ssize_t flistxattr(int fd, char *list, size_t size);
+ssize_t getxattr(const char *path, const char *name, void *value, size_t size);
+ssize_t lgetxattr(const char *path, const char *name, void *value, size_t size);
+ssize_t fgetxattr(int fd, const char *name, void *value, size_t size);
+int setxattr(const char *path, const char *name, const void *value, size_t size, int flags);
+int lsetxattr(const char *path, const char *name, const void *value, size_t size, int flags);
+int fsetxattr(int fd, const char *name, const void *value, size_t size, int flags);
+int removexattr(const char *path, const char *name);
+int lremovexattr(const char *path, const char *name);
+int fremovexattr(int fd, const char *name);
+
 int unshare(int flags);
 int setns(int fd, int nstype);
 
@@ -4284,15 +4297,15 @@ function S.sysinfo(info)
   return info
 end
 
-local function growattrbuf(sys, a, b)
+local function growattrbuf(f, a, b)
   local len = 512
   local buffer = t.buffer(len)
   local ret
   repeat
     if b then
-      ret = tonumber(C.syscall(sys, a, b, pt.void(buffer), t.int(len)))
+      ret = tonumber(f(a, b, buffer, len))
     else
-      ret = tonumber(C.syscall(sys, a, pt.void(buffer), t.int(len)))
+      ret = tonumber(f(a, buffer, len))
     end
     if ret == -1 and ffi.errno ~= S.E.ERANGE then return nil, t.error() end
     if ret == -1 then
@@ -4312,27 +4325,27 @@ local function lattrbuf(sys, a)
   return split('\0', s)
 end
 
-function S.listxattr(path) return lattrbuf(S.SYS.listxattr, path) end
-function S.llistxattr(path) return lattrbuf(S.SYS.llistxattr, path) end
-function S.flistxattr(fd) return lattrbuf(S.SYS.flistxattr, t.int(getfd(fd))) end
+function S.listxattr(path) return lattrbuf(C.listxattr, path) end
+function S.llistxattr(path) return lattrbuf(C.llistxattr, path) end
+function S.flistxattr(fd) return lattrbuf(C.flistxattr, getfd(fd)) end
 
 function S.setxattr(path, name, value, flags)
-  return retbool(C.syscall(S.SYS.setxattr, path, name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
+  return retbool(C.setxattr(path, name, value, #value + 1, stringflag(flags, "XATTR_")))
 end
 function S.lsetxattr(path, name, value, flags)
-  return retbool(C.syscall(S.SYS.lsetxattr, path, name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
+  return retbool(C.lsetxattr(path, name, value, #value + 1, stringflag(flags, "XATTR_")))
 end
 function S.fsetxattr(fd, name, value, flags)
-  return retbool(C.syscall(S.SYS.fsetxattr, t.int(getfd(fd)), name, value, t.int(#value + 1), t.int(stringflag(flags, "XATTR_"))))
+  return retbool(C.fsetxattr(getfd(fd), name, value, #value + 1, stringflag(flags, "XATTR_")))
 end
 
-function S.getxattr(path, name) return growattrbuf(S.SYS.getxattr, path, name) end
-function S.lgetxattr(path, name) return growattrbuf(S.SYS.lgetxattr, path, name) end
-function S.fgetxattr(fd, name) return growattrbuf(S.SYS.fgetxattr, t.int(getfd(fd)), name) end
+function S.getxattr(path, name) return growattrbuf(C.getxattr, path, name) end
+function S.lgetxattr(path, name) return growattrbuf(C.lgetxattr, path, name) end
+function S.fgetxattr(fd, name) return growattrbuf(C.fgetxattr, getfd(fd), name) end
 
-function S.removexattr(path, name) return retbool(C.syscall(S.SYS.removexattr, path, name)) end
-function S.lremovexattr(path, name) return retbool(C.syscall(S.SYS.lremovexattr, path, name)) end
-function S.fremovexattr(fd, name) return retbool(C.syscall(S.SYS.fremovexattr, t.int(getfd(fd)), name)) end
+function S.removexattr(path, name) return retbool(C.removexattr(path, name)) end
+function S.lremovexattr(path, name) return retbool(C.lremovexattr(path, name)) end
+function S.fremovexattr(fd, name) return retbool(C.fremovexattr(getfd(fd), name)) end
 
 -- helper function to set and return attributes in tables
 local function xattr(list, get, set, remove, path, t)
