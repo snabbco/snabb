@@ -3591,9 +3591,7 @@ function S.inet_pton(af, src, addr)
 end
 
 -- these functions might not be in libc, so provide direct syscall fallbacks
-local function inlibc(f)
-  if pcall(C[f]) then return true else return false end
-end
+local function inlibc(f) return C[f] end
 
 -- TODO move the other syscalls here, and checks to see if in libc
 
@@ -3617,7 +3615,7 @@ else -- 32 bit uses splits for 64 bit args
   end
 end
 
-if inlibc("fallocate") then CC.fallocate = C.fallocate end
+if pcall(inlibc, "fallocate") then CC.fallocate = C.fallocate end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
