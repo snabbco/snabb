@@ -199,4 +199,5 @@ Misc list of ideas, no particular order
 20. add functions to add and remove addresses to net interface 
 21. Standard lua support, eventually. Might start with luasocket support for netlink, but there is a lot of work to do.
 22. make more modular, eg netlink etc.
+23. udev (uses netlink)
 
