@@ -1,9 +1,4 @@
--- test framework for ljsyscall. Tries to be comprehensive.
-
--- note tests missing tests for setting time TODO
--- note have tested pause, reboot but not in tests
-
--- assert(S.sigsuspend(m)) -- needs to be tested in fork.
+-- test framework for ljsyscall.
 
 local strict = require "strict"
 local S = require "syscall"
