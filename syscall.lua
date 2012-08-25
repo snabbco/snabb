@@ -5632,11 +5632,11 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
   local tp
 
   if type(msg) == "table" then -- for nested attributes
-    args = msg
+    local nargs = msg
     len = 0
-    while #args ~= 0 do
+    while #nargs ~= 0 do
       local nlen
-      nlen, args, messages, values = ifla_getmsg(args, messages, values, tab, lookup, af)
+      nlen, nargs, messages, values = ifla_getmsg(nargs, messages, values, tab, lookup, af)
       len = len + nlen
     end
     return len, args, messages, values
