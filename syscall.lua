@@ -5558,7 +5558,7 @@ local ifla_msg_types = {
     --[S.IFLA_AF_SPEC] = "nested",
   },
   ifla_info = {
-    [S.IFLA_INFO_KIND] = "asciiz",
+    [S.IFLA_INFO_KIND] = "ascii",
     [S.IFLA_INFO_DATA] = {"ifla_vlan", "IFLA_VLAN_"},
   },
   ifla_vlan = {
@@ -5591,7 +5591,7 @@ local ifla_msg_types = {
   },
   veth = {
     -- VETH_INFO_UNSPEC
-    [S.VETH_INFO_PEER] = t.ifinfomsg
+    [S.VETH_INFO_PEER] = {"ifla", "IFLA_"},
   },
 }
 
@@ -5685,8 +5685,14 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
     if not value then error("not enough arguments") end
   end
 
+  local slen
+
   if tp == "asciiz" then
     tp = t.buffer(#value + 1)
+    slen = nlmsg_align(s.rtattr) + #value + 1
+  elseif tp == "ascii" then -- not zero terminated
+    tp = t.buffer(#value + 1) -- hack to copy ip
+    slen = nlmsg_align(s.rtattr) + #value
   else
     if tp == "address" then
       tp = S.addrtype[af]
@@ -5697,10 +5703,11 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
   end
 
   len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))
+  slen = slen or len
 
   messages[#messages + 1] = t.rtattr
   messages[#messages + 1] = tp
-  values[#values + 1] = {rta_type = msg, rta_len = len}
+  values[#values + 1] = {rta_type = msg, rta_len = slen}
   values[#values + 1] = value
 
   return len, args, messages, values
@@ -5723,6 +5730,8 @@ local function ifla_f(tab, lookup, af, ...)
     local result, value = table.remove(results, 1), table.remove(values, 1)
     if type(value) == "string" then
       ffi.copy(result, value)
+    --elseif type(value) == "cdata" then
+    --  ffi.copy(result[0], value, ffi.sizeof(value))
     else
       result[0] = value
     end

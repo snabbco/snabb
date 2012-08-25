@@ -4,7 +4,7 @@ local strict = require "strict"
 local S = require "syscall"
 local bit = require "bit"
 
-setmetatable(S, {__index = function() error("bad index access on S") end})
+setmetatable(S, {__index = function(i, k) error("bad index access on S: " .. k) end})
 
 local oldassert = assert
 local function assert(c, s)
@@ -1393,10 +1393,10 @@ test_netlink = {
   test_netlink_veth_root = function()
     -- ip link add name veth_master type veth peer name veth_slave
     -- assert(S.create_interface{name = "veth0", type = "veth", ****})
-    --assert(S.newlink(0, S.NLM_F_CREATE, 0, 0, "ifname", "veth0", "linkinfo", {"kind", "veth"}, "veth_info_peer", {}, "ifname", "veth1"))
---local i = assert(S.interfaces())
---print(i)
---assert(0)
+    assert(S.newlink(0, S.NLM_F_CREATE + S.NLM_F_EXCL, 0, 0, "linkinfo", {"kind", "veth", "veth_info_peer", {t.ifinfomsg, {}, "ifla_ifname", "veth1"}}, "ifname", "veth0"))
+local i = assert(S.interfaces())
+print(i)
+assert(0)
   end,
 }
 
