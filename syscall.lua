@@ -10,7 +10,9 @@ local arch = require("syscall-" .. ffi.arch) -- architecture specific code
 
 S.SYS = arch.SYS -- syscalls
 
-local C = ffi.C
+S.C = setmetatable({}, {__index = ffi.C})
+local C = S.C
+
 local CC = {} -- functions that might not be in C, may use syscalls
 
 local octal = function (s) return tonumber(s, 8) end 
@@ -2647,16 +2649,14 @@ int vhangup(void);
 local stattypename
 if ffi.abi("64bit") then
   stattypename = "struct stat"
-  CC.truncate = C.truncate
-  CC.ftruncate = C.ftruncate
 else
   stattypename = "struct stat64"
   S.SYS.stat = S.SYS.stat64
   S.SYS.lstat = S.SYS.lstat64
   S.SYS.fstat = S.SYS.fstat64
   S.SYS.fstatat = S.SYS.fstatat64
-  CC.truncate = C.truncate64
-  CC.ftruncate = C.ftruncate64
+  C.truncate = ffi.C.truncate64
+  C.ftruncate = ffi.C.ftruncate64
 end
 
 -- functions we need for metatypes
@@ -3594,15 +3594,15 @@ function S.inet_pton(af, src, addr)
 end
 
 -- these functions might not be in libc, so provide direct syscall fallbacks
-local function inlibc(f) return C[f] end
+local function inlibc(f) return ffi.C[f] end
 
 -- TODO move the other syscalls here, and checks to see if in libc
 
 -- note dev_t not passed as 64 bits
-function CC.mknod(pathname, mode, dev)
+function C.mknod(pathname, mode, dev)
   return C.syscall(S.SYS.mknod, pathname, t.mode(mode), t.long(dev))
 end
-function CC.mknodat(fd, pathname, mode, dev)
+function C.mknodat(fd, pathname, mode, dev)
   return C.syscall(S.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.long(dev))
 end
 
@@ -3618,7 +3618,8 @@ else -- 32 bit uses splits for 64 bit args
   end
 end
 
-if pcall(inlibc, "fallocate") then CC.fallocate = C.fallocate end
+-- if not in libc replace
+if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
@@ -3728,8 +3729,8 @@ function S.fchownat(dirfd, path, owner, group, flags)
   return retbool(C.fchownat(getfd_at(dirfd), path, owner or -1, group or -1, flaglist(flags, "AT_", {"AT_SYMLINK_NOFOLLOW"})))
 end
 
-function S.truncate(path, length) return retbool(CC.truncate(path, length)) end
-function S.ftruncate(fd, length) return retbool(CC.ftruncate(getfd(fd), length)) end
+function S.truncate(path, length) return retbool(C.truncate(path, length)) end
+function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 
 function S.access(pathname, mode) return retbool(C.access(pathname, accessflags(mode))) end
 function S.faccessat(dirfd, pathname, mode, flags)
@@ -3768,10 +3769,10 @@ function S.readlinkat(dirfd, path)
 end
 
 function S.mknod(pathname, mode, dev)
-  return retbool(CC.mknod(pathname, stringflags(mode, "S_"), dev or 0))
+  return retbool(C.mknod(pathname, stringflags(mode, "S_"), dev or 0))
 end
 function S.mknodat(fd, pathname, mode, dev)
-  return retbool(CC.mknodat(getfd_at(fd), pathname, stringflags(mode, "S_"), dev or 0))
+  return retbool(C.mknodat(getfd_at(fd), pathname, stringflags(mode, "S_"), dev or 0))
 end
 
 -- mkfifo is from man(3), add for convenience
@@ -4078,7 +4079,7 @@ function S.posix_fadvise(fd, advice, offset, len) -- note argument order
   return retbool(C.posix_fadvise(getfd(fd), offset or 0, len or 0, stringflag(advice, "POSIX_FADV_")))
 end
 function S.fallocate(fd, mode, offset, len)
-  return retbool(CC.fallocate(getfd(fd), stringflag(mode, "FALLOC_FL_"), offset or 0, len))
+  return retbool(C.fallocate(getfd(fd), stringflag(mode, "FALLOC_FL_"), offset or 0, len))
 end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count)

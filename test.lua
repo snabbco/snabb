@@ -80,6 +80,18 @@ test_basic = {
     assert_equal(S.major(d), 2)
     assert_equal(S.minor(d), 3)
   end,
+  test_mock = function()
+    local test = "teststring"
+    local oldread = rawget(S.C, "read") -- should be nil
+    S.C.read = function(fd, buf, count)
+      S.copy(buf, test)
+      return #test
+    end
+    local fd = assert(S.open("/dev/null"))
+    assert_equal(S.read(fd), test, "should be able to mock calls")
+    assert(fd:close())
+    rawset(S.C, "read", oldread)
+  end,
 }
 
 test_open_close = {
