@@ -5691,8 +5691,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
     tp = t.buffer(#value + 1)
     slen = nlmsg_align(s.rtattr) + #value + 1
   elseif tp == "ascii" then -- not zero terminated
-    tp = t.buffer(#value + 1) -- hack to copy ip
-    slen = nlmsg_align(s.rtattr) + #value
+    tp = t.buffer(#value) -- hack to copy ip
   else
     if tp == "address" then
       tp = S.addrtype[af]
