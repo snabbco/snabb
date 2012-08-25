@@ -1391,7 +1391,7 @@ test_netlink = {
     end
   end,
   test_netlink_veth_root = function()
-    -- ip link add name veth_master type veth peer name veth_slave
+    -- TODO create_interface version
     -- assert(S.create_interface{name = "veth0", type = "veth", ****})
     assert(S.newlink(0, S.NLM_F_CREATE, 0, 0, "linkinfo", {"kind", "veth", "data", "veth_info_peer", {t.ifinfomsg, {}, "ifla_ifname", "veth1"}}, "ifname", "veth0"))
     local i = assert(S.interfaces())

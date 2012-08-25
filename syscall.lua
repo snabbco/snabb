@@ -5655,7 +5655,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
 
   local rawmsg = msg
 
-  -- TODO more general method for this
+  -- TODO more general method for this, special cased
   if msg == "veth_info_peer" then
     lookup = "VETH_"
     tab = "veth"
@@ -5691,7 +5691,8 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
     tp = t.buffer(#value + 1)
     slen = nlmsg_align(s.rtattr) + #value + 1
   elseif tp == "ascii" then -- not zero terminated
-    tp = t.buffer(#value) -- hack to copy ip
+    tp = t.buffer(#value)
+    slen = nlmsg_align(s.rtattr) + #value
   else
     if tp == "address" then
       tp = S.addrtype[af]
