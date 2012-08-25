@@ -851,6 +851,9 @@ S.IFLA_PORT_HOST_UUID = 5
 S.IFLA_PORT_REQUEST   = 6
 S.IFLA_PORT_RESPONSE  = 7
 
+S.VETH_INFO_UNSPEC = 0
+S.VETH_INFO_PEER   = 1
+
 S.PORT_PROFILE_MAX      =  40
 S.PORT_UUID_MAX         =  16
 S.PORT_SELF_VF          =  -1
@@ -5584,7 +5587,11 @@ local ifla_msg_types = {
     --          RTA_PROTOINFO
     --          RTA_FLOW
     --          RTA_CACHEINFO
-  }
+  },
+  veth = {
+    -- VETH_INFO_UNSPEC
+    [S.VETH_INFO_PEER] = t.ifinfomsg
+  },
 }
 
 --[[ TODO add
@@ -5646,6 +5653,13 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
   end
 
   local rawmsg = msg
+
+  -- TODO more general method for this
+  if msg == "veth_info_peer" then
+    lookup = "VETH_"
+    tab = "veth"
+  end
+
   msg = stringflag(msg, lookup)
   tp = ifla_msg_types[tab][msg]
   if not tp then error("unknown message type " .. rawmsg .. " in " .. tab .. " lookup " .. lookup) end
@@ -5733,9 +5747,15 @@ local function nlmsg(ntype, flags, af, ...)
   if not sock then return nil, err end
   local a = t.sockaddr_nl() -- kernel will fill in address
   local ok, err = sock:bind(a)
-  if not ok then return nil, err end -- gc will take care of closing socket...
-  a = sock:getsockname() -- to get bound address
-  if not a then return nil, err end -- gc will take care of closing socket...
+  if not ok then
+    sock:close()
+    return nil, err
+  end
+  local a, err = sock:getsockname() -- to get bound address
+  if not a then
+    sock:close()
+    return nil, err
+  end
 
   local k = t.sockaddr_nl() -- kernel destination
 

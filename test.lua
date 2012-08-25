@@ -1378,6 +1378,14 @@ test_netlink = {
       assert(fds:close())
     end
   end,
+  test_netlink_veth_root = function()
+    -- ip link add name veth_master type veth peer name veth_slave
+    -- assert(S.create_interface{name = "veth0", type = "veth", ****})
+    --assert(S.newlink(0, S.NLM_F_CREATE, 0, 0, "ifname", "veth0", "linkinfo", {"kind", "veth"}, "veth_info_peer", {}, "ifname", "veth1"))
+--local i = assert(S.interfaces())
+--print(i)
+--assert(0)
+  end,
 }
 
 test_termios = {
