@@ -3687,6 +3687,9 @@ end
 function CC.sync_file_range(fd, offset, count, flags)
   return C.syscall(S.SYS.sync_file_range, t.int(fd), t.loff(offset), t.loff(count), t.uint(flags))
 end
+function CC.readahead(fd, offset, count)
+  return C.syscall(S.SYS.readahead, t.int(fd), t.loff(offset), t.size(count))
+end
 
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
@@ -4153,9 +4156,7 @@ function S.fallocate(fd, mode, offset, len)
   return retbool(C.fallocate(getfd(fd), stringflag(mode, "FALLOC_FL_"), offset or 0, len))
 end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
-function S.readahead(fd, offset, count)
-  return retbool(C.syscall(S.SYS.readahead, t.int(getfd(fd)), t.loff(offset), t.size(count)))
-end
+function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), offset, count)) end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain
   if domain == S.AF_NETLINK then return stringflag(protocol, "NETLINK_") end
