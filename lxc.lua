@@ -18,7 +18,7 @@ S.chdir(arg[1])
 local p = assert(S.clone("newnet,newipc,newns,newpid,newuts"))
 
 if p == 0 then -- child
-  -- unmount parent mounts?
+  -- do we need to clean anything?
 
   assert(S.execve("/sbin/init", {"init"}, {}))
   S.exit("failure")

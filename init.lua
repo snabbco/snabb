@@ -8,6 +8,7 @@
 package.path = "/lib/?.lua;?"
 
 local S = require "syscall"
+local nl = require "nl"
 
 local function fatal(s)
   print(s)
@@ -30,14 +31,14 @@ try(S.mount, "devpts", "/dev/pts", "devpts", "rw,nosuid,noexec,relatime")
 
 -- interfaces
 
-local i = S.interfaces()
+local i = nl.interfaces()
 local lo, eth0 = i.lo, i.eth0
 
 lo:up()
 
 eth0:up()
 
-S.newaddr(eth0, "inet", 32, "permanent", "address", "10.3.0.2") -- TODO should be function to add this easily!
+nl.newaddr(eth0, "inet", 32, "permanent", "address", "10.3.0.2") -- TODO should be function to add this easily!
 
 -- run processes
 
