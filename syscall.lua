@@ -3696,7 +3696,7 @@ end
 function CC.timerfd_create(clockid, flags)
   return C.syscall(S.SYS.timerfd_create, t.int(clockid), t.int(flags))
 end
-function CC.timerfd_settime(fd, flags, it)
+function CC.timerfd_settime(fd, flags, it, oldtime)
   return C.syscall(S.SYS.timerfd_settime, t.int(fd), t.int(flags), pt.void(it), pt.void(oldtime))
 end
 function CC.timerfd_gettime(fd, curr_value)
@@ -4744,8 +4744,8 @@ function S.timerfd_create(clockid, flags)
   return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
 end
 
-function S.timerfd_settime(fd, flags, it)
-  local oldtime = t.itimerspec()
+function S.timerfd_settime(fd, flags, it, oldtime)
+  oldtime = oldtime or t.itimerspec()
   if not ffi.istype(t.itimerspec, it) then it = t.itimerspec(it) end
   local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), it, oldtime)
   if ret == -1 then return nil, t.error() end
