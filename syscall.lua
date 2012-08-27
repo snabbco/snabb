@@ -3607,14 +3607,16 @@ local function inlibc(f) return ffi.C[f] end
 
 -- TODO move the other syscalls here, and checks to see if in libc
 
--- note dev_t not passed as 64 bits
-function C.mknod(pathname, mode, dev)
+-- TODO why did I use the syscalls for mknod, mknodat? In Musl now.
+-- note dev_t not passed as 64 bits to this syscall
+function CC.mknod(pathname, mode, dev)
   return C.syscall(S.SYS.mknod, pathname, t.mode(mode), t.long(dev))
 end
-function C.mknodat(fd, pathname, mode, dev)
+function CC.mknodat(fd, pathname, mode, dev)
   return C.syscall(S.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.long(dev))
 end
 
+-- these might not be in libc
 if ffi.abi("64bit") then
   function CC.fallocate(fd, mode, offset, len)
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
