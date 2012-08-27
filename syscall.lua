@@ -4955,12 +4955,14 @@ end
 function S.clock_nanosleep(clk_id, flags, req, rem)
   if not ffi.istype(t.timespec, req) then req = t.timespec(req) end
   if not rem then rem = t.timespec() end
-  local ret = C.syscall(S.SYS.clock_nanosleep, t.clockid(stringflag(clk_id, "CLOCK_")), t.int(stringflag(flags, "TIMER_")), pt.void(req), pt.void(rem))
+  local ret = C.clock_nanosleep(stringflag(clk_id, "CLOCK_"), stringflag(flags, "TIMER_"), req, rem)
   if ret == -1 then
     if ffi.errno() == S.E.INTR then return rem else return nil, t.error() end
   end
   return true
 end
+
+--C.syscall(S.SYS.clock_nanosleep, t.clockid(stringflag(clk_id, "CLOCK_")), t.int(stringflag(flags, "TIMER_")), pt.void(req), pt.void(rem))
 
 -- straight passthroughs, no failure possible, still wrap to allow mocking
 function S.getuid() return C.getuid() end
