@@ -3676,6 +3676,9 @@ end
 function CC.setns(fd, nstype)
   return C.syscall(S.SYS.setns, t.int(fd), t.int(nstype))
 end
+function CC.sync_file_range(fd, offset, count, flags)
+  return C.syscall(S.SYS.sync_file_range, t.int(fd), t.loff(offset), t.loff(count), t.uint(flags))
+end
 
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
@@ -3695,6 +3698,7 @@ end
 if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
 if not pcall(inlibc, "acct") then C.acct = CC.acct end
 if not pcall(inlibc, "setns") then C.setns = CC.setns end
+if not pcall(inlibc, "sync_file_range") then C.sync_file_range = CC.sync_file_range end
 
 -- not in eglibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
@@ -4019,7 +4023,7 @@ function S.fchmodat(dirfd, pathname, mode)
   return retbool(C.fchmodat(getfd_at(dirfd), pathname, S.mode(mode), 0)) -- no flags actually supported
 end
 function S.sync_file_range(fd, offset, count, flags)
-  return retbool(C.syscall(S.SYS.sync_file_range, t.int(getfd(fd)), t.loff(offset), t.loff(count), t.uint(stringflags(flags, "SYNC_FILE_RANGE_"))))
+  return retbool(C.sync_file_range(getfd(fd), offset, count, stringflags(flags, "SYNC_FILE_RANGE_")))
 end
 
 function S.stat(path, buf)
