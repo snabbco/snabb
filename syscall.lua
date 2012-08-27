@@ -3624,8 +3624,6 @@ function CC.mknodat(fd, pathname, mode, dev)
   return C.syscall(S.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.long(dev))
 end
 
---  local ret = C.syscall(S.SYS.pipe2, pt.void(fd2), t.int(stringflags(flags, "O_")))
-
 -- these might not be in libc
 if ffi.abi("64bit") then
   function CC.fallocate(fd, mode, offset, len)
