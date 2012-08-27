@@ -200,4 +200,5 @@ Misc list of ideas, no particular order
 21. Standard lua support, eventually. Might start with luasocket support for netlink, but there is a lot of work to do.
 22. make more modular, started with netlink and arch specific but needs more.
 23. udev (uses netlink)
+24. netlink listen for events
 
