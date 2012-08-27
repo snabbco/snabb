@@ -35,6 +35,9 @@ S.STDIN_FILENO = 0
 S.STDOUT_FILENO = 1
 S.STDERR_FILENO = 2
 
+-- sizes
+S.PATH_MAX = 4096
+
 -- open, fcntl
 S.O_ACCMODE   = octal('0003')
 S.O_RDONLY    = octal('00')
@@ -3621,6 +3624,11 @@ function C.getdents(fd, buf, size)
   return C.syscall(S.SYS.getdents64, t.int(fd), buf, t.uint(size))
 end
 
+-- getcwd will allocate memory, so use syscall
+function C.getcwd(buf, size)
+  return C.syscall(S.SYS.getcwd, pt.void(buf), t.ulong(size))
+end
+
 -- for stat we use the syscall as libc will tend to have a different struct stat for compatibility
 if ffi.abi("64bit") then
   function C.stat(path, buf)
@@ -4084,17 +4092,11 @@ S.utimes = S.utime
 
 function S.chroot(path) return retbool(C.chroot(path)) end
 
-function S.getcwd()
-  local size = 64
-  local buf, ret
-  repeat
-    buf = t.buffer(size)
-    ret = C.syscall(S.SYS.getcwd, pt.void(buf), t.ulong(size))
-    if ret == -1 then 
-      local errno = ffi.errno()
-      if errno == S.E.ERANGE then size = size * 2 else return nil, t.error(errno) end
-    end
-  until ret ~= -1
+function S.getcwd(buf, size)
+  size = size or S.PATH_MAX
+  buf = buf or t.buffer(size)
+  local ret = C.getcwd(buf, size)
+  if ret == -1 then return nil, t.error() end
   return ffi.string(buf)
 end
 
