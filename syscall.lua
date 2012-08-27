@@ -3690,6 +3690,9 @@ end
 function CC.readahead(fd, offset, count)
   return C.syscall(S.SYS.readahead, t.int(fd), t.loff(offset), t.size(count))
 end
+function CC.splice(fd_in, off_in, fd_out, off_out, len, flags)
+  return C.syscall(S.SYS.splice, t.int(fd_in), pt.void(offin), t.int(fd_out), pt.void(offout), t.int(len), t.uint(flags))
+end
 
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
@@ -4591,7 +4594,7 @@ function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
     offout = t.loff1()
     offout[0] = off_out
   end
-  return retnum(C.syscall(S.SYS.splice, t.int(getfd(fd_in)), pt.void(offin), t.int(getfd(fd_out)), pt.void(offout), t.int(len), t.uint(stringflags(flags, "SPLICE_F_"))))
+  return retnum(C.splice(getfd(fd_in), offin, getfd(fd_out), offout, len, stringflags(flags, "SPLICE_F_")))
 end
 
 function S.vmsplice(fd, iov, flags)
