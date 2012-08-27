@@ -3690,9 +3690,6 @@ end
 function CC.readahead(fd, offset, count)
   return C.syscall(S.SYS.readahead, t.int(fd), t.loff(offset), t.size(count))
 end
-function CC.splice(fd_in, off_in, fd_out, off_out, len, flags)
-  return C.syscall(S.SYS.splice, t.int(fd_in), pt.void(offin), t.int(fd_out), pt.void(offout), t.int(len), t.uint(flags))
-end
 
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
