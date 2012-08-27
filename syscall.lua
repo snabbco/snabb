@@ -3579,6 +3579,29 @@ function S.inet_pton(af, src, addr)
   return addr
 end
 
+t.i6432 = ffi.typeof("union {int64_t i64; int32_t i32[2];}")
+t.u6432 = ffi.typeof("union {uint64_t i64; uint32_t i32[2];}")
+
+if ffi.abi("le") then
+  function S.i64(n)
+    local u = t.i6432(n)
+    return u.i32[1], u.i32[0]
+  end
+  function S.u64(n)
+    local u = t.u6432(n)
+    return u.i32[1], u.i32[0]
+  end
+else
+  function S.i64(n)
+    local u = t.i6432(n)
+    return u.i32[0], u.i32[1]
+  end
+  function S.u64(n)
+    local u = t.u6432(n)
+    return u.i32[0], u.i32[1]
+  end
+end
+
 -- these functions might not be in libc, so provide direct syscall fallbacks
 local function inlibc(f) return ffi.C[f] end
 
@@ -4980,30 +5003,7 @@ end
 function S.clearenv() return retbool(C.clearenv()) end
 
 -- 'macros' and helper functions etc
-
-t.i6432 = ffi.typeof("union {int64_t i64; int32_t i32[2];}")
-t.u6432 = ffi.typeof("union {uint64_t i64; uint32_t i32[2];}")
-
-if ffi.abi("le") then
-  function S.i64(n)
-    local u = t.i6432(n)
-    return u.i32[1], u.i32[0]
-  end
-  function S.u64(n)
-    local u = t.u6432(n)
-    return u.i32[1], u.i32[0]
-  end
-else
-  function S.i64(n)
-    local u = t.i6432(n)
-    return u.i32[0], u.i32[1]
-  end
-  function S.u64(n)
-    local u = t.u6432(n)
-    return u.i32[0], u.i32[1]
-  end
-
-end
+-- TODO from here (approx, some may be in wrong place), move to util library. These are library functions.
 
 function S.major(dev)
   local h, l = S.i64(dev)
