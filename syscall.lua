@@ -4596,7 +4596,7 @@ end
 
 function S.vmsplice(fd, iov, flags)
   if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
-  return retnum(C.syscall(S.SYS.vmsplice, t.int(getfd(fd)), pt.void(iov.iov), t.int(#iov), t.uint(stringflags(flags, "SPLICE_F_"))))
+  return retnum(C.vmsplice(getfd(fd), iov.iov, #iov, stringflags(flags, "SPLICE_F_")))
 end
 
 function S.tee(fd_in, fd_out, len, flags)
