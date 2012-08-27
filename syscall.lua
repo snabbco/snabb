@@ -3607,7 +3607,6 @@ local function inlibc(f) return ffi.C[f] end
 
 -- TODO move the other syscalls here, and checks to see if in libc
 
--- TODO why did I use the syscalls for mknod, mknodat? In Musl now.
 -- note dev_t not passed as 64 bits to this syscall
 function CC.mknod(pathname, mode, dev)
   return C.syscall(S.SYS.mknod, pathname, t.mode(mode), t.long(dev))
@@ -3630,7 +3629,12 @@ else -- 32 bit uses splits for 64 bit args
 end
 
 -- if not in libc replace
+-- not in Musl
 if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
+
+-- not in eglibc
+if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
+if not pcall(inlibc, "mknodat") then C.mknodat = CC.mknodat end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
