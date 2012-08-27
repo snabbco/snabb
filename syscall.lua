@@ -3690,6 +3690,9 @@ end
 function CC.readahead(fd, offset, count)
   return C.syscall(S.SYS.readahead, t.int(fd), t.loff(offset), t.size(count))
 end
+function CC.tee(fd_in, fd_out, len, flags)
+  return C.syscall(S.SYS.tee, t.int(fd_in), t.int(fd_out), t.int(len), t.uint(flags))
+end
 
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
@@ -3711,6 +3714,7 @@ if not pcall(inlibc, "acct") then C.acct = CC.acct end
 if not pcall(inlibc, "setns") then C.setns = CC.setns end
 if not pcall(inlibc, "sync_file_range") then C.sync_file_range = CC.sync_file_range end
 if not pcall(inlibc, "readahead") then C.readahead = CC.readahead end
+if not pcall(inlibc, "tee") then C.tee = CC.tee end
 
 -- not in eglibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
@@ -4600,7 +4604,7 @@ function S.vmsplice(fd, iov, flags)
 end
 
 function S.tee(fd_in, fd_out, len, flags)
-  return retnum(C.syscall(S.SYS.tee, t.int(getfd(fd_in)), t.int(getfd(fd_out)), t.int(len), t.uint(stringflags(flags, "SPLICE_F_"))))
+  return retnum(C.tee(getfd(fd_in), getfd(fd_out), len, stringflags(flags, "SPLICE_F_")))
 end
 
 function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "IN_"))) end
