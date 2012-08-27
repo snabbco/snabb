@@ -3650,6 +3650,17 @@ else
   end
 end
 
+-- lseek is a mess in 32 bit, use _llseek syscall to get clean result
+if ffi.abi("32bit") then
+  function C.lseek(fd, offset, whence)
+    local result = t.loff1()
+    local off1, off2 = S.u64(offset)
+    local ret = C.syscall(S.SYS._llseek, t.int(fd), t.ulong(off1), t.ulong(off2), pt.void(result), t.uint(whence))
+    if ret == -1 then return -1 end
+    return result[0]
+  end
+end
+
 -- these syscalls may not be supported in libc being used
 
 -- note dev_t not passed as 64 bits to this syscall
@@ -3943,18 +3954,8 @@ function S.write(fd, buf, count) return retnum(C.write(getfd(fd), buf, count or 
 function S.pread(fd, buf, count, offset) return retnum(C.pread64(getfd(fd), buf, count, offset)) end
 function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite64(getfd(fd), buf, count or #buf, offset)) end
 
-if ffi.abi("64bit") then
-  function S.lseek(fd, offset, whence)
-    return ret64(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_")))
-  end
-else
-  function S.lseek(fd, offset, whence, result)
-    local offhigh, offlow = t.int64(offset) / 4294967296LL, t.int64(offset) % 4294967296LL
-    if not result then result = t.loff1() end
-    local ret = C.syscall(S.SYS._llseek, t.int(getfd(fd)), t.ulong(offhigh), t.ulong(offlow), pt.void(result), t.uint(stringflag(whence, "SEEK_")))
-    if ret == -1 then return nil, t.error() end
-    return result[0]
-  end
+function S.lseek(fd, offset, whence)
+  return ret64(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_")))
 end
 
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
