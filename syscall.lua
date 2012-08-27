@@ -3678,6 +3678,7 @@ end
 -- not in Musl TODO patch so they are
 if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
 if not pcall(inlibc, "acct") then C.acct = CC.acct end
+if not pcall(inlibc, "setns") then C.setns = CC.setns end
 
 -- not in eglibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
