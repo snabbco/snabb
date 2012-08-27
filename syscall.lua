@@ -5946,7 +5946,7 @@ local link_process = { -- TODO very incomplete. generate?
       local id = tab.id
       if id then
         tab.id = nil
-        return {"linkinfo", {"kind", v, "data", "id", id}}
+        return {"linkinfo", {"kind", v, "data", {"id", id}}}
      end
     end
     return {"linkinfo", "kind", v}
