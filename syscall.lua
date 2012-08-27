@@ -3616,6 +3616,11 @@ function C.clone(flags, signal, stack, ptid, tls, ctid)
   return C.syscall(S.SYS.clone, t.int(flags), pt.void(stack), pt.void(ptid), pt.void(tls), pt.void(ctid))
 end
 
+-- getdents is not provided by glibc. Musl has weak alias but seems not to be visible.
+function C.getdents(fd, buf, size)
+  return C.syscall(S.SYS.getdents64, t.int(fd), buf, t.uint(size))
+end
+
 -- for stat we use the syscall as libc will tend to have a different struct stat for compatibility
 if ffi.abi("64bit") then
   function C.stat(path, buf)
@@ -3659,11 +3664,6 @@ function CC.acct(filename)
 end
 function CC.setns(fd, nstype)
   return C.syscall(S.SYS.setns, t.int(fd), t.int(nstype))
-end
-
--- getdents is not provided by glibc. Musl does provide it and it is the right one (getdents64). Be careful with other libc.
-function CC.getdents(fd, buf, size)
-  return C.syscall(S.SYS.getdents64, t.int(fd), buf, t.uint(size))
 end
 
 -- these ones for aligment reasons need 32 bit splits
