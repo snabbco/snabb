@@ -3631,18 +3631,11 @@ if ffi.abi("64bit") then
   function CC.fallocate(fd, mode, offset, len)
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
   end
-  function CC.pipe2(fd2, flags)
-    return C.syscall(S.SYS.pipe2, pt.void(fd2), t.int(stringflags(flags, "O_")))
-  end
 else -- 32 bit uses splits for 64 bit args
   function CC.fallocate(fd, mode, offset, len)
     local off2, off1 = S.u64(offset)
     local len2, len1 = S.u64(len)
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
-  end
-  function CC.pipe2(fd2, flags)
-    local pt2, pt1 = S.u64(fd2)
-    return C.syscall(S.SYS.pipe2, t.uint32(pt1), t.uint32(pt2), t.int(stringflags(flags, "O_")))
   end
 end
 
