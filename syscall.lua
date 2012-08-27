@@ -3640,7 +3640,7 @@ else
   end
 end
 
--- these syscalls may not be in supported libc
+-- these syscalls may not be supported in libc being used
 
 -- note dev_t not passed as 64 bits to this syscall
 function CC.mknod(pathname, mode, dev)
@@ -3649,8 +3649,9 @@ end
 function CC.mknodat(fd, pathname, mode, dev)
   return C.syscall(S.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.long(dev))
 end
-
--- these might not be in libc
+function CC.acct(filename)
+  return C.syscall(S.SYS.acct, filename)
+end
 
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
@@ -3764,7 +3765,7 @@ function S.chdir(path) return retbool(C.chdir(path)) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, S.mode(mode))) end
 function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(getfd_at(fd), path, S.mode(mode))) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
-function S.acct(filename) return retbool(C.syscall(S.SYS.acct, filename)) end
+function S.acct(filename) return retbool(C.acct(filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
