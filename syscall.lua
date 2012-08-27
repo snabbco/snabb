@@ -3657,6 +3657,9 @@ end
 function CC.acct(filename)
   return C.syscall(S.SYS.acct, filename)
 end
+function CC.setns(fd, nstype)
+  return C.syscall(S.SYS.setns, t.int(fd), t.int(nstype))
+end
 
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
@@ -3858,12 +3861,8 @@ function S.clone(flags, signal, stack, ptid, tls, ctid)
   return retnum(C.clone(flags, stack, ptid, tls, ctid))
 end
 
-function S.unshare(flags)
-  return retbool(C.unshare(stringflags(flags, "CLONE_")))
-end
-function S.setns(fd, nstype)
-  return retbool(C.syscall(S.SYS.setns, t.int(getfd(fd)), t.int(stringflag(nstype, "CLONE_"))))
-end
+function S.unshare(flags) return retbool(C.unshare(stringflags(flags, "CLONE_"))) end
+function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), stringflag(nstype, "CLONE_"))) end
 
 function S.fork() return retnum(C.fork()) end
 function S.execve(filename, argv, envp)
