@@ -3893,6 +3893,15 @@ function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), addr, addrlen or ffi.sizeof(addr)))
 end
 
+function S.sendmsg(fd, msg, flags)
+  if not msg then -- send a single byte message, eg enough to send credentials
+    local buf1 = t.buffer(1)
+    local io = t.iovecs{{buf1, 1}}
+    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io}
+  end
+  return retbool(C.sendmsg(getfd(fd), msg, stringflags(flags, "MSG_")))
+end
+
 function S.readv(fd, iov)
   if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
   return retnum(C.readv(getfd(fd), iov.iov, #iov))
@@ -5008,15 +5017,6 @@ end
 
 function S.makedev(major, minor)
   return bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff))
-end
-
-function S.sendmsg(fd, msg, flags)
-  if not msg then -- send a single byte message, eg enough to send credentials
-    local buf1 = t.buffer(1)
-    local io = t.iovecs{{buf1, 1}}
-    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io}
-  end
-  return retbool(C.sendmsg(getfd(fd), msg, stringflags(flags, "MSG_")))
 end
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
