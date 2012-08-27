@@ -3629,7 +3629,7 @@ else -- 32 bit uses splits for 64 bit args
 end
 
 -- if not in libc replace
--- not in Musl
+-- not in Musl TODO patch so they are
 if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
 
 -- not in eglibc
