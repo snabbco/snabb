@@ -3693,6 +3693,15 @@ end
 function CC.tee(fd_in, fd_out, len, flags)
   return C.syscall(S.SYS.tee, t.int(fd_in), t.int(fd_out), t.int(len), t.uint(flags))
 end
+function CC.timerfd_create(clockid, flags)
+  return C.syscall(S.SYS.timerfd_create, t.int(clockid), t.int(flags))
+end
+function CC.timerfd_settime(fd, flags, it)
+  return C.syscall(S.SYS.timerfd_settime, t.int(fd), t.int(flags), pt.void(it), pt.void(oldtime))
+end
+function CC.timerfd_gettime(fd, curr_value)
+  return C.syscall(S.SYS.timerfd_gettime, t.int(fd), pt.void(curr_value))
+end
 
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
@@ -3715,6 +3724,9 @@ if not pcall(inlibc, "setns") then C.setns = CC.setns end
 if not pcall(inlibc, "sync_file_range") then C.sync_file_range = CC.sync_file_range end
 if not pcall(inlibc, "readahead") then C.readahead = CC.readahead end
 if not pcall(inlibc, "tee") then C.tee = CC.tee end
+if not pcall(inlibc, "timerfd_create") then C.timerfd_create = CC.timerfd_create end
+if not pcall(inlibc, "timerfd_settime") then C.timerfd_settime = CC.timerfd_settime end
+if not pcall(inlibc, "timerfd_gettime") then C.timerfd_gettime = CC.timerfd_gettime end
 
 -- not in eglibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
@@ -4729,20 +4741,20 @@ function S.setitimer(which, it)
 end
 
 function S.timerfd_create(clockid, flags)
-  return retfd(C.syscall(S.SYS.timerfd_create, t.int(stringflag(clockid, "CLOCK_")), t.int(stringflags(flags, "TFD_"))))
+  return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
 end
 
 function S.timerfd_settime(fd, flags, it)
   local oldtime = t.itimerspec()
   if not ffi.istype(t.itimerspec, it) then it = t.itimerspec(it) end
-  local ret = C.syscall(S.SYS.timerfd_settime, t.int(getfd(fd)), t.int(stringflag(flags, "TFD_TIMER_")), pt.void(it), pt.void(oldtime))
+  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), it, oldtime)
   if ret == -1 then return nil, t.error() end
   return oldtime
 end
 
 function S.timerfd_gettime(fd, curr_value)
   if not curr_value then curr_value = t.itimerspec() end
-  local ret = C.syscall(S.SYS.timerfd_gettime, t.int(getfd(fd)), pt.void(curr_value))
+  local ret = C.timerfd_gettime(getfd(fd), curr_value)
   if ret == -1 then return nil, t.error() end
   return curr_value
 end
