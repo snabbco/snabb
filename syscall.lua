@@ -3710,6 +3710,7 @@ if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
 if not pcall(inlibc, "acct") then C.acct = CC.acct end
 if not pcall(inlibc, "setns") then C.setns = CC.setns end
 if not pcall(inlibc, "sync_file_range") then C.sync_file_range = CC.sync_file_range end
+if not pcall(inlibc, "readahead") then C.readahead = CC.readahead end
 
 -- not in eglibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
