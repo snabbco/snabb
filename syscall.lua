@@ -3702,6 +3702,9 @@ end
 function CC.timerfd_gettime(fd, curr_value)
   return C.syscall(S.SYS.timerfd_gettime, t.int(fd), pt.void(curr_value))
 end
+function CC.clock_nanosleep(clk_id, flags, req, rem)
+  return C.syscall(S.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
+end
 
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
@@ -3731,6 +3734,7 @@ if not pcall(inlibc, "timerfd_gettime") then C.timerfd_gettime = CC.timerfd_gett
 -- not in eglibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
 if not pcall(inlibc, "mknodat") then C.mknodat = CC.mknodat end
+if not pcall(inlibc, "clock_nanosleep") then C.clock_nanosleep = CC.clock_nanosleep end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
@@ -4961,8 +4965,6 @@ function S.clock_nanosleep(clk_id, flags, req, rem)
   end
   return true
 end
-
---C.syscall(S.SYS.clock_nanosleep, t.clockid(stringflag(clk_id, "CLOCK_")), t.int(stringflag(flags, "TIMER_")), pt.void(req), pt.void(rem))
 
 -- straight passthroughs, no failure possible, still wrap to allow mocking
 function S.getuid() return C.getuid() end
