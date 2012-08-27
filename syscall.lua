@@ -3879,15 +3879,6 @@ function S.execve(filename, argv, envp)
   return retbool(C.execve(filename, cargv, cenvp))
 end
 
--- best to call C.syscall directly? do not export?
-function S.syscall(num, ...)
-  -- call with the right types, use at your own risk
-  local a, b, c, d, e, f = ...
-  local ret = C.syscall(stringflag(num, "SYS_"), a, b, c, d, e, f)
-  if ret == -1 then return nil, t.error() end
-  return ret
-end
-
 -- generally calling C.ioctl directly
 function S.ioctl(d, request, argp)
   local ret = C.ioctl(d, request, argp)
