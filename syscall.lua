@@ -3607,6 +3607,15 @@ local function inlibc(f) return ffi.C[f] end
 
 -- TODO move the other syscalls here, and checks to see if in libc
 
+-- Always use syscall rather than libc implementation, usually due to bugs in glibc
+
+-- glibc caches pid, but this fails to work eg after clone()
+function C.getpid()
+  return C.syscall(S.SYS.getpid)
+end
+
+-- these syscalls may not be in supported libc
+
 -- note dev_t not passed as 64 bits to this syscall
 function CC.mknod(pathname, mode, dev)
   return C.syscall(S.SYS.mknod, pathname, t.mode(mode), t.long(dev))
@@ -3615,16 +3624,25 @@ function CC.mknodat(fd, pathname, mode, dev)
   return C.syscall(S.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.long(dev))
 end
 
+--  local ret = C.syscall(S.SYS.pipe2, pt.void(fd2), t.int(stringflags(flags, "O_")))
+
 -- these might not be in libc
 if ffi.abi("64bit") then
   function CC.fallocate(fd, mode, offset, len)
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
+  end
+  function CC.pipe2(fd2, flags)
+    return C.syscall(S.SYS.pipe2, pt.void(fd2), t.int(stringflags(flags, "O_")))
   end
 else -- 32 bit uses splits for 64 bit args
   function CC.fallocate(fd, mode, offset, len)
     local off2, off1 = S.u64(offset)
     local len2, len1 = S.u64(len)
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
+  end
+  function CC.pipe2(fd2, flags)
+    local pt2, pt1 = S.u64(fd2)
+    return C.syscall(S.SYS.pipe2, t.uint32(pt1), t.uint32(pt2), t.int(stringflags(flags, "O_")))
   end
 end
 
@@ -3692,7 +3710,7 @@ mt.pipe = {
 
 function S.pipe(flags)
   local fd2 = t.int2()
-  local ret = C.syscall(S.SYS.pipe2, pt.void(fd2), t.int(stringflags(flags, "O_")))
+  local ret = C.pipe2(fd2, stringflags(flags, "O_"))
   if ret == -1 then return nil, t.error() end
   return setmetatable({t.fd(fd2[0]), t.fd(fd2[1])}, mt.pipe)
 end
@@ -4906,9 +4924,7 @@ function S.getegid() return C.getegid() end
 function S.sync() return C.sync() end
 function S.alarm(s) return C.alarm(s) end
 
-function S.getpid()
-  return C.syscall(S.SYS.getpid) -- bypass glibc caching of pids
-end
+function S.getpid() return C.getpid() end -- note this will use syscall as overridden above
 
 function S.setuid(uid) return retbool(C.setuid(uid)) end
 function S.setgid(gid) return retbool(C.setgid(gid)) end
