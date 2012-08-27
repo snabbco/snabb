@@ -3611,6 +3611,11 @@ function C.getpid()
   return C.syscall(S.SYS.getpid)
 end
 
+-- clone interface provided is not same as system one, and is less convenient
+function C.clone(flags, signal, stack, ptid, tls, ctid)
+  return C.syscall(S.SYS.clone, t.int(flags), pt.void(stack), pt.void(ptid), pt.void(tls), pt.void(ctid))
+end
+
 -- for stat we use the syscall as libc will tend to have a different struct stat for compatibility
 if ffi.abi("64bit") then
   function C.stat(path, buf)
@@ -3850,7 +3855,7 @@ function S.setpriority(which, who, prio) return retnume(C.setpriority, stringfla
  -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
 function S.clone(flags, signal, stack, ptid, tls, ctid)
   flags = stringflags(flags, "CLONE_") + stringflag(signal, "SIG")
-  return retnum(C.syscall(S.SYS.clone, t.int(flags), pt.void(stack), pt.void(ptid), pt.void(tls), pt.void(ctid)))
+  return retnum(C.clone(flags, stack, ptid, tls, ctid))
 end
 
 function S.unshare(flags)
