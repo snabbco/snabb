@@ -5139,18 +5139,18 @@ function S.sendfds(fd, ...)
   return S.sendmsg(fd, msg, 0)
 end
 
-function S.nonblock(s)
-  local fl, err = s:fcntl(S.F_GETFL)
+function S.nonblock(fd)
+  local fl, err = S.fcntl(fd, S.F_GETFL)
   if not fl then return nil, err end
-  fl, err = s:fcntl(S.F_SETFL, bit.bor(fl, S.O_NONBLOCK))
+  fl, err = S.fcntl(fd, S.F_SETFL, bit.bor(fl, S.O_NONBLOCK))
   if not fl then return nil, err end
   return true
 end
 
-function S.block(s)
-  local fl, err = s:fcntl(S.F_GETFL)
+function S.block(fd)
+  local fl, err = S.fcntl(fd, S.F_GETFL)
   if not fl then return nil, err end
-  fl, err = s:fcntl(S.F_SETFL, bit.band(fl, bit.bnot(S.O_NONBLOCK)))
+  fl, err = S.fcntl(fd, S.F_SETFL, bit.band(fl, bit.bnot(S.O_NONBLOCK)))
   if not fl then return nil, err end
   return true
 end
