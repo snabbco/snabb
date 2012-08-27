@@ -1393,7 +1393,7 @@ test_netlink = {
   test_netlink_veth_root = function()
     -- TODO create_interface version
     -- assert(S.create_interface{name = "veth0", type = "veth", ****})
-    assert(S.newlink(0, S.NLM_F_CREATE, 0, 0, "linkinfo", {"kind", "veth", "data", "veth_info_peer", {t.ifinfomsg, {}, "ifla_ifname", "veth1"}}, "ifname", "veth0"))
+    assert(S.newlink(0, S.NLM_F_CREATE, 0, 0, "linkinfo", {"kind", "veth", "data", "veth_info_peer", {t.ifinfomsg, {}, "ifname", "veth1"}}, "ifname", "veth0"))
     local i = assert(S.interfaces())
     assert(i.veth0, "expect veth0")
     assert(i.veth1, "expect veth1")
