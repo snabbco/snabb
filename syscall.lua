@@ -5944,25 +5944,30 @@ function S.interface(i) -- could optimize just to retrieve info for one
   return ifs[i]
 end
 
+local link_process_f
 local link_process = { -- TODO very incomplete. generate?
   name = function(args, v) return {"ifname", v} end,
   link = function(args, v) return {"link", v} end,
+  address = function(args, v) return {"address", v} end,
   type = function(args, v, tab)
     if v == "vlan" then
       local id = tab.id
       if id then
         tab.id = nil
-        return {"linkinfo", {"kind", v, "data", {"id", id}}}
+        return {"linkinfo", {"kind", "vlan", "data", {"id", id}}}
      end
+    elseif v == "veth" then
+      local peer = tab.peer
+      tab.peer = nil
+      local peertab = link_process_f(peer)
+      return {"linkinfo", {"kind", "veth", "data", {"peer", {t.ifinfomsg, {}, peertab}}}}
     end
     return {"linkinfo", "kind", v}
   end,
 }
 
--- TODO better name. even more general, not just newlink. or make this the exposed newlink interface?
--- I think this is generally a nicer interface to expose than the ones above, for all functions
-function S.iplink(tab)
-  local args = {tab.index or 0, tab.modifier or 0, tab.flags or 0, tab.change or 0}
+function link_process_f(tab, args)
+  args = args or {}
   for _, k in ipairs{"link", "name", "type"} do
     local v = tab[k]
     if v then
@@ -5973,6 +5978,14 @@ function S.iplink(tab)
       end
     end
   end
+  return args
+end
+
+-- TODO better name. even more general, not just newlink. or make this the exposed newlink interface?
+-- I think this is generally a nicer interface to expose than the ones above, for all functions
+function S.iplink(tab)
+  local args = {tab.index or 0, tab.modifier or 0, tab.flags or 0, tab.change or 0}
+  local args = link_process_f(tab, args)
   return S.newlink(unpack(args))
 end
 
