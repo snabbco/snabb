@@ -2651,10 +2651,6 @@ if ffi.abi("64bit") then
   stattypename = "struct stat"
 else
   stattypename = "struct stat64"
-  S.SYS.stat = S.SYS.stat64
-  S.SYS.lstat = S.SYS.lstat64
-  S.SYS.fstat = S.SYS.fstat64
-  S.SYS.fstatat = S.SYS.fstatat64
   C.truncate = ffi.C.truncate64
   C.ftruncate = ffi.C.ftruncate64
 end
@@ -2790,6 +2786,7 @@ t.uintptr = ffi.typeof("uintptr_t")
 t.size = ffi.typeof("size_t")
 t.mode = ffi.typeof("mode_t")
 t.dev = ffi.typeof("dev_t")
+t.loff = ffi.typeof("loff_t")
 
 t.sa_family = ffi.typeof("sa_family_t")
 t.msghdr = ffi.typeof("struct msghdr")
@@ -2818,7 +2815,6 @@ t.sighandler = ffi.typeof("sighandler_t")
 t.sigaction = ffi.typeof("struct sigaction")
 t.clockid = ffi.typeof("clockid_t")
 t.inotify_event = ffi.typeof("struct inotify_event")
-t.loff = ffi.typeof("loff_t")
 t.io_event = ffi.typeof("struct io_event")
 t.seccomp_data = ffi.typeof("struct seccomp_data")
 t.iovec = ffi.typeof("struct iovec")
@@ -3406,6 +3402,7 @@ pt.sockaddr_in6 = ptt(t.sockaddr_in6)
 pt.sockaddr_nl = ptt(t.sockaddr_nl)
 pt.macaddr = ptt(t.macaddr)
 pt.rtmsg = ptt(t.rtmsg)
+pt.stat = ptt(t.stat)
 
 local voidp = ffi.typeof("void *")
 
@@ -3614,6 +3611,35 @@ function C.getpid()
   return C.syscall(S.SYS.getpid)
 end
 
+-- for stat we use the syscall as libc will tend to have a different struct stat for compatibility
+if ffi.abi("64bit") then
+  function C.stat(path, buf)
+    return C.syscall(S.SYS.stat, path, pt.void(buf))
+  end
+  function C.lstat(path, buf)
+    return C.syscall(S.SYS.lstat, path, pt.void(buf))
+  end
+  function C.fstat(fd, buf)
+    return C.syscall(S.SYS.fstat, t.int(fd), pt.void(buf))
+  end
+  function C.fstatat(fd, path, buf, flags)
+    return C.syscall(S.SYS.fstatat, t.int(fd), path, pt.void(buf), t.int(flags))
+  end
+else
+  function C.stat(path, buf)
+    return C.syscall(S.SYS.stat64, path, pt.void(buf))
+  end
+  function C.lstat(path, buf)
+    return C.syscall(S.SYS.lstat64, path, pt.void(buf))
+  end
+  function C.fstat(fd, buf)
+    return C.syscall(S.SYS.fstat64, t.int(fd), pt.void(buf))
+  end
+  function C.fstatat(fd, path, buf, flags)
+    return C.syscall(S.SYS.fstatat64, t.int(fd), path, pt.void(buf), t.int(flags))
+  end
+end
+
 -- these syscalls may not be in supported libc
 
 -- note dev_t not passed as 64 bits to this syscall
@@ -3625,6 +3651,8 @@ function CC.mknodat(fd, pathname, mode, dev)
 end
 
 -- these might not be in libc
+
+-- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
   function CC.fallocate(fd, mode, offset, len)
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
@@ -3992,28 +4020,28 @@ end
 
 function S.stat(path, buf)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS.stat, path, pt.void(buf))
+  local ret = C.stat(path, buf)
   if ret == -1 then return nil, t.error() end
   return buf
 end
 
 function S.lstat(path, buf)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS.lstat, path, pt.void(buf))
+  local ret = C.lstat(path, buf)
   if ret == -1 then return nil, t.error() end
   return buf
 end
 
 function S.fstat(fd, buf)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS.fstat, t.int(getfd(fd)), pt.void(buf))
+  local ret = C.fstat(getfd(fd), buf)
   if ret == -1 then return nil, t.error() end
   return buf
 end
 
 function S.fstatat(fd, path, buf, flags)
   if not buf then buf = t.stat() end
-  local ret = C.syscall(S.SYS.fstatat, t.int(getfd_at(fd)), path, pt.void(buf), t.int(flaglist(flags, "AT_", {"AT_NO_AUTOMOUNT", "AT_SYMLINK_NOFOLLOW"})))
+  local ret = C.fstatat(getfd_at(fd), path, buf, flaglist(flags, "AT_", {"AT_NO_AUTOMOUNT", "AT_SYMLINK_NOFOLLOW"}))
   if ret == -1 then return nil, t.error() end
   return buf
 end
