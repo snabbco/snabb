@@ -1,5 +1,7 @@
 #!/bin/luajit
 
+-- Work in progress - not complete or tested yet
+
 -- basic init process
 -- note we do not catch all errors as we cannot do much about them
 
