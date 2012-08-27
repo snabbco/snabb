@@ -3661,6 +3661,11 @@ function CC.setns(fd, nstype)
   return C.syscall(S.SYS.setns, t.int(fd), t.int(nstype))
 end
 
+-- getdents is not provided by glibc. Musl does provide it and it is the right one (getdents64). Be careful with other libc.
+function CC.getdents(fd, buf, size)
+  return C.syscall(S.SYS.getdents64, t.int(fd), buf, t.uint(size))
+end
+
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
   function CC.fallocate(fd, mode, offset, len)
@@ -3902,7 +3907,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
   local d = {}
   local ret
   repeat
-    ret = C.syscall(S.SYS.getdents64, t.int(getfd(fd)), buf, t.uint(size))
+    ret = C.getdents(getfd(fd), buf, size)
     if ret == -1 then return nil, t.error() end
     local i = 0
     while i < ret do
