@@ -2,6 +2,7 @@
 
 local strict = require "strict"
 local S = require "syscall"
+local nl = require "nl"
 local bit = require "bit"
 
 setmetatable(S, {__index = function(i, k) error("bad index access on S: " .. k) end})
@@ -1147,7 +1148,7 @@ test_sockets = {
 
 test_netlink = {
   test_getlink = function()
-    local i = assert(S.getlink())
+    local i = assert(nl.getlink())
     local df = assert(S.ls("/sys/class/net", true))
     assert_equal(#df, #i, "expect same number of interfaces as /sys/class/net")
     assert(i.lo, "expect a loopback interface")
@@ -1180,12 +1181,12 @@ test_netlink = {
       assert_equal(tostring(wlan.macaddr) .. '\n', mac, "mac address should match that from /sys")
     end
   end,
-  test_bridge_list = function()
+  test_bridge_list = function() -- TODO not in netlink tests
     local b = assert(S.bridge_list())
   end,
   test_get_addresses_in = function()
-    local as = assert(S.getaddr("inet"))
-    local lo = assert(S.getlink()).lo.index
+    local as = assert(nl.getaddr("inet"))
+    local lo = assert(nl.getlink()).lo.index
     for i = 1, #as do
       if as[i].index == lo then
         assert_equal(tostring(as[i].addr), "127.0.0.1", "loopback ipv4 on lo")
@@ -1193,8 +1194,8 @@ test_netlink = {
     end
   end,
   test_get_addresses_in6 = function()
-    local as = assert(S.getaddr("inet6"))
-    local lo = assert(S.getlink()).lo.index
+    local as = assert(nl.getaddr("inet6"))
+    local lo = assert(nl.getlink()).lo.index
     for i = 1, #as do
       if as[i].index == lo then
         assert_equal(tostring(as[i].addr), "::1", "loopback ipv6 on lo") -- allow fail if no ipv6
@@ -1202,7 +1203,7 @@ test_netlink = {
     end
   end,
   test_interfaces = function()
-    local i = S.interfaces()
+    local i = nl.interfaces()
     assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
     assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
   end,
@@ -1210,9 +1211,9 @@ test_netlink = {
     local p = assert(S.clone())
      if p == 0 then
       fork_assert(S.unshare("newnet"))
-      local i = fork_assert(S.interfaces())
+      local i = fork_assert(nl.interfaces())
       fork_assert(i.lo and not i.lo.flags.up, "expect new network ns has down lo interface")
-      fork_assert(S.newlink(i.lo.index, 0, "up", "up"))
+      fork_assert(nl.newlink(i.lo.index, 0, "up", "up"))
       local lo = fork_assert(i.lo:refresh())
       fork_assert(lo.flags.up, "expect lo up now")
       S.exit()
@@ -1222,7 +1223,7 @@ test_netlink = {
     end
   end,
   test_interface_up_down_root = function()
-    local i = assert(S.interfaces())
+    local i = assert(nl.interfaces())
     assert(i.lo:down())
     assert(not i.lo.flags.up, "expect lo down")
     assert(i.lo:up())
@@ -1232,7 +1233,7 @@ test_netlink = {
     local p = assert(S.clone())
      if p == 0 then
       fork_assert(S.unshare("newnet"))
-      local i = fork_assert(S.interfaces())
+      local i = fork_assert(nl.interfaces())
       fork_assert(i.lo, "expect new network ns has lo interface")
       fork_assert(not i.lo.flags.up, "expect new network lo is down")
       fork_assert(i.lo:setflags("up"))
@@ -1244,7 +1245,7 @@ test_netlink = {
     end
   end,
   test_interface_set_mtu_root = function()
-    local i = assert(S.interfaces())
+    local i = assert(nl.interfaces())
     local lo = assert(i.lo, "expect lo interface")
     assert(lo:up())
     assert(lo.flags.up, "expect lo up now")
@@ -1254,11 +1255,11 @@ test_netlink = {
     assert(lo:setmtu(mtu))
   end,
   test_interface_set_mtu_byname_root = function()
-    local i = assert(S.interfaces())
+    local i = assert(nl.interfaces())
     local lo = assert(i.lo, "expect lo interface")
     local mtu = lo.mtu
     assert(lo:up())
-    assert(S.newlink(0, 0, "up", "up", "ifname", "lo", "mtu", 16000))
+    assert(nl.newlink(0, 0, "up", "up", "ifname", "lo", "mtu", 16000))
     assert(lo:refresh())
     assert_equal(lo.mtu, 16000, "expect MTU now 16000")
     assert(lo.flags.up, "expect lo up now")
@@ -1267,7 +1268,7 @@ test_netlink = {
   test_interface_rename_root = function()
     -- using bridge to test this as no other interface in container yet and not sure you can rename lo
     assert(S.bridge_add("br0"))
-    local i = assert(S.interfaces())
+    local i = assert(nl.interfaces())
     assert(i.br0)
     assert(i.br0:rename("newname"))
     assert(i:refresh())
@@ -1275,9 +1276,9 @@ test_netlink = {
     assert(S.bridge_del("newname"))
   end,
   test_interface_set_macaddr_root = function()
-    -- using bridge to test this as no other interface in container yet
+    -- using bridge to test this as no other interface in container yet (now could use dummy)
     assert(S.bridge_add("br0"))
-    local i = assert(S.interfaces())
+    local i = assert(nl.interfaces())
     assert(i.br0)
     assert(i.br0:setmac("46:9d:c9:06:dd:dd"))
     assert_equal(tostring(i.br0.macaddr), "46:9d:c9:06:dd:dd", "interface should have new mac address")
@@ -1285,41 +1286,41 @@ test_netlink = {
     assert(S.bridge_del("br0"))
   end,
   test_interface_set_macaddr_fail = function()
-    local i = assert(S.interfaces())
+    local i = assert(nl.interfaces())
     assert(i.lo, "expect to find lo")
-    local ok, err = S.newlink(i.lo.index, 0, 0, 0, "address", "46:9d:c9:06:dd:dd")
+    local ok, err = nl.newlink(i.lo.index, 0, 0, 0, "address", "46:9d:c9:06:dd:dd")
     assert(not ok and err and (err.EPERM or err.EOPNOTSUPP), "should not be able to change macaddr on lo")
   end,
   test_newlink_error_root = function()
-    local ok, err = S.newlink(-1, 0, "up", "up")
+    local ok, err = nl.newlink(-1, 0, "up", "up")
     assert(not ok, "expect bogus newlink to fail")
     assert(err.NODEV, "expect no such device error")
   end,
   test_newlink_newif_dummy_root = function()
-    local ok, err = S.create_interface{name = "dummy0", type = "dummy"}
-    local i = assert(S.interfaces())
+    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    local i = assert(nl.interfaces())
     assert(i.dummy0, "expect dummy interface")
-    assert(S.dellink(i.dummy0.index))
+    assert(nl.dellink(i.dummy0.index))
   end,
   test_newlink_newif_bridge_root = function()
-    assert(S.create_interface{name = "br0", type = "bridge"})
-    local i = assert(S.interfaces())
+    assert(nl.create_interface{name = "br0", type = "bridge"})
+    local i = assert(nl.interfaces())
     assert(i.br0, "expect bridge interface")
     local b = assert(S.bridge_list())
     assert(b.br0, "expect to find new bridge")
-    assert(S.dellink(i.br0.index))
+    assert(nl.dellink(i.br0.index))
   end,
   test_dellink_by_name_root = function()
-    assert(S.create_interface{name = "dummy0", type = "dummy"})
-    local i = assert(S.interfaces())
+    assert(nl.create_interface{name = "dummy0", type = "dummy"})
+    local i = assert(nl.interfaces())
     assert(i.dummy0, "expect dummy interface")
-    assert(S.dellink(0, "ifname", "dummy0"))
-    local i = assert(S.interfaces())
+    assert(nl.dellink(0, "ifname", "dummy0"))
+    local i = assert(nl.interfaces())
     assert(not i.dummy0, "expect dummy interface gone")
   end,
   test_newaddr_root = function()
-    local lo = assert(S.interface("lo"))
-    assert(S.newaddr(lo, "inet6", 128, "permanent", "address", "::2"))
+    local lo = assert(nl.interface("lo"))
+    assert(nl.newaddr(lo, "inet6", 128, "permanent", "address", "::2"))
     assert(lo:refresh())
     assert_equal(#lo.inet6, 2, "expect two inet6 addresses on lo now")
     if tostring(lo.inet6[1].addr) == "::1"
@@ -1328,14 +1329,14 @@ test_netlink = {
     end
     assert_equal(lo.inet6[2].prefixlen, 128, "expect /128")
     assert_equal(lo.inet6[1].prefixlen, 128, "expect /128")
-    assert(S.deladdr(lo.index, "inet6", 128, "address", "::2"))
+    assert(nl.deladdr(lo.index, "inet6", 128, "address", "::2"))
     assert(lo:refresh())
     assert_equal(#lo.inet6, 1, "expect one inet6 addresses on lo now")
     assert_equal(tostring(lo.inet6[1].addr), "::1", "expect only ::1 now")
     -- TODO this leaves a route to ::2 which we should delete
   end,
   test_getroute_inet = function()
-    local r = assert(S.routes("inet", "unspec"))
+    local r = assert(nl.routes("inet", "unspec"))
     local nr = r:match("127.0.0.0/32")
     assert_equal(#nr, 1, "expect 1 route")
     local lor = nr[1]
@@ -1343,7 +1344,7 @@ test_netlink = {
     assert_equal(lor.output, "lo", "expect to be on lo")
   end,
   test_getroute_inet6 = function()
-    local r = assert(S.routes("inet6", "unspec"))
+    local r = assert(nl.routes("inet6", "unspec"))
     local nr = r:match("::1/128")
     assert_equal(#nr, 1, "expect one matched route")
     local lor = nr[1]
@@ -1351,9 +1352,9 @@ test_netlink = {
     assert_equal(lor.output, "lo", "expect to be on lo")
   end,
   test_newroute_inet6_root = function()
-    local r = assert(S.routes("inet6", "unspec"))
-    local lo = assert(S.interface("lo"))
-    assert(S.newroute("create", {family = "inet6", dst_len = 128, type = "unicast", protocol = "static"}, "dst", "::3", "oif", lo.index))
+    local r = assert(nl.routes("inet6", "unspec"))
+    local lo = assert(nl.interface("lo"))
+    assert(nl.newroute("create", {family = "inet6", dst_len = 128, type = "unicast", protocol = "static"}, "dst", "::3", "oif", lo.index))
     r:refresh()
     local nr = r:match("::3/128")
     assert_equal(#nr, 1, "expect to find new route")
@@ -1361,27 +1362,27 @@ test_netlink = {
     assert_equal(nr.oif, lo.index, "expect route on lo")
     assert_equal(nr.output, "lo", "expect route on lo")
     assert_equal(nr.dst_len, 128, "expect /128")
-    assert(S.delroute({family = "inet6", dst_len = 128}, "dst", "::3", "oif", lo.index))
+    assert(nl.delroute({family = "inet6", dst_len = 128}, "dst", "::3", "oif", lo.index))
     r:refresh()
     local nr = r:match("::3/128")
     assert_equal(#nr, 0, "expect route deleted")
   end,
   test_move_interface_ns_root = function()
     local fds = assert(S.pipe())
-    assert(S.create_interface{name = "dummy0", type = "dummy"})
-    local i = assert(S.interfaces())
+    assert(nl.create_interface{name = "dummy0", type = "dummy"})
+    local i = assert(nl.interfaces())
     assert(i.dummy0, "expect dummy0 interface")
     local p = assert(S.clone("newnet"))
     if p == 0 then
       fork_assert(fds:read(nil, 1)) -- wait until interface moved. TODO wait for event from netlink listener instead?
-      local i = fork_assert(S.interfaces())
+      local i = fork_assert(nl.interfaces())
       fork_assert(i.dummy0, "expect dummy0 interface in child")
-      fork_assert(S.dellink(0, "ifname", "dummy0"))
+      fork_assert(nl.dellink(0, "ifname", "dummy0"))
       fork_assert(i:refresh())
       fork_assert(not i.dummy0, "expect no dummy if")
       S.exit()
     else
-      assert(S.newlink(i.dummy0.index, 0, 0, 0, "net_ns_pid", p))
+      assert(nl.newlink(i.dummy0.index, 0, 0, 0, "net_ns_pid", p))
       assert(i:refresh())
       assert(fds:write(".")) -- say we are ready
       assert(not i.dummy0, "expect dummy0 vanished")
@@ -1391,22 +1392,22 @@ test_netlink = {
     end
   end,
   test_netlink_veth_root = function()
-    assert(S.newlink(0, S.NLM_F_CREATE, 0, 0, "linkinfo", {"kind", "veth", "data", {"peer", {t.ifinfomsg, {}, "ifname", "veth1"}}}, "ifname", "veth0"))
-    local i = assert(S.interfaces())
+    assert(nl.newlink(0, S.NLM_F_CREATE, 0, 0, "linkinfo", {"kind", "veth", "data", {"peer", {t.ifinfomsg, {}, "ifname", "veth1"}}}, "ifname", "veth0"))
+    local i = assert(nl.interfaces())
     assert(i.veth0, "expect veth0")
     assert(i.veth1, "expect veth1")
-    assert(S.dellink(0, "ifname", "veth0"))
+    assert(nl.dellink(0, "ifname", "veth0"))
     assert(i:refresh())
     assert(not i.veth0, "expect no veth0")
     assert(not i.veth1, "expect no veth1")
   end,
   test_create_veth_root = function()
     -- TODO create_interface version
-    assert(S.create_interface{name = "veth0", type = "veth", peer = {name = "veth1"}})
-    local i = assert(S.interfaces())
+    assert(nl.create_interface{name = "veth0", type = "veth", peer = {name = "veth1"}})
+    local i = assert(nl.interfaces())
     assert(i.veth0, "expect veth0")
     assert(i.veth1, "expect veth1")
-    assert(S.dellink(0, "ifname", "veth0"))
+    assert(nl.dellink(0, "ifname", "veth0"))
     assert(i:refresh())
     assert(not i.veth0, "expect no veth0")
     assert(not i.veth1, "expect no veth1")
@@ -1750,7 +1751,7 @@ test_namespaces_root = {
   test_netns = function()
     local p = assert(S.clone("newnet"))
     if p == 0 then
-      local i = fork_assert(S.interfaces())
+      local i = fork_assert(nl.interfaces())
       fork_assert(i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       S.exit()
     else
@@ -1761,7 +1762,7 @@ test_namespaces_root = {
     local p = assert(S.clone())
     if p == 0 then
       local ok = fork_assert(S.unshare("newnet"))
-      local i = fork_assert(S.interfaces())
+      local i = fork_assert(nl.interfaces())
       fork_assert(i.lo and not i.lo.flags.up, "expect new network ns only has down lo interface")
       S.exit()
     else
@@ -1856,12 +1857,12 @@ test_misc_root = {
     local ok, err = S.bridge_add("br0")
     assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
     if ok then
-      local i = assert(S.interfaces())
+      local i = assert(nl.interfaces())
       assert(i.br0)
       local b = assert(S.bridge_list())
       assert(b.br0 and b.br0.bridge.root_id, "expect to find bridge in list")
       assert(S.bridge_del("br0"))
-      i = assert(S.interfaces())
+      i = assert(nl.interfaces())
       assert(not i.br0, "bridge should be gone")
     end
   end,
@@ -1873,7 +1874,7 @@ test_misc_root = {
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
   assert(S.unshare("newnet, newns, newuts")) -- do not interfere with anything on host during tests
-  local i = assert(S.interfaces())
+  local i = assert(nl.interfaces())
   local lo = assert(i.lo)
   assert(lo:up())
   assert(S.mount("none", "/sys", "sysfs"))
