@@ -5559,7 +5559,7 @@ local ifla_msg_types = {
   },
   ifla_info = {
     [S.IFLA_INFO_KIND] = "ascii",
-    [S.IFLA_INFO_DATA] = {"ifla_vlan", "IFLA_VLAN_"},
+    [S.IFLA_INFO_DATA] = "kind",
   },
   ifla_vlan = {
     [S.IFLA_VLAN_ID] = t.uint16,
@@ -5589,7 +5589,7 @@ local ifla_msg_types = {
     --          RTA_FLOW
     --          RTA_CACHEINFO
   },
-  veth = {
+  veth_info = {
     -- VETH_INFO_UNSPEC
     [S.VETH_INFO_PEER] = {"ifla", "IFLA_"},
   },
@@ -5626,7 +5626,7 @@ static const struct nla_policy ifla_port_policy[IFLA_PORT_MAX+1] = {
 };
 ]]
 
-local function ifla_getmsg(args, messages, values, tab, lookup, af)
+local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
   local msg = table.remove(args, 1)
   local value, len
   local tp
@@ -5636,10 +5636,10 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
     len = 0
     while #nargs ~= 0 do
       local nlen
-      nlen, nargs, messages, values = ifla_getmsg(nargs, messages, values, tab, lookup, af)
+      nlen, nargs, messages, values, kind = ifla_getmsg(nargs, messages, values, tab, lookup, kind, af)
       len = len + nlen
     end
-    return len, args, messages, values
+    return len, args, messages, values, kind
   end
 
   if type(msg) == "cdata" then
@@ -5650,20 +5650,22 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
     len = ffi.sizeof(value)
     messages[#messages + 1] = tp
     values[#values + 1] = value
-    return len, args, messages, values
+    return len, args, messages, values, kind
   end
 
   local rawmsg = msg
 
-  -- TODO more general method for this, special cased
-  if msg == "veth_info_peer" then
-    lookup = "VETH_"
-    tab = "veth"
-  end
-
   msg = stringflag(msg, lookup)
   tp = ifla_msg_types[tab][msg]
   if not tp then error("unknown message type " .. rawmsg .. " in " .. tab .. " lookup " .. lookup) end
+
+  if tp == "kind" then
+    local kinds = {
+      vlan = {"ifla_vlan", "IFLA_VLAN_"},
+      veth = {"veth_info", "VETH_INFO_"},
+    }
+    tp = kinds[kind]
+  end
 
   if type(tp) == "table" then
     value = {rta_type = msg} -- missing rta_len, but have reference and can fix
@@ -5671,18 +5673,24 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
     messages[#messages + 1] = t.rtattr
     values[#values + 1] = value
 
-    len, args, messages, values = ifla_getmsg(args, messages, values, tp[1], tp[2])
+    tab, lookup = tp[1], tp[2]
+
+    len, args, messages, values, kind = ifla_getmsg(args, messages, values, tab, lookup, kind, af)
     len = nlmsg_align(s.rtattr) + len
 
     value.rta_len = len
 
-    return len, args, messages, values
+    return len, args, messages, values, kind
 
   -- recursion base case, just a value, not nested
 
   else
     value = table.remove(args, 1)
     if not value then error("not enough arguments") end
+  end
+
+  if tab == "ifla_info" and msg == S.IFLA_INFO_KIND then
+    kind = value
   end
 
   local slen
@@ -5710,16 +5718,16 @@ local function ifla_getmsg(args, messages, values, tab, lookup, af)
   values[#values + 1] = {rta_type = msg, rta_len = slen}
   values[#values + 1] = value
 
-  return len, args, messages, values
+  return len, args, messages, values, kind
 end
 
 local function ifla_f(tab, lookup, af, ...)
-  local len
+  local len, kind
   local messages, values = {}, {}
 
   local args = {...}
   while #args ~= 0 do
-    len, args, messages, values = ifla_getmsg(args, messages, values, tab, lookup, af)
+    len, args, messages, values, kind = ifla_getmsg(args, messages, values, tab, lookup, kind, af)
   end
 
   local results = {nlmsgbuffer(unpack(messages))}
@@ -5730,8 +5738,6 @@ local function ifla_f(tab, lookup, af, ...)
     local result, value = table.remove(results, 1), table.remove(values, 1)
     if type(value) == "string" then
       ffi.copy(result, value)
-    --elseif type(value) == "cdata" then
-    --  ffi.copy(result[0], value, ffi.sizeof(value))
     else
       result[0] = value
     end
