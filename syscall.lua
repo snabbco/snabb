@@ -2333,7 +2333,7 @@ typedef struct siginfo {
     } sigfault;
 
     struct {
-      long int si_band;   /* Band event for SIGPOLL.  */
+      long int si_band;
        int si_fd;
     } sigpoll;
   } sifields;
@@ -2364,8 +2364,8 @@ if arch.epoll then arch.epoll()
 else
 ffi.cdef[[
 struct epoll_event {
-  uint32_t events;      /* Epoll events */
-  epoll_data_t data;    /* User data variable */
+  uint32_t events;
+  epoll_data_t data;
 };
 ]]
 end
@@ -4891,14 +4891,14 @@ function S.clock_nanosleep(clk_id, flags, req, rem)
   return true
 end
 
--- straight passthroughs, as no failure possible
-S.getuid = C.getuid
-S.geteuid = C.geteuid
-S.getppid = C.getppid
-S.getgid = C.getgid
-S.getegid = C.getegid
-S.sync = C.sync
-S.alarm = C.alarm
+-- straight passthroughs, no failure possible, still wrap to allow mocking
+function S.getuid() return C.getuid() end
+function S.geteuid() return C.geteuid() end
+function S.getppid() return C.getppid() end
+function S.getgid() return C.getgid() end
+function S.getegid() return C.getegid() end
+function S.sync() return C.sync() end
+function S.alarm(s) return C.alarm(s) end
 
 function S.getpid()
   return C.syscall(S.SYS.getpid) -- bypass glibc caching of pids
