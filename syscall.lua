@@ -4807,7 +4807,7 @@ end
 
 function S.io_destroy(ctx)
   if ctx.ctx == 0 then return end
-  local ret = retbool(C.syscall(S.SYS.io_destroy, ctx:n()))
+  local ret = retbool(C.syscall(S.SYS.io_destroy, ctx.ctx))
   ctx.ctx = 0
   return ret
 end
@@ -4847,7 +4847,7 @@ end
 function S.io_cancel(ctx, iocb, result)
   iocb = getiocb(iocb)
   if not result then result = t.io_event() end
-  local ret = C.syscall(S.SYS.io_cancel, ctx:n(), iocb, result)
+  local ret = C.syscall(S.SYS.io_cancel, ctx.ctx, iocb, result)
   if ret == -1 then return nil, t.error() end
   return ret
 end
@@ -4855,7 +4855,7 @@ end
 function S.io_getevents(ctx, min, nr, timeout, events)
   if not events then events = t.io_events(nr) end
   if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
-  local ret = C.syscall(S.SYS.io_getevents, ctx:n(), t.long(min), t.long(nr), events, timeout)
+  local ret = C.syscall(S.SYS.io_getevents, ctx.ctx, t.long(min), t.long(nr), events, timeout)
   if ret == -1 then return nil, t.error() end
   -- need to think more about how to return these, eg metatype for io_event?
   local r = {}
@@ -4870,7 +4870,7 @@ end
 
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
   iocb, nr = getiocbs(iocb)
-  return retnum(C.syscall(S.SYS.io_submit, ctx:n(), t.long(nr), iocb))
+  return retnum(C.syscall(S.SYS.io_submit, ctx.ctx, t.long(nr), iocb))
 end
 
 -- map for valid options for arg2
@@ -5694,8 +5694,7 @@ S.stdout = ffi.gc(t.fd(S.STDOUT_FILENO), nil)
 S.stderr = ffi.gc(t.fd(S.STDERR_FILENO), nil)
 
 t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
-  __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel,
-             n = function(ctx) return t.ulong(ctx.ctx) end},
+  __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel},
   __gc = S.io_destroy
 })
 
