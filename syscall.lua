@@ -3673,6 +3673,14 @@ if ffi.abi("32bit") then
   end
 end
 
+-- native Linux aio not generally supported, only posix API
+function C.io_setup(nr_events, ctx)
+  return C.syscall(S.SYS.io_setup, t.uint(nr_events), ctx)
+end
+function C.io_destroy(ctx)
+  return C.syscall(S.SYS.io_destroy, ctx)
+end
+
 -- these syscalls may not be supported in libc being used
 
 -- note dev_t not passed as 64 bits to this syscall
@@ -4800,14 +4808,14 @@ end
 -- aio functions
 function S.io_setup(nr_events)
   local ctx = t.aio_context()
-  local ret = C.syscall(S.SYS.io_setup, t.uint(nr_events), ctx)
+  local ret = C.io_setup(nr_events, ctx)
   if ret == -1 then return nil, t.error() end
   return ctx
 end
 
 function S.io_destroy(ctx)
   if ctx.ctx == 0 then return end
-  local ret = retbool(C.syscall(S.SYS.io_destroy, ctx.ctx))
+  local ret = retbool(C.io_destroy(ctx.ctx))
   ctx.ctx = 0
   return ret
 end
