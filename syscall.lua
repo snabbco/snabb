@@ -3709,6 +3709,15 @@ end
 function CC.clock_nanosleep(clk_id, flags, req, rem)
   return C.syscall(S.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
 end
+function CC.clock_getres(clk_id, ts)
+  return C.syscall(S.SYS.clock_getres, t.clockid(clk_id), pt.void(ts))
+end
+function CC.clock_gettime(clk_id, ts)
+  return C.syscall(S.SYS.clock_gettime, t.clockid(clk_id), pt.void(ts))
+end
+function CC.clock_settime(clk_id, ts)
+  return C.syscall(S.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
+end
 
 -- these ones for aligment reasons need 32 bit splits
 if ffi.abi("64bit") then
@@ -3734,6 +3743,11 @@ if not pcall(inlibc, "tee") then C.tee = CC.tee end
 if not pcall(inlibc, "timerfd_create") then C.timerfd_create = CC.timerfd_create end
 if not pcall(inlibc, "timerfd_settime") then C.timerfd_settime = CC.timerfd_settime end
 if not pcall(inlibc, "timerfd_gettime") then C.timerfd_gettime = CC.timerfd_gettime end
+
+-- not in either Musl or eglibc
+if not pcall(inlibc, "clock_getres") then C.clock_getres = CC.clock_getres end
+if not pcall(inlibc, "clock_settime") then C.clock_settime = CC.clock_settime end
+if not pcall(inlibc, "clock_gettime") then C.clock_gettime = CC.clock_gettime end
 
 -- not in eglibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
@@ -4951,21 +4965,21 @@ end
 
 function S.clock_getres(clk_id, ts)
   if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
-  local ret = C.syscall(S.SYS.clock_getres, t.clockid(stringflag(clk_id, "CLOCK_")), pt.void(ts))
+  local ret = C.clock_getres(stringflag(clk_id, "CLOCK_"), ts)
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
   if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
-  local ret = C.syscall(S.SYS.clock_gettime, t.clockid(stringflag(clk_id, "CLOCK_")), pt.void(ts))
+  local ret = C.clock_gettime(stringflag(clk_id, "CLOCK_"), ts)
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_settime(clk_id, ts)
   if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
-  return retbool(C.syscall(S.SYS.clock_settime, t.int(stringflag(clk_id, "CLOCK_")), pt.void(ts)))
+  return retbool(C.clock_settime(stringflag(clk_id, "CLOCK_"), ts))
 end
 
 function S.clock_nanosleep(clk_id, flags, req, rem)

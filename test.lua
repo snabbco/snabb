@@ -867,6 +867,7 @@ test_timers_signals = {
   test_clock = function()
     local tt = assert(S.clock_getres("realtime"))
     local tt = assert(S.clock_gettime("realtime"))
+    -- TODO add settime
   end,
   test_clock_nanosleep = function()
     local rem = assert(S.clock_nanosleep("realtime", nil, 0.001))

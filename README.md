@@ -115,7 +115,7 @@ There will no doubt be bugs, please report them if you find them.
 ### Missing functions etc
 
 pselect, ppoll
-timer\_create, timer\_getoverrun
+timer\_create, timer\_getoverrun, clock_adjtime
 sigqueue,
 capset, capget
 pivot\_root, init\_module, delete\_module, query\_module, get_\kernel\_syms, swapon, swapoff
