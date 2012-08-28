@@ -5494,6 +5494,8 @@ function S.mounts(file)
     end
     mounts[#mounts + 1] = l
   end
+  -- TODO some of the options you get in /proc/mounts are file system specific and should be moved to l.data
+  -- idea is you can round-trip this data
   return mounts
 end
 
