@@ -55,6 +55,7 @@ local efile = "/tmp/tmpXXYYY" .. S.getpid() .. ".sh"
 local t, pt = S.t, S.pt
 
 local clean = function()
+  S.rmdir(tmpfile)
   S.unlink(tmpfile)
   S.unlink(tmpfile2)
   S.unlink(longfile)
@@ -1847,6 +1848,24 @@ test_misc_root = {
     assert(S.mount{source = "none", target = tmpfile, type = "tmpfs", flags = "rdonly, noatime"})
     assert(S.umount(tmpfile))
     assert(S.rmdir(tmpfile))
+  end,
+  test_mounts = function()
+    local cwd = assert(S.getcwd())
+    local dir = cwd .. tmpfile
+    assert(S.mkdir(dir))
+    local a = {source = "none", target = dir, type = "tmpfs", flags = "rdonly, noatime"}
+    assert(S.mount(a))
+    local m = assert(S.mounts())
+    assert(#m > 0, "expect at least one mount point")
+    local b = m[#m]
+    assert_equal(b.source, a.source, "expect source match")
+    assert_equal(b.target, a.target, "expect target match")
+    assert_equal(b.type, a.type, "expect type match")
+    assert_equal(S.stringflags(b.flags, "MS_"), S.stringflags(a.flags, "MS_"), "expect flags match")
+    assert_equal(b.freq, "0")
+    assert_equal(b.passno, "0")
+    assert(S.umount(dir))
+    assert(S.rmdir(dir))
   end,
   test_acct = function()
     S.acct() -- may not be configured

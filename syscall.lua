@@ -162,11 +162,6 @@ S.MAP_NONBLOCK   = 0x10000
 S.MAP_STACK      = 0x20000
 S.MAP_HUGETLB    = 0x40000
 
--- flags to `msync'.
-S.MS_ASYNC       = 1
-S.MS_SYNC        = 4
-S.MS_INVALIDATE  = 2
-
 -- flags for `mlockall'.
 S.MCL_CURRENT    = 1
 S.MCL_FUTURE     = 2
@@ -1208,10 +1203,19 @@ S.MS_STRICTATIME = bit.lshift(1, 24)
 S.MS_ACTIVE = bit.lshift(1, 30)
 S.MS_NOUSER = bit.lshift(1, 31)
 
+-- fake flags
+S.MS_RO = S.MS_RDONLY -- allow use of "ro" as flag as that is what /proc/mounts uses
+S.MS_RW = 0           -- allow use of "rw" as flag as appears in /proc/mounts
+
 S.MNT_FORCE = 1
 S.MNT_DETACH = 2
 S.MNT_EXPIRE = 4
 S.UMOUNT_NOFOLLOW = 8
+
+-- flags to `msync'.
+S.MS_ASYNC       = 1
+S.MS_SYNC        = 4
+S.MS_INVALIDATE  = 2
 
 -- reboot
 S.LINUX_REBOOT_CMD_RESTART      =  0x01234567
@@ -5463,7 +5467,8 @@ mt.ps = {
 }
 
 function S.ps()
-  local ls = S.ls("/proc")
+  local ls, err = S.ls("/proc")
+  if not ls then return nil, err end
   local ps = {}
   for i = 1, #ls do
     if not string.match(ls[i], '[^%d]') then
@@ -5473,6 +5478,23 @@ function S.ps()
   end
   table.sort(ps, function(a, b) return a.pid < b.pid end)
   return setmetatable(ps, mt.ps)
+end
+
+function S.mounts(file)
+  local mf, err = S.readfile(file or "/proc/mounts")
+  if not mf then return nil, err end
+  local mounts = {}
+  for line in mf:gmatch("[^\r\n]+") do
+    local l = {}
+    local parts = {"source", "target", "type", "flags", "freq", "passno"}
+    local p = 1
+    for word in line:gmatch("%S+") do
+      l[parts[p]] = word
+      p = p + 1
+    end
+    mounts[#mounts + 1] = l
+  end
+  return mounts
 end
 
 -- these functions are all just ioctls can do natively
