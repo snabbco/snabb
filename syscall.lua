@@ -4541,7 +4541,15 @@ function S.poll(fds, timeout)
 end
 
 function S.mount(source, target, filesystemtype, mountflags, data)
-  return retbool(C.mount(source, target, filesystemtype, stringflags(mountflags, "MS_"), data or nil))
+  if type(source) == "table" then
+    local t = source
+    source = t.source
+    target = t.target
+    filesystemtype = t.type
+    mountflags = t.flags
+    data = t.data
+  end
+  return retbool(C.mount(source, target, filesystemtype, stringflags(mountflags, "MS_"), data))
 end
 
 function S.umount(target, flags)

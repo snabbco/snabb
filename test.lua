@@ -1842,6 +1842,12 @@ test_misc_root = {
     assert(S.umount(tmpfile, "mnt_detach, umount_nofollow"))
     assert(S.rmdir(tmpfile))
   end,
+  test_mount_table = function()
+    assert(S.mkdir(tmpfile))
+    assert(S.mount{source = "none", target = tmpfile, type = "tmpfs", flags = "rdonly, noatime"})
+    assert(S.umount(tmpfile))
+    assert(S.rmdir(tmpfile))
+  end,
   test_acct = function()
     S.acct() -- may not be configured
   end,
