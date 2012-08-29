@@ -1852,7 +1852,7 @@ test_misc_root = {
   end,
   test_mounts = function()
     local cwd = assert(S.getcwd())
-    local dir = cwd .. tmpfile
+    local dir = cwd .. "/" .. tmpfile
     assert(S.mkdir(dir))
     local a = {source = "none", target = dir, type = "tmpfs", flags = "rdonly, noatime"}
     assert(S.mount(a))
