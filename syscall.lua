@@ -3680,6 +3680,15 @@ end
 function C.io_destroy(ctx)
   return C.syscall(S.SYS.io_destroy, ctx)
 end
+function C.io_cancel(ctx, iocb, result)
+  return C.syscall(S.SYS.io_cancel, ctx, iocb, result)
+end
+function C.io_getevents(ctx, min, nr, timeout, events)
+  return C.syscall(S.SYS.io_getevents, ctx, t.long(min), t.long(nr), events, timeout)
+end
+function C.io_submit(ctx, iocb, nr)
+  return C.syscall(S.SYS.io_submit, ctx, t.long(nr), iocb)
+end
 
 -- these syscalls may not be supported in libc being used
 
@@ -4855,7 +4864,7 @@ end
 function S.io_cancel(ctx, iocb, result)
   iocb = getiocb(iocb)
   if not result then result = t.io_event() end
-  local ret = C.syscall(S.SYS.io_cancel, ctx.ctx, iocb, result)
+  local ret = C.io_cancel(ctx.ctx, iocb, result)
   if ret == -1 then return nil, t.error() end
   return ret
 end
@@ -4863,7 +4872,7 @@ end
 function S.io_getevents(ctx, min, nr, timeout, events)
   if not events then events = t.io_events(nr) end
   if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
-  local ret = C.syscall(S.SYS.io_getevents, ctx.ctx, t.long(min), t.long(nr), events, timeout)
+  local ret = C.io_getevents(ctx.ctx, min, nr, events, timeout)
   if ret == -1 then return nil, t.error() end
   -- need to think more about how to return these, eg metatype for io_event?
   local r = {}
@@ -4876,9 +4885,9 @@ function S.io_getevents(ctx, min, nr, timeout, events)
   return r
 end
 
-function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args
+function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args TODO redo like iov so no nr
   iocb, nr = getiocbs(iocb)
-  return retnum(C.syscall(S.SYS.io_submit, ctx.ctx, t.long(nr), iocb))
+  return retnum(C.io_submit(ctx.ctx, iocb, nr))
 end
 
 -- map for valid options for arg2
