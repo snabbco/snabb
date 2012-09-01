@@ -122,10 +122,16 @@ S.F_SETPIPE_SZ  = 1031
 S.F_GETPIPE_SZ  = 1032
 S.F_DUPFD_CLOEXEC = 1030
 
--- actually use the normal ones
-S.F_GETLK64     = S.F_GETLK
-S.F_SETLK64     = S.F_SETLK
-S.F_SETLKW64    = S.F_SETLKW
+-- messy
+if ffi.abi("64bit") then
+  S.F_GETLK64     = S.F_GETLK
+  S.F_SETLK64     = S.F_SETLK
+  S.F_SETLKW64    = S.F_SETLKW
+else
+  S.F_GETLK       = S.F_GETLK64
+  S.F_SETLK       = S.F_SETLK64
+  S.F_SETLKW      = S.F_SETLKW64
+end
 
 S.FD_CLOEXEC = 1
 
