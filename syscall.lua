@@ -3691,7 +3691,7 @@ end
 function C.io_cancel(ctx, iocb, result)
   return C.syscall(S.SYS.io_cancel, ctx, iocb, result)
 end
-function C.io_getevents(ctx, min, nr, timeout, events)
+function C.io_getevents(ctx, min, nr, events, timeout)
   return C.syscall(S.SYS.io_getevents, ctx, t.long(min), t.long(nr), events, timeout)
 end
 function C.io_submit(ctx, iocb, nr)
@@ -4877,7 +4877,7 @@ function S.io_cancel(ctx, iocb, result)
   return ret
 end
 
-function S.io_getevents(ctx, min, nr, timeout, events)
+function S.io_getevents(ctx, min, nr, events, timeout)
   if not events then events = t.io_events(nr) end
   if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
   local ret = C.io_getevents(ctx.ctx, min, nr, events, timeout)
