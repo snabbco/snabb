@@ -2786,37 +2786,39 @@ local function addtype(name, tp)
   S.ctypes[tp] = t[name]
 end
 
-addtype("char")
-t.uchar = ffi.typeof("unsigned char")
-t.int = ffi.typeof("int")
-t.uint = ffi.typeof("unsigned int")
-t.uint16 = ffi.typeof("uint16_t")
-t.int32 = ffi.typeof("int32_t")
-t.uint32 = ffi.typeof("uint32_t")
-t.int64 = ffi.typeof("int64_t")
-t.uint64 = ffi.typeof("uint64_t")
-t.long = ffi.typeof("long")
-t.ulong = ffi.typeof("unsigned long")
-t.uintptr = ffi.typeof("uintptr_t")
-t.size = ffi.typeof("size_t")
-t.mode = ffi.typeof("mode_t")
-t.dev = ffi.typeof("dev_t")
-t.loff = ffi.typeof("loff_t")
+local addtypes = {
+  {"char"},
+  {"uchar", "unsigned char"},
+  {"int"},
+  {"uint", "unsigned int"},
+  {"uint16", "uint16_t"},
+  {"int32", "int32_t"},
+  {"uint32", "uint32_t"},
+  {"int64", "int64_t"},
+  {"uint64", "uint64_t"},
+  {"long"},
+  {"ulong", "unsigned long"},
+  {"uintptr", "uintptr_t"},
+  {"size", "size_t"},
+  {"mode", "mode_t"},
+  {"dev", "dev_t"},
+  {"loff", "loff_t"},
+  {"sa_family", "sa_family_t"},
 
-t.sa_family = ffi.typeof("sa_family_t")
-t.msghdr = ffi.typeof("struct msghdr")
-t.cmsghdr = ffi.typeof("struct cmsghdr")
-t.ucred = ffi.typeof("struct ucred")
-t.sysinfo = ffi.typeof("struct sysinfo")
-t.fdset = ffi.typeof("fd_set")
-t.fdmask = ffi.typeof("fd_mask")
-t.epoll_event = ffi.typeof("struct epoll_event")
-t.off = ffi.typeof("off_t")
-t.nlmsghdr = ffi.typeof("struct nlmsghdr")
-t.rtgenmsg = ffi.typeof("struct rtgenmsg")
-t.rtmsg = ffi.typeof("struct rtmsg")
-t.ifinfomsg = ffi.typeof("struct ifinfomsg")
-t.ifaddrmsg = ffi.typeof("struct ifaddrmsg")
+  {"fdset", "fd_set"},
+  {"fdmask", "fd_mask"},
+
+  {"msghdr", "struct msghdr"},
+  {"cmsghdr", "struct cmsghdr"},
+  {"ucred", "struct ucred"},
+  {"sysinfo", "struct sysinfo"},
+  {"epoll_event", "struct epoll_event"},
+  {"nlmsghdr", "struct nlmsghdr"},
+  {"rtgenmsg", "struct rtgenmsg"},
+  {"rtmsg", "struct rtmsg"},
+  {"ifinfomsg", "struct ifinfomsg"},
+  {"ifaddrmsg", "struct ifaddrmsg"},
+}
 t.rtattr = ffi.typeof("struct rtattr")
 t.rta_cacheinfo = ffi.typeof("struct rta_cacheinfo")
 t.nlmsgerr = ffi.typeof("struct nlmsgerr")
@@ -2860,6 +2862,8 @@ t.uid1 = ffi.typeof("uid_t[1]")
 t.gid1 = ffi.typeof("gid_t[1]")
 t.int2 = ffi.typeof("int[2]")
 t.timespec2 = ffi.typeof("struct timespec[2]")
+
+for _, v in ipairs(addtypes) do addtype(v[1], v[2]) end
 
 -- types with metatypes
 t.error = ffi.metatype("struct {int errno;}", {
