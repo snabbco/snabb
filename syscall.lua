@@ -2778,18 +2778,23 @@ function S.mode(mode) return stringflags(mode, "S_") end
 
 -- Lua type constructors corresponding to defined types
 -- basic types
+
+-- cast to pointer to a type. could generate for all types.
+local function ptt(tp)
+  local ptp = ffi.typeof("$ *", tp)
+  return function(x) return ffi.cast(ptp, x) end
+end
+
 S.ctypes = {} -- map from C names to types. Used for tests, but might be useful otherwise
 
-local function addtype(name, tp)
+local function addtype(name, tp, mt)
   tp = tp or name
-  t[name] = ffi.typeof(tp)
+  if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
   S.ctypes[tp] = t[name]
+  pt[name] = ptt(t[name])
 end
 
-local function metatype(name, tp, mt)
-  t[name] = ffi.metatype(tp, mt)
-  S.ctypes[tp] = t[name]
-end
+local metatype = addtype
 
 local addtypes = {
   {"char"},
@@ -3397,37 +3402,6 @@ metatype("sigset", "sigset_t", {
     if sig then return sigismember(set, sig) end
   end
 })
-
--- cast to pointer to a type. could generate for all types.
-local function ptt(tp)
-  local ptp = ffi.typeof("$ *", tp)
-  return function(x) return ffi.cast(ptp, x) end
-end
-
-pt.uchar = ptt(t.uchar)
-pt.char = ptt(t.char)
-pt.int = ptt(t.int)
-pt.uint = ptt(t.uint)
-pt.uint32 = ptt(t.uint32)
-
-pt.nlmsghdr = ptt(t.nlmsghdr)
-pt.rtattr = ptt(t.rtattr)
-pt.ifinfomsg = ptt(t.ifinfomsg)
-pt.ifaddrmsg = ptt(t.ifaddrmsg)
-pt.nlmsgerr = ptt(t.nlmsgerr)
-pt.cmsghdr = ptt(t.cmsghdr)
-pt.fdb_entry = ptt(t.fdb_entry)
-pt.signalfd_siginfo = ptt(t.signalfd_siginfo)
-pt.linux_dirent64 = ptt(t.linux_dirent64)
-pt.inotify_event = ptt(t.inotify_event)
-pt.ucred = ptt(t.ucred)
-pt.sockaddr_un = ptt(t.sockaddr_un)
-pt.sockaddr_in = ptt(t.sockaddr_in)
-pt.sockaddr_in6 = ptt(t.sockaddr_in6)
-pt.sockaddr_nl = ptt(t.sockaddr_nl)
-pt.macaddr = ptt(t.macaddr)
-pt.rtmsg = ptt(t.rtmsg)
-pt.stat = ptt(t.stat)
 
 local voidp = ffi.typeof("void *")
 

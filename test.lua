@@ -1033,7 +1033,7 @@ test_sockets = {
       if s:bind(sa) then break end
     end
     local ba = assert(s:getsockname())
-    assert(ba.sin_family == 2, "expect family on getsockname to be AF_INET=2")
+    assert_equal(ba.sin_family, 2, "expect family on getsockname to be AF_INET=2")
     assert(s:listen()) -- will fail if we did not bind
     local c = assert(S.socket("inet", "stream")) -- client socket
     assert(c:nonblock())
