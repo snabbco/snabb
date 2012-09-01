@@ -13,6 +13,7 @@ S.ctypes["struct stat64"] = nil
 S.ctypes["struct fdb_entry"] = nil
 S.ctypes["struct seccomp_data"] = nil
 S.ctypes["sighandler_t"] = nil
+S.ctypes["struct rlimit64"] = nil
 
 -- fixes for constants
 S.__WALL = S.WALL; S.WALL = nil
