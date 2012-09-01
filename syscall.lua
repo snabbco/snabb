@@ -2840,7 +2840,6 @@ local addtypes = {
   {"sighandler", "sighandler_t"},
   {"sigaction", "struct sigaction"},
   {"clockid", "clockid_t"},
-  {"inotify_event", "struct inotify_event"},
   {"io_event", "struct io_event"},
   {"seccomp_data", "struct seccomp_data"},
   {"iovec", "struct iovec"},
@@ -2855,6 +2854,7 @@ local addtypes = {
 for _, v in ipairs(addtypes) do addtype(v[1], v[2]) end
 
 -- these ones not in table as not helpful with vararg or arrays
+t.inotify_event = ffi.typeof("struct inotify_event")
 t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
 t.io_events = ffi.typeof("struct io_event[?]")
 t.iocbs = ffi.typeof("struct iocb[?]")
@@ -2875,6 +2875,9 @@ t.uid1 = ffi.typeof("uid_t[1]")
 t.gid1 = ffi.typeof("gid_t[1]")
 t.int2 = ffi.typeof("int[2]")
 t.timespec2 = ffi.typeof("struct timespec[2]")
+
+-- still need pointers to these
+pt.inotify_event = ptt(t.inotify_event)
 
 -- types with metatypes
 metatype("error", "struct {int errno;}", {
