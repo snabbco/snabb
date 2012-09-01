@@ -203,4 +203,5 @@ Misc list of ideas, no particular order
 24. netlink listen for events
 25. fix fs specific mount ops so can round-trip mounts
 26. fix aio
+27. automate ctest.lua to do full compile and run
 
