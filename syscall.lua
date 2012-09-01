@@ -92,8 +92,6 @@ S.S_IROTH = octal('00004')
 S.S_IWOTH = octal('00002')
 S.S_IXOTH = octal('00001')
 
-if ffi.abi('32bit') then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end -- never required
-
 -- access
 S.R_OK = 4
 S.W_OK = 2

@@ -12,13 +12,41 @@ S.ctypes["struct flock64"] = nil
 S.ctypes["struct stat64"] = nil
 S.ctypes["struct fdb_entry"] = nil
 S.ctypes["struct seccomp_data"] = nil
+S.ctypes["sighandler_t"] = nil
+
+-- fixes for constants
+S.__WALL = S.WALL; S.WALL = nil
+S.__WCLONE = S.WCLONE; S.WCLONE = nil
+
+-- remove seccomp for now as no support on the ARM box
+for k, _ in pairs(S) do
+  if k:sub(1, 8) == 'SECCOMP_' then S[k] = nil end
+end
+
+-- fake constants
+S.MS_RO = nil
+S.MS_RW = nil
+S.IFF_ALL = nil
+S.IFF_NONE = nil
+
+-- TODO find the headers/flags for these if exist, or remove
+S.SA_RESTORER = nil
+S.AF_DECNET = nil
+S.SIG_HOLD = nil
+S.NOTHREAD = nil
+S.RTF_PREFIX_RT = nil
+S.RTF_EXPIRES = nil
+S.RTF_ROUTEINFO = nil
+S.RTF_ANYCAST = nil
 
 -- include kitchen sink, garbage can etc
 print [[
 #include "assert.h"
 
+#define _GNU_SOURCE
 #define __USE_GNU
 
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -43,15 +71,45 @@ print [[
 #include <linux/posix_types.h>
 #include <linux/if.h>
 #include <linux/if_bridge.h>
+#include <sys/mman.h>
+#include <sched.h>
+#include <sys/xattr.h>
+#include <linux/if_arp.h>
+#include <sys/capability.h>
+#include <linux/sched.h>
+#include <termios.h>
+#include <unistd.h>
+#include <sys/prctl.h>
+#include <sys/mount.h>
+#include <sys/uio.h>
+#include <net/route.h>
+#include <sys/inotify.h>
+#include <sys/wait.h>
+#include <linux/mman.h>
+#include <linux/veth.h>
+#include <linux/sockios.h>
+#include <dirent.h>
+#include <linux/reboot.h>
+#include <sys/timerfd.h>
+#include <linux/falloc.h>
+#include <sys/eventfd.h>
 
 int main(int argc, char **argv) {
 ]]
 
 -- iterate over S.ctypes
-
 for k, v in pairs(S.ctypes) do
   print("assert(sizeof(" .. k .. ") == " .. ffi.sizeof(v) .. ");")
-end;
+end
+
+-- test all the constants
+
+for k, v in pairs(S) do
+  if type(S[k]) == "number" then
+    print("assert(" .. k .. " == " .. v .. ");")
+  end
+end
+
 
 print [[
 }
