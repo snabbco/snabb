@@ -9,6 +9,7 @@ local s, t = S.s, S.t
 S.ctypes["struct linux_dirent64"] = nil
 S.ctypes["struct statfs64"] = nil
 S.ctypes["struct flock64"] = nil
+S.ctypes["struct stat64"] = nil
 S.ctypes["struct fdb_entry"] = nil
 
 -- include kitchen sink, garbage can etc
