@@ -2818,30 +2818,34 @@ local addtypes = {
   {"rtmsg", "struct rtmsg"},
   {"ifinfomsg", "struct ifinfomsg"},
   {"ifaddrmsg", "struct ifaddrmsg"},
-}
-t.rtattr = ffi.typeof("struct rtattr")
-t.rta_cacheinfo = ffi.typeof("struct rta_cacheinfo")
-t.nlmsgerr = ffi.typeof("struct nlmsgerr")
-t.timex = ffi.typeof("struct timex")
-t.utsname = ffi.typeof("struct utsname")
-t.rlimit = ffi.typeof("struct rlimit")
-t.fdb_entry = ffi.typeof("struct fdb_entry")
-t.signalfd_siginfo = ffi.typeof("struct signalfd_siginfo")
-t.iocb = ffi.typeof("struct iocb")
-t.sighandler = ffi.typeof("sighandler_t")
-t.sigaction = ffi.typeof("struct sigaction")
-t.clockid = ffi.typeof("clockid_t")
-t.inotify_event = ffi.typeof("struct inotify_event")
-t.io_event = ffi.typeof("struct io_event")
-t.seccomp_data = ffi.typeof("struct seccomp_data")
-t.iovec = ffi.typeof("struct iovec")
-t.rtnl_link_stats = ffi.typeof("struct rtnl_link_stats")
-t.statfs = ffi.typeof("struct statfs64")
-t.ifreq = ffi.typeof("struct ifreq")
-t.linux_dirent64 = ffi.typeof("struct linux_dirent64")
-t.ifa_cacheinfo = ffi.typeof("struct ifa_cacheinfo")
-t.flock = ffi.typeof("struct flock64")
 
+  {"rtattr", "struct rtattr")
+  {"rta_cacheinfo", "struct rta_cacheinfo")
+  {"nlmsgerr", "struct nlmsgerr")
+  {"timex", "struct timex")
+  {"utsname", "struct utsname")
+  {"rlimit", "struct rlimit")
+  {"fdb_entry", "struct fdb_entry")
+  {"signalfd_siginfo", "struct signalfd_siginfo")
+  {"iocb", "struct iocb")
+  {"sighandler", "sighandler_t")
+  {"sigaction", "struct sigaction")
+  {"clockid", "clockid_t")
+  {"inotify_event", "struct inotify_event")
+  {"io_event", "struct io_event")
+  {"seccomp_data", "struct seccomp_data")
+  {"iovec", "struct iovec")
+  {"rtnl_link_stats", "struct rtnl_link_stats")
+  {"statfs", "struct statfs64")
+  {"ifreq", "struct ifreq")
+  {"linux_dirent64", = "struct linux_dirent64")
+  {"ifa_cacheinfo", "struct ifa_cacheinfo")
+  {"flock", "struct flock64")
+}
+
+for _, v in ipairs(addtypes) do addtype(v[1], v[2]) end
+
+-- these ones not in table as not helpful with vararg or arrays
 t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
 t.io_events = ffi.typeof("struct io_event[?]")
 t.iocbs = ffi.typeof("struct iocb[?]")
@@ -2863,7 +2867,6 @@ t.gid1 = ffi.typeof("gid_t[1]")
 t.int2 = ffi.typeof("int[2]")
 t.timespec2 = ffi.typeof("struct timespec[2]")
 
-for _, v in ipairs(addtypes) do addtype(v[1], v[2]) end
 
 -- types with metatypes
 t.error = ffi.metatype("struct {int errno;}", {
