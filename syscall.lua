@@ -510,10 +510,10 @@ S.TIME_ERROR      = 5
 S.TIME_BAD        = S.TIME_ERROR
 
 mt.timex = {
-  __index = function(t, k)
+  __index = function(timex, k)
     local prefix = "TIME_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(t.state, S[k]) ~= 0 end
+    if S[k] then return bit.band(timex.state, S[k]) ~= 0 end
   end
 }
 
