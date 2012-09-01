@@ -2786,6 +2786,11 @@ local function addtype(name, tp)
   S.ctypes[tp] = t[name]
 end
 
+local function metatype(name, tp, mt)
+  t[name] = ffi.metatype(tp, mt)
+  S.ctypes[tp] = t[name]
+end
+
 local addtypes = {
   {"char"},
   {"uchar", "unsigned char"},
@@ -2866,9 +2871,8 @@ t.gid1 = ffi.typeof("gid_t[1]")
 t.int2 = ffi.typeof("int[2]")
 t.timespec2 = ffi.typeof("struct timespec[2]")
 
-
 -- types with metatypes
-t.error = ffi.metatype("struct {int errno;}", {
+metatype("error", "struct {int errno;}", {
   __tostring = function(e) return S.strerror(e.errno) end,
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
@@ -2892,7 +2896,7 @@ meth.sockaddr = {
   }
 }
 
-t.sockaddr = ffi.metatype("struct sockaddr", {
+metatype("sockaddr", "struct sockaddr", {
   __index = function(sa, k) if meth.sockaddr.index[k] then return meth.sockaddr.index[k](sa) end end,
 })
 
@@ -2906,7 +2910,7 @@ meth.sockaddr_storage = {
 }
 
 -- experiment, see if we can use this as generic type, to avoid allocations.
-t.sockaddr_storage = ffi.metatype("struct sockaddr_storage", {
+metatype("sockaddr_storage", "struct sockaddr_storage", {
   __index = function(sa, k)
     if meth.sockaddr_storage.index[k] then return meth.sockaddr_storage.index[k](sa) end
     local st = samap2[sa.ss_family]
@@ -2957,7 +2961,7 @@ meth.sockaddr_in = {
   }
 }
 
-t.sockaddr_in = ffi.metatype("struct sockaddr_in", {
+metatype("sockaddr_in", "struct sockaddr_in", {
   __index = function(sa, k) if meth.sockaddr_in.index[k] then return meth.sockaddr_in.index[k](sa) end end,
   __newindex = function(sa, k, v) if meth.sockaddr_in.newindex[k] then meth.sockaddr_in.newindex[k](sa, v) end end,
   __new = function(tp, port, addr)
@@ -2980,7 +2984,7 @@ meth.sockaddr_in6 = {
   }
 }
 
-t.sockaddr_in6 = ffi.metatype("struct sockaddr_in6", {
+metatype("sockaddr_in6", "struct sockaddr_in6", {
   __index = function(sa, k) if meth.sockaddr_in6.index[k] then return meth.sockaddr_in6.index[k](sa) end end,
   __newindex = function(sa, k, v) if meth.sockaddr_in6.newindex[k] then meth.sockaddr_in6.newindex[k](sa, v) end end,
   __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers. should we allow table init too?
@@ -2998,7 +3002,7 @@ meth.sockaddr_un = {
   },
 }
 
-t.sockaddr_un = ffi.metatype("struct sockaddr_un", {
+metatype("sockaddr_un", "struct sockaddr_un", {
   __index = function(sa, k) if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end end,
   __new = function(tp) return ffi.new(tp, S.AF_UNIX) end,
 })
@@ -3015,7 +3019,7 @@ meth.sockaddr_nl = {
   }
 }
 
-t.sockaddr_nl = ffi.metatype("struct sockaddr_nl", {
+metatype("sockaddr_nl", "struct sockaddr_nl", {
   __index = function(sa, k) if meth.sockaddr_nl.index[k] then return meth.sockaddr_nl.index[k](sa) end end,
   __newindex = function(sa, k, v) if meth.sockaddr_nl.newindex[k] then meth.sockaddr_nl.newindex[k](sa, v) end end,
   __new = function(tp, pid, groups) return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0) end,
@@ -3055,7 +3059,7 @@ meth.stat = {
   }
 }
 
-t.stat = ffi.metatype(stattypename, { -- either struct stat on 64 bit or struct stat64 on 32 bit
+metatype("stat", stattypename, { -- either struct stat on 64 bit or struct stat64 on 32 bit
   __index = function(st, k) if meth.stat.index[k] then return meth.stat.index[k](st) end end,
 })
 
@@ -3092,12 +3096,12 @@ meth.siginfo = {
   }
 }
 
-t.siginfo = ffi.metatype("struct siginfo", {
+metatype("siginfo", "struct siginfo", {
   __index = function(t, k) if meth.siginfo.index[k] then return meth.siginfo.index[k](t) end end,
   __newindex = function(t, k, v) if meth.siginfo.newindex[k] then meth.siginfo.newindex[k](t, v) end end,
 })
 
-t.macaddr = ffi.metatype("struct {uint8_t mac_addr[6];}", {
+metatype("macaddr", "struct {uint8_t mac_addr[6];}", {
   __tostring = function(m)
     local hex = {}
     for i = 1, 6 do
@@ -3133,7 +3137,7 @@ meth.timeval = {
   }
 }
 
-t.timeval = ffi.metatype("struct timeval", {
+metatype("timeval", "struct timeval", {
   __index = function(tv, k) if meth.timeval.index[k] then return meth.timeval.index[k](tv) end end,
   __newindex = function(tv, k, v) if meth.timeval.newindex[k] then meth.timeval.newindex[k](tv, v) end end,
   __new = function(tp, v)
@@ -3161,7 +3165,7 @@ meth.timespec = {
   }
 }
 
-t.timespec = ffi.metatype("struct timespec", {
+metatype("timespec", "struct timespec", {
   __index = function(tv, k) if meth.timespec.index[k] then return meth.timespec.index[k](tv) end end,
   __newindex = function(tv, k, v) if meth.timespec.newindex[k] then meth.timespec.newindex[k](tv, v) end end,
   __new = function(tp, v)
@@ -3201,7 +3205,7 @@ meth.itimerspec = {
   }
 }
 
-t.itimerspec = ffi.metatype("struct itimerspec", {
+metatype("itimerspec", "struct itimerspec", {
   __index = function(it, k) if meth.itimerspec.index[k] then return meth.itimerspec.index[k](it) end end,
   __new = function(tp, v)
     v = itnormal(v)
@@ -3211,7 +3215,7 @@ t.itimerspec = ffi.metatype("struct itimerspec", {
   end
 })
 
-t.itimerval = ffi.metatype("struct itimerval", {
+metatype("itimerval", "struct itimerval", {
   __index = function(it, k) if meth.itimerspec.index[k] then return meth.itimerspec.index[k](it) end end, -- can use same meth
   __new = function(tp, v)
     v = itnormal(v)
@@ -3252,9 +3256,9 @@ mt.iovecs = {
   end
 }
 
-t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs)
+t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs) -- do not use metatype helper as variable size
 
-t.pollfd = ffi.metatype("struct pollfd", {
+metatype("pollfd", "struct pollfd", {
   __index = function(t, k)
     if k == 'fileno' then return t.fd end
     local prefix = "POLL"
@@ -3287,7 +3291,7 @@ mt.pollfds = {
 
 t.pollfds = ffi.metatype("struct { int count; struct pollfd pfd[?];}", mt.pollfds)
 
-t.in_addr = ffi.metatype("struct in_addr", {
+metatype("in_addr", "struct in_addr", {
   __tostring = function(a) return S.inet_ntoa(a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
@@ -3296,7 +3300,7 @@ t.in_addr = ffi.metatype("struct in_addr", {
   end
 })
 
-t.in6_addr = ffi.metatype("struct in6_addr", {
+metatype("in6_addr", "struct in6_addr", {
   __tostring = function(a) return S.inet_ntop(S.AF_INET6, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
@@ -3382,7 +3386,7 @@ local function sigdelsets(set, sigs) -- allow multiple
   return set
 end
 
-t.sigset = ffi.metatype("sigset_t", {
+metatype("sigset", "sigset_t", {
   __index = function(set, k)
     if k == 'add' then return sigaddsets end
     if k == 'del' then return sigdelsets end
