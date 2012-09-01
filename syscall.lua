@@ -2778,7 +2778,15 @@ function S.mode(mode) return stringflags(mode, "S_") end
 
 -- Lua type constructors corresponding to defined types
 -- basic types
-t.char = ffi.typeof("char")
+S.ctypes = {} -- map from C names to types. Used for tests, but might be useful otherwise
+
+local function addtype(name, tp)
+  tp = tp or name
+  t[name] = ffi.typeof(tp)
+  S.ctypes[tp] = t[name]
+end
+
+addtype("char")
 t.uchar = ffi.typeof("unsigned char")
 t.int = ffi.typeof("int")
 t.uint = ffi.typeof("unsigned int")
