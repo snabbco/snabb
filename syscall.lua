@@ -609,7 +609,7 @@ S.EPOLLERR = 0x008
 S.EPOLLHUP = 0x010
 S.EPOLLRDHUP = 0x2000
 S.EPOLLONESHOT = bit.lshift(1, 30)
-S.EPOLLET = bit.lshift(1, 31)
+S.EPOLLET = bit.lshift(1, 30) * 2 -- 2^31 but making sure no sign issue 
 
 mt.epoll = {
   __index = function(tab, k)
