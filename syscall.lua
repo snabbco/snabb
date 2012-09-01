@@ -2792,6 +2792,7 @@ local function addtype(name, tp, mt)
   if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
   S.ctypes[tp] = t[name]
   pt[name] = ptt(t[name])
+  s[name] = ffi.sizeof(t[name])
 end
 
 local metatype = addtype
@@ -3419,25 +3420,6 @@ samap2 = {
   [S.AF_NETLINK] = pt.sockaddr_nl,
 }
 
-for k, v in pairs(t) do
-  local ignore = { -- these are not fixed size
-    inotify_event = true,
-    string_array = true,
-    iocb_ptrs = true,
-    io_events = true,
-    ints = true,
-    iocbs = true,
-    iovecs = true,
-    epoll_events = true,
-    pollfds = true,
-    buffer = true,
-    gids = true
-  }
-  if not ignore[k] then
-    s[k] = ffi.sizeof(v)
-  end
-end
-
 -- misc
 
 -- typed values for pointer comparison
@@ -4064,14 +4046,14 @@ function S.setsockopt(fd, level, optname, optval, optlen)
   if not optlen and type(optval) == 'boolean' then if optval then optval = 1 else optval = 0 end end
   if not optlen and type(optval) == 'number' then
     optval = t.int1(optval)
-    optlen = s.int1
+    optlen = s.int
   end
   return retbool(C.setsockopt(getfd(fd), stringflag(level, "SOL_"), stringflag(optname, "SO_"), optval, optlen))
 end
 
 function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool options
   local optval, optlen = t.int1(), t.socklen1()
-  optlen[0] = s.int1
+  optlen[0] = s.int
   local ret = C.getsockopt(getfd(fd), level, optname, optval, optlen)
   if ret == -1 then return nil, t.error() end
   return tonumber(optval[0]) -- no special case for bool
@@ -5188,7 +5170,7 @@ function S.recvmsg(fd, msg, flags)
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == S.SCM_RIGHTS then
         local fda = pt.int(cmsg + 1) -- cmsg_data
-        local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, s.int1)
+        local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, s.int)
         ret.fd = {}
         for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
       end -- add other SOL_SOCKET messages
