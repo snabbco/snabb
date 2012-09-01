@@ -2841,7 +2841,6 @@ local addtypes = {
   {"nlmsgerr", "struct nlmsgerr"},
   {"timex", "struct timex"},
   {"utsname", "struct utsname"},
-  {"rlimit", "struct rlimit64"},
   {"fdb_entry", "struct fdb_entry"},
   {"signalfd_siginfo", "struct signalfd_siginfo"},
   {"iocb", "struct iocb"},
@@ -3152,6 +3151,17 @@ meth.timeval = {
     usec = function(tv, v) tv.tv_usec = v end,
   }
 }
+
+meth.rlimit = {
+  index = {
+    cur = function(r) return tonumber(r.rlim_cur) end,
+    max = function(r) return tonumber(r.rlim_max) end,
+  }
+}
+
+metatype("rlimit", "struct rlimit64", {
+  __index = function(r, k) if meth.rlimit.index[k] then return meth.rlimit.index[k](r) end end,
+})
 
 metatype("timeval", "struct timeval", {
   __index = function(tv, k) if meth.timeval.index[k] then return meth.timeval.index[k](tv) end end,
