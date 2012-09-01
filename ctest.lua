@@ -11,6 +11,7 @@ S.ctypes["struct statfs64"] = nil
 S.ctypes["struct flock64"] = nil
 S.ctypes["struct stat64"] = nil
 S.ctypes["struct fdb_entry"] = nil
+S.ctypes["struct seccomp_data"] = nil
 
 -- include kitchen sink, garbage can etc
 print [[
@@ -39,7 +40,6 @@ print [[
 #include <linux/rtnetlink.h>
 #include <sys/vfs.h>
 #include <sys/timex.h>
-#include <linux/seccomp.h>
 #include <linux/posix_types.h>
 #include <linux/if.h>
 #include <linux/if_bridge.h>
