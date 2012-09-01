@@ -4598,6 +4598,7 @@ function S.prlimit(pid, resource, new_limit)
   return old_limit
 end
 
+-- old rlimit functions are 32 bit only so now defined using prlimit
 function S.getrlimit(resource)
   return S.prlimit(0, resource)
 end
