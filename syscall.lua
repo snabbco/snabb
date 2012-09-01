@@ -2817,7 +2817,6 @@ local addtypes = {
   {"sa_family", "sa_family_t"},
 
   {"fdset", "fd_set"},
-  {"fdmask", "fd_mask"},
 
   {"msghdr", "struct msghdr"},
   {"cmsghdr", "struct cmsghdr"},
