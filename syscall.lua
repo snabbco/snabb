@@ -656,10 +656,10 @@ S.DT_SOCK = 12
 S.DT_WHT = 14
 
 mt.dents = {
-  __index = function(t, k)
+  __index = function(tab, k)
     local prefix = "DT_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return t.type == S[k] end
+    if S[k] then return tab.type == S[k] end
   end
 }
 
