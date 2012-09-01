@@ -260,7 +260,7 @@ S.SIGUNUSED     = 31
 S.SIGCLD        = S.SIGCHLD
 S.SIGPOLL       = S.SIGIO
 
-S.NSIG          = 32
+S.NSIG          = 65
 
 -- sigprocmask
 S.SIG_BLOCK     = 0
