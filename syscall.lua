@@ -1290,10 +1290,10 @@ S.IN_ALL_EVENTS    = S.IN_ACCESS + S.IN_MODIFY + S.IN_ATTRIB + S.IN_CLOSE_WRITE
                        + S.IN_DELETE_SELF + S.IN_MOVE_SELF
 
 mt.inotify = {
-  __index = function(t, k)
+  __index = function(tab, k)
     local prefix = "IN_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(t.mask, S[k]) ~= 0 end
+    if S[k] then return bit.band(tab.mask, S[k]) ~= 0 end
   end
 }
 
