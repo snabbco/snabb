@@ -2818,29 +2818,28 @@ local addtypes = {
   {"rtmsg", "struct rtmsg"},
   {"ifinfomsg", "struct ifinfomsg"},
   {"ifaddrmsg", "struct ifaddrmsg"},
-
-  {"rtattr", "struct rtattr")
-  {"rta_cacheinfo", "struct rta_cacheinfo")
-  {"nlmsgerr", "struct nlmsgerr")
-  {"timex", "struct timex")
-  {"utsname", "struct utsname")
-  {"rlimit", "struct rlimit")
-  {"fdb_entry", "struct fdb_entry")
-  {"signalfd_siginfo", "struct signalfd_siginfo")
-  {"iocb", "struct iocb")
-  {"sighandler", "sighandler_t")
-  {"sigaction", "struct sigaction")
-  {"clockid", "clockid_t")
-  {"inotify_event", "struct inotify_event")
-  {"io_event", "struct io_event")
-  {"seccomp_data", "struct seccomp_data")
-  {"iovec", "struct iovec")
-  {"rtnl_link_stats", "struct rtnl_link_stats")
-  {"statfs", "struct statfs64")
-  {"ifreq", "struct ifreq")
-  {"linux_dirent64", = "struct linux_dirent64")
-  {"ifa_cacheinfo", "struct ifa_cacheinfo")
-  {"flock", "struct flock64")
+  {"rtattr", "struct rtattr"},
+  {"rta_cacheinfo", "struct rta_cacheinfo"},
+  {"nlmsgerr", "struct nlmsgerr"},
+  {"timex", "struct timex"},
+  {"utsname", "struct utsname"},
+  {"rlimit", "struct rlimit"},
+  {"fdb_entry", "struct fdb_entry"},
+  {"signalfd_siginfo", "struct signalfd_siginfo"},
+  {"iocb", "struct iocb"},
+  {"sighandler", "sighandler_t"},
+  {"sigaction", "struct sigaction"},
+  {"clockid", "clockid_t"},
+  {"inotify_event", "struct inotify_event"},
+  {"io_event", "struct io_event"},
+  {"seccomp_data", "struct seccomp_data"},
+  {"iovec", "struct iovec"},
+  {"rtnl_link_stats", "struct rtnl_link_stats"},
+  {"statfs", "struct statfs64"},
+  {"ifreq", "struct ifreq"},
+  {"linux_dirent64", "struct linux_dirent64"},
+  {"ifa_cacheinfo", "struct ifa_cacheinfo"},
+  {"flock", "struct flock64"},
 }
 
 for _, v in ipairs(addtypes) do addtype(v[1], v[2]) end
