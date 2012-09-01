@@ -1078,7 +1078,7 @@ S.AF_PHONET     = 35
 S.AF_IEEE802154 = 36
 S.AF_CAIF       = 37
 S.AF_ALG        = 38
-S.AF_MAX        = 39
+S.AF_NFC        = 39
 
 -- arp types, which are also interface types for ifi_type
 S.ARPHRD_NETROM   = 0
