@@ -1803,6 +1803,7 @@ typedef int32_t daddr_t;
 typedef uint64_t dev_t;
 typedef uint64_t loff_t;
 typedef uint64_t off64_t;
+typedef uint64_t rlim64_t;
 
 // posix standards
 typedef unsigned short int sa_family_t;
@@ -1818,7 +1819,6 @@ typedef long blkcnt_t;
 typedef long clock_t;
 typedef unsigned long ino_t;
 typedef unsigned long nlink_t;
-typedef unsigned long rlim_t;
 typedef unsigned long aio_context_t;
 typedef unsigned long nfds_t;
 
@@ -1877,9 +1877,9 @@ struct ucred { /* this is Linux specific */
   uid_t uid;
   gid_t gid;
 };
-struct rlimit {
-  rlim_t rlim_cur;
-  rlim_t rlim_max;
+struct rlimit64 {
+  rlim64_t rlim_cur;
+  rlim64_t rlim_max;
 };
 struct sysinfo { /* Linux only */
   long uptime;
@@ -2567,8 +2567,7 @@ int ftruncate(int fd, off_t length);
 int truncate64(const char *path, loff_t length);
 int ftruncate64(int fd, loff_t length);
 int pause(void);
-int getrlimit(int resource, struct rlimit *rlim);
-int setrlimit(int resource, const struct rlimit *rlim);
+int prlimit(pid_t pid, int resource, const struct rlimit64 *new_limit, struct rlimit64 *old_limit);
 
 int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);
@@ -2842,7 +2841,7 @@ local addtypes = {
   {"nlmsgerr", "struct nlmsgerr"},
   {"timex", "struct timex"},
   {"utsname", "struct utsname"},
-  {"rlimit", "struct rlimit"},
+  {"rlimit", "struct rlimit64"},
   {"fdb_entry", "struct fdb_entry"},
   {"signalfd_siginfo", "struct signalfd_siginfo"},
   {"iocb", "struct iocb"},
@@ -4578,19 +4577,25 @@ function S.umount(target, flags)
 end
 
 -- unlimited value. TODO metatype should return this to Lua.
-S.RLIM_INFINITY = ffi.cast("rlim_t", -1)
+-- TODO math.huge should be converted to this in __new
+S.RLIM_INFINITY = ffi.cast("rlim64_t", -1)
 
-function S.getrlimit(resource)
-  local rlim = t.rlimit()
-  local ret = C.getrlimit(stringflag(resource, "RLIMIT_"), rlim)
+function S.prlimit(pid, resource, new_limit)
+  if new_limit and not ffi.istype(t.rlimit, new_limit) then new_limit = t.rlimit(new_limit) end
+  local old_limit = t.rlimit()
+  local ret = C.prlimit(pid, stringflag(resource, "RLIMIT_"), new_limit, old_limit)
   if ret == -1 then return nil, t.error() end
-  return rlim
+  return old_limit
 end
 
-function S.setrlimit(resource, rlim, rlim2) -- can pass table, struct, or just both the parameters
-  if rlim and rlim2 then rlim = t.rlimit(rlim, rlim2)
-  elseif type(rlim) == 'table' then rlim = t.rlimit(rlim) end
-  return retbool(C.setrlimit(stringflag(resource, "RLIMIT_"), rlim))
+function S.getrlimit(resource)
+  return S.prlimit(0, resource)
+end
+
+function S.setrlimit(resource, rlim)
+  local ret, err = S.prlimit(0, resource, rlim)
+  if not ret then return nil, err end
+  return true
 end
 
 function S.epoll_create(flags)

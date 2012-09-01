@@ -950,7 +950,7 @@ test_misc = {
     assert(S.setrlimit("nofile", 0, r.rlim_max))
     local fd, err = S.open("/dev/zero", "rdonly")
     assert(err.EMFILE, "should be over rlimit")
-    assert(S.setrlimit("nofile", r.rlim_cur, r.rlim_max)) -- reset
+    assert(S.setrlimit("nofile", r)) -- reset
     fd = assert(S.open("/dev/zero", "rdonly"))
     assert(fd:close())
   end,

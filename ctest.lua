@@ -45,6 +45,9 @@ print [[
 
 #define _GNU_SOURCE
 #define __USE_GNU
+#define _FILE_OFFSET_BITS 64
+#define _LARGE_FILES 1
+#define __USE_FILE_OFFSET64
 
 #include <stdlib.h>
 #include <sys/types.h>
