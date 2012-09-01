@@ -614,10 +614,10 @@ S.EPOLLONESHOT = bit.lshift(1, 30)
 S.EPOLLET = bit.lshift(1, 31)
 
 mt.epoll = {
-  __index = function(t, k)
+  __index = function(tab, k)
     local prefix = "EPOLL"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(t.events, S[k]) ~= 0 end
+    if S[k] then return bit.band(tab.events, S[k]) ~= 0 end
   end
 }
 
