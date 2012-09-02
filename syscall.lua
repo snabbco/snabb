@@ -3026,7 +3026,7 @@ meth.sockaddr_in = {
 metatype("sockaddr_in", "struct sockaddr_in", {
   __index = function(sa, k) if meth.sockaddr_in.index[k] then return meth.sockaddr_in.index[k](sa) end end,
   __newindex = function(sa, k, v) if meth.sockaddr_in.newindex[k] then meth.sockaddr_in.newindex[k](sa, v) end end,
-  __new = function(tp, port, addr)
+  __new = function(tp, port, addr) -- TODO allow table init
     if not ffi.istype(t.in_addr, addr) then
       addr = t.in_addr(addr)
       if not addr then return end
@@ -3049,7 +3049,7 @@ meth.sockaddr_in6 = {
 metatype("sockaddr_in6", "struct sockaddr_in6", {
   __index = function(sa, k) if meth.sockaddr_in6.index[k] then return meth.sockaddr_in6.index[k](sa) end end,
   __newindex = function(sa, k, v) if meth.sockaddr_in6.newindex[k] then meth.sockaddr_in6.newindex[k](sa, v) end end,
-  __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers. should we allow table init too?
+  __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers. TODO allow table init
     if not ffi.istype(t.in6_addr, addr) then
       addr = t.in6_addr(addr)
       if not addr then return end
@@ -3084,7 +3084,12 @@ meth.sockaddr_nl = {
 metatype("sockaddr_nl", "struct sockaddr_nl", {
   __index = function(sa, k) if meth.sockaddr_nl.index[k] then return meth.sockaddr_nl.index[k](sa) end end,
   __newindex = function(sa, k, v) if meth.sockaddr_nl.newindex[k] then meth.sockaddr_nl.newindex[k](sa, v) end end,
-  __new = function(tp, pid, groups) return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0) end,
+  __new = function(tp, pid, groups)
+    if type(pid) == "table" then
+      pid.nl_family = S.AF_NETLINK
+      return ffi.new(tp, pid)
+    end
+    return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0) end,
 })
 
 samap = {

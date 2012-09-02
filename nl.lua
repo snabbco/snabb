@@ -800,8 +800,7 @@ end
 
 -- TODO "route" should be passed in as parameter, test with other netlink types
 local function nlmsg(ntype, flags, af, ...)
-  local a = t.sockaddr_nl() -- kernel will fill in address
-  local sock, err = nl.socket("route", a) 
+  local sock, err = nl.socket("route", {}) -- bind to empty sockaddr_nl, kernel fills address
   if not sock then return nil, err end
 
   local k = t.sockaddr_nl() -- kernel destination
