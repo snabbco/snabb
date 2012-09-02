@@ -3794,18 +3794,12 @@ if not pcall(inlibc, "clock_nanosleep") then C.clock_nanosleep = CC.clock_nanosl
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
-  local ret = C.open(pathname, stringflags(flags, "O_"), S.mode(mode))
-  if ret == -1 then return nil, t.error() end
-  return t.fd(ret)
+  return retfd(C.open(pathname, stringflags(flags, "O_"), S.mode(mode)))
 end
 
 function S.dup(oldfd, newfd, flags)
-  local ret
-  if newfd == nil then ret = C.dup(getfd(oldfd))
-  elseif flags == nil then ret = C.dup2(getfd(oldfd), getfd(newfd))
-  else ret = C.dup3(getfd(oldfd), getfd(newfd), flags) end
-  if ret == -1 then return nil, t.error() end
-  return t.fd(ret)
+  if newfd == nil then return retfd(C.dup(getfd(oldfd))) end
+  return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags or 0))
 end
 
 mt.pipe = {
