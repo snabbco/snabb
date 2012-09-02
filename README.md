@@ -199,7 +199,7 @@ Misc list of ideas, no particular order
 20. Standard lua support, eventually. Might start with luasocket support for netlink, but there is a lot of work to do.
 21. make more modular, started with netlink and arch specific but needs more.
 22. udev (uses netlink)
-23. netlink listen for events
+23. netlink listen for events - started, needs more work
 24. fix fs specific mount ops so can round-trip mounts
 25. fix aio
 26. automate ctest.lua to do full compile and run
