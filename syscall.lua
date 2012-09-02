@@ -2630,8 +2630,6 @@ int ioctl(int d, int request, void *argp); /* void* easiest here */
 
 // functions from libc ie man 3 not man 2
 void exit(int status);
-int inet_aton(const char *cp, struct in_addr *inp);
-char *inet_ntoa(struct in_addr in);
 int inet_pton(int af, const char *src, void *dst);
 const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 
@@ -3318,10 +3316,10 @@ mt.pollfds = {
 t.pollfds = ffi.metatype("struct { int count; struct pollfd pfd[?];}", mt.pollfds)
 
 metatype("in_addr", "struct in_addr", {
-  __tostring = function(a) return S.inet_ntoa(a) end,
+  __tostring = function(a) return S.inet_ntop(S.AF_INET, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = S.inet_aton(s, addr) end
+    if s then addr = S.inet_pton(S.AF_INET, s, addr) end
     return addr
   end
 })
@@ -3544,24 +3542,16 @@ end
 -- functions from section 3 that we use for ip addresses etc
 function S.strerror(errno) return ffi.string(C.strerror(errno)) end
 
-function S.inet_aton(s, addr)
-  if not addr then addr = t.in_addr() end
-  local ret = C.inet_aton(s, addr)
-  if ret == 0 then return nil end
-  return addr
-end
-
-function S.inet_ntoa(addr)
-  local b = pt.uchar(addr)
-  return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
-end
-
 local INET6_ADDRSTRLEN = 46
 local INET_ADDRSTRLEN = 16
 
 function S.inet_ntop(af, src)
   af = stringflag(af, "AF_")
-  local len = INET6_ADDRSTRLEN -- could shorten for ipv4
+  if af == S.AF_INET then
+    local b = pt.uchar(src)
+    return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
+  end
+  local len = INET6_ADDRSTRLEN
   local dst = t.buffer(len)
   local ret = C.inet_ntop(af, src, dst, len)
   if ret == nil then return nil, t.error() end
@@ -3575,6 +3565,14 @@ function S.inet_pton(af, src, addr)
   if ret == -1 then return nil, t.error() end
   if ret == 0 then return nil end -- maybe return string
   return addr
+end
+
+function S.inet_aton(s)
+  return S.inet_pton(S.AF_INET, s)
+end
+
+function S.inet_ntoa(addr)
+  return S.inet_ntop(S.AF_INET, addr)
 end
 
 t.i6432 = ffi.typeof("union {int64_t i64; int32_t i32[2];}")
