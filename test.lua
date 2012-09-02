@@ -1426,7 +1426,7 @@ test_netlink = {
     assert_equal(#nr, 0, "expect route deleted")
   end,
   test_netlink_events_root = function()
-    local sock = assert(nl.socket("route", {nl_groups = S.RTMGRP_LINK})) -- should allow symbolic names, ie "link"
+    local sock = assert(nl.socket("route", {nl_groups = S.RTMGRP_LINK})) -- TODO allow symbolic names, ie "link"
     assert(nl.create_interface{name = "dummy1", type = "dummy"})
     local m = assert(nl.read(sock))
     assert(m.dummy1, "should find dummy 1 in returned info")
