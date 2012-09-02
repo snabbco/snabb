@@ -1044,7 +1044,7 @@ S.IFF_VOLATILE = S.IFF_LOOPBACK + S.IFF_POINTOPOINT + S.IFF_BROADCAST + S.IFF_EC
                  S.IFF_MASTER + S.IFF_SLAVE + S.IFF_RUNNING + S.IFF_LOWER_UP + S.IFF_DORMANT
 
 -- netlink multicast groups
--- legacy I believe
+-- legacy names, which are masks.
 S.RTMGRP_LINK            = 1
 S.RTMGRP_NOTIFY          = 2
 S.RTMGRP_NEIGH           = 4
@@ -1057,8 +1057,8 @@ S.RTMGRP_IPV6_IFADDR     = 0x100
 S.RTMGRP_IPV6_MROUTE     = 0x200
 S.RTMGRP_IPV6_ROUTE      = 0x400
 S.RTMGRP_IPV6_IFINFO     = 0x800
-S.RTMGRP_DECnet_IFADDR   = 0x1000
-S.RTMGRP_DECnet_ROUTE    = 0x4000
+S.RTMGRP_DECNET_IFADDR   = 0x1000
+S.RTMGRP_DECNET_ROUTE    = 0x4000
 S.RTMGRP_IPV6_PREFIX     = 0x20000
 -- rtnetlink multicast groups (bit numbers not masks)
 S.RTNLGRP_NONE = 0
