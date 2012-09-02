@@ -33,7 +33,7 @@ if p == 0 then -- child
   assert(S.execve("/sbin/init", {"init"}, {}))
   S.exit("failure")
 else -- parent
-  -- move veth1 to child
+  assert(i.veth1:move_ns(p))
 
   assert(S.waitpid(-1, "clone"))
 end
