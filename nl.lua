@@ -761,8 +761,13 @@ local rtpref = {
   [S.RTM_DELROUTE] = {"rta", "RTA_"},
 }
 
+function nl.socket(tp)
+  tp = S.stringflag(tp, "NETLINK_")
+  return S.socket("netlink", "raw", tp)
+end
+
 local function nlmsg(ntype, flags, af, ...)
-  local sock, err = S.socket("netlink", "raw", "route")
+  local sock, err = nl.socket("route")
   if not sock then return nil, err end
   local a = t.sockaddr_nl() -- kernel will fill in address
   local ok, err = sock:bind(a)
