@@ -1377,6 +1377,23 @@ test_netlink = {
     assert_equal(tostring(lo.inet6[1].addr), "::1", "expect only ::1 now")
     -- TODO this leaves a route to ::2 which we should delete
   end,
+  test_newaddr_helper_root = function()
+    local lo = assert(nl.interface("lo"))
+    assert(lo:address("::2/128"))
+    assert(lo:refresh())
+    assert_equal(#lo.inet6, 2, "expect two inet6 addresses on lo now")
+    if tostring(lo.inet6[1].addr) == "::1"
+      then assert_equal(tostring(lo.inet6[2].addr), "::2")
+      else assert_equal(tostring(lo.inet6[1].addr), "::2")
+    end
+    assert_equal(lo.inet6[2].prefixlen, 128, "expect /128")
+    assert_equal(lo.inet6[1].prefixlen, 128, "expect /128")
+    assert(nl.deladdr(lo.index, "inet6", 128, "address", "::2")) -- TODO helper for this
+    assert(lo:refresh())
+    assert_equal(#lo.inet6, 1, "expect one inet6 addresses on lo now")
+    assert_equal(tostring(lo.inet6[1].addr), "::1", "expect only ::1 now")
+    -- TODO this leaves a route to ::2 which we should delete
+  end,
   test_getroute_inet = function()
     local r = assert(nl.routes("inet", "unspec"))
     local nr = r:match("127.0.0.0/32")

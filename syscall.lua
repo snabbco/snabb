@@ -3577,12 +3577,14 @@ function S.inet_ntoa(addr)
 end
 
 -- generic inet name to ip, also with netmask support TODO think of better name?
-function S.inet_name(src)
-  local netmask, addr
-  local a, b = src:find("/", 1, true)
-  if a then
-    netmask = tonumber(src:sub(b + 1))
-    src = src:sub(1, a - 1)
+function S.inet_name(src, netmask)
+  local addr
+  if not netmask then
+    local a, b = src:find("/", 1, true)
+    if a then
+      netmask = tonumber(src:sub(b + 1))
+      src = src:sub(1, a - 1)
+    end
   end
   if src:find(":", 1, true) then -- ipv6
     addr = S.inet_pton(S.AF_INET6, src)
