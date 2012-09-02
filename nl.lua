@@ -766,7 +766,7 @@ function nl.socket(tp, addr)
   local sock, err = S.socket("netlink", "raw", tp)
   if not sock then return nil, err end
   if addr then
-    if not ffi.istype(t.sockaddr_nl, addr) then addr = t.sockaddr_in(addr) end
+    if not ffi.istype(t.sockaddr_nl, addr) then addr = t.sockaddr_nl(addr) end
     local ok, err = S.bind(sock, addr)
     if not ok then
       S.close(sock)
