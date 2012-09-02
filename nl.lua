@@ -778,10 +778,7 @@ end
 
 function nl.write(sock, dest, ntype, flags, af, ...)
   local a, err = sock:getsockname() -- to get bound address
-  if not a then
-    sock:close()
-    return nil, err
-  end
+  if not a then return nil, err end
 
   dest = dest or t.sockaddr_nl() -- kernel destination default
 
