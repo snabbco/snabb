@@ -1388,8 +1388,7 @@ test_netlink = {
     end
     assert_equal(lo.inet6[2].prefixlen, 128, "expect /128")
     assert_equal(lo.inet6[1].prefixlen, 128, "expect /128")
-    assert(nl.deladdr(lo.index, "inet6", 128, "address", "::2")) -- TODO helper for this
-    assert(lo:refresh())
+    assert(lo:deladdr("::2"))
     assert_equal(#lo.inet6, 1, "expect one inet6 addresses on lo now")
     assert_equal(tostring(lo.inet6[1].addr), "::1", "expect only ::1 now")
     -- TODO this leaves a route to ::2 which we should delete

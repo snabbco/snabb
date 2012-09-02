@@ -257,6 +257,15 @@ meth.iflink = {
       if not ok then return nil, err end
       return i:refresh()
     end,
+    deladdr = function(i, address, netmask)
+      if type(address) == "string" then address, netmask = S.inet_name(address, netmask) end
+      if not address then return nil end
+      local af
+      if ffi.istype(t.in6_addr, address) then af = S.AF_INET6 else af = S.AF_INET end
+      local ok, err = nl.deladdr(i.index, af, netmask, "address", address)
+      if not ok then return nil, err end
+      return i:refresh()
+    end,
     rename = function(i, name)
       local ok, err = nl.newlink(i.index, 0, 0, 0, "ifname", name)
       if not ok then return nil, err end
