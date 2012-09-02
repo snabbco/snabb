@@ -2165,12 +2165,6 @@ struct inotify_event {
   uint32_t len;
   char name[?];
 };
-struct linux_dirent {
-  long           d_ino;
-  kernel_off_t   d_off;
-  unsigned short d_reclen;
-  char           d_name[256];
-};
 struct linux_dirent64 {
   uint64_t             d_ino;
   int64_t              d_off;
@@ -2863,7 +2857,7 @@ local addtypes = {
   {"rtnl_link_stats", "struct rtnl_link_stats"},
   {"statfs", "struct statfs64"},
   {"ifreq", "struct ifreq"},
-  {"linux_dirent64", "struct linux_dirent64"},
+  {"dirent", "struct linux_dirent64"},
   {"ifa_cacheinfo", "struct ifa_cacheinfo"},
   {"flock", "struct flock64"},
   {"mqattr", "struct mq_attr"},
@@ -3998,7 +3992,7 @@ end
 
 function S.reboot(cmd) return retbool(C.reboot(stringflag(cmd, "LINUX_REBOOT_CMD_"))) end
 
--- ffi metatype on linux_dirent?
+-- ffi metatype on dirent?
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
   if not buf then
     size = size or 4096
@@ -4011,7 +4005,7 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     if ret == -1 then return nil, t.error() end
     local i = 0
     while i < ret do
-      local dp = pt.linux_dirent64(buf + i)
+      local dp = pt.dirent(buf + i)
       local dd = setmetatable({inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off), type = tonumber(dp.d_type)}, mt.dents)
       d[ffi.string(dp.d_name)] = dd -- could calculate length
       i = i + dp.d_reclen
