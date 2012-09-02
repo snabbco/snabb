@@ -1440,7 +1440,7 @@ test_netlink = {
       fork_assert(not i.dummy0, "expect no dummy if")
       S.exit()
     else
-      assert(nl.newlink(i.dummy0.index, 0, 0, 0, "net_ns_pid", p))
+      assert(i.dummy0:move_ns(p))
       assert(i:refresh())
       assert(fds:write(".")) -- say we are ready
       assert(not i.dummy0, "expect dummy0 vanished")
