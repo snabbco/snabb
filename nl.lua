@@ -494,7 +494,7 @@ local nlmsg_data_decode = {
   end,
 }
 
-function nl.nlmsg_read(s, addr, bufsize) -- maybe we create the sockaddr?
+function nl.read(s, addr, bufsize)
   if not bufsize then bufsize = 8192 end
   local reply = t.buffer(bufsize)
   local ior = t.iovecs{{reply, bufsize}}
@@ -517,7 +517,7 @@ function nl.nlmsg_read(s, addr, bufsize) -- maybe we create the sockaddr?
       if nlmsg_data_decode[tp] then
         r = nlmsg_data_decode[tp](r, buffer + nlmsg_hdrlen, msg.nlmsg_len - nlmsg_hdrlen)
 
-        if r.overrun then return S.nlmsg_read(s, addr, bufsize * 2) end -- TODO add test
+        if r.overrun then return S.read(s, addr, bufsize * 2) end -- TODO add test
         if r.error then return nil, r.error end -- not sure what the errors mean though!
         if r.ack then done = true end
 
@@ -812,7 +812,7 @@ local function nlmsg(ntype, flags, af, ...)
     return nil, err
   end
 
-  local r, err = nl.nlmsg_read(sock, k)
+  local r, err = nl.read(sock, k)
   if not r then
     sock:close()
     return nil, err
