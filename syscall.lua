@@ -3910,19 +3910,11 @@ function S.readlink(path, buffer, size)
   return ffi.string(buffer, ret)
 end
 
-function S.readlinkat(dirfd, path)
-  local size = 256
-  local buffer, ret
-  dirfd = getfd_at(dirfd)
-  repeat
-    buffer = t.buffer(size)
-    ret = tonumber(C.readlinkat(dirfd, path, buffer, size))
-    if ret == -1 then return nil, t.error() end
-    if ret == size then -- possibly truncated
-      buffer = nil
-      size = size * 2
-    end
-  until buffer
+function S.readlinkat(dirfd, path, buffer, size)
+  size = size or S.PATH_MAX
+  buffer = buffer or t.buffer(size)
+  local ret = tonumber(C.readlinkat(getfd_at(dirfd), path, buffer, size))
+  if ret == -1 then return nil, t.error() end
   return ffi.string(buffer, ret)
 end
 
