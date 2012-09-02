@@ -3902,18 +3902,11 @@ function S.faccessat(dirfd, pathname, mode, flags)
   return retbool(C.faccessat(getfd_at(dirfd), pathname, accessflags(mode), flaglist(flags, "AT_", {"AT_EACCESS", "AT_SYMLINK_NOFOLLOW"})))
 end
 
-function S.readlink(path) -- note no idea if name truncated except return value is buffer len, so have to reallocate
-  local size = 256
-  local buffer, ret
-  repeat
-    buffer = t.buffer(size)
-    ret = tonumber(C.readlink(path, buffer, size))
-    if ret == -1 then return nil, t.error() end
-    if ret == size then -- possibly truncated
-      buffer = nil
-      size = size * 2
-    end
-  until buffer
+function S.readlink(path, buffer, size)
+  size = size or S.PATH_MAX
+  buffer = buffer or t.buffer(size)
+  local ret = tonumber(C.readlink(path, buffer, size))
+  if ret == -1 then return nil, t.error() end
   return ffi.string(buffer, ret)
 end
 
