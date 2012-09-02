@@ -1429,8 +1429,7 @@ test_netlink = {
     local sock = assert(nl.socket("route", {nl_groups = S.RTMGRP_LINK})) -- should allow symbolic names, ie "link"
     -- may make sense to use connect
     assert(nl.create_interface{name = "dummy1", type = "dummy"})
-    local a = assert(sock:getsockname())
-    local k = t.sockaddr_nl{nl_pid = a.pid, nl_groups = S.RTMGRP_LINK}
+    local k = t.sockaddr_nl()
     local m = assert(nl.read(sock, k))
     assert(m.dummy1, "should find dummy 1 in returned info")
     assert(nl.dellink(0, "ifname", "dummy1")) -- TODO short form that is just dellink("dummy1")
