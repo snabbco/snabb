@@ -422,6 +422,27 @@ mt.ifaddr = {
   end
 }
 
+local function decode_link(r, buf, len)
+  local iface = pt.ifinfomsg(buf)
+  buf = buf + nlmsg_align(s.ifinfomsg)
+  len = len - nlmsg_align(s.ifinfomsg)
+  local rtattr = pt.rtattr(buf)
+  local ir = setmetatable({ifinfo = t.ifinfomsg()}, mt.iflink)
+  ffi.copy(ir.ifinfo, iface, s.ifinfomsg)
+
+  while rta_ok(rtattr, len) do
+    if ifla_decode[rtattr.rta_type] then
+      ifla_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
+    end
+    rtattr, buf, len = rta_next(rtattr, buf, len)
+  end
+
+  r[ir.name] = ir
+  r[#r + 1] = ir -- array and names
+
+  return r
+end
+
 local nlmsg_data_decode = {
   [S.NLMSG_NOOP] = function(r, buf, len) return r end,
   [S.NLMSG_ERROR] = function(r, buf, len)
@@ -454,26 +475,8 @@ local nlmsg_data_decode = {
 
    return r
   end,
-  [S.RTM_NEWLINK] = function(r, buf, len)
-    local iface = pt.ifinfomsg(buf)
-    buf = buf + nlmsg_align(s.ifinfomsg)
-    len = len - nlmsg_align(s.ifinfomsg)
-    local rtattr = pt.rtattr(buf)
-    local ir = setmetatable({ifinfo = t.ifinfomsg()}, mt.iflink)
-    ffi.copy(ir.ifinfo, iface, s.ifinfomsg)
-
-    while rta_ok(rtattr, len) do
-      if ifla_decode[rtattr.rta_type] then
-        ifla_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
-      end
-      rtattr, buf, len = rta_next(rtattr, buf, len)
-    end
-
-    r[ir.name] = ir
-    r[#r + 1] = ir -- array and names
-
-    return r
-  end,
+  [S.RTM_NEWLINK] = decode_link,
+  [S.RTM_DELLINK] = decode_link,
   [S.RTM_NEWROUTE] = function(r, buf, len)
     local rt = pt.rtmsg(buf)
     buf = buf + nlmsg_align(s.rtmsg)
