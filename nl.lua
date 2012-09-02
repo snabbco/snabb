@@ -761,20 +761,27 @@ local rtpref = {
   [S.RTM_DELROUTE] = {"rta", "RTA_"},
 }
 
-function nl.socket(tp)
+function nl.socket(tp, addr)
   tp = S.stringflag(tp, "NETLINK_")
-  return S.socket("netlink", "raw", tp)
+  local sock, err = S.socket("netlink", "raw", tp)
+  if not sock then return nil, err end
+  if addr then
+    if not ffi.istype(t.sockaddr_nl, addr) then addr = t.sockaddr_in(addr) end
+    local ok, err = S.bind(sock, addr)
+    if not ok then
+      S.close(sock)
+      return nil, err
+    end
+  end
+  return sock
 end
 
+-- TODO split into send and receive
 local function nlmsg(ntype, flags, af, ...)
-  local sock, err = nl.socket("route")
-  if not sock then return nil, err end
   local a = t.sockaddr_nl() -- kernel will fill in address
-  local ok, err = sock:bind(a)
-  if not ok then
-    sock:close()
-    return nil, err
-  end
+  -- TODO "route" should be passed in as parameter, test with other netlink types
+  local sock, err = nl.socket("route", a) 
+  if not sock then return nil, err end
   local a, err = sock:getsockname() -- to get bound address
   if not a then
     sock:close()
