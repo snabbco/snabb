@@ -115,7 +115,7 @@ There will no doubt be bugs, please report them if you find them.
 ### Missing functions etc
 
 pselect, ppoll
-timer\_create, timer\_getoverrun, clock_adjtime
+timer\_create, timer\_getoverrun, clock\_adjtime
 sigqueue,
 capset, capget
 pivot\_root, init\_module, delete\_module, query\_module, get_\kernel\_syms, swapon, swapoff
@@ -125,7 +125,7 @@ getrusage, ptrace
 setfsuid, setfsgid
 setpgid, getpgid, setpgrp, getpgrp
 recvmmsg
-mq\_open, mq\_close, mq\_getattr, mq\_notify, mq\_receive, mq\_send, mq\_unlink -- note glibc wraps these
+mq\_open, mq\_close, mq\_getattr, mq\_notify, mq\_receive, mq\_send, mq\_unlink, mq\_timedrecieve, mq\_timedsend -- note glibc wraps these (in -lrt)
 quotactl, ioprio\_set, ioprio\_get
 setdomainname, bdflush, kexec\_load
 mbind, get\_mpolicy, set\_mpolicy
@@ -140,7 +140,7 @@ open\_by\_handle\_at, name\_by\_handle\_at
 note we will probably implement the posix ipc not sysv, as functionality slightly better.
 sys v ipc: msgctl, msgget, msgrcv, msgsnd, semctl, semget, semop, semtimedop, shmat, shmctl, shmdt, shmget
 
-probably not useful: brk, uselib, socketcall, idle, ipc, modify_ldt, personality, sigreturn, sigaltstack, lookup\_dcookie
+probably not useful: brk, uselib, socketcall, idle, ipc, modify\_ldt, personality, sigreturn, sigaltstack, lookup\_dcookie
 
 from man(3)
 clock_getcpuclockid

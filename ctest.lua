@@ -114,6 +114,7 @@ for k, v in pairs(S) do
   end
 end
 
+-- TODO test error codes
 
 print [[
 }

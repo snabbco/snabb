@@ -1830,6 +1830,7 @@ typedef struct {
   int32_t val[1024 / (8 * sizeof (int32_t))];
 } sigset_t;
 
+typedef int mqd_t;
 typedef int idtype_t; /* defined as enum */
 
 // misc
@@ -2262,6 +2263,9 @@ struct seccomp_data {
   uint64_t instruction_pointer;
   uint64_t args[6];
 };
+struct mq_attr {
+  long mq_flags, mq_maxmsg, mq_msgsize, mq_curmsgs, __unused[4];
+};
 
 /* termios */
 typedef unsigned char	cc_t;
@@ -2629,6 +2633,13 @@ int syscall(int number, ...);
 
 int ioctl(int d, int request, void *argp); /* void* easiest here */
 
+mqd_t mq_open(const char *name, int oflag, mode_t mode, struct mq_attr *attr);
+int mq_getsetattr(mqd_t mqdes, struct mq_attr *newattr, struct mq_attr *oldattr);
+ssize_t mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len, unsigned *msg_prio, const struct timespec *abs_timeout);
+int mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len, unsigned msg_prio, const struct timespec *abs_timeout);
+int mq_notify(mqd_t mqdes, const struct sigevent *sevp);
+int mq_unlink(const char *name);
+
 // functions from libc ie man 3 not man 2
 void exit(int status);
 int inet_pton(int af, const char *src, void *dst);
@@ -2855,6 +2866,7 @@ local addtypes = {
   {"linux_dirent64", "struct linux_dirent64"},
   {"ifa_cacheinfo", "struct ifa_cacheinfo"},
   {"flock", "struct flock64"},
+  {"mqattr", "struct mq_attr"},
 }
 
 for _, v in ipairs(addtypes) do addtype(v[1], v[2]) end
