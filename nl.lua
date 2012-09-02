@@ -798,9 +798,9 @@ function nl.write(sock, dest, ntype, flags, af, ...)
   return sock:sendmsg(m)
 end
 
+-- TODO "route" should be passed in as parameter, test with other netlink types
 local function nlmsg(ntype, flags, af, ...)
   local a = t.sockaddr_nl() -- kernel will fill in address
-  -- TODO "route" should be passed in as parameter, test with other netlink types
   local sock, err = nl.socket("route", a) 
   if not sock then return nil, err end
 
