@@ -776,19 +776,14 @@ function nl.socket(tp, addr)
   return sock
 end
 
--- TODO split into send and receive
-local function nlmsg(ntype, flags, af, ...)
-  local a = t.sockaddr_nl() -- kernel will fill in address
-  -- TODO "route" should be passed in as parameter, test with other netlink types
-  local sock, err = nl.socket("route", a) 
-  if not sock then return nil, err end
+function nl.write(sock, dest, ntype, flags, af, ...)
   local a, err = sock:getsockname() -- to get bound address
   if not a then
     sock:close()
     return nil, err
   end
 
-  local k = t.sockaddr_nl() -- kernel destination
+  dest = dest or t.sockaddr_nl() -- kernel destination default
 
   local tl = rtpref[ntype]
   if not tl then error("NYI: ", ntype) end
@@ -801,10 +796,24 @@ local function nlmsg(ntype, flags, af, ...)
   hdr[0] = {nlmsg_len = len, nlmsg_type = ntype, nlmsg_flags = flags, nlmsg_seq = sock:seq(), nlmsg_pid = a.pid}
 
   local ios = t.iovecs{{buf, len}}
-  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = k, msg_namelen = s.sockaddr_nl}
+  local m = t.msghdr{msg_iov = ios.iov, msg_iovlen = #ios, msg_name = dest, msg_namelen = s.sockaddr_nl}
 
-  local n, err = sock:sendmsg(m)
-  if not n then return nil, err end
+  return sock:sendmsg(m)
+end
+
+local function nlmsg(ntype, flags, af, ...)
+  local a = t.sockaddr_nl() -- kernel will fill in address
+  -- TODO "route" should be passed in as parameter, test with other netlink types
+  local sock, err = nl.socket("route", a) 
+  if not sock then return nil, err end
+
+  local k = t.sockaddr_nl() -- kernel destination
+
+  local ok, err = nl.write(sock, k, ntype, flags, af, ...)
+  if not ok then
+    sock:close()
+    return nil, err
+  end
 
   local r, err = nl.nlmsg_read(sock, k)
   if not r then
