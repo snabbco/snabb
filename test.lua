@@ -1427,14 +1427,12 @@ test_netlink = {
   end,
   test_netlink_events_root = function()
     local sock = assert(nl.socket("route", {nl_groups = S.RTMGRP_LINK})) -- should allow symbolic names, ie "link"
-    -- may make sense to use connect
     assert(nl.create_interface{name = "dummy1", type = "dummy"})
-    local k = t.sockaddr_nl()
-    local m = assert(nl.read(sock, k))
+    local m = assert(nl.read(sock))
     assert(m.dummy1, "should find dummy 1 in returned info")
     assert(m.dummy1:setmac("46:9d:c9:06:dd:dd"))
     assert(nl.dellink(0, "ifname", "dummy1")) -- TODO short form that is just dellink("dummy1")
-    local m = assert(nl.read(sock, k))
+    local m = assert(nl.read(sock))
     assert(m.dummy1, "should get info about deleted interface")
     assert_equal(tostring(m.dummy1.macaddr), "46:9d:c9:06:dd:dd", "should get address that was set")
     assert(sock:close())

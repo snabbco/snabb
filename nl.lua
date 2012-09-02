@@ -499,7 +499,8 @@ local nlmsg_data_decode = {
 }
 
 function nl.read(s, addr, bufsize, untildone)
-  if not bufsize then bufsize = 8192 end
+  addr = addr or t.sockaddr_nl() -- default to kernel
+  bufsize = bufsize or 8192
   local reply = t.buffer(bufsize)
   local ior = t.iovecs{{reply, bufsize}}
   local m = t.msghdr{msg_iov = ior.iov, msg_iovlen = #ior, msg_name = addr, msg_namelen = ffi.sizeof(addr)}
