@@ -1425,6 +1425,18 @@ test_netlink = {
     local nr = r:match("::3/128")
     assert_equal(#nr, 0, "expect route deleted")
   end,
+  test_netlink_events_root = function()
+    local sock = assert(nl.socket("route", {nl_groups = S.RTMGRP_LINK})) -- should allow symbolic names, ie "link"
+    -- may make sense to use connect
+    assert(nl.create_interface{name = "dummy1", type = "dummy"})
+    local a = assert(sock:getsockname())
+    local k = t.sockaddr_nl{nl_pid = a.pid, nl_groups = S.RTMGRP_LINK}
+    local m = assert(nl.read(sock, k))
+    assert(m.dummy1, "should find dummy 1 in returned info")
+    assert(nl.dellink(0, "ifname", "dummy1")) -- TODO short form that is just dellink("dummy1")
+    -- local m = assert(nl.read(sock, k)) -- TODO fix
+    assert(sock:close())
+  end,
   test_move_interface_ns_root = function()
     local fds = assert(S.pipe())
     assert(nl.create_interface{name = "dummy0", type = "dummy"})

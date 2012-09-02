@@ -291,6 +291,7 @@ mt.iflink = {
   __index = function(i, k)
     if meth.iflink.index[k] then return meth.iflink.index[k](i) end
     if meth.iflink.fn[k] then return meth.iflink.fn[k] end
+    if k == "inet" or k == "inet6" then return end -- might not be set, as we add it, kernel does not provide
     local prefix = "ARPHRD_"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     if S[k] then return i.ifinfo.ifi_type == S[k] end
@@ -299,12 +300,12 @@ mt.iflink = {
     local hw = ''
     if not i.loopback and i.macaddr then hw = '  HWaddr ' .. tostring(i.macaddr) end
     local s = i.name .. string.rep(' ', 10 - #i.name) .. 'Link encap:' .. i.typename .. hw .. '\n'
-    for a = 1, #i.inet do
+    if i.inet then for a = 1, #i.inet do
       s = s .. '          ' .. 'inet addr: ' .. tostring(i.inet[a].addr) .. '/' .. i.inet[a].prefixlen .. '\n'
-    end
-    for a = 1, #i.inet6 do
+    end end
+    if i.inet6 then for a = 1, #i.inet6 do
       s = s .. '          ' .. 'inet6 addr: ' .. tostring(i.inet6[a].addr) .. '/' .. i.inet6[a].prefixlen .. '\n'
-    end
+    end end
       s = s .. '          ' .. tostring(i.flags) .. '  MTU: ' .. i.mtu .. '\n'
       s = s .. '          ' .. 'RX packets:' .. i.stats.rx_packets .. ' errors:' .. i.stats.rx_errors .. ' dropped:' .. i.stats.rx_dropped .. '\n'
       s = s .. '          ' .. 'TX packets:' .. i.stats.tx_packets .. ' errors:' .. i.stats.tx_errors .. ' dropped:' .. i.stats.tx_dropped .. '\n'
@@ -494,7 +495,7 @@ local nlmsg_data_decode = {
   end,
 }
 
-function nl.read(s, addr, bufsize)
+function nl.read(s, addr, bufsize, untildone)
   if not bufsize then bufsize = 8192 end
   local reply = t.buffer(bufsize)
   local ior = t.iovecs{{reply, bufsize}}
@@ -527,6 +528,7 @@ function nl.read(s, addr, bufsize)
       if tp == S.NLMSG_DONE then done = true end
       msg, buffer, len = nlmsg_next(msg, buffer, len)
     end
+    if not untildone then done = true end
   end
 
   return r
@@ -811,7 +813,7 @@ local function nlmsg(ntype, flags, af, ...)
     return nil, err
   end
 
-  local r, err = nl.read(sock, k)
+  local r, err = nl.read(sock, k, nil, true) -- true means until get done message
   if not r then
     sock:close()
     return nil, err
