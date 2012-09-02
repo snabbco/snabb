@@ -40,7 +40,7 @@ lo:up()
 
 eth0:up()
 
-nl.newaddr(eth0, "inet", 32, "permanent", "address", "10.3.0.2") -- TODO should be function to add this easily!
+eth0:address("10.3.0.2")
 
 -- run processes
 
