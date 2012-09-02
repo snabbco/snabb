@@ -1020,6 +1020,20 @@ test_misc = {
     local u = assert(S.uname())
     assert(h == u.nodename, "gethostname did not return nodename")
   end,
+  test_inet_name = function()
+    local addr, mask = S.inet_name("127.0.0.1/24")
+    assert(addr, "expect to get valid address")
+    assert(S.istype(t.in_addr, addr))
+    assert_equal(tostring(addr), "127.0.0.1")
+    assert_equal(mask, 24)
+  end,
+  test_inet_name6 = function()
+    local addr, mask = S.inet_name("::1")
+    assert(addr, "expect to get valid address")
+    assert(S.istype(t.in6_addr, addr))
+    assert_equal(tostring(addr), "::1")
+    assert_equal(mask, 128, "expect default mask")
+  end,
 }
 
 test_sockets = {

@@ -30,6 +30,7 @@ S.sizeof = ffi.sizeof
 S.cast = ffi.cast
 S.copy = ffi.copy
 S.fill = ffi.fill
+S.istype = ffi.istype
 
 S.STDIN_FILENO = 0
 S.STDOUT_FILENO = 1
@@ -3573,6 +3574,26 @@ end
 
 function S.inet_ntoa(addr)
   return S.inet_ntop(S.AF_INET, addr)
+end
+
+-- generic inet name to ip, also with netmask support TODO think of better name?
+function S.inet_name(src)
+  local netmask, addr
+  local a, b = src:find("/", 1, true)
+  if a then
+    netmask = tonumber(src:sub(b + 1))
+    src = src:sub(1, a - 1)
+  end
+  if src:find(":", 1, true) then -- ipv6
+    addr = S.inet_pton(S.AF_INET6, src)
+    if not addr then return nil end
+    if not netmask then netmask = 128 end
+  else
+    addr = S.inet_pton(S.AF_INET, src)
+    if not addr then return nil end
+    if not netmask then netmask = 32 end
+  end
+  return addr, netmask
 end
 
 t.i6432 = ffi.typeof("union {int64_t i64; int32_t i32[2];}")
