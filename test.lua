@@ -1431,7 +1431,7 @@ test_netlink = {
     local m = assert(nl.read(sock))
     assert(m.dummy1, "should find dummy 1 in returned info")
     assert(m.dummy1:setmac("46:9d:c9:06:dd:dd"))
-    assert(nl.dellink(0, "ifname", "dummy1")) -- TODO short form that is just dellink("dummy1")
+    assert(m.dummy1:dellink())
     local m = assert(nl.read(sock))
     assert(m.dummy1, "should get info about deleted interface")
     assert_equal(tostring(m.dummy1.macaddr), "46:9d:c9:06:dd:dd", "should get address that was set")

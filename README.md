@@ -203,4 +203,5 @@ Misc list of ideas, no particular order
 24. fix fs specific mount ops so can round-trip mounts
 25. fix aio
 26. automate ctest.lua to do full compile and run
+27. short form for dellink(name)
 

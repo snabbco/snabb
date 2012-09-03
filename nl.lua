@@ -266,6 +266,11 @@ meth.iflink = {
       if not ok then return nil, err end
       return i:refresh()
     end,
+    dellink = function(i)
+      local ok, err = nl.dellink(i.index)
+      if not ok then return nil, err end
+      return true     
+    end,
     move_ns = function(i, ns) -- TODO also support file descriptor form as well as pid
       local ok, err = nl.newlink(i.index, 0, 0, 0, "net_ns_pid", ns)
       if not ok then return nil, err end
