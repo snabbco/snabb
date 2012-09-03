@@ -1447,7 +1447,7 @@ test_netlink = {
       fork_assert(fds:read(nil, 1)) -- wait until interface moved. TODO wait for event from netlink listener instead?
       local i = fork_assert(nl.interfaces())
       fork_assert(i.dummy0, "expect dummy0 interface in child")
-      fork_assert(nl.dellink(0, "ifname", "dummy0"))
+      fork_assert(i.dummy0:dellink())
       fork_assert(i:refresh())
       fork_assert(not i.dummy0, "expect no dummy if")
       S.exit()
