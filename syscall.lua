@@ -3367,7 +3367,7 @@ mt.pollfds = {
   end
 }
 
-t.pollfds = ffi.metatype("struct { int count; struct pollfd pfd[?];}", mt.pollfds)
+t.pollfds = ffi.metatype("struct {int count; struct pollfd pfd[?];}", mt.pollfds)
 
 metatype("in_addr", "struct in_addr", {
   __tostring = function(a) return S.inet_ntop(S.AF_INET, a) end,
@@ -3403,7 +3403,6 @@ local function mksigset(str)
     if st:sub(1, 3) ~= "SIG" then st = "SIG" .. st end
     local sig = S[st]
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-
     local d = bit.rshift(sig - 1, 5) -- always 32 bits
     f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
   end
@@ -4008,9 +4007,8 @@ function S.execve(filename, argv, envp)
   return retbool(C.execve(filename, cargv, cenvp))
 end
 
--- generally calling C.ioctl directly
 function S.ioctl(d, request, argp)
-  local ret = C.ioctl(d, request, argp)
+  local ret = C.ioctl(getfd(d), request, argp)
   if ret == -1 then return nil, t.error() end
   -- some different return types may need to be handled
   return true
@@ -5382,8 +5380,8 @@ local function if_nametoindex(name, s) -- internal version when already have soc
   local len = #name + 1
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
-  local ret = C.ioctl(getfd(s), S.SIOCGIFINDEX, ifr)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = S.ioctl(s, S.SIOCGIFINDEX, ifr)
+  if not ret then return nil, err end
   return ifr.ifr_ifru.ifru_ivalue
 end
 
@@ -5401,8 +5399,8 @@ end
 local function bridge_ioctl(io, name)
   local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
-  local ret = C.ioctl(getfd(s), io, pt.char(name))
-  if ret == -1 then return nil, t.error() end
+  local ret, err = S.ioctl(s, io, pt.char(name))
+  if not ret then return nil, err end
   local ok, err = s:close()
   if not ok then return nil, err end
   return true
@@ -5424,8 +5422,8 @@ local function bridge_if_ioctl(io, bridge, dev)
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, bridge, len) -- note not using the short forms as no metatable defined yet...
   ifr.ifr_ifru.ifru_ivalue = dev
-  ret = C.ioctl(getfd(s), io, ifr);
-  if ret == -1 then return nil, t.error() end
+  ret, err = S.ioctl(s, io, ifr);
+  if not ret then return nil, err end
   ok, err = s:close()
   if not ok then return nil, err end
   return true
@@ -5672,13 +5670,15 @@ end
 
 function S.unlockpt(fd)
   local unlock = t.int1()
-  return retbool(C.ioctl(getfd(fd), S.TIOCSPTLCK, pt.void(unlock)))
+  local ret, err = S.ioctl(fd, S.TIOCSPTLCK, pt.void(unlock)) -- TODO make sure this returns true instead?
+  if not ret then return nil, err end
+  return true
 end
 
 function S.ptsname(fd)
   local pts = t.int1()
-  local ret = C.ioctl(getfd(fd), S.TIOCGPTN, pt.void(pts))
-  if ret == -1 then return nil, t.error() end
+  local ret, error = S.ioctl(fd, S.TIOCGPTN, pt.void(pts))
+  if not ret then return nil, err end
   return "/dev/pts/" .. tostring(pts[0])
 end
 
