@@ -1342,7 +1342,7 @@ test_netlink = {
     local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
     local i = assert(nl.interfaces())
     assert(i.dummy0, "expect dummy interface")
-    assert(nl.dellink(i.dummy0.index))
+    assert(i.dummy0:delete())
   end,
   test_newlink_newif_bridge_root = function()
     assert(nl.create_interface{name = "br0", type = "bridge"})
@@ -1350,7 +1350,7 @@ test_netlink = {
     assert(i.br0, "expect bridge interface")
     local b = assert(S.bridge_list())
     assert(b.br0, "expect to find new bridge")
-    assert(nl.dellink(i.br0.index))
+    assert(i.br0:delete())
   end,
   test_dellink_by_name_root = function()
     assert(nl.create_interface{name = "dummy0", type = "dummy"})
@@ -1388,7 +1388,7 @@ test_netlink = {
     end
     assert_equal(lo.inet6[2].prefixlen, 128, "expect /128")
     assert_equal(lo.inet6[1].prefixlen, 128, "expect /128")
-    assert(lo:deladdr("::2"))
+    assert(lo:deladdress("::2"))
     assert_equal(#lo.inet6, 1, "expect one inet6 addresses on lo now")
     assert_equal(tostring(lo.inet6[1].addr), "::1", "expect only ::1 now")
     -- TODO this leaves a route to ::2 which we should delete
@@ -1430,10 +1430,13 @@ test_netlink = {
     assert(nl.create_interface{name = "dummy1", type = "dummy"})
     local m = assert(nl.read(sock))
     assert(m.dummy1, "should find dummy 1 in returned info")
+    assert_equal(m.dummy1.op, "newlink", "new interface")
+    assert(m.dummy1.newlink, "new interface")
     assert(m.dummy1:setmac("46:9d:c9:06:dd:dd"))
-    assert(m.dummy1:dellink())
+    assert(m.dummy1:delete())
     local m = assert(nl.read(sock))
     assert(m.dummy1, "should get info about deleted interface")
+
     assert_equal(tostring(m.dummy1.macaddr), "46:9d:c9:06:dd:dd", "should get address that was set")
     assert(sock:close())
   end,
@@ -1447,7 +1450,7 @@ test_netlink = {
       fork_assert(fds:read(nil, 1)) -- wait until interface moved. TODO wait for event from netlink listener instead?
       local i = fork_assert(nl.interfaces())
       fork_assert(i.dummy0, "expect dummy0 interface in child")
-      fork_assert(i.dummy0:dellink())
+      fork_assert(i.dummy0:delete())
       fork_assert(i:refresh())
       fork_assert(not i.dummy0, "expect no dummy if")
       S.exit()

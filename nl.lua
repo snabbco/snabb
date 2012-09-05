@@ -257,7 +257,7 @@ meth.iflink = {
       if not ok then return nil, err end
       return i:refresh()
     end,
-    deladdr = function(i, address, netmask)
+    deladdress = function(i, address, netmask)
       if type(address) == "string" then address, netmask = S.inet_name(address, netmask) end
       if not address then return nil end
       local af
@@ -266,7 +266,7 @@ meth.iflink = {
       if not ok then return nil, err end
       return i:refresh()
     end,
-    dellink = function(i)
+    delete = function(i)
       local ok, err = nl.dellink(i.index)
       if not ok then return nil, err end
       return true     
@@ -479,12 +479,14 @@ local nlmsg_data_decode = {
   end,
   [S.RTM_NEWLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
+    ir.op, ir.newlink, ir.nl = "newlink", true, S.RTM_NEWLINK
     r[ir.name] = ir
     r[#r + 1] = ir
     return r
   end,
   [S.RTM_DELLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
+    ir.op, ir.dellink, ir.nl = "dellink", true, S.RTM_DELLINK
     r[ir.name] = ir
     r[#r + 1] = ir
     return r
