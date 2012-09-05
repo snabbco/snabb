@@ -482,6 +482,18 @@ local nlmsg_data_decode = {
     r[#r + 1] = ir
     return r
   end,
+  [S.RTM_DELADDR] = function(r, buf, len)
+    local ir = decode_address(buf, len)
+    ir.op, ir.deladdr, ir.nl = "delddr", true, S.RTM_DELADDR
+    r[#r + 1] = ir
+    return r
+  end,
+  [S.RTM_GETADDR] = function(r, buf, len)
+    local ir = decode_address(buf, len)
+    ir.op, ir.getaddr, ir.nl = "getaddr", true, S.RTM_GETADDR
+    r[#r + 1] = ir
+    return r
+  end,
   [S.RTM_NEWLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
     ir.op, ir.newlink, ir.nl = "newlink", true, S.RTM_NEWLINK
