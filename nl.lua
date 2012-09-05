@@ -427,7 +427,7 @@ mt.ifaddr = {
   end
 }
 
-local function decode_link(r, buf, len)
+local function decode_link(buf, len)
   local iface = pt.ifinfomsg(buf)
   buf = buf + nlmsg_align(s.ifinfomsg)
   len = len - nlmsg_align(s.ifinfomsg)
@@ -442,10 +442,7 @@ local function decode_link(r, buf, len)
     rtattr, buf, len = rta_next(rtattr, buf, len)
   end
 
-  r[ir.name] = ir
-  r[#r + 1] = ir -- array and names
-
-  return r
+  return ir
 end
 
 local nlmsg_data_decode = {
@@ -480,8 +477,18 @@ local nlmsg_data_decode = {
 
    return r
   end,
-  [S.RTM_NEWLINK] = decode_link,
-  [S.RTM_DELLINK] = decode_link,
+  [S.RTM_NEWLINK] = function(r, buf, len)
+    local ir = decode_link(buf, len)
+    r[ir.name] = ir
+    r[#r + 1] = ir
+    return r
+  end,
+  [S.RTM_DELLINK] = function(r, buf, len)
+    local ir = decode_link(buf, len)
+    r[ir.name] = ir
+    r[#r + 1] = ir
+    return r
+  end,
   [S.RTM_NEWROUTE] = function(r, buf, len)
     local rt = pt.rtmsg(buf)
     buf = buf + nlmsg_align(s.rtmsg)
