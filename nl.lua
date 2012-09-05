@@ -534,6 +534,18 @@ local nlmsg_data_decode = {
     r[#r + 1] = ir
     return r
   end,
+  [S.RTM_DELROUTE] = function(r, buf, len)
+    local ir = decode_route(buf, len)
+    ir.op, ir.delroute, ir.nl = "delroute", true, S.RTM_DELROUTE
+    r[#r + 1] = ir
+    return r
+  end,
+  [S.RTM_GETROUTE] = function(r, buf, len)
+    local ir = decode_route(buf, len)
+    ir.op, ir.getroute, ir.nl = "getroute", true, S.RTM_GETROUTE
+    r[#r + 1] = ir
+    return r
+  end,
 }
 
 function nl.read(s, addr, bufsize, untildone)
