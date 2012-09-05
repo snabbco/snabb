@@ -445,6 +445,25 @@ local function decode_link(buf, len)
   return ir
 end
 
+local function decode_address(buf, len)
+  local addr = pt.ifaddrmsg(buf)
+  buf = buf + nlmsg_align(s.ifaddrmsg)
+  len = len - nlmsg_align(s.ifaddrmsg)
+  local rtattr = pt.rtattr(buf)
+
+  local ir = setmetatable({ifaddr = t.ifaddrmsg(), addr = {}}, mt.ifaddr)
+  ffi.copy(ir.ifaddr, addr, s.ifaddrmsg)
+
+  while rta_ok(rtattr, len) do
+    if ifa_decode[rtattr.rta_type] then
+      ifa_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
+    end
+    rtattr, buf, len = rta_next(rtattr, buf, len)
+  end
+
+  return ir
+end
+
 local nlmsg_data_decode = {
   [S.NLMSG_NOOP] = function(r, buf, len) return r end,
   [S.NLMSG_ERROR] = function(r, buf, len)
@@ -458,24 +477,10 @@ local nlmsg_data_decode = {
     return r
   end,
   [S.RTM_NEWADDR] = function(r, buf, len)
-    local addr = pt.ifaddrmsg(buf)
-    buf = buf + nlmsg_align(s.ifaddrmsg)
-    len = len - nlmsg_align(s.ifaddrmsg)
-    local rtattr = pt.rtattr(buf)
-
-    local ir = setmetatable({ifaddr = t.ifaddrmsg(), addr = {}}, mt.ifaddr)
-    ffi.copy(ir.ifaddr, addr, s.ifaddrmsg)
-
-    while rta_ok(rtattr, len) do
-      if ifa_decode[rtattr.rta_type] then
-        ifa_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
-      end
-      rtattr, buf, len = rta_next(rtattr, buf, len)
-    end
-
-   r[#r + 1] = ir
-
-   return r
+    local ir = decode_address(buf, len)
+    ir.op, ir.newaddr, ir.nl = "newaddr", true, S.RTM_NEWADDR
+    r[#r + 1] = ir
+    return r
   end,
   [S.RTM_NEWLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
@@ -487,6 +492,14 @@ local nlmsg_data_decode = {
   [S.RTM_DELLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
     ir.op, ir.dellink, ir.nl = "dellink", true, S.RTM_DELLINK
+    r[ir.name] = ir
+    r[#r + 1] = ir
+    return r
+  end,
+  -- TODO need test that returns these, assume updates do
+  [S.RTM_GETLINK] = function(r, buf, len)
+    local ir = decode_link(buf, len)
+    ir.op, ir.getlink, ir.nl = "getlink", true, S.RTM_GETLINK
     r[ir.name] = ir
     r[#r + 1] = ir
     return r
