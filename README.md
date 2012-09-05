@@ -205,4 +205,5 @@ Misc list of ideas, no particular order
 26. automate ctest.lua to do full compile and run
 27. short form for dellink(name)
 28. use S.if_nametoindex to convert interface names to numbers in nl where number not.
+29. performance counters
 
