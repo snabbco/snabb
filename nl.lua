@@ -434,14 +434,12 @@ local function decode_link(buf, len)
   local rtattr = pt.rtattr(buf)
   local ir = setmetatable({ifinfo = t.ifinfomsg()}, mt.iflink)
   ffi.copy(ir.ifinfo, iface, s.ifinfomsg)
-
   while rta_ok(rtattr, len) do
     if ifla_decode[rtattr.rta_type] then
       ifla_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
     end
     rtattr, buf, len = rta_next(rtattr, buf, len)
   end
-
   return ir
 end
 
@@ -450,17 +448,31 @@ local function decode_address(buf, len)
   buf = buf + nlmsg_align(s.ifaddrmsg)
   len = len - nlmsg_align(s.ifaddrmsg)
   local rtattr = pt.rtattr(buf)
-
   local ir = setmetatable({ifaddr = t.ifaddrmsg(), addr = {}}, mt.ifaddr)
   ffi.copy(ir.ifaddr, addr, s.ifaddrmsg)
-
   while rta_ok(rtattr, len) do
     if ifa_decode[rtattr.rta_type] then
       ifa_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
     end
     rtattr, buf, len = rta_next(rtattr, buf, len)
   end
+  return ir
+end
 
+local function decode_route(buf, len)
+  local rt = pt.rtmsg(buf)
+  buf = buf + nlmsg_align(s.rtmsg)
+  len = len - nlmsg_align(s.rtmsg)
+  local rtattr = pt.rtattr(buf)
+  local ir = setmetatable({rtmsg = t.rtmsg()}, mt.rtmsg)
+  ffi.copy(ir.rtmsg, rt, s.rtmsg)
+  while rta_ok(rtattr, len) do
+    if rta_decode[rtattr.rta_type] then
+      rta_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
+    else print("NYI", rtattr.rta_type)
+    end
+    rtattr, buf, len = rta_next(rtattr, buf, len)
+  end
   return ir
 end
 
@@ -517,22 +529,9 @@ local nlmsg_data_decode = {
     return r
   end,
   [S.RTM_NEWROUTE] = function(r, buf, len)
-    local rt = pt.rtmsg(buf)
-    buf = buf + nlmsg_align(s.rtmsg)
-    len = len - nlmsg_align(s.rtmsg)
-    local rtattr = pt.rtattr(buf)
-    local ir = setmetatable({rtmsg = t.rtmsg()}, mt.rtmsg)
-    ffi.copy(ir.rtmsg, rt, s.rtmsg)
-    while rta_ok(rtattr, len) do
-      if rta_decode[rtattr.rta_type] then
-        rta_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
-      else print("NYI", rtattr.rta_type)
-      end
-      rtattr, buf, len = rta_next(rtattr, buf, len)
-    end
-
+    local ir = decode_route(buf, len)
+    ir.op, ir.newroute, ir.nl = "newroute", true, S.RTM_NEWROUTE
     r[#r + 1] = ir
-
     return r
   end,
 }
