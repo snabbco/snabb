@@ -206,4 +206,5 @@ Misc list of ideas, no particular order
 27. short form for dellink(name)
 28. use S.if_nametoindex to convert interface names to numbers in nl where number not.
 29. performance counters
+30. define a bitshift function that works correctly with unsigned output.
 
