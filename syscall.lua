@@ -2702,6 +2702,9 @@ long migrate_pages(int pid, unsigned long maxnode, const unsigned long *old_node
 int mincore(void *addr, size_t length, unsigned char *vec);
 long move_pages(int pid, unsigned long count, void **pages, const int *nodes, int *status, int flags);
 int mprotect(const void *addr, size_t len, int prot);
+int personality(unsigned long persona);
+int pivot_root(const char *new_root, const char *put_old);
+int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
 
 int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
