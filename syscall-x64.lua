@@ -331,6 +331,8 @@ arch.SYS = {
 # define SYS_fadvise SYS_fadvise64
 ]]
 
+arch.SYS.fstatat = arch.SYS.newfstatat
+
 arch.epoll = function()
 ffi.cdef[[
 struct epoll_event {
