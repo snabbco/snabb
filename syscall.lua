@@ -2649,19 +2649,6 @@ int fstatfs(int fd, struct statfs64 *buf);          /* this too */
 int futimens(int fd, const struct timespec times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 
-int tgkill(int tgid, int tid, int sig);
-int brk(void *addr);
-void *sbrk(intptr_t increment);
-void exit_group(int status);
-
-/* these need their types adding or fixing before can uncomment */
-/*
-int capget(cap_user_header_t hdrp, cap_user_data_t datap);
-int capset(cap_user_header_t hdrp, const cap_user_data_t datap);
-caddr_t create_module(const char *name, size_t size);
-*/
-int delete_module(const char *name);
-
 ssize_t listxattr(const char *path, char *list, size_t size);
 ssize_t llistxattr(const char *path, char *list, size_t size);
 ssize_t flistxattr(int fd, char *list, size_t size);
@@ -2681,6 +2668,21 @@ int setns(int fd, int nstype);
 int syscall(int number, ...);
 
 int ioctl(int d, int request, void *argp); /* void* easiest here */
+
+/* TODO from here to libc functions are not implemented yet */
+int tgkill(int tgid, int tid, int sig);
+int brk(void *addr);
+void *sbrk(intptr_t increment);
+void exit_group(int status);
+
+/* these need their types adding or fixing before can uncomment */
+/*
+int capget(cap_user_header_t hdrp, cap_user_data_t datap);
+int capset(cap_user_header_t hdrp, const cap_user_data_t datap);
+caddr_t create_module(const char *name, size_t size);
+*/
+int delete_module(const char *name);
+int flock(int fd, int operation);
 
 mqd_t mq_open(const char *name, int oflag, mode_t mode, struct mq_attr *attr);
 int mq_getsetattr(mqd_t mqdes, struct mq_attr *newattr, struct mq_attr *oldattr);
