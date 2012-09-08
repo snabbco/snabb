@@ -2649,6 +2649,8 @@ int fstatfs(int fd, struct statfs64 *buf);          /* this too */
 int futimens(int fd, const struct timespec times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 
+int tgkill(int tgid, int tid, int sig);
+
 ssize_t listxattr(const char *path, char *list, size_t size);
 ssize_t llistxattr(const char *path, char *list, size_t size);
 ssize_t flistxattr(int fd, char *list, size_t size);

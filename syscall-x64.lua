@@ -319,6 +319,7 @@ arch.SYS = {
   process_vm_writev = 311,
 }
 
+-- TODO probably set these here not in main
 --[[ from Musl
 #undef SYS_fstatat
 #undef SYS_pread
