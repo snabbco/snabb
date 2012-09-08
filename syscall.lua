@@ -2693,6 +2693,8 @@ int msgget(key_t key, int msgflg);
 long ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data);
 int quotactl(int cmd, const char *special, int id, caddr_t addr);
 int semget(key_t key, int nsems, int semflg);
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+int shmget(key_t key, size_t size, int shmflg);
 */
 int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
 ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);
@@ -2716,6 +2718,8 @@ int remap_file_pages(void *addr, size_t size, int prot, ssize_t pgoff, int flags
 int semctl(int semid, int semnum, int cmd, ...);
 int semop(int semid, struct sembuf *sops, unsigned nsops);
 int semtimedop(int semid, struct sembuf *sops, unsigned nsops, struct timespec *timeout);
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+int shmdt(const void *shmaddr);
 
 int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
