@@ -2700,6 +2700,8 @@ int timer_delete(timer_t timerid);
 int timer_getoverrun(timer_t timerid);
 int timer_settime(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec * old_value);
 int timer_gettime(timer_t timerid, struct itimerspec *curr_value);
+clock_t times(struct tms *buf);
+int utime(const char *filename, const struct utimbuf *times);
 */
 int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
 ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);
