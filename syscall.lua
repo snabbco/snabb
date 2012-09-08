@@ -2712,6 +2712,10 @@ ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, unsigned int flags, struct timespec *timeout);
 int remap_file_pages(void *addr, size_t size, int prot, ssize_t pgoff, int flags);
+int semctl(int semid, int semnum, int cmd, ...);
+int semop(int semid, struct sembuf *sops, unsigned nsops);
+int semtimedop(int semid, struct sembuf *sops, unsigned nsops, struct timespec *timeout);
+int semget(key_t key, int nsems, int semflg);
 
 int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
