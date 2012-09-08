@@ -104,6 +104,13 @@ test_open_close = {
     assert(err.ENOENT, "expect ENOENT from open non existent file")
     assert(tostring(err) == "No such file or directory", "should get string error message")
   end,
+  test_openat = function()
+    local dfd = S.open(".")
+    local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "irwxu"))
+    assert(dfd:unlinkat(tmpfile))
+    assert(fd:close())
+    assert(dfd:close())
+  end,
   test_close_invalid_fd = function()
     local ok, err = S.close(127)
     assert(err, "expected to fail on close invalid fd")

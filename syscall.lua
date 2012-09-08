@@ -2476,6 +2476,7 @@ end
 ffi.cdef[[
 int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
+int openat(int dirfd, const char *pathname, int flags, mode_t mode);
 int creat(const char *pathname, mode_t mode);
 int chdir(const char *path);
 int mkdir(const char *pathname, mode_t mode);
@@ -3856,6 +3857,10 @@ if not pcall(inlibc, "clock_nanosleep") then C.clock_nanosleep = CC.clock_nanosl
 -- main definitions start here
 function S.open(pathname, flags, mode)
   return retfd(C.open(pathname, stringflags(flags, "O_"), S.mode(mode)))
+end
+
+function S.openat(dirfd, pathname, flags, mode)
+  return retfd(C.openat(getfd_at(dirfd), pathname, stringflags(flags, "O_"), S.mode(mode)))
 end
 
 function S.dup(oldfd, newfd, flags)
@@ -5741,7 +5746,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
-                   'fchownat', 'readlinkat', 'mkfifoat', 'isatty', 'setns'
+                   'fchownat', 'readlinkat', 'mkfifoat', 'isatty', 'setns', 'openat'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
