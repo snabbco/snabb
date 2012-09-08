@@ -474,7 +474,7 @@ test_file_operations = {
   test_fadvise_etc = function() -- could split
     local fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
     assert(S.unlink(tmpfile))
-    assert(fd:posix_fadvise("random"))
+    assert(fd:fadvise("random"))
     local ok, err = fd:fallocate("keep_size", 0, 4096)
     assert(ok or err.EOPNOTSUPP or err.ENOSYS, "expect fallocate to succeed if supported")
     ok, err = fd:posix_fallocate(0, 8192)

@@ -2652,6 +2652,15 @@ int utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 int tgkill(int tgid, int tid, int sig);
 int brk(void *addr);
 void *sbrk(intptr_t increment);
+void exit_group(int status);
+
+/* these need their types adding or fixing before can uncomment */
+/*
+int capget(cap_user_header_t hdrp, cap_user_data_t datap);
+int capset(cap_user_header_t hdrp, const cap_user_data_t datap);
+caddr_t create_module(const char *name, size_t size);
+*/
+int delete_module(const char *name);
 
 ssize_t listxattr(const char *path, char *list, size_t size);
 ssize_t llistxattr(const char *path, char *list, size_t size);
@@ -4230,7 +4239,7 @@ function S.mremap(old_address, old_size, new_size, flags, new_address)
   return retptr(C.mremap(old_address, old_size, new_size, stringflags(flags, "MREMAP_"), new_address))
 end
 function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, stringflag(advice, "MADV_"))) end
-function S.posix_fadvise(fd, advice, offset, len) -- note argument order
+function S.fadvise(fd, advice, offset, len) -- note argument order
   return retbool(C.posix_fadvise(getfd(fd), offset or 0, len or 0, stringflag(advice, "POSIX_FADV_")))
 end
 function S.fallocate(fd, mode, offset, len)
@@ -5702,7 +5711,7 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
                    'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee',
                    'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
-                   'posix_fadvise', 'fallocate', 'posix_fallocate', 'readahead',
+                   'fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
