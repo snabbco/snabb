@@ -2695,6 +2695,11 @@ int quotactl(int cmd, const char *special, int id, caddr_t addr);
 int semget(key_t key, int nsems, int semflg);
 int shmctl(int shmid, int cmd, struct shmid_ds *buf);
 int shmget(key_t key, size_t size, int shmflg);
+int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid);
+int timer_delete(timer_t timerid);
+int timer_getoverrun(timer_t timerid);
+int timer_settime(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec * old_value);
+int timer_gettime(timer_t timerid, struct itimerspec *curr_value);
 */
 int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
 ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);
@@ -2722,6 +2727,7 @@ void *shmat(int shmid, const void *shmaddr, int shmflg);
 int shmdt(const void *shmaddr);
 int swapon(const char *path, int swapflags);
 int swapoff(const char *path);
+void syncfs(int fd);
 
 int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
