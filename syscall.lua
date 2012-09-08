@@ -2730,6 +2730,7 @@ int shmdt(const void *shmaddr);
 int swapon(const char *path, int swapflags);
 int swapoff(const char *path);
 void syncfs(int fd);
+pid_t wait4(pid_t pid, int *status, int options, struct rusage *rusage);
 
 int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
