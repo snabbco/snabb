@@ -2650,6 +2650,8 @@ int futimens(int fd, const struct timespec times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 
 int tgkill(int tgid, int tid, int sig);
+int brk(void *addr);
+void *sbrk(intptr_t increment);
 
 ssize_t listxattr(const char *path, char *list, size_t size);
 ssize_t llistxattr(const char *path, char *list, size_t size);
