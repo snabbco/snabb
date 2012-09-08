@@ -3774,15 +3774,6 @@ end
 function CC.setns(fd, nstype)
   return C.syscall(S.SYS.setns, t.int(fd), t.int(nstype))
 end
-function CC.sync_file_range(fd, offset, count, flags)
-  return C.syscall(S.SYS.sync_file_range, t.int(fd), t.loff(offset), t.loff(count), t.uint(flags))
-end
-function CC.readahead(fd, offset, count)
-  return C.syscall(S.SYS.readahead, t.int(fd), t.loff(offset), t.size(count))
-end
-function CC.tee(fd_in, fd_out, len, flags)
-  return C.syscall(S.SYS.tee, t.int(fd_in), t.int(fd_out), t.int(len), t.uint(flags))
-end
 function CC.clock_nanosleep(clk_id, flags, req, rem)
   return C.syscall(S.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
 end
@@ -3796,7 +3787,7 @@ function CC.clock_settime(clk_id, ts)
   return C.syscall(S.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
 end
 
--- these ones for aligment reasons need 32 bit splits
+--[[ if you need to split 64 bit args on 32 bit syscalls use code like this
 if ffi.abi("64bit") then
   function CC.fallocate(fd, mode, offset, len)
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
@@ -3808,10 +3799,10 @@ else -- 32 bit uses splits for 64 bit args
     return C.syscall(S.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
   end
 end
+]]
 
 -- if not in libc replace
--- not in Musl TODO patch so they are
---if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
+-- not in Musl TODO patch so they are--if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
 if not pcall(inlibc, "acct") then C.acct = CC.acct end
 if not pcall(inlibc, "setns") then C.setns = CC.setns end
 --if not pcall(inlibc, "sync_file_range") then C.sync_file_range = CC.sync_file_range end
