@@ -2721,7 +2721,11 @@ int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
 pid_t getpgrp(pid_t pid);
 pid_t gettid(void);
+int setfsgid(uid_t fsgid);
+int setfsuid(uid_t fsuid);
 long keyctl(int cmd, ...);
+int getdomainname(char *name, size_t len);
+int setdomainname(const char *name, size_t len);
 
 mqd_t mq_open(const char *name, int oflag, mode_t mode, struct mq_attr *attr);
 int mq_getsetattr(mqd_t mqdes, struct mq_attr *newattr, struct mq_attr *oldattr);
