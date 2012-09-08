@@ -2705,6 +2705,8 @@ int mprotect(const void *addr, size_t len, int prot);
 int personality(unsigned long persona);
 int pivot_root(const char *new_root, const char *put_old);
 int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
+ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 
 int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
