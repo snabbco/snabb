@@ -2680,9 +2680,33 @@ void exit_group(int status);
 int capget(cap_user_header_t hdrp, cap_user_data_t datap);
 int capset(cap_user_header_t hdrp, const cap_user_data_t datap);
 caddr_t create_module(const char *name, size_t size);
+int init_module(const char *name, struct module *image);
+int get_kernel_syms(struct kernel_sym *table);
+int getcpu(unsigned *cpu, unsigned *node, struct getcpu_cache *tcache);
+int getrusage(int who, struct rusage *usage);
+int get_thread_area(struct user_desc *u_info);
+long kexec_load(unsigned long entry, unsigned long nr_segments, struct kexec_segment *segments, unsigned long flags);
+int lookup_dcookie(u64 cookie, char *buffer, size_t len);
+int msgctl(int msqid, int cmd, struct msqid_ds *buf);
+int msgget(key_t key, int msgflg);
 */
+int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);
+
 int delete_module(const char *name);
 int flock(int fd, int operation);
+int get_mempolicy(int *mode, unsigned long *nodemask, unsigned long maxnode, unsigned long addr, unsigned long flags);
+int mbind(void *addr, unsigned long len, int mode, unsigned long *nodemask, unsigned long maxnode, unsigned flags);
+long migrate_pages(int pid, unsigned long maxnode, const unsigned long *old_nodes, const unsigned long *new_nodes);
+int mincore(void *addr, size_t length, unsigned char *vec);
+long move_pages(int pid, unsigned long count, void **pages, const int *nodes, int *status, int flags);
+int mprotect(const void *addr, size_t len, int prot);
+
+int setpgid(pid_t pid, pid_t pgid);
+pid_t getpgid(pid_t pid);
+pid_t getpgrp(pid_t pid);
+pid_t gettid(void);
+long keyctl(int cmd, ...);
 
 mqd_t mq_open(const char *name, int oflag, mode_t mode, struct mq_attr *attr);
 int mq_getsetattr(mqd_t mqdes, struct mq_attr *newattr, struct mq_attr *oldattr);
