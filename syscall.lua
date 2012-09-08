@@ -2690,6 +2690,8 @@ long kexec_load(unsigned long entry, unsigned long nr_segments, struct kexec_seg
 int lookup_dcookie(u64 cookie, char *buffer, size_t len);
 int msgctl(int msqid, int cmd, struct msqid_ds *buf);
 int msgget(key_t key, int msgflg);
+long ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data);
+int quotactl(int cmd, const char *special, int id, caddr_t addr);
 */
 int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
 ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);
@@ -2707,6 +2709,9 @@ int pivot_root(const char *new_root, const char *put_old);
 int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
 ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
+int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, unsigned int flags, struct timespec *timeout);
+int remap_file_pages(void *addr, size_t size, int prot, ssize_t pgoff, int flags);
 
 int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
