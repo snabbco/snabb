@@ -3781,15 +3781,6 @@ end
 function CC.tee(fd_in, fd_out, len, flags)
   return C.syscall(S.SYS.tee, t.int(fd_in), t.int(fd_out), t.int(len), t.uint(flags))
 end
-function CC.timerfd_create(clockid, flags)
-  return C.syscall(S.SYS.timerfd_create, t.int(clockid), t.int(flags))
-end
-function CC.timerfd_settime(fd, flags, it, oldtime)
-  return C.syscall(S.SYS.timerfd_settime, t.int(fd), t.int(flags), pt.void(it), pt.void(oldtime))
-end
-function CC.timerfd_gettime(fd, curr_value)
-  return C.syscall(S.SYS.timerfd_gettime, t.int(fd), pt.void(curr_value))
-end
 function CC.clock_nanosleep(clk_id, flags, req, rem)
   return C.syscall(S.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
 end
@@ -3824,9 +3815,6 @@ if not pcall(inlibc, "setns") then C.setns = CC.setns end
 if not pcall(inlibc, "sync_file_range") then C.sync_file_range = CC.sync_file_range end
 if not pcall(inlibc, "readahead") then C.readahead = CC.readahead end
 if not pcall(inlibc, "tee") then C.tee = CC.tee end
---if not pcall(inlibc, "timerfd_create") then C.timerfd_create = CC.timerfd_create end
---if not pcall(inlibc, "timerfd_settime") then C.timerfd_settime = CC.timerfd_settime end
---if not pcall(inlibc, "timerfd_gettime") then C.timerfd_gettime = CC.timerfd_gettime end
 
 -- not in either Musl or eglibc
 if not pcall(inlibc, "clock_getres") then C.clock_getres = CC.clock_getres end
