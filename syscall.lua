@@ -2720,6 +2720,8 @@ int semop(int semid, struct sembuf *sops, unsigned nsops);
 int semtimedop(int semid, struct sembuf *sops, unsigned nsops, struct timespec *timeout);
 void *shmat(int shmid, const void *shmaddr, int shmflg);
 int shmdt(const void *shmaddr);
+int swapon(const char *path, int swapflags);
+int swapoff(const char *path);
 
 int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
