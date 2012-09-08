@@ -3811,12 +3811,12 @@ end
 
 -- if not in libc replace
 -- not in Musl TODO patch so they are
-if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
+--if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
 if not pcall(inlibc, "acct") then C.acct = CC.acct end
 if not pcall(inlibc, "setns") then C.setns = CC.setns end
-if not pcall(inlibc, "sync_file_range") then C.sync_file_range = CC.sync_file_range end
-if not pcall(inlibc, "readahead") then C.readahead = CC.readahead end
-if not pcall(inlibc, "tee") then C.tee = CC.tee end
+--if not pcall(inlibc, "sync_file_range") then C.sync_file_range = CC.sync_file_range end
+--if not pcall(inlibc, "readahead") then C.readahead = CC.readahead end
+--if not pcall(inlibc, "tee") then C.tee = CC.tee end
 
 -- not in either Musl or eglibc
 if not pcall(inlibc, "clock_getres") then C.clock_getres = CC.clock_getres end
