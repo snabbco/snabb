@@ -3840,12 +3840,6 @@ end
 function CC.mknodat(fd, pathname, mode, dev)
   return C.syscall(S.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.long(dev))
 end
-function CC.acct(filename)
-  return C.syscall(S.SYS.acct, filename)
-end
-function CC.setns(fd, nstype)
-  return C.syscall(S.SYS.setns, t.int(fd), t.int(nstype))
-end
 function CC.clock_nanosleep(clk_id, flags, req, rem)
   return C.syscall(S.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
 end
@@ -3874,9 +3868,6 @@ end
 ]]
 
 -- if not in libc replace
--- not in Musl TODO patch so they are--if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
---if not pcall(inlibc, "acct") then C.acct = CC.acct end
---if not pcall(inlibc, "setns") then C.setns = CC.setns end
 
 -- not in either Musl or eglibc
 if not pcall(inlibc, "clock_getres") then C.clock_getres = CC.clock_getres end
