@@ -3840,18 +3840,6 @@ end
 function CC.mknodat(fd, pathname, mode, dev)
   return C.syscall(S.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.long(dev))
 end
-function CC.clock_nanosleep(clk_id, flags, req, rem)
-  return C.syscall(S.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
-end
-function CC.clock_getres(clk_id, ts)
-  return C.syscall(S.SYS.clock_getres, t.clockid(clk_id), pt.void(ts))
-end
-function CC.clock_gettime(clk_id, ts)
-  return C.syscall(S.SYS.clock_gettime, t.clockid(clk_id), pt.void(ts))
-end
-function CC.clock_settime(clk_id, ts)
-  return C.syscall(S.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
-end
 
 --[[ if you need to split 64 bit args on 32 bit syscalls use code like this
 if ffi.abi("64bit") then
