@@ -3873,7 +3873,7 @@ function S.openat(dirfd, pathname, flags, mode)
   return retfd(C.openat(getfd_at(dirfd), pathname, stringflags(flags, "O_"), S.mode(mode)))
 end
 
--- TODO dup3 can have a race condition (see man page) although Musl fixes, need to check if glibc does.
+-- TODO dup3 can have a race condition (see man page) although Musl fixes, appears eglibc does not
 function S.dup(oldfd, newfd, flags)
   if newfd == nil then return retfd(C.dup(getfd(oldfd))) end
   return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags or 0))
