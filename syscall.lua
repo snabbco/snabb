@@ -3770,7 +3770,7 @@ function C.getcwd(buf, size)
 end
 
 -- for stat we use the syscall as libc might have a different struct stat for compatibility
--- TODO see if we can avoid this, at least for reasonable libc
+-- TODO see if we can avoid this, at least for reasonable libc. Musl returns the right struct.
 if ffi.abi("64bit") then
   function C.stat(path, buf)
     return C.syscall(S.SYS.stat, path, pt.void(buf))
