@@ -3869,15 +3869,18 @@ end
 
 -- if not in libc replace
 
--- not in either Musl or eglibc
---if not pcall(inlibc, "clock_getres") then C.clock_getres = CC.clock_getres end
---if not pcall(inlibc, "clock_settime") then C.clock_settime = CC.clock_settime end
---if not pcall(inlibc, "clock_gettime") then C.clock_gettime = CC.clock_gettime end
+-- with glibc in -rt
+if not pcall(inlibc, "clock_getres") then
+  local rt = ffi.load "rt"
+  C.clock_getres = rt.clock_getres
+  C.clock_settime = rt.clock_settime
+  C.clock_gettime = rt.clock_gettime
+  C.clock_nanosleep = rt.clock_nanosleep
+end
 
 -- not in eglibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
 if not pcall(inlibc, "mknodat") then C.mknodat = CC.mknodat end
-if not pcall(inlibc, "clock_nanosleep") then C.clock_nanosleep = CC.clock_nanosleep end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
