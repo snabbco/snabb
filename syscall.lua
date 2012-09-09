@@ -3774,6 +3774,7 @@ function C.getcwd(buf, size)
 end
 
 -- for stat we use the syscall as libc will tend to have a different struct stat for compatibility
+-- TODO see if we can avoid this, at least for reasonable libc
 if ffi.abi("64bit") then
   function C.stat(path, buf)
     return C.syscall(S.SYS.stat, path, pt.void(buf))
@@ -3874,8 +3875,8 @@ end
 
 -- if not in libc replace
 -- not in Musl TODO patch so they are--if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
-if not pcall(inlibc, "acct") then C.acct = CC.acct end
-if not pcall(inlibc, "setns") then C.setns = CC.setns end
+--if not pcall(inlibc, "acct") then C.acct = CC.acct end
+--if not pcall(inlibc, "setns") then C.setns = CC.setns end
 
 -- not in either Musl or eglibc
 if not pcall(inlibc, "clock_getres") then C.clock_getres = CC.clock_getres end
