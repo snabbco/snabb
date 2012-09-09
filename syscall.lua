@@ -3870,9 +3870,9 @@ end
 -- if not in libc replace
 
 -- not in either Musl or eglibc
-if not pcall(inlibc, "clock_getres") then C.clock_getres = CC.clock_getres end
-if not pcall(inlibc, "clock_settime") then C.clock_settime = CC.clock_settime end
-if not pcall(inlibc, "clock_gettime") then C.clock_gettime = CC.clock_gettime end
+--if not pcall(inlibc, "clock_getres") then C.clock_getres = CC.clock_getres end
+--if not pcall(inlibc, "clock_settime") then C.clock_settime = CC.clock_settime end
+--if not pcall(inlibc, "clock_gettime") then C.clock_gettime = CC.clock_gettime end
 
 -- not in eglibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
