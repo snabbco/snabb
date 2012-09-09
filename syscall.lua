@@ -3746,14 +3746,10 @@ else
   end
 end
 
--- these functions might not be in libc, so provide direct syscall fallbacks
+-- these functions might not be in libc, or are buggy so provide direct syscall fallbacks
 local function inlibc(f) return ffi.C[f] end
 
--- TODO move the other syscalls here, and checks to see if in libc
-
--- Always use syscall rather than libc implementation, usually due to bugs in glibc
-
--- glibc caches pid, but this fails to work eg after clone()
+-- glibc caches pid, but this fails to work eg after clone(). Musl is fine TODO test for this?
 function C.getpid()
   return C.syscall(S.SYS.getpid)
 end
@@ -3763,7 +3759,7 @@ function C.clone(flags, signal, stack, ptid, tls, ctid)
   return C.syscall(S.SYS.clone, t.int(flags), pt.void(stack), pt.void(ptid), pt.void(tls), pt.void(ctid))
 end
 
--- getdents is not provided by glibc. Musl has weak alias but seems not to be visible.
+-- getdents is not provided by glibc. Musl has weak alias so not visible.
 function C.getdents(fd, buf, size)
   return C.syscall(S.SYS.getdents64, t.int(fd), buf, t.uint(size))
 end
@@ -3773,7 +3769,7 @@ function C.getcwd(buf, size)
   return C.syscall(S.SYS.getcwd, pt.void(buf), t.ulong(size))
 end
 
--- for stat we use the syscall as libc will tend to have a different struct stat for compatibility
+-- for stat we use the syscall as libc might have a different struct stat for compatibility
 -- TODO see if we can avoid this, at least for reasonable libc
 if ffi.abi("64bit") then
   function C.stat(path, buf)
@@ -3814,7 +3810,7 @@ if ffi.abi("32bit") then
   end
 end
 
--- native Linux aio not generally supported, only posix API
+-- native Linux aio not generally supported, only posix API TODO these are not working
 function C.io_setup(nr_events, ctx)
   return C.syscall(S.SYS.io_setup, t.uint(nr_events), ctx)
 end
@@ -3830,8 +3826,6 @@ end
 function C.io_submit(ctx, iocb, nr)
   return C.syscall(S.SYS.io_submit, ctx, t.long(nr), iocb)
 end
-
--- these syscalls may not be supported in libc being used
 
 -- note dev_t not passed as 64 bits to this syscall
 function CC.mknod(pathname, mode, dev)
