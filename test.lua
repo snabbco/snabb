@@ -1613,7 +1613,7 @@ test_events = {
     local p = assert(S.ppoll(pev, 0, nil))
     assert(p[1].fd == c:fileno() and p[1].revents == 0, "one event now")
     assert(s:write(teststring))
-    local p = assert(S.ppoll(pev, 0, "alrm"))
+    local p = assert(S.ppoll(pev, nil, "alrm"))
     assert(p[1].fd == c:fileno() and p[1].POLLIN, "one event now")
     assert(c:read())
     assert(s:close())
