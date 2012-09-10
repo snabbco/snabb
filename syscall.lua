@@ -4674,6 +4674,7 @@ function S.poll(fds, timeout)
   return fds
 end
 
+-- note that syscall does return timeout remaining but libc does not, due to standard prototype
 function S.ppoll(fds, timeout, set)
   if not ffi.istype(t.pollfds, fds) then fds = t.pollfds(fds) end
   if timeout and not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
