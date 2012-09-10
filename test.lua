@@ -1606,6 +1606,19 @@ test_events = {
     assert(s:close())
     assert(c:close())
   end,
+  test_ppoll = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    local c, s = sv[1], sv[2]
+    local pev = {{fd = c, events = S.POLLIN}}
+    local p = assert(S.ppoll(pev, 0, "alrm"))
+    assert(p[1].fd == c:fileno() and p[1].revents == 0, "one event now")
+    assert(s:write(teststring))
+    local p = assert(S.ppoll(pev, 0, "alrm"))
+    assert(p[1].fd == c:fileno() and p[1].POLLIN, "one event now")
+    assert(c:read())
+    assert(s:close())
+    assert(c:close())
+  end,
   test_select = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local c, s = sv[1], sv[2]

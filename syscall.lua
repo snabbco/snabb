@@ -2575,6 +2575,8 @@ int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optl
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
+int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
 off_t lseek(int fd, off_t offset, int whence); // only for 64 bit, else use _llseek
@@ -2718,8 +2720,6 @@ long move_pages(int pid, unsigned long count, void **pages, const int *nodes, in
 int mprotect(const void *addr, size_t len, int prot);
 int personality(unsigned long persona);
 int pivot_root(const char *new_root, const char *put_old);
-int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
-int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, unsigned int flags, struct timespec *timeout);
 int remap_file_pages(void *addr, size_t size, int prot, ssize_t pgoff, int flags);
 int semctl(int semid, int semnum, int cmd, ...);
@@ -4665,9 +4665,20 @@ function S.select(s) -- note same structure as returned
           exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
 end
 
+-- TODO S.pselect
+
 function S.poll(fds, timeout)
   if not ffi.istype(t.pollfds, fds) then fds = t.pollfds(fds) end
   local ret = C.poll(fds.pfd, #fds, timeout or -1)
+  if ret == -1 then return nil, t.error() end
+  return fds
+end
+
+function S.ppoll(fds, timeout, set)
+  if not ffi.istype(t.pollfds, fds) then fds = t.pollfds(fds) end
+  if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
+  set = mksigset(set)
+  local ret = C.ppoll(fds.pfd, #fds, timeout, set)
   if ret == -1 then return nil, t.error() end
   return fds
 end
