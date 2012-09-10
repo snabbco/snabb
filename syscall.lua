@@ -2499,7 +2499,6 @@ int symlinkat(const char *oldpath, int newdirfd, const char *newpath);
 int chroot(const char *path);
 mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
-int gethostname(char *name, size_t len);
 int sethostname(const char *name, size_t len);
 uid_t getuid(void);
 uid_t geteuid(void);
@@ -4459,15 +4458,23 @@ function S.uname()
 end
 
 function S.gethostname()
-  local buf = t.buffer(HOST_NAME_MAX + 1)
-  local ret = C.gethostname(buf, HOST_NAME_MAX + 1)
-  if ret == -1 then return nil, t.error() end
-  buf[HOST_NAME_MAX] = 0 -- paranoia here to make sure null terminated, which could happen if HOST_NAME_MAX was incorrect
-  return ffi.string(buf)
+  local u, err = S.uname()
+  if not u then return nil, err end
+  return u.nodename
+end
+
+function S.getdomainname()
+  local u, err = S.uname()
+  if not u then return nil, err end
+  return u.domainname
 end
 
 function S.sethostname(s) -- only accept Lua string, do not see use case for buffer as well
   return retbool(C.sethostname(s, #s))
+end
+
+function S.setdomainname(s)
+  return retbool(C.setdomainname(s, #s))
 end
 
 -- does not support passing a function as a handler, use sigaction instead

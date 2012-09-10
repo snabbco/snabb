@@ -1054,11 +1054,26 @@ test_misc = {
     assert_string(u.sysname)
     assert_string(u.release)
     assert_string(u.version)
+    assert_string(u.machine)
+    assert_string(u.domainname)
   end,
-  test_hostname = function()
+  test_gethostname = function()
     local h = assert(S.gethostname())
     local u = assert(S.uname())
-    assert(h == u.nodename, "gethostname did not return nodename")
+    assert_equal(h, u.nodename, "gethostname did not return nodename")
+  end,
+  test_getdomainname = function()
+    local d = assert(S.getdomainname())
+    local u = assert(S.uname())
+    assert_equal(d, u.domainname, "getdomainname did not return domainname")
+  end,
+  test_sethostname_root = function()
+    assert(S.sethostname("hostnametest"))
+    assert_equal(S.gethostname(), "hostnametest")
+  end,
+  test_setdomainname_root = function()
+    assert(S.setdomainname("domainnametest"))
+    assert_equal(S.getdomainname(), "domainnametest")
   end,
   test_inet_name = function()
     local addr, mask = S.inet_name("127.0.0.1/24")
