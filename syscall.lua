@@ -2569,6 +2569,8 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags);
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
+ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
@@ -2717,8 +2719,6 @@ int mprotect(const void *addr, size_t len, int prot);
 int personality(unsigned long persona);
 int pivot_root(const char *new_root, const char *put_old);
 int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
-ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
-ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, unsigned int flags, struct timespec *timeout);
 int remap_file_pages(void *addr, size_t size, int prot, ssize_t pgoff, int flags);
@@ -3399,7 +3399,12 @@ mt.iovecs = {
       elseif type(i) == 'number' then
         iov[n].iov_base = t.buffer(i)
         iov[n].iov_len = i
-      else
+      elseif ffi.istype(t.iovec, i) then
+        ffi.copy(iov[n], i, s.iovec)
+      elseif type(i) == 'cdata' then -- eg buffer or other structure
+        iov[n].iov_base = i
+        iov[n].iov_len = ffi.sizeof(i)
+      else -- eg table
         iov[n] = i
       end
     end
@@ -4102,7 +4107,7 @@ function S.pread(fd, buf, count, offset) return retnum(C.pread64(getfd(fd), buf,
 function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite64(getfd(fd), buf, count or #buf, offset)) end
 
 function S.lseek(fd, offset, whence)
-  return ret64(C.lseek(getfd(fd), offset, stringflag(whence, "SEEK_")))
+  return ret64(C.lseek(getfd(fd), offset or 0, stringflag(whence, "SEEK_")))
 end
 
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
@@ -4127,6 +4132,16 @@ end
 function S.writev(fd, iov)
   if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
   return retnum(C.writev(getfd(fd), iov.iov, #iov))
+end
+
+function S.preadv(fd, iov, offset)
+  if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
+  return retnum(C.preadv(getfd(fd), iov.iov, #iov, offset))
+end
+
+function S.pwritev(fd, iov, offset)
+  if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
+  return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
 end
 
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
@@ -5743,6 +5758,7 @@ S.in6addr_any = t.in6_addr()
 S.in6addr_loopback = t.in6_addr("::1")
 
 -- methods on an fd
+-- note could split, so a socket does not have methods only appropriate for a file
 local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
                    'close', 'dup', 'read', 'write', 'pread', 'pwrite', 'tell', 'lockf',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
@@ -5757,7 +5773,8 @@ local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendc
                    'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
                    'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
-                   'fchownat', 'readlinkat', 'mkfifoat', 'isatty', 'setns', 'openat'
+                   'fchownat', 'readlinkat', 'mkfifoat', 'isatty', 'setns', 'openat',
+                   'preadv', 'pwritev'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end

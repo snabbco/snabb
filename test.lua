@@ -1,4 +1,4 @@
--- test framework for ljsyscall.
+-- test suite for ljsyscall.
 
 local strict = require "strict"
 local S = require "syscall"
@@ -53,6 +53,7 @@ local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 local longfile = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
 local efile = "/tmp/tmpXXYYY" .. S.getpid() .. ".sh"
 local t, pt = S.t, S.pt
+local largeval = math.pow(2, 35) -- larger than 2^32 for testing
 
 local clean = function()
   S.rmdir(tmpfile)
@@ -123,9 +124,6 @@ test_open_close = {
     assert(fd2:fileno() >= 4, "should get file descriptor of at least 4 back from second open")
     assert(fd:close())
     assert(fd2:close())
-  end,
-  test_sync = function()
-    S.sync() -- cannot fail...
   end,
   test_fd_cleared_on_close = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
@@ -228,7 +226,39 @@ test_read_write = {
     local ss = assert(S.readfile(tmpfile))
     assert_equal(ss, teststring, "readfile should get back what writefile wrote")
     assert(S.unlink(tmpfile))
-  end
+  end,
+  test_readv_writev = function()
+    local fd = assert(S.open(tmpfile, "rdwr,creat", "irwxu"))
+    local n = assert(fd:writev{"test", "ing", "writev"})
+    assert_equal(n, 13, "expect length 13")
+    assert(fd:seek())
+    local b1, b2, b3 = S.t.buffer(6), S.t.buffer(4), S.t.buffer(3)
+    local n = assert(fd:readv{b1, b2, b3})
+    assert_equal(n, 13, "expect length 13")
+    assert_equal(S.string(b1), "testin")
+    assert_equal(S.string(b2), "gwri")
+    assert_equal(S.string(b3), "tev")
+    assert(S.unlink(tmpfile))
+  end,
+  test_preadv_pwritev = function()
+    local offset = largeval
+    local fd = assert(S.open(tmpfile, "rdwr,creat", "irwxu"))
+    local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
+    assert_equal(n, 13, "expect length 13")
+    local b1, b2, b3 = S.t.buffer(6), S.t.buffer(4), S.t.buffer(3)
+    local n = assert(fd:preadv({b1, b2, b3}, offset))
+    assert_equal(n, 13, "expect length 13")
+    assert_equal(S.string(b1), "testin")
+    assert_equal(S.string(b2), "gwri")
+    assert_equal(S.string(b3), "tev")
+    assert(fd:seek(offset))
+    local n = assert(fd:readv{b1, b2, b3})
+    assert_equal(n, 13, "expect length 13")
+    assert_equal(S.string(b1), "testin")
+    assert_equal(S.string(b2), "gwri")
+    assert_equal(S.string(b3), "tev")
+    assert(S.unlink(tmpfile))
+  end,
 }
 
 test_file_operations = {
@@ -281,6 +311,9 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
     assert(dirfd:close())
+  end,
+  test_sync = function()
+    S.sync() -- cannot fail...
   end,
   test_fchmod = function()
     local fd = assert(S.creat(tmpfile, "IRWXU"))
