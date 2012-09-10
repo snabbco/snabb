@@ -2500,6 +2500,7 @@ int chroot(const char *path);
 mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
 int sethostname(const char *name, size_t len);
+int setdomainname(const char *name, size_t len);
 uid_t getuid(void);
 uid_t geteuid(void);
 pid_t getpid(void);
@@ -2738,8 +2739,6 @@ pid_t gettid(void);
 int setfsgid(uid_t fsgid);
 int setfsuid(uid_t fsuid);
 long keyctl(int cmd, ...);
-int getdomainname(char *name, size_t len);
-int setdomainname(const char *name, size_t len);
 
 mqd_t mq_open(const char *name, int oflag, mode_t mode, struct mq_attr *attr);
 int mq_getsetattr(mqd_t mqdes, struct mq_attr *newattr, struct mq_attr *oldattr);
