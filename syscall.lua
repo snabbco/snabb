@@ -4676,7 +4676,7 @@ end
 
 function S.ppoll(fds, timeout, set)
   if not ffi.istype(t.pollfds, fds) then fds = t.pollfds(fds) end
-  if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
+  if timespec and not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
   set = mksigset(set)
   local ret = C.ppoll(fds.pfd, #fds, timeout, set)
   if ret == -1 then return nil, t.error() end
