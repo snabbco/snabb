@@ -34,9 +34,6 @@ end
 -- Functions that can be interesting to call
 
 function dump_forwarding_table()
-   if ffi.C.fork() == 0 then
-      return
-   end
    io.stdout:write("-- Snabb Switch forwarding table:\n")
    for key,value in pairs(switch.fdb.table) do
       io.stdout:write(formatmac(key) .. " -> " .. tostring(value) .. "\n")
