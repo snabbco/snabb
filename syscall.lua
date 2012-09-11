@@ -4665,7 +4665,22 @@ function S.select(s) -- note same structure as returned
           exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
 end
 
--- TODO S.pselect
+function S.pselect(s) -- note same structure as returned
+  local r, w, e
+  local nfds = 0
+  local timeout, set
+  if s.timeout then
+    if ffi.istype(t.timespec, s.timeout) then timeout = s.timeout else timeout = t.timespec(s.timeout) end
+  end
+  if s.sigset then set = mksigset(s.sigset) end
+  r, nfds = mkfdset(s.readfds or {}, nfds or 0)
+  w, nfds = mkfdset(s.writefds or {}, nfds)
+  e, nfds = mkfdset(s.exceptfds or {}, nfds)
+  local ret = C.pselect(nfds, r, w, e, timeout, set)
+  if ret == -1 then return nil, t.error() end
+  return {readfds = fdisset(s.readfds or {}, r), writefds = fdisset(s.writefds or {}, w),
+          exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret), sigset = set}
+end
 
 function S.poll(fds, timeout)
   if not ffi.istype(t.pollfds, fds) then fds = t.pollfds(fds) end

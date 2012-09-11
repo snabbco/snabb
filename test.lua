@@ -1630,6 +1630,17 @@ test_events = {
     assert(s:close())
     assert(c:close())
   end,
+  test_pselect = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    local c, s = sv[1], sv[2]
+    local sel = assert(S.pselect{readfds = {c, s}, timeout = 0, sigset = "alrm"})
+    assert(sel.count == 0, "nothing to read select now")
+    assert(s:write(teststring))
+    sel = assert(S.pselect{readfds = {c, s}, timeout = 0, sigset = sel.sigset})
+    assert(sel.count == 1, "one fd available for read now")
+    assert(s:close())
+    assert(c:close())
+  end,
   test_epoll = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local c, s = sv[1], sv[2]
