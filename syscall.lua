@@ -3140,6 +3140,12 @@ metatype("sockaddr_un", "struct sockaddr_un", {
   __new = function(tp) return ffi.new(tp, S.AF_UNIX) end,
 })
 
+local nlgroupmap = { -- map from netlink socket type to group names. Note there are two forms of name though, bits and shifts.
+  [S.NETLINK_ROUTE] = "RTMGRP_", -- or RTNLGRP_ and shift not mask TODO make shiftflags function
+  -- add rest of these
+  [S.NETLINK_SELINUX] = "SELNLGRP_",
+}
+
 meth.sockaddr_nl = {
   index = {
     family = function(sa) return sa.nl_family end,
@@ -3155,12 +3161,14 @@ meth.sockaddr_nl = {
 metatype("sockaddr_nl", "struct sockaddr_nl", {
   __index = function(sa, k) if meth.sockaddr_nl.index[k] then return meth.sockaddr_nl.index[k](sa) end end,
   __newindex = function(sa, k, v) if meth.sockaddr_nl.newindex[k] then meth.sockaddr_nl.newindex[k](sa, v) end end,
-  __new = function(tp, pid, groups)
-    if type(pid) == "table" then -- TODO allow table with short names too (groups not nl_groups)
-      pid.nl_family = S.AF_NETLINK
-      return ffi.new(tp, pid)
+  __new = function(tp, pid, groups, nltype)
+    if type(pid) == "table" then
+      local tb = pid
+      pid, groups, nltype = tb.nl_pid or tb.pid, tb.nl_groups or tb.groups, tb.type
     end
-    return ffi.new(tp, S.AF_NETLINK, pid or 0, groups or 0) end,
+    if nltype and nlgroupmap[nltype] then groups = stringflags(groups, nlgroupmap[nltype]) end -- see note about shiftflags
+    return ffi.new(tp, {nl_family = S.AF_NETLINK, nl_pid = pid, nl_groups = groups})
+  end,
 })
 
 samap = {

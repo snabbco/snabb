@@ -1481,7 +1481,7 @@ test_netlink = {
     assert_equal(#nr, 0, "expect route deleted")
   end,
   test_netlink_events_root = function()
-    local sock = assert(nl.socket("route", {nl_groups = S.RTMGRP_LINK})) -- TODO allow symbolic names, ie "link"
+    local sock = assert(nl.socket("route", {groups = "link"}))
     assert(nl.create_interface{name = "dummy1", type = "dummy"})
     local m = assert(nl.read(sock))
     assert(m.dummy1, "should find dummy 1 in returned info")
@@ -1491,7 +1491,6 @@ test_netlink = {
     assert(m.dummy1:delete())
     local m = assert(nl.read(sock))
     assert(m.dummy1, "should get info about deleted interface")
-
     assert_equal(tostring(m.dummy1.macaddr), "46:9d:c9:06:dd:dd", "should get address that was set")
     assert(sock:close())
   end,
