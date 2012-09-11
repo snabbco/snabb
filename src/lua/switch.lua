@@ -12,11 +12,12 @@ module("switch",package.seeall)
 
 require("shm")
 
-local ffi  = require("ffi")
-local c    = require("c")
-local port = require("port")
-local medium = require("medium")
-local C    = ffi.C
+local ffi       = require("ffi")
+local c         = require("c")
+local port      = require("port")
+local medium    = require("medium")
+local C         = ffi.C
+local report    = require("report")
 
 local tracefile
 
@@ -63,7 +64,7 @@ local pcap_record = ffi.new("struct pcap_record")
 local pcap_extra  = ffi.new("struct pcap_record_extra")
 
 -- Switch logic
-local fdb = {} -- { MAC -> [Port] }
+fdb = { table = {} }
 
 function main ()
    while true do
@@ -75,6 +76,7 @@ function main ()
 	    input(packet)
 	 end
       end
+      report.scan()
       C.usleep(10000)
    end
 end
@@ -129,11 +131,11 @@ end
 -- Forwarding database
 
 function fdb:update (packet)
-   self[packet.src] = packet.inputport.id
+   self.table[packet.src] = packet.inputport.id
 end
 
 function fdb:lookup (packet)
-   local out = self[packet.dst]
+   local out = self.table[packet.dst]
    if out ~= nil and out ~= packet.inputport then
       -- print("out = " .. tostring(out))
       return {out}
