@@ -4652,14 +4652,14 @@ end
 function S.select(s) -- note same structure as returned
   local r, w, e
   local nfds = 0
-  local timeout2
+  local timeout
   if s.timeout then
-    if ffi.istype(t.timeval, s.timeout) then timeout2 = s.timeout else timeout2 = t.timeval(s.timeout) end
+    if ffi.istype(t.timeval, s.timeout) then timeout = s.timeout else timeout = t.timeval(s.timeout) end
   end
   r, nfds = mkfdset(s.readfds or {}, nfds or 0)
   w, nfds = mkfdset(s.writefds or {}, nfds)
   e, nfds = mkfdset(s.exceptfds or {}, nfds)
-  local ret = C.select(nfds, r, w, e, timeout2)
+  local ret = C.select(nfds, r, w, e, timeout)
   if ret == -1 then return nil, t.error() end
   return {readfds = fdisset(s.readfds or {}, r), writefds = fdisset(s.writefds or {}, w),
           exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
