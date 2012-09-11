@@ -22,5 +22,7 @@ ffi.cdef[[
       // write(2) - write to a file descriptor
       int     write(int fd, void *buf, size_t count);
       
+      // fork(2) - create a child process
+      int     fork();
 ]]
 
