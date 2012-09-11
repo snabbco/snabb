@@ -96,8 +96,8 @@ function makepacket (inputport, data, length)
    return {inputport = inputport,
 	   length    = length,
 	   data      = data,
-	   src       = ffi.string(data, 6),
-	   dst       = ffi.string(data + 6, 6)}
+	   dst       = ffi.string(data, 6),
+	   src       = ffi.string(data + 6, 6)}
 end
 
 function tracepacket (packet, direction)
