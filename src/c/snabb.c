@@ -1,16 +1,18 @@
 /* Copyright 2012 Snabb GmbH. See the file COPYING for license details. */
 
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <sys/mman.h>
 #include <assert.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
 #include <fcntl.h>
-#include <net/if.h>
 #include <linux/if_tun.h>
+#include <net/if.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <time.h>
 
 #include "snabb.h"
 #include <net/snabb-shm-dev.h>
@@ -44,5 +46,13 @@ int open_tap(const char *name)
         return -1;
     }
     return fd;
+}
+
+uint64_t get_time_ns()
+{
+    /* XXX Consider using RDTSC. */
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
