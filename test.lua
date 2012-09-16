@@ -2044,7 +2044,28 @@ test_misc_root = {
   end,
   test_chroot = function()
     assert(S.chroot("/"))
- end,
+  end,
+  test_pivot_root = function()
+    assert(S.mkdir(tmpfile))
+    local p = assert(S.clone("newns"))
+    if p == 0 then
+      fork_assert(S.mount(tmpfile, tmpfile, "none", "bind")) -- to make sure on different mount point
+      fork_assert(S.mount(tmpfile, tmpfile, nil, "private"))
+      fork_assert(S.chdir(tmpfile))
+      fork_assert(S.mkdir("old"))
+      fork_assert(S.pivot_root(".", "old"))
+      fork_assert(S.chdir("/"))
+      local d = fork_assert(S.dirfile("/"))
+      fork_assert(d["old"])
+      --fork_assert(S.umount("old")) -- returning busy, need to sort out why.
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end
+    assert(S.rmdir(tmpfile .. "/old")) -- until we can unmount above
+    assert(S.rmdir(tmpfile))
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.

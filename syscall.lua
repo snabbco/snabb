@@ -2669,6 +2669,7 @@ int fremovexattr(int fd, const char *name);
 
 int unshare(int flags);
 int setns(int fd, int nstype);
+int pivot_root(const char *new_root, const char *put_old);
 
 int syscall(int number, ...);
 
@@ -2719,7 +2720,6 @@ int mincore(void *addr, size_t length, unsigned char *vec);
 long move_pages(int pid, unsigned long count, void **pages, const int *nodes, int *status, int flags);
 int mprotect(const void *addr, size_t len, int prot);
 int personality(unsigned long persona);
-int pivot_root(const char *new_root, const char *put_old);
 int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, unsigned int flags, struct timespec *timeout);
 int remap_file_pages(void *addr, size_t size, int prot, ssize_t pgoff, int flags);
 int semctl(int semid, int semnum, int cmd, ...);
@@ -3845,6 +3845,10 @@ end
 function CC.mknodat(fd, pathname, mode, dev)
   return C.syscall(S.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.long(dev))
 end
+-- pivot_root is not provided by glibc, is provided by Musl
+function CC.pivot_root(new_root, put_old)
+  return C.syscall(C.SYS.pivot_root, new_root, put_old)
+end
 
 --[[ if you need to split 64 bit args on 32 bit syscalls use code like this
 if ffi.abi("64bit") then
@@ -3874,6 +3878,7 @@ end
 -- not in eglibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
 if not pcall(inlibc, "mknodat") then C.mknodat = CC.mknodat end
+if not pcall(inlibc, "pivot_root") then C.pivot_root = CC.pivot_root end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
@@ -4952,6 +4957,8 @@ function S.timerfd_read(fd, buffer)
   if not ret then return nil, err end
   return tonumber(buffer[0])
 end
+
+function S.pivot_root(new_root, put_old) return retbool(C.pivot_root(new_root, put_old)) end
 
 -- aio functions
 function S.io_setup(nr_events)
