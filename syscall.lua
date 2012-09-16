@@ -59,6 +59,8 @@ S.O_NOATIME   = octal('01000000')
 S.O_DSYNC     = octal('010000')
 S.O_RSYNC     = S.O_SYNC
 
+if ffi.abi("32bit") then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end
+
 -- these are arch dependent!
 if arch.oflags then arch.oflags(S)
 else -- generic values from asm-generic
@@ -2561,7 +2563,7 @@ ssize_t write(int fd, const void *buf, size_t count);
 ssize_t pread64(int fd, void *buf, size_t count, loff_t offset);
 ssize_t pwrite64(int fd, const void *buf, size_t count, loff_t offset);
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
-// for sendto and recvfrom use void poointer not const struct sockaddr * to avoid casting
+// for sendto and recvfrom use void pointer not const struct sockaddr * to avoid casting
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const void *dest_addr, socklen_t addrlen);
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, void *src_addr, socklen_t *addrlen);
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
@@ -2569,8 +2571,11 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags);
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
-ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
-ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+// ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+// ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+ssize_t preadv64(int fd, const struct iovec *iov, int iovcnt, loff_t offset);
+ssize_t pwritev64(int fd, const struct iovec *iov, int iovcnt, loff_t offset);
+
 int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
@@ -3882,11 +3887,13 @@ if not pcall(inlibc, "pivot_root") then C.pivot_root = CC.pivot_root end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
-  return retfd(C.open(pathname, stringflags(flags, "O_"), S.mode(mode)))
+  flags = bit.bor(stringflags(flags, "O_"), S.O_LARGEFILE)
+  return retfd(C.open(pathname, flags, S.mode(mode)))
 end
 
 function S.openat(dirfd, pathname, flags, mode)
-  return retfd(C.openat(getfd_at(dirfd), pathname, stringflags(flags, "O_"), S.mode(mode)))
+  flags = bit.bor(stringflags(flags, "O_"), S.O_LARGEFILE)
+  return retfd(C.openat(getfd_at(dirfd), pathname, flags, S.mode(mode)))
 end
 
 -- TODO dup3 can have a race condition (see man page) although Musl fixes, appears eglibc does not
@@ -4147,12 +4154,12 @@ end
 
 function S.preadv(fd, iov, offset)
   if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
-  return retnum(C.preadv(getfd(fd), iov.iov, #iov, offset))
+  return retnum(C.preadv64(getfd(fd), iov.iov, #iov, offset))
 end
 
 function S.pwritev(fd, iov, offset)
   if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
-  return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
+  return retnum(C.pwritev64(getfd(fd), iov.iov, #iov, offset))
 end
 
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end

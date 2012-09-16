@@ -53,7 +53,7 @@ local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 local longfile = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
 local efile = "/tmp/tmpXXYYY" .. S.getpid() .. ".sh"
 local t, pt = S.t, S.pt
-local largeval = math.pow(2, 35) -- larger than 2^32 for testing
+local largeval = math.pow(2, 33) -- larger than 2^32 for testing
 
 local clean = function()
   S.rmdir(tmpfile)
