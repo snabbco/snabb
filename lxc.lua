@@ -23,12 +23,19 @@ assert(nl.create_interface{name = "veth0", type = "veth", peer = {name = "veth1"
 local p = assert(S.clone("newnet,newipc,newns,newpid,newuts"))
 
 if p == 0 then -- child
-  -- do we need to clean anything?
-
-  -- wait on network arriving
-
+  -- wait for interface to appear
+  local sock = assert(nl.socket("route", {groups = "link"}))
   local i = nl.interfaces()
+  if not i.veth1 then
+    local m = assert(nl.read(sock))
+    assert(m.veth1)
+  end
+  sock:close()
+  i:refresh()
+  -- rename it to eth0
   i.veth1:rename("eth0")
+
+  -- set up file system
 
   assert(S.execve("/sbin/init", {"init"}, {}))
   S.exit("failure")
