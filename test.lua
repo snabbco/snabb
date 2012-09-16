@@ -2057,7 +2057,7 @@ test_misc_root = {
       fork_assert(S.chdir("/"))
       local d = fork_assert(S.dirfile("/"))
       fork_assert(d["old"])
-      --fork_assert(S.umount("old")) -- returning busy, need to sort out why.
+      --fork_assert(S.umount("old")) -- returning busy, TODO need to sort out why.
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
