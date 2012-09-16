@@ -4439,7 +4439,7 @@ function S.fcntl(fd, cmd, arg)
   cmd = stringflag(cmd, "F_")
 
   local m = {
-    [S.F_SETFL] = function(arg) return stringflags(arg, "O_") end,
+    [S.F_SETFL] = function(arg) return bit.bot(stringflags(arg, "O_"), S.O_LARGEFILE) end,
     [S.F_SETFD] = function(arg) return stringflag(arg, "FD_") end,
     [S.F_GETLK] = getflock,
     [S.F_SETLK] = getflock,
