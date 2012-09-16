@@ -1503,6 +1503,7 @@ test_netlink = {
         local m = assert(nl.read(sock))
         fork_assert(m.dummy0, "expect dummy0 appeared")
       end
+      fork_assert(sock:close())
       local i = fork_assert(nl.interfaces())
       fork_assert(i.dummy0, "expect dummy0 interface in child")
       fork_assert(i.dummy0:delete())
