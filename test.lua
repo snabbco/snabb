@@ -1278,9 +1278,6 @@ test_netlink = {
       assert_equal(tostring(wlan.macaddr) .. '\n', mac, "mac address should match that from /sys")
     end
   end,
-  test_bridge_list = function() -- TODO not in netlink tests
-    local b = assert(S.bridge_list())
-  end,
   test_get_addresses_in = function()
     local as = assert(nl.getaddr("inet"))
     local lo = assert(nl.getlink()).lo.index
