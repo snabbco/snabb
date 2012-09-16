@@ -1492,13 +1492,17 @@ test_netlink = {
     assert(sock:close())
   end,
   test_move_interface_ns_root = function()
-    local fds = assert(S.pipe())
     assert(nl.create_interface{name = "dummy0", type = "dummy"})
     local i = assert(nl.interfaces())
     assert(i.dummy0, "expect dummy0 interface")
     local p = assert(S.clone("newnet"))
     if p == 0 then
-      fork_assert(fds:read(nil, 1)) -- wait until interface moved. TODO wait for event from netlink listener instead?
+      local sock = assert(nl.socket("route", {groups = "link"}))
+      local i = fork_assert(nl.interfaces())
+      if not i.dummy0 then
+        local m = assert(nl.read(sock))
+        fork_assert(m.dummy0, "expect dummy0 appeared")
+      end
       local i = fork_assert(nl.interfaces())
       fork_assert(i.dummy0, "expect dummy0 interface in child")
       fork_assert(i.dummy0:delete())
@@ -1508,11 +1512,9 @@ test_netlink = {
     else
       assert(i.dummy0:move_ns(p))
       assert(i:refresh())
-      assert(fds:write(".")) -- say we are ready
       assert(not i.dummy0, "expect dummy0 vanished")
       local w = assert(S.waitpid(-1, "clone"))
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
-      assert(fds:close())
     end
   end,
   test_netlink_veth_root = function()
