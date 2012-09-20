@@ -32,6 +32,8 @@ S.copy = ffi.copy
 S.fill = ffi.fill
 S.istype = ffi.istype
 
+-- constants
+
 S.STDIN_FILENO = 0
 S.STDOUT_FILENO = 1
 S.STDERR_FILENO = 2
@@ -2792,6 +2794,11 @@ else
   C.ftruncate = ffi.C.ftruncate64
 end
 
+-- makes code tidier
+local function istype(x, tp)
+  if ffi.istype(x, tp) then return tp else return false end
+end
+
 -- functions we need for metatypes
 
 local function split(delimiter, text)
@@ -3371,8 +3378,8 @@ metatype("itimerspec", "struct itimerspec", {
   __index = function(it, k) if meth.itimerspec.index[k] then return meth.itimerspec.index[k](it) end end,
   __new = function(tp, v)
     v = itnormal(v)
-    if not ffi.istype(t.timespec, v.it_interval) then v.it_interval = t.timespec(v.it_interval) end
-    if not ffi.istype(t.timespec, v.it_value) then v.it_value = t.timespec(v.it_value) end
+    v.it_interval = istype(t.timespec, v.it_interval) or t.timespec(v.it_interval)
+    v.it_value = istype(t.timespec, v.it_value) or t.timespec(v.it_value)
     return ffi.new(tp, v)
   end
 })
@@ -3381,8 +3388,8 @@ metatype("itimerval", "struct itimerval", {
   __index = function(it, k) if meth.itimerspec.index[k] then return meth.itimerspec.index[k](it) end end, -- can use same meth
   __new = function(tp, v)
     v = itnormal(v)
-    if not ffi.istype(t.timeval, v.it_interval) then v.it_interval = t.timeval(v.it_interval) end
-    if not ffi.istype(t.timeval, v.it_value) then v.it_value = t.timeval(v.it_value) end
+    v.it_interval = istype(t.timeval, v.it_interval) or t.timeval(v.it_interval)
+    v.it_value = istype(t.timeval, v.it_value) or t.timeval(v.it_value)
     return ffi.new(tp, v)
   end
 })
@@ -3392,7 +3399,7 @@ mt.iovecs = {
     return io.iov[k - 1]
   end,
   __newindex = function(io, k, v)
-    if not ffi.istype(t.iovec, v) then v = t.iovec(v) end
+    v = istype(t.iovec, v) or t.iovec(v)
     ffi.copy(io.iov[k - 1], v, s.iovec)
   end,
   __len = function(io) return io.count end,
@@ -3439,7 +3446,7 @@ mt.pollfds = {
     return p.pfd[k - 1]
   end,
   __newindex = function(p, k, v)
-    if not ffi.istype(t.pollfd, v) then v = t.pollfd(v) end
+    v = istype(t.pollfd, v) or t.pollfd(v)
     ffi.copy(p.pfd[k - 1], v, s.pollfd)
   end,
   __len = function(p) return p.count end,
@@ -4143,22 +4150,22 @@ function S.sendmsg(fd, msg, flags)
 end
 
 function S.readv(fd, iov)
-  if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
+  iov = istype(t.iovecs, iov) or t.iovecs(iov)
   return retnum(C.readv(getfd(fd), iov.iov, #iov))
 end
 
 function S.writev(fd, iov)
-  if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
+  iov = istype(t.iovecs, iov) or t.iovecs(iov)
   return retnum(C.writev(getfd(fd), iov.iov, #iov))
 end
 
 function S.preadv(fd, iov, offset)
-  if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
+  iov = istype(t.iovecs, iov) or t.iovecs(iov)
   return retnum(C.preadv64(getfd(fd), iov.iov, #iov, offset))
 end
 
 function S.pwritev(fd, iov, offset)
-  if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
+  iov = istype(t.iovecs, iov) or t.iovecs(iov)
   return retnum(C.pwritev64(getfd(fd), iov.iov, #iov, offset))
 end
 
@@ -4283,8 +4290,8 @@ function S.fstatfs(fd)
 end
 
 function S.nanosleep(req, rem)
-  if not ffi.istype(t.timespec, req) then req = t.timespec(req) end
-  if not rem then rem = t.timespec() end
+  req = istype(t.timespec, req) or t.timespec(req)
+  rem = rem or t.timespec()
   local ret = C.nanosleep(req, rem)
   if ret == -1 then
     if ffi.errno() == S.E.INTR then return rem else return nil, t.error() end
