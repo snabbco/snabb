@@ -4710,7 +4710,7 @@ function S.pselect(s) -- note same structure as returned
 end
 
 function S.poll(fds, timeout)
-  if not ffi.istype(t.pollfds, fds) then fds = t.pollfds(fds) end
+  fds = istype(t.pollfds, fds) or t.pollfds(fds)
   local ret = C.poll(fds.pfd, #fds, timeout or -1)
   if ret == -1 then return nil, t.error() end
   return fds
@@ -4718,8 +4718,8 @@ end
 
 -- note that syscall does return timeout remaining but libc does not, due to standard prototype
 function S.ppoll(fds, timeout, set)
-  if not ffi.istype(t.pollfds, fds) then fds = t.pollfds(fds) end
-  if timeout and not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
+  fds = istype(t.pollfds, fds) or t.pollfds(fds)
+  if timeout then timeout = istype(t.timespec, timeout) or t.timespec(timeout) end
   if set then set = mksigset(set) end
   local ret = C.ppoll(fds.pfd, #fds, timeout, set)
   if ret == -1 then return nil, t.error() end
@@ -4748,7 +4748,7 @@ end
 S.RLIM_INFINITY = ffi.cast("rlim64_t", -1)
 
 function S.prlimit(pid, resource, new_limit)
-  if new_limit and not ffi.istype(t.rlimit, new_limit) then new_limit = t.rlimit(new_limit) end
+  if new_limit then new_limit = istype(t.rlimit, new_limit) or t.rlimit(new_limit) end
   local old_limit = t.rlimit()
   local ret = C.prlimit(pid, stringflag(resource, "RLIMIT_"), new_limit, old_limit)
   if ret == -1 then return nil, t.error() end
@@ -4816,7 +4816,7 @@ function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
 end
 
 function S.vmsplice(fd, iov, flags)
-  if not ffi.istype(t.iovecs, iov) then iov = t.iovecs(iov) end
+  iov = istype(t.iovecs, iov) or t.iovecs(iov)
   return retnum(C.vmsplice(getfd(fd), iov.iov, #iov, stringflags(flags, "SPLICE_F_")))
 end
 
@@ -4938,7 +4938,7 @@ function S.getitimer(which, value)
 end
 
 function S.setitimer(which, it)
-  if not ffi.istype(t.itimerval, it) then it = t.itimerval(it) end
+  it = istype(t.itimerval, it) or t.itimerval(it)
   local oldtime = t.itimerval()
   local ret = C.setitimer(stringflag(which, "ITIMER_"), it, oldtime)
   if ret == -1 then return nil, t.error() end
@@ -4951,7 +4951,7 @@ end
 
 function S.timerfd_settime(fd, flags, it, oldtime)
   oldtime = oldtime or t.itimerspec()
-  if not ffi.istype(t.itimerspec, it) then it = t.itimerspec(it) end
+  it = istype(t.itimerspec, it) or t.itimerspec(it)
   local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), it, oldtime)
   if ret == -1 then return nil, t.error() end
   return oldtime
@@ -5030,8 +5030,8 @@ function S.io_cancel(ctx, iocb, result)
 end
 
 function S.io_getevents(ctx, min, nr, events, timeout)
-  if not events then events = t.io_events(nr) end
-  if not ffi.istype(t.timespec, timeout) then timeout = t.timespec(timeout) end
+  events = events or t.io_events(nr)
+  timeout = istype(t.timespec, timeout) or t.timespec(timeout)
   local ret = C.io_getevents(ctx.ctx, min, nr, events, timeout)
   if ret == -1 then return nil, t.error() end
   -- need to think more about how to return these, eg metatype for io_event?
@@ -5141,27 +5141,27 @@ function S.adjtimex(a)
 end
 
 function S.clock_getres(clk_id, ts)
-  if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
+  ts = istype(t.timespec, ts) or t.timespec(ts)
   local ret = C.clock_getres(stringflag(clk_id, "CLOCK_"), ts)
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
-  if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
+  ts = istype(t.timespec, ts) or t.timespec(ts)
   local ret = C.clock_gettime(stringflag(clk_id, "CLOCK_"), ts)
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_settime(clk_id, ts)
-  if not ffi.istype(t.timespec, ts) then ts = t.timespec(ts) end
+  ts = istype(t.timespec, ts) or t.timespec(ts)
   return retbool(C.clock_settime(stringflag(clk_id, "CLOCK_"), ts))
 end
 
 function S.clock_nanosleep(clk_id, flags, req, rem)
-  if not ffi.istype(t.timespec, req) then req = t.timespec(req) end
-  if not rem then rem = t.timespec() end
+  req = istype(t.timespec, req) or t.timespec(req)
+  rem = rem or t.timespec()
   local ret = C.clock_nanosleep(stringflag(clk_id, "CLOCK_"), stringflag(flags, "TIMER_"), req, rem)
   if ret == -1 then
     if ffi.errno() == S.E.INTR then return rem else return nil, t.error() end
