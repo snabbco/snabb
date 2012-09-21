@@ -4747,9 +4747,9 @@ end
 -- TODO math.huge should be converted to this in __new
 S.RLIM_INFINITY = ffi.cast("rlim64_t", -1)
 
-function S.prlimit(pid, resource, new_limit)
+function S.prlimit(pid, resource, new_limit, old_limit)
   if new_limit then new_limit = istype(t.rlimit, new_limit) or t.rlimit(new_limit) end
-  local old_limit = t.rlimit()
+  old_limit = old_limit or t.rlimit()
   local ret = C.prlimit(pid, stringflag(resource, "RLIMIT_"), new_limit, old_limit)
   if ret == -1 then return nil, t.error() end
   return old_limit
