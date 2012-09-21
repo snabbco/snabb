@@ -2620,7 +2620,7 @@ int ftruncate(int fd, off_t length);
 int truncate64(const char *path, loff_t length);
 int ftruncate64(int fd, loff_t length);
 int pause(void);
-int prlimit(pid_t pid, int resource, const struct rlimit64 *new_limit, struct rlimit64 *old_limit);
+int prlimit64(pid_t pid, int resource, const struct rlimit64 *new_limit, struct rlimit64 *old_limit);
 
 int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);
@@ -4750,7 +4750,7 @@ S.RLIM_INFINITY = ffi.cast("rlim64_t", -1)
 function S.prlimit(pid, resource, new_limit, old_limit)
   if new_limit then new_limit = istype(t.rlimit, new_limit) or t.rlimit(new_limit) end
   old_limit = old_limit or t.rlimit()
-  local ret = C.prlimit(pid, stringflag(resource, "RLIMIT_"), new_limit, old_limit)
+  local ret = C.prlimit64(pid or 0, stringflag(resource, "RLIMIT_"), new_limit, old_limit)
   if ret == -1 then return nil, t.error() end
   return old_limit
 end
