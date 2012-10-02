@@ -13,6 +13,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "snabb.h"
 #include <net/snabb-shm-dev.h>
@@ -54,5 +55,20 @@ uint64_t get_time_ns()
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec * 1000000000LL + ts.tv_nsec;
+}
+
+void *map_pci_resource(const char *path)
+{
+  int fd;
+  void *ptr;
+  struct stat st;
+  assert( (fd = open(path, O_RDWR | O_SYNC)) >= 0 );
+  assert( fstat(fd, &st) == 0 );
+  ptr = mmap(NULL, st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (ptr == MAP_FAILED) {
+    return NULL;
+  } else {
+    return ptr;
+  }
 }
 

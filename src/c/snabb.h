@@ -19,3 +19,11 @@ struct snabb_shm_dev *open_shm(const char *path);
    an empty string if a name should be provisioned on demand. */
 int open_tap(const char *name);
 
+/* Map PCI device memory into the process via a sysfs PCI resource file.
+   Return a point to the mapped memory, or NULL on failure.
+
+   'path' is for example /sys/bus/pci/devices/0000:00:04.0/resource0
+
+   XXX Close file discipline? */
+void *map_pci_resource(const char *path);
+
