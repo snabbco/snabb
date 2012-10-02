@@ -1,5 +1,5 @@
 libsnabb.so: snabb.c
-	gcc -lrt -I/home/luke/hacking/QEMU -fpic -Wall -Werror -shared -o $@ $<
+	gcc -lrt -I../../../QEMU -fpic -Wall -Werror -shared -o $@ $<
 
 clean:
 	rm libsnabb.so
