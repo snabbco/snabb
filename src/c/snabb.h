@@ -27,3 +27,7 @@ int open_tap(const char *name);
    XXX Close file discipline? */
 void *map_pci_resource(const char *path);
 
+/* Map physical memory into the process.
+   Return a pointer to the mapped memory, or NULL on failure. */
+void *map_physical_ram(uint64_t start, uint64_t end, bool cacheable);
+

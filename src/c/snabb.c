@@ -5,6 +5,7 @@
 #include <linux/if_tun.h>
 #include <net/if.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -65,6 +66,20 @@ void *map_pci_resource(const char *path)
   assert( (fd = open(path, O_RDWR | O_SYNC)) >= 0 );
   assert( fstat(fd, &st) == 0 );
   ptr = mmap(NULL, st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (ptr == MAP_FAILED) {
+    return NULL;
+  } else {
+    return ptr;
+  }
+}
+
+void *map_physical_ram(uint64_t start, uint64_t end, bool cacheable)
+{
+  int fd;
+  void *ptr;
+  fprintf(stderr, "%lx - %lx", start, end);
+  assert( (fd = open("/dev/mem", O_RDWR | (cacheable ? 0 : O_SYNC))) >= 0 );
+  ptr = mmap(NULL, end-start, PROT_READ | PROT_WRITE, MAP_SHARED, fd, start);
   if (ptr == MAP_FAILED) {
     return NULL;
   } else {
