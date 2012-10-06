@@ -32,6 +32,42 @@ S.copy = ffi.copy
 S.fill = ffi.fill
 S.istype = ffi.istype
 
+local function split(delimiter, text)
+  if delimiter == "" then return {text} end
+  if #text == 0 then return {} end
+  local list = {}
+  local pos = 1
+  while true do
+    local first, last = text:find(delimiter, pos)
+    if first then
+      list[#list + 1] = text:sub(pos, first - 1)
+      pos = last + 1
+    else
+      list[#list + 1] = text:sub(pos)
+      break
+    end
+  end
+  return list
+end
+
+local function trim(s)
+  return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
+
+-- metatables for constants
+local function strflag(t, str) -- single value only
+  if not str then return 0 end
+  if type(str) ~= "string" then return str end
+  if #str == 0 then return 0 end
+  local s = trim(str):upper()
+  local val = t[s]
+  if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions
+  t[str] = val -- this memoizes for future use
+  return val
+end
+
+mt.stringflag = {__index = strflag, __call = strflag}
+
 -- constants
 
 S.STDIN_FILENO = 0
@@ -1091,7 +1127,7 @@ S.RTNLGRP_PHONET_ROUTE = 22
 S.RTNLGRP_DCB = 23
 
 -- address families
-S.AF = {
+S.AF = setmetatable({
   UNSPEC     = 0,
   LOCAL      = 1,
   INET       = 2,
@@ -1130,7 +1166,7 @@ S.AF = {
   CAIF       = 37,
   ALG        = 38,
   NFC        = 39,
-}
+}, mt.stringflag)
 
 S.AF.UNIX       = S.AF.LOCAL
 S.AF.FILE       = S.AF.LOCAL
@@ -2802,28 +2838,6 @@ end
 
 -- functions we need for metatypes
 
-local function split(delimiter, text)
-  if delimiter == "" then return {text} end
-  if #text == 0 then return {} end
-  local list = {}
-  local pos = 1
-  while true do
-    local first, last = text:find(delimiter, pos)
-    if first then
-      list[#list + 1] = text:sub(pos, first - 1)
-      pos = last + 1
-    else
-      list[#list + 1] = text:sub(pos)
-      break
-    end
-  end
-  return list
-end
-
-local function trim(s)
-  return (s:gsub("^%s*(.-)%s*$", "%1"))
-end
-
 local memo = {} -- memoize flags so faster looping
 
 -- take a bunch of flags in a string and return a number
@@ -2883,6 +2897,7 @@ function S.flaglist(str, prefix, list) -- flags from a list. TODO memoize using 
 end
 
 -- new versions using table not string append
+--[[
 function S.stringflag2(str, prefix) -- single value only
   if not str then return 0 end
   if type(str) ~= "string" then return str end
@@ -2891,9 +2906,11 @@ function S.stringflag2(str, prefix) -- single value only
   local s = trim(str):upper()
   local val = S[prefix][s]
   if not val then error("invalid flag: " ..prefix .. "." .. s) end -- don't use this format if you don't want exceptions
-  S[prefix][str] = val
+  S[prefix][str] = val -- this memoizes for future use
   return val
 end
+]]
+function S.stringflag2(str, prefix) return S[prefix][str] end
 
 -- TODO maybe just replace these
 local stringflag, stringflags, flaglist = S.stringflag, S.stringflags, S.flaglist
