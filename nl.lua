@@ -12,7 +12,6 @@ local S = require "syscall"
 
 local t, pt, s = S.t, S.pt, S.s
 local stringflag, stringflags, flaglist = S.stringflag, S.stringflags, S.flaglist
-local stringflag2 = S.stringflag2
 
 local mt = {} -- metatables
 local meth = {}
@@ -904,7 +903,7 @@ end
 
 -- read routes
 function nl.getroute(af, tp, tab, prot, scope, ...)
-  af = stringflag2(af, "AF")
+  af = S.AF[af]
   tp = stringflag(tp, "RTN_")
   tab = stringflag(tab, "RT_TABLE_")
   prot = stringflag(prot, "RTPROT_")
@@ -916,7 +915,7 @@ function nl.getroute(af, tp, tab, prot, scope, ...)
 end
 
 function nl.routes(af, tp)
-  af = stringflag2(af, "AF")
+  af = S.AF[af]
   if not tp then tp = S.RTN_UNICAST end
   tp = stringflag(tp, "RTN_")
   local r, err = nl.getroute(af, tp)
@@ -950,7 +949,7 @@ end
 
 local function rtm_table(tab)
   tab = preftable(tab, "rtm_")
-  tab.rtm_family = stringflag2(tab.rtm_family, "AF")
+  tab.rtm_family = S.AF[tab.rtm_family]
   tab.rtm_protocol = stringflag(tab.rtm_protocol, "RTPROT_")
   tab.rtm_type = stringflag(tab.rtm_type, "RTN_")
   tab.rtm_scope = stringflag(tab.rtm_scope, "RT_SCOPE_")
@@ -973,7 +972,7 @@ end
 
 -- read addresses from interface
 function nl.getaddr(af, ...)
-  local family = stringflag2(af, "AF")
+  local family = S.AF[af]
   local ifav = {ifa_family = family}
   return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, family, t.ifaddrmsg, ifav, ...)
 end
@@ -981,14 +980,14 @@ end
 -- TODO may need ifa_scope
 function nl.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
-  local family = stringflag2(af, "AF")
+  local family = S.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = stringflag(flags, "IFA_F_"), ifa_index = index}
   return nlmsg(S.RTM_NEWADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
 function nl.deladdr(index, af, prefixlen, ...)
   if type(index) == 'table' then index = index.index end
-  local family = stringflag2(af, "AF")
+  local family = S.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
   return nlmsg(S.RTM_DELADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end

@@ -2896,25 +2896,8 @@ function S.flaglist(str, prefix, list) -- flags from a list. TODO memoize using 
   return f
 end
 
--- new versions using table not string append
---[[
-function S.stringflag2(str, prefix) -- single value only
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  if #str == 0 then return 0 end
-  if S[prefix][string] then return S[prefix][string] end
-  local s = trim(str):upper()
-  local val = S[prefix][s]
-  if not val then error("invalid flag: " ..prefix .. "." .. s) end -- don't use this format if you don't want exceptions
-  S[prefix][str] = val -- this memoizes for future use
-  return val
-end
-]]
-function S.stringflag2(str, prefix) return S[prefix][str] end
-
 -- TODO maybe just replace these
 local stringflag, stringflags, flaglist = S.stringflag, S.stringflags, S.flaglist
-local stringflag2 = S.stringflag2
 
 local function getfd(fd)
   if ffi.istype(t.fd, fd) then return fd.filenum end
@@ -3082,7 +3065,7 @@ meth.sockaddr_storage = {
     family = function(sa) return sa.ss_family end,
   },
   newindex = {
-    family = function(sa, v) sa.ss_family = stringflag2(v, "AF") end,
+    family = function(sa, v) sa.ss_family = S.AF[v] end,
   }
 }
 
@@ -3110,7 +3093,7 @@ metatype("sockaddr_storage", "struct sockaddr_storage", {
   __new = function(tp, init)
     local ss = ffi.new(tp)
     local family
-    if init and init.family then family = stringflag2(init.family, "AF") end
+    if init and init.family then family = S.AF[init.family] end
     local st
     if family then
       st = samap2[family]
@@ -3727,7 +3710,7 @@ local INET6_ADDRSTRLEN = 46
 local INET_ADDRSTRLEN = 16
 
 function S.inet_ntop(af, src)
-  af = stringflag2(af, "AF")
+  af = S.AF[af]
   if af == S.AF.INET then
     local b = pt.uchar(src)
     return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
@@ -3740,7 +3723,7 @@ function S.inet_ntop(af, src)
 end
 
 function S.inet_pton(af, src, addr)
-  af = stringflag2(af, "AF")
+  af = S.AF[af]
   if not addr then addr = S.addrtype[af]() end
   local ret = C.inet_pton(af, src, addr)
   if ret == -1 then return nil, t.error() end
@@ -4368,7 +4351,7 @@ local function sproto(domain, protocol) -- helper function to lookup protocol ty
 end
 
 function S.socket(domain, stype, protocol)
-  domain = stringflag2(domain, "AF")
+  domain = S.AF[domain]
   local ret = C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol))
   if ret == -1 then return nil, t.error() end
   return t.fd(ret)
@@ -4408,7 +4391,7 @@ mt.socketpair = {
 }
 
 function S.socketpair(domain, stype, protocol)
-  domain = stringflag2(domain, "AF")
+  domain = S.AF[domain]
   local sv2 = t.int2()
   local ret = C.socketpair(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol), sv2)
   if ret == -1 then return nil, t.error() end
