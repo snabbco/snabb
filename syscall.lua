@@ -248,8 +248,10 @@ S.POSIX_FADV = setmetatable({
 }, mt.stringflag)
 
 -- fallocate
-S.FALLOC_FL_KEEP_SIZE	= 0x01
-S.FALLOC_FL_PUNCH_HOLE	= 0x02
+S.FALLOC_FL = setmetatable({
+  KEEP_SIZE  = 0x01,
+  PUNCH_HOLE = 0x02,
+}, mt.stringflag)
 
 -- getpriority, setpriority flags
 S.PRIO_PROCESS = 0
@@ -4350,7 +4352,7 @@ function S.fadvise(fd, advice, offset, len) -- note argument order
   return retbool(C.posix_fadvise(getfd(fd), offset or 0, len or 0, S.POSIX_FADV[advice]))
 end
 function S.fallocate(fd, mode, offset, len)
-  return retbool(C.fallocate(getfd(fd), stringflag(mode, "FALLOC_FL_"), offset or 0, len))
+  return retbool(C.fallocate(getfd(fd), S.FALLOC_FL[mode], offset or 0, len))
 end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), offset, count)) end
