@@ -50,7 +50,7 @@ local function split(delimiter, text)
   return list
 end
 
-local function trim(s)
+local function trim(s) -- TODO should replace underscore with space
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
@@ -1313,14 +1313,16 @@ S.MS_SYNC        = 4
 S.MS_INVALIDATE  = 2
 
 -- reboot
-S.LINUX_REBOOT_CMD_RESTART      =  0x01234567
-S.LINUX_REBOOT_CMD_HALT         =  0xCDEF0123
-S.LINUX_REBOOT_CMD_CAD_ON       =  0x89ABCDEF
-S.LINUX_REBOOT_CMD_CAD_OFF      =  0x00000000
-S.LINUX_REBOOT_CMD_POWER_OFF    =  0x4321FEDC
-S.LINUX_REBOOT_CMD_RESTART2     =  0xA1B2C3D4
-S.LINUX_REBOOT_CMD_SW_SUSPEND   =  0xD000FCE2
-S.LINUX_REBOOT_CMD_KEXEC        =  0x45584543
+S.LINUX_REBOOT_CMD = setmetatable({
+  RESTART      =  0x01234567,
+  HALT         =  0xCDEF0123,
+  CAD_ON       =  0x89ABCDEF,
+  CAD_OFF      =  0x00000000,
+  POWER_OFF    =  0x4321FEDC,
+  RESTART2     =  0xA1B2C3D4,
+  SW_SUSPEND   =  0xD000FCE2,
+  KEXEC        =  0x45584543,
+}, mt.stringflag)
 
 -- clone
 S.CLONE_VM      = 0x00000100
@@ -4090,7 +4092,7 @@ function S.ioctl(d, request, argp)
   return true
 end
 
-function S.reboot(cmd) return retbool(C.reboot(stringflag(cmd, "LINUX_REBOOT_CMD_"))) end
+function S.reboot(cmd) return retbool(C.reboot(S.LINUX_REBOOT_CMD[cmd])) end
 
 -- ffi metatype on dirent?
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
