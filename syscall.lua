@@ -238,12 +238,14 @@ S.MADV = setmetatable({
 }, mt.stringflag)
 
 -- posix fadvise
-S.POSIX_FADV_NORMAL       = 0
-S.POSIX_FADV_RANDOM       = 1
-S.POSIX_FADV_SEQUENTIAL   = 2
-S.POSIX_FADV_WILLNEED     = 3
-S.POSIX_FADV_DONTNEED    = 4
-S.POSIX_FADV_NOREUSE     = 5
+S.POSIX_FADV = setmetatable({
+  NORMAL       = 0,
+  RANDOM       = 1,
+  SEQUENTIAL   = 2,
+  WILLNEED     = 3,
+  DONTNEED     = 4,
+  NOREUSE      = 5,
+}, mt.stringflag)
 
 -- fallocate
 S.FALLOC_FL_KEEP_SIZE	= 0x01
@@ -4345,7 +4347,7 @@ function S.mremap(old_address, old_size, new_size, flags, new_address)
 end
 function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, S.MADV[advice])) end
 function S.fadvise(fd, advice, offset, len) -- note argument order
-  return retbool(C.posix_fadvise(getfd(fd), offset or 0, len or 0, stringflag(advice, "POSIX_FADV_")))
+  return retbool(C.posix_fadvise(getfd(fd), offset or 0, len or 0, S.POSIX_FADV[advice]))
 end
 function S.fallocate(fd, mode, offset, len)
   return retbool(C.fallocate(getfd(fd), stringflag(mode, "FALLOC_FL_"), offset or 0, len))
