@@ -732,12 +732,12 @@ test_locking = {
 test_sockets_pipes = {
   test_sockaddr_storage = function()
     local sa = t.sockaddr_storage{family = "netlink", pid = 2}
-    assert_equal(sa.family, S.AF_NETLINK, "netlink family")
+    assert_equal(sa.family, S.AF.NETLINK, "netlink family")
     assert_equal(sa.pid, 2, "should get pid back")
     sa.pid = 3
     assert_equal(sa.pid, 3, "should get pid back")
     sa.family = "inet"
-    assert_equal(sa.family, S.AF_INET, "inet family")
+    assert_equal(sa.family, S.AF.INET, "inet family")
     sa.port = 4
     assert_equal(sa.port, 4, "should get port back")
   end,
@@ -1119,7 +1119,7 @@ test_sockets = {
     local sa = assert(t.sockaddr_in(1234, loop))
     assert_equal(S.inet_ntoa(sa.sin_addr), loop, "expect address converted back to string to still be same")
     assert_equal(tostring(sa.sin_addr), loop, "expect address converted back to string to still be same")
-    assert(sa.sin_family == 2, "expect family on inet socket to be AF_INET=2")
+    assert(sa.sin_family == 2, "expect family on inet socket to be 2")
     -- find a free port
     local port
     for i = 1024, 2048 do
@@ -1128,7 +1128,7 @@ test_sockets = {
       if s:bind(sa) then break end
     end
     local ba = assert(s:getsockname())
-    assert_equal(ba.sin_family, 2, "expect family on getsockname to be AF_INET=2")
+    assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
     assert(s:listen()) -- will fail if we did not bind
     local c = assert(S.socket("inet", "stream")) -- client socket
     assert(c:nonblock())
@@ -1218,9 +1218,9 @@ test_sockets = {
     assert(c:close())
   end,
   test_ipv6_socket = function()
-    local s, err = S.socket("AF_INET6", "dgram")
+    local s, err = S.socket("inet6", "dgram")
     if s then 
-      local c = assert(S.socket("AF_INET6", "dgram"))
+      local c = assert(S.socket("inet6", "dgram"))
       local sa = assert(t.sockaddr_in6(0, S.in6addr_any))
       local ca = assert(t.sockaddr_in6(0, S.in6addr_any))
       assert_equal(tostring(sa.sin6_addr), "::", "expect :: for in6addr_any")

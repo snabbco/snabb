@@ -12,6 +12,7 @@ local S = require "syscall"
 
 local t, pt, s = S.t, S.pt, S.s
 local stringflag, stringflags, flaglist = S.stringflag, S.stringflags, S.flaglist
+local stringflag2 = S.stringflag2
 
 local mt = {} -- metatables
 local meth = {}
@@ -252,7 +253,7 @@ meth.iflink = {
       if type(address) == "string" then address, netmask = S.inet_name(address, netmask) end
       if not address then return nil end
       local af
-      if ffi.istype(t.in6_addr, address) then af = S.AF_INET6 else af = S.AF_INET end
+      if ffi.istype(t.in6_addr, address) then af = S.AF.INET6 else af = S.AF.INET end
       local ok, err = nl.newaddr(i.index, af, netmask, "permanent", "address", address)
       if not ok then return nil, err end
       return i:refresh()
@@ -261,7 +262,7 @@ meth.iflink = {
       if type(address) == "string" then address, netmask = S.inet_name(address, netmask) end
       if not address then return nil end
       local af
-      if ffi.istype(t.in6_addr, address) then af = S.AF_INET6 else af = S.AF_INET end
+      if ffi.istype(t.in6_addr, address) then af = S.AF.INET6 else af = S.AF.INET end
       local ok, err = nl.deladdr(i.index, af, netmask, "address", address)
       if not ok then return nil, err end
       return i:refresh()
@@ -367,12 +368,12 @@ meth.routes = {
           len = tonumber(addr:sub(sl + 1))
           addr = addr:sub(1, sl - 1)
         end
-        if rs.family == S.AF_INET6 then addr = t.in6_addr(addr) else addr = t.in_addr(addr) end
+        if rs.family == S.AF.INET6 then addr = t.in6_addr(addr) else addr = t.in_addr(addr) end
       end
       local matches = {}
       for _, v in ipairs(rs) do
         if len == v.dst_len then
-          if v.family == S.AF_INET then
+          if v.family == S.AF.INET then
             if addr.s_addr == v.dest.s_addr then matches[#matches + 1] = v end
           else
             local match = true
@@ -819,7 +820,7 @@ local rtpref = {
 
 function nl.socket(tp, addr)
   tp = S.stringflag(tp, "NETLINK_")
-  local sock, err = S.socket(S.AF_NETLINK, S.SOCK_RAW, tp)
+  local sock, err = S.socket(S.AF.NETLINK, S.SOCK_RAW, tp)
   if not sock then return nil, err end
   if addr then
     if type(addr) == "table" then addr.type = tp end -- need type to convert group names from string
@@ -898,12 +899,12 @@ end
 
 -- read interfaces and details.
 function nl.getlink(...)
-  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, nil, t.rtgenmsg, {rtgen_family = S.AF_PACKET}, ...)
+  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, nil, t.rtgenmsg, {rtgen_family = S.AF.PACKET}, ...)
 end
 
 -- read routes
 function nl.getroute(af, tp, tab, prot, scope, ...)
-  af = stringflag(af, "AF_")
+  af = stringflag2(af, "AF")
   tp = stringflag(tp, "RTN_")
   tab = stringflag(tab, "RT_TABLE_")
   prot = stringflag(prot, "RTPROT_")
@@ -915,7 +916,7 @@ function nl.getroute(af, tp, tab, prot, scope, ...)
 end
 
 function nl.routes(af, tp)
-  af = stringflag(af, "AF_")
+  af = stringflag2(af, "AF")
   if not tp then tp = S.RTN_UNICAST end
   tp = stringflag(tp, "RTN_")
   local r, err = nl.getroute(af, tp)
@@ -949,7 +950,7 @@ end
 
 local function rtm_table(tab)
   tab = preftable(tab, "rtm_")
-  tab.rtm_family = stringflag(tab.rtm_family, "AF_")
+  tab.rtm_family = stringflag2(tab.rtm_family, "AF")
   tab.rtm_protocol = stringflag(tab.rtm_protocol, "RTPROT_")
   tab.rtm_type = stringflag(tab.rtm_type, "RTN_")
   tab.rtm_scope = stringflag(tab.rtm_scope, "RT_SCOPE_")
@@ -972,7 +973,7 @@ end
 
 -- read addresses from interface
 function nl.getaddr(af, ...)
-  local family = stringflag(af, "AF_")
+  local family = stringflag2(af, "AF")
   local ifav = {ifa_family = family}
   return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, family, t.ifaddrmsg, ifav, ...)
 end
@@ -980,14 +981,14 @@ end
 -- TODO may need ifa_scope
 function nl.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
-  local family = stringflag(af, "AF_")
+  local family = stringflag2(af, "AF")
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = stringflag(flags, "IFA_F_"), ifa_index = index}
   return nlmsg(S.RTM_NEWADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
 function nl.deladdr(index, af, prefixlen, ...)
   if type(index) == 'table' then index = index.index end
-  local family = stringflag(af, "AF_")
+  local family = stringflag2(af, "AF")
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
   return nlmsg(S.RTM_DELADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end
@@ -995,9 +996,9 @@ end
 function nl.interfaces() -- returns with address info too.
   local ifs, err = nl.getlink()
   if not ifs then return nil, err end
-  local addr4, err = nl.getaddr(S.AF_INET)
+  local addr4, err = nl.getaddr(S.AF.INET)
   if not addr4 then return nil, err end
-  local addr6, err = nl.getaddr(S.AF_INET6)
+  local addr6, err = nl.getaddr(S.AF.INET6)
   if not addr6 then return nil, err end
   local indexmap = {}
   for i, v in pairs(ifs) do

@@ -1091,47 +1091,50 @@ S.RTNLGRP_PHONET_ROUTE = 22
 S.RTNLGRP_DCB = 23
 
 -- address families
-S.AF_UNSPEC     = 0
-S.AF_LOCAL      = 1
-S.AF_UNIX       = S.AF_LOCAL
-S.AF_FILE       = S.AF_LOCAL
-S.AF_INET       = 2
-S.AF_AX25       = 3
-S.AF_IPX        = 4
-S.AF_APPLETALK  = 5
-S.AF_NETROM     = 6
-S.AF_BRIDGE     = 7
-S.AF_ATMPVC     = 8
-S.AF_X25        = 9
-S.AF_INET6      = 10
-S.AF_ROSE       = 11
-S.AF_DECNET     = 12
-S.AF_NETBEUI    = 13
-S.AF_SECURITY   = 14
-S.AF_KEY        = 15
-S.AF_NETLINK    = 16
-S.AF_ROUTE      = S.AF_NETLINK
-S.AF_PACKET     = 17
-S.AF_ASH        = 18
-S.AF_ECONET     = 19
-S.AF_ATMSVC     = 20
-S.AF_RDS        = 21
-S.AF_SNA        = 22
-S.AF_IRDA       = 23
-S.AF_PPPOX      = 24
-S.AF_WANPIPE    = 25
-S.AF_LLC        = 26
-S.AF_CAN        = 29
-S.AF_TIPC       = 30
-S.AF_BLUETOOTH  = 31
-S.AF_IUCV       = 32
-S.AF_RXRPC      = 33
-S.AF_ISDN       = 34
-S.AF_PHONET     = 35
-S.AF_IEEE802154 = 36
-S.AF_CAIF       = 37
-S.AF_ALG        = 38
-S.AF_NFC        = 39
+S.AF = {
+  UNSPEC     = 0,
+  LOCAL      = 1,
+  INET       = 2,
+  AX25       = 3,
+  IPX        = 4,
+  APPLETALK  = 5,
+  NETROM     = 6,
+  BRIDGE     = 7,
+  ATMPVC     = 8,
+  X25        = 9,
+  INET6      = 10,
+  ROSE       = 11,
+  DECNET     = 12,
+  NETBEUI    = 13,
+  SECURITY   = 14,
+  KEY        = 15,
+  NETLINK    = 16,
+  PACKET     = 17,
+  ASH        = 18,
+  ECONET     = 19,
+  ATMSVC     = 20,
+  RDS        = 21,
+  SNA        = 22,
+  IRDA       = 23,
+  PPPOX      = 24,
+  WANPIPE    = 25,
+  LLC        = 26,
+  CAN        = 29,
+  TIPC       = 30,
+  BLUETOOTH  = 31,
+  IUCV       = 32,
+  RXRPC      = 33,
+  ISDN       = 34,
+  PHONET     = 35,
+  IEEE802154 = 36,
+  CAIF       = 37,
+  ALG        = 38,
+  NFC        = 39,
+}
+
+S.AF.UNIX       = S.AF.LOCAL
+S.AF.FILE       = S.AF.LOCAL
+S.AF.ROUTE      = S.AF.NETLINK
 
 -- arp types, which are also interface types for ifi_type
 S.ARPHRD_NETROM   = 0
@@ -2879,8 +2882,22 @@ function S.flaglist(str, prefix, list) -- flags from a list. TODO memoize using 
   return f
 end
 
+-- new versions using table not string append
+function S.stringflag2(str, prefix) -- single value only
+  if not str then return 0 end
+  if type(str) ~= "string" then return str end
+  if #str == 0 then return 0 end
+  if S[prefix][string] then return S[prefix][string] end
+  local s = trim(str):upper()
+  local val = S[prefix][s]
+  if not val then error("invalid flag: " ..prefix .. "." .. s) end -- don't use this format if you don't want exceptions
+  S[prefix][str] = val
+  return val
+end
+
 -- TODO maybe just replace these
 local stringflag, stringflags, flaglist = S.stringflag, S.stringflags, S.flaglist
+local stringflag2 = S.stringflag2
 
 local function getfd(fd)
   if ffi.istype(t.fd, fd) then return fd.filenum end
@@ -3048,7 +3065,7 @@ meth.sockaddr_storage = {
     family = function(sa) return sa.ss_family end,
   },
   newindex = {
-    family = function(sa, v) sa.ss_family = stringflag(v, "AF_") end,
+    family = function(sa, v) sa.ss_family = stringflag2(v, "AF") end,
   }
 }
 
@@ -3076,7 +3093,7 @@ metatype("sockaddr_storage", "struct sockaddr_storage", {
   __new = function(tp, init)
     local ss = ffi.new(tp)
     local family
-    if init and init.family then family = stringflag(init.family, "AF_") end
+    if init and init.family then family = stringflag2(init.family, "AF") end
     local st
     if family then
       st = samap2[family]
@@ -3112,7 +3129,7 @@ metatype("sockaddr_in", "struct sockaddr_in", {
       addr = t.in_addr(addr)
       if not addr then return end
     end
-    return ffi.new(tp, S.AF_INET, S.htons(port or 0), addr)
+    return ffi.new(tp, S.AF.INET, S.htons(port or 0), addr)
   end
 })
 
@@ -3135,7 +3152,7 @@ metatype("sockaddr_in6", "struct sockaddr_in6", {
       addr = t.in6_addr(addr)
       if not addr then return end
     end
-    return ffi.new(tp, S.AF_INET6, S.htons(port or 0), flowinfo or 0, addr, scope_id or 0)
+    return ffi.new(tp, S.AF.INET6, S.htons(port or 0), flowinfo or 0, addr, scope_id or 0)
   end
 })
 
@@ -3147,7 +3164,7 @@ meth.sockaddr_un = {
 
 metatype("sockaddr_un", "struct sockaddr_un", {
   __index = function(sa, k) if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end end,
-  __new = function(tp) return ffi.new(tp, S.AF_UNIX) end,
+  __new = function(tp) return ffi.new(tp, S.AF.UNIX) end,
 })
 
 local nlgroupmap = { -- map from netlink socket type to group names. Note there are two forms of name though, bits and shifts.
@@ -3177,15 +3194,15 @@ metatype("sockaddr_nl", "struct sockaddr_nl", {
       pid, groups, nltype = tb.nl_pid or tb.pid, tb.nl_groups or tb.groups, tb.type
     end
     if nltype and nlgroupmap[nltype] then groups = stringflags(groups, nlgroupmap[nltype]) end -- see note about shiftflags
-    return ffi.new(tp, {nl_family = S.AF_NETLINK, nl_pid = pid, nl_groups = groups})
+    return ffi.new(tp, {nl_family = S.AF.NETLINK, nl_pid = pid, nl_groups = groups})
   end,
 })
 
 samap = {
-  [S.AF_UNIX] = t.sockaddr_un,
-  [S.AF_INET] = t.sockaddr_in,
-  [S.AF_INET6] = t.sockaddr_in6,
-  [S.AF_NETLINK] = t.sockaddr_nl,
+  [S.AF.UNIX] = t.sockaddr_un,
+  [S.AF.INET] = t.sockaddr_in,
+  [S.AF.INET6] = t.sockaddr_in6,
+  [S.AF.NETLINK] = t.sockaddr_nl,
 }
 
 meth.stat = {
@@ -3464,26 +3481,26 @@ mt.pollfds = {
 t.pollfds = ffi.metatype("struct {int count; struct pollfd pfd[?];}", mt.pollfds)
 
 metatype("in_addr", "struct in_addr", {
-  __tostring = function(a) return S.inet_ntop(S.AF_INET, a) end,
+  __tostring = function(a) return S.inet_ntop(S.AF.INET, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = S.inet_pton(S.AF_INET, s, addr) end
+    if s then addr = S.inet_pton(S.AF.INET, s, addr) end
     return addr
   end
 })
 
 metatype("in6_addr", "struct in6_addr", {
-  __tostring = function(a) return S.inet_ntop(S.AF_INET6, a) end,
+  __tostring = function(a) return S.inet_ntop(S.AF.INET6, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = S.inet_pton(S.AF_INET6, s, addr) end
+    if s then addr = S.inet_pton(S.AF.INET6, s, addr) end
     return addr
   end
 })
 
 S.addrtype = {
-  [S.AF_INET] = t.in_addr,
-  [S.AF_INET6] = t.in6_addr,
+  [S.AF.INET] = t.in_addr,
+  [S.AF.INET6] = t.in6_addr,
 }
 
 -- signal set handlers TODO replace with metatypes
@@ -3576,10 +3593,10 @@ pt.void = function(x)
 end
 
 samap2 = {
-  [S.AF_UNIX] = pt.sockaddr_un,
-  [S.AF_INET] = pt.sockaddr_in,
-  [S.AF_INET6] = pt.sockaddr_in6,
-  [S.AF_NETLINK] = pt.sockaddr_nl,
+  [S.AF.UNIX] = pt.sockaddr_un,
+  [S.AF.INET] = pt.sockaddr_in,
+  [S.AF.INET6] = pt.sockaddr_in6,
+  [S.AF.NETLINK] = pt.sockaddr_nl,
 }
 
 -- misc
@@ -3678,7 +3695,7 @@ mt.sockaddr_un = {
 
 local function sa(addr, addrlen)
   local family = addr.family
-  if family == S.AF_UNIX then -- we return Lua metatable not metatype, as need length to decode
+  if family == S.AF.UNIX then -- we return Lua metatable not metatype, as need length to decode
     local sa = t.sockaddr_un()
     ffi.copy(sa, addr, addrlen)
     return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
@@ -3693,8 +3710,8 @@ local INET6_ADDRSTRLEN = 46
 local INET_ADDRSTRLEN = 16
 
 function S.inet_ntop(af, src)
-  af = stringflag(af, "AF_")
-  if af == S.AF_INET then
+  af = stringflag2(af, "AF")
+  if af == S.AF.INET then
     local b = pt.uchar(src)
     return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
   end
@@ -3706,7 +3723,7 @@ function S.inet_ntop(af, src)
 end
 
 function S.inet_pton(af, src, addr)
-  af = stringflag(af, "AF_")
+  af = stringflag2(af, "AF")
   if not addr then addr = S.addrtype[af]() end
   local ret = C.inet_pton(af, src, addr)
   if ret == -1 then return nil, t.error() end
@@ -3715,11 +3732,11 @@ function S.inet_pton(af, src, addr)
 end
 
 function S.inet_aton(s)
-  return S.inet_pton(S.AF_INET, s)
+  return S.inet_pton(S.AF.INET, s)
 end
 
 function S.inet_ntoa(addr)
-  return S.inet_ntop(S.AF_INET, addr)
+  return S.inet_ntop(S.AF.INET, addr)
 end
 
 -- generic inet name to ip, also with netmask support TODO think of better name?
@@ -3733,11 +3750,11 @@ function S.inet_name(src, netmask)
     end
   end
   if src:find(":", 1, true) then -- ipv6
-    addr = S.inet_pton(S.AF_INET6, src)
+    addr = S.inet_pton(S.AF.INET6, src)
     if not addr then return nil end
     if not netmask then netmask = 128 end
   else
-    addr = S.inet_pton(S.AF_INET, src)
+    addr = S.inet_pton(S.AF.INET, src)
     if not addr then return nil end
     if not netmask then netmask = 32 end
   end
@@ -4329,12 +4346,12 @@ function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, le
 function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), offset, count)) end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain
-  if domain == S.AF_NETLINK then return stringflag(protocol, "NETLINK_") end
+  if domain == S.AF.NETLINK then return stringflag(protocol, "NETLINK_") end
   return protocol or 0
 end
 
 function S.socket(domain, stype, protocol)
-  domain = stringflag(domain, "AF_")
+  domain = stringflag2(domain, "AF")
   local ret = C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol))
   if ret == -1 then return nil, t.error() end
   return t.fd(ret)
@@ -4374,7 +4391,7 @@ mt.socketpair = {
 }
 
 function S.socketpair(domain, stype, protocol)
-  domain = stringflag(domain, "AF_")
+  domain = stringflag2(domain, "AF")
   local sv2 = t.int2()
   local ret = C.socketpair(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol), sv2)
   if ret == -1 then return nil, t.error() end
@@ -5492,7 +5509,7 @@ local function if_nametoindex(name, s) -- internal version when already have soc
 end
 
 function S.if_nametoindex(name) -- standard function in some libc versions
-  local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
+  local s, err = S.socket(S.AF.LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
   local i, err = if_nametoindex(name, s)
   if not i then return nil, err end
@@ -5503,7 +5520,7 @@ end
 
 -- bridge functions, could be in utility library. in error cases use gc to close file.
 local function bridge_ioctl(io, name)
-  local s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
+  local s, err = S.socket(S.AF.LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
   local ret, err = S.ioctl(s, io, pt.char(name))
   if not ret then return nil, err end
@@ -5517,7 +5534,7 @@ function S.bridge_del(name) return bridge_ioctl(S.SIOCBRDELBR, name) end
 
 local function bridge_if_ioctl(io, bridge, dev)
   local err, s, ifr, len, ret, ok
-  s, err = S.socket(S.AF_LOCAL, S.SOCK_STREAM, 0)
+  s, err = S.socket(S.AF.LOCAL, S.SOCK_STREAM, 0)
   if not s then return nil, err end
   if type(dev) == "string" then
     dev, err = if_nametoindex(dev, s)
