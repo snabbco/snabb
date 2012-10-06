@@ -383,9 +383,11 @@ S.WNOHANG       = 1
 S.WUNTRACED     = 2
 
 -- waitid
-S.P_ALL  = 0
-S.P_PID  = 1
-S.P_PGID = 2
+S.P = setmetatable({
+  ALL  = 0,
+  PID  = 1,
+  PGID = 2,
+}, mt.stringflag)
 
 S.WSTOPPED      = 2
 S.WEXITED       = 4
@@ -4127,7 +4129,7 @@ end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
   if not infop then infop = t.siginfo() end
   infop.si_pid = 0 -- see notes on man page
-  local ret = C.waitid(stringflag(idtype, "P_"), id or 0, infop, stringflags(options, "W"))
+  local ret = C.waitid(S.P[idtype], id or 0, infop, stringflags(options, "W"))
   if ret == -1 then return nil, t.error() end
   return infop -- return table here?
 end
