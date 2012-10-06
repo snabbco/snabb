@@ -139,43 +139,47 @@ S.W_OK = 2
 S.X_OK = 1
 S.F_OK = 0
 
-S.F_DUPFD       = 0
-S.F_GETFD       = 1
-S.F_SETFD       = 2
-S.F_GETFL       = 3
-S.F_SETFL       = 4
-S.F_GETLK       = 5
-S.F_SETLK       = 6
-S.F_SETLKW      = 7
-S.F_SETOWN      = 8
-S.F_GETOWN      = 9
-S.F_SETSIG      = 10
-S.F_GETSIG      = 11
-S.F_GETLK64     = 12
-S.F_SETLK64     = 13
-S.F_SETLKW64    = 14
-S.F_SETOWN_EX   = 15
-S.F_GETOWN_EX   = 16
-S.F_SETLEASE    = 1024
-S.F_GETLEASE    = 1025
-S.F_NOTIFY      = 1026
-S.F_SETPIPE_SZ  = 1031
-S.F_GETPIPE_SZ  = 1032
-S.F_DUPFD_CLOEXEC = 1030
+-- fcntl
+S.F = setmetatable({
+  DUPFD       = 0,
+  GETFD       = 1,
+  SETFD       = 2,
+  GETFL       = 3,
+  SETFL       = 4,
+  GETLK       = 5,
+  SETLK       = 6,
+  SETLKW      = 7,
+  SETOWN      = 8,
+  GETOWN      = 9,
+  SETSIG      = 10,
+  GETSIG      = 11,
+  GETLK64     = 12,
+  SETLK64     = 13,
+  SETLKW64    = 14,
+  SETOWN_EX   = 15,
+  GETOWN_EX   = 16,
+  SETLEASE    = 1024,
+  GETLEASE    = 1025,
+  NOTIFY      = 1026,
+  SETPIPE_SZ  = 1031,
+  GETPIPE_SZ  = 1032,
+  DUPFD_CLOEXEC = 1030,
+}, mt.stringflag)
 
 -- messy
 if ffi.abi("64bit") then
-  S.F_GETLK64     = S.F_GETLK
-  S.F_SETLK64     = S.F_SETLK
-  S.F_SETLKW64    = S.F_SETLKW
+  S.F.GETLK64   = S.F.GETLK
+  S.F.SETLK64   = S.F.SETLK
+  S.F.SETLKW64  = S.F.SETLKW
 else
-  S.F_GETLK       = S.F_GETLK64
-  S.F_SETLK       = S.F_SETLK64
-  S.F_SETLKW      = S.F_SETLKW64
+  S.F.GETLK     = S.F.GETLK64
+  S.F.SETLK     = S.F.SETLK64
+  S.F.SETLKW    = S.F.SETLKW64
 end
 
 S.FD_CLOEXEC = 1
 
+-- namespace issue!
 S.F_RDLCK = 0
 S.F_WRLCK = 1
 S.F_UNLCK = 2
@@ -4464,42 +4468,42 @@ local function getflock(arg)
         arg[v] = nil
       end
     end
-    arg.l_type = stringflags(arg.l_type, "F_")
+    arg.l_type = stringflag(arg.l_type, "F_")
     arg.l_whence = stringflag(arg.l_whence, "SEEK_")
     arg = t.flock(arg)
   end
   return arg
 end
 
+local fcntl_commands = {
+  [S.F.SETFL] = function(arg) return bit.bor(stringflags(arg, "O_"), S.O_LARGEFILE) end,
+  [S.F.SETFD] = function(arg) return stringflag(arg, "FD_") end,
+  [S.F.GETLK] = getflock,
+  [S.F.SETLK] = getflock,
+  [S.F.SETLKW] = getflock,
+}
+
+local fcntl_ret = {
+  [S.F.DUPFD] = function(ret) return t.fd(ret) end,
+  [S.F.DUPFD_CLOEXEC] = function(ret) return t.fd(ret) end,
+  [S.F.GETFD] = function(ret) return tonumber(ret) end,
+  [S.F.GETFL] = function(ret) return tonumber(ret) end,
+  [S.F.GETLEASE] = function(ret) return tonumber(ret) end,
+  [S.F.GETOWN] = function(ret) return tonumber(ret) end,
+  [S.F.GETSIG] = function(ret) return tonumber(ret) end,
+  [S.F.GETPIPE_SZ] = function(ret) return tonumber(ret) end,
+  [S.F.GETLK] = function(ret, arg) return arg end,
+}
+
 function S.fcntl(fd, cmd, arg)
-  cmd = stringflag(cmd, "F_")
+  cmd = S.F[cmd]
 
-  local m = {
-    [S.F_SETFL] = function(arg) return bit.bor(stringflags(arg, "O_"), S.O_LARGEFILE) end,
-    [S.F_SETFD] = function(arg) return stringflag(arg, "FD_") end,
-    [S.F_GETLK] = getflock,
-    [S.F_SETLK] = getflock,
-    [S.F_SETLKW] = getflock,
-  }
-
-  if m[cmd] then arg = m[cmd](arg) end
+  if fcntl_commands[cmd] then arg = fcntl_commands[cmd](arg) end
 
   local ret = C.fcntl(getfd(fd), cmd, pt.void(arg or 0))
   if ret == -1 then return nil, t.error() end
 
-  local r = {
-    [S.F_DUPFD] = t.fd,
-    [S.F_DUPFD_CLOEXEC] = t.fd,
-    [S.F_GETFD] = tonumber,
-    [S.F_GETFL] = tonumber,
-    [S.F_GETLEASE] = tonumber,
-    [S.F_GETOWN] = tonumber,
-    [S.F_GETSIG] = tonumber,
-    [S.F_GETPIPE_SZ] = tonumber,
-    [S.F_GETLK] = function(ret) return arg end,
-  }
-
-  if r[cmd] then return r[cmd](ret) end
+  if fcntl_ret[cmd] then return fcntl_ret[cmd](ret, arg) end
 
   return true
 end
@@ -5445,17 +5449,17 @@ function S.sendfds(fd, ...)
 end
 
 function S.nonblock(fd)
-  local fl, err = S.fcntl(fd, S.F_GETFL)
+  local fl, err = S.fcntl(fd, S.F.GETFL)
   if not fl then return nil, err end
-  fl, err = S.fcntl(fd, S.F_SETFL, bit.bor(fl, S.O_NONBLOCK))
+  fl, err = S.fcntl(fd, S.F.SETFL, bit.bor(fl, S.O_NONBLOCK))
   if not fl then return nil, err end
   return true
 end
 
 function S.block(fd)
-  local fl, err = S.fcntl(fd, S.F_GETFL)
+  local fl, err = S.fcntl(fd, S.F.GETFL)
   if not fl then return nil, err end
-  fl, err = S.fcntl(fd, S.F_SETFL, bit.band(fl, bit.bnot(S.O_NONBLOCK)))
+  fl, err = S.fcntl(fd, S.F.SETFL, bit.band(fl, bit.bnot(S.O_NONBLOCK)))
   if not fl then return nil, err end
   return true
 end
