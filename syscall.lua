@@ -380,9 +380,11 @@ end
 S.SOMAXCONN = 128
 
 -- shutdown
-S.SHUT_RD = 0
-S.SHUT_WR = 1
-S.SHUT_RDWR = 2
+S.SHUT = setmetatable({
+  RD   = 0,
+  WR   = 1,
+  RDWR = 2,
+}, mt.stringflag)
 
 -- waitpid 3rd arg
 S.WNOHANG       = 1
@@ -4419,7 +4421,7 @@ function S.connect(sockfd, addr, addrlen)
   return retbool(C.connect(getfd(sockfd), addr, addrlen or ffi.sizeof(addr)))
 end
 
-function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), stringflag(how, "SHUT_"))) end
+function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), S.SHUT[how])) end
 
 function S.accept(sockfd, flags, addr, addrlen)
   if not addr then addr = t.sockaddr_storage() end
