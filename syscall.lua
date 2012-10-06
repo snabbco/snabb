@@ -720,25 +720,27 @@ S.SYNC_FILE_RANGE_WRITE       = 2
 S.SYNC_FILE_RANGE_WAIT_AFTER  = 4
 
 -- netlink
-S.NETLINK_ROUTE         = 0
-S.NETLINK_UNUSED        = 1
-S.NETLINK_USERSOCK      = 2
-S.NETLINK_FIREWALL      = 3
-S.NETLINK_INET_DIAG     = 4
-S.NETLINK_NFLOG         = 5
-S.NETLINK_XFRM          = 6
-S.NETLINK_SELINUX       = 7
-S.NETLINK_ISCSI         = 8
-S.NETLINK_AUDIT         = 9
-S.NETLINK_FIB_LOOKUP    = 10      
-S.NETLINK_CONNECTOR     = 11
-S.NETLINK_NETFILTER     = 12
-S.NETLINK_IP6_FW        = 13
-S.NETLINK_DNRTMSG       = 14
-S.NETLINK_KOBJECT_UEVENT= 15
-S.NETLINK_GENERIC       = 16
-S.NETLINK_SCSITRANSPORT = 18
-S.NETLINK_ECRYPTFS      = 19
+S.NETLINK = setmetatable({
+  ROUTE         = 0,
+  UNUSED        = 1,
+  USERSOCK      = 2,
+  FIREWALL      = 3,
+  INET_DIAG     = 4,
+  NFLOG         = 5,
+  XFRM          = 6,
+  SELINUX       = 7,
+  ISCSI         = 8,
+  AUDIT         = 9,
+  FIB_LOOKUP    = 10,     
+  CONNECTOR     = 11,
+  NETFILTER     = 12,
+  IP6_FW        = 13,
+  DNRTMSG       = 14,
+  KOBJECT_UEVENT= 15,
+  GENERIC       = 16,
+  SCSITRANSPORT = 18,
+  ECRYPTFS      = 19,
+}, mt.stringflag)
 
 S.NLM_F_REQUEST = 1
 S.NLM_F_MULTI   = 2
@@ -3172,9 +3174,9 @@ metatype("sockaddr_un", "struct sockaddr_un", {
 })
 
 local nlgroupmap = { -- map from netlink socket type to group names. Note there are two forms of name though, bits and shifts.
-  [S.NETLINK_ROUTE] = "RTMGRP_", -- or RTNLGRP_ and shift not mask TODO make shiftflags function
+  [S.NETLINK.ROUTE] = "RTMGRP_", -- or RTNLGRP_ and shift not mask TODO make shiftflags function
   -- add rest of these
-  [S.NETLINK_SELINUX] = "SELNLGRP_",
+  [S.NETLINK.SELINUX] = "SELNLGRP_",
 }
 
 meth.sockaddr_nl = {
@@ -4350,7 +4352,7 @@ function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, le
 function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), offset, count)) end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain
-  if domain == S.AF.NETLINK then return stringflag(protocol, "NETLINK_") end
+  if domain == S.AF.NETLINK then return S.NETLINK[protocol] end
   return protocol or 0
 end
 

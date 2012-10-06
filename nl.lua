@@ -818,7 +818,7 @@ local rtpref = {
 }
 
 function nl.socket(tp, addr)
-  tp = S.stringflag(tp, "NETLINK_")
+  tp = S.NETLINK[tp]
   local sock, err = S.socket(S.AF.NETLINK, S.SOCK_RAW, tp)
   if not sock then return nil, err end
   if addr then
