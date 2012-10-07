@@ -615,8 +615,10 @@ S.XATTR_CREATE = 1
 S.XATTR_REPLACE = 2
 
 -- utime
-S.UTIME_NOW  = bit.lshift(1, 30) - 1
-S.UTIME_OMIT = bit.lshift(1, 30) - 2
+S.UTIME = setmetatable({
+  NOW  = bit.lshift(1, 30) - 1,
+  OMIT = bit.lshift(1, 30) - 2,
+}, mt.stringflag)
 
 -- ...at commands
 S.AT_FDCWD = -100
@@ -1174,6 +1176,7 @@ S.RTMGRP_IPV6_IFINFO     = 0x800
 S.RTMGRP_DECNET_IFADDR   = 0x1000
 S.RTMGRP_DECNET_ROUTE    = 0x4000
 S.RTMGRP_IPV6_PREFIX     = 0x20000
+
 -- rtnetlink multicast groups (bit numbers not masks)
 S.RTNLGRP_NONE = 0
 S.RTNLGRP_LINK = 1
@@ -4148,7 +4151,7 @@ function S.clone(flags, signal, stack, ptid, tls, ctid)
 end
 
 function S.unshare(flags) return retbool(C.unshare(stringflags(flags, "CLONE_"))) end
-function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), stringflag(nstype, "CLONE_"))) end
+function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), stringflags(nstype, "CLONE_"))) end
 
 function S.fork() return retnum(C.fork()) end
 function S.execve(filename, argv, envp)
@@ -4332,8 +4335,8 @@ local function gettimespec2(ts)
   if ts and (not ffi.istype(t.timespec2, ts)) then
     local s1, s2 = ts[1], ts[2]
     ts = t.timespec2()
-    if type(s1) == 'string' then ts[0].tv_nsec = stringflag(s1, "UTIME_") else ts[0] = t.timespec(s1) end
-    if type(s2) == 'string' then ts[1].tv_nsec = stringflag(s2, "UTIME_") else ts[1] = t.timespec(s2) end
+    if type(s1) == 'string' then ts[0].tv_nsec = S.UTIME[s1] else ts[0] = t.timespec(s1) end
+    if type(s2) == 'string' then ts[1].tv_nsec = S.UTIME[s2] else ts[1] = t.timespec(s2) end
   end
   return ts
 end
