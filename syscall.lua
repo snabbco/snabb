@@ -611,8 +611,10 @@ mt.timex = {
 }
 
 -- xattr
-S.XATTR_CREATE = 1
-S.XATTR_REPLACE = 2
+S.XATTR = setmetatable({
+  CREATE  = 1,
+  REPLACE = 2,
+}, mt.stringflag)
 
 -- utime
 S.UTIME = setmetatable({
@@ -4538,7 +4540,7 @@ end
 
 local fcntl_commands = {
   [S.F.SETFL] = function(arg) return bit.bor(stringflags(arg, "O_"), S.O_LARGEFILE) end,
-  [S.F.SETFD] = function(arg) return stringflag(arg, "FD_") end,
+  [S.F.SETFD] = function(arg) return stringflags(arg, "FD_") end,
   [S.F.GETLK] = getflock,
   [S.F.SETLK] = getflock,
   [S.F.SETLKW] = getflock,
@@ -4678,13 +4680,13 @@ function S.llistxattr(path) return lattrbuf(C.llistxattr, path) end
 function S.flistxattr(fd) return lattrbuf(C.flistxattr, getfd(fd)) end
 
 function S.setxattr(path, name, value, flags)
-  return retbool(C.setxattr(path, name, value, #value + 1, stringflag(flags, "XATTR_")))
+  return retbool(C.setxattr(path, name, value, #value + 1, S.XATTR[flags]))
 end
 function S.lsetxattr(path, name, value, flags)
-  return retbool(C.lsetxattr(path, name, value, #value + 1, stringflag(flags, "XATTR_")))
+  return retbool(C.lsetxattr(path, name, value, #value + 1, S.XATTR[flags]))
 end
 function S.fsetxattr(fd, name, value, flags)
-  return retbool(C.fsetxattr(getfd(fd), name, value, #value + 1, stringflag(flags, "XATTR_")))
+  return retbool(C.fsetxattr(getfd(fd), name, value, #value + 1, S.XATTR[flags]))
 end
 
 function S.getxattr(path, name) return growattrbuf(C.getxattr, path, name) end
