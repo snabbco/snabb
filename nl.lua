@@ -67,10 +67,10 @@ local addrlenmap = { -- map interface type to length of hardware address
 }
 
 local ifla_decode = {
-  [S.IFLA_IFNAME] = function(ir, buf, len)
+  [S.IFLA.IFNAME] = function(ir, buf, len)
     ir.name = ffi.string(buf)
   end,
-  [S.IFLA_ADDRESS] = function(ir, buf, len)
+  [S.IFLA.ADDRESS] = function(ir, buf, len)
     local addrlen = addrlenmap[ir.type]
     if (addrlen) then
       ir.addrlen = addrlen
@@ -78,7 +78,7 @@ local ifla_decode = {
       ffi.copy(ir.macaddr, buf, addrlen)
     end
   end,
-  [S.IFLA_BROADCAST] = function(ir, buf, len)
+  [S.IFLA.BROADCAST] = function(ir, buf, len)
     local addrlen = addrlenmap[ir.type]
     if (addrlen) then
       ir.braddrlen = addrlen
@@ -86,87 +86,87 @@ local ifla_decode = {
       ffi.copy(ir.broadcast, buf, addrlen)
     end
   end,
-  [S.IFLA_MTU] = function(ir, buf, len)
+  [S.IFLA.MTU] = function(ir, buf, len)
     local u = pt.uint(buf)
     ir.mtu = tonumber(u[0])
   end,
-  [S.IFLA_LINK] = function(ir, buf, len)
+  [S.IFLA.LINK] = function(ir, buf, len)
     local i = pt.int(buf)
     ir.link = tonumber(i[0])
   end,
-  [S.IFLA_QDISC] = function(ir, buf, len)
+  [S.IFLA.QDISC] = function(ir, buf, len)
     ir.qdisc = ffi.string(buf)
   end,
-  [S.IFLA_STATS] = function(ir, buf, len)
+  [S.IFLA.STATS] = function(ir, buf, len)
     ir.stats = t.rtnl_link_stats() -- despite man page, this is what kernel uses. So only get 32 bit stats here.
     ffi.copy(ir.stats, buf, s.rtnl_link_stats)
   end
 }
 
 local ifa_decode = {
-  [S.IFA_ADDRESS] = function(ir, buf, len)
+  [S.IFA.ADDRESS] = function(ir, buf, len)
     ir.addr = S.addrtype[ir.family]()
     ffi.copy(ir.addr, buf, ffi.sizeof(ir.addr))
   end,
-  [S.IFA_LOCAL] = function(ir, buf, len)
+  [S.IFA.LOCAL] = function(ir, buf, len)
     ir.loc = S.addrtype[ir.family]()
     ffi.copy(ir.loc, buf, ffi.sizeof(ir.loc))
   end,
-  [S.IFA_BROADCAST] = function(ir, buf, len)
+  [S.IFA.BROADCAST] = function(ir, buf, len)
     ir.broadcast = S.addrtype[ir.family]()
     ffi.copy(ir.broadcast, buf, ffi.sizeof(ir.broadcast))
   end,
-  [S.IFA_LABEL] = function(ir, buf, len)
+  [S.IFA.LABEL] = function(ir, buf, len)
     ir.label = ffi.string(buf)
   end,
-  [S.IFA_ANYCAST] = function(ir, buf, len)
+  [S.IFA.ANYCAST] = function(ir, buf, len)
     ir.anycast = S.addrtype[ir.family]()
     ffi.copy(ir.anycast, buf, ffi.sizeof(ir.anycast))
   end,
-  [S.IFA_CACHEINFO] = function(ir, buf, len)
+  [S.IFA.CACHEINFO] = function(ir, buf, len)
     ir.cacheinfo = t.ifa_cacheinfo()
     ffi.copy(ir.cacheinfo, buf, ffi.sizeof(t.ifa_cacheinfo))
   end,
 }
 
 local rta_decode = {
-  [S.RTA_DST] = function(ir, buf, len)
+  [S.RTA.DST] = function(ir, buf, len)
     ir.dst = S.addrtype[ir.family]()
     ffi.copy(ir.dst, buf, ffi.sizeof(ir.dst))
   end,
-  [S.RTA_SRC] = function(ir, buf, len)
+  [S.RTA.SRC] = function(ir, buf, len)
     ir.src = S.addrtype[ir.family]()
     ffi.copy(ir.src, buf, ffi.sizeof(ir.src))
   end,
-  [S.RTA_IIF] = function(ir, buf, len)
+  [S.RTA.IIF] = function(ir, buf, len)
     local i = pt.int(buf)
     ir.iif = tonumber(i[0])
   end,
-  [S.RTA_OIF] = function(ir, buf, len)
+  [S.RTA.OIF] = function(ir, buf, len)
     local i = pt.int(buf)
     ir.oif = tonumber(i[0])
   end,
-  [S.RTA_GATEWAY] = function(ir, buf, len)
+  [S.RTA.GATEWAY] = function(ir, buf, len)
     ir.gateway = S.addrtype[ir.family]()
     ffi.copy(ir.gateway, buf, ffi.sizeof(ir.gateway))
   end,
-  [S.RTA_PRIORITY] = function(ir, buf, len)
+  [S.RTA.PRIORITY] = function(ir, buf, len)
     local i = pt.int(buf)
     ir.priority = tonumber(i[0])
   end,
-  [S.RTA_PREFSRC] = function(ir, buf, len)
+  [S.RTA.PREFSRC] = function(ir, buf, len)
     local i = pt.uint32(buf)
     ir.prefsrc = tonumber(i[0])
   end,
-  [S.RTA_METRICS] = function(ir, buf, len)
+  [S.RTA.METRICS] = function(ir, buf, len)
     local i = pt.int(buf)
     ir.metrics = tonumber(i[0])
   end,
-  [S.RTA_TABLE] = function(ir, buf, len)
+  [S.RTA.TABLE] = function(ir, buf, len)
     local i = pt.uint32(buf)
     ir.table = tonumber(i[0])
   end,
-  [S.RTA_CACHEINFO] = function(ir, buf, len)
+  [S.RTA.CACHEINFO] = function(ir, buf, len)
     ir.cacheinfo = t.rta_cacheinfo()
     ffi.copy(ir.cacheinfo, buf, s.rta_cacheinfo)
   end,
@@ -595,62 +595,62 @@ end
 -- TODO share with read side
 local ifla_msg_types = {
   ifla = {
-    -- IFLA_UNSPEC
-    [S.IFLA_ADDRESS] = t.macaddr,
-    [S.IFLA_BROADCAST] = t.macaddr,
-    [S.IFLA_IFNAME] = "asciiz",
-    -- TODO IFLA_MAP
-    [S.IFLA_MTU] = t.uint32,
-    [S.IFLA_LINK] = t.uint32,
-    [S.IFLA_MASTER] = t.uint32,
-    [S.IFLA_TXQLEN] = t.uint32,
-    [S.IFLA_WEIGHT] = t.uint32,
-    [S.IFLA_OPERSTATE] = t.uint8,
-    [S.IFLA_LINKMODE] = t.uint8,
-    [S.IFLA_LINKINFO] = {"ifla_info", "IFLA_INFO_"},
-    [S.IFLA_NET_NS_PID] = t.uint32,
-    [S.IFLA_NET_NS_FD] = t.uint32,
-    [S.IFLA_IFALIAS] = "asciiz",
-    --[S.IFLA_VFINFO_LIST] = "nested",
-    --[S.IFLA_VF_PORTS] = "nested",
-    --[S.IFLA_PORT_SELF] = "nested",
-    --[S.IFLA_AF_SPEC] = "nested",
+    -- IFLA.UNSPEC
+    [S.IFLA.ADDRESS] = t.macaddr,
+    [S.IFLA.BROADCAST] = t.macaddr,
+    [S.IFLA.IFNAME] = "asciiz",
+    -- TODO IFLA.MAP
+    [S.IFLA.MTU] = t.uint32,
+    [S.IFLA.LINK] = t.uint32,
+    [S.IFLA.MASTER] = t.uint32,
+    [S.IFLA.TXQLEN] = t.uint32,
+    [S.IFLA.WEIGHT] = t.uint32,
+    [S.IFLA.OPERSTATE] = t.uint8,
+    [S.IFLA.LINKMODE] = t.uint8,
+    [S.IFLA.LINKINFO] = {"ifla_info", S.IFLA_INFO},
+    [S.IFLA.NET_NS_PID] = t.uint32,
+    [S.IFLA.NET_NS_FD] = t.uint32,
+    [S.IFLA.IFALIAS] = "asciiz",
+    --[S.IFLA.VFINFO_LIST] = "nested",
+    --[S.IFLA.VF_PORTS] = "nested",
+    --[S.IFLA.PORT_SELF] = "nested",
+    --[S.IFLA.AF_SPEC] = "nested",
   },
   ifla_info = {
-    [S.IFLA_INFO_KIND] = "ascii",
-    [S.IFLA_INFO_DATA] = "kind",
+    [S.IFLA_INFO.KIND] = "ascii",
+    [S.IFLA_INFO.DATA] = "kind",
   },
   ifla_vlan = {
-    [S.IFLA_VLAN_ID] = t.uint16,
+    [S.IFLA_VLAN.ID] = t.uint16,
     -- other vlan params
   },
   ifa = {
-    -- IFA_UNSPEC
-    [S.IFA_ADDRESS] = "address",
-    [S.IFA_LOCAL] = "address",
-    [S.IFA_LABEL] = "asciiz",
-    [S.IFA_BROADCAST] = "address",
-    [S.IFA_ANYCAST] = "address",
-    -- IFA_CACHEINFO
+    -- IFA.UNSPEC
+    [S.IFA.ADDRESS] = "address",
+    [S.IFA.LOCAL] = "address",
+    [S.IFA.LABEL] = "asciiz",
+    [S.IFA.BROADCAST] = "address",
+    [S.IFA.ANYCAST] = "address",
+    -- IFA.CACHEINFO
   },
   rta = {
     -- RTA_UNSPEC
-    [S.RTA_DST] = "address",
-    [S.RTA_SRC] = "address",
-    [S.RTA_IIF] = t.uint32,
-    [S.RTA_OIF] = t.uint32,
-    [S.RTA_GATEWAY] = "address",
-    [S.RTA_PRIORITY] = t.uint32,
-    [S.RTA_METRICS] = t.uint32,
-    --          RTA_PREFSRC
-    --          RTA_MULTIPATH
-    --          RTA_PROTOINFO
-    --          RTA_FLOW
-    --          RTA_CACHEINFO
+    [S.RTA.DST] = "address",
+    [S.RTA.SRC] = "address",
+    [S.RTA.IIF] = t.uint32,
+    [S.RTA.OIF] = t.uint32,
+    [S.RTA.GATEWAY] = "address",
+    [S.RTA.PRIORITY] = t.uint32,
+    [S.RTA.METRICS] = t.uint32,
+    --          RTA.PREFSRC
+    --          RTA.MULTIPATH
+    --          RTA.PROTOINFO
+    --          RTA.FLOW
+    --          RTA.CACHEINFO
   },
   veth_info = {
     -- VETH_INFO_UNSPEC
-    [S.VETH_INFO_PEER] = {"ifla", "IFLA_"},
+    [S.VETH_INFO.PEER] = {"ifla", S.IFLA},
   },
 }
 
@@ -714,14 +714,15 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
 
   local rawmsg = msg
 
-  msg = stringflag(msg, lookup)
+  msg = lookup[msg]
+
   tp = ifla_msg_types[tab][msg]
-  if not tp then error("unknown message type " .. rawmsg .. " in " .. tab .. " lookup " .. lookup) end
+  if not tp then error("unknown message type " .. rawmsg .. " in " .. tab) end
 
   if tp == "kind" then
     local kinds = {
-      vlan = {"ifla_vlan", "IFLA_VLAN_"},
-      veth = {"veth_info", "VETH_INFO_"},
+      vlan = {"ifla_vlan", S.IFLA_VLAN},
+      veth = {"veth_info", S.VETH_INFO},
     }
     tp = kinds[kind]
   end
@@ -748,7 +749,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
     if not value then error("not enough arguments") end
   end
 
-  if tab == "ifla_info" and msg == S.IFLA_INFO_KIND then
+  if tab == "ifla_info" and msg == S.IFLA_INFO.KIND then
     kind = value
   end
 
@@ -806,15 +807,15 @@ local function ifla_f(tab, lookup, af, ...)
 end
 
 local rtpref = {
-  [S.RTM.NEWLINK] = {"ifla", "IFLA_"},
-  [S.RTM.GETLINK] = {"ifla", "IFLA_"},
-  [S.RTM.DELLINK] = {"ifla", "IFLA_"},
-  [S.RTM.NEWADDR] = {"ifa", "IFA_"},
-  [S.RTM.GETADDR] = {"ifa", "IFA_"},
-  [S.RTM.DELADDR] = {"ifa", "IFA_"},
-  [S.RTM.NEWROUTE] = {"rta", "RTA_"},
-  [S.RTM.GETROUTE] = {"rta", "RTA_"},
-  [S.RTM.DELROUTE] = {"rta", "RTA_"},
+  [S.RTM.NEWLINK] = {"ifla", S.IFLA},
+  [S.RTM.GETLINK] = {"ifla", S.IFLA},
+  [S.RTM.DELLINK] = {"ifla", S.IFLA},
+  [S.RTM.NEWADDR] = {"ifa", S.IFA},
+  [S.RTM.GETADDR] = {"ifa", S.IFA},
+  [S.RTM.DELADDR] = {"ifa", S.IFA},
+  [S.RTM.NEWROUTE] = {"rta", S.RTA},
+  [S.RTM.GETROUTE] = {"rta", S.RTA},
+  [S.RTM.DELROUTE] = {"rta", S.RTA},
 }
 
 function nl.socket(tp, addr)

@@ -858,40 +858,38 @@ S.RTM = setmetatable({
   SETDCB = 79,
 }, mt.stringflag)
 
-local nlmsgtypes = {} -- lookup table by value
-for k, v in ipairs(S.NLMSG) do nlmsgtypes[v] = k end
-for k, v in ipairs(S.RTM) do nlmsgtypes[v] = k end
-
 -- linux/if_link.h
-S.IFLA_UNSPEC    = 0
-S.IFLA_ADDRESS   = 1
-S.IFLA_BROADCAST = 2
-S.IFLA_IFNAME    = 3
-S.IFLA_MTU       = 4
-S.IFLA_LINK      = 5
-S.IFLA_QDISC     = 6
-S.IFLA_STATS     = 7
-S.IFLA_COST      = 8
-S.IFLA_PRIORITY  = 9
-S.IFLA_MASTER    = 10
-S.IFLA_WIRELESS  = 11
-S.IFLA_PROTINFO  = 12
-S.IFLA_TXQLEN    = 13
-S.IFLA_MAP       = 14
-S.IFLA_WEIGHT    = 15
-S.IFLA_OPERSTATE = 16
-S.IFLA_LINKMODE  = 17
-S.IFLA_LINKINFO  = 18
-S.IFLA_NET_NS_PID= 19
-S.IFLA_IFALIAS   = 20
-S.IFLA_NUM_VF    = 21
-S.IFLA_VFINFO_LIST = 22
-S.IFLA_STATS64   = 23
-S.IFLA_VF_PORTS  = 24
-S.IFLA_PORT_SELF = 25
-S.IFLA_AF_SPEC   = 26
-S.IFLA_GROUP     = 27
-S.IFLA_NET_NS_FD = 28
+S.IFLA = setmetatable({
+  UNSPEC    = 0,
+  ADDRESS   = 1,
+  BROADCAST = 2,
+  IFNAME    = 3,
+  MTU       = 4,
+  LINK      = 5,
+  QDISC     = 6,
+  STATS     = 7,
+  COST      = 8,
+  PRIORITY  = 9,
+  MASTER    = 10,
+  WIRELESS  = 11,
+  PROTINFO  = 12,
+  TXQLEN    = 13,
+  MAP       = 14,
+  WEIGHT    = 15,
+  OPERSTATE = 16,
+  LINKMODE  = 17,
+  LINKINFO  = 18,
+  NET_NS_PID= 19,
+  IFALIAS   = 20,
+  NUM_VF    = 21,
+  VFINFO_LIST = 22,
+  STATS64   = 23,
+  VF_PORTS  = 24,
+  PORT_SELF = 25,
+  AF_SPEC   = 26,
+  GROUP     = 27,
+  NET_NS_FD = 28,
+}, mt.stringflag)
 
 S.IFLA_INET_UNSPEC = 0
 S.IFLA_INET_CONF   = 1
@@ -904,16 +902,20 @@ S.IFLA_INET6_MCAST  = 4
 S.IFLA_INET6_CACHEINFO  = 5
 S.IFLA_INET6_ICMP6STATS = 6
 
-S.IFLA_INFO_UNSPEC = 0
-S.IFLA_INFO_KIND   = 1
-S.IFLA_INFO_DATA   = 2
-S.IFLA_INFO_XSTATS = 3
+S.IFLA_INFO = setmetatable({
+  UNSPEC = 0,
+  KIND   = 1,
+  DATA   = 2,
+  XSTATS = 3,
+}, mt.stringflag)
 
-S.IFLA_VLAN_UNSPEC = 0
-S.IFLA_VLAN_ID     = 1
-S.IFLA_VLAN_FLAGS  = 2
-S.IFLA_VLAN_EGRESS_QOS  = 3
-S.IFLA_VLAN_INGRESS_QOS = 4
+S.IFLA_VLAN = setmetatable({
+  UNSPEC = 0,
+  ID     = 1,
+  FLAGS  = 2,
+  EGRESS_QOS  = 3,
+  INGRESS_QOS = 4,
+}, mt.stringflag)
 
 S.IFLA_VLAN_QOS_UNSPEC  = 0
 S.IFLA_VLAN_QOS_MAPPING = 1
@@ -947,8 +949,10 @@ S.IFLA_PORT_HOST_UUID = 5
 S.IFLA_PORT_REQUEST   = 6
 S.IFLA_PORT_RESPONSE  = 7
 
-S.VETH_INFO_UNSPEC = 0
-S.VETH_INFO_PEER   = 1
+S.VETH_INFO = setmetatable({
+  UNSPEC = 0,
+  PEER   = 1,
+}, mt.stringflag)
 
 S.PORT_PROFILE_MAX      =  40
 S.PORT_UUID_MAX         =  16
@@ -974,15 +978,16 @@ S.PORT_PROFILE_RESPONSE_INSUFFICIENT_RESOURCES = 0x104
 S.PORT_PROFILE_RESPONSE_ERROR = 0x105
 
 -- from if_addr.h interface address types and flags
-S.IFA_UNSPEC    = 0
-S.IFA_ADDRESS   = 1
-S.IFA_LOCAL     = 2
-S.IFA_LABEL     = 3
-S.IFA_BROADCAST = 4
-S.IFA_ANYCAST   = 5
-S.IFA_CACHEINFO = 6
-S.IFA_MULTICAST = 7
-S.IFA_MAX       = 7
+S.IFA = setmetatable({
+  UNSPEC    = 0,
+  ADDRESS   = 1,
+  LOCAL     = 2,
+  LABEL     = 3,
+  BROADCAST = 4,
+  ANYCAST   = 5,
+  CACHEINFO = 6,
+  MULTICAST = 7,
+}, mt.stringflag)
 
 S.IFA_F_SECONDARY   = 0x01
 S.IFA_F_TEMPORARY   = S.IFA_F_SECONDARY
@@ -1042,23 +1047,25 @@ S.RT_TABLE_MAIN = 254
 S.RT_TABLE_LOCAL = 255
 S.RT_TABLE_MAX = 0xFFFFFFFF
 
-S.RTA_UNSPEC = 0
-S.RTA_DST = 1
-S.RTA_SRC = 2
-S.RTA_IIF = 3
-S.RTA_OIF = 4
-S.RTA_GATEWAY = 5
-S.RTA_PRIORITY = 6
-S.RTA_PREFSRC = 7
-S.RTA_METRICS = 8
-S.RTA_MULTIPATH = 9
-S.RTA_PROTOINFO = 10
-S.RTA_FLOW = 11
-S.RTA_CACHEINFO = 12
-S.RTA_SESSION = 13
-S.RTA_MP_ALGO = 14
-S.RTA_TABLE = 15
-S.RTA_MARK = 16
+S.RTA = setmetatable({
+  UNSPEC = 0,
+  DST = 1,
+  SRC = 2,
+  IIF = 3,
+  OIF = 4,
+  GATEWAY = 5,
+  PRIORITY = 6,
+  PREFSRC = 7,
+  METRICS = 8,
+  MULTIPATH = 9,
+  PROTOINFO = 10,
+  FLOW = 11,
+  CACHEINFO = 12,
+  SESSION = 13,
+  MP_ALGO = 14,
+  TABLE = 15,
+  MARK = 16,
+}, mt.stringflag)
 
 -- route flags
 S.RTF_UP          = 0x0001
