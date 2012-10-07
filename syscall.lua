@@ -282,7 +282,7 @@ S.EXIT = setmetatable({
   FAILURE = 1,
 }, mt.stringflag)
 
--- sigaction, note renamed SIGACT from SIG_
+-- sigaction, note renamed SIGACT from SIG
 S.SIGACT = setmetatable({
   ERR = -1,
   DFL =  0,
@@ -290,50 +290,51 @@ S.SIGACT = setmetatable({
   HOLD = 2,
 }, mt.stringflag)
 
-local signals = {
-"SIGHUP",
-"SIGINT",
-"SIGQUIT",
-"SIGILL",
-"SIGTRAP",
-"SIGABRT",
-"SIGBUS",
-"SIGFPE",
-"SIGKILL",
-"SIGUSR1",
-"SIGSEGV",
-"SIGUSR2",
-"SIGPIPE",
-"SIGALRM",
-"SIGTERM",
-"SIGSTKFLT",
-"SIGCHLD",
-"SIGCONT",
-"SIGSTOP",
-"SIGTSTP",
-"SIGTTIN",
-"SIGTTOU",
-"SIGURG",
-"SIGXCPU",
-"SIGXFSZ",
-"SIGVTALRM",
-"SIGPROF",
-"SIGWINCH",
-"SIGIO",
-"SIGPWR",
-"SIGSYS",
-}
+S.SIG = setmetatable({
+  HUP = 1,
+  INT = 2,
+  QUIT = 3,
+  ILL = 4,
+  TRAP = 5,
+  ABRT = 6,
+  BUS = 7,
+  FPE = 8,
+  KILL = 9,
+  USR1 = 10,
+  SEGV = 11,
+  USR2 = 12,
+  PIPE = 13,
+  ALRM = 14,
+  TERM = 15,
+  STKFLT = 16,
+  CHLD = 17,
+  CONT = 18,
+  STOP = 19,
+  TSTP = 20,
+  TTIN = 21,
+  TTOU = 22,
+  URG  = 23,
+  XCPU = 24,
+  XFSZ = 25,
+  VTALRM = 26,
+  PROF = 27,
+  WINCH = 28,
+  IO = 29,
+  PWR = 30,
+  SYS = 31,
+}, mt.stringflag)
 
-for i, v in ipairs(signals) do S[v] = i end
+local signals = {}
+for k, v in pairs(S.SIG) do signals[v] = k end
 
-S.SIGIOT = 6
-S.SIGUNUSED     = 31
-S.SIGCLD        = S.SIGCHLD
-S.SIGPOLL       = S.SIGIO
+S.SIG.IOT = 6
+S.SIG.UNUSED     = 31
+S.SIG.CLD        = S.SIG.CHLD
+S.SIG.POLL       = S.SIG.IO
 
 S.NSIG          = 65
 
--- sigprocmask note renaming of SIG_ to SIGPM
+-- sigprocmask note renaming of SIG to SIGPM
 S.SIGPM = setmetatable({
   BLOCK     = 0,
   UNBLOCK   = 1,
@@ -437,95 +438,111 @@ S.NOTHREAD, S.WALL, S.WCLONE = S.__WNOTHREAD, S.__WALL, S.__WCLONE
 local signal_reasons_gen = {}
 local signal_reasons = {}
 
-S.SI_ASYNCNL = -60
-S.SI_TKILL = -6
-S.SI_SIGIO = -5
-S.SI_ASYNCIO = -4
-S.SI_MESGQ = -3
-S.SI_TIMER = -2
-S.SI_QUEUE = -1
-S.SI_USER = 0
-S.SI_KERNEL = 0x80
+S.SI = setmetatable({
+  ASYNCNL = -60,
+  TKILL = -6,
+  SIGIO = -5,
+  ASYNCIO = -4,
+  MESGQ = -3,
+  TIMER = -2,
+  QUEUE = -1,
+  USER = 0,
+  KERNEL = 0x80,
+}, mt.stringflag)
 
-for _, v in ipairs{"SI_ASYNCNL", "SI_TKILL", "SI_SIGIO", "SI_ASYNCIO", "SI_MESGQ", "SI_TIMER", "SI_QUEUE", "SI_USER", "SI_KERNEL"} do
-  signal_reasons_gen[S[v]] = v
+for k, v in pairs(S.SI) do
+  signal_reasons_gen[v] = k
 end
 
-S.ILL_ILLOPC = 1
-S.ILL_ILLOPN = 2
-S.ILL_ILLADR = 3
-S.ILL_ILLTRP = 4
-S.ILL_PRVOPC = 5
-S.ILL_PRVREG = 6
-S.ILL_COPROC = 7
-S.ILL_BADSTK = 8
+S.ILL = setmetatable({
+  ILLOPC = 1,
+  ILLOPN = 2,
+  ILLADR = 3,
+  ILLTRP = 4,
+  PRVOPC = 5,
+  PRVREG = 6,
+  COPROC = 7,
+  BADSTK = 8,
+}, mt.stringflag)
 
-signal_reasons[S.SIGILL] = {}
-for _, v in ipairs{"ILL_ILLOPC", "ILL_ILLOPN", "ILL_ILLADR", "ILL_ILLTRP", "ILL_PRVOPC", "ILL_PRVREG", "ILL_COPROC", "ILL_BADSTK"} do
-  signal_reasons[S.SIGILL][S[v]] = v
+signal_reasons[S.SIG.ILL] = {}
+for k, v in pairs(S.ILL) do
+  signal_reasons[S.SIG.ILL][v] = k
 end
 
-S.FPE_INTDIV = 1
-S.FPE_INTOVF = 2
-S.FPE_FLTDIV = 3
-S.FPE_FLTOVF = 4
-S.FPE_FLTUND = 5
-S.FPE_FLTRES = 6
-S.FPE_FLTINV = 7
-S.FPE_FLTSUB = 8
+S.FPE = setmetatable({
+  INTDIV = 1,
+  INTOVF = 2,
+  FLTDIV = 3,
+  FLTOVF = 4,
+  FLTUND = 5,
+  FLTRES = 6,
+  FLTINV = 7,
+  FLTSUB = 8,
+}, mt.stringflag)
 
-signal_reasons[S.SIGFPE] = {}
-for _, v in ipairs{"FPE_INTDIV", "FPE_INTOVF", "FPE_FLTDIV", "FPE_FLTOVF", "FPE_FLTUND", "FPE_FLTRES", "FPE_FLTINV", "FPE_FLTSUB"} do
-  signal_reasons[S.SIGFPE][S[v]] = v
+signal_reasons[S.SIG.FPE] = {}
+for k, v in pairs(S.FPE) do
+  signal_reasons[S.SIG.FPE][v] = k
 end
 
-S.SEGV_MAPERR = 1
-S.SEGV_ACCERR = 2
+S.SEGV = setmetatable({
+  MAPERR = 1,
+  ACCERR = 2,
+}, mt.stringflag)
 
-signal_reasons[S.SIGSEGV] = {}
-for _, v in ipairs{"SEGV_MAPERR", "SEGV_ACCERR"} do
-  signal_reasons[S.SIGSEGV][S[v]] = v
+signal_reasons[S.SIG.SEGV] = {}
+for k, v in pairs(S.SEGV) do
+  signal_reasons[S.SIG.SEGV][v] = k
 end
 
-S.BUS_ADRALN = 1
-S.BUS_ADRERR = 2
-S.BUS_OBJERR = 3
+S.BUS = setmetatable({
+  ADRALN = 1,
+  ADRERR = 2,
+  OBJERR = 3,
+}, mt.stringflag)
 
-signal_reasons[S.SIGBUS] = {}
-for _, v in ipairs{"BUS_ADRALN", "BUS_ADRERR", "BUS_OBJERR"} do
-  signal_reasons[S.SIGBUS][S[v]] = v
+signal_reasons[S.SIG.BUS] = {}
+for k, v in pairs(S.BUS) do
+  signal_reasons[S.SIG.BUS][v] = k
 end
 
-S.TRAP_BRKPT = 1
-S.TRAP_TRACE = 2
+S.TRAP = setmetatable({
+  BRKPT = 1,
+  TRACE = 2,
+}, mt.stringflag)
 
-signal_reasons[S.SIGTRAP] = {}
-for _, v in ipairs{"TRAP_BRKPT", "TRAP_TRACE"} do
-  signal_reasons[S.SIGTRAP][S[v]] = v
+signal_reasons[S.SIG.TRAP] = {}
+for k, v in pairs(S.TRAP) do
+  signal_reasons[S.SIG.TRAP][v] = k
 end
 
-S.CLD_EXITED    = 1
-S.CLD_KILLED    = 2
-S.CLD_DUMPED    = 3
-S.CLD_TRAPPED   = 4
-S.CLD_STOPPED   = 5
-S.CLD_CONTINUED = 6
+S.CLD = setmetatable({
+  EXITED    = 1,
+  KILLED    = 2,
+  DUMPED    = 3,
+  TRAPPED   = 4,
+  STOPPED   = 5,
+  CONTINUED = 6,
+}, mt.stringflag)
 
-signal_reasons[S.SIGCHLD] = {}
-for _, v in ipairs{"CLD_EXITED", "CLD_KILLED", "CLD_DUMPED", "CLD_TRAPPED", "CLD_STOPPED", "CLD_CONTINUED"} do
-  signal_reasons[S.SIGCHLD][S[v]] = v
+signal_reasons[S.SIG.CHLD] = {}
+for k, v in pairs(S.CLD) do
+  signal_reasons[S.SIG.CHLD][v] = k
 end
 
-S.POLL_IN  = 1
-S.POLL_OUT = 2
-S.POLL_MSG = 3
-S.POLL_ERR = 4
-S.POLL_PRI = 5
-S.POLL_HUP = 6
+S.POLL = setmetatable({
+  IN  = 1,
+  OUT = 2,
+  MSG = 3,
+  ERR = 4,
+  PRI = 5,
+  HUP = 6,
+}, mt.stringflag)
 
-signal_reasons[S.SIGPOLL] = {}
-for _, v in ipairs{"POLL_IN", "POLL_OUT", "POLL_MSG", "POLL_ERR", "POLL_PRI", "POLL_HUP"} do
-  signal_reasons[S.SIGPOLL][S[v]] = v
+signal_reasons[S.SIG.POLL] = {}
+for k, v in pairs(S.POLL) do
+  signal_reasons[S.SIG.POLL][v] = k
 end
 
 -- sigaction
@@ -3625,16 +3642,15 @@ S.addrtype = {
   [S.AF.INET6] = t.in6_addr,
 }
 
--- signal set handlers TODO replace with metatypes
+-- signal set handlers TODO replace with metatypes, reuse code from stringflags
 local function mksigset(str)
   if not str then return t.sigset() end
   if type(str) ~= 'string' then return str end
   local f = t.sigset()
   local a = split(",", str)
   for i, v in ipairs(a) do
-    local st = trim(v:upper())
-    if st:sub(1, 3) ~= "SIG" then st = "SIG" .. st end
-    local sig = S[st]
+    local st = trim(v)
+    local sig = S.SIG[st]
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     local d = bit.rshift(sig - 1, 5) -- always 32 bits
     f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
@@ -3673,9 +3689,8 @@ local function sigaddsets(set, sigs) -- allow multiple
   set = mksigset(set)
   local a = split(",", sigs)
   for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
+    local s = trim(v)
+    local sig = S.SIG[s]
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     sigaddset(set, sig)
   end
@@ -3687,9 +3702,8 @@ local function sigdelsets(set, sigs) -- allow multiple
   set = mksigset(set)
   local a = split(",", sigs)
   for i, v in ipairs(a) do
-    local s = trim(v:upper())
-    if s:sub(1, 3) ~= "SIG" then s = "SIG" .. s end
-    local sig = S[s]
+    local s = trim(v)
+    local sig = S.SIG[s]
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     sigdelset(set, sig)
   end
@@ -3701,9 +3715,7 @@ metatype("sigset", "sigset_t", {
     if k == 'add' then return sigaddsets end
     if k == 'del' then return sigdelsets end
     if k == 'isemptyset' then return sigemptyset(set) end
-    local prefix = "SIG"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    local sig = S[k]
+    local sig = S.SIG[k]
     if sig then return sigismember(set, sig) end
   end
 })
@@ -4189,7 +4201,7 @@ function S.setpriority(which, who, prio) return retnume(C.setpriority, S.PRIO[wh
 
  -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
 function S.clone(flags, signal, stack, ptid, tls, ctid)
-  flags = stringflags(flags, "CLONE_") + stringflag(signal, "SIG")
+  flags = stringflags(flags, "CLONE_") + S.SIG[signal]
   return retnum(C.clone(flags, stack, ptid, tls, ctid))
 end
 
@@ -4642,7 +4654,7 @@ end
 
 -- does not support passing a function as a handler, use sigaction instead
 -- actualy glibc does not call the syscall anyway, defines in terms of sigaction; TODO we should too
-function S.signal(signum, handler) return retbool(C.signal(stringflag(signum, "SIG"), S.SIGACT[handler])) end
+function S.signal(signum, handler) return retbool(C.signal(S.SIG[signum], S.SIGACT[handler])) end
 
 -- missing siginfo functionality for now, only supports getting signum TODO
 -- NOTE I do not think it is safe to call this with a function argument as the jit compiler will not know when it is going to
@@ -4660,12 +4672,12 @@ function S.sigaction(signum, handler, mask, flags)
     sa = t.sigaction{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = stringflags(flags, "SA_")}
   end
   local old = t.sigaction()
-  local ret = C.sigaction(stringflag(signum, "SIG"), sa, old)
+  local ret = C.sigaction(S.SIG[signum], sa, old)
   if ret == -1 then return nil, t.error() end
   return old
 end
 
-function S.kill(pid, sig) return retbool(C.kill(pid, stringflag(sig, "SIG"))) end
+function S.kill(pid, sig) return retbool(C.kill(pid, S.SIG[sig])) end
 function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 
 function S.gettimeofday(tv)
@@ -5008,17 +5020,17 @@ function S.eventfd_write(fd, value)
   return retbool(C.write(getfd(fd), value, 8))
 end
 
-local function sigcode(s, signo, code)
+local function sigcode(s, signo, code) -- TODO this should be metatypes/table, cleanup
   s.code = code
   s.signo = signo
   local name = signals[s.signo]
   s[name] = true
-  s[name:lower():sub(4)] = true
+  s[name:lower()] = true
   local rname = signal_reasons_gen[code]
   if not rname and signal_reasons[signo] then rname = signal_reasons[signo][code] end
   if rname then
     s[rname] = true
-    s[rname:sub(rname:find("_") + 1):lower()] = true
+    s[rname:lower()] = true
   end
 end
 
@@ -5036,25 +5048,25 @@ function S.signalfd_read(fd, buffer, len)
     sig.errno = tonumber(ssi.ssi_errno)
     sigcode(sig, tonumber(ssi.ssi_signo), tonumber(ssi.ssi_code))
 
-    if sig.SI_USER or sig.SI_QUEUE then
+    if sig.SI_USER or sig.SI_QUEUE then -- TODO this is now broken!
       sig.pid = tonumber(ssi.ssi_pid)
       sig.uid = tonumber(ssi.ssi_uid)
       sig.int = tonumber(ssi.ssi_int)
       sig.ptr = t.uint64(ssi.ssi_ptr)
-    elseif sig.SI_TIMER then
+    elseif sig.SI_TIMER then -- TODO this is now broken!
       sig.overrun = tonumber(ssi.ssi_overrun)
       sig.timerid = tonumber(ssi.ssi_tid)
     end
 
-    if sig.SIGCHLD then 
+    if sig.CHLD then 
       sig.pid = tonumber(ssi.ssi_pid)
       sig.uid = tonumber(ssi.ssi_uid)
       sig.status = tonumber(ssi.ssi_status)
       sig.utime = tonumber(ssi.ssi_utime) / 1000000 -- convert to seconds
       sig.stime = tonumber(ssi.ssi_stime) / 1000000
-    elseif sig.SIGILL or sig.SIGFPE or sig.SIGSEGV or sig.SIGBUS or sig.SIGTRAP then
+    elseif sig.ILL or sig.FPE or sig.SEGV or sig.BUS or sig.TRAP then
       sig.addr = t.uint64(ssi.ssi_addr)
-    elseif sig.SIGIO or sig.SIGPOLL then
+    elseif sig.IO or sig.POLL then
       sig.band = tonumber(ssi.ssi_band) -- should split this up, is events from poll, TODO
       sig.fd = tonumber(ssi.ssi_fd)
     end

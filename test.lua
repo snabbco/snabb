@@ -68,7 +68,7 @@ test_basic = {
     assert_equal(S.O_CREAT, 64, "wrong octal value for O_CREAT")
   end,
   test_signals = function()
-    assert_equal(S.SIGSYS, 31) -- test numbers correct
+    assert_equal(S.SIG.SYS, 31) -- test numbers correct
   end,
   test_b64 = function()
     local h, l = S.i64(0xffffffffffffffffLL)
@@ -856,10 +856,10 @@ test_timers_signals = {
     local m = assert(S.sigprocmask())
     assert(m.isemptyset, "expect initial sigprocmask to be empty")
     assert(not m.winch, "expect set empty")
-    m = m:add(S.SIGWINCH)
+    m = m:add(S.SIG.WINCH)
     assert(not m.isemptyset, "expect set not empty")
     assert(m.winch, "expect to have added SIGWINCH")
-    m = m:del("SIGWINCH, pipe")
+    m = m:del("WINCH, pipe")
     assert(not m.winch, "expect set empty again")
     assert(m.isemptyset, "expect initial sigprocmask to be empty")
     m = m:add("winch")
@@ -879,8 +879,8 @@ test_timers_signals = {
     assert((ss[1].winch and ss[2].usr1) or (ss[2].winch and ss[1].usr1), "expect a winch and a usr1 signal") -- unordered
     assert(ss[1].user, "signal sent by user")
     assert(ss[2].user, "signal sent by user")
-    assert(ss[1].pid == S.getpid(), "signal sent by my pid")
-    assert(ss[2].pid == S.getpid(), "signal sent by my pid")
+    assert_equal(ss[1].pid, S.getpid(), "signal sent by my pid")
+    assert_equal(ss[2].pid, S.getpid(), "signal sent by my pid")
     assert(fd:close())
   end,
   test_timerfd = function()
@@ -1039,7 +1039,7 @@ test_misc = {
     assert(n == 0, "process pdeathsig defaults to 0")
     assert(S.prctl("set_pdeathsig", "winch"))
     n = assert(S.prctl("get_pdeathsig"))
-    assert(n == S.SIGWINCH, "process pdeathsig should now be set to winch")
+    assert(n == S.SIG.WINCH, "process pdeathsig should now be set to winch")
     assert(S.prctl("set_pdeathsig")) -- reset
     n = assert(S.prctl("get_name"))
     assert(S.prctl("set_name", "test"))
@@ -1766,9 +1766,9 @@ test_processes = {
       S.exit(23)
     else -- parent
       local w = assert(S.waitid("all", 0, "exited, stopped, continued"))
-      assert(w.si_signo == S.SIGCHLD, "waitid to return SIGCHLD")
+      assert(w.si_signo == S.SIG.CHLD, "waitid to return SIGCHLD")
       assert(w.si_status == 23, "exit should be 23")
-      assert(w.si_code == S.CLD_EXITED, "normal exit expected")
+      assert(w.si_code == S.CLD.EXITED, "normal exit expected")
     end
 
     pid = assert(S.fork())
