@@ -729,15 +729,17 @@ S.SPLICE_F_MORE         = 4
 S.SPLICE_F_GIFT         = 8
 
 -- aio - see /usr/include/linux/aio_abi.h
-S.IOCB_CMD_PREAD = 0
-S.IOCB_CMD_PWRITE = 1
-S.IOCB_CMD_FSYNC = 2
-S.IOCB_CMD_FDSYNC = 3
---S.IOCB_CMD_PREADX = 4
---S.IOCB_CMD_POLL = 5
-S.IOCB_CMD_NOOP = 6
-S.IOCB_CMD_PREADV = 7
-S.IOCB_CMD_PWRITEV = 8
+S.IOCB_CMD = setmetatable({
+  PREAD   = 0,
+  PWRITE  = 1,
+  FSYNC   = 2,
+  FDSYNC  = 3,
+-- PREADX = 4,
+-- POLL   = 5,
+  NOOP    = 6,
+  PREADV  = 7,
+  PWRITEV = 8,
+}, mt.stringflag)
 
 S.IOCB_FLAG_RESFD = 1
 
@@ -5057,7 +5059,7 @@ end
 -- TODO replace these functions with metatypes
 local function getiocb(ioi, iocb)
   if not iocb then iocb = t.iocb() end
-  iocb.aio_lio_opcode = stringflags(ioi.cmd, "IOCB_CMD_")
+  iocb.aio_lio_opcode = S.IOCB_CMD[ioi.cmd]
   iocb.aio_data = ioi.data or 0
   iocb.aio_reqprio = ioi.reqprio or 0
   iocb.aio_fildes = getfd(ioi.fd)
