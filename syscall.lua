@@ -679,7 +679,9 @@ S.RLIMIT.OFILE = S.RLIMIT.NOFILE
 S.TFD_CLOEXEC = octal("02000000")
 S.TFD_NONBLOCK = octal("04000")
 
-S.TFD_TIMER_ABSTIME = 1
+S.TFD_TIMER = setmetatable({
+  ABSTIME = 1,
+}, mt.stringflag)
 
 -- poll
 S.POLLIN          = 0x001
@@ -5048,7 +5050,7 @@ end
 function S.timerfd_settime(fd, flags, it, oldtime)
   oldtime = oldtime or t.itimerspec()
   it = istype(t.itimerspec, it) or t.itimerspec(it)
-  local ret = C.timerfd_settime(getfd(fd), stringflag(flags, "TFD_TIMER_"), it, oldtime)
+  local ret = C.timerfd_settime(getfd(fd), S.TFD_TIMER[flags], it, oldtime)
   if ret == -1 then return nil, t.error() end
   return oldtime
 end
