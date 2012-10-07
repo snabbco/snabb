@@ -716,9 +716,11 @@ mt.epoll = {
   end
 }
 
-S.EPOLL_CTL_ADD = 1
-S.EPOLL_CTL_DEL = 2
-S.EPOLL_CTL_MOD = 3
+S.EPOLL_CTL = setmetatable({
+  ADD = 1,
+  DEL = 2,
+  MOD = 3,
+}, mt.stringflag)
 
 -- splice etc
 S.SPLICE_F_MOVE         = 1
@@ -4840,7 +4842,7 @@ function S.epoll_ctl(epfd, op, fd, event, data)
     event.events = events
     if data then event.data.u64 = data else event.data.fd = getfd(fd) end
   end
-  return retbool(C.epoll_ctl(getfd(epfd), stringflag(op, "EPOLL_CTL_"), getfd(fd), event))
+  return retbool(C.epoll_ctl(getfd(epfd), S.EPOLL_CTL[op], getfd(fd), event))
 end
 
 local epoll_flags = {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"}
