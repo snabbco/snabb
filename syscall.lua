@@ -180,16 +180,19 @@ end
 S.FD_CLOEXEC = 1
 
 -- note changed from F_ to FCNTL_LOCK
-S.FCNTL_LOCK = {
+S.FCNTL_LOCK = setmetatable({
   RDLCK = 0,
   WRLCK = 1,
   UNLCK = 2,
-}
+}, mt.stringflag)
 
-S.F_ULOCK = 0
-S.F_LOCK  = 1
-S.F_TLOCK = 2
-S.F_TEST  = 3
+-- lockf, changed from F_ to LOCKF_
+S.LOCKF = setmetatable({
+  ULOCK = 0,
+  LOCK  = 1,
+  TLOCK = 2,
+  TEST  = 3,
+}, mt.stringflag)
 
 --mmap
 S.PROT_READ  = 0x1
@@ -359,15 +362,17 @@ S.SCM = setmetatable({
   CREDENTIALS = 0x02,
 }, mt.stringflag)
 
-S.SOL_SOCKET     = 1
-
-S.SOL_RAW        = 255
-S.SOL_DECNET     = 261
-S.SOL_X25        = 262
-S.SOL_PACKET     = 263
-S.SOL_ATM        = 264
-S.SOL_AAL        = 265
-S.SOL_IRDA       = 266
+-- setsockopt
+S.SOL = setmetatable({
+  SOCKET     = 1,
+  RAW        = 255,
+  DECNET     = 261,
+  X25        = 262,
+  PACKET     = 263,
+  ATM        = 264,
+  AAL        = 265,
+  IRDA       = 266,
+}, mt.stringflag)
 
 S.SO_DEBUG       = 1
 S.SO_REUSEADDR   = 2
@@ -4235,7 +4240,7 @@ function S.setsockopt(fd, level, optname, optval, optlen)
     optval = t.int1(optval)
     optlen = s.int
   end
-  return retbool(C.setsockopt(getfd(fd), stringflag(level, "SOL_"), stringflag(optname, "SO_"), optval, optlen))
+  return retbool(C.setsockopt(getfd(fd), S.SOL[level], stringflag(optname, "SO_"), optval, optlen))
 end
 
 function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool options
@@ -5391,7 +5396,7 @@ function S.recvmsg(fd, msg, flags)
   local ret = {count = ret, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
   local mc, cmsg = cmsg_firsthdr(msg)
   while cmsg do
-    if cmsg.cmsg_level == S.SOL_SOCKET then
+    if cmsg.cmsg_level == S.SOL.SOCKET then
       if cmsg.cmsg_type == S.SCM.CREDENTIALS then
         local cred = pt.ucred(cmsg + 1) -- cmsg_data
         ret.pid = cred.pid
@@ -5402,7 +5407,7 @@ function S.recvmsg(fd, msg, flags)
         local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, s.int)
         ret.fd = {}
         for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
-      end -- add other SOL_SOCKET messages
+      end -- add other SOL.SOCKET messages
     end -- add other processing for different types
     mc, cmsg = cmsg_nxthdr(msg, mc, cmsg)
   end
@@ -5429,7 +5434,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   msg.msg_control = buf
   msg.msg_controllen = bufsize
   local mc, cmsg = cmsg_firsthdr(msg)
-  cmsg.cmsg_level = S.SOL_SOCKET
+  cmsg.cmsg_level = S.SOL.SOCKET
   cmsg.cmsg_type = S.SCM.CREDENTIALS
   cmsg.cmsg_len = buflen
   ffi.copy(cmsg.cmsg_data, ucred, s.ucred)
@@ -5453,7 +5458,7 @@ function S.sendfds(fd, ...)
   msg.msg_control = buf
   msg.msg_controllen = bufsize
   local mc, cmsg = cmsg_firsthdr(msg)
-  cmsg.cmsg_level = S.SOL_SOCKET
+  cmsg.cmsg_level = S.SOL.SOCKET
   cmsg.cmsg_type = S.SCM.RIGHTS
   cmsg.cmsg_len = buflen -- could set from a constructor
   ffi.copy(cmsg + 1, fa, fasize) -- cmsg_data
@@ -5843,15 +5848,15 @@ function S.setblocking(s, b) if b then return s:block() else return s:nonblock()
 function S.tell(fd) return fd:lseek(0, S.SEEK.CUR) end
 
 function S.lockf(fd, cmd, len)
-  cmd = stringflag(cmd, "F_")
-  if cmd == S.F_LOCK then
-    return S.fcntl(fd, "setlkw", {l_type = S.FCNTL_LOCK.WRLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
-  elseif cmd == S.F_TLOCK then
-    return S.fcntl(fd, "setlk", {l_type = S.FCNTL_LOCK.WRLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
-  elseif cmd == S.F_ULOCK then
-    return S.fcntl(fd, "setlk", {l_type = S.FCNTL_LOCK.UNLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
-  elseif cmd == S.F_TEST then
-    local ret, err = S.fcntl(fd, "getlk", {l_type = S.FCNTL_LOCK.WRLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
+  cmd = S.LOCKF[cmd]
+  if cmd == S.LOCKF.LOCK then
+    return S.fcntl(fd, S.F.SETLKW, {l_type = S.FCNTL_LOCK.WRLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
+  elseif cmd == S.LOCKF.TLOCK then
+    return S.fcntl(fd, S.F.SETLK, {l_type = S.FCNTL_LOCK.WRLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
+  elseif cmd == S.LOCKF.ULOCK then
+    return S.fcntl(fd, S.F.SETLK, {l_type = S.FCNTL_LOCK.UNLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
+  elseif cmd == S.LOCKF.TEST then
+    local ret, err = S.fcntl(fd, S.F.GETLK, {l_type = S.FCNTL_LOCK.WRLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
     if not ret then return nil, err end
     return ret.l_type == S.FCNTL_LOCK.UNLCK
   end
