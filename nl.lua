@@ -477,72 +477,72 @@ local function decode_route(buf, len)
 end
 
 local nlmsg_data_decode = {
-  [S.NLMSG_NOOP] = function(r, buf, len) return r end,
-  [S.NLMSG_ERROR] = function(r, buf, len)
+  [S.NLMSG.NOOP] = function(r, buf, len) return r end,
+  [S.NLMSG.ERROR] = function(r, buf, len)
     local e = pt.nlmsgerr(buf)
     if e.error ~= 0 then r.error = t.error(-e.error) else r.ack = true end -- error zero is ACK, others negative
     return r
   end,
-  [S.NLMSG_DONE] = function(r, buf, len) return r end,
-  [S.NLMSG_OVERRUN] = function(r, buf, len)
+  [S.NLMSG.DONE] = function(r, buf, len) return r end,
+  [S.NLMSG.OVERRUN] = function(r, buf, len)
     r.overrun = true
     return r
   end,
-  [S.RTM_NEWADDR] = function(r, buf, len)
+  [S.RTM.NEWADDR] = function(r, buf, len)
     local ir = decode_address(buf, len)
-    ir.op, ir.newaddr, ir.nl = "newaddr", true, S.RTM_NEWADDR
+    ir.op, ir.newaddr, ir.nl = "newaddr", true, S.RTM.NEWADDR
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM_DELADDR] = function(r, buf, len)
+  [S.RTM.DELADDR] = function(r, buf, len)
     local ir = decode_address(buf, len)
-    ir.op, ir.deladdr, ir.nl = "delddr", true, S.RTM_DELADDR
+    ir.op, ir.deladdr, ir.nl = "delddr", true, S.RTM.DELADDR
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM_GETADDR] = function(r, buf, len)
+  [S.RTM.GETADDR] = function(r, buf, len)
     local ir = decode_address(buf, len)
-    ir.op, ir.getaddr, ir.nl = "getaddr", true, S.RTM_GETADDR
+    ir.op, ir.getaddr, ir.nl = "getaddr", true, S.RTM.GETADDR
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM_NEWLINK] = function(r, buf, len)
+  [S.RTM.NEWLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
-    ir.op, ir.newlink, ir.nl = "newlink", true, S.RTM_NEWLINK
+    ir.op, ir.newlink, ir.nl = "newlink", true, S.RTM.NEWLINK
     r[ir.name] = ir
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM_DELLINK] = function(r, buf, len)
+  [S.RTM.DELLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
-    ir.op, ir.dellink, ir.nl = "dellink", true, S.RTM_DELLINK
+    ir.op, ir.dellink, ir.nl = "dellink", true, S.RTM.DELLINK
     r[ir.name] = ir
     r[#r + 1] = ir
     return r
   end,
   -- TODO need test that returns these, assume updates do
-  [S.RTM_GETLINK] = function(r, buf, len)
+  [S.RTM.GETLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
-    ir.op, ir.getlink, ir.nl = "getlink", true, S.RTM_GETLINK
+    ir.op, ir.getlink, ir.nl = "getlink", true, S.RTM.GETLINK
     r[ir.name] = ir
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM_NEWROUTE] = function(r, buf, len)
+  [S.RTM.NEWROUTE] = function(r, buf, len)
     local ir = decode_route(buf, len)
-    ir.op, ir.newroute, ir.nl = "newroute", true, S.RTM_NEWROUTE
+    ir.op, ir.newroute, ir.nl = "newroute", true, S.RTM.NEWROUTE
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM_DELROUTE] = function(r, buf, len)
+  [S.RTM.DELROUTE] = function(r, buf, len)
     local ir = decode_route(buf, len)
-    ir.op, ir.delroute, ir.nl = "delroute", true, S.RTM_DELROUTE
+    ir.op, ir.delroute, ir.nl = "delroute", true, S.RTM.DELROUTE
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM_GETROUTE] = function(r, buf, len)
+  [S.RTM.GETROUTE] = function(r, buf, len)
     local ir = decode_route(buf, len)
-    ir.op, ir.getroute, ir.nl = "getroute", true, S.RTM_GETROUTE
+    ir.op, ir.getroute, ir.nl = "getroute", true, S.RTM.GETROUTE
     r[#r + 1] = ir
     return r
   end,
@@ -579,7 +579,7 @@ function nl.read(s, addr, bufsize, untildone)
       else error("unknown data " .. tp)
       end
 
-      if tp == S.NLMSG_DONE then done = true end
+      if tp == S.NLMSG.DONE then done = true end
       msg, buffer, len = nlmsg_next(msg, buffer, len)
     end
     if not untildone then done = true end
@@ -806,15 +806,15 @@ local function ifla_f(tab, lookup, af, ...)
 end
 
 local rtpref = {
-  [S.RTM_NEWLINK] = {"ifla", "IFLA_"},
-  [S.RTM_GETLINK] = {"ifla", "IFLA_"},
-  [S.RTM_DELLINK] = {"ifla", "IFLA_"},
-  [S.RTM_NEWADDR] = {"ifa", "IFA_"},
-  [S.RTM_GETADDR] = {"ifa", "IFA_"},
-  [S.RTM_DELADDR] = {"ifa", "IFA_"},
-  [S.RTM_NEWROUTE] = {"rta", "RTA_"},
-  [S.RTM_GETROUTE] = {"rta", "RTA_"},
-  [S.RTM_DELROUTE] = {"rta", "RTA_"},
+  [S.RTM.NEWLINK] = {"ifla", "IFLA_"},
+  [S.RTM.GETLINK] = {"ifla", "IFLA_"},
+  [S.RTM.DELLINK] = {"ifla", "IFLA_"},
+  [S.RTM.NEWADDR] = {"ifa", "IFA_"},
+  [S.RTM.GETADDR] = {"ifa", "IFA_"},
+  [S.RTM.DELADDR] = {"ifa", "IFA_"},
+  [S.RTM.NEWROUTE] = {"rta", "RTA_"},
+  [S.RTM.GETROUTE] = {"rta", "RTA_"},
+  [S.RTM.DELROUTE] = {"rta", "RTA_"},
 }
 
 function nl.socket(tp, addr)
@@ -887,18 +887,18 @@ function nl.newlink(index, flags, iflags, change, ...)
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = stringflags(change, "IFF_")}
-  return nlmsg(S.RTM_NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, nil, t.ifinfomsg, ifv, ...)
+  return nlmsg(S.RTM.NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, nil, t.ifinfomsg, ifv, ...)
 end
 
 function nl.dellink(index, ...)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index}
-  return nlmsg(S.RTM_DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, nil, t.ifinfomsg, ifv, ...)
+  return nlmsg(S.RTM.DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, nil, t.ifinfomsg, ifv, ...)
 end
 
 -- read interfaces and details.
 function nl.getlink(...)
-  return nlmsg(S.RTM_GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, nil, t.rtgenmsg, {rtgen_family = S.AF.PACKET}, ...)
+  return nlmsg(S.RTM.GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, nil, t.rtgenmsg, {rtgen_family = S.AF.PACKET}, ...)
 end
 
 -- read routes
@@ -908,7 +908,7 @@ function nl.getroute(af, tp, tab, prot, scope, ...)
   tab = stringflag(tab, "RT_TABLE_")
   prot = stringflag(prot, "RTPROT_")
   scope = stringflag(scope, "RT_SCOPE_")
-  local r, err = nlmsg(S.RTM_GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg,
+  local r, err = nlmsg(S.RTM.GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg,
                    {rtm_family = af, rtm_table = tab, rtm_protocol = prot, rtm_type = tp, rtm_scope = scope})
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
@@ -962,19 +962,19 @@ end
 function nl.newroute(flags, tab, ...)
   tab = rtm_table(tab)
   flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
-  return nlmsg(S.RTM_NEWROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, tab.rtm_family, t.rtmsg, tab, ...)
+  return nlmsg(S.RTM.NEWROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, tab.rtm_family, t.rtmsg, tab, ...)
 end
 
 function nl.delroute(tp, ...)
   tp = rtm_table(tp)
-  return nlmsg(S.RTM_DELROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK, tp.rtm_family, t.rtmsg, tp, ...)
+  return nlmsg(S.RTM.DELROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK, tp.rtm_family, t.rtmsg, tp, ...)
 end
 
 -- read addresses from interface
 function nl.getaddr(af, ...)
   local family = S.AF[af]
   local ifav = {ifa_family = family}
-  return nlmsg(S.RTM_GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(S.RTM.GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, family, t.ifaddrmsg, ifav, ...)
 end
 
 -- TODO may need ifa_scope
@@ -982,14 +982,14 @@ function nl.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
   local family = S.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = stringflag(flags, "IFA_F_"), ifa_index = index}
-  return nlmsg(S.RTM_NEWADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(S.RTM.NEWADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
 function nl.deladdr(index, af, prefixlen, ...)
   if type(index) == 'table' then index = index.index end
   local family = S.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
-  return nlmsg(S.RTM_DELADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(S.RTM.DELADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
 function nl.interfaces() -- returns with address info too.
