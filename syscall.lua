@@ -605,7 +605,7 @@ S.TIME.BAD        = S.TIME.ERROR
 
 mt.timex = {
   __index = function(timex, k)
-    if S.TIME[k] then return timex.state == S[k] end
+    if S.TIME[k] then return timex.state == S.TIME[k] end
     return nil
   end
 }
@@ -744,21 +744,22 @@ S.IOCB_CMD = setmetatable({
 S.IOCB_FLAG_RESFD = 1
 
 -- file types in directory
-S.DT_UNKNOWN = 0
-S.DT_FIFO = 1
-S.DT_CHR = 2
-S.DT_DIR = 4
-S.DT_BLK = 6
-S.DT_REG = 8
-S.DT_LNK = 10
-S.DT_SOCK = 12
-S.DT_WHT = 14
+S.DT = setmetatable({
+  UNKNOWN = 0,
+  FIFO = 1,
+  CHR = 2,
+  DIR = 4,
+  BLK = 6,
+  REG = 8,
+  LNK = 10,
+  SOCK = 12,
+  WHT = 14,
+}, mt.stringflag)
 
 mt.dents = {
   __index = function(tab, k)
-    local prefix = "DT_"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return tab.type == S[k] end
+    if S.DT[k] then return tab.type == S.DT[k] end
+    return nil
   end
 }
 
