@@ -541,9 +541,11 @@ S.SA_ONESHOT   = S.SA_RESETHAND
 S.SA_RESTORER  = 0x04000000
 
 -- timers
-S.ITIMER_REAL = 0
-S.ITIMER_VIRTUAL = 1
-S.ITIMER_PROF = 2
+S.ITIMER = setmetatable({
+  REAL    = 0,
+  VIRTUAL = 1,
+  PROF    = 2,
+}, mt.stringflag)
 
 -- clocks
 S.CLOCK = setmetatable({
@@ -5026,7 +5028,7 @@ end
 
 function S.getitimer(which, value)
   if not value then value = t.itimerval() end
-  local ret = C.getitimer(stringflag(which, "ITIMER_"), value)
+  local ret = C.getitimer(S.ITIMER[which], value)
   if ret == -1 then return nil, t.error() end
   return value
 end
@@ -5034,7 +5036,7 @@ end
 function S.setitimer(which, it)
   it = istype(t.itimerval, it) or t.itimerval(it)
   local oldtime = t.itimerval()
-  local ret = C.setitimer(stringflag(which, "ITIMER_"), it, oldtime)
+  local ret = C.setitimer(S.ITIMER[which], it, oldtime)
   if ret == -1 then return nil, t.error() end
   return oldtime
 end
