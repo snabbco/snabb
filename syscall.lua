@@ -556,7 +556,9 @@ S.CLOCK = setmetatable({
   MONOTONIC_COARSE   = 6,
 }, mt.stringflag)
 
-S.TIMER_ABSTIME = 1
+S.TIMER = setmetatable({
+  ABSTIME = 1,
+}, mt.stringflag)
 
 -- adjtimex
 S.ADJ_OFFSET             = 0x0001
@@ -5217,7 +5219,7 @@ end
 function S.clock_nanosleep(clk_id, flags, req, rem)
   req = istype(t.timespec, req) or t.timespec(req)
   rem = rem or t.timespec()
-  local ret = C.clock_nanosleep(S.CLOCK[clk_id], stringflag(flags, "TIMER_"), req, rem)
+  local ret = C.clock_nanosleep(S.CLOCK[clk_id], S.TIMER[flags], req, rem)
   if ret == -1 then
     if ffi.errno() == S.E.INTR then return rem else return nil, t.error() end
   end
