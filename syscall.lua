@@ -1028,20 +1028,22 @@ S.RTN = setmetatable({
   XRESOLVE    = 11,
 }, mt.stringflag)
 
-S.RTPROT_UNSPEC   = 0
-S.RTPROT_REDIRECT = 1
-S.RTPROT_KERNEL   = 2
-S.RTPROT_BOOT     = 3
-S.RTPROT_STATIC   = 4
-S.RTPROT_GATED    = 8
-S.RTPROT_RA       = 9
-S.RTPROT_MRT      = 10
-S.RTPROT_ZEBRA    = 11
-S.RTPROT_BIRD     = 12
-S.RTPROT_DNROUTED = 13
-S.RTPROT_XORP     = 14
-S.RTPROT_NTK      = 15
-S.RTPROT_DHCP     = 16
+S.RTPROT = setmetatable({
+  UNSPEC   = 0,
+  REDIRECT = 1,
+  KERNEL   = 2,
+  BOOT     = 3,
+  STATIC   = 4,
+  GATED    = 8,
+  RA       = 9,
+  MRT      = 10,
+  ZEBRA    = 11,
+  BIRD     = 12,
+  DNROUTED = 13,
+  XORP     = 14,
+  NTK      = 15,
+  DHCP     = 16,
+}, mt.stringflag)
 
 S.RT_SCOPE_UNIVERSE = 0
 S.RT_SCOPE_SITE = 200
