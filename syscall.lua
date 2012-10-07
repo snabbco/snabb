@@ -1478,108 +1478,145 @@ mt.inotify = {
 }
 
 --prctl
-S.PR_SET_PDEATHSIG = 1
-S.PR_GET_PDEATHSIG = 2
-S.PR_GET_DUMPABLE  = 3
-S.PR_SET_DUMPABLE  = 4
-S.PR_GET_UNALIGN   = 5
-S.PR_SET_UNALIGN   = 6
-S.PR_UNALIGN_NOPRINT   = 1
-S.PR_UNALIGN_SIGBUS    = 2
-S.PR_GET_KEEPCAPS  = 7
-S.PR_SET_KEEPCAPS  = 8
-S.PR_GET_FPEMU     = 9
-S.PR_SET_FPEMU     = 10
-S.PR_FPEMU_NOPRINT     = 1
-S.PR_FPEMU_SIGFPE      = 2
-S.PR_GET_FPEXC     = 11
-S.PR_SET_FPEXC     = 12
-S.PR_FP_EXC_SW_ENABLE  = 0x80
-S.PR_FP_EXC_DIV        = 0x010000
-S.PR_FP_EXC_OVF        = 0x020000
-S.PR_FP_EXC_UND        = 0x040000
-S.PR_FP_EXC_RES        = 0x080000
-S.PR_FP_EXC_INV        = 0x100000
-S.PR_FP_EXC_DISABLED   = 0
-S.PR_FP_EXC_NONRECOV   = 1
-S.PR_FP_EXC_ASYNC      = 2
-S.PR_FP_EXC_PRECISE    = 3
-S.PR_GET_TIMING    = 13
-S.PR_SET_TIMING    = 14
-S.PR_TIMING_STATISTICAL= 0
-S.PR_TIMING_TIMESTAMP  = 1
-S.PR_SET_NAME      = 15
-S.PR_GET_NAME      = 16
-S.PR_GET_ENDIAN    = 19
-S.PR_SET_ENDIAN    = 20
-S.PR_ENDIAN_BIG         = 0
-S.PR_ENDIAN_LITTLE      = 1
-S.PR_ENDIAN_PPC_LITTLE  = 2
-S.PR_GET_SECCOMP   = 21
-S.PR_SET_SECCOMP   = 22
-S.PR_CAPBSET_READ  = 23
-S.PR_CAPBSET_DROP  = 24
-S.PR_GET_TSC       = 25
-S.PR_SET_TSC       = 26
-S.PR_TSC_ENABLE         = 1
-S.PR_TSC_SIGSEGV        = 2
-S.PR_GET_SECUREBITS= 27
-S.PR_SET_SECUREBITS= 28
-S.PR_SET_TIMERSLACK= 29
-S.PR_GET_TIMERSLACK= 30
-S.PR_TASK_PERF_EVENTS_DISABLE=31
-S.PR_TASK_PERF_EVENTS_ENABLE=32
-S.PR_MCE_KILL      = 33
-S.PR_MCE_KILL_CLEAR     = 0
-S.PR_MCE_KILL_SET       = 1
-S.PR_MCE_KILL_LATE         = 0
-S.PR_MCE_KILL_EARLY        = 1
-S.PR_MCE_KILL_DEFAULT      = 2
-S.PR_MCE_KILL_GET  = 34
-S.PR_SET_PTRACER   = 0x59616d61 -- Ubuntu extension
+S.PR = setmetatable({
+  SET_PDEATHSIG = 1,
+  GET_PDEATHSIG = 2,
+  GET_DUMPABLE  = 3,
+  SET_DUMPABLE  = 4,
+  GET_UNALIGN   = 5,
+  SET_UNALIGN   = 6,
+  GET_KEEPCAPS  = 7,
+  SET_KEEPCAPS  = 8,
+  GET_FPEMU     = 9,
+  SET_FPEMU     = 10,
+  GET_FPEXC     = 11,
+  SET_FPEXC     = 12,
+  GET_TIMING    = 13,
+  SET_TIMING    = 14,
+  SET_NAME      = 15,
+  GET_NAME      = 16,
+  GET_ENDIAN    = 19,
+  SET_ENDIAN    = 20,
+  GET_SECCOMP   = 21,
+  SET_SECCOMP   = 22,
+  CAPBSET_READ  = 23,
+  CAPBSET_DROP  = 24,
+  GET_TSC       = 25,
+  SET_TSC       = 26,
+  GET_SECUREBITS= 27,
+  SET_SECUREBITS= 28,
+  SET_TIMERSLACK= 29,
+  GET_TIMERSLACK= 30,
+  TASK_PERF_EVENTS_DISABLE=31,
+  TASK_PERF_EVENTS_ENABLE=32,
+  MCE_KILL      = 33,
+  MCE_KILL_GET  = 34,
+  SET_PTRACER   = 0x59616d61, -- Ubuntu extension
+}, mt.stringflag)
+
+-- for PR get/set unalign
+S.PR_UNALIGN = setmetatable({
+  NOPRINT   = 1,
+  SIGBUS    = 2,
+}, mt.stringflag)
+
+-- for PR fpemu
+S.PR_FPEMU = setmetatable({
+  NOPRINT     = 1,
+  SIGFPE      = 2,
+}, mt.stringflag)
+
+-- for PR fpexc
+S.PR_FP_EXC = setmetatable({
+  SW_ENABLE  = 0x80,
+  DIV        = 0x010000,
+  OVF        = 0x020000,
+  UND        = 0x040000,
+  RES        = 0x080000,
+  INV        = 0x100000,
+  DISABLED   = 0,
+  NONRECOV   = 1,
+  ASYNC      = 2,
+  PRECISE    = 3,
+}, mt.stringflag) -- TODO should be a combo of stringflag and flags
+
+-- PR get set timing
+S.PR_TIMING = setmetatable({
+  STATISTICAL= 0,
+  TIMESTAMP  = 1,
+}, mt.stringflag)
+
+-- PR set endian
+S.PR_ENDIAN = setmetatable({
+  BIG         = 0,
+  LITTLE      = 1,
+  PPC_LITTLE  = 2,
+}, mt.stringflag)
+
+-- PR TSC
+S.PR_TSC = setmetatable({
+  ENABLE         = 1,
+  SIGSEGV        = 2,
+}, mt.stringflag)
+
+S.PR_MCE_KILL = setmetatable({
+  CLEAR     = 0,
+  SET       = 1,
+}, mt.stringflag)
+
+-- note rename, this is extra option see prctl code
+S.PR_MCE_KILL_OPT = setmetatable({
+  LATE         = 0,
+  EARLY        = 1,
+  DEFAULT      = 2,
+}, mt.stringflag)
 
 -- capabilities
-S.CAP_CHOWN = 0
-S.CAP_DAC_OVERRIDE = 1
-S.CAP_DAC_READ_SEARCH = 2
-S.CAP_FOWNER = 3
-S.CAP_FSETID = 4
-S.CAP_KILL = 5
-S.CAP_SETGID = 6
-S.CAP_SETUID = 7
-S.CAP_SETPCAP = 8
-S.CAP_LINUX_IMMUTABLE = 9
-S.CAP_NET_BIND_SERVICE = 10
-S.CAP_NET_BROADCAST = 11
-S.CAP_NET_ADMIN = 12
-S.CAP_NET_RAW = 13
-S.CAP_IPC_LOCK = 14
-S.CAP_IPC_OWNER = 15
-S.CAP_SYS_MODULE = 16
-S.CAP_SYS_RAWIO = 17
-S.CAP_SYS_CHROOT = 18
-S.CAP_SYS_PTRACE = 19
-S.CAP_SYS_PACCT = 20
-S.CAP_SYS_ADMIN = 21
-S.CAP_SYS_BOOT = 22
-S.CAP_SYS_NICE = 23
-S.CAP_SYS_RESOURCE = 24
-S.CAP_SYS_TIME = 25
-S.CAP_SYS_TTY_CONFIG = 26
-S.CAP_MKNOD = 27
-S.CAP_LEASE = 28
-S.CAP_AUDIT_WRITE = 29
-S.CAP_AUDIT_CONTROL = 30
-S.CAP_SETFCAP = 31
-S.CAP_MAC_OVERRIDE = 32
-S.CAP_MAC_ADMIN = 33
-S.CAP_SYSLOG = 34
-S.CAP_WAKE_ALARM = 35
+S.CAP = setmetatable({
+  CHOWN = 0,
+  DAC_OVERRIDE = 1,
+  DAC_READ_SEARCH = 2,
+  FOWNER = 3,
+  FSETID = 4,
+  KILL = 5,
+  SETGID = 6,
+  SETUID = 7,
+  SETPCAP = 8,
+  LINUX_IMMUTABLE = 9,
+  NET_BIND_SERVICE = 10,
+  NET_BROADCAST = 11,
+  NET_ADMIN = 12,
+  NET_RAW = 13,
+  IPC_LOCK = 14,
+  IPC_OWNER = 15,
+  SYS_MODULE = 16,
+  SYS_RAWIO = 17,
+  SYS_CHROOT = 18,
+  SYS_PTRACE = 19,
+  SYS_PACCT = 20,
+  SYS_ADMIN = 21,
+  SYS_BOOT = 22,
+  SYS_NICE = 23,
+  SYS_RESOURCE = 24,
+  SYS_TIME = 25,
+  SYS_TTY_CONFIG = 26,
+  MKNOD = 27,
+  LEASE = 28,
+  AUDIT_WRITE = 29,
+  AUDIT_CONTROL = 30,
+  SETFCAP = 31,
+  MAC_OVERRIDE = 32,
+  MAC_ADMIN = 33,
+  SYSLOG = 34,
+  WAKE_ALARM = 35,
+}, mt.stringflag)
 
 -- new SECCOMP modes, now there is filter as well as strict
-S.SECCOMP_MODE_DISABLED = 0
-S.SECCOMP_MODE_STRICT   = 1
-S.SECCOMP_MODE_FILTER   = 2
+S.SECCOMP_MODE = setmetatable({
+  DISABLED = 0,
+  STRICT   = 1,
+  FILTER   = 2,
+}, mt.stringflag)
 
 S.SECCOMP_RET_KILL      = 0x00000000
 S.SECCOMP_RET_TRAP      = 0x00030000
@@ -5150,59 +5187,58 @@ end
 
 -- map for valid options for arg2
 local prctlmap = {
-  [S.PR_CAPBSET_READ] = "CAP_",
-  [S.PR_CAPBSET_DROP] = "CAP_",
-  [S.PR_SET_ENDIAN] = "PR_ENDIAN",
-  [S.PR_SET_FPEMU] = "PR_FPEMU_",
-  [S.PR_SET_FPEXC] = "PR_FP_EXC_",
-  [S.PR_SET_PDEATHSIG] = "SIG",
-  [S.PR_SET_SECUREBITS] = "SECBIT_",
-  [S.PR_SET_TIMING] = "PR_TIMING_",
-  [S.PR_SET_TSC] = "PR_TSC_",
-  [S.PR_SET_UNALIGN] = "PR_UNALIGN_",
-  [S.PR_MCE_KILL] = "PR_MCE_KILL_",
-  [S.PR_SET_SECCOMP] = "SECCOMP_MODE_",
+  [S.PR.CAPBSET_READ] = S.CAP,
+  [S.PR.CAPBSET_DROP] = S.CAP,
+  [S.PR.SET_ENDIAN] = S.PR_ENDIAN,
+  [S.PR.SET_FPEMU] = S.PR_FPEMU,
+  [S.PR.SET_FPEXC] = S.PR_FP_EXC,
+  [S.PR.SET_PDEATHSIG] = S.SIG,
+  --[S.PR.SET_SECUREBITS] = S.SECBIT, -- TODO not defined yet
+  [S.PR.SET_TIMING] = S.PR_TIMING,
+  [S.PR.SET_TSC] = S.PR_TSC,
+  [S.PR.SET_UNALIGN] = S.PR_UNALIGN,
+  [S.PR.MCE_KILL] = S.PR_MCE_KILL,
+  [S.PR.SET_SECCOMP] = S.SECCOMP_MODE,
 }
 
 local prctlrint = { -- returns an integer directly TODO add metatables to set names
-  [S.PR_GET_DUMPABLE] = true,
-  [S.PR_GET_KEEPCAPS] = true,
-  [S.PR_CAPBSET_READ] = true,
-  [S.PR_GET_TIMING] = true,
-  [S.PR_GET_SECUREBITS] = true,
-  [S.PR_MCE_KILL_GET] = true,
-  [S.PR_GET_SECCOMP] = true,
+  [S.PR.GET_DUMPABLE] = true,
+  [S.PR.GET_KEEPCAPS] = true,
+  [S.PR.CAPBSET_READ] = true,
+  [S.PR.GET_TIMING] = true,
+  [S.PR.GET_SECUREBITS] = true,
+  [S.PR.MCE_KILL_GET] = true,
+  [S.PR.GET_SECCOMP] = true,
 }
 
 local prctlpint = { -- returns result in a location pointed to by arg2
-  [S.PR_GET_ENDIAN] = true,
-  [S.PR_GET_FPEMU] = true,
-  [S.PR_GET_FPEXC] = true,
-  [S.PR_GET_PDEATHSIG] = true,
-  [S.PR_GET_UNALIGN] = true,
+  [S.PR.GET_ENDIAN] = true,
+  [S.PR.GET_FPEMU] = true,
+  [S.PR.GET_FPEXC] = true,
+  [S.PR.GET_PDEATHSIG] = true,
+  [S.PR.GET_UNALIGN] = true,
 }
 
 function S.prctl(option, arg2, arg3, arg4, arg5)
   local i, name
-  option = stringflag(option, "PR_") -- actually not all PR_ prefixed options ok some are for other args, could be more specific
-  local noption = tonumber(option)
-  local m = prctlmap[noption]
-  if m then arg2 = stringflag(arg2, m) end
-  if option == S.PR_MCE_KILL and arg2 == S.PR_MCE_KILL_SET then arg3 = stringflag(arg3, "PR_MCE_KILL_")
-  elseif prctlpint[noption] then
+  option = S.PR[option]
+  local m = prctlmap[option]
+  if m then arg2 = m[arg2] end
+  if option == S.PR.MCE_KILL and arg2 == S.PR.MCE_KILL_SET then arg3 = S.PR_MCE_KILL_OPT[arg3]
+  elseif prctlpint[option] then
     i = t.int1()
     arg2 = ffi.cast(t.ulong, i)
-  elseif option == S.PR_GET_NAME then
+  elseif option == S.PR.GET_NAME then
     name = t.buffer(16)
     arg2 = ffi.cast(t.ulong, name)
-  elseif option == S.PR_SET_NAME then
+  elseif option == S.PR.SET_NAME then
     if type(arg2) == "string" then arg2 = ffi.cast(t.ulong, arg2) end
   end
   local ret = C.prctl(option, arg2 or 0, arg3 or 0, arg4 or 0, arg5 or 0)
   if ret == -1 then return nil, t.error() end
-  if prctlrint[noption] then return ret end
-  if prctlpint[noption] then return i[0] end
-  if option == S.PR_GET_NAME then
+  if prctlrint[option] then return ret end
+  if prctlpint[option] then return i[0] end
+  if option == S.PR.GET_NAME then
     if name[15] ~= 0 then return ffi.string(name, 16) end -- actually, 15 bytes seems to be longest, aways 0 terminated
     return ffi.string(name)
   end
