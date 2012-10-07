@@ -374,30 +374,32 @@ S.SOL = setmetatable({
   IRDA       = 266,
 }, mt.stringflag)
 
-S.SO_DEBUG       = 1
-S.SO_REUSEADDR   = 2
-S.SO_TYPE        = 3
-S.SO_ERROR       = 4
-S.SO_DONTROUTE   = 5
-S.SO_BROADCAST   = 6
-S.SO_SNDBUF      = 7
-S.SO_RCVBUF      = 8
-S.SO_SNDBUFFORCE = 32
-S.SO_RCVBUFFORCE = 33
-S.SO_KEEPALIVE   = 9
-S.SO_OOBINLINE   = 10
-S.SO_NO_CHECK    = 11
-S.SO_PRIORITY    = 12
-S.SO_LINGER      = 13
-S.SO_BSDCOMPAT   = 14
+S.SO = setmetatable({
+  DEBUG       = 1,
+  REUSEADDR   = 2,
+  TYPE        = 3,
+  ERROR       = 4,
+  DONTROUTE   = 5,
+  BROADCAST   = 6,
+  SNDBUF      = 7,
+  RCVBUF      = 8,
+  KEEPALIVE   = 9,
+  OOBINLINE   = 10,
+  NO_CHECK    = 11,
+  PRIORITY    = 12,
+  LINGER      = 13,
+  BSDCOMPAT   = 14,
+  SNDBUFFORCE = 32,
+  RCVBUFFORCE = 33,
+}, mt.stringflag)
 if arch.socketoptions then arch.socketoptions(S)
 else
-  S.SO_PASSCRED    = 16
-  S.SO_PEERCRED    = 17
-  S.SO_RCVLOWAT    = 18
-  S.SO_SNDLOWAT    = 19
-  S.SO_RCVTIMEO    = 20
-  S.SO_SNDTIMEO    = 21
+  S.SO.PASSCRED    = 16
+  S.SO.PEERCRED    = 17
+  S.SO.RCVLOWAT    = 18
+  S.SO.SNDLOWAT    = 19
+  S.SO.RCVTIMEO    = 20
+  S.SO.SNDTIMEO    = 21
 end
 
 -- Maximum queue length specifiable by listen.
@@ -4240,7 +4242,7 @@ function S.setsockopt(fd, level, optname, optval, optlen)
     optval = t.int1(optval)
     optlen = s.int
   end
-  return retbool(C.setsockopt(getfd(fd), S.SOL[level], stringflag(optname, "SO_"), optval, optlen))
+  return retbool(C.setsockopt(getfd(fd), S.SOL[level], S.SO[optname], optval, optlen))
 end
 
 function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool options
