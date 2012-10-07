@@ -1058,12 +1058,14 @@ S.RTM_F_CLONED          = 0x200
 S.RTM_F_EQUALIZE        = 0x400
 S.RTM_F_PREFIX          = 0x800
 
-S.RT_TABLE_UNSPEC = 0
-S.RT_TABLE_COMPAT = 252
-S.RT_TABLE_DEFAULT = 253
-S.RT_TABLE_MAIN = 254
-S.RT_TABLE_LOCAL = 255
-S.RT_TABLE_MAX = 0xFFFFFFFF
+S.RT_TABLE = setmetatable({
+  UNSPEC  = 0,
+  COMPAT  = 252,
+  DEFAULT = 253,
+  MAIN    = 254,
+  LOCAL   = 255,
+  MAX     = 0xFFFFFFFF,
+}, mt.stringflag)
 
 S.RTA = setmetatable({
   UNSPEC = 0,

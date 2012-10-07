@@ -906,7 +906,7 @@ end
 function nl.getroute(af, tp, tab, prot, scope, ...)
   af = S.AF[af]
   tp = S.RTN[tp]
-  tab = stringflag(tab, "RT_TABLE_")
+  tab = S.RT_TABLE[tab]
   prot = S.RTPROT[prot]
   scope = S.RT_SCOPE[scope]
   local r, err = nlmsg(S.RTM.GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg,
@@ -954,8 +954,8 @@ local function rtm_table(tab)
   tab.rtm_protocol = S.RTPROT[tab.rtm_protocol]
   tab.rtm_type = S.RTN[tab.rtm_type]
   tab.rtm_scope = S.RT_SCOPE[tab.rtm_scope]
-  tab.rtm_flags = stringflag(tab.rtm_flags, "RTM_F_")
-  tab.rtm_table = stringflag(tab.rtm_table, "RT_TABLE_")
+  tab.rtm_flags = stringflags(tab.rtm_flags, "RTM_F_")
+  tab.rtm_table = S.RT_TABLE[tab.rtm_table]
   return tab
 end
 
