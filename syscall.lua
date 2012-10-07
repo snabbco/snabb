@@ -648,23 +648,26 @@ S.MSG_WAITFORONE      = 0x10000
 S.MSG_CMSG_CLOEXEC    = 0x40000000
 
 -- rlimit
-S.RLIMIT_CPU = 0
-S.RLIMIT_FSIZE = 1
-S.RLIMIT_DATA = 2
-S.RLIMIT_STACK = 3
-S.RLIMIT_CORE = 4
-S.RLIMIT_RSS = 5
-S.RLIMIT_NPROC = 6
-S.RLIMIT_NOFILE = 7
-S.RLIMIT_OFILE = S.RLIMIT_NOFILE
-S.RLIMIT_MEMLOCK = 8
-S.RLIMIT_AS = 9
-S.RLIMIT_LOCKS = 10
-S.RLIMIT_SIGPENDING = 11
-S.RLIMIT_MSGQUEUE = 12
-S.RLIMIT_NICE = 13
-S.RLIMIT_RTPRIO = 14
-S.RLIMIT_RTTIME = 15
+S.RLIMIT = setmetatable({
+  CPU        = 0,
+  FSIZE      = 1,
+  DATA       = 2,
+  STACK      = 3,
+  CORE       = 4,
+  RSS        = 5,
+  NPROC      = 6,
+  NOFILE     = 7,
+  MEMLOCK    = 8,
+  AS         = 9,
+  LOCKS      = 10,
+  SIGPENDING = 11,
+  MSGQUEUE   = 12,
+  NICE       = 13,
+  RTPRIO     = 14,
+  RTTIME     = 15,
+}, mt.stringflag)
+
+S.RLIMIT.OFILE = S.RLIMIT.NOFILE
 
 -- timerfd
 S.TFD_CLOEXEC = octal("02000000")
@@ -4810,7 +4813,7 @@ S.RLIM_INFINITY = ffi.cast("rlim64_t", -1)
 function S.prlimit(pid, resource, new_limit, old_limit)
   if new_limit then new_limit = istype(t.rlimit, new_limit) or t.rlimit(new_limit) end
   old_limit = old_limit or t.rlimit()
-  local ret = C.prlimit64(pid or 0, stringflag(resource, "RLIMIT_"), new_limit, old_limit)
+  local ret = C.prlimit64(pid or 0, S.RLIMIT[resource], new_limit, old_limit)
   if ret == -1 then return nil, t.error() end
   return old_limit
 end
