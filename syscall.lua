@@ -546,13 +546,15 @@ S.ITIMER_VIRTUAL = 1
 S.ITIMER_PROF = 2
 
 -- clocks
-S.CLOCK_REALTIME = 0
-S.CLOCK_MONOTONIC = 1
-S.CLOCK_PROCESS_CPUTIME_ID = 2
-S.CLOCK_THREAD_CPUTIME_ID = 3
-S.CLOCK_MONOTONIC_RAW = 4
-S.CLOCK_REALTIME_COARSE = 5
-S.CLOCK_MONOTONIC_COARSE = 6
+S.CLOCK = setmetatable({
+  REALTIME           = 0,
+  MONOTONIC          = 1,
+  PROCESS_CPUTIME_ID = 2,
+  THREAD_CPUTIME_ID  = 3,
+  MONOTONIC_RAW      = 4,
+  REALTIME_COARSE    = 5,
+  MONOTONIC_COARSE   = 6,
+}, mt.stringflag)
 
 S.TIMER_ABSTIME = 1
 
@@ -4999,7 +5001,7 @@ function S.setitimer(which, it)
 end
 
 function S.timerfd_create(clockid, flags)
-  return retfd(C.timerfd_create(stringflag(clockid, "CLOCK_"), stringflags(flags, "TFD_")))
+  return retfd(C.timerfd_create(S.CLOCK[clockid], stringflags(flags, "TFD_")))
 end
 
 function S.timerfd_settime(fd, flags, it, oldtime)
@@ -5195,27 +5197,27 @@ end
 
 function S.clock_getres(clk_id, ts)
   ts = istype(t.timespec, ts) or t.timespec(ts)
-  local ret = C.clock_getres(stringflag(clk_id, "CLOCK_"), ts)
+  local ret = C.clock_getres(S.CLOCK[clk_id], ts)
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
   ts = istype(t.timespec, ts) or t.timespec(ts)
-  local ret = C.clock_gettime(stringflag(clk_id, "CLOCK_"), ts)
+  local ret = C.clock_gettime(S.CLOCK[clk_id], ts)
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_settime(clk_id, ts)
   ts = istype(t.timespec, ts) or t.timespec(ts)
-  return retbool(C.clock_settime(stringflag(clk_id, "CLOCK_"), ts))
+  return retbool(C.clock_settime(S.CLOCK[clk_id], ts))
 end
 
 function S.clock_nanosleep(clk_id, flags, req, rem)
   req = istype(t.timespec, req) or t.timespec(req)
   rem = rem or t.timespec()
-  local ret = C.clock_nanosleep(stringflag(clk_id, "CLOCK_"), stringflag(flags, "TIMER_"), req, rem)
+  local ret = C.clock_nanosleep(S.CLOCK[clk_id], stringflag(flags, "TIMER_"), req, rem)
   if ret == -1 then
     if ffi.errno() == S.E.INTR then return rem else return nil, t.error() end
   end
