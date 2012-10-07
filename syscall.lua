@@ -591,19 +591,22 @@ S.STA_NANO        = 0x2000
 S.STA_MODE        = 0x4000
 S.STA_CLK         = 0x8000
 
-S.TIME_OK         = 0
-S.TIME_INS        = 1
-S.TIME_DEL        = 2
-S.TIME_OOP        = 3
-S.TIME_WAIT       = 4
-S.TIME_ERROR      = 5
-S.TIME_BAD        = S.TIME_ERROR
+-- return values for adjtimex
+S.TIME = setmetatable({
+  OK         = 0,
+  INS        = 1,
+  DEL        = 2,
+  OOP        = 3,
+  WAIT       = 4,
+  ERROR      = 5,
+}, mt.stringflag)
+
+S.TIME.BAD        = S.TIME.ERROR
 
 mt.timex = {
   __index = function(timex, k)
-    local prefix = "TIME_"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(timex.state, S[k]) ~= 0 end
+    if S.TIME[k] then return timex.state == S[k] end
+    return nil
   end
 }
 
