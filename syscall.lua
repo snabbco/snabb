@@ -179,10 +179,12 @@ end
 
 S.FD_CLOEXEC = 1
 
--- namespace issue!
-S.F_RDLCK = 0
-S.F_WRLCK = 1
-S.F_UNLCK = 2
+-- note changed from F_ to FCNTL_LOCK
+S.FCNTL_LOCK = {
+  RDLCK = 0,
+  WRLCK = 1,
+  UNLCK = 2,
+}
 
 S.F_ULOCK = 0
 S.F_LOCK  = 1
@@ -339,7 +341,7 @@ S.SIGPM = setmetatable({
 S.SFD_CLOEXEC  = octal('02000000')
 S.SFD_NONBLOCK = octal('04000')
 
--- sockets
+-- sockets note mix of single and multiple flags
 S.SOCK_STREAM    = 1
 S.SOCK_DGRAM     = 2
 S.SOCK_RAW       = 3
@@ -352,8 +354,10 @@ S.SOCK_CLOEXEC  = octal('02000000')
 S.SOCK_NONBLOCK = octal('04000')
 
 -- misc socket constants
-S.SCM_RIGHTS = 0x01
-S.SCM_CREDENTIALS = 0x02
+S.SCM = setmetatable({
+  RIGHTS = 0x01,
+  CREDENTIALS = 0x02,
+}, mt.stringflag)
 
 S.SOL_SOCKET     = 1
 
@@ -4475,11 +4479,11 @@ local function getflock(arg)
   if not ffi.istype(t.flock, arg) then
     for _, v in pairs {"type", "whence", "start", "len", "pid"} do -- allow use of short names
       if arg[v] then
-        arg["l_" .. v] = arg[v]
+        arg["l_" .. v] = arg[v] -- TODO cleanup this to use table?
         arg[v] = nil
       end
     end
-    arg.l_type = stringflag(arg.l_type, "F_")
+    arg.l_type = S.FCNTL_LOCK[arg.l_type]
     arg.l_whence = S.SEEK[arg.l_whence]
     arg = t.flock(arg)
   end
@@ -5388,12 +5392,12 @@ function S.recvmsg(fd, msg, flags)
   local mc, cmsg = cmsg_firsthdr(msg)
   while cmsg do
     if cmsg.cmsg_level == S.SOL_SOCKET then
-      if cmsg.cmsg_type == S.SCM_CREDENTIALS then
+      if cmsg.cmsg_type == S.SCM.CREDENTIALS then
         local cred = pt.ucred(cmsg + 1) -- cmsg_data
         ret.pid = cred.pid
         ret.uid = cred.uid
         ret.gid = cred.gid
-      elseif cmsg.cmsg_type == S.SCM_RIGHTS then
+      elseif cmsg.cmsg_type == S.SCM.RIGHTS then
         local fda = pt.int(cmsg + 1) -- cmsg_data
         local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, s.int)
         ret.fd = {}
@@ -5426,7 +5430,7 @@ function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect
   msg.msg_controllen = bufsize
   local mc, cmsg = cmsg_firsthdr(msg)
   cmsg.cmsg_level = S.SOL_SOCKET
-  cmsg.cmsg_type = S.SCM_CREDENTIALS
+  cmsg.cmsg_type = S.SCM.CREDENTIALS
   cmsg.cmsg_len = buflen
   ffi.copy(cmsg.cmsg_data, ucred, s.ucred)
   msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
@@ -5450,7 +5454,7 @@ function S.sendfds(fd, ...)
   msg.msg_controllen = bufsize
   local mc, cmsg = cmsg_firsthdr(msg)
   cmsg.cmsg_level = S.SOL_SOCKET
-  cmsg.cmsg_type = S.SCM_RIGHTS
+  cmsg.cmsg_type = S.SCM.RIGHTS
   cmsg.cmsg_len = buflen -- could set from a constructor
   ffi.copy(cmsg + 1, fa, fasize) -- cmsg_data
   msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
@@ -5841,15 +5845,15 @@ function S.tell(fd) return fd:lseek(0, S.SEEK.CUR) end
 function S.lockf(fd, cmd, len)
   cmd = stringflag(cmd, "F_")
   if cmd == S.F_LOCK then
-    return S.fcntl(fd, "setlkw", {l_type = "wrlck", l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
+    return S.fcntl(fd, "setlkw", {l_type = S.FCNTL_LOCK.WRLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
   elseif cmd == S.F_TLOCK then
-    return S.fcntl(fd, "setlk", {l_type = "wrlck", l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
+    return S.fcntl(fd, "setlk", {l_type = S.FCNTL_LOCK.WRLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
   elseif cmd == S.F_ULOCK then
-    return S.fcntl(fd, "setlk", {l_type = "unlck", l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
+    return S.fcntl(fd, "setlk", {l_type = S.FCNTL_LOCK.UNLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
   elseif cmd == S.F_TEST then
-    local ret, err = S.fcntl(fd, "getlk", {l_type = "wrlck", l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
+    local ret, err = S.fcntl(fd, "getlk", {l_type = S.FCNTL_LOCK.WRLCK, l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
     if not ret then return nil, err end
-    return ret.l_type == S.F_UNLCK
+    return ret.l_type == S.FCNTL_LOCK.UNLCK
   end
 end
 
