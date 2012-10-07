@@ -905,7 +905,7 @@ end
 -- read routes
 function nl.getroute(af, tp, tab, prot, scope, ...)
   af = S.AF[af]
-  tp = stringflag(tp, "RTN_")
+  tp = S.RTN[tp]
   tab = stringflag(tab, "RT_TABLE_")
   prot = stringflag(prot, "RTPROT_")
   scope = stringflag(scope, "RT_SCOPE_")
@@ -917,8 +917,8 @@ end
 
 function nl.routes(af, tp)
   af = S.AF[af]
-  if not tp then tp = S.RTN_UNICAST end
-  tp = stringflag(tp, "RTN_")
+  if not tp then tp = S.RTN.UNICAST end
+  tp = S.RTN[tp]
   local r, err = nl.getroute(af, tp)
   if not r then return nil, err end
   local ifs, err = nl.getlink()
@@ -952,7 +952,7 @@ local function rtm_table(tab)
   tab = preftable(tab, "rtm_")
   tab.rtm_family = S.AF[tab.rtm_family]
   tab.rtm_protocol = stringflag(tab.rtm_protocol, "RTPROT_")
-  tab.rtm_type = stringflag(tab.rtm_type, "RTN_")
+  tab.rtm_type = S.RTN[tab.rtm_type]
   tab.rtm_scope = stringflag(tab.rtm_scope, "RT_SCOPE_")
   tab.rtm_flags = stringflag(tab.rtm_flags, "RTM_F_")
   tab.rtm_table = stringflag(tab.rtm_table, "RT_TABLE_")

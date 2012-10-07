@@ -1013,18 +1013,20 @@ S.IFA_F_TENTATIVE   = 0x40
 S.IFA_F_PERMANENT   = 0x80
 
 -- routing
-S.RTN_UNSPEC      = 0
-S.RTN_UNICAST     = 1
-S.RTN_LOCAL       = 2
-S.RTN_BROADCAST   = 3
-S.RTN_ANYCAST     = 4
-S.RTN_MULTICAST   = 5
-S.RTN_BLACKHOLE   = 6
-S.RTN_UNREACHABLE = 7
-S.RTN_PROHIBIT    = 8
-S.RTN_THROW       = 9
-S.RTN_NAT         = 10
-S.RTN_XRESOLVE    = 11
+S.RTN = setmetatable({
+  UNSPEC      = 0,
+  UNICAST     = 1,
+  LOCAL       = 2,
+  BROADCAST   = 3,
+  ANYCAST     = 4,
+  MULTICAST   = 5,
+  BLACKHOLE   = 6,
+  UNREACHABLE = 7,
+  PROHIBIT    = 8,
+  THROW       = 9,
+  NAT         = 10,
+  XRESOLVE    = 11,
+}, mt.stringflag)
 
 S.RTPROT_UNSPEC   = 0
 S.RTPROT_REDIRECT = 1
