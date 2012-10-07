@@ -258,9 +258,11 @@ S.FALLOC_FL = setmetatable({
 }, mt.stringflag)
 
 -- getpriority, setpriority flags
-S.PRIO_PROCESS = 0
-S.PRIO_PGRP = 1
-S.PRIO_USER = 2
+S.PRIO = setmetatable({
+  PROCESS = 0,
+  PGRP = 1,
+  USER = 2,
+}, mt.stringflag)
 
 -- lseek
 S.SEEK = setmetatable({
@@ -4089,8 +4091,8 @@ end
 function S.nice(inc) return retnume(C.nice, inc) end
 -- NB glibc is shifting these values from what strace shows, as per man page, kernel adds 20 to make these values positive...
 -- might cause issues with other C libraries in which case may shift to using system call
-function S.getpriority(which, who) return retnume(C.getpriority, stringflags(which, "PRIO_"), who or 0) end
-function S.setpriority(which, who, prio) return retnume(C.setpriority, stringflags(which, "PRIO_"), who or 0, prio) end
+function S.getpriority(which, who) return retnume(C.getpriority, S.PRIO[which], who or 0) end
+function S.setpriority(which, who, prio) return retnume(C.setpriority, S.PRIO[which], who or 0, prio) end
 
  -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
 function S.clone(flags, signal, stack, ptid, tls, ctid)
