@@ -891,16 +891,20 @@ S.IFLA = setmetatable({
   NET_NS_FD = 28,
 }, mt.stringflag)
 
-S.IFLA_INET_UNSPEC = 0
-S.IFLA_INET_CONF   = 1
+S.IFLA_INET = setmetatable({
+  UNSPEC = 0,
+  CONF   = 1,
+}, mt.stringflag)
 
-S.IFLA_INET6_UNSPEC = 0
-S.IFLA_INET6_FLAGS  = 1
-S.IFLA_INET6_CONF   = 2
-S.IFLA_INET6_STATS  = 3
-S.IFLA_INET6_MCAST  = 4
-S.IFLA_INET6_CACHEINFO  = 5
-S.IFLA_INET6_ICMP6STATS = 6
+S.IFLA_INET6 = setmetatable({
+  UNSPEC = 0,
+  FLAGS  = 1,
+  CONF   = 2,
+  STATS  = 3,
+  MCAST  = 4,
+  CACHEINFO  = 5,
+  ICMP6STATS = 6,
+}, mt.stringflag)
 
 S.IFLA_INFO = setmetatable({
   UNSPEC = 0,
@@ -917,11 +921,15 @@ S.IFLA_VLAN = setmetatable({
   INGRESS_QOS = 4,
 }, mt.stringflag)
 
-S.IFLA_VLAN_QOS_UNSPEC  = 0
-S.IFLA_VLAN_QOS_MAPPING = 1
+S.IFLA_VLAN_QOS = setmetatable({
+  UNSPEC  = 0,
+  MAPPING = 1,
+}, mt.stringflag)
 
-S.IFLA_MACVLAN_UNSPEC = 0
-S.IFLA_MACVLAN_MODE   = 1
+S.IFLA_MACVLAN = setmetatable({
+  UNSPEC = 0,
+  MODE   = 1,
+}, mt.stringflag)
 
 S.MACVLAN_MODE_PRIVATE = 1
 S.MACVLAN_MODE_VEPA    = 2
@@ -929,25 +937,29 @@ S.MACVLAN_MODE_BRIDGE  = 4
 S.MACVLAN_MODE_PASSTHRU = 8
 
 S.IFLA_VF_INFO_UNSPEC = 0
-S.IFLA_VF_INFO        = 1
+S.IFLA_VF_INFO        = 1 -- TODO may have to rename IFLA_VF_INFO_INFO?
 
-S.IFLA_VF_UNSPEC   = 0
-S.IFLA_VF_MAC      = 1
-S.IFLA_VF_VLAN     = 2
-S.IFLA_VF_TX_RATE  = 3
-S.IFLA_VF_SPOOFCHK = 4
+S.IFLA_VF = setmetatable({
+  UNSPEC   = 0,
+  MAC      = 1,
+  VLAN     = 2,
+  TX_RATE  = 3,
+  SPOOFCHK = 4,
+}, mt.stringflag)
 
 S.IFLA_VF_PORT_UNSPEC = 0
-S.IFLA_VF_PORT        = 1
+S.IFLA_VF_PORT        = 1 -- TODO may have to rename IFLA_VF_PORT_PORT?
 
-S.IFLA_PORT_UNSPEC    = 0
-S.IFLA_PORT_VF        = 1
-S.IFLA_PORT_PROFILE   = 2
-S.IFLA_PORT_VSI_TYPE  = 3
-S.IFLA_PORT_INSTANCE_UUID = 4
-S.IFLA_PORT_HOST_UUID = 5
-S.IFLA_PORT_REQUEST   = 6
-S.IFLA_PORT_RESPONSE  = 7
+S.IFLA_PORT = setmetatable({
+  UNSPEC    = 0,
+  VF        = 1,
+  PROFILE   = 2,
+  VSI_TYPE  = 3,
+  INSTANCE_UUID = 4,
+  HOST_UUID = 5,
+  REQUEST   = 6,
+  RESPONSE  = 7,
+}, mt.stringflag)
 
 S.VETH_INFO = setmetatable({
   UNSPEC = 0,
