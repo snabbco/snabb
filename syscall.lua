@@ -263,9 +263,11 @@ S.PRIO_PGRP = 1
 S.PRIO_USER = 2
 
 -- lseek
-S.SEEK_SET = 0
-S.SEEK_CUR = 1
-S.SEEK_END = 2
+S.SEEK = setmetatable({
+  SET = 0,
+  CUR = 1,
+  END = 2,
+}, mt.stringflag)
 
 -- exit
 S.EXIT = setmetatable({
@@ -4172,7 +4174,7 @@ function S.pread(fd, buf, count, offset) return retnum(C.pread64(getfd(fd), buf,
 function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite64(getfd(fd), buf, count or #buf, offset)) end
 
 function S.lseek(fd, offset, whence)
-  return ret64(C.lseek(getfd(fd), offset or 0, stringflag(whence, "SEEK_")))
+  return ret64(C.lseek(getfd(fd), offset or 0, S.SEEK[whence]))
 end
 
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
@@ -4476,7 +4478,7 @@ local function getflock(arg)
       end
     end
     arg.l_type = stringflag(arg.l_type, "F_")
-    arg.l_whence = stringflag(arg.l_whence, "SEEK_")
+    arg.l_whence = S.SEEK[arg.l_whence]
     arg = t.flock(arg)
   end
   return arg
@@ -5832,18 +5834,18 @@ function S.vhangup() return retbool(C.vhangup()) end
 
 -- Nixio compatibility to make porting easier, and useful functions (often man 3). Incomplete.
 function S.setblocking(s, b) if b then return s:block() else return s:nonblock() end end
-function S.tell(fd) return fd:lseek(0, S.SEEK_CUR) end
+function S.tell(fd) return fd:lseek(0, S.SEEK.CUR) end
 
 function S.lockf(fd, cmd, len)
   cmd = stringflag(cmd, "F_")
   if cmd == S.F_LOCK then
-    return S.fcntl(fd, "setlkw", {l_type = "wrlck", l_whence = "cur", l_start = 0, l_len = len})
+    return S.fcntl(fd, "setlkw", {l_type = "wrlck", l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
   elseif cmd == S.F_TLOCK then
-    return S.fcntl(fd, "setlk", {l_type = "wrlck", l_whence = "cur", l_start = 0, l_len = len})
+    return S.fcntl(fd, "setlk", {l_type = "wrlck", l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
   elseif cmd == S.F_ULOCK then
-    return S.fcntl(fd, "setlk", {l_type = "unlck", l_whence = "cur", l_start = 0, l_len = len})
+    return S.fcntl(fd, "setlk", {l_type = "unlck", l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
   elseif cmd == S.F_TEST then
-    local ret, err = S.fcntl(fd, "getlk", {l_type = "wrlck", l_whence = "cur", l_start = 0, l_len = len})
+    local ret, err = S.fcntl(fd, "getlk", {l_type = "wrlck", l_whence = S.SEEK.CUR, l_start = 0, l_len = len})
     if not ret then return nil, err end
     return ret.l_type == S.F_UNLCK
   end
