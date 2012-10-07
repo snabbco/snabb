@@ -66,7 +66,7 @@ local function strflag(t, str) -- single value only
   return val
 end
 
-mt.stringflag = {__index = strflag, __call = strflag}
+mt.stringflag = {__index = strflag, __call = function(t, a) return t[a] end}
 
 -- constants
 
@@ -268,13 +268,18 @@ S.SEEK_CUR = 1
 S.SEEK_END = 2
 
 -- exit
-S.EXIT_SUCCESS = 0
-S.EXIT_FAILURE = 1
+S.EXIT = setmetatable({
+  SUCCESS = 0,
+  FAILURE = 1,
+}, mt.stringflag)
 
-S.SIG_ERR = -1
-S.SIG_DFL =  0
-S.SIG_IGN =  1
-S.SIG_HOLD = 2
+-- sigaction, note renamed SIGACT from SIG_
+S.SIGACT = setmetatable({
+  ERR = -1,
+  DFL =  0,
+  IGN =  1,
+  HOLD = 2,
+}, mt.stringflag)
 
 local signals = {
 "SIGHUP",
@@ -319,10 +324,12 @@ S.SIGPOLL       = S.SIGIO
 
 S.NSIG          = 65
 
--- sigprocmask
-S.SIG_BLOCK     = 0
-S.SIG_UNBLOCK   = 1
-S.SIG_SETMASK   = 2
+-- sigprocmask note renaming of SIG_ to SIGPM
+S.SIGPM = setmetatable({
+  BLOCK     = 0,
+  UNBLOCK   = 1,
+  SETMASK   = 2,
+}, mt.stringflag)
 
 -- signalfd
 S.SFD_CLOEXEC  = octal('02000000')
@@ -4148,8 +4155,8 @@ function S.waitid(idtype, id, options, infop) -- note order of args, as usually 
   return infop -- return table here?
 end
 
-function S._exit(status) C._exit(stringflag(status, "EXIT_")) end
-function S.exit(status) C.exit(stringflag(status, "EXIT_")) end
+function S._exit(status) C._exit(S.EXIT[status]) end
+function S.exit(status) C.exit(S.EXIT[status]) end
 
 function S.read(fd, buf, count)
   if buf then return retnum(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
@@ -4537,8 +4544,8 @@ function S.setdomainname(s)
 end
 
 -- does not support passing a function as a handler, use sigaction instead
--- actualy glibc does not call the syscall anyway, defines in terms of sigaction; we could too
-function S.signal(signum, handler) return retbool(C.signal(stringflag(signum, "SIG"), stringflag(handler, "SIG_"))) end
+-- actualy glibc does not call the syscall anyway, defines in terms of sigaction; TODO we should too
+function S.signal(signum, handler) return retbool(C.signal(stringflag(signum, "SIG"), S.SIGACT[handler])) end
 
 -- missing siginfo functionality for now, only supports getting signum TODO
 -- NOTE I do not think it is safe to call this with a function argument as the jit compiler will not know when it is going to
@@ -4549,7 +4556,7 @@ function S.sigaction(signum, handler, mask, flags)
   if ffi.istype(t.sigaction, handler) then sa = handler
   else
     if type(handler) == 'string' then
-      handler = ffi.cast(t.sighandler, t.int1(stringflag(handler, "SIG_")))
+      handler = ffi.cast(t.sighandler, t.int1(S.SIGACT[handler]))
     --elseif
     --  type(handler) == 'function' then handler = ffi.cast(t.sighandler, handler) -- TODO check if gc problem here? need to copy?
     end
@@ -4687,10 +4694,8 @@ local function fdisset(fds, set)
 end
 
 function S.sigprocmask(how, set)
-  how = stringflag(how, "SIG_")
-  set = mksigset(set)
   local oldset = t.sigset()
-  local ret = C.sigprocmask(how, set, oldset)
+  local ret = C.sigprocmask(S.SIGPM[how], mksigset(set), oldset)
   if ret == -1 then return nil, t.error() end
   return oldset
 end
