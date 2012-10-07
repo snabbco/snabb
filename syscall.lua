@@ -1045,11 +1045,13 @@ S.RTPROT = setmetatable({
   DHCP     = 16,
 }, mt.stringflag)
 
-S.RT_SCOPE_UNIVERSE = 0
-S.RT_SCOPE_SITE = 200
-S.RT_SCOPE_LINK = 253
-S.RT_SCOPE_HOST = 254
-S.RT_SCOPE_NOWHERE = 255
+S.RT_SCOPE = setmetatable({
+  UNIVERSE = 0,
+  SITE = 200,
+  LINK = 253,
+  HOST = 254,
+  NOWHERE = 255,
+}, mt.stringflag)
 
 S.RTM_F_NOTIFY          = 0x100
 S.RTM_F_CLONED          = 0x200

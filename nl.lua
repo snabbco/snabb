@@ -908,7 +908,7 @@ function nl.getroute(af, tp, tab, prot, scope, ...)
   tp = S.RTN[tp]
   tab = stringflag(tab, "RT_TABLE_")
   prot = S.RTPROT[prot]
-  scope = stringflag(scope, "RT_SCOPE_")
+  scope = S.RT_SCOPE[scope]
   local r, err = nlmsg(S.RTM.GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg,
                    {rtm_family = af, rtm_table = tab, rtm_protocol = prot, rtm_type = tp, rtm_scope = scope})
   if not r then return nil, err end
@@ -953,7 +953,7 @@ local function rtm_table(tab)
   tab.rtm_family = S.AF[tab.rtm_family]
   tab.rtm_protocol = S.RTPROT[tab.rtm_protocol]
   tab.rtm_type = S.RTN[tab.rtm_type]
-  tab.rtm_scope = stringflag(tab.rtm_scope, "RT_SCOPE_")
+  tab.rtm_scope = S.RT_SCOPE[tab.rtm_scope]
   tab.rtm_flags = stringflag(tab.rtm_flags, "RTM_F_")
   tab.rtm_table = stringflag(tab.rtm_table, "RT_TABLE_")
   return tab
