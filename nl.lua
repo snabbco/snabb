@@ -885,7 +885,7 @@ end
 
 function nl.newlink(index, flags, iflags, change, ...)
   if change == 0 then change = S.IFF_NONE end -- 0 should work, but does not
-  flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
+  flags = stringflags(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = stringflags(change, "IFF_")}
   return nlmsg(S.RTM.NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, nil, t.ifinfomsg, ifv, ...)
@@ -962,7 +962,7 @@ end
 -- this time experiment using table as so many params, plus they are just to init struct.
 function nl.newroute(flags, tab, ...)
   tab = rtm_table(tab)
-  flags = stringflag(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
+  flags = stringflags(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
   return nlmsg(S.RTM.NEWROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, tab.rtm_family, t.rtmsg, tab, ...)
 end
 
@@ -982,7 +982,7 @@ end
 function nl.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
   local family = S.AF[af]
-  local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = stringflag(flags, "IFA_F_"), ifa_index = index}
+  local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = stringflags(flags, "IFA_F_"), ifa_index = index}
   return nlmsg(S.RTM.NEWADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
 end
 

@@ -3011,20 +3011,6 @@ function S.stringflags(str, prefix) -- allows multiple comma sep flags that are 
   return f
 end
 
-function S.stringflag(str, prefix) -- single value only
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  if #str == 0 then return 0 end
-  if memo[prefix] and memo[prefix][str] then return memo[prefix][str] end
-  local s = trim(str):upper()
-  if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
-  local val = S[s]
-  if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions, better than silent ignore
-  if not memo[prefix] then memo[prefix] = {} end
-  memo[prefix][str] = val
-  return val
-end
-
 function S.flaglist(str, prefix, list) -- flags from a list. TODO memoize using table
   if not str then return 0 end
   if type(str) ~= "string" then return str end
