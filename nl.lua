@@ -60,10 +60,10 @@ local function rta_next(msg, buf, len)
   return pt.rtattr(buf + inc), buf + inc, len - inc
 end
 
-local addrlenmap = { -- map interface type to length of hardware address
-  [S.ARPHRD_ETHER] = 6,
-  [S.ARPHRD_EETHER] = 6,
-  [S.ARPHRD_LOOPBACK] = 6,
+local addrlenmap = { -- map interface type to length of hardware address TODO are these always same?
+  [S.ARPHRD.ETHER] = 6,
+  [S.ARPHRD.EETHER] = 6,
+  [S.ARPHRD.LOOPBACK] = 6,
 }
 
 local ifla_decode = {
@@ -189,8 +189,8 @@ mt.iff = {
 }
 
 nl.encapnames = {
-  [S.ARPHRD_ETHER] = "Ethernet",
-  [S.ARPHRD_LOOPBACK] = "Local Loopback",
+  [S.ARPHRD.ETHER] = "Ethernet",
+  [S.ARPHRD.LOOPBACK] = "Local Loopback",
 }
 
 meth.iflinks = {
@@ -297,9 +297,7 @@ mt.iflink = {
     if meth.iflink.index[k] then return meth.iflink.index[k](i) end
     if meth.iflink.fn[k] then return meth.iflink.fn[k] end
     if k == "inet" or k == "inet6" then return end -- might not be set, as we add it, kernel does not provide
-    local prefix = "ARPHRD_"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return i.ifinfo.ifi_type == S[k] end
+    if S.ARPHRD[k] then return i.ifinfo.ifi_type == S.ARPHRD[k] end
   end,
   __tostring = function(i)
     local hw = ''
