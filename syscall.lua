@@ -59,9 +59,12 @@ local function strflag(t, str) -- single value only
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   if #str == 0 then return 0 end
+  local val = rawget(t, str)
+  if val then return val end  
   local s = trim(str):upper()
-  local val = t[s]
-  if not val then error("invalid flag: " .. s) end -- don't use this format if you don't want exceptions
+  if #s == 0 then return 0 end
+  local val = rawget(t, s)
+  if not val then return nil end
   t[str] = val -- this memoizes for future use
   return val
 end
@@ -3125,7 +3128,6 @@ local addtypes = {
   {"timex", "struct timex"},
   {"utsname", "struct utsname"},
   {"fdb_entry", "struct fdb_entry"},
-  {"signalfd_siginfo", "struct signalfd_siginfo"},
   {"iocb", "struct iocb"},
   {"sighandler", "sighandler_t"},
   {"sigaction", "struct sigaction"},
@@ -3614,10 +3616,53 @@ mt.pollfds = {
       fds[n].revents = 0
     end
     return fds
-  end
+  end,
 }
 
 t.pollfds = ffi.metatype("struct {int count; struct pollfd pfd[?];}", mt.pollfds)
+
+meth.signalfd = {
+  index = {
+    signo = function(ss) return tonumber(ss.ssi_signo) end,
+    code = function(ss) return tonumber(ss.ssi_code) end,
+    pid = function(ss) return tonumber(ss.ssi_pid) end,
+    uid = function(ss) return tonumber(ss.ssi_uid) end,
+    fd = function(ss) return tonumber(ss.ssi_fd) end,
+    tid = function(ss) return tonumber(ss.ssi_tid) end,
+    band = function(ss) return tonumber(ss.ssi_band) end,
+    overrun = function(ss) return tonumber(ss.ssi_overrun) end,
+    trapno = function(ss) return tonumber(ss.ssi_trapno) end,
+    status = function(ss) return tonumber(ss.ssi_status) end,
+    int = function(ss) return tonumber(ss.ssi_int) end,
+    ptr = function(ss) return ss.ss_ptr end,
+    utime = function(ss) return tonumber(ss.ssi_utime) end,
+    stime = function(ss) return tonumber(ss.ssi_stime) end,
+    addr = function(ss) return ss.ss_addr end,
+  },
+}
+
+metatype("signalfd_siginfo", "struct signalfd_siginfo", {
+  __index = function(ss, k)
+    if ss.ssi_signo == S.SIG(k) then return true end
+    local rname = signal_reasons_gen[ss.ssi_code]
+    if not rname and signal_reasons[ss.ssi_signo] then rname = signal_reasons[ss.ssi_signo][ss.ssi_code] end
+    if rname == k then return true end
+    if rname == k:upper() then return true end -- TODO use some metatable to hide this?
+    if meth.signalfd.index[k] then return meth.signalfd.index[k](ss) end
+  end,
+})
+
+mt.siginfos = {
+  __index = function(ss, k)
+    return ss.sfd[k - 1]
+  end,
+  __len = function(p) return p.count end,
+  __new = function(tp, ss)
+    return ffi.new(tp, ss, ss, ss * s.signalfd_siginfo)
+  end,
+}
+
+t.siginfos = ffi.metatype("struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
 
 metatype("in_addr", "struct in_addr", {
   __tostring = function(a) return S.inet_ntop(S.AF.INET, a) end,
@@ -5020,60 +5065,12 @@ function S.eventfd_write(fd, value)
   return retbool(C.write(getfd(fd), value, 8))
 end
 
-local function sigcode(s, signo, code) -- TODO this should be metatypes/table, cleanup
-  s.code = code
-  s.signo = signo
-  local name = signals[s.signo]
-  s[name] = true
-  s[name:lower()] = true
-  local rname = signal_reasons_gen[code]
-  if not rname and signal_reasons[signo] then rname = signal_reasons[signo][code] end
-  if rname then
-    s[rname] = true
-    s[rname:lower()] = true
-  end
-end
-
--- TODO use metatypes
-function S.signalfd_read(fd, buffer, len)
-  if not len then len = s.signalfd_siginfo * 4 end
-  if not buffer then buffer = t.buffer(len) end
-  local ret, err = S.read(fd, buffer, len)
+function S.signalfd_read(fd, ss)
+  ss = istype(t.siginfos, ss) or t.siginfos(ss or 8)
+  local ret, err = S.read(fd, ss.sfd, ss.bytes)
   if ret == 0 or (err and err.EAGAIN) then return {} end
   if not ret then return nil, err end
-  local offset, ss = 0, {}
-  while offset < ret do
-    local ssi = pt.signalfd_siginfo(buffer + offset)
-    local sig = {}
-    sig.errno = tonumber(ssi.ssi_errno)
-    sigcode(sig, tonumber(ssi.ssi_signo), tonumber(ssi.ssi_code))
-
-    if sig.SI_USER or sig.SI_QUEUE then -- TODO this is now broken!
-      sig.pid = tonumber(ssi.ssi_pid)
-      sig.uid = tonumber(ssi.ssi_uid)
-      sig.int = tonumber(ssi.ssi_int)
-      sig.ptr = t.uint64(ssi.ssi_ptr)
-    elseif sig.SI_TIMER then -- TODO this is now broken!
-      sig.overrun = tonumber(ssi.ssi_overrun)
-      sig.timerid = tonumber(ssi.ssi_tid)
-    end
-
-    if sig.CHLD then 
-      sig.pid = tonumber(ssi.ssi_pid)
-      sig.uid = tonumber(ssi.ssi_uid)
-      sig.status = tonumber(ssi.ssi_status)
-      sig.utime = tonumber(ssi.ssi_utime) / 1000000 -- convert to seconds
-      sig.stime = tonumber(ssi.ssi_stime) / 1000000
-    elseif sig.ILL or sig.FPE or sig.SEGV or sig.BUS or sig.TRAP then
-      sig.addr = t.uint64(ssi.ssi_addr)
-    elseif sig.IO or sig.POLL then
-      sig.band = tonumber(ssi.ssi_band) -- should split this up, is events from poll, TODO
-      sig.fd = tonumber(ssi.ssi_fd)
-    end
-
-    ss[#ss + 1] = sig
-    offset = offset + s.signalfd_siginfo
-  end
+  ss.count = ret / s.signalfd_siginfo -- may not be full length
   return ss
 end
 
