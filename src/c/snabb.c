@@ -77,7 +77,6 @@ void *map_physical_ram(uint64_t start, uint64_t end, bool cacheable)
 {
   int fd;
   void *ptr;
-  fprintf(stderr, "%lx - %lx", start, end);
   assert( (fd = open("/dev/mem", O_RDWR | (cacheable ? 0 : O_SYNC))) >= 0 );
   ptr = mmap(NULL, end-start, PROT_READ | PROT_WRITE, MAP_SHARED, fd, start);
   if (ptr == MAP_FAILED) {
