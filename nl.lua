@@ -11,7 +11,7 @@ local bit = require "bit"
 local S = require "syscall"
 
 local t, pt, s = S.t, S.pt, S.s
-local stringflag, stringflags, flaglist = S.stringflag, S.stringflags, S.flaglist
+local stringflags, flaglist = S.stringflags, S.flaglist
 
 local mt = {} -- metatables
 local meth = {}

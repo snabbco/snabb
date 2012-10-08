@@ -3031,7 +3031,7 @@ function S.flaglist(str, prefix, list) -- flags from a list. TODO memoize using 
 end
 
 -- TODO maybe just replace these
-local stringflag, stringflags, flaglist = S.stringflag, S.stringflags, S.flaglist
+local stringflags, flaglist = S.stringflags, S.flaglist
 
 local function getfd(fd)
   if ffi.istype(t.fd, fd) then return fd.filenum end
