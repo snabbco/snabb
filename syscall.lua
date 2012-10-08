@@ -3042,6 +3042,7 @@ local function getfd_at(fd)
   return getfd(fd)
 end
 
+-- TODO replace with metatable like stringflags on OK table
 local function accessflags(s) -- allow "rwx"
   if not s then return 0 end
   if type(s) ~= "string" then return s end
