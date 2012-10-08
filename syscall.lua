@@ -2989,8 +2989,6 @@ end
 local memo = {} -- memoize flags so faster looping
 
 -- take a bunch of flags in a string and return a number
--- note if using with 64 bit flags will have to change to use a 64 bit number, currently assumes 32 bit, as uses bitops
--- also forcing to return an int now - TODO find any 64 bit flags we are using and fix to use new function
 function S.stringflags(str, prefix) -- allows multiple comma sep flags that are ORed
   if not str then return 0 end
   if type(str) ~= "string" then return str end
@@ -3004,7 +3002,7 @@ function S.stringflags(str, prefix) -- allows multiple comma sep flags that are 
     if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
     val = S[s]
     if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
+    f = bit.bor(f, val)
   end
   if not memo[prefix] then memo[prefix] = {} end
   memo[prefix][str] = f
@@ -3025,12 +3023,12 @@ function S.flaglist(str, prefix, list) -- flags from a list. TODO memoize using 
     if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
     val = S[s]
     if not list2[s] or not val then error("invalid flag: " .. v) end
-    f = bit.bor(f, val) -- note this forces to signed 32 bit, ok for most flags, but might get sign extension on long
+    f = bit.bor(f, val)
   end
   return f
 end
 
--- TODO maybe just replace these
+-- TODO remove when replaced with metatables
 local stringflags, flaglist = S.stringflags, S.flaglist
 
 local function getfd(fd)
