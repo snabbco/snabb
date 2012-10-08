@@ -1806,21 +1806,27 @@ S.FLUSHO  = octal('0010000')
 S.PENDIN  = octal('0040000')
 S.IEXTEN  = octal('0100000')
 
--- termios - tcflow() and TCXONC use these
-S.TCOOFF = 0
-S.TCOON  = 1
-S.TCIOFF = 2
-S.TCION  = 3
+-- termios - tcflow() and TCXONC use these. renamed from TC to TCFLOW
+S.TCFLOW = setmetatable({
+  OOFF = 0,
+  OON  = 1,
+  IOFF = 2,
+  ION  = 3,
+}, mt.stringflag)
 
--- termios - tcflush() and TCFLSH use these
-S.TCIFLUSH  = 0
-S.TCOFLUSH  = 1
-S.TCIOFLUSH = 2
+-- termios - tcflush() and TCFLSH use these. renamed from TC to TCFLUSH
+S.TCFLUSH = setmetatable({
+  IFLUSH  = 0,
+  OFLUSH  = 1,
+  IOFLUSH = 2,
+}, mt.stringflag)
 
 -- termios - tcsetattr uses these
-S.TCSANOW   = 0
-S.TCSADRAIN = 1
-S.TCSAFLUSH = 2
+S.TCSA = setmetatable({
+  NOW   = 0,
+  DRAIN = 1,
+  FLUSH = 2,
+}, mt.stringflag)
 
 -- TIOCM ioctls
 S.TIOCM_LE  = 0x001
@@ -5888,7 +5894,7 @@ function S.isatty(fd)
 end
 
 function S.tcsetattr(fd, optional_actions, termios)
-  return retbool(C.tcsetattr(getfd(fd), stringflag(optional_actions, "TCSA"), termios))
+  return retbool(C.tcsetattr(getfd(fd), S.TCSA[optional_actions], termios))
 end
 
 function S.tcsendbreak(fd, duration)
@@ -5900,11 +5906,11 @@ function S.tcdrain(fd)
 end
 
 function S.tcflush(fd, queue_selector)
-  return retbool(C.tcflush(getfd(fd), stringflag(queue_selector, "TC")))
+  return retbool(C.tcflush(getfd(fd), S.TCFLUSH[queue_selector]))
 end
 
 function S.tcflow(fd, action)
-  return retbool(C.tcflow(getfd(fd), stringflag(action, "TC")))
+  return retbool(C.tcflow(getfd(fd), S.TCFLOW[action]))
 end
 
 function S.tcgetsid(fd)
