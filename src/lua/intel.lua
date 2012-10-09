@@ -68,9 +68,9 @@ local dma_start = 0x10000000
 local dma_end   = 0x11000000
 
 -- Static DMA memory map. Offsets for each memory region.
-local offset_txdesc   = 0x00000000 //  1MB TX descriptors
-local offset_rxdesc   = 0x00100000 //  1MB RX descriptors
-local offset_buffers  = 0x00200000 // 14MB packet buffers
+local offset_txdesc   = 0x00000000 --  1MB TX descriptors
+local offset_rxdesc   = 0x00100000 --  1MB RX descriptors
+local offset_buffers  = 0x00200000 -- 14MB packet buffers
 
 local num_descriptors = 32
 local buffer_size = 16384
