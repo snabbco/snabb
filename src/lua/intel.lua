@@ -106,7 +106,7 @@ local TDBAL  = 0x03800 -- Transmit Descriptor Base Address Low (RW)
 local TDBAH  = 0x03804 -- Transmit Descriptor Base Address High (RW)
 local TDLEN  = 0x03808 -- Transmit Descriptor Length (RW)
 local TDH    = 0x03810 -- Transmit Descriptor Head (RW)
-local TDL    = 0x03818 -- Transmit Desciprotr Tail (RW)
+local TDT    = 0x03818 -- Transmit Desciprotr Tail (RW)
 
 local regs = ffi.cast("uint32_t *", map_pci_memory("0000:00:04.0", 0))          
 print(string.format("CTRL   = 0x%x", regs[CTRL]))
@@ -193,11 +193,6 @@ function init_receive ()
    regs[RCTL] = bit.bor(regs[RCTL], bits{EN=1})
 end
 
--- Make the buffer with INDEX available for RX.
-function add_rxbuf (index)
-   
-end
-
 ffi.cdef[[
 // TX Extended Data Descriptor written by software.
 struct tx_desc {
@@ -206,7 +201,7 @@ struct tx_desc {
    unsigned int popts:8;
    unsigned int extcmd:4;
    unsigned int sta:4;
-   unsigned int fcmd:8;
+   unsigned int dcmd:8;
    unsigned int dtype:4;
    unsigned int dtalen:20;
 } __attribute__((packed));
@@ -234,12 +229,73 @@ function init_transmit_ring ()
    assert( num_descriptors * ffi.sizeof("union tx") % 128 == 0 )
    regs[TDLEN] = num_descriptors * ffi.sizeof("union tx")
    regs[TDH] = 0
-   regs[TDL] = 0
+   regs[TDT] = 0
 end
 
 function enable_mac_loopback ()
    regs[RCTL] = bits({LBM0=6}, regs[RCTL])
    print(bit.tohex(regs[RCTL]))
+end
+
+-- Enqueue a receive descriptor to receive a packet.
+function add_rxbuf (address, size)
+   -- NOTE: RDT points to the next unused descriptor
+   local index = regs[RDT]
+   rxdesc[rdt].desc.address = address
+   rxdesc[rdt].desc.dd = 0
+   regs[RDT] = index + 1 % num_descriptors
+   return true
+end
+
+function is_rx_descriptor_available ()
+   return regs[RDT] ~= regs[RDH] + 1 % num_descriptors
+end
+
+-- Enqueue a transmit descriptor to send a packet.
+function add_txbuf (address, size)
+   local index = regs[TDT]
+   txdesc[index].desc.address = address
+   txdesc[index].desc.dtalen = size
+   txdesc[index].desc.dtype  = 0x1
+   -- XXX I don't like calling bits() on the transmit path.
+   txdesc[index].desc.dcmd   = bits({EOP=0, DEXT=5})
+   txdesc[index].desc.dtalen = size
+   regs[TDT] = index + 1 % num_descriptors
+   print("IDX = " .. (index + 1 % num_descriptors))
+   print(regs[TDT])
+end
+
+-- 
+function is_tx_descriptor_available ()
+   return regs[TDT] ~= regs[TDH] + 1 % num_descriptors
+end
+
+-- Statistics
+
+local stats = {tx_packets=0, tx_bytes=0, tx_errors=0,
+	       rx_packets=0, rx_bytes=0, rx_errors=0}
+
+local GPRC  = 0x04074 -- Good Packets Received Count (R)
+local GPTC  = 0x04080 -- Good Packets Transmitted Count (R)
+-- NOTE: Octet counter registers reset when the high word is read.
+local GORCL = 0x04088 -- Good Octets Received Count Low (R)
+local GORCH = 0x0408C -- Good Octets Received Count High (R)
+local GOTCL = 0x04090 -- Good Octets Transmitted Count Low (R)
+local GOTCH = 0x04094 -- Good Octets Transmitted Count High (R)
+
+function print_stats ()
+   update_stats()
+   print("TX Packets: " .. stats.tx_packets)
+   print("RX Packets: " .. stats.rx_packets)
+   print("TX Bytes  : " .. stats.rx_bytes)
+   print("RX Bytes  : " .. stats.rx_bytes)
+end
+
+function update_stats ()
+   stats.tx_packets = stats.tx_packets + regs[GPTC]
+   stats.rx_packets = stats.rx_packets + regs[GPRC]
+   stats.tx_bytes = stats.tx_bytes + regs[GOTCL] + bit.lshift(regs[GOTCH], 32)
+   stats.rx_bytes = stats.rx_bytes + regs[GORCL] + bit.lshift(regs[GORCH], 32)
 end
 
 -- Return a bitmask using the values of `bitset' as indexes.
@@ -263,6 +319,19 @@ local mem = snabb.map_physical_ram(0x10000000, 0x11000000, true)
 init()
 init_receive()
 enable_mac_loopback()
+
+print("TX available: " .. tostring(is_tx_descriptor_available()))
+for i = 0, 100, 1 do
+   add_txbuf(dma_phys, 123)
+
+end
+C.usleep(100000)
+
+print("TDH = " .. regs[TDH])
+print("TDT = " .. regs[TDT])
+
+
+print_stats()
 
 print "Survived!"
 
