@@ -48,21 +48,21 @@ end
 --   mem[0x001] => <word at 0x1004>
 --   mem[0x080] => ERROR <address out of bounds: 0x1200>
 --   mem.ptr   => cdata<uint32_t *>: 0x1000 (get the raw pointer)
-function protected (type, base, offset, size)
-   local bound = size / ffi.sizeof(type)
-   local ptr = ffi.cast(type.."*", ffi.cast("uint8_t*", base) + offset)
-   local table = { ptr = ptr }
-   setmetatable(
-      table,
-      { __index    = function (table, key)
-			assert(key >= 0 and key < bound)
-			return ptr[key]
-		     end,
-	__newindex = function (table, key, value)
-			assert(key >= 0 and key < bound)
-			ptr[key] = value
-		     end })
-   return table
+local function protected (type, base, offset, size)
+   type = ffi.typeof(type)
+   local bound = (size + 0ULL) / ffi.sizeof(type)
+   local tptr = ffi.typeof("$ *", type)
+   local wrap = ffi.metatype(ffi.typeof("struct { $ _ptr; }", tptr), {
+				__index = function(w, idx)
+					     assert(idx < bound)
+					     return w._ptr[idx]
+					  end,
+				__newindex = function(w, idx, val)
+						assert(idx < bound)
+						w._ptr[idx] = val
+					     end,
+			     })
+   return wrap(ffi.cast(tptr, ffi.cast("uint8_t *", base) + offset))
 end
 
 -- 2. MMAP physical memory
