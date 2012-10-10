@@ -79,12 +79,23 @@ local dma_phys = dma_start -- physical address of DMA memory
 local dma_virt = nil       -- virtual mmap'd address of DMA memory
 local dma_ptr  = nil       -- pointer to first byte of free DMA memory
 
+local rxdesc  = nil
+local txdesc  = nil
+local buffers = nil
+
 local CTRL   = 0x00000 -- Device Control Register (RW)
 local STATUS = 0x00008
 local PBA    = 0x01000 -- Packet Buffer Allocation
 local IMC    = 0x000D8 -- Interrupt Mask Clear (W)
 local RCTL   = 0x00100 -- Receive Control Register (RW)
 local RFCTL  = 0x05008 -- Receive Filter Control Register (RW)
+local RXDCTL = 0x02828 -- Receive Descriptor Control (RW)
+local RXCSUM = 0x05000 -- Receive Checksum Control (RW)
+local RDBAL  = 0x02800 -- Receive Descriptor Base Address Low (RW)
+local RDBAH  = 0x02804 -- Receive Descriptor Base Address High (RW)
+local RDLEN  = 0x02808 -- Receive Descriptor Length (RW)
+local RDH    = 0x02810 -- Receive Descriptor Head (RW)
+local RDT    = 0x02818 -- Receive Descriptor Tail (RW)
 
 local regs = ffi.cast("uint32_t *", map_pci_memory("0000:00:04.0", 0))          
 print(string.format("CTRL   = 0x%x", regs[CTRL]))
@@ -105,8 +116,9 @@ end
 function init_dma_memory ()
    dma_virt = snabb.map_physical_ram(dma_start, dma_end, true)
    C.memset(dma_virt, 0, dma_end - dma_start)
-   rxdesc = protected("union rx", dma_virt, offset_rxdesc, 0x1000000)
-   rxbuffer = protected("uint8_t", dma_virt, offset_rxbuf, 0xf000000)
+   rxdesc  = protected("union rx", dma_virt, offset_rxdesc, 0x100000)
+   txdesc  = protected("union tx", dma_virt, offset_txdesc, 0x100000)
+   buffers = protected("uint8_t", dma_virt, offset_buffers, 0xe00000)
 end
 
 function reset ()
@@ -132,9 +144,9 @@ end
 ffi.cdef[[
 // RX descriptor written by software.
 struct rx_desc {
-      uint64_t address;    // 64-bit address of receive buffer
-      uint64_t dd;         // low bit must be 0, otherwise reserved
-   } __attribute__((packed));
+    uint64_t address;    // 64-bit address of receive buffer
+    uint64_t dd;         // low bit must be 0, otherwise reserved
+} __attribute__((packed));
 
 // RX writeback descriptor written by hardware.
 struct rx_desc_wb {
@@ -152,21 +164,26 @@ union rx {
 ]]
 
 function init_receive ()
-   for i = 0, num_descriptors-1, 1 do
-      rxdesc[i].desc.address = 0
-      rxdesc[i].desc.address = dma_phys + offset_rxbuf + i*buffer_size
-      rxdesc[i].desc.dd      = 0
-   end
-   regs[RCTL] = bits({EN=1,         -- Enable packet receive
-		      UPE=3, MPE=4, -- Unicast & Multicast promiscuous mode
+   -- Disable RX and program all the registers
+   regs[RCTL] = bits({UPE=3, MPE=4, -- Unicast & Multicast promiscuous mode
 		      LPE=5,        -- Long Packet Enable (XXX what is that?)
 		      BSIZE1=16, BSEX=25, -- 16KB buffers
 		      SECRC=26      -- Strip Ethernet CRC from packets
       })
    regs[RFCTL] = bits({EXSTEN=15})  -- Extended RX writeback descriptor format
+   regs[RXDCTL] = bits({WTHRESH0=16}) -- Set to data sheet default value
+   regs[RXCSUM] = 0                 -- Disable checksum offload - not needed
+   regs[RDLEN] = num_descriptors * ffi.sizeof("union rx")
+   regs[RDBAL] = bit.band(dma_phys + offset_rxdesc, 0xffffffff)
+   regs[RDBAH] = bit.rshift(dma_phys + offset_rxdesc, 32)
+   regs[RDH] = 0
+   regs[RDT] = 0
+   -- Enable RX
+   regs[RCTL] = bit.bor(regs[RCTL], bits{EN=1})
 end
 
 function init_transmit ()
+   
 end
 
 function enable_mac_loopback ()
