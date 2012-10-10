@@ -7,6 +7,9 @@
 
 module(...,package.seeall)
 
+-- Notes:
+-- PSP (pad short packets to 64 bytes)
+
 local ffi = require("ffi")
 local snabb = ffi.load("snabb")
 local bit = require("bit")
@@ -96,6 +99,14 @@ local RDBAH  = 0x02804 -- Receive Descriptor Base Address High (RW)
 local RDLEN  = 0x02808 -- Receive Descriptor Length (RW)
 local RDH    = 0x02810 -- Receive Descriptor Head (RW)
 local RDT    = 0x02818 -- Receive Descriptor Tail (RW)
+local TXDCTL = 0x03828 -- Transmit Descriptor Control (RW)
+local TCTL   = 0x00400 -- Transmit Control Register (RW)
+local TIPG   = 0x00410 -- Transmit Inter-Packet Gap (RW)
+local TDBAL  = 0x03800 -- Transmit Descriptor Base Address Low (RW)
+local TDBAH  = 0x03804 -- Transmit Descriptor Base Address High (RW)
+local TDLEN  = 0x03808 -- Transmit Descriptor Length (RW)
+local TDH    = 0x03810 -- Transmit Descriptor Head (RW)
+local TDL    = 0x03818 -- Transmit Desciprotr Tail (RW)
 
 local regs = ffi.cast("uint32_t *", map_pci_memory("0000:00:04.0", 0))          
 print(string.format("CTRL   = 0x%x", regs[CTRL]))
@@ -182,8 +193,48 @@ function init_receive ()
    regs[RCTL] = bit.bor(regs[RCTL], bits{EN=1})
 end
 
-function init_transmit ()
+-- Make the buffer with INDEX available for RX.
+function add_rxbuf (index)
    
+end
+
+ffi.cdef[[
+// TX Extended Data Descriptor written by software.
+struct tx_desc {
+   uint64_t address;
+   unsigned int vlan:16;
+   unsigned int popts:8;
+   unsigned int extcmd:4;
+   unsigned int sta:4;
+   unsigned int fcmd:8;
+   unsigned int dtype:4;
+   unsigned int dtalen:20;
+} __attribute__((packed));
+
+union tx {
+   struct tx_desc desc;
+   // XXX context descriptor
+};
+]]
+
+function init_transmit ()
+   regs[TXDCTL] = bits({GRAN=24, WTHRESH0=16})
+   regs[TCTL] = bit.bor(bits({PSP=3}),
+			bit.lshift(0x3F, 12)) -- COLD value for full duplex
+   regs[TIPG] = 0x00602006 -- Suggested value in data sheet
+   regs[TDBAL] = bit.band(dma_phys + offset_txdesc, 0xffffffff)
+   regs[TDBAH] = bit.rshift(dma_phys + offset_txdesc, 32)
+   init_transmit_ring()
+   -- Enable transmit
+   regs[TCTL] = bit.bor(regs[TCTL], bits({EN=1}))
+end
+
+function init_transmit_ring ()
+   -- Hardware requires the value to be 128-byte aligned
+   assert( num_descriptors * ffi.sizeof("union tx") % 128 == 0 )
+   regs[TDLEN] = num_descriptors * ffi.sizeof("union tx")
+   regs[TDH] = 0
+   regs[TDL] = 0
 end
 
 function enable_mac_loopback ()
