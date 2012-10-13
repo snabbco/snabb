@@ -1241,12 +1241,12 @@ if not pcall(inlibc, "pivot_root") then C.pivot_root = CC.pivot_root end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
-  flags = bit.bor(stringflags(flags, "O_"), S.O_LARGEFILE)
+  flags = bit.bor(stringflags(flags, "O_"), S.O_LARGEFILE or 0)
   return retfd(C.open(pathname, flags, S.mode(mode)))
 end
 
 function S.openat(dirfd, pathname, flags, mode)
-  flags = bit.bor(stringflags(flags, "O_"), S.O_LARGEFILE)
+  flags = bit.bor(stringflags(flags, "O_"), S.O_LARGEFILE or 0)
   return retfd(C.openat(getfd_at(dirfd), pathname, flags, S.mode(mode)))
 end
 
@@ -1790,7 +1790,7 @@ local function getflock(arg)
 end
 
 local fcntl_commands = {
-  [S.F.SETFL] = function(arg) return bit.bor(stringflags(arg, "O_"), S.O_LARGEFILE) end,
+  [S.F.SETFL] = function(arg) return bit.bor(stringflags(arg, "O_"), S.O_LARGEFILE or 0) end,
   [S.F.SETFD] = function(arg) return stringflags(arg, "FD_") end,
   [S.F.GETLK] = getflock,
   [S.F.SETLK] = getflock,
