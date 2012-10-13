@@ -6,7 +6,7 @@ local S = {} -- exported functions
 local ffi = require "ffi"
 local bit = require "bit"
 
-require "headers/headers"
+require "include/headers"
 
 local arch = require("syscall-" .. ffi.arch) -- architecture specific code
 
@@ -56,7 +56,7 @@ local function trim(s) -- TODO should replace underscore with space
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
-local constants = require "headers/constants"
+local constants = require "include/constants"
 
 for k, v in pairs(constants) do S[k] = v end
 
