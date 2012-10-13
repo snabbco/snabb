@@ -2,7 +2,10 @@
 
 local ffi = require "ffi"
 
-local arch = pcall(require, "headers-" .. ffi.arch) or {} -- architecture specific definitions
+-- currently used for x86, x64. arm has no differences.
+local ok, arch = pcall(require, "include/headers-" .. ffi.arch) -- architecture specific definitions
+
+if not ok then arch = {} end
 
 -- define C types
 ffi.cdef[[
