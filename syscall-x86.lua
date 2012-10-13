@@ -1,7 +1,5 @@
 -- x86 specific code
 
-local ffi = require "ffi"
-
 local arch = {}
 
 arch.SYS = {
@@ -349,21 +347,6 @@ arch.SYS = {
 }
 
 arch.SYS["break"] = 17 -- reserved word
-
--- x86 has a different sigaction
-arch.sigaction = function()
-ffi.cdef[[
-struct sigaction {
-  union {
-    sighandler_t sa_handler;
-    void (*sa_sigaction)(int, struct siginfo *, void *);
-  };
-  sigset_t sa_mask;
-  unsigned long sa_flags;
-  void (*sa_restorer)(void);
-};
-]]
-end
 
 return arch
 
