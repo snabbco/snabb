@@ -54,23 +54,6 @@ local function trim(s) -- TODO should replace underscore with space
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
--- metatables for constants
-local function strflag(t, str) -- single value only
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  if #str == 0 then return 0 end
-  local val = rawget(t, str)
-  if val then return val end  
-  local s = trim(str):upper()
-  if #s == 0 then return 0 end
-  local val = rawget(t, s)
-  if not val then return nil end
-  t[str] = val -- this memoizes for future use
-  return val
-end
-
-mt.stringflag = {__index = strflag, __call = function(t, a) return t[a] end}
-
 local constants = require "constants"
 
 for k, v in pairs(constants) do S[k] = v end
