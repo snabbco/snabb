@@ -1,6 +1,4 @@
--- x86-64 specific code
-
-local ffi = require "ffi"
+-- x64 specific constants
 
 local arch = {}
 

@@ -1,4 +1,4 @@
--- arm specific code
+-- arm specific constants
 
 local ffi = require "ffi"
 
@@ -60,6 +60,7 @@ arch.SYS = {
   setns            = 375,
 }
 
+-- TODO cleanup to return table
 arch.oflags = function(S)
   S.O_DIRECTORY = octal('040000')
   S.O_NOFOLLOW  = octal('0100000')

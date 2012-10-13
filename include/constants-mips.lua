@@ -1,8 +1,6 @@
--- mips specific code
+-- mips specific constants
 
 error("mips support is coming soon")
-
-local ffi = require "ffi"
 
 local arch = {}
 

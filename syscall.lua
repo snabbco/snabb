@@ -8,10 +8,6 @@ local bit = require "bit"
 
 require "include/headers"
 
-local arch = require("syscall-" .. ffi.arch) -- architecture specific code
-
-S.SYS = arch.SYS -- syscalls
-
 S.C = setmetatable({}, {__index = ffi.C})
 local C = S.C
 

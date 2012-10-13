@@ -6,7 +6,7 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-local arch = require("syscall-" .. ffi.arch) -- architecture specific code
+local arch = require("include/constants-" .. ffi.arch) -- architecture specific code
 
 local function octal(s) return tonumber(s, 8) end 
 
@@ -50,6 +50,8 @@ end
 local stringflag = {__index = strflag, __call = function(t, a) return t[a] end}
 
 local S = {} -- TODO rename
+
+S.SYS = arch.SYS
 
 -- TODO in table
 S.STDIN_FILENO = 0

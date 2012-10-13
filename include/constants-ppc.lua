@@ -2,8 +2,6 @@
 
 error("ppc support is coming soon")
 
-local ffi = require "ffi"
-
 local arch = {}
 
 arch.socketoptions = function(S)
