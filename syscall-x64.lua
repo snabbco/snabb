@@ -334,4 +334,6 @@ arch.SYS = {
 
 arch.SYS.fstatat = arch.SYS.newfstatat
 
+return arch
+
 
