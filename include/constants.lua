@@ -53,10 +53,14 @@ local S = {} -- TODO rename
 
 S.SYS = arch.SYS
 
--- TODO in table
-S.STDIN_FILENO = 0
-S.STDOUT_FILENO = 1
-S.STDERR_FILENO = 2
+S.STD = setmetatable({
+  IN_FILENO = 0,
+  OUT_FILENO = 1,
+  ERR_FILENO = 2,
+  IN = 0,
+  OUT = 1,
+  ERR = 2,
+}, stringflag)
 
 -- sizes
 S.PATH_MAX = 4096

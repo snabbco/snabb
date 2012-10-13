@@ -30,6 +30,8 @@ S.copy = ffi.copy
 S.fill = ffi.fill
 S.istype = ffi.istype
 
+function S.nogc(d) return ffi.gc(d, nil) end
+
 local function split(delimiter, text)
   if delimiter == "" then return {text} end
   if #text == 0 then return {} end
@@ -104,9 +106,6 @@ signal_reasons[S.SIG.POLL] = {}
 for k, v in pairs(S.POLL) do
   signal_reasons[S.SIG.POLL][v] = k
 end
-
-
-
 
 -- use 64 bit fileops on 32 bit always
 local stattypename
@@ -945,8 +944,6 @@ local zeropointer = pt.void(0)
 local errpointer = pt.void(-1)
 
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
-
-function S.nogc(d) ffi.gc(d, nil) end
 
 -- return helpers. not so much needed any more, often not using
 
@@ -3173,9 +3170,9 @@ t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   __gc = S.close,
 })
 
-S.stdin = ffi.gc(t.fd(S.STDIN_FILENO), nil)
-S.stdout = ffi.gc(t.fd(S.STDOUT_FILENO), nil)
-S.stderr = ffi.gc(t.fd(S.STDERR_FILENO), nil)
+S.stdin = S.nogc(t.fd(S.STD.IN))
+S.stdout = S.nogc(t.fd(S.STD.OUT))
+S.stderr = S.nogc(t.fd(S.STD.ERR))
 
 t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
   __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel},
