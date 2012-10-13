@@ -13,6 +13,7 @@ local C = S.C
 
 local CC = {} -- functions that might not be in C, may use syscalls
 
+-- TODO move to types file
 local t, pt, s = {}, {}, {} -- types, pointer types and sizes tables
 S.t = t
 S.pt = pt
