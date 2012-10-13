@@ -13,8 +13,6 @@ local C = S.C
 
 local CC = {} -- functions that might not be in C, may use syscalls
 
-local function octal(s) return tonumber(s, 8) end 
-
 local t, pt, s = {}, {}, {} -- types, pointer types and sizes tables
 S.t = t
 S.pt = pt
