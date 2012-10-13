@@ -211,7 +211,6 @@ end
 S.ctypes = {} -- map from C names to types. Used for tests, but might be useful otherwise
 
 local function addtype(name, tp, mt)
-  tp = tp or name
   if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
   S.ctypes[tp] = t[name]
   pt[name] = ptt(t[name])
@@ -221,16 +220,16 @@ end
 local metatype = addtype
 
 local addtypes = {
-  {"char"},
+  {"char", "char"},
   {"uchar", "unsigned char"},
-  {"int"},
+  {"int", "int"},
   {"uint", "unsigned int"},
   {"uint16", "uint16_t"},
   {"int32", "int32_t"},
   {"uint32", "uint32_t"},
   {"int64", "int64_t"},
   {"uint64", "uint64_t"},
-  {"long"},
+  {"long", "long"},
   {"ulong", "unsigned long"},
   {"uintptr", "uintptr_t"},
   {"size", "size_t"},
