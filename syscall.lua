@@ -56,7 +56,7 @@ local function trim(s) -- TODO should replace underscore with space
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
-local constants = require "constants"
+local constants = require "headers/constants"
 
 for k, v in pairs(constants) do S[k] = v end
 
