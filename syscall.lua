@@ -143,8 +143,8 @@ if ffi.abi("32bit") then
 end
 
 -- makes code tidier
-local function istype(x, tp)
-  if ffi.istype(x, tp) then return tp else return false end
+local function istype(tp, x)
+  if ffi.istype(tp, x) then return x else return false end
 end
 
 -- TODO remove, see note in types.lua

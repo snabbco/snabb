@@ -54,8 +54,8 @@ if ffi.abi("32bit") then
 end
 
 -- makes code tidier
-local function istype(x, tp)
-  if ffi.istype(x, tp) then return tp else return false end
+local function istype(tp, x)
+  if ffi.istype(tp, x) then return x else return false end
 end
 
 -- TODO cleanup this (what should provide this?)
@@ -218,13 +218,26 @@ pt.inotify_event = ptt(t.inotify_event)
 
 -- fd type. This will be overridden by syscall as it adds methods
 -- so this is the minimal one necessary to provide the interface eg does not gc file
+-- TODO add tests once types is standalone
 
---metatype("fd", "struct {int fileno
+mt.fd = {
+  __index = {
+    getfd = function(fd) return fd.fileno end,
+  },
+  __new = function(tp, i)
+    return istype(tp, i) or ffi.new(tp, i)
+  end
+}
+
+metatype("fd", "struct {int fileno;}", mt.fd)
+
+assert(t.fd(4):getfd() == 4) -- TODO this is just a standin for a real test which we cant do right now
 
 -- duplicated from syscall. TODO cleanup by doing in reverse ie make the fd into a non gc fd if a number then get the fd.
 local function getfd(fd)
-  if ffi.istype(t.fd, fd) then return fd:getfd() end
-  return fd
+  --if ffi.istype(t.fd, fd) then return fd:getfd() end
+  --return fd
+  return t.fd(fd):getfd()
 end
 
 
@@ -647,7 +660,7 @@ t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs) 
 
 metatype("pollfd", "struct pollfd", {
   __index = function(t, k)
-    if k == 'fileno' then return t.fd end
+    if k == 'getfd' then return t.fd end -- TODO use meth
     local prefix = "POLL"
     if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
     return bit.band(t.revents, S[k]) ~= 0
@@ -668,7 +681,7 @@ mt.pollfds = {
     local count = #ps
     local fds = ffi.new(tp, count, count)
     for n = 1, count do
-      fds[n].fd = getfd(ps[n].fd)
+      fds[n].fd = ps[n].fd:getfd()
       fds[n].events = stringflags(ps[n].events, "POLL")
       fds[n].revents = 0
     end
