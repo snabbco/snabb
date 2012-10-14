@@ -2,7 +2,7 @@
 -- these are either simple ffi types or ffi metatypes for the kernel types
 
 -- TODO this currently requires being called with S from syscall which breaks modularity
--- TODO should fix this, should just need constants
+-- TODO should fix this, should just need constants (which it could return)
 
 local ffi = require "ffi"
 local bit = require "bit"
