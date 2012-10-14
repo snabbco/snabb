@@ -1,4 +1,6 @@
 
+-- Linux syscall ABI ffi interface
+
 local function syscall()
 
 local S = {} -- exported functions
@@ -2382,7 +2384,7 @@ function S.lockf(fd, cmd, len)
   end
 end
 
--- constants
+-- constants TODO move to table
 S.INADDR_ANY = t.in_addr()
 S.INADDR_LOOPBACK = t.in_addr("127.0.0.1")
 S.INADDR_BROADCAST = t.in_addr("255.255.255.255")
