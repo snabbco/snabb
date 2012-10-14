@@ -96,7 +96,7 @@ local ntohs = htons -- reverse is the same
 
 -- functions we use from man(3)
 
-
+local function strerror(errno) return ffi.string(ffi.C.strerror(errno)) end
 
 -- Lua type constructors corresponding to defined types
 -- basic types
@@ -197,7 +197,7 @@ pt.inotify_event = ptt(t.inotify_event)
 
 -- types with metatypes
 metatype("error", "struct {int errno;}", {
-  __tostring = function(e) return S.strerror(e.errno) end,
+  __tostring = function(e) return strerror(e.errno) end,
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
     if k == 'lsym' then return errsyms[t.errno]:sub(2):lower() end

@@ -30,7 +30,7 @@ local function assert_equal(...)
   return assert_equals(...)
 end
 
-local sysfile = debug.getinfo(S.strerror).source
+local sysfile = debug.getinfo(S.open).source
 local cov = {active = {}, cov = {}}
 
 local function coverage(event, line)
