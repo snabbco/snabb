@@ -313,6 +313,8 @@ local function sa(addr, addrlen)
 end
 
 -- functions from section 3 that we use for ip addresses etc
+
+-- TODO only used by types, maybe move.
 function S.strerror(errno) return ffi.string(C.strerror(errno)) end
 
 local INET6_ADDRSTRLEN = 46
