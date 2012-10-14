@@ -86,7 +86,7 @@ S.O_DSYNC     = octal('010000')
 S.O_RSYNC     = S.O_SYNC
 
 -- incorporate into metatable for O so set as O>LARGEFILE or 0
-if ffi.abi("32bit") then S.O_LARGEFILE = octal('0100000') end
+if ffi.abi("32bit") then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end
 
 -- these are arch dependent!
 if arch.oflags then arch.oflags(S)
