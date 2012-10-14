@@ -4,6 +4,8 @@
 -- TODO this currently requires being called with S from syscall which breaks modularity
 -- TODO should fix this, should just need constants (which it could return)
 
+-- note that some types will be overridden, eg default fd type will have metamethods added TODO document and test
+
 local ffi = require "ffi"
 local bit = require "bit"
 
@@ -54,12 +56,6 @@ end
 -- makes code tidier
 local function istype(x, tp)
   if ffi.istype(x, tp) then return tp else return false end
-end
-
--- duplicated from syscall. TODO cleanup by doing in reverse ie make the fd into a non gc fd if a number then get the fd.
-local function getfd(fd)
-  if ffi.istype(t.fd, fd) then return fd.filenum end
-  return fd
 end
 
 -- TODO cleanup this (what should provide this?)
@@ -219,6 +215,19 @@ t.timespec2 = ffi.typeof("struct timespec[2]")
 pt.inotify_event = ptt(t.inotify_event)
 
 -- types with metatypes
+
+-- fd type. This will be overridden by syscall as it adds methods
+-- so this is the minimal one necessary to provide the interface eg does not gc file
+
+-- duplicated from syscall. TODO cleanup by doing in reverse ie make the fd into a non gc fd if a number then get the fd.
+local function getfd(fd)
+  if ffi.istype(t.fd, fd) then return fd.filenum end
+  return fd
+end
+
+
+
+
 metatype("error", "struct {int errno;}", {
   __tostring = function(e) return strerror(e.errno) end,
   __index = function(t, k)

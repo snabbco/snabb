@@ -1407,7 +1407,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   local r = {}
   for i = 1, ret do -- put in Lua array
     local e = events[i - 1]
-    local ev = setmetatable({fileno = tonumber(e.data.fd), data = t.uint64(e.data.u64), events = e.events}, mt.epoll)
+    local ev = setmetatable({fd = tonumber(e.data.fd), data = t.uint64(e.data.u64), events = e.events}, mt.epoll)
     r[i] = ev
   end
   return r
@@ -2425,7 +2425,7 @@ fmeth.seq = function(fd)
   return fd.sequence
 end
 
-fmeth.fileno = function(fd) return fd.filenum end
+fmeth.getfd = function(fd) return fd.filenum end
 
 t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   __index = fmeth,
