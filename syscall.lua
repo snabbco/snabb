@@ -273,16 +273,6 @@ local function retwait(ret, status)
   return setmetatable({pid = ret, status = status}, mt.wait)
 end
 
--- endian conversion
-if ffi.abi("be") then -- nothing to do
-  function S.htonl(b) return b end
-else
-  function S.htonl(b) return bit.bswap(b) end
-  function S.htons(b) return bit.rshift(bit.bswap(b), 16) end
-end
-S.ntohl = S.htonl -- reverse is the same
-S.ntohs = S.htons -- reverse is the same
-
 -- TODO add tests
 mt.sockaddr_un = {
   __index = function(un, k)

@@ -82,6 +82,22 @@ for k, v in pairs(S.POLL) do
   signal_reasons[S.SIG.POLL][v] = k
 end
 
+-- endian conversion
+-- TODO add tests eg for signs.
+local htonl, htons
+if ffi.abi("be") then -- nothing to do
+  function htonl(b) return b end
+else
+  function htonl(b) return bit.bswap(b) end
+  function htons(b) return bit.rshift(bit.bswap(b), 16) end
+end
+local ntohl = htonl -- reverse is the same
+local ntohs = htons -- reverse is the same
+
+-- functions we use from man(3)
+
+
+
 -- Lua type constructors corresponding to defined types
 -- basic types
 
@@ -261,11 +277,11 @@ metatype("sockaddr_storage", "struct sockaddr_storage", {
 meth.sockaddr_in = {
   index = {
     family = function(sa) return sa.sin_family end,
-    port = function(sa) return S.ntohs(sa.sin_port) end,
+    port = function(sa) return ntohs(sa.sin_port) end,
     addr = function(sa) return sa.sin_addr end,
   },
   newindex = {
-    port = function(sa, v) sa.sin_port = S.htons(v) end
+    port = function(sa, v) sa.sin_port = htons(v) end
   }
 }
 
@@ -277,18 +293,18 @@ metatype("sockaddr_in", "struct sockaddr_in", {
       addr = t.in_addr(addr)
       if not addr then return end
     end
-    return ffi.new(tp, S.AF.INET, S.htons(port or 0), addr)
+    return ffi.new(tp, S.AF.INET, htons(port or 0), addr)
   end
 })
 
 meth.sockaddr_in6 = {
   index = {
     family = function(sa) return sa.sin6_family end,
-    port = function(sa) return S.ntohs(sa.sin6_port) end,
+    port = function(sa) return ntohs(sa.sin6_port) end,
     addr = function(sa) return sa.sin6_addr end,
   },
   newindex = {
-    port = function(sa, v) sa.sin6_port = S.htons(v) end
+    port = function(sa, v) sa.sin6_port = htons(v) end
   }
 }
 
@@ -300,7 +316,7 @@ metatype("sockaddr_in6", "struct sockaddr_in6", {
       addr = t.in6_addr(addr)
       if not addr then return end
     end
-    return ffi.new(tp, S.AF.INET6, S.htons(port or 0), flowinfo or 0, addr, scope_id or 0)
+    return ffi.new(tp, S.AF.INET6, htons(port or 0), flowinfo or 0, addr, scope_id or 0)
   end
 })
 
