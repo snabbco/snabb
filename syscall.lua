@@ -147,7 +147,6 @@ local function istype(tp, x)
   if ffi.istype(tp, x) then return x else return false end
 end
 
--- TODO remove, see note in types.lua
 local function getfd(fd)
   if ffi.istype(t.fd, fd) then return fd:getfd() end
   return fd
@@ -518,7 +517,7 @@ end
 
 -- TODO dup3 can have a race condition (see man page) although Musl fixes, appears eglibc does not
 function S.dup(oldfd, newfd, flags)
-  if newfd == nil then return retfd(C.dup(getfd(oldfd))) end
+  if not newfd then return retfd(C.dup(getfd(oldfd))) end
   return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags or 0))
 end
 
@@ -1283,7 +1282,8 @@ end
 function S.sigsuspend(mask) return retbool(C.sigsuspend(mksigset(mask))) end
 
 function S.signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
-  return retfd(C.signalfd(getfd(fd) or -1, mksigset(set), stringflags(flags, "SFD_")))
+  if fd then fd = getfd(fd) else fd = -1 end
+  return retfd(C.signalfd(fd, mksigset(set), stringflags(flags, "SFD_")))
 end
 
 -- TODO convert to metatype?
@@ -2430,6 +2430,9 @@ fmeth.getfd = function(fd) return fd.filenum end
 t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   __index = fmeth,
   __gc = S.close,
+  __new = function(tp, i)
+    return istype(tp, i) or ffi.new(tp, i)
+  end
 })
 
 S.stdin = S.nogc(t.fd(S.STD.IN))

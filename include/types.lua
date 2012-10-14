@@ -231,17 +231,11 @@ mt.fd = {
 
 metatype("fd", "struct {int fileno;}", mt.fd)
 
-assert(t.fd(4):getfd() == 4) -- TODO this is just a standin for a real test which we cant do right now
-
--- duplicated from syscall. TODO cleanup by doing in reverse ie make the fd into a non gc fd if a number then get the fd.
+-- can replace with a different t.fd function
 local function getfd(fd)
-  --if ffi.istype(t.fd, fd) then return fd:getfd() end
-  --return fd
-  return t.fd(fd):getfd()
+  if ffi.istype(t.fd, fd) then return fd:getfd() end
+  return fd
 end
-
-
-
 
 metatype("error", "struct {int errno;}", {
   __tostring = function(e) return strerror(e.errno) end,
