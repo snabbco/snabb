@@ -219,9 +219,11 @@ pt.inotify_event = ptt(t.inotify_event)
 -- fd type. This will be overridden by syscall as it adds methods
 -- so this is the minimal one necessary to provide the interface eg does not gc file
 
+--metatype("fd", "struct {int fileno
+
 -- duplicated from syscall. TODO cleanup by doing in reverse ie make the fd into a non gc fd if a number then get the fd.
 local function getfd(fd)
-  if ffi.istype(t.fd, fd) then return fd.filenum end
+  if ffi.istype(t.fd, fd) then return fd:getfd() end
   return fd
 end
 

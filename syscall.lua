@@ -149,7 +149,7 @@ end
 
 -- TODO remove, see note in types.lua
 local function getfd(fd)
-  if ffi.istype(t.fd, fd) then return fd.filenum end
+  if ffi.istype(t.fd, fd) then return fd:getfd() end
   return fd
 end
 

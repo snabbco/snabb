@@ -744,8 +744,8 @@ test_sockets_pipes = {
   test_pipe = function()
     local p = assert(S.pipe())
     assert(p:close())
-    assert_equal(p[1].filenum, -1)
-    assert_equal(p[2].filenum, -1)
+    assert_equal(p[1]:getfd(), -1)
+    assert_equal(p[2]:getfd(), -1)
   end,
   test_nonblock = function()
     local fds = assert(S.pipe())
