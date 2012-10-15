@@ -92,9 +92,9 @@ if ffi.abi("32bit") then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0
 -- these are arch dependent!
 if arch.oflags then arch.oflags(S)
 else -- generic values from asm-generic
+  S.O_DIRECT    = octal('040000')
   S.O_DIRECTORY = octal('0200000')
   S.O_NOFOLLOW  = octal('0400000')
-  S.O_DIRECT    = octal('040000')
 end
 
 -- modes
