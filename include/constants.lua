@@ -363,8 +363,10 @@ S.SIGPM = setmetatable({
 }, stringflag)
 
 -- signalfd
-S.SFD_CLOEXEC  = octal('02000000')
-S.SFD_NONBLOCK = octal('04000')
+S.SFD = setmetatable({
+  CLOEXEC  = octal('02000000'),
+  NONBLOCK = octal('04000'),
+}, multiflags)
 
 -- sockets note mix of single and multiple flags
 S.SOCK_STREAM    = 1

@@ -1283,7 +1283,7 @@ function S.sigsuspend(mask) return retbool(C.sigsuspend(mksigset(mask))) end
 
 function S.signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
   if fd then fd = getfd(fd) else fd = -1 end
-  return retfd(C.signalfd(fd, mksigset(set), stringflags(flags, "SFD_")))
+  return retfd(C.signalfd(fd, mksigset(set), S.SFD[flags]))
 end
 
 -- TODO convert to metatype?
