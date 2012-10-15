@@ -590,22 +590,24 @@ S.ADJ = setmetatable({
   OFFSET_SS_READ     = 0xa001,
 }, multiflags)
 
-S.STA_PLL         = 0x0001
-S.STA_PPSFREQ     = 0x0002
-S.STA_PPSTIME     = 0x0004
-S.STA_FLL         = 0x0008
-S.STA_INS         = 0x0010
-S.STA_DEL         = 0x0020
-S.STA_UNSYNC      = 0x0040
-S.STA_FREQHOLD    = 0x0080
-S.STA_PPSSIGNAL   = 0x0100
-S.STA_PPSJITTER   = 0x0200
-S.STA_PPSWANDER   = 0x0400
-S.STA_PPSERROR    = 0x0800
-S.STA_CLOCKERR    = 0x1000
-S.STA_NANO        = 0x2000
-S.STA_MODE        = 0x4000
-S.STA_CLK         = 0x8000
+S.STA = setmetatable({
+  PLL         = 0x0001,
+  PPSFREQ     = 0x0002,
+  PPSTIME     = 0x0004,
+  FLL         = 0x0008,
+  INS         = 0x0010,
+  DEL         = 0x0020,
+  UNSYNC      = 0x0040,
+  FREQHOLD    = 0x0080,
+  PPSSIGNAL   = 0x0100,
+  PPSJITTER   = 0x0200,
+  PPSWANDER   = 0x0400,
+  PPSERROR    = 0x0800,
+  CLOCKERR    = 0x1000,
+  NANO        = 0x2000,
+  MODE        = 0x4000,
+  CLK         = 0x8000,
+}, multiflags)
 
 -- return values for adjtimex
 S.TIME = setmetatable({
