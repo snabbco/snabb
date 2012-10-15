@@ -206,12 +206,14 @@ S.LOCKF = setmetatable({
 }, stringflag)
 
 --mmap
-S.PROT_READ  = 0x1
-S.PROT_WRITE = 0x2
-S.PROT_EXEC  = 0x4
-S.PROT_NONE  = 0x0
-S.PROT_GROWSDOWN = 0x01000000
-S.PROT_GROWSUP   = 0x02000000
+S.PROT = setmetatable({
+  NONE  = 0x0,
+  READ  = 0x1,
+  WRITE = 0x2,
+  EXEC  = 0x4,
+  GROWSDOWN = 0x01000000,
+  GROWSUP   = 0x02000000,
+}, multiflags)
 
 -- Sharing types
 S.MAP_SHARED  = 0x01

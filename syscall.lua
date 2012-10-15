@@ -919,7 +919,7 @@ function S.sleep(sec) -- standard libc function
 end
 
 function S.mmap(addr, length, prot, flags, fd, offset)
-  return retptr(C.mmap(addr, length, stringflags(prot, "PROT_"), stringflags(flags, "MAP_"), getfd(fd), offset))
+  return retptr(C.mmap(addr, length, S.PROT[prot], stringflags(flags, "MAP_"), getfd(fd), offset))
 end
 function S.munmap(addr, length)
   return retbool(C.munmap(addr, length))
