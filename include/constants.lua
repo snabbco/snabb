@@ -216,23 +216,27 @@ S.PROT = setmetatable({
 }, multiflags)
 
 -- Sharing types
-S.MAP_SHARED  = 0x01
-S.MAP_PRIVATE = 0x02
-S.MAP_TYPE    = 0x0f
-S.MAP_FIXED     = 0x10
-S.MAP_FILE      = 0
-S.MAP_ANONYMOUS = 0x20
-S.MAP_ANON      = S.MAP_ANONYMOUS
-S.MAP_32BIT     = 0x40
-S.MAP_GROWSDOWN  = 0x00100
-S.MAP_DENYWRITE  = 0x00800
-S.MAP_EXECUTABLE = 0x01000
-S.MAP_LOCKED     = 0x02000
-S.MAP_NORESERVE  = 0x04000
-S.MAP_POPULATE   = 0x08000
-S.MAP_NONBLOCK   = 0x10000
-S.MAP_STACK      = 0x20000
-S.MAP_HUGETLB    = 0x40000
+S.MAP = setmetatable({
+  FILE       = 0,
+  SHARED     = 0x01,
+  PRIVATE    = 0x02,
+  TYPE       = 0x0f,
+  FIXED      = 0x10,
+  ANONYMOUS  = 0x20,
+--32BIT      = 0x40,
+  GROWSDOWN  = 0x00100,
+  DENYWRITE  = 0x00800,
+  EXECUTABLE = 0x01000,
+  LOCKED     = 0x02000,
+  NORESERVE  = 0x04000,
+  POPULATE   = 0x08000,
+  NONBLOCK   = 0x10000,
+  STACK      = 0x20000,
+  HUGETLB    = 0x40000,
+}, multiflags)
+
+S.MAP["32BIT"]   = 0x40 -- starts with number
+S.MAP.ANON       = S.MAP.ANONYMOUS
 
 -- flags for `mlockall'.
 S.MCL_CURRENT    = 1
