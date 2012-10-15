@@ -575,18 +575,20 @@ S.TIMER = setmetatable({
 }, stringflag)
 
 -- adjtimex
-S.ADJ_OFFSET             = 0x0001
-S.ADJ_FREQUENCY          = 0x0002
-S.ADJ_MAXERROR           = 0x0004
-S.ADJ_ESTERROR           = 0x0008
-S.ADJ_STATUS             = 0x0010
-S.ADJ_TIMECONST          = 0x0020
-S.ADJ_TAI                = 0x0080
-S.ADJ_MICRO              = 0x1000
-S.ADJ_NANO               = 0x2000
-S.ADJ_TICK               = 0x4000
-S.ADJ_OFFSET_SINGLESHOT  = 0x8001
-S.ADJ_OFFSET_SS_READ     = 0xa001
+S.ADJ = setmetatable({
+  OFFSET             = 0x0001,
+  FREQUENCY          = 0x0002,
+  MAXERROR           = 0x0004,
+  ESTERROR           = 0x0008,
+  STATUS             = 0x0010,
+  TIMECONST          = 0x0020,
+  TAI                = 0x0080,
+  MICRO              = 0x1000,
+  NANO               = 0x2000,
+  TICK               = 0x4000,
+  OFFSET_SINGLESHOT  = 0x8001,
+  OFFSET_SS_READ     = 0xa001,
+}, multiflags)
 
 S.STA_PLL         = 0x0001
 S.STA_PPSFREQ     = 0x0002

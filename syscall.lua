@@ -1692,7 +1692,7 @@ end
 function S.adjtimex(a)
   if not a then a = t.timex() end
   if type(a) == 'table' then  -- TODO pull this out to general initialiser for t.timex
-    if a.modes then a.modes = tonumber(stringflags(a.modes, "ADJ_")) end
+    if a.modes then a.modes = tonumber(S.ADJ[a.modes]) end
     if a.status then a.status = tonumber(stringflags(a.status, "STA_")) end
     a = t.timex(a)
   end
