@@ -239,8 +239,10 @@ S.MAP["32BIT"]   = 0x40 -- starts with number
 S.MAP.ANON       = S.MAP.ANONYMOUS
 
 -- flags for `mlockall'.
-S.MCL_CURRENT    = 1
-S.MCL_FUTURE     = 2
+S.MCL = setmetatable({
+  CURRENT    = 1,
+  FUTURE     = 2,
+}, multiflags)
 
 -- flags for `mremap'.
 S.MREMAP_MAYMOVE = 1

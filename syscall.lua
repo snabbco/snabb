@@ -927,7 +927,7 @@ end
 function S.msync(addr, length, flags) return retbool(C.msync(addr, length, stringflags(flags, "MS_"))) end
 function S.mlock(addr, len) return retbool(C.mlock(addr, len)) end
 function S.munlock(addr, len) return retbool(C.munlock(addr, len)) end
-function S.mlockall(flags) return retbool(C.mlockall(stringflags(flags, "MCL_"))) end
+function S.mlockall(flags) return retbool(C.mlockall(S.MCL[flags])) end
 function S.munlockall() return retbool(C.munlockall()) end
 function S.mremap(old_address, old_size, new_size, flags, new_address)
   return retptr(C.mremap(old_address, old_size, new_size, stringflags(flags, "MREMAP_"), new_address))
