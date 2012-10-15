@@ -930,7 +930,7 @@ function S.munlock(addr, len) return retbool(C.munlock(addr, len)) end
 function S.mlockall(flags) return retbool(C.mlockall(S.MCL[flags])) end
 function S.munlockall() return retbool(C.munlockall()) end
 function S.mremap(old_address, old_size, new_size, flags, new_address)
-  return retptr(C.mremap(old_address, old_size, new_size, stringflags(flags, "MREMAP_"), new_address))
+  return retptr(C.mremap(old_address, old_size, new_size, S.MREMAP[flags], new_address))
 end
 function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, S.MADV[advice])) end
 function S.fadvise(fd, advice, offset, len) -- note argument order

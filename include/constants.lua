@@ -245,8 +245,10 @@ S.MCL = setmetatable({
 }, multiflags)
 
 -- flags for `mremap'.
-S.MREMAP_MAYMOVE = 1
-S.MREMAP_FIXED   = 2
+S.MREMAP = setmetatable({
+  MAYMOVE = 1,
+  FIXED   = 2,
+}, multiflags)
 
 -- madvise advice parameter
 S.MADV = setmetatable({
