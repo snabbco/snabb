@@ -747,9 +747,9 @@ function S.lseek(fd, offset, whence)
   return ret64(C.lseek(getfd(fd), offset or 0, S.SEEK[whence]))
 end
 
-function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
+function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, S.MSG[flags])) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
-  return retnum(C.sendto(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"), addr, addrlen or ffi.sizeof(addr)))
+  return retnum(C.sendto(getfd(fd), buf, count or #buf, S.MSG[flags], addr, addrlen or ffi.sizeof(addr)))
 end
 
 function S.sendmsg(fd, msg, flags)
@@ -758,7 +758,7 @@ function S.sendmsg(fd, msg, flags)
     local io = t.iovecs{{buf1, 1}}
     msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io}
   end
-  return retbool(C.sendmsg(getfd(fd), msg, stringflags(flags, "MSG_")))
+  return retbool(C.sendmsg(getfd(fd), msg, S.MSG[flags]))
 end
 
 function S.readv(fd, iov)
@@ -781,13 +781,13 @@ function S.pwritev(fd, iov, offset)
   return retnum(C.pwritev64(getfd(fd), iov.iov, #iov, offset))
 end
 
-function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, stringflags(flags, "MSG_"))) end
+function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, S.MSG[flags])) end
 function S.recvfrom(fd, buf, count, flags, ss, addrlen)
   if not ss then
     ss = t.sockaddr_storage()
     addrlen = t.socklen1(s.sockaddr_storage)
   end
-  local ret = C.recvfrom(getfd(fd), buf, count, stringflags(flags, "MSG_"), ss, addrlen)
+  local ret = C.recvfrom(getfd(fd), buf, count, S.MSG[flags], ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return {count = tonumber(ret), addr = sa(ss, addrlen[0])}
 end
@@ -1902,7 +1902,7 @@ function S.recvmsg(fd, msg, flags)
     local buf = t.buffer(bufsize)
     msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io, msg_control = buf, msg_controllen = bufsize}
   end
-  local ret = C.recvmsg(getfd(fd), msg, stringflags(flags, "MSG_"))
+  local ret = C.recvmsg(getfd(fd), msg, S.MSG[flags])
   if ret == -1 then return nil, t.error() end
   local ret = {count = ret, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
   local mc, cmsg = cmsg_firsthdr(msg)

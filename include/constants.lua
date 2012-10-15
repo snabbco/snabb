@@ -633,7 +633,7 @@ S.UTIME = setmetatable({
   OMIT = bit.lshift(1, 30) - 2,
 }, stringflag)
 
--- ...at commands
+-- ...at commands TODO metatable but uses flaglist as only some valid
 S.AT_FDCWD = -100
 S.AT_SYMLINK_NOFOLLOW    = 0x100
 S.AT_REMOVEDIR           = 0x200
@@ -642,25 +642,28 @@ S.AT_NO_AUTOMOUNT        = 0x800
 S.AT_EACCESS             = 0x200
 
 -- send, recv etc
-S.MSG_OOB             = 0x01
-S.MSG_PEEK            = 0x02
-S.MSG_DONTROUTE       = 0x04
-S.MSG_TRYHARD         = S.MSG_DONTROUTE
-S.MSG_CTRUNC          = 0x08
-S.MSG_PROXY           = 0x10
-S.MSG_TRUNC           = 0x20
-S.MSG_DONTWAIT        = 0x40
-S.MSG_EOR             = 0x80
-S.MSG_WAITALL         = 0x100
-S.MSG_FIN             = 0x200
-S.MSG_SYN             = 0x400
-S.MSG_CONFIRM         = 0x800
-S.MSG_RST             = 0x1000
-S.MSG_ERRQUEUE        = 0x2000
-S.MSG_NOSIGNAL        = 0x4000
-S.MSG_MORE            = 0x8000
-S.MSG_WAITFORONE      = 0x10000
-S.MSG_CMSG_CLOEXEC    = 0x40000000
+S.MSG = setmetatable({
+  OOB             = 0x01,
+  PEEK            = 0x02,
+  DONTROUTE       = 0x04,
+  CTRUNC          = 0x08,
+  PROXY           = 0x10,
+  TRUNC           = 0x20,
+  DONTWAIT        = 0x40,
+  EOR             = 0x80,
+  WAITALL         = 0x100,
+  FIN             = 0x200,
+  SYN             = 0x400,
+  CONFIRM         = 0x800,
+  RST             = 0x1000,
+  ERRQUEUE        = 0x2000,
+  NOSIGNAL        = 0x4000,
+  MORE            = 0x8000,
+  WAITFORONE      = 0x10000,
+  CMSG_CLOEXEC    = 0x40000000,
+}, multiflags)
+
+S.MSG.TRYHARD         = S.MSG.DONTROUTE
 
 -- rlimit
 S.RLIMIT = setmetatable({
