@@ -8,6 +8,12 @@ local bit = require "bit"
 
 local arch = require("include/constants-" .. ffi.arch) -- architecture specific code
 
+local oldsm = setmetatable
+local function setmetatable(t, mt)
+  assert(mt, "BUG: nil metatable")
+  return oldsm(t, mt)
+end
+
 local function octal(s) return tonumber(s, 8) end 
 
 local function split(delimiter, text)
@@ -368,7 +374,7 @@ S.SFD = setmetatable({
   NONBLOCK = octal('04000'),
 }, multiflags)
 
--- sockets note mix of single and multiple flags
+-- sockets note mix of single and multiple flags TODO code to handle
 S.SOCK_STREAM    = 1
 S.SOCK_DGRAM     = 2
 S.SOCK_RAW       = 3
