@@ -76,14 +76,15 @@ S.O_NOCTTY    = octal('0400')
 S.O_TRUNC     = octal('01000')
 S.O_APPEND    = octal('02000')
 S.O_NONBLOCK  = octal('04000')
-S.O_NDELAY    = S.O_NONBLOCK
-S.O_SYNC      = octal('04010000')
-S.O_FSYNC     = S.O_SYNC
-S.O_ASYNC     = octal('020000')
-S.O_CLOEXEC   = octal('02000000')
-S.O_NOATIME   = octal('01000000')
 S.O_DSYNC     = octal('010000')
+S.O_ASYNC     = octal('020000')
+S.O_NOATIME   = octal('01000000')
+S.O_CLOEXEC   = octal('02000000')
+S.O_SYNC      = octal('04010000')
+
+S.O_FSYNC     = S.O_SYNC
 S.O_RSYNC     = S.O_SYNC
+S.O_NDELAY    = S.O_NONBLOCK
 
 -- incorporate into metatable for O so set as O>LARGEFILE or 0
 if ffi.abi("32bit") then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end
