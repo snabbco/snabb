@@ -66,10 +66,10 @@ S.STD = setmetatable({
 S.PATH_MAX = 4096
 
 -- open, fcntl
+S.O_RDONLY    = octal('0000')
+S.O_WRONLY    = octal('0001')
+S.O_RDWR      = octal('0002')
 S.O_ACCMODE   = octal('0003')
-S.O_RDONLY    = octal('00')
-S.O_WRONLY    = octal('01')
-S.O_RDWR      = octal('02')
 S.O_CREAT     = octal('0100')
 S.O_EXCL      = octal('0200')
 S.O_NOCTTY    = octal('0400')
