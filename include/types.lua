@@ -233,8 +233,10 @@ metatype("fd", "struct {int fileno;}", mt.fd)
 
 -- can replace with a different t.fd function
 local function getfd(fd)
-  if ffi.istype(t.fd, fd) then return fd:getfd() end
-  return fd
+  --if ffi.istype(t.fd, fd) then return fd:getfd() end
+  --return fd
+  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
+  return fd:getfd()
 end
 
 metatype("error", "struct {int errno;}", {

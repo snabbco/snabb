@@ -148,8 +148,8 @@ local function istype(tp, x)
 end
 
 local function getfd(fd)
-  if ffi.istype(t.fd, fd) then return fd:getfd() end
-  return fd
+  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
+  return fd:getfd()
 end
 
 local function getfd_at(fd)
