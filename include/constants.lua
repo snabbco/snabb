@@ -33,12 +33,12 @@ local function trim(s) -- TODO should replace underscore with space
 end
 
 -- for single valued flags only
-local function strflag(t, str)
+local function flag(t, str)
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   if #str == 0 then return 0 end
   local val = rawget(t, str)
-  if val then return val end  
+  if val then return val end
   local s = trim(str):upper()
   if #s == 0 then return 0 end
   local val = rawget(t, s)
@@ -47,7 +47,28 @@ local function strflag(t, str)
   return val
 end
 
-local stringflag = {__index = strflag, __call = function(t, a) return t[a] end}
+local stringflag = {__index = flag, __call = function(t, a) return t[a] end}
+
+-- take a bunch of flags in a string and return a number
+function flags(t, str) -- allows multiple comma sep flags that are ORed
+  if not str then return 0 end
+  if type(str) ~= "string" then return str end
+  if #str == 0 then return 0 end
+  local val = rawget(t, str)
+  if val then return val end
+  local f = 0
+  local a = split(",", str)
+  for i, v in ipairs(a) do
+    local s = trim(v):upper()
+    local val = rawget(t, s)
+    if not val then return nil end
+    f = bit.bor(f, val)
+  end
+  t[str] = f
+  return f
+end
+
+local multiflags = {__index = flags, __call = function(t, a) return t[a] end}
 
 local S = {} -- TODO rename
 
