@@ -220,6 +220,7 @@ pt.inotify_event = ptt(t.inotify_event)
 -- so this is the minimal one necessary to provide the interface eg does not gc file
 -- TODO add tests once types is standalone
 
+--[[
 mt.fd = {
   __index = {
     getfd = function(fd) return fd.fileno end,
@@ -230,11 +231,12 @@ mt.fd = {
 }
 
 metatype("fd", "struct {int fileno;}", mt.fd)
+]]
+-- even simpler version, just pass numbers
+t.fd = function(fd) return tonumber(fd) end
 
 -- can replace with a different t.fd function
 local function getfd(fd)
-  --if ffi.istype(t.fd, fd) then return fd:getfd() end
-  --return fd
   if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
   return fd:getfd()
 end
