@@ -2435,12 +2435,13 @@ t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   end
 })
 
-S.stdin = S.nogc(t.fd(S.STD.IN))
-S.stdout = S.nogc(t.fd(S.STD.OUT))
-S.stderr = S.nogc(t.fd(S.STD.ERR))
+-- TODO note a new fd implementation would have to redefine as these set at init time. Document or fix.
+S.stdin = t.fd(S.STD.IN):nogc()
+S.stdout = t.fd(S.STD.OUT):nogc()
+S.stderr = t.fd(S.STD.ERR):nogc()
 
 t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
-  __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel},
+  __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel, nogc = S.nogc},
   __gc = S.io_destroy
 })
 
