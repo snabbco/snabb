@@ -549,8 +549,8 @@ S.SA = setmetatable({
   RESTORER  = 0x04000000,
 }, multiflags)
 
-S.SA_NOMASK    = S.SA_NODEFER
-S.SA_ONESHOT   = S.SA_RESETHAND
+S.SA.NOMASK    = S.SA.NODEFER
+S.SA.ONESHOT   = S.SA.RESETHAND
 
 -- timers
 S.ITIMER = setmetatable({
