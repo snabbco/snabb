@@ -1056,7 +1056,7 @@ end
 
 local fcntl_commands = {
   [S.F.SETFL] = function(arg) return bit.bor(stringflags(arg, "O_"), S.O_LARGEFILE or 0) end,
-  [S.F.SETFD] = function(arg) return stringflags(arg, "FD_") end,
+  [S.F.SETFD] = function(arg) return S.FD[arg] end,
   [S.F.GETLK] = getflock,
   [S.F.SETLK] = getflock,
   [S.F.SETLKW] = getflock,
@@ -1132,7 +1132,7 @@ function S.sigaction(signum, handler, mask, flags)
     --elseif
     --  type(handler) == 'function' then handler = ffi.cast(t.sighandler, handler) -- TODO check if gc problem here? need to copy?
     end
-    sa = t.sigaction{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = stringflags(flags, "SA_")}
+    sa = t.sigaction{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = S.SA[flags]}
   end
   local old = t.sigaction()
   local ret = C.sigaction(S.SIG[signum], sa, old)

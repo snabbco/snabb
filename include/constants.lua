@@ -3,6 +3,9 @@
 -- so far almost all the single flag options have been converted to seperate tables with metamethods but still TODO
 -- are the multi flag ones
 
+-- TODO add test that we do not reallocate
+-- TODO move to new table k rather than in S
+
 local ffi = require "ffi"
 local bit = require "bit"
 
@@ -92,7 +95,7 @@ S.STD = setmetatable({
 -- sizes
 S.PATH_MAX = 4096
 
--- open, fcntl
+-- open, fcntl TODO must set LARGEFILE if needed (note pipe2 only uses nonblock and cloexec)
 S.O_RDONLY    = octal('0000')
 S.O_WRONLY    = octal('0001')
 S.O_RDWR      = octal('0002')
@@ -194,7 +197,9 @@ else
   S.F.SETLKW    = S.F.SETLKW64
 end
 
-S.FD_CLOEXEC = 1
+S.FD = setmetatable({
+  CLOEXEC = 1,
+}, multiflags)
 
 -- note changed from F_ to FCNTL_LOCK
 S.FCNTL_LOCK = setmetatable({
@@ -359,7 +364,7 @@ S.SIG.UNUSED     = 31
 S.SIG.CLD        = S.SIG.CHLD
 S.SIG.POLL       = S.SIG.IO
 
-S.NSIG          = 65
+S.NSIG          = 65 -- TODO not sure we need
 
 -- sigprocmask note renaming of SIG to SIGPM
 S.SIGPM = setmetatable({
@@ -533,16 +538,19 @@ S.POLL = setmetatable({
 }, stringflag)
 
 -- sigaction
-S.SA_NOCLDSTOP = 0x00000001
-S.SA_NOCLDWAIT = 0x00000002
-S.SA_SIGINFO   = 0x00000004
-S.SA_ONSTACK   = 0x08000000
-S.SA_RESTART   = 0x10000000
-S.SA_NODEFER   = 0x40000000
-S.SA_RESETHAND = 0x80000000
+S.SA = setmetatable({
+  NOCLDSTOP = 0x00000001,
+  NOCLDWAIT = 0x00000002,
+  SIGINFO   = 0x00000004,
+  ONSTACK   = 0x08000000,
+  RESTART   = 0x10000000,
+  NODEFER   = 0x40000000,
+  RESETHAND = 0x80000000,
+  RESTORER  = 0x04000000,
+}, multiflags)
+
 S.SA_NOMASK    = S.SA_NODEFER
 S.SA_ONESHOT   = S.SA_RESETHAND
-S.SA_RESTORER  = 0x04000000
 
 -- timers
 S.ITIMER = setmetatable({
