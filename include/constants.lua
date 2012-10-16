@@ -1209,21 +1209,23 @@ S.IFF_UNICAST_FLT = 0x20000
 
 -- netlink multicast groups
 -- legacy names, which are masks.
-S.RTMGRP_LINK            = 1
-S.RTMGRP_NOTIFY          = 2
-S.RTMGRP_NEIGH           = 4
-S.RTMGRP_TC              = 8
-S.RTMGRP_IPV4_IFADDR     = 0x10
-S.RTMGRP_IPV4_MROUTE     = 0x20
-S.RTMGRP_IPV4_ROUTE      = 0x40
-S.RTMGRP_IPV4_RULE       = 0x80
-S.RTMGRP_IPV6_IFADDR     = 0x100
-S.RTMGRP_IPV6_MROUTE     = 0x200
-S.RTMGRP_IPV6_ROUTE      = 0x400
-S.RTMGRP_IPV6_IFINFO     = 0x800
---S.RTMGRP_DECNET_IFADDR   = 0x1000
---S.RTMGRP_DECNET_ROUTE    = 0x4000
-S.RTMGRP_IPV6_PREFIX     = 0x20000
+S.RTMGRP = setmetatable({
+  LINK            = 1,
+  NOTIFY          = 2,
+  NEIGH           = 4,
+  TC              = 8,
+  IPV4_IFADDR     = 0x10,
+  IPV4_MROUTE     = 0x20,
+  IPV4_ROUTE      = 0x40,
+  IPV4_RULE       = 0x80,
+  IPV6_IFADDR     = 0x100,
+  IPV6_MROUTE     = 0x200,
+  IPV6_ROUTE      = 0x400,
+  IPV6_IFINFO     = 0x800,
+--DECNET_IFADDR   = 0x1000,
+--DECNET_ROUTE    = 0x4000,
+  IPV6_PREFIX     = 0x20000,
+}, multiflags)
 
 -- rtnetlink multicast groups (bit numbers not masks)
 S.RTNLGRP_NONE = 0

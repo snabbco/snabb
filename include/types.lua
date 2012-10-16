@@ -378,9 +378,9 @@ metatype("sockaddr_un", "struct sockaddr_un", {
 })
 
 local nlgroupmap = { -- map from netlink socket type to group names. Note there are two forms of name though, bits and shifts.
-  [S.NETLINK.ROUTE] = "RTMGRP_", -- or RTNLGRP_ and shift not mask TODO make shiftflags function
+  [S.NETLINK.ROUTE] = S.RTMGRP, -- or RTNLGRP_ and shift not mask TODO make shiftflags function
   -- add rest of these
-  [S.NETLINK.SELINUX] = "SELNLGRP_",
+--  [S.NETLINK.SELINUX] = S.SELNLGRP,
 }
 
 meth.sockaddr_nl = {
@@ -403,7 +403,7 @@ metatype("sockaddr_nl", "struct sockaddr_nl", {
       local tb = pid
       pid, groups, nltype = tb.nl_pid or tb.pid, tb.nl_groups or tb.groups, tb.type
     end
-    if nltype and nlgroupmap[nltype] then groups = stringflags(groups, nlgroupmap[nltype]) end -- see note about shiftflags
+    if nltype and nlgroupmap[nltype] then groups = nlgroupmap[nltype][groups] end -- see note about shiftflags
     return ffi.new(tp, {nl_family = S.AF.NETLINK, nl_pid = pid, nl_groups = groups})
   end,
 })
