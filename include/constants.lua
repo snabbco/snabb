@@ -812,9 +812,11 @@ S.DT = setmetatable({
 }, stringflag)
 
 -- sync file range
-S.SYNC_FILE_RANGE_WAIT_BEFORE = 1
-S.SYNC_FILE_RANGE_WRITE       = 2
-S.SYNC_FILE_RANGE_WAIT_AFTER  = 4
+S.SYNC_FILE_RANGE = setmetatable({
+  WAIT_BEFORE = 1,
+  WRITE       = 2,
+  WAIT_AFTER  = 4,
+}, multiflags)
 
 -- netlink
 S.NETLINK = setmetatable({

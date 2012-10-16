@@ -796,7 +796,7 @@ function S.fchmodat(dirfd, pathname, mode)
   return retbool(C.fchmodat(getfd_at(dirfd), pathname, S.MODE[mode], 0)) -- no flags actually supported
 end
 function S.sync_file_range(fd, offset, count, flags)
-  return retbool(C.sync_file_range(getfd(fd), offset, count, stringflags(flags, "SYNC_FILE_RANGE_")))
+  return retbool(C.sync_file_range(getfd(fd), offset, count, S.SYNC_FILE_RANGE[flags]))
 end
 
 function S.stat(path, buf)
