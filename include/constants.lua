@@ -758,10 +758,12 @@ S.EPOLL_CTL = setmetatable({
 }, stringflag)
 
 -- splice etc
-S.SPLICE_F_MOVE         = 1
-S.SPLICE_F_NONBLOCK     = 2
-S.SPLICE_F_MORE         = 4
-S.SPLICE_F_GIFT         = 8
+S.SPLICE_F = setmetatable({
+  MOVE         = 1,
+  NONBLOCK     = 2,
+  MORE         = 4,
+  GIFT         = 8,
+}, multiflags)
 
 -- aio - see /usr/include/linux/aio_abi.h
 S.IOCB_CMD = setmetatable({

@@ -1403,16 +1403,16 @@ function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
     offout = t.loff1()
     offout[0] = off_out
   end
-  return retnum(C.splice(getfd(fd_in), offin, getfd(fd_out), offout, len, stringflags(flags, "SPLICE_F_")))
+  return retnum(C.splice(getfd(fd_in), offin, getfd(fd_out), offout, len, S.SPLICE_F[flags]))
 end
 
 function S.vmsplice(fd, iov, flags)
   iov = istype(t.iovecs, iov) or t.iovecs(iov)
-  return retnum(C.vmsplice(getfd(fd), iov.iov, #iov, stringflags(flags, "SPLICE_F_")))
+  return retnum(C.vmsplice(getfd(fd), iov.iov, #iov, S.SPLICE_F[flags]))
 end
 
 function S.tee(fd_in, fd_out, len, flags)
-  return retnum(C.tee(getfd(fd_in), getfd(fd_out), len, stringflags(flags, "SPLICE_F_")))
+  return retnum(C.tee(getfd(fd_in), getfd(fd_out), len, S.SPLICE_F[flags]))
 end
 
 function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "IN_"))) end
