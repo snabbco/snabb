@@ -33,12 +33,12 @@ inet_ntop
 inet_name (uses inet_pton)
 
 temporary, as these are going away.
-stringflags
+stringflags DONE
 flaglist  DONE
 ]]
 
 -- TODO remove when replaced with metatables
-local stringflags = S.stringflags
+local mksigset = S.mksigset
 
 local types = {}
 
@@ -755,7 +755,6 @@ S.addrtype = {
 }
 
 -- signal set handlers TODO replace with metatypes, reuse code from stringflags
-local mksigset = S.mksigset
 
 local function sigismember(set, sig)
   local d = bit.rshift(sig - 1, 5) -- always 32 bits
