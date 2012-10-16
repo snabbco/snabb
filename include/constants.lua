@@ -1041,16 +1041,18 @@ S.IFA = setmetatable({
   MULTICAST = 7,
 }, stringflag)
 
-S.IFA_F_SECONDARY   = 0x01
-S.IFA_F_TEMPORARY   = S.IFA_F_SECONDARY
+S.IFA_F = setmetatable({
+  SECONDARY   = 0x01,
+  NODAD       = 0x02,
+  OPTIMISTIC  = 0x04,
+  DADFAILED   = 0x08,
+  HOMEADDRESS = 0x10,
+  DEPRECATED  = 0x20,
+  TENTATIVE   = 0x40,
+  PERMANENT   = 0x80,
+}, multiflags)
 
-S.IFA_F_NODAD       = 0x02
-S.IFA_F_OPTIMISTIC  = 0x04
-S.IFA_F_DADFAILED   = 0x08
-S.IFA_F_HOMEADDRESS = 0x10
-S.IFA_F_DEPRECATED  = 0x20
-S.IFA_F_TENTATIVE   = 0x40
-S.IFA_F_PERMANENT   = 0x80
+S.IFA_F.TEMPORARY   = S.IFA_F.SECONDARY
 
 -- routing
 S.RTN = setmetatable({

@@ -415,9 +415,7 @@ meth.ifaddr = {
 mt.ifaddr = {
   __index = function(i, k)
     if meth.ifaddr.index[k] then return meth.ifaddr.index[k](i) end
-    local prefix = "IFA_F_"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(i.ifaddr.ifa_flags, S[k]) ~= 0 end
+    if S.IFA_F[k] then return bit.band(i.ifaddr.ifa_flags, S.IFA_F[k]) ~= 0 end
   end
 }
 
@@ -978,7 +976,7 @@ end
 function nl.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
   local family = S.AF[af]
-  local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = stringflags(flags, "IFA_F_"), ifa_index = index}
+  local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = S.IFA_F[flags], ifa_index = index}
   return nlmsg(S.RTM.NEWADDR, S.NLM_F.REQUEST + S.NLM_F.ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
