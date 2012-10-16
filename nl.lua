@@ -176,15 +176,11 @@ local rta_decode = {
 mt.iff = {
   __tostring = function(f)
     local s = {}
-    local flags = {"UP", "BROADCAST", "DEBUG", "LOOPBACK", "POINTOPOINT", "NOTRAILERS", "RUNNING", "NOARP", "PROMISC",
-                   "ALLMULTI", "MASTER", "SLAVE", "MULTICAST", "PORTSEL", "AUTOMEDIA", "DYNAMIC", "LOWER_UP", "DORMANT", "ECHO"}
-    for _, i in pairs(flags) do if f[i] then s[#s + 1] = i end end
+    for k, _ in pairs(S.IFF) do if f[k] then s[#s + 1] = k end end
     return table.concat(s, ' ')
   end,
   __index = function(f, k)
-    local prefix = "IFF_"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(f.flags, S[k]) ~= 0 end
+    if S.IFF[k] then return bit.band(f.flags, S.IFF[k]) ~= 0 end
   end
 }
 
@@ -232,7 +228,7 @@ meth.iflink = {
   },
   fn = {
     setflags = function(i, flags, change)
-      local ok, err = nl.newlink(i, 0, flags, change or S.IFF_ALL)
+      local ok, err = nl.newlink(i, 0, flags, change or S.IFF.ALL)
       if not ok then return nil, err end
       return i:refresh()
     end,
@@ -883,10 +879,10 @@ end
 -- TODO cleanup use of NLMSG tables NLMSG_NEWLINK NLMSG_GETLINK, NLM_F.
 
 function nl.newlink(index, flags, iflags, change, ...)
-  if change == 0 then change = S.IFF_NONE end -- 0 should work, but does not
+  if change == 0 then change = S.IFF.NONE end -- 0 should work, but does not
   flags = S.NLMSG_NEWLINK[flags] -- TODO integrate flags below
   if type(index) == 'table' then index = index.index end
-  local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = stringflags(change, "IFF_")}
+  local ifv = {ifi_index = index, ifi_flags = S.IFF[iflags], ifi_change = S.IFF[change]}
   return nlmsg(S.RTM.NEWLINK, S.NLM_F.REQUEST + S.NLM_F.ACK + flags, nil, t.ifinfomsg, ifv, ...)
 end
 

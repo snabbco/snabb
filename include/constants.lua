@@ -1157,30 +1157,35 @@ S.RTF_POLICY      = 0x04000000
 S.RTF_LOCAL       = 0x80000000
 
 -- interface flags
-S.IFF_UP         = 0x1
-S.IFF_BROADCAST  = 0x2
-S.IFF_DEBUG      = 0x4
-S.IFF_LOOPBACK   = 0x8
-S.IFF_POINTOPOINT= 0x10
-S.IFF_NOTRAILERS = 0x20
-S.IFF_RUNNING    = 0x40
-S.IFF_NOARP      = 0x80
-S.IFF_PROMISC    = 0x100
-S.IFF_ALLMULTI   = 0x200
-S.IFF_MASTER     = 0x400
-S.IFF_SLAVE      = 0x800
-S.IFF_MULTICAST  = 0x1000
-S.IFF_PORTSEL    = 0x2000
-S.IFF_AUTOMEDIA  = 0x4000
-S.IFF_DYNAMIC    = 0x8000
-S.IFF_LOWER_UP   = 0x10000
-S.IFF_DORMANT    = 0x20000
-S.IFF_ECHO       = 0x40000
+S.IFF = setmetatable({
+  UP         = 0x1,
+  BROADCAST  = 0x2,
+  DEBUG      = 0x4,
+  LOOPBACK   = 0x8,
+  POINTOPOINT= 0x10,
+  NOTRAILERS = 0x20,
+  RUNNING    = 0x40,
+  NOARP      = 0x80,
+  PROMISC    = 0x100,
+  ALLMULTI   = 0x200,
+  MASTER     = 0x400,
+  SLAVE      = 0x800,
+  MULTICAST  = 0x1000,
+  PORTSEL    = 0x2000,
+  AUTOMEDIA  = 0x4000,
+  DYNAMIC    = 0x8000,
+  LOWER_UP   = 0x10000,
+  DORMANT    = 0x20000,
+  ECHO       = 0x40000,
+}, multiflags)
 
-S.IFF_ALL        = 0xffffffff
-S.IFF_NONE       = bit.bnot(0x7ffff) -- this is a bit of a fudge as zero should work, but does not for historical reasons see net/core/rtnetlink.c
+S.IFF.ALL        = 0xffffffff
+S.IFF.NONE       = bit.bnot(0x7ffff) -- this is a bit of a fudge as zero should work, but does not for historical reasons see net/core/rtnetlink.c
 
--- not sure if we need these
+S.IFF.VOLATILE = S.IFF.LOOPBACK + S.IFF.POINTOPOINT + S.IFF.BROADCAST + S.IFF.ECHO +
+                 S.IFF.MASTER + S.IFF.SLAVE + S.IFF.RUNNING + S.IFF.LOWER_UP + S.IFF.DORMANT
+
+-- not sure if we need these TODO another table as duplicated values
 S.IFF_SLAVE_NEEDARP = 0x40
 S.IFF_ISATAP        = 0x80
 S.IFF_MASTER_ARPMON = 0x100
@@ -1193,9 +1198,6 @@ S.IFF_BRIDGE_PORT = 0x4000
 S.IFF_OVS_DATAPATH       = 0x8000
 S.IFF_TX_SKB_SHARING     = 0x10000
 S.IFF_UNICAST_FLT = 0x20000
-
-S.IFF_VOLATILE = S.IFF_LOOPBACK + S.IFF_POINTOPOINT + S.IFF_BROADCAST + S.IFF_ECHO +
-                 S.IFF_MASTER + S.IFF_SLAVE + S.IFF_RUNNING + S.IFF_LOWER_UP + S.IFF_DORMANT
 
 -- netlink multicast groups
 -- legacy names, which are masks.
