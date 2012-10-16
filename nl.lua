@@ -949,7 +949,7 @@ local function rtm_table(tab)
   tab.rtm_protocol = S.RTPROT[tab.rtm_protocol]
   tab.rtm_type = S.RTN[tab.rtm_type]
   tab.rtm_scope = S.RT_SCOPE[tab.rtm_scope]
-  tab.rtm_flags = stringflags(tab.rtm_flags, "RTM_F_")
+  tab.rtm_flags = S.RTM_F[tab.rtm_flags]
   tab.rtm_table = S.RT_TABLE[tab.rtm_table]
   return tab
 end

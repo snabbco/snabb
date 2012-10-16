@@ -1093,10 +1093,12 @@ S.RT_SCOPE = setmetatable({
   NOWHERE = 255,
 }, stringflag)
 
-S.RTM_F_NOTIFY          = 0x100
-S.RTM_F_CLONED          = 0x200
-S.RTM_F_EQUALIZE        = 0x400
-S.RTM_F_PREFIX          = 0x800
+S.RTM_F = setmetatable({
+  NOTIFY          = 0x100,
+  CLONED          = 0x200,
+  EQUALIZE        = 0x400,
+  PREFIX          = 0x800,
+}, multiflags)
 
 S.RT_TABLE = setmetatable({
   UNSPEC  = 0,
