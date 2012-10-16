@@ -633,8 +633,13 @@ S.UTIME = setmetatable({
   OMIT = bit.lshift(1, 30) - 2,
 }, stringflag)
 
--- ...at commands TODO metatable but uses flaglist as only some valid
-S.AT_FDCWD = -100
+-- ...at commands note these are valid in different combinations so different tables provided
+S.AT_FDCWD = setmetatable({
+  FDCWD = -100,
+}, stringflag)
+
+--S.AT_FDCWD = -100
+
 S.AT_SYMLINK_NOFOLLOW    = 0x100
 S.AT_REMOVEDIR           = 0x200
 S.AT_SYMLINK_FOLLOW      = 0x400

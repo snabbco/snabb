@@ -153,8 +153,8 @@ local function getfd(fd)
 end
 
 local function getfd_at(fd)
-  if not fd then return S.AT_FDCWD end
-  if type(fd) == "string" then return flaglist(fd, "AT_", {"AT_FDCWD"}) end
+  if not fd then return S.AT_FDCWD.FDCWD end
+  if type(fd) == "string" then return S.AT_FDCWD[fd] end
   return getfd(fd)
 end
 
