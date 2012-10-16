@@ -1375,7 +1375,7 @@ S.EFD_SEMAPHORE = 1
 S.EFD_CLOEXEC = octal("02000000")
 S.EFD_NONBLOCK = octal("04000")
 
--- mount and umount
+-- mount
 S.MS_RDONLY = 1
 S.MS_NOSUID = 2
 S.MS_NODEV = 4
@@ -1406,15 +1406,23 @@ S.MS_NOUSER = bit.lshift(1, 31)
 S.MS_RO = S.MS_RDONLY -- allow use of "ro" as flag as that is what /proc/mounts uses
 S.MS_RW = 0           -- allow use of "rw" as flag as appears in /proc/mounts
 
+-- flags to `msync'. - note same prefix
+S.MS_ASYNC       = 1
+S.MS_SYNC        = 4
+S.MS_INVALIDATE  = 2
+
 S.MNT_FORCE = 1
 S.MNT_DETACH = 2
 S.MNT_EXPIRE = 4
 S.UMOUNT_NOFOLLOW = 8
 
--- flags to `msync'.
-S.MS_ASYNC       = 1
-S.MS_SYNC        = 4
-S.MS_INVALIDATE  = 2
+-- one table for umount as it uses MNT_ and UMOUNT_ options
+S.UMOUNT = setmetatable({
+  FORCE    = 1,
+  DETACH   = 2,
+  EXPIRE   = 4,
+  NOFOLLOW = 8,
+}, multiflags)
 
 -- reboot
 S.LINUX_REBOOT_CMD = setmetatable({

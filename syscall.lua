@@ -1350,8 +1350,7 @@ function S.mount(source, target, filesystemtype, mountflags, data)
 end
 
 function S.umount(target, flags)
-  if flags then return retbool(C.umount2(target, flaglist(flags, "", {"MNT_FORCE", "MNT_DETACH", "MNT_EXPIRE", "UMOUNT_NOFOLLOW"}))) end
-  return retbool(C.umount(target))
+  return retbool(C.umount2(target, S.UMOUNT[flags]))
 end
 
 -- unlimited value. TODO metatype should return this to Lua.

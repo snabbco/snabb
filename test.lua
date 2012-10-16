@@ -1994,7 +1994,7 @@ test_misc_root = {
   test_mount = function()
     assert(S.mkdir(tmpfile))
     assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
-    assert(S.umount(tmpfile, "mnt_detach, umount_nofollow"))
+    assert(S.umount(tmpfile, "detach, nofollow"))
     assert(S.rmdir(tmpfile))
   end,
   test_mount_table = function()
