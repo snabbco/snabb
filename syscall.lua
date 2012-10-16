@@ -864,7 +864,7 @@ function S.futimens(fd, ts)
 end
 
 function S.utimensat(dirfd, path, ts, flags)
-  return retbool(C.utimensat(getfd_at(dirfd), path, gettimespec2(ts), flaglist(flags, "AT_", {"AT_SYMLINK_NOFOLLOW"})))
+  return retbool(C.utimensat(getfd_at(dirfd), path, gettimespec2(ts), S.AT_SYMLINK_NOFOLLOW[flags]))
 end
 
 -- because you can just pass floats to all the time functions, just use the same one, but provide different templates
