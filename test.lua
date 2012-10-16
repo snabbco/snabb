@@ -1522,7 +1522,7 @@ test_netlink = {
     end
   end,
   test_netlink_veth_root = function()
-    assert(nl.newlink(0, S.NLM_F_CREATE, 0, 0, "linkinfo", {"kind", "veth", "data", {"peer", {t.ifinfomsg, {}, "ifname", "veth1"}}}, "ifname", "veth0"))
+    assert(nl.newlink(0, S.NLMSG_NEWLINK.CREATE, 0, 0, "linkinfo", {"kind", "veth", "data", {"peer", {t.ifinfomsg, {}, "ifname", "veth1"}}}, "ifname", "veth0"))
     local i = assert(nl.interfaces())
     assert(i.veth0, "expect veth0")
     assert(i.veth1, "expect veth1")

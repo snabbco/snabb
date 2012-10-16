@@ -880,24 +880,25 @@ local function nlmsg(ntype, flags, af, ...)
 end
 
 -- TODO do not have all these different arguments for these functions, pass a table for initialization. See also iplink.
+-- TODO cleanup use of NLMSG tables NLMSG_NEWLINK NLMSG_GETLINK, NLM_F.
 
 function nl.newlink(index, flags, iflags, change, ...)
   if change == 0 then change = S.IFF_NONE end -- 0 should work, but does not
-  flags = stringflags(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
+  flags = S.NLMSG_NEWLINK[flags] -- TODO integrate flags below
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = stringflags(iflags, "IFF_"), ifi_change = stringflags(change, "IFF_")}
-  return nlmsg(S.RTM.NEWLINK, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, nil, t.ifinfomsg, ifv, ...)
+  return nlmsg(S.RTM.NEWLINK, S.NLM_F.REQUEST + S.NLM_F.ACK + flags, nil, t.ifinfomsg, ifv, ...)
 end
 
 function nl.dellink(index, ...)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index}
-  return nlmsg(S.RTM.DELLINK, S.NLM_F_REQUEST + S.NLM_F_ACK, nil, t.ifinfomsg, ifv, ...)
+  return nlmsg(S.RTM.DELLINK, S.NLM_F.REQUEST + S.NLM_F.ACK, nil, t.ifinfomsg, ifv, ...)
 end
 
 -- read interfaces and details.
 function nl.getlink(...)
-  return nlmsg(S.RTM.GETLINK, S.NLM_F_REQUEST + S.NLM_F_DUMP, nil, t.rtgenmsg, {rtgen_family = S.AF.PACKET}, ...)
+  return nlmsg(S.RTM.GETLINK, S.NLM_F.REQUEST + S.NLMSG_GETLINK.DUMP, nil, t.rtgenmsg, {rtgen_family = S.AF.PACKET}, ...)
 end
 
 -- read routes
@@ -907,7 +908,7 @@ function nl.getroute(af, tp, tab, prot, scope, ...)
   tab = S.RT_TABLE[tab]
   prot = S.RTPROT[prot]
   scope = S.RT_SCOPE[scope]
-  local r, err = nlmsg(S.RTM.GETROUTE, S.NLM_F_REQUEST + S.NLM_F_DUMP, af, t.rtmsg,
+  local r, err = nlmsg(S.RTM.GETROUTE, S.NLM_F.REQUEST + S.NLMSG_GETLINK.DUMP, af, t.rtmsg,
                    {rtm_family = af, rtm_table = tab, rtm_protocol = prot, rtm_type = tp, rtm_scope = scope})
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
@@ -957,23 +958,24 @@ local function rtm_table(tab)
   return tab
 end
 
--- this time experiment using table as so many params, plus they are just to init struct.
+-- this time experiment using table as so many params, plus they are just to init struct. TODO flag cleanup
 function nl.newroute(flags, tab, ...)
   tab = rtm_table(tab)
-  flags = stringflags(flags, "NLM_F_") -- for replace, excl, create, append, TODO only allow these
-  return nlmsg(S.RTM.NEWROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK + flags, tab.rtm_family, t.rtmsg, tab, ...)
+  flags = S.NLMSG_NEWLINK[flags]
+  return nlmsg(S.RTM.NEWROUTE, S.NLM_F.REQUEST + S.NLM_F.ACK + flags, tab.rtm_family, t.rtmsg, tab, ...)
 end
 
+-- TODO flag cleanup
 function nl.delroute(tp, ...)
   tp = rtm_table(tp)
-  return nlmsg(S.RTM.DELROUTE, S.NLM_F_REQUEST + S.NLM_F_ACK, tp.rtm_family, t.rtmsg, tp, ...)
+  return nlmsg(S.RTM.DELROUTE, S.NLM_F.REQUEST + S.NLM_F.ACK, tp.rtm_family, t.rtmsg, tp, ...)
 end
 
--- read addresses from interface
+-- read addresses from interface TODO flag cleanup
 function nl.getaddr(af, ...)
   local family = S.AF[af]
   local ifav = {ifa_family = family}
-  return nlmsg(S.RTM.GETADDR, S.NLM_F_REQUEST + S.NLM_F_ROOT, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(S.RTM.GETADDR, S.NLM_F.REQUEST + S.NLMSG_GETLINK.ROOT, family, t.ifaddrmsg, ifav, ...)
 end
 
 -- TODO may need ifa_scope
@@ -981,14 +983,14 @@ function nl.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
   local family = S.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = stringflags(flags, "IFA_F_"), ifa_index = index}
-  return nlmsg(S.RTM.NEWADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(S.RTM.NEWADDR, S.NLM_F.REQUEST + S.NLM_F.ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
 function nl.deladdr(index, af, prefixlen, ...)
   if type(index) == 'table' then index = index.index end
   local family = S.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
-  return nlmsg(S.RTM.DELADDR, S.NLM_F_REQUEST + S.NLM_F_ACK, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(S.RTM.DELADDR, S.NLM_F.REQUEST + S.NLM_F.ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
 function nl.interfaces() -- returns with address info too.
@@ -1065,8 +1067,9 @@ function nl.iplink(tab)
   return nl.newlink(unpack(args))
 end
 
+-- TODO iplink may not be appropriate always sort out flags
 function nl.create_interface(tab)
-  tab.modifier = S.NLM_F_CREATE
+  tab.modifier = S.NLMSG_NEWLINK.CREATE
   return nl.iplink(tab)
 end
 

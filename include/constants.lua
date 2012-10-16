@@ -815,20 +815,36 @@ S.NETLINK = setmetatable({
   ECRYPTFS      = 19,
 }, stringflag)
 
-S.NLM_F_REQUEST = 1
-S.NLM_F_MULTI   = 2
-S.NLM_F_ACK     = 4
-S.NLM_F_ECHO    = 8
+-- see man netlink(7) for details. NLM_F_ is generic, actually use NLMSG_GET, NLMSG_NEW. TODO cleanup usage.
+S.NLM_F = setmetatable({
+  REQUEST = 1,
+  MULTI   = 2,
+  ACK     = 4,
+  ECHO    = 8,
+}, multiflags)
 
-S.NLM_F_ROOT    = 0x100
-S.NLM_F_MATCH   = 0x200
-S.NLM_F_ATOMIC  = 0x400
-S.NLM_F_DUMP    = bit.bor(S.NLM_F_ROOT, S.NLM_F_MATCH)
+S.NLMSG_GETLINK = setmetatable({
+  REQUEST = 1,
+  MULTI   = 2,
+  ACK     = 4,
+  ECHO    = 8,
+  ROOT    = 0x100,
+  MATCH   = 0x200,
+  ATOMIC  = 0x400,
+}, multiflags)
 
-S.NLM_F_REPLACE = 0x100
-S.NLM_F_EXCL    = 0x200
-S.NLM_F_CREATE  = 0x400
-S.NLM_F_APPEND  = 0x800
+S.NLMSG_GETLINK.DUMP = bit.bor(S.NLMSG_GETLINK.ROOT, S.NLMSG_GETLINK.MATCH)
+
+S.NLMSG_NEWLINK = setmetatable({
+  REQUEST = 1,
+  MULTI   = 2,
+  ACK     = 4,
+  ECHO    = 8,
+  REPLACE = 0x100,
+  EXCL    = 0x200,
+  CREATE  = 0x400,
+  APPEND  = 0x800,
+}, multiflags)
 
 -- generic types. These are part of same sequence as RTM
 S.NLMSG = setmetatable({
