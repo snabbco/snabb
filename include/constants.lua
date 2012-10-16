@@ -1401,9 +1401,11 @@ S.IPPROTO = setmetatable({
 }, stringflag)
 
 -- eventfd
-S.EFD_SEMAPHORE = 1
-S.EFD_CLOEXEC = octal("02000000")
-S.EFD_NONBLOCK = octal("04000")
+S.EFD = setmetatable({
+  SEMAPHORE = 1,
+  CLOEXEC = octal("02000000"),
+  NONBLOCK = octal("04000"),
+}, multiflags)
 
 -- mount
 S.MS_RDONLY = 1
@@ -1490,7 +1492,7 @@ S.CLONE_NEWPID   = 0x20000000
 S.CLONE_NEWNET   = 0x40000000
 S.CLONE_IO       = 0x80000000
 
--- inotify
+-- inotify TODO note conflicts
 -- flags
 S.IN_CLOEXEC = octal("02000000")
 S.IN_NONBLOCK = octal("04000")

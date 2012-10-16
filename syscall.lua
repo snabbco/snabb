@@ -1445,7 +1445,7 @@ function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two differen
   return {count = tonumber(ret), offset = tonumber(off[0])}
 end
 
-function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, stringflags(flags, "EFD_"))) end
+function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, S.EFD[flags])) end
 -- eventfd read and write helpers, as in glibc but Lua friendly. Note returns 0 for EAGAIN, as 0 never returned directly
 -- returns Lua number - if you need all 64 bits, pass your own value in and use that for the exact result
 function S.eventfd_read(fd, value)
