@@ -610,7 +610,7 @@ function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, g
 function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
 function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
 function S.fchownat(dirfd, path, owner, group, flags)
-  return retbool(C.fchownat(getfd_at(dirfd), path, owner or -1, group or -1, flaglist(flags, "AT_", {"AT_SYMLINK_NOFOLLOW"})))
+  return retbool(C.fchownat(getfd_at(dirfd), path, owner or -1, group or -1, S.AT_SYMLINK_NOFOLLOW[flags]))
 end
 
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
@@ -618,7 +618,7 @@ function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) 
 
 function S.access(pathname, mode) return retbool(C.access(pathname, accessflags(mode))) end
 function S.faccessat(dirfd, pathname, mode, flags)
-  return retbool(C.faccessat(getfd_at(dirfd), pathname, accessflags(mode), flaglist(flags, "AT_", {"AT_EACCESS", "AT_SYMLINK_NOFOLLOW"})))
+  return retbool(C.faccessat(getfd_at(dirfd), pathname, accessflags(mode), S.AT_ACCESSAT[flags]))
 end
 
 function S.readlink(path, buffer, size)
@@ -844,7 +844,7 @@ end
 
 function S.fstatat(fd, path, buf, flags)
   if not buf then buf = t.stat() end
-  local ret = C.fstatat(getfd_at(fd), path, buf, flaglist(flags, "AT_", {"AT_NO_AUTOMOUNT", "AT_SYMLINK_NOFOLLOW"}))
+  local ret = C.fstatat(getfd_at(fd), path, buf, S.AT_FSTATAT[flags])
   if ret == -1 then return nil, t.error() end
   return buf
 end
