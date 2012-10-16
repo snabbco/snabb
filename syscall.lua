@@ -72,25 +72,6 @@ function S.stringflags(str, prefix) -- allows multiple comma sep flags that are 
   return f
 end
 
-function S.flaglist(str, prefix, list) -- flags from a list. TODO memoize using table
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  local list2 = {}
-  for _, v in ipairs(list) do list2[v] = true end
-  local f = 0
-  local a = split(",", str)
-  local ts, s, val
-  for i, v in ipairs(a) do
-    ts = trim(v)
-    s = ts:upper()
-    if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
-    val = S[s]
-    if not list2[s] or not val then error("invalid flag: " .. v) end
-    f = bit.bor(f, val)
-  end
-  return f
-end
-
 local t, pt, s, ctypes -- t used below.
 
 -- TODO all metatypes too
@@ -110,7 +91,7 @@ function S.mksigset(str)
 end
 
 -- TODO remove when replaced with metatables
-local stringflags, flaglist, mksigset = S.stringflags, S.flaglist, S.mksigset
+local stringflags, mksigset = S.stringflags, S.mksigset
 
 local types = require("include/types")(S)
 
