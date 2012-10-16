@@ -432,13 +432,13 @@ meth.stat = {
     mtime = function(st) return tonumber(st.st_mtime) end,
     major = function(st) return S.major(st.st_rdev) end,
     minor = function(st) return S.minor(st.st_rdev) end,
-    isreg = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFREG end,
-    isdir = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFDIR end,
-    ischr = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFCHR end,
-    isblk = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFBLK end,
-    isfifo = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFIFO end,
-    islnk = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFLNK end,
-    issock = function(st) return bit.band(st.st_mode, S.S_IFMT) == S.S_IFSOCK end,
+    isreg = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFREG end,
+    isdir = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFDIR end,
+    ischr = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFCHR end,
+    isblk = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFBLK end,
+    isfifo = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFIFO end,
+    islnk = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFLNK end,
+    issock = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFSOCK end,
   }
 }
 

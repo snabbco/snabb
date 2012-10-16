@@ -322,7 +322,7 @@ test_file_operations = {
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(fd:fchmod("IRUSR, IWUSR"))
     local st = fd:stat()
-    assert_equal(st.mode, S.mode("IFREG, IRUSR, IWUSR"))
+    assert_equal(st.mode, S.S["IFREG, IRUSR, IWUSR"]) -- TODO should be better way to test
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
@@ -971,7 +971,7 @@ test_misc = {
     local mask
     mask = S.umask("IWGRP, IWOTH")
     mask = S.umask("IWGRP, IWOTH")
-    assert_equal(mask, S.S_IWGRP + S.S_IWOTH, "umask not set correctly")
+    assert_equal(mask, S.S.IWGRP + S.S.IWOTH, "umask not set correctly")
   end,
   test_sysinfo = function()
     local i = assert(S.sysinfo()) -- TODO test values returned for some sanity

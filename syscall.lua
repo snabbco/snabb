@@ -155,9 +155,6 @@ local function accessflags(s) -- allow "rwx"
   return flag
 end
 
--- useful for comparing modes etc
-function S.mode(mode) return stringflags(mode, "S_") end
-
 -- metatables for Lua types not ffi types
 
 mt.wait = {
@@ -488,12 +485,12 @@ if not pcall(inlibc, "pivot_root") then C.pivot_root = CC.pivot_root end
 -- main definitions start here
 function S.open(pathname, flags, mode)
   flags = bit.bor(stringflags(flags, "O_"), S.O_LARGEFILE or 0)
-  return retfd(C.open(pathname, flags, S.mode(mode)))
+  return retfd(C.open(pathname, flags, S.MODE[mode]))
 end
 
 function S.openat(dirfd, pathname, flags, mode)
   flags = bit.bor(stringflags(flags, "O_"), S.O_LARGEFILE or 0)
-  return retfd(C.openat(getfd_at(dirfd), pathname, flags, S.mode(mode)))
+  return retfd(C.openat(getfd_at(dirfd), pathname, flags, S.MODE[mode]))
 end
 
 -- TODO dup3 can have a race condition (see man page) although Musl fixes, appears eglibc does not
@@ -564,7 +561,7 @@ function S.close(fd)
   return true
 end
 
-function S.creat(pathname, mode) return retfd(C.creat(pathname, S.mode(mode))) end
+function S.creat(pathname, mode) return retfd(C.creat(pathname, S.MODE[mode])) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.unlinkat(dirfd, path, flags)
   return retbool(C.unlinkat(getfd_at(dirfd), path, S.AT_REMOVEDIR[flags]))
@@ -574,11 +571,11 @@ function S.renameat(olddirfd, oldpath, newdirfd, newpath)
   return retbool(C.renameat(getfd_at(olddirfd), oldpath, getfd_at(newdirfd), newpath))
 end
 function S.chdir(path) return retbool(C.chdir(path)) end
-function S.mkdir(path, mode) return retbool(C.mkdir(path, S.mode(mode))) end
-function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(getfd_at(fd), path, S.mode(mode))) end
+function S.mkdir(path, mode) return retbool(C.mkdir(path, S.MODE[mode])) end
+function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(getfd_at(fd), path, S.MODE[mode])) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.acct(filename) return retbool(C.acct(filename)) end
-function S.chmod(path, mode) return retbool(C.chmod(path, S.mode(mode))) end
+function S.chmod(path, mode) return retbool(C.chmod(path, S.MODE[mode])) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
   return retbool(C.linkat(getfd_at(olddirfd), oldpath, getfd_at(newdirfd), newpath, S.AT_SYMLINK_FOLLOW[flags]))
@@ -619,15 +616,15 @@ function S.readlinkat(dirfd, path, buffer, size)
 end
 
 function S.mknod(pathname, mode, dev)
-  return retbool(C.mknod(pathname, stringflags(mode, "S_"), dev or 0))
+  return retbool(C.mknod(pathname, S.S[mode], dev or 0))
 end
 function S.mknodat(fd, pathname, mode, dev)
-  return retbool(C.mknodat(getfd_at(fd), pathname, stringflags(mode, "S_"), dev or 0))
+  return retbool(C.mknodat(getfd_at(fd), pathname, S.S[mode], dev or 0))
 end
 
 -- mkfifo is from man(3), add for convenience
-function S.mkfifo(path, mode) return S.mknod(path, bit.bor(stringflags(mode, "S_"), S.S_IFIFO)) end
-function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(stringflags(mode, "S_"), S.S_IFIFO), 0) end
+function S.mkfifo(path, mode) return S.mknod(path, bit.bor(S.S[mode], S.S.IFIFO)) end
+function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(S.S[mode], S.S.IFIFO), 0) end
 
 local function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
   ffi.errno(0)
@@ -794,9 +791,9 @@ end
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
-function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), S.mode(mode))) end
+function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), S.MODE[mode])) end
 function S.fchmodat(dirfd, pathname, mode)
-  return retbool(C.fchmodat(getfd_at(dirfd), pathname, S.mode(mode), 0)) -- no flags actually supported
+  return retbool(C.fchmodat(getfd_at(dirfd), pathname, S.MODE[mode], 0)) -- no flags actually supported
 end
 function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.sync_file_range(getfd(fd), offset, count, stringflags(flags, "SYNC_FILE_RANGE_")))
@@ -1788,7 +1785,7 @@ function S.setgroups(groups)
   return retbool(C.setgroups(groups.count, groups.list))
 end
 
-function S.umask(mask) return C.umask(S.mode(mask)) end
+function S.umask(mask) return C.umask(S.MODE[mask]) end
 
 function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
 function S.setsid() return retnum(C.setsid()) end

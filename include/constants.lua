@@ -127,31 +127,47 @@ else -- generic values from asm-generic
   S.O_NOFOLLOW  = octal('0400000')
 end
 
--- modes
-S.S_IFMT   = octal('0170000')
-S.S_IFSOCK = octal('0140000')
-S.S_IFLNK  = octal('0120000')
-S.S_IFREG  = octal('0100000')
-S.S_IFBLK  = octal('0060000')
-S.S_IFDIR  = octal('0040000')
-S.S_IFCHR  = octal('0020000')
-S.S_IFIFO  = octal('0010000')
-S.S_ISUID  = octal('0004000')
-S.S_ISGID  = octal('0002000')
-S.S_ISVTX  = octal('0001000')
+-- modes and file types. note renamed second set from S_ to MODE_ plus note split
+S.S = setmetatable({
+  IFMT   = octal('0170000'),
+  IFSOCK = octal('0140000'),
+  IFLNK  = octal('0120000'),
+  IFREG  = octal('0100000'),
+  IFBLK  = octal('0060000'),
+  IFDIR  = octal('0040000'),
+  IFCHR  = octal('0020000'),
+  IFIFO  = octal('0010000'),
+  ISUID  = octal('0004000'),
+  ISGID  = octal('0002000'),
+  ISVTX  = octal('0001000'),
+  IRWXU  = octal('00700'),
+  IRUSR  = octal('00400'),
+  IWUSR  = octal('00200'),
+  IXUSR  = octal('00100'),
+  IRWXG  = octal('00070'),
+  IRGRP  = octal('00040'),
+  IWGRP  = octal('00020'),
+  IXGRP  = octal('00010'),
+  IRWXO  = octal('00007'),
+  IROTH  = octal('00004'),
+  IWOTH  = octal('00002'),
+  IXOTH  = octal('00001'),
+}, multiflags)
 
-S.S_IRWXU = octal('00700')
-S.S_IRUSR = octal('00400')
-S.S_IWUSR = octal('00200')
-S.S_IXUSR = octal('00100')
-S.S_IRWXG = octal('00070')
-S.S_IRGRP = octal('00040')
-S.S_IWGRP = octal('00020')
-S.S_IXGRP = octal('00010')
-S.S_IRWXO = octal('00007')
-S.S_IROTH = octal('00004')
-S.S_IWOTH = octal('00002')
-S.S_IXOTH = octal('00001')
+S.MODE = setmetatable({
+  IRWXU = octal('00700'),
+  IRUSR = octal('00400'),
+  IWUSR = octal('00200'),
+  IXUSR = octal('00100'),
+  IRWXG = octal('00070'),
+  IRGRP = octal('00040'),
+  IWGRP = octal('00020'),
+  IXGRP = octal('00010'),
+  IRWXO = octal('00007'),
+  IROTH = octal('00004'),
+  IWOTH = octal('00002'),
+  IXOTH = octal('00001'),
+}, multiflags)
 
 -- access
 S.R_OK = 4
