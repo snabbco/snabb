@@ -638,10 +638,13 @@ S.AT_FDCWD = setmetatable({
   FDCWD = -100,
 }, stringflag)
 
---S.AT_FDCWD = -100
+S.AT_REMOVEDIR = setmetatable({
+  REMOVEDIR = 0x200,
+}, multiflags)
 
+--S.AT_FDCWD = -100
 S.AT_SYMLINK_NOFOLLOW    = 0x100
-S.AT_REMOVEDIR           = 0x200
+--S.AT_REMOVEDIR           = 0x200
 S.AT_SYMLINK_FOLLOW      = 0x400
 S.AT_NO_AUTOMOUNT        = 0x800
 S.AT_EACCESS             = 0x200

@@ -586,7 +586,7 @@ end
 function S.creat(pathname, mode) return retfd(C.creat(pathname, S.mode(mode))) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.unlinkat(dirfd, path, flags)
-  return retbool(C.unlinkat(getfd_at(dirfd), path, flaglist(flags, "AT_", {"AT_REMOVEDIR"})))
+  return retbool(C.unlinkat(getfd_at(dirfd), path, S.AT_REMOVEDIR[flags]))
 end
 function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
 function S.renameat(olddirfd, oldpath, newdirfd, newpath)
