@@ -33,11 +33,12 @@ inet_ntop
 inet_name (uses inet_pton)
 
 temporary, as these are going away.
-stringflags, flaglist
+stringflags
+flaglist  DONE
 ]]
 
 -- TODO remove when replaced with metatables
-local stringflags, flaglist = S.stringflags, S.flaglist
+local stringflags = S.stringflags
 
 local types = {}
 
