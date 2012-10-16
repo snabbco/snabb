@@ -1598,12 +1598,12 @@ test_events = {
   test_poll = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local c, s = sv[1], sv[2]
-    local pev = {{fd = c, events = S.POLLIN}}
+    local pev = {{fd = c, events = S.POLL.IN}}
     local p = assert(S.poll(pev, 0))
     assert(p[1].fd == c:getfd() and p[1].revents == 0, "one event now")
     assert(s:write(teststring))
     local p = assert(S.poll(pev, 0))
-    assert(p[1].fd == c:getfd() and p[1].POLLIN, "one event now")
+    assert(p[1].fd == c:getfd() and p[1].IN, "one event now")
     assert(c:read())
     assert(s:close())
     assert(c:close())
@@ -1611,12 +1611,12 @@ test_events = {
   test_ppoll = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local c, s = sv[1], sv[2]
-    local pev = {{fd = c, events = S.POLLIN}}
+    local pev = {{fd = c, events = S.POLL.IN}}
     local p = assert(S.ppoll(pev, 0, nil))
     assert(p[1].fd == c:getfd() and p[1].revents == 0, "one event now")
     assert(s:write(teststring))
     local p = assert(S.ppoll(pev, nil, "alrm"))
-    assert(p[1].fd == c:getfd() and p[1].POLLIN, "one event now")
+    assert(p[1].fd == c:getfd() and p[1].IN, "one event now")
     assert(c:read())
     assert(s:close())
     assert(c:close())

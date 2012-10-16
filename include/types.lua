@@ -660,9 +660,7 @@ t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs) 
 metatype("pollfd", "struct pollfd", {
   __index = function(t, k)
     if k == 'getfd' then return t.fd end -- TODO use meth
-    local prefix = "POLL"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    return bit.band(t.revents, S[k]) ~= 0
+    return bit.band(t.revents, S.POLL[k]) ~= 0
   end
 })
 
@@ -681,7 +679,7 @@ mt.pollfds = {
     local fds = ffi.new(tp, count, count)
     for n = 1, count do
       fds[n].fd = ps[n].fd:getfd()
-      fds[n].events = stringflags(ps[n].events, "POLL")
+      fds[n].events = S.POLL[ps[n].events]
       fds[n].revents = 0
     end
     return fds

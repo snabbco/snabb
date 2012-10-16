@@ -717,19 +717,21 @@ S.TFD_TIMER = setmetatable({
 }, stringflag)
 
 -- poll
-S.POLLIN          = 0x001
-S.POLLPRI         = 0x002
-S.POLLOUT         = 0x004
-S.POLLRDNORM      = 0x040
-S.POLLRDBAND      = 0x080
-S.POLLWRNORM      = 0x100
-S.POLLWRBAND      = 0x200
-S.POLLMSG         = 0x400
-S.POLLREMOVE      = 0x1000
-S.POLLRDHUP       = 0x2000
-S.POLLERR         = 0x008
-S.POLLHUP         = 0x010
-S.POLLNVAL        = 0x020
+S.POLL = setmetatable({
+  IN          = 0x001,
+  PRI         = 0x002,
+  OUT         = 0x004,
+  ERR         = 0x008,
+  HUP         = 0x010,
+  NVAL        = 0x020,
+  RDNORM      = 0x040,
+  RDBAND      = 0x080,
+  WRNORM      = 0x100,
+  WRBAND      = 0x200,
+  MSG         = 0x400,
+  REMOVE      = 0x1000,
+  RDHUP       = 0x2000,
+}, multiflags)
 
 -- epoll
 S.EPOLL_CLOEXEC = octal("02000000")
