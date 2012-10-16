@@ -481,7 +481,9 @@ S.SI = setmetatable({
   KERNEL = 0x80,
 }, stringflag)
 
-S.ILL = setmetatable({
+-- note renamed ILL to SIGILL etc as POLL clashes
+
+S.SIGILL = setmetatable({
   ILLOPC = 1,
   ILLOPN = 2,
   ILLADR = 3,
@@ -492,7 +494,7 @@ S.ILL = setmetatable({
   BADSTK = 8,
 }, stringflag)
 
-S.FPE = setmetatable({
+S.SIGFPE = setmetatable({
   INTDIV = 1,
   INTOVF = 2,
   FLTDIV = 3,
@@ -503,23 +505,23 @@ S.FPE = setmetatable({
   FLTSUB = 8,
 }, stringflag)
 
-S.SEGV = setmetatable({
+S.SIGSEGV = setmetatable({
   MAPERR = 1,
   ACCERR = 2,
 }, stringflag)
 
-S.BUS = setmetatable({
+S.SIGBUS = setmetatable({
   ADRALN = 1,
   ADRERR = 2,
   OBJERR = 3,
 }, stringflag)
 
-S.TRAP = setmetatable({
+S.SIGTRAP = setmetatable({
   BRKPT = 1,
   TRACE = 2,
 }, stringflag)
 
-S.CLD = setmetatable({
+S.SIGCLD = setmetatable({
   EXITED    = 1,
   KILLED    = 2,
   DUMPED    = 3,
@@ -528,7 +530,7 @@ S.CLD = setmetatable({
   CONTINUED = 6,
 }, stringflag)
 
-S.POLL = setmetatable({
+S.SIGPOLL = setmetatable({
   IN  = 1,
   OUT = 2,
   MSG = 3,

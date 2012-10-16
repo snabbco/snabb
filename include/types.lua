@@ -68,37 +68,37 @@ for k, v in pairs(S.SI) do
 end
 
 signal_reasons[S.SIG.ILL] = {}
-for k, v in pairs(S.ILL) do
+for k, v in pairs(S.SIGILL) do
   signal_reasons[S.SIG.ILL][v] = k
 end
 
 signal_reasons[S.SIG.FPE] = {}
-for k, v in pairs(S.FPE) do
+for k, v in pairs(S.SIGFPE) do
   signal_reasons[S.SIG.FPE][v] = k
 end
 
 signal_reasons[S.SIG.SEGV] = {}
-for k, v in pairs(S.SEGV) do
+for k, v in pairs(S.SIGSEGV) do
   signal_reasons[S.SIG.SEGV][v] = k
 end
 
 signal_reasons[S.SIG.BUS] = {}
-for k, v in pairs(S.BUS) do
+for k, v in pairs(S.SIGBUS) do
   signal_reasons[S.SIG.BUS][v] = k
 end
 
 signal_reasons[S.SIG.TRAP] = {}
-for k, v in pairs(S.TRAP) do
+for k, v in pairs(S.SIGTRAP) do
   signal_reasons[S.SIG.TRAP][v] = k
 end
 
 signal_reasons[S.SIG.CHLD] = {}
-for k, v in pairs(S.CLD) do
+for k, v in pairs(S.SIGCLD) do
   signal_reasons[S.SIG.CHLD][v] = k
 end
 
 signal_reasons[S.SIG.POLL] = {}
-for k, v in pairs(S.POLL) do
+for k, v in pairs(S.SIGPOLL) do
   signal_reasons[S.SIG.POLL][v] = k
 end
 

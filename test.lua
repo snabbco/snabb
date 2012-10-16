@@ -1771,7 +1771,7 @@ test_processes = {
       local w = assert(S.waitid("all", 0, "exited, stopped, continued"))
       assert(w.si_signo == S.SIG.CHLD, "waitid to return SIGCHLD")
       assert(w.si_status == 23, "exit should be 23")
-      assert(w.si_code == S.CLD.EXITED, "normal exit expected")
+      assert(w.si_code == S.SIGCLD.EXITED, "normal exit expected")
     end
 
     pid = assert(S.fork())
