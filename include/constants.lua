@@ -709,8 +709,10 @@ S.RLIMIT = setmetatable({
 S.RLIMIT.OFILE = S.RLIMIT.NOFILE
 
 -- timerfd
-S.TFD_CLOEXEC = octal("02000000")
-S.TFD_NONBLOCK = octal("04000")
+S.TFD = setmetatable({
+  CLOEXEC = octal("02000000"),
+  NONBLOCK = octal("04000"),
+}, multiflags)
 
 S.TFD_TIMER = setmetatable({
   ABSTIME = 1,

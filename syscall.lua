@@ -1489,7 +1489,7 @@ function S.setitimer(which, it)
 end
 
 function S.timerfd_create(clockid, flags)
-  return retfd(C.timerfd_create(S.CLOCK[clockid], stringflags(flags, "TFD_")))
+  return retfd(C.timerfd_create(S.CLOCK[clockid], S.TFD[flags]))
 end
 
 function S.timerfd_settime(fd, flags, it, oldtime)
