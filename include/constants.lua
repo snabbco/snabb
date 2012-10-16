@@ -1428,41 +1428,46 @@ S.EFD = setmetatable({
 }, multiflags)
 
 -- mount
-S.MS_RDONLY = 1
-S.MS_NOSUID = 2
-S.MS_NODEV = 4
-S.MS_NOEXEC = 8
-S.MS_SYNCHRONOUS = 16
-S.MS_REMOUNT = 32
-S.MS_MANDLOCK = 64
-S.MS_DIRSYNC = 128
-S.MS_NOATIME = 1024
-S.MS_NODIRATIME = 2048
-S.MS_BIND = 4096
-S.MS_MOVE = 8192
-S.MS_REC = 16384
-S.MS_SILENT = 32768
-S.MS_POSIXACL = bit.lshift(1, 16)
-S.MS_UNBINDABLE = bit.lshift(1, 17)
-S.MS_PRIVATE = bit.lshift(1, 18)
-S.MS_SLAVE = bit.lshift(1, 19)
-S.MS_SHARED = bit.lshift(1, 20)
-S.MS_RELATIME = bit.lshift(1, 21)
-S.MS_KERNMOUNT = bit.lshift(1, 22)
-S.MS_I_VERSION = bit.lshift(1, 23)
-S.MS_STRICTATIME = bit.lshift(1, 24)
-S.MS_ACTIVE = bit.lshift(1, 30)
-S.MS_NOUSER = bit.lshift(1, 31)
+S.MS = setmetatable({
+  RDONLY = 1,
+  NOSUID = 2,
+  NODEV = 4,
+  NOEXEC = 8,
+  SYNCHRONOUS = 16,
+  REMOUNT = 32,
+  MANDLOCK = 64,
+  DIRSYNC = 128,
+  NOATIME = 1024,
+  NODIRATIME = 2048,
+  BIND = 4096,
+  MOVE = 8192,
+  REC = 16384,
+  SILENT = 32768,
+  POSIXACL = bit.lshift(1, 16),
+  UNBINDABLE = bit.lshift(1, 17),
+  PRIVATE = bit.lshift(1, 18),
+  SLAVE = bit.lshift(1, 19),
+  SHARED = bit.lshift(1, 20),
+  RELATIME = bit.lshift(1, 21),
+  KERNMOUNT = bit.lshift(1, 22),
+  I_VERSION = bit.lshift(1, 23),
+  STRICTATIME = bit.lshift(1, 24),
+  ACTIVE = bit.lshift(1, 30),
+  NOUSER = bit.lshift(1, 31),
+}, multiflags)
 
 -- fake flags
-S.MS_RO = S.MS_RDONLY -- allow use of "ro" as flag as that is what /proc/mounts uses
-S.MS_RW = 0           -- allow use of "rw" as flag as appears in /proc/mounts
+S.MS.RO = S.MS.RDONLY -- allow use of "ro" as flag as that is what /proc/mounts uses
+S.MS.RW = 0           -- allow use of "rw" as flag as appears in /proc/mounts
 
--- flags to `msync'. - note same prefix
-S.MS_ASYNC       = 1
-S.MS_SYNC        = 4
-S.MS_INVALIDATE  = 2
+-- flags to `msync'. - note was MS_ renamed to MSYNC_
+S.MSYNC = setmetatable({
+  ASYNC       = 1,
+  INVALIDATE  = 2,
+  SYNC        = 4,
+}, multiflags)
 
+-- TODO are these still used?
 S.MNT_FORCE = 1
 S.MNT_DETACH = 2
 S.MNT_EXPIRE = 4

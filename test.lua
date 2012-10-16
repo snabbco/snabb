@@ -2015,7 +2015,7 @@ test_misc_root = {
     assert_equal(b.source, a.source, "expect source match")
     assert_equal(b.target, a.target, "expect target match")
     assert_equal(b.type, a.type, "expect type match")
-    assert_equal(S.stringflags(b.flags, "MS_"), S.stringflags(a.flags, "MS_"), "expect flags match")
+    assert_equal(S.MS[b.flags], S.MS[a.flags], "expect flags match")
     assert_equal(b.freq, "0")
     assert_equal(b.passno, "0")
     assert(S.umount(dir))

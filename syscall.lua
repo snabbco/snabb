@@ -902,7 +902,7 @@ end
 function S.munmap(addr, length)
   return retbool(C.munmap(addr, length))
 end
-function S.msync(addr, length, flags) return retbool(C.msync(addr, length, stringflags(flags, "MS_"))) end
+function S.msync(addr, length, flags) return retbool(C.msync(addr, length, S.MSYNC[flags])) end
 function S.mlock(addr, len) return retbool(C.mlock(addr, len)) end
 function S.munlock(addr, len) return retbool(C.munlock(addr, len)) end
 function S.mlockall(flags) return retbool(C.mlockall(S.MCL[flags])) end
@@ -1324,7 +1324,7 @@ function S.mount(source, target, filesystemtype, mountflags, data)
     mountflags = t.flags
     data = t.data
   end
-  return retbool(C.mount(source, target, filesystemtype, stringflags(mountflags, "MS_"), data))
+  return retbool(C.mount(source, target, filesystemtype, S.MS[mountflags], data))
 end
 
 function S.umount(target, flags)
