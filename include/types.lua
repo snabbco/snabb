@@ -24,17 +24,11 @@ makdev
 mksigset
 
 these are man 3 dont need to export?
-htons     DONE
-ntohs     DONE
-strerror  DONE
 inet_pton
 inet_ntop
 
 inet_name (uses inet_pton)
 
-temporary, as these are going away.
-stringflags DONE
-flaglist  DONE
 ]]
 
 -- TODO remove when replaced with metatables
