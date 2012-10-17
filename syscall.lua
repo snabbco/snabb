@@ -23,7 +23,7 @@ local CC = {} -- functions that might not be in C, may use syscalls
 
 local constants = require "include/constants"
 
-for k, v in pairs(constants) do S[k] = v end
+for k, v in pairs(constants) do S[k] = v end -- TODO put in k table (need bits_to_speed and speed_to_bits should be metatables)
 
 -- functions we need for metatypes TODO remove once moved to constants
 
