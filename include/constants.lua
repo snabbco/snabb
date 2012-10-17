@@ -1559,43 +1559,46 @@ S.CLONE = setmetatable({
   IO       = 0x80000000,
 }, multiflags)
 
--- inotify TODO note conflicts
--- flags
-S.IN_CLOEXEC = octal("02000000")
-S.IN_NONBLOCK = octal("04000")
+-- inotify
+-- flags note rename from IN_ to IN_INIT
+S.IN_INIT = setmetatable({
+  CLOEXEC = octal("02000000"),
+  NONBLOCK = octal("04000"),
+}, multiflags)
 
 -- events
-S.IN_ACCESS        = 0x00000001
-S.IN_MODIFY        = 0x00000002
-S.IN_ATTRIB        = 0x00000004
-S.IN_CLOSE_WRITE   = 0x00000008
-S.IN_CLOSE_NOWRITE = 0x00000010
-S.IN_OPEN          = 0x00000020
-S.IN_MOVED_FROM    = 0x00000040
-S.IN_MOVED_TO      = 0x00000080
-S.IN_CREATE        = 0x00000100
-S.IN_DELETE        = 0x00000200
-S.IN_DELETE_SELF   = 0x00000400
-S.IN_MOVE_SELF     = 0x00000800
+S.IN = setmetatable({
+  ACCESS        = 0x00000001,
+  MODIFY        = 0x00000002,
+  ATTRIB        = 0x00000004,
+  CLOSE_WRITE   = 0x00000008,
+  CLOSE_NOWRITE = 0x00000010,
+  OPEN          = 0x00000020,
+  MOVED_FROM    = 0x00000040,
+  MOVED_TO      = 0x00000080,
+  CREATE        = 0x00000100,
+  DELETE        = 0x00000200,
+  DELETE_SELF   = 0x00000400,
+  MOVE_SELF     = 0x00000800,
+  UNMOUNT       = 0x00002000,
+  Q_OVERFLOW    = 0x00004000,
+  IGNORED       = 0x00008000,
 
-S.IN_UNMOUNT       = 0x00002000
-S.IN_Q_OVERFLOW    = 0x00004000
-S.IN_IGNORED       = 0x00008000
+  ONLYDIR       = 0x01000000,
+  DONT_FOLLOW   = 0x02000000,
+  EXCL_UNLINK   = 0x04000000,
+  MASK_ADD      = 0x20000000,
+  ISDIR         = 0x40000000,
+  ONESHOT       = 0x80000000,
+}, multiflags)
 
-S.IN_CLOSE         = S.IN_CLOSE_WRITE + S.IN_CLOSE_NOWRITE
-S.IN_MOVE          = S.IN_MOVED_FROM + S.IN_MOVED_TO
+S.IN.CLOSE         = S.IN.CLOSE_WRITE + S.IN.CLOSE_NOWRITE
+S.IN.MOVE          = S.IN.MOVED_FROM + S.IN.MOVED_TO
 
-S.IN_ONLYDIR       = 0x01000000
-S.IN_DONT_FOLLOW   = 0x02000000
-S.IN_EXCL_UNLINK   = 0x04000000
-S.IN_MASK_ADD      = 0x20000000
-S.IN_ISDIR         = 0x40000000
-S.IN_ONESHOT       = 0x80000000
-
-S.IN_ALL_EVENTS    = S.IN_ACCESS + S.IN_MODIFY + S.IN_ATTRIB + S.IN_CLOSE_WRITE
-                       + S.IN_CLOSE_NOWRITE + S.IN_OPEN + S.IN_MOVED_FROM
-                       + S.IN_MOVED_TO + S.IN_CREATE + S.IN_DELETE
-                       + S.IN_DELETE_SELF + S.IN_MOVE_SELF
+S.IN.ALL_EVENTS    = S.IN.ACCESS + S.IN.MODIFY + S.IN.ATTRIB + S.IN.CLOSE_WRITE
+                       + S.IN.CLOSE_NOWRITE + S.IN.OPEN + S.IN.MOVED_FROM
+                       + S.IN.MOVED_TO + S.IN.CREATE + S.IN.DELETE
+                       + S.IN.DELETE_SELF + S.IN.MOVE_SELF
 
 --prctl
 S.PR = setmetatable({

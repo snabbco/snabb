@@ -139,7 +139,7 @@ local function getfd_at(fd)
   return getfd(fd)
 end
 
--- metatables for Lua types not ffi types
+-- metatables for Lua types not ffi types - convert to ffi types
 
 mt.wait = {
   __index = function(w, k)
@@ -160,6 +160,7 @@ mt.wait = {
   end
 }
 
+-- TODO convert to ffi metatype
 mt.timex = {
   __index = function(timex, k)
     if S.TIME[k] then return timex.state == S.TIME[k] end
@@ -174,14 +175,14 @@ mt.epoll = {
   end
 }
 
+-- TODO convert to ffi metatype
 mt.inotify = {
   __index = function(tab, k)
-    local prefix = "IN_"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(tab.mask, S[k]) ~= 0 end
+    if S.IN[k] then return bit.band(tab.mask, S.IN[k]) ~= 0 end
   end
 }
 
+-- TODO convert to ffi metatype
 mt.dents = {
   __index = function(tab, k)
     if S.DT[k] then return tab.type == S.DT[k] end
@@ -1391,11 +1392,11 @@ function S.tee(fd_in, fd_out, len, flags)
   return retnum(C.tee(getfd(fd_in), getfd(fd_out), len, S.SPLICE_F[flags]))
 end
 
-function S.inotify_init(flags) return retfd(C.inotify_init1(stringflags(flags, "IN_"))) end
-function S.inotify_add_watch(fd, pathname, mask) return retnum(C.inotify_add_watch(getfd(fd), pathname, stringflags(mask, "IN_"))) end
+function S.inotify_init(flags) return retfd(C.inotify_init1(S.IN_INIT[flags])) end
+function S.inotify_add_watch(fd, pathname, mask) return retnum(C.inotify_add_watch(getfd(fd), pathname, S.IN[mask])) end
 function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd), wd)) end
 
--- helper function to read inotify structs as table from inotify fd
+-- helper function to read inotify structs as table from inotify fd TODO switch to ffi metatype
 function S.inotify_read(fd, buffer, len)
   if not len then len = 1024 end
   if not buffer then buffer = t.buffer(len) end
