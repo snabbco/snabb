@@ -793,19 +793,21 @@ S.EPOLLCREATE = setmetatable({
   NONBLOCK = octal("04000"),
 }, multiflags)
 
-S.EPOLLIN = 0x001
-S.EPOLLPRI = 0x002
-S.EPOLLOUT = 0x004
-S.EPOLLRDNORM = 0x040
-S.EPOLLRDBAND = 0x080
-S.EPOLLWRNORM = 0x100
-S.EPOLLWRBAND = 0x200
-S.EPOLLMSG = 0x400
-S.EPOLLERR = 0x008
-S.EPOLLHUP = 0x010
-S.EPOLLRDHUP = 0x2000
-S.EPOLLONESHOT = bit.lshift(1, 30)
-S.EPOLLET = bit.lshift(1, 30) * 2 -- 2^31 but making sure no sign issue 
+S.EPOLL = setmetatable({
+  IN  = 0x001,
+  PRI = 0x002,
+  OUT = 0x004,
+  RDNORM = 0x040,
+  RDBAND = 0x080,
+  WRNORM = 0x100,
+  WRBAND = 0x200,
+  MSG = 0x400,
+  ERR = 0x008,
+  HUP = 0x010,
+  RDHUP = 0x2000,
+  ONESHOT = bit.lshift(1, 30),
+  ET = bit.lshift(1, 30) * 2, -- 2^31 but making sure no sign issue 
+}, multiflags)
 
 S.EPOLL_CTL = setmetatable({
   ADD = 1,

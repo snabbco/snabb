@@ -1653,7 +1653,7 @@ test_events = {
     assert(s:write(teststring))
     r = assert(ep:epoll_wait())
     assert(#r == 1, "one event now")
-    assert(r[1].EPOLLIN, "read event")
+    assert(r[1].IN, "read event")
     assert(r[1].fd == c:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
     assert(ep:close())
     assert(c:read()) -- clear event

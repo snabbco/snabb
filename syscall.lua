@@ -167,11 +167,10 @@ mt.timex = {
   end
 }
 
+-- TODO convert to ffi metatype
 mt.epoll = {
   __index = function(tab, k)
-    local prefix = "EPOLL"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(tab.events, S[k]) ~= 0 end
+    if S.EPOLL[k] then return bit.band(tab.events, S.EPOLL[k]) ~= 0 end
   end
 }
 
@@ -1342,15 +1341,13 @@ end
 
 function S.epoll_ctl(epfd, op, fd, event, data)
   if not ffi.istype(t.epoll_event, event) then
-    local events = stringflags(event, "EPOLL")
+    local events = S.EPOLL[event]
     event = t.epoll_event()
     event.events = events
     if data then event.data.u64 = data else event.data.fd = getfd(fd) end
   end
   return retbool(C.epoll_ctl(getfd(epfd), S.EPOLL_CTL[op], getfd(fd), event))
 end
-
-local epoll_flags = {"EPOLLIN", "EPOLLOUT", "EPOLLRDHUP", "EPOLLPRI", "EPOLLERR", "EPOLLHUP"}
 
 function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes optional epoll_pwait functionality
   if not maxevents then maxevents = 16 end
@@ -1364,7 +1361,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   end
   if ret == -1 then return nil, t.error() end
   local r = {}
-  for i = 1, ret do -- put in Lua array
+  for i = 1, ret do -- put in Lua array TODO convert to metatype
     local e = events[i - 1]
     local ev = setmetatable({fd = tonumber(e.data.fd), data = t.uint64(e.data.u64), events = e.events}, mt.epoll)
     r[i] = ev
