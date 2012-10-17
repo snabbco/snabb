@@ -145,14 +145,14 @@ test_open_close = {
   end,
   test_access = function()
     assert(S.access("/dev/null", "r"), "expect access to say can read /dev/null")
-    assert(S.access("/dev/null", S.R_OK), "expect access to say can read /dev/null")
+    assert(S.access("/dev/null", S.OK.R), "expect access to say can read /dev/null")
     assert(S.access("/dev/null", "w"), "expect access to say can write /dev/null")
     assert(not S.access("/dev/null", "x"), "expect access to say cannot execute /dev/null")
   end,
   test_faccessat = function()
     local fd = S.open("/dev")
     assert(fd:faccessat("null", "r"), "expect access to say can read /dev/null")
-    assert(fd:faccessat("null", S.R_OK), "expect access to say can read /dev/null")
+    assert(fd:faccessat("null", S.OK.R), "expect access to say can read /dev/null")
     assert(fd:faccessat("null", "w"), "expect access to say can write /dev/null")
     assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
     assert(fd:close())

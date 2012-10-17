@@ -139,22 +139,6 @@ local function getfd_at(fd)
   return getfd(fd)
 end
 
--- TODO replace with metatable like stringflags on OK table
-local function accessflags(s) -- allow "rwx"
-  if not s then return 0 end
-  if type(s) ~= "string" then return s end
-  s = trim(s:upper())
-  local flag = 0
-  for i = 1, #s do
-    local c = s:sub(i, i)
-    if     c == 'R' then flag = bit.bor(flag, S.R_OK)
-    elseif c == 'W' then flag = bit.bor(flag, S.W_OK)
-    elseif c == 'X' then flag = bit.bor(flag, S.X_OK)
-    else error("invalid access flag") end
-  end
-  return flag
-end
-
 -- metatables for Lua types not ffi types
 
 mt.wait = {
@@ -592,9 +576,9 @@ end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 
-function S.access(pathname, mode) return retbool(C.access(pathname, accessflags(mode))) end
+function S.access(pathname, mode) return retbool(C.access(pathname, S.OK[mode])) end
 function S.faccessat(dirfd, pathname, mode, flags)
-  return retbool(C.faccessat(getfd_at(dirfd), pathname, accessflags(mode), S.AT_ACCESSAT[flags]))
+  return retbool(C.faccessat(getfd_at(dirfd), pathname, S.OK[mode], S.AT_ACCESSAT[flags]))
 end
 
 function S.readlink(path, buffer, size)

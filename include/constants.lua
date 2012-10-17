@@ -79,6 +79,21 @@ end
 
 local multiflags = {__index = flags, __call = function(t, a) return t[a] end}
 
+-- single char flags, eg used for access which allows "rwx"
+local function chflags(t, s)
+  if not s then return 0 end
+  if type(s) ~= "string" then return s end
+  s = trim(s:upper())
+  local flag = 0
+  for i = 1, #s do
+    local c = s:sub(i, i)
+    flag = bit.bor(flag, t[c])
+  end
+  return flag
+end
+
+local charflags = {__index = chflags, __call = function(t, a) return t[a] end}
+
 local S = {} -- TODO rename
 
 S.SYS = arch.SYS
@@ -189,10 +204,12 @@ S.MODE = setmetatable({
 }, multiflags)
 
 -- access
-S.R_OK = 4
-S.W_OK = 2
-S.X_OK = 1
-S.F_OK = 0
+S.OK = setmetatable({
+  R = 4,
+  W = 2,
+  X = 1,
+  F = 0,
+}, charflags)
 
 -- fcntl
 S.F = setmetatable({
