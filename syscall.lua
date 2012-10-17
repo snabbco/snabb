@@ -49,29 +49,6 @@ local function trim(s) -- TODO should replace underscore with space
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
-local memo = {} -- memoize flags so faster looping
-
--- take a bunch of flags in a string and return a number
-function S.stringflags(str, prefix) -- allows multiple comma sep flags that are ORed
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  if memo[prefix] and memo[prefix][str] then return memo[prefix][str] end
-  local f = 0
-  local a = split(",", str)
-  local ts, s, val
-  for i, v in ipairs(a) do
-    ts = trim(v)
-    s = ts:upper()
-    if s:sub(1, #prefix) ~= prefix then s = prefix .. s end -- prefix optional
-    val = S[s]
-    if not val then error("invalid flag: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    f = bit.bor(f, val)
-  end
-  if not memo[prefix] then memo[prefix] = {} end
-  memo[prefix][str] = f
-  return f
-end
-
 local t, pt, s, ctypes -- t used below.
 
 -- TODO all metatypes too
