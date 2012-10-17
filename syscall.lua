@@ -176,7 +176,7 @@ local errpointer = pt.void(-1)
 
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
--- return helpers. not so much needed any more, often not using
+-- return helpers.
 
 -- straight passthrough, only needed for real 64 bit quantities. Used eg for seek (file might have giant holes!)
 local function ret64(ret)
@@ -207,9 +207,17 @@ local function retptr(ret)
   return ret
 end
 
-local function retwait(ret, status)
+local function retwait(ret, status) -- TODO metatype
   if ret == -1 then return nil, t.error() end
   return setmetatable({pid = ret, status = status}, mt.wait)
+end
+
+local function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
+  ffi.errno(0)
+  local ret = f(...)
+  local errno = ffi.errno()
+  if errno ~= 0 then return nil, t.error() end
+  return ret
 end
 
 -- TODO add tests
@@ -504,6 +512,7 @@ function S.pipe(flags)
   return setmetatable({t.fd(fd2[0]), t.fd(fd2[1])}, mt.pipe)
 end
 
+-- TODO more generic so works with alternate fd structures (call __close?)
 function S.close(fd)
   local fileno = getfd(fd)
   if fileno == -1 then return true end -- already closed
@@ -585,14 +594,6 @@ end
 -- mkfifo is from man(3), add for convenience
 function S.mkfifo(path, mode) return S.mknod(path, bit.bor(S.S[mode], S.S.IFIFO)) end
 function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(S.S[mode], S.S.IFIFO), 0) end
-
-local function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
-  ffi.errno(0)
-  local ret = f(...)
-  local errno = ffi.errno()
-  if errno ~= 0 then return nil, t.error() end
-  return ret
-end
 
 function S.nice(inc) return retnume(C.nice, inc) end
 -- NB glibc is shifting these values from what strace shows, as per man page, kernel adds 20 to make these values positive...
