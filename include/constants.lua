@@ -96,36 +96,55 @@ S.STD = setmetatable({
 S.PATH_MAX = 4096
 
 -- open, fcntl TODO must set LARGEFILE if needed (note pipe2 only uses nonblock and cloexec)
-S.O_RDONLY    = octal('0000')
-S.O_WRONLY    = octal('0001')
-S.O_RDWR      = octal('0002')
-S.O_ACCMODE   = octal('0003')
-S.O_CREAT     = octal('0100')
-S.O_EXCL      = octal('0200')
-S.O_NOCTTY    = octal('0400')
-S.O_TRUNC     = octal('01000')
-S.O_APPEND    = octal('02000')
-S.O_NONBLOCK  = octal('04000')
-S.O_DSYNC     = octal('010000')
-S.O_ASYNC     = octal('020000')
-S.O_NOATIME   = octal('01000000')
-S.O_CLOEXEC   = octal('02000000')
-S.O_SYNC      = octal('04010000')
+S.O = {
+  RDONLY    = octal('0000'),
+  WRONLY    = octal('0001'),
+  RDWR      = octal('0002'),
+  ACCMODE   = octal('0003'),
+  CREAT     = octal('0100'),
+  EXCL      = octal('0200'),
+  NOCTTY    = octal('0400'),
+  TRUNC     = octal('01000'),
+  APPEND    = octal('02000'),
+  NONBLOCK  = octal('04000'),
+  DSYNC     = octal('010000'),
+  ASYNC     = octal('020000'),
+  NOATIME   = octal('01000000'),
+  CLOEXEC   = octal('02000000'),
+  SYNC      = octal('04010000'),
+}
 
-S.O_FSYNC     = S.O_SYNC
-S.O_RSYNC     = S.O_SYNC
-S.O_NDELAY    = S.O_NONBLOCK
+S.O.FSYNC     = S.O.SYNC
+S.O.RSYNC     = S.O.SYNC
+S.O.NDELAY    = S.O.NONBLOCK
 
--- incorporate into metatable for O so set as O>LARGEFILE or 0
-if ffi.abi("32bit") then S.O_LARGEFILE = octal('0100000') else S.O_LARGEFILE = 0 end
+-- any use of a string will add largefile. If you use flags directly you need to add it yourself.
+-- if there is a problem use a different table eg OPIPE
+if ffi.abi("32bit") then
+  S.O.LARGEFILE = octal('0100000')
+  setmetatable(S.O, {
+    __index = function(t, str)
+      return bit.bor(flags(t, str), S.O.LARGEFILE)
+    end,
+    __call = multiflags.__call,
+  })
+else
+  S.O.LARGEFILE = 0
+  setmetatable(S.O, multiflags)
+end
 
 -- these are arch dependent!
 if arch.oflags then arch.oflags(S)
 else -- generic values from asm-generic
-  S.O_DIRECT    = octal('040000')
-  S.O_DIRECTORY = octal('0200000')
-  S.O_NOFOLLOW  = octal('0400000')
+  S.O.DIRECT    = octal('040000')
+  S.O.DIRECTORY = octal('0200000')
+  S.O.NOFOLLOW  = octal('0400000')
 end
+
+S.OPIPE = setmetatable({
+  NONBLOCK  = octal('04000'),
+  CLOEXEC   = octal('02000000'),
+}, multiflags)
 
 -- modes and file types. note renamed second set from S_ to MODE_ plus note split
 S.S = setmetatable({

@@ -484,13 +484,11 @@ if not pcall(inlibc, "pivot_root") then C.pivot_root = CC.pivot_root end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
-  flags = bit.bor(stringflags(flags, "O_"), S.O_LARGEFILE or 0)
-  return retfd(C.open(pathname, flags, S.MODE[mode]))
+  return retfd(C.open(pathname, S.O[flags], S.MODE[mode]))
 end
 
 function S.openat(dirfd, pathname, flags, mode)
-  flags = bit.bor(stringflags(flags, "O_"), S.O_LARGEFILE or 0)
-  return retfd(C.openat(getfd_at(dirfd), pathname, flags, S.MODE[mode]))
+  return retfd(C.openat(getfd_at(dirfd), pathname, S.O[flags], S.MODE[mode]))
 end
 
 -- TODO dup3 can have a race condition (see man page) although Musl fixes, appears eglibc does not
@@ -539,7 +537,7 @@ mt.pipe = {
 
 function S.pipe(flags)
   local fd2 = t.int2()
-  local ret = C.pipe2(fd2, stringflags(flags, "O_"))
+  local ret = C.pipe2(fd2, S.OPIPE[flags])
   if ret == -1 then return nil, t.error() end
   return setmetatable({t.fd(fd2[0]), t.fd(fd2[1])}, mt.pipe)
 end
@@ -1033,7 +1031,7 @@ local function getflock(arg)
 end
 
 local fcntl_commands = {
-  [S.F.SETFL] = function(arg) return bit.bor(stringflags(arg, "O_"), S.O_LARGEFILE or 0) end,
+  [S.F.SETFL] = function(arg) return S.O[arg] end,
   [S.F.SETFD] = function(arg) return S.FD[arg] end,
   [S.F.GETLK] = getflock,
   [S.F.SETLK] = getflock,
@@ -1957,7 +1955,7 @@ end
 function S.nonblock(fd)
   local fl, err = S.fcntl(fd, S.F.GETFL)
   if not fl then return nil, err end
-  fl, err = S.fcntl(fd, S.F.SETFL, bit.bor(fl, S.O_NONBLOCK))
+  fl, err = S.fcntl(fd, S.F.SETFL, bit.bor(fl, S.O.NONBLOCK))
   if not fl then return nil, err end
   return true
 end
@@ -1965,14 +1963,14 @@ end
 function S.block(fd)
   local fl, err = S.fcntl(fd, S.F.GETFL)
   if not fl then return nil, err end
-  fl, err = S.fcntl(fd, S.F.SETFL, bit.band(fl, bit.bnot(S.O_NONBLOCK)))
+  fl, err = S.fcntl(fd, S.F.SETFL, bit.band(fl, bit.bnot(S.O.NONBLOCK)))
   if not fl then return nil, err end
   return true
 end
 
 -- TODO fix short reads, add a loop
 function S.readfile(name, buffer, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
-  local f, err = S.open(name, S.O_RDONLY)
+  local f, err = S.open(name, "rdonly")
   if not f then return nil, err end
   local r, err = f:read(buffer, length or 4096)
   if not r then return nil, err end
@@ -1983,7 +1981,7 @@ end
 
 function S.writefile(name, str, mode) -- write string to named file. specify mode if want to create file, silently ignore short writes
   local f, err
-  if mode then f, err = S.creat(name, mode) else f, err = S.open(name, S.O_WRONLY) end
+  if mode then f, err = S.creat(name, mode) else f, err = S.open(name, "wronly") end
   if not f then return nil, err end
   local n, err = f:write(str)
   if not n then return nil, err end
@@ -1994,7 +1992,7 @@ end
 
 function S.dirfile(name, nodots) -- return the directory entries in a file, remove . and .. if nodots true
   local fd, d, ok, err
-  fd, err = S.open(name, S.O_DIRECTORY + S.O_RDONLY)
+  fd, err = S.open(name, "directory, rdonly")
   if err then return nil, err end
   d, err = fd:getdents()
   if err then return nil, err end
@@ -2108,7 +2106,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
   if not S.stat(fdb) then return nil end
   local sl = 2048
   local buffer = t.buffer(sl)
-  local fd = S.open(fdb, S.O_RDONLY)
+  local fd = S.open(fdb, "rdonly")
   if not fd then return nil end
   local brforward = {}
 

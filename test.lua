@@ -65,7 +65,7 @@ end
 
 test_basic = {
   test_octal = function()
-    assert_equal(S.O_CREAT, 64, "wrong octal value for O_CREAT")
+    assert_equal(S.O.CREAT, 64, "wrong octal value for O_CREAT")
   end,
   test_signals = function()
     assert_equal(S.SIG.SYS, 31) -- test numbers correct
