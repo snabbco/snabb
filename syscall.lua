@@ -640,12 +640,12 @@ function S.setpriority(which, who, prio) return retnume(C.setpriority, S.PRIO[wh
 
  -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
 function S.clone(flags, signal, stack, ptid, tls, ctid)
-  flags = stringflags(flags, "CLONE_") + S.SIG[signal]
+  flags = S.CLONE[flags] + S.SIG[signal]
   return retnum(C.clone(flags, stack, ptid, tls, ctid))
 end
 
-function S.unshare(flags) return retbool(C.unshare(stringflags(flags, "CLONE_"))) end
-function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), stringflags(nstype, "CLONE_"))) end
+function S.unshare(flags) return retbool(C.unshare(S.CLONE[flags])) end
+function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), S.CLONE[nstype])) end
 
 function S.fork() return retnum(C.fork()) end
 function S.execve(filename, argv, envp)
