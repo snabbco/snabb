@@ -787,9 +787,11 @@ S.POLL = setmetatable({
   RDHUP       = 0x2000,
 }, multiflags)
 
--- epoll
-S.EPOLL_CLOEXEC = octal("02000000")
-S.EPOLL_NONBLOCK = octal("04000")
+-- epoll renamed from EPOLL_ to EPOLLCREATE
+S.EPOLLCREATE = setmetatable({
+  CLOEXEC = octal("02000000"),
+  NONBLOCK = octal("04000"),
+}, multiflags)
 
 S.EPOLLIN = 0x001
 S.EPOLLPRI = 0x002

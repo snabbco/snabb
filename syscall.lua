@@ -1337,7 +1337,7 @@ function S.setrlimit(resource, rlim)
 end
 
 function S.epoll_create(flags)
-  return retfd(C.epoll_create1(stringflags(flags, "EPOLL_")))
+  return retfd(C.epoll_create1(S.EPOLLCREATE[flags]))
 end
 
 function S.epoll_ctl(epfd, op, fd, event, data)
