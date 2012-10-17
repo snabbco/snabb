@@ -811,7 +811,7 @@ local rtpref = {
 
 function nl.socket(tp, addr)
   tp = S.NETLINK[tp]
-  local sock, err = S.socket(S.AF.NETLINK, S.SOCK_RAW, tp)
+  local sock, err = S.socket(S.AF.NETLINK, S.SOCK.RAW, tp)
   if not sock then return nil, err end
   if addr then
     if type(addr) == "table" then addr.type = tp end -- need type to convert group names from string

@@ -910,7 +910,7 @@ end
 
 function S.socket(domain, stype, protocol)
   domain = S.AF[domain]
-  local ret = C.socket(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol))
+  local ret = C.socket(domain, S.SOCK[stype], sproto(domain, protocol))
   if ret == -1 then return nil, t.error() end
   return t.fd(ret)
 end
@@ -951,7 +951,7 @@ mt.socketpair = {
 function S.socketpair(domain, stype, protocol)
   domain = S.AF[domain]
   local sv2 = t.int2()
-  local ret = C.socketpair(domain, stringflags(stype, "SOCK_"), sproto(domain, protocol), sv2)
+  local ret = C.socketpair(domain, S.SOCK[stype], sproto(domain, protocol), sv2)
   if ret == -1 then return nil, t.error() end
   return setmetatable({t.fd(sv2[0]), t.fd(sv2[1])}, mt.socketpair)
 end
@@ -973,7 +973,7 @@ function S.accept(sockfd, flags, addr, addrlen)
   local ret
   if not flags
     then ret = C.accept(getfd(sockfd), addr, addrlen)
-    else ret = C.accept4(getfd(sockfd), addr, addrlen, stringflags(flags, "SOCK_"))
+    else ret = C.accept4(getfd(sockfd), addr, addrlen, S.SOCK[flags])
   end
   if ret == -1 then return nil, t.error() end
   return {fd = t.fd(ret), addr = sa(addr, addrlen[0])}
@@ -2014,7 +2014,7 @@ local function if_nametoindex(name, s) -- internal version when already have soc
 end
 
 function S.if_nametoindex(name) -- standard function in some libc versions
-  local s, err = S.socket(S.AF.LOCAL, S.SOCK_STREAM, 0)
+  local s, err = S.socket(S.AF.LOCAL, S.SOCK.STREAM, 0)
   if not s then return nil, err end
   local i, err = if_nametoindex(name, s)
   if not i then return nil, err end
@@ -2025,7 +2025,7 @@ end
 
 -- bridge functions, could be in utility library. in error cases use gc to close file.
 local function bridge_ioctl(io, name)
-  local s, err = S.socket(S.AF.LOCAL, S.SOCK_STREAM, 0)
+  local s, err = S.socket(S.AF.LOCAL, S.SOCK.STREAM, 0)
   if not s then return nil, err end
   local ret, err = S.ioctl(s, io, pt.char(name))
   if not ret then return nil, err end
@@ -2039,7 +2039,7 @@ function S.bridge_del(name) return bridge_ioctl(S.SIOCBRDELBR, name) end
 
 local function bridge_if_ioctl(io, bridge, dev)
   local err, s, ifr, len, ret, ok
-  s, err = S.socket(S.AF.LOCAL, S.SOCK_STREAM, 0)
+  s, err = S.socket(S.AF.LOCAL, S.SOCK.STREAM, 0)
   if not s then return nil, err end
   if type(dev) == "string" then
     dev, err = if_nametoindex(dev, s)

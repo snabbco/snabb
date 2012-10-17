@@ -431,17 +431,19 @@ S.SFD = setmetatable({
   NONBLOCK = octal('04000'),
 }, multiflags)
 
--- sockets note mix of single and multiple flags TODO code to handle
-S.SOCK_STREAM    = 1
-S.SOCK_DGRAM     = 2
-S.SOCK_RAW       = 3
-S.SOCK_RDM       = 4
-S.SOCK_SEQPACKET = 5
-S.SOCK_DCCP      = 6
-S.SOCK_PACKET    = 10
+-- sockets note mix of single and multiple flags TODO code to handle temporarily using multi which is kind of ok
+S.SOCK = setmetatable({
+  STREAM    = 1,
+  DGRAM     = 2,
+  RAW       = 3,
+  RDM       = 4,
+  SEQPACKET = 5,
+  DCCP      = 6,
+  PACKET    = 10,
 
-S.SOCK_CLOEXEC  = octal('02000000')
-S.SOCK_NONBLOCK = octal('04000')
+  CLOEXEC  = octal('02000000'),
+  NONBLOCK = octal('04000'),
+}, multiflags)
 
 -- misc socket constants
 S.SCM = setmetatable({
