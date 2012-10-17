@@ -500,8 +500,18 @@ S.SHUT = setmetatable({
 }, stringflag)
 
 -- waitpid 3rd arg
-S.WNOHANG       = 1
-S.WUNTRACED     = 2
+S.W = setmetatable({
+  NOHANG       = 1,
+  UNTRACED     = 2,
+  EXITED       = 4,
+  CONTINUED    = 8,
+  NOWAIT       = 0x01000000,
+  NOTHREAD     = 0x20000000, -- __WNOTHREAD
+  ALL          = 0x40000000, -- __WALL
+  CLONE        = 0x80000000, -- __WCLONE
+}, multiflags)
+
+S.W.STOPPED      = S.W.UNTRACED
 
 -- waitid
 S.P = setmetatable({
@@ -509,16 +519,6 @@ S.P = setmetatable({
   PID  = 1,
   PGID = 2,
 }, stringflag)
-
-S.WSTOPPED      = 2
-S.WEXITED       = 4
-S.WCONTINUED    = 8
-S.WNOWAIT       = 0x01000000
-
-S.__WNOTHREAD    = 0x20000000
-S.__WALL         = 0x40000000
-S.__WCLONE       = 0x80000000
-S.NOTHREAD, S.WALL, S.WCLONE = S.__WNOTHREAD, S.__WALL, S.__WCLONE
 
 -- struct siginfo, eg waitid
 S.SI = setmetatable({

@@ -141,6 +141,7 @@ end
 
 -- metatables for Lua types not ffi types - convert to ffi types
 
+-- convert to ffi. note missing some macros eg WCOREDUMP()
 mt.wait = {
   __index = function(w, k)
     local WTERMSIG = bit.band(w.status, 0x7f)
@@ -677,12 +678,12 @@ function S.wait()
 end
 function S.waitpid(pid, options)
   local status = t.int1()
-  return retwait(C.waitpid(pid, status, stringflags(options, "W")), status[0])
+  return retwait(C.waitpid(pid, status, S.W[options]), status[0])
 end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
   if not infop then infop = t.siginfo() end
   infop.si_pid = 0 -- see notes on man page
-  local ret = C.waitid(S.P[idtype], id or 0, infop, stringflags(options, "W"))
+  local ret = C.waitid(S.P[idtype], id or 0, infop, S.W[options])
   if ret == -1 then return nil, t.error() end
   return infop -- return table here?
 end
