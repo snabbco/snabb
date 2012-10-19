@@ -10,7 +10,7 @@ local ffi = require "ffi"
 local bit = require "bit"
 local S = require "syscall"
 
-local t, pt, s = S.t, S.pt, S.s
+local t, pt, s, c = S.t, S.pt, S.s, S.c
 
 local mt = {} -- metatables
 local meth = {}
@@ -60,16 +60,16 @@ local function rta_next(msg, buf, len)
 end
 
 local addrlenmap = { -- map interface type to length of hardware address TODO are these always same?
-  [S.ARPHRD.ETHER] = 6,
-  [S.ARPHRD.EETHER] = 6,
-  [S.ARPHRD.LOOPBACK] = 6,
+  [c.ARPHRD.ETHER] = 6,
+  [c.ARPHRD.EETHER] = 6,
+  [c.ARPHRD.LOOPBACK] = 6,
 }
 
 local ifla_decode = {
-  [S.IFLA.IFNAME] = function(ir, buf, len)
+  [c.IFLA.IFNAME] = function(ir, buf, len)
     ir.name = ffi.string(buf)
   end,
-  [S.IFLA.ADDRESS] = function(ir, buf, len)
+  [c.IFLA.ADDRESS] = function(ir, buf, len)
     local addrlen = addrlenmap[ir.type]
     if (addrlen) then
       ir.addrlen = addrlen
@@ -77,7 +77,7 @@ local ifla_decode = {
       ffi.copy(ir.macaddr, buf, addrlen)
     end
   end,
-  [S.IFLA.BROADCAST] = function(ir, buf, len)
+  [c.IFLA.BROADCAST] = function(ir, buf, len)
     local addrlen = addrlenmap[ir.type]
     if (addrlen) then
       ir.braddrlen = addrlen
@@ -85,87 +85,87 @@ local ifla_decode = {
       ffi.copy(ir.broadcast, buf, addrlen)
     end
   end,
-  [S.IFLA.MTU] = function(ir, buf, len)
+  [c.IFLA.MTU] = function(ir, buf, len)
     local u = pt.uint(buf)
     ir.mtu = tonumber(u[0])
   end,
-  [S.IFLA.LINK] = function(ir, buf, len)
+  [c.IFLA.LINK] = function(ir, buf, len)
     local i = pt.int(buf)
     ir.link = tonumber(i[0])
   end,
-  [S.IFLA.QDISC] = function(ir, buf, len)
+  [c.IFLA.QDISC] = function(ir, buf, len)
     ir.qdisc = ffi.string(buf)
   end,
-  [S.IFLA.STATS] = function(ir, buf, len)
+  [c.IFLA.STATS] = function(ir, buf, len)
     ir.stats = t.rtnl_link_stats() -- despite man page, this is what kernel uses. So only get 32 bit stats here.
     ffi.copy(ir.stats, buf, s.rtnl_link_stats)
   end
 }
 
 local ifa_decode = {
-  [S.IFA.ADDRESS] = function(ir, buf, len)
-    ir.addr = S.addrtype[ir.family]()
+  [c.IFA.ADDRESS] = function(ir, buf, len)
+    ir.addr = t.addrtype[ir.family]()
     ffi.copy(ir.addr, buf, ffi.sizeof(ir.addr))
   end,
-  [S.IFA.LOCAL] = function(ir, buf, len)
-    ir.loc = S.addrtype[ir.family]()
+  [c.IFA.LOCAL] = function(ir, buf, len)
+    ir.loc = t.addrtype[ir.family]()
     ffi.copy(ir.loc, buf, ffi.sizeof(ir.loc))
   end,
-  [S.IFA.BROADCAST] = function(ir, buf, len)
-    ir.broadcast = S.addrtype[ir.family]()
+  [c.IFA.BROADCAST] = function(ir, buf, len)
+    ir.broadcast = t.addrtype[ir.family]()
     ffi.copy(ir.broadcast, buf, ffi.sizeof(ir.broadcast))
   end,
-  [S.IFA.LABEL] = function(ir, buf, len)
+  [c.IFA.LABEL] = function(ir, buf, len)
     ir.label = ffi.string(buf)
   end,
-  [S.IFA.ANYCAST] = function(ir, buf, len)
-    ir.anycast = S.addrtype[ir.family]()
+  [c.IFA.ANYCAST] = function(ir, buf, len)
+    ir.anycast = t.addrtype[ir.family]()
     ffi.copy(ir.anycast, buf, ffi.sizeof(ir.anycast))
   end,
-  [S.IFA.CACHEINFO] = function(ir, buf, len)
+  [c.IFA.CACHEINFO] = function(ir, buf, len)
     ir.cacheinfo = t.ifa_cacheinfo()
     ffi.copy(ir.cacheinfo, buf, ffi.sizeof(t.ifa_cacheinfo))
   end,
 }
 
 local rta_decode = {
-  [S.RTA.DST] = function(ir, buf, len)
-    ir.dst = S.addrtype[ir.family]()
+  [c.RTA.DST] = function(ir, buf, len)
+    ir.dst = t.addrtype[ir.family]()
     ffi.copy(ir.dst, buf, ffi.sizeof(ir.dst))
   end,
-  [S.RTA.SRC] = function(ir, buf, len)
-    ir.src = S.addrtype[ir.family]()
+  [c.RTA.SRC] = function(ir, buf, len)
+    ir.src = t.addrtype[ir.family]()
     ffi.copy(ir.src, buf, ffi.sizeof(ir.src))
   end,
-  [S.RTA.IIF] = function(ir, buf, len)
+  [c.RTA.IIF] = function(ir, buf, len)
     local i = pt.int(buf)
     ir.iif = tonumber(i[0])
   end,
-  [S.RTA.OIF] = function(ir, buf, len)
+  [c.RTA.OIF] = function(ir, buf, len)
     local i = pt.int(buf)
     ir.oif = tonumber(i[0])
   end,
-  [S.RTA.GATEWAY] = function(ir, buf, len)
-    ir.gateway = S.addrtype[ir.family]()
+  [c.RTA.GATEWAY] = function(ir, buf, len)
+    ir.gateway = t.addrtype[ir.family]()
     ffi.copy(ir.gateway, buf, ffi.sizeof(ir.gateway))
   end,
-  [S.RTA.PRIORITY] = function(ir, buf, len)
+  [c.RTA.PRIORITY] = function(ir, buf, len)
     local i = pt.int(buf)
     ir.priority = tonumber(i[0])
   end,
-  [S.RTA.PREFSRC] = function(ir, buf, len)
+  [c.RTA.PREFSRC] = function(ir, buf, len)
     local i = pt.uint32(buf)
     ir.prefsrc = tonumber(i[0])
   end,
-  [S.RTA.METRICS] = function(ir, buf, len)
+  [c.RTA.METRICS] = function(ir, buf, len)
     local i = pt.int(buf)
     ir.metrics = tonumber(i[0])
   end,
-  [S.RTA.TABLE] = function(ir, buf, len)
+  [c.RTA.TABLE] = function(ir, buf, len)
     local i = pt.uint32(buf)
     ir.table = tonumber(i[0])
   end,
-  [S.RTA.CACHEINFO] = function(ir, buf, len)
+  [c.RTA.CACHEINFO] = function(ir, buf, len)
     ir.cacheinfo = t.rta_cacheinfo()
     ffi.copy(ir.cacheinfo, buf, s.rta_cacheinfo)
   end,
@@ -175,17 +175,17 @@ local rta_decode = {
 mt.iff = {
   __tostring = function(f)
     local s = {}
-    for k, _ in pairs(S.IFF) do if f[k] then s[#s + 1] = k end end
+    for k, _ in pairs(c.IFF) do if f[k] then s[#s + 1] = k end end
     return table.concat(s, ' ')
   end,
   __index = function(f, k)
-    if S.IFF[k] then return bit.band(f.flags, S.IFF[k]) ~= 0 end
+    if c.IFF[k] then return bit.band(f.flags, c.IFF[k]) ~= 0 end
   end
 }
 
 nl.encapnames = {
-  [S.ARPHRD.ETHER] = "Ethernet",
-  [S.ARPHRD.LOOPBACK] = "Local Loopback",
+  [c.ARPHRD.ETHER] = "Ethernet",
+  [c.ARPHRD.LOOPBACK] = "Local Loopback",
 }
 
 meth.iflinks = {
@@ -227,7 +227,7 @@ meth.iflink = {
   },
   fn = {
     setflags = function(i, flags, change)
-      local ok, err = nl.newlink(i, 0, flags, change or S.IFF.ALL)
+      local ok, err = nl.newlink(i, 0, flags, change or c.IFF.ALL)
       if not ok then return nil, err end
       return i:refresh()
     end,
@@ -247,7 +247,7 @@ meth.iflink = {
       if type(address) == "string" then address, netmask = S.inet_name(address, netmask) end
       if not address then return nil end
       local af
-      if ffi.istype(t.in6_addr, address) then af = S.AF.INET6 else af = S.AF.INET end
+      if ffi.istype(t.in6_addr, address) then af = c.AF.INET6 else af = c.AF.INET end
       local ok, err = nl.newaddr(i.index, af, netmask, "permanent", "address", address)
       if not ok then return nil, err end
       return i:refresh()
@@ -256,7 +256,7 @@ meth.iflink = {
       if type(address) == "string" then address, netmask = S.inet_name(address, netmask) end
       if not address then return nil end
       local af
-      if ffi.istype(t.in6_addr, address) then af = S.AF.INET6 else af = S.AF.INET end
+      if ffi.istype(t.in6_addr, address) then af = c.AF.INET6 else af = c.AF.INET end
       local ok, err = nl.deladdr(i.index, af, netmask, "address", address)
       if not ok then return nil, err end
       return i:refresh()
@@ -292,7 +292,7 @@ mt.iflink = {
     if meth.iflink.index[k] then return meth.iflink.index[k](i) end
     if meth.iflink.fn[k] then return meth.iflink.fn[k] end
     if k == "inet" or k == "inet6" then return end -- might not be set, as we add it, kernel does not provide
-    if S.ARPHRD[k] then return i.ifinfo.ifi_type == S.ARPHRD[k] end
+    if c.ARPHRD[k] then return i.ifinfo.ifi_type == c.ARPHRD[k] end
   end,
   __tostring = function(i)
     local hw = ''
@@ -318,9 +318,9 @@ meth.rtmsg = {
     src_len = function(i) return tonumber(i.rtmsg.rtm_src_len) end,
     index = function(i) return tonumber(i.oif) end,
     flags = function(i) return tonumber(i.rtmsg.rtm_flags) end,
-    dest = function(i) return i.dst or S.addrtype[i.family]() end,
-    source = function(i) return i.src or S.addrtype[i.family]() end,
-    gw = function(i) return i.gateway or S.addrtype[i.family]() end,
+    dest = function(i) return i.dst or t.addrtype[i.family]() end,
+    source = function(i) return i.src or t.addrtype[i.family]() end,
+    gw = function(i) return i.gateway or t.addrtype[i.family]() end,
     -- might not be set in Lua table, so return nil
     iif = function() return nil end,
     oif = function() return nil end,
@@ -328,13 +328,13 @@ meth.rtmsg = {
     dst = function() return nil end,
   },
   flags = { -- TODO rework so iterates in fixed order. TODO Do not seem to be set, find how to retrieve.
-    [S.RTF_UP] = "U",
-    [S.RTF_GATEWAY] = "G",
-    [S.RTF_HOST] = "H",
-    [S.RTF_REINSTATE] = "R",
-    [S.RTF_DYNAMIC] = "D",
-    [S.RTF_MODIFIED] = "M",
-    [S.RTF_REJECT] = "!",
+    [c.RTF_UP] = "U",
+    [c.RTF_GATEWAY] = "G",
+    [c.RTF_HOST] = "H",
+    [c.RTF_REINSTATE] = "R",
+    [c.RTF_DYNAMIC] = "D",
+    [c.RTF_MODIFIED] = "M",
+    [c.RTF_REJECT] = "!",
   }
 }
 
@@ -360,12 +360,12 @@ meth.routes = {
           len = tonumber(addr:sub(sl + 1))
           addr = addr:sub(1, sl - 1)
         end
-        if rs.family == S.AF.INET6 then addr = t.in6_addr(addr) else addr = t.in_addr(addr) end
+        if rs.family == c.AF.INET6 then addr = t.in6_addr(addr) else addr = t.in_addr(addr) end
       end
       local matches = {}
       for _, v in ipairs(rs) do
         if len == v.dst_len then
-          if v.family == S.AF.INET then
+          if v.family == c.AF.INET then
             if addr.s_addr == v.dest.s_addr then matches[#matches + 1] = v end
           else
             local match = true
@@ -414,7 +414,7 @@ meth.ifaddr = {
 mt.ifaddr = {
   __index = function(i, k)
     if meth.ifaddr.index[k] then return meth.ifaddr.index[k](i) end
-    if S.IFA_F[k] then return bit.band(i.ifaddr.ifa_flags, S.IFA_F[k]) ~= 0 end
+    if c.IFA_F[k] then return bit.band(i.ifaddr.ifa_flags, c.IFA_F[k]) ~= 0 end
   end
 }
 
@@ -468,72 +468,72 @@ local function decode_route(buf, len)
 end
 
 local nlmsg_data_decode = {
-  [S.NLMSG.NOOP] = function(r, buf, len) return r end,
-  [S.NLMSG.ERROR] = function(r, buf, len)
+  [c.NLMSG.NOOP] = function(r, buf, len) return r end,
+  [c.NLMSG.ERROR] = function(r, buf, len)
     local e = pt.nlmsgerr(buf)
     if e.error ~= 0 then r.error = t.error(-e.error) else r.ack = true end -- error zero is ACK, others negative
     return r
   end,
-  [S.NLMSG.DONE] = function(r, buf, len) return r end,
-  [S.NLMSG.OVERRUN] = function(r, buf, len)
+  [c.NLMSG.DONE] = function(r, buf, len) return r end,
+  [c.NLMSG.OVERRUN] = function(r, buf, len)
     r.overrun = true
     return r
   end,
-  [S.RTM.NEWADDR] = function(r, buf, len)
+  [c.RTM.NEWADDR] = function(r, buf, len)
     local ir = decode_address(buf, len)
-    ir.op, ir.newaddr, ir.nl = "newaddr", true, S.RTM.NEWADDR
+    ir.op, ir.newaddr, ir.nl = "newaddr", true, c.RTM.NEWADDR
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM.DELADDR] = function(r, buf, len)
+  [c.RTM.DELADDR] = function(r, buf, len)
     local ir = decode_address(buf, len)
-    ir.op, ir.deladdr, ir.nl = "delddr", true, S.RTM.DELADDR
+    ir.op, ir.deladdr, ir.nl = "delddr", true, c.RTM.DELADDR
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM.GETADDR] = function(r, buf, len)
+  [c.RTM.GETADDR] = function(r, buf, len)
     local ir = decode_address(buf, len)
-    ir.op, ir.getaddr, ir.nl = "getaddr", true, S.RTM.GETADDR
+    ir.op, ir.getaddr, ir.nl = "getaddr", true, c.RTM.GETADDR
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM.NEWLINK] = function(r, buf, len)
+  [c.RTM.NEWLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
-    ir.op, ir.newlink, ir.nl = "newlink", true, S.RTM.NEWLINK
+    ir.op, ir.newlink, ir.nl = "newlink", true, c.RTM.NEWLINK
     r[ir.name] = ir
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM.DELLINK] = function(r, buf, len)
+  [c.RTM.DELLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
-    ir.op, ir.dellink, ir.nl = "dellink", true, S.RTM.DELLINK
+    ir.op, ir.dellink, ir.nl = "dellink", true, c.RTM.DELLINK
     r[ir.name] = ir
     r[#r + 1] = ir
     return r
   end,
   -- TODO need test that returns these, assume updates do
-  [S.RTM.GETLINK] = function(r, buf, len)
+  [c.RTM.GETLINK] = function(r, buf, len)
     local ir = decode_link(buf, len)
-    ir.op, ir.getlink, ir.nl = "getlink", true, S.RTM.GETLINK
+    ir.op, ir.getlink, ir.nl = "getlink", true, c.RTM.GETLINK
     r[ir.name] = ir
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM.NEWROUTE] = function(r, buf, len)
+  [c.RTM.NEWROUTE] = function(r, buf, len)
     local ir = decode_route(buf, len)
-    ir.op, ir.newroute, ir.nl = "newroute", true, S.RTM.NEWROUTE
+    ir.op, ir.newroute, ir.nl = "newroute", true, c.RTM.NEWROUTE
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM.DELROUTE] = function(r, buf, len)
+  [c.RTM.DELROUTE] = function(r, buf, len)
     local ir = decode_route(buf, len)
-    ir.op, ir.delroute, ir.nl = "delroute", true, S.RTM.DELROUTE
+    ir.op, ir.delroute, ir.nl = "delroute", true, c.RTM.DELROUTE
     r[#r + 1] = ir
     return r
   end,
-  [S.RTM.GETROUTE] = function(r, buf, len)
+  [c.RTM.GETROUTE] = function(r, buf, len)
     local ir = decode_route(buf, len)
-    ir.op, ir.getroute, ir.nl = "getroute", true, S.RTM.GETROUTE
+    ir.op, ir.getroute, ir.nl = "getroute", true, c.RTM.GETROUTE
     r[#r + 1] = ir
     return r
   end,
@@ -570,7 +570,7 @@ function nl.read(s, addr, bufsize, untildone)
       else error("unknown data " .. tp)
       end
 
-      if tp == S.NLMSG.DONE then done = true end
+      if tp == c.NLMSG.DONE then done = true end
       msg, buffer, len = nlmsg_next(msg, buffer, len)
     end
     if not untildone then done = true end
@@ -587,52 +587,52 @@ end
 local ifla_msg_types = {
   ifla = {
     -- IFLA.UNSPEC
-    [S.IFLA.ADDRESS] = t.macaddr,
-    [S.IFLA.BROADCAST] = t.macaddr,
-    [S.IFLA.IFNAME] = "asciiz",
+    [c.IFLA.ADDRESS] = t.macaddr,
+    [c.IFLA.BROADCAST] = t.macaddr,
+    [c.IFLA.IFNAME] = "asciiz",
     -- TODO IFLA.MAP
-    [S.IFLA.MTU] = t.uint32,
-    [S.IFLA.LINK] = t.uint32,
-    [S.IFLA.MASTER] = t.uint32,
-    [S.IFLA.TXQLEN] = t.uint32,
-    [S.IFLA.WEIGHT] = t.uint32,
-    [S.IFLA.OPERSTATE] = t.uint8,
-    [S.IFLA.LINKMODE] = t.uint8,
-    [S.IFLA.LINKINFO] = {"ifla_info", S.IFLA_INFO},
-    [S.IFLA.NET_NS_PID] = t.uint32,
-    [S.IFLA.NET_NS_FD] = t.uint32,
-    [S.IFLA.IFALIAS] = "asciiz",
-    --[S.IFLA.VFINFO_LIST] = "nested",
-    --[S.IFLA.VF_PORTS] = "nested",
-    --[S.IFLA.PORT_SELF] = "nested",
-    --[S.IFLA.AF_SPEC] = "nested",
+    [c.IFLA.MTU] = t.uint32,
+    [c.IFLA.LINK] = t.uint32,
+    [c.IFLA.MASTER] = t.uint32,
+    [c.IFLA.TXQLEN] = t.uint32,
+    [c.IFLA.WEIGHT] = t.uint32,
+    [c.IFLA.OPERSTATE] = t.uint8,
+    [c.IFLA.LINKMODE] = t.uint8,
+    [c.IFLA.LINKINFO] = {"ifla_info", c.IFLA_INFO},
+    [c.IFLA.NET_NS_PID] = t.uint32,
+    [c.IFLA.NET_NS_FD] = t.uint32,
+    [c.IFLA.IFALIAS] = "asciiz",
+    --[c.IFLA.VFINFO_LIST] = "nested",
+    --[c.IFLA.VF_PORTS] = "nested",
+    --[c.IFLA.PORT_SELF] = "nested",
+    --[c.IFLA.AF_SPEC] = "nested",
   },
   ifla_info = {
-    [S.IFLA_INFO.KIND] = "ascii",
-    [S.IFLA_INFO.DATA] = "kind",
+    [c.IFLA_INFO.KIND] = "ascii",
+    [c.IFLA_INFO.DATA] = "kind",
   },
   ifla_vlan = {
-    [S.IFLA_VLAN.ID] = t.uint16,
+    [c.IFLA_VLAN.ID] = t.uint16,
     -- other vlan params
   },
   ifa = {
     -- IFA.UNSPEC
-    [S.IFA.ADDRESS] = "address",
-    [S.IFA.LOCAL] = "address",
-    [S.IFA.LABEL] = "asciiz",
-    [S.IFA.BROADCAST] = "address",
-    [S.IFA.ANYCAST] = "address",
+    [c.IFA.ADDRESS] = "address",
+    [c.IFA.LOCAL] = "address",
+    [c.IFA.LABEL] = "asciiz",
+    [c.IFA.BROADCAST] = "address",
+    [c.IFA.ANYCAST] = "address",
     -- IFA.CACHEINFO
   },
   rta = {
     -- RTA_UNSPEC
-    [S.RTA.DST] = "address",
-    [S.RTA.SRC] = "address",
-    [S.RTA.IIF] = t.uint32,
-    [S.RTA.OIF] = t.uint32,
-    [S.RTA.GATEWAY] = "address",
-    [S.RTA.PRIORITY] = t.uint32,
-    [S.RTA.METRICS] = t.uint32,
+    [c.RTA.DST] = "address",
+    [c.RTA.SRC] = "address",
+    [c.RTA.IIF] = t.uint32,
+    [c.RTA.OIF] = t.uint32,
+    [c.RTA.GATEWAY] = "address",
+    [c.RTA.PRIORITY] = t.uint32,
+    [c.RTA.METRICS] = t.uint32,
     --          RTA.PREFSRC
     --          RTA.MULTIPATH
     --          RTA.PROTOINFO
@@ -641,7 +641,7 @@ local ifla_msg_types = {
   },
   veth_info = {
     -- VETH_INFO_UNSPEC
-    [S.VETH_INFO.PEER] = {"ifla", S.IFLA},
+    [c.VETH_INFO.PEER] = {"ifla", c.IFLA},
   },
 }
 
@@ -712,8 +712,8 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
 
   if tp == "kind" then
     local kinds = {
-      vlan = {"ifla_vlan", S.IFLA_VLAN},
-      veth = {"veth_info", S.VETH_INFO},
+      vlan = {"ifla_vlan", c.IFLA_VLAN},
+      veth = {"veth_info", c.VETH_INFO},
     }
     tp = kinds[kind]
   end
@@ -740,7 +740,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
     if not value then error("not enough arguments") end
   end
 
-  if tab == "ifla_info" and msg == S.IFLA_INFO.KIND then
+  if tab == "ifla_info" and msg == c.IFLA_INFO.KIND then
     kind = value
   end
 
@@ -754,7 +754,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
     slen = nlmsg_align(s.rtattr) + #value
   else
     if tp == "address" then
-      tp = S.addrtype[af]
+      tp = t.addrtype[af]
     end
     if not ffi.istype(tp, value) then
       value = tp(value)
@@ -798,20 +798,20 @@ local function ifla_f(tab, lookup, af, ...)
 end
 
 local rtpref = {
-  [S.RTM.NEWLINK] = {"ifla", S.IFLA},
-  [S.RTM.GETLINK] = {"ifla", S.IFLA},
-  [S.RTM.DELLINK] = {"ifla", S.IFLA},
-  [S.RTM.NEWADDR] = {"ifa", S.IFA},
-  [S.RTM.GETADDR] = {"ifa", S.IFA},
-  [S.RTM.DELADDR] = {"ifa", S.IFA},
-  [S.RTM.NEWROUTE] = {"rta", S.RTA},
-  [S.RTM.GETROUTE] = {"rta", S.RTA},
-  [S.RTM.DELROUTE] = {"rta", S.RTA},
+  [c.RTM.NEWLINK] = {"ifla", c.IFLA},
+  [c.RTM.GETLINK] = {"ifla", c.IFLA},
+  [c.RTM.DELLINK] = {"ifla", c.IFLA},
+  [c.RTM.NEWADDR] = {"ifa", c.IFA},
+  [c.RTM.GETADDR] = {"ifa", c.IFA},
+  [c.RTM.DELADDR] = {"ifa", c.IFA},
+  [c.RTM.NEWROUTE] = {"rta", c.RTA},
+  [c.RTM.GETROUTE] = {"rta", c.RTA},
+  [c.RTM.DELROUTE] = {"rta", c.RTA},
 }
 
 function nl.socket(tp, addr)
-  tp = S.NETLINK[tp]
-  local sock, err = S.socket(S.AF.NETLINK, S.SOCK.RAW, tp)
+  tp = c.NETLINK[tp]
+  local sock, err = S.socket(c.AF.NETLINK, c.SOCK.RAW, tp)
   if not sock then return nil, err end
   if addr then
     if type(addr) == "table" then addr.type = tp end -- need type to convert group names from string
@@ -876,41 +876,41 @@ end
 -- TODO cleanup use of NLMSG tables NLMSG_NEWLINK NLMSG_GETLINK, NLM_F.
 
 function nl.newlink(index, flags, iflags, change, ...)
-  if change == 0 then change = S.IFF.NONE end -- 0 should work, but does not
-  flags = S.NLMSG_NEWLINK[flags] -- TODO integrate flags below
+  if change == 0 then change = c.IFF.NONE end -- 0 should work, but does not
+  flags = c.NLMSG_NEWLINK[flags] -- TODO integrate flags below
   if type(index) == 'table' then index = index.index end
-  local ifv = {ifi_index = index, ifi_flags = S.IFF[iflags], ifi_change = S.IFF[change]}
-  return nlmsg(S.RTM.NEWLINK, S.NLM_F.REQUEST + S.NLM_F.ACK + flags, nil, t.ifinfomsg, ifv, ...)
+  local ifv = {ifi_index = index, ifi_flags = c.IFF[iflags], ifi_change = c.IFF[change]}
+  return nlmsg(c.RTM.NEWLINK, c.NLM_F.REQUEST + c.NLM_F.ACK + flags, nil, t.ifinfomsg, ifv, ...)
 end
 
 function nl.dellink(index, ...)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index}
-  return nlmsg(S.RTM.DELLINK, S.NLM_F.REQUEST + S.NLM_F.ACK, nil, t.ifinfomsg, ifv, ...)
+  return nlmsg(c.RTM.DELLINK, c.NLM_F.REQUEST + c.NLM_F.ACK, nil, t.ifinfomsg, ifv, ...)
 end
 
 -- read interfaces and details.
 function nl.getlink(...)
-  return nlmsg(S.RTM.GETLINK, S.NLM_F.REQUEST + S.NLMSG_GETLINK.DUMP, nil, t.rtgenmsg, {rtgen_family = S.AF.PACKET}, ...)
+  return nlmsg(c.RTM.GETLINK, c.NLM_F.REQUEST + c.NLMSG_GETLINK.DUMP, nil, t.rtgenmsg, {rtgen_family = c.AF.PACKET}, ...)
 end
 
 -- read routes
 function nl.getroute(af, tp, tab, prot, scope, ...)
-  af = S.AF[af]
-  tp = S.RTN[tp]
-  tab = S.RT_TABLE[tab]
-  prot = S.RTPROT[prot]
-  scope = S.RT_SCOPE[scope]
-  local r, err = nlmsg(S.RTM.GETROUTE, S.NLM_F.REQUEST + S.NLMSG_GETLINK.DUMP, af, t.rtmsg,
+  af = c.AF[af]
+  tp = c.RTN[tp]
+  tab = c.RT_TABLE[tab]
+  prot = c.RTPROT[prot]
+  scope = c.RT_SCOPE[scope]
+  local r, err = nlmsg(c.RTM.GETROUTE, c.NLM_F.REQUEST + c.NLMSG_GETLINK.DUMP, af, t.rtmsg,
                    {rtm_family = af, rtm_table = tab, rtm_protocol = prot, rtm_type = tp, rtm_scope = scope})
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
 end
 
 function nl.routes(af, tp)
-  af = S.AF[af]
-  if not tp then tp = S.RTN.UNICAST end
-  tp = S.RTN[tp]
+  af = c.AF[af]
+  if not tp then tp = c.RTN.UNICAST end
+  tp = c.RTN[tp]
   local r, err = nl.getroute(af, tp)
   if not r then return nil, err end
   local ifs, err = nl.getlink()
@@ -942,56 +942,56 @@ end
 
 local function rtm_table(tab)
   tab = preftable(tab, "rtm_")
-  tab.rtm_family = S.AF[tab.rtm_family]
-  tab.rtm_protocol = S.RTPROT[tab.rtm_protocol]
-  tab.rtm_type = S.RTN[tab.rtm_type]
-  tab.rtm_scope = S.RT_SCOPE[tab.rtm_scope]
-  tab.rtm_flags = S.RTM_F[tab.rtm_flags]
-  tab.rtm_table = S.RT_TABLE[tab.rtm_table]
+  tab.rtm_family = c.AF[tab.rtm_family]
+  tab.rtm_protocol = c.RTPROT[tab.rtm_protocol]
+  tab.rtm_type = c.RTN[tab.rtm_type]
+  tab.rtm_scope = c.RT_SCOPE[tab.rtm_scope]
+  tab.rtm_flags = c.RTM_F[tab.rtm_flags]
+  tab.rtm_table = c.RT_TABLE[tab.rtm_table]
   return tab
 end
 
 -- this time experiment using table as so many params, plus they are just to init struct. TODO flag cleanup
 function nl.newroute(flags, tab, ...)
   tab = rtm_table(tab)
-  flags = S.NLMSG_NEWLINK[flags]
-  return nlmsg(S.RTM.NEWROUTE, S.NLM_F.REQUEST + S.NLM_F.ACK + flags, tab.rtm_family, t.rtmsg, tab, ...)
+  flags = c.NLMSG_NEWLINK[flags]
+  return nlmsg(c.RTM.NEWROUTE, c.NLM_F.REQUEST + c.NLM_F.ACK + flags, tab.rtm_family, t.rtmsg, tab, ...)
 end
 
 -- TODO flag cleanup
 function nl.delroute(tp, ...)
   tp = rtm_table(tp)
-  return nlmsg(S.RTM.DELROUTE, S.NLM_F.REQUEST + S.NLM_F.ACK, tp.rtm_family, t.rtmsg, tp, ...)
+  return nlmsg(c.RTM.DELROUTE, c.NLM_F.REQUEST + c.NLM_F.ACK, tp.rtm_family, t.rtmsg, tp, ...)
 end
 
 -- read addresses from interface TODO flag cleanup
 function nl.getaddr(af, ...)
-  local family = S.AF[af]
+  local family = c.AF[af]
   local ifav = {ifa_family = family}
-  return nlmsg(S.RTM.GETADDR, S.NLM_F.REQUEST + S.NLMSG_GETLINK.ROOT, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(c.RTM.GETADDR, c.NLM_F.REQUEST + c.NLMSG_GETLINK.ROOT, family, t.ifaddrmsg, ifav, ...)
 end
 
 -- TODO may need ifa_scope
 function nl.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
-  local family = S.AF[af]
-  local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = S.IFA_F[flags], ifa_index = index}
-  return nlmsg(S.RTM.NEWADDR, S.NLM_F.REQUEST + S.NLM_F.ACK, family, t.ifaddrmsg, ifav, ...)
+  local family = c.AF[af]
+  local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = c.IFA_F[flags], ifa_index = index}
+  return nlmsg(c.RTM.NEWADDR, c.NLM_F.REQUEST + c.NLM_F.ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
 function nl.deladdr(index, af, prefixlen, ...)
   if type(index) == 'table' then index = index.index end
-  local family = S.AF[af]
+  local family = c.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
-  return nlmsg(S.RTM.DELADDR, S.NLM_F.REQUEST + S.NLM_F.ACK, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(c.RTM.DELADDR, c.NLM_F.REQUEST + c.NLM_F.ACK, family, t.ifaddrmsg, ifav, ...)
 end
 
 function nl.interfaces() -- returns with address info too.
   local ifs, err = nl.getlink()
   if not ifs then return nil, err end
-  local addr4, err = nl.getaddr(S.AF.INET)
+  local addr4, err = nl.getaddr(c.AF.INET)
   if not addr4 then return nil, err end
-  local addr6, err = nl.getaddr(S.AF.INET6)
+  local addr6, err = nl.getaddr(c.AF.INET6)
   if not addr6 then return nil, err end
   local indexmap = {}
   for i, v in pairs(ifs) do
@@ -1062,7 +1062,7 @@ end
 
 -- TODO iplink may not be appropriate always sort out flags
 function nl.create_interface(tab)
-  tab.modifier = S.NLMSG_NEWLINK.CREATE
+  tab.modifier = c.NLMSG_NEWLINK.CREATE
   return nl.iplink(tab)
 end
 

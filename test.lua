@@ -8,18 +8,18 @@ local bit = require "bit"
 setmetatable(S, {__index = function(i, k) error("bad index access on S: " .. k) end})
 
 local oldassert = assert
-local function assert(c, s)
+local function assert(cond, s)
   collectgarbage("collect") -- force gc, to test for bugs
-  return oldassert(c, tostring(s)) -- annoyingly, assert does not call tostring!
+  return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
 end
 
-local function fork_assert(c, s) -- if we have forked we need to fail in main thread not fork
-  if not c then
+local function fork_assert(cond, s) -- if we have forked we need to fail in main thread not fork
+  if not cond then
     print(tostring(s))
     print(debug.traceback())
     S.exit("failure")
   end
-  return c, s
+  return cond, s
 end
 
 USE_EXPECTED_ACTUAL_IN_ASSERT_EQUALS = true -- strict wants this to be set
@@ -45,14 +45,15 @@ end
 
 if arg[1] == "coverage" then debug.sethook(coverage, "lc") end
 
+local t, pt, c = S.t, S.pt, S.c
+
 local teststring = "this is a test string"
 local size = 512
-local buf = S.t.buffer(size)
+local buf = t.buffer(size)
 local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 local longfile = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
 local efile = "/tmp/tmpXXYYY" .. S.getpid() .. ".sh"
-local t, pt = S.t, S.pt
 local largeval = math.pow(2, 33) -- larger than 2^32 for testing
 
 local clean = function()
@@ -65,10 +66,10 @@ end
 
 test_basic = {
   test_octal = function()
-    assert_equal(S.O.CREAT, 64, "wrong octal value for O_CREAT")
+    assert_equal(c.O.CREAT, 64, "wrong octal value for O_CREAT")
   end,
   test_signals = function()
-    assert_equal(S.SIG.SYS, 31) -- test numbers correct
+    assert_equal(c.SIG.SYS, 31) -- test numbers correct
   end,
   test_b64 = function()
     local h, l = S.i64(0xffffffffffffffffLL)
@@ -118,7 +119,7 @@ test_open_close = {
   test_close_invalid_fd = function()
     local ok, err = S.close(127)
     assert(err, "expected to fail on close invalid fd")
-    assert_equal(err.errno, S.E.EBADF, "expect EBADF from invalid numberic fd")
+    assert_equal(err.errno, c.E.EBADF, "expect EBADF from invalid numberic fd")
   end,
   test_open_valid = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
@@ -145,14 +146,14 @@ test_open_close = {
   end,
   test_access = function()
     assert(S.access("/dev/null", "r"), "expect access to say can read /dev/null")
-    assert(S.access("/dev/null", S.OK.R), "expect access to say can read /dev/null")
+    assert(S.access("/dev/null", c.OK.R), "expect access to say can read /dev/null")
     assert(S.access("/dev/null", "w"), "expect access to say can write /dev/null")
     assert(not S.access("/dev/null", "x"), "expect access to say cannot execute /dev/null")
   end,
   test_faccessat = function()
     local fd = S.open("/dev")
     assert(fd:faccessat("null", "r"), "expect access to say can read /dev/null")
-    assert(fd:faccessat("null", S.OK.R), "expect access to say can read /dev/null")
+    assert(fd:faccessat("null", c.OK.R), "expect access to say can read /dev/null")
     assert(fd:faccessat("null", "w"), "expect access to say can write /dev/null")
     assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
     assert(fd:close())
@@ -235,7 +236,7 @@ test_read_write = {
     local n = assert(fd:writev{"test", "ing", "writev"})
     assert_equal(n, 13, "expect length 13")
     assert(fd:seek())
-    local b1, b2, b3 = S.t.buffer(6), S.t.buffer(4), S.t.buffer(3)
+    local b1, b2, b3 = t.buffer(6), t.buffer(4), t.buffer(3)
     local n = assert(fd:readv{b1, b2, b3})
     assert_equal(n, 13, "expect length 13")
     assert_equal(S.string(b1, 6), "testin")
@@ -248,7 +249,7 @@ test_read_write = {
     local fd = assert(S.open(tmpfile, "rdwr,creat", "irwxu"))
     local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
     assert_equal(n, 13, "expect length 13")
-    local b1, b2, b3 = S.t.buffer(6), S.t.buffer(4), S.t.buffer(3)
+    local b1, b2, b3 = t.buffer(6), t.buffer(4), t.buffer(3)
     local n = assert(fd:preadv({b1, b2, b3}, offset))
     assert_equal(n, 13, "expect length 13")
     assert_equal(S.string(b1, 6), "testin")
@@ -322,7 +323,7 @@ test_file_operations = {
     local fd = assert(S.creat(tmpfile, "IRWXU"))
     assert(fd:fchmod("IRUSR, IWUSR"))
     local st = fd:stat()
-    assert_equal(st.mode, S.S["IFREG, IRUSR, IWUSR"]) -- TODO should be better way to test
+    assert_equal(st.mode, c.S["IFREG, IRUSR, IWUSR"]) -- TODO should be better way to test
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
@@ -735,12 +736,12 @@ test_locking = {
 test_sockets_pipes = {
   test_sockaddr_storage = function()
     local sa = t.sockaddr_storage{family = "netlink", pid = 2}
-    assert_equal(sa.family, S.AF.NETLINK, "netlink family")
+    assert_equal(sa.family, c.AF.NETLINK, "netlink family")
     assert_equal(sa.pid, 2, "should get pid back")
     sa.pid = 3
     assert_equal(sa.pid, 3, "should get pid back")
     sa.family = "inet"
-    assert_equal(sa.family, S.AF.INET, "inet family")
+    assert_equal(sa.family, c.AF.INET, "inet family")
     sa.port = 4
     assert_equal(sa.port, 4, "should get port back")
   end,
@@ -781,7 +782,7 @@ test_sockets_pipes = {
       assert(n == #str)
       n = assert(s[2]:read())
       assert(#n == #str)
-      local buf2 = S.t.buffer(#str)
+      local buf2 = t.buffer(#str)
       S.copy(buf2, str, #str)
 
       n = assert(S.vmsplice(p[2], {{buf2, #str}}, "nonblock")) -- write our memory into pipe
@@ -859,7 +860,7 @@ test_timers_signals = {
     local m = assert(S.sigprocmask())
     assert(m.isemptyset, "expect initial sigprocmask to be empty")
     assert(not m.winch, "expect set empty")
-    m = m:add(S.SIG.WINCH)
+    m = m:add(c.SIG.WINCH)
     assert(not m.isemptyset, "expect set not empty")
     assert(m.winch, "expect to have added SIGWINCH")
     m = m:del("WINCH, pipe")
@@ -971,7 +972,7 @@ test_misc = {
     local mask
     mask = S.umask("IWGRP, IWOTH")
     mask = S.umask("IWGRP, IWOTH")
-    assert_equal(mask, S.S.IWGRP + S.S.IWOTH, "umask not set correctly")
+    assert_equal(mask, c.S.IWGRP + c.S.IWOTH, "umask not set correctly")
   end,
   test_sysinfo = function()
     local i = assert(S.sysinfo()) -- TODO test values returned for some sanity
@@ -1042,7 +1043,7 @@ test_misc = {
     assert(n == 0, "process pdeathsig defaults to 0")
     assert(S.prctl("set_pdeathsig", "winch"))
     n = assert(S.prctl("get_pdeathsig"))
-    assert(n == S.SIG.WINCH, "process pdeathsig should now be set to winch")
+    assert(n == c.SIG.WINCH, "process pdeathsig should now be set to winch")
     assert(S.prctl("set_pdeathsig")) -- reset
     n = assert(S.prctl("get_name"))
     assert(S.prctl("set_name", "test"))
@@ -1100,13 +1101,13 @@ test_sockets = {
     assert_equal(tostring(t.in_addr("255.255.255.255")), "255.255.255.255", "print ipv4")
   end,
   test_socket_sizes = function()
-    assert(S.sizeof(S.t.sockaddr) == S.sizeof(S.t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
-    assert(S.sizeof(S.t.sockaddr_storage) == 128) -- this is the required size in Linux
-    assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr))
-    assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_in))
-    assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_in6))
-    assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_un))
-    assert(S.sizeof(S.t.sockaddr_storage) >= S.sizeof(S.t.sockaddr_nl))
+    assert(S.sizeof(t.sockaddr) == S.sizeof(t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
+    assert(S.sizeof(t.sockaddr_storage) == 128) -- this is the required size in Linux
+    assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr))
+    assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr_in))
+    assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr_in6))
+    assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr_un))
+    assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr_nl))
   end,
   test_inet_aton_error = function()
     local a = S.inet_aton("error")
@@ -1153,14 +1154,14 @@ test_sockets = {
     assert(n == #teststring, "should read back string into buffer")
     assert(S.string(buf, n) == teststring, "we should read back the same string that was sent")
     -- test scatter gather
-    local b0 = S.t.buffer(4)
-    local b1 = S.t.buffer(3)
+    local b0 = t.buffer(4)
+    local b1 = t.buffer(3)
     S.copy(b0, "test", 4) -- string init adds trailing 0 byte
     S.copy(b1, "ing", 3)
     n = assert(c:writev({{b0, 4}, {b1, 3}}))
     assert(n == 7, "expect writev to write 7 bytes")
-    b0 = S.t.buffer(3)
-    b1 = S.t.buffer(4)
+    b0 = t.buffer(3)
+    b1 = t.buffer(4)
     local iov = t.iovecs{{b0, 3}, {b1, 4}}
     n = assert(a.fd:readv(iov))
     assert_equal(n, 7, "expect readv to read 7 bytes")
@@ -1184,7 +1185,7 @@ test_sockets = {
   test_sendcred = function()
     local sv = assert(S.socketpair("unix", "stream"))
     assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
-    local so = assert(sv[2]:getsockopt(S.SOL.SOCKET, S.SO.PASSCRED))
+    local so = assert(sv[2]:getsockopt(c.SOL.SOCKET, c.SO.PASSCRED))
     assert(so == 1, "getsockopt should have updated value")
     assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
     local r = assert(sv[2]:recvmsg())
@@ -1522,7 +1523,7 @@ test_netlink = {
     end
   end,
   test_netlink_veth_root = function()
-    assert(nl.newlink(0, S.NLMSG_NEWLINK.CREATE, 0, 0, "linkinfo", {"kind", "veth", "data", {"peer", {t.ifinfomsg, {}, "ifname", "veth1"}}}, "ifname", "veth0"))
+    assert(nl.newlink(0, c.NLMSG_NEWLINK.CREATE, 0, 0, "linkinfo", {"kind", "veth", "data", {"peer", {t.ifinfomsg, {}, "ifname", "veth1"}}}, "ifname", "veth0"))
     local i = assert(nl.interfaces())
     assert(i.veth0, "expect veth0")
     assert(i.veth1, "expect veth1")
@@ -1557,13 +1558,13 @@ test_termios = {
     termios:cfsetspeed(115200)
     assert_equal(termios:cfgetispeed(), 115200, "expect input speed as set")
     assert_equal(termios:cfgetospeed(), 115200, "expect output speed as set")
-    assert(bit.band(termios.c_lflag, S.ICANON) ~= 0)
+    assert(bit.band(termios.c_lflag, c.ICANON) ~= 0)
     termios:cfmakeraw()
-    assert(bit.band(termios.c_lflag, S.ICANON) == 0)
+    assert(bit.band(termios.c_lflag, c.ICANON) == 0)
     assert(pts:tcsetattr("now", termios))
     termios = assert(pts:tcgetattr())
     assert(termios:cfgetospeed() == 115200)
-    assert(bit.band(termios.c_lflag, S.ICANON) == 0)
+    assert(bit.band(termios.c_lflag, c.ICANON) == 0)
     assert(pts:tcsendbreak(0))
     assert(pts:tcdrain())
     assert(pts:tcflush('ioflush'))
@@ -1597,68 +1598,68 @@ test_events = {
   end,
   test_poll = function()
     local sv = assert(S.socketpair("unix", "stream"))
-    local c, s = sv[1], sv[2]
-    local pev = {{fd = c, events = S.POLL.IN}}
+    local a, b = sv[1], sv[2]
+    local pev = {{fd = a, events = c.POLL.IN}}
     local p = assert(S.poll(pev, 0))
-    assert(p[1].fd == c:getfd() and p[1].revents == 0, "one event now")
-    assert(s:write(teststring))
+    assert(p[1].fd == a:getfd() and p[1].revents == 0, "one event now")
+    assert(b:write(teststring))
     local p = assert(S.poll(pev, 0))
-    assert(p[1].fd == c:getfd() and p[1].IN, "one event now")
-    assert(c:read())
-    assert(s:close())
-    assert(c:close())
+    assert(p[1].fd == a:getfd() and p[1].IN, "one event now")
+    assert(a:read())
+    assert(b:close())
+    assert(a:close())
   end,
   test_ppoll = function()
     local sv = assert(S.socketpair("unix", "stream"))
-    local c, s = sv[1], sv[2]
-    local pev = {{fd = c, events = S.POLL.IN}}
+    local a, b = sv[1], sv[2]
+    local pev = {{fd = a, events = c.POLL.IN}}
     local p = assert(S.ppoll(pev, 0, nil))
-    assert(p[1].fd == c:getfd() and p[1].revents == 0, "one event now")
-    assert(s:write(teststring))
+    assert(p[1].fd == a:getfd() and p[1].revents == 0, "one event now")
+    assert(b:write(teststring))
     local p = assert(S.ppoll(pev, nil, "alrm"))
-    assert(p[1].fd == c:getfd() and p[1].IN, "one event now")
-    assert(c:read())
-    assert(s:close())
-    assert(c:close())
+    assert(p[1].fd == a:getfd() and p[1].IN, "one event now")
+    assert(a:read())
+    assert(b:close())
+    assert(a:close())
   end,
   test_select = function()
     local sv = assert(S.socketpair("unix", "stream"))
-    local c, s = sv[1], sv[2]
-    local sel = assert(S.select{readfds = {c, s}, timeout = S.t.timeval(0,0)})
+    local a, b = sv[1], sv[2]
+    local sel = assert(S.select{readfds = {a, b}, timeout = t.timeval(0,0)})
     assert(sel.count == 0, "nothing to read select now")
-    assert(s:write(teststring))
-    sel = assert(S.select{readfds = {c, s}, timeout = {0, 0}})
+    assert(b:write(teststring))
+    sel = assert(S.select{readfds = {a, b}, timeout = {0, 0}})
     assert(sel.count == 1, "one fd available for read now")
-    assert(s:close())
-    assert(c:close())
+    assert(b:close())
+    assert(a:close())
   end,
   test_pselect = function()
     local sv = assert(S.socketpair("unix", "stream"))
-    local c, s = sv[1], sv[2]
-    local sel = assert(S.pselect{readfds = {c, s}, timeout = 0, sigset = "alrm"})
+    local a, b = sv[1], sv[2]
+    local sel = assert(S.pselect{readfds = {1, b}, timeout = 0, sigset = "alrm"})
     assert(sel.count == 0, "nothing to read select now")
-    assert(s:write(teststring))
-    sel = assert(S.pselect{readfds = {c, s}, timeout = 0, sigset = sel.sigset})
+    assert(b:write(teststring))
+    sel = assert(S.pselect{readfds = {a, b}, timeout = 0, sigset = sel.sigset})
     assert(sel.count == 1, "one fd available for read now")
-    assert(s:close())
-    assert(c:close())
+    assert(b:close())
+    assert(a:close())
   end,
   test_epoll = function()
     local sv = assert(S.socketpair("unix", "stream"))
-    local c, s = sv[1], sv[2]
+    local a, b = sv[1], sv[2]
     local ep = assert(S.epoll_create("cloexec"))
-    assert(ep:epoll_ctl("add", c, "in"))
+    assert(ep:epoll_ctl("add", a, "in"))
     local r = assert(ep:epoll_wait(nil, 1, 0))
     assert(#r == 0, "no events yet")
-    assert(s:write(teststring))
+    assert(b:write(teststring))
     r = assert(ep:epoll_wait())
     assert(#r == 1, "one event now")
     assert(r[1].IN, "read event")
-    assert(r[1].fd == c:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
+    assert(r[1].fd == a:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
     assert(ep:close())
-    assert(c:read()) -- clear event
-    assert(s:close())
-    assert(c:close())
+    assert(a:read()) -- clear event
+    assert(b:close())
+    assert(a:close())
   end
 }
 
@@ -1670,8 +1671,8 @@ test_aio = {
   end,
   test_aio_ctx_gc = function()
     local ctx = assert(S.io_setup(8))
-    local ctx2 = S.t.aio_context()
-    S.copy(ctx2, ctx, S.sizeof(S.t.aio_context))
+    local ctx2 = t.aio_context()
+    S.copy(ctx2, ctx, S.sizeof(t.aio_context))
     ctx = nil
     collectgarbage("collect")
     local ok, err = S.io_destroy(ctx2)
@@ -1769,9 +1770,9 @@ test_processes = {
       S.exit(23)
     else -- parent
       local w = assert(S.waitid("all", 0, "exited, stopped, continued"))
-      assert(w.si_signo == S.SIG.CHLD, "waitid to return SIGCHLD")
+      assert(w.si_signo == c.SIG.CHLD, "waitid to return SIGCHLD")
       assert(w.si_status == 23, "exit should be 23")
-      assert(w.si_code == S.SIGCLD.EXITED, "normal exit expected")
+      assert(w.si_code == c.SIGCLD.EXITED, "normal exit expected")
     end
 
     pid = assert(S.fork())
@@ -2015,7 +2016,7 @@ test_misc_root = {
     assert_equal(b.source, a.source, "expect source match")
     assert_equal(b.target, a.target, "expect target match")
     assert_equal(b.type, a.type, "expect type match")
-    assert_equal(S.MS[b.flags], S.MS[a.flags], "expect flags match")
+    assert_equal(c.MS[b.flags], c.MS[a.flags], "expect flags match")
     assert_equal(b.freq, "0")
     assert_equal(b.passno, "0")
     assert(S.umount(dir))

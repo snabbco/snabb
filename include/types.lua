@@ -11,6 +11,8 @@ local bit = require "bit"
 
 require "include/headers"
 
+local c = require "include/constants"
+
 local function init(S)
 
 --[[
@@ -57,43 +59,43 @@ end
 local signal_reasons_gen = {}
 local signal_reasons = {}
 
-for k, v in pairs(S.SI) do
+for k, v in pairs(c.SI) do
   signal_reasons_gen[v] = k
 end
 
-signal_reasons[S.SIG.ILL] = {}
-for k, v in pairs(S.SIGILL) do
-  signal_reasons[S.SIG.ILL][v] = k
+signal_reasons[c.SIG.ILL] = {}
+for k, v in pairs(c.SIGILL) do
+  signal_reasons[c.SIG.ILL][v] = k
 end
 
-signal_reasons[S.SIG.FPE] = {}
-for k, v in pairs(S.SIGFPE) do
-  signal_reasons[S.SIG.FPE][v] = k
+signal_reasons[c.SIG.FPE] = {}
+for k, v in pairs(c.SIGFPE) do
+  signal_reasons[c.SIG.FPE][v] = k
 end
 
-signal_reasons[S.SIG.SEGV] = {}
-for k, v in pairs(S.SIGSEGV) do
-  signal_reasons[S.SIG.SEGV][v] = k
+signal_reasons[c.SIG.SEGV] = {}
+for k, v in pairs(c.SIGSEGV) do
+  signal_reasons[c.SIG.SEGV][v] = k
 end
 
-signal_reasons[S.SIG.BUS] = {}
-for k, v in pairs(S.SIGBUS) do
-  signal_reasons[S.SIG.BUS][v] = k
+signal_reasons[c.SIG.BUS] = {}
+for k, v in pairs(c.SIGBUS) do
+  signal_reasons[c.SIG.BUS][v] = k
 end
 
-signal_reasons[S.SIG.TRAP] = {}
-for k, v in pairs(S.SIGTRAP) do
-  signal_reasons[S.SIG.TRAP][v] = k
+signal_reasons[c.SIG.TRAP] = {}
+for k, v in pairs(c.SIGTRAP) do
+  signal_reasons[c.SIG.TRAP][v] = k
 end
 
-signal_reasons[S.SIG.CHLD] = {}
-for k, v in pairs(S.SIGCLD) do
-  signal_reasons[S.SIG.CHLD][v] = k
+signal_reasons[c.SIG.CHLD] = {}
+for k, v in pairs(c.SIGCLD) do
+  signal_reasons[c.SIG.CHLD][v] = k
 end
 
-signal_reasons[S.SIG.POLL] = {}
-for k, v in pairs(S.SIGPOLL) do
-  signal_reasons[S.SIG.POLL][v] = k
+signal_reasons[c.SIG.POLL] = {}
+for k, v in pairs(c.SIGPOLL) do
+  signal_reasons[c.SIG.POLL][v] = k
 end
 
 -- endian conversion
@@ -241,8 +243,8 @@ metatype("error", "struct {int errno;}", {
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
     if k == 'lsym' then return errsyms[t.errno]:sub(2):lower() end
-    if S.E[k] then return S.E[k] == t.errno end
-    local uk = S.E['E' .. k:upper()]
+    if c.E[k] then return c.E[k] == t.errno end
+    local uk = c.E['E' .. k:upper()]
     if uk then return uk == t.errno end
   end,
   __new = function(tp, errno)
@@ -269,7 +271,7 @@ meth.sockaddr_storage = {
     family = function(sa) return sa.ss_family end,
   },
   newindex = {
-    family = function(sa, v) sa.ss_family = S.AF[v] end,
+    family = function(sa, v) sa.ss_family = c.AF[v] end,
   }
 }
 
@@ -297,7 +299,7 @@ metatype("sockaddr_storage", "struct sockaddr_storage", {
   __new = function(tp, init)
     local ss = ffi.new(tp)
     local family
-    if init and init.family then family = S.AF[init.family] end
+    if init and init.family then family = c.AF[init.family] end
     local st
     if family then
       st = samap2[family]
@@ -333,7 +335,7 @@ metatype("sockaddr_in", "struct sockaddr_in", {
       addr = t.in_addr(addr)
       if not addr then return end
     end
-    return ffi.new(tp, S.AF.INET, htons(port or 0), addr)
+    return ffi.new(tp, c.AF.INET, htons(port or 0), addr)
   end
 })
 
@@ -356,7 +358,7 @@ metatype("sockaddr_in6", "struct sockaddr_in6", {
       addr = t.in6_addr(addr)
       if not addr then return end
     end
-    return ffi.new(tp, S.AF.INET6, htons(port or 0), flowinfo or 0, addr, scope_id or 0)
+    return ffi.new(tp, c.AF.INET6, htons(port or 0), flowinfo or 0, addr, scope_id or 0)
   end
 })
 
@@ -368,13 +370,13 @@ meth.sockaddr_un = {
 
 metatype("sockaddr_un", "struct sockaddr_un", {
   __index = function(sa, k) if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end end,
-  __new = function(tp) return ffi.new(tp, S.AF.UNIX) end,
+  __new = function(tp) return ffi.new(tp, c.AF.UNIX) end,
 })
 
 local nlgroupmap = { -- map from netlink socket type to group names. Note there are two forms of name though, bits and shifts.
-  [S.NETLINK.ROUTE] = S.RTMGRP, -- or RTNLGRP_ and shift not mask TODO make shiftflags function
+  [c.NETLINK.ROUTE] = c.RTMGRP, -- or RTNLGRP_ and shift not mask TODO make shiftflags function
   -- add rest of these
---  [S.NETLINK.SELINUX] = S.SELNLGRP,
+--  [c.NETLINK.SELINUX] = c.SELNLGRP,
 }
 
 meth.sockaddr_nl = {
@@ -398,15 +400,15 @@ metatype("sockaddr_nl", "struct sockaddr_nl", {
       pid, groups, nltype = tb.nl_pid or tb.pid, tb.nl_groups or tb.groups, tb.type
     end
     if nltype and nlgroupmap[nltype] then groups = nlgroupmap[nltype][groups] end -- see note about shiftflags
-    return ffi.new(tp, {nl_family = S.AF.NETLINK, nl_pid = pid, nl_groups = groups})
+    return ffi.new(tp, {nl_family = c.AF.NETLINK, nl_pid = pid, nl_groups = groups})
   end,
 })
 
 samap = {
-  [S.AF.UNIX] = t.sockaddr_un,
-  [S.AF.INET] = t.sockaddr_in,
-  [S.AF.INET6] = t.sockaddr_in6,
-  [S.AF.NETLINK] = t.sockaddr_nl,
+  [c.AF.UNIX] = t.sockaddr_un,
+  [c.AF.INET] = t.sockaddr_in,
+  [c.AF.INET6] = t.sockaddr_in6,
+  [c.AF.NETLINK] = t.sockaddr_nl,
 }
 
 meth.stat = {
@@ -426,13 +428,13 @@ meth.stat = {
     mtime = function(st) return tonumber(st.st_mtime) end,
     major = function(st) return S.major(st.st_rdev) end,
     minor = function(st) return S.minor(st.st_rdev) end,
-    isreg = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFREG end,
-    isdir = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFDIR end,
-    ischr = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFCHR end,
-    isblk = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFBLK end,
-    isfifo = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFIFO end,
-    islnk = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFLNK end,
-    issock = function(st) return bit.band(st.st_mode, S.S.IFMT) == S.S.IFSOCK end,
+    isreg = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFREG end,
+    isdir = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFDIR end,
+    ischr = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFCHR end,
+    isblk = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFBLK end,
+    isfifo = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFIFO end,
+    islnk = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFLNK end,
+    issock = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFSOCK end,
   }
 }
 
@@ -654,7 +656,7 @@ t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs) 
 metatype("pollfd", "struct pollfd", {
   __index = function(t, k)
     if k == 'getfd' then return t.fd end -- TODO use meth
-    return bit.band(t.revents, S.POLL[k]) ~= 0
+    return bit.band(t.revents, c.POLL[k]) ~= 0
   end
 })
 
@@ -673,7 +675,7 @@ mt.pollfds = {
     local fds = ffi.new(tp, count, count)
     for n = 1, count do
       fds[n].fd = ps[n].fd:getfd()
-      fds[n].events = S.POLL[ps[n].events]
+      fds[n].events = c.POLL[ps[n].events]
       fds[n].revents = 0
     end
     return fds
@@ -704,7 +706,7 @@ meth.signalfd = {
 
 metatype("signalfd_siginfo", "struct signalfd_siginfo", {
   __index = function(ss, k)
-    if ss.ssi_signo == S.SIG(k) then return true end
+    if ss.ssi_signo == c.SIG(k) then return true end
     local rname = signal_reasons_gen[ss.ssi_code]
     if not rname and signal_reasons[ss.ssi_signo] then rname = signal_reasons[ss.ssi_signo][ss.ssi_code] end
     if rname == k then return true end
@@ -726,26 +728,26 @@ mt.siginfos = {
 t.siginfos = ffi.metatype("struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
 
 metatype("in_addr", "struct in_addr", {
-  __tostring = function(a) return S.inet_ntop(S.AF.INET, a) end,
+  __tostring = function(a) return S.inet_ntop(c.AF.INET, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = S.inet_pton(S.AF.INET, s, addr) end
+    if s then addr = S.inet_pton(c.AF.INET, s, addr) end
     return addr
   end
 })
 
 metatype("in6_addr", "struct in6_addr", {
-  __tostring = function(a) return S.inet_ntop(S.AF.INET6, a) end,
+  __tostring = function(a) return S.inet_ntop(c.AF.INET6, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = S.inet_pton(S.AF.INET6, s, addr) end
+    if s then addr = S.inet_pton(c.AF.INET6, s, addr) end
     return addr
   end
 })
 
-S.addrtype = {
-  [S.AF.INET] = t.in_addr,
-  [S.AF.INET6] = t.in6_addr,
+t.addrtype = {
+  [c.AF.INET] = t.in_addr,
+  [c.AF.INET6] = t.in6_addr,
 }
 
 -- signal set handlers TODO replace with metatypes, reuse code from stringflags
@@ -805,7 +807,7 @@ local function sigaddsets(set, sigs) -- allow multiple
   local a = split(",", sigs)
   for i, v in ipairs(a) do
     local s = trim(v)
-    local sig = S.SIG[s]
+    local sig = c.SIG[s]
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     sigaddset(set, sig)
   end
@@ -818,7 +820,7 @@ local function sigdelsets(set, sigs) -- allow multiple
   local a = split(",", sigs)
   for i, v in ipairs(a) do
     local s = trim(v)
-    local sig = S.SIG[s]
+    local sig = c.SIG[s]
     if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
     sigdelset(set, sig)
   end
@@ -830,7 +832,7 @@ metatype("sigset", "sigset_t", {
     if k == 'add' then return sigaddsets end
     if k == 'del' then return sigdelsets end
     if k == 'isemptyset' then return sigemptyset(set) end
-    local sig = S.SIG[k]
+    local sig = c.SIG[k]
     if sig then return sigismember(set, sig) end
   end
 })
@@ -842,10 +844,10 @@ pt.void = function(x)
 end
 
 samap2 = {
-  [S.AF.UNIX] = pt.sockaddr_un,
-  [S.AF.INET] = pt.sockaddr_in,
-  [S.AF.INET6] = pt.sockaddr_in6,
-  [S.AF.NETLINK] = pt.sockaddr_nl,
+  [c.AF.UNIX] = pt.sockaddr_un,
+  [c.AF.INET] = pt.sockaddr_in,
+  [c.AF.INET6] = pt.sockaddr_in6,
+  [c.AF.NETLINK] = pt.sockaddr_nl,
 }
 
 return types
