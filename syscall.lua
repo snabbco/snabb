@@ -512,23 +512,7 @@ function S.pipe(flags)
   return setmetatable({t.fd(fd2[0]), t.fd(fd2[1])}, mt.pipe)
 end
 
--- TODO more generic so works with alternate fd structures (call __close?)
-function S.close(fd)
-  local fileno = getfd(fd)
-  if fileno == -1 then return true end -- already closed
-  local ret = C.close(fileno)
-  if ret == -1 then
-    local errno = ffi.errno()
-    if ffi.istype(t.fd, fd) and errno ~= S.E.INTR then -- file will still be open if interrupted
-      fd.filenum = -1 -- make sure cannot accidentally close this fd object again
-    end
-    return nil, t.error()
-  end
-  if ffi.istype(t.fd, fd) then
-    fd.filenum = -1 -- make sure cannot accidentally close this fd object again
-  end
-  return true
-end
+function S.close(fd) return retbool(C.close(getfd(fd))) end
 
 function S.creat(pathname, mode) return retfd(C.creat(pathname, S.MODE[mode])) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
@@ -2320,7 +2304,7 @@ S.in6addr_loopback = t.in6_addr("::1")
 -- methods on an fd
 -- note could split, so a socket does not have methods only appropriate for a file
 local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
-                   'close', 'dup', 'read', 'write', 'pread', 'pwrite', 'tell', 'lockf',
+                   'dup', 'read', 'write', 'pread', 'pwrite', 'tell', 'lockf',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
@@ -2361,11 +2345,19 @@ fmeth.seq = function(fd)
   return fd.sequence
 end
 
+function fmeth.close(fd)
+  local fileno = getfd(fd)
+  if fileno == -1 then return true end -- already closed
+  local ok, err = S.close(fileno)
+  fd.filenum = -1 -- make sure cannot accidentally close this fd object again
+  return ok, err
+end
+
 fmeth.getfd = function(fd) return fd.filenum end
 
 t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   __index = fmeth,
-  __gc = S.close,
+  __gc = fmeth.close,
   __new = function(tp, i)
     return istype(tp, i) or ffi.new(tp, i)
   end
