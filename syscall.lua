@@ -68,7 +68,7 @@ function S.mksigset(str)
 end
 
 -- TODO remove when replaced with metatables
-local stringflags, mksigset = S.stringflags, S.mksigset
+local mksigset = S.mksigset
 
 local types = require("include/types")(S)
 
