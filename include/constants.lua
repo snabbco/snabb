@@ -1215,33 +1215,37 @@ c.RTA = setmetatable({
 }, stringflag)
 
 -- route flags
-c.RTF_UP          = 0x0001
-c.RTF_GATEWAY     = 0x0002
-c.RTF_HOST        = 0x0004
-c.RTF_REINSTATE   = 0x0008
-c.RTF_DYNAMIC     = 0x0010
-c.RTF_MODIFIED    = 0x0020
-c.RTF_MTU         = 0x0040
-c.RTF_MSS         = c.RTF_MTU
-c.RTF_WINDOW      = 0x0080
-c.RTF_IRTT        = 0x0100
-c.RTF_REJECT      = 0x0200
+c.RTF = setmetatable({
+  UP          = 0x0001,
+  GATEWAY     = 0x0002,
+  HOST        = 0x0004,
+  REINSTATE   = 0x0008,
+  DYNAMIC     = 0x0010,
+  MODIFIED    = 0x0020,
+  MTU         = 0x0040,
+  WINDOW      = 0x0080,
+  IRTT        = 0x0100,
+  REJECT      = 0x0200,
 
 -- ipv6 route flags
-c.RTF_DEFAULT     = 0x00010000
-c.RTF_ALLONLINK   = 0x00020000
-c.RTF_ADDRCONF    = 0x00040000
-c.RTF_PREFIX_RT   = 0x00080000
-c.RTF_ANYCAST     = 0x00100000
-c.RTF_NONEXTHOP   = 0x00200000
-c.RTF_EXPIRES     = 0x00400000
-c.RTF_ROUTEINFO   = 0x00800000
-c.RTF_CACHE       = 0x01000000
-c.RTF_FLOW        = 0x02000000
-c.RTF_POLICY      = 0x04000000
+  DEFAULT     = 0x00010000,
+  ALLONLINK   = 0x00020000,
+  ADDRCONF    = 0x00040000,
+  PREFIX_RT   = 0x00080000,
+  ANYCAST     = 0x00100000,
+  NONEXTHOP   = 0x00200000,
+  EXPIRES     = 0x00400000,
+  ROUTEINFO   = 0x00800000,
+  CACHE       = 0x01000000,
+  FLOW        = 0x02000000,
+  POLICY      = 0x04000000,
+  LOCAL       = 0x80000000,
+}, multiflags)
+
+c.RTF.MSS         = c.RTF.MTU
+
 --#define RTF_PREF(pref)  ((pref) << 27)
 --#define RTF_PREF_MASK   0x18000000
-c.RTF_LOCAL       = 0x80000000
 
 -- interface flags
 c.IFF = setmetatable({

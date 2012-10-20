@@ -328,22 +328,20 @@ meth.rtmsg = {
     dst = function() return nil end,
   },
   flags = { -- TODO rework so iterates in fixed order. TODO Do not seem to be set, find how to retrieve.
-    [c.RTF_UP] = "U",
-    [c.RTF_GATEWAY] = "G",
-    [c.RTF_HOST] = "H",
-    [c.RTF_REINSTATE] = "R",
-    [c.RTF_DYNAMIC] = "D",
-    [c.RTF_MODIFIED] = "M",
-    [c.RTF_REJECT] = "!",
+    [c.RTF.UP] = "U",
+    [c.RTF.GATEWAY] = "G",
+    [c.RTF.HOST] = "H",
+    [c.RTF.REINSTATE] = "R",
+    [c.RTF.DYNAMIC] = "D",
+    [c.RTF.MODIFIED] = "M",
+    [c.RTF.REJECT] = "!",
   }
 }
 
 mt.rtmsg = {
   __index = function(i, k)
     if meth.rtmsg.index[k] then return meth.rtmsg.index[k](i) end
-    local prefix = "RTF_"
-    if k:sub(1, #prefix) ~= prefix then k = prefix .. k:upper() end
-    if S[k] then return bit.band(i.flags, S[k]) ~= 0 end
+    -- if S.RTF[k] then return bit.band(i.flags, S.RTF[k]) ~= 0 end -- TODO see above
   end,
   __tostring = function(i) -- TODO make more like output of ip route
     local s = "dst: " .. tostring(i.dest) .. "/" .. i.dst_len .. " gateway: " .. tostring(i.gw) .. " src: " .. tostring(i.source) .. "/" .. i.src_len .. " if: " .. (i.output or i.oif)
