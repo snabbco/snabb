@@ -1039,13 +1039,17 @@ c.IFLA_MACVLAN = setmetatable({
   MODE   = 1,
 }, stringflag)
 
-c.MACVLAN_MODE_PRIVATE = 1
-c.MACVLAN_MODE_VEPA    = 2
-c.MACVLAN_MODE_BRIDGE  = 4
-c.MACVLAN_MODE_PASSTHRU = 8
+c.MACVLAN_MODE = setmetatable({
+  PRIVATE = 1,
+  VEPA    = 2,
+  BRIDGE  = 4,
+  PASSTHRU = 8,
+}, multiflags)
 
-c.IFLA_VF_INFO_UNSPEC = 0
-c.IFLA_VF_INFO        = 1 -- TODO may have to rename IFLA_VF_INFO_INFO?
+c.IFLA_VF_INFO = setmetatable({
+  UNSPEC = 0,
+  INFO   = 1, -- note renamed IFLA_VF_INFO to IFLA_VF_INFO.INFO
+}, stringflag)
 
 c.IFLA_VF = setmetatable({
   UNSPEC   = 0,
@@ -1055,8 +1059,10 @@ c.IFLA_VF = setmetatable({
   SPOOFCHK = 4,
 }, stringflag)
 
-c.IFLA_VF_PORT_UNSPEC = 0
-c.IFLA_VF_PORT        = 1 -- TODO may have to rename IFLA_VF_PORT_PORT?
+c.IFLA_VF_PORT = setmetatable({
+  UNSPEC = 0,
+  PORT   = 1, -- note renamed from IFLA_VF_PORT to IFLA_VF_PORT.PORT?
+}, stringflag)
 
 c.IFLA_PORT = setmetatable({
   UNSPEC    = 0,
