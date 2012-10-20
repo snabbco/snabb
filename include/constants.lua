@@ -1760,14 +1760,16 @@ c.SECCOMP_MODE = setmetatable({
   FILTER   = 2,
 }, stringflag)
 
-c.SECCOMP_RET_KILL      = 0x00000000
-c.SECCOMP_RET_TRAP      = 0x00030000
-c.SECCOMP_RET_ERRNO     = 0x00050000
-c.SECCOMP_RET_TRACE     = 0x7ff00000
-c.SECCOMP_RET_ALLOW     = 0x7fff0000
+c.SECCOMP_RET = setmetatable({
+  KILL      = 0x00000000,
+  TRAP      = 0x00030000,
+  ERRNO     = 0x00050000,
+  TRACE     = 0x7ff00000,
+  ALLOW     = 0x7fff0000,
 
-c.SECCOMP_RET_ACTION    = 0xffff0000 -- note unsigned 
-c.SECCOMP_RET_DATA      = 0x0000ffff
+  ACTION    = 0xffff0000, -- note unsigned 
+  DATA      = 0x0000ffff,
+}, multiflags)
 
 -- termios
 c.NCCS = 32
