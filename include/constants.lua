@@ -1277,6 +1277,7 @@ c.IFF.VOLATILE = c.IFF.LOOPBACK + c.IFF.POINTOPOINT + c.IFF.BROADCAST + c.IFF.EC
                  c.IFF.MASTER + c.IFF.SLAVE + c.IFF.RUNNING + c.IFF.LOWER_UP + c.IFF.DORMANT
 
 -- not sure if we need these TODO another table as duplicated values
+--[[
 c.IFF_SLAVE_NEEDARP = 0x40
 c.IFF_ISATAP        = 0x80
 c.IFF_MASTER_ARPMON = 0x100
@@ -1289,6 +1290,7 @@ c.IFF_BRIDGE_PORT = 0x4000
 c.IFF_OVS_DATAPATH       = 0x8000
 c.IFF_TX_SKB_SHARING     = 0x10000
 c.IFF_UNICAST_FLT = 0x20000
+]]
 
 -- netlink multicast groups
 -- legacy names, which are masks.
@@ -1311,30 +1313,32 @@ c.RTMGRP = setmetatable({
 }, multiflags)
 
 -- rtnetlink multicast groups (bit numbers not masks)
-c.RTNLGRP_NONE = 0
-c.RTNLGRP_LINK = 1
-c.RTNLGRP_NOTIFY = 2
-c.RTNLGRP_NEIGH = 3
-c.RTNLGRP_TC = 4
-c.RTNLGRP_IPV4_IFADDR = 5
-c.RTNLGRP_IPV4_MROUTE = 6
-c.RTNLGRP_IPV4_ROUTE = 7
-c.RTNLGRP_IPV4_RULE = 8
-c.RTNLGRP_IPV6_IFADDR = 9
-c.RTNLGRP_IPV6_MROUTE = 10
-c.RTNLGRP_IPV6_ROUTE = 11
-c.RTNLGRP_IPV6_IFINFO = 12
---c.RTNLGRP_DECNET_IFADDR = 13
-c.RTNLGRP_NOP2 = 14
---c.RTNLGRP_DECNET_ROUTE = 15
---c.RTNLGRP_DECNET_RULE = 16
-c.RTNLGRP_NOP4 = 17
-c.RTNLGRP_IPV6_PREFIX = 18
-c.RTNLGRP_IPV6_RULE = 19
-c.RTNLGRP_ND_USEROPT = 20
-c.RTNLGRP_PHONET_IFADDR = 21
-c.RTNLGRP_PHONET_ROUTE = 22
-c.RTNLGRP_DCB = 23
+c.RTNLGRP = setmetatable({
+  NONE = 0,
+  LINK = 1,
+  NOTIFY = 2,
+  NEIGH = 3,
+  TC = 4,
+  IPV4_IFADDR = 5,
+  IPV4_MROUTE = 6,
+  IPV4_ROUTE = 7,
+  IPV4_RULE = 8,
+  IPV6_IFADDR = 9,
+  IPV6_MROUTE = 10,
+  IPV6_ROUTE = 11,
+  IPV6_IFINFO = 12,
+-- DECNET_IFADDR = 13,
+  NOP2 = 14,
+-- DECNET_ROUTE = 15,
+-- DECNET_RULE = 16,
+  NOP4 = 17,
+  IPV6_PREFIX = 18,
+  IPV6_RULE = 19,
+  ND_USEROPT = 20,
+  PHONET_IFADDR = 21,
+  PHONET_ROUTE = 22,
+  DCB = 23,
+}, stringflag)
 
 -- address families
 c.AF = setmetatable({
