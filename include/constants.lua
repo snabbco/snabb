@@ -1532,12 +1532,6 @@ c.MSYNC = setmetatable({
   SYNC        = 4,
 }, multiflags)
 
--- TODO are these still used?
-c.MNT_FORCE = 1
-c.MNT_DETACH = 2
-c.MNT_EXPIRE = 4
-c.UMOUNT_NOFOLLOW = 8
-
 -- one table for umount as it uses MNT_ and UMOUNT_ options
 c.UMOUNT = setmetatable({
   FORCE    = 1,
