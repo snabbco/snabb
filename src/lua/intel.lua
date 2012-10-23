@@ -115,14 +115,6 @@ local ICR    = 0x00C00 / 4 -- Interrupt Cause Register (RW)
 
 local regs = ffi.cast("uint32_t *", map_pci_memory("0000:00:04.0", 0))          
 
-function print_register_summary ()
-   print(string.format("CTRL   = 0x%x", regs[CTRL]))
-   print(string.format("STATUS = 0x%x", regs[STATUS]))
-   print(string.format("PBA    = 0x%x", regs[PBA]))
-   print(string.format("TDH    = 0x%x", regs[TDH / 4]))
-   print(string.format("TDT    = 0x%x", regs[TDT / 4]))
-end
-
 -- Initialization
 
 function init ()
