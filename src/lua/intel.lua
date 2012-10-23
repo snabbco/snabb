@@ -86,32 +86,42 @@ local rxdesc  = nil
 local txdesc  = nil
 local buffers = nil
 
-local CTRL   = 0x00000 -- Device Control Register (RW)
-local STATUS = 0x00008
-local PBA    = 0x01000 -- Packet Buffer Allocation
-local IMC    = 0x000D8 -- Interrupt Mask Clear (W)
-local RCTL   = 0x00100 -- Receive Control Register (RW)
-local RFCTL  = 0x05008 -- Receive Filter Control Register (RW)
-local RXDCTL = 0x02828 -- Receive Descriptor Control (RW)
-local RXCSUM = 0x05000 -- Receive Checksum Control (RW)
-local RDBAL  = 0x02800 -- Receive Descriptor Base Address Low (RW)
-local RDBAH  = 0x02804 -- Receive Descriptor Base Address High (RW)
-local RDLEN  = 0x02808 -- Receive Descriptor Length (RW)
-local RDH    = 0x02810 -- Receive Descriptor Head (RW)
-local RDT    = 0x02818 -- Receive Descriptor Tail (RW)
-local TXDCTL = 0x03828 -- Transmit Descriptor Control (RW)
-local TCTL   = 0x00400 -- Transmit Control Register (RW)
-local TIPG   = 0x00410 -- Transmit Inter-Packet Gap (RW)
-local TDBAL  = 0x03800 -- Transmit Descriptor Base Address Low (RW)
-local TDBAH  = 0x03804 -- Transmit Descriptor Base Address High (RW)
-local TDLEN  = 0x03808 -- Transmit Descriptor Length (RW)
-local TDH    = 0x03810 -- Transmit Descriptor Head (RW)
-local TDT    = 0x03818 -- Transmit Desciprotr Tail (RW)
+-- Register addresses as 32-bit word offsets.
+local CTRL   = 0x00000 / 4 -- Device Control Register (RW)
+local STATUS = 0x00008 / 4 -- Device Status Register (RO)
+local PBA    = 0x01000 / 4 -- Packet Buffer Allocation
+local IMC    = 0x000D8 / 4 -- Interrupt Mask Clear (W)
+local RCTL   = 0x00100 / 4 -- Receive Control Register (RW)
+local RFCTL  = 0x05008 / 4 -- Receive Filter Control Register (RW)
+local RXDCTL = 0x02828 / 4 -- Receive Descriptor Control (RW)
+local RXCSUM = 0x05000 / 4 -- Receive Checksum Control (RW)
+local RDBAL  = 0x02800 / 4 -- Receive Descriptor Base Address Low (RW)
+local RDBAH  = 0x02804 / 4 -- Receive Descriptor Base Address High (RW)
+local RDLEN  = 0x02808 / 4 -- Receive Descriptor Length (RW)
+local RDH    = 0x02810 / 4 -- Receive Descriptor Head (RW)
+local RDT    = 0x02818 / 4 -- Receive Descriptor Tail (RW)
+local TXDCTL = 0x03828 / 4 -- Transmit Descriptor Control (RW)
+local TCTL   = 0x00400 / 4 -- Transmit Control Register (RW)
+local TIPG   = 0x00410 / 4 -- Transmit Inter-Packet Gap (RW)
+local TDBAL  = 0x03800 / 4 -- Transmit Descriptor Base Address Low (RW)
+local TDBAH  = 0x03804 / 4 -- Transmit Descriptor Base Address High (RW)
+local TDLEN  = 0x03808 / 4 -- Transmit Descriptor Length (RW)
+local TDH    = 0x03810 / 4 -- Transmit Descriptor Head (RW)
+local TDT    = 0x03818 / 4 -- Transmit Desciprotr Tail (RW)
+local MDIC   = 0x00020 / 4 -- MDI Control Register (RW)
+local EXTCNF_CTRL = 0x00F00 / 4 -- Extended Configuration Control (RW)
+local POEMB  = 0x00F10 / 4 -- PHY OEM Bits Register (RW)
+local ICR    = 0x00C00 / 4 -- Interrupt Cause Register (RW)
 
 local regs = ffi.cast("uint32_t *", map_pci_memory("0000:00:04.0", 0))          
-print(string.format("CTRL   = 0x%x", regs[CTRL]))
-print(string.format("STATUS = 0x%x", regs[STATUS]))
-print(string.format("PBA    = 0x%x", regs[PBA]))
+
+function print_register_summary ()
+   print(string.format("CTRL   = 0x%x", regs[CTRL]))
+   print(string.format("STATUS = 0x%x", regs[STATUS]))
+   print(string.format("PBA    = 0x%x", regs[PBA]))
+   print(string.format("TDH    = 0x%x", regs[TDH / 4]))
+   print(string.format("TDT    = 0x%x", regs[TDT / 4]))
+end
 
 -- Initialization
 
@@ -124,14 +134,6 @@ function init ()
    init_transmit()
 end
 
-function init_dma_memory ()
-   dma_virt = snabb.map_physical_ram(dma_start, dma_end, true)
-   C.memset(dma_virt, 0, dma_end - dma_start)
-   rxdesc  = protected("union rx", dma_virt, offset_rxdesc, 0x100000)
-   txdesc  = protected("union tx", dma_virt, offset_txdesc, 0x100000)
-   buffers = protected("uint8_t", dma_virt, offset_buffers, 0xe00000)
-end
-
 function reset ()
    -- Disable interrupts (IMC)
    regs[IMC] = 0
@@ -142,15 +144,83 @@ function reset ()
    regs[IMC] = 0
 end
 
+function init_dma_memory ()
+   dma_virt = snabb.map_physical_ram(dma_start, dma_end, true)
+   C.memset(dma_virt, 0, dma_end - dma_start)
+   rxdesc  = protected("union rx", dma_virt, offset_rxdesc, 0x100000)
+   txdesc  = protected("union tx", dma_virt, offset_txdesc, 0x100000)
+   buffers = protected("uint8_t", dma_virt, offset_buffers, 0xe00000)
+end
+
 function init_link ()
-   -- Currently using autoneg for everything, as recommended in data sheet.
-   -- I have a feeling that autoneg speed + forced FDX is most practical.
+   reset_phy()
+   -- phy_write(9, bit.bor(bits({Adv1GFDX=9})))
+   -- force_autoneg()
 end
 
 function init_statistics ()
    -- Statistics registers initialize themselves within 1ms of a reset.
    C.usleep(1000)
 end
+
+function print_status ()
+   local status, tctl, rctl = regs[STATUS], regs[TCTL], regs[RCTL]
+   print("MAC status")
+   print("  STATUS      = " .. bit.tohex(status))
+   print("  Full Duplex = " .. onoff(status, 0))
+   print("  Link Up     = " .. onoff(status, 1))
+   print("  PHYRA       = " .. onoff(status, 10))
+   speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 6),3)])
+   print("  Speed       = " .. speed .. ' Mb/s')
+   print("Transmit status")
+   print("  TCTL        = " .. bit.tohex(tctl))
+   print("  TXDCTL      = " .. bit.tohex(regs[TXDCTL]))
+   print("  TX Enable   = " .. onoff(tctl, 1))
+   print("  TDH         = " .. regs[TDH])
+   print("  TDT         = " .. regs[TDT])
+   print("  TDBAH       = " .. bit.tohex(regs[TDBAH]))
+   print("  TDBAL       = " .. bit.tohex(regs[TDBAL]))
+   print("  TDLEN       = " .. regs[TDLEN])
+   print("Receive status")
+   print("  RCTL        = " .. bit.tohex(rctl))
+   print("  RXDCTL      = " .. bit.tohex(regs[RXDCTL]))
+   print("  RX Enable   = " .. onoff(rctl, 1))
+   print("  RX Loopback = " .. onoff(rctl, 6))
+   print("  RDH         = " .. regs[RDH])
+   print("  RDT         = " .. regs[RDT])
+   print("  RDBAH       = " .. bit.tohex(regs[RDBAH]))
+   print("  RDBAL       = " .. bit.tohex(regs[RDBAL]))
+   print("  RDLEN       = " .. regs[RDLEN])
+   print("PHY status")
+   local phystatus, phyext, copperstatus = phy_read(1), phy_read(15), phy_read(17)
+   print("  Autonegotiate state    = " .. (bitset(phystatus,5) and 'complete' or 'not complete'))
+   print("  Remote fault detection = " .. (bitset(phystatus,4) and 'remote fault detected' or 'no remote fault detected'))
+   print("  Copper Link Status     = " .. (bitset(copperstatus,3) and 'copper link is up' or 'copper link is down'))
+   print("  Speed and duplex resolved = " .. onoff(copperstatus,11))
+   physpeed = (({10,100,1000,'(reserved)'})[1+bit.band(bit.rshift(status, 6),3)])
+   print("  Speed                  = " .. physpeed .. 'Mb/s')
+   print("  Duplex                 = " .. (bitset(copperstatus,13) and 'full-duplex' or 'half-duplex'))
+   local autoneg, autoneg1G = phy_read(4), phy_read(9)
+   print("  Advertise 1000 Mb/s FD = " .. onoff(autoneg1G,9))
+   print("  Advertise 1000 Mb/s HD = " .. onoff(autoneg1G,8))
+   print("  Advertise  100 Mb/s FD = " .. onoff(autoneg,8))
+   print("  Advertise  100 Mb/s HD = " .. onoff(autoneg,7))
+   print("  Advertise   10 Mb/s FD = " .. onoff(autoneg,6))
+   print("  Advertise   10 Mb/s HD = " .. onoff(autoneg,5))
+   local partner, partner1G = phy_read(5), phy_read(10)
+   print("  Partner   1000 Mb/s FD = " .. onoff(partner1G,11)) -- reg 10
+   print("  Partner   1000 Mb/s HD = " .. onoff(partner1G,10))
+   print("  Partner    100 Mb/s FD = " .. onoff(partner,8))
+   print("  Partner    100 Mb/s HD = " .. onoff(partner,7))
+   print("  Partner     10 Mb/s FD = " .. onoff(partner,6))
+   print("  Partner     10 Mb/s HD = " .. onoff(partner,5))
+end
+
+function onoff (value, bit)
+   return bitset(value, bit) and 'on' or 'off'
+end
+
+-- Receive functionality
 
 ffi.cdef[[
 // RX descriptor written by software.
@@ -186,24 +256,44 @@ function init_receive ()
    regs[RXCSUM] = 0                 -- Disable checksum offload - not needed
    regs[RDLEN] = num_descriptors * ffi.sizeof("union rx")
    regs[RDBAL] = bit.band(dma_phys + offset_rxdesc, 0xffffffff)
-   regs[RDBAH] = bit.rshift(dma_phys + offset_rxdesc, 32)
+   regs[RDBAH] = 0
+--   regs[RDBAH] = bit.rshift(dma_phys + offset_rxdesc, 32)
    regs[RDH] = 0
    regs[RDT] = 0
    -- Enable RX
    regs[RCTL] = bit.bor(regs[RCTL], bits{EN=1})
 end
 
+-- Enqueue a receive descriptor to receive a packet.
+function add_rxbuf (address, size)
+   -- NOTE: RDT points to the next unused descriptor
+   local index = regs[RDT]
+   rxdesc[index].desc.address = address
+   rxdesc[index].desc.dd = 0
+   regs[RDT] = index + 1 % num_descriptors
+   return true
+end
+
+function is_rx_descriptor_available ()
+   return regs[RDT] ~= regs[RDH] + 1 % num_descriptors
+end
+
+-- Transmit functionality
+
 ffi.cdef[[
 // TX Extended Data Descriptor written by software.
 struct tx_desc {
    uint64_t address;
-   unsigned int vlan:16;
-   unsigned int popts:8;
-   unsigned int extcmd:4;
-   unsigned int sta:4;
-   unsigned int dcmd:8;
-   unsigned int dtype:4;
-   unsigned int dtalen:20;
+   uint64_t options;
+/*
+--   unsigned int vlan:16;
+--   unsigned int popts:8;
+--   unsigned int extcmd:4;
+--   unsigned int sta:4;
+--   unsigned int dcmd:8;
+--   unsigned int dtype:4;
+--   unsigned int dtalen:20;
+ */
 } __attribute__((packed));
 
 union tx {
@@ -213,61 +303,111 @@ union tx {
 ]]
 
 function init_transmit ()
-   regs[TXDCTL] = bits({GRAN=24, WTHRESH0=16})
    regs[TCTL] = bit.bor(bits({PSP=3}),
 			bit.lshift(0x3F, 12)) -- COLD value for full duplex
+   regs[TXDCTL] = bits({GRAN=24, WTHRESH0=16})
    regs[TIPG] = 0x00602006 -- Suggested value in data sheet
-   regs[TDBAL] = bit.band(dma_phys + offset_txdesc, 0xffffffff)
-   regs[TDBAH] = bit.rshift(dma_phys + offset_txdesc, 32)
    init_transmit_ring()
    -- Enable transmit
    regs[TCTL] = bit.bor(regs[TCTL], bits({EN=1}))
 end
 
 function init_transmit_ring ()
+   regs[TDBAL] = bit.band(dma_phys + offset_txdesc, 0xffffffff)
+   regs[TDBAH] = 0
+--   regs[TDBAH] = bit.rshift(dma_phys + offset_txdesc, 32)
+   print(bit.tohex(dma_phys + offset_txdesc),
+	 bit.tohex(bit.band(dma_phys + offset_txdesc, 0xffffffff)),
+	 bit.tohex(bit.rshift(dma_phys + offset_txdesc, 32)))
+   assert(regs[TDBAL] ~= regs[TDBAH])
    -- Hardware requires the value to be 128-byte aligned
    assert( num_descriptors * ffi.sizeof("union tx") % 128 == 0 )
    regs[TDLEN] = num_descriptors * ffi.sizeof("union tx")
-   regs[TDH] = 0
-   regs[TDT] = 0
-end
-
-function enable_mac_loopback ()
-   regs[RCTL] = bits({LBM0=6}, regs[RCTL])
-   print(bit.tohex(regs[RCTL]))
-end
-
--- Enqueue a receive descriptor to receive a packet.
-function add_rxbuf (address, size)
-   -- NOTE: RDT points to the next unused descriptor
-   local index = regs[RDT]
-   rxdesc[rdt].desc.address = address
-   rxdesc[rdt].desc.dd = 0
-   regs[RDT] = index + 1 % num_descriptors
-   return true
-end
-
-function is_rx_descriptor_available ()
-   return regs[RDT] ~= regs[RDH] + 1 % num_descriptors
 end
 
 -- Enqueue a transmit descriptor to send a packet.
 function add_txbuf (address, size)
    local index = regs[TDT]
    txdesc[index].desc.address = address
-   txdesc[index].desc.dtalen = size
-   txdesc[index].desc.dtype  = 0x1
-   -- XXX I don't like calling bits() on the transmit path.
-   txdesc[index].desc.dcmd   = bits({EOP=0, DEXT=5})
-   txdesc[index].desc.dtalen = size
+   txdesc[index].desc.options = bit.bor(size, bits({dtype=20, eop=24, dext=29}))
+   -- txdesc[index].desc.dtalen = size
+   -- txdesc[index].desc.dtype  = 0x1
+   -- txdesc[index].desc.sta    = 0
+   -- txdesc[index].desc.dcmd   = 0x20 -- EOP(0)=0 DEXT(5)=1
    regs[TDT] = index + 1 % num_descriptors
-   print("IDX = " .. (index + 1 % num_descriptors))
-   print(regs[TDT])
 end
 
 -- 
 function is_tx_descriptor_available ()
    return regs[TDT] ~= regs[TDH] + 1 % num_descriptors
+end
+
+-- PHY.
+
+-- Read a PHY register.
+function phy_read (phyreg)
+   regs[MDIC] = bit.bor(bit.lshift(phyreg, 16), bits({OP1=27,PHYADD0=21}))
+   phy_wait_ready()
+   local mdic = regs[MDIC]
+   -- phy_unlock_semaphore()
+   assert(bit.band(mdic, bits({ERROR=30})) == 0)
+   return bit.band(mdic, 0xffff)
+end
+
+-- Write to a PHY register.
+function phy_write (phyreg, value)
+   regs[MDIC] = bit.bor(value, bit.lshift(phyreg, 16), bits({OP0=26,PHYADD0=21}))
+   phy_wait_ready()
+   return bit.band(regs[MDIC], bits({ERROR=30})) == 0
+end
+
+function phy_wait_ready ()
+   while bit.band(regs[MDIC], bits({READY=28,ERROR=30})) == 0 do
+      ffi.C.usleep(2000)
+   end
+end
+
+function reset_phy ()
+   phy_write(0, bits({AutoNeg=12,Duplex=8,RestartAutoNeg=9}))
+   ffi.C.usleep(1)
+   phy_write(0, bit.bor(bits({RST=15}), phy_read(0)))
+end
+
+function force_autoneg ()
+   ffi.C.usleep(1)
+   regs[POEMB] = bit.bor(regs[POEMB], bits({reautoneg_now=5}))
+end
+
+-- Lock and unlock the PHY semaphore. This is used to avoid race
+-- conditions between software and hardware both accessing the PHY.
+
+function phy_lock ()
+   regs[EXTCNF_CTRL] = bits({MDIO_SW=5})
+   while bit.band(regs[EXTCNF_CTRL], bits({MDIO_SW=5})) == 0 do
+      ffi.C.usleep(2000)
+   end
+end
+
+function phy_unlock ()
+   regs[EXTCNF_CTRL] = 0
+end
+
+function linkup ()
+   return bit.band(phy_read(17), bits({CopperLink=10})) ~= 0
+end
+
+-- Link control.
+
+function linkup ()
+   return bit.band(phy_read(17), bits({CopperLink=10})) ~= 0
+end
+
+function enable_phy_loopback ()
+   phy_write(0x01, bit.bor(phy_read(0x01), bits({LOOPBACK=14})))
+end
+
+function enable_mac_loopback ()
+   regs[RCTL] = bit.bor(bits({LBM0=6}, regs[RCTL]))
 end
 
 -- Statistics
@@ -314,24 +454,22 @@ function bitset (value, n)
    return bit.band(value, bit.lshift(1, n)) ~= 0
 end
 
-local mem = snabb.map_physical_ram(0x10000000, 0x11000000, true)
-
+print("Initializing controller..")
 init()
-init_receive()
-enable_mac_loopback()
 
-print("TX available: " .. tostring(is_tx_descriptor_available()))
-for i = 0, 100, 1 do
-   add_txbuf(dma_phys, 123)
-
-end
-C.usleep(100000)
-
-print("TDH = " .. regs[TDH])
-print("TDT = " .. regs[TDT])
-
+print("UP2? " .. tostring(linkup()))
 
 print_stats()
-
 print "Survived!"
+
+while true do
+   print_status()
+   print("RDH = " .. regs[RDH] .. " RDT = " .. regs[RDT])
+   print("TDH = " .. regs[TDH] .. " TDT = " .. regs[TDT])
+   print("writing packet")
+   add_txbuf(dma_phys, 123)
+   add_rxbuf(dma_phys, 16*1024)
+   C.usleep(1000000)
+end
+
 
