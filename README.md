@@ -1,13 +1,13 @@
 # Snabb Switch
 
-<a href="http://www.snabb.co"><img align="right" src="http://www.snabb.co/snabb-tiger-medium.png"/></a>
+<a href="http://www.snabb.co"><img align="right" src="http://www.snabb.co/Tiger_snabb_256.png"/></a>
 Snabb Switch is an open source virtual Ethernet switch for cloud networks. The defining characteristics of Snabb Switch are:
 
 - Simple: Compiles to a small self-contained firmware image.
 - Convenient: Executes as a Linux process or as a virtual machine.
 - Understandable: Source code that you can read on your kindle.
-- Low latency: Network device drivers built in.
-- High performance: Direct hypervisor integration (kernel bypass).
+- Low latency: Optimized network device drivers built in (kernel bypass).
+- High performance: Direct hypervisor network integration (kernel bypass).
 - Open and honest: Transparent open source development process.
 - Dependable: Commercially supported by <a href="http://www.snabb.co/">Snabb</a> for high-end users.
 
@@ -28,7 +28,7 @@ You are welcome to post questions, suggestions, and relevant links to the Snabb 
 
 ## License
 
-Snabb Switch is dual licensed free and open source software. Everybody can use Snabb Switch under the terms of the Snabb License, a derivative of the OSI approved [Sleepycat License](http://en.wikipedia.org/wiki/Sleepycat_License). Commercial licensees can use Snabb Switch as part of non-free products.
+Snabb Switch is dual licensed free and open source software. Everybody can use Snabb Switch under the terms of the [Snabb License](http://www.snabb.co/SnabbLicense.html), a derivative of the OSI approved [Sleepycat License](http://en.wikipedia.org/wiki/Sleepycat_License). Commercial licensees can use Snabb Switch as part of non-free products.
 
 To support dual licensing Snabb has to be able to legally distribute
 contributions to both open source and proprietary users of Snabb
