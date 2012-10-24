@@ -8,7 +8,7 @@ Snabb Switch is an open source virtual Ethernet switch for cloud networks. The d
 - Understandable: Source code that you can read on your kindle.
 - Low latency: Optimized network device drivers built in (kernel bypass).
 - High performance: Direct hypervisor network integration (kernel bypass).
-- Open and honest: Transparent open source development process.
+- No bullshit: Transparent open source development process.
 - Dependable: Commercially supported by <a href="http://www.snabb.co/">Snabb</a> for high-end users.
 
 Snabb Switch is a new project that we are busy developing. The firmware is not yet ready for deployment, but you can follow the development online or visit the <a href="http://www.snabb.co/">Snabb</a> website to subscribe to major announcements.
