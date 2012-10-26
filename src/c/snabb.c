@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 #include "snabb.h"
-#include <net/snabb-shm-dev.h>
+#include "snabb-shm-dev.h"
 
 struct snabb_shm_dev *open_shm(const char *path)
 {
@@ -40,7 +40,7 @@ int open_tap(const char *name)
         perror("open /dev/net/tun");
         return -1;
     }
-    memset(&ifr, 0, sizeof(ifr));
+    //memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
     strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name)-1);
     if (ioctl(fd, TUNSETIFF, (void*)&ifr) < 0) {
