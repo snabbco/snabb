@@ -1,11 +1,11 @@
 LUAJIT := ../deps/luajit/src/luajit
 
-LUASRC := $(wildcard lua/*.lua)
-CSRC   := $(wildcard c/*.c)
-CHDR   := $(wildcard c/*.h)
+LUASRC := $(wildcard *.lua)
+CSRC   := $(wildcard *.c)
+CHDR   := $(wildcard *.h)
 
-LUAOBJ := $(patsubst lua/%.lua,obj/%.o,$(LUASRC))
-COBJ   := $(patsubst c/%.c,obj/%.o,$(CSRC))
+LUAOBJ := $(patsubst %.lua,obj/%.o,$(LUASRC))
+COBJ   := $(patsubst %.c,obj/%.o,$(CSRC))
 
 all: snabbswitch
 	@echo -n "Firmware: "
@@ -17,10 +17,10 @@ snabbswitch: $(LUAOBJ) $(COBJ)
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt
 
-$(LUAOBJ): obj/%.o: lua/%.lua
+$(LUAOBJ): obj/%.o: %.lua
 	$(LUAJIT) -b $< $@
 
-$(COBJ): obj/%.o: c/%.c $(CHDR)
+$(COBJ): obj/%.o: %.c $(CHDR)
 	gcc -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
 clean:
