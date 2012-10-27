@@ -2070,6 +2070,16 @@ test_misc_root = {
     assert(S.rmdir(tmpfile .. "/old")) -- until we can unmount above
     assert(S.rmdir(tmpfile))
   end,
+  test_reboot = function()
+    local p = assert(S.clone("newpid"))
+    if p == 0 then
+      fork_assert(S.reboot("restart")) -- will send SIGHUP to us as in pid namespace NB older kernels may reboot! if so disable test
+      S.pause()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.IFSIGNALED, "expect signal killed process")
+    end
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.
