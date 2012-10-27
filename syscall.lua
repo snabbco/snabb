@@ -611,6 +611,7 @@ function S.ioctl(d, request, argp)
   return true
 end
 
+-- note that this is not strictly the syscall that has some other arguments, but has same functionality
 function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 
 -- ffi metatype on dirent?
