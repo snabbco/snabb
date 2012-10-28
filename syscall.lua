@@ -307,29 +307,6 @@ function S.inet_name(src, netmask)
   return addr, netmask
 end
 
-t.i6432 = ffi.typeof("union {int64_t i64; int32_t i32[2];}")
-t.u6432 = ffi.typeof("union {uint64_t i64; uint32_t i32[2];}")
-
-if ffi.abi("le") then
-  function S.i64(n)
-    local u = t.i6432(n)
-    return u.i32[1], u.i32[0]
-  end
-  function S.u64(n)
-    local u = t.u6432(n)
-    return u.i32[1], u.i32[0]
-  end
-else
-  function S.i64(n)
-    local u = t.i6432(n)
-    return u.i32[0], u.i32[1]
-  end
-  function S.u64(n)
-    local u = t.u6432(n)
-    return u.i32[0], u.i32[1]
-  end
-end
-
 -- these functions might not be in libc, or are buggy so provide direct syscall fallbacks
 local function inlibc(f) return ffi.C[f] end
 
@@ -570,9 +547,11 @@ function S.readlinkat(dirfd, path, buffer, size)
 end
 
 function S.mknod(pathname, mode, dev)
+  if type(dev) == "table" then dev = dev.dev end
   return retbool(C.mknod(pathname, c.S[mode], dev or 0))
 end
 function S.mknodat(fd, pathname, mode, dev)
+  if type(dev) == "table" then dev = dev.dev end
   return retbool(C.mknodat(getfd_at(fd), pathname, c.S[mode], dev or 0))
 end
 
@@ -1765,20 +1744,6 @@ function S.clearenv() return retbool(C.clearenv()) end
 
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to util library. These are library functions.
-
-function S.major(dev)
-  local h, l = S.i64(dev)
-  return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)));
-end
-
-function S.minor(dev)
-  local h, l = S.i64(dev)
-  return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
-end
-
-function S.makedev(major, minor)
-  return bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff))
-end
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end

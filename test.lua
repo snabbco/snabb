@@ -72,17 +72,17 @@ test_basic = {
     assert_equal(c.SIG.SYS, 31) -- test numbers correct
   end,
   test_b64 = function()
-    local h, l = S.i64(0xffffffffffffffffLL)
+    local h, l = t.i6432(0xffffffffffffffffLL):to32()
     assert_equal(h, bit.tobit(0xffffffff))
     assert_equal(l, bit.tobit(0xffffffff))
-    local h, l = S.i64(0xaffffffffffbffffLL)
+    local h, l = t.i6432(0xaffffffffffbffffLL):to32()
     assert_equal(h, bit.tobit(0xafffffff))
     assert_equal(l, bit.tobit(0xfffbffff))
   end,
   test_major_minor = function()
-    local d = S.makedev(2, 3)
-    assert_equal(S.major(d), 2)
-    assert_equal(S.minor(d), 3)
+    local d = t.device(2, 3)
+    assert_equal(d:major(), 2)
+    assert_equal(d:minor(), 3)
   end,
   test_mock = function()
     local test = "teststring"
@@ -462,9 +462,9 @@ test_file_operations = {
     local stat = assert(S.stat("/dev/zero"))
     assert_equal(stat.nlink, 1, "expect link count on /dev/zero to be 1")
     assert(stat.ischr, "expect /dev/zero to be a character device")
-    assert_equal(stat.major, 1 , "expect major number of /dev/zero to be 1")
-    assert_equal(stat.minor, 5, "expect minor number of /dev/zero to be 5")
-    assert_equal(stat.rdev, S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
+    assert_equal(stat.rdev:major(), 1 , "expect major number of /dev/zero to be 1")
+    assert_equal(stat.rdev:minor(), 5, "expect minor number of /dev/zero to be 5")
+    assert_equal(stat.rdev, t.device(1, 5), "expect raw device to be makedev(1, 5)")
   end,
   test_stat_directory = function()
     local fd = assert(S.open("/"))
@@ -625,12 +625,12 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
   end,
   test_mknod_chr_root = function()
-    assert(S.mknod(tmpfile, "ifchr,irwxu", S.makedev(1, 5)))
+    assert(S.mknod(tmpfile, "ifchr,irwxu", t.device(1, 5)))
     local stat = assert(S.stat(tmpfile))
     assert(stat.ischr, "expect to be a character device")
-    assert_equal(stat.major, 1 , "expect major number to be 1")
-    assert_equal(stat.minor, 5, "expect minor number to be 5")
-    assert(stat.rdev == S.makedev(1, 5), "expect raw device to be makedev(1, 5)")
+    assert_equal(stat.rdev:major(), 1 , "expect major number to be 1")
+    assert_equal(stat.rdev:minor(), 5, "expect minor number to be 5")
+    assert_equal(stat.rdev, t.device(1, 5), "expect raw device to be makedev(1, 5)")
     assert(S.unlink(tmpfile))
   end,
   test_mknodat_fifo = function()

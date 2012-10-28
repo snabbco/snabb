@@ -1,5 +1,6 @@
 -- Linux kernel types
 -- these are either simple ffi types or ffi metatypes for the kernel types
+-- plus some Lua metatables for types that cannot be sensibly done as Lua types eg arrays, integers
 
 -- TODO this currently requires being called with S from syscall which breaks modularity
 -- TODO should fix this, should just need constants (which it could return)
@@ -17,11 +18,6 @@ local function init(S)
 
 --[[
 We do not want to pass S, we only need a littl from it, eliminating it gradually
-
-should be metatable? of what?
-major
-minor
-makdev
 
 mksigset
 
@@ -411,9 +407,51 @@ samap = {
   [c.AF.NETLINK] = t.sockaddr_nl,
 }
 
+-- 64 to 32 bit conversions via unions TODO use meth not object?
+
+if ffi.abi("le") then
+mt.i6432 = {
+  __index = {
+    to32 = function(u) return u.i32[1], u.i32[0] end,
+  }
+}
+else
+mt.i6432 = {
+  __index = {
+    to32 = function(u) return u.i32[0], u.i32[1] end,
+  }
+}
+end
+
+t.i6432 = ffi.metatype("union {int64_t i64; int32_t i32[2];}", mt.i6432)
+t.u6432 = ffi.metatype("union {uint64_t i64; uint32_t i32[2];}", mt.i6432)
+
+-- Lua metatables where we cannot return an ffi type eg value is an array or integer or otherwise problematic
+
+-- TODO should we change to meth
+mt.device = {
+  __index = {
+    major = function(dev)
+      local h, l = t.i6432(dev.dev):to32()
+      return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)));
+    end,
+    minor = function(dev)
+      local h, l = t.i6432(dev.dev):to32()
+      return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)));
+    end,
+    device = function(dev) return tonumber(dev.dev) end,
+  },
+}
+
+t.device = function(major, minor)
+    local dev = major
+    if minor then dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff)) end
+    return setmetatable({dev = t.dev(dev)}, mt.device)
+  end
+
 meth.stat = {
   index = {
-    dev = function(st) return tonumber(st.st_dev) end,
+    dev = function(st) return t.device(st.st_dev) end,
     ino = function(st) return tonumber(st.st_ino) end,
     mode = function(st) return st.st_mode end,
     nlink = function(st) return st.st_nlink end,
@@ -426,8 +464,7 @@ meth.stat = {
     atime = function(st) return tonumber(st.st_atime) end,
     ctime = function(st) return tonumber(st.st_ctime) end,
     mtime = function(st) return tonumber(st.st_mtime) end,
-    major = function(st) return S.major(st.st_rdev) end,
-    minor = function(st) return S.minor(st.st_rdev) end,
+    rdev = function(st) return t.device(st.st_rdev) end,
     isreg = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFREG end,
     isdir = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFDIR end,
     ischr = function(st) return bit.band(st.st_mode, c.S.IFMT) == c.S.IFCHR end,
