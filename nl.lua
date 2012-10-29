@@ -1,9 +1,5 @@
 -- modularize netlink code as it is large and standalone
 
--- note that the constants are in S still. Could move them.
-
-local function nl()
-
 local nl = {} -- exports
 
 local ffi = require "ffi"
@@ -1066,7 +1062,4 @@ end
 
 return nl
 
-end
-
-return nl()
 

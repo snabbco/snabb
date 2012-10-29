@@ -10,9 +10,9 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-require "include/headers"
+require "include.headers"
 
-local c = require "include/constants"
+local c = require "include.constants"
 
 local function init(S)
 
@@ -21,7 +21,7 @@ We do not want to pass S, we only need a littl from it, eliminating it gradually
 
 mksigset
 
-these are man 3 dont need to export?
+these are man 3 dont need to export? move to util
 inet_pton
 inet_ntop
 
@@ -31,6 +31,8 @@ inet_name (uses inet_pton)
 
 -- TODO remove when replaced with metatables
 local mksigset = S.mksigset
+
+local C = ffi.C -- for inet_aton etc, due to be replaced with Lua
 
 local types = {}
 
@@ -764,20 +766,46 @@ mt.siginfos = {
 
 t.siginfos = ffi.metatype("struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
 
+local INET6_ADDRSTRLEN = 46
+
+local function inet_ntop(af, src)
+  af = c.AF[af] -- TODO do not need, in fact could split into two functions if no need to export.
+  if af == c.AF.INET then
+    local b = pt.uchar(src)
+    return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
+  end
+  local len = INET6_ADDRSTRLEN
+  local dst = t.buffer(len)
+  local ret = C.inet_ntop(af, src, dst, len) -- TODO replace with pure Lua
+  if ret == nil then return nil, t.error() end
+  return ffi.string(dst)
+end
+
+local function inet_pton(af, src, addr)
+  af = c.AF[af]
+  if not addr then addr = t.addrtype[af]() end
+  local ret = C.inet_pton(af, src, addr) -- TODO redo in pure Lua
+  if ret == -1 then return nil, t.error() end
+  if ret == 0 then return nil end -- maybe return string
+  return addr
+end
+
+-- TODO add generic address type that works out which to take? basically inet_name, except without netmask
+
 metatype("in_addr", "struct in_addr", {
-  __tostring = function(a) return S.inet_ntop(c.AF.INET, a) end,
+  __tostring = function(a) return inet_ntop(c.AF.INET, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = S.inet_pton(c.AF.INET, s, addr) end
+    if s then addr = inet_pton(c.AF.INET, s, addr) end
     return addr
   end
 })
 
 metatype("in6_addr", "struct in6_addr", {
-  __tostring = function(a) return S.inet_ntop(c.AF.INET6, a) end,
+  __tostring = function(a) return inet_ntop(c.AF.INET6, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = S.inet_pton(c.AF.INET6, s, addr) end
+    if s then addr = inet_pton(c.AF.INET6, s, addr) end
     return addr
   end
 })

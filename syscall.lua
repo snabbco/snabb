@@ -8,7 +8,7 @@ local S = {} -- exported functions
 local ffi = require "ffi"
 local bit = require "bit"
 
-require "include/headers"
+require "include.headers"
 
 local oldsm = setmetatable
 local function setmetatable(t, mt)
@@ -21,7 +21,7 @@ local C = S.C
 
 local CC = {} -- functions that might not be in C, may use syscalls
 
-local c = require "include/constants"
+local c = require "include.constants"
 
 S.c = c
 S.bits_to_speed, S.speed_to_bits = c.bits_to_speed, c.speed_to_bits -- should be in metatables
@@ -71,7 +71,7 @@ end
 -- TODO remove when replaced with metatables
 local mksigset = S.mksigset
 
-local types = require("include/types")(S)
+local types = require("include.types")(S) -- TODO should not be function!
 
 S.t, S.pt, S.s, S.ctypes = types.t, types.pt, types.s, types.ctypes -- types, pointer types and sizes tables and ctypes map
 t, pt, s, ctypes = S.t, S.pt, S.s, S.ctypes
@@ -248,63 +248,6 @@ local function sa(addr, addrlen)
     return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
   end
   return addr
-end
-
--- functions from section 3 that we use for ip addresses etc
-
-local INET6_ADDRSTRLEN = 46
-local INET_ADDRSTRLEN = 16
-
-function S.inet_ntop(af, src)
-  af = c.AF[af]
-  if af == c.AF.INET then
-    local b = pt.uchar(src)
-    return tonumber(b[0]) .. "." .. tonumber(b[1]) .. "." .. tonumber(b[2]) .. "." .. tonumber(b[3])
-  end
-  local len = INET6_ADDRSTRLEN
-  local dst = t.buffer(len)
-  local ret = C.inet_ntop(af, src, dst, len)
-  if ret == nil then return nil, t.error() end
-  return ffi.string(dst)
-end
-
-function S.inet_pton(af, src, addr)
-  af = c.AF[af]
-  if not addr then addr = t.addrtype[af]() end
-  local ret = C.inet_pton(af, src, addr)
-  if ret == -1 then return nil, t.error() end
-  if ret == 0 then return nil end -- maybe return string
-  return addr
-end
-
-function S.inet_aton(s)
-  return S.inet_pton(c.AF.INET, s)
-end
-
-function S.inet_ntoa(addr)
-  return S.inet_ntop(c.AF.INET, addr)
-end
-
--- generic inet name to ip, also with netmask support TODO think of better name?
-function S.inet_name(src, netmask)
-  local addr
-  if not netmask then
-    local a, b = src:find("/", 1, true)
-    if a then
-      netmask = tonumber(src:sub(b + 1))
-      src = src:sub(1, a - 1)
-    end
-  end
-  if src:find(":", 1, true) then -- ipv6
-    addr = S.inet_pton(c.AF.INET6, src)
-    if not addr then return nil end
-    if not netmask then netmask = 128 end
-  else
-    addr = S.inet_pton(c.AF.INET, src)
-    if not addr then return nil end
-    if not netmask then netmask = 32 end
-  end
-  return addr, netmask
 end
 
 -- these functions might not be in libc, or are buggy so provide direct syscall fallbacks
