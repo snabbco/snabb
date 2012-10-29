@@ -7,9 +7,12 @@ CHDR   := $(wildcard *.h)
 LUAOBJ := $(patsubst %.lua,obj/%.o,$(LUASRC))
 COBJ   := $(patsubst %.c,obj/%.o,$(CSRC))
 
-all: snabbswitch
+all: snabbswitch libsnabb.so
 	@echo -n "Firmware: "
 	@ls -sh snabbswitch
+
+libsnabb.so: snabb.c snabb.h
+	gcc -fpic -shared -o $@ $<
 
 snabbswitch: $(LUAOBJ) $(COBJ)
 	gcc -Wl,-E -Werror -Wall -o $@ $^ \
