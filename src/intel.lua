@@ -16,7 +16,7 @@ local bit = require("bit")
 local c = require("c")
 local C = ffi.C
 
-ffi.cdef(io.open(os.getenv("SNABB").."/src/c/snabb.h"):read("*a"))
+ffi.cdef(io.open(os.getenv("SNABB").."/src/snabb.h"):read("*a"))
 
 -- Linux-based glue code to access the device.
 
@@ -75,7 +75,7 @@ local offset_txdesc   = 0x00000000 --  1MB TX descriptors
 local offset_rxdesc   = 0x00100000 --  1MB RX descriptors
 local offset_buffers  = 0x00200000 -- 14MB packet buffers
 
-local num_descriptors = 32
+local num_descriptors = 256
 local buffer_size = 16384
 
 local dma_phys = dma_start -- physical address of DMA memory
@@ -108,6 +108,7 @@ local TDBAH  = 0x03804 / 4 -- Transmit Descriptor Base Address High (RW)
 local TDLEN  = 0x03808 / 4 -- Transmit Descriptor Length (RW)
 local TDH    = 0x03810 / 4 -- Transmit Descriptor Head (RW)
 local TDT    = 0x03818 / 4 -- Transmit Descriptor Tail (RW)
+local TARC   = 0x03840 / 4 -- Transmit Arbitration Count - TARC (RW)
 local MDIC   = 0x00020 / 4 -- MDI Control Register (RW)
 local EXTCNF_CTRL = 0x00F00 / 4 -- Extended Configuration Control (RW)
 local POEMB  = 0x00F10 / 4 -- PHY OEM Bits Register (RW)
@@ -127,13 +128,10 @@ function init ()
 end
 
 function reset ()
-   -- Disable interrupts (IMC)
-   regs[IMC] = 0
-   -- Global reset
-   regs[CTRL] = bits({FD=0,SLU=6,RST=26})
+   regs[IMC] = 0			  -- Disable interrupts
+   regs[CTRL] = bits({FD=0,SLU=6,RST=26}) -- Global reset
    C.usleep(10); assert( not bitset(regs[CTRL],26) )
-   -- Disable interrupts
-   regs[IMC] = 0
+   regs[IMC] = 0		          -- Disable interrupts
 end
 
 function init_dma_memory ()
@@ -173,6 +171,8 @@ function print_status ()
    print("  TDBAH       = " .. bit.tohex(regs[TDBAH]))
    print("  TDBAL       = " .. bit.tohex(regs[TDBAL]))
    print("  TDLEN       = " .. regs[TDLEN])
+   print("  TARC        = " .. bit.tohex(regs[TARC]))
+   print("  TIPG        = " .. bit.tohex(regs[TIPG]))
    print("Receive status")
    print("  RCTL        = " .. bit.tohex(rctl))
    print("  RXDCTL      = " .. bit.tohex(regs[RXDCTL]))
@@ -249,7 +249,6 @@ function init_receive ()
    regs[RDLEN] = num_descriptors * ffi.sizeof("union rx")
    regs[RDBAL] = bit.band(dma_phys + offset_rxdesc, 0xffffffff)
    regs[RDBAH] = 0
---   regs[RDBAH] = bit.rshift(dma_phys + offset_rxdesc, 32)
    regs[RDH] = 0
    regs[RDT] = 0
    -- Enable RX
@@ -295,23 +294,21 @@ union tx {
 ]]
 
 function init_transmit ()
-   regs[TCTL] = bit.bor(bits({PSP=3}),
-			bit.lshift(0x3F, 12)) -- COLD value for full duplex
-   regs[TXDCTL] = bits({GRAN=24, WTHRESH0=16})
+   regs[TCTL]        = 0x3103f0f8
+   regs[TXDCTL]      = 0x01410000
    regs[TIPG] = 0x00602006 -- Suggested value in data sheet
    init_transmit_ring()
    -- Enable transmit
-   regs[TCTL] = bit.bor(regs[TCTL], bits({EN=1}))
+   regs[TDH] = 0
+   regs[TDT] = 0
+   regs[TXDCTL]      = 0x01410000
+   regs[TCTL]        = 0x3103f0fa
+
 end
 
 function init_transmit_ring ()
    regs[TDBAL] = bit.band(dma_phys + offset_txdesc, 0xffffffff)
    regs[TDBAH] = 0
---   regs[TDBAH] = bit.rshift(dma_phys + offset_txdesc, 32)
-   print(bit.tohex(dma_phys + offset_txdesc),
-	 bit.tohex(bit.band(dma_phys + offset_txdesc, 0xffffffff)),
-	 bit.tohex(bit.rshift(dma_phys + offset_txdesc, 32)))
-   assert(regs[TDBAL] ~= regs[TDBAH])
    -- Hardware requires the value to be 128-byte aligned
    assert( num_descriptors * ffi.sizeof("union tx") % 128 == 0 )
    regs[TDLEN] = num_descriptors * ffi.sizeof("union tx")
@@ -321,7 +318,7 @@ end
 function add_txbuf (address, size)
    local index = regs[TDT]
    txdesc[index].desc.address = address
-   txdesc[index].desc.options = bit.bor(size, bits({dtype=20, eop=24, dext=29}))
+   txdesc[index].desc.options = bit.bor(size, bits({dtype=20, eop=24, ifcs=25, dext=29}))
    -- txdesc[index].desc.dtalen = size
    -- txdesc[index].desc.dtype  = 0x1
    -- txdesc[index].desc.sta    = 0
