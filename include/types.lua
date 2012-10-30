@@ -14,9 +14,7 @@ require "include.headers"
 
 local c = require "include.constants"
 
-local function init(S)
-
-local C = ffi.C -- for inet_aton etc, due to be replaced with Lua
+local C = ffi.C -- for inet_pton etc, due to be replaced with Lua
 
 local types = {}
 
@@ -915,7 +913,4 @@ samap2 = {
 
 return types
 
-end -- function init
-
-return init
 

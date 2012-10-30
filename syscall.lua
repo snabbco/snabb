@@ -26,8 +26,6 @@ local c = require "include.constants"
 S.c = c
 S.bits_to_speed, S.speed_to_bits = c.bits_to_speed, c.speed_to_bits -- should be in metatables
 
--- functions we need for metatypes TODO remove once moved to constants
-
 local function split(delimiter, text)
   if delimiter == "" then return {text} end
   if #text == 0 then return {} end
@@ -46,17 +44,10 @@ local function split(delimiter, text)
   return list
 end
 
-local function trim(s) -- TODO should replace underscore with space
-  return (s:gsub("^%s*(.-)%s*$", "%1"))
-end
-
-local t, pt, s, ctypes -- t used below.
-
-
-local types = require("include.types")(S) -- TODO should not be function!
+local types = require("include.types")
 
 S.t, S.pt, S.s, S.ctypes = types.t, types.pt, types.s, types.ctypes -- types, pointer types and sizes tables and ctypes map
-t, pt, s, ctypes = S.t, S.pt, S.s, S.ctypes
+local t, pt, s, ctypes = S.t, S.pt, S.s, S.ctypes
 
 local mt = {} -- metatables
 local meth = {}
