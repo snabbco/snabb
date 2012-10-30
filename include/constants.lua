@@ -4,7 +4,6 @@
 -- are the multi flag ones
 
 -- TODO add test that we do not reallocate
--- TODO move to new table k rather than in S
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -149,7 +148,7 @@ else
 end
 
 -- these are arch dependent!
-if arch.oflags then arch.oflags(S)
+if arch.oflags then arch.oflags(c)
 else -- generic values from asm-generic
   c.O.DIRECT    = octal('040000')
   c.O.DIRECTORY = octal('0200000')
@@ -481,7 +480,7 @@ c.SO = setmetatable({
   SNDBUFFORCE = 32,
   RCVBUFFORCE = 33,
 }, stringflag)
-if arch.socketoptions then arch.socketoptions(S)
+if arch.socketoptions then arch.socketoptions(c)
 else
   c.SO.PASSCRED    = 16
   c.SO.PEERCRED    = 17
