@@ -263,7 +263,7 @@ meth.iflink = {
       return i:refresh()
     end,
     address = function(i, address, netmask) -- add address
-      if type(address) == "string" then address, netmask = S.inet_name(address, netmask) end
+      if type(address) == "string" then address, netmask = inet_name(address, netmask) end
       if not address then return nil end
       local af
       if ffi.istype(t.in6_addr, address) then af = c.AF.INET6 else af = c.AF.INET end
@@ -272,7 +272,7 @@ meth.iflink = {
       return i:refresh()
     end,
     deladdress = function(i, address, netmask)
-      if type(address) == "string" then address, netmask = S.inet_name(address, netmask) end
+      if type(address) == "string" then address, netmask = inet_name(address, netmask) end
       if not address then return nil end
       local af
       if ffi.istype(t.in6_addr, address) then af = c.AF.INET6 else af = c.AF.INET end

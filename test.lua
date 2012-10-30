@@ -4,7 +4,6 @@ local strict = require "strict"
 local S = require "syscall"
 local nl = require "nl"
 local bit = require "bit"
-local util = require "util"
 
 setmetatable(S, {__index = function(i, k) error("bad index access on S: " .. k) end})
 
@@ -1080,6 +1079,8 @@ test_misc = {
     assert(S.setdomainname("domainnametest"))
     assert_equal(S.getdomainname(), "domainnametest")
   end,
+--[[
+  -- may switch this back to a type
   test_inet_name = function()
     local addr, mask = util.inet_name("127.0.0.1/24")
     assert(addr, "expect to get valid address")
@@ -1094,6 +1095,7 @@ test_misc = {
     assert_equal(tostring(addr), "::1")
     assert_equal(mask, 128, "expect default mask")
   end,
+]]
 }
 
 test_sockets = {
@@ -1110,10 +1112,6 @@ test_sockets = {
     assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr_un))
     assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr_nl))
   end,
-  test_inet_aton_error = function()
-    local a = S.inet_aton("error")
-    assert(not a, "should get invalid IP address")
-  end,
   test_sockaddr_in_error = function()
     local sa = t.sockaddr_in(1234, "error")
     assert(not sa, "expect nil socket address from invalid ip string")
@@ -1122,7 +1120,6 @@ test_sockets = {
     local s = assert(S.socket("inet", "stream, nonblock"))
     local loop = "127.0.0.1"
     local sa = assert(t.sockaddr_in(1234, loop))
-    assert_equal(S.inet_ntoa(sa.sin_addr), loop, "expect address converted back to string to still be same")
     assert_equal(tostring(sa.sin_addr), loop, "expect address converted back to string to still be same")
     assert(sa.sin_family == 2, "expect family on inet socket to be 2")
     -- find a free port
@@ -1147,7 +1144,7 @@ test_sockets = {
     assert(c:connect(sa)) -- able to connect now we have accepted
     local ba = assert(c:getpeername())
     assert(ba.sin_family == 2, "expect ipv4 connection")
-    assert(S.inet_ntoa(ba.sin_addr) == "127.0.0.1", "expect peer on localhost")
+    assert(tostring(ba.sin_addr) == "127.0.0.1", "expect peer on localhost")
     assert(ba.sin_addr.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
     local n = assert(c:send(teststring))
     assert(n == #teststring, "should be able to write out short string")
