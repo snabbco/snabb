@@ -16,22 +16,6 @@ local c = require "include.constants"
 
 local function init(S)
 
---[[
-We do not want to pass S, we only need a littl from it, eliminating it gradually
-
-mksigset
-
-these are man 3 dont need to export? move to util
-inet_pton
-inet_ntop
-
-inet_name (uses inet_pton)
-
-]]
-
--- TODO remove when replaced with metatables
-local mksigset = S.mksigset
-
 local C = ffi.C -- for inet_aton etc, due to be replaced with Lua
 
 local types = {}
@@ -830,14 +814,14 @@ local function sigemptyset(set)
 end
 
 local function sigaddset(set, sig)
-  set = mksigset(set)
+  set = t.sigset(set)
   local d = bit.rshift(sig - 1, 5)
   set.val[d] = bit.bor(set.val[d], bit.lshift(1, (sig - 1) % 32))
   return set
 end
 
 local function sigdelset(set, sig)
-  set = mksigset(set)
+  set = t.sigset(set)
   local d = bit.rshift(sig - 1, 5)
   set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
   return set
@@ -868,7 +852,7 @@ end
 
 local function sigaddsets(set, sigs) -- allow multiple
   if type(sigs) ~= "string" then return sigaddset(set, sigs) end
-  set = mksigset(set)
+  set = t.sigset(set)
   local a = split(",", sigs)
   for i, v in ipairs(a) do
     local s = trim(v)
@@ -881,7 +865,7 @@ end
 
 local function sigdelsets(set, sigs) -- allow multiple
   if type(sigs) ~= "string" then return sigdelset(set, sigs) end
-  set = mksigset(set)
+  set = t.sigset(set)
   local a = split(",", sigs)
   for i, v in ipairs(a) do
     local s = trim(v)
@@ -899,7 +883,21 @@ metatype("sigset", "sigset_t", {
     if k == 'isemptyset' then return sigemptyset(set) end
     local sig = c.SIG[k]
     if sig then return sigismember(set, sig) end
-  end
+  end,
+  __new = function(tp, str)
+    if ffi.istype(tp, str) then return str end
+    if not str then return ffi.new(tp) end
+    local f = ffi.new(tp)
+    local a = split(",", str)
+    for i, v in ipairs(a) do
+      local st = trim(v)
+      local sig = c.SIG[st]
+      if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
+      local d = bit.rshift(sig - 1, 5) -- always 32 bits
+      f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
+    end
+    return f
+  end,
 })
 
 local voidp = ffi.typeof("void *")

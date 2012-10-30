@@ -52,24 +52,6 @@ end
 
 local t, pt, s, ctypes -- t used below.
 
--- TODO all metatypes too
-function S.mksigset(str)
-  if not str then return t.sigset() end
-  if type(str) ~= 'string' then return str end
-  local f = t.sigset()
-  local a = split(",", str)
-  for i, v in ipairs(a) do
-    local st = trim(v)
-    local sig = c.SIG[st]
-    if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
-    local d = bit.rshift(sig - 1, 5) -- always 32 bits
-    f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
-  end
-  return f
-end
-
--- TODO remove when replaced with metatables
-local mksigset = S.mksigset
 
 local types = require("include.types")(S) -- TODO should not be function!
 
@@ -970,6 +952,7 @@ function S.signal(signum, handler) return retbool(C.signal(c.SIG[signum], c.SIGA
 -- NOTE I do not think it is safe to call this with a function argument as the jit compiler will not know when it is going to
 -- be called, so have removed this functionality again
 -- recommend using signalfd to handle signals if you need to do anything complex.
+-- note arguments can be different TODO should we change
 function S.sigaction(signum, handler, mask, flags)
   local sa
   if ffi.istype(t.sigaction, handler) then sa = handler
@@ -979,7 +962,7 @@ function S.sigaction(signum, handler, mask, flags)
     --elseif
     --  type(handler) == 'function' then handler = ffi.cast(t.sighandler, handler) -- TODO check if gc problem here? need to copy?
     end
-    sa = t.sigaction{sa_handler = handler, sa_mask = mksigset(mask), sa_flags = c.SA[flags]}
+    sa = t.sigaction{sa_handler = handler, sa_mask = t.sigset(mask), sa_flags = c.SA[flags]}
   end
   local old = t.sigaction()
   local ret = C.sigaction(c.SIG[signum], sa, old)
@@ -1114,7 +1097,7 @@ end
 
 function S.sigprocmask(how, set)
   local oldset = t.sigset()
-  local ret = C.sigprocmask(c.SIGPM[how], mksigset(set), oldset)
+  local ret = C.sigprocmask(c.SIGPM[how], t.sigset(set), oldset)
   if ret == -1 then return nil, t.error() end
   return oldset
 end
@@ -1126,11 +1109,11 @@ function S.sigpending()
  return set
 end
 
-function S.sigsuspend(mask) return retbool(C.sigsuspend(mksigset(mask))) end
+function S.sigsuspend(mask) return retbool(C.sigsuspend(t.sigset(mask))) end
 
 function S.signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
   if fd then fd = getfd(fd) else fd = -1 end
-  return retfd(C.signalfd(fd, mksigset(set), c.SFD[flags]))
+  return retfd(C.signalfd(fd, t.sigset(set), c.SFD[flags]))
 end
 
 -- TODO convert to metatype?
@@ -1157,7 +1140,7 @@ function S.pselect(s) -- note same structure as returned
   if s.timeout then
     if ffi.istype(t.timespec, s.timeout) then timeout = s.timeout else timeout = t.timespec(s.timeout) end
   end
-  if s.sigset then set = mksigset(s.sigset) end
+  if s.sigset then set = t.sigset(s.sigset) end
   r, nfds = mkfdset(s.readfds or {}, nfds or 0)
   w, nfds = mkfdset(s.writefds or {}, nfds)
   e, nfds = mkfdset(s.exceptfds or {}, nfds)
@@ -1178,7 +1161,7 @@ end
 function S.ppoll(fds, timeout, set)
   fds = istype(t.pollfds, fds) or t.pollfds(fds)
   if timeout then timeout = istype(t.timespec, timeout) or t.timespec(timeout) end
-  if set then set = mksigset(set) end
+  if set then set = t.sigset(set) end
   local ret = C.ppoll(fds.pfd, #fds, timeout, set)
   if ret == -1 then return nil, t.error() end
   return fds
@@ -1241,7 +1224,7 @@ end
 function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes optional epoll_pwait functionality
   if not maxevents then maxevents = 16 end
   if not events then events = t.epoll_events(maxevents) end
-  if sigmask then sigmask = mksigset(sigmask) end
+  if sigmask then sigmask = t.sigset(sigmask) end
   local ret
   if sigmask then
     ret = C.epoll_pwait(getfd(epfd), events, maxevents, timeout or -1, sigmask)
