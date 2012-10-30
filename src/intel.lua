@@ -75,7 +75,7 @@ local offset_txdesc   = 0x00000000 --  1MB TX descriptors
 local offset_rxdesc   = 0x00100000 --  1MB RX descriptors
 local offset_buffers  = 0x00200000 -- 14MB packet buffers
 
-local num_descriptors = 256
+local num_descriptors = 32
 local buffer_size = 16384
 
 local dma_phys = dma_start -- physical address of DMA memory
@@ -206,6 +206,7 @@ function print_status ()
    print("  Partner    100 Mb/s HD = " .. yesno(partner,7))
    print("  Partner     10 Mb/s FD = " .. yesno(partner,6))
    print("  Partner     10 Mb/s HD = " .. yesno(partner,5))
+--   print("Power state              = D"..bit.band(regs[PMCSR],3))
 end
 
 function yesno (value, bit)
@@ -261,12 +262,12 @@ function add_rxbuf (address, size)
    local index = regs[RDT]
    rxdesc[index].desc.address = address
    rxdesc[index].desc.dd = 0
-   regs[RDT] = index + 1 % num_descriptors
+   regs[RDT] = (index + 1) % num_descriptors
    return true
 end
 
 function is_rx_descriptor_available ()
-   return regs[RDT] ~= regs[RDH] + 1 % num_descriptors
+   return regs[RDT] ~= (regs[RDH] + 1) % num_descriptors
 end
 
 -- Transmit functionality
@@ -323,12 +324,12 @@ function add_txbuf (address, size)
    -- txdesc[index].desc.dtype  = 0x1
    -- txdesc[index].desc.sta    = 0
    -- txdesc[index].desc.dcmd   = 0x20 -- EOP(0)=0 DEXT(5)=1
-   regs[TDT] = index + 1 % num_descriptors
+   regs[TDT] = (index + 1) % num_descriptors
 end
 
 -- 
 function is_tx_descriptor_available ()
-   return regs[TDT] ~= regs[TDH] + 1 % num_descriptors
+   return regs[TDT] ~= (regs[TDH] + 1) % num_descriptors
 end
 
 -- PHY.
@@ -421,10 +422,10 @@ function print_stats ()
 end
 
 function update_stats ()
-   stats.tx_packets = stats.tx_packets + regs[GPTC]
-   stats.rx_packets = stats.rx_packets + regs[GPRC]
-   stats.tx_bytes = stats.tx_bytes + regs[GOTCL] + bit.lshift(regs[GOTCH], 32)
-   stats.rx_bytes = stats.rx_bytes + regs[GORCL] + bit.lshift(regs[GORCH], 32)
+   stats.tx_packets = regs[GPTC]
+   stats.rx_packets = regs[GPRC]
+   stats.tx_bytes = regs[GOTCL] + bit.lshift(regs[GOTCH], 32)
+   stats.rx_bytes = regs[GORCL] + bit.lshift(regs[GORCH], 32)
 end
 
 -- Return a bitmask using the values of `bitset' as indexes.
@@ -451,8 +452,12 @@ print("UP2? " .. tostring(linkup()))
 print_stats()
 print "Survived!"
 
+-- enable_mac_loopback()
+-- enable_phy_loopback()
+
 while true do
    print_status()
+   print_stats()
    print("RDH = " .. regs[RDH] .. " RDT = " .. regs[RDT])
    print("TDH = " .. regs[TDH] .. " TDT = " .. regs[TDT])
    print("writing packet")
