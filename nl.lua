@@ -11,12 +11,35 @@ local t, pt, s, c = S.t, S.pt, S.s, S.c
 local mt = {} -- metatables
 local meth = {}
 
+-- generic inet name to ip, also with netmask support
+-- TODO convert to a type?
+local function inet_name(src, netmask)
+  local addr
+  if not netmask then
+    local a, b = src:find("/", 1, true)
+    if a then
+      netmask = tonumber(src:sub(b + 1))
+      src = src:sub(1, a - 1)
+    end
+  end
+  if src:find(":", 1, true) then -- ipv6
+    addr = t.in6_addr(src)
+    if not addr then return nil end
+    if not netmask then netmask = 128 end
+  else
+    addr = t.in_addr(src)
+    if not addr then return nil end
+    if not netmask then netmask = 32 end
+  end
+  return addr, netmask
+end
+
+local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
+
 local function ptt(tp)
   local ptp = ffi.typeof("$ *", tp)
   return function(x) return ffi.cast(ptp, x) end
 end
-
-local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
 
 local function tbuffer(a, ...) -- helper function for sequence of types in a buffer
   local function threc(buf, offset, tp, ...)
