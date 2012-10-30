@@ -1,6 +1,6 @@
 local S = require "syscall"
 
-local t = S.t
+local t, c = S.t, S.c
 
 local oldassert = assert
 function assert(c, s)
@@ -34,14 +34,14 @@ test
 </html>
 ]]
 
-local reply = [[
-HTTP/1.0 200 OK
-Content-type: text/html
-Connection: close
-Content-Length: ]] .. #msg .. [[
-
-
-]] .. msg
+local reply = table.concat({
+"HTTP/1.0 200 OK",
+"Content-type: text/html",
+"Connection: close",
+"Content-Length: " .. #msg,
+"",
+"",
+}, "\r\n") .. msg
 
 local maxevents = 1024
 local events = t.epoll_events(maxevents)
@@ -60,29 +60,29 @@ local r = assert(ep:epoll_wait(events, maxevents))
 
 for i = 1, #r do
   local ev = r[i]
-  if ev.fileno == s.filenum then -- server socket, accept
+  if ev.fd == s.filenum then -- server socket, accept
     repeat
       local a, err = s:accept("nonblock", ss, addrlen)
       if a then
-        event.events = S.EPOLLIN
-        event.data.fd = a.fd.filenum
+        event.events = c.EPOLL.IN
+        event.data.fd = a.fd:getfd()
         assert(ep:epoll_ctl("add", a.fd, event))
-        w[a.fd.filenum] = a.fd
+        w[a.fd:getfd()] = a.fd
       end
     until not a
   else
-    local fd = w[ev.fileno]
-    if ev.EPOLLHUP or ev.EPOLLERR then -- closed or error
+    local fd = w[ev.fd]
+    if ev.HUP or ev.ERR then -- closed or error
       fd:close()
       w[ev.fileno] = nil
     else
-      if ev.EPOLLIN then
+      if ev.IN then
         local n
         fd:read(buffer, bufsize)
         n = fd:write(reply)
         assert(n == #reply)
         assert(fd:close())
-        w[ev.fileno] = nil
+        w[ev.fd] = nil
       end
     end
   end
