@@ -31,3 +31,6 @@ void *map_pci_resource(const char *path);
    Return a pointer to the mapped memory, or NULL on failure. */
 void *map_physical_ram(uint64_t start, uint64_t end, bool cacheable);
 
+/* Open Linux sysfs PCIe configuration file for read/write. */
+int open_pcie_config(const char *path);
+

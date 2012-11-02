@@ -86,3 +86,8 @@ void *map_physical_ram(uint64_t start, uint64_t end, bool cacheable)
   }
 }
 
+int open_pcie_config(const char *path)
+{
+  return open(path, O_RDWR);
+}
+
