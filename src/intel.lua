@@ -120,6 +120,7 @@ local regs = ffi.cast("uint32_t *", map_pci_memory("0000:00:04.0", 0))
 
 function init ()
    reset()
+   init_pcie()
    init_dma_memory()
    init_link()
    init_statistics()
@@ -132,6 +133,11 @@ function reset ()
    regs[CTRL] = bits({FD=0,SLU=6,RST=26}) -- Global reset
    C.usleep(10); assert( not bitset(regs[CTRL],26) )
    regs[IMC] = 0		          -- Disable interrupts
+end
+
+function init_pcie()
+   -- PCIe bus mastering has to be enabled for DMA to work.
+   set_pcie_bus_master(true)
 end
 
 function init_dma_memory ()
@@ -384,6 +390,32 @@ end
 
 function linkup ()
    return bit.band(phy_read(17), bits({CopperLink=10})) ~= 0
+end
+
+-- PCIe config
+
+local pcie_config_fd = snabb.open_pcie_config("/sys/bus/pci/devices/".."0000:00:04.0".."/config")
+
+local pcie_value = ffi.new("uint16_t[1]")
+
+function pcie_write (reg, value)
+   pcie_value[0] = value
+   assert(ffi.C.pwrite(pcie_config_fd, pcie_value, 2, reg) == 2)
+end
+
+function pcie_read (reg)
+   assert(ffi.C.pread(pcie_config_fd, pcie_value, 2, reg) == 2)
+   return pcie_value[0]
+end
+
+function set_pcie_bus_master (flag)
+   local control = pcie_read(0x04)
+   if flag then
+      control = bit.bor(control, bits({EnableMastering=2}))
+   else
+      control = bit.band(control, bit.bnot(bits({EnableMastering=2})))
+   end
+   pcie_write(0x04, control)
 end
 
 -- Link control.
