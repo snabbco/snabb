@@ -8,24 +8,22 @@ local function setmetatable(t, mt)
   return oldsm(t, mt)
 end
 
-local S = {} -- exported functions
-
 local ffi = require "ffi"
 local bit = require "bit"
 
 require "include.headers"
+local c = require "include.constants"
+local types = require("include.types")
+
+local S = {} -- exported functions
 
 S.C = setmetatable({}, {__index = ffi.C})
 local C = S.C
 
 local CC = {} -- functions that might not be in C, may use syscalls
 
-local c = require "include.constants"
-
 S.c = c
 S.bits_to_speed, S.speed_to_bits = c.bits_to_speed, c.speed_to_bits -- should be in metatables
-
-local types = require("include.types")
 
 S.t, S.pt, S.s, S.ctypes = types.t, types.pt, types.s, types.ctypes -- types, pointer types and sizes tables and ctypes map
 local t, pt, s = S.t, S.pt, S.s
@@ -39,12 +37,6 @@ function S.nogc(d) return ffi.gc(d, nil) end
 local errsyms = {} -- reverse lookup
 for k, v in pairs(c.E) do
   errsyms[v] = k
-end
-
--- use 64 bit fileops on 32 bit always
-if ffi.abi("32bit") then
-  C.truncate = ffi.C.truncate64
-  C.ftruncate = ffi.C.ftruncate64
 end
 
 -- makes code tidier
@@ -194,6 +186,12 @@ local function sa(addr, addrlen)
     return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
   end
   return addr
+end
+
+-- use 64 bit fileops on 32 bit always
+if ffi.abi("32bit") then
+  C.truncate = ffi.C.truncate64
+  C.ftruncate = ffi.C.ftruncate64
 end
 
 -- these functions might not be in libc, or are buggy so provide direct syscall fallbacks
