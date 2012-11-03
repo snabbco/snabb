@@ -28,7 +28,7 @@ S.bits_to_speed, S.speed_to_bits = c.bits_to_speed, c.speed_to_bits -- should be
 local types = require("include.types")
 
 S.t, S.pt, S.s, S.ctypes = types.t, types.pt, types.s, types.ctypes -- types, pointer types and sizes tables and ctypes map
-local t, pt, s, ctypes = S.t, S.pt, S.s, S.ctypes
+local t, pt, s = S.t, S.pt, S.s
 
 local mt = {} -- metatables
 local meth = {}
