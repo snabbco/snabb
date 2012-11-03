@@ -33,14 +33,6 @@ local t, pt, s = S.t, S.pt, S.s
 local mt = {} -- metatables
 local meth = {}
 
--- convenience so user need not require ffi
-S.string = ffi.string
-S.sizeof = ffi.sizeof
-S.cast = ffi.cast
-S.copy = ffi.copy
-S.fill = ffi.fill
-S.istype = ffi.istype
-
 function S.nogc(d) return ffi.gc(d, nil) end
 
 -- reverse lookup tables from constants

@@ -4,6 +4,7 @@ local strict = require "strict"
 local S = require "syscall"
 local nl = require "nl"
 local bit = require "bit"
+local ffi = require "ffi"
 
 setmetatable(S, {__index = function(i, k) error("bad index access on S: " .. k) end})
 
@@ -45,7 +46,7 @@ end
 
 if arg[1] == "coverage" then debug.sethook(coverage, "lc") end
 
-local t, pt, c = S.t, S.pt, S.c
+local t, pt, c, s = S.t, S.pt, S.c, S.s
 
 local teststring = "this is a test string"
 local size = 512
@@ -88,7 +89,7 @@ test_basic = {
     local test = "teststring"
     local oldread = rawget(S.C, "read") -- should be nil
     S.C.read = function(fd, buf, count)
-      S.copy(buf, test)
+      ffi.copy(buf, test)
       return #test
     end
     local fd = assert(S.open("/dev/null"))
@@ -245,9 +246,9 @@ test_read_write = {
     local b1, b2, b3 = t.buffer(6), t.buffer(4), t.buffer(3)
     local n = assert(fd:readv{b1, b2, b3})
     assert_equal(n, 13, "expect length 13")
-    assert_equal(S.string(b1, 6), "testin")
-    assert_equal(S.string(b2, 4), "gwri")
-    assert_equal(S.string(b3, 3), "tev")
+    assert_equal(ffi.string(b1, 6), "testin")
+    assert_equal(ffi.string(b2, 4), "gwri")
+    assert_equal(ffi.string(b3, 3), "tev")
     assert(S.unlink(tmpfile))
   end,
   test_preadv_pwritev = function()
@@ -258,15 +259,15 @@ test_read_write = {
     local b1, b2, b3 = t.buffer(6), t.buffer(4), t.buffer(3)
     local n = assert(fd:preadv({b1, b2, b3}, offset))
     assert_equal(n, 13, "expect length 13")
-    assert_equal(S.string(b1, 6), "testin")
-    assert_equal(S.string(b2, 4), "gwri")
-    assert_equal(S.string(b3, 3), "tev")
+    assert_equal(ffi.string(b1, 6), "testin")
+    assert_equal(ffi.string(b2, 4), "gwri")
+    assert_equal(ffi.string(b3, 3), "tev")
     assert(fd:seek(offset))
     local n = assert(fd:readv{b1, b2, b3})
     assert_equal(n, 13, "expect length 13")
-    assert_equal(S.string(b1, 6), "testin")
-    assert_equal(S.string(b2, 4), "gwri")
-    assert_equal(S.string(b3, 3), "tev")
+    assert_equal(ffi.string(b1, 6), "testin")
+    assert_equal(ffi.string(b2, 4), "gwri")
+    assert_equal(ffi.string(b3, 3), "tev")
     assert(S.unlink(tmpfile))
   end,
 }
@@ -789,7 +790,7 @@ test_sockets_pipes = {
       n = assert(s[2]:read())
       assert(#n == #str)
       local buf2 = t.buffer(#str)
-      S.copy(buf2, str, #str)
+      ffi.copy(buf2, str, #str)
 
       n = assert(S.vmsplice(p[2], {{buf2, #str}}, "nonblock")) -- write our memory into pipe
       assert(n == #str)
@@ -1110,13 +1111,13 @@ test_sockets = {
     assert_equal(tostring(t.in_addr("255.255.255.255")), "255.255.255.255", "print ipv4")
   end,
   test_socket_sizes = function()
-    assert(S.sizeof(t.sockaddr) == S.sizeof(t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
-    assert(S.sizeof(t.sockaddr_storage) == 128) -- this is the required size in Linux
-    assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr))
-    assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr_in))
-    assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr_in6))
-    assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr_un))
-    assert(S.sizeof(t.sockaddr_storage) >= S.sizeof(t.sockaddr_nl))
+    assert(ffi.sizeof(t.sockaddr) == ffi.sizeof(t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
+    assert(ffi.sizeof(t.sockaddr_storage) == 128) -- this is the required size in Linux
+    assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr))
+    assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr_in))
+    assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr_in6))
+    assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr_un))
+    assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr_nl))
   end,
   test_sockaddr_in_error = function()
     local sa = t.sockaddr_in(1234, "error")
@@ -1156,12 +1157,12 @@ test_sockets = {
     assert(n == #teststring, "should be able to write out short string")
     n = assert(a.fd:read(buf, size))
     assert(n == #teststring, "should read back string into buffer")
-    assert(S.string(buf, n) == teststring, "we should read back the same string that was sent")
+    assert(ffi.string(buf, n) == teststring, "we should read back the same string that was sent")
     -- test scatter gather
     local b0 = t.buffer(4)
     local b1 = t.buffer(3)
-    S.copy(b0, "test", 4) -- string init adds trailing 0 byte
-    S.copy(b1, "ing", 3)
+    ffi.copy(b0, "test", 4) -- string init adds trailing 0 byte
+    ffi.copy(b1, "ing", 3)
     n = assert(c:writev({{b0, 4}, {b1, 3}}))
     assert(n == 7, "expect writev to write 7 bytes")
     b0 = t.buffer(3)
@@ -1169,7 +1170,7 @@ test_sockets = {
     local iov = t.iovecs{{b0, 3}, {b1, 4}}
     n = assert(a.fd:readv(iov))
     assert_equal(n, 7, "expect readv to read 7 bytes")
-    assert(S.string(b0, 3) == "tes" and S.string(b1, 4) == "ting", "expect to get back same stuff")
+    assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
     -- test sendfile
     local f = assert(S.open("/etc/passwd", "RDONLY"))
     local off = 0
@@ -1676,7 +1677,7 @@ test_aio = {
   test_aio_ctx_gc = function()
     local ctx = assert(S.io_setup(8))
     local ctx2 = t.aio_context()
-    S.copy(ctx2, ctx, S.sizeof(t.aio_context))
+    ffi.copy(ctx2, ctx, s.aio_context)
     ctx = nil
     collectgarbage("collect")
     local ok, err = S.io_destroy(ctx2)
@@ -1685,11 +1686,11 @@ test_aio = {
   test_aio = function() -- split this up
     -- need aligned buffer for O_DIRECT
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
-    S.copy(abuf, teststring)
+    ffi.copy(abuf, teststring)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
-    S.fill(abuf, 4096)
+    ffi.fill(abuf, 4096)
     local efd = assert(S.eventfd())
     --local ctx = assert(S.io_setup(8))
     -- failing on 32 bit. TODO debug aio properly!
