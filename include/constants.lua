@@ -8,7 +8,7 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-local arch = require("include/constants-" .. ffi.arch) -- architecture specific code
+local arch = require("include.constants-" .. ffi.arch) -- architecture specific code
 
 local oldsm = setmetatable
 local function setmetatable(t, mt)
