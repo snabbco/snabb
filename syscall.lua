@@ -8,8 +8,6 @@ local function setmetatable(t, mt)
   return oldsm(t, mt)
 end
 
-local function syscall()
-
 local S = {} -- exported functions
 
 local ffi = require "ffi"
@@ -2276,9 +2274,4 @@ t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
 })
 
 return S
-
-end
-
-return syscall()
-
 
