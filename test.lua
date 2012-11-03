@@ -1599,7 +1599,7 @@ test_events = {
     local a, b = sv[1], sv[2]
     local pev = {{fd = a, events = c.POLL.IN}}
     local p = assert(S.poll(pev, 0))
-    assert(p[1].fd == a:getfd() and p[1].revents == 0, "one event now")
+    assert(p[1].fd == a:getfd() and p[1].revents == 0, "no events")
     assert(b:write(teststring))
     local p = assert(S.poll(pev, 0))
     assert(p[1].fd == a:getfd() and p[1].IN, "one event now")
