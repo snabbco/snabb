@@ -1800,8 +1800,24 @@ function S.block(fd)
   return true
 end
 
--- TODO fix short reads, add a loop
-function S.readfile(name, buffer, length) -- convenience for reading short files into strings, eg for /proc etc, silently ignores short reads
+function S.mapfile(name, buffer, length) -- generally better to use, bit no good for sysfs etc
+  local fd, err = S.open(name, "rdonly")
+  if not fd then return nil, err end
+  local st, err = S.fstat(fd)
+  if not st then return nil, err end
+  local size = st.size
+  local m, err = S.mmap(nil, size, "read", "shared", fd, 0)
+  if not m then return nil, err end
+  local str = ffi.string(m, size)
+  local ok, err = S.munmap(m, size)
+  if not ok then return nil, err end
+  local ok, err = S.close(fd)
+  if not ok then return nil, err end
+  return str
+end
+
+-- note will give short reads, but mainly used for sysfs, proc
+function S.readfile(name, buffer, length)
   local f, err = S.open(name, "rdonly")
   if not f then return nil, err end
   local r, err = f:read(buffer, length or 4096)

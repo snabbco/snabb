@@ -231,6 +231,12 @@ test_read_write = {
     assert_equal(ss, teststring, "readfile should get back what writefile wrote")
     assert(S.unlink(tmpfile))
   end,
+  test_mapfile = function()
+    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    local ss = assert(S.mapfile(tmpfile))
+    assert_equal(ss, teststring, "mapfile should get back what writefile wrote")
+    assert(S.unlink(tmpfile))
+  end,
   test_readv_writev = function()
     local fd = assert(S.open(tmpfile, "rdwr,creat", "irwxu"))
     local n = assert(fd:writev{"test", "ing", "writev"})
@@ -1678,7 +1684,7 @@ test_aio = {
   end,
   test_aio = function() -- split this up
     -- need aligned buffer for O_DIRECT
-    local abuf = assert(S.mmap(nil, 4096, "read,write", "private, anonymous", -1, 0))
+    local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     S.copy(abuf, teststring)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
     assert(S.unlink(tmpfile))
