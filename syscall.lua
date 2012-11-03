@@ -1107,7 +1107,7 @@ function S.signalfd(set, flags, fd) -- note different order of args, as fd usual
   return retfd(C.signalfd(fd, t.sigset(set), c.SFD[flags]))
 end
 
--- TODO convert to metatype?
+-- TODO convert to metatype. Problem is how to deal with nfds
 function S.select(s) -- note same structure as returned
   local r, w, e
   local nfds = 0
