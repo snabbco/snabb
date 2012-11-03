@@ -280,7 +280,7 @@ end
 if ffi.abi("32bit") then
   function C.lseek(fd, offset, whence)
     local result = t.loff1()
-    local off1, off2 = S.u64(offset)
+    local off1, off2 = t.u6432(offset):to32()
     local ret = C.syscall(c.SYS._llseek, t.int(fd), t.ulong(off1), t.ulong(off2), pt.void(result), t.uint(whence))
     if ret == -1 then return -1 end
     return result[0]
