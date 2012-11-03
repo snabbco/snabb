@@ -26,24 +26,6 @@ local c = require "include.constants"
 S.c = c
 S.bits_to_speed, S.speed_to_bits = c.bits_to_speed, c.speed_to_bits -- should be in metatables
 
-local function split(delimiter, text)
-  if delimiter == "" then return {text} end
-  if #text == 0 then return {} end
-  local list = {}
-  local pos = 1
-  while true do
-    local first, last = text:find(delimiter, pos)
-    if first then
-      list[#list + 1] = text:sub(pos, first - 1)
-      pos = last + 1
-    else
-      list[#list + 1] = text:sub(pos)
-      break
-    end
-  end
-  return list
-end
-
 local types = require("include.types")
 
 S.t, S.pt, S.s, S.ctypes = types.t, types.pt, types.s, types.ctypes -- types, pointer types and sizes tables and ctypes map
@@ -1004,6 +986,24 @@ local function growattrbuf(f, a, b)
   if ret > 0 then ret = ret - 1 end -- has trailing \0
 
   return ffi.string(buffer, ret)
+end
+
+local function split(delimiter, text)
+  if delimiter == "" then return {text} end
+  if #text == 0 then return {} end
+  local list = {}
+  local pos = 1
+  while true do
+    local first, last = text:find(delimiter, pos)
+    if first then
+      list[#list + 1] = text:sub(pos, first - 1)
+      pos = last + 1
+    else
+      list[#list + 1] = text:sub(pos)
+      break
+    end
+  end
+  return list
 end
 
 local function lattrbuf(sys, a)
