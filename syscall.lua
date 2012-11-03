@@ -1112,9 +1112,7 @@ function S.select(s) -- note same structure as returned
   local r, w, e
   local nfds = 0
   local timeout
-  if s.timeout then
-    if ffi.istype(t.timeval, s.timeout) then timeout = s.timeout else timeout = t.timeval(s.timeout) end
-  end
+  if s.timeout then timeout = istype(t.timeval, s.timeout) or t.timeval(s.timeout) end
   r, nfds = mkfdset(s.readfds or {}, nfds or 0)
   w, nfds = mkfdset(s.writefds or {}, nfds)
   e, nfds = mkfdset(s.exceptfds or {}, nfds)
