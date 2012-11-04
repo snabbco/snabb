@@ -222,7 +222,11 @@ function CC.mknodat(fd, pathname, mode, dev)
 end
 -- pivot_root is not provided by glibc, is provided by Musl
 function CC.pivot_root(new_root, put_old)
-  return C.syscall(C.SYS.pivot_root, new_root, put_old)
+  return C.syscall(c.SYS.pivot_root, new_root, put_old)
+end
+-- setns not in some glibc versions
+function CC.setns(fd, nstype)
+  return C.syscall(c.SYS.setns, t.int(fd), t.int(nstype))
 end
 
 --[[ if you need to split 64 bit args on 32 bit syscalls use code like this
@@ -250,10 +254,13 @@ if not pcall(inlibc, "clock_getres") then
   C.clock_nanosleep = rt.clock_nanosleep
 end
 
--- not in eglibc
+-- not in glibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
 if not pcall(inlibc, "mknodat") then C.mknodat = CC.mknodat end
 if not pcall(inlibc, "pivot_root") then C.pivot_root = CC.pivot_root end
+
+-- not in glibc on my dev ARM box
+if not pcall(inlibc, "setns") then C.setns = CC.setns end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
@@ -1804,7 +1811,7 @@ local function if_nametoindex(name, s) -- internal version when already have soc
   local len = #name + 1
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
-  local ret, err = S.ioctl(s, c.SIOCGIFINDEX, ifr)
+  local ret, err = S.ioctl(s, c.SIOC.GIFINDEX, ifr)
   if not ret then return nil, err end
   return ifr.ifr_ifru.ifru_ivalue
 end
@@ -1830,8 +1837,8 @@ local function bridge_ioctl(io, name)
   return true
 end
 
-function S.bridge_add(name) return bridge_ioctl(c.SIOCBRADDBR, name) end
-function S.bridge_del(name) return bridge_ioctl(c.SIOCBRDELBR, name) end
+function S.bridge_add(name) return bridge_ioctl(c.SIOC.BRADDBR, name) end
+function S.bridge_del(name) return bridge_ioctl(c.SIOC.BRDELBR, name) end
 
 local function bridge_if_ioctl(io, bridge, dev)
   local err, s, ifr, len, ret, ok
@@ -1853,8 +1860,8 @@ local function bridge_if_ioctl(io, bridge, dev)
   return true
 end
 
-function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOCBRADDIF, bridge, dev) end
-function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOCBRDELIF, bridge, dev) end
+function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOC.BRADDIF, bridge, dev) end
+function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOC.BRDELIF, bridge, dev) end
 
 -- should probably have constant for "/sys/class/net"
 
@@ -2094,14 +2101,14 @@ end
 
 function S.unlockpt(fd)
   local unlock = t.int1()
-  local ret, err = S.ioctl(fd, c.TIOCSPTLCK, pt.void(unlock)) -- TODO make sure this returns true instead?
+  local ret, err = S.ioctl(fd, c.TIOC.SPTLCK, pt.void(unlock)) -- TODO make sure this returns true instead?
   if not ret then return nil, err end
   return true
 end
 
 function S.ptsname(fd)
   local pts = t.int1()
-  local ret, error = S.ioctl(fd, c.TIOCGPTN, pt.void(pts))
+  local ret, error = S.ioctl(fd, c.TIOC.GPTN, pt.void(pts))
   if not ret then return nil, err end
   return "/dev/pts/" .. tostring(pts[0])
 end
