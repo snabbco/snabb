@@ -62,9 +62,9 @@ arch.SYS = {
 
 -- TODO cleanup to return table
 arch.oflags = function(c)
-  c.O_DIRECTORY = octal('040000')
-  c.O_NOFOLLOW  = octal('0100000')
-  c.O_DIRECT    = octal('0200000')
+  c.O.DIRECTORY = octal('040000')
+  c.O.NOFOLLOW  = octal('0100000')
+  c.O.DIRECT    = octal('0200000')
 end
 
 return arch
