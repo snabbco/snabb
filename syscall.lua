@@ -1838,7 +1838,7 @@ local function if_nametoindex(name, s) -- internal version when already have soc
   local len = #name + 1
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
-  local ret, err = S.ioctl(s, c.SIOCGIFINDEX, ifr)
+  local ret, err = S.ioctl(s, c.SIOC.GIFINDEX, ifr)
   if not ret then return nil, err end
   return ifr.ifr_ifru.ifru_ivalue
 end
@@ -1864,8 +1864,8 @@ local function bridge_ioctl(io, name)
   return true
 end
 
-function S.bridge_add(name) return bridge_ioctl(c.SIOCBRADDBR, name) end
-function S.bridge_del(name) return bridge_ioctl(c.SIOCBRDELBR, name) end
+function S.bridge_add(name) return bridge_ioctl(c.SIOC.BRADDBR, name) end
+function S.bridge_del(name) return bridge_ioctl(c.SIOC.BRDELBR, name) end
 
 local function bridge_if_ioctl(io, bridge, dev)
   local err, s, ifr, len, ret, ok
@@ -1887,8 +1887,8 @@ local function bridge_if_ioctl(io, bridge, dev)
   return true
 end
 
-function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOCBRADDIF, bridge, dev) end
-function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOCBRDELIF, bridge, dev) end
+function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOC.BRADDIF, bridge, dev) end
+function S.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOC.BRDELIF, bridge, dev) end
 
 -- should probably have constant for "/sys/class/net"
 

@@ -1973,20 +1973,22 @@ c.TIOCM_DSR = 0x100
 c.TIOCM_CD  = c.TIOCM_CAR
 c.TIOCM_RI  = c.TIOCM_RNG
 
--- ioctls, filling in as needed
-c.SIOCGIFINDEX   = 0x8933
+-- ioctls, filling in as needed TODO more general framework?
+c.SIOC = setmetatable({
+  GIFINDEX   = 0x8933,
 
-c.SIOCBRADDBR    = 0x89a0
-c.SIOCBRDELBR    = 0x89a1
-c.SIOCBRADDIF    = 0x89a2
-c.SIOCBRDELIF    = 0x89a3
+  BRADDBR    = 0x89a0,
+  BRDELBR    = 0x89a1,
+  BRADDIF    = 0x89a2,
+  BRDELIF    = 0x89a3,
 
-c.TIOCMGET       = 0x5415
-c.TIOCMBIS       = 0x5416
-c.TIOCMBIC       = 0x5417
-c.TIOCMSET       = 0x5418
-c.TIOCGPTN	 = 0x80045430LL
-c.TIOCSPTLCK	 = 0x40045431LL
+  MGET       = 0x5415,
+  MBIS       = 0x5416,
+  MBIC       = 0x5417,
+  MSET       = 0x5418,
+  GPTN	     = 0x80045430LL,
+  SPTLCK	 = 0x40045431LL,
+}, stringflag)
 
 -- sysfs values
 c.SYSFS_BRIDGE_ATTR        = "bridge"
