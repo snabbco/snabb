@@ -1099,6 +1099,10 @@ test_misc = {
       assert(not i.br0, "bridge should be gone")
     end
   end,
+  test_bridge_delete_fail = function()
+    local ok, err = S.bridge_del("nosuchbridge99")
+    assert(err.ENOPKG or err.EPERM or err.ENXIO, err)
+  end,
 
 --[[
   -- may switch this back to a type
