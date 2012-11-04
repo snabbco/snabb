@@ -146,9 +146,8 @@ local function retptr(ret)
   return ret
 end
 
-local function retwait(ret, status) -- TODO metatype
-  if ret == -1 then return nil, t.error() end
-  return setmetatable({pid = ret, status = status}, mt.wait)
+local function retwait(pid, status) -- TODO metatype?
+  return setmetatable({pid = pid, status = status}, mt.wait)
 end
 
 local function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
@@ -504,11 +503,15 @@ end
 
 function S.wait()
   local status = t.int1()
-  return retwait(C.wait(status), status[0])
+  local ret = C.wait(status)
+  if ret == -1 then return nil, t.error() end
+  return retwait(ret, status[0])
 end
 function S.waitpid(pid, options)
   local status = t.int1()
-  return retwait(C.waitpid(pid, status, c.W[options]), status[0])
+  local ret = C.waitpid(pid, status, c.W[options])
+  if ret == -1 then return nil, t.error() end
+  return retwait(ret, status[0])
 end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
   if not infop then infop = t.siginfo() end
