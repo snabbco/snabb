@@ -251,11 +251,11 @@ function CC.mknodat(fd, pathname, mode, dev)
 end
 -- pivot_root is not provided by glibc, is provided by Musl
 function CC.pivot_root(new_root, put_old)
-  return C.syscall(C.SYS.pivot_root, new_root, put_old)
+  return C.syscall(c.SYS.pivot_root, new_root, put_old)
 end
 -- setns not in some glibc versions
 function CC.setns(fd, nstype)
-  return C.syscall(C.SYS.setns, t.int(fd), t.int(nstype))
+  return C.syscall(c.SYS.setns, t.int(fd), t.int(nstype))
 end
 
 --[[ if you need to split 64 bit args on 32 bit syscalls use code like this
