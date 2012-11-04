@@ -53,6 +53,7 @@ local size = 512
 local buf = t.buffer(size)
 local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
+local tmpfile3 = "MMMMMTTTTGGG" .. S.getpid()
 local longfile = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
 local efile = "/tmp/tmpXXYYY" .. S.getpid() .. ".sh"
 local largeval = math.pow(2, 33) -- larger than 2^32 for testing
@@ -2076,9 +2077,9 @@ test_misc_root = {
     assert(S.mkdir(tmpfile))
     local p = assert(S.clone("newns"))
     if p == 0 then
-      fork_assert(S.mount(tmpfile, tmpfile, "none", "bind")) -- to make sure on different mount point
-      fork_assert(S.mount(tmpfile, tmpfile, nil, "private"))
-      fork_assert(S.chdir(tmpfile))
+      fork_assert(S.mount(tmpfile3, tmpfile3, "none", "bind")) -- to make sure on different mount point
+      fork_assert(S.mount(tmpfile3, tmpfile3, nil, "private"))
+      fork_assert(S.chdir(tmpfile3))
       fork_assert(S.mkdir("old"))
       fork_assert(S.pivot_root(".", "old"))
       fork_assert(S.chdir("/"))
