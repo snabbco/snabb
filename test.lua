@@ -53,6 +53,7 @@ local size = 512
 local buf = t.buffer(size)
 local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
+local tmpfile3 = "MMMMMTTTTGGG" .. S.getpid()
 local longfile = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
 local efile = "/tmp/tmpXXYYY" .. S.getpid() .. ".sh"
 local largeval = math.pow(2, 33) -- larger than 2^32 for testing
@@ -61,6 +62,7 @@ local clean = function()
   S.rmdir(tmpfile)
   S.unlink(tmpfile)
   S.unlink(tmpfile2)
+  S.unlink(tmpfile3)
   S.unlink(longfile)
   S.unlink(efile)
 end
@@ -2073,12 +2075,12 @@ test_misc_root = {
     assert(S.chroot("/"))
   end,
   test_pivot_root = function()
-    assert(S.mkdir(tmpfile))
+    assert(S.mkdir(tmpfile3))
     local p = assert(S.clone("newns"))
     if p == 0 then
-      fork_assert(S.mount(tmpfile, tmpfile, "none", "bind")) -- to make sure on different mount point
-      fork_assert(S.mount(tmpfile, tmpfile, nil, "private"))
-      fork_assert(S.chdir(tmpfile))
+      fork_assert(S.mount(tmpfile3, tmpfile3, "none", "bind")) -- to make sure on different mount point
+      fork_assert(S.mount(tmpfile3, tmpfile3, nil, "private"))
+      fork_assert(S.chdir(tmpfile3))
       fork_assert(S.mkdir("old"))
       fork_assert(S.pivot_root(".", "old"))
       fork_assert(S.chdir("/"))
@@ -2090,8 +2092,8 @@ test_misc_root = {
       local w = assert(S.waitpid(-1, "clone"))
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
-    assert(S.rmdir(tmpfile .. "/old")) -- until we can unmount above
-    assert(S.rmdir(tmpfile))
+    assert(S.rmdir(tmpfile3 .. "/old")) -- until we can unmount above
+    assert(S.rmdir(tmpfile3))
   end,
   test_reboot = function()
     local p = assert(S.clone("newpid"))
