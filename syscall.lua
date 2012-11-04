@@ -37,7 +37,7 @@ for k, v in pairs(c.E) do
   errsyms[v] = k
 end
 
--- makes code tidier
+-- makes code tidier TODO could make all types accept themselves as constructors
 local function istype(tp, x)
   if ffi.istype(tp, x) then return x else return false end
 end
@@ -124,35 +124,6 @@ local function retnume(f, ...) -- for cases where need to explicitly set and che
   local errno = ffi.errno()
   if errno ~= 0 then return nil, t.error() end
   return ret
-end
-
--- TODO add tests
-mt.sockaddr_un = {
-  __index = function(un, k)
-    local sa = un.addr
-    if k == 'family' then return tonumber(sa.sun_family) end
-    local namelen = un.addrlen - s.sun_family
-    if namelen > 0 then
-      if sa.sun_path[0] == 0 then
-        if k == 'abstract' then return true end
-        if k == 'name' then return ffi.string(rets.addr.sun_path, namelen) end -- should we also remove leading \0?
-      else
-        if k == 'name' then return ffi.string(rets.addr.sun_path) end
-      end
-    else
-      if k == 'unnamed' then return true end
-    end
-  end
-}
-
-local function sa(addr, addrlen)
-  local family = addr.family
-  if family == c.AF.UNIX then -- we return Lua metatable not metatype, as need length to decode
-    local sa = t.sockaddr_un()
-    ffi.copy(sa, addr, addrlen)
-    return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
-  end
-  return addr
 end
 
 -- use 64 bit fileops on 32 bit always
@@ -426,7 +397,7 @@ function S.nice(inc) return retnume(C.nice, inc) end
 function S.getpriority(which, who) return retnume(C.getpriority, c.PRIO[which], who or 0) end
 function S.setpriority(which, who, prio) return retnume(C.setpriority, c.PRIO[which], who or 0, prio) end
 
- -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
+ -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly?
 function S.clone(flags, signal, stack, ptid, tls, ctid)
   flags = c.CLONE[flags] + c.SIG[signal]
   return retnum(C.clone(flags, stack, ptid, tls, ctid))
@@ -558,7 +529,7 @@ function S.recvfrom(fd, buf, count, flags, ss, addrlen)
   end
   local ret = C.recvfrom(getfd(fd), buf, count, c.MSG[flags], ss, addrlen)
   if ret == -1 then return nil, t.error() end
-  return {count = tonumber(ret), addr = sa(ss, addrlen[0])}
+  return {count = tonumber(ret), addr = t.sa(ss, addrlen[0])}
 end
 
 function S.setsockopt(fd, level, optname, optval, optlen)
@@ -618,8 +589,10 @@ function S.fstatat(fd, path, buf, flags)
   return buf
 end
 
+-- TODO part of type
 local function gettimespec2(ts)
-  if ts and (not ffi.istype(t.timespec2, ts)) then
+  if ffi.istype(t.timespec2, ts) then return ts end
+  if ts then
     local s1, s2 = ts[1], ts[2]
     ts = t.timespec2()
     if type(s1) == 'string' then ts[0].tv_nsec = c.UTIME[s1] else ts[0] = t.timespec(s1) end
@@ -784,7 +757,7 @@ function S.accept(sockfd, flags, addr, addrlen)
     else ret = C.accept4(getfd(sockfd), addr, addrlen, c.SOCK[flags])
   end
   if ret == -1 then return nil, t.error() end
-  return {fd = t.fd(ret), addr = sa(addr, addrlen[0])}
+  return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
 end
 
 function S.getsockname(sockfd, ss, addrlen)
@@ -794,7 +767,7 @@ function S.getsockname(sockfd, ss, addrlen)
   end
   local ret = C.getsockname(getfd(sockfd), ss, addrlen)
   if ret == -1 then return nil, t.error() end
-  return sa(ss, addrlen[0])
+  return t.sa(ss, addrlen[0])
 end
 
 function S.getpeername(sockfd, ss, addrlen)
@@ -804,7 +777,7 @@ function S.getpeername(sockfd, ss, addrlen)
   end
   local ret = C.getpeername(getfd(sockfd), ss, addrlen)
   if ret == -1 then return nil, t.error() end
-  return sa(ss, addrlen[0])
+  return t.sa(ss, addrlen[0])
 end
 
 local function getflock(arg)
