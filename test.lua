@@ -2112,7 +2112,7 @@ if S.geteuid() == 0 then
   local lo = assert(i.lo)
   assert(lo:up())
   assert(S.mount("none", "/sys", "sysfs"))
-  else -- remove tests that need root
+else -- remove tests that need root
   for k in pairs(_G) do
     if k:match("test") then
       if k:match("root")
