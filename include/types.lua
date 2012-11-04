@@ -354,6 +354,35 @@ metatype("sockaddr_un", "struct sockaddr_un", {
   __new = function(tp) return ffi.new(tp, c.AF.UNIX) end,
 })
 
+-- this is a bit odd, but we actually use Lua metatables for sockaddr_un, and use t.sa to multiplex
+mt.sockaddr_un = {
+  __index = function(un, k)
+    local sa = un.addr
+    if k == 'family' then return tonumber(sa.sun_family) end
+    local namelen = un.addrlen - s.sun_family
+    if namelen > 0 then
+      if sa.sun_path[0] == 0 then
+        if k == 'abstract' then return true end
+        if k == 'name' then return ffi.string(rets.addr.sun_path, namelen) end -- should we also remove leading \0?
+      else
+        if k == 'name' then return ffi.string(rets.addr.sun_path) end
+      end
+    else
+      if k == 'unnamed' then return true end
+    end
+  end
+}
+
+function t.sa(addr, addrlen)
+  local family = addr.family
+  if family == c.AF.UNIX then -- we return Lua metatable not metatype, as need length to decode
+    local sa = t.sockaddr_un()
+    ffi.copy(sa, addr, addrlen)
+    return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
+  end
+  return addr
+end
+
 local nlgroupmap = { -- map from netlink socket type to group names. Note there are two forms of name though, bits and shifts.
   [c.NETLINK.ROUTE] = c.RTMGRP, -- or RTNLGRP_ and shift not mask TODO make shiftflags function
   -- add rest of these
