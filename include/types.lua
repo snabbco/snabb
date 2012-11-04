@@ -912,6 +912,33 @@ samap2 = {
   [c.AF.NETLINK] = pt.sockaddr_nl,
 }
 
+-- slightly miscellaneous types, eg need to use Lua metatables
+
+-- TODO convert to use constants? note missing some macros eg WCOREDUMP(). Allow lower case.
+mt.wait = {
+  __index = function(w, k)
+    local WTERMSIG = bit.band(w.status, 0x7f)
+    local EXITSTATUS = bit.rshift(bit.band(w.status, 0xff00), 8)
+    local WIFEXITED = (WTERMSIG == 0)
+    local tab = {
+      WIFEXITED = WIFEXITED,
+      WIFSTOPPED = bit.band(w.status, 0xff) == 0x7f,
+      WIFSIGNALED = not WIFEXITED and bit.band(w.status, 0x7f) ~= 0x7f -- I think this is right????? TODO recheck, cleanup
+    }
+    if tab.WIFEXITED then tab.EXITSTATUS = EXITSTATUS end
+    if tab.WIFSTOPPED then tab.WSTOPSIG = EXITSTATUS end
+    if tab.WIFSIGNALED then tab.WTERMSIG = WTERMSIG end
+    if tab[k] then return tab[k] end
+    local uc = 'W' .. k:upper()
+    if tab[uc] then return tab[uc] end
+  end
+}
+
+-- cannot really use metatype here, as status is just an int, and we need to pass pid
+function t.wait(pid, status)
+  return setmetatable({pid = pid, status = status}, mt.wait)
+end
+
 return types
 
 

@@ -57,26 +57,6 @@ end
 
 -- metatables for Lua types not ffi types - convert to ffi types
 
--- convert to ffi. note missing some macros eg WCOREDUMP()
-mt.wait = {
-  __index = function(w, k)
-    local WTERMSIG = bit.band(w.status, 0x7f)
-    local EXITSTATUS = bit.rshift(bit.band(w.status, 0xff00), 8)
-    local WIFEXITED = (WTERMSIG == 0)
-    local tab = {
-      WIFEXITED = WIFEXITED,
-      WIFSTOPPED = bit.band(w.status, 0xff) == 0x7f,
-      WIFSIGNALED = not WIFEXITED and bit.band(w.status, 0x7f) ~= 0x7f -- I think this is right????? TODO recheck, cleanup
-    }
-    if tab.WIFEXITED then tab.EXITSTATUS = EXITSTATUS end
-    if tab.WIFSTOPPED then tab.WSTOPSIG = EXITSTATUS end
-    if tab.WIFSIGNALED then tab.WTERMSIG = WTERMSIG end
-    if tab[k] then return tab[k] end
-    local uc = 'W' .. k:upper()
-    if tab[uc] then return tab[uc] end
-  end
-}
-
 -- TODO convert to ffi metatype
 mt.timex = {
   __index = function(timex, k)
@@ -144,10 +124,6 @@ end
 local function retptr(ret)
   if ret == errpointer then return nil, t.error() end
   return ret
-end
-
-local function retwait(pid, status) -- TODO metatype?
-  return setmetatable({pid = pid, status = status}, mt.wait)
 end
 
 local function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
@@ -505,13 +481,13 @@ function S.wait()
   local status = t.int1()
   local ret = C.wait(status)
   if ret == -1 then return nil, t.error() end
-  return retwait(ret, status[0])
+  return t.wait(ret, status[0])
 end
 function S.waitpid(pid, options)
   local status = t.int1()
   local ret = C.waitpid(pid, status, c.W[options])
   if ret == -1 then return nil, t.error() end
-  return retwait(ret, status[0])
+  return t.wait(ret, status[0])
 end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
   if not infop then infop = t.siginfo() end
