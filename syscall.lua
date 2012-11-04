@@ -47,12 +47,6 @@ local function getfd(fd)
   return fd:getfd()
 end
 
-local function getfd_at(fd)
-  if not fd then return c.AT_FDCWD.FDCWD end
-  if type(fd) == "string" then return c.AT_FDCWD[fd] end
-  return getfd(fd)
-end
-
 -- metatables for Lua types not ffi types - convert to ffi types
 
 -- TODO convert to ffi metatype
@@ -296,7 +290,7 @@ function S.open(pathname, flags, mode)
 end
 
 function S.openat(dirfd, pathname, flags, mode)
-  return retfd(C.openat(getfd_at(dirfd), pathname, c.O[flags], c.MODE[mode]))
+  return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, c.O[flags], c.MODE[mode]))
 end
 
 -- TODO dup3 can have a race condition (see man page) although Musl fixes, appears eglibc does not
@@ -355,31 +349,31 @@ function S.close(fd) return retbool(C.close(getfd(fd))) end
 function S.creat(pathname, mode) return retfd(C.creat(pathname, c.MODE[mode])) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.unlinkat(dirfd, path, flags)
-  return retbool(C.unlinkat(getfd_at(dirfd), path, c.AT_REMOVEDIR[flags]))
+  return retbool(C.unlinkat(c.AT_FDCWD[dirfd], path, c.AT_REMOVEDIR[flags]))
 end
 function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
 function S.renameat(olddirfd, oldpath, newdirfd, newpath)
-  return retbool(C.renameat(getfd_at(olddirfd), oldpath, getfd_at(newdirfd), newpath))
+  return retbool(C.renameat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath))
 end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, c.MODE[mode])) end
-function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(getfd_at(fd), path, c.MODE[mode])) end
+function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(c.AT_FDCWD[fd], path, c.MODE[mode])) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.acct(filename) return retbool(C.acct(filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, c.MODE[mode])) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
-  return retbool(C.linkat(getfd_at(olddirfd), oldpath, getfd_at(newdirfd), newpath, c.AT_SYMLINK_FOLLOW[flags]))
+  return retbool(C.linkat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath, c.AT_SYMLINK_FOLLOW[flags]))
 end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
-function S.symlinkat(oldpath, newdirfd, newpath) return retbool(C.symlinkat(oldpath, getfd_at(newdirfd), newpath)) end
+function S.symlinkat(oldpath, newdirfd, newpath) return retbool(C.symlinkat(oldpath, c.AT_FDCWD[newdirfd], newpath)) end
 function S.pause() return retbool(C.pause()) end
 
 function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
 function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
 function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
 function S.fchownat(dirfd, path, owner, group, flags)
-  return retbool(C.fchownat(getfd_at(dirfd), path, owner or -1, group or -1, c.AT_SYMLINK_NOFOLLOW[flags]))
+  return retbool(C.fchownat(c.AT_FDCWD[dirfd], path, owner or -1, group or -1, c.AT_SYMLINK_NOFOLLOW[flags]))
 end
 
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
@@ -387,7 +381,7 @@ function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) 
 
 function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
 function S.faccessat(dirfd, pathname, mode, flags)
-  return retbool(C.faccessat(getfd_at(dirfd), pathname, c.OK[mode], c.AT_ACCESSAT[flags]))
+  return retbool(C.faccessat(c.AT_FDCWD[dirfd], pathname, c.OK[mode], c.AT_ACCESSAT[flags]))
 end
 
 function S.readlink(path, buffer, size)
@@ -401,7 +395,7 @@ end
 function S.readlinkat(dirfd, path, buffer, size)
   size = size or c.PATH_MAX
   buffer = buffer or t.buffer(size)
-  local ret = tonumber(C.readlinkat(getfd_at(dirfd), path, buffer, size))
+  local ret = tonumber(C.readlinkat(c.AT_FDCWD[dirfd], path, buffer, size))
   if ret == -1 then return nil, t.error() end
   return ffi.string(buffer, ret)
 end
@@ -412,7 +406,7 @@ function S.mknod(pathname, mode, dev)
 end
 function S.mknodat(fd, pathname, mode, dev)
   if type(dev) == "table" then dev = dev.dev end
-  return retbool(C.mknodat(getfd_at(fd), pathname, c.S[mode], dev or 0))
+  return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S[mode], dev or 0))
 end
 
 -- mkfifo is from man(3), add for convenience
@@ -583,7 +577,7 @@ function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), c.MODE[mode])) end
 function S.fchmodat(dirfd, pathname, mode)
-  return retbool(C.fchmodat(getfd_at(dirfd), pathname, c.MODE[mode], 0)) -- no flags actually supported
+  return retbool(C.fchmodat(c.AT_FDCWD[dirfd], pathname, c.MODE[mode], 0)) -- no flags actually supported
 end
 function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.sync_file_range(getfd(fd), offset, count, c.SYNC_FILE_RANGE[flags]))
@@ -612,7 +606,7 @@ end
 
 function S.fstatat(fd, path, buf, flags)
   if not buf then buf = t.stat() end
-  local ret = C.fstatat(getfd_at(fd), path, buf, c.AT_FSTATAT[flags])
+  local ret = C.fstatat(c.AT_FDCWD[fd], path, buf, c.AT_FSTATAT[flags])
   if ret == -1 then return nil, t.error() end
   return buf
 end
@@ -632,7 +626,7 @@ function S.futimens(fd, ts)
 end
 
 function S.utimensat(dirfd, path, ts, flags)
-  return retbool(C.utimensat(getfd_at(dirfd), path, gettimespec2(ts), c.AT_SYMLINK_NOFOLLOW[flags]))
+  return retbool(C.utimensat(c.AT_FDCWD[dirfd], path, gettimespec2(ts), c.AT_SYMLINK_NOFOLLOW[flags]))
 end
 
 -- because you can just pass floats to all the time functions, just use the same one, but provide different templates

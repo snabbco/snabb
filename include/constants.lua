@@ -689,9 +689,16 @@ c.UTIME = setmetatable({
 }, stringflag)
 
 -- ...at commands note these are valid in different combinations so different tables provided
+
+local function atflag(t, str)
+  if not str then return c.AT_FDCWD.FDCWD end -- non standard nil case
+  if type(str) == "string" or type(str) == "number" then return flag(t, str) end -- normal case
+  return str:getfd() -- fallback to file descriptor
+end
+
 c.AT_FDCWD = setmetatable({
   FDCWD = -100,
-}, stringflag)
+}, {__index = atflag, __call = function(t, a) return t[a] end})
 
 c.AT_REMOVEDIR = setmetatable({
   REMOVEDIR = 0x200,
