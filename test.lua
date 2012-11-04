@@ -1086,6 +1086,20 @@ test_misc = {
     assert(S.setdomainname("domainnametest"))
     assert_equal(S.getdomainname(), "domainnametest")
   end,
+  test_bridge = function()
+    local ok, err = S.bridge_add("br0")
+    assert(ok or err.ENOPKG or err.EPERM, err) -- ok not to to have bridge in kernel, may not be root
+    if ok then
+      local i = assert(nl.interfaces())
+      assert(i.br0)
+      local b = assert(S.bridge_list())
+      assert(b.br0 and b.br0.bridge.root_id, "expect to find bridge in list")
+      assert(S.bridge_del("br0"))
+      i = assert(nl.interfaces())
+      assert(not i.br0, "bridge should be gone")
+    end
+  end,
+
 --[[
   -- may switch this back to a type
   test_inet_name = function()
