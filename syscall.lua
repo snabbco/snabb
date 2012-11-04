@@ -31,8 +31,6 @@ local t, pt, s = S.t, S.pt, S.s
 local mt = {} -- metatables
 local meth = {}
 
-function S.nogc(d) return ffi.gc(d, nil) end
-
 -- reverse lookup tables from constants
 local errsyms = {} -- reverse lookup
 for k, v in pairs(c.E) do
@@ -2172,7 +2170,7 @@ S.in6addr_loopback = t.in6_addr("::1")
 
 -- methods on an fd
 -- note could split, so a socket does not have methods only appropriate for a file
-local fdmethods = {'nogc', 'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
+local fdmethods = {'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
                    'dup', 'read', 'write', 'pread', 'pwrite', 'tell', 'lockf',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
@@ -2208,6 +2206,10 @@ fmeth.seek = S.lseek
 fmeth.lock = S.lockf
 fmeth.chown = S.fchown
 
+local function nogc(d) return ffi.gc(d, nil) end
+
+fmeth.nogc = nogc
+
 -- sequence number used by netlink messages
 fmeth.seq = function(fd)
   fd.sequence = fd.sequence + 1
@@ -2238,7 +2240,7 @@ S.stdout = t.fd(c.STD.OUT):nogc()
 S.stderr = t.fd(c.STD.ERR):nogc()
 
 t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
-  __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel, nogc = S.nogc},
+  __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel, nogc = nogc},
   __gc = S.io_destroy
 })
 

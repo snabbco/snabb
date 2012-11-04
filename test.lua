@@ -98,7 +98,7 @@ test_basic = {
     rawset(S.C, "read", oldread)
   end,
   test_fd_nums = function() -- TODO should also test on the version from types.lua
-    assert_equal(S.nogc(t.fd(18)):getfd(), 18, "should be able to trivially create fd")
+    assert_equal(t.fd(18):nogc():getfd(), 18, "should be able to trivially create fd")
   end,
 }
 
