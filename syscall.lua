@@ -390,7 +390,7 @@ function S.nice(inc) return retnume(C.nice, inc) end
 function S.getpriority(which, who) return retnume(C.getpriority, c.PRIO[which], who or 0) end
 function S.setpriority(which, who, prio) return retnume(C.setpriority, c.PRIO[which], who or 0, prio) end
 
- -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
+ -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly?
 function S.clone(flags, signal, stack, ptid, tls, ctid)
   flags = c.CLONE[flags] + c.SIG[signal]
   return retnum(C.clone(flags, stack, ptid, tls, ctid))
@@ -582,8 +582,10 @@ function S.fstatat(fd, path, buf, flags)
   return buf
 end
 
+-- TODO part of type
 local function gettimespec2(ts)
-  if ts and (not ffi.istype(t.timespec2, ts)) then
+  if ffi.istype(t.timespec2, ts) then return ts end
+  if ts then
     local s1, s2 = ts[1], ts[2]
     ts = t.timespec2()
     if type(s1) == 'string' then ts[0].tv_nsec = c.UTIME[s1] else ts[0] = t.timespec(s1) end
