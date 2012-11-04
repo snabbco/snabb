@@ -253,6 +253,10 @@ end
 function CC.pivot_root(new_root, put_old)
   return C.syscall(C.SYS.pivot_root, new_root, put_old)
 end
+-- setns not in some glibc versions
+function CC.setns(fd, nstype)
+  return C.syscall(C.SYS.setns, t.int(fd), t.int(nstype))
+end
 
 --[[ if you need to split 64 bit args on 32 bit syscalls use code like this
 if ffi.abi("64bit") then
@@ -279,10 +283,13 @@ if not pcall(inlibc, "clock_getres") then
   C.clock_nanosleep = rt.clock_nanosleep
 end
 
--- not in eglibc
+-- not in glibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
 if not pcall(inlibc, "mknodat") then C.mknodat = CC.mknodat end
 if not pcall(inlibc, "pivot_root") then C.pivot_root = CC.pivot_root end
+
+-- not in glibc on my dev ARM box
+if not pcall(inlibc, "setns") then C.setns = CC.setns end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
