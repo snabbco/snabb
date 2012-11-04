@@ -1981,7 +1981,9 @@ c.SIOC = setmetatable({
   BRDELBR    = 0x89a1,
   BRADDIF    = 0x89a2,
   BRDELIF    = 0x89a3,
+}, stringflag)
 
+c.TIOC = setmetatable({
   MGET       = 0x5415,
   MBIS       = 0x5416,
   MBIC       = 0x5417,

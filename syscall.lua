@@ -2128,14 +2128,14 @@ end
 
 function S.unlockpt(fd)
   local unlock = t.int1()
-  local ret, err = S.ioctl(fd, c.TIOCSPTLCK, pt.void(unlock)) -- TODO make sure this returns true instead?
+  local ret, err = S.ioctl(fd, c.TIOC.SPTLCK, pt.void(unlock)) -- TODO make sure this returns true instead?
   if not ret then return nil, err end
   return true
 end
 
 function S.ptsname(fd)
   local pts = t.int1()
-  local ret, error = S.ioctl(fd, c.TIOCGPTN, pt.void(pts))
+  local ret, error = S.ioctl(fd, c.TIOC.GPTN, pt.void(pts))
   if not ret then return nil, err end
   return "/dev/pts/" .. tostring(pts[0])
 end
