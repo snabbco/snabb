@@ -1138,7 +1138,7 @@ test_sockets = {
     assert(not sa, "expect nil socket address from invalid ip string")
   end,
   test_inet_socket = function() -- should break this test up
-    local s = assert(S.socket("inet", "stream, nonblock"))
+    local s = assert(S.socket("inet", "stream"))
     local loop = "127.0.0.1"
     local sa = assert(t.sockaddr_in(1234, loop))
     assert_equal(tostring(sa.sin_addr), loop, "expect address converted back to string to still be same")
