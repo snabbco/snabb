@@ -385,13 +385,6 @@ metatype("sockaddr_nl", "struct sockaddr_nl", {
   end,
 })
 
-samap = {
-  [c.AF.UNIX] = t.sockaddr_un,
-  [c.AF.INET] = t.sockaddr_in,
-  [c.AF.INET6] = t.sockaddr_in6,
-  [c.AF.NETLINK] = t.sockaddr_nl,
-}
-
 -- 64 to 32 bit conversions via unions TODO use meth not object?
 
 if ffi.abi("le") then
@@ -904,6 +897,14 @@ local voidp = ffi.typeof("void *")
 pt.void = function(x)
   return ffi.cast(voidp, x)
 end
+
+-- these are declared above
+samap = {
+  [c.AF.UNIX] = t.sockaddr_un,
+  [c.AF.INET] = t.sockaddr_in,
+  [c.AF.INET6] = t.sockaddr_in6,
+  [c.AF.NETLINK] = t.sockaddr_nl,
+}
 
 samap2 = {
   [c.AF.UNIX] = pt.sockaddr_un,
