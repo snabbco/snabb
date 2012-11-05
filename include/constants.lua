@@ -51,7 +51,7 @@ local function flag(t, str)
   if #s == 0 then return 0 end
   local val = rawget(t, s)
   if not val then return nil end
-  t[str] = val -- this memoizes for future use
+  rawset(t, str, val) -- this memoizes for future use
   return val
 end
 
@@ -72,7 +72,7 @@ function flags(t, str) -- allows multiple comma sep flags that are ORed
     if not val then return nil end
     f = bit.bor(f, val)
   end
-  t[str] = f
+  rawset(t, str, f)
   return f
 end
 
@@ -86,7 +86,7 @@ local function chflags(t, s)
   local flag = 0
   for i = 1, #s do
     local c = s:sub(i, i)
-    flag = bit.bor(flag, t[c])
+    flag = bit.bor(flag, rawget(t, c))
   end
   return flag
 end
