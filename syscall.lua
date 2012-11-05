@@ -228,6 +228,10 @@ end
 function CC.setns(fd, nstype)
   return C.syscall(c.SYS.setns, t.int(fd), t.int(nstype))
 end
+-- prlimit64 not in my ARM glibc
+function CC.prlimit64(pid, resource, new_limit, old_limit)
+  return C.syscall(c.SYS.prlimit64, t.pid(pid), new_limit, old_limit)
+end
 
 --[[ if you need to split 64 bit args on 32 bit syscalls use code like this
 if ffi.abi("64bit") then
@@ -245,7 +249,7 @@ end
 
 -- if not in libc replace
 
--- with glibc in -rt
+-- with glibc in -rt TODO maybe use syscalls?
 if not pcall(inlibc, "clock_getres") then
   local rt = ffi.load "rt"
   C.clock_getres = rt.clock_getres
@@ -261,6 +265,7 @@ if not pcall(inlibc, "pivot_root") then C.pivot_root = CC.pivot_root end
 
 -- not in glibc on my dev ARM box
 if not pcall(inlibc, "setns") then C.setns = CC.setns end
+if not pcall(inlibc, "prlimit64") then C.prlimit64 = CC.prlimit64 end
 
 -- main definitions start here
 function S.open(pathname, flags, mode)
