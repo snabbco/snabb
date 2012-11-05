@@ -109,7 +109,7 @@ c.STD = setmetatable({
 -- sizes
 c.PATH_MAX = 4096
 
--- open, fcntl TODO must set LARGEFILE if needed (note pipe2 only uses nonblock and cloexec)
+-- open, fcntl TODO not setting largefile if matches exactly in upper case, potentially confusing
 c.O = {
   RDONLY    = octal('0000'),
   WRONLY    = octal('0001'),
@@ -155,6 +155,7 @@ else
   setmetatable(c.O, multiflags)
 end
 
+-- just for pipe2
 c.OPIPE = setmetatable({
   NONBLOCK  = octal('04000'),
   CLOEXEC   = octal('02000000'),
