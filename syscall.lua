@@ -230,7 +230,7 @@ function CC.setns(fd, nstype)
 end
 -- prlimit64 not in my ARM glibc
 function CC.prlimit64(pid, resource, new_limit, old_limit)
-  return C.syscall(c.SYS.prlimit64, t.pid(pid), new_limit, old_limit)
+  return C.syscall(c.SYS.prlimit64, t.pid(pid), pt.void(new_limit), pt.void(old_limit))
 end
 
 --[[ if you need to split 64 bit args on 32 bit syscalls use code like this
