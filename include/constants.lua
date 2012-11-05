@@ -132,10 +132,18 @@ c.O.FSYNC     = c.O.SYNC
 c.O.RSYNC     = c.O.SYNC
 c.O.NDELAY    = c.O.NONBLOCK
 
+-- these are arch dependent!
+if arch.oflags then arch.oflags(c)
+else -- generic values from asm-generic
+  if ffi.abi("32bit") then c.O.LARGEFILE = octal('0100000') end
+  c.O.DIRECT    = octal('040000')
+  c.O.DIRECTORY = octal('0200000')
+  c.O.NOFOLLOW  = octal('0400000')
+end
+
 -- any use of a string will add largefile. If you use flags directly you need to add it yourself.
 -- if there is a problem use a different table eg OPIPE
 if ffi.abi("32bit") then
-  c.O.LARGEFILE = octal('0100000')
   setmetatable(c.O, {
     __index = function(t, str)
       return bit.bor(flags(t, str), c.O.LARGEFILE)
@@ -145,14 +153,6 @@ if ffi.abi("32bit") then
 else
   c.O.LARGEFILE = 0
   setmetatable(c.O, multiflags)
-end
-
--- these are arch dependent!
-if arch.oflags then arch.oflags(c)
-else -- generic values from asm-generic
-  c.O.DIRECT    = octal('040000')
-  c.O.DIRECTORY = octal('0200000')
-  c.O.NOFOLLOW  = octal('0400000')
 end
 
 c.OPIPE = setmetatable({

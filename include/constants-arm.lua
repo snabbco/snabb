@@ -71,6 +71,7 @@ arch.oflags = function(c)
   c.O.DIRECTORY = octal('040000')
   c.O.NOFOLLOW  = octal('0100000')
   c.O.DIRECT    = octal('0200000')
+  c.O.LARGEFILE = octal('0400000')
 end
 
 return arch
