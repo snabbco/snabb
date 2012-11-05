@@ -129,6 +129,7 @@ local addtypes = {
   mode = "mode_t",
   dev = "dev_t",
   loff = "loff_t",
+  pid = "pid_t",
   aio_context = "aio_context_t",
   sa_family = "sa_family_t",
   fdset = "fd_set",
