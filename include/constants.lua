@@ -110,7 +110,7 @@ c.STD = setmetatable({
 c.PATH_MAX = 4096
 
 -- open, fcntl TODO not setting largefile if matches exactly in upper case, potentially confusing
-c.O = {
+c.O = setmetatable({
   RDONLY    = octal('0000'),
   WRONLY    = octal('0001'),
   RDWR      = octal('0002'),
@@ -126,7 +126,7 @@ c.O = {
   NOATIME   = octal('01000000'),
   CLOEXEC   = octal('02000000'),
   SYNC      = octal('04010000'),
-}
+}, multiflags)
 
 c.O.FSYNC     = c.O.SYNC
 c.O.RSYNC     = c.O.SYNC
@@ -135,24 +135,10 @@ c.O.NDELAY    = c.O.NONBLOCK
 -- these are arch dependent!
 if arch.oflags then arch.oflags(c)
 else -- generic values from asm-generic
-  if ffi.abi("32bit") then c.O.LARGEFILE = octal('0100000') end
+  if ffi.abi("32bit") then c.O.LARGEFILE = octal('0100000') else c.O.LARGEFILE = 0 end
   c.O.DIRECT    = octal('040000')
   c.O.DIRECTORY = octal('0200000')
   c.O.NOFOLLOW  = octal('0400000')
-end
-
--- any use of a string will add largefile. If you use flags directly you need to add it yourself.
--- if there is a problem use a different table eg OPIPE
-if ffi.abi("32bit") then
-  setmetatable(c.O, {
-    __index = function(t, str)
-      return bit.bor(flags(t, str), c.O.LARGEFILE)
-    end,
-    __call = multiflags.__call,
-  })
-else
-  c.O.LARGEFILE = 0
-  setmetatable(c.O, multiflags)
 end
 
 -- just for pipe2
