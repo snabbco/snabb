@@ -56,7 +56,13 @@ arch.SYS = {
   fallocate        = 352,
   timerfd_settime  = 353,
   timerfd_gettime  = 354,
-  pipe2            = 359,
+  pipe2            = 359, -- TODO several missing
+  perf_event_open  = 364,
+  recvmmsg         = 365,
+  accept4          = 366,
+  fanotify_init    = 367,
+  fanotify_mark    = 368,
+  prlimit64		   = 369,
   setns            = 375,
 }
 
