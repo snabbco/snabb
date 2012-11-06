@@ -1,45 +1,51 @@
 -- generate C test file to check type sizes etc
+-- luajit ctest.lua > ctest.c && cc ctest.c -o ctest && ./ctest
 
 local S = require "syscall"
 local ffi = require "ffi"
 
-local s, t = S.s, S.t
+local s, t, c, ctypes = S.s, S.t, S.c, S.ctypes
 
 -- TODO fix these, various naming issues
-S.ctypes["struct linux_dirent64"] = nil
-S.ctypes["struct statfs64"] = nil
-S.ctypes["struct flock64"] = nil
-S.ctypes["struct stat64"] = nil
-S.ctypes["struct fdb_entry"] = nil
-S.ctypes["struct seccomp_data"] = nil
-S.ctypes["sighandler_t"] = nil
-S.ctypes["struct rlimit64"] = nil
-S.ctypes["struct mq_attr"] = nil
+ctypes["struct linux_dirent64"] = nil
+ctypes["struct statfs64"] = nil
+ctypes["struct flock64"] = nil
+ctypes["struct stat64"] = nil
+ctypes["struct fdb_entry"] = nil
+ctypes["struct seccomp_data"] = nil
+ctypes["sighandler_t"] = nil
+ctypes["struct rlimit64"] = nil
+ctypes["struct mq_attr"] = nil
 
 -- fixes for constants
-S.__WALL = S.WALL; S.WALL = nil
-S.__WCLONE = S.WCLONE; S.WCLONE = nil
+c.__WALL = c.WALL; c.WALL = nil
+c.__WCLONE = c.WCLONE; c.WCLONE = nil
 
 -- remove seccomp for now as no support on the ARM box
-for k, _ in pairs(S) do
-  if k:sub(1, 8) == 'SECCOMP_' then S[k] = nil end
+for k, _ in pairs(c) do
+  if k:sub(1, 8) == 'SECCOMP_' then c[k] = nil end
 end
 
 -- fake constants
-S.MS_RO = nil
-S.MS_RW = nil
-S.IFF_ALL = nil
-S.IFF_NONE = nil
+c.MS.RO = nil
+c.MS.RW = nil
+c.IFF.ALL = nil
+c.IFF.NONE = nil
 
 -- TODO find the headers/flags for these if exist, or remove
-S.SA_RESTORER = nil
-S.AF_DECNET = nil
-S.SIG_HOLD = nil
-S.NOTHREAD = nil
-S.RTF_PREFIX_RT = nil
-S.RTF_EXPIRES = nil
-S.RTF_ROUTEINFO = nil
-S.RTF_ANYCAST = nil
+c.SA.RESTORER = nil
+c.AF.DECNET = nil
+c.SIG.HOLD = nil
+c.NOTHREAD = nil
+c.RTF.PREFIX_RT = nil
+c.RTF.EXPIRES = nil
+c.RTF.ROUTEINFO = nil
+c.RTF.ANYCAST = nil
+
+-- renamed constants
+c.O.NONBLOCK = c.OPIPE.NONBLOCK
+c.O.CLOEXEC = c.OPIPE.CLOEXEC
+c.OPIPE = nil
 
 -- include kitchen sink, garbage can etc
 print [[
@@ -103,15 +109,19 @@ int main(int argc, char **argv) {
 ]]
 
 -- iterate over S.ctypes
-for k, v in pairs(S.ctypes) do
+for k, v in pairs(ctypes) do
   print("assert(sizeof(" .. k .. ") == " .. ffi.sizeof(v) .. ");")
 end
 
 -- test all the constants
 
-for k, v in pairs(S) do
-  if type(S[k]) == "number" then
+for k, v in pairs(c) do
+  if type(v) == "number" then
     print("assert(" .. k .. " == " .. v .. ");")
+  elseif type(v) == "table" then
+    for k2, v2 in pairs(v) do
+      print("assert(" .. k .. "_" .. k2 .. " == " .. tostring(v2) .. ");")
+    end
   end
 end
 
