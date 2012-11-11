@@ -1705,32 +1705,58 @@ test_aio = {
     assert(not ok, "should have closed aio ctx")
   end,
 ]]
-  test_aio = function() -- split this up
-    -- need aligned buffer for O_DIRECT
+  test_aio = function()
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
-    local efd = assert(S.eventfd())
     local ctx = assert(S.io_setup(8))
     assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
     local r = assert(S.io_getevents(ctx, 1, 1))
     assert(#r == 1, "expect one aio event") -- should also test what is returned
-    assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
-    -- TODO this is erroring, not sure why, needs debugging
-    -- r, err = assert(ctx:cancel({cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}))
-    --r = assert(ctx:getevents(1, 1))
+    assert(fd:close())
+    assert(S.munmap(abuf, 4096))
+  end,
+  test_aio_cancel = function()
+    local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
+    ffi.copy(abuf, teststring)
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
+    assert(S.unlink(tmpfile))
+    assert(fd:pwrite(abuf, 4096, 0))
+    ffi.fill(abuf, 4096)
+    local ctx = assert(S.io_setup(8))
+    -- erroring, perhaps already completed?
+    --assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
+    --local r, err = S.io_cancel(ctx, {cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0})
+    --r = assert(S.io_getevents(ctx, 1, 1))
     --assert(#r == 0, "expect no aio events")
+    assert(S.io_destroy(ctx))
+    assert(fd:close())
+    assert(S.munmap(abuf, 4096))
+  end,
+  test_aio_eventfd = function()
+    local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
+    ffi.copy(abuf, teststring)
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
+    assert(S.unlink(tmpfile))
+    assert(fd:pwrite(abuf, 4096, 0))
+    ffi.fill(abuf, 4096)
+    local ctx = assert(S.io_setup(8))
+
     -- TODO this is not working either
+    local efd = assert(S.eventfd())
     --assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0, resfd = efd}} == 1)
     --local p = assert(S.poll({fd = efd, events = "in"}, 0, 1000))
     --assert(#p == 1, "expect one event available from poll, got " .. #p)
     --assert(ctx:destroy())
+    assert(efd:close())
+
+    assert(S.io_destroy(ctx))
     assert(fd:close())
     assert(S.munmap(abuf, 4096))
-  end
+  end,
 }
 
 test_processes = {
