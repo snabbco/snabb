@@ -831,7 +831,9 @@ c.IOCB_CMD = setmetatable({
   PWRITEV = 8,
 }, stringflag)
 
-c.IOCB_FLAG_RESFD = 1
+c.IOCB_FLAG = setmetatable({
+  RESFD = 1,
+}, stringflag)
 
 -- file types in directory
 c.DT = setmetatable({
