@@ -1365,7 +1365,7 @@ end
 function S.io_cancel(ctx, iocb, result)
   iocb = getiocb(iocb)
   if not result then result = t.io_event() end
-  local ret = C.io_cancel(ctx.ctx, iocb, result)
+  local ret = C.io_cancel(ctx, iocb, result)
   if ret == -1 then return nil, t.error() end
   return ret
 end
@@ -1373,7 +1373,7 @@ end
 function S.io_getevents(ctx, min, nr, events, timeout)
   events = events or t.io_events(nr)
   timeout = istype(t.timespec, timeout) or t.timespec(timeout)
-  local ret = C.io_getevents(ctx.ctx, min, nr, events, timeout)
+  local ret = C.io_getevents(ctx, min, nr, events, timeout)
   if ret == -1 then return nil, t.error() end
   -- need to think more about how to return these, eg metatype for io_event?
   local r = {}
@@ -1388,7 +1388,7 @@ end
 
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args TODO redo like iov so no nr
   iocb, nr = getiocbs(iocb)
-  return retnum(C.io_submit(ctx.ctx, iocb, nr))
+  return retnum(C.io_submit(ctx, iocb, nr))
 end
 
 -- map for valid options for arg2

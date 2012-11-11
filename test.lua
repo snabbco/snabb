@@ -1714,10 +1714,9 @@ test_aio = {
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
     local efd = assert(S.eventfd())
-    --local ctx = assert(S.io_setup(8))
-    -- failing on 32 bit. TODO debug aio properly!
-    --assert_equal(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}, 1)
-    --local r = assert(ctx:getevents(1, 1))
+    local ctx = assert(S.io_setup(8))
+    assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
+    local r = assert(S.io_getevents(ctx, 1, 1))
     --assert(#r == 1, "expect one aio event") -- should also test what is returned
     --assert_equal(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}, 1)
     -- TODO this is erroring, not sure why, needs debugging
