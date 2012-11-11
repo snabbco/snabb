@@ -198,19 +198,19 @@ end
 
 -- native Linux aio not generally supported, only posix API TODO these are not working
 function C.io_setup(nr_events, ctx)
-  return C.syscall(c.SYS.io_setup, t.uint(nr_events), ctx)
+  return C.syscall(c.SYS.io_setup, t.uint(nr_events), pt.void(ctx))
 end
 function C.io_destroy(ctx)
-  return C.syscall(c.SYS.io_destroy, ctx)
+  return C.syscall(c.SYS.io_destroy, t.aio_context(ctx))
 end
 function C.io_cancel(ctx, iocb, result)
-  return C.syscall(c.SYS.io_cancel, ctx, iocb, result)
+  return C.syscall(c.SYS.io_cancel, t.aio_context(ctx), pt.void(iocb), pt.void(result))
 end
 function C.io_getevents(ctx, min, nr, events, timeout)
-  return C.syscall(c.SYS.io_getevents, ctx, t.long(min), t.long(nr), events, timeout)
+  return C.syscall(c.SYS.io_getevents, t.aio_context(ctx), t.long(min), t.long(nr), pt.void(events), pt.void(timeout))
 end
 function C.io_submit(ctx, iocb, nr)
-  return C.syscall(c.SYS.io_submit, ctx, t.long(nr), iocb)
+  return C.syscall(c.SYS.io_submit, t.aio_context(ctx), t.long(nr), pt.void(iocb))
 end
 
 -- note dev_t not passed as 64 bits to this syscall
@@ -1322,18 +1322,13 @@ function S.pivot_root(new_root, put_old) return retbool(C.pivot_root(new_root, p
 
 -- aio functions
 function S.io_setup(nr_events)
-  local ctx = t.aio_context()
+  local ctx = t.aio_context1()
   local ret = C.io_setup(nr_events, ctx)
   if ret == -1 then return nil, t.error() end
-  return ctx
+  return ctx[0]
 end
 
-function S.io_destroy(ctx)
-  if ctx.ctx == 0 then return end
-  local ret = retbool(C.io_destroy(ctx.ctx))
-  ctx.ctx = 0
-  return ret
-end
+function S.io_destroy(ctx) return retbool(C.io_destroy(ctx)) end
 
 -- TODO replace these functions with metatypes
 local function getiocb(ioi, iocb)
@@ -2239,10 +2234,13 @@ S.stdin = t.fd(c.STD.IN):nogc()
 S.stdout = t.fd(c.STD.OUT):nogc()
 S.stderr = t.fd(c.STD.ERR):nogc()
 
+-- TODO reinstate this, more like fd is, hence changes to destroy
+--[[
 t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
   __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel, nogc = nogc},
   __gc = S.io_destroy
 })
+]]
 
 return S
 

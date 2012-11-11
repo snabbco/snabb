@@ -1691,9 +1691,10 @@ test_events = {
 test_aio = {
   teardown = clean,
   test_aio_setup = function()
-    --local ctx = assert(S.io_setup(8))
-    --assert(ctx:destroy())
+    local ctx = assert(S.io_setup(8))
+    assert(S.io_destroy(ctx))
   end,
+--[[ -- temporarily disabled gc and methods on aio
   test_aio_ctx_gc = function()
     local ctx = assert(S.io_setup(8))
     local ctx2 = t.aio_context()
@@ -1703,6 +1704,7 @@ test_aio = {
     local ok, err = S.io_destroy(ctx2)
     assert(not ok, "should have closed aio ctx")
   end,
+]]
   test_aio = function() -- split this up
     -- need aligned buffer for O_DIRECT
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))

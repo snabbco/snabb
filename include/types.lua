@@ -187,6 +187,7 @@ t.off1 = ffi.typeof("off_t[1]")
 t.loff1 = ffi.typeof("loff_t[1]")
 t.uid1 = ffi.typeof("uid_t[1]")
 t.gid1 = ffi.typeof("gid_t[1]")
+t.aio_context1 = ffi.typeof("aio_context_t[1]")
 t.int2 = ffi.typeof("int[2]")
 t.timespec2 = ffi.typeof("struct timespec[2]")
 
