@@ -686,6 +686,7 @@ function S.sleep(sec) -- standard libc function
   return tonumber(rem.tv_sec)
 end
 
+-- TODO return metatype that has length and can gc?
 function S.mmap(addr, length, prot, flags, fd, offset)
   return retptr(C.mmap(addr, length, c.PROT[prot], c.MAP[flags], getfd(fd), offset))
 end
