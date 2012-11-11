@@ -2128,6 +2128,13 @@ else -- remove tests that need root
   end
 end
 
+-- some tests are causing issues, eg one of my servers reboots on pivot_root
+if not (arg[1] and arg[1] == "all") then
+  test_misc_root.test_pivot_root = nil
+else
+  arg[1] = nil
+end
+
 local f
 if arg[1] and arg[1] ~= "coverage" then f = luaunit:run(arg[1]) else f = luaunit:run() end
 
@@ -2139,6 +2146,7 @@ if f ~= 0 then S.exit("failure") end
 
 -- TODO iterate through all functions in S and upvalues for active rather than trace
 -- also check for non interesting cases, eg fall through to end
+-- TODO add more files
 
 if arg[1] == "coverage" then
   cov.covered = 0
