@@ -1727,8 +1727,8 @@ test_aio = {
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
     local ctx = assert(S.io_setup(8))
-    -- erroring, giving EINVAL which is odd, man page says means ctx invalid TODO fix
     assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
+    -- erroring, giving EINVAL which is odd, man page says means ctx invalid TODO fix
     --local r, err = S.io_cancel(ctx, {cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0})
     --r = assert(S.io_getevents(ctx, 1, 1))
     --assert(#r == 0, "expect no aio events")
