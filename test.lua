@@ -2109,6 +2109,14 @@ test_misc_root = {
 
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
+
+  -- some tests are causing issues, eg one of my servers reboots on pivot_root
+  if not (arg[1] and arg[1] == "all") then
+    test_misc_root.test_pivot_root = nil
+  else
+    arg[1] = nil
+  end
+
   assert(S.unshare("newnet, newns, newuts")) -- do not interfere with anything on host during tests
   local i = assert(nl.interfaces())
   local lo = assert(i.lo)
@@ -2126,13 +2134,6 @@ else -- remove tests that need root
       end
     end
   end
-end
-
--- some tests are causing issues, eg one of my servers reboots on pivot_root
-if not (arg[1] and arg[1] == "all") then
-  test_misc_root.test_pivot_root = nil
-else
-  arg[1] = nil
 end
 
 local f
