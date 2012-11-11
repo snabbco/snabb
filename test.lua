@@ -1708,21 +1708,21 @@ test_aio = {
   test_aio = function()
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
-    local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- use O_DIRECT or aio may not
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
     local ctx = assert(S.io_setup(8))
     assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
     local r = assert(S.io_getevents(ctx, 1, 1))
-    assert(#r == 1, "expect one aio event") -- should also test what is returned
+    assert(#r == 1, "expect one aio event") -- TODO test what is returned
     assert(fd:close())
     assert(S.munmap(abuf, 4096))
   end,
   test_aio_cancel = function()
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
-    local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU")
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
