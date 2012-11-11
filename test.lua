@@ -1744,15 +1744,14 @@ test_aio = {
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
     local ctx = assert(S.io_setup(8))
-
-    -- TODO this is not working either
     local efd = assert(S.eventfd())
-    --assert(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0, resfd = efd}} == 1)
-    --local p = assert(S.poll({fd = efd, events = "in"}, 0, 1000))
-    --assert(#p == 1, "expect one event available from poll, got " .. #p)
-    --assert(ctx:destroy())
+    local ep = assert(S.epoll_create())
+    assert(ep:epoll_ctl("add", efd, "in"))
+    assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0, resfd = efd}}), 1)
+    local r = assert(ep:epoll_wait())
+    assert_equal(#r, 1, "one event now")
     assert(efd:close())
-
+    assert(ep:close())
     assert(S.io_destroy(ctx))
     assert(fd:close())
     assert(S.munmap(abuf, 4096))
