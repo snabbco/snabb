@@ -1367,7 +1367,7 @@ function S.io_cancel(ctx, iocb, result)
   if not result then result = t.io_event() end
   local ret = C.io_cancel(ctx, iocb, result)
   if ret == -1 then return nil, t.error() end
-  return ret
+  return result
 end
 
 function S.io_getevents(ctx, min, nr, events, timeout)
