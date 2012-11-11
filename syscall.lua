@@ -233,6 +233,20 @@ function CC.prlimit64(pid, resource, new_limit, old_limit)
   return C.syscall(c.SYS.prlimit64, t.pid(pid), t.int(resource), pt.void(new_limit), pt.void(old_limit))
 end
 
+-- you can get these functions from ffi.load "rt" in glibc but this upsets valgrind so get from syscalls
+function CC.clock_nanosleep(clk_id, flags, req, rem)
+  return C.syscall(c.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
+end
+function CC.clock_getres(clk_id, ts)
+  return C.syscall(c.SYS.clock_getres, t.clockid(clk_id), pt.void(ts))
+end
+function CC.clock_gettime(clk_id, ts)
+  return C.syscall(c.SYS.clock_gettime, t.clockid(clk_id), pt.void(ts))
+end
+function CC.clock_settime(clk_id, ts)
+  return C.syscall(c.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
+end
+
 --[[ if you need to split 64 bit args on 32 bit syscalls use code like this
 if ffi.abi("64bit") then
   function CC.fallocate(fd, mode, offset, len)
@@ -249,14 +263,11 @@ end
 
 -- if not in libc replace
 
--- with glibc in -rt TODO maybe use syscalls?
-if not pcall(inlibc, "clock_getres") then
-  local rt = ffi.load "rt"
-  C.clock_getres = rt.clock_getres
-  C.clock_settime = rt.clock_settime
-  C.clock_gettime = rt.clock_gettime
-  C.clock_nanosleep = rt.clock_nanosleep
-end
+-- in librt for glibc but use syscalls instead
+if not pcall(inlibc, "clock_getres") then C.clock_getres = CC.clock_getres end
+if not pcall(inlibc, "clock_settime") then C.clock_settime = CC.clock_settime end
+if not pcall(inlibc, "clock_gettime") then C.clock_gettime = CC.clock_gettime end
+if not pcall(inlibc, "clock_nanosleep") then C.clock_nanosleep = CC.clock_nanosleep end
 
 -- not in glibc
 if not pcall(inlibc, "mknod") then C.mknod = CC.mknod end
