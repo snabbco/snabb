@@ -1717,8 +1717,8 @@ test_aio = {
     local ctx = assert(S.io_setup(8))
     assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
     local r = assert(S.io_getevents(ctx, 1, 1))
-    --assert(#r == 1, "expect one aio event") -- should also test what is returned
-    --assert_equal(ctx:submit{{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}, 1)
+    assert(#r == 1, "expect one aio event") -- should also test what is returned
+    assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
     -- TODO this is erroring, not sure why, needs debugging
     -- r, err = assert(ctx:cancel({cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}))
     --r = assert(ctx:getevents(1, 1))
