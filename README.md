@@ -16,6 +16,16 @@ This code is beta. Interfaces will change in future. The code is riddled with TO
 
 LuaJIT 2.0.0 or later. ARM (soft or hard float), x86 or AMD64 architectures; intend to support PPC and MIPS in future. Either glibc or [Musl libc](http://www.musl-libc.org/); currently uClibc is not supported. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
+## Release notes
+
+0.4 is a release that works well with LuaJIT 2.0.0 and has had extensive testing. The code is somewhat modular now, which makes it easier to use and understand.
+
+0.3 was the last release to work with luaffi. There are significant bugs.
+
+0.2 work in progress release.
+
+0.1 very early prototype.
+
 ## Examples
 
 Apart from the tests, there are now some examples at [ljsyscall-examples](https://github.com/justincormack/ljsyscall-examples). More to come.
