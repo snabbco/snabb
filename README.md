@@ -1,16 +1,20 @@
 # Linux system calls for LuaJIT
 
-What? An FFI implementation of the Linux kernel ABI for LuaJIT.
+What? An FFI implementation of the Linux kernel ABI for LuaJIT. This means you will be able to program all the functionality the Linux kernel provides to userspace directly in Lua.
 
 Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua.
 
 Linux only? Not so easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library (that applies also to any non glibc library too), and test. Patches accepted, but will probably need to restructure for maintainability. However you may well be better off using [LuaPosix](https://github.com/rrthomas/luaposix) if you want to write portable Unix code.
 
-Requirements: Needs LuaJIT 2.0.0-beta10 or later. Generally tested using git head. Currently requires git head.
+Requirements: Needs [LuaJIT 2.0.0](http://www.luajit.org/) or later.
 
-Also supports [luaffi](https://github.com/jmckaskill/luaffi) so you can use with standard Lua; all the tests now pass, have added some workarounds to support current issues in luaffi which could be removed but these are not performance critical or important now as all the major issues have been resolved. There may still be a few issues in code that is not exercised by the tests, but actually luaffi has fixed most of the issues that were coming up anyway now. This is now tested and working with Lua 5.1 and 5.2.
+The code does not currently support the main Lua implementation, only LuaJIT. It used to support [luaffi](https://github.com/jmckaskill/luaffi) but this has not kept up with LuaJIT ffi features. At some point I intend to support Lua directly, but this will be after the API has stabilised.
 
-Releases after tag 0.3 do not currently work with luaffi, please use that until fixed. Using new ffi features to simplify code.
+This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
+
+## Requirements
+
+LuaJIT 2.0.0 or later. ARM (soft or hard float), x86 or AMD64 architectures; intend to support PPC and MIPS in future. Either glibc or [Musl libc](http://www.musl-libc.org/); currently uClibc is not supported. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
 ## Examples
 
@@ -18,25 +22,23 @@ Apart from the tests, there are now some examples at [ljsyscall-examples](https:
 
 ## Testing
 
-The test script is quite comprehensive, though it does not test all the syscalls, as I assume they work, but it should stress the bindings. Tested on ARM, amd64, x86. Intend to get my ppc build machine back up one day, if you want this supported please ask. I do not currently have a mips box, if you want this can you suggest a suitable dev box.
+The test script is fairly comprehensive. Tested on ARM, amd64, x86, with various combinations of libc. I run long test runs as LuaJIT makes random choices in code generation so single runs do not necessarily show errors. Also tested with Valgrind to pick up memory errors, although there are some issues with some of the system calls, which are being gradually resolved (I use Valgrind SVN). 
 
-Some tests need to be run as root, and will not be run otherwise. You cannot test a lot of stuff otherwise. However most of the testing is now done in isolated containers so should be harmless.
+Some tests need to be run as root, and will not be run otherwise. You cannot test a lot of system calls otherwise. The testing is now done in isolated containers so should not affect the host system, although on old kernels reboot in a container could reboot the host.
 
-Some tests may fail if you do not have kernel support for some feature (eg namespacing, ipv6, etc).
-
-Initial testing on uclibc, at one point worked on my configuration, but uclibc warns that ABI can depend on compile options, so please test. I thought uclibc used kernel structures for eg stat, but they seem to use the glibc ones now, so more compatible. If there are more compatibility issues I may move towards using more syscalls directly, now we have the syscall function. Other C libraries may need more changes; I intend to test musl libc once I have a working build.
+Some tests may fail if you do not have kernel support for some feature (eg namespacing, ipv6, bridges).
 
 The test script is a copy of [luaunit](https://github.com/rjpcomputing/luaunit). I have pushed all my changes upstream, including Lua 5.2 support and fixes to not allocate globals.
 
-I have added initial coverage tests, which are over 90% (some functions may be missing, will update). Fixing the missing parts gradually (found some bugs from this).
+I have added initial coverage tests, and a C test to check constants and structures, but these are very much work in progress.
 
 ## What is implemented?
 
-This project is in beta! Some syscalls are missing, this is a work in progress! The majority of syscalls are now there, let me know if you need some that are not.
+This project is in beta! Much stuff is still missing, this is a work in progress! The majority of syscalls are now there, let me know if you need some that are not.
 
-The syscall API covers a lot of stuff, but there are other interfaces. There is now a small wrapper for the process interface (/proc).
+As well as syscalls, there are interfaces to features such as proc, termios and netlink. These are still work in progress, and will be split into separate modules.
 
-Work on the netlink API is progressing. A lot of the code for bridges was done as a prototype, and now working on the interface for network interfaces. The read side of network interfaces is done, you can now do `print(S.get_interfaces()` to get something much like ifconfig returns, and all the raw data is there as Lua tables. Still to do are the write side of these interfaces, and the additional parts such as routing, but these should be quicker to implement now some is done, although these interfaces are quite large.
+Work on the netlink API is progressing. You can now do `print(S.get_interfaces()` to get something much like ifconfig returns, and all the raw data is there as Lua tables. You can then modify these, and add IP addresses, similarly for routes. There is also a raw netlink interface, and you can create new interfaces. There is a lot more functionality that netlink needs to provide, but this is now mostly a matter of configuration. The API needs more work still. Netlink documentation is pretty bad. Useful resources: [blog post](http://maz-programmersdiary.blogspot.co.uk/2011/09/netlink-sockets.html)
 
 There is also a lot of the `ioctl` interfaces to implement, which are very miscellaneous. Mostly you just need some constants and typecasting, but helper functions are probably useful.
 
@@ -80,23 +82,19 @@ File descriptors are returned as a type not an integer. This is because they are
 
 String conversions are not done automatically, you get a buffer back, you have to force a conversion. This is because interning strings is expensive if you do not need it. However if you do not supply a buffer for the return value, you will get a string in general as more useful.
 
-Many functions that return structs return metatypes exposing additional methods, so you get the raw values eg `st_size` and a Lua number as `size`, and possibly some extra helpful methods, like `major` and `minor` from stat. As these are metamethods they have no overhead, so more can be added to make the interfaces easier to use.
+Many functions that return structs return metatypes exposing additional methods, so you get the raw values eg `st_size` and a Lua number as `size`, and possibly some extra helpful methods. As these are (ffi) metamethods they have no overhead, so more can be added to make the interfaces easier to use.
 
-Constants should all be available, eg `L.SEEK_SET` etc. You can add to combine them. They are also available as strings, so "SEEK\_SET" will be converted to S.SEEK\_SET. You can miss off the "SEEK\_" prefix, and they are not case sensitive, so you can just use `fd:lseek(offset, "set")` for more concise and readable use. If multiple flags are allowed, they can be comma separated for logical OR, such as `S.mmap(nil, size, "read", "private, anonymous", -1, 0)`. Note that there is some namespacing overlap, so some invalid flags can be used. Perhaps we should define shorter sets as a table when this could happen.
+Constants should all be available, eg `c.SEEK.SET` etc. The constant tables will also let you combine flags where appropriate and you can use lower case, so `c.O["rdonly, create"]` is the same as the bitwise or of `c.O.RDONLY` and `c.O.CREAT`. When you call a function, you can just pass the string, as `fd = S.open("file", "rdonly, creat")` which makes things much more concise.
 
-You do not need to use the numbered versions of functions, eg dup can do dup2 or dup3 by adding more arguments
+You do not generally need to use the numbered versions of functions, eg dup can do dup2 or dup3 by adding more arguments
 
-Standard convenience macros are also provided, eg S.major(dev) to extract a major number from a device number. Generally metamethods are also provided for these.
-
-`bind` does not require a length for the address type length, as it can work this out dynamically.
-
-`uname` returns a Lua table with the returned strings in it. Similarly `getdents` returns directory entries as a table. Other functions such as `poll` return an ffi metatype that behaves like a Lua array, ie is 1-indexed and has a `#` length method, which wraps the underlying C structure.
+Types are key, as these encapsulate a lot of functionality, and easy to use constructors and helpful methods. For example you can create the `in_addr` type with `addr = t.in_addr("127.0.0.1")`.
 
 The test cases are good examples until I do better documentation!
 
-A few functions have arguments in a different order to make optional ones easier. This is a bit confusing sometimes, so check the examples or source code.
+A very few functions have arguments in a different order to make optional ones easier. This is a bit confusing sometimes, so check the examples or source code.
 
-It would be nice to be API compatible with other projects, especially Luaposix, luasocket, nixio. I should have probably looked at these before I started, but things can be changed. Startde some nixio compatibility, in progress.
+It would be nice to be API compatible with other projects, especially Luaposix, luasocket, nixio. Unfortunately none of these seem to have test suites.
 
 ### Performance
 
@@ -106,19 +104,16 @@ There is an example epoll script that you can test with Apachebench (in the exam
 
 ### Issues
 
-Siginfo support in sigaction not there yet, as confused by the kernel API.
+There will no doubt be bugs and missing features, please report them if you find them. Also API design issues.
 
-only some of aio is working, needs some debugging before being used. Also all the iocb functions should be replaced with metatypes eg getiocb, getiocbs.
+### Missing functions
 
-There will no doubt be bugs, please report them if you find them.
+This list is possibly out of date.
 
-### Missing functions etc
-
-pselect, ppoll
 timer\_create, timer\_getoverrun, clock\_adjtime
 sigqueue,
 capset, capget
-pivot\_root, init\_module, delete\_module, query\_module, get_\kernel\_syms, swapon, swapoff
+init\_module, delete\_module, query\_module, get_\kernel\_syms, swapon, swapoff
 iopl, ioperm
 futex, set\_robust\_list, get\_robust\_list
 getrusage, ptrace
@@ -156,27 +151,9 @@ These now work and have tests, the 64 bit operations are always used on 32 bit a
 
 Note that fcntl64 has not been changed yet, as we have not defined the flock structure which is the change, and it is wrapped by glibc. statfs is also wrapped by glibc.
 
-### uid size.
-Linux 2.4 increased the size of user and group IDs from 16 to 32 bits.  Tosupport this change, a range of system calls were added (e.g., chown32(2),getuid32(2), getgroups32(2), setresuid32(2)), superseding earlier calls ofthe same name without the "32" suffix.
-
-The glibc wrappers hide this, and call the 32 bit calls anyway, so should be ok.
-
-## netlink
-Allow configuring and getting properties by name. Allow get for just one interface.
-
-Netlink documentation is pretty bad. Useful resources: [blog post](http://maz-programmersdiary.blogspot.co.uk/2011/09/netlink-sockets.html)
-
-Make commands that look more like `ip`, or as methods of the interface objects, or both. Currently adding metamethods, eg setflags.
-
-Currently support get, add and delete for interfaces, routes and addresses, although functionality not fully complete even for these, and API not finalized.
-
-## nixio compatibility
-
-Current plan is to have the same level of functionality, but not worry about except compatibility for now. I can't find a test suite, and the API choice does not seem very well thought out.
-
 ## TODO
 
-Misc list of ideas, no particular order
+Misc list of ideas, no particular order. See also notes in code.
 
 1. non blocking netlink functions ie return EAGAIN but can resume.
 2. futex support. Needs some assembly support.
@@ -208,4 +185,5 @@ Misc list of ideas, no particular order
 28. use S.if_nametoindex to convert interface names to numbers in nl where number not.
 29. performance counters
 30. define a bitshift function that works correctly with unsigned output.
+31. garbage collect mmap?
 
