@@ -223,7 +223,6 @@ arch.SYS = {
   pivot_root	  = 217,
   mincore	  = 218,
   madvise	  = 219,
-  madvise1	  = 219,
   getdents64	  = 220,
   fcntl64	  = 221,
   gettid	  = 224,
