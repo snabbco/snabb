@@ -110,6 +110,7 @@ print [[
 #define _LARGE_FILES 1
 #define __USE_FILE_OFFSET64
 
+#include <limits.h>
 #include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
