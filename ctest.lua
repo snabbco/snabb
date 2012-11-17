@@ -177,10 +177,11 @@ local nm = {
   SIG = "SIG",
   EPOLL = "EPOLL",
   STD = "STD",
-  MODE = "S_",
+  MODE = "S_I",
   MSYNC = "MS_",
   W = "W",
   POLL = "POLL",
+  S_I = "S_I",
 }
 
 for k, v in pairs(c) do

@@ -114,7 +114,7 @@ test_open_close = {
   end,
   test_openat = function()
     local dfd = S.open(".")
-    local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "irwxu"))
+    local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "rwxu"))
     assert(dfd:unlinkat(tmpfile))
     assert(fd:close())
     assert(dfd:close())
@@ -229,19 +229,19 @@ test_read_write = {
     assert(fd:close())
   end,
   test_readfile_writefile = function()
-    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    assert(S.writefile(tmpfile, teststring, "RWXU"))
     local ss = assert(S.readfile(tmpfile))
     assert_equal(ss, teststring, "readfile should get back what writefile wrote")
     assert(S.unlink(tmpfile))
   end,
   test_mapfile = function()
-    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    assert(S.writefile(tmpfile, teststring, "RWXU"))
     local ss = assert(S.mapfile(tmpfile))
     assert_equal(ss, teststring, "mapfile should get back what writefile wrote")
     assert(S.unlink(tmpfile))
   end,
   test_readv_writev = function()
-    local fd = assert(S.open(tmpfile, "rdwr,creat", "irwxu"))
+    local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local n = assert(fd:writev{"test", "ing", "writev"})
     assert_equal(n, 13, "expect length 13")
     assert(fd:seek())
@@ -255,7 +255,7 @@ test_read_write = {
   end,
   test_preadv_pwritev = function()
     local offset = largeval
-    local fd = assert(S.open(tmpfile, "rdwr,creat", "irwxu"))
+    local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
     assert_equal(n, 13, "expect length 13")
     local b1, b2, b3 = t.buffer(6), t.buffer(4), t.buffer(3)
@@ -290,7 +290,7 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_link = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.link(tmpfile, tmpfile2))
     assert(S.unlink(tmpfile2))
     assert(S.unlink(tmpfile))
@@ -298,7 +298,7 @@ test_file_operations = {
   end,
   test_linkat = function()
     local dirfd = assert(S.open("."))
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.linkat(dirfd, tmpfile, dirfd, tmpfile2, "symlink_follow"))
     assert(S.unlink(tmpfile2))
     assert(S.unlink(tmpfile))
@@ -306,7 +306,7 @@ test_file_operations = {
     assert(dirfd:close())
   end,
   test_symlink = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.symlink(tmpfile, tmpfile2))
     local s = assert(S.readlink(tmpfile2))
     assert_equal(s, tmpfile, "should be able to read symlink")
@@ -316,7 +316,7 @@ test_file_operations = {
   end,
   test_symlinkat = function()
     local dirfd = assert(S.open("."))
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.symlinkat(tmpfile, dirfd, tmpfile2))
     local s = assert(S.readlinkat(dirfd, tmpfile2))
     assert_equal(s, tmpfile, "should be able to read symlink")
@@ -329,31 +329,31 @@ test_file_operations = {
     S.sync() -- cannot fail...
   end,
   test_fchmod = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
-    assert(fd:fchmod("IRUSR, IWUSR"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:fchmod("RUSR, WUSR"))
     local st = fd:stat()
-    assert_equal(st.mode, c.S["IFREG, IRUSR, IWUSR"]) -- TODO should be better way to test
+    assert_equal(st.mode, c.S_I["FREG, RUSR, WUSR"]) -- TODO should be better way to test
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
   test_chmod = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
-    assert(S.chmod(tmpfile, "IRUSR, IWUSR"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.chmod(tmpfile, "RUSR, WUSR"))
     assert(S.access(tmpfile, "rw"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
   test_fchmodat = function()
     local dirfd = assert(S.open("."))
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
-    assert(dirfd:fchmodat(tmpfile, "IRUSR, IWUSR"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(dirfd:fchmodat(tmpfile, "RUSR, WUSR"))
     assert(S.access(tmpfile, "rw"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
     assert(dirfd:close())
   end,
   test_chown_root = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.chown(tmpfile, 66, 55))
     local stat = S.stat(tmpfile)
     assert_equal(stat.uid, 66, "expect uid changed")
@@ -362,13 +362,13 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_chown = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.chown(tmpfile)) -- unchanged
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
   test_fchown_root = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:chown(66, 55))
     local stat = fd:stat()
     assert_equal(stat.uid, 66, "expect uid changed")
@@ -386,7 +386,7 @@ test_file_operations = {
   end,
   test_fchownat_root = function()
     local dirfd = assert(S.open("."))
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(dirfd:fchownat(tmpfile, 66, 55, "symlink_nofollow"))
     local stat = S.stat(tmpfile)
     assert_equal(stat.uid, 66, "expect uid changed")
@@ -396,7 +396,7 @@ test_file_operations = {
     assert(dirfd:close())
   end,
   test_sync = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:fsync())
     assert(fd:fdatasync())
     assert(fd:sync()) -- synonym
@@ -406,7 +406,7 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_seek = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     local offset = 1
     local n
     n = assert(fd:lseek(offset, "set"))
@@ -424,7 +424,7 @@ test_file_operations = {
     assert(err.badf, "bad file descriptor")
   end,
   test_mkdir_rmdir = function()
-    assert(S.mkdir(tmpfile, "IRWXU"))
+    assert(S.mkdir(tmpfile, "RWXU"))
     assert(S.rmdir(tmpfile))
   end,
   test_chdir = function()
@@ -438,7 +438,7 @@ test_file_operations = {
   end,
   test_getcwd_long = function()
     local cwd = assert(S.getcwd())
-    assert(S.mkdir(longfile, "IRWXU"))
+    assert(S.mkdir(longfile, "RWXU"))
     assert(S.chdir(longfile))
     local nd = assert(S.getcwd())
     assert_equal(nd, cwd .. "/" .. longfile, "expect to get filename plus cwd")
@@ -447,12 +447,12 @@ test_file_operations = {
   end,
   test_mkdirat_unlinkat = function()
     local fd = assert(S.open("."))
-    assert(fd:mkdirat(tmpfile, "IRWXU"))
+    assert(fd:mkdirat(tmpfile, "RWXU"))
     assert(fd:unlinkat(tmpfile, "removedir"))
     assert(not fd:fstatat(tmpfile), "expect dir gone")
   end,
   test_rename = function()
-    assert(S.writefile(tmpfile, teststring, "IRWXU")) -- TODO just use touch instead
+    assert(S.writefile(tmpfile, teststring, "RWXU")) -- TODO just use touch instead
     assert(S.rename(tmpfile, tmpfile2))
     assert(not S.stat(tmpfile))
     assert(S.stat(tmpfile2))
@@ -460,7 +460,7 @@ test_file_operations = {
   end,
   test_renameat = function()
     local fd = assert(S.open("."))
-    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    assert(S.writefile(tmpfile, teststring, "RWXU"))
     assert(S.renameat(fd, tmpfile, fd, tmpfile2))
     assert(not S.stat(tmpfile))
     assert(S.stat(tmpfile2))
@@ -498,20 +498,20 @@ test_file_operations = {
   end,
   test_fstatat = function()
     local fd = assert(S.open("."))
-    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    assert(S.writefile(tmpfile, teststring, "RWXU"))
     local stat = assert(fd:fstatat(tmpfile))
     assert(stat.size == #teststring, "expect length to br what was written")
     assert(fd:close())
     assert(S.unlink(tmpfile))
   end,
   test_fstatat_fdcwd = function()
-    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    assert(S.writefile(tmpfile, teststring, "RWXU"))
     local stat = assert(S.fstatat("fdcwd", tmpfile, nil, "no_automount, symlink_nofollow"))
     assert(stat.size == #teststring, "expect length to br what was written")
     assert(S.unlink(tmpfile))
   end,
   test_truncate = function()
-    assert(S.writefile(tmpfile, teststring, "IRWXU"))
+    assert(S.writefile(tmpfile, teststring, "RWXU"))
     local stat = assert(S.stat(tmpfile))
     assert_equal(stat.size, #teststring, "expect to get size of written string")
     assert(S.truncate(tmpfile, 1))
@@ -525,7 +525,7 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_fadvise_etc = function() -- could split
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
     assert(fd:fadvise("random"))
     local ok, err = fd:fallocate("keep_size", 0, 4096)
@@ -554,13 +554,13 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_inotify = function()
-    assert(S.mkdir(tmpfile, "IRWXU")) -- do in directory so ok to run in parallel
+    assert(S.mkdir(tmpfile, "RWXU")) -- do in directory so ok to run in parallel
     local fd = assert(S.inotify_init("cloexec, nonblock"))
     local wd = assert(fd:inotify_add_watch(tmpfile, "create, delete"))
     assert(S.chdir(tmpfile))
     local n, err = fd:inotify_read()
     assert(err.again, "no inotify events yet")
-    assert(S.writefile(tmpfile, "test", "IRWXU"))
+    assert(S.writefile(tmpfile, "test", "RWXU"))
     assert(S.unlink(tmpfile))
     n = assert(fd:inotify_read())
     assert_equal(#n, 2, "expect 2 events now")
@@ -574,7 +574,7 @@ test_file_operations = {
     assert(S.rmdir(tmpfile))
   end,
   test_xattr = function()
-    assert(S.writefile(tmpfile, "test", "IRWXU"))
+    assert(S.writefile(tmpfile, "test", "RWXU"))
     local l, err = S.listxattr(tmpfile)
     assert(l or err.NOTSUP, "expect to get xattr or not supported on fs")
     if l then
@@ -634,7 +634,7 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
   end,
   test_mknod_chr_root = function()
-    assert(S.mknod(tmpfile, "ifchr,irwxu", t.device(1, 5)))
+    assert(S.mknod(tmpfile, "fchr,rwxu", t.device(1, 5)))
     local stat = assert(S.stat(tmpfile))
     assert(stat.ischr, "expect to be a character device")
     assert_equal(stat.rdev:major(), 1 , "expect major number to be 1")
@@ -644,7 +644,7 @@ test_file_operations = {
   end,
   test_mknodat_fifo = function()
     local fd = assert(S.open("."))
-    assert(fd:mknodat(tmpfile, "ififo,irwxu"))
+    assert(fd:mknodat(tmpfile, "fifo,rwxu"))
     local stat = assert(S.stat(tmpfile))
     assert(stat.isfifo, "expect to be a fifo")
     assert(fd:close())
@@ -652,14 +652,14 @@ test_file_operations = {
   end,
   test_mkfifoat = function()
     local fd = assert(S.open("."))
-    assert(fd:mkfifoat(tmpfile, "irwxu"))
+    assert(fd:mkfifoat(tmpfile, "rwxu"))
     local stat = assert(S.stat(tmpfile))
     assert(stat.isfifo, "expect to be a fifo")
     assert(fd:close())
     assert(S.unlink(tmpfile))
   end,
   test_mkfifo = function()
-    assert(S.mkfifo(tmpfile, "irwxu"))
+    assert(S.mkfifo(tmpfile, "rwxu"))
     local stat = assert(S.stat(tmpfile))
     assert(stat.isfifo, "expect to be a fifo")
     assert(S.unlink(tmpfile))
@@ -668,7 +668,7 @@ test_file_operations = {
 
 test_largefile = {
   test_seek64 = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     local loff = t.loff(2^34)
     local offset = 2^34 -- should work with Lua numbers up to 56 bits, above that need explicit 64 bit type.
     local n
@@ -684,7 +684,7 @@ test_largefile = {
     assert(fd:close())
   end,
   test_ftruncate64 = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     local offset = 2^35
     assert(fd:truncate(offset), "64 bit ftruncate should be ok")
     local st = assert(fd:stat(), "64 bit stat should be ok")
@@ -693,7 +693,7 @@ test_largefile = {
     assert(fd:close())
   end,
   test_truncate64 = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     local offset = 2^35
     assert(S.truncate(tmpfile, offset), "64 bit truncate should be ok")
     local st = assert(S.stat(tmpfile), "64 bit stat should be ok")
@@ -705,28 +705,28 @@ test_largefile = {
 
 test_locking = {
   test_fcntl_setlk = function()
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
     assert(fd:truncate(4096))
     assert(fd:fcntl("setlk", {type = "rdlck", whence = "set", start = 0, len = 4096}))
     assert(fd:close())
   end,
   test_lockf_lock = function()
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
     assert(fd:truncate(4096))
     assert(fd:lockf("lock", 4096))
     assert(fd:close())
   end,
   test_lockf_tlock = function()
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
     assert(fd:truncate(4096))
     assert(fd:lockf("tlock", 4096))
     assert(fd:close())
   end,
   test_lockf_ulock = function()
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
     assert(fd:truncate(4096))
     assert(fd:lockf("lock", 4096))
@@ -734,7 +734,7 @@ test_locking = {
     assert(fd:close())
   end,
   test_lockf_test = function()
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "IRWXU"))
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
     assert(fd:truncate(4096))
     assert(fd:lockf("test", 4096))
@@ -771,7 +771,7 @@ test_sockets_pipes = {
     local p = assert(S.pipe("nonblock"))
     local pp = assert(S.pipe("nonblock"))
     local s = assert(S.socketpair("unix", "stream, nonblock"))
-    local fd = assert(S.open(tmpfile, "rdwr, creat", "IRWXU"))
+    local fd = assert(S.open(tmpfile, "rdwr, creat", "RWXU"))
     assert(S.unlink(tmpfile))
 
     local str = teststring
@@ -979,9 +979,9 @@ test_mmap = {
 test_misc = {
   test_umask = function()
     local mask
-    mask = S.umask("IWGRP, IWOTH")
-    mask = S.umask("IWGRP, IWOTH")
-    assert_equal(mask, c.MODE.IWGRP + c.MODE.IWOTH, "umask not set correctly")
+    mask = S.umask("WGRP, WOTH")
+    mask = S.umask("WGRP, WOTH")
+    assert_equal(mask, c.MODE.WGRP + c.MODE.WOTH, "umask not set correctly")
   end,
   test_sysinfo = function()
     local i = assert(S.sysinfo()) -- TODO test values returned for some sanity
@@ -1708,7 +1708,7 @@ test_aio = {
   test_aio = function()
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
-    local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- use O_DIRECT or aio may not
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- use O_DIRECT or aio may not
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
@@ -1722,7 +1722,7 @@ test_aio = {
   test_aio_cancel = function()
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
-    local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU")
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU")
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
@@ -1739,7 +1739,7 @@ test_aio = {
   test_aio_eventfd = function()
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
-    local fd = S.open(tmpfile, "creat, direct, rdwr", "IRWXU") -- need to use O_DIRECT for aio to work
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- need to use O_DIRECT for aio to work
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
@@ -1836,7 +1836,7 @@ test_processes = {
 [ $PATH = "/bin:/usr/bin" ] || (echo "shell assert $PATH"; exit 1)
 
 ]]
-      fork_assert(S.writefile(efile, script, "IRWXU"))
+      fork_assert(S.writefile(efile, script, "RWXU"))
       fork_assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
       -- never reach here
       os.exit()
@@ -2009,7 +2009,7 @@ test_filesystem = {
     assert(fd:close())
   end,
   test_futimens = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:futimens())
     local st1 = fd:stat()
     assert(fd:futimens{"omit", "omit"})
@@ -2019,7 +2019,7 @@ test_filesystem = {
     assert(fd:close())
   end,
   test_utimensat = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     local dfd = assert(S.open("."))
     assert(S.utimensat(nil, tmpfile))
     local st1 = fd:stat()
@@ -2031,7 +2031,7 @@ test_filesystem = {
     assert(dfd:close())
   end,
   test_utime = function()
-    local fd = assert(S.creat(tmpfile, "IRWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     local st1 = fd:stat()
     assert(S.utime(tmpfile, 100, 200))
     local st2 = fd:stat()

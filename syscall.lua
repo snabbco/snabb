@@ -400,16 +400,16 @@ end
 
 function S.mknod(pathname, mode, dev)
   if type(dev) == "table" then dev = dev.dev end
-  return retbool(C.mknod(pathname, c.S[mode], dev or 0))
+  return retbool(C.mknod(pathname, c.S_I[mode], dev or 0))
 end
 function S.mknodat(fd, pathname, mode, dev)
   if type(dev) == "table" then dev = dev.dev end
-  return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S[mode], dev or 0))
+  return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S_I[mode], dev or 0))
 end
 
 -- mkfifo is from man(3), add for convenience
-function S.mkfifo(path, mode) return S.mknod(path, bit.bor(c.S[mode], c.S.IFIFO)) end
-function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(c.S[mode], c.S.IFIFO), 0) end
+function S.mkfifo(path, mode) return S.mknod(path, bit.bor(c.MODE[mode], c.S_I.FIFO)) end
+function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(c.MODE[mode], c.S_I.FIFO), 0) end
 
 function S.nice(inc) return retnume(C.nice, inc) end
 -- NB glibc is shifting these values from what strace shows, as per man page, kernel adds 20 to make these values positive...
