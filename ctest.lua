@@ -18,6 +18,9 @@ ctypes["struct rlimit64"] = nil
 ctypes["struct mq_attr"] = nil
 ctypes["int errno"] = nil
 
+-- missing on ARM
+c.CAP = nil
+
 -- fake constants
 c.MS.RO = nil
 c.MS.RW = nil
@@ -132,7 +135,6 @@ print [[
 #include <sched.h>
 #include <sys/xattr.h>
 #include <linux/if_arp.h>
-#include <sys/capability.h>
 #include <linux/sched.h>
 #include <termios.h>
 #include <unistd.h>
