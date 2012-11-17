@@ -124,7 +124,6 @@ print [[
 #include <signal.h>
 #include <sys/utsname.h>
 #include <time.h>
-#include <linux/aio_abi.h>
 #include <sys/resource.h>
 #include <sys/sysinfo.h>
 #include <sys/time.h>
@@ -132,17 +131,11 @@ print [[
 #include <netinet/ip.h>
 #include <poll.h>
 #include <sys/signalfd.h>
-#include <linux/rtnetlink.h>
 #include <sys/vfs.h>
 #include <sys/timex.h>
-#include <linux/posix_types.h>
-#include <linux/if.h>
-#include <linux/if_bridge.h>
 #include <sys/mman.h>
 #include <sched.h>
 #include <sys/xattr.h>
-#include <linux/if_arp.h>
-#include <linux/sched.h>
 #include <termios.h>
 #include <unistd.h>
 #include <sys/prctl.h>
@@ -151,14 +144,22 @@ print [[
 #include <net/route.h>
 #include <sys/inotify.h>
 #include <sys/wait.h>
+#include <dirent.h>
+#include <sys/eventfd.h>
+#include <syscall.h>
+
+#include <linux/aio_abi.h>
+#include <linux/reboot.h>
+#include <linux/falloc.h>
 #include <linux/mman.h>
 #include <linux/veth.h>
 #include <linux/sockios.h>
-#include <dirent.h>
-#include <linux/reboot.h>
-#include <linux/falloc.h>
-#include <sys/eventfd.h>
-#include <syscall.h>
+#include <linux/if_arp.h>
+#include <linux/sched.h>
+#include <linux/posix_types.h>
+#include <linux/if.h>
+#include <linux/if_bridge.h>
+#include <linux/rtnetlink.h>
 
 int main(int argc, char **argv) {
 ]]
