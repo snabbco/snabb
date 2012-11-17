@@ -23,6 +23,7 @@ c.CAP = nil
 c.AF.NFC = nil
 c.PR.SET_PTRACER = nil
 c.MAP["32BIT"] = nil
+c.SYS.sync_file_range = nil
 
 -- fake constants
 c.MS.RO = nil
