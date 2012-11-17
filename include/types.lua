@@ -226,7 +226,7 @@ for k, v in pairs(c.E) do
   errsyms[v] = k
 end
 
-metatype("error", "struct {int errno;}", {
+t.error = ffi.metatype("struct {int errno;}", {
   __tostring = function(e) return strerror(e.errno) end,
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
