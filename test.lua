@@ -109,7 +109,7 @@ test_open_close = {
   test_open_nofile = function()
     local fd, err = S.open("/tmp/file/does/not/exist", "rdonly")
     assert(err, "expected open to fail on file not found")
-    assert(err.ENOENT, "expect ENOENT from open non existent file")
+    assert(err.NOENT, "expect NOENT from open non existent file")
     assert(tostring(err) == "No such file or directory", "should get string error message")
   end,
   test_openat = function()
@@ -122,7 +122,7 @@ test_open_close = {
   test_close_invalid_fd = function()
     local ok, err = S.close(127)
     assert(err, "expected to fail on close invalid fd")
-    assert_equal(err.errno, c.E.EBADF, "expect EBADF from invalid numberic fd")
+    assert_equal(err.errno, c.E.BADF, "expect BADF from invalid numberic fd")
   end,
   test_open_valid = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
@@ -145,7 +145,7 @@ test_open_close = {
     assert(fd:close())
     local fd, err = S.close(fileno)
     assert(err, "expected to fail on close already closed fd")
-    assert(err.badf, "expect EBADF from invalid numberic fd")
+    assert(err.badf, "expect BADF from invalid numberic fd")
   end,
   test_access = function()
     assert(S.access("/dev/null", "r"), "expect access to say can read /dev/null")
@@ -168,7 +168,7 @@ test_open_close = {
     collectgarbage("collect")
     local _, err = S.read(fileno, buf, size)
     assert(err, "should not be able to read from fd after gc")
-    assert(err.EBADF, "expect EBADF from already closed fd")
+    assert(err.BADF, "expect BADF from already closed fd")
   end,
   test_fd_nogc = function()
     local fd = assert(S.open("/dev/zero", "RDONLY"))
@@ -202,7 +202,7 @@ test_read_write = {
     local fd = assert(S.open("/dev/zero"))
     local n, err = fd:write(buf, size)
     assert(err, "should not be able to write to file opened read only")
-    assert(err.EBADF, "expect EBADF when writing read only file")
+    assert(err.BADF, "expect BADF when writing read only file")
     assert(fd:close())
   end,
   test_write = function()
@@ -529,9 +529,9 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:fadvise("random"))
     local ok, err = fd:fallocate("keep_size", 0, 4096)
-    assert(ok or err.EOPNOTSUPP or err.ENOSYS, "expect fallocate to succeed if supported")
+    assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported")
     ok, err = fd:posix_fallocate(0, 8192)
-    assert(ok or err.EOPNOTSUPP or err.ENOSYS, "expect posix_fallocate to succeed if supported")
+    assert(ok or err.OPNOTSUPP or err.NOSYS, "expect posix_fallocate to succeed if supported")
     assert(fd:readahead(0, 4096))
     assert(fd:close())
   end,
@@ -576,7 +576,7 @@ test_file_operations = {
   test_xattr = function()
     assert(S.writefile(tmpfile, "test", "IRWXU"))
     local l, err = S.listxattr(tmpfile)
-    assert(l or err.ENOTSUP, "expect to get xattr or not supported on fs")
+    assert(l or err.NOTSUP, "expect to get xattr or not supported on fs")
     if l then
       local fd = assert(S.open(tmpfile, "rdwr"))
       assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
@@ -586,7 +586,7 @@ test_file_operations = {
       assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
       local nn = #l
       local ok, err = S.setxattr(tmpfile, "user.test", "42", "create")
-      if ok then -- likely to get err.ENOTSUP here if fs not mounted with user_xattr
+      if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr
         l = assert(S.listxattr(tmpfile))
         assert(#l == nn + 1, "expect another attribute set")
         assert(S.lsetxattr(tmpfile, "user.test", "44", "replace"))
@@ -600,13 +600,13 @@ test_file_operations = {
         s = assert(fd:fgetxattr("user.test2"))
         assert(s == "42", "expect to read set value of xattr")
         local s, err = fd:fgetxattr("user.test3")
-        assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from non existent xattr")
+        assert(err and err.nodata, "expect to get NODATA (=NOATTR) from non existent xattr")
         s = assert(S.removexattr(tmpfile, "user.test"))
         s = assert(S.lremovexattr(tmpfile, "user.test2"))
         l = assert(S.listxattr(tmpfile))
         assert(#l == nn, "expect no xattr now")
         local s, err = fd:fremovexattr("user.test3")
-        assert(err and err.nodata, "expect to get ENODATA (=ENOATTR) from remove non existent xattr")
+        assert(err and err.nodata, "expect to get NODATA (=NOATTR) from remove non existent xattr")
         -- table helpers
         local tt = assert(S.xattr(tmpfile))
         local n = 0
@@ -764,7 +764,7 @@ test_sockets_pipes = {
     local fds = assert(S.pipe())
     assert(fds:setblocking(false))
     local r, err = fds:read()
-    assert(err.EAGAIN, "expect EAGAIN")
+    assert(err.AGAIN, "expect AGAIN")
     assert(fds:close())
   end,
   test_tee_splice = function()
@@ -801,7 +801,7 @@ test_sockets_pipes = {
       n = assert(s[2]:read())
       assert(#n == #str)
     else
-      assert(err.ENOSYS, "only allowed error is syscall not suported, as valgrind gives this")
+      assert(err.NOSYS, "only allowed error is syscall not suported, as valgrind gives this")
     end
 
     assert(fd:close())
@@ -937,7 +937,7 @@ test_mmap = {
     local size = 4096
     local mem, err = S.mmap(pt.void(1), size, "read", "fixed, anonymous", -1, 0)
     assert(err, "expect non aligned fixed map to fail")
-    assert(err.EINVAL, "expect non aligned map to return EINVAL")
+    assert(err.INVAL, "expect non aligned map to return EINVAL")
   end,
   test_mmap = function()
     local size = 4096
@@ -1002,7 +1002,7 @@ test_misc = {
     local r = assert(S.getrlimit("nofile"))
     assert(S.setrlimit("nofile", {0, r.rlim_max}))
     local fd, err = S.open("/dev/zero", "rdonly")
-    assert(err.EMFILE, "should be over rlimit")
+    assert(err.MFILE, "should be over rlimit")
     assert(S.setrlimit("nofile", r)) -- reset
     fd = assert(S.open("/dev/zero", "rdonly"))
     assert(fd:close())
@@ -1090,7 +1090,7 @@ test_misc = {
   end,
   test_bridge = function()
     local ok, err = S.bridge_add("br0")
-    assert(ok or err.ENOPKG or err.EPERM, err) -- ok not to to have bridge in kernel, may not be root
+    assert(ok or err.NOPKG or err.PERM, err) -- ok not to to have bridge in kernel, may not be root
     if ok then
       local i = assert(nl.interfaces())
       assert(i.br0)
@@ -1103,7 +1103,7 @@ test_misc = {
   end,
   test_bridge_delete_fail = function()
     local ok, err = S.bridge_del("nosuchbridge99")
-    assert(not ok and (err.ENOPKG or err.EPERM or err.ENXIO), err)
+    assert(not ok and (err.NOPKG or err.PERM or err.NXIO), err)
   end,
 
 --[[
@@ -1164,7 +1164,7 @@ test_sockets = {
     assert(c:fcntl("setfd", "cloexec"))
     local ok, err = c:connect(sa)
     assert(not ok, "connect should fail here")
-    assert(err.EINPROGRESS, "have not accepted should get Operation in progress")
+    assert(err.INPROGRESS, "have not accepted should get Operation in progress")
     local a = assert(s:accept()) --TODO this blocks on ARM, I think error in connect
     -- a is a table with the fd, but also the inbound connection details
     assert(a.addr.sin_family == 2, "expect ipv4 connection")
@@ -1228,7 +1228,7 @@ test_sockets = {
     assert(S.signal("pipe", "ign"))
     assert(sv[2]:close())
     local n, err = sv[1]:write("will get sigpipe")
-    assert(err.EPIPE, "should get sigpipe")
+    assert(err.PIPE, "should get sigpipe")
     assert(sv[1]:close())
   end,
   test_udp_socket = function()
@@ -1263,7 +1263,7 @@ test_sockets = {
       assert(f.addr.port == serverport, "should be able to get server port in recvfrom")
       assert(c:close())
       assert(s:close())
-    else assert(err.EAFNOSUPPORT, err) end -- fairly common to not have ipv6 in kernel
+    else assert(err.AFNOSUPPORT, err) end -- fairly common to not have ipv6 in kernel
   end,
   test_ipv6_names = function()
     local sa = assert(t.sockaddr_in6(1234, "2002::4:5"))
@@ -1412,7 +1412,7 @@ test_netlink = {
     local i = assert(nl.interfaces())
     assert(i.lo, "expect to find lo")
     local ok, err = nl.newlink(i.lo.index, 0, 0, 0, "address", "46:9d:c9:06:dd:dd")
-    assert(not ok and err and (err.EPERM or err.EOPNOTSUPP), "should not be able to change macaddr on lo")
+    assert(not ok and err and (err.PERM or err.OPNOTSUPP), "should not be able to change macaddr on lo")
   end,
   test_newlink_error_root = function()
     local ok, err = nl.newlink(-1, 0, "up", "up")
@@ -2086,7 +2086,7 @@ test_misc_root = {
   end,
   test_bridge = function()
     local ok, err = S.bridge_add("br0")
-    assert(ok or err.ENOPKG, err) -- ok not to to have bridge in kernel
+    assert(ok or err.NOPKG, err) -- ok not to to have bridge in kernel
     if ok then
       local i = assert(nl.interfaces())
       assert(i.br0)

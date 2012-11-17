@@ -221,14 +221,17 @@ local function getfd(fd)
   return fd:getfd()
 end
 
+local errsyms = {} -- reverse lookup
+for k, v in pairs(c.E) do
+  errsyms[v] = k
+end
+
 metatype("error", "struct {int errno;}", {
   __tostring = function(e) return strerror(e.errno) end,
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
-    if k == 'lsym' then return errsyms[t.errno]:sub(2):lower() end
+    if k == 'lsym' then return errsyms[t.errno]:lower() end
     if c.E[k] then return c.E[k] == t.errno end
-    local uk = c.E['E' .. k:upper()]
-    if uk then return uk == t.errno end
   end,
   __new = function(tp, errno)
     if not errno then errno = ffi.errno() end

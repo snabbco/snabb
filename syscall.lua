@@ -31,12 +31,6 @@ local t, pt, s = S.t, S.pt, S.s
 local mt = {} -- metatables
 local meth = {}
 
--- reverse lookup tables from constants
-local errsyms = {} -- reverse lookup
-for k, v in pairs(c.E) do
-  errsyms[v] = k
-end
-
 -- makes code tidier TODO could make all types accept themselves as constructors
 local function istype(tp, x)
   if ffi.istype(tp, x) then return x else return false end
@@ -943,7 +937,7 @@ local function growattrbuf(f, a, b)
     else
       ret = tonumber(f(a, buffer, len))
     end
-    if ret == -1 and ffi.errno ~= c.E.ERANGE then return nil, t.error() end
+    if ret == -1 and ffi.errno ~= c.E.RANGE then return nil, t.error() end
     if ret == -1 then
       len = len * 2
       buffer = t.buffer(len)
@@ -1255,7 +1249,7 @@ function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, c.EFD[fl
 function S.eventfd_read(fd, value)
   if not value then value = t.uint64_1() end
   local ret = C.read(getfd(fd), value, 8)
-  if ret == -1 and ffi.errno() == c.E.EAGAIN then
+  if ret == -1 and ffi.errno() == c.E.AGAIN then
     value[0] = 0
     return 0
   end
@@ -1271,7 +1265,7 @@ end
 function S.signalfd_read(fd, ss)
   ss = istype(t.siginfos, ss) or t.siginfos(ss or 8)
   local ret, err = S.read(fd, ss.sfd, ss.bytes)
-  if ret == 0 or (err and err.EAGAIN) then return {} end
+  if ret == 0 or (err and err.AGAIN) then return {} end
   if not ret then return nil, err end
   ss.count = ret / s.signalfd_siginfo -- may not be full length
   return ss
@@ -1314,7 +1308,7 @@ end
 function S.timerfd_read(fd, buffer)
   if not buffer then buffer = t.uint64_1() end
   local ret, err = S.read(fd, buffer, 8)
-  if not ret and err.EAGAIN then return 0 end -- will never actually return 0
+  if not ret and err.AGAIN then return 0 end -- will never actually return 0
   if not ret then return nil, err end
   return tonumber(buffer[0])
 end

@@ -1994,14 +1994,14 @@ local IFNAMSIZ      = 16
 local IFHWADDRLEN   = 6
 
 -- errors
-c.E = {
+c.E = setmetatable({
   PERM          =  1,
   NOENT         =  2,
   SRCH          =  3,
   INTR          =  4,
   IO            =  5,
   NXIO          =  6,
-  2BIG          =  7,
+  -- 2BIG          =  7, -- bad name
   NOEXEC        =  8,
   BADF          =  9,
   CHILD         = 10,
@@ -2124,7 +2124,9 @@ c.E = {
   OWNERDEAD     = 130,
   NOTRECOVERABLE= 131,
   RFKILL        = 132,
-}
+}, stringflag)
+
+c.E["2BIG"]     =  7
 
 -- alternate names
 c.E.WOULDBLOCK    = c.E.EAGAIN
