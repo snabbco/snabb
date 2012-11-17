@@ -17,15 +17,6 @@ ctypes["sighandler_t"] = nil
 ctypes["struct rlimit64"] = nil
 ctypes["struct mq_attr"] = nil
 
--- fixes for constants
-c.__WALL = c.WALL; c.WALL = nil
-c.__WCLONE = c.WCLONE; c.WCLONE = nil
-
--- remove seccomp for now as no support on the ARM box
-for k, _ in pairs(c) do
-  if k:sub(1, 8) == 'SECCOMP_' then c[k] = nil end
-end
-
 -- fake constants
 c.MS.RO = nil
 c.MS.RW = nil
@@ -115,12 +106,19 @@ end
 
 -- test all the constants
 
+local nm = {
+  E = "E",
+  
+
+}
+
 for k, v in pairs(c) do
   if type(v) == "number" then
     print("assert(" .. k .. " == " .. v .. ");")
   elseif type(v) == "table" then
     for k2, v2 in pairs(v) do
-      print("assert(" .. k .. "_" .. k2 .. " == " .. tostring(v2) .. ");")
+      local name = nm[k] or k .. "_"
+      print("assert(" .. name .. k2 .. " == " .. tostring(v2) .. ");")
     end
   end
 end
