@@ -147,7 +147,7 @@ c.OPIPE = setmetatable({
   CLOEXEC   = octal('02000000'),
 }, multiflags)
 
--- modes and file types. note renamed second set from S_ to MODE_ plus note split
+-- modes and file types. note renamed second set from S_ to MODE_ but duplicated in S for stat
 c.S = setmetatable({
   IFMT   = octal('0170000'),
   IFSOCK = octal('0140000'),

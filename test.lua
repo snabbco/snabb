@@ -981,7 +981,7 @@ test_misc = {
     local mask
     mask = S.umask("IWGRP, IWOTH")
     mask = S.umask("IWGRP, IWOTH")
-    assert_equal(mask, c.S.IWGRP + c.S.IWOTH, "umask not set correctly")
+    assert_equal(mask, c.MODE.IWGRP + c.MODE.IWOTH, "umask not set correctly")
   end,
   test_sysinfo = function()
     local i = assert(S.sysinfo()) -- TODO test values returned for some sanity
