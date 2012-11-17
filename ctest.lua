@@ -90,6 +90,8 @@ c.AT_FDCWD = nil
 c.AT_ACCESSAT = nil
 c.NLMSG_GETLINK = nil
 c.SYS.fstatat = nil
+c.TFD = nil
+c.TFD_TIMER = nil
 
 if ffi.abi("64bit") then c.O.LARGEFILE = nil end
 
@@ -153,7 +155,6 @@ print [[
 #include <linux/sockios.h>
 #include <dirent.h>
 #include <linux/reboot.h>
-#include <sys/timerfd.h>
 #include <linux/falloc.h>
 #include <sys/eventfd.h>
 #include <syscall.h>
