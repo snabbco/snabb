@@ -18,8 +18,11 @@ ctypes["struct rlimit64"] = nil
 ctypes["struct mq_attr"] = nil
 ctypes["int errno"] = nil
 
--- missing on ARM
+-- missing on my ARM box
 c.CAP = nil
+c.AF.NFC = nil
+c.PR.SET_PTRACER = nil
+c.MAP["32BIT"] = nil
 
 -- fake constants
 c.MS.RO = nil
