@@ -14,7 +14,7 @@ This code is beta. Interfaces will change in future. The code is riddled with TO
 
 ## Requirements
 
-LuaJIT 2.0.0 or later. ARM (soft or hard float), x86 or AMD64 architectures; intend to support PPC and MIPS in future. Either glibc or [Musl libc](http://www.musl-libc.org/). Note that uClibc partially works but has some issues that are being resolved. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
+LuaJIT 2.0.0 or later. ARM (soft or hard float), x86 or AMD64 architectures; intend to support PPC and MIPS in future. Either glibc or [Musl libc](http://www.musl-libc.org/) or uClibc should work. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
 ## Release notes
 
