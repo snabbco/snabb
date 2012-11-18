@@ -20,6 +20,8 @@ ctypes["int errno"] = nil
 
 -- TODO seems to be an issue with sockaddr_storage (alignment difference?) on Musl, needs fixing
 ctypes["struct sockaddr_storage"] = nil
+-- TODO seems to be a size issue on Musl
+ctypes["struct siginfo"] = nil
 
 -- missing on my ARM box
 c.CAP = nil
