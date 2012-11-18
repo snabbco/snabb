@@ -93,6 +93,41 @@ c.SYS.fstatat = nil
 c.TFD = nil
 c.TFD_TIMER = nil
 
+-- this lot are not in uClibc/Musl at present
+c.ADJ.OFFSET_SS_READ = nil
+c.ADJ.NANO = nil
+c.ADJ.MICRO = nil
+c.ADJ.TAI = nil
+c.F.GETPIPE_SZ = nil
+c.F.GETOWN_EX = nil
+c.F.SETOWN_EX = nil
+c.F.SETPIPE_SZ = nil
+c.AF_RDS = nil
+c.MS.MOVE = nil
+c.MS.PRIVATE = nil
+c.MS.ACTIVE = nil
+c.MS.POSIXACL = nil
+c.MS.RELATIME = nil
+c.MS.NOUSER = nil
+c.MS.SLAVE = nil
+c.MS.I_VERSION = nil
+c.MS.KERNMOUNT = nil
+c.MS.SHARED = nil
+c.MS.STRICTATIME = nil
+c.MS.UNBINDABLE = nil
+c.MS.DIRSYNC = nil
+c.MS.SILENT = nil
+c.MS.REC = nil
+c.RLIMIT.RTTIME = nil
+c.UMOUNT.NOFOLLOW = nil
+c.STA.MODE = nil
+c.STA.CLK = nil
+c.STA.NANO = nil
+c.CLOCK.MONOTONIC_COARSE = nil
+c.CLOCK.REALTIME_COARSE = nil
+c.CLOCK.MONOTONIC_RAW = nil
+c.SOCK.DCCP = nil
+
 if ffi.abi("64bit") then c.O.LARGEFILE = nil end
 
 -- renamed constants
