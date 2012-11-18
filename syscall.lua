@@ -244,30 +244,27 @@ end
 -- missing in some uClibc versions as exported symbols. Note potentially all largefile operators should be here
 -- note example of how to split 64 bit syscall arguments on 32 bit platforms
 if ffi.abi("64bit") then
- function CC.preadv64(fd, iov, iovcnt, offset)
-    return C.syscall(c.SYS.preadv64, t.int(fd), pt.void(iov), t.int(iovcnt), t.loff(offset))
-  end
-  function CC.pwritev64(fd, iov, iovcnt, offset)
-    return C.syscall(c.SYS.pwritev64, t.int(fd), pt.void(iov), t.int(iovcnt), t.loff(offset))
-  end
   function CC.fallocate(fd, mode, offset, len)
     return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
   end
 else
- function CC.preadv64(fd, iov, iovcnt, offset)
-    local off2, off1 = t.u6432(offset):to32()
-    return C.syscall(c.SYS.preadv64, t.int(fd), pt.void(iov), t.int(iovcnt), t.uint32(off1), t.uint32(off2))
-  end
-  function CC.pwritev64(fd, iov, iovcnt, offset)
-    local off2, off1 = t.u6432(offset):to32()
-    return C.syscall(c.SYS.pwritev64, t.int(fd), pt.void(iov), t.int(iovcnt), t.uint32(off1), t.uint32(off2))
-  end
   function CC.fallocate(fd, mode, offset, len)
     local off2, off1 = t.u6432(offset):to32()
     local len2, len1 = t.u6432(len):to32()
     return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
   end
 end
+
+-- missing in uClibc. Note very odd split 64 bit arguments even on 64 bit platform.
+function CC.preadv64(fd, iov, iovcnt, offset)
+  local off2, off1 = t.i6432(offset):to32()
+  return C.syscall(c.SYS.preadv, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
+end
+function CC.pwritev64(fd, iov, iovcnt, offset)
+  local off2, off1 = t.i6432(offset):to32()
+  return C.syscall(c.SYS.pwritev, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
+end
+
 
 -- if not in libc replace
 
