@@ -1804,12 +1804,12 @@ function S.readfile(name, buffer, length)
 end
 
 function S.writefile(name, str, mode) -- write string to named file. specify mode if want to create file, silently ignore short writes
-  local f, err
-  if mode then f, err = S.creat(name, mode) else f, err = S.open(name, "wronly") end
-  if not f then return nil, err end
-  local n, err = f:write(str)
+  local fd, err
+  if mode then fd, err = S.creat(name, mode) else fd, err = S.open(name, "wronly") end
+  if not fd then return nil, err end
+  local n, err = S.write(fd, str)
   if not n then return nil, err end
-  local ok, err = f:close()
+  local ok, err = S.close(fd)
   if not ok then return nil, err end
   return true
 end
@@ -1818,13 +1818,13 @@ function S.dirfile(name, nodots) -- return the directory entries in a file, remo
   local fd, d, ok, err
   fd, err = S.open(name, "directory, rdonly")
   if err then return nil, err end
-  d, err = fd:getdents()
+  d, err = S.getdents(fd)
   if err then return nil, err end
   if nodots then
     d["."] = nil
     d[".."] = nil
   end
-  ok, err = fd:close()
+  ok, err = S.close(fd)
   if not ok then return nil, err end
   return d
 end
@@ -1935,7 +1935,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
   local brforward = {}
 
   repeat
-    local n = fd:read(buffer, sl)
+    local n = S.read(fd, buffer, sl)
     if not n then return nil end
 
     local fdbs = pt.fdb_entry(buffer)
@@ -1954,7 +1954,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
     end
 
   until n == 0
-  if not fd:close() then return nil end
+  if not S.close(fd) then return nil end
 
   return {bridge = bridge, brif = brif, brforward = brforward}
 end
@@ -1977,9 +1977,9 @@ mt.proc = {
     if st.isreg then
       local fd, err = S.open(p.dir .. k, "rdonly")
       if not fd then return nil, err end
-      local ret, err = fd:read() -- read defaults to 4k, sufficient?
+      local ret, err = S.read(fd) -- read defaults to 4k, sufficient?
       if not ret then return nil, err end
-      fd:close()
+      S.close(fd)
       return ret -- TODO many could usefully do with some parsing
     end
     if st.islnk then
@@ -2155,7 +2155,7 @@ function S.vhangup() return retbool(C.vhangup()) end
 
 -- Nixio compatibility to make porting easier, and useful functions (often man 3). Incomplete.
 function S.setblocking(s, b) if b then return s:block() else return s:nonblock() end end
-function S.tell(fd) return fd:lseek(0, c.SEEK.CUR) end
+function S.tell(fd) return S.lseek(fd, 0, c.SEEK.CUR) end
 
 function S.lockf(fd, cmd, len)
   cmd = c.LOCKF[cmd]
