@@ -1696,6 +1696,7 @@ c.PR_TSC = setmetatable({
   SIGSEGV        = 2,
 }, stringflag)
 
+-- somewhat confusing as there are some in PR too.
 c.PR_MCE_KILL = setmetatable({
   CLEAR     = 0,
   SET       = 1,
