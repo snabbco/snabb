@@ -149,6 +149,11 @@ function C.getcwd(buf, size)
   return C.syscall(c.SYS.getcwd, pt.void(buf), t.ulong(size))
 end
 
+-- uClibc only provides a version of eventfd without flags, and we cannot detect this
+function C.eventfd(initval, flags)
+  return C.syscall(c.SYS.eventfd2, t.uint(initval), t.int(flags))
+end
+
 -- for stat we use the syscall as libc might have a different struct stat for compatibility
 -- TODO see if we can avoid this, at least for reasonable libc. Musl returns the right struct.
 if ffi.abi("64bit") then
