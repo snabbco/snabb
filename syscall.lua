@@ -1213,6 +1213,9 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   return r
 end
 
+-- TODO maybe split out once done metatype
+S.epoll_pwait = S.epoll_wait
+
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
   local offin, offout = off_in, off_out
   if off_in and not ffi.istype(t.loff1, off_in) then
