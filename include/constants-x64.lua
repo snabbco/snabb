@@ -317,19 +317,6 @@ arch.SYS = {
   process_vm_writev = 311,
 }
 
--- TODO probably set these here not in main
---[[ from Musl
-#undef SYS_fstatat
-#undef SYS_pread
-#undef SYS_pwrite
-#undef SYS_getdents
-# define SYS_fstatat SYS_newfstatat
-# define SYS_pread SYS_pread64
-# define SYS_pwrite SYS_pwrite64
-# define SYS_getdents SYS_getdents64
-# define SYS_fadvise SYS_fadvise64
-]]
-
 arch.SYS.fstatat = arch.SYS.newfstatat
 
 return arch
