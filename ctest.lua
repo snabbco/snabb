@@ -22,6 +22,8 @@ ctypes["int errno"] = nil
 ctypes["struct sockaddr_storage"] = nil
 -- TODO seems to be a size issue on Musl
 ctypes["struct siginfo"] = nil
+-- TODO seems to be a size issue on Musl, have asked list
+ctypes["struct sysinfo"] = nil
 
 -- missing on my ARM box
 c.CAP = nil
