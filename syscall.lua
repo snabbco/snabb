@@ -129,7 +129,7 @@ end
 -- these functions might not be in libc, or are buggy so provide direct syscall fallbacks
 local function inlibc(f) return ffi.C[f] end
 
--- glibc caches pid, but this fails to work eg after clone(). Musl is fine TODO test for this?
+-- glibc caches pid, but this fails to work eg after clone().
 function C.getpid()
   return C.syscall(c.SYS.getpid)
 end
@@ -144,7 +144,7 @@ function C.getdents(fd, buf, size)
   return C.syscall(c.SYS.getdents64, t.int(fd), buf, t.uint(size))
 end
 
--- getcwd will allocate memory, so use syscall
+-- getcwd in libc will allocate memory, so use syscall
 function C.getcwd(buf, size)
   return C.syscall(c.SYS.getcwd, pt.void(buf), t.ulong(size))
 end
@@ -155,7 +155,6 @@ function C.eventfd(initval, flags)
 end
 
 -- for stat we use the syscall as libc might have a different struct stat for compatibility
--- TODO see if we can avoid this, at least for reasonable libc. Musl returns the right struct.
 if ffi.abi("64bit") then
   function C.stat(path, buf)
     return C.syscall(c.SYS.stat, path, pt.void(buf))
@@ -195,7 +194,7 @@ if ffi.abi("32bit") then
   end
 end
 
--- native Linux aio not generally supported, only posix API TODO these are not working
+-- native Linux aio not generally supported by libc, only posix API
 function C.io_setup(nr_events, ctx)
   return C.syscall(c.SYS.io_setup, t.uint(nr_events), pt.void(ctx))
 end
