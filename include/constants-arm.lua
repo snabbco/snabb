@@ -56,6 +56,7 @@ arch.SYS = {
   fallocate        = 352,
   timerfd_settime  = 353,
   timerfd_gettime  = 354,
+  eventfd2         = 356,
   pipe2            = 359, -- TODO several missing
   perf_event_open  = 364,
   recvmmsg         = 365,
