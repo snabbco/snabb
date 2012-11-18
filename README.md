@@ -4,7 +4,7 @@ What? An FFI implementation of the Linux kernel ABI for LuaJIT. This means you w
 
 Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua.
 
-Linux only? Not so easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library (that applies also to any non glibc library too), and test. Patches accepted, but will probably need to restructure for maintainability. However you may well be better off using [LuaPosix](https://github.com/rrthomas/luaposix) if you want to write portable Unix code.
+Linux only? Not so easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library, and test. Patches accepted, but will probably need to restructure for maintainability. Other Unixes may not provide the same ABI stability guarantees, from the kernel, they will usually provide from libc instead, as these are often tightly coupled. However you may well be better off using [LuaPosix](https://github.com/rrthomas/luaposix) if you want to write portable Unix code.
 
 Requirements: Needs [LuaJIT 2.0.0](http://www.luajit.org/) or later.
 
