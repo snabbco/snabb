@@ -177,6 +177,12 @@ c.IN.EXCL_UNLINK = nil
 c.MNT.EXPIRE = nil
 c.MNT.DETACH = nil
 
+-- Musl changes some of the syscall constants in its 32/64 bit handling
+c.SYS.getdents = nil
+
+-- Musl ors O.ACCMODE with O_SEARCH TODO why?
+c.O.ACCMODE = nil
+
 if ffi.abi("64bit") then c.O.LARGEFILE = nil end
 
 -- renamed constants
