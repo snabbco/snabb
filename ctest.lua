@@ -18,6 +18,9 @@ ctypes["struct rlimit64"] = nil
 ctypes["struct mq_attr"] = nil
 ctypes["int errno"] = nil
 
+-- TODO seems to be an issue with sockaddr_storage (alignment difference?) on Musl, needs fixing
+ctypes["struct sockaddr_storage"] = nil
+
 -- missing on my ARM box
 c.CAP = nil
 c.AF.NFC = nil
