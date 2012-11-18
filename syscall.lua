@@ -245,10 +245,10 @@ end
 -- note example of how to split 64 bit syscall arguments on 32 bit platforms
 if ffi.abi("64bit") then
  function CC.preadv64(fd, iov, iovcnt, offset)
-    return C.syscall(t.int(fd), pt.void(iov), t.int(iovcnt), t.loff(offset))
+    return C.syscall(c.SYS.preadv64, t.int(fd), pt.void(iov), t.int(iovcnt), t.loff(offset))
   end
-  function CC.preadv64(fd, iov, iovcnt, offset)
-    return C.syscall(t.int(fd), pt.void(iov), t.int(iovcnt), t.loff(offset))
+  function CC.pwritev64(fd, iov, iovcnt, offset)
+    return C.syscall(c.SYS.pwritev64, t.int(fd), pt.void(iov), t.int(iovcnt), t.loff(offset))
   end
   function CC.fallocate(fd, mode, offset, len)
     return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
@@ -256,11 +256,11 @@ if ffi.abi("64bit") then
 else
  function CC.preadv64(fd, iov, iovcnt, offset)
     local off2, off1 = t.u6432(offset):to32()
-    return C.syscall(t.int(fd), pt.void(iov), t.int(iovcnt), t.uint32(off1), t.uint32(off2))
+    return C.syscall(c.SYS.preadv64, t.int(fd), pt.void(iov), t.int(iovcnt), t.uint32(off1), t.uint32(off2))
   end
-  function CC.preadv64(fd, iov, iovcnt, offset)
+  function CC.pwritev64(fd, iov, iovcnt, offset)
     local off2, off1 = t.u6432(offset):to32()
-    return C.syscall(t.int(fd), pt.void(iov), t.int(iovcnt), t.uint32(off1), t.uint32(off2))
+    return C.syscall(c.SYS.pwritev64, t.int(fd), pt.void(iov), t.int(iovcnt), t.uint32(off1), t.uint32(off2))
   end
   function CC.fallocate(fd, mode, offset, len)
     local off2, off1 = t.u6432(offset):to32()
