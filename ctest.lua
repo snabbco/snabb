@@ -93,7 +93,7 @@ c.SYS.fstatat = nil
 c.TFD = nil
 c.TFD_TIMER = nil
 
--- this lot are not in uClibc/Musl at present
+-- this lot are not in uClibc at present
 c.ADJ.OFFSET_SS_READ = nil
 c.ADJ.NANO = nil
 c.ADJ.MICRO = nil
@@ -127,6 +127,44 @@ c.CLOCK.MONOTONIC_COARSE = nil
 c.CLOCK.REALTIME_COARSE = nil
 c.CLOCK.MONOTONIC_RAW = nil
 c.SOCK.DCCP = nil
+
+-- these are not in Musl at present TODO send patches to get them in
+c.IPPROT.UDPLITE = nil
+c.IPPROTO.DCCP = nil
+c.IPPROTO.SCTP = nil
+c.CIBAUD = nil
+c.F.GETLEASE = nil
+c.F.SETLK64 = nil
+c.F.NOTIFY = nil
+c.F.SETLEASE = nil
+c.F.GETLK64 = nil
+c.F.SETLKW64 = nil
+c.AF.LLC = nil
+c.AF.TIPC = nil
+c.AF.CAN = nil
+c.MSG.TRYHARD = nil
+c.MSG.SYN = nil
+c.PR_TASK_PERF_EVENTS = nil
+c.PR_MCE_KILL = nil -- TODO something odd here, seeing PR_MCE_KILL_GET
+c.SIG.IOT = nil
+c.SIG.CLD = nil
+c.__MAX_BAUD = nil
+c.O.FSYNC = nil
+c.RLIMIT.OFILE = nil
+c.SO.SNDBUFFORCE = nil
+c.SO.RCVBUFFORCE = nil
+c.POLL.REMOVE = nil
+c.POLL.RDHUP = nil
+c.PR_MCE_KILL.SET = nil
+c.PR_MCE_KILL.CLEAR = nil
+c.EXTA = nil
+c.EXTB = nil
+c.XCASE = nil
+c.IUTF8 = nil
+c.CMSPAR = nil
+c.IN.EXCL_UNLINK = nil
+c.MNT.EXPIRE = nil
+c.MNT.DETACH = nil
 
 if ffi.abi("64bit") then c.O.LARGEFILE = nil end
 
