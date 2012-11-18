@@ -402,8 +402,6 @@ c.SIG.UNUSED     = 31
 c.SIG.CLD        = c.SIG.CHLD
 c.SIG.POLL       = c.SIG.IO
 
-c.NSIG          = 65 -- TODO not sure we need
-
 -- sigprocmask note renaming of SIG to SIGPM
 c.SIGPM = setmetatable({
   BLOCK     = 0,
