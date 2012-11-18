@@ -270,7 +270,6 @@ function CC.pwritev64(fd, iov, iovcnt, offset)
   return C.syscall(c.SYS.pwritev, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
 end
 
-
 -- if not in libc replace
 
 -- in librt for glibc but use syscalls instead
@@ -291,7 +290,7 @@ if not pcall(inlibc, "prlimit64") then C.prlimit64 = CC.prlimit64 end
 -- not in uClibc
 if not pcall(inlibc, "preadv64") then C.preadv64 = CC.preadv64 end
 if not pcall(inlibc, "pwritev64") then C.pwritev64 = CC.pwritev64 end
-if not pcall(inlibc, "falocate") then C.fallocate = CC.fallocate end
+if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
 
 -- main definitions start here
 if ffi.abi("32bit") then
