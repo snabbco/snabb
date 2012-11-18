@@ -255,16 +255,16 @@ if ffi.abi("64bit") then
   end
 else
  function CC.preadv64(fd, iov, iovcnt, offset)
-    local off2, off1 = S.u64(offset)
+    local off2, off1 = t.u6432(offset):to32()
     return C.syscall(t.int(fd), pt.void(iov), t.int(iovcnt), t.uint32(off1), t.uint32(off2))
   end
   function CC.preadv64(fd, iov, iovcnt, offset)
-    local off2, off1 = S.u64(offset)
+    local off2, off1 = t.u6432(offset):to32()
     return C.syscall(t.int(fd), pt.void(iov), t.int(iovcnt), t.uint32(off1), t.uint32(off2))
   end
   function CC.fallocate(fd, mode, offset, len)
-    local off2, off1 = S.u64(offset)
-    local len2, len1 = S.u64(len)
+    local off2, off1 = t.u6432(offset):to32()
+    local len2, len1 = t.u6432(len):to32()
     return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
   end
 end
