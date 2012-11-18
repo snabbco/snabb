@@ -129,7 +129,7 @@ c.CLOCK.MONOTONIC_RAW = nil
 c.SOCK.DCCP = nil
 
 -- these are not in Musl at present TODO send patches to get them in
-c.IPPROT.UDPLITE = nil
+c.IPPROTO.UDPLITE = nil
 c.IPPROTO.DCCP = nil
 c.IPPROTO.SCTP = nil
 c.CIBAUD = nil
