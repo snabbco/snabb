@@ -178,6 +178,7 @@ c.CMSPAR = nil
 c.IN.EXCL_UNLINK = nil
 c.MNT.EXPIRE = nil
 c.MNT.DETACH = nil
+c.SYS.fadvise64_64 = nil
 
 -- Musl changes some of the syscall constants in its 32/64 bit handling
 c.SYS.getdents = nil
