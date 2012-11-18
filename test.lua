@@ -1836,7 +1836,7 @@ test_processes = {
 [ $PATH = "/bin:/usr/bin" ] || (echo "shell assert $PATH"; exit 1)
 
 ]]
-      fork_assert(S.writefile(efile, script, "\RWXU"))
+      fork_assert(S.writefile(efile, script, "RWXU"))
       fork_assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
       -- never reach here
       os.exit()

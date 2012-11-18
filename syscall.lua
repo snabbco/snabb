@@ -241,19 +241,33 @@ function CC.clock_settime(clk_id, ts)
   return C.syscall(c.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
 end
 
---[[ if you need to split 64 bit args on 32 bit syscalls use code like this
+-- missing in some uClibc versions as exported symbols. Note potentially all largefile operators should be here
+-- note example of how to split 64 bit syscall arguments on 32 bit platforms
 if ffi.abi("64bit") then
+ function CC.preadv64(fd, iov, iovcnt, offset)
+    return C.syscall(t.int(fd), pt.void(iov), t.int(iovcnt), t.loff(offset))
+  end
+  function CC.preadv64(fd, iov, iovcnt, offset)
+    return C.syscall(t.int(fd), pt.void(iov), t.int(iovcnt), t.loff(offset))
+  end
   function CC.fallocate(fd, mode, offset, len)
     return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
   end
-else -- 32 bit uses splits for 64 bit args
+else
+ function CC.preadv64(fd, iov, iovcnt, offset)
+    local off2, off1 = S.u64(offset)
+    return C.syscall(t.int(fd), pt.void(iov), t.int(iovcnt), t.uint32(off1), t.uint32(off2))
+  end
+  function CC.preadv64(fd, iov, iovcnt, offset)
+    local off2, off1 = S.u64(offset)
+    return C.syscall(t.int(fd), pt.void(iov), t.int(iovcnt), t.uint32(off1), t.uint32(off2))
+  end
   function CC.fallocate(fd, mode, offset, len)
     local off2, off1 = S.u64(offset)
     local len2, len1 = S.u64(len)
     return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
   end
 end
-]]
 
 -- if not in libc replace
 
@@ -271,6 +285,11 @@ if not pcall(inlibc, "pivot_root") then C.pivot_root = CC.pivot_root end
 -- not in glibc on my dev ARM box
 if not pcall(inlibc, "setns") then C.setns = CC.setns end
 if not pcall(inlibc, "prlimit64") then C.prlimit64 = CC.prlimit64 end
+
+-- not in uClibc
+if not pcall(inlibc, "preadv64") then C.preadv64 = CC.preadv64 end
+if not pcall(inlibc, "pwritev64") then C.pwritev64 = CC.pwritev64 end
+if not pcall(inlibc, "falocate") then C.fallocate = CC.fallocate end
 
 -- main definitions start here
 if ffi.abi("32bit") then
