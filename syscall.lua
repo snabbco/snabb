@@ -2056,7 +2056,12 @@ end
 
 -- these functions are all just ioctls can do natively
 function S.cfmakeraw(termios)
-  C.cfmakeraw(termios)
+  termios.c_iflag = bit.band(termios.c_iflag, bit.bnot(c.IFLAG["IGNBRK,BRKINT,PARMRK,ISTRIP,INLCR,IGNCR,ICRNL,IXON"]))
+  termios.c_oflag = bit.band(termios.c_oflag, bit.bnot(c.OFLAG["OPOST"]))
+  termios.c_lflag = bit.band(termios.c_lflag, bit.bnot(c.LFLAG["ECHO,ECHONL,ICANON,ISIG,IEXTEN"]))
+  termios.c_cflag = bit.bor(bit.band(termios.c_cflag, bit.bnot(c.CFLAG["CSIZE,PARENB"])), c.CFLAG.CS8)
+  termios.c_cc[c.CC.VMIN] = 1
+  termios.c_cc[c.CC.VTIME] = 0
   return true
 end
 

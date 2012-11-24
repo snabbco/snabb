@@ -58,7 +58,7 @@ end
 local stringflag = {__index = flag, __call = function(t, a) return t[a] end}
 
 -- take a bunch of flags in a string and return a number
-function flags(t, str) -- allows multiple comma sep flags that are ORed
+function flags(t, str) -- allows multiple comma sep flags that are ORed TODO allow | as well
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   if #str == 0 then return 0 end
@@ -1769,7 +1769,7 @@ c.SECCOMP_RET = setmetatable({
 c.NCCS = 32
 
 -- termios - c_cc characters
-c.CC = setmetatable({
+c.CC = setmetatable({ -- TODO add metatable to termios so can do t.VMIN = 1 not t.c_cc[c.CC.VMIN] = 1
   VINTR    = 0,
   VQUIT    = 1,
   VERASE   = 2,
@@ -1883,18 +1883,6 @@ defspeed(19200, '0000016')
 defspeed(38400, '0000017')
 c.EXTA       = c.B19200
 c.EXTB       = c.B38400
-c.CSIZE      = octal('0000060')
-c.CS5        = octal('0000000')
-c.CS6        = octal('0000020')
-c.CS7        = octal('0000040')
-c.CS8        = octal('0000060')
-c.CSTOPB     = octal('0000100')
-c.CREAD      = octal('0000200')
-c.PARENB     = octal('0000400')
-c.PARODD     = octal('0001000')
-c.HUPCL      = octal('0002000')
-c.CLOCAL     = octal('0004000')
-c.CBAUDEX    = octal('0010000')
 defspeed(57600, '0010001')
 defspeed(115200, '0010002')
 defspeed(230400, '0010003')
@@ -1911,26 +1899,46 @@ defspeed(3000000, '0010015')
 defspeed(3500000, '0010016')
 defspeed(4000000, '0010017')
 c.__MAX_BAUD = c.B4000000
+
+c.CBAUDEX    = octal('0010000')
+
 c.CIBAUD     = octal('002003600000') -- input baud rate (not used)
 c.CMSPAR     = octal('010000000000') -- mark or space (stick) parity
 c.CRTSCTS    = octal('020000000000') -- flow control
 
+-- termios - c_cflag bits
+c.CFLAG = setmetatable({
+  CSIZE      = octal('0000060'),
+  CS5        = octal('0000000'),
+  CS6        = octal('0000020'),
+  CS7        = octal('0000040'),
+  CS8        = octal('0000060'),
+  CSTOPB     = octal('0000100'),
+  CREAD      = octal('0000200'),
+  PARENB     = octal('0000400'),
+  PARODD     = octal('0001000'),
+  HUPCL      = octal('0002000'),
+  CLOCAL     = octal('0004000'),
+}, multiflags)
+
 -- termios - c_lflag bits
-c.ISIG    = octal('0000001')
-c.ICANON  = octal('0000002')
-c.XCASE   = octal('0000004')
-c.ECHO    = octal('0000010')
-c.ECHOE   = octal('0000020')
-c.ECHOK   = octal('0000040')
-c.ECHONL  = octal('0000100')
-c.NOFLSH  = octal('0000200')
-c.TOSTOP  = octal('0000400')
-c.ECHOCTL = octal('0001000')
-c.ECHOPRT = octal('0002000')
-c.ECHOKE  = octal('0004000')
-c.FLUSHO  = octal('0010000')
-c.PENDIN  = octal('0040000')
-c.IEXTEN  = octal('0100000')
+c.LFLAG = setmetatable({
+  ISIG    = octal('0000001'),
+  ICANON  = octal('0000002'),
+  XCASE   = octal('0000004'),
+  ECHO    = octal('0000010'),
+  ECHOE   = octal('0000020'),
+  ECHOK   = octal('0000040'),
+  ECHONL  = octal('0000100'),
+  NOFLSH  = octal('0000200'),
+  TOSTOP  = octal('0000400'),
+  ECHOCTL = octal('0001000'),
+  ECHOPRT = octal('0002000'),
+  ECHOKE  = octal('0004000'),
+  FLUSHO  = octal('0010000'),
+  PENDIN  = octal('0040000'),
+  IEXTEN  = octal('0100000'),
+}, multiflags)
 
 -- termios - tcflow() and TCXONC use these. renamed from TC to TCFLOW
 c.TCFLOW = setmetatable({

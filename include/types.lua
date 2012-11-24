@@ -163,6 +163,7 @@ local addtypes = {
   ifa_cacheinfo = "struct ifa_cacheinfo",
   flock = "struct flock64",
   mqattr = "struct mq_attr",
+  termios = "struct termios",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end

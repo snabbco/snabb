@@ -488,20 +488,18 @@ struct mq_attr {
   long mq_flags, mq_maxmsg, mq_msgsize, mq_curmsgs, __unused[4];
 };
 
-/* termios */
 typedef unsigned char	cc_t;
 typedef unsigned int	speed_t;
 typedef unsigned int	tcflag_t;
-struct termios
-  {
-    tcflag_t c_iflag;		/* input mode flags */
-    tcflag_t c_oflag;		/* output mode flags */
-    tcflag_t c_cflag;		/* control mode flags */
-    tcflag_t c_lflag;		/* local mode flags */
-    cc_t c_line;			/* line discipline */
-    cc_t c_cc[32];		/* control characters */
-    speed_t c_ispeed;		/* input speed */
-    speed_t c_ospeed;		/* output speed */
+struct termios {
+    tcflag_t c_iflag;
+    tcflag_t c_oflag;
+    tcflag_t c_cflag;
+    tcflag_t c_lflag;
+    cc_t c_line;
+    cc_t c_cc[32];
+    speed_t c_ispeed;
+    speed_t c_ospeed;
   };
 ]]
 
@@ -955,7 +953,7 @@ int tcsendbreak(int fd, int duration);
 int tcdrain(int fd);
 int tcflush(int fd, int queue_selector);
 int tcflow(int fd, int action);
-void cfmakeraw(struct termios *termios_p);
+--void cfmakeraw(struct termios *termios_p);
 speed_t cfgetispeed(const struct termios *termios_p);
 speed_t cfgetospeed(const struct termios *termios_p);
 int cfsetispeed(struct termios *termios_p, speed_t speed);
