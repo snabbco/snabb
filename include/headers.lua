@@ -953,7 +953,7 @@ int tcsendbreak(int fd, int duration);
 int tcdrain(int fd);
 int tcflush(int fd, int queue_selector);
 int tcflow(int fd, int action);
---void cfmakeraw(struct termios *termios_p);
+//void cfmakeraw(struct termios *termios_p);
 speed_t cfgetispeed(const struct termios *termios_p);
 speed_t cfgetospeed(const struct termios *termios_p);
 int cfsetispeed(struct termios *termios_p, speed_t speed);
