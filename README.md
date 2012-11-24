@@ -42,6 +42,8 @@ The test script is a copy of [luaunit](https://github.com/rjpcomputing/luaunit).
 
 I have added initial coverage tests, and a C test to check constants and structures, but these are very much work in progress.
 
+There is now limited [Travis CI](https://travis-ci.org/) support, although this will only test on one architecture.
+
 ## What is implemented?
 
 This project is in beta! Much stuff is still missing, this is a work in progress! The majority of syscalls are now there, let me know if you need some that are not.
