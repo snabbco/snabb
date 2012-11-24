@@ -1769,23 +1769,25 @@ c.SECCOMP_RET = setmetatable({
 c.NCCS = 32
 
 -- termios - c_cc characters
-c.VINTR    = 0
-c.VQUIT    = 1
-c.VERASE   = 2
-c.VKILL    = 3
-c.VEOF     = 4
-c.VTIME    = 5
-c.VMIN     = 6
-c.VSWTC    = 7
-c.VSTART   = 8
-c.VSTOP    = 9
-c.VSUSP    = 10
-c.VEOL     = 11
-c.VREPRINT = 12
-c.VDISCARD = 13
-c.VWERASE  = 14
-c.VLNEXT   = 15
-c.VEOL2    = 16
+c.CC = setmetatable({
+  VINTR    = 0,
+  VQUIT    = 1,
+  VERASE   = 2,
+  VKILL    = 3,
+  VEOF     = 4,
+  VTIME    = 5,
+  VMIN     = 6,
+  VSWTC    = 7,
+  VSTART   = 8,
+  VSTOP    = 9,
+  VSUSP    = 10,
+  VEOL     = 11,
+  VREPRINT = 12,
+  VDISCARD = 13,
+  VWERASE  = 14,
+  VLNEXT   = 15,
+  VEOL2    = 16,
+}, stringflag)
 
 -- termios - c_iflag bits
 c.IGNBRK  = octal('0000001')
