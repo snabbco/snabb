@@ -1,0 +1,9 @@
+language: c
+
+before_install: 
+ - sudo add-apt-repository ppa:mwild1/ppa -y
+ - sudo apt-get update -y
+ - sudo apt-get install luajit -y
+
+script: luajit test.lua
+
