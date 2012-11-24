@@ -1963,17 +1963,20 @@ c.TCSA = setmetatable({
 }, stringflag)
 
 -- TIOCM ioctls
-c.TIOCM_LE  = 0x001
-c.TIOCM_DTR = 0x002
-c.TIOCM_RTS = 0x004
-c.TIOCM_ST  = 0x008
-c.TIOCM_SR  = 0x010
-c.TIOCM_CTS = 0x020
-c.TIOCM_CAR = 0x040
-c.TIOCM_RNG = 0x080
-c.TIOCM_DSR = 0x100
-c.TIOCM_CD  = c.TIOCM_CAR
-c.TIOCM_RI  = c.TIOCM_RNG
+c.TIOCM = setmetatable({
+  LE  = 0x001,
+  DTR = 0x002,
+  RTS = 0x004,
+  ST  = 0x008,
+  SR  = 0x010,
+  CTS = 0x020,
+  CAR = 0x040,
+  RNG = 0x080,
+  DSR = 0x100,
+}, multiflags)
+
+TIOCM.CD  = c.TIOCM.CAR
+TIOCM.RI  = c.TIOCM.RNG
 
 -- ioctls, filling in as needed TODO more general framework?
 c.SIOC = setmetatable({
