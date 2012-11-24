@@ -42,7 +42,7 @@ The test script is a copy of [luaunit](https://github.com/rjpcomputing/luaunit).
 
 I have added initial coverage tests, and a C test to check constants and structures, but these are very much work in progress.
 
-There is now limited [Travis CI](https://travis-ci.org/) support, although this will only test on one architecture.
+There is now limited [Travis CI](https://travis-ci.org/) support, although this will only test on one architecture (x86, glibc). You can [see the test results here](https://travis-ci.org/justincormack/ljsyscall). If you fork the code you should be able to run these tests by setting up your own Travis account.
 
 ## What is implemented?
 
