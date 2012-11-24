@@ -1790,7 +1790,7 @@ c.CC = setmetatable({
 }, stringflag)
 
 -- termios - c_iflag bits
-c.IFLAGS = setmetatable({
+c.IFLAG = setmetatable({
   IGNBRK  = octal('0000001'),
   BRKINT  = octal('0000002'),
   IGNPAR  = octal('0000004'),
@@ -1809,37 +1809,39 @@ c.IFLAGS = setmetatable({
 }, multiflags)
 
 -- termios - c_oflag bits
-c.OPOST  = octal('0000001')
-c.OLCUC  = octal('0000002')
-c.ONLCR  = octal('0000004')
-c.OCRNL  = octal('0000010')
-c.ONOCR  = octal('0000020')
-c.ONLRET = octal('0000040')
-c.OFILL  = octal('0000100')
-c.OFDEL  = octal('0000200')
-c.NLDLY  = octal('0000400')
-c.NL0    = octal('0000000')
-c.NL1    = octal('0000400')
-c.CRDLY  = octal('0003000')
-c.CR0    = octal('0000000')
-c.CR1    = octal('0001000')
-c.CR2    = octal('0002000')
-c.CR3    = octal('0003000')
-c.TABDLY = octal('0014000')
-c.TAB0   = octal('0000000')
-c.TAB1   = octal('0004000')
-c.TAB2   = octal('0010000')
-c.TAB3   = octal('0014000')
-c.BSDLY  = octal('0020000')
-c.BS0    = octal('0000000')
-c.BS1    = octal('0020000')
-c.FFDLY  = octal('0100000')
-c.FF0    = octal('0000000')
-c.FF1    = octal('0100000')
-c.VTDLY  = octal('0040000')
-c.VT0    = octal('0000000')
-c.VT1    = octal('0040000')
-c.XTABS  = octal('0014000')
+c.OFLAG = setmetatable({
+  OPOST  = octal('0000001'),
+  OLCUC  = octal('0000002'),
+  ONLCR  = octal('0000004'),
+  OCRNL  = octal('0000010'),
+  ONOCR  = octal('0000020'),
+  ONLRET = octal('0000040'),
+  OFILL  = octal('0000100'),
+  OFDEL  = octal('0000200'),
+  NLDLY  = octal('0000400'),
+  NL0    = octal('0000000'),
+  NL1    = octal('0000400'),
+  CRDLY  = octal('0003000'),
+  CR0    = octal('0000000'),
+  CR1    = octal('0001000'),
+  CR2    = octal('0002000'),
+  CR3    = octal('0003000'),
+  TABDLY = octal('0014000'),
+  TAB0   = octal('0000000'),
+  TAB1   = octal('0004000'),
+  TAB2   = octal('0010000'),
+  TAB3   = octal('0014000'),
+  BSDLY  = octal('0020000'),
+  BS0    = octal('0000000'),
+  BS1    = octal('0020000'),
+  FFDLY  = octal('0100000'),
+  FF0    = octal('0000000'),
+  FF1    = octal('0100000'),
+  VTDLY  = octal('0040000'),
+  VT0    = octal('0000000'),
+  VT1    = octal('0040000'),
+  XTABS  = octal('0014000'),
+}, multiflags)
 
 -- TODO rework this with functions in a metatable
 local bits_speed_map = { }
