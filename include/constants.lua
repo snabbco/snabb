@@ -1790,21 +1790,23 @@ c.CC = setmetatable({
 }, stringflag)
 
 -- termios - c_iflag bits
-c.IGNBRK  = octal('0000001')
-c.BRKINT  = octal('0000002')
-c.IGNPAR  = octal('0000004')
-c.PARMRK  = octal('0000010')
-c.INPCK   = octal('0000020')
-c.ISTRIP  = octal('0000040')
-c.INLCR   = octal('0000100')
-c.IGNCR   = octal('0000200')
-c.ICRNL   = octal('0000400')
-c.IUCLC   = octal('0001000')
-c.IXON    = octal('0002000')
-c.IXANY   = octal('0004000')
-c.IXOFF   = octal('0010000')
-c.IMAXBEL = octal('0020000')
-c.IUTF8   = octal('0040000')
+c.IFLAGS = setmetatable({
+  IGNBRK  = octal('0000001'),
+  BRKINT  = octal('0000002'),
+  IGNPAR  = octal('0000004'),
+  PARMRK  = octal('0000010'),
+  INPCK   = octal('0000020'),
+  ISTRIP  = octal('0000040'),
+  INLCR   = octal('0000100'),
+  IGNCR   = octal('0000200'),
+  ICRNL   = octal('0000400'),
+  IUCLC   = octal('0001000'),
+  IXON    = octal('0002000'),
+  IXANY   = octal('0004000'),
+  IXOFF   = octal('0010000'),
+  IMAXBEL = octal('0020000'),
+  IUTF8   = octal('0040000'),
+}, multiflags)
 
 -- termios - c_oflag bits
 c.OPOST  = octal('0000001')
