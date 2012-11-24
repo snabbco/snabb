@@ -5,5 +5,7 @@ before_install:
  - sudo apt-get update -y
  - sudo apt-get install luajit -y
 
-script: luajit test.lua
+script: 
+ - luajit test.lua
+ - luajit ctest.lua > ctest.c && cc ctest.c -o ctest && ./ctest
 
