@@ -275,6 +275,11 @@ local nm = {
   W = "W",
   POLL = "POLL",
   S_I = "S_I",
+  LFLAG = "",
+  IFLAG = "",
+  OFLAG = "",
+  CFLAG = "",
+  CC = "",
 }
 
 for k, v in pairs(c) do
