@@ -1711,7 +1711,6 @@ end
 
 -- helper functions
 
--- TODO no tests
 function S.sendcred(fd, pid, uid, gid) -- only needed for root to send incorrect credentials?
   if not pid then pid = C.getpid() end
   if not uid then uid = C.getuid() end
