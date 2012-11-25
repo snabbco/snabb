@@ -1785,11 +1785,11 @@ end
 
 -- note will give short reads, but mainly used for sysfs, proc
 function S.readfile(name, buffer, length)
-  local f, err = S.open(name, "rdonly")
-  if not f then return nil, err end
-  local r, err = f:read(buffer, length or 4096)
+  local fd, err = S.open(name, "rdonly")
+  if not fd then return nil, err end
+  local r, err = S.read(fd, buffer, length or 4096)
   if not r then return nil, err end
-  local ok, err = S.close(f)
+  local ok, err = S.close(fd)
   if not ok then return nil, err end
   return r
 end
