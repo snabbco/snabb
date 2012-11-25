@@ -517,6 +517,12 @@ struct input_event {
     uint16_t code;
     int32_t value;
 };
+struct input_id {
+    uint16_t bustype;
+    uint16_t vendor;
+    uint16_t product;
+    uint16_t version;
+};
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage

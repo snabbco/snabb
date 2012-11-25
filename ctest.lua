@@ -17,7 +17,6 @@ ctypes["sighandler_t"] = nil
 ctypes["struct rlimit64"] = nil
 ctypes["struct mq_attr"] = nil
 ctypes["int errno"] = nil
-ctypes["struct termios2"] = nil
 
 -- TODO seems to be an issue with sockaddr_storage (alignment difference?) on Musl, needs fixing
 ctypes["struct sockaddr_storage"] = nil
@@ -255,6 +254,19 @@ print [[
 #include <linux/if_bridge.h>
 #include <linux/rtnetlink.h>
 #include <linux/ioctl.h>
+#include <linux/input.h>
+
+/* not defined anywhere useful */
+struct termios2 {
+        tcflag_t c_iflag;
+        tcflag_t c_oflag;
+        tcflag_t c_cflag;
+        tcflag_t c_lflag;
+        cc_t c_line;
+        cc_t c_cc[19];  /* note not using NCCS as redefined! */
+        speed_t c_ispeed;
+        speed_t c_ospeed;
+};
 
 int main(int argc, char **argv) {
 ]]
