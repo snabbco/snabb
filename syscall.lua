@@ -2054,52 +2054,7 @@ function S.mounts(file)
   return mounts
 end
 
--- these functions are all just ioctls can do natively
-function S.cfmakeraw(termios)
-  termios.c_iflag = bit.band(termios.c_iflag, bit.bnot(c.IFLAG["IGNBRK,BRKINT,PARMRK,ISTRIP,INLCR,IGNCR,ICRNL,IXON"]))
-  termios.c_oflag = bit.band(termios.c_oflag, bit.bnot(c.OFLAG["OPOST"]))
-  termios.c_lflag = bit.band(termios.c_lflag, bit.bnot(c.LFLAG["ECHO,ECHONL,ICANON,ISIG,IEXTEN"]))
-  termios.c_cflag = bit.bor(bit.band(termios.c_cflag, bit.bnot(c.CFLAG["CSIZE,PARENB"])), c.CFLAG.CS8)
-  termios.c_cc[c.CC.VMIN] = 1
-  termios.c_cc[c.CC.VTIME] = 0
-  return true
-end
-
-function S.cfgetispeed(termios)
-  local bits = C.cfgetispeed(termios)
-  if bits == -1 then return nil, t.error() end
-  return S.bits_to_speed(bits)
-end
-
-function S.cfgetospeed(termios)
-  local bits = C.cfgetospeed(termios)
-  if bits == -1 then return nil, t.error() end
-  return S.bits_to_speed(bits)
-end
-
-function S.cfsetispeed(termios, speed)
-  return retbool(C.cfsetispeed(termios, S.speed_to_bits(speed)))
-end
-
-function S.cfsetospeed(termios, speed)
-  return retbool(C.cfsetospeed(termios, S.speed_to_bits(speed)))
-end
-
-function S.cfsetspeed(termios, speed)
-  return retbool(C.cfsetspeed(termios, S.speed_to_bits(speed)))
-end
-
-t.termios = ffi.metatype("struct termios", {
-  __index = {
-    cfmakeraw = S.cfmakeraw,
-    cfgetispeed = S.cfgetispeed,
-    cfgetospeed = S.cfgetospeed,
-    cfsetispeed = S.cfsetispeed,
-    cfsetospeed = S.cfsetospeed,
-    cfsetspeed = S.cfsetspeed
-  }
-})
-
+-- termios TODO replace with actual ioctls
 function S.tcgetattr(fd)
   local termios = t.termios()
   local ret = C.tcgetattr(getfd(fd), termios)

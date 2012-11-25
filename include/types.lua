@@ -163,7 +163,6 @@ local addtypes = {
   ifa_cacheinfo = "struct ifa_cacheinfo",
   flock = "struct flock64",
   mqattr = "struct mq_attr",
-  termios = "struct termios",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
@@ -974,6 +973,61 @@ mt.wait = {
 function t.wait(pid, status)
   return setmetatable({pid = pid, status = status}, mt.wait)
 end
+
+-- termios
+
+local bits_to_speed = {}
+for k, v in pairs(c.B) do
+  bits_to_speed[v] = tonumber(k)
+end
+
+meth.termios = {
+  index = {
+    cfmakeraw = function(termios)
+      termios.c_iflag = bit.band(termios.c_iflag, bit.bnot(c.IFLAG["IGNBRK,BRKINT,PARMRK,ISTRIP,INLCR,IGNCR,ICRNL,IXON"]))
+      termios.c_oflag = bit.band(termios.c_oflag, bit.bnot(c.OFLAG["OPOST"]))
+      termios.c_lflag = bit.band(termios.c_lflag, bit.bnot(c.LFLAG["ECHO,ECHONL,ICANON,ISIG,IEXTEN"]))
+      termios.c_cflag = bit.bor(bit.band(termios.c_cflag, bit.bnot(c.CFLAG["CSIZE,PARENB"])), c.CFLAG.CS8)
+      termios.c_cc[c.CC.VMIN] = 1
+      termios.c_cc[c.CC.VTIME] = 0
+      return true
+    end,
+    -- TODO these functions are all just ioctls can do natively
+    cfgetispeed = function(termios)
+      local bits = ffi.C.cfgetispeed(termios)
+      return bits_to_speed[bits]
+    end,
+    cfgetospeed = function(termios)
+      local bits = ffi.C.cfgetospeed(termios)
+      return bits_to_speed[bits]
+    end,
+    -- TODO move to __newindex?
+    cfsetispeed = function(termios, speed)
+      local ok, err = ffi.C.cfsetispeed(termios, c.B[speed])
+      if not ok then return nil, t.error() end
+      return true
+    end,
+    cfsetospeed = function(termios, speed)
+      local ok, err = ffi.C.cfsetospeed(termios, c.B[speed])
+      if not ok then return nil, t.error() end
+      return true
+    end,
+  },
+}
+
+meth.termios.index.cfsetspeed = meth.termios.index.cfsetospeed -- also shorter names eg ospeed?
+
+metatype("termios", "struct termios", {
+  __index = function(termios, k)
+    if meth.termios.index[k] then return meth.termios.index[k] end -- note these are called as objects, could use meta metatable
+    if c.CC[k] then return termios.c_cc[c.CC[k]] end
+  end,
+  __newindex = function(termios, k, v)
+    if meth.termios.newindex[k] then return meth.termios.newindex[k](termios, v) end
+    if c.CC[k] then termios.c_cc[c.CC[k]] = v end
+  end,
+})
+
 
 return types
 

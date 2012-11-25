@@ -14,6 +14,8 @@ end
 local lshift = bit.lshift
 local rshift = bit.rshift
 
+-- TODO would rather not include ffi, but we need sizes so split these out into a new file
+
 --[[
  * ioctl command encoding: 32 bits total, command in lower 16 bits,
  * size of the parameter structure in the lower 14 bits of the

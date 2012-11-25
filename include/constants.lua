@@ -1771,7 +1771,7 @@ c.SECCOMP_RET = setmetatable({
 c.NCCS = 32
 
 -- termios - c_cc characters
-c.CC = setmetatable({ -- TODO add metatable to termios so can do t.VMIN = 1 not t.c_cc[c.CC.VMIN] = 1
+c.CC = setmetatable({
   VINTR    = 0,
   VQUIT    = 1,
   VERASE   = 2,
@@ -1845,63 +1845,53 @@ c.OFLAG = setmetatable({
   XTABS  = octal('0014000'),
 }, multiflags)
 
--- TODO rework this with functions in a metatable
-local bits_speed_map = { }
-local speed_bits_map = { }
-local function defspeed(speed, bits)
-  bits = octal(bits)
-  bits_speed_map[bits] = speed
-  speed_bits_map[speed] = bits
-  c['B'..speed] = bits -- TODO in table
-end
-function c.bits_to_speed(bits)
-  local speed = bits_speed_map[bits]
-  if not speed then error("unknown speedbits: " .. bits) end
-  return speed
-end
-function c.speed_to_bits(speed)
-  local bits = speed_bits_map[speed]
-  if not bits then error("unknown speed: " .. speed) end
-  return bits
-end
+-- using string keys as sparse array uses a lot of memory
+c.B = setmetatable({
+  ['0'] = octal('0000000'),
+  ['50'] = octal('0000001'),
+  ['75'] = octal('0000002'),
+  ['110'] = octal('0000003'),
+  ['134'] = octal('0000004'),
+  ['150'] = octal('0000005'),
+  ['200'] = octal('0000006'),
+  ['300'] = octal('0000007'),
+  ['600'] = octal('0000010'),
+  ['1200'] = octal('0000011'),
+  ['1800'] = octal('0000012'),
+  ['2400'] = octal('0000013'),
+  ['4800'] = octal('0000014'),
+  ['9600'] = octal('0000015'),
+  ['19200'] = octal('0000016'),
+  ['38400'] = octal('0000017'),
+  ['57600'] = octal('0010001'),
+  ['115200'] = octal('0010002'),
+  ['230400'] = octal('0010003'),
+  ['460800'] = octal('0010004'),
+  ['500000'] = octal('0010005'),
+  ['576000'] = octal('0010006'),
+  ['921600'] = octal('0010007'),
+  ['1000000'] = octal('0010010'),
+  ['1152000'] = octal('0010011'),
+  ['1500000'] = octal('0010012'),
+  ['2000000'] = octal('0010013'),
+  ['2500000'] = octal('0010014'),
+  ['3000000'] = octal('0010015'),
+  ['3500000'] = octal('0010016'),
+  ['4000000'] = octal('0010017'),
+}, {
+  __index = function(b, k)
+    return b[tostring(k)]
+  end,
+})
 
--- termios - c_cflag bit meaning
-c.CBAUD      = octal('0010017')
-defspeed(0, '0000000') -- hang up
-defspeed(50, '0000001')
-defspeed(75, '0000002')
-defspeed(110, '0000003')
-defspeed(134, '0000004')
-defspeed(150, '0000005')
-defspeed(200, '0000006')
-defspeed(300, '0000007')
-defspeed(600, '0000010')
-defspeed(1200, '0000011')
-defspeed(1800, '0000012')
-defspeed(2400, '0000013')
-defspeed(4800, '0000014')
-defspeed(9600, '0000015')
-defspeed(19200, '0000016')
-defspeed(38400, '0000017')
+--[[
+c.__MAX_BAUD = c.B4000000
 c.EXTA       = c.B19200
 c.EXTB       = c.B38400
-defspeed(57600, '0010001')
-defspeed(115200, '0010002')
-defspeed(230400, '0010003')
-defspeed(460800, '0010004')
-defspeed(500000, '0010005')
-defspeed(576000, '0010006')
-defspeed(921600, '0010007')
-defspeed(1000000, '0010010')
-defspeed(1152000, '0010011')
-defspeed(1500000, '0010012')
-defspeed(2000000, '0010013')
-defspeed(2500000, '0010014')
-defspeed(3000000, '0010015')
-defspeed(3500000, '0010016')
-defspeed(4000000, '0010017')
-c.__MAX_BAUD = c.B4000000
+]]
 
+-- TODO clean up how to handle these (used for custom speeds)
+c.CBAUD      = octal('0010017')
 c.CBAUDEX    = octal('0010000')
 
 c.CIBAUD     = octal('002003600000') -- input baud rate (not used)
