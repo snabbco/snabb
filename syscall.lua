@@ -756,23 +756,23 @@ mt.socketpair = {
       return true
     end,
     nonblock = function(s)
-      local ok, err = s[1]:nonblock()
+      local ok, err = S.nonblock(s[1])
       if not ok then return nil, err end
-      local ok, err = s[2]:nonblock()
+      local ok, err = S.nonblock(s[2])
       if not ok then return nil, err end
       return true
     end,
     block = function(s)
-      local ok, err = s[1]:block()
+      local ok, err = S.block(s[1])
       if not ok then return nil, err end
-      local ok, err = s[2]:block()
+      local ok, err = S.block(s[2])
       if not ok then return nil, err end
       return true
     end,
     setblocking = function(s, b)
-      local ok, err = s[1]:setblocking(b)
+      local ok, err = S.setblocking(s[1], b)
       if not ok then return nil, err end
-      local ok, err = s[2]:setblocking(b)
+      local ok, err = S.setblocking(s[2], b)
       if not ok then return nil, err end
       return true
     end,
