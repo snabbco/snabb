@@ -15,6 +15,7 @@ local lshift = bit.lshift
 local rshift = bit.rshift
 
 -- TODO would rather not include ffi, but we need sizes so split these out into a new file
+require "include.headers"
 
 --[[
  * ioctl command encoding: 32 bits total, command in lower 16 bits,
@@ -134,10 +135,10 @@ local ioctl = {
   TIOCSBRK        = 0x5427,
   TIOCCBRK        = 0x5428,
   TIOCGSID        = 0x5429,
-  --TCGETS2         _IOR('T', 0x2A, struct termios2),
-  --TCSETS2         _IOW('T', 0x2B, struct termios2),
-  --TCSETSW2        _IOW('T', 0x2C, struct termios2),
-  --TCSETSF2        _IOW('T', 0x2D, struct termios2),
+  TCGETS2         = _IOR('T', 0x2A, "struct termios2"),
+  TCSETS2         = _IOW('T', 0x2B, "struct termios2"),
+  TCSETSW2        = _IOW('T', 0x2C, "struct termios2"),
+  TCSETSF2        = _IOW('T', 0x2D, "struct termios2"),
   TIOCGRS485      = 0x542E,
   TIOCSRS485      = 0x542F,
   TIOCGPTN        = _IOR('T', 0x30, "unsigned int"),
