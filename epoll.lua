@@ -1,3 +1,6 @@
+-- simple epoll-based socket example. Serves up http responses, but is of course not a proper server
+-- you can test performance iwth ab -n 100000 -c 100 http://localhost:8000/ although ab may be the limiting factor
+
 local S = require "syscall"
 
 local t, c = S.t, S.c
@@ -19,7 +22,7 @@ assert(s:listen(128))
 
 local ep = assert(S.epoll_create())
 
-assert(ep:epoll_ctl("add", s, "in")) -- actually dont need to set err, hup
+assert(ep:epoll_ctl("add", s, "in"))
 
 local w = {}
 
