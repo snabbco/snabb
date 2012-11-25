@@ -281,6 +281,7 @@ local nm = {
   CFLAG = "",
   CC = "",
   IOCTL = "",
+  B = "B",
 }
 
 for k, v in pairs(c) do
