@@ -1,9 +1,6 @@
 -- ioctls, filling in as needed
 -- note there are some architecture dependent values
 
--- parts adapted from https://github.com/Wiladams/LJIT2RPi/blob/master/include/ioctl.lua
-
-local ffi = require "ffi"
 local bit = require "bit"
 local band = bit.band
 local function bor(...)
@@ -15,27 +12,8 @@ local lshift = bit.lshift
 local rshift = bit.rshift
 
 -- TODO would rather not include ffi, but we need sizes so split these out into a new file
+local ffi = require "ffi"
 require "include.headers"
-
---[[
- * ioctl command encoding: 32 bits total, command in lower 16 bits,
- * size of the parameter structure in the lower 14 bits of the
- * upper 16 bits.
- * Encoding the size of the parameter structure in the ioctl request
- * is useful for catching programs compiled with old versions
- * and to avoid overwriting user space outside the user buffer area.
- * The highest 2 bits are reserved for indicating the ``access mode''.
- * NOTE: This limits the max parameter size to 16kB -1 !
---]]
-
---[[
- * The following is for compatibility across the various Linux
- * platforms.  The generic ioctl numbering scheme doesn't really enforce
- * a type field.  De facto, however, the top 8 bits of the lower 16
- * bits are indeed used as a type field, so we might just as well make
- * this explicit here.  Please be sure to use the decoding macros
- * below from now on.
---]]
 
 local IOC_NRBITS	= 8
 local IOC_TYPEBITS	= 8
@@ -70,10 +48,10 @@ local function _IOC(dir, tp, nr, size)
 end
 
 -- used to create numbers
-local _IO 	 = function(tp, nr)		return _IOC(IOC_NONE, tp, nr, 0) end
-local _IOR 	 = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, ffi.sizeof(size)) end
-local _IOW 	 = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, ffi.sizeof(size)) end
-local _IOWR	 = function(tp, nr, size)	return _IOC(bor(IOC_READ, IOC_WRITE), tp, nr, ffi.sizeof(size)) end
+local _IO 	     = function(tp, nr)		    return _IOC(IOC_NONE, tp, nr, 0) end
+local _IOR  	 = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, ffi.sizeof(size)) end
+local _IOW   	 = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, ffi.sizeof(size)) end
+local _IOWR	     = function(tp, nr, size)	return _IOC(bor(IOC_READ, IOC_WRITE), tp, nr, ffi.sizeof(size)) end
 local _IOR_BAD   = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, ffi.sizeof(size)) end
 local _IOW_BAD   = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, ffi.sizeof(size)) end
 local _IOWR_BAD  = function(tp, nr, size)	return _IOC(bor(IOC_READ, IOC_WRITE), tp, nr, ffi.sizeof(size)) end
