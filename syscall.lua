@@ -338,10 +338,8 @@ mt.pipe = {
       if not ok2 then return nil, err2 end
       return true
     end,
-    read = function(p, ...) return p[1]:read(...) end,
-    write = function(p, ...) return p[2]:write(...) end,
-    pread = function(p, ...) return p[1]:pread(...) end,
-    pwrite = function(p, ...) return p[2]:pwrite(...) end,
+    read = function(p, ...) return S.read(p[1], ...) end,
+    write = function(p, ...) return S.write(p[2], ...) end,
     nonblock = function(p)
       local ok, err = p[1]:nonblock()
       if not ok then return nil, err end
