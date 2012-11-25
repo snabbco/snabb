@@ -56,16 +56,16 @@ local function _IOC(dir, tp, nr, size)
 end
 
 -- used to create numbers
-local _IO 	     = function(tp, nr)		    return _IOC(IOC_NONE, tp, nr, 0) end
-local _IOR  	 = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, size) end
-local _IOW   	 = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, size) end
-local _IOWR	     = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, size) end
+local _IO    = function(tp, nr)		return _IOC(IOC_NONE, tp, nr, 0) end
+local _IOR   = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, size) end
+local _IOW   = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, size) end
+local _IOWR  = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, size) end
 
 -- used to decode ioctl numbers..
-local _IOC_DIR  = function(nr)			return band(rshift(nr, IOC_DIRSHIFT), IOC_DIRMASK) end
-local _IOC_TYPE = function(nr)			return band(rshift(nr, IOC_TYPESHIFT), IOC_TYPEMASK) end
-local _IOC_NR   = function(nr)			return band(rshift(nr, IOC_NRSHIFT), IOC_NRMASK) end
-local _IOC_SIZE = function(nr)			return band(rshift(nr, IOC_SIZESHIFT), IOC_SIZEMASK) end
+local _IOC_DIR  = function(nr) return band(rshift(nr, IOC_DIRSHIFT), IOC_DIRMASK) end
+local _IOC_TYPE = function(nr) return band(rshift(nr, IOC_TYPESHIFT), IOC_TYPEMASK) end
+local _IOC_NR   = function(nr) return band(rshift(nr, IOC_NRSHIFT), IOC_NRMASK) end
+local _IOC_SIZE = function(nr) return band(rshift(nr, IOC_SIZESHIFT), IOC_SIZEMASK) end
 
 -- ...and for the drivers/sound files...
 
