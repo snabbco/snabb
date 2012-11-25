@@ -1017,7 +1017,7 @@ meth.termios = {
 
 meth.termios.index.cfsetspeed = meth.termios.index.cfsetospeed -- also shorter names eg ospeed?
 
-metatype("termios", "struct termios", {
+mt.termios = {
   __index = function(termios, k)
     if meth.termios.index[k] then return meth.termios.index[k] end -- note these are called as objects, could use meta metatable
     if c.CC[k] then return termios.c_cc[c.CC[k]] end
@@ -1026,8 +1026,10 @@ metatype("termios", "struct termios", {
     if meth.termios.newindex[k] then return meth.termios.newindex[k](termios, v) end
     if c.CC[k] then termios.c_cc[c.CC[k]] = v end
   end,
-})
+}
 
+metatype("termios", "struct termios", mt.termios)
+metatype("termios2", "struct termios2", mt.termios)
 
 return types
 

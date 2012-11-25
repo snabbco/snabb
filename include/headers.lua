@@ -501,6 +501,16 @@ struct termios {
     speed_t c_ispeed;
     speed_t c_ospeed;
   };
+struct termios2 {
+    tcflag_t c_iflag;
+    tcflag_t c_oflag;
+    tcflag_t c_cflag;
+    tcflag_t c_lflag;
+    cc_t c_line;
+    cc_t c_cc[19];
+    speed_t c_ispeed;
+    speed_t c_ospeed;
+};
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
