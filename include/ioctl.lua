@@ -44,6 +44,7 @@ local IOC_DIRSHIFT	= IOC_SIZESHIFT + IOC_SIZEBITS
 local IOC_NONE	= 0
 local IOC_WRITE	= 1
 local IOC_READ	= 2
+local IOC_READWRITE = IOC_READ + IOC_WRITE
 
 local function _IOC(dir, tp, nr, size)
   if type(tp) == "string" then tp = tp:byte() end
@@ -57,10 +58,10 @@ end
 local _IO 	     = function(tp, nr)		    return _IOC(IOC_NONE, tp, nr, 0) end
 local _IOR  	 = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, ffi.sizeof(size)) end
 local _IOW   	 = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, ffi.sizeof(size)) end
-local _IOWR	     = function(tp, nr, size)	return _IOC(bor(IOC_READ, IOC_WRITE), tp, nr, ffi.sizeof(size)) end
+local _IOWR	     = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, ffi.sizeof(size)) end
 local _IOR_BAD   = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, ffi.sizeof(size)) end
 local _IOW_BAD   = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, ffi.sizeof(size)) end
-local _IOWR_BAD  = function(tp, nr, size)	return _IOC(bor(IOC_READ, IOC_WRITE), tp, nr, ffi.sizeof(size)) end
+local _IOWR_BAD  = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, ffi.sizeof(size)) end
 
 -- used to decode ioctl numbers..
 local _IOC_DIR  = function(nr)			return band(rshift(nr, IOC_DIRSHIFT), IOC_DIRMASK) end

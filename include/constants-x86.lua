@@ -20,7 +20,7 @@ arch.SYS = {
   mknod		  = 14,
   chmod		  = 15,
   lchown	  = 16,
-  --break	  = 17, -- set below
+  ["break"]	  = 17,
   oldstat	  = 18,
   lseek		  = 19,
   getpid	  = 20,
@@ -344,8 +344,6 @@ arch.SYS = {
   process_vm_readv = 347,
   process_vm_writev = 348,
 }
-
-arch.SYS["break"] = 17 -- reserved word
 
 return arch
 
