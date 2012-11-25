@@ -15,6 +15,9 @@ local rshift = bit.rshift
 local ffi = require "ffi"
 require "include.headers"
 
+local ok, arch = pcall(require, "include.ioctl-" .. ffi.arch) -- architecture specific definitions
+if not ok then arch = {} end
+
 local IOC_NRBITS	= 8
 local IOC_TYPEBITS	= 8
 
@@ -153,6 +156,9 @@ local ioctl = {
 
 -- alternate names
 ioctl.TIOCINQ = ioctl.FIONREAD
+
+-- varies by arch
+if arch.FIOQSIZE then ioctl.FIOQSIZE = arch.FIOQSIZE end
 
 return ioctl
 
