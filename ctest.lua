@@ -39,6 +39,10 @@ c.IFF.ALL = nil
 c.IFF.NONE = nil
 c.W.ALL = nil
 
+-- TODO sign issues with ioctls? need to make long?
+c.IOCTL.TIOCGDEV = nil
+c.IOCTL.TIOCSIG = nil
+
 -- umount is odd
 c.MNT = {}
 c.MNT.FORCE = c.UMOUNT.FORCE
@@ -280,6 +284,7 @@ local nm = {
   OFLAG = "",
   CFLAG = "",
   CC = "",
+  IOCTL = "",
 }
 
 for k, v in pairs(c) do

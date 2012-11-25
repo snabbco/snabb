@@ -97,6 +97,8 @@ local c = {}
 
 c.SYS = arch.SYS
 
+c.IOCTL = setmetatable(require "include.ioctl", stringflag)
+
 c.STD = setmetatable({
   IN_FILENO = 0,
   OUT_FILENO = 1,
@@ -1962,7 +1964,7 @@ c.TCSA = setmetatable({
   FLUSH = 2,
 }, stringflag)
 
--- TIOCM ioctls
+-- TIOCM
 c.TIOCM = setmetatable({
   LE  = 0x001,
   DTR = 0x002,
@@ -1975,27 +1977,8 @@ c.TIOCM = setmetatable({
   DSR = 0x100,
 }, multiflags)
 
-TIOCM.CD  = c.TIOCM.CAR
-TIOCM.RI  = c.TIOCM.RNG
-
--- ioctls, filling in as needed TODO more general framework?
-c.SIOC = setmetatable({
-  GIFINDEX   = 0x8933,
-
-  BRADDBR    = 0x89a0,
-  BRDELBR    = 0x89a1,
-  BRADDIF    = 0x89a2,
-  BRDELIF    = 0x89a3,
-}, stringflag)
-
-c.TIOC = setmetatable({
-  MGET       = 0x5415,
-  MBIS       = 0x5416,
-  MBIC       = 0x5417,
-  MSET       = 0x5418,
-  GPTN	     = 0x80045430LL,
-  SPTLCK	 = 0x40045431LL,
-}, stringflag)
+c.TIOCM.CD  = c.TIOCM.CAR
+c.TIOCM.RI  = c.TIOCM.RNG
 
 -- sysfs values
 c.SYSFS_BRIDGE_ATTR        = "bridge"

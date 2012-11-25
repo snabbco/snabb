@@ -458,10 +458,10 @@ function S.execve(filename, argv, envp)
 end
 
 function S.ioctl(d, request, argp)
-  local ret = C.ioctl(getfd(d), request, argp)
+  if type(argp) == "string" then argp = pt.char(argp) end 
+  local ret = C.ioctl(getfd(d), c.IOCTL[request], argp)
   if ret == -1 then return nil, t.error() end
-  -- some different return types may need to be handled
-  return true
+  return ret -- usually zero
 end
 
 -- note that this is not strictly the syscall that has some other arguments, but has same functionality
@@ -1800,7 +1800,7 @@ function S.readfile(name, buffer, length)
   if not f then return nil, err end
   local r, err = f:read(buffer, length or 4096)
   if not r then return nil, err end
-  local ok, err = f:close()
+  local ok, err = S.close(f)
   if not ok then return nil, err end
   return r
 end
@@ -1851,7 +1851,7 @@ local function if_nametoindex(name, s) -- internal version when already have soc
   local len = #name + 1
   if len > IFNAMSIZ then len = IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
-  local ret, err = S.ioctl(s, c.SIOC.GIFINDEX, ifr)
+  local ret, err = S.ioctl(s, "SIOCGIFINDEX", ifr)
   if not ret then return nil, err end
   return ifr.ifr_ifru.ifru_ivalue
 end
@@ -1861,7 +1861,7 @@ function S.if_nametoindex(name) -- standard function in some libc versions
   if not s then return nil, err end
   local i, err = if_nametoindex(name, s)
   if not i then return nil, err end
-  local ok, err = s:close()
+  local ok, err = S.close(s)
   if not ok then return nil, err end
   return i
 end
@@ -1870,15 +1870,15 @@ end
 local function bridge_ioctl(io, name)
   local s, err = S.socket(c.AF.LOCAL, c.SOCK.STREAM, 0)
   if not s then return nil, err end
-  local ret, err = S.ioctl(s, io, pt.char(name))
+  local ret, err = S.ioctl(s, io, name)
   if not ret then return nil, err end
-  local ok, err = s:close()
+  local ok, err = S.close(s)
   if not ok then return nil, err end
   return true
 end
 
-function S.bridge_add(name) return bridge_ioctl(c.SIOC.BRADDBR, name) end
-function S.bridge_del(name) return bridge_ioctl(c.SIOC.BRDELBR, name) end
+function S.bridge_add(name) return bridge_ioctl("SIOCBRADDBR", name) end
+function S.bridge_del(name) return bridge_ioctl("SIOCBRDELBR", name) end
 
 local function bridge_if_ioctl(io, bridge, dev)
   local err, s, ifr, len, ret, ok
@@ -1895,7 +1895,7 @@ local function bridge_if_ioctl(io, bridge, dev)
   ifr.ifr_ifru.ifru_ivalue = dev
   ret, err = S.ioctl(s, io, ifr);
   if not ret then return nil, err end
-  ok, err = s:close()
+  ok, err = S.close(s)
   if not ok then return nil, err end
   return true
 end
@@ -2146,14 +2146,14 @@ end
 
 function S.unlockpt(fd)
   local unlock = t.int1()
-  local ret, err = S.ioctl(fd, c.TIOC.SPTLCK, pt.void(unlock)) -- TODO make sure this returns true instead?
+  local ret, err = S.ioctl(fd, "TIOCSPTLCK", unlock) -- TODO make sure this returns true instead?
   if not ret then return nil, err end
   return true
 end
 
 function S.ptsname(fd)
   local pts = t.int1()
-  local ret, error = S.ioctl(fd, c.TIOC.GPTN, pt.void(pts))
+  local ret, error = S.ioctl(fd, "TIOCGPTN", pts)
   if not ret then return nil, err end
   return "/dev/pts/" .. tostring(pts[0])
 end
