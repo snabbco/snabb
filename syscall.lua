@@ -8,18 +8,20 @@ local function setmetatable(t, mt)
   return oldsm(t, mt)
 end
 
+local S = {} -- exported functions
+
 local ffi = require "ffi"
 local bit = require "bit"
 
 require "include.headers"
 local c = require "include.constants"
-c.IOCTL = require "include.ioctl" -- avoids dependency issues
 local types = require "include.types"
-local h = require "include.helpers"
 
+local h = require "include.helpers"
 local split = h.split
 
-local S = {} -- exported functions
+local ioctl = require "include.ioctl" -- avoids dependency issues
+c.IOCTL = ioctl.IOCTL
 
 S.C = setmetatable({}, {__index = ffi.C})
 local C = S.C
@@ -462,7 +464,7 @@ function S.execve(filename, argv, envp)
 end
 
 function S.ioctl(d, request, argp)
-  if type(argp) == "string" then argp = pt.char(argp) end 
+  if type(argp) == "string" then argp = pt.char(argp) end
   local ret = C.ioctl(getfd(d), c.IOCTL[request], argp)
   if ret == -1 then return nil, t.error() end
   return ret -- usually zero

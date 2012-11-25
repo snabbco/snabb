@@ -22,6 +22,8 @@ local ffi = require "ffi"
 local ok, arch = pcall(require, "include.ioctl-" .. ffi.arch) -- architecture specific definitions
 if not ok then arch = {} end
 
+local ioctl = {}
+
 local IOC_NRBITS	= 8
 local IOC_TYPEBITS	= 8
 
@@ -75,7 +77,7 @@ local IOC_INOUT		= lshift(bor(IOC_WRITE, IOC_READ), IOC_DIRSHIFT)
 local IOCSIZE_MASK	= lshift(IOC_SIZEMASK, IOC_SIZESHIFT)
 local IOCSIZE_SHIFT	= IOC_SIZESHIFT
 
-local ioctl = setmetatable({
+ioctl.IOCTL = setmetatable({
 -- termios, non standard values generally 0x54 = 'T'
   TCGETS          = 0x5401,
   TCSETS          = 0x5402,
@@ -154,7 +156,7 @@ local ioctl = setmetatable({
   SIOCBRDELBR     = 0x89a1,
   SIOCBRADDIF     = 0x89a2,
   SIOCBRDELIF     = 0x89a3,
--- event system TODO fix the ones with multiple arguments
+-- event system
   EVIOCGVERSION   = _IOR('E', 0x01, s.int),
   EVIOCGID        = _IOR('E', 0x02, s.input_id),
   EVIOCGREP       = _IOR('E', 0x03, s.uint2),
@@ -171,9 +173,9 @@ local ioctl = setmetatable({
   EVIOCGLED  = function(len) return _IOC(IOC_READ, 'E', 0x19, len) end,
   EVIOCGSND  = function(len) return _IOC(IOC_READ, 'E', 0x1a, len) end,
   EVIOCGSW   = function(len) return _IOC(IOC_READ, 'E', 0x1b, len) end,
-  --EVIOCGBIT  = function(ev, len) return _IOC(IOC_READ, 'E', 0x20 + ev, len) end,
-  --EVIOCGABS  = function(abs) return _IOR('E', 0x40 + abs, s.input_absinfo) end,
-  --EVIOCSABS  = function(abs) return _IOW('E', 0xc0 + abs, s.input_absinfo) end,
+  EVIOCGBIT  = function(ev, len) return _IOC(IOC_READ, 'E', 0x20 + ev, len) end,
+  EVIOCGABS  = function(abs) return _IOR('E', 0x40 + abs, s.input_absinfo) end,
+  EVIOCSABS  = function(abs) return _IOW('E', 0xc0 + abs, s.input_absinfo) end,
   EVIOCSFF   = _IOC(IOC_WRITE, 'E', 0x80, s.ff_effect),
   EVIOCRMFF  = _IOW('E', 0x81, s.int),
   EVIOCGEFFECTS = _IOR('E', 0x84, s.int),
@@ -181,10 +183,11 @@ local ioctl = setmetatable({
 }, stringflag)
 
 -- alternate names
-ioctl.TIOCINQ = ioctl.FIONREAD
+ioctl.IOCTL.TIOCINQ = ioctl.IOCTL.FIONREAD
 
 -- varies by arch
-if arch.FIOQSIZE then ioctl.FIOQSIZE = arch.FIOQSIZE end
+if arch.FIOQSIZE then ioctl.IOCTL.FIOQSIZE = arch.FIOQSIZE end
 
+-- TODO should we export more functions?
 return ioctl
 
