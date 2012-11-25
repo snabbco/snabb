@@ -304,7 +304,9 @@ for k, v in pairs(c) do
   elseif type(v) == "table" then
     for k2, v2 in pairs(v) do
       local name = nm[k] or k .. "_"
-      print("assert(" .. name .. k2 .. " == " .. tostring(v2) .. ");")
+      if type(v2) ~= "function" then
+        print("assert(" .. name .. k2 .. " == " .. tostring(v2) .. ");")
+      end
     end
   end
 end

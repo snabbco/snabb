@@ -202,7 +202,11 @@ t.uid1 = ffi.typeof("uid_t[1]")
 t.gid1 = ffi.typeof("gid_t[1]")
 t.aio_context1 = ffi.typeof("aio_context_t[1]")
 t.int2 = ffi.typeof("int[2]")
+t.uint2 = ffi.typeof("unsigned int[2]")
 t.timespec2 = ffi.typeof("struct timespec[2]")
+
+-- still need sizes for these, for ioctls
+s.uint2 = ffi.sizeof(t.uint2)
 
 -- still need pointers to these
 pt.inotify_event = ptt(t.inotify_event)

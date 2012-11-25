@@ -57,12 +57,9 @@ end
 
 -- used to create numbers
 local _IO 	     = function(tp, nr)		    return _IOC(IOC_NONE, tp, nr, 0) end
-local _IOR  	 = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, s[size]) end
-local _IOW   	 = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, s[size]) end
-local _IOWR	     = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, s[size]) end
-local _IOR_BAD   = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, s[size]) end
-local _IOW_BAD   = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, s[size]) end
-local _IOWR_BAD  = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, s[size]) end
+local _IOR  	 = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, size) end
+local _IOW   	 = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, size) end
+local _IOWR	     = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, size) end
 
 -- used to decode ioctl numbers..
 local _IOC_DIR  = function(nr)			return band(rshift(nr, IOC_DIRSHIFT), IOC_DIRMASK) end
@@ -120,20 +117,20 @@ local ioctl = setmetatable({
   TIOCSBRK        = 0x5427,
   TIOCCBRK        = 0x5428,
   TIOCGSID        = 0x5429,
-  TCGETS2         = _IOR('T', 0x2A, "termios2"),
-  TCSETS2         = _IOW('T', 0x2B, "termios2"),
-  TCSETSW2        = _IOW('T', 0x2C, "termios2"),
-  TCSETSF2        = _IOW('T', 0x2D, "termios2"),
+  TCGETS2         = _IOR('T', 0x2A, s.termios2),
+  TCSETS2         = _IOW('T', 0x2B, s.termios2),
+  TCSETSW2        = _IOW('T', 0x2C, s.termios2),
+  TCSETSF2        = _IOW('T', 0x2D, s.termios2),
   TIOCGRS485      = 0x542E,
   TIOCSRS485      = 0x542F,
-  TIOCGPTN        = _IOR('T', 0x30, "uint"),
-  TIOCSPTLCK      = _IOW('T', 0x31, "int"),
-  TIOCGDEV        = _IOR('T', 0x32, "uint"),
+  TIOCGPTN        = _IOR('T', 0x30, s.uint),
+  TIOCSPTLCK      = _IOW('T', 0x31, s.int),
+  TIOCGDEV        = _IOR('T', 0x32, s.uint),
   TCGETX          = 0x5432,
   TCSETX          = 0x5433,
   TCSETXF         = 0x5434,
   TCSETXW         = 0x5435,
-  TIOCSIG         = _IOW('T', 0x36, "int"),
+  TIOCSIG         = _IOW('T', 0x36, s.int),
   TIOCVHANGUP     = 0x5437,
   FIONCLEX        = 0x5450,
   FIOCLEX         = 0x5451,
@@ -157,6 +154,30 @@ local ioctl = setmetatable({
   SIOCBRDELBR     = 0x89a1,
   SIOCBRADDIF     = 0x89a2,
   SIOCBRDELIF     = 0x89a3,
+-- event system TODO fix the ones with multiple arguments
+  EVIOCGVERSION   = _IOR('E', 0x01, s.int),
+  EVIOCGID        = _IOR('E', 0x02, s.input_id),
+  EVIOCGREP       = _IOR('E', 0x03, s.uint2),
+  EVIOCSREP       = _IOW('E', 0x03, s.uint2),
+  EVIOCGKEYCODE   = _IOR('E', 0x04, s.uint2),
+  EVIOCGKEYCODE_V2 = _IOR('E', 0x04, s.input_keymap_entry),
+  EVIOCSKEYCODE   = _IOW('E', 0x04, s.uint2),
+  EVIOCSKEYCODE_V2 = _IOW('E', 0x04, s.input_keymap_entry),
+  EVIOCGNAME = function(len) return _IOC(IOC_READ, 'E', 0x06, len) end,
+  EVIOCGPHYS = function(len) return _IOC(IOC_READ, 'E', 0x07, len) end,
+  EVIOCGUNIQ = function(len) return _IOC(IOC_READ, 'E', 0x08, len) end,
+  EVIOCGPROP = function(len) return _IOC(IOC_READ, 'E', 0x09, len) end,
+  EVIOCGKEY  = function(len) return _IOC(IOC_READ, 'E', 0x18, len) end,
+  EVIOCGLED  = function(len) return _IOC(IOC_READ, 'E', 0x19, len) end,
+  EVIOCGSND  = function(len) return _IOC(IOC_READ, 'E', 0x1a, len) end,
+  EVIOCGSW   = function(len) return _IOC(IOC_READ, 'E', 0x1b, len) end,
+  --EVIOCGBIT  = function(ev, len) return _IOC(IOC_READ, 'E', 0x20 + ev, len) end,
+  --EVIOCGABS  = function(abs) return _IOR('E', 0x40 + abs, s.input_absinfo) end,
+  --EVIOCSABS  = function(abs) return _IOW('E', 0xc0 + abs, s.input_absinfo) end,
+  EVIOCSFF   = _IOC(IOC_WRITE, 'E', 0x80, s.ff_effect),
+  EVIOCRMFF  = _IOW('E', 0x81, s.int),
+  EVIOCGEFFECTS = _IOR('E', 0x84, s.int),
+  EVIOCGRAB  = _IOW('E', 0x90, s.int),
 }, stringflag)
 
 -- alternate names
