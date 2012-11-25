@@ -37,8 +37,8 @@ local t, pt, s = S.t, S.pt, S.s
 local mt = {} -- metatables
 local meth = {}
 
-local function u6432t(x) return t.u6432(x):to32() end
-local function i6432t(x) return t.i6432(x):to32() end
+local function u6432(x) return t.u6432(x):to32() end
+local function i6432(x) return t.i6432(x):to32() end
 
 -- makes code tidier TODO could make all types accept themselves as constructors
 local function istype(tp, x)
