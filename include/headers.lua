@@ -531,6 +531,73 @@ struct input_absinfo {
     int32_t flat;
     int32_t resolution;
 };
+struct input_keymap_entry {
+    uint8_t  flags;
+    uint8_t  len;
+    uint16_t index;
+    uint32_t keycode;
+    uint8_t  scancode[32];
+};
+struct ff_replay {
+    uint16_t length;
+    uint16_t delay;
+};
+struct ff_trigger {
+    uint16_t button;
+    uint16_t interval;
+};
+struct ff_envelope {
+    uint16_t attack_length;
+    uint16_t attack_level;
+    uint16_t fade_length;
+    uint16_t fade_level;
+};
+struct ff_constant_effect {
+    int16_t level;
+    struct ff_envelope envelope;
+};
+struct ff_ramp_effect {
+    int16_t start_level;
+    int16_t end_level;
+    struct ff_envelope envelope;
+};
+struct ff_condition_effect {
+    uint16_t right_saturation;
+    uint16_t left_saturation;
+    int16_t right_coeff;
+    int16_t left_coeff;
+    uint16_t deadband;
+    int16_t center;
+};
+struct ff_periodic_effect {
+    uint16_t waveform;
+    uint16_t period;
+    int16_t magnitude;
+    int16_t offset;
+    uint16_t phase;
+    struct ff_envelope envelope;
+    uint32_t custom_len;
+    int16_t *custom_data;
+};
+struct ff_rumble_effect {
+    uint16_t strong_magnitude;
+    uint16_t weak_magnitude;
+};
+struct ff_effect {
+    uint16_t type;
+    int16_t id;
+    uint16_t direction;
+    struct ff_trigger trigger;
+    struct ff_replay replay;
+    union {
+        struct ff_constant_effect constant;
+        struct ff_ramp_effect ramp;
+        struct ff_periodic_effect periodic;
+        struct ff_condition_effect condition[2];
+        struct ff_rumble_effect rumble;
+    } u;
+};
+
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage

@@ -166,6 +166,16 @@ local addtypes = {
   input_event = "struct input_event",
   input_id = "struct input_id",
   input_absinfo = "struct input_absinfo",
+  input_keymap_entry = "struct input_keymap_entry",
+  ff_replay = "struct ff_replay",
+  ff_trigger = "struct ff_trigger",
+  ff_envelope = "struct ff_envelope",
+  ff_constant_effect = "struct ff_constant_effect",
+  ff_ramp_effect = "struct ff_ramp_effect",
+  ff_condition_effect = "struct ff_condition_effect",
+  ff_periodic_effect = "struct ff_periodic_effect",
+  ff_rumble_effect = "struct ff_rumble_effect",
+  ff_effect = "struct ff_effect",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
