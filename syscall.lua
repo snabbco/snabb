@@ -37,6 +37,9 @@ local t, pt, s = S.t, S.pt, S.s
 local mt = {} -- metatables
 local meth = {}
 
+local function u6432t(x) return t.u6432(x):to32() end
+local function i6432t(x) return t.i6432(x):to32() end
+
 -- makes code tidier TODO could make all types accept themselves as constructors
 local function istype(tp, x)
   if ffi.istype(tp, x) then return x else return false end
@@ -193,7 +196,7 @@ end
 if ffi.abi("32bit") then
   function C.lseek(fd, offset, whence)
     local result = t.loff1()
-    local off1, off2 = t.u6432(offset):to32()
+    local off1, off2 = u6432(offset)
     local ret = C.syscall(c.SYS._llseek, t.int(fd), t.ulong(off1), t.ulong(off2), pt.void(result), t.uint(whence))
     if ret == -1 then return -1 end
     return result[0]
@@ -259,19 +262,19 @@ if ffi.abi("64bit") then
   end
 else
   function CC.fallocate(fd, mode, offset, len)
-    local off2, off1 = t.u6432(offset):to32()
-    local len2, len1 = t.u6432(len):to32()
+    local off2, off1 = u6432(offset)
+    local len2, len1 = u6432(len)
     return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
   end
 end
 
 -- missing in uClibc. Note very odd split 64 bit arguments even on 64 bit platform.
 function CC.preadv64(fd, iov, iovcnt, offset)
-  local off2, off1 = t.i6432(offset):to32()
+  local off2, off1 = i6432(offset)
   return C.syscall(c.SYS.preadv, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
 end
 function CC.pwritev64(fd, iov, iovcnt, offset)
-  local off2, off1 = t.i6432(offset):to32()
+  local off2, off1 = i6432(offset)
   return C.syscall(c.SYS.pwritev, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
 end
 
