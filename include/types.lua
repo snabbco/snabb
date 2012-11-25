@@ -165,6 +165,7 @@ local addtypes = {
   mqattr = "struct mq_attr",
   input_event = "struct input_event",
   input_id = "struct input_id",
+  input_absinfo = "struct input_absinfo",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
