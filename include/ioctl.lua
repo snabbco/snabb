@@ -6,9 +6,9 @@
 local ffi = require "ffi"
 local bit = require "bit"
 local band = bit.band
-local function bor(a, b)
-  local r = bit.bor(a, b)
-  if r < 0 then r = r + 4294967296 end
+local function bor(...)
+  local r = bit.bor(...)
+  if r < 0 then r = r + 4294967296LL end
   return r
 end
 local lshift = bit.lshift
@@ -59,7 +59,7 @@ local IOC_WRITE	= 1
 local IOC_READ	= 2
 
 local function _IOC(dir, tp, nr, size)
-  if type(tp) == "string" then tp = tp.byte(1) end
+  if type(tp) == "string" then tp = tp:byte() end
   return bor(lshift(dir, IOC_DIRSHIFT), 
 	 lshift(tp, IOC_TYPESHIFT), 
 	 lshift(nr, IOC_NRSHIFT), 
@@ -67,7 +67,7 @@ local function _IOC(dir, tp, nr, size)
 end
 
 -- used to create numbers
-local _IO 	 = function(tp, nr)		return _IOC(IOC_NONE, tp, nr,0) end
+local _IO 	 = function(tp, nr)		return _IOC(IOC_NONE, tp, nr, 0) end
 local _IOR 	 = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, ffi.sizeof(size)) end
 local _IOW 	 = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, ffi.sizeof(size)) end
 local _IOWR	 = function(tp, nr, size)	return _IOC(bor(IOC_READ, IOC_WRITE), tp, nr, ffi.sizeof(size)) end
@@ -170,10 +170,6 @@ local ioctl = {
   SIOCBRADDIF     = 0x89a2,
   SIOCBRDELIF     = 0x89a3,
 }
-
--- TODO fix these, somehow not getting correct value
-ioctl.TIOCGPTN	     = 0x80045430LL
-ioctl.TIOCSPTLCK     = 0x40045431LL
 
 return ioctl
 
