@@ -22,7 +22,7 @@ local function ev(dev)
 
   local pversion = S.t.int1()
 
-  assert(S.ioctl(fd, ioctl.EVIOCGVERSION, pversion))
+  assert(S.ioctl(fd, "EVIOCGVERSION", pversion))
 
   local version = pversion[0]
 
