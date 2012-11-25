@@ -11,13 +11,14 @@ end
 local lshift = bit.lshift
 local rshift = bit.rshift
 
--- TODO would rather not include ffi, but we need sizes so split these out into a new file
-local ffi = require "ffi"
-require "include.headers"
+-- include types to get sizes
+local t = require "include.types"
+local s = t.s
 
 local h = require "include.helpers"
 local stringflag = h.stringflag
 
+local ffi = require "ffi"
 local ok, arch = pcall(require, "include.ioctl-" .. ffi.arch) -- architecture specific definitions
 if not ok then arch = {} end
 
@@ -56,12 +57,12 @@ end
 
 -- used to create numbers
 local _IO 	     = function(tp, nr)		    return _IOC(IOC_NONE, tp, nr, 0) end
-local _IOR  	 = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, ffi.sizeof(size)) end
-local _IOW   	 = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, ffi.sizeof(size)) end
-local _IOWR	     = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, ffi.sizeof(size)) end
-local _IOR_BAD   = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, ffi.sizeof(size)) end
-local _IOW_BAD   = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, ffi.sizeof(size)) end
-local _IOWR_BAD  = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, ffi.sizeof(size)) end
+local _IOR  	 = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, s[size]) end
+local _IOW   	 = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, s[size]) end
+local _IOWR	     = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, s[size]) end
+local _IOR_BAD   = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, s[size]) end
+local _IOW_BAD   = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, s[size]) end
+local _IOWR_BAD  = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, s[size]) end
 
 -- used to decode ioctl numbers..
 local _IOC_DIR  = function(nr)			return band(rshift(nr, IOC_DIRSHIFT), IOC_DIRMASK) end
@@ -119,15 +120,15 @@ local ioctl = setmetatable({
   TIOCSBRK        = 0x5427,
   TIOCCBRK        = 0x5428,
   TIOCGSID        = 0x5429,
-  TCGETS2         = _IOR('T', 0x2A, "struct termios2"),
-  TCSETS2         = _IOW('T', 0x2B, "struct termios2"),
-  TCSETSW2        = _IOW('T', 0x2C, "struct termios2"),
-  TCSETSF2        = _IOW('T', 0x2D, "struct termios2"),
+  TCGETS2         = _IOR('T', 0x2A, "termios2"),
+  TCSETS2         = _IOW('T', 0x2B, "termios2"),
+  TCSETSW2        = _IOW('T', 0x2C, "termios2"),
+  TCSETSF2        = _IOW('T', 0x2D, "termios2"),
   TIOCGRS485      = 0x542E,
   TIOCSRS485      = 0x542F,
-  TIOCGPTN        = _IOR('T', 0x30, "unsigned int"),
+  TIOCGPTN        = _IOR('T', 0x30, "uint"),
   TIOCSPTLCK      = _IOW('T', 0x31, "int"),
-  TIOCGDEV        = _IOR('T', 0x32, "unsigned int"),
+  TIOCGDEV        = _IOR('T', 0x32, "uint"),
   TCGETX          = 0x5432,
   TCSETX          = 0x5433,
   TCSETXF         = 0x5434,

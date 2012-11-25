@@ -24,8 +24,6 @@ local c = {}
 
 c.SYS = arch.SYS
 
-c.IOCTL = require "include.ioctl"
-
 c.STD = setmetatable({
   IN_FILENO = 0,
   OUT_FILENO = 1,

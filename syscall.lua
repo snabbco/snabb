@@ -13,6 +13,7 @@ local bit = require "bit"
 
 require "include.headers"
 local c = require "include.constants"
+c.IOCTL = require "include.ioctl" -- avoids dependency issues
 local types = require "include.types"
 local h = require "include.helpers"
 
