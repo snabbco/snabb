@@ -13,7 +13,10 @@ local bit = require "bit"
 
 require "include.headers"
 local c = require "include.constants"
-local types = require("include.types")
+local types = require "include.types"
+local h = require "include.helpers"
+
+local split = h.split
 
 local S = {} -- exported functions
 
@@ -969,24 +972,6 @@ local function growattrbuf(f, a, b)
   if ret > 0 then ret = ret - 1 end -- has trailing \0
 
   return ffi.string(buffer, ret)
-end
-
-local function split(delimiter, text)
-  if delimiter == "" then return {text} end
-  if #text == 0 then return {} end
-  local list = {}
-  local pos = 1
-  while true do
-    local first, last = text:find(delimiter, pos)
-    if first then
-      list[#list + 1] = text:sub(pos, first - 1)
-      pos = last + 1
-    else
-      list[#list + 1] = text:sub(pos)
-      break
-    end
-  end
-  return list
 end
 
 local function lattrbuf(sys, a)

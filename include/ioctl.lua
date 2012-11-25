@@ -99,7 +99,6 @@ local ioctl = {
   TIOCGSOFTCAR    = 0x5419,
   TIOCSSOFTCAR    = 0x541A,
   FIONREAD        = 0x541B,
-  --TIOCINQ         FIONREAD
   TIOCLINUX       = 0x541C,
   TIOCCONS        = 0x541D,
   TIOCGSERIAL     = 0x541E,
@@ -151,6 +150,9 @@ local ioctl = {
   SIOCBRADDIF     = 0x89a2,
   SIOCBRDELIF     = 0x89a3,
 }
+
+-- alternate names
+ioctl.TIOCINQ = ioctl.FIONREAD
 
 return ioctl
 
