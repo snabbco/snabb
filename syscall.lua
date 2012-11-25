@@ -2105,7 +2105,7 @@ end
 function S.vhangup() return retbool(C.vhangup()) end
 
 -- Nixio compatibility to make porting easier, and useful functions (often man 3). Incomplete.
-function S.setblocking(s, b) if b then return s:block() else return s:nonblock() end end
+function S.setblocking(s, b) if b then return S.block(s) else return S.nonblock(s) end end
 function S.tell(fd) return S.lseek(fd, 0, c.SEEK.CUR) end
 
 function S.lockf(fd, cmd, len)
