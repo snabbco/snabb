@@ -511,6 +511,12 @@ struct termios2 {
     speed_t c_ispeed;
     speed_t c_ospeed;
 };
+struct input_event {
+    struct timeval time;
+    uint16_t type;
+    uint16_t code;
+    int32_t value;
+};
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
