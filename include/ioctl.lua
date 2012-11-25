@@ -149,7 +149,7 @@ ioctl.IOCTL = setmetatable({
   TIOCMIWAIT      = 0x545C,
   TIOCGICOUNT     = 0x545D,
   FIOQSIZE        = 0x5460,
--- network ioctls
+-- network ioctls (from the pre-netlink tools) from linux/sockios.h
   SIOCGIFINDEX    = 0x8933,
 
   SIOCBRADDBR     = 0x89a0,
