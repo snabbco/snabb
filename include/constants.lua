@@ -24,7 +24,7 @@ local c = {}
 
 c.SYS = arch.SYS
 
-c.IOCTL = setmetatable(require "include.ioctl", stringflag)
+c.IOCTL = require "include.ioctl"
 
 c.STD = setmetatable({
   IN_FILENO = 0,

@@ -15,6 +15,9 @@ local rshift = bit.rshift
 local ffi = require "ffi"
 require "include.headers"
 
+local h = require "include.helpers"
+local stringflag = h.stringflag
+
 local ok, arch = pcall(require, "include.ioctl-" .. ffi.arch) -- architecture specific definitions
 if not ok then arch = {} end
 
@@ -73,7 +76,7 @@ local IOC_INOUT		= lshift(bor(IOC_WRITE, IOC_READ), IOC_DIRSHIFT)
 local IOCSIZE_MASK	= lshift(IOC_SIZEMASK, IOC_SIZESHIFT)
 local IOCSIZE_SHIFT	= IOC_SIZESHIFT
 
-local ioctl = {
+local ioctl = setmetatable({
 -- termios, non standard values generally 0x54 = 'T'
   TCGETS          = 0x5401,
   TCSETS          = 0x5402,
@@ -152,7 +155,7 @@ local ioctl = {
   SIOCBRDELBR     = 0x89a1,
   SIOCBRADDIF     = 0x89a2,
   SIOCBRDELIF     = 0x89a3,
-}
+}, stringflag)
 
 -- alternate names
 ioctl.TIOCINQ = ioctl.FIONREAD
