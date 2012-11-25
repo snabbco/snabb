@@ -2197,7 +2197,6 @@ t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   end
 })
 
--- TODO note a new fd implementation would have to redefine as these set at init time. Document or fix.
 S.stdin = t.fd(c.STD.IN):nogc()
 S.stdout = t.fd(c.STD.OUT):nogc()
 S.stderr = t.fd(c.STD.ERR):nogc()
