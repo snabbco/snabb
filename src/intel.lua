@@ -422,13 +422,13 @@ function new (pciaddress)
    local stats = {tx_packets=0, tx_bytes=0, tx_errors=0,
 		  rx_packets=0, rx_bytes=0, rx_errors=0}
 
-   local GPRC  = 0x04074 -- Good Packets Received Count (R)
-   local GPTC  = 0x04080 -- Good Packets Transmitted Count (R)
+   local GPRC  = 0x04074/4 -- Good Packets Received Count (R)
+   local GPTC  = 0x04080/4 -- Good Packets Transmitted Count (R)
    -- NOTE: Octet counter registers reset when the high word is read.
-   local GORCL = 0x04088 -- Good Octets Received Count Low (R)
-   local GORCH = 0x0408C -- Good Octets Received Count High (R)
-   local GOTCL = 0x04090 -- Good Octets Transmitted Count Low (R)
-   local GOTCH = 0x04094 -- Good Octets Transmitted Count High (R)
+   local GORCL = 0x04088/4 -- Good Octets Received Count Low (R)
+   local GORCH = 0x0408C/4 -- Good Octets Received Count High (R)
+   local GOTCL = 0x04090/4 -- Good Octets Transmitted Count Low (R)
+   local GOTCH = 0x04094/4 -- Good Octets Transmitted Count High (R)
 
    function M.print_stats ()
       update_stats()
@@ -439,10 +439,10 @@ function new (pciaddress)
    end
 
    function update_stats ()
-      stats.tx_packets = regs[GPTC]
-      stats.rx_packets = regs[GPRC]
-      stats.tx_bytes = regs[GOTCL] + bit.lshift(regs[GOTCH], 32)
-      stats.rx_bytes = regs[GORCL] + bit.lshift(regs[GORCH], 32)
+      stats.tx_packets = stats.tx_packets + regs[GPTC]
+      stats.rx_packets = stats.rx_packets + regs[GPRC]
+      stats.tx_bytes = stats.tx_bytes + regs[GOTCL] + bit.lshift(regs[GOTCH], 32)
+      stats.rx_bytes = stats.rx_bytes + regs[GORCL] + bit.lshift(regs[GORCH], 32)
    end
 
    -- Return a bitmask using the values of `bitset' as indexes.
