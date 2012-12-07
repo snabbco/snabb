@@ -72,9 +72,6 @@ function new (pciaddress)
       return wrap(ffi.cast(tptr, ffi.cast("uint8_t *", base) + offset))
    end
 
-   -- 2. MMAP physical memory
-
-
    -- Static DMA memory map. Offsets for each memory region.
    local offset_txdesc   = 0x00000000 --  1MB TX descriptors
    local offset_rxdesc   = 0x00100000 --  1MB RX descriptors
@@ -288,15 +285,6 @@ function new (pciaddress)
 	 struct tx_desc {
 	    uint64_t address;
 	    uint64_t options;
-	    /*
-	    --   unsigned int vlan:16;
-	    --   unsigned int popts:8;
-	    --   unsigned int extcmd:4;
-	    --   unsigned int sta:4;
-	    --   unsigned int dcmd:8;
-	    --   unsigned int dtype:4;
-	    --   unsigned int dtalen:20;
-	    */
 	 } __attribute__((packed));
 
 	 union tx {
@@ -331,10 +319,6 @@ function new (pciaddress)
       local index = regs[TDT]
       txdesc[index].desc.address = address
       txdesc[index].desc.options = bit.bor(size, bits({dtype=20, eop=24, ifcs=25, dext=29}))
-      -- txdesc[index].desc.dtalen = size
-      -- txdesc[index].desc.dtype  = 0x1
-      -- txdesc[index].desc.sta    = 0
-      -- txdesc[index].desc.dcmd   = 0x20 -- EOP(0)=0 DEXT(5)=1
       regs[TDT] = (index + 1) % num_descriptors
    end
 
@@ -484,11 +468,6 @@ local nic = new("0000:00:04.0")
 
 print("Initializing controller..")
 nic.init()
-
-print("UP2? " .. tostring(nic.linkup()))
-
-nic.print_stats()
-print "Survived!"
 
 nic.enable_mac_loopback()
 -- nic.enable_phy_loopback()
