@@ -213,8 +213,8 @@ print [[
 #define _LARGE_FILES 1
 #define __USE_FILE_OFFSET64
 
+#include <stdio.h>
 #include <limits.h>
-#include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -279,12 +279,16 @@ struct termios2 {
         speed_t c_ospeed;
 };
 
+void sassert(int a, int b, char *n) {
+  if (a != b) printf("error with %s: %d != %d\n", n, a, b);
+}
+
 int main(int argc, char **argv) {
 ]]
 
 -- iterate over S.ctypes
 for k, v in pairs(ctypes) do
-  print("assert(sizeof(" .. k .. ") == " .. ffi.sizeof(v) .. ");")
+  print("sassert(sizeof(" .. k .. "), " .. ffi.sizeof(v) .. ', "' .. k .. '");')
 end
 
 -- test all the constants
@@ -311,12 +315,12 @@ local nm = {
 
 for k, v in pairs(c) do
   if type(v) == "number" then
-    print("assert(" .. k .. " == " .. v .. ");")
+    print("sassert(" .. k .. ", " .. v .. ', "' .. k .. '");')
   elseif type(v) == "table" then
     for k2, v2 in pairs(v) do
       local name = nm[k] or k .. "_"
       if type(v2) ~= "function" then
-        print("assert(" .. name .. k2 .. " == " .. tostring(v2) .. ");")
+        print("sassert(" .. name .. k2 .. ", " .. tostring(v2)  .. ', "' .. name .. k2 .. '");')
       end
     end
   end
