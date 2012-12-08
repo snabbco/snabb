@@ -240,6 +240,7 @@ print [[
 #include <dirent.h>
 #include <sys/eventfd.h>
 #include <syscall.h>
+#include <sys/ioctl.h>
 
 #include <linux/aio_abi.h>
 #include <linux/reboot.h>
