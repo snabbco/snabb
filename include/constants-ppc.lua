@@ -363,7 +363,7 @@ arch.SYS = {
 }
 
 arch.socketoptions = function(c)
-  error("ppc socketoptions need to be set")
+  print("ppc socketoptions need to be set")
 end
 
 return arch
