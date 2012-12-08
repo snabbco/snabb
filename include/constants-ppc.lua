@@ -312,7 +312,6 @@ arch.SYS = {
   epoll_pwait		= 303,
   utimensat		= 304,
   signalfd		= 305,
-  timerfd		= 306,
   timerfd_create     	= 306,
   eventfd		= 307,
   sync_file_range2	= 308,
