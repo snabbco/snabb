@@ -1,6 +1,6 @@
 # Linux system calls for LuaJIT
 
-What? An FFI implementation of the Linux kernel ABI for LuaJIT. This means you will be able to program all the functionality the Linux kernel provides to userspace directly in Lua.
+What? An FFI implementation of the Linux kernel ABI for LuaJIT. This means you will be able to program all the functionality the Linux kernel provides to userspace directly in Lua. You can view it as a high level language equivalent of the busybox project in a way, although the functionality it provides is somewhat different, and the interface very different.
 
 Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua.
 
@@ -64,28 +64,6 @@ Lots of system calls have glibc wrappers, some of these are trivial some less so
 
 As well as eglibc and glibc, everything now runs on [Musl libc](http://www.etalabs.net/musl/). I use [sabotage](https://github.com/rofl0r/sabotage) as a build environment, which now includes luajit, although you may need to update to git head. Musl is much smaller than libc (700k vs 3M), while still implementing everything we need in easy to understand code. It is also BSD licensed, which may be useful as it matches the other licenses for LuaJIT and ljsyscall.
 
-### System calls
-
-This list is now out of date.
-
-open, close, creat, chdir, mkdir, rmdir, unlink, acct, chmod, link, umask, uname, gethostname, sethostname, getuid, geteuid, getpid, getppid, getgid, getegid, fork, execve, wait, waitpid, \_exit, signal, gettimeofday, settimeofday, time, clock\_getres, clock\_gettime, clock\_settime, sysinfo, read, write, pread, pwrite, lseek, send, sendto, sendmsg, recv, recvfrom, recvmsg, readv, writev, getsockopt, setsockopt, select, epoll\_create, epoll\_ctl, epoll_wait, sendfile, dup, fchdir, fsync, fdatasync, fcntl, fchmod, socket, socketpair, bind, listen, connect, accept, getsockname, getpeername, mmap, munmap, msync, mlock, munlock, mlockall, munlockall, mremap, madvise, pipe, access, getcwd, nanosleep, syscall, stat, fstat, lstat, ioctl, eventfd, truncate, ftruncate, pause, reboot, sync, shutdown, ksyslogctl, mount, umount,
-nice, getpriority, setpriority, prctl, alarm, waitid, inotify\_init, inotify\_add\_watch, inotify\_rm\_watch, adjtimex, getrlimit, setrlimit, sigprocmask, sigpending,
-sigsuspend, getsid, setsid, listxattr, llistxattr, flistxattr, setxattr, lsetxattr, fsetxattr, getxattr, lgetxattr, fgetxattr, removexattr, lremovexattr, fremovexattr,
-readlink, splice, vmsplice, tee, signalfd, timerfd\_create, timerfd\_settime, timerfd\_gettime, posix\_fadvise, fallocate, readahead, poll,
-getitimer, setitimer, sync\_file\_range,
-io\_cancel, io\_destroy, io\_setup, io\_submit, io\_getevents
-
-### Other functions
-
-exit, inet\_aton, inet\_ntoa, inet\_pton, inet\_ntop,
-cfgetispeed, cfgetospeed, cfsetispeed, cfsetospeed, cfsetspeed,
-tcgetattr, tcsetattr, tcsendbreak, tcdrain, tcflush, tcflow, tcgetsid,
-posix\_openpt, grantpt, unlockpt, ptsname
-
-### Socket types
-
-inet, inet6, unix, netlink.
-
 ### API
 
 All functions return two values, the return value, or true if there is not one other than success, then an error value. This makes it easy to write things like assert(fd:close()). The error type can be converted to a string message, or you can retrieve the errno, or test against a symbolic error name.
@@ -116,86 +94,7 @@ There is an example epoll script that you can test with Apachebench (in the exam
 
 ### Issues
 
-There will no doubt be bugs and missing features, please report them if you find them. Also API design issues.
+There will no doubt be bugs and missing features, please report them if you find them. Also API design issues. You can use the (github issue tracker)[https://github.com/justincormack/ljsyscall/issues?page=1&state=open]
 
-### Missing functions
 
-This list is possibly out of date.
-
-timer\_create, timer\_getoverrun, clock\_adjtime
-sigqueue,
-capset, capget
-init\_module, delete\_module, query\_module, get_\kernel\_syms, swapon, swapoff
-iopl, ioperm
-futex, set\_robust\_list, get\_robust\_list
-getrusage, ptrace
-setfsuid, setfsgid
-setpgid, getpgid, setpgrp, getpgrp
-recvmmsg
-mq\_open, mq\_close, mq\_getattr, mq\_notify, mq\_receive, mq\_send, mq\_unlink, mq\_timedrecieve, mq\_timedsend -- note glibc wraps these (in -lrt)
-quotactl, ioprio\_set, ioprio\_get
-setdomainname, bdflush, kexec\_load
-mbind, get\_mpolicy, set\_mpolicy
-sysfs, mincore, remap\_file\_pages, set\_tid\_address
-add\_key, request\_key, keyctl (see libkeyutils wrappers)
-sched\_setaffinity, sched\_getaffinity, migrate\_pages, move\_pages
-perf\_event\_open  -- see http://web.eecs.utk.edu/~vweaver1/projects/perf-events/programming.html
-set\_thread\_area, get\_thread\_area, exit_group, tgkill
-open\_by\_handle\_at, name\_by\_handle\_at
-fanotify
-...
-
-note we will probably implement the posix ipc not sysv, as functionality slightly better.
-sys v ipc: msgctl, msgget, msgrcv, msgsnd, semctl, semget, semop, semtimedop, shmat, shmctl, shmdt, shmget
-
-probably not useful: brk, uselib, socketcall, idle, ipc, modify\_ldt, personality, sigreturn, sigaltstack, lookup\_dcookie
-
-from man(3)
-clock_getcpuclockid
-getdomainname (from uname)
-ftok
-shm_open and other posix functions (use /dev/shm)
-uuid
-
-### 64 bit fileops on 32 bit
-
-These now work and have tests, the 64 bit operations are always used on 32 bit architectures.
-
-Note that fcntl64 has not been changed yet, as we have not defined the flock structure which is the change, and it is wrapped by glibc. statfs is also wrapped by glibc.
-
-## TODO
-
-Misc list of ideas, no particular order. See also notes in code.
-
-1. non blocking netlink functions ie return EAGAIN but can resume.
-2. futex support. Needs some assembly support.
-3. Other atomic ops eg CAS - see https://lwn.net/Articles/509102/
-4. try using llvm to parse headers to get syscall numbers, or a C program. Generate headers by arch.
-5. evented coroutine example
-6. iterators eg for reading large files? (cat)
-7. ping support
-8. dhcp client
-9. misc shell commands eg touch
-10. syslog? Not sure. Might do remote protocol.
-11. selinux
-12. seccomp
-13. insmod, lsmod, depmod
-14. decide on netlink interface, still experimenting
-15. netlink missing functionality and tests
-16. use netlink instead of bridge ioctls for create, destroy.
-17. sysctl wrapper (trivial write to /proc/sys)
-18. cgroups
-19. replace more of the man(3) stuff with native syscalls. More transparent.
-20. Standard lua support, eventually. Might start with luasocket support for netlink, but there is a lot of work to do.
-21. make more modular, started with netlink and arch specific but needs more.
-22. udev (uses netlink)
-23. netlink listen for events - started, needs more work
-24. fix fs specific mount ops so can round-trip mounts
-25. fix aio
-26. automate ctest.lua to do full compile and run
-27. short form for dellink(name)
-28. use S.if_nametoindex to convert interface names to numbers in nl where number not.
-29. performance counters
-30. define a bitshift function that works correctly with unsigned output.
-31. garbage collect mmap?
 
