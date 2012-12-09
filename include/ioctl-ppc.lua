@@ -6,6 +6,7 @@ local arch = {
   IOC_NONE      = 1,
   IOC_READ      = 2,
   IOC_WRITE     = 4,
+  FIOCLEX	= {'_IO', 'f', 1},
   FIONCLEX	= {'_IO', 'f', 2},
   TCSETA	= {'_IOW', 't', 24, 'termio'},
   TCSETAW	= {'_IOW', 't', 25, 'termio'},
