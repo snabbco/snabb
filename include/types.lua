@@ -83,6 +83,7 @@ end
 local htonl, htons
 if ffi.abi("be") then -- nothing to do
   function htonl(b) return b end
+  function htons(b) return b end
 else
   function htonl(b) return bit.bswap(b) end
   function htons(b) return bit.rshift(bit.bswap(b), 16) end
