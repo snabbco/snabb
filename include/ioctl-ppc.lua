@@ -9,6 +9,7 @@ local arch = {
   FIOCLEX	= {'_IO', 'f', 1},
   FIONCLEX	= {'_IO', 'f', 2},
   FIOQSIZE	= {'_IOR', 'f', 128, 'loff'},
+  FIOASYNC	= {'_IOW', 'f', 125, 'int'},
   TCGETS	= {'_IOR', 't', 19, 'termios'},
   TCSETS	= {'_IOW', 't', 20, 'termios'},
   TCSETSW	= {'_IOW', 't', 21, 'termios'},
