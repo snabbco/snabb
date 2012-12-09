@@ -1850,7 +1850,7 @@ c.CFLAG = setmetatable({
 }, multiflags)
 
 -- termios - c_lflag bits
-c.LFLAG = setmetatable({
+c.LFLAG = setmetatable(arch.LFLAG or {
   ISIG    = octal('0000001'),
   ICANON  = octal('0000002'),
   XCASE   = octal('0000004'),
@@ -1866,6 +1866,7 @@ c.LFLAG = setmetatable({
   FLUSHO  = octal('0010000'),
   PENDIN  = octal('0040000'),
   IEXTEN  = octal('0100000'),
+  EXTPROC = octal('0200000'),
 }, multiflags)
 
 -- termios - tcflow() and TCXONC use these. renamed from TC to TCFLOW
