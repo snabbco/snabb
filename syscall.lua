@@ -133,6 +133,8 @@ end
 if ffi.abi("32bit") then
   C.truncate = ffi.C.truncate64
   C.ftruncate = ffi.C.ftruncate64
+  C.statfs = ffi.C.statfs64
+  C.fstatfs = ffi.C.fstatfs64
 end
 
 -- these functions might not be in libc, or are buggy so provide direct syscall fallbacks

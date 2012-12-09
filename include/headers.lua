@@ -963,8 +963,10 @@ int nanosleep(const struct timespec *req, struct timespec *rem);
 int access(const char *pathname, int mode);
 int faccessat(int dirfd, const char *pathname, int mode, int flags);
 char *getcwd(char *buf, size_t size);
-int statfs(const char *path, struct statfs64 *buf); /* this is statfs64 syscall, but glibc wraps */
-int fstatfs(int fd, struct statfs64 *buf);          /* this too */
+int statfs(const char *path, struct statfs64 *buf); /* for 64 bit */
+int fstatfs(int fd, struct statfs64 *buf);          /* for 64 bit */
+int statfs64(const char *path, struct statfs64 *buf); /* for 32 bit */
+int fstatfs64(int fd, struct statfs64 *buf);          /* for 32 bit */
 int futimens(int fd, const struct timespec times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 
