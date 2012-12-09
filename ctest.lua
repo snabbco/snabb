@@ -311,6 +311,7 @@ local nm = {
   CC = "",
   IOCTL = "",
   B = "B",
+  SYS = "__NR_",
 }
 
 for k, v in pairs(c) do
