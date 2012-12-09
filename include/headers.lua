@@ -602,6 +602,9 @@ struct winsize {
   unsigned short ws_xpixel;
   unsigned short ws_ypixel;
 };
+typedef struct {
+  int     val[2];
+} kernel_fsid_t;
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
@@ -635,18 +638,16 @@ struct termio {
 ]]
 end
 
--- Linux struct siginfo padding depends on architecture, also statfs
+-- Linux struct siginfo padding depends on architecture
 if ffi.abi("64bit") then
 ffi.cdef[[
 static const int SI_MAX_SIZE = 128;
 static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 4;
-typedef long statfs_word;
 ]]
 else
 ffi.cdef[[
 static const int SI_MAX_SIZE = 128;
 static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 3;
-typedef uint32_t statfs_word;
 ]]
 end
 
@@ -694,11 +695,21 @@ typedef struct siginfo {
     } sigpoll;
   } sifields;
 } siginfo_t;
+]]
 
-typedef struct {
-  int     val[2];
-} kernel_fsid_t;
-
+if arch.statfs then arch.statfs()
+else
+-- Linux struct statfs/statfs64 depends on 64/32 bit
+if ffi.abi("64bit") then
+ffi.cdef[[
+typedef long statfs_word;
+]]
+else
+ffi.cdef[[
+typedef uint32_t statfs_word;
+]]
+end
+ffi.cdef[[
 struct statfs64 {
   statfs_word f_type;
   statfs_word f_bsize;
@@ -714,6 +725,7 @@ struct statfs64 {
   statfs_word f_spare[4];
 };
 ]]
+end
 
 -- epoll packed on x86_64 only (so same as x86)
 if arch.epoll then arch.epoll()

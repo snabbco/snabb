@@ -2006,7 +2006,7 @@ test_filesystem = {
   end,
   test_fstatfs = function()
     local fd = assert(S.open(".", "rdonly"))
-    local st = assert(fd:statfs())
+    local st = assert(S.fstatfs(fd))
     assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
     assert(fd:close())
   end,

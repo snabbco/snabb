@@ -8,9 +8,6 @@ local s, t, c, ctypes = S.s, S.t, S.c, S.ctypes
 
 -- TODO fix these, various naming issues
 ctypes["struct linux_dirent64"] = nil
-ctypes["struct statfs64"] = nil
-ctypes["struct flock64"] = nil
-ctypes["struct stat64"] = nil
 ctypes["struct fdb_entry"] = nil
 ctypes["struct seccomp_data"] = nil
 ctypes["sighandler_t"] = nil
