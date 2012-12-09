@@ -267,6 +267,8 @@ print [[
 #include <linux/ioctl.h>
 #include <linux/input.h>
 
+int ret = 0;
+
 /* not defined anywhere useful */
 struct termios2 {
         tcflag_t c_iflag;
@@ -280,7 +282,10 @@ struct termios2 {
 };
 
 void sassert(int a, int b, char *n) {
-  if (a != b) printf("error with %s: %d (0x%x) != %d (0x%x)\n", n, a, a, b, b);
+  if (a != b) {
+    printf("error with %s: %d (0x%x) != %d (0x%x)\n", n, a, a, b, b);
+    ret = 1;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -330,6 +335,7 @@ end
 -- TODO test error codes
 
 print [[
+return ret;
 }
 ]]
 
