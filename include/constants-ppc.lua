@@ -358,12 +358,12 @@ arch.SYS = {
 }
 
 arch.SO = {
-  RCVLOWAT     16,
-  SNDLOWAT     17,
-  RCVTIMEO     18,
-  SNDTIMEO     19,
-  PASSCRED     20,
-  PEERCRED     21,
+  RCVLOWAT    = 16,
+  SNDLOWAT    = 17,
+  RCVTIMEO    = 18,
+  SNDTIMEO    = 19,
+  PASSCRED    = 20,
+  PEERCRED    = 21,
 }
 
 arch.OFLAG = {
