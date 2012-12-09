@@ -361,5 +361,62 @@ arch.socketoptions = function(c)
   --ppc socketoptions need to be set
 end
 
+-- TODO these are generic, fix
+arch.OFLAG = {
+  OPOST  = octal('0000001'),
+  OLCUC  = octal('0000002'),
+  ONLCR  = octal('0000004'),
+  OCRNL  = octal('0000010'),
+  ONOCR  = octal('0000020'),
+  ONLRET = octal('0000040'),
+  OFILL  = octal('0000100'),
+  OFDEL  = octal('0000200'),
+  NLDLY  = octal('0000400'),
+  NL0    = octal('0000000'),
+  NL1    = octal('0000400'),
+  CRDLY  = octal('0003000'),
+  CR0    = octal('0000000'),
+  CR1    = octal('0001000'),
+  CR2    = octal('0002000'),
+  CR3    = octal('0003000'),
+  TABDLY = octal('0014000'),
+  TAB0   = octal('0000000'),
+  TAB1   = octal('0004000'),
+  TAB2   = octal('0010000'),
+  TAB3   = octal('0014000'),
+  BSDLY  = octal('0020000'),
+  BS0    = octal('0000000'),
+  BS1    = octal('0020000'),
+  FFDLY  = octal('0100000'),
+  FF0    = octal('0000000'),
+  FF1    = octal('0100000'),
+  VTDLY  = octal('0040000'),
+  VT0    = octal('0000000'),
+  VT1    = octal('0040000'),
+  XTABS  = octal('0014000'),
+}
+
+arch.CC = {
+  VINTR           = 0,
+  VQUIT           = 1,
+  VERASE          = 2,
+  VKILL           = 3,
+  VEOF            = 4,
+  VMIN            = 5,
+  VEOL            = 6,
+  VTIME           = 7,
+  VEOL2           = 8,
+  VSWTC           = 9,
+  VWERASE         =10,
+  VREPRINT        =11,
+  VSUSP           =12,
+  VSTART          =13,
+  VSTOP           =14,
+  VLNEXT          =15,
+  VDISCARD        =16,
+}
+
+-- TODO oflags
+
 return arch
 

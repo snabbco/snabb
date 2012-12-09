@@ -59,7 +59,7 @@ c.O.FSYNC     = c.O.SYNC
 c.O.RSYNC     = c.O.SYNC
 c.O.NDELAY    = c.O.NONBLOCK
 
--- these are arch dependent!
+-- these are arch dependent! TODO cleanup include
 if arch.oflags then arch.oflags(c)
 else -- generic values from asm-generic
   if ffi.abi("32bit") then c.O.LARGEFILE = octal('0100000') else c.O.LARGEFILE = 0 end
@@ -1695,7 +1695,7 @@ c.SECCOMP_RET = setmetatable({
 c.NCCS = 32
 
 -- termios - c_cc characters
-c.CC = setmetatable({
+c.CC = setmetatable(arch.CC or {
   VINTR    = 0,
   VQUIT    = 1,
   VERASE   = 2,
@@ -1735,7 +1735,7 @@ c.IFLAG = setmetatable({
 }, multiflags)
 
 -- termios - c_oflag bits
-c.OFLAG = setmetatable({
+c.OFLAG = setmetatable(arch.OFLAG or {
   OPOST  = octal('0000001'),
   OLCUC  = octal('0000002'),
   ONLCR  = octal('0000004'),
