@@ -8,6 +8,7 @@ local arch = {
   IOC_WRITE     = 4,
   TIOCSPGRP	= {'_IOW', 't', 118, 'int'},
   TIOCGPGRP	= {'_IOR', 't', 119, 'int'},
+  TIOCGWINSZ	= {'_IOR', 't', 104, 'winsize')
 }
 
 return arch

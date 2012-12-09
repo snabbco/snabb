@@ -596,7 +596,12 @@ struct ff_effect {
         struct ff_rumble_effect rumble;
     } u;
 };
-
+struct winsize {
+  unsigned short ws_row;
+  unsigned short ws_col;
+  unsigned short ws_xpixel;
+  unsigned short ws_ypixel;
+};
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
