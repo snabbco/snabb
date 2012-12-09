@@ -29,8 +29,8 @@ local IOC_TYPEBITS	= 8
 
 -- Let any architecture override either of the following
 
-local IOC_SIZEBITS	= 14
-local IOC_DIRBITS	= 2
+local IOC_SIZEBITS	= arch.IOC_SIZEBITS or 14
+local IOC_DIRBITS	= arch.IOC_DIRBITS or 2
 
 local IOC_NRMASK	= lshift(1, IOC_NRBITS) - 1
 local IOC_TYPEMASK	= lshift(1, IOC_TYPEBITS) - 1
@@ -44,9 +44,9 @@ local IOC_DIRSHIFT	= IOC_SIZESHIFT + IOC_SIZEBITS
 
 -- Direction bits, which any architecture can choose to override
 
-local IOC_NONE	= 0
-local IOC_WRITE	= 1
-local IOC_READ	= 2
+local IOC_NONE	= arch.IOC_NONE or 0
+local IOC_WRITE	= arch.IOC_WRITE or 1
+local IOC_READ	= arch.IOC_READ or 2
 local IOC_READWRITE = IOC_READ + IOC_WRITE
 
 local function _IOC(dir, tp, nr, size)
