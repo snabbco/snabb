@@ -193,7 +193,7 @@ c.O.NONBLOCK = c.OPIPE.NONBLOCK
 c.O.CLOEXEC = c.OPIPE.CLOEXEC
 c.OPIPE = nil
 
--- not included on ppc
+-- not included on ppc?
 c.IOCTL.TCSETS2 = nil
 c.IOCTL.TCGETS2 = nil
 c.IOCTL.TCSETX = nil
@@ -280,7 +280,7 @@ struct termios2 {
 };
 
 void sassert(int a, int b, char *n) {
-  if (a != b) printf("error with %s: %d (%x) != %d (%x)\n", n, a, a, b, b);
+  if (a != b) printf("error with %s: %d (0x%x) != %d (0x%x)\n", n, a, a, b, b);
 }
 
 int main(int argc, char **argv) {
