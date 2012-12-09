@@ -474,7 +474,7 @@ arch.MCL = {
 }
 
 arch.PROT = {
-  SAO        0x10, -- Strong Access Ordering
+  SAO       = 0x10, -- Strong Access Ordering
 }
 
 return arch
