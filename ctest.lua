@@ -280,7 +280,7 @@ struct termios2 {
 };
 
 void sassert(int a, int b, char *n) {
-  if (a != b) printf("error with %s: %d != %d\n", n, a, b);
+  if (a != b) printf("error with %s: %d (%x) != %d (%x)\n", n, a, a, b, b);
 }
 
 int main(int argc, char **argv) {
