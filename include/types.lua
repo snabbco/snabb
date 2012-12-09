@@ -178,6 +178,7 @@ local addtypes = {
   ff_rumble_effect = "struct ff_rumble_effect",
   ff_effect = "struct ff_effect",
   winsize = "struct winsize",
+  termio = "struct termio",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end

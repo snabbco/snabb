@@ -620,6 +620,21 @@ struct sigaction {
 ]]
 end
 
+if arch.termio then arch.termio()
+else
+ffi.cdef[[
+static const int NCC = 8;
+struct termio {
+  unsigned short c_iflag;
+  unsigned short c_oflag;
+  unsigned short c_cflag;
+  unsigned short c_lflag;
+  unsigned char c_line;
+  unsigned char c_cc[NCC];
+};
+]]
+end
+
 -- Linux struct siginfo padding depends on architecture, also statfs
 if ffi.abi("64bit") then
 ffi.cdef[[
