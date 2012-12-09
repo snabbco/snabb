@@ -18,3 +18,5 @@ struct termio {
 ]]
 end
 
+return arch
+
