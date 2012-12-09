@@ -20,6 +20,11 @@ local function setmetatable(t, mt)
   return oldsm(t, mt)
 end
 
+local function addarch(tb, a, default)
+  local add = a or default
+  for k, v in pairs(add) do tb[k] = v end
+end
+
 local c = {}
 
 c.SYS = arch.SYS
@@ -59,13 +64,15 @@ c.O.FSYNC     = c.O.SYNC
 c.O.RSYNC     = c.O.SYNC
 c.O.NDELAY    = c.O.NONBLOCK
 
--- these are arch dependent! TODO cleanup include
-if arch.oflags then arch.oflags(c)
-else -- generic values from asm-generic
+-- these four are arch dependent
+addarch(c.O, arch.O, {
+  DIRECT    = octal('040000'),
+  DIRECTORY = octal('0200000'),
+  NOFOLLOW  = octal('0400000'),
+})
+
+if not c.O.LARGEFILE then -- also can be arch dependent
   if ffi.abi("32bit") then c.O.LARGEFILE = octal('0100000') else c.O.LARGEFILE = 0 end
-  c.O.DIRECT    = octal('040000')
-  c.O.DIRECTORY = octal('0200000')
-  c.O.NOFOLLOW  = octal('0400000')
 end
 
 -- just for pipe2
@@ -191,6 +198,8 @@ c.PROT = setmetatable({
   GROWSUP   = 0x02000000,
 }, multiflags)
 
+addarch(c.PROT, arch.PROT, {})
+
 -- Sharing types
 c.MAP = setmetatable({
   FILE       = 0,
@@ -203,18 +212,21 @@ c.MAP = setmetatable({
   GROWSDOWN  = 0x00100,
   DENYWRITE  = 0x00800,
   EXECUTABLE = 0x01000,
-  LOCKED     = 0x02000,
-  NORESERVE  = 0x04000,
   POPULATE   = 0x08000,
   NONBLOCK   = 0x10000,
   STACK      = 0x20000,
   HUGETLB    = 0x40000,
 }, multiflags)
 
+addarch(c.MAP, arch.MAP, {
+  LOCKED     = 0x02000,
+  NORESERVE  = 0x04000,
+})
+
 c.MAP.ANON       = c.MAP.ANONYMOUS
 
 -- flags for `mlockall'.
-c.MCL = setmetatable({
+c.MCL = setmetatable(arch.MCL or {
   CURRENT    = 1,
   FUTURE     = 2,
 }, multiflags)
@@ -391,15 +403,15 @@ c.SO = setmetatable({
   SNDBUFFORCE = 32,
   RCVBUFFORCE = 33,
 }, stringflag)
-if arch.socketoptions then arch.socketoptions(c)
-else
-  c.SO.PASSCRED    = 16
-  c.SO.PEERCRED    = 17
-  c.SO.RCVLOWAT    = 18
-  c.SO.SNDLOWAT    = 19
-  c.SO.RCVTIMEO    = 20
-  c.SO.SNDTIMEO    = 21
-end
+
+addarch(c.SO, arch.SO, {
+  PASSCRED    = 16,
+  PEERCRED    = 17,
+  RCVLOWAT    = 18,
+  SNDLOWAT    = 19,
+  RCVTIMEO    = 20,
+  SNDTIMEO    = 21,
+})
 
 -- Maximum queue length specifiable by listen.
 c.SOMAXCONN = 128
@@ -1770,7 +1782,7 @@ c.OFLAG = setmetatable(arch.OFLAG or {
 }, multiflags)
 
 -- using string keys as sparse array uses a lot of memory
-c.B = setmetatable({
+c.B = setmetatable(arch.B or {
   ['0'] = octal('0000000'),
   ['50'] = octal('0000001'),
   ['75'] = octal('0000002'),

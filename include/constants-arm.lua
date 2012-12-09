@@ -344,13 +344,12 @@ arch.SYS = {
   process_vm_writev= 377,
 }
 
--- TODO cleanup to return table
-arch.oflags = function(c)
-  c.O.DIRECTORY = octal('040000')
-  c.O.NOFOLLOW  = octal('0100000')
-  c.O.DIRECT    = octal('0200000')
-  c.O.LARGEFILE = octal('0400000')
-end
+arch.O = {
+  DIRECTORY = octal('040000')
+  NOFOLLOW  = octal('0100000')
+  DIRECT    = octal('0200000')
+  LARGEFILE = octal('0400000')
+}
 
 return arch
 

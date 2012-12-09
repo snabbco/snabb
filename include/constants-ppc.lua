@@ -357,43 +357,49 @@ arch.SYS = {
   process_vm_writev     = 352,
 }
 
-arch.socketoptions = function(c)
-  --ppc socketoptions need to be set
-end
+arch.SO = {
+  RCVLOWAT     16,
+  SNDLOWAT     17,
+  RCVTIMEO     18,
+  SNDTIMEO     19,
+  PASSCRED     20,
+  PEERCRED     21,
+}
 
--- TODO these are generic, fix
 arch.OFLAG = {
-  OPOST  = octal('0000001'),
-  OLCUC  = octal('0000002'),
-  ONLCR  = octal('0000004'),
-  OCRNL  = octal('0000010'),
-  ONOCR  = octal('0000020'),
-  ONLRET = octal('0000040'),
-  OFILL  = octal('0000100'),
-  OFDEL  = octal('0000200'),
-  NLDLY  = octal('0000400'),
-  NL0    = octal('0000000'),
-  NL1    = octal('0000400'),
-  CRDLY  = octal('0003000'),
-  CR0    = octal('0000000'),
-  CR1    = octal('0001000'),
-  CR2    = octal('0002000'),
-  CR3    = octal('0003000'),
-  TABDLY = octal('0014000'),
-  TAB0   = octal('0000000'),
-  TAB1   = octal('0004000'),
-  TAB2   = octal('0010000'),
-  TAB3   = octal('0014000'),
-  BSDLY  = octal('0020000'),
-  BS0    = octal('0000000'),
-  BS1    = octal('0020000'),
-  FFDLY  = octal('0100000'),
-  FF0    = octal('0000000'),
-  FF1    = octal('0100000'),
-  VTDLY  = octal('0040000'),
-  VT0    = octal('0000000'),
-  VT1    = octal('0040000'),
-  XTABS  = octal('0014000'),
+  OPOST  = octal('00000001'),
+  OLCUC  = octal('00000002'),
+  ONLCR  = octal('00000004'),
+  OCRNL  = octal('00000010'),
+  ONOCR  = octal('00000020'),
+  ONLRET = octal('00000040'),
+  OFILL  = octal('00000100'),
+  OFDEL  = octal('00000200'),
+  NLDLY  = octal('00001400'),
+  NL0    = octal('00000000'),
+  NL1    = octal('00000400'),
+  NL2    = octal('00001000'),
+  NL3    = octal('00001400'),
+  CRDLY  = octal('00030000'),
+  CR0    = octal('00000000'),
+  CR1    = octal('00010000'),
+  CR2    = octal('00020000'),
+  CR3    = octal('00030000'),
+  TABDLY = octal('00006000'),
+  TAB0   = octal('00000000'),
+  TAB1   = octal('00002000'),
+  TAB2   = octal('00004000'),
+  TAB3   = octal('00006000'),
+  BSDLY  = octal('00100000'),
+  BS0    = octal('00000000'),
+  BS1    = octal('00100000'),
+  FFDLY  = octal('00040000'),
+  FF0    = octal('00000000'),
+  FF1    = octal('00040000'),
+  VTDLY  = octal('00200000'),
+  VT0    = octal('00000000'),
+  VT1    = octal('00200000'),
+  XTABS  = octal('00006000'),
 }
 
 arch.CC = {
@@ -407,16 +413,69 @@ arch.CC = {
   VTIME           = 7,
   VEOL2           = 8,
   VSWTC           = 9,
-  VWERASE         =10,
-  VREPRINT        =11,
-  VSUSP           =12,
-  VSTART          =13,
-  VSTOP           =14,
-  VLNEXT          =15,
-  VDISCARD        =16,
+  VWERASE         = 10,
+  VREPRINT        = 11,
+  VSUSP           = 12,
+  VSTART          = 13,
+  VSTOP           = 14,
+  VLNEXT          = 15,
+  VDISCARD        = 16,
 }
 
--- TODO oflags
+arch.B = {
+  ['0'] = octal('0000000'),
+  ['50'] = octal('0000001'),
+  ['75'] = octal('0000002'),
+  ['110'] = octal('0000003'),
+  ['134'] = octal('0000004'),
+  ['150'] = octal('0000005'),
+  ['200'] = octal('0000006'),
+  ['300'] = octal('0000007'),
+  ['600'] = octal('0000010'),
+  ['1200'] = octal('0000011'),
+  ['1800'] = octal('0000012'),
+  ['2400'] = octal('0000013'),
+  ['4800'] = octal('0000014'),
+  ['9600'] = octal('0000015'),
+  ['19200'] = octal('0000016'),
+  ['38400'] = octal('0000017'),
+  ['57600'] = octal('00020'),
+  ['115200'] = octal('00021'),
+  ['230400'] = octal('00022'),
+  ['460800'] = octal('00023'),
+  ['500000'] = octal('00024'),
+  ['576000'] = octal('00025'),
+  ['921600'] = octal('00026'),
+  ['1000000'] = octal('00027'),
+  ['1152000'] = octal('00030'),
+  ['1500000'] = octal('00031'),
+  ['2000000'] = octal('00032'),
+  ['2500000'] = octal('00033'),
+  ['3000000'] = octal('00034'),
+  ['3500000'] = octal('00035'),
+  ['4000000'] = octal('00036'),
+}
+
+arch.O = {
+  DIRECTORY    = octal('040000'),
+  NOFOLLOW     = octal('0100000'),
+  LARGEFILE    = octal('0200000'),
+  DIRECT       = octa;('0400000'),
+}
+
+arch.MAP = {
+  MAP_NORESERVE  = 0x40,
+  MAP_LOCKED     = 0x80,
+}
+
+arch.MCL = {
+  CURRENT    = 0x2000,
+  FUTURE     = 0x4000,
+}
+
+arch.PROT = {
+  SAO        0x10, -- Strong Access Ordering
+}
 
 return arch
 
