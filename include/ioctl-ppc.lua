@@ -6,6 +6,7 @@ local arch = {
   IOC_NONE      = 1,
   IOC_READ      = 2,
   IOC_WRITE     = 4,
+  TIOCSPGRP	= {'_IOW', 't', 118, 'int'},
 }
 
 return arch

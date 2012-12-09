@@ -77,6 +77,17 @@ local IOC_INOUT		= lshift(bor(IOC_WRITE, IOC_READ), IOC_DIRSHIFT)
 local IOCSIZE_MASK	= lshift(IOC_SIZEMASK, IOC_SIZESHIFT)
 local IOCSIZE_SHIFT	= IOC_SIZESHIFT
 
+local mapname = {
+  _IO = _IO,
+  _IOR = _IOR,
+  _IOW = _IOW,
+  _IOWR = _IOWR,
+}
+
+for k, v in pairs(arch) do
+  if type(v) == "table" then arch[k] = mapname(v[1])(v[2], v[3], v[4]) end -- some of the ioctls are functions
+end
+
 ioctl.IOCTL = setmetatable({
 -- termios, non standard values generally 0x54 = 'T'
   TCGETS          = 0x5401,
@@ -185,8 +196,9 @@ ioctl.IOCTL = setmetatable({
 -- alternate names
 ioctl.IOCTL.TIOCINQ = ioctl.IOCTL.FIONREAD
 
--- varies by arch
-if arch.FIOQSIZE then ioctl.IOCTL.FIOQSIZE = arch.FIOQSIZE end
+for _, k in pairs{"FIOQSIZE", "TIOCSPGRP"} do -- arch overrides
+  if arch[k] then ioctl.IOCTL[k] = arch[k] end
+end
 
 -- TODO should we export more functions?
 return ioctl
