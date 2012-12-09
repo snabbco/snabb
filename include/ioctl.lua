@@ -85,7 +85,7 @@ local mapname = {
 }
 
 for k, v in pairs(arch) do
-  if type(v) == "table" then arch[k] = mapname[v[1]](v[2], v[3], v[4]) end -- some of the ioctls are functions
+  if type(v) == "table" then arch[k] = mapname[v[1]](v[2], v[3], s[v[4]]) end -- some of the ioctls are functions
 end
 
 ioctl.IOCTL = setmetatable({
