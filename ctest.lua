@@ -35,6 +35,7 @@ c.SYS.sync_file_range = nil
 -- fake constants
 c.MS.RO = nil
 c.MS.RW = nil
+c.MS.SECLABEL = nil
 c.IFF.ALL = nil
 c.IFF.NONE = nil
 c.W.ALL = nil

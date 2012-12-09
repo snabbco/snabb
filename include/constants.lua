@@ -1455,6 +1455,7 @@ c.MS = setmetatable({
 -- fake flags
 c.MS.RO = c.MS.RDONLY -- allow use of "ro" as flag as that is what /proc/mounts uses
 c.MS.RW = 0           -- allow use of "rw" as flag as appears in /proc/mounts
+c.MS.SECLABEL = 0     -- appears in /proc/mounts in some distros, ignore
 
 -- flags to `msync'. - note was MS_ renamed to MSYNC_
 c.MSYNC = setmetatable({
