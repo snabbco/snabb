@@ -84,10 +84,6 @@ local mapname = {
   _IOWR = _IOWR,
 }
 
-for k, v in pairs(arch) do
-  if type(v) == "table" then arch[k] = mapname[v[1]](v[2], v[3], s[v[4]]) end -- some of the ioctls are functions
-end
-
 ioctl.IOCTL = setmetatable({
 -- termios, non standard values generally 0x54 = 'T'
   TCGETS          = 0x5401,
@@ -197,6 +193,7 @@ ioctl.IOCTL = setmetatable({
 ioctl.IOCTL.TIOCINQ = ioctl.IOCTL.FIONREAD
 
 for k, v in pairs(arch) do -- arch overrides
+  if type(v) == "table" then arch[k] = mapname[v[1]](v[2], v[3], s[v[4]]) end -- some of the ioctls are functions
   if string.sub(k, 1, 4) ~= "IOC_" then ioctl.IOCTL[k] = v end
 end
 
