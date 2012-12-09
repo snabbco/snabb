@@ -189,13 +189,13 @@ ioctl.IOCTL = setmetatable({
   EVIOCGRAB  = _IOW('E', 0x90, s.int),
 }, stringflag)
 
--- alternate names
-ioctl.IOCTL.TIOCINQ = ioctl.IOCTL.FIONREAD
-
 for k, v in pairs(arch) do -- arch overrides
   if type(v) == "table" then v = mapname[v[1]](v[2], v[3], s[v[4]]) end -- some of the ioctls are functions
   if string.sub(k, 1, 4) ~= "IOC_" then ioctl.IOCTL[k] = v end
 end
+
+-- alternate names
+ioctl.IOCTL.TIOCINQ = ioctl.IOCTL.FIONREAD
 
 -- TODO should we export more functions?
 return ioctl
