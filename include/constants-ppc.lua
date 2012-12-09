@@ -1,5 +1,8 @@
 -- ppc specific code
 
+local h = require "include.helpers"
+
+local octal = h.octal
 
 local arch = {}
 
@@ -460,7 +463,7 @@ arch.O = {
   DIRECTORY    = octal('040000'),
   NOFOLLOW     = octal('0100000'),
   LARGEFILE    = octal('0200000'),
-  DIRECT       = octa;('0400000'),
+  DIRECT       = octal('0400000'),
 }
 
 arch.MAP = {
