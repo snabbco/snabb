@@ -467,8 +467,8 @@ arch.O = {
 }
 
 arch.MAP = {
-  MAP_NORESERVE  = 0x40,
-  MAP_LOCKED     = 0x80,
+  NORESERVE  = 0x40,
+  LOCKED     = 0x80,
 }
 
 arch.MCL = {
