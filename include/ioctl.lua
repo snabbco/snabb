@@ -196,8 +196,8 @@ ioctl.IOCTL = setmetatable({
 -- alternate names
 ioctl.IOCTL.TIOCINQ = ioctl.IOCTL.FIONREAD
 
-for _, k in pairs{"FIOQSIZE", "TIOCSPGRP"} do -- arch overrides
-  if arch[k] then ioctl.IOCTL[k] = arch[k] end
+for k, v in pairs(arch) do -- arch overrides
+  if strsub(arch[k], 1, 4) ~= "IOC_" then ioctl.IOCTL[k] = v end
 end
 
 -- TODO should we export more functions?
