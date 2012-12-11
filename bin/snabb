@@ -4,7 +4,7 @@
 
 export SNABB=$(cd `dirname $0`/..; pwd)
 export PATH="$SNABB/bin:$SNABB/tools/tush/bin:$PATH"
-export LD_LIBRARY_PATH="$SNABB/src/c:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$SNABB/src:$LD_LIBRARY_PATH"
 
 if [ $# -lt 1 -o ! -x $SNABB/src/scripts/$1 ]; then
     cat >&2 <<EOF
