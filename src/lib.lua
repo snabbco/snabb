@@ -1,0 +1,17 @@
+module(...,package.seeall)
+
+-- Return a bitmask using the values of `bitset' as indexes.
+-- The keys of bitset are ignored (and can be used as comments).
+-- Example: bits({RESET=0,ENABLE=4}, 123) => 1<<0 | 1<<4 | 123
+function bits (bitset, basevalue)
+   local sum = basevalue or 0
+   for _,n in pairs(bitset) do
+	 sum = bit.bor(sum, bit.lshift(1, n))
+   end
+   return sum
+end
+
+-- Return true if bit number 'n' of 'value' is set.
+function bitset (value, n)
+   return bit.band(value, bit.lshift(1, n)) ~= 0
+end

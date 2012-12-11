@@ -11,8 +11,11 @@ module(...,package.seeall)
 -- PSP (pad short packets to 64 bytes)
 
 local ffi = require("ffi")
-local bit = require("bit")
 local C = ffi.C
+local bit = require("bit")
+local pci = require("pci")
+local lib = require("lib")
+local bits, bitset = lib.bits, lib.bitset
 
 require("clib_h")
 require("snabb_h")
@@ -24,23 +27,6 @@ function new (pciaddress)
 
    -- Method dictionary for Intel NIC objects.
    local M = {}
-
-   -- Linux-based glue code to access the device.
-   function pcidev_is_82574 (device)
-      return io.open(path(device,"config"), "ro"):read(4) == "\x86\x80\xd3\x10"
-   end
-
-   function path(pcidev, file)
-      return "/sys/bus/pci/devices/"..pcidev.."/"..file
-   end
-
-   -- 1. map registers
-   function map_pci_memory (device, n)
-      local filepath = path(device,"resource")..n
-      local addr = C.map_pci_resource(filepath)
-      assert( addr ~= 0 )
-      return addr
-   end
 
    -- Return a table for protected (bounds-checked) memory access.
    -- 
@@ -87,6 +73,8 @@ function new (pciaddress)
    local txdesc  = nil
    local buffers = nil
 
+   local pci_config_fd = nil
+
    -- Register addresses as 32-bit word offsets.
    local CTRL   = 0x00000 / 4 -- Device Control Register (RW)
    local STATUS = 0x00008 / 4 -- Device Status Register (RO)
@@ -115,13 +103,13 @@ function new (pciaddress)
    local POEMB  = 0x00F10 / 4 -- PHY OEM Bits Register (RW)
    local ICR    = 0x00C00 / 4 -- Interrupt Cause Register (RW)
 
-   local regs = ffi.cast("uint32_t *", map_pci_memory(pciaddress, 0))
+   local regs = ffi.cast("uint32_t *", pci.map_pci_memory(pciaddress, 0))
 
    -- Initialization
 
    function M.init ()
       reset()
-      init_pcie()
+      init_pci()
       init_dma_memory()
       init_link()
       init_statistics()
@@ -136,9 +124,10 @@ function new (pciaddress)
       regs[IMC] = 0		          -- Disable interrupts
    end
 
-   function init_pcie()
-      -- PCIe bus mastering has to be enabled for DMA to work.
-      set_pcie_bus_master(true)
+   function init_pci ()
+      -- PCI bus mastering has to be enabled for DMA to work.
+      pci_config_fd = pci.open_config(pciaddress)
+      pci.set_bus_master(pci_config_fd, true)
    end
 
    function init_dma_memory ()
@@ -380,32 +369,6 @@ function new (pciaddress)
       regs[EXTCNF_CTRL] = 0
    end
 
-   -- PCIe config
-
-   local pcie_config_fd = C.open_pcie_config("/sys/bus/pci/devices/"..pciaddress.."/config")
-
-   local pcie_value = ffi.new("uint16_t[1]")
-
-   function pcie_write (reg, value)
-      pcie_value[0] = value
-      assert(ffi.C.pwrite(pcie_config_fd, pcie_value, 2, reg) == 2)
-   end
-
-   function pcie_read (reg)
-      assert(ffi.C.pread(pcie_config_fd, pcie_value, 2, reg) == 2)
-      return pcie_value[0]
-   end
-
-   function set_pcie_bus_master (flag)
-      local control = pcie_read(0x04)
-      if flag then
-	 control = bit.bor(control, bits({EnableMastering=2}))
-      else
-	 control = bit.band(control, bit.bnot(bits({EnableMastering=2})))
-      end
-      pcie_write(0x04, control)
-   end
-
    -- Link control.
 
    function M.linkup ()
@@ -446,22 +409,6 @@ function new (pciaddress)
       stats.rx_packets = stats.rx_packets + regs[GPRC]
       stats.tx_bytes = stats.tx_bytes + regs[GOTCL] + bit.lshift(regs[GOTCH], 32)
       stats.rx_bytes = stats.rx_bytes + regs[GORCL] + bit.lshift(regs[GORCH], 32)
-   end
-
-   -- Return a bitmask using the values of `bitset' as indexes.
-   -- The keys of bitset are ignored (and can be used as comments).
-   -- Example: bits({RESET=0,ENABLE=4}, 123) => 1<<0 | 1<<4 | 123
-   function bits (bitset, basevalue)
-      local sum = basevalue or 0
-      for _,n in pairs(bitset) do
-	 sum = bit.bor(sum, bit.lshift(1, n))
-      end
-      return sum
-   end
-
-   -- Return true if bit number 'n' of 'value' is set.
-   function bitset (value, n)
-      return bit.band(value, bit.lshift(1, n)) ~= 0
    end
 
    return M
