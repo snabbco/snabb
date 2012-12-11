@@ -6,15 +6,10 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
-/* the Lua interpreter */
-lua_State* L;
-
-int main(void)
+int main(int argc, char **argv)
 {
-  L = luaL_newstate();
+  lua_State* L = luaL_newstate();
   luaL_openlibs(L);
-  (void)luaL_dostring(L, "require switch");
-  lua_close(L);
-
-  return 0;
+  return luaL_dostring(L, "require \"main\"");
 }
+

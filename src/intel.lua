@@ -11,12 +11,11 @@ module(...,package.seeall)
 -- PSP (pad short packets to 64 bytes)
 
 local ffi = require("ffi")
-local snabb = ffi.load("snabb")
 local bit = require("bit")
-local c = require("c")
 local C = ffi.C
 
-ffi.cdef(io.open(os.getenv("SNABB").."/src/snabb.h"):read("*a"))
+require("clib_h")
+require("snabb_h")
 
 local dma_start = 0x10000000
 local dma_end   = 0x11000000
@@ -38,7 +37,7 @@ function new (pciaddress)
    -- 1. map registers
    function map_pci_memory (device, n)
       local filepath = path(device,"resource")..n
-      local addr = snabb.map_pci_resource(filepath)
+      local addr = C.map_pci_resource(filepath)
       assert( addr ~= 0 )
       return addr
    end
@@ -143,7 +142,7 @@ function new (pciaddress)
    end
 
    function init_dma_memory ()
-      dma_virt = snabb.map_physical_ram(dma_start, dma_end, true)
+      dma_virt = C.map_physical_ram(dma_start, dma_end, true)
       C.memset(dma_virt, 0, dma_end - dma_start)
       rxdesc  = protected("union rx", dma_virt, offset_rxdesc, 0x100000)
       txdesc  = protected("union tx", dma_virt, offset_txdesc, 0x100000)
@@ -322,6 +321,10 @@ function new (pciaddress)
       regs[TDT] = (index + 1) % num_descriptors
    end
 
+   function M.add_txbuf_tso (address, size)
+      
+   end
+
    -- 
    function M.is_tx_descriptor_available ()
       return regs[TDT] ~= (regs[TDH] + 1) % num_descriptors
@@ -379,7 +382,7 @@ function new (pciaddress)
 
    -- PCIe config
 
-   local pcie_config_fd = snabb.open_pcie_config("/sys/bus/pci/devices/"..pciaddress.."/config")
+   local pcie_config_fd = C.open_pcie_config("/sys/bus/pci/devices/"..pciaddress.."/config")
 
    local pcie_value = ffi.new("uint16_t[1]")
 
@@ -462,22 +465,5 @@ function new (pciaddress)
    end
 
    return M
-end
-
-local nic = new("0000:00:04.0")
-
-print("Initializing controller..")
-nic.init()
-
-nic.enable_mac_loopback()
--- nic.enable_phy_loopback()
-
-while true do
-   nic.print_status()
-   nic.print_stats()
-   print("writing packet")
-   nic.add_txbuf(dma_start, 123)
-   nic.add_rxbuf(dma_start, 16*1024)
-   C.usleep(1000000)
 end
 
