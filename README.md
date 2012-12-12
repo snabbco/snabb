@@ -13,15 +13,13 @@ Snabb Switch is a new project that is under active development. The
 firmware is not yet ready for deployment, but you are welcome to get
 involved in the development.
 
-## Getting involved
+## Support Snabb Switch
 
-Snabb Switch development is hosted on Github:
+Snabb Switch is an important project. Please support us!
 
-- https://github.com/SnabbCo/snabbswitch is the main software repository.
-- https://github.com/SnabbCo/QEMU is the fork of QEMU/KVM extended with shared-memory Ethernet I/O support.
-
-You are welcome to fork these repositories, make improvements, and
-send Github pull requests.
+- Use Snabb Switch to build a network or a networking product. It's free!
+- Develop a new feature and send us a Github pull request. It's fun!
+- [Sponsor Snabb](http://www.snabb.co/) to further develop the software. It makes a difference!
 
 ## Snabb Reddit
 
