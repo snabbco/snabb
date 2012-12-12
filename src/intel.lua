@@ -58,11 +58,11 @@ function new (pciaddress)
    end
 
    -- Static DMA memory map. Offsets for each memory region.
-   local offset_txdesc   = 0x00000000 --  1MB TX descriptors
-   local offset_rxdesc   = 0x00100000 --  1MB RX descriptors
-   local offset_buffers  = 0x00200000 -- 14MB packet buffers
+   local offset_buffers  = 0x00000000 -- 14MB packet buffers
+   local offset_txdesc   = 0x00e00000 --  1MB TX descriptors
+   local offset_rxdesc   = 0x00f00000 --  1MB RX descriptors
 
-   local num_descriptors = 32
+   local num_descriptors = 128
    local buffer_size = 16384
 
    local dma_phys = dma_start -- physical address of DMA memory
@@ -262,8 +262,12 @@ function new (pciaddress)
       return true
    end
 
-   function M.is_rx_descriptor_available ()
-      return regs[RDT] ~= (regs[RDH] + 1) % num_descriptors
+   function M.rx_full ()
+      return regs[RDH] == (regs[RDT] + 1) % num_descriptors
+   end
+
+   function M.rx_empty ()
+      return regs[RDH] == regs[RDT]
    end
 
    -- Transmit functionality
@@ -310,16 +314,18 @@ function new (pciaddress)
       regs[TDT] = (index + 1) % num_descriptors
    end
 
-   function M.add_txbuf_tso (address, size)
-      
+   function M.tx_full  () return M.tx_pending() == num_descriptors - 1 end
+   function M.tx_empty () return M.tx_pending() == 0 end
+
+   function M.tx_pending ()
+      return ring_pending(regs[TDT], regs[TDH])
    end
 
-   -- 
-   function M.is_tx_descriptor_available ()
-      return regs[TDT] ~= (regs[TDH] + 1) % num_descriptors
+   function ring_pending(head, tail)
+      if head == tail then return 0 end
+      if head <  tail then return tail - head
+      else                 return num_descriptors + tail - head end
    end
-
-   -- PHY.
 
    -- Read a PHY register.
    function phy_read (phyreg)
@@ -385,30 +391,83 @@ function new (pciaddress)
 
    -- Statistics
 
-   local stats = {tx_packets=0, tx_bytes=0, tx_errors=0,
-		  rx_packets=0, rx_bytes=0, rx_errors=0}
+   local statistics_regs = {
+      {"CRCERRS",  0x04000, "CRC Error Count"},
+      {"ALGNERRC", 0x04004, "Alignment Error Count"},
+      {"RXERRC",   0x0400C, "RX Error Count"},
+      {"MPC",      0x04010, "Missed Packets Count"},
+      {"SCC",      0x04014, "Single Collision Count"},
+      {"ECOL",     0x04018, "Excessive Collision Count"},
+      {"MCC",      0x0401C, "Multiple Collision Count"},
+      {"LATECOL",  0x04020, "Late Collisions Count"},
+      {"COLC",     0x04028, "Collision Count"},
+      {"DC",       0x04030, "Defer Count"},
+      {"TNCRS",    0x04034, "Transmit with No CRS"},
+      {"CEXTERR",  0x0403C, "Carrier Extension Error Count"},
+      {"RLEC",     0x04040, "Receive Length Error Count"},
+      {"XONRXC",   0x04048, "XON Received Count"},
+      {"XONTXC",   0x0403C, "XON Transmitted Count"},
+      {"XOFFRXC",  0x04050, "XOFF Received Count"},
+      {"XOFFTXC",  0x04054, "XOFF Transmitted Count"},
+      {"FCRUC",    0x04058, "FC Received Unsupported Count"},
+      {"PRC64",    0x0405C, "Packets Received [64 Bytes] Count"},
+      {"PRC127",   0x04060, "Packets Received [65-127 Bytes] Count"},
+      {"PRC255",   0x04064, "Packets Received [128 - 255 Bytes] Count"},
+      {"PRC511",   0x04068, "Packets Received [256–511 Bytes] Count"},
+      {"PRC1023",  0x0406C, "Packets Received [512–1023 Bytes] Count"},
+      {"PRC1522",  0x04070, "Packets Received [1024 to Max Bytes] Count"},
+      {"GPRC",     0x04074, "Good Packets Received Count"},
+      {"BPRC",     0x04078, "Broadcast Packets Received Count"},
+      {"MPRC",     0x0407C, "Multicast Packets Received Count"},
+      {"GPTC",     0x04080, "Good Packets Transmitted Count"},
+      {"GORCL",    0x04088, "Good Octets Received Count"},
+      {"GORCH",    0x0408C, "Good Octets Received Count"},
+      {"GOTCL",    0x04090, "Good Octets Transmitted Count"},
+      {"GOTCH",    0x04094, "Good Octets Transmitted Count"},
+      {"RNBC",     0x040A0, "Receive No Buffers Count"},
+      {"RUC",      0x040A4, "Receive Undersize Count"},
+      {"RFC",      0x040A8, "Receive Fragment Count"},
+      {"ROC",      0x040AC, "Receive Oversize Count"},
+      {"RJC",      0x040B0, "Receive Jabber Count"},
+      {"MNGPRC",   0x040B4, "Management Packets Received Count"},
+      {"MPDC",     0x040B8, "Management Packets Dropped Count"},
+      {"MPTC",     0x040BC, "Management Packets Transmitted Count"},
+      {"TORL",     0x040C0, "Total Octets Received (Low)"},
+      {"TORH",     0x040C4, "Total Octets Received (High)"},
+      {"TOTL",     0x040C8, "Total Octets Transmitted (Low)"},
+      {"TOTH",     0x040CC, "Total Octets Transmitted (High)"},
+      {"TPR",      0x040D0, "Total Packets Received "},
+      {"TPT",      0x040D4, "Total Packets Transmitted "},
+      {"PTC64",    0x040D8, "Packets Transmitted [64 Bytes] Count"},
+      {"PTC127",   0x040DC, "Packets Transmitted [65–127 Bytes] Count"},
+      {"PTC255",   0x040E0, "Packets Transmitted [128–255 Bytes] Count"},
+      {"PTC511",   0x040E4, "Packets Transmitted [256–511 Bytes] Count"},
+      {"PTC1023",  0x040E8, "Packets Transmitted [512–1023 Bytes] Count"},
+      {"PTC1522",  0x040EC, "Packets Transmitted [Greater than 1024 Bytes] Count"},
+      {"MPTC",     0x040F0, "Multicast Packets Transmitted Count"},
+      {"BPTC",     0x040F4, "Broadcast Packets Transmitted Count"},
+      {"TSCTC",    0x040F8, "TCP Segmentation Context Transmitted Count"},
+      {"TSCTFC",   0x040FC, "TCP Segmentation Context Transmit Fail Count"},
+      {"IAC",      0x04100, "Interrupt Assertion Count"}
+     }
 
-   local GPRC  = 0x04074/4 -- Good Packets Received Count (R)
-   local GPTC  = 0x04080/4 -- Good Packets Transmitted Count (R)
-   -- NOTE: Octet counter registers reset when the high word is read.
-   local GORCL = 0x04088/4 -- Good Octets Received Count Low (R)
-   local GORCH = 0x0408C/4 -- Good Octets Received Count High (R)
-   local GOTCL = 0x04090/4 -- Good Octets Transmitted Count Low (R)
-   local GOTCH = 0x04094/4 -- Good Octets Transmitted Count High (R)
+   M.stats = {}
 
-   function M.print_stats ()
-      update_stats()
-      print("TX Packets: " .. stats.tx_packets)
-      print("RX Packets: " .. stats.rx_packets)
-      print("TX Bytes  : " .. stats.rx_bytes)
-      print("RX Bytes  : " .. stats.rx_bytes)
+   function M.update_stats ()
+      for _,reg in ipairs(statistics_regs) do
+         name, offset, desc = reg[1], reg[2], reg[3]
+         M.stats[name] = (M.stats[name] or 0) + regs[offset/4]
+      end
    end
 
-   function update_stats ()
-      stats.tx_packets = stats.tx_packets + regs[GPTC]
-      stats.rx_packets = stats.rx_packets + regs[GPRC]
-      stats.tx_bytes = stats.tx_bytes + regs[GOTCL] + bit.lshift(regs[GOTCH], 32)
-      stats.rx_bytes = stats.rx_bytes + regs[GORCL] + bit.lshift(regs[GORCH], 32)
+   function M.print_stats ()
+      print("Statistics for PCI device " .. pciaddress .. ":")
+      for _,reg in ipairs(statistics_regs) do
+         name, desc = reg[1], reg[3]
+         if M.stats[name] > 0 then
+            print(("%20s %-10s %s"):format(lib.comma_value(M.stats[name]), name, desc))
+         end
+      end
    end
 
    return M
