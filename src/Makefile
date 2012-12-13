@@ -1,5 +1,3 @@
-LUAJIT := luajit
-
 LUASRC := $(wildcard *.lua)
 CSRC   := $(wildcard *.c)
 CHDR   := $(wildcard *.h)
@@ -8,7 +6,7 @@ LUAOBJ := $(patsubst %.lua,obj/%.o,$(LUASRC))
 COBJ   := $(patsubst %.c,obj/%.o,$(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,$(CHDR))
 
-PATH := ../deps/luajit/src:$(PATH)
+PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
 all: snabbswitch
 	@echo -n "Firmware: "
@@ -20,18 +18,21 @@ snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt
 
-$(LUAOBJ): obj/%.o: %.lua
-	$(LUAJIT) -b $< $@
+$(LUAOBJ): obj/%.o: %.lua obj
+	luajit -b $< $@
 
-$(COBJ): obj/%.o: %.c $(CHDR)
+$(COBJ): obj/%.o: %.c $(CHDR) obj
 	gcc -Wl,-E -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
-$(HOBJ): obj/%_h.o: %.h
+$(HOBJ): obj/%_h.o: %.h obj
 	@echo Generating $(basename $@).lua from $< - $(basename $@)
 	@(echo -n "module(...,package.seeall); require(\"ffi\").cdef[=============["; \
 	 cat $<; \
 	 echo "]=============]") >> $(basename $@).lua
-	@$(LUAJIT) -b $(basename $@).lua $@
+	luajit -b $(basename $@).lua $@
+
+obj:
+	mkdir $@
 
 clean:
 	-rm snabbswitch
