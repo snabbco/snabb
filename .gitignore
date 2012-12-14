@@ -3,4 +3,4 @@
 *.o
 *#
 /src/snabbswitch
-/src/obj/*
+

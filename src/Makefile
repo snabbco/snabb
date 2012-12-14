@@ -18,21 +18,18 @@ snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt
 
-$(LUAOBJ): obj/%.o: %.lua obj
+$(LUAOBJ): obj/%.o: %.lua
 	luajit -b $< $@
 
-$(COBJ): obj/%.o: %.c $(CHDR) obj
+$(COBJ): obj/%.o: %.c $(CHDR)
 	gcc -Wl,-E -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
-$(HOBJ): obj/%_h.o: %.h obj
+$(HOBJ): obj/%_h.o: %.h
 	@echo Generating $(basename $@).lua from $< - $(basename $@)
 	@(echo -n "module(...,package.seeall); require(\"ffi\").cdef[=============["; \
 	 cat $<; \
 	 echo "]=============]") >> $(basename $@).lua
 	luajit -b $(basename $@).lua $@
-
-obj:
-	mkdir $@
 
 clean:
 	-rm snabbswitch
