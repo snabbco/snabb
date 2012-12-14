@@ -6,6 +6,7 @@ local C = ffi.C
 local test = require("test")
 
 print "selftest"
+assert(C.lock_memory() == 0)
 
 local nic = intel.new("0000:00:04.0")
 

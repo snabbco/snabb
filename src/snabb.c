@@ -13,11 +13,17 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
 
 #include "snabb.h"
 #include "snabb-shm-dev.h"
+
+int lock_memory()
+{
+  return mlockall(MCL_CURRENT | MCL_FUTURE);
+}
 
 struct snabb_shm_dev *open_shm(const char *path)
 {

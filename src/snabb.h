@@ -5,6 +5,11 @@
 /* Return the current wall-clock time in nanoseconds. */
 uint64_t get_time_ns();
 
+/* Lock the physical address of all virtual memory in the process.
+   This is effective for all current and future memory allocations.
+   Returns 0 on success or -1 on error. */
+int lock_memory();
+
 /* Open a 'snabb_shm' QEMU/KVM shared memory ethernet device.
    This is a shared memory area where ethernet frames can be exchanged
    with the hypervisor. */
