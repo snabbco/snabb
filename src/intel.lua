@@ -89,6 +89,8 @@ function new (pciaddress)
    local RDLEN  = 0x02808 / 4 -- Receive Descriptor Length (RW)
    local RDH    = 0x02810 / 4 -- Receive Descriptor Head (RW)
    local RDT    = 0x02818 / 4 -- Receive Descriptor Tail (RW)
+   local RADV   = 0x0282C / 4 -- Receive Interrupt Absolute Delay Timer (RW)
+   local RDTR   = 0x02820 / 4 -- Rx Interrupt Delay Timer [Packet Timer] (RW)
    local TXDCTL = 0x03828 / 4 -- Transmit Descriptor Control (RW)
    local TCTL   = 0x00400 / 4 -- Transmit Control Register (RW)
    local TIPG   = 0x00410 / 4 -- Transmit Inter-Packet Gap (RW)
@@ -132,7 +134,7 @@ function new (pciaddress)
 
    function init_dma_memory ()
       dma_virt = C.map_physical_ram(dma_start, dma_end, true)
-      C.memset(dma_virt, 0, dma_end - dma_start)
+      C.memset(dma_virt, 0xaa, dma_end - dma_start)
       rxdesc  = protected("union rx", dma_virt, offset_rxdesc, 0x100000)
       txdesc  = protected("union tx", dma_virt, offset_txdesc, 0x100000)
       buffers = protected("uint8_t", dma_virt, offset_buffers, 0xe00000)
@@ -179,6 +181,7 @@ function new (pciaddress)
       print("  RDBAH       = " .. bit.tohex(regs[RDBAH]))
       print("  RDBAL       = " .. bit.tohex(regs[RDBAL]))
       print("  RDLEN       = " .. regs[RDLEN])
+      print("  RADV        = " .. regs[RADV])
       print("PHY status")
       local phystatus, phyext, copperstatus = phy_read(1), phy_read(15), phy_read(17)
       print("  Autonegotiate state    = " .. (bitset(phystatus,5) and 'complete' or 'not complete'))
@@ -220,34 +223,42 @@ function new (pciaddress)
 
 	 // RX writeback descriptor written by hardware.
 	 struct rx_desc_wb {
-	    uint16_t checksum, ipid;
+	    // uint32_t rss;
+	    uint16_t checksum;
+	    uint16_t id;
 	    uint32_t mrq;
-	    uint16_t vlan, length;
 	    uint32_t status;
+	    uint16_t length;
+	    uint16_t vlan;
 	 } __attribute__((packed));
 
 	 union rx {
-	    struct rx_desc desc;
+	    struct rx_desc data;
 	    struct rx_desc_wb wb;
-	 };
-
+	 } __attribute__((packed));
    ]]
+
+   local rxnext = 0
+   local rxbuffers = {}
 
    function init_receive ()
       -- Disable RX and program all the registers
       regs[RCTL] = bits({UPE=3, MPE=4, -- Unicast & Multicast promiscuous mode
-	    LPE=5,        -- Long Packet Enable (XXX what is that?)
-	    BSIZE1=16, BSEX=25, -- 16KB buffers
-	    SECRC=26      -- Strip Ethernet CRC from packets
+	    LPE=5,        -- Long Packet Enable (over 1522 bytes)
+	    BSIZE1=17, BSIZE0=16, BSEX=25, -- 4KB buffers
+	    SECRC=26,      -- Strip Ethernet CRC from packets
+	    BAM=15         -- Broadcast Accept Mode
 	 })
       regs[RFCTL] = bits({EXSTEN=15})  -- Extended RX writeback descriptor format
-      regs[RXDCTL] = bits({WTHRESH0=16}) -- Set to data sheet default value
+--      regs[RXDCTL] = bits({GRAN=24, WTHRESH0=16})
       regs[RXCSUM] = 0                 -- Disable checksum offload - not needed
+      regs[RADV] = math.log(1024,2)    -- 1us max writeback delay
       regs[RDLEN] = num_descriptors * ffi.sizeof("union rx")
       regs[RDBAL] = bit.band(dma_phys + offset_rxdesc, 0xffffffff)
       regs[RDBAH] = 0
       regs[RDH] = 0
       regs[RDT] = 0
+      rxnext = 0
       -- Enable RX
       regs[RCTL] = bit.bor(regs[RCTL], bits{EN=1})
    end
@@ -256,9 +267,10 @@ function new (pciaddress)
    function M.add_rxbuf (address, size)
       -- NOTE: RDT points to the next unused descriptor
       local index = regs[RDT]
-      rxdesc[index].desc.address = address
-      rxdesc[index].desc.dd = 0
+      rxdesc[index].data.address = address
+      rxdesc[index].data.dd = 0
       regs[RDT] = (index + 1) % num_descriptors
+      rxbuffers[index] = address
       return true
    end
 
@@ -270,6 +282,21 @@ function new (pciaddress)
       return regs[RDH] == regs[RDT]
    end
 
+   -- Return the next available packet as two values: buffer, length.
+   -- If no packet is available then return nil.
+   function M.receive ()
+      if regs[RDH] ~= rxnext then
+	 local wb = rxdesc[rxnext].wb
+	 local index = rxnext
+	 local length = wb.length
+	 rxnext = (rxnext + 1) % num_descriptors
+	 return rxbuffers[index], length
+      end
+   end
+
+   function M.ack ()
+   end
+
    -- Transmit functionality
 
    ffi.cdef[[
@@ -279,9 +306,25 @@ function new (pciaddress)
 	    uint64_t options;
 	 } __attribute__((packed));
 
+	 struct tx_context_desc {
+	    unsigned int tucse:16,
+	                 tucso:8,
+	                 tucss:8,
+	                 ipcse:16,
+	                 ipcso:8,
+	                 ipcss:8,
+	                 mss:16,
+	                 hdrlen:8,
+	                 rsv:2,
+	                 sta:4,
+	                 tucmd:8,
+	                 dtype:4,
+	                 paylen:20;
+	 } __attribute__((packed));
+
 	 union tx {
-	    struct tx_desc desc;
-	    // XXX context descriptor
+	    struct tx_desc data;
+	    struct tx_context_desc ctx;
 	 };
    ]]
 
@@ -309,9 +352,26 @@ function new (pciaddress)
    -- Enqueue a transmit descriptor to send a packet.
    function M.add_txbuf (address, size)
       local index = regs[TDT]
-      txdesc[index].desc.address = address
-      txdesc[index].desc.options = bit.bor(size, bits({dtype=20, eop=24, ifcs=25, dext=29}))
+      txdesc[index].data.address = address
+      txdesc[index].data.options = bit.bor(size, bits({dtype=20, eop=24, ifcs=25, dext=29}))
       regs[TDT] = (index + 1) % num_descriptors
+   end
+
+   function M.add_txbuf_tso (address, size, mss, ctx)
+      local index = regs[TDT]
+      ctx = ffi.cast("struct tx_context_desc *", txdesc + index)
+      ctx.tucse = 0
+      ctx.tucso = 0
+      ctx.tucss = 0
+      ctx.ipcse = 0
+      ctx.ipcso = 0
+      ctx.ipcss = 0
+      ctx.mss = 1440
+      ctx.hdrlen = 0
+      ctx.sta = 0
+      ctx.tucmd = 0
+      ctx.dtype = 0
+      ctx.paylen = 0
    end
 
    function M.tx_full  () return M.tx_pending() == num_descriptors - 1 end
@@ -467,6 +527,66 @@ function new (pciaddress)
          if M.stats[name] > 0 then
             print(("%20s %-10s %s"):format(lib.comma_value(M.stats[name]), name, desc))
          end
+      end
+   end
+
+   -- Self-test diagnostics
+
+   -- Test the NIC.
+   function M.selftest (options)
+      options = options or {}
+      local packets = options.packets or 100000
+      local verify = options.verify == true
+      local noloopback = options.noloopback == true
+      local verbose = options.verbose == true
+      local rxindex = 0
+      local software_rx_packets = 0
+      local software_rx_bytes = 0
+      local start_time_ns = C.get_time_ns()
+      local function txbuf(i)
+	 return dma_start + offset_buffers + 4096*1024 + (i % 1024)*1024
+      end
+      local function rxbuf(i)
+	 return dma_start + offset_buffers + (i % 1024)*4096
+      end
+      local function rxpacket ()
+	 local packet, length = M.receive()
+	 if packet then
+	    software_rx_packets = software_rx_packets + 1
+	    software_rx_bytes = software_rx_bytes + length + 4 -- stripped CRC
+	    return true
+	 end
+      end
+      -- Transmit and receive loop
+      for txindex = 0,packets-1 do
+	 while not M.rx_full() do
+	    M.add_rxbuf(rxbuf(rxindex), 4096)
+	    rxindex = rxindex + 1
+	 end
+	 if not M.tx_full() then M.add_txbuf(txbuf(txindex), 996) end
+	 while rxpacket() do end
+      end
+      -- Catch up remaining packets
+      for catchup = 0,num_descriptors do
+	 rxpacket()
+      end
+      M.update_stats()
+      M.print_stats()
+      print("software RX packets: ", lib.comma_value(software_rx_packets))
+      print("software RX bytes:   ", lib.comma_value(software_rx_bytes))
+      local elapsed_time = tonumber(C.get_time_ns() - start_time_ns) / 1000000000.0
+      print("Elapsed time (secs): ", lib.comma_value(elapsed_time))
+      print("Megabits per second: ",
+	    lib.comma_value(math.floor(software_rx_bytes * 8.0 / 1024 / 1028 / elapsed_time)))
+      print("Packets per second:  ",
+	    lib.comma_value(math.floor(software_rx_packets / elapsed_time)))
+
+      if verbose then
+	 local ptr = ffi.cast("uint32_t*", ffi.cast("char*", dma_virt) + 8192)
+	 for x = 1,128 do
+	    io.write(bit.tohex(ptr[x]).." ")
+	    if x > 0 and x % 8 == 0 then print() end
+	 end
       end
    end
 
