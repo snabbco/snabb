@@ -11,13 +11,13 @@ void *memset(void *s, int c, size_t n);
 char *strncpy(char *dest, const char *src, size_t n);
 
 // read(2) - read from a file descriptor
-int     read(int fd, void *buf, size_t count);
+int read(int fd, void *buf, size_t count);
 
 // write(2) - write to a file descriptor
-int     write(int fd, void *buf, size_t count);
+int write(int fd, void *buf, size_t count);
 
 // fork(2) - create a child process
-int     fork();
+int fork();
 
 // pread(2), pwrite(2) - read/write from a file descriptor at an offset
 size_t pread(int fd, void *buf, int count, int offset);
