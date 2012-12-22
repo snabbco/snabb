@@ -45,15 +45,15 @@ function new (pciaddress)
       local bound = (size + 0ULL) / ffi.sizeof(type)
       local tptr = ffi.typeof("$ *", type)
       local wrap = ffi.metatype(ffi.typeof("struct { $ _ptr; }", tptr), {
-				   __index = function(w, idx)
-						assert(idx < bound)
-						return w._ptr[idx]
-					     end,
-				   __newindex = function(w, idx, val)
-						   assert(idx < bound)
-						   w._ptr[idx] = val
-						end,
-				})
+                                   __index = function(w, idx)
+                                                assert(idx < bound)
+                                                return w._ptr[idx]
+                                             end,
+                                   __newindex = function(w, idx, val)
+                                                   assert(idx < bound)
+                                                   w._ptr[idx] = val
+                                                end,
+                                })
       return wrap(ffi.cast(tptr, ffi.cast("uint8_t *", base) + offset))
    end
 
@@ -120,10 +120,10 @@ function new (pciaddress)
    end
 
    function reset ()
-      regs[IMC] = 0			  -- Disable interrupts
+      regs[IMC] = 0                       -- Disable interrupts
       regs[CTRL] = bits({FD=0,SLU=6,RST=26}) -- Global reset
       C.usleep(10); assert( not bitset(regs[CTRL],26) )
-      regs[IMC] = 0		          -- Disable interrupts
+      regs[IMC] = 0                       -- Disable interrupts
    end
 
    function init_pci ()
@@ -134,7 +134,7 @@ function new (pciaddress)
 
    function init_dma_memory ()
       dma_virt = C.map_physical_ram(dma_start, dma_end, true)
-      C.memset(dma_virt, 0xaa, dma_end - dma_start)
+      C.memset(dma_virt, 0, dma_end - dma_start)
       rxdesc  = protected("union rx", dma_virt, offset_rxdesc, 0x100000)
       txdesc  = protected("union tx", dma_virt, offset_txdesc, 0x100000)
       buffers = protected("uint8_t", dma_virt, offset_buffers, 0xe00000)
@@ -215,27 +215,27 @@ function new (pciaddress)
    -- Receive functionality
 
    ffi.cdef[[
-	 // RX descriptor written by software.
-	 struct rx_desc {
-	    uint64_t address;    // 64-bit address of receive buffer
-	    uint64_t dd;         // low bit must be 0, otherwise reserved
-	 } __attribute__((packed));
+         // RX descriptor written by software.
+         struct rx_desc {
+            uint64_t address;    // 64-bit address of receive buffer
+            uint64_t dd;         // low bit must be 0, otherwise reserved
+         } __attribute__((packed));
 
-	 // RX writeback descriptor written by hardware.
-	 struct rx_desc_wb {
-	    // uint32_t rss;
-	    uint16_t checksum;
-	    uint16_t id;
-	    uint32_t mrq;
-	    uint32_t status;
-	    uint16_t length;
-	    uint16_t vlan;
-	 } __attribute__((packed));
+         // RX writeback descriptor written by hardware.
+         struct rx_desc_wb {
+            // uint32_t rss;
+            uint16_t checksum;
+            uint16_t id;
+            uint32_t mrq;
+            uint32_t status;
+            uint16_t length;
+            uint16_t vlan;
+         } __attribute__((packed));
 
-	 union rx {
-	    struct rx_desc data;
-	    struct rx_desc_wb wb;
-	 } __attribute__((packed));
+         union rx {
+            struct rx_desc data;
+            struct rx_desc_wb wb;
+         } __attribute__((packed));
    ]]
 
    local rxnext = 0
@@ -244,11 +244,11 @@ function new (pciaddress)
    function init_receive ()
       -- Disable RX and program all the registers
       regs[RCTL] = bits({UPE=3, MPE=4, -- Unicast & Multicast promiscuous mode
-	    LPE=5,        -- Long Packet Enable (over 1522 bytes)
-	    BSIZE1=17, BSIZE0=16, BSEX=25, -- 4KB buffers
-	    SECRC=26,      -- Strip Ethernet CRC from packets
-	    BAM=15         -- Broadcast Accept Mode
-	 })
+            LPE=5,        -- Long Packet Enable (over 1522 bytes)
+            BSIZE1=17, BSIZE0=16, BSEX=25, -- 4KB buffers
+            SECRC=26,      -- Strip Ethernet CRC from packets
+            BAM=15         -- Broadcast Accept Mode
+         })
       regs[RFCTL] = bits({EXSTEN=15})  -- Extended RX writeback descriptor format
 --      regs[RXDCTL] = bits({GRAN=24, WTHRESH0=16})
       regs[RXCSUM] = 0                 -- Disable checksum offload - not needed
@@ -286,11 +286,11 @@ function new (pciaddress)
    -- If no packet is available then return nil.
    function M.receive ()
       if regs[RDH] ~= rxnext then
-	 local wb = rxdesc[rxnext].wb
-	 local index = rxnext
-	 local length = wb.length
-	 rxnext = (rxnext + 1) % num_descriptors
-	 return rxbuffers[index], length
+         local wb = rxdesc[rxnext].wb
+         local index = rxnext
+         local length = wb.length
+         rxnext = (rxnext + 1) % num_descriptors
+         return rxbuffers[index], length
       end
    end
 
@@ -300,32 +300,32 @@ function new (pciaddress)
    -- Transmit functionality
 
    ffi.cdef[[
-	 // TX Extended Data Descriptor written by software.
-	 struct tx_desc {
-	    uint64_t address;
-	    uint64_t options;
-	 } __attribute__((packed));
+         // TX Extended Data Descriptor written by software.
+         struct tx_desc {
+            uint64_t address;
+            uint64_t options;
+         } __attribute__((packed));
 
-	 struct tx_context_desc {
-	    unsigned int tucse:16,
-	                 tucso:8,
-	                 tucss:8,
-	                 ipcse:16,
-	                 ipcso:8,
-	                 ipcss:8,
-	                 mss:16,
-	                 hdrlen:8,
-	                 rsv:2,
-	                 sta:4,
-	                 tucmd:8,
-	                 dtype:4,
-	                 paylen:20;
-	 } __attribute__((packed));
+         struct tx_context_desc {
+            unsigned int tucse:16,
+                         tucso:8,
+                         tucss:8,
+                         ipcse:16,
+                         ipcso:8,
+                         ipcss:8,
+                         mss:16,
+                         hdrlen:8,
+                         rsv:2,
+                         sta:4,
+                         tucmd:8,
+                         dtype:4,
+                         paylen:20;
+         } __attribute__((packed));
 
-	 union tx {
-	    struct tx_desc data;
-	    struct tx_context_desc ctx;
-	 };
+         union tx {
+            struct tx_desc data;
+            struct tx_context_desc ctx;
+         };
    ]]
 
    function init_transmit ()
@@ -406,7 +406,7 @@ function new (pciaddress)
 
    function phy_wait_ready ()
       while bit.band(regs[MDIC], bits({READY=28,ERROR=30})) == 0 do
-	 ffi.C.usleep(2000)
+         ffi.C.usleep(2000)
       end
    end
 
@@ -427,7 +427,7 @@ function new (pciaddress)
    function phy_lock ()
       regs[EXTCNF_CTRL] = bits({MDIO_SW=5})
       while bit.band(regs[EXTCNF_CTRL], bits({MDIO_SW=5})) == 0 do
-	 ffi.C.usleep(2000)
+         ffi.C.usleep(2000)
       end
    end
 
@@ -544,31 +544,31 @@ function new (pciaddress)
       local software_rx_bytes = 0
       local start_time_ns = C.get_time_ns()
       local function txbuf(i)
-	 return dma_start + offset_buffers + 4096*1024 + (i % 1024)*1024
+         return dma_start + offset_buffers + 4096*1024 + (i % 1024)*1024
       end
       local function rxbuf(i)
-	 return dma_start + offset_buffers + (i % 1024)*4096
+         return dma_start + offset_buffers + (i % 1024)*4096
       end
       local function rxpacket ()
-	 local packet, length = M.receive()
-	 if packet then
-	    software_rx_packets = software_rx_packets + 1
-	    software_rx_bytes = software_rx_bytes + length + 4 -- stripped CRC
-	    return true
-	 end
+         local packet, length = M.receive()
+         if packet then
+            software_rx_packets = software_rx_packets + 1
+            software_rx_bytes = software_rx_bytes + length + 4 -- stripped CRC
+            return true
+         end
       end
       -- Transmit and receive loop
       for txindex = 0,packets-1 do
-	 while not M.rx_full() do
-	    M.add_rxbuf(rxbuf(rxindex), 4096)
-	    rxindex = rxindex + 1
-	 end
-	 if not M.tx_full() then M.add_txbuf(txbuf(txindex), 996) end
-	 while rxpacket() do end
+         while not M.rx_full() do
+            M.add_rxbuf(rxbuf(rxindex), 4096)
+            rxindex = rxindex + 1
+         end
+         if not M.tx_full() then M.add_txbuf(txbuf(txindex), 996) end
+         while rxpacket() do end
       end
       -- Catch up remaining packets
       for catchup = 0,num_descriptors do
-	 rxpacket()
+         rxpacket()
       end
       M.update_stats()
       M.print_stats()
@@ -577,16 +577,16 @@ function new (pciaddress)
       local elapsed_time = tonumber(C.get_time_ns() - start_time_ns) / 1000000000.0
       print("Elapsed time (secs): ", lib.comma_value(elapsed_time))
       print("Megabits per second: ",
-	    lib.comma_value(math.floor(software_rx_bytes * 8.0 / 1024 / 1028 / elapsed_time)))
+            lib.comma_value(math.floor(software_rx_bytes * 8.0 / 1024 / 1028 / elapsed_time)))
       print("Packets per second:  ",
-	    lib.comma_value(math.floor(software_rx_packets / elapsed_time)))
+            lib.comma_value(math.floor(software_rx_packets / elapsed_time)))
 
       if verbose then
-	 local ptr = ffi.cast("uint32_t*", ffi.cast("char*", dma_virt) + 8192)
-	 for x = 1,128 do
-	    io.write(bit.tohex(ptr[x]).." ")
-	    if x > 0 and x % 8 == 0 then print() end
-	 end
+         local ptr = ffi.cast("uint32_t*", ffi.cast("char*", dma_virt) + 8192)
+         for x = 1,128 do
+            io.write(bit.tohex(ptr[x]).." ")
+            if x > 0 and x % 8 == 0 then print() end
+         end
       end
    end
 
