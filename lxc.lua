@@ -23,6 +23,8 @@ assert(nl.create_interface{name = "veth0", type = "veth", peer = {name = "veth1"
 local p = assert(S.clone("newnet,newipc,newns,newpid,newuts"))
 
 if p == 0 then -- child
+  local nl = require "syscall.nl"
+
   -- wait for interface to appear
   local sock = assert(nl.socket("route", {groups = "link"}))
   local i = nl.interfaces()

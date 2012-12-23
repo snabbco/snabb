@@ -10,7 +10,7 @@
 package.path = "/lib/?.lua;?"
 
 local S = require "syscall"
-local nl = require "nl"
+local nl = require "syscall.nl"
 
 local function fatal(s)
   print(s)
