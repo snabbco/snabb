@@ -855,7 +855,7 @@ test_timers_signals = {
 
     assert(S.setitimer("real", {0, 0.01}))
     assert(S.nanosleep(0.1)) -- nanosleep does not interact with itimer
-    
+
     local sig = assert(fd:signalfd_read())
     assert(#sig == 1, "expect one signal")
     assert(sig[1].alrm, "expect alarm clock to have rung")
@@ -1250,7 +1250,7 @@ test_sockets = {
   end,
   test_ipv6_socket = function()
     local s, err = S.socket("inet6", "dgram")
-    if s then 
+    if s then
       local c = assert(S.socket("inet6", "dgram"))
       local sa = assert(t.sockaddr_in6(0, S.in6addr_any))
       local ca = assert(t.sockaddr_in6(0, S.in6addr_any))
