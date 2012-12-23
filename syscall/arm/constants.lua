@@ -345,10 +345,10 @@ arch.SYS = {
 }
 
 arch.O = {
-  DIRECTORY = octal('040000')
-  NOFOLLOW  = octal('0100000')
-  DIRECT    = octal('0200000')
-  LARGEFILE = octal('0400000')
+  DIRECTORY = octal('040000'),
+  NOFOLLOW  = octal('0100000'),
+  DIRECT    = octal('0200000'),
+  LARGEFILE = octal('0400000'),
 }
 
 return arch
