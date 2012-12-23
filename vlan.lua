@@ -1,7 +1,7 @@
 -- example of how to create a vlan using ljsyscall
 -- not in the tests as it will mess up your interfaces and as far as I know you can only create vlans on physical interfaces
 
-local nl = require "nl"
+local nl = require "syscall.nl"
 
 local interface = "eth0"
 local vlan = 40
