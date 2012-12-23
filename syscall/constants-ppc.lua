@@ -1,6 +1,6 @@
 -- ppc specific code
 
-local h = require "include.helpers"
+local h = require "syscall.helpers"
 
 local octal = h.octal
 

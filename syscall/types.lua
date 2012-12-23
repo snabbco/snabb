@@ -10,9 +10,9 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-require "include.headers"
+require "syscall.headers"
 
-local c = require "include.constants"
+local c = require "syscall.constants"
 
 local C = ffi.C -- for inet_pton etc, due to be replaced with Lua
 

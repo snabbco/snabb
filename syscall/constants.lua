@@ -8,9 +8,9 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-local arch = require("include.constants-" .. ffi.arch) -- architecture specific code
+local arch = require("syscall.constants-" .. ffi.arch) -- architecture specific code
 
-local h = require "include.helpers"
+local h = require "syscall.helpers"
 
 local octal, stringflag, multiflags, charflags, flag = h.octal, h.stringflag, h.multiflags, h.charflags, h.flag
 

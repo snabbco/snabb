@@ -12,14 +12,14 @@ local lshift = bit.lshift
 local rshift = bit.rshift
 
 -- include types to get sizes
-local t = require "include.types"
+local t = require "syscall.types"
 local s = t.s
 
-local h = require "include.helpers"
+local h = require "syscall.helpers"
 local stringflag = h.stringflag
 
 local ffi = require "ffi"
-local ok, arch = pcall(require, "include.ioctl-" .. ffi.arch) -- architecture specific definitions
+local ok, arch = pcall(require, "syscall.ioctl-" .. ffi.arch) -- architecture specific definitions
 if not ok then arch = {} end
 
 local ioctl = {}
