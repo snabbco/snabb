@@ -737,7 +737,7 @@ c.EPOLL = setmetatable({
   HUP = 0x010,
   RDHUP = 0x2000,
   ONESHOT = bit.lshift(1, 30),
-  ET = bit.lshift(1, 30) * 2, -- 2^31 but making sure no sign issue 
+  ET = bit.lshift(1, 30) * 2, -- 2^31 but making sure no sign issue
 }, multiflags)
 
 c.EPOLL_CTL = setmetatable({
@@ -803,7 +803,7 @@ c.NETLINK = setmetatable({
   SELINUX       = 7,
   ISCSI         = 8,
   AUDIT         = 9,
-  FIB_LOOKUP    = 10,     
+  FIB_LOOKUP    = 10,
   CONNECTOR     = 11,
   NETFILTER     = 12,
   IP6_FW        = 13,
@@ -1700,7 +1700,7 @@ c.SECCOMP_RET = setmetatable({
   TRACE     = 0x7ff00000,
   ALLOW     = 0x7fff0000,
 
-  ACTION    = 0xffff0000, -- note unsigned 
+  ACTION    = 0xffff0000, -- note unsigned
   DATA      = 0x0000ffff,
 }, multiflags)
 
