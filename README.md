@@ -90,8 +90,8 @@ It would be nice to be API compatible with other projects, especially Luaposix, 
 
 If you want the highest performance, allocate and pass your own buffers, as obviously allocation is expensive. It is now fine to use the string flags for functions, as these are memoized. Check the output of `luajit -jv` to see what is going on and let me know if there are any issues that need fixes for NYI functions. You should be able to get native C like performance.
 
-There is an example epoll script that you can test with Apachebench (in the examples)[https://github.com/justincormack/ljsyscall-examples]. On my machine apachebench uses more CPU time than the script so the results are a bit low.
+There is an example epoll script that you can test with Apachebench [in the examples](https://github.com/justincormack/ljsyscall-examples). On my machine apachebench uses more CPU time than the script so the results are a bit low.
 
 ### Issues
 
-There will no doubt be bugs and missing features, please report them if you find them. Also API design issues. You can use the (github issue tracker)[https://github.com/justincormack/ljsyscall/issues?page=1&state=open]
+There will no doubt be bugs and missing features, please report them if you find them. Also API design issues. You can use the [github issue tracker](https://github.com/justincormack/ljsyscall/issues?page=1&state=open)
