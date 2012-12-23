@@ -19,7 +19,7 @@ local h = require "syscall.helpers"
 local stringflag = h.stringflag
 
 local ffi = require "ffi"
-local ok, arch = pcall(require, "syscall.ioctl-" .. ffi.arch) -- architecture specific definitions
+local ok, arch = pcall(require, "syscall." .. ffi.arch .. ".ioctl") -- architecture specific definitions
 if not ok then arch = {} end
 
 local ioctl = {}

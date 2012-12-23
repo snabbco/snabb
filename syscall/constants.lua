@@ -8,7 +8,7 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-local arch = require("syscall.constants-" .. ffi.arch) -- architecture specific code
+local arch = require("syscall." .. ffi.arch .. ".constants") -- architecture specific code
 
 local h = require "syscall.helpers"
 

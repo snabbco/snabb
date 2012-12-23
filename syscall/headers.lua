@@ -2,8 +2,7 @@
 
 local ffi = require "ffi"
 
--- currently used for x86, x64. arm has no differences.
-local ok, arch = pcall(require, "syscall.headers-" .. ffi.arch) -- architecture specific definitions
+local ok, arch = pcall(require, "syscall." .. ffi.arch .. ".headers") -- architecture specific definitions
 if not ok then arch = {} end
 
 -- define C types
