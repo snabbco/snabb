@@ -1670,7 +1670,7 @@ end
 
 -- if no msg provided, assume want to receive cmsg
 function S.recvmsg(fd, msg, flags)
-  if not msg then 
+  if not msg then
     local buf1 = t.buffer(1) -- assume user wants to receive single byte to get cmsg
     local io = t.iovecs{{buf1, 1}}
     local bufsize = 1024 -- sane default, build your own structure otherwise
