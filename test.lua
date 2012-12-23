@@ -2,7 +2,7 @@
 
 local strict = require "strict"
 local S = require "syscall"
-local nl = require "nl"
+local nl = require "syscall.nl"
 local bit = require "bit"
 local ffi = require "ffi"
 
