@@ -4,6 +4,8 @@ error("mips support is coming soon")
 
 local arch = {}
 
+arch.syscall0pad = true
+
 arch.SYS = {
   syscall               = 4000,
   exit                  = 4001,

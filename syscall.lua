@@ -201,10 +201,18 @@ else
   function C.fstatat(fd, path, buf, flags)
     return C.syscall(c.SYS.fstatat64, t.int(fd), path, pt.void(buf), t.int(flags))
   end
-  function C.fadvise64(fd, offset, len, advise)
-    local off2, off1 = u6432(offset)
-    local len2, len1 = u6432(len)
-    return C.syscall(sys_fadvise64, t.int(fd), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2), t.int(advise))
+  if c.syscall0pad then
+    function C.fadvise64(fd, offset, len, advise)
+      local off2, off1 = u6432(offset)
+      local len2, len1 = u6432(len)
+      return C.syscall(sys_fadvise64, t.int(fd), 0, t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2), t.int(advise))
+    end
+  else
+    function C.fadvise64(fd, offset, len, advise)
+      local off2, off1 = u6432(offset)
+      local len2, len1 = u6432(len)
+      return C.syscall(sys_fadvise64, t.int(fd), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2), t.int(advise))
+    end
   end
   function C.fallocate(fd, mode, offset, len)
     local off2, off1 = u6432(offset)

@@ -8,6 +8,8 @@ local octal = function (s) return tonumber(s, 8) end
 
 local arch = {}
 
+arch.syscall0pad = true
+
 arch.SYS = {
   restart_syscall  = 0,
   exit             = 1,

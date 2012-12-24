@@ -24,6 +24,8 @@ end
 
 local c = {}
 
+c.syscall0pad = arch.syscall0pad
+
 c.SYS = arch.SYS
 
 c.STD = setmetatable({

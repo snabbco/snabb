@@ -6,6 +6,8 @@ local octal = h.octal
 
 local arch = {}
 
+arch.syscall0pad = true
+
 arch.SYS = {
   restart_syscall         = 0,
   exit                    = 1,
