@@ -6,7 +6,10 @@ local octal = h.octal
 
 local arch = {}
 
-arch.syscall0pad = true
+arch.syscall = {
+  zeropad = true,
+  fallocate = true -- apparently ppc reverses endianness just for this call. TODO understand this properly
+}
 
 arch.SYS = {
   restart_syscall         = 0,

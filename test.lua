@@ -528,11 +528,13 @@ test_file_operations = {
     local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
     assert(S.fadvise(fd, "random"))
-    local ok, err = S.fallocate(fd, "keep_size", 0, 4096)
+    local ok, err = S.fallocate(fd, "keep_size", 1024, 4096)
     assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported")
     ok, err = S.posix_fallocate(fd, 0, 8192)
     assert(ok or err.OPNOTSUPP or err.NOSYS, "expect posix_fallocate to succeed if supported")
     assert(S.readahead(fd, 0, 4096))
+    local ok, err = S.fallocate(fd, "keep_size", largeval, largeval + 1) -- test 64 bit ops 8589934592, 8589934593
+    assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported")
     assert(fd:close())
   end,
   test_getdents_dirfile = function()

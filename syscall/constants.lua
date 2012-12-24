@@ -24,7 +24,7 @@ end
 
 local c = {}
 
-c.syscall0pad = arch.syscall0pad
+c.syscall = arch.syscall or {} -- special syscall handling
 
 c.SYS = arch.SYS
 
