@@ -429,6 +429,20 @@ arch.LFLAG = {
   EXTPROC = 0x10000000,
 }
 
+arch.CFLAG = {
+  CSIZE      = octal('00001400'),
+  CS5        = octal('00000000'),
+  CS6        = octal('00000400'),
+  CS7        = octal('00001000'),
+  CS8        = octal('00001400'),
+  CSTOPB     = octal('00002000'),
+  CREAD      = octal('00004000'),
+  PARENB     = octal('00010000'),
+  PARODD     = octal('00020000'),
+  HUPCL      = octal('00040000'),
+  CLOCAL     = octal('00100000'),
+}
+
 arch.CC = {
   VINTR           = 0,
   VQUIT           = 1,

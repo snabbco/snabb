@@ -1835,7 +1835,7 @@ c.CMSPAR     = octal('010000000000') -- mark or space (stick) parity
 c.CRTSCTS    = octal('020000000000') -- flow control
 
 -- termios - c_cflag bits
-c.CFLAG = setmetatable({
+c.CFLAG = setmetatable(arch.CFLAG or {
   CSIZE      = octal('0000060'),
   CS5        = octal('0000000'),
   CS6        = octal('0000020'),
