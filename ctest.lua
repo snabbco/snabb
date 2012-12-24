@@ -1,5 +1,5 @@
 -- generate C test file to check type sizes etc
--- luajit ctest.lua > ctest.c && cc ctest.c -o ctest && ./ctest
+-- luajit ctest.lua > ctest.c && cc -std=c99 ctest.c -o ctest && ./ctest
 
 local S = require "syscall"
 local ffi = require "ffi"
