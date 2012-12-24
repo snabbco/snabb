@@ -949,7 +949,7 @@ int munlockall(void);
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
 int madvise(void *addr, size_t length, int advice);
 int posix_fadvise(int fd, off_t offset, off_t len, int advice);
-int fallocate(int fd, int mode, off_t offset, off_t len);
+int fallocate(int fd, int mode, loff_t offset, loff_t len); /* note there are 32 bit issues with glibc */
 ssize_t readahead(int fd, off64_t offset, size_t count);
 
 int pipe(int pipefd[2]);

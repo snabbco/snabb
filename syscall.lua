@@ -302,6 +302,11 @@ if not pcall(inlibc, "preadv64") then C.preadv64 = CC.preadv64 end
 if not pcall(inlibc, "pwritev64") then C.pwritev64 = CC.pwritev64 end
 if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
 
+-- more 32 bit file system stuff, as glibc hacks these around
+if ffi.abi("32bit") then
+  C.fallocate = CC.fallocate
+end
+
 -- main definitions start here
 if ffi.abi("32bit") then
   function S.open(pathname, flags, mode)
