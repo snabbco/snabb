@@ -1490,7 +1490,7 @@ test_netlink = {
   test_getroute_inet6 = function()
     local r = assert(nl.routes("inet6", "unspec"))
     local nr = r:match("::1/128")
-    assert_equal(#nr, 1, "expect one matched route")
+    assert(#nr >= 1, "expect at least one matched route") -- one of my machines has two
     local lor = nr[1]
     assert_equal(tostring(lor.source), "::", "expect empty source route")
     assert_equal(lor.output, "lo", "expect to be on lo")
