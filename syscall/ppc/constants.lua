@@ -447,6 +447,24 @@ arch.CFLAG = {
   CLOCAL     = octal('00100000'),
 }
 
+arch.IFLAG = {
+  IGNBRK  = octal('0000001'),
+  BRKINT  = octal('0000002'),
+  IGNPAR  = octal('0000004'),
+  PARMRK  = octal('0000010'),
+  INPCK   = octal('0000020'),
+  ISTRIP  = octal('0000040'),
+  INLCR   = octal('0000100'),
+  IGNCR   = octal('0000200'),
+  ICRNL   = octal('0000400'),
+  IXON    = octal('0001000'),
+  IXOFF   = octal('0002000'),
+  IXANY   = octal('0004000'),
+  IUCLC   = octal('0010000'),
+  IMAXBEL = octal('0020000'),
+  IUTF8   = octal('0040000'),
+}
+
 arch.CC = {
   VINTR           = 0,
   VQUIT           = 1,

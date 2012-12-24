@@ -1728,7 +1728,7 @@ c.CC = setmetatable(arch.CC or {
 }, stringflag)
 
 -- termios - c_iflag bits
-c.IFLAG = setmetatable({
+c.IFLAG = setmetatable(arch.IFLAG or {
   IGNBRK  = octal('0000001'),
   BRKINT  = octal('0000002'),
   IGNPAR  = octal('0000004'),
