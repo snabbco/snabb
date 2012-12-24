@@ -1827,8 +1827,8 @@ c.EXTB       = c.B38400
 ]]
 
 -- TODO clean up how to handle these (used for custom speeds)
-c.CBAUD      = octal('0010017')
-c.CBAUDEX    = octal('0010000')
+c.CBAUD      = arch.CBAUD or octal('0010017')
+c.CBAUDEX    = arch.CBAUDEX or octal('0010000')
 
 c.CIBAUD     = octal('002003600000') -- input baud rate (not used)
 c.CMSPAR     = octal('010000000000') -- mark or space (stick) parity

@@ -429,6 +429,10 @@ arch.LFLAG = {
   EXTPROC = 0x10000000,
 }
 
+-- TODO these will be in a table
+c.CBAUD      = octal('0000377')
+c.CBAUDEX    = octal('0000020')
+
 arch.CFLAG = {
   CSIZE      = octal('00001400'),
   CS5        = octal('00000000'),
