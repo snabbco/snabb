@@ -1,8 +1,5 @@
 -- tables of constants
 
--- so far almost all the single flag options have been converted to seperate tables with metamethods but still TODO
--- are the multi flag ones
-
 -- TODO add test that we do not reallocate
 
 local ffi = require "ffi"
