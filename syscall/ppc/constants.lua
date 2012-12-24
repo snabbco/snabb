@@ -376,8 +376,8 @@ arch.SO = {
 
 arch.OFLAG = {
   OPOST  = octal('00000001'),
-  OLCUC  = octal('00000002'),
-  ONLCR  = octal('00000004'),
+  ONLCR  = octal('00000002'),
+  OLCUC  = octal('00000004'),
   OCRNL  = octal('00000010'),
   ONOCR  = octal('00000020'),
   ONLRET = octal('00000040'),
