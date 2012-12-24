@@ -167,6 +167,7 @@ end
 
 -- for stat we use the syscall as libc might have a different struct stat for compatibility
 -- similarly fadvise64 is not provided, and posix_fadvise may not have 64 bit args on 32 bit
+-- and fallocate seems to have issues in uClibc
 local sys_fadvise64 = c.SYS.fadvise64_64 or c.SYS.fadvise64
 if ffi.abi("64bit") then
   function C.stat(path, buf)
@@ -183,6 +184,9 @@ if ffi.abi("64bit") then
   end
   function C.fadvise64(fd, offset, len, advise)
     return C.syscall(sys_fadvise64, t.int(fd), t.loff(offset), t.loff(len), t.int(advise))
+  end
+  function C.fallocate(fd, mode, offset, len)
+    return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
   end
 else
   function C.stat(path, buf)
@@ -201,6 +205,11 @@ else
     local off2, off1 = u6432(offset)
     local len2, len1 = u6432(len)
     return C.syscall(sys_fadvise64, t.int(fd), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2), t.int(advise))
+  end
+  function C.fallocate(fd, mode, offset, len)
+    local off2, off1 = u6432(offset)
+    local len2, len1 = u6432(len)
+    return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
   end
 end
 
@@ -266,20 +275,6 @@ function CC.clock_settime(clk_id, ts)
   return C.syscall(c.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
 end
 
--- missing in some uClibc versions as exported symbols. Note potentially all largefile operators should be here
--- note example of how to split 64 bit syscall arguments on 32 bit platforms
-if ffi.abi("64bit") then
-  function CC.fallocate(fd, mode, offset, len)
-    return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
-  end
-else
-  function CC.fallocate(fd, mode, offset, len)
-    local off2, off1 = u6432(offset)
-    local len2, len1 = u6432(len)
-    return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
-  end
-end
-
 -- missing in uClibc. Note very odd split 64 bit arguments even on 64 bit platform.
 function CC.preadv64(fd, iov, iovcnt, offset)
   local off2, off1 = i6432(offset)
@@ -310,12 +305,6 @@ if not pcall(inlibc, "prlimit64") then C.prlimit64 = CC.prlimit64 end
 -- not in uClibc
 if not pcall(inlibc, "preadv64") then C.preadv64 = CC.preadv64 end
 if not pcall(inlibc, "pwritev64") then C.pwritev64 = CC.pwritev64 end
-if not pcall(inlibc, "fallocate") then C.fallocate = CC.fallocate end
-
--- more 32 bit file system stuff, as glibc hacks these around
-if ffi.abi("32bit") then
-  C.fallocate = CC.fallocate
-end
 
 -- main definitions start here
 if ffi.abi("32bit") then
