@@ -527,12 +527,12 @@ test_file_operations = {
   test_fadvise_etc = function() -- could split
     local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
-    assert(fd:fadvise("random"))
-    local ok, err = fd:fallocate("keep_size", 0, 4096)
+    assert(S.fadvise(fd, "random"))
+    local ok, err = S.fallocate(fd, "keep_size", 0, 4096)
     assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported")
-    ok, err = fd:posix_fallocate(0, 8192)
+    ok, err = S.posix_fallocate(fd, 0, 8192)
     assert(ok or err.OPNOTSUPP or err.NOSYS, "expect posix_fallocate to succeed if supported")
-    assert(fd:readahead(0, 4096))
+    assert(S.readahead(fd, 0, 4096))
     assert(fd:close())
   end,
   test_getdents_dirfile = function()
