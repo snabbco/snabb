@@ -22,6 +22,9 @@ ctypes["struct siginfo"] = nil
 -- TODO seems to be a size issue on Musl, have asked list
 ctypes["struct sysinfo"] = nil
 
+-- internal use
+c.syscall = nil
+
 -- missing on my ARM box
 c.CAP = nil
 c.AF.NFC = nil
