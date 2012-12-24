@@ -166,6 +166,8 @@ function C.eventfd(initval, flags)
 end
 
 -- for stat we use the syscall as libc might have a different struct stat for compatibility
+-- similarly fadvise64 is not provided, and posix_fadvise may not have 64 bit args on 32 bit
+local sys_fadvise64 = c.SYS.fadvise64_64 or c.SYS.fadvise64
 if ffi.abi("64bit") then
   function C.stat(path, buf)
     return C.syscall(c.SYS.stat, path, pt.void(buf))
@@ -179,6 +181,9 @@ if ffi.abi("64bit") then
   function C.fstatat(fd, path, buf, flags)
     return C.syscall(c.SYS.fstatat, t.int(fd), path, pt.void(buf), t.int(flags))
   end
+  function C.fadvise64(fd, offset, len, advise)
+    return C.syscall(sys_fadvise64, t.int(fd), t.loff(offset), t.loff(len), t.int(advise))
+  end
 else
   function C.stat(path, buf)
     return C.syscall(c.SYS.stat64, path, pt.void(buf))
@@ -191,6 +196,11 @@ else
   end
   function C.fstatat(fd, path, buf, flags)
     return C.syscall(c.SYS.fstatat64, t.int(fd), path, pt.void(buf), t.int(flags))
+  end
+  function C.fadvise64(fd, offset, len, advise)
+    local off2, off1 = u6432(offset)
+    local len2, len1 = u6432(len)
+    return C.syscall(sys_fadvise64, t.int(fd), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2), t.int(advise))
   end
 end
 
@@ -732,8 +742,8 @@ function S.mremap(old_address, old_size, new_size, flags, new_address)
   return retptr(C.mremap(old_address, old_size, new_size, c.MREMAP[flags], new_address))
 end
 function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, c.MADV[advice])) end
-function S.fadvise(fd, advice, offset, len) -- note argument order
-  return retbool(C.posix_fadvise(getfd(fd), offset or 0, len or 0, c.POSIX_FADV[advice]))
+function S.fadvise(fd, advice, offset, len) -- note argument order TODO change back?
+  return retbool(C.fadvise64(getfd(fd), offset or 0, len or 0, c.POSIX_FADV[advice]))
 end
 function S.fallocate(fd, mode, offset, len)
   return retbool(C.fallocate(getfd(fd), c.FALLOC_FL[mode], offset or 0, len))
