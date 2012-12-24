@@ -1170,7 +1170,7 @@ test_sockets = {
     local ok, err = c:connect(sa)
     assert(not ok, "connect should fail here")
     assert(err.INPROGRESS, "have not accepted should get Operation in progress")
-    local a = assert(s:accept()) -- TODO this fails ARM, but not as root, only as user. Posibly my s
+    local a = assert(s:accept())
     -- a is a table with the fd, but also the inbound connection details
     assert(a.addr.sin_family == 2, "expect ipv4 connection")
     assert(c:connect(sa)) -- able to connect now we have accepted
