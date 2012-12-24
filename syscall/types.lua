@@ -441,19 +441,11 @@ metatype("sockaddr_nl", "struct sockaddr_nl", {
 
 -- 64 to 32 bit conversions via unions TODO use meth not object?
 
-if ffi.abi("le") then
 mt.i6432 = {
   __index = {
     to32 = function(u) return u.i32[1], u.i32[0] end,
   }
 }
-else
-mt.i6432 = {
-  __index = {
-    to32 = function(u) return u.i32[0], u.i32[1] end,
-  }
-}
-end
 
 t.i6432 = ffi.metatype("union {int64_t i64; int32_t i32[2];}", mt.i6432)
 t.u6432 = ffi.metatype("union {uint64_t i64; uint32_t i32[2];}", mt.i6432)
