@@ -1155,12 +1155,15 @@ test_sockets = {
     assert_equal(tostring(sa.sin_addr), loop, "expect address converted back to string to still be same")
     assert(sa.sin_family == 2, "expect family on inet socket to be 2")
     -- find a free port
-    local port
-    for i = 32768, 60000 do
-      port = i
+    local bound = false
+    for port = 32768, 60000 do
       sa.port = port
-      if s:bind(sa) then break end
+      if s:bind(sa) then
+        bound = true
+        break
+      end
     end
+    assert(bound, "should be able to bind to a port")
     local ba = assert(s:getsockname())
     assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
     assert(s:listen()) -- will fail if we did not bind
