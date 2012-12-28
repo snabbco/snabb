@@ -2145,9 +2145,9 @@ test_misc_root = {
 if S.geteuid() == 0 then
 
   -- some tests are causing issues, eg one of my servers reboots on pivot_root
-  if not (arg[1] and arg[1] == "all") then
+  if not arg[1] and arg[1] ~= "all" then
     test_misc_root.test_pivot_root = nil
-  else
+  elseif arg[1] == "all" then
     arg[1] = nil
   end
 
