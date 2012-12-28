@@ -1789,7 +1789,7 @@ function S.block(fd)
   return true
 end
 
-function S.mapfile(name, buffer, length) -- generally better to use, bit no good for sysfs etc
+function S.mapfile(name) -- generally better to use, but no good for sysfs etc
   local fd, err = S.open(name, "rdonly")
   if not fd then return nil, err end
   local st, err = S.fstat(fd)
