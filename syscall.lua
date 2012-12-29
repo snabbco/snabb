@@ -1621,6 +1621,9 @@ function S.umask(mask) return C.umask(c.MODE[mask]) end
 function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
 function S.setsid() return retnum(C.setsid()) end
 
+-- 'macros' and helper functions etc
+-- TODO from here (approx, some may be in wrong place), move to syscall.util library.
+
 -- handle environment (Lua only provides os.getenv). TODO add metatable to make more Lualike.
 function S.environ() -- return whole environment as table
   local environ = ffi.C.environ
@@ -1647,9 +1650,6 @@ function S.setenv(name, value, overwrite)
   return retbool(C.setenv(name, value, overwrite or 0))
 end
 function S.clearenv() return retbool(C.clearenv()) end
-
--- 'macros' and helper functions etc
--- TODO from here (approx, some may be in wrong place), move to util library. These are library functions.
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
@@ -1687,7 +1687,7 @@ local function cmsg_nxthdr(msg, buf, cmsg)
   return buf, cmsg
 end
 
--- if no msg provided, assume want to receive cmsg
+-- if no msg provided, assume want to receive cmsg TODO cleanup cmsg parts to util
 function S.recvmsg(fd, msg, flags)
   if not msg then
     local buf1 = t.buffer(1) -- assume user wants to receive single byte to get cmsg
