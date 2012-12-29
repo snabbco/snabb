@@ -540,7 +540,7 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_getdents_dirfile = function()
-    local d = assert(S.dirfile("/dev")) -- tests getdents from higher level interface
+    local d = assert(util.dirfile("/dev")) -- tests getdents from higher level interface TODO move to util test, test directly too
     assert(d.zero, "expect to find /dev/zero")
     assert(d["."], "expect to find .")
     assert(d[".."], "expect to find ..")
@@ -553,7 +553,7 @@ test_file_operations = {
   end,
   test_getdents_error = function()
     local fd = assert(S.open("/etc/passwd", "RDONLY"))
-    local d, err = fd:getdents()
+    local d, err = S.getdents(fd)
     assert(err.notdir, "/etc/passwd should give a not directory error")
     assert(fd:close())
   end,
@@ -1094,24 +1094,6 @@ test_misc = {
     assert(S.setdomainname("domainnametest"))
     assert_equal(S.getdomainname(), "domainnametest")
   end,
-  test_bridge = function()
-    local ok, err = S.bridge_add("br0")
-    assert(ok or err.NOPKG or err.PERM, err) -- ok not to to have bridge in kernel, may not be root
-    if ok then
-      local i = assert(nl.interfaces())
-      assert(i.br0)
-      local b = assert(S.bridge_list())
-      assert(b.br0 and b.br0.bridge.root_id, "expect to find bridge in list")
-      assert(S.bridge_del("br0"))
-      i = assert(nl.interfaces())
-      assert(not i.br0, "bridge should be gone")
-    end
-  end,
-  test_bridge_delete_fail = function()
-    local ok, err = S.bridge_del("nosuchbridge99")
-    assert(not ok and (err.NOPKG or err.PERM or err.NXIO), err)
-  end,
-
 --[[
   -- may switch this back to a type
   test_inet_name = function()
@@ -1284,7 +1266,7 @@ test_sockets = {
 test_netlink = {
   test_getlink = function()
     local i = assert(nl.getlink())
-    local df = assert(S.ls("/sys/class/net", true))
+    local df = assert(util.ls("/sys/class/net", true))
     assert_equal(#df, #i, "expect same number of interfaces as /sys/class/net")
     assert(i.lo, "expect a loopback interface")
     local lo = i.lo
@@ -1398,24 +1380,22 @@ test_netlink = {
     assert(lo:setmtu(mtu))
   end,
   test_interface_rename_root = function()
-    -- using bridge to test this as no other interface in container yet and not sure you can rename lo
-    assert(S.bridge_add("br0"))
+    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
     local i = assert(nl.interfaces())
-    assert(i.br0)
-    assert(i.br0:rename("newname"))
+    assert(i.dummy0)
+    assert(i.dummy0:rename("newname"))
     assert(i:refresh())
-    assert(i.newname and not i.br0, "interface should be renamed")
-    assert(S.bridge_del("newname"))
+    assert(i.newname and not i.dummy0, "interface should be renamed")
+    assert(i.newname:delete())
   end,
   test_interface_set_macaddr_root = function()
-    -- using bridge to test this as no other interface in container yet (now could use dummy)
-    assert(S.bridge_add("br0"))
+    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
     local i = assert(nl.interfaces())
-    assert(i.br0)
-    assert(i.br0:setmac("46:9d:c9:06:dd:dd"))
-    assert_equal(tostring(i.br0.macaddr), "46:9d:c9:06:dd:dd", "interface should have new mac address")
-    assert(i.br0:down())
-    assert(S.bridge_del("br0"))
+    assert(i.dummy0)
+    assert(i.dummy0:setmac("46:9d:c9:06:dd:dd"))
+    assert_equal(tostring(i.dummy0.macaddr), "46:9d:c9:06:dd:dd", "interface should have new mac address")
+    assert(i.dummy0:down())
+    assert(i.dummy0:delete())
   end,
   test_interface_set_macaddr_fail = function()
     local i = assert(nl.interfaces())
@@ -1438,7 +1418,7 @@ test_netlink = {
     assert(nl.create_interface{name = "br0", type = "bridge"})
     local i = assert(nl.interfaces())
     assert(i.br0, "expect bridge interface")
-    local b = assert(S.bridge_list())
+    local b = assert(util.bridge_list())
     assert(b.br0, "expect to find new bridge")
     assert(i.br0:delete())
   end,
@@ -1780,19 +1760,6 @@ test_processes = {
     assert(p and p.cmdline, "expect init to have cmdline")
     assert(p.cmdline:find("init") or p.cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
   end,
-  test_ps = function()
-    local ps = S.ps()
-    local me = S.getpid()
-    local found = false
-    for i = 1, #ps do
-      if ps[i].pid == 1 then
-        assert(ps[i].cmdline:find("init") or ps[i].cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
-      end
-      if ps[i].pid == me then found = true end
-    end
-    assert(found, "expect to find my process in ps")
-    assert(tostring(ps), "can convert ps to string")
-  end,
   test_nice = function()
     local n = assert(S.getpriority("process"))
     assert (n == 0, "process should start at priority 0")
@@ -2093,19 +2060,6 @@ test_misc_root = {
     assert(S.sethostname(h))
     assert_equal(h, assert(S.gethostname()))
   end,
-  test_bridge = function()
-    local ok, err = S.bridge_add("br0")
-    assert(ok or err.NOPKG, err) -- ok not to to have bridge in kernel
-    if ok then
-      local i = assert(nl.interfaces())
-      assert(i.br0)
-      local b = assert(S.bridge_list())
-      assert(b.br0 and b.br0.bridge.root_id, "expect to find bridge in list")
-      assert(S.bridge_del("br0"))
-      i = assert(nl.interfaces())
-      assert(not i.br0, "bridge should be gone")
-    end
-  end,
   test_chroot = function()
     assert(S.chroot("/"))
   end,
@@ -2155,6 +2109,45 @@ test_util = {
     assert(not ok and err.notempty, "should fail as not empty")
     assert(util.rm(tmpfile)) -- rm -r
     assert(not S.stat(tmpfile), "directory should be deleted")
+  end,
+  test_ls = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    local fd = assert(S.creat(tmpfile .. "/file")) -- replace with util.touch
+    assert(fd:close())
+    local list = assert(util.ls(tmpfile, true))
+    assert_equal(#list, 1, "one item in directory")
+    assert_equal(list[1], "file", "one file called file")
+    assert(util.rm(tmpfile))
+  end,
+  test_ps = function()
+    local ps = util.ps()
+    local me = S.getpid()
+    local found = false
+    for i = 1, #ps do
+      if ps[i].pid == 1 then
+        assert(ps[i].cmdline:find("init") or ps[i].cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
+      end
+      if ps[i].pid == me then found = true end
+    end
+    assert(found, "expect to find my process in ps")
+    assert(tostring(ps), "can convert ps to string")
+  end,
+  test_bridge = function()
+    local ok, err = util.bridge_add("br0")
+    assert(ok or err.NOPKG or err.PERM, err) -- ok not to to have bridge in kernel, may not be root
+    if ok then
+      local i = assert(nl.interfaces())
+      assert(i.br0)
+      local b = assert(util.bridge_list())
+      assert(b.br0 and b.br0.bridge.root_id, "expect to find bridge in list")
+      assert(util.bridge_del("br0"))
+      i = assert(nl.interfaces())
+      assert(not i.br0, "bridge should be gone")
+    end
+  end,
+  test_bridge_delete_fail = function()
+    local ok, err = util.bridge_del("nosuchbridge99")
+    assert(not ok and (err.NOPKG or err.PERM or err.NXIO), err)
   end,
 }
 
