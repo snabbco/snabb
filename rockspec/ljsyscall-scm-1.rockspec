@@ -29,6 +29,7 @@ build =
       ["syscall.ioctl"] = "syscall/ioctl.lua";
       ["syscall.types"] = "syscall/types.lua";
       ["syscall.nl"] = "syscall/nl.lua";
+      ["syscall.util"] = "syscall/util.lua";
       ["syscall.arm.constants"] = "syscall/arm/constants.lua";
       ["syscall.arm.ioctl"] = "syscall/arm/ioctl.lua";
       ["syscall.mips.constants"] = "syscall/mips/constants.lua";
