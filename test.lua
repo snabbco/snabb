@@ -3,6 +3,7 @@
 local strict = require "strict"
 local S = require "syscall"
 local nl = require "syscall.nl"
+local util = require "syscall.util"
 local bit = require "bit"
 local ffi = require "ffi"
 
@@ -2138,6 +2139,22 @@ test_misc_root = {
       local w = assert(S.waitpid(-1, "clone"))
       assert(w.IFSIGNALED, "expect signal killed process")
     end
+  end,
+}
+test_util = {
+  test_rm_recursive = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(S.mkdir(tmpfile .. "/subdir", "rwxu"))
+    local fd = assert(S.creat(tmpfile .. "/file")) -- replace with util.touch
+    assert(fd:close())
+    local fd = assert(S.creat(tmpfile .. "/subdir/subfile"))
+    assert(fd:close())
+    assert(S.stat(tmpfile), "directory should be there")
+    assert(S.stat(tmpfile).isdir, "should be a directory")
+    local ok, err = S.rmdir(tmpfile)
+    assert(not ok and err.notempty, "should fail as not empty")
+    assert(util.rm(tmpfile)) -- rm -r
+    assert(not S.stat(tmpfile), "directory should be deleted")
   end,
 }
 
