@@ -5,6 +5,10 @@
 local ffi = require "ffi"
 local S = require "syscall"
 
+local h = require "syscall.helpers"
+
+local octal = h.octal
+
 local util = {}
 
 local t, pt, s, c = S.t, S.pt, S.s, S.c
@@ -198,6 +202,21 @@ function util.bridge_list()
     b[d] = brinfo(d)
   end
   return b
+end
+
+function util.touch(file)
+  local fd, err = S.open(file, "wronly,creat,noctty,nonblock", octal("666"))
+  if not fd then return nil, err end
+  local fd2, err = S.dup(fd)
+  if not fd2 then
+    fd2:close()
+    return nil, err
+  end
+  fd:close()
+  local ok, err = S.futimens(fd2, "now")
+  fd2:close()
+  if not ok then return nil, err end
+  return true
 end
 
 return util

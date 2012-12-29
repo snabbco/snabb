@@ -29,7 +29,6 @@ local C = S.C
 local CC = {} -- functions that might not be in C, may use syscalls
 
 S.c = c
-S.bits_to_speed, S.speed_to_bits = c.bits_to_speed, c.speed_to_bits -- should be in metatables
 
 S.t, S.pt, S.s, S.ctypes = types.t, types.pt, types.s, types.ctypes -- types, pointer types and sizes tables and ctypes map
 local t, pt, s = S.t, S.pt, S.s

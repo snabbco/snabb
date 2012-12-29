@@ -2095,14 +2095,13 @@ test_misc_root = {
     end
   end,
 }
+
 test_util = {
   test_rm_recursive = function()
     assert(S.mkdir(tmpfile, "rwxu"))
     assert(S.mkdir(tmpfile .. "/subdir", "rwxu"))
-    local fd = assert(S.creat(tmpfile .. "/file")) -- replace with util.touch
-    assert(fd:close())
-    local fd = assert(S.creat(tmpfile .. "/subdir/subfile"))
-    assert(fd:close())
+    assert(util.touch(tmpfile .. "/file"))
+    assert(util.touch(tmpfile .. "/subdir/subfile"))
     assert(S.stat(tmpfile), "directory should be there")
     assert(S.stat(tmpfile).isdir, "should be a directory")
     local ok, err = S.rmdir(tmpfile)
@@ -2112,8 +2111,7 @@ test_util = {
   end,
   test_ls = function()
     assert(S.mkdir(tmpfile, "rwxu"))
-    local fd = assert(S.creat(tmpfile .. "/file")) -- replace with util.touch
-    assert(fd:close())
+    assert(util.touch(tmpfile .. "/file"))
     local list = assert(util.ls(tmpfile, true))
     assert_equal(#list, 1, "one item in directory")
     assert_equal(list[1], "file", "one file called file")
@@ -2148,6 +2146,10 @@ test_util = {
   test_bridge_delete_fail = function()
     local ok, err = util.bridge_del("nosuchbridge99")
     assert(not ok and (err.NOPKG or err.PERM or err.NXIO), err)
+  end,
+  test_touch = function()
+    assert(util.touch(tmpfile))
+    assert(S.unlink(tmpfile))
   end,
 }
 
