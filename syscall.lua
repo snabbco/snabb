@@ -41,7 +41,8 @@ local function i6432(x) return t.i6432(x):to32() end
 
 -- makes code tidier TODO could make all types accept themselves as constructors
 local function istype(tp, x)
-  if ffi.istype(tp, x) then return x else return false end
+  if ffi.istype(tp, x) then return x end
+  return false
 end
 
 local function getfd(fd)
