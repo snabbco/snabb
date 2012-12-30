@@ -1705,26 +1705,6 @@ function S.writefile(name, str, mode) -- write string to named file. specify mod
   return true
 end
 
-local function if_nametoindex(name, s) -- internal version when already have socket for ioctl
-  local ifr = t.ifreq()
-  local len = #name + 1
-  if len > IFNAMSIZ then len = IFNAMSIZ end
-  ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
-  local ret, err = S.ioctl(s, "SIOCGIFINDEX", ifr)
-  if not ret then return nil, err end
-  return ifr.ifr_ifru.ifru_ivalue
-end
-
-function S.if_nametoindex(name) -- standard function in some libc versions
-  local s, err = S.socket(c.AF.LOCAL, c.SOCK.STREAM, 0)
-  if not s then return nil, err end
-  local i, err = if_nametoindex(name, s)
-  if not i then return nil, err end
-  local ok, err = S.close(s)
-  if not ok then return nil, err end
-  return i
-end
-
 -- TODO could add umount method.
 mt.mount = {
   __tostring = function(m) return m.source .. " on " .. m.target .. " type " .. m.type .. " (" .. m.flags .. ")" end,

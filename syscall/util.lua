@@ -1,6 +1,7 @@
 -- misc utils
 
 -- aim is to move a lot of stuff that is not strictly syscalls out of main code to modularise better
+-- most code here is man(1) or man(3) or misc helpers for common tasks.
 
 local ffi = require "ffi"
 local S = require "syscall"
@@ -405,6 +406,26 @@ function util.mounts(file)
   -- idea is you can round-trip this data
   -- a lot of the fs specific options are key=value so easier to recognise
   return setmetatable(mounts, mt.mounts)
+end
+
+local function if_nametoindex(name, s) -- internal version when already have socket for ioctl (although not used anywhere)
+  local ifr = t.ifreq()
+  local len = #name + 1
+  if len > IFNAMSIZ then len = IFNAMSIZ end
+  ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
+  local ret, err = S.ioctl(s, "SIOCGIFINDEX", ifr)
+  if not ret then return nil, err end
+  return ifr.ifr_ifru.ifru_ivalue
+end
+
+function util.if_nametoindex(name) -- standard function in some libc versions
+  local s, err = S.socket(c.AF.LOCAL, c.SOCK.STREAM, 0)
+  if not s then return nil, err end
+  local i, err = if_nametoindex(name, s)
+  if not i then return nil, err end
+  local ok, err = S.close(s)
+  if not ok then return nil, err end
+  return i
 end
 
 return util
