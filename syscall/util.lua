@@ -378,6 +378,11 @@ function util.proc(pid)
   return setmetatable({pid = pid, dir = "/proc/" .. pid .. "/"}, mt.proc)
 end
 
+-- TODO could add umount method.
+mt.mount = {
+  __tostring = function(m) return m.source .. " on " .. m.target .. " type " .. m.type .. " (" .. m.flags .. ")" end,
+}
+
 mt.mounts = {
   __tostring = function(ms)
   local rs = ""
