@@ -625,6 +625,16 @@ test_file_operations = {
     end
     assert(S.unlink(tmpfile))
   end,
+  test_xattr_long = function()
+    assert(util.touch(tmpfile))
+    local l = string.rep("test", 500)
+    local ok, err = S.setxattr(tmpfile, "user.test", l, "create")
+    if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr
+      local tt = assert(S.getxattr(tmpfile, "user.test"))
+      assert_equal(tt, l, "should match string")
+    else assert(err.NOTSUP, "only ok error is xattr not supported") end
+    assert(S.unlink(tmpfile))
+  end,
   test_mknod_chr_root = function()
     assert(S.mknod(tmpfile, "fchr,rwxu", t.device(1, 5)))
     local stat = assert(S.stat(tmpfile))

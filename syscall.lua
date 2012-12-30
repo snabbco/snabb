@@ -984,11 +984,12 @@ local function growattrbuf(f, a, b)
   local ret
   repeat
     if b then
-      ret = tonumber(f(a, b, buffer, len))
+      ret = f(a, b, buffer, len)
     else
-      ret = tonumber(f(a, buffer, len))
+      ret = f(a, buffer, len)
     end
-    if ret == -1 and ffi.errno ~= c.E.RANGE then return nil, t.error() end
+    ret = tonumber(ret)
+    if ret == -1 and ffi.errno() ~= c.E.RANGE then return nil, t.error() end
     if ret == -1 then
       len = len * 2
       buffer = t.buffer(len)
