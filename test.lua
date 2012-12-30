@@ -1194,23 +1194,9 @@ test_sockets = {
   end,
   test_unix_socket = function()
     local sv = assert(S.socketpair("unix", "stream"))
-    assert(sv[1]:sendmsg())
-    assert(sv[2]:recvmsg())
-    assert(sv:close())
-  end,
-  test_sendcred = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
-    local so = assert(sv[2]:getsockopt(c.SOL.SOCKET, c.SO.PASSCRED))
-    assert(so == 1, "getsockopt should have updated value")
-    assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
-    local r = assert(sv[2]:recvmsg())
-    assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
-    assert(sv[1]:sendfds(S.stdin))
-    local r = assert(sv[2]:recvmsg())
-    assert(#r.fd == 1, "expect to get one file descriptor back")
-    assert(r.fd[1]:close())
-    assert(r.pid == S.getpid(), "should get my pid from sent credentals")
+    assert(sv[1]:write("test"))
+    local r = assert(sv[2]:read())
+    assert_equal(r, "test")
     assert(sv:close())
   end,
   test_sigpipe = function()
@@ -2150,6 +2136,24 @@ test_util = {
   test_touch = function()
     assert(util.touch(tmpfile))
     assert(S.unlink(tmpfile))
+  end,
+  test_sendcred = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
+    local so = assert(sv[2]:getsockopt(c.SOL.SOCKET, c.SO.PASSCRED))
+    assert(so == 1, "getsockopt should have updated value")
+    assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
+    local r = assert(util.recvcmsg(sv[2]))
+    assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
+    assert(sv:close())
+  end,
+  test_sendfd = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(util.sendfds(sv[1], S.stdin))
+    local r = assert(util.recvcmsg(sv[2]))
+    assert(#r.fd == 1, "expect to get one file descriptor back")
+    assert(r.fd[1]:close())
+    assert(sv:close())
   end,
 }
 

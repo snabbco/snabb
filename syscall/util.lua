@@ -219,5 +219,128 @@ function util.touch(file)
   return true
 end
 
+-- cmsg functions, try to hide some of this nasty stuff from the user
+local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end -- TODO use ffi.alignof
+
+local cmsg_align
+local cmsg_hdrsize = ffi.sizeof(t.cmsghdr(0))
+if ffi.abi('32bit') then
+  function cmsg_align(len) return align(len, 4) end -- TODO use sizeof in local var
+else
+  function cmsg_align(len) return align(len, 8) end
+end
+
+local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
+local function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
+local function cmsg_len(len) return cmsg_ahdr + len end
+
+-- msg_control is a bunch of cmsg structs, but these are all different lengths, as they have variable size arrays
+
+-- these functions also take and return a raw char pointer to msg_control, to make life easier, as well as the cast cmsg
+local function cmsg_firsthdr(msg)
+  if tonumber(msg.msg_controllen) < cmsg_hdrsize then return nil end
+  local mc = msg.msg_control
+  local cmsg = pt.cmsghdr(mc)
+  return mc, cmsg
+end
+
+local function cmsg_nxthdr(msg, buf, cmsg)
+  if tonumber(cmsg.cmsg_len) < cmsg_hdrsize then return nil end -- invalid cmsg
+  buf = pt.char(buf)
+  local msg_control = pt.char(msg.msg_control)
+  buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
+  if buf + cmsg_hdrsize > msg_control + msg.msg_controllen then return nil end -- header would not fit
+  cmsg = pt.cmsghdr(buf)
+  if buf + cmsg_align(cmsg.cmsg_len) > msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
+  return buf, cmsg
+end
+
+local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
+
+-- receive cmsg, extended helper on recvmsg, fairly incomplete at present
+function util.recvcmsg(fd, msg, flags)
+  if not msg then
+    local buf1 = t.buffer(1) -- assume user wants to receive single byte to get cmsg
+    local io = t.iovecs{{buf1, 1}}
+    local bufsize = 1024 -- sane default, build your own structure otherwise
+    local buf = t.buffer(bufsize)
+    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io, msg_control = buf, msg_controllen = bufsize}
+  end
+  local count, err = S.recvmsg(fd, msg, flags)
+  if not count then return nil, error end
+  local ret = {count = count, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
+  local mc, cmsg = cmsg_firsthdr(msg)
+  while cmsg do
+    if cmsg.cmsg_level == c.SOL.SOCKET then
+      if cmsg.cmsg_type == c.SCM.CREDENTIALS then
+        local cred = pt.ucred(cmsg + 1) -- cmsg_data
+        ret.pid = cred.pid
+        ret.uid = cred.uid
+        ret.gid = cred.gid
+      elseif cmsg.cmsg_type == c.SCM.RIGHTS then
+        local fda = pt.int(cmsg + 1) -- cmsg_data
+        local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, s.int)
+        ret.fd = {}
+        for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
+      end -- TODO add other SOL.SOCKET messages
+    end -- TODO add other processing for different types
+    mc, cmsg = cmsg_nxthdr(msg, mc, cmsg)
+  end
+  return ret
+end
+
+-- helper functions
+
+function util.sendcred(fd, pid, uid, gid) -- only needed for root to send (incorrect!) credentials
+  if not pid then pid = C.getpid() end
+  if not uid then uid = C.getuid() end
+  if not gid then gid = C.getgid() end
+  local ucred = t.ucred()
+  ucred.pid = pid
+  ucred.uid = uid
+  ucred.gid = gid
+  local buf1 = t.buffer(1) -- need to send one byte
+  local io = t.iovecs{{buf1, 1}}
+  local bufsize = cmsg_space(s.ucred)
+  local buflen = cmsg_len(s.ucred)
+  local buf = t.buffer(bufsize) -- this is our cmsg buffer
+  local msg = t.msghdr() -- assume socket connected and so does not need address
+  msg.msg_iov = io.iov
+  msg.msg_iovlen = #io
+  msg.msg_control = buf
+  msg.msg_controllen = bufsize
+  local mc, cmsg = cmsg_firsthdr(msg)
+  cmsg.cmsg_level = c.SOL.SOCKET
+  cmsg.cmsg_type = c.SCM.CREDENTIALS
+  cmsg.cmsg_len = buflen
+  ffi.copy(cmsg.cmsg_data, ucred, s.ucred)
+  msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
+  return S.sendmsg(fd, msg, 0)
+end
+
+function util.sendfds(fd, ...)
+  local buf1 = t.buffer(1) -- need to send one byte
+  local io = t.iovecs{{buf1, 1}}
+  local fds = {}
+  for i, v in ipairs{...} do fds[i] = v:getfd() end
+  local fa = t.ints(#fds, fds)
+  local fasize = ffi.sizeof(fa)
+  local bufsize = cmsg_space(fasize)
+  local buflen = cmsg_len(fasize)
+  local buf = t.buffer(bufsize) -- this is our cmsg buffer
+  local msg = t.msghdr() -- assume socket connected and so does not need address
+  msg.msg_iov = io.iov
+  msg.msg_iovlen = #io
+  msg.msg_control = buf
+  msg.msg_controllen = bufsize
+  local mc, cmsg = cmsg_firsthdr(msg)
+  cmsg.cmsg_level = c.SOL.SOCKET
+  cmsg.cmsg_type = c.SCM.RIGHTS
+  cmsg.cmsg_len = buflen -- could set from a constructor
+  ffi.copy(cmsg + 1, fa, fasize) -- cmsg_data
+  msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
+  return S.sendmsg(fd, msg, 0)
+end
+
 return util
 

@@ -567,9 +567,8 @@ function nl.read(s, addr, bufsize, untildone)
   local r = {}
 
   while not done do
-    local n, err = s:recvmsg(m)
-    if not n then return nil, err end
-    local len = tonumber(n.count)
+    local len, err = s:recvmsg(m)
+    if not len then return nil, err end
     local buffer = reply
 
     local msg = pt.nlmsghdr(buffer)
