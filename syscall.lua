@@ -477,9 +477,9 @@ function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), c.CLONE[nstype]))
 
 function S.fork() return retnum(C.fork()) end
 function S.execve(filename, argv, envp)
-  local cargv = t.string_array(#argv + 1, argv)
+  local cargv = t.string_array(#argv + 1, argv or {})
   cargv[#argv] = nil -- LuaJIT does not zero rest of a VLA
-  local cenvp = t.string_array(#envp + 1, envp)
+  local cenvp = t.string_array(#envp + 1, envp or {})
   cenvp[#envp] = nil
   return retbool(C.execve(filename, cargv, cenvp))
 end
