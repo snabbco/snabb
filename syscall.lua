@@ -1667,11 +1667,6 @@ function S.block(fd)
   return true
 end
 
--- TODO could add umount method.
-mt.mount = {
-  __tostring = function(m) return m.source .. " on " .. m.target .. " type " .. m.type .. " (" .. m.flags .. ")" end,
-}
-
 -- termios TODO replace with actual ioctls
 function S.tcgetattr(fd)
   local termios = t.termios()
