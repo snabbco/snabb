@@ -50,7 +50,7 @@ end
 local function rmhelper(file, prefix)
   local name
   if prefix then name = prefix .. "/" .. file else name = file end
-  local st, err = S.stat(name)
+  local st, err = S.lstat(name)
   if not st then return nil, err end
   if st.isdir then
     local files, err = util.dirfile(name, true)

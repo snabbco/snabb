@@ -2067,7 +2067,7 @@ test_util = {
     assert(S.mkdir(tmpfile, "rwxu"))
     assert(S.symlink(tmpfile .. "/none", tmpfile .. "/link"))
     assert(util.rm(tmpfile))
-    assert(not S.stat(tmpfile), "directory should be deleted")    
+    assert(not S.stat(tmpfile), "directory should be deleted")
   end,
   test_ls = function()
     assert(S.mkdir(tmpfile, "rwxu"))
