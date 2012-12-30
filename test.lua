@@ -2137,7 +2137,7 @@ test_util = {
     assert(p and p.cmdline, "expect init to have cmdline")
     assert(p.cmdline:find("init") or p.cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
   end,
-  test_mounts = function()
+  test_mounts_root = function()
     local cwd = assert(S.getcwd())
     local dir = cwd .. "/" .. tmpfile
     assert(S.mkdir(dir))
