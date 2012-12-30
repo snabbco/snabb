@@ -2063,6 +2063,12 @@ test_util = {
     assert(util.rm(tmpfile)) -- rm -r
     assert(not S.stat(tmpfile), "directory should be deleted")
   end,
+  test_rm_broken_symlink = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(S.symlink(tmpfile .. "/none", tmpfile .. "/link"))
+    assert(util.rm(tmpfile))
+    assert(not S.stat(tmpfile), "directory should be deleted")    
+  end,
   test_ls = function()
     assert(S.mkdir(tmpfile, "rwxu"))
     assert(util.touch(tmpfile .. "/file"))
