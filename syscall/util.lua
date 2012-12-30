@@ -91,7 +91,7 @@ function util.ps()
   local ps = {}
   for i = 1, #ls do
     if not string.match(ls[i], '[^%d]') then
-      local p = S.proc(tonumber(ls[i]))
+      local p = util.proc(tonumber(ls[i]))
       if p then ps[#ps + 1] = p end
     end
   end
@@ -336,6 +336,45 @@ function util.sendfds(fd, ...)
   ffi.copy(cmsg + 1, fa, fasize) -- cmsg_data
   msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
   return S.sendmsg(fd, msg, 0)
+end
+
+mt.proc = {
+  __index = function(p, k)
+    local name = p.dir .. k
+    local st, err = S.lstat(name)
+    if not st then return nil, err end
+    if st.isreg then
+      local fd, err = S.open(p.dir .. k, "rdonly")
+      if not fd then return nil, err end
+      local ret, err = S.read(fd) -- read defaults to 4k, sufficient?
+      if not ret then return nil, err end
+      S.close(fd)
+      return ret -- TODO many could usefully do with some parsing
+    end
+    if st.islnk then
+      local ret, err = S.readlink(name)
+      if not ret then return nil, err end
+      return ret
+    end
+    -- TODO directories
+  end,
+  __tostring = function(p) -- TODO decide what to print
+    local c = p.cmdline
+    if c then
+      if #c == 0 then
+        local comm = p.comm
+        if comm and #comm > 0 then
+          c = '[' .. comm:sub(1, -2) .. ']'
+        end
+      end
+      return p.pid .. '  ' .. c
+    end
+  end
+}
+
+function util.proc(pid)
+  if not pid then pid = S.getpid() end
+  return setmetatable({pid = pid, dir = "/proc/" .. pid .. "/"}, mt.proc)
 end
 
 return util

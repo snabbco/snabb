@@ -1725,45 +1725,6 @@ function S.if_nametoindex(name) -- standard function in some libc versions
   return i
 end
 
-mt.proc = {
-  __index = function(p, k)
-    local name = p.dir .. k
-    local st, err = S.lstat(name)
-    if not st then return nil, err end
-    if st.isreg then
-      local fd, err = S.open(p.dir .. k, "rdonly")
-      if not fd then return nil, err end
-      local ret, err = S.read(fd) -- read defaults to 4k, sufficient?
-      if not ret then return nil, err end
-      S.close(fd)
-      return ret -- TODO many could usefully do with some parsing
-    end
-    if st.islnk then
-      local ret, err = S.readlink(name)
-      if not ret then return nil, err end
-      return ret
-    end
-    -- TODO directories
-  end,
-  __tostring = function(p) -- TODO decide what to print
-    local c = p.cmdline
-    if c then
-      if #c == 0 then
-        local comm = p.comm
-        if comm and #comm > 0 then
-          c = '[' .. comm:sub(1, -2) .. ']'
-        end
-      end
-      return p.pid .. '  ' .. c
-    end
-  end
-}
-
-function S.proc(pid)
-  if not pid then pid = S.getpid() end
-  return setmetatable({pid = pid, dir = "/proc/" .. pid .. "/"}, mt.proc)
-end
-
 -- TODO could add umount method.
 mt.mount = {
   __tostring = function(m) return m.source .. " on " .. m.target .. " type " .. m.type .. " (" .. m.flags .. ")" end,

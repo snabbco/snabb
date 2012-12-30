@@ -1734,18 +1734,6 @@ test_aio = {
 }
 
 test_processes = {
-  test_proc_self = function()
-    local p = assert(S.proc())
-    assert(not p.wrongname, "test non existent files")
-    assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
-    assert(p.exe and #p.exe > 1, "expect an executable")
-    assert_equal(p.root, "/", "expect our root to be / usually")
-  end,
-  test_proc_init = function()
-    local p = S.proc(1)
-    assert(p and p.cmdline, "expect init to have cmdline")
-    assert(p.cmdline:find("init") or p.cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
-  end,
   test_nice = function()
     local n = assert(S.getpriority("process"))
     assert (n == 0, "process should start at priority 0")
@@ -2154,6 +2142,18 @@ test_util = {
     assert(#r.fd == 1, "expect to get one file descriptor back")
     assert(r.fd[1]:close())
     assert(sv:close())
+  end,
+  test_proc_self = function()
+    local p = assert(util.proc())
+    assert(not p.wrongname, "test non existent files")
+    assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
+    assert(p.exe and #p.exe > 1, "expect an executable")
+    assert_equal(p.root, "/", "expect our root to be / usually")
+  end,
+  test_proc_init = function()
+    local p = util.proc(1)
+    assert(p and p.cmdline, "expect init to have cmdline")
+    assert(p.cmdline:find("init") or p.cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
   end,
 }
 
