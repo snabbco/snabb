@@ -76,6 +76,14 @@ function util.rm(...)
   return true
 end
 
+function util.cp(source, dest, mode) -- TODO make much more functional, less broken
+  local contents, err = util.mapfile(source)
+  if not contents then return nil, err end
+  local ok, err = util.writefile(dest, contents, mode)
+  if not ok then return nil, err end
+  return true
+end
+
 mt.ps = {
   __tostring = function(ps)
     local s = {}

@@ -2171,6 +2171,13 @@ test_util = {
     assert_equal(ss, teststring, "mapfile should get back what writefile wrote")
     assert(S.unlink(tmpfile))
   end,
+  test_cp = function()
+    assert(util.writefile(tmpfile, teststring, "rusr,wusr"))
+    assert(util.cp(tmpfile, tmpfile2, "rusr,wusr"))
+    assert_equal(assert(util.mapfile(tmpfile2)), teststring)
+    assert(S.unlink(tmpfile))
+    assert(S.unlink(tmpfile2))
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.
