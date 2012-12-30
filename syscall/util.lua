@@ -146,7 +146,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
   local fs = util.dirfile(bd, true)
   if not fs then return nil end
   for f, _ in pairs(fs) do
-    local s = S.readfile(bd .. "/" .. f)
+    local s = util.readfile(bd .. "/" .. f)
     if s then
       s = s:sub(1, #s - 1) -- remove newline at end
       if f == "group_addr" or f == "root_id" or f == "bridge_id" then -- string values
@@ -389,7 +389,7 @@ end
 }
 
 function util.mounts(file)
-  local mf, err = S.readfile(file or "/proc/mounts")
+  local mf, err = util.readfile(file or "/proc/mounts")
   if not mf then return nil, err end
   local mounts = {}
   for line in mf:gmatch("[^\r\n]+") do
@@ -426,6 +426,44 @@ function util.if_nametoindex(name) -- standard function in some libc versions
   local ok, err = S.close(s)
   if not ok then return nil, err end
   return i
+end
+
+function util.mapfile(name) -- generally better to use, but no good for sysfs etc
+  local fd, err = S.open(name, "rdonly")
+  if not fd then return nil, err end
+  local st, err = S.fstat(fd)
+  if not st then return nil, err end
+  local size = st.size
+  local m, err = S.mmap(nil, size, "read", "shared", fd, 0)
+  if not m then return nil, err end
+  local str = ffi.string(m, size)
+  local ok, err = S.munmap(m, size)
+  if not ok then return nil, err end
+  local ok, err = fd:close()
+  if not ok then return nil, err end
+  return str
+end
+
+-- note will give short reads, but mainly used for sysfs, proc
+function util.readfile(name, buffer, length)
+  local fd, err = S.open(name, "rdonly")
+  if not fd then return nil, err end
+  local r, err = S.read(fd, buffer, length or 4096)
+  if not r then return nil, err end
+  local ok, err = fd:close()
+  if not ok then return nil, err end
+  return r
+end
+
+function util.writefile(name, str, mode) -- write string to named file; silently ignore short writes
+  local fd, err
+  if mode then fd, err = S.creat(name, mode) else fd, err = S.open(name, "wronly") end
+  if not fd then return nil, err end
+  local n, err = S.write(fd, str)
+  if not n then return nil, err end
+  local ok, err = fd:close()
+  if not ok then return nil, err end
+  return true
 end
 
 return util

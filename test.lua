@@ -229,18 +229,6 @@ test_read_write = {
     assert_equal(n, size, "should not get truncated pwrite on /dev/zero")
     assert(fd:close())
   end,
-  test_readfile_writefile = function()
-    assert(S.writefile(tmpfile, teststring, "RWXU"))
-    local ss = assert(S.readfile(tmpfile))
-    assert_equal(ss, teststring, "readfile should get back what writefile wrote")
-    assert(S.unlink(tmpfile))
-  end,
-  test_mapfile = function()
-    assert(S.writefile(tmpfile, teststring, "RWXU"))
-    local ss = assert(S.mapfile(tmpfile))
-    assert_equal(ss, teststring, "mapfile should get back what writefile wrote")
-    assert(S.unlink(tmpfile))
-  end,
   test_readv_writev = function()
     local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local n = assert(fd:writev{"test", "ing", "writev"})
@@ -453,7 +441,7 @@ test_file_operations = {
     assert(not fd:fstatat(tmpfile), "expect dir gone")
   end,
   test_rename = function()
-    assert(S.writefile(tmpfile, teststring, "RWXU")) -- TODO just use touch instead
+    assert(util.writefile(tmpfile, teststring, "RWXU")) -- TODO just use touch instead
     assert(S.rename(tmpfile, tmpfile2))
     assert(not S.stat(tmpfile))
     assert(S.stat(tmpfile2))
@@ -461,7 +449,7 @@ test_file_operations = {
   end,
   test_renameat = function()
     local fd = assert(S.open("."))
-    assert(S.writefile(tmpfile, teststring, "RWXU"))
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
     assert(S.renameat(fd, tmpfile, fd, tmpfile2))
     assert(not S.stat(tmpfile))
     assert(S.stat(tmpfile2))
@@ -499,20 +487,20 @@ test_file_operations = {
   end,
   test_fstatat = function()
     local fd = assert(S.open("."))
-    assert(S.writefile(tmpfile, teststring, "RWXU"))
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
     local stat = assert(fd:fstatat(tmpfile))
     assert(stat.size == #teststring, "expect length to br what was written")
     assert(fd:close())
     assert(S.unlink(tmpfile))
   end,
   test_fstatat_fdcwd = function()
-    assert(S.writefile(tmpfile, teststring, "RWXU"))
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
     local stat = assert(S.fstatat("fdcwd", tmpfile, nil, "no_automount, symlink_nofollow"))
     assert(stat.size == #teststring, "expect length to br what was written")
     assert(S.unlink(tmpfile))
   end,
   test_truncate = function()
-    assert(S.writefile(tmpfile, teststring, "RWXU"))
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
     local stat = assert(S.stat(tmpfile))
     assert_equal(stat.size, #teststring, "expect to get size of written string")
     assert(S.truncate(tmpfile, 1))
@@ -564,7 +552,7 @@ test_file_operations = {
     assert(S.chdir(tmpfile))
     local n, err = fd:inotify_read()
     assert(err.again, "no inotify events yet")
-    assert(S.writefile(tmpfile, "test", "RWXU"))
+    assert(util.writefile(tmpfile, "test", "RWXU"))
     assert(S.unlink(tmpfile))
     n = assert(fd:inotify_read())
     assert_equal(#n, 2, "expect 2 events now")
@@ -578,7 +566,7 @@ test_file_operations = {
     assert(S.rmdir(tmpfile))
   end,
   test_xattr = function()
-    assert(S.writefile(tmpfile, "test", "RWXU"))
+    assert(util.writefile(tmpfile, "test", "RWXU"))
     local l, err = S.listxattr(tmpfile)
     assert(l or err.NOTSUP, "expect to get xattr or not supported on fs")
     if l then
@@ -1064,7 +1052,7 @@ test_misc = {
     assert(S.prctl("set_name", "test"))
     n = assert(S.prctl("get_name"))
     assert(n == "test", "name should be as set")
-    n = assert(S.readfile("/proc/self/comm"))
+    n = assert(util.readfile("/proc/self/comm"))
     assert(n == "test\n", "comm should be as set")
   end,
   test_uname = function()
@@ -1270,17 +1258,17 @@ test_netlink = {
       assert(eth.flags.multicast, "ethernet interface should be multicast")
       assert(eth.ether, "ethernet interface type should be ether")
       assert_equal(eth.addrlen, 6, "ethernet hardware address length is 6")
-      local mac = assert(S.readfile("/sys/class/net/" .. eth.name .. "/address"), "expect eth to have address file in /sys")
+      local mac = assert(util.readfile("/sys/class/net/" .. eth.name .. "/address"), "expect eth to have address file in /sys")
       assert_equal(tostring(eth.macaddr) .. '\n', mac, "mac address hsould match that from /sys")
       assert_equal(tostring(eth.broadcast), 'ff:ff:ff:ff:ff:ff', "ethernet broadcast mac")
-      local mtu = assert(S.readfile("/sys/class/net/" .. eth.name .. "/mtu"), "expect eth to have mtu in /sys")
+      local mtu = assert(util.readfile("/sys/class/net/" .. eth.name .. "/mtu"), "expect eth to have mtu in /sys")
       assert_equal(eth.mtu, tonumber(mtu), "expect ethernet MTU to match /sys")
     end
     local wlan = i.wlan0
     if wlan then
       assert(wlan.ether, "wlan interface type should be ether")
       assert_equal(wlan.addrlen, 6, "wireless hardware address length is 6")
-      local mac = assert(S.readfile("/sys/class/net/" .. wlan.name .. "/address"), "expect wlan to have address file in /sys")
+      local mac = assert(util.readfile("/sys/class/net/" .. wlan.name .. "/address"), "expect wlan to have address file in /sys")
       assert_equal(tostring(wlan.macaddr) .. '\n', mac, "mac address should match that from /sys")
     end
   end,
@@ -1786,7 +1774,7 @@ test_processes = {
 [ $PATH = "/bin:/usr/bin" ] || (echo "shell assert $PATH"; exit 1)
 
 ]]
-      fork_assert(S.writefile(efile, script, "RWXU"))
+      fork_assert(util.writefile(efile, script, "RWXU"))
       fork_assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
       -- never reach here
       os.exit()
@@ -2154,6 +2142,18 @@ test_util = {
     assert_equal(b.passno, "0")
     assert(S.umount(dir))
     assert(S.rmdir(dir))
+  end,
+  test_readfile_writefile = function()
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
+    local ss = assert(util.readfile(tmpfile))
+    assert_equal(ss, teststring, "readfile should get back what writefile wrote")
+    assert(S.unlink(tmpfile))
+  end,
+  test_mapfile = function()
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
+    local ss = assert(util.mapfile(tmpfile))
+    assert_equal(ss, teststring, "mapfile should get back what writefile wrote")
+    assert(S.unlink(tmpfile))
   end,
 }
 

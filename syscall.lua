@@ -1667,44 +1667,6 @@ function S.block(fd)
   return true
 end
 
-function S.mapfile(name) -- generally better to use, but no good for sysfs etc
-  local fd, err = S.open(name, "rdonly")
-  if not fd then return nil, err end
-  local st, err = S.fstat(fd)
-  if not st then return nil, err end
-  local size = st.size
-  local m, err = S.mmap(nil, size, "read", "shared", fd, 0)
-  if not m then return nil, err end
-  local str = ffi.string(m, size)
-  local ok, err = S.munmap(m, size)
-  if not ok then return nil, err end
-  local ok, err = fd:close()
-  if not ok then return nil, err end
-  return str
-end
-
--- note will give short reads, but mainly used for sysfs, proc
-function S.readfile(name, buffer, length)
-  local fd, err = S.open(name, "rdonly")
-  if not fd then return nil, err end
-  local r, err = S.read(fd, buffer, length or 4096)
-  if not r then return nil, err end
-  local ok, err = fd:close()
-  if not ok then return nil, err end
-  return r
-end
-
-function S.writefile(name, str, mode) -- write string to named file. specify mode if want to create file, silently ignore short writes
-  local fd, err
-  if mode then fd, err = S.creat(name, mode) else fd, err = S.open(name, "wronly") end
-  if not fd then return nil, err end
-  local n, err = S.write(fd, str)
-  if not n then return nil, err end
-  local ok, err = fd:close()
-  if not ok then return nil, err end
-  return true
-end
-
 -- TODO could add umount method.
 mt.mount = {
   __tostring = function(m) return m.source .. " on " .. m.target .. " type " .. m.type .. " (" .. m.flags .. ")" end,
