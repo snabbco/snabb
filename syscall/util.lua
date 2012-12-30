@@ -220,15 +220,11 @@ function util.touch(file)
 end
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
-local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end -- TODO use ffi.alignof
+local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
 
-local cmsg_align
 local cmsg_hdrsize = ffi.sizeof(t.cmsghdr(0))
-if ffi.abi('32bit') then
-  function cmsg_align(len) return align(len, 4) end -- TODO use sizeof in local var
-else
-  function cmsg_align(len) return align(len, 8) end
-end
+local voidalign = ffi.alignof(ffi.typeof("void *"))
+local function cmsg_align(len) return align(len, voidalign) end
 
 local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
 local function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
