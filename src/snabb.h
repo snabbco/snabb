@@ -39,3 +39,8 @@ void *map_physical_ram(uint64_t start, uint64_t end, bool cacheable);
 /* Open Linux sysfs PCIe configuration file for read/write. */
 int open_pcie_config(const char *path);
 
+/* Return the physical page index of the given virtual page index.
+   That is: convert from virtual process address space to physical
+   memory address. */
+uint64_t phys_page(uint64_t virt_page);
+
