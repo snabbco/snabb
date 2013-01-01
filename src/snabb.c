@@ -97,3 +97,27 @@ int open_pcie_config(const char *path)
   return open(path, O_RDWR);
 }
 
+static int pagemap_fd;
+
+uint64_t phys_page(uint64_t virt_page)
+{
+  if (pagemap_fd == 0) {
+    if ((pagemap_fd = open("/proc/self/pagemap", O_RDONLY)) <= 0) {
+      perror("open pagemap");
+      return 0;
+    }
+  }
+  uint64_t data;
+  int len;
+  len = pread(pagemap_fd, &data, sizeof(data), virt_page * sizeof(uint64_t));
+  if (len != sizeof(data)) {
+    perror("pread");
+    return 0;
+  }
+  if ((data & (1ULL<<63)) == 0) {
+    fprintf(stderr, "page %lx not present: %lx", virt_page, data);
+    return 0;
+  }
+  return data & ((1ULL << 55) - 1);
+}
+

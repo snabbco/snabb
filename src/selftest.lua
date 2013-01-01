@@ -4,6 +4,9 @@ local intel = require "intel"
 local ffi = require "ffi"
 local C = ffi.C
 local test = require("test")
+local memory = require("memory")
+
+memory.selftest({verbose = true})
 
 print "selftest"
 assert(C.lock_memory() == 0)
