@@ -8,15 +8,23 @@ HOBJ   := $(patsubst %.h,obj/%_h.o,$(CHDR))
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-all: snabbswitch
-	@echo -n "Firmware: "
-	@ls -sh snabbswitch
+all: snabbswitch snabblite
 
 snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
 	gcc -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luafilesystem/src/lfs.o \
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt
+	@echo -n "Firmware: "
+	@ls -sh snabbswitch
+
+snabblite: $(HOBJ) $(COBJ)
+	gcc -Wl,-E -Werror -Wall -o $@ $^ \
+	    ../deps/luafilesystem/src/lfs.o \
+	    ../deps/luajit/src/libluajit.a \
+	    -lc -ldl -lm -lrt
+	@echo -n "Firmware: "
+	@ls -sh snabblite
 
 $(LUAOBJ): obj/%.o: %.lua
 	luajit -b $< $@
