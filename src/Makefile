@@ -40,6 +40,6 @@ $(HOBJ): obj/%_h.o: %.h
 	luajit -b $(basename $@).lua $@
 
 clean:
-	-rm snabbswitch
+	-rm snabbswitch snabblite
 	-rm obj/*
 
