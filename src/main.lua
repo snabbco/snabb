@@ -6,7 +6,7 @@ function main ()
    local jit_dump = require "jit.dump"
    local jit_v = require "jit.v"
 
-   jit_v.start("snabbswitch-jit-dump.txt")
+   jit_dump.start("", "snabbswitch-jit-dump.txt")
 
    require "selftest"
 
