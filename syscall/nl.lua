@@ -267,7 +267,7 @@ meth.iflink = {
       if not address then return nil end
       local af
       if ffi.istype(t.in6_addr, address) then af = c.AF.INET6 else af = c.AF.INET end
-      local ok, err = nl.newaddr(i.index, af, netmask, "permanent", "address", address)
+      local ok, err = nl.newaddr(i.index, af, netmask, "permanent", "local", address)
       if not ok then return nil, err end
       return i:refresh()
     end,
@@ -276,7 +276,7 @@ meth.iflink = {
       if not address then return nil end
       local af
       if ffi.istype(t.in6_addr, address) then af = c.AF.INET6 else af = c.AF.INET end
-      local ok, err = nl.deladdr(i.index, af, netmask, "address", address)
+      local ok, err = nl.deladdr(i.index, af, netmask, "local", address)
       if not ok then return nil, err end
       return i:refresh()
     end,

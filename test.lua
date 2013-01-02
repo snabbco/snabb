@@ -1416,7 +1416,7 @@ test_netlink = {
   end,
   test_newaddr6_root = function()
     local lo = assert(nl.interface("lo"))
-    assert(nl.newaddr(lo, "inet6", 128, "permanent", "address", "::2"))
+    assert(nl.newaddr(lo, "inet6", 128, "permanent", "local", "::2"))
     assert(lo:refresh())
     assert_equal(#lo.inet6, 2, "expect two inet6 addresses on lo now")
     if tostring(lo.inet6[1].addr) == "::1"
@@ -1435,10 +1435,21 @@ test_netlink = {
     local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
     local i = assert(nl.interfaces())
     assert(i.dummy0:up())
-    assert(i.dummy0:address("10.255.0.1/24"))
+    local af, netmask, address = c.AF.INET, 32, t.in_addr("10.10.10.1")
+    assert(nl.newaddr(i.dummy0.index, af, netmask, "permanent", "local", address))
+    assert(i:refresh())
+    assert_equal(#i.dummy0.inet, 1, "expect one address now")
+    assert_equal(tostring(i.dummy0.inet[1].addr), "10.10.10.1")
+    assert(i.dummy0:delete())
+  end,
+  test_newaddr_helper_root = function()
+    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    local i = assert(nl.interfaces())
+    assert(i.dummy0:up())
+    assert(i.dummy0:address("10.10.10.1/24"))
     assert(i.dummy0:refresh())
     assert_equal(#i.dummy0.inet, 1, "expect one address now")
-    assert_equal(i.dummy0.inet[1].addr, "10.255.0.1")
+    assert_equal(tostring(i.dummy0.inet[1].addr), "10.10.10.1")
     assert(i.dummy0:delete())
   end,
   test_newaddr6_helper_root = function()
