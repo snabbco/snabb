@@ -1,6 +1,20 @@
 -- misc helper functions that we use across the board
 
+local ffi = require "ffi"
+
 local h = {}
+
+-- endian conversion
+-- TODO add tests eg for signs.
+if ffi.abi("be") then -- nothing to do
+  function h.htonl(b) return b end
+  function h.htons(b) return b end
+else
+  function h.htonl(b) return bit.bswap(b) end
+  function h.htons(b) return bit.rshift(bit.bswap(b), 16) end
+end
+h.ntohl = h.htonl -- reverse is the same
+h.ntohs = h.htons -- reverse is the same
 
 function h.octal(s) return tonumber(s, 8) end 
 

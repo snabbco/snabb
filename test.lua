@@ -1414,6 +1414,11 @@ test_netlink = {
     local i = assert(nl.interfaces())
     assert(not i.dummy0, "expect dummy interface gone")
   end,
+  test_broadcast = function()
+    assert_equal(tostring(nl.broadcast("0.0.0.0", 32)), "0.0.0.0")
+    assert_equal(tostring(nl.broadcast("10.10.20.1", 24)), "10.10.20.255")
+    assert_equal(tostring(nl.broadcast("0.0.0.0", 0)), "255.255.255.255")
+  end,
   test_newaddr6_root = function()
     local lo = assert(nl.interface("lo"))
     assert(nl.newaddr(lo, "inet6", 128, "permanent", "local", "::2"))
@@ -1440,6 +1445,7 @@ test_netlink = {
     assert(i:refresh())
     assert_equal(#i.dummy0.inet, 1, "expect one address now")
     assert_equal(tostring(i.dummy0.inet[1].addr), "10.10.10.1")
+    assert_equal(tostring(i.dummy0.inet[1].broadcast), "10.10.10.255")
     assert(i.dummy0:delete())
   end,
   test_newaddr_helper_root = function()
@@ -1450,6 +1456,7 @@ test_netlink = {
     assert(i.dummy0:refresh())
     assert_equal(#i.dummy0.inet, 1, "expect one address now")
     assert_equal(tostring(i.dummy0.inet[1].addr), "10.10.10.1")
+    assert_equal(tostring(i.dummy0.inet[1].broadcast), "10.10.10.255")
     assert(i.dummy0:delete())
   end,
   test_newaddr6_helper_root = function()

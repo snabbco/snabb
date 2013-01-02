@@ -12,6 +12,10 @@ local bit = require "bit"
 
 require "syscall.headers"
 
+local h = require "syscall.helpers"
+
+local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
+
 local c = require "syscall.constants"
 
 local C = ffi.C -- for inet_pton etc, due to be replaced with Lua
@@ -77,19 +81,6 @@ signal_reasons[c.SIG.POLL] = {}
 for k, v in pairs(c.SIGPOLL) do
   signal_reasons[c.SIG.POLL][v] = k
 end
-
--- endian conversion
--- TODO add tests eg for signs.
-local htonl, htons
-if ffi.abi("be") then -- nothing to do
-  function htonl(b) return b end
-  function htons(b) return b end
-else
-  function htonl(b) return bit.bswap(b) end
-  function htons(b) return bit.rshift(bit.bswap(b), 16) end
-end
-local ntohl = htonl -- reverse is the same
-local ntohs = htons -- reverse is the same
 
 -- functions we use from man(3)
 
@@ -826,7 +817,9 @@ metatype("in_addr", "struct in_addr", {
   __tostring = function(a) return inet_ntop(c.AF.INET, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = inet_pton(c.AF.INET, s, addr) end
+    if s then
+      if ffi.istype(tp, s) then addr.s_addr = s.s_addr else addr = inet_pton(c.AF.INET, s, addr) end
+    end
     return addr
   end
 })

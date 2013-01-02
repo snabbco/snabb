@@ -5,6 +5,9 @@ local nl = {} -- exports
 local ffi = require "ffi"
 local bit = require "bit"
 local S = require "syscall"
+local h = require "syscall.helpers"
+
+local htonl = h.htonl
 
 local t, pt, s, c = S.t, S.pt, S.s, S.c
 
@@ -99,7 +102,6 @@ local ifla_decode = {
   [c.IFLA.BROADCAST] = function(ir, buf, len)
     local addrlen = addrlenmap[ir.type]
     if (addrlen) then
-      ir.braddrlen = addrlen
       ir.broadcast = t.macaddr()
       ffi.copy(ir.broadcast, buf, addrlen)
     end
@@ -236,6 +238,15 @@ mt.iflinks = {
   end
 }
 
+-- get broadcast address for ipv4 address and netmask TODO move to util?
+function nl.broadcast(address, netmask)
+  if type(address) == "string" then address, netmask = inet_name(address, netmask) end
+  if not address or not ffi.istype(t.in_addr, address) then return nil end
+  local bcast = t.in_addr(address)
+  if netmask < 32 then bcast.s_addr = bit.bor(tonumber(address.s_addr), htonl(bit.rshift(-1, netmask))) end
+  return bcast
+end
+
 meth.iflink = {
   index = {
     family = function(i) return tonumber(i.ifinfo.ifi_family) end,
@@ -269,9 +280,12 @@ meth.iflink = {
     address = function(i, address, netmask) -- add address
       if type(address) == "string" then address, netmask = inet_name(address, netmask) end
       if not address then return nil end
-      local af
-      if ffi.istype(t.in6_addr, address) then af = c.AF.INET6 else af = c.AF.INET end
-      local ok, err = nl.newaddr(i.index, af, netmask, "permanent", "local", address)
+      local ok, err
+      if ffi.istype(t.in6_addr, address) then
+        ok, err = nl.newaddr(i.index, c.AF.INET6, netmask, "permanent", "local", address)
+      else
+        ok, err = nl.newaddr(i.index, c.AF.INET, netmask, "permanent", "local", address, "broadcast", nl.broadcast(address, netmask))
+      end
       if not ok then return nil, err end
       return i:refresh()
     end,
