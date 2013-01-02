@@ -40,7 +40,7 @@ lo:up()
 
 eth0:up()
 
-eth0:address("10.3.0.2")
+eth0:address("10.3.0.2/24")
 
 -- print something
 local i = nl.interfaces()
