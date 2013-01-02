@@ -1435,8 +1435,8 @@ test_netlink = {
     local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
     local i = assert(nl.interfaces())
     assert(i.dummy0:up())
-    local af, netmask, address = c.AF.INET, 32, t.in_addr("10.10.10.1")
-    assert(nl.newaddr(i.dummy0.index, af, netmask, "permanent", "local", address))
+    local af, netmask, address, bcast = c.AF.INET, 24, t.in_addr("10.10.10.1"), t.in_addr("10.10.10.255")
+    assert(nl.newaddr(i.dummy0.index, af, netmask, "permanent", "local", address, "broadcast", bcast))
     assert(i:refresh())
     assert_equal(#i.dummy0.inet, 1, "expect one address now")
     assert_equal(tostring(i.dummy0.inet[1].addr), "10.10.10.1")
