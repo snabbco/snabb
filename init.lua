@@ -42,6 +42,10 @@ eth0:up()
 
 eth0:address("10.3.0.2")
 
+-- print something
+local i = nl.interfaces()
+print(i)
+
 -- run processes
 
 

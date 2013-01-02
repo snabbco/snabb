@@ -63,6 +63,9 @@ assert(S.chdir(root))
 -- should use random names. Also should gc the veth to cleanup. For now just delete it on entry as this is a demo.
 nl.dellink(0, "ifname", "veth0")
 assert(nl.create_interface{name = "veth0", type = "veth", peer = {name = "veth1"}})
+local i = nl.interfaces()
+assert(i.veth0:up())
+assert(i.veth0:address("10.3.0.1/24"))
 
 local p = assert(S.clone("newnet,newipc,newns,newpid,newuts"))
 
