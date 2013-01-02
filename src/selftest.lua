@@ -15,7 +15,8 @@ local nic = intel.new("0000:00:04.0")
 
 print("Initializing controller..")
 nic.init()
-nic.enable_mac_loopback()
 test.waitfor("linkup", nic.linkup, 20, 250000)
-nic.selftest({packets=100000})
+nic.selftest2()
+-- nic.enable_mac_loopback()
+-- nic.selftest({packets=10000000})
 

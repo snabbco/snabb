@@ -62,7 +62,7 @@ function new (pciaddress)
    local offset_txdesc   = 0x00e00000 --  1MB TX descriptors
    local offset_rxdesc   = 0x00f00000 --  1MB RX descriptors
 
-   local num_descriptors = 128
+   local num_descriptors = 64 * 1024
    local buffer_size = 16384
 
    local dma_phys = dma_start -- physical address of DMA memory
@@ -282,6 +282,18 @@ function new (pciaddress)
       return regs[RDH] == regs[RDT]
    end
 
+   function M.rx_available ()
+      return num_descriptors - M.rx_pending()
+   end
+
+   function M.rx_pending ()
+      return ring_pending(regs[RDT], regs[RDH])
+   end
+
+   function M.rx_load ()
+      return rx_pending() / num_descriptors
+   end
+
    -- Return the next available packet as two values: buffer, length.
    -- If no packet is available then return nil.
    function M.receive ()
@@ -349,17 +361,25 @@ function new (pciaddress)
       regs[TDLEN] = num_descriptors * ffi.sizeof("union tx")
    end
 
+   local flags = bits({dtype=20, eop=24, ifcs=25, dext=29})
+
+   -- Locally cached copies of TDT and TDH registers.
+   -- Because it's too expensive to constantly check these registers.
+   local tdt = 0
+
    -- Enqueue a transmit descriptor to send a packet.
-   function M.add_txbuf (address, size)
-      local index = regs[TDT]
-      txdesc[index].data.address = address
-      txdesc[index].data.options = bit.bor(size, bits({dtype=20, eop=24, ifcs=25, dext=29}))
-      regs[TDT] = (index + 1) % num_descriptors
-   end
+   local function add_txbuf (address, size)
+      txdesc[tdt].data.address = address
+      txdesc[tdt].data.options = bit.bor(size, flags)
+      tdt = (tdt + 1) % num_descriptors
+   end M.add_txbuf = add_txbuf
+
+   local function flush_tx(address, size)
+      regs[TDT] = tdt
+   end M.flush_tx = flush_tx
 
    function M.add_txbuf_tso (address, size, mss, ctx)
-      local index = regs[TDT]
-      ctx = ffi.cast("struct tx_context_desc *", txdesc + index)
+      ctx = ffi.cast("struct tx_context_desc *", txdesc + tdt)
       ctx.tucse = 0
       ctx.tucso = 0
       ctx.tucss = 0
@@ -377,15 +397,23 @@ function new (pciaddress)
    function M.tx_full  () return M.tx_pending() == num_descriptors - 1 end
    function M.tx_empty () return M.tx_pending() == 0 end
 
-   function M.tx_pending ()
-      return ring_pending(regs[TDT], regs[TDH])
-   end
-
-   function ring_pending(head, tail)
+   local function ring_pending(head, tail)
       if head == tail then return 0 end
       if head <  tail then return tail - head
       else                 return num_descriptors + tail - head end
-   end
+   end M.ring_pending = ring_pending
+
+   local function tx_pending ()
+      return ring_pending(regs[TDH], tdt)
+   end M.tx_pending = tx_pending
+
+   local function tx_available ()
+      return num_descriptors - tx_pending() - 1
+   end M.tx_available = tx_available
+
+   local function tx_load ()
+      return tx_pending() / num_descriptors
+   end M.tx_load = tx_load
 
    -- Read a PHY register.
    function phy_read (phyreg)
@@ -532,17 +560,49 @@ function new (pciaddress)
 
    -- Self-test diagnostics
 
+   function M.selftest2 (options)
+      options = options or {}
+      --      local tx_load,tx_available,add_txbuf = M.tx_load,M.tx_available,M.add_txbuf
+      if not options.nolinkup then
+         test.waitfor("linkup", M.linkup, 20, 250000)
+      end
+      if options.loopback then
+         M.enable_mac_loopback()
+      end
+      if not options.skip_transmit then
+         local deadline = C.get_time_ns() + 10000000000LL
+         local sleeps, tx = 0, 0
+         repeat
+            local available = tx_available()
+            if available < num_descriptors / 2 then
+               C.usleep(1000)
+            else
+               while tx_load() > 0.5 do C.usleep(1); sleeps = sleeps + 1 end
+               local available = tx_available()
+               for i = 1, tx_available() do
+                  tx = tx + 1
+                  add_txbuf(dma_phys, 60)
+               end
+               flush_tx()
+            end
+         until C.get_time_ns() > deadline
+         print("sleeps", sleeps, "tx", lib.comma_value(tx))
+         M.update_stats()
+         M.print_stats()
+      end
+   end
+
    -- Test the NIC.
    function M.selftest (options)
       options = options or {}
       local packets = options.packets or 100000
       local verify = options.verify == true
-      local noloopback = options.noloopback == true
       local verbose = options.verbose == true
       local rxindex = 0
       local software_rx_packets = 0
       local software_rx_bytes = 0
       local start_time_ns = C.get_time_ns()
+
       local function txbuf(i)
          return dma_start + offset_buffers + 4096*1024 + (i % 1024)*1024
       end
