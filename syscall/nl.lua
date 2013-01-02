@@ -193,12 +193,12 @@ local rta_decode = {
 
 -- annoyingly we can't use table as we add more values to it...
 local ifflist = {"UP", "BROADCAST", "LOOPBACK", "POINTOPOINT", "NOTRAILERS", "RUNNING", "NOARP", "PROMISC", "ALLMULTI",
-  "MASTER", "SLAVE", "MULTICAST", "PORTSEL", "AUTOMEDIA", "DYNAMIC", "LOWER_UP", "DORMANT", "ECHO"}
+  "MASTER", "SLAVE", "MULTICAST", "PORTSEL", "AUTOMEDIA", "DYNAMIC", "DORMANT", "ECHO"}
 
 mt.iff = {
   __tostring = function(f)
     local s = {}
-    for _, k in pairs(ifflist) do if c.IFF[k] then s[#s + 1] = k end end
+    for _, k in pairs(ifflist) do if bit.band(f.flags, c.IFF[k]) ~= 0 then s[#s + 1] = k end end
     return table.concat(s, ' ')
   end,
   __index = function(f, k)
