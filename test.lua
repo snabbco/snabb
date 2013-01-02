@@ -1414,7 +1414,7 @@ test_netlink = {
     local i = assert(nl.interfaces())
     assert(not i.dummy0, "expect dummy interface gone")
   end,
-  test_newaddr_root = function()
+  test_newaddr6_root = function()
     local lo = assert(nl.interface("lo"))
     assert(nl.newaddr(lo, "inet6", 128, "permanent", "address", "::2"))
     assert(lo:refresh())
@@ -1431,7 +1431,17 @@ test_netlink = {
     assert_equal(tostring(lo.inet6[1].addr), "::1", "expect only ::1 now")
     -- TODO this leaves a route to ::2 which we should delete
   end,
-  test_newaddr_helper_root = function()
+  test_newaddr_root = function()
+    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    local i = assert(nl.interfaces())
+    assert(i.dummy0:up())
+    assert(i.dummy0:address("10.255.0.1/24"))
+    assert(i.dummy0:refresh())
+    assert_equal(#i.dummy0.inet, 1, "expect one address now")
+    assert_equal(i.dummy0.inet[1].addr, "10.255.0.1")
+    assert(i.dummy0:delete())
+  end,
+  test_newaddr6_helper_root = function()
     local lo = assert(nl.interface("lo"))
     assert(lo:address("::2/128"))
     assert(lo:refresh())
