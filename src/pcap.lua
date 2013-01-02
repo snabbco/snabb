@@ -4,7 +4,6 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
-local c   = require("c")
 
 -- PCAP file format: http://wiki.wireshark.org/Development/LibpcapFileFormat/
 ffi.cdef[[
@@ -47,7 +46,7 @@ function write_file_header(file)
 end
 
 local pcap_extra = ffi.new("struct pcap_record_extra")
-ffi.C.memset(pcap_extra, 0, ffi.sizeof(pcap_extra))
+ffi.fill(pcap_extra, ffi.sizeof(pcap_extra), 0)
 
 function write_record(file, ffi_buffer, length,   port, input)
    local pcap_record = ffi.new("struct pcap_record")
@@ -71,6 +70,7 @@ end
 -- Return an iterator for pcap records in FILENAME.
 function records (filename)
    local file = io.open(filename, "r")
+   if file == nil then error("Unable to open file: " .. filename) end
    local pcap_file = readc(file, "struct pcap_file")
    if pcap_file.magic_number == 0xD4C3B2A1 then
       error("Endian mismatch in " .. filename)
