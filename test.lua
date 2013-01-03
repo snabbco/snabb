@@ -1573,11 +1573,11 @@ test_netlink = {
 
 test_termios = {
   test_pts_termios = function()
-    local ptm = assert(S.posix_openpt("rdwr, noctty"))
+    local ptm = assert(util.posix_openpt("rdwr, noctty"))
     assert(ptm:grantpt())
     assert(ptm:unlockpt())
     local pts_name = assert(ptm:ptsname())
-    local pts = assert(S.open(pts_name, "rdwr, noctty"))
+    local pts = assert(util.open_pts(pts_name, "rdwr, noctty"))
     assert(pts:isatty(), "should be a tty")
     local termios = assert(pts:tcgetattr())
     assert(termios:cfgetospeed() ~= 115200)
@@ -1603,7 +1603,7 @@ test_termios = {
   end,
   test_isatty_fail = function()
     local fd = S.open("/dev/zero")
-    assert(not fd:isatty(), "not a tty")
+    assert(not util.isatty(fd), "not a tty")
     assert(fd:close())
   end,
 }

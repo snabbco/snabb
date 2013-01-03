@@ -1671,70 +1671,6 @@ function S.block(fd)
   return true
 end
 
--- termios TODO move elsewhere
-function S.tcgetattr(fd)
-  local tio = t.termios()
-  local ok, err = S.ioctl(fd, "TCGETS", tio)
-  if not ok then return nil, err end
-  return tio
-end
-
-function S.isatty(fd)
-  local tc = S.tcgetattr(fd)
-  if tc then return true else return false end
-end
-
-function S.tcsetattr(fd, optional_actions, tio)
-  local inc = c.TCSA[optional_actions]
-  if inc < 0 or inc > 2 then return nil end
-  return S.ioctl(fd, c.IOCTL.TCSETS + inc, tio)
-end
-
-function S.tcsendbreak(fd, duration)
-  return S.ioctl(fd, "TCSBRK", pt.void(duration)) -- duration in seconds if not zero
-end
-
-function S.tcdrain(fd)
-  return S.ioctl(fd, "TCSBRK", pt.void(1))
-end
-
-function S.tcflush(fd, queue_selector)
-  return S.ioctl(fd, "TCFLSH", pt.void(c.TCFLUSH[queue_selector]))
-end
-
-function S.tcflow(fd, action)
-  return S.ioctl(fd, "TCXONC", pt.void(c.TCFLOW[action]))
-end
-
-function S.tcgetsid(fd)
-  local sid = t.int1()
-  local ok, err = S.ioctl(fd, "TIOCGSID", sid)
-  if not ok then return nil, err end
-  return sid[0]
-end
-
-function S.posix_openpt(flags)
-  return S.open("/dev/ptmx", flags);
-end
-
-function S.grantpt(fd) -- I don't think we need to do anything here (eg Musl libc does not)
-  return true
-end
-
-function S.unlockpt(fd)
-  local unlock = t.int1()
-  local ok, err = S.ioctl(fd, "TIOCSPTLCK", unlock) -- TODO make sure this returns true instead?
-  if not ok then return nil, err end
-  return true
-end
-
-function S.ptsname(fd)
-  local pts = t.int1()
-  local ret, error = S.ioctl(fd, "TIOCGPTN", pts)
-  if not ret then return nil, err end
-  return "/dev/pts/" .. tostring(pts[0])
-end
-
 -- Nixio compatibility to make porting easier, and useful functions (often man 3). Incomplete.
 function S.setblocking(s, b) if b then return S.block(s) else return S.nonblock(s) end end
 function S.tell(fd) return S.lseek(fd, 0, c.SEEK.CUR) end
@@ -1775,10 +1711,9 @@ local fdmethods = {'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
                    'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee',
                    'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
                    'fadvise', 'fallocate', 'posix_fallocate', 'readahead',
-                   'tcgetattr', 'tcsetattr', 'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
-                   'grantpt', 'unlockpt', 'ptsname', 'sync_file_range', 'fstatfs', 'futimens',
+                   'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
-                   'fchownat', 'readlinkat', 'mkfifoat', 'isatty', 'setns', 'openat',
+                   'fchownat', 'readlinkat', 'mkfifoat', 'setns', 'openat',
                    'preadv', 'pwritev'
                    }
 local fmeth = {}

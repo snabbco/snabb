@@ -479,5 +479,101 @@ function util.writefile(name, str, mode) -- write string to named file; silently
   return true
 end
 
+-- termios
+-- TODO note disadvantage of having in a different file is that cannot apply methods to a normal fd
+-- hence open_pts. Need to work out how to make this extensible more effectively. Same issue for adding nonblock() still in syscall
+function util.tcgetattr(fd)
+  local tio = t.termios()
+  local ok, err = S.ioctl(fd, "TCGETS", tio)
+  if not ok then return nil, err end
+  return tio
+end
+
+function util.isatty(fd)
+  local tc = util.tcgetattr(fd)
+  if tc then return true else return false end
+end
+
+function util.tcsetattr(fd, optional_actions, tio)
+  local inc = c.TCSA[optional_actions]
+  if inc < 0 or inc > 2 then return nil end
+  return S.ioctl(fd, c.IOCTL.TCSETS + inc, tio)
+end
+
+function util.tcsendbreak(fd, duration)
+  return S.ioctl(fd, "TCSBRK", pt.void(duration)) -- duration in seconds if not zero
+end
+
+function util.tcdrain(fd)
+  return S.ioctl(fd, "TCSBRK", pt.void(1))
+end
+
+function util.tcflush(fd, queue_selector)
+  return S.ioctl(fd, "TCFLSH", pt.void(c.TCFLUSH[queue_selector]))
+end
+
+function util.tcflow(fd, action)
+  return S.ioctl(fd, "TCXONC", pt.void(c.TCFLOW[action]))
+end
+
+function util.tcgetsid(fd)
+  local sid = t.int1()
+  local ok, err = S.ioctl(fd, "TIOCGSID", sid)
+  if not ok then return nil, err end
+  return sid[0]
+end
+
+function util.posix_openpt(flags)
+  local fd, err = S.open("/dev/ptmx", flags)
+  if not fd then return nil, err end
+  return setmetatable({fd = fd}, mt.openpt)
+end
+
+function util.grantpt(fd) -- I don't think we need to do anything here (eg Musl libc does not)
+  return true
+end
+
+function util.unlockpt(fd)
+  local unlock = t.int1()
+  local ok, err = S.ioctl(fd, "TIOCSPTLCK", unlock)
+  if not ok then return nil, err end
+  return true
+end
+
+function util.ptsname(fd)
+  local pts = t.int1()
+  local ret, error = S.ioctl(fd, "TIOCGPTN", pts)
+  if not ret then return nil, err end
+  return "/dev/pts/" .. tostring(pts[0])
+end
+
+function util.open_pts(name, flags)
+  local fd, err = S.open(name, flags)
+  if not fd then return nil, err end
+  return setmetatable({fd = fd}, mt.openpt)
+end
+
+local openptindex = {
+  getfd = function(t) return t.fd:getfd() end,
+  tcgetattr = util.tcgetattr,
+  isatty = util.isatty,
+  tcsetattr = util.tcsetattr,
+  tcsendbreak = util.tcsendbreak,
+  tcdrain = util.tcdrain,
+  tcflush = util.tcflush,
+  tcflow = util.tcflow,
+  tcgetsid = util.tcgetsid,
+  grantpt = util.grantpt,
+  unlockpt = util.unlockpt,
+  ptsname = util.ptsname,
+}
+
+mt.openpt = {
+  __index = function(t, k)
+    if openptindex[k] then return openptindex[k] end
+    return t.fd[k]
+  end
+}
+
 return util
 

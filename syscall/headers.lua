@@ -1076,19 +1076,13 @@ int unsetenv(const char *name);
 int clearenv(void);
 char *getenv(const char *name);
 
-int tcgetattr(int fd, struct termios *termios_p);
-int tcsetattr(int fd, int optional_actions, const struct termios *termios_p);
-int tcsendbreak(int fd, int duration);
-int tcdrain(int fd);
-int tcflush(int fd, int queue_selector);
-int tcflow(int fd, int action);
-//void cfmakeraw(struct termios *termios_p);
+pid_t tcgetsid(int fd);
+int vhangup(void);
+
 speed_t cfgetispeed(const struct termios *termios_p);
 speed_t cfgetospeed(const struct termios *termios_p);
 int cfsetispeed(struct termios *termios_p, speed_t speed);
 int cfsetospeed(struct termios *termios_p, speed_t speed);
 int cfsetspeed(struct termios *termios_p, speed_t speed);
-pid_t tcgetsid(int fd);
-int vhangup(void);
 ]]
 
