@@ -1689,7 +1689,7 @@ function S.tcsetattr(fd, optional_actions, termios)
 end
 
 function S.tcsendbreak(fd, duration)
-  return retbool(C.tcsendbreak(getfd(fd), duration))
+  return S.ioctl(fd, "TCSBRK", pt.void(duration)) -- duration in seconds if not zero
 end
 
 function S.tcdrain(fd)
