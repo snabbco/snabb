@@ -62,7 +62,7 @@ function new (pciaddress)
    local offset_txdesc   = 0x00e00000 --  1MB TX descriptors
    local offset_rxdesc   = 0x00f00000 --  1MB RX descriptors
 
-   local num_descriptors = 64 * 1024
+   local num_descriptors = 32 * 1024
    local buffer_size = 16384
 
    local dma_phys = dma_start -- physical address of DMA memory
@@ -361,16 +361,18 @@ function new (pciaddress)
       regs[TDLEN] = num_descriptors * ffi.sizeof("union tx")
    end
 
-   local flags = bits({dtype=20, eop=24, ifcs=25, dext=29})
-
-   -- Locally cached copies of TDT and TDH registers.
-   -- Because it's too expensive to constantly check these registers.
+   -- Locally cached copy of the Transmit Descriptor Tail (TDT) register.
+   -- Updates are kept locally here until flush_tx() is called.
+   -- That's because updating the hardware register is relatively expensive.
    local tdt = 0
+
+   -- Flags for transmit descriptors.
+   local txdesc_flags = bits({dtype=20, eop=24, ifcs=25, dext=29})
 
    -- Enqueue a transmit descriptor to send a packet.
    local function add_txbuf (address, size)
       txdesc[tdt].data.address = address
-      txdesc[tdt].data.options = bit.bor(size, flags)
+      txdesc[tdt].data.options = bit.bor(size, txdesc_flags)
       tdt = (tdt + 1) % num_descriptors
    end M.add_txbuf = add_txbuf
 
@@ -404,7 +406,7 @@ function new (pciaddress)
    end M.ring_pending = ring_pending
 
    local function tx_pending ()
-      return ring_pending(regs[TDH], tdt)
+      return ring_pending(regs[TDH], regs[TDT])
    end M.tx_pending = tx_pending
 
    local function tx_available ()
@@ -570,23 +572,14 @@ function new (pciaddress)
          M.enable_mac_loopback()
       end
       if not options.skip_transmit then
-         local deadline = C.get_time_ns() + 10000000000LL
-         local sleeps, tx = 0, 0
+         local deadline = C.get_time_ns() + 100000000000LL
          repeat
-            local available = tx_available()
-            if available < num_descriptors / 2 then
-               C.usleep(1000)
-            else
-               while tx_load() > 0.5 do C.usleep(1); sleeps = sleeps + 1 end
-               local available = tx_available()
-               for i = 1, tx_available() do
-                  tx = tx + 1
-                  add_txbuf(dma_phys, 60)
-               end
-               flush_tx()
+            while tx_load() > 0.75 do C.usleep(10000) end
+            for i = 1, tx_available() do
+               add_txbuf(dma_phys, 32)
             end
+            flush_tx()
          until C.get_time_ns() > deadline
-         print("sleeps", sleeps, "tx", lib.comma_value(tx))
          M.update_stats()
          M.print_stats()
       end
