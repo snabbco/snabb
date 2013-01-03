@@ -1671,12 +1671,12 @@ function S.block(fd)
   return true
 end
 
--- termios TODO replace with actual ioctls
+-- termios TODO move elsewhere
 function S.tcgetattr(fd)
-  local termios = t.termios()
-  local ret = C.tcgetattr(getfd(fd), termios)
-  if ret == -1 then return nil, t.error() end
-  return termios
+  local tio = t.termios()
+  local ok, err = S.ioctl(fd, "TCGETS", tio)
+  if not ok then return nil, err end
+  return tio
 end
 
 function S.isatty(fd)
