@@ -1078,11 +1078,5 @@ char *getenv(const char *name);
 
 pid_t tcgetsid(int fd);
 int vhangup(void);
-
-speed_t cfgetispeed(const struct termios *termios_p);
-speed_t cfgetospeed(const struct termios *termios_p);
-int cfsetispeed(struct termios *termios_p, speed_t speed);
-int cfsetospeed(struct termios *termios_p, speed_t speed);
-int cfsetspeed(struct termios *termios_p, speed_t speed);
 ]]
 

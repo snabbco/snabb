@@ -1005,30 +1005,24 @@ meth.termios = {
       termios.c_cc[c.CC.VTIME] = 0
       return true
     end,
-    -- TODO these functions are all just ioctls can do natively
-    cfgetispeed = function(termios)
-      local bits = ffi.C.cfgetispeed(termios)
-      return bits_to_speed[bits]
-    end,
     cfgetospeed = function(termios)
-      local bits = ffi.C.cfgetospeed(termios)
+      local bits = bit.band(termios.c_cflag, c.CBAUD)
       return bits_to_speed[bits]
     end,
     -- TODO move to __newindex?
-    cfsetispeed = function(termios, speed)
-      local ok, err = ffi.C.cfsetispeed(termios, c.B[speed])
-      if not ok then return nil, t.error() end
-      return true
-    end,
     cfsetospeed = function(termios, speed)
-      local ok, err = ffi.C.cfsetospeed(termios, c.B[speed])
-      if not ok then return nil, t.error() end
+      local speed = c.B[speed]
+      if bit.band(speed, bit.bnot(c.CBAUD)) ~= 0 then return nil end
+      termios.c_cflag = bit.bor(bit.band(termios.c_cflag, bit.bnot(c.CBAUD)), speed)
       return true
     end,
   },
 }
 
 meth.termios.index.cfsetspeed = meth.termios.index.cfsetospeed -- also shorter names eg ospeed?
+meth.termios.index.cfgetspeed = meth.termios.index.cfgetospeed
+meth.termios.index.cfsetispeed = meth.termios.index.cfsetospeed
+meth.termios.index.cfgetispeed = meth.termios.index.cfgetospeed
 
 mt.termios = {
   __index = function(termios, k)
