@@ -1699,7 +1699,7 @@ function S.tcflush(fd, queue_selector)
 end
 
 function S.tcflow(fd, action)
-  return retbool(C.tcflow(getfd(fd), c.TCFLOW[action]))
+  return S.ioctl(fd, "TCXONC", pt.void(c.TCFLOW[action]))
 end
 
 function S.tcgetsid(fd)
