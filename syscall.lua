@@ -1623,6 +1623,8 @@ function S.umask(mask) return C.umask(c.MODE[mask]) end
 function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
 function S.setsid() return retnum(C.setsid()) end
 
+function S.vhangup() return retbool(C.vhangup()) end
+
 -- handle environment (Lua only provides os.getenv). TODO add metatable to make more Lualike.
 function S.environ() -- return whole environment as table
   local environ = ffi.C.environ
@@ -1695,7 +1697,7 @@ function S.tcdrain(fd)
 end
 
 function S.tcflush(fd, queue_selector)
-  return retbool(C.tcflush(getfd(fd), c.TCFLUSH[queue_selector]))
+  return S.ioctl(fd, "TCFLSH", pt.void(c.TCFLUSH[queue_selector]))
 end
 
 function S.tcflow(fd, action)
@@ -1730,8 +1732,6 @@ function S.ptsname(fd)
   if not ret then return nil, err end
   return "/dev/pts/" .. tostring(pts[0])
 end
-
-function S.vhangup() return retbool(C.vhangup()) end
 
 -- Nixio compatibility to make porting easier, and useful functions (often man 3). Incomplete.
 function S.setblocking(s, b) if b then return S.block(s) else return S.nonblock(s) end end
