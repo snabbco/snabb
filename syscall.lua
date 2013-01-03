@@ -1703,7 +1703,10 @@ function S.tcflow(fd, action)
 end
 
 function S.tcgetsid(fd)
-  return retnum(C.tcgetsid(getfd(fd)))
+  local sid = t.int1()
+  local ok, err = S.ioctl(fd, "TIOCGSID", sid)
+  if not ok then return nil, err end
+  return sid[0]
 end
 
 function S.posix_openpt(flags)
@@ -1716,8 +1719,8 @@ end
 
 function S.unlockpt(fd)
   local unlock = t.int1()
-  local ret, err = S.ioctl(fd, "TIOCSPTLCK", unlock) -- TODO make sure this returns true instead?
-  if not ret then return nil, err end
+  local ok, err = S.ioctl(fd, "TIOCSPTLCK", unlock) -- TODO make sure this returns true instead?
+  if not ok then return nil, err end
   return true
 end
 
