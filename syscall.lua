@@ -1684,8 +1684,10 @@ function S.isatty(fd)
   if tc then return true else return false end
 end
 
-function S.tcsetattr(fd, optional_actions, termios)
-  return retbool(C.tcsetattr(getfd(fd), c.TCSA[optional_actions], termios))
+function S.tcsetattr(fd, optional_actions, tio)
+  local inc = c.TCSA[optional_actions]
+  if inc < 0 or inc > 2 then return nil end
+  return S.ioctl(fd, c.IOCTL.TCSETS + inc, tio)
 end
 
 function S.tcsendbreak(fd, duration)
