@@ -1693,7 +1693,7 @@ function S.tcsendbreak(fd, duration)
 end
 
 function S.tcdrain(fd)
-  return retbool(C.tcdrain(getfd(fd)))
+  return S.ioctl(fd, "TCSBRK", pt.void(1))
 end
 
 function S.tcflush(fd, queue_selector)
