@@ -39,7 +39,7 @@ local meth = {}
 local function u6432(x) return t.u6432(x):to32() end
 local function i6432(x) return t.i6432(x):to32() end
 
--- makes code tidier TODO could make all types accept themselves as constructors
+-- makes code tidier TODO could return constructed type if not that type to simplify usage.
 local function istype(tp, x)
   if ffi.istype(tp, x) then return x end
   return false
@@ -1281,32 +1281,6 @@ function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two differen
 end
 
 function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, c.EFD[flags])) end
--- eventfd read and write helpers, as in glibc but Lua friendly. Note returns 0 for EAGAIN, as 0 never returned directly
--- returns Lua number - if you need all 64 bits, pass your own value in and use that for the exact result
-function S.eventfd_read(fd, value)
-  if not value then value = t.uint64_1() end
-  local ret = C.read(getfd(fd), value, 8)
-  if ret == -1 and ffi.errno() == c.E.AGAIN then
-    value[0] = 0
-    return 0
-  end
-  if ret == -1 then return nil, t.error() end
-  return tonumber(value[0])
-end
-function S.eventfd_write(fd, value)
-  if not value then value = 1 end
-  if type(value) == "number" then value = t.uint64_1(value) end
-  return retbool(C.write(getfd(fd), value, 8))
-end
-
-function S.signalfd_read(fd, ss)
-  ss = istype(t.siginfos, ss) or t.siginfos(ss or 8)
-  local ret, err = S.read(fd, ss.sfd, ss.bytes)
-  if ret == 0 or (err and err.AGAIN) then return {} end
-  if not ret then return nil, err end
-  ss.count = ret / s.signalfd_siginfo -- may not be full length
-  return ss
-end
 
 function S.getitimer(which, value)
   if not value then value = t.itimerval() end
@@ -1340,14 +1314,6 @@ function S.timerfd_gettime(fd, curr_value)
   local ret = C.timerfd_gettime(getfd(fd), curr_value)
   if ret == -1 then return nil, t.error() end
   return curr_value
-end
-
-function S.timerfd_read(fd, buffer)
-  if not buffer then buffer = t.uint64_1() end
-  local ret, err = S.read(fd, buffer, 8)
-  if not ret and err.AGAIN then return 0 end -- will never actually return 0
-  if not ret then return nil, err end
-  return tonumber(buffer[0])
 end
 
 function S.pivot_root(new_root, put_old) return retbool(C.pivot_root(new_root, put_old)) end
@@ -1707,10 +1673,10 @@ local fdmethods = {'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
                    'recvmsg', 'setsockopt', 'epoll_ctl', 'epoll_wait', 'sendfile', 'getdents',
-                   'eventfd_read', 'eventfd_write', 'ftruncate', 'shutdown', 'getsockopt',
+                   'ftruncate', 'shutdown', 'getsockopt',
                    'inotify_add_watch', 'inotify_rm_watch', 'inotify_read', 'flistxattr',
                    'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee',
-                   'signalfd_read', 'timerfd_gettime', 'timerfd_settime', 'timerfd_read',
+                   'timerfd_gettime', 'timerfd_settime',
                    'fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',

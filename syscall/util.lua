@@ -3,12 +3,20 @@
 -- aim is to move a lot of stuff that is not strictly syscalls out of main code to modularise better
 -- most code here is man(1) or man(3) or misc helpers for common tasks.
 
+-- TODO rework so that items can be methods on fd again, for eventfd, timerfd, signalfd and tty
+
 local ffi = require "ffi"
 local S = require "syscall"
 
 local h = require "syscall.helpers"
 
 local octal = h.octal
+
+-- TODO move to helpers? see notes in syscall.lua about reworking though
+local function istype(tp, x)
+  if ffi.istype(tp, x) then return x end
+  return false
+end
 
 local util = {}
 
@@ -574,6 +582,43 @@ mt.openpt = {
     return t.fd[k]
   end
 }
+
+-- eventfd read and write helpers, as in glibc but Lua friendly. Note returns 0 for EAGAIN, as 0 never returned directly
+-- returns Lua number - if you need all 64 bits, pass your own value in and use that for the exact result
+function util.eventfd_read(fd, value)
+  if not value then value = t.uint64_1() end
+  local ret, err = S.read(fd, value, 8)
+  if err and err.AGAIN then
+    value[0] = 0
+    return 0
+  end
+  if not ret then return nil, err end
+  return tonumber(value[0])
+end
+function util.eventfd_write(fd, value)
+  if not value then value = 1 end
+  if type(value) == "number" then value = t.uint64_1(value) end
+  local ret, err = S.write(fd, value, 8)
+  if not ret then return nil, err end
+  return true
+end
+
+function util.signalfd_read(fd, ss)
+  ss = istype(t.siginfos, ss) or t.siginfos(ss or 8)
+  local ret, err = S.read(fd, ss.sfd, ss.bytes)
+  if ret == 0 or (err and err.AGAIN) then return {} end
+  if not ret then return nil, err end
+  ss.count = ret / s.signalfd_siginfo -- may not be full length
+  return ss
+end
+
+function util.timerfd_read(fd, buffer)
+  if not buffer then buffer = t.uint64_1() end
+  local ret, err = S.read(fd, buffer, 8)
+  if not ret and err.AGAIN then return 0 end -- will never actually return 0
+  if not ret then return nil, err end
+  return tonumber(buffer[0])
+end
 
 return util
 

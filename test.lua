@@ -858,7 +858,7 @@ test_timers_signals = {
     assert(S.setitimer("real", {0, 0.01}))
     assert(S.nanosleep(0.1)) -- nanosleep does not interact with itimer
 
-    local sig = assert(fd:signalfd_read())
+    local sig = assert(util.signalfd_read(fd))
     assert(#sig == 1, "expect one signal")
     assert(sig[1].alrm, "expect alarm clock to have rung")
     assert(fd:close())
@@ -891,7 +891,7 @@ test_timers_signals = {
     local fd = assert(S.signalfd(ss, "nonblock"))
     assert(S.sigprocmask("block", ss))
     assert(S.kill(S.getpid(), "usr1"))
-    local ss = assert(fd:signalfd_read())
+    local ss = assert(util.signalfd_read(fd))
     assert(#ss == 2, "expect to read two signals") -- previous pending winch, plus USR1
     assert((ss[1].winch and ss[2].usr1) or (ss[2].winch and ss[1].usr1), "expect a winch and a usr1 signal") -- unordered
     assert(ss[1].user, "signal sent by user")
@@ -902,12 +902,12 @@ test_timers_signals = {
   end,
   test_timerfd = function()
     local fd = assert(S.timerfd_create("monotonic", "nonblock, cloexec"))
-    local n = assert(fd:timerfd_read())
+    local n = assert(util.timerfd_read(fd))
     assert(n == 0, "no timer events yet")
     assert(fd:block())
     local o = assert(fd:timerfd_settime(nil, {0, 0.000001}))
     assert(o.interval.time == 0 and o.value.time == 0, "old timer values zero")
-    n = assert(fd:timerfd_read())
+    n = assert(util.timerfd_read(fd))
     assert(n == 1, "should have exactly one timer expiry")
     local o = assert(fd:timerfd_gettime())
     assert_equal(o.interval.time, 0, "expect 0 from gettime as expired")
@@ -1611,14 +1611,14 @@ test_termios = {
 test_events = {
   test_eventfd = function()
     local fd = assert(S.eventfd(0, "nonblock"))
-    local n = assert(fd:eventfd_read())
+    local n = assert(util.eventfd_read(fd))
     assert_equal(n, 0, "eventfd should return 0 initially")
-    assert(fd:eventfd_write(3))
-    assert(fd:eventfd_write(6))
-    assert(fd:eventfd_write(1))
-    n = assert(fd:eventfd_read())
+    assert(util.eventfd_write(fd, 3))
+    assert(util.eventfd_write(fd, 6))
+    assert(util.eventfd_write(fd, 1))
+    n = assert(util.eventfd_read(fd))
     assert_equal(n, 10, "eventfd should return 10")
-    n = assert(fd:eventfd_read())
+    n = assert(util.eventfd_read(fd))
     assert(n, 0, "eventfd should return 0 again")
     assert(fd:close())
   end,
