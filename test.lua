@@ -1716,7 +1716,9 @@ test_aio = {
     local ctx = assert(S.io_setup(8))
     assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
     local r = assert(S.io_getevents(ctx, 1, 1))
-    assert(#r == 1, "expect one aio event") -- TODO test what is returned
+    assert_equal(#r, 1, "expect one aio event") -- TODO test what is returned
+    assert_equal(r[1].data, 42, "expect to get our data back")
+    assert_equal(r[1].res, 4096, "expect to get full read")
     assert(fd:close())
     assert(S.munmap(abuf, 4096))
   end,
@@ -1756,7 +1758,7 @@ test_aio = {
     local e = util.eventfd_read(efd)
     assert_equal(e, 1, "expect to be told one aio event ready")
     local r = assert(S.io_getevents(ctx, 1, 1))
-    assert(#r == 1, "expect one aio event")
+    assert_equal(#r, 1, "expect one aio event")
     assert_equal(r[1].data, 42, "expect to get our data back")
     assert_equal(r[1].res, 4096, "expect to get full read")
     assert(efd:close())

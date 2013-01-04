@@ -1370,12 +1370,12 @@ end
 
 function S.io_getevents(ctx, min, nr, events, timeout)
   events = events or t.io_events(nr)
-  timeout = istype(t.timespec, timeout) or t.timespec(timeout)
+  if timeout then timeout = istype(t.timespec, timeout) or t.timespec(timeout) end -- nil ok
   local ret = C.io_getevents(ctx, min, nr, events, timeout)
   if ret == -1 then return nil, t.error() end
-  -- need to think more about how to return these, eg metatype for io_event?
+  -- TODO convert to metatype for io_event
   local r = {}
-  for i = 0, nr - 1 do
+  for i = 0, ret - 1 do
     r[i + 1] = events[i]
   end
   r.timeout = timeout
