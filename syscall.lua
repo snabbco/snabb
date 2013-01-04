@@ -1385,7 +1385,7 @@ function S.io_getevents(ctx, min, nr, events, timeout)
 end
 
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args TODO redo like iov so no nr
-  iocb, nr = getiocbs(iocb)
+  iocb, nr = getiocbs(iocb, nr)
   return retnum(C.io_submit(ctx, iocb, nr))
 end
 
