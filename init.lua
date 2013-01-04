@@ -40,6 +40,10 @@ eth0:up()
 
 eth0:address("10.3.0.2/24")
 
+-- hostname
+
+S.sethostname("lua")
+
 -- print something
 local i = nl.interfaces()
 print(i)
