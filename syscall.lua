@@ -1499,6 +1499,7 @@ function S.klogctl(tp, buf, len)
   return true
 end
 
+-- TODO for input should be able to set modes automatically from which fields are set.
 function S.adjtimex(a)
   if not a then a = t.timex() end
   if type(a) == 'table' then  -- TODO pull this out to general initialiser for t.timex
