@@ -1055,7 +1055,7 @@ meth.iocb = {
     data = function(iocb, v) iocb.aio_data = v end,
     reqprio = function(iocb, v) iocb.aio_reqprio = v end,
     fildes = function(iocb, v) iocb.aio_fildes = getfd(v) end,
-    buf = function(iocb, v) iocb.aio_buf = ffi.cast(t.intptr, pt.void(v)) end,
+    buf = function(iocb, v) iocb.aio_buf = ffi.cast(t.int64, pt.void(v)) end,
     nbytes = function(iocb, v) iocb.aio_nbytes = v end,
     offset = function(iocb, v) iocb.aio_offset = v end,
     flags = function(iocb, v) iocb.aio_flags = c.IOCB_FLAG[v] end,
