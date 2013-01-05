@@ -1736,9 +1736,9 @@ test_aio = {
     local ret = assert(S.io_submit(ctx, a))
     assert_equal(ret, 1, "expect one event submitted")
     -- erroring, giving EINVAL which is odd, man page says means ctx invalid TODO fix
-    --local r, err = S.io_cancel(ctx, {cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0})
+    --local ok = assert(S.io_cancel(ctx, a.ptrs[0]))
     --r = assert(S.io_getevents(ctx, 1, 1))
-    --assert(#r == 0, "expect no aio events")
+    --assert_equal(r, 0, "expect no aio events")
     assert(S.io_destroy(ctx))
     assert(fd:close())
     assert(S.munmap(abuf, 4096))
