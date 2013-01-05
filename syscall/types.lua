@@ -1080,6 +1080,7 @@ metatype("iocb", "struct iocb", mt.iocb)
 -- aio operations want an array of pointers to struct iocb. To make sure no gc, we provide a table with array and pointers
 -- easiest to do as Lua table not ffi type. 
 -- expects Lua table of either tables or iocb as input. can provide ptr table too
+-- TODO check maybe the implementation actually copies these? only the posix aio says you need to keep.
 
 t.iocb_array = function(tab, ptrs)
   local nr = #tab
