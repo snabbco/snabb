@@ -1070,7 +1070,7 @@ mt.iocb = {
   __newindex = function(iocb, k, v) if meth.iocb.newindex[k] then meth.iocb.newindex[k](iocb, v) end end,
   __new = function(tp, ioi)
     local iocb = ffi.new(tp)
-    for k, v in pairs(ioi) do iocb[k] = v end
+    if ioi then for k, v in pairs(ioi) do iocb[k] = v end end
     return iocb
   end,
 }
