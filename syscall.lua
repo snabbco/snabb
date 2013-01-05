@@ -1385,6 +1385,7 @@ function S.io_getevents(ctx, min, nr, events, timeout)
   return r
 end
 
+-- TODO this is broken as iocb must persist until retrieved, and could be gc'd if passed as table...
 function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args TODO redo like iov so no nr
   iocb, nr = getiocbs(iocb, nr)
   return retnum(C.io_submit(ctx, iocb, nr))
