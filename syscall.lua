@@ -1374,6 +1374,7 @@ function S.io_getevents(ctx, min, nr, events, timeout)
   local ret = C.io_getevents(ctx, min, nr, events, timeout)
   if ret == -1 then return nil, t.error() end
   -- TODO convert to metatype for io_event
+  -- TODO metatype should support error type if res is negative
   local r = {}
   for i = 0, ret - 1 do
     r[i + 1] = events[i]
