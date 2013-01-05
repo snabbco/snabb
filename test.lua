@@ -1709,12 +1709,14 @@ test_aio = {
   test_aio = function()
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
-    local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- use O_DIRECT or aio may not
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- use O_DIRECT or aio may not work
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
     local ctx = assert(S.io_setup(8))
-    assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
+    local a = t.iocb_array{{opcode = "pread", data = 42, fildes = fd, buf = abuf, nbytes = 4096, offset = 0}}
+    local ret = assert(S.io_submit(ctx, a))
+    assert_equal(ret, 1, "expect one event submitted")
     local r = assert(S.io_getevents(ctx, 1, 1))
     assert_equal(#r, 1, "expect one aio event") -- TODO test what is returned
     assert_equal(r[1].data, 42, "expect to get our data back")
@@ -1730,7 +1732,9 @@ test_aio = {
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
     local ctx = assert(S.io_setup(8))
-    assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0}}), 1)
+    local a = t.iocb_array{{opcode = "pread", data = 42, fildes = fd, buf = abuf, nbytes = 4096, offset = 0}}
+    local ret = assert(S.io_submit(ctx, a))
+    assert_equal(ret, 1, "expect one event submitted")
     -- erroring, giving EINVAL which is odd, man page says means ctx invalid TODO fix
     --local r, err = S.io_cancel(ctx, {cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0})
     --r = assert(S.io_getevents(ctx, 1, 1))
@@ -1750,7 +1754,9 @@ test_aio = {
     local efd = assert(S.eventfd())
     local ep = assert(S.epoll_create())
     assert(ep:epoll_ctl("add", efd, "in"))
-    assert_equal(S.io_submit(ctx, {{cmd = "pread", data = 42, fd = fd, buf = abuf, nbytes = 4096, offset = 0, resfd = efd}}), 1)
+    local a = t.iocb_array{{opcode = "pread", data = 42, fildes = fd, buf = abuf, nbytes = 4096, offset = 0, resfd = efd}}
+    local ret = assert(S.io_submit(ctx, a))
+    assert_equal(ret, 1, "expect one event submitted")
     local r = assert(ep:epoll_wait())
     assert_equal(#r, 1, "one event now")
     assert(r[1].IN, "read event")

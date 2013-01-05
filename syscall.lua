@@ -1328,40 +1328,7 @@ end
 
 function S.io_destroy(ctx) return retbool(C.io_destroy(ctx)) end
 
--- TODO replace these functions with metatypes
-local function getiocb(ioi, iocb)
-  if not iocb then iocb = t.iocb() end
-  iocb.aio_lio_opcode = c.IOCB_CMD[ioi.cmd]
-  iocb.aio_data = ioi.data or 0
-  iocb.aio_reqprio = ioi.reqprio or 0
-  iocb.aio_fildes = getfd(ioi.fd)
-  iocb.aio_buf = ffi.cast(t.int64, ioi.buf) -- TODO check, looks wrong
-  iocb.aio_nbytes = ioi.nbytes
-  iocb.aio_offset = ioi.offset
-  if ioi.resfd then
-    iocb.aio_flags = iocb.aio_flags + c.IOCB_FLAG.RESFD
-    iocb.aio_resfd = getfd(ioi.resfd)
-  end
-  return iocb
-end
-
-local function getiocbs(iocb, nr)
-  if type(iocb) == "table" then
-    local io = iocb
-    nr = #io
-    iocb = t.iocb_ptrs(nr)
-    local iocba = t.iocbs(nr)
-    for i = 0, nr - 1 do
-      local ioi = io[i + 1]
-      iocb[i] = iocba + i
-      getiocb(ioi, iocba[i])
-    end
-  end
-  return iocb, nr
-end
-
 function S.io_cancel(ctx, iocb, result)
-  iocb = getiocb(iocb)
   if not result then result = t.io_event() end
   local ret = C.io_cancel(ctx, iocb, result)
   if ret == -1 then return nil, t.error() end
@@ -1386,9 +1353,8 @@ function S.io_getevents(ctx, min, nr, events, timeout)
 end
 
 -- TODO this is broken as iocb must persist until retrieved, and could be gc'd if passed as table...
-function S.io_submit(ctx, iocb, nr) -- takes an array of pointers to iocb. note order of args TODO redo like iov so no nr
-  iocb, nr = getiocbs(iocb, nr)
-  return retnum(C.io_submit(ctx, iocb, nr))
+function S.io_submit(ctx, iocb) -- takes a t.iocb_array in order to pin for gc
+  return retnum(C.io_submit(ctx, iocb.ptrs, iocb.nr))
 end
 
 -- map for valid options for arg2

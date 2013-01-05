@@ -141,7 +141,6 @@ local addtypes = {
   timex = "struct timex",
   utsname = "struct utsname",
   fdb_entry = "struct fdb_entry",
-  iocb = "struct iocb",
   sighandler = "sighandler_t",
   sigaction = "struct sigaction",
   clockid = "clockid_t",
@@ -1037,6 +1036,61 @@ mt.termios = {
 
 metatype("termios", "struct termios", mt.termios)
 metatype("termios2", "struct termios2", mt.termios)
+
+meth.iocb = {
+  index = {
+    opcode = function(iocb) return iocb.aio_lio_opcode end,
+    data = function(iocb) return tonumber(iocb.aio_data) end,
+    reqprio = function(iocb) return iocb.aio_reqprio end,
+    fildes = function(iocb) return iocb.aio_fildes end, -- do not convert to fd as will already be open, don't want to gc
+    buf = function(iocb) return iocb.aio_buf end,
+    nbytes = function(iocb) return tonumber(iocb.aio_nbytes) end,
+    offset = function(iocb) return tonumber(iocb.aio_offset) end,
+    resfd = function(iocb) return iocb.aio_resfd end,
+    flags = function(iocb) return iocb.aio_flags end,
+  },
+  newindex = {
+    opcode = function(iocb, v) iocb.aio_lio_opcode = c.IOCB_CMD[v] end,
+    data = function(iocb, v) iocb.aio_data = v end,
+    reqprio = function(iocb, v) iocb.aio_reqprio = v end,
+    fildes = function(iocb, v) iocb.aio_fildes = getfd(v) end,
+    buf = function(iocb, v) iocb.aio_buf = ffi.cast(t.int64, v) end,
+    nbytes = function(iocb, v) iocb.aio_nbytes = v end,
+    offset = function(iocb, v) iocb.aio_offset = v end,
+    flags = function(iocb, v) iocb.aio_flags = c.IOCB_FLAG[v] end,
+    resfd = function(iocb, v)
+      iocb.aio_flags = bit.bor(iocb.aio_flags, c.IOCB_FLAG.RESFD)
+      iocb.aio_resfd = getfd(v)
+    end,
+  },
+}
+
+mt.iocb = {
+  __index = function(iocb, k) if meth.iocb.index[k] then return meth.iocb.index[k](iocb) end end,
+  __newindex = function(iocb, k, v) if meth.iocb.newindex[k] then meth.iocb.newindex[k](iocb, v) end end,
+  __new = function(tp, ioi)
+    local iocb = ffi.new(tp)
+    for k, v in pairs(ioi) do iocb[k] = v end
+    return iocb
+  end,
+}
+
+metatype("iocb", "struct iocb", mt.iocb)
+
+-- aio operations want an array of pointers to struct iocb. To make sure no gc, we provide a table with array and pointers
+-- easiest to do as Lua table not ffi type. 
+
+t.iocb_array = function(tab)
+  local nr = #tab
+  local a = {nr = nr, iocbs = t.iocbs(nr), ptrs = t.iocb_ptrs(nr)}
+  for i = 1, nr do
+    local iocb = tab[i]
+    iocb = istype(t.iocb, iocb) or t.iocb(iocb)
+    ffi.copy(a.iocbs[i - 1], iocb, s.iocb)
+    a.ptrs[i - 1] = a.iocbs[i - 1]
+  end
+  return a
+end
 
 return types
 
