@@ -25,8 +25,8 @@ function resolve (virt_page)
 end
 
 function selftest (options)
+   print("selftest: memory")
    local verbose = options.verbose or false
-   print("selftest: physmem")
    local physbase = 0x10000000
    local size     = 0x01000000
    local mem = C.map_physical_ram(physbase, physbase + size, true)
