@@ -263,16 +263,27 @@ function new (pciaddress)
       regs[RCTL] = bit.bor(regs[RCTL], bits{EN=1})
    end
 
+   local rdt = 0
+
    -- Enqueue a receive descriptor to receive a packet.
-   function M.add_rxbuf (address, size)
+   local function add_rxbuf (address)
       -- NOTE: RDT points to the next unused descriptor
-      local index = regs[RDT]
-      rxdesc[index].data.address = address
-      rxdesc[index].data.dd = 0
-      regs[RDT] = (index + 1) % num_descriptors
-      rxbuffers[index] = address
+      rxdesc[rdt].data.address = address
+      rxdesc[rdt].data.dd = 0
+      rdt = (rdt + 1) % num_descriptors
+--      rxbuffers[rdt] = address
       return true
-   end
+   end M.add_rxbuf = add_rxbuf
+
+   local function flush_rx ()
+      regs[RDT] = rdt
+   end M.flush_rx = flush_rx
+
+   local function ring_pending(head, tail)
+      if head == tail then return 0 end
+      if head <  tail then return tail - head
+      else                 return num_descriptors + tail - head end
+   end M.ring_pending = ring_pending
 
    function M.rx_full ()
       return regs[RDH] == (regs[RDT] + 1) % num_descriptors
@@ -282,13 +293,13 @@ function new (pciaddress)
       return regs[RDH] == regs[RDT]
    end
 
-   function M.rx_available ()
-      return num_descriptors - M.rx_pending()
-   end
-
-   function M.rx_pending ()
+   local function rx_pending ()
       return ring_pending(regs[RDT], regs[RDH])
-   end
+   end M.rx_pending = rx_pending
+
+   local function rx_available ()
+      return num_descriptors - rx_pending() - 1
+   end M.rx_available = rx_available
 
    function M.rx_load ()
       return rx_pending() / num_descriptors
@@ -376,7 +387,7 @@ function new (pciaddress)
       tdt = (tdt + 1) % num_descriptors
    end M.add_txbuf = add_txbuf
 
-   local function flush_tx(address, size)
+   local function flush_tx()
       regs[TDT] = tdt
    end M.flush_tx = flush_tx
 
@@ -398,12 +409,6 @@ function new (pciaddress)
 
    function M.tx_full  () return M.tx_pending() == num_descriptors - 1 end
    function M.tx_empty () return M.tx_pending() == 0 end
-
-   local function ring_pending(head, tail)
-      if head == tail then return 0 end
-      if head <  tail then return tail - head
-      else                 return num_descriptors + tail - head end
-   end M.ring_pending = ring_pending
 
    local function tx_pending ()
       return ring_pending(regs[TDH], regs[TDT])
@@ -550,6 +555,10 @@ function new (pciaddress)
       end
    end
 
+   function M.reset_stats ()
+      M.stats = {}
+   end
+
    function M.print_stats ()
       print("Statistics for PCI device " .. pciaddress .. ":")
       for _,reg in ipairs(statistics_regs) do
@@ -562,84 +571,45 @@ function new (pciaddress)
 
    -- Self-test diagnostics
 
-   function M.selftest2 (options)
+   function M.selftest (options)
       options = options or {}
-      --      local tx_load,tx_available,add_txbuf = M.tx_load,M.tx_available,M.add_txbuf
-      if not options.nolinkup then
-         test.waitfor("linkup", M.linkup, 20, 250000)
+      io.write("intel selftest: pciaddr="..pciaddress)
+      for key,value in pairs(options) do
+         io.write(" "..key.."="..tostring(value))
       end
+      print()
+      local secs = options.secs or 10
+      local receive = options.receive or false
+      local randomsize = options.randomsize or false
       if options.loopback then
          M.enable_mac_loopback()
       end
+      if not options.nolinkup then
+         test.waitfor("linkup", M.linkup, 20, 250000)
+      end
       if not options.skip_transmit then
-         local deadline = C.get_time_ns() + 10000000000LL
+         local secs = (options.secs or 10)
+         print("Generating traffic for "..tostring(secs).." second(s)...")
+         local deadline = C.get_time_ns() + secs * 1000000000LL
          repeat
             while tx_load() > 0.75 do C.usleep(10000) end
+            if receive then
+               for i = 1, rx_available() do
+                  add_rxbuf(dma_phys + 4096)
+               end
+               flush_rx()
+            end
             for i = 1, tx_available() do
-               add_txbuf(dma_phys, math.random(100, 1400))
+               if randomsize then
+                  add_txbuf(dma_phys, math.random(32, 1496))
+               else
+                  add_txbuf(dma_phys, 32)
+               end
             end
             flush_tx()
          until C.get_time_ns() > deadline
          M.update_stats()
          M.print_stats()
-      end
-   end
-
-   -- Test the NIC.
-   function M.selftest (options)
-      options = options or {}
-      local packets = options.packets or 100000
-      local verify = options.verify == true
-      local verbose = options.verbose == true
-      local rxindex = 0
-      local software_rx_packets = 0
-      local software_rx_bytes = 0
-      local start_time_ns = C.get_time_ns()
-
-      local function txbuf(i)
-         return dma_start + offset_buffers + 4096*1024 + (i % 1024)*1024
-      end
-      local function rxbuf(i)
-         return dma_start + offset_buffers + (i % 1024)*4096
-      end
-      local function rxpacket ()
-         local packet, length = M.receive()
-         if packet then
-            software_rx_packets = software_rx_packets + 1
-            software_rx_bytes = software_rx_bytes + length + 4 -- stripped CRC
-            return true
-         end
-      end
-      -- Transmit and receive loop
-      for txindex = 0,packets-1 do
-         while not M.rx_full() do
-            M.add_rxbuf(rxbuf(rxindex), 4096)
-            rxindex = rxindex + 1
-         end
-         if not M.tx_full() then M.add_txbuf(txbuf(txindex), 996) end
-         while rxpacket() do end
-      end
-      -- Catch up remaining packets
-      for catchup = 0,num_descriptors do
-         rxpacket()
-      end
-      M.update_stats()
-      M.print_stats()
-      print("software RX packets: ", lib.comma_value(software_rx_packets))
-      print("software RX bytes:   ", lib.comma_value(software_rx_bytes))
-      local elapsed_time = tonumber(C.get_time_ns() - start_time_ns) / 1000000000.0
-      print("Elapsed time (secs): ", lib.comma_value(elapsed_time))
-      print("Megabits per second: ",
-            lib.comma_value(math.floor(software_rx_bytes * 8.0 / 1024 / 1028 / elapsed_time)))
-      print("Packets per second:  ",
-            lib.comma_value(math.floor(software_rx_packets / elapsed_time)))
-
-      if verbose then
-         local ptr = ffi.cast("uint32_t*", ffi.cast("char*", dma_virt) + 8192)
-         for x = 1,128 do
-            io.write(bit.tohex(ptr[x]).." ")
-            if x > 0 and x % 8 == 0 then print() end
-         end
       end
    end
 
