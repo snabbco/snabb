@@ -572,11 +572,11 @@ function new (pciaddress)
          M.enable_mac_loopback()
       end
       if not options.skip_transmit then
-         local deadline = C.get_time_ns() + 100000000000LL
+         local deadline = C.get_time_ns() + 10000000000LL
          repeat
             while tx_load() > 0.75 do C.usleep(10000) end
             for i = 1, tx_available() do
-               add_txbuf(dma_phys, 32)
+               add_txbuf(dma_phys, math.random(100, 1400))
             end
             flush_tx()
          until C.get_time_ns() > deadline
