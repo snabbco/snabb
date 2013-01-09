@@ -250,7 +250,7 @@ function new (pciaddress)
             BAM=15         -- Broadcast Accept Mode
          })
       regs[RFCTL] = bits({EXSTEN=15})  -- Extended RX writeback descriptor format
---      regs[RXDCTL] = bits({GRAN=24, WTHRESH0=16})
+      regs[RXDCTL] = bits({GRAN=24, WTHRESH0=16})
       regs[RXCSUM] = 0                 -- Disable checksum offload - not needed
       regs[RADV] = math.log(1024,2)    -- 1us max writeback delay
       regs[RDLEN] = num_descriptors * ffi.sizeof("union rx")
