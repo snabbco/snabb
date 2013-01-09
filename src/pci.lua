@@ -11,7 +11,7 @@ require("clib_h")
 require("snabb_h")
 
 function suitable_devices ()
-   list = {}
+   local list = {}
    for _,info in ipairs(devices()) do
       if info.vendor == "0x8086" and info.device == "0x10d3" and
          (info.interface == nil or info.status == 'down') then
@@ -32,7 +32,7 @@ function prepare_device (pciaddress)
 end
 
 function devices ()
-   info = {}
+   local info = {}
    for _,device in ipairs(scandir("/sys/bus/pci/devices")) do
       info[#info + 1] = device_info(device)
    end
