@@ -33,16 +33,11 @@ function reserve_new_page ()
 end
 
 function get_hugepages ()
-   local file = io.open("/proc/sys/vm/nr_hugepages", "r")
-   local n = file:read('*n')
-   file:close()
-   return n
+   return lib.readfile("/proc/sys/vm/nr_hugepages", "*n")
 end
 
 function set_hugepages (n)
-   local file = io.open("/proc/sys/vm/nr_hugepages", "w")
-   assert(file:write(tostring(n).."\n") ~= nil)
-   file:close()
+   lib.writefile("/proc/sys/vm/nr_hugepages", tostring(n))
 end
 
 -- From virtual page to physical page
