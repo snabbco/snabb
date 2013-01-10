@@ -9,7 +9,7 @@ function readfile (filename, what)
 end
 
 function writefile (filename, value)
-   local f = io:open(filename, "w")
+   local f = io.open(filename, "w")
    if f == nil then error("Unable to open file: " .. filename) end
    local result = f:write(value)
    f:close()

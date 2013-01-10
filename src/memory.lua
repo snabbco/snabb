@@ -12,15 +12,35 @@ local huge_page_size =
     end)()
 
 -- Allocate physically contiguous memory that is suitable for DMA.
--- Return a pointer (or nil on failure) and the total number of bytes
--- allocated (which can be more or less than requested).
+-- Returns three values when successful:
+--   Virtual memory address as a void* pointer for use within Lua (or nil).
+--   Physical memory address as a uint64_t for passing to hardware.
+--   Actual number of bytes allocated, which can be different than requested.
+-- Returns nil on failure.
 function dma_alloc (size)
    local page = allocate_huge_page()
-   if page == nil then return nil, 0 end
-   return page, math.min(huge_page_size, size)
+   if page == nil then return nil end
+   return page, map(page), math.min(huge_page_size, size)
 end
 
--- Try hard to allocate a huge page and return its address.
+-- Return the 64-bit physical address of virt_addr.
+function map (virt_addr)
+   virt_addr = ffi.cast("uint64_t", virt_addr)
+   local virt_page = tonumber(virt_addr / base_page_size)
+   local offset    = tonumber(virt_addr % base_page_size)
+   local phys_page = resolve(virt_page)
+   return ffi.cast("uint64_t", phys_page * base_page_size + offset)
+end
+
+-- Return the physical page number of virtpage.
+function resolve (virt_page)
+   local phys_page = C.phys_page(virt_page)
+   if phys_page == 0 then error("Unable to resolve page " .. virt_page) end
+   return phys_page
+end
+
+---- HugeTLB ("huge page") support.
+
 function allocate_huge_page ()
    for i = 1,3 do
       local page = C.allocate_huge_page(huge_page_size)
@@ -40,26 +60,6 @@ function set_hugepages (n)
    lib.writefile("/proc/sys/vm/nr_hugepages", tostring(n))
 end
 
--- From virtual page to physical page
-local cache = {}
-
--- Return the 64-bit physical address of virt_addr.
-function map (virt_addr)
-   virt_addr = ffi.cast("uint64_t", virt_addr)
-   local virt_page = tonumber(virt_addr / base_page_size)
-   local offset   = tonumber(virt_addr % base_page_size)
-   local phys_page = cache[virt_page] or resolve(virt_page)
-   return ffi.cast("uint64_t", phys_page * base_page_size + offset)
-end
-
--- Return (and cache) the physical page number of virtpage.
-function resolve (virt_page)
-   local phys_page = C.phys_page(virt_page)
-   if phys_page == 0 then error("Unable to resolve page " .. virt_page) end
-   cache[virt_page] = phys_page
-   return phys_page
-end
-
 function selftest (options)
    print("selftest: memory")
    local verbose = options.verbose or false
@@ -67,9 +67,10 @@ function selftest (options)
    for i = 1, 4 do
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
       io.flush()
-      local dmaptr, dmalen = dma_alloc(1024*1024)
-      print(tostring(dmaptr)..", "..tostring(dmalen))
-      if dmaptr == nil or dmalen ~= 1024*1024 then
+      local dmaptr, physptr, dmalen = dma_alloc(huge_page_size)
+      print("Got "..(dmalen/1024^2).."MB at 0x"..bit.tohex(tonumber(physptr)))
+      ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- make sure the memory works
+      if dmaptr == nil or dmalen ~= huge_page_size then
          error("Failed to allocate HugeTLB page.")
       end
    end
