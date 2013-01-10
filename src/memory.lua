@@ -3,7 +3,13 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 
-local hugepagesize = 2 * 1024 * 1024
+local base_page_size = 4096
+local huge_page_size =
+   (function ()
+       local meminfo = lib.readfile("/proc/meminfo", "*a")
+       local _,_,hugesize = meminfo:find("Hugepagesize: +([0-9]+) kB")
+       return tonumber(hugesize) * 1024
+    end)()
 
 -- Allocate physically contiguous memory that is suitable for DMA.
 -- Return a pointer (or nil on failure) and the total number of bytes
@@ -11,13 +17,13 @@ local hugepagesize = 2 * 1024 * 1024
 function dma_alloc (size)
    local page = allocate_huge_page()
    if page == nil then return nil, 0 end
-   return page, math.min(hugepagesize, size)
+   return page, math.min(huge_page_size, size)
 end
 
 -- Try hard to allocate a huge page and return its address.
 function allocate_huge_page ()
    for i = 1,3 do
-      local page = C.allocate_huge_page(hugepagesize)
+      local page = C.allocate_huge_page(huge_page_size)
       if page ~= nil then  return page  else  reserve_new_page()  end
    end
 end
@@ -41,15 +47,14 @@ end
 
 -- From virtual page to physical page
 local cache = {}
-local page_size = 4096
 
 -- Return the 64-bit physical address of virt_addr.
 function map (virt_addr)
    virt_addr = ffi.cast("uint64_t", virt_addr)
-   local virt_page = tonumber(virt_addr / page_size)
-   local offset   = tonumber(virt_addr % page_size)
+   local virt_page = tonumber(virt_addr / base_page_size)
+   local offset   = tonumber(virt_addr % base_page_size)
    local phys_page = cache[virt_page] or resolve(virt_page)
-   return ffi.cast("uint64_t", phys_page * page_size + offset)
+   return ffi.cast("uint64_t", phys_page * base_page_size + offset)
 end
 
 -- Return (and cache) the physical page number of virtpage.
@@ -65,7 +70,8 @@ function selftest (options)
    local verbose = options.verbose or false
    print("Kernel HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
    for i = 1, 4 do
-      io.write("  Allocating 1MB from a HugeTLB page: ") io.flush()
+      io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
+      io.flush()
       local dmaptr, dmalen = dma_alloc(1024*1024)
       print(tostring(dmaptr)..", "..tostring(dmalen))
       if dmaptr == nil or dmalen ~= 1024*1024 then
