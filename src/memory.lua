@@ -29,7 +29,7 @@ function map (virt_addr)
    local virt_page = tonumber(virt_addr / base_page_size)
    local offset    = tonumber(virt_addr % base_page_size)
    local phys_page = resolve(virt_page)
-   return ffi.cast("uint64_t", phys_page * base_page_size + offset)
+   return tonumber(ffi.cast("uint64_t", phys_page * base_page_size + offset))
 end
 
 -- Return the physical page number of virtpage.
