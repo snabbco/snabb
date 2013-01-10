@@ -99,7 +99,7 @@ int open_pcie_config(const char *path)
 
 static int pagemap_fd;
 
-uint64_t pagemap_info(uint64_t virt_page)
+uint64_t phys_page(uint64_t virt_page)
 {
   if (pagemap_fd == 0) {
     if ((pagemap_fd = open("/proc/self/pagemap", O_RDONLY)) <= 0) {
@@ -114,7 +114,11 @@ uint64_t pagemap_info(uint64_t virt_page)
     perror("pread");
     return 0;
   }
-  return data;
+  if ((data & (1ULL<<63)) == 0) {
+    fprintf(stderr, "page %lx not present: %lx", virt_page, data);
+    return 0;
+  }
+  return data & ((1ULL << 55) - 1);
 }
 
 void *allocate_huge_page(int size)

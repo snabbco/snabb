@@ -39,11 +39,12 @@ void *map_physical_ram(uint64_t start, uint64_t end, bool cacheable);
 /* Open Linux sysfs PCIe configuration file for read/write. */
 int open_pcie_config(const char *path);
 
-/* Return the Linux /proc/self/pagemap information about a virtual page.
-   See http://www.kernel.org/doc/Documentation/vm/pagemap.txt for details
-   of how to interpret the return value. */
-uint64_t pagemap_info(uint64_t virt_page);
+/* Return the physical page index of the given virtual page index.
+   That is: convert from virtual process address space to physical
+   memory address. */
+uint64_t phys_page(uint64_t virt_page);
 
 /* Allocate a HugeTLB memory page of 'size' bytes.
    Return NULL if such a page cannot be allocated.*/
 void *allocate_huge_page(int size);
+
