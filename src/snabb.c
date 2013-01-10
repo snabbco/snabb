@@ -121,3 +121,10 @@ uint64_t phys_page(uint64_t virt_page)
   return data & ((1ULL << 55) - 1);
 }
 
+void *allocate_huge_page(int size)
+{
+  void *ptr = mmap(NULL, size, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, 0, 0);
+  return ptr != MAP_FAILED ? ptr : NULL;
+}
+

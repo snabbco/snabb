@@ -44,3 +44,7 @@ int open_pcie_config(const char *path);
    memory address. */
 uint64_t phys_page(uint64_t virt_page);
 
+/* Allocate a HugeTLB memory page of 'size' bytes.
+   Return NULL if such a page cannot be allocated.*/
+void *allocate_huge_page(int size);
+

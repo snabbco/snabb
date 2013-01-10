@@ -3,6 +3,42 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 
+local hugepagesize = 2 * 1024 * 1024
+
+-- Allocate physically contiguous memory that is suitable for DMA.
+-- Return a pointer (or nil on failure) and the total number of bytes
+-- allocated (which can be more or less than requested).
+function dma_alloc (size)
+   local page = allocate_huge_page()
+   if page == nil then return nil, 0 end
+   return page, math.min(hugepagesize, size)
+end
+
+-- Try hard to allocate a huge page and return its address.
+function allocate_huge_page ()
+   for i = 1,3 do
+      local page = C.allocate_huge_page(hugepagesize)
+      if page ~= nil then  return page  else  reserve_new_page()  end
+   end
+end
+
+function reserve_new_page ()
+   set_hugepages(get_hugepages() + 1)
+end
+
+function get_hugepages ()
+   local file = io.open("/proc/sys/vm/nr_hugepages", "r")
+   local n = file:read('*n')
+   file:close()
+   return n
+end
+
+function set_hugepages (n)
+   local file = io.open("/proc/sys/vm/nr_hugepages", "w")
+   assert(file:write(tostring(n).."\n") ~= nil)
+   file:close()
+end
+
 -- From virtual page to physical page
 local cache = {}
 local page_size = 4096
@@ -27,10 +63,22 @@ end
 function selftest (options)
    print("selftest: memory")
    local verbose = options.verbose or false
+   print("Kernel HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
+   for i = 1, 4 do
+      io.write("  Allocating 1MB from a HugeTLB page: ") io.flush()
+      local dmaptr, dmalen = dma_alloc(1024*1024)
+      print(tostring(dmaptr)..", "..tostring(dmalen))
+      if dmaptr == nil or dmalen ~= 1024*1024 then
+         error("Failed to allocate HugeTLB page.")
+      end
+   end
+   print("Kernel HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
+   print("HugeTLB page allocation OK.")
    local physbase = 0x10000000
    local size     = 0x01000000
    local mem = C.map_physical_ram(physbase, physbase + size, true)
    local virtbase = ffi.cast("uint64_t", mem)
+   print("Virtual->Physical mapping test...")
    if verbose then
       print(("%s:%s are the virtual:physical base addresses.")
             :format(bit.tohex(tonumber(virtbase)),
@@ -54,6 +102,6 @@ function selftest (options)
       end
       if (verbose and i % 4 == 0) then print() end
    end
-   print("OK")
+   print("Virtual->Physical mapping OK.")
 end
 
