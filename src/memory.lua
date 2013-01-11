@@ -76,34 +76,5 @@ function selftest (options)
    end
    print("Kernel HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
    print("HugeTLB page allocation OK.")
-   local physbase = 0x10000000
-   local size     = 0x01000000
-   local mem = C.map_physical_ram(physbase, physbase + size, true)
-   local virtbase = ffi.cast("uint64_t", mem)
-   print("Virtual->Physical mapping test...")
-   if verbose then
-      print(("%s:%s are the virtual:physical base addresses.")
-            :format(bit.tohex(tonumber(virtbase)),
-                    bit.tohex(tonumber(physbase))))
-      print("Testing mapping with random addresses:")
-   end
-   math.randomseed(0)
-   for i = 1,64 do
-      local virt = math.random(tonumber(virtbase), tonumber(virtbase + size))
-      local mapped = map(virt)
-      local phys   = physbase + (virt - virtbase)
-      if (phys == mapped) then
-         if verbose then
-            io.write(("%s:%s ")
-                     :format(bit.tohex(virt), bit.tohex(tonumber(mapped))))
-         end
-      else
-         error(("Error: Mapped %s to %s but expected %s")
-               :format(bit.tohex(virt), bit.tohex(tonumber(mapped)),
-                       bit.tohex(tonumber(phys))))
-      end
-      if (verbose and i % 4 == 0) then print() end
-   end
-   print("Virtual->Physical mapping OK.")
 end
 
