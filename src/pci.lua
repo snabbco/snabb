@@ -13,21 +13,28 @@ require("snabb_h")
 function suitable_devices ()
    local list = {}
    for _,info in ipairs(devices()) do
-      if info.vendor == "0x8086" and info.device == "0x10d3" and
-         (info.interface == nil or info.status == 'down') then
-         list[#list + 1] = info
-      end
+      if is_suitable(info) then list[#list + 1] = info end
    end
    return list
 end
 
+function is_suitable (info)
+   return info.vendor == "0x8086" and info.device == "0x10d3" and
+      (info.interface == nil or info.status == 'down')
+end
+
+-- Prepare the device with pciaddress for use with the switch.
+-- Return true on success.
 function prepare_device (pciaddress)
    local device = device_info(pciaddress)
-   if device.status == 'down' then
+   if device.interface == nil then
+         return true
+   else
       print("Unbinding PCI device "..pciaddress.." ("..device.interface..") from the operating system driver.")
       local file = io.open(path(pciaddress).."/driver/unbind", "w")
       file:write(pciaddress)
       file.close()
+      return is_suitable(device_info(pciaddress))
    end
 end
 

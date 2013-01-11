@@ -14,7 +14,9 @@ pci.selftest()
 for _,device in ipairs(pci.suitable_devices()) do
    local pciaddress = device.pciaddress
    print("selftest: intel device "..pciaddress)
-   pci.prepare_device(pciaddress)
+   if not pci.prepare_device(pciaddress) then
+      error("Failed to prepare PCI device: " .. device.pciaddress)
+   end
    local nic = intel.new(pciaddress)
    print "NIC transmit test"
    nic.init()
