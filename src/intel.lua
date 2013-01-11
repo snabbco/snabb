@@ -20,9 +20,6 @@ local bits, bitset = lib.bits, lib.bitset
 require("clib_h")
 require("snabb_h")
 
-local dma_start = 0x10000000
-local dma_end   = 0x11000000
-
 function new (pciaddress)
 
    -- Method dictionary for Intel NIC objects.
@@ -57,21 +54,12 @@ function new (pciaddress)
       return wrap(ffi.cast(tptr, ffi.cast("uint8_t *", base) + offset))
    end
 
-   -- Static DMA memory map. Offsets for each memory region.
-   local offset_buffers  = 0x00000000 -- 14MB packet buffers
-   local offset_txdesc   = 0x00e00000 --  1MB TX descriptors
-   local offset_rxdesc   = 0x00f00000 --  1MB RX descriptors
-
    local num_descriptors = 32 * 1024
    local buffer_size = 16384
 
-   local dma_phys = dma_start -- physical address of DMA memory
-   local dma_virt = nil       -- virtual mmap'd address of DMA memory
-   local dma_ptr  = nil       -- pointer to first byte of free DMA memory
-
-   local rxdesc  = nil
-   local txdesc  = nil
-   local buffers = nil
+   local rxdesc, rxdesc_phy
+   local txdesc, txdesc_phy
+   local buffers, buffers_phy
 
    local pci_config_fd = nil
 
@@ -133,11 +121,15 @@ function new (pciaddress)
    end
 
    function init_dma_memory ()
-      dma_virt = C.map_physical_ram(dma_start, dma_end, true)
-      C.memset(dma_virt, 0, dma_end - dma_start)
-      rxdesc  = protected("union rx", dma_virt, offset_rxdesc, 0x100000)
-      txdesc  = protected("union tx", dma_virt, offset_txdesc, 0x100000)
-      buffers = protected("uint8_t", dma_virt, offset_buffers, 0xe00000)
+      local descriptor_bytes = 1024 * 1024
+      local buffers_bytes = 2 * 1024 * 1024
+      rxdesc, rxdesc_phy = memory.dma_alloc(descriptor_bytes)
+      txdesc, txdesc_phy = memory.dma_alloc(descriptor_bytes)
+      buffers, buffers_phy = memory.dma_alloc(buffers_bytes)
+      -- Add bounds checking
+      rxdesc  = protected("union rx", rxdesc, 0, descriptor_bytes)
+      txdesc  = protected("union tx", txdesc, 0, descriptor_bytes)
+      buffers = protected("uint8_t", buffers, 0, buffers_bytes)
    end
 
    function init_link ()
@@ -254,7 +246,7 @@ function new (pciaddress)
       regs[RXCSUM] = 0                 -- Disable checksum offload - not needed
       regs[RADV] = math.log(1024,2)    -- 1us max writeback delay
       regs[RDLEN] = num_descriptors * ffi.sizeof("union rx")
-      regs[RDBAL] = bit.band(dma_phys + offset_rxdesc, 0xffffffff)
+      regs[RDBAL] = bit.band(rxdesc_phy, 0xffffffff)
       regs[RDBAH] = 0
       regs[RDH] = 0
       regs[RDT] = 0
@@ -365,7 +357,7 @@ function new (pciaddress)
    end
 
    function init_transmit_ring ()
-      regs[TDBAL] = bit.band(dma_phys + offset_txdesc, 0xffffffff)
+      regs[TDBAL] = bit.band(txdesc_phy, 0xffffffff)
       regs[TDBAH] = 0
       -- Hardware requires the value to be 128-byte aligned
       assert( num_descriptors * ffi.sizeof("union tx") % 128 == 0 )
@@ -595,15 +587,15 @@ function new (pciaddress)
             while tx_load() > 0.75 do C.usleep(10000) end
             if receive then
                for i = 1, rx_available() do
-                  add_rxbuf(dma_phys + 4096)
+                  add_rxbuf(buffers_phy + 4096)
                end
                flush_rx()
             end
             for i = 1, tx_available() do
                if randomsize then
-                  add_txbuf(dma_phys, math.random(32, 1496))
+                  add_txbuf(buffers_phy, math.random(32, 1496))
                else
-                  add_txbuf(dma_phys, 32)
+                  add_txbuf(buffers_phy, 32)
                end
             end
             flush_tx()
