@@ -20,9 +20,6 @@ local bits, bitset = lib.bits, lib.bitset
 require("clib_h")
 require("snabb_h")
 
-local dma_start = 0x10000000
-local dma_end   = 0x11000000
-
 function new (pciaddress)
 
    -- Method dictionary for Intel NIC objects.
