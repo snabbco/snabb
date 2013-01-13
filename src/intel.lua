@@ -91,7 +91,7 @@ function new (pciaddress)
    local MDIC   = 0x00020 / 4 -- MDI Control Register (RW)
    local EXTCNF_CTRL = 0x00F00 / 4 -- Extended Configuration Control (RW)
    local POEMB  = 0x00F10 / 4 -- PHY OEM Bits Register (RW)
-   local ICR    = 0x00C00 / 4 -- Interrupt Cause Register (RW)
+   local ICR    = 0x000C0 / 4 -- Interrupt Cause Register (RW)
 
    local regs = ffi.cast("uint32_t *", pci.map_pci_memory(pciaddress, 0))
 
