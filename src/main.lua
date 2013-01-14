@@ -8,6 +8,11 @@ function main ()
 
 --   jit_dump.start("", "snabbswitch-jit-dump.txt")
 
+   -- Register the available drivers by the PCI vendor and device.
+   local pci = require("pci")
+   pci.register('0x8086', '0x10d3', 'intel')
+   pci.register('0x8086', '0x105e', 'intel_82571')
+
    require "selftest"
 
 end

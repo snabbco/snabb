@@ -24,7 +24,7 @@ function new (pciaddress)
 
    -- Method dictionary for Intel NIC objects.
    local M = {}
-   M.driver_name = "Intel 82574"
+   M.driver_name = "Intel 82571"
 
    -- Return a table for protected (bounds-checked) memory access.
    -- 

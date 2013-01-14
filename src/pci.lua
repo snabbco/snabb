@@ -10,6 +10,27 @@ local lib = require("lib")
 require("clib_h")
 require("snabb_h")
 
+-- Table of registered device drivers. Keys are the PCI vendor and
+-- device ID's concatentated together and the values are the driver
+-- modules names (strings, they are not loaded).
+local registered_drivers = {}
+
+-- Register a driver module name that supports the PCI `vendor_id` and
+-- `device_id` combination. The driver module is not loaded when it is
+-- registered. 
+function register (vendor_id, device_id, driver_module)
+   registered_drivers[vendor_id..':'..device_id] = driver_module
+end
+
+-- Load and return the appropriate driver instance for the device at
+-- 'pciaddress'. Return `nil` if an appropriate module cannot be
+-- found.
+function driver (pciaddress)
+   local device = device_info(pciaddress)
+   local driver = require(registered_drivers[device.vendor..':'..device.device])
+   return driver.new(pciaddress)
+end 
+
 function suitable_devices ()
    local list = {}
    for _,info in ipairs(devices()) do
@@ -19,8 +40,14 @@ function suitable_devices ()
 end
 
 function is_suitable (info)
-   return info.vendor == "0x8086" and info.device == "0x10d3" and
-      (info.interface == nil or info.status == 'down')
+   for identifier in pairs(registered_drivers) do
+      vendor_id, device_id = string.match(identifier, "([^:]*):([^:]*)")
+      if info.vendor == vendor_id and info.device == device_id and
+         (info.interface == nil or info.status == 'down') then
+         return true
+      end
+   end
+   return false
 end
 
 -- Prepare the device with pciaddress for use with the switch.
