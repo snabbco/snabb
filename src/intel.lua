@@ -583,8 +583,9 @@ function new (pciaddress)
          local secs = (options.secs or 10)
          print("Generating traffic for "..tostring(secs).." second(s)...")
          local deadline = C.get_time_ns() + secs * 1000000000LL
+         local done = function () return C.get_time_ns() > deadline end
          repeat
-            while tx_load() > 0.75 do C.usleep(10000) end
+            while not done() and tx_load() > 0.75 do C.usleep(10000) end
             if receive then
                for i = 1, rx_available() do
                   add_rxbuf(buffers_phy + 4096)
@@ -599,7 +600,7 @@ function new (pciaddress)
                end
             end
             flush_tx()
-         until C.get_time_ns() > deadline
+         until done()
          M.update_stats()
          M.print_stats()
       end
