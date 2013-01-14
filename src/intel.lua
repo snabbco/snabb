@@ -91,7 +91,7 @@ function new (pciaddress)
    local MDIC   = 0x00020 / 4 -- MDI Control Register (RW)
    local EXTCNF_CTRL = 0x00F00 / 4 -- Extended Configuration Control (RW)
    local POEMB  = 0x00F10 / 4 -- PHY OEM Bits Register (RW)
-   local ICR    = 0x00C00 / 4 -- Interrupt Cause Register (RW)
+   local ICR    = 0x000C0 / 4 -- Interrupt Cause Register (RW)
 
    local regs = ffi.cast("uint32_t *", pci.map_pci_memory(pciaddress, 0))
 
@@ -603,6 +603,40 @@ function new (pciaddress)
          M.update_stats()
          M.print_stats()
       end
+   end
+
+   -- Test that TCP Segmentation Optimization (TSO) works.
+   function M.selftest_tso (options)
+      print "selftest: TCP Segmentation Offload (TSO)"
+      options = options or {}
+      local size = options.size or 4096
+      local mss  = options.mss  or 1500
+      local txtcp = 0 -- Total number of TCP packets sent
+      local txeth = 0 -- Expected number of ethernet packets sent
+
+      C.usleep(100000) -- Wait for old traffic from previous tests to die out
+      M.update_stats()
+      local txhardware_start = M.stats.GPTC
+
+      -- Transmit a packet with TSO and count expected ethernet transmits.
+      add_tso_test_buffer(size, mss)
+      txeth = txeth + math.ceil(size / mss)
+      
+      -- Wait a safe time and check hardware count
+      C.usleep(100000) -- wait for receive
+      M.update_stats()
+      local txhardware = txhardware_start - M.stats.GPTC
+
+      -- Check results
+      print("size", "mss", "txtcp", "txeth", "txhw")
+      print(size, mss, txtcp, txeth, txhardware)
+      if txeth ~= txhardware then
+         print("Expected "..txeth.." packet(s) transmitted but measured "..txhardware)
+      end
+   end
+
+   function add_tso_test_buffer (size)
+      -- Construct a TCP packet of 'size' total bytes and transmit with TSO.
    end
 
    return M
