@@ -39,7 +39,7 @@ function new (pciaddress)
    --   mem.ptr   => cdata<uint32_t *>: 0x1000 (get the raw pointer)
    local function protected (type, base, offset, size)
       type = ffi.typeof(type)
-      local bound = (size + 0ULL) / ffi.sizeof(type)
+      local bound = ((size * ffi.sizeof(type)) + 0ULL) / ffi.sizeof(type)
       local tptr = ffi.typeof("$ *", type)
       local wrap = ffi.metatype(ffi.typeof("struct { $ _ptr; }", tptr), {
                                    __index = function(w, idx)
