@@ -17,8 +17,8 @@ local chunk_ptr, chunk_phys, chunk_size
 -- Mostly useful if you have reserved memory using 'linux memmap=16M$0x10000000'
 -- Then you can use install(0x10000000, 16*1024*1024)
 function install (physical, size)
-   local ptr = C.map_physical_ram(physical, size, true)
-   if ptr == nil then error("Error installing RAM at "..bit.tohex(physical)) end
+   local ptr = C.map_physical_ram(physical, physical+size, true)
+   if ptr == nil then error("Error installing RAM at 0x"..bit.tohex(physical)) end
    chunk_ptr, chunk_phy, chunk_size = ffi.cast("char*",ptr), physical, size
 end
 
