@@ -109,10 +109,10 @@ function new (pciaddress)
    end
 
    function reset ()
-      regs[IMC] = 0                       -- Disable interrupts
+      regs[IMC] = 0xffffffff                 -- Disable interrupts
       regs[CTRL] = bits({FD=0,SLU=6,RST=26}) -- Global reset
       C.usleep(10); assert( not bitset(regs[CTRL],26) )
-      regs[IMC] = 0                       -- Disable interrupts
+      regs[IMC] = 0xffffffff                 -- Disable interrupts
    end
 
    function init_pci ()
