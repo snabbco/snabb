@@ -247,8 +247,8 @@ function new (pciaddress)
       regs[RXCSUM] = 0                 -- Disable checksum offload - not needed
       regs[RADV] = math.log(1024,2)    -- 1us max writeback delay
       regs[RDLEN] = num_descriptors * ffi.sizeof("union rx")
-      regs[RDBAL] = bit.band(rxdesc_phy, 0xffffffff)
-      regs[RDBAH] = 0
+      regs[RDBAL] = rxdesc_phy % (2^32)
+      regs[RDBAH] = rxdesc_phy / (2^32)
       regs[RDH] = 0
       regs[RDT] = 0
       rxnext = 0
@@ -358,8 +358,8 @@ function new (pciaddress)
    end
 
    function init_transmit_ring ()
-      regs[TDBAL] = bit.band(txdesc_phy, 0xffffffff)
-      regs[TDBAH] = 0
+      regs[TDBAL] = txdesc_phy % (2^32)
+      regs[TDBAH] = txdesc_phy / (2^32)
       -- Hardware requires the value to be 128-byte aligned
       assert( num_descriptors * ffi.sizeof("union tx") % 128 == 0 )
       regs[TDLEN] = num_descriptors * ffi.sizeof("union tx")
