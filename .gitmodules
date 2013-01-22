@@ -1,6 +1,8 @@
 [submodule "deps/luajit"]
 	path = deps/luajit
 	url = http://luajit.org/git/luajit-2.0.git
+        ignore = dirty
 [submodule "deps/luafilesystem"]
 	path = deps/luafilesystem
 	url = https://github.com/keplerproject/luafilesystem.git
+        ignore = dirty
