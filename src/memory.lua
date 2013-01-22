@@ -11,7 +11,7 @@ local C = ffi.C
 --- allocations.
 
 -- Current chunk: pointer, physical address, remaining size.
-local chunk_ptr, chunk_phys, chunk_size
+local chunk_ptr, chunk_phy, chunk_size
 
 -- Install a new chunk of memory at a specific physical memory address.
 -- Mostly useful if you have reserved memory using 'linux memmap=16M$0x10000000'
