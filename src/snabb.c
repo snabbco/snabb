@@ -16,6 +16,8 @@
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
+#include <linux/vhost.h>
+#include <linux/virtio_ring.h>
 
 #include "snabb.h"
 #include "snabb-shm-dev.h"
@@ -126,5 +128,37 @@ void *allocate_huge_page(int size)
   void *ptr = mmap(NULL, size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, 0, 0);
   return ptr != MAP_FAILED ? ptr : NULL;
+}
+
+int vhost_setup(int sockfd, struct snabb_vhost *vhost)
+{
+  int eventfd = -1;
+  uint64_t features;
+  struct vhost_vring_file file0 = { .index = 0, .fd = sockfd };
+  struct vhost_vring_file file1 = { .index = 1, .fd = sockfd };
+  assert(vhost->tapfd);
+  assert(vhost->memory);
+  if ((eventfd = eventfd(0, EFD_NONBLOCK)) < 0)           goto error;
+  if ((ioctl(sockfd, VHOST_SET_OWNER, NULL)) < 0)         goto error;
+  if ((ioctl(sockfd, VHOST_GET_FEATURES, &features)) < 0) goto error;
+  if ((ioctl(sockfd, VHOST_NET_SET_BACKEND, &file0)) < 0) goto error;
+  if ((ioctl(sockfd, VHOST_NET_SET_BACKEND, &file1)) < 0) goto error;
+
+  // MORE:
+  SET_VRING_ADDR;
+  SET_VRING_NUM;
+  SET_VRING_BASE;
+  ...
+
+  vhost->eventfd = eventfd;
+  return 0;
+ error:
+  if (eventfd > 0) close(eventfd);
+  return -1;
+}
+
+int vhost_set_memory(int sockfd, struct vhost_memory *memory)
+{
+  return ioctl(sockfd, VHOST_SET_MEM_TABLE, memory);
 }
 

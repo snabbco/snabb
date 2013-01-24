@@ -48,3 +48,16 @@ uint64_t phys_page(uint64_t virt_page);
    Return NULL if such a page cannot be allocated.*/
 void *allocate_huge_page(int size);
 
+/* Setup vhost I/O on sockfd (a tap device or raw socket).
+   On success return 0 and fully populate the snabb_virtio struct argument.
+
+   See this link for a discussion of the Linux/KVM vhost_net feature:
+   http://blog.vmsplice.net/2011/09/qemu-internals-vhost-architecture.html */
+int vhost_setup(int sockfd, struct snabb_virto *vio);
+
+/* Setup vhost memory mapping for sockfd (a tap device or raw socket).
+   The memory mapping tells the kernel how to interpret addresses that
+   we write in our vring for virtio_net.
+   Return 0 on success. */
+int vhost_set_memory(int sockfd, struct vhost_memory *memory);
+
