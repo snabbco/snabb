@@ -13,13 +13,16 @@ local C = ffi.C
 -- Current chunk: pointer, physical address, remaining size.
 local chunk_ptr, chunk_phy, chunk_size
 
+-- Array of {address = virtaddr, size = bytes} tables for each DMA region.
+local dma_regions = {}
+
 -- Install a new chunk of memory at a specific physical memory address.
 -- Mostly useful if you have reserved memory using 'linux memmap=16M$0x10000000'
 -- Then you can use install(0x10000000, 16*1024*1024)
 function install (physical, size)
    local ptr = C.map_physical_ram(physical, physical+size, true)
    if ptr == nil then error("Error installing RAM at 0x"..bit.tohex(physical)) end
-   chunk_ptr, chunk_phy, chunk_size = ffi.cast("char*",ptr), physical, size
+   add_chunk(ffi.cast("char*",ptr), physical, size)
 end
 
 -- Install a new chunk of memory from a dynamically allocated HugeTLB page.
@@ -27,7 +30,13 @@ end
 function install_huge_page ()
    local page = allocate_huge_page()
    if page == nil then error("Failed to allocate HugeTLB page for DMA.") end
-   chunk_ptr, chunk_phy, chunk_size = ffi.cast("char*",page), map(page), huge_page_size
+   add_chunk(ffi.cast("char*",page), map(page), huge_page_size)
+end
+
+-- Add a new chunk of memory for the next DMA allocations.
+function add_chunk (ptr, physical, size)
+   dma_regions[#dma_regions + 1] = {address = ffi.ptr, size = size}
+   chunk_ptr, chunk_phy, chunk_size = ptr, physical, size
 end
 
 --- DMA is allocated from the current chunk, which is replaced once it
