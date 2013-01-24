@@ -319,7 +319,7 @@ function new (pciaddress)
    end
 
    local function rx_pending ()
-      return ring_pending(regs[RDT], regs[RDH])
+      return ring_pending(regs[RDH], regs[RDT])
    end M.rx_pending = rx_pending
 
    local function rx_available ()
