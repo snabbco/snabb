@@ -77,6 +77,8 @@ ffi.cdef[[
 
 
 function new (pciaddress)
+   -- PCI device ID
+   local device = pci.device_info(pciaddress).device
 
    -- Method dictionary for Intel NIC objects.
    local M = {}
@@ -149,6 +151,9 @@ function new (pciaddress)
    local EXTCNF_CTRL = 0x00F00 / 4 -- Extended Configuration Control (RW)
    local POEMB  = 0x00F10 / 4 -- PHY OEM Bits Register (RW)
    local ICR    = 0x000C0 / 4 -- Interrupt Cause Register (RW)
+   local MANC   = 0x05820 / 4 -- Management Control Register (RW / 82571)
+   local SWSM   = 0x05B50  / 4 -- Software Semaphore (RW / 82571)
+   local EEMNGCTL = 0x01010 / 4 -- MNG EEPROM Control (RW / 82571)
 
    local regs = ffi.cast("uint32_t *", pci.map_pci_memory(pciaddress, 0))
 
@@ -235,11 +240,21 @@ function new (pciaddress)
       local phystatus, phyext, copperstatus = phy_read(1), phy_read(15), phy_read(17)
       print("  Autonegotiate state    = " .. (bitset(phystatus,5) and 'complete' or 'not complete'))
       print("  Remote fault detection = " .. (bitset(phystatus,4) and 'remote fault detected' or 'no remote fault detected'))
-      print("  Copper Link Status     = " .. (bitset(copperstatus,3) and 'copper link is up' or 'copper link is down'))
-      print("  Speed and duplex resolved = " .. yesno(copperstatus,11))
+      if device == "0x105e" then
+         print("  Copper Link Status     = " .. (bitset(copperstatus,10) and 'copper link is up' or 'copper link is down'))
+      elseif device == "0x10d3" then
+         print("  Copper Link Status     = " .. (bitset(copperstatus,3) and 'copper link is up' or 'copper link is down'))
+      end
+      if device == "0x10d3" then
+         print("  Speed and duplex resolved = " .. yesno(copperstatus,11))
+      end
       physpeed = (({10,100,1000,'(reserved)'})[1+bit.band(bit.rshift(status, 6),3)])
       print("  Speed                  = " .. physpeed .. 'Mb/s')
-      print("  Duplex                 = " .. (bitset(copperstatus,13) and 'full-duplex' or 'half-duplex'))
+      if device == "0x105e" then
+         print("  Duplex                 = " .. (bitset(copperstatus,9) and 'full-duplex' or 'half-duplex'))
+      elseif device == "0x10d3" then
+         print("  Duplex                 = " .. (bitset(copperstatus,13) and 'full-duplex' or 'half-duplex'))
+      end
       local autoneg, autoneg1G = phy_read(4), phy_read(9)
       print("  Advertise 1000 Mb/s FD = " .. yesno(autoneg1G,9))
       print("  Advertise 1000 Mb/s HD = " .. yesno(autoneg1G,8))
@@ -418,32 +433,138 @@ function new (pciaddress)
       return tx_pending() / num_descriptors
    end M.tx_load = tx_load
 
+--[[
+
+   EEPROM/PHY Firmware/Software Synchronization (82571EB)
+
+   For the 82571EB, there are two semaphores located in the Software
+   Semaphore (SWSM) register (see Section 13.8.17).
+
+   • Bit0 (SWSM.SMBI) is the software/software semaphore. This bit is
+     needed in multi-process environments to prevent software running
+     on one port from interferring with software on another the other
+     port.
+
+   • Bit1SWSM.SWESMBI is the software/firmware semaphore. This is
+     always needed when accessing the PHY or EEPROM (reads, writes, or
+     resets). This prevents the firmware and software from accessing
+     the PHY and or EEPROM at the same time.
+
+   If resetting the PHY, the software/software semaphore should not be
+   released until 1 ms after CFG_DONE (bit 18) is set in the MNG
+   EEPROM Control Register (EEMNGCTL) register (see Section
+   13.3.26). The software/firmware semaphore should be released
+   approximately 10 ms after the PHY reset is deasserted before
+   polling of CFG_DONE is attempted. For details on how to reset the
+   PHY see section Section 14.9.
+
+   For EEPROM or PHY register access:
+
+   1. Software reads SWSM.SMBI. If SWSM.SMBI is 0b, then it owns the
+      software/software semaphore and can continue. If SWSM.SMBI is
+      1b, then some other software already has the semaphore.
+   2. Software writes 1b to the SWSM.SWESMBI bit and then reads it. If
+      the value is 1b, then software owns the software/firmware
+      semaphore and can continue; otherwise, firmware has the
+      semaphore.  
+      Software can now access the EEPROM and/or PHY.
+   3. Release the software/firmware semaphore by clearing SWSM.SWESMBI.
+   4. Release the software/software semaphore by clearing SWSM.SMBI.
+--]]
+
    -- Read a PHY register.
    function phy_read (phyreg)
+      phy_lock()
       regs[MDIC] = bit.bor(bit.lshift(phyreg, 16), bits({OP1=27,PHYADD0=21}))
       phy_wait_ready()
       local mdic = regs[MDIC]
-      -- phy_unlock_semaphore()
+      phy_unlock()
       assert(bit.band(mdic, bits({ERROR=30})) == 0)
       return bit.band(mdic, 0xffff)
    end
 
    -- Write to a PHY register.
    function phy_write (phyreg, value)
+      phy_lock()
       regs[MDIC] = bit.bor(value, bit.lshift(phyreg, 16), bits({OP0=26,PHYADD0=21}))
       phy_wait_ready()
-      return bit.band(regs[MDIC], bits({ERROR=30})) == 0
+      local mdic = regs[MDIC]
+      phy_unlock()
+      return bit.band(mdic, bits({ERROR=30})) == 0
    end
 
    function phy_wait_ready ()
+      -- Calling function should call this in between calls to phy_lock/unlock
       while bit.band(regs[MDIC], bits({READY=28,ERROR=30})) == 0 do
          ffi.C.usleep(2000)
       end
    end
 
+--[[
+   PHY Reset (82571EB/82572EI):
+   To reset the PHY using software:
+   
+   1. Obtain the Software/Software semaphore (SWSM.SMBI - 05B50h; bit
+      0). This is needed for multi-threaded environments.
+   2. Read (MANC.BLK_Phy_Rst_On_IDE – 05820h; bit 18) and then wait
+      until it becomes 0b.
+   3. Obtain the Software/Firmware semaphore (SWSM.SWESMBI - 05B50h;
+      bit 1).
+   4. Drive PHY reset (CTRL.PHY_RST at offset 0000h [bit 31], write
+      1b, wait 100 μs, and then write 0b).
+   5. Release the Software/Firmware semaphore (SWSM.SWESMBI - 05B50h;
+      bit 1).
+   6. Wait for the CFG_DONE (EEMNGCTL.CFG_DONE at offset 1010h [bit
+      18] becomes 1b).
+   7. Wait for a 1 ms delay. The PHY should now be ready. If
+      additional access to the PHY is necessary (reads or writes) the
+      Software/Firmware semaphore (SWSM.SWESMBI - 05B50h; bit 1) must be
+      re-acquired and then released once done.
+   8. Release the Software/Software semaphore (SWSM.SMBI - 05B50h; bit
+      0). This is needed for multi-threaded environments.
+--]]
+
    function reset_phy ()
+      -- Step 1
+      phy_lock({sw=true})
+
+      if device == "0x105e" then
+         -- Step 2
+         while bit.band(regs[MANC], bits({Blk_Phy_Rst_On_IDE=18})) ~= 0 do
+            ffi.C.usleep(2000)
+         end
+
+         -- Step 3
+         phy_lock({fw=true})
+
+         -- Step 4
+         regs[CTRL] = bit.bor(regs[CTRL], bits({PHY_RST=31}))
+         ffi.C.usleep(100)
+         regs[CTRL] = bit.band(regs[CTRL], bit.bnot(bits({PHY_RST=31})))
+
+         -- Step 5
+         phy_unlock({fw=true})
+
+         -- Step 6
+         while bit.band(regs[EEMNGCTL], bits({CFG_DONE=18})) == 0 do
+            ffi.C.usleep(2000)
+         end
+      end
+
+      -- Step 7
+      -- Must unlock software lock here as the next phy_write's 
+      -- will obtain both locks as part of any write or read.
+      phy_unlock({sw=true}) 
+
+      ffi.C.usleep(1000)
       phy_write(0, bits({AutoNeg=12,Duplex=8,RestartAutoNeg=9}))
       ffi.C.usleep(1)
+
+      -- I'm not sure if this next line is required to reset the PHY
+      -- in the 82571 as the data sheet doesn't even mention the need
+      -- to set the RST in the PHY.PCTRL register to reset the PHY
+      -- (see steps above). However, in testing this does not seem to
+      -- have any negative effects.
       phy_write(0, bit.bor(bits({RST=15}), phy_read(0)))
    end
 
@@ -455,15 +576,57 @@ function new (pciaddress)
    -- Lock and unlock the PHY semaphore. This is used to avoid race
    -- conditions between software and hardware both accessing the PHY.
 
-   function phy_lock ()
-      regs[EXTCNF_CTRL] = bits({MDIO_SW=5})
-      while bit.band(regs[EXTCNF_CTRL], bits({MDIO_SW=5})) == 0 do
-         ffi.C.usleep(2000)
+   -- Obtain lock for PHY access. If no options are passed, obtain
+   -- both a software lock and a firmware lock. Software lock is
+   -- obtained first. A software only lock can be requested by passing
+   -- {sw=true}, while a firmware only lock can be requested by
+   -- passing {fw=true}.
+   function phy_lock (options)
+      options = options or {sw=true, fw=true}
+
+      if options.sw then
+         -- Obtain the software/software semaphore. We need to do so
+         -- with the 82571 as it is a two-port card and another driver
+         -- could be trying to configure the controller at the same
+         -- time. It's not as important for the 82574 because it is
+         -- single port, but it's still a good idea to play it safe.
+         while bit.band(regs[SWSM], bits({SMBI=0})) ~= 0 do
+            ffi.C.usleep(2000)
+         end
+      end
+
+      if options.fw then
+         -- Firmware/software locking is different between cards
+         if device == "0x105e" then
+            regs[SWSM] = bit.bor(regs[SWSM], bits({SWESMBI=1}))
+            while bit.band(regs[SWSM], bits({SWESMBI=1})) == 0 do
+               ffi.C.usleep(2000)
+               regs[SWSM] = bit.bor(regs[SWSM], bits({SWESMBI=1}))
+            end
+         elseif device == "0x10d3" then
+            regs[EXTCNF_CTRL] = bits({MDIO_SW=5})
+            while bit.band(regs[EXTCNF_CTRL], bits({MDIO_SW=5})) == 0 do
+               ffi.C.usleep(2000)
+            end
+         end
       end
    end
 
-   function phy_unlock ()
-      regs[EXTCNF_CTRL] = 0
+   function phy_unlock (options)
+      options = options or {sw=true, fw=true}
+
+      if options.fw then
+         -- Firmware/software unlocking is different between cards
+         if device == "0x105e" then
+            regs[SWSM] = bit.band(regs[SWSM], bit.bnot(bits({SWESMBI=1})))
+         elseif device == "0x10d3" then         
+            regs[EXTCNF_CTRL] = 0
+         end
+      end
+
+      if options.sw then
+         regs[SWSM] = bit.band(regs[SWSM], bit.bnot(bits({SMBI=0})))
+      end
    end
 
    -- Link control.
