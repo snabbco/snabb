@@ -53,7 +53,7 @@ void *allocate_huge_page(int size);
 
    See this link for a discussion of the Linux/KVM vhost_net feature:
    http://blog.vmsplice.net/2011/09/qemu-internals-vhost-architecture.html */
-int vhost_setup(int sockfd, struct snabb_virto *vio);
+int vhost_setup(int sockfd, struct vio *vio);
 
 /* Setup vhost memory mapping for sockfd (a tap device or raw socket).
    The memory mapping tells the kernel how to interpret addresses that

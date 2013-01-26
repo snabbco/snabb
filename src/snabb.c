@@ -14,11 +14,13 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/eventfd.h>
 #include <time.h>
 #include <unistd.h>
 #include <linux/vhost.h>
 #include <linux/virtio_ring.h>
 
+#include "virtio.h"
 #include "snabb.h"
 #include "snabb-shm-dev.h"
 
@@ -130,35 +132,50 @@ void *allocate_huge_page(int size)
   return ptr != MAP_FAILED ? ptr : NULL;
 }
 
-int vhost_setup(int sockfd, struct snabb_vhost *vhost)
+/* forward declaration */
+static int setup_vring(struct vio *vhost, int index);
+
+int vhost_setup(int sockfd, struct vio *vhost)
 {
-  int eventfd = -1;
-  uint64_t features;
-  struct vhost_vring_file file0 = { .index = 0, .fd = sockfd };
-  struct vhost_vring_file file1 = { .index = 1, .fd = sockfd };
   assert(vhost->tapfd);
-  assert(vhost->memory);
-  if ((eventfd = eventfd(0, EFD_NONBLOCK)) < 0)           goto error;
-  if ((ioctl(sockfd, VHOST_SET_OWNER, NULL)) < 0)         goto error;
-  if ((ioctl(sockfd, VHOST_GET_FEATURES, &features)) < 0) goto error;
-  if ((ioctl(sockfd, VHOST_NET_SET_BACKEND, &file0)) < 0) goto error;
-  if ((ioctl(sockfd, VHOST_NET_SET_BACKEND, &file1)) < 0) goto error;
-
-  // MORE:
-  SET_VRING_ADDR;
-  SET_VRING_NUM;
-  SET_VRING_BASE;
-  ...
-
-  vhost->eventfd = eventfd;
+  if ((vhost->kickfd = eventfd(0, EFD_NONBLOCK)) < 0 ||
+      (vhost->callfd = eventfd(0, EFD_NONBLOCK)) < 0 ||
+      (ioctl(sockfd, VHOST_SET_OWNER, NULL))     < 0 ||
+      (ioctl(sockfd, VHOST_GET_FEATURES, &vhost->features)) < 0 ||
+      setup_vring(vhost, 1) < 0 ||
+      setup_vring(vhost, 2) < 0) {
+    /* Error */
+    if (vhost->kickfd >= 0) { close(vhost->kickfd); vhost->kickfd = -1; }
+    if (vhost->callfd >= 0) { close(vhost->callfd); vhost->callfd = -1; }
+    return -1;
+  }
   return 0;
- error:
-  if (eventfd > 0) close(eventfd);
-  return -1;
 }
 
-int vhost_set_memory(int sockfd, struct vhost_memory *memory)
+static int setup_vring(struct vio *vio, int index)
 {
-  return ioctl(sockfd, VHOST_SET_MEM_TABLE, memory);
+  struct vio_vring *vring = &vio->vring[index];
+  struct vhost_vring_file  backend = { .index = index, .fd = vio->tapfd };
+  struct vhost_vring_state num  = { .index = index, .num = VIO_VRING_SIZE };
+  struct vhost_vring_state base = { .index = index, .num = 0 };
+  struct vhost_vring_file  kick = { .index = index, .fd = vio->kickfd };
+  struct vhost_vring_file  call = { .index = index, .fd = vio->callfd };
+  struct vhost_vring_addr  addr = { .index = index,
+				    .desc_user_addr  = (uint64_t)&vring->desc,
+				    .avail_user_addr = (uint64_t)&vring->avail,
+				    .used_user_addr  = (uint64_t)&vring->used,
+				    .log_guest_addr  = (uint64_t)NULL,
+				    .flags = 0 };
+  return (ioctl(vio->tapfd, VHOST_NET_SET_BACKEND, &backend) ||
+	  ioctl(vio->tapfd, VHOST_SET_VRING_NUM,  &num) ||
+	  ioctl(vio->tapfd, VHOST_SET_VRING_BASE, &base) ||
+	  ioctl(vio->tapfd, VHOST_SET_VRING_KICK, &kick) ||
+	  ioctl(vio->tapfd, VHOST_SET_VRING_CALL, &call) ||
+	  ioctl(vio->tapfd, VHOST_SET_VRING_ADDR, &addr));
+}
+
+int vhost_set_memory(int tapfd, struct vhost_memory *memory)
+{
+  return ioctl(tapfd, VHOST_SET_MEM_TABLE, memory);
 }
 
