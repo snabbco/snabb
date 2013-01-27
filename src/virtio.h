@@ -90,8 +90,10 @@ struct vio {
   uint64_t features;
   // tap device / raw socket file descriptor
   int tapfd;
+  // fd opened from /dev/vhost-net
+  int vhostfd;
   // eventfd(2) for notifying the kernel (kickfd) and being notified (callfd)
   int kickfd, callfd;
-  struct vio_vring vring[2];
+  struct vio_vring vring[0];
 };
 

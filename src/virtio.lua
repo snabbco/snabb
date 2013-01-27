@@ -4,12 +4,15 @@
 
 module(...,package.seeall)
 
+local ffi = require("ffi")
+local C = ffi.C
+
 require("virtio_h")
 
 function selftest ()
-   local tapfd = C.open_tap("");
-   local vhost = ffi.new("struct snabb_vhost")
-   C.vhost_setup(tapfd, vhost)
+   local vio = ffi.new("struct vio")
+   vio.tapfd = C.open_tap("");
+   assert(C.vhost_setup(vio) == 0)
    set_memory_regions()
 end
 
@@ -20,17 +23,19 @@ end
 -- process virtual address space, i.e. we will be using ordinary
 -- pointer values (rather than, say, physical addresses).
 function set_memory_regions (sockfd)
-   local memory = ffi.new("struct vhost_memory")
+   local vio_memory = ffi.new("struct vio_memory")
    local dma_regions = memory.dma_regions
-   memory.nregions = #dma_regions
-   memory.padding = 0
-   for i = 0, memory.nregions - 1 do
-      local r = memory.regions[i]
+   vio_memory.nregions = #dma_regions
+   vio_memory.padding = 0
+   local vio_index = 0
+   for _,region in ipairs(dma_regions) do
+      local r = vio_memory.regions[vio_index]
       r.guest_phys_addr = memory.address
       r.userspace_addr = memory.address
       r.memory_size = memory.size
       r.flags_padding = 0
+      vio_index = i + 1
    end
-   assert( C.vhost_set_memory(sockfd, memory) == 0 )
+--   assert( C.vhost_set_memory(sockfd, memory) == 0 )
 end
 

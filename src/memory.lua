@@ -14,7 +14,7 @@ local C = ffi.C
 local chunk_ptr, chunk_phy, chunk_size
 
 -- Array of {address = virtaddr, size = bytes} tables for each DMA region.
-local dma_regions = {}
+dma_regions = {}
 
 -- Install a new chunk of memory at a specific physical memory address.
 -- Mostly useful if you have reserved memory using 'linux memmap=16M$0x10000000'

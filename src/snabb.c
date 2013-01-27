@@ -135,18 +135,20 @@ void *allocate_huge_page(int size)
 /* forward declaration */
 static int setup_vring(struct vio *vhost, int index);
 
-int vhost_setup(int sockfd, struct vio *vhost)
+int vhost_setup(struct vio *vio)
 {
-  assert(vhost->tapfd);
-  if ((vhost->kickfd = eventfd(0, EFD_NONBLOCK)) < 0 ||
-      (vhost->callfd = eventfd(0, EFD_NONBLOCK)) < 0 ||
-      (ioctl(sockfd, VHOST_SET_OWNER, NULL))     < 0 ||
-      (ioctl(sockfd, VHOST_GET_FEATURES, &vhost->features)) < 0 ||
-      setup_vring(vhost, 1) < 0 ||
-      setup_vring(vhost, 2) < 0) {
+  assert(vio->tapfd);
+  if ((vio->vhostfd = open("/dev/vhost-net", O_RDWR)) < 0 ||
+      (vio->kickfd = eventfd(0, EFD_NONBLOCK)) < 0 ||
+      (vio->callfd = eventfd(0, EFD_NONBLOCK)) < 0 ||
+      (ioctl(vio->vhostfd, VHOST_SET_OWNER, NULL)) < 0 ||
+      (ioctl(vio->vhostfd, VHOST_GET_FEATURES, &vio->features)) < 0 ||
+      setup_vring(vio, 1) < 0 ||
+      setup_vring(vio, 2) < 0) {
     /* Error */
-    if (vhost->kickfd >= 0) { close(vhost->kickfd); vhost->kickfd = -1; }
-    if (vhost->callfd >= 0) { close(vhost->callfd); vhost->callfd = -1; }
+    if (vio->vhostfd >= 0) { close(vio->vhostfd); vio->vhostfd = -1; }
+    if (vio->kickfd  >= 0) { close(vio->kickfd);  vio->kickfd = -1; }
+    if (vio->callfd  >= 0) { close(vio->callfd);  vio->callfd = -1; }
     return -1;
   }
   return 0;
@@ -166,16 +168,20 @@ static int setup_vring(struct vio *vio, int index)
 				    .used_user_addr  = (uint64_t)&vring->used,
 				    .log_guest_addr  = (uint64_t)NULL,
 				    .flags = 0 };
-  return (ioctl(vio->tapfd, VHOST_NET_SET_BACKEND, &backend) ||
-	  ioctl(vio->tapfd, VHOST_SET_VRING_NUM,  &num) ||
-	  ioctl(vio->tapfd, VHOST_SET_VRING_BASE, &base) ||
-	  ioctl(vio->tapfd, VHOST_SET_VRING_KICK, &kick) ||
-	  ioctl(vio->tapfd, VHOST_SET_VRING_CALL, &call) ||
-	  ioctl(vio->tapfd, VHOST_SET_VRING_ADDR, &addr));
+  printf("backend file = %d\n", backend.fd);
+  if (ioctl(vio->vhostfd, VHOST_NET_SET_BACKEND, &backend) ||
+      ioctl(vio->vhostfd, VHOST_SET_VRING_NUM,  &num) ||
+      ioctl(vio->vhostfd, VHOST_SET_VRING_BASE, &base) ||
+      ioctl(vio->vhostfd, VHOST_SET_VRING_KICK, &kick) ||
+      ioctl(vio->vhostfd, VHOST_SET_VRING_CALL, &call) ||
+      ioctl(vio->vhostfd, VHOST_SET_VRING_ADDR, &addr)) {
+    return -1;
+  }
+  return 0;
 }
 
-int vhost_set_memory(int tapfd, struct vhost_memory *memory)
+int vhost_set_memory(int vhostfd, struct vhost_memory *memory)
 {
-  return ioctl(tapfd, VHOST_SET_MEM_TABLE, memory);
+  return ioctl(vhostfd, VHOST_SET_MEM_TABLE, memory);
 }
 
