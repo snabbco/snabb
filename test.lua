@@ -1364,7 +1364,7 @@ test_netlink = {
     assert(lo:setmtu(mtu))
   end,
   test_interface_rename_root = function()
-    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    assert(nl.create_interface{name = "dummy0", type = "dummy"})
     local i = assert(nl.interfaces())
     assert(i.dummy0)
     assert(i.dummy0:rename("newname"))
@@ -1373,7 +1373,7 @@ test_netlink = {
     assert(i.newname:delete())
   end,
   test_interface_set_macaddr_root = function()
-    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    assert(nl.create_interface{name = "dummy0", type = "dummy"})
     local i = assert(nl.interfaces())
     assert(i.dummy0)
     assert(i.dummy0:setmac("46:9d:c9:06:dd:dd"))
