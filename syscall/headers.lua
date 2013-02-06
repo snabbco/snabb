@@ -604,6 +604,12 @@ struct winsize {
 typedef struct {
   int     val[2];
 } kernel_fsid_t;
+struct udphdr {
+  uint16_t source;
+  uint16_t dest;
+  uint16_t len;
+  uint16_t check;
+};
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
