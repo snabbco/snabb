@@ -143,8 +143,9 @@ int vhost_setup(struct vio *vio)
       (vio->callfd = eventfd(0, EFD_NONBLOCK)) < 0 ||
       (ioctl(vio->vhostfd, VHOST_SET_OWNER, NULL)) < 0 ||
       (ioctl(vio->vhostfd, VHOST_GET_FEATURES, &vio->features)) < 0 ||
-      setup_vring(vio, 1) < 0 ||
-      setup_vring(vio, 2) < 0) {
+      (ioctl(vio->vhostfd, VHOST_SET_MEM_TABLE, &vio->memory) < 0) ||
+      setup_vring(vio, 0) < 0 ||
+      setup_vring(vio, 1) < 0) {
     /* Error */
     if (vio->vhostfd >= 0) { close(vio->vhostfd); vio->vhostfd = -1; }
     if (vio->kickfd  >= 0) { close(vio->kickfd);  vio->kickfd = -1; }
@@ -169,12 +170,13 @@ static int setup_vring(struct vio *vio, int index)
 				    .log_guest_addr  = (uint64_t)NULL,
 				    .flags = 0 };
   printf("backend file = %d\n", backend.fd);
-  if (ioctl(vio->vhostfd, VHOST_NET_SET_BACKEND, &backend) ||
-      ioctl(vio->vhostfd, VHOST_SET_VRING_NUM,  &num) ||
+  printf("align %x %llx %llx %llx\n", *(uint32_t*)addr.desc_user_addr, addr.avail_user_addr % 8, addr.used_user_addr % 8, addr.log_guest_addr % 8);
+  if (ioctl(vio->vhostfd, VHOST_SET_VRING_NUM,  &num) ||
       ioctl(vio->vhostfd, VHOST_SET_VRING_BASE, &base) ||
       ioctl(vio->vhostfd, VHOST_SET_VRING_KICK, &kick) ||
       ioctl(vio->vhostfd, VHOST_SET_VRING_CALL, &call) ||
-      ioctl(vio->vhostfd, VHOST_SET_VRING_ADDR, &addr)) {
+      ioctl(vio->vhostfd, VHOST_SET_VRING_ADDR, &addr) ||
+      ioctl(vio->vhostfd, VHOST_NET_SET_BACKEND, &backend)) {
     return -1;
   }
   return 0;

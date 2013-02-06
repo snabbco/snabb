@@ -57,6 +57,12 @@ enum { // virtio_net_hdr.gso_type
   VIO_NET_HDR_GSO_ECN   = 0x80
 };
 
+enum { // vring flags
+  VIO_DESC_F_NEXT = 1,	  // Descriptor continues via 'next' field
+  VIO_DESC_F_WRITE = 2,   // Write-only descriptor (otherwise read-only)
+  VIO_DESC_F_INDIRECT = 4 // 
+};
+
 enum {
   // Maximum elements in vhost_memory.regions
   VIO_MEMORY_MAX_NREGIONS = 64,
@@ -80,9 +86,9 @@ struct vio_memory {
 // Snabb Switch data structures
 
 struct vio_vring {
-  struct vio_desc desc;
-  struct vio_avail avail;
-  struct vio_used used;
+  struct vio_desc desc[VIO_VRING_SIZE] __attribute__((aligned(8)));
+  struct vio_avail avail               __attribute__((aligned(8)));
+  struct vio_used used                 __attribute__((aligned(8)));
 };
 
 struct vio {
@@ -94,6 +100,7 @@ struct vio {
   int vhostfd;
   // eventfd(2) for notifying the kernel (kickfd) and being notified (callfd)
   int kickfd, callfd;
-  struct vio_vring vring[0];
+  struct vio_memory memory;
+  struct vio_vring vring[2];
 };
 
