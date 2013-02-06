@@ -223,6 +223,7 @@ print [[
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <signal.h>
