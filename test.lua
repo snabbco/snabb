@@ -1247,6 +1247,45 @@ test_sockets = {
   end
 }
 
+test_raw_socket_root = {
+  test_raw_udp = function()
+    local loop = "127.0.0.1"
+    local raw = assert(S.socket("inet", "raw", "raw"))
+    local msg = "raw message"
+    local udplen = s.udphdr + #msg
+    local len = s.iphdr + udplen
+    local buf = t.buffer(len)
+    local iphdr = pt.iphdr(buf)
+    local udphdr = pt.udphdr(buf + s.iphdr)
+    ffi.copy(buf + s.iphdr + s.udphdr, msg, #msg)
+    local sport = 666
+    local buf2 = t.buffer(#msg)
+
+    local sa = assert(t.sockaddr_in(sport, loop))
+    local cl = assert(S.socket("inet", "dgram"))
+    local ca = assert(t.sockaddr_in(0, loop))
+    local bca = assert(cl:getsockname())
+    local cport = bca.port -- find client port
+
+    assert(cl:bind(sa))
+
+    local h = require "syscall.helpers" -- should not have to use later
+
+    -- iphdr should have __index helpers for endianness etc (note use raw s_addr)
+    iphdr = {ihl = 5, version = 4, tos = 0, id = 0, frag_off = h.htons(0x4000), ttl = 64, protocol = c.IPPROTO.RAW, check = 0,
+             saddr = sa.s_addr, daddr = ca.s_addr, tot_len = h.htons(len)}
+    udphdr = {src = sport, dst = cport, len = udplen}
+
+    local n = assert(raw:sendto(buf, len, 0, bca))
+
+    --local f = assert(cl:recvfrom(buf2, #msg))
+
+    assert(raw:close())
+    assert(cl:close())
+  end,
+
+}
+
 test_netlink = {
   test_getlink = function()
     local i = assert(nl.getlink())

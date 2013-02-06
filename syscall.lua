@@ -756,9 +756,10 @@ end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), offset, count)) end
 
-local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain
+local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
+  protocol = protocol or 0
   if domain == c.AF.NETLINK then return c.NETLINK[protocol] end
-  return protocol or 0
+  return c.IPPROTO[protocol]
 end
 
 function S.socket(domain, stype, protocol)
