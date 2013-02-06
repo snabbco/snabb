@@ -35,7 +35,8 @@ end
 
 -- Add a new chunk of memory for the next DMA allocations.
 function add_chunk (ptr, physical, size)
-   dma_regions[#dma_regions + 1] = {address = ffi.ptr, size = size}
+   local address = tonumber(ffi.cast("uint64_t", ptr))
+   dma_regions[#dma_regions + 1] = {address = address, size = size}
    chunk_ptr, chunk_phy, chunk_size = ptr, physical, size
 end
 
