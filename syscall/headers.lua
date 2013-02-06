@@ -743,20 +743,28 @@ ffi.cdef[[
 struct iocb {
   uint64_t   aio_data;
   uint32_t   aio_key, aio_reserved1;
-
   uint16_t   aio_lio_opcode;
   int16_t    aio_reqprio;
   uint32_t   aio_fildes;
-
   uint64_t   aio_buf;
   uint64_t   aio_nbytes;
   int64_t    aio_offset;
-
   uint64_t   aio_reserved2;
-
   uint32_t   aio_flags;
-
   uint32_t   aio_resfd;
+};
+struct iphdr {
+  uint8_t  ihl:4,
+           version:4;
+  uint8_t  tos;
+  uint16_t tot_len;
+  uint16_t id;
+  uint16_t frag_off;
+  uint8_t  ttl;
+  uint8_t  protocol;
+  uint16_t check;
+  uint32_t saddr;
+  uint32_t daddr;
 };
 ]]
 else
@@ -764,20 +772,28 @@ ffi.cdef[[
 struct iocb {
   uint64_t   aio_data;
   uint32_t   aio_reserved1, aio_key;
-
   uint16_t   aio_lio_opcode;
   int16_t    aio_reqprio;
   uint32_t   aio_fildes;
-
   uint64_t   aio_buf;
   uint64_t   aio_nbytes;
   int64_t    aio_offset;
-
   uint64_t   aio_reserved2;
-
   uint32_t   aio_flags;
-
   uint32_t   aio_resfd;
+};
+struct iphdr {
+  uint8_t  version:4,
+           ihl:4;
+  uint8_t  tos;
+  uint16_t tot_len;
+  uint16_t id;
+  uint16_t frag_off;
+  uint8_t  ttl;
+  uint8_t  protocol;
+  uint16_t check;
+  uint32_t saddr;
+  uint32_t daddr;
 };
 ]]
 end
