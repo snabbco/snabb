@@ -1094,6 +1094,59 @@ t.iocb_array = function(tab, ptrs)
   return a
 end
 
+-- ip, udp types. Need endian conversions
+
+--[[
+struct iphdr {
+  uint8_t  ihl:4,
+           version:4;
+  uint8_t  tos;
+  uint16_t tot_len;
+  uint16_t id;
+  uint16_t frag_off;
+  uint8_t  ttl;
+  uint8_t  protocol;
+  uint16_t check;
+  uint32_t saddr;
+  uint32_t daddr;
+};
+]]
+meth.iphdr = {
+  index = {
+  },
+  newindex = {
+  },
+}
+
+mt.iphdr = {
+  __index = function(i, k) if meth.iphdr.index[k] then return meth.iphdr.index[k](i) end end,
+  __newindex = function(i, k, v) if meth.iphdr.newindex[k] then meth.iphdr.index[k](i, v) end end,
+}
+
+metatype("iphdr", "struct iphdr", mt.iphdr)
+
+-- ugh, naming problems as cannot remove namespace as usual
+meth.udphdr = {
+  index = {
+    src = function(u) return ntohs(u.source) end,
+    dst = function(u) return ntohs(u.dest) end,
+    length = function(u) return ntohs(u.len) end,
+  },
+  newindex = {
+    src = function(u, v) u.source = htons(v) end,
+    dst = function(u, v) u.dest = htons(v) end,
+    length = function(u, v) u.len = htons(v) end,
+  },
+}
+
+-- checksum = function(u, ...) return 0 end, -- TODO checksum, needs IP packet info too. as method.
+mt.udphdr = {
+  __index = function(u, k) if meth.udphdr.index[k] then return meth.udphdr.index[k](u) end end,
+  __newindex = function(u, k, v) if meth.udphdr.newindex[k] then meth.udphdr.index[k](u, v) end end,
+}
+
+metatype("udphdr", "struct udphdr", mt.udphdr)
+
 return types
 
 
