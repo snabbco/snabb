@@ -133,17 +133,17 @@ void *allocate_huge_page(int size)
 }
 
 /* forward declaration */
-static int setup_vring(struct vio *vhost, int index);
+static int setup_vring(struct vio *vio, int index);
 
-int vhost_setup(struct vio *vio)
+int vhost_open(struct vio *vio, int tapfd, struct vio_memory *memory)
 {
-  assert(vio->tapfd);
+  vio->tapfd = tapfd;
   if ((vio->vhostfd = open("/dev/vhost-net", O_RDWR)) < 0 ||
       (vio->kickfd = eventfd(0, EFD_NONBLOCK)) < 0 ||
       (vio->callfd = eventfd(0, EFD_NONBLOCK)) < 0 ||
       (ioctl(vio->vhostfd, VHOST_SET_OWNER, NULL)) < 0 ||
       (ioctl(vio->vhostfd, VHOST_GET_FEATURES, &vio->features)) < 0 ||
-      (ioctl(vio->vhostfd, VHOST_SET_MEM_TABLE, &vio->memory) < 0) ||
+      vhost_set_memory(vio, memory) ||
       setup_vring(vio, 0) < 0 ||
       setup_vring(vio, 1) < 0) {
     /* Error */
@@ -169,21 +169,22 @@ static int setup_vring(struct vio *vio, int index)
 				    .used_user_addr  = (uint64_t)&vring->used,
 				    .log_guest_addr  = (uint64_t)NULL,
 				    .flags = 0 };
-  printf("backend file = %d\n", backend.fd);
-  printf("align %x %llx %llx %llx\n", *(uint32_t*)addr.desc_user_addr, addr.avail_user_addr % 8, addr.used_user_addr % 8, addr.log_guest_addr % 8);
-  if (ioctl(vio->vhostfd, VHOST_SET_VRING_NUM,  &num) ||
-      ioctl(vio->vhostfd, VHOST_SET_VRING_BASE, &base) ||
-      ioctl(vio->vhostfd, VHOST_SET_VRING_KICK, &kick) ||
-      ioctl(vio->vhostfd, VHOST_SET_VRING_CALL, &call) ||
-      ioctl(vio->vhostfd, VHOST_SET_VRING_ADDR, &addr) ||
-      ioctl(vio->vhostfd, VHOST_NET_SET_BACKEND, &backend)) {
-    return -1;
-  }
-  return 0;
+  return (ioctl(vio->vhostfd, VHOST_SET_VRING_NUM,  &num)  ||
+	  ioctl(vio->vhostfd, VHOST_SET_VRING_BASE, &base) ||
+	  ioctl(vio->vhostfd, VHOST_SET_VRING_KICK, &kick) ||
+	  ioctl(vio->vhostfd, VHOST_SET_VRING_CALL, &call) ||
+	  ioctl(vio->vhostfd, VHOST_SET_VRING_ADDR, &addr) ||
+	  ioctl(vio->vhostfd, VHOST_NET_SET_BACKEND, &backend));
 }
 
-int vhost_set_memory(int vhostfd, struct vhost_memory *memory)
+int vhost_set_memory(struct vio *vio, struct vio_memory *memory)
 {
-  return ioctl(vhostfd, VHOST_SET_MEM_TABLE, memory);
+  return ioctl(vio->vhostfd, VHOST_SET_MEM_TABLE, memory);
+}
+
+void full_memory_barrier()
+{
+  // See http://gcc.gnu.org/onlinedocs/gcc-4.1.1/gcc/Atomic-Builtins.html
+  __sync_synchronize();
 }
 

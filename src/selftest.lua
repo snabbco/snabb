@@ -5,8 +5,16 @@ local ffi = require "ffi"
 local C = ffi.C
 local test = require("test")
 local memory = require("memory")
+local virtio = require("virtio")
 
 assert(C.lock_memory() == 0)
+
+local vio = virtio.new("vio%d")
+vio.init()
+-- vio.selftest()
+vio.echotest()
+
+os.exit(0)
 
 memory.selftest({verbose = false})
 pci.selftest()

@@ -4,7 +4,7 @@
  * Copyright 2013 Luke Gorrie.
  */
 
-enum { VIO_VRING_SIZE = 256 };
+enum { VIO_VRING_SIZE = 8 };
 
 // Based on the specification:
 //   virtio: Towards a De-Facto Standard For Virtual I/O Devices (Rusty Russell)
@@ -30,7 +30,7 @@ struct vio_used_elem {
 
 struct vio_used {
   uint16_t flags;
-  uint16_t len;
+  uint16_t idx;
   struct vio_used_elem ring[VIO_VRING_SIZE];
 };
 
@@ -88,7 +88,7 @@ struct vio_memory {
 struct vio_vring {
   struct vio_desc desc[VIO_VRING_SIZE] __attribute__((aligned(8)));
   struct vio_avail avail               __attribute__((aligned(8)));
-  struct vio_used used                 __attribute__((aligned(8)));
+  struct vio_used used                 __attribute__((aligned(4096)));
 };
 
 struct vio {
@@ -100,7 +100,6 @@ struct vio {
   int vhostfd;
   // eventfd(2) for notifying the kernel (kickfd) and being notified (callfd)
   int kickfd, callfd;
-  struct vio_memory memory;
   struct vio_vring vring[2];
 };
 
