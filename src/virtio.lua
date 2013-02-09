@@ -19,7 +19,7 @@ function new (tapinterface)
 
    function init ()
       rx_freelist, tx_freelist = {}, {}
-      for i = 0, C.VIO_VRING_SIZE-2 do
+      for i = 0, C.VIO_VRING_SIZE-1 do
 	 rx_freelist[i+1] = i
 	 tx_freelist[i+1] = i
       end
@@ -40,7 +40,6 @@ function new (tapinterface)
       print("regions = " .. #dma_regions)
       for _,region in ipairs(dma_regions) do
 	 local r = vio_memory.regions + vio_index
-	 print(region.address, region.size)
 	 r.guest_phys_addr = region.address
 	 r.userspace_addr = region.address
 	 r.memory_size = region.size
@@ -62,11 +61,13 @@ function new (tapinterface)
 
    function transmit (address, size)
       local bufferindex = get_transmit_buffer()
+      print("bufferindex", bufferindex)
       local desc = txring.desc[bufferindex]
+      print("desc", desc)
       desc.addr, desc.len = address, size
       desc.flags, desc.next = 0, 0
       txring.avail.ring[next_tx_avail] = bufferindex
-      next_tx_avail = (next_tx_avail + 1) % C.VIO_VRING_SIZE
+      next_tx_avail = (next_tx_avail + 1) % 65536
    end M.transmit = transmit
 
    -- Return the index of an available transmit buffer, or nil.
@@ -78,15 +79,15 @@ function new (tapinterface)
    local txused = 0
    function reclaim_transmit_buffers ()
       while txused ~= txring.used.idx do
-	 table.insert(tx_freelist, txring.used.ring[idx].id)
-	 txused = (txused + 1) % C.VIO_VRING_SIZE
+	 table.insert(tx_freelist, txring.used.ring[txused % C.VIO_VRING_SIZE].id)
+	 txused = (txused + 1) % 65536
       end
    end
 
    function sync_transmit ()
       C.full_memory_barrier()
       txring.avail.idx = next_tx_avail
-      kick()
+      kick(txring)
    end M.sync_transmit = sync_transmit
 
    function transmit_ready ()
@@ -101,7 +102,7 @@ function new (tapinterface)
       local desc = rxring.desc[bufferindex]
       desc.addr, desc.len = ffi.cast("uint64_t", address), size
       desc.flags, desc.next = C.VIO_DESC_F_WRITE, 0
-      next_rx_avail = (next_rx_avail + 1) % C.VIO_VRING_SIZE
+      next_rx_avail = (next_rx_avail + 1) % 65536
    end M.add_rxbuf = add_rxbuf
 
    function get_rx_buffer ()
@@ -112,8 +113,8 @@ function new (tapinterface)
    local rxused = 0
    function reclaim_receive_buffers ()
       while rxused ~= rxring.used.idx do
-	 table.insert(rx_freelist, rxring.used.ring[idx].id)
-	 rxused = (rxused + 1) % C.VIO_VRING_SIZE
+	 table.insert(rx_freelist, rxring.used.ring[idx % C.VIO_VRING_SIZE].id)
+	 rxused = (rxused + 1) % 65536
       end
    end
 
@@ -127,16 +128,18 @@ function new (tapinterface)
       if rxused ~= rxring.used.idx then
 	 print("receive rxused="..rxused.." used.idx="..(rxring.used.idx))
 	 print_vio(vio)
+	 print("free tx = " .. #tx_freelist .. " free rx = " .. #rx_freelist)
+	 assert(#tx_freelist <= C.VIO_VRING_SIZE)
 	 print("a")
-	 local index = rxring.used.ring[rxused].id
+	 local index = rxring.used.ring[rxused % C.VIO_VRING_SIZE].id
 	 print("b")
-	 local length  = rxring.used.ring[rxused].len
+	 local length  = rxring.used.ring[rxused % C.VIO_VRING_SIZE].len
 	 print("c index = " .. index)
 	 local address = rxring.desc[index].addr
 	 print("d")
 	 table.insert(rx_freelist, index)
 	 print("e")
-	 rxused = (rxused + 1) % C.VIO_VRING_SIZE
+	 rxused = (rxused + 1) % 65536
 	 print("f")
 	 return address, length
       end
@@ -149,6 +152,8 @@ function new (tapinterface)
    function flush_rx()
       C.full_memory_barrier()
       rxring.avail.idx = next_rx_avail
+--      rxring.avail.idx = math.min(next_rx_avail, 1023)
+      kick(rxring)
    end M.flush_rx = flush_rx
 
    function M.selftest ()
@@ -178,30 +183,34 @@ function new (tapinterface)
       while true do
 	 while receive_buffer_ready() do
 	    print("adding a buffer")
-	    add_rxbuf(memory.dma_alloc(2048), 2048)
---	    C.vhost_set_memory(vio, memory_regions())
+--	    add_rxbuf(memory.dma_alloc(2048), 2048)
+	    add_rxbuf(buffer, 2048)
+	    C.vhost_set_memory(vio, memory_regions())
+--	    print_vio(vio)
 	 end
 	 flush_rx()
-	 while receive_packet_ready() do
+	 while transmit_ready() and receive_packet_ready() do
 	    print "Got a packet!"
 	    local address, length = receive()
-	    print("Length " .. length)
+	    print("Length " .. length .. " address = " .. tostring(ffi.cast("char*",address)))
 	    transmit(address, length)
+	    print("tx success")
 	 end
+	 reclaim_transmit_buffers()
 	 sync_transmit()
 --	 print_vio(vio)
 --	 for i = 0, 16 do
 --	    io.write(bit.tohex(ffi.cast("int32_t*", buffer)[i]).." ")
 --	 end
 --	 print()
-	 C.usleep(1e3)
+	 C.usleep(1e2)
       end
    end
 
-   function kick ()
+   function kick (ring)
       local value = ffi.new("uint64_t[1]")
       value[0] = 1
-      C.write(vio.kickfd, value, 8)
+      C.write(ring.kickfd, value, 8)
    end
 
    return M
