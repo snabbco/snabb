@@ -1122,9 +1122,8 @@ local function ip_checksum(buf, size, c, final)
   for i = 0, size / 2 do
     c = c + htons(b16[i])
   end
-  if size % 2 == 1 then print("bogus");c = c + b16[size - 1] * 256 end -- FIX, clearly wrong.
+  if size % 2 == 1 then c = c + b16[size - 1] * 256 end -- TODO FIX, clearly wrong.
 
-print("gg", c, bit.rshift(c, 16), bit.band(c, 0xffff))
   c = bit.rshift(c, 16) + bit.band(c, 0xffff)
   c = c + bit.rshift(c, 16)
   if final then c = bit.bnot(c) end
