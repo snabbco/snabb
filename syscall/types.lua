@@ -185,7 +185,7 @@ t.iocb_ptrs = ffi.typeof("struct iocb *[?]")
 t.string_array = ffi.typeof("const char *[?]")
 
 t.ints = ffi.typeof("int[?]")
-t.buffer = ffi.typeof("char[?]")
+t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
 
 t.int1 = ffi.typeof("int[1]")
 t.int64_1 = ffi.typeof("int64_t[1]")
@@ -196,6 +196,8 @@ t.loff1 = ffi.typeof("loff_t[1]")
 t.uid1 = ffi.typeof("uid_t[1]")
 t.gid1 = ffi.typeof("gid_t[1]")
 t.aio_context1 = ffi.typeof("aio_context_t[1]")
+
+t.char2 = ffi.typeof("char[2]")
 t.int2 = ffi.typeof("int[2]")
 t.uint2 = ffi.typeof("unsigned int[2]")
 t.timespec2 = ffi.typeof("struct timespec[2]")
@@ -1112,17 +1114,28 @@ struct iphdr {
   uint32_t daddr;
 };
 ]]
+
+local function ip_checksum(buf, size, c, final)
+  c = c or 0
+  final = final or true
+  local b16 = pt.int16(buf)
+  for i = 0, size / 2 do
+    c = c + htons(b16[i])
+  end
+  if size % 2 == 1 then print("bogus");c = c + b16[size - 1] * 256 end -- FIX, clearly wrong.
+
+print("gg", c, bit.rshift(c, 16), bit.band(c, 0xffff))
+  c = bit.rshift(c, 16) + bit.band(c, 0xffff)
+  c = c + bit.rshift(c, 16)
+  if final then c = bit.bnot(c) end
+  return htons(c)
+end
+
 meth.iphdr = {
   index = {
     checksum = function(i) return function(i)
       i.check = 0
-      local b16 = pt.int16(i)
-      local c = 0
-      for j = 0, s.iphdr / 2 do
-        c = (c + b16[j]) % 10000
-      end
-        c = bit.bnot(c)
-        i.check = c
+      i.check = ip_checksum(i, s.iphdr)
     end end,
   },
   newindex = {
@@ -1142,6 +1155,21 @@ meth.udphdr = {
     src = function(u) return ntohs(u.source) end,
     dst = function(u) return ntohs(u.dest) end,
     length = function(u) return ntohs(u.len) end,
+    checksum = function(i) return function(i, source, dest, body)
+      local c = 0
+      -- checksum false header
+      c = ip_checksum(source, 4, c, false)
+      c = ip_checksum(dest, 4, c, false)
+      local pr = t.char2(0, c.IPPROTO.UDP)
+      c = ip_checksum(pr, 2, c, false)
+      c = ip_checksum(i.len, 2, c, false)
+      -- checksum udp header
+      i.check = 0
+      c = ip_checksum(i, s.udphdr, c, false)
+      -- checksum body
+      c = ip_checksum(body, i.length - s.udphdr, c, true)
+      i.check = c
+    end end,
   },
   newindex = {
     src = function(u, v) u.source = htons(v) end,
@@ -1150,10 +1178,19 @@ meth.udphdr = {
   },
 }
 
+--[[
+struct pseudo_hdr {
+u_int32_t source;
+u_int32_t dest;
+u_int8_t zero;
+u_int8_t protocol;
+u_int16_t udp_length;
+};
+]]
 -- checksum = function(u, ...) return 0 end, -- TODO checksum, needs IP packet info too. as method.
 mt.udphdr = {
   __index = function(u, k) if meth.udphdr.index[k] then return meth.udphdr.index[k](u) end end,
-  __newindex = function(u, k, v) if meth.udphdr.newindex[k] then meth.udphdr.index[k](u, v) end end,
+  __newindex = function(u, k, v) if meth.udphdr.newindex[k] then meth.udphdr.newindex[k](u, v) end end,
 }
 
 metatype("udphdr", "struct udphdr", mt.udphdr)

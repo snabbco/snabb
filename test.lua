@@ -1251,7 +1251,7 @@ test_raw_socket_root = {
   test_raw_udp = function()
     local loop = "127.0.0.1"
     local raw = assert(S.socket("inet", "raw", "raw"))
-    local msg = "raw message"
+    local msg = "raw message."
     local udplen = s.udphdr + #msg
     local len = s.iphdr + udplen
     local buf = t.buffer(len)
@@ -1275,7 +1275,11 @@ test_raw_socket_root = {
     iphdr[0] = {ihl = 5, version = 4, tos = 0, id = 0, frag_off = h.htons(0x4000), ttl = 64, protocol = c.IPPROTO.UDP, check = 0,
              saddr = sa.sin_addr.s_addr, daddr = ca.sin_addr.s_addr, tot_len = h.htons(len)}
     iphdr[0]:checksum()
-    udphdr[0] = {src = sport, dst = cport, len = udplen}
+    --udphdr[0] = {src = sport, dst = cport, length = udplen} -- doesnt work with metamethods
+    udphdr[0].src = sport
+    udphdr[0].dst = cport
+    udphdr[0].length = udplen
+    udphdr[0]:checksum(sa.sin_addr.s_addr, ca.sin_addr.s_addr, buf + s.iphdr + s.udphdr)
 
     local n = assert(raw:sendto(buf, len, 0, bca))
 
