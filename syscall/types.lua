@@ -109,6 +109,7 @@ local addtypes = {
   uchar = "unsigned char",
   int = "int",
   uint = "unsigned int",
+  int16 = "int16_t",
   uint16 = "uint16_t",
   int32 = "int32_t",
   uint32 = "uint32_t",
@@ -1113,6 +1114,16 @@ struct iphdr {
 ]]
 meth.iphdr = {
   index = {
+    checksum = function(i) return function(i)
+      i.check = 0
+      local b16 = pt.int16(i)
+      local c = 0
+      for j = 0, s.iphdr / 2 do
+        c = (c + b16[j]) % 10000
+      end
+        c = bit.bnot(c)
+        i.check = c
+    end end,
   },
   newindex = {
   },

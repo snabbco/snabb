@@ -1261,7 +1261,7 @@ test_raw_socket_root = {
     local sport = 666
     local buf2 = t.buffer(#msg)
 
-    local sa = assert(t.sockaddr_in(sport, loop))
+    local sa = assert(t.sockaddr_in(0, loop))
     local cl = assert(S.socket("inet", "dgram"))
     local ca = assert(t.sockaddr_in(0, loop))
     local bca = assert(cl:getsockname())
@@ -1272,11 +1272,14 @@ test_raw_socket_root = {
     local h = require "syscall.helpers" -- should not have to use later
 
     -- iphdr should have __index helpers for endianness etc (note use raw s_addr)
-    iphdr = {ihl = 5, version = 4, tos = 0, id = 0, frag_off = h.htons(0x4000), ttl = 64, protocol = c.IPPROTO.RAW, check = 0,
-             saddr = sa.s_addr, daddr = ca.s_addr, tot_len = h.htons(len)}
-    udphdr = {src = sport, dst = cport, len = udplen}
+    iphdr[0] = {ihl = 5, version = 4, tos = 0, id = 0, frag_off = h.htons(0x4000), ttl = 64, protocol = c.IPPROTO.UDP, check = 0,
+             saddr = sa.sin_addr.s_addr, daddr = ca.sin_addr.s_addr, tot_len = h.htons(len)}
+    iphdr[0]:checksum()
+    udphdr[0] = {src = sport, dst = cport, len = udplen}
 
     local n = assert(raw:sendto(buf, len, 0, bca))
+
+    assert(util.writefile("/tmp/dump", ffi.string(buf, len), "RWXU"))
 
     --local f = assert(cl:recvfrom(buf2, #msg))
 
