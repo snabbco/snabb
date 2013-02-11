@@ -28,8 +28,8 @@ function new (tapinterface)
       -- Initialize freelists
       rx_freelist, tx_freelist = {}, {}
       for i = 0, C.VIO_VRING_SIZE-1 do
-	 rx_freelist[i+1] = i
-	 tx_freelist[i+1] = i
+         rx_freelist[i+1] = i
+         tx_freelist[i+1] = i
       end
    end M.init = init
 
@@ -68,11 +68,11 @@ function new (tapinterface)
    local txused = 0
    function reclaim_transmit_buffers ()
       while txused ~= txring.used.idx do
-	 C.full_memory_barrier()
-	 table.insert(tx_freelist, txring.used.ring[txused % C.VIO_VRING_SIZE].id)
-	 assert(#tx_freelist <= C.VIO_VRING_SIZE)
-	 txused = (txused + 1) % 65536
-	 txpackets = txpackets + 1
+         C.full_memory_barrier()
+         table.insert(tx_freelist, txring.used.ring[txused % C.VIO_VRING_SIZE].id)
+         assert(#tx_freelist <= C.VIO_VRING_SIZE)
+         txused = (txused + 1) % 65536
+         txpackets = txpackets + 1
       end
    end
 
@@ -144,12 +144,12 @@ function new (tapinterface)
       vio_memory.padding = 0
       local vio_index = 0
       for _,region in ipairs(dma_regions) do
-	 local r = vio_memory.regions + vio_index
-	 r.guest_phys_addr = region.address
-	 r.userspace_addr = region.address
-	 r.memory_size = region.size
-	 r.flags_padding = 0
-	 vio_index = vio_index + 1
+         local r = vio_memory.regions + vio_index
+         r.guest_phys_addr = region.address
+         r.userspace_addr = region.address
+         r.memory_size = region.size
+         r.flags_padding = 0
+         vio_index = vio_index + 1
       end
       return vio_memory
    end
@@ -166,18 +166,18 @@ function new (tapinterface)
       local done = function () return C.get_time_ns() > deadline end
       print("Echoing packets for "..secs.." second(s).")
       repeat
-	 while receive_buffer_ready() do
-	    add_rxbuf(memory.dma_alloc(2048), 2048)
-	    -- XXX memory.lua should call this automatically when needed
-	    update_vhost_memory_map()
-	 end
-	 while transmit_ready() and receive_packet_ready() do
-	    local address, length = receive()
-	    transmit(address, length)
-	 end
-	 flush_rx()
-	 flush_transmit()
-	 reclaim_transmit_buffers()
+         while receive_buffer_ready() do
+            add_rxbuf(memory.dma_alloc(2048), 2048)
+            -- XXX memory.lua should call this automatically when needed
+            update_vhost_memory_map()
+         end
+         while transmit_ready() and receive_packet_ready() do
+            local address, length = receive()
+            transmit(address, length)
+         end
+         flush_rx()
+         flush_transmit()
+         reclaim_transmit_buffers()
       until done()
       print_stats()
    end
