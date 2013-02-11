@@ -4,7 +4,7 @@
  * Copyright 2013 Luke Gorrie.
  */
 
-enum { VIO_VRING_SIZE = 32 };
+enum { VIO_VRING_SIZE = 512 };
 
 // Based on the specification:
 //   virtio: Towards a De-Facto Standard For Virtual I/O Devices (Rusty Russell)
@@ -86,11 +86,11 @@ struct vio_memory {
 // Snabb Switch data structures
 
 struct vio_vring {
+  // eventfd(2) for notifying the kernel (kick) and being notified (call)
+  int kickfd, callfd;
   struct vio_desc desc[VIO_VRING_SIZE] __attribute__((aligned(8)));
   struct vio_avail avail               __attribute__((aligned(8)));
   struct vio_used used                 __attribute__((aligned(4096)));
-  // eventfd(2) for notifying the kernel (kick) and being notified (call)
-  int kickfd, callfd;
 };
 
 struct vio {

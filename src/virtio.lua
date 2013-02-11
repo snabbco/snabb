@@ -1,4 +1,4 @@
--- intel.lua -- Intel 82574L driver with Linux integration
+-- virtio.lua -- Linux 'vhost' interface for ethernet I/O towards the kernel.
 -- Copyright 2013 Luke Gorrie
 -- Apache License 2.0: http://www.apache.org/licenses/LICENSE-2.0
 
@@ -17,37 +17,18 @@ function new (tapinterface)
    local rx_freelist, tx_freelist
    local rxring, txring = vio.vring[0], vio.vring[1]
 
+   local txpackets, rxpackets = 0, 0
+
    function init ()
+      local tapfd = C.open_tap(tapinterface);
+      assert(C.vhost_open(vio, tapfd, memory_regions()) == 0)
+      -- Initialize freelists
       rx_freelist, tx_freelist = {}, {}
       for i = 0, C.VIO_VRING_SIZE-1 do
 	 rx_freelist[i+1] = i
 	 tx_freelist[i+1] = i
       end
    end M.init = init
-
-   -- Setup vhost DMA for all currently allocated chunks of DMA memory.
-   --
-   -- Specifically: tell the Linux kernel that addresses we use in the
-   -- virtio vring should be interpreted as being in the snabbswitch
-   -- process virtual address space, i.e. we will be using ordinary
-   -- pointer values (rather than, say, physical addresses).
-   function memory_regions ()
-      local vio_memory = ffi.new("struct vio_memory")
-      local dma_regions = memory.dma_regions
-      vio_memory.nregions = #dma_regions
-      vio_memory.padding = 0
-      local vio_index = 0
-      print("regions = " .. #dma_regions)
-      for _,region in ipairs(dma_regions) do
-	 local r = vio_memory.regions + vio_index
-	 r.guest_phys_addr = region.address
-	 r.userspace_addr = region.address
-	 r.memory_size = region.size
-	 r.flags_padding = 0
-	 vio_index = vio_index + 1
-      end
-      return vio_memory
-   end
 
    function print_vio (vio)
       print("avail[0].idx:" .. tostring(vio.vring[0].avail.idx))
@@ -60,35 +41,41 @@ function new (tapinterface)
    local next_tx_avail = 0 -- Next available position in the tx avail ring
 
    function transmit (address, size)
-      local bufferindex = get_transmit_buffer()
-      print("bufferindex", bufferindex)
-      local desc = txring.desc[bufferindex]
-      print("desc", desc)
-      desc.addr, desc.len = address, size
-      desc.flags, desc.next = 0, 0
-      txring.avail.ring[next_tx_avail] = bufferindex
+      local descindex = init_transmit_descriptor(address, size)
+      assert(descindex < C.VIO_VRING_SIZE)
+      txring.avail.ring[next_tx_avail % C.VIO_VRING_SIZE] = descindex
       next_tx_avail = (next_tx_avail + 1) % 65536
    end M.transmit = transmit
 
-   -- Return the index of an available transmit buffer, or nil.
+   function init_transmit_descriptor (address, size)
+      local index = get_transmit_buffer()
+      assert(index <= C.VIO_VRING_SIZE)
+      local d = txring.desc[index]
+      d.addr, d.len, d.flags, d.next = address, size, 0, 0
+      return index
+   end
+
+   -- Return the index of an available transmit buffer.
+   -- Precondition: transmit_ready() tested to return true.
    function get_transmit_buffer ()
-      if tx_freelist[1] == nil then reclaim_transmit_buffers() end
+      assert(transmit_ready())
       return table.remove(tx_freelist)
    end
 
    local txused = 0
    function reclaim_transmit_buffers ()
       while txused ~= txring.used.idx do
+	 C.full_memory_barrier()
 	 table.insert(tx_freelist, txring.used.ring[txused % C.VIO_VRING_SIZE].id)
+	 assert(#tx_freelist <= C.VIO_VRING_SIZE)
 	 txused = (txused + 1) % 65536
+	 txpackets = txpackets + 1
       end
    end
 
-   function sync_transmit ()
-      C.full_memory_barrier()
-      txring.avail.idx = next_tx_avail
-      kick(txring)
-   end M.sync_transmit = sync_transmit
+   function flush_transmit ()
+      C.full_memory_barrier()  txring.avail.idx = next_tx_avail  kick(txring)
+   end M.flush_transmit = flush_transmit
 
    function transmit_ready ()
       if tx_freelist[1] == nil then return nil, 'no free descriptors'
@@ -99,6 +86,7 @@ function new (tapinterface)
 
    function add_rxbuf (address, size)
       local bufferindex = get_rx_buffer()
+      assert(bufferindex < C.VIO_VRING_SIZE)
       local desc = rxring.desc[bufferindex]
       desc.addr, desc.len = ffi.cast("uint64_t", address), size
       desc.flags, desc.next = C.VIO_DESC_F_WRITE, 0
@@ -106,16 +94,8 @@ function new (tapinterface)
    end M.add_rxbuf = add_rxbuf
 
    function get_rx_buffer ()
-      if rx_freelist[1] == nil then reclaim_receive_buffers() end
+      assert(receive_buffer_ready())
       return table.remove(rx_freelist)
-   end
-
-   local rxused = 0
-   function reclaim_receive_buffers ()
-      while rxused ~= rxring.used.idx do
-	 table.insert(rx_freelist, rxring.used.ring[idx % C.VIO_VRING_SIZE].id)
-	 rxused = (rxused + 1) % 65536
-      end
    end
 
    -- Is there a receive descriptor available to store a new buffer in? [XXX name]
@@ -123,26 +103,17 @@ function new (tapinterface)
       return rx_freelist[1] ~= nil
    end M.receive_buffer_ready = receive_buffer_ready
 
-   local rxused = 0		-- Next unprocessed index in the used ring
+   local rxused = 0
    function receive ()
-      if rxused ~= rxring.used.idx then
-	 print("receive rxused="..rxused.." used.idx="..(rxring.used.idx))
-	 print_vio(vio)
-	 print("free tx = " .. #tx_freelist .. " free rx = " .. #rx_freelist)
-	 assert(#tx_freelist <= C.VIO_VRING_SIZE)
-	 print("a")
-	 local index = rxring.used.ring[rxused % C.VIO_VRING_SIZE].id
-	 print("b")
-	 local length  = rxring.used.ring[rxused % C.VIO_VRING_SIZE].len
-	 print("c index = " .. index)
-	 local address = rxring.desc[index].addr
-	 print("d")
-	 table.insert(rx_freelist, index)
-	 print("e")
-	 rxused = (rxused + 1) % 65536
-	 print("f")
-	 return address, length
-      end
+      assert(receive_packet_ready())
+      local index = rxring.used.ring[rxused % C.VIO_VRING_SIZE].id
+      local length  = rxring.used.ring[rxused % C.VIO_VRING_SIZE].len
+      local address = rxring.desc[index].addr
+      rxused = (rxused + 1) % 65536
+      table.insert(rx_freelist, index)
+      assert(#rx_freelist <= C.VIO_VRING_SIZE)
+      rxpackets = rxpackets + 1
+      return address, length
    end M.receive = receive
 
    function receive_packet_ready ()
@@ -150,63 +121,65 @@ function new (tapinterface)
    end M.receive_packet_ready = receive_packet_ready
 
    function flush_rx()
-      C.full_memory_barrier()
-      rxring.avail.idx = next_rx_avail
---      rxring.avail.idx = math.min(next_rx_avail, 1023)
-      kick(rxring)
+      C.full_memory_barrier()  rxring.avail.idx = next_rx_avail  kick(rxring)
    end M.flush_rx = flush_rx
 
-   function M.selftest ()
-      local buffer = memory.dma_alloc(2048)
-      local tapfd = C.open_tap(tapinterface);
-      assert(C.vhost_open(vio, tapfd, memory_regions()) == 0)
-      rxring.desc[0].addr = ffi.cast("uint64_t", buffer)
-      rxring.desc[0].len = 2048
-      rxring.desc[0].flags = C.VIO_DESC_F_WRITE;
-      rxring.avail.idx = 1;
-      while true do
-	 C.usleep(1000000)
-	 print_vio(vio)
-	 for i = 0, 16 do
-	    io.write(bit.tohex(ffi.cast("int32_t*", buffer)[i]).." ")
-	 end
-	 txring.desc[0].addr = ffi.cast("uint64_t", buffer)
-	 txring.desc[0].len = rxring.used.ring[0].len
-      end
+   -- Make all of our DMA memory usable as vhost packet buffers.
+   function update_vhost_memory_map ()
+      C.vhost_set_memory(vio, memory_regions())
    end
 
-   -- Write each received frame back onto the network.
-   function M.echotest ()
-      local buffer = memory.dma_alloc(2048)
-      local tapfd = C.open_tap(tapinterface);
-      assert(C.vhost_open(vio, tapfd, memory_regions()) == 0)
-      while true do
+   -- Construct a vhost memory map for the kernel. The memory map
+   -- includes all of our currently allocated DMA buffers and reuses
+   -- the address space of this process. This means that we can use
+   -- ordinary pointer addresses to DMA buffers in our vring
+   -- descriptors.
+   function memory_regions ()
+      local vio_memory = ffi.new("struct vio_memory")
+      local dma_regions = memory.dma_regions
+      vio_memory.nregions = #dma_regions
+      vio_memory.padding = 0
+      local vio_index = 0
+      for _,region in ipairs(dma_regions) do
+	 local r = vio_memory.regions + vio_index
+	 r.guest_phys_addr = region.address
+	 r.userspace_addr = region.address
+	 r.memory_size = region.size
+	 r.flags_padding = 0
+	 vio_index = vio_index + 1
+      end
+      return vio_memory
+   end
+
+   function print_stats ()
+      print("packets transmitted: " .. lib.comma_value(txpackets))
+      print("packets received:    " .. lib.comma_value(rxpackets))
+   end
+
+   -- Selftest procedure to read packets from a tap device and write them back.
+   function M.selftest ()
+      local secs = 10
+      local deadline = C.get_time_ns() + secs * 1e9
+      local done = function () return C.get_time_ns() > deadline end
+      print("Echoing packets for "..secs.." second(s).")
+      repeat
 	 while receive_buffer_ready() do
-	    print("adding a buffer")
---	    add_rxbuf(memory.dma_alloc(2048), 2048)
-	    add_rxbuf(buffer, 2048)
-	    C.vhost_set_memory(vio, memory_regions())
---	    print_vio(vio)
+	    add_rxbuf(memory.dma_alloc(2048), 2048)
+	    -- XXX memory.lua should call this automatically when needed
+	    update_vhost_memory_map()
+	 end
+	 while transmit_ready() and receive_packet_ready() do
+	    local address, length = receive()
+	    transmit(address, length)
 	 end
 	 flush_rx()
-	 while transmit_ready() and receive_packet_ready() do
-	    print "Got a packet!"
-	    local address, length = receive()
-	    print("Length " .. length .. " address = " .. tostring(ffi.cast("char*",address)))
-	    transmit(address, length)
-	    print("tx success")
-	 end
+	 flush_transmit()
 	 reclaim_transmit_buffers()
-	 sync_transmit()
---	 print_vio(vio)
---	 for i = 0, 16 do
---	    io.write(bit.tohex(ffi.cast("int32_t*", buffer)[i]).." ")
---	 end
---	 print()
-	 C.usleep(1e2)
-      end
+      until done()
+      print_stats()
    end
 
+   -- Signal the kernel via the 'kick' eventfd that there is new data.
    function kick (ring)
       local value = ffi.new("uint64_t[1]")
       value[0] = 1
@@ -214,5 +187,12 @@ function new (tapinterface)
    end
 
    return M
+end
+
+function selftest ()
+   print("Testing vhost (virtio) support.")
+   local v = virtio.new("vio%d")
+   v.init()
+   v.selftest()
 end
 
