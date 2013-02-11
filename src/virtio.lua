@@ -20,6 +20,9 @@ function new (tapinterface)
    local txpackets, rxpackets = 0, 0
 
    function init ()
+      -- XXX do this better!
+      os.execute("modprobe tun")
+      os.execute("modprobe vhost_net")
       local tapfd = C.open_tap(tapinterface);
       assert(C.vhost_open(vio, tapfd, memory_regions()) == 0)
       -- Initialize freelists
