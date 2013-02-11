@@ -14,9 +14,13 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/eventfd.h>
 #include <time.h>
 #include <unistd.h>
+#include <linux/vhost.h>
+#include <linux/virtio_ring.h>
 
+#include "virtio.h"
 #include "snabb.h"
 #include "snabb-shm-dev.h"
 
@@ -126,5 +130,61 @@ void *allocate_huge_page(int size)
   void *ptr = mmap(NULL, size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, 0, 0);
   return ptr != MAP_FAILED ? ptr : NULL;
+}
+
+/* forward declaration */
+static int setup_vring(struct vio *vio, int index);
+
+int vhost_open(struct vio *vio, int tapfd, struct vio_memory *memory)
+{
+  vio->tapfd = tapfd;
+  if ((vio->vhostfd = open("/dev/vhost-net", O_RDWR)) < 0 ||
+      (ioctl(vio->vhostfd, VHOST_SET_OWNER, NULL)) < 0 ||
+      (ioctl(vio->vhostfd, VHOST_GET_FEATURES, &vio->features)) < 0 ||
+      vhost_set_memory(vio, memory) ||
+      setup_vring(vio, 0) < 0 ||
+      setup_vring(vio, 1) < 0) {
+    /* Error */
+    if (vio->vhostfd >= 0) { close(vio->vhostfd); vio->vhostfd = -1; }
+    return -1;
+  }
+  return 0;
+}
+
+static int setup_vring(struct vio *vio, int index)
+{
+  struct vio_vring *vring = &vio->vring[index];
+  vring->kickfd = eventfd(0, EFD_NONBLOCK);
+  vring->callfd = eventfd(0, EFD_NONBLOCK);
+  assert(vring->kickfd >= 0);
+  assert(vring->callfd >= 0);
+  struct vhost_vring_file  backend = { .index = index, .fd = vio->tapfd };
+  struct vhost_vring_state num  = { .index = index, .num = VIO_VRING_SIZE };
+  struct vhost_vring_state base = { .index = index, .num = 0 };
+  struct vhost_vring_file  kick = { .index = index, .fd = vring->kickfd };
+  struct vhost_vring_file  call = { .index = index, .fd = vring->callfd };
+  struct vhost_vring_addr  addr = { .index = index,
+				    .desc_user_addr  = (uint64_t)&vring->desc,
+				    .avail_user_addr = (uint64_t)&vring->avail,
+				    .used_user_addr  = (uint64_t)&vring->used,
+				    .log_guest_addr  = (uint64_t)NULL,
+				    .flags = 0 };
+  return (ioctl(vio->vhostfd, VHOST_SET_VRING_NUM,  &num)  ||
+	  ioctl(vio->vhostfd, VHOST_SET_VRING_BASE, &base) ||
+	  ioctl(vio->vhostfd, VHOST_SET_VRING_KICK, &kick) ||
+	  ioctl(vio->vhostfd, VHOST_SET_VRING_CALL, &call) ||
+	  ioctl(vio->vhostfd, VHOST_SET_VRING_ADDR, &addr) ||
+	  ioctl(vio->vhostfd, VHOST_NET_SET_BACKEND, &backend));
+}
+
+int vhost_set_memory(struct vio *vio, struct vio_memory *memory)
+{
+  return ioctl(vio->vhostfd, VHOST_SET_MEM_TABLE, memory);
+}
+
+void full_memory_barrier()
+{
+  // See http://gcc.gnu.org/onlinedocs/gcc-4.1.1/gcc/Atomic-Builtins.html
+  __sync_synchronize();
 }
 

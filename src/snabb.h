@@ -48,3 +48,27 @@ uint64_t phys_page(uint64_t virt_page);
    Return NULL if such a page cannot be allocated.*/
 void *allocate_huge_page(int size);
 
+/* Open vhost I/O on given TAP file descriptor and specified memory
+   range. The caller is responsible for passing a valid tap file
+   descriptor and memory structure but not for initializing the vio
+   struct.
+
+   Return 0 on success.
+
+   See this link for a discussion of the Linux/KVM vhost_net feature:
+   http://blog.vmsplice.net/2011/09/qemu-internals-vhost-architecture.html */
+int vhost_open(struct vio *vio, int tapfd, struct vio_memory *memory);
+
+/* Setup vhost memory mapping for sockfd (a tap device or raw socket).
+   The memory mapping tells the kernel how to interpret addresses that
+   we write in our vring for virtio_net.
+
+   This should be called each time new DMA memory is introduced into
+   the process after an initial call to vhost_open().
+
+   Return 0 on success. */
+int vhost_set_memory(struct vio *vio, struct vio_memory *memory);
+
+/* Execute a full CPU hardware memory barrier.
+   See: http://en.wikipedia.org/wiki/Memory_barrier */
+void full_memory_barrier();

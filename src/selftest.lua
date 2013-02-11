@@ -5,8 +5,11 @@ local ffi = require "ffi"
 local C = ffi.C
 local test = require("test")
 local memory = require("memory")
+local virtio = require("virtio")
 
 assert(C.lock_memory() == 0)
+
+virtio.selftest()
 
 memory.selftest({verbose = false})
 pci.selftest()
