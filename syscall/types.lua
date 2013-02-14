@@ -1122,9 +1122,16 @@ local function ip_checksum(buf, size, c, final)
   for i = 0, size / 2 do
     c = c + htons(b16[i])
   end
-  if size % 2 == 1 then c = c + b16[size - 1] * 256 end -- TODO FIX, clearly wrong.
+  if size % 2 == 1 then
+    local cbuf = pt.char(buf)
+    local bbuf = t.char2(cbuf[size - 1], 0)
+    local c16 = pt.uint16(bbuf)
+    c = c + htons(c16[0])
+  end
 
-  c = bit.rshift(c, 16) + bit.band(c, 0xffff)
+  local v = bit.band(c, 0xffff)
+  if v < 0 then v = v + 0x10000 end -- positive
+  c = bit.rshift(c, 16) + v
   c = c + bit.rshift(c, 16)
   if final then c = bit.bnot(c) end
   return htons(c)
@@ -1154,20 +1161,22 @@ meth.udphdr = {
     src = function(u) return ntohs(u.source) end,
     dst = function(u) return ntohs(u.dest) end,
     length = function(u) return ntohs(u.len) end,
-    checksum = function(i) return function(i, source, dest, body)
-      local c = 0
+    checksum = function(i) return function(i, ip, body)
+      local bip = pt.char(ip)
+      local bup = pt.char(i)
+      local cs = 0
       -- checksum false header
-      c = ip_checksum(source, 4, c, false)
-      c = ip_checksum(dest, 4, c, false)
+      cs = ip_checksum(bip + ffi.offsetof(ip, "saddr"), 4, cs, false)
+      cs = ip_checksum(bip + ffi.offsetof(ip, "daddr"), 4, cs, false)
       local pr = t.char2(0, c.IPPROTO.UDP)
-      c = ip_checksum(pr, 2, c, false)
-      c = ip_checksum(i.len, 2, c, false)
+      cs = ip_checksum(pr, 2, cs, false)
+      cs = ip_checksum(bup + ffi.offsetof(i, "len"), 2, cs, false)
       -- checksum udp header
       i.check = 0
-      c = ip_checksum(i, s.udphdr, c, false)
+      cs = ip_checksum(i, s.udphdr, cs, false)
       -- checksum body
-      c = ip_checksum(body, i.length - s.udphdr, c, true)
-      i.check = c
+      cs = ip_checksum(body, i.length - s.udphdr, cs, true)
+      i.check = cs
     end end,
   },
   newindex = {
