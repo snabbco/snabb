@@ -1115,6 +1115,7 @@ struct iphdr {
 };
 ]]
 
+--TODO check wtrict aliasing here and below
 local function ip_checksum(buf, size, c, final)
   c = c or 0
   final = final or true
