@@ -189,6 +189,7 @@ t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
 
 t.int1 = ffi.typeof("int[1]")
 t.int16_1 = ffi.typeof("int16_t[1]")
+t.uint16_1 = ffi.typeof("uint16_t[1]")
 t.int64_1 = ffi.typeof("int64_t[1]")
 t.uint64_1 = ffi.typeof("uint64_t[1]")
 t.socklen1 = ffi.typeof("socklen_t[1]")
@@ -1118,25 +1119,27 @@ struct iphdr {
 
 local function ip_checksum(buf, size, c, final)
   c = c or 0
-  final = final or true
+  final = final or false
   local b8 = pt.char(buf)
-  local i16 = t.int16_1()
-  for i = 0, size, 2 do
+  local i16 = t.uint16_1()
+  for i = 0, size - 1, 2 do
     ffi.copy(i16, b8 + i, 2)
-    c = c + ntohs(i16[0])
+    c = c + i16[0]
   end
   if size % 2 == 1 then
     i16[0] = 0
     ffi.copy(i16, b8[size - 1], 1)
-    c = c + ntohs(i16[0])
+    c = c + i16[0]
   end
 
   local v = bit.band(c, 0xffff)
   if v < 0 then v = v + 0x10000 end -- positive
   c = bit.rshift(c, 16) + v
   c = c + bit.rshift(c, 16)
+
   if final then c = bit.bnot(c) end
-  return htons(c)
+  if c < 0 then c = c + 0x10000 end -- positive
+  return c
 end
 
 meth.iphdr = {
@@ -1144,6 +1147,7 @@ meth.iphdr = {
     checksum = function(i) return function(i)
       i.check = 0
       i.check = ip_checksum(i, s.iphdr)
+      return i.check
     end end,
   },
   newindex = {
@@ -1168,17 +1172,19 @@ meth.udphdr = {
       local bup = pt.char(i)
       local cs = 0
       -- checksum pseudo header
-      cs = ip_checksum(bip + ffi.offsetof(ip, "saddr"), 4, cs, false)
-      cs = ip_checksum(bip + ffi.offsetof(ip, "daddr"), 4, cs, false)
+      cs = ip_checksum(bip + ffi.offsetof(ip, "saddr"), 4, cs)
+      cs = ip_checksum(bip + ffi.offsetof(ip, "daddr"), 4, cs)
       local pr = t.char2(0, c.IPPROTO.UDP)
-      cs = ip_checksum(pr, 2, cs, false)
-      cs = ip_checksum(bup + ffi.offsetof(i, "len"), 2, cs, false)
+      cs = ip_checksum(pr, 2, cs)
+      cs = ip_checksum(bup + ffi.offsetof(i, "len"), 2, cs)
       -- checksum udp header
       i.check = 0
-      cs = ip_checksum(i, s.udphdr, cs, false)
+      cs = ip_checksum(i, s.udphdr, cs)
       -- checksum body
       cs = ip_checksum(body, i.length - s.udphdr, cs, true)
+      if cs == 0 then cs = 0xffff end
       i.check = cs
+      return cs
     end end,
   },
   newindex = {

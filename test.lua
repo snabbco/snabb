@@ -1247,8 +1247,23 @@ test_sockets = {
   end
 }
 
-test_raw_socket_root = {
-  test_raw_udp = function()
+test_raw_socket = {
+  test_ip_checksum = function()
+    local packet = {0x45, 0x00,
+      0x00, 0x73, 0x00, 0x00,
+      0x40, 0x00, 0x40, 0x11,
+      0xb8, 0x61, 0xc0, 0xa8, 0x00, 0x01,
+      0xc0, 0xa8, 0x00, 0xc7}
+
+    local expected = 0x61B8 -- note reversed from example at https://en.wikipedia.org/wiki/IPv4_header_checksum#Example:_Calculating_a_checksum due to byte order issue
+
+    local buf = t.buffer(#packet, packet)
+    local iphdr = pt.iphdr(buf)
+    iphdr[0].check = 0
+    local cs = iphdr[0]:checksum()
+    assert(cs == expected, "expect correct ip checksum: " .. string.format("%%%04X", cs) .. " " .. string.format("%%%04X", expected))
+  end,
+  test_raw_udp_root = function()
 
     local h = require "syscall.helpers" -- should not have to use later
 
@@ -1278,13 +1293,22 @@ test_raw_socket_root = {
              saddr = sa.sin_addr.s_addr, daddr = ca.sin_addr.s_addr, tot_len = h.htons(len)}
     iphdr[0]:checksum()
 
+    -- test checksum TODO new test
+    cport = 777
+
     --udphdr[0] = {src = sport, dst = cport, length = udplen} -- doesnt work with metamethods
     udphdr[0].src = sport
     udphdr[0].dst = cport
     udphdr[0].length = udplen
     udphdr[0]:checksum(iphdr[0], buf + s.iphdr + s.udphdr)
 
-print(string.format("%%%04X", udphdr[0].check))
+    assert_equal(udphdr[0].check, 0x306b) -- reversed due to network order
+
+    cport = ca.port
+    udphdr[0].dst = cport
+    udphdr[0]:checksum(iphdr[0], buf + s.iphdr + s.udphdr)
+
+--print(string.format("%%%04X", udphdr[0].check))
 
     local n = assert(raw:sendto(buf, len, 0, ca))
     --local f = assert(cl:recvfrom(buf2, #msg))
@@ -2283,7 +2307,7 @@ if S.geteuid() == 0 then
     arg[1] = nil
   end
 
-  -- cut out this section if you want to debug on real interfaces
+  -- cut out this section if you want to (careful!) debug on real interfaces
 --[[
   assert(S.unshare("newnet, newns, newuts")) -- do not interfere with anything on host during tests
   local i = assert(nl.interfaces())
