@@ -1213,7 +1213,7 @@ test_sockets = {
     local sa = assert(t.sockaddr_in(0, loop))
     local ca = assert(t.sockaddr_in(0, loop))
     assert(s:bind(sa))
-    assert(c:bind(sa))
+    assert(c:bind(ca))
     local bca = c:getsockname() -- find bound address
     local serverport = s:getsockname().port -- find bound port
     local n = assert(s:sendto(teststring, nil, 0, bca))
@@ -1261,16 +1261,17 @@ test_raw_socket_root = {
     local iphdr = pt.iphdr(buf)
     local udphdr = pt.udphdr(buf + s.iphdr)
     ffi.copy(buf + s.iphdr + s.udphdr, msg, #msg)
+    local bound = false
     local sport = 666
+    local sa = t.sockaddr_in(sport, loop)
+
     local buf2 = t.buffer(#msg)
 
-    local sa = assert(t.sockaddr_in(0, loop))
     local cl = assert(S.socket("inet", "dgram"))
-    local ca = assert(t.sockaddr_in(0, loop))
-    local bca = assert(cl:getsockname())
-    local cport = bca.port -- find client port
-
-    assert(cl:bind(sa))
+    local ca = t.sockaddr_in(0, loop)
+    assert(cl:bind(ca))
+    local ca = cl:getsockname()
+    local cport = ca.port
 
     -- iphdr should have __index helpers for endianness etc (note use raw s_addr)
     iphdr[0] = {ihl = 5, version = 4, tos = 0, id = 0, frag_off = h.htons(0x4000), ttl = 64, protocol = c.IPPROTO.UDP, check = 0,
@@ -1283,14 +1284,14 @@ test_raw_socket_root = {
     udphdr[0].length = udplen
     udphdr[0]:checksum(iphdr[0], buf + s.iphdr + s.udphdr)
 
-    local n = assert(raw:sendto(buf, len, 0, bca))
+print(string.format("%%%04X", udphdr[0].check))
 
-    --assert(util.writefile("/tmp/dump", ffi.string(buf, len), "rwxu"))
-
+    local n = assert(raw:sendto(buf, len, 0, ca))
     --local f = assert(cl:recvfrom(buf2, #msg))
 
     assert(raw:close())
     assert(cl:close())
+
   end,
 
 }
@@ -2282,11 +2283,14 @@ if S.geteuid() == 0 then
     arg[1] = nil
   end
 
+  -- cut out this section if you want to debug on real interfaces
+--[[
   assert(S.unshare("newnet, newns, newuts")) -- do not interfere with anything on host during tests
   local i = assert(nl.interfaces())
   local lo = assert(i.lo)
   assert(lo:up())
   assert(S.mount("none", "/sys", "sysfs"))
+]]
 else -- remove tests that need root
   for k in pairs(_G) do
     if k:match("test") then

@@ -188,6 +188,7 @@ t.ints = ffi.typeof("int[?]")
 t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
 
 t.int1 = ffi.typeof("int[1]")
+t.int16_1 = ffi.typeof("int16_t[1]")
 t.int64_1 = ffi.typeof("int64_t[1]")
 t.uint64_1 = ffi.typeof("uint64_t[1]")
 t.socklen1 = ffi.typeof("socklen_t[1]")
@@ -1115,19 +1116,19 @@ struct iphdr {
 };
 ]]
 
---TODO check wtrict aliasing here and below
 local function ip_checksum(buf, size, c, final)
   c = c or 0
   final = final or true
-  local b16 = pt.int16(buf)
-  for i = 0, size / 2 do
-    c = c + htons(b16[i])
+  local b8 = pt.char(buf)
+  local i16 = t.int16_1()
+  for i = 0, size, 2 do
+    ffi.copy(i16, b8 + i, 2)
+    c = c + ntohs(i16[0])
   end
   if size % 2 == 1 then
-    local cbuf = pt.char(buf)
-    local bbuf = t.char2(cbuf[size - 1], 0)
-    local c16 = pt.uint16(bbuf)
-    c = c + htons(c16[0])
+    i16[0] = 0
+    ffi.copy(i16, b8[size - 1], 1)
+    c = c + ntohs(i16[0])
   end
 
   local v = bit.band(c, 0xffff)
@@ -1166,7 +1167,7 @@ meth.udphdr = {
       local bip = pt.char(ip)
       local bup = pt.char(i)
       local cs = 0
-      -- checksum false header
+      -- checksum pseudo header
       cs = ip_checksum(bip + ffi.offsetof(ip, "saddr"), 4, cs, false)
       cs = ip_checksum(bip + ffi.offsetof(ip, "daddr"), 4, cs, false)
       local pr = t.char2(0, c.IPPROTO.UDP)
