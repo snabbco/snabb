@@ -1117,9 +1117,8 @@ struct iphdr {
 };
 ]]
 
-local function ip_checksum(buf, size, c, final)
+local function ip_checksum(buf, size, c, notfinal)
   c = c or 0
-  final = final or false
   local b8 = pt.char(buf)
   local i16 = t.uint16_1()
   for i = 0, size - 1, 2 do
@@ -1137,7 +1136,7 @@ local function ip_checksum(buf, size, c, final)
   c = bit.rshift(c, 16) + v
   c = c + bit.rshift(c, 16)
 
-  if final then c = bit.bnot(c) end
+  if not notfinal then c = bit.bnot(c) end
   if c < 0 then c = c + 0x10000 end -- positive
   return c
 end
@@ -1172,16 +1171,16 @@ meth.udphdr = {
       local bup = pt.char(i)
       local cs = 0
       -- checksum pseudo header
-      cs = ip_checksum(bip + ffi.offsetof(ip, "saddr"), 4, cs)
-      cs = ip_checksum(bip + ffi.offsetof(ip, "daddr"), 4, cs)
+      cs = ip_checksum(bip + ffi.offsetof(ip, "saddr"), 4, cs, true)
+      cs = ip_checksum(bip + ffi.offsetof(ip, "daddr"), 4, cs, true)
       local pr = t.char2(0, c.IPPROTO.UDP)
-      cs = ip_checksum(pr, 2, cs)
-      cs = ip_checksum(bup + ffi.offsetof(i, "len"), 2, cs)
+      cs = ip_checksum(pr, 2, cs, true)
+      cs = ip_checksum(bup + ffi.offsetof(i, "len"), 2, cs, true)
       -- checksum udp header
       i.check = 0
-      cs = ip_checksum(i, s.udphdr, cs)
+      cs = ip_checksum(i, s.udphdr, cs, true)
       -- checksum body
-      cs = ip_checksum(body, i.length - s.udphdr, cs, true)
+      cs = ip_checksum(body, i.length - s.udphdr, cs)
       if cs == 0 then cs = 0xffff end
       i.check = cs
       return cs

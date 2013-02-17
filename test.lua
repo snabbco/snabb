@@ -1308,10 +1308,10 @@ test_raw_socket = {
     udphdr[0].dst = cport
     udphdr[0]:checksum(iphdr[0], buf + s.iphdr + s.udphdr)
 
---print(string.format("%%%04X", udphdr[0].check))
-
     local n = assert(raw:sendto(buf, len, 0, ca))
-    --local f = assert(cl:recvfrom(buf2, #msg))
+    local f = assert(cl:recvfrom(buf2, #msg))
+
+    assert_equal(f.count, #msg)
 
     assert(raw:close())
     assert(cl:close())
