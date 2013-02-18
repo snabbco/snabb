@@ -435,8 +435,44 @@ metatype("sockaddr_nl", "struct sockaddr_nl", {
   end,
 })
 
--- 64 to 32 bit conversions via unions TODO use meth not object?
+meth.sockaddr_ll = {
+  index = {
+    family = function(sa) return sa.sll_family end,
+    protocol = function(sa) return ntohs(sa.sll_protocol) end,
+    ifindex = function(sa) return sa.sll_ifindex end,
+    hatype = function(sa) return sa.sll_hatype end,
+    pkttype = function(sa) return sa.sll_pkttype end,
+    halen = function(sa) return sa.sll_halen end,
+    addr = function(sa)
+      if sa.sll_halen == 6 then return pt.macaddr(sa.sll_addr) else return ffi.string(sa.sll_addr, sa.sll_halen) end
+    end,
+  },
+  newindex = {
+    protocol = function(sa, v) sa.sll_protocol = htons(c.ETH_P[v]) end,
+    ifindex = function(sa, v) sa.sll_ifindex = v end,
+    hatype = function(sa, v) sa.sll_hatype = v end,
+    pkttype = function(sa, v) sa.sll_pkttype = v end,
+    halen = function(sa, v) sa.sll_halen = v end,
+    addr = function(sa, v)
+      if ffi.istype(t.macaddr, v) then
+        sa.sll_halen = 6
+        ffi.copy(sa.sll_addr, v, 6)
+      else sa.sll_addr = v end
+    end,
+  }
+}
 
+metatype("sockaddr_ll", "struct sockaddr_ll", {
+  __index = function(sa, k) if meth.sockaddr_ll.index[k] then return meth.sockaddr_ll.index[k](sa) end end,
+  __newindex = function(sa, k, v) if meth.sockaddr_ll.newindex[k] then meth.sockaddr_ll.newindex[k](sa, v) end end,
+  __new = function(tp, tb)
+    local sa = ffi.new(tp, {sll_family = c.AF.PACKET})
+    for k, v in pairs(tb or {}) do sa[k] = v end
+    return sa
+  end,
+})
+
+-- 64 to 32 bit conversions via unions TODO use meth not object?
 if ffi.abi("le") then
 mt.i6432 = {
   __index = {
@@ -956,6 +992,7 @@ samap = {
   [c.AF.INET] = t.sockaddr_in,
   [c.AF.INET6] = t.sockaddr_in6,
   [c.AF.NETLINK] = t.sockaddr_nl,
+  [c.AF.PACKET] = t.sockaddr_ll,
 }
 
 samap2 = {
@@ -963,6 +1000,7 @@ samap2 = {
   [c.AF.INET] = pt.sockaddr_in,
   [c.AF.INET6] = pt.sockaddr_in6,
   [c.AF.NETLINK] = pt.sockaddr_nl,
+  [c.AF.PACKET] = pt.sockaddr_ll,
 }
 
 -- slightly miscellaneous types, eg need to use Lua metatables
@@ -1193,15 +1231,6 @@ meth.udphdr = {
   },
 }
 
---[[
-struct pseudo_hdr {
-u_int32_t source;
-u_int32_t dest;
-u_int8_t zero;
-u_int8_t protocol;
-u_int16_t udp_length;
-};
-]]
 -- checksum = function(u, ...) return 0 end, -- TODO checksum, needs IP packet info too. as method.
 mt.udphdr = {
   __index = function(u, k) if meth.udphdr.index[k] then return meth.udphdr.index[k](u) end end,
@@ -1209,6 +1238,12 @@ mt.udphdr = {
 }
 
 metatype("udphdr", "struct udphdr", mt.udphdr)
+
+mt.ethhdr = {
+  -- TODO
+}
+
+metatype("ethhdr", "struct ethhdr", mt.ethhdr)
 
 return types
 

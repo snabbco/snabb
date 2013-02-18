@@ -209,6 +209,15 @@ struct sockaddr_nl {
   uint32_t        nl_pid;
   uint32_t        nl_groups;
 };
+struct sockaddr_ll {
+  unsigned short  sll_family;
+  unsigned short  sll_protocol; /* __be16 */
+  int             sll_ifindex;
+  unsigned short  sll_hatype;
+  unsigned char   sll_pkttype;
+  unsigned char   sll_halen;
+  unsigned char   sll_addr[8];
+};
 struct nlmsghdr {
   uint32_t           nlmsg_len;
   uint16_t           nlmsg_type;
@@ -246,6 +255,11 @@ struct rtmsg {
   unsigned char rtm_type;
   unsigned int  rtm_flags;
 };
+struct ethhdr {
+  unsigned char   h_dest[6];
+  unsigned char   h_source[6];
+  unsigned short  h_proto; /* __be16 */
+} __attribute__((packed));
 
 static const int IFNAMSIZ = 16;
 
