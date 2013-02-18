@@ -65,6 +65,9 @@ c.W.NOTHREAD = nil
 c.IP.NODEFRAG = nil
 c.IP.UNICAST_IF = nil
 
+-- not on travis CI box
+c.ETH_P["802_EX1"] = nil
+
 -- fix these, renamed tables, signals etc
 c.SIGTRAP = nil
 c.SIGPM = nil
