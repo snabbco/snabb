@@ -1385,7 +1385,6 @@ c.ARPHRD.HDLC     = c.ARPHRD.CISCO
 -- IP
 c.IPPROTO = setmetatable({
   IP = 0,
-  HOPOPTS = 0, -- TODO overloaded namespace?
   ICMP = 1,
   IGMP = 2,
   IPIP = 4,
@@ -1413,6 +1412,44 @@ c.IPPROTO = setmetatable({
   SCTP = 132,
   UDPLITE = 136,
   RAW = 255,
+}, stringflag)
+
+c.IP = setmetatable({
+  TOS          = 1,
+  TTL          = 2,
+  HDRINCL      = 3,
+  OPTIONS      = 4,
+  ROUTER_ALERT = 5,
+  RECVOPTS     = 6,
+  RETOPTS      = 7,
+  PKTINFO      = 8,
+  PKTOPTIONS   = 9,
+  MTU_DISCOVER = 10,
+  RECVERR      = 11,
+  RECVTTL      = 12,
+  RECVTOS      = 13,
+  MTU          = 14,
+  FREEBIND     = 15,
+  IPSEC_POLICY = 16,
+  XFRM_POLICY  = 17,
+  PASSSEC      = 18,
+  TRANSPARENT  = 19,
+  ORIGDSTADDR  = 20,
+  MINTTL       = 21,
+  NODEFRAG     = 22,
+  MULTICAST_IF                 = 32,
+  MULTICAST_TTL                = 33,
+  MULTICAST_LOOP               = 34,
+  ADD_MEMBERSHIP               = 35,
+  DROP_MEMBERSHIP              = 36,
+  UNBLOCK_SOURCE               = 37,
+  BLOCK_SOURCE                 = 38,
+  ADD_SOURCE_MEMBERSHIP        = 39,
+  DROP_SOURCE_MEMBERSHIP       = 40,
+  MSFILTER                     = 41,
+
+  MULTICAST_ALL                = 49,
+  UNICAST_IF                   = 50,
 }, stringflag)
 
 -- eventfd

@@ -61,6 +61,10 @@ c.RTF.ANYCAST = nil
 c.W.CLONE = nil
 c.W.NOTHREAD = nil
 
+-- only in Linux headers that conflict
+c.IP.NODEFRAG = nil
+c.IP.UNICAST_IF = nil
+
 -- fix these, renamed tables, signals etc
 c.SIGTRAP = nil
 c.SIGPM = nil
