@@ -2308,13 +2308,12 @@ if S.geteuid() == 0 then
   end
 
   -- cut out this section if you want to (careful!) debug on real interfaces
---[[
   assert(S.unshare("newnet, newns, newuts")) -- do not interfere with anything on host during tests
   local i = assert(nl.interfaces())
   local lo = assert(i.lo)
   assert(lo:up())
   assert(S.mount("none", "/sys", "sysfs"))
-]]
+
 else -- remove tests that need root
   for k in pairs(_G) do
     if k:match("test") then
