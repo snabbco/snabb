@@ -291,9 +291,35 @@ function new (pciaddress)
             BAM=15         -- Broadcast Accept Mode
          })
       regs[RFCTL] = bits({EXSTEN=15})  -- Extended RX writeback descriptor format
-      regs[RXDCTL] = bits({GRAN=24, WTHRESH0=16})
+
+      -- RXDCTL Threshold Settings
+      -- e1000e Settings (82563/6/7, 82571/2/3/4/7/8/9, 82583)
+      --   pthresh 32 descriptors
+      --   hthresh 4 descriptors
+      --   wthresh 4 descriptors
+      --
+      -- igb Settings (82575/6-, 82580-, and I350-based):
+      --   pthresh 8 descriptors
+      --   hthresh 8 descriptors
+      --   wthresh 4 descriptors
+      --
+      -- ixgbe (82598-, 82599-, and X540 10Gig)
+      --   pthresh 32 descriptors
+      --   hthresh 4 descriptors
+      --   wthresh 8 descriptors
+      --
+      -- Values for 82571 and 82574 controllers (same as e1000e driver).
+      regs[RXDCTL] = bits({GRAN=24, PTHRESH5=5, HTHRESH2=10, WTHRESH2=18})
+
       regs[RXCSUM] = 0                 -- Disable checksum offload - not needed
-      regs[RADV] = math.log(1024,2)    -- 1us max writeback delay
+
+      -- e1000e Settings (82563/6/7, 82571/2/3/4/7/8/9, 82583)
+      --   RDTR 0x20
+      --   RADV 0x20
+      -- We should probably switch to using ITR instead per specsheet
+      regs[RDTR] = 0x20
+      regs[RADV] = 0x20
+
       regs[RDLEN] = num_descriptors * ffi.sizeof("union rx")
       regs[RDBAL] = rxdesc_phy % (2^32)
       regs[RDBAH] = rxdesc_phy / (2^32)
@@ -368,15 +394,43 @@ function new (pciaddress)
    local tdt = 0
 
    function init_transmit ()
-      regs[TCTL]        = 0x3103f0f8
-      regs[TXDCTL]      = 0x01410000
+      regs[TCTL] = 0x3103f0f8 -- Disable 'transmit enable'
       regs[TIPG] = 0x00602006 -- Suggested value in data sheet
       init_transmit_ring()
+
       -- Enable transmit
       regs[TDH] = 0
       regs[TDT] = 0
-      regs[TXDCTL]      = 0x01410000
-      regs[TCTL]        = 0x3103f0fa
+
+      -- TXDCTL Threshold Settings
+      -- e1000e Settings (82563/6/7, 82571/2/3/4/7/8/9, 82583)
+      --   pthresh 31 descriptors
+      --   hthresh 1 descriptors
+      --   wthresh 1 descriptors (comment from e1000.h header file):
+      --     in the case of WTHRESH, it appears at least the 82571/2
+      --     hardware writes back 4 descriptors when WTHRESH=5, and 3
+      --     descriptors when WTHRESH=4, so a setting of 5 gives the
+      --     most efficient bus utilization but to avoid possible Tx
+      --     stalls, set it to 1.
+      --   https://patchwork.kernel.org/patch/1614951/
+      --
+      -- igb Settings (82575/6-, 82580-, and I350-based):
+      --   pthresh 8 descriptors
+      --   hthresh 1 descriptors
+      --   wthresh 16 descriptors
+      --
+      -- ixgbe (82598-, 82599-, and X540 10Gig)
+      --   pthresh 32 descriptors
+      --   hthresh 1 descriptors
+      --   wthresh 8 descriptors (or 1 if ITR is disabled)
+      --
+      -- Use same as e1000e for now
+      regs[TXDCTL] = bits({GRAN=24,
+                           PTHRESH0=0, PTHRESH1=1, PTHRESH2=2, PTHRESH3=3, PTHRESH4=4,
+                           HTHRESH0=8,
+                           WTHRESH0=16})
+
+      regs[TCTL] = 0x3103f0fa -- Enable 'transmit enable'
       tdt = 0
    end
 
