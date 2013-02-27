@@ -1,5 +1,7 @@
 module(...,package.seeall)
 
+local ffi = require("ffi")
+
 function readfile (filename, what)
    local f = io.open(filename, "r")
    if f == nil then error("Unable to open file: " .. filename) end
@@ -37,3 +39,32 @@ function comma_value(n) -- credit http://richard.warburton.it
    return left..(num:reverse():gsub('(%d%d%d)','%1,'):reverse())..right
 end
 
+-- Return a table for protected (bounds-checked) memory access.
+-- 
+-- The table can be indexed like a pointer. Index 0 refers to address
+-- BASE+OFFSET, index N refers to address BASE+OFFSET+N*sizeof(TYPE),
+-- and access to indices >= SIZE is prohibited.
+--
+-- Examples:
+--   local mem =  protected("uint32_t", 0x1000, 0x0, 0x080)
+--   mem[0x000] => <word at 0x1000>
+--   mem[0x001] => <word at 0x1004>
+--   mem[0x07F] => <word at 0x11FC>
+--   mem[0x080] => ERROR <address out of bounds: 0x1200>
+--   mem._ptr   => cdata<uint32_t *>: 0x1000 (get the raw pointer)
+function protected (type, base, offset, size)
+   type = ffi.typeof(type)
+   local bound = ((size * ffi.sizeof(type)) + 0ULL) / ffi.sizeof(type) 
+   local tptr = ffi.typeof("$ *", type)
+   local wrap = ffi.metatype(ffi.typeof("struct { $ _ptr; }", tptr), {
+				__index = function(w, idx)
+					     assert(idx < bound)
+					     return w._ptr[idx]
+					  end,
+				__newindex = function(w, idx, val)
+						assert(idx < bound)
+						w._ptr[idx] = val
+					     end,
+			     })
+   return wrap(ffi.cast(tptr, ffi.cast("uint8_t *", base) + offset))
+end
