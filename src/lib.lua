@@ -1,6 +1,7 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
+local C = ffi.C
 
 function readfile (filename, what)
    local f = io.open(filename, "r")
@@ -68,3 +69,10 @@ function protected (type, base, offset, size)
 			     })
    return wrap(ffi.cast(tptr, ffi.cast("uint8_t *", base) + offset))
 end
+
+-- Return a function that will return false until NS nanoseconds have elapsed.
+function timer (ns)
+   local deadline = C.get_time_ns() + ns
+   return function () return C.get_time_ns() >= deadline end
+end
+
