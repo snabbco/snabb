@@ -72,3 +72,7 @@ int vhost_set_memory(struct vio *vio, struct vio_memory *memory);
 /* Execute a full CPU hardware memory barrier.
    See: http://en.wikipedia.org/wiki/Memory_barrier */
 void full_memory_barrier();
+
+/* Sleep for a given number of nanoseconds.
+   Must be less than 1 second. */
+void sleep_ns(int nanoseconds);

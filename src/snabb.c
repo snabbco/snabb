@@ -188,3 +188,11 @@ void full_memory_barrier()
   __sync_synchronize();
 }
 
+void sleep_ns(int nanoseconds)
+{
+  static struct timespec time;
+  struct timespec rem;
+  time.tv_nsec = nanoseconds;
+  nanosleep(&time, &rem);
+}
+
