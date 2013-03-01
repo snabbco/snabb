@@ -65,7 +65,7 @@ function init_device ()
    wait_eeprom_autoread()
    wait_dma()
 --   setup_link()
---   init_statistics()
+   init_statistics()
    init_receive()
    init_transmit()
 end
@@ -90,6 +90,10 @@ end
 
 function waitfor (condition)
    while not condition() do print "Waiting" C.usleep(100) end
+end
+
+function init_statistics ()
+   for _,reg in pairs(s) do reg.clear() end
 end
 
 function linkup () return bitset(r.LINKS(), 30) end
@@ -134,27 +138,47 @@ function transmit (address, size)
 end
 
 function sync_transmit ()
---   C.full_memory_barrier()
+   C.full_memory_barrier()
    tdh = r.TDH()
    r.TDT(tdt)
 end
 
 function tx_full () return (tdt + 1) % num_descriptors == tdh end
-function ring_pending(head, tail)
-   if head == tail then return 0 end
-   if head <  tail then return tail - head
-   else                 return num_descriptors + tail - head end
-end
-function tx_pending () return ring_pending(tdh, tdt) end
-function tx_avail () return num_descriptors - tx_pending() - 1 end
 
---local txdesc_flags = bits({dtype0=20, dtype1=21, eop=24, ifcs=25, dext=29})
-function test_transmit ()
-   txdesc[r.TDT()].data.address = buffers_phy
-   txdesc[r.TDT()].data.options = bit.bor(1024, bits{eop=24,ifcs=25})
-   C.full_memory_barrier()
-   r.TDT(r.TDT()+1)
+-- Return the next available packet as two values: buffer, length.
+-- If no packet is available then return nil.
+
+rdh, rdt, rxnext = 0, 0, 0
+
+-- Return the next available packet as two values: buffer, length.
+-- If no packet is available then return nil.
+function receive ()
+   if rdh ~= rxnet then
+      local buffer = rxbuffers[rxnext]
+      local wb = rxdesc[rxnext].wb
+      rxnext = (rxnext + 1) % num_descriptors
+      return buffer, wb.length
+   end
 end
+
+function receive_descriptor_available ()
+   return (rdt + 1) % num_descriptors ~= rdh
+end
+
+function add_receive_buffer (address)
+   assert(receive_descriptor_available())
+   local desc = rxdesc[rdt].data
+   desc.address, desc.dd = address, 0
+   rdt = (rdt + 1) % num_descriptors
+end
+
+function sync_receive ()
+   C.full_memory_barrier()
+   rdh = r.RDH()
+   r.RDT(rdt)
+end
+
+function sync () sync_receive() sync_transmit() end
 
 local txdesc_t = ffi.typeof [[
       union { struct { uint64_t address, options; } data;
@@ -202,6 +226,11 @@ function make_register (name, address, desc, base_pointer, mode)
                         return desc
                      elseif key == "name" then
                         return name
+		     elseif key == "clear" then
+			return function ()
+				  acc = reg.ptr[0]
+				  acc = 0
+			       end
                      end
                   end,
 	__tostring = function(reg)
@@ -221,13 +250,16 @@ function selftest ()
    init_device()
    enable_mac_loopback()
    test.waitfor("linkup", linkup, 20, 250000)
---   C.usleep(100000)
    local finished = lib.timer(1e9)
+   buffers[0] = 99
    repeat
-      while not tx_full() do transmit(buffers_phy, 40) end
-      sync_transmit()
-      C.sleep_ns(1)
+      sync()
+      while receive_descriptor_available() do add_receive_buffer(buffers_phy + 40960) end
+      while not tx_full() do transmit(buffers_phy, 50) end
+      sync()
+      C.usleep(1)
    until finished()
+   assert(buffers[40960]==99)
    C.usleep(1000)
    print "stats"
    registerdump(s)
