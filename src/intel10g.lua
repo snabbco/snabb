@@ -58,6 +58,16 @@ registerspec = [[
       TXDCTL    0x06028 +0x40*0..127 (RW) Transmit Descriptor Control
 ]]
 
+function open ()
+   local pcidev = "0000:83:00.1"
+   local pci_config_fd = pci.open_config(pcidev)
+   pci.set_bus_master(pci_config_fd, true)
+   base = ffi.cast("uint32_t*", pci.map_pci_memory(pcidev, 0))
+   defregisters(registerspec, base, r)
+   defregisters(statisticsregs, base, s, 'accumulate')
+   init_device()
+end
+
 function init_device ()
    init_dma_memory()
    disable_interrupts()
@@ -130,11 +140,24 @@ function init_transmit ()
 end
 
 tdh, tdt = 0, 0 -- Cached values of TDT and TDH
+txfree = 0
 txdesc_flags = bits{eop=24,ifcs=25}
 function transmit (address, size)
    txdesc[tdt].data.address = address
    txdesc[tdt].data.options = bit.bor(size, txdesc_flags)
    tdt = (tdt + 1) % num_descriptors
+end
+
+function can_reclaim_buffer ()
+   return txfree ~= tdh
+end
+
+function reclaim_buffer ()
+   if txfree ~= tdh then
+      local address = txdesc[txfree].data.address
+      txfree = (txfree + 1) % num_descriptors
+      return buffer
+   end
 end
 
 function sync_transmit ()
@@ -143,7 +166,7 @@ function sync_transmit ()
    r.TDT(tdt)
 end
 
-function tx_full () return (tdt + 1) % num_descriptors == tdh end
+function tx_full () return (tdt + 1) % num_descriptors == txfree end
 
 -- Return the next available packet as two values: buffer, length.
 -- If no packet is available then return nil.
@@ -161,12 +184,16 @@ function receive ()
    end
 end
 
-function receive_descriptor_available ()
+function can_receive ()
+   return rdh ~= rxnext
+end
+
+function can_add_receive_buffer ()
    return (rdt + 1) % num_descriptors ~= rdh
 end
 
 function add_receive_buffer (address)
-   assert(receive_descriptor_available())
+   assert(can_add_receive_buffer())
    local desc = rxdesc[rdt].data
    desc.address, desc.dd = address, 0
    rdt = (rdt + 1) % num_descriptors
@@ -241,23 +268,17 @@ end
 
 function selftest ()
    print("intel10g")
-   local pcidev = "0000:83:00.1"
-   local pci_config_fd = pci.open_config(pcidev)
-   pci.set_bus_master(pci_config_fd, true)
-   base = ffi.cast("uint32_t*", pci.map_pci_memory(pcidev, 0))
-   defregisters(registerspec, base, r)
-   defregisters(statisticsregs, base, s, 'accumulate')
-   init_device()
+   open()
    enable_mac_loopback()
    test.waitfor("linkup", linkup, 20, 250000)
    local finished = lib.timer(1e9)
    buffers[0] = 99
    repeat
       sync()
-      while receive_descriptor_available() do add_receive_buffer(buffers_phy + 40960) end
+      while can_add_receive_buffer() do add_receive_buffer(buffers_phy + 40960) end
       while not tx_full() do transmit(buffers_phy, 50) end
       sync()
-      C.usleep(1)
+--      C.usleep(1)
    until finished()
    assert(buffers[40960]==99)
    C.usleep(1000)
