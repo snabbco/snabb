@@ -109,7 +109,7 @@ end
 function linkup () return bitset(r.LINKS(), 30) end
 
 function enable_mac_loopback ()
-   set(r.AUTOC, bits({ForceLinkUp=0}))
+   set(r.AUTOC, bits({ForceLinkUp=0, LMS10G=13}))
    set(r.HLREG0, bits({Loop=15}))
 end
 
@@ -120,7 +120,7 @@ function clr (r, bitmask) r(bit.band(bit.bnot(bitmask), r())) end
 function init_receive ()
    set_promiscuous_mode() -- accept all, no need to configure MAC address filter
    set(r.RDRXCTL, bits{CRCStrip=0})
-   clr(r.HLREG0, bits({RXLNGTHERREN=27}))
+   clr(r.HLREG0, bits({RXLNGTHERREN=27, UndocumentedRXCRCSTRP=1}))
    r.RDBAL(rxdesc_phy % 2^32)
    r.RDBAH(rxdesc_phy / 2^32)
    r.RDLEN(num_descriptors * ffi.sizeof("union rx"))
@@ -143,6 +143,7 @@ tdh, tdt = 0, 0 -- Cached values of TDT and TDH
 txfree = 0
 txdesc_flags = bits{eop=24,ifcs=25}
 function transmit (address, size)
+--   print("TX DUMP ("..size.."): " .. bit.tohex(ffi.cast("uint32_t*", address)[1]))
    txdesc[tdt].data.address = address
    txdesc[tdt].data.options = bit.bor(size, txdesc_flags)
    tdt = (tdt + 1) % num_descriptors
@@ -156,7 +157,7 @@ function reclaim_buffer ()
    if txfree ~= tdh then
       local address = txdesc[txfree].data.address
       txfree = (txfree + 1) % num_descriptors
-      return buffer
+      return ffi.cast("uint8_t*", address)
    end
 end
 
@@ -166,19 +167,25 @@ function sync_transmit ()
    r.TDT(tdt)
 end
 
-function tx_full () return (tdt + 1) % num_descriptors == txfree end
+function can_transmit () return (tdt + 1) % num_descriptors ~= txfree end
 
--- Return the next available packet as two values: buffer, length.
--- If no packet is available then return nil.
+-- Pointer to buffer address for each receive descriptor.
+-- (So that we know even if the address in the receive descriptor is
+-- overwritten during write-back.)
+rxbuffers = ffi.new("uint8_t*[?]", num_descriptors)
 
 rdh, rdt, rxnext = 0, 0, 0
 
 -- Return the next available packet as two values: buffer, length.
 -- If no packet is available then return nil.
 function receive ()
-   if rdh ~= rxnet then
+   if rdh ~= rxnext then
       local buffer = rxbuffers[rxnext]
       local wb = rxdesc[rxnext].wb
+--      local p = ffi.cast("uint32_t*", buffer)
+--      io.write("RX DUMP ("..wb.length.."): ")
+--      for i = 0, 8 do io.write(bit.tohex(p[i]).." ") end
+--      print()
       rxnext = (rxnext + 1) % num_descriptors
       return buffer, wb.length
    end
@@ -192,10 +199,11 @@ function can_add_receive_buffer ()
    return (rdt + 1) % num_descriptors ~= rdh
 end
 
-function add_receive_buffer (address)
+function add_receive_buffer (address, size)
    assert(can_add_receive_buffer())
    local desc = rxdesc[rdt].data
-   desc.address, desc.dd = address, 0
+   desc.address, desc.dd = memory.map(address), size
+   rxbuffers[rdt] = address
    rdt = (rdt + 1) % num_descriptors
 end
 
@@ -213,7 +221,10 @@ local txdesc_t = ffi.typeof [[
 ]]
 
 local rxdesc_t = ffi.typeof [[
-      union { struct { uint64_t address, dd; } data; }
+      union { struct { uint64_t address, dd; } data;
+	      struct { uint16_t csum, id;
+		       uint32_t mrq, status;
+		       uint16_t length, vlan; } wb; }
 ]]
 
 function init_dma_memory ()
@@ -266,6 +277,10 @@ function make_register (name, address, desc, base_pointer, mode)
    return type(base_pointer + address/4)
 end
 
+function wait_linkup ()
+   test.waitfor("linkup", linkup, 20, 250000)
+end
+
 function selftest ()
    print("intel10g")
    open()
@@ -276,7 +291,7 @@ function selftest ()
    repeat
       sync()
       while can_add_receive_buffer() do add_receive_buffer(buffers_phy + 40960) end
-      while not tx_full() do transmit(buffers_phy, 50) end
+      while can_transmit() do transmit(buffers_phy, 50) end
       sync()
 --      C.usleep(1)
    until finished()
