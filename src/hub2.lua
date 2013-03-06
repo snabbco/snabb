@@ -6,13 +6,25 @@ module(...,package.seeall)
 
 local memory = require("memory")
 local intel10g = require("intel10g")
-local virtio = require("virtio").new("vio0")
+local virtio = require("virtio")
+local ffi = require("ffi")
+local C = ffi.C
+
+local vio
+
+function init ()
+   intel10g.open()
+--   intel10g.enable_mac_loopback()
+   intel10g.wait_linkup()
+   vio = virtio.new("vio%d")
+   vio.init()
+end
 
 -- Copy traffic between a virtio (tap) interface and a 10G NIC.
 function test ()
    while true do
-      transfer(intel10g, virtio)
-      transfer(virtio, intel10g)
+      transfer(vio, intel10g)
+      transfer(intel10g, vio)
    end
 end
 
@@ -20,7 +32,8 @@ end
 function transfer (input, output)
    input.sync_receive()
    while input.can_receive() and output.can_transmit() do
-      output.transmit(input.receive())
+      local addr, len = input.receive()
+      output.transmit(addr, len)
    end
    while input.can_add_receive_buffer() do
       input.add_receive_buffer(allocate())
@@ -36,13 +49,7 @@ freelist = {}
 
 -- Return a free packet buffer.
 function allocate ()
-   return table.remove(freelist) or dma_alloc()
-end
-
--- Allocate a new packet buffer.
-function dma_alloc ()
-   local virt, phys = memory.dma_alloc(buffer_size)
-   return phys
+   return (table.remove(freelist) or memory.dma_alloc(buffer_size)), buffer_size
 end
 
 -- Free a packet buffer for later reuse.
