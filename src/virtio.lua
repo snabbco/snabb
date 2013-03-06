@@ -54,61 +54,65 @@ function new (tapinterface)
       local index = get_transmit_buffer()
       assert(index <= C.VIO_VRING_SIZE)
       local d = txring.desc[index]
-      d.addr, d.len, d.flags, d.next = address, size, 0, 0
+      d.addr, d.len, d.flags, d.next = tonumber(ffi.cast("uint64_t",address)), size, 0, 0
       return index
    end
 
    -- Return the index of an available transmit buffer.
    -- Precondition: transmit_ready() tested to return true.
    function get_transmit_buffer ()
-      assert(transmit_ready())
+      assert(can_transmit())
       return table.remove(tx_freelist)
    end
 
    local txused = 0
-   function reclaim_transmit_buffers ()
-      while txused ~= txring.used.idx do
-         C.full_memory_barrier()
-         table.insert(tx_freelist, txring.used.ring[txused % C.VIO_VRING_SIZE].id)
-         assert(#tx_freelist <= C.VIO_VRING_SIZE)
-         txused = (txused + 1) % 65536
-         txpackets = txpackets + 1
-      end
-   end
+   function can_reclaim_buffer ()
+      return txused ~= txring.used.idx
+   end M.can_reclaim_buffer = can_reclaim_buffer
 
-   function flush_transmit ()
+   function reclaim_buffer ()
+      assert(can_reclaim_buffer())
+      table.insert(tx_freelist, txring.used.ring[txused % C.VIO_VRING_SIZE].id)
+      assert(#tx_freelist <= C.VIO_VRING_SIZE)
+      txused = (txused + 1) % 65536
+      txpackets = txpackets + 1
+   end M.reclaim_buffer = reclaim_buffer
+
+   function sync_transmit ()
       C.full_memory_barrier()  txring.avail.idx = next_tx_avail  kick(txring)
-   end M.flush_transmit = flush_transmit
+   end M.sync_transmit = sync_transmit
 
-   function transmit_ready ()
+   function can_transmit ()
       if tx_freelist[1] == nil then return nil, 'no free descriptors'
       else return true end
-   end M.transmit_ready = transmit_ready
+   end M.can_transmit = can_transmit
 
    local next_rx_avail = 0 -- Next available position in the rx avail ring
 
-   function add_rxbuf (address, size)
+   function add_receive_buffer (address, size)
       local bufferindex = get_rx_buffer()
       assert(bufferindex < C.VIO_VRING_SIZE)
       local desc = rxring.desc[bufferindex]
       desc.addr, desc.len = ffi.cast("uint64_t", address), size
       desc.flags, desc.next = C.VIO_DESC_F_WRITE, 0
       next_rx_avail = (next_rx_avail + 1) % 65536
-   end M.add_rxbuf = add_rxbuf
+      -- XXX memory.lua should call this automatically when needed
+      update_vhost_memory_map()
+   end M.add_receive_buffer = add_receive_buffer
 
    function get_rx_buffer ()
-      assert(receive_buffer_ready())
+      assert(can_add_receive_buffer())
       return table.remove(rx_freelist)
    end
 
-   -- Is there a receive descriptor available to store a new buffer in? [XXX name]
-   function receive_buffer_ready ()
+   -- Is there a receive descriptor available to store a new buffer in?
+   function can_add_receive_buffer ()
       return rx_freelist[1] ~= nil
-   end M.receive_buffer_ready = receive_buffer_ready
+   end M.can_add_receive_buffer = can_add_receive_buffer
 
    local rxused = 0
    function receive ()
-      assert(receive_packet_ready())
+      assert(can_receive())
       local index = rxring.used.ring[rxused % C.VIO_VRING_SIZE].id
       local length  = rxring.used.ring[rxused % C.VIO_VRING_SIZE].len
       local address = rxring.desc[index].addr
@@ -119,13 +123,13 @@ function new (tapinterface)
       return address, length
    end M.receive = receive
 
-   function receive_packet_ready ()
+   function can_receive ()
       return rxused ~= rxring.used.idx
-   end M.receive_packet_ready = receive_packet_ready
+   end M.can_receive = can_receive
 
-   function flush_rx()
+   function sync_receive ()
       C.full_memory_barrier()  rxring.avail.idx = next_rx_avail  kick(rxring)
-   end M.flush_rx = flush_rx
+   end M.sync_receive = sync_receive
 
    -- Make all of our DMA memory usable as vhost packet buffers.
    function update_vhost_memory_map ()
@@ -166,18 +170,18 @@ function new (tapinterface)
       local done = function () return C.get_time_ns() > deadline end
       print("Echoing packets for "..secs.." second(s).")
       repeat
-         while receive_buffer_ready() do
-            add_rxbuf(memory.dma_alloc(2048), 2048)
-            -- XXX memory.lua should call this automatically when needed
-            update_vhost_memory_map()
+         while can_add_receive_buffer() do
+            add_receive_buffer(memory.dma_alloc(2048), 2048)
          end
-         while transmit_ready() and receive_packet_ready() do
+         while can_transmit() and can_receive() do
             local address, length = receive()
             transmit(address, length)
          end
-         flush_rx()
-         flush_transmit()
-         reclaim_transmit_buffers()
+         sync_receive()
+         sync_transmit()
+	 while can_reclaim_buffer() do
+	    reclaim_buffer()
+	 end
       until done()
       print_stats()
    end
