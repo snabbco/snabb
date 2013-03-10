@@ -1012,7 +1012,9 @@ test_misc = {
     assert(fd:close())
   end,
   test_prlimit = function()
-    local r = assert(S.prlimit(0, "nofile"))
+    local r, err = S.prlimit(0, "nofile")
+    -- new travis CI does not support this
+    if not r and err.NOTSUP then return end
     local r2 = assert(S.prlimit(0, "nofile", {512, r.max}))
     assert_equal(r2.cur, r.cur, "old value same")
     assert_equal(r2.max, r.max, "old value same")
