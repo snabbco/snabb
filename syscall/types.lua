@@ -244,6 +244,7 @@ end
 
 t.error = ffi.metatype("struct {int errno;}", {
   __tostring = function(e) return strerror(e.errno) end,
+  __tonumber = function(e) return e.errno end,
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
     if k == 'lsym' then return errsyms[t.errno]:lower() end
