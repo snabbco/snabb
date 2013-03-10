@@ -2304,11 +2304,6 @@ test_util = {
   end,
 }
 
---[[
-BPF_STMT(BPF_LD+BPF_H+BPF_ABS, 12),
-BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, ETHERTYPE_REVARP, 0, 3),
-]]
-
 test_bpf = {
   test_bpf_struct_stmt = function()
     local bpf = t.sock_filter("LD,H,ABS", 12)
