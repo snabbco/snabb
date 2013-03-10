@@ -632,7 +632,7 @@ test_file_operations = {
     if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr
       local tt = assert(S.getxattr(tmpfile, "user.test"))
       assert_equal(tt, l, "should match string")
-    else assert(err.NOTSUP, "only ok error is xattr not supported") end
+    else assert(err.NOTSUP, "only ok error is xattr not supported, got " .. err) end
     assert(S.unlink(tmpfile))
   end,
   test_mknod_chr_root = function()
