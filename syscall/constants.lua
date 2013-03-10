@@ -1527,19 +1527,19 @@ c.ETH_P = setmetatable({
   CAIF      = 0x00F7,
 }, stringflag)
 
-c.ETHERTYPE = setmetetable({
-  PUP           0x0200,
-  SPRITE        0x0500,
-  IP            0x0800,
-  ARP           0x0806,
-  REVARP        0x8035,
-  AT            0x809B,
-  AARP          0x80F3,
-  VLAN          0x8100,
-  IPX           0x8137,
-  IPV6          0x86dd,
-  LOOPBACK      0x9000,
-  TRAIL         0x1000,
+c.ETHERTYPE = setmetatable({
+  PUP          = 0x0200,
+  SPRITE       = 0x0500,
+  IP           = 0x0800,
+  ARP          = 0x0806,
+  REVARP       = 0x8035,
+  AT           = 0x809B,
+  AARP         = 0x80F3,
+  VLAN         = 0x8100,
+  IPX          = 0x8137,
+  IPV6         = 0x86dd,
+  LOOPBACK     = 0x9000,
+  TRAIL        = 0x1000,
 }, stringflag)
 
 -- eventfd

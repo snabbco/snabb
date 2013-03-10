@@ -261,6 +261,7 @@ print [[
 #include <syscall.h>
 #include <sys/ioctl.h>
 #include <elf.h>
+#include <net/ethernet.h>
 
 #include <linux/aio_abi.h>
 #include <linux/reboot.h>
