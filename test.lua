@@ -632,7 +632,7 @@ test_file_operations = {
     if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr
       local tt = assert(S.getxattr(tmpfile, "user.test"))
       assert_equal(tt, l, "should match string")
-    else assert(err.NOTSUP, "only ok error is xattr not supported, got " .. tostring(err) .. "(" .. err.errno .. ")") end
+    else assert(err.NOTSUP or err.OPNOTSUPP, "only ok error is xattr not supported, got " .. tostring(err) .. " (" .. err.errno .. ")") end
     assert(S.unlink(tmpfile))
   end,
   test_mknod_chr_root = function()
@@ -1017,8 +1017,8 @@ test_misc = {
   test_prlimit = function()
     local r, err = S.prlimit(0, "nofile")
     -- new travis CI does not support this
-    if err and err.NOTSUP then return end
-    assert(not err, "expect no error, got " .. tostring(err) .. "(" .. err.errno .. ")")
+    if err and err.NOSYS then return end
+    assert(not err, "expect no error, got " .. tostring(err) .. " (" .. err.errno .. ")")
     local r2 = assert(S.prlimit(0, "nofile", {512, r.max}))
     assert_equal(r2.cur, r.cur, "old value same")
     assert_equal(r2.max, r.max, "old value same")
