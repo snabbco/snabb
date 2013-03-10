@@ -1933,6 +1933,53 @@ c.AUDIT_ARCH = setmetatable({
   X86_64 = c.EM.X86_64 + __AUDIT_ARCH_64BIT + __AUDIT_ARCH_LE,
 }, stringflag)
 
+-- BPF socket filter
+c.BPF = setmetatable({
+-- class
+  LD         = 0x00,
+  LDX        = 0x01,
+  ST         = 0x02,
+  STX        = 0x03,
+  ALU        = 0x04,
+  JMP        = 0x05,
+  RET        = 0x06,
+  MISC       = 0x07,
+-- size
+  W          = 0x00,
+  H          = 0x08,
+  B          = 0x10,
+-- mode
+  IMM        = 0x00,
+  ABS        = 0x20,
+  IND        = 0x40,
+  MEM        = 0x60,
+  LEN        = 0x80,
+  MSH        = 0xa0,
+-- op
+  ADD        = 0x00,
+  SUB        = 0x10,
+  MUL        = 0x20,
+  DIV        = 0x30,
+  OR         = 0x40,
+  AND        = 0x50,
+  LSH        = 0x60,
+  RSH        = 0x70,
+  NEG        = 0x80,
+  JA         = 0x00,
+  JEQ        = 0x10,
+  JGT        = 0x20,
+  JGE        = 0x30,
+  JSET       = 0x40,
+-- src
+  K          = 0x00,
+  X          = 0x08,
+-- rval
+  A          = 0x10,
+-- miscop
+  TAX        = 0x00,
+  TXA        = 0x80,
+}, multiflags)
+
 -- termios
 c.NCCS = 32
 

@@ -496,6 +496,12 @@ struct seccomp_data {
   uint64_t instruction_pointer;
   uint64_t args[6];
 };
+struct sock_filter {
+  uint16_t   code;
+  uint8_t    jt;
+  uint8_t    jf;
+  uint32_t   k;
+};
 struct mq_attr {
   long mq_flags, mq_maxmsg, mq_msgsize, mq_curmsgs, __unused[4];
 };

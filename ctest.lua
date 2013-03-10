@@ -277,6 +277,7 @@ print [[
 #include <linux/ioctl.h>
 #include <linux/input.h>
 #include <linux/audit.h>
+#include <linux/filter.h>
 
 int ret = 0;
 
