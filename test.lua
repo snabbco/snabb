@@ -992,7 +992,7 @@ test_misc = {
   end,
   test_sysctl = function()
     local syslog = assert(S.klogctl(10))
-    assert(#syslog > 1, "syslog buffer should have positive size")
+    assert(syslog > 1, "syslog buffer should have positive size")
   end,
   test_environ = function()
     local e = S.environ()
