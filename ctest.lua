@@ -9,7 +9,7 @@ local s, t, c, ctypes = S.s, S.t, S.c, S.ctypes
 -- TODO fix these, various naming issues
 ctypes["struct linux_dirent64"] = nil
 ctypes["struct fdb_entry"] = nil
-ctypes["struct seccomp_data"] = nil
+--ctypes["struct seccomp_data"] = nil
 ctypes["sighandler_t"] = nil
 ctypes["struct rlimit64"] = nil
 ctypes["struct mq_attr"] = nil
@@ -279,6 +279,7 @@ print [[
 #include <linux/input.h>
 #include <linux/audit.h>
 #include <linux/filter.h>
+#include <linux/seccomp.h>
 
 int ret = 0;
 
