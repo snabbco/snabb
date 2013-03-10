@@ -260,6 +260,7 @@ print [[
 #include <sys/eventfd.h>
 #include <syscall.h>
 #include <sys/ioctl.h>
+#include <elf.h>
 
 #include <linux/aio_abi.h>
 #include <linux/reboot.h>
@@ -275,6 +276,7 @@ print [[
 #include <linux/rtnetlink.h>
 #include <linux/ioctl.h>
 #include <linux/input.h>
+#include <linux/audit.h>
 
 int ret = 0;
 
