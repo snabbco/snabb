@@ -1018,7 +1018,7 @@ test_misc = {
     local r, err = S.prlimit(0, "nofile")
     -- new travis CI does not support this
     if err and err.NOSYS then return end
-    assert(not err, "expect no error, got " .. tostring(err) .. " (" .. err.errno .. ")")
+    assert(not err, "expect no error")
     local r2 = assert(S.prlimit(0, "nofile", {512, r.max}))
     assert_equal(r2.cur, r.cur, "old value same")
     assert_equal(r2.max, r.max, "old value same")
