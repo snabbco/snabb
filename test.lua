@@ -991,8 +991,8 @@ test_misc = {
     local i = assert(S.sysinfo()) -- TODO test values returned for some sanity
   end,
   test_sysctl = function()
-    local syslog = assert(S.klogctl(3))
-    assert(#syslog > 20, "should be something in syslog")
+    local syslog = assert(S.klogctl(10))
+    assert(#syslog > 1, "syslog buffer should have positive size")
   end,
   test_environ = function()
     local e = S.environ()
