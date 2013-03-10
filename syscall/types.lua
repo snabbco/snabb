@@ -171,7 +171,6 @@ local addtypes = {
   ff_effect = "struct ff_effect",
   winsize = "struct winsize",
   termio = "struct termio",
-  sock_filter = "struct sock_filter",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
@@ -1245,6 +1244,15 @@ mt.ethhdr = {
 }
 
 metatype("ethhdr", "struct ethhdr", mt.ethhdr)
+
+mt.sock_filter = {
+  __new = function(tp, code, k, jt, jf)
+    return ffi.new(tp, c.BPF[code], jt or 0, jf or 0, k)
+  end
+}
+
+metatype("sock_filter", "struct sock_filter", mt.sock_filter)
+
 
 return types
 

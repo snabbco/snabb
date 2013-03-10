@@ -2304,6 +2304,28 @@ test_util = {
   end,
 }
 
+--[[
+BPF_STMT(BPF_LD+BPF_H+BPF_ABS, 12),
+BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, ETHERTYPE_REVARP, 0, 3),
+]]
+
+test_bpf = {
+  test_bpf_struct_stmt = function()
+    local bpf = t.sock_filter("LD,H,ABS", 12)
+    assert_equal(bpf.code, c.BPF.LD + c.BPF.H + c.BPF.ABS)
+    assert_equal(bpf.jt, 0)
+    assert_equal(bpf.jf, 0)
+    assert_equal(bpf.k, 12)
+  end,
+  test_bpf_struct_jump = function()
+    local bpf = t.sock_filter("JMP,JEQ,K", c.ETHERTYPE.REVARP, 0, 3)
+    assert_equal(bpf.code, c.BPF.JMP + c.BPF.JEQ + c.BPF.K)
+    assert_equal(bpf.jt, 0)
+    assert_equal(bpf.jf, 3)
+    assert_equal(bpf.k, c.ETHERTYPE.REVARP)
+  end,
+}
+
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
 
