@@ -1003,7 +1003,10 @@ test_misc = {
     assert_nil(S.environ().XXXXYYYYZZZZZZZZ, "expect to be able to unset env vars")
   end,
   test_rlimit = function()
-    local r = assert(S.getrlimit("nofile"))
+    local r, err = S.getrlimit("nofile")
+    -- new travis CI does not support this
+    if err and err.NOSYS then return end
+    assert(not err, "expect no error, got " .. err)
     assert(S.setrlimit("nofile", {0, r.rlim_max}))
     local fd, err = S.open("/dev/zero", "rdonly")
     assert(err.MFILE, "should be over rlimit")
@@ -1014,7 +1017,8 @@ test_misc = {
   test_prlimit = function()
     local r, err = S.prlimit(0, "nofile")
     -- new travis CI does not support this
-    if not r and err.NOTSUP then return end
+    if err and err.NOTSUP then return end
+    assert(not err, "expect no error, got " .. err)
     local r2 = assert(S.prlimit(0, "nofile", {512, r.max}))
     assert_equal(r2.cur, r.cur, "old value same")
     assert_equal(r2.max, r.max, "old value same")
