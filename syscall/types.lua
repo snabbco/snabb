@@ -171,6 +171,7 @@ local addtypes = {
   ff_effect = "struct ff_effect",
   winsize = "struct winsize",
   termio = "struct termio",
+  sock_fprog = "struct sock_fprog",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end

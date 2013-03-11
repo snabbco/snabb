@@ -502,6 +502,10 @@ struct sock_filter {
   uint8_t    jf;
   uint32_t   k;
 };
+struct sock_fprog {
+  unsigned short len;
+  struct sock_filter *filter;
+};
 struct mq_attr {
   long mq_flags, mq_maxmsg, mq_msgsize, mq_curmsgs, __unused[4];
 };
