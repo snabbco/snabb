@@ -620,5 +620,22 @@ function util.timerfd_read(fd, buffer)
   return tonumber(buffer[0])
 end
 
+local auditarch_le = {
+  x86 = "I386",
+  x64 = "X86_64",
+  arm = "ARM",
+  mips = "MIPSEL",
+}
+
+local auditarch_be = {
+  ppc = "PPC",
+  arm = "ARMEB",
+  mips = "MIPS",
+}
+
+function util.auditarch()
+  if ffi.abi("le") then return c.AUDIT_ARCH[auditarch_le(ffi.arch)] else return c.AUDIT_ARCH[auditarch_be(ffi.arch)] end
+end
+
 return util
 
