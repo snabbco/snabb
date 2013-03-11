@@ -2335,6 +2335,26 @@ test_seccomp = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
+  test_seccomp_allow = function()
+    local p = assert(S.clone())
+     if p == 0 then
+      local ok, err = S.prctl("set_no_new_privs", true)
+      if err and err.INVAL then S.exit() end -- may not be supported
+      local nnp = fork_assert(S.prctl("get_no_new_privs"))
+      fork_assert(nnp == true)
+      local program = {
+        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+      }
+      local pp = t.sock_filters(#program, program)
+      local p = t.sock_fprog1{{#program, pp}}
+      fork_assert(S.prctl("set_seccomp", "filter", p))
+      local pid = S.getpid()
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end
+  end,
   test_seccomp = function()
     local p = assert(S.clone())
      if p == 0 then
@@ -2344,9 +2364,9 @@ test_seccomp = {
       fork_assert(nnp == true)
       local program = {
         -- test architecture correct
-        --t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
-        --t.sock_filter("JMP,JEQ,K", util.auditarch(), 0, 1),
-        --t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
+        t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
+        t.sock_filter("JMP,JEQ,K", util.auditarch(), 1, 0),
+        t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
         -- get syscall number
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "nr")),
         -- allow syscall getpid
@@ -2368,7 +2388,7 @@ test_seccomp = {
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
-  test_seccomp_allow = function()
+  test_seccomp_fail = function()
     local p = assert(S.clone())
      if p == 0 then
       local ok, err = S.prctl("set_no_new_privs", true)
@@ -2376,7 +2396,20 @@ test_seccomp = {
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
       fork_assert(nnp == true)
       local program = {
+        -- test architecture correct
+        --t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
+        --t.sock_filter("JMP,JEQ,K", util.auditarch(), 0, 1),
+        --t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
+        -- get syscall number
+        t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "nr")),
+        -- allow syscall getpid
+        t.sock_filter("JMP,JEQ,K", c.SYS.getpid, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        -- allow syscall exit_group
+        t.sock_filter("JMP,JEQ,K", c.SYS.exit_group, 0, 1),
+        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        -- else kill
+        t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
       }
       local pp = t.sock_filters(#program, program)
       local p = t.sock_fprog1{{#program, pp}}
