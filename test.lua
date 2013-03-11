@@ -2392,7 +2392,7 @@ test_seccomp = {
     local p = assert(S.clone())
      if p == 0 then
       local ok, err = S.prctl("set_no_new_privs", true)
-      if err and err.INVAL then S.exit() end -- may not be supported
+      if err and err.INVAL then S.exit(42) end -- may not be supported
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
       fork_assert(nnp == true)
       local program = {
@@ -2415,12 +2415,11 @@ test_seccomp = {
       local p = t.sock_fprog1{{#program, pp}}
       fork_assert(S.prctl("set_seccomp", "filter", p))
       local pid = S.getpid()
-      local fd = fork_assert(S.open("/dev/null", "rdonly"))
+      local fd = fork_assert(S.open("/dev/null", "rdonly")) -- not allowed
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS ~= 0, "expect not normal exit in clone")
-      assert(w.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp")
+      assert(w.EXITSTATUS == 42 or w.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp (or not implemented)")
     end
   end,
 }
