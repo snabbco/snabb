@@ -2344,7 +2344,7 @@ test_seccomp = {
       fork_assert(nnp == true)
       local program = {
         -- test architecture correct
-        --t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
+        t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
         t.sock_filter("JMP,JEQ,K", util.auditarch(), 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
         -- get syscall number

@@ -883,6 +883,7 @@ pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);
 int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 void _exit(int status);
+void exit_group(int status);
 int signal(int signum, int handler); /* although deprecated, just using to set SIG_ values */
 int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
 int kill(pid_t pid, int sig);
@@ -1040,7 +1041,6 @@ int ioctl(int d, int request, void *argp); /* void* easiest here */
 int tgkill(int tgid, int tid, int sig);
 int brk(void *addr);
 void *sbrk(intptr_t increment);
-void exit_group(int status);
 
 /* these need their types adding or fixing before can uncomment */
 /*

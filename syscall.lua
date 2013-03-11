@@ -143,6 +143,11 @@ function C.getpid()
   return C.syscall(c.SYS.getpid)
 end
 
+-- exit_group is the normal syscall but not available
+function C.exit_group(status)
+  return C.syscall(c.SYS.exit_group, t.int(status or 0))
+end
+
 -- clone interface provided is not same as system one, and is less convenient
 function C.clone(flags, signal, stack, ptid, tls, ctid)
   return C.syscall(c.SYS.clone, t.int(flags), pt.void(stack), pt.void(ptid), pt.void(tls), pt.void(ctid))
@@ -537,7 +542,7 @@ function S.waitid(idtype, id, options, infop) -- note order of args, as usually 
 end
 
 function S._exit(status) C._exit(c.EXIT[status]) end
-function S.exit(status) C.exit(c.EXIT[status]) end
+function S.exit(status) C.exit_group(c.EXIT[status]) end
 
 function S.read(fd, buf, count)
   if buf then return retnum(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
