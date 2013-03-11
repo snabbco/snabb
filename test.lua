@@ -2397,9 +2397,9 @@ test_seccomp = {
       fork_assert(nnp == true)
       local program = {
         -- test architecture correct
-        --t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
-        --t.sock_filter("JMP,JEQ,K", util.auditarch(), 0, 1),
-        --t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
+        t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
+        t.sock_filter("JMP,JEQ,K", util.auditarch(), 1, 0),
+        t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
         -- get syscall number
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "nr")),
         -- allow syscall getpid
@@ -2415,10 +2415,12 @@ test_seccomp = {
       local p = t.sock_fprog1{{#program, pp}}
       fork_assert(S.prctl("set_seccomp", "filter", p))
       local pid = S.getpid()
+      local fd = fork_assert(S.open("/dev/null", "rdonly"))
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+      assert(w.EXITSTATUS ~= 0, "expect not normal exit in clone")
+      assert(w.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp")
     end
   end,
 }
