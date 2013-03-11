@@ -634,7 +634,7 @@ local auditarch_be = {
 }
 
 function util.auditarch()
-  if ffi.abi("le") then return c.AUDIT_ARCH[auditarch_le(ffi.arch)] else return c.AUDIT_ARCH[auditarch_be(ffi.arch)] end
+  if ffi.abi("le") then return c.AUDIT_ARCH[auditarch_le[ffi.arch]] else return c.AUDIT_ARCH[auditarch_be[ffi.arch]] end
 end
 
 return util

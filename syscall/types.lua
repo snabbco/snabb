@@ -181,6 +181,7 @@ t.inotify_event = ffi.typeof("struct inotify_event")
 t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
 t.io_events = ffi.typeof("struct io_event[?]")
 t.iocbs = ffi.typeof("struct iocb[?]")
+t.sock_filters = ffi.typeof("struct sock_filter[?]")
 
 t.iocb_ptrs = ffi.typeof("struct iocb *[?]")
 t.string_array = ffi.typeof("const char *[?]")
@@ -199,6 +200,7 @@ t.loff1 = ffi.typeof("loff_t[1]")
 t.uid1 = ffi.typeof("uid_t[1]")
 t.gid1 = ffi.typeof("gid_t[1]")
 t.aio_context1 = ffi.typeof("aio_context_t[1]")
+t.sock_fprog1 = ffi.typeof("struct sock_fprog[1]")
 
 t.char2 = ffi.typeof("char[2]")
 t.int2 = ffi.typeof("int[2]")

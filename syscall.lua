@@ -1397,6 +1397,7 @@ local prctlpint = { -- returns result in a location pointed to by arg2
   [c.PR.GET_UNALIGN] = true,
 }
 
+-- this is messy, TODO clean up
 function S.prctl(option, arg2, arg3, arg4, arg5)
   local i, name
   option = c.PR[option]
@@ -1411,6 +1412,8 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
     arg2 = ffi.cast(t.ulong, name)
   elseif option == c.PR.SET_NAME then
     if type(arg2) == "string" then arg2 = ffi.cast(t.ulong, arg2) end
+  elseif option == c.PR.SET_SECCOMP then
+    arg3 = tonumber(ffi.cast(t.intptr, arg3 or 0))
   end
   local ret = C.prctl(option, arg2 or 0, arg3 or 0, arg4 or 0, arg5 or 0)
   if ret == -1 then return nil, t.error() end
