@@ -2344,13 +2344,16 @@ test_seccomp = {
       fork_assert(nnp == true)
       local program = {
         -- test architecture correct
-        t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
-        t.sock_filter("JMP,JEQ,K", util.auditarch(), 0, 1),
-        t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
+        --t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
+        --t.sock_filter("JMP,JEQ,K", util.auditarch(), 0, 1),
+        --t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
         -- get syscall number
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "nr")),
         -- allow syscall getpid
         t.sock_filter("JMP,JEQ,K", c.SYS.getpid, 0, 1),
+        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        -- allow syscall exit_group
+        t.sock_filter("JMP,JEQ,K", c.SYS.exit_group, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- else kill
         t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
