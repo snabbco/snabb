@@ -1711,6 +1711,9 @@ c.PR = setmetatable({
   TASK_PERF_EVENTS_ENABLE=32,
   MCE_KILL      = 33,
   MCE_KILL_GET  = 34,
+  SET_NO_NEW_PRIVS = 38,
+  GET_NO_NEW_PRIVS = 39,
+  GET_TID_ADDRESS = 40,
   SET_PTRACER   = 0x59616d61, -- Ubuntu extension
 }, stringflag)
 
