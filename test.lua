@@ -2326,7 +2326,7 @@ test_seccomp = {
     local p = assert(S.clone())
      if p == 0 then
       local ok, err = S.prctl("set_no_new_privs", true)
-      if err and err.EINVAL then S.exit() end -- may not be supported
+      if err and err.INVAL then S.exit() end -- may not be supported
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
       fork_assert(nnp == true)
       S.exit()
