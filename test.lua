@@ -2325,7 +2325,8 @@ test_seccomp = {
   test_no_new_privs = function() -- this must be done for non root to call type 2 seccomp
     local p = assert(S.clone())
      if p == 0 then
-      fork_assert(S.prctl("set_no_new_privs", true))
+      local ok, err = S.prctl("set_no_new_privs", true)
+      if err and err.EINVAL then S.exit() end -- may not be supported
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
       fork_assert(nnp == true)
       S.exit()
