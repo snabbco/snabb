@@ -26,6 +26,13 @@ local c = {}
 
 c.syscall = arch.syscall or {} -- special syscall handling
 
+c.BOOLEAN = {
+  [0] = 0,
+  [1] = 1,
+  [false] = 0,
+  [true] = 1,
+}
+
 c.SYS = arch.SYS
 
 c.STD = setmetatable({

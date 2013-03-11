@@ -2321,6 +2321,21 @@ test_bpf = {
   end,
 }
 
+test_seccomp = {
+  test_no_new_privs = function() -- this must be done for non root to call type 2 seccomp
+    local p = assert(S.clone())
+     if p == 0 then
+      fork_assert(S.prctl("set_no_new_privs", true))
+      local nnp = fork_assert(S.prctl("get_no_new_privs"))
+      fork_assert(nnp == true)
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+    end
+  end,
+}
+
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
 
