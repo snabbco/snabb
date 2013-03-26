@@ -2428,6 +2428,14 @@ test_swap = {
   test_swap_constants = function()
     assert_equal(c.SWAP_FLAG["23, discard"], c.SWAP_FLAG["prefer, discard"] + bit.lshift(23, c.SWAP_FLAG["prio_shift"]))
   end,
+  test_swap_fail = function()
+    local ex = "PERM" -- EPERM if not root
+    if S.geteuid() == 0 then ex = "INVAL" end
+    local ok, err = S.swapon("/dev/null", "23, discard")
+    assert(not ok and err[ex], "should not create swap on /dev/null")
+    local ok, err = S.swapoff("/dev/null")
+    assert(not ok and err[ex], "no swap on /dev/null")
+  end
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.

@@ -1602,6 +1602,9 @@ function S.setenv(name, value, overwrite)
 end
 function S.clearenv() return retbool(C.clearenv()) end
 
+function S.swapon(path, swapflags) return retbool(C.swapon(path, c.SWAP_FLAG[swapflags])) end
+function S.swapoff(path) return retbool(C.swapoff(path)) end
+
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 
