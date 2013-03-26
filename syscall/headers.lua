@@ -1032,6 +1032,8 @@ int fremovexattr(int fd, const char *name);
 int unshare(int flags);
 int setns(int fd, int nstype);
 int pivot_root(const char *new_root, const char *put_old);
+int swapon(const char *path, int swapflags);
+int swapoff(const char *path);
 
 int syscall(int number, ...);
 
