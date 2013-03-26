@@ -26,6 +26,7 @@ local c = {}
 
 c.syscall = arch.syscall or {} -- special syscall handling
 
+-- not sure I like this
 c.BOOLEAN = {
   [0] = 0,
   [1] = 1,
