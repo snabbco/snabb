@@ -2435,7 +2435,8 @@ test_swap = {
     assert(not ok and err[ex], "should not create swap on /dev/null")
     local ok, err = S.swapoff("/dev/null")
     assert(not ok and err[ex], "no swap on /dev/null")
-  end
+  end,
+  -- TODO need mkswap to test success
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.
