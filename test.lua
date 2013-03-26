@@ -2424,6 +2424,12 @@ test_seccomp = {
   end,
 }
 
+test_swap = {
+  test_swap_constants = function()
+    assert_equal(c.SWAP_FLAG["23, discard"], c.SWAP_FLAG["prefer, discard"] + bit.lshift(23, c.SWAP_FLAG["prio_shift"]))
+  end,
+}
+
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
 

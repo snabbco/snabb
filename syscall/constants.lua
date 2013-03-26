@@ -9,7 +9,7 @@ local arch = require("syscall." .. ffi.arch .. ".constants") -- architecture spe
 
 local h = require "syscall.helpers"
 
-local octal, stringflag, multiflags, charflags, flag = h.octal, h.stringflag, h.multiflags, h.charflags, h.flag
+local octal, stringflag, multiflags, charflags, swapflags, flag = h.octal, h.stringflag, h.multiflags, h.charflags, h.swapflags, h.flag
 
 local oldsm = setmetatable
 local function setmetatable(t, mt)
@@ -3062,6 +3062,13 @@ c.E = setmetatable({
 c.E.WOULDBLOCK    = c.E.EAGAIN
 c.E.DEADLOCK      = c.E.EDEADLK
 c.E.NOATTR        = c.E.ENODATA
+
+c.SWAP_FLAG = setmetatable({
+  PREFER       = 0x8000,
+  PRIO_MASK    = 0x7fff,
+  PRIO_SHIFT   = 0,
+  DISCARD      = 0x10000,
+}, swapflags)
 
 return c
 
