@@ -6,7 +6,7 @@ local C = ffi.C
 --- ## Chunks
 ---
 --- Memory is allocated from the operating system one "chunk" at a
---- time. A chunk is an arbitrary-sized block of physically contiugous
+--- time. A chunk is an arbitrary-sized block of physically contiguous
 --- memory. Chunks are then then sliced up to serve individual
 --- allocations.
 
@@ -101,15 +101,25 @@ function map (virt_addr)
    virt_addr = ffi.cast("uint64_t", virt_addr)
    local virt_page = tonumber(virt_addr / base_page_size)
    local offset    = tonumber(virt_addr % base_page_size)
-   local phys_page = resolve(virt_page)
+   local phys_page = C.phys_page(virt_page)
+   if phys_page == 0 then resolve_error(virt_addr) end
    return tonumber(ffi.cast("uint64_t", phys_page * base_page_size + offset))
 end
 
--- Return the physical page number of virtpage.
-function resolve (virt_page)
-   local phys_page = C.phys_page(virt_page)
-   if phys_page == 0 then error("Unable to resolve page " .. virt_page) end
-   return phys_page
+function resolve_error (virt_addr)
+   print("  0x"..bit.tohex(tonumber(virt_addr)).." did not resolve with active DMA regions:")
+   for _,d in ipairs(dma_regions) do
+      io.write(("  0x%s - 0x%s [%d KB] "):format(
+		  bit.tohex(tonumber(d.address)),
+		  bit.tohex(tonumber(d.address+d.size)),
+		  d.size/1024))
+      if virt_addr >= d.address and virt_addr <= d.address + d.size then
+	 io.write("<-- address belongs in this range\n")
+      else
+	 io.write("(no match)\n")
+      end
+   end
+   error("Failed to resolve physical address of 0x"..bit.tohex(tonumber(virt_addr)))
 end
 
 --- Sizes of normal and huge pages in the host kernel.
