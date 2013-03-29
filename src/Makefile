@@ -18,13 +18,13 @@ snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
 	@echo -n "Firmware: "
 	@ls -sh snabbswitch
 
-$(LUAOBJ): obj/%.o: %.lua
+$(LUAOBJ): obj/%.o: %.lua Makefile
 	luajit -bg $< $@
 
-$(COBJ): obj/%.o: %.c $(CHDR)
+$(COBJ): obj/%.o: %.c $(CHDR) Makefile
 	gcc -Wl,-E -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
-$(HOBJ): obj/%_h.o: %.h
+$(HOBJ): obj/%_h.o: %.h Makefile
 	@echo Generating $(basename $@).lua from $< - $(basename $@)
 	@(echo -n "module(...,package.seeall); require(\"ffi\").cdef[=============["; \
 	 cat $<; \
