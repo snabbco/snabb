@@ -110,13 +110,13 @@ function resolve_error (virt_addr)
    print("  0x"..bit.tohex(tonumber(virt_addr)).." did not resolve with active DMA regions:")
    for _,d in ipairs(dma_regions) do
       io.write(("  0x%s - 0x%s [%d KB] "):format(
-		  bit.tohex(tonumber(d.address)),
-		  bit.tohex(tonumber(d.address+d.size)),
-		  d.size/1024))
+                  bit.tohex(tonumber(d.address)),
+                  bit.tohex(tonumber(d.address+d.size)),
+                  d.size/1024))
       if virt_addr >= d.address and virt_addr <= d.address + d.size then
-	 io.write("<-- address belongs in this range\n")
+         io.write("<-- address belongs in this range\n")
       else
-	 io.write("(no match)\n")
+         io.write("(no match)\n")
       end
    end
    error("Failed to resolve physical address of 0x"..bit.tohex(tonumber(virt_addr)))

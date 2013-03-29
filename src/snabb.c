@@ -164,17 +164,17 @@ static int setup_vring(struct vio *vio, int index)
   struct vhost_vring_file  kick = { .index = index, .fd = vring->kickfd };
   struct vhost_vring_file  call = { .index = index, .fd = vring->callfd };
   struct vhost_vring_addr  addr = { .index = index,
-				    .desc_user_addr  = (uint64_t)&vring->desc,
-				    .avail_user_addr = (uint64_t)&vring->avail,
-				    .used_user_addr  = (uint64_t)&vring->used,
-				    .log_guest_addr  = (uint64_t)NULL,
-				    .flags = 0 };
+                                    .desc_user_addr  = (uint64_t)&vring->desc,
+                                    .avail_user_addr = (uint64_t)&vring->avail,
+                                    .used_user_addr  = (uint64_t)&vring->used,
+                                    .log_guest_addr  = (uint64_t)NULL,
+                                    .flags = 0 };
   return (ioctl(vio->vhostfd, VHOST_SET_VRING_NUM,  &num)  ||
-	  ioctl(vio->vhostfd, VHOST_SET_VRING_BASE, &base) ||
-	  ioctl(vio->vhostfd, VHOST_SET_VRING_KICK, &kick) ||
-	  ioctl(vio->vhostfd, VHOST_SET_VRING_CALL, &call) ||
-	  ioctl(vio->vhostfd, VHOST_SET_VRING_ADDR, &addr) ||
-	  ioctl(vio->vhostfd, VHOST_NET_SET_BACKEND, &backend));
+          ioctl(vio->vhostfd, VHOST_SET_VRING_BASE, &base) ||
+          ioctl(vio->vhostfd, VHOST_SET_VRING_KICK, &kick) ||
+          ioctl(vio->vhostfd, VHOST_SET_VRING_CALL, &call) ||
+          ioctl(vio->vhostfd, VHOST_SET_VRING_ADDR, &addr) ||
+          ioctl(vio->vhostfd, VHOST_NET_SET_BACKEND, &backend));
 }
 
 int vhost_set_memory(struct vio *vio, struct vio_memory *memory)
