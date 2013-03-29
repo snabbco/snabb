@@ -140,3 +140,9 @@ function selftest (options)
    print("HugeTLB page allocation OK.")
 end
 
+function module_init ()
+   print("memory initialized")
+   assert(C.lock_memory() == 0)
+end
+
+module_init()
