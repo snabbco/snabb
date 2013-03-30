@@ -2450,7 +2450,7 @@ if S.geteuid() == 0 then
   end
 
   -- cut out this section if you want to (careful!) debug on real interfaces
-  assert(S.unshare("newnet, newns, newuts"), "tests require kernel namespaces") -- do not interfere with anything on host during tests
+  assert(S.unshare("newnet, newns, newuts"), "tests as root require kernel namespaces") -- do not interfere with anything on host during tests
   local i = assert(nl.interfaces())
   local lo = assert(i.lo)
   assert(lo:up())
