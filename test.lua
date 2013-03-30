@@ -579,7 +579,7 @@ test_file_operations = {
       assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
       local nn = #l
       local ok, err = S.setxattr(tmpfile, "user.test", "42", "create")
-      if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr
+      if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr TODO add to features
         l = assert(S.listxattr(tmpfile))
         assert(#l == nn + 1, "expect another attribute set")
         assert(S.lsetxattr(tmpfile, "user.test", "44", "replace"))
@@ -630,7 +630,7 @@ test_file_operations = {
     assert(util.touch(tmpfile))
     local l = string.rep("test", 500)
     local ok, err = S.setxattr(tmpfile, "user.test", l, "create")
-    if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr
+    if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr TODO add to features
       local tt = assert(S.getxattr(tmpfile, "user.test"))
       assert_equal(tt, l, "should match string")
     else assert(err.NOTSUP or err.OPNOTSUPP, "only ok error is xattr not supported, got " .. tostring(err) .. " (" .. err.errno .. ")") end
@@ -806,7 +806,7 @@ test_sockets_pipes = {
       n = assert(s[2]:read())
       assert(#n == #str)
     else
-      assert(err.NOSYS, "only allowed error is syscall not suported, as valgrind gives this")
+      assert(err.NOSYS, "only allowed error is syscall not suported, as valgrind gives this") -- TODO add to features
     end
 
     assert(fd:close())
@@ -1005,7 +1005,7 @@ test_misc = {
   end,
   test_rlimit = function()
     local r, err = S.getrlimit("nofile")
-    -- new travis CI does not support this
+    -- new travis CI does not support this TODO add to features
     if err and err.NOSYS then return end
     assert(not err, "expect no error, got " .. tostring(err))
     assert(S.setrlimit("nofile", {0, r.rlim_max}))
@@ -1017,7 +1017,7 @@ test_misc = {
   end,
   test_prlimit = function()
     local r, err = S.prlimit(0, "nofile")
-    -- new travis CI does not support this
+    -- new travis CI does not support this TODO add to features
     if err and err.NOSYS then return end
     assert(not err, "expect no error")
     local r2 = assert(S.prlimit(0, "nofile", {512, r.max}))
@@ -2450,6 +2450,7 @@ if S.geteuid() == 0 then
   end
 
   -- cut out this section if you want to (careful!) debug on real interfaces
+  -- TODO add to features as may not be supported
   assert(S.unshare("newnet, newns, newuts"), "tests as root require kernel namespaces") -- do not interfere with anything on host during tests
   local i = assert(nl.interfaces())
   local lo = assert(i.lo)
