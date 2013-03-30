@@ -4,6 +4,7 @@ local strict = require "strict"
 local S = require "syscall"
 local nl = require "syscall.nl"
 local util = require "syscall.util"
+local features = require "syscall.features"
 local bit = require "bit"
 local ffi = require "ffi"
 
@@ -1229,23 +1230,22 @@ test_sockets = {
     assert(c:close())
   end,
   test_ipv6_socket = function()
-    local s, err = S.socket("inet6", "dgram")
-    if s then
-      local c = assert(S.socket("inet6", "dgram"))
-      local sa = assert(t.sockaddr_in6(0, S.in6addr_any))
-      local ca = assert(t.sockaddr_in6(0, S.in6addr_any))
-      assert_equal(tostring(sa.sin6_addr), "::", "expect :: for in6addr_any")
-      assert(s:bind(sa))
-      assert(c:bind(sa))
-      local bca = c:getsockname() -- find bound address
-      local serverport = s:getsockname().port -- find bound port
-      local n = assert(s:sendto(teststring, nil, 0, bca))
-      local f = assert(c:recvfrom(buf, size))
-      assert(f.count == #teststring, "should get the whole string back")
-      assert(f.addr.port == serverport, "should be able to get server port in recvfrom")
-      assert(c:close())
-      assert(s:close())
-    else assert(err.AFNOSUPPORT, err) end -- fairly common to not have ipv6 in kernel
+    if not features.ipv6() then return true end
+    local s = assert(S.socket("inet6", "dgram"))
+    local c = assert(S.socket("inet6", "dgram"))
+    local sa = assert(t.sockaddr_in6(0, S.in6addr_any))
+    local ca = assert(t.sockaddr_in6(0, S.in6addr_any))
+    assert_equal(tostring(sa.sin6_addr), "::", "expect :: for in6addr_any")
+    assert(s:bind(sa))
+    assert(c:bind(sa))
+    local bca = c:getsockname() -- find bound address
+    local serverport = s:getsockname().port -- find bound port
+    local n = assert(s:sendto(teststring, nil, 0, bca))
+    local f = assert(c:recvfrom(buf, size))
+    assert(f.count == #teststring, "should get the whole string back")
+    assert(f.addr.port == serverport, "should be able to get server port in recvfrom")
+    assert(c:close())
+    assert(s:close())
   end,
   test_ipv6_names = function()
     local sa = assert(t.sockaddr_in6(1234, "2002::4:5"))
