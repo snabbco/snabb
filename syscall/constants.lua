@@ -1783,7 +1783,10 @@ c.PR_MCE_KILL_OPT = setmetatable({
   DEFAULT      = 2,
 }, stringflag)
 
--- capabilities
+c.LINUX_CAPABILITY_VERSION = {0x19980330, 0x20071026, 0x20080522}
+c.LINUX_CAPABILITY_U32S = {1, 2, 2}
+
+-- capabilities NB these are bit shifts
 c.CAP = setmetatable({
   CHOWN = 0,
   DAC_OVERRIDE = 1,

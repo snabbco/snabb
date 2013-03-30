@@ -172,6 +172,8 @@ local addtypes = {
   winsize = "struct winsize",
   termio = "struct termio",
   sock_fprog = "struct sock_fprog",
+  user_cap_header = "struct user_cap_header",
+  user_cap_data = "struct user_cap_data",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
@@ -206,6 +208,7 @@ t.char2 = ffi.typeof("char[2]")
 t.int2 = ffi.typeof("int[2]")
 t.uint2 = ffi.typeof("unsigned int[2]")
 t.timespec2 = ffi.typeof("struct timespec[2]")
+t.user_cap_data2 = ffi.typeof("struct user_cap_data[2]")
 
 -- still need sizes for these, for ioctls
 s.uint2 = ffi.sizeof(t.uint2)

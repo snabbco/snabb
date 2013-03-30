@@ -634,6 +634,16 @@ struct udphdr {
   uint16_t len;
   uint16_t check;
 };
+/* we define the underlying structs not the pointer typedefs for capabilities */
+struct user_cap_header {
+  uint32_t version;
+  int pid;
+};
+struct user_cap_data {
+  uint32_t effective;
+  uint32_t permitted;
+  uint32_t inheritable;
+};
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
@@ -1039,6 +1049,10 @@ int syscall(int number, ...);
 
 int ioctl(int d, int request, void *argp); /* void* easiest here */
 
+/* note we use underlying struct not typedefs here */
+int capget(struct user_cap_header *hdrp, struct user_cap_data *datap);
+int capset(struct user_cap_header *hdrp, const struct user_cap_data *datap);
+
 /* TODO from here to libc functions are not implemented yet */
 int tgkill(int tgid, int tid, int sig);
 int brk(void *addr);
@@ -1046,8 +1060,6 @@ void *sbrk(intptr_t increment);
 
 /* these need their types adding or fixing before can uncomment */
 /*
-int capget(cap_user_header_t hdrp, cap_user_data_t datap);
-int capset(cap_user_header_t hdrp, const cap_user_data_t datap);
 caddr_t create_module(const char *name, size_t size);
 int init_module(const char *name, struct module *image);
 int get_kernel_syms(struct kernel_sym *table);
