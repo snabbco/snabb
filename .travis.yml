@@ -1,7 +1,7 @@
 language: c
 
 before_install:
- - sudo apt-get install libcap-dev 
+ - sudo apt-get install libcap-dev -y 
  - sudo add-apt-repository ppa:mwild1/ppa -y
  - sudo apt-get update -y
  - sudo apt-get install luajit -y
