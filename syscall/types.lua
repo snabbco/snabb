@@ -1259,6 +1259,48 @@ mt.sock_filter = {
 
 metatype("sock_filter", "struct sock_filter", mt.sock_filter)
 
+-- capabilities data is an array so cannot put metatable on it. Also depends on version, so combine into one structure.
+mt.cap = {
+  __index = function(cap, k)
+    local ci = c.CAP[k]
+    if not ci then return end
+    local i, shift = h.divmod(ci, 32)
+    local mask = bit.bnot(bit.lshift(1, shift))
+    return bit.band(cap.cap[i], mask) ~= 0
+  end,
+  __newindex = function(cap, k, v)
+    local ci = c.CAP[k]
+    if not ci then return end
+    local i, shift = h.divmod(ci, 32)
+    local mask = bit.lshift(1, shift)
+    cap.cap[i] = bit.bor(cap.cap[i], mask)
+  end,
+}
+
+metatype("cap", "struct cap", mt.cap)
+
+-- TODO add method to return hdr, data
+meth.capabilities = {
+  index = {
+    hdrdata = function(cap)
+      local hdr, data = t.user_cap_header(cap.version, cap.pid), t.user_cap_data2()
+      data[0].effective, data[1].effective = cap.effective.cap[0], cap.effective.cap[1]
+      data[0].permitted, data[1].permitted = cap.permitted.cap[0], cap.permitted.cap[1]
+      data[0].inheritable, data[1].inheritable = cap.inheritable.cap[0], cap.inheritable.cap[1]
+      return hdr, data
+    end
+  },
+}
+
+mt.capabilities = {
+  __index = function(cap, k) if meth.capabilities.index[k] then return meth.capabilities.index[k](cap) end end,
+  __new = function(tp)
+    -- not much point initialising any other fields
+    return ffi.new(tp, c.LINUX_CAPABILITY_VERSION[3], 0)
+  end
+}
+
+metatype("capabilities", "struct capabilities", mt.capabilities)
 
 return types
 

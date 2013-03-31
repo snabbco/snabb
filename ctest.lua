@@ -17,6 +17,10 @@ ctypes["int errno"] = nil
 ctypes["struct user_cap_header"] = nil
 ctypes["struct user_cap_data"] = nil
 
+-- internal only
+ctypes["struct capabilities"] = nil
+ctypes["struct cap"] = nil
+
 -- TODO seems to be an issue with sockaddr_storage (alignment difference?) on Musl, needs fixing
 ctypes["struct sockaddr_storage"] = nil
 -- TODO seems to be a size issue on Musl

@@ -121,5 +121,9 @@ end
 
 h.charflags = {__index = chflags, __call = function(t, a) return t[a] end}
 
+h.divmod = function(a, b)
+  return math.floor(a / b), a % b
+end
+
 return h
 

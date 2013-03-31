@@ -644,6 +644,16 @@ struct user_cap_data {
   uint32_t permitted;
   uint32_t inheritable;
 };
+/* this are overall capabilities structs to put metatables on */
+struct cap {
+  uint32_t cap[2];
+};
+struct capabilities {
+  uint32_t version;
+  int pid;
+  struct cap effective;
+  struct cap permitted;
+  struct cap inheritable;
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
