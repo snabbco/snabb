@@ -2385,7 +2385,7 @@ test_seccomp = {
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+      assert_equal(w.EXITSTATUS, 0, "expect normal exit in clone")
     end
   end,
   test_seccomp_fail = function()
@@ -2440,6 +2440,13 @@ test_swap = {
 }
 
 test_capabilities = {
+  test_cap_types = function()
+    local cap = t.capabilities()
+    assert_equal(cap.version, c.LINUX_CAPABILITY_VERSION[3], "expect defaults to version 3")
+
+-- TODO
+
+  end,
   test_get_cap_version = function()
     local hdr = t.user_cap_header()
     local ok, err = S.capget(hdr)
