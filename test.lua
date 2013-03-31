@@ -1893,9 +1893,9 @@ test_processes = {
       S.exit(23)
     else -- parent
       local w = assert(S.waitid("all", 0, "exited, stopped, continued"))
-      assert(w.si_signo == c.SIG.CHLD, "waitid to return SIGCHLD")
-      assert(w.si_status == 23, "exit should be 23")
-      assert(w.si_code == c.SIGCLD.EXITED, "normal exit expected")
+      assert_equal(w.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
+      assert_equal(w.status, 23, "exit should be 23")
+      assert_equal(w.code, c.SIGCLD.EXITED, "normal exit expected")
     end
 
     pid = assert(S.fork())
@@ -2375,8 +2375,16 @@ test_seccomp = {
         -- allow syscall exit_group
         t.sock_filter("JMP,JEQ,K", c.SYS.exit_group, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        -- allow syscall mmap in case luajit allocates memory
+        t.sock_filter("JMP,JEQ,K", c.SYS.mmap, 0, 1),
+        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        -- allow syscall brk in case luajit allocates memory
+        t.sock_filter("JMP,JEQ,K", c.SYS.brk, 0, 1),
+        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- else kill
-        t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
+        --t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
+        -- for ease of debugging just trap
+        t.sock_filter("RET,K", c.SECCOMP_RET.TRAP),
       }
       local pp = t.sock_filters(#program, program)
       local p = t.sock_fprog1{{#program, pp}}
@@ -2385,7 +2393,7 @@ test_seccomp = {
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
-      assert_equal(w.EXITSTATUS, 0, "expect normal exit in clone")
+      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
   test_seccomp_fail = function()
