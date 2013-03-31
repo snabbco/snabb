@@ -1269,11 +1269,12 @@ mt.cap = {
     return bit.band(cap.cap[i], mask) ~= 0
   end,
   __newindex = function(cap, k, v)
+    if v == true then v = 1 elseif v == false then v = 0 end
     local ci = c.CAP[k]
     if not ci then return end
     local i, shift = h.divmod(ci, 32)
-    local mask = bit.lshift(1, shift)
-    cap.cap[i] = bit.bor(cap.cap[i], mask)
+    local mask = bit.lshift(v, shift)
+    cap.cap[i] = bit.bor(bit.band(cap.cap[i], mask), cap.cap[i], mask)
   end,
 }
 
