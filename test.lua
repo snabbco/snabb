@@ -2376,11 +2376,11 @@ test_seccomp = {
         t.sock_filter("JMP,JEQ,K", c.SYS.exit_group, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall mmap in case luajit allocates memory
-        t.sock_filter("JMP,JEQ,K", c.SYS.mmap, 0, 1),
-        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        --t.sock_filter("JMP,JEQ,K", c.SYS.mmap, 0, 1),
+        --t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall brk in case luajit allocates memory
-        t.sock_filter("JMP,JEQ,K", c.SYS.brk, 0, 1),
-        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        --t.sock_filter("JMP,JEQ,K", c.SYS.brk, 0, 1),
+        --t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- else kill
         --t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
         -- for ease of debugging just trap
@@ -2393,6 +2393,10 @@ test_seccomp = {
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
+      if w.EXITSTATUS ~= 0 then -- failed, get debug info
+        assert_equal(w.code , c.SYS.seccomp, "expect reason is seccomp")
+
+      end
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
@@ -2428,6 +2432,46 @@ test_seccomp = {
     else
       local w = assert(S.waitpid(-1, "clone"))
       assert(w.EXITSTATUS == 42 or w.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp (or not implemented)")
+    end
+  end,
+  test_seccomp_fail_signal = function()
+    local p = assert(S.fork())
+     if p == 0 then
+      local ok, err = S.prctl("set_no_new_privs", true)
+      if err and err.INVAL then S.exit(42) end -- may not be supported TODO change to feature test
+      local nnp = fork_assert(S.prctl("get_no_new_privs"))
+      fork_assert(nnp == true)
+      local program = {
+        -- test architecture correct
+        t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
+        t.sock_filter("JMP,JEQ,K", util.auditarch(), 1, 0),
+        t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
+        -- get syscall number
+        t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "nr")),
+        -- allow syscall getpid
+        t.sock_filter("JMP,JEQ,K", c.SYS.getpid, 0, 1),
+        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        -- allow syscall exit_group
+        t.sock_filter("JMP,JEQ,K", c.SYS.exit_group, 0, 1),
+        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        -- else trap, also return syscall number
+        t.sock_filter("ALU,OR,K", c.SECCOMP_RET.TRAP),
+        t.sock_filter("RET,A"),
+      }
+      local pp = t.sock_filters(#program, program)
+      local p = t.sock_fprog1{{#program, pp}}
+      fork_assert(S.prctl("set_seccomp", "filter", p))
+      local pid = S.getpid()
+      local fd = fork_assert(S.open("/dev/null", "rdonly")) -- not allowed
+      S.exit()
+    else
+      local w = assert(S.waitid("pid", p, "exited, stopped"))
+      assert_equal(w.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
+      if w.code == c.SIGCLD.EXITED then
+        assert_equal(w.status, 42)
+        return
+      end
+      assert(w.status == c.SIG.SYS, "expect SIGSYS from failed seccomp")
     end
   end,
 }

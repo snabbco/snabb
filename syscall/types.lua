@@ -1259,7 +1259,7 @@ metatype("ethhdr", "struct ethhdr", mt.ethhdr)
 
 mt.sock_filter = {
   __new = function(tp, code, k, jt, jf)
-    return ffi.new(tp, c.BPF[code], jt or 0, jf or 0, k)
+    return ffi.new(tp, c.BPF[code], jt or 0, jf or 0, k or 0)
   end
 }
 
