@@ -2435,12 +2435,16 @@ test_seccomp = {
     end
   end,
   test_seccomp_fail_signal = function()
-    local p = assert(S.fork())
+    local p = assert(S.clone())
      if p == 0 then
       local ok, err = S.prctl("set_no_new_privs", true)
       if err and err.INVAL then S.exit(42) end -- may not be supported TODO change to feature test
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
       fork_assert(nnp == true)
+
+      local fd = fork_assert(S.signalfd("sys"))
+      fork_assert(S.sigprocmask("block", "sys"))
+
       local program = {
         -- test architecture correct
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
@@ -2450,6 +2454,15 @@ test_seccomp = {
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "nr")),
         -- allow syscall getpid
         t.sock_filter("JMP,JEQ,K", c.SYS.getpid, 0, 1),
+        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        -- allow syscall read
+        t.sock_filter("JMP,JEQ,K", c.SYS.read, 0, 1),
+        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        -- allow syscall close
+        t.sock_filter("JMP,JEQ,K", c.SYS.close, 0, 1),
+        t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
+        -- allow syscall rt_sigprocmask
+        t.sock_filter("JMP,JEQ,K", c.SYS.rt_sigprocmask, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall exit_group
         t.sock_filter("JMP,JEQ,K", c.SYS.exit_group, 0, 1),
@@ -2462,16 +2475,17 @@ test_seccomp = {
       local p = t.sock_fprog1{{#program, pp}}
       fork_assert(S.prctl("set_seccomp", "filter", p))
       local pid = S.getpid()
-      local fd = fork_assert(S.open("/dev/null", "rdonly")) -- not allowed
+      local ofd, err = S.open("/dev/null", "rdonly") -- not allowed
+
+      local sig = fork_assert(util.signalfd_read(fd))
+      fork_assert(#sig == 1, "expect one signal")
+      fork_assert(sig[1].sys, "expect SIGSYS")
+      fork_assert(fd:close())
+      fork_assert(S.sigprocmask("unblock", "sys"))
       S.exit()
     else
-      local w = assert(S.waitid("pid", p, "exited, stopped"))
-      assert_equal(w.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
-      if w.code == c.SIGCLD.EXITED then
-        assert_equal(w.status, 42)
-        return
-      end
-      assert(w.status == c.SIG.SYS, "expect SIGSYS from failed seccomp")
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0 or w.EXITSTATUS == 42, "expect normal exit if supported")
     end
   end,
 }
