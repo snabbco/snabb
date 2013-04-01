@@ -17,7 +17,7 @@ This code is beta. Interfaces will change in future. The code is riddled with TO
 LuaJIT 2.0.0 or later. ARM (soft or hard float), x86 or AMD64 architectures; intend to support PPC and MIPS in future. Either glibc or [Musl libc](http://www.musl-libc.org/) or uClibc should work. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
 ## Release notes
-0.6pre adds support for raw sockets, seccomp mode 2 (syscall filtering), bug fixes.
+0.6pre adds support for raw sockets, seccomp mode 2 (syscall filtering), capabilities, feature tests, plus bug fixes.
 
 0.5 adds support for ppc, has some bug fixes for 64 bit file handling on 32 bit architectures, and better organisation of files.
 
