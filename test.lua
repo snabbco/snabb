@@ -2505,9 +2505,21 @@ test_capabilities = {
   test_cap_types = function()
     local cap = t.capabilities()
     assert_equal(cap.version, c.LINUX_CAPABILITY_VERSION[3], "expect defaults to version 3")
-
--- TODO
-
+    for k, _ in pairs(c.CAP) do
+      assert(not cap.effective[k])
+    end
+    for k, _ in pairs(c.CAP) do
+      cap.effective[k] = true
+    end
+    for k, _ in pairs(c.CAP) do
+      assert(cap.effective[k])
+    end
+    for k, _ in pairs(c.CAP) do
+      cap.effective[k] = false
+    end
+    for k, _ in pairs(c.CAP) do
+      assert(not cap.effective[k])
+    end
   end,
   test_get_cap_version = function()
     local hdr = t.user_cap_header()
