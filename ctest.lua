@@ -277,8 +277,8 @@ print [[
 #include <elf.h>
 #include <net/ethernet.h>
 #include <sys/swap.h>
-#include <sys/capability.h>
 
+#include <linux/capability.h>
 #include <linux/aio_abi.h>
 #include <linux/reboot.h>
 #include <linux/falloc.h>
