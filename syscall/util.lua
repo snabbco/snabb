@@ -48,7 +48,8 @@ mt.ls = {
 
 function util.ls(name, nodots) -- return just the list, no other data, cwd if no directory specified
   if not name then name = S.getcwd() end
-  local ds = util.dirfile(name, nodots)
+  local ds, err = util.dirfile(name, nodots)
+  if not ds then return nil, err end
   local l = {}
   for k, _ in pairs(ds) do l[#l + 1] = k end
   return setmetatable(l, mt.ls)
