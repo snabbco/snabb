@@ -243,6 +243,14 @@ if ffi.abi("32bit") then
   end
 end
 
+-- on 32 bit systems mmap oses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
+if ffi.abi("32bit") then
+  function C.mmap(addr, length, prot, flags, fd, offset)
+    local pgoffset = math.floor(offset / 4096)
+    return pt.void(C.syscall(c.SYS.mmap2, pt.void(addr), t.size(length), t.int(prot), t.int(flags), t.int(fd), t.uint32(pgoffset)))
+  end
+end
+
 -- native Linux aio not generally supported by libc, only posix API
 function C.io_setup(nr_events, ctx)
   return C.syscall(c.SYS.io_setup, t.uint(nr_events), pt.void(ctx))
