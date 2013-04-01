@@ -1008,6 +1008,7 @@ int getpeername(int sockfd, void *addr, socklen_t *addrlen);
 int shutdown(int sockfd, int how);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+void *mmap2(void *addr, size_t length, int prot, int flags, int fd, off_t pgoffset);
 int munmap(void *addr, size_t length);
 int msync(void *addr, size_t length, int flags);
 int mlock(const void *addr, size_t len);
