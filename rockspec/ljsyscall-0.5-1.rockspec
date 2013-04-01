@@ -1,8 +1,9 @@
 package = "ljsyscall"
-version = "0.6"
+version = "0.5-1"
 source =
 {
-  url = "https://github.com/justincormack/ljsyscall/archive/v0.6.tar.gz";
+  url = "https://github.com/justincormack/ljsyscall/archive/v0.5.tar.gz";
+  dir = "ljsyscall-0.5";
 }
 description =
 {
@@ -28,8 +29,6 @@ build =
       ["syscall.ioctl"] = "syscall/ioctl.lua";
       ["syscall.types"] = "syscall/types.lua";
       ["syscall.nl"] = "syscall/nl.lua";
-      ["syscall.util"] = "syscall/util.lua";
-      ["syscall.features"] = "syscall/features.lua";
       ["syscall.arm.constants"] = "syscall/arm/constants.lua";
       ["syscall.arm.ioctl"] = "syscall/arm/ioctl.lua";
       ["syscall.mips.constants"] = "syscall/mips/constants.lua";
