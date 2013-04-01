@@ -123,7 +123,8 @@ local function retnume(f, ...) -- for cases where need to explicitly set and che
   ffi.errno(0)
   local ret = f(...)
   local errno = ffi.errno()
-  if errno ~= 0 then return nil, t.error() end
+print("no", errno)
+  if errno ~= 0 then return nil, t.error(errno) end
   return ret
 end
 
