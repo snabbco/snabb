@@ -123,7 +123,6 @@ local function retnume(f, ...) -- for cases where need to explicitly set and che
   ffi.errno(0)
   local ret = f(...)
   local errno = ffi.errno()
-print("no", errno)
   if errno ~= 0 then return nil, t.error(errno) end
   return ret
 end
@@ -478,7 +477,7 @@ function S.nice(inc) return retnume(C.nice, inc) end
 -- NB glibc is shifting these values from what strace shows, as per man page, kernel adds 20 to make these values positive...
 -- might cause issues with other C libraries in which case may shift to using system call
 function S.getpriority(which, who) return retnume(C.getpriority, c.PRIO[which], who or 0) end
-function S.setpriority(which, who, prio) return retnume(C.setpriority, c.PRIO[which], who or 0, prio) end
+function S.setpriority(which, who, prio) return retbool(C.setpriority, c.PRIO[which], who or 0, prio) end
 
  -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly?
 function S.clone(flags, signal, stack, ptid, tls, ctid)
