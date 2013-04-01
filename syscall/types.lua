@@ -1302,9 +1302,15 @@ meth.capabilities = {
 
 mt.capabilities = {
   __index = function(cap, k) if meth.capabilities.index[k] then return meth.capabilities.index[k](cap) end end,
-  __new = function(tp)
-    -- not much point initialising any other fields
-    return ffi.new(tp, c.LINUX_CAPABILITY_VERSION[3], 0)
+  __new = function(tp, hdr, data)
+    local cap = ffi.new(tp, c.LINUX_CAPABILITY_VERSION[3], 0)
+    if hdr then cap.version, cap.pid = hdr.version, hdr.pid end
+    if data then
+      cap.effective.cap[0], cap.effective.cap[1] = data[0].effective, data[1].effective
+      cap.permitted.cap[0], cap.permitted.cap[1] = data[0].permitted, data[1].permitted
+      cap.inheritable.cap[0], cap.inheritable.cap[1] = data[0].inheritable, data[1].inheritable
+    end
+    return cap
   end
 }
 

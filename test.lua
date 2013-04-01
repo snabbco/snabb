@@ -2523,7 +2523,7 @@ test_capabilities = {
   end,
   test_get_cap_version = function()
     local hdr = t.user_cap_header()
-    local ok, err = S.capget(hdr)
+    S.capget(hdr) -- man page says returns error, but does not seem to
     assert_equal(hdr.version, c.LINUX_CAPABILITY_VERSION[3], "expect capability version 3 API on recent kernel")
   end,
 }

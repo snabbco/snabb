@@ -1607,14 +1607,20 @@ function S.swapoff(path) return retbool(C.swapoff(path)) end
 
 -- capabilities. Somewhat complex kernel interface due to versioning, Posix requiring malloc in API.
 -- only support version 3, should be ok for recent kernels, or pass your own hdr, data in
--- to detect capability API version, pass in hdr with empty version and ignore error, version will be set
+-- to detect capability API version, pass in hdr with empty version, version will be set
 function S.capget(hdr, data) -- normally just leave as nil for get, can pass pid in
   hdr = istype(t.user_cap_header, hdr) or t.user_cap_header(c.LINUX_CAPABILITY_VERSION[3], hdr or 0)
   if not data and hdr.version ~= 0 then data = t.user_cap_data2() end
   local ret = C.capget(hdr, data)
   if ret == -1 then return nil, t.error() end
-  return data -- TODO needs metatable to be usable
+  if not data then return hdr end
+  return t.capabilities(hdr, data)
 end
+
+--[[
+function S.capset(hdr, data)
+  if ffi.istype(t.capabilities, hdr) then hdr, data = hdr.hdrdata()
+]]
 
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
