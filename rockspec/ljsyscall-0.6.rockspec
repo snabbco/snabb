@@ -1,9 +1,8 @@
 package = "ljsyscall"
-version = "scm-1"
+version = "0.6"
 source =
 {
-  url = "git://github.com/justincormack/ljsyscall.git";
-  branch = "master";
+  url = "https://github.com/justincormack/ljsyscall/archive/v0.6.tar.gz";
 }
 description =
 {
