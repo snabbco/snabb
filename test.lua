@@ -2378,8 +2378,8 @@ test_seccomp = {
         -- allow syscall mprotect in case luajit allocates memory for jitting
         t.sock_filter("JMP,JEQ,K", c.SYS.mprotect, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
-        -- allow syscall mmap in case luajit allocates memory
-        t.sock_filter("JMP,JEQ,K", c.SYS.mmap, 0, 1),
+        -- allow syscall mmap/mmap2 in case luajit allocates memory
+        t.sock_filter("JMP,JEQ,K", c.SYS.mmap2 or c.SYS.mmap, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall brk in case luajit allocates memory
         t.sock_filter("JMP,JEQ,K", c.SYS.brk, 0, 1),
@@ -2460,8 +2460,8 @@ test_seccomp = {
         -- allow syscall mprotect in case luajit allocates memory for jitting
         t.sock_filter("JMP,JEQ,K", c.SYS.mprotect, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
-        -- allow syscall mmap in case luajit allocates memory
-        t.sock_filter("JMP,JEQ,K", c.SYS.mmap, 0, 1),
+        -- allow syscall mmap/mmap2 in case luajit allocates memory
+        t.sock_filter("JMP,JEQ,K", c.SYS.mmap2 or c.SYS.mmap, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall brk in case luajit allocates memory
         t.sock_filter("JMP,JEQ,K", c.SYS.brk, 0, 1),
