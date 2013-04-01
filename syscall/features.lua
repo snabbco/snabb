@@ -15,5 +15,14 @@ features.ipv6 = function()
   return true
 end
 
+features.cap = setmetatable({},
+  {__index =
+    function(_, k)
+      local cap = S.capget()
+      return cap.effective[k]
+    end,
+  }
+)
+
 return features
 
