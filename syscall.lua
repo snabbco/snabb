@@ -1610,7 +1610,7 @@ function S.swapoff(path) return retbool(C.swapoff(path)) end
 -- to detect capability API version, pass in hdr with empty version and ignore error, version will be set
 function S.capget(hdr, data) -- normally just leave as nil for get, can pass pid in
   hdr = istype(t.user_cap_header, hdr) or t.user_cap_header(c.LINUX_CAPABILITY_VERSION[3], hdr or 0)
-  if not data then data = t.user_cap_data2() end
+  if not data and hdr.version ~= 0 then data = t.user_cap_data2() end
   local ret = C.capget(hdr, data)
   if ret == -1 then return nil, t.error() end
   return data -- TODO needs metatable to be usable
