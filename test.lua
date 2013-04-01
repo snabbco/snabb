@@ -2532,6 +2532,20 @@ test_capabilities = {
     for k, _ in pairs(c.CAP) do if cap.effective[k] then count = count + 1 end end
     if S.geteuid() == 0 then assert(count > 0, "root should have some caps") else assert(count == 0, "non-root has no caps") end
   end,
+  test_capset_root = function()
+    local p = assert(S.clone())
+    if p == 0 then
+      local cap = fork_assert(S.capget())
+      cap.effective.sys_chroot = false
+      fork_assert(S.capset(cap))
+      local ok, err = S.chroot(".")
+      fork_assert(not ok and err.PERM, "should not have chroot capability")
+      S.exit()
+    else
+      local w = assert(S.waitpid(-1, "clone"))
+      assert(w.EXITSTATUS == 0, "expect normal exit")
+    end
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.

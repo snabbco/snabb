@@ -1617,10 +1617,10 @@ function S.capget(hdr, data) -- normally just leave as nil for get, can pass pid
   return t.capabilities(hdr, data)
 end
 
---[[
 function S.capset(hdr, data)
-  if ffi.istype(t.capabilities, hdr) then hdr, data = hdr.hdrdata()
-]]
+  if ffi.istype(t.capabilities, hdr) then hdr, data = hdr.hdrdata() end
+  return retbool(C.capset(hdr, data))
+end
 
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.

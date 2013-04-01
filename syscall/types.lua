@@ -1301,7 +1301,7 @@ meth.capabilities = {
 }
 
 mt.capabilities = {
-  __index = function(cap, k) if meth.capabilities.index[k] then return meth.capabilities.index[k](cap) end end,
+  __index = function(cap, k) if meth.capabilities.index[k] then return function() return meth.capabilities.index[k](cap) end end end,
   __new = function(tp, hdr, data)
     local cap = ffi.new(tp, c.LINUX_CAPABILITY_VERSION[3], 0)
     if hdr then cap.version, cap.pid = hdr.version, hdr.pid end
