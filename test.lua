@@ -2526,6 +2526,12 @@ test_capabilities = {
     S.capget(hdr) -- man page says returns error, but does not seem to
     assert_equal(hdr.version, c.LINUX_CAPABILITY_VERSION[3], "expect capability version 3 API on recent kernel")
   end,
+  test_capget = function()
+    local cap = S.capget()
+    local count = 0
+    for k, _ in pairs(c.CAP) do if cap.effective[k] then count = count + 1 end end
+    if S.geteuid() == 0 then assert(count > 0, "root should have some caps") else assert(count == 0, "non-root has no caps") end
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.
