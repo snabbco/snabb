@@ -188,44 +188,6 @@ end
 
 function set_promiscuous_mode () r.FCTRL(bits({MPE=8, UPE=9, BAM=10})) end
 
--- Create a hardware register object called NAME with ADDRESS.
--- The ADDRESS is the byte-offset relative to the uint32_t* BASE_POINTER.
-function make_register (name, address, desc, base_pointer, mode)
-   assert(address % 4 == 0)
-   local acc = 0
-   local type = ffi.metatype(
-      -- Each register has its own anonymous struct type wrapping a pointer.
-      ffi.typeof("struct { uint32_t *ptr; }"),
-      { __call = function(reg, value)
-		    if value == nil then
-                       if mode == 'accumulate' then
-                          acc = acc + reg.ptr[0]
-                          return acc
-                       else
-                          return reg.ptr[0]
-                       end
-                    else
-                       reg.ptr[0] = value
-                       end
-		 end,
-        __index = function (reg, key)
-                     if key == "desc" then
-                        return desc
-                     elseif key == "name" then
-                        return name
-		     elseif key == "clear" then
-			return function ()
-				  acc = reg.ptr[0]
-				  acc = 0
-			       end
-                     end
-                  end,
-	__tostring = function(reg)
-			return name..":"..bit.tohex(reg())
-		     end })
-   return type(base_pointer + address/4)
-end
-
 function wait_linkup ()
    test.waitfor("linkup", linkup, 20, 250000)
 end
