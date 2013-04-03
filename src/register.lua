@@ -1,5 +1,7 @@
 -- register.lua -- Hardware device register abstraction
 
+module(...,package.seeall)
+
 -- ## Register object
 
 Register = {}
@@ -17,7 +19,9 @@ function new (name, longname, offset, base_ptr, mode)
    local o = { name=name, longname=longname,
 	       ptr=base_ptr + offset/4, mode=mode }
    assert(mode == 'RO' or mode == 'RW' or mode == 'RC')
-   setmetatable(o, Register)
+   setmetatable(o, {__index = Register,
+                    __call = Register.__call,
+                    __tostring = Register.__tostring})
    return o
 end
 
@@ -25,6 +29,8 @@ end
 ---     reg()      <=> reg:read()
 ---     reg(value) <=> reg:write(value)
 function Register:__call (value)
+--   for k,v in pairs(getmetatable(self)) do print(k,v) end
+--   print("read",self.read,"write",self.write,"getmetatable",getmetatable(self).__call)
    if value == nil then return self:read() else return self:write(value) end
 end
 
@@ -35,8 +41,8 @@ end
 
 function Register:read ()
    local value = self.ptr[0]
-   if mode == 'RC' then
-      self.acc = self.acc + value
+   if self.mode == 'RC' then
+      self.acc = (self.acc or 0) + value
       return self.acc
    else
       return value
@@ -44,6 +50,7 @@ function Register:read ()
 end
 
 function Register:write (value)
+--   print("mode",self.mode,"name",self.name)
    assert(self.mode == 'RW')
    self.ptr[0] = value
    return value
@@ -57,7 +64,7 @@ function Register:clr (bitmask) self(bit.band(self(), bit.bnot(bitmask))) end
 --- If `value` is not given then until all bits in the mask are set.
 function Register:wait (bitmask, value)
    lib.waitfor(function ()
-		  return bit.band(register(), bitmask) == (value or bitmask)
+		  return bit.band(self(), bitmask) == (value or bitmask)
 	       end)
 end
 
@@ -83,26 +90,25 @@ function Register:reset () self.acc = nil end
 function define (description, table, base_ptr)
    local pattern = " *(%S+) +(%S+) +(%S+) +(%S+) (.-)\n"
    for name,offset,index,perm,longname in description:gmatch(pattern) do
-      table[name] = new(name, longname, base, tonumber(offset), perm)
+      table[name] = new(name, longname, tonumber(offset), base_ptr, perm)
    end
 end
 
 -- Print a pretty-printed register dump for a table of register objects.
-function dump (table)
-   table = table or r
+function dump (tab, iscounters)
    print "Register dump:"
    local strings = {}
-   for _,reg in pairs(table) do
-      if table ~= s or reg() > 0 then
+   for _,reg in pairs(tab) do
+      if iscounters == nil or reg() > 0 then
          table.insert(strings, reg)
       end
    end
    table.sort(strings, function(a,b) return a.name < b.name end)
    for _,reg in pairs(strings) do
-      if table == s then
-         io.write(("%20s %16s %s\n"):format(reg.name, lib.comma_value(reg()), reg.desc))
+      if iscounters then
+         io.write(("%20s %16s %s\n"):format(reg.name, lib.comma_value(reg()), reg.longname))
       else
-         io.write(("%20s %s\n"):format(reg, reg.desc))
+         io.write(("%20s %s\n"):format(reg, reg.longname))
       end
    end
 end

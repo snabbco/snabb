@@ -5,6 +5,11 @@ module(...,package.seeall)
 local ffi = require "ffi"
 local C = ffi.C
 local lib = require("lib")
+local pci = require("pci")
+local register = require("register")
+local memory = require("memory")
+local intel = require("intel") -- FIXME need rx/tx descriptor C types
+local test = require("test")
 local bits, bitset = lib.bits, lib.bitset
 
 -- DMA memory.
@@ -56,14 +61,14 @@ function wait_eeprom_autoread () r.EEC:wait(bits{AutoreadDone=9}) end
 function wait_dma ()             r.RDRXCTL:wait(bits{DMAInitDone=3})  end
 
 function init_statistics ()
-   for _,reg in pairs(s) do reg.clear() end
+   for _,reg in pairs(s) do reg:reset() end
 end
 
 function linkup () return bitset(r.LINKS(), 30) end
 
 function enable_mac_loopback ()
-   set(r.AUTOC, bits({ForceLinkUp=0, LMS10G=13}))
-   set(r.HLREG0, bits({Loop=15}))
+   r.AUTOC:set(bits({ForceLinkUp=0, LMS10G=13}))
+   r.HLREG0:set(bits({Loop=15}))
 end
 
 function init_receive ()
@@ -151,8 +156,8 @@ end
 function add_receive_buffer (address, size)
    assert(can_add_receive_buffer())
    local desc = rxdesc[rdt].data
-   desc.address, desc.dd = memory.map(address), size
-   rxbuffers[rdt] = address
+   desc.address, desc.dd = address, size
+   rxbuffers[rdt] = ffi.cast("uint8_t*", address)
    rdt = (rdt + 1) % num_descriptors
 end
 
@@ -201,7 +206,7 @@ function selftest ()
    buffers[0] = 99
    repeat
       sync()
-      while can_add_receive_buffer() do add_receive_buffer(buffers_phy + 40960) end
+      while can_add_receive_buffer() do add_receive_buffer(buffers_phy + 40960, 4096) end
       while can_transmit() do transmit(buffers_phy, 50) end
       sync()
 --      C.usleep(1)
@@ -209,7 +214,7 @@ function selftest ()
    assert(buffers[40960]==99)
    C.usleep(1000)
    print "stats"
-   register.dump(s)
+   register.dump(s, true)
 end
 
 --- ## Configuration register description.
@@ -234,7 +239,7 @@ RXCTRL    0x03000 -            RW Receive Control
 STATUS    0x00008 -            RO Device Status
 TDBAL     0x06000 +0x40*0..127 RW Transmit Descriptor Base Address Low
 TDBAH     0x06004 +0x40*0..127 RW Transmit Descriptor Base Address High
-TDH       0x06010 +0x40*0..127 RO Transmit Descriptor Head
+TDH       0x06010 +0x40*0..127 RW Transmit Descriptor Head
 TDT       0x06018 +0x40*0..127 RW Transmit Descriptor Tail
 TDLEN     0x06008 +0x40*0..127 RW Transmit Descriptor Length
 TXDCTL    0x06028 +0x40*0..127 RW Transmit Descriptor Control
