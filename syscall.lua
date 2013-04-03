@@ -616,6 +616,7 @@ function S.recvfrom(fd, buf, count, flags, ss, addrlen)
   return {count = tonumber(ret), addr = t.sa(ss, addrlen[0])}
 end
 
+-- TODO {get,set}sockopt may need better type handling
 function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far
   if not optlen and type(optval) == 'boolean' then if optval then optval = 1 else optval = 0 end end
@@ -626,12 +627,13 @@ function S.setsockopt(fd, level, optname, optval, optlen)
   return retbool(C.setsockopt(getfd(fd), c.SOL[level], c.SO[optname], optval, optlen))
 end
 
-function S.getsockopt(fd, level, optname) -- will need fixing for non int/bool options
-  local optval, optlen = t.int1(), t.socklen1()
-  optlen[0] = s.int
-  local ret = C.getsockopt(getfd(fd), level, optname, optval, optlen)
+function S.getsockopt(fd, level, optname, optval, optlen)
+  local len = t.socklen1()
+  if not optval then optval, optlen = t.int1(), s.int end
+  local len = t.socklen1(optlen)
+  local ret = C.getsockopt(getfd(fd), level, optname, optval, len)
   if ret == -1 then return nil, t.error() end
-  return tonumber(optval[0]) -- no special case for bool
+  return optval[0]
 end
 
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
