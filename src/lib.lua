@@ -76,3 +76,7 @@ function timer (ns)
    return function () return C.get_time_ns() >= deadline end
 end
 
+-- Loop until the function `condition` returns true.
+function waitfor (condition)
+   while not condition() do C.usleep(100) end
+end
