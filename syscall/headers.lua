@@ -655,6 +655,10 @@ struct capabilities {
   struct cap permitted;
   struct cap inheritable;
 };
+struct xt_get_revision {
+  char name[29];
+  uint8_t revision;
+};
 ]]
 
 -- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage

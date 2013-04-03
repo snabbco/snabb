@@ -3073,5 +3073,37 @@ c.SWAP_FLAG = setmetatable({
   DISCARD      = 0x10000,
 }, swapflags)
 
+-- iptables/xtables
+
+c.NF = setmetatable({
+  DROP = 0,
+  ACCEPT = 1,
+  STOLEN = 2,
+  QUEUE = 3,
+  REPEAT = 4,
+  STOP = 5,
+}, stringflag)
+
+-- misc values, just gathered in a table as better namespacing
+c.XT = setmetatable({
+  FUNCTION_MAXNAMELEN  = 30,
+  EXTENSION_MAXNAMELEN = 29,
+  TABLE_MAXNAMELEN     = 32,
+}, stringflag)
+
+local IPT_BASE_CTL = 64
+
+c.IPT_SO_SET = setmetatable({
+  REPLACE      = IPT_BASE_CTL,
+  ADD_COUNTERS = IPT_BASE_CTL + 1,
+}, stringflag)
+
+c.IPT_SO_GET = setmetatable({
+  INFO                 = IPT_BASE_CTL,
+  ENTRIES              = IPT_BASE_CTL + 1,
+  REVISION_MATCH       = IPT_BASE_CTL + 2,
+  REVISION_TARGET      = IPT_BASE_CTL + 3,
+}, stringflag)
+
 return c
 
