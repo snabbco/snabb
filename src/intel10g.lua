@@ -26,8 +26,7 @@ s = {}
 
 function open ()
    local pcidev = "0000:83:00.1"
-   local pci_config_fd = pci.open_config(pcidev)
-   pci.set_bus_master(pci_config_fd, true)
+   pci.set_bus_master(pcidev, true)
    base = ffi.cast("uint32_t*", pci.map_pci_memory(pcidev, 0))
    register.define(config_registers_desc, r, base)
    register.define(statistics_registers_desc, s, base)

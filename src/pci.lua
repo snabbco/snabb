@@ -10,43 +10,37 @@ local lib = require("lib")
 require("clib_h")
 require("snabb_h")
 
-function suitable_devices ()
-   local list = {}
-   for _,info in ipairs(devices()) do
-      if is_suitable(info) then list[#list + 1] = info end
-   end
-   return list
-end
+--- ## Hardware device information
 
-function is_suitable (info)
-   return info.vendor == "0x8086" and 
-      (info.device == "0x10d3" or info.device == "0x105e") and
-      (info.interface == nil or info.status == 'down')
-end
+--- Array of all supported hardware devices.
+---
+--- Each entry is a "device info" table with these attributes:
+---     * `pciaddress` e.g. `"0000:83:00.1"`
+---     * `vendor` id hex string e.g. `"0x8086"` for Intel.
+---     * `device` id hex string e.g. `"0x10fb"` for 82599 chip.
+---     * `interface` name of Linux interface using this device e.g. `"eth0"`.
+---     * `status` string Linux operational status, or `nil` if not known.
+---     * `driver` Lua module that supports this hardware e.g. `"intel10g"`.
+---     * `usable` device was suitable to use when scanned? `yes` or `no`
+devices = {}
 
--- Prepare the device with pciaddress for use with the switch.
--- Return true on success.
-function prepare_device (pciaddress)
-   local device = device_info(pciaddress)
-   if device.interface == nil then
-         return true
-   else
-      print("Unbinding PCI device "..pciaddress.." ("..device.interface..") from the operating system driver.")
-      local file = io.open(path(pciaddress).."/driver/unbind", "w")
-      file:write(pciaddress)
-      file.close()
-      return is_suitable(device_info(pciaddress))
-   end
-end
-
-function devices ()
-   local info = {}
+-- Return device information table i.e. value for the devices table.
+function scan_devices ()
    for _,device in ipairs(scandir("/sys/bus/pci/devices")) do
-      info[#info + 1] = device_info(device)
+      local info = device_info(device)
+      if info.driver then table.insert(devices, info) end
    end
-   return info
 end
 
+function scandir (dir)
+   local files = {}
+   for line in io.popen('ls -1 "'..dir..'" 2>/dev/null'):lines() do
+      table.insert(files, line)
+   end
+   return files
+end
+
+-- Return the 
 function device_info (pciaddress)
    local info = {}
    local p = path(pciaddress)
@@ -54,33 +48,40 @@ function device_info (pciaddress)
    info.vendor = firstline(p.."/vendor")
    info.device = firstline(p.."/device")
    info.interface = firstfile(p.."/net")
+   info.driver = which_driver(info.vendor, info.device)
    if info.interface then
       info.status = firstline(p.."/net/"..info.interface.."/operstate")
    end
+   info.usable = lib.yesno(is_usable(info))
    return info
 end
 
-function firstline(filename)
-   local file = io.open(filename, "r")
-   if file then
-      local line = file:read("*l")
-      file.close()
-      return line
-   end
-end
-
-function firstfile(dir)
-   for _,file in ipairs(scandir(dir)) do return file end
-end
-
--- Return true if 'device' is an Intel 82574 ethernet controller.
-function pcidev_is_82574 (device)
-   return io.open(path(device).."/config", "ro"):read(4) == "\x86\x80\xd3\x10"
-end
-
+-- Return the path to the sysfs directory for `pcidev`.
 function path(pcidev) return "/sys/bus/pci/devices/"..pcidev end
 
+-- Return the name of the Lua module that implements support for this device.
+function which_driver (vendor, device)
+   if vendor == '0x8086' and device == '0x10fb' then return 'intel10g' end
+   if vendor == '0x8086' and device == '0x10d3' then return 'intel' end
+end
+
+function firstline (filename) return lib.readfile(filename, "*l") end
+
+-- Return the name of the first file in `dir`.
+function firstfile (dir)
+   return lib.readcmd("ls -1 "..dir.." 2>/dev/null", "*l")
+end
+
+--- ## Device manipulation
+
+-- Force Linux to release the device with `pciaddress`.
+-- The corresponding network interface (e.g. `eth0`) will disappear.
+function unbind_device_from_linux (pciaddress)
+   lib.writefile(path(pciaddress).."/driver/unbind", pciaddress)
+end
+
 -- Return a pointer for MMIO access to 'device' resource 'n'.
+-- Device configuration registers can be accessed this way.
 function map_pci_memory (device, n)
    local filepath = path(device).."/resource"..n
    local addr = C.map_pci_resource(filepath)
@@ -88,67 +89,49 @@ function map_pci_memory (device, n)
    return addr
 end
 
--- Return a file descriptor for accessing PCI configuration space.
-function open_config (device)
-   return C.open_pcie_config(path(device).."/config")
-end
-
--- Close the file descriptor for PCI configuration space access.
-function close_config (fd)
-   C.close(config)
-end
-
-local pci_value = ffi.new("uint16_t[1]")
-
-function read_config (fd, reg)
-   assert(C.pread(fd, pci_value, 2, reg) == 2)
-   return pci_value[0]
-end
-
-function write_config (fd, reg, value)
-   pci_value[0] = value
-   assert(C.pwrite(fd, pci_value, 2, reg) == 2)
-end
-
-function set_bus_master (fd, flag)
-   local control = read_config(fd, 0x04)
-   if flag then
-      control = bit.bor(control, lib.bits({EnableMastering=2}))
+-- Enable or disable PCI bus mastering.
+-- (DMA only works when bus mastering is enabled.)
+function set_bus_master (device, enable)
+   local fd = C.open_pcie_config(path(device).."/config")
+   local value = ffi.new("uint16_t[1]")
+   assert(C.pread(fd, value, 2, 0x4) == 2)
+   if enable then
+      value[0] = bit.bor(value[0], lib.bits({Master=2}))
    else
-      control = bit.band(control, bit.bnot(lib.bits({EnableMastering=2})))
+      value[0] = bit.band(value[0], bit.bnot(lib.bits({Master=2})))
    end
-   write_config(fd, 0x04, control)
+   assert(C.pwrite(fd, value, 2, 0x4) == 2)
 end
+
+-- Return true if `device` is available for use or false if it seems
+-- to be used by the operating system.
+function is_usable (info)
+   return info.driver and (info.interface == nil or info.status == 'down')
+end
+
+--- ## Selftest
 
 function selftest ()
    print("selftest: pci")
-   print("Scanning PCI devices:")
-   list_devices()
-   local suitable = suitable_devices()
-   if #suitable == 0 then
-      print("No suitable PCI Ethernet devices found.")
-   else
-      print("Suitable devices: ")
-      for _,device in ipairs(suitable) do
-         print("  "..device.pciaddress)
+   print_devices()
+end
+
+--- Print a table summarizing all the available hardware devices.
+function print_devices ()
+   local attrs = {"pciaddress", "vendor", "device", "interface", "status",
+                  "driver", "usable"}
+   local fmt = "%-13s %-7s %-7s %-10s %-9s %-11s %s"
+   print(fmt:format(unpack(attrs)))
+   for _,info in ipairs(devices) do
+      local values = {}
+      for _,attr in ipairs(attrs) do
+         table.insert(values, info[attr] or "-")
       end
+      print(fmt:format(unpack(values)))
    end
 end
 
-function list_devices ()
-   print("pciaddr", "", "vendor", "device", "iface", "status")
-   for _,d in ipairs(devices()) do
-      print(d.pciaddress, d.vendor, d.device, d.interface or "-", d.status or "-")
-   end
-end
+function module_init () scan_devices () end
 
--- Return the names of all files in dir.
--- XXX Consider doing this with luafilesystem (lfs) instead of popen.
-function scandir (dir)
-   local files = {}
-   for filename in io.popen('ls -1 "'..dir..'" 2>/dev/null'):lines() do
-      files[#files + 1] = filename
-   end
-   return files
-end
+module_init()
 

@@ -3,6 +3,14 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 
+--- Return `command` in the Unix shell and read `what` from the result.
+function readcmd (command, what)
+   local f = io.popen(command)
+   local value = f:read(what)
+   f:close()
+   return value
+end
+
 function readfile (filename, what)
    local f = io.open(filename, "r")
    if f == nil then error("Unable to open file: " .. filename) end
@@ -79,4 +87,8 @@ end
 -- Loop until the function `condition` returns true.
 function waitfor (condition)
    while not condition() do C.usleep(100) end
+end
+
+function yesno (flag)
+   if flag then return 'yes' else return 'no' end
 end
