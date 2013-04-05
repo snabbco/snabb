@@ -12,7 +12,6 @@ all: snabbswitch
 
 snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
 	gcc -Wl,-E -Werror -Wall -o $@ $^ \
-	    ../deps/luafilesystem/src/lfs.o \
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt
 	@echo -n "Firmware: "
