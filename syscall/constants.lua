@@ -1830,7 +1830,6 @@ c.CAP = setmetatable({
 c.VFS_CAP = setmetatable({
   REVISION_MASK   = 0xFF000000,
   REVISION_SHIFT  = 24,
-  FLAGS_EFFECTIVE = 0x000001,
   REVISION_1      = 0x01000000,
   U32_1           = 1,
   REVISION_2      = 0x02000000,
@@ -1840,6 +1839,10 @@ c.VFS_CAP = setmetatable({
 c.VFS_CAP.FLAGS_MASK = bit.bnot(c.VFS_CAP.REVISION_MASK)
 c.VFS_CAP.U32      = c.VFS_CAP.U32_2
 c.VFS_CAP.REVISION = c.VFS_CAP.REVISION_2
+
+c.VFS_CAP_FLAGS = setmetatable({
+  EFFECTIVE = 0x000001,
+}, stringflag)
 
 c.XATTR_CAPS = setmetatable({
   SZ_1 = 4 * (1 + 2 * c.VFS_CAP.U32_1),

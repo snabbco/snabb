@@ -653,17 +653,20 @@ function util.capget(f)
   local cap = t.capabilities()
   cap.permitted.cap[0], cap.permitted.cap[1] = h.convle32(vfs.data[0].permitted), h.convle32(vfs.data[1].permitted)
   cap.inheritable.cap[0], cap.inheritable.cap[1] = h.convle32(vfs.data[0].inheritable), h.convle32(vfs.data[1].inheritable)
-  if bit.band(magic_etc, c.VFS_CAP.FLAGS_EFFECTIVE) ~= 0 then
+  if bit.band(magic_etc, c.VFS_CAP_FLAGS.EFFECTIVE) ~= 0 then
     cap.effective.cap[0] = bit.bor(cap.permitted.cap[0], cap.inheritable.cap[0])
     cap.effective.cap[1] = bit.bor(cap.permitted.cap[1], cap.inheritable.cap[1])
   end
   return cap
 end
 
-function util.capset(f, v, flags)
+function util.capset(f, cap, flags) -- TODO allow init of cap from table
+  local vfsflags = 0
+  for k, _ in pairs(c.CAP) do if cap.effective[k] then vfsflags = c.VFS_CAP_FLAGS.EFFECTIVE end end
   local vfs = t.vfs_cap_data()
-  
-  local ok, err
+  vfs.magic_etc = h.convle32(c.VFS_CAP.REVISION_2 + vfsflags)
+  vfs.data[0].permitted, vfs.data[1].permitted = h.convle32(cap.permitted.cap[0]), h.convle32(cap.permitted.cap[1])
+  vfs.data[0].inheritable, vfs.data[1].inheritable = h.convle32(cap.inheritable.cap[0]), h.convle32(cap.inheritable.cap[1])
   if type(f) == "string" then return S.setxattr(f, seccap, vfs, flags) else return f:getxattr(seccap, vfs, flags) end
 end
 

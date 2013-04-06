@@ -1285,6 +1285,19 @@ mt.cap = {
     local set = bit.lshift(v, shift)
     cap.cap[i] = bit.bor(bit.band(cap.cap[i], mask), set)
   end,
+  __tostring = function(cap)
+    local str = ""
+    local one
+    for k, _ in pairs(c.CAP) do
+      if cap[k] then
+        if one then str = str .. "," end
+        str = str .. k
+        one = true
+      end
+    end
+    str = str .. "\n"
+  return str
+  end,
 }
 
 metatype("cap", "struct cap", mt.cap)
@@ -1306,6 +1319,7 @@ mt.capabilities = {
   __index = function(cap, k) if meth.capabilities.index[k] then return function() return meth.capabilities.index[k](cap) end end end,
   __new = function(tp, hdr, data)
     local cap = ffi.new(tp, c.LINUX_CAPABILITY_VERSION[3], 0)
+    -- TODO allow creation from table {permitted="MKNOD"} etc
     if hdr then cap.version, cap.pid = hdr.version, hdr.pid end
     if data then
       cap.effective.cap[0], cap.effective.cap[1] = data[0].effective, data[1].effective
@@ -1318,16 +1332,7 @@ mt.capabilities = {
     local str = ""
     for nm, capt in pairs{permitted = cap.permitted, inheritable = cap.inheritable, effective = cap.effective} do
       str = str .. nm .. ": "
-      local one
-      for k, _ in pairs(c.CAP) do
-        if capt[k] then
-          if one then str = str .. "," end
-          str = str .. k
-          one = true
-        else
-        end
-      end
-      str = str .. "\n"
+      str = str .. tostring(capt)
     end
     return str
   end,
