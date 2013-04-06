@@ -641,20 +641,6 @@ end
 -- file system capabilities
 local seccap = "security.capability"
 
---[[
-    for (i=0; i < tocopy; i++) {
-        result->u[i].flat[CAP_INHERITABLE]
-            = FIXUP_32BITS(rawvfscap->data[i].inheritable);
-        result->u[i].flat[CAP_PERMITTED]
-            = FIXUP_32BITS(rawvfscap->data[i].permitted);
-        if (magic_etc & VFS_CAP_FLAGS_EFFECTIVE) {
-            result->u[i].flat[CAP_EFFECTIVE]
-                = result->u[i].flat[CAP_INHERITABLE]
-                | result->u[i].flat[CAP_PERMITTED];
-        }
-    }
-]]
-
 function util.capget(f)
   local attr, err
   if type(f) == "string" then attr, err = S.getxattr(f, seccap) else attr, err = f:getxattr(seccap) end

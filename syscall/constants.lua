@@ -1837,7 +1837,7 @@ c.VFS_CAP = setmetatable({
   U32_2           = 2,
 }, stringflag)
 
-c.FLAGS_MASK       = bit.bnot(c.VFS_CAP.REVISION_MASK)
+c.VFS_CAP.FLAGS_MASK = bit.bnot(c.VFS_CAP.REVISION_MASK)
 c.VFS_CAP.U32      = c.VFS_CAP.U32_2
 c.VFS_CAP.REVISION = c.VFS_CAP.REVISION_2
 
