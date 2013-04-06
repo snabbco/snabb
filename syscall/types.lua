@@ -1273,7 +1273,7 @@ mt.cap = {
     local ci = c.CAP[k]
     if not ci then return end
     local i, shift = h.divmod(ci, 32)
-    local mask = bit.bnot(bit.lshift(1, shift))
+    local mask = bit.lshift(1, shift)
     return bit.band(cap.cap[i], mask) ~= 0
   end,
   __newindex = function(cap, k, v)
@@ -1313,7 +1313,24 @@ mt.capabilities = {
       cap.inheritable.cap[0], cap.inheritable.cap[1] = data[0].inheritable, data[1].inheritable
     end
     return cap
-  end
+  end,
+  __tostring = function(cap)
+    local str = ""
+    for nm, capt in pairs{permitted = cap.permitted, inheritable = cap.inheritable, effective = cap.effective} do
+      str = str .. nm .. ": "
+      local one
+      for k, _ in pairs(c.CAP) do
+        if capt[k] then
+          if one then str = str .. "," end
+          str = str .. k
+          one = true
+        else
+        end
+      end
+      str = str .. "\n"
+    end
+    return str
+  end,
 }
 
 metatype("capabilities", "struct capabilities", mt.capabilities)

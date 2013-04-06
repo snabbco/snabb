@@ -653,9 +653,9 @@ function util.capget(f)
   local cap = t.capabilities()
   cap.permitted.cap[0], cap.permitted.cap[1] = h.convle32(vfs.data[0].permitted), h.convle32(vfs.data[1].permitted)
   cap.inheritable.cap[0], cap.inheritable.cap[1] = h.convle32(vfs.data[0].inheritable), h.convle32(vfs.data[1].inheritable)
-  if bit.band(magic_etc, c.VFS_CAP.FLAGS_EFFECTIVE) then
-    cap.effective.cap[0] = bit.bor(cap.permitted.cap[0], cap.effective.cap[0])
-    cap.effective.cap[1] = bit.bor(cap.permitted.cap[1], cap.effective.cap[1])
+  if bit.band(magic_etc, c.VFS_CAP.FLAGS_EFFECTIVE) ~= 0 then
+    cap.effective.cap[0] = bit.bor(cap.permitted.cap[0], cap.inheritable.cap[0])
+    cap.effective.cap[1] = bit.bor(cap.permitted.cap[1], cap.inheritable.cap[1])
   end
   return cap
 end
