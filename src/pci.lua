@@ -109,11 +109,46 @@ function is_usable (info)
    return info.driver and (info.interface == nil or info.status == 'down')
 end
 
+--- ## Open a device
+---
+--- Load a fresh copy of the device driver's Lua module for each
+--- device. The module will be told at load-time the PCI address of
+--- the device it is controlling. This makes the module code short
+--- because it can assume that it's always talking to the same device.
+---
+--- This is achieved with our own require()-like function that loads a
+--- fresh copy and passes the PCI address as an argument.
+
+open_devices = {}
+
+-- Load a new instance of the 'driver' module for 'pciaddress'.
+-- On success this creates the Lua module 'driver@pciaddress'.
+--
+-- Example: open_device("intel10g", "0000:83:00.1") creates module
+-- "intel10g@0000:83:00.1" which controls that specific device.
+function open_device(pciaddress, driver)
+   local instance = driver.."@"..pciaddress
+   find_loader(driver)(instance, pciaddress)
+   open_devices[pciaddress] = package.loaded[instance]
+   return package.loaded[instance]
+end
+
+-- (This could be a Lua builtin.)
+-- Return loader function for `module`.
+-- Calling the loader function will run the module's code.
+function find_loader (mod)
+   for i = 1, #package.loaders do
+      status, loader = pcall(package.loaders[i], mod)
+      if type(loader) == 'function' then return loader end
+   end
+end
+
 --- ## Selftest
 
 function selftest ()
    print("selftest: pci")
    print_devices()
+   open_usable_devices()
 end
 
 --- Print a table summarizing all the available hardware devices.
@@ -128,6 +163,19 @@ function print_devices ()
          table.insert(values, info[attr] or "-")
       end
       print(fmt:format(unpack(values)))
+   end
+end
+
+function open_usable_devices ()
+   for _,device in ipairs(devices) do
+      if device.usable == 'yes' then
+         print("Unbinding device from linux: "..device.pciaddress)
+         unbind_device_from_linux(device.pciaddress)
+         print("Opening device "..device.pciaddress)
+         local driver = open_device(device.pciaddress, device.driver)
+         print("Testing "..device.pciaddress)
+         driver.selftest()
+      end
    end
 end
 

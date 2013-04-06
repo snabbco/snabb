@@ -1,6 +1,17 @@
 -- intel10g.lua -- Intel 82599 10GbE ethernet device driver
 
-module(...,package.seeall)
+--- This module defines a device driver for one specific PCI device.
+--- The load-time `...` argument must be bound to two values:
+---     * The unique name for this module instance.
+---     * The PCI address for the device this instance manages.
+
+local moduleinstance,pciaddress = ...
+
+if pciaddress == nil then
+   print("WARNING: intel10g loaded as normal module; should be device-specific.")
+end
+
+module(moduleinstance,package.seeall)
 
 local ffi = require "ffi"
 local C = ffi.C
@@ -25,9 +36,8 @@ r = {}
 s = {}
 
 function open ()
-   local pcidev = "0000:83:00.1"
-   pci.set_bus_master(pcidev, true)
-   base = ffi.cast("uint32_t*", pci.map_pci_memory(pcidev, 0))
+   pci.set_bus_master(pciaddress, true)
+   base = ffi.cast("uint32_t*", pci.map_pci_memory(pciaddress, 0))
    register.define(config_registers_desc, r, base)
    register.define(statistics_registers_desc, s, base)
    init_device()
