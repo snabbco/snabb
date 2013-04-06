@@ -638,5 +638,49 @@ function util.auditarch()
   if ffi.abi("le") then return c.AUDIT_ARCH[auditarch_le[ffi.arch]] else return c.AUDIT_ARCH[auditarch_be[ffi.arch]] end
 end
 
+-- file system capabilities
+local seccap = "security.capability"
+
+--[[
+    for (i=0; i < tocopy; i++) {
+        result->u[i].flat[CAP_INHERITABLE]
+            = FIXUP_32BITS(rawvfscap->data[i].inheritable);
+        result->u[i].flat[CAP_PERMITTED]
+            = FIXUP_32BITS(rawvfscap->data[i].permitted);
+        if (magic_etc & VFS_CAP_FLAGS_EFFECTIVE) {
+            result->u[i].flat[CAP_EFFECTIVE]
+                = result->u[i].flat[CAP_INHERITABLE]
+                | result->u[i].flat[CAP_PERMITTED];
+        }
+    }
+]]
+
+function util.capget(f)
+  local attr, err
+  if type(f) == "string" then attr, err = S.getxattr(f, seccap) else attr, err = f:getxattr(seccap) end
+  if not attr then return nil, err end
+  local vfs = pt.vfs_cap_data(attr)
+  local magic_etc = h.convle32(vfs.magic_etc)
+  local version = bit.band(c.VFS_CAP.REVISION_MASK, magic_etc)
+  -- TODO if you need support for version 1 filesystem caps add here, fairly simple
+  assert(version == c.VFS_CAP.REVISION_2, "FIXME: Currently only support version 2 filesystem capabilities")
+  local cap = t.capabilities()
+  cap.permitted.cap[0], cap.permitted.cap[1] = h.convle32(vfs.data[0].permitted), h.convle32(vfs.data[1].permitted)
+  cap.inheritable.cap[0], cap.inheritable.cap[1] = h.convle32(vfs.data[0].inheritable), h.convle32(vfs.data[1].inheritable)
+  if bit.band(magic_etc, c.VFS_CAP.FLAGS_EFFECTIVE) then
+    cap.effective.cap[0] = bit.bor(cap.permitted.cap[0], cap.effective.cap[0])
+    cap.effective.cap[1] = bit.bor(cap.permitted.cap[1], cap.effective.cap[1])
+  end
+  return cap
+end
+
+function util.capset(f, v, flags)
+  local vfs = t.vfs_cap_data()
+  
+  local ok, err
+  if type(f) == "string" then return S.setxattr(f, seccap, vfs, flags) else return f:getxattr(seccap, vfs, flags) end
+end
+
+
 return util
 

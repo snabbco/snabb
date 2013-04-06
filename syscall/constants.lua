@@ -1826,6 +1826,28 @@ c.CAP = setmetatable({
   WAKE_ALARM = 35,
 }, stringflag)
 
+-- capabilities as stored on file system in xattr
+c.VFS_CAP = setmetatable({
+  REVISION_MASK   = 0xFF000000,
+  REVISION_SHIFT  = 24,
+  FLAGS_EFFECTIVE = 0x000001,
+  REVISION_1      = 0x01000000,
+  U32_1           = 1,
+  REVISION_2      = 0x02000000,
+  U32_2           = 2,
+}, stringflag)
+
+c.FLAGS_MASK       = bit.bnot(c.VFS_CAP.REVISION_MASK)
+c.VFS_CAP.U32      = c.VFS_CAP.U32_2
+c.VFS_CAP.REVISION = c.VFS_CAP.REVISION_2
+
+c.XATTR_CAPS = setmetatable({
+  SZ_1 = 4 * (1 + 2 * c.VFS_CAP.U32_1),
+  SZ_2 = 4 * (1 + 2 * c.VFS_CAP.U32_2),
+}, stringflag)
+
+c.XATTR_CAPS.SZ = c.XATTR_CAPS.SZ_2
+
 -- new SECCOMP modes, now there is filter as well as strict
 c.SECCOMP_MODE = setmetatable({
   DISABLED = 0,

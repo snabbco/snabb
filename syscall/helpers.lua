@@ -9,9 +9,11 @@ local h = {}
 if ffi.abi("be") then -- nothing to do
   function h.htonl(b) return b end
   function h.htons(b) return b end
+  function h.convle32(b) return bit.bswap(b) end -- used by file system capabilities, always stored as le
 else
   function h.htonl(b) return bit.bswap(b) end
   function h.htons(b) return bit.rshift(bit.bswap(b), 16) end
+  function h.convle32(b) return b end -- used by file system capabilities, always stored as le
 end
 h.ntohl = h.htonl -- reverse is the same
 h.ntohs = h.htons -- reverse is the same

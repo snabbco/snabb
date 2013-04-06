@@ -2546,6 +2546,13 @@ test_capabilities = {
       assert(w.EXITSTATUS == 0, "expect normal exit")
     end
   end,
+  test_filesystem_caps_get = function()
+    assert(util.touch(tmpfile))
+    local c, err = util.capget(tmpfile)
+    assert(not c and err.NODATA, "expect no caps")
+
+    assert(S.unlink(tmpfile))
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.

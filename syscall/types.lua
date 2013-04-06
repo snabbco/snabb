@@ -175,6 +175,7 @@ local addtypes = {
   user_cap_header = "struct user_cap_header",
   user_cap_data = "struct user_cap_data",
   xt_get_revision = "struct xt_get_revision",
+  vfs_cap_data = "struct vfs_cap_data",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end

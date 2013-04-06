@@ -24,7 +24,7 @@ typedef uint32_t id_t;
 typedef int32_t pid_t;
 typedef int32_t clockid_t;
 typedef int32_t daddr_t;
-
+typedef uint32_t le32; /* this is little endian */
 // 64 bit
 typedef uint64_t dev_t;
 typedef uint64_t loff_t;
@@ -658,6 +658,13 @@ struct capabilities {
 struct xt_get_revision {
   char name[29];
   uint8_t revision;
+};
+struct vfs_cap_data {
+  le32 magic_etc;
+  struct {
+    le32 permitted;    /* Little endian */
+    le32 inheritable;  /* Little endian */
+  } data[2];
 };
 ]]
 
