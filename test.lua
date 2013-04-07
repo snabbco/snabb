@@ -16,13 +16,13 @@ local function assert(cond, s)
   return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
 end
 
-local function fork_assert(cond, s) -- if we have forked we need to fail in main thread not fork
+local function fork_assert(cond, str) -- if we have forked we need to fail in main thread not fork
   if not cond then
-    print(tostring(s))
+    print(tostring(str))
     print(debug.traceback())
     S.exit("failure")
   end
-  return cond, s
+  return cond, str
 end
 
 USE_EXPECTED_ACTUAL_IN_ASSERT_EQUALS = true -- strict wants this to be set
