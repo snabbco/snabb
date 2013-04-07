@@ -1270,9 +1270,9 @@ test_raw_socket = {
     local cs = iphdr[0]:checksum()
     assert(cs == expected, "expect correct ip checksum: " .. string.format("%%%04X", cs) .. " " .. string.format("%%%04X", expected))
   end,
-  test_raw_udp_root = function()
+  test_raw_udp_root = function() -- TODO create some helper functions, this is not very nice
 
-    local h = require "syscall.helpers" -- should not have to use later
+    local h = require "syscall.helpers" -- TODO should not have to use later
 
     local loop = "127.0.0.1"
     local raw = assert(S.socket("inet", "raw", "raw"))
@@ -1295,7 +1295,7 @@ test_raw_socket = {
     local ca = cl:getsockname()
     local cport = ca.port
 
-    -- iphdr should have __index helpers for endianness etc (note use raw s_addr)
+    -- TODO iphdr should have __index helpers for endianness etc (note use raw s_addr)
     iphdr[0] = {ihl = 5, version = 4, tos = 0, id = 0, frag_off = h.htons(0x4000), ttl = 64, protocol = c.IPPROTO.UDP, check = 0,
              saddr = sa.sin_addr.s_addr, daddr = ca.sin_addr.s_addr, tot_len = h.htons(len)}
     iphdr[0]:checksum()
