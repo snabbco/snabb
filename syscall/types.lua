@@ -1268,6 +1268,19 @@ mt.sock_filter = {
 metatype("sock_filter", "struct sock_filter", mt.sock_filter)
 
 -- capabilities data is an array so cannot put metatable on it. Also depends on version, so combine into one structure.
+
+-- TODO maybe add caching
+local function capflags(val, str)
+  if not str then return val end
+  if #str == 0 then return val end
+  local a = h.split(",", str)
+  for i, v in ipairs(a) do
+    local s = h.trim(v):upper()
+    if c.CAP[s] then val[s] = true end
+  end
+  return val
+end
+
 mt.cap = {
   __index = function(cap, k)
     local ci = c.CAP[k]
@@ -1291,6 +1304,11 @@ mt.cap = {
       if cap[k] then tab[#tab + 1] = k end
     end
     return table.concat(tab, ",") .. "\n"
+  end,
+  __new = function(tp, str)
+    local cap = ffi.new(tp)
+    if str then capflags(cap, str) end
+    return cap
   end,
 }
 
