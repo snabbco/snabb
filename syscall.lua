@@ -1012,15 +1012,15 @@ local function growattrbuf(f, a, b)
     end
   until ret >= 0
 
-  if ret > 0 then ret = ret - 1 end -- has trailing \0
-
   return ffi.string(buffer, ret)
 end
 
 local function lattrbuf(sys, a)
   local s, err = growattrbuf(sys, a)
   if not s then return nil, err end
-  return split('\0', s)
+  local tab = split('\0', s)
+  tab[#tab] = nil -- there is a trailing \0 so one extra
+  return tab
 end
 
 function S.listxattr(path) return lattrbuf(C.listxattr, path) end
@@ -1028,13 +1028,13 @@ function S.llistxattr(path) return lattrbuf(C.llistxattr, path) end
 function S.flistxattr(fd) return lattrbuf(C.flistxattr, getfd(fd)) end
 
 function S.setxattr(path, name, value, flags)
-  return retbool(C.setxattr(path, name, value, #value + 1, c.XATTR[flags]))
+  return retbool(C.setxattr(path, name, value, #value, c.XATTR[flags]))
 end
 function S.lsetxattr(path, name, value, flags)
-  return retbool(C.lsetxattr(path, name, value, #value + 1, c.XATTR[flags]))
+  return retbool(C.lsetxattr(path, name, value, #value, c.XATTR[flags]))
 end
 function S.fsetxattr(fd, name, value, flags)
-  return retbool(C.fsetxattr(getfd(fd), name, value, #value + 1, c.XATTR[flags]))
+  return retbool(C.fsetxattr(getfd(fd), name, value, #value, c.XATTR[flags]))
 end
 
 function S.getxattr(path, name) return growattrbuf(C.getxattr, path, name) end

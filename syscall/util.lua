@@ -660,8 +660,10 @@ function util.capget(f)
   return cap
 end
 
-function util.capset(f, cap, flags) -- TODO allow init of cap from table
+function util.capset(f, cap, flags)
+  cap = istype(t.capabilities, cap) or t.capabilities(cap)
   local vfsflags = 0
+  -- is this the correct way to do this? TODO check
   for k, _ in pairs(c.CAP) do if cap.effective[k] then vfsflags = c.VFS_CAP_FLAGS.EFFECTIVE end end
   local vfs = t.vfs_cap_data()
   vfs.magic_etc = h.convle32(c.VFS_CAP.REVISION_2 + vfsflags)

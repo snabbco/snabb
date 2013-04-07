@@ -2550,7 +2550,15 @@ test_capabilities = {
     assert(util.touch(tmpfile))
     local c, err = util.capget(tmpfile)
     assert(not c and err.NODATA, "expect no caps")
-
+    assert(S.unlink(tmpfile))
+  end,
+  test_filesystem_caps_getset_root = function()
+    assert(util.touch(tmpfile))
+    local c, err = util.capget(tmpfile)
+    assert(not c and err.NODATA, "expect no caps")
+    assert(util.capset(tmpfile, {permitted = "chroot, sys_admin", inheritable = "chown, mknod"}, "create"))
+    local c = assert(util.capget(tmpfile))
+    assert(c.permitted.chroot)
     assert(S.unlink(tmpfile))
   end,
 }
