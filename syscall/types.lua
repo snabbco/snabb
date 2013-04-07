@@ -1286,17 +1286,11 @@ mt.cap = {
     cap.cap[i] = bit.bor(bit.band(cap.cap[i], mask), set)
   end,
   __tostring = function(cap)
-    local str = ""
-    local one
+    local tab = {}
     for k, _ in pairs(c.CAP) do
-      if cap[k] then
-        if one then str = str .. "," end
-        str = str .. k
-        one = true
-      end
+      if cap[k] then tab[#tab + 1] = k end
     end
-    str = str .. "\n"
-  return str
+    return table.concat(tab, ",") .. "\n"
   end,
 }
 
