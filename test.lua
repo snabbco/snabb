@@ -37,12 +37,12 @@ local sysfile = debug.getinfo(S.open).source
 local cov = {active = {}, cov = {}}
 
 local function coverage(event, line)
-  local s = debug.getinfo(2, "nLlS")
-  if s.source ~= sysfile then return end
+  local ss = debug.getinfo(2, "nLlS")
+  if ss.source ~= sysfile then return end
   if event == "line" then
     cov.cov[line] = true
   elseif event == "call" then
-    if s.activelines then for k, _ in pairs(s.activelines) do cov.active[k] = true end end
+    if ss.activelines then for k, _ in pairs(ss.activelines) do cov.active[k] = true end end
   end
 end
 
