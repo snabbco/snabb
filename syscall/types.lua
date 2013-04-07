@@ -95,6 +95,10 @@ local function ptt(tp)
   return function(x) return ffi.cast(ptp, x) end
 end
 
+local lenmt = {
+  __len = function(tp) return ffi.sizeof(tp) end,
+}
+
 local function addtype(name, tp, mt)
   if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
   ctypes[tp] = t[name]
@@ -127,6 +131,13 @@ local addtypes = {
   aio_context = "aio_context_t",
   sa_family = "sa_family_t",
   fdset = "fd_set",
+  clockid = "clockid_t",
+  sighandler = "sighandler_t",
+}
+
+-- as an experiment, see https://github.com/justincormack/ljsyscall/issues/28 trying adding a __len method
+-- however initially only for the ones with no extra metatype.
+local addstructs = {
   msghdr = "struct msghdr",
   cmsghdr = "struct cmsghdr",
   ucred = "struct ucred",
@@ -143,9 +154,7 @@ local addtypes = {
   timex = "struct timex",
   utsname = "struct utsname",
   fdb_entry = "struct fdb_entry",
-  sighandler = "sighandler_t",
   sigaction = "struct sigaction",
-  clockid = "clockid_t",
   io_event = "struct io_event",
   seccomp_data = "struct seccomp_data",
   iovec = "struct iovec",
@@ -179,6 +188,7 @@ local addtypes = {
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
+for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 
 -- these ones not in table as not helpful with vararg or arrays
 t.inotify_event = ffi.typeof("struct inotify_event")
