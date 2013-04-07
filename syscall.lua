@@ -628,7 +628,6 @@ function S.setsockopt(fd, level, optname, optval, optlen)
 end
 
 function S.getsockopt(fd, level, optname, optval, optlen)
-  local len = t.socklen1()
   if not optval then optval, optlen = t.int1(), s.int end
   local len = t.socklen1(optlen)
   local ret = C.getsockopt(getfd(fd), level, optname, optval, len)
