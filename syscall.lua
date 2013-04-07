@@ -629,7 +629,7 @@ end
 
 function S.getsockopt(fd, level, optname, optval, optlen)
   if not optval then optval, optlen = t.int1(), s.int end
-  local len = t.socklen1(optlen)
+  local len = t.socklen1(optlen or #optval)
   local ret = C.getsockopt(getfd(fd), level, optname, optval, len)
   if ret == -1 then return nil, t.error() end
   return optval[0]
@@ -1118,35 +1118,35 @@ function S.signalfd(set, flags, fd) -- note different order of args, as fd usual
 end
 
 -- TODO convert to metatype. Problem is how to deal with nfds
-function S.select(s) -- note same structure as returned
+function S.select(sel) -- note same structure as returned
   local r, w, e
   local nfds = 0
   local timeout
-  if s.timeout then timeout = istype(t.timeval, s.timeout) or t.timeval(s.timeout) end
-  r, nfds = mkfdset(s.readfds or {}, nfds or 0)
-  w, nfds = mkfdset(s.writefds or {}, nfds)
-  e, nfds = mkfdset(s.exceptfds or {}, nfds)
+  if sel.timeout then timeout = istype(t.timeval, sel.timeout) or t.timeval(sel.timeout) end
+  r, nfds = mkfdset(sel.readfds or {}, nfds or 0)
+  w, nfds = mkfdset(sel.writefds or {}, nfds)
+  e, nfds = mkfdset(sel.exceptfds or {}, nfds)
   local ret = C.select(nfds, r, w, e, timeout)
   if ret == -1 then return nil, t.error() end
-  return {readfds = fdisset(s.readfds or {}, r), writefds = fdisset(s.writefds or {}, w),
-          exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret)}
+  return {readfds = fdisset(sel.readfds or {}, r), writefds = fdisset(sel.writefds or {}, w),
+          exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret)}
 end
 
-function S.pselect(s) -- note same structure as returned
+function S.pselect(sel) -- note same structure as returned
   local r, w, e
   local nfds = 0
   local timeout, set
-  if s.timeout then
-    if ffi.istype(t.timespec, s.timeout) then timeout = s.timeout else timeout = t.timespec(s.timeout) end
+  if sel.timeout then
+    if ffi.istype(t.timespec, sel.timeout) then timeout = sel.timeout else timeout = t.timespec(sel.timeout) end
   end
-  if s.sigset then set = t.sigset(s.sigset) end
-  r, nfds = mkfdset(s.readfds or {}, nfds or 0)
-  w, nfds = mkfdset(s.writefds or {}, nfds)
-  e, nfds = mkfdset(s.exceptfds or {}, nfds)
+  if sel.sigset then set = t.sigset(sel.sigset) end
+  r, nfds = mkfdset(sel.readfds or {}, nfds or 0)
+  w, nfds = mkfdset(sel.writefds or {}, nfds)
+  e, nfds = mkfdset(sel.exceptfds or {}, nfds)
   local ret = C.pselect(nfds, r, w, e, timeout, set)
   if ret == -1 then return nil, t.error() end
-  return {readfds = fdisset(s.readfds or {}, r), writefds = fdisset(s.writefds or {}, w),
-          exceptfds = fdisset(s.exceptfds or {}, e), count = tonumber(ret), sigset = set}
+  return {readfds = fdisset(sel.readfds or {}, r), writefds = fdisset(sel.writefds or {}, w),
+          exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret), sigset = set}
 end
 
 function S.poll(fds, timeout)
