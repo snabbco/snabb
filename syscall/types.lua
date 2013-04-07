@@ -1303,7 +1303,7 @@ mt.cap = {
     for k, _ in pairs(c.CAP) do
       if cap[k] then tab[#tab + 1] = k end
     end
-    return table.concat(tab, ",") .. "\n"
+    return table.concat(tab, ",")
   end,
   __new = function(tp, str)
     local cap = ffi.new(tp)
@@ -1331,7 +1331,15 @@ mt.capabilities = {
   __index = function(cap, k) if meth.capabilities.index[k] then return function() return meth.capabilities.index[k](cap) end end end,
   __new = function(tp, hdr, data)
     local cap = ffi.new(tp, c.LINUX_CAPABILITY_VERSION[3], 0)
-    -- TODO allow creation from table {permitted="MKNOD"} etc
+    if type(hdr) == "table" then
+      if hdr.permitted then cap.permitted = t.cap(hdr.permitted) end
+      if hdr.effective then cap.effective = t.cap(hdr.effective) end
+      if hdr.inheritable then cap.inheritable = t.cap(hdr.inheritable) end
+      cap.pid = hdr.pid or 0
+      if hdr.version then cap.version = c.LINUX_CAPABILITY_VERSION[hdr.version] end
+      return cap
+    end
+    -- not passed a table
     if hdr then cap.version, cap.pid = hdr.version, hdr.pid end
     if data then
       cap.effective.cap[0], cap.effective.cap[1] = data[0].effective, data[1].effective
@@ -1344,7 +1352,7 @@ mt.capabilities = {
     local str = ""
     for nm, capt in pairs{permitted = cap.permitted, inheritable = cap.inheritable, effective = cap.effective} do
       str = str .. nm .. ": "
-      str = str .. tostring(capt)
+      str = str .. tostring(capt) .. "\n"
     end
     return str
   end,
