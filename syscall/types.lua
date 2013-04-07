@@ -846,6 +846,7 @@ metatype("signalfd_siginfo", "struct signalfd_siginfo", {
     if rname == k:upper() then return true end -- TODO use some metatable to hide this?
     if meth.signalfd.index[k] then return meth.signalfd.index[k](ss) end
   end,
+  __len = lenfn,
 })
 
 mt.siginfos = {

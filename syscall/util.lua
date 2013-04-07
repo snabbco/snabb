@@ -193,7 +193,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
 
     local fdbs = pt.fdb_entry(buffer)
 
-    for i = 1, n / s.fdb_entry do
+    for i = 1, math.floor(n / s.fdb_entry) do
       local fdb = fdbs[i - 1]
       local mac = t.macaddr()
       ffi.copy(mac, fdb.mac_addr, IFHWADDRLEN)
@@ -315,8 +315,8 @@ function util.sendcred(fd, pid, uid, gid) -- only needed for root to send (incor
   ucred.gid = gid
   local buf1 = t.buffer(1) -- need to send one byte
   local io = t.iovecs{{buf1, 1}}
-  local bufsize = cmsg_space(s.ucred)
-  local buflen = cmsg_len(s.ucred)
+  local bufsize = cmsg_space(#ucred)
+  local buflen = cmsg_len(#ucred)
   local buf = t.buffer(bufsize) -- this is our cmsg buffer
   local msg = t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io.iov
@@ -327,7 +327,7 @@ function util.sendcred(fd, pid, uid, gid) -- only needed for root to send (incor
   cmsg.cmsg_level = c.SOL.SOCKET
   cmsg.cmsg_type = c.SCM.CREDENTIALS
   cmsg.cmsg_len = buflen
-  ffi.copy(cmsg.cmsg_data, ucred, s.ucred)
+  ffi.copy(cmsg.cmsg_data, ucred, #ucred)
   msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
   return S.sendmsg(fd, msg, 0)
 end
