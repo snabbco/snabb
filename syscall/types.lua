@@ -1286,7 +1286,8 @@ local function capflags(val, str)
   local a = h.split(",", str)
   for i, v in ipairs(a) do
     local s = h.trim(v):upper()
-    if c.CAP[s] then val[s] = true end
+    assert(c.CAP[s], "invalid capability") -- TODO not sure if throw is best solution here, but silent errors otherwise
+    val[s] = true
   end
   return val
 end
@@ -1310,7 +1311,8 @@ mt.cap = {
   end,
   __tostring = function(cap)
     local tab = {}
-    for k, _ in pairs(c.CAP) do
+    for i = 1, #c.CAP do
+      local k = c.CAP[i]
       if cap[k] then tab[#tab + 1] = k end
     end
     return table.concat(tab, ",")
