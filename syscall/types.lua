@@ -95,9 +95,9 @@ local function ptt(tp)
   return function(x) return ffi.cast(ptp, x) end
 end
 
-local lenmt = {
-  __len = function(tp) return ffi.sizeof(tp) end,
-}
+local function lenfn(tp) return ffi.sizeof(tp) end
+
+local lenmt = {__len = lenfn}
 
 local function addtype(name, tp, mt)
   if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
