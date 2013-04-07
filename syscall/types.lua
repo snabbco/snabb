@@ -284,6 +284,7 @@ meth.sockaddr = {
 
 metatype("sockaddr", "struct sockaddr", {
   __index = function(sa, k) if meth.sockaddr.index[k] then return meth.sockaddr.index[k](sa) end end,
+  __len = lenfn,
 })
 
 meth.sockaddr_storage = {
@@ -334,6 +335,7 @@ metatype("sockaddr_storage", "struct sockaddr_storage", {
     end
     return ss
   end,
+  __len = lenfn,
 })
 
 meth.sockaddr_in = {
@@ -356,7 +358,8 @@ metatype("sockaddr_in", "struct sockaddr_in", {
       if not addr then return end
     end
     return ffi.new(tp, c.AF.INET, htons(port or 0), addr)
-  end
+  end,
+  __len = lenfn,
 })
 
 meth.sockaddr_in6 = {
@@ -379,7 +382,8 @@ metatype("sockaddr_in6", "struct sockaddr_in6", {
       if not addr then return end
     end
     return ffi.new(tp, c.AF.INET6, htons(port or 0), flowinfo or 0, addr, scope_id or 0)
-  end
+  end,
+  __len = lenfn,
 })
 
 meth.sockaddr_un = {
@@ -391,9 +395,11 @@ meth.sockaddr_un = {
 metatype("sockaddr_un", "struct sockaddr_un", {
   __index = function(sa, k) if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end end,
   __new = function(tp) return ffi.new(tp, c.AF.UNIX) end,
+  __len = lenfn,
 })
 
 -- this is a bit odd, but we actually use Lua metatables for sockaddr_un, and use t.sa to multiplex
+-- basically a unix socket structure is not possible to interpret without size
 mt.sockaddr_un = {
   __index = function(un, k)
     local sa = un.addr
@@ -409,7 +415,7 @@ mt.sockaddr_un = {
     else
       if k == 'unnamed' then return true end
     end
-  end
+  end,
 }
 
 function t.sa(addr, addrlen)
@@ -451,6 +457,7 @@ metatype("sockaddr_nl", "struct sockaddr_nl", {
     if nltype and nlgroupmap[nltype] then groups = nlgroupmap[nltype][groups] end -- see note about shiftflags
     return ffi.new(tp, {nl_family = c.AF.NETLINK, nl_pid = pid, nl_groups = groups})
   end,
+  __len = lenfn,
 })
 
 meth.sockaddr_ll = {
@@ -488,6 +495,7 @@ metatype("sockaddr_ll", "struct sockaddr_ll", {
     for k, v in pairs(tb or {}) do sa[k] = v end
     return sa
   end,
+  __len = lenfn,
 })
 
 -- 64 to 32 bit conversions via unions TODO use meth not object?
