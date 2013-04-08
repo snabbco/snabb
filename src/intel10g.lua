@@ -75,6 +75,15 @@ end
 
 function linkup () return bitset(r.LINKS(), 30) end
 
+function get_configuration_state ()
+   return { AUTOC = r.AUTOC(), HLREG0 = r.HLREG0() }
+end
+
+function restore_configuration_state (saved_state)
+   r.AUTOC(saved_state.AUTOC)
+   r.HLREG0(saved_state.HLREG0)
+end
+
 function enable_mac_loopback ()
    r.AUTOC:set(bits({ForceLinkUp=0, LMS10G=13}))
    r.HLREG0:set(bits({Loop=15}))
@@ -209,6 +218,7 @@ end
 function selftest ()
    print("intel10g")
    open()
+   local saved_state = get_configuration_state()
    enable_mac_loopback()
    test.waitfor("linkup", linkup, 20, 250000)
    local finished = lib.timer(1e9)
@@ -220,6 +230,7 @@ function selftest ()
       sync()
 --      C.usleep(1)
    until finished()
+   restore_configuration_state(saved_state)
    assert(buffers[40960]==99)
    C.usleep(1000)
    print "stats"
