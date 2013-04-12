@@ -77,11 +77,11 @@ test_basic = {
     assert_equal(c.SIG.SYS, 31) -- test numbers correct
   end,
   test_b64 = function()
-    local h, l = t.i6432(0xffffffffffffffffLL):to32()
+    local h, l = t.i6432(-1):to32()
     assert_equal(h, bit.tobit(0xffffffff))
     assert_equal(l, bit.tobit(0xffffffff))
-    local h, l = t.i6432(0xaffffffffffbffffLL):to32()
-    assert_equal(h, bit.tobit(0xafffffff))
+    local h, l = t.i6432(0xfffbffff):to32()
+    assert_equal(h, bit.tobit(0x0))
     assert_equal(l, bit.tobit(0xfffbffff))
   end,
   test_major_minor = function()

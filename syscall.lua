@@ -673,7 +673,7 @@ function S.fstatat(fd, path, buf, flags)
   return buf
 end
 
--- TODO part of type
+-- TODO part of type see https://github.com/justincormack/ljsyscall/issues/19
 local function gettimespec2(ts)
   if ffi.istype(t.timespec2, ts) then return ts end
   if ts then
