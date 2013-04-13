@@ -142,7 +142,6 @@ local addstructs = {
   cmsghdr = "struct cmsghdr",
   ucred = "struct ucred",
   sysinfo = "struct sysinfo",
-  epoll_event = "struct epoll_event",
   nlmsghdr = "struct nlmsghdr",
   rtgenmsg = "struct rtgenmsg",
   rtmsg = "struct rtmsg",
@@ -1437,6 +1436,34 @@ mt.adjtimex = {
 t.adjtimex = function(ret, timex)
   return setmetatable({state = ret, timex = timex}, mt.adjtimex)
 end
+
+--fd = tonumber(e.data.fd), data = e.data.u64, u32 = e.data.u32, ptr = e.data.ptr
+meth.epoll_event = {
+  index = {
+    fd = function(e) return tonumber(e.data.fd) end,
+    u64 = function(e) return e.data.u64 end,
+    u32 = function(e) return e.data.u32 end,
+    ptr = function(e) return e.data.ptr end,
+  },
+  newindex = {
+    fd = function(e, v) e.data.fd = v end,
+    u64 = function(e, v) e.data.u64 = v end,
+    u32 = function(e, v) e.data.u32 = v end,
+    ptr = function(e, v) e.data.ptr = v end,
+  }
+}
+
+mt.epoll_event = {
+  __index = function(e, k) if meth.index[k] then return meth.index[k](e) end end,
+  __newindex = function(e, k, v) if meth.newindex[k] then meth.newindex[k](e, v) end end,
+  __new = function(tp, a)
+    local e = ffi.new(tp)
+    if a then for k, v in pairs(a) do e[k] = v end end
+    return e
+  end,
+}
+
+metatype("epoll_event", "struct epoll_event", mt.epoll_event)
 
 return types
 
