@@ -1435,12 +1435,7 @@ mt.adjtimex = {
 
 -- TODO for input should be able to set modes automatically from which fields are set.
 function S.adjtimex(a)
-  if not a then a = t.timex() end
-  if type(a) == 'table' then  -- TODO pull this out to general initialiser for t.timex
-    if a.modes then a.modes = c.ADJ[a.modes] end
-    if a.status then a.status = c.STA[a.status] end
-    a = t.timex(a)
-  end
+  a = istype(t.timex, a) or t.timex(a)
   local ret = C.adjtimex(a)
   if ret == -1 then return nil, t.error() end
   -- we need to return a table, as we need to return both ret and the struct timex. should probably put timex fields in table

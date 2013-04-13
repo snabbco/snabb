@@ -151,7 +151,6 @@ local addstructs = {
   rtattr = "struct rtattr",
   rta_cacheinfo = "struct rta_cacheinfo",
   nlmsgerr = "struct nlmsgerr",
-  timex = "struct timex",
   utsname = "struct utsname",
   fdb_entry = "struct fdb_entry",
   sigaction = "struct sigaction",
@@ -1412,6 +1411,19 @@ t.inotify_events = function(buffer, len)
   end
   return ee
 end
+
+mt.timex = {
+  __new = function(tp, a)
+    if type(a) == 'table' then
+      if a.modes then a.modes = c.ADJ[a.modes] end
+      if a.status then a.status = c.STA[a.status] end
+      return ffi.new(tp, a)
+    end
+    return ffi.new(tp)
+  end,
+}
+
+metatype("timex", "struct timex", mt.timex)
 
 return types
 
