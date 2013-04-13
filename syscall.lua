@@ -1262,8 +1262,8 @@ function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd),
 
 -- helper function to read inotify structs as table from inotify fd TODO switch to ffi metatype
 function S.inotify_read(fd, buffer, len)
-  if not len then len = 1024 end
-  if not buffer then buffer = t.buffer(len) end
+  len = len or 1024
+  buffer = buffer or t.buffer(len)
   local ret, err = S.read(fd, buffer, len)
   if not ret then return nil, err end
   local off, ee = 0, {}
