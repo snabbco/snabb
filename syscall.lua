@@ -243,7 +243,7 @@ if ffi.abi("32bit") then
   end
 end
 
--- on 32 bit systems mmap oses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
+-- on 32 bit systems mmap uses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
 if ffi.abi("32bit") then
   function C.mmap(addr, length, prot, flags, fd, offset)
     local pgoffset = math.floor(offset / 4096)
