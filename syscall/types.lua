@@ -7,6 +7,13 @@
 
 -- note that some types will be overridden, eg default fd type will have metamethods added TODO document and test
 
+-- to test for bugs
+local oldsm = setmetatable
+local function setmetatable(t, mt)
+  assert(mt, "BUG: nil metatable")
+  return oldsm(t, mt)
+end
+
 local ffi = require "ffi"
 local bit = require "bit"
 

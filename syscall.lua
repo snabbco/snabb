@@ -1,13 +1,6 @@
 
 -- Linux syscall ABI ffi interface
 
--- to test for bugs
-local oldsm = setmetatable
-local function setmetatable(t, mt)
-  assert(mt, "BUG: nil metatable")
-  return oldsm(t, mt)
-end
-
 local S = {} -- exported functions
 
 local ffi = require "ffi"
