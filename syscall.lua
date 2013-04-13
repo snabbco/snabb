@@ -1227,10 +1227,6 @@ end
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 
--- mkfifo is from man(3), add for convenience
-function S.mkfifo(path, mode) return S.mknod(path, bit.bor(c.MODE[mode], c.S_I.FIFO)) end
-function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(c.MODE[mode], c.S_I.FIFO), 0) end
-
 -- handle environment (Lua only provides os.getenv). TODO add metatable to make more Lualike.
 function S.environ() -- return whole environment as table
   local environ = ffi.C.environ
@@ -1316,7 +1312,7 @@ local fdmethods = {'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
                    'fadvise', 'fallocate', 'posix_fallocate', 'readahead',
                    'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
-                   'fchownat', 'readlinkat', 'mkfifoat', 'setns', 'openat',
+                   'fchownat', 'readlinkat', 'setns', 'openat',
                    'preadv', 'pwritev', "epoll_pwait"
                    }
 local fmeth = {}
