@@ -330,7 +330,7 @@ function S.dup(oldfd, newfd, flags)
   return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags or 0))
 end
 
-mt.pipe = {
+local mt_pipe = {
   __index = {
     close = function(p)
       local ok1, err1 = p[1]:close()
@@ -366,11 +366,16 @@ mt.pipe = {
   }
 }
 
+t.pipe = function(s1, s2)
+  if ffi.istype(t.int2, s1) then s1, s2 = s1[0], s1[1] end
+  return setmetatable({t.fd(s1), t.fd(s2)}, mt_pipe)
+end
+
 function S.pipe(flags)
   local fd2 = t.int2()
   local ret = C.pipe2(fd2, c.OPIPE[flags])
   if ret == -1 then return nil, t.error() end
-  return setmetatable({t.fd(fd2[0]), t.fd(fd2[1])}, mt.pipe)
+  return t.pipe(fd2)
 end
 
 function S.close(fd) return retbool(C.close(getfd(fd))) end

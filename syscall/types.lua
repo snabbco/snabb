@@ -1501,6 +1501,8 @@ t.socketpair = function(s1, s2)
   return {t.fd(s1), t.fd(s2)}
 end
 
+t.pipe = t.socketpair -- also just two fds
+
 return types
 
 
