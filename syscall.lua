@@ -26,9 +26,6 @@ S.c = c
 S.t, S.pt, S.s, S.ctypes = types.t, types.pt, types.s, types.ctypes -- types, pointer types and sizes tables and ctypes map
 local t, pt, s = S.t, S.pt, S.s
 
-local mt = {} -- metatables
-local meth = {}
-
 local function u6432(x) return t.u6432(x):to32() end
 local function i6432(x) return t.i6432(x):to32() end
 
