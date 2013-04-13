@@ -1425,21 +1425,11 @@ function S.klogctl(tp, buf, len)
   return true
 end
 
--- TODO convert to ffi metatype
-mt.adjtimex = {
-  __index = function(timex, k)
-    if c.TIME[k] then return timex.state == c.TIME[k] end
-    return nil
-  end
-}
-
--- TODO for input should be able to set modes automatically from which fields are set.
 function S.adjtimex(a)
   a = istype(t.timex, a) or t.timex(a)
   local ret = C.adjtimex(a)
   if ret == -1 then return nil, t.error() end
-  -- we need to return a table, as we need to return both ret and the struct timex. should probably put timex fields in table
-  return setmetatable({state = ret, timex = a}, mt.adjtimex)
+  return t.adjtimex(ret, a)
 end
 
 function S.clock_getres(clk_id, ts)

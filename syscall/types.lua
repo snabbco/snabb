@@ -1412,6 +1412,7 @@ t.inotify_events = function(buffer, len)
   return ee
 end
 
+-- TODO for input should be able to set modes automatically from which fields are set.
 mt.timex = {
   __new = function(tp, a)
     if type(a) == 'table' then
@@ -1424,6 +1425,18 @@ mt.timex = {
 }
 
 metatype("timex", "struct timex", mt.timex)
+
+-- not sane to convert to ffi metatype, only used as adjtimex needs to return ret and a struct
+mt.adjtimex = {
+  __index = function(timex, k)
+    if c.TIME[k] then return timex.state == c.TIME[k] end
+    return nil
+  end
+}
+
+t.adjtimex = function(ret, timex)
+  return setmetatable({state = ret, timex = timex}, mt.adjtimex)
+end
 
 return types
 
