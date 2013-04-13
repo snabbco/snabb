@@ -472,11 +472,17 @@ end
 function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 
 -- TODO convert to ffi metatype
-mt.dents = {
+mt.dent = {
   __index = function(tab, k)
     if c.DT[k] then return tab.type == c.DT[k] end
   end
 }
+
+--[[
+t.dent = function(dp)
+  return setmetatable
+end
+]]
 
 -- ffi metatype on dirent?
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
@@ -490,8 +496,13 @@ function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate ov
     local i = 0
     while i < ret do
       local dp = pt.dirent(buf + i)
-      local dd = setmetatable({inode = tonumber(dp.d_ino), offset = tonumber(dp.d_off), type = tonumber(dp.d_type)}, mt.dents)
-      d[ffi.string(dp.d_name)] = dd -- could calculate length
+      local dd = setmetatable({
+        inode = tonumber(dp.d_ino),
+        type = dp.d_type,
+        name = ffi.string(dp.d_name), -- could calculate length
+        d_ino = dp.d_ino,
+      }, mt.dent)
+      d[dd.name] = dd
       i = i + dp.d_reclen
     end
   until noiter or ret == 0
