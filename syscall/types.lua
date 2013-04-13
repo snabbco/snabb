@@ -1395,7 +1395,7 @@ t.groups = ffi.metatype("struct {int count; gid_t list[?];}", {
 })
 
 -- difficult to sanely use an ffi metatype for inotify events, so use Lua table
-mt.inotify = {
+mt.inotify_events = {
   __index = function(tab, k)
     if c.IN[k] then return bit.band(tab.mask, c.IN[k]) ~= 0 end
   end
@@ -1405,7 +1405,7 @@ t.inotify_events = function(buffer, len)
   local off, ee = 0, {}
   while off < len do
     local ev = pt.inotify_event(buffer + off)
-    local le = setmetatable({wd = ev.wd, mask = ev.mask, cookie = ev.cookie}, mt.inotify)
+    local le = setmetatable({wd = ev.wd, mask = ev.mask, cookie = ev.cookie}, mt.inotify_events)
     if ev.len > 0 then le.name = ffi.string(ev.name) end
     ee[#ee + 1] = le
     off = off + ffi.sizeof(t.inotify_event(ev.len))
