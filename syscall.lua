@@ -376,24 +376,14 @@ function S.fstatat(fd, path, buf, flags)
   return buf
 end
 
--- TODO part of type see https://github.com/justincormack/ljsyscall/issues/19
-local function gettimespec2(ts)
-  if ffi.istype(t.timespec2, ts) then return ts end
-  if ts then
-    local s1, s2 = ts[1], ts[2]
-    ts = t.timespec2()
-    if type(s1) == 'string' then ts[0].tv_nsec = c.UTIME[s1] else ts[0] = t.timespec(s1) end
-    if type(s2) == 'string' then ts[1].tv_nsec = c.UTIME[s2] else ts[1] = t.timespec(s2) end
-  end
-  return ts
-end
-
 function S.futimens(fd, ts)
-  return retbool(C.futimens(getfd(fd), gettimespec2(ts)))
+  if ts then ts = t.timespec2(ts) end
+  return retbool(C.futimens(getfd(fd), ts))
 end
 
 function S.utimensat(dirfd, path, ts, flags)
-  return retbool(C.utimensat(c.AT_FDCWD[dirfd], path, gettimespec2(ts), c.AT_SYMLINK_NOFOLLOW[flags]))
+  if ts then ts = t.timespec2(ts) end
+  return retbool(C.utimensat(c.AT_FDCWD[dirfd], path, ts, c.AT_SYMLINK_NOFOLLOW[flags]))
 end
 
 -- because you can just pass floats to all the time functions, just use the same one, but provide different templates

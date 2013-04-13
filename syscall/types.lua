@@ -226,7 +226,6 @@ t.sock_fprog1 = ffi.typeof("struct sock_fprog[1]")
 t.char2 = ffi.typeof("char[2]")
 t.int2 = ffi.typeof("int[2]")
 t.uint2 = ffi.typeof("unsigned int[2]")
-t.timespec2 = ffi.typeof("struct timespec[2]")
 t.user_cap_data2 = ffi.typeof("struct user_cap_data[2]")
 
 -- still need sizes for these, for ioctls
@@ -703,6 +702,17 @@ metatype("timespec", "struct timespec", {
     return ts
   end
 })
+
+-- array so cannot just add metamethods
+t.timespec2_raw = ffi.typeof("struct timespec[2]")
+t.timespec2 = function(ts1, ts2)
+  if ffi.istype(t.timespec2_raw, ts1) then return ts1 end
+  if type(ts1) == "table" then ts1, ts2 = ts1[1], ts1[2] end
+  local ts = t.timespec2_raw()
+  if ts1 then if type(ts1) == 'string' then ts[0].tv_nsec = c.UTIME[ts1] else ts[0] = t.timespec(ts1) end end
+  if ts2 then if type(ts2) == 'string' then ts[1].tv_nsec = c.UTIME[ts2] else ts[1] = t.timespec(ts2) end end
+  return ts
+end
 
 local function itnormal(v)
   if not v then v = {{0, 0}, {0, 0}} end
