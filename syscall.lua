@@ -1540,20 +1540,6 @@ function S.setresgid(rgid, egid, sgid)
   return retbool(C.setresgid(rgid, egid, sgid))
 end
 
-t.groups = ffi.metatype("struct {int count; gid_t list[?];}", {
-  __index = function(g, k)
-    return g.list[k - 1]
-  end,
-  __newindex = function(g, k, v)
-    g.list[k - 1] = v
-  end,
-  __new = function(tp, gs)
-    if type(gs) == 'number' then return ffi.new(tp, gs, gs) end
-    return ffi.new(tp, #gs, #gs, gs)
-  end,
-  __len = function(g) return g.count end,
-})
-
 function S.getgroups()
   local size = C.getgroups(0, nil)
   if size == -1 then return nil, t.error() end
