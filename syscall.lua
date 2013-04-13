@@ -53,13 +53,6 @@ end
 -- metatables for Lua types not ffi types - convert to ffi types
 
 -- TODO convert to ffi metatype
-mt.epoll = {
-  __index = function(tab, k)
-    if c.EPOLL[k] then return bit.band(tab.events, c.EPOLL[k]) ~= 0 end
-  end
-}
-
--- TODO convert to ffi metatype
 mt.dents = {
   __index = function(tab, k)
     if c.DT[k] then return tab.type == c.DT[k] end
@@ -1196,6 +1189,23 @@ function S.epoll_ctl(epfd, op, fd, event, data)
   return retbool(C.epoll_ctl(getfd(epfd), c.EPOLL_CTL[op], getfd(fd), event))
 end
 
+-- TODO convert to ffi metatype
+mt.epoll = {
+  __index = function(tab, k)
+    if c.EPOLL[k] then return bit.band(tab.events, c.EPOLL[k]) ~= 0 end
+  end
+}
+
+t.epoll_events_array = function(ret, events)
+  local r = {}
+  for i = 1, ret do -- put in Lua array TODO convert to metatype
+    local e = events[i - 1]
+    local ev = setmetatable({fd = tonumber(e.data.fd), data = e.data.u64, u32 = e.data.u32, ptr = e.data.ptr, events = e.events}, mt.epoll)
+    r[i] = ev
+  end
+  return r
+end
+
 function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes optional epoll_pwait functionality
   if not maxevents then maxevents = 16 end
   if not events then events = t.epoll_events(maxevents) end
@@ -1207,13 +1217,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
     ret = C.epoll_wait(getfd(epfd), events, maxevents, timeout or -1)
   end
   if ret == -1 then return nil, t.error() end
-  local r = {}
-  for i = 1, ret do -- put in Lua array TODO convert to metatype
-    local e = events[i - 1]
-    local ev = setmetatable({fd = tonumber(e.data.fd), data = t.uint64(e.data.u64), events = e.events}, mt.epoll)
-    r[i] = ev
-  end
-  return r
+  return t.epoll_events_array(ret, events)
 end
 
 -- TODO maybe split out once done metatype
