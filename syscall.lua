@@ -483,10 +483,8 @@ function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 
 -- ffi metatype on dirent?
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
-  if not buf then
-    size = size or 4096
-    buf = t.buffer(size)
-  end
+  size = size or 4096
+  buf = buf or t.buffer(size)
   local d = {}
   local ret
   repeat
