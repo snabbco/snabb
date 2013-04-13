@@ -522,6 +522,7 @@ function S.getpeername(sockfd, ss, addrlen)
   return t.sa(ss, addrlen[0])
 end
 
+-- TODO change to type
 local function getflock(arg)
   if not arg then arg = t.flock() end
   if not ffi.istype(t.flock, arg) then
@@ -571,6 +572,7 @@ function S.fcntl(fd, cmd, arg)
   return true
 end
 
+-- TODO change to type
 function S.uname()
   local u = t.utsname()
   local ret = C.uname(u)
@@ -637,9 +639,7 @@ end
 
 function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
 
-function S.time()
-  return tonumber(C.time(nil))
-end
+function S.time(time) return retnum(C.time(time)) end
 
 function S.sysinfo(info)
   if not info then info = t.sysinfo() end
