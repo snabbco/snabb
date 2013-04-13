@@ -777,12 +777,17 @@ mt.socketpair = {
   }
 }
 
+t.socketpair = function(s1, s2)
+  if ffi.istype(t.int2, s1) then s1, s2 = s1[0], s1[1] end
+  return setmetatable({t.fd(s1), t.fd(s2)}, mt.socketpair)
+end
+
 function S.socketpair(domain, stype, protocol)
   domain = c.AF[domain]
   local sv2 = t.int2()
   local ret = C.socketpair(domain, c.SOCK[stype], sproto(domain, protocol), sv2)
   if ret == -1 then return nil, t.error() end
-  return setmetatable({t.fd(sv2[0]), t.fd(sv2[1])}, mt.socketpair)
+  return t.socketpair(sv2)
 end
 
 function S.bind(sockfd, addr, addrlen)
