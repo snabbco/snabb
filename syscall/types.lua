@@ -1479,6 +1479,22 @@ t.epoll_wait = function(n, events)
   return r
 end
 
+-- difficult to use ffi type as variable length
+mt.dent = {
+  __index = function(tab, k)
+    if c.DT[k] then return tab.type == c.DT[k] end
+  end
+}
+
+t.dent = function(dp)
+  return setmetatable({
+    inode = tonumber(dp.d_ino),
+    type = dp.d_type,
+    name = ffi.string(dp.d_name), -- could calculate length
+    d_ino = dp.d_ino,
+  }, mt.dent)
+end
+
 return types
 
 
