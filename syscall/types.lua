@@ -91,7 +91,7 @@ local function strerror(errno) return ffi.string(ffi.C.strerror(errno)) end
 
 -- cast to pointer to a type. could generate for all types.
 local function ptt(tp)
-  local ptp = ffi.typeof("$ *", tp)
+  local ptp = ffi.typeof(tp .. " *")
   return function(x) return ffi.cast(ptp, x) end
 end
 
@@ -102,7 +102,7 @@ local lenmt = {__len = lenfn}
 local function addtype(name, tp, mt)
   if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
   ctypes[tp] = t[name]
-  pt[name] = ptt(t[name])
+  pt[name] = ptt(tp)
   s[name] = ffi.sizeof(t[name])
 end
 
@@ -192,6 +192,8 @@ for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 
 -- these ones not in table as not helpful with vararg or arrays
 t.inotify_event = ffi.typeof("struct inotify_event")
+pt.inotify_event = ptt("struct inotify_event") -- still need pointer to this
+
 t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
 t.io_events = ffi.typeof("struct io_event[?]")
 t.iocbs = ffi.typeof("struct iocb[?]")
@@ -224,9 +226,6 @@ t.user_cap_data2 = ffi.typeof("struct user_cap_data[2]")
 
 -- still need sizes for these, for ioctls
 s.uint2 = ffi.sizeof(t.uint2)
-
--- still need pointers to these
-pt.inotify_event = ptt(t.inotify_event)
 
 -- types with metatypes
 
