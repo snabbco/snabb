@@ -40,8 +40,6 @@ local function getfd(fd)
   return fd:getfd()
 end
 
--- misc
-
 -- typed values for pointer comparison
 local zeropointer = pt.void(0)
 local errpointer = pt.void(-1)
@@ -77,7 +75,9 @@ local function retptr(ret)
   return ret
 end
 
-local function retnume(f, ...) -- for cases where need to explicitly set and check errno, ie signed int return
+-- for cases where need to explicitly set and check errno, ie signed int return. These do not really exist outside libc so could
+-- remove if used syscalls for these functions instead
+local function retnume(f, ...)
   ffi.errno(0)
   local ret = f(...)
   local errno = ffi.errno()
@@ -119,6 +119,23 @@ end
 -- getcwd in libc will allocate memory, so use syscall
 function C.getcwd(buf, size)
   return C.syscall(c.SYS.getcwd, pt.void(buf), t.ulong(size))
+end
+
+-- nice in libc may or may not return old value, syscall never does; however nice syscall may not exist
+if c.SYS.nice then
+  function C.nice(inc)
+    return C.syscall(c.SYS.nice, t.int(inc))
+  end
+else
+  function C.nice(inc)
+    local prio = S.getpriority(c.PRIO.PROCESS, 0) -- this cannot fail with these args. Call S. not C. as adjusted values
+    return C.setpriority(c.PRIO.PROCESS, 0, prio + inc)
+  end
+end
+
+-- avoid having to set errno by calling getpriority directly and adjusting return values
+function C.getpriority(which, who)
+  return C.syscall(c.SYS.getpriority, t.int(which), t.int(who))
 end
 
 -- uClibc only provides a version of eventfd without flags, and we cannot detect this
@@ -391,10 +408,12 @@ function S.mknodat(fd, pathname, mode, dev)
   return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S_I[mode], dev or 0))
 end
 
-function S.nice(inc) return retnume(C.nice, inc) end
--- NB glibc is shifting these values from what strace shows, as per man page, kernel adds 20 to make these values positive...
--- might cause issues with other C libraries in which case may shift to using system call
-function S.getpriority(which, who) return retnume(C.getpriority, c.PRIO[which], who or 0) end
+function S.nice(inc) return retbool(C.nice(inc)) end
+function S.getpriority(which, who)
+  local ret = C.getpriority(c.PRIO[which], who or 0)
+  if ret == -1 then return nil, t.error() end
+  return 20 - ret -- adjust for kernel returned values as this is syscall not libc
+end
 function S.setpriority(which, who, prio) return retbool(C.setpriority(c.PRIO[which], who or 0, prio)) end
 
  -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly?

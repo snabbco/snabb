@@ -1858,12 +1858,12 @@ test_aio = {
 test_processes = {
   test_nice = function()
     local n = assert(S.getpriority("process"))
-    assert (n == 0, "process should start at priority 0")
+    assert_equal(n, 0, "process should start at priority 0")
     assert(S.nice(1))
     assert(S.setpriority("process", 0, 1)) -- sets to 1, which it already is
     if S.geteuid() ~= 0 then
       local n, err = S.nice(-2)
-      assert(not n and err.PERM, "non root user should not be able to set negative priority")
+      assert(not n and (err.PERM or err.ACCES), "non root user should not be able to set negative priority")
       local n, err = S.setpriority("process", 0, -1)
       assert(not n and err.ACCES, "non root user should not be able to set negative priority")
     end
