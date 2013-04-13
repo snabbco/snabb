@@ -1210,7 +1210,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes opt
   local r = {}
   for i = 1, ret do -- put in Lua array TODO convert to metatype
     local e = events[i - 1]
-    local ev = setmetatable({fd = e.data.fd, data = t.uint64(e.data.u64), events = e.events}, mt.epoll)
+    local ev = setmetatable({fd = tonumber(e.data.fd), data = t.uint64(e.data.u64), events = e.events}, mt.epoll)
     r[i] = ev
   end
   return r
