@@ -551,7 +551,7 @@ end
 
 function util.ptsname(fd)
   local pts = t.int1()
-  local ret, error = S.ioctl(fd, "TIOCGPTN", pts)
+  local ret, err = S.ioctl(fd, "TIOCGPTN", pts)
   if not ret then return nil, err end
   return "/dev/pts/" .. tostring(pts[0])
 end

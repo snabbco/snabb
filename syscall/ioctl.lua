@@ -1,19 +1,9 @@
 -- ioctls, filling in as needed
 -- note there are some architecture dependent values
 
-local bit = require "bit"
-local band = bit.band
-local function bor(...)
-  local r = bit.bor(...)
-  if r < 0 then r = r + 4294967296LL end
-  return r
-end
-local lshift = bit.lshift
-local rshift = bit.rshift
-
 -- include types to get sizes
-local t = require "syscall.types"
-local s = t.s
+local types = require "syscall.types"
+local s, t = types.s, types.t
 
 local h = require "syscall.helpers"
 local stringflag = h.stringflag
@@ -21,6 +11,17 @@ local stringflag = h.stringflag
 local ffi = require "ffi"
 local ok, arch = pcall(require, "syscall." .. ffi.arch .. ".ioctl") -- architecture specific definitions
 if not ok then arch = {} end
+
+local bit = require "bit"
+
+local band = bit.band
+local function bor(...)
+  local r = bit.bor(...)
+  if r < 0 then r = r + t.int64(4294967296) end
+  return r
+end
+local lshift = bit.lshift
+local rshift = bit.rshift
 
 local ioctl = {}
 
