@@ -1196,9 +1196,9 @@ mt.epoll_events_array = {
   end
 }
 
-t.epoll_events_array = function(ret, events)
+t.epoll_events_array = function(n, events)
   local r = {}
-  for i = 1, ret do -- put in Lua array TODO convert to metatype
+  for i = 1, n do
     local e = events[i - 1]
     local ev = setmetatable({fd = tonumber(e.data.fd), data = e.data.u64, u32 = e.data.u32, ptr = e.data.ptr, events = e.events}, mt.epoll_events_array)
     r[i] = ev
