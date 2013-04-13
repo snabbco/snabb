@@ -75,16 +75,6 @@ local function retptr(ret)
   return ret
 end
 
--- for cases where need to explicitly set and check errno, ie signed int return. These do not really exist outside libc so could
--- remove if used syscalls for these functions instead
-local function retnume(f, ...)
-  ffi.errno(0)
-  local ret = f(...)
-  local errno = ffi.errno()
-  if errno ~= 0 then return nil, t.error(errno) end
-  return ret
-end
-
 -- use 64 bit fileops on 32 bit always
 if ffi.abi("32bit") then
   C.truncate = ffi.C.truncate64
