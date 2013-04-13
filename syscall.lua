@@ -475,7 +475,6 @@ function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 mt.dents = {
   __index = function(tab, k)
     if c.DT[k] then return tab.type == c.DT[k] end
-    return nil
   end
 }
 
