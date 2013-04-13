@@ -1,3 +1,5 @@
+-- This sets up the table of C functions, overriding libc where necessary with direct syscalls
+
 local ffi = require "ffi"
 
 require "syscall.headers"
