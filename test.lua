@@ -1755,7 +1755,7 @@ test_events = {
     local a, b = sv[1], sv[2]
     local ep = assert(S.epoll_create("cloexec"))
     assert(ep:epoll_ctl("add", a, "in"))
-    local r = assert(ep:epoll_wait(nil, 1, 0))
+    local r = assert(ep:epoll_pwait(nil, 1, 0))
     assert(#r == 0, "no events yet")
     assert(b:write(teststring))
     r = assert(ep:epoll_wait())

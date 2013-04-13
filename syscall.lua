@@ -1189,22 +1189,22 @@ function S.epoll_ctl(epfd, op, fd, event, data)
   return retbool(C.epoll_ctl(getfd(epfd), c.EPOLL_CTL[op], getfd(fd), event))
 end
 
-function S.epoll_wait(epfd, events, maxevents, timeout, sigmask) -- includes optional epoll_pwait functionality
-  if not maxevents then maxevents = 16 end
-  if not events then events = t.epoll_events(maxevents) end
-  if sigmask then sigmask = t.sigset(sigmask) end
-  local ret
-  if sigmask then
-    ret = C.epoll_pwait(getfd(epfd), events, maxevents, timeout or -1, sigmask)
-  else
-    ret = C.epoll_wait(getfd(epfd), events, maxevents, timeout or -1)
-  end
+function S.epoll_wait(epfd, events, maxevents, timeout)
+  maxevents = maxevents or 16
+  events = events or t.epoll_events(maxevents)
+  local ret = C.epoll_wait(getfd(epfd), events, maxevents, timeout or -1)
   if ret == -1 then return nil, t.error() end
   return t.epoll_wait(ret, events)
 end
 
--- TODO maybe split out once done metatype
-S.epoll_pwait = S.epoll_wait
+function S.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
+  maxevents = maxevents or 16
+  events = events or t.epoll_events(maxevents)
+  if sigmask then sigmask = istype(t.sigset, sigmask) or t.sigset(sigmask) end
+  local ret = C.epoll_pwait(getfd(epfd), events, maxevents, timeout or -1, sigmask)
+  if ret == -1 then return nil, t.error() end
+  return t.epoll_wait(ret, events)
+end
 
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
   local offin, offout = off_in, off_out
@@ -1631,7 +1631,7 @@ local fdmethods = {'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
                    'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
                    'fchownat', 'readlinkat', 'mkfifoat', 'setns', 'openat',
-                   'preadv', 'pwritev'
+                   'preadv', 'pwritev', "epoll_pwait"
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
