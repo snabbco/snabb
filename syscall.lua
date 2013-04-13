@@ -50,16 +50,6 @@ local function getfd(fd)
   return fd:getfd()
 end
 
--- metatables for Lua types not ffi types - convert to ffi types
-
--- TODO convert to ffi metatype
-mt.dents = {
-  __index = function(tab, k)
-    if c.DT[k] then return tab.type == c.DT[k] end
-    return nil
-  end
-}
-
 -- misc
 
 -- typed values for pointer comparison
@@ -480,6 +470,14 @@ end
 
 -- note that this is not strictly the syscall that has some other arguments, but has same functionality
 function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
+
+-- TODO convert to ffi metatype
+mt.dents = {
+  __index = function(tab, k)
+    if c.DT[k] then return tab.type == c.DT[k] end
+    return nil
+  end
+}
 
 -- ffi metatype on dirent?
 function S.getdents(fd, buf, size, noiter) -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
