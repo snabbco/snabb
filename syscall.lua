@@ -53,14 +53,6 @@ end
 -- metatables for Lua types not ffi types - convert to ffi types
 
 -- TODO convert to ffi metatype
-mt.timex = {
-  __index = function(timex, k)
-    if c.TIME[k] then return timex.state == c.TIME[k] end
-    return nil
-  end
-}
-
--- TODO convert to ffi metatype
 mt.epoll = {
   __index = function(tab, k)
     if c.EPOLL[k] then return bit.band(tab.events, c.EPOLL[k]) ~= 0 end
@@ -1433,18 +1425,26 @@ function S.klogctl(tp, buf, len)
   return true
 end
 
+-- TODO convert to ffi metatype
+mt.adjtimex = {
+  __index = function(timex, k)
+    if c.TIME[k] then return timex.state == c.TIME[k] end
+    return nil
+  end
+}
+
 -- TODO for input should be able to set modes automatically from which fields are set.
 function S.adjtimex(a)
   if not a then a = t.timex() end
   if type(a) == 'table' then  -- TODO pull this out to general initialiser for t.timex
-    if a.modes then a.modes = tonumber(c.ADJ[a.modes]) end
-    if a.status then a.status = tonumber(c.STA[a.status]) end
+    if a.modes then a.modes = c.ADJ[a.modes] end
+    if a.status then a.status = c.STA[a.status] end
     a = t.timex(a)
   end
   local ret = C.adjtimex(a)
   if ret == -1 then return nil, t.error() end
   -- we need to return a table, as we need to return both ret and the struct timex. should probably put timex fields in table
-  return setmetatable({state = ret, timex = a}, mt.timex)
+  return setmetatable({state = ret, timex = a}, mt.adjtimex)
 end
 
 function S.clock_getres(clk_id, ts)
