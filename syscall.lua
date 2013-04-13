@@ -469,10 +469,6 @@ function S.mknodat(fd, pathname, mode, dev)
   return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S_I[mode], dev or 0))
 end
 
--- mkfifo is from man(3), add for convenience
-function S.mkfifo(path, mode) return S.mknod(path, bit.bor(c.MODE[mode], c.S_I.FIFO)) end
-function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(c.MODE[mode], c.S_I.FIFO), 0) end
-
 function S.nice(inc) return retnume(C.nice, inc) end
 -- NB glibc is shifting these values from what strace shows, as per man page, kernel adds 20 to make these values positive...
 -- might cause issues with other C libraries in which case may shift to using system call
@@ -1601,6 +1597,10 @@ end
 
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
+
+-- mkfifo is from man(3), add for convenience
+function S.mkfifo(path, mode) return S.mknod(path, bit.bor(c.MODE[mode], c.S_I.FIFO)) end
+function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(c.MODE[mode], c.S_I.FIFO), 0) end
 
 -- handle environment (Lua only provides os.getenv). TODO add metatable to make more Lualike.
 function S.environ() -- return whole environment as table
