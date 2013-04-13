@@ -68,13 +68,6 @@ mt.epoll = {
 }
 
 -- TODO convert to ffi metatype
-mt.inotify = {
-  __index = function(tab, k)
-    if c.IN[k] then return bit.band(tab.mask, c.IN[k]) ~= 0 end
-  end
-}
-
--- TODO convert to ffi metatype
 mt.dents = {
   __index = function(tab, k)
     if c.DT[k] then return tab.type == c.DT[k] end
@@ -1259,19 +1252,6 @@ end
 function S.inotify_init(flags) return retfd(C.inotify_init1(c.IN_INIT[flags])) end
 function S.inotify_add_watch(fd, pathname, mask) return retnum(C.inotify_add_watch(getfd(fd), pathname, c.IN[mask])) end
 function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd), wd)) end
-
--- difficult to sanely use an ffi metatype, so use Lua table
-t.inotify_events = function(buffer, len)
-  local off, ee = 0, {}
-  while off < len do
-    local ev = pt.inotify_event(buffer + off)
-    local le = setmetatable({wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)}, mt.inotify)
-    if ev.len > 0 then le.name = ffi.string(ev.name) end
-    ee[#ee + 1] = le
-    off = off + ffi.sizeof(t.inotify_event(ev.len))
-  end
-  return ee
-end
 
 -- helper function to read inotify structs as table from inotify fd
 function S.inotify_read(fd, buffer, len)
