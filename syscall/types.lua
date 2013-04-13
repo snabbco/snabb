@@ -1495,6 +1495,12 @@ t.dent = function(dp)
   }, mt.dent)
 end
 
+-- default implementation, no metatmethods, overriden later
+t.socketpair = function(s1, s2)
+  if ffi.istype(t.int2, s1) then s1, s2 = s1[0], s1[1] end
+  return {t.fd(s1), t.fd(s2)}
+end
+
 return types
 
 
