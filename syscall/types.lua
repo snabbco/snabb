@@ -1470,6 +1470,7 @@ mt.epoll_event = {
 
 metatype("epoll_event", "struct epoll_event", mt.epoll_event)
 
+-- this is array form of epoll_events as returned from epoll_wait TODO make constructor for epoll_events?
 t.epoll_wait = function(n, events)
   local r = {events = events}
   for i = 1, n do
