@@ -1260,14 +1260,10 @@ function S.inotify_init(flags) return retfd(C.inotify_init1(c.IN_INIT[flags])) e
 function S.inotify_add_watch(fd, pathname, mask) return retnum(C.inotify_add_watch(getfd(fd), pathname, c.IN[mask])) end
 function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd), wd)) end
 
--- helper function to read inotify structs as table from inotify fd TODO switch to ffi metatype
-function S.inotify_read(fd, buffer, len)
-  len = len or 1024
-  buffer = buffer or t.buffer(len)
-  local ret, err = S.read(fd, buffer, len)
-  if not ret then return nil, err end
+-- difficult to sanely use an ffi metatype, so use Lua table
+t.inotify_events = function(buffer, len)
   local off, ee = 0, {}
-  while off < ret do
+  while off < len do
     local ev = pt.inotify_event(buffer + off)
     local le = setmetatable({wd = tonumber(ev.wd), mask = tonumber(ev.mask), cookie = tonumber(ev.cookie)}, mt.inotify)
     if ev.len > 0 then le.name = ffi.string(ev.name) end
@@ -1275,6 +1271,15 @@ function S.inotify_read(fd, buffer, len)
     off = off + ffi.sizeof(t.inotify_event(ev.len))
   end
   return ee
+end
+
+-- helper function to read inotify structs as table from inotify fd
+function S.inotify_read(fd, buffer, len)
+  len = len or 1024
+  buffer = buffer or t.buffer(len)
+  local ret, err = S.read(fd, buffer, len)
+  if not ret then return nil, err end
+  return t.inotify_events(buffer, ret)
 end
 
 function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two different return types...
