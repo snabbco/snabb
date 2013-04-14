@@ -19,9 +19,6 @@ local t, pt, s = S.t, S.pt, S.s
 local h = require "syscall.helpers"
 local split = h.split
 
-local ioctl = require "syscall.ioctl" -- avoids dependency issues
-c.IOCTL = ioctl.IOCTL
-
 -- makes code tidier TODO could return constructed type if not that type to simplify usage.
 local function istype(tp, x)
   if ffi.istype(tp, x) then return x end

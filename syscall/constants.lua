@@ -11,12 +11,6 @@ local h = require "syscall.helpers"
 
 local octal, stringflag, multiflags, charflags, swapflags, flag = h.octal, h.stringflag, h.multiflags, h.charflags, h.swapflags, h.flag
 
-local oldsm = setmetatable
-local function setmetatable(t, mt)
-  assert(mt, "BUG: nil metatable")
-  return oldsm(t, mt)
-end
-
 local function addarch(tb, a, default)
   local add = a or default
   for k, v in pairs(add) do tb[k] = v end
@@ -24,9 +18,20 @@ end
 
 local c = {}
 
+setmetatable(c, {
+  __index = function(c, k)
+    if k == "IOCTL" then
+      local ioctl = require "syscall.ioctl"
+      c.IOCTL = ioctl.IOCTL
+      setmetatable(c, nil)
+      return c.IOCTL
+    end
+  end
+})
+
 c.syscall = arch.syscall or {} -- special syscall handling
 
--- not sure I like this
+-- not sure I like this TODO replace, and use in more places
 c.BOOLEAN = {
   [0] = 0,
   [1] = 1,
