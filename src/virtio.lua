@@ -164,8 +164,8 @@ function new (tapinterface)
    end
 
    -- Selftest procedure to read packets from a tap device and write them back.
-   function M.selftest ()
-      local secs = 10
+   function M.selftest (opts)
+      local secs = (opts and opts.secs) or 1
       local deadline = C.get_time_ns() + secs * 1e9
       local done = function () return C.get_time_ns() > deadline end
       print("Echoing packets for "..secs.." second(s).")
