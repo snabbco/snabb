@@ -5,6 +5,21 @@ local ffi = require("ffi")
 local C = ffi.C
 require("snabb_h")
 
+--- ## High level allocate() and free()
+
+buffer_size = 4096
+freelist = {}
+
+-- Return a free packet buffer.
+function allocate ()
+   return (table.remove(freelist) or dma_alloc(buffer_size)), buffer_size
+end
+
+-- Free a packet buffer for later reuse.
+function free (buffer)
+   table.insert(freelist, buffer)
+end
+
 --- ## Chunks
 ---
 --- Memory is allocated from the operating system one "chunk" at a
