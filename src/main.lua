@@ -21,6 +21,7 @@ local debug_on_error = false
 
 function main ()
    require "strict"
+   initialize()
    local args = command_line_args()
    if #args == 0 then
       print("No arguments given (-h for help). Defaulting to: -l selftest")
@@ -48,6 +49,12 @@ function main ()
       end
    end
    os.exit(0)
+end
+
+--- Globally initialize some things. Module can depend on this being done.
+function initialize ()
+   require("lib")
+   require("clib_h")
 end
 
 function command_line_args()

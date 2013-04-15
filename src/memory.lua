@@ -1,7 +1,9 @@
 module(...,package.seeall)
 
+local lib = require("lib")
 local ffi = require("ffi")
 local C = ffi.C
+require("snabb_h")
 
 --- ## Chunks
 ---
@@ -134,6 +136,7 @@ huge_page_size =
 
 function selftest (options)
    print("selftest: memory")
+   options = options or {}
    local verbose = options.verbose or false
    print("Kernel HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
    for i = 1, 4 do
