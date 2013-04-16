@@ -84,9 +84,12 @@ end
 function selftest (options)
    print("selftest: port")
    options = options or {}
-   local virtio = require("virtio").new("snabb%d")
-   virtio.init()
-   local port = port.new("test", virtio, virtio)
+   local device = options.device
+   if device == nil then
+      device = require("virtio").new("snabb%d")
+      device.init()
+   end
+   local port = port.new("test", device, device)
    local program = options.program or Port.spam
    port.coroutine = coroutine.wrap(program)
    local finished = lib.timer((options.secs or 1) * 1e9)
