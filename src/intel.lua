@@ -63,7 +63,7 @@ function protected (type, base, offset, size)
    return wrap(ffi.cast(tptr, ffi.cast("uint8_t *", base) + offset))
 end
 
-local num_descriptors = 32 * 1024
+local num_descriptors = 64 * 1024
 local buffer_count = 2 * 1024 * 1024
 
 local rxdesc, rxdesc_phy
@@ -281,13 +281,14 @@ function init_receive ()
 end
 
 -- Enqueue a receive descriptor to receive a packet.
-function add_receive_buffer (address, size)
+function add_receive_buffer (buf)
    -- NOTE: RDT points to the next unused descriptor
    -- FIXME: size
-   rxdesc[rdt].data.address = ffi.cast("uint64_t", address)
+   rxdesc[rdt].data.address = buf.phy
    rxdesc[rdt].data.dd = 0
    rdt = (rdt + 1) % num_descriptors
-   rxbuffers[rdt] = address
+   rxbuffers[rdt] = buf
+   buffer.ref(buf)
    return true
 end
 
@@ -336,8 +337,10 @@ function receive ()
       local wb = rxdesc[rxnext].wb
       local index = rxnext
       local length = wb.length
+      local buf = rxbuffers[index]
       rxnext = (rxnext + 1) % num_descriptors
-      return rxbuffers[index], length
+      buffer.deref(buf)
+      return buf
    end
 end
 
@@ -404,16 +407,18 @@ end
 local txdesc_flags = bits({dtype=20, eop=24, ifcs=25, dext=29})
 
 -- API function.
-function transmit (address, size)
-   txdesc[tdt].data.address = ffi.cast("uint64_t", address)
-   txdesc[tdt].data.options = bit.bor(size, txdesc_flags)
+function transmit (buf)
+   txdesc[tdt].data.address = buf.phy
+   txdesc[tdt].data.options = bit.bor(buf.size, txdesc_flags)
    tdt = (tdt + 1) % num_descriptors
+   buffer.ref(buf)
 end
 
 -- API function.
 function sync_transmit ()
    C.full_memory_barrier()
    regs[TDT] = tdt
+   -- FIXME deref buffers that have been transmitted
 end
 
 function add_txbuf_tso (address, size, mss, ctx)
@@ -768,9 +773,9 @@ function selftest (options)
       test.waitfor("linkup", linkup, 20, 250000)
    end
    require("port").selftest(options)
-   print_status()
    update_stats()
    print_stats()
+   -- print_status()
 end
 
 -- Test that TCP Segmentation Optimization (TSO) works.

@@ -2,7 +2,7 @@
 
 module(...,package.seeall)
 
-local memory = require("memory")
+local buffer = require("buffer")
 
 -- Dictionary of ports that exist.
 ports = {}
@@ -38,24 +38,22 @@ end
 function Port:spam ()
    local input, output = self.input, self.output
    -- Keep it simple: use one buffer for everything.
-   local buffer, len = memory.allocate()
+   local buf = buffer.allocate()
+   buf.size = 64
    repeat
       input.sync_receive()
       while input.can_receive() do
 	 input.receive()
       end
       while output.can_transmit() do
-	 output.transmit(buffer, len)
+	 output.transmit(buf)
       end
       while input.can_add_receive_buffer() do
-	 input.add_receive_buffer(buffer, len)
-      end
-      while output.can_reclaim_buffer() do
-	 output.reclaim_buffer()
+	 input.add_receive_buffer(buf)
       end
       output.sync_transmit()
    until coroutine.yield("spam") == nil
-   memory.free(buffer)
+   buffer.deref(buf)
 end
 
 -- Echo receives packets and transmits the same packets back onto the
@@ -72,10 +70,10 @@ function Port:echo ()
 	 output.transmit(addr, len)
       end
       while input.can_add_receive_buffer() do
-	 input.add_receive_buffer(memory.allocate())
+	 input.add_receive_buffer(buffer.allocate())
       end
       while output.can_reclaim_buffer() do
-	 memory.free(output.reclaim_buffer())
+	 buffer.free(output.reclaim_buffer())
       end
       output.sync_transmit()
    until coroutine.yield("echo") == nil
