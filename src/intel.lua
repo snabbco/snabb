@@ -84,9 +84,6 @@ ffi.cdef[[
 -- PCI device ID
 local device = pci.device_info(pciaddress).device
 
--- Method dictionary for Intel NIC objects.
-local M = {}
-
 -- Return a table for protected (bounds-checked) memory access.
 -- 
 -- The table can be indexed like a pointer. Index 0 refers to address
@@ -100,7 +97,7 @@ local M = {}
 --   mem[0x07F] => <word at 0x11FC>
 --   mem[0x080] => ERROR <address out of bounds: 0x1200>
 --   mem._ptr   => cdata<uint32_t *>: 0x1000 (get the raw pointer)
-local function protected (type, base, offset, size)
+function protected (type, base, offset, size)
    type = ffi.typeof(type)
    local bound = ((size * ffi.sizeof(type)) + 0ULL) / ffi.sizeof(type) 
    local tptr = ffi.typeof("$ *", type)
@@ -163,7 +160,7 @@ local regs = ffi.cast("uint32_t *", pci.map_pci_memory(pciaddress, 0))
 
 -- Initialization
 
-function M.init ()
+function init ()
    reset()
    init_pci()
    init_dma_memory()
@@ -209,7 +206,7 @@ function init_statistics ()
    C.usleep(1000)
 end
 
-function M.print_status ()
+function print_status ()
    local status, tctl, rctl = regs[STATUS], regs[TCTL], regs[RCTL]
    print("MAC status")
    print("  STATUS      = " .. bit.tohex(status))
@@ -336,48 +333,48 @@ function init_receive ()
 end
 
 -- Enqueue a receive descriptor to receive a packet.
-local function add_rxbuf (address)
+function add_rxbuf (address)
    -- NOTE: RDT points to the next unused descriptor
    rxdesc[rdt].data.address = address
    rxdesc[rdt].data.dd = 0
    rdt = (rdt + 1) % num_descriptors
      rxbuffers[rdt] = address
    return true
-end M.add_rxbuf = add_rxbuf
+end
 
-local function flush_rx ()
+function flush_rx ()
    regs[RDT] = rdt
-end M.flush_rx = flush_rx
+end
 
-local function ring_pending(head, tail)
+function ring_pending(head, tail)
    if head == tail then return 0 end
    if head <  tail then return tail - head
    else                 return num_descriptors + tail - head end
-end M.ring_pending = ring_pending
+end
 
-function M.rx_full ()
+function rx_full ()
    return regs[RDH] == (regs[RDT] + 1) % num_descriptors
 end
 
-function M.rx_empty ()
+function rx_empty ()
    return regs[RDH] == regs[RDT]
 end
 
-local function rx_pending ()
+function rx_pending ()
    return ring_pending(regs[RDH], regs[RDT])
-end M.rx_pending = rx_pending
+end
 
-local function rx_available ()
+function rx_available ()
    return num_descriptors - rx_pending() - 1
-end M.rx_available = rx_available
+end
 
-function M.rx_load ()
+function rx_load ()
    return rx_pending() / num_descriptors
 end
 
 -- Return the next available packet as two values: buffer, length.
 -- If no packet is available then return nil.
-function M.receive ()
+function receive ()
    if regs[RDH] ~= rxnext then
       local wb = rxdesc[rxnext].wb
       local index = rxnext
@@ -387,7 +384,7 @@ function M.receive ()
    end
 end
 
-function M.ack ()
+function ack ()
 end
 
 -- Transmit functionality
@@ -450,17 +447,17 @@ end
 local txdesc_flags = bits({dtype=20, eop=24, ifcs=25, dext=29})
 
 -- Enqueue a transmit descriptor to send a packet.
-local function add_txbuf (address, size)
+function add_txbuf (address, size)
    txdesc[tdt].data.address = address
    txdesc[tdt].data.options = bit.bor(size, txdesc_flags)
    tdt = (tdt + 1) % num_descriptors
-end M.add_txbuf = add_txbuf
+end
 
-local function flush_tx()
+function flush_tx()
    regs[TDT] = tdt
-end M.flush_tx = flush_tx
+end
 
-function M.add_txbuf_tso (address, size, mss, ctx)
+function add_txbuf_tso (address, size, mss, ctx)
    ctx = ffi.cast("struct tx_context_desc *", txdesc + tdt)
    ctx.tucse = 0
    ctx.tucso = 0
@@ -476,20 +473,20 @@ function M.add_txbuf_tso (address, size, mss, ctx)
    ctx.paylen = 0
 end
 
-function M.tx_full  () return M.tx_pending() == num_descriptors - 1 end
-function M.tx_empty () return M.tx_pending() == 0 end
+function tx_full  () return tx_pending() == num_descriptors - 1 end
+function tx_empty () return tx_pending() == 0 end
 
-local function tx_pending ()
+function tx_pending ()
    return ring_pending(regs[TDH], regs[TDT])
-end M.tx_pending = tx_pending
+end
 
-local function tx_available ()
+function tx_available ()
    return num_descriptors - tx_pending() - 1
-end M.tx_available = tx_available
+end
 
-local function tx_load ()
+function tx_load ()
    return tx_pending() / num_descriptors
-end M.tx_load = tx_load
+end
 
 --[[
 
@@ -498,12 +495,12 @@ end M.tx_load = tx_load
    For the 82571EB, there are two semaphores located in the Software
    Semaphore (SWSM) register (see Section 13.8.17).
 
-   • Bit0 (SWSM.SMBI) is the software/software semaphore. This bit is
+   • Bit0 (SWSSMBI) is the software/software semaphore. This bit is
      needed in multi-process environments to prevent software running
      on one port from interferring with software on another the other
      port.
 
-   • Bit1SWSM.SWESMBI is the software/firmware semaphore. This is
+   • Bit1SWSSWESMBI is the software/firmware semaphore. This is
      always needed when accessing the PHY or EEPROM (reads, writes, or
      resets). This prevents the firmware and software from accessing
      the PHY and or EEPROM at the same time.
@@ -518,16 +515,16 @@ end M.tx_load = tx_load
 
    For EEPROM or PHY register access:
 
-   1. Software reads SWSM.SMBI. If SWSM.SMBI is 0b, then it owns the
-      software/software semaphore and can continue. If SWSM.SMBI is
+   1. Software reads SWSSMBI. If SWSSMBI is 0b, then it owns the
+      software/software semaphore and can continue. If SWSSMBI is
       1b, then some other software already has the semaphore.
-   2. Software writes 1b to the SWSM.SWESMBI bit and then reads it. If
+   2. Software writes 1b to the SWSSWESMBI bit and then reads it. If
       the value is 1b, then software owns the software/firmware
       semaphore and can continue; otherwise, firmware has the
       semaphore.  
       Software can now access the EEPROM and/or PHY.
-   3. Release the software/firmware semaphore by clearing SWSM.SWESMBI.
-   4. Release the software/software semaphore by clearing SWSM.SMBI.
+   3. Release the software/firmware semaphore by clearing SWSSWESMBI.
+   4. Release the software/software semaphore by clearing SWSSMBI.
 --]]
 
 -- Read a PHY register.
@@ -562,23 +559,23 @@ end
    PHY Reset (82571EB/82572EI):
    To reset the PHY using software:
    
-   1. Obtain the Software/Software semaphore (SWSM.SMBI - 05B50h; bit
+   1. Obtain the Software/Software semaphore (SWSSMBI - 05B50h; bit
       0). This is needed for multi-threaded environments.
    2. Read (MANC.BLK_Phy_Rst_On_IDE – 05820h; bit 18) and then wait
       until it becomes 0b.
-   3. Obtain the Software/Firmware semaphore (SWSM.SWESMBI - 05B50h;
+   3. Obtain the Software/Firmware semaphore (SWSSWESMBI - 05B50h;
       bit 1).
    4. Drive PHY reset (CTRL.PHY_RST at offset 0000h [bit 31], write
       1b, wait 100 μs, and then write 0b).
-   5. Release the Software/Firmware semaphore (SWSM.SWESMBI - 05B50h;
+   5. Release the Software/Firmware semaphore (SWSSWESMBI - 05B50h;
       bit 1).
    6. Wait for the CFG_DONE (EEMNGCTL.CFG_DONE at offset 1010h [bit
       18] becomes 1b).
    7. Wait for a 1 ms delay. The PHY should now be ready. If
       additional access to the PHY is necessary (reads or writes) the
-      Software/Firmware semaphore (SWSM.SWESMBI - 05B50h; bit 1) must be
+      Software/Firmware semaphore (SWSSWESMBI - 05B50h; bit 1) must be
       re-acquired and then released once done.
-   8. Release the Software/Software semaphore (SWSM.SMBI - 05B50h; bit
+   8. Release the Software/Software semaphore (SWSSMBI - 05B50h; bit
       0). This is needed for multi-threaded environments.
 --]]
 
@@ -689,15 +686,15 @@ end
 
 -- Link control.
 
-function M.linkup ()
+function linkup ()
    return bit.band(phy_read(17), bits({CopperLink=10})) ~= 0
 end
 
-function M.enable_phy_loopback ()
+function enable_phy_loopback ()
    phy_write(0x01, bit.bor(phy_read(0x01), bits({LOOPBACK=14})))
 end
 
-function M.enable_mac_loopback ()
+function enable_mac_loopback ()
    regs[RCTL] = bit.bor(bits({LBM0=6}, regs[RCTL]))
 end
 
@@ -763,76 +760,52 @@ local statistics_regs = {
    {"IAC",      0x04100, "Interrupt Assertion Count"}
   }
 
-M.stats = {}
+stats = {}
 
-function M.update_stats ()
+function update_stats ()
    for _,reg in ipairs(statistics_regs) do
       name, offset, desc = reg[1], reg[2], reg[3]
-      M.stats[name] = (M.stats[name] or 0) + regs[offset/4]
+      stats[name] = (stats[name] or 0) + regs[offset/4]
    end
 end
 
-function M.reset_stats ()
-   M.stats = {}
+function reset_stats ()
+   stats = {}
 end
 
-function M.print_stats ()
+function print_stats ()
    print("Statistics for PCI device " .. pciaddress .. ":")
    for _,reg in ipairs(statistics_regs) do
       name, desc = reg[1], reg[3]
-      if M.stats[name] > 0 then
-         print(("%20s %-10s %s"):format(lib.comma_value(M.stats[name]), name, desc))
+      if stats[name] > 0 then
+         print(("%20s %-10s %s"):format(lib.comma_value(stats[name]), name, desc))
       end
    end
 end
 
 -- Self-test diagnostics
 
-function M.selftest (options)
+function selftest (options)
    options = options or {}
    io.write("intel selftest: pciaddr="..pciaddress)
    for key,value in pairs(options) do
       io.write(" "..key.."="..tostring(value))
    end
    print()
-   local secs = options.secs or 10
-   local receive = options.receive or false
-   local randomsize = options.randomsize or false
+   options.device = getfenv()
    if options.loopback then
-      M.enable_mac_loopback()
+      enable_mac_loopback()
    end
    if not options.nolinkup then
-      test.waitfor("linkup", M.linkup, 20, 250000)
+      test.waitfor("linkup", linkup, 20, 250000)
    end
-   if not options.skip_transmit then
-      local secs = (options.secs or 10)
-      print("Generating traffic for "..tostring(secs).." second(s)...")
-      local deadline = C.get_time_ns() + secs * 1000000000LL
-      local done = function () return C.get_time_ns() > deadline end
-      repeat
-         while not done() and tx_load() > 0.75 do C.usleep(10000) end
-         if receive then
-            for i = 1, rx_available() do
-               add_rxbuf(buffers_phy + 4096)
-            end
-            flush_rx()
-         end
-         for i = 1, tx_available() do
-            if randomsize then
-               add_txbuf(buffers_phy, math.random(32, 1496))
-            else
-               add_txbuf(buffers_phy, 32)
-            end
-         end
-         flush_tx()
-      until done()
-      M.update_stats()
-      M.print_stats()
-   end
+   require("port").selftest(options)
+   update_stats()
+   print_stats()
 end
 
 -- Test that TCP Segmentation Optimization (TSO) works.
-function M.selftest_tso (options)
+function selftest_tso (options)
    print "selftest: TCP Segmentation Offload (TSO)"
    options = options or {}
    local size = options.size or 4096
@@ -841,8 +814,8 @@ function M.selftest_tso (options)
    local txeth = 0 -- Expected number of ethernet packets sent
 
    C.usleep(100000) -- Wait for old traffic from previous tests to die out
-   M.update_stats()
-   local txhardware_start = M.stats.GPTC
+   update_stats()
+   local txhardware_start = stats.GPTC
 
    -- Transmit a packet with TSO and count expected ethernet transmits.
    add_tso_test_buffer(size, mss)
@@ -850,8 +823,8 @@ function M.selftest_tso (options)
    
    -- Wait a safe time and check hardware count
    C.usleep(100000) -- wait for receive
-   M.update_stats()
-   local txhardware = txhardware_start - M.stats.GPTC
+   update_stats()
+   local txhardware = txhardware_start - stats.GPTC
 
    -- Check results
    print("size", "mss", "txtcp", "txeth", "txhw")
@@ -864,6 +837,4 @@ end
 function add_tso_test_buffer (size)
    -- Construct a TCP packet of 'size' total bytes and transmit with TSO.
 end
-
-return M
 
