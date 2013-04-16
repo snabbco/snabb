@@ -21,6 +21,7 @@ local C = ffi.C
 local bit = require("bit")
 local pci = require("pci")
 local lib = require("lib")
+local test = require("test")
 local bits, bitset = lib.bits, lib.bitset
 
 require("clib_h")
@@ -127,8 +128,7 @@ end
 
 function init_pci ()
    -- PCI bus mastering has to be enabled for DMA to work.
-   pci_config_fd = pci.open_config(pciaddress)
-   pci.set_bus_master(pci_config_fd, true)
+   pci.set_bus_master(pciaddress, true)
 end
 
 function init_dma_memory ()
@@ -281,17 +281,26 @@ function init_receive ()
 end
 
 -- Enqueue a receive descriptor to receive a packet.
-function add_rxbuf (address)
+function add_receive_buffer (address, size)
    -- NOTE: RDT points to the next unused descriptor
-   rxdesc[rdt].data.address = address
+   -- FIXME: size
+   rxdesc[rdt].data.address = ffi.cast("uint64_t", address)
    rxdesc[rdt].data.dd = 0
    rdt = (rdt + 1) % num_descriptors
-     rxbuffers[rdt] = address
+   rxbuffers[rdt] = address
    return true
 end
 
-function flush_rx ()
+function sync_receive ()
    regs[RDT] = rdt
+end
+
+function can_add_receive_buffer ()
+   return not rx_full()
+end
+
+function can_receive ()
+   return regs[RDH] ~= rxnext
 end
 
 function ring_pending(head, tail)
@@ -301,15 +310,15 @@ function ring_pending(head, tail)
 end
 
 function rx_full ()
-   return regs[RDH] == (regs[RDT] + 1) % num_descriptors
+   return regs[RDH] == (rdt + 1) % num_descriptors
 end
 
 function rx_empty ()
-   return regs[RDH] == regs[RDT]
+   return regs[RDH] == rdt
 end
 
 function rx_pending ()
-   return ring_pending(regs[RDH], regs[RDT])
+   return ring_pending(regs[RDH], rdt)
 end
 
 function rx_available ()
@@ -394,14 +403,16 @@ end
 -- Flags for transmit descriptors.
 local txdesc_flags = bits({dtype=20, eop=24, ifcs=25, dext=29})
 
--- Enqueue a transmit descriptor to send a packet.
-function add_txbuf (address, size)
-   txdesc[tdt].data.address = address
+-- API function.
+function transmit (address, size)
+   txdesc[tdt].data.address = ffi.cast("uint64_t", address)
    txdesc[tdt].data.options = bit.bor(size, txdesc_flags)
    tdt = (tdt + 1) % num_descriptors
 end
 
-function flush_tx()
+-- API function.
+function sync_transmit ()
+   C.full_memory_barrier()
    regs[TDT] = tdt
 end
 
@@ -421,11 +432,18 @@ function add_txbuf_tso (address, size, mss, ctx)
    ctx.paylen = 0
 end
 
+function can_transmit () return not tx_full() end
+
+function can_reclaim_buffer ()
+   -- FIXME
+   return false
+end
+
 function tx_full  () return tx_pending() == num_descriptors - 1 end
 function tx_empty () return tx_pending() == 0 end
 
 function tx_pending ()
-   return ring_pending(regs[TDH], regs[TDT])
+   return ring_pending(regs[TDH], tdt)
 end
 
 function tx_available ()
@@ -741,13 +759,16 @@ function selftest (options)
    end
    print()
    options.device = getfenv()
-   if options.loopback then
+   init()
+   print_status()
+   if not options.noloopback then
       enable_mac_loopback()
    end
    if not options.nolinkup then
       test.waitfor("linkup", linkup, 20, 250000)
    end
    require("port").selftest(options)
+   print_status()
    update_stats()
    print_stats()
 end
