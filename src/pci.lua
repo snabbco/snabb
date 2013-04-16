@@ -169,8 +169,10 @@ end
 function open_usable_devices ()
    for _,device in ipairs(devices) do
       if device.usable == 'yes' then
-         print("Unbinding device from linux: "..device.pciaddress)
-         unbind_device_from_linux(device.pciaddress)
+         if device.interface ~= nil then
+            print("Unbinding device from linux: "..device.pciaddress)
+            unbind_device_from_linux(device.pciaddress)
+         end
          print("Opening device "..device.pciaddress)
          local driver = open_device(device.pciaddress, device.driver)
          print("Testing "..device.pciaddress)
