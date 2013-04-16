@@ -19,8 +19,8 @@ local lib = require("lib")
 local pci = require("pci")
 local register = require("register")
 local memory = require("memory")
-local intel = require("intel") -- FIXME need rx/tx descriptor C types
 local test = require("test")
+require("intel_h")
 local bits, bitset = lib.bits, lib.bitset
 
 -- DMA memory.
