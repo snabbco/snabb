@@ -229,7 +229,7 @@ end
 
 local rxnext = 0
 local rxbuffers = {}
-local rdt = 0
+local rdh, rdt = 0, 0
 
 function init_receive ()
    -- Disable RX and program all the registers
@@ -294,6 +294,7 @@ end
 
 function sync_receive ()
    regs[RDT] = rdt
+   rdh = regs[RDH]
 end
 
 function can_add_receive_buffer ()
@@ -301,7 +302,7 @@ function can_add_receive_buffer ()
 end
 
 function can_receive ()
-   return regs[RDH] ~= rxnext
+   return rdh ~= rxnext
 end
 
 function ring_pending(head, tail)
@@ -311,15 +312,15 @@ function ring_pending(head, tail)
 end
 
 function rx_full ()
-   return regs[RDH] == (rdt + 1) % num_descriptors
+   return rdh == (rdt + 1) % num_descriptors
 end
 
 function rx_empty ()
-   return regs[RDH] == rdt
+   return rdh == rdt
 end
 
 function rx_pending ()
-   return ring_pending(regs[RDH], rdt)
+   return ring_pending(rdh, rdt)
 end
 
 function rx_available ()
@@ -333,7 +334,7 @@ end
 -- Return the next available packet as two values: buffer, length.
 -- If no packet is available then return nil.
 function receive ()
-   if regs[RDH] ~= rxnext then
+   if rdh ~= rxnext then
       local wb = rxdesc[rxnext].wb
       local index = rxnext
       local length = wb.length
@@ -352,7 +353,7 @@ end
 -- Locally cached copy of the Transmit Descriptor Tail (TDT) register.
 -- Updates are kept locally here until flush_tx() is called.
 -- That's because updating the hardware register is relatively expensive.
-local tdt = 0
+local tdh, tdt = 0, 0
 
 function init_transmit ()
    regs[TCTL] = 0x3103f0f8 -- Disable 'transmit enable'
@@ -418,6 +419,7 @@ end
 function sync_transmit ()
    C.full_memory_barrier()
    regs[TDT] = tdt
+   tdh = regs[TDH]
    -- FIXME deref buffers that have been transmitted
 end
 
@@ -448,7 +450,7 @@ function tx_full  () return tx_pending() == num_descriptors - 1 end
 function tx_empty () return tx_pending() == 0 end
 
 function tx_pending ()
-   return ring_pending(regs[TDH], tdt)
+   return ring_pending(tdh, tdt)
 end
 
 function tx_available ()
