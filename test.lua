@@ -962,7 +962,7 @@ test_timers_signals = {
     assert_equal(pid[0], S.getpid())
     f:free() -- free ffi slot for function
   end,
-  test_sigaction_ucontext = function()
+  test_sigaction_ucontext = function() -- this test does not do much yet
     local sig = t.int1(0)
     local pid = t.int32_1(0)
     local f = t.sa_sigaction(function(s, info, ucontext)
