@@ -1524,7 +1524,7 @@ end
 t.pipe = t.socketpair -- also just two fds
 
 -- sigaction
-t.sa_sigaction = ffi.typeof("void (*)(int, siginfo_t *, void *)")
+t.sa_sigaction = ffi.typeof("void (*)(int, siginfo_t *, ucontext_t *)")
 s.sa_sigaction = ffi.sizeof(t.sa_sigaction)
 
 meth.sigaction = {

@@ -962,6 +962,21 @@ test_timers_signals = {
     assert_equal(pid[0], S.getpid())
     f:free() -- free ffi slot for function
   end,
+  test_sigaction_ucontext = function()
+    local sig = t.int1(0)
+    local pid = t.int32_1(0)
+    local f = t.sa_sigaction(function(s, info, ucontext)
+      sig[0] = s
+      pid[0] = info.pid
+      local mcontext = ucontext.uc_mcontext
+    end)
+    assert(S.sigaction("pipe", {sigaction = f}))
+    assert(S.kill(S.getpid(), "pipe"))
+    assert(S.sigaction("pipe", "dfl"))
+    assert_equal(sig[0], c.SIG.PIPE)
+    assert_equal(pid[0], S.getpid())
+    f:free() -- free ffi slot for function
+  end,
 }
 
 test_mmap = {
