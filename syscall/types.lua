@@ -1523,7 +1523,7 @@ t.pipe = t.socketpair -- also just two fds
 meth.sigaction = {
   index = {
     handler = function(sa) return sa.sa_handler end,
-    action = function(sa) return sa.sa_sigaction end,
+    sigaction = function(sa) return sa.sa_sigaction end,
     mask = function(sa) return sa.sa_mask end,
     flags = function(sa) return sa.sa_flags end,
   },
