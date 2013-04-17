@@ -33,6 +33,7 @@ build =
       ["syscall.util"] = "syscall/util.lua";
       ["syscall.features"] = "syscall/features.lua";
       ["syscall.arm.constants"] = "syscall/arm/constants.lua";
+      ["syscall.arm.headers"] = "syscall/arm/headers.lua";
       ["syscall.arm.ioctl"] = "syscall/arm/ioctl.lua";
       ["syscall.mips.constants"] = "syscall/mips/constants.lua";
       ["syscall.ppc.constants"] = "syscall/ppc/constants.lua";
