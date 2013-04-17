@@ -843,7 +843,6 @@ test_timers_signals = {
   end,
   test_alarm = function()
     assert(S.signal("alrm", "ign"))
-    assert(S.sigaction("alrm", "ign")) -- should do same as above
     assert(S.alarm(10))
     assert(S.alarm(0)) -- cancel again
     assert(S.signal("alrm", "dfl"))
@@ -864,11 +863,6 @@ test_timers_signals = {
     assert(sig[1].alrm, "expect alarm clock to have rung")
     assert(fd:close())
     assert(S.sigprocmask("unblock", ss))
-  end,
-  test_kill_ignored = function()
-    assert(S.signal("pipe", "ign"))
-    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
-    assert(S.signal("pipe", "dfl"))
   end,
   test_sigprocmask = function()
     local m = assert(S.sigprocmask())
@@ -934,6 +928,16 @@ test_timers_signals = {
   test_clock_nanosleep_abs = function()
     local rem = assert(S.clock_nanosleep("realtime", "abstime", 0)) -- in the past
     assert_equal(rem, true, "expect no elapsed time after clock_nanosleep")
+  end,
+  test_signal_ignore = function()
+    assert(S.signal("pipe", "ign"))
+    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
+    assert(S.signal("pipe", "dfl"))
+  end,
+  test_sigaction_ignore = function()
+    assert(S.sigaction("pipe", "ign"))
+    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
+    assert(S.sigaction("pipe", "dfl"))
   end,
 }
 

@@ -603,26 +603,12 @@ end
 -- actualy glibc does not call the syscall anyway, defines in terms of sigaction; TODO we should too
 function S.signal(signum, handler) return retbool(C.signal(c.SIG[signum], c.SIGACT[handler])) end
 
--- missing siginfo functionality for now, only supports getting signum TODO
--- NOTE I do not think it is safe to call this with a function argument as the jit compiler will not know when it is going to
--- be called, so have removed this functionality again
--- recommend using signalfd to handle signals if you need to do anything complex.
--- note arguments can be different TODO should we change
-function S.sigaction(signum, handler, mask, flags)
-  local sa
-  if ffi.istype(t.sigaction, handler) then sa = handler
-  else
-    if type(handler) == 'string' then
-      handler = ffi.cast(t.sighandler, t.int1(c.SIGACT[handler]))
-    --elseif
-    --  type(handler) == 'function' then handler = ffi.cast(t.sighandler, handler) -- TODO check if gc problem here? need to copy?
-    end
-    sa = t.sigaction{sa_handler = handler, sa_mask = t.sigset(mask), sa_flags = c.SA[flags]}
+function S.sigaction(signum, handler, oldact)
+  if type(handler) == "string" or type(handler) == "function" then
+    handler = {handler = handler, mask = "", flags = 0} -- simple case like signal
   end
-  local old = t.sigaction()
-  local ret = C.sigaction(c.SIG[signum], sa, old)
-  if ret == -1 then return nil, t.error() end
-  return old
+  handler = istype(t.sigaction, handler) or t.sigaction(handler)
+  return retbool(C.sigaction(c.SIG[signum], handler, oldact))
 end
 
 function S.kill(pid, sig) return retbool(C.kill(pid, c.SIG[sig])) end
