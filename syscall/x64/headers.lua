@@ -7,8 +7,8 @@ local arch = {}
 arch.epoll = function()
 ffi.cdef[[
 struct epoll_event {
-  uint32_t events;      /* Epoll events */
-  epoll_data_t data;    /* User data variable */
+  uint32_t events;
+  epoll_data_t data;
 }  __attribute__ ((packed));
 ]]
 end
