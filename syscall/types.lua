@@ -212,6 +212,8 @@ t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
 t.int1 = ffi.typeof("int[1]")
 t.int16_1 = ffi.typeof("int16_t[1]")
 t.uint16_1 = ffi.typeof("uint16_t[1]")
+t.int32_1 = ffi.typeof("int32_t[1]")
+t.uint32_1 = ffi.typeof("uint32_t[1]")
 t.int64_1 = ffi.typeof("int64_t[1]")
 t.uint64_1 = ffi.typeof("uint64_t[1]")
 t.socklen1 = ffi.typeof("socklen_t[1]")
@@ -1520,26 +1522,28 @@ end
 t.pipe = t.socketpair -- also just two fds
 
 -- sigaction
+t.sa_sigaction = ffi.typeof("void (*)(int, siginfo_t *, void *)")
+s.sa_sigaction = ffi.sizeof(t.sa_sigaction)
+
 meth.sigaction = {
   index = {
     handler = function(sa) return sa.sa_handler end,
     sigaction = function(sa) return sa.sa_sigaction end,
     mask = function(sa) return sa.sa_mask end,
-    flags = function(sa) return sa.sa_flags end,
+    flags = function(sa) return tonumber(sa.sa_flags) end,
   },
   newindex = {
     handler = function(sa, v)
       if type(v) == "string" then v = c.SIGACT[v] end
       if type(v) == "number" then v = pt.void(v) end
       if type(v) == "function" then v = ffi.cast(t.sighandler, v) end -- note doing this will leak resource, use carefully
-      sa.sa_handler = v
+      sa.sa_handler.sa_handler = v
     end,
     sigaction = function(sa, v)
       if type(v) == "string" then v = c.SIGACT[v] end
       if type(v) == "number" then v = pt.void(v) end
-      if type(v) == "function" then v = ffi.cast(t.sighandler, v) end -- note doing this will leak resource, use carefully
-      sa.sa_handler = v
-      sa.sa_flags = bit.bor(sa.sa_flags, c.SA.SIGINFO) -- this flag must be set if sigaction set
+      if type(v) == "function" then v = ffi.cast(t.sa_sigaction, v) end -- note doing this will leak resource, use carefully
+      sa.sa_handler.sa_sigaction = v
     end,
     mask = function(sa, v)
       if not ffi.istype(t.sigset, v) then v = t.sigset(v) end
@@ -1555,6 +1559,7 @@ mt.sigaction = {
   __new = function(tp, tab)
     local sa = ffi.new(tp)
     if tab then for k, v in pairs(tab) do sa[k] = v end end
+    if tab and tab.sigaction then sa.sa_flags = bit.bor(sa.flags, c.SA.SIGINFO) end -- this flag must be set if sigaction set
     return sa
   end,
 }

@@ -235,6 +235,8 @@ print [[
 #define _LARGE_FILES 1
 #define __USE_FILE_OFFSET64
 
+#include <stddef.h>
+
 #include <stdio.h>
 #include <limits.h>
 #include <errno.h>
@@ -323,6 +325,10 @@ void sassert(int a, int b, char *n) {
 
 int main(int argc, char **argv) {
 ]]
+
+-- important check on layout even if size right
+print("sassert(offsetof(struct sigaction, sa_mask), " .. ffi.offsetof(t.sigaction, "sa_mask") .. ', "offsetof sigaction sa_mask");')
+print("sassert(offsetof(struct sigaction, sa_flags), " .. ffi.offsetof(t.sigaction, "sa_flags") .. ', "offsetof sigaction sa_flags");')
 
 -- iterate over S.ctypes
 for k, v in pairs(ctypes) do

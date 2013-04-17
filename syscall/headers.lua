@@ -668,37 +668,6 @@ struct vfs_cap_data {
 };
 ]]
 
--- sigaction is a union on x86. note luajit supports anonymous unions, which simplifies usage
--- it appears that there is no kernel sigaction in non x86 architectures? Need to check source.
--- presumably does not care, but the types are a bit of a pain.
--- temporarily just going to implement sighandler support
-if arch.sigaction then arch.sigaction()
-else
-ffi.cdef[[
-struct sigaction {
-  sighandler_t sa_handler;
-  unsigned long sa_flags;
-  void (*sa_restorer)(void);
-  sigset_t sa_mask;
-};
-]]
-end
-
-if arch.termio then arch.termio()
-else
-ffi.cdef[[
-static const int NCC = 8;
-struct termio {
-  unsigned short c_iflag;
-  unsigned short c_oflag;
-  unsigned short c_cflag;
-  unsigned short c_lflag;
-  unsigned char c_line;
-  unsigned char c_cc[NCC];
-};
-]]
-end
-
 -- Linux struct siginfo padding depends on architecture
 if ffi.abi("64bit") then
 ffi.cdef[[
@@ -757,6 +726,36 @@ typedef struct siginfo {
   } sifields;
 } siginfo_t;
 ]]
+
+if arch.sigaction then arch.sigaction()
+else
+ffi.cdef[[
+struct sigaction {
+  union {
+    sighandler_t sa_handler;
+    void (*sa_sigaction) (int, siginfo_t *, void *);
+  } sa_handler;
+  sigset_t sa_mask;
+  unsigned long sa_flags;
+  void (*sa_restorer)(void);
+};
+]]
+end
+
+if arch.termio then arch.termio()
+else
+ffi.cdef[[
+static const int NCC = 8;
+struct termio {
+  unsigned short c_iflag;
+  unsigned short c_oflag;
+  unsigned short c_cflag;
+  unsigned short c_lflag;
+  unsigned char c_line;
+  unsigned char c_cc[NCC];
+};
+]]
+end
 
 if arch.statfs then arch.statfs()
 else

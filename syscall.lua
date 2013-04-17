@@ -603,7 +603,7 @@ function S.sigaction(signum, handler, oldact)
   if type(handler) == "string" or type(handler) == "function" then
     handler = {handler = handler, mask = "", flags = 0} -- simple case like signal
   end
-  handler = istype(t.sigaction, handler) or t.sigaction(handler)
+  if handler then handler = istype(t.sigaction, handler) or t.sigaction(handler) end
   return retbool(C.sigaction(c.SIG[signum], handler, oldact))
 end
 
