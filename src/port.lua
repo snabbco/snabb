@@ -2,6 +2,7 @@
 
 module(...,package.seeall)
 
+local C = require("ffi").C
 local buffer = require("buffer")
 
 -- Dictionary of ports that exist.
@@ -39,7 +40,7 @@ function Port:spam ()
    local input, output = self.input, self.output
    -- Keep it simple: use one buffer for everything.
    local buf = buffer.allocate()
-   buf.size = 64
+   buf.size = 32
    repeat
       input.sync_receive()
       while input.can_receive() do
@@ -52,6 +53,7 @@ function Port:spam ()
 	 input.add_receive_buffer(buf)
       end
       output.sync_transmit()
+      C.usleep(100000)
    until coroutine.yield("spam") == nil
    buffer.deref(buf)
 end
