@@ -190,6 +190,7 @@ local addstructs = {
   xt_get_revision = "struct xt_get_revision",
   vfs_cap_data = "struct vfs_cap_data",
   ucontext = "ucontext_t",
+  mcontext = "mcontext_t",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
