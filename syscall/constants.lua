@@ -41,6 +41,8 @@ c.BOOLEAN = {
 
 c.SYS = arch.SYS
 
+c.REG = arch.REG
+
 c.STD = setmetatable({
   IN_FILENO = 0,
   OUT_FILENO = 1,

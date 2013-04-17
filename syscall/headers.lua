@@ -666,6 +666,11 @@ struct vfs_cap_data {
     le32 inheritable;  /* Little endian */
   } data[2];
 };
+typedef struct {
+  void *ss_sp;
+  int ss_flags;
+  size_t ss_size;
+} stack_t;
 ]]
 
 -- Linux struct siginfo padding depends on architecture
@@ -741,6 +746,8 @@ struct sigaction {
 };
 ]]
 end
+
+arch.ucontext() -- there is no default for ucontext and related types as very machine specific
 
 if arch.termio then arch.termio()
 else
