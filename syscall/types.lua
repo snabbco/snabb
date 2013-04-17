@@ -159,7 +159,6 @@ local addstructs = {
   nlmsgerr = "struct nlmsgerr",
   utsname = "struct utsname",
   fdb_entry = "struct fdb_entry",
-  sigaction = "struct sigaction",
   io_event = "struct io_event",
   seccomp_data = "struct seccomp_data",
   iovec = "struct iovec",
@@ -1519,6 +1518,48 @@ t.socketpair = function(s1, s2)
 end
 
 t.pipe = t.socketpair -- also just two fds
+
+-- sigaction
+meth.sigaction = {
+  index = {
+    handler = function(sa) return sa.sa_handler end,
+    action = function(sa) return sa.sa_sigaction end,
+    mask = function(sa) return sa.sa_mask end,
+    flags = function(sa) return sa.sa_flags end,
+  },
+  newindex = {
+    handler = function(sa, v)
+      if type(v) == "string" then v = c.SIGACT[v] end
+      if type(v) == "number" then v = pt.void(v) end
+      if type(v) == "function" then v = ffi.cast(t.sighandler, v) end -- note doing this will leak resource, use carefully
+      sa.sa_handler = v
+    end,
+    sigaction = function(sa, v)
+      if type(v) == "string" then v = c.SIGACT[v] end
+      if type(v) == "number" then v = pt.void(v) end
+      if type(v) == "function" then v = ffi.cast(t.sighandler, v) end -- note doing this will leak resource, use carefully
+      sa.sa_handler = v
+      sa.sa_flags = bit.bor(sa.sa_flags, c.SA.SIGINFO) -- this flag must be set if sigaction set
+    end,
+    mask = function(sa, v)
+      if not ffi.istype(t.sigset, v) then v = t.sigset(v) end
+      sa.sa_mask = v
+    end,
+    flags = function(sa, v) sa.sa_flags = c.SA[v] end,
+  }
+}
+
+mt.sigaction = {
+  __index = function(sa, k) if meth.sigaction.index[k] then return meth.sigaction.index[k](sa) end end,
+  __newindex = function(sa, k, v) if meth.sigaction.newindex[k] then meth.sigaction.newindex[k](sa, v) end end,
+  __new = function(tp, tab)
+    local sa = ffi.new(tp)
+    if tab then for k, v in pairs(tab) do sa[k] = v end end
+    return sa
+  end,
+}
+
+metatype("sigaction", "struct sigaction", mt.sigaction)
 
 return types
 
