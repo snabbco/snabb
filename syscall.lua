@@ -599,16 +599,20 @@ function S.setdomainname(s)
   return retbool(C.setdomainname(s, #s))
 end
 
--- does not support passing a function as a handler, use sigaction instead
--- actualy glibc does not call the syscall anyway, defines in terms of sigaction; TODO we should too
-function S.signal(signum, handler) return retbool(C.signal(c.SIG[signum], c.SIGACT[handler])) end
-
 function S.sigaction(signum, handler, oldact)
   if type(handler) == "string" or type(handler) == "function" then
     handler = {handler = handler, mask = "", flags = 0} -- simple case like signal
   end
   handler = istype(t.sigaction, handler) or t.sigaction(handler)
   return retbool(C.sigaction(c.SIG[signum], handler, oldact))
+end
+
+-- defined in terms of sigaction
+function S.signal(signum, handler)
+  local oldact = t.sigaction()
+  local ok, err = S.sigaction(signum, handler, oldact)
+  if not ok then return nil, err end
+  return oldact.sa_handler
 end
 
 function S.kill(pid, sig) return retbool(C.kill(pid, c.SIG[sig])) end
