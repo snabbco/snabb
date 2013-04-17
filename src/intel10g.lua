@@ -121,18 +121,6 @@ function transmit (address, size)
    tdt = (tdt + 1) % num_descriptors
 end
 
-function can_reclaim_buffer ()
-   return txfree ~= tdh
-end
-
-function reclaim_buffer ()
-   if txfree ~= tdh then
-      local address = txdesc[txfree].data.address
-      txfree = (txfree + 1) % num_descriptors
-      return ffi.cast("uint8_t*", address)
-   end
-end
-
 function sync_transmit ()
    C.full_memory_barrier()
    tdh = r.TDH()
