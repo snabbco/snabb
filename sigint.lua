@@ -9,8 +9,9 @@ local ip
 if ffi.arch == "x86" then ip = c.REG.EIP
 elseif ffi.arch == "x64" then ip = c.REG.RIP
 else error "unsupported architecture" end
- 
-local g = ffi.cast("void (*)(void)", function() error("sigpipe") end)
+
+local backtrace = function() error("sigpipe") end
+local g = ffi.cast("void (*)(void)", backtrace)
  
 local f = t.sa_sigaction(function(s, info, ucontext)
   ucontext.uc_mcontext.gregs[ip] = ffi.cast("intptr_t", ffi.cast("void *", g)) -- set instruction pointer to g
