@@ -1142,11 +1142,6 @@ test_misc = {
     assert(S.setdomainname("domainnametest"))
     assert_equal(S.getdomainname(), "domainnametest")
   end,
-  test_getcpu = function()
-    local r, err = S.getcpu())
-print(err)
-    assert_equal(type(r), "table")
-  end,
 --[[
   -- may switch this back to a type
   test_inet_name = function()
@@ -2608,6 +2603,14 @@ test_capabilities = {
     assert(cap.permitted.sys_chroot and cap.permitted.sys_admin, "expect capabilities set")
     assert(cap.inheritable.chown and cap.inheritable.mknod, "expect capabilities set")
     assert(S.unlink(tmpfile))
+  end,
+}
+
+test_scheduler = {
+  test_getcpu = function()
+    local r, err = S.getcpu()
+print(err)
+    assert_equal(type(r), "table")
   end,
 }
 

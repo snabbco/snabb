@@ -3137,5 +3137,15 @@ c.IPT_SO_GET = setmetatable({
   REVISION_TARGET      = IPT_BASE_CTL + 3,
 }, stringflag)
 
+c.SCHED = setmetatable({
+  NORMAL           = 0,
+  FIFO             = 1,
+  RR               = 2,
+  BATCH            = 3,
+  -- ISO
+  IDLE             = 5,
+  RESET_ON_FORK    = 0x40000000, -- TODO only this flag can be ORed
+}, multiflags)
+
 return c
 
