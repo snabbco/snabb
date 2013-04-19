@@ -673,6 +673,7 @@ typedef struct {
 } stack_t;
 struct sched_param {
   int sched_priority;
+  /* unused after here */
   int sched_ss_low_priority;
   struct timespec sched_ss_repl_period;
   struct timespec sched_ss_init_budget;

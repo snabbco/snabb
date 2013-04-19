@@ -16,6 +16,7 @@ ctypes["struct mq_attr"] = nil
 ctypes["int errno"] = nil
 ctypes["struct user_cap_header"] = nil
 ctypes["struct user_cap_data"] = nil
+ctypes["struct sched_param"] = nil -- libc truncates unused parts
 
 -- internal only
 ctypes["struct capabilities"] = nil
