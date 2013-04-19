@@ -212,6 +212,7 @@ t.ints = ffi.typeof("int[?]")
 t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
 
 t.int1 = ffi.typeof("int[1]")
+t.uint1 = ffi.typeof("unsigned int[1]")
 t.int16_1 = ffi.typeof("int16_t[1]")
 t.uint16_1 = ffi.typeof("uint16_t[1]")
 t.int32_1 = ffi.typeof("int32_t[1]")

@@ -1142,6 +1142,10 @@ test_misc = {
     assert(S.setdomainname("domainnametest"))
     assert_equal(S.getdomainname(), "domainnametest")
   end,
+  test_getcpu = function()
+    local r = assert(S.getcpu())
+    assert_equal(type(r), "table")
+  end,
 --[[
   -- may switch this back to a type
   test_inet_name = function()

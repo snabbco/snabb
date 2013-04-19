@@ -1212,6 +1212,14 @@ function S.capset(hdr, data)
   return retbool(C.capset(hdr, data))
 end
 
+function S.getcpu(cpu, node)
+  cpu = cpu or t.uint1()
+  node = node or t.uint1()
+  local ret = C.getcpu(cpu, node)
+  if ret == -1 then return nil, t.error() end
+  return {cpu = cpu[0], node = node[0]}
+end
+
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 

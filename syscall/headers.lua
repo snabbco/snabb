@@ -1081,6 +1081,9 @@ int ioctl(int d, int request, void *argp); /* void* easiest here */
 int capget(struct user_cap_header *hdrp, struct user_cap_data *datap);
 int capset(struct user_cap_header *hdrp, const struct user_cap_data *datap);
 
+/* not defined by glibc */
+int getcpu(unsigned *cpu, unsigned *node, void *tcache);
+
 /* TODO from here to libc functions are not implemented yet */
 int tgkill(int tgid, int tid, int sig);
 int brk(void *addr);
@@ -1091,7 +1094,6 @@ void *sbrk(intptr_t increment);
 caddr_t create_module(const char *name, size_t size);
 int init_module(const char *name, struct module *image);
 int get_kernel_syms(struct kernel_sym *table);
-int getcpu(unsigned *cpu, unsigned *node, struct getcpu_cache *tcache);
 int getrusage(int who, struct rusage *usage);
 int get_thread_area(struct user_desc *u_info);
 long kexec_load(unsigned long entry, unsigned long nr_segments, struct kexec_segment *segments, unsigned long flags);

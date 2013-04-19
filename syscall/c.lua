@@ -69,6 +69,11 @@ function C.eventfd(initval, flags)
   return C.syscall(c.SYS.eventfd2, t.uint(initval), t.int(flags))
 end
 
+-- glibc does not provide getcpu
+function C.getcpu(cpu, node, tcache)
+  return C.syscall(c.SYS.getcpu, pt.uint(node), pt.uint(node), pt.void(tcache))
+end
+
 -- for stat we use the syscall as libc might have a different struct stat for compatibility
 -- similarly fadvise64 is not provided, and posix_fadvise may not have 64 bit args on 32 bit
 -- and fallocate seems to have issues in uClibc
