@@ -1220,6 +1220,8 @@ function S.getcpu(cpu, node)
   return {cpu = cpu[0], node = node[0]}
 end
 
+function S.sched_getscheduler(pid) return retnum(C.sched_getscheduler(pid or 0)) end
+
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 

@@ -74,6 +74,11 @@ function C.getcpu(cpu, node, tcache)
   return C.syscall(c.SYS.getcpu, pt.uint(node), pt.uint(node), pt.void(tcache))
 end
 
+-- Musl always returns ENOSYS for these
+function C.sched_getscheduler(pid)
+  return C.syscall(c.SYS.sched_getscheduler, t.pid(pid))
+end
+
 -- for stat we use the syscall as libc might have a different struct stat for compatibility
 -- similarly fadvise64 is not provided, and posix_fadvise may not have 64 bit args on 32 bit
 -- and fallocate seems to have issues in uClibc

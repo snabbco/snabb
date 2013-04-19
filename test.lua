@@ -2611,6 +2611,9 @@ test_scheduler = {
     local r, err = S.getcpu()
     assert((err and err.NOSYS) or type(r) == "table", "table returned if supported")
   end,
+  test_sched_getscheduler = function()
+    assert(S.sched_getscheduler())
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.
