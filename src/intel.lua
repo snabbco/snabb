@@ -468,12 +468,12 @@ end
    For the 82571EB, there are two semaphores located in the Software
    Semaphore (SWSM) register (see Section 13.8.17).
 
-   • Bit0 (SWSSMBI) is the software/software semaphore. This bit is
+   * Bit0 (SWSSMBI) is the software/software semaphore. This bit is
      needed in multi-process environments to prevent software running
      on one port from interferring with software on another the other
      port.
 
-   • Bit1SWSSWESMBI is the software/firmware semaphore. This is
+   * Bit1SWSSWESMBI is the software/firmware semaphore. This is
      always needed when accessing the PHY or EEPROM (reads, writes, or
      resets). This prevents the firmware and software from accessing
      the PHY and or EEPROM at the same time.
@@ -534,12 +534,12 @@ end
    
    1. Obtain the Software/Software semaphore (SWSSMBI - 05B50h; bit
       0). This is needed for multi-threaded environments.
-   2. Read (MANC.BLK_Phy_Rst_On_IDE – 05820h; bit 18) and then wait
+   2. Read (MANC.BLK_Phy_Rst_On_IDE - 05820h; bit 18) and then wait
       until it becomes 0b.
    3. Obtain the Software/Firmware semaphore (SWSSWESMBI - 05B50h;
       bit 1).
    4. Drive PHY reset (CTRL.PHY_RST at offset 0000h [bit 31], write
-      1b, wait 100 μs, and then write 0b).
+      1b, wait 100 us, and then write 0b).
    5. Release the Software/Firmware semaphore (SWSSWESMBI - 05B50h;
       bit 1).
    6. Wait for the CFG_DONE (EEMNGCTL.CFG_DONE at offset 1010h [bit
