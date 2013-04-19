@@ -9,6 +9,7 @@ COBJ   := $(patsubst %.c,obj/%.o,$(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,$(CHDR))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
+MDOBJS := $(patsubst %, doc/obj/%.md, $(LUASRC) $(CSRC) $(CHDR) Makefile)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
@@ -48,7 +49,22 @@ obj/jit_tprof.o: extra/tprof.lua
 obj/jit_vmprof.o: extra/vmprof.c
 	gcc -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
+$(MDOBJS): doc/obj/%.md : %
+	sed -E -e 's/^/    /g' -e 's/^    --- ?//g' < $< > $@
+
+book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
+
+doc/snabbswitch.md: $(MDOBJS)
+	(cd doc; ./genbook.sh) > $@
+
+doc/snabbswitch.pdf: doc/snabbswitch.md
+	pandoc -V documentclass:book -S --toc --chapters -o $@ $<
+
+doc/snabbswitch.html doc/snabbswitch.epub: doc/snabbswitch.md
+	pandoc -S --toc --chapters -o $@ $<
+
 clean:
 	-rm snabbswitch
 	-rm obj/*
-
+	-rm doc/*.md
+	-rm doc/snabbswitch.*
