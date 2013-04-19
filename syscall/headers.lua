@@ -671,6 +671,13 @@ typedef struct {
   int ss_flags;
   size_t ss_size;
 } stack_t;
+struct sched_param {
+  int sched_priority;
+  int sched_ss_low_priority;
+  struct timespec sched_ss_repl_period;
+  struct timespec sched_ss_init_budget;
+  int sched_ss_max_repl;
+};
 ]]
 
 -- Linux struct siginfo padding depends on architecture

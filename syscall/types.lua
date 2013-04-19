@@ -189,6 +189,7 @@ local addstructs = {
   user_cap_data = "struct user_cap_data",
   xt_get_revision = "struct xt_get_revision",
   vfs_cap_data = "struct vfs_cap_data",
+  sched_param = "struct sched_param",
   ucontext = "ucontext_t",
   mcontext = "mcontext_t",
 }
