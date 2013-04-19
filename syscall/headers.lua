@@ -1088,8 +1088,11 @@ int ioctl(int d, int request, void *argp); /* void* easiest here */
 int capget(struct user_cap_header *hdrp, struct user_cap_data *datap);
 int capset(struct user_cap_header *hdrp, const struct user_cap_data *datap);
 
-/* not defined by glibc */
+/* getcpu not defined by glibc */
 int getcpu(unsigned *cpu, unsigned *node, void *tcache);
+
+int sched_setscheduler(pid_t pid, int policy, const struct sched_param *param);
+int sched_getscheduler(pid_t pid);
 
 /* TODO from here to libc functions are not implemented yet */
 int tgkill(int tgid, int tid, int sig);

@@ -2609,7 +2609,7 @@ test_capabilities = {
 test_scheduler = {
   test_getcpu = function()
     local r, err = S.getcpu()
-    assert((err and err.NOSYS) or type(r) = "table", "table returned if supported")
+    assert((err and err.NOSYS) or type(r) == "table", "table returned if supported")
   end,
 }
 
