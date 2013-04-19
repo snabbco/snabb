@@ -2611,8 +2611,10 @@ test_scheduler = {
     local r, err = S.getcpu()
     assert((err and err.NOSYS) or type(r) == "table", "table returned if supported")
   end,
-  test_sched_getscheduler = function()
-    assert(S.sched_getscheduler())
+  test_sched_set_getscheduler = function()
+    assert(S.sched_setscheduler(0, "normal"))
+    local sched = assert(S.sched_getscheduler())
+    assert_equal(sched, c.SCHED.NORMAL)
   end,
 }
 

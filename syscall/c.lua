@@ -78,6 +78,9 @@ end
 function C.sched_getscheduler(pid)
   return C.syscall(c.SYS.sched_getscheduler, t.pid(pid))
 end
+function C.sched_setscheduler(pid, policy, param)
+  return C.syscall(c.SYS.sched_setscheduler, t.pid(pid), t.int(policy), pt.sched_param(param))
+end
 
 -- for stat we use the syscall as libc might have a different struct stat for compatibility
 -- similarly fadvise64 is not provided, and posix_fadvise may not have 64 bit args on 32 bit

@@ -1221,6 +1221,10 @@ function S.getcpu(cpu, node)
 end
 
 function S.sched_getscheduler(pid) return retnum(C.sched_getscheduler(pid or 0)) end
+function S.sched_setscheduler(pid, policy, param)
+  param = param or t.sched_param()
+  return retbool(C.sched_setscheduler(pid or 0, c.SCHED[policy], param))
+end
 
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.

@@ -3139,6 +3139,7 @@ c.IPT_SO_GET = setmetatable({
 
 c.SCHED = setmetatable({
   NORMAL           = 0,
+  OTHER            = 0,
   FIFO             = 1,
   RR               = 2,
   BATCH            = 3,

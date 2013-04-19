@@ -68,6 +68,7 @@ c.RTF.ROUTEINFO = nil
 c.RTF.ANYCAST = nil
 c.W.CLONE = nil
 c.W.NOTHREAD = nil
+c.SCHED.OTHER = nil -- NORMAL in kernel
 
 -- only in Linux headers that conflict
 c.IP.NODEFRAG = nil
