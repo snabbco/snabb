@@ -2,7 +2,7 @@
 
 module(...,package.seeall)
 
--- ## Register object
+--- ### Register object
 
 Register = {}
 
@@ -71,7 +71,7 @@ end
 --- For type `RC`: Reset the accumulator to 0.
 function Register:reset () self.acc = nil end
 
--- ## Define registers from string description.
+--- ### Define registers from string description.
 
 --- Define a set of registers described by a string.
 --- The register objects become named entries in `table`.
@@ -88,7 +88,8 @@ function Register:reset () self.acc = nil end
 ---     Longname   ::= <string>
 ---     Offset ::= OffsetStep ::= Min ::= Max ::= <number>
 function define (description, table, base_ptr)
-   local pattern = " *(%S+) +(%S+) +(%S+) +(%S+) (.-)\n"
+   local pattern = [[ *(%S+) +(%S+) +(%S+) +(%S+) (.-)
+]]
    for name,offset,index,perm,longname in description:gmatch(pattern) do
       table[name] = new(name, longname, tonumber(offset), base_ptr, perm)
    end

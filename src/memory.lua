@@ -5,7 +5,7 @@ local ffi = require("ffi")
 local C = ffi.C
 require("snabb_h")
 
---- ## High level allocate() and free()
+--- ### High level allocate() and free().
 
 buffer_size = 4096
 freelist = {}
@@ -20,7 +20,7 @@ function free (buffer)
    table.insert(freelist, buffer)
 end
 
---- ## Chunks
+--- ### Chunks.
 ---
 --- Memory is allocated from the operating system one "chunk" at a
 --- time. A chunk is an arbitrary-sized block of physically contiguous
@@ -85,7 +85,7 @@ function dma_alloc (size)
    end
 end
 
---- ## HugeTLB ("huge page") allocation from the Linux kernel
+--- ### HugeTLB ("huge page") allocation from the Linux kernel
 ---
 --- This is a way to dynamically allocate large (typically 2-4MB)
 --- areas of physically contiguous memory.
@@ -111,7 +111,7 @@ function set_hugepages (n)
    lib.writefile("/proc/sys/vm/nr_hugepages", tostring(n))
 end
 
---- ## Physical address translation
+--- ### Physical address translation
 
 -- Return the physical address of virt_addr as a number.
 function map (virt_addr)

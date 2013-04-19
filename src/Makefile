@@ -66,5 +66,5 @@ doc/snabbswitch.html doc/snabbswitch.epub: doc/snabbswitch.md
 clean:
 	-rm snabbswitch
 	-rm obj/*
-	-rm doc/*.md
 	-rm doc/snabbswitch.*
+	-rm doc/obj/*.md

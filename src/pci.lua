@@ -10,7 +10,7 @@ local lib = require("lib")
 require("clib_h")
 require("snabb_h")
 
---- ## Hardware device information
+--- ### Hardware device information.
 
 --- Array of all supported hardware devices.
 ---
@@ -73,7 +73,7 @@ function firstfile (dir)
    return lib.readcmd("ls -1 "..dir.." 2>/dev/null", "*l")
 end
 
---- ## Device manipulation
+--- ### Device manipulation.
 
 -- Force Linux to release the device with `pciaddress`.
 -- The corresponding network interface (e.g. `eth0`) will disappear.
@@ -110,7 +110,7 @@ function is_usable (info)
    return info.driver and (info.interface == nil or info.status == 'down')
 end
 
---- ## Open a device
+--- ### Open a device
 ---
 --- Load a fresh copy of the device driver's Lua module for each
 --- device. The module will be told at load-time the PCI address of
@@ -144,7 +144,7 @@ function find_loader (mod)
    end
 end
 
---- ## Selftest
+--- ### Selftest
 
 function selftest ()
    print("selftest: pci")

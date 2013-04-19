@@ -225,7 +225,7 @@ function selftest ()
    register.dump(s, true)
 end
 
---- ## Configuration register description.
+--- ### Configuration register description.
 
 config_registers_desc = [[
 AUTOC     0x042A0 -            RW Auto Negotiation Control
@@ -253,7 +253,7 @@ TDLEN     0x06008 +0x40*0..127 RW Transmit Descriptor Length
 TXDCTL    0x06028 +0x40*0..127 RW Transmit Descriptor Control
 ]]
 
---- ## Statistics register description.
+--- ### Statistics register description.
 
 statistics_registers_desc = [[
 CRCERRS       0x04000 -           RC CRC Error Count
