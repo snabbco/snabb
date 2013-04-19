@@ -1094,6 +1094,7 @@ int getcpu(unsigned *cpu, unsigned *node, void *tcache);
 
 int sched_setscheduler(pid_t pid, int policy, const struct sched_param *param);
 int sched_getscheduler(pid_t pid);
+int sched_yield(void);
 
 /* TODO from here to libc functions are not implemented yet */
 int tgkill(int tgid, int tid, int sig);

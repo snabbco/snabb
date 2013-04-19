@@ -2616,6 +2616,9 @@ test_scheduler = {
     local sched = assert(S.sched_getscheduler())
     assert_equal(sched, c.SCHED.NORMAL)
   end,
+  test_sched_yield = function()
+    assert(S.sched_yield())
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.

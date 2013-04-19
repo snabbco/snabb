@@ -1225,6 +1225,7 @@ function S.sched_setscheduler(pid, policy, param)
   param = param or t.sched_param()
   return retbool(C.sched_setscheduler(pid or 0, c.SCHED[policy], param))
 end
+function S.sched_yield() return retbool(C.sched_yield()) end
 
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
