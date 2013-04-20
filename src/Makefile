@@ -8,12 +8,13 @@ LUAOBJ := $(patsubst %.lua,obj/%.o,$(LUASRC))
 COBJ   := $(patsubst %.c,obj/%.o,$(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,$(CHDR))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
+EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
 all: snabbswitch
 
-snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(JITOBJS)
+snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(JITOBJS) $(EXTRAOBJS)
 	gcc -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt
@@ -35,6 +36,17 @@ $(HOBJ): obj/%_h.o: %.h Makefile
 
 $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua
 	luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
+
+
+# extra/ third party bits and pieces
+obj/strict.o: extra/strict.lua
+	luajit -bg $< $@
+
+obj/jit_tprof.o: extra/tprof.lua
+	luajit -bg -n jit.tprof $< $@
+
+obj/jit_vmprof.o: extra/vmprof.c
+	gcc -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
 clean:
 	-rm snabbswitch
