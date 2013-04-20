@@ -63,6 +63,7 @@ function path(pcidev) return "/sys/bus/pci/devices/"..pcidev end
 function which_driver (vendor, device)
    if vendor == '0x8086' and device == '0x10fb' then return 'intel10g' end
    if vendor == '0x8086' and device == '0x10d3' then return 'intel' end
+   if vendor == '0x8086' and device == '0x105e' then return 'intel' end
 end
 
 function firstline (filename) return lib.readfile(filename, "*l") end
