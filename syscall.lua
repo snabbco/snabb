@@ -1228,7 +1228,10 @@ end
 function S.sched_yield() return retbool(C.sched_yield()) end
 
 function S.sched_getaffinity(pid, mask, len) -- note len last as optional
-  
+  mask = istype(t.cpu_set) or t.cpu_set(mask)
+  local ret = C.sched_getaffinity(pid, mask, len or s.cpu_set)
+  if ret == -1 then return nil, t.error() end
+  return mask
 end
 
 -- 'macros' and helper functions etc

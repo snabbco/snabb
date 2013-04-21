@@ -1574,6 +1574,10 @@ mt.cpu_set = {
   __index = {
     zero = function(set) ffi.fill(set, s.cpu_set) end,
     set = function(set, cpu)
+      if type(cpu) == "table" then -- table is an array of CPU numbers eg {1, 2, 4}
+        for i = 1, #cpu do set:set(cpu[i]) end
+        return set
+      end
       local d = bit.rshift(cpu, 5) -- 5 is 32 bits
       set.val[d] = bit.bor(set.val[d], bit.lshift(1, cpu % 32))
     end,
@@ -1581,9 +1585,7 @@ mt.cpu_set = {
   },
   __new = function(tp, tab)
     local set = ffi.new(tp)
-    if not tab then return set end
-    -- table is an array of CPU numbers eg {1, 2, 4}
-    for i = 1, #tab do set:set(tab[i]) end
+    if tab then set:set(tab) end
     return set
   end,
 }
