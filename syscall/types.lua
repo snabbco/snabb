@@ -1580,6 +1580,16 @@ meth.cpu_set = {
       end
       local d = bit.rshift(cpu, 5) -- 5 is 32 bits
       set.val[d] = bit.bor(set.val[d], bit.lshift(1, cpu % 32))
+      return set
+    end,
+    clear = function(set, cpu)
+      if type(cpu) == "table" then -- table is an array of CPU numbers eg {1, 2, 4}
+        for i = 1, #cpu do set:clear(cpu[i]) end
+        return set
+      end
+      local d = bit.rshift(cpu, 5) -- 5 is 32 bits
+      set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, cpu % 32)))
+      return set
     end,
     get = function(set, cpu)
       local d = bit.rshift(cpu, 5) -- 5 is 32 bits
@@ -1593,6 +1603,9 @@ mt.cpu_set = {
   __index = function(set, k)
     if meth.cpu_set.index[k] then return meth.cpu_set.index[k] end
     if type(k) == "number" then return set:get(k) end
+  end,
+  __newindex = function(set, k, v)
+    if v then set:set(k) else set:clear(k) end
   end,
   __new = function(tp, tab)
     local set = ffi.new(tp)

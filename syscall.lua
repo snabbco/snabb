@@ -1234,6 +1234,11 @@ function S.sched_getaffinity(pid, mask, len) -- note len last as rarely used. Al
   return mask
 end
 
+function S.sched_setaffinity(pid, mask, len) -- note len last as rarely used
+  mask = istype(t.cpu_set, mask) or t.cpu_set(mask)
+  return retbool(C.sched_setaffinity(pid or 0, len or s.cpu_set, mask))
+end
+
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 
