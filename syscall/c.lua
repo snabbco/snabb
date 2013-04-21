@@ -226,6 +226,14 @@ function CC.pwritev64(fd, iov, iovcnt, offset)
   return C.syscall(c.SYS.pwritev, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
 end
 
+-- sched_setaffinity and sched_getaffinity not in Musl at the moment, use syscalls. Could test instead.
+function C.sched_getaffinity(pid, len, mask)
+  return C.syscall(c.SYS.sched_getaffinity, t.pid(pid), t.uint(len), pt.void(mask))
+end
+function C.sched_setaffinity(pid, len, mask)
+  return C.syscall(c.SYS.sched_setaffinity, t.pid(pid), t.uint(len), pt.void(mask))
+end
+
 -- if not in libc replace
 
 -- in librt for glibc but use syscalls instead
