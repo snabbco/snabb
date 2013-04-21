@@ -1227,9 +1227,9 @@ function S.sched_setscheduler(pid, policy, param)
 end
 function S.sched_yield() return retbool(C.sched_yield()) end
 
-function S.sched_getaffinity(pid, mask, len) -- note len last as optional
+function S.sched_getaffinity(pid, mask, len) -- note len last as rarely used. All parameters optional
   mask = istype(t.cpu_set) or t.cpu_set(mask)
-  local ret = C.sched_getaffinity(pid, mask, len or s.cpu_set)
+  local ret = C.sched_getaffinity(pid or 0, len or s.cpu_set, mask)
   if ret == -1 then return nil, t.error() end
   return mask
 end

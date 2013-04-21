@@ -1599,6 +1599,11 @@ mt.cpu_set = {
     if tab then set:set(tab) end
     return set
   end,
+  __tostring = function(set)
+    local tab = {}
+    for i = 0, s.cpu_set * 8 - 1 do if set:get(i) then tab[#tab + 1] = i end end
+    return "{" .. table.concat(tab, ",") .. "}"
+  end
 }
 
 metatype("cpu_set", "struct cpu_set_t", mt.cpu_set)

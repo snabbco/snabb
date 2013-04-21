@@ -2625,6 +2625,10 @@ test_scheduler = {
     assert(set:get(0) and set:get(1) and not set:get(2))
     assert(set[0] and set[1] and not set[2])
   end,
+  test_sched_getaffinity = function()
+    local set = S.sched_getaffinity()
+    assert(set[0], "should be able to run on cpu 0")
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.
