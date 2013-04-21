@@ -1239,6 +1239,9 @@ function S.sched_setaffinity(pid, mask, len) -- note len last as rarely used
   return retbool(C.sched_setaffinity(pid or 0, len or s.cpu_set, mask))
 end
 
+function S.sched_get_priority_max(policy) return retnum(C.sched_get_priority_max(c.SCHED[policy])) end
+function S.sched_get_priority_min(policy) return retnum(C.sched_get_priority_min(c.SCHED[policy])) end
+
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 

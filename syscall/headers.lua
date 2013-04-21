@@ -1102,6 +1102,9 @@ int sched_setscheduler(pid_t pid, int policy, const struct sched_param *param);
 int sched_getscheduler(pid_t pid);
 int sched_yield(void);
 
+int sched_get_priority_max(int policy);
+int sched_get_priority_min(int policy);
+
 /* TODO from here to libc functions are not implemented yet */
 int tgkill(int tgid, int tid, int sig);
 int brk(void *addr);

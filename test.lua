@@ -2635,6 +2635,12 @@ test_scheduler = {
     assert(not set[1])
     assert(S.sched_setaffinity(0, set))
   end,
+  test_get_sched_priority_minmax = function()
+    local min = S.sched_get_priority_min("fifo")
+    local max = S.sched_get_priority_max("fifo")
+    assert_equal(min, 1) -- values for Linux
+    assert_equal(max, 99) -- values for Linux
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.
