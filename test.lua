@@ -1980,6 +1980,8 @@ test_processes = {
   test_setpgid = function()
     -- TODO
     S.setpgid()
+    assert(S.getpgid())
+    assert(S.getpgrp())
   end,
 }
 
