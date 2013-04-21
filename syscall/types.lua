@@ -1570,8 +1570,8 @@ mt.sigaction = {
 
 metatype("sigaction", "struct sigaction", mt.sigaction)
 
-mt.cpu_set = {
-  __index = {
+meth.cpu_set = {
+  index = {
     zero = function(set) ffi.fill(set, s.cpu_set) end,
     set = function(set, cpu)
       if type(cpu) == "table" then -- table is an array of CPU numbers eg {1, 2, 4}
@@ -1581,8 +1581,19 @@ mt.cpu_set = {
       local d = bit.rshift(cpu, 5) -- 5 is 32 bits
       set.val[d] = bit.bor(set.val[d], bit.lshift(1, cpu % 32))
     end,
+    get = function(set, cpu)
+      local d = bit.rshift(cpu, 5) -- 5 is 32 bits
+      return bit.band(set.val[d], bit.lshift(1, cpu % 32)) ~= 0
+    end,
     -- TODO add rest of interface from man(3) CPU_SET
   },
+}
+
+mt.cpu_set = {
+  __index = function(set, k)
+    if meth.cpu_set.index[k] then return meth.cpu_set.index[k] end
+    if type(k) == "number" then return set:get(k) end
+  end,
   __new = function(tp, tab)
     local set = ffi.new(tp)
     if tab then set:set(tab) end

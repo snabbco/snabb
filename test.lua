@@ -2620,12 +2620,10 @@ test_scheduler = {
     assert(S.sched_yield())
   end,
   test_cpu_set = function()
-    local set = t.cpu_set()
-    set:set(0)
-    set:set(1)
-    assert_equal(set.val[0], 3)
     local set = t.cpu_set{0, 1}
     assert_equal(set.val[0], 3)
+    assert(set:get(0) and set:get(1) and not set:get(2))
+    assert(set[0] and set[1] and not set[2])
   end,
 }
 
