@@ -233,6 +233,13 @@ end
 function C.sched_setaffinity(pid, len, mask)
   return C.syscall(c.SYS.sched_setaffinity, t.pid(pid), t.uint(len), pt.void(mask))
 end
+-- sched_setparam and sched_getparam in Musl return ENOSYS, probably as they work on threads not processes.
+function C.sched_getparam(pid, param)
+  return C.syscall(c.SYS.sched_getparam, t.pid(pid), pt.void(param))
+end
+function C.sched_setparam(pid, param)
+  return C.syscall(c.SYS.sched_setparam, t.pid(pid), pt.void(param))
+end
 
 -- if not in libc replace
 

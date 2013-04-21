@@ -2616,6 +2616,12 @@ test_scheduler = {
     local sched = assert(S.sched_getscheduler())
     assert_equal(sched, c.SCHED.NORMAL)
   end,
+  test_sched_set_getscheduler_root = function()
+    assert(S.sched_setscheduler(0, "idle"))
+    local sched = assert(S.sched_getscheduler())
+    assert_equal(sched, c.SCHED.IDLE)
+    assert(S.sched_setscheduler(0, "normal"))
+  end,
   test_sched_yield = function()
     assert(S.sched_yield())
   end,
@@ -2640,6 +2646,20 @@ test_scheduler = {
     local max = S.sched_get_priority_max("fifo")
     assert_equal(min, 1) -- values for Linux
     assert_equal(max, 99) -- values for Linux
+  end,
+  test_sched_getparam = function()
+    local prio = S.sched_getparam()
+    assert_equal(prio, 0, "standard schedular has no priority value")
+  end,
+    test_sched_setgetparam = function()
+    assert(S.sched_setscheduler(0, "fifo", 1))
+    assert_equal(S.sched_getscheduler(), c.SCHED.FIFO)
+    local prio = S.sched_getparam()
+    assert_equal(prio, 1, "set to 1")
+    S.sched_setparam(0, 50)
+    local prio = S.sched_getparam()
+    assert_equal(prio, 50, "set to 50")
+    assert(S.sched_setscheduler(0, "normal"))
   end,
 }
 

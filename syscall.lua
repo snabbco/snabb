@@ -1222,7 +1222,7 @@ end
 
 function S.sched_getscheduler(pid) return retnum(C.sched_getscheduler(pid or 0)) end
 function S.sched_setscheduler(pid, policy, param)
-  param = param or t.sched_param()
+  param = istype(t.sched_param, param) or t.sched_param(param or 0)
   return retbool(C.sched_setscheduler(pid or 0, c.SCHED[policy], param))
 end
 function S.sched_yield() return retbool(C.sched_yield()) end
@@ -1241,6 +1241,17 @@ end
 
 function S.sched_get_priority_max(policy) return retnum(C.sched_get_priority_max(c.SCHED[policy])) end
 function S.sched_get_priority_min(policy) return retnum(C.sched_get_priority_min(c.SCHED[policy])) end
+
+function S.sched_setparam(pid, param)
+  param = istype(t.sched_param, param) or t.sched_param(param or 0)
+  return retbool(C.sched_setparam(pid or 0, param))
+end
+function S.sched_getparam(pid, param)
+  param = istype(t.sched_param, param) or t.sched_param(param or 0)
+  local ret = C.sched_getparam(pid or 0, param)
+  if ret == -1 then return nil, t.error() end
+  return param.sched_priority -- only one useful parameter
+end
 
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
