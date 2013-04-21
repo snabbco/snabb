@@ -2661,6 +2661,9 @@ test_scheduler = {
     assert_equal(prio, 50, "set to 50")
     assert(S.sched_setscheduler(0, "normal"))
   end,
+  test_sched_rr_get_interval = function()
+    local ts = assert(S.sched_rr_get_interval())
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.

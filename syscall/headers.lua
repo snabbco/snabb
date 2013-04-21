@@ -1105,6 +1105,7 @@ int sched_get_priority_max(int policy);
 int sched_get_priority_min(int policy);
 int sched_setparam(pid_t pid, const struct sched_param *param);
 int sched_getparam(pid_t pid, struct sched_param *param);
+int sched_rr_get_interval(pid_t pid, struct timespec *tp);
 
 /* TODO from here to libc functions are not implemented yet */
 int tgkill(int tgid, int tid, int sig);

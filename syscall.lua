@@ -1253,6 +1253,13 @@ function S.sched_getparam(pid, param)
   return param.sched_priority -- only one useful parameter
 end
 
+function S.sched_rr_get_interval(pid, ts)
+  ts = istype(t.timespec, ts) or t.timespec(ts)
+  local ret = C.sched_rr_get_interval(pid or 0, ts)
+  if ret == -1 then return nil, t.error() end
+  return ts
+end
+
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 
