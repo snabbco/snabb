@@ -2619,6 +2619,14 @@ test_scheduler = {
   test_sched_yield = function()
     assert(S.sched_yield())
   end,
+  test_cpu_set = function()
+    local set = t.cpu_set()
+    set:set(0)
+    set:set(1)
+    assert_equal(set.val[0], 3)
+    local set = t.cpu_set{0, 1}
+    assert_equal(set.val[0], 3)
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.

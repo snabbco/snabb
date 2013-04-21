@@ -1227,6 +1227,10 @@ function S.sched_setscheduler(pid, policy, param)
 end
 function S.sched_yield() return retbool(C.sched_yield()) end
 
+function S.sched_getaffinity(pid, mask, len) -- note len last as optional
+  
+end
+
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 

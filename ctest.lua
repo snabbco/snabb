@@ -17,6 +17,7 @@ ctypes["int errno"] = nil
 ctypes["struct user_cap_header"] = nil
 ctypes["struct user_cap_data"] = nil
 ctypes["struct sched_param"] = nil -- libc truncates unused parts
+ctypes["struct cpu_set_t"] = nil -- not actually a struct
 
 -- internal only
 ctypes["struct capabilities"] = nil

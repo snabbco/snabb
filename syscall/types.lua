@@ -1570,6 +1570,26 @@ mt.sigaction = {
 
 metatype("sigaction", "struct sigaction", mt.sigaction)
 
+mt.cpu_set = {
+  __index = {
+    zero = function(set) ffi.fill(set, s.cpu_set) end,
+    set = function(set, cpu)
+      local d = bit.rshift(cpu, 5) -- 5 is 32 bits
+      set.val[d] = bit.bor(set.val[d], bit.lshift(1, cpu % 32))
+    end,
+    -- TODO add rest of interface from man(3) CPU_SET
+  },
+  __new = function(tp, tab)
+    local set = ffi.new(tp)
+    if not tab then return set end
+    -- table is an array of CPU numbers eg {1, 2, 4}
+    for i = 1, #tab do set:set(tab[i]) end
+    return set
+  end,
+}
+
+metatype("cpu_set", "struct cpu_set_t", mt.cpu_set)
+
 return types
 
 

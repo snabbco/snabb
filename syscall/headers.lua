@@ -51,9 +51,15 @@ typedef unsigned long nfds_t;
 // should be a word, but we use 32 bits as bitops are signed 32 bit in LuaJIT at the moment
 typedef int32_t fd_mask;
 
+// again, should be a long
 typedef struct {
   int32_t val[1024 / (8 * sizeof (int32_t))];
 } sigset_t;
+
+// again should be a long, and we have wrapped in a struct
+struct cpu_set_t {
+  int32_t val[1024 / (8 * sizeof (int32_t))];
+};
 
 typedef int mqd_t;
 typedef int idtype_t; /* defined as enum */
