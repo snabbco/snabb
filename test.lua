@@ -2651,7 +2651,7 @@ test_scheduler = {
     local prio = S.sched_getparam()
     assert_equal(prio, 0, "standard schedular has no priority value")
   end,
-    test_sched_setgetparam = function()
+    test_sched_setgetparam_root = function()
     assert(S.sched_setscheduler(0, "fifo", 1))
     assert_equal(S.sched_getscheduler(), c.SCHED.FIFO)
     local prio = S.sched_getparam()
