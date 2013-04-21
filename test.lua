@@ -1914,10 +1914,6 @@ test_processes = {
     local pid0 = S.getpid()
     assert(pid0 > 1, "expecting my pid to be larger than 1")
     assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
-
-    assert(S.getsid())
-    S.setsid() -- may well fail
-
     local pid = assert(S.fork())
     if pid == 0 then -- child
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
@@ -1974,6 +1970,16 @@ test_processes = {
       assert(w.WIFEXITED, "process should have exited normally")
       assert(w.EXITSTATUS == 23, "exit should be 23")
     end
+  end,
+  test_setsid = function()
+    -- may be process leader, so need to fork twice and let child do it
+    -- TODO not written yet
+    assert(S.getsid())
+    S.setsid()
+  end,
+  test_setpgid = function()
+    -- TODO
+    S.setpgid()
   end,
 }
 

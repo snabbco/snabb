@@ -927,6 +927,11 @@ int setresuid(uid_t ruid, uid_t euid, uid_t suid);
 int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
 pid_t getsid(pid_t pid);
 pid_t setsid(void);
+
+int setpgid(pid_t pid, pid_t pgid);
+pid_t getpgid(pid_t pid);
+pid_t getpgrp(pid_t pid);
+
 int getgroups(int size, gid_t list[]);
 int setgroups(size_t size, const gid_t *list);
 pid_t fork(void);
@@ -1160,9 +1165,6 @@ int swapoff(const char *path);
 void syncfs(int fd);
 pid_t wait4(pid_t pid, int *status, int options, struct rusage *rusage);
 
-int setpgid(pid_t pid, pid_t pgid);
-pid_t getpgid(pid_t pid);
-pid_t getpgrp(pid_t pid);
 pid_t gettid(void);
 int setfsgid(uid_t fsgid);
 int setfsuid(uid_t fsuid);
