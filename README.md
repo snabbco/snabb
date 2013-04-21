@@ -4,17 +4,23 @@ What? An FFI implementation of the Linux kernel ABI for LuaJIT. This means you w
 
 Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua.
 
-Linux only? Not so easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library, and test. Patches accepted, but will probably need to restructure for maintainability. Other Unixes may not provide the same ABI stability guarantees, from the kernel, they will usually provide from libc instead, as these are often tightly coupled. However you may well be better off using [LuaPosix](https://github.com/rrthomas/luaposix) if you want to write portable Unix code.
+Linux only? Not so easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library, and test. Patches accepted, but will probably need to restructure for maintainability. Other Unixes may not provide the same ABI stability guarantees, from the kernel, they will usually provide from libc instead, as these are often tightly coupled. However you may well be better off using [LuaPosix](https://github.com/rrthomas/luaposix) if you want to write portable Unix code. However I am now looking at porting to BSD more seriously.
+
+This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
+
+## Install
+
+You just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Kepe the directory structure there is. You can rmeove files from architectures you do not use.
+
+You can install using ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` or one of the other versions in that directory, which will pull the version from github and install in the right place.
+
+## Requirements
 
 Requirements: Needs [LuaJIT 2.0.0](http://www.luajit.org/) or later.
 
 The code does not currently support the main Lua implementation, only LuaJIT. It used to support [luaffi](https://github.com/jmckaskill/luaffi) but this has not kept up with LuaJIT ffi features. At some point I intend to support Lua directly, but this will be after the API has stabilised.
 
-This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
-
-## Requirements
-
-LuaJIT 2.0.0 or later. ARM (soft or hard float), x86 or AMD64 architectures; intend to support PPC and MIPS in future. Either glibc or [Musl libc](http://www.musl-libc.org/) or uClibc should work. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
+ARM (soft or hard float), x86 or AMD64 and PPC architectures are supported; intend to support MIPS in future. Either glibc or [Musl libc](http://www.musl-libc.org/) or uClibc should work. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
 ## Release notes
 0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions. Planning to start looking at netfilter, dhcp, selinux.
