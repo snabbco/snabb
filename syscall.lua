@@ -1190,8 +1190,8 @@ function S.umask(mask) return C.umask(c.MODE[mask]) end
 function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
 function S.setsid() return retnum(C.setsid()) end
 function S.setpgid(pid, pgid) return retbool(C.setpgid(pid or 0, pgid or 0)) end
-function S.getpgid(pid) return retbool(C.getpgid(pid or 0)) end
-function S.getpgrp(pid) return retbool(C.getpgrp(pid or 0)) end
+function S.getpgid(pid) return retnum(C.getpgid(pid or 0)) end
+function S.getpgrp() return retnum(C.getpgrp()) end
 
 function S.vhangup() return retbool(C.vhangup()) end
 

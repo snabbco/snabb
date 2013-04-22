@@ -930,7 +930,7 @@ pid_t setsid(void);
 
 int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
-pid_t getpgrp(pid_t pid);
+pid_t getpgrp(void);
 
 int getgroups(int size, gid_t list[]);
 int setgroups(size_t size, const gid_t *list);

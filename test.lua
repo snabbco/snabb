@@ -1997,10 +1997,9 @@ test_processes = {
     end
   end,
   test_setpgid = function()
-    -- TODO
     S.setpgid()
-    assert(S.getpgid())
-    assert(S.getpgrp())
+    assert_equal(S.getpgid(), S.getpid())
+    assert_equal(S.getpgrp(), S.getpid())
   end,
 }
 
