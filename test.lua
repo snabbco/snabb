@@ -1972,10 +1972,29 @@ test_processes = {
     end
   end,
   test_setsid = function()
-    -- may be process leader, so need to fork twice and let child do it
-    -- TODO not written yet
-    assert(S.getsid())
-    S.setsid()
+    -- need to fork twice in case start as process leader
+    local pp1 = S.pipe()
+    local pp2 = S.pipe()
+    local pid = assert(S.fork())
+    if (pid == 0) then -- child
+      local pid = assert(S.fork())
+      if (pid == 0) then -- child
+        assert(pp1:read(nil, 1))
+        local ok, err = S.setsid()
+        ok = ok and ok == S.getpid() and ok == S.getsid()
+        if ok then pp2:write("y") else pp2:write("n") end
+        S._exit(0)
+      else
+        S._exit(0)
+      end
+    else
+      local w = assert(S.waitid("pid", pid, "exited"))
+      assert(pp1:write("a"))
+      local ok = pp2:read(nil, 1)
+      assert_equal(ok, "y")
+      pp1:close()
+      pp2:close()
+    end
   end,
   test_setpgid = function()
     -- TODO
