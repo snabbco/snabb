@@ -50,7 +50,7 @@ obj/jit_vmprof.o: extra/vmprof.c
 	gcc -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
 $(MDOBJS): doc/obj/%.md : %
-	sed -E -e 's/^/    /g' -e 's/^    --- ?//g' < $< > $@
+	awk '/^ *[^-]{3}/ {if (last~/^ *---/) printf("\n")} {print} {last=$$0}' < $< | sed -E -e 's/^/    /g' -e 's/^    --- ?//g' > $@
 
 book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
 
@@ -58,7 +58,7 @@ doc/snabbswitch.md: $(MDOBJS)
 	(cd doc; ./genbook.sh) > $@
 
 doc/snabbswitch.pdf: doc/snabbswitch.md
-	pandoc -V documentclass:book -S --toc --chapters -o $@ $<
+	pandoc --template=doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=inconsolata -V monoscale=.80 -V verbatimspacing=.85 -V mainfont=droidsans -V sansfont=droidsans -V documentclass:book -V geometry:margin=1.5in -S --toc --chapters  -o $@ $<
 
 doc/snabbswitch.html doc/snabbswitch.epub: doc/snabbswitch.md
 	pandoc -S --toc --chapters -o $@ $<
