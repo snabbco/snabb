@@ -2712,11 +2712,16 @@ test_mq = {
     assert(mq:close())
   end,
   test_mq_send_receive = function()
-    local mq = assert(S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 512}))
+    local mq = assert(S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 1}))
     assert(S.mq_unlink(mqname))
-    assert(mq:timedsend("a", nil, 10, 1)) -- 1 is timeout in seconds
-    assert(mq:send("b")) -- default prio is zero so should be ahead of first message
-
+    assert(mq:timedsend("a"))  -- default prio is zero so should be behind second message
+    assert(mq:send("b", nil, 10, 1)) -- 1 is timeout in seconds
+    local prio = t.int1(-1) -- initialise with invalid value
+    local msg = mq:timedreceive(nil, 1, prio, 1)
+    assert_equal(msg, "b")
+    assert_equal(prio[0], 10)
+    local msg = mq:receive(nil, 1)
+    assert_equal(msg, "a")
     assert(mq:close())    
   end,
 }

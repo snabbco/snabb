@@ -1284,6 +1284,16 @@ function S.mq_timedsend(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   return retbool(C.mq_timedsend(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio or 0, abs_timeout))
 end
 
+-- like read, return string if buffer not provided. Length required. TODO should we return prio?
+function S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
+  if abs_timeout then abs_timeout = istype(t.timespec, abs_timeout) or t.timespec(abs_timeout) end
+  if msg_ptr then return retbool(C.mq_timedreceive(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio, abs_timeout)) end
+  msg_ptr = t.buffer(msg_len)
+  local ret = C.mq_timedreceive(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio, abs_timeout)
+  if ret == -1 then return nil, t.error() end
+  return ffi.string(msg_ptr, msg_len)
+end
+
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 
@@ -1439,6 +1449,8 @@ mqmeth = {
   end,
   timedsend = S.mq_timedsend,
   send = function(mqd, msg_ptr, msg_len, msg_prio) return S.mq_timedsend(mqd, msg_ptr, msg_len, msg_prio) end,
+  timedreceive = S.mq_timedreceive,
+  receive = function(mqd, msg_ptr, msg_len, msg_prio) return S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio) end,
 }
 
 t.mqd = ffi.metatype("struct {mqd_t filenum;}", {
