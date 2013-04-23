@@ -1271,6 +1271,9 @@ function S.mq_open(name, flags, mode, attr)
   return t.mqd(ret)
 end
 
+function S.mq_unlink(name)
+  return retbool(C.mq_unlink(name))
+end
 
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.

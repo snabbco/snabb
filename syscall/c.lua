@@ -185,9 +185,13 @@ function C.io_submit(ctx, iocb, nr)
   return C.syscall(c.SYS.io_submit, t.aio_context(ctx), t.long(nr), pt.void(iocb))
 end
 
--- libc tends to modify stuff, plus varargs so just use syscall, and also in -rt for glibc
+-- mq functions in -rt for glibc, plus syscalls differ slightly
 function C.mq_open(name, flags, mode, attr)
   return C.syscall(c.SYS.mq_open, pt.void(name), t.int(flags), t.mode(mode), pt.void(attr))
+end
+
+function C.mq_unlink(name)
+  return C.syscall(c.SYS.mq_unlink, pt.void(name))
 end
 
 -- note dev_t not passed as 64 bits to this syscall
