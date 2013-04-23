@@ -2696,7 +2696,19 @@ test_scheduler = {
 test_mq = {
   test_mq_open_close_unlink = function()
     local mq = assert(S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 512}))
-    assert(S.mq_unlink(mqname)) -- unlink so errors do not leave fangling
+    assert(S.mq_unlink(mqname)) -- unlink so errors do not leave dangling
+    assert(mq:close())
+  end,
+  test_mq_getsetattr = function()
+    local mq = assert(S.mq_open(mqname, "rdwr,creat, nonblock", "rusr,wusr", {maxmsg = 10, msgsize = 512}))
+    assert(S.mq_unlink(mqname))
+    local attr = mq:getattr()
+    assert_equal(attr.flags, c.O.NONBLOCK)
+    assert_equal(attr.maxmsg, 10)
+    assert_equal(attr.msgsize, 512)
+    assert(mq:setattr(0)) -- clear nonblock flag
+    local attr = mq:getattr()
+    assert_equal(attr.flags, 0)
     assert(mq:close())
   end,
 }

@@ -1275,6 +1275,10 @@ function S.mq_unlink(name)
   return retbool(C.mq_unlink(name))
 end
 
+function S.mq_getsetattr(mqd, new, old) -- provided for completeness, but use getattr, setattr which are methods
+  return retbool(C.mq_getsetattr(getfd(mqd), new, old))
+end
+
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 
@@ -1417,6 +1421,17 @@ mqmeth = {
   close = fmeth.close,
   nogc = nogc,
   getfd = function(fd) return fd.filenum end,
+  getattr = function(mqd, attr)
+    attr = attr or t.mq_attr()
+    local ok, err = S.mq_getsetattr(mqd, nil, attr)
+    if not ok then return nil, err end
+    return attr
+  end,
+  setattr = function(mqd, attr)
+    if type(attr) == "number" or type(attr) == "string" then attr = {flags = attr} end -- only flags can be set so allow this
+    attr = istype(t.mq_attr, attr) or t.mq_attr(attr)
+    return S.mq_getsetattr(mqd, attr, nil)
+  end,
 }
 
 t.mqd = ffi.metatype("struct {mqd_t filenum;}", {

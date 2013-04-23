@@ -194,6 +194,10 @@ function C.mq_unlink(name)
   return C.syscall(c.SYS.mq_unlink, pt.void(name))
 end
 
+function C.mq_getsetattr(mqd, new, old)
+  return C.syscall(c.SYS.mq_getsetattr, t.int(mqd), pt.void(new), pt.void(old))
+end
+
 -- note dev_t not passed as 64 bits to this syscall
 function CC.mknod(pathname, mode, dev)
   return C.syscall(c.SYS.mknod, pathname, t.mode(mode), t.long(dev))
