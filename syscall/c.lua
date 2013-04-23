@@ -1,5 +1,8 @@
 -- This sets up the table of C functions, overriding libc where necessary with direct syscalls
 
+-- ffi.C (ie libc) is the default fallback via the metatable, but we override stuff that might be missing, has different semantics
+-- or which we cannot detect sanely which ABI is being presented.
+
 local ffi = require "ffi"
 
 require "syscall.headers"
