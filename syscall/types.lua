@@ -168,7 +168,7 @@ local addstructs = {
   dirent = "struct linux_dirent64",
   ifa_cacheinfo = "struct ifa_cacheinfo",
   flock = "struct flock64",
-  mqattr = "struct mq_attr",
+  mq_attr = "struct mq_attr",
   input_event = "struct input_event",
   input_id = "struct input_id",
   input_absinfo = "struct input_absinfo",
@@ -242,20 +242,9 @@ s.uint2 = ffi.sizeof(t.uint2)
 -- so this is the minimal one necessary to provide the interface eg does not gc file
 -- TODO add tests once types is standalone
 
---[[
-mt.fd = {
-  __index = {
-    getfd = function(fd) return fd.fileno end,
-  },
-  __new = function(tp, i)
-    return istype(tp, i) or ffi.new(tp, i)
-  end
-}
-
-metatype("fd", "struct {int fileno;}", mt.fd)
-]]
 -- even simpler version, just pass numbers
 t.fd = function(fd) return tonumber(fd) end
+t.mqd = t.fd -- basically an fd, but will have different metamethods
 
 -- can replace with a different t.fd function
 local function getfd(fd)

@@ -59,6 +59,7 @@ local tmpfile3 = "MMMMMTTTTGGG" .. S.getpid()
 local longfile = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
 local efile = "./tmpexXXYYY" .. S.getpid() .. ".sh"
 local largeval = math.pow(2, 33) -- larger than 2^32 for testing
+local mqname = "ljsyscallXXYYZZ" .. S.getpid()
 
 local clean = function()
   S.rmdir(tmpfile)
@@ -2691,6 +2692,22 @@ test_scheduler = {
     local ts = assert(S.sched_rr_get_interval())
   end,
 }
+
+test_mq = {
+  test_mq_open_close_unlink = function()
+    local mq = S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {mq_maxmsg = 10, mq_msgsize = 512})
+  end,
+}
+
+--[[
+           struct mq_attr {
+               long mq_flags;       /* Flags: 0 or O_NONBLOCK */
+               long mq_maxmsg;      /* Max. # of messages on queue */
+               long mq_msgsize;     /* Max. message size (bytes) */
+               long mq_curmsgs;     /* # of messages currently in queue */
+           };
+]]
+
 
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
