@@ -2735,7 +2735,7 @@ if f ~= 0 then S.exit("failure") end
 
 -- TODO iterate through all functions in S and upvalues for active rather than trace
 -- also check for non interesting cases, eg fall through to end
--- TODO add more files
+-- TODO add more files, this is not very applicable since code made modular
 
 if arg[1] == "coverage" then
   cov.covered = 0
