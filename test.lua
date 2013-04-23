@@ -2724,6 +2724,7 @@ test_mq = {
     assert_equal(msg, "a")
     assert(mq:close())    
   end,
+  -- TODO mq_notify
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.
