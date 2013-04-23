@@ -2695,19 +2695,9 @@ test_scheduler = {
 
 test_mq = {
   test_mq_open_close_unlink = function()
-    local mq = S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {mq_maxmsg = 10, mq_msgsize = 512})
+    local mq = assert(S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 512}))
   end,
 }
-
---[[
-           struct mq_attr {
-               long mq_flags;       /* Flags: 0 or O_NONBLOCK */
-               long mq_maxmsg;      /* Max. # of messages on queue */
-               long mq_msgsize;     /* Max. message size (bytes) */
-               long mq_curmsgs;     /* # of messages currently in queue */
-           };
-]]
-
 
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then

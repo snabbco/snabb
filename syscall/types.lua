@@ -168,7 +168,6 @@ local addstructs = {
   dirent = "struct linux_dirent64",
   ifa_cacheinfo = "struct ifa_cacheinfo",
   flock = "struct flock64",
-  mq_attr = "struct mq_attr",
   input_event = "struct input_event",
   input_id = "struct input_id",
   input_absinfo = "struct input_absinfo",
@@ -1609,6 +1608,33 @@ mt.cpu_set = {
 }
 
 metatype("cpu_set", "struct cpu_set_t", mt.cpu_set)
+
+meth.mq_attr = {
+  index = {
+    flags = function(mqa) return mqa.mq_flags end,
+    maxmsg = function(mqa) return mqa.mq_maxmsg end,
+    msgsize = function(mqa) return mqa.mq_msgsize end,
+    curmsgs = function(mqa) return mqa.mq_curmsgs end,
+  },
+  newindex = {
+    flags = function(mqa, v) mqa.mq_flags = c.OMQATTR[v] end, -- only allows O.NONBLOCK
+    maxmsg = function(mqa, v) mqa.mq_maxmsg = v end,
+    msgsize = function(mqa, v) mqa.mq_msgsize = v end,
+    -- no sense in writing curmsgs
+}
+}
+
+mt.mq_attr = {
+  __index = function(mqa, k) if meth.mq_attr.index[k] then return meth.mq_attr.index[k](mqa) end end,
+  __newindex = function(mqa, k, v) if meth.mq_attr.newindex[k] then meth.mq_attr.newindex[k](mqa, v) end end,
+  __new = function(tp, tab)
+    local mqa = ffi.new(tp)
+    if tab then for k, v in pairs(tab) do mqa[k] = v end end
+    return mqa
+  end,
+}
+
+metatype("mq_attr", "struct mq_attr", mt.mq_attr)
 
 return types
 

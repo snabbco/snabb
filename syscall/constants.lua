@@ -95,6 +95,11 @@ c.OPIPE = setmetatable({
   CLOEXEC   = octal('02000000'),
 }, multiflags)
 
+-- for mq_attr NONBLOCK only flag allowed
+c.OMQATTR = setmetatable({
+  NONBLOCK = c.O.NONBLOCK,
+}, multiflags)
+
 -- modes and file types. note renamed second set from S_ to MODE_ but duplicated in S for stat
 c.S_I = setmetatable({
   FMT   = octal('0170000'),
