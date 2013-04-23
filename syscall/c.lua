@@ -198,6 +198,10 @@ function C.mq_getsetattr(mqd, new, old)
   return C.syscall(c.SYS.mq_getsetattr, t.int(mqd), pt.void(new), pt.void(old))
 end
 
+function C.mq_timedsend(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
+  return C.syscall(c.SYS.mq_timedsend, t.int(mqd), pt.void(msg_ptr), t.size(msg_len), t.uint(msg_prio), pt.void(abs_timeout))
+end
+
 -- note dev_t not passed as 64 bits to this syscall
 function CC.mknod(pathname, mode, dev)
   return C.syscall(c.SYS.mknod, pathname, t.mode(mode), t.long(dev))

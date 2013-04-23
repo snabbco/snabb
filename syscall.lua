@@ -1279,6 +1279,11 @@ function S.mq_getsetattr(mqd, new, old) -- provided for completeness, but use ge
   return retbool(C.mq_getsetattr(getfd(mqd), new, old))
 end
 
+function S.mq_timedsend(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
+  if abs_timeout then abs_timeout = istype(t.timespec, abs_timeout) or t.timespec(abs_timeout) end
+  return retbool(C.mq_timedsend(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio or 0, abs_timeout))
+end
+
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 
@@ -1432,6 +1437,8 @@ mqmeth = {
     attr = istype(t.mq_attr, attr) or t.mq_attr(attr)
     return S.mq_getsetattr(mqd, attr, nil)
   end,
+  timedsend = S.mq_timedsend,
+  send = function(mqd, msg_ptr, msg_len, msg_prio) return S.mq_timedsend(mqd, msg_ptr, msg_len, msg_prio) end,
 }
 
 t.mqd = ffi.metatype("struct {mqd_t filenum;}", {

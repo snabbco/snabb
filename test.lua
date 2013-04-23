@@ -2711,6 +2711,14 @@ test_mq = {
     assert_equal(attr.flags, 0)
     assert(mq:close())
   end,
+  test_mq_send_receive = function()
+    local mq = assert(S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 512}))
+    assert(S.mq_unlink(mqname))
+    assert(mq:timedsend("a", nil, 10, 1)) -- 1 is timeout in seconds
+    assert(mq:send("b")) -- default prio is zero so should be ahead of first message
+
+    assert(mq:close())    
+  end,
 }
 
 -- note at present we check for uid 0, but could check capabilities instead.
