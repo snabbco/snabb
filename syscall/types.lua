@@ -1621,7 +1621,7 @@ meth.mq_attr = {
     maxmsg = function(mqa, v) mqa.mq_maxmsg = v end,
     msgsize = function(mqa, v) mqa.mq_msgsize = v end,
     -- no sense in writing curmsgs
-}
+  }
 }
 
 mt.mq_attr = {

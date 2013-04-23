@@ -1263,12 +1263,14 @@ function S.sched_rr_get_interval(pid, ts)
   return ts
 end
 
+-- POSIX message queues. Note there is no mq_close as it is just close in Linux
 function S.mq_open(name, flags, mode, attr)
   attr = istype(t.mq_attr, attr) or t.mq_attr(attr)
   local ret = C.mq_open(name, c.O[flags], c.MODE[mode], attr)
   if ret == -1 then return nil, t.error() end
   return t.mqd(ret)
 end
+
 
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
@@ -1405,7 +1407,21 @@ t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   __gc = fmeth.close,
   __new = function(tp, i)
     return istype(tp, i) or ffi.new(tp, i)
-  end
+  end,
+})
+
+mqmeth = {
+  close = fmeth.close,
+  nogc = nogc,
+  getfd = function(fd) return fd.filenum end,
+}
+
+t.mqd = ffi.metatype("struct {mqd_t filenum;}", {
+  __index = mqmeth,
+  __gc = mqmeth.close,
+  __new = function(tp, i)
+    return istype(tp, i) or ffi.new(tp, i)
+  end,
 })
 
 -- override socketpair to provide methods
