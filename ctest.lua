@@ -33,6 +33,7 @@ ctypes["struct sysinfo"] = nil
 -- internal use
 c.syscall = nil
 c.BOOLEAN = nil
+c.OMQATTR = nil
 
 -- missing on my ARM box
 c.CAP = nil
