@@ -1383,7 +1383,7 @@ local fdmethods = {'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
                    'sync_file_range', 'fstatfs', 'futimens',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
                    'fchownat', 'readlinkat', 'setns', 'openat',
-                   'preadv', 'pwritev', "epoll_pwait"
+                   'preadv', 'pwritev', 'epoll_pwait', 'ioctl'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end

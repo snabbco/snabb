@@ -2570,6 +2570,19 @@ test_swap = {
   -- TODO need mkswap to test success
 }
 
+test_tuntap = {
+  test_tuntap_root = function()
+    local clonedev = "/dev/net/tun"
+    local fd = assert(S.open(clonedev, "rdwr"))
+    local ifr = t.ifreq()
+    --ifr.ifr_ifrn.ifrn_name = "tun0" -- TODO metamethods
+    ifr.ifr_ifru.ifru_flags = c.TUNSETIFF.TUN
+    assert(fd:ioctl("TUNSETIFF", ifr))
+    assert_equal(ffi.string(ifr.ifr_ifrn.ifrn_name), "tun0")
+    assert(fd:close())
+  end,
+}
+
 test_capabilities = {
   test_cap_types = function()
     local cap = t.capabilities()
