@@ -685,6 +685,15 @@ struct sched_param {
   struct timespec sched_ss_init_budget;
   int sched_ss_max_repl;
 };
+struct tun_filter {
+  uint16_t flags;
+  uint16_t count;
+  uint8_t addr[0][6];
+};
+struct tun_pi {
+  uint16_t flags;
+  uint16_t proto; /* __be16 */
+};
 ]]
 
 -- Linux struct siginfo padding depends on architecture

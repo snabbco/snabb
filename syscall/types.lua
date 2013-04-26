@@ -191,6 +191,8 @@ local addstructs = {
   sched_param = "struct sched_param",
   ucontext = "ucontext_t",
   mcontext = "mcontext_t",
+  tun_pi = "struct tun_pi",
+  tun_filter = "struct tun_filter",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
