@@ -4,7 +4,6 @@ before_install:
  - sudo add-apt-repository ppa:mwild1/ppa -y
  - sudo apt-get update -y
  - sudo apt-get install luajit -y
- - sudo apt-get install linux-libc-dev -y
 
 script: 
  - luajit test.lua

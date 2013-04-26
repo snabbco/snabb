@@ -203,6 +203,13 @@ c.SYS.fadvise64_64 = nil
 for k, v in pairs(c.TUNSETIFF) do c.IFF[k] = v end
 c.TUNSETIFF = nil
 
+-- travis missing tun tap stuff
+c.IFF.MULTI_QUEUE = nil
+c.IFF.ATTACH_QUEUE = nil
+c.IFF.DETACH_QUEUE = nil
+c.IOCTL.TUNSETQUEUE = nil
+c.TUN.TAP_MQ = nil
+
 -- Musl changes some of the syscall constants in its 32/64 bit handling
 c.SYS.getdents = nil
 
