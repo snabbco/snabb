@@ -199,6 +199,10 @@ c.MNT.EXPIRE = nil
 c.MNT.DETACH = nil
 c.SYS.fadvise64_64 = nil
 
+-- we renamed these for namespacing reasons
+for k, v in c.TUNSETIFF do c.IFF[k] = v end
+c.TUNSETIFF = nil
+
 -- Musl changes some of the syscall constants in its 32/64 bit handling
 c.SYS.getdents = nil
 

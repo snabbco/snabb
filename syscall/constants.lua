@@ -3153,5 +3153,51 @@ c.SCHED = setmetatable({
   RESET_ON_FORK    = 0x40000000, -- TODO only this flag can be ORed
 }, multiflags)
 
+c.TUN_READQ = setmetatable({
+  SIZE = 500,
+}, stringflag)
+
+c.TUN = setmetatable({
+  TUN_DEV        = 0x0001, 
+  TAP_DEV        = 0x0002,
+  TYPE_MASK      = 0x000f,
+  TUN_FASYNC     = 0x0010,
+  TUN_NOCHECKSUM = 0x0020,
+  TUN_NO_PI      = 0x0040,
+  TUN_ONE_QUEUE  = 0x0080,
+  TUN_PERSIST    = 0x0100,
+  TUN_VNET_HDR   = 0x0200,
+  TUN_TAP_MQ     = 0x0400,
+}, multiflags)
+
+-- note that these are IFF_ but that is a duplicated prefix so use TUNSETIFF
+c.TUNSETIFF = setmetatable({
+  TUN          = 0x0001,
+  TAP          = 0x0002,
+  NO_PI        = 0x1000,
+  ONE_QUEUE    = 0x2000,
+  VNET_HDR     = 0x4000,
+  TUN_EXCL     = 0x8000,
+  MULTI_QUEUE  = 0x0100,
+  ATTACH_QUEUE = 0x0200,
+  DETACH_QUEUE = 0x0400,
+}, multiflags)
+
+c.TUN_F = setmetatable({
+  CSUM     = 0x01,
+  TSO4     = 0x02,
+  TSO6     = 0x04,
+  TSO_ECN  = 0x08,
+  UFO      = 0x10,
+}, multiflags)
+
+c.TUN_PKT = setmetatable({
+  STRIP = 0x0001,
+}, stringflag)
+
+c.TUN_FLT = setmetatable({
+  ALLMULTI = 0x0001,
+}, stringflag)
+
 return c
 
