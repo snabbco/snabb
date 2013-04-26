@@ -305,6 +305,7 @@ print [[
 #include <linux/netfilter.h>
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
+#include <linux/if_tun.h>
 
 int ret = 0;
 
