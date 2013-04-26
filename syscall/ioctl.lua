@@ -188,6 +188,25 @@ ioctl.IOCTL = setmetatable({
   EVIOCRMFF  = _IOW('E', 0x81, s.int),
   EVIOCGEFFECTS = _IOR('E', 0x84, s.int),
   EVIOCGRAB  = _IOW('E', 0x90, s.int),
+-- tun/tap
+  TUNSETNOCSUM   = _IOW('T', 200, s.int),
+  TUNSETDEBUG    = _IOW('T', 201, s.int),
+  TUNSETIFF      = _IOW('T', 202, s.int),
+  TUNSETPERSIST  = _IOW('T', 203, s.int),
+  TUNSETOWNER    = _IOW('T', 204, s.int),
+  TUNSETLINK     = _IOW('T', 205, s.int),
+  TUNSETGROUP    = _IOW('T', 206, s.int),
+  TUNGETFEATURES = _IOR('T', 207, s.uint),
+  TUNSETOFFLOAD  = _IOW('T', 208, s.uint),
+  TUNSETTXFILTER = _IOW('T', 209, s.uint),
+  TUNGETIFF      = _IOR('T', 210, s.uint),
+  TUNGETSNDBUF   = _IOR('T', 211, s.int),
+  TUNSETSNDBUF   = _IOW('T', 212, s.int),
+  TUNATTACHFILTER= _IOW('T', 213, s.sock_fprog),
+  TUNDETACHFILTER= _IOW('T', 214, s.sock_fprog),
+  TUNGETVNETHDRSZ= _IOR('T', 215, s.int),
+  TUNSETVNETHDRSZ= _IOW('T', 216, s.int),
+  TUNSETQUEUE    = _IOW('T', 217, s.int),
 }, stringflag)
 
 for k, v in pairs(arch) do -- arch overrides
