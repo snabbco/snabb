@@ -2257,10 +2257,10 @@ c.SYSFS_BRIDGE_PORT_SUBDIR = "brif"
 c.SYSFS_BRIDGE_PORT_ATTR   = "brport"
 c.SYSFS_BRIDGE_PORT_LINK   = "bridge"
 
--- sizes -- should we export?
-local HOST_NAME_MAX = 64
-local IFNAMSIZ      = 16
-local IFHWADDRLEN   = 6
+-- sizes -- TODO in tables?
+c.HOST_NAME_MAX = 64
+c.IFNAMSIZ      = 16
+c.IFHWADDRLEN   = 6
 
 -- input subsystem. TODO split into another file as a lot of them
 c.INPUT_PROP = setmetatable({

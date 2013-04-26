@@ -46,6 +46,13 @@ local function istype(tp, x)
   if ffi.istype(tp, x) then return x else return false end
 end
 
+-- generic for __new TODO use more
+local function newfn(tp, tab)
+  local obj = ffi.new(tp)
+  if tab then for k, v in pairs(tab) do obj[k] = v end end
+  return obj
+end
+
 -- TODO cleanup this (what should provide this?)
 local signal_reasons_gen = {}
 local signal_reasons = {}
@@ -164,7 +171,6 @@ local addstructs = {
   iovec = "struct iovec",
   rtnl_link_stats = "struct rtnl_link_stats",
   statfs = "struct statfs64",
-  ifreq = "struct ifreq", -- TODO add metamethod to stop too long name being used
   dirent = "struct linux_dirent64",
   ifa_cacheinfo = "struct ifa_cacheinfo",
   flock = "struct flock64",
@@ -1629,15 +1635,41 @@ meth.mq_attr = {
 mt.mq_attr = {
   __index = function(mqa, k) if meth.mq_attr.index[k] then return meth.mq_attr.index[k](mqa) end end,
   __newindex = function(mqa, k, v) if meth.mq_attr.newindex[k] then meth.mq_attr.newindex[k](mqa, v) end end,
-  __new = function(tp, tab)
-    local mqa = ffi.new(tp)
-    if tab then for k, v in pairs(tab) do mqa[k] = v end end
-    return mqa
-  end,
+  __new = newfn,
 }
 
 metatype("mq_attr", "struct mq_attr", mt.mq_attr)
 
-return types
+meth.ifreq = {
+  index = {
+    name = function(ifr) return ffi.string(ifr.ifr_ifrn.ifrn_name) end,
+    addr = function(ifr) return ifr.ifr_ifru.ifru_addr end,
+    dstaddr = function(ifr) return ifr.ifr_ifru.ifru_dstaddr end,
+    broadaddr = function(ifr) return ifr.ifr_ifru.ifru_broadaddr end,
+    netmask = function(ifr) return ifr.ifr_ifru.ifru_netmask end,
+    hwaddr = function(ifr) return ifr.ifr_ifru.ifru_hwaddr end,
+    flags = function(ifr) return ifr.ifr_ifru.ifru_flags end,
+    -- TODO rest of fields
+  },
+  newindex = {
+    name = function(ifr, v)
+      assert(#v <= c.IFNAMSIZ, "name too long")
+      ifr.ifr_ifrn.ifrn_name = v
+    end,
+    flags = function(ifr, v) -- which flags are valid here? odd namespace with tun tap TODO likely to need fixing
+      ifr.ifr_ifru.ifru_flags = c.TUNSETIFF[v]
+    end,
+    -- TODO rest of fields
+  },
+}
 
+mt.ifreq = {
+  __index = function(ifr, k) if meth.ifreq.index[k] then return meth.ifreq.index[k](ifr) end end,
+  __newindex = function(ifr, k, v) if meth.ifreq.newindex[k] then meth.ifreq.newindex[k](ifr, v) end end,
+  __new = newfn,
+}
+
+metatype("ifreq", "struct ifreq", mt.ifreq)
+
+return types
 

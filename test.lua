@@ -2575,11 +2575,12 @@ test_tuntap = {
     local clonedev = "/dev/net/tun"
     local fd = assert(S.open(clonedev, "rdwr"))
     local ifr = t.ifreq()
-    --ifr.ifr_ifrn.ifrn_name = "tun0" -- TODO metamethods
-    ifr.ifr_ifru.ifru_flags = c.TUNSETIFF.TUN
+    ifr.flags = "tun"
     assert(fd:ioctl("TUNSETIFF", ifr))
-    assert_equal(ffi.string(ifr.ifr_ifrn.ifrn_name), "tun0")
+    assert_equal(ifr.name, "tun0")
     assert(fd:close())
+    local i = assert(nl.interfaces())
+    assert(not i.tun0, "interface should not persist")
   end,
 }
 
