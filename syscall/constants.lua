@@ -3158,16 +3158,16 @@ c.TUN_READQ = setmetatable({
 }, stringflag)
 
 c.TUN = setmetatable({
-  TUN_DEV        = 0x0001, 
-  TAP_DEV        = 0x0002,
-  TYPE_MASK      = 0x000f,
-  TUN_FASYNC     = 0x0010,
-  TUN_NOCHECKSUM = 0x0020,
-  TUN_NO_PI      = 0x0040,
-  TUN_ONE_QUEUE  = 0x0080,
-  TUN_PERSIST    = 0x0100,
-  TUN_VNET_HDR   = 0x0200,
-  TUN_TAP_MQ     = 0x0400,
+  TUN_DEV    = 0x0001, 
+  TAP_DEV    = 0x0002,
+  TYPE_MASK  = 0x000f,
+  FASYNC     = 0x0010,
+  NOCHECKSUM = 0x0020,
+  NO_PI      = 0x0040,
+  ONE_QUEUE  = 0x0080,
+  PERSIST    = 0x0100,
+  VNET_HDR   = 0x0200,
+  TAP_MQ     = 0x0400,
 }, multiflags)
 
 -- note that these are IFF_ but that is a duplicated prefix so use TUNSETIFF
