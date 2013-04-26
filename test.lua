@@ -1384,7 +1384,7 @@ test_netlink = {
     assert(not lo.flags.multicast, "loopback interface should not be multicast")
     assert_equal(tostring(lo.macaddr), "00:00:00:00:00:00", "null hardware address on loopback")
     assert(lo.loopback, "loopback interface type should be loopback") -- TODO add getflag
-    assert_equal(lo.mtu, 16436, "expect lo MTU is 16436")
+    assert(lo.mtu >= 16436, "expect lo MTU at least 16436")
     local eth = i.eth0 or i.eth1 -- may not exist
     if eth then
       assert(eth.flags.broadcast, "ethernet interface should be broadcast")
