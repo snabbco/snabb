@@ -1,11 +1,19 @@
 \documentclass[$if(fontsize)$$fontsize$,$endif$$if(lang)$$lang$,$endif$]{$documentclass$}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
+% Use sans for sections, serif for main
+\usepackage{sectsty}
+\allsectionsfont{\sffamily}
+% Nicer chapter headings
+\usepackage{titlesec,color}
+\definecolor{gray75}{gray}{0.75}
+\newcommand{\hsp}{\hspace{20pt}}
+\titleformat{\chapter}[hang]{\Huge\sffamily}{\thechapter\hsp\textcolor{gray75}{|}\hsp}{0pt}{\Huge\sffamily}
 % Smaller spacing with bullets
 \usepackage{enumitem}
 \setlist{nolistsep}
-$if(verbatimspacing)$
 % Smaller line spacing with verbatim code listings
+$if(verbatimspacing)$
 \usepackage{setspace}
 \usepackage{etoolbox}
 \preto{\verbatim}{\edef\tempstretch{\baselinestretch}\par\setstretch{$verbatimspacing$}}
