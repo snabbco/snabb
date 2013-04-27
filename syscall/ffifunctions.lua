@@ -306,9 +306,6 @@ int mq_unlink(const char *name);
 int inet_pton(int af, const char *src, void *dst);
 const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 
-// functions from libc that could be exported as a convenience, used internally
-char *strerror(int);
-
 // env. dont support putenv, as does not copy which is an issue
 extern char **environ;
 int setenv(const char *name, const char *value, int overwrite);

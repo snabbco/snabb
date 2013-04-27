@@ -1433,7 +1433,7 @@ c.IP = setmetatable({
   DROP_SOURCE_MEMBERSHIP       = 40,
   MSFILTER                     = 41,
 
-  MULTICAST_ALL                = 49,
+  MULTICAST_ALL                = 49, 
   UNICAST_IF                   = 50,
 }, stringflag)
 
@@ -3043,6 +3043,7 @@ c.E = setmetatable({
   CONNREFUSED   = 111,
   HOSTDOWN      = 112,
   HOSTUNREACH   = 113,
+  ALREADY       = 114,
   INPROGRESS    = 115,
   STALE         = 116,
   UCLEAN        = 117,
@@ -3067,6 +3068,7 @@ c.E = setmetatable({
 c.E.WOULDBLOCK    = c.E.EAGAIN
 c.E.DEADLOCK      = c.E.EDEADLK
 c.E.NOATTR        = c.E.ENODATA
+c.E.NOTSUP        = c.E.OPNOTSUPP
 
 c.SWAP_FLAG = setmetatable({
   PREFER       = 0x8000,

@@ -96,13 +96,6 @@ for k, v in pairs(c.SIGPOLL) do
   signal_reasons[c.SIG.POLL][v] = k
 end
 
--- functions we use from man(3)
-
-local function strerror(errno) return ffi.string(ffi.C.strerror(errno)) end
-
--- Lua type constructors corresponding to defined types
--- basic types
-
 -- cast to pointer to a type. could generate for all types.
 local function ptt(tp)
   local ptp = ffi.typeof(tp .. " *")
@@ -265,7 +258,7 @@ for k, v in pairs(c.E) do
 end
 
 t.error = ffi.metatype("struct {int errno;}", {
-  __tostring = function(e) return strerror(e.errno) end,
+  __tostring = function(e) return require("syscall.errors")[e.errno] end,
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
     if k == 'lsym' then return errsyms[t.errno]:lower() end
