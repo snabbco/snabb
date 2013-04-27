@@ -927,7 +927,7 @@ end
 function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, c.EFD[flags])) end
 
 function S.getitimer(which, value)
-  if not value then value = t.itimerval() end
+  value = value or t.itimerval()
   local ret = C.getitimer(c.ITIMER[which], value)
   if ret == -1 then return nil, t.error() end
   return value
