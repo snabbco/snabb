@@ -9,8 +9,8 @@ local arch = require("syscall." .. ffi.arch .. ".constants") -- architecture spe
 
 local h = require "syscall.helpers"
 
-local octal, multiflags, charflags, swapflags, flag, strflag
-  = h.octal, h.multiflags, h.charflags, h.swapflags, h.flag, h.strflag
+local octal, multiflags, charflags, swapflags, strflag, atflag
+  = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag
 
 local function addarch(tb, a, default)
   local add = a or default
@@ -614,15 +614,9 @@ c.UTIME = strflag {
 
 -- ...at commands note these are valid in different combinations so different tables provided
 
-local function atflag(t, str)
-  if not str then return c.AT_FDCWD.FDCWD end -- non standard nil case
-  if type(str) == "string" or type(str) == "number" then return flag(t, str) end -- normal case
-  return str:getfd() -- fallback to file descriptor
-end
-
-c.AT_FDCWD = setmetatable({
+c.AT_FDCWD = atflag {
   FDCWD = -100,
-}, {__index = atflag, __call = function(t, a) return t[a] end})
+}
 
 c.AT_REMOVEDIR = setmetatable({
   REMOVEDIR = 0x200,

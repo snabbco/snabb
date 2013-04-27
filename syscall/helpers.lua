@@ -44,22 +44,21 @@ end
 
 local split, trim = h.split, h.trim
 
--- the old version now used only in one place TODO remove
-function h.flag(t, str)
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  if #str == 0 then return 0 end
-  if rawget(t, "__cache") then
-    local val = t.__cache[str]
-    if val then return val end
+-- for single valued flags
+function h.atflag(tab)
+  local function flag(cache, str)
+    if not str then return tab.FDCWD end
+    if type(str) == "number" then return str end
+    if type(str) ~= "string" then return str:getfd() end
+    if #str == 0 then return 0 end
+    local s = trim(str):upper()
+    if #s == 0 then return 0 end
+    local val = rawget(tab, s)
+    if not val then return nil end
+    cache[str] = val
+    return val
   end
-  local s = trim(str):upper()
-  if #s == 0 then return 0 end
-  local val = rawget(t, s)
-  if not val then return nil end
-  if not t.__cache then t.__cache = {} end
-  t.__cache[str] = val -- memoize for future use
-  return val
+  return setmetatable(tab, {__index = setmetatable({}, {__index = flag}), __call = function(t, a) return t[a] end})
 end
 
 -- for single valued flags

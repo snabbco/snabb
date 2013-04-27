@@ -126,6 +126,13 @@ test_basic = {
     assert(not rawget(c.F, "getfd"))
     assert(rawget(getmetatable(c.F).__index, "getfd")) -- a little implementation dependent
   end,
+  test_at_flags = function()
+    assert_equal(c.AT_FDCWD[nil], c.AT_FDCWD.FDCWD) -- nil returns current dir
+    assert_equal(c.AT_FDCWD.fdcwd, c.AT_FDCWD.FDCWD)
+    local fd = t.fd(-1)
+    assert_equal(c.AT_FDCWD[fd], -1)
+    assert_equal(c.AT_FDCWD[33], 33)
+  end,
 }
 
 test_open_close = {
