@@ -75,13 +75,6 @@ IOC.INOUT		= lshift(bor(IOC.WRITE, IOC.READ), IOC.DIRSHIFT)
 local IOCSIZE_MASK	= lshift(IOC.SIZEMASK, IOC.SIZESHIFT)
 local IOCSIZE_SHIFT	= IOC.SIZESHIFT
 
-local mapname = {
-  _IO = _IO,
-  _IOR = _IOR,
-  _IOW = _IOW,
-  _IOWR = _IOWR,
-}
-
 local ioctl = setmetatable({
 -- termios, non standard values generally 0x54 = 'T'
   TCGETS          = 0x5401,
