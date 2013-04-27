@@ -5,8 +5,7 @@
 local types = require "syscall.types"
 local s, t = types.s, types.t
 
-local h = require "syscall.helpers"
-local stringflag = h.stringflag
+local strflag = require("syscall.helpers").strflag
 
 local ffi = require "ffi"
 local ok, arch = pcall(require, "syscall." .. ffi.arch .. ".ioctl") -- architecture specific definitions
@@ -75,7 +74,7 @@ IOC.INOUT		= lshift(bor(IOC.WRITE, IOC.READ), IOC.DIRSHIFT)
 local IOCSIZE_MASK	= lshift(IOC.SIZEMASK, IOC.SIZESHIFT)
 local IOCSIZE_SHIFT	= IOC.SIZESHIFT
 
-local ioctl = setmetatable({
+local ioctl = strflag {
 -- termios, non standard values generally 0x54 = 'T'
   TCGETS          = 0x5401,
   TCSETS          = 0x5402,
@@ -197,7 +196,7 @@ local ioctl = setmetatable({
   TUNGETVNETHDRSZ= _IOR('T', 215, s.int),
   TUNSETVNETHDRSZ= _IOW('T', 216, s.int),
   TUNSETQUEUE    = _IOW('T', 217, s.int),
-}, stringflag)
+}
 
 local override = arch.ioctl or {}
 if type(override) == "function" then override = override(_IO, _IOR, _IOW, _IORW) end

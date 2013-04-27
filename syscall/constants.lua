@@ -9,8 +9,8 @@ local arch = require("syscall." .. ffi.arch .. ".constants") -- architecture spe
 
 local h = require "syscall.helpers"
 
-local octal, stringflag, multiflags, charflags, swapflags, flag, strflag
-  = h.octal, h.stringflag, h.multiflags, h.charflags, h.swapflags, h.flag, h.strflag
+local octal, multiflags, charflags, swapflags, flag, strflag
+  = h.octal, h.multiflags, h.charflags, h.swapflags, h.flag, h.strflag
 
 local function addarch(tb, a, default)
   local add = a or default

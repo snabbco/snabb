@@ -44,7 +44,7 @@ end
 
 local split, trim = h.split, h.trim
 
--- for single valued flags only
+-- the old version now used only in one place TODO remove
 function h.flag(t, str)
   if not str then return 0 end
   if type(str) ~= "string" then return str end
@@ -62,9 +62,7 @@ function h.flag(t, str)
   return val
 end
 
-h.stringflag = {__index = h.flag, __call = function(t, a) return t[a] end}
-
--- rework
+-- for single valued flags
 function h.strflag(tab)
   local function flag(cache, str)
     if not str then return 0 end
