@@ -103,7 +103,7 @@ local msg = {
 }
 
 local errors = setmetatable({}, {
-  __index = function(errno) return "No error information (error " .. errno .. ")" end,
+  __index = function(err, errno) return "No error information (error " .. errno .. ")" end,
   __call = function(err, errno) return err[errno] end,
 })
 
