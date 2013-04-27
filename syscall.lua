@@ -619,7 +619,7 @@ function S.kill(pid, sig) return retbool(C.kill(pid, c.SIG[sig])) end
 function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 
 function S.gettimeofday(tv)
-  if not tv then tv = t.timeval() end -- note it is faster to pass your own tv if you call a lot
+  tv = tv or t.timeval() -- note it is faster to pass your own tv if you call a lot
   local ret = C.gettimeofday(tv, nil)
   if ret == -1 then return nil, t.error() end
   return tv
@@ -630,7 +630,7 @@ function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
 function S.time(time) return retnum(C.time(time)) end
 
 function S.sysinfo(info)
-  if not info then info = t.sysinfo() end
+  info = info or t.sysinfo()
   local ret = C.sysinfo(info)
   if ret == -1 then return nil, t.error() end
   return info
