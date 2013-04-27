@@ -522,7 +522,7 @@ end
 
 -- TODO change to type
 local function getflock(arg)
-  if not arg then arg = t.flock() end
+  arg = arg or t.flock()
   if not ffi.istype(t.flock, arg) then
     for _, v in pairs {"type", "whence", "start", "len", "pid"} do -- allow use of short names
       if arg[v] then
