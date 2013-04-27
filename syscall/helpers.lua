@@ -64,6 +64,22 @@ end
 
 h.stringflag = {__index = h.flag, __call = function(t, a) return t[a] end}
 
+-- rework
+function h.strflag(tab)
+  local function flag(cache, str)
+    if not str then return 0 end
+    if type(str) ~= "string" then return str end
+    if #str == 0 then return 0 end
+    local s = trim(str):upper()
+    if #s == 0 then return 0 end
+    local val = rawget(tab, s)
+    if not val then return nil end
+    cache[str] = val
+    return val
+  end
+  return setmetatable(tab, {__index = setmetatable({}, {__index = flag}), __call = function(t, a) return t[a] end})
+end
+
 -- take a bunch of flags in a string and return a number
 local function flags(t, str) -- allows multiple comma sep flags that are ORed TODO allow | as well
   if not str then return 0 end
