@@ -19,11 +19,11 @@ local t, pt, s = S.t, S.pt, S.s
 local h = require "syscall.helpers"
 local split = h.split
 
--- makes code tidier TODO could return constructed type if not that type to simplify usage.
-local function istype(tp, x)
-  if ffi.istype(tp, x) then return x end
-  return false
-end
+-- makes code tidier
+local function istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
+
+-- even simpler version coerces to type
+local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
 local function getfd(fd)
   if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
@@ -291,22 +291,22 @@ end
 function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG[flags])) end
 
 function S.readv(fd, iov)
-  iov = istype(t.iovecs, iov) or t.iovecs(iov)
+  iov = mktype(t.iovecs, iov)
   return retnum(C.readv(getfd(fd), iov.iov, #iov))
 end
 
 function S.writev(fd, iov)
-  iov = istype(t.iovecs, iov) or t.iovecs(iov)
+  iov = mktype(t.iovecs, iov)
   return retnum(C.writev(getfd(fd), iov.iov, #iov))
 end
 
 function S.preadv(fd, iov, offset)
-  iov = istype(t.iovecs, iov) or t.iovecs(iov)
+  iov = mktype(t.iovecs, iov)
   return retnum(C.preadv64(getfd(fd), iov.iov, #iov, offset))
 end
 
 function S.pwritev(fd, iov, offset)
-  iov = istype(t.iovecs, iov) or t.iovecs(iov)
+  iov = mktype(t.iovecs, iov)
   return retnum(C.pwritev64(getfd(fd), iov.iov, #iov, offset))
 end
 
@@ -423,9 +423,8 @@ function S.fstatfs(fd)
 end
 
 function S.nanosleep(req, rem)
-  req = istype(t.timespec, req) or t.timespec(req)
   rem = rem or t.timespec()
-  local ret = C.nanosleep(req, rem)
+  local ret = C.nanosleep(mktype(t.timespec, req), rem)
   if ret == -1 then
     if ffi.errno() == c.E.INTR then return rem else return nil, t.error() end
   end
@@ -607,7 +606,7 @@ function S.sigaction(signum, handler, oldact)
   if type(handler) == "string" or type(handler) == "function" then
     handler = {handler = handler, mask = "", flags = 0} -- simple case like signal
   end
-  if handler then handler = istype(t.sigaction, handler) or t.sigaction(handler) end
+  if handler then handler = mktype(t.sigaction, handler) end
   return retbool(C.sigaction(c.SIG[signum], handler, oldact))
 end
 
@@ -769,7 +768,7 @@ function S.select(sel) -- note same structure as returned
   local r, w, e
   local nfds = 0
   local timeout
-  if sel.timeout then timeout = istype(t.timeval, sel.timeout) or t.timeval(sel.timeout) end
+  if sel.timeout then timeout = mktype(t.timeval, sel.timeout) end
   r, nfds = mkfdset(sel.readfds or {}, nfds or 0)
   w, nfds = mkfdset(sel.writefds or {}, nfds)
   e, nfds = mkfdset(sel.exceptfds or {}, nfds)
@@ -783,9 +782,7 @@ function S.pselect(sel) -- note same structure as returned
   local r, w, e
   local nfds = 0
   local timeout, set
-  if sel.timeout then
-    if ffi.istype(t.timespec, sel.timeout) then timeout = sel.timeout else timeout = t.timespec(sel.timeout) end
-  end
+  if sel.timeout then timeout = mktype(t.timespec, sel.timeout) end
   if sel.sigset then set = t.sigset(sel.sigset) end
   r, nfds = mkfdset(sel.readfds or {}, nfds or 0)
   w, nfds = mkfdset(sel.writefds or {}, nfds)
@@ -797,7 +794,7 @@ function S.pselect(sel) -- note same structure as returned
 end
 
 function S.poll(fds, timeout)
-  fds = istype(t.pollfds, fds) or t.pollfds(fds)
+  fds = mktype(t.pollfds, fds)
   local ret = C.poll(fds.pfd, #fds, timeout or -1)
   if ret == -1 then return nil, t.error() end
   return fds
@@ -805,9 +802,9 @@ end
 
 -- note that syscall does return timeout remaining but libc does not, due to standard prototype
 function S.ppoll(fds, timeout, set)
-  fds = istype(t.pollfds, fds) or t.pollfds(fds)
-  if timeout then timeout = istype(t.timespec, timeout) or t.timespec(timeout) end
-  if set then set = t.sigset(set) end
+  fds = mktype(t.pollfds, fds)
+  if timeout then timeout = mktype(t.timespec, timeout) end
+  if set then set = mktype(t.sigset, set) end
   local ret = C.ppoll(fds.pfd, #fds, timeout, set)
   if ret == -1 then return nil, t.error() end
   return fds
@@ -835,7 +832,7 @@ end
 S.RLIM_INFINITY = ffi.cast("rlim64_t", -1)
 
 function S.prlimit(pid, resource, new_limit, old_limit)
-  if new_limit then new_limit = istype(t.rlimit, new_limit) or t.rlimit(new_limit) end
+  if new_limit then new_limit = mktype(t.rlimit, new_limit) end
   old_limit = old_limit or t.rlimit()
   local ret = C.prlimit64(pid or 0, c.RLIMIT[resource], new_limit, old_limit)
   if ret == -1 then return nil, t.error() end
@@ -878,7 +875,7 @@ end
 function S.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
   maxevents = maxevents or 16
   events = events or t.epoll_events(maxevents)
-  if sigmask then sigmask = istype(t.sigset, sigmask) or t.sigset(sigmask) end
+  if sigmask then sigmask = mktype(t.sigset, sigmask) end
   local ret = C.epoll_pwait(getfd(epfd), events, maxevents, timeout or -1, sigmask)
   if ret == -1 then return nil, t.error() end
   return t.epoll_wait(ret, events)
@@ -898,7 +895,7 @@ function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
 end
 
 function S.vmsplice(fd, iov, flags)
-  iov = istype(t.iovecs, iov) or t.iovecs(iov)
+  iov = mktype(t.iovecs, iov)
   return retnum(C.vmsplice(getfd(fd), iov.iov, #iov, c.SPLICE_F[flags]))
 end
 
@@ -951,8 +948,7 @@ end
 
 function S.timerfd_settime(fd, flags, it, oldtime)
   oldtime = oldtime or t.itimerspec()
-  it = istype(t.itimerspec, it) or t.itimerspec(it)
-  local ret = C.timerfd_settime(getfd(fd), c.TFD_TIMER[flags], it, oldtime)
+  local ret = C.timerfd_settime(getfd(fd), c.TFD_TIMER[flags], mktype(t.itimerspec, it), oldtime)
   if ret == -1 then return nil, t.error() end
   return oldtime
 end
@@ -985,7 +981,7 @@ end
 
 function S.io_getevents(ctx, min, nr, events, timeout)
   events = events or t.io_events(nr)
-  if timeout then timeout = istype(t.timespec, timeout) or t.timespec(timeout) end -- nil ok
+  if timeout then timeout = mktype(t.timespec, timeout) end
   local ret = C.io_getevents(ctx, min, nr, events, timeout)
   if ret == -1 then return nil, t.error() end
   -- TODO convert to metatype for io_event
@@ -1091,35 +1087,34 @@ function S.klogctl(tp, buf, len)
 end
 
 function S.adjtimex(a)
-  a = istype(t.timex, a) or t.timex(a)
+  a = mktype(t.timex, a)
   local ret = C.adjtimex(a)
   if ret == -1 then return nil, t.error() end
   return t.adjtimex(ret, a)
 end
 
 function S.clock_getres(clk_id, ts)
-  ts = istype(t.timespec, ts) or t.timespec(ts)
+  ts = mktype(t.timespec, ts)
   local ret = C.clock_getres(c.CLOCK[clk_id], ts)
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
-  ts = istype(t.timespec, ts) or t.timespec(ts)
+  ts = mktype(t.timespec, ts)
   local ret = C.clock_gettime(c.CLOCK[clk_id], ts)
   if ret == -1 then return nil, t.error() end
   return ts
 end
 
 function S.clock_settime(clk_id, ts)
-  ts = istype(t.timespec, ts) or t.timespec(ts)
+  ts = mktype(t.timespec, ts)
   return retbool(C.clock_settime(c.CLOCK[clk_id], ts))
 end
 
 function S.clock_nanosleep(clk_id, flags, req, rem)
-  req = istype(t.timespec, req) or t.timespec(req)
   rem = rem or t.timespec()
-  local ret = C.clock_nanosleep(c.CLOCK[clk_id], c.TIMER[flags], req, rem)
+  local ret = C.clock_nanosleep(c.CLOCK[clk_id], c.TIMER[flags], mktype(t.timespec, req), rem)
   if ret == -1 then
     if ffi.errno() == c.E.INTR then return rem else return nil, t.error() end
   end
@@ -1229,39 +1224,37 @@ end
 
 function S.sched_getscheduler(pid) return retnum(C.sched_getscheduler(pid or 0)) end
 function S.sched_setscheduler(pid, policy, param)
-  param = istype(t.sched_param, param) or t.sched_param(param or 0)
+  param = mktype(t.sched_param, param or 0)
   return retbool(C.sched_setscheduler(pid or 0, c.SCHED[policy], param))
 end
 function S.sched_yield() return retbool(C.sched_yield()) end
 
 function S.sched_getaffinity(pid, mask, len) -- note len last as rarely used. All parameters optional
-  mask = istype(t.cpu_set) or t.cpu_set(mask)
+  mask = mktype(t.cpu_set, mask)
   local ret = C.sched_getaffinity(pid or 0, len or s.cpu_set, mask)
   if ret == -1 then return nil, t.error() end
   return mask
 end
 
 function S.sched_setaffinity(pid, mask, len) -- note len last as rarely used
-  mask = istype(t.cpu_set, mask) or t.cpu_set(mask)
-  return retbool(C.sched_setaffinity(pid or 0, len or s.cpu_set, mask))
+  return retbool(C.sched_setaffinity(pid or 0, len or s.cpu_set, mktype(t.cpu_set, mask)))
 end
 
 function S.sched_get_priority_max(policy) return retnum(C.sched_get_priority_max(c.SCHED[policy])) end
 function S.sched_get_priority_min(policy) return retnum(C.sched_get_priority_min(c.SCHED[policy])) end
 
 function S.sched_setparam(pid, param)
-  param = istype(t.sched_param, param) or t.sched_param(param or 0)
-  return retbool(C.sched_setparam(pid or 0, param))
+  return retbool(C.sched_setparam(pid or 0, mktype(t.sched_param, param or 0)))
 end
 function S.sched_getparam(pid, param)
-  param = istype(t.sched_param, param) or t.sched_param(param or 0)
+  param = mktype(t.sched_param, param or 0)
   local ret = C.sched_getparam(pid or 0, param)
   if ret == -1 then return nil, t.error() end
   return param.sched_priority -- only one useful parameter
 end
 
 function S.sched_rr_get_interval(pid, ts)
-  ts = istype(t.timespec, ts) or t.timespec(ts)
+  ts = mktype(t.timespec, ts)
   local ret = C.sched_rr_get_interval(pid or 0, ts)
   if ret == -1 then return nil, t.error() end
   return ts
@@ -1269,8 +1262,7 @@ end
 
 -- POSIX message queues. Note there is no mq_close as it is just close in Linux
 function S.mq_open(name, flags, mode, attr)
-  attr = istype(t.mq_attr, attr) or t.mq_attr(attr)
-  local ret = C.mq_open(name, c.O[flags], c.MODE[mode], attr)
+  local ret = C.mq_open(name, c.O[flags], c.MODE[mode], mktype(t.mq_attr, attr))
   if ret == -1 then return nil, t.error() end
   return t.mqd(ret)
 end
@@ -1284,13 +1276,13 @@ function S.mq_getsetattr(mqd, new, old) -- provided for completeness, but use ge
 end
 
 function S.mq_timedsend(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
-  if abs_timeout then abs_timeout = istype(t.timespec, abs_timeout) or t.timespec(abs_timeout) end
+  if abs_timeout then abs_timeout = mktype(t.timespec, abs_timeout) end
   return retbool(C.mq_timedsend(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio or 0, abs_timeout))
 end
 
 -- like read, return string if buffer not provided. Length required. TODO should we return prio?
 function S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
-  if abs_timeout then abs_timeout = istype(t.timespec, abs_timeout) or t.timespec(abs_timeout) end
+  if abs_timeout then abs_timeout = mktype(t.timespec, abs_timeout) end
   if msg_ptr then return retbool(C.mq_timedreceive(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio, abs_timeout)) end
   msg_ptr = t.buffer(msg_len)
   local ret = C.mq_timedreceive(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio, abs_timeout)
@@ -1448,7 +1440,7 @@ mqmeth = {
   end,
   setattr = function(mqd, attr)
     if type(attr) == "number" or type(attr) == "string" then attr = {flags = attr} end -- only flags can be set so allow this
-    attr = istype(t.mq_attr, attr) or t.mq_attr(attr)
+    attr = mktype(t.mq_attr, attr)
     return S.mq_getsetattr(mqd, attr, nil)
   end,
   timedsend = S.mq_timedsend,
