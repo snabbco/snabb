@@ -931,12 +931,12 @@ c.IFLA = strflag {
   NET_NS_FD = 28,
 }
 
-c.IFLA_INET = setmetatable({
+c.IFLA_INET = strflag {
   UNSPEC = 0,
   CONF   = 1,
-}, stringflag)
+}
 
-c.IFLA_INET6 = setmetatable({
+c.IFLA_INET6 = strflag {
   UNSPEC = 0,
   FLAGS  = 1,
   CONF   = 2,
@@ -944,32 +944,32 @@ c.IFLA_INET6 = setmetatable({
   MCAST  = 4,
   CACHEINFO  = 5,
   ICMP6STATS = 6,
-}, stringflag)
+}
 
-c.IFLA_INFO = setmetatable({
+c.IFLA_INFO = strflag {
   UNSPEC = 0,
   KIND   = 1,
   DATA   = 2,
   XSTATS = 3,
-}, stringflag)
+}
 
-c.IFLA_VLAN = setmetatable({
+c.IFLA_VLAN = strflag {
   UNSPEC = 0,
   ID     = 1,
   FLAGS  = 2,
   EGRESS_QOS  = 3,
   INGRESS_QOS = 4,
-}, stringflag)
+}
 
-c.IFLA_VLAN_QOS = setmetatable({
+c.IFLA_VLAN_QOS = strflag {
   UNSPEC  = 0,
   MAPPING = 1,
-}, stringflag)
+}
 
-c.IFLA_MACVLAN = setmetatable({
+c.IFLA_MACVLAN = strflag {
   UNSPEC = 0,
   MODE   = 1,
-}, stringflag)
+}
 
 c.MACVLAN_MODE = setmetatable({
   PRIVATE = 1,
@@ -978,25 +978,25 @@ c.MACVLAN_MODE = setmetatable({
   PASSTHRU = 8,
 }, multiflags)
 
-c.IFLA_VF_INFO = setmetatable({
+c.IFLA_VF_INFO = strflag {
   UNSPEC = 0,
   INFO   = 1, -- note renamed IFLA_VF_INFO to IFLA_VF_INFO.INFO
-}, stringflag)
+}
 
-c.IFLA_VF = setmetatable({
+c.IFLA_VF = strflag {
   UNSPEC   = 0,
   MAC      = 1,
   VLAN     = 2,
   TX_RATE  = 3,
   SPOOFCHK = 4,
-}, stringflag)
+}
 
-c.IFLA_VF_PORT = setmetatable({
+c.IFLA_VF_PORT = strflag {
   UNSPEC = 0,
   PORT   = 1, -- note renamed from IFLA_VF_PORT to IFLA_VF_PORT.PORT?
-}, stringflag)
+}
 
-c.IFLA_PORT = setmetatable({
+c.IFLA_PORT = strflag {
   UNSPEC    = 0,
   VF        = 1,
   PROFILE   = 2,
@@ -1005,27 +1005,27 @@ c.IFLA_PORT = setmetatable({
   HOST_UUID = 5,
   REQUEST   = 6,
   RESPONSE  = 7,
-}, stringflag)
+}
 
-c.VETH_INFO = setmetatable({
+c.VETH_INFO = strflag {
   UNSPEC = 0,
   PEER   = 1,
-}, stringflag)
+}
 
-c.PORT = setmetatable({
+c.PORT = strflag {
   PROFILE_MAX      =  40,
   UUID_MAX         =  16,
   SELF_VF          =  -1,
-}, stringflag)
+}
 
-c.PORT_REQUEST = setmetatable({
+c.PORT_REQUEST = strflag {
   PREASSOCIATE    = 0,
   PREASSOCIATE_RR = 1,
   ASSOCIATE       = 2,
   DISASSOCIATE    = 3,
-}, stringflag)
+}
 
-c.PORT_VDP_RESPONSE = setmetatable({
+c.PORT_VDP_RESPONSE = strflag {
   SUCCESS = 0,
   INVALID_FORMAT = 1,
   INSUFFICIENT_RESOURCES = 2,
@@ -1033,19 +1033,19 @@ c.PORT_VDP_RESPONSE = setmetatable({
   VTID_VIOLATION = 4,
   VTID_VERSION_VIOALTION = 5, -- seems to be misspelled in headers
   OUT_OF_SYNC = 6,
-}, stringflag)
+}
 
-c.PORT_PROFILE_RESPONSE = setmetatable({
+c.PORT_PROFILE_RESPONSE = strflag {
   SUCCESS = 0x100,
   INPROGRESS = 0x101,
   INVALID = 0x102,
   BADSTATE = 0x103,
   INSUFFICIENT_RESOURCES = 0x104,
   RESPONSE_ERROR = 0x105,
-}, stringflag)
+}
 
 -- from if_addr.h interface address types and flags
-c.IFA = setmetatable({
+c.IFA = strflag {
   UNSPEC    = 0,
   ADDRESS   = 1,
   LOCAL     = 2,
@@ -1054,7 +1054,7 @@ c.IFA = setmetatable({
   ANYCAST   = 5,
   CACHEINFO = 6,
   MULTICAST = 7,
-}, stringflag)
+}
 
 c.IFA_F = setmetatable({
   SECONDARY   = 0x01,
@@ -1070,7 +1070,7 @@ c.IFA_F = setmetatable({
 c.IFA_F.TEMPORARY   = c.IFA_F.SECONDARY
 
 -- routing
-c.RTN = setmetatable({
+c.RTN = strflag {
   UNSPEC      = 0,
   UNICAST     = 1,
   LOCAL       = 2,
@@ -1083,9 +1083,9 @@ c.RTN = setmetatable({
   THROW       = 9,
   NAT         = 10,
   XRESOLVE    = 11,
-}, stringflag)
+}
 
-c.RTPROT = setmetatable({
+c.RTPROT = strflag {
   UNSPEC   = 0,
   REDIRECT = 1,
   KERNEL   = 2,
@@ -1100,15 +1100,15 @@ c.RTPROT = setmetatable({
   XORP     = 14,
   NTK      = 15,
   DHCP     = 16,
-}, stringflag)
+}
 
-c.RT_SCOPE = setmetatable({
+c.RT_SCOPE = strflag {
   UNIVERSE = 0,
   SITE = 200,
   LINK = 253,
   HOST = 254,
   NOWHERE = 255,
-}, stringflag)
+}
 
 c.RTM_F = setmetatable({
   NOTIFY          = 0x100,
@@ -1117,16 +1117,16 @@ c.RTM_F = setmetatable({
   PREFIX          = 0x800,
 }, multiflags)
 
-c.RT_TABLE = setmetatable({
+c.RT_TABLE = strflag {
   UNSPEC  = 0,
   COMPAT  = 252,
   DEFAULT = 253,
   MAIN    = 254,
   LOCAL   = 255,
   MAX     = 0xFFFFFFFF,
-}, stringflag)
+}
 
-c.RTA = setmetatable({
+c.RTA = strflag {
   UNSPEC = 0,
   DST = 1,
   SRC = 2,
@@ -1144,7 +1144,7 @@ c.RTA = setmetatable({
   MP_ALGO = 14,
   TABLE = 15,
   MARK = 16,
-}, stringflag)
+}
 
 -- route flags
 c.RTF = setmetatable({
@@ -1229,7 +1229,7 @@ c.RTMGRP = setmetatable({
 }, multiflags)
 
 -- rtnetlink multicast groups (bit numbers not masks)
-c.RTNLGRP = setmetatable({
+c.RTNLGRP = strflag {
   NONE = 0,
   LINK = 1,
   NOTIFY = 2,
@@ -1254,10 +1254,10 @@ c.RTNLGRP = setmetatable({
   PHONET_IFADDR = 21,
   PHONET_ROUTE = 22,
   DCB = 23,
-}, stringflag)
+}
 
 -- address families
-c.AF = setmetatable({
+c.AF = strflag {
   UNSPEC     = 0,
   LOCAL      = 1,
   INET       = 2,
@@ -1296,14 +1296,14 @@ c.AF = setmetatable({
   CAIF       = 37,
   ALG        = 38,
   NFC        = 39,
-}, stringflag)
+}
 
 c.AF.UNIX       = c.AF.LOCAL
 c.AF.FILE       = c.AF.LOCAL
 c.AF.ROUTE      = c.AF.NETLINK
 
 -- arp types, which are also interface types for ifi_type
-c.ARPHRD = setmetatable({
+c.ARPHRD = strflag {
   NETROM   = 0,
   ETHER    = 1,
   EETHER   = 2,
@@ -1364,12 +1364,12 @@ c.ARPHRD = setmetatable({
   CAIF     = 822,
   VOID     = 0xFFFF,
   NONE     = 0xFFFE,
-}, stringflag)
+}
 
 c.ARPHRD.HDLC     = c.ARPHRD.CISCO
 
 -- IP
-c.IPPROTO = setmetatable({
+c.IPPROTO = strflag {
   IP = 0,
   ICMP = 1,
   IGMP = 2,
@@ -1398,9 +1398,9 @@ c.IPPROTO = setmetatable({
   SCTP = 132,
   UDPLITE = 136,
   RAW = 255,
-}, stringflag)
+}
 
-c.IP = setmetatable({
+c.IP = strflag {
   TOS          = 1,
   TTL          = 2,
   HDRINCL      = 3,
@@ -1436,9 +1436,9 @@ c.IP = setmetatable({
 
   MULTICAST_ALL                = 49, 
   UNICAST_IF                   = 50,
-}, stringflag)
+}
 
-c.ETH_P = setmetatable({
+c.ETH_P = strflag {
   LOOP      = 0x0060,
   PUP       = 0x0200,
   PUPAT     = 0x0201,
@@ -1511,9 +1511,9 @@ c.ETH_P = setmetatable({
   PHONET    = 0x00F5,
   IEEE802154= 0x00F6,
   CAIF      = 0x00F7,
-}, stringflag)
+}
 
-c.ETHERTYPE = setmetatable({
+c.ETHERTYPE = strflag {
   PUP          = 0x0200,
   SPRITE       = 0x0500,
   IP           = 0x0800,
@@ -1526,7 +1526,7 @@ c.ETHERTYPE = setmetatable({
   IPV6         = 0x86dd,
   LOOPBACK     = 0x9000,
   TRAIL        = 0x1000,
-}, stringflag)
+}
 
 -- eventfd
 c.EFD = setmetatable({
