@@ -206,10 +206,9 @@ local ioctl = setmetatable({
   TUNSETQUEUE    = _IOW('T', 217, s.int),
 }, stringflag)
 
-for k, v in pairs(arch) do -- arch overrides
-  if type(v) == "table" then v = mapname[v[1]](v[2], v[3], s[v[4]]) end -- some of the ioctls are functions
-  if string.sub(k, 1, 4) ~= "IOC_" then ioctl[k] = v end
-end
+local override = arch.ioctl or {}
+if type(override) == "function" then override = override(_IO, _IOR, _IOW, _IORW) end
+for k, v in pairs(override) do ioctl[k] = v end
 
 -- alternate names
 ioctl.TIOCINQ = ioctl.FIONREAD
