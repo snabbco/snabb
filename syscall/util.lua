@@ -503,10 +503,15 @@ function util.isatty(fd)
   if tc then return true else return false end
 end
 
+local tcsets = {
+  [0] = "TCSETS",  -- now
+  [1] = "TCSETSW", -- drain
+  [2] = "TCSETSF", -- flush. Note these are in fact consecutive ioctl numbers
+}
+
 function util.tcsetattr(fd, optional_actions, tio)
   local inc = c.TCSA[optional_actions]
-  if inc < 0 or inc > 2 then return nil end
-  return S.ioctl(fd, c.IOCTL.TCSETS + inc, tio)
+  return S.ioctl(fd, tcsets[inc], tio)
 end
 
 function util.tcsendbreak(fd, duration)

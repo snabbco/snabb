@@ -23,8 +23,6 @@ end
 local lshift = bit.lshift
 local rshift = bit.rshift
 
-local ioctl = {}
-
 local IOC_NRBITS	= 8
 local IOC_TYPEBITS	= 8
 
@@ -85,7 +83,7 @@ local mapname = {
   _IOWR = _IOWR,
 }
 
-ioctl.IOCTL = setmetatable({
+local ioctl = setmetatable({
 -- termios, non standard values generally 0x54 = 'T'
   TCGETS          = 0x5401,
   TCSETS          = 0x5402,
@@ -211,11 +209,11 @@ ioctl.IOCTL = setmetatable({
 
 for k, v in pairs(arch) do -- arch overrides
   if type(v) == "table" then v = mapname[v[1]](v[2], v[3], s[v[4]]) end -- some of the ioctls are functions
-  if string.sub(k, 1, 4) ~= "IOC_" then ioctl.IOCTL[k] = v end
+  if string.sub(k, 1, 4) ~= "IOC_" then ioctl[k] = v end
 end
 
 -- alternate names
-ioctl.IOCTL.TIOCINQ = ioctl.IOCTL.FIONREAD
+ioctl.TIOCINQ = ioctl.FIONREAD
 
 -- TODO should we export more functions?
 return ioctl

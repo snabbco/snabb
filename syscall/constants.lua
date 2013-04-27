@@ -18,18 +18,6 @@ end
 
 local c = {}
 
--- lazy load ioctls
-setmetatable(c, {
-  __index = function(c, k)
-    if k == "IOCTL" then
-      local ioctl = require "syscall.ioctl"
-      c.IOCTL = ioctl.IOCTL
-      setmetatable(c, nil)
-      return c.IOCTL
-    end
-  end
-})
-
 c.syscall = arch.syscall or {} -- special syscall handling
 
 c.SYS = arch.SYS

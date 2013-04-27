@@ -6,6 +6,8 @@ local ffi = require "ffi"
 
 local s, t, c, ctypes = S.s, S.t, S.c, S.ctypes
 
+local c.IOCTL = require "syscall.ioctl"
+
 -- TODO fix these, various naming issues
 ctypes["struct linux_dirent64"] = nil
 ctypes["struct fdb_entry"] = nil

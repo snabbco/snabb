@@ -26,7 +26,7 @@ ARM (soft or hard float), x86 or AMD64 and PPC architectures are supported; inte
 netfilter, dhcp, selinux.
 
 ## Release notes
-0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support.
+0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, small ioctl restructure.
 
 0.6 adds support for raw sockets, BPF, seccomp mode 2 (syscall filtering), capabilities, feature tests, plus bug fixes.
 
