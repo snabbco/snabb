@@ -132,7 +132,7 @@ h.booltoc = setmetatable({
   [1] = 1,
   [false] = 0,
   [true] = 1,
-}, {__call = function(tb, arg) return tb[arg] end})
+}, {__call = function(tb, arg) return tb[arg or 0] end}) -- allow nil as false
 
 return h
 

@@ -318,7 +318,7 @@ end
 -- TODO {get,set}sockopt may need better type handling
 function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far
-  if not optlen and type(optval) == 'boolean' then if optval then optval = 1 else optval = 0 end end
+  if not optlen and type(optval) == 'boolean' then optval = h.booltoc(optval) end
   if not optlen and type(optval) == 'number' then
     optval = t.int1(optval)
     optlen = s.int
@@ -1319,8 +1319,8 @@ function S.getenv(name)
 end
 function S.unsetenv(name) return retbool(C.unsetenv(name)) end
 function S.setenv(name, value, overwrite)
-  if type(overwrite) == 'boolean' and overwrite then overwrite = 1 end
-  return retbool(C.setenv(name, value, overwrite or 0))
+  overwrite = h.booltoc(overwrite) -- allows nil as false/0
+  return retbool(C.setenv(name, value, overwrite))
 end
 function S.clearenv() return retbool(C.clearenv()) end
 
