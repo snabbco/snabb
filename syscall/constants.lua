@@ -1585,7 +1585,7 @@ c.UMOUNT = setmetatable({
 }, multiflags)
 
 -- reboot
-c.LINUX_REBOOT_CMD = setmetatable({
+c.LINUX_REBOOT_CMD = strflag {
   RESTART      =  0x01234567,
   HALT         =  0xCDEF0123,
   CAD_ON       =  0x89ABCDEF,
@@ -1594,7 +1594,7 @@ c.LINUX_REBOOT_CMD = setmetatable({
   RESTART2     =  0xA1B2C3D4,
   SW_SUSPEND   =  0xD000FCE2,
   KEXEC        =  0x45584543,
-}, stringflag)
+}
 
 -- clone
 c.CLONE = setmetatable({
@@ -1664,7 +1664,7 @@ c.IN.ALL_EVENTS    = c.IN.ACCESS + c.IN.MODIFY + c.IN.ATTRIB + c.IN.CLOSE_WRITE
                        + c.IN.DELETE_SELF + c.IN.MOVE_SELF
 
 --prctl
-c.PR = setmetatable({
+c.PR = strflag {
   SET_PDEATHSIG = 1,
   GET_PDEATHSIG = 2,
   GET_DUMPABLE  = 3,
@@ -1701,19 +1701,19 @@ c.PR = setmetatable({
   GET_NO_NEW_PRIVS = 39,
   GET_TID_ADDRESS = 40,
   SET_PTRACER   = 0x59616d61, -- Ubuntu extension
-}, stringflag)
+}
 
 -- for PR get/set unalign
-c.PR_UNALIGN = setmetatable({
+c.PR_UNALIGN = strflag {
   NOPRINT   = 1,
   SIGBUS    = 2,
-}, stringflag)
+}
 
 -- for PR fpemu
-c.PR_FPEMU = setmetatable({
+c.PR_FPEMU = strflag {
   NOPRINT     = 1,
   SIGFPE      = 2,
-}, stringflag)
+}
 
 -- for PR fpexc
 c.PR_FP_EXC = setmetatable({
@@ -1727,45 +1727,45 @@ c.PR_FP_EXC = setmetatable({
   NONRECOV   = 1,
   ASYNC      = 2,
   PRECISE    = 3,
-}, stringflag) -- TODO should be a combo of stringflag and flags
+}, multiflags) -- TODO should be a combo of stringflag and flags
 
 -- PR get set timing
-c.PR_TIMING = setmetatable({
+c.PR_TIMING = strflag {
   STATISTICAL= 0,
   TIMESTAMP  = 1,
-}, stringflag)
+}
 
 -- PR set endian
-c.PR_ENDIAN = setmetatable({
+c.PR_ENDIAN = strflag {
   BIG         = 0,
   LITTLE      = 1,
   PPC_LITTLE  = 2,
-}, stringflag)
+}
 
 -- PR TSC
-c.PR_TSC = setmetatable({
+c.PR_TSC = strflag {
   ENABLE         = 1,
   SIGSEGV        = 2,
-}, stringflag)
+}
 
 -- somewhat confusing as there are some in PR too.
-c.PR_MCE_KILL = setmetatable({
+c.PR_MCE_KILL = strflag {
   CLEAR     = 0,
   SET       = 1,
-}, stringflag)
+}
 
 -- note rename, this is extra option see prctl code
-c.PR_MCE_KILL_OPT = setmetatable({
+c.PR_MCE_KILL_OPT = strflag {
   LATE         = 0,
   EARLY        = 1,
   DEFAULT      = 2,
-}, stringflag)
+}
 
 c.LINUX_CAPABILITY_VERSION = {0x19980330, 0x20071026, 0x20080522}
 c.LINUX_CAPABILITY_U32S = {1, 2, 2}
 
 -- capabilities NB these are bit shifts
-c.CAP = setmetatable({
+c.CAP = strflag {
   CHOWN = 0,
   DAC_OVERRIDE = 1,
   DAC_READ_SEARCH = 2,
@@ -1802,39 +1802,39 @@ c.CAP = setmetatable({
   MAC_ADMIN = 33,
   SYSLOG = 34,
   WAKE_ALARM = 35,
-}, stringflag)
+}
 
 -- capabilities as stored on file system in xattr
-c.VFS_CAP = setmetatable({
+c.VFS_CAP = strflag {
   REVISION_MASK   = 0xFF000000,
   REVISION_SHIFT  = 24,
   REVISION_1      = 0x01000000,
   U32_1           = 1,
   REVISION_2      = 0x02000000,
   U32_2           = 2,
-}, stringflag)
+}
 
 c.VFS_CAP.FLAGS_MASK = bit.bnot(c.VFS_CAP.REVISION_MASK)
 c.VFS_CAP.U32      = c.VFS_CAP.U32_2
 c.VFS_CAP.REVISION = c.VFS_CAP.REVISION_2
 
-c.VFS_CAP_FLAGS = setmetatable({
+c.VFS_CAP_FLAGS = strflag {
   EFFECTIVE = 0x000001,
-}, stringflag)
+}
 
-c.XATTR_CAPS = setmetatable({
+c.XATTR_CAPS = strflag {
   SZ_1 = 4 * (1 + 2 * c.VFS_CAP.U32_1),
   SZ_2 = 4 * (1 + 2 * c.VFS_CAP.U32_2),
-}, stringflag)
+}
 
 c.XATTR_CAPS.SZ = c.XATTR_CAPS.SZ_2
 
 -- new SECCOMP modes, now there is filter as well as strict
-c.SECCOMP_MODE = setmetatable({
+c.SECCOMP_MODE = strflag {
   DISABLED = 0,
   STRICT   = 1,
   FILTER   = 2,
-}, stringflag)
+}
 
 c.SECCOMP_RET = setmetatable({
   KILL      = 0x00000000,
@@ -1848,7 +1848,7 @@ c.SECCOMP_RET = setmetatable({
 }, multiflags)
 
 -- Elf machine flags
-c.EM = setmetatable({
+c.EM = strflag {
   NONE        = 0,
   M32         = 1,
   SPARC       = 2,
@@ -1927,7 +1927,7 @@ c.EM = setmetatable({
   ARC_A5      = 93,
   XTENSA      = 94,
   ALPHA       = 0x9026,
-}, stringflag)
+}
 
 -- audit flags (lots missing from linux/audit.h)
 
@@ -1935,7 +1935,7 @@ c.EM = setmetatable({
 local __AUDIT_ARCH_64BIT = 0x80000000
 local __AUDIT_ARCH_LE    = 0x40000000
 
-c.AUDIT_ARCH = setmetatable({
+c.AUDIT_ARCH = strflag {
   ALPHA = c.EM.ALPHA + __AUDIT_ARCH_64BIT + __AUDIT_ARCH_LE,
   ARM = c.EM.ARM + __AUDIT_ARCH_LE,
   ARMEB = c.EM.ARM,
@@ -1963,7 +1963,7 @@ c.AUDIT_ARCH = setmetatable({
   SPARC =c.EM.SPARC,
   SPARC64 =c.EM.SPARCV9 + __AUDIT_ARCH_64BIT,
   X86_64 = c.EM.X86_64 + __AUDIT_ARCH_64BIT + __AUDIT_ARCH_LE,
-}, stringflag)
+}
 
 -- BPF socket filter
 c.BPF = setmetatable({
@@ -2016,7 +2016,7 @@ c.BPF = setmetatable({
 c.NCCS = 32
 
 -- termios - c_cc characters
-c.CC = setmetatable(arch.CC or {
+c.CC = strflag(arch.CC or {
   VINTR    = 0,
   VQUIT    = 1,
   VERASE   = 2,
@@ -2034,7 +2034,7 @@ c.CC = setmetatable(arch.CC or {
   VWERASE  = 14,
   VLNEXT   = 15,
   VEOL2    = 16,
-}, stringflag)
+})
 
 -- termios - c_iflag bits
 c.IFLAG = setmetatable(arch.IFLAG or {
@@ -2179,26 +2179,26 @@ c.LFLAG = setmetatable(arch.LFLAG or {
 }, multiflags)
 
 -- termios - tcflow() and TCXONC use these. renamed from TC to TCFLOW
-c.TCFLOW = setmetatable({
+c.TCFLOW = strflag {
   OOFF = 0,
   OON  = 1,
   IOFF = 2,
   ION  = 3,
-}, stringflag)
+}
 
 -- termios - tcflush() and TCFLSH use these. renamed from TC to TCFLUSH
-c.TCFLUSH = setmetatable({
+c.TCFLUSH = strflag {
   IFLUSH  = 0,
   OFLUSH  = 1,
   IOFLUSH = 2,
-}, stringflag)
+}
 
 -- termios - tcsetattr uses these
-c.TCSA = setmetatable({
+c.TCSA = strflag {
   NOW   = 0,
   DRAIN = 1,
   FLUSH = 2,
-}, stringflag)
+}
 
 -- TIOCM
 c.TIOCM = setmetatable({
@@ -2229,14 +2229,14 @@ c.IFNAMSIZ      = 16
 c.IFHWADDRLEN   = 6
 
 -- input subsystem. TODO split into another file as a lot of them
-c.INPUT_PROP = setmetatable({
+c.INPUT_PROP = strflag {
   POINTER              = 0x00,
   DIRECT               = 0x01,
   BUTTONPAD            = 0x02,
   SEMI_MT              = 0x03,
-}, stringflag)
+}
 
-c.EV = setmetatable({
+c.EV = strflag {
   SYN                  = 0x00,
   KEY                  = 0x01,
   REL                  = 0x02,
@@ -2248,16 +2248,16 @@ c.EV = setmetatable({
   REP                  = 0x14,
   FF                   = 0x15,
   PWR                  = 0x16,
-  FF_STATUS    		   = 0x17,
+  FF_STATUS    	       = 0x17,
   MAX                  = 0x1f,
-}, stringflag)
+}
 
-c.SYN = setmetatable({
+c.SYN = strflag {
   REPORT              = 0,
   CONFIG              = 1,
-  MT_REPORT   		  = 2,
+  MT_REPORT   	      = 2,
   DROPPED             = 3,
-}, stringflag)
+}
 
 -- TODO odd namespacing issue with KEY and BTN, not sure best resolution, maybe have KEYBTN table with both
 c.KEY = setmetatable({
