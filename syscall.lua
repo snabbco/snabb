@@ -200,9 +200,12 @@ function S.execve(filename, argv, envp)
 end
 
 function S.ioctl(d, request, argp)
-  local ioctl = require "syscall.ioctl" -- lazy load ioctl table
+  if type(request) == "string" then
+    local ioctl = require "syscall.ioctl" -- lazy load ioctl table
+    request = ioctl[request]
+  end
   if type(argp) == "string" then argp = pt.char(argp) end
-  local ret = C.ioctl(getfd(d), ioctl[request], argp)
+  local ret = C.ioctl(getfd(d), request, argp)
   if ret == -1 then return nil, t.error() end
   return ret -- usually zero
 end
