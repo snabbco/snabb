@@ -17,7 +17,7 @@ end
 local ffi = require "ffi"
 local bit = require "bit"
 
-require "syscall.headers"
+require "syscall.ffitypes"
 
 local h = require "syscall.helpers"
 
