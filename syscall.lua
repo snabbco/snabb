@@ -387,7 +387,7 @@ end
 -- because you can just pass floats to all the time functions, just use the same one, but provide different templates
 function S.utime(path, actime, modtime)
   local ts
-  if not modtime then modtime = actime end
+  modtime = modtime or actime
   if actime and modtime then ts = {actime, modtime} end
   return S.utimensat(nil, path, ts)
 end
@@ -493,8 +493,8 @@ end
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), c.SHUT[how])) end
 
 function S.accept(sockfd, flags, addr, addrlen)
-  if not addr then addr = t.sockaddr_storage() end
-  if not addrlen then addrlen = t.socklen1(addrlen or ffi.sizeof(addr)) end
+  addr = addr or t.sockaddr_storage()
+  addrlen = addrlen or t.socklen1(addrlen or ffi.sizeof(addr))
   local ret
   if not flags
     then ret = C.accept(getfd(sockfd), addr, addrlen)
