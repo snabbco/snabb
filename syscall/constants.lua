@@ -2260,7 +2260,7 @@ c.SYN = strflag {
 }
 
 -- TODO odd namespacing issue with KEY and BTN, not sure best resolution, maybe have KEYBTN table with both
-c.KEY = setmetatable({
+c.KEY = strflag {
   RESERVED            = 0,
   ESC                 = 1,
   ["1"]               = 2,
@@ -2654,12 +2654,12 @@ c.KEY = setmetatable({
   CAMERA_DOWN         = 0x218,
   CAMERA_LEFT         = 0x219,
   CAMERA_RIGHT        = 0x21a,
-}, stringflag)
+}
 
 c.KEY.SCREENLOCK = c.KEY.COFFEE
 c.KEY.HANGUEL    = c.KEY.HANGEUL
 
-c.BTN = setmetatable({
+c.BTN = strflag {
   MISC                = 0x100,
   ["0"]               = 0x100,
   ["1"]               = 0x101,
@@ -2771,9 +2771,9 @@ c.BTN = setmetatable({
   TRIGGER_HAPPY38             = 0x2e5,
   TRIGGER_HAPPY39             = 0x2e6,
   TRIGGER_HAPPY40             = 0x2e7,
-}, stringflag)
+}
 
-c.REL = setmetatable({
+c.REL = strflag {
   X                   = 0x00,
   Y                   = 0x01,
   Z                   = 0x02,
@@ -2785,9 +2785,9 @@ c.REL = setmetatable({
   WHEEL               = 0x08,
   MISC                = 0x09,
   MAX                 = 0x0f,
-}, stringflag)
+}
 
-c.ABS = setmetatable({
+c.ABS = strflag {
   X                   = 0x00,
   Y                   = 0x01,
   Z                   = 0x02,
@@ -2828,18 +2828,18 @@ c.ABS = setmetatable({
   MT_PRESSURE         = 0x3a,
   MT_DISTANCE         = 0x3b,
   MAX                 = 0x3f,
-}, stringflag)
+}
 
-c.MSC = setmetatable({
+c.MSC = strflag {
   SERIAL              = 0x00,
   PULSELED            = 0x01,
   GESTURE             = 0x02,
   RAW                 = 0x03,
   SCAN                = 0x04,
   MAX                 = 0x07,
-}, stringflag)
+}
 
-c.LED = setmetatable({
+c.LED = strflag {
   NUML                = 0x00,
   CAPSL               = 0x01,
   SCROLLL             = 0x02,
@@ -2852,29 +2852,29 @@ c.LED = setmetatable({
   MAIL                = 0x09,
   CHARGING            = 0x0a,
   MAX                 = 0x0f,
-}, stringflag)
+}
 
-c.REP = setmetatable({
+c.REP = strflag {
   DELAY               = 0x00,
   PERIOD              = 0x01,
   MAX                 = 0x01,
-}, stringflag)
+}
 
-c.SND = setmetatable({
+c.SND = strflag {
   CLICK               = 0x00,
   BELL                = 0x01,
   TONE                = 0x02,
   MAX                 = 0x07,
-}, stringflag)
+}
 
-c.ID = setmetatable({
+c.ID = strflag {
   BUS                  = 0,
   VENDOR               = 1,
   PRODUCT              = 2,
   VERSION              = 3,
-}, stringflag)
+}
 
-c.BUS = setmetatable({
+c.BUS = strflag {
   PCI                 = 0x01,
   ISAPNP              = 0x02,
   USB                 = 0x03,
@@ -2894,22 +2894,22 @@ c.BUS = setmetatable({
   GSC                 = 0x1A,
   ATARI               = 0x1B,
   SPI                 = 0x1C,
-}, stringflag)
+}
 
-c.MT_TOOL = setmetatable({
+c.MT_TOOL = strflag {
   FINGER  = 0,
   PEN     = 1,
   MAX     = 1,
-}, stringflag)
+}
 
-c.FF_STATUS = setmetatable({
+c.FF_STATUS = strflag {
   STOPPED       = 0x00,
   PLAYING       = 0x01,
   MAX           = 0x01,
-}, stringflag)
+}
 
 -- TODO note these are split into different categories eg EFFECT, WAVEFORM unclear how best to handle (FF_STATUS too?)
-c.FF = setmetatable({
+c.FF = strflag {
 -- EFFECT
   RUMBLE       = 0x50;
   PERIODIC     = 0x51;
@@ -2929,10 +2929,10 @@ c.FF = setmetatable({
 -- dev props
   GAIN         = 0x60;
   AUTOCENTER   = 0x61;
-}, stringflag)
+}
 
 -- errors
-c.E = setmetatable({
+c.E = strflag {
   PERM          =  1,
   NOENT         =  2,
   SRCH          =  3,
@@ -3063,7 +3063,7 @@ c.E = setmetatable({
   OWNERDEAD     = 130,
   NOTRECOVERABLE= 131,
   RFKILL        = 132,
-}, stringflag)
+}
 
 -- alternate names
 c.E.WOULDBLOCK    = c.E.EAGAIN
@@ -3080,14 +3080,14 @@ c.SWAP_FLAG = setmetatable({
 
 -- iptables/xtables
 
-c.NF = setmetatable({
+c.NF = strflag {
   DROP = 0,
   ACCEPT = 1,
   STOLEN = 2,
   QUEUE = 3,
   REPEAT = 4,
   STOP = 5,
-}, stringflag)
+}
 
 -- misc values, just gathered in a table as better namespacing
 c.XT = setmetatable({
