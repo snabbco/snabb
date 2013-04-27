@@ -954,7 +954,7 @@ function S.timerfd_settime(fd, flags, it, oldtime)
 end
 
 function S.timerfd_gettime(fd, curr_value)
-  if not curr_value then curr_value = t.itimerspec() end
+  curr_value = curr_value or t.itimerspec()
   local ret = C.timerfd_gettime(getfd(fd), curr_value)
   if ret == -1 then return nil, t.error() end
   return curr_value
