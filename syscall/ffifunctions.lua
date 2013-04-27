@@ -293,28 +293,27 @@ int setfsgid(uid_t fsgid);
 int setfsuid(uid_t fsuid);
 long keyctl(int cmd, ...);
 
+/* unused as use syscalls
 mqd_t mq_open(const char *name, int oflag, mode_t mode, struct mq_attr *attr);
 int mq_getsetattr(mqd_t mqdes, struct mq_attr *newattr, struct mq_attr *oldattr);
 ssize_t mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len, unsigned *msg_prio, const struct timespec *abs_timeout);
 int mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len, unsigned msg_prio, const struct timespec *abs_timeout);
 int mq_notify(mqd_t mqdes, const struct sigevent *sevp);
 int mq_unlink(const char *name);
+*/
 
 // functions from libc ie man 3 not man 2
-void exit(int status);
 int inet_pton(int af, const char *src, void *dst);
 const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 
 // functions from libc that could be exported as a convenience, used internally
 char *strerror(int);
+
 // env. dont support putenv, as does not copy which is an issue
 extern char **environ;
 int setenv(const char *name, const char *value, int overwrite);
 int unsetenv(const char *name);
 int clearenv(void);
 char *getenv(const char *name);
-
-pid_t tcgetsid(int fd);
-int vhangup(void);
 ]]
 
