@@ -1656,8 +1656,8 @@ meth.ifreq = {
       assert(#v <= c.IFNAMSIZ, "name too long")
       ifr.ifr_ifrn.ifrn_name = v
     end,
-    flags = function(ifr, v) -- which flags are valid here? odd namespace with tun tap TODO likely to need fixing
-      ifr.ifr_ifru.ifru_flags = c.TUNSETIFF[v]
+    flags = function(ifr, v)
+      ifr.ifr_ifru.ifru_flags = c.IFREQ[v]
     end,
     -- TODO rest of fields
   },

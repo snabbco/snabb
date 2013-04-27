@@ -18,6 +18,7 @@ end
 
 local c = {}
 
+-- lazy load ioctls
 setmetatable(c, {
   __index = function(c, k)
     if k == "IOCTL" then
@@ -1225,22 +1226,6 @@ c.IFF.NONE       = bit.bnot(0x7ffff) -- this is a bit of a fudge as zero should 
 
 c.IFF.VOLATILE = c.IFF.LOOPBACK + c.IFF.POINTOPOINT + c.IFF.BROADCAST + c.IFF.ECHO +
                  c.IFF.MASTER + c.IFF.SLAVE + c.IFF.RUNNING + c.IFF.LOWER_UP + c.IFF.DORMANT
-
--- not sure if we need these TODO another table as duplicated values
---[[
-c.IFF_SLAVE_NEEDARP = 0x40
-c.IFF_ISATAP        = 0x80
-c.IFF_MASTER_ARPMON = 0x100
-c.IFF_WAN_HDLC      = 0x200
-c.IFF_XMIT_DST_RELEASE = 0x400
-c.IFF_DONT_BRIDGE   = 0x800
-c.IFF_DISABLE_NETPOLL    = 0x1000
-c.IFF_MACVLAN_PORT       = 0x2000
-c.IFF_BRIDGE_PORT = 0x4000
-c.IFF_OVS_DATAPATH       = 0x8000
-c.IFF_TX_SKB_SHARING     = 0x10000
-c.IFF_UNICAST_FLT = 0x20000
-]]
 
 -- netlink multicast groups
 -- legacy names, which are masks.
@@ -3170,8 +3155,10 @@ c.TUN = setmetatable({
   TAP_MQ     = 0x0400,
 }, multiflags)
 
--- note that these are IFF_ but that is a duplicated prefix so use TUNSETIFF
-c.TUNSETIFF = setmetatable({
+-- note that these are IFF_ but that is a duplicated prefix so using this.
+-- These are valid options for struct ifreq flags, while the other IFF_ are for ifinfo
+c.IFREQ = setmetatable({
+-- for tun tap interfaces
   TUN          = 0x0001,
   TAP          = 0x0002,
   NO_PI        = 0x1000,
@@ -3181,6 +3168,19 @@ c.TUNSETIFF = setmetatable({
   MULTI_QUEUE  = 0x0100,
   ATTACH_QUEUE = 0x0200,
   DETACH_QUEUE = 0x0400,
+-- for bridge interfaces
+  SLAVE_NEEDARP = 0x40,
+  ISATAP        = 0x80,
+  MASTER_ARPMON = 0x100,
+  WAN_HDLC      = 0x200,
+  XMIT_DST_RELEASE = 0x400,
+  DONT_BRIDGE   = 0x800,
+  DISABLE_NETPOLL  = 0x1000,
+  MACVLAN_PORT     = 0x2000,
+  BRIDGE_PORT   = 0x4000,
+  OVS_DATAPATH     = 0x8000,
+  TX_SKB_SHARING   = 0x10000,
+  UNICAST_FLT   = 0x20000,
 }, multiflags)
 
 c.TUN_F = setmetatable({

@@ -193,7 +193,7 @@ local rta_decode = {
   -- TODO some missing
 }
 
--- annoyingly we can't use table as we add more values to it...
+-- annoyingly we can't use table as we add more values to it... TODO fix
 local ifflist = {"UP", "BROADCAST", "LOOPBACK", "POINTOPOINT", "NOTRAILERS", "RUNNING", "NOARP", "PROMISC", "ALLMULTI",
   "MASTER", "SLAVE", "MULTICAST", "PORTSEL", "AUTOMEDIA", "DYNAMIC", "DORMANT", "ECHO"}
 

@@ -200,8 +200,8 @@ c.MNT.DETACH = nil
 c.SYS.fadvise64_64 = nil
 
 -- we renamed these for namespacing reasons
-for k, v in pairs(c.TUNSETIFF) do c.IFF[k] = v end
-c.TUNSETIFF = nil
+for k, v in pairs(c.IFREQ) do c.IFF[k] = v end
+c.IFREQ = nil
 
 -- travis missing tun tap stuff
 c.IFF.MULTI_QUEUE = nil
