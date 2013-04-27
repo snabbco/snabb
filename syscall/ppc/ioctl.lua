@@ -1,11 +1,13 @@
 -- ppc ioctl differences
 
 local arch = {
-  IOC_SIZEBITS  = 13,
-  IOC_DIRBITS   = 3,
-  IOC_NONE      = 1,
-  IOC_READ      = 2,
-  IOC_WRITE     = 4,
+  IOC = {
+    SIZEBITS  = 13,
+    DIRBITS   = 3,
+    NONE      = 1,
+    READ      = 2,
+    WRITE     = 4,
+  },
   FIOCLEX	= {'_IO', 'f', 1},
   FIONCLEX	= {'_IO', 'f', 2},
   FIOQSIZE	= {'_IOR', 'f', 128, 'loff'},

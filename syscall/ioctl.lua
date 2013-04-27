@@ -23,58 +23,57 @@ end
 local lshift = bit.lshift
 local rshift = bit.rshift
 
-local IOC_NRBITS	= 8
-local IOC_TYPEBITS	= 8
+-- these can vary by architecture
+local IOC = arch.IOC or {
+  SIZEBITS = 14,
+  DIRBITS = 2,
+  NONE = 0,
+  WRITE = 1,
+  READ = 2,
+}
 
--- Let any architecture override either of the following
+IOC.READWRITE = IOC.READ + IOC.WRITE
 
-local IOC_SIZEBITS	= arch.IOC_SIZEBITS or 14
-local IOC_DIRBITS	= arch.IOC_DIRBITS or 2
+IOC.NRBITS	= 8
+IOC.TYPEBITS	= 8
 
-local IOC_NRMASK	= lshift(1, IOC_NRBITS) - 1
-local IOC_TYPEMASK	= lshift(1, IOC_TYPEBITS) - 1
-local IOC_SIZEMASK	= lshift(1, IOC_SIZEBITS) - 1
-local IOC_DIRMASK	= lshift(1, IOC_DIRBITS) - 1
+IOC.NRMASK	= lshift(1, IOC.NRBITS) - 1
+IOC.TYPEMASK	= lshift(1, IOC.TYPEBITS) - 1
+IOC.SIZEMASK	= lshift(1, IOC.SIZEBITS) - 1
+IOC.DIRMASK	= lshift(1, IOC.DIRBITS) - 1
 
-local IOC_NRSHIFT	= 0
-local IOC_TYPESHIFT	= IOC_NRSHIFT + IOC_NRBITS
-local IOC_SIZESHIFT	= IOC_TYPESHIFT + IOC_TYPEBITS
-local IOC_DIRSHIFT	= IOC_SIZESHIFT + IOC_SIZEBITS
-
--- Direction bits, which any architecture can choose to override
-
-local IOC_NONE	= arch.IOC_NONE or 0
-local IOC_WRITE	= arch.IOC_WRITE or 1
-local IOC_READ	= arch.IOC_READ or 2
-local IOC_READWRITE = IOC_READ + IOC_WRITE
+IOC.NRSHIFT   = 0
+IOC.TYPESHIFT = IOC.NRSHIFT + IOC.NRBITS
+IOC.SIZESHIFT = IOC.TYPESHIFT + IOC.TYPEBITS
+IOC.DIRSHIFT  = IOC.SIZESHIFT + IOC.SIZEBITS
 
 local function _IOC(dir, tp, nr, size)
   if type(tp) == "string" then tp = tp:byte() end
-  return bor(lshift(dir, IOC_DIRSHIFT), 
-	 lshift(tp, IOC_TYPESHIFT), 
-	 lshift(nr, IOC_NRSHIFT), 
-	 lshift(size, IOC_SIZESHIFT))
+  return bor(lshift(dir, IOC.DIRSHIFT), 
+	 lshift(tp, IOC.TYPESHIFT), 
+	 lshift(nr, IOC.NRSHIFT), 
+	 lshift(size, IOC.SIZESHIFT))
 end
 
 -- used to create numbers
-local _IO    = function(tp, nr)		return _IOC(IOC_NONE, tp, nr, 0) end
-local _IOR   = function(tp, nr, size)	return _IOC(IOC_READ, tp, nr, size) end
-local _IOW   = function(tp, nr, size)	return _IOC(IOC_WRITE, tp, nr, size) end
-local _IOWR  = function(tp, nr, size)	return _IOC(IOC_READWRITE, tp, nr, size) end
+local _IO    = function(tp, nr)		return _IOC(IOC.NONE, tp, nr, 0) end
+local _IOR   = function(tp, nr, size)	return _IOC(IOC.READ, tp, nr, size) end
+local _IOW   = function(tp, nr, size)	return _IOC(IOC.WRITE, tp, nr, size) end
+local _IOWR  = function(tp, nr, size)	return _IOC(IOC.READWRITE, tp, nr, size) end
 
 -- used to decode ioctl numbers..
-local _IOC_DIR  = function(nr) return band(rshift(nr, IOC_DIRSHIFT), IOC_DIRMASK) end
-local _IOC_TYPE = function(nr) return band(rshift(nr, IOC_TYPESHIFT), IOC_TYPEMASK) end
-local _IOC_NR   = function(nr) return band(rshift(nr, IOC_NRSHIFT), IOC_NRMASK) end
-local _IOC_SIZE = function(nr) return band(rshift(nr, IOC_SIZESHIFT), IOC_SIZEMASK) end
+local _IOC_DIR  = function(nr) return band(rshift(nr, IOC.DIRSHIFT), IOC.DIRMASK) end
+local _IOC_TYPE = function(nr) return band(rshift(nr, IOC.TYPESHIFT), IOC.TYPEMASK) end
+local _IOC_NR   = function(nr) return band(rshift(nr, IOC.NRSHIFT), IOC.NRMASK) end
+local _IOC_SIZE = function(nr) return band(rshift(nr, IOC.SIZESHIFT), IOC.SIZEMASK) end
 
 -- ...and for the drivers/sound files...
 
-local IOC_IN		= lshift(IOC_WRITE, IOC_DIRSHIFT)
-local IOC_OUT		= lshift(IOC_READ, IOC_DIRSHIFT)
-local IOC_INOUT		= lshift(bor(IOC_WRITE, IOC_READ), IOC_DIRSHIFT)
-local IOCSIZE_MASK	= lshift(IOC_SIZEMASK, IOC_SIZESHIFT)
-local IOCSIZE_SHIFT	= IOC_SIZESHIFT
+IOC.IN		= lshift(IOC.WRITE, IOC.DIRSHIFT)
+IOC.OUT		= lshift(IOC.READ, IOC.DIRSHIFT)
+IOC.INOUT		= lshift(bor(IOC.WRITE, IOC.READ), IOC.DIRSHIFT)
+local IOCSIZE_MASK	= lshift(IOC.SIZEMASK, IOC.SIZESHIFT)
+local IOCSIZE_SHIFT	= IOC.SIZESHIFT
 
 local mapname = {
   _IO = _IO,
@@ -171,18 +170,18 @@ local ioctl = setmetatable({
   EVIOCGKEYCODE_V2 = _IOR('E', 0x04, s.input_keymap_entry),
   EVIOCSKEYCODE   = _IOW('E', 0x04, s.uint2),
   EVIOCSKEYCODE_V2 = _IOW('E', 0x04, s.input_keymap_entry),
-  EVIOCGNAME = function(len) return _IOC(IOC_READ, 'E', 0x06, len) end,
-  EVIOCGPHYS = function(len) return _IOC(IOC_READ, 'E', 0x07, len) end,
-  EVIOCGUNIQ = function(len) return _IOC(IOC_READ, 'E', 0x08, len) end,
-  EVIOCGPROP = function(len) return _IOC(IOC_READ, 'E', 0x09, len) end,
-  EVIOCGKEY  = function(len) return _IOC(IOC_READ, 'E', 0x18, len) end,
-  EVIOCGLED  = function(len) return _IOC(IOC_READ, 'E', 0x19, len) end,
-  EVIOCGSND  = function(len) return _IOC(IOC_READ, 'E', 0x1a, len) end,
-  EVIOCGSW   = function(len) return _IOC(IOC_READ, 'E', 0x1b, len) end,
-  EVIOCGBIT  = function(ev, len) return _IOC(IOC_READ, 'E', 0x20 + ev, len) end,
+  EVIOCGNAME = function(len) return _IOC(IOC.READ, 'E', 0x06, len) end,
+  EVIOCGPHYS = function(len) return _IOC(IOC.READ, 'E', 0x07, len) end,
+  EVIOCGUNIQ = function(len) return _IOC(IOC.READ, 'E', 0x08, len) end,
+  EVIOCGPROP = function(len) return _IOC(IOC.READ, 'E', 0x09, len) end,
+  EVIOCGKEY  = function(len) return _IOC(IOC.READ, 'E', 0x18, len) end,
+  EVIOCGLED  = function(len) return _IOC(IOC.READ, 'E', 0x19, len) end,
+  EVIOCGSND  = function(len) return _IOC(IOC.READ, 'E', 0x1a, len) end,
+  EVIOCGSW   = function(len) return _IOC(IOC.READ, 'E', 0x1b, len) end,
+  EVIOCGBIT  = function(ev, len) return _IOC(IOC.READ, 'E', 0x20 + ev, len) end,
   EVIOCGABS  = function(abs) return _IOR('E', 0x40 + abs, s.input_absinfo) end,
   EVIOCSABS  = function(abs) return _IOW('E', 0xc0 + abs, s.input_absinfo) end,
-  EVIOCSFF   = _IOC(IOC_WRITE, 'E', 0x80, s.ff_effect),
+  EVIOCSFF   = _IOC(IOC.WRITE, 'E', 0x80, s.ff_effect),
   EVIOCRMFF  = _IOW('E', 0x81, s.int),
   EVIOCGEFFECTS = _IOR('E', 0x84, s.int),
   EVIOCGRAB  = _IOW('E', 0x90, s.int),
