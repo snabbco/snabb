@@ -973,7 +973,7 @@ end
 function S.io_destroy(ctx) return retbool(C.io_destroy(ctx)) end
 
 function S.io_cancel(ctx, iocb, result)
-  if not result then result = t.io_event() end
+  result = result or t.io_event()
   local ret = C.io_cancel(ctx, iocb, result)
   if ret == -1 then return nil, t.error() end
   return result
