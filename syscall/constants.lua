@@ -3090,25 +3090,25 @@ c.NF = strflag {
 }
 
 -- misc values, just gathered in a table as better namespacing
-c.XT = setmetatable({
+c.XT = strflag {
   FUNCTION_MAXNAMELEN  = 30,
   EXTENSION_MAXNAMELEN = 29,
   TABLE_MAXNAMELEN     = 32,
-}, stringflag)
+}
 
 local IPT_BASE_CTL = 64
 
-c.IPT_SO_SET = setmetatable({
+c.IPT_SO_SET = strflag {
   REPLACE      = IPT_BASE_CTL,
   ADD_COUNTERS = IPT_BASE_CTL + 1,
-}, stringflag)
+}
 
-c.IPT_SO_GET = setmetatable({
+c.IPT_SO_GET = strflag {
   INFO                 = IPT_BASE_CTL,
   ENTRIES              = IPT_BASE_CTL + 1,
   REVISION_MATCH       = IPT_BASE_CTL + 2,
   REVISION_TARGET      = IPT_BASE_CTL + 3,
-}, stringflag)
+}
 
 c.SCHED = setmetatable({
   NORMAL           = 0,
@@ -3121,9 +3121,9 @@ c.SCHED = setmetatable({
   RESET_ON_FORK    = 0x40000000, -- TODO only this flag can be ORed
 }, multiflags)
 
-c.TUN_READQ = setmetatable({
+c.TUN_READQ = strflag {
   SIZE = 500,
-}, stringflag)
+}
 
 c.TUN = setmetatable({
   TUN_DEV    = 0x0001, 
@@ -3174,13 +3174,13 @@ c.TUN_F = setmetatable({
   UFO      = 0x10,
 }, multiflags)
 
-c.TUN_PKT = setmetatable({
+c.TUN_PKT = strflag {
   STRIP = 0x0001,
-}, stringflag)
+}
 
-c.TUN_FLT = setmetatable({
+c.TUN_FLT = strflag {
   ALLMULTI = 0x0001,
-}, stringflag)
+}
 
 return c
 
