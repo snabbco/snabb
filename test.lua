@@ -5,6 +5,7 @@ local S = require "syscall"
 local nl = require "syscall.nl"
 local util = require "syscall.util"
 local features = require "syscall.features"
+local helpers = require "syscall.helpers"
 local bit = require "bit"
 local ffi = require "ffi"
 
@@ -104,6 +105,14 @@ test_basic = {
   end,
   test_fd_nums = function() -- TODO should also test on the version from types.lua
     assert_equal(t.fd(18):nogc():getfd(), 18, "should be able to trivially create fd")
+  end,
+}
+
+test_helpers = {
+  test_booltoc = function()
+    assert_equal(helpers.booltoc(true), 1)
+    assert_equal(helpers.booltoc[true], 1)
+    assert_equal(helpers.booltoc[0], 0)
   end,
 }
 

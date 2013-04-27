@@ -1015,7 +1015,7 @@ local prctlmap = {
   [c.PR.SET_UNALIGN] = c.PR_UNALIGN,
   [c.PR.MCE_KILL] = c.PR_MCE_KILL,
   [c.PR.SET_SECCOMP] = c.SECCOMP_MODE,
-  [c.PR.SET_NO_NEW_PRIVS] = c.BOOLEAN,
+  [c.PR.SET_NO_NEW_PRIVS] = h.booltoc,
 }
 
 local prctlrint = { -- returns an integer directly TODO add metatables to set names

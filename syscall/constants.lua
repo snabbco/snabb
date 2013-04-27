@@ -32,14 +32,6 @@ setmetatable(c, {
 
 c.syscall = arch.syscall or {} -- special syscall handling
 
--- not sure I like this TODO replace, and use in more places
-c.BOOLEAN = {
-  [0] = 0,
-  [1] = 1,
-  [false] = 0,
-  [true] = 1,
-}
-
 c.SYS = arch.SYS
 
 c.REG = arch.REG

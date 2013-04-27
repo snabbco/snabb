@@ -127,5 +127,12 @@ h.divmod = function(a, b)
   return math.floor(a / b), a % b
 end
 
+h.booltoc = setmetatable({
+  [0] = 0,
+  [1] = 1,
+  [false] = 0,
+  [true] = 1,
+}, {__call = function(tb, arg) return tb[arg] end})
+
 return h
 
