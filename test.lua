@@ -114,13 +114,16 @@ test_basic = {
     local err = t.error(0)
     assert(tostring(err) == "No error information (error 0)", "should get missing error message")
   end,
-}
-
-test_helpers = {
   test_booltoc = function()
     assert_equal(helpers.booltoc(true), 1)
     assert_equal(helpers.booltoc[true], 1)
     assert_equal(helpers.booltoc[0], 0)
+  end,
+  test_constants = function()
+    assert_equal(c.O.CREAT, c.O.creat) -- test can use upper and lower case
+    assert_equal(c.O.CREAT, c.O.Creat) -- test can use mixed case
+    assert(rawget(c.O, "CREAT"))
+    --assert(not rawget(c.O, "creat"))
   end,
 }
 

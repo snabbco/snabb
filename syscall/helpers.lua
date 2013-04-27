@@ -49,13 +49,16 @@ function h.flag(t, str)
   if not str then return 0 end
   if type(str) ~= "string" then return str end
   if #str == 0 then return 0 end
-  local val = rawget(t, str)
-  if val then return val end
+  if rawget(t, "__cache") then
+    local val = t.__cache[str]
+    if val then return val end
+  end
   local s = trim(str):upper()
   if #s == 0 then return 0 end
   local val = rawget(t, s)
   if not val then return nil end
-  rawset(t, str, val) -- this memoizes for future use
+  if not t.__cache then t.__cache = {} end
+  t.__cache[str] = val -- memoize for future use
   return val
 end
 
