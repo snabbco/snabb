@@ -125,12 +125,12 @@ c.MODE = setmetatable({
 }, multiflags)
 
 -- access
-c.OK = setmetatable({
+c.OK = charflags {
   R = 4,
   W = 2,
   X = 1,
   F = 0,
-}, charflags)
+}
 
 -- fcntl
 c.F = h.strflag {

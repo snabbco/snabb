@@ -123,21 +123,22 @@ function h.swapflags(tab)
   return setmetatable(tab, {__index = setmetatable({}, {__index = flag}), __call = function(t, a) return t[a] end})
 end
 
--- TODO redo like strflag
 -- single char flags, eg used for access which allows "rwx"
-local function chflags(t, s)
-  if not s then return 0 end
-  if type(s) ~= "string" then return s end
-  s = trim(s:upper())
-  local flag = 0
-  for i = 1, #s do
-    local c = s:sub(i, i)
-    flag = bit.bor(flag, rawget(t, c))
+function h.charflags(tab)
+  local function flag(cache, str)
+    if not str then return 0 end
+    if type(str) ~= "string" then return str end
+    str = trim(str:upper())
+    local flag = 0
+    for i = 1, #str do
+      local c = str:sub(i, i)
+      flag = bit.bor(flag, rawget(tab, c))
+    end
+    cache[str] = flag
+    return flag
   end
-  return flag
+  return setmetatable(tab, {__index = setmetatable({}, {__index = flag}), __call = function(t, a) return t[a] end})
 end
-
-h.charflags = {__index = chflags, __call = function(t, a) return t[a] end}
 
 h.divmod = function(a, b)
   return math.floor(a / b), a % b
