@@ -1,11 +1,36 @@
-\documentclass[$if(fontsize)$$fontsize$,$endif$$if(lang)$$lang$,$endif$]{$documentclass$}
+\documentclass[oneside,$if(fontsize)$$fontsize$,$endif$$if(lang)$$lang$,$endif$]{$documentclass$}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
+% Use sans for sections, serif for main
+\usepackage{sectsty}
+\allsectionsfont{\sffamily}
+% Nicer chapter headings
+\usepackage{titlesec,color}
+\definecolor{gray75}{gray}{0.75}
+\definecolor{gray30}{gray}{0.30}
+\newcommand{\hsp}{\hspace{20pt}}
+\titleformat{\chapter}[hang]{\Huge\sffamily}{\textcolor{gray30}{\thechapter}\hsp\textcolor{gray75}{|}\hsp}{0pt}{\Huge\sffamily\textcolor{gray30}}
+% Make nice title
+\usepackage{titling}
+\renewcommand{\maketitlehooka}{\sffamily}
+\pretitle{\begin{center}\Huge}
+\posttitle{\par\end{center}\vskip 0.5em}
+% Make nicer headers
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\lhead{\nouppercase{\textcolor{gray30}{\leftmark}\ {\bfseries\textcolor{gray75}|} \textcolor{gray30}\rightmark}}
+\rhead{\nouppercase{\textcolor{gray30}\thepage}}
+\cfoot{}
+\fancypagestyle{plain}{\fancyhf{}}
+\fancyheadoffset[R]{0.0in}
 % Smaller spacing with bullets
 \usepackage{enumitem}
 \setlist{nolistsep}
-$if(verbatimspacing)$
 % Smaller line spacing with verbatim code listings
+$if(verbatimspacing)$
 \usepackage{setspace}
 \usepackage{etoolbox}
 \preto{\verbatim}{\edef\tempstretch{\baselinestretch}\par\setstretch{$verbatimspacing$}}
@@ -159,7 +184,9 @@ $endfor$
 $if(toc)$
 {
 \hypersetup{linkcolor=black}
+\pagestyle{plain}
 \tableofcontents
+\cleardoublepage
 }
 $endif$
 $body$

@@ -58,7 +58,7 @@ doc/snabbswitch.md: $(MDOBJS)
 	(cd doc; ./genbook.sh) > $@
 
 doc/snabbswitch.pdf: doc/snabbswitch.md
-	pandoc --template=doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=inconsolata -V monoscale=.80 -V verbatimspacing=.85 -V mainfont=droidsans -V sansfont=droidsans -V documentclass:book -V geometry:margin=1.5in -S --toc --chapters  -o $@ $<
+	pandoc --template=doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o $@ $<
 
 doc/snabbswitch.html doc/snabbswitch.epub: doc/snabbswitch.md
 	pandoc -S --toc --chapters -o $@ $<
