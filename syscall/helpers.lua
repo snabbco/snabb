@@ -77,27 +77,26 @@ function h.strflag(tab)
   return setmetatable(tab, {__index = setmetatable({}, {__index = flag}), __call = function(t, a) return t[a] end})
 end
 
--- TODO redo like strflag
 -- take a bunch of flags in a string and return a number
-local function flags(t, str) -- allows multiple comma sep flags that are ORed TODO allow | as well
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  if #str == 0 then return 0 end
-  local val = rawget(t, str)
-  if val then return val end
-  local f = 0
-  local a = split(",", str)
-  for i, v in ipairs(a) do
-    local s = trim(v):upper()
-    local val = rawget(t, s)
-    if not val then return nil end
-    f = bit.bor(f, val)
+-- allows multiple comma sep flags that are ORed TODO allow | as well
+function h.multiflags(tab)
+  local function flag(cache, str)
+    if not str then return 0 end
+    if type(str) ~= "string" then return str end
+    if #str == 0 then return 0 end
+    local f = 0
+    local a = split(",", str)
+    for i, v in ipairs(a) do
+      local s = trim(v):upper()
+      local val = rawget(tab, s)
+      if not val then return nil end -- TODO should we error here?
+      f = bit.bor(f, val)
+    end
+    cache[str] = f
+    return f
   end
-  rawset(t, str, f)
-  return f
+  return setmetatable(tab, {__index = setmetatable({}, {__index = flag}), __call = function(t, a) return t[a] end})
 end
-
-h.multiflags = {__index = flags, __call = function(t, a) return t[a] end}
 
 function h.swapflags(tab)
   local function flag(cache, str)
