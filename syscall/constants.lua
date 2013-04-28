@@ -3065,12 +3065,12 @@ c.E.DEADLOCK      = c.E.EDEADLK
 c.E.NOATTR        = c.E.ENODATA
 c.E.NOTSUP        = c.E.OPNOTSUPP
 
-c.SWAP_FLAG = setmetatable({
+c.SWAP_FLAG = swapflags {
   PREFER       = 0x8000,
   PRIO_MASK    = 0x7fff,
   PRIO_SHIFT   = 0,
   DISCARD      = 0x10000,
-}, swapflags)
+}
 
 -- iptables/xtables
 

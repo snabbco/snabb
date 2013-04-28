@@ -99,32 +99,29 @@ end
 
 h.multiflags = {__index = flags, __call = function(t, a) return t[a] end}
 
--- TODO redo like strflag
--- for swap flags, which can have number
-local function swapflags(t, str) -- allows multiple comma sep flags that are ORed TODO allow | as well
-  if not str then return 0 end
-  if type(str) ~= "string" then return str end
-  if #str == 0 then return 0 end
-  local val = rawget(t, str)
-  if val then return val end
-  local f = 0
-  local a = split(",", str)
-  for i, v in ipairs(a) do
-    local s = trim(v):upper()
-    if tonumber(s) then
-      local val = tonumber(s)
-      f = bit.bor(f, rawget(t, "PREFER"), bit.lshift(bit.band(rawget(t, "PRIO_MASK"), val), rawget(t, "PRIO_SHIFT")))
-    else
-      local val = rawget(t, s)
-      if not val then return nil end
-      f = bit.bor(f, val)
+function h.swapflags(tab)
+  local function flag(cache, str)
+    if not str then return 0 end
+    if type(str) ~= "string" then return str end
+    if #str == 0 then return 0 end
+    local f = 0
+    local a = split(",", str)
+    for i, v in ipairs(a) do
+      local s = trim(v):upper()
+      if tonumber(s) then
+        local val = tonumber(s)
+        f = bit.bor(f, rawget(tab, "PREFER"), bit.lshift(bit.band(rawget(tab, "PRIO_MASK"), val), rawget(tab, "PRIO_SHIFT")))
+      else
+        local val = rawget(tab, s)
+        if not val then return nil end
+        f = bit.bor(f, val)
+      end
     end
+    cache[str] = f
+    return f
   end
-  rawset(t, str, f)
-  return f
+  return setmetatable(tab, {__index = setmetatable({}, {__index = flag}), __call = function(t, a) return t[a] end})
 end
-
-h.swapflags = {__index = swapflags, __call = function(t, a) return t[a] end}
 
 -- TODO redo like strflag
 -- single char flags, eg used for access which allows "rwx"
