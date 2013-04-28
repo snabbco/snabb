@@ -44,7 +44,7 @@ end
 
 local split, trim = h.split, h.trim
 
--- for single valued flags
+-- for AT_FDCWD
 function h.atflag(tab)
   local function flag(cache, str)
     if not str then return tab.FDCWD end
@@ -77,6 +77,7 @@ function h.strflag(tab)
   return setmetatable(tab, {__index = setmetatable({}, {__index = flag}), __call = function(t, a) return t[a] end})
 end
 
+-- TODO redo like strflag
 -- take a bunch of flags in a string and return a number
 local function flags(t, str) -- allows multiple comma sep flags that are ORed TODO allow | as well
   if not str then return 0 end
@@ -98,6 +99,7 @@ end
 
 h.multiflags = {__index = flags, __call = function(t, a) return t[a] end}
 
+-- TODO redo like strflag
 -- for swap flags, which can have number
 local function swapflags(t, str) -- allows multiple comma sep flags that are ORed TODO allow | as well
   if not str then return 0 end
@@ -124,6 +126,7 @@ end
 
 h.swapflags = {__index = swapflags, __call = function(t, a) return t[a] end}
 
+-- TODO redo like strflag
 -- single char flags, eg used for access which allows "rwx"
 local function chflags(t, s)
   if not s then return 0 end

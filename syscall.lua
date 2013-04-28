@@ -934,10 +934,9 @@ function S.getitimer(which, value)
   return value
 end
 
-function S.setitimer(which, it)
-  it = istype(t.itimerval, it) or t.itimerval(it)
-  local oldtime = t.itimerval()
-  local ret = C.setitimer(c.ITIMER[which], it, oldtime)
+function S.setitimer(which, it, oldtime)
+  oldtime = oldtime or t.itimerval()
+  local ret = C.setitimer(c.ITIMER[which], mktype(t.itimerval, it), oldtime)
   if ret == -1 then return nil, t.error() end
   return oldtime
 end
