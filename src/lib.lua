@@ -27,6 +27,21 @@ function writefile (filename, value)
    return result
 end
 
+-- Return the name of the first file in `dir`.
+function firstfile (dir)
+   return readcmd("ls -1 "..dir.." 2>/dev/null", "*l")
+end
+
+function firstline (filename) return readfile(filename, "*l") end
+
+function files_in_directory (dir)
+   local files = {}
+   for line in io.popen('ls -1 "'..dir..'" 2>/dev/null'):lines() do
+      table.insert(files, line)
+   end
+   return files
+end
+
 -- Return a bitmask using the values of `bitset' as indexes.
 -- The keys of bitset are ignored (and can be used as comments).
 -- Example: bits({RESET=0,ENABLE=4}, 123) => 1<<0 | 1<<4 | 123
@@ -92,3 +107,4 @@ end
 function yesno (flag)
    if flag then return 'yes' else return 'no' end
 end
+

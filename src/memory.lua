@@ -5,52 +5,48 @@ local ffi = require("ffi")
 local C = ffi.C
 require("memory_h")
 
---- ### High level allocate() and free().
-
-buffer_size = 4096
-freelist = {}
-
--- Return a free packet buffer.
-function allocate ()
-   return (table.remove(freelist) or dma_alloc(buffer_size)), buffer_size
-end
-
--- Free a packet buffer for later reuse.
-function free (buffer)
-   table.insert(freelist, buffer)
-end
-
---- ### Chunks.
+--- ### Chunks
 ---
---- Memory is allocated from the operating system one "chunk" at a
---- time. A chunk is an arbitrary-sized block of physically contiguous
---- memory. Chunks are then then sliced up to serve individual
---- allocations.
+--- Physical memory is allocated from the operating system in large
+--- "chunks" which are then sliced up to serve individual
+--- variable-size allocations. There is always one "current chunk"
+--- that memory is allocated from. If the current chunk is not large
+--- enough for a given allocation then it is replaced by a fresh HugeTLB page.
 
--- Current chunk: pointer, physical address, remaining size.
+-- Current chunk: virtual address, physical address, total size
 local chunk_ptr, chunk_phy, chunk_size
 
--- Array of {address = virtaddr, size = bytes} tables for each DMA region.
+--- The `dma_regions` table keeps a list of every chunk that has been allocated. This is effectively a list of all memory that our process may want to use for DMA.
+---
+--- This is useful information. For example, our Vhost_net client has
+--- to declare this memory to the Linux kernel for direct access.
+
 dma_regions = {}
 
--- Install a new chunk of memory at a specific physical memory address.
--- Mostly useful if you have reserved memory using 'linux memmap=16M$0x10000000'
--- Then you can use install(0x10000000, 16*1024*1024)
+--- Install a new chunk of memory at a specific physical memory
+--- address. This is an alternative to dynamically allocating HugeTLB
+--- pages. You could reserve a block of physical memory by booting
+--- Linux with:
+---
+---         linux memmap=16M$0x10000000
+---
+--- and then huge that reserved memory with this call:
+---
+---         memory.install(0x10000000, 16*1024*1024)
 function install (physical, size)
    local ptr = C.map_physical_ram(physical, physical+size, true)
    if ptr == nil then error("Error installing RAM at 0x"..bit.tohex(physical)) end
    add_chunk(ffi.cast("char*",ptr), physical, size)
 end
 
--- Install a new chunk of memory from a dynamically allocated HugeTLB page.
--- This happens automatically when more memory is needed.
+--- Install a new chunk from a fresh dynamically allocated HugeTLB page.
 function install_huge_page ()
    local page = allocate_huge_page()
    if page == nil then error("Failed to allocate HugeTLB page for DMA.") end
    add_chunk(ffi.cast("char*",page), map(page), huge_page_size)
 end
 
--- Add a new chunk of memory for the next DMA allocations.
+--- Add a new chunk of memory for the next DMA allocations.
 function add_chunk (ptr, physical, size)
    local address = tonumber(ffi.cast("uint64_t", ptr))
    dma_regions[#dma_regions + 1] = {address = address, size = size}
@@ -66,6 +62,13 @@ end
 --   Physical memory address as a uint64_t for passing to hardware.
 --   Actual number of bytes allocated, which can be different than requested.
 -- Returns nil on failure.
+
+--- Allocate `size` bytes of memory suitable for DMA. Return three
+--- values on success:
+---
+--- 1. `char*` pointer to the memory in our address space.
+--- 2. `uint64_t` physical address.
+--- 3. Actual number of bytes allocated, which may be more than requested.
 function dma_alloc (size)
    if size % 128 ~= 0 then
       -- Keep 128-byte alignment
@@ -86,11 +89,6 @@ function dma_alloc (size)
 end
 
 --- ### HugeTLB ("huge page") allocation from the Linux kernel
----
---- This is a way to dynamically allocate large (typically 2-4MB)
---- areas of physically contiguous memory.
----
---- See <http://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt>
 
 function allocate_huge_page ()
    for i = 1,3 do
@@ -113,33 +111,20 @@ end
 
 --- ### Physical address translation
 
--- Return the physical address of virt_addr as a number.
+--- Return the physical address of virt_addr as a number.
+---
+--- XXX This should probably be a `uint64_t` instead of a number!
 function map (virt_addr)
    virt_addr = ffi.cast("uint64_t", virt_addr)
    local virt_page = tonumber(virt_addr / base_page_size)
    local offset    = tonumber(virt_addr % base_page_size)
    local phys_page = C.phys_page(virt_page)
-   if phys_page == 0 then resolve_error(virt_addr) end
+   if phys_page == 0 then
+      error("Failed to resolve physical address of "..tostring(virt_addr))
    return tonumber(ffi.cast("uint64_t", phys_page * base_page_size + offset))
 end
 
-function resolve_error (virt_addr)
-   print("  0x"..bit.tohex(tonumber(virt_addr)).." did not resolve with active DMA regions:")
-   for _,d in ipairs(dma_regions) do
-      io.write(("  0x%s - 0x%s [%d KB] "):format(
-                  bit.tohex(tonumber(d.address)),
-                  bit.tohex(tonumber(d.address+d.size)),
-                  d.size/1024))
-      if virt_addr >= d.address and virt_addr <= d.address + d.size then
-         io.write("<-- address belongs in this range\n")
-      else
-         io.write("(no match)\n")
-      end
-   end
-   error("Failed to resolve physical address of 0x"..bit.tohex(tonumber(virt_addr)))
-end
-
---- Sizes of normal and huge pages in the host kernel.
+--- Sizes of normal and huge pages in the host kernel. (Huge pages are usually around 2MB but it's up to Linux.)
 
 base_page_size = 4096
 huge_page_size =
@@ -148,6 +133,11 @@ huge_page_size =
        local _,_,hugesize = meminfo:find("Hugepagesize: +([0-9]+) kB")
        return tonumber(hugesize) * 1024
     end)()
+
+--- ### selftest
+---
+--- Check that huge page allocation succeeds and that we can access
+--- the allocated memory.
 
 function selftest (options)
    print("selftest: memory")
@@ -167,6 +157,9 @@ function selftest (options)
    print("Kernel HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
    print("HugeTLB page allocation OK.")
 end
+
+--- Lock our process's virtual-physical address map automatically when
+--- this module is loaded.
 
 function module_init ()
    print("memory initialized")
