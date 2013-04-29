@@ -877,7 +877,7 @@ local function inet_ntop(af, src)
     local b = pt.uchar(src)
     return b[0] .. "." .. b[1] .. "." .. b[2] .. "." .. b[3]
   end
-
+  if af ~= c.AF.INET6 then return end
   local a = src.s6_addr
   local parts = {256*a[0] + a[1], 256*a[2] + a[3],   256*a[4] + a[5],   256*a[6] + a[7],
                  256*a[8] + a[9], 256*a[10] + a[11], 256*a[12] + a[13], 256*a[14] + a[15]}
