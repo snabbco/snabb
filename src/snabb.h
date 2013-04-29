@@ -1,6 +1,4 @@
-/* snabb.h - interface for libsnabb: the C backend of Snabb Switch.
- *
- * Copyright 2012 Snabb GmbH. See the file COPYING for license details. */
+/* snabb.h - interface for libsnabb: the C backend of Snabb Switch. */
 
 /* Return the current wall-clock time in nanoseconds. */
 uint64_t get_time_ns();

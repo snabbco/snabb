@@ -1,6 +1,3 @@
--- pci.lua -- PCI device access via Linux sysfs.
--- Copyright 2012 Snabb GmbH. See the file LICENSE.
-
 module(...,package.seeall)
 
 local ffi = require("ffi")

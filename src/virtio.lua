@@ -1,6 +1,4 @@
 -- virtio.lua -- Linux 'vhost' interface for ethernet I/O towards the kernel.
--- Copyright 2013 Luke Gorrie
--- Apache License 2.0: http://www.apache.org/licenses/LICENSE-2.0
 
 module(...,package.seeall)
 

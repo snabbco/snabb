@@ -1,5 +1,3 @@
-/* Copyright 2012 Snabb GmbH. See the file COPYING for license details. */
-
 #include <assert.h>
 #include <fcntl.h>
 #include <linux/if_tun.h>

@@ -1,7 +1,3 @@
--- hub2.lua -- 2-port ethernet hub
--- Copyright 2013 Luke Gorrie <luke@snabb.co>
--- Apache License 2.0: http://www.apache.org/licenses/LICENSE-2.0
-
 module(...,package.seeall)
 
 local memory = require("memory")

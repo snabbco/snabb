@@ -1,5 +1,3 @@
-/* Copyright 2012 Snabb GmbH. See the file COPYING for license details. */
-
 #include <stdio.h>
 
 #include "lua.h"

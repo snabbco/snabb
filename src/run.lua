@@ -1,7 +1,4 @@
--- run.lua -- Run a switch based on a given configuration file.
--- For testing switch behavior from test input files.
--- 
--- Copyright 2012 Snabb GmbH. See the file LICENSE.
+--- For testing switch behavior from test input files.
 
 module("run",package.seeall)
 

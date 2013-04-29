@@ -1,6 +1,3 @@
--- intel.lua -- Intel 82574L driver with Linux integration
--- Copyright 2012 Snabb GmbH. See the file LICENSE.
-
 -- This is a device driver for the Intel 82574L gigabit ethernet controller.
 -- The chip is very well documented in Intel's data sheet:
 -- http://ark.intel.com/products/32209/Intel-82574L-Gigabit-Ethernet-Controller

@@ -1,7 +1,6 @@
 /* virtio.h - Virtual I/O device support in Linux/KVM style
  *
  * http://www.apache.org/licenses/LICENSE-2.0
- * Copyright 2013 Luke Gorrie.
  */
 
 enum { VIO_VRING_SIZE = 512 };
