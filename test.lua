@@ -1172,23 +1172,18 @@ test_misc = {
     assert(S.setdomainname("domainnametest"))
     assert_equal(S.getdomainname(), "domainnametest")
   end,
---[[
-  -- may switch this back to a type
   test_inet_name = function()
-    local addr, mask = util.inet_name("127.0.0.1/24")
+    local addr = t.in_addr("127.0.0.1")
     assert(addr, "expect to get valid address")
-    assert(S.istype(t.in_addr, addr))
     assert_equal(tostring(addr), "127.0.0.1")
-    assert_equal(mask, 24)
   end,
   test_inet_name6 = function()
-    local addr, mask = util.inet_name("::1")
-    assert(addr, "expect to get valid address")
-    assert(S.istype(t.in6_addr, addr))
-    assert_equal(tostring(addr), "::1")
-    assert_equal(mask, 128, "expect default mask")
+    for _, a in ipairs {"::1", "::2:0:0:0", "0:0:0:2::", "1::"} do
+      local addr = t.in6_addr(a)
+      assert(addr, "expect to get valid address")
+      assert_equal(tostring(addr), a)
+    end
   end,
-]]
 }
 
 test_sockets = {
