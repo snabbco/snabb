@@ -121,6 +121,7 @@ function map (virt_addr)
    local phys_page = C.phys_page(virt_page)
    if phys_page == 0 then
       error("Failed to resolve physical address of "..tostring(virt_addr))
+   end
    return tonumber(ffi.cast("uint64_t", phys_page * base_page_size + offset))
 end
 
