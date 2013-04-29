@@ -10,6 +10,14 @@
 \definecolor{gray30}{gray}{0.30}
 \newcommand{\hsp}{\hspace{20pt}}
 \titleformat{\chapter}[hang]{\Huge\sffamily}{\textcolor{gray30}{\thechapter}\hsp\textcolor{gray75}{|}\hsp}{0pt}{\Huge\sffamily\textcolor{gray30}}
+% Convert footnotes to margin notes
+\usepackage{setspace}
+\usepackage{cprotect}
+\let\oldfootnote\footnote
+\renewcommand\footnote[1]{\marginpar{#1}}
+\let\oldmarginpar\marginpar
+\renewcommand\marginpar[1]{\-\oldmarginpar{\setlength{\parindent}{0pt}\setlength{\parskip}{6pt plus 2pt minus 1pt}\raggedright\itshape\small\leavevmode\color{gray30}#1}}
+%\renewcommand\marginpar[1]{\-\oldmarginpar{\setstretch{1.0}\raggedright\itshape\small #1}}
 % Make nice title
 \usepackage{titling}
 \renewcommand{\maketitlehooka}{\sffamily}
@@ -31,7 +39,6 @@
 \setlist{nolistsep}
 % Smaller line spacing with verbatim code listings
 $if(verbatimspacing)$
-\usepackage{setspace}
 \usepackage{etoolbox}
 \preto{\verbatim}{\edef\tempstretch{\baselinestretch}\par\setstretch{$verbatimspacing$}}
 \appto{\endverbatim}{\vspace{-\tempstretch\baselineskip}\vspace{\baselineskip}}
@@ -176,6 +183,8 @@ $endif$
 $if(title)$
 \maketitle
 $endif$
+
+\newgeometry{bottom=1.0in,left=1.0in,right=0.5in,includemp=true,marginparwidth=1.5in,marginparsep=0.25in}
 
 $for(include-before)$
 $include-before$
