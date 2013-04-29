@@ -2,9 +2,6 @@
 -- these are either simple ffi types or ffi metatypes for the kernel types
 -- plus some Lua metatables for types that cannot be sensibly done as Lua types eg arrays, integers
 
--- TODO this currently requires being called with S from syscall which breaks modularity
--- TODO should fix this, should just need constants (which it could return)
-
 -- note that some types will be overridden, eg default fd type will have metamethods added TODO document and test
 
 local ffi = require "ffi"
