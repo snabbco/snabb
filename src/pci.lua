@@ -7,7 +7,7 @@ local lib = require("lib")
 require("clib_h")
 require("pci_h")
 
---- ### Hardware device information.
+--- ### Hardware device information
 
 --- Array of all supported hardware devices.
 ---
@@ -37,7 +37,6 @@ function scandir (dir)
    return files
 end
 
--- Return the 
 function device_info (pciaddress)
    local info = {}
    local p = path(pciaddress)

@@ -7,13 +7,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-/* Lock the physical address of all virtual memory in the process.
-   This is effective for all current and future memory allocations.
-   Returns 0 on success or -1 on error. */
-int lock_memory()
-{
-  return mlockall(MCL_CURRENT | MCL_FUTURE);
-}
+/// ### HugeTLB page allocation
 
 /* Allocate a HugeTLB memory page of 'size' bytes.
    Return NULL if such a page cannot be allocated.*/
@@ -22,6 +16,16 @@ void *allocate_huge_page(int size)
   void *ptr = mmap(NULL, size, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, 0, 0);
   return ptr != MAP_FAILED ? ptr : NULL;
+}
+
+/// ### Stable physical memory access
+
+/* Lock the physical address of all virtual memory in the process.
+   This is effective for all current and future memory allocations.
+   Returns 0 on success or -1 on error. */
+int lock_memory()
+{
+  return mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
 /* Create a mapping from physical memory to virtual memory.

@@ -9,7 +9,7 @@ COBJ   := $(patsubst %.c,obj/%.o,$(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,$(CHDR))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
-MDOBJS := $(patsubst %, doc/obj/%.md, $(LUASRC) $(CSRC) $(CHDR) Makefile)
+MDOBJS := $(patsubst %, doc/obj/%.md, $(LUASRC) $(CSRC) $(CHDR))
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
@@ -49,12 +49,18 @@ obj/jit_tprof.o: extra/tprof.lua
 obj/jit_vmprof.o: extra/vmprof.c
 	gcc -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
-$(MDOBJS): doc/obj/%.md : %
+doc/obj/%.lua.md : %.lua Makefile
 	awk '/^ *[^-]{3}/ {if (last~/^ *---/) printf("\n")} {print} {last=$$0}' < $< | sed -E -e 's/^/    /g' -e 's/^    --- ?//g' > $@
+
+doc/obj/%.c.md : %.c Makefile
+	awk '/^ *[^-]{3}/ {if (last~/^ *\/\/\//) printf("\n")} {print} {last=$$0}' < $< | sed -E -e 's/^/    /g' -e 's|^    /// ?||g' > $@
+
+doc/obj/%.h.md : %.h Makefile
+	awk '/^ *[^-]{3}/ {if (last~/^ *\/\/\//) printf("\n")} {print} {last=$$0}' < $< | sed -E -e 's/^/    /g' -e 's|^    /// ?||g' > $@
 
 book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
 
-doc/snabbswitch.md: $(MDOBJS)
+doc/snabbswitch.md: $(MDOBJS) Makefile
 	(cd doc; ./genbook.sh) > $@
 
 doc/snabbswitch.pdf: doc/snabbswitch.md

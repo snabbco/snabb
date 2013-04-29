@@ -5,6 +5,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+/// ### Access PCI devices using Linux sysfs (/sys) filesystem
+
 /* Map PCI device memory into the process via a sysfs PCI resource file.
    Return a point to the mapped memory, or NULL on failure.
 

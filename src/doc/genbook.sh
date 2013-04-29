@@ -21,31 +21,41 @@ $(cat obj/main.lua.md)
 ## \`snabb_lib_init.c\`: Customized Lua initialization
 $(cat obj/snabb_lib_init.c.md)
 
-# Hardware interface
-## \`register.lua\`: Hardware device register abstraction
+# Memory
+## \`memory.c\`: Operating system support
+$(cat obj/memory.c.md)
+## \`memory.lua\`: Allocate physical memory in Lua
+$(cat obj/memory.lua.md)
+## \`buffer.lua\`: Allocate packet buffers from a pool
+$(cat obj/buffer.lua.md)
+
+# PCI
+## \`pci.c\`: Operating system support
+$(cat obj/pci.c.md)
+## \`pci.lua\`: PCI access in Lua
+$(cat obj/pci.lua.md)
+
+# Hardware Ethernet device drivers
+## Hardware device register access
 $(cat obj/register.lua.md)
-## \`intel.h\`: Data structures for DMA
-$(cat obj/intel.h.md)
-## \`intel10g.lua\`: Intel 10-Gigabit device driver
+## Intel 10-Gigabit driver
 $(cat obj/intel10g.lua.md)
-## \`intel.lua\`: Intel Gigabit device driver
+## Intel Gigabit driver
 $(cat obj/intel.lua.md)
 
-# Linux interface
-## \`memory.lua\`: Physical memory management
-$(cat obj/memory.lua.md)
-## \`pci.lua\`: PCI device access (via sysfs)
-$(cat obj/pci.lua.md)
-## \`snabb.h\`: C support API
-$(cat obj/snabb.h.md)
-## \`snabb.c\`: C support library code
-$(cat obj/snabb.c.md)
+# Linux Vhost_net Virtio-based software Ethernet I/O
+## \`vhost_client.c\`: \`ioctl()\` bindings
+$(cat obj/vhost_client.c.md)
+## \`virtio.h\`: Virtio data structures
+$(cat obj/virtio.h.md)
+## \`virtio.lua\`: Virtio DMA client
+$(cat obj/virtio.lua.md)
 
-# Networking logic
+# Networking
 ## \`port.lua\`: Ethernet network port
 $(cat obj/port.lua.md)
-## \`buffer.lua\`: Network packet buffer
-$(cat obj/buffer.lua.md)
+## \`hub2.lua\`: 2-port ethernet hub
+$(cat obj/hub2.lua.md)
 
 # Library
 ## \`clib.h\`: Standard C function prototypes
