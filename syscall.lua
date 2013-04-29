@@ -826,11 +826,6 @@ function S.umount(target, flags)
   return retbool(C.umount2(target, c.UMOUNT[flags]))
 end
 
--- unlimited value. TODO metatype should return this to Lua.
--- TODO math.huge should be converted to this in __new
--- TODO move to constants?
-S.RLIM_INFINITY = ffi.cast("rlim64_t", -1)
-
 function S.prlimit(pid, resource, new_limit, old_limit)
   if new_limit then new_limit = mktype(t.rlimit, new_limit) end
   old_limit = old_limit or t.rlimit()

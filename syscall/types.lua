@@ -36,10 +36,13 @@ local function istype(tp, x)
   if ffi.istype(tp, x) then return x else return false end
 end
 
--- generic for __new TODO use more
+-- generic for __new TODO use more.
 local function newfn(tp, tab)
-  local obj = ffi.new(tp)
-  if tab then for k, v in pairs(tab) do obj[k] = v end end
+  local num = {}
+  if tab then for i = 1, #tab do num[i] = tab[i] end end -- numeric index initialisers
+  local obj = ffi.new(tp, num)
+  -- these are split out so __newindex is called, not just initialisers luajit understands
+  for k, v in pairs(tab or {}) do if type(k) == "number" then obj[k] = v end end -- set string indexes
   return obj
 end
 
@@ -640,11 +643,20 @@ meth.rlimit = {
   index = {
     cur = function(r) return tonumber(r.rlim_cur) end,
     max = function(r) return tonumber(r.rlim_max) end,
-  }
+  },
+  newindex = {
+    cur = function(r, v) r.rlim_cur = c.RLIM[v] end, -- allows use of "infinity"
+    max = function(r, v) r.rlim_max = c.RLIM[v] end,
+  },
 }
 
 metatype("rlimit", "struct rlimit64", {
   __index = function(r, k) if meth.rlimit.index[k] then return meth.rlimit.index[k](r) end end,
+  __newindex = function(r, k, v) if meth.rlimit.newindex[k] then meth.rlimit.newindex[k](r, v) end end,
+  __new = function(tp, tab)
+    if tab then for k, v in pairs(tab) do tab[k] = c.RLIM[v] end end
+    return newfn(tp, tab)
+  end,
 })
 
 metatype("timeval", "struct timeval", {

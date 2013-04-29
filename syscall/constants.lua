@@ -686,6 +686,10 @@ c.RLIMIT = strflag {
 
 c.RLIMIT.OFILE = c.RLIMIT.NOFILE
 
+c.RLIM = strflag {
+  INFINITY = -1,
+}
+
 -- timerfd
 c.TFD = multiflags {
   CLOEXEC  = octal("02000000"),
