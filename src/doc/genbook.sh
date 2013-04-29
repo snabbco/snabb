@@ -13,14 +13,6 @@ cat <<EOF
         sort | uniq -c | sort -nr | sed 's/^[0-9 ]*//' | \
         awk 'NR > 1 { printf("; ") } { printf("%s", $0) } END { print("") }')
 
-# Startup
-## \`snabbswitch.c\`: C \`main()\` entry point
-$(cat obj/snabbswitch.c.md)
-## \`main.lua\`: Lua entry point
-$(cat obj/main.lua.md)
-## \`snabb_lib_init.c\`: Customized Lua initialization
-$(cat obj/snabb_lib_init.c.md)
-
 # Memory
 ## \`memory.c\`: Operating system support
 $(cat obj/memory.c.md)
@@ -62,5 +54,13 @@ $(cat obj/hub2.lua.md)
 $(cat obj/clib.h.md)
 ## \`lib.lua\`: Lua library routines
 $(cat obj/lib.lua.md)
+
+# Startup
+## \`snabbswitch.c\`: C \`main()\` entry point
+$(cat obj/snabbswitch.c.md)
+## \`main.lua\`: Lua entry point
+$(cat obj/main.lua.md)
+## \`snabb_lib_init.c\`: Customized Lua initialization
+$(cat obj/snabb_lib_init.c.md)
 
 EOF
