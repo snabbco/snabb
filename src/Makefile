@@ -4,7 +4,7 @@ CHDR   := $(wildcard *.h)
 # Import jit.* modules from LuaJIT.
 JITSRC := v bc bcsave dump vmdef dis_x86 dis_x64
 
-LUAOBJ := $(patsubst %.lua,obj/%.o,$(LUASRC))
+LUAOBJ := $(patsubst %.lua,obj/lua_%.o,$(LUASRC))
 COBJ   := $(patsubst %.c,obj/%.o,$(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,$(CHDR))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
@@ -22,7 +22,7 @@ snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(JITOBJS) $(EXTRAOBJS)
 	@echo -n "Firmware: "
 	@ls -sh snabbswitch
 
-$(LUAOBJ): obj/%.o: %.lua Makefile
+$(LUAOBJ): obj/lua_%.o: %.lua Makefile
 	luajit -bg $< $@
 
 $(COBJ): obj/%.o: %.c $(CHDR) Makefile

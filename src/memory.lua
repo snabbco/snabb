@@ -3,7 +3,7 @@ module(...,package.seeall)
 local lib = require("lib")
 local ffi = require("ffi")
 local C = ffi.C
-require("snabb_h")
+require("memory_h")
 
 --- ### High level allocate() and free().
 

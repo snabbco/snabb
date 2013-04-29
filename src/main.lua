@@ -55,7 +55,7 @@ end
 function initialize ()
    require("lib")
    require("clib_h")
-   require("snabb_h")
+   require("lib_h")
 end
 
 function command_line_args()

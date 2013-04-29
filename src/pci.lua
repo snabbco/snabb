@@ -5,7 +5,7 @@ local C = ffi.C
 local lib = require("lib")
 
 require("clib_h")
-require("snabb_h")
+require("pci_h")
 
 --- ### Hardware device information.
 

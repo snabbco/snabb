@@ -5,7 +5,9 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 
+require("vhost_client_h")
 require("virtio_h")
+require("tuntap_h")
 
 function new (tapinterface)
 
