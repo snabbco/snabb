@@ -15,7 +15,7 @@ local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
 local c = require "syscall.constants"
 
-local C = ffi.C -- for inet_pton etc, due to be replaced with Lua
+local C = ffi.C -- for inet_pton etc, TODO due to be replaced with Lua
 
 local types = {}
 
