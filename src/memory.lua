@@ -69,6 +69,12 @@ end
 --- 1. `char*` pointer to the memory in our address space.
 --- 2. `uint64_t` physical address.
 --- 3. Actual number of bytes allocated, which may be more than requested.
+---
+--- XXX: This line is to terminate the above list. We'll need to use
+--- fenced codeblocks instead of relying on four space indentation to
+--- signify the start of a block because the four space rule also
+--- allows you to use multi block list items (even if there are blank
+--- newlines in between!)
 function dma_alloc (size)
    if size % 128 ~= 0 then
       -- Keep 128-byte alignment

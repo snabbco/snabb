@@ -35,8 +35,8 @@
 \fancypagestyle{plain}{\fancyhf{}}
 \fancyheadoffset[R]{0.0in}
 % Smaller spacing with bullets
-\usepackage{enumitem}
-\setlist{nolistsep}
+%\usepackage{enumitem}
+%\setlist{nolistsep}
 % Smaller line spacing with verbatim code listings
 $if(verbatimspacing)$
 \usepackage{etoolbox}
