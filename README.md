@@ -46,6 +46,8 @@ Apart from the tests, there are now some examples at [ljsyscall-examples](https:
 
 ## Testing
 
+[![Build Status](https://travis-ci.org/justincormack/ljsyscall.png)](https://travis-ci.org/justincormack/ljsyscall)
+
 The test script is fairly comprehensive. Tested on ARM, amd64, x86, with various combinations of libc. I run long test runs as LuaJIT makes random choices in code generation so single runs do not necessarily show errors. Also tested with Valgrind to pick up memory errors, although there are some issues with some of the system calls, which are being gradually resolved (I use Valgrind SVN).
 
 Some tests need to be run as root, and will not be run otherwise. You cannot test a lot of system calls otherwise. The testing is now done in isolated containers so should not affect the host system, although on old kernels reboot in a container could reboot the host.
