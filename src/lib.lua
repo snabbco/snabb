@@ -108,3 +108,8 @@ function yesno (flag)
    if flag then return 'yes' else return 'no' end
 end
 
+-- Increase value to be a multiple of size (if it is not already).
+function align (value, size)
+   if value % size ~= 0 then return value + size - (value % size) end
+end
+

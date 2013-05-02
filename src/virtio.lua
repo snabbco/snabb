@@ -143,15 +143,15 @@ function new (tapinterface)
    -- descriptors.
    function memory_regions ()
       local vio_memory = ffi.new("struct vio_memory")
-      local dma_regions = memory.dma_regions
-      vio_memory.nregions = #dma_regions
+      local chunks = memory.chunks
+      vio_memory.nregions = #chunks
       vio_memory.padding = 0
       local vio_index = 0
-      for _,region in ipairs(dma_regions) do
+      for _,chunk in ipairs(chunks) do
          local r = vio_memory.regions + vio_index
-         r.guest_phys_addr = region.address
-         r.userspace_addr = region.address
-         r.memory_size = region.size
+         r.guest_phys_addr = ffi.cast("uint64_t", chunk.pointer)
+         r.userspace_addr  = ffi.cast("uint64_t", chunk.pointer)
+         r.memory_size = chunk.size
          r.flags_padding = 0
          vio_index = vio_index + 1
       end
