@@ -3075,6 +3075,8 @@ c.SWAP_FLAG = swapflags {
   DISCARD      = 0x10000,
 }
 
+--c.FUTEX = 
+
 -- iptables/xtables
 
 c.NF = strflag {
