@@ -9,8 +9,8 @@
 
 /// ### HugeTLB page allocation
 
-/// Allocate a HugeTLB memory page of 'size' bytes.
-/// Return NULL if such a page cannot be allocated.
+// Allocate a HugeTLB memory page of 'size' bytes.
+// Return a pointer to the start of the page, or NULL on failure.
 void *allocate_huge_page(int size)
 {
   void *ptr = mmap(NULL, size, PROT_READ | PROT_WRITE,
@@ -24,21 +24,16 @@ void *allocate_huge_page(int size)
 
 /// ### Stable physical memory access
 
-/// Lock the physical address of all virtual memory in the process.
-/// This is effective for all current and future memory allocations.
-///
-/// Returns 0 on success or -1 on error.
+// Lock all current and future virtual memory in a stable physical location.
 int lock_memory()
 {
   return mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
-/// Convert from virtual addresses in our own process address space to
-/// physical addresses in the RAM chips.
-///
-/// Note: Here we use page numbers, which are simply addresses divided
-/// by 4096.
-
+// Convert from virtual addresses in our own process address space to
+// physical addresses in the RAM chips.
+//
+// Note: Using page numbers, which are simply addresses divided by 4096.
 uint64_t phys_page(uint64_t virt_page)
 {
   static int pagemap_fd;

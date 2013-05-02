@@ -14,6 +14,7 @@ cat <<EOF
         awk 'NR > 1 { printf("; ") } { printf("%s", $0) } END { print("") }')
 
 # Memory
+$(cat ../memory.md)
 ## \`memory.c\`: Operating system support
 $(cat obj/memory.c.md)
 ## \`memory.lua\`: Allocate physical memory in Lua

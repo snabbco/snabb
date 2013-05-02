@@ -110,6 +110,10 @@ end
 
 -- Increase value to be a multiple of size (if it is not already).
 function align (value, size)
-   if value % size ~= 0 then return value + size - (value % size) end
+   if value % size == 0 then
+      return value
+   else
+      return value + size - (value % size)
+   end
 end
 

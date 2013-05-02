@@ -5,10 +5,10 @@ local ffi = require("ffi")
 local C = ffi.C
 require("memory_h")
 
---- ### Chunks: Serve small allocations from memory allocated in bulk
+--- ### Serve small allocations from hugepage "chunks"
 
--- Table of {pointer, physical, size, used}.
--- Extended each time a new chunk is allocated.
+-- List of all allocated huge pages: {pointer, physical, size, used}
+-- The last element is used to service new DMA allocations.
 chunks = {}
 
 -- Allocate DMA-friendly memory.
