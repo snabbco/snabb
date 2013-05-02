@@ -91,18 +91,6 @@ test_basic = {
     assert_equal(d:major(), 2)
     assert_equal(d:minor(), 3)
   end,
-  test_mock = function()
-    local test = "teststring"
-    local oldread = rawget(S.C, "read") -- should be nil
-    S.C.read = function(fd, buf, count)
-      ffi.copy(buf, test)
-      return #test
-    end
-    local fd = assert(S.open("/dev/null"))
-    assert_equal(S.read(fd), test, "should be able to mock calls")
-    assert(fd:close())
-    rawset(S.C, "read", oldread)
-  end,
   test_fd_nums = function() -- TODO should also test on the version from types.lua
     assert_equal(t.fd(18):nogc():getfd(), 18, "should be able to trivially create fd")
   end,
