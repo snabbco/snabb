@@ -5,7 +5,7 @@ local ffi = require("ffi")
 local C = ffi.C
 require("memory_h")
 
---- ### Chunks
+--- ### Chunks: Serve small allocations from memory allocated in bulk
 
 -- Table of {pointer, physical, size, used}.
 -- Extended each time a new chunk is allocated.
@@ -29,12 +29,12 @@ end
 function allocate_next_chunk ()
    local ptr = allocate_huge_page()
    chunks[#chunks + 1] = { pointer = ffi.cast("char*", ptr),
-			   physical = map(ptr),
-			   size = huge_page_size,
-			   used = 0 }
+                           physical = map(ptr),
+                           size = huge_page_size,
+                           used = 0 }
 end
 
---- ### HugeTLB ("huge page") allocation from the Linux kernel
+--- ### HugeTLB: Allocate contiguous memory in bulk from Linux
 
 function allocate_huge_page ()
    local attempts = 3
