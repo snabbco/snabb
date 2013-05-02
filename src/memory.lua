@@ -29,7 +29,7 @@ end
 function allocate_next_chunk ()
    local ptr = allocate_huge_page()
    chunks[#chunks + 1] = { pointer = ffi.cast("char*", ptr),
-                           physical = map(ptr),
+                           physical = virtual_to_physical(ptr),
                            size = huge_page_size,
                            used = 0 }
 end
@@ -89,7 +89,8 @@ function selftest (options)
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
       io.flush()
       local dmaptr, physptr, dmalen = dma_alloc(huge_page_size)
-      print("Got "..(dmalen/1024^2).."MB at 0x"..ffi.cast("void*",tonumber(physptr)))
+      print("Got "..(dmalen/1024^2).."MB "..
+         "at 0x"..tostring(ffi.cast("void*",tonumber(physptr))))
       ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- try a write
       assert(dmaptr ~= nil and dmalen == huge_page_size)
    end
@@ -99,6 +100,7 @@ end
 
 --- ### module init: `mlock()` at load time
 
--- This module requires a stable virtual-to-physical address mapping.
+--- This module requires a stable physical-virtual mapping so this is
+--- enforced automatically at load-time.
 assert(C.lock_memory() == 0)
 
