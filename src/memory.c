@@ -33,22 +33,6 @@ int lock_memory()
   return mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
-/// Create a mapping from physical memory to virtual memory.
-///
-/// Return a pointer to the virtual memory, or NULL on failure.
-void *map_physical_ram(uint64_t start, uint64_t end, bool cacheable)
-{
-  int fd;
-  void *ptr;
-  assert( (fd = open("/dev/mem", O_RDWR | (cacheable ? 0 : O_SYNC))) >= 0 );
-  ptr = mmap(NULL, end-start, PROT_READ | PROT_WRITE, MAP_SHARED, fd, start);
-  if (ptr == MAP_FAILED) {
-    return NULL;
-  } else {
-    return ptr;
-  }
-}
-
 /// Convert from virtual addresses in our own process address space to
 /// physical addresses in the RAM chips.
 ///
