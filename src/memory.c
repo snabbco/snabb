@@ -24,6 +24,10 @@ void *allocate_huge_page(int size)
 
 /// ### Stable physical memory access
 
+/// Physical addresses are resolved using the Linux
+/// [pagemap](https://www.kernel.org/doc/Documentation/vm/pagemap.txt)
+/// `procfs` file.
+
 // Lock all current and future virtual memory in a stable physical location.
 int lock_memory()
 {
