@@ -28,7 +28,7 @@ $(cat obj/pci.c.md)
 ## \`pci.lua\`: PCI access in Lua
 $(cat obj/pci.lua.md)
 
-# Hardware Ethernet device drivers
+# [DRAFT] Hardware Ethernet device drivers
 ## Hardware device register access
 $(cat obj/register.lua.md)
 ## Intel 10-Gigabit driver
@@ -36,7 +36,7 @@ $(cat obj/intel10g.lua.md)
 ## Intel Gigabit driver
 $(cat obj/intel.lua.md)
 
-# Linux Vhost_net Virtio-based software Ethernet I/O
+# [DRAFT] Linux Vhost_net Virtio-based software Ethernet I/O
 ## \`vhost_client.c\`: \`ioctl()\` bindings
 $(cat obj/vhost_client.c.md)
 ## \`virtio.h\`: Virtio data structures
@@ -44,13 +44,17 @@ $(cat obj/virtio.h.md)
 ## \`virtio.lua\`: Virtio DMA client
 $(cat obj/virtio.lua.md)
 
-# Networking
+$(cat ../kvm.md)
+
+# [DRAFT] Networking
 ## \`port.lua\`: Ethernet network port
 $(cat obj/port.lua.md)
 ## \`hub2.lua\`: 2-port ethernet hub
 $(cat obj/hub2.lua.md)
 
-# Library
+$(cat ../openstack.md)
+
+# [DRAFT] Library
 ## \`clib.h\`: Standard C function prototypes
 $(cat obj/clib.h.md)
 ## \`lib.lua\`: Lua library routines
