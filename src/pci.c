@@ -19,6 +19,7 @@ void *map_pci_resource(const char *path)
   assert( (fd = open(path, O_RDWR | O_SYNC)) >= 0 );
   assert( fstat(fd, &st) == 0 );
   ptr = mmap(NULL, st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  close(fd);
   if (ptr == MAP_FAILED) {
     return NULL;
   } else {
