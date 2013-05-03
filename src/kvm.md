@@ -30,12 +30,12 @@ The best plan of attack is an open question. Here are some options:
 
 2. Implement VMware-compatible networking and reuse KVM's support.
    Here is the relevant code in KVM:
-   * https://github.com/qemu/qemu/blob/master/hw/net/vmxnet3.h
-   * https://github.com/qemu/qemu/blob/master/hw/net/vmxnet3.c
+   [vmxnet3.h](https://github.com/qemu/qemu/blob/master/hw/net/vmxnet3.h)
+   and
+   [vmxnet3.c](https://github.com/qemu/qemu/blob/master/hw/net/vmxnet3.c).
 
 3. Implement Xen-compatible networking and reuse KVM's support.
-   Here is the relevant code in KVM:
-   * https://github.com/qemu/qemu/blob/master/hw/net/xen_nic.c
+   Here is the relevant code in KVM: [xen_nic.c](https://github.com/qemu/qemu/blob/master/hw/net/xen_nic.c)
 
 4. Add native Snabb Switch support to KVM. If none of the above
    are suitable, we could do this. It would be important to have it
