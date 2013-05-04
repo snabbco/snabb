@@ -48,9 +48,12 @@ function Register:reset () self.acc = nil end
 ---     reg()      <=> reg:read()
 ---     reg(value) <=> reg:write(value)
 function Register:__call (value)
---   for k,v in pairs(getmetatable(self)) do print(k,v) end
---   print("read",self.read,"write",self.write,"getmetatable",getmetatable(self).__call)
-   if value == nil then return self:read() else return self:write(value) end
+   if value then return self:write(value) else return self:read() end
+end
+
+-- Callable for read only registers
+function Register:__callr ()
+   return self:read()
 end
 
 --- Registers print as `$NAME:$HEXVALUE` to make debugging easy.
@@ -61,11 +64,11 @@ end
 --- Metatables for the three different types of register
 local mt = {
   RO = {__index = { read=Register.read, wait=Register.wait},
-       __call = Register.__call, __tostring = Register.__tostring},
+       __call = Register.__callr, __tostring = Register.__tostring},
   RW = {__index = { read=Register.read, write=Register.write, wait=Register.wait, set=Register.set, clr=Register.clr},
        __call = Register.__call, __tostring = Register.__tostring},
   RC = {__index = { read=Register.readrc, reset=Register.reset},
-       __call = Register.__call, __tostring = Register.__tostring},
+       __call = Register.__callr, __tostring = Register.__tostring},
 }
 
 --- Create a register `offset` bytes from `base_ptr`.
