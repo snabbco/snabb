@@ -3,8 +3,45 @@
 module(...,package.seeall)
 
 --- ### Register object
+--- There are three types of register objects, set by the mode when created:
+--- * `RO` - read only.
+--- * `RW` - read-write.
+--- * `RC` - read-only and return the sum of all values read. This
+---   mode is for counter registers that clear back to zero when read.
 
 Register = {}
+
+--- Read a standard register
+function Register:read ()
+   return self.ptr[0]
+end
+
+--- Read a counter register
+function Register:readrc ()
+   local value = self.ptr[0]
+   self.acc = (self.acc or 0) + value
+   return self.acc
+end
+
+function Register:write (value)
+   self.ptr[0] = value
+   return value
+end
+
+--- Set and clear specific masked bits.
+function Register:set (bitmask) self(bit.bor(self(), bitmask)) end
+function Register:clr (bitmask) self(bit.band(self(), bit.bnot(bitmask))) end
+
+--- Block until applying `bitmask` to the register value gives `value`.
+--- If `value` is not given then until all bits in the mask are set.
+function Register:wait (bitmask, value)
+   lib.waitfor(function ()
+		  return bit.band(self(), bitmask) == (value or bitmask)
+	       end)
+end
+
+--- For type `RC`: Reset the accumulator to 0.
+function Register:reset () self.acc = nil end
 
 --- Metatable indexes for the three different types of register
 local index = {
@@ -15,11 +52,6 @@ local index = {
 }
 
 --- Create a register `offset` bytes from `base_ptr`.
---- MODE is one of these values:
---- * `RO` - read only.
---- * `RW` - read-write.
---- * `RC` - read-only and return the sum of all values read. This
----   mode is for counter registers that clear back to zero when read.
 ---
 --- Example:
 ---     register.new("TPT", "Total Packets Transmitted", 0x040D4, ptr, "RC")
@@ -46,36 +78,6 @@ end
 function Register:__tostring ()
    return self.name..":"..bit.tohex(self())
 end
-
-function Register:read ()
-   return self.ptr[0]
-end
-
-function Register:readrc ()
-   local value = self.ptr[0]
-   self.acc = (self.acc or 0) + value
-   return self.acc
-end
-
-function Register:write (value)
-   self.ptr[0] = value
-   return value
-end
-
---- Set and clear specific masked bits.
-function Register:set (bitmask) self(bit.bor(self(), bitmask)) end
-function Register:clr (bitmask) self(bit.band(self(), bit.bnot(bitmask))) end
-
---- Block until applying `bitmask` to the register value gives `value`.
---- If `value` is not given then until all bits in the mask are set.
-function Register:wait (bitmask, value)
-   lib.waitfor(function ()
-		  return bit.band(self(), bitmask) == (value or bitmask)
-	       end)
-end
-
---- For type `RC`: Reset the accumulator to 0.
-function Register:reset () self.acc = nil end
 
 --- ### Define registers from string description.
 
