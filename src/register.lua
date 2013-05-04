@@ -23,6 +23,7 @@ function Register:readrc ()
    return self.acc
 end
 
+--- Write a register
 function Register:write (value)
    self.ptr[0] = value
    return value
