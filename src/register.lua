@@ -11,8 +11,7 @@ local index = {
   RO = { read=Register.read, wait=Register.wait},
   RW = { read=Register.read, write=Register.write, wait=Register.wait,
          set=Register.set, clr=Register.clr},
-  RC = { read=Register.read, write=Register.write, wait=Register.wait,
-         set=Register.set, clr=Register.clr, reset=Register.reset},
+  RC = { read=Register.readrc, reset=Register.reset},
 }
 
 --- Create a register `offset` bytes from `base_ptr`.
@@ -49,18 +48,16 @@ function Register:__tostring ()
 end
 
 function Register:read ()
+   return self.ptr[0]
+end
+
+function Register:readrc ()
    local value = self.ptr[0]
-   if self.mode == 'RC' then
-      self.acc = (self.acc or 0) + value
-      return self.acc
-   else
-      return value
-   end
+   self.acc = (self.acc or 0) + value
+   return self.acc
 end
 
 function Register:write (value)
---   print("mode",self.mode,"name",self.name)
-   assert(self.mode == 'RW')
    self.ptr[0] = value
    return value
 end
