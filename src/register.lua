@@ -42,7 +42,10 @@ function Register:wait (bitmask, value)
 end
 
 --- For type `RC`: Reset the accumulator to 0.
-function Register:reset () self.acc = nil end
+function Register:reset () self.acc = 0 end
+
+--- For other registers provide a noop
+function Register:noop () end
 
 --- Register objects are "callable" as functions for convenience:
 ---     reg()      <=> reg:read()
@@ -58,9 +61,10 @@ end
 
 --- Metatables for the three different types of register
 local mt = {
-  RO = {__index = { read=Register.read, wait=Register.wait},
+  RO = {__index = { read=Register.read, wait=Register.wait, reset=Register.noop},
        __call = Register.read, __tostring = Register.__tostring},
-  RW = {__index = { read=Register.read, write=Register.write, wait=Register.wait, set=Register.set, clr=Register.clr},
+  RW = {__index = { read=Register.read, write=Register.write, wait=Register.wait,
+                    set=Register.set, clr=Register.clr, reset=Register.noop},
        __call = Register.__call, __tostring = Register.__tostring},
   RC = {__index = { read=Register.readrc, reset=Register.reset},
        __call = Register.readrc, __tostring = Register.__tostring},
