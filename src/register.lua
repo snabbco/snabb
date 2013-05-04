@@ -62,12 +62,12 @@ end
 --- Metatables for the three different types of register
 local mt = {
   RO = {__index = { read=Register.read, wait=Register.wait, reset=Register.noop},
-       __call = Register.read, __tostring = Register.__tostring},
+        __call = Register.read, __tostring = Register.__tostring},
   RW = {__index = { read=Register.read, write=Register.write, wait=Register.wait,
                     set=Register.set, clr=Register.clr, reset=Register.noop},
-       __call = Register.__call, __tostring = Register.__tostring},
+        __call = Register.__call, __tostring = Register.__tostring},
   RC = {__index = { read=Register.readrc, reset=Register.reset},
-       __call = Register.readrc, __tostring = Register.__tostring},
+        __call = Register.readrc, __tostring = Register.__tostring},
 }
 
 --- Create a register `offset` bytes from `base_ptr`.
