@@ -6,6 +6,15 @@ module(...,package.seeall)
 
 Register = {}
 
+--- Metatable indexes for the three different types of register
+local index = {
+  RO = { read=Register.read, wait=Register.wait},
+  RW = { read=Register.read, write=Register.write, wait=Register.wait,
+         set=Register.set, clr=Register.clr},
+  RC = { read=Register.read, write=Register.write, wait=Register.wait,
+         set=Register.set, clr=Register.clr, reset=Register.reset},
+}
+
 --- Create a register `offset` bytes from `base_ptr`.
 --- MODE is one of these values:
 --- * `RO` - read only.
@@ -19,7 +28,7 @@ function new (name, longname, offset, base_ptr, mode)
    local o = { name=name, longname=longname,
 	       ptr=base_ptr + offset/4, mode=mode }
    assert(mode == 'RO' or mode == 'RW' or mode == 'RC')
-   setmetatable(o, {__index = Register,
+   setmetatable(o, {__index = index[mode],
                     __call = Register.__call,
                     __tostring = Register.__tostring})
    return o
