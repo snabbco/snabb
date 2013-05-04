@@ -43,28 +43,6 @@ end
 --- For type `RC`: Reset the accumulator to 0.
 function Register:reset () self.acc = nil end
 
---- Metatable indexes for the three different types of register
-local index = {
-  RO = { read=Register.read, wait=Register.wait},
-  RW = { read=Register.read, write=Register.write, wait=Register.wait,
-         set=Register.set, clr=Register.clr},
-  RC = { read=Register.readrc, reset=Register.reset},
-}
-
---- Create a register `offset` bytes from `base_ptr`.
----
---- Example:
----     register.new("TPT", "Total Packets Transmitted", 0x040D4, ptr, "RC")
-function new (name, longname, offset, base_ptr, mode)
-   local o = { name=name, longname=longname,
-	       ptr=base_ptr + offset/4, mode=mode }
-   assert(mode == 'RO' or mode == 'RW' or mode == 'RC')
-   setmetatable(o, {__index = index[mode],
-                    __call = Register.__call,
-                    __tostring = Register.__tostring})
-   return o
-end
-
 --- Register objects are "callable" as functions for convenience:
 ---     reg()      <=> reg:read()
 ---     reg(value) <=> reg:write(value)
@@ -77,6 +55,28 @@ end
 --- Registers print as `$NAME:$HEXVALUE` to make debugging easy.
 function Register:__tostring ()
    return self.name..":"..bit.tohex(self())
+end
+
+--- Metatables for the three different types of register
+local mt = {
+  RO = {__index = { read=Register.read, wait=Register.wait},
+       __call = Register.__call, __tostring = Register.__tostring},
+  RW = {__index = { read=Register.read, write=Register.write, wait=Register.wait, set=Register.set, clr=Register.clr},
+       __call = Register.__call, __tostring = Register.__tostring},
+  RC = {__index = { read=Register.readrc, reset=Register.reset},
+       __call = Register.__call, __tostring = Register.__tostring},
+}
+
+--- Create a register `offset` bytes from `base_ptr`.
+---
+--- Example:
+---     register.new("TPT", "Total Packets Transmitted", 0x040D4, ptr, "RC")
+function new (name, longname, offset, base_ptr, mode)
+   local o = { name=name, longname=longname,
+	       ptr=base_ptr + offset/4, mode=mode }
+   local mt = mt[mode]
+   assert(mt)
+   return setmetatable(o, mt)
 end
 
 --- ### Define registers from string description.
