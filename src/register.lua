@@ -73,7 +73,7 @@ local mt = {
 ---     register.new("TPT", "Total Packets Transmitted", 0x040D4, ptr, "RC")
 function new (name, longname, offset, base_ptr, mode)
    local o = { name=name, longname=longname,
-	       ptr=base_ptr + offset/4, mode=mode }
+	       ptr=base_ptr + offset/4 }
    local mt = mt[mode]
    assert(mt)
    return setmetatable(o, mt)
