@@ -1,10 +1,12 @@
--- intel10g.lua -- Intel 82599 10GbE ethernet device driver
+--- Device driver for the Intel 82599 10-Gigabit Ethernet controller.
+--- This is one of the most popular production 10G Ethernet
+--- controllers on the market and it is readily available in
+--- affordable (~$400) network cards made by Intel and others.
+---
+--- You will need to familiarize yourself with the excellent [data
+--- sheet]() to understand this module.
 
---- This module defines a device driver for one specific PCI device.
---- The load-time `...` argument must be bound to two values:
----     * The unique name for this module instance.
----     * The PCI address for the device this instance manages.
-
+-- This module is loaded once per PCI device. See `pci.lua` for details.
 local moduleinstance,pciaddress = ...
 
 if pciaddress == nil then
@@ -23,17 +25,13 @@ local test = require("test")
 require("intel_h")
 local bits, bitset = lib.bits, lib.bitset
 
--- DMA memory.
-local num_descriptors = 32 * 1024
-local buffer_count = 2 * 1024 * 1024
-local rxdesc, rxdesc_phy
-local txdesc, txdesc_phy
-local buffers, buffers_phy
+num_descriptors = 32 * 1024
+rxdesc, rxdesc_phy, txdesc, txdesc_phy = nil
 
--- Configuration registers table.
-r = {}
--- Statistics registers table.
-s = {}
+r = {} -- Configuration registers
+s = {} -- Statistics registers
+
+--- ### Initialization
 
 function open ()
    pci.set_bus_master(pciaddress, true)
@@ -43,50 +41,41 @@ function open ()
    init_device()
 end
 
+--- See data sheet section 4.6.3 "Initialization Sequence."
+
 function init_device ()
    init_dma_memory()
    disable_interrupts()
    global_reset()
    wait_eeprom_autoread()
    wait_dma()
---   setup_link()
    init_statistics()
    init_receive()
    init_transmit()
 end
 
-function disable_interrupts () end
+function init_dma_memory ()
+   rxdesc, rxdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
+   txdesc, txdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
+   -- Add bounds checking
+   rxdesc  = lib.bounds_checked(rxdesc_t, rxdesc, 0, num_descriptors)
+   txdesc  = lib.bounds_checked(txdesc_t, txdesc, 0, num_descriptors)
+end
 
 function global_reset ()
    local reset = bits{LinkReset=3, DeviceReset=26}
    r.CTRL(reset)
-   register.dump(r)
    C.usleep(1000)
-   register.dump(r)
    r.CTRL:wait(reset, 0)
 end
 
+function disable_interrupts () end --- XXX do this
 function wait_eeprom_autoread () r.EEC:wait(bits{AutoreadDone=9}) end
 function wait_dma ()             r.RDRXCTL:wait(bits{DMAInitDone=3})  end
 
 function init_statistics ()
-   for _,reg in pairs(s) do reg:reset() end
-end
-
-function linkup () return bitset(r.LINKS(), 30) end
-
-function get_configuration_state ()
-   return { AUTOC = r.AUTOC(), HLREG0 = r.HLREG0() }
-end
-
-function restore_configuration_state (saved_state)
-   r.AUTOC(saved_state.AUTOC)
-   r.HLREG0(saved_state.HLREG0)
-end
-
-function enable_mac_loopback ()
-   r.AUTOC:set(bits({ForceLinkUp=0, LMS10G=13}))
-   r.HLREG0:set(bits({Loop=15}))
+   -- Read and then zero each statistic register
+   for _,reg in pairs(s) do reg:read() reg:reset() end
 end
 
 function init_receive ()
@@ -100,6 +89,8 @@ function init_receive ()
    r.RXCTRL:set(bits{RXEN=0})
 end
 
+function set_promiscuous_mode () r.FCTRL(bits({MPE=8, UPE=9, BAM=10})) end
+
 function init_transmit ()
    r.HLREG0:set(bits{TXCRCEN=0})
    r.TDBAL(txdesc_phy % 2^32)
@@ -111,11 +102,14 @@ function init_transmit ()
    r.TXDCTL:wait(bits{Enable=25})
 end
 
+--- ### Transmit
+
+--- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
+
 tdh, tdt = 0, 0 -- Cached values of TDT and TDH
 txfree = 0
 txdesc_flags = bits{eop=24,ifcs=25}
 function transmit (address, size)
---   print("TX DUMP ("..size.."): " .. bit.tohex(ffi.cast("uint32_t*", address)[1]))
    txdesc[tdt].data.address = address
    txdesc[tdt].data.options = bit.bor(size, txdesc_flags)
    tdt = (tdt + 1) % num_descriptors
@@ -128,6 +122,10 @@ function sync_transmit ()
 end
 
 function can_transmit () return (tdt + 1) % num_descriptors ~= txfree end
+
+--- ### Receive
+
+--- See datasheet section 7.1 "Inline Functions -- Receive Functionality."
 
 -- Pointer to buffer address for each receive descriptor.
 -- (So that we know even if the address in the receive descriptor is
@@ -142,10 +140,6 @@ function receive ()
    if rdh ~= rxnext then
       local buffer = rxbuffers[rxnext]
       local wb = rxdesc[rxnext].wb
---      local p = ffi.cast("uint32_t*", buffer)
---      io.write("RX DUMP ("..wb.length.."): ")
---      for i = 0, 8 do io.write(bit.tohex(p[i]).." ") end
---      print()
       rxnext = (rxnext + 1) % num_descriptors
       return buffer, wb.length
    end
@@ -187,42 +181,26 @@ local rxdesc_t = ffi.typeof [[
 		       uint16_t length, vlan; } wb; }
 ]]
 
-function init_dma_memory ()
-   rxdesc, rxdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
-   txdesc, txdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
-   buffers, buffers_phy = memory.dma_alloc(buffer_count * ffi.sizeof("uint8_t"))
-   -- Add bounds checking
-   rxdesc  = lib.protected(rxdesc_t, rxdesc, 0, num_descriptors)
-   txdesc  = lib.protected(txdesc_t, txdesc, 0, num_descriptors)
-   buffers = lib.protected("uint8_t", buffers, 0, buffer_count)
-end
-
-function set_promiscuous_mode () r.FCTRL(bits({MPE=8, UPE=9, BAM=10})) end
-
 function wait_linkup ()
    test.waitfor("linkup", linkup, 20, 250000)
 end
 
-function selftest ()
-   print("intel10g")
-   open()
-   local saved_state = get_configuration_state()
-   enable_mac_loopback()
-   test.waitfor("linkup", linkup, 20, 250000)
-   local finished = lib.timer(1e9)
-   buffers[0] = 99
-   repeat
-      sync()
-      while can_add_receive_buffer() do add_receive_buffer(buffers_phy + 40960, 4096) end
-      while can_transmit() do transmit(buffers_phy, 50) end
-      sync()
---      C.usleep(1)
-   until finished()
-   restore_configuration_state(saved_state)
-   assert(buffers[40960]==99)
-   C.usleep(1000)
-   print "stats"
-   register.dump(s, true)
+--- ### Status and diagnostics
+
+function linkup () return bitset(r.LINKS(), 30) end
+
+function get_configuration_state ()
+   return { AUTOC = r.AUTOC(), HLREG0 = r.HLREG0() }
+end
+
+function restore_configuration_state (saved_state)
+   r.AUTOC(saved_state.AUTOC)
+   r.HLREG0(saved_state.HLREG0)
+end
+
+function enable_mac_loopback ()
+   r.AUTOC:set(bits({ForceLinkUp=0, LMS10G=13}))
+   r.HLREG0:set(bits({Loop=15}))
 end
 
 --- ### Configuration register description.
