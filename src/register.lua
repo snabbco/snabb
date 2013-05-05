@@ -3,55 +3,28 @@
 module(...,package.seeall)
 
 --- ### Register object
-
-Register = {}
-
---- Create a register `offset` bytes from `base_ptr`.
---- MODE is one of these values:
+--- There are three types of register objects, set by the mode when created:
 --- * `RO` - read only.
 --- * `RW` - read-write.
 --- * `RC` - read-only and return the sum of all values read. This
 ---   mode is for counter registers that clear back to zero when read.
----
---- Example:
----     register.new("TPT", "Total Packets Transmitted", 0x040D4, ptr, "RC")
-function new (name, longname, offset, base_ptr, mode)
-   local o = { name=name, longname=longname,
-	       ptr=base_ptr + offset/4, mode=mode }
-   assert(mode == 'RO' or mode == 'RW' or mode == 'RC')
-   setmetatable(o, {__index = Register,
-                    __call = Register.__call,
-                    __tostring = Register.__tostring})
-   return o
-end
 
---- Register objects are "callable" as functions for convenience:
----     reg()      <=> reg:read()
----     reg(value) <=> reg:write(value)
-function Register:__call (value)
---   for k,v in pairs(getmetatable(self)) do print(k,v) end
---   print("read",self.read,"write",self.write,"getmetatable",getmetatable(self).__call)
-   if value == nil then return self:read() else return self:write(value) end
-end
+Register = {}
 
---- Registers print as `$NAME:$HEXVALUE` to make debugging easy.
-function Register:__tostring ()
-   return self.name..":"..bit.tohex(self())
-end
-
+--- Read a standard register
 function Register:read ()
-   local value = self.ptr[0]
-   if self.mode == 'RC' then
-      self.acc = (self.acc or 0) + value
-      return self.acc
-   else
-      return value
-   end
+   return self.ptr[0]
 end
 
+--- Read a counter register
+function Register:readrc ()
+   local value = self.ptr[0]
+   self.acc = (self.acc or 0) + value
+   return self.acc
+end
+
+--- Write a register
 function Register:write (value)
---   print("mode",self.mode,"name",self.name)
-   assert(self.mode == 'RW')
    self.ptr[0] = value
    return value
 end
@@ -69,7 +42,45 @@ function Register:wait (bitmask, value)
 end
 
 --- For type `RC`: Reset the accumulator to 0.
-function Register:reset () self.acc = nil end
+function Register:reset () self.acc = 0 end
+
+--- For other registers provide a noop
+function Register:noop () end
+
+--- Register objects are "callable" as functions for convenience:
+---     reg()      <=> reg:read()
+---     reg(value) <=> reg:write(value)
+function Register:__call (value)
+   if value then return self:write(value) else return self:read() end
+end
+
+--- Registers print as `$NAME:$HEXVALUE` to make debugging easy.
+function Register:__tostring ()
+   return self.name..":"..bit.tohex(self())
+end
+
+--- Metatables for the three different types of register
+local mt = {
+  RO = {__index = { read=Register.read, wait=Register.wait, reset=Register.noop},
+        __call = Register.read, __tostring = Register.__tostring},
+  RW = {__index = { read=Register.read, write=Register.write, wait=Register.wait,
+                    set=Register.set, clr=Register.clr, reset=Register.noop},
+        __call = Register.__call, __tostring = Register.__tostring},
+  RC = {__index = { read=Register.readrc, reset=Register.reset},
+        __call = Register.readrc, __tostring = Register.__tostring},
+}
+
+--- Create a register `offset` bytes from `base_ptr`.
+---
+--- Example:
+---     register.new("TPT", "Total Packets Transmitted", 0x040D4, ptr, "RC")
+function new (name, longname, offset, base_ptr, mode)
+   local o = { name=name, longname=longname,
+	       ptr=base_ptr + offset/4 }
+   local mt = mt[mode]
+   assert(mt)
+   return setmetatable(o, mt)
+end
 
 --- ### Define registers from string description.
 
