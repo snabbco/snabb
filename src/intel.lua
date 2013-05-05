@@ -328,14 +328,10 @@ function rx_load ()
    return rx_pending() / num_descriptors
 end
 
--- Return the next available packet as two values: buffer, length.
--- If no packet is available then return nil.
 function receive ()
    if rdh ~= rxnext then
-      local wb = rxdesc[rxnext].wb
-      local index = rxnext
-      local length = wb.length
-      local buf = rxbuffers[index]
+      local buf = rxbuffers[rxnext]
+      buffer.size = rxdesc[rxnext].length
       rxnext = (rxnext + 1) % num_descriptors
       buffer.deref(buf)
       return buf
