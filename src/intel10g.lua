@@ -109,10 +109,11 @@ end
 tdh, tdt = 0, 0 -- Cached values of TDT and TDH
 txfree = 0
 txdesc_flags = bits{eop=24,ifcs=25}
-function transmit (address, size)
-   txdesc[tdt].data.address = address
-   txdesc[tdt].data.options = bit.bor(size, txdesc_flags)
+function transmit (buf)
+   txdesc[tdt].data.address = buf.phy
+   txdesc[tdt].data.options = bit.bor(buf.size, txdesc_flags)
    tdt = (tdt + 1) % num_descriptors
+   buffer.ref(buf)
 end
 
 function sync_transmit ()
@@ -127,21 +128,17 @@ function can_transmit () return (tdt + 1) % num_descriptors ~= txfree end
 
 --- See datasheet section 7.1 "Inline Functions -- Receive Functionality."
 
--- Pointer to buffer address for each receive descriptor.
--- (So that we know even if the address in the receive descriptor is
--- overwritten during write-back.)
-rxbuffers = ffi.new("uint8_t*[?]", num_descriptors)
-
+-- Queued
+rxbuffers = {}
 rdh, rdt, rxnext = 0, 0, 0
 
--- Return the next available packet as two values: buffer, length.
--- If no packet is available then return nil.
 function receive ()
    if rdh ~= rxnext then
-      local buffer = rxbuffers[rxnext]
-      local wb = rxdesc[rxnext].wb
+      local buf = rxbuffers[rxnext]
+      buffer.size = rxdesc[rxnext].wb
       rxnext = (rxnext + 1) % num_descriptors
-      return buffer, wb.length
+      buffer.deref(buf)
+      return buf
    end
 end
 
@@ -153,12 +150,13 @@ function can_add_receive_buffer ()
    return (rdt + 1) % num_descriptors ~= rdh
 end
 
-function add_receive_buffer (address, size)
+function add_receive_buffer (buf)
    assert(can_add_receive_buffer())
    local desc = rxdesc[rdt].data
-   desc.address, desc.dd = address, size
-   rxbuffers[rdt] = ffi.cast("uint8_t*", address)
+   desc.address, desc.dd = buf.phy, buf.size
+   rxbuffers[rdt] = buf
    rdt = (rdt + 1) % num_descriptors
+   buffer.ref(buf)
 end
 
 function sync_receive ()
