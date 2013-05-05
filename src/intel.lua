@@ -331,7 +331,7 @@ end
 function receive ()
    if rdh ~= rxnext then
       local buf = rxbuffers[rxnext]
-      buffer.size = rxdesc[rxnext].length
+      buf.size = rxdesc[rxnext].length
       rxnext = (rxnext + 1) % num_descriptors
       buffer.deref(buf)
       return buf

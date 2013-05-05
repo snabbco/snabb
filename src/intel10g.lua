@@ -38,12 +38,12 @@ function open ()
    base = ffi.cast("uint32_t*", pci.map_pci_memory(pciaddress, 0))
    register.define(config_registers_desc, r, base)
    register.define(statistics_registers_desc, s, base)
-   init_device()
+   init()
 end
 
 --- See data sheet section 4.6.3 "Initialization Sequence."
 
-function init_device ()
+function init ()
    init_dma_memory()
    disable_interrupts()
    global_reset()
@@ -135,7 +135,7 @@ rdh, rdt, rxnext = 0, 0, 0
 function receive ()
    if rdh ~= rxnext then
       local buf = rxbuffers[rxnext]
-      buffer.size = rxdesc[rxnext].wb
+      buf.size = rxdesc[rxnext].wb.length
       rxnext = (rxnext + 1) % num_descriptors
       buffer.deref(buf)
       return buf
@@ -167,12 +167,12 @@ end
 
 function sync () sync_receive() sync_transmit() end
 
-local txdesc_t = ffi.typeof [[
+txdesc_t = ffi.typeof [[
       union { struct { uint64_t address, options; } data;
               struct { uint64_t a, b; }             context; }
 ]]
 
-local rxdesc_t = ffi.typeof [[
+rxdesc_t = ffi.typeof [[
       union { struct { uint64_t address, dd; } data;
 	      struct { uint16_t csum, id;
 		       uint32_t mrq, status;
@@ -199,6 +199,25 @@ end
 function enable_mac_loopback ()
    r.AUTOC:set(bits({ForceLinkUp=0, LMS10G=13}))
    r.HLREG0:set(bits({Loop=15}))
+end
+
+function selftest (options)
+   options = options or {}
+   io.write("intel10g selftest: pciaddr="..pciaddress)
+   for key,value in pairs(options) do
+      io.write(" "..key.."="..tostring(value))
+   end
+   print()
+   options.device = getfenv()
+   open()
+   if not options.noloopback then
+      enable_mac_loopback()
+   end
+   if not options.nolinkup then
+      test.waitfor("linkup", linkup, 20, 250000)
+   end
+   require("port").selftest(options)
+   register.dump(s, true)
 end
 
 --- ### Configuration register description.
