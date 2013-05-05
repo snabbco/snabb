@@ -283,8 +283,8 @@ function add_receive_buffer (buf)
    -- FIXME: size
    rxdesc[rdt].data.address = buf.phy
    rxdesc[rdt].data.dd = 0
-   rdt = (rdt + 1) % num_descriptors
    rxbuffers[rdt] = buf
+   rdt = (rdt + 1) % num_descriptors
    buffer.ref(buf)
    return true
 end
