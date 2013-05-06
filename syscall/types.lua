@@ -15,6 +15,8 @@ local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
 local c = require "syscall.constants"
 
+local abi = require "syscall.abi"
+
 local C = ffi.C -- for inet_pton etc, TODO due to be replaced with Lua
 
 local types = {}
@@ -27,7 +29,7 @@ local meth = {}
 
 -- use 64 bit stat type always
 local stattypename = "struct stat"
-if ffi.abi("32bit") then
+if abi.abi32 then
   stattypename = "struct stat64"
 end
 
@@ -489,7 +491,7 @@ metatype("sockaddr_ll", "struct sockaddr_ll", {
 })
 
 -- 64 to 32 bit conversions via unions TODO use meth not object?
-if ffi.abi("le") then
+if abi.le then
 mt.i6432 = {
   __index = {
     to32 = function(u) return u.i32[1], u.i32[0] end,

@@ -1,12 +1,12 @@
 -- misc helper functions that we use across the board
 
-local ffi = require "ffi"
+local abi = require "syscall.abi"
 
 local h = {}
 
 -- endian conversion
 -- TODO add tests eg for signs.
-if ffi.abi("be") then -- nothing to do
+if abi.be then -- nothing to do
   function h.htonl(b) return b end
   function h.htons(b) return b end
   function h.convle32(b) return bit.bswap(b) end -- used by file system capabilities, always stored as le

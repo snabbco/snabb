@@ -8,6 +8,7 @@ local ffi = require "ffi"
 require "syscall.ffifunctions"
 
 local c = require "syscall.constants"
+local abi = require "syscall.abi"
 
 local types = require "syscall.types"
 local t, pt, s = types.t, types.pt, types.s
@@ -20,7 +21,7 @@ local C = setmetatable({}, {__index = ffi.C})
 local CC = {} -- functions that might not be in C, may use syscalls
 
 -- use 64 bit fileops on 32 bit always
-if ffi.abi("32bit") then
+if abi.abi32 then
   C.truncate = ffi.C.truncate64
   C.ftruncate = ffi.C.ftruncate64
   C.statfs = ffi.C.statfs64
@@ -89,7 +90,7 @@ end
 -- similarly fadvise64 is not provided, and posix_fadvise may not have 64 bit args on 32 bit
 -- and fallocate seems to have issues in uClibc
 local sys_fadvise64 = c.SYS.fadvise64_64 or c.SYS.fadvise64
-if ffi.abi("64bit") then
+if abi.abi64 then
   function C.stat(path, buf)
     return C.syscall(c.SYS.stat, path, pt.void(buf))
   end
@@ -150,7 +151,7 @@ else
 end
 
 -- lseek is a mess in 32 bit, use _llseek syscall to get clean result
-if ffi.abi("32bit") then
+if abi.abi32 then
   function C.lseek(fd, offset, whence)
     local result = t.loff1()
     local off1, off2 = u6432(offset)
@@ -161,7 +162,7 @@ if ffi.abi("32bit") then
 end
 
 -- on 32 bit systems mmap uses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
-if ffi.abi("32bit") then
+if abi.abi32 then
   function C.mmap(addr, length, prot, flags, fd, offset)
     local pgoffset = math.floor(offset / 4096)
     return pt.void(C.syscall(c.SYS.mmap2, pt.void(addr), t.size(length), t.int(prot), t.int(flags), t.int(fd), t.uint32(pgoffset)))

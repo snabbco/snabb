@@ -1,8 +1,8 @@
 -- arm specific constants
 
-local ffi = require "ffi"
+local abi = require "syscall.abi"
 
-assert(ffi.abi("eabi"), "only support eabi for arm")
+assert(abi.eabi, "only support eabi for arm")
 
 local octal = function (s) return tonumber(s, 8) end 
 

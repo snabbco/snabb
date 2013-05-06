@@ -8,6 +8,7 @@
 local ffi = require "ffi"
 local S = require "syscall"
 
+local abi = require "syscall.abi"
 local h = require "syscall.helpers"
 
 local octal = h.octal
@@ -640,7 +641,7 @@ local auditarch_be = {
 }
 
 function util.auditarch()
-  if ffi.abi("le") then return c.AUDIT_ARCH[auditarch_le[ffi.arch]] else return c.AUDIT_ARCH[auditarch_be[ffi.arch]] end
+  if abi.le then return c.AUDIT_ARCH[auditarch_le[abi.arch]] else return c.AUDIT_ARCH[auditarch_be[abi.arch]] end
 end
 
 -- file system capabilities

@@ -7,8 +7,10 @@ local s, t = types.s, types.t
 
 local strflag = require("syscall.helpers").strflag
 
+local abi = require "syscall.abi"
+
 local ffi = require "ffi"
-local ok, arch = pcall(require, "syscall." .. ffi.arch .. ".ioctl") -- architecture specific definitions
+local ok, arch = pcall(require, "syscall." .. abi.arch .. ".ioctl") -- architecture specific definitions
 if not ok then arch = {} end
 
 local bit = require "bit"

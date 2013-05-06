@@ -3,6 +3,7 @@
 
 local S = require "syscall"
 local ffi = require "ffi"
+local abi = require "syscall.abi"
 
 local s, t, c, ctypes = S.s, S.t, S.c, S.ctypes
 
@@ -217,7 +218,7 @@ c.SYS.getdents = nil
 -- Musl ors O.ACCMODE with O_SEARCH TODO why?
 c.O.ACCMODE = nil
 
-if ffi.abi("64bit") then c.O.LARGEFILE = nil end
+if abi.abi64 then c.O.LARGEFILE = nil end
 
 -- renamed constants
 c.O.NONBLOCK = c.OPIPE.NONBLOCK

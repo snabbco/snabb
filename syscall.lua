@@ -19,6 +19,8 @@ local t, pt, s = S.t, S.pt, S.s
 local h = require "syscall.helpers"
 local split = h.split
 
+local abi = require "syscall.abi"
+
 -- makes code tidier
 local function istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
 
@@ -66,7 +68,7 @@ local function retptr(ret)
 end
 
 -- main definitions start here
-if ffi.abi("32bit") then
+if abi.abi32 then
   function S.open(pathname, flags, mode)
     flags = bit.bor(c.O[flags], c.O.LARGEFILE)
     return retfd(C.open(pathname, flags, c.MODE[mode]))
