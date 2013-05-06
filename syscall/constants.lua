@@ -2,12 +2,13 @@
 
 -- TODO add test that we do not reallocate
 
-local ffi = require "ffi"
-local bit = require "bit"
+local abi = require "syscall.abi"
 
-local architecture = ffi.arch
-local abi32 = ffi.abi("32bit")
-local abi64 = ffi.abi("64bit")
+local architecture = abi.architecture
+local abi32 = abi.abi32
+local abi64 = abi.abi64
+
+local bit = require "bit"
 
 local arch = require("syscall." .. architecture .. ".constants") -- architecture specific code
 
