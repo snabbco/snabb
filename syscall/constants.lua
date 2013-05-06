@@ -688,7 +688,7 @@ c.RLIMIT = strflag {
 c.RLIMIT.OFILE = c.RLIMIT.NOFILE
 
 c.RLIM = strflag {
-  INFINITY = -1,
+  INFINITY = 0xffffffffffffffffULL,
 }
 
 -- timerfd

@@ -253,6 +253,7 @@ print [[
 #define __USE_FILE_OFFSET64
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include <stdio.h>
 #include <limits.h>
@@ -341,6 +342,13 @@ void sassert(int a, int b, char *n) {
   }
 }
 
+void sassert_u64(uint64_t a, uint64_t b, char *n) {
+  if (a != b) {
+    printf("error with %s: %llu (0x%llx) != %llu (0x%llx)\n", n, (unsigned long long)a, (unsigned long long)a, (unsigned long long)b, (unsigned long long)b);
+    ret = 1;
+  }
+}
+
 int main(int argc, char **argv) {
 ]]
 
@@ -383,7 +391,11 @@ for k, v in pairs(c) do
     for k2, v2 in pairs(v) do
       local name = nm[k] or k .. "_"
       if type(v2) ~= "function" then
-        print("sassert(" .. name .. k2 .. ", " .. tostring(v2)  .. ', "' .. name .. k2 .. '");')
+        if type(v2) == "cdata" and ffi.sizeof(v2) == 8 then
+         print("sassert_u64(" .. name .. k2 .. ", " .. tostring(v2)  .. ', "' .. name .. k2 .. '");')
+        else
+         print("sassert(" .. name .. k2 .. ", " .. tostring(v2)  .. ', "' .. name .. k2 .. '");')
+        end
       end
     end
   end
