@@ -7,5 +7,5 @@ before_install:
 
 script: 
  - luajit test.lua
- - luajit ctest.lua > ctest.c && cc -std=c99 ctest.c -o ctest && ./ctest
+ - luajit test/ctest.lua > test/ctest.c && cc -std=c99 test/ctest.c -o test/ctest && ./test/ctest
 
