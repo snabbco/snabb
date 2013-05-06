@@ -72,12 +72,6 @@ local clean = function()
 end
 
 test_basic = {
-  test_octal = function()
-    assert_equal(c.O.CREAT, 64, "wrong octal value for O_CREAT")
-  end,
-  test_signals = function()
-    assert_equal(c.SIG.SYS, 31) -- test numbers correct
-  end,
   test_b64 = function()
     local h, l = t.i6432(-1):to32()
     assert_equal(h, bit.tobit(0xffffffff))
