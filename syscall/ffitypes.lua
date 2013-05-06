@@ -2,12 +2,12 @@
 
 local abi = require "syscall.abi"
 
-local ffi = require "ffi"
+local cdef = require "ffi".cdef
 
 local ok, arch = pcall(require, "syscall." .. abi.architecture .. ".ffitypes") -- architecture specific definitions
 if not ok then arch = {} end
 
-ffi.cdef[[
+cdef[[
 
 static const int UTSNAME_LENGTH = 65;
 
@@ -699,18 +699,18 @@ struct tun_pi {
 
 -- Linux struct siginfo padding depends on architecture
 if abi.abi64 then
-ffi.cdef[[
+cdef[[
 static const int SI_MAX_SIZE = 128;
 static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 4;
 ]]
 else
-ffi.cdef[[
+cdef[[
 static const int SI_MAX_SIZE = 128;
 static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 3;
 ]]
 end
 
-ffi.cdef[[
+cdef[[
 typedef struct siginfo {
   int si_signo;
   int si_errno;
@@ -758,7 +758,7 @@ typedef struct siginfo {
 
 if arch.sigaction then arch.sigaction()
 else
-ffi.cdef[[
+cdef[[
 struct sigaction {
   union {
     sighandler_t sa_handler;
@@ -775,7 +775,7 @@ arch.ucontext() -- there is no default for ucontext and related types as very ma
 
 if arch.termio then arch.termio()
 else
-ffi.cdef[[
+cdef[[
 static const int NCC = 8;
 struct termio {
   unsigned short c_iflag;
@@ -792,15 +792,15 @@ if arch.statfs then arch.statfs()
 else
 -- Linux struct statfs/statfs64 depends on 64/32 bit
 if abi.abi64 then
-ffi.cdef[[
+cdef[[
 typedef long statfs_word;
 ]]
 else
-ffi.cdef[[
+cdef[[
 typedef uint32_t statfs_word;
 ]]
 end
-ffi.cdef[[
+cdef[[
 struct statfs64 {
   statfs_word f_type;
   statfs_word f_bsize;
@@ -821,7 +821,7 @@ end
 -- epoll packed on x86_64 only (so same as x86)
 if arch.epoll then arch.epoll()
 else
-ffi.cdef[[
+cdef[[
 struct epoll_event {
   uint32_t events;
   epoll_data_t data;
@@ -831,7 +831,7 @@ end
 
 -- endian dependent
 if abi.le then
-ffi.cdef[[
+cdef[[
 struct iocb {
   uint64_t   aio_data;
   uint32_t   aio_key, aio_reserved1;
@@ -860,7 +860,7 @@ struct iphdr {
 };
 ]]
 else
-ffi.cdef[[
+cdef[[
 struct iocb {
   uint64_t   aio_data;
   uint32_t   aio_reserved1, aio_key;
