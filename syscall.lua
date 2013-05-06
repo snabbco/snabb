@@ -7,14 +7,11 @@ local ffi = require "ffi"
 local bit = require "bit"
 
 local C = require "syscall.c"
-S.C = C
 
 local c = require "syscall.constants"
-S.c = c
 
 local types = require "syscall.types"
-S.t, S.pt, S.s, S.ctypes = types.t, types.pt, types.s, types.ctypes -- types, pointer types and sizes tables and ctypes map
-local t, pt, s = S.t, S.pt, S.s
+local t, pt, s = types.t, types.pt, types.s
 
 local h = require "syscall.helpers"
 local split = h.split

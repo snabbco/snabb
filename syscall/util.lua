@@ -10,6 +10,8 @@ local S = require "syscall"
 
 local abi = require "syscall.abi"
 local h = require "syscall.helpers"
+local types = require "syscall.types"
+local c = require "syscall.constants"
 
 local octal = h.octal
 
@@ -21,7 +23,7 @@ end
 
 local util = {}
 
-local t, pt, s, c = S.t, S.pt, S.s, S.c
+local t, pt, s = types.t, types.pt, types.s
 
 local mt = {}
 

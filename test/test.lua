@@ -6,8 +6,13 @@ local nl = require "syscall.nl"
 local util = require "syscall.util"
 local features = require "syscall.features"
 local helpers = require "syscall.helpers"
+local types = require "syscall.types"
+local c = require "syscall.constants"
+
 local bit = require "bit"
 local ffi = require "ffi"
+
+local t, pt, s = types.t, types.pt, types.s
 
 setmetatable(S, {__index = function(i, k) error("bad index access on S: " .. k) end})
 
@@ -49,7 +54,6 @@ end
 
 if arg[1] == "coverage" then debug.sethook(coverage, "lc") end
 
-local t, pt, c, s = S.t, S.pt, S.c, S.s
 
 local teststring = "this is a test string"
 local size = 512

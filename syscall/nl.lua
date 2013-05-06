@@ -6,10 +6,12 @@ local ffi = require "ffi"
 local bit = require "bit"
 local S = require "syscall"
 local h = require "syscall.helpers"
+local types = require "syscall.types"
+local c = require "syscall.constants"
 
 local htonl = h.htonl
 
-local t, pt, s, c = S.t, S.pt, S.s, S.c
+local t, pt, s = types.t, types.pt, types.s
 
 local mt = {} -- metatables
 local meth = {}
