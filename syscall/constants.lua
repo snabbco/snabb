@@ -5,7 +5,11 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-local arch = require("syscall." .. ffi.arch .. ".constants") -- architecture specific code
+local architecture = ffi.arch
+local abi32 = ffi.abi("32bit")
+local abi64 = ffi.abi("64bit")
+
+local arch = require("syscall." .. architecture .. ".constants") -- architecture specific code
 
 local h = require "syscall.helpers"
 
@@ -68,7 +72,7 @@ addarch(c.O, arch.O, {
 })
 
 if not c.O.LARGEFILE then -- also can be arch dependent
-  if ffi.abi("32bit") then c.O.LARGEFILE = octal('0100000') else c.O.LARGEFILE = 0 end
+  if abi32 then c.O.LARGEFILE = octal('0100000') else c.O.LARGEFILE = 0 end
 end
 
 -- just for pipe2
@@ -160,7 +164,7 @@ c.F = strflag {
 }
 
 -- messy
-if ffi.abi("64bit") then
+if abi64 then
   c.F.GETLK64   = c.F.GETLK
   c.F.SETLK64   = c.F.SETLK
   c.F.SETLKW64  = c.F.SETLKW
