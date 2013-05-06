@@ -1,11 +1,11 @@
 -- generate C test file to check type sizes etc
 -- luajit ctest.lua > ctest.c && cc -std=c99 ctest.c -o ctest && ./ctest
 
-local S = require "syscall"
 local ffi = require "ffi"
 local abi = require "syscall.abi"
-
-local s, t, c, ctypes = S.s, S.t, S.c, S.ctypes
+local types = require "syscall.types"
+local t, ctypes, s = types.t, types.ctypes, types.s
+local c = require "syscall.constants"
 
 c.IOCTL = require "syscall.ioctl"
 
