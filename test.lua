@@ -27,7 +27,7 @@ local function fork_assert(cond, str) -- if we have forked we need to fail in ma
 end
 
 USE_EXPECTED_ACTUAL_IN_ASSERT_EQUALS = true -- strict wants this to be set
-local luaunit = require "luaunit"
+local luaunit = require "test.luaunit"
 
 local function assert_equal(...)
   collectgarbage("collect") -- force gc, to test for bugs
