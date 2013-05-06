@@ -4,13 +4,9 @@
 
 local abi = require "syscall.abi"
 
-local architecture = abi.architecture
-local abi32 = abi.abi32
-local abi64 = abi.abi64
-
 local bit = require "bit"
 
-local arch = require("syscall." .. architecture .. ".constants") -- architecture specific code
+local arch = require("syscall." .. abi.architecture .. ".constants") -- architecture specific code
 
 local h = require "syscall.helpers"
 
@@ -73,7 +69,7 @@ addarch(c.O, arch.O, {
 })
 
 if not c.O.LARGEFILE then -- also can be arch dependent
-  if abi32 then c.O.LARGEFILE = octal('0100000') else c.O.LARGEFILE = 0 end
+  if abi.abi32 then c.O.LARGEFILE = octal('0100000') else c.O.LARGEFILE = 0 end
 end
 
 -- just for pipe2
@@ -165,7 +161,7 @@ c.F = strflag {
 }
 
 -- messy
-if abi64 then
+if abi.abi64 then
   c.F.GETLK64   = c.F.GETLK
   c.F.SETLK64   = c.F.SETLK
   c.F.SETLKW64  = c.F.SETLKW

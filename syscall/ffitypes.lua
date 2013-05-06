@@ -1,8 +1,10 @@
 -- ffi definitions of Linux types
 
+local abi = require "syscall.abi"
+
 local ffi = require "ffi"
 
-local ok, arch = pcall(require, "syscall." .. ffi.arch .. ".ffitypes") -- architecture specific definitions
+local ok, arch = pcall(require, "syscall." .. abi.architecture .. ".ffitypes") -- architecture specific definitions
 if not ok then arch = {} end
 
 ffi.cdef[[
@@ -696,7 +698,7 @@ struct tun_pi {
 ]]
 
 -- Linux struct siginfo padding depends on architecture
-if ffi.abi("64bit") then
+if abi.abi64 then
 ffi.cdef[[
 static const int SI_MAX_SIZE = 128;
 static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 4;
@@ -789,7 +791,7 @@ end
 if arch.statfs then arch.statfs()
 else
 -- Linux struct statfs/statfs64 depends on 64/32 bit
-if ffi.abi("64bit") then
+if abi.abi64 then
 ffi.cdef[[
 typedef long statfs_word;
 ]]
@@ -828,7 +830,7 @@ struct epoll_event {
 end
 
 -- endian dependent
-if ffi.abi("le") then
+if abi.le then
 ffi.cdef[[
 struct iocb {
   uint64_t   aio_data;
