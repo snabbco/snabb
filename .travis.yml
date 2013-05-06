@@ -6,6 +6,6 @@ before_install:
  - sudo apt-get install luajit -y
 
 script: 
- - luajit test.lua
+ - luajit test/test.lua
  - luajit test/ctest.lua > test/ctest.c && cc -std=c99 test/ctest.c -o test/ctest && ./test/ctest
 
