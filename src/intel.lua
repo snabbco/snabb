@@ -22,7 +22,6 @@ local test = require("test")
 local bits, bitset = lib.bits, lib.bitset
 
 require("clib_h")
-require("snabb_h")
 require("intel_h")
 
 -- FFI definitions for receive and transmit descriptors
