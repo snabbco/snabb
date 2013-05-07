@@ -3,10 +3,17 @@
 
 local c = require "syscall.constants"
 
-local types = require "syscall.types"
-local t, pt, s = types.t, types.pt, types.s
+local C = require "syscall.c"
 
-local S = require "syscall.syscalls"
+local c = require "syscall.constants"
+
+local types = require "syscall.types"
+
+local abi = require "syscall.abi"
+
+local S = require "syscall.syscalls".init(C, c, types, abi)
+
+local t, pt, s = types.t, types.pt, types.s
 
 local ffi = require "ffi"
 

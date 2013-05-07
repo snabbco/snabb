@@ -1,21 +1,17 @@
--- Linux syscall ABI ffi interface
+-- This is the actual system calls
+
+-- allow init with different tables
+local function init(C, c, types, abi)
 
 local S = {} -- exported functions
 
 local ffi = require "ffi"
 local bit = require "bit"
 
-local C = require "syscall.c"
-
-local c = require "syscall.constants"
-
-local types = require "syscall.types"
 local t, pt, s = types.t, types.pt, types.s
 
 local h = require "syscall.helpers"
 local split = h.split
-
-local abi = require "syscall.abi"
 
 -- makes code tidier
 local function istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
@@ -1283,4 +1279,8 @@ function S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
 end
 
 return S
+
+end
+
+return {init = init}
 
