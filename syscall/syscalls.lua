@@ -1057,10 +1057,10 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
   return true
 end
 
--- this is the glibc name for the syslog syscall
-function S.klogctl(tp, buf, len)
+function S.syslog(tp, buf, len)
   if not buf and (tp == 2 or tp == 3 or tp == 4) then
     if not len then
+      -- this is the glibc name for the syslog syscall
       len = C.klogctl(10, nil, 0) -- get size so we can allocate buffer
       if len == -1 then return nil, t.error() end
     end
