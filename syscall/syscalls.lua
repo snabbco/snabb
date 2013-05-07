@@ -11,7 +11,6 @@ local bit = require "bit"
 local t, pt, s = types.t, types.pt, types.s
 
 local h = require "syscall.helpers"
-local split = h.split
 
 -- makes code tidier
 local function istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
@@ -657,7 +656,7 @@ end
 local function lattrbuf(sys, a)
   local s, err = growattrbuf(sys, a)
   if not s then return nil, err end
-  local tab = split('\0', s)
+  local tab = h.split('\0', s)
   tab[#tab] = nil -- there is a trailing \0 so one extra
   return tab
 end
