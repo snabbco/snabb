@@ -23,6 +23,7 @@ build =
     lua =
     {
       ["syscall"] = "syscall.lua";
+      ["syscall.syscalls"] = "syscall/syscalls.lua";
       ["syscall.abi"] = "syscall/abi.lua";
       ["syscall.c"] = "syscall/c.lua";
       ["syscall.constants"] = "syscall/constants.lua";
