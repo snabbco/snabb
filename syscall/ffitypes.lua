@@ -56,6 +56,7 @@ typedef struct {
 } sigset_t;
 
 // again should be a long, and we have wrapped in a struct
+// TODO ok to wrap Lua types but not syscall? https://github.com/justincormack/ljsyscall/issues/36
 struct cpu_set_t {
   int32_t val[1024 / (8 * sizeof (int32_t))];
 };
