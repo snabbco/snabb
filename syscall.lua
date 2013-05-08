@@ -2,22 +2,15 @@
 -- TODO want to try to remove everything from here
 
 local c = require "syscall.constants"
-
 local C = require "syscall.c"
-
-local c = require "syscall.constants"
-
 local types = require "syscall.types"
-
 local abi = require "syscall.abi"
-
+local h = require "syscall.helpers"
 local S = require "syscall.syscalls".init(C, c, types, abi)
 
 local t, pt, s = types.t, types.pt, types.s
 
 local ffi = require "ffi"
-
-local h = require "syscall.helpers"
 
 -- TODO these are duplicated, if this code stays here then refactor, but ideally it does not
 local function istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
