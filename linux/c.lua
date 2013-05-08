@@ -288,8 +288,10 @@ if not pcall(inlibc, "setns") then C.setns = CC.setns end
 if not pcall(inlibc, "prlimit64") then C.prlimit64 = CC.prlimit64 end
 
 -- not in uClibc
-if not pcall(inlibc, "preadv64") then C.preadv64 = CC.preadv64 end
-if not pcall(inlibc, "pwritev64") then C.pwritev64 = CC.pwritev64 end
+if abi.abi32 then
+  if not pcall(inlibc, "preadv64") then C.preadv = CC.preadv64 end
+  if not pcall(inlibc, "pwritev64") then C.pwritev = CC.pwritev64 end
+end
 
 return C
 
