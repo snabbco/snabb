@@ -10,5 +10,6 @@ return {
   le = ffi.abi("le"), -- boolean
   be = ffi.abi("be"), -- boolean
   eabi = ffi.abi("eabi"), -- boolean
+  os = ffi.os:lower(), -- bsd, linux
 }
 

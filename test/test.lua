@@ -2,12 +2,13 @@
 
 local strict = require "test.strict"
 local S = require "syscall"
-local nl = require "syscall.nl"
-local util = require "syscall.util"
-local features = require "syscall.features"
 local helpers = require "syscall.helpers"
 local types = require "syscall.types"
 local c = require "syscall.constants"
+
+local nl = require "linux.nl"
+local util = require "linux.util"
+local features = require "linux.features"
 
 local bit = require "bit"
 local ffi = require "ffi"

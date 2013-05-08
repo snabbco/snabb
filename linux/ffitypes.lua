@@ -4,7 +4,7 @@ local abi = require "syscall.abi"
 
 local cdef = require "ffi".cdef
 
-local ok, arch = pcall(require, "syscall." .. abi.arch .. ".ffitypes") -- architecture specific definitions
+local ok, arch = pcall(require, "linux." .. abi.arch .. ".ffitypes") -- architecture specific definitions
 if not ok then arch = {} end
 
 cdef[[
