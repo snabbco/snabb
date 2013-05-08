@@ -313,6 +313,7 @@ print [[
 #include <linux/rtnetlink.h>
 #include <linux/ioctl.h>
 #include <linux/input.h>
+#include <linux/uinput.h>
 #include <linux/audit.h>
 #include <linux/filter.h>
 #include <linux/seccomp.h>
