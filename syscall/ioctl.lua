@@ -206,7 +206,7 @@ local ioctl = strflag {
 }
 
 local override = arch.ioctl or {}
-if type(override) == "function" then override = override(_IO, _IOR, _IOW, _IORW) end
+if type(override) == "function" then override = override(_IO, _IOR, _IOW, _IOWR) end
 for k, v in pairs(override) do ioctl[k] = v end
 
 -- alternate names
