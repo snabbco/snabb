@@ -6,7 +6,6 @@ require "syscall.ffitypes"
 
 cdef[[
 int openat(int dirfd, const char *pathname, int flags, mode_t mode);
-int creat(const char *pathname, mode_t mode);
 int chdir(const char *path);
 int mkdir(const char *pathname, mode_t mode);
 int mkdirat(int dirfd, const char *pathname, mode_t mode);
