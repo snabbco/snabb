@@ -5,12 +5,12 @@
 
 local ffi = require "ffi"
 
-require "linux.ffifunctions"
+require "syscall.ffifunctions"
 
-local c = require "linux.constants"
+local c = require "syscall.constants"
 local abi = require "syscall.abi"
 
-local types = require "linux.types"
+local types = require "syscall.types"
 local t, pt, s = types.t, types.pt, types.s
 
 local function u6432(x) return t.u6432(x):to32() end

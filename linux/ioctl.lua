@@ -2,7 +2,7 @@
 -- note there are some architecture dependent values
 
 -- include types to get sizes
-local types = require "linux.types"
+local types = require "syscall.types"
 local s, t = types.s, types.t
 
 local strflag = require("syscall.helpers").strflag

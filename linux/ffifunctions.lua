@@ -2,7 +2,7 @@
 
 local ffi = require "ffi"
 
-require "linux.ffitypes"
+require "syscall.ffitypes"
 
 ffi.cdef[[
 int close(int fd);

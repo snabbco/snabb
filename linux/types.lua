@@ -7,13 +7,13 @@
 local ffi = require "ffi"
 local bit = require "bit"
 
-require "linux.ffitypes"
+require "syscall.ffitypes"
 
 local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
-local c = require "linux.constants"
+local c = require "syscall.constants"
 
 local abi = require "syscall.abi"
 
