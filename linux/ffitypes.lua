@@ -7,6 +7,7 @@ local cdef = require "ffi".cdef
 local ok, arch = pcall(require, "linux." .. abi.arch .. ".ffitypes") -- architecture specific definitions
 if not ok then arch = {} end
 
+--[[ -- now in common code
 cdef[[
 
 // typedefs for word size independent types
@@ -45,7 +46,9 @@ typedef unsigned long ino_t;
 typedef unsigned long nlink_t;
 typedef unsigned long aio_context_t;
 typedef unsigned long nfds_t;
+]]
 
+cdef[[
 // should be a word, but we use 32 bits as bitops are signed 32 bit in LuaJIT at the moment
 typedef int32_t fd_mask;
 
