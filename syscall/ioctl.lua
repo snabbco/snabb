@@ -180,10 +180,10 @@ local ioctl = strflag {
   EVIOCGEFFECTS = _IOR('E', 0x84, s.int),
   EVIOCGRAB  = _IOW('E', 0x90, s.int),
 -- input devices
-  UI_DEV_CREATE  = _IO ('U',   1)
-  UI_DEV_DESTROY = _IO ('U',   2)
-  UI_SET_EVBIT   = _IOW('U', 100, s.int)
-  UI_SET_KEYBIT  = _IOW('U', 101, s.int)
+  UI_DEV_CREATE  = _IO ('U', 1),
+  UI_DEV_DESTROY = _IO ('U', 2),
+  UI_SET_EVBIT   = _IOW('U', 100, s.int),
+  UI_SET_KEYBIT  = _IOW('U', 101, s.int),
 -- tun/tap
   TUNSETNOCSUM   = _IOW('T', 200, s.int),
   TUNSETDEBUG    = _IOW('T', 201, s.int),
