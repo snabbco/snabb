@@ -101,6 +101,13 @@ test_basic = {
     local err = t.error(0)
     assert(tostring(err) == "No error information (error 0)", "should get missing error message")
   end,
+  test_no_missing_error_strings = function()
+    local noerr = "No error information"
+    for k, v in pairs(c.E) do
+      local msg = assert(tostring(t.error(v)))
+      assert(msg:sub(1, #noerr) ~= noerr, "no error message for " .. k)
+    end
+  end,
   test_booltoc = function()
     assert_equal(helpers.booltoc(true), 1)
     assert_equal(helpers.booltoc[true], 1)
