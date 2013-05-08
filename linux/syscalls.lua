@@ -156,15 +156,6 @@ function S.mknodat(fd, pathname, mode, dev)
   return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S_I[mode], dev or 0))
 end
 
-if C.nice then
-  function S.nice(inc) return retbool(C.nice(inc)) end
-else
-  function S.nice(inc)
-    local prio = S.getpriority(c.PRIO.PROCESS, 0) -- this cannot fail with these args. Call S. not C. as adjusted values
-    return S.setpriority(c.PRIO.PROCESS, 0, prio + inc)
-  end
-end
-
 function S.getpriority(which, who)
   local ret = C.getpriority(c.PRIO[which], who or 0)
   if ret == -1 then return nil, t.error() end
