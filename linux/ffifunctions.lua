@@ -2,6 +2,8 @@
 
 local cdef = require "ffi".cdef
 
+local abi = require "syscall.abi"
+
 require "syscall.ffitypes"
 
 cdef[[
@@ -49,8 +51,6 @@ int timerfd_gettime(int fd, struct itimerspec *curr_value);
 int mknod(const char *pathname, mode_t mode, dev_t dev);
 int mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev);
 
-ssize_t pread64(int fd, void *buf, size_t count, loff_t offset);
-ssize_t pwrite64(int fd, const void *buf, size_t count, loff_t offset);
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
 // for sendto and recvfrom use void pointer not const struct sockaddr * to avoid casting
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const void *dest_addr, socklen_t addrlen);
@@ -263,4 +263,11 @@ int unsetenv(const char *name);
 int clearenv(void);
 char *getenv(const char *name);
 ]]
+
+if abi.abi32 then
+cdef[[
+ssize_t pread64(int fd, void *buf, size_t count, loff_t offset);
+ssize_t pwrite64(int fd, const void *buf, size_t count, loff_t offset);
+]]
+end
 
