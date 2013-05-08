@@ -68,9 +68,6 @@ if abi.abi32 then
     flags = bit.bor(c.O[flags], c.O.LARGEFILE)
     return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, flags, c.MODE[mode]))
   end
-  function S.creat(pathname, mode)
-    return retfd(C.open(pathname, c.O["CREAT,WRONLY,TRUNC,LARGEFILE"], c.MODE[mode]))
-  end
 else -- no largefile issues
   function S.open(pathname, flags, mode)
     return retfd(C.open(pathname, c.O[flags], c.MODE[mode]))
@@ -78,8 +75,9 @@ else -- no largefile issues
   function S.openat(dirfd, pathname, flags, mode)
     return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, c.O[flags], c.MODE[mode]))
   end
-  function S.creat(pathname, mode) return retfd(C.creat(pathname, c.MODE[mode])) end
 end
+
+function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
 
 -- TODO dup3 can have a race condition (see man page) although Musl fixes, appears eglibc does not
 function S.dup(oldfd, newfd, flags)
