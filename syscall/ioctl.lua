@@ -198,6 +198,11 @@ local ioctl = strflag {
   TUNGETVNETHDRSZ= _IOR('T', 215, s.int),
   TUNSETVNETHDRSZ= _IOW('T', 216, s.int),
   TUNSETQUEUE    = _IOW('T', 217, s.int),
+-- allow user defined ioctls
+  _IO = _IO,
+  _IOR = _IOR, 
+  _IOW = _IOW,
+  _IOWR = _IOWR
 }
 
 local override = arch.ioctl or {}
