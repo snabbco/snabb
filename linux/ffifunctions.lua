@@ -6,76 +6,35 @@ require "syscall.ffitypes"
 
 cdef[[
 int openat(int dirfd, const char *pathname, int flags, mode_t mode);
-int chdir(const char *path);
-int mkdir(const char *pathname, mode_t mode);
 int mkdirat(int dirfd, const char *pathname, mode_t mode);
-int rmdir(const char *pathname);
-int unlink(const char *pathname);
 int unlinkat(int dirfd, const char *pathname, int flags);
-int rename(const char *oldpath, const char *newpath);
 int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
-int acct(const char *filename);
-int chmod(const char *path, mode_t mode);
-int chown(const char *path, uid_t owner, gid_t group);
-int fchown(int fd, uid_t owner, gid_t group);
-int lchown(const char *path, uid_t owner, gid_t group);
 int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
-int link(const char *oldpath, const char *newpath);
-int linkat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath, int flags);
-int symlink(const char *oldpath, const char *newpath);
 int symlinkat(const char *oldpath, int newdirfd, const char *newpath);
-int chroot(const char *path);
-mode_t umask(mode_t mask);
 int uname(struct utsname *buf);
 int sethostname(const char *name, size_t len);
 int setdomainname(const char *name, size_t len);
-uid_t getuid(void);
-uid_t geteuid(void);
-pid_t getpid(void);
-pid_t getppid(void);
-gid_t getgid(void);
-gid_t getegid(void);
-int setuid(uid_t uid);
-int setgid(gid_t gid);
-int seteuid(uid_t euid);
-int setegid(gid_t egid);
+
 int setreuid(uid_t ruid, uid_t euid);
 int setregid(gid_t rgid, gid_t egid);
 int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid);
 int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
 int setresuid(uid_t ruid, uid_t euid, uid_t suid);
 int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
-pid_t getsid(pid_t pid);
-pid_t setsid(void);
 
-int setpgid(pid_t pid, pid_t pgid);
-pid_t getpgid(pid_t pid);
-pid_t getpgrp(void);
-
-int getgroups(int size, gid_t list[]);
-int setgroups(size_t size, const gid_t *list);
-pid_t fork(void);
-int execve(const char *filename, const char *argv[], const char *envp[]);
-pid_t wait(int *status);
-pid_t waitpid(pid_t pid, int *status, int options);
 int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
-void _exit(int status);
 void exit_group(int status);
 int signal(int signum, int handler); /* although deprecated, just using to set SIG_ values */
-int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
-int kill(pid_t pid, int sig);
-int gettimeofday(struct timeval *tv, void *tz);   /* not even defining struct timezone */
-int settimeofday(const struct timeval *tv, const void *tz);
-int getitimer(int which, struct itimerval *curr_value);
-int setitimer(int which, const struct itimerval *new_value, struct itimerval *old_value);
+
 time_t time(time_t *t);
+
+/* down to here have moved to shared calls */
 int clock_getres(clockid_t clk_id, struct timespec *res);
 int clock_gettime(clockid_t clk_id, struct timespec *tp);
 int clock_settime(clockid_t clk_id, const struct timespec *tp);
 int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *request, struct timespec *remain);
 unsigned int alarm(unsigned int seconds);
 int sysinfo(struct sysinfo *info);
-void sync(void);
 int nice(int inc);
 int getpriority(int which, int who);
 int setpriority(int which, int who, int prio);
@@ -90,8 +49,6 @@ int timerfd_gettime(int fd, struct itimerspec *curr_value);
 int mknod(const char *pathname, mode_t mode, dev_t dev);
 int mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev);
 
-ssize_t read(int fd, void *buf, size_t count);
-ssize_t write(int fd, const void *buf, size_t count);
 ssize_t pread64(int fd, void *buf, size_t count, loff_t offset);
 ssize_t pwrite64(int fd, const void *buf, size_t count, loff_t offset);
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
@@ -101,8 +58,6 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, void *src_addr, s
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
 ssize_t recv(int sockfd, void *buf, size_t len, int flags);
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
-ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
-ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 // ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 // ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 ssize_t preadv64(int fd, const struct iovec *iov, int iovcnt, loff_t offset);
@@ -139,11 +94,9 @@ int sync_file_range(int fd, loff_t offset, loff_t count, unsigned int flags);
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
 int dup3(int oldfd, int newfd, int flags);
-int fchdir(int fd);
 int fsync(int fd);
 int fdatasync(int fd);
 int fcntl(int fd, int cmd, void *arg); /* arg is long or pointer */
-int fchmod(int fd, mode_t mode);
 int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
 int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
