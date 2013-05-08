@@ -10,7 +10,7 @@ local cdef = require "ffi".cdef
 
 require "syscall.ffitypes"
 
--- common functions for BSD and Linux
+-- common functions for BSD (currently NetBSD) and Linux
 
 cdef[[
 int close(int fd);
@@ -32,6 +32,7 @@ int symlink(const char *oldpath, const char *newpath);
 int chroot(const char *path);
 mode_t umask(mode_t mask);
 void sync(void);
+int mknod(const char *pathname, mode_t mode, dev_t dev);
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 ssize_t write(int fd, const void *buf, size_t count);
@@ -40,6 +41,18 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+int socket(int domain, int type, int protocol);
+int socketpair(int domain, int type, int protocol, int sv[2]);
+int dup(int oldfd);
+int dup2(int oldfd, int newfd);
+int dup3(int oldfd, int newfd, int flags);
+ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+// for sendto and recvfrom use void pointer not const struct sockaddr * to avoid casting TODO should cast
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const void *dest_addr, socklen_t addrlen);
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, void *src_addr, socklen_t *addrlen);
+ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
+ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
 
 uid_t getuid(void);
 uid_t geteuid(void);

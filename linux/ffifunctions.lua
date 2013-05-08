@@ -13,6 +13,8 @@ int unlinkat(int dirfd, const char *pathname, int flags);
 int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
 int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
 int symlinkat(const char *oldpath, int newdirfd, const char *newpath);
+int mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev);
+
 int uname(struct utsname *buf);
 int sethostname(const char *name, size_t len);
 int setdomainname(const char *name, size_t len);
@@ -37,7 +39,6 @@ int clock_settime(clockid_t clk_id, const struct timespec *tp);
 int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *request, struct timespec *remain);
 unsigned int alarm(unsigned int seconds);
 int sysinfo(struct sysinfo *info);
-int nice(int inc);
 int getpriority(int which, int who);
 int setpriority(int which, int who, int prio);
 int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5);
@@ -48,16 +49,6 @@ int signalfd(int fd, const sigset_t *mask, int flags);
 int timerfd_create(int clockid, int flags);
 int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value);
 int timerfd_gettime(int fd, struct itimerspec *curr_value);
-int mknod(const char *pathname, mode_t mode, dev_t dev);
-int mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev);
-
-ssize_t send(int sockfd, const void *buf, size_t len, int flags);
-// for sendto and recvfrom use void pointer not const struct sockaddr * to avoid casting
-ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const void *dest_addr, socklen_t addrlen);
-ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, void *src_addr, socklen_t *addrlen);
-ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
-ssize_t recv(int sockfd, void *buf, size_t len, int flags);
-ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
 
 int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
@@ -87,9 +78,6 @@ int inotify_rm_watch(int fd, uint32_t wd);
 int adjtimex(struct timex *buf);
 int sync_file_range(int fd, loff_t offset, loff_t count, unsigned int flags);
 
-int dup(int oldfd);
-int dup2(int oldfd, int newfd);
-int dup3(int oldfd, int newfd, int flags);
 int fsync(int fd);
 int fdatasync(int fd);
 int fcntl(int fd, int cmd, void *arg); /* arg is long or pointer */
@@ -101,8 +89,6 @@ int ftruncate64(int fd, loff_t length);
 int pause(void);
 int prlimit64(pid_t pid, int resource, const struct rlimit64 *new_limit, struct rlimit64 *old_limit);
 
-int socket(int domain, int type, int protocol);
-int socketpair(int domain, int type, int protocol, int sv[2]);
 int bind(int sockfd, const void *addr, socklen_t addrlen); // void not struct
 int listen(int sockfd, int backlog);
 int connect(int sockfd, const void *addr, socklen_t addrlen);
