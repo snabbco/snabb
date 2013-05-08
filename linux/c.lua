@@ -28,6 +28,8 @@ if abi.abi32 then
   C.fstatfs = ffi.C.fstatfs64
   C.pread = ffi.C.pread64
   C.pwrite = ffi.C.pwrite64
+  C.preadv = ffi.C.preadv64
+  C.pwritev = ffi.C.pwritev64
 end
 
 -- test if function in libc

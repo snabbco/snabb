@@ -284,12 +284,12 @@ end
 
 function S.preadv(fd, iov, offset)
   iov = mktype(t.iovecs, iov)
-  return retnum(C.preadv64(getfd(fd), iov.iov, #iov, offset))
+  return retnum(C.preadv(getfd(fd), iov.iov, #iov, offset))
 end
 
 function S.pwritev(fd, iov, offset)
   iov = mktype(t.iovecs, iov)
-  return retnum(C.pwritev64(getfd(fd), iov.iov, #iov, offset))
+  return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
 end
 
 function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, c.MSG[flags])) end

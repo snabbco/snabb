@@ -58,10 +58,6 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, void *src_addr, s
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
 ssize_t recv(int sockfd, void *buf, size_t len, int flags);
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
-// ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
-// ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
-ssize_t preadv64(int fd, const struct iovec *iov, int iovcnt, loff_t offset);
-ssize_t pwritev64(int fd, const struct iovec *iov, int iovcnt, loff_t offset);
 
 int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
@@ -268,6 +264,8 @@ if abi.abi32 then
 cdef[[
 ssize_t pread64(int fd, void *buf, size_t count, loff_t offset);
 ssize_t pwrite64(int fd, const void *buf, size_t count, loff_t offset);
+ssize_t preadv64(int fd, const struct iovec *iov, int iovcnt, loff_t offset);
+ssize_t pwritev64(int fd, const struct iovec *iov, int iovcnt, loff_t offset);
 ]]
 end
 
