@@ -26,6 +26,8 @@ if abi.abi32 then
   C.ftruncate = ffi.C.ftruncate64
   C.statfs = ffi.C.statfs64
   C.fstatfs = ffi.C.fstatfs64
+  C.pread = ffi.C.pread64
+  C.pwrite = ffi.C.pwrite64
 end
 
 -- test if function in libc
@@ -168,10 +170,6 @@ if abi.abi32 then
     return pt.void(C.syscall(c.SYS.mmap2, pt.void(addr), t.size(length), t.int(prot), t.int(flags), t.int(fd), t.uint32(pgoffset)))
   end
 end
-
--- pread,pwrite are 32 bit but we always get pread64, pwrite64 available (which are the syscalls)
-C.pread = C.pread64
-C.pwrite = C.pwrite64
 
 -- native Linux aio not generally supported by libc, only posix API
 function C.io_setup(nr_events, ctx)
