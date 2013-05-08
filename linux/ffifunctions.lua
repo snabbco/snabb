@@ -1,12 +1,10 @@
 -- define system calls for ffi
 
-local ffi = require "ffi"
+local cdef = require "ffi".cdef
 
 require "syscall.ffitypes"
 
-ffi.cdef[[
-int close(int fd);
-int open(const char *pathname, int flags, mode_t mode);
+cdef[[
 int openat(int dirfd, const char *pathname, int flags, mode_t mode);
 int creat(const char *pathname, mode_t mode);
 int chdir(const char *path);

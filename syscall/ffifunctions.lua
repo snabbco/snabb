@@ -4,5 +4,16 @@
 
 local abi = require "syscall.abi"
 
-return require(abi.os .. ".ffifunctions")
+require(abi.os .. ".ffifunctions")
+
+local cdef = require "ffi".cdef
+
+require "syscall.ffitypes"
+
+-- common functions
+
+cdef[[
+int close(int fd);
+int open(const char *pathname, int flags, mode_t mode);
+]]
 
