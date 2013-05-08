@@ -4,7 +4,7 @@ local abi = require "syscall.abi"
 
 local S = require(abi.os .. ".syscalls")
 
--- creat is not actually a syscall always, just define
+-- these functions are not always available as syscalls, so always define via other calls
 function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
 
 function S.nice(inc)
