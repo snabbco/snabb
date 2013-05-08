@@ -4,7 +4,7 @@ What? An FFI implementation of the Linux kernel ABI for LuaJIT. This means you w
 
 Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua.
 
-Linux only? Not so easy to port to other Unixes, you need to check the types and constants are correct, and remove anything that is not in your C library, and test. Patches accepted, but will probably need to restructure for maintainability. Other Unixes may not provide the same ABI stability guarantees, from the kernel, they will usually provide from libc instead, as these are often tightly coupled. However you may well be better off using [LuaPosix](https://github.com/rrthomas/luaposix) if you want to write portable Unix code. However I am now looking at porting to BSD more seriously.
+Currently working to support BSD (initially NetBSD). Nothing is working yet, but should be at least partially supported in the next release. For now you might want to use [LuaPosix](https://github.com/rrthomas/luaposix) if you want to write portable Unix code.
 
 This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
 
@@ -26,7 +26,7 @@ ARM (soft or hard float), x86 or AMD64 and PPC architectures are supported; inte
 netfilter, dhcp, selinux.
 
 ## Release notes
-0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, small ioctl restructure.
+0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, ioctl improvements, initial NetBSD support.
 
 0.6 adds support for raw sockets, BPF, seccomp mode 2 (syscall filtering), capabilities, feature tests, plus bug fixes.
 
