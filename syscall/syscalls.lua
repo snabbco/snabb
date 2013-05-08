@@ -9,8 +9,9 @@ function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", m
 
 function S.nice(inc)
   local prio = S.getpriority("process", 0) -- this cannot fail with these args.
-  return S.setpriority("process", 0, prio + inc)
-  -- TODO change to return new priority as POSIX requires
+  local ok, err = S.setpriority("process", 0, prio + inc)
+  if not ok then return nil, err end
+  return S.getpriority("process", 0)
 end
 
 -- TODO setpgrp and similar - see the man page

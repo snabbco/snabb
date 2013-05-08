@@ -163,7 +163,7 @@ function S.getpriority(which, who)
 end
 function S.setpriority(which, who, prio) return retbool(C.setpriority(c.PRIO[which], who or 0, prio)) end
 
- -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
+-- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
 function S.clone(flags, signal, stack, ptid, tls, ctid)
   flags = c.CLONE[flags] + c.SIG[signal]
   return retnum(C.clone(flags, stack, ptid, tls, ctid))
