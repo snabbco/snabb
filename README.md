@@ -23,7 +23,7 @@ The code does not currently support the main Lua implementation, only LuaJIT. It
 ARM (soft or hard float), x86 or AMD64 and PPC architectures are supported; intend to support MIPS in future. Either glibc or [Musl libc](http://www.musl-libc.org/) or uClibc should work. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
 ## new features planned soon
-netfilter, dhcp, selinux.
+netfilter, dhcp, selinux, NetBSD rump kernel support.
 
 ## Release notes
 0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, ioctl improvements, initial NetBSD support.
