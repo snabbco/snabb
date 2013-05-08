@@ -169,6 +169,10 @@ if abi.abi32 then
   end
 end
 
+-- pread,pwrite are 32 bit but we always get pread64, pwrite64 available (which are the syscalls)
+C.pread = C.pread64
+C.pwrite = C.pwrite64
+
 -- native Linux aio not generally supported by libc, only posix API
 function C.io_setup(nr_events, ctx)
   return C.syscall(c.SYS.io_setup, t.uint(nr_events), pt.void(ctx))

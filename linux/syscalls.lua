@@ -249,8 +249,8 @@ function S.read(fd, buf, count)
 end
 
 function S.write(fd, buf, count) return retnum(C.write(getfd(fd), buf, count or #buf)) end
-function S.pread(fd, buf, count, offset) return retnum(C.pread64(getfd(fd), buf, count, offset)) end
-function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite64(getfd(fd), buf, count or #buf, offset)) end
+function S.pread(fd, buf, count, offset) return retnum(C.pread(getfd(fd), buf, count, offset)) end
+function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf, count or #buf, offset)) end
 
 function S.lseek(fd, offset, whence)
   return ret64(C.lseek(getfd(fd), offset or 0, c.SEEK[whence]))
