@@ -1,6 +1,7 @@
 -- test suite for ljsyscall.
 
 local strict = require "test.strict"
+
 local S = require "syscall"
 local helpers = require "syscall.helpers"
 local types = require "syscall.types"

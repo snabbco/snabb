@@ -1,7 +1,9 @@
 -- This is the actual system calls
 
--- allow init with different tables
-local function init(C, c, types, abi)
+local c = require "syscall.constants"
+local C = require "syscall.c"
+local types = require "syscall.types"
+local abi = require "syscall.abi"
 
 local S = {} -- exported functions
 
@@ -76,8 +78,6 @@ else -- no largefile issues
     return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, c.O[flags], c.MODE[mode]))
   end
 end
-
-function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
 
 -- TODO dup3 can have a race condition (see man page) although Musl fixes, appears eglibc does not
 function S.dup(oldfd, newfd, flags)
@@ -1276,8 +1276,4 @@ function S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
 end
 
 return S
-
-end
-
-return {init = init}
 
