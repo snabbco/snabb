@@ -37,7 +37,6 @@ typedef unsigned short int sa_family_t;
 typedef unsigned long size_t;
 typedef long ssize_t;
 typedef long off_t;
-typedef long kernel_off_t;
 typedef long time_t;
 typedef long blksize_t;
 typedef long blkcnt_t;
