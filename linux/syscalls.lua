@@ -1,4 +1,4 @@
--- This is the actual system calls
+-- This is the actual system calls for Linux
 
 return function(S, hh)
 
