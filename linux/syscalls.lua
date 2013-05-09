@@ -1,11 +1,11 @@
 -- This is the actual system calls
 
+return function(S, hh)
+
 local c = require "syscall.constants"
 local C = require "syscall.c"
 local types = require "syscall.types"
 local abi = require "syscall.abi"
-
-local S = {} -- exported functions
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -14,53 +14,9 @@ local t, pt, s = types.t, types.pt, types.s
 
 local h = require "syscall.helpers"
 
--- makes code tidier
-local function istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
+local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
+local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr
 
--- even simpler version coerces to type
-local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
-
-local function getfd(fd)
-  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
-  return fd:getfd()
-end
-
--- typed values for pointer comparison
-local zeropointer = pt.void(0)
-local errpointer = pt.void(-1)
-
--- return helpers.
-
--- straight passthrough, only needed for real 64 bit quantities. Used eg for seek (file might have giant holes!)
-local function ret64(ret)
-  if ret == t.uint64(-1) then return nil, t.error() end
-  return ret
-end
-
-local function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
-  ret = tonumber(ret)
-  if ret == -1 then return nil, t.error() end
-  return ret
-end
-
-local function retfd(ret)
-  if ret == -1 then return nil, t.error() end
-  return t.fd(ret)
-end
-
--- used for no return value, return true for use of assert
-local function retbool(ret)
-  if ret == -1 then return nil, t.error() end
-  return true
-end
-
--- used for pointer returns, -1 is failure
-local function retptr(ret)
-  if ret == errpointer then return nil, t.error() end
-  return ret
-end
-
--- main definitions start here
 if abi.abi32 then
   function S.open(pathname, flags, mode)
     flags = bit.bor(c.O[flags], c.O.LARGEFILE)
@@ -1267,4 +1223,6 @@ function S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
 end
 
 return S
+
+end
 

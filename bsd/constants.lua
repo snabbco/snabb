@@ -1,4 +1,4 @@
--- tables of constants
+-- tables of constants for BSD
 
 -- TODO add test that we do not reallocate
 

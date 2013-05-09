@@ -18,7 +18,7 @@ end
 h.ntohl = h.htonl -- reverse is the same
 h.ntohs = h.htons -- reverse is the same
 
-function h.octal(s) return tonumber(s, 8) end 
+function h.octal(s) return tonumber(s, 8) end
 
 function h.split(delimiter, text)
   if delimiter == "" then return {text} end

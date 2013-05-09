@@ -8,18 +8,24 @@ local abi = require "syscall.abi"
 local h = require "syscall.helpers"
 local S = require "syscall.syscalls"
 
-local t, pt, s = types.t, types.pt, types.s
-
 local ffi = require "ffi"
 
--- TODO these are duplicated, if this code stays here then refactor, but ideally it does not
-local function istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
-local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
+local t, pt, s = types.t, types.pt, types.s
+
+-- TODO these are duplicated, probably should not be used in this file anyway
 local function getfd(fd)
   if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
   return fd:getfd()
 end
+
+-- makes code tidier
+local function istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
+
+-- even simpler version coerces to type
+local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
+
 local zeropointer = pt.void(0)
+
 local function retbool(ret)
   if ret == -1 then return nil, t.error() end
   return true
