@@ -58,6 +58,12 @@ local function retptr(ret)
   return ret
 end
 
+-- generic system calls
+function S.open(pathname, flags, mode)
+  return retfd(C.open(pathname, c.O[flags], c.MODE[mode]))
+end
+
+-- now call OS specific for non-generic calls
 local hh = {
   istype = istype, mktype = mktype , getfd = getfd,
   ret64 = ret64, retnum = retnum, retfd = retfd, retbool = retbool, retptr = retptr

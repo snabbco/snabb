@@ -18,6 +18,7 @@ local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
 local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr
 
 if abi.abi32 then
+  -- override open call with largefile
   function S.open(pathname, flags, mode)
     flags = bit.bor(c.O[flags], c.O.LARGEFILE)
     return retfd(C.open(pathname, flags, c.MODE[mode]))
@@ -27,9 +28,6 @@ if abi.abi32 then
     return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, flags, c.MODE[mode]))
   end
 else -- no largefile issues
-  function S.open(pathname, flags, mode)
-    return retfd(C.open(pathname, c.O[flags], c.MODE[mode]))
-  end
   function S.openat(dirfd, pathname, flags, mode)
     return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, c.O[flags], c.MODE[mode]))
   end
