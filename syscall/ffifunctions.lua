@@ -13,8 +13,8 @@ require "syscall.ffitypes"
 -- common functions for BSD (currently NetBSD) and Linux
 
 cdef[[
-int close(int fd);
 int open(const char *pathname, int flags, mode_t mode);
+int close(int fd);
 int chdir(const char *path);
 int fchdir(int fd);
 int mkdir(const char *pathname, mode_t mode);

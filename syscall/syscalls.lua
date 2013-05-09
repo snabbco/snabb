@@ -63,6 +63,8 @@ function S.open(pathname, flags, mode)
   return retfd(C.open(pathname, c.O[flags], c.MODE[mode]))
 end
 
+function S.close(fd) return retbool(C.close(getfd(fd))) end
+
 -- now call OS specific for non-generic calls
 local hh = {
   istype = istype, mktype = mktype , getfd = getfd,

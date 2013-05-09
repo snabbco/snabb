@@ -46,8 +46,6 @@ function S.pipe(flags)
   return t.pipe(fd2)
 end
 
-function S.close(fd) return retbool(C.close(getfd(fd))) end
-
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.unlinkat(dirfd, path, flags)
   return retbool(C.unlinkat(c.AT_FDCWD[dirfd], path, c.AT_REMOVEDIR[flags]))
