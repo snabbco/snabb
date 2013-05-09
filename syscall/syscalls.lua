@@ -59,11 +59,13 @@ local function retptr(ret)
 end
 
 -- generic system calls
-function S.open(pathname, flags, mode)
-  return retfd(C.open(pathname, c.O[flags], c.MODE[mode]))
-end
-
+function S.open(pathname, flags, mode) return retfd(C.open(pathname, c.O[flags], c.MODE[mode])) end
 function S.close(fd) return retbool(C.close(getfd(fd))) end
+function S.chdir(path) return retbool(C.chdir(path)) end
+function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
+function S.mkdir(path, mode) return retbool(C.mkdir(path, c.MODE[mode])) end
+function S.rmdir(path) return retbool(C.rmdir(path)) end
+function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 
 -- now call OS specific for non-generic calls
 local hh = {

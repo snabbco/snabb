@@ -46,7 +46,6 @@ function S.pipe(flags)
   return t.pipe(fd2)
 end
 
-function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.unlinkat(dirfd, path, flags)
   return retbool(C.unlinkat(c.AT_FDCWD[dirfd], path, c.AT_REMOVEDIR[flags]))
 end
@@ -54,10 +53,7 @@ function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) e
 function S.renameat(olddirfd, oldpath, newdirfd, newpath)
   return retbool(C.renameat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath))
 end
-function S.chdir(path) return retbool(C.chdir(path)) end
-function S.mkdir(path, mode) return retbool(C.mkdir(path, c.MODE[mode])) end
 function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(c.AT_FDCWD[fd], path, c.MODE[mode])) end
-function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.acct(filename) return retbool(C.acct(filename)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, c.MODE[mode])) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
@@ -273,7 +269,6 @@ function S.getsockopt(fd, level, optname, optval, optlen)
   return optval[0]
 end
 
-function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), c.MODE[mode])) end
