@@ -37,22 +37,26 @@ end
 --- packet buffer.
 
 function Port:spam ()
-   local input, output = self.input, self.output
+   local inputs, outputs = self.inputs, self.outputs
    -- Keep it simple: use one buffer for everything.
    local buf = buffer.allocate()
    buf.size = 32
    repeat
-      input.sync_receive()
-      while input.can_receive() do
-	 input.receive()
+      for _,input in pairs(inputs) do
+         input.sync_receive()
+         while input.can_receive() do
+            input.receive()
+         end
+         while input.can_add_receive_buffer() do
+            input.add_receive_buffer(buf)
+         end
       end
-      while output.can_transmit() do
-	 output.transmit(buf)
+      for _,output in pairs(outputs) do
+         while output.can_transmit() do
+            output.transmit(buf)
+         end
+         output.sync_transmit()
       end
-      while input.can_add_receive_buffer() do
-	 input.add_receive_buffer(buf)
-      end
-      output.sync_transmit()
       C.usleep(100000)
    until coroutine.yield("spam") == nil
    buffer.deref(buf)
@@ -84,12 +88,14 @@ end
 function selftest (options)
    print("selftest: port")
    options = options or {}
-   local device = options.device
-   if device == nil then
-      device = require("virtio").new("snabb%d")
-      device.init()
+   local devices = options.devices
+   if devices == nil then
+      devices = {require("virtio").new("snabb%d")}
+      for _,device in pairs(devices) do
+         device.init()
+      end
    end
-   local port = port.new("test", device, device)
+   local port = port.new("test", devices, devices)
    local program = options.program or Port.spam
    port.coroutine = coroutine.wrap(program)
    local finished = lib.timer((options.secs or 1) * 1e9)
