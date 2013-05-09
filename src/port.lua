@@ -2,6 +2,7 @@
 
 module(...,package.seeall)
 
+require("pci")
 local C = require("ffi").C
 local buffer = require("buffer")
 
@@ -12,8 +13,8 @@ ports = {}
 
 Port = {}
 
-function new (name, input, output, coroutine)
-   local o = {name = name, input = input, output = output,
+function new (name, inputs, outputs, coroutine)
+   local o = {name = name, inputs = inputs, outputs = outputs,
 	      coroutine = coroutine, state = "start"}
    setmetatable(o, {__index = Port,
 		    __tostring = Port.tostring})
@@ -90,9 +91,15 @@ function selftest (options)
    options = options or {}
    local devices = options.devices
    if devices == nil then
-      devices = {require("virtio").new("snabb%d")}
-      for _,device in pairs(devices) do
-         device.init()
+      devices = {}
+      for _,d in pairs(pci.devices) do
+         if d.usable then
+            local driver = pci.open_device(d.pciaddress, d.driver)
+            driver.open()
+            driver.enable_mac_loopback()
+            driver.wait_linkup()
+            table.insert(devices, driver)
+         end
       end
    end
    local port = port.new("test", devices, devices)
@@ -102,5 +109,8 @@ function selftest (options)
    repeat
       port:run(port)
    until finished()
+   for _,d in pairs(devices) do
+      register.dump(d.s, true)
+   end
 end
 

@@ -167,12 +167,12 @@ end
 
 function sync () sync_receive() sync_transmit() end
 
-local txdesc_t = ffi.typeof [[
+txdesc_t = ffi.typeof [[
       union { struct { uint64_t address, options; } data;
               struct { uint64_t a, b; }             context; }
 ]]
 
-local rxdesc_t = ffi.typeof [[
+rxdesc_t = ffi.typeof [[
       union { struct { uint64_t address, dd; } data;
 	      struct { uint16_t csum, id;
 		       uint32_t mrq, status;
