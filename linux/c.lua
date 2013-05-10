@@ -5,8 +5,6 @@
 
 local ffi = require "ffi"
 
-require "syscall.ffifunctions"
-
 local c = require "syscall.constants"
 local abi = require "syscall.abi"
 

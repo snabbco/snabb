@@ -3,7 +3,5 @@
 
 local ffi = require "ffi"
 
-require "bsd.ffifunctions"
-
 return ffi.C
 
