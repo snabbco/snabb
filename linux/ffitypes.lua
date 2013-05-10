@@ -56,10 +56,6 @@ struct utsname {
   char machine[65];
   char domainname[65];
 };
-struct iovec {
-  void *iov_base;
-  size_t iov_len;
-};
 struct pollfd {
   int fd;
   short int events;

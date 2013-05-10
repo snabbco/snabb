@@ -42,6 +42,10 @@ typedef unsigned long ino_t;
 typedef unsigned long nlink_t;
 typedef unsigned long nfds_t;
 
+struct iovec {
+  void *iov_base;
+  size_t iov_len;
+};
 struct in_addr {
   uint32_t       s_addr;
 };

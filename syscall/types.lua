@@ -139,6 +139,7 @@ local addtypes = {
 }
 
 local addstructs = {
+  iovec = "struct iovec",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
@@ -251,6 +252,44 @@ t.addrtype = {
   [c.AF.INET] = t.in_addr,
   [c.AF.INET6] = t.in6_addr,
 }
+
+mt.iovecs = {
+  __index = function(io, k)
+    return io.iov[k - 1]
+  end,
+  __newindex = function(io, k, v)
+    v = istype(t.iovec, v) or t.iovec(v)
+    ffi.copy(io.iov[k - 1], v, s.iovec)
+  end,
+  __len = function(io) return io.count end,
+  __new = function(tp, is)
+    if type(is) == 'number' then return ffi.new(tp, is, is) end
+    local count = #is
+    local iov = ffi.new(tp, count, count)
+    for n = 1, count do
+      local i = is[n]
+      if type(i) == 'string' then
+        local buf = t.buffer(#i)
+        ffi.copy(buf, i, #i)
+        iov[n].iov_base = buf
+        iov[n].iov_len = #i
+      elseif type(i) == 'number' then
+        iov[n].iov_base = t.buffer(i)
+        iov[n].iov_len = i
+      elseif ffi.istype(t.iovec, i) then
+        ffi.copy(iov[n], i, s.iovec)
+      elseif type(i) == 'cdata' then -- eg buffer or other structure
+        iov[n].iov_base = i
+        iov[n].iov_len = ffi.sizeof(i)
+      else -- eg table
+        iov[n] = i
+      end
+    end
+    return iov
+  end
+}
+
+t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs) -- do not use metatype helper as variable size
 
 -- include OS specific types
 local hh = {ptt = ptt, addtype = addtype, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
