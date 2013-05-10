@@ -111,6 +111,9 @@ c.S_I = multiflags {
 }
 
 c.MODE = multiflags {
+  SUID = octal('04000'),
+  SGID = octal('02000'),
+  SVTX = octal('01000'),
   RWXU = octal('00700'),
   RUSR = octal('00400'),
   WUSR = octal('00200'),

@@ -206,5 +206,22 @@ c.OK = charflags {
   F = 0,
 }
 
+c.MODE = multiflags {
+  SUID = octal('04000'),
+  SGID = octal('02000'),
+  STXT = octal('01000'),
+  RWXU = octal('00700'),
+  RUSR = octal('00400'),
+  WUSR = octal('00200'),
+  XUSR = octal('00100'),
+  RWXG = octal('00070'),
+  RGRP = octal('00040'),
+  WGRP = octal('00020'),
+  XGRP = octal('00010'),
+  RWXO = octal('00007'),
+  ROTH = octal('00004'),
+  WOTH = octal('00002'),
+  XOTH = octal('00001'),
+}
 return c
 
