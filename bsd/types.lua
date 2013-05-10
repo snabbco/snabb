@@ -1,4 +1,4 @@
--- Linux kernel types
+-- BSD types
 
 return function(types, hh)
 

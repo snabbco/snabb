@@ -141,6 +141,30 @@ local addstructs = {
 for k, v in pairs(addtypes) do addtype(k, v) end
 for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 
+t.ints = ffi.typeof("int[?]")
+t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
+
+t.int1 = ffi.typeof("int[1]")
+t.uint1 = ffi.typeof("unsigned int[1]")
+t.int16_1 = ffi.typeof("int16_t[1]")
+t.uint16_1 = ffi.typeof("uint16_t[1]")
+t.int32_1 = ffi.typeof("int32_t[1]")
+t.uint32_1 = ffi.typeof("uint32_t[1]")
+t.int64_1 = ffi.typeof("int64_t[1]")
+t.uint64_1 = ffi.typeof("uint64_t[1]")
+t.socklen1 = ffi.typeof("socklen_t[1]")
+t.off1 = ffi.typeof("off_t[1]")
+t.loff1 = ffi.typeof("loff_t[1]")
+t.uid1 = ffi.typeof("uid_t[1]")
+t.gid1 = ffi.typeof("gid_t[1]")
+
+t.char2 = ffi.typeof("char[2]")
+t.int2 = ffi.typeof("int[2]")
+t.uint2 = ffi.typeof("unsigned int[2]")
+
+-- still need sizes for these, for ioctls
+s.uint2 = ffi.sizeof(t.uint2)
+
 -- TODO add generic address type that works out which to take? basically inet_name, except without netmask
 
 addtype("in_addr", "struct in_addr", {

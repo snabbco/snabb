@@ -145,32 +145,10 @@ t.sock_filters = ffi.typeof("struct sock_filter[?]")
 t.iocb_ptrs = ffi.typeof("struct iocb *[?]")
 t.string_array = ffi.typeof("const char *[?]")
 
-t.ints = ffi.typeof("int[?]")
-t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
-
-t.int1 = ffi.typeof("int[1]")
-t.uint1 = ffi.typeof("unsigned int[1]")
-t.int16_1 = ffi.typeof("int16_t[1]")
-t.uint16_1 = ffi.typeof("uint16_t[1]")
-t.int32_1 = ffi.typeof("int32_t[1]")
-t.uint32_1 = ffi.typeof("uint32_t[1]")
-t.int64_1 = ffi.typeof("int64_t[1]")
-t.uint64_1 = ffi.typeof("uint64_t[1]")
-t.socklen1 = ffi.typeof("socklen_t[1]")
-t.off1 = ffi.typeof("off_t[1]")
-t.loff1 = ffi.typeof("loff_t[1]")
-t.uid1 = ffi.typeof("uid_t[1]")
-t.gid1 = ffi.typeof("gid_t[1]")
 t.aio_context1 = ffi.typeof("aio_context_t[1]")
 t.sock_fprog1 = ffi.typeof("struct sock_fprog[1]")
 
-t.char2 = ffi.typeof("char[2]")
-t.int2 = ffi.typeof("int[2]")
-t.uint2 = ffi.typeof("unsigned int[2]")
 t.user_cap_data2 = ffi.typeof("struct user_cap_data[2]")
-
--- still need sizes for these, for ioctls
-s.uint2 = ffi.sizeof(t.uint2)
 
 -- types with metatypes
 
