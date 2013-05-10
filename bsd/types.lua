@@ -19,8 +19,6 @@ local c = require "syscall.constants"
 
 local abi = require "syscall.abi"
 
-local C = ffi.C -- for inet_pton etc, TODO due to be replaced with Lua
-
 local mt = {} -- metatables
 local meth = {}
 
