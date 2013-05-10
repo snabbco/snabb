@@ -199,5 +199,12 @@ c.EXIT = strflag {
   FAILURE = 1,
 }
 
+c.OK = charflags {
+  R = 4,
+  W = 2,
+  X = 1,
+  F = 0,
+}
+
 return c
 
