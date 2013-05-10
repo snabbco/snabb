@@ -42,6 +42,21 @@ local function lenfn(tp) return ffi.sizeof(tp) end
 
 local lenmt = {__len = lenfn}
 
+-- generic for __new TODO use more
+local function newfn(tp, tab)
+  local num = {}
+  if tab then for i = 1, #tab do num[i] = tab[i] end end -- numeric index initialisers
+  local obj = ffi.new(tp, num)
+  -- these are split out so __newindex is called, not just initialisers luajit understands
+  for k, v in pairs(tab or {}) do if type(k) == "string" then obj[k] = v end end -- set string indexes
+  return obj
+end
+
+-- makes code tidier
+local function istype(tp, x)
+  if ffi.istype(tp, x) then return x else return false end
+end
+
 -- generic types
 
 local addtypes = {
@@ -74,7 +89,7 @@ for k, v in pairs(addtypes) do addtype(k, v) end
 for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 
 -- include OS specific types
-local hh = {ptt = ptt, addtype = addtype, lenfn = lenfn, lenmt = lenmt}
+local hh = {ptt = ptt, addtype = addtype, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
 
 types = require(abi.os .. ".types")(types, hh)
 

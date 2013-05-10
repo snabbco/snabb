@@ -4,7 +4,7 @@ return function(types, hh)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local ptt, addtype, lenfn, lenmt = hh.ptt, hh.addtype, hh.lenfn, hh.lenmt
+local ptt, addtype, lenfn, lenmt, newfn, istype = hh.ptt, hh.addtype, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -28,21 +28,6 @@ local meth = {}
 local stattypename = "struct stat"
 if abi.abi32 then
   stattypename = "struct stat64"
-end
-
--- makes code tidier
-local function istype(tp, x)
-  if ffi.istype(tp, x) then return x else return false end
-end
-
--- generic for __new TODO use more.
-local function newfn(tp, tab)
-  local num = {}
-  if tab then for i = 1, #tab do num[i] = tab[i] end end -- numeric index initialisers
-  local obj = ffi.new(tp, num)
-  -- these are split out so __newindex is called, not just initialisers luajit understands
-  for k, v in pairs(tab or {}) do if type(k) == "string" then obj[k] = v end end -- set string indexes
-  return obj
 end
 
 -- TODO cleanup this (what should provide this?)
