@@ -40,8 +40,14 @@ typedef long blkcnt_t;
 typedef long clock_t;
 typedef unsigned long ino_t;
 typedef unsigned long nlink_t;
-typedef unsigned long aio_context_t;
 typedef unsigned long nfds_t;
+
+struct in_addr {
+  uint32_t       s_addr;
+};
+struct in6_addr {
+  unsigned char  s6_addr[16];
+};
 ]]
 
 require(abi.os .. ".ffitypes")
