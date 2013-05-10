@@ -64,13 +64,6 @@ test_open_close = {
     assert(err, "expected open to fail on file not found")
     assert(err.NOENT, "expect NOENT from open non existent file")
   end,
-  test_openat = function()
-    local dfd = S.open(".")
-    local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "rwxu"))
-    assert(dfd:unlinkat(tmpfile))
-    assert(fd:close())
-    assert(dfd:close())
-  end,
   test_close_invalid_fd = function()
     local ok, err = S.close(127)
     assert(err, "expected to fail on close invalid fd")
@@ -105,14 +98,6 @@ test_open_close = {
     assert(S.access("/dev/null", "w"), "expect access to say can write /dev/null")
     assert(not S.access("/dev/null", "x"), "expect access to say cannot execute /dev/null")
   end,
-  test_faccessat = function()
-    local fd = S.open("/dev")
-    assert(fd:faccessat("null", "r"), "expect access to say can read /dev/null")
-    assert(fd:faccessat("null", c.OK.R), "expect access to say can read /dev/null")
-    assert(fd:faccessat("null", "w"), "expect access to say can write /dev/null")
-    assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
-    assert(fd:close())
-  end,
   test_fd_gc = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
     local fileno = fd:getfd()
@@ -131,6 +116,24 @@ test_open_close = {
     local n = assert(S.read(fileno, buf, size))
     assert(S.close(fileno))
   end
+}
+
+test_openat_accessat = {
+  test_openat = function()
+    local dfd = S.open(".")
+    local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "rwxu"))
+    assert(dfd:unlinkat(tmpfile))
+    assert(fd:close())
+    assert(dfd:close())
+  end,
+  test_faccessat = function()
+    local fd = S.open("/dev")
+    assert(fd:faccessat("null", "r"), "expect access to say can read /dev/null")
+    assert(fd:faccessat("null", c.OK.R), "expect access to say can read /dev/null")
+    assert(fd:faccessat("null", "w"), "expect access to say can write /dev/null")
+    assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
+    assert(fd:close())
+  end,
 }
 
 test_read_write = {
