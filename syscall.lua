@@ -171,6 +171,7 @@ t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   end,
 })
 
+if S.mq_open then -- TODO better test. TODO support in BSD but will be slightly different as use -lrt not syscalls
 mqmeth = {
   close = fmeth.close,
   nogc = nogc,
@@ -199,6 +200,7 @@ t.mqd = ffi.metatype("struct {mqd_t filenum;}", {
     return istype(tp, i) or ffi.new(tp, i)
   end,
 })
+end
 
 -- override socketpair to provide methods
 local mt_socketpair = {
