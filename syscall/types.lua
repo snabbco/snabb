@@ -28,6 +28,9 @@ local types = {}
 local t, pt, s, ctypes = {}, {}, {}, {} -- types, pointer types and sizes tables
 types.t, types.pt, types.s, types.ctypes = t, pt, s, ctypes
 
+local mt = {} -- metatables
+local meth = {}
+
 --helpers
 local function ptt(tp)
   local ptp = ffi.typeof(tp .. " *")
