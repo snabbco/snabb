@@ -106,7 +106,7 @@ test_basic = {
     local allok = true
     for k, v in pairs(c.E) do
       local msg = t.error(v)
-      if not msg or msg:sub(1, #noerr) == noerr then
+      if not msg or tostring(msg):sub(1, #noerr) == noerr then
         print("no error message for " .. k)
         allok = false
       end
