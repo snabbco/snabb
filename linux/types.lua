@@ -19,7 +19,10 @@ local c = require "syscall.constants"
 
 local abi = require "syscall.abi"
 
-local C = ffi.C -- for inet_pton etc, TODO due to be replaced with Lua
+local C = ffi.C -- for inet_pton, TODO due to be replaced with Lua
+ffi.cdef[[
+int inet_pton(int af, const char *src, void *dst);
+]]
 
 local mt = {} -- metatables
 local meth = {}

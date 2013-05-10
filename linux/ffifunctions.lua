@@ -235,8 +235,6 @@ int mq_unlink(const char *name);
 */
 
 // functions from libc ie man 3 not man 2
-int inet_pton(int af, const char *src, void *dst);
-const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 
 // env. dont support putenv, as does not copy which is an issue
 extern char **environ;
