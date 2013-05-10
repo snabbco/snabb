@@ -223,5 +223,12 @@ c.MODE = multiflags {
   WOTH = octal('00002'),
   XOTH = octal('00001'),
 }
+
+c.SEEK = strflag {
+  SET = 0,
+  CUR = 1,
+  END = 2,
+}
+
 return c
 
