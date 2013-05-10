@@ -112,6 +112,9 @@ function S.pwritev(fd, iov, offset)
   return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
 end
 function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
+function S.lseek(fd, offset, whence)
+  return ret64(C.lseek(getfd(fd), offset or 0, c.SEEK[whence]))
+end
 
 function S.getuid() return C.getuid() end
 function S.geteuid() return C.geteuid() end

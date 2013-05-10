@@ -172,10 +172,6 @@ end
 
 function S.exit(status) C.exit_group(c.EXIT[status]) end
 
-function S.lseek(fd, offset, whence)
-  return ret64(C.lseek(getfd(fd), offset or 0, c.SEEK[whence]))
-end
-
 function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, c.MSG[flags])) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, c.MSG[flags], addr, addrlen or ffi.sizeof(addr)))

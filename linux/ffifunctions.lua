@@ -58,7 +58,6 @@ int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, co
 int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
-off_t lseek(int fd, off_t offset, int whence); // only for 64 bit, else use _llseek
 
 int epoll_create1(int flags);
 int epoll_create(int size);
