@@ -169,5 +169,30 @@ c.AT_FDCWD = atflag {
   FDCWD = -100,
 }
 
+c.O = multiflags {
+  RDONLY      = 0x00000000,
+  WRONLY      = 0x00000001,
+  RDWR        = 0x00000002,
+  ACCMODE     = 0x00000003,
+  NONBLOCK    = 0x00000004,
+  APPEND      = 0x00000008,
+  SHLOCK      = 0x00000010,
+  EXLOCK      = 0x00000020,
+  ASYNC       = 0x00000040,
+  NOFOLLOW    = 0x00000100,
+  CREAT       = 0x00000200,
+  TRUNC       = 0x00000400,
+  EXCL        = 0x00000800,
+  NOCTTY      = 0x00008000,
+  DSYNC       = 0x00010000,
+  RSYNC       = 0x00020000,
+  ALT_IO      = 0x00040000,
+  DIRECT      = 0x00080000,
+  DIRECTORY   = 0x00200000,
+  CLOEXEC     = 0x00400000,
+  SEARCH      = 0x00800000,
+  NOSIGPIPE   = 0x01000000,
+}
+
 return c
 
