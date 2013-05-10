@@ -987,12 +987,6 @@ addtype("sigset", "sigset_t", {
   end,
 })
 
-local voidp = ffi.typeof("void *")
-
-pt.void = function(x)
-  return ffi.cast(voidp, x)
-end
-
 -- these are declared above
 samap = {
   [c.AF.UNIX] = t.sockaddr_un,

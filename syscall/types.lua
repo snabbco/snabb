@@ -59,6 +59,12 @@ end
 
 -- generic types
 
+local voidp = ffi.typeof("void *")
+
+pt.void = function(x)
+  return ffi.cast(voidp, x)
+end
+
 local addtypes = {
   char = "char",
   uchar = "unsigned char",
