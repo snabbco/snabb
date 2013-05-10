@@ -112,6 +112,22 @@ function S.pwritev(fd, iov, offset)
   return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
 end
 
+function S.getuid() return C.getuid() end
+function S.geteuid() return C.geteuid() end
+function S.getpid() return C.getpid() end
+function S.getppid() return C.getppid() end
+function S.getgid() return C.getgid() end
+function S.getegid() return C.getegid() end
+function S.setuid(uid) return retbool(C.setuid(uid)) end
+function S.setgid(gid) return retbool(C.setgid(gid)) end
+function S.seteuid(uid) return retbool(C.seteuid(uid)) end
+function S.setegid(gid) return retbool(C.setegid(gid)) end
+function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
+function S.setsid() return retnum(C.setsid()) end
+function S.setpgid(pid, pgid) return retbool(C.setpgid(pid or 0, pgid or 0)) end
+function S.getpgid(pid) return retnum(C.getpgid(pid or 0)) end
+function S.getpgrp() return retnum(C.getpgrp()) end
+
 -- now call OS specific for non-generic calls
 local hh = {
   istype = istype, mktype = mktype , getfd = getfd,

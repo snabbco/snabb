@@ -995,20 +995,8 @@ function S.clock_nanosleep(clk_id, flags, req, rem)
   return true
 end
 
--- straight passthroughs, no failure possible, still wrap to allow mocking
-function S.getuid() return C.getuid() end
-function S.geteuid() return C.geteuid() end
-function S.getppid() return C.getppid() end
-function S.getgid() return C.getgid() end
-function S.getegid() return C.getegid() end
 function S.alarm(s) return C.alarm(s) end
 
-function S.getpid() return C.getpid() end -- note this will use syscall as overridden above
-
-function S.setuid(uid) return retbool(C.setuid(uid)) end
-function S.setgid(gid) return retbool(C.setgid(gid)) end
-function S.seteuid(uid) return retbool(C.seteuid(uid)) end
-function S.setegid(gid) return retbool(C.setegid(gid)) end
 function S.setreuid(ruid, euid) return retbool(C.setreuid(ruid, euid)) end
 function S.setregid(rgid, egid) return retbool(C.setregid(rgid, egid)) end
 
@@ -1056,12 +1044,6 @@ function S.setgroups(groups)
   if type(groups) == "table" then groups = t.groups(groups) end
   return retbool(C.setgroups(groups.count, groups.list))
 end
-
-function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
-function S.setsid() return retnum(C.setsid()) end
-function S.setpgid(pid, pgid) return retbool(C.setpgid(pid or 0, pgid or 0)) end
-function S.getpgid(pid) return retnum(C.getpgid(pid or 0)) end
-function S.getpgrp() return retnum(C.getpgrp()) end
 
 function S.vhangup() return retbool(C.vhangup()) end
 
