@@ -114,11 +114,11 @@ test_basic = {
     assert_equal(helpers.booltoc[0], 0)
   end,
   test_constants = function()
-    assert_equal(c.F.GETFD, c.F.getfd) -- test can use upper and lower case
-    assert_equal(c.F.GETFD, c.F.getFD) -- test can use mixed case
-    assert(rawget(c.F, "GETFD"))
-    assert(not rawget(c.F, "getfd"))
-    assert(rawget(getmetatable(c.F).__index, "getfd")) -- a little implementation dependent
+    assert_equal(c.O.CREAT, c.O.creat) -- test can use upper and lower case
+    assert_equal(c.O.CREAT, c.O.Creat) -- test can use mixed case
+    assert(rawget(c.O, "CREAT"))
+    assert(not rawget(c.O, "creat"))
+    assert(rawget(getmetatable(c.O).__index, "creat")) -- a little implementation dependent
   end,
   test_at_flags = function()
     assert_equal(c.AT_FDCWD[nil], c.AT_FDCWD.FDCWD) -- nil returns current dir
