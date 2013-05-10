@@ -134,6 +134,67 @@ test_basic = {
   end,
 }
 
+test_open_close = {
+  teardown = clean,
+  test_open_nofile = function()
+    local fd, err = S.open("/tmp/file/does/not/exist", "rdonly")
+    assert(err, "expected open to fail on file not found")
+    assert(err.NOENT, "expect NOENT from open non existent file")
+  end,
+  test_close_invalid_fd = function()
+    local ok, err = S.close(127)
+    assert(err, "expected to fail on close invalid fd")
+    assert_equal(err.errno, c.E.BADF, "expect BADF from invalid numberic fd")
+  end,
+  test_open_valid = function()
+    local fd = assert(S.open("/dev/null", "rdonly"))
+    assert(fd:getfd() >= 3, "should get file descriptor of at least 3 back from first open")
+    local fd2 = assert(S.open("/dev/zero", "RDONLY"))
+    assert(fd2:getfd() >= 4, "should get file descriptor of at least 4 back from second open")
+    assert(fd:close())
+    assert(fd2:close())
+  end,
+  test_fd_cleared_on_close = function()
+    local fd = assert(S.open("/dev/null", "rdonly"))
+    assert(fd:close())
+    local fd2 = assert(S.open("/dev/zero")) -- reuses same fd
+    local ok, err = assert(fd:close()) -- this should not close fd again, but no error as does nothing
+    assert(fd2:close()) -- this should succeed
+  end,
+  test_double_close = function()
+    local fd = assert(S.open("/dev/null", "rdonly"))
+    local fileno = fd:getfd()
+    assert(fd:close())
+    local fd, err = S.close(fileno)
+    assert(err, "expected to fail on close already closed fd")
+    assert(err.badf, "expect BADF from invalid numberic fd")
+  end,
+  test_access = function()
+    assert(S.access("/dev/null", "r"), "expect access to say can read /dev/null")
+    assert(S.access("/dev/null", c.OK.R), "expect access to say can read /dev/null")
+    assert(S.access("/dev/null", "w"), "expect access to say can write /dev/null")
+    assert(not S.access("/dev/null", "x"), "expect access to say cannot execute /dev/null")
+  end,
+  test_fd_gc = function()
+    local fd = assert(S.open("/dev/null", "rdonly"))
+    local fileno = fd:getfd()
+    fd = nil
+    collectgarbage("collect")
+    local _, err = S.read(fileno, buf, size)
+    assert(err, "should not be able to read from fd after gc")
+    assert(err.BADF, "expect BADF from already closed fd")
+  end,
+  test_fd_nogc = function()
+    local fd = assert(S.open("/dev/zero", "RDONLY"))
+    local fileno = fd:getfd()
+    fd:nogc()
+    fd = nil
+    collectgarbage("collect")
+    local n = assert(S.read(fileno, buf, size))
+    assert(S.close(fileno))
+  end
+}
+
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
   if abi.os == "linux" then
