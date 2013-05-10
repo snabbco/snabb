@@ -1,6 +1,10 @@
 -- Linux kernel types
 
-return function(types)
+return function(types, hh)
+
+local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
+
+local ptt, addtype, lenfn, lenmt = hh.ptt, hh.addtype, hh.lenfn, hh.lenmt
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -16,11 +20,6 @@ local c = require "syscall.constants"
 local abi = require "syscall.abi"
 
 local C = ffi.C -- for inet_pton etc, TODO due to be replaced with Lua
-
-local types = {}
-
-local t, pt, s, ctypes = {}, {}, {}, {} -- types, pointer types and sizes tables
-types.t, types.pt, types.s, types.ctypes = t, pt, s, ctypes
 
 local mt = {} -- metatables
 local meth = {}
@@ -89,48 +88,11 @@ for k, v in pairs(c.SIGPOLL) do
   signal_reasons[c.SIG.POLL][v] = k
 end
 
--- cast to pointer to a type. could generate for all types.
-local function ptt(tp)
-  local ptp = ffi.typeof(tp .. " *")
-  return function(x) return ffi.cast(ptp, x) end
-end
-
-local function lenfn(tp) return ffi.sizeof(tp) end
-
-local lenmt = {__len = lenfn}
-
-local function addtype(name, tp, mt)
-  if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
-  ctypes[tp] = t[name]
-  pt[name] = ptt(tp)
-  s[name] = ffi.sizeof(t[name])
-end
-
 local addtypes = {
-  char = "char",
-  uchar = "unsigned char",
-  int = "int",
-  uint = "unsigned int",
-  int16 = "int16_t",
-  uint16 = "uint16_t",
-  int32 = "int32_t",
-  uint32 = "uint32_t",
-  int64 = "int64_t",
-  uint64 = "uint64_t",
-  long = "long",
-  ulong = "unsigned long",
-  uintptr = "uintptr_t",
-  intptr = "intptr_t",
-  size = "size_t",
-  mode = "mode_t",
-  dev = "dev_t",
-  loff = "loff_t",
-  pid = "pid_t",
-  aio_context = "aio_context_t",
-  sa_family = "sa_family_t",
   fdset = "fd_set",
   clockid = "clockid_t",
   sighandler = "sighandler_t",
+  aio_context = "aio_context_t",
 }
 
 -- as an experiment, see https://github.com/justincormack/ljsyscall/issues/28 trying adding a __len method
