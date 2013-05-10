@@ -165,6 +165,24 @@ t.uint2 = ffi.typeof("unsigned int[2]")
 -- still need sizes for these, for ioctls
 s.uint2 = ffi.sizeof(t.uint2)
 
+-- 64 to 32 bit conversions via unions TODO use meth not object?
+if abi.le then
+mt.i6432 = {
+  __index = {
+    to32 = function(u) return u.i32[1], u.i32[0] end,
+  }
+}
+else
+mt.i6432 = {
+  __index = {
+    to32 = function(u) return u.i32[0], u.i32[1] end,
+  }
+}
+end
+
+t.i6432 = ffi.metatype("union {int64_t i64; int32_t i32[2];}", mt.i6432)
+t.u6432 = ffi.metatype("union {uint64_t i64; uint32_t i32[2];}", mt.i6432)
+
 -- TODO add generic address type that works out which to take? basically inet_name, except without netmask
 
 addtype("in_addr", "struct in_addr", {
