@@ -1,4 +1,4 @@
--- Linux specific tests
+-- BSD specific tests
 
 -- TODO stop using globals for tests
 
@@ -12,10 +12,6 @@ local bit = require "bit"
 local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
-
-local nl = require "linux.nl"
-local util = require "linux.util"
-local features = require "linux.features"
 
 local oldassert = assert
 local function assert(cond, s)
