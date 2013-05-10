@@ -144,6 +144,9 @@ local msg = {
   LIBBAD     = "Accessing a corrupted shared library",
   LIBMAX     = "Attempting to link in too many shared libraries",
   UNATCH     = "Protocol driver not attached",
+
+-- these are NetBSD specific errors
+  PROCLIM    = "Too many processes",
 }
 
 local errors = setmetatable({}, {
