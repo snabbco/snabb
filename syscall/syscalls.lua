@@ -128,6 +128,8 @@ function S.setpgid(pid, pgid) return retbool(C.setpgid(pid or 0, pgid or 0)) end
 function S.getpgid(pid) return retnum(C.getpgid(pid or 0)) end
 function S.getpgrp() return retnum(C.getpgrp()) end
 
+function S._exit(status) C._exit(c.EXIT[status]) end
+
 -- now call OS specific for non-generic calls
 local hh = {
   istype = istype, mktype = mktype , getfd = getfd,

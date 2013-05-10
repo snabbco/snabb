@@ -171,7 +171,6 @@ function S.waitid(idtype, id, options, infop) -- note order of args, as usually 
   return infop -- return table here?
 end
 
-function S._exit(status) C._exit(c.EXIT[status]) end
 function S.exit(status) C.exit_group(c.EXIT[status]) end
 
 function S.lseek(fd, offset, whence)

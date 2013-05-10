@@ -70,14 +70,14 @@ int setpgid(pid_t pid, pid_t pgid);
 pid_t getpgid(pid_t pid);
 pid_t getpgrp(void);
 
-int getgroups(int size, gid_t list[]);
-int setgroups(size_t size, const gid_t *list);
-
 pid_t fork(void);
 int execve(const char *filename, const char *argv[], const char *envp[]);
 void _exit(int status);
 int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
 int kill(pid_t pid, int sig);
+
+int getgroups(int size, gid_t list[]);
+int setgroups(size_t size, const gid_t *list);
 
 int gettimeofday(struct timeval *tv, void *tz);
 int settimeofday(const struct timeval *tv, const void *tz);
