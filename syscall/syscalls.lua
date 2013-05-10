@@ -111,6 +111,7 @@ function S.pwritev(fd, iov, offset)
   iov = mktype(t.iovecs, iov)
   return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
 end
+function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
 
 function S.getuid() return C.getuid() end
 function S.geteuid() return C.geteuid() end

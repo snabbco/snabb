@@ -1,4 +1,4 @@
--- define system calls for ffi
+-- define Linux system calls for ffi
 
 local cdef = require "ffi".cdef
 
@@ -118,7 +118,6 @@ int umount(const char *target);
 int umount2(const char *target, int flags);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
-int access(const char *pathname, int mode);
 int faccessat(int dirfd, const char *pathname, int mode, int flags);
 char *getcwd(char *buf, size_t size);
 int statfs(const char *path, struct statfs64 *buf); /* for 64 bit */

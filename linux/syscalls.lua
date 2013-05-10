@@ -65,7 +65,6 @@ end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 
-function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
 function S.faccessat(dirfd, pathname, mode, flags)
   return retbool(C.faccessat(c.AT_FDCWD[dirfd], pathname, c.OK[mode], c.AT_ACCESSAT[flags]))
 end
