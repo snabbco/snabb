@@ -147,6 +147,14 @@ local msg = {
 
 -- these are NetBSD specific errors
   PROCLIM    = "Too many processes",
+  FTYPE      = "Inappropriate file type or format",
+  PROGUNAVAIL= "RPC prog. not avail",
+  AUTH       = "Authentication error",
+  PROGMISMATCH = "Program version wrong",
+  BADRPC     = "RPC struct is bad",
+  NEEDAUTH   = "Need authenticator",
+  RPCMISMATCH= "RPC version wrong",
+  PROCUNAVAIL= "Bad procedure for program",
 }
 
 local errors = setmetatable({}, {
