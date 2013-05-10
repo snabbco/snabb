@@ -186,6 +186,24 @@ end
 t.i6432 = ffi.metatype("union {int64_t i64; int32_t i32[2];}", mt.i6432)
 t.u6432 = ffi.metatype("union {uint64_t i64; uint32_t i32[2];}", mt.i6432)
 
+local errsyms = {} -- reverse lookup
+for k, v in pairs(c.E) do
+  errsyms[v] = k
+end
+
+t.error = ffi.metatype("struct {int errno;}", {
+  __tostring = function(e) return require("syscall.errors")[e.errno] end,
+  __index = function(t, k)
+    if k == 'sym' then return errsyms[t.errno] end
+    if k == 'lsym' then return errsyms[t.errno]:lower() end
+    if c.E[k] then return c.E[k] == t.errno end
+  end,
+  __new = function(tp, errno)
+    if not errno then errno = ffi.errno() end
+    return ffi.new(tp, errno)
+  end
+})
+
 -- TODO add generic address type that works out which to take? basically inet_name, except without netmask
 
 addtype("in_addr", "struct in_addr", {

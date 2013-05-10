@@ -166,24 +166,6 @@ local function getfd(fd)
   return fd:getfd()
 end
 
-local errsyms = {} -- reverse lookup
-for k, v in pairs(c.E) do
-  errsyms[v] = k
-end
-
-t.error = ffi.metatype("struct {int errno;}", {
-  __tostring = function(e) return require("syscall.errors")[e.errno] end,
-  __index = function(t, k)
-    if k == 'sym' then return errsyms[t.errno] end
-    if k == 'lsym' then return errsyms[t.errno]:lower() end
-    if c.E[k] then return c.E[k] == t.errno end
-  end,
-  __new = function(tp, errno)
-    if not errno then errno = ffi.errno() end
-    return ffi.new(tp, errno)
-  end
-})
-
 -- cast socket address to actual type based on family
 local samap, samap2 = {}, {}
 
