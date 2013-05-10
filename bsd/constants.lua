@@ -194,5 +194,10 @@ c.O = multiflags {
   NOSIGPIPE   = 0x01000000,
 }
 
+c.EXIT = strflag {
+  SUCCESS = 0,
+  FAILURE = 1,
+}
+
 return c
 
