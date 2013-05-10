@@ -123,5 +123,47 @@ c.E.DEADLOCK      = c.E.EDEADLK
 c.E.NOATTR        = c.E.ENODATA
 c.E.NOTSUP        = c.E.OPNOTSUPP
 
+c.AF = strflag {
+  UNSPEC      = 0,
+  LOCAL       = 1,
+  INET        = 2,
+  IMPLINK     = 3,
+  PUP         = 4,
+  CHAOS       = 5,
+  NS          = 6,
+  ISO         = 7,
+  ECMA        = 8,
+  DATAKIT     = 9,
+  CCITT       = 10,
+  SNA         = 11,
+  DECNET      = 12,
+  DLI         = 13,
+  LAT         = 14,
+  HYLINK      = 15,
+  APPLETALK   = 16,
+  OROUTE      = 17,
+  LINK        = 18,
+-- #define pseudo_AF_XTP   19
+  COIP        = 20,
+  CNT         = 21,
+-- #define pseudo_AF_RTIP  22
+  IPX         = 23,
+  INET6       = 24,
+-- pseudo_AF_PIP   25
+  ISDN        = 26,
+  NATM        = 27,
+  ARP         = 28,
+-- #define pseudo_AF_KEY   29
+-- #define pseudo_AF_HDRCMPLT 30
+  BLUETOOTH   = 31,
+  IEEE80211   = 32,
+  MPLS        = 33,
+  AF_ROUTE    = 34,
+}
+
+c.AF.UNIX = c.AF.LOCAL
+c.AF.OSI = c.AF.ISO
+c.AF.E164 = c.AF.ISDN
+
 return c
 
