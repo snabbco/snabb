@@ -66,6 +66,51 @@ function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, c.MODE[mode])) end
 function S.rmdir(path) return retbool(C.rmdir(path)) end
 function S.unlink(pathname) return retbool(C.unlink(pathname)) end
+function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
+function S.chmod(path, mode) return retbool(C.chmod(path, c.MODE[mode])) end
+function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), c.MODE[mode])) end
+function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
+function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
+function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
+function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
+function S.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
+  return retbool(C.linkat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath, c.AT_SYMLINK_FOLLOW[flags]))
+end
+function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
+function S.chroot(path) return retbool(C.chroot(path)) end
+function S.umask(mask) return C.umask(c.MODE[mask]) end
+function S.sync() return C.sync() end
+function S.mknod(pathname, mode, dev)
+  if type(dev) == "table" then dev = dev.dev end
+  return retbool(C.mknod(pathname, c.S_I[mode], dev or 0))
+end
+function S.read(fd, buf, count)
+  if buf then return retnum(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
+  if not count then count = 4096 end
+  buf = t.buffer(count)
+  local ret = C.read(getfd(fd), buf, count)
+  if ret == -1 then return nil, t.error() end
+  return ffi.string(buf, ret) -- user gets a string back, can get length from #string
+end
+function S.readv(fd, iov)
+  iov = mktype(t.iovecs, iov)
+  return retnum(C.readv(getfd(fd), iov.iov, #iov))
+end
+function S.write(fd, buf, count) return retnum(C.write(getfd(fd), buf, count or #buf)) end
+function S.writev(fd, iov)
+  iov = mktype(t.iovecs, iov)
+  return retnum(C.writev(getfd(fd), iov.iov, #iov))
+end
+function S.pread(fd, buf, count, offset) return retnum(C.pread(getfd(fd), buf, count, offset)) end
+function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf, count or #buf, offset)) end
+function S.preadv(fd, iov, offset)
+  iov = mktype(t.iovecs, iov)
+  return retnum(C.preadv(getfd(fd), iov.iov, #iov, offset))
+end
+function S.pwritev(fd, iov, offset)
+  iov = mktype(t.iovecs, iov)
+  return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
+end
 
 -- now call OS specific for non-generic calls
 local hh = {
