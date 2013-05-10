@@ -165,5 +165,9 @@ c.AF.UNIX = c.AF.LOCAL
 c.AF.OSI = c.AF.ISO
 c.AF.E164 = c.AF.ISDN
 
+c.AT_FDCWD = atflag {
+  FDCWD = -100,
+}
+
 return c
 
