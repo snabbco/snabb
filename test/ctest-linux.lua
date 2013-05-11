@@ -1,4 +1,5 @@
 -- generate C test file to check type sizes etc
+-- Linux specific as there are a lot of workarounds
 -- luajit ctest.lua > ctest.c && cc -std=c99 ctest.c -o ctest && ./ctest
 
 local ffi = require "ffi"
