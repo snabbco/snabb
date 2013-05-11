@@ -1035,7 +1035,7 @@ test_sockets = {
     assert(a.fd:close())
     assert(s:close())
   end,
-  test_unix_socket = function()
+  test_unix_socketpair = function()
     local sv = assert(S.socketpair("unix", "stream"))
     assert(sv[1]:write("test"))
     local r = assert(sv[2]:read())

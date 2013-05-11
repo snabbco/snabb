@@ -313,6 +313,16 @@ test_address_names = {
   end,
 }
 
+test_sockets_tmp = { -- TODO delete once rest moved here
+  test_unix_socketpair = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(sv[1]:write("test"))
+    local r = assert(sv[2]:read())
+    assert_equal(r, "test")
+    assert(sv:close())
+  end,
+}
+
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
   if abi.os == "linux" then
