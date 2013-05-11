@@ -103,13 +103,15 @@ function S.writev(fd, iov)
 end
 function S.pread(fd, buf, count, offset) return retnum(C.pread(getfd(fd), buf, count, offset)) end
 function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf, count or #buf, offset)) end
-function S.preadv(fd, iov, offset)
-  iov = mktype(t.iovecs, iov)
-  return retnum(C.preadv(getfd(fd), iov.iov, #iov, offset))
-end
-function S.pwritev(fd, iov, offset)
-  iov = mktype(t.iovecs, iov)
-  return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
+if C.preadv and C.pwritev then -- these are missing in eg OSX
+  function S.preadv(fd, iov, offset)
+    iov = mktype(t.iovecs, iov)
+    return retnum(C.preadv(getfd(fd), iov.iov, #iov, offset))
+  end
+  function S.pwritev(fd, iov, offset)
+    iov = mktype(t.iovecs, iov)
+    return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
+  end
 end
 function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
 function S.lseek(fd, offset, whence)
