@@ -483,13 +483,13 @@ test_file_operations = {
 test_largefile = {
   test_seek64 = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
-    local loff = t.loff(2^34)
+    local off = t.off(2^34)
     local offset = 2^34 -- should work with Lua numbers up to 56 bits, above that need explicit 64 bit type.
     local n
-    n = assert(fd:lseek(loff, "set"))
-    assert_equal(n, loff, "seek should position at set position")
-    n = assert(fd:lseek(loff, "cur"))
-    assert_equal(n, loff + loff, "seek should position at set position")
+    n = assert(fd:lseek(off, "set"))
+    assert_equal(n, off, "seek should position at set position")
+    n = assert(fd:lseek(off, "cur"))
+    assert_equal(n, off + off, "seek should position at set position")
     n = assert(fd:lseek(offset, "set"))
     assert_equal(n, offset, "seek should position at set position")
     n = assert(fd:lseek(offset, "cur"))
