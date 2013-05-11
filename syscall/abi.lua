@@ -13,7 +13,7 @@ local abi = {
   os = ffi.os:lower(), -- bsd, linux
 }
 
-if abi.os == "osx" then abi.os = "bsd" -- more or less BSD, will try to just use feature detection
+if abi.os == "osx" then abi.os = "bsd" end -- more or less BSD, will try to just use feature detection
 
 return abi
 
