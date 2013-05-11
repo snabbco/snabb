@@ -27,9 +27,6 @@ typedef uint64_t dev_t;
 typedef uint64_t off_t;
 typedef uint64_t rlim64_t;
 
-// posix standards
-typedef unsigned short int sa_family_t;
-
 // typedefs which are word length
 typedef unsigned long size_t;
 typedef long ssize_t;

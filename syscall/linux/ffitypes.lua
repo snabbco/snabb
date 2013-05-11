@@ -8,6 +8,8 @@ local ok, arch = pcall(require, "syscall.linux." .. abi.arch .. ".ffitypes") -- 
 if not ok then arch = {} end
 
 cdef[[
+typedef unsigned short int sa_family_t;
+
 typedef unsigned long aio_context_t;
 
 // should be a word, but we use 32 bits as bitops are signed 32 bit in LuaJIT at the moment
