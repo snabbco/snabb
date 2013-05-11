@@ -228,5 +228,18 @@ c.SEEK = strflag {
   END = 2,
 }
 
+c.SOCK = multiflags {
+  STREAM    = 1,
+  DGRAM     = 2,
+  RAW       = 3,
+  RDM       = 4,
+  SEQPACKET = 5,
+
+  CLOEXEC   = 0x10000000,
+  NONBLOCK  = 0x20000000,
+  NOSIGPIPE = 0x40000000,
+  FLAGS_MASK= 0xf0000000,
+}
+
 return c
 
