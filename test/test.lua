@@ -12,7 +12,11 @@ local features = require "syscall.features"
 local bit = require "bit"
 local ffi = require "ffi"
 
-require("test." .. abi.os) -- OS specific tests
+local os = abi.os
+
+if os == "osx" then os = "bsd" -- use same tests for now
+
+require("test." .. os) -- OS specific tests
 
 local t, pt, s = types.t, types.pt, types.s
 
