@@ -16,8 +16,6 @@ require("test." .. abi.os) -- OS specific tests
 
 local t, pt, s = types.t, types.pt, types.s
 
-setmetatable(S, {__index = function(i, k) error("bad index access on S: " .. k) end})
-
 local oldassert = assert
 local function assert(cond, s)
   collectgarbage("collect") -- force gc, to test for bugs
