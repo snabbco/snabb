@@ -13,9 +13,9 @@ local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
 
-local nl = require "linux.nl"
-local util = require "linux.util"
-local features = require "linux.features"
+local nl = require "syscall.linux.nl"
+local util = require "syscall.linux.util"
+local features = require "syscall.linux.features"
 
 local oldassert = assert
 local function assert(cond, s)

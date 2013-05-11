@@ -6,7 +6,7 @@ local abi = require "syscall.abi"
 
 local bit = require "bit"
 
-local arch = require("linux." .. abi.arch .. ".constants") -- architecture specific code
+local arch = require("syscall.linux." .. abi.arch .. ".constants") -- architecture specific code
 
 local h = require "syscall.helpers"
 
