@@ -50,7 +50,6 @@ print [[
 #include <net/route.h>
 #include <sys/wait.h>
 #include <dirent.h>
-#include <syscall.h>
 #include <sys/ioctl.h>
 
 int ret = 0;
