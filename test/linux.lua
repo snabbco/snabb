@@ -970,10 +970,6 @@ test_misc = {
 }
 
 test_sockets = {
-  test_ipv4_print = function()
-    assert_equal(tostring(t.in_addr("127.0.0.1")), "127.0.0.1", "print ipv4")
-    assert_equal(tostring(t.in_addr("255.255.255.255")), "255.255.255.255", "print ipv4")
-  end,
   test_socket_sizes = function()
     assert(ffi.sizeof(t.sockaddr) == ffi.sizeof(t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
     assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr))
@@ -1096,11 +1092,6 @@ test_sockets = {
     assert(c:close())
     assert(s:close())
   end,
-  test_ipv6_names = function()
-    local sa = assert(t.sockaddr_in6(1234, "2002::4:5"))
-    assert_equal(sa.port, 1234, "want same port back")
-    assert_equal(tostring(sa.sin6_addr), "2002::4:5", "expect same address back")
-  end
 }
 
 test_raw_socket = {

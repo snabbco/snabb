@@ -301,6 +301,18 @@ test_read_write = {
   end,
 }
 
+test_address_names = {
+  test_ipv4_names = function()
+    assert_equal(tostring(t.in_addr("127.0.0.1")), "127.0.0.1", "print ipv4")
+    assert_equal(tostring(t.in_addr("255.255.255.255")), "255.255.255.255", "print ipv4")
+  end,
+  test_ipv6_names = function()
+    local sa = assert(t.sockaddr_in6(1234, "2002::4:5"))
+    assert_equal(sa.port, 1234, "want same port back")
+    assert_equal(tostring(sa.sin6_addr), "2002::4:5", "expect same address back")
+  end,
+}
+
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
   if abi.os == "linux" then
