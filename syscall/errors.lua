@@ -157,6 +157,14 @@ local msg = {
   PROCUNAVAIL= "Bad procedure for program",
   NOATTR     = "Attribute not found",
   NOTSUP     = "Not supported",
+
+-- these are OSX specific errors
+  BADMACHO   = "Malformed Macho file",
+  QFULL      = "Interface output queue is full",
+  SHLIBVERS  = "Shared library version mismatch",
+  BADARCH    = "Bad CPU type in executable",
+  BADEXEC    = "Bad executable",
+  NOPOLICY   = "No such policy registered",
 }
 
 local errors = setmetatable({}, {
