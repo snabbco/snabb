@@ -1,4 +1,8 @@
 local abi = require "syscall.abi"
 
-require("test.ctest-" .. abi.os)
+local os = abi.os
+
+if os == "osx" then os = "bsd" end -- use same tests for now
+
+require("test.ctest-" .. os)
 
