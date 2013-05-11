@@ -158,10 +158,6 @@ c.AF.UNIX = c.AF.LOCAL
 c.AF.OSI = c.AF.ISO
 c.AF.E164 = c.AF.ISDN
 
-c.AT_FDCWD = atflag {
-  FDCWD = -100,
-}
-
 c.O = multiflags {
   RDONLY      = 0x0000,
   WRONLY      = 0x0001,
