@@ -190,7 +190,7 @@ function S.nice(inc)
 end
 
 -- deprecated in NetBSD so implement with recvfrom
-function S.recv(fd, buf, count, flags) return retnum(C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], nil, 0)) end
+function S.recv(fd, buf, count, flags) return retnum(C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], nil, nil)) end
 
 -- TODO setpgrp and similar - see the man page
 

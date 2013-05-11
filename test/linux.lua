@@ -1044,7 +1044,7 @@ test_sockets = {
     local bca = c:getsockname() -- find bound address
     local serverport = s:getsockname().port -- find bound port
     local n = assert(s:sendto(teststring, nil, 0, bca))
-    local f = assert(c:recvfrom(buf, size)) -- do not test as can drop data
+    local f = assert(c:recv(buf, size)) -- do not test as can drop data
     assert(s:close())
     assert(c:close())
   end,
