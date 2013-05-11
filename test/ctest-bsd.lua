@@ -48,7 +48,6 @@ print [[
 #include <sys/mount.h>
 #include <sys/uio.h>
 #include <net/route.h>
-#include <sys/inotify.h>
 #include <sys/wait.h>
 #include <dirent.h>
 #include <syscall.h>
