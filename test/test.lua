@@ -129,6 +129,7 @@ test_basic = {
     assert(rawget(getmetatable(c.O).__index, "creat")) -- a little implementation dependent
   end,
   test_at_flags = function()
+    if not c.AT_FDCWD then return end -- OSX does no support any *at functions
     assert_equal(c.AT_FDCWD[nil], c.AT_FDCWD.FDCWD) -- nil returns current dir
     assert_equal(c.AT_FDCWD.fdcwd, c.AT_FDCWD.FDCWD)
     local fd = t.fd(-1)
