@@ -81,7 +81,6 @@ local addtypes = {
 -- as an experiment, see https://github.com/justincormack/ljsyscall/issues/28 trying adding a __len method
 -- however initially only for the ones with no extra metatype.
 local addstructs = {
-  msghdr = "struct msghdr",
   cmsghdr = "struct cmsghdr",
   ucred = "struct ucred",
   sysinfo = "struct sysinfo",

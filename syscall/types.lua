@@ -142,6 +142,7 @@ local addtypes = {
 
 local addstructs = {
   iovec = "struct iovec",
+  msghdr = "struct msghdr",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
