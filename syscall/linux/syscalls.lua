@@ -1113,7 +1113,7 @@ function S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   msg_ptr = t.buffer(msg_len)
   local ret = C.mq_timedreceive(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio, abs_timeout)
   if ret == -1 then return nil, t.error() end
-  return ffi.string(msg_ptr, msg_len)
+  return ffi.string(msg_ptr,ret)
 end
 
 return S
