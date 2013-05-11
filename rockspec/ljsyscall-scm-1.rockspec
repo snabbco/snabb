@@ -23,31 +23,49 @@ build =
     lua =
     {
       ["syscall"] = "syscall.lua";
-      ["syscall.syscalls"] = "syscall/syscalls.lua";
+      ["syscall.errors"] = "syscall/errors.lua";
       ["syscall.abi"] = "syscall/abi.lua";
+      ["syscall.helpers"] = "syscall/helpers.lua";
+      ["syscall.syscalls"] = "syscall/syscalls.lua";
       ["syscall.c"] = "syscall/c.lua";
       ["syscall.constants"] = "syscall/constants.lua";
       ["syscall.ffitypes"] = "syscall/ffitypes.lua";
       ["syscall.ffifunctions"] = "syscall/ffifunctions.lua";
-      ["syscall.helpers"] = "syscall/helpers.lua";
       ["syscall.ioctl"] = "syscall/ioctl.lua";
       ["syscall.types"] = "syscall/types.lua";
-      ["syscall.errors"] = "syscall/errors.lua";
-      ["syscall.nl"] = "syscall/nl.lua";
-      ["syscall.util"] = "syscall/util.lua";
-      ["syscall.features"] = "syscall/features.lua";
-      ["syscall.netfilter"] = "syscall/netfilter.lua";
-      ["syscall.arm.constants"] = "syscall/arm/constants.lua";
-      ["syscall.arm.ffitypes"] = "syscall/arm/ffitypes.lua";
-      ["syscall.arm.ioctl"] = "syscall/arm/ioctl.lua";
-      ["syscall.mips.constants"] = "syscall/mips/constants.lua";
-      ["syscall.ppc.constants"] = "syscall/ppc/constants.lua";
-      ["syscall.ppc.ffitypes"] = "syscall/ppc/ffitypes.lua";
-      ["syscall.ppc.ioctl"] = "syscall/ppc/ioctl.lua";
-      ["syscall.x64.constants"] = "syscall/x64/constants.lua";
-      ["syscall.x64.ffitypes"] = "syscall/x64/ffitypes.lua";
-      ["syscall.x86.constants"] = "syscall/x86/constants.lua";
-      ["syscall.x86.ffitypes"] = "syscall/x86/ffitypes.lua";
+
+      ["linux.syscalls"] = "linux/syscalls.lua";
+      ["linux.c"] = "linux/c.lua";
+      ["linux.constants"] = "linux/constants.lua";
+      ["linux.ffitypes"] = "linux/ffitypes.lua";
+      ["linux.ffifunctions"] = "linux/ffifunctions.lua";
+      ["linux.ioctl"] = "linux/ioctl.lua";
+      ["linux.types"] = "linux/types.lua";
+
+      ["linux.features"] = "linux/features.lua";
+      ["linux.nl"] = "linux/nl.lua";
+      ["linux.netfilter"] = "linux/netfilter.lua";
+      ["linux.util"] = "linux/util.lua";
+      ["linux.arm.constants"] = "linux/arm/constants.lua";
+      ["linux.arm.ffitypes"] = "linux/arm/ffitypes.lua";
+      ["linux.arm.ioctl"] = "linux/arm/ioctl.lua";
+      ["linux.mips.constants"] = "linux/mips/constants.lua";
+      ["linux.ppc.constants"] = "linux/ppc/constants.lua";
+      ["linux.ppc.ffitypes"] = "linux/ppc/ffitypes.lua";
+      ["linux.ppc.ioctl"] = "linux/ppc/ioctl.lua";
+      ["linux.x64.constants"] = "linux/x64/constants.lua";
+      ["linux.x64.ffitypes"] = "linux/x64/ffitypes.lua";
+      ["linux.x86.constants"] = "linux/x86/constants.lua";
+      ["linux.x86.ffitypes"] = "linux/x86/ffitypes.lua";
+
+      ["bsd.syscalls"] = "bsd/syscalls.lua";
+      ["bsd.c"] = "bsd/c.lua";
+      ["bsd.constants"] = "bsd/constants.lua";
+      ["bsd.ffitypes"] = "bsd/ffitypes.lua";
+      ["bsd.ffifunctions"] = "bsd/ffifunctions.lua";
+      ["bsd.ioctl"] = "bsd/ioctl.lua";
+      ["bsd.types"] = "bsd/types.lua";
+
     };
   };
 }
