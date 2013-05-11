@@ -21,5 +21,21 @@ struct sockaddr_storage {
   int64_t       __ss_align;
   char          __ss_pad2[128 - 2 - 8 - 6];
 };
+struct sockaddr_in {
+  uint8_t         sin_len;
+  sa_family_t     sin_family;
+  in_port_t       sin_port;
+  struct in_addr  sin_addr;
+  int8_t          sin_zero[8];
+};
+struct sockaddr_in6 {
+  uint8_t         sin6_len;
+  sa_family_t     sin6_family;
+  in_port_t       sin6_port;
+  uint32_t        sin6_flowinfo;
+  struct in6_addr sin6_addr;
+  uint32_t        sin6_scope_id;
+};
+
 ]]
 
