@@ -976,7 +976,6 @@ test_sockets = {
   end,
   test_socket_sizes = function()
     assert(ffi.sizeof(t.sockaddr) == ffi.sizeof(t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
-    assert(ffi.sizeof(t.sockaddr_storage) == 128) -- this is the required size in Linux
     assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr))
     assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr_in))
     assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr_in6))
