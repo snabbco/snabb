@@ -209,12 +209,12 @@ function C.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   return C.syscall(c.SYS.mq_timedreceive, t.int(mqd), pt.void(msg_ptr), t.size(msg_len), pt.void(msg_prio), pt.void(abs_timeout))
 end
 
--- note dev_t not passed as 64 bits to this syscall
-function CC.mknod(pathname, mode, dev)
-  return C.syscall(c.SYS.mknod, pathname, t.mode(mode), t.long(dev))
+-- note kernel dev_t is 32 bits, use syscall so we can ignore glibc using 64 bit dev_t
+function C.mknod(pathname, mode, dev)
+  return C.syscall(c.SYS.mknod, pathname, t.mode(mode), t.uint(dev))
 end
-function CC.mknodat(fd, pathname, mode, dev)
-  return C.syscall(c.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.long(dev))
+function C.mknodat(fd, pathname, mode, dev)
+  return C.syscall(c.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.uint(dev))
 end
 -- pivot_root is not provided by glibc, is provided by Musl
 function CC.pivot_root(new_root, put_old)
@@ -277,8 +277,6 @@ if not inlibc "clock_gettime" then C.clock_gettime = CC.clock_gettime end
 if not inlibc "clock_nanosleep" then C.clock_nanosleep = CC.clock_nanosleep end
 
 -- not in glibc
-if not inlibc "mknod" then C.mknod = CC.mknod end
-if not inlibc "mknodat" then C.mknodat = CC.mknodat end
 if not inlibc "pivot_root" then C.pivot_root = CC.pivot_root end
 
 -- not in glibc on my dev ARM box

@@ -22,9 +22,7 @@ typedef uint32_t le32; /* this is little endian */
 typedef uint32_t off32_t; /* only used for eg mmap2 on Linux */
 
 // 64 bit
-typedef uint64_t dev_t;
 typedef uint64_t off_t;
-typedef uint64_t rlim64_t;
 
 // typedefs which are word length
 typedef unsigned long size_t;

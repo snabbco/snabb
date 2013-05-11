@@ -165,6 +165,21 @@ local function getfd(fd)
   return fd:getfd()
 end
 
+-- 32 bit dev_t, 8 bit minor, 8 bit major. Note glibc has 64 bit dev_t but we use syscall API which does not
+mt.device = {
+  __index = {
+    major = function(dev) return bit.band(bit.rshift(dev:device(), 8), 0xff) end,
+    minor = function(dev) return bit.band(dev:device(), 0xff) end,
+    device = function(dev) return tonumber(dev.dev) end,
+  },
+}
+
+t.device = function(major, minor)
+  local dev = major
+  if minor then dev = bit.bor(minor, bit.lshift(major, 8)) end
+  return setmetatable({dev = t.dev(dev)}, mt.device)
+end
+
 -- cast socket address to actual type based on family
 local samap, samap2 = {}, {}
 
@@ -400,7 +415,6 @@ meth.stat = {
     nlink = function(st) return st.st_nlink end,
     uid = function(st) return st.st_uid end,
     gid = function(st) return st.st_gid end,
-    rdev = function(st) return tonumber(st.st_rdev) end,
     size = function(st) return tonumber(st.st_size) end,
     blksize = function(st) return tonumber(st.st_blksize) end,
     blocks = function(st) return tonumber(st.st_blocks) end,
