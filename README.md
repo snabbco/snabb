@@ -1,16 +1,16 @@
-# Linux system calls for LuaJIT
+# Unix system calls for LuaJIT
 
 What? An FFI implementation of the Linux kernel ABI for LuaJIT. This means you will be able to program all the functionality the Linux kernel provides to userspace directly in Lua. You can view it as a high level language equivalent of the busybox project in a way, although the functionality it provides is somewhat different, and the interface very different.
 
 Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua.
 
-Currently working to support BSD (initially NetBSD). Nothing is working yet, but should be at least partially supported in the next release. For now you might want to use [LuaPosix](https://github.com/rrthomas/luaposix) if you want to write portable Unix code.
+There is a work in progress port to BSD systems, currently targetting NetBSD (32 bit) and OSX (64 bit).
 
 This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
 
 ## Install
 
-You just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Kepe the directory structure there is. You can rmeove files from architectures you do not use.
+You just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Kepe the directory structure there is. You can safely remove files from architectures and operating systems you do not use.
 
 You can install using ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` or one of the other versions in that directory, which will pull the version from github and install in the right place.
 
@@ -20,13 +20,15 @@ Requirements: Needs [LuaJIT 2.0.0](http://www.luajit.org/) or later.
 
 The code does not currently support the main Lua implementation, only LuaJIT. It used to support [luaffi](https://github.com/jmckaskill/luaffi) but this has not kept up with LuaJIT ffi features. At some point I intend to support Lua directly, but this will be after the API has stabilised.
 
-ARM (soft or hard float), x86 or AMD64 and PPC architectures are supported; intend to support MIPS in future. Either glibc or [Musl libc](http://www.musl-libc.org/) or uClibc should work. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
+ARM (soft or hard float), x86 or AMD64 and PPC architectures are supported; intend to support MIPS in future. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
+
+For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT) and (partially tested) OSX 64 bit. Other 32 bit architectures of NetBSD eg ARM should work if supported by LuaJIT as it is clean and portable. Other BSDs like FreeBSD should work at least in 64 bits, they may need 32 bit filesystem fixes in 32 bit mode, and there may be some other fixes needed.
 
 ## new features planned soon
 netfilter, dhcp, selinux, NetBSD rump kernel support.
 
 ## Release notes
-0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, ioctl improvements, initial NetBSD support.
+0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, ioctl improvements, initial BSD and OSX support.
 
 0.6 adds support for raw sockets, BPF, seccomp mode 2 (syscall filtering), capabilities, feature tests, plus bug fixes.
 
