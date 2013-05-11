@@ -7,6 +7,7 @@ local helpers = require "syscall.helpers"
 local types = require "syscall.types"
 local c = require "syscall.constants"
 local abi = require "syscall.abi"
+local features = require "syscall.features"
 
 local bit = require "bit"
 local ffi = require "ffi"
@@ -15,7 +16,6 @@ local t, pt, s = types.t, types.pt, types.s
 
 local nl = require "syscall.linux.nl"
 local util = require "syscall.linux.util"
-local features = require "syscall.linux.features"
 
 local oldassert = assert
 local function assert(cond, s)

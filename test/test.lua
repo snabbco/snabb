@@ -7,6 +7,7 @@ local helpers = require "syscall.helpers"
 local types = require "syscall.types"
 local c = require "syscall.constants"
 local abi = require "syscall.abi"
+local features = require "syscall.features"
 
 local bit = require "bit"
 local ffi = require "ffi"

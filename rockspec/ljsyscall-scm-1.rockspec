@@ -33,6 +33,7 @@ build =
       ["syscall.ffifunctions"] = "syscall/ffifunctions.lua";
       ["syscall.ioctl"] = "syscall/ioctl.lua";
       ["syscall.types"] = "syscall/types.lua";
+      ["syscall.features"] = "syscall/features.lua";
 
       ["syscall.linux.syscalls"] = "syscall/linux/syscalls.lua";
       ["syscall.linux.c"] = "syscall/linux/c.lua";
@@ -42,7 +43,6 @@ build =
       ["syscall.linux.ioctl"] = "syscall/linux/ioctl.lua";
       ["syscall.linux.types"] = "syscall/linux/types.lua";
 
-      ["syscall.linux.features"] = "syscall/linux/features.lua";
       ["syscall.linux.nl"] = "syscall/linux/nl.lua";
       ["syscall.linux.netfilter"] = "syscall/linux/netfilter.lua";
       ["syscall.linux.util"] = "syscall/linux/util.lua";
