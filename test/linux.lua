@@ -970,14 +970,6 @@ test_misc = {
 }
 
 test_sockets = {
-  test_socket_sizes = function()
-    assert(ffi.sizeof(t.sockaddr) == ffi.sizeof(t.sockaddr_in)) -- inet socket addresses should be padded to same as sockaddr
-    assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr))
-    assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr_in))
-    assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr_in6))
-    assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr_un))
-    assert(ffi.sizeof(t.sockaddr_storage) >= ffi.sizeof(t.sockaddr_nl))
-  end,
   test_sockaddr_in_error = function()
     local sa = t.sockaddr_in(1234, "error")
     assert(not sa, "expect nil socket address from invalid ip string")
