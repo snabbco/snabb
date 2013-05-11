@@ -3,7 +3,7 @@
 
 local ffi = require "ffi"
 
-return {
+local abi = {
   arch = ffi.arch, -- ppc, x86, arm, x64
   abi32 = ffi.abi("32bit"), -- boolean
   abi64 = ffi.abi("64bit"), -- boolean
@@ -12,4 +12,8 @@ return {
   eabi = ffi.abi("eabi"), -- boolean
   os = ffi.os:lower(), -- bsd, linux
 }
+
+if abi.os == "osx" then abi.os = "bsd" -- more or less BSD, will try to just use feature detection
+
+return abi
 
