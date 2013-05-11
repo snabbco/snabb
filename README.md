@@ -22,13 +22,13 @@ The code does not currently support the main Lua implementation, only LuaJIT. It
 
 ARM (soft or hard float), x86 or AMD64 and PPC architectures are supported; intend to support MIPS in future. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
-For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT) and (partially tested) OSX 64 bit. Other 32 bit architectures of NetBSD eg ARM should work if supported by LuaJIT as it is clean and portable. Other BSDs like FreeBSD might work at least in 64 bits, they may need 32 bit filesystem fixes in 32 bit mode, and there will be some other fixes needed. Feature detection for different BSDs may prove difficult though.
+For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT) and OSX 64 bit. Other 32 bit architectures of NetBSD eg ARM should work if supported by LuaJIT as it is clean and portable. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the (small) differences.
 
 ## new features planned soon
 netfilter, dhcp, selinux, NetBSD rump kernel support.
 
 ## Release notes
-0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, ioctl improvements, initial BSD and OSX support.
+0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, ioctl improvements, initial NetBSD and OSX support.
 
 0.6 adds support for raw sockets, BPF, seccomp mode 2 (syscall filtering), capabilities, feature tests, plus bug fixes.
 
