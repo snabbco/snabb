@@ -345,9 +345,7 @@ end
 
 function S.socket(domain, stype, protocol)
   domain = c.AF[domain]
-  local ret = C.socket(domain, c.SOCK[stype], sproto(domain, protocol))
-  if ret == -1 then return nil, t.error() end
-  return t.fd(ret)
+  return retfd(C.socket(domain, c.SOCK[stype], sproto(domain, protocol)))
 end
 
 function S.socketpair(domain, stype, protocol)
