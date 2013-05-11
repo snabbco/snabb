@@ -121,6 +121,24 @@ function S.lseek(fd, offset, whence)
   return ret64(C.lseek(getfd(fd), offset or 0, c.SEEK[whence]))
 end
 
+local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
+  protocol = protocol or 0
+  if domain == c.AF.NETLINK then return c.NETLINK[protocol] end
+  return c.IPPROTO[protocol]
+end
+
+function S.socket(domain, stype, protocol)
+  domain = c.AF[domain]
+  return retfd(C.socket(domain, c.SOCK[stype], sproto(domain, protocol)))
+end
+function S.socketpair(domain, stype, protocol)
+  domain = c.AF[domain]
+  local sv2 = t.int2()
+  local ret = C.socketpair(domain, c.SOCK[stype], sproto(domain, protocol), sv2)
+  if ret == -1 then return nil, t.error() end
+  return t.socketpair(sv2)
+end
+
 function S.getuid() return C.getuid() end
 function S.geteuid() return C.geteuid() end
 function S.getpid() return C.getpid() end
