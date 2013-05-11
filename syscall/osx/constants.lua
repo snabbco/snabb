@@ -141,18 +141,13 @@ c.AF = strflag {
   APPLETALK   = 16,
   OROUTE      = 17,
   LINK        = 18,
--- #define pseudo_AF_XTP   19
   COIP        = 20,
   CNT         = 21,
--- #define pseudo_AF_RTIP  22
   IPX         = 23,
   INET6       = 24,
--- pseudo_AF_PIP   25
   ISDN        = 26,
   NATM        = 27,
   ARP         = 28,
--- #define pseudo_AF_KEY   29
--- #define pseudo_AF_HDRCMPLT 30
   BLUETOOTH   = 31,
   IEEE80211   = 32,
   MPLS        = 33,
@@ -168,28 +163,25 @@ c.AT_FDCWD = atflag {
 }
 
 c.O = multiflags {
-  RDONLY      = 0x00000000,
-  WRONLY      = 0x00000001,
-  RDWR        = 0x00000002,
-  ACCMODE     = 0x00000003,
-  NONBLOCK    = 0x00000004,
-  APPEND      = 0x00000008,
-  SHLOCK      = 0x00000010,
-  EXLOCK      = 0x00000020,
-  ASYNC       = 0x00000040,
-  NOFOLLOW    = 0x00000100,
-  CREAT       = 0x00000200,
-  TRUNC       = 0x00000400,
-  EXCL        = 0x00000800,
-  NOCTTY      = 0x00008000,
-  DSYNC       = 0x00010000,
-  RSYNC       = 0x00020000,
-  ALT_IO      = 0x00040000,
-  DIRECT      = 0x00080000,
-  DIRECTORY   = 0x00200000,
-  CLOEXEC     = 0x00400000,
-  SEARCH      = 0x00800000,
-  NOSIGPIPE   = 0x01000000,
+  RDONLY      = 0x0000,
+  WRONLY      = 0x0001,
+  RDWR        = 0x0002,
+  ACCMODE     = 0x0003,
+  NONBLOCK    = 0x0004,
+  APPEND      = 0x0008,
+  SHLOCK      = 0x0010,
+  EXLOCK      = 0x0020,
+  ASYNC       = 0x0040,
+  SYNC        = 0x0080
+  NOFOLLOW    = 0x0100,
+  CREAT       = 0x0200,
+  TRUNC       = 0x0400,
+  EXCL        = 0x0800,
+  EVTONLY     = 0x8000,
+  NOCTTY      = 0x20000,
+  DIRECTORY   = 0x100000,
+  DSYNC       = 0x400000,
+  CLOEXEC     = 0x1000000,
 }
 
 c.EXIT = strflag {
