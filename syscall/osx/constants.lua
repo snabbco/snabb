@@ -16,6 +16,8 @@ c.STD = strflag {
   ERR = 2,
 }
 
+c.PATH_MAX = 1024
+
 c.E = strflag {
   PERM          =  1,
   NOENT         =  2,

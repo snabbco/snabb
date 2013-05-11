@@ -63,14 +63,6 @@ function S.faccessat(dirfd, pathname, mode, flags)
   return retbool(C.faccessat(c.AT_FDCWD[dirfd], pathname, c.OK[mode], c.AT_ACCESSAT[flags]))
 end
 
-function S.readlink(path, buffer, size)
-  size = size or c.PATH_MAX
-  buffer = buffer or t.buffer(size)
-  local ret = tonumber(C.readlink(path, buffer, size))
-  if ret == -1 then return nil, t.error() end
-  return ffi.string(buffer, ret)
-end
-
 function S.readlinkat(dirfd, path, buffer, size)
   size = size or c.PATH_MAX
   buffer = buffer or t.buffer(size)

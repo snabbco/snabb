@@ -43,6 +43,7 @@ ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 int access(const char *pathname, int mode);
 off_t lseek(int fd, off_t offset, int whence);
+ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 
 int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);

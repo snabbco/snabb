@@ -58,7 +58,6 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
 int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
-ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
 
 int epoll_create1(int flags);

@@ -121,6 +121,13 @@ function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode]))
 function S.lseek(fd, offset, whence)
   return ret64(C.lseek(getfd(fd), offset or 0, c.SEEK[whence]))
 end
+function S.readlink(path, buffer, size)
+  size = size or c.PATH_MAX
+  buffer = buffer or t.buffer(size)
+  local ret = tonumber(C.readlink(path, buffer, size))
+  if ret == -1 then return nil, t.error() end
+  return ffi.string(buffer, ret)
+end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
   protocol = protocol or 0
