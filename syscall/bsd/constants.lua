@@ -120,8 +120,6 @@ c.E = strflag {
 -- alternate names
 c.E.WOULDBLOCK    = c.E.EAGAIN
 c.E.DEADLOCK      = c.E.EDEADLK
-c.E.NOATTR        = c.E.ENODATA
-c.E.NOTSUP        = c.E.OPNOTSUPP
 
 c.AF = strflag {
   UNSPEC      = 0,
