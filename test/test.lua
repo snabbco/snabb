@@ -256,6 +256,25 @@ test_read_write = {
     assert(S.unlink(tmpfile))
   end,
   test_preadv_pwritev = function()
+    local offset = 0
+    local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
+    local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
+    assert_equal(n, 13, "expect length 13")
+    local b1, b2, b3 = t.buffer(6), t.buffer(4), t.buffer(3)
+    local n = assert(fd:preadv({b1, b2, b3}, offset))
+    assert_equal(n, 13, "expect length 13")
+    assert_equal(ffi.string(b1, 6), "testin")
+    assert_equal(ffi.string(b2, 4), "gwri")
+    assert_equal(ffi.string(b3, 3), "tev")
+    assert(fd:seek(offset))
+    local n = assert(fd:readv{b1, b2, b3})
+    assert_equal(n, 13, "expect length 13")
+    assert_equal(ffi.string(b1, 6), "testin")
+    assert_equal(ffi.string(b2, 4), "gwri")
+    assert_equal(ffi.string(b3, 3), "tev")
+    assert(S.unlink(tmpfile))
+  end,
+  test_preadv_pwritev_large = function()
     local offset = largeval
     local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
