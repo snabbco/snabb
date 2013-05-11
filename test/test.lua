@@ -257,6 +257,7 @@ test_read_write = {
     assert(S.unlink(tmpfile))
   end,
   test_preadv_pwritev = function()
+    if not features.preadv() then return true end
     local offset = 0
     local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
@@ -276,6 +277,7 @@ test_read_write = {
     assert(S.unlink(tmpfile))
   end,
   test_preadv_pwritev_large = function()
+    if not features.preadv() then return true end
     local offset = largeval
     local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))

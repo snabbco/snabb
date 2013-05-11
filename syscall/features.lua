@@ -28,5 +28,8 @@ else
   features.cap = {}
 end
 
+features.preadv = function() return S.preadv ~= nil end
+features.pwritev = function() return S.pwritev ~= nil end
+
 return features
 
