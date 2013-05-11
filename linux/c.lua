@@ -106,10 +106,10 @@ if abi.abi64 then
     return C.syscall(c.SYS.fstatat, t.int(fd), path, pt.void(buf), t.int(flags))
   end
   function C.fadvise64(fd, offset, len, advise)
-    return C.syscall(sys_fadvise64, t.int(fd), t.loff(offset), t.loff(len), t.int(advise))
+    return C.syscall(sys_fadvise64, t.int(fd), t.off(offset), t.off(len), t.int(advise))
   end
   function C.fallocate(fd, mode, offset, len)
-    return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.loff(offset), t.loff(len))
+    return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.off(offset), t.off(len))
   end
 else
   function C.stat(path, buf)
@@ -155,7 +155,7 @@ end
 -- lseek is a mess in 32 bit, use _llseek syscall to get clean result
 if abi.abi32 then
   function C.lseek(fd, offset, whence)
-    local result = t.loff1()
+    local result = t.off1()
     local off1, off2 = u6432(offset)
     local ret = C.syscall(c.SYS._llseek, t.int(fd), t.ulong(off1), t.ulong(off2), pt.void(result), t.uint(whence))
     if ret == -1 then return -1 end

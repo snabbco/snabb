@@ -752,12 +752,12 @@ end
 
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
   local offin, offout = off_in, off_out
-  if off_in and not ffi.istype(t.loff1, off_in) then
-    offin = t.loff1()
+  if off_in and not ffi.istype(t.off1, off_in) then
+    offin = t.off1()
     offin[0] = off_in
   end
-  if off_out and not ffi.istype(t.loff1, off_out) then
-    offout = t.loff1()
+  if off_out and not ffi.istype(t.off1, off_out) then
+    offout = t.off1()
     offout[0] = off_out
   end
   return retnum(C.splice(getfd(fd_in), offin, getfd(fd_out), offout, len, c.SPLICE_F[flags]))

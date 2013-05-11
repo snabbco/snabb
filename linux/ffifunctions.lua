@@ -66,7 +66,7 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 int epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *sigmask);
 ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 int eventfd(unsigned int initval, int flags);
-ssize_t splice(int fd_in, loff_t *off_in, int fd_out, loff_t *off_out, size_t len, unsigned int flags);
+ssize_t splice(int fd_in, off_t *off_in, int fd_out, off_t *off_out, size_t len, unsigned int flags);
 ssize_t vmsplice(int fd, const struct iovec *iov, unsigned long nr_segs, unsigned int flags);
 ssize_t tee(int fd_in, int fd_out, size_t len, unsigned int flags);
 int reboot(int cmd);
@@ -75,7 +75,7 @@ int inotify_init1(int flags);
 int inotify_add_watch(int fd, const char *pathname, uint32_t mask);
 int inotify_rm_watch(int fd, uint32_t wd);
 int adjtimex(struct timex *buf);
-int sync_file_range(int fd, loff_t offset, loff_t count, unsigned int flags);
+int sync_file_range(int fd, off_t offset, off_t count, unsigned int flags);
 
 int fsync(int fd);
 int fdatasync(int fd);
@@ -83,8 +83,8 @@ int fcntl(int fd, int cmd, void *arg); /* arg is long or pointer */
 int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
 int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
-int truncate64(const char *path, loff_t length);
-int ftruncate64(int fd, loff_t length);
+int truncate64(const char *path, off_t length);
+int ftruncate64(int fd, off_t length);
 int pause(void);
 int prlimit64(pid_t pid, int resource, const struct rlimit64 *new_limit, struct rlimit64 *old_limit);
 
@@ -98,7 +98,7 @@ int getpeername(int sockfd, void *addr, socklen_t *addrlen);
 int shutdown(int sockfd, int how);
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
-void *mmap2(void *addr, size_t length, int prot, int flags, int fd, off_t pgoffset);
+void *mmap2(void *addr, size_t length, int prot, int flags, int fd, off32_t pgoffset);
 int munmap(void *addr, size_t length);
 int msync(void *addr, size_t length, int flags);
 int mlock(const void *addr, size_t len);
@@ -107,8 +107,8 @@ int mlockall(int flags);
 int munlockall(void);
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
 int madvise(void *addr, size_t length, int advice);
-int fallocate(int fd, int mode, loff_t offset, loff_t len); /* note there are 32 bit issues with glibc */
-ssize_t readahead(int fd, off64_t offset, size_t count);
+int fallocate(int fd, int mode, off_t offset, off_t len); /* note there are 32 bit issues with glibc */
+ssize_t readahead(int fd, off_t offset, size_t count);
 
 int pipe(int pipefd[2]);
 int pipe2(int pipefd[2], int flags);
@@ -244,10 +244,10 @@ char *getenv(const char *name);
 
 if abi.abi32 then
 cdef[[
-ssize_t pread64(int fd, void *buf, size_t count, loff_t offset);
-ssize_t pwrite64(int fd, const void *buf, size_t count, loff_t offset);
-ssize_t preadv64(int fd, const struct iovec *iov, int iovcnt, loff_t offset);
-ssize_t pwritev64(int fd, const struct iovec *iov, int iovcnt, loff_t offset);
+ssize_t pread64(int fd, void *buf, size_t count, off_t offset);
+ssize_t pwrite64(int fd, const void *buf, size_t count, off_t offset);
+ssize_t preadv64(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+ssize_t pwritev64(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 ]]
 end
 

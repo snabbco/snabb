@@ -14,7 +14,7 @@ local arch = {
     return {
       FIOCLEX	= _IO('f', 1),
       FIONCLEX	= _IO('f', 2),
-      FIOQSIZE	= _IOR('f', 128, s.loff),
+      FIOQSIZE	= _IOR('f', 128, s.off),
       FIOASYNC	= _IOW('f', 125, s.int),
       TCGETS	= _IOR('t', 19, s.termios),
       TCSETS	= _IOW('t', 20, s.termios),

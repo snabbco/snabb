@@ -20,11 +20,11 @@ typedef int32_t pid_t;
 typedef int32_t clockid_t;
 typedef int32_t daddr_t;
 typedef uint32_t le32; /* this is little endian */
+typedef uint32_t off32_t; /* only used for eg mmap2 on Linux */
 
 // 64 bit
 typedef uint64_t dev_t;
-typedef uint64_t loff_t;
-typedef uint64_t off64_t;
+typedef uint64_t off_t;
 typedef uint64_t rlim64_t;
 
 // posix standards
@@ -33,7 +33,6 @@ typedef unsigned short int sa_family_t;
 // typedefs which are word length
 typedef unsigned long size_t;
 typedef long ssize_t;
-typedef long off_t;
 typedef long time_t;
 typedef long blksize_t;
 typedef long blkcnt_t;

@@ -414,8 +414,8 @@ struct stat64 { /* only for 32 bit architectures */
 struct flock64 {
   short int l_type;
   short int l_whence;
-  off64_t l_start;
-  off64_t l_len;
+  off_t l_start;
+  off_t l_len;
   pid_t l_pid;
 };
 typedef union epoll_data {

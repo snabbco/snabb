@@ -133,7 +133,7 @@ local addtypes = {
   size = "size_t",
   mode = "mode_t",
   dev = "dev_t",
-  loff = "loff_t",
+  off = "off_t",
   pid = "pid_t",
   sa_family = "sa_family_t",
 }
@@ -158,7 +158,6 @@ t.int64_1 = ffi.typeof("int64_t[1]")
 t.uint64_1 = ffi.typeof("uint64_t[1]")
 t.socklen1 = ffi.typeof("socklen_t[1]")
 t.off1 = ffi.typeof("off_t[1]")
-t.loff1 = ffi.typeof("loff_t[1]")
 t.uid1 = ffi.typeof("uid_t[1]")
 t.gid1 = ffi.typeof("gid_t[1]")
 
