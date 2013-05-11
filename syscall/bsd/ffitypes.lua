@@ -36,6 +36,5 @@ struct sockaddr_in6 {
   struct in6_addr sin6_addr;
   uint32_t        sin6_scope_id;
 };
-
 ]]
 
