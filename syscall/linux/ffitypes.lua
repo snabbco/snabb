@@ -8,6 +8,7 @@ local ok, arch = pcall(require, "syscall.linux." .. abi.arch .. ".ffitypes") -- 
 if not ok then arch = {} end
 
 cdef[[
+typedef uint32_t mode_t;
 typedef unsigned short int sa_family_t;
 
 typedef unsigned long aio_context_t;
