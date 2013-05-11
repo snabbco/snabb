@@ -348,7 +348,7 @@ if S.geteuid() == 0 then
   -- cut out this section if you want to (careful!) debug on real interfaces
   -- TODO add to features as may not be supported
   assert(S.unshare("newnet, newns, newuts"), "tests as root require kernel namespaces") -- do not interfere with anything on host during tests
-  local nl = require "linux.nl"
+  local nl = require "syscall.linux.nl"
   local i = assert(nl.interfaces())
   local lo = assert(i.lo)
   assert(lo:up())
