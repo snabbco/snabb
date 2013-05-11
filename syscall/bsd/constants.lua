@@ -158,7 +158,7 @@ c.AF = strflag {
   BLUETOOTH   = 31,
   IEEE80211   = 32,
   MPLS        = 33,
-  AF_ROUTE    = 34,
+  ROUTE       = 34,
 }
 
 c.AF.UNIX = c.AF.LOCAL
