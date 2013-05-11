@@ -14,7 +14,7 @@ local ffi = require "ffi"
 
 local os = abi.os
 
-if os == "osx" then os = "bsd" -- use same tests for now
+if os == "osx" then os = "bsd" end -- use same tests for now
 
 require("test." .. os) -- OS specific tests
 
