@@ -40,7 +40,6 @@ print [[
 #include <sys/un.h>
 #include <netinet/ip.h>
 #include <poll.h>
-#include <sys/timex.h>
 #include <sys/mman.h>
 #include <sched.h>
 #include <sys/xattr.h>
