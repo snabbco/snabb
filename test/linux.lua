@@ -955,18 +955,6 @@ test_misc = {
     assert(S.setdomainname("domainnametest"))
     assert_equal(S.getdomainname(), "domainnametest")
   end,
-  test_inet_name = function()
-    local addr = t.in_addr("127.0.0.1")
-    assert(addr, "expect to get valid address")
-    assert_equal(tostring(addr), "127.0.0.1")
-  end,
-  test_inet_name6 = function()
-    for _, a in ipairs {"::1", "::2:0:0:0", "0:0:0:2::", "1::"} do
-      local addr = t.in6_addr(a)
-      assert(addr, "expect to get valid address")
-      assert_equal(tostring(addr), a)
-    end
-  end,
 }
 
 test_sockets = {
@@ -1029,18 +1017,6 @@ test_sockets = {
     assert(a.fd:close())
     assert(s:close())
   end,
-  test_sendfile = function()
-    local f1 = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
-    local f2 = assert(S.open(tmpfile2, "rdwr,creat", "rwxu"))
-    assert(S.unlink(tmpfile))
-    assert(f1:truncate(30))
-    assert(f2:truncate(30))
-    local off = 0
-    local n = assert(f1:sendfile(f2, off, 16))
-    assert(n.count == 16 and n.offset == 16, "sendfile should send 16 bytes")
-    assert(f1:close())
-    assert(f2:close())
-  end,
   test_unix_socketpair = function()
     local sv = assert(S.socketpair("unix", "stream"))
     assert(sv[1]:write("test"))
@@ -1089,6 +1065,21 @@ test_sockets = {
     assert(f.addr.port == serverport, "should be able to get server port in recvfrom")
     assert(c:close())
     assert(s:close())
+  end,
+}
+
+test_sendfile = {
+  test_sendfile = function()
+    local f1 = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
+    local f2 = assert(S.open(tmpfile2, "rdwr,creat", "rwxu"))
+    assert(S.unlink(tmpfile))
+    assert(f1:truncate(30))
+    assert(f2:truncate(30))
+    local off = 0
+    local n = assert(f1:sendfile(f2, off, 16))
+    assert(n.count == 16 and n.offset == 16, "sendfile should send 16 bytes")
+    assert(f1:close())
+    assert(f2:close())
   end,
 }
 

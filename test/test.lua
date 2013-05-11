@@ -311,6 +311,18 @@ test_address_names = {
     assert_equal(sa.port, 1234, "want same port back")
     assert_equal(tostring(sa.sin6_addr), "2002::4:5", "expect same address back")
   end,
+  test_inet_name = function()
+    local addr = t.in_addr("127.0.0.1")
+    assert(addr, "expect to get valid address")
+    assert_equal(tostring(addr), "127.0.0.1")
+  end,
+  test_inet_name6 = function()
+    for _, a in ipairs {"::1", "::2:0:0:0", "0:0:0:2::", "1::"} do
+      local addr = t.in6_addr(a)
+      assert(addr, "expect to get valid address")
+      assert_equal(tostring(addr), a)
+    end
+  end,
 }
 
 test_sockets_tmp = { -- TODO delete once rest moved here
