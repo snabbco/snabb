@@ -275,7 +275,7 @@ c.IPPROTO = strflag {
   VRRP           = 112,
   CARP           = 112,
   PFSYNC         = 240,
-  IPPROTO_RAW    = 255,
+  RAW            = 255,
 }
 
 return c
