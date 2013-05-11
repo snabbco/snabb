@@ -32,6 +32,8 @@ local mt = {} -- metatables
 local meth = {}
 
 --helpers
+local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
+
 local function ptt(tp)
   local ptp = ffi.typeof(tp .. " *")
   return function(x) return ffi.cast(ptp, x) end
@@ -51,7 +53,7 @@ local lenmt = {__len = lenfn}
 -- generic for __new TODO use more
 local function newfn(tp, tab)
   local num = {}
-  if tab then for i = 1, #tab do num[i] = tab[i] end end -- numeric index initialisers
+  if tab then for i = 1, #tab do num[i] = tab[i] end end -- numeric index initialisers TODO remove these as may vary by OS
   local obj = ffi.new(tp, num)
   -- these are split out so __newindex is called, not just initialisers luajit understands
   for k, v in pairs(tab or {}) do if type(k) == "string" then obj[k] = v end end -- set string indexes
@@ -211,7 +213,12 @@ addtype("in_addr", "struct in_addr", {
   __new = function(tp, s)
     local addr = ffi.new(tp)
     if s then
-      if ffi.istype(tp, s) then addr.s_addr = s.s_addr else addr = inet_pton(c.AF.INET, s, addr) end
+      if ffi.istype(tp, s) then
+        addr.s_addr = s.s_addr
+      else
+        addr = inet_pton(c.AF.INET, s, addr)
+        if not addr then return nil end
+      end
     end
     return addr
   end
@@ -287,19 +294,25 @@ meth.sockaddr_in = {
     addr = function(sa) return sa.sin_addr end,
   },
   newindex = {
-    port = function(sa, v) sa.sin_port = htons(v) end
+    family = function(sa, v) sa.sin_family = v end,
+    port = function(sa, v) sa.sin_port = htons(v) end,
+    addr = function(sa, v) sa.sin_addr = v end,
   }
 }
 
 addtype("sockaddr_in", "struct sockaddr_in", {
   __index = function(sa, k) if meth.sockaddr_in.index[k] then return meth.sockaddr_in.index[k](sa) end end,
   __newindex = function(sa, k, v) if meth.sockaddr_in.newindex[k] then meth.sockaddr_in.newindex[k](sa, v) end end,
-  __new = function(tp, port, addr) -- TODO allow table init
-    if not ffi.istype(t.in_addr, addr) then
-      addr = t.in_addr(addr)
-      if not addr then return end
+  __new = function(tp, port, addr)
+    local tab
+    if type(port) == "table" then
+      tab = port
+    else
+      tab = {family = c.AF.INET, port = port, addr = addr}
     end
-    return ffi.new(tp, c.AF.INET, htons(port or 0), addr)
+    tab.addr = mktype(t.in_addr, tab.addr)
+    if not tab.addr then return nil end
+    return newfn(tp, tab)
   end,
   __len = lenfn,
 })
