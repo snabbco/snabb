@@ -170,6 +170,24 @@ function S.recvfrom(fd, buf, count, flags, ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return {count = tonumber(ret), addr = t.sa(ss, addrlen[0])}
 end
+-- TODO {get,set}sockopt may need better type handling
+function S.setsockopt(fd, level, optname, optval, optlen)
+   -- allocate buffer for user, from Lua type if know how, int and bool so far
+  if not optlen and type(optval) == 'boolean' then optval = h.booltoc(optval) end
+  if not optlen and type(optval) == 'number' then
+    optval = t.int1(optval)
+    optlen = s.int
+  end
+  return retbool(C.setsockopt(getfd(fd), c.SOL[level], c.SO[optname], optval, optlen))
+end
+function S.getsockopt(fd, level, optname, optval, optlen)
+  if not optval then optval, optlen = t.int1(), s.int end
+  optlen = optlen or #optval
+  local len = t.socklen1(optlen)
+  local ret = C.getsockopt(getfd(fd), level, optname, optval, len)
+  if ret == -1 then return nil, t.error() end
+  return optval[0]
+end
 
 function S.getuid() return C.getuid() end
 function S.geteuid() return C.geteuid() end

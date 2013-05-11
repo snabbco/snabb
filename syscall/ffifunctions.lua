@@ -55,6 +55,8 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const void *d
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, void *src_addr, socklen_t *addrlen);
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
+int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
+int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 
 uid_t getuid(void);
 uid_t geteuid(void);

@@ -52,8 +52,6 @@ int timerfd_create(int clockid, int flags);
 int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value);
 int timerfd_gettime(int fd, struct itimerspec *curr_value);
 
-int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
-int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
