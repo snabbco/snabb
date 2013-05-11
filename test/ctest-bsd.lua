@@ -36,7 +36,6 @@ print [[
 #include <sys/utsname.h>
 #include <time.h>
 #include <sys/resource.h>
-#include <sys/sysinfo.h>
 #include <sys/time.h>
 #include <sys/un.h>
 #include <netinet/ip.h>
