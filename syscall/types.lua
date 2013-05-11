@@ -324,19 +324,27 @@ meth.sockaddr_in6 = {
     addr = function(sa) return sa.sin6_addr end,
   },
   newindex = {
-    port = function(sa, v) sa.sin6_port = htons(v) end
+    family = function(sa, v) sa.sin6_family = v end,
+    port = function(sa, v) sa.sin6_port = htons(v) end,
+    addr = function(sa, v) sa.sin6_addr = v end,
+    flowinfo = function(sa, v) sa.sin6_flowinfo = v end,
+    scope_id = function(sa, v) sa.sin6_scope_id = v end,
   }
 }
 
 addtype("sockaddr_in6", "struct sockaddr_in6", {
   __index = function(sa, k) if meth.sockaddr_in6.index[k] then return meth.sockaddr_in6.index[k](sa) end end,
   __newindex = function(sa, k, v) if meth.sockaddr_in6.newindex[k] then meth.sockaddr_in6.newindex[k](sa, v) end end,
-  __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers. TODO allow table init
-    if not ffi.istype(t.in6_addr, addr) then
-      addr = t.in6_addr(addr)
-      if not addr then return end
+  __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers.
+    local tab
+    if type(port) == "table" then
+      tab = port
+    else
+      tab = {family = c.AF.INET6, port = port, addr = addr, flowinfo = flowinfo, scope_id = scope_id}
     end
-    return ffi.new(tp, c.AF.INET6, htons(port or 0), flowinfo or 0, addr, scope_id or 0)
+    tab.addr = mktype(t.in6_addr, tab.addr)
+    if not tab.addr then return nil end
+    return newfn(tp, tab)
   end,
   __len = lenfn,
 })
