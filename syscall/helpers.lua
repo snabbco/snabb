@@ -2,7 +2,13 @@
 
 local abi = require "syscall.abi"
 
+local ffi = require "ffi"
+
 local h = {}
+
+-- test if function in libc
+local function inlibc_fn(f) return ffi.C[f] end
+function h.inlibc(f) return pcall(inlibc_fn, f) end
 
 -- endian conversion
 -- TODO add tests eg for signs.

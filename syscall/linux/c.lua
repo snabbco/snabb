@@ -11,6 +11,9 @@ local abi = require "syscall.abi"
 local types = require "syscall.types"
 local t, pt, s = types.t, types.pt, types.s
 
+local h = require "syscall.helpers"
+local inlibc = h.inlibc
+
 local function u6432(x) return t.u6432(x):to32() end
 local function i6432(x) return t.i6432(x):to32() end
 
@@ -29,10 +32,6 @@ if abi.abi32 then
   C.preadv = ffi.C.preadv64
   C.pwritev = ffi.C.pwritev64
 end
-
--- test if function in libc
-local function inlibc_fn(f) return ffi.C[f] end
-local function inlibc(f) return pcall(inlibc_fn, f) end
 
 -- glibc caches pid, but this fails to work eg after clone().
 function C.getpid()
