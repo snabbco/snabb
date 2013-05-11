@@ -1025,15 +1025,21 @@ test_sockets = {
     n = assert(a.fd:readv(iov))
     assert_equal(n, 7, "expect readv to read 7 bytes")
     assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
-    -- test sendfile
-    local f = assert(S.open("/etc/passwd", "RDONLY"))
-    local off = 0
-    n = assert(c:sendfile(f, off, 16))
-    assert(n.count == 16 and n.offset == 16, "sendfile should send 16 bytes")
-    assert(f:close())
     assert(c:close())
     assert(a.fd:close())
     assert(s:close())
+  end,
+  test_sendfile = function()
+    local f1 = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
+    local f2 = assert(S.open(tmpfile2, "rdwr,creat", "rwxu"))
+    assert(S.unlink(tmpfile))
+    assert(f1:truncate(30))
+    assert(f2:truncate(30))
+    local off = 0
+    local n = assert(f1:sendfile(f2, off, 16))
+    assert(n.count == 16 and n.offset == 16, "sendfile should send 16 bytes")
+    assert(f1:close())
+    assert(f2:close())
   end,
   test_unix_socketpair = function()
     local sv = assert(S.socketpair("unix", "stream"))
