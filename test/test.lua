@@ -110,7 +110,7 @@ test_basic = {
         allok = false
       end
     end
-    assert(allok)
+    assert(allok, "missing error message")
   end,
   test_booltoc = function()
     assert_equal(helpers.booltoc(true), 1)

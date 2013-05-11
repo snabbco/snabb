@@ -155,6 +155,8 @@ local msg = {
   NEEDAUTH   = "Need authenticator",
   RPCMISMATCH= "RPC version wrong",
   PROCUNAVAIL= "Bad procedure for program",
+  NOATTR     = "Attribute not found",
+  NOTSUP     = "Not supported",
 }
 
 local errors = setmetatable({}, {
