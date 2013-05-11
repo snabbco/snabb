@@ -122,7 +122,7 @@ c.E = strflag {
   NOPOLICY      = 103,
   NOTRECOVERABLE= 104,
   OWNERDEAD     = 105,
-  EQFULL        = 106,
+  QFULL        = 106,
 }
 
 -- alternate names
