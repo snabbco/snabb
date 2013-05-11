@@ -50,7 +50,6 @@ print [[
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/un.h>
-#include <netinet/ip.h>
 #include <poll.h>
 #include <sys/mman.h>
 #include <sched.h>
