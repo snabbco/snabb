@@ -32,6 +32,8 @@ int signal(int signum, int handler); /* although deprecated, just using to set S
 
 time_t time(time_t *t);
 
+int dup3(int oldfd, int newfd, int flags);
+
 /* down to here have moved to shared calls */
 int clock_getres(clockid_t clk_id, struct timespec *res);
 int clock_gettime(clockid_t clk_id, struct timespec *tp);

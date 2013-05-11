@@ -33,12 +33,6 @@ else -- no largefile issues
   end
 end
 
--- TODO dup3 can have a race condition (see man page) although Musl fixes, appears eglibc does not
-function S.dup(oldfd, newfd, flags)
-  if not newfd then return retfd(C.dup(getfd(oldfd))) end
-  return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags or 0))
-end
-
 function S.pipe(flags)
   local fd2 = t.int2()
   local ret = C.pipe2(fd2, c.OPIPE[flags])
@@ -188,7 +182,6 @@ end
 
 function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG[flags])) end
 
-function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, c.MSG[flags])) end
 function S.recvfrom(fd, buf, count, flags, ss, addrlen)
   ss = ss or t.sockaddr_storage()
   addrlen = addrlen or t.socklen1(#ss)

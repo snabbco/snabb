@@ -7,6 +7,7 @@ require "syscall.ffitypes"
 cdef[[
 int lchmod(const char *path, mode_t mode);
 int fchroot(int fd);
+int dup3(int oldfd, int newfd, int flags);
 ]]
 
 --[[ -- need more types defined

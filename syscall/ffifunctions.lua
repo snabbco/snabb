@@ -48,7 +48,6 @@ int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
-int dup3(int oldfd, int newfd, int flags);
 ssize_t send(int sockfd, const void *buf, size_t len, int flags);
 // for sendto and recvfrom use void pointer not const struct sockaddr * to avoid casting TODO should cast
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const void *dest_addr, socklen_t addrlen);

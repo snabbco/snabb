@@ -1,4 +1,5 @@
 -- choose correct syscalls for OS, plus shared calls
+-- note that where functions are identical if present but may be missing they can also go here
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -138,6 +139,19 @@ function S.socketpair(domain, stype, protocol)
   if ret == -1 then return nil, t.error() end
   return t.socketpair(sv2)
 end
+if inlibc "dup3" then
+  -- TODO dup3 can have a race condition (see Linux man page) although Musl fixes, appears eglibc does not
+  function S.dup(oldfd, newfd, flags)
+    if not newfd then return retfd(C.dup(getfd(oldfd))) end
+    return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags or 0))
+  end
+else -- OSX does not have dup3
+  function S.dup(oldfd, newfd, flags)
+    assert(not flags, "TODO: emulate dup3 behaviour on OSX")
+    if not newfd then return retfd(C.dup(getfd(oldfd))) end
+    return retfd(C.dup2(getfd(oldfd), getfd(newfd))) -- TODO set flags on newfd
+  end
+end
 
 function S.getuid() return C.getuid() end
 function S.geteuid() return C.geteuid() end
@@ -174,6 +188,9 @@ function S.nice(inc)
   if not ok then return nil, err end
   return S.getpriority("process", 0)
 end
+
+-- deprecated in NetBSD so implement with recvfrom
+function S.recv(fd, buf, count, flags) return retnum(C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], nil, 0)) end
 
 -- TODO setpgrp and similar - see the man page
 
