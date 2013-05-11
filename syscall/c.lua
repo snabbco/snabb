@@ -4,5 +4,5 @@ local abi = require "syscall.abi"
 
 require "syscall.ffifunctions"
 
-return require(abi.os .. ".c")
+return require("syscall." .. abi.os .. ".c")
 

@@ -53,5 +53,5 @@ struct in6_addr {
 };
 ]]
 
-require(abi.os .. ".ffitypes")
+require("syscall." .. abi.os .. ".ffitypes")
 

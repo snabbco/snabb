@@ -293,7 +293,7 @@ t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs) 
 -- include OS specific types
 local hh = {ptt = ptt, addtype = addtype, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
 
-types = require(abi.os .. ".types")(types, hh)
+types = require("syscall." .. abi.os .. ".types")(types, hh)
 
 return types
 

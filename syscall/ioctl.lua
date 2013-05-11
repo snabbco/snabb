@@ -2,5 +2,5 @@
 
 local abi = require "syscall.abi"
 
-return require(abi.os .. ".ioctl")
+return require("syscall." .. abi.os .. ".ioctl")
 

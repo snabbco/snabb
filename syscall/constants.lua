@@ -2,5 +2,5 @@
 
 local abi = require "syscall.abi"
 
-return require(abi.os .. ".constants")
+return require("syscall." .. abi.os .. ".constants")
 

@@ -4,7 +4,7 @@
 
 local abi = require "syscall.abi"
 
-require(abi.os .. ".ffifunctions")
+require("syscall." .. abi.os .. ".ffifunctions")
 
 local cdef = require "ffi".cdef
 

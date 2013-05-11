@@ -140,7 +140,7 @@ local hh = {
   ret64 = ret64, retnum = retnum, retfd = retfd, retbool = retbool, retptr = retptr
 }
 
-local S = require(abi.os .. ".syscalls")(S, hh)
+local S = require("syscall." .. abi.os .. ".syscalls")(S, hh)
 
 -- these functions are not always available as syscalls, so always define via other calls
 function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
