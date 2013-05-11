@@ -241,5 +241,42 @@ c.SOCK = multiflags {
   FLAGS_MASK= 0xf0000000,
 }
 
+c.IPPROTO = strflag {
+  IP             = 0,
+  HOPOPTS        = 0,
+  ICMP           = 1,
+  IGMP           = 2,
+  GGP            = 3,
+  IPV4           = 4,
+  IPIP           = 4,
+  TCP            = 6,
+  EGP            = 8,
+  PUP            = 12,
+  UDP            = 17,
+  IDP            = 22,
+  TP             = 29,
+  IPV6           = 41,
+  ROUTING        = 43,
+  FRAGMENT       = 44,
+  RSVP           = 46,
+  GRE            = 47,
+  ESP            = 50,
+  AH             = 51,
+  MOBILE         = 55,
+  IPV6_ICMP      = 58,
+  ICMPV6         = 58,
+  NONE           = 59,
+  DSTOPTS        = 60,
+  EON            = 80,
+  ETHERIP        = 97,
+  ENCAP          = 98,
+  PIM            = 103,
+  IPCOMP         = 108,
+  VRRP           = 112,
+  CARP           = 112,
+  PFSYNC         = 240,
+  IPPROTO_RAW    = 255,
+}
+
 return c
 
