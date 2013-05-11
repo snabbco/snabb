@@ -10,10 +10,8 @@ local abi = {
   le = ffi.abi("le"), -- boolean
   be = ffi.abi("be"), -- boolean
   eabi = ffi.abi("eabi"), -- boolean
-  os = ffi.os:lower(), -- bsd, linux
+  os = ffi.os:lower(), -- bsd, osx, linux
 }
-
-if abi.os == "osx" then abi.os = "bsd" end -- more or less BSD, will try to just use feature detection
 
 return abi
 

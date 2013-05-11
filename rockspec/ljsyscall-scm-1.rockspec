@@ -66,6 +66,13 @@ build =
       ["syscall.bsd.ioctl"] = "syscall/bsd/ioctl.lua";
       ["syscall.bsd.types"] = "syscall/bsd/types.lua";
 
+      ["syscall.osx.syscalls"] = "syscall/osx/syscalls.lua";
+      ["syscall.osx.c"] = "syscall/osx/c.lua";
+      ["syscall.osx.constants"] = "syscall/osx/constants.lua";
+      ["syscall.osx.ffitypes"] = "syscall/osx/ffitypes.lua";
+      ["syscall.osx.ffifunctions"] = "syscall/osx/ffifunctions.lua";
+      ["syscall.osx.ioctl"] = "syscall/osx/ioctl.lua";
+      ["syscall.osx.types"] = "syscall/osx/types.lua";
     };
   };
 }
