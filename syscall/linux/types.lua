@@ -180,20 +180,6 @@ t.device = function(major, minor)
   return setmetatable({dev = t.dev(dev)}, mt.device)
 end
 
--- cast socket address to actual type based on family
-local samap, samap2 = {}, {}
-
-meth.sockaddr = {
-  index = {
-    family = function(sa) return sa.sa_family end,
-  }
-}
-
-addtype("sockaddr", "struct sockaddr", {
-  __index = function(sa, k) if meth.sockaddr.index[k] then return meth.sockaddr.index[k](sa) end end,
-  __len = lenfn,
-})
-
 meth.sockaddr_storage = {
   index = {
     family = function(sa) return sa.ss_family end,
@@ -202,6 +188,9 @@ meth.sockaddr_storage = {
     family = function(sa, v) sa.ss_family = c.AF[v] end,
   }
 }
+
+-- cast socket address to actual type based on family
+local samap, samap2 = {}, {}
 
 -- experiment, see if we can use this as generic type, to avoid allocations.
 addtype("sockaddr_storage", "struct sockaddr_storage", {
@@ -241,54 +230,6 @@ addtype("sockaddr_storage", "struct sockaddr_storage", {
       end
     end
     return ss
-  end,
-  __len = lenfn,
-})
-
-meth.sockaddr_in = {
-  index = {
-    family = function(sa) return sa.sin_family end,
-    port = function(sa) return ntohs(sa.sin_port) end,
-    addr = function(sa) return sa.sin_addr end,
-  },
-  newindex = {
-    port = function(sa, v) sa.sin_port = htons(v) end
-  }
-}
-
-addtype("sockaddr_in", "struct sockaddr_in", {
-  __index = function(sa, k) if meth.sockaddr_in.index[k] then return meth.sockaddr_in.index[k](sa) end end,
-  __newindex = function(sa, k, v) if meth.sockaddr_in.newindex[k] then meth.sockaddr_in.newindex[k](sa, v) end end,
-  __new = function(tp, port, addr) -- TODO allow table init
-    if not ffi.istype(t.in_addr, addr) then
-      addr = t.in_addr(addr)
-      if not addr then return end
-    end
-    return ffi.new(tp, c.AF.INET, htons(port or 0), addr)
-  end,
-  __len = lenfn,
-})
-
-meth.sockaddr_in6 = {
-  index = {
-    family = function(sa) return sa.sin6_family end,
-    port = function(sa) return ntohs(sa.sin6_port) end,
-    addr = function(sa) return sa.sin6_addr end,
-  },
-  newindex = {
-    port = function(sa, v) sa.sin6_port = htons(v) end
-  }
-}
-
-addtype("sockaddr_in6", "struct sockaddr_in6", {
-  __index = function(sa, k) if meth.sockaddr_in6.index[k] then return meth.sockaddr_in6.index[k](sa) end end,
-  __newindex = function(sa, k, v) if meth.sockaddr_in6.newindex[k] then meth.sockaddr_in6.newindex[k](sa, v) end end,
-  __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers. TODO allow table init
-    if not ffi.istype(t.in6_addr, addr) then
-      addr = t.in6_addr(addr)
-      if not addr then return end
-    end
-    return ffi.new(tp, c.AF.INET6, htons(port or 0), flowinfo or 0, addr, scope_id or 0)
   end,
   __len = lenfn,
 })
