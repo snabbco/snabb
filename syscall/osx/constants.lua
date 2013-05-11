@@ -1,6 +1,4 @@
--- tables of constants for BSD
-
--- TODO add test that we do not reallocate
+-- tables of constants for OSX
 
 local h = require "syscall.helpers"
 
@@ -112,9 +110,19 @@ c.E = strflag {
   NOSTR		= 91,
   TIME		= 92,
   NOATTR	= 93,
-  MULTIHOP	= 94,
-  NOLINK	= 95,
-  PROTO		= 96,
+  BADMSG	= 94,
+  MULTIHOP	= 95,
+  NODATA	= 96,
+  NOLINK        = 97,
+  NOSR          = 98,
+  NOSTR         = 99,
+  PROTO         = 100,
+  TIME          = 101,
+  OPNOTSUPP	= 102,
+  NOPOLICY      = 103,
+  NOTRECOVERABLE= 104,
+  OWNERDEAD     = 105,
+  EQFULL        = 106,
 }
 
 -- alternate names
