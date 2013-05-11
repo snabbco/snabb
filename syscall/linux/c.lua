@@ -271,24 +271,24 @@ end
 -- if not in libc replace
 
 -- in librt for glibc but use syscalls instead
-if not inlibc("clock_getres") then C.clock_getres = CC.clock_getres end
-if not inlibc("clock_settime") then C.clock_settime = CC.clock_settime end
-if not inlibc("clock_gettime") then C.clock_gettime = CC.clock_gettime end
-if not inlibc("clock_nanosleep") then C.clock_nanosleep = CC.clock_nanosleep end
+if not inlibc "clock_getres" then C.clock_getres = CC.clock_getres end
+if not inlibc "clock_settime" then C.clock_settime = CC.clock_settime end
+if not inlibc "clock_gettime" then C.clock_gettime = CC.clock_gettime end
+if not inlibc "clock_nanosleep" then C.clock_nanosleep = CC.clock_nanosleep end
 
 -- not in glibc
-if not inlibc("mknod") then C.mknod = CC.mknod end
-if not inlibc("mknodat") then C.mknodat = CC.mknodat end
-if not inlibc("pivot_root") then C.pivot_root = CC.pivot_root end
+if not inlibc "mknod" then C.mknod = CC.mknod end
+if not inlibc "mknodat" then C.mknodat = CC.mknodat end
+if not inlibc "pivot_root" then C.pivot_root = CC.pivot_root end
 
 -- not in glibc on my dev ARM box
-if not inlibc("setns") then C.setns = CC.setns end
-if not inlibc("prlimit64") then C.prlimit64 = CC.prlimit64 end
+if not inlibc "setns" then C.setns = CC.setns end
+if not inlibc "prlimit64" then C.prlimit64 = CC.prlimit64 end
 
 -- not in uClibc
 if abi.abi32 then
-  if not inlibc("preadv64") then C.preadv = CC.preadv64 end
-  if not inlibc("pwritev64") then C.pwritev = CC.pwritev64 end
+  if not inlibc "preadv64" then C.preadv = CC.preadv64 end
+  if not inlibc "pwritev64"  then C.pwritev = CC.pwritev64 end
 end
 
 return C

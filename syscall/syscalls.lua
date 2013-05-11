@@ -7,8 +7,11 @@ local c = require "syscall.constants"
 local C = require "syscall.c"
 local types = require "syscall.types"
 local abi = require "syscall.abi"
+local h = require "syscall.helpers"
 
 local t, pt, s = types.t, types.pt, types.s
+
+local inlibc = h.inlibc
 
 local S = {}
 
@@ -103,7 +106,7 @@ function S.writev(fd, iov)
 end
 function S.pread(fd, buf, count, offset) return retnum(C.pread(getfd(fd), buf, count, offset)) end
 function S.pwrite(fd, buf, count, offset) return retnum(C.pwrite(getfd(fd), buf, count or #buf, offset)) end
-if C.preadv and C.pwritev then -- these are missing in eg OSX
+if inlibc "preadv" and inlibc "pwritev" then -- these are missing in eg OSX
   function S.preadv(fd, iov, offset)
     iov = mktype(t.iovecs, iov)
     return retnum(C.preadv(getfd(fd), iov.iov, #iov, offset))
