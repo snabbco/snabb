@@ -36,5 +36,10 @@ struct sockaddr_in6 {
   struct in6_addr sin6_addr;
   uint32_t        sin6_scope_id;
 };
+struct sockaddr_un {
+  uint8_t         sun_len;
+  sa_family_t     sun_family;
+  char            sun_path[104];
+};
 ]]
 

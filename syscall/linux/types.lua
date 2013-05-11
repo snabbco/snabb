@@ -236,7 +236,7 @@ addtype("sockaddr_storage", "struct sockaddr_storage", {
 
 meth.sockaddr_un = {
   index = {
-    family = function(sa) return sa.un_family end,
+    family = function(sa) return sa.sun_family end,
   },
 }
 
@@ -247,7 +247,7 @@ addtype("sockaddr_un", "struct sockaddr_un", {
 })
 
 -- this is a bit odd, but we actually use Lua metatables for sockaddr_un, and use t.sa to multiplex
--- basically a unix socket structure is not possible to interpret without size
+-- basically the lINUX unix socket structure is not possible to interpret without size, but does not have size in struct
 mt.sockaddr_un = {
   __index = function(un, k)
     local sa = un.addr

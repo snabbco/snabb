@@ -43,6 +43,29 @@ t.device = function(major, minor)
   return setmetatable({dev = t.dev(dev)}, mt.device)
 end
 
+meth.sockaddr_un = {
+  index = {
+    family = function(sa) return sa.sun_family end,
+    path = function(sa) return ffi.string(sa.sun_path) end,
+  },
+  newindex = {
+    family = function(sa, v) sa.sun_family = v end,
+    path = function(sa, v) ffi.copy(sa.sun_path, v) end,
+  }
+}
+
+addtype("sockaddr_un", "struct sockaddr_un", {
+  __index = function(sa, k) if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end end,
+  __new = function(tp, path) return newfn(tp, {family = c.AF.UNIX, path = path}) end,
+  __len = function(sa)
+    if sa.sun_len == 0 then -- length not set explicitly
+      return 2 + #sa.path -- does not include terminating 0
+    else
+      return sa.sun_len
+    end
+  end,
+})
+
 return types
 
 end
