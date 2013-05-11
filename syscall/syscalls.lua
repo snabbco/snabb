@@ -152,6 +152,13 @@ else -- OSX does not have dup3
     return retfd(C.dup2(getfd(oldfd), getfd(newfd))) -- TODO set flags on newfd
   end
 end
+function S.recvfrom(fd, buf, count, flags, ss, addrlen)
+  ss = ss or t.sockaddr_storage()
+  addrlen = addrlen or t.socklen1(#ss)
+  local ret = C.recvfrom(getfd(fd), buf, count, c.MSG[flags], ss, addrlen)
+  if ret == -1 then return nil, t.error() end
+  return {count = tonumber(ret), addr = t.sa(ss, addrlen[0])}
+end
 
 function S.getuid() return C.getuid() end
 function S.geteuid() return C.geteuid() end

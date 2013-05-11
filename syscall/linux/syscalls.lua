@@ -182,14 +182,6 @@ end
 
 function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG[flags])) end
 
-function S.recvfrom(fd, buf, count, flags, ss, addrlen)
-  ss = ss or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(#ss)
-  local ret = C.recvfrom(getfd(fd), buf, count, c.MSG[flags], ss, addrlen)
-  if ret == -1 then return nil, t.error() end
-  return {count = tonumber(ret), addr = t.sa(ss, addrlen[0])}
-end
-
 -- TODO {get,set}sockopt may need better type handling
 function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far
