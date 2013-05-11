@@ -170,6 +170,15 @@ function S.recvfrom(fd, buf, count, flags, ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return {count = tonumber(ret), addr = t.sa(ss, addrlen[0])}
 end
+function S.sendmsg(fd, msg, flags)
+  if not msg then -- send a single byte message, eg enough to send credentials
+    local buf1 = t.buffer(1)
+    local io = t.iovecs{{buf1, 1}}
+    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io}
+  end
+  return retbool(C.sendmsg(getfd(fd), msg, c.MSG[flags]))
+end
+function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG[flags])) end
 -- TODO {get,set}sockopt may need better type handling
 function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far

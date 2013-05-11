@@ -158,17 +158,6 @@ end
 
 function S.exit(status) C.exit_group(c.EXIT[status]) end
 
-function S.sendmsg(fd, msg, flags)
-  if not msg then -- send a single byte message, eg enough to send credentials
-    local buf1 = t.buffer(1)
-    local io = t.iovecs{{buf1, 1}}
-    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io}
-  end
-  return retbool(C.sendmsg(getfd(fd), msg, c.MSG[flags]))
-end
-
-function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG[flags])) end
-
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.fchmodat(dirfd, pathname, mode)
