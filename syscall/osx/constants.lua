@@ -340,5 +340,21 @@ c.IPPROTO = strflag {
   RAW            = 255,
 }
 
+c.MSG = multiflags {
+  OOB             = 0x0001,
+  PEEK            = 0x0002,
+  DONTROUTE       = 0x0004,
+  EOR             = 0x0008,
+  TRUNC           = 0x0010,
+  CTRUNC          = 0x0020,
+  WAITALL         = 0x0040,
+  DONTWAIT        = 0x0080,
+  BCAST           = 0x0100,
+  MCAST           = 0x0200,
+  NOSIGNAL        = 0x0400,
+  CMSG_CLOEXEC    = 0x0800,
+  NBIO            = 0x1000,
+}
+
 return c
 
