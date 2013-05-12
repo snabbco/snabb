@@ -10,9 +10,8 @@ typedef uint8_t sa_family_t;
 typedef uint32_t dev_t;
 typedef int64_t blkcnt_t;
 typedef int32_t blksize_t;
-// TODO check below here
 typedef uint16_t nlink_t;
-typedef unsigned long ino_t;
+typedef uint64_t ino_t; // at least on recent desktop; TODO define as ino64_t
 typedef long time_t;
 typedef int32_t daddr_t;
 typedef long ssize_t;
@@ -67,6 +66,26 @@ struct msghdr {
   void            *msg_control;
   socklen_t       msg_controllen;
   int             msg_flags;
+};
+struct stat {
+  dev_t           st_dev;
+  mode_t          st_mode;
+  nlink_t         st_nlink;
+  ino_t           st_ino;
+  uid_t           st_uid;
+  gid_t           st_gid;
+  dev_t           st_rdev;
+  struct timespec st_atimespec;
+  struct timespec st_mtimespec;
+  struct timespec st_ctimespec;
+  struct timespec st_birthtimespec;
+  off_t           st_size;
+  blkcnt_t        st_blocks;
+  blksize_t       st_blksize;
+  uint32_t        st_flags;
+  uint32_t        st_gen;
+  int32_t         st_lspare;
+  int64_t         st_qspare[2];
 };
 ]]
 
