@@ -29,8 +29,8 @@ function Port:selftest ()
 end
 
 function Port:run (...)
-   if self.coroutine then
-      if self.coroutine(...) == nil then self.coroutine = nil end
+   if self.program then
+      if self.program(...) == nil then self.program = nil end
    end
 end
 
@@ -41,26 +41,34 @@ function Port:spam ()
    local inputs, outputs = self.inputs, self.outputs
    -- Keep it simple: use one buffer for everything.
    local buf = buffer.allocate()
-   buf.size = 32
-   repeat
-      for _,input in pairs(inputs) do
-         input.sync_receive()
-         while input.can_receive() do
-            input.receive()
-         end
-         while input.can_add_receive_buffer() do
-            input.add_receive_buffer(buf)
-         end
-      end
-      for _,output in pairs(outputs) do
-         while output.can_transmit() do
-            output.transmit(buf)
-         end
-         output.sync_transmit()
-      end
-      C.usleep(100000)
-   until coroutine.yield("spam") == nil
-   buffer.deref(buf)
+   buf.refcount = 0
+   buf.size = 50
+   return function ()
+--             if false then
+                for _,input in ipairs(inputs) do
+                   while input.can_receive() do
+                      input.receive()
+                   end
+                   if (math.random() > 0.9) then 
+                      while input.can_add_receive_buffer() do
+                         input.add_receive_buffer(buf)
+                      end
+                   end
+                end
+--             end
+             for _,output in ipairs(outputs) do
+--                for i = 1,output.how_many_can_transmit() do
+--                   output.transmit(buf)
+--                end
+--                if false then
+                   while output.can_transmit() do
+                      output.transmit(buf)
+                   end
+--                end
+                output.sync_transmit()
+             end
+             return true
+          end
 end
 
 -- Echo receives packets and transmits the same packets back onto the
@@ -103,14 +111,26 @@ function selftest (options)
       end
    end
    local port = port.new("test", devices, devices)
-   local program = options.program or Port.spam
-   port.coroutine = coroutine.wrap(program)
-   local finished = lib.timer((options.secs or 1) * 1e9)
+   local program = options.program or port:spam()
+   port.program = program
+   local finished = lib.timer((options.secs or 10) * 1e9)
+   local start_time = C.get_time_ns()
    repeat
       port:run(port)
    until finished()
+   local end_time = C.get_time_ns()
+   local rx, tx = 0, 0
+   local rxp, txp = 0, 0
    for _,d in pairs(devices) do
-      register.dump(d.s, true)
+--      register.dump(d.s, true)
+--      register.dump(d.r)
+      rx = rx + d.s.GORCL() + d.s.GORCH() * 2^32
+      tx = tx + d.s.GOTCL() + d.s.GOTCH() * 2^32
+      rxp = rxp + d.s.GPRC()
+      txp = txp + d.s.GPTC()
    end
+   nanos = tonumber(end_time - start_time)
+   io.write(("Transmit goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(tx)/nanos * 8, txp * 1000 / nanos))
+   io.write(("Receive  goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(rx)/nanos * 8, rxp * 1000 / nanos))
 end
 

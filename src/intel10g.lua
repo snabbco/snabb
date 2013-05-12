@@ -25,8 +25,8 @@ local test = require("test")
 require("intel_h")
 local bits, bitset = lib.bits, lib.bitset
 
-num_descriptors = 32 * 1024
-rxdesc, rxdesc_phy, txdesc, txdesc_phy = nil
+local num_descriptors = 32 * 1024
+local rxdesc, rxdesc_phy, txdesc, txdesc_phy = nil
 
 r = {} -- Configuration registers
 s = {} -- Statistics registers
@@ -106,23 +106,29 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
-tdh, tdt = 0, 0 -- Cached values of TDT and TDH
+local tdh, tdt = 0, 0 -- Cached values of TDT and TDH
 txfree = 0
-txdesc_flags = bits{eop=24,ifcs=25}
+local txdesc_flags = bits{eop=24,ifcs=25}
 function transmit (buf)
    txdesc[tdt].data.address = buf.phy
    txdesc[tdt].data.options = bit.bor(buf.size, txdesc_flags)
    tdt = (tdt + 1) % num_descriptors
-   buffer.ref(buf)
+--   buffer.ref(buf)
 end
 
 function sync_transmit ()
-   C.full_memory_barrier()
+--   C.full_memory_barrier()
    tdh = r.TDH()
    r.TDT(tdt)
 end
 
-function can_transmit () return (tdt + 1) % num_descriptors ~= txfree end
+--function can_transmit () return (tdt + 1) % num_descriptors ~= txfree end
+function can_transmit () return (tdt + 1) % num_descriptors ~= tdh end
+function how_many_can_transmit ()
+   if tdh > tdt then return tdh - tdt - 1
+   else              return (tdh + num_descriptors) - tdt - 1
+   end
+end
 
 --- ### Receive
 
@@ -160,7 +166,7 @@ function add_receive_buffer (buf)
 end
 
 function sync_receive ()
-   C.full_memory_barrier()
+--   C.full_memory_barrier()
    rdh = r.RDH()
    r.RDT(rdt)
 end

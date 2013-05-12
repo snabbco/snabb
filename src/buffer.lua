@@ -44,6 +44,7 @@ function ref (buf)
 end
 
 function deref (buf)
+   if true then return end
    if     buf.refcount == 0 then return 
    elseif buf.refcount == 1 then table.append(freelist, buf) 
    else                          buf.refcount = buf.refcount -1 end

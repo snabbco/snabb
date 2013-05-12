@@ -18,7 +18,7 @@ all: snabbswitch
 snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(JITOBJS) $(EXTRAOBJS)
 	gcc -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
-	    -lc -ldl -lm -lrt
+	    -lc -ldl -lm -lrt -lpthread
 	@echo -n "Firmware: "
 	@ls -sh snabbswitch
 
