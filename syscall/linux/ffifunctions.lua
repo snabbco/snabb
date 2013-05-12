@@ -77,8 +77,6 @@ int adjtimex(struct timex *buf);
 int sync_file_range(int fd, off_t offset, off_t count, unsigned int flags);
 
 int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
-int truncate(const char *path, off_t length);
-int ftruncate(int fd, off_t length);
 int truncate64(const char *path, off_t length);
 int ftruncate64(int fd, off_t length);
 int pause(void);

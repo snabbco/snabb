@@ -51,6 +51,8 @@ int fcntl(int fd, int cmd, void *arg); /* arg is long or pointer */
 int stat(const char *path, struct stat *sb);
 int lstat(const char *path, struct stat *sb);
 int fstat(int fd, struct stat *sb);
+int truncate(const char *path, off_t length);
+int ftruncate(int fd, off_t length);
 
 int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);

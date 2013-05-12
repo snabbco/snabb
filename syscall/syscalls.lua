@@ -150,6 +150,8 @@ function S.fstat(fd, buf)
   if ret == -1 then return nil, t.error() end
   return buf
 end
+function S.truncate(path, length) return retbool(C.truncate(path, length)) end
+function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
   protocol = protocol or 0
