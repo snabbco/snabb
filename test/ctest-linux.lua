@@ -107,7 +107,6 @@ c.IFLA_VF_INFO = nil
 c.IFLA_VF_PORT = nil
 c.TCFLOW = nil
 c.TCSA = nil
-c.FCNTL_LOCK = nil
 c.TCFLUSH = nil
 c.SECCOMP_RET = nil
 c.IN_INIT = nil
@@ -385,6 +384,7 @@ local nm = {
   IOCTL = "",
   B = "B",
   SYS = "__NR_",
+  FCNTL_LOCK = "F_",
 }
 
 for k, v in pairs(c) do
