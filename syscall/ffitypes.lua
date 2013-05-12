@@ -2,6 +2,10 @@
 
 -- TODO many are common and can be shared here
 
+-- TODO to support rump we are going to have to not share as many though
+-- best to rename eg dev64_t, mode32_t I think
+-- that means some more types and function signatures will alas differ, plus splitting out some Lua types
+
 local abi = require "syscall.abi"
 
 local cdef = require "ffi".cdef
