@@ -57,7 +57,7 @@ local clean = function()
   S.unlink(efile)
 end
 
-test_openat_accessat = {
+test_file_operations_linux = {
   test_openat = function()
     local dfd = S.open(".")
     local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "rwxu"))
@@ -73,9 +73,6 @@ test_openat_accessat = {
     assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
     assert(fd:close())
   end,
-}
-
-test_file_operations_linux = {
   test_linkat = function()
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
@@ -342,11 +339,11 @@ test_locking = {
 
 test_sockets_pipes = {
   test_sockaddr_storage = function()
-    local sa = t.sockaddr_storage{family = "netlink", pid = 2}
-    assert_equal(sa.family, c.AF.NETLINK, "netlink family")
-    assert_equal(sa.pid, 2, "should get pid back")
-    sa.pid = 3
-    assert_equal(sa.pid, 3, "should get pid back")
+    local sa = t.sockaddr_storage{family = "inet6", port = 2}
+    assert_equal(sa.family, c.AF.INET6, "inet6 family")
+    assert_equal(sa.port, 2, "should get port back")
+    sa.port = 3
+    assert_equal(sa.port, 3, "should get port back")
     sa.family = "inet"
     assert_equal(sa.family, c.AF.INET, "inet family")
     sa.port = 4
