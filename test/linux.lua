@@ -75,28 +75,7 @@ test_openat_accessat = {
   end,
 }
 
-test_file_operations = {
-  teardown = clean,
-  test_dup = function()
-    local fd = assert(S.open("/dev/zero"))
-    local fd2 = assert(fd:dup())
-    assert(fd2:close())
-    assert(fd:close())
-  end,
-  test_dup_to_number = function()
-    local fd = assert(S.open("/dev/zero"))
-    local fd2 = assert(fd:dup(17))
-    assert_equal(fd2:getfd(), 17, "dup2 should set file id as specified")
-    assert(fd2:close())
-    assert(fd:close())
-  end,
-  test_link = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(S.link(tmpfile, tmpfile2))
-    assert(S.unlink(tmpfile2))
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
+test_file_operations_linux = {
   test_linkat = function()
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
@@ -105,15 +84,6 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
     assert(dirfd:close())
-  end,
-  test_symlink = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(S.symlink(tmpfile, tmpfile2))
-    local s = assert(S.readlink(tmpfile2))
-    assert_equal(s, tmpfile, "should be able to read symlink")
-    assert(S.unlink(tmpfile2))
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
   end,
   test_symlinkat = function()
     local dirfd = assert(S.open("."))
@@ -126,24 +96,6 @@ test_file_operations = {
     assert(fd:close())
     assert(dirfd:close())
   end,
-  test_sync = function()
-    S.sync() -- cannot fail...
-  end,
-  test_fchmod = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(fd:fchmod("RUSR, WUSR"))
-    local st = fd:stat()
-    assert_equal(st.mode, c.S_I["FREG, RUSR, WUSR"]) -- TODO should be better way to test
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_chmod = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(S.chmod(tmpfile, "RUSR, WUSR"))
-    assert(S.access(tmpfile, "rw"))
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
   test_fchmodat = function()
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
@@ -152,38 +104,6 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
     assert(dirfd:close())
-  end,
-  test_chown_root = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(S.chown(tmpfile, 66, 55))
-    local stat = S.stat(tmpfile)
-    assert_equal(stat.uid, 66, "expect uid changed")
-    assert_equal(stat.gid, 55, "expect gid changed")
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_chown = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(S.chown(tmpfile)) -- unchanged
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_fchown_root = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(fd:chown(66, 55))
-    local stat = fd:stat()
-    assert_equal(stat.uid, 66, "expect uid changed")
-    assert_equal(stat.gid, 55, "expect gid changed")
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_lchown_root = function()
-    assert(S.symlink("/dev/zero", tmpfile))
-    assert(S.lchown(tmpfile, 66, 55))
-    local stat = S.lstat(tmpfile)
-    assert_equal(stat.uid, 66, "expect uid changed")
-    assert_equal(stat.gid, 55, "expect gid changed")
-    assert(S.unlink(tmpfile))
   end,
   test_fchownat_root = function()
     local dirfd = assert(S.open("."))
@@ -196,68 +116,17 @@ test_file_operations = {
     assert(fd:close())
     assert(dirfd:close())
   end,
-  test_sync = function()
+  test_sync_file_range = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(fd:fsync())
-    assert(fd:fdatasync())
-    assert(fd:sync()) -- synonym
-    assert(fd:datasync()) -- synonym
     assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
-  end,
-  test_seek = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    local offset = 1
-    local n
-    n = assert(fd:lseek(offset, "set"))
-    assert_equal(n, offset, "seek should position at set position")
-    n = assert(fd:lseek(offset, "cur"))
-    assert_equal(n, offset + offset, "seek should position at set position")
-    local t = fd:tell()
-    assert_equal(t, n, "tell should return current offset")
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_seek_error = function()
-    local s, err = S.lseek(-1, 0, "set")
-    assert(not s, "seek should fail with invalid fd")
-    assert(err.badf, "bad file descriptor")
-  end,
-  test_mkdir_rmdir = function()
-    assert(S.mkdir(tmpfile, "RWXU"))
-    assert(S.rmdir(tmpfile))
-  end,
-  test_chdir = function()
-    local cwd = assert(S.getcwd())
-    assert(S.chdir("/"))
-    local fd = assert(S.open("/"))
-    assert(fd:fchdir())
-    local nd = assert(S.getcwd())
-    assert(nd == "/", "expect cwd to be /")
-    assert(S.chdir(cwd)) -- return to original directory
-  end,
-  test_getcwd_long = function()
-    local cwd = assert(S.getcwd())
-    assert(S.mkdir(longfile, "RWXU"))
-    assert(S.chdir(longfile))
-    local nd = assert(S.getcwd())
-    assert_equal(nd, cwd .. "/" .. longfile, "expect to get filename plus cwd")
-    assert(S.chdir(cwd))
-    assert(S.rmdir(longfile))
   end,
   test_mkdirat_unlinkat = function()
     local fd = assert(S.open("."))
     assert(fd:mkdirat(tmpfile, "RWXU"))
     assert(fd:unlinkat(tmpfile, "removedir"))
     assert(not fd:fstatat(tmpfile), "expect dir gone")
-  end,
-  test_rename = function()
-    assert(util.writefile(tmpfile, teststring, "RWXU")) -- TODO just use touch instead
-    assert(S.rename(tmpfile, tmpfile2))
-    assert(not S.stat(tmpfile))
-    assert(S.stat(tmpfile2))
-    assert(S.unlink(tmpfile2))
   end,
   test_renameat = function()
     local fd = assert(S.open("."))
@@ -267,35 +136,6 @@ test_file_operations = {
     assert(S.stat(tmpfile2))
     assert(fd:close())
     assert(S.unlink(tmpfile2))
-  end,
-  test_stat = function()
-    local stat = assert(S.stat("/dev/zero"))
-    assert_equal(stat.nlink, 1, "expect link count on /dev/zero to be 1")
-    assert(stat.ischr, "expect /dev/zero to be a character device")
-    assert_equal(stat.rdev:major(), 1 , "expect major number of /dev/zero to be 1")
-    assert_equal(stat.rdev:minor(), 5, "expect minor number of /dev/zero to be 5")
-    assert_equal(stat.rdev, t.device(1, 5), "expect raw device to be makedev(1, 5)")
-  end,
-  test_stat_directory = function()
-    local fd = assert(S.open("/"))
-    local stat = assert(fd:stat())
-    assert(stat.size == 4096, "expect / to be size 4096") -- might not be
-    assert(stat.isdir, "expect / to be a directory")
-    assert(fd:close())
-  end,
-  test_stat_symlink = function()
-    assert(S.symlink("/etc/passwd", tmpfile))
-    local stat = assert(S.stat(tmpfile))
-    assert(stat.isreg, "expect /etc/passwd to be a regular file")
-    assert(not stat.islnk, "should not be symlink")
-    assert(S.unlink(tmpfile))
-  end,
-  test_lstat_symlink = function()
-    assert(S.symlink("/etc/passwd", tmpfile))
-    local stat = assert(S.lstat(tmpfile))
-    assert(stat.islnk, "expect lstat to stat the symlink")
-    assert(not stat.isreg, "lstat should find symlink not regular file")
-    assert(S.unlink(tmpfile))
   end,
   test_fstatat = function()
     local fd = assert(S.open("."))
@@ -311,20 +151,6 @@ test_file_operations = {
     assert(stat.size == #teststring, "expect length to br what was written")
     assert(S.unlink(tmpfile))
   end,
-  test_truncate = function()
-    assert(util.writefile(tmpfile, teststring, "RWXU"))
-    local stat = assert(S.stat(tmpfile))
-    assert_equal(stat.size, #teststring, "expect to get size of written string")
-    assert(S.truncate(tmpfile, 1))
-    stat = assert(S.stat(tmpfile))
-    assert_equal(stat.size, 1, "expect get truncated size")
-    local fd = assert(S.open(tmpfile, "RDWR"))
-    assert(fd:truncate(1024))
-    stat = assert(fd:stat())
-    assert_equal(stat.size, 1024, "expect get truncated size")
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
   test_fadvise_etc = function() -- could split
     local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
@@ -339,8 +165,20 @@ test_file_operations = {
     --assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported, got " .. tostring(err))
     assert(fd:close())
   end,
+  test_mknodat_fifo = function()
+    local fd = assert(S.open("."))
+    assert(fd:mknodat(tmpfile, "fifo,rwxu"))
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.isfifo, "expect to be a fifo")
+    assert(fd:close())
+    assert(S.unlink(tmpfile))
+  end,
+}
+
+test_directory_operations = {
+-- tests getdents from higher level interface TODO move to util test, test directly too? make portable
   test_getdents_dirfile = function()
-    local d = assert(util.dirfile("/dev")) -- tests getdents from higher level interface TODO move to util test, test directly too
+    local d = assert(util.dirfile("/dev"))
     assert(d.zero, "expect to find /dev/zero")
     assert(d["."], "expect to find .")
     assert(d[".."], "expect to find ..")
@@ -357,6 +195,9 @@ test_file_operations = {
     assert(err.notdir, "/etc/passwd should give a not directory error")
     assert(fd:close())
   end,
+}
+
+test_inotify = {
   test_inotify = function()
     assert(S.mkdir(tmpfile, "RWXU")) -- do in directory so ok to run in parallel
     local fd = assert(S.inotify_init("cloexec, nonblock"))
@@ -377,6 +218,9 @@ test_file_operations = {
     assert(S.chdir(".."))
     assert(S.rmdir(tmpfile))
   end,
+}
+
+test_xattr = {
   test_xattr = function()
     assert(util.writefile(tmpfile, "test", "RWXU"))
     local l, err = S.listxattr(tmpfile)
@@ -447,6 +291,187 @@ test_file_operations = {
     else assert(err.NOTSUP or err.OPNOTSUPP, "only ok error is xattr not supported, got " .. tostring(err) .. " (" .. err.errno .. ")") end
     assert(S.unlink(tmpfile))
   end,
+}
+
+test_file_operations = {
+  teardown = clean,
+  test_dup = function()
+    local fd = assert(S.open("/dev/zero"))
+    local fd2 = assert(fd:dup())
+    assert(fd2:close())
+    assert(fd:close())
+  end,
+  test_dup_to_number = function()
+    local fd = assert(S.open("/dev/zero"))
+    local fd2 = assert(fd:dup(17))
+    assert_equal(fd2:getfd(), 17, "dup2 should set file id as specified")
+    assert(fd2:close())
+    assert(fd:close())
+  end,
+  test_link = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.link(tmpfile, tmpfile2))
+    assert(S.unlink(tmpfile2))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_symlink = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.symlink(tmpfile, tmpfile2))
+    local s = assert(S.readlink(tmpfile2))
+    assert_equal(s, tmpfile, "should be able to read symlink")
+    assert(S.unlink(tmpfile2))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_sync = function()
+    S.sync() -- cannot fail...
+  end,
+  test_fchmod = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:fchmod("RUSR, WUSR"))
+    local st = fd:stat()
+    assert_equal(st.mode, c.S_I["FREG, RUSR, WUSR"]) -- TODO should be better way to test
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_chmod = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.chmod(tmpfile, "RUSR, WUSR"))
+    assert(S.access(tmpfile, "rw"))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_chown_root = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.chown(tmpfile, 66, 55))
+    local stat = S.stat(tmpfile)
+    assert_equal(stat.uid, 66, "expect uid changed")
+    assert_equal(stat.gid, 55, "expect gid changed")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_chown = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.chown(tmpfile)) -- unchanged
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_fchown_root = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:chown(66, 55))
+    local stat = fd:stat()
+    assert_equal(stat.uid, 66, "expect uid changed")
+    assert_equal(stat.gid, 55, "expect gid changed")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_lchown_root = function()
+    assert(S.symlink("/dev/zero", tmpfile))
+    assert(S.lchown(tmpfile, 66, 55))
+    local stat = S.lstat(tmpfile)
+    assert_equal(stat.uid, 66, "expect uid changed")
+    assert_equal(stat.gid, 55, "expect gid changed")
+    assert(S.unlink(tmpfile))
+  end,
+  test_sync = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:fsync())
+    assert(fd:fdatasync())
+    assert(fd:sync()) -- synonym
+    assert(fd:datasync()) -- synonym
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_seek = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    local offset = 1
+    local n
+    n = assert(fd:lseek(offset, "set"))
+    assert_equal(n, offset, "seek should position at set position")
+    n = assert(fd:lseek(offset, "cur"))
+    assert_equal(n, offset + offset, "seek should position at set position")
+    local t = fd:tell()
+    assert_equal(t, n, "tell should return current offset")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_seek_error = function()
+    local s, err = S.lseek(-1, 0, "set")
+    assert(not s, "seek should fail with invalid fd")
+    assert(err.badf, "bad file descriptor")
+  end,
+  test_mkdir_rmdir = function()
+    assert(S.mkdir(tmpfile, "RWXU"))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_chdir = function()
+    local cwd = assert(S.getcwd())
+    assert(S.chdir("/"))
+    local fd = assert(S.open("/"))
+    assert(fd:fchdir())
+    local nd = assert(S.getcwd())
+    assert(nd == "/", "expect cwd to be /")
+    assert(S.chdir(cwd)) -- return to original directory
+  end,
+  test_getcwd_long = function()
+    local cwd = assert(S.getcwd())
+    assert(S.mkdir(longfile, "RWXU"))
+    assert(S.chdir(longfile))
+    local nd = assert(S.getcwd())
+    assert_equal(nd, cwd .. "/" .. longfile, "expect to get filename plus cwd")
+    assert(S.chdir(cwd))
+    assert(S.rmdir(longfile))
+  end,
+  test_rename = function()
+    assert(util.writefile(tmpfile, teststring, "RWXU")) -- TODO just use touch instead
+    assert(S.rename(tmpfile, tmpfile2))
+    assert(not S.stat(tmpfile))
+    assert(S.stat(tmpfile2))
+    assert(S.unlink(tmpfile2))
+  end,
+  test_stat = function()
+    local stat = assert(S.stat("/dev/zero"))
+    assert_equal(stat.nlink, 1, "expect link count on /dev/zero to be 1")
+    assert(stat.ischr, "expect /dev/zero to be a character device")
+    assert_equal(stat.rdev:major(), 1 , "expect major number of /dev/zero to be 1")
+    assert_equal(stat.rdev:minor(), 5, "expect minor number of /dev/zero to be 5")
+    assert_equal(stat.rdev, t.device(1, 5), "expect raw device to be makedev(1, 5)")
+  end,
+  test_stat_directory = function()
+    local fd = assert(S.open("/"))
+    local stat = assert(fd:stat())
+    assert(stat.isdir, "expect / to be a directory")
+    assert(fd:close())
+  end,
+  test_stat_symlink = function()
+    assert(S.symlink("/etc/passwd", tmpfile)) -- TODO create file instead
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.isreg, "expect /etc/passwd to be a regular file")
+    assert(not stat.islnk, "should not be symlink")
+    assert(S.unlink(tmpfile))
+  end,
+  test_lstat_symlink = function()
+    assert(S.symlink("/etc/passwd", tmpfile)) -- TODO create file instead
+    local stat = assert(S.lstat(tmpfile))
+    assert(stat.islnk, "expect lstat to stat the symlink")
+    assert(not stat.isreg, "lstat should find symlink not regular file")
+    assert(S.unlink(tmpfile))
+  end,
+  test_truncate = function()
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
+    local stat = assert(S.stat(tmpfile))
+    assert_equal(stat.size, #teststring, "expect to get size of written string")
+    assert(S.truncate(tmpfile, 1))
+    stat = assert(S.stat(tmpfile))
+    assert_equal(stat.size, 1, "expect get truncated size")
+    local fd = assert(S.open(tmpfile, "RDWR"))
+    assert(fd:truncate(1024))
+    stat = assert(fd:stat())
+    assert_equal(stat.size, 1024, "expect get truncated size")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
   test_mknod_chr_root = function()
     assert(S.mknod(tmpfile, "fchr,rwxu", t.device(1, 5)))
     local stat = assert(S.stat(tmpfile))
@@ -454,14 +479,6 @@ test_file_operations = {
     assert_equal(stat.rdev:major(), 1 , "expect major number to be 1")
     assert_equal(stat.rdev:minor(), 5, "expect minor number to be 5")
     assert_equal(stat.rdev, t.device(1, 5), "expect raw device to be makedev(1, 5)")
-    assert(S.unlink(tmpfile))
-  end,
-  test_mknodat_fifo = function()
-    local fd = assert(S.open("."))
-    assert(fd:mknodat(tmpfile, "fifo,rwxu"))
-    local stat = assert(S.stat(tmpfile))
-    assert(stat.isfifo, "expect to be a fifo")
-    assert(fd:close())
     assert(S.unlink(tmpfile))
   end,
   test_mkfifoat = function()
