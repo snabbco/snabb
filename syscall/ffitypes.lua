@@ -36,8 +36,6 @@ typedef long time_t;
 typedef long blksize_t;
 typedef long blkcnt_t;
 typedef long clock_t;
-typedef unsigned long ino_t;
-typedef unsigned long nlink_t;
 typedef unsigned long nfds_t;
 
 struct iovec {

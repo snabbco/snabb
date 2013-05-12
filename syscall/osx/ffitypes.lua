@@ -8,6 +8,8 @@ cdef [[
 typedef uint16_t mode_t;
 typedef uint8_t sa_family_t;
 typedef uint32_t dev_t;
+typedef unsigned long nlink_t; // TODO check
+typedef unsigned long ino_t; // TODO check
 
 struct sockaddr {
   uint8_t       sa_len;
