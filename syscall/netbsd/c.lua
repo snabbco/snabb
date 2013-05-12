@@ -3,5 +3,15 @@
 
 local ffi = require "ffi"
 
-return ffi.C
+local types = require "syscall.types"
+local t, pt, s = types.t, types.pt, types.s
+
+local C = ffi.C
+
+-- SYS___fstat50   440
+C.stat = function(path, buf)
+  return C.syscall(440, pt.void(path), pt.void(buf))
+end
+
+return C
 
