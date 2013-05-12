@@ -14,6 +14,10 @@ typedef long time_t;
 typedef int32_t daddr_t;
 typedef long blkcnt_t;
 
+struct timespec {
+  time_t tv_sec;
+  long   tv_nsec;
+};
 struct sockaddr {
   uint8_t       sa_len;
   sa_family_t   sa_family;
