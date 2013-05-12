@@ -20,6 +20,7 @@ local S = {}
 -- helpers
 local zeropointer = pt.void(0)
 local errpointer = pt.void(-1)
+local err64 = t.uint64(-1LL)
 
 local function getfd(fd)
   if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
@@ -36,7 +37,7 @@ local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x
 
 -- straight passthrough, only needed for real 64 bit quantities. Used eg for seek (file might have giant holes!)
 local function ret64(ret)
-  if ret == t.uint64(-1) then return nil, t.error() end
+  if ret == err64 then return nil, t.error() end
   return ret
 end
 
