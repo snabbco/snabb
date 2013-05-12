@@ -1071,20 +1071,6 @@ mt.capabilities = {
 
 addtype("capabilities", "struct capabilities", mt.capabilities)
 
-t.groups = ffi.metatype("struct {int count; gid_t list[?];}", {
-  __index = function(g, k)
-    return g.list[k - 1]
-  end,
-  __newindex = function(g, k, v)
-    g.list[k - 1] = v
-  end,
-  __new = function(tp, gs)
-    if type(gs) == 'number' then return ffi.new(tp, gs, gs) end
-    return ffi.new(tp, #gs, #gs, gs)
-  end,
-  __len = function(g) return g.count end,
-})
-
 -- difficult to sanely use an ffi metatype for inotify events, so use Lua table
 mt.inotify_events = {
   __index = function(tab, k)
