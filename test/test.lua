@@ -463,10 +463,19 @@ test_file_operations = {
     assert(S.stat(tmpfile2))
     assert(S.unlink(tmpfile2))
   end,
-  test_stat = function()
+  test_stat_device = function()
     local stat = assert(S.stat("/dev/zero"))
     assert_equal(stat.nlink, 1, "expect link count on /dev/zero to be 1")
     assert(stat.ischr, "expect /dev/zero to be a character device")
+  end,
+  test_stat_file = function()
+    local fd = assert(S.creat(tmpfile, "rwxu"))
+    assert(fd:write("four"))
+    assert(fd:close())
+    local stat = assert(S.stat(tmpfile))
+    assert_equal(stat.size, 4, "expect size 4")
+    assert(stat.isreg, "regular file")
+    assert(S.unlink(tmpfile))
   end,
   test_stat_directory = function()
     local fd = assert(S.open("/"))
