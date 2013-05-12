@@ -42,10 +42,6 @@ struct timeval {
   long    tv_sec;         /* seconds */
   long    tv_usec;        /* microseconds */
 };
-struct timespec {
-  time_t tv_sec;        /* seconds */
-  long   tv_nsec;       /* nanoseconds */
-};
 struct itimerspec {
   struct timespec it_interval;
   struct timespec it_value;
