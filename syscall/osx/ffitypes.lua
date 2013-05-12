@@ -8,11 +8,16 @@ cdef [[
 typedef uint16_t mode_t;
 typedef uint8_t sa_family_t;
 typedef uint32_t dev_t;
-typedef unsigned long nlink_t; // TODO check
-typedef unsigned long ino_t; // TODO check
+int64_t blkcnt_t;
+int32_t blksize_t;
+// TODO check below here
+typedef unsigned long nlink_t;
+typedef unsigned long ino_t;
 typedef long time_t;
 typedef int32_t daddr_t;
-typedef long blkcnt_t;
+typedef long ssize_t;
+typedef unsigned long size_t;
+typedef unsigned long clock_t;
 
 struct timespec {
   time_t tv_sec;

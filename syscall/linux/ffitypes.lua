@@ -16,7 +16,12 @@ typedef unsigned long ino_t;
 typedef long time_t;
 typedef int32_t daddr_t;
 typedef long blkcnt_t;
+typedef long blksize_t;
 typedef int32_t clockid_t;
+typedef long ssize_t;
+typedef unsigned long size_t;
+typedef long clock_t;
+typedef uint32_t off32_t; /* only used for eg mmap2 on Linux */
 
 /* despite glibc, Linux uses 32 bit dev_t */
 typedef uint32_t dev_t;
