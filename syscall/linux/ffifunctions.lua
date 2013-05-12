@@ -76,9 +76,6 @@ int inotify_rm_watch(int fd, uint32_t wd);
 int adjtimex(struct timex *buf);
 int sync_file_range(int fd, off_t offset, off_t count, unsigned int flags);
 
-int fsync(int fd);
-int fdatasync(int fd);
-int fcntl(int fd, int cmd, void *arg); /* arg is long or pointer */
 int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
 int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);

@@ -8,6 +8,7 @@ cdef[[
 int lchmod(const char *path, mode_t mode);
 int fchroot(int fd);
 int dup3(int oldfd, int newfd, int flags);
+fsync_range(int fd, int how, off_t start, off_t length);
 ]]
 
 --[[ -- need more types defined

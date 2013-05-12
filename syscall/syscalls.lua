@@ -128,6 +128,8 @@ function S.readlink(path, buffer, size)
   if ret == -1 then return nil, t.error() end
   return ffi.string(buffer, ret)
 end
+function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
+function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
   protocol = protocol or 0
@@ -215,6 +217,50 @@ function S.getpgid(pid) return retnum(C.getpgid(pid or 0)) end
 function S.getpgrp() return retnum(C.getpgrp()) end
 
 function S._exit(status) C._exit(c.EXIT[status]) end
+
+-- TODO maybe in separate config file?
+-- TODO change to type
+local function getflock(arg)
+  arg = arg or t.flock()
+  if not ffi.istype(t.flock, arg) then
+    for _, v in pairs {"type", "whence", "start", "len", "pid"} do -- allow use of short names
+      if arg[v] then
+        arg["l_" .. v] = arg[v] -- TODO cleanup this to use table?
+        arg[v] = nil
+      end
+    end
+    arg.l_type = c.FCNTL_LOCK[arg.l_type]
+    arg.l_whence = c.SEEK[arg.l_whence]
+    arg = t.flock(arg)
+  end
+  return arg
+end
+local fcntl_commands = {
+  [c.F.SETFL] = function(arg) return c.O[arg] end,
+  [c.F.SETFD] = function(arg) return c.FD[arg] end,
+  [c.F.GETLK] = getflock,
+  [c.F.SETLK] = getflock,
+  [c.F.SETLKW] = getflock,
+}
+local fcntl_ret = {
+  [c.F.DUPFD] = function(ret) return t.fd(ret) end,
+  [c.F.DUPFD_CLOEXEC] = function(ret) return t.fd(ret) end,
+  [c.F.GETFD] = function(ret) return tonumber(ret) end,
+  [c.F.GETFL] = function(ret) return tonumber(ret) end,
+  [c.F.GETLEASE] = function(ret) return tonumber(ret) end,
+  [c.F.GETOWN] = function(ret) return tonumber(ret) end,
+  [c.F.GETSIG] = function(ret) return tonumber(ret) end,
+  [c.F.GETPIPE_SZ] = function(ret) return tonumber(ret) end,
+  [c.F.GETLK] = function(ret, arg) return arg end,
+}
+function S.fcntl(fd, cmd, arg)
+  cmd = c.F[cmd]
+  if fcntl_commands[cmd] then arg = fcntl_commands[cmd](arg) end
+  local ret = C.fcntl(getfd(fd), cmd, pt.void(arg or 0))
+  if ret == -1 then return nil, t.error() end
+  if fcntl_ret[cmd] then return fcntl_ret[cmd](ret, arg) end
+  return true
+end
 
 -- now call OS specific for non-generic calls
 local hh = {
