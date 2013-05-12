@@ -6,6 +6,7 @@ local c = require "syscall.constants"
 local C = require "syscall.c"
 local types = require "syscall.types"
 local abi = require "syscall.abi"
+local ioctl = require "syscall.ioctl"
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -100,7 +101,6 @@ end
 
 function S.ioctl(d, request, argp)
   if type(request) == "string" then
-    local ioctl = require "syscall.ioctl" -- lazy load ioctl table
     request = ioctl[request]
   end
   if type(argp) == "string" then argp = pt.char(argp) end

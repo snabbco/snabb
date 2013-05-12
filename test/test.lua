@@ -567,6 +567,55 @@ test_largefile = {
   end,
 }
 
+test_ids = {
+  test_setuid = function()
+    assert(S.setuid(S.getuid()))
+  end,
+  test_setgid = function()
+    assert(S.setgid(S.getgid()))
+  end,
+  test_setgid_root = function()
+    local gid = S.getgid()
+    assert(S.setgid(66))
+    assert_equal(S.getgid(), 66, "gid should be as set")
+    assert(S.setgid(gid))
+    assert_equal(S.getgid(), gid, "gid should be as set")
+  end,
+  test_seteuid = function()
+    assert(S.seteuid(S.geteuid()))
+  end,
+  test_seteuid_root = function()
+    local uid = S.geteuid()
+    assert(S.seteuid(66))
+    assert_equal(S.geteuid(), 66, "gid should be as set")
+    assert(S.seteuid(uid))
+    assert_equal(S.geteuid(), uid, "gid should be as set")
+  end,
+  test_setegid = function()
+    assert(S.setegid(S.getegid()))
+  end,
+  test_setegid_root = function()
+    local gid = S.getegid()
+    assert(S.setegid(66))
+    assert_equal(S.getegid(), 66, "gid should be as set")
+    assert(S.setegid(gid))
+    assert_equal(S.getegid(), gid, "gid should be as set")
+  end,
+  test_getgroups = function()
+    local g = assert(S.getgroups())
+    assert(#g, "groups behaves like a table")
+  end,
+  test_setgroups_root = function()
+    local og = assert(S.getgroups())
+    assert(S.setgroups{0, 1, 66, 77, 5})
+    local g = assert(S.getgroups())
+    assert_equal(#g, 5, "expect 5 groups now")
+    assert(S.setgroups(og))
+    local g = assert(S.getgroups())
+    assert_equal(#g, #og, "expect same number of groups as previously")
+  end,
+}
+
 test_sockets_tmp = { -- TODO delete once rest moved here
   test_unix_socketpair = function()
     local sv = assert(S.socketpair("unix", "stream"))

@@ -569,13 +569,6 @@ test_mmap = {
     assert(S.madvise(mem, size, "random"))
     assert(S.munmap(mem, size))
   end,
-  test_mremap = function()
-    local size = 4096
-    local size2 = size * 2
-    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-    mem = assert(S.mremap(mem, size, size2, "maymove"))
-    assert(S.munmap(mem, size2))
-  end,
   test_mlock = function()
     local size = 4096
     local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
@@ -587,6 +580,16 @@ test_mmap = {
     assert(S.munlockall())
     assert(S.munmap(mem, size))
   end
+}
+
+test_mremap = { -- differs in prototype by OS
+  test_mremap = function()
+    local size = 4096
+    local size2 = size * 2
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    mem = assert(S.mremap(mem, size, size2, "maymove"))
+    assert(S.munmap(mem, size2))
+  end,
 }
 
 test_misc = {
@@ -1290,6 +1293,8 @@ test_termios = {
     assert(pts:tcflow('ion'))
     assert(pts:close())
     assert(ptm:close())
+    assert_equal(pts:getfd(), -1, "fd should be closed")
+    assert_equal(ptm:getfd(), -1, "fd should be closed")
   end,
   test_isatty_fail = function()
     local fd = S.open("/dev/zero")
@@ -1298,20 +1303,7 @@ test_termios = {
   end,
 }
 
-test_events = {
-  test_eventfd = function()
-    local fd = assert(S.eventfd(0, "nonblock"))
-    local n = assert(util.eventfd_read(fd))
-    assert_equal(n, 0, "eventfd should return 0 initially")
-    assert(util.eventfd_write(fd, 3))
-    assert(util.eventfd_write(fd, 6))
-    assert(util.eventfd_write(fd, 1))
-    n = assert(util.eventfd_read(fd))
-    assert_equal(n, 10, "eventfd should return 10")
-    n = assert(util.eventfd_read(fd))
-    assert(n, 0, "eventfd should return 0 again")
-    assert(fd:close())
-  end,
+test_poll_select = {
   test_poll = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local a, b = sv[1], sv[2]
@@ -1320,19 +1312,6 @@ test_events = {
     assert(p[1].fd == a:getfd() and p[1].revents == 0, "no events")
     assert(b:write(teststring))
     local p = assert(S.poll(pev, 0))
-    assert(p[1].fd == a:getfd() and p[1].IN, "one event now")
-    assert(a:read())
-    assert(b:close())
-    assert(a:close())
-  end,
-  test_ppoll = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    local a, b = sv[1], sv[2]
-    local pev = {{fd = a, events = c.POLL.IN}}
-    local p = assert(S.ppoll(pev, 0, nil))
-    assert(p[1].fd == a:getfd() and p[1].revents == 0, "one event now")
-    assert(b:write(teststring))
-    local p = assert(S.ppoll(pev, nil, "alrm"))
     assert(p[1].fd == a:getfd() and p[1].IN, "one event now")
     assert(a:read())
     assert(b:close())
@@ -1349,6 +1328,22 @@ test_events = {
     assert(b:close())
     assert(a:close())
   end,
+}
+
+test_ppoll_pselect = {
+  test_ppoll = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    local a, b = sv[1], sv[2]
+    local pev = {{fd = a, events = c.POLL.IN}}
+    local p = assert(S.ppoll(pev, 0, nil))
+    assert(p[1].fd == a:getfd() and p[1].revents == 0, "one event now")
+    assert(b:write(teststring))
+    local p = assert(S.ppoll(pev, nil, "alrm"))
+    assert(p[1].fd == a:getfd() and p[1].IN, "one event now")
+    assert(a:read())
+    assert(b:close())
+    assert(a:close())
+  end,
   test_pselect = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local a, b = sv[1], sv[2]
@@ -1359,6 +1354,22 @@ test_events = {
     assert(sel.count == 1, "one fd available for read now")
     assert(b:close())
     assert(a:close())
+  end,
+}
+
+test_events_epoll = {
+  test_eventfd = function()
+    local fd = assert(S.eventfd(0, "nonblock"))
+    local n = assert(util.eventfd_read(fd))
+    assert_equal(n, 0, "eventfd should return 0 initially")
+    assert(util.eventfd_write(fd, 3))
+    assert(util.eventfd_write(fd, 6))
+    assert(util.eventfd_write(fd, 1))
+    n = assert(util.eventfd_read(fd))
+    assert_equal(n, 10, "eventfd should return 10")
+    n = assert(util.eventfd_read(fd))
+    assert(n, 0, "eventfd should return 0 again")
+    assert(fd:close())
   end,
   test_epoll = function()
     local sv = assert(S.socketpair("unix", "stream"))
@@ -1572,40 +1583,7 @@ test_processes = {
   end,
 }
 
-test_ids = {
-  test_setuid = function()
-    assert(S.setuid(S.getuid()))
-  end,
-  test_setgid = function()
-    assert(S.setgid(S.getgid()))
-  end,
-  test_setgid_root = function()
-    local gid = S.getgid()
-    assert(S.setgid(66))
-    assert_equal(S.getgid(), 66, "gid should be as set")
-    assert(S.setgid(gid))
-    assert_equal(S.getgid(), gid, "gid should be as set")
-  end,
-  test_seteuid = function()
-    assert(S.seteuid(S.geteuid()))
-  end,
-  test_seteuid_root = function()
-    local uid = S.geteuid()
-    assert(S.seteuid(66))
-    assert_equal(S.geteuid(), 66, "gid should be as set")
-    assert(S.seteuid(uid))
-    assert_equal(S.geteuid(), uid, "gid should be as set")
-  end,
-  test_setegid = function()
-    assert(S.setegid(S.getegid()))
-  end,
-  test_setegid_root = function()
-    local gid = S.getegid()
-    assert(S.setegid(66))
-    assert_equal(S.getegid(), 66, "gid should be as set")
-    assert(S.setegid(gid))
-    assert_equal(S.getegid(), gid, "gid should be as set")
-  end,
+test_ids_linux = {
   test_setreuid = function()
     assert(S.setreuid(S.geteuid(), S.getuid()))
   end,
@@ -1647,19 +1625,6 @@ test_ids = {
     assert_equal(gg.egid, 33, "effective gid as set")
     assert_equal(gg.sgid, 44, "saved gid as set")
     assert(S.setresgid(g))
-  end,
-  test_getgroups = function()
-    local g = assert(S.getgroups())
-    assert(#g, "groups behaves like a table")
-  end,
-  test_setgroups_root = function()
-    local og = assert(S.getgroups())
-    assert(S.setgroups{0, 1, 66, 77, 5})
-    local g = assert(S.getgroups())
-    assert_equal(#g, 5, "expect 5 groups now")
-    assert(S.setgroups(og))
-    local g = assert(S.getgroups())
-    assert_equal(#g, #og, "expect same number of groups as previously")
   end,
 }
 
