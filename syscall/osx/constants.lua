@@ -343,19 +343,22 @@ c.IPPROTO = strflag {
 }
 
 c.MSG = multiflags {
-  OOB             = 0x0001,
-  PEEK            = 0x0002,
-  DONTROUTE       = 0x0004,
-  EOR             = 0x0008,
-  TRUNC           = 0x0010,
-  CTRUNC          = 0x0020,
-  WAITALL         = 0x0040,
-  DONTWAIT        = 0x0080,
-  BCAST           = 0x0100,
-  MCAST           = 0x0200,
-  NOSIGNAL        = 0x0400,
-  CMSG_CLOEXEC    = 0x0800,
-  NBIO            = 0x1000,
+  OOB             = 0x1,
+  PEEK            = 0x2,
+  DONTROUTE       = 0x4,
+  EOR             = 0x8,
+  TRUNC           = 0x10,
+  CTRUNC          = 0x20,
+  WAITALL         = 0x40,
+  DONTWAIT        = 0x80,
+  EOF             = 0x100,
+  WAITSTREAM      = 0x200,
+  FLUSH           = 0x400,
+  HOLD            = 0x800,
+  SEND            = 0x1000,
+  HAVEMORE        = 0x2000,
+  RCVMORE         = 0x4000,
+  NEEDSA          = 0x10000,
 }
 
 return c
