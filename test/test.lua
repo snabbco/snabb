@@ -552,7 +552,7 @@ test_largefile = {
     local offset = 2^35
     assert(fd:truncate(offset), "64 bit ftruncate should be ok")
     local st = assert(fd:stat(), "64 bit stat should be ok")
-    assert(st.size == offset, "stat shoul be truncated length")
+    assert(st.size == offset, "stat should be truncated length")
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
