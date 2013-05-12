@@ -301,43 +301,6 @@ test_xattr = {
   end,
 }
 
-test_largefile = {
-  test_seek64 = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    local off = t.off(2^34)
-    local offset = 2^34 -- should work with Lua numbers up to 56 bits, above that need explicit 64 bit type.
-    local n
-    n = assert(fd:lseek(off, "set"))
-    assert_equal(n, off, "seek should position at set position")
-    n = assert(fd:lseek(off, "cur"))
-    assert_equal(n, off + off, "seek should position at set position")
-    n = assert(fd:lseek(offset, "set"))
-    assert_equal(n, offset, "seek should position at set position")
-    n = assert(fd:lseek(offset, "cur"))
-    assert_equal(n, offset + offset, "seek should position at set position")
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_ftruncate64 = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    local offset = 2^35
-    assert(fd:truncate(offset), "64 bit ftruncate should be ok")
-    local st = assert(fd:stat(), "64 bit stat should be ok")
-    assert(st.size == offset, "stat shoul be truncated length")
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_truncate64 = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    local offset = 2^35
-    assert(S.truncate(tmpfile, offset), "64 bit truncate should be ok")
-    local st = assert(S.stat(tmpfile), "64 bit stat should be ok")
-    assert(st.size == offset, "stat shoul be truncated length")
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-}
-
 test_locking = {
   test_fcntl_setlk = function()
     local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
