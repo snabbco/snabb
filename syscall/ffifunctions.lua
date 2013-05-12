@@ -47,6 +47,9 @@ ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 int fsync(int fd);
 int fdatasync(int fd);
 int fcntl(int fd, int cmd, void *arg); /* arg is long or pointer */
+int stat(const char *path, struct stat *sb);
+int lstat(const char *path, struct stat *sb);
+int fstat(int fd, struct stat *sb);
 
 int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);
