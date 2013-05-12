@@ -320,7 +320,7 @@ c.FD = multiflags {
 
 -- note changed from F_ to FCNTL_LOCK
 c.FCNTL_LOCK = strflag {
-  RDLCK = 0,
+  RDLCK = 1,
   UNLCK = 2,
   WRLCK = 3,
 }
