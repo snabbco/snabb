@@ -49,6 +49,7 @@ t.device = function(major, minor)
   return setmetatable({dev = t.dev(dev)}, mt.device)
 end
 
+-- TODO test properly, different from Linux as metatype
 meth.sockaddr_un = {
   index = {
     family = function(sa) return sa.sun_family end,
