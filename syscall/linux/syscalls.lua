@@ -869,20 +869,6 @@ function S.setresgid(rgid, egid, sgid)
   return retbool(C.setresgid(rgid, egid, sgid))
 end
 
-function S.getgroups()
-  local size = C.getgroups(0, nil)
-  if size == -1 then return nil, t.error() end
-  local groups = t.groups(size)
-  local ret = C.getgroups(size, groups.list)
-  if ret == -1 then return nil, t.error() end
-  return groups
-end
-
-function S.setgroups(groups)
-  if type(groups) == "table" then groups = t.groups(groups) end
-  return retbool(C.setgroups(groups.count, groups.list))
-end
-
 function S.vhangup() return retbool(C.vhangup()) end
 
 function S.swapon(path, swapflags) return retbool(C.swapon(path, c.SWAP_FLAG[swapflags])) end

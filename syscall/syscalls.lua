@@ -237,6 +237,18 @@ function S.setsid() return retnum(C.setsid()) end
 function S.setpgid(pid, pgid) return retbool(C.setpgid(pid or 0, pgid or 0)) end
 function S.getpgid(pid) return retnum(C.getpgid(pid or 0)) end
 function S.getpgrp() return retnum(C.getpgrp()) end
+function S.getgroups()
+  local size = C.getgroups(0, nil)
+  if size == -1 then return nil, t.error() end
+  local groups = t.groups(size)
+  local ret = C.getgroups(size, groups.list)
+  if ret == -1 then return nil, t.error() end
+  return groups
+end
+function S.setgroups(groups)
+  if type(groups) == "table" then groups = t.groups(groups) end
+  return retbool(C.setgroups(groups.count, groups.list))
+end
 
 function S._exit(status) C._exit(c.EXIT[status]) end
 
