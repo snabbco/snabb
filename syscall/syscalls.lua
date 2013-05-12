@@ -235,30 +235,32 @@ local function getflock(arg)
   end
   return arg
 end
-local fcntl_commands = {
-  [c.F.SETFL] = function(arg) return c.O[arg] end,
-  [c.F.SETFD] = function(arg) return c.FD[arg] end,
-  [c.F.GETLK] = getflock,
-  [c.F.SETLK] = getflock,
-  [c.F.SETLKW] = getflock,
-}
-local fcntl_ret = {
-  [c.F.DUPFD] = function(ret) return t.fd(ret) end,
-  [c.F.DUPFD_CLOEXEC] = function(ret) return t.fd(ret) end,
-  [c.F.GETFD] = function(ret) return tonumber(ret) end,
-  [c.F.GETFL] = function(ret) return tonumber(ret) end,
-  [c.F.GETLEASE] = function(ret) return tonumber(ret) end,
-  [c.F.GETOWN] = function(ret) return tonumber(ret) end,
-  [c.F.GETSIG] = function(ret) return tonumber(ret) end,
-  [c.F.GETPIPE_SZ] = function(ret) return tonumber(ret) end,
-  [c.F.GETLK] = function(ret, arg) return arg end,
+local fcntl = {
+  commands = {
+    [c.F.SETFL] = function(arg) return c.O[arg] end,
+    [c.F.SETFD] = function(arg) return c.FD[arg] end,
+    [c.F.GETLK] = getflock,
+    [c.F.SETLK] = getflock,
+    [c.F.SETLKW] = getflock,
+  },
+  ret = {
+    [c.F.DUPFD] = function(ret) return t.fd(ret) end,
+    [c.F.DUPFD_CLOEXEC] = function(ret) return t.fd(ret) end,
+    [c.F.GETFD] = function(ret) return tonumber(ret) end,
+    [c.F.GETFL] = function(ret) return tonumber(ret) end,
+    [c.F.GETLEASE] = function(ret) return tonumber(ret) end,
+    [c.F.GETOWN] = function(ret) return tonumber(ret) end,
+    [c.F.GETSIG] = function(ret) return tonumber(ret) end,
+    [c.F.GETPIPE_SZ] = function(ret) return tonumber(ret) end,
+    [c.F.GETLK] = function(ret, arg) return arg end,
+  }
 }
 function S.fcntl(fd, cmd, arg)
   cmd = c.F[cmd]
-  if fcntl_commands[cmd] then arg = fcntl_commands[cmd](arg) end
+  if fcntl.commands[cmd] then arg = fcntl.commands[cmd](arg) end
   local ret = C.fcntl(getfd(fd), cmd, pt.void(arg or 0))
   if ret == -1 then return nil, t.error() end
-  if fcntl_ret[cmd] then return fcntl_ret[cmd](ret, arg) end
+  if fcntl.ret[cmd] then return fcntl.ret[cmd](ret, arg) end
   return true
 end
 
