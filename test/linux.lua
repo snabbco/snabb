@@ -337,33 +337,7 @@ test_locking = {
   end,
 }
 
-test_sockets_pipes = {
-  test_sockaddr_storage = function()
-    local sa = t.sockaddr_storage{family = "inet6", port = 2}
-    assert_equal(sa.family, c.AF.INET6, "inet6 family")
-    assert_equal(sa.port, 2, "should get port back")
-    sa.port = 3
-    assert_equal(sa.port, 3, "should get port back")
-    sa.family = "inet"
-    assert_equal(sa.family, c.AF.INET, "inet family")
-    sa.port = 4
-    assert_equal(sa.port, 4, "should get port back")
-  end,
-  test_pipe = function()
-    local p = assert(S.pipe())
-    assert(p:close())
-    local ok, err = S.close(p[1])
-    assert(err, "should be invalid")
-    local ok, err = S.close(p[2])
-    assert(err, "should be invalid")
-  end,
-  test_nonblock = function()
-    local fds = assert(S.pipe())
-    assert(fds:setblocking(false))
-    local r, err = fds:read()
-    assert(err.AGAIN, "expect AGAIN")
-    assert(fds:close())
-  end,
+test_tee_splice = {
   test_tee_splice = function()
     local p = assert(S.pipe("nonblock"))
     local pp = assert(S.pipe("nonblock"))
@@ -738,7 +712,33 @@ test_misc = {
   end,
 }
 
-test_sockets = {
+test_sockets_pipes = {
+  test_sockaddr_storage = function()
+    local sa = t.sockaddr_storage{family = "inet6", port = 2}
+    assert_equal(sa.family, c.AF.INET6, "inet6 family")
+    assert_equal(sa.port, 2, "should get port back")
+    sa.port = 3
+    assert_equal(sa.port, 3, "should get port back")
+    sa.family = "inet"
+    assert_equal(sa.family, c.AF.INET, "inet family")
+    sa.port = 4
+    assert_equal(sa.port, 4, "should get port back")
+  end,
+  test_pipe = function()
+    local p = assert(S.pipe())
+    assert(p:close())
+    local ok, err = S.close(p[1])
+    assert(err, "should be invalid")
+    local ok, err = S.close(p[2])
+    assert(err, "should be invalid")
+  end,
+  test_nonblock = function()
+    local fds = assert(S.pipe())
+    assert(fds:setblocking(false))
+    local r, err = fds:read()
+    assert(err.AGAIN, "expect AGAIN")
+    assert(fds:close())
+  end,
   test_sockaddr_in_error = function()
     local sa = t.sockaddr_in(1234, "error")
     assert(not sa, "expect nil socket address from invalid ip string")
