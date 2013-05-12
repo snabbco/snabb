@@ -16,6 +16,7 @@ typedef unsigned long ino_t;
 typedef long time_t;
 typedef int32_t daddr_t;
 typedef long blkcnt_t;
+typedef int32_t clockid_t;
 
 /* despite glibc, Linux uses 32 bit dev_t */
 typedef uint32_t dev_t;

@@ -22,6 +22,12 @@ local abi = require "syscall.abi"
 local mt = {} -- metatables
 local meth = {}
 
+local addtypes = {
+  clockid = "clockid_t",
+}
+
+for k, v in pairs(addtypes) do addtype(k, v) end
+
 -- 64 bit dev_t
 mt.device = {
   __index = {

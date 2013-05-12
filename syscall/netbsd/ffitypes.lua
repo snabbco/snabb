@@ -13,6 +13,7 @@ typedef uint64_t ino_t;
 typedef int64_t time_t;
 typedef int64_t daddr_t;
 typedef uint64_t blkcnt_t;
+typedef int32_t clockid_t;
 
 struct timespec {
   time_t tv_sec;

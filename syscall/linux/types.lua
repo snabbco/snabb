@@ -76,6 +76,7 @@ local addtypes = {
   clockid = "clockid_t",
   sighandler = "sighandler_t",
   aio_context = "aio_context_t",
+  clockid = "clockid_t",
 }
 
 -- as an experiment, see https://github.com/justincormack/ljsyscall/issues/28 trying adding a __len method

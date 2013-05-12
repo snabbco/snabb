@@ -21,7 +21,6 @@ typedef uint32_t gid_t;
 typedef uint32_t socklen_t;
 typedef uint32_t id_t;
 typedef int32_t pid_t;
-typedef int32_t clockid_t;
 typedef uint32_t le32; /* this is little endian */
 typedef uint32_t off32_t; /* only used for eg mmap2 on Linux */
 

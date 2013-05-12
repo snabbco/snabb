@@ -144,7 +144,6 @@ local addtypes = {
   sa_family = "sa_family_t",
   socklen = "socklen_t",
   id = "id_t",
-  clockid = "clockid_t",
   daddr = "daddr_t",
   time = "time_t",
   blksize = "blksize_t",
