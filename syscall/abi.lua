@@ -13,5 +13,10 @@ local abi = {
   os = ffi.os:lower(), -- bsd, osx, linux
 }
 
+-- At the moment we only support NetBSD but do not attempt to detect it
+-- If you want to support eg FreeBSD then will have to detect it
+
+if abi.os == "bsd" then abi.os = "netbsd" end
+
 return abi
 
