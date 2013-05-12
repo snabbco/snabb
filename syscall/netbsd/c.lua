@@ -6,7 +6,7 @@ local ffi = require "ffi"
 local types = require "syscall.types"
 local t, pt, s = types.t, types.pt, types.s
 
-local C = ffi.C
+local C = setmetatable({}, {__index = ffi.C})
 
 -- SYS___fstat50   440
 C.stat = function(path, buf)
