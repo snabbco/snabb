@@ -53,7 +53,7 @@ function C.getdents(fd, buf, size)
   return C.syscall(c.SYS.getdents64, t.int(fd), buf, t.uint(size))
 end
 
--- getcwd in libc will allocate memory, so use syscall
+-- getcwd in libc may allocate memory and has inconsistent return value, so use syscall
 function C.getcwd(buf, size)
   return C.syscall(c.SYS.getcwd, pt.void(buf), t.ulong(size))
 end

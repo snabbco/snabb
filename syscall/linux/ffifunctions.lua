@@ -117,7 +117,6 @@ int umount2(const char *target, int flags);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
 int faccessat(int dirfd, const char *pathname, int mode, int flags);
-char *getcwd(char *buf, size_t size);
 int statfs(const char *path, struct statfs64 *buf); /* for 64 bit */
 int fstatfs(int fd, struct statfs64 *buf);          /* for 64 bit */
 int statfs64(const char *path, struct statfs64 *buf); /* for 32 bit */

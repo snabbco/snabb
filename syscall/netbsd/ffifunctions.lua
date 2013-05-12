@@ -28,6 +28,7 @@ int sethostname(const char *name, size_t len);
 int getdomainname(char *name, size_t namelen);
 int setdomainname(const char *name, size_t len);
 void exit(int status);
+char *getcwd(char *buf, size_t size);
 ]]
 
 -- setreuid, setregid are deprecated, implement by other means

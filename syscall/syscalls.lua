@@ -237,6 +237,17 @@ end
 -- deprecated in NetBSD so implement with recvfrom
 function S.recv(fd, buf, count, flags) return retnum(C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], nil, nil)) end
 
+-- if getcwd not defined, fall back to libc implemenrarion (currently bsd, osx) TODO move? use underlying?
+if not S.getcwd then
+  function S.getcwd(buf, size)
+    size = size or c.PATH_MAX
+    buf = buf or t.buffer(size)
+    local ret = C.getcwd(buf, size)
+    if ret == zeropointer then return nil, t.error() end
+    return ffi.string(buf)
+  end
+end
+
 -- TODO setpgrp and similar - see the man page
 
 return S
