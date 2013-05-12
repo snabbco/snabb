@@ -33,6 +33,7 @@ int chroot(const char *path);
 mode_t umask(mode_t mask);
 void sync(void);
 int mknod(const char *pathname, mode_t mode, dev_t dev);
+int mkfifo(const char *path, mode_t mode);
 ssize_t read(int fd, void *buf, size_t count);
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
 ssize_t write(int fd, const void *buf, size_t count);

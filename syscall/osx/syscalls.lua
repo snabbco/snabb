@@ -8,6 +8,7 @@ local types = require "syscall.types"
 local abi = require "syscall.abi"
 
 function S.exit(status) C.exit(c.EXIT[status]) end
+function S.mkfifo(pathname, mode) return retbool(C.mkfifo(pathname, c.S_I[mode])) end
 
 return S
 
