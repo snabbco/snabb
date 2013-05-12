@@ -1057,6 +1057,10 @@ function S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   return ffi.string(msg_ptr,ret)
 end
 
+-- in Linux mkfifo is not a syscall, emulate
+function S.mkfifo(path, mode) return S.mknod(path, bit.bor(c.MODE[mode], c.S_I.FIFO)) end
+function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(c.MODE[mode], c.S_I.FIFO), 0) end
+
 return S
 
 end
