@@ -13,6 +13,9 @@ typedef unsigned short int sa_family_t;
 typedef uint64_t rlim64_t;
 typedef unsigned long nlink_t;
 typedef unsigned long ino_t;
+typedef long time_t;
+typedef int32_t daddr_t;
+typedef long blkcnt_t;
 
 /* despite glibc, Linux uses 32 bit dev_t */
 typedef uint32_t dev_t;

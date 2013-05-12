@@ -10,6 +10,9 @@ typedef uint8_t sa_family_t;
 typedef uint64_t dev_t;
 typedef uint32_t nlink_t;
 typedef uint64_t ino_t;
+typedef int64_t time_t;
+typedef int64_t daddr_t;
+typedef uint64_t blkcnt_t;
 
 struct sockaddr {
   uint8_t       sa_len;
