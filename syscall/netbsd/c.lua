@@ -8,9 +8,9 @@ local t, pt, s = types.t, types.pt, types.s
 
 local C = setmetatable({}, {__index = ffi.C})
 
--- SYS___fstat50   440
+-- SYS___stat50    439
 C.stat = function(path, buf)
-  return C.syscall(440, pt.void(path), pt.void(buf))
+  return C.syscall(439, pt.void(path), pt.void(buf))
 end
 
 return C
