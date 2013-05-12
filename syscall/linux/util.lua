@@ -588,7 +588,7 @@ local openptindex = {
 mt.openpt = {
   __index = function(t, k)
     if openptindex[k] then return openptindex[k] end
-    return t.fd[k]
+    return function(pty, ...) return t.fd[k](t.fd, ...) end
   end
 }
 
