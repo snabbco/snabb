@@ -29,10 +29,6 @@ typedef uint64_t off_t;
 // typedefs which are word length
 typedef unsigned long nfds_t;
 
-struct iovec {
-  void *iov_base;
-  size_t iov_len;
-};
 struct in_addr {
   uint32_t       s_addr;
 };

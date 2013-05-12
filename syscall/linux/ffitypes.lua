@@ -45,6 +45,10 @@ struct cpu_set_t {
 typedef int mqd_t;
 typedef int idtype_t; /* defined as enum */
 
+struct iovec {
+  void *iov_base;
+  size_t iov_len;
+};
 struct timespec {
   time_t tv_sec;
   long   tv_nsec;

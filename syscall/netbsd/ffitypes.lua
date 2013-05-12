@@ -19,6 +19,10 @@ typedef int ssize_t;
 typedef unsigned int size_t;
 typedef unsigned long clock_t;
 
+struct iovec {
+  void *iov_base;
+  size_t iov_len;
+};
 struct timespec {
   time_t tv_sec;
   long   tv_nsec;
