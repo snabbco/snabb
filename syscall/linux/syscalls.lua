@@ -165,27 +165,6 @@ function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.sync_file_range(getfd(fd), offset, count, c.SYNC_FILE_RANGE[flags]))
 end
 
-function S.stat(path, buf)
-  if not buf then buf = t.stat() end
-  local ret = C.stat(path, buf)
-  if ret == -1 then return nil, t.error() end
-  return buf
-end
-
-function S.lstat(path, buf)
-  if not buf then buf = t.stat() end
-  local ret = C.lstat(path, buf)
-  if ret == -1 then return nil, t.error() end
-  return buf
-end
-
-function S.fstat(fd, buf)
-  if not buf then buf = t.stat() end
-  local ret = C.fstat(getfd(fd), buf)
-  if ret == -1 then return nil, t.error() end
-  return buf
-end
-
 function S.fstatat(fd, path, buf, flags)
   if not buf then buf = t.stat() end
   local ret = C.fstatat(c.AT_FDCWD[fd], path, buf, c.AT_FSTATAT[flags])

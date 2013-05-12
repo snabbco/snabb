@@ -131,6 +131,24 @@ function S.readlink(path, buffer, size)
 end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
+function S.stat(path, buf)
+  if not buf then buf = t.stat() end
+  local ret = C.stat(path, buf)
+  if ret == -1 then return nil, t.error() end
+  return buf
+end
+function S.lstat(path, buf)
+  if not buf then buf = t.stat() end
+  local ret = C.lstat(path, buf)
+  if ret == -1 then return nil, t.error() end
+  return buf
+end
+function S.fstat(fd, buf)
+  if not buf then buf = t.stat() end
+  local ret = C.fstat(getfd(fd), buf)
+  if ret == -1 then return nil, t.error() end
+  return buf
+end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
   protocol = protocol or 0
