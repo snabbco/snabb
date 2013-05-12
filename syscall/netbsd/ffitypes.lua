@@ -63,12 +63,10 @@ struct stat {
   dev_t     st_dev;
   mode_t    st_mode;
   ino_t     st_ino;
-//  nlink_t   st_nlink;
-  dev_t     st_rdev;
+  nlink_t   st_nlink;
   uid_t     st_uid;
   gid_t     st_gid;
-//  dev_t     st_rdev;
-  nlink_t   st_nlink;
+  dev_t     st_rdev;
   struct    timespec st_atimespec;
   struct    timespec st_mtimespec;
   struct    timespec st_ctimespec;

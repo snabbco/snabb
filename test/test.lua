@@ -467,9 +467,6 @@ test_file_operations = {
     local stat = assert(S.stat("/dev/zero"))
     assert_equal(stat.nlink, 1, "expect link count on /dev/zero to be 1")
     assert(stat.ischr, "expect /dev/zero to be a character device")
-    assert_equal(stat.rdev:major(), 1 , "expect major number of /dev/zero to be 1")
-    assert_equal(stat.rdev:minor(), 5, "expect minor number of /dev/zero to be 5")
-    assert_equal(stat.rdev, t.device(1, 5), "expect raw device to be makedev(1, 5)")
   end,
   test_stat_directory = function()
     local fd = assert(S.open("/"))
