@@ -296,5 +296,34 @@ c.MSG = multiflags {
   NBIO            = 0x1000,
 }
 
+c.F = strflag {
+  DUPFD       = 0,
+  GETFD       = 1,
+  SETFD       = 2,
+  GETFL       = 3,
+  SETFL       = 4,
+  GETOWN      = 5,
+  SETOWN      = 6,
+  GETLK       = 7,
+  SETLK       = 8,
+  SETLKW      = 9,
+  CLOSEM      = 10,
+  MAXFD       = 11,
+  DUPFD_CLOEXEC= 12,
+  GETNOSIGPIPE= 13,
+  SETNOSIGPIPE= 14,
+}
+
+c.FD = multiflags {
+  CLOEXEC = 1,
+}
+
+-- note changed from F_ to FCNTL_LOCK
+c.FCNTL_LOCK = strflag {
+  RDLCK = 0,
+  UNLCK = 2,
+  WRLCK = 3,
+}
+
 return c
 
