@@ -345,8 +345,6 @@ addtype("sockaddr_ll", "struct sockaddr_ll", {
   __len = lenfn,
 })
 
--- Lua metatables where we cannot return an ffi type eg value is an array or integer or otherwise problematic
-
 meth.stat = {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
@@ -362,6 +360,7 @@ meth.stat = {
     ctime = function(st) return tonumber(st.st_ctime) end,
     mtime = function(st) return tonumber(st.st_mtime) end,
     rdev = function(st) return t.device(st.st_rdev) end,
+
     isreg = function(st) return bit.band(st.st_mode, c.S_I.FMT) == c.S_I.FREG end,
     isdir = function(st) return bit.band(st.st_mode, c.S_I.FMT) == c.S_I.FDIR end,
     ischr = function(st) return bit.band(st.st_mode, c.S_I.FMT) == c.S_I.FCHR end,
@@ -372,8 +371,10 @@ meth.stat = {
   }
 }
 
+--TODO sort out stat/stat64
 addtype("stat", stattypename, { -- either struct stat on 64 bit or struct stat64 on 32 bit
   __index = function(st, k) if meth.stat.index[k] then return meth.stat.index[k](st) end end,
+  __len = lenfn,
 })
 
 meth.siginfo = {

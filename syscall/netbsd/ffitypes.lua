@@ -50,5 +50,24 @@ struct msghdr {
   socklen_t       msg_controllen;
   int             msg_flags;
 };
+struct stat {
+  dev_t     st_dev;
+  mode_t    st_mode;
+  ino_t     st_ino;
+  nlink_t   st_nlink;
+  uid_t     st_uid;
+  gid_t     st_gid;
+  dev_t     st_rdev;
+  struct    timespec st_atimespec;
+  struct    timespec st_mtimespec;
+  struct    timespec st_ctimespec;
+  struct    timespec st_birthtimespec;
+  off_t     st_size;
+  blkcnt_t  st_blocks;
+  blksize_t st_blksize;
+  uint32_t  st_flags;
+  uint32_t  st_gen;
+  uint32_t  st_spare[2];
+};
 ]]
 
