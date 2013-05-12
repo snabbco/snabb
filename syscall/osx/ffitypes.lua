@@ -8,8 +8,8 @@ cdef [[
 typedef uint16_t mode_t;
 typedef uint8_t sa_family_t;
 typedef uint32_t dev_t;
-int64_t blkcnt_t;
-int32_t blksize_t;
+typedef int64_t blkcnt_t;
+typedef int32_t blksize_t;
 // TODO check below here
 typedef unsigned long nlink_t;
 typedef unsigned long ino_t;
