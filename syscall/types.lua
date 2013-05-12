@@ -133,11 +133,23 @@ local addtypes = {
   uintptr = "uintptr_t",
   intptr = "intptr_t",
   size = "size_t",
+  ssize = "ssize_t",
   mode = "mode_t",
   dev = "dev_t",
   off = "off_t",
+  uid = "uid_t",
+  gid = "gid_t",
   pid = "pid_t",
+  in_port = "in_port_t",
   sa_family = "sa_family_t",
+  socklen = "socklen_t",
+  id = "id_t",
+  clockid = "clockid_t",
+  daddr = "daddr_t",
+  time = "time_t",
+  blksize = "blksize_t",
+  blkcnt = "blkcnt_t",
+  clock = "clock_t",
 }
 
 local addstructs = {
@@ -348,6 +360,34 @@ addtype("sockaddr_in6", "struct sockaddr_in6", {
     return newfn(tp, tab)
   end,
   __len = lenfn,
+})
+
+meth.timespec = {
+  index = {
+    time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_nsec) / 1000000000 end,
+    sec = function(tv) return tonumber(tv.tv_sec) end,
+    nsec = function(tv) return tonumber(tv.tv_nsec) end,
+  },
+  newindex = {
+    time = function(tv, v)
+      local i, f = math.modf(v)
+      tv.tv_sec, tv.tv_nsec = i, math.floor(f * 1000000000)
+    end,
+    sec = function(tv, v) tv.tv_sec = v end,
+    nsec = function(tv, v) tv.tv_nsec = v end,
+  }
+}
+
+addtype("timespec", "struct timespec", {
+  __index = function(tv, k) if meth.timespec.index[k] then return meth.timespec.index[k](tv) end end,
+  __newindex = function(tv, k, v) if meth.timespec.newindex[k] then meth.timespec.newindex[k](tv, v) end end,
+  __new = function(tp, v)
+    if not v then v = {0, 0} end
+    if type(v) ~= "number" then return ffi.new(tp, v) end
+    local ts = ffi.new(tp)
+    ts.time = v
+    return ts
+  end
 })
 
 -- include OS specific types
