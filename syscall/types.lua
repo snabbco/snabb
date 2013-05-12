@@ -149,6 +149,8 @@ local addtypes = {
   blksize = "blksize_t",
   blkcnt = "blkcnt_t",
   clock = "clock_t",
+  nlink = "nlink_t",
+  ino = "ino_t",
 }
 
 local addstructs = {
