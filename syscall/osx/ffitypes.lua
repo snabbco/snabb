@@ -11,7 +11,7 @@ typedef uint32_t dev_t;
 typedef int64_t blkcnt_t;
 typedef int32_t blksize_t;
 // TODO check below here
-typedef unsigned long nlink_t;
+typedef uint16_t nlink_t;
 typedef unsigned long ino_t;
 typedef long time_t;
 typedef int32_t daddr_t;
