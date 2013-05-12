@@ -363,7 +363,7 @@ test_file_operations = {
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:fchmod("RUSR, WUSR"))
     local st = fd:stat()
-    assert_equal(st.mode, c.S_I["FREG, RUSR, WUSR"]) -- TODO should be better way to test
+    assert_equal(bit.band(st.mode, c.S_I["RUSR, WUSR"]), c.S_I["RUSR, WUSR"])
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
