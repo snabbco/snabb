@@ -1,4 +1,12 @@
--- buffer.lua -- packet buffer data structure
+--- Buffers represent Ethernet packets in memory. This is a young data
+--- structure that is sure to undergo much evolution. For now buffers
+--- have these properties:
+
+--- - Buffers are reference-counted for automatic reuse. Buffers are
+---   typically "ref'd" when they are placed on a transmit or receive
+---   queue and then "deref'd" when processed by the DMA engine.
+--- - Buffers consist of one 4096-byte buffer. (This won't last.)
+--- - Buffers have a known physical and virtual address.
 
 module(...,package.seeall)
 
@@ -18,7 +26,7 @@ size = 4096 -- Size of every buffer allocated by this module.
 freelist = {}
 buffer_t = ffi.typeof("struct buffer")
 
--- Return a buffer with a refcount of 1.
+--- Return a buffer with a refcount of 1.
 function allocate ()
    return table.remove(freelist) or new_buffer()
 end

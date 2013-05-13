@@ -5,12 +5,22 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-/// ### Access PCI devices using Linux sysfs (/sys) filesystem
+/// ### Access PCI devices using Linux sysfs (`/sys`) filesystem
+///
+/// sysfs is an interface towards the Linux kernel based on special
+/// files that are implemented as callbacks into the kernel. Here are
+/// some background links about sysfs:
+///
+/// - High-level: <http://en.wikipedia.org/wiki/Sysfs>
+/// - Low-level:  <https://www.kernel.org/doc/Documentation/filesystems/sysfs.txt>
 
-/* Map PCI device memory into the process via a sysfs PCI resource file.
-   Return a point to the mapped memory, or NULL on failure.
+/// PCI hardware device registers can be memory-mapped via sysfs for
+/// "Memory-Mapped I/O" by device drivers. The trick is to `mmap()` a file
+/// such as:
+///         /sys/bus/pci/devices/0000:00:04.0/resource0
+/// and then read and write that memory to access the device.
 
-   'path' is for example /sys/bus/pci/devices/0000:00:04.0/resource0 */
+// Return a point to the mapped memory, or NULL on failure.
 void *map_pci_resource(const char *path)
 {
   int fd;
@@ -27,7 +37,8 @@ void *map_pci_resource(const char *path)
   }
 }
 
-/* Open Linux sysfs PCIe configuration file for read/write. */
+/// Little convenience function for Lua to open the `config` PCI sysfs
+/// file. (XXX Is there an easy way to do this directly in Lua?)
 int open_pcie_config(const char *path)
 {
   return open(path, O_RDWR);

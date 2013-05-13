@@ -1,10 +1,12 @@
--- intel10g.lua -- Intel 82599 10GbE ethernet device driver
+--- Device driver for the Intel 82599 10-Gigabit Ethernet controller.
+--- This is one of the most popular production 10G Ethernet
+--- controllers on the market and it is readily available in
+--- affordable (~$400) network cards made by Intel and others.
+---
+--- You will need to familiarize yourself with the excellent [data
+--- sheet]() to understand this module.
 
---- This module defines a device driver for one specific PCI device.
---- The load-time `...` argument must be bound to two values:
----     * The unique name for this module instance.
----     * The PCI address for the device this instance manages.
-
+-- This module is loaded once per PCI device. See `pci.lua` for details.
 local moduleinstance,pciaddress = ...
 
 if pciaddress == nil then
@@ -23,55 +25,165 @@ local test = require("test")
 require("intel_h")
 local bits, bitset = lib.bits, lib.bitset
 
--- DMA memory.
-local num_descriptors = 32 * 1024
-local buffer_count = 2 * 1024 * 1024
-local rxdesc, rxdesc_phy
-local txdesc, txdesc_phy
-local buffers, buffers_phy
+num_descriptors = 32 * 1024
+rxdesc, rxdesc_phy, txdesc, txdesc_phy = nil
 
--- Configuration registers table.
-r = {}
--- Statistics registers table.
-s = {}
+r = {} -- Configuration registers
+s = {} -- Statistics registers
+
+--- ### Initialization
 
 function open ()
    pci.set_bus_master(pciaddress, true)
    base = ffi.cast("uint32_t*", pci.map_pci_memory(pciaddress, 0))
    register.define(config_registers_desc, r, base)
    register.define(statistics_registers_desc, s, base)
-   init_device()
+   init()
 end
 
-function init_device ()
+--- See data sheet section 4.6.3 "Initialization Sequence."
+
+function init ()
    init_dma_memory()
    disable_interrupts()
    global_reset()
    wait_eeprom_autoread()
    wait_dma()
---   setup_link()
    init_statistics()
    init_receive()
    init_transmit()
 end
 
-function disable_interrupts () end
+function init_dma_memory ()
+   rxdesc, rxdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
+   txdesc, txdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
+   -- Add bounds checking
+   rxdesc  = lib.bounds_checked(rxdesc_t, rxdesc, 0, num_descriptors)
+   txdesc  = lib.bounds_checked(txdesc_t, txdesc, 0, num_descriptors)
+end
 
 function global_reset ()
    local reset = bits{LinkReset=3, DeviceReset=26}
    r.CTRL(reset)
-   register.dump(r)
    C.usleep(1000)
-   register.dump(r)
    r.CTRL:wait(reset, 0)
 end
 
+function disable_interrupts () end --- XXX do this
 function wait_eeprom_autoread () r.EEC:wait(bits{AutoreadDone=9}) end
 function wait_dma ()             r.RDRXCTL:wait(bits{DMAInitDone=3})  end
 
 function init_statistics ()
-   for _,reg in pairs(s) do reg:reset() end
+   -- Read and then zero each statistic register
+   for _,reg in pairs(s) do reg:read() reg:reset() end
 end
+
+function init_receive ()
+   set_promiscuous_mode() -- accept all, no need to configure MAC address filter
+   r.RDRXCTL:set(bits{CRCStrip=0})
+   r.HLREG0:clr(bits({RXLNGTHERREN=27, UndocumentedRXCRCSTRP=1}))
+   r.RDBAL(rxdesc_phy % 2^32)
+   r.RDBAH(rxdesc_phy / 2^32)
+   r.RDLEN(num_descriptors * ffi.sizeof("union rx"))
+   r.RXDCTL(bits{Enable=25})
+   r.RXCTRL:set(bits{RXEN=0})
+end
+
+function set_promiscuous_mode () r.FCTRL(bits({MPE=8, UPE=9, BAM=10})) end
+
+function init_transmit ()
+   r.HLREG0:set(bits{TXCRCEN=0})
+   r.TDBAL(txdesc_phy % 2^32)
+   r.TDBAH(txdesc_phy / 2^32)
+   r.TDLEN(num_descriptors * ffi.sizeof("union tx"))
+   r.TDH(0)
+   r.TDT(0)
+   r.DMATXCTL(bits{TE=0})
+   r.TXDCTL:wait(bits{Enable=25})
+end
+
+--- ### Transmit
+
+--- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
+
+tdh, tdt = 0, 0 -- Cached values of TDT and TDH
+txfree = 0
+txdesc_flags = bits{eop=24,ifcs=25}
+function transmit (buf)
+   txdesc[tdt].data.address = buf.phy
+   txdesc[tdt].data.options = bit.bor(buf.size, txdesc_flags)
+   tdt = (tdt + 1) % num_descriptors
+   buffer.ref(buf)
+end
+
+function sync_transmit ()
+   C.full_memory_barrier()
+   tdh = r.TDH()
+   r.TDT(tdt)
+end
+
+function can_transmit () return (tdt + 1) % num_descriptors ~= txfree end
+
+--- ### Receive
+
+--- See datasheet section 7.1 "Inline Functions -- Receive Functionality."
+
+-- Queued
+rxbuffers = {}
+rdh, rdt, rxnext = 0, 0, 0
+
+function receive ()
+   if rdh ~= rxnext then
+      local buf = rxbuffers[rxnext]
+      buf.size = rxdesc[rxnext].wb.length
+      rxnext = (rxnext + 1) % num_descriptors
+      buffer.deref(buf)
+      return buf
+   end
+end
+
+function can_receive ()
+   return rdh ~= rxnext
+end
+
+function can_add_receive_buffer ()
+   return (rdt + 1) % num_descriptors ~= rdh
+end
+
+function add_receive_buffer (buf)
+   assert(can_add_receive_buffer())
+   local desc = rxdesc[rdt].data
+   desc.address, desc.dd = buf.phy, buf.size
+   rxbuffers[rdt] = buf
+   rdt = (rdt + 1) % num_descriptors
+   buffer.ref(buf)
+end
+
+function sync_receive ()
+   C.full_memory_barrier()
+   rdh = r.RDH()
+   r.RDT(rdt)
+end
+
+function sync () sync_receive() sync_transmit() end
+
+txdesc_t = ffi.typeof [[
+      union { struct { uint64_t address, options; } data;
+              struct { uint64_t a, b; }             context; }
+]]
+
+rxdesc_t = ffi.typeof [[
+      union { struct { uint64_t address, dd; } data;
+	      struct { uint16_t csum, id;
+		       uint32_t mrq, status;
+		       uint16_t length, vlan; } wb; }
+]]
+
+function wait_linkup ()
+   test.waitfor("linkup", linkup, 20, 250000)
+end
+
+--- ### Status and diagnostics
 
 function linkup () return bitset(r.LINKS(), 30) end
 
@@ -89,139 +201,22 @@ function enable_mac_loopback ()
    r.HLREG0:set(bits({Loop=15}))
 end
 
-function init_receive ()
-   set_promiscuous_mode() -- accept all, no need to configure MAC address filter
-   r.RDRXCTL:set(bits{CRCStrip=0})
-   r.HLREG0:clr(bits({RXLNGTHERREN=27, UndocumentedRXCRCSTRP=1}))
-   r.RDBAL(rxdesc_phy % 2^32)
-   r.RDBAH(rxdesc_phy / 2^32)
-   r.RDLEN(num_descriptors * ffi.sizeof("union rx"))
-   r.RXDCTL(bits{Enable=25})
-   r.RXCTRL:set(bits{RXEN=0})
-end
-
-function init_transmit ()
-   r.HLREG0:set(bits{TXCRCEN=0})
-   r.TDBAL(txdesc_phy % 2^32)
-   r.TDBAH(txdesc_phy / 2^32)
-   r.TDLEN(num_descriptors * ffi.sizeof("union tx"))
-   r.TDH(0)
-   r.TDT(0)
-   r.DMATXCTL(bits{TE=0})
-   r.TXDCTL:wait(bits{Enable=25})
-end
-
-tdh, tdt = 0, 0 -- Cached values of TDT and TDH
-txfree = 0
-txdesc_flags = bits{eop=24,ifcs=25}
-function transmit (address, size)
---   print("TX DUMP ("..size.."): " .. bit.tohex(ffi.cast("uint32_t*", address)[1]))
-   txdesc[tdt].data.address = address
-   txdesc[tdt].data.options = bit.bor(size, txdesc_flags)
-   tdt = (tdt + 1) % num_descriptors
-end
-
-function sync_transmit ()
-   C.full_memory_barrier()
-   tdh = r.TDH()
-   r.TDT(tdt)
-end
-
-function can_transmit () return (tdt + 1) % num_descriptors ~= txfree end
-
--- Pointer to buffer address for each receive descriptor.
--- (So that we know even if the address in the receive descriptor is
--- overwritten during write-back.)
-rxbuffers = ffi.new("uint8_t*[?]", num_descriptors)
-
-rdh, rdt, rxnext = 0, 0, 0
-
--- Return the next available packet as two values: buffer, length.
--- If no packet is available then return nil.
-function receive ()
-   if rdh ~= rxnext then
-      local buffer = rxbuffers[rxnext]
-      local wb = rxdesc[rxnext].wb
---      local p = ffi.cast("uint32_t*", buffer)
---      io.write("RX DUMP ("..wb.length.."): ")
---      for i = 0, 8 do io.write(bit.tohex(p[i]).." ") end
---      print()
-      rxnext = (rxnext + 1) % num_descriptors
-      return buffer, wb.length
+function selftest (options)
+   options = options or {}
+   io.write("intel10g selftest: pciaddr="..pciaddress)
+   for key,value in pairs(options) do
+      io.write(" "..key.."="..tostring(value))
    end
-end
-
-function can_receive ()
-   return rdh ~= rxnext
-end
-
-function can_add_receive_buffer ()
-   return (rdt + 1) % num_descriptors ~= rdh
-end
-
-function add_receive_buffer (address, size)
-   assert(can_add_receive_buffer())
-   local desc = rxdesc[rdt].data
-   desc.address, desc.dd = address, size
-   rxbuffers[rdt] = ffi.cast("uint8_t*", address)
-   rdt = (rdt + 1) % num_descriptors
-end
-
-function sync_receive ()
-   C.full_memory_barrier()
-   rdh = r.RDH()
-   r.RDT(rdt)
-end
-
-function sync () sync_receive() sync_transmit() end
-
-local txdesc_t = ffi.typeof [[
-      union { struct { uint64_t address, options; } data;
-              struct { uint64_t a, b; }             context; }
-]]
-
-local rxdesc_t = ffi.typeof [[
-      union { struct { uint64_t address, dd; } data;
-	      struct { uint16_t csum, id;
-		       uint32_t mrq, status;
-		       uint16_t length, vlan; } wb; }
-]]
-
-function init_dma_memory ()
-   rxdesc, rxdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
-   txdesc, txdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
-   buffers, buffers_phy = memory.dma_alloc(buffer_count * ffi.sizeof("uint8_t"))
-   -- Add bounds checking
-   rxdesc  = lib.protected(rxdesc_t, rxdesc, 0, num_descriptors)
-   txdesc  = lib.protected(txdesc_t, txdesc, 0, num_descriptors)
-   buffers = lib.protected("uint8_t", buffers, 0, buffer_count)
-end
-
-function set_promiscuous_mode () r.FCTRL(bits({MPE=8, UPE=9, BAM=10})) end
-
-function wait_linkup ()
-   test.waitfor("linkup", linkup, 20, 250000)
-end
-
-function selftest ()
-   print("intel10g")
+   print()
+   options.device = getfenv()
    open()
-   local saved_state = get_configuration_state()
-   enable_mac_loopback()
-   test.waitfor("linkup", linkup, 20, 250000)
-   local finished = lib.timer(1e9)
-   buffers[0] = 99
-   repeat
-      sync()
-      while can_add_receive_buffer() do add_receive_buffer(buffers_phy + 40960, 4096) end
-      while can_transmit() do transmit(buffers_phy, 50) end
-      sync()
---      C.usleep(1)
-   until finished()
-   restore_configuration_state(saved_state)
-   assert(buffers[40960]==99)
-   C.usleep(1000)
-   print "stats"
+   if not options.noloopback then
+      enable_mac_loopback()
+   end
+   if not options.nolinkup then
+      test.waitfor("linkup", linkup, 20, 250000)
+   end
+   require("port").selftest(options)
    register.dump(s, true)
 end
 

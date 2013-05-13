@@ -282,8 +282,8 @@ function add_receive_buffer (buf)
    -- FIXME: size
    rxdesc[rdt].data.address = buf.phy
    rxdesc[rdt].data.dd = 0
-   rdt = (rdt + 1) % num_descriptors
    rxbuffers[rdt] = buf
+   rdt = (rdt + 1) % num_descriptors
    buffer.ref(buf)
    return true
 end
@@ -327,14 +327,10 @@ function rx_load ()
    return rx_pending() / num_descriptors
 end
 
--- Return the next available packet as two values: buffer, length.
--- If no packet is available then return nil.
 function receive ()
    if rdh ~= rxnext then
-      local wb = rxdesc[rxnext].wb
-      local index = rxnext
-      local length = wb.length
-      local buf = rxbuffers[index]
+      local buf = rxbuffers[rxnext]
+      buf.size = rxdesc[rxnext].length
       rxnext = (rxnext + 1) % num_descriptors
       buffer.deref(buf)
       return buf
