@@ -387,5 +387,11 @@ c.S_I = multiflags {
   XOTH  = octal('00001'),
 }
 
+c.SHUT = strflag {
+  RD   = 0,
+  WR   = 1,
+  RDWR = 2,
+}
+
 return c
 
