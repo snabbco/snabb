@@ -218,7 +218,7 @@ t.error = ffi.metatype("struct {int errno;}", {
   __new = function(tp, errno)
     if not errno then errno = ffi.errno() end
     return ffi.new(tp, errno)
-  end
+  end,
 })
 
 -- TODO add generic address type that works out which to take? basically inet_name, except without netmask
@@ -236,7 +236,8 @@ addtype("in_addr", "struct in_addr", {
       end
     end
     return addr
-  end
+  end,
+  __len = lenfn,
 })
 
 addtype("in6_addr", "struct in6_addr", {
@@ -245,7 +246,8 @@ addtype("in6_addr", "struct in6_addr", {
     local addr = ffi.new(tp)
     if s then addr = inet_pton(c.AF.INET6, s, addr) end
     return addr
-  end
+  end,
+  __len = lenfn,
 })
 
 t.addrtype = {
@@ -389,7 +391,8 @@ addtype("timespec", "struct timespec", {
     local ts = ffi.new(tp)
     ts.time = v
     return ts
-  end
+  end,
+  __len = lenfn,
 })
 
 t.groups = ffi.metatype("struct {int count; gid_t list[?];}", {
@@ -481,6 +484,44 @@ addtype("sigset", "sigset_t", {
     end
     return f
   end,
+  __len = lenfn,
+})
+
+meth.siginfo = {
+  index = {
+    signo   = function(s) return s._info._signo end,
+    code    = function(s) return s._info._code end,
+    errno   = function(s) return s._info._errno end,
+    value   = function(s) return s._info._reason._rt._value end,
+    pid     = function(s) return s._info._reason._child._pid end,
+    uid     = function(s) return s._info._reason._child._uid end,
+    status  = function(s) return s._info._reason._child._status end,
+    utime   = function(s) return s._info._reason._child._utime end,
+    stime   = function(s) return s._info._reason._child._stime end,
+    addr    = function(s) return s._info._reason._fault._addr end,
+    band    = function(s) return s._info._reason._poll._band end,
+    fd      = function(s) return s._info._reason._poll._fd end,
+  },
+  newindex = {
+    signo   = function(s, v) s._info._signo = v end,
+    code    = function(s, v) s._info._code = v end,
+    errno   = function(s, v) s._info._errno = v end,
+    value   = function(s, v) s._info._reason._rt._value = v end,
+    pid     = function(s, v) s._info._reason._child._pid = v end,
+    uid     = function(s, v) s._info._reason._child._uid = v end,
+    status  = function(s, v) s._info._reason._child._status = v end,
+    utime   = function(s, v) s._info._reason._child._utime = v end,
+    stime   = function(s, v) s._info._reason._child._stime = v end,
+    addr    = function(s, v) s._info._reason._fault._addr = v end,
+    band    = function(s, v) s._info._reason._poll._band = v end,
+    fd      = function(s, v) s._info._reason._poll._fd = v end,
+  }
+}
+
+addtype("siginfo", "struct siginfo", {
+  __index = function(t, k) if meth.siginfo.index[k] then return meth.siginfo.index[k](t) end end,
+  __newindex = function(t, k, v) if meth.siginfo.newindex[k] then meth.siginfo.newindex[k](t, v) end end,
+  __len = lenfn,
 })
 
 -- sigaction
