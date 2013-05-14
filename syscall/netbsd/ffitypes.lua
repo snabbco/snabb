@@ -27,6 +27,9 @@ struct timespec {
   time_t tv_sec;
   long   tv_nsec;
 };
+typedef struct {
+  uint32_t      val[4]; // note renamed to match Linux
+} sigset_t;
 struct sockaddr {
   uint8_t       sa_len;
   sa_family_t   sa_family;

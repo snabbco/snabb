@@ -14,6 +14,7 @@ require "syscall.ffitypes"
 local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
+local split, trim = h.split, h.trim
 
 local c = require "syscall.constants"
 
@@ -650,29 +651,6 @@ local function sigdelset(set, sig)
   local d = bit.rshift(sig - 1, 5)
   set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
   return set
-end
-
--- TODO remove duplication of split and trim as this should all be in constants, metatypes
-local function split(delimiter, text)
-  if delimiter == "" then return {text} end
-  if #text == 0 then return {} end
-  local list = {}
-  local pos = 1
-  while true do
-    local first, last = text:find(delimiter, pos)
-    if first then
-      list[#list + 1] = text:sub(pos, first - 1)
-      pos = last + 1
-    else
-      list[#list + 1] = text:sub(pos)
-      break
-    end
-  end
-  return list
-end
-
-local function trim(s) -- TODO should replace underscore with space
-  return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
 local function sigaddsets(set, sigs) -- allow multiple
