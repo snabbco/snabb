@@ -40,7 +40,6 @@ local fcntl = {
     [c.F.DUPFD_CLOEXEC] = function(ret) return t.fd(ret) end,
     [c.F.GETFD] = function(ret) return tonumber(ret) end,
     [c.F.GETFL] = function(ret) return tonumber(ret) end,
-    [c.F.GETLEASE] = function(ret) return tonumber(ret) end,
     [c.F.GETOWN] = function(ret) return tonumber(ret) end,
     [c.F.GETSIG] = function(ret) return tonumber(ret) end,
     [c.F.GETLK] = function(ret, arg) return arg end,
