@@ -37,6 +37,8 @@ t.device = function(major, minor)
   return setmetatable({dev = t.dev(dev)}, mt.device)
 end
 
+function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has odd unix handling
+
 meth.stat = {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
