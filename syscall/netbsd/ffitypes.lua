@@ -90,6 +90,80 @@ struct stat {
   uint32_t  st_gen;
   uint32_t  st_spare[2];
 };
+typedef union sigval {
+  int     sival_int;
+  void    *sival_ptr;
+} sigval_t;
+]]
+
+if abi.abi64 then
+cdef [[
+struct _ksiginfo {
+  int     _signo;
+  int     _code;
+  int     _errno;
+  int     _pad; /* only on LP64 */
+  union {
+    struct {
+      pid_t   _pid;
+      uid_t   _uid;
+      sigval_t        _value;
+    } _rt;
+    struct {
+      pid_t   _pid;
+      uid_t   _uid;
+      int     _status;
+      clock_t _utime;
+      clock_t _stime;
+    } _child;
+    struct {
+      void   *_addr;
+      int     _trap;
+    } _fault;
+    struct {
+      long    _band;
+      int     _fd;
+    } _poll;
+  } _reason;
+};
+]]
+else
+cdef [[
+struct _ksiginfo {
+  int     _signo;
+  int     _code;
+  int     _errno;
+  union {
+    struct {
+      pid_t   _pid;
+      uid_t   _uid;
+      sigval_t        _value;
+    } _rt;
+    struct {
+      pid_t   _pid;
+      uid_t   _uid;
+      int     _status;
+      clock_t _utime;
+      clock_t _stime;
+    } _child;
+    struct {
+      void   *_addr;
+      int     _trap;
+    } _fault;
+    struct {
+      long    _band;
+      int     _fd;
+    } _poll;
+  } _reason;
+};
+]]
+end
+
+cdef [[
+typedef union siginfo {
+        char    si_pad[128];    /* Total size; for future expansion */
+        struct _ksiginfo _info;
+} siginfo_t;
 struct sigaction {
   union {
     void (*sa_handler)(int);
