@@ -135,7 +135,7 @@ meth.siginfo = {
     addr    = function(s, v) s._info._reason._fault._addr = v end,
     band    = function(s, v) s._info._reason._poll._band = v end,
     fd      = function(s, v) s._info._reason._poll._fd = v end,
-  }
+  },
 }
 
 addtype("siginfo", "struct siginfo", {
