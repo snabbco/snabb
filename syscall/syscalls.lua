@@ -313,12 +313,22 @@ end
 
 if not S.accept then
   function S.accept(sockfd, flags, addr, addrlen) -- TODO emulate netbsd paccept and Linux accept4
-    assert(not flags, "TODO add acceot flags emulation")
+    assert(not flags, "TODO add accept flags emulation")
     addr = addr or t.sockaddr_storage()
     addrlen = addrlen or t.socklen1(addrlen or #addr)
     local ret = C.accept(getfd(sockfd), addr, addrlen)
     if ret == -1 then return nil, t.error() end
     return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
+  end
+end
+
+if not S.pipe then
+  function S.pipe(flags) -- TODO emulate flags
+    assert(not flags, "TODO add pipe flags emulation")
+    local fd2 = t.int2()
+    local ret = C.pipe(fd2)
+    if ret == -1 then return nil, t.error() end
+    return t.pipe(fd2)
   end
 end
 
