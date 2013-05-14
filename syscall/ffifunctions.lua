@@ -70,7 +70,6 @@ int bind(int sockfd, const void *addr, socklen_t addrlen); // void not struct
 int listen(int sockfd, int backlog);
 int connect(int sockfd, const void *addr, socklen_t addrlen);
 int accept(int sockfd, void *addr, socklen_t *addrlen);
-int accept4(int sockfd, void *addr, socklen_t *addrlen, int flags);
 int getsockname(int sockfd, void *addr, socklen_t *addrlen);
 int getpeername(int sockfd, void *addr, socklen_t *addrlen);
 int shutdown(int sockfd, int how);

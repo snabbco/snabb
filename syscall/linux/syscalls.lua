@@ -252,20 +252,9 @@ end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), offset, count)) end
 
-function S.bind(sockfd, addr, addrlen)
-  return retbool(C.bind(getfd(sockfd), addr, addrlen or #addr))
-end
-
-function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or c.SOMAXCONN)) end
-function S.connect(sockfd, addr, addrlen)
-  return retbool(C.connect(getfd(sockfd), addr, addrlen or #addr))
-end
-
-function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), c.SHUT[how])) end
-
-function S.accept(sockfd, flags, addr, addrlen)
+function S.accept(sockfd, flags, addr, addrlen) -- TODO emulate netbsd paccept
   addr = addr or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(addrlen or ffi.sizeof(addr))
+  addrlen = addrlen or t.socklen1(addrlen or #addr)
   local ret
   if not flags
     then ret = C.accept(getfd(sockfd), addr, addrlen)
@@ -273,22 +262,6 @@ function S.accept(sockfd, flags, addr, addrlen)
   end
   if ret == -1 then return nil, t.error() end
   return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
-end
-
-function S.getsockname(sockfd, ss, addrlen)
-  ss = ss or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(#ss)
-  local ret = C.getsockname(getfd(sockfd), ss, addrlen)
-  if ret == -1 then return nil, t.error() end
-  return t.sa(ss, addrlen[0])
-end
-
-function S.getpeername(sockfd, ss, addrlen)
-  ss = ss or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(#ss)
-  local ret = C.getpeername(getfd(sockfd), ss, addrlen)
-  if ret == -1 then return nil, t.error() end
-  return t.sa(ss, addrlen[0])
 end
 
 -- TODO change to type

@@ -221,6 +221,24 @@ function S.getsockopt(fd, level, optname, optval, optlen)
   if ret == -1 then return nil, t.error() end
   return optval[0]
 end
+function S.bind(sockfd, addr, addrlen) return retbool(C.bind(getfd(sockfd), addr, addrlen or #addr)) end
+function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or c.SOMAXCONN)) end
+function S.connect(sockfd, addr, addrlen) return retbool(C.connect(getfd(sockfd), addr, addrlen or #addr)) end
+function S.getsockname(sockfd, ss, addrlen)
+  ss = ss or t.sockaddr_storage()
+  addrlen = addrlen or t.socklen1(#ss)
+  local ret = C.getsockname(getfd(sockfd), ss, addrlen)
+  if ret == -1 then return nil, t.error() end
+  return t.sa(ss, addrlen[0])
+end
+function S.getpeername(sockfd, ss, addrlen)
+  ss = ss or t.sockaddr_storage()
+  addrlen = addrlen or t.socklen1(#ss)
+  local ret = C.getpeername(getfd(sockfd), ss, addrlen)
+  if ret == -1 then return nil, t.error() end
+  return t.sa(ss, addrlen[0])
+end
+function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), c.SHUT[how])) end
 
 function S.getuid() return C.getuid() end
 function S.geteuid() return C.geteuid() end
@@ -290,6 +308,17 @@ if not S.getcwd then
     local ret = C.getcwd(buf, size)
     if ret == zeropointer then return nil, t.error() end
     return ffi.string(buf)
+  end
+end
+
+if not S.accept then
+  function S.accept(sockfd, flags, addr, addrlen) -- TODO emulate netbsd paccept and Linux accept4
+    assert(not flags, "TODO add acceot flags emulation")
+    addr = addr or t.sockaddr_storage()
+    addrlen = addrlen or t.socklen1(addrlen or #addr)
+    local ret = C.accept(getfd(sockfd), addr, addrlen)
+    if ret == -1 then return nil, t.error() end
+    return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
   end
 end
 

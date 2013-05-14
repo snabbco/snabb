@@ -9,6 +9,7 @@ int lchmod(const char *path, mode_t mode);
 int fchroot(int fd);
 int dup3(int oldfd, int newfd, int flags);
 int fsync_range(int fd, int how, off_t start, off_t length);
+int paccept(int s, struct sockaddr *addr, socklen_t *addrlen, const sigset_t *sigmask, int flags);
 
 int syscall(int number, ...);
 //quad_t __syscall(quad_t number, ...);
