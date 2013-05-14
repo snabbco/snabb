@@ -258,7 +258,7 @@ end
 
 function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or c.SOMAXCONN)) end
 function S.connect(sockfd, addr, addrlen)
-  return retbool(C.connect(getfd(sockfd), addr, addrlen or ffi.sizeof(addr)))
+  return retbool(C.connect(getfd(sockfd), addr, addrlen or #addr))
 end
 
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), c.SHUT[how])) end
