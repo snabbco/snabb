@@ -41,7 +41,6 @@ local fcntl = {
     [c.F.GETFD] = function(ret) return tonumber(ret) end,
     [c.F.GETFL] = function(ret) return tonumber(ret) end,
     [c.F.GETOWN] = function(ret) return tonumber(ret) end,
-    [c.F.GETSIG] = function(ret) return tonumber(ret) end,
     [c.F.GETLK] = function(ret, arg) return arg end,
     [C.F.MAXFD] = function(ret) return tonumber(ret) end,
     [C.F.GETNOSIGPIPE] = function(ret) return ctobool(ret) end,
