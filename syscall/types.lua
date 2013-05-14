@@ -488,7 +488,7 @@ addtype("sigset", "sigset_t", {
 })
 
 -- sigaction
-t.sa_sigaction = ffi.typeof("void (*)(int, siginfo_t *, ucontext_t *)")
+t.sa_sigaction = ffi.typeof("void (*)(int, siginfo_t *, void *)")
 s.sa_sigaction = ffi.sizeof(t.sa_sigaction)
 
 meth.sigaction = {
