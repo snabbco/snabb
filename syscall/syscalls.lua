@@ -322,11 +322,23 @@ if not S.accept then
   end
 end
 
-if not S.pipe then
+if not inlibc "pipe2" then
   function S.pipe(flags) -- TODO emulate flags
     assert(not flags, "TODO add pipe flags emulation")
     local fd2 = t.int2()
     local ret = C.pipe(fd2)
+    if ret == -1 then return nil, t.error() end
+    return t.pipe(fd2)
+  end
+else -- NetBSD and Linux have pipe2
+  function S.pipe(flags)
+    local fd2 = t.int2()
+    local ret
+    if flags then
+      ret = C.pipe2(fd2, c.OPIPE[flags])
+    else
+      ret = C.pipe(fd2)
+    end
     if ret == -1 then return nil, t.error() end
     return t.pipe(fd2)
   end

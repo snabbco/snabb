@@ -34,18 +34,6 @@ else -- no largefile issues
   end
 end
 
-function S.pipe(flags)
-  local fd2 = t.int2()
-  local ret
-  if flags then
-    ret = C.pipe2(fd2, c.OPIPE[flags])
-  else
-    ret = C.pipe(fd2)
-  end
-  if ret == -1 then return nil, t.error() end
-  return t.pipe(fd2)
-end
-
 function S.unlinkat(dirfd, path, flags)
   return retbool(C.unlinkat(c.AT_FDCWD[dirfd], path, c.AT_REMOVEDIR[flags]))
 end
