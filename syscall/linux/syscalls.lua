@@ -286,22 +286,6 @@ function S.setdomainname(s)
   return retbool(C.setdomainname(s, #s))
 end
 
-function S.sigaction(signum, handler, oldact)
-  if type(handler) == "string" or type(handler) == "function" then
-    handler = {handler = handler, mask = "", flags = 0} -- simple case like signal
-  end
-  if handler then handler = mktype(t.sigaction, handler) end
-  return retbool(C.sigaction(c.SIG[signum], handler, oldact))
-end
-
--- defined in terms of sigaction
-function S.signal(signum, handler)
-  local oldact = t.sigaction()
-  local ok, err = S.sigaction(signum, handler, oldact)
-  if not ok then return nil, err end
-  return oldact.sa_handler
-end
-
 function S.kill(pid, sig) return retbool(C.kill(pid, c.SIG[sig])) end
 function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 

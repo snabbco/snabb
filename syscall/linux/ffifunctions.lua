@@ -28,7 +28,6 @@ int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
 
 int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 void exit_group(int status);
-int signal(int signum, int handler); /* although deprecated, just using to set SIG_ values */
 
 time_t time(time_t *t);
 

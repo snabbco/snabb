@@ -267,7 +267,13 @@ function S.setgroups(groups)
   if type(groups) == "table" then groups = t.groups(groups) end
   return retbool(C.setgroups(groups.count, groups.list))
 end
-
+function S.sigaction(signum, handler, oldact)
+  if type(handler) == "string" or type(handler) == "function" then
+    handler = {handler = handler, mask = "", flags = 0} -- simple case like signal
+  end
+  if handler then handler = mktype(t.sigaction, handler) end
+  return retbool(C.sigaction(c.SIG[signum], handler, oldact))
+end
 function S._exit(status) C._exit(c.EXIT[status]) end
 
 function S.fcntl(fd, cmd, arg)
@@ -299,6 +305,14 @@ end
 
 -- deprecated in NetBSD so implement with recvfrom
 function S.recv(fd, buf, count, flags) return retnum(C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], nil, nil)) end
+
+-- not a syscall in many systems, defined in terms of sigaction
+function S.signal(signum, handler) -- defined in terms of sigaction
+  local oldact = t.sigaction()
+  local ok, err = S.sigaction(signum, handler, oldact)
+  if not ok then return nil, err end
+  return oldact.sa_handler
+end
 
 -- if getcwd not defined, fall back to libc implemenrarion (currently bsd, osx) TODO move? use underlying?
 if not S.getcwd then
