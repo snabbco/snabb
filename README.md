@@ -44,7 +44,7 @@ netfilter, dhcp, selinux, NetBSD rump kernel support.
 
 ## Examples
 
-Apart from the tests, there are now some examples at [ljsyscall-examples](https://github.com/justincormack/ljsyscall-examples). More to come.
+Apart from the tests, there are now some examples at in the examples directory; more to come.
 
 ## Testing
 
