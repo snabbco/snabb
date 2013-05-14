@@ -82,15 +82,6 @@ int ftruncate64(int fd, off_t length);
 int pause(void);
 int prlimit64(pid_t pid, int resource, const struct rlimit64 *new_limit, struct rlimit64 *old_limit);
 
-int bind(int sockfd, const void *addr, socklen_t addrlen); // void not struct
-int listen(int sockfd, int backlog);
-int connect(int sockfd, const void *addr, socklen_t addrlen);
-int accept(int sockfd, void *addr, socklen_t *addrlen);
-int accept4(int sockfd, void *addr, socklen_t *addrlen, int flags);
-int getsockname(int sockfd, void *addr, socklen_t *addrlen);
-int getpeername(int sockfd, void *addr, socklen_t *addrlen);
-int shutdown(int sockfd, int how);
-
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 void *mmap2(void *addr, size_t length, int prot, int flags, int fd, off32_t pgoffset);
 int munmap(void *addr, size_t length);
