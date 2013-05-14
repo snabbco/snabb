@@ -161,8 +161,8 @@ end
 
 cdef [[
 typedef union siginfo {
-        char    si_pad[128];    /* Total size; for future expansion */
-        struct _ksiginfo _info;
+  char    si_pad[128];    /* Total size; for future expansion */
+  struct _ksiginfo _info;
 } siginfo_t;
 struct sigaction {
   union {

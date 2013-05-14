@@ -138,7 +138,7 @@ meth.siginfo = {
   },
 }
 
-addtype("siginfo", "struct siginfo", {
+addtype("siginfo", "siginfo_t", {
   __index = function(t, k) if meth.siginfo.index[k] then return meth.siginfo.index[k](t) end end,
   __newindex = function(t, k, v) if meth.siginfo.newindex[k] then meth.siginfo.newindex[k](t, v) end end,
   __len = lenfn,
