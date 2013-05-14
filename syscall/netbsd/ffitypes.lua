@@ -168,7 +168,7 @@ struct sigaction {
   union {
     void (*sa_handler)(int);
     void (*sa_sigaction)(int, siginfo_t *, void *);
-  } sa_handler -- renamed as in Linux definition
+  } sa_handler; // renamed as in Linux definition
   sigset_t sa_mask;
   int sa_flags;
 };
