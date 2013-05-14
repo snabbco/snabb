@@ -190,6 +190,15 @@ c.O = multiflags {
   CLOEXEC     = 0x1000000,
 }
 
+-- sigaction, note renamed SIGACT from SIG
+-- note not cast to (void *)(int) TODO should it be?
+c.SIGACT = strflag {
+  ERR = -1,
+  DFL =  0,
+  IGN =  1,
+  HOLD = 3,
+}
+
 c.EXIT = strflag {
   SUCCESS = 0,
   FAILURE = 1,
