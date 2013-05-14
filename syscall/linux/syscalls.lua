@@ -253,7 +253,7 @@ function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, le
 function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), offset, count)) end
 
 function S.bind(sockfd, addr, addrlen)
-  return retbool(C.bind(getfd(sockfd), addr, addrlen or ffi.sizeof(addr)))
+  return retbool(C.bind(getfd(sockfd), addr, addrlen or #addr))
 end
 
 function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or c.SOMAXCONN)) end
