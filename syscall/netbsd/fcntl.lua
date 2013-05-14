@@ -6,7 +6,7 @@ local c = require "syscall.constants"
 local types = require "syscall.types"
 local t, pt, s = types.t, types.pt, types.s
 
-local h = require "helpers"
+local h = require "syscall.helpers"
 
 local ctobool, booltoc = h.ctobool, h.booltoc
 
