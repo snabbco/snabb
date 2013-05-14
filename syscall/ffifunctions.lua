@@ -73,6 +73,7 @@ int accept(int sockfd, void *addr, socklen_t *addrlen);
 int getsockname(int sockfd, void *addr, socklen_t *addrlen);
 int getpeername(int sockfd, void *addr, socklen_t *addrlen);
 int shutdown(int sockfd, int how);
+int pipe(int pipefd[2]);
 
 uid_t getuid(void);
 uid_t geteuid(void);

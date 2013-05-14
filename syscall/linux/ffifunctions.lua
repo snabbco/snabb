@@ -97,7 +97,6 @@ int madvise(void *addr, size_t length, int advice);
 int fallocate(int fd, int mode, off_t offset, off_t len); /* note there are 32 bit issues with glibc */
 ssize_t readahead(int fd, off_t offset, size_t count);
 
-int pipe(int pipefd[2]);
 int pipe2(int pipefd[2], int flags);
 int mount(const char *source, const char *target, const char *filesystemtype, unsigned long mountflags, const void *data);
 int umount(const char *target);
