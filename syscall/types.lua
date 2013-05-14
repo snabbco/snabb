@@ -41,6 +41,7 @@ local function ptt(tp)
 end
 
 local function addtype(name, tp, mt)
+  if abi.os == "netbsd" and name == "siginfo" then return error"siginfo" end
   if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
   ctypes[tp] = t[name]
   pt[name] = ptt(tp)
