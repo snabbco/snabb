@@ -181,60 +181,6 @@ t.device = function(major, minor)
   return setmetatable({dev = t.dev(dev)}, mt.device)
 end
 
-meth.sockaddr_storage = {
-  index = {
-    family = function(sa) return sa.ss_family end,
-  },
-  newindex = {
-    family = function(sa, v) sa.ss_family = c.AF[v] end,
-  }
-}
-
--- cast socket address to actual type based on family
-local samap, samap2 = {}, {}
-
--- experiment, see if we can use this as generic type, to avoid allocations.
-addtype("sockaddr_storage", "struct sockaddr_storage", {
-  __index = function(sa, k)
-    if meth.sockaddr_storage.index[k] then return meth.sockaddr_storage.index[k](sa) end
-    local st = samap2[sa.ss_family]
-    if st then
-      local cs = st(sa)
-      return cs[k]
-    end
-  end,
-  __newindex = function(sa, k, v)
-    if meth.sockaddr_storage.newindex[k] then
-      meth.sockaddr_storage.newindex[k](sa, v)
-      return
-    end
-    local st = samap2[sa.ss_family]
-    if st then
-      local cs = st(sa)
-      cs[k] = v
-    end
-  end,
-  __new = function(tp, init)
-    local ss = ffi.new(tp)
-    local family
-    if init and init.family then family = c.AF[init.family] end
-    local st
-    if family then
-      st = samap2[family]
-      ss.ss_family = family
-      init.family = nil
-    end
-    if st then
-      local cs = st(ss)
-      for k, v in pairs(init) do
-        cs[k] = v
-      end
-    end
-    return ss
-  end,
-  __len = lenfn,
-})
-
 meth.sockaddr_un = {
   index = {
     family = function(sa) return sa.sun_family end,
@@ -624,23 +570,6 @@ mt.siginfos = {
 }
 
 t.siginfos = ffi.metatype("struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
-
--- these are declared above
-samap = {
-  [c.AF.UNIX] = t.sockaddr_un,
-  [c.AF.INET] = t.sockaddr_in,
-  [c.AF.INET6] = t.sockaddr_in6,
-  [c.AF.NETLINK] = t.sockaddr_nl,
-  [c.AF.PACKET] = t.sockaddr_ll,
-}
-
-samap2 = {
-  [c.AF.UNIX] = pt.sockaddr_un,
-  [c.AF.INET] = pt.sockaddr_in,
-  [c.AF.INET6] = pt.sockaddr_in6,
-  [c.AF.NETLINK] = pt.sockaddr_nl,
-  [c.AF.PACKET] = pt.sockaddr_ll,
-}
 
 -- slightly miscellaneous types, eg need to use Lua metatables
 
