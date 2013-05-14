@@ -387,6 +387,8 @@ c.S_I = multiflags {
   XOTH  = octal('00001'),
 }
 
+c.SOMAXCONN = 128
+
 c.SHUT = strflag {
   RD   = 0,
   WR   = 1,

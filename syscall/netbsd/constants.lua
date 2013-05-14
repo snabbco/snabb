@@ -355,6 +355,8 @@ c.S_I.READ  = c.S_I.RUSR
 c.S_I.WRITE = c.S_I.WUSR
 c.S_I.EXEC  = c.S_I.XUSR
 
+c.SOMAXCONN = 128
+
 c.SHUT = strflag {
   RD   = 0,
   WR   = 1,
