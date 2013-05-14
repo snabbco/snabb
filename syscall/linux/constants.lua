@@ -520,7 +520,7 @@ c.SIGPOLL = strflag {
   HUP = 6,
 }
 
--- sigaction
+-- sigaction -- note not cast to (void *)(int) as we do not know type here
 c.SA = multiflags {
   NOCLDSTOP = 0x00000001,
   NOCLDWAIT = 0x00000002,

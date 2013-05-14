@@ -191,7 +191,6 @@ c.O = multiflags {
 }
 
 -- sigaction, note renamed SIGACT from SIG
--- note not cast to (void *)(int) TODO should it be?
 c.SIGACT = strflag {
   ERR = -1,
   DFL =  0,
