@@ -156,5 +156,7 @@ h.booltoc = setmetatable({
   [true] = 1,
 }, {__call = function(tb, arg) return tb[arg or 0] end}) -- allow nil as false
 
+function h.ctobool(i) return tonumber(i) ~= 0 end
+
 return h
 
