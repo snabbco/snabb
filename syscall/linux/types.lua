@@ -1082,51 +1082,6 @@ end
 
 t.pipe = t.socketpair -- also just two fds
 
--- sigaction
-t.sa_sigaction = ffi.typeof("void (*)(int, siginfo_t *, ucontext_t *)")
-s.sa_sigaction = ffi.sizeof(t.sa_sigaction)
-
-meth.sigaction = {
-  index = {
-    handler = function(sa) return sa.sa_handler end,
-    sigaction = function(sa) return sa.sa_sigaction end,
-    mask = function(sa) return sa.sa_mask end,
-    flags = function(sa) return tonumber(sa.sa_flags) end,
-  },
-  newindex = {
-    handler = function(sa, v)
-      if type(v) == "string" then v = c.SIGACT[v] end
-      if type(v) == "number" then v = pt.void(v) end
-      if type(v) == "function" then v = ffi.cast(t.sighandler, v) end -- note doing this will leak resource, use carefully
-      sa.sa_handler.sa_handler = v
-    end,
-    sigaction = function(sa, v)
-      if type(v) == "string" then v = c.SIGACT[v] end
-      if type(v) == "number" then v = pt.void(v) end
-      if type(v) == "function" then v = ffi.cast(t.sa_sigaction, v) end -- note doing this will leak resource, use carefully
-      sa.sa_handler.sa_sigaction = v
-    end,
-    mask = function(sa, v)
-      if not ffi.istype(t.sigset, v) then v = t.sigset(v) end
-      sa.sa_mask = v
-    end,
-    flags = function(sa, v) sa.sa_flags = c.SA[v] end,
-  }
-}
-
-mt.sigaction = {
-  __index = function(sa, k) if meth.sigaction.index[k] then return meth.sigaction.index[k](sa) end end,
-  __newindex = function(sa, k, v) if meth.sigaction.newindex[k] then meth.sigaction.newindex[k](sa, v) end end,
-  __new = function(tp, tab)
-    local sa = ffi.new(tp)
-    if tab then for k, v in pairs(tab) do sa[k] = v end end
-    if tab and tab.sigaction then sa.sa_flags = bit.bor(sa.flags, c.SA.SIGINFO) end -- this flag must be set if sigaction set
-    return sa
-  end,
-}
-
-addtype("sigaction", "struct sigaction", mt.sigaction)
-
 meth.cpu_set = {
   index = {
     zero = function(set) ffi.fill(set, s.cpu_set) end,
