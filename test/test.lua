@@ -616,13 +616,140 @@ test_ids = {
   end,
 }
 
-test_sockets_tmp = { -- TODO delete once rest moved here
+test_sockets_pipes = {
+  test_sockaddr_storage = function()
+    local sa = t.sockaddr_storage{family = "inet6", port = 2}
+    assert_equal(sa.family, c.AF.INET6, "inet6 family")
+    assert_equal(sa.port, 2, "should get port back")
+    sa.port = 3
+    assert_equal(sa.port, 3, "should get port back")
+    sa.family = "inet"
+    assert_equal(sa.family, c.AF.INET, "inet family")
+    sa.port = 4
+    assert_equal(sa.port, 4, "should get port back")
+  end,
+  test_pipe = function()
+    local p = assert(S.pipe())
+    assert(p:close())
+    local ok, err = S.close(p[1])
+    assert(err, "should be invalid")
+    local ok, err = S.close(p[2])
+    assert(err, "should be invalid")
+  end,
+  test_nonblock = function()
+    local fds = assert(S.pipe())
+    assert(fds:setblocking(false))
+    local r, err = fds:read()
+    assert(err.AGAIN, "expect AGAIN")
+    assert(fds:close())
+  end,
+  test_sockaddr_in_error = function()
+    local sa = t.sockaddr_in(1234, "error")
+    assert(not sa, "expect nil socket address from invalid ip string")
+  end,
+  test_inet_socket = function() -- TODO break this test up
+    local s = assert(S.socket("inet", "stream, nonblock"))
+    local loop = "127.0.0.1"
+    local sa = assert(t.sockaddr_in(1234, loop))
+    assert_equal(tostring(sa.sin_addr), loop, "expect address converted back to string to still be same")
+    assert(sa.sin_family == 2, "expect family on inet socket to be 2")
+    -- find a free port
+    local bound = false
+    for port = 32768, 60000 do
+      sa.port = port
+      if s:bind(sa) then
+        bound = true
+        break
+      end
+    end
+    assert(bound, "should be able to bind to a port")
+    local ba = assert(s:getsockname())
+    assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
+    assert(s:listen()) -- will fail if we did not bind
+    local c = assert(S.socket("inet", "stream")) -- client socket
+    assert(c:nonblock())
+    assert(c:fcntl("setfd", "cloexec"))
+    local ok, err = c:connect(sa)
+    assert(not ok, "connect should fail here")
+    assert(err.INPROGRESS, "have not accepted should get Operation in progress")
+    local a = assert(s:accept())
+    -- a is a table with the fd, but also the inbound connection details
+    assert(a.addr.sin_family == 2, "expect ipv4 connection")
+    assert(c:connect(sa)) -- able to connect now we have accepted
+    local ba = assert(c:getpeername())
+    assert(ba.sin_family == 2, "expect ipv4 connection")
+    assert(tostring(ba.sin_addr) == "127.0.0.1", "expect peer on localhost")
+    assert(ba.sin_addr.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
+    local n = assert(c:send(teststring))
+    assert(n == #teststring, "should be able to write out short string")
+    n = assert(a.fd:read(buf, size))
+    assert(n == #teststring, "should read back string into buffer")
+    assert(ffi.string(buf, n) == teststring, "we should read back the same string that was sent")
+    -- test scatter gather
+    local b0 = t.buffer(4)
+    local b1 = t.buffer(3)
+    ffi.copy(b0, "test", 4) -- string init adds trailing 0 byte
+    ffi.copy(b1, "ing", 3)
+    n = assert(c:writev({{b0, 4}, {b1, 3}}))
+    assert(n == 7, "expect writev to write 7 bytes")
+    b0 = t.buffer(3)
+    b1 = t.buffer(4)
+    local iov = t.iovecs{{b0, 3}, {b1, 4}}
+    n = assert(a.fd:readv(iov))
+    assert_equal(n, 7, "expect readv to read 7 bytes")
+    assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
+    assert(c:close())
+    assert(a.fd:close())
+    assert(s:close())
+  end,
   test_unix_socketpair = function()
     local sv = assert(S.socketpair("unix", "stream"))
     assert(sv[1]:write("test"))
     local r = assert(sv[2]:read())
     assert_equal(r, "test")
     assert(sv:close())
+  end,
+  test_sigpipe = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(sv[1]:shutdown("rd"))
+    assert(S.signal("pipe", "ign"))
+    assert(sv[2]:close())
+    local n, err = sv[1]:write("will get sigpipe")
+    assert(err.PIPE, "should get sigpipe")
+    assert(sv[1]:close())
+  end,
+  test_udp_socket = function()
+    local loop = "127.0.0.1"
+    local s = assert(S.socket("inet", "dgram"))
+    local c = assert(S.socket("inet", "dgram"))
+    local sa = assert(t.sockaddr_in(0, loop))
+    local ca = assert(t.sockaddr_in(0, loop))
+    assert(s:bind(sa))
+    assert(c:bind(ca))
+    local bca = c:getsockname() -- find bound address
+    local serverport = s:getsockname().port -- find bound port
+    local n = assert(s:sendto(teststring, nil, 0, bca))
+    local f = assert(c:recv(buf, size)) -- do not test as can drop data
+    assert(s:close())
+    assert(c:close())
+  end,
+  test_ipv6_socket = function()
+    if not features.ipv6() then return true end
+    local s = assert(S.socket("inet6", "dgram"))
+    local c = assert(S.socket("inet6", "dgram"))
+    local sa = assert(t.sockaddr_in6(0, S.in6addr_any))
+    local ca = assert(t.sockaddr_in6(0, S.in6addr_any))
+    assert_equal(tostring(sa.sin6_addr), "::", "expect :: for in6addr_any")
+    assert(s:bind(sa))
+    assert(c:bind(sa))
+    local bca = c:getsockname() -- find bound address
+    local serverport = s:getsockname().port -- find bound port
+    local n = assert(s:sendto(teststring, nil, 0, bca))
+    local f = assert(c:recvfrom(buf, size))
+    assert(f.count == #teststring, "should get the whole string back")
+    assert(f.addr.port == serverport, "should be able to get server port in recvfrom")
+    assert(c:close())
+    assert(s:close())
   end,
 }
 
