@@ -7,6 +7,8 @@ local C = require "syscall.c"
 local types = require "syscall.types"
 local abi = require "syscall.abi"
 
+local t, pt, s = types.t, types.pt, types.s
+
 local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
 local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr
 
