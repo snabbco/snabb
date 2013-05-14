@@ -113,3 +113,12 @@ There is an example epoll script that you can test with Apachebench [in the exam
 ### Issues
 
 There will no doubt be bugs and missing features, please report them if you find them. Also API design issues. You can use the [github issue tracker](https://github.com/justincormack/ljsyscall/issues?page=1&state=open)
+
+### Video
+
+Here is alightning talk I gave at [Fosdem 2013](http://fosdem.org)
+
+<video src="http://www.myriabit.com/ljsyscall/A_high_level_language_for_low_level_code.webm" controls>
+        You need to update your browser to display video.
+</video>
+
