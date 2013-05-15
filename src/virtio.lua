@@ -4,6 +4,8 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
+local memory = require("memory")
+local buffer = require("buffer")
 
 require("vhost_client_h")
 require("virtio_h")
@@ -42,12 +44,15 @@ function new (tapinterface)
    end
 
    local next_tx_avail = 0 -- Next available position in the tx avail ring
+   local txbuffers = {}
 
-   function transmit (address, size)
-      local descindex = init_transmit_descriptor(address, size)
-      assert(descindex < C.VIO_VRING_SIZE)
-      txring.avail.ring[next_tx_avail % C.VIO_VRING_SIZE] = descindex
+   function transmit (buf)
+      local bufferindex = init_transmit_descriptor(buf.ptr, buf.size)
+      assert(bufferindex < C.VIO_VRING_SIZE)
+      txbuffers[bufferindex] = buf
+      txring.avail.ring[next_tx_avail % C.VIO_VRING_SIZE] = bufferindex
       next_tx_avail = (next_tx_avail + 1) % 65536
+      buffer.ref(buf)
    end M.transmit = transmit
 
    function init_transmit_descriptor (address, size)
@@ -72,13 +77,19 @@ function new (tapinterface)
 
    function reclaim_buffer ()
       assert(can_reclaim_buffer())
-      table.insert(tx_freelist, txring.used.ring[txused % C.VIO_VRING_SIZE].id)
+      local descindex = txused % C.VIO_VRING_SIZE
+      local bufferindex = txring.used.ring[descindex].id
+      local buf = txbuffers[bufferindex]
+      table.insert(tx_freelist, bufferindex)
       assert(#tx_freelist <= C.VIO_VRING_SIZE)
+      buffer.deref(buf)
+      txbuffers[bufferindex] = nil
       txused = (txused + 1) % 65536
       txpackets = txpackets + 1
    end M.reclaim_buffer = reclaim_buffer
 
    function sync_transmit ()
+      while can_reclaim_buffer() do reclaim_buffer() end
       C.full_memory_barrier()  txring.avail.idx = next_tx_avail  kick(txring)
    end M.sync_transmit = sync_transmit
 
@@ -88,12 +99,16 @@ function new (tapinterface)
    end M.can_transmit = can_transmit
 
    local next_rx_avail = 0 -- Next available position in the rx avail ring
+   local rxbuffers = {}
 
-   function add_receive_buffer (address, size)
+   function add_receive_buffer (buf)
       local bufferindex = get_rx_buffer()
       assert(bufferindex < C.VIO_VRING_SIZE)
-      local desc = rxring.desc[bufferindex]
-      desc.addr, desc.len = ffi.cast("uint64_t", address), size
+      rxbuffers[bufferindex] = buf
+      buffer.ref(buf)
+      local desc = rxring.desc[next_rx_avail % C.VIO_VRING_SIZE]
+      rxring.avail.ring[next_rx_avail % C.VIO_VRING_SIZE] = bufferindex
+      desc.addr, desc.len = ffi.cast("uint64_t", buf.ptr), buf.maxsize
       desc.flags, desc.next = C.VIO_DESC_F_WRITE, 0
       next_rx_avail = (next_rx_avail + 1) % 65536
       -- XXX memory.lua should call this automatically when needed
@@ -114,13 +129,16 @@ function new (tapinterface)
    function receive ()
       assert(can_receive())
       local index = rxring.used.ring[rxused % C.VIO_VRING_SIZE].id
-      local length  = rxring.used.ring[rxused % C.VIO_VRING_SIZE].len
-      local address = rxring.desc[index].addr
+      local buf = rxbuffers[index]
+      assert(buf)
+      buf.size = rxring.used.ring[rxused % C.VIO_VRING_SIZE].len
+      buffer.deref(buf)
+      rxbuffers[index] = nil
       rxused = (rxused + 1) % 65536
       table.insert(rx_freelist, index)
       assert(#rx_freelist <= C.VIO_VRING_SIZE)
       rxpackets = rxpackets + 1
-      return address, length
+      return buf
    end M.receive = receive
 
    function can_receive ()
@@ -164,25 +182,15 @@ function new (tapinterface)
    end
 
    -- Selftest procedure to read packets from a tap device and write them back.
-   function M.selftest (opts)
-      local secs = (opts and opts.secs) or 1
-      local deadline = C.get_time_ns() + secs * 1e9
-      local done = function () return C.get_time_ns() > deadline end
-      print("Echoing packets for "..secs.." second(s).")
-      repeat
-         while can_add_receive_buffer() do
-            add_receive_buffer(memory.dma_alloc(2048), 2048)
-         end
-         while can_transmit() and can_receive() do
-            local address, length = receive()
-            transmit(address, length)
-         end
-         sync_receive()
-         sync_transmit()
-	 while can_reclaim_buffer() do
-	    reclaim_buffer()
-	 end
-      until done()
+   function M.selftest (options)
+      local port = require("port")
+      print("virtio selftest")
+      options = options or {}
+      options.device = M
+      options.program = port.Port.echo
+      options.secs = 60
+      M.init()
+      port.selftest(options)
       print_stats()
    end
 
