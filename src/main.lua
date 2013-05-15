@@ -13,6 +13,7 @@ Usage: snabbswitch [options]
 Available options are:
 -e chunk     Execute string 'chunk'.
 -l name      Require library 'name'.
+-t name      Test module 'name' with selftest().
 -d           Debug unhandled errors with the Lua interactive debugger.
 -jdump file  Trace JIT decisions to 'file'. (Requires LuaJIT jit.* library.)
 ]]
@@ -32,6 +33,9 @@ function main ()
       if args[i] == '-l' and i < #args then
 	 require(args[i+1])
 	 i = i + 2
+      elseif args[i] == '-t' and i < #args then
+         require(args[i+1]).selftest()
+         i = i + 2
       elseif args[i] == '-e' and i < #args then
 	 local thunk, error = loadstring(args[i+1])
 	 if thunk then thunk() else print(error) end
