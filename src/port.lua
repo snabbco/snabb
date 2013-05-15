@@ -68,14 +68,12 @@ function Port:echo ()
    repeat
       self.input.sync_receive()
       while input.can_receive() and output.can_transmit() do
-	 local addr, len = input.receive()
-	 output.transmit(addr, len)
+         local buf = input.receive()
+         output.transmit(buf)
+         buffer.deref(buf)
       end
       while input.can_add_receive_buffer() do
 	 input.add_receive_buffer(buffer.allocate())
-      end
-      while output.can_reclaim_buffer() do
-	 buffer.free(output.reclaim_buffer())
       end
       output.sync_transmit()
    until coroutine.yield("echo") == nil
