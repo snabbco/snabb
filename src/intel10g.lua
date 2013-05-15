@@ -80,12 +80,15 @@ end
 
 function init_receive ()
    set_promiscuous_mode() -- accept all, no need to configure MAC address filter
-   r.RDRXCTL:set(bits{CRCStrip=0})
-   r.HLREG0:clr(bits({RXLNGTHERREN=27, UndocumentedRXCRCSTRP=1}))
+--   r.RDRXCTL:set(bits{CRCStrip=0})
+--   r.HLREG0:clr(bit.bor(bit.lshift(0x1f, 17), -- RSCFRSTSIZE
+--                bits({RXLNGTHERREN=27, UndocumentedRXCRCSTRP=1})))
+   r.HLREG0:clr(bits({RXLNGTHERREN=27}))
    r.RDBAL(rxdesc_phy % 2^32)
    r.RDBAH(rxdesc_phy / 2^32)
    r.RDLEN(num_descriptors * ffi.sizeof("union rx"))
    r.RXDCTL(bits{Enable=25})
+   r.RXDCTL:wait(bits{enable=25})
    r.RXCTRL:set(bits{RXEN=0})
 end
 
@@ -96,8 +99,6 @@ function init_transmit ()
    r.TDBAL(txdesc_phy % 2^32)
    r.TDBAH(txdesc_phy / 2^32)
    r.TDLEN(num_descriptors * ffi.sizeof("union tx"))
-   r.TDH(0)
-   r.TDT(0)
    r.DMATXCTL(bits{TE=0})
    r.TXDCTL:wait(bits{Enable=25})
 end
@@ -106,23 +107,32 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
+txbuffers = {}
 tdh, tdt = 0, 0 -- Cached values of TDT and TDH
-txfree = 0
 txdesc_flags = bits{eop=24,ifcs=25}
 function transmit (buf)
+--   print("buf",buf)
    txdesc[tdt].data.address = buf.phy
    txdesc[tdt].data.options = bit.bor(buf.size, txdesc_flags)
+   txbuffers[tdt] = buf
    tdt = (tdt + 1) % num_descriptors
    buffer.ref(buf)
 end
 
 function sync_transmit ()
    C.full_memory_barrier()
+   local old_tdh = tdh
    tdh = r.TDH()
+   -- Release processed buffers
+   while old_tdh ~= tdh do
+      buffer.deref(txbuffers[old_tdh])
+      txbuffers[old_tdh] = nil
+      old_tdh = (old_tdh + 1) % num_descriptors
+   end
    r.TDT(tdt)
 end
 
-function can_transmit () return (tdt + 1) % num_descriptors ~= txfree end
+function can_transmit () return (tdt + 1) % num_descriptors ~= tdh end
 
 --- ### Receive
 
@@ -133,21 +143,20 @@ rxbuffers = {}
 rdh, rdt, rxnext = 0, 0, 0
 
 function receive ()
-   if rdh ~= rxnext then
-      local buf = rxbuffers[rxnext]
-      buf.size = rxdesc[rxnext].wb.length
-      rxnext = (rxnext + 1) % num_descriptors
-      buffer.deref(buf)
-      return buf
-   end
+   assert(rdh ~= rxnext)
+   local buf = rxbuffers[rxnext]
+   local wb = rxdesc[rxnext].wb
+   buf.size = wb.length
+   assert(bit.band(wb.status, 1) == 1) -- Descriptor Done
+   rxnext = (rxnext + 1) % num_descriptors
+   buffer.deref(buf)
+   return buf
 end
 
-function can_receive ()
-   return rdh ~= rxnext
-end
+function can_receive () return rxnext ~= rdh end
 
 function can_add_receive_buffer ()
-   return (rdt + 1) % num_descriptors ~= rdh
+   return (rdt + 1) % num_descriptors ~= rxnext
 end
 
 function add_receive_buffer (buf)
@@ -160,9 +169,10 @@ function add_receive_buffer (buf)
 end
 
 function sync_receive ()
-   C.full_memory_barrier()
    rdh = r.RDH()
    r.RDT(rdt)
+   C.full_memory_barrier()
+   assert(rdh < num_descriptors)
 end
 
 function sync () sync_receive() sync_transmit() end
@@ -173,10 +183,12 @@ txdesc_t = ffi.typeof [[
 ]]
 
 rxdesc_t = ffi.typeof [[
-      union { struct { uint64_t address, dd; } data;
-	      struct { uint16_t csum, id;
-		       uint32_t mrq, status;
-		       uint16_t length, vlan; } wb; }
+      union { struct { uint64_t address, dd; } __attribute__((packed)) data;
+              struct { uint64_t address;
+                       uint16_t length,fragcsum;
+                       uint8_t  status,error;
+                       uint16_t vlan; } __attribute__((packed)) wb;
+            }
 ]]
 
 function wait_linkup ()
@@ -202,6 +214,7 @@ function enable_mac_loopback ()
 end
 
 function selftest (options)
+   local port = require("port")
    options = options or {}
    io.write("intel10g selftest: pciaddr="..pciaddress)
    for key,value in pairs(options) do
@@ -209,6 +222,8 @@ function selftest (options)
    end
    print()
    options.device = getfenv()
+   options.program = port.Port.loopback_test
+--   options.secs = 60
    open()
    if not options.noloopback then
       enable_mac_loopback()
@@ -216,7 +231,7 @@ function selftest (options)
    if not options.nolinkup then
       test.waitfor("linkup", linkup, 20, 250000)
    end
-   require("port").selftest(options)
+   port.selftest(options)
    register.dump(s, true)
 end
 
@@ -239,6 +254,7 @@ RXDCTL    0x01028 +0x40*0..63  RW Receive Descriptor Control
 RDRXCTL   0x02F00 -            RW Receive DMA Control
 RTTDCS    0x04900 -            RW DCB Transmit Descriptor Plane Control
 RXCTRL    0x03000 -            RW Receive Control
+SECRX_DIS 0x08D00 -            RW Security RX Control
 STATUS    0x00008 -            RO Device Status
 TDBAL     0x06000 +0x40*0..127 RW Transmit Descriptor Base Address Low
 TDBAH     0x06004 +0x40*0..127 RW Transmit Descriptor Base Address High
