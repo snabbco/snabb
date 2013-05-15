@@ -337,10 +337,7 @@ c.SIG = strflag {
   SYS = 31,
 }
 
-local signals = {}
-for k, v in pairs(c.SIG) do signals[v] = k end
-
-c.SIG.IOT = 6
+c.SIG.IOT = c.SIG.ABRT
 c.SIG.UNUSED     = 31
 c.SIG.CLD        = c.SIG.CHLD
 c.SIG.POLL       = c.SIG.IO
