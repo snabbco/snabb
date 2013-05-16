@@ -723,7 +723,7 @@ test_sockets_pipes = {
     local sa = assert(t.sockaddr_in(0, loop))
     assert(s:bind(sa))
     local bsa = s:getsockname() -- find bound address
-    local n = assert(c:sendto(teststring, #teststring, 0, bsa))
+    local n = assert(c:sendto(teststring, #teststring, 0, bsa, s.sockaddr_in))
     local f = assert(s:recv(buf, size)) -- do not test as can drop data
     assert(s:close())
     assert(c:close())
