@@ -170,11 +170,11 @@ end
 mt.device = {
   __index = {
     major = function(dev)
-      local d = tonumber(dev.dev)
+      local d = dev:device()
       return bit.band(bit.rshift(d, 8), 0x00000fff)
     end,
     minor = function(dev)
-      local d = tonumber(dev.dev)
+      local d = dev:device()
       return bit.bor(bit.band(d, 0x000000ff), bit.band(bit.rshift(d, 12), 0x000000ff))
     end,
     device = function(dev) return tonumber(dev.dev) end,
@@ -183,7 +183,7 @@ mt.device = {
 
 t.device = function(major, minor)
   local dev = major
-  if minor then dev = bit.bor(minor, bit.lshift(major, 8)) end
+  if minor then dev = bit.bor(bit.lshift(bit.band(minor, 0xffffff00), 12), bit.band(minor, 0xff), bit.lshift(major, 8)) end
   return setmetatable({dev = t.dev(dev)}, mt.device)
 end
 
