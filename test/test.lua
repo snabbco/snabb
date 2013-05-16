@@ -730,16 +730,15 @@ test_sockets_pipes = {
   end,
   test_ipv6_socket = function()
     if not features.ipv6() then return true end
+    local loop6 = "::1"
     local ss = assert(S.socket("inet6", "dgram"))
     local cs = assert(S.socket("inet6", "dgram"))
-    local sa = assert(t.sockaddr_in6(0, S.in6addr_any))
-    assert_equal(tostring(sa.sin6_addr), "::", "expect :: for in6addr_any")
+    local sa = assert(t.sockaddr_in6(0, loop6))
     assert(ss:bind(sa))
     local bsa = ss:getsockname() -- find bound address
-    local n = assert(ss:sendto(teststring, nil, 0, bsa))
-    local f = assert(cs:recvfrom(buf, size))
+    local n = assert(cs:sendto(teststring, nil, 0, bsa))
+    local f = assert(ss:recvfrom(buf, size))
     assert(f.count == #teststring, "should get the whole string back")
-    assert(f.addr.port == serverport, "should be able to get server port in recvfrom")
     assert(cs:close())
     assert(ss:close())
   end,
