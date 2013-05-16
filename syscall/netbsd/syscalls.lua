@@ -34,7 +34,8 @@ function S.mount(filesystemtype, dir, flags, data, datalen)
     data = t.data
     datalen = t.datalen
   end
--- TODO deal with different data options
+-- TODO deal with different data options, need different structs
+-- TODO initialise structs from same table
   if not data then datalen = 0 end
   return retbool(C.mount(filesystemtype, dir, c.MNT[flags], data, datalen or #data))
 end
