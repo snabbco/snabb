@@ -670,12 +670,10 @@ test_sockets_pipes = {
     assert(c:nonblock())
     assert(c:fcntl("setfd", "cloexec"))
     local ok, err = c:connect(sa)
-    assert(not ok, "connect should fail here")
-    assert(err.INPROGRESS, "have not accepted should get Operation in progress")
     local a = assert(s:accept())
     -- a is a table with the fd, but also the inbound connection details
     assert(a.addr.sin_family == 2, "expect ipv4 connection")
-    assert(c:connect(sa)) -- able to connect now we have accepted
+    local ok, err = c:connect(sa) -- Linux will have returned INPROGRESS above, other IS may have connected
     local ba = assert(c:getpeername())
     assert(ba.sin_family == 2, "expect ipv4 connection")
     assert(tostring(ba.sin_addr) == "127.0.0.1", "expect peer on localhost")
