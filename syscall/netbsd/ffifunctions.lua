@@ -13,6 +13,7 @@ int paccept(int s, struct sockaddr *addr, socklen_t *addrlen, const sigset_t *si
 int pipe2(int pipefd[2], int flags);
 int mount(const char *type, const char *dir, int flags, void *data, size_t data_len);
 int unmount(const char *dir, int flags);
+int reboot(int howto, char *bootstr);
 
 int syscall(int number, ...);
 //quad_t __syscall(quad_t number, ...);

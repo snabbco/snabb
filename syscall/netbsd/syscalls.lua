@@ -53,6 +53,10 @@ end
 
 function S.mkfifo(pathname, mode) return retbool(C.mkfifo(pathname, c.S_I[mode])) end
 
+function S.reboot(how, bootstr)
+  return retbool(S.reboot(how, bootstr)) -- TODO add c.RB[how] constants
+end
+
 -- from man 3
 function S.exit(status) C.exit(c.EXIT[status]) end
 
