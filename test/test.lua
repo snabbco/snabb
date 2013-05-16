@@ -718,33 +718,33 @@ test_sockets_pipes = {
   end,
   test_udp_socket = function()
     local loop = "127.0.0.1"
-    local s = assert(S.socket("inet", "dgram"))
-    local c = assert(S.socket("inet", "dgram"))
+    local ss = assert(S.socket("inet", "dgram"))
+    local cs = assert(S.socket("inet", "dgram"))
     local sa = assert(t.sockaddr_in(0, loop))
-    assert(s:bind(sa))
-    local bsa = s:getsockname() -- find bound address
-    local n = assert(c:sendto(teststring, #teststring, 0, bsa, s.sockaddr_in))
-    local f = assert(s:recv(buf, size)) -- do not test as can drop data
-    assert(s:close())
-    assert(c:close())
+    assert(ss:bind(sa))
+    local bsa = ss:getsockname() -- find bound address
+    local n = assert(cs:sendto(teststring, #teststring, 0, bsa, s.sockaddr_in))
+    local f = assert(ss:recv(buf, size)) -- do not test as can drop data
+    assert(ss:close())
+    assert(cs:close())
   end,
   test_ipv6_socket = function()
     if not features.ipv6() then return true end
-    local s = assert(S.socket("inet6", "dgram"))
-    local c = assert(S.socket("inet6", "dgram"))
+    local ss = assert(S.socket("inet6", "dgram"))
+    local cs = assert(S.socket("inet6", "dgram"))
     local sa = assert(t.sockaddr_in6(0, S.in6addr_any))
     local ca = assert(t.sockaddr_in6(0, S.in6addr_any))
     assert_equal(tostring(sa.sin6_addr), "::", "expect :: for in6addr_any")
-    assert(s:bind(sa))
-    assert(c:bind(sa))
-    local bca = c:getsockname() -- find bound address
-    local serverport = s:getsockname().port -- find bound port
-    local n = assert(s:sendto(teststring, nil, 0, bca))
-    local f = assert(c:recvfrom(buf, size))
+    assert(ss:bind(sa))
+    assert(cs:bind(sa))
+    local bca = cs:getsockname() -- find bound address
+    local serverport = ss:getsockname().port -- find bound port
+    local n = assert(ss:sendto(teststring, nil, 0, bca))
+    local f = assert(cs:recvfrom(buf, size))
     assert(f.count == #teststring, "should get the whole string back")
     assert(f.addr.port == serverport, "should be able to get server port in recvfrom")
-    assert(c:close())
-    assert(s:close())
+    assert(cs:close())
+    assert(ss:close())
   end,
 }
 
