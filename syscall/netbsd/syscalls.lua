@@ -24,6 +24,13 @@ function S.accept(sockfd, flags, addr, addrlen) -- TODO add support for signal m
   return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
 end
 
+local mntstruct = {
+  --ffs = t.ufs_args,
+  --nfs = t.nfs_args,
+  --mfs = t.mfs_args,
+  --tmpfs = t.tmpfs_args,
+}
+
 function S.mount(filesystemtype, dir, flags, data, datalen)
   if type(filesystemtype) == "table" then
     local t = filesystemtype
