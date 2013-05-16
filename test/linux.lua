@@ -665,12 +665,11 @@ test_misc = {
     local n
     n = assert(S.prctl("capbset_read", "mknod"))
     assert(n == 0 or n == 1, "capability may or may not be set")
-    n = assert(S.prctl("get_dumpable"))
-    assert(n == 1, "process dumpable by default")
+    local nn = assert(S.prctl("get_dumpable"))
     assert(S.prctl("set_dumpable", 0))
     n = assert(S.prctl("get_dumpable"))
     assert(n == 0, "process not dumpable after change")
-    assert(S.prctl("set_dumpable", 1))
+    assert(S.prctl("set_dumpable", nn))
     n = assert(S.prctl("get_keepcaps"))
     assert(n == 0, "process keepcaps defaults to 0")
     n = assert(S.prctl("get_pdeathsig"))
@@ -1581,12 +1580,6 @@ test_filesystem = {
 }
 
 test_misc_root = {
-  test_mount = function()
-    assert(S.mkdir(tmpfile))
-    assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
-    assert(S.umount(tmpfile, "detach, nofollow"))
-    assert(S.rmdir(tmpfile))
-  end,
   test_mount_table = function()
     assert(S.mkdir(tmpfile))
     assert(S.mount{source = "none", target = tmpfile, type = "tmpfs", flags = "rdonly, noatime"})
