@@ -316,13 +316,13 @@ meth.sockaddr_storage = {
 }
 
 -- cast socket address to actual type based on family, defined later
-local samap, samap2 = {}, {}
+local samap_t, samap_pt, samap_s = {}, {}, {}
 
 -- experiment, see if we can use this as generic type, to avoid allocations.
 addtype("sockaddr_storage", "struct sockaddr_storage", {
   __index = function(sa, k)
     if meth.sockaddr_storage.index[k] then return meth.sockaddr_storage.index[k](sa) end
-    local st = samap2[sa.ss_family]
+    local st = samap_pt[sa.ss_family]
     if st then
       local cs = st(sa)
       return cs[k]
@@ -333,7 +333,7 @@ addtype("sockaddr_storage", "struct sockaddr_storage", {
       meth.sockaddr_storage.newindex[k](sa, v)
       return
     end
-    local st = samap2[sa.ss_family]
+    local st = samap_pt[sa.ss_family]
     if st then
       local cs = st(sa)
       cs[k] = v
@@ -345,7 +345,7 @@ addtype("sockaddr_storage", "struct sockaddr_storage", {
     if init and init.family then family = c.AF[init.family] end
     local st
     if family then
-      st = samap2[family]
+      st = samap_pt[family]
       ss.ss_family = family
       init.family = nil
     end
@@ -357,7 +357,8 @@ addtype("sockaddr_storage", "struct sockaddr_storage", {
     end
     return ss
   end,
-  __len = lenfn,
+  -- netbsd likes to see the correct size when it gets a sockaddr; Linux was ok with a longer one
+  __len = function(sa) return samap_s[sa.family] or s.sockaddr_storage end,
 })
 
 meth.sockaddr_in = {
@@ -595,26 +596,34 @@ local hh = {ptt = ptt, addtype = addtype, lenfn = lenfn, lenmt = lenmt, newfn = 
 types = require("syscall." .. abi.os .. ".types")(types, hh)
 
 -- these are declared above
-samap = {
+samap_t = {
   [c.AF.UNIX] = t.sockaddr_un,
   [c.AF.INET] = t.sockaddr_in,
   [c.AF.INET6] = t.sockaddr_in6,
 }
 
-samap2 = {
+samap_pt = {
   [c.AF.UNIX] = pt.sockaddr_un,
   [c.AF.INET] = pt.sockaddr_in,
   [c.AF.INET6] = pt.sockaddr_in6,
 }
 
+samap_s = {
+  [c.AF.UNIX] = s.sockaddr_un,
+  [c.AF.INET] = s.sockaddr_in,
+  [c.AF.INET6] = s.sockaddr_in6,
+}
+
 if c.AF.NETLINK then
-  samap[c.AF.NETLINK] = t.sockaddr_nl
-  samap2[c.AF.NETLINK] = pt.sockaddr_nl
+  samap_t[c.AF.NETLINK] = t.sockaddr_nl
+  samap_pt[c.AF.NETLINK] = pt.sockaddr_nl
+  samap_s[c.AF.NETLINK] = s.sockaddr_nl
 end
 
 if c.AF.PACKET then
-  samap[c.AF.PACKET] = t.sockaddr_ll
-  samap2[c.AF.PACKET] = pt.sockaddr_ll
+  samap_t[c.AF.PACKET] = t.sockaddr_ll
+  samap_pt[c.AF.PACKET] = pt.sockaddr_ll
+  samap_s[c.AF.PACKET] = s.sockaddr_ll
 end
 
 return types
