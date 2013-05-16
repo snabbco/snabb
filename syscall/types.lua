@@ -19,6 +19,8 @@ local c = require "syscall.constants"
 
 local abi = require "syscall.abi"
 
+local errors = require("syscall.errors")
+
 local C = ffi.C -- for inet_pton, TODO due to be replaced with Lua
 ffi.cdef[[
 int inet_pton(int af, const char *src, void *dst);
@@ -209,7 +211,7 @@ for k, v in pairs(c.E) do
 end
 
 t.error = ffi.metatype("struct {int errno;}", {
-  __tostring = function(e) return require("syscall.errors")[e.errno] end,
+  __tostring = function(e) return errors[e.errno] end,
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
     if k == 'lsym' then return errsyms[t.errno]:lower() end
