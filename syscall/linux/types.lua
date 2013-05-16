@@ -196,7 +196,8 @@ meth.sockaddr_un = {
 addtype("sockaddr_un", "struct sockaddr_un", {
   __index = function(sa, k) if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end end,
   __new = function(tp) return ffi.new(tp, c.AF.UNIX) end,
-  __len = lenfn,
+  __len = function(tp) return s.sockaddr_un end,
+
 })
 
 -- this is a bit odd, but we actually use Lua metatables for sockaddr_un, and use t.sa to multiplex
@@ -258,7 +259,7 @@ addtype("sockaddr_nl", "struct sockaddr_nl", {
     if nltype and nlgroupmap[nltype] then groups = nlgroupmap[nltype][groups] end -- see note about shiftflags
     return ffi.new(tp, {nl_family = c.AF.NETLINK, nl_pid = pid, nl_groups = groups})
   end,
-  __len = lenfn,
+  __len = function(tp) return s.sockaddr_nl end,
 })
 
 meth.sockaddr_ll = {
@@ -296,7 +297,7 @@ addtype("sockaddr_ll", "struct sockaddr_ll", {
     for k, v in pairs(tb or {}) do sa[k] = v end
     return sa
   end,
-  __len = lenfn,
+  __len = function(tp) return s.sockaddr_ll end,
 })
 
 meth.stat = {
