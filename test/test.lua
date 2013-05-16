@@ -744,15 +744,6 @@ test_sockets_pipes = {
   end,
 }
 
-test_mount = {
-  test_mount_root = function()
-    assert(S.mkdir(tmpfile))
-    assert(S.mount{dir=tmpfile, type="tmpfs", flags="rdonly, noatime"})
-    assert(S.umount(tmpfile))
-    assert(S.rmdir(tmpfile))
-  end,
-}
-
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
   if abi.os == "linux" then

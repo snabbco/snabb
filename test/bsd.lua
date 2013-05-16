@@ -54,3 +54,12 @@ local clean = function()
   S.unlink(efile)
 end
 
+test_mount_bsd_root = {
+  test_mount_root = function()
+    assert(S.mkdir(tmpfile))
+    assert(S.mount{dir=tmpfile, type="kernfs"})
+    assert(S.umount(tmpfile))
+    assert(S.rmdir(tmpfile))
+  end,
+}
+
