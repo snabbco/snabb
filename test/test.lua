@@ -722,7 +722,7 @@ test_sockets_pipes = {
     local c = assert(S.socket("inet", "dgram"))
     local sa = assert(t.sockaddr_in(0, loop))
     local ca = assert(t.sockaddr_in(0, loop))
-    assert(s:bind(sa))
+    --assert(s:bind(sa))
     assert(c:bind(ca))
     local bca = c:getsockname() -- find bound address
     local serverport = s:getsockname().port -- find bound port
