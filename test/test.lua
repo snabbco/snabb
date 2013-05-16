@@ -721,13 +721,10 @@ test_sockets_pipes = {
     local s = assert(S.socket("inet", "dgram"))
     local c = assert(S.socket("inet", "dgram"))
     local sa = assert(t.sockaddr_in(0, loop))
-    local ca = assert(t.sockaddr_in(0, loop))
-    --assert(s:bind(sa))
-    assert(c:bind(ca))
-    local bca = c:getsockname() -- find bound address
-    local serverport = s:getsockname().port -- find bound port
-    local n = assert(s:sendto(teststring, nil, 0, bca))
-    local f = assert(c:recv(buf, size)) -- do not test as can drop data
+    assert(s:bind(sa))
+    local bsa = s:getsockname() -- find bound address
+    local n = assert(c:sendto(teststring, #teststring, 0, bsa))
+    local f = assert(s:recv(buf, size)) -- do not test as can drop data
     assert(s:close())
     assert(c:close())
   end,
