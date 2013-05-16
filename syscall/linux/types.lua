@@ -166,11 +166,17 @@ local function getfd(fd)
   return fd:getfd()
 end
 
--- 32 bit dev_t, 8 bit minor, 8 bit major. Note glibc has 64 bit dev_t but we use syscall API which does not
+-- 32 bit dev_t. Note glibc has 64 bit dev_t but we use syscall API which does not
 mt.device = {
   __index = {
-    major = function(dev) return bit.band(bit.rshift(dev:device(), 8), 0xff) end,
-    minor = function(dev) return bit.band(dev:device(), 0xff) end,
+    major = function(dev)
+      local d = tonumber(dev.dev)
+      return bit.band(bit.rshift(d, 8), 0x00000fff)
+    end,
+    minor = function(dev)
+      local d = tonumber(dev.dev)
+      return bit.bor(bit.band(d, 0x000000ff), bit.band(bit.rshift(d, 12), 0x000000ff))
+    end,
     device = function(dev) return tonumber(dev.dev) end,
   },
 }
