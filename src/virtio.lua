@@ -188,7 +188,7 @@ function new (tapinterface)
       options = options or {}
       options.device = M
       options.program = port.Port.echo
-      options.secs = 60
+--      options.secs = 60
       M.init()
       port.selftest(options)
       print_stats()
