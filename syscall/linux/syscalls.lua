@@ -481,8 +481,8 @@ end
 function S.mount(source, target, filesystemtype, mountflags, data)
   if type(source) == "table" then
     local t = source
-    source = t.source
-    target = t.target
+    source = t.source or "none" -- standard default
+    target = t.target or t.dir -- netbsd compatible
     filesystemtype = t.type
     mountflags = t.flags
     data = t.data

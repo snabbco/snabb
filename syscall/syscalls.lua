@@ -358,6 +358,8 @@ else -- NetBSD and Linux have pipe2
   end
 end
 
+if not S.umount then S.umount = S.unmount end
+
 -- TODO setpgrp and similar - see the man page
 
 return S

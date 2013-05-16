@@ -747,7 +747,7 @@ test_sockets_pipes = {
 test_mount = {
   test_mount_root = function()
     assert(S.mkdir(tmpfile))
-    assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
+    assert(S.mount{dir=tmpfile, type="tmpfs", flags="rdonly, noatime"})
     assert(S.umount(tmpfile))
     assert(S.rmdir(tmpfile))
   end,

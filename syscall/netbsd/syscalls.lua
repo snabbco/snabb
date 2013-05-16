@@ -24,8 +24,28 @@ function S.accept(sockfd, flags, addr, addrlen) -- TODO add support for signal m
   return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
 end
 
-function S.exit(status) C.exit(c.EXIT[status]) end
+function S.mount(filesystemtype, dir, flags, data, datalen)
+  if type(filesystemtype) == "table" then
+    local t = filesystemtype
+    --source = t.source -- allow for ufs
+    dir = t.target or t.dir
+    filesystemtype = t.type
+    flags = t.flags
+    data = t.data
+    datalen = t.datalen
+  end
+-- TODO deal with different data options
+  return retbool(C.mount(filesystemtype, dir, c.MNT[flags], data, datalen or #data))
+end
+
+function S.unmount(target, flags)
+  return retbool(C.unmount(target, c.UMOUNT[flags]))
+end
+
 function S.mkfifo(pathname, mode) return retbool(C.mkfifo(pathname, c.S_I[mode])) end
+
+-- from man 3
+function S.exit(status) C.exit(c.EXIT[status]) end
 
 return S
 

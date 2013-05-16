@@ -419,5 +419,46 @@ c.SHUT = strflag {
   RDWR = 2,
 }
 
+c.UMOUNT = multiflags {
+  FORCE    = 0x00080000,
+}
+
+-- note equivalent of MS_ in Linux
+c.MNT = multiflags {
+  RDONLY      = 0x00000001,
+  SYNCHRONOUS = 0x00000002,
+  NOEXEC      = 0x00000004,
+  NOSUID      = 0x00000008,
+  NODEV       = 0x00000010,
+  UNION       = 0x00000020,
+  ASYNC       = 0x00000040,
+  NOCOREDUMP  = 0x00008000,
+  RELATIME    = 0x00020000,
+  IGNORE      = 0x00100000,
+  EXTATTR     = 0x01000000,
+  LOG         = 0x02000000,
+  NOATIME     = 0x04000000,
+  SYMPERM     = 0x20000000,
+  NODEVMTIME  = 0x40000000,
+  SOFTDEP     = 0x80000000,
+
+  EXRDONLY    = 0x00000080,
+  EXPORTED    = 0x00000100,
+  DEFEXPORTED = 0x00000200,
+  EXPORTANON  = 0x00000400,
+  EXKERB      = 0x00000800,
+  EXNORESPORT = 0x08000000,
+  EXPUBLIC    = 0x10000000,
+
+  LOCAL       = 0x00001000,
+  QUOTA       = 0x00002000,
+  ROOTFS      = 0x00004000,
+
+  UPDATE      = 0x00010000,
+  RELOAD      = 0x00040000,
+  FORCE       = 0x00080000,
+  GETARGS     = 0x00400000,
+}
+
 return c
 
