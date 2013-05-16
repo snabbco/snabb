@@ -733,13 +733,10 @@ test_sockets_pipes = {
     local ss = assert(S.socket("inet6", "dgram"))
     local cs = assert(S.socket("inet6", "dgram"))
     local sa = assert(t.sockaddr_in6(0, S.in6addr_any))
-    local ca = assert(t.sockaddr_in6(0, S.in6addr_any))
     assert_equal(tostring(sa.sin6_addr), "::", "expect :: for in6addr_any")
     assert(ss:bind(sa))
-    assert(cs:bind(sa))
-    local bca = cs:getsockname() -- find bound address
-    local serverport = ss:getsockname().port -- find bound port
-    local n = assert(ss:sendto(teststring, nil, 0, bca))
+    local bsa = ss:getsockname() -- find bound address
+    local n = assert(ss:sendto(teststring, nil, 0, bsa))
     local f = assert(cs:recvfrom(buf, size))
     assert(f.count == #teststring, "should get the whole string back")
     assert(f.addr.port == serverport, "should be able to get server port in recvfrom")
