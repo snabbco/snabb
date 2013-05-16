@@ -46,7 +46,7 @@ end
 function deref (buf)
    assert(buf)
    if     buf.refcount == 0 then return 
-   elseif buf.refcount == 1 then table.insert(freelist, buf) 
+   elseif buf.refcount == 1 then buf.size = 0  table.insert(freelist, buf)
    else                          buf.refcount = buf.refcount -1 end
 end
 
