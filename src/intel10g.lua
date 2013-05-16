@@ -262,12 +262,12 @@ LXONRXCNT     0x041A4 -           RC Link XON Received Count
 LXOFFRXCNT    0x041A8 -           RC Link XOFF Received Count
 PXONRXCNT     0x04140 +4*0..7     RC Priority XON Received Count
 PXOFFRXCNT    0x04160 +4*0..7     RC Priority XOFF Received Count
-PRC64         0x0405C -           RW Packets Received [64 Bytes] Count
-PRC127        0x04060 -           RW Packets Received [65-127 Bytes] Count
-PRC255        0x04064 -           RW Packets Received [128-255 Bytes] Count
-PRC511        0x04068 -           RW Packets Received [256-511 Bytes] Count
-PRC1023       0x0406C -           RW Packets Received [512-1023 Bytes] Count
-PRC1522       0x04070 -           RW Packets Received [1024 to Max Bytes] Count
+PRC64         0x0405C -           RC Packets Received [64 Bytes] Count
+PRC127        0x04060 -           RC Packets Received [65-127 Bytes] Count
+PRC255        0x04064 -           RC Packets Received [128-255 Bytes] Count
+PRC511        0x04068 -           RC Packets Received [256-511 Bytes] Count
+PRC1023       0x0406C -           RC Packets Received [512-1023 Bytes] Count
+PRC1522       0x04070 -           RC Packets Received [1024 to Max Bytes] Count
 BPRC          0x04078 -           RC Broadcast Packets Received Count
 MPRC          0x0407C -           RC Multicast Packets Received Count
 GPRC          0x04074 -           RC Good Packets Received Count
@@ -288,7 +288,7 @@ RXLPBKBCH     0x02F70 -           RC DMA Good Rx LPBK Byte Counter High
 RXDLPBKPC     0x02F74 -           RC DMA Duplicated Good Rx LPBK Packet Counter
 RXDLPBKBCL    0x02F78 -           RC DMA Duplicated Good Rx LPBK Byte Counter Low
 RXDLPBKBCH    0x02F7C -           RC DMA Duplicated Good Rx LPBK Byte Counter High
-GPTC          0x04080 -           RO Good Packets Transmitted Count
+GPTC          0x04080 -           RC Good Packets Transmitted Count
 GOTCL         0x04090 -           RC Good Octets Transmitted Count Low
 GOTCH         0x04094 -           RC Good Octets Transmitted Count High
 TXDGPC        0x087A0 -           RC DMA Good Tx Packet Counter
@@ -298,8 +298,8 @@ RUC           0x040A4 -           RC Receive Undersize Count
 RFC           0x040A8 -           RC Receive Fragment Count
 ROC           0x040AC -           RC Receive Oversize Count
 RJC           0x040B0 -           RC Receive Jabber Count
-MNGPRC        0x040B4 -           RO Management Packets Received Count
-MNGPDC        0x040B8 -           RO Management Packets Dropped Count
+MNGPRC        0x040B4 -           RC Management Packets Received Count
+MNGPDC        0x040B8 -           RC Management Packets Dropped Count
 TORL          0x040C0 -           RC Total Octets Received
 TORH          0x040C4 -           RC Total Octets Received
 TPR           0x040D0 -           RC Total Packets Received
@@ -314,9 +314,9 @@ MPTC          0x040F0 -           RC Multicast Packets Transmitted Count
 BPTC          0x040F4 -           RC Broadcast Packets Transmitted Count
 MSPDC         0x04010 -           RC MAC short Packet Discard Count
 XEC           0x04120 -           RC XSUM Error Count
-RQSMR         0x02300 +0x4*0..31  RW Receive Queue Statistic Mapping Registers
-RXDSTATCTRL   0x02F40 -           RW Rx DMA Statistic Counter Control
-TQSM          0x08600 +0x4*0..31  RW Transmit Queue Statistic Mapping Registers
+RQSMR         0x02300 +0x4*0..31  RC Receive Queue Statistic Mapping Registers
+RXDSTATCTRL   0x02F40 -           RC Rx DMA Statistic Counter Control
+TQSM          0x08600 +0x4*0..31  RC Transmit Queue Statistic Mapping Registers
 QPRC          0x01030 +0x40*0..15 RC Queue Packets Received Count
 QPRDC         0x01430 +0x40*0..15 RC Queue Packets Received Drop Count
 QBRC_L        0x01034 +0x40*0..15 RC Queue Bytes Received Count Low
