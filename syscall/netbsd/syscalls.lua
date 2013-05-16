@@ -35,7 +35,8 @@ function S.mount(filesystemtype, dir, flags, data, datalen)
     datalen = t.datalen
   end
 -- TODO deal with different data options
-  return retbool(C.mount(filesystemtype, dir, c.MNT[flags], data, datalen or #data or 0))
+  if not data then datalen = 0 end
+  return retbool(C.mount(filesystemtype, dir, c.MNT[flags], data, datalen or #data))
 end
 
 function S.unmount(target, flags)
