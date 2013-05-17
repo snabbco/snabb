@@ -60,14 +60,14 @@ build =
       ["syscall.linux.x86.constants"] = "syscall/linux/x86/constants.lua";
       ["syscall.linux.x86.ffitypes"] = "syscall/linux/x86/ffitypes.lua";
 
-      ["syscall.bsd.syscalls"] = "syscall/bsd/syscalls.lua";
-      ["syscall.bsd.c"] = "syscall/bsd/c.lua";
-      ["syscall.bsd.constants"] = "syscall/bsd/constants.lua";
-      ["syscall.bsd.ffitypes"] = "syscall/bsd/ffitypes.lua";
-      ["syscall.bsd.ffifunctions"] = "syscall/bsd/ffifunctions.lua";
-      ["syscall.bsd.ioctl"] = "syscall/bsd/ioctl.lua";
-      ["syscall.bsd.types"] = "syscall/bsd/types.lua";
-      ["syscall.bsd.fcntl"] = "syscall/bsd/fcntl.lua";
+      ["syscall.netbsd.syscalls"] = "syscall/netbsd/syscalls.lua";
+      ["syscall.netbsd.c"] = "syscall/netbsd/c.lua";
+      ["syscall.netbsd.constants"] = "syscall/netbsd/constants.lua";
+      ["syscall.netbsd.ffitypes"] = "syscall/netbsd/ffitypes.lua";
+      ["syscall.netbsd.ffifunctions"] = "syscall/netbsd/ffifunctions.lua";
+      ["syscall.netbsd.ioctl"] = "syscall/netbsd/ioctl.lua";
+      ["syscall.netbsd.types"] = "syscall/netbsd/types.lua";
+      ["syscall.netbsd.fcntl"] = "syscall/netbsd/fcntl.lua";
 
       ["syscall.osx.syscalls"] = "syscall/osx/syscalls.lua";
       ["syscall.osx.c"] = "syscall/osx/c.lua";
