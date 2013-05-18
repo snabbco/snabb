@@ -12,7 +12,7 @@ rump.module "fs.kernfs"
 
 rump.init()
 
-local C = require "syscall.rump.c"
+local C = rump.C
 
 local ok = C.mkdir("/kern", octal("0755"))
 assert(ok == 0, "mkdir " .. ok)

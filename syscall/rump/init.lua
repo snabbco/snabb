@@ -16,6 +16,7 @@ rump = {
     s = string.gsub(s, "%.", "_")
     ffi.load("rump" .. s, true)
   end,
+  C = require "syscall.rump.c",
 }
 
 return rump
