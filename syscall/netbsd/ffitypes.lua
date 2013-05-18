@@ -4,8 +4,8 @@ local abi = require "syscall.abi"
 
 local cdef = require "ffi".cdef
 
-local init = require "syscall.netbsd.ffitypes-common"
+local netbsd = require "syscall.netbsd.ffitypes-common"
 
-init(false) -- not rump kernel
+netbsd.init(false) -- not rump kernel
 
 
