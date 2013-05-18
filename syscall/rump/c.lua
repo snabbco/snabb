@@ -1,15 +1,8 @@
-
+-- define C functions for rump
 
 local ffi = require "ffi"
 
-local rumpuser = ffi.load("rumpuser")
 local rump = ffi.load("rump")
-local rumpvfs = ffi.load("rumpvfs", true)
-local rumpfs_kernfs = ffi.load("rumpfs_kernfs", true)
-
-ffi.cdef[[
-int rump_init(void);
-]]
 
 require "syscall.rump.ffifunctions"
 
@@ -22,6 +15,6 @@ local C = {
   reboot = rump.rump___sysimpl_reboot,
 }
 
-return {C = C, init = rump.rump_init}
+return C
 
 

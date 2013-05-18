@@ -25,7 +25,7 @@ cdef [[
 int rump___sysimpl_mkdir(const char *pathname, _netbsd_mode_t mode);
 int rump___sysimpl_mount50(const char *type, const char *dir, int flags, void *data, _netbsd_size_t data_len);
 int rump___sysimpl_open(const char *pathname, int flags, _netbsd_mode_t mode);
-ssize_t rump___sysimpl_read(int fd, void *buf, _netbsd_size_t count);
+_netbsd_ssize_t rump___sysimpl_read(int fd, void *buf, _netbsd_size_t count);
 int rump___sysimpl_close(int fd);
 int rump___sysimpl_reboot(int howto, char *bootstr);
 ]]
