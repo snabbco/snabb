@@ -22,18 +22,36 @@ struct buffer {
 };
 ]]
 
-size = 4096 -- Size of every buffer allocated by this module.
-freelist = {}
 buffer_t = ffi.typeof("struct buffer")
+
+size = 4096 -- Size of every buffer allocated by this module.
+max, allocated = 10e6, 0
+
+freelist = {}
+nfree = 0
 
 --- Return a buffer with a refcount of 1.
 function allocate ()
-   return table.remove(freelist) or new_buffer()
+   if nfree == 0 then
+      assert(allocated < max)
+      allocated = allocated + 1
+      return new_buffer()
+   else
+      nfree = nfree - 1
+      local buf = freelist[nfree]
+      freelist[nfree] = nil
+      return buf
+   end
 end
 
 function new_buffer ()
    local ptr, phys, bytes = memory.dma_alloc(size)
    return ffi.new(buffer_t, ptr, phys, size, 0, 1)
+end
+
+function free (buf)
+   freelist[nfree] = buf
+   nfree = nfree + 1
 end
 
 --- A buffer is reused when it has been deref'd more than ref'd.
@@ -46,7 +64,7 @@ end
 function deref (buf)
    assert(buf)
    if     buf.refcount == 0 then return 
-   elseif buf.refcount == 1 then buf.size = 0  table.insert(freelist, buf)
+   elseif buf.refcount == 1 then buf.size = 0  free(buf)
    else                          buf.refcount = buf.refcount -1 end
 end
 

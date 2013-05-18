@@ -63,7 +63,7 @@ function Port:loopback_test (options)
    local input, output = self.input, self.output
    options = options or {}
    local verify = options.verify
-   local npackets = options.npackets or 10000
+   local npackets = options.npackets or 20000
    print("npackets",npackets)
    C.usleep(100000)
    -- Allocate receive buffers
@@ -75,9 +75,11 @@ function Port:loopback_test (options)
    -- Fill the pipe with transmited packets
    for i = 1, npackets do
       local buf = buffer.allocate()
-      buf.size = 100
+      buf.size = 60
       assert(output.can_transmit())
       output.transmit(buf)
+      assert(buf.refcount == 2)
+      buffer.deref(buf)
    end
    output.sync_transmit()
    assert(not input.can_receive())
@@ -89,11 +91,13 @@ function Port:loopback_test (options)
       end
       while input.can_receive() and output.can_transmit() do
          local buf = input.receive()
+--         print("received "..buf.size.." bytes packet")
          output.transmit(buf)
+         assert(buf.refcount == 2)
          buffer.deref(buf)
       end
       output.sync_transmit()
---      C.usleep(1000)
+      C.usleep(1)
    until coroutine.yield("loopback") == nil
 end
 

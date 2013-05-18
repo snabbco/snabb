@@ -168,6 +168,7 @@ function open_usable_devices (options)
 	    print("Testing "..device.pciaddress)
 	    driver.selftest()
 	 end
+         return -- XXX abort early
       end
    end
 end

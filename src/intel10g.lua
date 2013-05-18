@@ -120,9 +120,9 @@ function transmit (buf)
 end
 
 function sync_transmit ()
-   C.full_memory_barrier()
    local old_tdh = tdh
    tdh = r.TDH()
+   C.full_memory_barrier()
    -- Release processed buffers
    while old_tdh ~= tdh do
       buffer.deref(txbuffers[old_tdh])
@@ -150,6 +150,7 @@ function receive ()
    assert(bit.band(wb.status, 1) == 1) -- Descriptor Done
    rxnext = (rxnext + 1) % num_descriptors
    buffer.deref(buf)
+   assert(buf.size > 0)
    return buf
 end
 
@@ -169,10 +170,12 @@ function add_receive_buffer (buf)
 end
 
 function sync_receive ()
-   rdh = r.RDH()
-   r.RDT(rdt)
-   C.full_memory_barrier()
+   -- XXX I have been surprised to see RDH = num_descriptors,
+   --     must check what that means. -luke
+   rdh = math.min(r.RDH(), num_descriptors-1)
    assert(rdh < num_descriptors)
+   C.full_memory_barrier()
+   r.RDT(rdt)
 end
 
 function sync () sync_receive() sync_transmit() end
@@ -223,7 +226,7 @@ function selftest (options)
    print()
    options.device = getfenv()
    options.program = port.Port.loopback_test
---   options.secs = 60
+--   options.secs = 10
    open()
    if not options.noloopback then
       enable_mac_loopback()
@@ -232,6 +235,7 @@ function selftest (options)
       test.waitfor("linkup", linkup, 20, 250000)
    end
    port.selftest(options)
+--   register.dump(r)
    register.dump(s, true)
 end
 
