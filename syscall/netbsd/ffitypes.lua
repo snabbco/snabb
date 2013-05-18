@@ -18,6 +18,7 @@ typedef int32_t clockid_t;
 typedef int ssize_t;
 typedef unsigned int size_t;
 typedef unsigned long clock_t;
+typedef unsigned int socklen_t;
 
 struct iovec {
   void *iov_base;

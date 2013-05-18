@@ -22,6 +22,8 @@ typedef long ssize_t;
 typedef unsigned long size_t;
 typedef long clock_t;
 typedef uint32_t off32_t; /* only used for eg mmap2 on Linux */
+typedef uint32_t socklen_t;
+typedef uint32_t le32; /* this is little endian - not really using it yet */
 
 /* despite glibc, Linux uses 32 bit dev_t */
 typedef uint32_t dev_t;
