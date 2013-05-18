@@ -12,6 +12,10 @@ int rump_init(void);
 
 rump = {
   init = rump_syms.rump_init,
+  module = function(s)
+    s = string.gsub(s, "%.", "_")
+    ffi.load("rump" .. s, true)
+  end,
 }
 
 return rump

@@ -5,15 +5,14 @@ local ffi = require "ffi"
 
 function octal(s) return tonumber(s, 8) end
 
-local C = require "syscall.rump.c"
-
-ffi.load("rumpvfs", true)
-ffi.load("rumpfs_kernfs", true)
-
 local rump = require "syscall.rump.init"
-local C = require "syscall.rump.c"
+
+rump.module "vfs"
+rump.module "fs.kernfs"
 
 rump.init()
+
+local C = require "syscall.rump.c"
 
 local ok = C.mkdir("/kern", octal("0755"))
 assert(ok == 0, "mkdir " .. ok)
