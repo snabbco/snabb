@@ -1,5 +1,7 @@
 -- ffi definitions of Linux types
 
+require "syscall.ffitypes-common"
+
 local abi = require "syscall.abi"
 
 local cdef = require "ffi".cdef
