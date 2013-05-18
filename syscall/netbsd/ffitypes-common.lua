@@ -37,10 +37,10 @@ typedef unsigned int _netbsd_size_t;
 typedef unsigned long _netbsd_clock_t;
 typedef unsigned int _netbsd_socklen_t;
 
-/* these need to be filled in/fixed */
-/*
-_netbsd_fd_set
-*/
+typedef uint32_t _netbsd_fd_mask;
+typedef struct {
+  _netbsd_fd_mask fds_bits[8];
+} _netbsd_fd_set;
 
 struct _netbsd_iovec {
   void *iov_base;
