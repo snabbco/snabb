@@ -28,6 +28,7 @@ function main ()
       print("No arguments given (-h for help). Defaulting to: -l selftest")
       args = { '-l', 'selftest' }
    end
+   local profiling = false
    local i = 1
    while i <= #args do
       if args[i] == '-l' and i < #args then
@@ -43,6 +44,10 @@ function main ()
       elseif args[i] == '-d' then
 	 debug_on_error = true
 	 i = i + 1
+      elseif args[i] == '-p' then
+         require("jit.tprof").start()
+         profiling = true
+         i = i + 1
       elseif args[i] == '-jdump' and i < #args then
 	 local jit_dump = require "jit.dump"
 	 jit_dump.start("", args[i+1])
@@ -52,6 +57,7 @@ function main ()
 	 os.exit(1)
       end
    end
+   if profiling then require("jit.tprof").off() end
    os.exit(0)
 end
 
