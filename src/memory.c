@@ -14,7 +14,7 @@
 void *allocate_huge_page(int size)
 {
   void *ptr = mmap(NULL, size, PROT_READ | PROT_WRITE,
-                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB, 0, 0);
+                   MAP_SHARED | MAP_ANONYMOUS | MAP_HUGETLB, 0, 0);
   if (ptr == MAP_FAILED) {
       return NULL;
   } else {
@@ -34,13 +34,14 @@ int lock_memory()
   return mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 
+int pagemap_fd;
+
 // Convert from virtual addresses in our own process address space to
 // physical addresses in the RAM chips.
 //
 // Note: Using page numbers, which are simply addresses divided by 4096.
 uint64_t phys_page(uint64_t virt_page)
 {
-  static int pagemap_fd;
   if (pagemap_fd == 0) {
     if ((pagemap_fd = open("/proc/self/pagemap", O_RDONLY)) <= 0) {
       perror("open pagemap");

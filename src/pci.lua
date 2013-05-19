@@ -156,6 +156,7 @@ function print_device_summary ()
 end
 
 function open_usable_devices (options)
+   local port = require("port")
    local drivers = {}
    for _,device in ipairs(devices) do
       if device.usable == 'yes' then
@@ -169,10 +170,17 @@ function open_usable_devices (options)
          table.insert(drivers, driver)
       end
    end
-   local port = require("port")
-   local options = {devices=drivers, secs=10,
-                    program=port.Port.loopback_test}
-   port.selftest(options)
+   for i,driver in ipairs(drivers) do
+      local options = {devices={driver}, secs=10,
+                       program=port.Port.loopback_test}
+      if ffi.C.fork() == 0 then
+         ffi.cdef("extern int pagemap_fd;")
+         assert(C.lock_memory() == 0)
+         ffi.C.pagemap_fd = 0
+         port.selftest(options)
+         os.exit(0)
+      end
+   end
 end
 
 function module_init () scan_devices () end
