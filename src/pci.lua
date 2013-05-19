@@ -156,6 +156,7 @@ function print_device_summary ()
 end
 
 function open_usable_devices (options)
+   local drivers = {}
    for _,device in ipairs(devices) do
       if device.usable == 'yes' then
          if device.interface ~= nil then
@@ -164,13 +165,14 @@ function open_usable_devices (options)
          end
          print("Opening device "..device.pciaddress)
          local driver = open_device(device.pciaddress, device.driver)
-	 if options.selftest then
-	    print("Testing "..device.pciaddress)
-	    driver.selftest()
-	 end
-         return -- XXX abort early
+         driver.open_for_loopback_test()
+         table.insert(drivers, driver)
       end
    end
+   local port = require("port")
+   local options = {devices=drivers, secs=10,
+                    program=port.Port.loopback_test}
+   port.selftest(options)
 end
 
 function module_init () scan_devices () end

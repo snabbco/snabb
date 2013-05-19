@@ -33,8 +33,6 @@ nfree = 0
 --- Return a buffer with a refcount of 1.
 function allocate ()
    if nfree == 0 then
-      assert(allocated < max)
-      allocated = allocated + 1
       return new_buffer()
    else
       nfree = nfree - 1
@@ -44,7 +42,12 @@ function allocate ()
    end
 end
 
+-- Get the cost of allocation (e.g. mapping huge pages) out of the way.
+function preallocate (n) while nfree < n do free(new_buffer()) end end
+
 function new_buffer ()
+   assert(allocated < max)
+   allocated = allocated + 1
    local ptr, phys, bytes = memory.dma_alloc(size)
    return ffi.new(buffer_t, ptr, phys, size, 0, 1)
 end

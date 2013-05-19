@@ -226,17 +226,15 @@ function selftest (options)
    print()
    options.device = getfenv()
    options.program = port.Port.loopback_test
---   options.secs = 10
-   open()
-   if not options.noloopback then
-      enable_mac_loopback()
-   end
-   if not options.nolinkup then
-      test.waitfor("linkup", linkup, 20, 250000)
-   end
+   options.secs = 10
+   open_for_loopback_test()
    port.selftest(options)
 --   register.dump(r)
    register.dump(s, true)
+end
+
+function open_for_loopback_test ()
+   open() enable_mac_loopback() test.waitfor("linkup", linkup, 20, 250000)
 end
 
 --- ### Configuration register description.
