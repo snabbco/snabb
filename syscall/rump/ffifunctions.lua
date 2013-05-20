@@ -21,7 +21,6 @@ else
   cdef = ffi.cdef -- use as provided
 end
 
--- TODO note a few commented out due to types not yet defined
 cdef [[
 _netbsd_ssize_t rump___sysimpl_read(int, void *, _netbsd_size_t);
 _netbsd_ssize_t rump___sysimpl_write(int, const void *, _netbsd_size_t);
