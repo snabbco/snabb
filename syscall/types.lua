@@ -21,7 +21,7 @@ local abi = require "syscall.abi"
 
 local errors = require("syscall.errors")
 
-local C = ffi.C -- for inet_pton, TODO due to be replaced with Lua
+local C = ffi.C -- for inet_pton, TODO due to be replaced with Lua TODO will not work with rump
 ffi.cdef[[
 int inet_pton(int af, const char *src, void *dst);
 ]]
@@ -167,18 +167,22 @@ for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 t.ints = ffi.typeof("int[?]")
 t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
 
-t.int1 = ffi.typeof("int[1]")
-t.uint1 = ffi.typeof("unsigned int[1]")
-t.int16_1 = ffi.typeof("int16_t[1]")
-t.uint16_1 = ffi.typeof("uint16_t[1]")
-t.int32_1 = ffi.typeof("int32_t[1]")
-t.uint32_1 = ffi.typeof("uint32_t[1]")
-t.int64_1 = ffi.typeof("int64_t[1]")
-t.uint64_1 = ffi.typeof("uint64_t[1]")
-t.socklen1 = ffi.typeof("socklen_t[1]")
-t.off1 = ffi.typeof("off_t[1]")
-t.uid1 = ffi.typeof("uid_t[1]")
-t.gid1 = ffi.typeof("gid_t[1]")
+function singleton(tp)
+  return ffi.typeof("$[1]", tp)
+end
+
+t.int1 = singleton(t.int)
+t.uint1 = singleton(t.uint)
+t.int16_1 = singleton(t.int16)
+t.uint16_1 = singleton(t.uint16)
+t.int32_1 = singleton(t.int32)
+t.uint32_1 = singleton(t.uint32)
+t.int64_1 = singleton(t.int64)
+t.uint64_1 = singleton(t.uint64)
+t.socklen1 = singleton(t.socklen)
+t.off1 = singleton(t.off)
+t.uid1 = singleton(t.uid)
+t.gid1 = singleton(t.gid)
 
 t.char2 = ffi.typeof("char[2]")
 t.int2 = ffi.typeof("int[2]")
