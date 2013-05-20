@@ -8,9 +8,7 @@ require("syscall." .. abi.os .. ".ffifunctions")
 
 local cdef = require "ffi".cdef
 
-require "syscall.ffitypes"
-
--- common functions for BSD (currently NetBSD) and Linux
+-- common functions for BSD, oSX and and Linux
 
 cdef[[
 int open(const char *pathname, int flags, mode_t mode);

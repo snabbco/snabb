@@ -4,7 +4,7 @@ local cdef = require "ffi".cdef
 
 local abi = require "syscall.abi"
 
-require "syscall.ffitypes"
+require "syscall.linux.ffitypes"
 
 cdef[[
 int openat(int dirfd, const char *pathname, int flags, mode_t mode);

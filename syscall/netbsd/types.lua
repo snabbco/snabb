@@ -9,7 +9,7 @@ local ptt, addtype, lenfn, lenmt, newfn, istype = hh.ptt, hh.addtype, hh.lenfn, 
 local ffi = require "ffi"
 local bit = require "bit"
 
-require "syscall.ffitypes"
+require "syscall.netbsd.ffitypes"
 
 local h = require "syscall.helpers"
 

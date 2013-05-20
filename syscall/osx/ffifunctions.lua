@@ -2,7 +2,7 @@
 
 local cdef = require "ffi".cdef
 
-require "syscall.ffitypes"
+require "syscall.osx.ffitypes"
 
 cdef[[
 int lchmod(const char *path, mode_t mode);

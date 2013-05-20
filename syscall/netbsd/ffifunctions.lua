@@ -2,7 +2,7 @@
 
 local cdef = require "ffi".cdef
 
-require "syscall.ffitypes"
+require "syscall.netbsd.ffitypes"
 
 cdef[[
 int lchmod(const char *path, mode_t mode);
