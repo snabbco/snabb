@@ -114,18 +114,21 @@ end
 -- dynamically.
 
 function Port:echo ()
-   local input, output = self.input, self.output
+   local inputs, outputs = self.inputs, self.outputs
    repeat
-      self.input.sync_receive()
-      while input.can_receive() and output.can_transmit() do
-         local buf = input.receive()
-         output.transmit(buf)
-         buffer.deref(buf)
+      for i = 1,#inputs do
+         local input, output = inputs[i], outputs[i]
+         input.sync_receive()
+         while input.can_receive() and output.can_transmit() do
+            local buf = input.receive()
+            output.transmit(buf)
+            buffer.deref(buf)
+         end
+         while input.can_add_receive_buffer() do
+            input.add_receive_buffer(buffer.allocate())
+         end
+         output.sync_transmit()
       end
-      while input.can_add_receive_buffer() do
-	 input.add_receive_buffer(buffer.allocate())
-      end
-      output.sync_transmit()
    until coroutine.yield("echo") == nil
 end
 
@@ -137,25 +140,26 @@ function selftest (options)
    local port = port.new("test", devices, devices)
    local program = options.program or Port.spam
    port.coroutine = coroutine.wrap(program)
-   buffer.preallocate(100000)
    local finished = lib.timer((options.secs or 1) * 1e9)
    local start_time = C.get_time_ns()
    repeat
       port:run(port)
    until finished()
    local end_time = C.get_time_ns()
-   local rx, tx = 0, 0
-   local rxp, txp = 0, 0
-   for _,d in pairs(options.devices) do
---      register.dump(d.r)
-      rx = rx + d.s.GORCL() + d.s.GORCH() * 2^32
-      tx = tx + d.s.GOTCL() + d.s.GOTCH() * 2^32
-      rxp = rxp + d.s.GPRC()
-      txp = txp + d.s.GPTC()
-      register.dump(d.s, true)
+   if options.module == 'intel10g' then
+      local rx, tx = 0, 0
+      local rxp, txp = 0, 0
+      for _,d in pairs(options.devices) do
+         --      register.dump(d.r)
+         rx = rx + d.s.GORCL() + d.s.GORCH() * 2^32
+         tx = tx + d.s.GOTCL() + d.s.GOTCH() * 2^32
+         rxp = rxp + d.s.GPRC()
+         txp = txp + d.s.GPTC()
+         register.dump(d.s, true)
+      end
+      nanos = tonumber(end_time - start_time)
+      io.write(("Transmit goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(tx)/nanos * 8, txp * 1000 / nanos))
+      io.write(("Receive  goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(rx)/nanos * 8, rxp * 1000 / nanos))
    end
-   nanos = tonumber(end_time - start_time)
-   io.write(("Transmit goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(tx)/nanos * 8, txp * 1000 / nanos))
-   io.write(("Receive  goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(rx)/nanos * 8, rxp * 1000 / nanos))
 end
 

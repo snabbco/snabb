@@ -226,6 +226,7 @@ function selftest (options)
    print()
    options.device = getfenv()
    options.program = port.Port.loopback_test
+   options.module = 'intel10g'
    options.secs = 10
    open_for_loopback_test()
    port.selftest(options)

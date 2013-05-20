@@ -151,7 +151,7 @@ function new (tapinterface)
 
    -- Make all of our DMA memory usable as vhost packet buffers.
    function update_vhost_memory_map ()
-      C.vhost_set_memory(vio, memory_regions())
+      assert(C.vhost_set_memory(vio, memory_regions()) == 0, "vhost memory")
    end
 
    -- Construct a vhost memory map for the kernel. The memory map
@@ -186,9 +186,9 @@ function new (tapinterface)
       local port = require("port")
       print("virtio selftest")
       options = options or {}
-      options.device = M
+      options.devices = {M}
       options.program = port.Port.echo
---      options.secs = 60
+      options.secs = 10
       M.init()
       port.selftest(options)
       print_stats()
