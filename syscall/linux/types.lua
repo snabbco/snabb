@@ -4,7 +4,7 @@ return function(types, hh)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local ptt, addtype, lenfn, lenmt, newfn, istype = hh.ptt, hh.addtype, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
+local ptt, addtype, addtype_var, lenfn, lenmt, newfn, istype = hh.ptt, hh.addtype, hh.addtype_var, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -526,7 +526,7 @@ mt.pollfds = {
   end,
 }
 
-t.pollfds = ffi.metatype("struct {int count; struct pollfd pfd[?];}", mt.pollfds)
+addtype_var("pollfds", "struct {int count; struct pollfd pfd[?];}", mt.pollfds)
 
 meth.signalfd = {
   index = {
@@ -570,7 +570,7 @@ mt.siginfos = {
   end,
 }
 
-t.siginfos = ffi.metatype("struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
+addtype_var("siginfos", "struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
 
 -- slightly miscellaneous types, eg need to use Lua metatables
 

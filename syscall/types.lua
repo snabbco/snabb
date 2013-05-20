@@ -49,6 +49,12 @@ local function addtype(name, tp, mt)
   s[name] = ffi.sizeof(t[name])
 end
 
+-- for variables length types, ie those with arrays
+local function addtype_var(name, tp, mt)
+  t[name] = ffi.metatype(tp, mt)
+  pt[name] = ptt(tp)
+end
+
 local function lenfn(tp) return ffi.sizeof(tp) end
 
 local lenmt = {__len = lenfn}
@@ -297,7 +303,7 @@ mt.iovecs = {
   end
 }
 
-t.iovecs = ffi.metatype("struct { int count; struct iovec iov[?];}", mt.iovecs) -- do not use metatype helper as variable size
+addtype_var("iovecs", "struct { int count; struct iovec iov[?];}", mt.iovecs)
 
 meth.sockaddr = {
   index = {
@@ -463,7 +469,7 @@ addtype("timespec", "struct timespec", {
   __len = lenfn,
 })
 
-t.groups = ffi.metatype("struct {int count; gid_t list[?];}", {
+addtype_var("groups", "struct {int count; gid_t list[?];}", {
   __index = function(g, k)
     return g.list[k - 1]
   end,
@@ -602,7 +608,7 @@ mt.sigaction = {
 addtype("sigaction", "struct sigaction", mt.sigaction)
 
 -- include OS specific types
-local hh = {ptt = ptt, addtype = addtype, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
+local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
 
 types = require("syscall." .. abi.os .. ".types")(types, hh)
 
