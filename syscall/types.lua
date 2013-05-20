@@ -109,9 +109,28 @@ local function inet_ntop(af, src)
   return table.concat(parts, ":")
 end
 
+--[[
+	if (af==AF_INET) {
+		for (i=0; i<4 && *s; i++) {
+			a[i] = x = strtoul(s, (char **)&z, 10);
+			if (!isdigit(*s) || z==s || (*z && *z != '.') || x>255)
+				return 0;
+			s=z+1;
+		}
+		return 1;
+]]
+
 local function inet_pton(af, src, addr)
   af = c.AF[af]
-  if not addr then addr = t.addrtype[af]() end
+  addr = addr or t.addrtype[af]()
+  if af == c.AF.INET then
+    local ip4 = split("%.", src)
+    if #ip4 ~= 4 then return nil end
+    addr = addr or t.in_addr()
+    addr.s_addr = ip4[4] * 0x1000000 + ip4[3] * 0x10000 + ip4[2] * 0x100 + ip4[1]
+    return addr
+  end
+
   local ret = C.inet_pton(af, src, addr) -- TODO redo in pure Lua
   if ret == -1 then return nil, t.error() end
   if ret == 0 then return nil end -- maybe return string

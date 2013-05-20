@@ -304,6 +304,7 @@ test_read_write = {
 test_address_names = {
   test_ipv4_names = function()
     assert_equal(tostring(t.in_addr("127.0.0.1")), "127.0.0.1", "print ipv4")
+    assert_equal(tostring(t.in_addr("1.2.3.4")), "1.2.3.4", "print ipv4")
     assert_equal(tostring(t.in_addr("255.255.255.255")), "255.255.255.255", "print ipv4")
   end,
   test_ipv6_names = function()
