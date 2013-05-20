@@ -420,47 +420,6 @@ struct linux_dirent64 {
   unsigned char   d_type;
   char            d_name[0];
 };
-struct stat {  /* only used on 64 bit architectures */
-  unsigned long   st_dev;
-  unsigned long   st_ino;
-  unsigned long   st_nlink;
-  unsigned int    st_mode;
-  unsigned int    st_uid;
-  unsigned int    st_gid;
-  unsigned int    __pad0;
-  unsigned long   st_rdev;
-  long            st_size;
-  long            st_blksize;
-  long            st_blocks;
-  unsigned long   st_atime;
-  unsigned long   st_atime_nsec;
-  unsigned long   st_mtime;
-  unsigned long   st_mtime_nsec;
-  unsigned long   st_ctime;
-  unsigned long   st_ctime_nsec;
-  long            __unused[3];
-};
-struct stat64 { /* only for 32 bit architectures */
-  unsigned long long      st_dev;
-  unsigned char   __pad0[4];
-  unsigned long   __st_ino;
-  unsigned int    st_mode;
-  unsigned int    st_nlink;
-  unsigned long   st_uid;
-  unsigned long   st_gid;
-  unsigned long long      st_rdev;
-  unsigned char   __pad3[4];
-  long long       st_size;
-  unsigned long   st_blksize;
-  unsigned long long      st_blocks;
-  unsigned long   st_atime;
-  unsigned long   st_atime_nsec;
-  unsigned long   st_mtime;
-  unsigned int    st_mtime_nsec;
-  unsigned long   st_ctime;
-  unsigned long   st_ctime_nsec;
-  unsigned long long      st_ino;
-};
 struct flock64 {
   short int l_type;
   short int l_whence;
@@ -816,6 +775,55 @@ struct statfs64 {
   statfs_word f_frsize;
   statfs_word f_flags;
   statfs_word f_spare[4];
+};
+]]
+end
+
+if abi.abi64 then
+cdef[[
+struct stat {  /* only used on 64 bit architectures */
+  unsigned long   st_dev;
+  unsigned long   st_ino;
+  unsigned long   st_nlink;
+  unsigned int    st_mode;
+  unsigned int    st_uid;
+  unsigned int    st_gid;
+  unsigned int    __pad0;
+  unsigned long   st_rdev;
+  long            st_size;
+  long            st_blksize;
+  long            st_blocks;
+  unsigned long   st_atime;
+  unsigned long   st_atime_nsec;
+  unsigned long   st_mtime;
+  unsigned long   st_mtime_nsec;
+  unsigned long   st_ctime;
+  unsigned long   st_ctime_nsec;
+  long            __unused[3];
+};
+]]
+else
+cdef [[
+struct stat { /* only for 32 bit architectures */
+  unsigned long long      st_dev;
+  unsigned char   __pad0[4];
+  unsigned long   __st_ino;
+  unsigned int    st_mode;
+  unsigned int    st_nlink;
+  unsigned long   st_uid;
+  unsigned long   st_gid;
+  unsigned long long      st_rdev;
+  unsigned char   __pad3[4];
+  long long       st_size;
+  unsigned long   st_blksize;
+  unsigned long long      st_blocks;
+  unsigned long   st_atime;
+  unsigned long   st_atime_nsec;
+  unsigned long   st_mtime;
+  unsigned int    st_mtime_nsec;
+  unsigned long   st_ctime;
+  unsigned long   st_ctime_nsec;
+  unsigned long long      st_ino;
 };
 ]]
 end

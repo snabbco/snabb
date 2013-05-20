@@ -23,12 +23,6 @@ local abi = require "syscall.abi"
 local mt = {} -- metatables
 local meth = {}
 
--- use 64 bit stat type always
-local stattypename = "struct stat"
-if abi.abi32 then
-  stattypename = "struct stat64"
-end
-
 -- TODO cleanup this (what should provide this?)
 local signal_reasons_gen = {}
 local signal_reasons = {}
@@ -327,7 +321,7 @@ meth.stat = {
 }
 
 --TODO sort out stat/stat64
-addtype("stat", stattypename, { -- either struct stat on 64 bit or struct stat64 on 32 bit
+addtype("stat", "struct stat", {
   __index = function(st, k) if meth.stat.index[k] then return meth.stat.index[k](st) end end,
   __len = lenfn,
 })
