@@ -76,8 +76,6 @@ int adjtimex(struct timex *buf);
 int sync_file_range(int fd, off_t offset, off_t count, unsigned int flags);
 
 int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
-int truncate64(const char *path, off_t length);
-int ftruncate64(int fd, off_t length);
 int pause(void);
 int prlimit64(pid_t pid, int resource, const struct rlimit64 *new_limit, struct rlimit64 *old_limit);
 
@@ -103,10 +101,8 @@ int umount2(const char *target, int flags);
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
 int faccessat(int dirfd, const char *pathname, int mode, int flags);
-int statfs(const char *path, struct statfs64 *buf); /* for 64 bit */
-int fstatfs(int fd, struct statfs64 *buf);          /* for 64 bit */
-int statfs64(const char *path, struct statfs64 *buf); /* for 32 bit */
-int fstatfs64(int fd, struct statfs64 *buf);          /* for 32 bit */
+int statfs(const char *path, struct statfs64 *buf);
+int fstatfs(int fd, struct statfs64 *buf);
 int futimens(int fd, const struct timespec times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 
@@ -232,6 +228,10 @@ ssize_t pread64(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite64(int fd, const void *buf, size_t count, off_t offset);
 ssize_t preadv64(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 ssize_t pwritev64(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+int statfs64(const char *path, struct statfs64 *buf); /* for 32 bit */
+int fstatfs64(int fd, struct statfs64 *buf);          /* for 32 bit */
+int truncate64(const char *path, off_t length);
+int ftruncate64(int fd, off_t length);
 ]]
 end
 
