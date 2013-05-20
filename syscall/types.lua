@@ -21,7 +21,7 @@ local abi = require "syscall.abi"
 
 local errors = require("syscall.errors")
 
-local C = ffi.C -- for inet_pton, TODO due to be replaced with Lua TODO will not work with rump
+local C = ffi.C -- for inet_pton, TODO due to be replaced with Lua
 ffi.cdef[[
 int inet_pton(int af, const char *src, void *dst);
 ]]
@@ -109,17 +109,6 @@ local function inet_ntop(af, src)
   return table.concat(parts, ":")
 end
 
---[[
-	if (af==AF_INET) {
-		for (i=0; i<4 && *s; i++) {
-			a[i] = x = strtoul(s, (char **)&z, 10);
-			if (!isdigit(*s) || z==s || (*z && *z != '.') || x>255)
-				return 0;
-			s=z+1;
-		}
-		return 1;
-]]
-
 local function inet_pton(af, src, addr)
   af = c.AF[af]
   addr = addr or t.addrtype[af]()
@@ -130,7 +119,7 @@ local function inet_pton(af, src, addr)
     addr.s_addr = ip4[4] * 0x1000000 + ip4[3] * 0x10000 + ip4[2] * 0x100 + ip4[1]
     return addr
   end
-
+-- TODO ipv6 implementation
   local ret = C.inet_pton(af, src, addr) -- TODO redo in pure Lua
   if ret == -1 then return nil, t.error() end
   if ret == 0 then return nil end -- maybe return string
