@@ -146,10 +146,10 @@ function selftest (options)
       port:run(port)
    until finished()
    local end_time = C.get_time_ns()
-   if options.module == 'intel10g' then
-      local rx, tx = 0, 0
-      local rxp, txp = 0, 0
-      for _,d in pairs(options.devices) do
+   local rx, tx = 0, 0
+   local rxp, txp = 0, 0
+   for _,d in pairs(options.devices) do
+      if d.s and d.s.GPRC then
          --      register.dump(d.r)
          rx = rx + d.s.GORCL() + d.s.GORCH() * 2^32
          tx = tx + d.s.GOTCL() + d.s.GOTCH() * 2^32
@@ -157,9 +157,9 @@ function selftest (options)
          txp = txp + d.s.GPTC()
          register.dump(d.s, true)
       end
-      nanos = tonumber(end_time - start_time)
-      io.write(("Transmit goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(tx)/nanos * 8, txp * 1000 / nanos))
-      io.write(("Receive  goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(rx)/nanos * 8, rxp * 1000 / nanos))
    end
+   nanos = tonumber(end_time - start_time)
+   io.write(("Transmit goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(tx)/nanos * 8, txp * 1000 / nanos))
+   io.write(("Receive  goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(rx)/nanos * 8, rxp * 1000 / nanos))
 end
 
