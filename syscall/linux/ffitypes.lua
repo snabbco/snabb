@@ -656,6 +656,33 @@ struct tun_pi {
   uint16_t flags;
   uint16_t proto; /* __be16 */
 };
+struct vhost_vring_state {
+  unsigned int index;
+  unsigned int num;
+};
+struct vhost_vring_file {
+  unsigned int index;
+  int fd;
+};
+struct vhost_vring_addr {
+  unsigned int index;
+  unsigned int flags;
+  uint64_t desc_user_addr;
+  uint64_t used_user_addr;
+  uint64_t avail_user_addr;
+  uint64_t log_guest_addr;
+};
+struct vhost_memory_region {
+  uint64_t guest_phys_addr;
+  uint64_t memory_size;
+  uint64_t userspace_addr;
+  uint64_t flags_padding;
+};
+struct vhost_memory {
+  uint32_t nregions;
+  uint32_t padding;
+  struct vhost_memory_region regions[0];
+};
 ]]
 
 -- Linux struct siginfo padding depends on architecture

@@ -122,6 +122,11 @@ local addstructs = {
   mcontext = "mcontext_t",
   tun_pi = "struct tun_pi",
   tun_filter = "struct tun_filter",
+  vhost_vring_state = "struct vhost_vring_state",
+  vhost_vring_file = "struct vhost_vring_file",
+  vhost_vring_addr = "struct vhost_vring_addr",
+  vhost_memory_region = "struct vhost_memory_region",
+  vhost_memory = "struct vhost_memory",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end

@@ -204,8 +204,21 @@ local ioctl = strflag {
   TUNSETVNETHDRSZ= _IOW('T', 216, s.int),
   TUNSETQUEUE    = _IOW('T', 217, s.int),
 -- from linux/vhost.h VHOST_VIRTIO 0xAF
-  VHOST_GET_FEATURES = _IOR(0xAF, 0x00, s.uint64),
-  VHOST_SET_FEATURES = _IOW(0xAF, 0x00, s.uint64),
+  VHOST_GET_FEATURES   = _IOR(0xAF, 0x00, s.uint64),
+  VHOST_SET_FEATURES   = _IOW(0xAF, 0x00, s.uint64),
+  VHOST_SET_OWNER      = _IO(0xAF, 0x01),
+  VHOST_RESET_OWNER    = _IO(0xAF, 0x02),
+  VHOST_SET_MEM_TABLE  = _IOW(0xAF, 0x03, s.vhost_memory),
+  VHOST_SET_LOG_BASE   = _IOW(0xAF, 0x04, s.uint64),
+  VHOST_SET_LOG_FD     = _IOW(0xAF, 0x07, s.int),
+  VHOST_SET_VRING_NUM  = _IOW(0xAF, 0x10, s.vhost_vring_state),
+  VHOST_SET_VRING_ADDR = _IOW(0xAF, 0x11, s.vhost_vring_addr),
+  VHOST_SET_VRING_BASE = _IOW(0xAF, 0x12, s.vhost_vring_state),
+  VHOST_GET_VRING_BASE = _IOWR(0xAF, 0x12, s.vhost_vring_state),
+  VHOST_SET_VRING_KICK = _IOW(0xAF, 0x20, s.vhost_vring_file),
+  VHOST_SET_VRING_CALL = _IOW(0xAF, 0x21, s.vhost_vring_file),
+  VHOST_SET_VRING_ERR  = _IOW(0xAF, 0x22, s.vhost_vring_file),
+  VHOST_NET_SET_BACKEND= _IOW(0xAF, 0x30, s.vhost_vring_file),
 
 -- allow user defined ioctls
   _IO = _IO,
