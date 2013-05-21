@@ -203,6 +203,10 @@ local ioctl = strflag {
   TUNGETVNETHDRSZ= _IOR('T', 215, s.int),
   TUNSETVNETHDRSZ= _IOW('T', 216, s.int),
   TUNSETQUEUE    = _IOW('T', 217, s.int),
+-- from linux/vhost.h VHOST_VIRTIO 0xAF
+  VHOST_GET_FEATURES = _IOR(0xAF, 0x00, s.uint64),
+  VHOST_SET_FEATURES = _IOW(0xAF, 0x00, s.uint64),
+
 -- allow user defined ioctls
   _IO = _IO,
   _IOR = _IOR, 

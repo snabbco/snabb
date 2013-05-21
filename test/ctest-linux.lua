@@ -322,6 +322,7 @@ print [[
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/if_tun.h>
+#include <linux/vhost.h>
 
 int ret = 0;
 
