@@ -12,10 +12,7 @@ if ffi.os == "netbsd" then
     ffi.cdef(s)
   end
 else
-  local netbsd = require "syscall.netbsd.common.ffitypes"
-
-  netbsd.init(true) -- rump = true
-
+  require "syscall.rump.ffitypes"
   cdef = ffi.cdef -- use as provided
 end
 
