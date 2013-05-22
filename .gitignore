@@ -1,0 +1,8 @@
+# misc temp files
+tmp/*
+*~
+
+# ctest files
+test/ctest.c
+test/ctest
+
