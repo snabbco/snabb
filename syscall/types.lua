@@ -74,58 +74,6 @@ local function istype(tp, x)
   if ffi.istype(tp, x) then return x else return false end
 end
 
--- convert strings to inet addresses and the reverse
-local function inet_ntop(af, src)
-  af = c.AF[af] -- TODO do not need, in fact could split into two functions if no need to export.
-  if af == c.AF.INET then
-    local b = pt.uchar(src)
-    return b[0] .. "." .. b[1] .. "." .. b[2] .. "." .. b[3]
-  end
-  if af ~= c.AF.INET6 then return end
-  local a = src.s6_addr
-  local parts = {256*a[0] + a[1], 256*a[2] + a[3],   256*a[4] + a[5],   256*a[6] + a[7],
-                 256*a[8] + a[9], 256*a[10] + a[11], 256*a[12] + a[13], 256*a[14] + a[15]}
-
-  for i = 1, #parts do parts[i] = string.format("%x", parts[i]) end
-
-  local start, max = 0, 0
-  for i = 1, #parts do
-    if parts[i] == "0" then
-      local count = 0
-      for j = i, #parts do
-        if parts[j] == "0" then count = count + 1 else break end
-      end
-      if count > max then max, start = count, i end
-    end
-  end
-
-  if max > 2 then
-    parts[start] = ""
-    if start == 1 or start + max == 9 then parts[start] = ":" end
-    if start == 1 and start + max == 9 then parts[start] = "::" end 
-    for i = 1, max - 1 do table.remove(parts, start + 1) end
-  end
-
-  return table.concat(parts, ":")
-end
-
-local function inet_pton(af, src, addr)
-  af = c.AF[af]
-  addr = addr or t.addrtype[af]()
-  if af == c.AF.INET then
-    local ip4 = split("%.", src)
-    if #ip4 ~= 4 then return nil end
-    addr = addr or t.in_addr()
-    addr.s_addr = ip4[4] * 0x1000000 + ip4[3] * 0x10000 + ip4[2] * 0x100 + ip4[1]
-    return addr
-  end
--- TODO ipv6 implementation
-  local ret = C.inet_pton(af, src, addr) -- TODO redo in pure Lua
-  if ret == -1 then return nil, t.error() end
-  if ret == 0 then return nil end -- maybe return string
-  return addr
-end
-
 -- generic types
 
 local voidp = ffi.typeof("void *")
@@ -242,6 +190,58 @@ t.error = ffi.metatype("struct {int errno;}", {
 })
 
 -- TODO add generic address type that works out which to take? basically inet_name, except without netmask
+
+-- convert strings to inet addresses and the reverse
+local function inet_ntop(af, src)
+  af = c.AF[af] -- TODO do not need, in fact could split into two functions if no need to export.
+  if af == c.AF.INET then
+    local b = pt.uchar(src)
+    return b[0] .. "." .. b[1] .. "." .. b[2] .. "." .. b[3]
+  end
+  if af ~= c.AF.INET6 then return end
+  local a = src.s6_addr
+  local parts = {256*a[0] + a[1], 256*a[2] + a[3],   256*a[4] + a[5],   256*a[6] + a[7],
+                 256*a[8] + a[9], 256*a[10] + a[11], 256*a[12] + a[13], 256*a[14] + a[15]}
+
+  for i = 1, #parts do parts[i] = string.format("%x", parts[i]) end
+
+  local start, max = 0, 0
+  for i = 1, #parts do
+    if parts[i] == "0" then
+      local count = 0
+      for j = i, #parts do
+        if parts[j] == "0" then count = count + 1 else break end
+      end
+      if count > max then max, start = count, i end
+    end
+  end
+
+  if max > 2 then
+    parts[start] = ""
+    if start == 1 or start + max == 9 then parts[start] = ":" end
+    if start == 1 and start + max == 9 then parts[start] = "::" end 
+    for i = 1, max - 1 do table.remove(parts, start + 1) end
+  end
+
+  return table.concat(parts, ":")
+end
+
+local function inet_pton(af, src, addr)
+  af = c.AF[af]
+  addr = addr or t.addrtype[af]()
+  if af == c.AF.INET then
+    local ip4 = split("%.", src)
+    if #ip4 ~= 4 then return nil end
+    addr = addr or t.in_addr()
+    addr.s_addr = ip4[4] * 0x1000000 + ip4[3] * 0x10000 + ip4[2] * 0x100 + ip4[1]
+    return addr
+  end
+-- TODO ipv6 implementation
+  local ret = C.inet_pton(af, src, addr) -- TODO redo in pure Lua
+  if ret == -1 then return nil, t.error() end
+  if ret == 0 then return nil end -- maybe return string
+  return addr
+end
 
 addtype("in_addr", "struct in_addr", {
   __tostring = function(a) return inet_ntop(c.AF.INET, a) end,
