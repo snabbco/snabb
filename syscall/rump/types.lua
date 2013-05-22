@@ -11,6 +11,8 @@ end
 local errors = require "syscall.netbsd.errors"
 local c = require "syscall.netbsd.constants"
 
-return require "syscall.types2"
+local init require "syscall.types2".init
+
+return init(abi, c, errors)
 
 

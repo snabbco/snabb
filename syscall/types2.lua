@@ -5,7 +5,7 @@
 
 -- note that some types will be overridden, eg default fd type will have metamethods added
 
-local function init(abi, errors, c)
+local function init(abi, c, errors, ostypes)
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -612,7 +612,7 @@ addtype("sigaction", "struct sigaction", mt.sigaction)
 -- include OS specific types
 local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
 
-types = require("syscall." .. abi.os .. ".types")(types, hh)
+types = ostypes(types, hh)
 
 -- this is declared above
 samap_pt = {

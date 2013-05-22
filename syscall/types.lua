@@ -6,10 +6,11 @@
 require "syscall.ffitypes"
 
 local abi = require "syscall.abi"
-local errors = require "syscall.errors"
 local c = require "syscall.constants"
+local errors = require "syscall.errors"
+local ostypes = require("syscall." .. abi.os .. ".types")
 
 local init = require "syscall.types2".init
 
-return init(abi, errors, c)
+return init(abi, c, errors, ostypes)
 
