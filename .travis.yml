@@ -13,4 +13,11 @@ script:
  - cd .. && mkdir test && cp -a ljsyscall/test/* test
  - export LUA_PATH="$HOME/.luarocks/share/lua/5.1/?.lua;./?.lua"
  - luajit test/test.lua
+ - git clone git://github.com/anttikantee/buildrump.sh.git
+ - cd buildrump.sh
+ - ./buildrump.sh checkout fullbuild
+ - export LD_LIBRARY_PATH="$HOME/buildrump.sh/rump/lib"
+ - cd $HOME/ljsyscall
+ - luajit examples/rump/fstest.lua
+
 
