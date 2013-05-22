@@ -12,5 +12,5 @@ local ostypes = require("syscall." .. abi.os .. ".types")
 
 local init = require "syscall.types2".init
 
-return init(abi, c, errors, ostypes)
+return init(abi, c, errors, ostypes, nil)
 

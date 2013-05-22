@@ -5,7 +5,7 @@
 
 -- note that some types will be overridden, eg default fd type will have metamethods added
 
-local function init(abi, c, errors, ostypes)
+local function init(abi, c, errors, ostypes, rump)
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -37,6 +37,7 @@ local function ptt(tp)
 end
 
 local function addtype(name, tp, mt)
+  if rump then tp = rump(tp) end
   if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
   ctypes[tp] = t[name]
   pt[name] = ptt(tp)
@@ -45,8 +46,15 @@ end
 
 -- for variables length types, ie those with arrays
 local function addtype_var(name, tp, mt)
+  if rump then tp = rump(tp) end
   t[name] = ffi.metatype(tp, mt)
   pt[name] = ptt(tp)
+end
+
+local function addtype_fn(name, tp)
+  if rump then tp = rump(tp) end
+  t[name] = ffi.typeof(tp)
+  s[name] = ffi.sizeof(t[name])
 end
 
 local function lenfn(tp) return ffi.sizeof(tp) end
@@ -564,8 +572,7 @@ addtype("sigset", "sigset_t", {
 })
 
 -- sigaction
-t.sa_sigaction = ffi.typeof("void (*)(int, siginfo_t *, void *)")
-s.sa_sigaction = ffi.sizeof(t.sa_sigaction)
+addtype_fn("sa_sigaction", "void (*)(int, siginfo_t *, void *)")
 
 meth.sigaction = {
   index = {

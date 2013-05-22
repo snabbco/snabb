@@ -1,4 +1,4 @@
--- BSD types
+-- OSX types
 
 return function(types, hh)
 
