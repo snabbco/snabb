@@ -17,6 +17,7 @@ rump = {
     ffi.load("rump" .. s, true)
   end,
   C = require "syscall.rump.c",
+  types = require "syscall.rump.types"
 }
 
 return rump
