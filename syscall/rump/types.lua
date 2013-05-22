@@ -8,11 +8,13 @@ end
 
 -- running on another OS
 
+require "syscall.rump.ffitypes"
+
 local errors = require "syscall.netbsd.errors"
 local c = require "syscall.netbsd.constants"
 local ostypes = require "syscall.netbsd.types"
 
-local init require "syscall.types2".init
+local init = require "syscall.types2".init
 
 return init(abi, c, errors, ostypes)
 
