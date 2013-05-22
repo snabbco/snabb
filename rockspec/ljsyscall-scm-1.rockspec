@@ -33,6 +33,7 @@ build =
       ["syscall.ffifunctions"] = "syscall/ffifunctions.lua";
       ["syscall.ioctl"] = "syscall/ioctl.lua";
       ["syscall.types"] = "syscall/types.lua";
+      ["syscall.types2"] = "syscall/types2.lua";
       ["syscall.features"] = "syscall/features.lua";
       ["syscall.fcntl"] = "syscall/fcntl.lua";
 
