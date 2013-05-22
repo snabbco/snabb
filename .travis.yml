@@ -11,6 +11,6 @@ script:
  - luajit test/ctest.lua > test/ctest.c && cc -std=c99 test/ctest.c -o test/ctest && ./test/ctest
  - luarocks install --local rockspec/ljsyscall-scm-1.rockspec
  - cd .. && mkdir test && cp -a ljsyscall/test/* test
- - export PACKAGE_PATH=$HOME/.luarocks/share/lua/5.1/
+ - export LUA_PATH=$HOME/.luarocks/share/lua/5.1/
  - luajit test/test.lua
 
