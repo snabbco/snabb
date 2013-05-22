@@ -1,5 +1,5 @@
 -- error messages
--- we could get these from libc strerror, but aalows eg localisation, and makes things clearer. Only loaded if you use them.
+-- we could get these from libc strerror, but allows eg localisation, and makes things clearer.
 
 local E = require("syscall.constants").E
 
