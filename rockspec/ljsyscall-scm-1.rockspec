@@ -45,10 +45,12 @@ build =
       ["syscall.linux.ioctl"] = "syscall/linux/ioctl.lua";
       ["syscall.linux.types"] = "syscall/linux/types.lua";
       ["syscall.linux.fcntl"] = "syscall/linux/fcntl.lua";
+      ["syscall.linux.errors"] = "syscall/linux/errors.lua";
 
       ["syscall.linux.nl"] = "syscall/linux/nl.lua";
       ["syscall.linux.netfilter"] = "syscall/linux/netfilter.lua";
       ["syscall.linux.util"] = "syscall/linux/util.lua";
+
       ["syscall.linux.arm.constants"] = "syscall/linux/arm/constants.lua";
       ["syscall.linux.arm.ffitypes"] = "syscall/linux/arm/ffitypes.lua";
       ["syscall.linux.arm.ioctl"] = "syscall/linux/arm/ioctl.lua";
@@ -69,6 +71,7 @@ build =
       ["syscall.netbsd.ioctl"] = "syscall/netbsd/ioctl.lua";
       ["syscall.netbsd.types"] = "syscall/netbsd/types.lua";
       ["syscall.netbsd.fcntl"] = "syscall/netbsd/fcntl.lua";
+      ["syscall.netbsd.errors"] = "syscall/netbsd/errors.lua";
 
       ["syscall.osx.syscalls"] = "syscall/osx/syscalls.lua";
       ["syscall.osx.c"] = "syscall/osx/c.lua";
@@ -78,6 +81,7 @@ build =
       ["syscall.osx.ioctl"] = "syscall/osx/ioctl.lua";
       ["syscall.osx.types"] = "syscall/osx/types.lua";
       ["syscall.osx.fcntl"] = "syscall/osx/fcntl.lua";
+
     };
   };
 }

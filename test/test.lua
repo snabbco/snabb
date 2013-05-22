@@ -102,7 +102,7 @@ test_basic = {
   end,
   test_missing_error_string = function()
     local err = t.error(0)
-    assert(tostring(err) == "No error information (error 0)", "should get missing error message")
+    assert(not tostring(err), "should get missing error message")
   end,
   test_no_missing_error_strings = function()
     local noerr = "No error information"
