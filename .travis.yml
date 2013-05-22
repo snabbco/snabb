@@ -9,6 +9,7 @@ before_install:
 
 script: 
  - luajit test/test.lua
+ - ORIG = $PWD
  - luajit test/ctest.lua > test/ctest.c && cc -std=c99 test/ctest.c -o test/ctest && ./test/ctest
  - luarocks install --local rockspec/ljsyscall-scm-1.rockspec
  - cd .. && mkdir test && cp -a ljsyscall/test/* test
@@ -18,7 +19,7 @@ script:
  - cd buildrump.sh
  - ./buildrump.sh -q checkout fullbuild
  - export LD_LIBRARY_PATH="$HOME/buildrump.sh/rump/lib"
- - cd $HOME/justincormack/ljsyscall
+ - cd $ORIG
  - luajit examples/rump/fstest.lua
 
 
