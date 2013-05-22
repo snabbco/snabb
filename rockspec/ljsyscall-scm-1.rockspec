@@ -72,6 +72,7 @@ build =
       ["syscall.netbsd.types"] = "syscall/netbsd/types.lua";
       ["syscall.netbsd.fcntl"] = "syscall/netbsd/fcntl.lua";
       ["syscall.netbsd.errors"] = "syscall/netbsd/errors.lua";
+      ["syscall.netbsd.common.ffitypes"] = "syscall/netbsd/common.ffitypes.lua";
 
       ["syscall.osx.syscalls"] = "syscall/osx/syscalls.lua";
       ["syscall.osx.c"] = "syscall/osx/c.lua";
@@ -81,6 +82,12 @@ build =
       ["syscall.osx.ioctl"] = "syscall/osx/ioctl.lua";
       ["syscall.osx.types"] = "syscall/osx/types.lua";
       ["syscall.osx.fcntl"] = "syscall/osx/fcntl.lua";
+
+      ["syscall.rump.init"] = "syscall/rump/init.lua";
+      ["syscall.rump.c"] = "syscall/rump/c.lua";
+      ["syscall.rump.ffitypes"] = "syscall/rump/ffitypes.lua";
+      ["syscall.rump.ffifunctions"] = "syscall/rump/ffifunctions.lua";
+      ["syscall.rump.types"] = "syscall/rump/types.lua";
 
     };
   };
