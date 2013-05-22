@@ -18,7 +18,7 @@ script:
  - cd buildrump.sh
  - ./buildrump.sh -q checkout fullbuild
  - export LD_LIBRARY_PATH="$HOME/buildrump.sh/rump/lib"
- - cd $HOME/ljsyscall
+ - cd $HOME/justincormack/ljsyscall
  - luajit examples/rump/fstest.lua
 
 
