@@ -4,8 +4,10 @@ before_install:
  - sudo add-apt-repository ppa:mwild1/ppa -y
  - sudo apt-get update -y
  - sudo apt-get install luajit -y
+ - sudo apt-get install luarocks -y
 
 script: 
  - luajit test/test.lua
  - luajit test/ctest.lua > test/ctest.c && cc -std=c99 test/ctest.c -o test/ctest && ./test/ctest
+ - luarocks install --local rockspec/ljsyscall-scm-1.rockspec
 
