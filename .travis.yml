@@ -9,7 +9,6 @@ before_install:
 
 script: 
  - luajit test/test.lua
- - ORIG = $PWD
  - luajit test/ctest.lua > test/ctest.c && cc -std=c99 test/ctest.c -o test/ctest && ./test/ctest
  - luarocks install --local rockspec/ljsyscall-scm-1.rockspec
  - cd .. && mkdir test && cp -a ljsyscall/test/* test
