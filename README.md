@@ -24,6 +24,8 @@ ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; intend
 
 For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT) and OSX 64 bit. NetBSD on ARM and PPC should work as it is clean and portable, and MIPS if LuaJIT runs. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the (small) differences.
 
+There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows try [TINN](https://github.com/Wiladams/TINN).
+
 ## new features planned soon
 netfilter, dhcp, selinux, NetBSD rump kernel support.
 

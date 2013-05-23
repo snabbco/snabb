@@ -5,7 +5,7 @@ before_install:
  - sudo apt-get update -y
  - sudo apt-get install luajit -y
  - sudo apt-get install luarocks -y
- - sudo apt-get install cvs -y
+# - install rump kernel
 
 script: 
  - luajit test/test.lua
@@ -14,11 +14,6 @@ script:
  - cd .. && mkdir test && cp -a ljsyscall/test/* test
  - export LUA_PATH="$HOME/.luarocks/share/lua/5.1/?.lua;./?.lua"
  - luajit test/test.lua
-# - git clone git://github.com/anttikantee/buildrump.sh.git
-# - cd buildrump.sh
-# - ./buildrump.sh -q checkout fullbuild
-# - export LD_LIBRARY_PATH="$HOME/buildrump.sh/rump/lib"
-# - cd $ORIG
 # - luajit examples/rump/fstest.lua
 
 
