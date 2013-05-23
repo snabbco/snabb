@@ -1,6 +1,6 @@
 -- ppc ioctl differences
 
-local s = require("syscall.types").s
+local function init(s)
 
 local arch = {
   IOC = {
@@ -39,4 +39,8 @@ local arch = {
 }
 
 return arch
+
+end
+
+return {init = init}
 

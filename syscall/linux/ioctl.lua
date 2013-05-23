@@ -1,16 +1,12 @@
 -- ioctls, filling in as needed
 -- note there are some architecture dependent values
 
--- include types to get sizes
-local s = require "syscall.types".s
+local function init(abi, s)
 
-local strflag = require("syscall.helpers").strflag
+local strflag = require "syscall.helpers".strflag
 
-local abi = require "syscall.abi"
-
-local ffi = require "ffi"
 local ok, arch = pcall(require, "syscall.linux." .. abi.arch .. ".ioctl") -- architecture specific definitions
-if not ok then arch = {} end
+if ok then arch = arch.init(s) else arch = {} end
 
 local bit = require "bit"
 
@@ -233,6 +229,9 @@ for k, v in pairs(override) do ioctl[k] = v end
 -- alternate names
 ioctl.TIOCINQ = ioctl.FIONREAD
 
--- TODO should we export more functions?
 return ioctl
+
+end
+
+return {init = init}
 
