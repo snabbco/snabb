@@ -1,9 +1,9 @@
 -- fcntl is one of those bits of the Unix API that is a bit random, so give it its own file
 
+return function(abi, c, types)
+
 local ffi = require "ffi"
 
-local c = require "syscall.constants"
-local types = require "syscall.types"
 local t, pt, s = types.t, types.pt, types.s
 
 local function getflock(arg)
@@ -44,4 +44,6 @@ local fcntl = {
 }
 
 return fcntl
+
+end
 

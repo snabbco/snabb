@@ -8,8 +8,7 @@ local types = require "syscall.types"
 local t, pt, s = types.t, types.pt, types.s
 
 local ioctl = require("syscall." .. abi.os .. ".ioctl")(abi, s)
-
-local fcntl = require "syscall.fcntl"
+local fcntl = require("syscall." .. abi.os .. ".fcntl")(abi, c, types)
 
 local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
 

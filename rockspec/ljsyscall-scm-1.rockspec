@@ -34,7 +34,6 @@ build =
       ["syscall.types"] = "syscall/types.lua";
       ["syscall.types2"] = "syscall/types2.lua";
       ["syscall.features"] = "syscall/features.lua";
-      ["syscall.fcntl"] = "syscall/fcntl.lua";
 
       ["syscall.linux.syscalls"] = "syscall/linux/syscalls.lua";
       ["syscall.linux.c"] = "syscall/linux/c.lua";
