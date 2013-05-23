@@ -1,16 +1,21 @@
 -- this file now does very little, just makes some modifications to syscalls
 -- TODO want to try to remove everything from here
 
+local abi = require "syscall.abi"
 local c = require "syscall.constants"
 local C = require "syscall.c"
 local types = require "syscall.types"
-local abi = require "syscall.abi"
-local h = require "syscall.helpers"
-local S = require "syscall.syscalls"
+local fcntl = require "syscall.fcntl"
+
+local init = require "syscall.syscalls".init
+
+local S = init(abi, c, C, types, fcntl)
 
 local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
+
+local h = require "syscall.helpers"
 
 -- TODO these are duplicated, probably should not be used in this file anyway
 local function getfd(fd)

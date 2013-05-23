@@ -1,15 +1,12 @@
 -- choose correct syscalls for OS, plus shared calls
 -- note that where functions are identical if present but may be missing they can also go here
 
+function init(abi, c, C, types, fcntl)
+
 local ffi = require "ffi"
 local bit = require "bit"
 
-local c = require "syscall.constants"
-local C = require "syscall.c"
-local types = require "syscall.types"
-local abi = require "syscall.abi"
 local h = require "syscall.helpers"
-local fcntl = require "syscall.fcntl"
 
 local t, pt, s = types.t, types.pt, types.s
 
@@ -358,9 +355,13 @@ else -- NetBSD and Linux have pipe2
   end
 end
 
-if not S.umount then S.umount = S.unmount end
+if not S.umount then S.umount = S.unmount end -- TODO reserse as well
 
 -- TODO setpgrp and similar - see the man page
 
 return S
+
+end
+
+return {init = init}
 
