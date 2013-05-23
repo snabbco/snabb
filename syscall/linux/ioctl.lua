@@ -2,8 +2,7 @@
 -- note there are some architecture dependent values
 
 -- include types to get sizes
-local types = require "syscall.types"
-local s, t = types.s, types.t
+local s = require "syscall.types".s
 
 local strflag = require("syscall.helpers").strflag
 
@@ -18,7 +17,7 @@ local bit = require "bit"
 local band = bit.band
 local function bor(...)
   local r = bit.bor(...)
-  if r < 0 then r = r + t.int64(4294967296) end
+  if r < 0 then r = r + 4294967296LL end -- TODO check if we need to do this, odd cast to 64 bit
   return r
 end
 local lshift = bit.lshift
