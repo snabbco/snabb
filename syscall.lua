@@ -11,12 +11,11 @@ local ioctl = require("syscall." .. abi.os .. ".ioctl").init(abi, s)
 
 local fcntl = require "syscall.fcntl"
 
-local init = require "syscall.syscalls".init
+local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
 
-local S = init(abi, c, C, types, ioctl, fcntl)
+S.abi, S.c, S.C, S.types, S.t, S.ioctl = abi, c, C, types, t, ioctl -- add to main table returned
 
 local ffi = require "ffi"
-
 
 local h = require "syscall.helpers"
 

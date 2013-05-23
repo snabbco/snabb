@@ -2,14 +2,17 @@
 -- Currently run for BSD TODO split into portable subset and BSD specific
 -- would need filtering to only test portable items though to run under Linux
 
-local ffi = require "ffi"
-local abi = require "syscall.abi"
-local types = require "syscall.types"
+local S = require "syscall"
+
+local abi = S.abi
+local types = S.types
 local t, ctypes, s = types.t, types.ctypes, types.s
-local c = require "syscall.constants"
+local c = S.c
+c.IOCTL = S.ioctl
 
-c.IOCTL = require "syscall.ioctl"
+local ffi = require "ffi"
 
+-- fixups
 c.AF.DECnet = c.AF.DECNET
 c.AF.DECNET = nil
 

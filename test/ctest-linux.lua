@@ -2,13 +2,15 @@
 -- Linux specific as there are a lot of workarounds
 -- luajit ctest.lua > ctest.c && cc -std=c99 ctest.c -o ctest && ./ctest
 
-local ffi = require "ffi"
-local abi = require "syscall.abi"
-local types = require "syscall.types"
-local t, ctypes, s = types.t, types.ctypes, types.s
-local c = require "syscall.constants"
+local S = require "syscall"
 
-c.IOCTL = require "syscall.ioctl"
+local abi = S.abi
+local types = S.types
+local t, ctypes, s = types.t, types.ctypes, types.s
+local c = S.c
+c.IOCTL = S.ioctl
+
+local ffi = require "ffi"
 
 -- TODO fix these, various naming issues
 ctypes["struct linux_dirent64"] = nil
