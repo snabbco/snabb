@@ -1,6 +1,6 @@
 -- BSD specific syscalls
 
-return function(S, hh, abi, c, C, types)
+return function(S, hh, abi, c, C, types, ioctl)
 
 local t, pt, s = types.t, types.pt, types.s
 

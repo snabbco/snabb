@@ -5,11 +5,12 @@ local abi = require "syscall.abi"
 local c = require "syscall.constants"
 local C = require "syscall.c"
 local types = require "syscall.types"
+local ioctl = require "syscall.ioctl"
 local fcntl = require "syscall.fcntl"
 
 local init = require "syscall.syscalls".init
 
-local S = init(abi, c, C, types, fcntl)
+local S = init(abi, c, C, types, ioctl, fcntl)
 
 local ffi = require "ffi"
 

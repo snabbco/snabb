@@ -1,8 +1,6 @@
 -- This is the actual system calls for Linux
 
-return function(S, hh, abi, c, C, types)
-
-local ioctl = require "syscall.ioctl"
+return function(S, hh, abi, c, C, types, ioctl)
 
 local ffi = require "ffi"
 local bit = require "bit"

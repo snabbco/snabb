@@ -1,7 +1,7 @@
 -- choose correct syscalls for OS, plus shared calls
 -- note that where functions are identical if present but may be missing they can also go here
 
-function init(abi, c, C, types, fcntl)
+function init(abi, c, C, types, ioctl, fcntl)
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -288,7 +288,7 @@ local hh = {
   ret64 = ret64, retnum = retnum, retfd = retfd, retbool = retbool, retptr = retptr
 }
 
-local S = require("syscall." .. abi.os .. ".syscalls")(S, hh, abi, c, C, types)
+local S = require("syscall." .. abi.os .. ".syscalls")(S, hh, abi, c, C, types, ioctl)
 
 -- these functions are not always available as syscalls, so always define via other calls
 function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
