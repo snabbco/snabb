@@ -3,12 +3,10 @@
 -- ffi.C (ie libc) is the default fallback via the metatable, but we override stuff that might be missing, has different semantics
 -- or which we cannot detect sanely which ABI is being presented.
 
+local function init(abi, c, types)
+
 local ffi = require "ffi"
 
-local c = require "syscall.constants"
-local abi = require "syscall.abi"
-
-local types = require "syscall.types"
 local t, pt, s = types.t, types.pt, types.s
 
 local h = require "syscall.helpers"
@@ -290,4 +288,9 @@ if abi.abi32 then
 end
 
 return C
+
+end
+
+return {init = init}
+
 

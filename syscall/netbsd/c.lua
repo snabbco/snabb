@@ -2,14 +2,15 @@
 -- For BSD we hope we do not need many overrides
 -- however stat appears to be "fixed" up in libc to return incorrect results TODO why?
 
+local function init(abi, c, types)
+
 local ffi = require "ffi"
 
-local types = require "syscall.types"
 local t, pt, s = types.t, types.pt, types.s
 
 local C = setmetatable({}, {__index = ffi.C})
 
--- TODO could move to constants
+-- TODO move to constants
 local stat50 = 439
 local fstat50 = 440
 local lstat50 = 441
@@ -27,4 +28,8 @@ C.lstat = function(path, buf)
 end
 
 return C
+
+end
+
+return {init = init}
 
