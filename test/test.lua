@@ -3,7 +3,7 @@
 local strict = require "test.strict"
 
 local S = require "syscall"
-local types = S.c
+local types = S.types
 local c = require "syscall.constants"
 local abi = require "syscall.abi"
 
