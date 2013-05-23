@@ -10,6 +10,12 @@ ffi.cdef[[
 int rump_init(void);
 ]]
 
+if ffi.os == "netbsd" then
+  require "syscall.netbsd.ffitypes" -- with rump on NetBSD the types are the same
+else
+  require "syscall.netbsd.common.ffitypes".init(true) -- rump = true
+end
+
 local C = require "syscall.rump.c"
 local types = require "syscall.rump.types"
 

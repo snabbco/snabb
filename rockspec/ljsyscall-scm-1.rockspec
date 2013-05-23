@@ -30,7 +30,6 @@ build =
       ["syscall.constants"] = "syscall/constants.lua";
       ["syscall.ffitypes"] = "syscall/ffitypes.lua";
       ["syscall.ffifunctions"] = "syscall/ffifunctions.lua";
-      ["syscall.types"] = "syscall/types.lua";
       ["syscall.types2"] = "syscall/types2.lua";
       ["syscall.features"] = "syscall/features.lua";
 
@@ -82,7 +81,6 @@ build =
 
       ["syscall.rump.init"] = "syscall/rump/init.lua";
       ["syscall.rump.c"] = "syscall/rump/c.lua";
-      ["syscall.rump.ffitypes"] = "syscall/rump/ffitypes.lua";
       ["syscall.rump.ffifunctions"] = "syscall/rump/ffifunctions.lua";
       ["syscall.rump.types"] = "syscall/rump/types.lua";
 

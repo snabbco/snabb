@@ -6,13 +6,11 @@ local ffi = require "ffi"
 local cdef
 
 if ffi.os == "netbsd" then
-  require "syscall.netbsd.ffitypes" -- with rump on NetBSD the types are the same
   cdef = function(s)
     s = string.gsub(s, "_netbsd_", "") -- no netbsd types
     ffi.cdef(s)
   end
 else
-  require "syscall.rump.ffitypes"
   cdef = ffi.cdef -- use as provided
 end
 

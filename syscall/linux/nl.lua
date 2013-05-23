@@ -4,10 +4,12 @@ local nl = {} -- exports
 
 local ffi = require "ffi"
 local bit = require "bit"
+
 local S = require "syscall"
 local h = require "syscall.helpers"
-local types = require "syscall.types"
-local c = require "syscall.constants"
+
+local types = S.types
+local c = S.c
 
 local htonl = h.htonl
 

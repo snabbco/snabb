@@ -1,18 +1,16 @@
 -- types for rump kernel
 
-abi = require "syscall.abi"
+local abi = require "syscall.abi"
+local c = require "syscall.netbsd.constants"
+local errors = require "syscall.netbsd.errors"
+local ostypes = require "syscall.netbsd.types"
 
+-- if running rump on netbsd just return normal NetBSD types
 if abi.os == "netbsd" then
-  return require "syscall.types" -- if running rump on netbsd just return normal types
+  return require "syscall.types2".init(abi, c, errors, ostypes, nil)
 end
 
 -- running on another OS
-
-require "syscall.rump.ffitypes"
-
-local errors = require "syscall.netbsd.errors"
-local c = require "syscall.netbsd.constants"
-local ostypes = require "syscall.netbsd.types"
 
 local unchanged = {
   char = true,
@@ -53,8 +51,6 @@ local function rumpfn(tp) -- add _netbsd_ to correct types
   return "_netbsd_" .. tp
 end
 
-local init = require "syscall.types2".init
-
-return init(abi, c, errors, ostypes, rumpfn)
+return require "syscall.types2".init(abi, c, errors, ostypes, rumpfn)
 
 

@@ -1,12 +1,18 @@
 -- this file now does very little, just makes some modifications to syscalls
 -- TODO want to try to remove everything from here
 
+require "syscall.ffitypes"
+require "syscall.ffifunctions"
+
 local abi = require "syscall.abi"
 local c = require "syscall.constants"
-local types = require "syscall.types"
-local t, pt, s = types.t, types.pt, types.s
+local errors = require("syscall." .. abi.os .. ".errors")
 
-require "syscall.ffifunctions"
+local ostypes = require("syscall." .. abi.os .. ".types")
+
+local types = require "syscall.types2".init(abi, c, errors, ostypes, nil) -- nil is not rump
+
+local t, pt, s = types.t, types.pt, types.s
 
 local C = require("syscall." .. abi.os .. ".c").init(abi, c, types)
 local ioctl = require("syscall." .. abi.os .. ".ioctl")(abi, s)

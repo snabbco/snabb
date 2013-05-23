@@ -8,7 +8,9 @@ local ffi = require "ffi"
 local bit = require "bit"
 local S = require "syscall"
 local h = require "syscall.helpers"
-local t, pt, s, c = S.t, S.pt, S.s, S.c
+local c = S.c
+local types = S.types
+local t, pt, s = types.t, types.pt, types.s
 
 function nf.socket(family)
   return S.socket(family, "raw", "raw")
