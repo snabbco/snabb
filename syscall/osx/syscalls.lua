@@ -1,11 +1,6 @@
 -- BSD specific syscalls
 
-return function(S, hh)
-
-local c = require "syscall.constants"
-local C = require "syscall.c"
-local types = require "syscall.types"
-local abi = require "syscall.abi"
+return function(S, hh, abi, c, C, types)
 
 local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
 local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr

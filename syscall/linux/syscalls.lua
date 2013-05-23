@@ -1,11 +1,7 @@
 -- This is the actual system calls for Linux
 
-return function(S, hh)
+return function(S, hh, abi, c, C, types)
 
-local c = require "syscall.constants"
-local C = require "syscall.c"
-local types = require "syscall.types"
-local abi = require "syscall.abi"
 local ioctl = require "syscall.ioctl"
 
 local ffi = require "ffi"
