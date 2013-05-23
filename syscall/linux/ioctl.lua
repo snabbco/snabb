@@ -1,12 +1,12 @@
 -- ioctls, filling in as needed
 -- note there are some architecture dependent values
 
-local function init(abi, s)
+return function(abi, s)
 
 local strflag = require "syscall.helpers".strflag
 
 local ok, arch = pcall(require, "syscall.linux." .. abi.arch .. ".ioctl") -- architecture specific definitions
-if ok then arch = arch.init(s) else arch = {} end
+if ok then arch = arch(s) else arch = {} end
 
 local bit = require "bit"
 
@@ -232,6 +232,4 @@ ioctl.TIOCINQ = ioctl.FIONREAD
 return ioctl
 
 end
-
-return {init = init}
 

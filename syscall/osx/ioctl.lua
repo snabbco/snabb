@@ -1,6 +1,6 @@
 -- ioctls, filling in as needed
 
-local function init(abi, s)
+return function(abi, s)
 
 local strflag = require("syscall.helpers").strflag
 local bit = require "bit"
@@ -20,6 +20,4 @@ local ioctl = strflag {
 return ioctl
 
 end
-
-return {init = init}
 

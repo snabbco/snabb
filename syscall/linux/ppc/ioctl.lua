@@ -1,6 +1,6 @@
 -- ppc ioctl differences
 
-local function init(s)
+return function(s)
 
 local arch = {
   IOC = {
@@ -41,6 +41,4 @@ local arch = {
 return arch
 
 end
-
-return {init = init}
 

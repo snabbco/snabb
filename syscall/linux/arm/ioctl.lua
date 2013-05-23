@@ -1,6 +1,6 @@
 -- ARM ioctl differences
 
-local function init(s)
+return function(s)
 
 local arch = {
   ioctl = {
@@ -11,6 +11,4 @@ local arch = {
 return arch
 
 end
-
-return {init = init}
 
