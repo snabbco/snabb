@@ -5,13 +5,15 @@
 
 -- TODO rework so that items can be methods on fd again, for eventfd, timerfd, signalfd and tty
 
-local ffi = require "ffi"
 local S = require "syscall"
 
-local abi = require "syscall.abi"
+local abi = S.abi
+local types = S.types
+local c = S.c
+
 local h = require "syscall.helpers"
-local types = require "syscall.types"
-local c = require "syscall.constants"
+
+local ffi = require "ffi"
 
 local octal = h.octal
 

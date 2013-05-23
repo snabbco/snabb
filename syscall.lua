@@ -13,7 +13,9 @@ local fcntl = require "syscall.fcntl"
 
 local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
 
-S.abi, S.c, S.C, S.types, S.t, S.ioctl = abi, c, C, types, t, ioctl -- add to main table returned
+c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps
+
+S.abi, S.c, S.C, S.types, S.t = abi, c, C, types, t -- add to main table returned
 
 local ffi = require "ffi"
 

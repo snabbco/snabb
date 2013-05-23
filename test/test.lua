@@ -3,11 +3,11 @@
 local strict = require "test.strict"
 
 local S = require "syscall"
+local abi = S.abi
 local types = S.types
-local c = require "syscall.constants"
-local abi = require "syscall.abi"
+local c = S.c
 
-local features = require "syscall.features"
+local features = require "syscall.features" -- TODO should be function of S
 
 local helpers = require "syscall.helpers"
 

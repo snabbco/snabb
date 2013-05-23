@@ -3,10 +3,9 @@
 -- TODO stop using globals for tests
 
 local S = require "syscall"
-local helpers = require "syscall.helpers"
-local types = require "syscall.types"
-local c = require "syscall.constants"
-local abi = require "syscall.abi"
+local abi = S.abi
+local types = S.types
+local c = S.c
 local features = require "syscall.features"
 
 local bit = require "bit"
@@ -16,6 +15,8 @@ local t, pt, s = types.t, types.pt, types.s
 
 local nl = require "syscall.linux.nl"
 local util = require "syscall.linux.util"
+
+local helpers = require "syscall.helpers"
 
 local oldassert = assert
 local function assert(cond, s)

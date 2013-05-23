@@ -8,7 +8,6 @@ local abi = S.abi
 local types = S.types
 local t, ctypes, s = types.t, types.ctypes, types.s
 local c = S.c
-c.IOCTL = S.ioctl
 
 local ffi = require "ffi"
 
