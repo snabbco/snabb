@@ -7,7 +7,7 @@ local ostypes = require "syscall.netbsd.types"
 
 -- if running rump on netbsd just return normal NetBSD types
 if abi.os == "netbsd" then
-  return require "syscall.types2".init(abi, c, errors, ostypes, nil)
+  return require "syscall.types".init(abi, c, errors, ostypes, nil)
 end
 
 -- running on another OS
@@ -51,6 +51,6 @@ local function rumpfn(tp) -- add _netbsd_ to correct types
   return "_netbsd_" .. tp
 end
 
-return require "syscall.types2".init(abi, c, errors, ostypes, rumpfn)
+return require "syscall.types".init(abi, c, errors, ostypes, rumpfn)
 
 

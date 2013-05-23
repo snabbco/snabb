@@ -10,7 +10,7 @@ local errors = require("syscall." .. abi.os .. ".errors")
 
 local ostypes = require("syscall." .. abi.os .. ".types")
 
-local types = require "syscall.types2".init(abi, c, errors, ostypes, nil) -- nil is not rump
+local types = require "syscall.types".init(abi, c, errors, ostypes, nil) -- nil is not rump
 
 local t, pt, s = types.t, types.pt, types.s
 
