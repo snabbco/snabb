@@ -1,24 +1,29 @@
 
--- test only
+-- This mirrors syscall.lua, but some differences
 
 local ffi = require "ffi"
 
 local rumpuser = ffi.load("rumpuser")
-local rump_syms = ffi.load("rump")
+local rump = ffi.load("rump")
 
 ffi.cdef[[
 int rump_init(void);
 ]]
 
-rump = {
-  init = rump_syms.rump_init,
-  module = function(s)
-    s = string.gsub(s, "%.", "_")
-    ffi.load("rump" .. s, true)
-  end,
-  C = require "syscall.rump.c",
-  types = require "syscall.rump.types"
-}
+local C = require "syscall.rump.c"
+local types = require "syscall.rump.types"
 
-return rump
+local function module(s)
+  s = string.gsub(s, "%.", "_")
+  ffi.load("rump" .. s, true)
+end
+
+local S = {}
+
+S.init = rump.rump_init
+S.module = module
+S.C = C
+S.types = types
+
+return S
 
