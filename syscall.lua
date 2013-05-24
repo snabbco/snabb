@@ -1,10 +1,10 @@
 -- this file now does very little, just makes some modifications to syscalls
 -- TODO want to try to remove everything from here
 
-require "syscall.ffitypes"
-require "syscall.ffifunctions"
-
 local abi = require "syscall.abi"
+
+require("syscall." .. abi.os .. ".ffitypes")
+require "syscall.ffifunctions"
 
 local c = require("syscall." .. abi.os .. ".constants")
 local errors = require("syscall." .. abi.os .. ".errors")
