@@ -214,12 +214,8 @@ int mq_unlink(const char *name);
 
 // functions from libc ie man 3 not man 2
 
-// env. dont support putenv, as does not copy which is an issue
+// environment
 extern char **environ;
-int setenv(const char *name, const char *value, int overwrite);
-int unsetenv(const char *name);
-int clearenv(void);
-char *getenv(const char *name);
 ]]
 
 if abi.abi32 then

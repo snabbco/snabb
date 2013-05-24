@@ -611,10 +611,6 @@ test_misc = {
   test_environ = function()
     local e = S.environ()
     assert(e.PATH, "expect PATH to be set in environment")
-    assert(S.setenv("XXXXYYYYZZZZZZZZ", "test"))
-    assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env vars")
-    assert(S.unsetenv("XXXXYYYYZZZZZZZZ"))
-    assert_nil(S.environ().XXXXYYYYZZZZZZZZ, "expect to be able to unset env vars")
   end,
   test_rlimit = function()
     local r, err = S.getrlimit("nofile")

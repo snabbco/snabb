@@ -51,7 +51,7 @@ end
 -- 'macros' and helper functions etc
 -- TODO from here (approx, some may be in wrong place), move to syscall.util library.
 
--- handle environment (Lua only provides os.getenv). TODO add metatable to make more Lualike.
+-- handle environment. Note setenv etc removed as not kernel interfaces, only exec writes a new environment
 function S.environ() -- return whole environment as table
   local environ = ffi.C.environ
   if not environ then return nil end
@@ -71,12 +71,6 @@ end
 function S.getenv(name)
   return S.environ()[name]
 end
-function S.unsetenv(name) return retbool(ffi.C.unsetenv(name)) end
-function S.setenv(name, value, overwrite)
-  overwrite = h.booltoc(overwrite) -- allows nil as false/0
-  return retbool(ffi.C.setenv(name, value, overwrite))
-end
-function S.clearenv() return retbool(C.clearenv()) end
 
 function S.nonblock(fd)
   local fl, err = S.fcntl(fd, c.F.GETFL)
