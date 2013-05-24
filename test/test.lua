@@ -657,9 +657,7 @@ test_sockets_pipes = {
   end,
   test_inet_socket = function() -- TODO break this test up
     local s = assert(S.socket("inet", "stream, nonblock"))
-    local loop = "127.0.0.1"
-    local sa = assert(t.sockaddr_in(1234, loop))
-    assert_equal(tostring(sa.sin_addr), loop, "expect address converted back to string to still be same")
+    local sa = assert(t.sockaddr_in(1234, "loopback"))
     assert(sa.sin_family == 2, "expect family on inet socket to be 2")
     -- find a free port
     local bound = false
