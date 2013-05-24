@@ -1,12 +1,10 @@
 -- BSD specific tests
 
--- TODO stop using globals for tests
-
 local S = require "syscall"
 local helpers = require "syscall.helpers"
-local types = require "syscall.types"
-local c = require "syscall.constants"
-local abi = require "syscall.abi"
+local types = S.types
+local c = S.c
+local abi = S.abi
 local features = require "syscall.features"
 
 local bit = require "bit"
