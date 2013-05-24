@@ -305,14 +305,19 @@ test_read_write = {
 
 test_address_names = {
   test_ipv4_names = function()
-    assert_equal(tostring(t.in_addr("127.0.0.1")), "127.0.0.1", "print ipv4")
-    assert_equal(tostring(t.in_addr("1.2.3.4")), "1.2.3.4", "print ipv4")
-    assert_equal(tostring(t.in_addr("255.255.255.255")), "255.255.255.255", "print ipv4")
+    assert_equal(tostring(t.in_addr("127.0.0.1")), "127.0.0.1")
+    assert_equal(tostring(t.in_addr("loopback")), "127.0.0.1")
+    assert_equal(tostring(t.in_addr("1.2.3.4")), "1.2.3.4")
+    assert_equal(tostring(t.in_addr("255.255.255.255")), "255.255.255.255")
+    assert_equal(tostring(t.in_addr("broadcast")), "255.255.255.255")
   end,
   test_ipv6_names = function()
     local sa = assert(t.sockaddr_in6(1234, "2002::4:5"))
     assert_equal(sa.port, 1234, "want same port back")
     assert_equal(tostring(sa.sin6_addr), "2002::4:5", "expect same address back")
+    local sa = assert(t.sockaddr_in6(1234, "loopback"))
+    assert_equal(sa.port, 1234, "want same port back")
+    assert_equal(tostring(sa.sin6_addr), "::1", "expect same address back")
   end,
   test_inet_name = function()
     local addr = t.in_addr("127.0.0.1")
@@ -680,7 +685,7 @@ test_sockets_pipes = {
     local ba = assert(c:getpeername())
     assert(ba.sin_family == 2, "expect ipv4 connection")
     assert(tostring(ba.sin_addr) == "127.0.0.1", "expect peer on localhost")
-    assert(ba.sin_addr.s_addr == S.INADDR_LOOPBACK.s_addr, "expect peer on localhost")
+    assert(ba.sin_addr.s_addr == t.in_addr("loopback").s_addr, "expect peer on localhost")
     local n = assert(c:send(teststring))
     assert(n == #teststring, "should be able to write out short string")
     n = assert(a.fd:read(buf, size))
@@ -720,10 +725,9 @@ test_sockets_pipes = {
     assert(sv[1]:close())
   end,
   test_udp_socket = function()
-    local loop = "127.0.0.1"
     local ss = assert(S.socket("inet", "dgram"))
     local cs = assert(S.socket("inet", "dgram"))
-    local sa = assert(t.sockaddr_in(0, loop))
+    local sa = assert(t.sockaddr_in(0, "loopback"))
     assert(ss:bind(sa))
     local bsa = ss:getsockname() -- find bound address
     local n = assert(cs:sendto(teststring, #teststring, 0, bsa))

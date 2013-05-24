@@ -72,14 +72,6 @@ function S.getenv(name)
   return S.environ()[name]
 end
 
--- constants TODO move to table
-S.INADDR_ANY = t.in_addr()
-S.INADDR_LOOPBACK = t.in_addr("127.0.0.1")
-S.INADDR_BROADCAST = t.in_addr("255.255.255.255")
--- ipv6 versions
-S.in6addr_any = t.in6_addr()
-S.in6addr_loopback = t.in6_addr("::1")
-
 -- modified types; we do not really want them here but types cannot set as syscalls not defined TODO fix this
 
 -- methods on an fd

@@ -13,7 +13,7 @@ local bit = require "bit"
 local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
-local split, trim = h.split, h.trim
+local split, trim, strflag = h.split, h.trim, h.strflag
 
 local C = ffi.C -- for inet_pton, TODO due to be replaced with Lua
 ffi.cdef[[
@@ -245,6 +245,17 @@ local function inet_pton(af, src, addr)
   return addr
 end
 
+local inaddr = strflag {
+  ANY = "0.0.0.0",
+  LOOPBACK = "127.0.0.1",
+  BROADCAST = "255.255.255.255",
+}
+
+local in6addr = strflag {
+  ANY = "::",
+  LOOPBACK = "::1",
+}
+
 addtype("in_addr", "struct in_addr", {
   __tostring = function(a) return inet_ntop(c.AF.INET, a) end,
   __new = function(tp, s)
@@ -253,6 +264,7 @@ addtype("in_addr", "struct in_addr", {
       if ffi.istype(tp, s) then
         addr.s_addr = s.s_addr
       else
+        if inaddr[s] then s = inaddr[s] end
         addr = inet_pton(c.AF.INET, s, addr)
         if not addr then return nil end
       end
@@ -266,7 +278,10 @@ addtype("in6_addr", "struct in6_addr", {
   __tostring = function(a) return inet_ntop(c.AF.INET6, a) end,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then addr = inet_pton(c.AF.INET6, s, addr) end
+    if s then
+      if in6addr[s] then s = in6addr[s] end
+      addr = inet_pton(c.AF.INET6, s, addr)
+    end
     return addr
   end,
   __len = lenfn,
