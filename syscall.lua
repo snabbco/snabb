@@ -5,7 +5,8 @@ require "syscall.ffitypes"
 require "syscall.ffifunctions"
 
 local abi = require "syscall.abi"
-local c = require "syscall.constants"
+
+local c = require("syscall." .. abi.os .. ".constants")
 local errors = require("syscall." .. abi.os .. ".errors")
 
 local ostypes = require("syscall." .. abi.os .. ".types")

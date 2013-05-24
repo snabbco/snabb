@@ -1,6 +1,6 @@
 -- Linux kernel types
 
-return function(types, hh)
+return function(types, hh, abi, c)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
@@ -9,16 +9,10 @@ local ptt, addtype, addtype_var, lenfn, lenmt, newfn, istype = hh.ptt, hh.addtyp
 local ffi = require "ffi"
 local bit = require "bit"
 
-require "syscall.linux.ffitypes"
-
 local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim = h.split, h.trim
-
-local c = require "syscall.constants"
-
-local abi = require "syscall.abi"
 
 local mt = {} -- metatables
 local meth = {}
@@ -132,7 +126,7 @@ local addstructs = {
 for k, v in pairs(addtypes) do addtype(k, v) end
 for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 
--- these ones not in table as not helpful with vararg or arrays
+-- these ones not in table as not helpful with vararg or arrays TODO add more addtype variants
 t.inotify_event = ffi.typeof("struct inotify_event")
 pt.inotify_event = ptt("struct inotify_event") -- still need pointer to this
 

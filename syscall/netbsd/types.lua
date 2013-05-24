@@ -1,6 +1,6 @@
 -- BSD types
 
-return function(types, hh)
+return function(types, hh, abi, c)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
@@ -12,10 +12,6 @@ local bit = require "bit"
 local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
-
-local c = require "syscall.constants"
-
-local abi = require "syscall.abi"
 
 local mt = {} -- metatables
 local meth = {}

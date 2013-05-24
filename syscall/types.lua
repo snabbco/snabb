@@ -619,7 +619,7 @@ addtype("sigaction", "struct sigaction", mt.sigaction)
 -- include OS specific types
 local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
 
-types = ostypes(types, hh)
+types = ostypes(types, hh, abi, c)
 
 -- this is declared above
 samap_pt = {
