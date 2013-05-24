@@ -72,41 +72,6 @@ function S.getenv(name)
   return S.environ()[name]
 end
 
-function S.nonblock(fd)
-  local fl, err = S.fcntl(fd, c.F.GETFL)
-  if not fl then return nil, err end
-  fl, err = S.fcntl(fd, c.F.SETFL, bit.bor(fl, c.O.NONBLOCK))
-  if not fl then return nil, err end
-  return true
-end
-
-function S.block(fd)
-  local fl, err = S.fcntl(fd, c.F.GETFL)
-  if not fl then return nil, err end
-  fl, err = S.fcntl(fd, c.F.SETFL, bit.band(fl, bit.bnot(c.O.NONBLOCK)))
-  if not fl then return nil, err end
-  return true
-end
-
--- Nixio compatibility to make porting easier, and useful functions (often man 3). Incomplete.
-function S.setblocking(s, b) if b then return S.block(s) else return S.nonblock(s) end end
-function S.tell(fd) return S.lseek(fd, 0, c.SEEK.CUR) end
-
-function S.lockf(fd, cmd, len)
-  cmd = c.LOCKF[cmd]
-  if cmd == c.LOCKF.LOCK then
-    return S.fcntl(fd, c.F.SETLKW, {l_type = c.FCNTL_LOCK.WRLCK, l_whence = c.SEEK.CUR, l_start = 0, l_len = len})
-  elseif cmd == c.LOCKF.TLOCK then
-    return S.fcntl(fd, c.F.SETLK, {l_type = c.FCNTL_LOCK.WRLCK, l_whence = c.SEEK.CUR, l_start = 0, l_len = len})
-  elseif cmd == c.LOCKF.ULOCK then
-    return S.fcntl(fd, c.F.SETLK, {l_type = c.FCNTL_LOCK.UNLCK, l_whence = c.SEEK.CUR, l_start = 0, l_len = len})
-  elseif cmd == c.LOCKF.TEST then
-    local ret, err = S.fcntl(fd, c.F.GETLK, {l_type = c.FCNTL_LOCK.WRLCK, l_whence = c.SEEK.CUR, l_start = 0, l_len = len})
-    if not ret then return nil, err end
-    return ret.l_type == c.FCNTL_LOCK.UNLCK
-  end
-end
-
 -- constants TODO move to table
 S.INADDR_ANY = t.in_addr()
 S.INADDR_LOOPBACK = t.in_addr("127.0.0.1")
@@ -119,7 +84,7 @@ S.in6addr_loopback = t.in6_addr("::1")
 
 -- methods on an fd
 -- note could split, so a socket does not have methods only appropriate for a file
-local fdmethods = {'nonblock', 'block', 'setblocking', 'sendfds', 'sendcred',
+local fdmethods = {'nonblock', 'block', 'sendfds', 'sendcred',
                    'dup', 'read', 'write', 'pread', 'pwrite', 'tell', 'lockf',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',

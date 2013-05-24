@@ -641,7 +641,7 @@ test_sockets_pipes = {
   end,
   test_nonblock = function()
     local fds = assert(S.pipe())
-    assert(fds:setblocking(false))
+    assert(fds:nonblock())
     local r, err = fds:read()
     assert(err.AGAIN, "expect AGAIN")
     assert(fds:close())

@@ -311,7 +311,7 @@ function S.signal(signum, handler) -- defined in terms of sigaction
   return oldact.sa_handler
 end
 
--- if getcwd not defined, fall back to libc implemenrarion (currently bsd, osx) TODO move? use underlying?
+-- if getcwd not defined, fall back to libc implementation (currently bsd, osx) TODO move? use underlying?
 if not S.getcwd then
   function S.getcwd(buf, size)
     size = size or c.PATH_MAX
@@ -358,6 +358,40 @@ end
 if not S.umount then S.umount = S.unmount end -- TODO reserse as well
 
 -- TODO setpgrp and similar - see the man page
+
+-- easier interfaces to some functions that are in common use
+function S.nonblock(fd)
+  local fl, err = S.fcntl(fd, c.F.GETFL)
+  if not fl then return nil, err end
+  fl, err = S.fcntl(fd, c.F.SETFL, bit.bor(fl, c.O.NONBLOCK))
+  if not fl then return nil, err end
+  return true
+end
+
+function S.block(fd)
+  local fl, err = S.fcntl(fd, c.F.GETFL)
+  if not fl then return nil, err end
+  fl, err = S.fcntl(fd, c.F.SETFL, bit.band(fl, bit.bnot(c.O.NONBLOCK)))
+  if not fl then return nil, err end
+  return true
+end
+
+function S.tell(fd) return S.lseek(fd, 0, c.SEEK.CUR) end
+
+function S.lockf(fd, cmd, len)
+  cmd = c.LOCKF[cmd]
+  if cmd == c.LOCKF.LOCK then
+    return S.fcntl(fd, c.F.SETLKW, {l_type = c.FCNTL_LOCK.WRLCK, l_whence = c.SEEK.CUR, l_start = 0, l_len = len})
+  elseif cmd == c.LOCKF.TLOCK then
+    return S.fcntl(fd, c.F.SETLK, {l_type = c.FCNTL_LOCK.WRLCK, l_whence = c.SEEK.CUR, l_start = 0, l_len = len})
+  elseif cmd == c.LOCKF.ULOCK then
+    return S.fcntl(fd, c.F.SETLK, {l_type = c.FCNTL_LOCK.UNLCK, l_whence = c.SEEK.CUR, l_start = 0, l_len = len})
+  elseif cmd == c.LOCKF.TEST then
+    local ret, err = S.fcntl(fd, c.F.GETLK, {l_type = c.FCNTL_LOCK.WRLCK, l_whence = c.SEEK.CUR, l_start = 0, l_len = len})
+    if not ret then return nil, err end
+    return ret.l_type == c.FCNTL_LOCK.UNLCK
+  end
+end
 
 return S
 
