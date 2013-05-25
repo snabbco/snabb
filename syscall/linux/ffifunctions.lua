@@ -2,9 +2,6 @@
 
 local cdef = require "ffi".cdef
 
--- TODO for consistency should be passed this, doesnt really matter
-local abi = require "syscall.abi"
-
 cdef[[
 int openat(int dirfd, const char *pathname, int flags, mode_t mode);
 int mkdirat(int dirfd, const char *pathname, mode_t mode);
@@ -201,21 +198,5 @@ pid_t gettid(void);
 int setfsgid(uid_t fsgid);
 int setfsuid(uid_t fsuid);
 long keyctl(int cmd, ...);
-
-/* unused as use syscalls
-mqd_t mq_open(const char *name, int oflag, mode_t mode, struct mq_attr *attr);
-int mq_getsetattr(mqd_t mqdes, struct mq_attr *newattr, struct mq_attr *oldattr);
-ssize_t mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len, unsigned *msg_prio, const struct timespec *abs_timeout);
-int mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len, unsigned msg_prio, const struct timespec *abs_timeout);
-int mq_notify(mqd_t mqdes, const struct sigevent *sevp);
-int mq_unlink(const char *name);
-*/
 ]]
-
-if abi.abi32 then
-cdef[[
-ssize_t pread64(int fd, void *buf, size_t count, off_t offset);
-ssize_t pwrite64(int fd, const void *buf, size_t count, off_t offset);
-]]
-end
 
