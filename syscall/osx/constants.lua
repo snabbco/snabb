@@ -463,6 +463,13 @@ c.FD = multiflags {
   CLOEXEC = 1,
 }
 
+-- note changed from F_ to FCNTL_LOCK
+c.FCNTL_LOCK = strflag {
+  RDLCK = 1,
+  UNLCK = 2,
+  WRLCK = 3,
+}
+
 c.S_I = multiflags {
   FMT   = octal('0170000'),
   FSOCK = octal('0140000'),
