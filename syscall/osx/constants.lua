@@ -240,7 +240,7 @@ c.SA = multiflags {
   NODEFER   = 0x0010,
   NOCLDWAIT = 0x0020,
   USERTRAMP = 0x0100,
-  64REGSET  = 0x0200,
+  ["64REGSET"] = 0x0200,
 }
 
 c.EXIT = strflag {
