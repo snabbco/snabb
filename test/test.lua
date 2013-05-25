@@ -544,7 +544,7 @@ test_file_operations = {
 }
 
 test_largefile = {
-  test_seek64 = function()
+  test_seek = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     local off = t.off(2^34)
     local offset = 2^34 -- should work with Lua numbers up to 56 bits, above that need explicit 64 bit type.
@@ -560,7 +560,7 @@ test_largefile = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
-  test_ftruncate64 = function()
+  test_ftruncate = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     local offset = 2^35
     assert(fd:truncate(offset), "64 bit ftruncate should be ok")
@@ -569,7 +569,7 @@ test_largefile = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
-  test_truncate64 = function()
+  test_truncate = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     local offset = 2^35
     assert(S.truncate(tmpfile, offset), "64 bit truncate should be ok")

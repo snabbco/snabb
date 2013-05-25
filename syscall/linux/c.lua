@@ -34,13 +34,24 @@ local C = setmetatable({}, {__index = ffi.C}) -- fall back to libc if do not ove
 
 -- use 64 bit fileops on 32 bit always. As may be missing will use syscalls directly
 if abi.abi32 then
-  function C.truncate(path, length)
-    local len1, len2 = arg64u(length)
-    return C.syscall(c.SYS.truncate64, path, t.long(len1), t.long(len2))
-  end
-  function C.ftruncate(fd, length)
-    local len1, len2 = arg64u(length)
-    return C.syscall(c.SYS.ftruncate64, t.int(fd), t.long(len1), t.long(len2))
+  if c.syscall.zeropad then
+    function C.truncate(path, length)
+      local len1, len2 = arg64u(length)
+      return C.syscall(c.SYS.truncate64, path, t.int(0), t.long(len1), t.long(len2))
+    end
+    function C.ftruncate(fd, length)
+      local len1, len2 = arg64u(length)
+      return C.syscall(c.SYS.ftruncate64, t.int(fd), t.int(0), t.long(len1), t.long(len2))
+    end
+  else
+    function C.truncate(path, length)
+      local len1, len2 = arg64u(length)
+      return C.syscall(c.SYS.truncate64, path, t.long(len1), t.long(len2))
+    end
+    function C.ftruncate(fd, length)
+      local len1, len2 = arg64u(length)
+      return C.syscall(c.SYS.ftruncate64, t.int(fd), t.long(len1), t.long(len2))
+    end
   end
   -- note statfs,fstatfs pass size of struct, we hide that here as on 64 bit we use libc call at present
   function C.statfs(path, buf) return C.syscall(c.SYS.statfs64, path, t.uint(s.statfs), pt.void(buf)) end
