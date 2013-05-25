@@ -295,7 +295,7 @@ c.EXIT = strflag {
   FAILURE = 1,
 }
 
--- sigaction, note renamed SIGACT from SIG
+-- sigaction, note renamed SIGACT from SIG_
 c.SIGACT = strflag {
   ERR = -1,
   DFL =  0,
