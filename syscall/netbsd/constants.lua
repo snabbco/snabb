@@ -466,7 +466,6 @@ c.RB = multiflags {
   NOSYNC      = 0x00000004,
   HALT        = 0x00000008,
   INITNAME    = 0x00000010,
-  UNUSED1     = 0x00000020,
   KDB         = 0x00000040,
   RDONLY      = 0x00000080,
   DUMP        = 0x00000100,
