@@ -1,10 +1,10 @@
 -- define C functions for rump
 
+local function init(abi, c, types)
+
 local ffi = require "ffi"
 
 local rump = ffi.load("rump")
-
-local abi = require "syscall.abi"
 
 local cdef
 
@@ -370,4 +370,7 @@ local C = {
 
 return C
 
+end
+
+return {init = init}
 

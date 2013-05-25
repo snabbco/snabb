@@ -1,6 +1,12 @@
 
 -- This mirrors syscall.lua, but some differences
 
+local abi = require "syscall.abi"
+
+local rumpabi = {}
+for k, v in pairs(abi) do rumpabi[k] = v end
+rumpabi.os = "netbsd"
+
 local ffi = require "ffi"
 
 local rumpuser = ffi.load("rumpuser")
@@ -10,26 +16,49 @@ ffi.cdef[[
 int rump_init(void);
 ]]
 
-if ffi.os == "netbsd" then
+if abi.os == "netbsd" then
   require "syscall.netbsd.ffitypes" -- with rump on NetBSD the types are the same
 else
   require "syscall.netbsd.common.ffitypes".init(true) -- rump = true
 end
 
-local C = require "syscall.rump.c"
-local types = require "syscall.rump.types"
+local c = require "syscall.netbsd.constants"
+local errors = require "syscall.netbsd.errors"
+
+local ostypes = require "syscall.netbsd.types"
+
+local types
+if abi.os == "netbsd" then
+  -- if running rump on netbsd just return normal NetBSD types
+  types = require "syscall.types".init(abi, c, errors, ostypes, nil)
+else
+  -- running on another OS
+  types = require "syscall.rump.types".init(abi, c, errors, ostypes)
+end
+
+local C = require "syscall.rump.c".init(rumpabi, c, types)
+local ioctl = require("syscall.netbsd.ioctl")(rumpabi, s)
+local fcntl = require("syscall.netbsd.fcntl")(rumpabi, c, types)
+
+c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps
+
+local S = require "syscall.syscalls".init(rumpabi, c, C, types, ioctl, fcntl)
 
 local function module(s)
   s = string.gsub(s, "%.", "_")
   ffi.load("rump" .. s, true)
 end
 
-local S = {}
+S.abi, S.c, S.C, S.types, S.t = rumpabi, c, C, types, types.t -- add to main table returned
+
+-- add methods
+S = require "syscall.methods".init(S)
+
+-- add feature tests
+S.features = require "syscall.features".init(S)
 
 S.init = rump.rump_init
 S.module = module
-S.C = C
-S.types = types
 
 return S
 

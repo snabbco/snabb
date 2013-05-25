@@ -5,28 +5,23 @@ local ffi = require "ffi"
 
 function octal(s) return tonumber(s, 8) end
 
-local rump = require "syscall.rump.init"
+local R = require "syscall.rump.init"
 
-rump.module "vfs"
-rump.module "fs.kernfs"
+R.module "vfs"
+R.module "fs.kernfs"
 
-rump.init()
+R.init()
 
-local C = rump.C
+local C, t, c = R.C, R.t, R.c
 
-local ok = C.mkdir("/kern", octal("0755"))
-assert(ok == 0, "mkdir " .. ok)
-local ok = C.mount("kernfs", "/kern", 0, nil, 0)
-assert(ok == 0, "mount " .. ok)
-local fd = C.open("/kern/version", 0, 0)
-assert(fd >= 0, "open " .. fd)
+assert(R.mkdir("/kern", octal("0755"))) -- TODO allow numerical
+assert(R.mount("kernfs", "/kern"))
 
-local buf_t = ffi.typeof("char[?]")
-local buf = buf_t(1024)
-local n = C.read(fd, buf, 1024)
-assert(n >= 0, "read " .. n)
-print(ffi.string(buf, n))
-local ok = C.close(fd)
-assert(ok >= 0, "close " .. ok)
-local ok = C.reboot(0, nil)
-assert(ok == 0, "reboot " .. ok)
+local fd = assert(R.open("/kern/version"))
+
+local str = assert(fd:read(nil, 1024))
+print("kernel version is " .. str)
+assert(fd:close())
+
+assert(R.reboot(0, nil))
+
