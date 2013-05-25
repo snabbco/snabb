@@ -135,5 +135,13 @@ typedef struct __siginfo {
   long    si_band;
   unsigned long   __pad[7];
 } siginfo_t;
+struct sigaction {
+  union {
+    void (*sa_handler)(int);
+    void (*sa_sigaction)(int, _netbsd_siginfo_t *, void *);
+  } sa_handler; // renamed as in Linux definition
+  sigset_t sa_mask;
+  int sa_flags;
+};
 ]]
 
