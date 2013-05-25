@@ -679,7 +679,7 @@ test_sockets_pipes = {
     local ok, err = c:connect(sa)
     local a = s:accept()
     local ok, err = c:connect(sa) -- Linux will have returned INPROGRESS above, other OS may have connected
-    assert(s:block()) -- force accept to wait now
+    assert(s:block()) -- force accept to wait 
     a = a or assert(s:accept())
     -- a is a table with the fd, but also the inbound connection details
     assert(a.addr.sin_family == 2, "expect ipv4 connection")
@@ -701,6 +701,7 @@ test_sockets_pipes = {
     assert(n == 7, "expect writev to write 7 bytes")
     b0 = t.buffer(3)
     b1 = t.buffer(4)
+    assert(a.fd:block())
     local iov = t.iovecs{{b0, 3}, {b1, 4}}
     n = assert(a.fd:readv(iov))
     assert_equal(n, 7, "expect readv to read 7 bytes")
