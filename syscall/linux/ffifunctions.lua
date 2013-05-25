@@ -218,8 +218,8 @@ ssize_t pread64(int fd, void *buf, size_t count, off_t offset);
 ssize_t pwrite64(int fd, const void *buf, size_t count, off_t offset);
 ssize_t preadv64(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 ssize_t pwritev64(int fd, const struct iovec *iov, int iovcnt, off_t offset);
-int statfs64(const char *path, struct statfs64 *buf); /* for 32 bit */
-int fstatfs64(int fd, struct statfs64 *buf);          /* for 32 bit */
+int statfs64(const char *path, struct statfs64 *buf);
+int fstatfs64(int fd, struct statfs64 *buf);
 int truncate64(const char *path, off_t length);
 int ftruncate64(int fd, off_t length);
 ]]
