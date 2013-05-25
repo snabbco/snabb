@@ -77,6 +77,7 @@ build =
       ["syscall.osx.ioctl"] = "syscall/osx/ioctl.lua";
       ["syscall.osx.types"] = "syscall/osx/types.lua";
       ["syscall.osx.fcntl"] = "syscall/osx/fcntl.lua";
+      ["syscall.osx.errors"] = "syscall/osx/errors.lua";
 
       ["syscall.rump.init"] = "syscall/rump/init.lua";
       ["syscall.rump.c"] = "syscall/rump/c.lua";
