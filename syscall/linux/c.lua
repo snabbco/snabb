@@ -15,11 +15,11 @@ local inlibc = h.inlibc
 local function u6432(x) return t.u6432(x):to32() end
 local function i6432(x) return t.i6432(x):to32() end
 
-local C = setmetatable({}, {__index = ffi.C})
+local C = setmetatable({}, {__index = ffi.C}) -- fall back to libc if do not overwrite
 
 local CC = {} -- functions that might not be in C, may use syscalls
 
--- use 64 bit fileops on 32 bit always
+-- use 64 bit fileops on 32 bit always. As may be missing will use syscalls directly
 if abi.abi32 then
   C.truncate = ffi.C.truncate64
   C.ftruncate = ffi.C.ftruncate64
@@ -27,8 +27,28 @@ if abi.abi32 then
   C.fstatfs = ffi.C.fstatfs64
   C.pread = ffi.C.pread64
   C.pwrite = ffi.C.pwrite64
-  C.preadv = ffi.C.preadv64
-  C.pwritev = ffi.C.pwritev64
+  -- Note very odd split 64 bit arguments even on 64 bit platform.
+  function C.preadv(fd, iov, iovcnt, offset)
+    local off2, off1 = i6432(offset)
+    return C.syscall(c.SYS.preadv, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
+  end
+  function C.pwritev(fd, iov, iovcnt, offset)
+    local off2, off1 = i6432(offset)
+    return C.syscall(c.SYS.pwritev, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
+  end
+  -- lseek is a mess in 32 bit, use _llseek syscall to get clean result
+  function C.lseek(fd, offset, whence)
+    local result = t.off1()
+    local off1, off2 = u6432(offset)
+    local ret = C.syscall(c.SYS._llseek, t.int(fd), t.ulong(off1), t.ulong(off2), pt.void(result), t.uint(whence))
+    if ret == -1 then return -1 end
+    return result[0]
+  end
+  -- on 32 bit systems mmap uses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
+  function C.mmap(addr, length, prot, flags, fd, offset)
+    local pgoffset = math.floor(offset / 4096)
+    return pt.void(C.syscall(c.SYS.mmap2, pt.void(addr), t.size(length), t.int(prot), t.int(flags), t.int(fd), t.uint32(pgoffset)))
+  end
 end
 
 -- glibc caches pid, but this fails to work eg after clone().
@@ -135,7 +155,7 @@ else
       return C.syscall(sys_fadvise64, t.int(fd), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2), t.int(advise))
     end
   end
-  if c.syscall.fallocate then
+  if c.syscall.fallocate then -- set for ppc only, reversed args TODO rename flag
     function C.fallocate(fd, mode, offset, len)
       local off2, off1 = u6432(offset)
       local len2, len1 = u6432(len)
@@ -147,25 +167,6 @@ else
       local len2, len1 = u6432(len)
       return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
     end
-  end
-end
-
--- lseek is a mess in 32 bit, use _llseek syscall to get clean result
-if abi.abi32 then
-  function C.lseek(fd, offset, whence)
-    local result = t.off1()
-    local off1, off2 = u6432(offset)
-    local ret = C.syscall(c.SYS._llseek, t.int(fd), t.ulong(off1), t.ulong(off2), pt.void(result), t.uint(whence))
-    if ret == -1 then return -1 end
-    return result[0]
-  end
-end
-
--- on 32 bit systems mmap uses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
-if abi.abi32 then
-  function C.mmap(addr, length, prot, flags, fd, offset)
-    local pgoffset = math.floor(offset / 4096)
-    return pt.void(C.syscall(c.SYS.mmap2, pt.void(addr), t.size(length), t.int(prot), t.int(flags), t.int(fd), t.uint32(pgoffset)))
   end
 end
 
@@ -241,16 +242,6 @@ function CC.clock_settime(clk_id, ts)
   return C.syscall(c.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
 end
 
--- missing in uClibc. Note very odd split 64 bit arguments even on 64 bit platform.
-function CC.preadv64(fd, iov, iovcnt, offset)
-  local off2, off1 = i6432(offset)
-  return C.syscall(c.SYS.preadv, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
-end
-function CC.pwritev64(fd, iov, iovcnt, offset)
-  local off2, off1 = i6432(offset)
-  return C.syscall(c.SYS.pwritev, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
-end
-
 -- sched_setaffinity and sched_getaffinity not in Musl at the moment, use syscalls. Could test instead.
 function C.sched_getaffinity(pid, len, mask)
   return C.syscall(c.SYS.sched_getaffinity, t.pid(pid), t.uint(len), pt.void(mask))
@@ -280,12 +271,6 @@ if not inlibc "pivot_root" then C.pivot_root = CC.pivot_root end
 -- not in glibc on my dev ARM box
 if not inlibc "setns" then C.setns = CC.setns end
 if not inlibc "prlimit64" then C.prlimit64 = CC.prlimit64 end
-
--- not in uClibc
-if abi.abi32 then
-  if not inlibc "preadv64" then C.preadv = CC.preadv64 end
-  if not inlibc "pwritev64"  then C.pwritev = CC.pwritev64 end
-end
 
 return C
 
