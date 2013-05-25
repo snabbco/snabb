@@ -44,6 +44,12 @@ typedef unsigned long size_t;
 typedef unsigned long clock_t;
 typedef uint32_t socklen_t;
 
+/* actually not a struct at all in osx, just a uint32_t but for compatibility fudge it */
+/* TODO this should work, otherwise need to move all sigset_t handling out of common types */
+typedef struct {
+  uint32_t      val[1];
+} sigset_t;
+
 struct iovec {
   void *iov_base;
   size_t iov_len;
