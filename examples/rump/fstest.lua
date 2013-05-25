@@ -5,7 +5,7 @@ local ffi = require "ffi"
 
 function octal(s) return tonumber(s, 8) end
 
-local S = require "syscall" -- your OS functions
+--local S = require "syscall" -- your OS functions
 local R = require "syscall.rump.init" -- rump kernel functions
 
 R.module "vfs"
