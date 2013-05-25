@@ -37,7 +37,7 @@ if not S.exit then
 ffi.cdef[[
 void exit(int status);
 ]]
-  function S.exit(status) C.exit(c.EXIT[status]) end
+  function S.exit(status) ffi.C.exit(c.EXIT[status]) end
 end
 
 --[[ -- need more types defined
