@@ -67,6 +67,7 @@ print [[
 #include <sys/wait.h>
 #include <dirent.h>
 #include <sys/ioctl.h>
+#include <sys/reboot.h>
 
 int ret = 0;
 
