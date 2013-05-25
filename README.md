@@ -22,7 +22,7 @@ The code does not currently support the main Lua implementation, only LuaJIT. It
 
 On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; intend to support MIPS in future but currently my only MIPS hardwrae does not support LuaJIT. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
-Android is currently untested. In principle it should largely work as Linux, but Bionic (the Android libc) is missing a lot of functionality so more functions may need to be replaced with direct system calls.
+Android does not currently work. In principle it should largely work as Linux, but Bionic (the Android libc) is missing a lot of functionality so more functions need to be replaced with direct system calls.
 
 For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT). NetBSD on ARM and PPC should work as it is clean and portable, and MIPS if LuaJIT runs. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the (small) differences.
 
