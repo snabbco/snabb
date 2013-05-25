@@ -27,8 +27,9 @@ if abi.abi32 then
     local len2, len1 = u6432(length)
     return C.syscall(c.SYS.ftruncate64, t.int(fd), t.long(len1), t.long(len2))
   end
-  C.statfs = ffi.C.statfs64
-  C.fstatfs = ffi.C.fstatfs64
+  -- note these syscalls pass size of struct, we hide that here as on 64 bit we use libc call at present
+  function C.statfs(path, buf) return C.syscall(c.SYS.statfs64, path, t.uint(s.statfs), pt.void(buf)) end
+  function C.fstatfs(fd, buf) return C.syscall(c.SYS.fstatfs64, t.int(fd), t.uint(s.statfs), pt.void(buf)) end
   C.pread = ffi.C.pread64
   C.pwrite = ffi.C.pwrite64
   -- Note very odd split 64 bit arguments even on 64 bit platform.
