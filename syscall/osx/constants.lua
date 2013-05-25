@@ -198,6 +198,17 @@ c.SIGACT = strflag {
   HOLD = 3,
 }
 
+c.SA = multiflags {
+  ONSTACK   = 0x0001,
+  RESTART   = 0x0002,
+  RESETHAND = 0x0004,
+  NOCLDSTOP = 0x0008,
+  NODEFER   = 0x0010,
+  NOCLDWAIT = 0x0020,
+  USERTRAMP = 0x0100,
+  64REGSET  = 0x0200,
+}
+
 c.EXIT = strflag {
   SUCCESS = 0,
   FAILURE = 1,
