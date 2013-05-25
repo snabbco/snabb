@@ -20,17 +20,21 @@ Requirements: Needs [LuaJIT 2.0.0](http://www.luajit.org/) or later.
 
 The code does not currently support the main Lua implementation, only LuaJIT. It used to support [luaffi](https://github.com/jmckaskill/luaffi) but this has not kept up with LuaJIT ffi features. At some point I intend to support Lua directly, but this will be after the API has stabilised.
 
-ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; intend to support MIPS in future. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
+On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; intend to support MIPS in future but currently my only MIPS hardwrae does not support LuaJIT. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options, in particular it will not work correctly without largefile support. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
-For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT) and OSX 64 bit. NetBSD on ARM and PPC should work as it is clean and portable, and MIPS if LuaJIT runs. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the (small) differences.
+Android is currently untested. In principle it should largely work as Linux, but Bionic (the Android libc) is missing a lot of functionality so more functions may need to be replaced with direct system calls.
 
-There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows try [TINN](https://github.com/Wiladams/TINN).
+For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT). NetBSD on ARM and PPC should work as it is clean and portable, and MIPS if LuaJIT runs. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the (small) differences.
+
+OSX support is currently only tested on x64. In principle there should be few problems running it on x86 and ARM (ie iOS), but I have not had a chance to try yet.
+
+There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
 ## new features planned soon
-netfilter, dhcp, selinux, NetBSD rump kernel support.
+netfilter, dhcp, selinux, arp.
 
 ## Release notes
-0.7pre bug fixes, filesystem capabilities, xattr bug fixes, general cleanups, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, ioctl improvements, initial NetBSD and OSX support.
+0.7pre bug fixes, general cleanups, filesystem capabilities, xattr bug fixes, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, ioctl improvements, veth ioctls, initial NetBSD and OSX support, initial NetBSD rump kernel support.
 
 0.6 adds support for raw sockets, BPF, seccomp mode 2 (syscall filtering), capabilities, feature tests, plus bug fixes.
 
@@ -60,9 +64,9 @@ Some tests may fail if you do not have kernel support for some feature (eg names
 
 The test script is a copy of [luaunit](https://github.com/rjpcomputing/luaunit). I have pushed all my changes upstream, including Lua 5.2 support and fixes to not allocate globals.
 
-I have added initial coverage tests, and a C test to check constants and structures, but these are very much work in progress.
+I have added initial coverage tests (need fixing), and a C test to check constants and structures.
 
-There is now limited [Travis CI](https://travis-ci.org/) support, although this will only test on one architecture (x86, glibc). You can [see the test results here](https://travis-ci.org/justincormack/ljsyscall). If you fork the code you should be able to run these tests by setting up your own Travis account.
+There is now limited [Travis CI](https://travis-ci.org/) support, although this will only test on one architecture (x86, glibc) at present (looks like OSX support may come soon). You can [see the test results here](https://travis-ci.org/justincormack/ljsyscall). If you fork the code you should be able to run these tests by setting up your own Travis account, and they will also be run for pull requests.
 
 ## What is implemented?
 
@@ -73,8 +77,6 @@ As well as syscalls, there are interfaces to features such as proc, termios and 
 Work on the netlink API is progressing. You can now do `print(S.get_interfaces()` to get something much like ifconfig returns, and all the raw data is there as Lua tables. You can then modify these, and add IP addresses, similarly for routes. There is also a raw netlink interface, and you can create new interfaces. There is a lot more functionality that netlink needs to provide, but this is now mostly a matter of configuration. The API needs more work still. Netlink documentation is pretty bad. Useful resources: [blog post](http://maz-programmersdiary.blogspot.co.uk/2011/09/netlink-sockets.html)
 
 There is also a lot of the `ioctl` interfaces to implement, which are very miscellaneous. Mostly you just need some constants and typecasting, but helper functions are probably useful.
-
-The termios and pty interfaces have been implemented, thanks to [bdowning](https://github.com/bdowning). These wrap the libc calls, which underneath are mostly `ioctl` interfaces plus interfaces to the `/dev/pty` devices.
 
 The aim is to provide nice to use, Lua friendly interfaces where possible, but more work needs to be done, as have really started with the raw interfaces, but adding functionality through metatypes.
 
