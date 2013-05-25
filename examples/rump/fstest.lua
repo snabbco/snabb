@@ -15,8 +15,6 @@ R.module "fs.kernfs"
 
 R.init()
 
-local C, t, c = R.C, R.t, R.c
-
 assert(R.mkdir("/kern", octal("0755"))) -- TODO allow numerical
 assert(R.mount("kernfs", "/kern"))
 
