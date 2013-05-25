@@ -749,6 +749,19 @@ test_sockets_pipes = {
   end,
 }
 
+if S.environ then -- use this as a proxy for whether libc functions defined (eg not defined in rump)
+test_libc = {
+  test_environ = function()
+    local e = S.environ()
+    assert(e.PATH, "expect PATH to be set in environment")
+    assert(S.setenv("XXXXYYYYZZZZZZZZ", "test"))
+    assert(S.environ().XXXXYYYYZZZZZZZZ == "test", "expect to be able to set env vars")
+    assert(S.unsetenv("XXXXYYYYZZZZZZZZ"))
+    assert(not S.environ().XXXXYYYYZZZZZZZZ, "expect to be able to unset env vars")
+  end,
+}
+end
+
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
   if abi.os == "linux" then

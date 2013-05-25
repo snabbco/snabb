@@ -41,38 +41,8 @@ local function istype(tp, x) if ffi.istype(tp, x) then return x else return fals
 -- even simpler version coerces to type
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
-local zeropointer = pt.void(0)
-
-local function retbool(ret)
-  if ret == -1 then return nil, t.error() end
-  return true
-end
-
--- 'macros' and helper functions etc
--- TODO from here (approx, some may be in wrong place), move to syscall.util library.
-
--- handle environment. Note setenv etc removed as not kernel interfaces, only exec writes a new environment
-function S.environ() -- return whole environment as table
-  local environ = ffi.C.environ
-  if not environ then return nil end
-  local r = {}
-  local i = 0
-  while environ[i] ~= zeropointer do
-    local e = ffi.string(environ[i])
-    local eq = e:find('=')
-    if eq then
-      r[e:sub(1, eq - 1)] = e:sub(eq + 1)
-    end
-    i = i + 1
-  end
-  return r
-end
-
-function S.getenv(name)
-  return S.environ()[name]
-end
-
--- modified types; we do not really want them here but types cannot set as syscalls not defined TODO fix this
+-- add functions from libc
+S = require "syscall.libc".init(S)
 
 -- methods on an fd
 -- note could split, so a socket does not have methods only appropriate for a file

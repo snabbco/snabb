@@ -311,17 +311,6 @@ function S.signal(signum, handler) -- defined in terms of sigaction
   return oldact.sa_handler
 end
 
--- if getcwd not defined, fall back to libc implementation (currently bsd, osx) TODO move? use underlying?
-if not S.getcwd then
-  function S.getcwd(buf, size)
-    size = size or c.PATH_MAX
-    buf = buf or t.buffer(size)
-    local ret = C.getcwd(buf, size)
-    if ret == zeropointer then return nil, t.error() end
-    return ffi.string(buf)
-  end
-end
-
 if not S.accept then
   function S.accept(sockfd, flags, addr, addrlen) -- TODO emulate netbsd paccept and Linux accept4
     assert(not flags, "TODO add accept flags emulation")

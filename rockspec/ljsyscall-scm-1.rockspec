@@ -29,6 +29,7 @@ build =
       ["syscall.ffifunctions"] = "syscall/ffifunctions.lua";
       ["syscall.types"] = "syscall/types.lua";
       ["syscall.features"] = "syscall/features.lua";
+      ["syscall.libc"] = "syscall/libc.lua";
 
       ["syscall.linux.syscalls"] = "syscall/linux/syscalls.lua";
       ["syscall.linux.c"] = "syscall/linux/c.lua";

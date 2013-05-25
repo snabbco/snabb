@@ -2,9 +2,8 @@
 
 local cdef = require "ffi".cdef
 
+-- TODO for consistency should be passed this, doesnt really matter
 local abi = require "syscall.abi"
-
-require "syscall.linux.ffitypes"
 
 cdef[[
 int openat(int dirfd, const char *pathname, int flags, mode_t mode);
@@ -211,11 +210,6 @@ int mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len, unsigned msg_
 int mq_notify(mqd_t mqdes, const struct sigevent *sevp);
 int mq_unlink(const char *name);
 */
-
-// functions from libc ie man 3 not man 2
-
-// environment
-extern char **environ;
 ]]
 
 if abi.abi32 then

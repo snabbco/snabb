@@ -608,10 +608,6 @@ test_misc = {
     local syslog = assert(S.syslog(10))
     assert(syslog > 1, "syslog buffer should have positive size")
   end,
-  test_environ = function()
-    local e = S.environ()
-    assert(e.PATH, "expect PATH to be set in environment")
-  end,
   test_rlimit = function()
     local r, err = S.getrlimit("nofile")
     -- new travis CI does not support this TODO add to features
