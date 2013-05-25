@@ -4,13 +4,6 @@ local ffi = require "ffi"
 
 local t, ctypes, pt, s = {}, {}, {}, {}
 
-local C = ffi.C -- for inet_pton, TODO due to be replaced with Lua
-ffi.cdef[[
-int inet_pton(int af, const char *src, void *dst);
-]]
-
-local c = require "syscall.linux.constants" -- TODO incorrect, should be removed
-
 local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
@@ -74,11 +67,25 @@ local function inet4_pton(src, addr)
   return addr
 end
 
+local function hex(str) return tonumber("0x" .. str) end
+
 local function inet6_pton(src, addr)
--- TODO ipv6 implementation
-  local ret = ffi.C.inet_pton(c.AF.INET6, src, addr) -- TODO redo in pure Lua
-  if ret == -1 then return nil, t.error() end
-  if ret == 0 then return nil end -- maybe return string
+  -- TODO allow form with decimals at end
+  local ip8 = split(":", src)
+  if #ip8 > 8 then return nil end
+  local before, after = src:find("::")
+  before, after = src:sub(1, before - 1), src:sub(after + 1)
+  if before then
+    if #ip8 == 8 then return nil end -- must be some missing
+    if before == "" then before = "0" end
+    if after == "" then after = "0" end
+    src = before .. ":" .. string.rep("0:", 8 - #ip8 + 1) .. after
+    ip8 = split(":", src)
+  end
+  for i = 1, 8 do
+    addr.s6_addr[i * 2 - 1] = hex(ip8[i]) % 256
+    addr.s6_addr[i * 2 - 2] = math.floor(hex(ip8[i]) / 256)
+  end
   return addr
 end
 
