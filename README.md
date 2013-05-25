@@ -26,7 +26,7 @@ Android (ARM tested so far) currently passes some tests and fails others, so nee
 
 For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT). NetBSD on ARM and PPC should work as it is clean and portable, and MIPS if LuaJIT runs. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the (small) differences.
 
-OSX support is currently only tested on x64. In principle there should be few problems running it on x86 and ARM (ie iOS), but I have not had a chance to try yet.
+OSX support is tested on x64 and x86. In principle there should be no issues running it on ARM (ie iOS), but I have not had a chance to try yet.
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
@@ -34,7 +34,7 @@ There will not be Windows support (although in principle Cygwin and similar plat
 netfilter, dhcp, selinux, arp.
 
 ## Release notes
-0.7pre bug fixes, general cleanups, filesystem capabilities, xattr bug fixes, signal handler functions, cpu affinity, scheduler functions, POSIX message queues, tun/tap support, ioctl improvements, veth ioctls, initial NetBSD and OSX support, initial NetBSD rump kernel support, some fixes to allow Android to work.
+0.7pre bug fixes, general cleanups, filesystem capabilities, xattr bug fixes, signal handler functions, cpu affinity support, scheduler functions, POSIX message queues, tun/tap support, ioctl additions and improvements, initial NetBSD and OSX support, initial NetBSD rump kernel support, some fixes to allow Android to work.
 
 0.6 adds support for raw sockets, BPF, seccomp mode 2 (syscall filtering), capabilities, feature tests, plus bug fixes.
 
