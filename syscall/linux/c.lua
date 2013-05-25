@@ -17,8 +17,6 @@ local function i6432(x) return t.i6432(x):to32() end
 
 local C = setmetatable({}, {__index = ffi.C}) -- fall back to libc if do not overwrite
 
-local CC = {} -- functions that might not be in C, may use syscalls
-
 -- use 64 bit fileops on 32 bit always. As may be missing will use syscalls directly
 if abi.abi32 then
   C.truncate = ffi.C.truncate64
@@ -216,30 +214,16 @@ function C.mknodat(fd, pathname, mode, dev)
   return C.syscall(c.SYS.mknodat, t.int(fd), pathname, t.mode(mode), t.uint(dev))
 end
 -- pivot_root is not provided by glibc, is provided by Musl
-function CC.pivot_root(new_root, put_old)
+function C.pivot_root(new_root, put_old)
   return C.syscall(c.SYS.pivot_root, new_root, put_old)
 end
 -- setns not in some glibc versions
-function CC.setns(fd, nstype)
+function C.setns(fd, nstype)
   return C.syscall(c.SYS.setns, t.int(fd), t.int(nstype))
 end
 -- prlimit64 not in my ARM glibc
-function CC.prlimit64(pid, resource, new_limit, old_limit)
+function C.prlimit64(pid, resource, new_limit, old_limit)
   return C.syscall(c.SYS.prlimit64, t.pid(pid), t.int(resource), pt.void(new_limit), pt.void(old_limit))
-end
-
--- you can get these functions from ffi.load "rt" in glibc but this upsets valgrind so get from syscalls
-function CC.clock_nanosleep(clk_id, flags, req, rem)
-  return C.syscall(c.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
-end
-function CC.clock_getres(clk_id, ts)
-  return C.syscall(c.SYS.clock_getres, t.clockid(clk_id), pt.void(ts))
-end
-function CC.clock_gettime(clk_id, ts)
-  return C.syscall(c.SYS.clock_gettime, t.clockid(clk_id), pt.void(ts))
-end
-function CC.clock_settime(clk_id, ts)
-  return C.syscall(c.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
 end
 
 -- sched_setaffinity and sched_getaffinity not in Musl at the moment, use syscalls. Could test instead.
@@ -259,18 +243,21 @@ end
 
 -- if not in libc replace
 
--- in librt for glibc but use syscalls instead
-if not inlibc "clock_getres" then C.clock_getres = CC.clock_getres end
-if not inlibc "clock_settime" then C.clock_settime = CC.clock_settime end
-if not inlibc "clock_gettime" then C.clock_gettime = CC.clock_gettime end
-if not inlibc "clock_nanosleep" then C.clock_nanosleep = CC.clock_nanosleep end
-
--- not in glibc
-if not inlibc "pivot_root" then C.pivot_root = CC.pivot_root end
-
--- not in glibc on my dev ARM box
-if not inlibc "setns" then C.setns = CC.setns end
-if not inlibc "prlimit64" then C.prlimit64 = CC.prlimit64 end
+-- in librt for glibc but use syscalls instead of loading another library
+if not inlibc "clock_getres" then
+  function C.clock_nanosleep(clk_id, flags, req, rem)
+    return C.syscall(c.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
+  end
+  function C.clock_getres(clk_id, ts)
+    return C.syscall(c.SYS.clock_getres, t.clockid(clk_id), pt.void(ts))
+  end
+  function C.clock_gettime(clk_id, ts)
+    return C.syscall(c.SYS.clock_gettime, t.clockid(clk_id), pt.void(ts))
+  end
+  function C.clock_settime(clk_id, ts)
+    return C.syscall(c.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
+  end
+end
 
 return C
 
