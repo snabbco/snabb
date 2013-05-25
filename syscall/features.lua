@@ -4,9 +4,7 @@
 -- cache carefully if you like
 -- TODO add metatable so can call if values not functions?
 
--- TODO needs to be a function of S now
-
-local S = require "syscall"
+local function init(S)
 
 local features = {}
 
@@ -34,4 +32,8 @@ features.preadv = function() return S.preadv ~= nil end
 features.pwritev = function() return S.pwritev ~= nil end
 
 return features
+
+end
+
+return {init = init}
 

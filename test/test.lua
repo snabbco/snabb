@@ -6,8 +6,7 @@ local S = require "syscall"
 local abi = S.abi
 local types = S.types
 local c = S.c
-
-local features = require "syscall.features" -- TODO should be function of S
+local features = S.features
 
 local helpers = require "syscall.helpers"
 
