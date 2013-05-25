@@ -9,7 +9,7 @@ ffi.cdef[[
 int inet_pton(int af, const char *src, void *dst);
 ]]
 
-local c = require "syscall.linux.constants"
+local c = require "syscall.linux.constants" -- TODO incorrect, should be removed
 
 local h = require "syscall.helpers"
 
