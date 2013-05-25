@@ -38,13 +38,7 @@ end
 
 local function addtype(name, tp, mt, again) -- again set if allowed to be set twice (only for in_addr, in6_addr)
   if rump then tp = rump(tp) end
-  if again then
-    -- check if it already has a metatable set
-    local ffitp = ffi.typeof(tp)
-    if getmetatable(ffitp) then t[name] = ffitp else t[name] = ffi.metatype(tp, mt) end
-  else
-    if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
-  end
+  if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
   ctypes[tp] = t[name]
   pt[name] = ptt(tp)
   s[name] = ffi.sizeof(t[name])
