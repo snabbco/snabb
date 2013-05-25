@@ -241,8 +241,6 @@ function C.sched_setparam(pid, param)
   return C.syscall(c.SYS.sched_setparam, t.pid(pid), pt.void(param))
 end
 
--- if not in libc replace
-
 -- in librt for glibc but use syscalls instead of loading another library
 if not inlibc "clock_getres" then
   function C.clock_nanosleep(clk_id, flags, req, rem)
