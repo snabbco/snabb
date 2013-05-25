@@ -15,43 +15,58 @@ local inlibc = h.inlibc
 local function u6432(x) return t.u6432(x):to32() end
 local function i6432(x) return t.i6432(x):to32() end
 
+local arg64, arg64u
+if abi.le then
+  arg64 = function(val)
+    local v2, v1 = i6432(val)
+    return v1, v2
+  end
+  arg64u = function(val)
+    local v2, v1 = u6432(val)
+    return v1, v2
+  end
+else
+  arg64 = function(val) return i6432(val) end
+  arg64u = function(val) return u6432(val) end
+end
+
 local C = setmetatable({}, {__index = ffi.C}) -- fall back to libc if do not overwrite
 
 -- use 64 bit fileops on 32 bit always. As may be missing will use syscalls directly
 if abi.abi32 then
   function C.truncate(path, length)
-    local len2, len1 = u6432(length)
+    local len1, len2 = arg64u(length)
     return C.syscall(c.SYS.truncate64, path, t.long(len1), t.long(len2))
   end
   function C.ftruncate(fd, length)
-    local len2, len1 = u6432(length)
+    local len1, len2 = arg64u(length)
     return C.syscall(c.SYS.ftruncate64, t.int(fd), t.long(len1), t.long(len2))
   end
   -- note statfs,fstatfs pass size of struct, we hide that here as on 64 bit we use libc call at present
   function C.statfs(path, buf) return C.syscall(c.SYS.statfs64, path, t.uint(s.statfs), pt.void(buf)) end
   function C.fstatfs(fd, buf) return C.syscall(c.SYS.fstatfs64, t.int(fd), t.uint(s.statfs), pt.void(buf)) end
   function C.pread(fd, buf, size, offset)
-    local off2, off1 = i6432(offset)
+    local off1, off2 = arg64(offset)
     return C.syscall(c.SYS.pread64, t.int(fd), pt.void(buf), t.size(size), t.long(off1), t.long(off2))
   end
   function C.pwrite(fd, buf, size, offset)
-    local off2, off1 = i6432(offset)
+    local off1, off2 = arg64(offset)
     return C.syscall(c.SYS.pwrite64, t.int(fd), pt.void(buf), t.size(size), t.long(off1), t.long(off2))
   end
   -- Note very odd split 64 bit arguments even on 64 bit platform.
   function C.preadv(fd, iov, iovcnt, offset)
-    local off2, off1 = i6432(offset)
+    local off1, off2 = arg64(offset)
     return C.syscall(c.SYS.preadv, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
   end
   function C.pwritev(fd, iov, iovcnt, offset)
-    local off2, off1 = i6432(offset)
+    local off1, off2 = arg64(offset)
     return C.syscall(c.SYS.pwritev, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
   end
-  -- lseek is a mess in 32 bit, use _llseek syscall to get clean result
+  -- lseek is a mess in 32 bit, use _llseek syscall to get clean result. Note reversed off1, of2
   function C.lseek(fd, offset, whence)
     local result = t.off1()
-    local off1, off2 = u6432(offset)
-    local ret = C.syscall(c.SYS._llseek, t.int(fd), t.ulong(off1), t.ulong(off2), pt.void(result), t.uint(whence))
+    local off1, off2 = arg64u(offset)
+    local ret = C.syscall(c.SYS._llseek, t.int(fd), t.ulong(off2), t.ulong(off1), pt.void(result), t.uint(whence))
     if ret == -1 then return -1 end
     return result[0]
   end
@@ -155,29 +170,21 @@ else
   end
   if c.syscall.zeropad then
     function C.fadvise64(fd, offset, len, advise)
-      local off2, off1 = u6432(offset)
-      local len2, len1 = u6432(len)
+      local off1, off2 = arg64u(offset)
+      local len1, len2 = arg64u(len)
       return C.syscall(sys_fadvise64, t.int(fd), 0, t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2), t.int(advise))
     end
   else
     function C.fadvise64(fd, offset, len, advise)
-      local off2, off1 = u6432(offset)
-      local len2, len1 = u6432(len)
+      local off1, off2 = arg64u(offset)
+      local len1, len2 = arg64u(len)
       return C.syscall(sys_fadvise64, t.int(fd), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2), t.int(advise))
     end
   end
-  if c.syscall.fallocate then -- set for ppc only, reversed args TODO rename flag
-    function C.fallocate(fd, mode, offset, len)
-      local off2, off1 = u6432(offset)
-      local len2, len1 = u6432(len)
-      return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off2), t.uint32(off1), t.uint32(len2), t.uint32(len1))
-    end
-  else
-    function C.fallocate(fd, mode, offset, len)
-      local off2, off1 = u6432(offset)
-      local len2, len1 = u6432(len)
-      return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
-    end
+  function C.fallocate(fd, mode, offset, len)
+    local off1, off2 = arg64u(offset)
+    local len1, len2 = arg64u(len)
+    return C.syscall(c.SYS.fallocate, t.int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
   end
 end
 

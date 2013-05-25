@@ -8,7 +8,6 @@ local arch = {}
 
 arch.syscall = {
   zeropad = true,
-  fallocate = true -- apparently ppc reverses endianness just for this call. TODO understand this properly
 }
 
 arch.SYS = {
