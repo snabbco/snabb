@@ -67,6 +67,37 @@ addtype("stat", "struct stat", {
   __len = lenfn,
 })
 
+meth.siginfo = {
+  index = {
+    signo   = function(s) return s.si_signo end,
+    errno   = function(s) return s.si_errno end,
+    code    = function(s) return s.si_code end,
+    pid     = function(s) return s.si_pid end,
+    uid     = function(s) return s.si_uid end,
+    status  = function(s) return s.si_status end,
+    addr    = function(s) return s.si_addr end,
+    value   = function(s) return s.si_value end,
+    band    = function(s) return s.si_band end,
+  },
+  newindex = {
+    signo   = function(s, v) s.si_signo = v end,
+    errno   = function(s, v) s.si_errno = v end,
+    code    = function(s, v) s.si_code = v end,
+    pid     = function(s, v) s.si_pid = v end,
+    uid     = function(s, v) s.si_uid = v end,
+    status  = function(s, v) s.si_status = v end,
+    addr    = function(s, v) s.si_addr = v end,
+    value   = function(s, v) s.si_value = v end,
+    band    = function(s, v) s.si_band = v end,
+  },
+}
+
+addtype("siginfo", "siginfo_t", {
+  __index = function(t, k) if meth.siginfo.index[k] then return meth.siginfo.index[k](t) end end,
+  __newindex = function(t, k, v) if meth.siginfo.newindex[k] then meth.siginfo.newindex[k](t, v) end end,
+  __len = lenfn,
+})
+
 return types
 
 end
