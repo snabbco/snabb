@@ -460,5 +460,22 @@ c.MNT = multiflags {
   GETARGS     = 0x00400000,
 }
 
+c.RB = multiflags {
+  ASKNAME     = 0x00000001,
+  SINGLE      = 0x00000002,
+  NOSYNC      = 0x00000004,
+  HALT        = 0x00000008,
+  INITNAME    = 0x00000010,
+  UNUSED1     = 0x00000020,
+  KDB         = 0x00000040,
+  RDONLY      = 0x00000080,
+  DUMP        = 0x00000100,
+  MINIROOT    = 0x00000200,
+  STRING      = 0x00000400,
+  USERCONF    = 0x00001000,
+}
+
+c.RB,POWERDOWN = c.RB.HALT + 0x800
+
 return c
 

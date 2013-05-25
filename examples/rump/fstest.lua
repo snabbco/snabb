@@ -5,10 +5,10 @@ local ffi = require "ffi"
 
 function octal(s) return tonumber(s, 8) end
 
-local S = require "syscall" -- your OS functions
+--local S = require "syscall" -- your OS functions
 local R = require "syscall.rump.init" -- rump kernel functions
 
-S.setenv("RUMP_VERBOSE", "1")
+--S.setenv("RUMP_VERBOSE", "1")
 
 R.module "vfs"
 R.module "fs.kernfs"
