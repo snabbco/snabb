@@ -19,8 +19,14 @@ local C = setmetatable({}, {__index = ffi.C}) -- fall back to libc if do not ove
 
 -- use 64 bit fileops on 32 bit always. As may be missing will use syscalls directly
 if abi.abi32 then
-  C.truncate = ffi.C.truncate64
-  C.ftruncate = ffi.C.ftruncate64
+  function C.truncate(path, length)
+    local len2, len1 = u6432(length)
+    return C.syscall(c.SYS.truncate64, path, t.long(len1), t.long(len2))
+  end
+  function C.ftruncate(fd, length)
+    local len2, len1 = u6432(length)
+    return C.syscall(c.SYS.ftruncate64, t.int(fd), t.long(len1), t.long(len2))
+  end
   C.statfs = ffi.C.statfs64
   C.fstatfs = ffi.C.fstatfs64
   C.pread = ffi.C.pread64
