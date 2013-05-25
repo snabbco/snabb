@@ -491,18 +491,24 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_stat_symlink = function()
-    assert(S.symlink("/etc/passwd", tmpfile)) -- TODO create file instead
+    local fd = assert(S.creat(tmpfile2, "rwxu"))
+    assert(fd:close())
+    assert(S.symlink(tmpfile2, tmpfile))
     local stat = assert(S.stat(tmpfile))
-    assert(stat.isreg, "expect /etc/passwd to be a regular file")
+    assert(stat.isreg, "expect file to be a regular file")
     assert(not stat.islnk, "should not be symlink")
     assert(S.unlink(tmpfile))
+    assert(S.unlink(tmpfile2))
   end,
   test_lstat_symlink = function()
-    assert(S.symlink("/etc/passwd", tmpfile)) -- TODO create file instead
+    local fd = assert(S.creat(tmpfile2, "rwxu"))
+    assert(fd:close())
+    assert(S.symlink(tmpfile2, tmpfile))
     local stat = assert(S.lstat(tmpfile))
     assert(stat.islnk, "expect lstat to stat the symlink")
     assert(not stat.isreg, "lstat should find symlink not regular file")
     assert(S.unlink(tmpfile))
+    assert(S.unlink(tmpfile2))
   end,
   test_truncate = function()
     local fd = assert(S.creat(tmpfile, "rwxu"))
