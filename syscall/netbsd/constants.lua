@@ -4,8 +4,8 @@
 
 local h = require "syscall.helpers"
 
-local octal, multiflags, charflags, swapflags, strflag, atflag
-  = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag
+local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
+  = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag, h.modeflags
 
 local c = {}
 
@@ -262,7 +262,7 @@ c.OK = charflags {
   F = 0,
 }
 
-c.MODE = multiflags {
+c.MODE = modeflags {
   SUID = octal('04000'),
   SGID = octal('02000'),
   STXT = octal('01000'),
@@ -475,7 +475,7 @@ c.RB = multiflags {
   USERCONF    = 0x00001000,
 }
 
-c.RB,POWERDOWN = c.RB.HALT + 0x800
+c.RB.POWERDOWN = c.RB.HALT + 0x800
 
 return c
 

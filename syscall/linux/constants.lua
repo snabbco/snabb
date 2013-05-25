@@ -10,8 +10,8 @@ local arch = require("syscall.linux." .. abi.arch .. ".constants") -- architectu
 
 local h = require "syscall.helpers"
 
-local octal, multiflags, charflags, swapflags, strflag, atflag
-  = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag
+local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
+  = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag, h.modeflags
 
 local function addarch(tb, a, default)
   local add = a or default
@@ -110,7 +110,7 @@ c.S_I = multiflags {
   XOTH  = octal('00001'),
 }
 
-c.MODE = multiflags {
+c.MODE = modeflags {
   SUID = octal('04000'),
   SGID = octal('02000'),
   SVTX = octal('01000'),

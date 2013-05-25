@@ -348,7 +348,7 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_link = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
+    local fd = assert(S.creat(tmpfile, "0755"))
     assert(S.link(tmpfile, tmpfile2))
     assert(S.unlink(tmpfile2))
     assert(S.unlink(tmpfile))

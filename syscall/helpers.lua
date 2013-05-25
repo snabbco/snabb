@@ -25,6 +25,7 @@ h.ntohl = h.htonl -- reverse is the same
 h.ntohs = h.htons -- reverse is the same
 
 function h.octal(s) return tonumber(s, 8) end
+local octal = h.octal
 
 function h.split(delimiter, text)
   if delimiter == "" then return {text} end
@@ -90,6 +91,27 @@ function h.multiflags(tab)
     if not str then return 0 end
     if type(str) ~= "string" then return str end
     if #str == 0 then return 0 end
+    local f = 0
+    local a = split(",", str)
+    for i, v in ipairs(a) do
+      local s = trim(v):upper()
+      local val = rawget(tab, s)
+      if not val then return nil end -- TODO should we error here?
+      f = bit.bor(f, val)
+    end
+    cache[str] = f
+    return f
+  end
+  return setmetatable(tab, {__index = setmetatable({}, {__index = flag}), __call = function(t, a) return t[a] end})
+end
+
+-- like multiflags but also allow octal values in string
+function h.modeflags(tab)
+  local function flag(cache, str)
+    if not str then return 0 end
+    if type(str) ~= "string" then return str end
+    if #str == 0 then return 0 end
+    if str:sub(1, 1) == "0" then return octal(str) end
     local f = 0
     local a = split(",", str)
     for i, v in ipairs(a) do
