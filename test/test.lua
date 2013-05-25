@@ -677,10 +677,11 @@ test_sockets_pipes = {
     assert(c:nonblock())
     assert(c:fcntl("setfd", "cloexec"))
     local ok, err = c:connect(sa)
-    local a = assert(s:accept())
+    local a = s:accept()
+    local ok, err = c:connect(sa) -- Linux will have returned INPROGRESS above, other OS may have connected
+    a = a or assert(s:accept())
     -- a is a table with the fd, but also the inbound connection details
     assert(a.addr.sin_family == 2, "expect ipv4 connection")
-    local ok, err = c:connect(sa) -- Linux will have returned INPROGRESS above, other IS may have connected
     local ba = assert(c:getpeername())
     assert(ba.sin_family == 2, "expect ipv4 connection")
     assert(tostring(ba.sin_addr) == "127.0.0.1", "expect peer on localhost")
