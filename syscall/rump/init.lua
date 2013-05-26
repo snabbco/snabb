@@ -28,7 +28,8 @@ local ostypes = require "syscall.netbsd.types"
 local types
 if abi.host == "netbsd" then
   -- if running rump on netbsd just return normal NetBSD types
-  types = require "syscall.types".init(abi, c, errors, ostypes, nil)
+  -- note that we get these by calling the whole thing so we do not get metatype redefinition erros
+  types = require "syscall".types
 else
   -- running on another OS
   types = require "syscall.rump.types".init(abi, c, errors, ostypes)
