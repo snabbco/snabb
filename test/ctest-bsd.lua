@@ -11,9 +11,6 @@ local c = S.c
 
 local ffi = require "ffi"
 
--- remove as using this for osx too
-c.TMPFS_ARGS = nil
-
 -- fixups
 c.AF.DECnet = c.AF.DECNET
 c.AF.DECNET = nil
@@ -71,6 +68,8 @@ print [[
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <sys/reboot.h>
+#include </usr/include/fs/tmpfs/tmpfs_args.h>
+#include </usr/include/ufs/ufs/ufsmount.h>
 
 int ret = 0;
 
