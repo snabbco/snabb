@@ -30,7 +30,7 @@ OSX support is tested on x64 and x86. In principle there should be no issues run
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
-For the rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project. Then install the libraries somewhere in your library path. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part.
+For the rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project. Then install the libraries somewhere in your library path. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There will be full tests soon, but there is a basic example in `examples/rump` which is a port of one of the tests in buildrump.
 
 ## New features planned soon
 netfilter, dhcp, selinux, arp, rump kernel backend, further BSD and OSX work.
