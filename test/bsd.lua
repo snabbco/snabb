@@ -53,9 +53,15 @@ local clean = function()
 end
 
 test_mount_bsd_root = {
-  test_mount_root = function()
+  test_mount_kernfs = function()
     assert(S.mkdir(tmpfile))
     assert(S.mount{dir=tmpfile, type="kernfs"})
+    assert(S.unmount(tmpfile))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_mount_tmpfs = function()
+    assert(S.mkdir(tmpfile))
+    assert(S.mount{dir=tmpfile, type="tmpfs", data={version = 1}})
     assert(S.unmount(tmpfile))
     assert(S.rmdir(tmpfile))
   end,
