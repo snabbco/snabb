@@ -1,20 +1,18 @@
 -- This is types for NetBSD and rump kernel, which are the same bar names.
 
-local function init(rump)
+local function init(abi)
 
 require "syscall.ffitypes"
 
 local ffi = require "ffi"
 
-local abi = require "syscall.abi"
-
 local cdef
 
-if rump then
+if abi.rump and abi.host ~= "netbsd" then
   cdef = ffi.cdef
 else
   cdef = function(s)
-    s = string.gsub(s, "_netbsd_", "") -- no netbsd types
+    s = string.gsub(s, "_netbsd_", "") -- remove netbsd types
     ffi.cdef(s)
   end
 end

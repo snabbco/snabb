@@ -1,11 +1,8 @@
 -- ffi definitions of BSD types
+-- calls the common definitions shared with rump kernel
 
 local abi = require "syscall.abi"
 
-local cdef = require "ffi".cdef
-
-local netbsd = require "syscall.netbsd.commonffitypes"
-
-netbsd.init(false) -- not rump kernel
+require "syscall.netbsd.commonffitypes".init(abi)
 
 

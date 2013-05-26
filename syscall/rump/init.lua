@@ -1,11 +1,13 @@
 
 -- This mirrors syscall.lua, but some differences
 
-local abi = require "syscall.abi"
+local hostabi = require "syscall.abi"
 
-local rumpabi = {}
-for k, v in pairs(abi) do rumpabi[k] = v end
-rumpabi.os = "netbsd"
+local abi = {}
+for k, v in pairs(hostabi) do abi[k] = v end
+abi.rump = true
+abi.host = abi.os
+abi.os = "netbsd"
 
 local ffi = require "ffi"
 
@@ -16,10 +18,10 @@ ffi.cdef[[
 int rump_init(void);
 ]]
 
-if abi.os == "netbsd" then
+if abi.hostos == "netbsd" then
   require "syscall.netbsd.ffitypes" -- with rump on NetBSD the types are the same
 else
-  require "syscall.netbsd.commonffitypes".init(true) -- rump = true
+  require "syscall.netbsd.commonffitypes".init(abi)
 end
 
 local c = require "syscall.netbsd.constants"
