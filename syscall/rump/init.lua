@@ -18,7 +18,7 @@ ffi.cdef[[
 int rump_init(void);
 ]]
 
-if abi.hostos == "netbsd" then
+if abi.host == "netbsd" then
   require "syscall.netbsd.ffitypes" -- with rump on NetBSD the types are the same
 else
   require "syscall.netbsd.commonffitypes".init(abi)
