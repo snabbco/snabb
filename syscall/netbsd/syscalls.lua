@@ -20,25 +20,28 @@ function S.accept(sockfd, flags, addr, addrlen) -- TODO add support for signal m
 end
 
 local mntstruct = {
-  --ffs = t.ufs_args,
+  ffs = t.ufs_args,
   --nfs = t.nfs_args,
   --mfs = t.mfs_args,
-  --tmpfs = t.tmpfs_args,
+  tmpfs = t.tmpfs_args,
 }
 
+-- TODO allow putting data in same table rather than nested table?
 function S.mount(filesystemtype, dir, flags, data, datalen)
   if type(filesystemtype) == "table" then
     local t = filesystemtype
-    --source = t.source -- allow for ufs
     dir = t.target or t.dir
     filesystemtype = t.type
     flags = t.flags
     data = t.data
     datalen = t.datalen
   end
--- TODO deal with different data options, need different structs
--- TODO initialise structs from same table
-  if not data then datalen = 0 end
+  if data then
+    local tp = mntstruct[filesystemtype]
+    if tp then data = mktype(tp, data) end
+  else
+    datalen = 0
+  end
   return retbool(C.mount(filesystemtype, dir, c.MNT[flags], data, datalen or #data))
 end
 

@@ -18,6 +18,8 @@ local meth = {}
 
 local addtypes = {
   clockid = "clockid_t",
+  ufs_args = "struct ufs_args",
+  tmpfs_args = "struct tmpfs_args",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end

@@ -193,6 +193,17 @@ struct _netbsd_sigaction {
   _netbsd_sigset_t sa_mask;
   int sa_flags;
 };
+struct _netbsd_ufs_args {
+  char *fspec;
+};
+struct _netbsd_tmpfs_args {
+  int ta_version;
+  _netbsd_ino_t ta_nodes_max;
+  off_t ta_size_max;
+  uid_t ta_root_uid;
+  gid_t ta_root_gid;
+  _netbsd_mode_t ta_root_mode;
+};
 ]]
 
 end

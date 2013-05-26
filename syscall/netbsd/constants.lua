@@ -476,5 +476,9 @@ c.RB = multiflags {
 
 c.RB.POWERDOWN = c.RB.HALT + 0x800
 
+c.TMPFS_ARGS = strflag {
+  VERSION = 1,
+}
+
 return c
 

@@ -11,6 +11,9 @@ local c = S.c
 
 local ffi = require "ffi"
 
+-- remove as using this for osx too
+c.TMPFS_ARGS = nil
+
 -- fixups
 c.AF.DECnet = c.AF.DECNET
 c.AF.DECNET = nil
