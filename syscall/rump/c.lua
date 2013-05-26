@@ -8,7 +8,7 @@ local rump = ffi.load("rump")
 
 local cdef
 
-if ffi.os == "netbsd" then
+if ffi.host == "netbsd" then
   cdef = function(s)
     s = string.gsub(s, "_netbsd_", "") -- no netbsd types
     ffi.cdef(s)
