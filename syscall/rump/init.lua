@@ -38,20 +38,20 @@ else
   types = require "syscall.rump.types".init(abi, c, errors, ostypes)
 end
 
-local C = require "syscall.rump.c".init(rumpabi, c, types)
-local ioctl = require("syscall.netbsd.ioctl")(rumpabi, s)
-local fcntl = require("syscall.netbsd.fcntl")(rumpabi, c, types)
+local C = require "syscall.rump.c".init(abi, c, types)
+local ioctl = require("syscall.netbsd.ioctl")(abi, s)
+local fcntl = require("syscall.netbsd.fcntl")(abi, c, types)
 
 c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps
 
-local S = require "syscall.syscalls".init(rumpabi, c, C, types, ioctl, fcntl)
+local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
 
 local function module(s)
   s = string.gsub(s, "%.", "_")
   ffi.load("rump" .. s, true)
 end
 
-S.abi, S.c, S.C, S.types, S.t = rumpabi, c, C, types, types.t -- add to main table returned
+S.abi, S.c, S.C, S.types, S.t = abi, c, C, types, types.t -- add to main table returned
 
 -- add methods
 S = require "syscall.methods".init(S)
