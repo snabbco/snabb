@@ -1,9 +1,5 @@
 -- this is a simple port of the fstest.c from buildrump.sh just to show it works
 
-local ffi = require "ffi"
-
-function octal(s) return tonumber(s, 8) end
-
 local S = require "syscall" -- your OS functions
 local R = require "syscall.rump.init" -- rump kernel functions
 
