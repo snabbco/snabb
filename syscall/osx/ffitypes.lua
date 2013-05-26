@@ -1,8 +1,8 @@
 -- ffi definitions of OSX types
 
-require "syscall.ffitypes"
+local function init(abi)
 
-local abi = require "syscall.abi"
+require "syscall.ffitypes"
 
 local cdef = require "ffi".cdef
 
@@ -121,4 +121,8 @@ struct sigaction {
   int sa_flags;
 };
 ]]
+
+end
+
+return {init = init}
 

@@ -1,8 +1,8 @@
 -- ffi definitions of Linux types
 
-require "syscall.ffitypes"
+local function init(abi)
 
-local abi = require "syscall.abi"
+require "syscall.ffitypes"
 
 local cdef = require "ffi".cdef
 
@@ -903,4 +903,8 @@ struct iphdr {
 };
 ]]
 end
+
+end
+
+return {init = init}
 

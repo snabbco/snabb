@@ -3,7 +3,7 @@
 
 local abi = require "syscall.abi"
 
-require("syscall." .. abi.os .. ".ffitypes")
+require("syscall." .. abi.os .. ".ffitypes").init(abi)
 require "syscall.ffifunctions"
 
 local c = require("syscall." .. abi.os .. ".constants")
@@ -16,8 +16,8 @@ local types = require "syscall.types".init(abi, c, errors, ostypes, nil) -- nil 
 local t, pt, s = types.t, types.pt, types.s
 
 local C = require("syscall." .. abi.os .. ".c").init(abi, c, types)
-local ioctl = require("syscall." .. abi.os .. ".ioctl")(abi, s)
-local fcntl = require("syscall." .. abi.os .. ".fcntl")(abi, c, types)
+local ioctl = require("syscall." .. abi.os .. ".ioctl")(abi, s) -- TODO add init fn
+local fcntl = require("syscall." .. abi.os .. ".fcntl")(abi, c, types) -- TODO add init fn
 
 local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
 

@@ -18,11 +18,7 @@ ffi.cdef[[
 int rump_init(void);
 ]]
 
-if abi.host == "netbsd" then
-  require "syscall.netbsd.ffitypes" -- with rump on NetBSD the types are the same
-else
-  require "syscall.netbsd.commonffitypes".init(abi)
-end
+require "syscall.netbsd.ffitypes".init(abi)
 
 local c = require "syscall.netbsd.constants"
 local errors = require "syscall.netbsd.errors"
