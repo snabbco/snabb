@@ -18,20 +18,20 @@ ffi.cdef[[
 int rump_init(void);
 ]]
 
-require "syscall.netbsd.ffitypes".init(abi)
-
-local c = require "syscall.netbsd.constants"
 local errors = require "syscall.netbsd.errors"
+local c, types
 
-local ostypes = require "syscall.netbsd.types"
-
-local types
 if abi.host == "netbsd" then
   -- if running rump on netbsd just return normal NetBSD types
-  -- note that we get these by calling the whole thing so we do not get metatype redefinition erros
-  types = require "syscall".types
+  -- note that we get these by calling the whole thing so we do not get type redefinition erros
+  local S = require "syscall"
+  c = S.c
+  types = S.types
 else
   -- running on another OS
+  require "syscall.netbsd.ffitypes".init(abi)
+  c = require "syscall.netbsd.constants"
+  local ostypes = require "syscall.netbsd.types"
   types = require "syscall.rump.types".init(abi, c, errors, ostypes)
 end
 
