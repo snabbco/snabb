@@ -19,7 +19,7 @@ int rump_init(void);
 if abi.os == "netbsd" then
   require "syscall.netbsd.ffitypes" -- with rump on NetBSD the types are the same
 else
-  require "syscall.netbsd.common.ffitypes".init(true) -- rump = true
+  require "syscall.netbsd.commonffitypes".init(true) -- rump = true
 end
 
 local c = require "syscall.netbsd.constants"
