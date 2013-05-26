@@ -1,5 +1,4 @@
 -- this is a simple port of the fstest.c from buildrump.sh just to show it works
--- As we have only defined C so far not syscall it is pretty gross to use
 
 local ffi = require "ffi"
 
