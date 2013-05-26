@@ -24,5 +24,5 @@ local str = assert(fd:read(nil, 1024))
 print("kernel version is " .. str)
 assert(fd:close())
 
-assert(R.reboot(0, nil))
+assert(R.reboot())
 
