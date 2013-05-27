@@ -23,6 +23,11 @@ typedef unsigned long nfds_t;
 typedef long ssize_t;
 typedef unsigned long size_t;
 
+struct iovec {
+  void *iov_base;
+  size_t iov_len;
+};
+
 struct in_addr {
   uint32_t       s_addr;
 };

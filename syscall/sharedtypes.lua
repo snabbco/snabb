@@ -21,9 +21,60 @@ local function addtype(name, tp, mt)
   s[name] = ffi.sizeof(t[name])
 end
 
+local function addtype_var(name, tp, mt)
+  t[name] = ffi.metatype(tp, mt)
+  pt[name] = ptt(tp)
+end
+
 local function lenfn(tp) return ffi.sizeof(tp) end
 
--- TODO add generic address type that works out which to take? basically inet_name, except without netmask
+local lenmt = {__len = lenfn}
+
+local mt = {}
+
+local function istype(tp, x)
+  if ffi.istype(tp, x) then return x else return false end
+end
+
+addtype("iovec", "struct iovec", lenmt)
+
+mt.iovecs = {
+  __index = function(io, k)
+    return io.iov[k - 1]
+  end,
+  __newindex = function(io, k, v)
+    v = istype(t.iovec, v) or t.iovec(v)
+    ffi.copy(io.iov[k - 1], v, s.iovec)
+  end,
+  __len = function(io) return io.count end,
+  __new = function(tp, is)
+    if type(is) == 'number' then return ffi.new(tp, is, is) end
+    local count = #is
+    local iov = ffi.new(tp, count, count)
+    for n = 1, count do
+      local i = is[n]
+      if type(i) == 'string' then
+        local buf = t.buffer(#i)
+        ffi.copy(buf, i, #i)
+        iov[n].iov_base = buf
+        iov[n].iov_len = #i
+      elseif type(i) == 'number' then
+        iov[n].iov_base = t.buffer(i)
+        iov[n].iov_len = i
+      elseif ffi.istype(t.iovec, i) then
+        ffi.copy(iov[n], i, s.iovec)
+      elseif type(i) == 'cdata' then -- eg buffer or other structure
+        iov[n].iov_base = i
+        iov[n].iov_len = ffi.sizeof(i)
+      else -- eg table
+        iov[n] = i
+      end
+    end
+    return iov
+  end
+}
+
+addtype_var("iovecs", "struct { int count; struct iovec iov[?];}", mt.iovecs)
 
 -- convert strings to inet addresses and the reverse
 local function inet4_ntop(src)

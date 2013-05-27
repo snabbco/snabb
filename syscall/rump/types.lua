@@ -33,6 +33,7 @@ local unchanged = {
   ssize_t = true,
   ["struct in_addr"] = true,
   ["struct in6_addr"] = true,
+  ["struct iovec"] = true,
 }
 
 local function rumpfn(tp) -- add _netbsd_ to correct types

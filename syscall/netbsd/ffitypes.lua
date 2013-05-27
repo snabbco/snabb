@@ -17,8 +17,6 @@ else
   end
 end
 
--- TODO note iovec can be shared despite very minor type difference
-
 -- these are the same, could just define as uint
 if abi.abi64 then
 cdef [[
@@ -51,10 +49,6 @@ typedef struct {
   _netbsd_fd_mask fds_bits[8];
 } _netbsd_fd_set;
 
-struct _netbsd_iovec {
-  void *iov_base;
-  size_t iov_len;
-};
 struct _netbsd_timespec {
   _netbsd_time_t tv_sec;
   long   tv_nsec;
@@ -97,7 +91,7 @@ struct _netbsd_sockaddr_un {
 struct _netbsd_msghdr {
   void            *msg_name;
   _netbsd_socklen_t       msg_namelen;
-  struct _netbsd_iovec    *msg_iov;
+  struct iovec    *msg_iov;
   int             msg_iovlen;
   void            *msg_control;
   _netbsd_socklen_t       msg_controllen;
