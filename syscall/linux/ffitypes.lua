@@ -20,8 +20,6 @@ typedef int32_t daddr_t;
 typedef long blkcnt_t;
 typedef long blksize_t;
 typedef int32_t clockid_t;
-typedef long ssize_t;
-typedef unsigned long size_t;
 typedef long clock_t;
 typedef uint32_t off32_t; /* only used for eg mmap2 on Linux */
 typedef uint32_t socklen_t;

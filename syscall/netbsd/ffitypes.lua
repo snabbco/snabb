@@ -19,17 +19,14 @@ end
 
 -- TODO note iovec can be shared despite very minor type difference
 
+-- these are the same, could just define as uint
 if abi.abi64 then
 cdef [[
 typedef unsigned int _netbsd_clock_t;
-typedef unsigned long _netbsd_size_t;
-typedef long _netbsd_ssize_t;
 ]]
 else
 cdef [[
 typedef unsigned long _netbsd_clock_t;
-typedef unsigned int _netbsd_size_t;
-typedef int _netbsd_ssize_t;
 ]]
 end
 
@@ -56,7 +53,7 @@ typedef struct {
 
 struct _netbsd_iovec {
   void *iov_base;
-  _netbsd_size_t iov_len;
+  size_t iov_len;
 };
 struct _netbsd_timespec {
   _netbsd_time_t tv_sec;

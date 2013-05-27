@@ -29,6 +29,8 @@ local unchanged = {
   pid_t = true,
   off_t = true,
   nfds_t = true,
+  size_t = true,
+  ssize_t = true,
   ["struct in_addr"] = true,
   ["struct in6_addr"] = true,
 }

@@ -16,8 +16,6 @@ typedef uint16_t nlink_t;
 typedef uint64_t ino_t; // at least on recent desktop; TODO define as ino64_t
 typedef long time_t;
 typedef int32_t daddr_t;
-typedef long ssize_t;
-typedef unsigned long size_t;
 typedef unsigned long clock_t;
 typedef uint32_t socklen_t;
 
