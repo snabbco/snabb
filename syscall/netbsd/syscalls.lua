@@ -29,7 +29,7 @@ local mntstruct = {
 
 -- TODO allow putting data in same table rather than nested table?
 function S.mount(filesystemtype, dir, flags, data, datalen)
-  if type(data) == "string" then data = {fspec = data} end -- common case, for ufs etc
+  if type(data) == "string" then data = {fspec = pt.char(data)} end -- common case, for ufs etc
   if type(filesystemtype) == "table" then
     local t = filesystemtype
     dir = t.target or t.dir
@@ -37,7 +37,7 @@ function S.mount(filesystemtype, dir, flags, data, datalen)
     flags = t.flags
     data = t.data
     datalen = t.datalen
-    if t.fspec then data = {fspec = t.fspec} end
+    if t.fspec then data = {fspec = pt.char(t.fspec)} end
   end
   if data then
     local tp = mntstruct[filesystemtype]
