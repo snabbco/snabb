@@ -24,6 +24,7 @@ local mntstruct = {
   --nfs = t.nfs_args,
   --mfs = t.mfs_args,
   tmpfs = t.tmpfs_args,
+  sysvbfs = t.ufs_args,
 }
 
 -- TODO allow putting data in same table rather than nested table?
