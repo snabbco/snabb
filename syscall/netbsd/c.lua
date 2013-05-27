@@ -11,9 +11,14 @@ local t, pt, s = types.t, types.pt, types.s
 local C = setmetatable({}, {__index = ffi.C})
 
 -- TODO move to constants
+local __mount50 = 410
 local stat50 = 439
 local fstat50 = 440
 local lstat50 = 441
+
+C.mount = function(fstype, dir, flags, data, data_len)
+  return C.syscall(__mount50, fstype, dir, t.int(flags), pt.void(data), t.size(data_len))
+end
 
 C.stat = function(path, buf)
   return C.syscall(stat50, pt.void(path), pt.void(buf))
