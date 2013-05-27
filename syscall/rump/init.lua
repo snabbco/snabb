@@ -16,6 +16,10 @@ local rump = ffi.load("rump")
 
 ffi.cdef[[
 int rump_init(void);
+
+int rump_pub_etfs_register(const char *key, const char *hostpath, int ftype);
+int rump_pub_etfs_register_withsize(const char *key, const char *hostpath, int ftype, uint64_t begin, uint64_t size);
+int rump_pub_etfs_remove(const char *key);
 ]]
 
 local errors = require "syscall.netbsd.errors"
@@ -43,11 +47,6 @@ c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier
 
 local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
 
-local function module(s)
-  s = string.gsub(s, "%.", "_")
-  ffi.load("rump" .. s, true)
-end
-
 S.abi, S.c, S.C, S.types, S.t = abi, c, C, types, types.t -- add to main table returned
 
 -- add methods
@@ -56,8 +55,45 @@ S = require "syscall.methods".init(S)
 -- add feature tests
 S.features = require "syscall.features".init(S)
 
-S.init = rump.rump_init
-S.module = module
+-- rump functions, constants
+
+local helpers = require "syscall.helpers"
+local strflag = helpers.strflag
+
+local RUMP_ETFS = strflag {
+  REG = 0,
+  BLK = 1,
+  CHR = 2,
+  DIR = 3,
+  DIR_SUBDIRS = 4,
+}
+
+function S.module(s)
+  s = string.gsub(s, "%.", "_")
+  ffi.load("rump" .. s, true)
+end
+
+local function retbool(ret)
+  if ret == -1 then return nil, t.error() end
+  return true
+end
+
+-- I think these return errors in errno
+function S.etfs_register(key, hostpath, ftype, begin, size)
+  ftype = RUMP_ETFS[ftype]
+  if begin then
+    local ret = rump.rump_pub_etfs_register_withsize(key, hostpath, ftype, begin, size);
+  else
+    local ret = rump.rump_pub_etfs_register(key, hostpath, ftype);
+  end
+  return retbool(ret)
+end
+
+function S.etfs_remove(key)
+  return retbool(rump.rump_pub_etfs_remove(key))
+end
+
+function S.init() return retbool(rump.rump_init()) end
 
 return S
 
