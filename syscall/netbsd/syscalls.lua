@@ -45,6 +45,7 @@ function S.mount(filesystemtype, dir, flags, data, datalen)
   else
     datalen = 0
   end
+  local ret = C.mount(filesystemtype, dir, c.MNT[flags], data, datalen or #data)
   return retbool(C.mount(filesystemtype, dir, c.MNT[flags], data, datalen or #data))
 end
 
