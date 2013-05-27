@@ -66,12 +66,5 @@ test_mount_bsd_root = {
     assert(S.unmount(tmpfile))
     assert(S.rmdir(tmpfile))
   end,
-  test_mount_sysvbfs = function()
-    if not abi.le then return true end -- this fs cannot be endian swapped
-    assert(S.mkdir(tmpfile))
-    assert(S.mount("sysvbfs", tmpfile, 0, "test/data/sysvbfs_le.img"))
-    assert(S.unmount(tmpfile))
-    assert(S.rmdir(tmpfile))
-  end,
 }
 
