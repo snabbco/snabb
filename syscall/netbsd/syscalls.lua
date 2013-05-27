@@ -37,7 +37,7 @@ function S.mount(filesystemtype, dir, flags, data, datalen)
     flags = t.flags
     data = t.data
     datalen = t.datalen
-    if t.fspec then data = {fspec = t.fspec}
+    if t.fspec then data = {fspec = t.fspec} end
   end
   if data then
     local tp = mntstruct[filesystemtype]
