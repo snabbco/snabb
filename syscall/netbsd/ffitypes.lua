@@ -17,7 +17,21 @@ else
   end
 end
 
--- TODO note iovec can probably be shared despite very minor type difference
+-- TODO note iovec can be shared despite very minor type difference
+
+if abi.abi64 then
+cdef [[
+typedef unsigned int _netbsd_clock_t;
+typedef unsigned long _netbsd_size_t;
+typedef long _netbsd_ssize_t;
+]]
+else
+cdef [[
+typedef unsigned long _netbsd_clock_t;
+typedef unsigned int _netbsd_size_t;
+typedef int _netbsd_ssize_t;
+]]
+end
 
 cdef [[
 typedef uint32_t _netbsd_mode_t;
@@ -29,11 +43,11 @@ typedef int64_t _netbsd_time_t;
 typedef int64_t _netbsd_daddr_t;
 typedef uint64_t _netbsd_blkcnt_t;
 typedef uint32_t _netbsd_blksize_t;
-typedef int32_t _netbsd_clockid_t;
-typedef int _netbsd_ssize_t;
-typedef unsigned int _netbsd_size_t;
-typedef unsigned long _netbsd_clock_t;
+typedef int _netbsd_clockid_t;
 typedef unsigned int _netbsd_socklen_t;
+typedef int _netbsd_timer_t;
+typedef int _netbsd_suseconds_t;
+typedef unsigned int useconds_t;
 
 typedef uint32_t _netbsd_fd_mask;
 typedef struct {
