@@ -61,7 +61,8 @@ test_mount_bsd_root = {
   end,
   test_mount_tmpfs = function()
     assert(S.mkdir(tmpfile))
-    assert(S.mount{dir=tmpfile, type="tmpfs", data={version = 1, ta_nodes_max=100, ta_size_max=1048576}})
+    local data = {ta_version = 1, ta_nodes_max=100, ta_size_max=1048576, ta_root_mode=helpers.octal("0700")}
+    assert(S.mount{dir=tmpfile, type="tmpfs", data})
     assert(S.unmount(tmpfile))
     assert(S.rmdir(tmpfile))
   end,
