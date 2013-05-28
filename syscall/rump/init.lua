@@ -102,5 +102,7 @@ end
 
 function S.rump.init() return retbool(rump.rump_init()) end
 
+function S.rump.version() return rump.rump_pub_getversion() end
+
 return S
 
