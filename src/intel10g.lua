@@ -28,154 +28,157 @@ local bits, bitset = lib.bits, lib.bitset
 num_descriptors = 32 * 1024
 rxdesc, rxdesc_phy, txdesc, txdesc_phy = nil
 
-r = {} -- Configuration registers
-s = {} -- Statistics registers
-
 --- ### Initialization
 
-function open ()
-   pci.set_bus_master(pciaddress, true)
-   base = ffi.cast("uint32_t*", pci.map_pci_memory(pciaddress, 0))
-   register.define(config_registers_desc, r, base)
-   register.define(statistics_registers_desc, s, base)
-   init()
+function new (pciaddress)
+   return { r = {} s = {},
+            txbuffers = {}, rxbuffers = {}
+            tdh = 0, tdt = 0, rdh = 0, rdt = 0, rxnext = 0 }
+end
+
+function open (dev)
+   pci.set_bus_master(dev.pciaddress, true)
+   base = ffi.cast("uint32_t*", pci.map_pci_memory(dev.pciaddress, 0))
+   register.define(config_registers_desc, dev.r, base)
+   register.define(statistics_registers_desc, dev.s, base)
+   init(dev)
 end
 
 --- See data sheet section 4.6.3 "Initialization Sequence."
 
-function init ()
-   init_dma_memory()
-   disable_interrupts()
-   global_reset()
-   wait_eeprom_autoread()
-   wait_dma()
-   init_statistics()
-   init_receive()
-   init_transmit()
+function init (dev)
+   init_dma_memory(dev)
+   disable_interrupts(dev)
+   global_reset(dev)
+   wait_eeprom_autoread(dev)
+   wait_dma(dev)
+   init_statistics(dev)
+   init_receive(dev)
+   init_transmit(dev)
 end
 
-function init_dma_memory ()
-   rxdesc, rxdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
-   txdesc, txdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
+function init_dma_memory (dev)
+   dev.rxdesc, dev.rxdesc_phy =
+      memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
+   dev.txdesc, dev.txdesc_phy =
+      memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
    -- Add bounds checking
-   rxdesc  = lib.bounds_checked(rxdesc_t, rxdesc, 0, num_descriptors)
-   txdesc  = lib.bounds_checked(txdesc_t, txdesc, 0, num_descriptors)
+   dev.rxdesc = lib.bounds_checked(rxdesc_t, rxdesc, 0, num_descriptors)
+   dev.txdesc = lib.bounds_checked(txdesc_t, txdesc, 0, num_descriptors)
 end
 
-function global_reset ()
+function global_reset (dev)
    local reset = bits{LinkReset=3, DeviceReset=26}
-   r.CTRL(reset)
+   register.set(dev.r.CTRL, reset)
    C.usleep(1000)
-   r.CTRL:wait(reset, 0)
+   register.wait(dev.r.CTRL, reset, 0)
 end
 
-function disable_interrupts () end --- XXX do this
-function wait_eeprom_autoread () r.EEC:wait(bits{AutoreadDone=9}) end
-function wait_dma ()             r.RDRXCTL:wait(bits{DMAInitDone=3})  end
+function disable_interrupts (dev) end --- XXX do this
 
-function init_statistics ()
+function wait_eeprom_autoread (dev)
+   register.wait(dev.r.EEC, bits{AutoreadDone=9})
+end
+
+function wait_dma (dev)
+   register.wait(dev.r.RDRXCTL, bits{DMAInitDone=3})
+end
+
+function init_statistics (dev)
    -- Read and then zero each statistic register
-   for _,reg in pairs(s) do reg:read() reg:reset() end
+   for _,reg in pairs(dev.s) do register.value(reg) register.reset(reg) end
 end
 
-function init_receive ()
-   set_promiscuous_mode() -- accept all, no need to configure MAC address filter
---   r.RDRXCTL:set(bits{CRCStrip=0})
---   r.HLREG0:clr(bit.bor(bit.lshift(0x1f, 17), -- RSCFRSTSIZE
---                bits({RXLNGTHERREN=27, UndocumentedRXCRCSTRP=1})))
-   r.HLREG0:clr(bits({RXLNGTHERREN=27}))
-   r.RDBAL(rxdesc_phy % 2^32)
-   r.RDBAH(rxdesc_phy / 2^32)
-   r.RDLEN(num_descriptors * ffi.sizeof("union rx"))
-   r.RXDCTL(bits{Enable=25})
-   r.RXDCTL:wait(bits{enable=25})
-   r.RXCTRL:set(bits{RXEN=0})
+function init_receive (dev)
+   set_promiscuous_mode(dev) -- accept all, no need to configure MAC filter
+   register.clear(dev.r.HLREG0, {RXLNGTHERREN=27})
+   register.poke(dev.r.RDBAL, dev.rxdesc_phy % 2^32)
+   register.poke(dev.r.RDBAH, dev.rxdesc_phy / 2^32)
+   register.poke(dev.r.RDLEN, num_descriptors * ffi.sizeof("union rx"))
+   register.poke(dev.r.RXDCTL, bits{Enable=25})
+   register.wait(dev.r.RXCTL, bits{Enable=25})
+   register.poke(dev.r.RXCTRL, bits{RXEN=0})
 end
 
-function set_promiscuous_mode () r.FCTRL(bits({MPE=8, UPE=9, BAM=10})) end
+function set_promiscuous_mode (dev)
+   register.poke(dev.r.FCTRL, bits({MPE=8, UPE=9, BAM=10}))
+end
 
-function init_transmit ()
-   r.HLREG0:set(bits{TXCRCEN=0})
-   r.TDBAL(txdesc_phy % 2^32)
-   r.TDBAH(txdesc_phy / 2^32)
-   r.TDLEN(num_descriptors * ffi.sizeof("union tx"))
-   r.DMATXCTL(bits{TE=0})
-   r.TXDCTL:wait(bits{Enable=25})
+function init_transmit (dev)
+   register.poke(dev.r.HLREG0, bits{TXCRCEN=0})
+   register.poke(dev.r.TDBAL, dev.txdesc_phy % 2^32)
+   register.poke(dev.r.TDBAH, dev.txdesc_phy / 2^32)
+   register.poke(dev.r.TDLEN, num_descriptors * ffi.sizeof("union tx"))
+   register.poke(dev.r.DMATXCTL, bits{TE=0})
+   register.wait(dev.r.TXDCTL, bits{Enable=25})
 end
 
 --- ### Transmit
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
-txbuffers = {}
-tdh, tdt = 0, 0 -- Cached values of TDT and TDH
 txdesc_flags = bits{eop=24,ifcs=25}
-function transmit (buf)
---   print("buf",buf)
-   txdesc[tdt].data.address = buf.phy
-   txdesc[tdt].data.options = bit.bor(buf.size, txdesc_flags)
-   txbuffers[tdt] = buf
-   tdt = (tdt + 1) % num_descriptors
+function transmit (dev, buf)
+   dev.txdesc[tdt].data.address = buf.phy
+   dev.txdesc[tdt].data.options = bit.bor(buf.size, txdesc_flags)
+   dev.txbuffers[tdt] = buf
+   dev.tdt = (dev.tdt + 1) % num_descriptors
    buffer.ref(buf)
 end
 
-function sync_transmit ()
-   local old_tdh = tdh
-   tdh = r.TDH()
+function sync_transmit (dev)
+   local old_tdh = dev.tdh
+   tdh = register.peek(dev.r.TDH)
    C.full_memory_barrier()
    -- Release processed buffers
-   while old_tdh ~= tdh do
+   while old_tdh ~= dev.tdh do
       buffer.deref(txbuffers[old_tdh])
-      txbuffers[old_tdh] = nil
+      dev.txbuffers[old_tdh] = nil
       old_tdh = (old_tdh + 1) % num_descriptors
    end
-   r.TDT(tdt)
+   register.poke(dev.r.TDT, dev.tdt)
 end
 
-function can_transmit () return (tdt + 1) % num_descriptors ~= tdh end
+function can_transmit (dev) return (dev.tdt + 1) % num_descriptors ~= dev.tdh end
 
 --- ### Receive
 
 --- See datasheet section 7.1 "Inline Functions -- Receive Functionality."
 
--- Queued
-rxbuffers = {}
-rdh, rdt, rxnext = 0, 0, 0
-
-function receive ()
-   assert(rdh ~= rxnext)
-   local buf = rxbuffers[rxnext]
-   local wb = rxdesc[rxnext].wb
+function receive (dev)
+   assert(dev.rdh ~= dev.rxnext)
+   local buf = dev.rxbuffers[dev.rxnext]
+   local wb = dev.rxdesc[dev.rxnext].wb
    buf.size = wb.length
    assert(bit.band(wb.status, 1) == 1) -- Descriptor Done
-   rxnext = (rxnext + 1) % num_descriptors
+   dev.rxnext = (dev.rxnext + 1) % num_descriptors
    buffer.deref(buf)
    assert(buf.size > 0)
    return buf
 end
 
-function can_receive () return rxnext ~= rdh end
+function can_receive (dev) return dev.rxnext ~= dev.rdh end
 
-function can_add_receive_buffer ()
-   return (rdt + 1) % num_descriptors ~= rxnext
+function can_add_receive_buffer (dev)
+   return (dev.rdt + 1) % num_descriptors ~= dev.rxnext
 end
 
-function add_receive_buffer (buf)
-   assert(can_add_receive_buffer())
-   local desc = rxdesc[rdt].data
+function add_receive_buffer (dev, buf)
+   assert(can_add_receive_buffer(dev))
+   local desc = dev.rxdesc[rdt].data
    desc.address, desc.dd = buf.phy, buf.size
-   rxbuffers[rdt] = buf
-   rdt = (rdt + 1) % num_descriptors
+   dev.rxbuffers[dev.rdt] = buf
+   dev.rdt = (dev.rdt + 1) % num_descriptors
    buffer.ref(buf)
 end
 
 function sync_receive ()
    -- XXX I have been surprised to see RDH = num_descriptors,
    --     must check what that means. -luke
-   rdh = math.min(r.RDH(), num_descriptors-1)
+   rdh = math.min(register.peek(r.RDH), num_descriptors-1)
    assert(rdh < num_descriptors)
    C.full_memory_barrier()
-   r.RDT(rdt)
+   register.poke(r.RDT, rdt)
 end
 
 function sync () sync_receive() sync_transmit() end
@@ -200,20 +203,20 @@ end
 
 --- ### Status and diagnostics
 
-function linkup () return bitset(r.LINKS(), 30) end
+function linkup () return bitset(register.peek(r.LINKS), 30) end
 
 function get_configuration_state ()
-   return { AUTOC = r.AUTOC(), HLREG0 = r.HLREG0() }
+   return { AUTOC = register.peek(r.AUTOC), HLREG0 = register.peek(r.HLREG0) }
 end
 
 function restore_configuration_state (saved_state)
-   r.AUTOC(saved_state.AUTOC)
-   r.HLREG0(saved_state.HLREG0)
+   register.poke(r.AUTOC, saved_state.AUTOC)
+   register.poke(r.HLREG0, saved_state.HLREG0)
 end
 
 function enable_mac_loopback ()
-   r.AUTOC:set(bits({ForceLinkUp=0, LMS10G=13}))
-   r.HLREG0:set(bits({Loop=15}))
+   register.poke(r.AUTOC, bits({ForceLinkUp=0, LMS10G=13}))
+   register.poke(r.HLREG0, bits({Loop=15}))
 end
 
 function selftest (options)
