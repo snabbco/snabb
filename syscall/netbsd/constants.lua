@@ -480,5 +480,27 @@ c.TMPFS_ARGS = strflag {
   VERSION = 1,
 }
 
+c.MODULE_CLASS = strflag {
+  ANY = 0,
+  MISC = 1,
+  VFS = 2,
+  DRIVER = 3,
+  EXEC = 4,
+  SECMODEL = 5,
+}
+
+c.MODULE_SOURCE = strflag {
+  KERNEL = 0,
+  BOOT = 1,
+  FILESYS = 2,
+}
+
+MODULE_CMD = strflag {
+  INIT = 0,
+  FINI = 1,
+  STAT = 2,
+  AUTOUNLOAD = 3,
+}
+
 return c
 

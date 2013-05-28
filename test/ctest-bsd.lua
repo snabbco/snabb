@@ -70,6 +70,7 @@ print [[
 #include <sys/reboot.h>
 #include </usr/include/fs/tmpfs/tmpfs_args.h>
 #include </usr/include/ufs/ufs/ufsmount.h>
+#include <sys/module.h>
 
 int ret = 0;
 
