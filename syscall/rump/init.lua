@@ -17,6 +17,11 @@ local rump = ffi.load("rump")
 ffi.cdef[[
 int rump_init(void);
 
+int rump_pub_getversion(void);
+
+int rump_pub_module_init(const struct modinfo * const *, size_t);
+int rump_pub_module_fini(const struct modinfo *);
+
 int rump_pub_etfs_register(const char *key, const char *hostpath, int ftype);
 int rump_pub_etfs_register_withsize(const char *key, const char *hostpath, int ftype, uint64_t begin, uint64_t size);
 int rump_pub_etfs_remove(const char *key);
@@ -57,6 +62,14 @@ S.features = require "syscall.features".init(S)
 
 -- rump functions, constants
 
+-- I think these return errors in errno
+local function retbool(ret)
+  if ret == -1 then return nil, t.error() end
+  return true
+end
+
+S.rump = {}
+
 local helpers = require "syscall.helpers"
 local strflag = helpers.strflag
 
@@ -68,18 +81,12 @@ local RUMP_ETFS = strflag {
   DIR_SUBDIRS = 4,
 }
 
-function S.module(s)
+function S.rump.module(s)
   s = string.gsub(s, "%.", "_")
   ffi.load("rump" .. s, true)
 end
 
-local function retbool(ret)
-  if ret == -1 then return nil, t.error() end
-  return true
-end
-
--- I think these return errors in errno
-function S.etfs_register(key, hostpath, ftype, begin, size)
+function S.rump.etfs_register(key, hostpath, ftype, begin, size)
   ftype = RUMP_ETFS[ftype]
   if begin then
     local ret = rump.rump_pub_etfs_register_withsize(key, hostpath, ftype, begin, size);
@@ -89,11 +96,11 @@ function S.etfs_register(key, hostpath, ftype, begin, size)
   return retbool(ret)
 end
 
-function S.etfs_remove(key)
+function S.rump.etfs_remove(key)
   return retbool(rump.rump_pub_etfs_remove(key))
 end
 
-function S.init() return retbool(rump.rump_init()) end
+function S.rump.init() return retbool(rump.rump_init()) end
 
 return S
 

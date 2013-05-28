@@ -5,10 +5,10 @@ local R = require "syscall.rump.init" -- rump kernel functions
 
 S.setenv("RUMP_VERBOSE", "1")
 
-R.module "vfs"
-R.module "fs.kernfs"
+R.rump.module "vfs"
+R.rump.module "fs.kernfs"
 
-R.init()
+R.rump.init()
 
 assert(R.mkdir("/kern", "0755"))
 assert(R.mount("kernfs", "/kern"))

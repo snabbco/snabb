@@ -10,13 +10,14 @@ assert(S.abi.le, "This test requires little endian machine")
 
 S.setenv("RUMP_VERBOSE", "1")
 
-R.module "vfs"
-R.module "fs.sysvbfs"
+R.rump.module "dev"
+R.rump.module "dev.disk"
 
-R.module "dev"
-R.module "dev.disk"
+R.rump.module "vfs"
+R.rump.module "fs.sysvbfs"
 
-R.init()
+R.rump.init()
+
 
 local dev = "/de-vice"
 
