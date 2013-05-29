@@ -680,6 +680,12 @@ local ifla_msg_types = {
     -- VETH_INFO_UNSPEC
     [c.VETH_INFO.PEER] = {"ifla", c.IFLA},
   },
+  nda = {
+    [c.NDA.DST]       = "address",
+    [c.NDA.LLADDR]    = t.macaddr,
+    [c.NDA.CACHEINFO] = t.nda_cacheinfo,
+--    [c.NDA.PROBES] = ,
+  },
 }
 
 --[[ TODO add
@@ -983,6 +989,7 @@ local function preftable(tab, prefix)
   return tab
 end
 
+-- TODO this should be in __new for type
 local function rtm_table(tab)
   tab = preftable(tab, "rtm_")
   tab.rtm_family = c.AF[tab.rtm_family]
@@ -1027,6 +1034,37 @@ function nl.deladdr(index, af, prefixlen, ...)
   local family = c.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
   return nlmsg(c.RTM.DELADDR, c.NLM_F.REQUEST + c.NLM_F.ACK, family, t.ifaddrmsg, ifav, ...)
+end
+
+-- TODO this should be in __new for type
+local function ndm_table(tab)
+  tab = preftable(tab, "ndm_")
+  tab.ndm_family = c.AF[tab.ndm_family]
+  tab.ndm_state = c.NUD[tab.ndm_state]
+  tab.ndm_flags = c.NTF[tab.ndm_flags or 0]
+  tab.ndm_type = tab.ndm_type or 0 -- which lookup?
+  return tab
+end
+
+function nl.getneigh(index, tab, ...)
+  if type(index) == 'table' then index = index.index end
+  tab.ndm_index = index
+  local ndm = ndm_table(tab)
+  return nlmsg(c.RTM.GETNEIGH, c.NLM_F.REQUEST + c.NLM_F.ACK, tab.ndm_family, t.ndmsg, ndm, ...)
+end
+
+function nl.newneigh(index, tab, ...)
+  if type(index) == 'table' then index = index.index end
+  tab.ndm_index = index
+  local ndm = ndm_table(tab)
+  return nlmsg(c.RTM.NEWNEIGH, c.NLM_F.REQUEST + c.NLM_F.ACK, tab.ndm_family, t.ndmsg, ndm, ...)
+end
+
+function nl.delneigh(index, tab, ...)
+  if type(index) == 'table' then index = index.index end
+  tab.ndm_index = index
+  local ndm = ndm_table(tab)
+  return nlmsg(c.RTM.DELNEIGH, c.NLM_F.REQUEST + c.NLM_F.ACK, tab.ndm_family, t.ndmsg, ndm, ...)
 end
 
 function nl.interfaces() -- returns with address info too.
