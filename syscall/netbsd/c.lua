@@ -1,6 +1,5 @@
--- This sets up the table of C functions
--- For BSD we hope we do not need many overrides
--- however stat appears to be "fixed" up in libc to return incorrect results TODO why?
+-- This sets up the table of C functions for BSD
+-- We need to override functions that are versioned as the old ones selected otherwise
 
 local function init(abi, c, types)
 
