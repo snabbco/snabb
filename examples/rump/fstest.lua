@@ -7,8 +7,6 @@ S.setenv("RUMP_VERBOSE", "1")
 
 R.rump.init("vfs", "fs.kernfs")
 
---R.rump.module "fs.kernfs"
-
 assert(R.mkdir("/kern", "0755"))
 assert(R.mount("kernfs", "/kern"))
 

@@ -94,7 +94,7 @@ local RUMP_ETFS = strflag {
   DIR_SUBDIRS = 4,
 }
 
-function S.rump.init(...) -- you must load the factions here eg dev, vfs, net
+function S.rump.init(...) -- you must load the factions here eg dev, vfs, net, plus modules
   for i, v in ipairs{...} do
     v = string.gsub(v, "%.", "_")
     ffi.load("rump" .. v, true)
@@ -104,7 +104,7 @@ end
 
 function S.rump.version() return rump.rump_pub_getversion() end
 
--- this is for standard kernel modules. Should we be using rump_pub_module_init?
+-- We could also use rump_pub_module_init if loading later
 function S.rump.module(s)
   s = string.gsub(s, "%.", "_")
   ffi.load("rump" .. s, true)

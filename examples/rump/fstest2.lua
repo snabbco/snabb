@@ -12,9 +12,6 @@ S.setenv("RUMP_VERBOSE", "1")
 
 R.rump.init("vfs", "fs.sysvbfs", "dev", "dev.disk")
 
---R.rump.module "dev.disk"
---R.rump.module "fs.sysvbfs"
-
 local dev = "/de-vice"
 
 assert(R.rump.etfs_register(dev, "test/data/sysvbfs_le.img", "blk"))
