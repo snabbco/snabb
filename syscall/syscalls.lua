@@ -87,6 +87,7 @@ function S.mknod(pathname, mode, dev)
   if type(dev) == "table" then dev = dev.dev end
   return retbool(C.mknod(pathname, c.S_I[mode], dev or 0))
 end
+-- TODO read should have consistent return type but then will differ from other calls.
 function S.read(fd, buf, count)
   if buf then return retnum(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
   if not count then count = 4096 end
