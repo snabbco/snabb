@@ -19,7 +19,7 @@ local dev = "/de-vice"
 
 assert(R.rump.etfs_register(dev, "test/data/sysvbfs_le.img", "blk"))
 
---local stat = assert(R.stat(dev))
+local stat = assert(R.stat(dev))
 
 assert(R.mkdir("/mnt", "0755"))
 assert(R.mount("sysvbfs", "/mnt", "rdonly", dev))
