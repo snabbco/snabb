@@ -324,6 +324,7 @@ print [[
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/if_tun.h>
 #include <linux/vhost.h>
+#include <linux/neighbour.h>
 
 int ret = 0;
 

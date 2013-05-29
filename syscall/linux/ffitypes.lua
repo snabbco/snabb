@@ -276,6 +276,49 @@ struct rtnl_link_stats {
   uint32_t rx_compressed;
   uint32_t tx_compressed;
 };
+struct ndmsg {
+  uint8_t  ndm_family;
+  uint8_t  ndm_pad1;
+  uint16_t ndm_pad2;
+  int32_t  ndm_ifindex;
+  uint16_t ndm_state;
+  uint8_t  ndm_flags;
+  uint8_t  ndm_type;
+};
+struct nda_cacheinfo {
+  uint32_t ndm_confirmed;
+  uint32_t ndm_used;
+  uint32_t ndm_updated;
+  uint32_t ndm_refcnt;
+};
+struct ndt_stats {
+  uint64_t ndts_allocs;
+  uint64_t ndts_destroys;
+  uint64_t ndts_hash_grows;
+  uint64_t ndts_res_failed;
+  uint64_t ndts_lookups;
+  uint64_t ndts_hits;
+  uint64_t ndts_rcv_probes_mcast;
+  uint64_t ndts_rcv_probes_ucast;
+  uint64_t ndts_periodic_gc_runs;
+  uint64_t ndts_forced_gc_runs;
+};
+struct ndtmsg {
+  uint8_t  ndtm_family;
+  uint8_t  ndtm_pad1;
+  uint16_t ndtm_pad2;
+};
+struct ndt_config {
+  uint16_t ndtc_key_len;
+  uint16_t ndtc_entry_size;
+  uint32_t ndtc_entries;
+  uint32_t ndtc_last_flush;
+  uint32_t ndtc_last_rand;
+  uint32_t ndtc_hash_rnd;
+  uint32_t ndtc_hash_mask;
+  uint32_t ndtc_hash_chain_gc;
+  uint32_t ndtc_proxy_qlen;
+};
 typedef struct { 
   unsigned int clock_rate;
   unsigned int clock_type;

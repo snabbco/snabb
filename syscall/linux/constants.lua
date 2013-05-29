@@ -1254,6 +1254,67 @@ c.RTNLGRP = strflag {
   DCB = 23,
 }
 
+-- netlink neighbours (arp)
+c.NDA = strflag {
+  UNSPEC = 0,
+  DST = 1,
+  LLADDR = 2,
+  CACHEINFO = 3,
+  PROBES = 4,
+}
+
+c.NTF = multiflags {
+  USE        = 0x01,
+  PROXY      = 0x08,
+  ROUTER     = 0x80,
+  SELF       = 0x02,
+  MASTER     = 0x04,
+}
+
+c.NUD = multiflags {
+  INCOMPLETE = 0x01,
+  REACHABLE  = 0x02,
+  STALE      = 0x04,
+  DELAY      = 0x08,
+  PROBE      = 0x10,
+  FAILED     = 0x20,
+  NOARP      = 0x40,
+  PERMANENT  = 0x80,
+  NONE       = 0x00,
+}
+
+c.NDTPA = strflag {
+  UNSPEC = 0,
+  IFINDEX = 1,
+  REFCNT = 2,
+  REACHABLE_TIME = 3,
+  BASE_REACHABLE_TIME = 4,
+  RETRANS_TIME = 5,
+  GC_STALETIME = 6,
+  DELAY_PROBE_TIME = 7,
+  QUEUE_LEN = 8,
+  APP_PROBES = 9,
+  UCAST_PROBES = 10,
+  MCAST_PROBES = 11,
+  ANYCAST_DELAY = 12,
+  PROXY_DELAY = 13,
+  PROXY_QLEN = 14,
+  LOCKTIME = 15,
+  QUEUE_LENBYTES = 16,
+}
+
+c.NDTA = strflag {
+  UNSPEC = 0,
+  NAME = 1,
+  THRESH1 = 2,
+  THRESH2 = 3,
+  THRESH3 = 4,
+  CONFIG = 5,
+  PARMS = 6,
+  STATS = 7,
+  GC_INTERVAL = 8,
+}
+
 -- address families
 c.AF = strflag {
   UNSPEC     = 0,
