@@ -9,6 +9,14 @@ local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
 
 local c = {}
 
+-- TODO incomplete
+c.SYS = strflag {
+  __mount50 = 410
+  stat50 = 439
+  fstat50 = 440
+  lstat50 = 441
+}
+
 c.STD = strflag {
   IN_FILENO = 0,
   OUT_FILENO = 1,
