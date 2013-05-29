@@ -10,20 +10,16 @@ assert(S.abi.le, "This test requires little endian machine")
 
 S.setenv("RUMP_VERBOSE", "1")
 
-R.rump.module "dev"
-R.rump.module "dev.disk"
+R.rump.init("vfs", "fs.sysvbfs", "dev", "dev.disk")
 
-R.rump.module "vfs"
-R.rump.module "fs.sysvbfs"
-
-R.rump.init()
-
+--R.rump.module "dev.disk"
+--R.rump.module "fs.sysvbfs"
 
 local dev = "/de-vice"
 
-assert(R.etfs_register(dev, "test/data/sysvbfs_le.img", "blk"))
+assert(R.rump.etfs_register(dev, "test/data/sysvbfs_le.img", "blk"))
 
-local stat = assert(R.stat(dev))
+--local stat = assert(R.stat(dev))
 
 assert(R.mkdir("/mnt", "0755"))
 assert(R.mount("sysvbfs", "/mnt", "rdonly", dev))

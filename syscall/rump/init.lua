@@ -9,24 +9,6 @@ abi.rump = true
 abi.host = abi.os
 abi.os = "netbsd"
 
-local ffi = require "ffi"
-
-local rumpuser = ffi.load("rumpuser")
-local rump = ffi.load("rump")
-
-ffi.cdef[[
-int rump_init(void);
-
-int rump_pub_getversion(void);
-
-int rump_pub_module_init(const struct modinfo * const *, size_t);
-int rump_pub_module_fini(const struct modinfo *);
-
-int rump_pub_etfs_register(const char *key, const char *hostpath, int ftype);
-int rump_pub_etfs_register_withsize(const char *key, const char *hostpath, int ftype, uint64_t begin, uint64_t size);
-int rump_pub_etfs_remove(const char *key);
-]]
-
 local errors = require "syscall.netbsd.errors"
 local c, types
 
@@ -62,6 +44,37 @@ S.features = require "syscall.features".init(S)
 
 -- rump functions, constants
 
+local ffi = require "ffi"
+
+local rumpuser = ffi.load("rumpuser")
+local rump = ffi.load("rump")
+
+-- note that modinfo is kernel only so not in ffitypes
+ffi.cdef[[
+int rump_init(void);
+
+int rump_pub_getversion(void);
+
+typedef struct modinfo {
+  unsigned int    mi_version;
+  int             mi_class;
+  int             (*mi_modcmd)(int, void *);
+  const char      *mi_name;
+  const char      *mi_required;
+} const modinfo_t;
+
+int rump_pub_etfs_register(const char *key, const char *hostpath, int ftype);
+int rump_pub_etfs_register_withsize(const char *key, const char *hostpath, int ftype, uint64_t begin, uint64_t size);
+int rump_pub_etfs_remove(const char *key);
+
+int rump_pub_module_init(const struct modinfo * const *, size_t);
+int rump_pub_module_fini(const struct modinfo *);
+]]
+
+local pt = types.pt
+
+local modinfo = ffi.typeof("struct modinfo")
+
 -- I think these return errors in errno
 local function retbool(ret)
   if ret == -1 then return nil, t.error() end
@@ -81,6 +94,17 @@ local RUMP_ETFS = strflag {
   DIR_SUBDIRS = 4,
 }
 
+function S.rump.init(...) -- you must load the factions here eg dev, vfs, net
+  for i, v in ipairs{...} do
+    v = string.gsub(v, "%.", "_")
+    ffi.load("rump" .. v, true)
+  end
+  return retbool(rump.rump_init())
+end
+
+function S.rump.version() return rump.rump_pub_getversion() end
+
+-- this is for standard kernel modules. Should we be using rump_pub_module_init?
 function S.rump.module(s)
   s = string.gsub(s, "%.", "_")
   ffi.load("rump" .. s, true)
@@ -89,9 +113,9 @@ end
 function S.rump.etfs_register(key, hostpath, ftype, begin, size)
   ftype = RUMP_ETFS[ftype]
   if begin then
-    local ret = rump.rump_pub_etfs_register_withsize(key, hostpath, ftype, begin, size);
+    local ret = ffi.C.rump_pub_etfs_register_withsize(key, hostpath, ftype, begin, size);
   else
-    local ret = rump.rump_pub_etfs_register(key, hostpath, ftype);
+    local ret = ffi.C.rump_pub_etfs_register(key, hostpath, ftype);
   end
   return retbool(ret)
 end
@@ -99,10 +123,6 @@ end
 function S.rump.etfs_remove(key)
   return retbool(rump.rump_pub_etfs_remove(key))
 end
-
-function S.rump.init() return retbool(rump.rump_init()) end
-
-function S.rump.version() return rump.rump_pub_getversion() end
 
 return S
 
