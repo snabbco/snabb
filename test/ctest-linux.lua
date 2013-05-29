@@ -239,6 +239,9 @@ c.IOCTL.TCSETSF2 = nil
 
 -- not on Travis CI
 c.PR.GET_TID_ADDRESS = nil
+c.NDTPA.QUEUE_LENBYTES = nil
+c.NTF.SELF = nil
+c.NTF.MASTER = nil
 
 -- renames
 c.LINUX_CAPABILITY_VERSION = c._LINUX_CAPABILITY_VERSION
