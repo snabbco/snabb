@@ -844,6 +844,12 @@ local rtpref = {
   [c.RTM.NEWROUTE] = {"rta", c.RTA},
   [c.RTM.GETROUTE] = {"rta", c.RTA},
   [c.RTM.DELROUTE] = {"rta", c.RTA},
+  [c.RTM.NEWNEIGH] = {"nda", c.NDA},
+  [c.RTM.DELNEIGH] = {"nda", c.NDA},
+  [c.RTM.GETNEIGH] = {"nda", c.NDA},
+  [c.RTM.NEWNEIGHTBL] = {"ndtpa", c.NDTPA},
+  [c.RTM.GETNEIGHTBL] = {"ndtpa", c.NDTPA},
+  [c.RTM.SETNEIGHTBL] = {"ndtpa", c.NDTPA},
 }
 
 function nl.socket(tp, addr)
