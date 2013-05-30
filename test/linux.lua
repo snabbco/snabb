@@ -1124,7 +1124,8 @@ test_netlink = {
     assert(i.dummy0:up())
     assert(i.dummy0:address("10.0.0.1/32"))
     assert(nl.newneigh(i.dummy0, {family = "inet", state = "permanent"}, "dst", "10.0.0.2", "lladdr", "46:9d:c9:06:dd:dd"))
-    local n = assert(nl.getneigh(i.dummy0, {family = "inet"}, "dst", "10.0.0.2", "lladdr", "46:9d:c9:06:dd:dd"))
+    --local n = assert(nl.getneigh(i.dummy0, {family = "inet"}, "dst", "10.0.0.2", "lladdr", "46:9d:c9:06:dd:dd"))
+    assert(nl.delneigh(i.dummy0, {family = "inet"}, "dst", "10.0.0.2", "lladdr", "46:9d:c9:06:dd:dd"))
     assert(i.dummy0:delete())
   end,
 }
