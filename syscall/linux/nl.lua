@@ -1050,7 +1050,7 @@ function nl.getneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
   tab.ndm_ifindex = index
   local ndm = ndm_table(tab)
-  return nlmsg(c.RTM.GETNEIGH, "request, ack", tab.ndm_family, t.ndmsg, ndm, ...)
+  return nlmsg(c.RTM.GETNEIGH, "request, dump", tab.ndm_family, t.ndmsg, ndm, ...)
 end
 
 function nl.newneigh(index, tab, ...)
