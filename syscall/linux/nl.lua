@@ -1048,21 +1048,21 @@ end
 
 function nl.getneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
-  tab.ndm_index = index
+  tab.ndm_ifindex = index
   local ndm = ndm_table(tab)
   return nlmsg(c.RTM.GETNEIGH, c.NLM_F.REQUEST + c.NLM_F.ACK, tab.ndm_family, t.ndmsg, ndm, ...)
 end
 
 function nl.newneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
-  tab.ndm_index = index
+  tab.ndm_ifindex = index
   local ndm = ndm_table(tab)
   return nlmsg(c.RTM.NEWNEIGH, c.NLM_F.REQUEST + c.NLM_F.ACK, tab.ndm_family, t.ndmsg, ndm, ...)
 end
 
 function nl.delneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
-  tab.ndm_index = index
+  tab.ndm_ifindex = index
   local ndm = ndm_table(tab)
   return nlmsg(c.RTM.DELNEIGH, c.NLM_F.REQUEST + c.NLM_F.ACK, tab.ndm_family, t.ndmsg, ndm, ...)
 end
