@@ -104,7 +104,7 @@ local ifla_decode = {
     end
   end,
   [c.IFLA.BROADCAST] = function(ir, buf, len)
-    local addrlen = addrlenmap[ir.type]
+    local addrlen = addrlenmap[ir.type] -- TODO always same
     if (addrlen) then
       ir.broadcast = t.macaddr()
       ffi.copy(ir.broadcast, buf, addrlen)
@@ -195,6 +195,24 @@ local rta_decode = {
     ffi.copy(ir.cacheinfo, buf, s.rta_cacheinfo)
   end,
   -- TODO some missing
+}
+
+local nda_decode = {
+  [c.NDA.DST] = function(ir, buf, len)
+    ir.dst = t.addrtype[ir.family]()
+    ffi.copy(ir.dst, buf, ffi.sizeof(ir.dst))
+  end,
+  [c.NDA.LLADDR] = function(ir, buf, len)
+    ir.lladdr = t.macaddr()
+    ffi.copy(ir.lladdr, buf, s.macaddr)
+  end,
+  [c.NDA.CACHEINFO] = function(ir, buf, len)
+     ir.cacheinfo = t.nda_cacheinfo()
+     ffi.copy(ir.cacheinfo, buf, s.nda_cacheinfo)
+  end,
+  [c.NDA.PROBES] = function(ir, buf, len)
+     -- TODO what is this? 4 bytes
+  end,
 }
 
 local ifflist = {}
@@ -456,6 +474,7 @@ mt.ifaddr = {
   end
 }
 
+-- TODO functions repetitious
 local function decode_link(buf, len)
   local iface = pt.ifinfomsg(buf)
   buf = buf + nlmsg_align(s.ifinfomsg)
@@ -505,6 +524,24 @@ local function decode_route(buf, len)
   return ir
 end
 
+local function decode_neigh(buf, len)
+  local rt = pt.rtmsg(buf)
+  buf = buf + nlmsg_align(s.rtmsg)
+  len = len - nlmsg_align(s.rtmsg)
+  local rtattr = pt.rtattr(buf)
+  local ir = setmetatable({rtmsg = t.rtmsg()}, mt.rtmsg)
+  ffi.copy(ir.rtmsg, rt, s.rtmsg)
+  while rta_ok(rtattr, len) do
+    if nda_decode[rtattr.rta_type] then
+      nda_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
+    else print("NYI", rtattr.rta_type)
+    end
+    rtattr, buf, len = rta_next(rtattr, buf, len)
+  end
+  return ir
+end
+
+-- TODO other than the first few these could be a table
 local nlmsg_data_decode = {
   [c.NLMSG.NOOP] = function(r, buf, len) return r end,
   [c.NLMSG.ERROR] = function(r, buf, len)
@@ -572,6 +609,24 @@ local nlmsg_data_decode = {
   [c.RTM.GETROUTE] = function(r, buf, len)
     local ir = decode_route(buf, len)
     ir.op, ir.getroute, ir.nl = "getroute", true, c.RTM.GETROUTE
+    r[#r + 1] = ir
+    return r
+  end,
+  [c.RTM.NEWNEIGH] = function(r, buf, len)
+    local ir = decode_neigh(buf, len)
+    ir.op, ir.newneigh, ir.nl = "newneigh", true, c.RTM.NEWNEIGH
+    r[#r + 1] = ir
+    return r
+  end,
+  [c.RTM.DELNEIGH] = function(r, buf, len)
+    local ir = decode_neigh(buf, len)
+    ir.op, ir.delneigh, ir.nl = "delneigh", true, c.RTM.DELNEIGH
+    r[#r + 1] = ir
+    return r
+  end,
+  [c.RTM.GETNEIGH] = function(r, buf, len)
+    local ir = decode_neigh(buf, len)
+    ir.op, ir.getneigh, ir.nl = "getneigh", true, c.RTM.GETNEIGH
     r[#r + 1] = ir
     return r
   end,
