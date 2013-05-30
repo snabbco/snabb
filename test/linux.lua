@@ -1098,7 +1098,7 @@ test_netlink = {
     end
   end,
   test_netlink_veth_root = function()
-    assert(nl.newlink(0, c.NLMSG_NEWLINK.CREATE, 0, 0, "linkinfo", {"kind", "veth", "data", {"peer", {t.ifinfomsg, {}, "ifname", "veth1"}}}, "ifname", "veth0"))
+    assert(nl.newlink(0, "create", 0, 0, "linkinfo", {"kind", "veth", "data", {"peer", {t.ifinfomsg, {}, "ifname", "veth1"}}}, "ifname", "veth0"))
     local i = assert(nl.interfaces())
     assert(i.veth0, "expect veth0")
     assert(i.veth1, "expect veth1")
@@ -1119,12 +1119,12 @@ test_netlink = {
     assert(not i.veth1, "expect no veth1")
   end,
   test_newneigh_root = function()
-    assert(nl.create_interface{name = "veth0", type = "veth", peer = {name = "veth1"}})
+    assert(nl.create_interface{name = "dummy0", type = "dummy"})
     local i = assert(nl.interfaces())
-    assert(i.veth0:up())
-    assert(i.veth0:address("10.0.0.1/32"))
-    assert(nl.newneigh(i.veth0.index, {family = "inet", state = "permanent"}, "dst", "10.0.0.2", "lladdr", "46:9d:c9:06:dd:dd"))
-    assert(i.veth0:delete())
+    assert(i.dummy0:up())
+    assert(i.dummy0:address("10.0.0.1/32"))
+    assert(nl.newneigh(i.dummy0.index, {family = "inet", state = "permanent"}, "dst", "10.0.0.2", "lladdr", "46:9d:c9:06:dd:dd"))
+    assert(i.dummy0:delete())
   end,
 }
 

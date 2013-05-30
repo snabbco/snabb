@@ -96,7 +96,6 @@ c.SIGBUS = nil
 c.SIGACT = nil
 
 c.SECCOMP_MODE = nil
-c.NLMSG_NEWLINK = nil
 c.AT_FSTATAT = nil
 c.LOCKF = nil
 c.AT_SYMLINK_FOLLOW = nil
@@ -118,7 +117,6 @@ c.STD = nil
 c.PORT_PROFILE_RESPONSE = nil
 c.AT_FDCWD = nil
 c.AT_ACCESSAT = nil
-c.NLMSG_GETLINK = nil
 c.SYS.fstatat = nil
 c.TFD = nil
 c.TFD_TIMER = nil

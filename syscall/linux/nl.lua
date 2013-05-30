@@ -898,6 +898,7 @@ end
 
 -- TODO "route" should be passed in as parameter, test with other netlink types
 local function nlmsg(ntype, flags, af, ...)
+  flags = c.NLM_F[flags]
   local sock, err = nl.socket("route", {}) -- bind to empty sockaddr_nl, kernel fills address
   if not sock then return nil, err end
 
@@ -922,11 +923,10 @@ local function nlmsg(ntype, flags, af, ...)
 end
 
 -- TODO do not have all these different arguments for these functions, pass a table for initialization. See also iplink.
--- TODO cleanup use of NLMSG tables NLMSG_NEWLINK NLMSG_GETLINK, NLM_F.
 
 function nl.newlink(index, flags, iflags, change, ...)
   if change == 0 then change = c.IFF.NONE end -- 0 should work, but does not
-  flags = c.NLMSG_NEWLINK[flags] -- TODO integrate flags below
+  flags = c.NLM_F[flags] -- TODO integrate flags below
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = c.IFF[iflags], ifi_change = c.IFF[change]}
   return nlmsg(c.RTM.NEWLINK, c.NLM_F.REQUEST + c.NLM_F.ACK + flags, nil, t.ifinfomsg, ifv, ...)
@@ -935,12 +935,12 @@ end
 function nl.dellink(index, ...)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index}
-  return nlmsg(c.RTM.DELLINK, c.NLM_F.REQUEST + c.NLM_F.ACK, nil, t.ifinfomsg, ifv, ...)
+  return nlmsg(c.RTM.DELLINK, "request, ack", nil, t.ifinfomsg, ifv, ...)
 end
 
 -- read interfaces and details.
 function nl.getlink(...)
-  return nlmsg(c.RTM.GETLINK, c.NLM_F.REQUEST + c.NLMSG_GETLINK.DUMP, nil, t.rtgenmsg, {rtgen_family = c.AF.PACKET}, ...)
+  return nlmsg(c.RTM.GETLINK, "request, dump", nil, t.rtgenmsg, {rtgen_family = c.AF.PACKET}, ...)
 end
 
 -- read routes
@@ -950,7 +950,7 @@ function nl.getroute(af, tp, tab, prot, scope, ...)
   tab = c.RT_TABLE[tab]
   prot = c.RTPROT[prot]
   scope = c.RT_SCOPE[scope]
-  local r, err = nlmsg(c.RTM.GETROUTE, c.NLM_F.REQUEST + c.NLMSG_GETLINK.DUMP, af, t.rtmsg,
+  local r, err = nlmsg(c.RTM.GETROUTE, "request, dump", af, t.rtmsg,
                    {rtm_family = af, rtm_table = tab, rtm_protocol = prot, rtm_type = tp, rtm_scope = scope})
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
@@ -1004,21 +1004,21 @@ end
 -- this time experiment using table as so many params, plus they are just to init struct. TODO flag cleanup
 function nl.newroute(flags, tab, ...)
   tab = rtm_table(tab)
-  flags = c.NLMSG_NEWLINK[flags]
+  flags = c.NLM_F[flags]
   return nlmsg(c.RTM.NEWROUTE, c.NLM_F.REQUEST + c.NLM_F.ACK + flags, tab.rtm_family, t.rtmsg, tab, ...)
 end
 
 -- TODO flag cleanup
 function nl.delroute(tp, ...)
   tp = rtm_table(tp)
-  return nlmsg(c.RTM.DELROUTE, c.NLM_F.REQUEST + c.NLM_F.ACK, tp.rtm_family, t.rtmsg, tp, ...)
+  return nlmsg(c.RTM.DELROUTE, "request, ack", tp.rtm_family, t.rtmsg, tp, ...)
 end
 
 -- read addresses from interface TODO flag cleanup
 function nl.getaddr(af, ...)
   local family = c.AF[af]
   local ifav = {ifa_family = family}
-  return nlmsg(c.RTM.GETADDR, c.NLM_F.REQUEST + c.NLMSG_GETLINK.ROOT, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(c.RTM.GETADDR, "request, root", family, t.ifaddrmsg, ifav, ...)
 end
 
 -- TODO may need ifa_scope
@@ -1026,14 +1026,14 @@ function nl.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
   local family = c.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = c.IFA_F[flags], ifa_index = index}
-  return nlmsg(c.RTM.NEWADDR, c.NLM_F.REQUEST + c.NLM_F.ACK, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(c.RTM.NEWADDR, "request, ack", family, t.ifaddrmsg, ifav, ...)
 end
 
 function nl.deladdr(index, af, prefixlen, ...)
   if type(index) == 'table' then index = index.index end
   local family = c.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
-  return nlmsg(c.RTM.DELADDR, c.NLM_F.REQUEST + c.NLM_F.ACK, family, t.ifaddrmsg, ifav, ...)
+  return nlmsg(c.RTM.DELADDR, "request, ack", family, t.ifaddrmsg, ifav, ...)
 end
 
 -- TODO this should be in __new for type
@@ -1050,21 +1050,21 @@ function nl.getneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
   tab.ndm_ifindex = index
   local ndm = ndm_table(tab)
-  return nlmsg(c.RTM.GETNEIGH, c.NLM_F.REQUEST + c.NLM_F.ACK, tab.ndm_family, t.ndmsg, ndm, ...)
+  return nlmsg(c.RTM.GETNEIGH, "request, ack", tab.ndm_family, t.ndmsg, ndm, ...)
 end
 
 function nl.newneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
   tab.ndm_ifindex = index
   local ndm = ndm_table(tab)
-  return nlmsg(c.RTM.NEWNEIGH, c.NLM_F.REQUEST + c.NLM_F.ACK, tab.ndm_family, t.ndmsg, ndm, ...)
+  return nlmsg(c.RTM.NEWNEIGH, "request, ack, excl, create", tab.ndm_family, t.ndmsg, ndm, ...)
 end
 
 function nl.delneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
   tab.ndm_ifindex = index
   local ndm = ndm_table(tab)
-  return nlmsg(c.RTM.DELNEIGH, c.NLM_F.REQUEST + c.NLM_F.ACK, tab.ndm_family, t.ndmsg, ndm, ...)
+  return nlmsg(c.RTM.DELNEIGH, "request, ack", tab.ndm_family, t.ndmsg, ndm, ...)
 end
 
 function nl.interfaces() -- returns with address info too.
@@ -1143,7 +1143,7 @@ end
 
 -- TODO iplink may not be appropriate always sort out flags
 function nl.create_interface(tab)
-  tab.modifier = c.NLMSG_NEWLINK.CREATE
+  tab.modifier = c.NLM_F.CREATE
   return nl.iplink(tab)
 end
 

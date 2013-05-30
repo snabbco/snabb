@@ -814,36 +814,24 @@ c.NETLINK = strflag {
   ECRYPTFS      = 19,
 }
 
--- see man netlink(7) for details. NLM_F_ is generic, actually use NLMSG_GET, NLMSG_NEW. TODO cleanup usage.
+-- see man netlink(7) for details. Note us of flags by context
 c.NLM_F = multiflags {
   REQUEST = 1,
   MULTI   = 2,
   ACK     = 4,
   ECHO    = 8,
-}
-
-c.NLMSG_GETLINK = multiflags {
-  REQUEST = 1,
-  MULTI   = 2,
-  ACK     = 4,
-  ECHO    = 8,
+-- for GET
   ROOT    = 0x100,
   MATCH   = 0x200,
   ATOMIC  = 0x400,
-}
-
-c.NLMSG_GETLINK.DUMP = bit.bor(c.NLMSG_GETLINK.ROOT, c.NLMSG_GETLINK.MATCH)
-
-c.NLMSG_NEWLINK = multiflags {
-  REQUEST = 1,
-  MULTI   = 2,
-  ACK     = 4,
-  ECHO    = 8,
+-- for NEW
   REPLACE = 0x100,
   EXCL    = 0x200,
   CREATE  = 0x400,
   APPEND  = 0x800,
 }
+
+c.NLM_F.DUMP = bit.bor(c.NLM_F.ROOT, c.NLM_F.MATCH)
 
 -- generic types. These are part of same sequence as RTM
 c.NLMSG = strflag{
