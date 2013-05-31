@@ -36,8 +36,10 @@ $(cat obj/intel10g.lua.md)
 
 # Software ethernet I/O (virtio)
 $(cat virtio.md)
-## \`virtio.h\`: Core data structures
-$(cat obj/virtio.h.md)
+## \`virtio_vring.h\`: vring DMA ring buffer data structure
+$(cat obj/virtio_vring.h.md)
+## \`virtio_vhost.h\`: vhost Linux kernel `ioctl` data structures
+$(cat obj/virtio_vhost.h.md)
 ## \`virtio_vhost_client.c\`: Linux \`/dev/vhost-net\` vhost client
 $(cat obj/virtio_vhost_client.c.md)
 ## \`virtio.lua\`: virtio network device driver

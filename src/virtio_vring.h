@@ -1,8 +1,7 @@
-// Size of vring structures used in Linux vhost. Max 512 [citation needed].
+// Size of vring structures used in Linux vhost. Max 32768.
 enum { VHOST_VRING_SIZE = 512 };
 
-/// ### vring_desc: I/O buffer descriptor
-
+// vring_desc I/O buffer descriptor
 struct vring_desc {
   uint64_t addr;  // packet data buffer address
   uint32_t len;   // packet data buffer size
@@ -35,28 +34,5 @@ struct vring_used {
   uint32_t flags;
   uint32_t idx;
   struct { uint32_t id, len; } ring[VHOST_VRING_SIZE];
-};
-
-/// ### virtio_net_hdr: packet offload information header
-
-struct virtio_net_hdr {
-  uint8_t flags;                // (see below)
-  uint8_t gso_type;             // (see below)
-  uint16_t hdr_len;
-  uint16_t gso_size;
-  uint16_t csum_start;
-  uint16_t csum_offset;
-};
-
-enum { // virtio_net_hdr.flags
-  VIO_NET_HDR_F_NEEDS_CSUM = 1 // use csum_start, csum_offset
-};
-
-enum { // virtio_net_hdr.gso_type
-  VIO_NET_HDR_GSO_NONE  = 0,
-  VIO_NET_HDR_GSO_TCPV4 = 1,
-  VIO_NET_HDR_GSO_UDP   = 3,
-  VIO_NET_HDR_GSO_TCPV6 = 4,
-  VIO_NET_HDR_GSO_ECN   = 0x80
 };
 
