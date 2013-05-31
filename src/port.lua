@@ -118,17 +118,20 @@ function Port:echo ()
    repeat
       for i = 1,#inputs do
          local input, output = inputs[i], outputs[i]
-         input.sync_receive()
-         while input.can_receive() and output.can_transmit() do
-            local buf = input.receive()
-            output.transmit(buf)
+         input:sync_receive()
+         while input:can_receive() and output:can_transmit() do
+            local buf = input:receive()
+            print("echoing a "..buf.size.."-byte packet")
+            print("word[0] = "..bit.tohex(require("ffi").cast("uint32_t*", buf.ptr)[0]))
+            output:transmit(buf)
             buffer.deref(buf)
          end
-         while input.can_add_receive_buffer() do
-            input.add_receive_buffer(buffer.allocate())
+         while input:can_add_receive_buffer() do
+            input:add_receive_buffer(buffer.allocate())
          end
-         output.sync_transmit()
+         output:sync_transmit()
       end
+      C.usleep(1)
    until coroutine.yield("echo") == nil
 end
 
@@ -148,18 +151,20 @@ function selftest (options)
    local end_time = C.get_time_ns()
    local rx, tx = 0, 0
    local rxp, txp = 0, 0
-   for _,d in pairs(options.devices) do
-      if d.s and d.s.GPRC then
-         --      register.dump(d.r)
-         rx = rx + d.s.GORCL() + d.s.GORCH() * 2^32
-         tx = tx + d.s.GOTCL() + d.s.GOTCH() * 2^32
-         rxp = rxp + d.s.GPRC()
-         txp = txp + d.s.GPTC()
-         register.dump(d.s, true)
+   if false then
+      for _,d in pairs(options.devices) do
+         if d.s and d.s.GPRC then
+            --      register.dump(d.r)
+            rx = rx + d.s.GORCL() + d.s.GORCH() * 2^32
+            tx = tx + d.s.GOTCL() + d.s.GOTCH() * 2^32
+            rxp = rxp + d.s.GPRC()
+            txp = txp + d.s.GPTC()
+            register.dump(d.s, true)
+         end
       end
+      nanos = tonumber(end_time - start_time)
+      io.write(("Transmit goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(tx)/nanos * 8, txp * 1000 / nanos))
+      io.write(("Receive  goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(rx)/nanos * 8, rxp * 1000 / nanos))
    end
-   nanos = tonumber(end_time - start_time)
-   io.write(("Transmit goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(tx)/nanos * 8, txp * 1000 / nanos))
-   io.write(("Receive  goodput: %3.2f Gbps %3.2f Mpps\n"):format(tonumber(rx)/nanos * 8, rxp * 1000 / nanos))
 end
 
