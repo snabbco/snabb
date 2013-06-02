@@ -36,7 +36,7 @@ For the rump kernel functionality, the easiest way at present to install it is u
 netfilter, dhcp, selinux, arp, rump kernel backend, further BSD and OSX work.
 
 ## Release notes
-0.8pre rump kernel fixes, NetBSD 64 bit fixes, ARP/neighbour support (in progress).
+0.8pre rump kernel fixes, NetBSD 64 bit fixes, ARP/neighbour support, towards MIPS support.
 
 0.7 bug fixes, general cleanups, filesystem capabilities, xattr bug fixes, signal handler functions, cpu affinity support, scheduler functions, POSIX message queues, tun/tap support, ioctl additions and improvements, initial NetBSD and OSX support, initial NetBSD rump kernel support, some fixes to allow Android to work.
 
