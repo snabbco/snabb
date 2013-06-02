@@ -52,6 +52,7 @@ build =
       ["syscall.linux.arm.ffitypes"] = "syscall/linux/arm/ffitypes.lua";
       ["syscall.linux.arm.ioctl"] = "syscall/linux/arm/ioctl.lua";
       ["syscall.linux.mips.constants"] = "syscall/linux/mips/constants.lua";
+      ["syscall.linux.mips.ffitypes"] = "syscall/linux/mips/ffitypes.lua";
       ["syscall.linux.ppc.constants"] = "syscall/linux/ppc/constants.lua";
       ["syscall.linux.ppc.ffitypes"] = "syscall/linux/ppc/ffitypes.lua";
       ["syscall.linux.ppc.ioctl"] = "syscall/linux/ppc/ioctl.lua";
