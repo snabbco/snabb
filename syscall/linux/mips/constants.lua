@@ -1,7 +1,5 @@
 -- mips specific constants
 
-error("mips support is coming soon")
-
 local arch = {}
 
 arch.syscall = {
