@@ -771,6 +771,20 @@ test_libc = {
 }
 end
 
+local function removeroottests()
+  for k in pairs(_G) do
+    if k:match("test") then
+      if k:match("root")
+      then _G[k] = nil;
+      else
+        for j in pairs(_G[k]) do
+          if j:match("test") and j:match("root") then _G[k][j] = nil end
+        end
+      end
+    end
+  end
+end
+
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
   if abi.os == "linux" then
@@ -783,7 +797,8 @@ if S.geteuid() == 0 then
 
   -- cut out this section if you want to (careful!) debug on real interfaces
   -- TODO add to features as may not be supported
-  assert(S.unshare("newnet, newns, newuts"), "tests as root require kernel namespaces") -- do not interfere with anything on host during tests
+  local ok, err = S.unshare("newnet, newns, newuts")
+  if not ok then removeroottests() end -- remove if you like, but may interfere with networking
   local nl = require "syscall.linux.nl"
   local i = assert(nl.interfaces())
   local lo = assert(i.lo)
@@ -793,17 +808,7 @@ if S.geteuid() == 0 then
     -- run all tests, no namespaces available
   end
 else -- remove tests that need root
-  for k in pairs(_G) do
-    if k:match("test") then
-      if k:match("root")
-      then _G[k] = nil;
-      else
-        for j in pairs(_G[k]) do
-          if j:match("test") and j:match("root") then _G[k][j] = nil end
-        end
-      end
-    end
-  end
+  removeroottests()
 end
 
 local f
