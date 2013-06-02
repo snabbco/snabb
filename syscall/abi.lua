@@ -18,5 +18,8 @@ local abi = {
 
 if abi.os == "bsd" then abi.os = "netbsd" end
 
+-- Makes no difference to us I believe
+if abi.arch == "ppcspe" then abi.arch = "ppc" end
+
 return abi
 
