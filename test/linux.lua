@@ -1352,12 +1352,6 @@ test_processes = {
     local nn = assert(S.nice(1))
     assert_equal(nn, 1)
     local nn = assert(S.setpriority("process", 0, 1)) -- sets to 1, which it already is
-    if S.geteuid() ~= 0 then
-      local n, err = S.nice(-2)
-      assert(not n and (err.PERM or err.ACCES), "non root user should not be able to set negative priority")
-      local n, err = S.setpriority("process", 0, -1)
-      assert(not n and err.ACCES, "non root user should not be able to set negative priority")
-    end
   end,
   test_fork = function() -- TODO split up
     local pid0 = S.getpid()
