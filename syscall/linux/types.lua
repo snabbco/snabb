@@ -71,7 +71,6 @@ local addtypes = {
 -- as an experiment, see https://github.com/justincormack/ljsyscall/issues/28 trying adding a __len method
 -- however initially only for the ones with no extra metatype.
 local addstructs = {
-  cmsghdr = "struct cmsghdr",
   ucred = "struct ucred",
   sysinfo = "struct sysinfo",
   nlmsghdr = "struct nlmsghdr",
@@ -1120,6 +1119,37 @@ mt.ifreq = {
 }
 
 addtype("ifreq", "struct ifreq", mt.ifreq)
+
+-- cmsg functions, try to hide some of this nasty stuff from the user
+local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
+
+local cmsg_hdrsize = ffi.sizeof(ffi.typeof("struct cmsghdr"),0)
+local voidalign = ffi.alignof(ffi.typeof("void *"))
+local function cmsg_align(len) return align(len, voidalign) end
+
+local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
+--local function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
+local function cmsg_len(len) return cmsg_ahdr + len end
+
+mt.cmsghdr = {
+  __index = {
+    datalen = function ( self )
+      return self.cmsg_len - cmsg_ahdr
+    end;
+  };
+  __new = function (tp, level, type, data, data_size)
+    data_size = data_size or #data
+    local self = ffi.new(tp, data_size, {
+      cmsg_len = cmsg_len(data_size);
+      cmsg_level = level;
+      cmsg_type = type;
+    })
+    ffi.copy(self.cmsg_data, data, data_size)
+    return self
+  end;
+  __len = lenfn;
+}
+addtype_var("cmsghdr", "struct cmsghdr", mt.cmsghdr)
 
 return types
 

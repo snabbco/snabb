@@ -155,7 +155,7 @@ struct cmsghdr {
   size_t cmsg_len;
   int cmsg_level;
   int cmsg_type;
-  //unsigned char cmsg_data[?]; /* causes issues with luaffi, pre C99 */
+  unsigned char cmsg_data[?]; /* causes issues with luaffi, pre C99 */
 };
 struct sockaddr {
   sa_family_t sa_family;

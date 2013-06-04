@@ -314,7 +314,7 @@ function util.recvcmsg(fd, msg, flags)
         ret.gid = cred.gid
       elseif cmsg.cmsg_type == c.SCM.RIGHTS then
         local fda = pt.int(cmsg + 1) -- cmsg_data
-        local fdc = div(tonumber(cmsg.cmsg_len) - cmsg_ahdr, s.int)
+        local fdc = div(cmsg:datalen(), s.int)
         ret.fd = {}
         for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
       end -- TODO add other SOL.SOCKET messages
@@ -335,20 +335,15 @@ function util.sendcred(fd, pid, uid, gid) -- only needed for root to send (incor
   ucred.gid = gid
   local buf1 = t.buffer(1) -- need to send one byte
   local io = t.iovecs{{buf1, 1}}
-  local bufsize = cmsg_space(#ucred)
-  local buflen = cmsg_len(#ucred)
-  local buf = t.buffer(bufsize) -- this is our cmsg buffer
+
+  local cmsg = t.cmsghdr(c.SOL.SOCKET, c.SCM.CREDENTIALS, ucred)
+
   local msg = t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io.iov
   msg.msg_iovlen = #io
-  msg.msg_control = buf
-  msg.msg_controllen = bufsize
-  local mc, cmsg = cmsg_firsthdr(msg)
-  cmsg.cmsg_level = c.SOL.SOCKET
-  cmsg.cmsg_type = c.SCM.CREDENTIALS
-  cmsg.cmsg_len = buflen
-  ffi.copy(cmsg.cmsg_data, ucred, #ucred)
-  msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
+  msg.msg_control = cmsg
+  msg.msg_controllen = #cmsg
+
   return S.sendmsg(fd, msg, 0)
 end
 
@@ -359,20 +354,15 @@ function util.sendfds(fd, ...)
   for i, v in ipairs{...} do fds[i] = v:getfd() end
   local fa = t.ints(#fds, fds)
   local fasize = ffi.sizeof(fa)
-  local bufsize = cmsg_space(fasize)
-  local buflen = cmsg_len(fasize)
-  local buf = t.buffer(bufsize) -- this is our cmsg buffer
+
+  local cmsg = t.cmsghdr(c.SOL.SOCKET, c.SCM.RIGHTS, fa, fasize)
+
   local msg = t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io.iov
   msg.msg_iovlen = #io
-  msg.msg_control = buf
-  msg.msg_controllen = bufsize
-  local mc, cmsg = cmsg_firsthdr(msg)
-  cmsg.cmsg_level = c.SOL.SOCKET
-  cmsg.cmsg_type = c.SCM.RIGHTS
-  cmsg.cmsg_len = buflen -- could set from a constructor
-  ffi.copy(cmsg + 1, fa, fasize) -- cmsg_data
-  msg.msg_controllen = cmsg.cmsg_len -- set to sum of all controllens
+  msg.msg_control = cmsg
+  msg.msg_controllen = #cmsg
+
   return S.sendmsg(fd, msg, 0)
 end
 
