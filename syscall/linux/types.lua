@@ -1141,8 +1141,8 @@ mt.cmsghdr = {
     data_size = data_size or #data
     local self = ffi.new(tp, data_size, {
       cmsg_len = cmsg_len(data_size);
-      cmsg_level = level;
-      cmsg_type = type;
+      cmsg_level = c.SOL[level];
+      cmsg_type = c.SCM[type];
     })
     ffi.copy(self.cmsg_data, data, data_size)
     return self

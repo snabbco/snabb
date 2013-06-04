@@ -287,7 +287,7 @@ function util.sendcred(fd, pid, uid, gid) -- only needed for root to send (incor
   local buf1 = t.buffer(1) -- need to send one byte
   local io = t.iovecs{{buf1, 1}}
 
-  local cmsg = t.cmsghdr(c.SOL.SOCKET, c.SCM.CREDENTIALS, ucred)
+  local cmsg = t.cmsghdr("socket", "credentials", ucred)
 
   local msg = t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io.iov
@@ -306,7 +306,7 @@ function util.sendfds(fd, ...)
   local fa = t.ints(#fds, fds)
   local fasize = ffi.sizeof(fa)
 
-  local cmsg = t.cmsghdr(c.SOL.SOCKET, c.SCM.RIGHTS, fa, fasize)
+  local cmsg = t.cmsghdr("socket", "rights", fa, fasize)
 
   local msg = t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io.iov
