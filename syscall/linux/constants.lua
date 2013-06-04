@@ -377,7 +377,10 @@ c.SCM = strflag {
 
 -- setsockopt
 c.SOL = strflag {
+  IP         = 0,
   SOCKET     = 1,
+  IPV6       = 41,
+  ICMPV6     = 58,
   RAW        = 255,
   DECNET     = 261,
   X25        = 262,

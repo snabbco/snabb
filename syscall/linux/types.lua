@@ -1131,6 +1131,11 @@ local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
 --local function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
 local function cmsg_len(len) return cmsg_ahdr + len end
 
+local typemap = {
+  [c.SOL.SOCKET] = c.SCM,
+  [c.SOL.IP] = c.IP,
+}
+
 mt.cmsghdr = {
   __index = {
     datalen = function ( self )
@@ -1139,10 +1144,12 @@ mt.cmsghdr = {
   };
   __new = function (tp, level, type, data, data_size)
     data_size = data_size or #data
+    level = c.SOL[level]
+    if typemap[level] then type = typemap[level][type] end
     local self = ffi.new(tp, data_size, {
-      cmsg_len = cmsg_len(data_size);
-      cmsg_level = c.SOL[level];
-      cmsg_type = c.SCM[type];
+      cmsg_len = cmsg_len(data_size),
+      cmsg_level = level,
+      cmsg_type = type,
     })
     ffi.copy(self.cmsg_data, data, data_size)
     return self
