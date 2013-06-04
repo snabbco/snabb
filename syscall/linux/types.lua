@@ -1151,6 +1151,54 @@ mt.cmsghdr = {
 }
 addtype_var("cmsghdr", "struct cmsghdr", mt.cmsghdr)
 
+-- msg_control is a bunch of cmsg structs, but these are all different lengths, as they have variable size arrays
+
+-- these functions also take and return a raw char pointer to msg_control, to make life easier, as well as the cast cmsg
+local function cmsg_firsthdr(msg)
+  if tonumber(msg.msg_controllen) < cmsg_hdrsize then return nil end
+  local mc = msg.msg_control
+  local cmsg = pt.cmsghdr(mc)
+  return mc, cmsg
+end
+
+local function cmsg_nxthdr(msg, buf, cmsg)
+  if tonumber(cmsg.cmsg_len) < cmsg_hdrsize then return nil end -- invalid cmsg
+  buf = pt.char(buf)
+  local msg_control = pt.char(msg.msg_control)
+  buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
+  if buf + cmsg_hdrsize > msg_control + msg.msg_controllen then return nil end -- header would not fit
+  cmsg = pt.cmsghdr(buf)
+  if buf + cmsg_align(cmsg.cmsg_len) > msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
+  return buf, cmsg
+end
+
+local function cmsg_headers(msg)
+  return function (msg, last_msg_control)
+    local msg_control
+    if last_msg_control == nil then -- First iteration
+      msg_control = pt.char(msg.msg_control)
+    else
+      local last_cmsg = pt.cmsghdr(last_msg_control)
+      msg_control = last_msg_control + cmsg_align(last_cmsg.cmsg_len) -- find next cmsg
+    end
+    local end_offset = pt.char(msg.msg_control) + msg.msg_controllen
+    if msg_control + cmsg_hdrsize > end_offset then return nil end -- header would not fit
+    local cmsg = pt.cmsghdr(msg_control)
+    if msg_control + cmsg_align(cmsg.cmsg_len) > end_offset then return nil end -- whole cmsg would not fit
+    return msg_control, cmsg
+  end, msg
+end
+
+mt.msghdr = {
+  __index = {
+    cmsg_firsthdr = cmsg_firsthdr ;
+    cmsg_nxthdr = cmsg_nxthdr ;
+    cmsgs = cmsg_headers ;
+  };
+  __len = lenfn;
+}
+addtype("msghdr", "struct msghdr", mt.msghdr)
+
 return types
 
 end

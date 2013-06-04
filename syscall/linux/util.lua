@@ -242,55 +242,6 @@ function util.touch(file)
   return true
 end
 
--- cmsg functions, try to hide some of this nasty stuff from the user
-local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
-
-local cmsg_hdrsize = ffi.sizeof(t.cmsghdr(0))
-local voidalign = ffi.alignof(ffi.typeof("void *"))
-local function cmsg_align(len) return align(len, voidalign) end
-
-local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
-local function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
-local function cmsg_len(len) return cmsg_ahdr + len end
-
--- msg_control is a bunch of cmsg structs, but these are all different lengths, as they have variable size arrays
-
--- these functions also take and return a raw char pointer to msg_control, to make life easier, as well as the cast cmsg
-local function cmsg_firsthdr(msg)
-  if tonumber(msg.msg_controllen) < cmsg_hdrsize then return nil end
-  local mc = msg.msg_control
-  local cmsg = pt.cmsghdr(mc)
-  return mc, cmsg
-end
-
-local function cmsg_nxthdr(msg, buf, cmsg)
-  if tonumber(cmsg.cmsg_len) < cmsg_hdrsize then return nil end -- invalid cmsg
-  buf = pt.char(buf)
-  local msg_control = pt.char(msg.msg_control)
-  buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
-  if buf + cmsg_hdrsize > msg_control + msg.msg_controllen then return nil end -- header would not fit
-  cmsg = pt.cmsghdr(buf)
-  if buf + cmsg_align(cmsg.cmsg_len) > msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
-  return buf, cmsg
-end
-
-local function cmsg_headers(msg)
-  return function (msg, last_msg_control)
-    local msg_control
-    if last_msg_control == nil then -- First iteration
-      msg_control = pt.char(msg.msg_control)
-    else
-      local last_cmsg = pt.cmsghdr(last_msg_control)
-      msg_control = last_msg_control + cmsg_align(last_cmsg.cmsg_len) -- find next cmsg
-    end
-    local end_offset = pt.char(msg.msg_control) + msg.msg_controllen
-    if msg_control + cmsg_hdrsize > end_offset then return nil end -- header would not fit
-    local cmsg = pt.cmsghdr(msg_control)
-    if msg_control + cmsg_align(cmsg.cmsg_len) > end_offset then return nil end -- whole cmsg would not fit
-    return msg_control, cmsg
-  end, msg
-end
-
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
 -- receive cmsg, extended helper on recvmsg, fairly incomplete at present
@@ -305,7 +256,7 @@ function util.recvcmsg(fd, msg, flags)
   local count, err = S.recvmsg(fd, msg, flags)
   if not count then return nil, err end
   local ret = {count = count, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
-  for mc, cmsg in cmsg_headers(msg) do
+  for mc, cmsg in msg:cmsgs() do
     if cmsg.cmsg_level == c.SOL.SOCKET then
       if cmsg.cmsg_type == c.SCM.CREDENTIALS then
         local cred = pt.ucred(cmsg + 1) -- cmsg_data
