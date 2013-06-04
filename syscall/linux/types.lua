@@ -1139,7 +1139,7 @@ local typemap = {
 mt.cmsghdr = {
   __index = {
     datalen = function ( self )
-      return self.cmsg_len - cmsg_ahdr
+      return tonumber(self.cmsg_len - cmsg_ahdr)
     end;
   };
   __new = function (tp, level, type, data, data_size)
