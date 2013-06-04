@@ -286,7 +286,7 @@ function util.recvcmsg(fd, msg, flags)
     msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io, msg_control = buf, msg_controllen = bufsize}
   end
   local count, err = S.recvmsg(fd, msg, flags)
-  if not count then return nil, error end
+  if not count then return nil, err end
   local ret = {count = count, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
   local mc, cmsg = cmsg_firsthdr(msg)
   while cmsg do
