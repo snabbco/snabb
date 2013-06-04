@@ -47,6 +47,14 @@ mt.iovecs = {
     ffi.copy(io.iov[k - 1], v, s.iovec)
   end,
   __len = function(io) return io.count end,
+  __tostring = function(io)
+    local s = {}
+    for i=1, io.count do
+      local iovec = io.iov[i-1]
+      s[i] = ffi.string(iovec.iov_base, iovec.iov_len)
+    end
+    return table.concat(s)
+  end;
   __new = function(tp, is)
     if type(is) == 'number' then return ffi.new(tp, is, is) end
     local count = #is
