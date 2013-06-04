@@ -120,7 +120,6 @@ local addtypes = {
 }
 
 local addstructs = {
-  msghdr = "struct msghdr",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
