@@ -274,6 +274,23 @@ local function cmsg_nxthdr(msg, buf, cmsg)
   return buf, cmsg
 end
 
+local function cmsg_headers(msg)
+  return function (msg, last_msg_control)
+    local msg_control
+    if last_msg_control == nil then -- First iteration
+      msg_control = pt.char(msg.msg_control)
+    else
+      local last_cmsg = pt.cmsghdr(last_msg_control)
+      msg_control = last_msg_control + cmsg_align(last_cmsg.cmsg_len) -- find next cmsg
+    end
+    local end_offset = pt.char(msg.msg_control) + msg.msg_controllen
+    if msg_control + cmsg_hdrsize > end_offset then return nil end -- header would not fit
+    local cmsg = pt.cmsghdr(msg_control)
+    if msg_control + cmsg_align(cmsg.cmsg_len) > end_offset then return nil end -- whole cmsg would not fit
+    return msg_control, cmsg
+  end, msg
+end
+
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
 -- receive cmsg, extended helper on recvmsg, fairly incomplete at present
@@ -288,8 +305,7 @@ function util.recvcmsg(fd, msg, flags)
   local count, err = S.recvmsg(fd, msg, flags)
   if not count then return nil, err end
   local ret = {count = count, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
-  local mc, cmsg = cmsg_firsthdr(msg)
-  while cmsg do
+  for mc, cmsg in cmsg_headers(msg) do
     if cmsg.cmsg_level == c.SOL.SOCKET then
       if cmsg.cmsg_type == c.SCM.CREDENTIALS then
         local cred = pt.ucred(cmsg + 1) -- cmsg_data
@@ -303,7 +319,6 @@ function util.recvcmsg(fd, msg, flags)
         for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
       end -- TODO add other SOL.SOCKET messages
     end -- TODO add other processing for different types
-    mc, cmsg = cmsg_nxthdr(msg, mc, cmsg)
   end
   return ret
 end
