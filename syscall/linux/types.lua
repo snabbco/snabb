@@ -1179,21 +1179,22 @@ local function cmsg_nxthdr(msg, buf, cmsg)
   return buf, cmsg
 end
 
+local function cmsg_iter(msg, last_msg_control)
+  local msg_control
+  if last_msg_control == nil then -- First iteration
+    msg_control = pt.char(msg.msg_control)
+  else
+    local last_cmsg = pt.cmsghdr(last_msg_control)
+    msg_control = last_msg_control + cmsg_align(last_cmsg.cmsg_len) -- find next cmsg
+  end
+  local end_offset = pt.char(msg.msg_control) + msg.msg_controllen
+  if msg_control + cmsg_hdrsize > end_offset then return nil end -- header would not fit
+  local cmsg = pt.cmsghdr(msg_control)
+  if msg_control + cmsg_align(cmsg.cmsg_len) > end_offset then return nil end -- whole cmsg would not fit
+  return msg_control, cmsg
+end
 local function cmsg_headers(msg)
-  return function (msg, last_msg_control)
-    local msg_control
-    if last_msg_control == nil then -- First iteration
-      msg_control = pt.char(msg.msg_control)
-    else
-      local last_cmsg = pt.cmsghdr(last_msg_control)
-      msg_control = last_msg_control + cmsg_align(last_cmsg.cmsg_len) -- find next cmsg
-    end
-    local end_offset = pt.char(msg.msg_control) + msg.msg_controllen
-    if msg_control + cmsg_hdrsize > end_offset then return nil end -- header would not fit
-    local cmsg = pt.cmsghdr(msg_control)
-    if msg_control + cmsg_align(cmsg.cmsg_len) > end_offset then return nil end -- whole cmsg would not fit
-    return msg_control, cmsg
-  end, msg
+  return cmsg_iter, msg, nil
 end
 
 mt.msghdr = {
