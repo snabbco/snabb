@@ -43,24 +43,25 @@ end
 
 local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
 
-local function ptt(tp)
-  local ptp = ffi.typeof("$ *", tp)
-  return function(x) return ffi.cast(ptp, x) end
-end
-
-local function tbuffer(a, ...) -- helper function for sequence of types in a buffer
-  local function threc(buf, offset, tp, ...)
-    if not tp then return nil end
-    local p = ptt(tp)
-    if select("#", ...) == 0 then return p(buf + offset) end
-    return p(buf + offset), threc(buf, offset + align(ffi.sizeof(tp), a), ...)
-  end
+-- Give an alignment and a list of values, returns a buffer to fit them, it's length, and what the offsets would be
+local function align_types(alignment, in_vals)
   local len = 0
-  for _, tp in ipairs{...} do
-    len = len + align(ffi.sizeof(tp), a)
+  local offsets = { }
+  for i, tp in ipairs(in_vals) do
+    local item_alignement = align(ffi.sizeof(tp), alignment)
+    offsets [ i ] = len
+    len = len + item_alignement
   end
-  local buf = t.buffer(len)
-  return buf, len, threc(buf, 0, ...)
+  return t.buffer(len), len, offsets
+end
+local function tbuffer(a,...)
+  local in_vals = {...}
+  local buf, len, offsets = align_types(a,in_vals)
+  for i=1,#offsets do
+    -- Instead of an offset, return a pointer (located in the buffer) and cast to correct type
+    offsets[i] = ffi.cast(ffi.typeof("$ *", in_vals[i]), buf + offsets[i])
+  end
+  return buf, len, unpack(offsets)
 end
 
 -- similar functions for netlink messages
