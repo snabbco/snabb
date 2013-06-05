@@ -1140,11 +1140,12 @@ local function cmsg_len(len) return cmsg_ahdr + len end
 local typemap = {
   [c.SOL.SOCKET] = c.SCM,
   [c.SOL.IP] = c.IP,
+  -- TODO add the othes here
 }
 
 mt.cmsghdr = {
   __index = {
-    datalen = function ( self )
+    datalen = function(self)
       return tonumber(self.cmsg_len - cmsg_ahdr)
     end;
   };
