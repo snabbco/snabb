@@ -17,7 +17,6 @@ typedef uint64_t ino_t; // at least on recent desktop; TODO define as ino64_t
 typedef long time_t;
 typedef int32_t daddr_t;
 typedef unsigned long clock_t;
-typedef uint32_t socklen_t;
 
 /* actually not a struct at all in osx, just a uint32_t but for compatibility fudge it */
 /* TODO this should work, otherwise need to move all sigset_t handling out of common types */

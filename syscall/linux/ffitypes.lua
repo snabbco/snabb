@@ -22,7 +22,6 @@ typedef long blksize_t;
 typedef int32_t clockid_t;
 typedef long clock_t;
 typedef uint32_t off32_t; /* only used for eg mmap2 on Linux */
-typedef uint32_t socklen_t;
 typedef uint32_t le32; /* this is little endian - not really using it yet */
 
 /* despite glibc, Linux uses 32 bit dev_t */
@@ -142,21 +141,6 @@ typedef union sigval {
   int sival_int;
   void *sival_ptr;
 } sigval_t;
-struct msghdr {
-  void *msg_name;
-  socklen_t msg_namelen;
-  struct iovec *msg_iov;
-  size_t msg_iovlen;
-  void *msg_control;
-  size_t msg_controllen;
-  int msg_flags;
-};
-struct cmsghdr {
-  size_t cmsg_len;
-  int cmsg_level;
-  int cmsg_type;
-  unsigned char cmsg_data[?]; /* causes issues with luaffi, pre C99 */
-};
 struct sockaddr {
   sa_family_t sa_family;
   char sa_data[14];

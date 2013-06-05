@@ -39,7 +39,6 @@ typedef int64_t _netbsd_daddr_t;
 typedef uint64_t _netbsd_blkcnt_t;
 typedef uint32_t _netbsd_blksize_t;
 typedef int _netbsd_clockid_t;
-typedef unsigned int _netbsd_socklen_t;
 typedef int _netbsd_timer_t;
 typedef int _netbsd_suseconds_t;
 typedef unsigned int useconds_t;
@@ -87,15 +86,6 @@ struct _netbsd_sockaddr_un {
   uint8_t         sun_len;
   _netbsd_sa_family_t     sun_family;
   char            sun_path[104];
-};
-struct _netbsd_msghdr {
-  void            *msg_name;
-  _netbsd_socklen_t       msg_namelen;
-  struct iovec    *msg_iov;
-  int             msg_iovlen;
-  void            *msg_control;
-  _netbsd_socklen_t       msg_controllen;
-  int             msg_flags;
 };
 struct _netbsd_stat {
   _netbsd_dev_t     st_dev;

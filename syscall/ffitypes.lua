@@ -13,6 +13,8 @@ typedef uint32_t gid_t;
 typedef uint32_t id_t;
 typedef int32_t pid_t;
 
+typedef unsigned int socklen_t;
+
 // 64 bit
 typedef uint64_t off_t;
 
@@ -33,6 +35,21 @@ struct in_addr {
 };
 struct in6_addr {
   unsigned char  s6_addr[16];
+};
+struct msghdr {
+  void *msg_name;
+  socklen_t msg_namelen;
+  struct iovec *msg_iov;
+  size_t msg_iovlen;
+  void *msg_control;
+  size_t msg_controllen;
+  int msg_flags;
+};
+struct cmsghdr {
+  size_t cmsg_len;
+  int cmsg_level;
+  int cmsg_type;
+  unsigned char cmsg_data[?];
 };
 ]]
 
