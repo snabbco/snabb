@@ -66,7 +66,6 @@ print [[
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <sys/reboot.h>
-#include <sys/module.h>
 #include <sys/syscall.h>
 
 int ret = 0;
