@@ -411,8 +411,8 @@ meth.timeval = {
 
 meth.rlimit = {
   index = {
-    cur = function(r) return tonumber(r.rlim_cur) end,
-    max = function(r) return tonumber(r.rlim_max) end,
+    cur = function(r) if r.rlim_cur == c.RLIM.INFINITY then return -1 else return tonumber(r.rlim_cur) end end,
+    max = function(r) if r.rlim_max == c.RLIM.INFINITY then return -1 else return tonumber(r.rlim_max) end end,
   },
   newindex = {
     cur = function(r, v) r.rlim_cur = c.RLIM[v] end, -- allows use of "infinity"
