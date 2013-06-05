@@ -85,7 +85,7 @@ function h.strflag(tab)
 end
 
 -- take a bunch of flags in a string and return a number
--- allows multiple comma sep flags that are ORed TODO allow | as well
+-- allows multiple comma sep flags that are ORed
 function h.multiflags(tab)
   local function flag(cache, str)
     if not str then return 0 end
@@ -102,7 +102,16 @@ function h.multiflags(tab)
     cache[str] = f
     return f
   end
-  return setmetatable(tab, {__index = setmetatable({}, {__index = flag}), __call = function(t, a) return t[a] end})
+  return setmetatable(tab, {
+    __index = setmetatable({}, {__index = flag}),
+    __call = function(t, ...)
+      local a = 0
+      for _, v in ipairs{...} do
+        a = bit.bor(a, t[v])
+      end
+      return a
+    end,
+  })
 end
 
 -- like multiflags but also allow octal values in string

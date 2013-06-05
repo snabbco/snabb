@@ -137,6 +137,9 @@ test_basic = {
     assert_equal(c.AT_FDCWD[fd], -1)
     assert_equal(c.AT_FDCWD[33], 33)
   end,
+  test_multiflags = function()
+    assert_equal(c.O["creat, excl, rdwr"], c.O("creat", "excl", "rdwr")) -- function form takes multiple arguments
+  end,
 }
 
 test_open_close = {
