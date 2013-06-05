@@ -68,9 +68,10 @@ print [[
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <sys/reboot.h>
-#include </usr/include/fs/tmpfs/tmpfs_args.h>
-#include </usr/include/ufs/ufs/ufsmount.h>
+#include <fs/tmpfs/tmpfs_args.h>
+#include <ufs/ufs/ufsmount.h>
 #include <sys/module.h>
+#include <sys/syscall.h>
 
 int ret = 0;
 
