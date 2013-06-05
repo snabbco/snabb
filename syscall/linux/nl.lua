@@ -13,6 +13,7 @@ local c = S.c
 
 local htonl = h.htonl
 local align = h.align
+local align_types = h.align_types
 
 local t, pt, s = types.t, types.pt, types.s
 
@@ -40,18 +41,6 @@ local function inet_name(src, netmask)
     if not netmask then netmask = 32 end
   end
   return addr, netmask
-end
-
--- Give an alignment and a list of values, returns a buffer to fit them, it's length, and what the offsets would be
-local function align_types(alignment, in_vals)
-  local len = 0
-  local offsets = { }
-  for i, tp in ipairs(in_vals) do
-    local item_alignement = align(ffi.sizeof(tp), alignment)
-    offsets [ i ] = len
-    len = len + item_alignement
-  end
-  return t.buffer(len), len, offsets
 end
 
 -- similar functions for netlink messages
