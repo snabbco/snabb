@@ -60,15 +60,6 @@ struct sockaddr_un {
   sa_family_t     sun_family;
   char            sun_path[104];
 };
-struct msghdr {
-  void            *msg_name;
-  socklen_t       msg_namelen;
-  struct iovec    *msg_iov;
-  int             msg_iovlen;
-  void            *msg_control;
-  socklen_t       msg_controllen;
-  int             msg_flags;
-};
 struct stat {
   dev_t           st_dev;
   mode_t          st_mode;
