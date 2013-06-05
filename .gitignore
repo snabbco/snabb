@@ -2,6 +2,7 @@
 tmp/*
 *~
 *.core
+ktrace.out
 
 # ctest files
 test/ctest.c
