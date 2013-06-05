@@ -12,6 +12,7 @@ local types = S.types
 local c = S.c
 
 local htonl = h.htonl
+local align = h.align
 
 local t, pt, s = types.t, types.pt, types.s
 
@@ -40,8 +41,6 @@ local function inet_name(src, netmask)
   end
   return addr, netmask
 end
-
-local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
 
 -- Give an alignment and a list of values, returns a buffer to fit them, it's length, and what the offsets would be
 local function align_types(alignment, in_vals)

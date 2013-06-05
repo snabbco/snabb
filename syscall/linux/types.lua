@@ -13,6 +13,7 @@ local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim = h.split, h.trim
+local align = h.align
 
 local mt = {} -- metatables
 local meth = {}
@@ -1127,8 +1128,6 @@ mt.ifreq = {
 addtype("ifreq", "struct ifreq", mt.ifreq)
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
-local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
-
 local cmsg_hdrsize = ffi.sizeof(ffi.typeof("struct cmsghdr"),0)
 local voidalign = ffi.alignof(ffi.typeof("void *"))
 local function cmsg_align(len) return align(len, voidalign) end

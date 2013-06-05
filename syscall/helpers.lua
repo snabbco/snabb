@@ -180,5 +180,7 @@ h.booltoc = setmetatable({
 
 function h.ctobool(i) return tonumber(i) ~= 0 end
 
+function h.align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
+
 return h
 
