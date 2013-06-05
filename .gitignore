@@ -1,6 +1,7 @@
 # misc temp files
 tmp/*
 *~
+*.core
 
 # ctest files
 test/ctest.c
