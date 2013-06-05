@@ -10,7 +10,7 @@ local t, pt, s = types.t, types.pt, types.s
 local C = setmetatable({}, {__index = ffi.C})
 
 C.mount = function(fstype, dir, flags, data, data_len)
-  return C.syscall(c.SYS.__mount50, fstype, dir, t.int(flags), pt.void(data), t.size(data_len))
+  return C.syscall(c.SYS.mount50, fstype, dir, t.int(flags), pt.void(data), t.size(data_len))
 end
 
 C.stat = function(path, buf)

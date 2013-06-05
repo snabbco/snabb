@@ -11,7 +11,7 @@ local c = {}
 
 -- TODO incomplete
 c.SYS = strflag {
-  __mount50 = 410,
+  mount50 = 410,
   stat50 = 439,
   fstat50 = 440,
   lstat50 = 441,
