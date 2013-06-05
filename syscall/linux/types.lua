@@ -1151,7 +1151,9 @@ mt.cmsghdr = {
       cmsg_level = level,
       cmsg_type = type,
     })
-    ffi.copy(self.cmsg_data, data, data_size)
+    if data ~= nil then
+      ffi.copy(self.cmsg_data, data, data_size)
+    end
     return self
   end;
   __len = lenfn;
