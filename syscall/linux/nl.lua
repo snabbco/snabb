@@ -928,6 +928,7 @@ end
 
 -- TODO "route" should be passed in as parameter, test with other netlink types
 local function nlmsg(ntype, flags, af, ...)
+  ntype = c.RTM[ntype]
   flags = c.NLM_F[flags]
   local sock, err = nl.socket("route", {}) -- bind to empty sockaddr_nl, kernel fills address
   if not sock then return nil, err end
@@ -959,18 +960,18 @@ function nl.newlink(index, flags, iflags, change, ...)
   flags = c.NLM_F("request", "ack", flags)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = c.IFF[iflags], ifi_change = c.IFF[change]}
-  return nlmsg(c.RTM.NEWLINK, flags, nil, t.ifinfomsg, ifv, ...)
+  return nlmsg("newlink", flags, nil, t.ifinfomsg, ifv, ...)
 end
 
 function nl.dellink(index, ...)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index}
-  return nlmsg(c.RTM.DELLINK, "request, ack", nil, t.ifinfomsg, ifv, ...)
+  return nlmsg("dellink", "request, ack", nil, t.ifinfomsg, ifv, ...)
 end
 
 -- read interfaces and details.
 function nl.getlink(...)
-  return nlmsg(c.RTM.GETLINK, "request, dump", nil, t.rtgenmsg, {rtgen_family = c.AF.PACKET}, ...)
+  return nlmsg("getlink", "request, dump", nil, t.rtgenmsg, {rtgen_family = c.AF.PACKET}, ...)
 end
 
 -- read routes
@@ -1035,20 +1036,20 @@ end
 function nl.newroute(flags, tab, ...)
   tab = rtm_table(tab)
   flags = c.NLM_F("request", "ack", flags)
-  return nlmsg(c.RTM.NEWROUTE, flags, tab.rtm_family, t.rtmsg, tab, ...)
+  return nlmsg("newroute", flags, tab.rtm_family, t.rtmsg, tab, ...)
 end
 
 -- TODO flag cleanup
 function nl.delroute(tp, ...)
   tp = rtm_table(tp)
-  return nlmsg(c.RTM.DELROUTE, "request, ack", tp.rtm_family, t.rtmsg, tp, ...)
+  return nlmsg("delroute", "request, ack", tp.rtm_family, t.rtmsg, tp, ...)
 end
 
 -- read addresses from interface TODO flag cleanup
 function nl.getaddr(af, ...)
   local family = c.AF[af]
   local ifav = {ifa_family = family}
-  return nlmsg(c.RTM.GETADDR, "request, root", family, t.ifaddrmsg, ifav, ...)
+  return nlmsg("getaddr", "request, root", family, t.ifaddrmsg, ifav, ...)
 end
 
 -- TODO may need ifa_scope
@@ -1056,14 +1057,14 @@ function nl.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
   local family = c.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = c.IFA_F[flags], ifa_index = index}
-  return nlmsg(c.RTM.NEWADDR, "request, ack", family, t.ifaddrmsg, ifav, ...)
+  return nlmsg("newaddr", "request, ack", family, t.ifaddrmsg, ifav, ...)
 end
 
 function nl.deladdr(index, af, prefixlen, ...)
   if type(index) == 'table' then index = index.index end
   local family = c.AF[af]
   local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = 0, ifa_index = index}
-  return nlmsg(c.RTM.DELADDR, "request, ack", family, t.ifaddrmsg, ifav, ...)
+  return nlmsg("deladdr", "request, ack", family, t.ifaddrmsg, ifav, ...)
 end
 
 -- TODO this should be in __new for type
@@ -1080,21 +1081,21 @@ function nl.getneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
   tab.ndm_ifindex = index
   local ndm = ndm_table(tab)
-  return nlmsg(c.RTM.GETNEIGH, "request, dump", tab.ndm_family, t.ndmsg, ndm, ...)
+  return nlmsg("getneigh", "request, dump", tab.ndm_family, t.ndmsg, ndm, ...)
 end
 
 function nl.newneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
   tab.ndm_ifindex = index
   local ndm = ndm_table(tab)
-  return nlmsg(c.RTM.NEWNEIGH, "request, ack, excl, create", tab.ndm_family, t.ndmsg, ndm, ...)
+  return nlmsg("newneigh", "request, ack, excl, create", tab.ndm_family, t.ndmsg, ndm, ...)
 end
 
 function nl.delneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
   tab.ndm_ifindex = index
   local ndm = ndm_table(tab)
-  return nlmsg(c.RTM.DELNEIGH, "request, ack", tab.ndm_family, t.ndmsg, ndm, ...)
+  return nlmsg("delneigh", "request, ack", tab.ndm_family, t.ndmsg, ndm, ...)
 end
 
 function nl.interfaces() -- returns with address info too.
