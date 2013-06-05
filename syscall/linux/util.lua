@@ -257,19 +257,17 @@ function util.recvcmsg(fd, msg, flags)
   if not count then return nil, err end
   local ret = {count = count, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
   for mc, cmsg in msg:cmsgs() do
-    if cmsg.cmsg_level == c.SOL.SOCKET then
-      if cmsg.cmsg_type == c.SCM.CREDENTIALS then
-        local cred = pt.ucred(cmsg + 1) -- cmsg_data
-        ret.pid = cred.pid
-        ret.uid = cred.uid
-        ret.gid = cred.gid
-      elseif cmsg.cmsg_type == c.SCM.RIGHTS then
-        local fda = pt.int(cmsg + 1) -- cmsg_data
-        local fdc = div(cmsg:datalen(), s.int)
-        ret.fd = {}
-        for i = 1, fdc do ret.fd[i] = t.fd(fda[i - 1]) end
-      end -- TODO add other SOL.SOCKET messages
-    end -- TODO add other processing for different types
+    local pid , uid , gid = cmsg:credentials ( )
+    if pid then
+      ret.pid = pid
+      ret.uid = uid
+      ret.gid = gid
+    end
+    local fd_array = { }
+    for fd in cmsg:fds ( ) do
+      fd_array[#fd_array+1] = fd
+    end
+    ret.fd = fd_array
   end
   return ret
 end
