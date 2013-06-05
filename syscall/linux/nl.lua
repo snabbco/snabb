@@ -54,15 +54,6 @@ local function align_types(alignment, in_vals)
   end
   return t.buffer(len), len, offsets
 end
-local function tbuffer(a,...)
-  local in_vals = {...}
-  local buf, len, offsets = align_types(a,in_vals)
-  for i=1,#offsets do
-    -- Instead of an offset, return a pointer (located in the buffer) and cast to correct type
-    offsets[i] = ffi.cast(ffi.typeof("$ *", in_vals[i]), buf + offsets[i])
-  end
-  return buf, len, unpack(offsets)
-end
 
 -- similar functions for netlink messages
 local function nlmsg_align(len) return align(len, 4) end
@@ -672,10 +663,6 @@ function nl.read(s, addr, bufsize, untildone)
   return r
 end
 
-local function nlmsgbuffer(...)
-  return tbuffer(nlmsg_align(1), t.nlmsghdr, ...)
-end
-
 -- TODO share with read side
 local ifla_msg_types = {
   ifla = {
@@ -873,19 +860,18 @@ end
 
 local function ifla_f(tab, lookup, af, ...)
   local len, kind
-  local messages, values = {}, {}
+  local messages, values = {t.nlmsghdr}, {false}
 
   local args = {...}
   while #args ~= 0 do
     len, args, messages, values, kind = ifla_getmsg(args, messages, values, tab, lookup, kind, af)
   end
 
-  local results = {nlmsgbuffer(unpack(messages))}
+  local buf, len, offsets = align_types(nlmsg_align(1), messages)
 
-  local buf, len, hdr = table.remove(results, 1), table.remove(results, 1), table.remove(results, 1)
-
-  while #results ~= 0 do
-    local result, value = table.remove(results, 1), table.remove(values, 1)
+  for i=2,#offsets do -- skip header
+    local result = ffi.cast(ffi.typeof("$ *", messages[i]), buf + offsets[i])
+    local value = values[i]
     if type(value) == "string" then
       ffi.copy(result, value)
     else
