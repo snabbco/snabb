@@ -180,7 +180,8 @@ h.booltoc = setmetatable({
 
 function h.ctobool(i) return tonumber(i) ~= 0 end
 
-function h.align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
+local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
+h.align = align
 
 -- Give an alignment and a list of values, returns a buffer to fit them, it's length, and what the offsets would be
 function h.align_types(alignment, in_vals)
