@@ -1148,6 +1148,30 @@ mt.cmsghdr = {
     datalen = function(self)
       return tonumber(self.cmsg_len - cmsg_ahdr)
     end;
+    fds = function(self)
+      if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.RIGHTS then
+        local fda = pt.int(self.cmsg_data)
+        local fdc = math.floor ( self:datalen() / s.int )
+        local i = 0
+        return function()
+          if i < fdc then
+            local fd = t.fd(fda[i])
+            i = i + 1
+            return fd
+          end
+        end
+      else
+        return function() end
+      end
+    end;
+    credentials = function(self)
+      if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.CREDENTIALS then
+        local cred = pt.ucred(self.cmsg_data)
+        return cred.pid, cred.uid, cred.gid
+      else
+        return nil, "cmsg does not contain credentials"
+      end;
+    end;
   };
   __new = function (tp, level, type, data, data_size)
     data_size = data_size or #data
