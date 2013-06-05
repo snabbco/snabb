@@ -13,6 +13,7 @@ local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim = h.split, h.trim
+local align = h.align
 
 local mt = {} -- metatables
 local meth = {}
@@ -1127,8 +1128,6 @@ mt.ifreq = {
 addtype("ifreq", "struct ifreq", mt.ifreq)
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
-local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
-
 local cmsg_hdrsize = ffi.sizeof(ffi.typeof("struct cmsghdr"),0)
 local voidalign = ffi.alignof(ffi.typeof("void *"))
 local function cmsg_align(len) return align(len, voidalign) end
@@ -1147,6 +1146,30 @@ mt.cmsghdr = {
   __index = {
     datalen = function(self)
       return tonumber(self.cmsg_len - cmsg_ahdr)
+    end;
+    fds = function(self)
+      if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.RIGHTS then
+        local fda = pt.int(self.cmsg_data)
+        local fdc = math.floor ( self:datalen() / s.int )
+        local i = 0
+        return function()
+          if i < fdc then
+            local fd = t.fd(fda[i])
+            i = i + 1
+            return fd
+          end
+        end
+      else
+        return function() end
+      end
+    end;
+    credentials = function(self)
+      if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.CREDENTIALS then
+        local cred = pt.ucred(self.cmsg_data)
+        return cred.pid, cred.uid, cred.gid
+      else
+        return nil, "cmsg does not contain credentials"
+      end;
     end;
   };
   __new = function (tp, level, type, data, data_size)

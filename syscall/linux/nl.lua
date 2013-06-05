@@ -12,6 +12,8 @@ local types = S.types
 local c = S.c
 
 local htonl = h.htonl
+local align = h.align
+local align_types = h.align_types
 
 local t, pt, s = types.t, types.pt, types.s
 
@@ -39,28 +41,6 @@ local function inet_name(src, netmask)
     if not netmask then netmask = 32 end
   end
   return addr, netmask
-end
-
-local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
-
-local function ptt(tp)
-  local ptp = ffi.typeof("$ *", tp)
-  return function(x) return ffi.cast(ptp, x) end
-end
-
-local function tbuffer(a, ...) -- helper function for sequence of types in a buffer
-  local function threc(buf, offset, tp, ...)
-    if not tp then return nil end
-    local p = ptt(tp)
-    if select("#", ...) == 0 then return p(buf + offset) end
-    return p(buf + offset), threc(buf, offset + align(ffi.sizeof(tp), a), ...)
-  end
-  local len = 0
-  for _, tp in ipairs{...} do
-    len = len + align(ffi.sizeof(tp), a)
-  end
-  local buf = t.buffer(len)
-  return buf, len, threc(buf, 0, ...)
 end
 
 -- similar functions for netlink messages
@@ -671,10 +651,6 @@ function nl.read(s, addr, bufsize, untildone)
   return r
 end
 
-local function nlmsgbuffer(...)
-  return tbuffer(nlmsg_align(1), t.nlmsghdr, ...)
-end
-
 -- TODO share with read side
 local ifla_msg_types = {
   ifla = {
@@ -872,19 +848,18 @@ end
 
 local function ifla_f(tab, lookup, af, ...)
   local len, kind
-  local messages, values = {}, {}
+  local messages, values = {t.nlmsghdr}, {false}
 
   local args = {...}
   while #args ~= 0 do
     len, args, messages, values, kind = ifla_getmsg(args, messages, values, tab, lookup, kind, af)
   end
 
-  local results = {nlmsgbuffer(unpack(messages))}
+  local buf, len, offsets = align_types(nlmsg_align(1), messages)
 
-  local buf, len, hdr = table.remove(results, 1), table.remove(results, 1), table.remove(results, 1)
-
-  while #results ~= 0 do
-    local result, value = table.remove(results, 1), table.remove(values, 1)
+  for i=2,#offsets do -- skip header
+    local result = ffi.cast(ffi.typeof("$ *", messages[i]), buf + offsets[i])
+    local value = values[i]
     if type(value) == "string" then
       ffi.copy(result, value)
     else
