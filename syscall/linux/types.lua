@@ -415,8 +415,14 @@ meth.rlimit = {
     max = function(r) if r.rlim_max == c.RLIM.INFINITY then return -1 else return tonumber(r.rlim_max) end end,
   },
   newindex = {
-    cur = function(r, v) r.rlim_cur = c.RLIM[v] end, -- allows use of "infinity"
-    max = function(r, v) r.rlim_max = c.RLIM[v] end,
+    cur = function(r, v)
+      if v == -1 then v = c.RLIM.INFINITY end
+      r.rlim_cur = c.RLIM[v] -- allows use of "infinity"
+    end,
+    max = function(r, v)
+      if v == -1 then v = c.RLIM.INFINITY end
+      r.rlim_max = c.RLIM[v] -- allows use of "infinity"
+    end,
   },
 }
 
