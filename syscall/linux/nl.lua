@@ -956,10 +956,10 @@ end
 
 function nl.newlink(index, flags, iflags, change, ...)
   if change == 0 then change = c.IFF.NONE end -- 0 should work, but does not
-  flags = c.NLM_F[flags] -- TODO integrate flags below
+  flags = c.NLM_F("request", "ack", flags)
   if type(index) == 'table' then index = index.index end
   local ifv = {ifi_index = index, ifi_flags = c.IFF[iflags], ifi_change = c.IFF[change]}
-  return nlmsg(c.RTM.NEWLINK, c.NLM_F.REQUEST + c.NLM_F.ACK + flags, nil, t.ifinfomsg, ifv, ...)
+  return nlmsg(c.RTM.NEWLINK, flags, nil, t.ifinfomsg, ifv, ...)
 end
 
 function nl.dellink(index, ...)
@@ -1034,8 +1034,8 @@ end
 -- this time experiment using table as so many params, plus they are just to init struct. TODO flag cleanup
 function nl.newroute(flags, tab, ...)
   tab = rtm_table(tab)
-  flags = c.NLM_F[flags]
-  return nlmsg(c.RTM.NEWROUTE, c.NLM_F.REQUEST + c.NLM_F.ACK + flags, tab.rtm_family, t.rtmsg, tab, ...)
+  flags = c.NLM_F("request", "ack", flags)
+  return nlmsg(c.RTM.NEWROUTE, flags, tab.rtm_family, t.rtmsg, tab, ...)
 end
 
 -- TODO flag cleanup
