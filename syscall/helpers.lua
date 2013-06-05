@@ -189,9 +189,9 @@ function h.align_types(alignment, in_vals)
   local len = 0
   local offsets = { }
   for i, tp in ipairs(in_vals) do
-    local item_alignement = align(ffi.sizeof(tp), alignment)
+    local item_alignment = align(ffi.sizeof(tp), alignment)
     offsets [ i ] = len
-    len = len + item_alignement
+    len = len + item_alignment
   end
   return buffer(len), len, offsets
 end
