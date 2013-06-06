@@ -100,7 +100,7 @@ end
 function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 
 -- default behaviour is to iterate over whole directory, use noiter if you have very large directories
--- TODO maybe remove this from here, move to util instead
+-- TODO remove this from here, move to util instead, make ls an iterator
 function S.getdents(fd, buf, size, noiter)
   size = size or 4096
   buf = buf or t.buffer(size)

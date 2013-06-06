@@ -196,9 +196,9 @@ test_directory_operations = {
     assert(d[".."].dir, ".. is a directory")
   end,
   test_getdents_error = function()
-    local fd = assert(S.open("/etc/passwd", "RDONLY"))
+    local fd = assert(S.open("/dev/zero", "RDONLY"))
     local d, err = S.getdents(fd)
-    assert(err.notdir, "/etc/passwd should give a not directory error")
+    assert(err.notdir, "/dev/zero should give a not directory error")
     assert(fd:close())
   end,
 }
