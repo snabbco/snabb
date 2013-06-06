@@ -493,7 +493,7 @@ addtype("sigaction", "struct sigaction", mt.sigaction)
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsg_hdrsize = ffi.sizeof(ffi.typeof("struct cmsghdr"),0)
 local voidalign = ffi.alignof(ffi.typeof("void *"))
-local function cmsg_align(len) return align(len, voidalign) end
+local function cmsg_align(len) return align(len, voidalign) end -- TODO double check this is correct for all OSs
 
 local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
 --local function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
@@ -513,7 +513,7 @@ mt.cmsghdr = {
     fds = function(self)
       if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.RIGHTS then
         local fda = pt.int(self.cmsg_data)
-        local fdc = math.floor ( self:datalen() / s.int )
+        local fdc = math.floor(self:datalen() / s.int)
         local i = 0
         return function()
           if i < fdc then
@@ -613,8 +613,9 @@ samap_pt = {
   [c.AF.INET] = pt.sockaddr_in,
   [c.AF.INET6] = pt.sockaddr_in6,
 }
-if c.AF.NETLINK then samap_pt[c.AF.NETLINK] = pt.sockaddr_nl end
 
+-- these are not defined for every OS (yet)
+if c.AF.NETLINK then samap_pt[c.AF.NETLINK] = pt.sockaddr_nl end
 if c.AF.PACKET then samap_pt[c.AF.PACKET] = pt.sockaddr_ll end
 
 return types
