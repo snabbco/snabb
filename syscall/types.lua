@@ -14,6 +14,7 @@ local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
+local align = h.align
 
 local types = require "syscall.sharedtypes"
 
@@ -488,6 +489,118 @@ mt.sigaction = {
 }
 
 addtype("sigaction", "struct sigaction", mt.sigaction)
+
+-- cmsg functions, try to hide some of this nasty stuff from the user
+local cmsg_hdrsize = ffi.sizeof(ffi.typeof("struct cmsghdr"),0)
+local voidalign = ffi.alignof(ffi.typeof("void *"))
+local function cmsg_align(len) return align(len, voidalign) end
+
+local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
+--local function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
+local function cmsg_len(len) return cmsg_ahdr + len end
+
+local typemap = {
+  [c.SOL.SOCKET] = c.SCM,
+  [c.SOL.IP] = c.IP,
+  -- TODO add the othes here
+}
+
+mt.cmsghdr = {
+  __index = {
+    datalen = function(self)
+      return tonumber(self.cmsg_len - cmsg_ahdr)
+    end;
+    fds = function(self)
+      if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.RIGHTS then
+        local fda = pt.int(self.cmsg_data)
+        local fdc = math.floor ( self:datalen() / s.int )
+        local i = 0
+        return function()
+          if i < fdc then
+            local fd = t.fd(fda[i])
+            i = i + 1
+            return fd
+          end
+        end
+      else
+        return function() end
+      end
+    end;
+    credentials = function(self)
+      if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.CREDENTIALS then
+        local cred = pt.ucred(self.cmsg_data)
+        return cred.pid, cred.uid, cred.gid
+      else
+        return nil, "cmsg does not contain credentials"
+      end;
+    end;
+  };
+  __new = function (tp, level, type, data, data_size)
+    data_size = data_size or #data
+    level = c.SOL[level]
+    if typemap[level] then type = typemap[level][type] end
+    local self = ffi.new(tp, data_size, {
+      cmsg_len = cmsg_len(data_size),
+      cmsg_level = level,
+      cmsg_type = type,
+    })
+    if data ~= nil then
+      ffi.copy(self.cmsg_data, data, data_size)
+    end
+    return self
+  end;
+  __len = lenfn;
+}
+addtype_var("cmsghdr", "struct cmsghdr", mt.cmsghdr)
+
+-- msg_control is a bunch of cmsg structs, but these are all different lengths, as they have variable size arrays
+
+-- these functions also take and return a raw char pointer to msg_control, to make life easier, as well as the cast cmsg
+local function cmsg_firsthdr(msg)
+  if tonumber(msg.msg_controllen) < cmsg_hdrsize then return nil end
+  local mc = msg.msg_control
+  local cmsg = pt.cmsghdr(mc)
+  return mc, cmsg
+end
+
+local function cmsg_nxthdr(msg, buf, cmsg)
+  if tonumber(cmsg.cmsg_len) < cmsg_hdrsize then return nil end -- invalid cmsg
+  buf = pt.char(buf)
+  local msg_control = pt.char(msg.msg_control)
+  buf = buf + cmsg_align(cmsg.cmsg_len) -- find next cmsg
+  if buf + cmsg_hdrsize > msg_control + msg.msg_controllen then return nil end -- header would not fit
+  cmsg = pt.cmsghdr(buf)
+  if buf + cmsg_align(cmsg.cmsg_len) > msg_control + msg.msg_controllen then return nil end -- whole cmsg would not fit
+  return buf, cmsg
+end
+
+local function cmsg_iter(msg, last_msg_control)
+  local msg_control
+  if last_msg_control == nil then -- First iteration
+    msg_control = pt.char(msg.msg_control)
+  else
+    local last_cmsg = pt.cmsghdr(last_msg_control)
+    msg_control = last_msg_control + cmsg_align(last_cmsg.cmsg_len) -- find next cmsg
+  end
+  local end_offset = pt.char(msg.msg_control) + msg.msg_controllen
+  if msg_control + cmsg_hdrsize > end_offset then return nil end -- header would not fit
+  local cmsg = pt.cmsghdr(msg_control)
+  if msg_control + cmsg_align(cmsg.cmsg_len) > end_offset then return nil end -- whole cmsg would not fit
+  return msg_control, cmsg
+end
+local function cmsg_headers(msg)
+  return cmsg_iter, msg, nil
+end
+
+mt.msghdr = {
+  __index = {
+    cmsg_firsthdr = cmsg_firsthdr ;
+    cmsg_nxthdr = cmsg_nxthdr ;
+    cmsgs = cmsg_headers ;
+  };
+  __len = lenfn;
+}
+addtype("msghdr", "struct msghdr", mt.msghdr)
 
 -- include OS specific types
 local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
