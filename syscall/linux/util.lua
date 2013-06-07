@@ -436,9 +436,9 @@ function util.readfile(name, buffer, length)
   return r
 end
 
-function util.writefile(name, str, mode) -- write string to named file; silently ignore short writes
+function util.writefile(name, str, mode, flags) -- write string to named file; silently ignore short writes
   local fd, err
-  if mode then fd, err = S.creat(name, mode) else fd, err = S.open(name, "wronly") end
+  if mode then fd, err = S.creat(name, mode) else fd, err = S.open(name, flags or "wronly") end
   if not fd then return nil, err end
   local n, err = S.write(fd, str)
   if not n then return nil, err end
