@@ -2140,3 +2140,13 @@ test_mq = {
   -- TODO mq_notify
 }
 
+test_shm = {
+  test_shm = function()
+    local name = "XXXXXYYYY" .. S.getpid()
+    local fd = assert(S.shm_open(name, "rdwr, creat"))
+    assert(S.shm_unlink(name))
+    assert(fd:truncate(4096))
+    assert(fd:close())
+  end,
+}
+

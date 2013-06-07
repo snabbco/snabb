@@ -915,6 +915,21 @@ end
 function S.mkfifo(path, mode) return S.mknod(path, bit.bor(c.MODE[mode], c.S_I.FIFO)) end
 function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(c.MODE[mode], c.S_I.FIFO), 0) end
 
+-- in Linux shm_open and shm_unlink are not syscalls
+local shm = "/dev/shm"
+
+function S.shm_open(pathname, flags, mode)
+  if pathname:sub(1, 1) ~= "/" then pathname = "/" .. pathname end
+  pathname = shm .. pathname
+  return S.open(pathname, c.O(flags, "nofollow", "cloexec", "nonblock"), mode)
+end
+
+function S.shm_unlink(pathname)
+  if pathname:sub(1, 1) ~= "/" then pathname = "/" .. pathname end
+  pathname = shm .. pathname
+  return S.unlink(pathname)
+end
+
 return S
 
 end
