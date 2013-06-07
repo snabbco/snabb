@@ -2143,7 +2143,9 @@ test_mq = {
 test_shm = {
   test_shm = function()
     local name = "XXXXXYYYY" .. S.getpid()
-    local fd = assert(S.shm_open(name, "rdwr, creat"))
+    local fd, err = S.shm_open(name, "rdwr, creat")
+    if not fd and err.PERM then return end -- Travis CI does not hav mounted...
+    assert(fd)
     assert(S.shm_unlink(name))
     assert(fd:truncate(4096))
     assert(fd:close())
