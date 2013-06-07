@@ -216,7 +216,7 @@ end
 
 -- TODO return metatype that has length and can gc?
 function S.mmap(addr, length, prot, flags, fd, offset)
-  return retptr(C.mmap(addr, length, c.PROT[prot], c.MAP[flags], getfd(fd), offset))
+  return retptr(C.mmap(addr, length, c.PROT[prot], c.MAP[flags], getfd(fd or 0), offset or 0))
 end
 function S.munmap(addr, length)
   return retbool(C.munmap(addr, length))
