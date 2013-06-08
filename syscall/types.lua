@@ -504,7 +504,7 @@ local typemap = {
 }
 
 -- TODO add the othes here, they differ by OS
-if c.SOL.IP then typemap[c.SOL.IP] = c.IP
+if c.SOL.IP then typemap[c.SOL.IP] = c.IP end
 
 mt.cmsghdr = {
   __index = {
