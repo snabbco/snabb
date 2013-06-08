@@ -72,6 +72,8 @@ I have added initial coverage tests (now need fixing), and a C test to check con
 
 There is now [Travis CI](https://travis-ci.org/) support, although this will only test on one architecture (x86, glibc) at present (looks like OSX support may come soon). You can [see the test results here](https://travis-ci.org/justincormack/ljsyscall). If you fork the code you should be able to run these tests by setting up your own Travis account, and they will also be run for pull requests.
 
+I have used the LuaJIT [reflect library](http://www.corsix.org/lua/reflect/api.html) [which you can download here](http://www.corsix.org/lua/reflect/reflect.lua) for checking struct offsets.
+
 ## What is implemented?
 
 This project is in beta! Much stuff is still missing, this is a work in progress! The majority of syscalls are now there, let me know if you need some that are not.
@@ -122,4 +124,7 @@ There is an example epoll script that you can test with Apachebench in the examp
 
 There will no doubt be bugs and missing features, please report them if you find them. Also API design issues. You can use the [github issue tracker](https://github.com/justincormack/ljsyscall/issues?page=1&state=open).
 
+### License
+
+All the ljsyscall code is under the MIT license, see license file. Other files that have a license (luaunit, reflect) are differently licensed (MIT, X11).
 
