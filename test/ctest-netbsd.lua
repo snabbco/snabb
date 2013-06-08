@@ -92,9 +92,24 @@ void sassert_u64(uint64_t a, uint64_t b, char *n) {
 int main(int argc, char **argv) {
 ]]
 
+local ignore_offsets = {
+}
+
 -- iterate over S.ctypes
 for k, v in pairs(ctypes) do
   print("sassert(sizeof(" .. k .. "), " .. ffi.sizeof(v) .. ', "' .. k .. '");')
+  -- check offset of struct fields
+  local refct = reflect.typeof(v)
+  if refct.what == "struct" then
+    for r in refct:members() do
+      local name = r.name
+      -- bit hacky - TODO fix these issues
+      if ignore_offsets[name] then name = nil end
+      if name then
+        print("sassert(offsetof(" .. k .. "," .. name .. "), " .. ffi.offsetof(v, name) .. ', " offset of ' .. name .. ' in' .. k .. '");')
+      end
+    end
+  end
 end
 
 -- test all the constants
