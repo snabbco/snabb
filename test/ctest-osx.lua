@@ -90,6 +90,7 @@ int main(int argc, char **argv) {
 ]]
 
 local ignore_offsets = {
+  val = "true", -- sigset_t renamed TODO rename back
 }
 
 -- iterate over S.ctypes
