@@ -121,6 +121,7 @@ local nm = {
   FCNTL_LOCK = "F_",
   SIGACT = "SIG_",
   UMOUNT = "MNT_",
+  SIGPM = "SIG_",
 }
 
 for k, v in pairs(c) do

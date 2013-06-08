@@ -315,8 +315,6 @@ c.SOCK = multiflags {
 }
 
 c.SOL = strflag {
-  NETWORK   = 0xfffd,
-  TRANSPORT = 0xfffe,
   SOCKET    = 0xffff,
 }
 
