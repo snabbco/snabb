@@ -281,7 +281,6 @@ function S.setdomainname(s)
   return retbool(C.setdomainname(s, #s))
 end
 
-function S.kill(pid, sig) return retbool(C.kill(pid, c.SIG[sig])) end
 function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 
 function S.gettimeofday(tv)
@@ -383,6 +382,11 @@ function S.xattr(path, t) return xattr(S.listxattr, S.getxattr, S.setxattr, S.re
 function S.lxattr(path, t) return xattr(S.llistxattr, S.lgetxattr, S.lsetxattr, S.lremovexattr, path, t) end
 function S.fxattr(fd, t) return xattr(S.flistxattr, S.fgetxattr, S.fsetxattr, S.fremovexattr, fd, t) end
 
+function S.signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
+  if fd then fd = getfd(fd) else fd = -1 end
+  return retfd(C.signalfd(fd, t.sigset(set), c.SFD[flags]))
+end
+
 -- fdset handlers
 local function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
   local set = t.fdset()
@@ -405,10 +409,6 @@ local function fdisset(fds, set)
   return f
 end
 
-function S.signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
-  if fd then fd = getfd(fd) else fd = -1 end
-  return retfd(C.signalfd(fd, t.sigset(set), c.SFD[flags]))
-end
 
 -- TODO convert to metatype. Problem is how to deal with nfds
 function S.select(sel) -- note same structure as returned

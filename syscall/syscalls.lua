@@ -285,6 +285,7 @@ function S.sigpending()
  return set
 end
 function S.sigsuspend(mask) return retbool(C.sigsuspend(t.sigset(mask))) end
+function S.kill(pid, sig) return retbool(C.kill(pid, c.SIG[sig])) end
 
 function S._exit(status) C._exit(c.EXIT[status]) end
 
