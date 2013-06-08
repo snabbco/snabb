@@ -294,6 +294,11 @@ c.SOCK = strflag {
   SEQPACKET = 5,
 }
 
+c.SOL = strflag {
+  LOCAL     = 0,
+  SOCKET    = 0xffff,
+}
+
 c.IPPROTO = strflag {
   IP             = 0,
   HOPOPTS        = 0,

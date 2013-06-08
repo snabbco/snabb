@@ -314,6 +314,12 @@ c.SOCK = multiflags {
   FLAGS_MASK= 0xf0000000,
 }
 
+c.SOL = strflag {
+  NETWORK   = 0xfffd,
+  TRANSPORT = 0xfffe,
+  SOCKET    = 0xffff,
+}
+
 c.IPPROTO = strflag {
   IP             = 0,
   HOPOPTS        = 0,

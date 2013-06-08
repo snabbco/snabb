@@ -501,9 +501,10 @@ local function cmsg_len(len) return cmsg_ahdr + len end
 
 local typemap = {
   [c.SOL.SOCKET] = c.SCM,
-  [c.SOL.IP] = c.IP,
-  -- TODO add the othes here
 }
+
+-- TODO add the othes here, they differ by OS
+if c.SOL.IP then typemap[c.SOL.IP] = c.IP
 
 mt.cmsghdr = {
   __index = {
