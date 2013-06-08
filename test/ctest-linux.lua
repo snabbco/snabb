@@ -27,6 +27,12 @@ ctypes["struct sched_param"] = nil -- libc truncates unused parts
 ctypes["struct cpu_set_t"] = nil -- not actually a struct
 ctypes["dev_t"] = nil -- use kernel value not glibc
 
+-- we do not use the ino_t and blkcnt_t types, they are really 64 bit
+if abi.abi32 then
+  ctypes.ino_t = nil
+  ctypes.blkcnt_t = nil
+end
+
 -- internal only
 ctypes["struct capabilities"] = nil
 ctypes["struct cap"] = nil
