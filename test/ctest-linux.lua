@@ -11,6 +11,8 @@ local c = S.c
 
 local ffi = require "ffi"
 
+local reflect = require "test.reflect"
+
 -- TODO fix these, various naming issues
 ctypes["struct linux_dirent64"] = nil
 ctypes["struct fdb_entry"] = nil
@@ -358,13 +360,30 @@ void sassert_u64(uint64_t a, uint64_t b, char *n) {
 int main(int argc, char **argv) {
 ]]
 
--- important check on layout even if size right
-print("sassert(offsetof(struct sigaction, sa_mask), " .. ffi.offsetof(t.sigaction, "sa_mask") .. ', "offsetof sigaction sa_mask");')
-print("sassert(offsetof(struct sigaction, sa_flags), " .. ffi.offsetof(t.sigaction, "sa_flags") .. ', "offsetof sigaction sa_flags");')
+-- TODO fix
+local ignore_offsets = {
+  st_atime_nsec = true, -- stat
+  st_ctime_nsec = true, -- stat
+  st_mtime_nsec = true, -- stat
+  val = true, -- sigset_t, I think renamed
+  ihl = true, -- bitfield
+  version = true, -- bitfield
+}
 
 -- iterate over S.ctypes
 for k, v in pairs(ctypes) do
+  -- check size
   print("sassert(sizeof(" .. k .. "), " .. ffi.sizeof(v) .. ', "' .. k .. '");')
+  -- check offset of struct fields
+  local refct = reflect.typeof(v)
+  if refct.what == "struct" then
+    for r in refct:members() do
+      local name = r.name
+      -- bit hacky - TODO fix these issues
+      if ignore_offsets[name] then name = nil end
+      if name then print("sassert(offsetof(" .. k .. "," .. name .. "), " .. ffi.offsetof(v, name) .. ', "' .. k .. '");') end
+    end
+  end
 end
 
 -- test all the constants
