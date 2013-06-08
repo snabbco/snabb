@@ -393,22 +393,6 @@ addtype("macaddr", "struct {uint8_t mac_addr[6];}", {
   end,
 })
 
-meth.timeval = {
-  index = {
-    time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end,
-    sec = function(tv) return tonumber(tv.tv_sec) end,
-    usec = function(tv) return tonumber(tv.tv_usec) end,
-  },
-  newindex = {
-    time = function(tv, v)
-      local i, f = math.modf(v)
-      tv.tv_sec, tv.tv_usec = i, math.floor(f * 1000000)
-    end,
-    sec = function(tv, v) tv.tv_sec = v end,
-    usec = function(tv, v) tv.tv_usec = v end,
-  }
-}
-
 meth.rlimit = {
   index = {
     cur = function(r) if r.rlim_cur == c.RLIM.INFINITY then return -1 else return tonumber(r.rlim_cur) end end,
@@ -433,18 +417,6 @@ addtype("rlimit", "struct rlimit64", {
     if tab then for k, v in pairs(tab) do tab[k] = c.RLIM[v] end end
     return newfn(tp, tab)
   end,
-})
-
-addtype("timeval", "struct timeval", {
-  __index = function(tv, k) if meth.timeval.index[k] then return meth.timeval.index[k](tv) end end,
-  __newindex = function(tv, k, v) if meth.timeval.newindex[k] then meth.timeval.newindex[k](tv, v) end end,
-  __new = function(tp, v)
-    if not v then v = {0, 0} end
-    if type(v) ~= "number" then return ffi.new(tp, v) end
-    local ts = ffi.new(tp)
-    ts.time = v
-    return ts
-  end
 })
 
 -- array so cannot just add metamethods
