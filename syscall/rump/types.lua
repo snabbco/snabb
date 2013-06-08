@@ -35,7 +35,6 @@ local unchanged = {
   ["struct in_addr"] = true,
   ["struct in6_addr"] = true,
   ["struct iovec"] = true,
-  ["struct msghdr"] = true,
   ["struct cmsghdr"] = true,
 }
 

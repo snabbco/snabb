@@ -24,7 +24,15 @@ typedef unsigned long clock_t;
 typedef struct {
   uint32_t      val[1];
 } sigset_t;
-
+struct msghdr {
+  void *msg_name;
+  socklen_t msg_namelen;
+  struct iovec *msg_iov;
+  int msg_iovlen;
+  void *msg_control;
+  socklen_t msg_controllen;
+  int msg_flags;
+};
 struct timespec {
   time_t tv_sec;
   long   tv_nsec;
