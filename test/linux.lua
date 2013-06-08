@@ -383,27 +383,7 @@ test_tee_splice = {
   end,
 }
 
-test_timers_signals = {
-  test_timespec = function()
-    local ts = t.timespec(1)
-    assert_equal(ts.time, 1)
-    assert_equal(ts.sec, 1)
-    assert_equal(ts.nsec, 0)
-    local ts = t.timespec{1, 0}
-    assert_equal(ts.time, 1)
-    assert_equal(ts.sec, 1)
-    assert_equal(ts.nsec, 0)
-  end,
-  test_timeval = function()
-    local ts = t.timeval(1)
-    assert_equal(ts.time, 1)
-    assert_equal(ts.sec, 1)
-    assert_equal(ts.usec, 0)
-    local ts = t.timeval{1, 0}
-    assert_equal(ts.time, 1)
-    assert_equal(ts.sec, 1)
-    assert_equal(ts.usec, 0)
-  end,
+test_timers_signals_linux = {
   test_nanosleep = function()
     local rem = assert(S.nanosleep(0.001))
     assert_equal(rem, true, "expect no elapsed time after nanosleep")
@@ -495,39 +475,6 @@ test_timers_signals = {
   test_clock_nanosleep_abs = function()
     local rem = assert(S.clock_nanosleep("realtime", "abstime", 0)) -- in the past
     assert_equal(rem, true, "expect no elapsed time after clock_nanosleep")
-  end,
-  test_signal_ignore = function()
-    assert(S.signal("pipe", "ign"))
-    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
-    assert(S.signal("pipe", "dfl"))
-  end,
-  test_sigaction_ignore = function()
-    assert(S.sigaction("pipe", "ign"))
-    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
-    assert(S.sigaction("pipe", "dfl"))
-  end,
-  test_sigaction_function_handler = function()
-    local sig = t.int1(0)
-    local f = t.sighandler(function(s) sig[0] = s end)
-    assert(S.sigaction("pipe", {handler = f}))
-    assert(S.kill(S.getpid(), "pipe"))
-    assert(S.sigaction("pipe", "dfl"))
-    assert_equal(sig[0], c.SIG.PIPE)
-    f:free() -- free ffi slot for function
-  end,
-  test_sigaction_function_sigaction = function()
-    local sig = t.int1(0)
-    local pid = t.int32_1(0)
-    local f = t.sa_sigaction(function(s, info, ucontext)
-      sig[0] = s
-      pid[0] = info.pid
-    end)
-    assert(S.sigaction("pipe", {sigaction = f}))
-    assert(S.kill(S.getpid(), "pipe"))
-    assert(S.sigaction("pipe", "dfl"))
-    assert_equal(sig[0], c.SIG.PIPE)
-    assert_equal(pid[0], S.getpid())
-    f:free() -- free ffi slot for function
   end,
   test_sigaction_ucontext = function() -- this test does not do much yet
     local sig = t.int1(0)

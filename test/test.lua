@@ -761,6 +761,62 @@ test_sockets_pipes = {
   end,
 }
 
+test_timers_signals = {
+  test_timespec = function()
+    local ts = t.timespec(1)
+    assert_equal(ts.time, 1)
+    assert_equal(ts.sec, 1)
+    assert_equal(ts.nsec, 0)
+    local ts = t.timespec{1, 0}
+    assert_equal(ts.time, 1)
+    assert_equal(ts.sec, 1)
+    assert_equal(ts.nsec, 0)
+  end,
+  test_timeval = function()
+    local ts = t.timeval(1)
+    assert_equal(ts.time, 1)
+    assert_equal(ts.sec, 1)
+    assert_equal(ts.usec, 0)
+    local ts = t.timeval{1, 0}
+    assert_equal(ts.time, 1)
+    assert_equal(ts.sec, 1)
+    assert_equal(ts.usec, 0)
+  end,
+  test_signal_ignore = function()
+    assert(S.signal("pipe", "ign"))
+    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
+    assert(S.signal("pipe", "dfl"))
+  end,
+  test_sigaction_ignore = function()
+    assert(S.sigaction("pipe", "ign"))
+    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
+    assert(S.sigaction("pipe", "dfl"))
+  end,
+  test_sigaction_function_handler = function()
+    local sig = t.int1(0)
+    local f = t.sighandler(function(s) sig[0] = s end)
+    assert(S.sigaction("pipe", {handler = f}))
+    assert(S.kill(S.getpid(), "pipe"))
+    assert(S.sigaction("pipe", "dfl"))
+    assert_equal(sig[0], c.SIG.PIPE)
+    f:free() -- free ffi slot for function
+  end,
+  test_sigaction_function_sigaction = function()
+    local sig = t.int1(0)
+    local pid = t.int32_1(0)
+    local f = t.sa_sigaction(function(s, info, ucontext)
+      sig[0] = s
+      pid[0] = info.pid
+    end)
+    assert(S.sigaction("pipe", {sigaction = f}))
+    assert(S.kill(S.getpid(), "pipe"))
+    assert(S.sigaction("pipe", "dfl"))
+    assert_equal(sig[0], c.SIG.PIPE)
+    assert_equal(pid[0], S.getpid())
+    f:free() -- free ffi slot for function
+  end,
+}
+
 if S.environ then -- use this as a proxy for whether libc functions defined (eg not defined in rump)
 test_libc = {
   test_environ = function()

@@ -272,6 +272,20 @@ function S.sigaction(signum, handler, oldact)
   if handler then handler = mktype(t.sigaction, handler) end
   return retbool(C.sigaction(c.SIG[signum], handler, oldact))
 end
+function S.sigprocmask(how, set)
+  local oldset = t.sigset()
+  local ret = C.sigprocmask(c.SIGPM[how], t.sigset(set), oldset)
+  if ret == -1 then return nil, t.error() end
+  return oldset
+end
+function S.sigpending()
+  local set = t.sigset()
+  local ret = C.sigpending(set)
+  if ret == -1 then return nil, t.error() end
+ return set
+end
+function S.sigsuspend(mask) return retbool(C.sigsuspend(t.sigset(mask))) end
+
 function S._exit(status) C._exit(c.EXIT[status]) end
 
 function S.fcntl(fd, cmd, arg)

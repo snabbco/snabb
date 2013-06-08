@@ -247,6 +247,13 @@ c.SIG = strflag {
 
 c.SIG.IOT = c.SIG.ABRT
 
+-- sigprocmask note renaming of SIG to SIGPM
+c.SIGPM = strflag {
+  BLOCK     = 1,
+  UNBLOCK   = 2,
+  SETMASK   = 3,
+}
+
 c.SA = multiflags {
   ONSTACK   = 0x0001,
   RESTART   = 0x0002,

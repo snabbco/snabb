@@ -28,6 +28,8 @@ else -- no largefile issues
   end
 end
 
+function S.pause() return retbool(C.pause()) end
+
 function S.unlinkat(dirfd, path, flags)
   return retbool(C.unlinkat(c.AT_FDCWD[dirfd], path, c.AT_REMOVEDIR[flags]))
 end
@@ -38,7 +40,6 @@ function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(c.AT_FDCWD[fd], path
 function S.acct(filename) return retbool(C.acct(filename)) end
 
 function S.symlinkat(oldpath, newdirfd, newpath) return retbool(C.symlinkat(oldpath, c.AT_FDCWD[newdirfd], newpath)) end
-function S.pause() return retbool(C.pause()) end
 
 function S.fchownat(dirfd, path, owner, group, flags)
   return retbool(C.fchownat(c.AT_FDCWD[dirfd], path, owner or -1, group or -1, c.AT_SYMLINK_NOFOLLOW[flags]))
@@ -403,22 +404,6 @@ local function fdisset(fds, set)
   end
   return f
 end
-
-function S.sigprocmask(how, set)
-  local oldset = t.sigset()
-  local ret = C.sigprocmask(c.SIGPM[how], t.sigset(set), oldset)
-  if ret == -1 then return nil, t.error() end
-  return oldset
-end
-
-function S.sigpending()
-  local set = t.sigset()
-  local ret = C.sigpending(set)
-  if ret == -1 then return nil, t.error() end
- return set
-end
-
-function S.sigsuspend(mask) return retbool(C.sigsuspend(t.sigset(mask))) end
 
 function S.signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
   if fd then fd = getfd(fd) else fd = -1 end
