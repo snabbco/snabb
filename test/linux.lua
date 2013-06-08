@@ -492,6 +492,29 @@ test_timers_signals_linux = {
     assert_equal(pid[0], S.getpid())
     f:free() -- free ffi slot for function
   end,
+  test_sigaction_function_handler = function()
+    local sig = t.int1(0)
+    local f = t.sighandler(function(s) sig[0] = s end)
+    assert(S.sigaction("pipe", {handler = f}))
+    assert(S.kill(S.getpid(), "pipe"))
+    assert(S.sigaction("pipe", "dfl"))
+    assert_equal(sig[0], c.SIG.PIPE)
+    f:free() -- free ffi slot for function
+  end,
+  test_sigaction_function_sigaction = function()
+    local sig = t.int1(0)
+    local pid = t.int32_1(0)
+    local f = t.sa_sigaction(function(s, info, ucontext)
+      sig[0] = s
+      pid[0] = info.pid
+    end)
+    assert(S.sigaction("pipe", {sigaction = f}))
+    assert(S.kill(S.getpid(), "pipe"))
+    assert(S.sigaction("pipe", "dfl"))
+    assert_equal(sig[0], c.SIG.PIPE)
+    assert_equal(pid[0], S.getpid())
+    f:free() -- free ffi slot for function
+  end,
 }
 
 test_mmap = {
