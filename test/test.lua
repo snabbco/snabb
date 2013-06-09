@@ -870,7 +870,9 @@ clean()
 
 debug.sethook()
 
-if f ~= 0 then S.exit("failure") end
+if f ~= 0 then
+if rump then os.exit(1) else S.exit("failure") end
+end
 
 -- TODO iterate through all functions in S and upvalues for active rather than trace
 -- also check for non interesting cases, eg fall through to end
