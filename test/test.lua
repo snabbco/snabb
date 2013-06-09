@@ -4,20 +4,21 @@ local strict = require "test.strict"
 
 local oldassert = assert
 local function assert(cond, s)
-  collectgarbage("collect") -- force gc, to test for bugs
+  --collectgarbage("collect") -- force gc, to test for bugs
   return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
 end
+
+local helpers = require "syscall.helpers"
 
 local S, rump
 
 if arg[1] == "rump" then
   S = require "syscall.rump.init"
+  S.rump.init("vfs", "fs.tmpfs")
   table.remove(arg, 1)
   rump = true
-  S.rump.init("vfs")
 else
   S = require "syscall"
-  rump = false
 end
 
 local abi = S.abi
@@ -26,9 +27,11 @@ local t, pt, s = types.t, types.pt, types.s
 local c = S.c
 local features = S.features
 
-local helpers = require "syscall.helpers"
-
 if rump then -- some initial setup
+  assert(S.mkdir("/tmp", "0700"))
+  local data = {ta_version = 1, ta_nodes_max=100, ta_size_max=1048576, ta_root_mode=helpers.octal("0700")}
+  assert(S.mount{dir="/tmp", type="tmpfs", data=data})
+  assert(S.chdir("/tmp"))
   assert(S.chmod("/dev/null", "0666")) -- TODO seems to have execute permission by default so access test fails
 end
 
