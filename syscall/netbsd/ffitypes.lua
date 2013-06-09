@@ -28,9 +28,6 @@ typedef unsigned long _netbsd_clock_t;
 ]]
 end
 
--- note cmsghdr is potentially defined twice, as is in common code too, should not matter
--- this is due to issues with common code, as it uses constants in metatype
-
 cdef [[
 typedef uint32_t _netbsd_mode_t;
 typedef uint8_t _netbsd_sa_family_t;

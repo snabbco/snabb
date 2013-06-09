@@ -33,6 +33,12 @@ struct msghdr {
   socklen_t msg_controllen;
   int msg_flags;
 };
+struct cmsghdr {
+  size_t cmsg_len;
+  int cmsg_level;
+  int cmsg_type;
+  unsigned char cmsg_data[?];
+};
 struct timespec {
   time_t tv_sec;
   long   tv_nsec;

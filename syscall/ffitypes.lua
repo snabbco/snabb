@@ -36,11 +36,5 @@ struct in_addr {
 struct in6_addr {
   unsigned char  s6_addr[16];
 };
-struct cmsghdr {
-  size_t cmsg_len;
-  int cmsg_level;
-  int cmsg_type;
-  unsigned char cmsg_data[?];
-};
 ]]
 
