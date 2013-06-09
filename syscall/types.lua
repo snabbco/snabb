@@ -47,7 +47,6 @@ end
 -- for variables length types, ie those with arrays
 local function addtype_var(name, tp, mt)
   if rump then tp = rump(tp) end
-print("name", name)
   t[name] = ffi.metatype(tp, mt)
   pt[name] = ptt(tp)
 end

@@ -16,7 +16,6 @@ local function ptt(tp)
 end
 
 local function addtype(name, tp, mt)
-print("shname", name)
   t[name] = ffi.metatype(tp, mt)
   ctypes[tp] = t[name]
   pt[name] = ptt(tp)
