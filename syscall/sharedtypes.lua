@@ -1,7 +1,5 @@
 -- this module defines the types with metatypes that are always common, so do not get errors redefining metatypes
 
-local function init(abi, c, errors, ostypes, rump)
-
 local ffi = require "ffi"
 
 local t, ctypes, pt, s = {}, {}, {}, {}
@@ -18,6 +16,7 @@ local function ptt(tp)
 end
 
 local function addtype(name, tp, mt)
+print("shname", name)
   t[name] = ffi.metatype(tp, mt)
   ctypes[tp] = t[name]
   pt[name] = ptt(tp)
@@ -193,75 +192,5 @@ addtype("in6_addr", "struct in6_addr", {
   __len = lenfn,
 })
 
--- cmsg functions, try to hide some of this nasty stuff from the user
-local cmsg_hdrsize = ffi.sizeof(ffi.typeof("struct cmsghdr"), 0)
-local voidalign = ffi.alignof(ffi.typeof("void *"))
-local function cmsg_align(len) return align(len, voidalign) end -- TODO double check this is correct for all OSs
-local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
---local function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
-local function cmsg_len(len) return cmsg_ahdr + len end
-
-
-local typemap = {
-  [c.SOL.SOCKET] = c.SCM,
-}
-
--- TODO add the othes here, they differ by OS
-if c.SOL.IP then typemap[c.SOL.IP] = c.IP end
-
-mt.cmsghdr = {
-  __index = {
-    datalen = function(self)
-      return tonumber(self.cmsg_len - cmsg_ahdr)
-    end,
-    hdrsize = function(self) return cmsg_hdrsize end, -- constant, but better to have it here
-    align = function(self) return cmsg_align(self.cmsg_len) end,
-    fds = function(self)
-      if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.RIGHTS then
-        local fda = pt.int(self.cmsg_data)
-        local fdc = math.floor(self:datalen() / s.int)
-        local i = 0
-        return function()
-          if i < fdc then
-            local fd = t.fd(fda[i])
-            i = i + 1
-            return fd
-          end
-        end
-      else
-        return function() end
-      end
-    end,
-    credentials = function(self)
-      if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.CREDENTIALS then
-        local cred = pt.ucred(self.cmsg_data)
-        return cred.pid, cred.uid, cred.gid
-      else
-        return nil, "cmsg does not contain credentials"
-      end;
-    end;
-  },
-  __new = function (tp, level, type, data, data_size)
-    data_size = data_size or #data
-    level = c.SOL[level]
-    if typemap[level] then type = typemap[level][type] end
-    local self = ffi.new(tp, data_size, {
-      cmsg_len = cmsg_len(data_size),
-      cmsg_level = level,
-      cmsg_type = type,
-    })
-    if data ~= nil then
-      ffi.copy(self.cmsg_data, data, data_size)
-    end
-    return self
-  end,
-  __len = lenfn,
-}
-addtype_var("cmsghdr", "struct cmsghdr", mt.cmsghdr)
-
 return {t = t, pt = pt, s = s, ctypes = ctypes}
-
-end
-
-return {init = init}
 
