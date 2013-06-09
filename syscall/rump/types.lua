@@ -35,7 +35,6 @@ local unchanged = {
   ["struct in_addr"] = true,
   ["struct in6_addr"] = true,
   ["struct iovec"] = true,
-  ["struct cmsghdr"] = true,
 }
 
 local function rumpfn(tp) -- add _netbsd_ to correct types

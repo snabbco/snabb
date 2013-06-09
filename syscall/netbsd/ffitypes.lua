@@ -28,6 +28,9 @@ typedef unsigned long _netbsd_clock_t;
 ]]
 end
 
+-- note cmsghdr is potentially defined twice, as is in common code too, should not matter
+-- this is due to issues with common code, as it uses constants in metatype
+
 cdef [[
 typedef uint32_t _netbsd_mode_t;
 typedef uint8_t _netbsd_sa_family_t;
@@ -55,6 +58,12 @@ struct _netbsd_msghdr {
   void *msg_control;
   socklen_t msg_controllen;
   int msg_flags;
+};
+struct _netbsd_cmsghdr {
+  size_t cmsg_len;
+  int cmsg_level;
+  int cmsg_type;
+  unsigned char cmsg_data[?];
 };
 struct _netbsd_timespec {
   _netbsd_time_t tv_sec;
