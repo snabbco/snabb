@@ -2,6 +2,8 @@
 
 return function(S, hh, abi, c, C, types, ioctl)
 
+local ffi = require "ffi"
+
 local t, pt, s = types.t, types.pt, types.s
 
 local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
@@ -57,6 +59,15 @@ function S.mkfifo(pathname, mode) return retbool(C.mkfifo(pathname, c.S_I[mode])
 
 function S.reboot(how, bootstr)
   return retbool(C.reboot(c.RB[how], bootstr))
+end
+
+-- TODO when we define this for osx in C can go in common code (curently defined in libc.lua)
+function S.getcwd(buf, size)
+  size = size or c.PATH_MAX
+  buf = buf or t.buffer(size)
+  local ret = C.getcwd(buf, size)
+  if ret == -1 then return nil, t.error() end
+  return ffi.string(buf)
 end
 
 return S
