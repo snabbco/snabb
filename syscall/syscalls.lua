@@ -338,6 +338,10 @@ if not S.accept then
   end
 end
 
+if not S.pause then -- NetBSD and OSX deprecate pause
+  function S.pause() return S.sigsuspend(t.sigset()) end
+end
+
 if not inlibc "pipe2" then
   function S.pipe(flags) -- TODO emulate flags
     assert(not flags, "TODO add pipe flags emulation")
