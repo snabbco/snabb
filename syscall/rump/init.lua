@@ -83,6 +83,8 @@ end
 
 S.rump = {}
 
+S.rump.__modules = {rump, rumpuser} -- so not garbage collected
+
 local helpers = require "syscall.helpers"
 local strflag = helpers.strflag
 
@@ -97,7 +99,8 @@ local RUMP_ETFS = strflag {
 function S.rump.init(...) -- you must load the factions here eg dev, vfs, net, plus modules
   for i, v in ipairs{...} do
     v = string.gsub(v, "%.", "_")
-    ffi.load("rump" .. v, true)
+    local mod = ffi.load("rump" .. v, true)
+    S.rump.__modules[#S.rump.__modules + 1] = mod
   end
   return retbool(rump.rump_init())
 end
@@ -107,7 +110,8 @@ function S.rump.version() return rump.rump_pub_getversion() end
 -- We could also use rump_pub_module_init if loading later
 function S.rump.module(s)
   s = string.gsub(s, "%.", "_")
-  ffi.load("rump" .. s, true)
+  local mod = ffi.load("rump" .. s, true)
+  S.rump.__modules[#S.rump.__modules + 1] = mod
 end
 
 function S.rump.etfs_register(key, hostpath, ftype, begin, size)
