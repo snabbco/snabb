@@ -2,7 +2,13 @@
 
 local strict = require "test.strict"
 
-local S = require "syscall"
+local S
+if arg[1] == "rump" then
+  S = require "syscall.rump.init"
+else
+  S = require "syscall"
+end
+
 local abi = S.abi
 local types = S.types
 local c = S.c
