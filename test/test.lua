@@ -2,11 +2,16 @@
 
 local strict = require "test.strict"
 
-local S
+local S, rump
+
 if arg[1] == "rump" then
   S = require "syscall.rump.init"
+  table.remove(arg, 1)
+  rump = true
+  S.rump.init("vfs")
 else
   S = require "syscall"
+  rump = false
 end
 
 local abi = S.abi
@@ -19,11 +24,11 @@ local helpers = require "syscall.helpers"
 local bit = require "bit"
 local ffi = require "ffi"
 
-local os = abi.os
+local useos = abi.os
 
-if os == "osx" or os == "netbsd" then os = "bsd" end -- use same tests for now
+if useos == "osx" or useos == "netbsd" then useos = "bsd" end -- use same tests for now
 
-require("test." .. os) -- OS specific tests
+require("test." .. useos) -- OS specific tests
 
 local t, pt, s = types.t, types.pt, types.s
 
@@ -828,7 +833,7 @@ local function removeroottests()
 end
 
 -- note at present we check for uid 0, but could check capabilities instead.
-if S.geteuid() == 0 then
+if not rump and S.geteuid() == 0 then
   if abi.os == "linux" then
     -- some tests are causing issues, eg one of my servers reboots on pivot_root
     if not arg[1] and arg[1] ~= "all" then
@@ -904,7 +909,12 @@ end
 
 collectgarbage("collect")
 
-S.exit("success")
+if rump then
+  os.exit()
+else
+  S.exit("success")
+end
+
 
 
 
