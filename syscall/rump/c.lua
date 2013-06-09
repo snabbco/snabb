@@ -366,6 +366,8 @@ local C = {
   writev = rump.rump___sysimpl_writev,
 }
 
+C,getcwd = C,__getcwd -- effectively gives us the syscall
+
 return C
 
 end

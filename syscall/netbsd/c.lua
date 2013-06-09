@@ -25,6 +25,10 @@ C.lstat = function(path, buf)
   return C.syscall(c.SYS.lstat50, pt.void(path), pt.void(buf))
 end
 
+C.getcwd = function(buf, size)
+  return C.syscall(c.SYS.__getcwd, pt.void(buf), t.size(size))
+end
+
 return C
 
 end

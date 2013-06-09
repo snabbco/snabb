@@ -18,7 +18,7 @@ local function retbool(ret)
   return true
 end
 
--- if getcwd not defined, fall back to libc implementation (currently bsd, osx) TODO use underlying syscall
+-- if getcwd not defined, fall back to libc implementation (currently osx) TODO use underlying syscall
 if not S.getcwd then
 ffi.cdef [[
 char *getcwd(char *buf, size_t size);
