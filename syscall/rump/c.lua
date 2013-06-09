@@ -1,10 +1,8 @@
 -- define C functions for rump
 
-local function init(abi, c, types)
+local function init(abi, c, types, rump)
 
 local ffi = require "ffi"
-
-local rump = ffi.load("rump")
 
 local cdef
 
@@ -367,6 +365,8 @@ local C = {
   write = rump.rump___sysimpl_write,
   writev = rump.rump___sysimpl_writev,
 }
+
+--C.mkdir = ffi.C.rump___sysimpl_mkdir
 
 return C
 

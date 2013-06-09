@@ -2,13 +2,18 @@
 
 -- version with no loading of S to check for accidental leakage
 
+local oldassert = assert
+local function assert(cond, s)
+  return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
+end
+
 local R = require "syscall.rump.init" -- rump kernel functions
 
 R.rump.init("vfs", "fs.kernfs")
 
 print("init")
 
-assert(R.mkdir("/kern", "0755"))
+assert(R.mkdir("/kern", "0700"))
 
 print("mkdir")
 

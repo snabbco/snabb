@@ -1,6 +1,11 @@
 
 -- This mirrors syscall.lua, but some differences
 
+local ffi = require "ffi"
+
+local rumpuser = ffi.load("rumpuser")
+local rump = ffi.load("rump")
+
 local hostabi = require "syscall.abi"
 
 local abi = {}
@@ -26,7 +31,7 @@ else
   types = require "syscall.rump.types".init(abi, c, errors, ostypes)
 end
 
-local C = require "syscall.rump.c".init(abi, c, types)
+local C = require "syscall.rump.c".init(abi, c, types, rump)
 local ioctl = require("syscall.netbsd.ioctl")(abi, s)
 local fcntl = require("syscall.netbsd.fcntl")(abi, c, types)
 
@@ -43,11 +48,6 @@ S = require "syscall.methods".init(S)
 S.features = require "syscall.features".init(S)
 
 -- rump functions, constants
-
-local ffi = require "ffi"
-
-local rumpuser = ffi.load("rumpuser")
-local rump = ffi.load("rump")
 
 -- note that modinfo is kernel only so not in ffitypes
 ffi.cdef[[
