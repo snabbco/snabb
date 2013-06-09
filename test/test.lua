@@ -2,6 +2,12 @@
 
 local strict = require "test.strict"
 
+local oldassert = assert
+local function assert(cond, s)
+  collectgarbage("collect") -- force gc, to test for bugs
+  return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
+end
+
 local S, rump
 
 if arg[1] == "rump" then
@@ -23,8 +29,7 @@ local features = S.features
 local helpers = require "syscall.helpers"
 
 if rump then -- some initial setup
-  S.mkdir("/dev")
-  S.mknod("/dev/null", "fchr, rusr, wusr", t.device(2, 2)) -- TODO see issue 56 to clean up
+  assert(S.chmod("/dev/null", "0666")) -- TODO seems to have execute permission by default so access test fails
 end
 
 local bit = require "bit"
@@ -35,12 +40,6 @@ local useos = abi.os
 if useos == "osx" or useos == "netbsd" then useos = "bsd" end -- use same tests for now
 
 require("test." .. useos) -- OS specific tests
-
-local oldassert = assert
-local function assert(cond, s)
-  collectgarbage("collect") -- force gc, to test for bugs
-  return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
-end
 
 local function fork_assert(cond, str) -- if we have forked we need to fail in main thread not fork
   if not cond then
@@ -188,8 +187,8 @@ test_open_close = {
     local fileno = fd:getfd()
     assert(fd:close())
     local fd, err = S.close(fileno)
-    assert(err, "expected to fail on close already closed fd")
-    assert(err.badf, "expect BADF from invalid numberic fd")
+    assert(not fd, "expected to fail on close already closed fd")
+    assert(err and err.badf, "expect BADF from invalid numberic fd")
   end,
   test_access = function()
     assert(S.access("/dev/null", "r"), "expect access to say can read /dev/null")
