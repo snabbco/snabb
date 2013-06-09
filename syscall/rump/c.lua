@@ -366,8 +366,6 @@ local C = {
   writev = rump.rump___sysimpl_writev,
 }
 
---C.mkdir = ffi.C.rump___sysimpl_mkdir
-
 return C
 
 end
