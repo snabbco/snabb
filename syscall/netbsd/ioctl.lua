@@ -1,6 +1,8 @@
 -- ioctls, filling in as needed
 
-return function(abi, s)
+return function(abi, types)
+
+local s = types.s
 
 local strflag = require("syscall.helpers").strflag
 local bit = require "bit"

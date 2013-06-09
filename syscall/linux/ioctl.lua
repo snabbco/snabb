@@ -1,7 +1,9 @@
 -- ioctls, filling in as needed
 -- note there are some architecture dependent values
 
-return function(abi, s)
+return function(abi, types)
+
+local s = types.s
 
 local strflag = require "syscall.helpers".strflag
 
