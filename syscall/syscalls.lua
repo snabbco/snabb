@@ -84,7 +84,7 @@ function S.chroot(path) return retbool(C.chroot(path)) end
 function S.umask(mask) return C.umask(c.MODE[mask]) end
 function S.sync() return C.sync() end
 function S.mknod(pathname, mode, dev)
-  if type(dev) == "table" then dev = dev.dev end
+  if type(dev) == "table" then dev = dev.dev end -- TODO allow array eg {2, 2} - major, minor
   return retbool(C.mknod(pathname, c.S_I[mode], dev or 0))
 end
 -- TODO read should have consistent return type but then will differ from other calls.

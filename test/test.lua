@@ -16,10 +16,16 @@ end
 
 local abi = S.abi
 local types = S.types
+local t, pt, s = types.t, types.pt, types.s
 local c = S.c
 local features = S.features
 
 local helpers = require "syscall.helpers"
+
+if rump then -- some initial setup
+  S.mkdir("/dev")
+  S.mknod("/dev/null", "fchr, rusr, wusr", t.device(2, 2)) -- TODO see issue 56 to clean up
+end
 
 local bit = require "bit"
 local ffi = require "ffi"
@@ -29,8 +35,6 @@ local useos = abi.os
 if useos == "osx" or useos == "netbsd" then useos = "bsd" end -- use same tests for now
 
 require("test." .. useos) -- OS specific tests
-
-local t, pt, s = types.t, types.pt, types.s
 
 local oldassert = assert
 local function assert(cond, s)
