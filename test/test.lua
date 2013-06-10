@@ -29,7 +29,7 @@ local features = S.features
 
 if rump then -- some initial setup
   assert(S.mkdir("/tmp", "0700"))
-  local data = {ta_version = 1, ta_nodes_max=100, ta_size_max=1048576, ta_root_mode=helpers.octal("0700")}
+  local data = {ta_version = 1, ta_nodes_max=100, ta_size_max=104857600, ta_root_mode=helpers.octal("0700")}
   assert(S.mount{dir="/tmp", type="tmpfs", data=data})
   assert(S.chdir("/tmp"))
   assert(S.chmod("/dev/null", "0666")) -- TODO seems to have execute permission by default so access test fails
@@ -584,16 +584,16 @@ test_largefile = {
   end,
   test_ftruncate = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
-    local offset = 2^35
-    assert(fd:truncate(offset), "64 bit ftruncate should be ok")
-    local st = assert(fd:stat(), "64 bit stat should be ok")
-    assert(st.size == offset, "stat should be truncated length")
+    local offset = largeval
+    assert(fd:truncate(offset))
+    local st = assert(fd:stat())
+    assert_equal(st.size, offset)
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
   test_truncate = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
-    local offset = 2^35
+    local offset = largeval
     assert(S.truncate(tmpfile, offset))
     local st = assert(S.stat(tmpfile))
     assert_equal(st.size, offset)
@@ -838,6 +838,11 @@ local function removeroottests()
       end
     end
   end
+end
+
+-- basically largefile on NetBSD is always going to work but tests may not use sparse files so run out of memory
+if rump then
+  test_largefile = nil
 end
 
 -- note at present we check for uid 0, but could check capabilities instead.
