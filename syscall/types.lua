@@ -528,6 +528,7 @@ local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
 --local function cmsg_space(len) return cmsg_ahdr + cmsg_align(len) end
 local function cmsg_len(len) return cmsg_ahdr + len end
 
+-- TODO move this to sockopt file, like set/getsockopt as very similar mapping
 local typemap = {
   [c.SOL.SOCKET] = c.SCM,
 }
