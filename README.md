@@ -8,6 +8,10 @@ There is a work in progress port to BSD systems, currently targetting NetBSD (32
 
 This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
 
+## Introductory talk
+
+There is the [video of my FOSDEM 2013 talk](http://www.myriabit.com/ljsyscall/) here.
+
 ## Install
 
 You just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Keep the directory structure there is. You can safely remove files from architectures and operating systems you do not use.
