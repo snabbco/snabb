@@ -31,8 +31,9 @@ local mt = {}
 
 mt.dir = {
   __tostring = function(t)
+    if #t == 0 then return "" end
     table.sort(t)
-    return table.concat(t, "\n")
+    return table.concat(t, "\n") .. "\n"
     end
 }
 

@@ -1651,11 +1651,43 @@ test_util = {
   end,
   test_ls = function()
     assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/file1"))
+    assert(util.touch(tmpfile .. "/file2"))
+    local f, count = {}, 0
+    for d in util.ls(tmpfile) do
+      f[d.name] = true
+      count = count + 1
+    end
+    assert_equal(count, 4)
+    assert(f.file1 and f.file2 and f["."] and f[".."], "expect four files")
+    assert(S.unlink(tmpfile .. "/file1"))
+    assert(S.unlink(tmpfile .. "/file2"))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_ls_long = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/veryverylongfile1"))
+    assert(util.touch(tmpfile .. "/veryveryfile2"))
+    local f, count = {}, 0
+    for d in util.ls(tmpfile, nil, 48) do
+      f[d.name] = true
+      count = count + 1
+    end
+    assert_equal(count, 4)
+    assert(f.veryverylongfile1 and f.veryveryfile2 and f["."] and f[".."], "expect four files")
+    assert(S.unlink(tmpfile .. "/veryverylongfile1"))
+    assert(S.unlink(tmpfile .. "/veryveryfile2"))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_dirfile = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
     assert(util.touch(tmpfile .. "/file"))
-    local list = assert(util.ls(tmpfile, true))
+    local list = assert(util.dirfile(tmpfile, true))
     assert_equal(#list, 1, "one item in directory")
     assert_equal(list[1], "file", "one file called file")
-    assert(util.rm(tmpfile))
+    assert_equal(tostring(list), "file\n")
+    assert(S.unlink(tmpfile .. "/file"))
+    assert(S.rmdir(tmpfile))
   end,
   test_ps = function()
     local ps = util.ps()
