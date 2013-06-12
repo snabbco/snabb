@@ -181,25 +181,86 @@ test_file_operations_linux = {
   end,
 }
 
+-- test dir ops, needs some stuff in util which should be common once getdents portable
 test_directory_operations = {
--- tests getdents from higher level interface TODO move to util test, test directly too? make portable
-  test_getdents_dirfile = function()
-    local d = assert(util.dirfile("/dev"))
+  test_getdents_dev = function()
+    local d = {}
+    for f in util.ls("/dev") do
+      d[f.name] = true
+      if f.name == "zero" then assert(f.chr, "/dev/zero is a character device") end
+      if f.name == "." then
+        assert(f.dir, ". is a directory")
+        assert(not f.chr, ". is not a character device")
+        assert(not f.sock, ". is not a socket")
+        assert(not f.lnk, ". is not a synlink")
+      end
+      if f.name == ".." then assert(f.dir, ".. is a directory") end
+    end
     assert(d.zero, "expect to find /dev/zero")
-    assert(d["."], "expect to find .")
-    assert(d[".."], "expect to find ..")
-    assert(d.zero.chr, "/dev/zero is a character device")
-    assert(d["."].dir, ". is a directory")
-    assert(not d["."].chr, ". is not a character device")
-    assert(not d["."].sock, ". is not a socket")
-    assert(not d["."].lnk, ". is not a synlink")
-    assert(d[".."].dir, ".. is a directory")
   end,
   test_getdents_error = function()
     local fd = assert(S.open("/dev/zero", "RDONLY"))
     local d, err = S.getdents(fd)
     assert(err.notdir, "/dev/zero should give a not directory error")
     assert(fd:close())
+  end,
+  test_getdents = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/file1"))
+    assert(util.touch(tmpfile .. "/file2"))
+    -- with only two files will get in one iteration of getdents
+    local fd = assert(S.open(tmpfile, "directory, rdonly"))
+    local f, count = {}, 0
+    for d in fd:getdents() do
+      f[d.name] = true
+      count = count + 1
+    end
+    assert_equal(count, 4)
+    assert(f.file1 and f.file2 and f["."] and f[".."], "expect four files")
+    assert(fd:close())
+    assert(S.unlink(tmpfile .. "/file1"))
+    assert(S.unlink(tmpfile .. "/file2"))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_ls = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/file1"))
+    assert(util.touch(tmpfile .. "/file2"))
+    local f, count = {}, 0
+    for d in util.ls(tmpfile) do
+      f[d.name] = true
+      count = count + 1
+    end
+    assert_equal(count, 4)
+    assert(f.file1 and f.file2 and f["."] and f[".."], "expect four files")
+    assert(S.unlink(tmpfile .. "/file1"))
+    assert(S.unlink(tmpfile .. "/file2"))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_ls_long = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/veryverylongfile1"))
+    assert(util.touch(tmpfile .. "/veryveryfile2"))
+    local f, count = {}, 0
+    for d in util.ls(tmpfile, nil, 48) do
+      f[d.name] = true
+      count = count + 1
+    end
+    assert_equal(count, 4)
+    assert(f.veryverylongfile1 and f.veryveryfile2 and f["."] and f[".."], "expect four files")
+    assert(S.unlink(tmpfile .. "/veryverylongfile1"))
+    assert(S.unlink(tmpfile .. "/veryveryfile2"))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_dirtable = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/file"))
+    local list = assert(util.dirtable(tmpfile, true))
+    assert_equal(#list, 1, "one item in directory")
+    assert_equal(list[1], "file", "one file called file")
+    assert_equal(tostring(list), "file\n")
+    assert(S.unlink(tmpfile .. "/file"))
+    assert(S.rmdir(tmpfile))
   end,
 }
 
@@ -769,7 +830,7 @@ test_raw_socket = {
 test_netlink = {
   test_getlink = function()
     local i = assert(nl.getlink())
-    local df = assert(util.ls("/sys/class/net", true))
+    local df = assert(util.dirtable("/sys/class/net", true))
     assert_equal(#df, #i, "expect same number of interfaces as /sys/class/net")
     assert(i.lo, "expect a loopback interface")
     local lo = i.lo
@@ -1630,64 +1691,6 @@ test_util = {
     assert(S.symlink(tmpfile .. "/none", tmpfile .. "/link"))
     assert(util.rm(tmpfile))
     assert(not S.stat(tmpfile), "directory should be deleted")
-  end,
-  test_getdents = function()
-    assert(S.mkdir(tmpfile, "rwxu"))
-    assert(util.touch(tmpfile .. "/file1"))
-    assert(util.touch(tmpfile .. "/file2"))
-    -- with only two files will get in one iteration of getdents
-    local fd = assert(S.open(tmpfile, "directory, rdonly"))
-    local f, count = {}, 0
-    for d in fd:getdents() do
-      f[d.name] = true
-      count = count + 1
-    end
-    assert_equal(count, 4)
-    assert(f.file1 and f.file2 and f["."] and f[".."], "expect four files")
-    assert(fd:close())
-    assert(S.unlink(tmpfile .. "/file1"))
-    assert(S.unlink(tmpfile .. "/file2"))
-    assert(S.rmdir(tmpfile))
-  end,
-  test_ls = function()
-    assert(S.mkdir(tmpfile, "rwxu"))
-    assert(util.touch(tmpfile .. "/file1"))
-    assert(util.touch(tmpfile .. "/file2"))
-    local f, count = {}, 0
-    for d in util.ls(tmpfile) do
-      f[d.name] = true
-      count = count + 1
-    end
-    assert_equal(count, 4)
-    assert(f.file1 and f.file2 and f["."] and f[".."], "expect four files")
-    assert(S.unlink(tmpfile .. "/file1"))
-    assert(S.unlink(tmpfile .. "/file2"))
-    assert(S.rmdir(tmpfile))
-  end,
-  test_ls_long = function()
-    assert(S.mkdir(tmpfile, "rwxu"))
-    assert(util.touch(tmpfile .. "/veryverylongfile1"))
-    assert(util.touch(tmpfile .. "/veryveryfile2"))
-    local f, count = {}, 0
-    for d in util.ls(tmpfile, nil, 48) do
-      f[d.name] = true
-      count = count + 1
-    end
-    assert_equal(count, 4)
-    assert(f.veryverylongfile1 and f.veryveryfile2 and f["."] and f[".."], "expect four files")
-    assert(S.unlink(tmpfile .. "/veryverylongfile1"))
-    assert(S.unlink(tmpfile .. "/veryveryfile2"))
-    assert(S.rmdir(tmpfile))
-  end,
-  test_dirfile = function()
-    assert(S.mkdir(tmpfile, "rwxu"))
-    assert(util.touch(tmpfile .. "/file"))
-    local list = assert(util.dirfile(tmpfile, true))
-    assert_equal(#list, 1, "one item in directory")
-    assert_equal(list[1], "file", "one file called file")
-    assert_equal(tostring(list), "file\n")
-    assert(S.unlink(tmpfile .. "/file"))
-    assert(S.rmdir(tmpfile))
   end,
   test_ps = function()
     local ps = util.ps()

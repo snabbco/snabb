@@ -37,7 +37,7 @@ mt.dir = {
     end
 }
 
-function util.dirfile(name, nodots) -- return table of directory entries, remove . and .. if nodots true
+function util.dirtable(name, nodots) -- return table of directory entries, remove . and .. if nodots true
   local d = {}
   local size = 4096
   local buf = t.buffer(size)
@@ -74,16 +74,16 @@ function util.ls(name, buf, size)
   end
 end
 
--- recursive rm
+-- recursive rm TODO use ls iterator, which also returns type
 local function rmhelper(file, prefix)
   local name
   if prefix then name = prefix .. "/" .. file else name = file end
   local st, err = S.lstat(name)
   if not st then return nil, err end
   if st.isdir then
-    local files, err = util.dirfile(name, true)
+    local files, err = util.dirtable(name, true)
     if not files then return nil, err end
-    for f, _ in pairs(files) do
+    for _, f in pairs(files) do
       local ok, err = rmhelper(f, name)
       if not ok then return nil, err end
     end
@@ -123,7 +123,7 @@ mt.ps = {
 }
 
 function util.ps()
-  local ls, err = util.ls("/proc")
+  local ls, err = util.dirtable("/proc")
   if not ls then return nil, err end
   local ps = {}
   for i = 1, #ls do
@@ -179,7 +179,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
   local bd = "/sys/class/net/" .. d .. "/" .. c.SYSFS_BRIDGE_ATTR
   if not S.stat(bd) then return nil end
   local bridge = {}
-  local fs = util.dirfile(bd, true)
+  local fs = util.dirtable(bd, true) -- TODO use iterator
   if not fs then return nil end
   for f, _ in pairs(fs) do
     local s = util.readfile(bd .. "/" .. f)
@@ -232,7 +232,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
 end
 
 function util.bridge_list()
-  local dir, err = util.dirfile("/sys/class/net", true)
+  local dir, err = util.dirtable("/sys/class/net", true)
   if not dir then return nil, err end
   local b = {}
   for d, _ in pairs(dir) do
