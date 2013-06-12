@@ -44,20 +44,31 @@ function util.dirfile(name, nodots) -- return the directory entries in a file, r
   return d
 end
 
-mt.ls = {
-  __tostring = function(t)
-    table.sort(t)
-    return table.concat(t, "\n")
-    end
-}
-
-function util.ls(name, nodots) -- return just the list, no other data, cwd if no directory specified
-  if not name then name = S.getcwd() end
-  local ds, err = util.dirfile(name, nodots)
-  if not ds then return nil, err end
-  local l = {}
-  for k, _ in pairs(ds) do l[#l + 1] = k end
-  return setmetatable(l, mt.ls)
+-- this returns an iterator over multiple calls to getdents TODO how best to return errors?
+function util.ls(name, buf, size)
+  size = size or 4096
+  buf = buf or t.buffer(size)
+  if not name then name = "." end
+  local fd, err = S.open(name, "directory, rdonly")
+  if err then return nil, err end
+  local di
+  return function()
+    local d, first
+    repeat
+      if not di then
+        di = fd:getdents(buf, size)
+        if not di then
+          fd:close()
+          return nil
+        end
+        first = true
+      end
+      d = di()
+      if not d then di = nil end
+      if not d and first then return nil end
+    until d
+    return d
+  end
 end
 
 -- recursive rm

@@ -665,8 +665,8 @@ end
 if t.dirent then
   t.dirents = function(buf, size) -- buf should be char*
     local d, i = nil, 0
-    return function()
-      if not d then
+    return function() -- TODO work out if possible to make stateless
+      if size > 0 and not d then
         d = pt.dirent(buf)
         i = i + d.d_reclen
         return d
