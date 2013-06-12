@@ -29,19 +29,21 @@ local t, pt, s = types.t, types.pt, types.s
 
 local mt = {}
 
-function util.dirfile(name, nodots) -- return the directory entries in a file, remove . and .. if nodots true
-  local fd, d, ok, err
-  fd, err = S.open(name, "directory, rdonly")
-  if err then return nil, err end
-  d, err = S.getdents(fd)
-  if err then return nil, err end
-  if nodots then
-    d["."] = nil
-    d[".."] = nil
+mt.dir = {
+  __tostring = function(t)
+    table.sort(t)
+    return table.concat(t, "\n")
+    end
+}
+
+function util.dirfile(name, nodots) -- return table of directory entries, remove . and .. if nodots true
+  local d = {}
+  local size = 4096
+  local buf = t.buffer(size)
+  for f in util.ls(name, buf, size) do
+    if not (nodots and (f.name == "." or f.name == "..")) then d[#d + 1] = f.name end
   end
-  ok, err = fd:close()
-  if not ok then return nil, err end
-  return d
+  return setmetatable(d, mt.dir)
 end
 
 -- this returns an iterator over multiple calls to getdents TODO how best to return errors?
