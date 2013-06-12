@@ -1,5 +1,7 @@
 -- Linux kernel types
 
+-- TODO add __len to metatables of more
+
 return function(types, hh, abi, c)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
@@ -92,7 +94,6 @@ local addstructs = {
   seccomp_data = "struct seccomp_data",
   rtnl_link_stats = "struct rtnl_link_stats",
   statfs = "struct statfs64",
-  dirent = "struct linux_dirent64",
   ifa_cacheinfo = "struct ifa_cacheinfo",
   flock = "struct flock64",
   input_event = "struct input_event",
@@ -969,22 +970,6 @@ t.epoll_wait = function(n, events)
   return r
 end
 
--- difficult to use ffi type as variable length
-mt.dent = {
-  __index = function(tab, k)
-    if c.DT[k] then return tab.type == c.DT[k] end
-  end
-}
-
-t.dent = function(dp)
-  return setmetatable({
-    inode = tonumber(dp.d_ino),
-    type = dp.d_type,
-    name = ffi.string(dp.d_name), -- could calculate length
-    d_ino = dp.d_ino,
-  }, mt.dent)
-end
-
 -- default implementation, no metatmethods, overriden later
 t.socketpair = function(s1, s2)
   if ffi.istype(t.int2, s1) then s1, s2 = s1[0], s1[1] end
@@ -1039,7 +1024,7 @@ mt.cpu_set = {
     local tab = {}
     for i = 0, s.cpu_set * 8 - 1 do if set:get(i) then tab[#tab + 1] = i end end
     return "{" .. table.concat(tab, ",") .. "}"
-  end
+  end,
 }
 
 addtype("cpu_set", "struct cpu_set_t", mt.cpu_set)
@@ -1097,6 +1082,27 @@ mt.ifreq = {
 }
 
 addtype("ifreq", "struct ifreq", mt.ifreq)
+
+-- note t.dirents iterator is defined in common types
+meth.dirent = {
+  index = {
+    ino = function(self) return tonumber(self.d_ino) end,
+    off = function(self) return self.d_off end,
+    reclen = function(self) return self.d_reclen end,
+    name = function(self) return ffi.string(self.d_name) end,
+    type = function(self) return self.d_type end,
+  },
+}
+
+mt.dirent = {
+  __index = function(self, k)
+    if meth.dirent.index[k] then return meth.dirent.index[k](self) end
+    if c.DT[k] then return self.type == c.DT[k] end
+  end,
+  __len = function(self) return self.d_reclen end,
+}
+
+addtype("dirent", "struct linux_dirent64", mt.dirent)
 
 return types
 

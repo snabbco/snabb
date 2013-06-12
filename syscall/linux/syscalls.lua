@@ -100,25 +100,12 @@ end
 -- note that this is not strictly the syscall that has some other arguments, but has same functionality
 function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 
--- default behaviour is to iterate over whole directory, use noiter if you have very large directories
--- TODO remove this from here, move to util instead, make ls an iterator
-function S.getdents(fd, buf, size, noiter)
+function S.getdents(fd, buf, size)
   size = size or 4096
   buf = buf or t.buffer(size)
-  local d = {}
-  local ret
-  repeat
-    ret = C.getdents(getfd(fd), buf, size)
-    if ret == -1 then return nil, t.error() end
-    local i = 0
-    while i < ret do
-      local dp = pt.dirent(buf + i)
-      local dd = t.dent(dp)
-      d[dd.name] = dd
-      i = i + dp.d_reclen
-    end
-  until noiter or ret == 0
-  return d
+  local ret = C.getdents(getfd(fd), buf, size)
+  if ret == -1 then return nil, t.error() end
+  return t.dirents(buf, ret)
 end
 
 function S.wait(status)

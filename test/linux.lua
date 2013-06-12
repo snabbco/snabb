@@ -1631,6 +1631,24 @@ test_util = {
     assert(util.rm(tmpfile))
     assert(not S.stat(tmpfile), "directory should be deleted")
   end,
+  test_getdents = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/file1"))
+    assert(util.touch(tmpfile .. "/file2"))
+    -- with only two files will get in one iteration of getdents
+    local fd = assert(S.open(tmpfile, "directory, rdonly"))
+    local f, count = {}, 0
+    for d in fd:getdents() do
+      f[d.name] = true
+      count = count + 1
+    end
+    assert_equal(count, 4)
+    assert(f.file1 and f.file2 and f["."] and f[".."], "expect four files")
+    assert(fd:close())
+    assert(S.unlink(tmpfile .. "/file1"))
+    assert(S.unlink(tmpfile .. "/file2"))
+    assert(S.rmdir(tmpfile))
+  end,
   test_ls = function()
     assert(S.mkdir(tmpfile, "rwxu"))
     assert(util.touch(tmpfile .. "/file"))
