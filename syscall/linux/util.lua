@@ -47,7 +47,7 @@ function util.dirtable(name, nodots) -- return table of directory entries, remov
   return setmetatable(d, mt.dir)
 end
 
--- this returns an iterator over multiple calls to getdents TODO how best to return errors?
+-- this returns an iterator over multiple calls to getdents TODO how best to return errors? TODO add nodots?
 function util.ls(name, buf, size)
   size = size or 4096
   buf = buf or t.buffer(size)
@@ -179,23 +179,22 @@ local function brinfo(d) -- can be used as subpart of general interface info
   local bd = "/sys/class/net/" .. d .. "/" .. c.SYSFS_BRIDGE_ATTR
   if not S.stat(bd) then return nil end
   local bridge = {}
-  local fs = util.dirtable(bd, true) -- TODO use iterator
-  if not fs then return nil end
-  for f, _ in pairs(fs) do
-    local s = util.readfile(bd .. "/" .. f)
+  for f in util.ls(bd) do
+    local fn = f.name
+    local s = util.readfile(bd .. "/" .. fn)
     if s then
       s = s:sub(1, #s - 1) -- remove newline at end
-      if f == "group_addr" or f == "root_id" or f == "bridge_id" then -- string values
-        bridge[f] = s
+      if fn == "group_addr" or fn == "root_id" or fn == "bridge_id" then -- string values
+        bridge[fn] = s
       elseif f == "stp_state" then -- bool
-        bridge[f] = s == 1
-      else
-        bridge[f] = tonumber(s) -- not quite correct, most are timevals TODO
+        bridge[fn] = s == 1
+      elseif fn ~= "." and fn ~=".." then
+        bridge[fn] = tonumber(s) -- not quite correct, most are timevals TODO
       end
     end
   end
 
-  local brif, err = util.ls("/sys/class/net/" .. d .. "/" .. c.SYSFS_BRIDGE_PORT_SUBDIR, true)
+  local brif, err = util.dirtable("/sys/class/net/" .. d .. "/" .. c.SYSFS_BRIDGE_PORT_SUBDIR, true)
   if not brif then return nil end
 
   local fdb = "/sys/class/net/" .. d .. "/" .. c.SYSFS_BRIDGE_FDB
@@ -232,11 +231,9 @@ local function brinfo(d) -- can be used as subpart of general interface info
 end
 
 function util.bridge_list()
-  local dir, err = util.dirtable("/sys/class/net", true)
-  if not dir then return nil, err end
   local b = {}
-  for d, _ in pairs(dir) do
-    b[d] = brinfo(d)
+  for d in util.ls("/sys/class/net") do
+    if d.name ~= "." and d.name ~= ".." then b[d.name] = brinfo(d.name) end
   end
   return b
 end
