@@ -1,5 +1,4 @@
--- this file now does very little, just makes some modifications to syscalls
--- TODO want to try to remove everything from here
+-- this puts everything into one table ready to use
 
 local abi = require "syscall.abi"
 
@@ -33,6 +32,9 @@ S = require "syscall.methods".init(S)
 
 -- add feature tests
 S.features = require "syscall.features".init(S)
+
+-- add utils
+S.util = require "syscall.util".init(S)
 
 return S
 

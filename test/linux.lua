@@ -6,7 +6,8 @@ local S = require "syscall"
 local abi = S.abi
 local types = S.types
 local c = S.c
-local features = require "syscall.features"
+local features = S.features
+local util = S.util
 
 local bit = require "bit"
 local ffi = require "ffi"
@@ -14,7 +15,6 @@ local ffi = require "ffi"
 local t, pt, s = types.t, types.pt, types.s
 
 local nl = require "syscall.linux.nl"
-local util = require "syscall.linux.util"
 
 local helpers = require "syscall.helpers"
 
