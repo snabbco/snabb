@@ -61,6 +61,15 @@ function S.reboot(how, bootstr)
   return retbool(C.reboot(c.RB[how], bootstr))
 end
 
+-- this is identical to Linux, may be able to share TODO find out how OSX works
+function S.getdents(fd, buf, size)
+  size = size or 4096 -- may have to be equal to at least block size of fs
+  buf = buf or t.buffer(size)
+  local ret = C.getdents(getfd(fd), buf, size)
+  if ret == -1 then return nil, t.error() end
+  return t.dirents(buf, ret)
+end
+
 -- TODO when we define this for osx in C can go in common code (curently defined in libc.lua)
 function S.getcwd(buf, size)
   size = size or c.PATH_MAX

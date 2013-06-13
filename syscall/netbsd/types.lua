@@ -146,6 +146,29 @@ addtype("siginfo", "siginfo_t", {
   __len = lenfn,
 })
 
+-- note t.dirents iterator is defined in common types
+meth.dirent = {
+  index = {
+    fileno = function(self) return tonumber(self.d_fileno) end,
+    reclen = function(self) return self.d_reclen end,
+    namlen = function(self) return self.d_namlen end,
+    name = function(self) return ffi.string(self.d_name, self.d_namlen) end,
+    type = function(self) return self.d_type end,
+  },
+}
+
+meth.dirent.index.ino = meth.dirent.index.fileno -- alternate name
+
+mt.dirent = {
+  __index = function(self, k)
+    if meth.dirent.index[k] then return meth.dirent.index[k](self) end
+    if c.DT[k] then return self.type == c.DT[k] end
+  end,
+  __len = function(self) return self.d_reclen end,
+}
+
+addtype("dirent", "struct dirent", mt.dirent)
+
 return types
 
 end
