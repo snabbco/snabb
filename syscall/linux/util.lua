@@ -238,7 +238,7 @@ function util.bridge_list()
 end
 
 function util.touch(file)
-  local fd, err = S.open(file, "wronly,creat,noctty,nonblock", octal("666"))
+  local fd, err = S.open(file, "wronly,creat,noctty,nonblock", "0666")
   if not fd then return nil, err end
   local fd2, err = S.dup(fd)
   if not fd2 then
