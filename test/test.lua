@@ -30,7 +30,7 @@ local util = S.util
 
 if rump then -- some initial setup
   assert(S.mkdir("/tmp", "0700"))
-  local data = {ta_version = 1, ta_nodes_max=100, ta_size_max=104857600, ta_root_mode=helpers.octal("0700")}
+  local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode=helpers.octal("0700")}
   assert(S.mount{dir="/tmp", type="tmpfs", data=data})
   assert(S.chdir("/tmp"))
   assert(S.chmod("/dev/null", "0666")) -- TODO seems to have execute permission by default so access test fails

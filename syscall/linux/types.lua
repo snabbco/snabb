@@ -420,8 +420,37 @@ addtype("rlimit", "struct rlimit64", {
   end,
 })
 
+meth.timespec = {
+  index = {
+    time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_nsec) / 1000000000 end,
+    sec = function(tv) return tonumber(tv.tv_sec) end,
+    nsec = function(tv) return tonumber(tv.tv_nsec) end,
+  },
+  newindex = {
+    time = function(tv, v)
+      local i, f = math.modf(v)
+      tv.tv_sec, tv.tv_nsec = i, math.floor(f * 1000000000)
+    end,
+    sec = function(tv, v) tv.tv_sec = v end,
+    nsec = function(tv, v) tv.tv_nsec = v end,
+  }
+}
+
+addtype("timespec", "struct timespec", {
+  __index = function(tv, k) if meth.timespec.index[k] then return meth.timespec.index[k](tv) end end,
+  __newindex = function(tv, k, v) if meth.timespec.newindex[k] then meth.timespec.newindex[k](tv, v) end end,
+  __new = function(tp, v)
+    if not v then v = {0, 0} end
+    if type(v) ~= "number" then return ffi.new(tp, v) end
+    local ts = ffi.new(tp)
+    ts.time = v
+    return ts
+  end,
+  __len = lenfn,
+})
+
 -- array so cannot just add metamethods
-t.timespec2_raw = ffi.typeof("struct timespec[2]")
+t.timespec2_raw = ffi.typeof("$[2]", t.timespec)
 t.timespec2 = function(ts1, ts2)
   if ffi.istype(t.timespec2_raw, ts1) then return ts1 end
   if type(ts1) == "table" then ts1, ts2 = ts1[1], ts1[2] end

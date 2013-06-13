@@ -324,35 +324,6 @@ addtype("sockaddr_in6", "struct sockaddr_in6", {
   __len = function(tp) return s.sockaddr_in6 end,
 })
 
-meth.timespec = {
-  index = {
-    time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_nsec) / 1000000000 end,
-    sec = function(tv) return tonumber(tv.tv_sec) end,
-    nsec = function(tv) return tonumber(tv.tv_nsec) end,
-  },
-  newindex = {
-    time = function(tv, v)
-      local i, f = math.modf(v)
-      tv.tv_sec, tv.tv_nsec = i, math.floor(f * 1000000000)
-    end,
-    sec = function(tv, v) tv.tv_sec = v end,
-    nsec = function(tv, v) tv.tv_nsec = v end,
-  }
-}
-
-addtype("timespec", "struct timespec", {
-  __index = function(tv, k) if meth.timespec.index[k] then return meth.timespec.index[k](tv) end end,
-  __newindex = function(tv, k, v) if meth.timespec.newindex[k] then meth.timespec.newindex[k](tv, v) end end,
-  __new = function(tp, v)
-    if not v then v = {0, 0} end
-    if type(v) ~= "number" then return ffi.new(tp, v) end
-    local ts = ffi.new(tp)
-    ts.time = v
-    return ts
-  end,
-  __len = lenfn,
-})
-
 meth.timeval = {
   index = {
     time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end,
