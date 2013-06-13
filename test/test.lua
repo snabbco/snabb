@@ -623,17 +623,16 @@ test_directory_operations = {
   end,
   test_ls_long = function()
     assert(S.mkdir(tmpfile, "rwxu"))
-    assert(util.touch(tmpfile .. "/veryverylongfile1"))
-    assert(util.touch(tmpfile .. "/veryveryfile2"))
+    local num = 300 -- sufficient to need more than one getdents call
+    for i = 1, num do assert(util.touch(tmpfile .. "/file" .. i)) end
     local f, count = {}, 0
-    for d in util.ls(tmpfile, nil, 48) do -- TODO too short for NetBSD, add more files
+    for d in util.ls(tmpfile) do
       f[d] = true
       count = count + 1
     end
-    assert_equal(count, 4)
-    assert(f.veryverylongfile1 and f.veryveryfile2 and f["."] and f[".."], "expect four files")
-    assert(S.unlink(tmpfile .. "/veryverylongfile1"))
-    assert(S.unlink(tmpfile .. "/veryveryfile2"))
+    assert_equal(count, num + 2)
+    for i = 1, num do assert(f["file" .. i]) end
+    for i = 1, num do assert(S.unlink(tmpfile .. "/file" .. i)) end
     assert(S.rmdir(tmpfile))
   end,
   test_dirtable = function()
