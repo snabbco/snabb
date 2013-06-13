@@ -189,21 +189,6 @@ function util.bridge_list()
   return b
 end
 
-function util.touch(file)
-  local fd, err = S.open(file, "wronly,creat,noctty,nonblock", "0666")
-  if not fd then return nil, err end
-  local fd2, err = S.dup(fd)
-  if not fd2 then
-    fd2:close()
-    return nil, err
-  end
-  fd:close()
-  local ok, err = S.futimens(fd2, "now")
-  fd2:close()
-  if not ok then return nil, err end
-  return true
-end
-
 local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
 
 -- receive cmsg, extended helper on recvmsg, fairly incomplete at present

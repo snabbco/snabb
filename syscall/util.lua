@@ -59,6 +59,21 @@ function util.ls(name, buf, size)
   end
 end
 
+function util.touch(file)
+  local fd, err = S.open(file, "wronly,creat,noctty,nonblock", "0666")
+  if not fd then return nil, err end
+  local fd2, err = S.dup(fd)
+  if not fd2 then
+    fd2:close()
+    return nil, err
+  end
+  fd:close()
+  local ok, err = S.futimens(fd2, "now")
+  fd2:close()
+  if not ok then return nil, err end
+  return true
+end
+
 return util
 
 end
