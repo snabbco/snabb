@@ -40,7 +40,7 @@ For the rump kernel functionality, the easiest way at present to install it is u
 netfilter, dhcp, selinux, arp, rump kernel backend, further BSD and OSX work.
 
 ## Release notes
-0.8pre rump kernel fixes, NetBSD 64 bit fixes, ARP/neighbour support, towards MIPS support, cmsg cleanup, shm_open.
+0.8pre rump kernel fixes, NetBSD 64 bit fixes, ARP/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support.
 
 0.7 bug fixes, general cleanups, filesystem capabilities, xattr bug fixes, signal handler functions, cpu affinity support, scheduler functions, POSIX message queues, tun/tap support, ioctl additions and improvements, initial NetBSD and OSX support, initial NetBSD rump kernel support, some fixes to allow Android to work.
 
@@ -82,11 +82,11 @@ I have used the LuaJIT [reflect library](http://www.corsix.org/lua/reflect/api.h
 
 This project is in beta! Much stuff is still missing, this is a work in progress! The majority of syscalls are now there, let me know if you need some that are not.
 
-As well as syscalls, there are interfaces to features such as proc, termios and netlink. These are still work in progress, and will be split into separate modules.
+As well as syscalls, there are interfaces to features such as proc, termios and netlink. These are still work in progress, and are being split into separate modules.
 
 Work on the netlink API is progressing. You can now do `print(S.get_interfaces()` to get something much like ifconfig returns, and all the raw data is there as Lua tables. You can then modify these, and add IP addresses, similarly for routes. There is also a raw netlink interface, and you can create new interfaces. There is a lot more functionality that netlink needs to provide, but this is now mostly a matter of configuration. The API needs more work still. Netlink documentation is pretty bad. Useful resources: [blog post](http://maz-programmersdiary.blogspot.co.uk/2011/09/netlink-sockets.html)
 
-There is also a lot of the `ioctl` interfaces to implement, which are very miscellaneous. Mostly you just need some constants and typecasting, but helper functions are probably useful.
+There is also a lot of the `ioctl`, `getsockopt` and `fcntl` interfaces to implement, which are very miscellaneous. Mostly you just need some constants and typecasting, but helper functions are probably useful.
 
 The aim is to provide nice to use, Lua friendly interfaces where possible, but more work needs to be done, as have really started with the raw interfaces, but adding functionality through metatypes. Where possible the aim is to provide cross platform interfaces for higher level functionality that are as close as possible at least in a duck-typing sort of way.
 
@@ -123,6 +123,18 @@ It would be nice to be API compatible with other projects, especially Luaposix, 
 If you want the highest performance, allocate and pass your own buffers, as obviously allocation is expensive. It is now fine to use the string flags for functions, as these are memoized. Check the output of `luajit -jv` to see what is going on and let me know if there are any issues that need fixes for NYI functions. You should be able to get native C like performance.
 
 There is an example epoll script that you can test with Apachebench in the examples directory. On my machine apachebench uses more CPU time than the script so the results are a bit low.
+
+### Porting
+
+If you wish to port to an unsupported platform, please get in touch for help. All contributions welcomed.
+
+Porting to a different libc should be relatively simple, it is mainly a matter of dealing with anything that is missing (eg for bionic on Android, which partially works).
+
+Porting to different Linux processor architectures is a matter of filling in the constants and types that differ. The `ctest` tests will flag issues with these, although many platforms are also missing headers which makes it more complex.
+
+Porting to different OSs is a fair amount of work, but can generally be done gradually. The other BSDs should be very similar to NetBSD and OSX. Solaris has an ABI defined by libc not the kernel ABI, which would mean that you should probably target that. The first thing to do is check the bas shared types, and work out if there are issues with large file support if it is a 32 bit platform.
+
+If you want to port this to a different language, then get in touch, as I have some ideas. Pypy and Ruby ought to be suitable targets as they have an ffi; I also intend to do a classic Lua port using the C API. I intend to use reflection to generate more generic data for the ports, and rework how files are included. The first thing to do is just prototype some basic functions to see what is needed. Get in touch!
 
 ### Issues
 
