@@ -26,6 +26,7 @@ local types = S.types
 local t, pt, s = types.t, types.pt, types.s
 local c = S.c
 local features = S.features
+local util = S.util
 
 if rump then -- some initial setup
   assert(S.mkdir("/tmp", "0700"))
@@ -562,6 +563,88 @@ test_file_operations = {
     local stat = assert(S.stat(tmpfile))
     assert(stat.isfifo, "expect to be a fifo")
     assert(S.unlink(tmpfile))
+  end,
+}
+
+test_directory_operations = {
+  test_getdents_dev = function()
+    local d = {}
+    for fn, f in util.ls("/dev") do
+      d[fn] = true
+      if fn == "zero" then assert(f.chr, "/dev/zero is a character device") end
+      if fn == "." then
+        assert(f.dir, ". is a directory")
+        assert(not f.chr, ". is not a character device")
+        assert(not f.sock, ". is not a socket")
+        assert(not f.lnk, ". is not a synlink")
+      end
+      if fn == ".." then assert(f.dir, ".. is a directory") end
+    end
+    assert(d.zero, "expect to find /dev/zero")
+  end,
+  test_getdents_error = function()
+    local fd = assert(S.open("/dev/zero", "RDONLY"))
+    local d, err = S.getdents(fd)
+    assert(err.notdir, "/dev/zero should give a not directory error")
+    assert(fd:close())
+  end,
+  test_getdents = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/file1"))
+    assert(util.touch(tmpfile .. "/file2"))
+    -- with only two files will get in one iteration of getdents
+    local fd = assert(S.open(tmpfile, "directory, rdonly"))
+    local f, count = {}, 0
+    for d in fd:getdents() do
+      f[d.name] = true
+      count = count + 1
+    end
+    assert_equal(count, 4)
+    assert(f.file1 and f.file2 and f["."] and f[".."], "expect four files")
+    assert(fd:close())
+    assert(S.unlink(tmpfile .. "/file1"))
+    assert(S.unlink(tmpfile .. "/file2"))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_ls = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/file1"))
+    assert(util.touch(tmpfile .. "/file2"))
+    local f, count = {}, 0
+    for d in util.ls(tmpfile) do
+      f[d] = true
+      count = count + 1
+    end
+    assert_equal(count, 4)
+    assert(f.file1 and f.file2 and f["."] and f[".."], "expect four files")
+    assert(S.unlink(tmpfile .. "/file1"))
+    assert(S.unlink(tmpfile .. "/file2"))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_ls_long = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/veryverylongfile1"))
+    assert(util.touch(tmpfile .. "/veryveryfile2"))
+    local f, count = {}, 0
+    for d in util.ls(tmpfile, nil, 48) do -- TODO too short for NetBSD, add more files
+      f[d] = true
+      count = count + 1
+    end
+    assert_equal(count, 4)
+    assert(f.veryverylongfile1 and f.veryveryfile2 and f["."] and f[".."], "expect four files")
+    assert(S.unlink(tmpfile .. "/veryverylongfile1"))
+    assert(S.unlink(tmpfile .. "/veryveryfile2"))
+    assert(S.rmdir(tmpfile))
+  end,
+  test_dirtable = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(util.touch(tmpfile .. "/file"))
+    local list = assert(util.dirtable(tmpfile, true))
+    assert_equal(#list, 1, "one item in directory")
+    assert_equal(list[1], "file", "one file called file")
+    assert_equal(tostring(list), "file\n")
+    assert(S.unlink(tmpfile .. "/file"))
+    assert(S.rmdir(tmpfile))
   end,
 }
 
