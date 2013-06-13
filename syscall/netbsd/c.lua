@@ -30,7 +30,7 @@ C.getcwd = function(buf, size)
 end
 
 C.getdents = function(fd, buf, nbytes)
-  return C.syscall(c.SYS.getdents30, pt.void(buf), t.size(nbytes))
+  return C.syscall(c.SYS.getdents30, t.int(fd), pt.void(buf), t.size(nbytes))
 end
 
 return C
