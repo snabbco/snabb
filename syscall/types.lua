@@ -651,16 +651,6 @@ samap_pt = {
 if c.AF.NETLINK then samap_pt[c.AF.NETLINK] = pt.sockaddr_nl end
 if c.AF.PACKET then samap_pt[c.AF.PACKET] = pt.sockaddr_ll end
 
-local function diter(bs, d)
-if d then print(bs.buf, bs.size, d.name, bs.size, d.d_reclen, d.d_off, tonumber(d.d_off)) end
-  if not d then d=pt.dirent(bs.buf);print(bs.buf, bs.size, d.name, d.d_reclen);return pt.dirent(bs.buf) end
-  if d.d_off ~= 0 then
-    return pt.dirent(pt.char(d) + d.d_reclen)
-  else
-    return nil
-  end
-end
-
 -- define dents type if dirent is defined
 if t.dirent then
   t.dirents = function(buf, size) -- buf should be char*
