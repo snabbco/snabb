@@ -516,5 +516,17 @@ c.SHUT = strflag {
   RDWR = 2,
 }
 
+c.DT = strflag {
+  UNKNOWN = 0,
+  FIFO = 1,
+  CHR = 2,
+  DIR = 4,
+  BLK = 6,
+  REG = 8,
+  LNK = 10,
+  SOCK = 12,
+  WHT = 14,
+}
+
 return c
 
