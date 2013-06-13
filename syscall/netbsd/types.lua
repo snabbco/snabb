@@ -152,8 +152,8 @@ meth.dirent = {
     fileno = function(self) return tonumber(self.d_fileno) end,
     reclen = function(self) return self.d_reclen end,
     namlen = function(self) return self.d_namlen end,
-    name = function(self) return ffi.string(self.d_name, self.d_namlen) end,
     type = function(self) return self.d_type end,
+    name = function(self) return ffi.string(self.d_name) end,
   },
 }
 

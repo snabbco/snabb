@@ -222,7 +222,7 @@ struct _netbsd_dirent {
   uint16_t d_reclen;
   uint16_t d_namlen;
   uint8_t  d_type;
-  char    d_name[0];
+  char     d_name[512];
 };
 ]]
 

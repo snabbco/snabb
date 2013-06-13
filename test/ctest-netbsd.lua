@@ -100,9 +100,7 @@ local ignore_offsets = {
 
 -- iterate over S.ctypes
 for k, v in pairs(ctypes) do
-  if k ~= "struct dirent" then -- VLA, so just test offset not total size
-    print("sassert(sizeof(" .. k .. "), " .. ffi.sizeof(v) .. ', "' .. k .. '");')
-  end
+  print("sassert(sizeof(" .. k .. "), " .. ffi.sizeof(v) .. ', "' .. k .. '");')
   -- check offset of struct fields
   local refct = reflect.typeof(v)
   if refct.what == "struct" then
