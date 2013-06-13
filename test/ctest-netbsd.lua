@@ -100,7 +100,9 @@ local ignore_offsets = {
 
 -- iterate over S.ctypes
 for k, v in pairs(ctypes) do
-  print("sassert(sizeof(" .. k .. "), " .. ffi.sizeof(v) .. ', "' .. k .. '");')
+  if k ~= "struct dirent" then -- VLA, so just test offset not total size
+    print("sassert(sizeof(" .. k .. "), " .. ffi.sizeof(v) .. ', "' .. k .. '");')
+  end
   -- check offset of struct fields
   local refct = reflect.typeof(v)
   if refct.what == "struct" then
@@ -141,8 +143,6 @@ local nm = {
   UMOUNT = "MNT_",
   SIGPM = "SIG_",
 }
-
-ctypes["struct dirent"] = nil -- size incorrect as we have VLA at end, this is full size, so just test offsets not len
 
 for k, v in pairs(c) do
   if type(v) == "number" then
