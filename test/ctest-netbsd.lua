@@ -142,6 +142,8 @@ local nm = {
   SIGPM = "SIG_",
 }
 
+ctypes.["struct dirent"] = nil -- size incorrect as we have VLA at end, this is full size, so just test offsets not len
+
 for k, v in pairs(c) do
   if type(v) == "number" then
     print("sassert(" .. k .. ", " .. v .. ', "' .. k .. '");')
