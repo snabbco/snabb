@@ -585,7 +585,7 @@ test_directory_operations = {
   test_getdents_error = function()
     local fd = assert(S.open("/dev/zero", "RDONLY"))
     local d, err = S.getdents(fd)
-    assert(err.notdir, "/dev/zero should give a not directory error")
+    assert(err, "getdents should fail on /dev/zero")
     assert(fd:close())
   end,
   test_getdents = function()
