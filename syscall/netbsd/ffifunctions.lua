@@ -12,10 +12,9 @@ int pipe2(int pipefd[2], int flags);
 int mount(const char *type, const char *dir, int flags, void *data, size_t data_len);
 int unmount(const char *dir, int flags);
 int reboot(int howto, char *bootstr);
-int getdents(int fd, char *buf, size_t nbytes);
+int futimens(int fd, const struct timespec times[2]);
 
 int syscall(int number, ...);
-//quad_t __syscall(quad_t number, ...);
 ]]
 
 --[[ -- need more types defined
