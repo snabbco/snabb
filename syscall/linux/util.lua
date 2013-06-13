@@ -42,7 +42,7 @@ function util.dirtable(name, nodots) -- return table of directory entries, remov
   local size = 4096
   local buf = t.buffer(size)
   for f in util.ls(name, buf, size) do
-    if not (nodots and (f.name == "." or f.name == "..")) then d[#d + 1] = f.name end
+    if not (nodots and (f == "." or f == "..")) then d[#d + 1] = f end
   end
   return setmetatable(d, mt.dir)
 end
@@ -70,7 +70,7 @@ function util.ls(name, buf, size)
       if not d then di = nil end
       if not d and first then return nil end
     until d
-    return d
+    return d.name, d
   end
 end
 
@@ -179,8 +179,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
   local bd = "/sys/class/net/" .. d .. "/" .. c.SYSFS_BRIDGE_ATTR
   if not S.stat(bd) then return nil end
   local bridge = {}
-  for f in util.ls(bd) do
-    local fn = f.name
+  for fn, f in util.ls(bd) do
     local s = util.readfile(bd .. "/" .. fn)
     if s then
       s = s:sub(1, #s - 1) -- remove newline at end
@@ -233,7 +232,7 @@ end
 function util.bridge_list()
   local b = {}
   for d in util.ls("/sys/class/net") do
-    if d.name ~= "." and d.name ~= ".." then b[d.name] = brinfo(d.name) end
+    if d ~= "." and d ~= ".." then b[d] = brinfo(d) end
   end
   return b
 end

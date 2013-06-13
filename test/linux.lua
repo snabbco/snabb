@@ -185,16 +185,16 @@ test_file_operations_linux = {
 test_directory_operations = {
   test_getdents_dev = function()
     local d = {}
-    for f in util.ls("/dev") do
-      d[f.name] = true
-      if f.name == "zero" then assert(f.chr, "/dev/zero is a character device") end
-      if f.name == "." then
+    for fn, f in util.ls("/dev") do
+      d[fn] = true
+      if fn == "zero" then assert(f.chr, "/dev/zero is a character device") end
+      if fn == "." then
         assert(f.dir, ". is a directory")
         assert(not f.chr, ". is not a character device")
         assert(not f.sock, ". is not a socket")
         assert(not f.lnk, ". is not a synlink")
       end
-      if f.name == ".." then assert(f.dir, ".. is a directory") end
+      if fn == ".." then assert(f.dir, ".. is a directory") end
     end
     assert(d.zero, "expect to find /dev/zero")
   end,
@@ -228,7 +228,7 @@ test_directory_operations = {
     assert(util.touch(tmpfile .. "/file2"))
     local f, count = {}, 0
     for d in util.ls(tmpfile) do
-      f[d.name] = true
+      f[d] = true
       count = count + 1
     end
     assert_equal(count, 4)
@@ -243,7 +243,7 @@ test_directory_operations = {
     assert(util.touch(tmpfile .. "/veryveryfile2"))
     local f, count = {}, 0
     for d in util.ls(tmpfile, nil, 48) do
-      f[d.name] = true
+      f[d] = true
       count = count + 1
     end
     assert_equal(count, 4)
