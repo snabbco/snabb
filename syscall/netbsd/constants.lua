@@ -535,5 +535,10 @@ c.DT = strflag {
   WHT = 14,
 }
 
+c.UTIME = strflag {
+  NOW  = bit.lshift(1, 30) - 1,
+  OMIT = bit.lshift(1, 30) - 2,
+}
+
 return c
 

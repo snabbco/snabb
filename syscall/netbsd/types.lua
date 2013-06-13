@@ -28,6 +28,17 @@ local addstructs = {
 for k, v in pairs(addtypes) do addtype(k, v) end
 for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 
+-- array so cannot just add metamethods
+t.timespec2_raw = ffi.typeof("struct timespec[2]")
+t.timespec2 = function(ts1, ts2)
+  if ffi.istype(t.timespec2_raw, ts1) then return ts1 end
+  if type(ts1) == "table" then ts1, ts2 = ts1[1], ts1[2] end
+  local ts = t.timespec2_raw()
+  if ts1 then if type(ts1) == 'string' then ts[0].tv_nsec = c.UTIME[ts1] else ts[0] = t.timespec(ts1) end end
+  if ts2 then if type(ts2) == 'string' then ts[1].tv_nsec = c.UTIME[ts2] else ts[1] = t.timespec(ts2) end end
+  return ts
+end
+
 -- 64 bit dev_t
 mt.device = {
   __index = {
