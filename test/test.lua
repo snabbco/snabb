@@ -588,16 +588,6 @@ test_directory_operations = {
     assert(err, "getdents should fail on /dev/zero")
     assert(fd:close())
   end,
-  test_getdents_slash = function()
-  local fd = assert(S.open("/", "directory, rdonly"))
-  local dotino, dotdotino = -1, -2 -- bogus so fails if missing
-  for d in fd:getdents() do
-    if d.name == "." then dotino = d.ino end
-    if d.name == ".." then dotdotino = d.ino end -- dot and .. are same ino on /
-  end
-  assert_equal(dotino, dotdotino)
-  assert(fd:close())  
-  end,
   test_getdents = function()
     assert(S.mkdir(tmpfile, "rwxu"))
     assert(util.touch(tmpfile .. "/file1"))
