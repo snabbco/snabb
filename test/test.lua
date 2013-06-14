@@ -576,7 +576,7 @@ test_directory_operations = {
         assert(f.dir, ". is a directory")
         assert(not f.chr, ". is not a character device")
         assert(not f.sock, ". is not a socket")
-        assert(not f.lnk, ". is not a synlink")
+        assert(not f.lnk, ". is not a symlink")
       end
       if fn == ".." then assert(f.dir, ".. is a directory") end
     end
