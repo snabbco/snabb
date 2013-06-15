@@ -24,6 +24,9 @@ c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier
 
 S.abi, S.c, S.C, S.types, S.t = abi, c, C, types, t -- add to main table returned
 
+-- add compatibility code
+S = require "syscall.compat".init(S)
+
 -- add functions from libc
 S = require "syscall.libc".init(S)
 

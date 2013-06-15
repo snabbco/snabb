@@ -154,16 +154,6 @@ function S.utimensat(dirfd, path, ts, flags)
   return retbool(C.utimensat(c.AT_FDCWD[dirfd], path, ts, c.AT_SYMLINK_NOFOLLOW[flags]))
 end
 
--- because you can just pass floats to all the time functions, just use the same one, but provide different templates
-function S.utime(path, actime, modtime)
-  local ts
-  modtime = modtime or actime
-  if actime and modtime then ts = {actime, modtime} end
-  return S.utimensat(nil, path, ts)
-end
-
-S.utimes = S.utime
-
 function S.getcwd(buf, size)
   size = size or c.PATH_MAX
   buf = buf or t.buffer(size)
@@ -396,7 +386,6 @@ local function fdisset(fds, set)
   return f
 end
 
-
 -- TODO convert to metatype. Problem is how to deal with nfds
 function S.select(sel) -- note same structure as returned
   local r, w, e
@@ -468,15 +457,11 @@ function S.prlimit(pid, resource, new_limit, old_limit)
   return old_limit
 end
 
--- old rlimit functions are 32 bit only so now defined using prlimit
-function S.getrlimit(resource)
-  return S.prlimit(0, resource)
-end
-
-function S.setrlimit(resource, rlim)
-  local ret, err = S.prlimit(0, resource, rlim)
-  if not ret then return nil, err end
-  return true
+function S.pipe(flags)
+  local fd2 = t.int2()
+  local ret = C.pipe2(fd2, c.OPIPE[flags])
+  if ret == -1 then return nil, t.error() end
+  return t.pipe(fd2)
 end
 
 function S.epoll_create(flags)

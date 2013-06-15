@@ -70,13 +70,19 @@ function S.getdents(fd, buf, size)
   return t.dirents(buf, ret)
 end
 
--- this is identical to Linux, but OSX does not have the nanosecond time functions
+function S.pipe(flags)
+  local fd2 = t.int2()
+  local ret = C.pipe2(fd2, c.OPIPE[flags])
+  if ret == -1 then return nil, t.error() end
+  return t.pipe(fd2)
+end
+
 function S.futimens(fd, ts)
   if ts then ts = t.timespec2(ts) end
   return retbool(C.futimens(getfd(fd), ts))
 end
 
--- TODO when we define this for osx in C can go in common code (curently defined in libc.lua)
+-- TODO when we define this for osx can go in common code (curently defined in libc.lua)
 function S.getcwd(buf, size)
   size = size or c.PATH_MAX
   buf = buf or t.buffer(size)

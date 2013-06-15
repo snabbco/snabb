@@ -34,6 +34,7 @@ build =
       ["syscall.methods"] = "syscall/methods.lua";
       ["syscall.ffitypes"] = "syscall/ffitypes.lua";
       ["syscall.util"] = "syscall/util.lua";
+      ["syscall.compat"] = "syscall/compat.lua";
 
       ["syscall.linux.syscalls"] = "syscall/linux/syscalls.lua";
       ["syscall.linux.c"] = "syscall/linux/c.lua";

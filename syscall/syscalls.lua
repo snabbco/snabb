@@ -188,7 +188,7 @@ end
 function S.recvfrom(fd, buf, count, flags, ss, addrlen)
   ss = ss or t.sockaddr_storage()
   addrlen = addrlen or t.socklen1(#ss)
-  local ret = C.recvfrom(getfd(fd), buf, count, c.MSG[flags], ss, addrlen)
+  local ret = C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], ss, addrlen)
   if ret == -1 then return nil, t.error() end
   return {count = tonumber(ret), addr = t.sa(ss, addrlen[0])}
 end
@@ -305,68 +305,6 @@ local hh = {
 }
 
 local S = require("syscall." .. abi.os .. ".syscalls")(S, hh, abi, c, C, types, ioctl)
-
--- these functions are not always available as syscalls, so always define via other calls
-function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
-
-function S.nice(inc)
-  local prio = S.getpriority("process", 0) -- this cannot fail with these args.
-  local ok, err = S.setpriority("process", 0, prio + inc)
-  if not ok then return nil, err end
-  return S.getpriority("process", 0)
-end
-
--- deprecated in NetBSD so implement with recvfrom
-function S.recv(fd, buf, count, flags) return retnum(C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], nil, nil)) end
-
--- not a syscall in many systems, defined in terms of sigaction
-function S.signal(signum, handler) -- defined in terms of sigaction
-  local oldact = t.sigaction()
-  local ok, err = S.sigaction(signum, handler, oldact)
-  if not ok then return nil, err end
-  return oldact.sa_handler
-end
-
-if not S.accept then
-  function S.accept(sockfd, flags, addr, addrlen) -- TODO emulate netbsd paccept and Linux accept4
-    assert(not flags, "TODO add accept flags emulation")
-    addr = addr or t.sockaddr_storage()
-    addrlen = addrlen or t.socklen1(addrlen or #addr)
-    local ret = C.accept(getfd(sockfd), addr, addrlen)
-    if ret == -1 then return nil, t.error() end
-    return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
-  end
-end
-
-if not S.pause then -- NetBSD and OSX deprecate pause
-  function S.pause() return S.sigsuspend(t.sigset()) end
-end
-
-if not inlibc "pipe2" then
-  function S.pipe(flags) -- TODO emulate flags
-    assert(not flags, "TODO add pipe flags emulation")
-    local fd2 = t.int2()
-    local ret = C.pipe(fd2)
-    if ret == -1 then return nil, t.error() end
-    return t.pipe(fd2)
-  end
-else -- NetBSD and Linux have pipe2
-  function S.pipe(flags)
-    local fd2 = t.int2()
-    local ret
-    if flags then
-      ret = C.pipe2(fd2, c.OPIPE[flags])
-    else
-      ret = C.pipe(fd2)
-    end
-    if ret == -1 then return nil, t.error() end
-    return t.pipe(fd2)
-  end
-end
-
-if not S.umount then S.umount = S.unmount end -- TODO reserse as well
-
--- TODO setpgrp and similar - see the man page
 
 return S
 
