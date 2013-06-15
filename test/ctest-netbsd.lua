@@ -140,6 +140,7 @@ local nm = {
   SIGACT = "SIG_",
   UMOUNT = "MNT_",
   SIGPM = "SIG_",
+  PIPE = "O_",
 }
 
 for k, v in pairs(c) do
