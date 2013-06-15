@@ -563,6 +563,26 @@ test_file_operations = {
     assert(stat.isfifo, "expect to be a fifo")
     assert(S.unlink(tmpfile))
   end,
+  test_futimens = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:futimens())
+    local st1 = fd:stat()
+    assert(fd:futimens{"omit", "omit"})
+    local st2 = fd:stat()
+    assert(st1.atime == st2.atime and st1.mtime == st2.mtime, "atime and mtime unchanged")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_utime = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    local st1 = fd:stat()
+    assert(S.utime(tmpfile, 100, 200))
+    local st2 = fd:stat()
+    assert(st1.atime ~= st2.atime and st1.mtime ~= st2.mtime, "atime and mtime changed")
+    assert(st2.atime == 100 and st2.mtime == 200, "times as set")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
 }
 
 test_directory_operations = {

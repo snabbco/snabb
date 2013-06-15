@@ -42,10 +42,10 @@ if not S.unmount then S.unmount = S.umount end
 -- TODO we should allow utimbuf and also table of times really; this is the very old 1s precesion version, NB Linux has syscall
 if not S.utime then
   function S.utime(path, actime, modtime)
-    local ts
+    local tv
     modtime = modtime or actime
-    if actime and modtime then ts = {actime, modtime} end
-    return S.utimensat(nil, path, ts)
+    if actime and modtime then tv = {actime, modtime} end
+    return S.utimes(path, tv)
   end
 end
 

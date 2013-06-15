@@ -1482,7 +1482,7 @@ test_namespaces_root = {
   end,
 }
 
-test_filesystem = {
+test_filesystem_linux = {
   test_statfs = function()
     local st = assert(S.statfs("."))
     assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
@@ -1491,16 +1491,6 @@ test_filesystem = {
     local fd = assert(S.open(".", "rdonly"))
     local st = assert(S.fstatfs(fd))
     assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
-    assert(fd:close())
-  end,
-  test_futimens = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(fd:futimens())
-    local st1 = fd:stat()
-    assert(fd:futimens{"omit", "omit"})
-    local st2 = fd:stat()
-    assert(st1.atime == st2.atime and st1.mtime == st2.mtime, "atime and mtime unchanged")
-    assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
   test_utimensat = function()
@@ -1514,16 +1504,6 @@ test_filesystem = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
     assert(dfd:close())
-  end,
-  test_utime = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    local st1 = fd:stat()
-    assert(S.utime(tmpfile, 100, 200))
-    local st2 = fd:stat()
-    assert(st1.atime ~= st2.atime and st1.mtime ~= st2.mtime, "atime and mtime changed")
-    assert(st2.atime == 100 and st2.mtime == 200, "times as set")
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
   end,
 }
 
