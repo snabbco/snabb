@@ -540,5 +540,12 @@ c.UTIME = strflag {
   OMIT = bit.lshift(1, 30) - 2,
 }
 
+-- for pipe2, selected flags from c.O
+c.OPIPE = multiflags {
+  NONBLOCK  = 0x00000004,
+  CLOEXEC   = 0x00400000,
+  NOSIGPIPE = 0x01000000,
+}
+
 return c
 
