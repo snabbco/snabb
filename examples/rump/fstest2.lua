@@ -4,13 +4,12 @@ local function assert(cond, s)
 end
 
 local S = require "syscall" -- your OS functions
-local R = require "syscall.rump.init" -- rump kernel functions
 
 assert(S.abi.le, "This test requires little endian machine")
 
 S.setenv("RUMP_VERBOSE", "1")
 
-R.rump.init("vfs", "fs.sysvbfs", "dev", "dev.disk")
+local R = require "syscall.rump.init".init("vfs", "fs.sysvbfs", "dev", "dev.disk")
 
 local dev = "/de-vice"
 

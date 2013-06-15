@@ -7,9 +7,7 @@ local function assert(cond, s)
   return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
 end
 
-local R = require "syscall.rump.init" -- rump kernel functions
-
-R.rump.init("vfs", "fs.kernfs")
+local R = require "syscall.rump.init".init("vfs", "fs.kernfs")
 
 print("init")
 

@@ -7,9 +7,7 @@ end
 
 local helpers = require "syscall.helpers"
 
-local R = require "syscall.rump.init" -- rump kernel functions
-
-R.rump.init("vfs", "fs.tmpfs")
+local R = require "syscall.rump.init".init("vfs", "fs.tmpfs")
 
 print("init")
 

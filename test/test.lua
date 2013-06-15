@@ -13,8 +13,7 @@ local helpers = require "syscall.helpers"
 local S, rump
 
 if arg[1] == "rump" then
-  S = require "syscall.rump.init"
-  S.rump.init("vfs", "fs.tmpfs")
+  S = require "syscall.rump.init".init("vfs", "fs.tmpfs")
   table.remove(arg, 1)
   rump = true
 else

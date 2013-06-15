@@ -99,15 +99,6 @@ local RUMP_ETFS = strflag {
   DIR_SUBDIRS = 4,
 }
 
-function S.rump.init(...) -- you must load the factions here eg dev, vfs, net, plus modules
-  for i, v in ipairs{...} do
-    v = string.gsub(v, "%.", "_")
-    local mod = ffi.load("rump" .. v, true)
-    S.rump.__modules[#S.rump.__modules + 1] = mod
-  end
-  return retbool(rump.rump_init())
-end
-
 function S.rump.version() return rump.rump_pub_getversion() end
 
 -- We could also use rump_pub_module_init if loading later
@@ -131,5 +122,17 @@ function S.rump.etfs_remove(key)
   return retbool(rump.rump_pub_etfs_remove(key))
 end
 
-return S
+function S.rump.init(...) -- you must load the factions here eg dev, vfs, net, plus modules
+  for i, v in ipairs{...} do
+    v = string.gsub(v, "%.", "_")
+    local mod = ffi.load("rump" .. v, true)
+    S.rump.__modules[#S.rump.__modules + 1] = mod
+  end
+  local ok = rump.rump_init()
+  if ok == -1 then return nil, t.error() end
+  return S
+end
+
+return S.rump
+ 
 
