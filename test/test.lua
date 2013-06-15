@@ -569,7 +569,8 @@ test_file_operations = {
     local st1 = fd:stat()
     assert(fd:futimens{"omit", "omit"})
     local st2 = fd:stat()
-    assert(st1.atime == st2.atime and st1.mtime == st2.mtime, "atime and mtime unchanged")
+    assert_equal(st1.atime, st2.atime)
+    assert_equal(st1.mtime, st2.mtime)
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
@@ -579,6 +580,8 @@ test_file_operations = {
     assert(S.utime(tmpfile, 100, 200))
     local st2 = fd:stat()
     assert(st1.atime ~= st2.atime and st1.mtime ~= st2.mtime, "atime and mtime changed")
+    assert_equal(st2.atime, 100)
+    assert_equal(st2.mtime, 200)
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,

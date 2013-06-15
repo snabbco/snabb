@@ -345,11 +345,11 @@ addtype("timeval", "struct timeval", {
   __newindex = function(tv, k, v) if meth.timeval.newindex[k] then meth.timeval.newindex[k](tv, v) end end,
   __new = function(tp, v)
     if not v then v = {0, 0} end
-    if istype(t.timespec, v) then v = {v.sec, math.floor(v.nsec / 1000)} end
+    if istype(t.timespec, v) then v = {v.tv_sec, math.floor(v.tv_nsec / 1000)} end
     if type(v) == "table" then
-      if v.nsec then -- compat with timespec
-        v.usec = math.floor(v.nsec / 1000)
-        v.usec = 0
+      if v.tv_nsec then -- compat with timespec
+        v.tv_usec = math.floor(v.tv_nsec / 1000)
+        v.tv_usec = 0
       end
     end
     if type(v) ~= "number" then return ffi.new(tp, v) end
@@ -380,11 +380,11 @@ addtype("timespec", "struct timespec", {
   __newindex = function(tv, k, v) if meth.timespec.newindex[k] then meth.timespec.newindex[k](tv, v) end end,
   __new = function(tp, v)
     if not v then v = {0, 0} end
-    if istype(t.timeval, v) then v = {v.sec, v.usec * 1000} end
+    if istype(t.timeval, v) then v = {v.tv_sec, v.tv_usec * 1000} end
     if type(v) == "table" then
-      if v.usec then -- compat with timespec
-        v.nsec = v.usec * 1000
-        v.nsec = 0
+      if v.tv_usec then -- compat with timespec
+        v.tv_nsec = v.tv_usec * 1000
+        v.tv_nsec = 0
       end
     end
     if type(v) ~= "number" then return ffi.new(tp, v) end
