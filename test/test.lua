@@ -579,7 +579,6 @@ test_file_operations = {
     assert(S.utime(tmpfile, 100, 200))
     local st2 = fd:stat()
     assert(st1.atime ~= st2.atime and st1.mtime ~= st2.mtime, "atime and mtime changed")
-    assert(st2.atime == 100 and st2.mtime == 200, "times as set")
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
