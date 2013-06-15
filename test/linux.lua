@@ -1953,7 +1953,11 @@ test_capabilities = {
     local cap = S.capget()
     local count = 0
     for k, _ in pairs(c.CAP) do if cap.effective[k] then count = count + 1 end end
-    if S.geteuid() == 0 then assert(count > 0, "root should have some caps") else assert(count == 0, "non-root has no caps") end
+    if S.geteuid() == 0 then
+      assert(count > 0, "root should have some caps")
+    else
+      assert(count == 0, "non-root has no caps, has " .. count .. ": " .. tostring(cap))
+    end
   end,
   test_capset_root = function()
     local p = assert(S.clone())
