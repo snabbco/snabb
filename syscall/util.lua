@@ -32,7 +32,9 @@ function util.dirtable(name, nodots) -- return table of directory entries, remov
   return setmetatable(d, mt.dir)
 end
 
--- this returns an iterator over multiple calls to getdents TODO how best to return errors? TODO add nodots?
+-- this returns an iterator over multiple calls to getdents TODO add nodots?
+-- note how errors work, getdents will throw as called multiple times, but normally should not fail if open succeeds
+-- getdents can fail eg on nfs though.
 function util.ls(name, buf, size)
   size = size or 4096
   buf = buf or t.buffer(size)
@@ -44,10 +46,11 @@ function util.ls(name, buf, size)
     local d, first
     repeat
       if not di then
-        di = fd:getdents(buf, size)
+        local err
+        di, err = fd:getdents(buf, size)
         if not di then
           fd:close()
-          return nil
+          error(err)
         end
         first = true
       end
