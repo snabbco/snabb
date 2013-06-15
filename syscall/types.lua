@@ -632,10 +632,12 @@ if t.dirent then
         i = i + d.d_reclen
         return d
       end
-      if i >= size then return nil end
-      d = pt.dirent(pt.char(d) + d.d_reclen)
-      i = i + d.d_reclen
-      return d
+      while i < size do
+        d = pt.dirent(pt.char(d) + d.d_reclen)
+        i = i + d.d_reclen
+        if d.ino ~= 0 then return d end -- some systems use ino = 0 for deleted files before removed eg OSX; it is never valid
+      end
+      return nil
     end
   end
 end
