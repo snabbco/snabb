@@ -185,13 +185,6 @@ function S.nanosleep(req, rem)
   return true
 end
 
-function S.sleep(sec) -- standard libc function
-  local rem, err = S.nanosleep(sec)
-  if not rem then return nil, err end
-  if rem == true then return 0 end
-  return tonumber(rem.tv_sec)
-end
-
 -- TODO return metatype that has length and can gc?
 function S.mmap(addr, length, prot, flags, fd, offset)
   return retptr(C.mmap(addr, length, c.PROT[prot], c.MAP[flags], getfd(fd or -1), offset or 0))
@@ -220,34 +213,18 @@ function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), of
 function S.accept(sockfd, flags, addr, addrlen) -- TODO emulate netbsd paccept
   addr = addr or t.sockaddr_storage()
   addrlen = addrlen or t.socklen1(addrlen or #addr)
-  local ret
-  if not flags
-    then ret = C.accept(getfd(sockfd), addr, addrlen)
-    else ret = C.accept4(getfd(sockfd), addr, addrlen, c.SOCK[flags])
-  end
+  local ret = C.accept4(getfd(sockfd), addr, addrlen, c.SOCK[flags])
   if ret == -1 then return nil, t.error() end
   return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
 end
 
--- TODO change to type
+-- TODO change to type?
 function S.uname()
   local u = t.utsname()
   local ret = C.uname(u)
   if ret == -1 then return nil, t.error() end
   return {sysname = ffi.string(u.sysname), nodename = ffi.string(u.nodename), release = ffi.string(u.release),
           version = ffi.string(u.version), machine = ffi.string(u.machine), domainname = ffi.string(u.domainname)}
-end
-
-function S.gethostname()
-  local u, err = S.uname()
-  if not u then return nil, err end
-  return u.nodename
-end
-
-function S.getdomainname()
-  local u, err = S.uname()
-  if not u then return nil, err end
-  return u.domainname
 end
 
 function S.sethostname(s) -- only accept Lua string, do not see use case for buffer as well
@@ -257,8 +234,6 @@ end
 function S.setdomainname(s)
   return retbool(C.setdomainname(s, #s))
 end
-
-function S.killpg(pgrp, sig) return S.kill(-pgrp, sig) end
 
 function S.gettimeofday(tv)
   tv = tv or t.timeval() -- note it is faster to pass your own tv if you call a lot
@@ -278,6 +253,7 @@ function S.sysinfo(info)
   return info
 end
 
+-- this is recommended way to size buffers for xattr
 local function growattrbuf(f, a, b)
   local len = 512
   local buffer = t.buffer(len)
@@ -330,6 +306,8 @@ function S.lremovexattr(path, name) return retbool(C.lremovexattr(path, name)) e
 function S.fremovexattr(fd, name) return retbool(C.fremovexattr(getfd(fd), name)) end
 
 -- helper function to set and return attributes in tables
+-- TODO this would make more sense as types?
+-- TODO listxattr should return an iterator not a table?
 local function xattr(list, get, set, remove, path, t)
   local l, err = list(path)
   if not l then return nil, err end
@@ -423,7 +401,7 @@ function S.poll(fds, timeout)
   return fds
 end
 
--- note that syscall does return timeout remaining but libc does not, due to standard prototype
+-- note that syscall does return timeout remaining but libc does not, due to standard prototype TODO use syscall?
 function S.ppoll(fds, timeout, set)
   fds = mktype(t.pollfds, fds)
   if timeout then timeout = mktype(t.timespec, timeout) end
@@ -521,15 +499,6 @@ function S.inotify_init(flags) return retfd(C.inotify_init1(c.IN_INIT[flags])) e
 function S.inotify_add_watch(fd, pathname, mask) return retnum(C.inotify_add_watch(getfd(fd), pathname, c.IN[mask])) end
 function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd), wd)) end
 
--- helper function to read inotify structs as table from inotify fd
-function S.inotify_read(fd, buffer, len)
-  len = len or 1024
-  buffer = buffer or t.buffer(len)
-  local ret, err = S.read(fd, buffer, len)
-  if not ret then return nil, err end
-  return t.inotify_events(buffer, ret)
-end
-
 function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two different return types...
   if not offset then return retnum(C.sendfile(getfd(out_fd), getfd(in_fd), nil, count)) end
   local off = t.off1()
@@ -614,6 +583,7 @@ function S.io_submit(ctx, iocb) -- takes a t.iocb_array in order to pin for gc
   return retnum(C.io_submit(ctx, iocb.ptrs, iocb.nr))
 end
 
+-- TODO prctl should be in a seperate file like ioctl fnctl (this is a Linux only interface)
 -- map for valid options for arg2
 local prctlmap = {
   [c.PR.CAPBSET_READ] = c.CAP,
@@ -653,7 +623,7 @@ local prctlpint = { -- returns result in a location pointed to by arg2
   [c.PR.GET_UNALIGN] = true,
 }
 
--- this is messy, TODO clean up
+-- this is messy, TODO clean up, its own file see above
 function S.prctl(option, arg2, arg3, arg4, arg5)
   local i, name
   option = c.PR[option]
@@ -866,25 +836,6 @@ function S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   local ret = C.mq_timedreceive(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio, abs_timeout)
   if ret == -1 then return nil, t.error() end
   return ffi.string(msg_ptr,ret)
-end
-
--- in Linux mkfifo is not a syscall, emulate
-function S.mkfifo(path, mode) return S.mknod(path, bit.bor(c.MODE[mode], c.S_I.FIFO)) end
-function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(c.MODE[mode], c.S_I.FIFO), 0) end
-
--- in Linux shm_open and shm_unlink are not syscalls
-local shm = "/dev/shm"
-
-function S.shm_open(pathname, flags, mode)
-  if pathname:sub(1, 1) ~= "/" then pathname = "/" .. pathname end
-  pathname = shm .. pathname
-  return S.open(pathname, c.O(flags, "nofollow", "cloexec", "nonblock"), mode)
-end
-
-function S.shm_unlink(pathname)
-  if pathname:sub(1, 1) ~= "/" then pathname = "/" .. pathname end
-  pathname = shm .. pathname
-  return S.unlink(pathname)
 end
 
 return S

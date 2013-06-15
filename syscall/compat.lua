@@ -1,9 +1,11 @@
 -- Compatibility wrappers to add more commonality between different systems, plus define common functions from man(3)
 
-local function init(S)
+local function init(S) 
 
-local types, c = S.types, S.c
+local abi, types, c = S.abi, S.types, S.c
 local t, pt, s = types.t, types.pt, types.s
+
+if abi.os == "linux" then S = require "syscall.linux.compat".init(S) end
 
 function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
 
@@ -14,7 +16,7 @@ function S.nice(inc)
   return S.getpriority("process", 0)
 end
 
--- deprecated in NetBSD, implement with recvfrom
+-- deprecated in NetBSD and not in some archs for Linux, implement with recvfrom
 function S.recv(fd, buf, count, flags) return S.recvfrom(fd, buf, count or #buf, c.MSG[flags], nil, nil) end
 
 -- not a syscall in many systems, defined in terms of sigaction
@@ -29,23 +31,17 @@ if not S.pause then -- NetBSD and OSX deprecate pause
   function S.pause() return S.sigsuspend(t.sigset()) end
 end
 
--- old rlimit functions in Linux are 32 bit only so now defined using prlimit
-if S.prlimit and not S.getrlimit then
-  function S.getrlimit(resource)
-    return S.prlimit(0, resource)
-  end
-
-  function S.setrlimit(resource, rlim)
-    local ret, err = S.prlimit(0, resource, rlim)
-    if not ret then return nil, err end
-    return true
-  end
-end
-
+-- non standard names
 if not S.umount then S.umount = S.unmount end
 if not S.unmount then S.unmount = S.umount end
 
--- the utimes, futimes, lutimes are legacy, but OSX does not support the nanosecond versions; we support both
+-- common libc function
+function S.sleep(sec)
+  local rem, err = S.nanosleep(sec)
+  if not rem then return nil, err end
+  if rem == true then return 0 end
+  return tonumber(rem.tv_sec)
+end
 
 -- TODO we should allow utimbuf and also table of times really
 if not S.utime then
@@ -57,7 +53,9 @@ if not S.utime then
   end
 end
 
--- TODO setpgrp and similar - see the man page
+-- the utimes, futimes, lutimes are legacy, but OSX does not support the nanosecond versions; we support both
+
+
 
 return S
 

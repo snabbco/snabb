@@ -45,10 +45,12 @@ build =
       ["syscall.linux.types"] = "syscall/linux/types.lua";
       ["syscall.linux.fcntl"] = "syscall/linux/fcntl.lua";
       ["syscall.linux.errors"] = "syscall/linux/errors.lua";
+      ["syscall.linux.compat"] = "syscall/linux/compat.lua";
+      ["syscall.linux.util"] = "syscall/linux/util.lua";
 
       ["syscall.linux.nl"] = "syscall/linux/nl.lua";
       ["syscall.linux.netfilter"] = "syscall/linux/netfilter.lua";
-      ["syscall.linux.util"] = "syscall/linux/util.lua";
+      ["syscall.linux.sockopt"] = "syscall/linux/sockopt.lua";
 
       ["syscall.linux.arm.constants"] = "syscall/linux/arm/constants.lua";
       ["syscall.linux.arm.ffitypes"] = "syscall/linux/arm/ffitypes.lua";
