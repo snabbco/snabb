@@ -201,7 +201,7 @@ function S.sendmsg(fd, msg, flags)
   return retbool(C.sendmsg(getfd(fd), msg, c.MSG[flags]))
 end
 function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG[flags])) end
--- TODO {get,set}sockopt may need better type handling
+-- TODO {get,set}sockopt may need better type handling see new sockopt file
 function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far
   if not optlen and type(optval) == 'boolean' then optval = h.booltoc(optval) end
@@ -296,6 +296,11 @@ function S.fcntl(fd, cmd, arg)
   if ret == -1 then return nil, t.error() end
   if fcntl.ret[cmd] then return fcntl.ret[cmd](ret, arg) end
   return true
+end
+
+function S.utimes(filename, ts)
+  if ts then ts = t.timeval2(ts) end
+  return retbool(C.utimes(filename, ts))
 end
 
 -- now call OS specific for non-generic calls

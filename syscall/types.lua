@@ -345,12 +345,77 @@ addtype("timeval", "struct timeval", {
   __newindex = function(tv, k, v) if meth.timeval.newindex[k] then meth.timeval.newindex[k](tv, v) end end,
   __new = function(tp, v)
     if not v then v = {0, 0} end
+    if istype(t.timespec, v) then v = {v.sec, math.floor(v.nsec / 1000)} end
+    if type(v) == "table" then
+      if v.nsec then -- compat with timespec
+        v.usec = math.floor(v.nsec / 1000)
+        v.usec = 0
+      end
+    end
     if type(v) ~= "number" then return ffi.new(tp, v) end
     local ts = ffi.new(tp)
     ts.time = v
     return ts
   end
 })
+
+meth.timespec = {
+  index = {
+    time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_nsec) / 1000000000 end,
+    sec = function(tv) return tonumber(tv.tv_sec) end,
+    nsec = function(tv) return tonumber(tv.tv_nsec) end,
+  },
+  newindex = {
+    time = function(tv, v)
+      local i, f = math.modf(v)
+      tv.tv_sec, tv.tv_nsec = i, math.floor(f * 1000000000)
+    end,
+    sec = function(tv, v) tv.tv_sec = v end,
+    nsec = function(tv, v) tv.tv_nsec = v end,
+  }
+}
+
+addtype("timespec", "struct timespec", {
+  __index = function(tv, k) if meth.timespec.index[k] then return meth.timespec.index[k](tv) end end,
+  __newindex = function(tv, k, v) if meth.timespec.newindex[k] then meth.timespec.newindex[k](tv, v) end end,
+  __new = function(tp, v)
+    if not v then v = {0, 0} end
+    if istype(t.timeval, v) then v = {v.sec, v.usec * 1000} end
+    if type(v) == "table" then
+      if v.usec then -- compat with timespec
+        v.nsec = v.usec * 1000
+        v.nsec = 0
+      end
+    end
+    if type(v) ~= "number" then return ffi.new(tp, v) end
+    local ts = ffi.new(tp)
+    ts.time = v
+    return ts
+  end,
+  __len = lenfn,
+})
+
+-- array so cannot just add metamethods
+t.timeval2_raw = ffi.typeof("$[2]", t.timeval) -- use $ as netbsd rename may have happened
+t.timeval2 = function(tv1, tv2)
+  if ffi.istype(t.timeval2_raw, tv1) then return tv1 end
+  if type(tv1) == "table" then tv1, tv2 = tv1[1], tv1[2] end
+  local tv = t.timeval2_raw()
+  if tv1 then tv[0] = t.timeval(tv1) end
+  if tv2 then tv[1] = t.timeval(tv2) end
+  return tv
+end
+
+-- array so cannot just add metamethods
+t.timespec2_raw = ffi.typeof("$[2]", t.timespec) -- use $ as netbsd rename may have happened
+t.timespec2 = function(ts1, ts2)
+  if ffi.istype(t.timespec2_raw, ts1) then return ts1 end
+  if type(ts1) == "table" then ts1, ts2 = ts1[1], ts1[2] end
+  local ts = t.timespec2_raw()
+  if ts1 then if type(ts1) == 'string' then ts[0].tv_nsec = c.UTIME[ts1] else ts[0] = t.timespec(ts1) end end
+  if ts2 then if type(ts2) == 'string' then ts[1].tv_nsec = c.UTIME[ts2] else ts[1] = t.timespec(ts2) end end
+  return ts
+end
 
 addtype_var("groups", "struct {int count; gid_t list[?];}", {
   __index = function(g, k)
@@ -605,46 +670,6 @@ mt.msghdr = {
   __len = lenfn;
 }
 addtype("msghdr", "struct msghdr", mt.msghdr)
-
-meth.timespec = {
-  index = {
-    time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_nsec) / 1000000000 end,
-    sec = function(tv) return tonumber(tv.tv_sec) end,
-    nsec = function(tv) return tonumber(tv.tv_nsec) end,
-  },
-  newindex = {
-    time = function(tv, v)
-      local i, f = math.modf(v)
-      tv.tv_sec, tv.tv_nsec = i, math.floor(f * 1000000000)
-    end,
-    sec = function(tv, v) tv.tv_sec = v end,
-    nsec = function(tv, v) tv.tv_nsec = v end,
-  }
-}
-
-addtype("timespec", "struct timespec", {
-  __index = function(tv, k) if meth.timespec.index[k] then return meth.timespec.index[k](tv) end end,
-  __newindex = function(tv, k, v) if meth.timespec.newindex[k] then meth.timespec.newindex[k](tv, v) end end,
-  __new = function(tp, v)
-    if not v then v = {0, 0} end
-    if type(v) ~= "number" then return ffi.new(tp, v) end
-    local ts = ffi.new(tp)
-    ts.time = v
-    return ts
-  end,
-  __len = lenfn,
-})
-
--- array so cannot just add metamethods
-t.timespec2_raw = ffi.typeof("$[2]", t.timespec)
-t.timespec2 = function(ts1, ts2)
-  if ffi.istype(t.timespec2_raw, ts1) then return ts1 end
-  if type(ts1) == "table" then ts1, ts2 = ts1[1], ts1[2] end
-  local ts = t.timespec2_raw()
-  if ts1 then if type(ts1) == 'string' then ts[0].tv_nsec = c.UTIME[ts1] else ts[0] = t.timespec(ts1) end end
-  if ts2 then if type(ts2) == 'string' then ts[1].tv_nsec = c.UTIME[ts2] else ts[1] = t.timespec(ts2) end end
-  return ts
-end
 
 -- include OS specific types
 local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}

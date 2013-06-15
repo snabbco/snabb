@@ -98,6 +98,7 @@ int statfs(const char *path, struct statfs64 *buf);
 int fstatfs(int fd, struct statfs64 *buf);
 int futimens(int fd, const struct timespec times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
+int utimes(const char *filename, const struct timeval times[2]);
 
 ssize_t listxattr(const char *path, char *list, size_t size);
 ssize_t llistxattr(const char *path, char *list, size_t size);

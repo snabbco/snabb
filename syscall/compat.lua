@@ -5,7 +5,11 @@ local function init(S)
 local abi, types, c = S.abi, S.types, S.c
 local t, pt, s = types.t, types.pt, types.s
 
+local ffi = require "ffi"
+
 if abi.os == "linux" then S = require "syscall.linux.compat".init(S) end
+
+local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
 function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
 
@@ -35,15 +39,7 @@ end
 if not S.umount then S.umount = S.unmount end
 if not S.unmount then S.unmount = S.umount end
 
--- common libc function
-function S.sleep(sec)
-  local rem, err = S.nanosleep(sec)
-  if not rem then return nil, err end
-  if rem == true then return 0 end
-  return tonumber(rem.tv_sec)
-end
-
--- TODO we should allow utimbuf and also table of times really
+-- TODO we should allow utimbuf and also table of times really; this is the very old 1s precesion version, NB Linux has syscall
 if not S.utime then
   function S.utime(path, actime, modtime)
     local ts
@@ -54,8 +50,24 @@ if not S.utime then
 end
 
 -- the utimes, futimes, lutimes are legacy, but OSX does not support the nanosecond versions; we support both
+S.futimes = S.futimes or S.futimens
 
+if S.utimensat and not S.lutimes then
+  function S.lutimes(filename, times)
+    return S.utimensat("FDCWD", filename, times, "SYMLINK_NOFOLLOW")
+  end
+end
 
+-- OSX does not support nanosecond times, emulate to less precision; note we auto convert timeval, timespec anyway
+S.futimens = S.futimens or S.futimes
+
+-- common libc function
+function S.sleep(sec)
+  local rem, err = S.nanosleep(sec)
+  if not rem then return nil, err end
+  if rem == true then return 0 end
+  return tonumber(rem.tv_sec)
+end
 
 return S
 
