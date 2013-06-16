@@ -45,7 +45,7 @@ if S.getdirentries and not S.getdents then -- eg OSX has extra arg
   end
 end
 
--- TODO we should allow utimbuf and also table of times really; this is the very old 1s precesion version, NB Linux has syscall
+-- TODO we should allow utimbuf and also table of times really; this is the very old 1s precision version, NB Linux has syscall
 if not S.utime then
   function S.utime(path, actime, modtime)
     local tv

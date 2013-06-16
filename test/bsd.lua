@@ -68,3 +68,20 @@ test_mount_bsd_root = {
   end,
 }
 
+test_filesystem_bsd = {
+-- BSD utimensat as same specification as Linux, but some functionality missing
+  test_utimensat = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    local dfd = assert(S.open("."))
+    assert(S.utimensat(nil, tmpfile))
+    local st1 = fd:stat()
+    assert(S.utimensat(dfd, tmpfile, {"omit", "omit"}))
+    local st2 = fd:stat()
+    assert(st1.atime == st2.atime and st1.mtime == st2.mtime, "atime and mtime unchanged")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+    assert(dfd:close())
+  end,
+}
+
+
