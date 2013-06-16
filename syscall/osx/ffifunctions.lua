@@ -13,5 +13,7 @@ int futimes(int, const struct timeval *);
 int stat64(const char *path, struct stat *sb);
 int lstat64(const char *path, struct stat *sb);
 int fstat64(int fd, struct stat *sb);
+
+int syscall(int number, ...);
 ]]
 
