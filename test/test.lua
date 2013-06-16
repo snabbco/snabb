@@ -41,7 +41,6 @@ local ffi = require "ffi"
 local useos = abi.os
 
 if rump then useos = "netbsd" end
-if useos == "osx" or useos == "netbsd" then useos = "bsd" end -- use same tests for now
 
 -- TODO fix, this is redefining methods somehow (very wrong!) when using rump
 if not rump then
