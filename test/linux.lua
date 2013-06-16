@@ -1935,7 +1935,7 @@ test_capabilities = {
     for k, _ in pairs(c.CAP) do
       if cap.effective[k] then
         count = count + 1
-        if S.geteuid() == 0 then print("non root had cap " .. k) end
+        if S.geteuid() ~= 0 then print("non root had cap " .. k) end
       end
     end
     if S.geteuid() == 0 then
