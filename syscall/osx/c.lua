@@ -11,7 +11,6 @@ local C = setmetatable({}, {__index = ffi.C})
 C.stat = C.stat64
 C.fstat = C.fstat64
 C.lstat = C.lstat64
-C.getdirentries = C.getdirentries64
 
 return C
 
