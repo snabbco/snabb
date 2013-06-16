@@ -26,6 +26,22 @@ function S.pipe(flags)
   return t.pipe(fd2)
 end
 
+function S.futimes(fd, ts)
+  if ts then ts = t.timeval2(ts) end
+  return retbool(C.futimes(getfd(fd), ts))
+end
+
+-- TODO lutimes is implemented using setattrlist(2) in OSX
+
+function S.getdirentries(fd, buf, size, basep)
+  size = size or 4096
+  buf = buf or t.buffer(size)
+  local ret = C.getdirentries(getfd(fd), buf, size, basep)
+  if ret == -1 then return nil, t.error() end
+  return t.dirents(buf, ret)
+end
+
+
 return S
 
 end

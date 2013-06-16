@@ -155,7 +155,7 @@ meth.dirent = {
     reclen = function(self) return self.d_reclen end,
     namlen = function(self) return self.d_namlen end,
     type = function(self) return self.d_type end,
-    name = function(self) return ffi.string(self.d_name) end,
+    name = function(self) return ffi.string(self.d_name, self.d_namlen) end,
     toif = function(self) return bit.lshift(self.d_type, 12) end, -- convert to stat types
   },
 }

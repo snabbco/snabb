@@ -39,6 +39,12 @@ end
 if not S.umount then S.umount = S.unmount end
 if not S.unmount then S.unmount = S.umount end
 
+if S.getdirentries and not S.getdents then -- eg OSX has extra arg
+  function S.getdents(fd, buf, len)
+    return S.getdirentries(fd, buf, len, nil)
+  end
+end
+
 -- TODO we should allow utimbuf and also table of times really; this is the very old 1s precesion version, NB Linux has syscall
 if not S.utime then
   function S.utime(path, actime, modtime)

@@ -9,5 +9,6 @@ int stat64(const char *path, struct stat *sb);
 int lstat64(const char *path, struct stat *sb);
 int fstat64(int fd, struct stat *sb);
 int utimes(const char *filename, const struct timeval times[2]);
+int getdirentries(int fd, char *buf, int nbytes, long *basep);
 ]]
 
