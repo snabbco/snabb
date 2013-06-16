@@ -1,7 +1,5 @@
 -- tables of constants
 
--- TODO add test that we do not reallocate
-
 local abi = require "syscall.abi"
 
 local bit = require "bit"

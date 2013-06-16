@@ -1,7 +1,5 @@
 -- tables of constants for BSD
 
--- TODO add test that we do not reallocate
-
 local h = require "syscall.helpers"
 
 local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags

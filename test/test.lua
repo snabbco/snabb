@@ -574,6 +574,17 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_futimes = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    local st1 = fd:stat()
+    assert(fd:futimes{100, 200})
+    local st2 = fd:stat()
+    assert(st1.atime ~= st2.atime and st1.mtime ~= st2.mtime, "atime and mtime changed")
+    assert_equal(st2.atime, 100)
+    assert_equal(st2.mtime, 200)
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
   test_utime = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     local st1 = fd:stat()
@@ -586,15 +597,24 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_utimes = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    local st1 = fd:stat()
+    assert(util.touch(tmpfile))
+    local st1 = S.stat(tmpfile)
     assert(S.utimes(tmpfile, {100, 200}))
-    local st2 = fd:stat()
+    local st2 = S.stat(tmpfile)
     assert(st1.atime ~= st2.atime and st1.mtime ~= st2.mtime, "atime and mtime changed")
     assert_equal(st2.atime, 100)
     assert_equal(st2.mtime, 200)
     assert(S.unlink(tmpfile))
-    assert(fd:close())
+  end,
+  test_lutimes = function()
+    assert(S.symlink("/no/such/file", tmpfile))
+    local st1 = S.lstat(tmpfile)
+    assert(S.lutimes(tmpfile, {100, 200}))
+    local st2 = S.lstat(tmpfile)
+    assert(st1.atime ~= st2.atime and st1.mtime ~= st2.mtime, "atime and mtime changed")
+    assert_equal(st2.atime, 100)
+    assert_equal(st2.mtime, 200)
+    assert(S.unlink(tmpfile))
   end,
 }
 

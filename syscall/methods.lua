@@ -71,7 +71,7 @@ local fdmethods = {'dup', 'read', 'write', 'pread', 'pwrite',
                    'fsetxattr', 'fgetxattr', 'fremovexattr', 'fxattr', 'splice', 'vmsplice', 'tee',
                    'timerfd_gettime', 'timerfd_settime',
                    'fadvise', 'fallocate', 'posix_fallocate', 'readahead',
-                   'sync_file_range', 'fstatfs', 'futimens',
+                   'sync_file_range', 'fstatfs', 'futimens', 'futimes',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
                    'fchownat', 'readlinkat', 'setns', 'openat',
                    'preadv', 'pwritev', 'epoll_pwait', 'ioctl'
@@ -96,7 +96,7 @@ fmeth.getxattr = S.gsetxattr
 fmeth.truncate = S.ftruncate
 fmeth.statfs = S.fstatfs
 fmeth.utimens = S.futimens
-fmeth.utime = S.futimens
+fmeth.utimes = S.futimes
 fmeth.seek = S.lseek
 fmeth.lock = S.lockf
 fmeth.chown = S.fchown

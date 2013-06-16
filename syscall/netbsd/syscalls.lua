@@ -82,6 +82,16 @@ function S.futimens(fd, ts)
   return retbool(C.futimens(getfd(fd), ts))
 end
 
+function S.futimes(fd, ts)
+  if ts then ts = t.timeval2(ts) end
+  return retbool(C.futimes(getfd(fd), ts))
+end
+
+function S.lutimes(path, ts)
+  if ts then ts = t.timeval2(ts) end
+  return retbool(C.lutimes(path, ts))
+end
+
 -- TODO when we define this for osx can go in common code (curently defined in libc.lua)
 function S.getcwd(buf, size)
   size = size or c.PATH_MAX
