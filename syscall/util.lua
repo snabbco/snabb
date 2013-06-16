@@ -71,7 +71,7 @@ function util.touch(file)
     return nil, err
   end
   fd:close()
-  local ok, err = S.futimens(fd2, "now")
+  local ok, err = S.futimes(fd2)
   fd2:close()
   if not ok then return nil, err end
   return true
