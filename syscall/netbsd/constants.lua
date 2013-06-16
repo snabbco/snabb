@@ -548,5 +548,9 @@ c.OPIPE = multiflags {
   NOSIGPIPE = 0x01000000,
 }
 
+c.AT_SYMLINK_NOFOLLOW = multiflags {
+  SYMLINK_NOFOLLOW = 0x200,
+}
+
 return c
 
