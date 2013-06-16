@@ -658,6 +658,19 @@ test_directory_operations = {
     assert(S.unlink(tmpfile .. "/file2"))
     assert(S.rmdir(tmpfile))
   end,
+  test_dents_stat_conversion = function()
+    local st = assert(S.stat("/dev/zero"))
+    assert(st.ischr, "/dev/zero is a character device")
+    for fn, f in util.ls("/dev") do
+      if fn == "zero" then
+        assert(f.chr, "/dev/zero is a character device")
+        assert_equal(st.todt, f.type)
+        assert_equal(f.toif, st.type)
+        assert_equal(st.todt, c.DT.CHR)
+        assert_equal(f.toif, c.S_I.FCHR)
+      end
+    end
+  end,
   test_ls = function()
     assert(S.mkdir(tmpfile, "rwxu"))
     assert(util.touch(tmpfile .. "/file1"))

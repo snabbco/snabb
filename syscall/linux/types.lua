@@ -314,13 +314,15 @@ meth.stat = {
     mtime = function(st) return tonumber(st.st_mtime) end,
     rdev = function(st) return t.device(st.st_rdev) end,
 
-    isreg = function(st) return bit.band(st.st_mode, c.S_I.FMT) == c.S_I.FREG end,
-    isdir = function(st) return bit.band(st.st_mode, c.S_I.FMT) == c.S_I.FDIR end,
-    ischr = function(st) return bit.band(st.st_mode, c.S_I.FMT) == c.S_I.FCHR end,
-    isblk = function(st) return bit.band(st.st_mode, c.S_I.FMT) == c.S_I.FBLK end,
-    isfifo = function(st) return bit.band(st.st_mode, c.S_I.FMT) == c.S_I.FIFO end,
-    islnk = function(st) return bit.band(st.st_mode, c.S_I.FMT) == c.S_I.FLNK end,
-    issock = function(st) return bit.band(st.st_mode, c.S_I.FMT) == c.S_I.FSOCK end,
+    type = function(st) return bit.band(st.st_mode, c.S_I.FMT) end,
+    todt = function(st) return bit.rshift(st.type, 12) end,
+    isreg = function(st) return st.type == c.S_I.FREG end,
+    isdir = function(st) return st.type == c.S_I.FDIR end,
+    ischr = function(st) return st.type == c.S_I.FCHR end,
+    isblk = function(st) return st.type == c.S_I.FBLK end,
+    isfifo = function(st) return st.type == c.S_I.FIFO end,
+    islnk = function(st) return st.type == c.S_I.FLNK end,
+    issock = function(st) return st.type == c.S_I.FSOCK end,
   }
 }
 
@@ -1080,6 +1082,7 @@ meth.dirent = {
     reclen = function(self) return self.d_reclen end,
     name = function(self) return ffi.string(self.d_name) end,
     type = function(self) return self.d_type end,
+    toif = function(self) return bit.lshift(self.d_type, 12) end, -- convert to stat types
   },
 }
 
