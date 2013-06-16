@@ -77,6 +77,11 @@ function S.pipe(flags)
   return t.pipe(fd2)
 end
 
+function S.utimensat(dirfd, path, ts, flags)
+  if ts then ts = t.timespec2(ts) end
+  return retbool(C.utimensat(c.AT_FDCWD[dirfd], path, ts, c.AT_SYMLINK_NOFOLLOW[flags]))
+end
+
 function S.futimens(fd, ts)
   if ts then ts = t.timespec2(ts) end
   return retbool(C.futimens(getfd(fd), ts))
