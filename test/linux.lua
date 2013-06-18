@@ -1934,19 +1934,26 @@ test_capabilities = {
     assert_equal(hdr.version, c.LINUX_CAPABILITY_VERSION[3], "expect capability version 3 API on recent kernel")
   end,
   test_capget = function()
+    if S.geteuid() == 0 then return end -- do not run test as root
     local cap = S.capget()
     local count = 0
     for k, _ in pairs(c.CAP) do
       if cap.effective[k] then
         count = count + 1
-        if S.geteuid() ~= 0 then print("non root had cap " .. k) end
+        print("error: non root has cap " .. k)
       end
     end
-    if S.geteuid() == 0 then
-      assert(count > 0, "root should have some caps")
-    else
-      assert(count == 0, "non-root has no caps, has " .. count .. ": " .. tostring(cap))
+    assert(count == 0, "non-root has no caps, has " .. count .. ": " .. tostring(cap))
+  end,
+  test_capget_root = function()
+    local cap = S.capget()
+    local count = 0
+    for k, _ in pairs(c.CAP) do
+      if cap.effective[k] then
+        count = count + 1
+      end
     end
+      assert(count > 0, "root should have some caps")
   end,
   test_capset_root = function()
     local p = assert(S.clone())
