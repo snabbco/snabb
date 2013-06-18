@@ -472,7 +472,8 @@ test_timers_signals_linux = {
   end,
   test_sigaction_function_handler = function()
     local sig = t.int1(0)
-    local f = t.sighandler(function(s) sig[0] = s end)
+    local fh = function(s) sig[0] = s end
+    local f = t.sighandler(fh)
     assert(S.sigaction("pipe", {handler = f}))
     assert(S.kill(S.getpid(), "pipe"))
     assert(S.sigaction("pipe", "dfl"))
