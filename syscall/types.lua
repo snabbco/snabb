@@ -523,13 +523,11 @@ meth.sigaction = {
     handler = function(sa, v)
       if type(v) == "string" then v = pt.void(c.SIGACT[v]) end
       if type(v) == "number" then v = pt.void(v) end
-      if type(v) == "function" then v = ffi.cast(t.sighandler, v) end -- note doing this will leak resource, use carefully
       sa.sa_handler.sa_handler = v
     end,
     sigaction = function(sa, v)
       if type(v) == "string" then v = pt.void(c.SIGACT[v]) end
       if type(v) == "number" then v = pt.void(v) end
-      if type(v) == "function" then v = ffi.cast(t.sa_sigaction, v) end -- note doing this will leak resource, use carefully
       sa.sa_handler.sa_sigaction = v
     end,
     mask = function(sa, v)
