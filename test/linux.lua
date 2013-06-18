@@ -457,12 +457,14 @@ test_timers_signals_linux = {
   test_sigaction_ucontext = function() -- this test does not do much yet
     local sig = t.int1(0)
     local pid = t.int32_1(0)
-    local f = t.sa_sigaction(function(s, info, uc)
+    local function fh(s, info, uc)
       local ucontext = pt.ucontext(uc)
       sig[0] = s
       pid[0] = info.pid
       local mcontext = ucontext.uc_mcontext
-    end)
+    end
+    jit.off(fh, true)
+    local f = t.sa_sigaction(fh)
     assert(S.sigaction("pipe", {sigaction = f}))
     assert(S.kill(S.getpid(), "pipe"))
     assert(S.sigaction("pipe", "dfl"))
@@ -472,7 +474,8 @@ test_timers_signals_linux = {
   end,
   test_sigaction_function_handler = function()
     local sig = t.int1(0)
-    local fh = function(s) sig[0] = s end
+    local function fh(s) sig[0] = s end
+    jit.off(fh, true)
     local f = t.sighandler(fh)
     assert(S.sigaction("pipe", {handler = f}))
     assert(S.kill(S.getpid(), "pipe"))
