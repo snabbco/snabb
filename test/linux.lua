@@ -1961,14 +1961,14 @@ test_capabilities = {
   test_filesystem_caps_get = function()
     assert(util.touch(tmpfile))
     local c, err = util.capget(tmpfile)
-    if not c and err.NOTSUP then return -- xattr/fs caps might not be supported
+    if not c and err.NOTSUP then return end -- xattr/fs caps might not be supported
     assert(not c and err.NODATA, "expect no caps")
     assert(S.unlink(tmpfile))
   end,
   test_filesystem_caps_getset_root = function()
     assert(util.touch(tmpfile))
     local cap, err = util.capget(tmpfile)
-    if not c and err.NOTSUP then return -- xattr/fs caps might not be supported
+    if not c and err.NOTSUP then return end -- xattr/fs caps might not be supported
     assert(not cap and err.NODATA, "expect no caps")
     assert(util.capset(tmpfile, {permitted = "sys_chroot, sys_admin", inheritable = "chown, mknod"}, "create"))
     local cap = assert(util.capget(tmpfile))
