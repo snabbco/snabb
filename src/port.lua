@@ -37,23 +37,19 @@ end
 --- packet buffer.
 
 function Port:spam ()
-   local input, output = self.input, self.output
+   local inputs, outputs = self.inputs, self.outputs
    -- Keep it simple: use one buffer for everything.
    local buf = buffer.allocate()
-   buf.size = 32
+   buf.size = 60
    repeat
-      input.sync_receive()
-      while input.can_receive() do
-	 input.receive()
+      for i = 1,#inputs do
+         local output = outputs[i]
+         while output:can_transmit() do
+            output:transmit(buf)
+         end
+         output:sync_transmit()
       end
-      while output.can_transmit() do
-	 output.transmit(buf)
-      end
-      while input.can_add_receive_buffer() do
-	 input.add_receive_buffer(buf)
-      end
-      output.sync_transmit()
-      C.usleep(100000)
+      C.usleep(10)
    until coroutine.yield("spam") == nil
    buffer.deref(buf)
 end
