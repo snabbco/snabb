@@ -121,8 +121,6 @@ function Port:echo ()
          input:sync_receive()
          while input:can_receive() and output:can_transmit() do
             local buf = input:receive()
-            print("echoing a "..buf.size.."-byte packet")
-            print("word[0] = "..bit.tohex(require("ffi").cast("uint32_t*", buf.ptr)[0]))
             output:transmit(buf)
             buffer.deref(buf)
          end
