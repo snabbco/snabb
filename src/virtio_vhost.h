@@ -23,9 +23,12 @@ struct vhost_memory {
 struct vhost_vring {
   // eventfd(2) for notifying the kernel (kick) and being notified (call)
   int kickfd, callfd;
-  struct vring_desc desc[VHOST_VRING_SIZE] __attribute__((aligned(8)));
-  struct vring_avail avail                 __attribute__((aligned(8)));
+  struct vring_desc desc[VHOST_VRING_SIZE] __attribute__((aligned(4)));
+  struct vring_avail avail                 __attribute__((aligned(2)));
   struct vring_used used                   __attribute__((aligned(4096)));
+  // XXX Hint: Adding this padding seems to reduce impact of heap corruption.
+  // So perhaps it's writes to a vring structure that's over-running?
+  // char pad[1000000];
 };
 
 struct vhost {
