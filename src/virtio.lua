@@ -221,8 +221,8 @@ function selftest (options)
    print("virtio selftest")
    options = options or {}
    options.devices = {dev}
-   options.program = port.Port.echo
-   options.secs = 10
+   options.program = port.Port.spam
+   options.secs = 600
    port.selftest(options)
    print("rx.availidx", dev.rxring.avail.idx)
    print("tx.availidx", dev.txring.avail.idx)
