@@ -26,8 +26,12 @@ function new (tapname)
                  txfree = descriptor_freelist(), -- free transmit descriptors
                  txused  = 0, rxused  = 0,   -- 'used' ring cursors  (0..65535)
                  txavail = 0, rxavail = 0,   -- 'avail' ring cursors (0..65535)
+                 txdirty = false, rxdirty = false, -- we have state to sync?
                  txpackets = 0, rxpackets = 0 -- statistics
               }
+   -- Disable interrupts (eventfd "call"). We are polling anyway.
+   dev.rxring.avail.flags = C.VRING_F_NO_INTERRUPT
+   dev.txring.avail.flags = C.VRING_F_NO_INTERRUPT
    open(dev, tapname)
    setmetatable(dev, {__index = virtio})
    return dev
@@ -82,6 +86,7 @@ function transmit (dev, buf)
    -- Setup mapping back from descriptor to buffer
    dev.txbuffers[descriptor_index] = buf
    buffer.ref(buf)
+   dev.txdirty = true
 end
 
 function can_transmit (dev)
@@ -91,16 +96,20 @@ end
 function sync_transmit (dev)
    -- Reclaim used descriptors and release buffers that have been transmitted
    while dev.txused ~= dev.txring.used.idx do
-      local descriptor_index = dev.txring.used.ring[dev.txused]
+      local descriptor_index = dev.txring.used.ring[dev.txused % vring_size].id
       freelist_add(dev.txfree, descriptor_index)
       buffer.deref(dev.txbuffers[descriptor_index])
       dev.txused = (dev.txused + 1) % 65536
       dev.txpackets = dev.txpackets + 1
    end
-   -- Make new descriptors available to hardware
-   C.full_memory_barrier()
-   dev.txring.avail.idx = dev.txavail
-   kick(dev.txring)
+   if dev.txdirty then
+      update_vhost_memory_map(dev)
+      -- Make new descriptors available to hardware
+      C.full_memory_barrier()
+      dev.txring.avail.idx = dev.txavail
+      kick(dev.txring)
+      dev.txdirty = false
+   end
 end
 
 -- Signal the kernel via the 'kick' eventfd that there is new data.
@@ -128,6 +137,7 @@ function add_receive_buffer (dev, buf)
    -- Setup mapping back from descriptor to buffer
    dev.rxbuffers[descriptor_index] = buf
    buffer.ref(buf)
+   dev.rxdirty = true
 end
 
 function can_add_receive_buffer (dev)
@@ -135,35 +145,47 @@ function can_add_receive_buffer (dev)
 end
 
 function receive (dev)
-   assert(can_receive(), "unable to receive")
+   assert(can_receive(dev), "unable to receive")
    -- Get descriptor
-   local descriptor_index = dev.rxring.used.ring[dev.rxused]
+   local used = dev.rxring.used.ring[dev.rxused % vring_size]
+   local descriptor_index = used.id
    local descriptor = dev.rxring.desc[descriptor_index]
    local buf = dev.rxbuffers[descriptor_index]
    dev.rxused = (dev.rxused + 1) % 65536
    dev.rxpackets = dev.rxpackets + 1
    -- Update and return buffer
-   buf.size = descriptor.size
+   buf.size = used.len
    buffer.deref(buf)
+   freelist_add(dev.rxfree, descriptor_index)
    return buf
 end
 
 function can_receive (dev)
---   print("rxused", dev.rxring.used.idx, dev.rxused)
    return dev.rxused ~= dev.rxring.used.idx
 end
 
 function sync_receive (dev)
-   C.full_memory_barrier()
-   dev.rxring.avail.idx = dev.rxavail
-   kick(dev.rxring)
+   if dev.rxdirty then
+      update_vhost_memory_map(dev)
+      C.full_memory_barrier()
+      dev.rxring.avail.idx = dev.rxavail
+      kick(dev.rxring)
+      dev.rxdirty = false
+   end
 end
 
 --- ### DMA memory map update
 
+prev_vhost_memory_map_size = -1
+
 -- Make all of our DMA memory usable as vhost packet buffers.
 function update_vhost_memory_map (dev)
-   assert(C.vhost_set_memory(dev.vhost, memory_regions()) == 0, "vhost memory")
+   assert(#memory.chunks <= C.VHOST_MEMORY_MAX_NREGIONS, "# vhost mem regions")
+   if #memory.chunks ~= prev_vhost_memory_map_size then
+      print("#memory.chunks", #memory.chunks)
+      assert(C.vhost_set_memory(dev.vhost, memory_regions()) == 0, "vhost memory")
+      prev_vhost_memory_map_size = #memory.chunks
+   end
 end
 
 -- Construct a vhost memory map for the kernel. The memory map
@@ -199,7 +221,7 @@ function selftest (options)
    options = options or {}
    options.devices = {dev}
    options.program = port.Port.echo
-   options.secs = 1
+   options.secs = 10
    port.selftest(options)
    print("rx.availidx", dev.rxring.avail.idx)
    print("tx.availidx", dev.txring.avail.idx)
