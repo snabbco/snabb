@@ -114,9 +114,11 @@ end
 
 -- Signal the kernel via the 'kick' eventfd that there is new data.
 function kick (ring)
-   local value = ffi.new("uint64_t[1]")
-   value[0] = 1
-   C.write(ring.kickfd, value, 8)
+   if bit.band(ring.used.flags, C.VRING_F_NO_NOTIFY) == 0 then
+      local value = ffi.new("uint64_t[1]")
+      value[0] = 1
+      C.write(ring.kickfd, value, 8)
+   end
 end
 
 --- ### Receive
