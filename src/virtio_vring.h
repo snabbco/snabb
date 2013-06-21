@@ -1,5 +1,5 @@
 // Size of vring structures used in Linux vhost. Max 32768.
-enum { VHOST_VRING_SIZE = 512 };
+enum { VHOST_VRING_SIZE = 32*1024 };
 
 // vring_desc I/O buffer descriptor
 struct vring_desc {
@@ -17,7 +17,8 @@ enum {
 };
 
 enum { // flags for avail and used rings
-  VRING_F_NO_INTERRUPT  = 1,  // Hint: don't bother to kick/interrupt me
+  VRING_F_NO_INTERRUPT  = 1,  // Hint: don't bother to call process
+  VRING_F_NO_NOTIFY     = 1,  // Hint: don't bother to kick kernel
   VRING_F_INDIRECT_DESC = 28, // Indirect descriptors are supported
   VRING_F_EVENT_IDX     = 29  // (Some boring complicated interrupt behavior..)
 };
