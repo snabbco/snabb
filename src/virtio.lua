@@ -122,7 +122,6 @@ end
 --- ### Receive
 
 function add_receive_buffer (dev, buf)
-   update_vhost_memory_map(dev)
    assert(can_add_receive_buffer(dev), "receive overflow")
    -- Initialize a receive descriptor
    local descriptor_index = freelist_remove(dev.rxfree)
