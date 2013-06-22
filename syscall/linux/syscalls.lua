@@ -413,12 +413,12 @@ end
 
 function S.mount(source, target, filesystemtype, mountflags, data)
   if type(source) == "table" then
-    local t = source
-    source = t.source or "none" -- standard default
-    target = t.target or t.dir -- netbsd compatible
-    filesystemtype = t.type
-    mountflags = t.flags
-    data = t.data
+    local tab = source
+    source = tab.source or "none" -- standard default
+    target = tab.target or tab.dir -- netbsd compatible
+    filesystemtype = tab.type
+    mountflags = tab.flags
+    data = tab.data
   end
   return retbool(C.mount(source, target, filesystemtype, c.MS[mountflags], data))
 end
