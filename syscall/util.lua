@@ -5,6 +5,8 @@
 
 local function init(S)
 
+local ffi = require "ffi"
+
 local abi, types, c = S.abi, S.types, S.c
 local t, pt, s = types.t, types.pt, types.s
 
@@ -73,6 +75,45 @@ function util.touch(file)
   fd:close()
   local ok, err = S.futimes(fd2)
   fd2:close()
+  if not ok then return nil, err end
+  return true
+end
+
+function util.mapfile(name) -- generally better to use, but no good for sysfs etc
+  local fd, err = S.open(name, "rdonly")
+  if not fd then return nil, err end
+  local st, err = S.fstat(fd)
+  if not st then return nil, err end
+  local size = st.size
+  local m, err = S.mmap(nil, size, "read", "shared", fd, 0)
+  if not m then return nil, err end
+  local str = ffi.string(m, size)
+  local ok, err = S.munmap(m, size)
+  if not ok then return nil, err end
+  local ok, err = fd:close()
+  if not ok then return nil, err end
+  return str
+end
+
+-- TODO fix short reads, but mainly used for sysfs, proc
+function util.readfile(name, buffer, length)
+  local fd, err = S.open(name, "rdonly")
+  if not fd then return nil, err end
+  local r, err = S.read(fd, buffer, length or 4096)
+  if not r then return nil, err end
+  local ok, err = fd:close()
+  if not ok then return nil, err end
+  return r
+end
+
+-- write string to named file; silently ignore short writes TODO fix
+function util.writefile(name, str, mode, flags)
+  local fd, err
+  if mode then fd, err = S.creat(name, mode) else fd, err = S.open(name, flags or "wronly") end
+  if not fd then return nil, err end
+  local n, err = S.write(fd, str)
+  if not n then return nil, err end
+  local ok, err = fd:close()
   if not ok then return nil, err end
   return true
 end
