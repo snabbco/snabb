@@ -10,6 +10,7 @@
 
 module(...,package.seeall)
 
+local memory = require("memory")
 local ffi = require("ffi")
 
 ffi.cdef[[
