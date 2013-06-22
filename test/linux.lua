@@ -1947,7 +1947,6 @@ test_capabilities = {
     for k, _ in pairs(c.CAP) do
       if cap.effective[k] then
         count = count + 1
-        print("error: non root has cap " .. k)
       end
     end
     assert(count == 0, "non-root has no caps, has " .. count .. ": " .. tostring(cap))
