@@ -37,10 +37,10 @@ There will not be Windows support (although in principle Cygwin and similar plat
 For the rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project. Then install the libraries somewhere in your library path. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There will be full tests soon, but there is a basic example in `examples/rump` which is a port of one of the tests in buildrump.
 
 ## New features planned soon
-netfilter, dhcp, selinux, arp, rump kernel backend, further BSD and OSX work.
+netfilter, dhcp, selinux, arp, rump kernel backend, further BSD and OSX work, better sockopt handling, cgroups support.
 
 ## Release notes
-0.8pre rump kernel fixes, NetBSD 64 bit fixes, ARP/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support.
+0.8pre rump kernel fixes, NetBSD 64 bit fixes, ARP/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support.
 
 0.7 bug fixes, general cleanups, filesystem capabilities, xattr bug fixes, signal handler functions, cpu affinity support, scheduler functions, POSIX message queues, tun/tap support, ioctl additions and improvements, initial NetBSD and OSX support, initial NetBSD rump kernel support, some fixes to allow Android to work.
 
