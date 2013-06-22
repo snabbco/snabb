@@ -811,13 +811,11 @@ test_sockets_pipes = {
   end,
   test_pipe = function()
     local p = assert(S.pipe())
+    assert(p:write("test"))
+    assert_equal(p:read(), "test")
     assert(p:close())
-    local ok, err = S.close(p[1])
-    assert(err, "should be invalid")
-    local ok, err = S.close(p[2])
-    assert(err, "should be invalid")
   end,
-  test_nonblock = function()
+  test_pipe_nonblock = function()
     local fds = assert(S.pipe())
     assert(fds:nonblock())
     local r, err = fds:read()

@@ -457,12 +457,14 @@ test_timers_signals_linux = {
   test_sigaction_ucontext = function() -- this test does not do much yet
     local sig = t.int1(0)
     local pid = t.int32_1(0)
-    local f = t.sa_sigaction(function(s, info, uc)
+    local function fh(s, info, uc)
       local ucontext = pt.ucontext(uc)
       sig[0] = s
       pid[0] = info.pid
       local mcontext = ucontext.uc_mcontext
-    end)
+    end
+    jit.off(fh, true)
+    local f = t.sa_sigaction(fh)
     assert(S.sigaction("pipe", {sigaction = f}))
     assert(S.kill(S.getpid(), "pipe"))
     assert(S.sigaction("pipe", "dfl"))
@@ -472,7 +474,9 @@ test_timers_signals_linux = {
   end,
   test_sigaction_function_handler = function()
     local sig = t.int1(0)
-    local f = t.sighandler(function(s) sig[0] = s end)
+    local function fh(s) sig[0] = s end
+    jit.off(fh, true)
+    local f = t.sighandler(fh)
     assert(S.sigaction("pipe", {handler = f}))
     assert(S.kill(S.getpid(), "pipe"))
     assert(S.sigaction("pipe", "dfl"))
@@ -1930,19 +1934,26 @@ test_capabilities = {
     assert_equal(hdr.version, c.LINUX_CAPABILITY_VERSION[3], "expect capability version 3 API on recent kernel")
   end,
   test_capget = function()
+    if S.geteuid() == 0 then return end -- do not run test as root
     local cap = S.capget()
     local count = 0
     for k, _ in pairs(c.CAP) do
       if cap.effective[k] then
         count = count + 1
-        if S.geteuid() ~= 0 then print("non root had cap " .. k) end
+        print("error: non root has cap " .. k)
       end
     end
-    if S.geteuid() == 0 then
-      assert(count > 0, "root should have some caps")
-    else
-      assert(count == 0, "non-root has no caps, has " .. count .. ": " .. tostring(cap))
+    assert(count == 0, "non-root has no caps, has " .. count .. ": " .. tostring(cap))
+  end,
+  test_capget_root = function()
+    local cap = S.capget()
+    local count = 0
+    for k, _ in pairs(c.CAP) do
+      if cap.effective[k] then
+        count = count + 1
+      end
     end
+      assert(count > 0, "root should have some caps")
   end,
   test_capset_root = function()
     local p = assert(S.clone())
