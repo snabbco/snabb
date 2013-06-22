@@ -51,6 +51,7 @@ build =
       ["syscall.linux.nl"] = "syscall/linux/nl.lua";
       ["syscall.linux.netfilter"] = "syscall/linux/netfilter.lua";
       ["syscall.linux.sockopt"] = "syscall/linux/sockopt.lua";
+      ["syscall.linux.cgroup"] = "syscall/linux/cgroup.lua";
 
       ["syscall.linux.arm.constants"] = "syscall/linux/arm/constants.lua";
       ["syscall.linux.arm.ffitypes"] = "syscall/linux/arm/ffitypes.lua";
