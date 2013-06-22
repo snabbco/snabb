@@ -1909,6 +1909,13 @@ test_tuntap = {
 }
 
 test_capabilities = {
+  test_cap_tostring = function()
+    local cap = t.cap()
+    cap.SYSLOG = true
+    assert_equal(tostring(cap), "SYSLOG")
+    cap.SYS_ADMIN = true
+    assert(tostring(cap) == "SYSLOG,SYS_ADMIN" or tostring(cap) == "SYS_ADMIN,SYSLOG")
+  end,
   test_cap_types = function()
     local cap = t.capabilities()
     assert_equal(cap.version, c.LINUX_CAPABILITY_VERSION[3], "expect defaults to version 3")

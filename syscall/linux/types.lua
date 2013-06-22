@@ -813,8 +813,7 @@ mt.cap = {
   end,
   __tostring = function(cap)
     local tab = {}
-    for i = 1, #c.CAP do
-      local k = c.CAP[i]
+    for k, _ in pairs(c.CAP) do
       if cap[k] then tab[#tab + 1] = k end
     end
     return table.concat(tab, ",")
