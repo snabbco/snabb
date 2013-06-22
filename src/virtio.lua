@@ -177,38 +177,36 @@ end
 
 --- ### DMA memory map update
 
-prev_vhost_memory_map_size = -1
+-- How many chunks were allocated the last time we updated the vhost memory map?
+vhost_mapped_chunks = 0
 
 -- Make all of our DMA memory usable as vhost packet buffers.
 function update_vhost_memory_map (dev)
-   assert(#memory.chunks <= C.VHOST_MEMORY_MAX_NREGIONS, "# vhost mem regions")
-   if #memory.chunks ~= prev_vhost_memory_map_size then
-      print("#memory.chunks", #memory.chunks)
+   -- Has a new chunk been allocated since last time?
+   if #memory.chunks > vhost_mapped_chunks then
       assert(C.vhost_set_memory(dev.vhost, memory_regions()) == 0, "vhost memory")
-      prev_vhost_memory_map_size = #memory.chunks
+      vhost_mapped_chunks = #memory.chunks
    end
 end
 
--- Construct a vhost memory map for the kernel. The memory map
--- includes all of our currently allocated DMA buffers and reuses
--- the address space of this process. This means that we can use
--- ordinary pointer addresses to DMA buffers in our vring
--- descriptors.
+-- Construct a vhost memory map for the kernel. Use one region of
+-- memory from the lowest to highest DMA address, and use addresses in
+-- our own virtual address space.
+--
+-- Note: Vhost supports max 64 regions so it is not practical to
+-- advertise each memory chunk individually.
 function memory_regions ()
-   local vhost_memory = ffi.new("struct vhost_memory")
-   local chunks = memory.chunks
-   vhost_memory.nregions = #chunks
-   vhost_memory.padding = 0
-   local vhost_index = 0
-   for _,chunk in ipairs(chunks) do
-      local r = vhost_memory.regions + vhost_index
-      r.guest_phys_addr = ffi.cast("uint64_t", chunk.pointer)
-      r.userspace_addr  = ffi.cast("uint64_t", chunk.pointer)
-      r.memory_size = chunk.size
-      r.flags_padding = 0
-      vhost_index = vhost_index + 1
+   local mem = ffi.new("struct vhost_memory")
+   if not memory.dma_max_addr then
+      mem.nregions = 0
+   else
+      mem.nregions = 1
+      mem.regions[0].guest_phys_addr = memory.dma_min_addr
+      mem.regions[0].userspace_addr  = memory.dma_min_addr
+      mem.regions[0].memory_size = memory.dma_max_addr - memory.dma_min_addr
+      mem.regions[0].flags_padding = 0
    end
-   return vhost_memory
+   return mem
 end
 
 --- ### Testing
