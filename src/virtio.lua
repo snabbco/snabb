@@ -220,7 +220,7 @@ function selftest (options)
    options = options or {}
    options.devices = {dev}
    options.program = port.Port.spam
-   options.secs = 600
+   options.secs = 10
    port.selftest(options)
    print("rx.availidx", dev.rxring.avail.idx)
    print("tx.availidx", dev.txring.avail.idx)
