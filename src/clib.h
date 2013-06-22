@@ -22,3 +22,5 @@ int fork();
 // pread(2), pwrite(2) - read/write from a file descriptor at an offset
 size_t pread(int fd, void *buf, int count, int offset);
 size_t pwrite(int fd, const void *buf, int count, int offset);
+
+void *malloc(int size);

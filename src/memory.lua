@@ -43,13 +43,20 @@ end
 
 --- ### HugeTLB: Allocate contiguous memory in bulk from Linux
 
+-- Configuration option: Set to false to disable HugeTLB.
+use_hugetlb = true
+
 function allocate_huge_page ()
-   local attempts = 3
-   for i = 1,attempts do
-      local page = C.allocate_huge_page(huge_page_size)
-      if page ~= nil then  return page  else  reserve_new_page()  end
+   if use_hugetlb then
+      local attempts = 3
+      for i = 1,attempts do
+         local page = C.allocate_huge_page(huge_page_size)
+         if page ~= nil then  return page  else  reserve_new_page()  end
+      end
+      error("Failed to allocate a huge page.")
+   else
+      return C.malloc(huge_page_size)
    end
-   error("Failed to allocate a huge page.")
 end
 
 function reserve_new_page ()
