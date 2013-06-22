@@ -39,5 +39,10 @@ S.features = require "syscall.features".init(S)
 -- add utils
 S.util = require "syscall.util".init(S)
 
+if abi.os == "linux" then
+  S.cgroup = require "syscall.linux.cgroup".init(S)
+  -- TODO add the other Linux specific modules here
+end
+
 return S
 
