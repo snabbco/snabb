@@ -171,7 +171,8 @@ function open_usable_devices (options)
    end
    local port = require("port")
    local options = {devices=drivers, secs=10,
-                    program=port.Port.loopback_test}
+                    program=port.Port.loopback_test,
+                    report=true}
    port.selftest(options)
 end
 
