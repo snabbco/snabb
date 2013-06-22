@@ -145,7 +145,8 @@ function selftest (options)
    local end_time = C.get_time_ns()
    local rx, tx = 0, 0
    local rxp, txp = 0, 0
-   if false then
+   if options.report then
+      -- Report traffic stats. XXX Currently specific to intel10g.
       for _,d in pairs(options.devices) do
          if d.s and d.s.GPRC then
             --      register.dump(d.r)
