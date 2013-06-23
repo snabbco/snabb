@@ -78,7 +78,7 @@ There is now [Travis CI](https://travis-ci.org/) support, although this will onl
 
 I have used the LuaJIT [reflect library](http://www.corsix.org/lua/reflect/api.html) [which you can download here](http://www.corsix.org/lua/reflect/reflect.lua) for checking struct offsets.
 
-Adding buildbot tests for a wider variety of architectures.
+Adding buildbot tests for a wider variety of architectures, as Travis is limited to Linux/Ubuntu.
 
 ## What is implemented?
 
