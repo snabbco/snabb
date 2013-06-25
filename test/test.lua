@@ -13,7 +13,7 @@ local helpers = require "syscall.helpers"
 local S, rump
 
 if arg[1] == "rump" then
-  S = require "syscall.rump.init".init("vfs", "fs.tmpfs")
+  S = require "syscall.rump.init".init("vfs", "fs.tmpfs" --[[, "net", "net.net"--]]) -- , "net.netinet", "net.config", "net.shmif"
   table.remove(arg, 1)
   rump = true
 else
