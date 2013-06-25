@@ -924,7 +924,7 @@ test_sockets_pipes = {
   end,
 }
 
-test_timers_signals = {
+test_timers = {
   test_timespec = function()
     local ts = t.timespec(1)
     assert_equal(ts.time, 1)
@@ -945,6 +945,10 @@ test_timers_signals = {
     assert_equal(ts.sec, 1)
     assert_equal(ts.usec, 0)
   end,
+}
+
+if not abi.rump then -- rump has no processes so not applicable
+test_signals = {
   test_signal_ignore = function()
     assert(S.signal("pipe", "ign"))
     assert(S.kill(S.getpid(), "pipe")) -- should be ignored
@@ -956,6 +960,7 @@ test_timers_signals = {
     assert(S.sigaction("pipe", "dfl"))
   end,
 }
+end
 
 if S.environ then -- use this as a proxy for whether libc functions defined (eg not defined in rump)
 test_libc = {
