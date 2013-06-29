@@ -183,14 +183,16 @@ else -- OSX does not have dup3
 end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
   if not addr then addrlen = 0 end
-  return retnum(C.sendto(getfd(fd), buf, count or #buf, c.MSG[flags], addr, addrlen or #addr))
+  local saddr = pt.sockaddr(addr)
+  return retnum(C.sendto(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen or #addr))
 end
-function S.recvfrom(fd, buf, count, flags, ss, addrlen)
-  ss = ss or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(#ss)
-  local ret = C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], ss, addrlen)
+function S.recvfrom(fd, buf, count, flags, addr, addrlen)
+  addr = addr or t.sockaddr_storage()
+  addrlen = addrlen or t.socklen1(#addr)
+  local saddr = pt.sockaddr(addr)
+  local ret = C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen)
   if ret == -1 then return nil, t.error() end
-  return {count = tonumber(ret), addr = t.sa(ss, addrlen[0])}
+  return {count = tonumber(ret), addr = t.sa(addr, addrlen[0])}
 end
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
