@@ -306,26 +306,6 @@ test_read_write = {
     assert_equal(ffi.string(b3, 3), "tev")
     assert(S.unlink(tmpfile))
   end,
-  test_preadv_pwritev_large = function()
-    if not features.preadv() then return true end
-    local offset = largeval
-    local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
-    local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
-    assert_equal(n, 13, "expect length 13")
-    local b1, b2, b3 = t.buffer(6), t.buffer(4), t.buffer(3)
-    local n = assert(fd:preadv({b1, b2, b3}, offset))
-    assert_equal(n, 13, "expect length 13")
-    assert_equal(ffi.string(b1, 6), "testin")
-    assert_equal(ffi.string(b2, 4), "gwri")
-    assert_equal(ffi.string(b3, 3), "tev")
-    assert(fd:seek(offset))
-    local n = assert(fd:readv{b1, b2, b3})
-    assert_equal(n, 13, "expect length 13")
-    assert_equal(ffi.string(b1, 6), "testin")
-    assert_equal(ffi.string(b2, 4), "gwri")
-    assert_equal(ffi.string(b3, 3), "tev")
-    assert(S.unlink(tmpfile))
-  end,
 }
 
 test_address_names = {
@@ -750,6 +730,26 @@ test_largefile = {
     assert_equal(st.size, offset)
     assert(S.unlink(tmpfile))
     assert(fd:close())
+  end,
+  test_preadv_pwritev = function()
+    if not features.preadv() then return true end
+    local offset = largeval
+    local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
+    local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
+    assert_equal(n, 13, "expect length 13")
+    local b1, b2, b3 = t.buffer(6), t.buffer(4), t.buffer(3)
+    local n = assert(fd:preadv({b1, b2, b3}, offset))
+    assert_equal(n, 13, "expect length 13")
+    assert_equal(ffi.string(b1, 6), "testin")
+    assert_equal(ffi.string(b2, 4), "gwri")
+    assert_equal(ffi.string(b3, 3), "tev")
+    assert(fd:seek(offset))
+    local n = assert(fd:readv{b1, b2, b3})
+    assert_equal(n, 13, "expect length 13")
+    assert_equal(ffi.string(b1, 6), "testin")
+    assert_equal(ffi.string(b2, 4), "gwri")
+    assert_equal(ffi.string(b3, 3), "tev")
+    assert(S.unlink(tmpfile))
   end,
 }
 
