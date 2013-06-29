@@ -81,7 +81,7 @@ int rump___sysimpl_shutdown(int, int);
 int rump___sysimpl_socketpair(int, int, int, int *);
 int rump___sysimpl_mkdir(const char *, _netbsd_mode_t);
 int rump___sysimpl_rmdir(const char *);
-int rump___sysimpl_utimes(const char *, const struct _netbsd_timeval *);
+int rump___sysimpl_utimes50(const char *, const struct _netbsd_timeval *);
 int rump___sysimpl_setsid(void);
 int rump___sysimpl_nfssvc(int, void *);
 ssize_t rump___sysimpl_pread(int, void *, size_t, off_t);
@@ -97,7 +97,7 @@ off_t rump___sysimpl_lseek(int, off_t, int);
 int rump___sysimpl_truncate(const char *, off_t);
 int rump___sysimpl_ftruncate(int, off_t);
 int rump___sysimpl___sysctl(const int *, unsigned int, void *, size_t *, const void *, size_t);
-int rump___sysimpl_futimes(int, const struct _netbsd_timeval *);
+int rump___sysimpl_futimes50(int, const struct _netbsd_timeval *);
 pid_t rump___sysimpl_getpgid(pid_t);
 int rump___sysimpl_reboot(int, char *);
 int rump___sysimpl_poll(struct _netbsd_pollfd *, unsigned int, int);
@@ -115,7 +115,7 @@ int rump___sysimpl__ksem_destroy(intptr_t);
 int rump___sysimpl__ksem_timedwait(intptr_t, const struct _netbsd_timespec *);
 int rump___sysimpl_lchmod(const char *, _netbsd_mode_t);
 int rump___sysimpl_lchown(const char *, uid_t, gid_t);
-int rump___sysimpl_lutimes(const char *, const struct _netbsd_timeval *);
+int rump___sysimpl_lutimes50(const char *, const struct _netbsd_timeval *);
 pid_t rump___sysimpl_getsid(pid_t);
 ssize_t rump___sysimpl_preadv(int, const struct iovec *, int, off_t);
 ssize_t rump___sysimpl_pwritev(int, const struct iovec *, int, off_t);
@@ -245,7 +245,7 @@ local C = {
   fsync = rump.rump___sysimpl_fsync,
   ftruncate = rump.rump___sysimpl_ftruncate,
   futimens = rump.rump___sysimpl_futimens,
-  futimes = rump.rump___sysimpl_futimes,
+  futimes = rump.rump___sysimpl_futimes50,
   __getcwd = rump.rump___sysimpl___getcwd,
   getdents = rump.rump___sysimpl_getdents30,
   getegid = rump.rump___sysimpl_getegid,
@@ -294,7 +294,7 @@ local C = {
   lseek = rump.rump___sysimpl_lseek,
   lsetxattr = rump.rump___sysimpl_lsetxattr,
   lstat = rump.rump___sysimpl_lstat50,
-  lutimes = rump.rump___sysimpl_lutimes,
+  lutimes = rump.rump___sysimpl_lutimes50,
   mkdirat = rump.rump___sysimpl_mkdirat,
   mkdir = rump.rump___sysimpl_mkdir,
   mkfifoat = rump.rump___sysimpl_mkfifoat,
@@ -361,7 +361,7 @@ local C = {
   unlink = rump.rump___sysimpl_unlink,
   unmount = rump.rump___sysimpl_unmount,
   utimensat = rump.rump___sysimpl_utimensat,
-  utimes = rump.rump___sysimpl_utimes,
+  utimes = rump.rump___sysimpl_utimes50,
   write = rump.rump___sysimpl_write,
   writev = rump.rump___sysimpl_writev,
 }
