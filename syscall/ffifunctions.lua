@@ -68,7 +68,7 @@ int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optl
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
 int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int listen(int sockfd, int backlog);
-int connect(int sockfd, const void *addr, socklen_t addrlen);
+int connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int accept(int sockfd, void *addr, socklen_t *addrlen);
 int getsockname(int sockfd, void *addr, socklen_t *addrlen);
 int getpeername(int sockfd, void *addr, socklen_t *addrlen);
