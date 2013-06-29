@@ -41,11 +41,11 @@ local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
 
 S.abi, S.c, S.C, S.types, S.t = abi, c, C, types, types.t -- add to main table returned
 
--- add methods
-S = require "syscall.methods".init(S)
-
 -- add compatibility code
 S = require "syscall.compat".init(S)
+
+-- add methods
+S = require "syscall.methods".init(S)
 
 -- add feature tests
 S.features = require "syscall.features".init(S)
