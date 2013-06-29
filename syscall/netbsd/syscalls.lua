@@ -12,10 +12,11 @@ local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.
 function S.accept(sockfd, flags, addr, addrlen) -- TODO add support for signal mask that paccept has
   addr = addr or t.sockaddr_storage()
   addrlen = addrlen or t.socklen1(addrlen or #addr)
+  local saddr = pt.sockaddr(addr)
   local ret
   if not flags
-    then ret = C.accept(getfd(sockfd), addr, addrlen)
-    else ret = C.paccept(getfd(sockfd), addr, addrlen, nil, c.SOCK[flags])
+    then ret = C.accept(getfd(sockfd), saddr, addrlen)
+    else ret = C.paccept(getfd(sockfd), saddr, addrlen, nil, c.SOCK[flags])
   end
   if ret == -1 then return nil, t.error() end
   return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}

@@ -13,7 +13,8 @@ function S.accept(sockfd, flags, addr, addrlen)
   assert(not flags, "TODO add accept flags emulation") -- TODO emulate netbsd paccept/Linux accept4
   addr = addr or t.sockaddr_storage()
   addrlen = addrlen or t.socklen1(addrlen or #addr)
-  local ret = C.accept(getfd(sockfd), addr, addrlen)
+  local saddr = pt.sockaddr(addr)
+  local ret = C.accept(getfd(sockfd), saddr, addrlen)
   if ret == -1 then return nil, t.error() end
   return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
 end
