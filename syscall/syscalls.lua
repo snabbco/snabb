@@ -187,12 +187,11 @@ function S.sendto(fd, buf, count, flags, addr, addrlen)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen or #addr))
 end
 function S.recvfrom(fd, buf, count, flags, addr, addrlen)
-  addr = addr or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(#addr)
+  if not addr then addrlen = 0 end
+  addrlen = addrlen or #addr
+  if type(addrlen) == "number" then addrlen = t.socklen1(addrlen) end
   local saddr = pt.sockaddr(addr)
-  local ret = C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen)
-  if ret == -1 then return nil, t.error() end
-  return {count = tonumber(ret), addr = t.sa(addr, addrlen[0])}
+  return retnum(C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen))
 end
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
