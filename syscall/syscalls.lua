@@ -181,8 +181,8 @@ else -- OSX does not have dup3
     return retfd(C.dup2(getfd(oldfd), getfd(newfd))) -- TODO set flags on newfd
   end
 end
-function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, c.MSG[flags])) end
 function S.sendto(fd, buf, count, flags, addr, addrlen)
+  if not addr then addrlen = 0 end
   return retnum(C.sendto(getfd(fd), buf, count or #buf, c.MSG[flags], addr, addrlen or #addr))
 end
 function S.recvfrom(fd, buf, count, flags, ss, addrlen)

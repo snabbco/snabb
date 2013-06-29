@@ -20,8 +20,9 @@ function S.nice(inc)
   return S.getpriority("process", 0)
 end
 
--- deprecated in NetBSD and not in some archs for Linux, implement with recvfrom
-function S.recv(fd, buf, count, flags) return S.recvfrom(fd, buf, count or #buf, c.MSG[flags], nil, nil) end
+-- deprecated in NetBSD and not in some archs for Linux, implement with recvfrom/sendto
+function S.recv(fd, buf, count, flags) return S.recvfrom(fd, buf, count, flags, nil, nil) end
+function S.send(fd, buf, count, flags) return S.sendto(fd, buf, count, flags, nil, nil) end
 
 -- not a syscall in many systems, defined in terms of sigaction
 function S.signal(signum, handler) -- defined in terms of sigaction
