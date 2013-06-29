@@ -904,7 +904,8 @@ test_sockets_pipes = {
     assert(ss:bind(sa))
     local bsa = ss:getsockname() -- find bound address
     local n = assert(cs:sendto(teststring, #teststring, 0, bsa))
-    local f = assert(ss:recv(buf, size)) -- do not test as can drop data
+    local f = assert(ss:recv(buf, size))
+    assert(f.count == #teststring, "should get the whole string back")
     assert(ss:close())
     assert(cs:close())
   end,
@@ -917,10 +918,27 @@ test_sockets_pipes = {
     assert(ss:bind(sa))
     local bsa = ss:getsockname() -- find bound address
     local n = assert(cs:sendto(teststring, nil, 0, bsa))
-    local f = assert(ss:recvfrom(buf, size))
+    local f = assert(ss:recv(buf, size))
     assert(f.count == #teststring, "should get the whole string back")
     assert(cs:close())
     assert(ss:close())
+  end,
+  test_recvfrom = function()
+    local ss = assert(S.socket("inet", "dgram"))
+    local cs = assert(S.socket("inet", "dgram"))
+    local sa = assert(t.sockaddr_in(0, "loopback"))
+    assert(ss:bind(sa))
+    assert(cs:bind(sa))
+    local bsa = ss:getsockname()
+    local csa = cs:getsockname()
+    local n = assert(cs:sendto(teststring, #teststring, 0, bsa))
+    local rsa = t.sockaddr_in()
+    local f = assert(ss:recvfrom(buf, size, "", rsa))
+    assert(f.count == #teststring, "should get the whole string back")
+    assert_equal(rsa.port, csa.port)
+    assert_equal(tostring(rsa.addr), "127.0.0.1")
+    assert(ss:close())
+    assert(cs:close())
   end,
 }
 
