@@ -739,7 +739,7 @@ test_raw_socket = {
     local n = assert(raw:sendto(buf, len, 0, ca))
     local f = assert(cl:recvfrom(buf2, #msg))
 
-    assert_equal(f.count, #msg)
+    assert_equal(f, #msg)
 
     assert(raw:close())
     assert(cl:close())
