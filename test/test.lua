@@ -10,9 +10,13 @@ end
 
 local helpers = require "syscall.helpers"
 
-local S, rump
+local S, SS, rump
 
 if arg[1] == "rump" then
+  SS = require "syscall"
+  if SS.abi.os == "linux" then
+    assert(SS.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
+  end
   S = require "syscall.rump.init".init("vfs", "fs.tmpfs", "net", "net.net", "net.netinet", "net.config", "net.shmif")
   table.remove(arg, 1)
   rump = true
