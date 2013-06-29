@@ -228,19 +228,21 @@ function S.connect(sockfd, addr, addrlen)
   local saddr = pt.sockaddr(addr)
   return retbool(C.connect(getfd(sockfd), saddr, addrlen or #addr))
 end
-function S.getsockname(sockfd, ss, addrlen)
-  ss = ss or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(#ss)
-  local ret = C.getsockname(getfd(sockfd), ss, addrlen)
+function S.getsockname(sockfd, addr, addrlen)
+  addr = addr or t.sockaddr_storage()
+  addrlen = addrlen or t.socklen1(#addr)
+  local saddr = pt.sockaddr(addr)
+  local ret = C.getsockname(getfd(sockfd), saddr, addrlen)
   if ret == -1 then return nil, t.error() end
-  return t.sa(ss, addrlen[0])
+  return t.sa(addr, addrlen[0])
 end
-function S.getpeername(sockfd, ss, addrlen)
-  ss = ss or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(#ss)
-  local ret = C.getpeername(getfd(sockfd), ss, addrlen)
+function S.getpeername(sockfd, addr, addrlen)
+  addr = addr or t.sockaddr_storage()
+  addrlen = addrlen or t.socklen1(#addr)
+  local saddr = pt.sockaddr(addr)
+  local ret = C.getpeername(getfd(sockfd), saddr, addrlen)
   if ret == -1 then return nil, t.error() end
-  return t.sa(ss, addrlen[0])
+  return t.sa(addr, addrlen[0])
 end
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), c.SHUT[how])) end
 
