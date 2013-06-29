@@ -213,7 +213,8 @@ function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), of
 function S.accept(sockfd, flags, addr, addrlen) -- TODO emulate netbsd paccept
   addr = addr or t.sockaddr_storage()
   addrlen = addrlen or t.socklen1(addrlen or #addr)
-  local ret = C.accept4(getfd(sockfd), addr, addrlen, c.SOCK[flags])
+  local saddr = pt.sockaddr(addr)
+  local ret = C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags])
   if ret == -1 then return nil, t.error() end
   return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
 end
