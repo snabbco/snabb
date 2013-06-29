@@ -66,7 +66,7 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
 int getsockopt(int sockfd, int level, int optname, void *optval, socklen_t *optlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen);
-int bind(int sockfd, const void *addr, socklen_t addrlen); // void not struct
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int listen(int sockfd, int backlog);
 int connect(int sockfd, const void *addr, socklen_t addrlen);
 int accept(int sockfd, void *addr, socklen_t *addrlen);

@@ -219,7 +219,10 @@ function S.getsockopt(fd, level, optname, optval, optlen)
   if ret == -1 then return nil, t.error() end
   return optval[0] -- TODO will not work if struct, eg see netfilter
 end
-function S.bind(sockfd, addr, addrlen) return retbool(C.bind(getfd(sockfd), addr, addrlen or #addr)) end
+function S.bind(sockfd, addr, addrlen)
+  local saddr = pt.sockaddr(addr)
+  return retbool(C.bind(getfd(sockfd), saddr, addrlen or #addr))
+end
 function S.listen(sockfd, backlog) return retbool(C.listen(getfd(sockfd), backlog or c.SOMAXCONN)) end
 function S.connect(sockfd, addr, addrlen) return retbool(C.connect(getfd(sockfd), addr, addrlen or #addr)) end
 function S.getsockname(sockfd, ss, addrlen)
