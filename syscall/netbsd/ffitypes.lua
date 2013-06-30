@@ -225,7 +225,7 @@ struct _netbsd_dirent {
   char     d_name[512];
 };
 struct _netbsd_ifreq {
-  char ifr_name[IFNAMSIZ];
+  char ifr_name[16];
   union {
     struct  _netbsd_sockaddr ifru_addr;
     struct  _netbsd_sockaddr ifru_dstaddr;
