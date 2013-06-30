@@ -29,7 +29,15 @@ local util = {}
 local mt = {}
 
 -- initial implementation of network ioctls, no real attempt to make it compatible with Linux...
---util.
+function util.ifcreate(name) -- TODO generic function that creates socket to do ioctl
+  local sock, err = S.socket("inet", "dgram")
+  if not sock then return nil, err end
+  local ifr = t.ifreq{name = name}
+  local io, err = sock:ioctl("SIOCIFCREATE", ifr)
+  local ok, err = sock:close()
+  if not ok then return nil, err end
+  return true
+end
 
 return util
 

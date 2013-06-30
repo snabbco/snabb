@@ -14,6 +14,8 @@ local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
 
 local c = {}
 
+c.IFNAMSIZ = 16
+
 -- TODO incomplete
 c.SYS = strflag {
   getcwd = 296,
