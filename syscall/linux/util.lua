@@ -232,9 +232,9 @@ end
 -- helper functions
 
 function util.sendcred(fd, pid, uid, gid) -- only needed for root to send (incorrect!) credentials
-  if not pid then pid = C.getpid() end
-  if not uid then uid = C.getuid() end
-  if not gid then gid = C.getgid() end
+  if not pid then pid = S.getpid() end
+  if not uid then uid = S.getuid() end
+  if not gid then gid = S.getgid() end
   local ucred = t.ucred()
   ucred.pid = pid
   ucred.uid = uid
