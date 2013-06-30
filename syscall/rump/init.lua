@@ -122,7 +122,7 @@ function S.rump.etfs_register(key, hostpath, ftype, begin, size)
 end
 
 function S.rump.etfs_remove(key)
-  return retbool(rump.rump_pub_etfs_remove(key))
+  return retbool(ffi.C.rump_pub_etfs_remove(key))
 end
 
 function S.rump.init(...) -- you must load the factions here eg dev, vfs, net, plus modules
