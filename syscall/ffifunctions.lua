@@ -108,6 +108,15 @@ int setitimer(int which, const struct itimerval *new_value, struct itimerval *ol
 
 int acct(const char *filename);
 
+void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+int munmap(void *addr, size_t length);
+int msync(void *addr, size_t length, int flags);
+int madvise(void *addr, size_t length, int advice);
+int mlock(const void *addr, size_t len);
+int munlock(const void *addr, size_t len);
+int mlockall(int flags);
+int munlockall(void);
+
 /* TODO in NetBSD these are implemented with wait4, we may want to do this */
 pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);

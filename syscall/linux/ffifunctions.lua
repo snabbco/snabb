@@ -74,16 +74,8 @@ int prlimit64(pid_t pid, int resource, const struct rlimit64 *new_limit, struct 
 
 int accept4(int sockfd, void *addr, socklen_t *addrlen, int flags);
 
-void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
 void *mmap2(void *addr, size_t length, int prot, int flags, int fd, off32_t pgoffset);
-int munmap(void *addr, size_t length);
-int msync(void *addr, size_t length, int flags);
-int mlock(const void *addr, size_t len);
-int munlock(const void *addr, size_t len);
-int mlockall(int flags);
-int munlockall(void);
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
-int madvise(void *addr, size_t length, int advice);
 int fallocate(int fd, int mode, off_t offset, off_t len); /* note there are 32 bit issues with glibc */
 ssize_t readahead(int fd, off_t offset, size_t count);
 

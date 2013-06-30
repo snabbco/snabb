@@ -312,6 +312,20 @@ function S.utimes(filename, ts)
   return retbool(C.utimes(filename, ts))
 end
 
+-- TODO return metatype that has length and can gc?
+function S.mmap(addr, length, prot, flags, fd, offset)
+  return retptr(C.mmap(addr, length, c.PROT[prot], c.MAP[flags], getfd(fd or -1), offset or 0))
+end
+function S.munmap(addr, length)
+  return retbool(C.munmap(addr, length))
+end
+function S.msync(addr, length, flags) return retbool(C.msync(addr, length, c.MSYNC[flags])) end
+function S.mlock(addr, len) return retbool(C.mlock(addr, len)) end
+function S.munlock(addr, len) return retbool(C.munlock(addr, len)) end
+function S.mlockall(flags) return retbool(C.mlockall(c.MCL[flags])) end
+function S.munlockall() return retbool(C.munlockall()) end
+function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, c.MADV[advice])) end
+
 -- now call OS specific for non-generic calls
 local hh = {
   istype = istype, mktype = mktype, getfd = getfd,

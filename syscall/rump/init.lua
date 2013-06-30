@@ -39,6 +39,12 @@ c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier
 
 local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
 
+-- some syscalls have been defined that do not exist in C, eg mmap. We should delete here
+-- TODO this list is not complete
+local del = {"mmap", "munmap", "msync", "mlock", "munlock", "mlockall", "munlockall", "madvise"} 
+
+for _, v in ipairs(del) do S[v] = nil end
+
 S.abi, S.c, S.C, S.types, S.t = abi, c, C, types, types.t -- add to main table returned
 
 -- add compatibility code
