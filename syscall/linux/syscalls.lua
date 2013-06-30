@@ -94,16 +94,6 @@ function S.execve(filename, argv, envp)
   return retbool(C.execve(filename, cargv, cenvp))
 end
 
-function S.ioctl(d, request, argp)
-  if type(request) == "string" then
-    request = ioctl[request]
-  end
-  if type(argp) == "string" then argp = pt.char(argp) end
-  local ret = C.ioctl(getfd(d), request, argp)
-  if ret == -1 then return nil, t.error() end
-  return ret -- usually zero
-end
-
 -- note that this is not strictly the syscall that has some other arguments, but has same functionality
 function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 
