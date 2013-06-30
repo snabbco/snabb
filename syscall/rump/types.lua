@@ -1,6 +1,13 @@
 -- types for rump kernel
 -- only called when not on NetBSD so needs types fixing up
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local function init(abi, c, errors, ostypes)
 
 local unchanged = {

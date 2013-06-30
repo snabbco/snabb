@@ -3,6 +3,13 @@
 -- ffi.C (ie libc) is the default fallback via the metatable, but we override stuff that might be missing, has different semantics
 -- or which we cannot detect sanely which ABI is being presented.
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local function init(abi, c, types)
 
 local ffi = require "ffi"

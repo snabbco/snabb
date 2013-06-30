@@ -1,4 +1,12 @@
 -- socket options mapping
+
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 -- TODO add typemap for cmsghdr from syscall/types.lua as very similar
 -- like ioctls and so on, socket options are a random interface that needs some help to make it nice to use
 -- we need to know the types of the options (in particular those that are not the default int)

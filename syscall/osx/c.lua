@@ -1,6 +1,13 @@
 -- This sets up the table of C functions
 -- For OSX we hope we do not need many overrides
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local function init(abi, c, types)
 
 local ffi = require "ffi"

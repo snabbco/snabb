@@ -5,6 +5,13 @@
 
 -- note that some types will be overridden, eg default fd type will have metamethods added
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local function init(abi, c, errors, ostypes, rump)
 
 local ffi = require "ffi"

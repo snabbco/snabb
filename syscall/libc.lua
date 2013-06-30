@@ -1,6 +1,13 @@
 -- things that are libc only, not syscalls
 -- this file will not be included if not running with libc eg for rump
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local function init(S)
 
 local c = S.c

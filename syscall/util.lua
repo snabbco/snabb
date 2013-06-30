@@ -3,6 +3,13 @@
 -- these are generally equivalent to things that are in man(1) or man(3)
 -- these can be made more modular as number increases
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local function init(S)
 
 local ffi = require "ffi"

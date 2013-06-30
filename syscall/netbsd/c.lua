@@ -1,6 +1,13 @@
 -- This sets up the table of C functions for BSD
 -- We need to override functions that are versioned as the old ones selected otherwise
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local function init(abi, c, types)
 
 local ffi = require "ffi"

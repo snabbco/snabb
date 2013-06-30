@@ -2,6 +2,13 @@
 
 -- TODO many are common and can be shared here
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local abi = require "syscall.abi"
 
 require("syscall." .. abi.os .. ".ffifunctions")

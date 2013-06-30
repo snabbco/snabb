@@ -1,6 +1,13 @@
 -- ioctls, filling in as needed
 -- note there are some architecture dependent values
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 return function(abi, types)
 
 local s = types.s

@@ -1,5 +1,12 @@
 -- this module defines the types with metatypes that are always common, so do not get errors redefining metatypes
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local ffi = require "ffi"
 
 local t, ctypes, pt, s = {}, {}, {}, {}

@@ -2,6 +2,13 @@
 -- will cover iptables, ip6tables, ebtables, arptables eventually
 -- even less documentation than for netlink but it does not look too bad...
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local nf = {} -- exports
 
 local ffi = require "ffi"

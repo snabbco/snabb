@@ -1,5 +1,12 @@
 -- fcntl is one of those bits of the Unix API that is a bit random, so give it its own file
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 return function(abi, c, types)
 
 local ffi = require "ffi"

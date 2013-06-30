@@ -1,5 +1,12 @@
 -- OSX specific syscalls
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 return function(S, hh, abi, c, C, types, ioctl)
 
 local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd

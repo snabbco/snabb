@@ -5,6 +5,13 @@
 
 -- TODO rework so that items can be methods on fd again, for eventfd, timerfd, signalfd and tty
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
 local function init(S)
 
 local abi, types, c = S.abi, S.types, S.c
