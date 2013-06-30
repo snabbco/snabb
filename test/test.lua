@@ -1,5 +1,10 @@
 -- test suite for ljsyscall.
 
+-- Some Lua installations do not have current directory in the path.
+-- Anyway, we want to give preference to the current directory,
+-- so it is good idea to put it first.
+package.path = "./?.lua;" .. package.path
+
 local strict = require "test.strict"
 
 local oldassert = assert
