@@ -10,7 +10,7 @@ local bit = require "bit"
 local band = bit.band
 local function bor(...)
   local r = bit.bor(...)
-  if r < 0 then r = r + 4294967296LL end -- TODO see note in Linux
+  if r < 0 then r = r + 4294967296LL end -- TODO see note in Linux.
   return r
 end
 local lshift = bit.lshift
@@ -63,6 +63,7 @@ local ioctl = strflag {
 --[[
   SIOCADDRT      =  _IOW('r', 10, "ortentry"),
   SIOCDELRT      =  _IOW('r', 11, "ortentry"),
+]]
   SIOCSIFADDR    =  _IOW('i', 12, "ifreq"),
   SIOCGIFADDR    = _IOWR('i', 33, "ifreq"),
   SIOCSIFDSTADDR =  _IOW('i', 14, "ifreq"),
@@ -71,12 +72,13 @@ local ioctl = strflag {
   SIOCGIFFLAGS   = _IOWR('i', 17, "ifreq"),
   SIOCGIFBRDADDR = _IOWR('i', 35, "ifreq"),
   SIOCSIFBRDADDR =  _IOW('i', 19, "ifreq"),
-  SIOCGIFCONF    = _IOWR('i', 38, "ifconf"),
+--SIOCGIFCONF    = _IOWR('i', 38, "ifconf"),
   SIOCGIFNETMASK = _IOWR('i', 37, "ifreq"),
   SIOCSIFNETMASK =  _IOW('i', 22, "ifreq"),
   SIOCGIFMETRIC  = _IOWR('i', 23, "ifreq"),
   SIOCSIFMETRIC  =  _IOW('i', 24, "ifreq"),
   SIOCDIFADDR    =  _IOW('i', 25, "ifreq"),
+--[[
   SIOCAIFADDR    =  _IOW('i', 26, "ifaliasreq"),
   SIOCGIFALIAS   = _IOWR('i', 27, "ifaliasreq"),
   SIOCALIFADDR   =  _IOW('i', 28, "if_laddrreq"),
@@ -84,37 +86,38 @@ local ioctl = strflag {
   SIOCDLIFADDR   =  _IOW('i', 30, "if_laddrreq"),
   SIOCSIFADDRPREF=  _IOW('i', 31, "if_addrprefreq"),
   SIOCGIFADDRPREF= _IOWR('i', 32, "if_addrprefreq"),
+]]
   SIOCADDMULTI   =  _IOW('i', 49, "ifreq"),
   SIOCDELMULTI   =  _IOW('i', 50, "ifreq"),
-  SIOCGETVIFCNT  = _IOWR('u', 51, "sioc_vif_req"),
-  SIOCGETSGCNT   = _IOWR('u', 52, "sioc_sg_req"),
+--SIOCGETVIFCNT  = _IOWR('u', 51, "sioc_vif_req"),
+--SIOCGETSGCNT   = _IOWR('u', 52, "sioc_sg_req"),
   SIOCSIFMEDIA   = _IOWR('i', 53, "ifreq"),
-  SIOCGIFMEDIA   = _IOWR('i', 54, "ifmediareq"),
+--SIOCGIFMEDIA   = _IOWR('i', 54, "ifmediareq"),
   SIOCSIFGENERIC =  _IOW('i', 57, "ifreq"),
   SIOCGIFGENERIC = _IOWR('i', 58, "ifreq"),
-  SIOCSIFPHYADDR =  _IOW('i', 70, "ifaliasreq"),
+--SIOCSIFPHYADDR =  _IOW('i', 70, "ifaliasreq"),
   SIOCGIFPSRCADDR= _IOWR('i', 71, "ifreq"),
   SIOCGIFPDSTADDR= _IOWR('i', 72, "ifreq"),
   SIOCDIFPHYADDR =  _IOW('i', 73, "ifreq"),
-  SIOCSLIFPHYADDR=  _IOW('i', 74, "if_laddrreq"),
-  SIOCGLIFPHYADDR= _IOWR('i', 75, "if_laddrreq"),
+--SIOCSLIFPHYADDR=  _IOW('i', 74, "if_laddrreq"),
+--SIOCGLIFPHYADDR= _IOWR('i', 75, "if_laddrreq"),
   SIOCSIFMTU     =  _IOW('i', 127, "ifreq"),
   SIOCGIFMTU     = _IOWR('i', 126, "ifreq"),
-  SIOCSDRVSPEC   =  _IOW('i', 123, "ifdrv"),
-  SIOCGDRVSPEC   = _IOWR('i', 123, "ifdrv"),
+--SIOCSDRVSPEC   =  _IOW('i', 123, "ifdrv"),
+--SIOCGDRVSPEC   = _IOWR('i', 123, "ifdrv"),
   SIOCIFCREATE   =  _IOW('i', 122, "ifreq"),
   SIOCIFDESTROY  =  _IOW('i', 121, "ifreq"),
-  SIOCIFGCLONERS = _IOWR('i', 120, "if_clonereq"),
+--SIOCIFGCLONERS = _IOWR('i', 120, "if_clonereq"),
   SIOCGIFDLT     = _IOWR('i', 119, "ifreq"),
-  SIOCGIFCAP     = _IOWR('i', 118, "ifcapreq"),
-  SIOCSIFCAP     =  _IOW('i', 117, "ifcapreq"),
+--SIOCGIFCAP     = _IOWR('i', 118, "ifcapreq"),
+--SIOCSIFCAP     =  _IOW('i', 117, "ifcapreq"),
   SIOCSVH        = _IOWR('i', 130, "ifreq"),
   SIOCGVH        = _IOWR('i', 131, "ifreq"),
   SIOCINITIFADDR = _IOWR('i', 132, "ifaddr"),
-  SIOCGIFDATA    = _IOWR('i', 133, "ifdatareq"),
-  SIOCZIFDATA    = _IOWR('i', 134, "ifdatareq"),
-  SIOCGLINKSTR   = _IOWR('i', 135, "ifdrv"),
-  SIOCSLINKSTR   =  _IOW('i', 136, "ifdrv"),
+--SIOCGIFDATA    = _IOWR('i', 133, "ifdatareq"),
+--SIOCZIFDATA    = _IOWR('i', 134, "ifdatareq"),
+--SIOCGLINKSTR   = _IOWR('i', 135, "ifdrv"),
+--SIOCSLINKSTR   =  _IOW('i', 136, "ifdrv"),
   SIOCSETPFSYNC  =  _IOW('i', 247, "ifreq"),
   SIOCGETPFSYNC  = _IOWR('i', 248, "ifreq"),
 ]]

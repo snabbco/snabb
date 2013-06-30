@@ -172,6 +172,41 @@ mt.dirent = {
 
 addtype("dirent", "struct dirent", mt.dirent)
 
+meth.ifreq = {
+  index = {
+    name = function(ifr) return ffi.string(ifr.ifr_name) end,
+    addr = function(ifr) return ifr.ifr_ifru.ifru_addr end,
+    dstaddr = function(ifr) return ifr.ifr_ifru.ifru_dstaddr end,
+    broadaddr = function(ifr) return ifr.ifr_ifru.ifru_broadaddr end,
+    space = function(ifr) return ifr.ifr_ifru.ifru_space end,
+    flags = function(ifr) return ifr.ifr_ifru.ifru_flags end,
+    metric = function(ifr) return ifr.ifr_ifru.ifru_metric end,
+    mtu = function(ifr) return ifr.ifr_ifru.ifru_mtu end,
+    dlt = function(ifr) return ifr.ifr_ifru.ifru_dlt end,
+    value = function(ifr) return ifr.ifr_ifru.ifru_value end,
+    media = function(ifr) return ifr.ifr_ifru.ifru_media end,
+    -- TODO rest of fields (buf, buflen)
+  },
+  newindex = {
+    name = function(ifr, v)
+      assert(#v <= c.IFNAMSIZ, "name too long")
+      ifr.ifr_ifrn.ifrn_name = v
+    end,
+    flags = function(ifr, v)
+      ifr.ifr_ifru.ifru_flags = c.IFREQ[v]
+    end,
+    -- TODO rest of fields
+  },
+}
+
+mt.ifreq = {
+  __index = function(ifr, k) if meth.ifreq.index[k] then return meth.ifreq.index[k](ifr) end end,
+  __newindex = function(ifr, k, v) if meth.ifreq.newindex[k] then meth.ifreq.newindex[k](ifr, v) end end,
+  __new = newfn,
+}
+
+addtype("ifreq", "struct ifreq", mt.ifreq)
+
 return types
 
 end

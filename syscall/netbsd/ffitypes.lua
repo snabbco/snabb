@@ -224,6 +224,25 @@ struct _netbsd_dirent {
   uint8_t  d_type;
   char     d_name[512];
 };
+struct _netbsd_ifreq {
+  char ifr_name[IFNAMSIZ];
+  union {
+    struct  _netbsd_sockaddr ifru_addr;
+    struct  _netbsd_sockaddr ifru_dstaddr;
+    struct  _netbsd_sockaddr ifru_broadaddr;
+    struct  _netbsd_sockaddr_storage ifru_space;
+    short   ifru_flags;
+    int     ifru_metric;
+    int     ifru_mtu;
+    int     ifru_dlt;
+    unsigned int   ifru_value;
+    void *  ifru_data;
+    struct {
+      uint32_t        b_buflen;
+      void            *b_buf;
+    } ifru_b;
+  } ifr_ifru;
+};
 ]]
 
 end
