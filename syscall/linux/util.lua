@@ -112,7 +112,7 @@ local function bridge_if_ioctl(io, bridge, dev)
   end
   ifr = t.ifreq()
   len = #bridge + 1
-  if len > IFNAMSIZ then len = IFNAMSIZ end
+  if len > c.IFNAMSIZ then len = c.IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, bridge, len) -- note not using the short forms as no metatable defined yet...
   ifr.ifr_ifru.ifru_ivalue = dev
   ret, err = S.ioctl(s, io, ifr);
@@ -339,7 +339,7 @@ end
 local function if_nametoindex(name, s) -- internal version when already have socket for ioctl (although not used anywhere)
   local ifr = t.ifreq()
   local len = #name + 1
-  if len > IFNAMSIZ then len = IFNAMSIZ end
+  if len > c.IFNAMSIZ then len = c.IFNAMSIZ end
   ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
   local ret, err = S.ioctl(s, "SIOCGIFINDEX", ifr)
   if not ret then return nil, err end
