@@ -1,7 +1,7 @@
 -- choose correct syscalls for OS, plus shared calls
 -- note that where functions are identical if present but may be missing they can also go here
 
-function init(abi, c, C, types, ioctl, fcntl)
+local function init(abi, c, C, types, ioctl, fcntl)
 
 local ffi = require "ffi"
 local bit = require "bit"
