@@ -175,7 +175,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
     for i = 1, math.floor(n / s.fdb_entry) do
       local fdb = fdbs[i - 1]
       local mac = t.macaddr()
-      ffi.copy(mac, fdb.mac_addr, IFHWADDRLEN)
+      ffi.copy(mac, fdb.mac_addr, s.macaddr)
 
       -- TODO ageing_timer_value is not an int, time, float
       brforward[#brforward + 1] = {
