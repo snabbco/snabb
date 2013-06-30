@@ -26,6 +26,16 @@ local util = {}
 
 local mt = {}
 
+local function if_nametoindex(name, s) -- internal version when already have socket for ioctl (although not used anywhere)
+  local ifr = t.ifreq()
+  local len = #name + 1
+  if len > c.IFNAMSIZ then len = c.IFNAMSIZ end
+  ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
+  local ret, err = S.ioctl(s, "SIOCGIFINDEX", ifr)
+  if not ret then return nil, err end
+  return ifr.ifr_ifru.ifru_ivalue
+end
+
 -- recursive rm TODO use ls iterator, which also returns type
 local function rmhelper(file, prefix)
   local name
@@ -334,16 +344,6 @@ function util.mounts(file)
   -- idea is you can round-trip this data
   -- a lot of the fs specific options are key=value so easier to recognise
   return setmetatable(mounts, mt.mounts)
-end
-
-local function if_nametoindex(name, s) -- internal version when already have socket for ioctl (although not used anywhere)
-  local ifr = t.ifreq()
-  local len = #name + 1
-  if len > c.IFNAMSIZ then len = c.IFNAMSIZ end
-  ffi.copy(ifr.ifr_ifrn.ifrn_name, name, len)
-  local ret, err = S.ioctl(s, "SIOCGIFINDEX", ifr)
-  if not ret then return nil, err end
-  return ifr.ifr_ifru.ifru_ivalue
 end
 
 function util.if_nametoindex(name) -- standard function in some libc versions
