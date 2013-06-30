@@ -49,9 +49,9 @@ local function _IOC(dir, tp, nr, size)
   if type(size) == "string" then size = s[size] end
   if type(tp) == "string" then tp = tp:byte() end
   return bor(lshift(dir, IOC.DIRSHIFT), 
-	 lshift(tp, IOC.TYPESHIFT), 
-	 lshift(nr, IOC.NRSHIFT), 
-	 lshift(size, IOC.SIZESHIFT))
+	     lshift(tp, IOC.TYPESHIFT), 
+	     lshift(nr, IOC.NRSHIFT), 
+	     lshift(size, IOC.SIZESHIFT))
 end
 
 -- used to create numbers

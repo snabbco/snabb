@@ -16,34 +16,39 @@ end
 local lshift = bit.lshift
 local rshift = bit.rshift
 
+local IOC = {
+  VOID  = 0x20000000UL,
+  OUT   = 0x40000000UL,
+  IN    = 0x80000000UL,
+
+  DIRMASK     = 0xe0000000UL,
+  PARM_MASK   = 0x1fff,
+  PARM_SHIFT  = 16,
+  GROUP_SHIFT = 8,
+}
+
+IOC.INOUT = IOC.IN + IOC.OUT
+
+local function _IOC(dir, tp, nr, size)
+  if type(size) == "string" then size = s[size] end
+  if type(tp) == "string" then tp = tp:byte() end
+  return bor(dir,
+             lshift(band(size, IOC.PARM_MASK), IOC.PARM_SHIFT),
+             lshift(tp , IOC.GROUP_SHIFT),
+             nr)
+end
+
+local _IO    = function(tp, nr)		return _IOC(IOC.VOID, tp, nr, 0) end
+local _IOR   = function(tp, nr, size)	return _IOC(IOC.OUT, tp, nr, size) end
+local _IOW   = function(tp, nr, size)	return _IOC(IOC.IN, tp, nr, size) end
+local _IOWR  = function(tp, nr, size)	return _IOC(IOC.INOUT, tp, nr, size) end
+
 --[[
-#define IOCPARM_MASK    0x1fff          /* parameter length, at most 13 bits */
-#define IOCPARM_SHIFT   16
-#define IOCGROUP_SHIFT  8
 #define IOCPARM_LEN(x)  (((x) >> IOCPARM_SHIFT) & IOCPARM_MASK)
 #define IOCBASECMD(x)   ((x) & ~(IOCPARM_MASK << IOCPARM_SHIFT))
 #define IOCGROUP(x)     (((x) >> IOCGROUP_SHIFT) & 0xff)
 
 #define IOCPARM_MAX     NBPG    /* max size of ioctl args, mult. of NBPG */
-                                /* no parameters */
-#define IOC_VOID        (unsigned long)0x20000000
-                                /* copy parameters out */
-#define IOC_OUT         (unsigned long)0x40000000
-                                /* copy parameters in */
-#define IOC_IN          (unsigned long)0x80000000
-                                /* copy parameters in and out */
-#define IOC_INOUT       (IOC_IN|IOC_OUT)
-                                /* mask for IN/OUT/VOID */
-#define IOC_DIRMASK     (unsigned long)0xe0000000
-
-#define _IOC(inout, group, num, len) \
-    ((inout) | (((len) & IOCPARM_MASK) << IOCPARM_SHIFT) | \
-    ((group) << IOCGROUP_SHIFT) | (num))
-#define _IO(g,n)        _IOC(IOC_VOID,  (g), (n), 0)
-#define _IOR(g,n,t)     _IOC(IOC_OUT,   (g), (n), sizeof(t))
-#define _IOW(g,n,t)     _IOC(IOC_IN,    (g), (n), sizeof(t))
-/* this should be _IORW, but stdio got there first */
-#define _IOWR(g,n,t)    _IOC(IOC_INOUT, (g), (n), sizeof(t))
 ]]
 
 local ioctl = strflag {
@@ -55,6 +60,7 @@ local ioctl = strflag {
   SIOCATMARK     =  _IOR('s',  7, "int"),
   SIOCSPGRP      =  _IOW('s',  8, "int"),
   SIOCGPGRP      =  _IOR('s',  9, "int"),
+--[[
   SIOCADDRT      =  _IOW('r', 10, "ortentry"),
   SIOCDELRT      =  _IOW('r', 11, "ortentry"),
   SIOCSIFADDR    =  _IOW('i', 12, "ifreq"),
@@ -111,6 +117,7 @@ local ioctl = strflag {
   SIOCSLINKSTR   =  _IOW('i', 136, "ifdrv"),
   SIOCSETPFSYNC  =  _IOW('i', 247, "ifreq"),
   SIOCGETPFSYNC  = _IOWR('i', 248, "ifreq"),
+]]
 }
 
 return ioctl
