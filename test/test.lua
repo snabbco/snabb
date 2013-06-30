@@ -850,7 +850,7 @@ test_sockets_pipes = {
     assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
     assert(s:listen()) -- will fail if we did not bind
     local c = assert(S.socket("inet", "stream")) -- client socket
-    assert(c:nonblock())
+    assert(c:block())
     assert(c:fcntl("setfd", "cloexec"))
     local ok, err = c:connect(sa)
     local a = s:accept()
