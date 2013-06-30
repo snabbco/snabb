@@ -13,7 +13,7 @@ local util = S.util
 
 local cgroup = {}
 
-local function mkgrp(name)
+local function mkgroup(name)
   -- append default location, should be tmpfs mount
   if name:sub(1, 1) ~= "/" then return "/sys/fs/cgroup" .. name else return name end
 end
