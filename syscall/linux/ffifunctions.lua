@@ -120,8 +120,6 @@ int swapoff(const char *path);
 
 int syscall(int number, ...);
 
-int ioctl(int d, int request, void *argp); /* void* easiest here */
-
 /* note we use underlying struct not typedefs here */
 int capget(struct user_cap_header *hdrp, struct user_cap_data *datap);
 int capset(struct user_cap_header *hdrp, const struct user_cap_data *datap);
