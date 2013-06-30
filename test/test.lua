@@ -1,5 +1,10 @@
 -- test suite for ljsyscall.
 
+-- Some Lua installations do not have current directory in the path.
+-- Anyway, we want to give preference to the current directory,
+-- so it is good idea to put it first.
+package.path = "./?.lua;" .. package.path
+
 local strict = require "test.strict"
 
 local oldassert = assert
@@ -856,7 +861,7 @@ test_sockets_pipes = {
     local a = s:accept()
     assert(a.fd:block())
     local ok, err = c:connect(sa) -- Linux will have returned INPROGRESS above, other OS may have connected
-    assert(s:block()) -- force accept to wait 
+    assert(s:block()) -- force accept to wait
     a = a or assert(s:accept())
     -- a is a table with the fd, but also the inbound connection details
     assert(a.addr.sin_family == 2, "expect ipv4 connection")
