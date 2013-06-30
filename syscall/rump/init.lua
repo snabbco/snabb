@@ -83,7 +83,7 @@ int rump_pub_module_init(const struct modinfo * const *, size_t);
 int rump_pub_module_fini(const struct modinfo *);
 ]]
 
-local pt = types.pt
+local t, pt = types.t, types.pt
 
 local modinfo = ffi.typeof("struct modinfo")
 
@@ -118,11 +118,12 @@ function S.rump.module(s)
 end
 
 function S.rump.etfs_register(key, hostpath, ftype, begin, size)
+  local ret
   ftype = RUMP_ETFS[ftype]
   if begin then
-    local ret = ffi.C.rump_pub_etfs_register_withsize(key, hostpath, ftype, begin, size);
+    ret = ffi.C.rump_pub_etfs_register_withsize(key, hostpath, ftype, begin, size);
   else
-    local ret = ffi.C.rump_pub_etfs_register(key, hostpath, ftype);
+    ret = ffi.C.rump_pub_etfs_register(key, hostpath, ftype);
   end
   return retbool(ret)
 end
