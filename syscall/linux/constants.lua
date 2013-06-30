@@ -229,7 +229,7 @@ addarch(c.MAP, arch.MAP, {
 c.MAP.ANON       = c.MAP.ANONYMOUS
 
 -- flags for `mlockall'.
-c.MCL = multiflags(arch.MCL or {
+c.MCL = strflag (arch.MCL or {
   CURRENT    = 1,
   FUTURE     = 2,
 })

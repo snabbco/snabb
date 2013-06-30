@@ -141,6 +141,7 @@ local nm = {
   UMOUNT = "MNT_",
   SIGPM = "SIG_",
   OPIPE = "O_",
+  MSYNC = "MS_",
 }
 
 for k, v in pairs(c) do

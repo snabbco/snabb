@@ -552,5 +552,47 @@ c.AT_SYMLINK_NOFOLLOW = multiflags {
   SYMLINK_NOFOLLOW = 0x200,
 }
 
+c.PROT = multiflags {
+  NONE  = 0x0,
+  READ  = 0x1,
+  WRITE = 0x2,
+  EXEC  = 0x4,
+}
+
+local function map_aligned(n) return bit.lshift(n, 24) end
+
+c.MAP = multiflags {
+  FILE       = 0x0000,
+  FIXED      = 0x0010,
+  RENAME     = 0x0020,
+  NORESERVE  = 0x0040,
+  INHERIT    = 0x0080,
+  HASSEMAPHORE= 0x0200,
+  TRYFIXED   = 0x0400,
+  WIRED      = 0x0800,
+  ANON       = 0x1000,
+  STACK      = 0x2000,
+  ALIGNMENT_64KB   = map_aligned(16),
+  ALIGNMENT_16MB   = map_aligned(24),
+  ALIGNMENT_4GB    = map_aligned(32),
+  ALIGNMENT_1TB    = map_aligned(40),
+  ALIGNMENT_256TB  = map_aligned(48),
+  ALIGNMENT_64PB   = map_aligned(56),
+}
+
+c.MAP.ANONYMOUS = c.MAP.ANON -- for compatibility
+
+c.MCL = strflag {
+  CURRENT    = 0x01,
+  FUTURE     = 0x02,
+}
+
+-- flags to `msync'. - note was MS_ renamed to MSYNC_
+c.MSYNC = multiflags {
+  ASYNC       = 0x01,
+  INVALIDATE  = 0x02,
+  SYNC        = 0x04,
+}
+
 return c
 
