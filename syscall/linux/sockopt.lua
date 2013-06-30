@@ -20,6 +20,8 @@
 -- draft
 
 -- will be more complex than this
+
+--[[
 local levelmaps = {
   [c.SOL.SOCKET] = c.SO,
 
@@ -42,3 +44,6 @@ local types = {
 
 
 }
+
+]]
+
