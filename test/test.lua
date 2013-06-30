@@ -893,15 +893,6 @@ test_sockets_pipes = {
     assert_equal(r, "test")
     assert(sv:close())
   end,
-  test_sigpipe = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(sv[1]:shutdown("rd"))
-    assert(S.signal("pipe", "ign"))
-    assert(sv[2]:close())
-    local n, err = sv[1]:write("will get sigpipe")
-    assert(err.PIPE, "should get sigpipe")
-    assert(sv[1]:close())
-  end,
   test_udp_socket = function()
     local ss = assert(S.socket("inet", "dgram"))
     local cs = assert(S.socket("inet", "dgram"))
@@ -981,6 +972,15 @@ test_signals = {
     assert(S.sigaction("pipe", "ign"))
     assert(S.kill(S.getpid(), "pipe")) -- should be ignored
     assert(S.sigaction("pipe", "dfl"))
+  end,
+  test_sigpipe = function() -- TODO BSDs have NOSIGPIPE flag that should do this too
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(sv[1]:shutdown("rd"))
+    assert(S.signal("pipe", "ign"))
+    assert(sv[2]:close())
+    local n, err = sv[1]:write("will get sigpipe")
+    assert(err.PIPE, "should get sigpipe")
+    assert(sv[1]:close())
   end,
 }
 end
