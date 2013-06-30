@@ -499,44 +499,6 @@ test_timers_signals_linux = {
   end,
 }
 
-test_mmap = {
-  test_mmap_fail = function()
-    local size = 4096
-    local mem, err = S.mmap(pt.void(1), size, "read", "fixed, anonymous", -1, 0)
-    assert(err, "expect non aligned fixed map to fail")
-    assert(err.INVAL, "expect non aligned map to return EINVAL")
-  end,
-  test_mmap = function()
-    local size = 4096
-    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-    assert(S.munmap(mem, size))
-  end,
-  test_msync = function()
-    local size = 4096
-    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-    assert(S.msync(mem, size, "sync"))
-    assert(S.munmap(mem, size))
-  end,
-  test_madvise = function()
-    local size = 4096
-    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-    assert(S.madvise(mem, size, "random"))
-    assert(S.munmap(mem, size))
-  end,
-  test_mlock = function()
-    local size = 4096
-    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-    assert(S.mlock(mem, size))
-    assert(S.munlock(mem, size))
-    assert(S.munmap(mem, size))
-  end,
-  test_mlockall = function()
-    local ok, err = S.mlockall("current")
-    assert(ok or err.nomem, "expect mlockall to succeed, or fail due to rlimit")
-    assert(S.munlockall())
-  end,
-}
-
 test_mremap = { -- differs in prototype by OS
   test_mremap = function()
     local size = 4096

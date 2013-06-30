@@ -961,7 +961,7 @@ test_timers = {
   end,
 }
 
-if not abi.rump then -- rump has no processes so not applicable
+if not abi.rump then -- rump has no processes, memory allocation so not applicable
 test_signals = {
   test_signal_ignore = function()
     assert(S.signal("pipe", "ign"))
@@ -981,6 +981,43 @@ test_signals = {
     local n, err = sv[1]:write("will get sigpipe")
     assert(err.PIPE, "should get sigpipe")
     assert(sv[1]:close())
+  end,
+}
+test_mmap = {
+  test_mmap_fail = function()
+    local size = 4096
+    local mem, err = S.mmap(pt.void(1), size, "read", "fixed, anonymous", -1, 0)
+    assert(err, "expect non aligned fixed map to fail")
+    assert(err.INVAL, "expect non aligned map to return EINVAL")
+  end,
+  test_mmap = function()
+    local size = 4096
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    assert(S.munmap(mem, size))
+  end,
+  test_msync = function()
+    local size = 4096
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    assert(S.msync(mem, size, "sync"))
+    assert(S.munmap(mem, size))
+  end,
+  test_madvise = function()
+    local size = 4096
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    assert(S.madvise(mem, size, "random"))
+    assert(S.munmap(mem, size))
+  end,
+  test_mlock = function()
+    local size = 4096
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    assert(S.mlock(mem, size))
+    assert(S.munlock(mem, size))
+    assert(S.munmap(mem, size))
+  end,
+  test_mlockall = function()
+    local ok, err = S.mlockall("current")
+    assert(ok or err.nomem, "expect mlockall to succeed, or fail due to rlimit")
+    assert(S.munlockall())
   end,
 }
 end
