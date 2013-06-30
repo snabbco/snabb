@@ -34,6 +34,7 @@ function util.ifcreate(name) -- TODO generic function that creates socket to do 
   if not sock then return nil, err end
   local ifr = t.ifreq{name = name}
   local io, err = sock:ioctl("SIOCIFCREATE", ifr)
+  if not io then return nil, err end
   local ok, err = sock:close()
   if not ok then return nil, err end
   return true
