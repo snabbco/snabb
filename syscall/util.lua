@@ -12,9 +12,7 @@ local t, pt, s = types.t, types.pt, types.s
 
 local mt, meth = {}, {}
 
-local util = {}
-
-if abi.os == "linux" then util = require "syscall.linux.util".init(S) end -- no other OSs have specific util code yet
+local util = require("syscall." .. abi.os .. ".util").init(S)
 
 mt.dir = {
   __tostring = function(t)

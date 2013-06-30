@@ -75,6 +75,7 @@ build =
       ["syscall.netbsd.types"] = "syscall/netbsd/types.lua";
       ["syscall.netbsd.fcntl"] = "syscall/netbsd/fcntl.lua";
       ["syscall.netbsd.errors"] = "syscall/netbsd/errors.lua";
+      ["syscall.netbsd.util"] = "syscall/netbsd/util.lua";
 
       ["syscall.osx.syscalls"] = "syscall/osx/syscalls.lua";
       ["syscall.osx.c"] = "syscall/osx/c.lua";
@@ -85,6 +86,7 @@ build =
       ["syscall.osx.types"] = "syscall/osx/types.lua";
       ["syscall.osx.fcntl"] = "syscall/osx/fcntl.lua";
       ["syscall.osx.errors"] = "syscall/osx/errors.lua";
+      ["syscall.osx.util"] = "syscall/osx/util.lua";
 
       ["syscall.rump.init"] = "syscall/rump/init.lua";
       ["syscall.rump.c"] = "syscall/rump/c.lua";
