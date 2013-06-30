@@ -562,6 +562,8 @@ c.PROT = multiflags {
 local function map_aligned(n) return bit.lshift(n, 24) end
 
 c.MAP = multiflags {
+  SHARED     = 0x0001,
+  PRIVATE    = 0x0002,
   FILE       = 0x0000,
   FIXED      = 0x0010,
   RENAME     = 0x0020,
