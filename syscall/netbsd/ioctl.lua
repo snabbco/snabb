@@ -17,11 +17,11 @@ local lshift = bit.lshift
 local rshift = bit.rshift
 
 local IOC = {
-  VOID  = 0x20000000UL,
-  OUT   = 0x40000000UL,
-  IN    = 0x80000000UL,
+  VOID  = 0x20000000,
+  OUT   = 0x40000000,
+  IN    = 0x80000000,
 
-  DIRMASK     = 0xe0000000UL,
+  DIRMASK     = 0xe0000000,
   PARM_MASK   = 0x1fff,
   PARM_SHIFT  = 16,
   GROUP_SHIFT = 8,
