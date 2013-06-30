@@ -529,11 +529,12 @@ test_mmap = {
     assert(S.mlock(mem, size))
     assert(S.munlock(mem, size))
     assert(S.munmap(mem, size))
+  end,
+  test_mlockall = function()
     local ok, err = S.mlockall("current")
     assert(ok or err.nomem, "expect mlockall to succeed, or fail due to rlimit")
     assert(S.munlockall())
-    assert(S.munmap(mem, size))
-  end
+  end,
 }
 
 test_mremap = { -- differs in prototype by OS
