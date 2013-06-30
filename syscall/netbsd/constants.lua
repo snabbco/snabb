@@ -596,5 +596,15 @@ c.MSYNC = multiflags {
   SYNC        = 0x04,
 }
 
+c.MADV = strflag {
+  NORMAL      = 0,
+  RANDOM      = 1,
+  SEQUENTIAL  = 2,
+  WILLNEED    = 3,
+  DONTNEED    = 4,
+  SPACEAVAIL  = 5,
+  FREE        = 6,
+}
+
 return c
 
