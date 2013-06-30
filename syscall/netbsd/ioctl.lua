@@ -30,7 +30,7 @@ local IOC = {
 IOC.INOUT = IOC.IN + IOC.OUT
 
 local function _IOC(dir, tp, nr, size)
-  if type(size) == "string" then size = s[size] end
+  if type(size) == "string" then size = assert(s[size], "missing type " .. size) end
   if type(tp) == "string" then tp = tp:byte() end
   return bor(dir,
              lshift(band(size, IOC.PARM_MASK), IOC.PARM_SHIFT),
@@ -113,14 +113,13 @@ local ioctl = strflag {
 --SIOCSIFCAP     =  _IOW('i', 117, "ifcapreq"),
   SIOCSVH        = _IOWR('i', 130, "ifreq"),
   SIOCGVH        = _IOWR('i', 131, "ifreq"),
-  SIOCINITIFADDR = _IOWR('i', 132, "ifaddr"),
+--SIOCINITIFADDR = _IOWR('i', 132, "ifaddr"),
 --SIOCGIFDATA    = _IOWR('i', 133, "ifdatareq"),
 --SIOCZIFDATA    = _IOWR('i', 134, "ifdatareq"),
 --SIOCGLINKSTR   = _IOWR('i', 135, "ifdrv"),
 --SIOCSLINKSTR   =  _IOW('i', 136, "ifdrv"),
   SIOCSETPFSYNC  =  _IOW('i', 247, "ifreq"),
   SIOCGETPFSYNC  = _IOWR('i', 248, "ifreq"),
-]]
 }
 
 return ioctl
