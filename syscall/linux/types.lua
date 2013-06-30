@@ -208,9 +208,9 @@ mt.sockaddr_un = {
     if namelen > 0 then
       if sa.sun_path[0] == 0 then
         if k == 'abstract' then return true end
-        if k == 'name' then return ffi.string(rets.addr.sun_path, namelen) end -- should we also remove leading \0?
+        if k == 'name' then return ffi.string(sa.sun_path, namelen) end -- should we also remove leading \0?
       else
-        if k == 'name' then return ffi.string(rets.addr.sun_path) end
+        if k == 'name' then return ffi.string(sa.sun_path) end
       end
     else
       if k == 'unnamed' then return true end
