@@ -854,6 +854,7 @@ test_sockets_pipes = {
     assert(c:fcntl("setfd", "cloexec"))
     local ok, err = c:connect(sa)
     local a = s:accept()
+    assert(a.fd:block())
     local ok, err = c:connect(sa) -- Linux will have returned INPROGRESS above, other OS may have connected
     assert(s:block()) -- force accept to wait 
     a = a or assert(s:accept())
@@ -877,7 +878,6 @@ test_sockets_pipes = {
     assert(n == 7, "expect writev to write 7 bytes")
     b0 = t.buffer(3)
     b1 = t.buffer(4)
-    assert(a.fd:block())
     local iov = t.iovecs{{b0, 3}, {b1, 4}}
     n = assert(a.fd:readv(iov))
     assert_equal(n, 7, "expect readv to read 7 bytes")
