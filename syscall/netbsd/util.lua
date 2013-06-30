@@ -19,6 +19,8 @@ local util = {}
 
 local mt = {}
 
+-- initial implementation of network ioctls, no real attempt to make it compatible with Linux...
+--util.
 
 return util
 
