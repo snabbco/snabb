@@ -1,8 +1,8 @@
 // A buffer describes a piece of memory with known size and physical address.
 struct buffer {
-  char *ptr;     // virtual address in this process
-  uint64_t phy;  // stable physical address
-  uint32_t size; // how many bytes in the buffer?
+  char     *pointer; // virtual address in this process
+  uint64_t physical; // stable physical address
+  uint32_t size;     // how many bytes in the buffer?
 }
 
 // A packet_iovec describes a portion of a buffer.
@@ -44,7 +44,13 @@ enum {
 };
 
 struct packet {
-  int refcount;
-  struct packet_header *header;
-  struct packet_iovec buffers[PACKET_IOVEC_MAX];
+  uint32_t refcount;
+  // How much "fuel" does this packet have left before it's dropped?
+  // This is like the Time-To-Live (TTL) IP header field.
+  uint32_t fuel;
+  // XXX do we need a callback when a packet is freed?
+  // (that's when we will give back buffers to kvm virtio clients?)
+  struct packet_info info;
+  int niovecs;
+  struct packet_iovec iovecs[PACKET_IOVEC_MAX];
 }
