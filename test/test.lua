@@ -1,5 +1,7 @@
 -- test suite for ljsyscall.
 
+-- TODO stop using globals for tests
+
 -- Some Lua installations do not have current directory in the path.
 -- Anyway, we want to give preference to the current directory,
 -- so it is good idea to put it first.
@@ -23,7 +25,8 @@ if arg[1] == "rump" then
   if SS.abi.os == "linux" then
     assert(SS.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
   end
-  S = require "syscall.rump.init".init("vfs", "fs.tmpfs", "net", "net.net", "net.local", "net.netinet", "net.config", "net.shmif")
+  local modules = {"vfs", "fs.tmpfs", "fs.kernfs", "net", "net.net", "net.local", "net.netinet", "net.shmif", "net.config"}
+  S = require "syscall.rump.init".init(modules)
   table.remove(arg, 1)
   rump = true
 else
@@ -48,14 +51,8 @@ end
 local bit = require "bit"
 local ffi = require "ffi"
 
-local useos = abi.os
-
-if rump then useos = "netbsd" end
-
--- TODO fix, this is redefining methods somehow (very wrong!) when using rump
-if not rump then
-  require("test." .. useos) -- OS specific tests
-end
+local test = require("test." .. abi.os).init(S) -- OS specific tests
+for k, v in pairs(test) do _G["test_" .. k] = v end
 
 local function fork_assert(cond, str) -- if we have forked we need to fail in main thread not fork
   if not cond then
@@ -1060,7 +1057,7 @@ if rump then
 end
 
 -- note at present we check for uid 0, but could check capabilities instead.
-if not rump and S.geteuid() == 0 then
+if S.geteuid() == 0 then
   if abi.os == "linux" then
     -- some tests are causing issues, eg one of my servers reboots on pivot_root
     if not arg[1] and arg[1] ~= "all" then
@@ -1100,7 +1097,7 @@ end
 
 -- TODO iterate through all functions in S and upvalues for active rather than trace
 -- also check for non interesting cases, eg fall through to end
--- TODO add more files, this is not very applicable since code made modular
+-- TODO this is not working any more, FIXME
 
 if arg[1] == "coverage" then
   cov.covered = 0

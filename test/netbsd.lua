@@ -1,11 +1,12 @@
 -- BSD specific tests
 
-local S = require "syscall"
+local function init(S)
+
 local helpers = require "syscall.helpers"
 local types = S.types
 local c = S.c
 local abi = S.abi
-local features = require "syscall.features"
+local features = S.features
 local util = S.util
 
 local bit = require "bit"
@@ -53,7 +54,9 @@ local clean = function()
   S.unlink(efile)
 end
 
-test_mount_bsd_root = {
+local test = {}
+
+test.mount_bsd_root = {
   test_mount_kernfs = function()
     assert(S.mkdir(tmpfile))
     assert(S.mount{dir=tmpfile, type="kernfs"})
@@ -69,7 +72,7 @@ test_mount_bsd_root = {
   end,
 }
 
-test_filesystem_bsd = {
+test.filesystem_bsd = {
 -- BSD utimensat as same specification as Linux, but some functionality missing, so test simpler
   test_utimensat = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
@@ -85,7 +88,7 @@ test_filesystem_bsd = {
   end,
 }
 
-test_network_utils_bsd_root = {
+test.network_utils_bsd_root = {
   test_ifcreate = function()
     local ifname = "lo99" .. tostring(S.getpid())
     assert(util.ifcreate(ifname))
@@ -93,4 +96,9 @@ test_network_utils_bsd_root = {
   end,
 }
 
+return test
+
+end
+
+return {init = init}
 

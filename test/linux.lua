@@ -1,8 +1,7 @@
 -- Linux specific tests
 
--- TODO stop using globals for tests
+local function init(S)
 
-local S = require "syscall"
 local abi = S.abi
 local types = S.types
 local c = S.c
@@ -58,7 +57,9 @@ local clean = function()
   S.unlink(efile)
 end
 
-test_file_operations_linux = {
+local test = {}
+
+test.file_operations_linux = {
   test_openat = function()
     local dfd = S.open(".")
     local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "rwxu"))
@@ -181,7 +182,7 @@ test_file_operations_linux = {
   end,
 }
 
-test_inotify = {
+test.inotify = {
   test_inotify = function()
     assert(S.mkdir(tmpfile, "RWXU")) -- do in directory so ok to run in parallel
     local fd = assert(S.inotify_init("cloexec, nonblock"))
@@ -204,7 +205,7 @@ test_inotify = {
   end,
 }
 
-test_xattr = {
+test.xattr = {
   test_xattr = function()
     assert(util.writefile(tmpfile, "test", "RWXU"))
     local l, err = S.listxattr(tmpfile)
@@ -277,7 +278,7 @@ test_xattr = {
   end,
 }
 
-test_locking = {
+test.locking = {
   test_fcntl_setlk = function()
     local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
@@ -316,7 +317,7 @@ test_locking = {
   end,
 }
 
-test_tee_splice = {
+test.tee_splice = {
   test_tee_splice = function()
     local p = assert(S.pipe("nonblock"))
     local pp = assert(S.pipe("nonblock"))
@@ -361,7 +362,7 @@ test_tee_splice = {
   end,
 }
 
-test_timers_signals_linux = {
+test.timers_signals_linux = {
   test_nanosleep = function()
     local rem = assert(S.nanosleep(0.001))
     assert_equal(rem, true, "expect no elapsed time after nanosleep")
@@ -499,7 +500,7 @@ test_timers_signals_linux = {
   end,
 }
 
-test_mremap = { -- differs in prototype by OS
+test.mremap = { -- differs in prototype by OS
   test_mremap = function()
     local size = 4096
     local size2 = size * 2
@@ -509,7 +510,7 @@ test_mremap = { -- differs in prototype by OS
   end,
 }
 
-test_misc = {
+test.misc = {
   test_umask = function()
     local mask
     mask = S.umask("WGRP, WOTH")
@@ -623,7 +624,7 @@ test_misc = {
   end,
 }
 
-test_sendfile = {
+test.sendfile = {
   test_sendfile = function()
     local f1 = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local f2 = assert(S.open(tmpfile2, "rdwr,creat", "rwxu"))
@@ -638,7 +639,7 @@ test_sendfile = {
   end,
 }
 
-test_raw_socket = {
+test.raw_socket = {
   test_ip_checksum = function()
     local packet = {0x45, 0x00,
       0x00, 0x73, 0x00, 0x00,
@@ -711,7 +712,7 @@ test_raw_socket = {
 
 }
 
-test_netlink = {
+test.netlink = {
   test_getlink = function()
     local i = assert(nl.getlink())
     local df = assert(util.dirtable("/sys/class/net", true))
@@ -1048,7 +1049,7 @@ test_netlink = {
   end,
 }
 
-test_termios = {
+test.termios = {
   test_pts_termios = function()
     local ptm = assert(util.posix_openpt("rdwr, noctty"))
     assert(ptm:grantpt())
@@ -1087,7 +1088,7 @@ test_termios = {
   end,
 }
 
-test_poll_select = {
+test.poll_select = {
   test_poll = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local a, b = sv[1], sv[2]
@@ -1114,7 +1115,7 @@ test_poll_select = {
   end,
 }
 
-test_ppoll_pselect = {
+test.ppoll_pselect = {
   test_ppoll = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local a, b = sv[1], sv[2]
@@ -1141,7 +1142,7 @@ test_ppoll_pselect = {
   end,
 }
 
-test_events_epoll = {
+test.events_epoll = {
   test_eventfd = function()
     local fd = assert(S.eventfd(0, "nonblock"))
     local n = assert(util.eventfd_read(fd))
@@ -1174,7 +1175,7 @@ test_events_epoll = {
   end
 }
 
-test_aio = {
+test.aio = {
   teardown = clean,
   test_aio_setup = function()
     local ctx = assert(S.io_setup(8))
@@ -1260,7 +1261,7 @@ test_aio = {
   end,
 }
 
-test_processes = {
+test.processes = {
   test_nice = function()
     local n = assert(S.getpriority("process"))
     assert_equal(n, 0, "process should start at priority 0")
@@ -1361,7 +1362,7 @@ test_processes = {
   end,
 }
 
-test_ids_linux = {
+test.ids_linux = {
   test_setreuid = function()
     assert(S.setreuid(S.geteuid(), S.getuid()))
   end,
@@ -1406,7 +1407,7 @@ test_ids_linux = {
   end,
 }
 
-test_namespaces_root = {
+test.namespaces_root = {
   test_netns = function()
     local p = assert(S.clone("newnet"))
     if p == 0 then
@@ -1449,7 +1450,7 @@ test_namespaces_root = {
   end,
 }
 
-test_filesystem_linux = {
+test.filesystem_linux = {
   test_statfs = function()
     local st = assert(S.statfs("."))
     assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
@@ -1474,7 +1475,7 @@ test_filesystem_linux = {
   end,
 }
 
-test_mount_linux_root = {
+test.mount_linux_root = {
   test_mount = function()
     assert(S.mkdir(tmpfile))
     assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
@@ -1489,7 +1490,7 @@ test_mount_linux_root = {
   end,
 }
 
-test_misc_root = {
+test.misc_root = {
   test_acct = function()
     S.acct() -- may not be configured
   end,
@@ -1537,7 +1538,7 @@ test_misc_root = {
   end,
 }
 
-test_util = {
+test.util = {
   test_rm_recursive = function()
     assert(S.mkdir(tmpfile, "rwxu"))
     assert(S.mkdir(tmpfile .. "/subdir", "rwxu"))
@@ -1660,7 +1661,7 @@ test_util = {
   end,
 }
 
-test_bpf = {
+test.bpf = {
   test_bpf_struct_stmt = function()
     local bpf = t.sock_filter("LD,H,ABS", 12)
     assert_equal(bpf.code, c.BPF.LD + c.BPF.H + c.BPF.ABS)
@@ -1677,7 +1678,7 @@ test_bpf = {
   end,
 }
 
-test_seccomp = {
+test.seccomp = {
   test_no_new_privs = function() -- this must be done for non root to call type 2 seccomp
     local p = assert(S.clone())
      if p == 0 then
@@ -1842,7 +1843,7 @@ test_seccomp = {
   end,
 }
 
-test_swap = {
+test.swap = {
   test_swap_constants = function()
     assert_equal(c.SWAP_FLAG["23, discard"], c.SWAP_FLAG["prefer, discard"] + bit.lshift(23, c.SWAP_FLAG["prio_shift"]))
   end,
@@ -1857,7 +1858,7 @@ test_swap = {
   -- TODO need mkswap to test success
 }
 
-test_tuntap = {
+test.tuntap = {
   test_tuntap_root = function()
     local clonedev = "/dev/net/tun"
     local fd = assert(S.open(clonedev, "rdwr"))
@@ -1871,7 +1872,7 @@ test_tuntap = {
   end,
 }
 
-test_capabilities = {
+test.capabilities = {
   test_cap_tostring = function()
     local cap = t.cap()
     cap.SYSLOG = true
@@ -1958,7 +1959,7 @@ test_capabilities = {
   end,
 }
 
-test_scheduler = {
+test.scheduler = {
   test_getcpu = function()
     local r, err = S.getcpu()
     assert((err and err.NOSYS) or type(r) == "table", "table returned if supported")
@@ -2018,7 +2019,7 @@ test_scheduler = {
   end,
 }
 
-test_mq = {
+test.mq = {
   test_mq_open_close_unlink = function()
     local mq = assert(S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 512}))
     assert(S.mq_unlink(mqname)) -- unlink so errors do not leave dangling
@@ -2052,7 +2053,7 @@ test_mq = {
   -- TODO mq_notify
 }
 
-test_shm = {
+test.shm = {
   test_shm = function()
     local name = "XXXXXYYYY" .. S.getpid()
     local fd, err = S.shm_open(name, "rdwr, creat")
@@ -2063,4 +2064,10 @@ test_shm = {
     assert(fd:close())
   end,
 }
+
+return test
+
+end
+
+return {init = init}
 

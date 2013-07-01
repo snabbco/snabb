@@ -1,6 +1,7 @@
 -- BSD specific tests
 
-local S = require "syscall"
+local function init(S)
+
 local helpers = require "syscall.helpers"
 local types = S.types
 local c = S.c
@@ -52,7 +53,9 @@ local clean = function()
   S.unlink(efile)
 end
 
-test_mount_bsd_root = {
+local test = {}
+
+test.mount_bsd_root = {
   test_mount_kernfs = function()
     assert(S.mkdir(tmpfile))
     assert(S.mount{dir=tmpfile, type="kernfs"})
@@ -67,6 +70,12 @@ test_mount_bsd_root = {
     assert(S.rmdir(tmpfile))
   end,
 }
+
+return test
+
+end
+
+return {init = init}
 
 
 
