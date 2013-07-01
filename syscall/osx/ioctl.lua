@@ -7,7 +7,7 @@ require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 
-return function(abi, types)
+local function init(abi, types)
 
 local s = types.s
 
@@ -29,4 +29,6 @@ local ioctl = strflag {
 return ioctl
 
 end
+
+return {init = init}
 

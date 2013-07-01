@@ -22,7 +22,7 @@ local types = require "syscall.types".init(abi, c, errors, ostypes, nil) -- nil 
 local t, pt, s = types.t, types.pt, types.s
 
 local C = require("syscall." .. abi.os .. ".c").init(abi, c, types)
-local ioctl = require("syscall." .. abi.os .. ".ioctl")(abi, types) -- TODO add init fn
+local ioctl = require("syscall." .. abi.os .. ".ioctl").init(abi, types)
 local fcntl = require("syscall." .. abi.os .. ".fcntl")(abi, c, types) -- TODO add init fn
 
 local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
