@@ -8,7 +8,7 @@ require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 
-return function(abi, c, types)
+local function init(abi, c, types)
 
 local ffi = require "ffi"
 
@@ -57,4 +57,6 @@ local fcntl = {
 return fcntl
 
 end
+
+return {init = init}
 

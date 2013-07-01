@@ -39,7 +39,7 @@ end
 
 local C = require "syscall.rump.c".init(abi, c, types, rump)
 local ioctl = require("syscall.netbsd.ioctl").init(abi, types)
-local fcntl = require("syscall.netbsd.fcntl")(abi, c, types)
+local fcntl = require("syscall.netbsd.fcntl").init(abi, c, types)
 
 c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps
 
