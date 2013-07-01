@@ -6,6 +6,7 @@ local types = S.types
 local c = S.c
 local abi = S.abi
 local features = require "syscall.features"
+local util = S.util
 
 local bit = require "bit"
 local ffi = require "ffi"
@@ -81,6 +82,14 @@ test_filesystem_bsd = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
     assert(dfd:close())
+  end,
+}
+
+test_network_utils_bsd_root = {
+  test_ifcreate = function()
+    local ifname = "lo99" .. tostring(S.getpid())
+    assert(util.ifcreate(ifname))
+    assert(util.ifdestroy(ifname))
   end,
 }
 
