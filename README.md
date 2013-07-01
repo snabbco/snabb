@@ -26,21 +26,21 @@ The code does not currently support the main Lua implementation, only LuaJIT. It
 
 On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; intend to support MIPS in future but currently my only MIPS hardwrae does not support LuaJIT. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
-Android (ARM tested so far) currently passes some tests and fails others, so needs some more work, probably dealing with things that are not implemented in the kernel and other environment differences.
+Android (ARM tested so far) currently passes some tests and fails others, so needs some more work, probably dealing with things that are not implemented in the kernel or libc and other environment differences.
 
-For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT). NetBSD on ARM and PPC should work as it is clean and portable, and MIPS if LuaJIT runs. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the (small) differences.
+For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT). NetBSD on other 32 bit platforms should also run; more targets will be added to tests soon. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the (small) differences.
 
-OSX support is tested on x64 and x86. In principle there should be no issues running it on ARM (ie iOS), but I have not had a chance to try yet, so there may be some other differences.
+OSX support is tested on x64 and x86. In principle there should be no issues running it on ARM (ie iOS), but I have not had a chance to try yet, so there may be some other differences. Note that currently OSX support has many issues that need further work, and tests are not passing, and will be revisited later.
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
-For the rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project. Then install the libraries somewhere in your library path. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There will be full tests soon, but there is a basic example in `examples/rump` which is a port of one of the tests in buildrump.
+For the rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project. Then install the libraries somewhere in your library path. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There are some additional examples in `examples/rump` which is a port of the tests in buildrump. The rump kernel should run on any OS and architecture, but test coverage is currently limited to x64 on Linux and x32 on NetBSD; more targets to be added soon.
 
 ## New features planned soon
-netfilter, dhcp, selinux, arp, rump kernel backend, further BSD and OSX work, better sockopt handling, cgroups support.
+netfilter, dhcp, selinux, arp, rump kernel backend, further BSD and OSX work, better sockopt handling, cgroups support, more NetBSD support, more rump kernel support.
 
 ## Release notes
-0.8pre rump kernel fixes, NetBSD 64 bit fixes, initial ARP/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support.
+0.8pre rump kernel fixes, NetBSD 64 bit fixes, initial arp/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support, initial support of NetBSD network config.
 
 0.7 bug fixes, general cleanups, filesystem capabilities, xattr bug fixes, signal handler functions, cpu affinity support, scheduler functions, POSIX message queues, tun/tap support, ioctl additions and improvements, initial NetBSD and OSX support, initial NetBSD rump kernel support, some fixes to allow Android to work.
 
