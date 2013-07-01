@@ -1,74 +1,35 @@
---- Buffers represent Ethernet packets in memory. This is a young data
---- structure that is sure to undergo much evolution. For now buffers
---- have these properties:
-
---- - Buffers are reference-counted for automatic reuse. Buffers are
----   typically "ref'd" when they are placed on a transmit or receive
----   queue and then "deref'd" when processed by the DMA engine.
---- - Buffers consist of one 4096-byte buffer. (This won't last.)
---- - Buffers have a known physical and virtual address.
-
 module(...,package.seeall)
 
 local memory = require("memory")
 local ffi = require("ffi")
 
-ffi.cdef[[
-struct buffer {
-   char *ptr;    // Virtual address in this process.
-   uint64_t phy; // Stable physical address.
-   int maxsize;  // How many bytes available?
-   int size;     // How many bytes used?
-   int refcount; // How many users? minimum 1.
-};
-]]
+max       = 10e5
+allocated = 0
 
+buffers = freelist.new("struct buffer *", max_buffers
 buffer_t = ffi.typeof("struct buffer")
 
-size = 4096 -- Size of every buffer allocated by this module.
-max, allocated = 10e6, 0
-
-freelist = {}
-nfree = 0
-
---- Return a buffer with a refcount of 1.
+-- Return a ready-to-use buffer, or nil if none is available.
 function allocate ()
-   if nfree == 0 then
-      return new_buffer()
-   else
-      nfree = nfree - 1
-      local buf = freelist[nfree]
-      freelist[nfree] = nil
-      return buf
-   end
+   return freelist.remove() or new_buffer()
 end
 
--- Get the cost of allocation (e.g. mapping huge pages) out of the way.
-function preallocate (n) while nfree < n do free(new_buffer()) end end
-
+-- Return a newly created buffer, or nil if none can be created.
 function new_buffer ()
-   assert(allocated < max)
+   if allocated == max then return nil end
    allocated = allocated + 1
-   local ptr, phys, bytes = memory.dma_alloc(size)
-   return ffi.new(buffer_t, ptr, phys, size, 0, 1)
+   local pointer, physical, bytes = memory.dma_alloc(size)
+   return ffi.new(buffer_t, pointer, physical, size)
 end
 
-function free (buf)
-   freelist[nfree] = buf
-   nfree = nfree + 1
+-- Free a buffer that is no longer in use.
+function free (b)
+   freelist.add(buffers, b)
 end
 
---- A buffer is reused when it has been deref'd more than ref'd.
---- Exception: buffers with ref = 0 are not reused.
-
-function ref (buf)
-   buf.refcount = buf.refcount + 1
-end
-
-function deref (buf)
-   assert(buf)
-   if     buf.refcount == 0 then return 
-   elseif buf.refcount == 1 then buf.size = 0  free(buf)
-   else                          buf.refcount = buf.refcount -1 end
+-- Create buffers until at least N are ready for use.
+-- This is a way to pay the cost of allocating buffer memory in advance.
+function preallocate (n)
+   while freelist.nfree(buffers) < n do free(new_buffer()) end
 end
 
