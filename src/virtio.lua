@@ -71,45 +71,62 @@ end
 
 --- ### Transmit
 
-function transmit (dev, buf)
-   assert(can_transmit(dev), "transmit overflow")
-   -- Initialize a transmit descriptor
-   local descriptor_index = freelist_remove(dev.txfree)
-   local descriptor = dev.txring.desc[descriptor_index]
-   descriptor.addr = ffi.cast(uint64_t, buf.ptr)
-   descriptor.len  = buf.size
-   descriptor.flags = 0
-   descriptor.next = 0
-   -- Add the descriptor to the 'available' ring
-   dev.txring.avail.ring[dev.txavail % vring_size] = descriptor_index
-   dev.txavail = (dev.txavail + 1) % 65536
-   -- Setup mapping back from descriptor to buffer
-   dev.txbuffers[descriptor_index] = buf
-   buffer.ref(buf)
+function transmit (dev, p)
+   assert(can_transmit(dev, p), "transmit overflow")
+   local prev_descriptor = nil
+   for i = 0, p.niovecs-1 do
+      local iov = p.iovecs[i]
+      local descriptor_index = freelist.remove(dev.txfree)
+      local descriptor = dev.txring.desc[descriptor_index]
+      descriptor.addr  = ffi.cast(uint64_t, iovec.buffer.pointer)
+      descriptor.len   = iovec.length
+      descriptor.flags = 0
+      if prev_descriptor == nil then -- first descriptor
+         dev.txring.avail.ring[dev.txavail % vring_size] = descriptor_index
+         txbuffers[descriptor_index] = p
+      else
+         prev_descriptor.next = descriptor_index
+         prev_descriptor.flags = C.VIRTIO_DESC_F_NEXT
+      end
+      prev_descriptor = descriptor
+   end
    dev.txdirty = true
 end
 
-function can_transmit (dev)
-   return dev.txfree.nfree ~= 0
+function can_transmit (dev,  p)
+   return dev.txfree.nfree >= (p and p.niovecs or C.PACKET_IOVEC_MAX)
 end
 
 function sync_transmit (dev)
-   -- Reclaim used descriptors and release buffers that have been transmitted
+   reclaim_transmitted_packets(dev)
+   if dev.txdirty then
+      sync_new_packets_for_transmit(dev)
+      dev.txdirty = false
+   end
+end
+
+-- Reclaim used descriptors and unref packets that have been transmitted.
+function reclaim_transmitted_packets (dev)
    while dev.txused ~= dev.txring.used.idx do
       local descriptor_index = dev.txring.used.ring[dev.txused % vring_size].id
-      freelist_add(dev.txfree, descriptor_index)
-      buffer.deref(dev.txbuffers[descriptor_index])
+      local descriptor = dev.txring.desc[descriptor_index]
+      packet.deref(dev.txbuffers[descriptor_index])
+      while bit.band(descriptor.flags, C.VIRTIO_DESC_F_NEXT) ~= 0 do
+         descriptor_index = descriptor.next
+         freelist.add(dev.txfree, descriptor_index)
+      end
       dev.txused = (dev.txused + 1) % 65536
       dev.txpackets = dev.txpackets + 1
    end
-   if dev.txdirty then
-      update_vhost_memory_map(dev)
-      -- Make new descriptors available to hardware
-      C.full_memory_barrier()
-      dev.txring.avail.idx = dev.txavail
-      kick(dev.txring)
-      dev.txdirty = false
-   end
+end
+
+-- Make the whole transmit queue available for transmission.
+function sync_new_packets_for_transmit (dev)
+   update_vhost_memory_map(dev)
+   -- Make new descriptors available to hardware
+   C.full_memory_barrier()
+   dev.txring.avail.idx = dev.txavail
+   kick(dev.txring)
 end
 
 -- Signal the kernel via the 'kick' eventfd that there is new data.
@@ -137,7 +154,6 @@ function add_receive_buffer (dev, buf)
    dev.rxavail = (dev.rxavail + 1) % 65536
    -- Setup mapping back from descriptor to buffer
    dev.rxbuffers[descriptor_index] = buf
-   buffer.ref(buf)
    dev.rxdirty = true
 end
 
@@ -148,17 +164,14 @@ end
 function receive (dev)
    assert(can_receive(dev), "unable to receive")
    -- Get descriptor
-   local used = dev.rxring.used.ring[dev.rxused % vring_size]
-   local descriptor_index = used.id
-   local descriptor = dev.rxring.desc[descriptor_index]
-   local buf = dev.rxbuffers[descriptor_index]
-   dev.rxused = (dev.rxused + 1) % 65536
-   dev.rxpackets = dev.rxpackets + 1
-   -- Update and return buffer
-   buf.size = used.len
-   buffer.deref(buf)
-   freelist_add(dev.rxfree, descriptor_index)
-   return buf
+   local p = packet.allocate()
+   local descriptor_index = dev.rxring.used.ring[dev.rxused % vring_size].id
+   repeat
+      local descriptor = dev.rxring.desc[descriptor_index]
+      packet.add_iovec(p, rxbuffers[descriptor_index], descriptor.len)
+      descriptor_index = descriptor.next
+   until bit.band(descriptor.flags, VIRTIO_DESC_F_NEXT) == 0
+   return p
 end
 
 function can_receive (dev)
