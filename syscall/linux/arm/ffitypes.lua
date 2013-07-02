@@ -1,5 +1,12 @@
 -- arm specific definitions
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math, bit = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math, bit
+
 local ffi = require "ffi"
 
 local arch = {}

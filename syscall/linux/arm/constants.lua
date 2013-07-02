@@ -1,5 +1,12 @@
 -- arm specific constants
 
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math, bit = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math, bit
+
 local abi = require "syscall.abi"
 
 assert(abi.eabi, "only support eabi for arm")
