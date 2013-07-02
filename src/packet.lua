@@ -26,6 +26,7 @@ function add_iovec (p, b, length,  offset)
    iovec.length = length
    iovec.offset = offset or 0
    p.niovecs = p.niovecs + 1
+   p.length = p.length + length
 end
 
 -- Increase the reference count for packet p.

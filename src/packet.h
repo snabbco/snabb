@@ -52,5 +52,6 @@ struct packet {
   // (that's when we will give back buffers to kvm virtio clients?)
   struct packet_info info;
   int niovecs;
+  int length;
   struct packet_iovec iovecs[PACKET_IOVEC_MAX];
 }
