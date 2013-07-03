@@ -13,7 +13,7 @@ local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
 
-local nl = require "syscall.linux.nl"
+local nl = S.nl
 
 local helpers = require "syscall.helpers"
 

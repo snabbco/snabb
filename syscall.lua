@@ -48,6 +48,7 @@ S.util = require "syscall.util".init(S)
 
 if abi.os == "linux" then
   S.cgroup = require "syscall.linux.cgroup".init(S)
+  S.nl = require "syscall.linux.nl".init(S)
   -- TODO add the other Linux specific modules here
 end
 

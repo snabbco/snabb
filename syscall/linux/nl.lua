@@ -8,12 +8,13 @@ require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math, bit
 
+local function init(S)
+
 local nl = {} -- exports
 
 local ffi = require "ffi"
 local bit = require "bit"
 
-local S = require "syscall"
 local h = require "syscall.helpers"
 
 local types = S.types
@@ -1188,4 +1189,7 @@ end
 
 return nl
 
+end
+
+return {init = init}
 
