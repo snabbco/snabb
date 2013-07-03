@@ -2,16 +2,20 @@ module(...,package.seeall)
 
 local memory = require("memory")
 local ffi = require("ffi")
+local freelist = require("freelist")
+
+require("packet_h")
 
 max       = 10e5
 allocated = 0
+size      = 4096
 
-buffers = freelist.new("struct buffer *", max_buffers
+buffers = freelist.new("struct buffer *", max)
 buffer_t = ffi.typeof("struct buffer")
 
 -- Return a ready-to-use buffer, or nil if none is available.
 function allocate ()
-   return freelist.remove() or new_buffer()
+   return freelist.remove(buffers) or new_buffer()
 end
 
 -- Return a newly created buffer, or nil if none can be created.

@@ -1,6 +1,10 @@
+module(...,package.seeall)
+
 local memory = require("memory")
 local ffi = require("ffi")
 local C = ffi.C
+
+require("packet_h")
 
 initial_fuel = 1000
 max_packets = 10e5

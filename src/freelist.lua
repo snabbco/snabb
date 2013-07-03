@@ -1,5 +1,7 @@
 module("freelist",package.seeall)
 
+local ffi = require("ffi")
+
 function new (type, size)
    return { nfree = 0,
             -- XXX Better LuaJIT idiom for specifying the array type?
