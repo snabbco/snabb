@@ -15,7 +15,7 @@ end
 
 local helpers = require "syscall.helpers"
 
-local S, SS, rump
+local S, SS, rump, exit
 
 if arg[1] == "rump" then
   SS = require "syscall"
@@ -27,8 +27,10 @@ if arg[1] == "rump" then
   S = require "syscall.rump.init".init(modules)
   table.remove(arg, 1)
   rump = true
+  exit = SS.exit
 else
   S = require "syscall"
+  exit = S.exit
 end
 
 local abi = S.abi
@@ -56,7 +58,7 @@ local function fork_assert(cond, str) -- if we have forked we need to fail in ma
   if not cond then
     print(tostring(str))
     print(debug.traceback())
-    S.exit("failure")
+    exit("failure")
   end
   return cond, str
 end
@@ -1090,7 +1092,7 @@ clean()
 debug.sethook()
 
 if f ~= 0 then
-if rump then os.exit(1) else S.exit("failure") end
+  exit("failure")
 end
 
 -- TODO iterate through all functions in S and upvalues for active rather than trace
@@ -1133,12 +1135,7 @@ end
 
 collectgarbage("collect")
 
-if rump then
-  os.exit()
-else
-  S.exit("success")
-end
-
+exit("success")
 
 
 
