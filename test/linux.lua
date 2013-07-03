@@ -15,8 +15,6 @@ local t, pt, s = types.t, types.pt, types.s
 
 local nl = S.nl
 
-local helpers = require "syscall.helpers"
-
 local oldassert = assert
 local function assert(cond, s)
   collectgarbage("collect") -- force gc, to test for bugs
