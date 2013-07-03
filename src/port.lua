@@ -4,6 +4,7 @@ module(...,package.seeall)
 
 local C = require("ffi").C
 local buffer = require("buffer")
+local packet = require("packet")
 
 -- Dictionary of ports that exist.
 ports = {}
@@ -39,13 +40,21 @@ end
 function Port:spam ()
    local inputs, outputs = self.inputs, self.outputs
    -- Keep it simple: use one buffer for everything.
-   local buf = buffer.allocate()
-   buf.size = 60
+   local p = packet.allocate()
+   -- But make it interesting: three iovecs in the packet.
+   local b1, b2, b3 = buffer.allocate(), buffer.allocate(), buffer.allocate()
+   for i = 0, b1.size-1 do b1.pointer[i] = 0xb1 end
+   for i = 0, b2.size-1 do b2.pointer[i] = 0xb2 end
+   for i = 0, b3.size-1 do b3.pointer[i] = 0xb3 end
+   packet.add_iovec(p, b1, 10)
+   packet.add_iovec(p, b2, 20)
+   packet.add_iovec(p, b3, 30)
+   C.usleep(1e6)
    repeat
       for i = 1,#inputs do
          local output = outputs[i]
          while output:can_transmit() do
-            output:transmit(buf)
+            output:transmit(p)
          end
          output:sync_transmit()
       end
@@ -116,9 +125,9 @@ function Port:echo ()
          local input, output = inputs[i], outputs[i]
          input:sync_receive()
          while input:can_receive() and output:can_transmit() do
-            local buf = input:receive()
-            output:transmit(buf)
-            buffer.deref(buf)
+            local p = input:receive()
+            output:transmit(p)
+            packet.deref(p)
          end
          while input:can_add_receive_buffer() do
             input:add_receive_buffer(buffer.allocate())
