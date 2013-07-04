@@ -4,11 +4,14 @@ local ffi = require("ffi")
 
 function new (type, size)
    return { nfree = 0,
+            max = size,
             -- XXX Better LuaJIT idiom for specifying the array type?
             list = ffi.new(type.."[?]", size) }
 end
 
 function add (freelist, element)
+   -- Safety check
+   assert(freelist.nfree < freelist.max, "freelist overflow")
    freelist.list[freelist.nfree] = element
    freelist.nfree = freelist.nfree + 1
 end
