@@ -49,23 +49,12 @@ function packet_table () return ffi.new("struct packet*[?]", vring_size) end
 function buffer_table () return ffi.new("struct buffer*[?]", vring_size) end
 
 function descriptor_freelist ()
-   local fl = { nfree = 0, list = ffi.new("uint16_t[?]", vring_size) }
+   local fl = freelist.new("uint16_t", vring_size)
    for i = 1, vring_size do
-      freelist_add(fl, vring_size - i)
+      freelist.add(fl, vring_size - i)
    end
    return fl
 end
-
-function freelist_add (freelist, n)
-   freelist.list[freelist.nfree] = n
-   freelist.nfree = freelist.nfree + 1
-end
-
-function freelist_remove (freelist)
-   assert(freelist.nfree > 0, "freelist allocation failure")
-   freelist.nfree = freelist.nfree - 1
-   return freelist.list[freelist.nfree]
-end   
 
 --- ### Transmit
 
@@ -94,7 +83,7 @@ function transmit (dev, p)
 end
 
 function can_transmit (dev,  p)
-   return dev.txfree.nfree >= (p and p.niovecs or C.PACKET_IOVEC_MAX)
+   return freelist.nfree(dev.txfree) >= (p and p.niovecs or C.PACKET_IOVEC_MAX)
 end
 
 function sync_transmit (dev)
@@ -107,14 +96,15 @@ end
 
 -- Reclaim used descriptors and unref packets that have been transmitted.
 function reclaim_transmitted_packets (dev)
-   while dev.txused ~= dev.txring.used.idx do
+   local used_idx = dev.txring.used.idx
+   C.full_memory_barrier()
+   while dev.txused ~= used_idx do
       local descriptor_index = dev.txring.used.ring[dev.txused % vring_size].id
-      local descriptor = dev.txring.desc[descriptor_index]
-      packet.deref(dev.txpackets[descriptor_index])
-      while bit.band(descriptor.flags, C.VIRTIO_DESC_F_NEXT) ~= 0 do
-         descriptor_index = descriptor.next
+      repeat
+         local descriptor = dev.txring.desc[descriptor_index]
          freelist.add(dev.txfree, descriptor_index)
-      end
+         descriptor_index = descriptor.next
+      until bit.band(descriptor.flags, C.VIRTIO_DESC_F_NEXT) == 0
       dev.txused = (dev.txused + 1) % 65536
    end
 end
@@ -142,7 +132,7 @@ end
 function add_receive_buffer (dev, buf)
    assert(can_add_receive_buffer(dev), "receive overflow")
    -- Initialize a receive descriptor
-   local descriptor_index = freelist_remove(dev.rxfree)
+   local descriptor_index = freelist.remove(dev.rxfree)
    local descriptor = dev.rxring.desc[descriptor_index]
    descriptor.addr  = ffi.cast(uint64_t, buf.pointer)
    descriptor.len   = buf.size
