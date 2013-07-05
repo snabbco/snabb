@@ -138,10 +138,11 @@ function add_receive_buffer (dev, buf)
    descriptor.len   = buf.size
    descriptor.flags = C.VIRTIO_DESC_F_WRITE -- device should write
    descriptor.next  = 0
-   local prev_index = dev.rxring.avail.ring[(dev.rxavail + 65535) % 65536]
+   local prev_index = dev.rxring.avail.ring[(dev.rxavail + vring_size-1) % vring_size]
    local prev_descriptor = dev.rxring.desc[prev_index % vring_size]
    prev_descriptor.next = descriptor_index
-   prev_descriptor.flags = bit.bor(prev_descriptor.flags, C.VIRTIO_DESC_F_NEXT)
+   -- XXX If we uncomment the next line we get invalid id -1 on the used ring.
+   -- prev_descriptor.flags = bit.bor(prev_descriptor.flags, C.VIRTIO_DESC_F_NEXT)
    -- Add the descriptor to the 'available' ring
    dev.rxring.avail.ring[dev.rxavail % vring_size] = descriptor_index
    dev.rxavail = (dev.rxavail + 1) % 65536
