@@ -12,8 +12,10 @@ local ffi = require("ffi")
 --
 -- "Canary in a coal mine": http://en.wiktionary.org/wiki/canary_in_a_coal_mine
 
-size = 64
-ffi.cdef("struct canary { uint8_t bytes["..size.."]; };")
+require("canary_h")
+local ffi = require("ffi")
+
+size = ffi.C.CANARY_SIZE
 
 canaries = {} -- index->canary
 names    = {} -- index->name
@@ -30,21 +32,33 @@ end
 
 -- Check all registered canaries and print postmortem analysis for dead ones.
 function check ()
+   local fail = false
    for i,c in pairs(canaries) do
       if is_dead(c) then
+	 fail = true
 	 print("canary '" .. names[i] .. "' died. Stomach contents:")
-	 for i = 0, size-1 do
-	    io.write(bit.tohex(c.bytes[i],2) .. " ")
-	    if i > 0 and i % 16 == 15 then print() end
-	 end
+	 hexdump(c)
 	 print()
       end
    end
+   assert(not fail, "dead canary")
 end
 
 function is_dead (c)
    for i = 0, size-1 do
-      if c.bytes[i] ~= i then return true end
+      if c.bytes[i] ~= i % 256 then return true end
+   end
+end
+
+function hexdump (c)
+   for i = 0, size-1 do
+      if i % 16 == 0 then
+	 -- print line address
+	 if i > 0 then print() end
+	 io.write(bit.tohex(i).."  ")
+      end
+      io.write(bit.tohex(c.bytes[i],2))
+      if c.bytes[i] ~= i % 256 then io.write("?") else io.write(" ") end
    end
 end
 
