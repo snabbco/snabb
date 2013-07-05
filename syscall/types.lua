@@ -135,6 +135,7 @@ for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 
 t.ints = ffi.typeof("int[?]")
 t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
+t.string_array = ffi.typeof("const char *[?]")
 
 local function singleton(tp)
   return ffi.typeof("$[1]", tp)

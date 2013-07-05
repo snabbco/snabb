@@ -153,7 +153,6 @@ t.iocbs = ffi.typeof("struct iocb[?]")
 t.sock_filters = ffi.typeof("struct sock_filter[?]")
 
 t.iocb_ptrs = ffi.typeof("struct iocb *[?]")
-t.string_array = ffi.typeof("const char *[?]")
 
 t.aio_context1 = ffi.typeof("aio_context_t[1]")
 t.sock_fprog1 = ffi.typeof("struct sock_fprog[1]")

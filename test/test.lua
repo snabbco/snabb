@@ -107,6 +107,28 @@ local clean = function()
   S.unlink(efile)
 end
 
+-- hacky but some types are lists of elements need a number; also varargs in here too as need number
+-- TODO our types need more metadata, or use reflection 
+local listtypes = {siginfos = true, inotify_events = true, io_events = "true", pollfds = true, epoll_events = true,
+                   iocb_ptrs = true, ints = true, iocbs = true, string_array = true, sock_filters = true,
+                   buffer = true, groups = true, iovecs = true, -- lists
+                   inotify_event = true} -- varargs
+
+test_types = {
+  test_allocate = function() -- create an element of every ctype
+    for k, v in pairs(t) do
+      if type(v) == "cdata" then
+        local x
+        if listtypes[k] then
+          x = v(1)
+        else
+          x = v()
+        end
+      end
+    end
+  end,
+}
+
 test_basic = {
   test_b64 = function()
     local h, l = t.i6432(-1):to32()
@@ -183,7 +205,7 @@ test_open_close = {
   test_open_valid = function()
     local fd = assert(S.open("/dev/null", "rdonly"))
     local fd2 = assert(S.open("/dev/zero", "RDONLY"))
-    assert(fd2:getfd() == fd:getfd() + 1, "should one larger fd from second")
+    assert_equal(fd2:getfd(), fd:getfd() + 1)
     assert(fd:close())
     assert(fd2:close())
   end,
