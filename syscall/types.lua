@@ -390,7 +390,7 @@ addtype("timespec", "struct timespec", {
     if not v then v = {0, 0} end
     if istype(t.timeval, v) then v = {v.tv_sec, v.tv_usec * 1000} end
     if type(v) == "table" then
-      if v.tv_usec then -- compat with timespec
+      if v.tv_usec then -- compat with timespec TODO add to methods, and use standard new allocation function?
         v.tv_nsec = v.tv_usec * 1000
         v.tv_usec = 0
       end
