@@ -23,7 +23,7 @@ local S = {}
 
 -- helpers
 local errpointer = pt.void(-1)
-local err64 = t.uint64(-1LL)
+local err64 = 0xffffffffffffffffULL
 
 local function getfd(fd)
   if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
