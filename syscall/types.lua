@@ -357,7 +357,7 @@ addtype("timeval", "struct timeval", {
     if type(v) == "table" then
       if v.tv_nsec then -- compat with timespec
         v.tv_usec = math.floor(v.tv_nsec / 1000)
-        v.tv_usec = 0
+        v.tv_nsec = 0
       end
     end
     if type(v) ~= "number" then return ffi.new(tp, v) end
@@ -392,7 +392,7 @@ addtype("timespec", "struct timespec", {
     if type(v) == "table" then
       if v.tv_usec then -- compat with timespec
         v.tv_nsec = v.tv_usec * 1000
-        v.tv_nsec = 0
+        v.tv_usec = 0
       end
     end
     if type(v) ~= "number" then return ffi.new(tp, v) end
