@@ -133,7 +133,7 @@ t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   __index = fmeth,
   __gc = fmeth.close,
   __new = function(tp, i)
-    return istype(tp, i) or ffi.new(tp, i or 0)
+    return istype(tp, i) or ffi.new(tp, i or -1)
   end,
 })
 
@@ -163,7 +163,7 @@ t.mqd = ffi.metatype("struct {mqd_t filenum;}", {
   __index = mqmeth,
   __gc = mqmeth.close,
   __new = function(tp, i)
-    return istype(tp, i) or ffi.new(tp, i or 0)
+    return istype(tp, i) or ffi.new(tp, i or -1)
   end,
 })
 end
