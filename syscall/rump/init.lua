@@ -133,7 +133,7 @@ function S.rump.etfs_remove(key)
 end
 
 function S.rump.init(modules) -- you must load the factions here eg dev, vfs, net, plus modules
-  for i, v in ipairs(modules) do
+  for i, v in ipairs(modules or {}) do
     v = string.gsub(v, "%.", "_")
     local mod = ffi.load("rump" .. v, true)
     S.rump.__modules[#S.rump.__modules + 1] = mod

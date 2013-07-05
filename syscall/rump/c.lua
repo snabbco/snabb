@@ -373,12 +373,13 @@ local C = {
   writev = rump.rump___sysimpl_writev,
 }
 
+-- TODO this mostly works, but not for eg mmap where should return a pointer -1...
 local function nosys()
   ffi.errno(78) -- NetBSD ENOSYS
   return -1
 end
 
-setmetatable(C, {__index = nosys})
+setmetatable(C, {__index = function() return nosys end})
 
 return C
 
