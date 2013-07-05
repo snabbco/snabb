@@ -138,10 +138,15 @@ function add_receive_buffer (dev, buf)
    descriptor.len   = buf.size
    descriptor.flags = C.VIRTIO_DESC_F_WRITE -- device should write
    descriptor.next  = 0
+   local prev_index = dev.rxring.avail.ring[(dev.rxavail + 65535) % 65536]
+   local prev_descriptor = dev.rxring.desc[prev_index % vring_size]
+   prev_descriptor.next = descriptor_index
+   prev_descriptor.flags = bit.bor(prev_descriptor.flags, C.VIRTIO_DESC_F_NEXT)
    -- Add the descriptor to the 'available' ring
    dev.rxring.avail.ring[dev.rxavail % vring_size] = descriptor_index
    dev.rxavail = (dev.rxavail + 1) % 65536
    -- Setup mapping back from descriptor to buffer
+   dev.rxbuffers[descriptor_index] = buf
    dev.rxdirty = true
 end
 
@@ -151,14 +156,23 @@ end
 
 function receive (dev)
    assert(can_receive(dev), "unable to receive")
+   C.full_memory_barrier() -- XXX optimize this away.
    -- Get descriptor
    local p = packet.allocate()
-   local descriptor_index = dev.rxring.used.ring[dev.rxused % vring_size].id
+   local used = dev.rxring.used.ring[dev.rxused % vring_size]
+   local len = used.len
+   local descriptor_index = used.id
+   assert(descriptor_index < vring_size, "bad descriptor index")
+   -- Loop converting each buffer in the chain into a packet iovec
    repeat
       local descriptor = dev.rxring.desc[descriptor_index]
-      packet.add_iovec(p, dev.rxbuffers[descriptor_index], descriptor.len)
+      local iovec_len = math.min(len, descriptor.len)
+      packet.add_iovec(p, dev.rxbuffers[descriptor_index], iovec_len)
+      freelist.add(dev.rxfree, descriptor_index)
       descriptor_index = descriptor.next
-   until bit.band(descriptor.flags, C.VIRTIO_DESC_F_NEXT) == 0
+      len = len - iovec_len
+   until len == 0
+   dev.rxused = (dev.rxused + 1) % 65536
    return p
 end
 
