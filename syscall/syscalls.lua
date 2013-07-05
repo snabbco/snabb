@@ -22,7 +22,6 @@ local inlibc = h.inlibc
 local S = {}
 
 -- helpers
-local zeropointer = pt.void(0)
 local errpointer = pt.void(-1)
 local err64 = t.uint64(-1LL)
 
