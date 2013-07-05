@@ -70,6 +70,7 @@ meth.sockaddr_un = {
 
 addtype("sockaddr_un", "struct sockaddr_un", {
   __index = function(sa, k) if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end end,
+  __newindex = function(sa, k, v) if meth.sockaddr_un.newindex[k] then meth.sockaddr_un.newindex[k](sa, v) end end,
   __new = function(tp, path) return newfn(tp, {family = c.AF.UNIX, path = path}) end,
   __len = function(sa)
     if sa.sun_len == 0 then -- length not set explicitly
