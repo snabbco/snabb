@@ -610,6 +610,7 @@ mt.cmsghdr = {
     end;
   },
   __new = function (tp, level, type, data, data_size)
+    if not data then data_size = 0 end
     data_size = data_size or #data
     level = c.SOL[level]
     if typemap[level] then type = typemap[level][type] end
@@ -618,7 +619,7 @@ mt.cmsghdr = {
       cmsg_level = level,
       cmsg_type = type,
     })
-    if data ~= nil then
+    if data then
       ffi.copy(self.cmsg_data, data, data_size)
     end
     return self
