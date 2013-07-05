@@ -253,7 +253,7 @@ local C = {
   ftruncate = rump.rump___sysimpl_ftruncate,
   futimens = rump.rump___sysimpl_futimens,
   futimes = rump.rump___sysimpl_futimes50,
-  __getcwd = rump.rump___sysimpl___getcwd,
+  getcwd = rump.rump___sysimpl___getcwd,
   getdents = rump.rump___sysimpl_getdents30,
   getegid = rump.rump___sysimpl_getegid,
   geteuid = rump.rump___sysimpl_geteuid,
@@ -373,7 +373,12 @@ local C = {
   writev = rump.rump___sysimpl_writev,
 }
 
-C.getcwd = C.__getcwd -- effectively gives us the syscall
+local function nosys()
+  ffi.errno(78) -- NetBSD ENOSYS
+  return -1
+end
+
+setmetatable(C, {__index = nosys})
 
 return C
 
