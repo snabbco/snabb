@@ -23,6 +23,11 @@ local h = require "syscall.helpers"
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim = h.split, h.trim
 
+local function getfd(fd)
+  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
+  return fd:getfd()
+end
+
 local mt = {} -- metatables
 local meth = {}
 
@@ -156,20 +161,6 @@ t.sock_fprog1 = ffi.typeof("struct sock_fprog[1]")
 t.user_cap_data2 = ffi.typeof("struct user_cap_data[2]")
 
 -- types with metatypes
-
--- fd type. This will be overridden by syscall as it adds methods
--- so this is the minimal one necessary to provide the interface eg does not gc file
--- TODO add tests once types is standalone
-
--- even simpler version, just pass numbers
-t.fd = function(fd) return tonumber(fd) end
-t.mqd = t.fd -- basically an fd, but will have different metamethods
-
--- can replace with a different t.fd function
-local function getfd(fd)
-  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
-  return fd:getfd()
-end
 
 -- 32 bit dev_t. Note glibc has 64 bit dev_t but we use syscall API which does not
 mt.device = {
