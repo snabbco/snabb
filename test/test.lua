@@ -108,7 +108,7 @@ local clean = function()
 end
 
 -- hacky but some types are lists of elements need a number; also varargs in here too as need number
--- TODO our types need more metadata, or use reflection 
+-- TODO our types need more metadata, or use reflection (ffi reflect can detect vla)
 local listtypes = {siginfos = true, inotify_events = true, io_events = "true", pollfds = true, epoll_events = true,
                    iocb_ptrs = true, ints = true, iocbs = true, string_array = true, sock_filters = true,
                    buffer = true, groups = true, iovecs = true, -- lists

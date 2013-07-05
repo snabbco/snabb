@@ -10,7 +10,7 @@ local c = S.c
 
 local ffi = require "ffi"
 
-local reflect = require "test.reflect"
+local reflect = require "include.reflect.reflect"
 
 -- fixups
 c.AF.DECnet = c.AF.DECNET
