@@ -69,7 +69,7 @@ local function assert_equal(...)
 end
 
 USE_EXPECTED_ACTUAL_IN_ASSERT_EQUALS = true -- strict wants this to be set
-local luaunit = require "test.luaunit"
+local luaunit = require "include.luaunit.luaunit"
 
 local sysfile = debug.getinfo(S.open).source
 local cov = {active = {}, cov = {}}
