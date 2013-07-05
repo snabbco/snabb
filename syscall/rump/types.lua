@@ -48,7 +48,7 @@ local function rumpfn(tp) -- add _netbsd_ to correct types
   if unchanged[tp] then return tp end
   if tp == "void (*)(int, siginfo_t *, void *)" then return "void (*)(int, _netbsd_siginfo_t *, void *)" end
   if string.find(tp, "struct") then
-    return string.gsub(tp, "struct (%a)", "struct _netbsd_%1")
+    return (string.gsub(tp, "struct (%a)", "struct _netbsd_%1"))
   end
   return "_netbsd_" .. tp
 end
