@@ -85,9 +85,9 @@ local ioctl = strflag {
   SIOCGIFMETRIC  = _IOWR('i', 23, "ifreq"),
   SIOCSIFMETRIC  =  _IOW('i', 24, "ifreq"),
   SIOCDIFADDR    =  _IOW('i', 25, "ifreq"),
---[[
   SIOCAIFADDR    =  _IOW('i', 26, "ifaliasreq"),
   SIOCGIFALIAS   = _IOWR('i', 27, "ifaliasreq"),
+--[[
   SIOCALIFADDR   =  _IOW('i', 28, "if_laddrreq"),
   SIOCGLIFADDR   = _IOWR('i', 29, "if_laddrreq"),
   SIOCDLIFADDR   =  _IOW('i', 30, "if_laddrreq"),
@@ -102,7 +102,7 @@ local ioctl = strflag {
 --SIOCGIFMEDIA   = _IOWR('i', 54, "ifmediareq"),
   SIOCSIFGENERIC =  _IOW('i', 57, "ifreq"),
   SIOCGIFGENERIC = _IOWR('i', 58, "ifreq"),
---SIOCSIFPHYADDR =  _IOW('i', 70, "ifaliasreq"),
+  SIOCSIFPHYADDR =  _IOW('i', 70, "ifaliasreq"),
   SIOCGIFPSRCADDR= _IOWR('i', 71, "ifreq"),
   SIOCGIFPDSTADDR= _IOWR('i', 72, "ifreq"),
   SIOCDIFPHYADDR =  _IOW('i', 73, "ifreq"),

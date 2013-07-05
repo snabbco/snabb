@@ -215,6 +215,35 @@ mt.ifreq = {
 
 addtype("ifreq", "struct ifreq", mt.ifreq)
 
+meth.ifaliasreq = {
+  index = {
+    name = function(ifra) return ffi.string(ifra.ifra_name) end,
+    addr = function(ifra) return ifra.ifra_addr end,
+    dstaddr = function(ifra) return ifra.ifra_dstaddr end,
+    mask = function(ifra) return ifra.ifra_mask end,
+  },
+  newindex = {
+    name = function(ifra, v)
+      assert(#v < c.IFNAMSIZ, "name too long")
+      ifra.ifra_name = v
+    end,
+    addr = function(ifra, v) ifra.ifra_addr = v end, -- TODO type constructor?
+    dstaddr = function(ifra, v) ifra.ifra_dstaddr = v end,
+    mask = function(ifra, v) ifra.ifra_mask = v end,
+  },
+}
+
+meth.ifaliasreq.index.broadaddr = meth.ifaliasreq.index.dstaddr
+meth.ifaliasreq.newindex.broadaddr = meth.ifaliasreq.newindex.dstaddr
+
+mt.ifaliasreq = {
+  __index = function(ifr, k) if meth.ifaliasreq.index[k] then return meth.ifaliasreq.index[k](ifr) end end,
+  __newindex = function(ifr, k, v) if meth.ifaliasreq.newindex[k] then meth.ifaliasreq.newindex[k](ifr, v) end end,
+  __new = newfn,
+}
+
+addtype("ifaliasreq", "struct ifaliasreq", mt.ifaliasreq)
+
 return types
 
 end
