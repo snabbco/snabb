@@ -22,7 +22,9 @@ local inlibc = h.inlibc
 local S = {}
 
 -- helpers
-local errpointer = pt.void(-1)
+
+local errpointer
+if abi.abi64 then errpointer = pt.void(0xffffffffffffffffULL) else errpointer = pt.void(0xffffffff) end
 local err64 = 0xffffffffffffffffULL
 
 local function getfd(fd)
