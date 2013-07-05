@@ -9,7 +9,7 @@ pcall, type, table, string, math, bit
 
 -- TODO add __len to metatables of more
 
-return function(types, hh, abi, c)
+local function init(types, hh, abi, c)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
@@ -1095,4 +1095,6 @@ addtype("dirent", "struct linux_dirent64", mt.dirent)
 return types
 
 end
+
+return {init = init}
 

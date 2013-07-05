@@ -23,7 +23,7 @@ local function ptt(tp)
 end
 
 local function addtype(name, tp, mt)
-  t[name] = ffi.metatype(tp, mt)
+  if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
   ctypes[tp] = t[name]
   pt[name] = ptt(tp)
   s[name] = ffi.sizeof(t[name])
@@ -35,6 +35,29 @@ local function addtype_var(name, tp, mt)
 end
 
 local function lenfn(tp) return ffi.sizeof(tp) end
+
+local addtypes = {
+  char = "char",
+  uchar = "unsigned char",
+  int = "int",
+  uint = "unsigned int",
+  int16 = "int16_t",
+  uint16 = "uint16_t",
+  int32 = "int32_t",
+  uint32 = "uint32_t",
+  int64 = "int64_t",
+  uint64 = "uint64_t",
+  long = "long",
+  ulong = "unsigned long",
+  uintptr = "uintptr_t",
+  intptr = "intptr_t",
+}
+
+for k, v in pairs(addtypes) do addtype(k, v) end
+
+t.ints = ffi.typeof("int[?]")
+t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
+t.string_array = ffi.typeof("const char *[?]")
 
 local lenmt = {__len = lenfn}
 

@@ -7,7 +7,7 @@ require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math, bit
 
-return function(types, hh, abi, c)
+local function init(types, hh, abi, c)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
@@ -218,4 +218,6 @@ addtype("ifreq", "struct ifreq", mt.ifreq)
 return types
 
 end
+
+return {init = init}
 

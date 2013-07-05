@@ -23,9 +23,16 @@ local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
 
-local types = require "syscall.sharedtypes"
+local types = {t = {}, pt = {}, s = {}, ctypes = {}}
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
+
+local sharedtypes = require "syscall.sharedtypes"
+
+for k, v in pairs(sharedtypes.t) do t[k] = v end
+for k, v in pairs(sharedtypes.pt) do pt[k] = v end
+for k, v in pairs(sharedtypes.s) do s[k] = v end
+for k, v in pairs(sharedtypes.ctypes) do ctypes[k] = v end
 
 t.addrtype = {
   [c.AF.INET] = t.in_addr,
@@ -92,20 +99,6 @@ pt.void = function(x)
 end
 
 local addtypes = {
-  char = "char",
-  uchar = "unsigned char",
-  int = "int",
-  uint = "unsigned int",
-  int16 = "int16_t",
-  uint16 = "uint16_t",
-  int32 = "int32_t",
-  uint32 = "uint32_t",
-  int64 = "int64_t",
-  uint64 = "uint64_t",
-  long = "long",
-  ulong = "unsigned long",
-  uintptr = "uintptr_t",
-  intptr = "intptr_t",
   size = "size_t",
   ssize = "ssize_t",
   mode = "mode_t",
@@ -132,10 +125,6 @@ local addstructs = {
 
 for k, v in pairs(addtypes) do addtype(k, v) end
 for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
-
-t.ints = ffi.typeof("int[?]")
-t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
-t.string_array = ffi.typeof("const char *[?]")
 
 local function singleton(tp)
   return ffi.typeof("$[1]", tp)
@@ -681,7 +670,7 @@ addtype("msghdr", "struct msghdr", mt.msghdr)
 -- include OS specific types
 local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
 
-types = ostypes(types, hh, abi, c)
+types = ostypes.init(types, hh, abi, c)
 
 -- this is declared above
 samap_pt = {
