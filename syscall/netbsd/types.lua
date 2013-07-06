@@ -57,7 +57,7 @@ t.device = function(major, minor)
 end
 
 -- TODO test properly, different from Linux as metatype
-meth.sockaddr_un = {
+addtype("sockaddr_un", "struct sockaddr_un", {
   index = {
     family = function(sa) return sa.sun_family end,
     path = function(sa) return ffi.string(sa.sun_path) end,
@@ -65,12 +65,7 @@ meth.sockaddr_un = {
   newindex = {
     family = function(sa, v) sa.sun_family = v end,
     path = function(sa, v) ffi.copy(sa.sun_path, v) end,
-  }
-}
-
-addtype("sockaddr_un", "struct sockaddr_un", {
-  __index = function(sa, k) if meth.sockaddr_un.index[k] then return meth.sockaddr_un.index[k](sa) end end,
-  __newindex = function(sa, k, v) if meth.sockaddr_un.newindex[k] then meth.sockaddr_un.newindex[k](sa, v) end end,
+  },
   __new = function(tp, path) return newfn(tp, {family = c.AF.UNIX, path = path}) end,
   __len = function(sa)
     if sa.sun_len == 0 then -- length not set explicitly
@@ -83,7 +78,7 @@ addtype("sockaddr_un", "struct sockaddr_un", {
 
 function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has odd unix handling
 
-meth.stat = {
+addtype("stat", "struct stat", {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
     mode = function(st) return st.st_mode end,
@@ -111,15 +106,11 @@ meth.stat = {
     isfifo = function(st) return st.type == c.S_I.FIFO end,
     islnk = function(st) return st.type == c.S_I.FLNK end,
     issock = function(st) return st.type == c.S_I.FSOCK end,
-  }
-}
-
-addtype("stat", "struct stat", {
-  __index = function(st, k) if meth.stat.index[k] then return meth.stat.index[k](st) end end,
+  },
   __len = lenfn,
 })
 
-meth.siginfo = {
+addtype("siginfo", "siginfo_t", {
   index = {
     signo   = function(s) return s._info._signo end,
     code    = function(s) return s._info._code end,
@@ -148,11 +139,6 @@ meth.siginfo = {
     band    = function(s, v) s._info._reason._poll._band = v end,
     fd      = function(s, v) s._info._reason._poll._fd = v end,
   },
-}
-
-addtype("siginfo", "siginfo_t", {
-  __index = function(t, k) if meth.siginfo.index[k] then return meth.siginfo.index[k](t) end end,
-  __newindex = function(t, k, v) if meth.siginfo.newindex[k] then meth.siginfo.newindex[k](t, v) end end,
   __len = lenfn,
 })
 
