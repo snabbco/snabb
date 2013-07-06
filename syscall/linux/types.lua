@@ -281,7 +281,8 @@ addtype("sockaddr_ll", "struct sockaddr_ll", {
   __len = function(tp) return s.sockaddr_ll end,
 })
 
-meth.stat = {
+--TODO sort out stat/stat64
+addtype("stat", "struct stat", {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
     ino = function(st) return tonumber(st.st_ino) end,
@@ -306,12 +307,7 @@ meth.stat = {
     isfifo = function(st) return st.type == c.S_I.FIFO end,
     islnk = function(st) return st.type == c.S_I.FLNK end,
     issock = function(st) return st.type == c.S_I.FSOCK end,
-  }
-}
-
---TODO sort out stat/stat64
-addtype("stat", "struct stat", {
-  __index = function(st, k) if meth.stat.index[k] then return meth.stat.index[k](st) end end,
+  },
   __len = lenfn,
 })
 
