@@ -137,6 +137,12 @@ test_types = {
             if mt.__newindex and mt.__newindex[kk] then x[kk] = r end -- write, unlikely to actually test anything
           end
         end
+        if mt and mt.index then
+          for kk, _ in pairs(mt.index) do
+            local r = x[kk] -- read value via metatable
+            --if mt.newindex and mt.newindex[kk] then x[kk] = r end -- write TODO make all types work here
+          end
+        end
       end
     end
   end,
