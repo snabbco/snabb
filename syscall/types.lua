@@ -495,7 +495,7 @@ addtype("sigset", "sigset_t", {
 -- sigaction
 addtype_fn("sa_sigaction", "void (*)(int, siginfo_t *, void *)")
 
-meth.sigaction = {
+mt.sigaction = {
   index = {
     handler = function(sa) return sa.sa_handler end,
     sigaction = function(sa) return sa.sa_sigaction end,
@@ -519,11 +519,6 @@ meth.sigaction = {
     end,
     flags = function(sa, v) sa.sa_flags = c.SA[v] end,
   },
-}
-
-mt.sigaction = {
-  __index = function(sa, k) if meth.sigaction.index[k] then return meth.sigaction.index[k](sa) end end,
-  __newindex = function(sa, k, v) if meth.sigaction.newindex[k] then meth.sigaction.newindex[k](sa, v) end end,
   __new = function(tp, tab)
     local sa = ffi.new(tp)
     if tab then for k, v in pairs(tab) do sa[k] = v end end
