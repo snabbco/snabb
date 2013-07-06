@@ -227,7 +227,7 @@ local nlgroupmap = { -- map from netlink socket type to group names. Note there 
 --  [c.NETLINK.SELINUX] = c.SELNLGRP,
 }
 
-meth.sockaddr_nl = {
+addtype("sockaddr_nl", "struct sockaddr_nl", {
   index = {
     family = function(sa) return sa.nl_family end,
     pid = function(sa) return sa.nl_pid end,
@@ -236,12 +236,7 @@ meth.sockaddr_nl = {
   newindex = {
     pid = function(sa, v) sa.nl_pid = v end,
     groups = function(sa, v) sa.nl_groups = v end,
-  }
-}
-
-addtype("sockaddr_nl", "struct sockaddr_nl", {
-  __index = function(sa, k) if meth.sockaddr_nl.index[k] then return meth.sockaddr_nl.index[k](sa) end end,
-  __newindex = function(sa, k, v) if meth.sockaddr_nl.newindex[k] then meth.sockaddr_nl.newindex[k](sa, v) end end,
+  },
   __new = function(tp, pid, groups, nltype)
     if type(pid) == "table" then
       local tb = pid
