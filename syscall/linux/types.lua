@@ -644,7 +644,7 @@ t.iocb_array = function(tab, ptrs)
   return a
 end
 
--- ip, udp types. Need endian conversions
+-- ip, udp types. Need endian conversions. TODO move to generic code
 
 local function ip_checksum(buf, size, c, notfinal)
   c = c or 0
@@ -683,7 +683,8 @@ mt.iphdr = {
 addtype("iphdr", "struct iphdr", mt.iphdr)
 
 -- ugh, naming problems as cannot remove namespace as usual
-meth.udphdr = {
+-- checksum = function(u, ...) return 0 end, -- TODO checksum, needs IP packet info too. as method.
+mt.udphdr = {
   index = {
     src = function(u) return ntohs(u.source) end,
     dst = function(u) return ntohs(u.dest) end,
@@ -712,14 +713,7 @@ meth.udphdr = {
     src = function(u, v) u.source = htons(v) end,
     dst = function(u, v) u.dest = htons(v) end,
     length = function(u, v) u.len = htons(v) end,
-  },
-}
-
--- checksum = function(u, ...) return 0 end, -- TODO checksum, needs IP packet info too. as method.
-mt.udphdr = {
-  __index = function(u, k) if meth.udphdr.index[k] then return meth.udphdr.index[k](u) end end,
-  __newindex = function(u, k, v) if meth.udphdr.newindex[k] then meth.udphdr.newindex[k](u, v) end end,
-}
+  },}
 
 addtype("udphdr", "struct udphdr", mt.udphdr)
 
