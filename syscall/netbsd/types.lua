@@ -178,7 +178,6 @@ mt.ifreq = {
     mtu = function(ifr) return ifr.ifr_ifru.ifru_mtu end,
     dlt = function(ifr) return ifr.ifr_ifru.ifru_dlt end,
     value = function(ifr) return ifr.ifr_ifru.ifru_value end,
-    media = function(ifr) return ifr.ifr_ifru.ifru_media end,
     -- TODO rest of fields (buf, buflen)
   },
   newindex = {
