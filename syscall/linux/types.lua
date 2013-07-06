@@ -412,15 +412,11 @@ local function itnormal(v)
   return v
 end
 
-meth.itimerspec = {
+addtype("itimerspec", "struct itimerspec", {
   index = {
     interval = function(it) return it.it_interval end,
     value = function(it) return it.it_value end,
-  }
-}
-
-addtype("itimerspec", "struct itimerspec", {
-  __index = function(it, k) if meth.itimerspec.index[k] then return meth.itimerspec.index[k](it) end end,
+  },
   __new = function(tp, v)
     v = itnormal(v)
     v.it_interval = istype(t.timespec, v.it_interval) or t.timespec(v.it_interval)
@@ -430,7 +426,10 @@ addtype("itimerspec", "struct itimerspec", {
 })
 
 addtype("itimerval", "struct itimerval", {
-  __index = function(it, k) if meth.itimerspec.index[k] then return meth.itimerspec.index[k](it) end end, -- can use same meth
+  index = {
+    interval = function(it) return it.it_interval end,
+    value = function(it) return it.it_value end,
+  },
   __new = function(tp, v)
     v = itnormal(v)
     v.it_interval = istype(t.timeval, v.it_interval) or t.timeval(v.it_interval)
