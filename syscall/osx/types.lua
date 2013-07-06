@@ -40,7 +40,7 @@ end
 
 function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has odd unix handling
 
-meth.stat = {
+addtype("stat", "struct stat", {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
     mode = function(st) return st.st_mode end,
@@ -68,15 +68,11 @@ meth.stat = {
     isfifo = function(st) return st.type == c.S_I.FIFO end,
     islnk = function(st) return st.type == c.S_I.FLNK end,
     issock = function(st) return st.type == c.S_I.FSOCK end,
-  }
-}
-
-addtype("stat", "struct stat", {
-  __index = function(st, k) if meth.stat.index[k] then return meth.stat.index[k](st) end end,
+  },
   __len = lenfn,
 })
 
-meth.siginfo = {
+addtype("siginfo", "siginfo_t", {
   index = {
     signo   = function(s) return s.si_signo end,
     errno   = function(s) return s.si_errno end,
@@ -99,11 +95,6 @@ meth.siginfo = {
     value   = function(s, v) s.si_value = v end,
     band    = function(s, v) s.si_band = v end,
   },
-}
-
-addtype("siginfo", "siginfo_t", {
-  __index = function(t, k) if meth.siginfo.index[k] then return meth.siginfo.index[k](t) end end,
-  __newindex = function(t, k, v) if meth.siginfo.newindex[k] then meth.siginfo.newindex[k](t, v) end end,
   __len = lenfn,
 })
 
