@@ -290,7 +290,7 @@ addtype("sockaddr_in", "struct sockaddr_in", {
   __len = function(tp) return s.sockaddr_in end,
 })
 
-meth.sockaddr_in6 = {
+addtype("sockaddr_in6", "struct sockaddr_in6", {
   index = {
     family = function(sa) return sa.sin6_family end,
     port = function(sa) return ntohs(sa.sin6_port) end,
@@ -302,12 +302,7 @@ meth.sockaddr_in6 = {
     addr = function(sa, v) sa.sin6_addr = v end,
     flowinfo = function(sa, v) sa.sin6_flowinfo = v end,
     scope_id = function(sa, v) sa.sin6_scope_id = v end,
-  }
-}
-
-addtype("sockaddr_in6", "struct sockaddr_in6", {
-  __index = function(sa, k) if meth.sockaddr_in6.index[k] then return meth.sockaddr_in6.index[k](sa) end end,
-  __newindex = function(sa, k, v) if meth.sockaddr_in6.newindex[k] then meth.sockaddr_in6.newindex[k](sa, v) end end,
+  },
   __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers.
     local tab
     if type(port) == "table" then
