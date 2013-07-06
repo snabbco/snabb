@@ -311,7 +311,7 @@ addtype("stat", "struct stat", {
   __len = lenfn,
 })
 
-meth.siginfo = {
+addtype("siginfo", "struct siginfo", {
   index = {
     signo   = function(s) return s.si_signo end,
     errno   = function(s) return s.si_errno end,
@@ -347,12 +347,7 @@ meth.siginfo = {
     addr    = function(s, v) s.sifields.sigfault.si_addr = v end,
     band    = function(s, v) s.sifields.sigpoll.si_band = v end,
     fd      = function(s, v) s.sifields.sigpoll.si_fd = v end,
-  }
-}
-
-addtype("siginfo", "struct siginfo", {
-  __index = function(t, k) if meth.siginfo.index[k] then return meth.siginfo.index[k](t) end end,
-  __newindex = function(t, k, v) if meth.siginfo.newindex[k] then meth.siginfo.newindex[k](t, v) end end,
+  },
 })
 
 addtype("macaddr", "struct {uint8_t mac_addr[6];}", {
