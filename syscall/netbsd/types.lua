@@ -166,7 +166,7 @@ mt.dirent = {
 
 addtype("dirent", "struct dirent", mt.dirent)
 
-meth.ifreq = {
+mt.ifreq = {
   index = {
     name = function(ifr) return ffi.string(ifr.ifr_name) end,
     addr = function(ifr) return ifr.ifr_ifru.ifru_addr end,
@@ -191,11 +191,6 @@ meth.ifreq = {
     end,
     -- TODO rest of fields
   },
-}
-
-mt.ifreq = {
-  __index = function(ifr, k) if meth.ifreq.index[k] then return meth.ifreq.index[k](ifr) end end,
-  __newindex = function(ifr, k, v) if meth.ifreq.newindex[k] then meth.ifreq.newindex[k](ifr, v) end end,
   __new = newfn,
 }
 
