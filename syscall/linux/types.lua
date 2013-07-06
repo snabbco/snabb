@@ -248,7 +248,7 @@ addtype("sockaddr_nl", "struct sockaddr_nl", {
   __len = function(tp) return s.sockaddr_nl end,
 })
 
-meth.sockaddr_ll = {
+addtype("sockaddr_ll", "struct sockaddr_ll", {
   index = {
     family = function(sa) return sa.sll_family end,
     protocol = function(sa) return ntohs(sa.sll_protocol) end,
@@ -272,12 +272,7 @@ meth.sockaddr_ll = {
         ffi.copy(sa.sll_addr, v, 6)
       else sa.sll_addr = v end
     end,
-  }
-}
-
-addtype("sockaddr_ll", "struct sockaddr_ll", {
-  __index = function(sa, k) if meth.sockaddr_ll.index[k] then return meth.sockaddr_ll.index[k](sa) end end,
-  __newindex = function(sa, k, v) if meth.sockaddr_ll.newindex[k] then meth.sockaddr_ll.newindex[k](sa, v) end end,
+  },
   __new = function(tp, tb)
     local sa = ffi.new(tp, {sll_family = c.AF.PACKET})
     for k, v in pairs(tb or {}) do sa[k] = v end
