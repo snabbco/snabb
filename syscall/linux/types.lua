@@ -469,6 +469,7 @@ mt.pollfds = {
 
 addtype_var("pollfds", "struct {int count; struct pollfd pfd[?];}", mt.pollfds)
 
+-- TODO merge into metatable
 meth.signalfd = {
   index = {
     signo = function(ss) return tonumber(ss.ssi_signo) end,
@@ -547,6 +548,7 @@ for k, v in pairs(c.B) do
   bits_to_speed[v] = tonumber(k)
 end
 
+-- TODO merge to metatable
 meth.termios = {
   index = {
     cfmakeraw = function(termios)
@@ -591,7 +593,7 @@ mt.termios = {
 addtype("termios", "struct termios", mt.termios)
 addtype("termios2", "struct termios2", mt.termios)
 
-meth.iocb = {
+mt.iocb = {
   index = {
     opcode = function(iocb) return iocb.aio_lio_opcode end,
     data = function(iocb) return tonumber(iocb.aio_data) end,
@@ -617,11 +619,6 @@ meth.iocb = {
       iocb.aio_resfd = getfd(v)
     end,
   },
-}
-
-mt.iocb = {
-  __index = function(iocb, k) if meth.iocb.index[k] then return meth.iocb.index[k](iocb) end end,
-  __newindex = function(iocb, k, v) if meth.iocb.newindex[k] then meth.iocb.newindex[k](iocb, v) end end,
   __new = function(tp, ioi)
     local iocb = ffi.new(tp)
     if ioi then for k, v in pairs(ioi) do iocb[k] = v end end
