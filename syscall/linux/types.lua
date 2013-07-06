@@ -670,7 +670,7 @@ local function ip_checksum(buf, size, c, notfinal)
   return c
 end
 
-meth.iphdr = {
+mt.iphdr = {
   index = {
     checksum = function(i) return function(i)
       i.check = 0
@@ -678,13 +678,6 @@ meth.iphdr = {
       return i.check
     end end,
   },
-  newindex = {
-  },
-}
-
-mt.iphdr = {
-  __index = function(i, k) if meth.iphdr.index[k] then return meth.iphdr.index[k](i) end end,
-  __newindex = function(i, k, v) if meth.iphdr.newindex[k] then meth.iphdr.index[k](i, v) end end,
 }
 
 addtype("iphdr", "struct iphdr", mt.iphdr)
