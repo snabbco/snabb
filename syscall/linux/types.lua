@@ -370,7 +370,7 @@ addtype("macaddr", "struct {uint8_t mac_addr[6];}", {
   end,
 })
 
-meth.rlimit = {
+addtype("rlimit", "struct rlimit64", {
   index = {
     cur = function(r) if r.rlim_cur == c.RLIM.INFINITY then return -1 else return tonumber(r.rlim_cur) end end,
     max = function(r) if r.rlim_max == c.RLIM.INFINITY then return -1 else return tonumber(r.rlim_max) end end,
@@ -385,11 +385,6 @@ meth.rlimit = {
       r.rlim_max = c.RLIM[v] -- allows use of "infinity"
     end,
   },
-}
-
-addtype("rlimit", "struct rlimit64", {
-  __index = function(r, k) if meth.rlimit.index[k] then return meth.rlimit.index[k](r) end end,
-  __newindex = function(r, k, v) if meth.rlimit.newindex[k] then meth.rlimit.newindex[k](r, v) end end,
   __new = function(tp, tab)
     if tab then for k, v in pairs(tab) do tab[k] = c.RLIM[v] end end
     return newfn(tp, tab)
