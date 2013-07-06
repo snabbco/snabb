@@ -779,7 +779,7 @@ mt.cap = {
 
 addtype("cap", "struct cap", mt.cap)
 
--- TODO add method to return hdr, data
+-- TODO add method to return hdr, data TODO merge to metatable
 meth.capabilities = {
   index = {
     hdrdata = function(cap)
@@ -870,6 +870,7 @@ t.adjtimex = function(ret, timex)
   return setmetatable({state = ret, timex = timex}, mt.adjtimex)
 end
 
+-- TODO move to metatable
 meth.epoll_event = {
   index = {
     fd = function(e) return tonumber(e.data.fd) end,
@@ -971,7 +972,7 @@ mt.cpu_set = {
 
 addtype("cpu_set", "struct cpu_set_t", mt.cpu_set)
 
-meth.mq_attr = {
+mt.mq_attr = {
   index = {
     flags = function(mqa) return mqa.mq_flags end,
     maxmsg = function(mqa) return mqa.mq_maxmsg end,
@@ -983,12 +984,7 @@ meth.mq_attr = {
     maxmsg = function(mqa, v) mqa.mq_maxmsg = v end,
     msgsize = function(mqa, v) mqa.mq_msgsize = v end,
     -- no sense in writing curmsgs
-  }
-}
-
-mt.mq_attr = {
-  __index = function(mqa, k) if meth.mq_attr.index[k] then return meth.mq_attr.index[k](mqa) end end,
-  __newindex = function(mqa, k, v) if meth.mq_attr.newindex[k] then meth.mq_attr.newindex[k](mqa, v) end end,
+  },
   __new = newfn,
 }
 
