@@ -196,7 +196,7 @@ mt.ifreq = {
 
 addtype("ifreq", "struct ifreq", mt.ifreq)
 
-meth.ifaliasreq = {
+mt.ifaliasreq = {
   index = {
     name = function(ifra) return ffi.string(ifra.ifra_name) end,
     addr = function(ifra) return ifra.ifra_addr end,
@@ -212,16 +212,11 @@ meth.ifaliasreq = {
     dstaddr = function(ifra, v) ifra.ifra_dstaddr = v end,
     mask = function(ifra, v) ifra.ifra_mask = v end,
   },
-}
-
-meth.ifaliasreq.index.broadaddr = meth.ifaliasreq.index.dstaddr
-meth.ifaliasreq.newindex.broadaddr = meth.ifaliasreq.newindex.dstaddr
-
-mt.ifaliasreq = {
-  __index = function(ifr, k) if meth.ifaliasreq.index[k] then return meth.ifaliasreq.index[k](ifr) end end,
-  __newindex = function(ifr, k, v) if meth.ifaliasreq.newindex[k] then meth.ifaliasreq.newindex[k](ifr, v) end end,
   __new = newfn,
 }
+
+mt.ifaliasreq.index.broadaddr = mt.ifaliasreq.index.dstaddr
+mt.ifaliasreq.newindex.broadaddr = mt.ifaliasreq.newindex.dstaddr
 
 addtype("ifaliasreq", "struct ifaliasreq", mt.ifaliasreq)
 
