@@ -317,7 +317,7 @@ addtype("sockaddr_in6", "struct sockaddr_in6", {
   __len = function(tp) return s.sockaddr_in6 end,
 })
 
-meth.timeval = {
+addtype("timeval", "struct timeval", {
   index = {
     time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end,
     sec = function(tv) return tonumber(tv.tv_sec) end,
@@ -330,12 +330,7 @@ meth.timeval = {
     end,
     sec = function(tv, v) tv.tv_sec = v end,
     usec = function(tv, v) tv.tv_usec = v end,
-  }
-}
-
-addtype("timeval", "struct timeval", {
-  __index = function(tv, k) if meth.timeval.index[k] then return meth.timeval.index[k](tv) end end,
-  __newindex = function(tv, k, v) if meth.timeval.newindex[k] then meth.timeval.newindex[k](tv, v) end end,
+  },
   __new = function(tp, v)
     if not v then v = {0, 0} end
     if istype(t.timespec, v) then v = {v.tv_sec, math.floor(v.tv_nsec / 1000)} end
