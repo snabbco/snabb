@@ -52,7 +52,17 @@ end
 
 local function addtype(name, tp, mt)
   if rump then tp = rump(tp) end
-  if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
+  if mt then
+    if mt.index and not mt.__index then -- generic index method
+      mt.__index = function(tp, k) if mt.index[k] then return mt.index[k](tp) end end
+    end
+    if mt.newindex and not mt.__newindex then -- generic newindex method
+      mt.__newindex = function(tp, k, v) if mt.newindex[k] then mt.newindex[k](tp, v) end end
+    end
+    t[name] = ffi.metatype(tp, mt)
+  else
+    t[name] = ffi.typeof(tp)
+  end
   ctypes[tp] = t[name]
   pt[name] = ptt(tp)
   s[name] = ffi.sizeof(t[name])
@@ -186,14 +196,10 @@ t.error = ffi.metatype("struct {int errno;}", {
   end,
 })
 
-meth.sockaddr = {
+addtype("sockaddr", "struct sockaddr", {
   index = {
     family = function(sa) return sa.sa_family end,
-  }
-}
-
-addtype("sockaddr", "struct sockaddr", {
-  __index = function(sa, k) if meth.sockaddr.index[k] then return meth.sockaddr.index[k](sa) end end,
+  },
   __len = function(tp) return s.sockaddr end,
 })
 
