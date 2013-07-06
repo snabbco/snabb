@@ -203,6 +203,7 @@ addtype("sockaddr", "struct sockaddr", {
   __len = function(tp) return s.sockaddr end,
 })
 
+-- TODO add to metatable like others
 meth.sockaddr_storage = {
   index = {
     family = function(sa) return sa.ss_family end,
