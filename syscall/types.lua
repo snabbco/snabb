@@ -265,7 +265,7 @@ addtype("sockaddr_storage", "struct sockaddr_storage", {
   end,
 })
 
-meth.sockaddr_in = {
+addtype("sockaddr_in", "struct sockaddr_in", {
   index = {
     family = function(sa) return sa.sin_family end,
     port = function(sa) return ntohs(sa.sin_port) end,
@@ -275,12 +275,7 @@ meth.sockaddr_in = {
     family = function(sa, v) sa.sin_family = v end,
     port = function(sa, v) sa.sin_port = htons(v) end,
     addr = function(sa, v) sa.sin_addr = v end,
-  }
-}
-
-addtype("sockaddr_in", "struct sockaddr_in", {
-  __index = function(sa, k) if meth.sockaddr_in.index[k] then return meth.sockaddr_in.index[k](sa) end end,
-  __newindex = function(sa, k, v) if meth.sockaddr_in.newindex[k] then meth.sockaddr_in.newindex[k](sa, v) end end,
+  },
   __new = function(tp, port, addr)
     local tab
     if type(port) == "table" then
