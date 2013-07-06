@@ -1,6 +1,5 @@
--- LuaJIT FII reflection library
 -- License: Same as LuaJIT
--- Version: beta 1 (2012-06-02)
+-- Version: beta 2 (2013-07-06)
 -- Author: Peter Cawley (lua@corsix.org)
 local ffi = require "ffi"
 local bit = require "bit"
@@ -18,6 +17,12 @@ ffi.cdef [[
   
   typedef struct CTState {
     CType *tab;
+    uint32_t top;
+    uint32_t sizetab;
+    void *L;
+    void *g;
+    void *finalizer;
+    void *miscmap;
   } CTState;
 ]]
 
@@ -26,6 +31,10 @@ local function gc_str(gcref) -- Convert a GCref (to a GCstr) into a string
     local ts = ffi.cast("uint32_t*", gcref)
     return ffi.string(ts + 4, ts[3])
   end
+end
+
+local function memptr(gcobj)
+  return tonumber(tostring(gcobj):match"%x*$", 16)
 end
 
 -- Acquire a pointer to this Lua universe's CTState
@@ -47,9 +56,16 @@ local CTState do
     }*
   ]]
   local co = coroutine.create(function()end) -- Any live coroutine will do.
-  local L = tonumber(tostring(co):match"%x*$", 16) -- Get the memory address of co's lua_State (ffi.cast won't accept a coroutine).
-  local G = ffi.cast(global_state_ptr, ffi.cast("uint32_t*", L)[2])
+  local G = ffi.cast(global_state_ptr, ffi.cast("uint32_t*", memptr(co))[2])
   CTState = ffi.cast("CTState*", G.ctype_state)
+end
+
+-- Acquire the CTState's miscmap table as a Lua variable
+local miscmap do
+  local t = {}; t[0] = t
+  local tvalue = ffi.cast("uint32_t*", memptr(t))[2]
+  ffi.cast("uint32_t*", tvalue)[ffi.abi"le" and 0 or 1] = ffi.cast("uint32_t", ffi.cast("uintptr_t", CTState.miscmap))
+  miscmap = t[0]
 end
 
 -- Information for unpacking a `struct CType`.
@@ -304,6 +320,10 @@ metatables.enum.__index.value = find_sibling
 
 function reflect.typeof(x) -- refct = reflect.typeof(ct)
   return refct_from_id(tonumber(ffi.typeof(x)))
+end
+
+function reflect.getmetatable(x) -- mt = reflect.getmetatable(ct)
+  return miscmap[-tonumber(ffi.typeof(x))]
 end
 
 return reflect

@@ -105,22 +105,37 @@ local clean = function()
   S.unlink(efile)
 end
 
--- hacky but some types are lists of elements need a number; also varargs in here too as need number
--- TODO our types need more metadata, or use reflection (ffi reflect can detect vla)
-local listtypes = {siginfos = true, inotify_events = true, io_events = "true", pollfds = true, epoll_events = true,
-                   iocb_ptrs = true, ints = true, iocbs = true, string_array = true, sock_filters = true,
-                   buffer = true, groups = true, iovecs = true, -- lists
-                   inotify_event = true} -- varargs
+-- type tests use reflection
+local reflect = require "include.reflect.reflect"
 
 test_types = {
   test_allocate = function() -- create an element of every ctype
     for k, v in pairs(t) do
       if type(v) == "cdata" then
         local x
-        if listtypes[k] then
+        if reflect.typeof(v).vla then
           x = v(1)
         else
           x = v()
+        end
+      end
+    end
+  end,
+  test_meta = function() -- read every __index metatype; unfortunately most are functions, so coverage not that useful yet
+    for k, v in pairs(t) do
+      if type(v) == "cdata" then
+        local x
+        if reflect.typeof(v).vla then
+          x = v(1)
+        else
+          x = v()
+        end
+        local mt = reflect.getmetatable(x)
+        if mt and type(mt.__index) == "table" then
+          for kk, _ in pairs(mt.__index) do
+            local r = x[kk] -- read value via metatable
+            if mt.__newindex and mt.__newindex[kk] then x[kk] = r end -- write, unlikely to actually test anything
+          end
         end
       end
     end
