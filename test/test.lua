@@ -351,6 +351,22 @@ test_read_write = {
   end,
 }
 
+test_poll = {
+  test_poll = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    local a, b = sv[1], sv[2]
+    local pev = {{fd = a, events = "in"}}
+    local p = assert(S.poll(pev, 0))
+    assert(p[1].fd == a:getfd() and p[1].revents == 0, "no events")
+    assert(b:write(teststring))
+    local p = assert(S.poll(pev, 0))
+    assert(p[1].fd == a:getfd() and p[1].IN, "one event now")
+    assert(a:read())
+    assert(b:close())
+    assert(a:close())
+  end,
+}
+
 test_address_names = {
   test_ipv4_names = function()
     assert_equal(tostring(t.in_addr("127.0.0.1")), "127.0.0.1")
