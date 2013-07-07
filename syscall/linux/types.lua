@@ -837,6 +837,10 @@ end
 
 -- TODO move to metatable
 meth.epoll_event = {
+
+}
+
+mt.epoll_event = {
   index = {
     fd = function(e) return tonumber(e.data.fd) end,
     u64 = function(e) return e.data.u64 end,
@@ -848,15 +852,7 @@ meth.epoll_event = {
     u64 = function(e, v) e.data.u64 = v end,
     u32 = function(e, v) e.data.u32 = v end,
     ptr = function(e, v) e.data.ptr = v end,
-  }
-}
-
-mt.epoll_event = {
-  __index = function(e, k)
-    if meth.epoll_event.index[k] then return meth.epoll_event.index[k](e) end
-    if c.EPOLL[k] then return bit.band(e.events, c.EPOLL[k]) ~= 0 end
-  end,
-  __newindex = function(e, k, v) if meth.epoll_event.newindex[k] then meth.epoll_event.newindex[k](e, v) end end,
+  },
   __new = function(tp, a)
     local e = ffi.new(tp)
     if a then
@@ -866,6 +862,10 @@ mt.epoll_event = {
     return e
   end,
 }
+
+for k, v in pairs(c.EPOLL) do
+  mt.epoll_event.index[k] = function(e) return bit.band(e.events, v) ~= 0 end
+end
 
 addtype("epoll_event", "struct epoll_event", mt.epoll_event)
 
