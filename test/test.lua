@@ -666,14 +666,14 @@ test_directory_operations = {
     local d = {}
     for fn, f in util.ls("/dev") do
       d[fn] = true
-      if fn == "zero" then assert(f.chr, "/dev/zero is a character device") end
+      if fn == "zero" then assert(f.CHR, "/dev/zero is a character device") end
       if fn == "." then
-        assert(f.dir, ". is a directory")
-        assert(not f.chr, ". is not a character device")
-        assert(not f.sock, ". is not a socket")
-        assert(not f.lnk, ". is not a symlink")
+        assert(f.DIR, ". is a directory")
+        assert(not f.CHR, ". is not a character device")
+        assert(not f.SOCK, ". is not a socket")
+        assert(not f.LNK, ". is not a symlink")
       end
-      if fn == ".." then assert(f.dir, ".. is a directory") end
+      if fn == ".." then assert(f.DIR, ".. is a directory") end
     end
     assert(d.zero, "expect to find /dev/zero")
   end,
@@ -706,7 +706,7 @@ test_directory_operations = {
     assert(st.ischr, "/dev/zero is a character device")
     for fn, f in util.ls("/dev") do
       if fn == "zero" then
-        assert(f.chr, "/dev/zero is a character device")
+        assert(f.CHR, "/dev/zero is a character device")
         assert_equal(st.todt, f.type)
         assert_equal(f.toif, st.type)
         assert_equal(st.todt, c.DT.CHR)
