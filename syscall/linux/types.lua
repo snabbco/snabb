@@ -872,8 +872,6 @@ t.epoll_wait = function(n, events)
   return r
 end
 
-t.pipe = t.socketpair -- also just two fds
-
 mt.cpu_set = {
   index = {
     zero = function(set) ffi.fill(set, s.cpu_set) end,
