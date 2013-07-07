@@ -203,23 +203,18 @@ addtype("sockaddr", "struct sockaddr", {
   __len = function(tp) return s.sockaddr end,
 })
 
--- TODO add to metatable like others
-meth.sockaddr_storage = {
+-- cast socket address to actual type based on family, defined later
+local samap_pt = {}
+
+mt.sockaddr_storage = {
   index = {
     family = function(sa) return sa.ss_family end,
   },
   newindex = {
     family = function(sa, v) sa.ss_family = c.AF[v] end,
-  }
-}
-
--- cast socket address to actual type based on family, defined later
-local samap_pt = {}
-
--- experiment, see if we can use this as generic type, to avoid allocations.
-addtype("sockaddr_storage", "struct sockaddr_storage", {
+  },
   __index = function(sa, k)
-    if meth.sockaddr_storage.index[k] then return meth.sockaddr_storage.index[k](sa) end
+    if mt.sockaddr_storage.index[k] then return mt.sockaddr_storage.index[k](sa) end
     local st = samap_pt[sa.ss_family]
     if st then
       local cs = st(sa)
@@ -227,8 +222,8 @@ addtype("sockaddr_storage", "struct sockaddr_storage", {
     end
   end,
   __newindex = function(sa, k, v)
-    if meth.sockaddr_storage.newindex[k] then
-      meth.sockaddr_storage.newindex[k](sa, v)
+    if mt.sockaddr_storage.newindex[k] then
+      mt.sockaddr_storage.newindex[k](sa, v)
       return
     end
     local st = samap_pt[sa.ss_family]
@@ -264,7 +259,10 @@ addtype("sockaddr_storage", "struct sockaddr_storage", {
       return s.sockaddr_storage
     end
   end,
-})
+}
+
+-- experiment, see if we can use this as generic type, to avoid allocations.
+addtype("sockaddr_storage", "struct sockaddr_storage", mt.sockaddr_storage)
 
 addtype("sockaddr_in", "struct sockaddr_in", {
   index = {
