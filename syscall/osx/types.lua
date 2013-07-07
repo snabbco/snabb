@@ -98,8 +98,7 @@ addtype("siginfo", "siginfo_t", {
   __len = lenfn,
 })
 
--- note t.dirents iterator is defined in common types
-meth.dirent = {
+mt.dirent = {
   index = {
     ino = function(self) return self.d_ino end,
     seekoff = function(self) return self.d_seekoff end,
@@ -109,15 +108,14 @@ meth.dirent = {
     name = function(self) return ffi.string(self.d_name, self.d_namlen) end,
     toif = function(self) return bit.lshift(self.d_type, 12) end, -- convert to stat types
   },
-}
-
-mt.dirent = {
-  __index = function(self, k)
-    if meth.dirent.index[k] then return meth.dirent.index[k](self) end
-    if c.DT[k] then return self.type == c.DT[k] end
-  end,
   __len = function(self) return self.d_reclen end,
 }
+
+-- TODO previously this allowed lower case values, but this static version does not
+-- could add mt.dirent.index[tolower(k)] = mt.dirent.index[k] but need to do consistently elsewhere
+for k, v in pairs(c.DT) do
+  mt.dirent.index[k] = function(self) return self.type == v end
+end
 
 addtype("dirent", "struct dirent", mt.dirent)
 
