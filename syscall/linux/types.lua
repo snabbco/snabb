@@ -748,21 +748,17 @@ mt.cap = {
 
 addtype("cap", "struct cap", mt.cap)
 
--- TODO add method to return hdr, data TODO merge to metatable
-meth.capabilities = {
-  index = {
+mt.capabilities = {
     hdrdata = function(cap)
       local hdr, data = t.user_cap_header(cap.version, cap.pid), t.user_cap_data2()
       data[0].effective, data[1].effective = cap.effective.cap[0], cap.effective.cap[1]
       data[0].permitted, data[1].permitted = cap.permitted.cap[0], cap.permitted.cap[1]
       data[0].inheritable, data[1].inheritable = cap.inheritable.cap[0], cap.inheritable.cap[1]
       return hdr, data
-    end
-  },
-}
-
-mt.capabilities = {
-  __index = function(cap, k) if meth.capabilities.index[k] then return function() return meth.capabilities.index[k](cap) end end end,
+    end,
+    index = {
+      hdrdata = function(cap) return mt.capabilities.hdrdata end,
+    },
   __new = function(tp, hdr, data)
     local cap = ffi.new(tp, c.LINUX_CAPABILITY_VERSION[3], 0)
     if type(hdr) == "table" then
