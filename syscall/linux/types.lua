@@ -516,31 +516,25 @@ for k, v in pairs(c.B) do
 end
 
 -- TODO merge to metatable
-meth.termios = {
+mt.termios = {
+  makeraw = function(termios)
+    termios.c_iflag = bit.band(termios.c_iflag, bit.bnot(c.IFLAG["IGNBRK,BRKINT,PARMRK,ISTRIP,INLCR,IGNCR,ICRNL,IXON"]))
+    termios.c_oflag = bit.band(termios.c_oflag, bit.bnot(c.OFLAG["OPOST"]))
+    termios.c_lflag = bit.band(termios.c_lflag, bit.bnot(c.LFLAG["ECHO,ECHONL,ICANON,ISIG,IEXTEN"]))
+    termios.c_cflag = bit.bor(bit.band(termios.c_cflag, bit.bnot(c.CFLAG["CSIZE,PARENB"])), c.CFLAG.CS8)
+    termios.c_cc[c.CC.VMIN] = 1
+    termios.c_cc[c.CC.VTIME] = 0
+    return true
+  end,
   index = {
     iflag = function(termios) return termios.c_iflag end,
     oflag = function(termios) return termios.c_oflag end,
     cflag = function(termios) return termios.c_cflag end,
     lflag = function(termios) return termios.c_lflag end,
-    cfmakeraw = function(termios)
-      termios.c_iflag = bit.band(termios.c_iflag, bit.bnot(c.IFLAG["IGNBRK,BRKINT,PARMRK,ISTRIP,INLCR,IGNCR,ICRNL,IXON"]))
-      termios.c_oflag = bit.band(termios.c_oflag, bit.bnot(c.OFLAG["OPOST"]))
-      termios.c_lflag = bit.band(termios.c_lflag, bit.bnot(c.LFLAG["ECHO,ECHONL,ICANON,ISIG,IEXTEN"]))
-      termios.c_cflag = bit.bor(bit.band(termios.c_cflag, bit.bnot(c.CFLAG["CSIZE,PARENB"])), c.CFLAG.CS8)
-      termios.c_cc[c.CC.VMIN] = 1
-      termios.c_cc[c.CC.VTIME] = 0
-      return true
-    end,
-    cfgetospeed = function(termios)
+    makeraw = function(termios) return mt.termios.makeraw end,
+    speed = function(termios)
       local bits = bit.band(termios.c_cflag, c.CBAUD)
       return bits_to_speed[bits]
-    end,
-    -- TODO move to __newindex?
-    cfsetospeed = function(termios, speed)
-      local speed = c.B[speed]
-      if bit.band(speed, bit.bnot(c.CBAUD)) ~= 0 then return nil end
-      termios.c_cflag = bit.bor(bit.band(termios.c_cflag, bit.bnot(c.CBAUD)), speed)
-      return true
     end,
   },
   newindex = {
@@ -548,24 +542,22 @@ meth.termios = {
     oflag = function(termios, v) termios.c_oflag = c.OFLAG(v) end,
     cflag = function(termios, v) termios.c_cflag = c.CFLAG(v) end,
     lflag = function(termios, v) termios.c_lflag = c.LFLAG(v) end,
+    speed = function(termios, speed)
+      local speed = c.B[speed]
+      termios.c_cflag = bit.bor(bit.band(termios.c_cflag, bit.bnot(c.CBAUD)), speed)
+    end,
   },
 }
 
-meth.termios.index.cfsetspeed = meth.termios.index.cfsetospeed -- also shorter names eg ospeed?
-meth.termios.index.cfgetspeed = meth.termios.index.cfgetospeed
-meth.termios.index.cfsetispeed = meth.termios.index.cfsetospeed
-meth.termios.index.cfgetispeed = meth.termios.index.cfgetospeed
+mt.termios.index.ospeed = mt.termios.index.speed
+mt.termios.index.ispeed = mt.termios.index.speed
+mt.termios.newindex.ospeed = mt.termios.newindex.speed
+mt.termios.newindex.ispeed = mt.termios.newindex.speed
 
-mt.termios = {
-  __index = function(termios, k)
-    if meth.termios.index[k] then return meth.termios.index[k] end -- note these are called as objects, could use meta metatable
-    if c.CC[k] then return termios.c_cc[c.CC[k]] end
-  end,
-  __newindex = function(termios, k, v)
-    if meth.termios.newindex[k] then return meth.termios.newindex[k](termios, v) end
-    if c.CC[k] then termios.c_cc[c.CC[k]] = v end
-  end,
-}
+for k, i in pairs(c.CC) do
+  mt.termios.index[k] = function(termios) return termios.c_cc[i] end
+  mt.termios.newindex[k] = function(termios, v) termios.c_cc[i] = v end
+end
 
 addtype("termios", "struct termios", mt.termios)
 addtype("termios2", "struct termios2", mt.termios)
