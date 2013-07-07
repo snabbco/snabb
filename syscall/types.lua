@@ -40,7 +40,6 @@ t.addrtype = {
 }
 
 local mt = {} -- metatables
-local meth = {}
 
 --helpers
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
