@@ -438,12 +438,15 @@ addtype("itimerval", "struct itimerval", {
   end
 })
 
-addtype("pollfd", "struct pollfd", {
-  __index = function(t, k)
-    if k == 'getfd' then return t.fd end -- TODO use meth
-    return bit.band(t.revents, c.POLL[k]) ~= 0
-  end
-})
+mt.pollfd = {
+  index = {
+    getfd = function(pfd) return pfd.fd end,
+  }
+}
+
+for k, v in pairs(c.POLL) do mt.pollfd.index[k] = function(pfd) return bit.band(pfd.revents, v) ~= 0 end end
+
+addtype("pollfd", "struct pollfd", mt.pollfd)
 
 mt.pollfds = {
   __index = function(p, k)
