@@ -379,13 +379,6 @@ function S.pselect(sel) -- note same structure as returned
           exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret), sigset = set}
 end
 
-function S.poll(fds, timeout)
-  fds = mktype(t.pollfds, fds)
-  local ret = C.poll(fds.pfd, #fds, timeout or -1)
-  if ret == -1 then return nil, t.error() end
-  return fds
-end
-
 -- note that syscall does return timeout remaining but libc does not, due to standard prototype TODO use syscall?
 function S.ppoll(fds, timeout, set)
   fds = mktype(t.pollfds, fds)

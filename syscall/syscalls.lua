@@ -254,6 +254,12 @@ function S.getpeername(sockfd, addr, addrlen)
   return t.sa(addr, addrlen[0])
 end
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), c.SHUT[how])) end
+function S.poll(fds, timeout)
+  fds = mktype(t.pollfds, fds)
+  local ret = C.poll(fds.pfd, #fds, timeout or -1)
+  if ret == -1 then return nil, t.error() end
+  return fds
+end
 
 function S.getuid() return C.getuid() end
 function S.geteuid() return C.geteuid() end
