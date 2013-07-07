@@ -615,5 +615,27 @@ c.MADV = strflag {
   FREE        = 6,
 }
 
+c.IFF = multiflags {
+  UP          = 0x0001,
+  BROADCAST   = 0x0002,
+  DEBUG       = 0x0004,
+  LOOPBACK    = 0x0008,
+  POINTOPOINT = 0x0010,
+  NOTRAILERS  = 0x0020,
+  RUNNING     = 0x0040,
+  NOARP       = 0x0080,
+  PROMISC     = 0x0100,
+  ALLMULTI    = 0x0200,
+  OACTIVE     = 0x0400,
+  SIMPLEX     = 0x0800,
+  LINK0       = 0x1000,
+  LINK1       = 0x2000,
+  LINK2       = 0x4000,
+  MULTICAST   = 0x8000,
+}
+
+c.IFF.CANTCHANGE = c.IFF.BROADCAST + c.IFF.POINTOPOINT + c.IFF.RUNNING + c.IFF.OACTIVE + 
+                   c.IFF.SIMPLEX + c.IFF.MULTICAST + c.IFF.ALLMULTI + c.IFF.PROMISC
+
 return c
 

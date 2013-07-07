@@ -186,7 +186,7 @@ mt.ifreq = {
       ifr.ifr_name = v
     end,
     flags = function(ifr, v)
-      ifr.ifr_ifru.ifru_flags = c.IFREQ[v]
+      ifr.ifr_ifru.ifru_flags = c.IFF[v]
     end,
     -- TODO rest of fields
   },
