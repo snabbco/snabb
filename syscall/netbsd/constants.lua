@@ -637,5 +637,19 @@ c.IFF = multiflags {
 c.IFF.CANTCHANGE = c.IFF.BROADCAST + c.IFF.POINTOPOINT + c.IFF.RUNNING + c.IFF.OACTIVE + 
                    c.IFF.SIMPLEX + c.IFF.MULTICAST + c.IFF.ALLMULTI + c.IFF.PROMISC
 
+c.POLL = multiflags {
+  IN         = 0x0001,
+  PRI        = 0x0002,
+  OUT        = 0x0004,
+  RDNORM     = 0x0040,
+  RDBAND     = 0x0080,
+  WRBAND     = 0x0100,
+  ERR        = 0x0008,
+  HUP        = 0x0010,
+  NVAL       = 0x0020,
+}
+
+c.POLL.WRNORM = c.POLL.OUT
+
 return c
 
