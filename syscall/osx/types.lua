@@ -21,7 +21,6 @@ local h = require "syscall.helpers"
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
 local mt = {} -- metatables
-local meth = {}
 
 -- 32 bit dev_t, 24 bit minor, 8 bit major
 mt.device = {
