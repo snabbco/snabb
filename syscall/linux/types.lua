@@ -886,7 +886,7 @@ end
 
 t.pipe = t.socketpair -- also just two fds
 
-meth.cpu_set = {
+mt.cpu_set = {
   index = {
     zero = function(set) ffi.fill(set, s.cpu_set) end,
     set = function(set, cpu)
@@ -913,11 +913,8 @@ meth.cpu_set = {
     end,
     -- TODO add rest of interface from man(3) CPU_SET
   },
-}
-
-mt.cpu_set = {
   __index = function(set, k)
-    if meth.cpu_set.index[k] then return meth.cpu_set.index[k] end
+    if mt.cpu_set.index[k] then return mt.cpu_set.index[k] end
     if type(k) == "number" then return set:get(k) end
   end,
   __newindex = function(set, k, v)
