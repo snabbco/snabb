@@ -256,6 +256,11 @@ struct _netbsd_ifaliasreq {
         struct  _netbsd_sockaddr ifra_dstaddr;
         struct  _netbsd_sockaddr ifra_mask;
 };
+struct _netbsd_pollfd {
+  int fd;
+  short int events;
+  short int revents;
+};
 ]]
 
 end
