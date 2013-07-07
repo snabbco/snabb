@@ -21,7 +21,6 @@ local h = require "syscall.helpers"
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
 local mt = {} -- metatables
-local meth = {}
 
 local addtypes = {
   clockid = "clockid_t",
