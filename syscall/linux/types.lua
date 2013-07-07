@@ -29,7 +29,6 @@ local function getfd(fd)
 end
 
 local mt = {} -- metatables
-local meth = {}
 
 -- TODO cleanup this (what should provide this?)
 local signal_reasons_gen = {}
@@ -834,11 +833,6 @@ mt.adjtimex = {
 t.adjtimex = function(ret, timex)
   return setmetatable({state = ret, timex = timex}, mt.adjtimex)
 end
-
--- TODO move to metatable
-meth.epoll_event = {
-
-}
 
 mt.epoll_event = {
   index = {
