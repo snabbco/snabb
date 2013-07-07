@@ -273,6 +273,7 @@ mt.iphdr = {
 addtype("iphdr", "struct iphdr", mt.iphdr)
 
 local udphdr_size = ffi.sizeof("struct udphdr")
+local char2 = ffi.typeof("char [2]")
 
 -- ugh, naming problems as cannot remove namespace as usual
 -- checksum = function(u, ...) return 0 end, -- TODO checksum, needs IP packet info too. as method.
@@ -288,7 +289,7 @@ mt.udphdr = {
       -- checksum pseudo header
       cs = ip_checksum(bip + ffi.offsetof(ip, "saddr"), 4, cs, true)
       cs = ip_checksum(bip + ffi.offsetof(ip, "daddr"), 4, cs, true)
-      local pr = t.char2(0, 17) -- c.IPPROTO.UDP
+      local pr = char2(0, 17) -- c.IPPROTO.UDP
       cs = ip_checksum(pr, 2, cs, true)
       cs = ip_checksum(bup + ffi.offsetof(i, "len"), 2, cs, true)
       -- checksum udp header

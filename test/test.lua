@@ -1020,6 +1020,79 @@ test_timers = {
   end,
 }
 
+test_raw_socket = {
+  test_ip_checksum = function()
+    local packet = {0x45, 0x00,
+      0x00, 0x73, 0x00, 0x00,
+      0x40, 0x00, 0x40, 0x11,
+      0xb8, 0x61, 0xc0, 0xa8, 0x00, 0x01,
+      0xc0, 0xa8, 0x00, 0xc7}
+
+    local expected = 0x61B8 -- note reversed from example at https://en.wikipedia.org/wiki/IPv4_header_checksum#Example:_Calculating_a_checksum due to byte order issue
+
+    local buf = t.buffer(#packet, packet)
+    local iphdr = pt.iphdr(buf)
+    iphdr[0].check = 0
+    local cs = iphdr[0]:checksum()
+    assert(cs == expected, "expect correct ip checksum: " .. string.format("%%%04X", cs) .. " " .. string.format("%%%04X", expected))
+  end,
+  test_raw_udp_root = function() -- TODO create some helper functions, this is not very nice
+
+    local h = require "syscall.helpers" -- TODO should not have to use later
+
+    local loop = "127.0.0.1"
+    local raw = assert(S.socket("inet", "raw", "raw"))
+    -- needed if not on Linux
+    assert(raw:setsockopt(0, c.IP.HDRINCL, 1)) -- TODO new sockopt code should be able to cope
+    local msg = "raw message."
+    local udplen = s.udphdr + #msg
+    local len = s.iphdr + udplen
+    local buf = t.buffer(len)
+    local iphdr = pt.iphdr(buf)
+    local udphdr = pt.udphdr(buf + s.iphdr)
+    ffi.copy(buf + s.iphdr + s.udphdr, msg, #msg)
+    local bound = false
+    local sport = 666
+    local sa = t.sockaddr_in(sport, loop)
+
+    local buf2 = t.buffer(#msg)
+
+    local cl = assert(S.socket("inet", "dgram"))
+    local ca = t.sockaddr_in(0, loop)
+    assert(cl:bind(ca))
+    local ca = cl:getsockname()
+    local cport = ca.port
+
+    -- TODO iphdr should have __index helpers for endianness etc (note use raw s_addr)
+    iphdr[0] = {ihl = 5, version = 4, tos = 0, id = 0, frag_off = h.htons(0x4000), ttl = 64, protocol = c.IPPROTO.UDP, check = 0,
+             saddr = sa.sin_addr.s_addr, daddr = ca.sin_addr.s_addr, tot_len = h.htons(len)}
+    iphdr[0]:checksum()
+
+    -- test checksum TODO new test
+    cport = 777
+
+    --udphdr[0] = {src = sport, dst = cport, length = udplen} -- doesnt work with metamethods
+    udphdr[0].src = sport
+    udphdr[0].dst = cport
+    udphdr[0].length = udplen
+    udphdr[0]:checksum(iphdr[0], buf + s.iphdr + s.udphdr)
+
+    assert_equal(udphdr[0].check, 0x306b) -- reversed due to network order
+
+    cport = ca.port
+    udphdr[0].dst = cport
+    udphdr[0]:checksum(iphdr[0], buf + s.iphdr + s.udphdr)
+
+    local n = assert(raw:sendto(buf, len, 0, ca))
+    local f = assert(cl:recvfrom(buf2, #msg))
+
+    assert_equal(f, #msg)
+
+    assert(raw:close())
+    assert(cl:close())
+  end,
+}
+
 if not abi.rump then -- rump has no processes, memory allocation so not applicable
 test_signals = {
   test_signal_ignore = function()
@@ -1128,7 +1201,7 @@ if S.geteuid() == 0 then
     local ok, err = S.unshare("newnet, newns, newuts")
     if not ok then removeroottests() -- remove if you like, but may interfere with networking
     else
-      local nl = require "syscall.linux.nl"
+      local nl = S.nl
       local i = assert(nl.interfaces())
       local lo = assert(i.lo)
       assert(lo:up())

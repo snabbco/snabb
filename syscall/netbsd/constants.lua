@@ -651,5 +651,53 @@ c.POLL = multiflags {
 
 c.POLL.WRNORM = c.POLL.OUT
 
+c.IP = strflag {
+  OPTIONS            = 1,
+  HDRINCL            = 2,
+  TOS                = 3,
+  TTL                = 4,
+  RECVOPTS           = 5,
+  RECVRETOPTS        = 6,
+  RECVDSTADDR        = 7,
+  RETOPTS            = 8,
+  MULTICAST_IF       = 9,
+  MULTICAST_TTL      = 10,
+  MULTICAST_LOOP     = 11,
+  ADD_MEMBERSHIP     = 12,
+  DROP_MEMBERSHIP    = 13,
+  PORTRANGE          = 19,
+  RECVIF             = 20,
+  ERRORMTU           = 21,
+  IPSEC_POLICY       = 22,
+  RECVTTL            = 23,
+  MINTTL             = 24,
+}
+
+c.SO = strflag {
+  DEBUG        = 0x0001,
+  ACCEPTCONN   = 0x0002,
+  REUSEADDR    = 0x0004,
+  KEEPALIVE    = 0x0008,
+  DONTROUTE    = 0x0010,
+  BROADCAST    = 0x0020,
+  USELOOPBACK  = 0x0040,
+  LINGER       = 0x0080,
+  OOBINLINE    = 0x0100,
+  REUSEPORT    = 0x0200,
+  NOSIGPIPE    = 0x0800,
+  ACCEPTFILTER = 0x1000,
+  TIMESTAMP    = 0x2000,
+  SNDBUF       = 0x1001,
+  RCVBUF       = 0x1002,
+  SNDLOWAT     = 0x1003,
+  RCVLOWAT     = 0x1004,
+  ERROR        = 0x1007,
+  TYPE         = 0x1008,
+  OVERFLOWED   = 0x1009,
+  NOHEADER     = 0x100a,
+  SNDTIMEO     = 0x100b,
+  RCVTIMEO     = 0x100c,
+}
+
 return c
 
