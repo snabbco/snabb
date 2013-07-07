@@ -520,6 +520,7 @@ meth.termios = {
   index = {
     iflag = function(termios) return termios.c_iflag end,
     oflag = function(termios) return termios.c_oflag end,
+    cflag = function(termios) return termios.c_cflag end,
     lflag = function(termios) return termios.c_lflag end,
     cfmakeraw = function(termios)
       termios.c_iflag = bit.band(termios.c_iflag, bit.bnot(c.IFLAG["IGNBRK,BRKINT,PARMRK,ISTRIP,INLCR,IGNCR,ICRNL,IXON"]))
@@ -545,6 +546,7 @@ meth.termios = {
   newindex = {
     iflag = function(termios, v) termios.c_iflag = c.IFLAG(v) end,
     oflag = function(termios, v) termios.c_oflag = c.OFLAG(v) end,
+    cflag = function(termios, v) termios.c_cflag = c.CFLAG(v) end,
     lflag = function(termios, v) termios.c_lflag = c.LFLAG(v) end,
   },
 }
