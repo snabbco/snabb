@@ -649,6 +649,40 @@ mt.msghdr = {
 }
 addtype("msghdr", "struct msghdr", mt.msghdr)
 
+mt.pollfd = {
+  index = {
+    getfd = function(pfd) return pfd.fd end,
+  }
+}
+
+for k, v in pairs(c.POLL) do mt.pollfd.index[k] = function(pfd) return bit.band(pfd.revents, v) ~= 0 end end
+
+addtype("pollfd", "struct pollfd", mt.pollfd)
+
+mt.pollfds = {
+  __index = function(p, k)
+    return p.pfd[k - 1]
+  end,
+  __newindex = function(p, k, v)
+    v = istype(t.pollfd, v) or t.pollfd(v)
+    ffi.copy(p.pfd[k - 1], v, s.pollfd)
+  end,
+  __len = function(p) return p.count end,
+  __new = function(tp, ps)
+    if type(ps) == 'number' then return ffi.new(tp, ps, ps) end
+    local count = #ps
+    local fds = ffi.new(tp, count, count)
+    for n = 1, count do
+      fds[n].fd = ps[n].fd:getfd()
+      fds[n].events = c.POLL[ps[n].events]
+      fds[n].revents = 0
+    end
+    return fds
+  end,
+}
+
+addtype_var("pollfds", "struct {int count; struct pollfd pfd[?];}", mt.pollfds)
+
 -- include OS specific types
 local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
 
