@@ -498,8 +498,8 @@ addtype_fn("sa_sigaction", "void (*)(int, siginfo_t *, void *)")
 
 mt.sigaction = {
   index = {
-    handler = function(sa) return sa.sa_handler end,
-    sigaction = function(sa) return sa.sa_sigaction end,
+    handler = function(sa) return sa.sa_handler.sa_handler end,
+    sigaction = function(sa) return sa.sa_handler.sa_sigaction end,
     mask = function(sa) return sa.sa_mask end,
     flags = function(sa) return tonumber(sa.sa_flags) end,
   },
