@@ -468,6 +468,7 @@ mt.signalfd = {
 }
 
 addtype("signalfd_siginfo", "struct signalfd_siginfo", mt.signalfd)
+
 mt.siginfos = {
   __index = function(ss, k)
     return ss.sfd[k - 1]
@@ -517,6 +518,9 @@ end
 -- TODO merge to metatable
 meth.termios = {
   index = {
+    iflag = function(termios) return termios.c_iflag end,
+    oflag = function(termios) return termios.c_oflag end,
+    lflag = function(termios) return termios.c_lflag end,
     cfmakeraw = function(termios)
       termios.c_iflag = bit.band(termios.c_iflag, bit.bnot(c.IFLAG["IGNBRK,BRKINT,PARMRK,ISTRIP,INLCR,IGNCR,ICRNL,IXON"]))
       termios.c_oflag = bit.band(termios.c_oflag, bit.bnot(c.OFLAG["OPOST"]))
@@ -537,6 +541,11 @@ meth.termios = {
       termios.c_cflag = bit.bor(bit.band(termios.c_cflag, bit.bnot(c.CBAUD)), speed)
       return true
     end,
+  },
+  newindex = {
+    iflag = function(termios, v) termios.c_iflag = c.IFLAG(v) end,
+    oflag = function(termios, v) termios.c_oflag = c.OFLAG(v) end,
+    lflag = function(termios, v) termios.c_lflag = c.LFLAG(v) end,
   },
 }
 
