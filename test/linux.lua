@@ -705,9 +705,7 @@ test.raw_socket = {
 
     assert(raw:close())
     assert(cl:close())
-
   end,
-
 }
 
 test.netlink = {
