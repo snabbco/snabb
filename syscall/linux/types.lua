@@ -438,8 +438,7 @@ addtype("itimerval", "struct itimerval", {
   end
 })
 
--- TODO merge into metatable
-meth.signalfd = {
+mt.signalfd = {
   index = {
     signo = function(ss) return tonumber(ss.ssi_signo) end,
     code = function(ss) return tonumber(ss.ssi_code) end,
@@ -457,20 +456,18 @@ meth.signalfd = {
     stime = function(ss) return tonumber(ss.ssi_stime) end,
     addr = function(ss) return ss.ss_addr end,
   },
-}
-
-addtype("signalfd_siginfo", "struct signalfd_siginfo", {
-  __index = function(ss, k)
+  __index = function(ss, k) -- TODO simplify this
     if ss.ssi_signo == c.SIG(k) then return true end
     local rname = signal_reasons_gen[ss.ssi_code]
     if not rname and signal_reasons[ss.ssi_signo] then rname = signal_reasons[ss.ssi_signo][ss.ssi_code] end
     if rname == k then return true end
     if rname == k:upper() then return true end -- TODO use some metatable to hide this?
-    if meth.signalfd.index[k] then return meth.signalfd.index[k](ss) end
+    if mt.signalfd.index[k] then return mt.signalfd.index[k](ss) end
   end,
   __len = lenfn,
-})
+}
 
+addtype("signalfd_siginfo", "struct signalfd_siginfo", mt.signalfd)
 mt.siginfos = {
   __index = function(ss, k)
     return ss.sfd[k - 1]
