@@ -9,7 +9,10 @@ require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math, bit
 
-local cdef = require "ffi".cdef
+local ffi = require "ffi"
+
+local cdef = ffi.cdef
+local le = ffi.abi("le") -- normally we would use abi file, but not included here
 
 cdef[[
 // 16 bit
@@ -44,5 +47,52 @@ struct in_addr {
 struct in6_addr {
   unsigned char  s6_addr[16];
 };
+struct ethhdr {
+  unsigned char   h_dest[6];
+  unsigned char   h_source[6];
+  unsigned short  h_proto; /* __be16 */
+} __attribute__((packed));
+struct udphdr {
+  uint16_t source;
+  uint16_t dest;
+  uint16_t len;
+  uint16_t check;
+};
 ]]
+
+-- endian dependent TODO not really, define in independent way
+if le then
+cdef[[
+struct iphdr {
+  uint8_t  ihl:4,
+           version:4;
+  uint8_t  tos;
+  uint16_t tot_len;
+  uint16_t id;
+  uint16_t frag_off;
+  uint8_t  ttl;
+  uint8_t  protocol;
+  uint16_t check;
+  uint32_t saddr;
+  uint32_t daddr;
+};
+]]
+else
+cdef[[
+struct iphdr {
+  uint8_t  version:4,
+           ihl:4;
+  uint8_t  tos;
+  uint16_t tot_len;
+  uint16_t id;
+  uint16_t frag_off;
+  uint8_t  ttl;
+  uint8_t  protocol;
+  uint16_t check;
+  uint32_t saddr;
+  uint32_t daddr;
+};
+]]
+end
+
 

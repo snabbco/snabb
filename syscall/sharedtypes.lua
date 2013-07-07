@@ -22,8 +22,19 @@ local function ptt(tp)
   return function(x) return ffi.cast(ptp, x) end
 end
 
+-- TODO share with main definition
 local function addtype(name, tp, mt)
-  if mt then t[name] = ffi.metatype(tp, mt) else t[name] = ffi.typeof(tp) end
+  if mt then
+    if mt.index and not mt.__index then -- generic index method
+      mt.__index = function(tp, k) if mt.index[k] then return mt.index[k](tp) end end
+    end
+    if mt.newindex and not mt.__newindex then -- generic newindex method
+      mt.__newindex = function(tp, k, v) if mt.newindex[k] then mt.newindex[k](tp, v) end end
+    end
+    t[name] = ffi.metatype(tp, mt)
+  else
+    t[name] = ffi.typeof(tp)
+  end
   ctypes[tp] = t[name]
   pt[name] = ptt(tp)
   s[name] = ffi.sizeof(t[name])
@@ -220,6 +231,90 @@ addtype("in6_addr", "struct in6_addr", {
   end,
   __len = lenfn,
 })
+
+-- ip, udp types. Need endian conversions.
+local ptchar = ffi.typeof("char *")
+local uint16 = ffi.typeof("uint16_t[1]")
+
+local function ip_checksum(buf, size, c, notfinal)
+  c = c or 0
+  local b8 = ffi.cast(ptchar, buf)
+  local i16 = uint16()
+  for i = 0, size - 1, 2 do
+    ffi.copy(i16, b8 + i, 2)
+    c = c + i16[0]
+  end
+  if size % 2 == 1 then
+    i16[0] = 0
+    ffi.copy(i16, b8[size - 1], 1)
+    c = c + i16[0]
+  end
+
+  local v = bit.band(c, 0xffff)
+  if v < 0 then v = v + 0x10000 end -- positive
+  c = bit.rshift(c, 16) + v
+  c = c + bit.rshift(c, 16)
+
+  if not notfinal then c = bit.bnot(c) end
+  if c < 0 then c = c + 0x10000 end -- positive
+  return c
+end
+
+mt.iphdr = {
+  index = {
+    checksum = function(i) return function(i)
+      i.check = 0
+      i.check = ip_checksum(i, s.iphdr)
+      return i.check
+    end end,
+  },
+}
+
+addtype("iphdr", "struct iphdr", mt.iphdr)
+
+local udphdr_size = ffi.sizeof("struct udphdr")
+
+-- ugh, naming problems as cannot remove namespace as usual
+-- checksum = function(u, ...) return 0 end, -- TODO checksum, needs IP packet info too. as method.
+mt.udphdr = {
+  index = {
+    src = function(u) return ntohs(u.source) end,
+    dst = function(u) return ntohs(u.dest) end,
+    length = function(u) return ntohs(u.len) end,
+    checksum = function(i) return function(i, ip, body)
+      local bip = pt.char(ip)
+      local bup = pt.char(i)
+      local cs = 0
+      -- checksum pseudo header
+      cs = ip_checksum(bip + ffi.offsetof(ip, "saddr"), 4, cs, true)
+      cs = ip_checksum(bip + ffi.offsetof(ip, "daddr"), 4, cs, true)
+      local pr = t.char2(0, c.IPPROTO.UDP)
+      cs = ip_checksum(pr, 2, cs, true)
+      cs = ip_checksum(bup + ffi.offsetof(i, "len"), 2, cs, true)
+      -- checksum udp header
+      i.check = 0
+      cs = ip_checksum(i, udphdr_size, cs, true)
+      -- checksum body
+      cs = ip_checksum(body, i.length - udphdr_size, cs)
+      if cs == 0 then cs = 0xffff end
+      i.check = cs
+      return cs
+    end end,
+  },
+  newindex = {
+    src = function(u, v) u.source = htons(v) end,
+    dst = function(u, v) u.dest = htons(v) end,
+    length = function(u, v) u.len = htons(v) end,
+  },
+}
+
+addtype("udphdr", "struct udphdr", mt.udphdr)
+
+mt.ethhdr = {
+  -- TODO
+}
+
+addtype("ethhdr", "struct ethhdr", mt.ethhdr)
 
 return {t = t, pt = pt, s = s, ctypes = ctypes}
 
