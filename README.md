@@ -2,9 +2,9 @@
 
 What? An FFI implementation of the Linux kernel ABI for LuaJIT. This means you will be able to program all the functionality the Linux kernel provides to userspace directly in Lua. You can view it as a high level language equivalent of the busybox project in a way, although the functionality it provides is somewhat different, and the interface very different.
 
-Why? Making a C library for everything you want to bind is a pain, so I thought I would see what you could do without, and I want to do some low level system stuff in Lua. Use it if you want a comprehensive and tested set of easy to use bindings for LuaJIT, if you want to use Linux features without writing lots of C code riddled with macros, to learn about how operating systems work, as a configuration language or many other uses.
+Why? First it provides a comprehensive set of system call APIs for programming sockets, files and so on, including the more obscure things (eg file change notifications). Second it provides higher level interfaces such as network interface configuration, so your application can control its entire runtime interface including IP addresses routing and so on. Third it provides tools for added security, such as support for Linux namespaces (containers), system call filtering (seccomp type 2), capabilities and so on, all with a script language interface that is much simpler to use than the C interface. As it is Lua based it can easily be embedded in another language; in the future ports to other scripting languages are planned. It also serves as a way of learning how the operating system interfaces work in a more forgiving environemnt than C.
 
-There is a work in progress port to BSD systems, currently targetting NetBSD (32 bit) and OSX (64 bit). These are currently less complete than the Linux version.
+There is a work in progress port to BSD systems, currently targetting NetBSD and OSX. NetBSD support is relatively good, OSX is currently lagging and not well tested.
 
 This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
 
