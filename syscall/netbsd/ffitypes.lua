@@ -261,6 +261,13 @@ struct _netbsd_pollfd {
   short int events;
   short int revents;
 };
+struct _netbsd_flock {
+  off_t   l_start;
+  off_t   l_len;
+  pid_t   l_pid;
+  short   l_type;
+  short   l_whence;
+};
 ]]
 
 end

@@ -29,6 +29,7 @@ local addtypes = {
 local addstructs = {
   ufs_args = "struct ufs_args",
   tmpfs_args = "struct tmpfs_args",
+  flock = "struct flock",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end

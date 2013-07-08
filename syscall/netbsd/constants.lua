@@ -699,5 +699,13 @@ c.SO = strflag {
   RCVTIMEO     = 0x100c,
 }
 
+-- lockf, changed from F_ to LOCKF_
+c.LOCKF = strflag {
+  ULOCK = 0,
+  LOCK  = 1,
+  TLOCK = 2,
+  TEST  = 3,
+}
+
 return c
 

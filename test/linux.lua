@@ -276,45 +276,6 @@ test.xattr = {
   end,
 }
 
-test.locking = {
-  test_fcntl_setlk = function()
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
-    assert(S.unlink(tmpfile))
-    assert(fd:truncate(4096))
-    assert(fd:fcntl("setlk", {type = "rdlck", whence = "set", start = 0, len = 4096}))
-    assert(fd:close())
-  end,
-  test_lockf_lock = function()
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
-    assert(S.unlink(tmpfile))
-    assert(fd:truncate(4096))
-    assert(fd:lockf("lock", 4096))
-    assert(fd:close())
-  end,
-  test_lockf_tlock = function()
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
-    assert(S.unlink(tmpfile))
-    assert(fd:truncate(4096))
-    assert(fd:lockf("tlock", 4096))
-    assert(fd:close())
-  end,
-  test_lockf_ulock = function()
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
-    assert(S.unlink(tmpfile))
-    assert(fd:truncate(4096))
-    assert(fd:lockf("lock", 4096))
-    assert(fd:lockf("ulock", 4096))
-    assert(fd:close())
-  end,
-  test_lockf_test = function()
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
-    assert(S.unlink(tmpfile))
-    assert(fd:truncate(4096))
-    assert(fd:lockf("test", 4096))
-    assert(fd:close())
-  end,
-}
-
 test.tee_splice = {
   test_tee_splice = function()
     local p = assert(S.pipe("nonblock"))
