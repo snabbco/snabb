@@ -51,6 +51,7 @@ end
 
 local function tell(fd) return S.lseek(fd, 0, c.SEEK.CUR) end
 
+-- somewhat confusing now we have flock too. I think this comes from nixio.
 local function lockf(fd, cmd, len)
   cmd = c.LOCKF[cmd]
   if cmd == c.LOCKF.LOCK then
@@ -81,7 +82,7 @@ local fdmethods = {'dup', 'read', 'write', 'pread', 'pwrite',
                    'sync_file_range', 'fstatfs', 'futimens', 'futimes',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
                    'fchownat', 'readlinkat', 'setns', 'openat',
-                   'preadv', 'pwritev', 'epoll_pwait', 'ioctl'
+                   'preadv', 'pwritev', 'epoll_pwait', 'ioctl', 'flock'
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
@@ -105,8 +106,8 @@ fmeth.statfs = S.fstatfs
 fmeth.utimens = S.futimens
 fmeth.utimes = S.futimes
 fmeth.seek = S.lseek
-fmeth.lock = S.lockf
 fmeth.chown = S.fchown
+fmeth.lock = S.flock
 
 local function nogc(d) return ffi.gc(d, nil) end
 

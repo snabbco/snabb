@@ -198,6 +198,18 @@ c.LOCKF = strflag {
   TEST  = 3,
 }
 
+-- for flock (2)
+c.LOCK = multiflags {
+  SH        = 1,
+  EX        = 2,
+  NB        = 4,
+  UN        = 8,
+  MAND      = 32,
+  READ      = 64,
+  WRITE     = 128,
+  RW        = 192,
+}
+
 --mmap
 c.PROT = multiflags {
   NONE  = 0x0,

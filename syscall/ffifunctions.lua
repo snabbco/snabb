@@ -60,6 +60,7 @@ int truncate(const char *path, off_t length);
 int ftruncate(int fd, off_t length);
 int shm_open(const char *pathname, int flags, mode_t mode);
 int shm_unlink(const char *name);
+int flock(int fd, int operation);
 
 int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);

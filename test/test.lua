@@ -1057,6 +1057,13 @@ test_locking = {
     assert(fd:lockf("test", 4096))
     assert(fd:close())
   end,
+  test_flock = function()
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
+    assert(fd:flock("sh, nb"))
+    assert(fd:flock("ex"))
+    assert(fd:flock("un"))
+    assert(fd:close())
+  end,
 }
 
 test_raw_socket = {

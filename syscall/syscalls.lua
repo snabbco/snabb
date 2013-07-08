@@ -95,6 +95,7 @@ function S.mknod(pathname, mode, dev)
   if type(dev) == "table" then dev = dev.dev end -- TODO allow array eg {2, 2} - major, minor
   return retbool(C.mknod(pathname, c.S_I[mode], dev or 0))
 end
+function S.flock(fd, operation) return retbool(C.flock(getfd(fd), c.LOCK[operation])) end
 -- TODO read should have consistent return type but then will differ from other calls.
 function S.read(fd, buf, count)
   if buf then return retnum(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage

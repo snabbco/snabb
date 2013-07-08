@@ -707,5 +707,13 @@ c.LOCKF = strflag {
   TEST  = 3,
 }
 
+-- for flock (2)
+c.LOCK = multiflags {
+  SH        = 1,
+  EX        = 2,
+  NB        = 4,
+  UN        = 8,
+}
+
 return c
 
