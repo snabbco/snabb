@@ -1043,7 +1043,7 @@ test_raw_socket = {
     local loop = "127.0.0.1"
     local raw = assert(S.socket("inet", "raw", "raw"))
     -- needed if not on Linux
-    assert(raw:setsockopt(0, c.IP.HDRINCL, 1)) -- TODO new sockopt code should be able to cope
+    assert(raw:setsockopt(c.IPPROTO.IP, c.IP.HDRINCL, 1)) -- TODO new sockopt code should be able to cope
     local msg = "raw message."
     local udplen = s.udphdr + #msg
     local len = s.iphdr + udplen
@@ -1061,26 +1061,16 @@ test_raw_socket = {
     local ca = t.sockaddr_in(0, loop)
     assert(cl:bind(ca))
     local ca = cl:getsockname()
-    local cport = ca.port
 
     -- TODO iphdr should have __index helpers for endianness etc (note use raw s_addr)
     iphdr[0] = {ihl = 5, version = 4, tos = 0, id = 0, frag_off = h.htons(0x4000), ttl = 64, protocol = c.IPPROTO.UDP, check = 0,
              saddr = sa.sin_addr.s_addr, daddr = ca.sin_addr.s_addr, tot_len = h.htons(len)}
-    iphdr[0]:checksum()
 
-    -- test checksum TODO new test
-    cport = 777
-
-    --udphdr[0] = {src = sport, dst = cport, length = udplen} -- doesnt work with metamethods
+    --udphdr[0] = {src = sport, dst = ca.port, length = udplen} -- doesnt work with metamethods
     udphdr[0].src = sport
-    udphdr[0].dst = cport
     udphdr[0].length = udplen
-    udphdr[0]:checksum(iphdr[0], buf + s.iphdr + s.udphdr)
 
-    assert_equal(udphdr[0].check, 0x306b) -- reversed due to network order
-
-    cport = ca.port
-    udphdr[0].dst = cport
+    udphdr[0].dst = ca.port
     udphdr[0]:checksum(iphdr[0], buf + s.iphdr + s.udphdr)
 
     local n = assert(raw:sendto(buf, len, 0, ca))
