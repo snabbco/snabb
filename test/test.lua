@@ -5,7 +5,7 @@
 -- only use this installation for tests
 package.path = "./?.lua;"
 
-local strict = require "test.strict"
+local strict = require "include.strict.strict"
 
 local oldassert = assert
 local function assert(cond, s)
