@@ -86,6 +86,13 @@ test.filesystem_bsd = {
     assert(fd:close())
     assert(dfd:close())
   end,
+  test_revoke = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.revoke(tmpfile))
+    local n, err = fd:read()
+    assert(not n, "access should be revoked")
+    assert(fd:close())
+  end,
 }
 
 test.network_utils_bsd_root = {

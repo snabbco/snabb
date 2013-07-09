@@ -105,6 +105,8 @@ function S.lutimes(path, ts)
   return retbool(C.lutimes(path, ts))
 end
 
+function S.revoke(path) return retbool(C.revoke(path)) end
+
 -- TODO when we define this for osx can go in common code (curently defined in libc.lua)
 function S.getcwd(buf, size)
   size = size or c.PATH_MAX
