@@ -90,7 +90,7 @@ test.filesystem_bsd = {
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.revoke(tmpfile))
     local n, err = fd:read()
-    assert(not n, "access should be revoked")
+    assert(not n and err.BADF, "access should be revoked")
     assert(fd:close())
   end,
 }
