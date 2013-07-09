@@ -422,11 +422,37 @@ c.SO = strflag {
   PRIORITY    = 12,
   LINGER      = 13,
   BSDCOMPAT   = 14,
-  SNDBUFFORCE = 32,
-  RCVBUFFORCE = 33,
+--REUSEPORT   = 15, -- new, may not be defined yet
+
+  -- see below for 16-21
+
+  SECURITY_AUTHENTICATION = 22,
+  SECURITY_ENCRYPTION_TRANSPORT = 23,
+  SECURITY_ENCRYPTION_NETWORK = 24,
+  BINDTODEVICE       = 25,
+  ATTACH_FILTER      = 26,
+  DETACH_FILTER      = 27,
+  PEERNAME           = 28,
+  TIMESTAMP          = 29,
+  ACCEPTCONN         = 30,
+  PEERSEC            = 31,
+  SNDBUFFORCE        = 32,
+  RCVBUFFORCE        = 33,
+  PASSSEC            = 34,
+  TIMESTAMPNS        = 35,
+  MARK               = 36,
+  TIMESTAMPING       = 37,
+  PROTOCOL           = 38,
+  DOMAIN             = 39,
+  RXQ_OVFL           = 40,
+  WIFI_STATUS        = 41,
+  PEEK_OFF           = 42,
+  NOFCS              = 43,
 }
 
-addarch(c.SO, arch.SO, {
+c.SO.GET_FILTER = c.SO.ATTACH_FILTER
+
+addarch(c.SO, arch.SO, { -- these vary for ppc
   PASSCRED    = 16,
   PEERCRED    = 17,
   RCVLOWAT    = 18,
