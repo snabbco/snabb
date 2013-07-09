@@ -135,17 +135,18 @@ If you wish to port to an unsupported platform, please get in touch for help. Al
 
 Porting to a different libc should be relatively simple, it is mainly a matter of dealing with anything that is missing (eg for bionic on Android, which partially works).
 
-Porting to different Linux processor architectures is a matter of filling in the constants and types that differ. The `ctest` tests will flag issues with these, although many platforms are also missing headers which makes it more complex.
+Porting to different Linux processor architectures is a matter of filling in the constants and types that differ. The `ctest` tests will flag issues with these, although many platforms are also missing headers which makes it more complex. If you can provide qemu target information that would be helpful as the platform can be added to the test suite.
 
-Porting to different OSs is a fair amount of work, but can generally be done gradually. The other BSDs should be very similar to NetBSD and OSX. Solaris has an ABI defined by libc not the kernel ABI, which would mean that you should probably target that. The first thing to do is check the bas shared types, and work out if there are issues with large file support if it is a 32 bit platform.
+Porting to different OSs is a fair amount of work, but can generally be done gradually. The other BSDs should be very similar to NetBSD and OSX. Solaris has an ABI defined by libc not the kernel ABI, which would mean that you should probably target that. The first thing to do is check the base shared types, and work out if there are issues with large file support if it is a 32 bit platform. There are more sharing opportunities between OSs that should be dealt with, at the moment for example there is some repetition with OSX and NetBSD, so some restructuring would be helpful. 
 
-If you want to port this to a different language, then get in touch, as I have some ideas. Pypy and Ruby ought to be suitable targets as they have an ffi; I also intend to do a classic Lua port using the C API. I intend to use reflection to generate more generic data for the ports, and rework how files are included. The first thing to do is just prototype some basic functions to see what is needed. Get in touch!
+If you want to port this to a different language, then get in touch, as I have some ideas and plans along this route, though I am trying to get a good fairly stable interface in Lua first. Pypy and Ruby ought to be suitable targets as they have an ffi; I also intend to do a classic Lua port using the C API. I intend to use reflection to generate more generic data for the ports, and rework how files are included. The first thing to do is just prototype some basic functions to see what is needed. Get in touch if you are interested in a port!
 
 ### Issues
 
-There will no doubt be bugs and missing features, please report them if you find them. Also API design issues. You can use the [github issue tracker](https://github.com/justincormack/ljsyscall/issues?page=1&state=open).
+There will no doubt be bugs and missing features, please report them if you find them. Also API design issues. You can use the [github issue tracker](https://github.com/justincormack/ljsyscall/issues?page=1&state=open) to report issues.
 
 ### License
 
-All the ljsyscall code is under the MIT license, see license file. Other files that have a license (luaunit, reflect) are differently licensed (MIT, X11).
+All the ljsyscall code is under the MIT license, see LICENSE file. Files in the include directory (luaunit, reflect, strict) may be differently licensed; these are only required for running the tests.
+
 
