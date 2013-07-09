@@ -75,6 +75,7 @@ print [[
 #include <ufs/ufs/ufsmount.h>
 #include <sys/module.h>
 #include <sys/syscall.h>
+#include <net/bpf.h>
 
 int ret = 0;
 
