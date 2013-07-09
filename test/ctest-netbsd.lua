@@ -144,6 +144,7 @@ local nm = {
   SYS = "SYS___",
   AT_FDCWD = "AT_",
   FCNTL_LOCK = "F_",
+  LOCKF = "F_",
   SIGACT = "SIG_",
   UMOUNT = "MNT_",
   SIGPM = "SIG_",
