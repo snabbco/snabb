@@ -106,6 +106,7 @@ addtype("stat", "struct stat", {
     isfifo = function(st) return st.type == c.S_I.FIFO end,
     islnk = function(st) return st.type == c.S_I.FLNK end,
     issock = function(st) return st.type == c.S_I.FSOCK end,
+    iswht = function(st) return st.type == c.S_I.FWHT end,
   },
   __len = lenfn,
 })
