@@ -135,7 +135,13 @@ test.filesystem_bsd = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
-
+  test_lchmod = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.lchmod(tmpfile, "RUSR, WUSR"))
+    assert(S.access(tmpfile, "rw"))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
 }
 
 test.network_utils_bsd_root = {
