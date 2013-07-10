@@ -67,6 +67,46 @@ end
 
 -- TODO setpgrp and similar - see the man page
 
+-- in Linux pathconf can just return constants
+
+-- TODO these could go into constants, although maybe better to get from here, and some are slightly bogus eg PAGE_SIZE
+local PAGE_SIZE = 4096
+local NAME_MAX = 255
+local PATH_MAX = 4096 -- TODO this is in constants, inconsistently
+local PIPE_BUF = 4096
+local FILESIZEBITS = 64
+local SYMLINK_MAX = 255
+local _POSIX_LINK_MAX = 8
+local _POSIX_MAX_CANON = 255
+local _POSIX_MAX_INPUT = 255
+
+local pathconf_values = {
+  [c.PC.LINK_MAX] = _POSIX_LINK_MAX,
+  [c.PC.MAX_CANON] = _POSIX_MAX_CANON,
+  [c.PC.MAX_INPUT] = _POSIX_MAX_INPUT,
+  [c.PC.NAME_MAX] = NAME_MAX,
+  [c.PC.PATH_MAX] = PATH_MAX,
+  [c.PC.PIPE_BUF] = PIPE_BUF,
+  [c.PC.CHOWN_RESTRICTED] = 1,
+  [c.PC.NO_TRUNC] = 1,
+  [c.PC.VDISABLE] = 0,
+  [c.PC.SYNC_IO] = 1,
+  [c.PC.ASYNC_IO] = -1,
+  [c.PC.PRIO_IO] = -1,
+  [c.PC.SOCK_MAXBUF] = -1,
+  [c.PC.FILESIZEBITS] = FILESIZEBITS,
+  [c.PC.REC_INCR_XFER_SIZE] = PAGE_SIZE,
+  [c.PC.REC_MAX_XFER_SIZE] = PAGE_SIZE,
+  [c.PC.REC_MIN_XFER_SIZE] = PAGE_SIZE,
+  [c.PC.REC_XFER_ALIGN] = PAGE_SIZE,
+  [c.PC.ALLOC_SIZE_MIN] = PAGE_SIZE,
+  [c.PC.SYMLINK_MAX] = SYMLINK_MAX,
+  [c.PC["2_SYMLINKS"]] = 1,
+}
+
+function S.pathconf(_, name) return pathconf_values[c.PC[name]] end
+function S.fpathconf(_, name) return pathconf_values[c.PC[name]] end
+
 return S
 
 end
