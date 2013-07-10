@@ -1072,9 +1072,19 @@ test_locking = {
   end,
 }
 
-test_misc_root = {
-  test_chroot = function()
+test_misc = {
+  test_chroot_root = function()
     assert(S.chroot("/"))
+  end,
+  test_pathconf = function()
+    local pc = assert(S.pathconf(".", "name_max"))
+    assert(pc >= 255, "name max shoul be at least 255")
+  end,
+  test_fpathconf = function()
+    local fd = assert(S.open(".", "rdonly"))
+    local pc = assert(fd:pathconf("name_max"))
+    assert(pc >= 255, "name max shoul be at least 255")
+    assert(fd:close())
   end,
 }
 
