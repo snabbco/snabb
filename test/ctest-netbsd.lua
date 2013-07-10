@@ -155,7 +155,7 @@ local nm = {
   MSYNC = "MS_",
   AT_SYMLINK_NOFOLLOW = "AT_",
   CHFLAGS = "",
-  PC = "_PC",
+  PC = "_PC_",
 }
 
 for k, v in pairs(c) do
