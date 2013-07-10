@@ -469,13 +469,7 @@ test.mremap = { -- differs in prototype by OS
   end,
 }
 
-test.misc = {
-  test_umask = function()
-    local mask
-    mask = S.umask("WGRP, WOTH")
-    mask = S.umask("WGRP, WOTH")
-    assert_equal(mask, c.MODE.WGRP + c.MODE.WOTH, "umask not set correctly")
-  end,
+test.misc_linux = {
   test_sysinfo = function()
     local i = assert(S.sysinfo()) -- TODO test values returned for some sanity
   end,

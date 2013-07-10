@@ -100,7 +100,7 @@ test.filesystem_bsd = {
     assert(fd:write("append"))
     assert(fd:seek(0, "set"))
     local n, err = fd:write("not append")
-    if not rump then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
+    if not abi.rump then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
     assert(S.chflags(tmpfile)) -- clear flags
     assert(S.unlink(tmpfile))
     assert(fd:close())
@@ -112,7 +112,7 @@ test.filesystem_bsd = {
     assert(fd:write("append"))
     assert(fd:seek(0, "set"))
     local n, err = fd:write("not append")
-    if not rump then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
+    if not abi.rump then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
     assert(S.lchflags(tmpfile)) -- clear flags
     assert(S.unlink(tmpfile))
     assert(fd:close())
@@ -124,8 +124,8 @@ test.filesystem_bsd = {
     assert(fd:write("append"))
     assert(fd:seek(0, "set"))
     local n, err = fd:write("not append")
-    if not rump then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
-    assert(fd:flags()) -- clear flags
+    if not abi.rump then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
+    assert(fd:chflags()) -- clear flags
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,

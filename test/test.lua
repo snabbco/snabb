@@ -266,7 +266,13 @@ test_open_close = {
     collectgarbage("collect")
     local n = assert(S.read(fileno, buf, size))
     assert(S.close(fileno))
-  end
+  end,
+  test_umask = function() -- TODO also test effect on permissions
+    local mask
+    mask = S.umask("WGRP, WOTH")
+    mask = S.umask("WGRP, WOTH")
+    assert_equal(mask, c.MODE.WGRP + c.MODE.WOTH, "umask not set correctly")
+  end,
 }
 
 test_read_write = {
