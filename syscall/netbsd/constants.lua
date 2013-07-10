@@ -779,5 +779,23 @@ c.CHFLAGS.IMMUTABLE = c.CHFLAGS.UF_IMMUTABLE -- common forms
 c.CHFLAGS.APPEND = c.CHFLAGS.UF_APPEND
 c.CHFLAGS.OPAQUE = c.CHFLAGS.UF_OPAQUE
 
+c.PC = strflag {
+  LINK_MAX          =  1,
+  MAX_CANON         =  2,
+  MAX_INPUT         =  3,
+  NAME_MAX          =  4,
+  PATH_MAX          =  5,
+  PIPE_BUF          =  6,
+  CHOWN_RESTRICTED  =  7,
+  NO_TRUNC          =  8,
+  VDISABLE          =  9,
+  SYNC_IO           = 10,
+  FILESIZEBITS      = 11,
+  SYMLINK_MAX       = 12,
+  ["2_SYMLINKS"]    = 13,
+  ACL_EXTENDED      = 14,
+  MIN_HOLE_SIZE     = 15,
+}
+
 return c
 

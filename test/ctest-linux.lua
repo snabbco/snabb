@@ -422,6 +422,7 @@ local nm = {
   B = "B",
   SYS = "__NR_",
   FCNTL_LOCK = "F_",
+  PC = "_PC_",
 }
 
 for k, v in pairs(c) do

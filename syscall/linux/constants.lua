@@ -3277,5 +3277,29 @@ c.TUN_FLT = strflag {
   ALLMULTI = 0x0001,
 }
 
+c.PC = strflag {
+  LINK_MAX          =  0,
+  MAX_CANON         =  1,
+  MAX_INPUT         =  2,
+  NAME_MAX          =  3,
+  PATH_MAX          =  4,
+  PIPE_BUF          =  5,
+  CHOWN_RESTRICTED  =  6,
+  NO_TRUNC          =  7,
+  VDISABLE          =  8,
+  SYNC_IO           =  9,
+  ASYNC_IO          = 10,
+  PRIO_IO           = 11,
+  SOCK_MAXBUF       = 12,
+  FILESIZEBITS      = 13,
+  REC_INCR_XFER_SIZE= 14,
+  REC_MAX_XFER_SIZE = 15,
+  REC_MIN_XFER_SIZE = 16,
+  REC_XFER_ALIGN    = 17,
+  ALLOC_SIZE_MIN    = 18,
+  SYMLINK_MAX       = 19,
+  ["2_SYMLINKS"]    = 20,
+}
+
 return c
 
