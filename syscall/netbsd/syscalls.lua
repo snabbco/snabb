@@ -106,6 +106,9 @@ function S.lutimes(path, ts)
 end
 
 function S.revoke(path) return retbool(C.revoke(path)) end
+function S.chflags(path, flags) return retbool(C.chflags(path, c.CHFLAGS[flags])) end
+function S.lchflags(path, flags) return retbool(C.lchflags(path, c.CHFLAGS[flags])) end
+function S.fchflags(fd, flags) return retbool(C.fchflags(getfd(fd), c.CHFLAGS[flags])) end
 
 -- TODO when we define this for osx can go in common code (curently defined in libc.lua)
 function S.getcwd(buf, size)

@@ -24,6 +24,9 @@ int utimes(const char *filename, const struct timeval times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 int revoke(const char *path);
+int chflags(const char *path, unsigned long flags);
+int lchflags(const char *path, unsigned long flags);
+int fchflags(int fd, unsigned long flags);
 
 int syscall(int number, ...);
 ]]

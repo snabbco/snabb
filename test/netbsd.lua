@@ -93,6 +93,18 @@ test.filesystem_bsd = {
     assert(not n and err.BADF, "access should be revoked")
     assert(fd:close())
   end,
+  test_chflags = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:write("append"))
+    assert(S.chflags(tmpfile, "append"))
+    assert(fd:write("append"))
+    assert(fd:seek(0, "set"))
+    local n, err = fd:write("not append")
+    assert(err, "non append write should fail")
+    assert(S.chflags(tmpfile)) -- clear flags
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
 }
 
 test.network_utils_bsd_root = {
