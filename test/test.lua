@@ -1078,12 +1078,12 @@ test_misc = {
   end,
   test_pathconf = function()
     local pc = assert(S.pathconf(".", "name_max"))
-    assert(pc >= 255, "name max shoul be at least 255")
+    assert(pc >= 255, "name max should be at least 255")
   end,
   test_fpathconf = function()
     local fd = assert(S.open(".", "rdonly"))
     local pc = assert(fd:pathconf("name_max"))
-    assert(pc >= 255, "name max shoul be at least 255")
+    assert(pc >= 255, "name max should be at least 255")
     assert(fd:close())
   end,
 }
