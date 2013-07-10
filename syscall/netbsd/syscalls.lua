@@ -110,6 +110,8 @@ function S.chflags(path, flags) return retbool(C.chflags(path, c.CHFLAGS[flags])
 function S.lchflags(path, flags) return retbool(C.lchflags(path, c.CHFLAGS[flags])) end
 function S.fchflags(fd, flags) return retbool(C.fchflags(getfd(fd), c.CHFLAGS[flags])) end
 function S.fchroot(fd) return retbool(C.fchroot(getfd(fd))) end
+function S.pathconf(path, name) return retbool(C.pathconf(path, c.PC[name])) end
+function S.fpathconf(fd, name) return retbool(C.fpathconf(getfd(fd), c.PC[name])) end
 
 -- TODO when we define this for osx can go in common code (curently defined in libc.lua)
 function S.getcwd(buf, size)

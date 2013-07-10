@@ -82,7 +82,7 @@ local fdmethods = {'dup', 'read', 'write', 'pread', 'pwrite',
                    'sync_file_range', 'fstatfs', 'futimens', 'futimes',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
                    'fchownat', 'readlinkat', 'setns', 'openat',
-                   'preadv', 'pwritev', 'epoll_pwait', 'ioctl', 'flock',
+                   'preadv', 'pwritev', 'epoll_pwait', 'ioctl', 'flock', 'fpathconf',
                    'fchflags', 'fchroot', -- netbsd only
                    }
 local fmeth = {}
@@ -109,6 +109,7 @@ fmeth.utimes = S.futimes
 fmeth.seek = S.lseek
 fmeth.chown = S.fchown
 fmeth.lock = S.flock
+fmeth.pathconf = S.fpathconf
 fmeth.chflags = S.fchflags -- netbsd
 fmeth.chroot = S.fchroot -- netbsd
 

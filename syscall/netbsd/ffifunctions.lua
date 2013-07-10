@@ -27,6 +27,8 @@ int revoke(const char *path);
 int chflags(const char *path, unsigned long flags);
 int lchflags(const char *path, unsigned long flags);
 int fchflags(int fd, unsigned long flags);
+long pathconf(const char *path, int name);
+long fpathconf(int fd, int name);
 
 int syscall(int number, ...);
 ]]
