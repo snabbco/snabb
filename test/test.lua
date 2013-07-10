@@ -1072,6 +1072,12 @@ test_locking = {
   end,
 }
 
+test_misc_root = {
+  test_chroot = function()
+    assert(S.chroot("/"))
+  end,
+}
+
 test_raw_socket = {
   test_ip_checksum = function()
     local packet = {0x45, 0x00,

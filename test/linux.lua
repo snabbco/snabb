@@ -1357,7 +1357,7 @@ test.mount_linux_root = {
   end,
 }
 
-test.misc_root = {
+test.misc_linux_root = {
   test_acct = function()
     S.acct() -- may not be configured
   end,
@@ -1368,9 +1368,6 @@ test.misc_root = {
     assert_equal(hh, assert(S.gethostname()))
     assert(S.sethostname(h))
     assert_equal(h, assert(S.gethostname()))
-  end,
-  test_chroot = function()
-    assert(S.chroot("/"))
   end,
   test_pivot_root = function()
     assert(S.mkdir(tmpfile3))
