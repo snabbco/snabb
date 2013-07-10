@@ -129,6 +129,13 @@ test.filesystem_bsd = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_fsync_range = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:sync_range("data", 0, 4096))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+
 }
 
 test.network_utils_bsd_root = {

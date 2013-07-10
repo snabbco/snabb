@@ -112,6 +112,7 @@ function S.fchflags(fd, flags) return retbool(C.fchflags(getfd(fd), c.CHFLAGS[fl
 function S.fchroot(fd) return retbool(C.fchroot(getfd(fd))) end
 function S.pathconf(path, name) return retbool(C.pathconf(path, c.PC[name])) end
 function S.fpathconf(fd, name) return retbool(C.fpathconf(getfd(fd), c.PC[name])) end
+function S.fsync_range(fd, how, start, length) return retbool(C.fsync_range(getfd(fd), c.FSYNC[how], start, length)) end
 
 -- TODO when we define this for osx can go in common code (curently defined in libc.lua)
 function S.getcwd(buf, size)

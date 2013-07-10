@@ -797,5 +797,12 @@ c.PC = strflag {
   MIN_HOLE_SIZE     = 15,
 }
 
+-- constants for fsync - note complex rename from FDATASYNC to FSYNC.DATA
+c.FSYNC = multiflags {
+  DATA  = 0x0010,
+  FILES = 0x0020,
+  DISK  = 0x0040,
+}
+
 return c
 

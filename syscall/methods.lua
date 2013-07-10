@@ -83,7 +83,7 @@ local fdmethods = {'dup', 'read', 'write', 'pread', 'pwrite',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
                    'fchownat', 'readlinkat', 'setns', 'openat',
                    'preadv', 'pwritev', 'epoll_pwait', 'ioctl', 'flock', 'fpathconf',
-                   'fchflags', 'fchroot', -- netbsd only
+                   'fchflags', 'fchroot', 'fsync_range', -- netbsd only
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
@@ -110,8 +110,10 @@ fmeth.seek = S.lseek
 fmeth.chown = S.fchown
 fmeth.lock = S.flock
 fmeth.pathconf = S.fpathconf
-fmeth.chflags = S.fchflags -- netbsd
-fmeth.chroot = S.fchroot -- netbsd
+-- netbsd only
+fmeth.chflags = S.fchflags
+fmeth.chroot = S.fchroot
+fmeth.sync_range = S.fsync_range
 
 local function nogc(d) return ffi.gc(d, nil) end
 

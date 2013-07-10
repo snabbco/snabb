@@ -34,6 +34,12 @@ c.CHFLAGS.IMMUTABLE = nil -- alias
 c.CHFLAGS.APPEND = nil -- alias
 c.CHFLAGS.OPAQUE = nil -- alias
 
+-- complex rename
+for k, v in pairs(c.FSYNC) do
+  c.FSYNC['F' .. k .. 'SYNC'] = v
+  c.FSYNC[k] = nil
+end
+
 -- these are Linux names TODO are there actually BSD names?
 ctypes["struct ethhdr"] = nil
 ctypes["struct iphdr"] = nil
@@ -157,6 +163,7 @@ local nm = {
   AT_SYMLINK_NOFOLLOW = "AT_",
   CHFLAGS = "",
   PC = "_PC_",
+  FSYNC = "F",
 }
 
 for k, v in pairs(c) do
