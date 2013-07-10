@@ -29,6 +29,9 @@ c.STD.ERR = nil
 
 c.SIGACT = nil -- TODO cast correctly instead, giving warning
 c.MAP.ANONYMOUS = nil -- compatibility
+c.CHFLAGS.NODUMP = nil -- alias
+c.CHFLAGS.IMMUTABLE = nil -- alias
+c.CHFLAGS.APPEND = nil -- alias
 
 -- these are Linux names TODO are there actually BSD names?
 ctypes["struct ethhdr"] = nil
