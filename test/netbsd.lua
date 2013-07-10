@@ -139,6 +139,14 @@ test.network_utils_bsd_root = {
   end,
 }
 
+test.misc_bsd_root = {
+  test_fchroot = function()
+    local fd = assert(S.open("/", "rdonly"))
+    assert(fd:chroot())
+    assert(fd:close())
+  end,
+}
+
 return test
 
 end
