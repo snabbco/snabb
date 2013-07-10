@@ -100,8 +100,32 @@ test.filesystem_bsd = {
     assert(fd:write("append"))
     assert(fd:seek(0, "set"))
     local n, err = fd:write("not append")
-    assert(err, "non append write should fail")
+    if not rump then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
     assert(S.chflags(tmpfile)) -- clear flags
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_lchflags = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:write("append"))
+    assert(S.lchflags(tmpfile, "append"))
+    assert(fd:write("append"))
+    assert(fd:seek(0, "set"))
+    local n, err = fd:write("not append")
+    if not rump then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
+    assert(S.lchflags(tmpfile)) -- clear flags
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_fchflags = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:write("append"))
+    assert(fd:chflags("append"))
+    assert(fd:write("append"))
+    assert(fd:seek(0, "set"))
+    local n, err = fd:write("not append")
+    if not rump then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
+    assert(fd:flags()) -- clear flags
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
