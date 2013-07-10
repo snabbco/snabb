@@ -68,7 +68,7 @@ function h.atflag(tab)
     local s = trim(str):upper()
     if #s == 0 then return 0 end
     local val = rawget(tab, s)
-    if not val then return nil end
+    if not val then error("invalid flag " .. s) end
     cache[str] = val
     return val
   end
@@ -100,10 +100,11 @@ function h.multiflags(tab)
     if #str == 0 then return 0 end
     local f = 0
     local a = split(",", str)
+    if #a == 1 and str == str:upper() then return nil end -- this is to allow testing for presense, while catching errors
     for i, v in ipairs(a) do
       local s = trim(v):upper()
       local val = rawget(tab, s)
-      if not val then return nil end -- TODO should we error here?
+      if not val then error("invalid flag " .. s) end
       f = bit.bor(f, val)
     end
     cache[str] = f
@@ -130,10 +131,11 @@ function h.modeflags(tab)
     if str:sub(1, 1) == "0" then return octal(str) end
     local f = 0
     local a = split(",", str)
+    if #a == 1 and str == str:upper() then return nil end -- this is to allow testing for presense, while catching errors
     for i, v in ipairs(a) do
       local s = trim(v):upper()
       local val = rawget(tab, s)
-      if not val then return nil end -- TODO should we error here?
+      if not val then error("invalid flag " .. s) end
       f = bit.bor(f, val)
     end
     cache[str] = f
@@ -149,6 +151,7 @@ function h.swapflags(tab)
     if #str == 0 then return 0 end
     local f = 0
     local a = split(",", str)
+    if #a == 1 and str == str:upper() then return nil end -- this is to allow testing for presense, while catching errors
     for i, v in ipairs(a) do
       local s = trim(v):upper()
       if tonumber(s) then
@@ -156,7 +159,7 @@ function h.swapflags(tab)
         f = bit.bor(f, rawget(tab, "PREFER"), bit.lshift(bit.band(rawget(tab, "PRIO_MASK"), val), rawget(tab, "PRIO_SHIFT")))
       else
         local val = rawget(tab, s)
-        if not val then return nil end
+        if not val then error("invalid flag " .. s) end
         f = bit.bor(f, val)
       end
     end
@@ -175,7 +178,9 @@ function h.charflags(tab)
     local flag = 0
     for i = 1, #str do
       local c = str:sub(i, i)
-      flag = bit.bor(flag, rawget(tab, c))
+      local val = rawget(tab, c)
+      if not val then error("invalid flag " .. c) end
+      flag = bit.bor(flag, val)
     end
     cache[str] = flag
     return flag
