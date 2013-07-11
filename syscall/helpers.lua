@@ -112,6 +112,7 @@ function h.multiflags(tab)
   end
   return setmetatable(tab, {
     __index = setmetatable({}, {__index = flag}),
+    -- this allows easily adding a flag TODO some mechanism to remove eg using ~ would be nice here or elsewhere
     __call = function(t, ...)
       local a = 0
       for _, v in ipairs{...} do
