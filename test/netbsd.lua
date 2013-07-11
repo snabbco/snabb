@@ -152,6 +152,16 @@ test.network_utils_bsd_root = {
   end,
 }
 
+test.pipes_bsd = {
+  test_nosigpipe = function()
+    local p = assert(S.pipe(), "nosigpipe")
+    assert(p[1]:close())
+    local ok, err = p[2]:write("other end closed")
+    assert(not ok and err.PIPE, "should get EPIPE")
+    assert(p:close())
+  end,
+}
+
 test.misc_bsd_root = {
   test_fchroot = function()
     local fd = assert(S.open("/", "rdonly"))
