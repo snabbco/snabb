@@ -92,6 +92,8 @@ build =
       ["syscall.rump.c"] = "syscall/rump/c.lua";
       ["syscall.rump.types"] = "syscall/rump/types.lua";
       ["syscall.rump.constants"] = "syscall/rump/constants.lua";
+      ["syscall.rump.ffitypes"] = "syscall/rump/ffitypes.lua";
+      ["syscall.rump.ffifunctions"] = "syscall/rump/ffifunctions.lua";
     };
   };
 }

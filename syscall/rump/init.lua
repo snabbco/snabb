@@ -59,18 +59,7 @@ S.features = require "syscall.features".init(S)
 -- add utils
 S.util = require "syscall.util".init(S)
 
--- rump functions, constants
-
--- note that modinfo is kernel only so not in ffitypes
-ffi.cdef[[
-typedef struct modinfo {
-  unsigned int    mi_version;
-  int             mi_class;
-  int             (*mi_modcmd)(int, void *);
-  const char      *mi_name;
-  const char      *mi_required;
-} const modinfo_t;
-]]
+require "syscall.rump.ffitypes"
 
 require "syscall.rump.ffifunctions"
 
