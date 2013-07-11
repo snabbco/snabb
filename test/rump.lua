@@ -35,6 +35,21 @@ test.rump_threads = {
     local lwp1 = assert(S.rump.curlwp(), "should get a pointer back")
     S.rump.releaselwp()
   end,
+  test_switch_threads = function()
+    local pid = assert(S.getpid())
+    assert(S.rump.newlwp(pid))
+    local lwp1 = assert(S.rump.curlwp(), "should get a pointer back")
+    assert(S.rump.newlwp(pid))
+    local lwp2 = assert(S.rump.curlwp(), "should get a pointer back")
+    S.rump.switchlwp(lwp1)
+    S.rump.switchlwp(lwp2)
+    S.rump.switchlwp(lwp1)
+    S.rump.releaselwp()
+    lwp1 = nil
+    S.rump.switchlwp(lwp2)
+    S.rump.releaselwp()
+    lwp2 = nil
+  end,
 }
 
 return test
