@@ -66,10 +66,15 @@ local t, pt = types.t, types.pt
 
 local modinfo = ffi.typeof("struct modinfo")
 
--- I think these return errors in errno
 local function retbool(ret)
   if ret == -1 then return nil, t.error() end
   return true
+end
+
+local function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
+  ret = tonumber(ret)
+  if ret == -1 then return nil, t.error() end
+  return ret
 end
 
 S.rump = {}
@@ -99,18 +104,19 @@ function S.rump.init(modules) -- you must load the factions here eg dev, vfs, ne
   return S
 end
 
-function S.rump.boot_gethowto() return ffi.C.rump_boot_gethowto() end
+function S.rump.boot_gethowto() return retnum(ffi.C.rump_boot_gethowto()) end
 function S.rump.boot_sethowto(how) ffi.C.rump_boot_sethowto(how) end
 function S.rump.boot_setsigmodel(model) ffi.C.rump_boot_etsigmodel(model) end
 function S.rump.schedule() ffi.C.rump_schedule() end
 function S.rump.unschedule() ffi.C.rump_unschedule() end
 function S.rump.printevcnts() ffi.C.rump_printevcnts() end
-function S.rump.daemonize_begin() return ffi.C.rump_daemonize_begin() end
-function S.rump.daemonize_done(err) return ffi.C.rump_daemonize_done(err) end
-function S.rump.init_server(url) return ffi.C.rump_init_server(url) end
+function S.rump.daemonize_begin() return retbool(ffi.C.rump_daemonize_begin()) end
+function S.rump.daemonize_done(err) return retbool(ffi.C.rump_daemonize_done(err)) end
+function S.rump.init_server(url) return retbool(ffi.C.rump_init_server(url)) end
 
 function S.rump.getversion() return rump.rump_pub_getversion() end
 
+-- etfs functions
 function S.rump.etfs_register(key, hostpath, ftype, begin, size)
   local ret
   ftype = S.rump.c.ETFS[ftype]
@@ -124,6 +130,13 @@ end
 function S.rump.etfs_remove(key)
   return retbool(ffi.C.rump_pub_etfs_remove(key))
 end
+
+-- threading
+function S.rump.rfork(flags) return retbool(ffi.C.rump_pub_lwproc_rfork(S.rump.c.RF[flags])) end
+function S.rump.newlwp(pid) return retbool(ffi.C.rump_pub_lwproc_newlwp(pid)) end
+function S.rump.switchlwp(lwp) ffi.C.rump_pub_lwproc_switch(lwp) end
+function S.rump.releaselwp() ffi.C.rump_pub_lwproc_releaselwp() end
+function S.rump.curlwp() return ffi.C.rump_pub_lwproc_curlwp() end
 
 return S.rump
  
