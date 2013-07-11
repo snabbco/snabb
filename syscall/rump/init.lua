@@ -63,10 +63,6 @@ S.util = require "syscall.util".init(S)
 
 -- note that modinfo is kernel only so not in ffitypes
 ffi.cdef[[
-int rump_init(void);
-
-int rump_pub_getversion(void);
-
 typedef struct modinfo {
   unsigned int    mi_version;
   int             mi_class;
@@ -74,14 +70,9 @@ typedef struct modinfo {
   const char      *mi_name;
   const char      *mi_required;
 } const modinfo_t;
-
-int rump_pub_etfs_register(const char *key, const char *hostpath, int ftype);
-int rump_pub_etfs_register_withsize(const char *key, const char *hostpath, int ftype, uint64_t begin, uint64_t size);
-int rump_pub_etfs_remove(const char *key);
-
-int rump_pub_module_init(const struct modinfo * const *, size_t);
-int rump_pub_module_fini(const struct modinfo *);
 ]]
+
+require "syscall.rump.ffifunctions"
 
 local t, pt = types.t, types.pt
 

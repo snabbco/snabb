@@ -23,5 +23,27 @@ c.ETFS = strflag {
   DIR_SUBDIRS = 4,
 }
 
+c.RUMPUIO = strflag {
+  READ = 0,
+  WRITE = 1,
+}
+
+c.SIGMODEL = strflag {
+  PANIC = 0,
+  IGNORE = 1,
+  HOST = 2,
+  RAISE = 3,
+  RECORD = 4,
+};
+
+c.RF = strflag {
+  NONE    = 0x00, -- not named, see issue https://github.com/anttikantee/buildrump.sh/issues/19
+  FDG     = 0x01,
+  CFDG    = 0x02,
+}
+
+c.CN_FREECRED = 0x02
+c.ETFS_SIZE_ENDOFF =0xffffffffffffffffULL
+
 return c
 
