@@ -1190,10 +1190,18 @@ test_mmap = {
     assert(err, "expect non aligned fixed map to fail")
     assert(err.INVAL, "expect non aligned map to return EINVAL")
   end,
-  test_mmap = function()
+  test_mmap_anon = function()
     local size = 4096
     local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
     assert(S.munmap(mem, size))
+  end,
+  test_mmap_file = function()
+    local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
+    assert(S.unlink(tmpfile))
+    local size = 4096
+    local mem = assert(fd:mmap(nil, size, "read", "shared", 0))
+    assert(S.munmap(mem, size))
+    assert(fd:close())
   end,
   test_msync = function()
     local size = 4096

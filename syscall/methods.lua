@@ -94,6 +94,9 @@ fmeth.nonblock = nonblock
 fmeth.tell = tell
 fmeth.lockf = lockf
 
+-- fd not first argument
+fmeth.mmap = function(fd, addr, length, prot, flags, offset) return S.mmap(addr, length, prot, flags, fd, offset) end
+
 -- allow calling without leading f
 fmeth.stat = S.fstat
 fmeth.chdir = S.fchdir
