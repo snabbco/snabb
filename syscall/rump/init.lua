@@ -95,18 +95,12 @@ end
 
 S.rump = {}
 
+S.rump.c = require "syscall.rump.constants"
+
 S.rump.__modules = {rump, rumpuser} -- so not garbage collected
 
 local helpers = require "syscall.helpers"
 local strflag = helpers.strflag
-
-local RUMP_ETFS = strflag {
-  REG = 0,
-  BLK = 1,
-  CHR = 2,
-  DIR = 3,
-  DIR_SUBDIRS = 4,
-}
 
 function S.rump.version() return rump.rump_pub_getversion() end
 
@@ -119,7 +113,7 @@ end
 
 function S.rump.etfs_register(key, hostpath, ftype, begin, size)
   local ret
-  ftype = RUMP_ETFS[ftype]
+  ftype = S.rump.c.ETFS[ftype]
   if begin then
     ret = ffi.C.rump_pub_etfs_register_withsize(key, hostpath, ftype, begin, size);
   else
