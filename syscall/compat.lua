@@ -76,11 +76,13 @@ end
 S.futimens = S.futimens or S.futimes
 
 -- common libc function
-function S.sleep(sec)
-  local rem, err = S.nanosleep(sec)
-  if not rem then return nil, err end
-  if rem == true then return 0 end
-  return tonumber(rem.tv_sec)
+if S.nanosleep then
+  function S.sleep(sec)
+    local rem, err = S.nanosleep(sec)
+    if not rem then return nil, err end
+    if rem == true then return 0 end
+    return tonumber(rem.tv_sec)
+  end
 end
 
 return S
