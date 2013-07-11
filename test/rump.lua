@@ -1,5 +1,5 @@
 -- rump specific tests
--- in particular testing the threading, as that is rather different
+-- in particular testing the threading, as that is rather different; you can map them to host threads how you like
 
 local function init(S)
 
@@ -36,7 +36,7 @@ test.rump_threads = {
     S.rump.releaselwp()
   end,
   test_switch_threads = function()
-    local pid = assert(S.getpid())
+    local pid = S.getpid()
     assert(S.rump.newlwp(pid))
     local lwp1 = assert(S.rump.curlwp(), "should get a pointer back")
     assert(S.rump.newlwp(pid))
@@ -49,6 +49,21 @@ test.rump_threads = {
     S.rump.switchlwp(lwp2)
     S.rump.releaselwp()
     lwp2 = nil
+  end,
+  test_rfork = function()
+    local pid1 = S.getpid()
+    local origlwp = S.rump.curlwp() -- will probably be null as we are initially running in implicit context
+    local fd = assert(S.open("/dev/zero", "rdonly"))
+    assert(fd:read()) -- readable
+    assert(S.rump.rfork("CFDG")) -- no shared fds
+    local pid2 = S.getpid()
+    assert(pid1 ~= pid2, "should have new pid")
+    local n, err = fd:read() -- should not be able to read this fd
+    assert(not n and err, "should not be able to access an fd")
+    S._exit() -- exit this process
+    S.rump.switchlwp(origlwp) -- probably back to implicit context
+    assert_equal(pid1, S.getpid())
+    assert(fd:read()) -- should be able to read /dev/zero now
   end,
 }
 
