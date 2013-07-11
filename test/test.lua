@@ -51,6 +51,10 @@ local ffi = require "ffi"
 
 local test = require("test." .. abi.os).init(S) -- OS specific tests
 for k, v in pairs(test) do _G["test_" .. k] = v end
+if rump then
+  local test = require "test.rump".init(S) -- rump specific tests
+  for k, v in pairs(test) do _G["test_" .. k] = v end
+end
 
 local function fork_assert(cond, str) -- if we have forked we need to fail in main thread not fork
   if not cond then
