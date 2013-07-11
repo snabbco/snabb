@@ -60,7 +60,6 @@ S.features = require "syscall.features".init(S)
 S.util = require "syscall.util".init(S)
 
 require "syscall.rump.ffitypes"
-
 require "syscall.rump.ffifunctions"
 
 local t, pt = types.t, types.pt
@@ -82,28 +81,11 @@ S.rump.__modules = {rump, rumpuser} -- so not garbage collected
 local helpers = require "syscall.helpers"
 local strflag = helpers.strflag
 
-function S.rump.version() return rump.rump_pub_getversion() end
-
 -- We could also use rump_pub_module_init if loading later
 function S.rump.module(s)
   s = string.gsub(s, "%.", "_")
   local mod = ffi.load("rump" .. s, true)
   S.rump.__modules[#S.rump.__modules + 1] = mod
-end
-
-function S.rump.etfs_register(key, hostpath, ftype, begin, size)
-  local ret
-  ftype = S.rump.c.ETFS[ftype]
-  if begin then
-    ret = ffi.C.rump_pub_etfs_register_withsize(key, hostpath, ftype, begin, size);
-  else
-    ret = ffi.C.rump_pub_etfs_register(key, hostpath, ftype);
-  end
-  return retbool(ret)
-end
-
-function S.rump.etfs_remove(key)
-  return retbool(ffi.C.rump_pub_etfs_remove(key))
 end
 
 function S.rump.init(modules) -- you must load the factions here eg dev, vfs, net, plus modules
@@ -115,6 +97,32 @@ function S.rump.init(modules) -- you must load the factions here eg dev, vfs, ne
   local ok = rump.rump_init()
   if ok == -1 then return nil, t.error() end
   return S
+end
+
+function S.rump.boot_gethowto() return ffi.C.rump_boot_gethowto() end
+function S.rump.boot_sethowto(how) ffi.C.rump_boot_sethowto(how) end
+function S.rump.boot_setsigmodel(model) ffi.C.rump_boot_etsigmodel(model) end
+function S.rump.schedule() ffi.C.rump_schedule() end
+function S.rump.unschedule() ffi.C.rump_unschedule() end
+function S.rump.printevcnts() ffi.C.rump_printevcnts() end
+function S.rump.daemonize_begin() return ffi.C.rump_daemonize_begin() end
+function S.rump.daemonize_done(err) return ffi.C.rump_daemonize_done(err) end
+function S.rump.init_server(url) return ffi.C.rump_init_server(url) end
+
+function S.rump.getversion() return rump.rump_pub_getversion() end
+
+function S.rump.etfs_register(key, hostpath, ftype, begin, size)
+  local ret
+  ftype = S.rump.c.ETFS[ftype]
+  if begin then
+    ret = ffi.C.rump_pub_etfs_register_withsize(key, hostpath, ftype, begin, size);
+  else
+    ret = ffi.C.rump_pub_etfs_register(key, hostpath, ftype);
+  end
+  return retbool(ret)
+end
+function S.rump.etfs_remove(key)
+  return retbool(ffi.C.rump_pub_etfs_remove(key))
 end
 
 return S.rump
