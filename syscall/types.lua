@@ -127,6 +127,7 @@ local addtypes = {
   clock = "clock_t",
   nlink = "nlink_t",
   ino = "ino_t",
+  fdset = "fd_set",
 }
 
 local addstructs = {

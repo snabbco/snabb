@@ -327,58 +327,6 @@ function S.signalfd(set, flags, fd) -- note different order of args, as fd usual
   return retfd(C.signalfd(fd, t.sigset(set), c.SFD[flags]))
 end
 
--- fdset handlers
-local function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
-  local set = t.fdset()
-  for i, v in ipairs(fds) do
-    local fd = tonumber(getfd(v))
-    if fd + 1 > nfds then nfds = fd + 1 end
-    local fdelt = bit.rshift(fd, 5) -- always 32 bits
-    set.fds_bits[fdelt] = bit.bor(set.fds_bits[fdelt], bit.lshift(1, fd % 32)) -- always 32 bit words
-  end
-  return set, nfds
-end
-
-local function fdisset(fds, set)
-  local f = {}
-  for i, v in ipairs(fds) do
-    local fd = tonumber(getfd(v))
-    local fdelt = bit.rshift(fd, 5) -- always 32 bits
-    if bit.band(set.fds_bits[fdelt], bit.lshift(1, fd % 32)) ~= 0 then table.insert(f, v) end -- careful not to duplicate fd objects
-  end
-  return f
-end
-
--- TODO convert to metatype. Problem is how to deal with nfds
-function S.select(sel) -- note same structure as returned
-  local r, w, e
-  local nfds = 0
-  local timeout
-  if sel.timeout then timeout = mktype(t.timeval, sel.timeout) end
-  r, nfds = mkfdset(sel.readfds or {}, nfds or 0)
-  w, nfds = mkfdset(sel.writefds or {}, nfds)
-  e, nfds = mkfdset(sel.exceptfds or {}, nfds)
-  local ret = C.select(nfds, r, w, e, timeout)
-  if ret == -1 then return nil, t.error() end
-  return {readfds = fdisset(sel.readfds or {}, r), writefds = fdisset(sel.writefds or {}, w),
-          exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret)}
-end
-
-function S.pselect(sel) -- note same structure as returned
-  local r, w, e
-  local nfds = 0
-  local timeout, set
-  if sel.timeout then timeout = mktype(t.timespec, sel.timeout) end
-  if sel.sigset then set = t.sigset(sel.sigset) end
-  r, nfds = mkfdset(sel.readfds or {}, nfds or 0)
-  w, nfds = mkfdset(sel.writefds or {}, nfds)
-  e, nfds = mkfdset(sel.exceptfds or {}, nfds)
-  local ret = C.pselect(nfds, r, w, e, timeout, set)
-  if ret == -1 then return nil, t.error() end
-  return {readfds = fdisset(sel.readfds or {}, r), writefds = fdisset(sel.writefds or {}, w),
-          exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret), sigset = set}
-end
-
 -- note that syscall does return timeout remaining but libc does not, due to standard prototype TODO use syscall?
 function S.ppoll(fds, timeout, set)
   fds = mktype(t.pollfds, fds)

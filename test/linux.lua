@@ -968,21 +968,7 @@ test.termios = {
   end,
 }
 
-test.test_select = {
-  test_select = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    local a, b = sv[1], sv[2]
-    local sel = assert(S.select{readfds = {a, b}, timeout = t.timeval(0,0)})
-    assert(sel.count == 0, "nothing to read select now")
-    assert(b:write(teststring))
-    sel = assert(S.select{readfds = {a, b}, timeout = {0, 0}})
-    assert(sel.count == 1, "one fd available for read now")
-    assert(b:close())
-    assert(a:close())
-  end,
-}
-
-test.ppoll_pselect = {
+test.ppoll = {
   test_ppoll = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local a, b = sv[1], sv[2]
@@ -993,17 +979,6 @@ test.ppoll_pselect = {
     local p = assert(S.ppoll(pev, nil, "alrm"))
     assert(p[1].fd == a:getfd() and p[1].IN, "one event now")
     assert(a:read())
-    assert(b:close())
-    assert(a:close())
-  end,
-  test_pselect = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    local a, b = sv[1], sv[2]
-    local sel = assert(S.pselect{readfds = {1, b}, timeout = 0, sigset = "alrm"})
-    assert(sel.count == 0, "nothing to read select now")
-    assert(b:write(teststring))
-    sel = assert(S.pselect{readfds = {a, b}, timeout = 0, sigset = sel.sigset})
-    assert(sel.count == 1, "one fd available for read now")
     assert(b:close())
     assert(a:close())
   end,

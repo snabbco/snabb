@@ -52,7 +52,7 @@ typedef unsigned int useconds_t;
 
 typedef uint32_t _netbsd_fd_mask;
 typedef struct {
-  _netbsd_fd_mask fds_bits[8];
+  _netbsd_fd_mask fds_bits[8]; /* kernel can cope with more */
 } _netbsd_fd_set;
 struct _netbsd_msghdr {
   void *msg_name;
