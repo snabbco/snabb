@@ -51,10 +51,7 @@ int timerfd_create(int clockid, int flags);
 int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value);
 int timerfd_gettime(int fd, struct itimerspec *curr_value);
 
-int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
-int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
-int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
 
 int epoll_create1(int flags);

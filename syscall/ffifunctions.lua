@@ -81,6 +81,9 @@ int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 int shutdown(int sockfd, int how);
 int pipe(int pipefd[2]);
 int ioctl(int d, int request, void *argp); /* void* easiest here */
+int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 
 uid_t getuid(void);
 uid_t geteuid(void);
