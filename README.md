@@ -18,7 +18,7 @@ For simples uses, you just need to put the ```.lua``` files somewhere that LuaJI
 
 You can install using ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` or one of the other versions in that directory, which will pull the version from github and install in the right place.
 
-If you want to link into a C program (or something else interfacing to C, such as another scripting language), there are some example scripts. `examples/bytecode.sh` creates an `ar` file with all the bytecode in, and `examples/cbuild.sh` makes a hello world program in C with ljsyscall and luajit linked in. These are only intended as examples
+If you want to link into a C program (or something else interfacing to C, such as another scripting language), there are some example scripts. `examples/bytecode.sh` creates an `ar` file with all the bytecode in, and `examples/cbuild.sh` makes a hello world program in C with ljsyscall and luajit linked in. These are only intended as examples to be customised as appropriate, and they link in all files not just the required ones for your architecture.
 
 ## Requirements
 
