@@ -13,8 +13,7 @@ require "syscall.ffitypes"
 
 local cdef = require "ffi".cdef
 
-local ok, arch = pcall(require, "syscall.linux." .. abi.arch .. ".ffitypes") -- architecture specific definitions
-if not ok then arch = {} end
+local arch = require("syscall.linux." .. abi.arch .. ".ffitypes") -- architecture specific definitions
 
 cdef[[
 typedef uint32_t mode_t;
