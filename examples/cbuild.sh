@@ -15,7 +15,7 @@ rm -f ./obj/cbuild
 # we will link in hello world
 luajit -b -t o -n hello examples/hello.lua obj/hello.o
 
-cc -Wl,-E -o obj/cbuild -I ${INCDIR} examples/cstub.c obj/hello.o ${LIBDIR}/libluajit-5.1.a obj/ljsyscall.a -ldl -lm
+cc -Wl,-E -o obj/cbuild -I ${INCDIR} examples/cstub.c obj/hello.o ${LIBDIR}/libluajit-5.1.a obj/syscall*.o -ldl -lm
 
 ./obj/cbuild
 
