@@ -8,7 +8,8 @@ before_install:
 
 script: 
  - luajit test/test.lua
- - luajit test/ctest.lua > test/ctest.c && cc -std=c99 test/ctest.c -o test/ctest && ./test/ctest
+ - mkdir -p ./obj
+ - luajit test/ctest.lua > ./obj/ctest.c && cc -std=c99 ./obj/ctest.c -o ./obj/ctest && ./obj/ctest
  - ./test/globals.sh
 
 
