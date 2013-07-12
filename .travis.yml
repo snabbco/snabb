@@ -10,7 +10,6 @@ script:
  - luajit test/test.lua
  - luajit test/ctest.lua > test/ctest.c && cc -std=c99 test/ctest.c -o test/ctest && ./test/ctest
  - ./test/globals.sh
- - ./examples/cbuild.sh
 
 
 
