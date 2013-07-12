@@ -8,6 +8,8 @@ INCDIR=/usr/local/include/luajit-2.0
 
 [ ! -f syscall.lua ] && echo "This script is designed to be run from top level directory" && exit
 
+rm -f ./obj/cbuild
+
 ./examples/bytecode.sh || ("Bytecode build failed" && exit)
 
 # we will link in hello world

@@ -8,9 +8,12 @@
 
 mkdir -p obj
 
-rm -f obj/*.{o,a}
+rm -f ./obj/*.{o,a}
 
-FILES=`find syscall.lua syscall -name '*.lua'`
+ARCH=`luajit -e "S=require'syscall';print(S.abi.arch)"`
+OS=`luajit -e "S=require'syscall';print(S.abi.os)"`
+
+FILES=`find syscall.lua syscall/*.lua syscall/rump/*.lua syscall/$OS/*.lua syscall/$OS/$ARCH/*.lua`
 
 for f in $FILES
 do
