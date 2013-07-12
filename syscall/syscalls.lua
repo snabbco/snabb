@@ -404,16 +404,16 @@ function S.ioctl(d, request, argp)
 end
 
 if inlibc "pipe2" then
-  function S.pipe(flags)
-    local fd2 = t.int2()
+  function S.pipe(flags, fd2)
+    fd2 = fd2 or t.int2()
     local ret = C.pipe2(fd2, c.OPIPE[flags])
     if ret == -1 then return nil, t.error() end
     return t.pipe(fd2)
   end
 else
-  function S.pipe(flags)
+  function S.pipe(flags, fd2)
     assert(not flags, "TODO add pipe flags emulation") -- TODO emulate flags from Linux pipe2
-    local fd2 = t.int2()
+    fd2 = fd2 or t.int2()
     local ret = C.pipe(fd2)
     if ret == -1 then return nil, t.error() end
     return t.pipe(fd2)
