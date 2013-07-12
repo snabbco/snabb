@@ -3,6 +3,7 @@ tmp/*
 *~
 *.core
 ktrace.out
+obj/*
 
 # ctest files
 test/ctest.c

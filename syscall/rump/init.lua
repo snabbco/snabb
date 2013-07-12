@@ -93,7 +93,8 @@ function S.rump.module(s)
   S.rump.__modules[#S.rump.__modules + 1] = mod
 end
 
-function S.rump.init(modules) -- you must load the factions here eg dev, vfs, net, plus modules
+function S.rump.init(modules, ...) -- you must load the factions here eg dev, vfs, net, plus modules
+  if type(modules) == "string" then modules = {modules, ...} end
   for i, v in ipairs(modules or {}) do
     v = string.gsub(v, "%.", "_")
     local mod = ffi.load("rump" .. v, true)
