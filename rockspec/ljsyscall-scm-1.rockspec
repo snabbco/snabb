@@ -58,13 +58,16 @@ build =
       ["syscall.linux.arm.ioctl"] = "syscall/linux/arm/ioctl.lua";
       ["syscall.linux.mips.constants"] = "syscall/linux/mips/constants.lua";
       ["syscall.linux.mips.ffitypes"] = "syscall/linux/mips/ffitypes.lua";
+      ["syscall.linux.mips.ioctl"] = "syscall/linux/mips/ioctl.lua";
       ["syscall.linux.ppc.constants"] = "syscall/linux/ppc/constants.lua";
       ["syscall.linux.ppc.ffitypes"] = "syscall/linux/ppc/ffitypes.lua";
       ["syscall.linux.ppc.ioctl"] = "syscall/linux/ppc/ioctl.lua";
       ["syscall.linux.x64.constants"] = "syscall/linux/x64/constants.lua";
       ["syscall.linux.x64.ffitypes"] = "syscall/linux/x64/ffitypes.lua";
+      ["syscall.linux.x64.ioctl"] = "syscall/linux/x64/ioctl.lua";
       ["syscall.linux.x86.constants"] = "syscall/linux/x86/constants.lua";
       ["syscall.linux.x86.ffitypes"] = "syscall/linux/x86/ffitypes.lua";
+      ["syscall.linux.x86.ioctl"] = "syscall/linux/x86/ioctl.lua";
 
       ["syscall.netbsd.syscalls"] = "syscall/netbsd/syscalls.lua";
       ["syscall.netbsd.c"] = "syscall/netbsd/c.lua";

@@ -14,8 +14,7 @@ local s = types.s
 
 local strflag = require "syscall.helpers".strflag
 
-local ok, arch = pcall(require, "syscall.linux." .. abi.arch .. ".ioctl") -- architecture specific definitions
-if ok then arch = arch(s) else arch = {} end
+local arch = require("syscall.linux." .. abi.arch .. ".ioctl")(s)
 
 local bit = require "bit"
 
