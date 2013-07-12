@@ -78,13 +78,6 @@ function S.getdents(fd, buf, size)
   return t.dirents(buf, ret)
 end
 
-function S.pipe(flags)
-  local fd2 = t.int2()
-  local ret = C.pipe2(fd2, c.OPIPE[flags])
-  if ret == -1 then return nil, t.error() end
-  return t.pipe(fd2)
-end
-
 function S.utimensat(dirfd, path, ts, flags)
   if ts then ts = t.timespec2(ts) end
   return retbool(C.utimensat(c.AT_FDCWD[dirfd], path, ts, c.AT_SYMLINK_NOFOLLOW[flags]))

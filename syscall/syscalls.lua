@@ -403,6 +403,23 @@ function S.ioctl(d, request, argp)
   return ret -- usually zero
 end
 
+if inlibc "pipe2" then
+  function S.pipe(flags)
+    local fd2 = t.int2()
+    local ret = C.pipe2(fd2, c.OPIPE[flags])
+    if ret == -1 then return nil, t.error() end
+    return t.pipe(fd2)
+  end
+else
+  function S.pipe(flags)
+    assert(not flags, "TODO add pipe flags emulation") -- TODO emulate flags from Linux pipe2
+    local fd2 = t.int2()
+    local ret = C.pipe(fd2)
+    if ret == -1 then return nil, t.error() end
+    return t.pipe(fd2)
+  end
+end
+
 -- now call OS specific for non-generic calls
 local hh = {
   istype = istype, mktype = mktype, getfd = getfd,

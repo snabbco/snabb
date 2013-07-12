@@ -361,13 +361,6 @@ function S.prlimit(pid, resource, new_limit, old_limit)
   return old_limit
 end
 
-function S.pipe(flags)
-  local fd2 = t.int2()
-  local ret = C.pipe2(fd2, c.OPIPE[flags])
-  if ret == -1 then return nil, t.error() end
-  return t.pipe(fd2)
-end
-
 function S.epoll_create(flags)
   return retfd(C.epoll_create1(c.EPOLLCREATE[flags]))
 end

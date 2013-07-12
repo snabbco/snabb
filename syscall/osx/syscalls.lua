@@ -26,14 +26,6 @@ function S.accept(sockfd, flags, addr, addrlen)
   return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
 end
 
-function S.pipe(flags)
-  assert(not flags, "TODO add pipe flags emulation") -- TODO emulate flags from Linux pipe2
-  local fd2 = t.int2()
-  local ret = C.pipe(fd2)
-  if ret == -1 then return nil, t.error() end
-  return t.pipe(fd2)
-end
-
 function S.futimes(fd, ts)
   if ts then ts = t.timeval2(ts) end
   return retbool(C.futimes(getfd(fd), ts))
