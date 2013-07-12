@@ -119,7 +119,6 @@ local addstructs = {
   ff_periodic_effect = "struct ff_periodic_effect",
   ff_rumble_effect = "struct ff_rumble_effect",
   ff_effect = "struct ff_effect",
-  winsize = "struct winsize",
   termio = "struct termio",
   sock_fprog = "struct sock_fprog",
   user_cap_header = "struct user_cap_header",
@@ -513,7 +512,6 @@ for k, v in pairs(c.B) do
   bits_to_speed[v] = tonumber(k)
 end
 
--- TODO merge to metatable
 mt.termios = {
   makeraw = function(termios)
     termios.c_iflag = bit.band(termios.c_iflag, bit.bnot(c.IFLAG["IGNBRK,BRKINT,PARMRK,ISTRIP,INLCR,IGNCR,ICRNL,IXON"]))

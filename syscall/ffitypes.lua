@@ -14,7 +14,12 @@ local ffi = require "ffi"
 local cdef = ffi.cdef
 local le = ffi.abi("le") -- normally we would use abi file, but not included here
 
+-- note that some of the typedefs which are not really needed are not at present created as Lua types, eg speed_t
+
 cdef[[
+// 8 bit
+typedef unsigned char cc_t;
+
 // 16 bit
 typedef uint16_t in_port_t;
 
@@ -25,6 +30,8 @@ typedef uint32_t id_t;
 typedef int32_t pid_t;
 
 typedef unsigned int socklen_t;
+typedef unsigned int tcflag_t;
+typedef unsigned int speed_t;
 
 // 64 bit
 typedef uint64_t off_t;
@@ -40,7 +47,12 @@ struct iovec {
   void *iov_base;
   size_t iov_len;
 };
-
+struct winsize {
+  unsigned short ws_row;
+  unsigned short ws_col;
+  unsigned short ws_xpixel;
+  unsigned short ws_ypixel;
+};
 struct in_addr {
   uint32_t       s_addr;
 };

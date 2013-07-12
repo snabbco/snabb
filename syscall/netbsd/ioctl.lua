@@ -59,6 +59,60 @@ local _IOWR  = function(tp, nr, size)	return _IOC(IOC.INOUT, tp, nr, size) end
 ]]
 
 local ioctl = strflag {
+  -- tty ioctls
+  TIOCEXCL       =  _IO('t', 13),
+  TIOCNXCL       =  _IO('t', 14),
+  TIOCFLUSH      = _IOW('t', 16, "int"),
+  TIOCGETA       = _IOR('t', 19, "termios"),
+  TIOCSETA       = _IOW('t', 20, "termios"),
+  TIOCSETAW      = _IOW('t', 21, "termios"),
+  TIOCSETAF      = _IOW('t', 22, "termios"),
+  TIOCGETD       = _IOR('t', 26, "int"),
+  TIOCSETD       = _IOW('t', 27, "int"),
+--#define TTLINEDNAMELEN  32
+--typedef char linedn_t[TTLINEDNAMELEN]
+--TIOCGLINED     = _IOR('t', 66, linedn_t),
+--TIOCSLINED     = _IOW('t', 67, linedn_t),
+  TIOCSBRK       =  _IO('t', 123),
+  TIOCCBRK       =  _IO('t', 122),
+  TIOCSDTR       =  _IO('t', 121),
+  TIOCCDTR       =  _IO('t', 120),
+  TIOCGPGRP      = _IOR('t', 119, "int"),
+  TIOCSPGRP      = _IOW('t', 118, "int"),
+  TIOCOUTQ       = _IOR('t', 115, "int"),
+  TIOCSTI        = _IOW('t', 114, "char"),
+  TIOCNOTTY      =  _IO('t', 113),
+  TIOCPKT        = _IOW('t', 112, "int"),    -- TODO this defines constants eg TIOCPKT_DATA need way to support
+  TIOCSTOP       =  _IO('t', 111),
+  TIOCSTART      =  _IO('t', 110),
+  TIOCMSET       = _IOW('t', 109, "int"),    -- todo uses constants eg TIOCM_LE
+  TIOCMBIS       = _IOW('t', 108, "int"),
+  TIOCMBIC       = _IOW('t', 107, "int"),
+  TIOCMGET       = _IOR('t', 106, "int"),
+  TIOCREMOTE     = _IOW('t', 105, "int"),
+  TIOCGWINSZ     = _IOR('t', 104, "winsize"),
+  TIOCSWINSZ     = _IOW('t', 103, "winsize"),
+  TIOCUCNTL      = _IOW('t', 102, "int"),
+  TIOCSTAT       = _IOW('t', 101, "int"),
+--UIOCCMD(n)     = _IO('u', n),     /* usr cntl op "n" */
+  TIOCGSID       = _IOR('t', 99, "int"),
+  TIOCCONS       = _IOW('t', 98, "int"),
+  TIOCSCTTY      =  _IO('t', 97),
+  TIOCEXT        = _IOW('t', 96, "int"),
+  TIOCSCTTY      =  _IO('t', 97),
+  TIOCEXT        = _IOW('t', 96, "int"),
+  TIOCSIG        =  _IO('t', 95),
+  TIOCDRAIN      =  _IO('t', 94),
+  TIOCGFLAGS     = _IOR('t', 93, "int"),
+  TIOCSFLAGS     = _IOW('t', 92, "int"),     -- TODO defines flags TIOCFLAG_*
+  TIOCDCDTIMESTAMP=_IOR('t', 88, "timeval"),
+--TIOCRCVFRAME   = _IOW('t', 69, struct mbuf *), -- TODO pointer not struct
+--TIOCXMTFRAME   = _IOW('t', 68, struct mbuf *), -- TODO pointer not struct
+  TIOCPTMGET     =  _IOR('t', 70, "ptmget"),
+  TIOCGRANTPT    =  _IO('t', 71),
+  TIOCPTSNAME    =  _IOR('t', 72, "ptmget"),
+  TIOCSQSIZE     =  _IOW('t', 128, "int"),
+  TIOCGQSIZE     =  _IOR('t', 129, "int"),
   -- socket ioctls
   SIOCSHIWAT     =  _IOW('s',  0, "int"),
   SIOCGHIWAT     =  _IOR('s',  1, "int"),
@@ -128,6 +182,9 @@ local ioctl = strflag {
   SIOCSETPFSYNC  =  _IOW('i', 247, "ifreq"),
   SIOCGETPFSYNC  = _IOWR('i', 248, "ifreq"),
 }
+
+ioctl.TIOCM_CD = ioctl.TIOCM_CAR
+ioctl.TIOCM_RI = ioctl.TIOCM_RNG
 
 return ioctl
 

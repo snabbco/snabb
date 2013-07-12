@@ -117,6 +117,9 @@ function S.getcwd(buf, size)
   return ffi.string(buf)
 end
 
+-- pty functions
+function S.grantpt(fd) return S.ioctl(fd, "TIOCGRANTPT", 0) end
+
 return S
 
 end

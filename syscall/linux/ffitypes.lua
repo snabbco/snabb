@@ -492,9 +492,6 @@ struct mq_attr {
   long mq_flags, mq_maxmsg, mq_msgsize, mq_curmsgs, __unused[4];
 };
 
-typedef unsigned char	cc_t;
-typedef unsigned int	speed_t;
-typedef unsigned int	tcflag_t;
 struct termios {
     tcflag_t c_iflag;
     tcflag_t c_oflag;
@@ -600,12 +597,6 @@ struct ff_effect {
         struct ff_condition_effect condition[2];
         struct ff_rumble_effect rumble;
     } u;
-};
-struct winsize {
-  unsigned short ws_row;
-  unsigned short ws_col;
-  unsigned short ws_xpixel;
-  unsigned short ws_ypixel;
 };
 typedef struct {
   int     val[2];

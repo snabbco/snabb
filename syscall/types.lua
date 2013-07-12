@@ -128,13 +128,11 @@ local addtypes = {
   nlink = "nlink_t",
   ino = "ino_t",
   fdset = "fd_set",
+  winsize = "struct winsize",
 }
 
-local addstructs = {
-}
-
+-- note we cannot add any metatable, as may be declared in os and rump, so not even lenmt added
 for k, v in pairs(addtypes) do addtype(k, v) end
-for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 
 local function singleton(tp)
   return ffi.typeof("$[1]", tp)

@@ -268,6 +268,21 @@ struct _netbsd_flock {
   short   l_type;
   short   l_whence;
 };
+struct _netbsd_ptmget {
+  int     cfd;
+  int     sfd;
+  char    cn[16];
+  char    sn[16];
+};
+struct _netbsd_termios {
+        tcflag_t        c_iflag;        /* input flags */
+        tcflag_t        c_oflag;        /* output flags */
+        tcflag_t        c_cflag;        /* control flags */
+        tcflag_t        c_lflag;        /* local flags */
+        cc_t            c_cc[20];       /* control chars */
+        int             c_ispeed;       /* input speed */
+        int             c_ospeed;       /* output speed */
+};
 ]]
 
 end

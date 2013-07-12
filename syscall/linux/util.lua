@@ -412,14 +412,11 @@ function util.tcgetsid(fd)
   return sid[0]
 end
 
+-- MOVED to syscall
 function util.posix_openpt(flags)
   local fd, err = S.open("/dev/ptmx", flags)
   if not fd then return nil, err end
   return setmetatable({fd = fd}, mt.openpt)
-end
-
-function util.grantpt(fd) -- I don't think we need to do anything here (eg Musl libc does not)
-  return true
 end
 
 function util.unlockpt(fd)
@@ -436,6 +433,7 @@ function util.ptsname(fd)
   return "/dev/pts/" .. tostring(pts[0])
 end
 
+-- OBSOLETE, just use open (if at all)
 function util.open_pts(name, flags)
   local fd, err = S.open(name, flags)
   if not fd then return nil, err end

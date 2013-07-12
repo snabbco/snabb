@@ -757,6 +757,9 @@ function S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   return ffi.string(msg_ptr,ret)
 end
 
+-- pty functions where not in common code
+function S.grantpt(fd) return true end -- Linux does not need to do anything here (Musl does not)
+
 return S
 
 end

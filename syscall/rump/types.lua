@@ -45,6 +45,7 @@ local unchanged = {
   ["struct iphdr"] = true,
   ["struct udphdr"] = true,
   ["struct ethhdr"] = true,
+  ["struct winsize"] = true,
 }
 
 local function rumpfn(tp) -- add _netbsd_ to correct types
