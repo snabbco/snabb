@@ -163,7 +163,7 @@ local nm = {
   AT_SYMLINK_NOFOLLOW = "AT_",
   CHFLAGS = "",
   PC = "_PC_",
-  FSYNC = "F",
+  FSYNC = "",
 }
 
 for k, v in pairs(c) do
