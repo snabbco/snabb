@@ -489,7 +489,7 @@ c.FCNTL_LOCK = strflag {
   WRLCK = 3,
 }
 
-c.S_I = multiflags {
+c.S_I = modeflags {
   FMT   = octal('0170000'),
   FSOCK = octal('0140000'),
   FLNK  = octal('0120000'),

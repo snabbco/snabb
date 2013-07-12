@@ -44,6 +44,7 @@ if rump then -- some initial setup
   assert(S.mount{dir="/tmp", type="tmpfs", data=data})
   assert(S.chdir("/tmp"))
   assert(S.chmod("/dev/null", "0666")) -- TODO seems to have execute permission by default so access test fails
+  --assert(S.mknod("/dev/ptmx", "0666", t.device(165, 0))) -- TODO some issue
 end
 
 local bit = require "bit"
@@ -1096,6 +1097,49 @@ test_locking = {
     assert(fd:flock("un"))
     assert(fd:close())
   end,
+}
+
+test_termios = {
+  test_pts_termios = function()
+--[[
+    local ptm = assert(S.posix_openpt("rdwr, noctty"))
+    assert(ptm:grantpt())
+    assert(ptm:unlockpt())
+    local pts_name = assert(ptm:ptsname())
+    local pts = assert(util.open_pts(pts_name, "rdwr, noctty"))
+    assert(pts:isatty(), "should be a tty")
+    local termios = assert(pts:tcgetattr())
+    assert(termios.ospeed ~= 115200)
+    termios.speed = 115200
+    assert_equal(termios.ispeed, 115200)
+    assert_equal(termios.ospeed, 115200)
+    assert(bit.band(termios.c_lflag, c.LFLAG.ICANON) ~= 0)
+    termios:makeraw()
+    assert(bit.band(termios.c_lflag, c.LFLAG.ICANON) == 0)
+    assert(pts:tcsetattr("now", termios))
+    termios = assert(pts:tcgetattr())
+    assert_equal(termios.ospeed, 115200)
+    assert(bit.band(termios.c_lflag, c.LFLAG.ICANON) == 0)
+    assert(pts:tcsendbreak(0))
+    assert(pts:tcdrain())
+    assert(pts:tcflush('ioflush'))
+    assert(pts:tcflow('ooff'))
+    assert(pts:tcflow('ioff'))
+    assert(pts:tcflow('oon'))
+    assert(pts:tcflow('ion'))
+    assert(pts:close())
+    assert(ptm:close())
+    assert_equal(pts:getfd(), -1, "fd should be closed")
+    assert_equal(ptm:getfd(), -1, "fd should be closed")
+]]
+  end,
+--[[
+  test_isatty_fail = function()
+    local fd = S.open("/dev/zero")
+    assert(not fd:isatty(), "not a tty")
+    assert(fd:close())
+  end,
+]]
 }
 
 test_misc = {

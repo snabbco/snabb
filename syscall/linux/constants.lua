@@ -89,7 +89,7 @@ c.OMQATTR = multiflags {
 }
 
 -- modes and file types. note renamed second set from S_ to MODE_ but duplicated in S for stat
-c.S_I = multiflags {
+c.S_I = modeflags {
   FMT   = octal('0170000'),
   FSOCK = octal('0140000'),
   FLNK  = octal('0120000'),
