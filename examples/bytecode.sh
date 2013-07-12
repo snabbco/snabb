@@ -13,7 +13,7 @@ rm -f ./obj/*.{o,a}
 ARCH=`luajit -e "S=require'syscall';print(S.abi.arch)"`
 OS=`luajit -e "S=require'syscall';print(S.abi.os)"`
 
-FILES=`find syscall.lua syscall/*.lua syscall/rump/*.lua syscall/$OS/*.lua syscall/$OS/$ARCH/*.lua`
+FILES=`find syscall.lua syscall -name '*.lua'`
 
 for f in $FILES
 do
@@ -22,5 +22,5 @@ do
   luajit -b -t o -n ${MODNAME} ${f} obj/${MODNAME}.o
 done
 
-ar cr obj/ljsyscall.a obj/*.o
+ar cr obj/ljsyscall.a obj/*.o # all files
 
