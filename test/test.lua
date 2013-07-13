@@ -23,7 +23,9 @@ if arg[1] == "rump" then
   if SS.abi.os == "linux" then
     assert(SS.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
   end
-  local modules = {"vfs", "fs.tmpfs", "fs.kernfs", "kern.tty", "net", "net.net", "net.local", "net.netinet", "net.shmif", "net.config"}
+  local modules = {"vfs", "fs.tmpfs", "fs.kernfs",
+                   "kern.tty",
+                   "net", "net.net", "net.local", "net.netinet", "net.shmif"}
   S = require "syscall.rump.init".init(modules)
   table.remove(arg, 1)
   rump = true
