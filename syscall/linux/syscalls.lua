@@ -793,6 +793,12 @@ end
 function S.tcflow(fd, action)
   return S.ioctl(fd, "TCXONC", pt.void(c.TCFLOW[action]))
 end
+function S.tcgetsid(fd)
+  local sid = t.int1()
+  local ok, err = S.ioctl(fd, "TIOCGSID", sid) -- TODO new ioctl code to clean up
+  if not ok then return nil, err end
+  return sid[0]
+end
 
 return S
 

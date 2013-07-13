@@ -405,7 +405,7 @@ end
 function util.tcflow(fd, action)
   return S.ioctl(fd, "TCXONC", pt.void(c.TCFLOW[action]))
 end
-
+--moved
 function util.tcgetsid(fd)
   local sid = t.int1()
   local ok, err = S.ioctl(fd, "TIOCGSID", sid)
