@@ -366,13 +366,14 @@ end
 -- termios
 -- TODO note disadvantage of having in a different file is that cannot apply methods to a normal fd
 -- hence open_pts. Need to work out how to make this extensible more effectively. Same issue for adding nonblock() still in syscall
+--MOVED
 function util.tcgetattr(fd)
   local tio = t.termios()
   local ok, err = S.ioctl(fd, "TCGETS", tio)
   if not ok then return nil, err end
   return tio
 end
-
+--MOVED
 function util.isatty(fd)
   local tc = util.tcgetattr(fd)
   if tc then return true else return false end

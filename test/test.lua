@@ -23,7 +23,7 @@ if arg[1] == "rump" then
   if SS.abi.os == "linux" then
     assert(SS.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
   end
-  local modules = {"vfs", "dev", "net", "kern.tty", "fs.tmpfs", "fs.kernfs", "fs.ptyfs",
+  local modules = {"vfs", "kern.tty", "dev", "net", "fs.tmpfs", "fs.kernfs", "fs.ptyfs",
                    "net.net", "net.local", "net.netinet", "net.shmif"}
   S = require "syscall.rump.init".init(modules)
   table.remove(arg, 1)
@@ -40,12 +40,13 @@ local features = S.features
 local util = S.util
 
 if rump then -- some initial setup
+  local octal = helpers.octal
   assert(S.mkdir("/tmp", "0700"))
-  local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode=helpers.octal("0700")}
+  local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0700")}
   assert(S.mount{dir="/tmp", type="tmpfs", data=data})
   assert(S.chdir("/tmp"))
   assert(S.mkdir("/dev/pts", "0666"))
-  assert(S.mount{dir="/dev/pts", type="ptyfs", data = {version = 2, gid = 0, mode = helpers.octal("0320")}})
+  assert(S.mount{dir="/dev/pts", type="ptyfs", data = {version = 2, gid = 0, mode = octal("0320")}})
 end
 
 local bit = require "bit"
@@ -1107,13 +1108,13 @@ test_termios = {
     assert(ptm:unlockpt())
     local pts_name = assert(ptm:ptsname())
     local pts = assert(S.open(pts_name, "rdwr, noctty"))
---[[
     assert(pts:isatty(), "should be a tty")
     local termios = assert(pts:tcgetattr())
     assert(termios.ospeed ~= 115200)
     termios.speed = 115200
     assert_equal(termios.ispeed, 115200)
     assert_equal(termios.ospeed, 115200)
+--[[
     assert(bit.band(termios.c_lflag, c.LFLAG.ICANON) ~= 0)
     termios:makeraw()
     assert(bit.band(termios.c_lflag, c.LFLAG.ICANON) == 0)

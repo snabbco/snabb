@@ -425,7 +425,10 @@ end
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
 S.openpt = S.posix_openpt
-
+function S.isatty(fd)
+  local tc = S.tcgetattr(fd)
+  if tc then return true else return false end
+end
 
 -- now call OS specific for non-generic calls
 local hh = {

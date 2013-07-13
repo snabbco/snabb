@@ -127,6 +127,12 @@ function S.ptsname(fd)
   if not ok then return nil, err end
   return ffi.string(pm.sn)
 end
+function S.tcgetattr(fd)
+  local tio = t.termios()
+  local ok, err = S.ioctl(fd, "TIOCGETA", tio) -- TODO new ioctl will cleanup
+  if not ok then return nil, err end
+  return tio
+end
 
 return S
 

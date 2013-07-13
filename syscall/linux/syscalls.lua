@@ -766,6 +766,12 @@ function S.ptsname(fd)
   if not ret then return nil, err end
   return "/dev/pts/" .. tostring(pts[0])
 end
+function S.tcgetattr(fd)
+  local tio = t.termios()
+  local ok, err = S.ioctl(fd, "TCGETS", tio) -- TODO new ioctl will do this
+  if not ok then return nil, err end
+  return tio
+end
 
 return S
 
