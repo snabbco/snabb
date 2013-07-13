@@ -103,6 +103,7 @@ function h.multiflags(tab)
     if #a == 1 and str == str:upper() then return nil end -- this is to allow testing for presense, while catching errors
     for i, v in ipairs(a) do
       local s = trim(v):upper()
+      if #s == 0 then error("empty flag") end
       local val = rawget(tab, s)
       if not val then error("invalid flag " .. s) end
       f = bit.bor(f, val)
@@ -129,14 +130,19 @@ function h.modeflags(tab)
     if not str then return 0 end
     if type(str) ~= "string" then return str end
     if #str == 0 then return 0 end
-    if str:sub(1, 1) == "0" then return octal(str) end
     local f = 0
     local a = split(",", str)
-    if #a == 1 and str == str:upper() then return nil end -- this is to allow testing for presense, while catching errors
+    if #a == 1 and str == str:upper() and str:sub(1,1) ~= "0" then return nil end -- this is to allow testing for presense, while catching errors
     for i, v in ipairs(a) do
       local s = trim(v):upper()
-      local val = rawget(tab, s)
-      if not val then error("invalid flag " .. s) end
+      if #s == 0 then error("empty flag") end
+      local val
+      if s:sub(1, 1) == "0" then
+        val = octal(s)
+      else
+        val = rawget(tab, s)
+        if not val then error("invalid flag " .. s) end
+      end
       f = bit.bor(f, val)
     end
     cache[str] = f
@@ -155,6 +161,7 @@ function h.swapflags(tab)
     if #a == 1 and str == str:upper() then return nil end -- this is to allow testing for presense, while catching errors
     for i, v in ipairs(a) do
       local s = trim(v):upper()
+      if #s == 0 then error("empty flag") end
       if tonumber(s) then
         local val = tonumber(s)
         f = bit.bor(f, rawget(tab, "PREFER"), bit.lshift(bit.band(rawget(tab, "PRIO_MASK"), val), rawget(tab, "PRIO_SHIFT")))
