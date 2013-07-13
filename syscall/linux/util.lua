@@ -401,7 +401,7 @@ end
 function util.tcflush(fd, queue_selector)
   return S.ioctl(fd, "TCFLSH", pt.void(c.TCFLUSH[queue_selector]))
 end
-
+--moved
 function util.tcflow(fd, action)
   return S.ioctl(fd, "TCXONC", pt.void(c.TCFLOW[action]))
 end

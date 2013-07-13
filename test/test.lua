@@ -1124,22 +1124,18 @@ test_termios = {
     local ok, err = pts:tcsendbreak(0) -- as this is not actually a serial line, NetBSD seems to fail here
     assert(pts:tcdrain())
     assert(pts:tcflush('ioflush'))
---[[
     assert(pts:tcflow('ooff'))
     assert(pts:tcflow('ioff'))
     assert(pts:tcflow('oon'))
     assert(pts:tcflow('ion'))
-]]
     assert(pts:close())
     assert(ptm:close())
   end,
---[[
   test_isatty_fail = function()
     local fd = S.open("/dev/zero")
     assert(not fd:isatty(), "not a tty")
     assert(fd:close())
   end,
-]]
 }
 
 test_misc = {

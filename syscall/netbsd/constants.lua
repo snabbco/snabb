@@ -909,5 +909,13 @@ c.TCFLUSH = strflag {
   IOFLUSH = 3,
 }
 
+-- termios - tcflow() and TCXONC use these. renamed from TC to TCFLOW
+c.TCFLOW = strflag {
+  OOFF = 1,
+  OON  = 2,
+  IOFF = 3,
+  ION  = 4,
+}
+
 return c
 

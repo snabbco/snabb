@@ -790,6 +790,9 @@ end
 function S.tcflush(fd, queue_selector)
   return S.ioctl(fd, "TCFLSH", t.int(c.TCFLUSH[queue_selector]))
 end
+function S.tcflow(fd, action)
+  return S.ioctl(fd, "TCXONC", pt.void(c.TCFLOW[action]))
+end
 
 return S
 
