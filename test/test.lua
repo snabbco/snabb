@@ -1335,13 +1335,6 @@ end
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
   if abi.os == "linux" then
-    -- some tests are causing issues, eg one of my servers reboots on pivot_root
-    if not arg[1] and arg[1] ~= "all" then
-      test_misc_root.test_pivot_root = nil
-    elseif arg[1] == "all" then
-      arg[1] = nil
-    end
-
     -- cut out this section if you want to (careful!) debug on real interfaces
     -- TODO add to features as may not be supported
     local ok, err = S.unshare("newnet, newns, newuts")

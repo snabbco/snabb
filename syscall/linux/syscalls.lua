@@ -677,7 +677,7 @@ function S.capget(hdr, data) -- normally just leave as nil for get, can pass pid
 end
 
 function S.capset(hdr, data)
-  if ffi.istype(t.capabilities, hdr) then hdr, data = hdr.hdrdata() end
+  if ffi.istype(t.capabilities, hdr) then hdr, data = hdr:hdrdata() end
   return retbool(C.capset(hdr, data))
 end
 

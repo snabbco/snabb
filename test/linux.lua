@@ -1344,6 +1344,7 @@ test.misc_linux_root = {
     assert(S.sethostname(h))
     assert_equal(h, assert(S.gethostname()))
   end,
+--[[ -- this is rebooting one machine, and umount, not working TODO debug
   test_pivot_root = function()
     assert(S.mkdir(tmpfile3))
     local p = assert(S.clone("newns"))
@@ -1365,6 +1366,7 @@ test.misc_linux_root = {
     assert(S.rmdir(tmpfile3 .. "/old")) -- until we can unmount above
     assert(S.rmdir(tmpfile3))
   end,
+]]
   test_reboot = function()
     local p = assert(S.clone("newpid"))
     if p == 0 then
