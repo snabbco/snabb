@@ -45,7 +45,7 @@ if rump then -- some initial setup
   assert(S.mount{dir="/tmp", type="tmpfs", data=data})
   assert(S.chdir("/tmp"))
   assert(S.mkdir("/dev/pts", "0666"))
-  assert(S.mount{dir="/dev/pts", type="ptyfs", data = {version = 2, gid = 0, mode = helpers.octal("0666")}})
+  assert(S.mount{dir="/dev/pts", type="ptyfs", data = {version = 2, gid = 0, mode = helpers.octal("0320")}})
 end
 
 local bit = require "bit"
