@@ -781,6 +781,9 @@ function S.tcsetattr(fd, optional_actions, tio)
   local inc = c.TCSA[optional_actions]
   return S.ioctl(fd, tcsets[inc], tio)
 end
+function S.tcsendbreak(fd, duration)
+  return S.ioctl(fd, "TCSBRK") -- Linux ignores duration
+end
 
 return S
 

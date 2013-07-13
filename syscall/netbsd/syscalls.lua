@@ -143,8 +143,15 @@ function S.tcsetattr(fd, optional_actions, tio)
   local inc = c.TCSA[optional_actions]
   return S.ioctl(fd, tcsets[inc], tio)
 end
+function S.tcsendbreak(fd, duration)
+  local ok, err = S.ioctl(fd, "TIOCSBRK")
+  if not ok then return nil, err end
+  S.nanosleep(0.4) -- NetBSD just does constant time
+  local ok, err = S.ioctl(fd, "TIOCCBRK")
+  if not ok then return nil, err end
+  return true
+end
 
- 
 return S
 
 end

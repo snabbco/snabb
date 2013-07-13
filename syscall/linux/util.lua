@@ -389,7 +389,7 @@ function util.tcsetattr(fd, optional_actions, tio)
   local inc = c.TCSA[optional_actions]
   return S.ioctl(fd, tcsets[inc], tio)
 end
-
+--MOVED
 function util.tcsendbreak(fd, duration)
   return S.ioctl(fd, "TCSBRK", pt.void(duration)) -- duration in seconds if not zero
 end
