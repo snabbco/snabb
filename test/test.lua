@@ -1124,10 +1124,10 @@ test_termios = {
     local ok, err = pts:tcsendbreak(0) -- as this is not actually a serial line, NetBSD seems to fail here
     assert(pts:tcdrain())
     assert(pts:tcflush('ioflush'))
-    --assert(pts:tcflow('ooff'))
+    assert(pts:tcflow('ooff'))
     --assert(pts:tcflow('ioff')) -- blocking in NetBSD
     assert(pts:tcflow('oon'))
-    assert(pts:tcflow('ion'))
+    --assert(pts:tcflow('ion')) -- blocking in NetBSD
     assert(pts:close())
     assert(ptm:close())
   end,
