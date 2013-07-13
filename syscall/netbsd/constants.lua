@@ -895,5 +895,12 @@ c.LFLAG = multiflags {
   NOFLSH         = 0x80000000,
 }
 
+c.TCSA = multiflags { -- this is another odd one, where you can have one flag plus SOFT
+  NOW   = 0,
+  DRAIN = 1,
+  FLUSH = 2,
+  SOFT  = 0x10,
+}
+
 return c
 

@@ -772,6 +772,15 @@ function S.tcgetattr(fd)
   if not ok then return nil, err end
   return tio
 end
+local tcsets = {
+  [c.TCSA.NOW]   = "TCSETS",
+  [c.TCSA.DRAIN] = "TCSETSW",
+  [c.TCSA.FLUSH] = "TCSETSF",
+}
+function S.tcsetattr(fd, optional_actions, tio)
+  local inc = c.TCSA[optional_actions]
+  return S.ioctl(fd, tcsets[inc], tio)
+end
 
 return S
 

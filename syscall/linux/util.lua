@@ -384,7 +384,7 @@ local tcsets = {
   [1] = "TCSETSW", -- drain
   [2] = "TCSETSF", -- flush. Note these are in fact consecutive ioctl numbers
 }
-
+-- MOVED
 function util.tcsetattr(fd, optional_actions, tio)
   local inc = c.TCSA[optional_actions]
   return S.ioctl(fd, tcsets[inc], tio)

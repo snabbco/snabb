@@ -133,7 +133,18 @@ function S.tcgetattr(fd)
   if not ok then return nil, err end
   return tio
 end
+local tcsets = {
+  [c.TCSA.NOW]   = "TIOCSETA",
+  [c.TCSA.DRAIN] = "TIOCSETAW",
+  [c.TCSA.FLUSH] = "TIOCSETAF",
+}
+function S.tcsetattr(fd, optional_actions, tio)
+  -- TODO also implement TIOCSOFT, which needs to make a modified copy of tio
+  local inc = c.TCSA[optional_actions]
+  return S.ioctl(fd, tcsets[inc], tio)
+end
 
+ 
 return S
 
 end
