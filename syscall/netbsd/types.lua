@@ -51,6 +51,7 @@ mt.device = {
   },
 }
 
+-- note metatable as not a struct...
 t.device = function(major, minor)
   local dev = major
   if minor then dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff)) end
@@ -100,7 +101,7 @@ addtype("stat", "struct stat", {
 
     type = function(st) return bit.band(st.st_mode, c.S_I.FMT) end,
     todt = function(st) return bit.rshift(st.type, 12) end,
-    isreg = function(st) return st.type == c.S_I.FREG end,
+    isreg = function(st) return st.type == c.S_I.FREG end, -- TODO allow upper case too?
     isdir = function(st) return st.type == c.S_I.FDIR end,
     ischr = function(st) return st.type == c.S_I.FCHR end,
     isblk = function(st) return st.type == c.S_I.FBLK end,

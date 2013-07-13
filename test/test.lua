@@ -23,7 +23,7 @@ if arg[1] == "rump" then
   if SS.abi.os == "linux" then
     assert(SS.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
   end
-  local modules = {"vfs", "fs.tmpfs", "fs.kernfs", "net", "net.net", "net.local", "net.netinet", "net.shmif", "net.config"}
+  local modules = {"vfs", "fs.tmpfs", "fs.kernfs", "kern.tty", "net", "net.net", "net.local", "net.netinet", "net.shmif", "net.config"}
   S = require "syscall.rump.init".init(modules)
   table.remove(arg, 1)
   rump = true
@@ -44,7 +44,6 @@ if rump then -- some initial setup
   assert(S.mount{dir="/tmp", type="tmpfs", data=data})
   assert(S.chdir("/tmp"))
   assert(S.chmod("/dev/null", "0666")) -- TODO seems to have execute permission by default so access test fails
-  --assert(S.mknod("/dev/ptmx", "0666", t.device(165, 0))) -- TODO some issue
 end
 
 local bit = require "bit"
@@ -1101,9 +1100,9 @@ test_locking = {
 
 test_termios = {
   test_pts_termios = function()
---[[
     local ptm = assert(S.posix_openpt("rdwr, noctty"))
     assert(ptm:grantpt())
+--[[
     assert(ptm:unlockpt())
     local pts_name = assert(ptm:ptsname())
     local pts = assert(util.open_pts(pts_name, "rdwr, noctty"))
@@ -1128,10 +1127,8 @@ test_termios = {
     assert(pts:tcflow('oon'))
     assert(pts:tcflow('ion'))
     assert(pts:close())
-    assert(ptm:close())
-    assert_equal(pts:getfd(), -1, "fd should be closed")
-    assert_equal(ptm:getfd(), -1, "fd should be closed")
 ]]
+    assert(ptm:close())
   end,
 --[[
   test_isatty_fail = function()
