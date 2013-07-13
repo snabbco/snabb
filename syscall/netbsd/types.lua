@@ -29,6 +29,7 @@ local addtypes = {
 local addstructs = {
   ufs_args = "struct ufs_args",
   tmpfs_args = "struct tmpfs_args",
+  ptyfs_args = "struct ptyfs_args",
   flock = "struct flock",
   ptmget = "struct ptmget",
 }

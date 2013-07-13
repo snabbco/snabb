@@ -224,6 +224,12 @@ struct _netbsd_tmpfs_args {
   gid_t ta_root_gid;
   _netbsd_mode_t ta_root_mode;
 };
+struct _netbsd_ptyfs_args {
+  int version;
+  gid_t gid;
+  _netbsd_mode_t mode;
+  int flags;
+};
 struct _netbsd_dirent {
   _netbsd_ino_t d_fileno;
   uint16_t d_reclen;
