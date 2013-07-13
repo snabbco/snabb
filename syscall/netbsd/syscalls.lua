@@ -169,7 +169,7 @@ function S.tcflow(fd, action)
   if not term then return nil, err end
   local cc
   if action == c.TCFLOW.IOFF then cc = term.VSTOP else cc = term.VSTART end
-  if cc ~= posix_vdisable and S.write(fd, t.uchar1(cc), 1) then return nil end
+  if cc ~= posix_vdisable and not S.write(fd, t.uchar1(cc), 1) then return nil end
   return true
 end
 
