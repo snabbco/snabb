@@ -177,6 +177,8 @@ function S.tcgetsid(fd)
   local ok, err = S.ioctl(fd, "TIOCGSID", sid) -- TODO new ioctl will clean up
   if not ok then return nil, err end
   return sid[0]
+end
+
 return S
 
 end
