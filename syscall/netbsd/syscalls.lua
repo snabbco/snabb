@@ -160,15 +160,15 @@ function S.tcflush(fd, com)
   return S.ioctl(fd, "TIOCFLUSH", c.TCFLUSH[com]) -- while defined as FREAD, FWRITE, values same
 end
 local posix_vdisable = helpers.octal "0377" -- move to constants?
-function S.tcflush(fd, action)
-  action = c.TCFLUSH[action]
-  if action == c.TCFLUSH.OOFF then return S.ioctl(fd, "TIOCSTOP") end
-  if action == c.TCFLUSH.OON then return S.ioctl(fd, "TIOCSTART") end
-  if action ~= c.TCFLUSH.ION and action ~= c.TCFLUSH.IOFF then return nil end
+function S.tcflow(fd, action)
+  action = c.TCFLOW[action]
+  if action == c.TCFLOW.OOFF then return S.ioctl(fd, "TIOCSTOP") end
+  if action == c.TCFLOW.OON then return S.ioctl(fd, "TIOCSTART") end
+  if action ~= c.TCFLOW.ION and action ~= c.TCFLOW.IOFF then return nil end
   local term, err = S.tcgetattr(fd)
   if not term then return nil, err end
   local cc
-  if action == c.TCFLUSH.IOFF then cc = term.VSTOP else cc = term.VSTART end
+  if action == c.TCFLOW.IOFF then cc = term.VSTOP else cc = term.VSTART end
   if cc ~= posix_vdisable and S.write(fd, t.uchar1(cc), 1) then return nil end
   return true
 end
