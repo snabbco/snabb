@@ -151,6 +151,9 @@ function S.tcsendbreak(fd, duration)
   if not ok then return nil, err end
   return true
 end
+function S.tcdrain(fd)
+  return S.ioctl(fd, "TIOCDRAIN")
+end
 
 return S
 

@@ -784,6 +784,9 @@ end
 function S.tcsendbreak(fd, duration)
   return S.ioctl(fd, "TCSBRK") -- Linux ignores duration
 end
+function S.tcdrain(fd)
+  return S.ioctl(fd, "TCSBRK", pt.void(1)) -- note use of literal 1, not pointer
+end
 
 return S
 

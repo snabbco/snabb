@@ -393,7 +393,7 @@ end
 function util.tcsendbreak(fd, duration)
   return S.ioctl(fd, "TCSBRK", pt.void(duration)) -- duration in seconds if not zero
 end
-
+--MOVED
 function util.tcdrain(fd)
   return S.ioctl(fd, "TCSBRK", pt.void(1))
 end
