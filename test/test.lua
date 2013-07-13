@@ -1114,10 +1114,10 @@ test_termios = {
     termios.speed = 115200
     assert_equal(termios.ispeed, 115200)
     assert_equal(termios.ospeed, 115200)
---[[
     assert(bit.band(termios.c_lflag, c.LFLAG.ICANON) ~= 0)
     termios:makeraw()
     assert(bit.band(termios.c_lflag, c.LFLAG.ICANON) == 0)
+--[[
     assert(pts:tcsetattr("now", termios))
     termios = assert(pts:tcgetattr())
     assert_equal(termios.ospeed, 115200)
