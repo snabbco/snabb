@@ -138,6 +138,8 @@ local function singleton(tp)
   return ffi.typeof("$[1]", tp)
 end
 
+t.char1 = singleton(t.char)
+t.uchar1 = singleton(t.uchar)
 t.int1 = singleton(t.int)
 t.uint1 = singleton(t.uint)
 t.int16_1 = singleton(t.int16)
