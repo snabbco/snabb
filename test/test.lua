@@ -1125,7 +1125,7 @@ test_termios = {
     assert(pts:tcdrain())
     assert(pts:tcflush('ioflush'))
     assert(pts:tcflow('ooff'))
-    assert(pts:tcflow('ioff'))
+    --assert(pts:tcflow('ioff')) -- blocking in NetBSD
     assert(pts:tcflow('oon'))
     assert(pts:tcflow('ion'))
     assert(pts:close())
