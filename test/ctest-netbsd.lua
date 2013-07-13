@@ -91,6 +91,7 @@ print [[
 #include <sys/module.h>
 #include <sys/syscall.h>
 #include <net/bpf.h>
+#include <fs/ptyfs/ptyfs.h>
 
 int ret = 0;
 
@@ -164,6 +165,7 @@ local nm = {
   CHFLAGS = "",
   PC = "_PC_",
   FSYNC = "",
+  TCSA = "TCSA",
 }
 
 for k, v in pairs(c) do
