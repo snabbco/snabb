@@ -166,6 +166,7 @@ local nm = {
   PC = "_PC_",
   FSYNC = "",
   TCSA = "TCSA",
+  TCFLUSH = "TC",
 }
 
 for k, v in pairs(c) do

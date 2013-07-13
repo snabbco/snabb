@@ -785,7 +785,10 @@ function S.tcsendbreak(fd, duration)
   return S.ioctl(fd, "TCSBRK") -- Linux ignores duration
 end
 function S.tcdrain(fd)
-  return S.ioctl(fd, "TCSBRK", pt.void(1)) -- note use of literal 1, not pointer
+  return S.ioctl(fd, "TCSBRK", t.int(1)) -- note use of literal 1, not pointer
+end
+function S.tcflush(fd, queue_selector)
+  return S.ioctl(fd, "TCFLSH", t.int(c.TCFLUSH[queue_selector]))
 end
 
 return S

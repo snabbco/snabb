@@ -154,6 +154,9 @@ end
 function S.tcdrain(fd)
   return S.ioctl(fd, "TIOCDRAIN")
 end
+function S.tcflush(fd, com)
+  return S.ioctl(fd, "TIOCFLUSH", c.TCFLUSH[com]) -- while defined as FREAD, FWRITE, values same
+end
 
 return S
 

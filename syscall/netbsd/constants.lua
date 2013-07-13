@@ -902,5 +902,12 @@ c.TCSA = multiflags { -- this is another odd one, where you can have one flag pl
   SOFT  = 0x10,
 }
 
+-- tcflush(), renamed from TC to TCFLUSH
+c.TCFLUSH = strflag {
+  IFLUSH  = 1,
+  OFLUSH  = 2,
+  IOFLUSH = 3,
+}
+
 return c
 

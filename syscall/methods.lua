@@ -83,7 +83,8 @@ local fdmethods = {'dup', 'read', 'write', 'pread', 'pwrite',
                    'fstatat', 'unlinkat', 'mkdirat', 'mknodat', 'faccessat', 'fchmodat', 'fchown',
                    'fchownat', 'readlinkat', 'setns', 'openat',
                    'preadv', 'pwritev', 'epoll_pwait', 'ioctl', 'flock', 'fpathconf',
-                   'grantpt', 'unlockpt', 'ptsname', 'tcgetattr', 'tcsetattr', 'isatty', 'tcsendbreak', 'tcdrain',
+                   'grantpt', 'unlockpt', 'ptsname', 'tcgetattr', 'tcsetattr', 'isatty',
+                   'tcsendbreak', 'tcdrain', 'tcflush',
                    'fchflags', 'fchroot', 'fsync_range', -- netbsd only
                    }
 local fmeth = {}

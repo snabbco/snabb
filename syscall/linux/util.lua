@@ -397,7 +397,7 @@ end
 function util.tcdrain(fd)
   return S.ioctl(fd, "TCSBRK", pt.void(1))
 end
-
+--MOVED
 function util.tcflush(fd, queue_selector)
   return S.ioctl(fd, "TCFLSH", pt.void(c.TCFLUSH[queue_selector]))
 end
