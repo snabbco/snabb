@@ -419,6 +419,11 @@ function util.posix_openpt(flags)
   return setmetatable({fd = fd}, mt.openpt)
 end
 
+-- MOVED to syscall
+function util.grantpt(fd) -- I don't think we need to do anything here (eg Musl libc does not)
+  return true
+end
+
 function util.unlockpt(fd)
   local unlock = t.int1()
   local ok, err = S.ioctl(fd, "TIOCSPTLCK", unlock)

@@ -929,7 +929,7 @@ test.netlink = {
   end,
 }
 
-test.termios = {
+test.termios_oldversion = {
   test_pts_termios = function()
     local ptm = assert(util.posix_openpt("rdwr, noctty"))
     assert(ptm:grantpt())
@@ -1699,7 +1699,7 @@ test.swap = {
   -- TODO need mkswap to test success
 }
 
-test.tuntap = {
+test.tuntap_root = {
   test_tuntap_root = function()
     local clonedev = "/dev/net/tun"
     local fd = assert(S.open(clonedev, "rdwr"))

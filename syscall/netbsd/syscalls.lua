@@ -119,6 +119,7 @@ end
 
 -- pty functions
 function S.grantpt(fd) return S.ioctl(fd, "TIOCGRANTPT") end
+function S.unlockpt(fd) return 0 end
 
 return S
 

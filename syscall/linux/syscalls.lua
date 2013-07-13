@@ -759,6 +759,7 @@ end
 
 -- pty functions where not in common code
 function S.grantpt(fd) return true end -- Linux does not need to do anything here (Musl does not)
+function S.unlockpt(fd) return S.ioctl(fd, "TIOCSPTLCK", 0) end
 
 return S
 
