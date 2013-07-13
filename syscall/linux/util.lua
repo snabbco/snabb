@@ -424,6 +424,7 @@ function util.grantpt(fd) -- I don't think we need to do anything here (eg Musl 
   return true
 end
 
+--MOVED
 function util.unlockpt(fd)
   local unlock = t.int1()
   local ok, err = S.ioctl(fd, "TIOCSPTLCK", unlock)
@@ -431,6 +432,7 @@ function util.unlockpt(fd)
   return true
 end
 
+--MOVED
 function util.ptsname(fd)
   local pts = t.int1()
   local ret, err = S.ioctl(fd, "TIOCGPTN", pts)

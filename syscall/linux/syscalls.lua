@@ -760,6 +760,12 @@ end
 -- pty functions where not in common code
 function S.grantpt(fd) return true end -- Linux does not need to do anything here (Musl does not)
 function S.unlockpt(fd) return S.ioctl(fd, "TIOCSPTLCK", 0) end
+function S.ptsname(fd)
+  local pts = t.int1()
+  local ret, err = S.ioctl(fd, "TIOCGPTN", pts) -- TODO new ioctl code should return the int
+  if not ret then return nil, err end
+  return "/dev/pts/" .. tostring(pts[0])
+end
 
 return S
 

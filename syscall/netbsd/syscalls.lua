@@ -120,6 +120,12 @@ end
 -- pty functions
 function S.grantpt(fd) return S.ioctl(fd, "TIOCGRANTPT") end
 function S.unlockpt(fd) return 0 end
+function S.ptsname(fd)
+  local pm = t.ptmget()
+  local ok, err = S.ioctl(fd, "TIOCPTSNAME", pm) -- TODO new ioctl should return this automatically
+  if not ok then return nil, err end
+  return ffi.string(pm.sn)
+end
 
 return S
 

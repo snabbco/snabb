@@ -1104,8 +1104,9 @@ test_termios = {
     local ptm = assert(S.posix_openpt("rdwr, noctty"))
     assert(ptm:grantpt())
     assert(ptm:unlockpt())
---[[
     local pts_name = assert(ptm:ptsname())
+print(pts_name)
+--[[
     local pts = assert(util.open_pts(pts_name, "rdwr, noctty"))
     assert(pts:isatty(), "should be a tty")
     local termios = assert(pts:tcgetattr())
