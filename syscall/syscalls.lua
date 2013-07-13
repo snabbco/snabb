@@ -393,6 +393,7 @@ function S.mlockall(flags) return retbool(C.mlockall(c.MCL[flags])) end
 function S.munlockall() return retbool(C.munlockall()) end
 function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, c.MADV[advice])) end
 
+-- TODO use more info from ioctl table to sort out type of arg
 function S.ioctl(d, request, argp)
   if type(request) == "string" then
     request = ioctl[request]
