@@ -283,20 +283,13 @@ struct _netbsd_termios {
         int             c_ispeed;       /* input speed */
         int             c_ospeed;       /* output speed */
 };
-]]
-
--- compatibility
-if abi.netbsd.version6 then
-cdef [[
-struct _netbsd_ptmget {
+/* compat issues */
+struct _netbsd_compat_60_ptmget {
   int     cfd;
   int     sfd;
   char    cn[16];
   char    sn[16];
 };
-]]
-else -- in late 6.99, 7 this is PATH_MAX
-cdef [[
 struct _netbsd_ptmget {
   int     cfd;
   int     sfd;
@@ -304,7 +297,6 @@ struct _netbsd_ptmget {
   char    sn[1024];
 };
 ]]
-end
 
 end
 

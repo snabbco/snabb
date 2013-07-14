@@ -31,8 +31,13 @@ local addstructs = {
   tmpfs_args = "struct tmpfs_args",
   ptyfs_args = "struct ptyfs_args",
   flock = "struct flock",
-  ptmget = "struct ptmget",
 }
+
+if abi.netbsd.version6 then
+  addstructs.ptmget = "struct compat_60_ptmget"
+else
+  addstructs.ptmget = "struct ptmget"
+end
 
 for k, v in pairs(addtypes) do addtype(k, v) end
 for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
