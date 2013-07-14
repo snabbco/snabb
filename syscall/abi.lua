@@ -28,5 +28,10 @@ if abi.os == "bsd" then abi.os = "netbsd" end
 -- Makes no difference to us I believe
 if abi.arch == "ppcspe" then abi.arch = "ppc" end
 
+if abi.os == "netbsd" then -- huge hack TODO we need to read version
+  abi.netbsd = {}
+  abi.netbsd.version6 = true
+end
+
 return abi
 

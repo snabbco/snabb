@@ -162,6 +162,7 @@ test.pipes_bsd = {
   end,
 }
 
+--[[ -- need to do in a thread as cannot exit
 test.misc_bsd_root = {
   test_fchroot = function()
     local fd = assert(S.open("/", "rdonly"))
@@ -169,6 +170,7 @@ test.misc_bsd_root = {
     assert(fd:close())
   end,
 }
+]]
 
 return test
 

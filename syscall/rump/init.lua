@@ -19,6 +19,8 @@ for k, v in pairs(hostabi) do abi[k] = v end
 abi.rump = true
 abi.host = abi.os
 abi.os = "netbsd"
+abi.netbsd = {}
+abi.netbsd.version7 = true -- TODO huge hack! see notes; currently support NetBSD head for rump, 6 for native, this is temporary
 
 local errors = require "syscall.netbsd.errors"
 local c, types

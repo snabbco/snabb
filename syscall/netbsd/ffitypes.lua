@@ -274,12 +274,6 @@ struct _netbsd_flock {
   short   l_type;
   short   l_whence;
 };
-struct _netbsd_ptmget {
-  int     cfd;
-  int     sfd;
-  char    cn[16];
-  char    sn[16];
-};
 struct _netbsd_termios {
         tcflag_t        c_iflag;        /* input flags */
         tcflag_t        c_oflag;        /* output flags */
@@ -290,6 +284,27 @@ struct _netbsd_termios {
         int             c_ospeed;       /* output speed */
 };
 ]]
+
+-- compatibility
+if abi.netbsd.version6 then
+cdef [[
+struct _netbsd_ptmget {
+  int     cfd;
+  int     sfd;
+  char    cn[16];
+  char    sn[16];
+};
+]]
+else -- in late 6.99, 7 this is PATH_MAX
+cdef [[
+struct _netbsd_ptmget {
+  int     cfd;
+  int     sfd;
+  char    cn[1024];
+  char    sn[1024];
+};
+]]
+end
 
 end
 
