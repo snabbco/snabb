@@ -22,6 +22,8 @@ abi.os = "netbsd"
 abi.netbsd = {}
 abi.netbsd.version7 = true -- TODO huge hack! see notes; currently support NetBSD head for rump, 6 for native, this is temporary
 
+-- TODO code below (S = require "syscall") means we cannot run a different version of rump as host on netbsd...
+
 local errors = require "syscall.netbsd.errors"
 local c, types
 
