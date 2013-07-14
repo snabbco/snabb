@@ -45,7 +45,7 @@ if rump then -- some initial setup
   local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0700")}
   assert(S.mount{dir="/tmp", type="tmpfs", data=data})
   assert(S.chdir("/tmp"))
-  assert(S.mkdir("/dev/pts", "0666"))
+  assert(S.mkdir("/dev/pts", "0555"))
   assert(S.mount{dir="/dev/pts", type="ptyfs", data = {version = 2, gid = 0, mode = octal("0320")}})
 end
 
