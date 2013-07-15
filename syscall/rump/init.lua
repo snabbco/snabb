@@ -23,13 +23,14 @@ abi.netbsd = {}
 abi.netbsd.version7 = true -- TODO huge hack! see notes; currently support NetBSD head for rump, 6 for native, this is temporary
 
 -- TODO code below (S = require "syscall") means we cannot run a different version of rump as host on netbsd...
+-- best solution is to run the "other OS" path if we are running a different version, and discourage this.
 
 -- TODO share this init code with syscall.lua
 
 local errors = require "syscall.netbsd.errors"
 local c, types
 
-if abi.host == "netbsd" then
+if abi.host == "netbsd" then -- TODO and netbsd.version the same
   -- if running rump on netbsd just return normal NetBSD types
   -- note that we get these by calling the whole thing so we do not get type redefinition errors
   local S = require "syscall"
