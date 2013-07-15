@@ -1,4 +1,4 @@
--- ffi function definitions for rump kernel functions
+-- ffi type and function definitions for rump kernel functions
 
 local require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
@@ -10,6 +10,14 @@ pcall, type, table, string, math, bit
 local cdef = require "ffi".cdef
 
 cdef[[
+typedef struct modinfo {
+  unsigned int    mi_version;
+  int             mi_class;
+  int             (*mi_modcmd)(int, void *);
+  const char      *mi_name;
+  const char      *mi_required;
+} const modinfo_t;
+
 int     rump_boot_gethowto(void);
 void    rump_boot_sethowto(int);
 void    rump_boot_setsigmodel(int);

@@ -65,8 +65,7 @@ S.features = require "syscall.features".init(S)
 -- add utils
 S.util = require "syscall.util".init(S)
 
-require "syscall.rump.ffitypes"
-require "syscall.rump.ffifunctions"
+require "syscall.rump.ffirump"
 
 local t, pt = types.t, types.pt
 
