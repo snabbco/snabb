@@ -17,7 +17,8 @@ local h = require "syscall.helpers"
 
 local t, pt, s = types.t, types.pt, types.s
 
-local inlibc = h.inlibc
+local inlibc -- TODO ugh, clean this up, C should provide a method to test presense
+if abi.rump then function inlibc(k) print(k, C[k] ~= nil);  return C[k] ~= nil end else inlibc = h.inlibc end
 
 local S = {}
 

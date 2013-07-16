@@ -15,13 +15,12 @@ end
 
 local helpers = require "syscall.helpers"
 
-local S, SS, rump
+local S, rump
 
 if arg[1] == "rump" then
-  SS = require "syscall"
   -- it is too late to set this now, needs to be set before executions starts
-  if SS.abi.os == "linux" then
-    assert(SS.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
+  if jit.os == "Linux" then
+    assert(os.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
   end
   local modules = {"vfs", "kern.tty", "dev", "net", "fs.tmpfs", "fs.kernfs", "fs.ptyfs",
                    "net.net", "net.local", "net.netinet", "net.shmif"}
