@@ -16,9 +16,6 @@ local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
 
-local h = require "syscall.helpers"
-local inlibc = h.inlibc
-
 local function u6432(x) return t.u6432(x):to32() end
 local function i6432(x) return t.i6432(x):to32() end
 
@@ -37,9 +34,11 @@ else
   arg64u = function(val) return u6432(val) end
 end
 
+local function inlibc_fn(k) return ffi.C[k] end
+
 local C = setmetatable({}, {
   __index = function(C, k)
-    if inlibc(k) then
+    if pcall(inlibc_fn, k) then
       C[k] = ffi.C[k] -- add to table, so need not pcall again as slow
       return C[k]
     else
