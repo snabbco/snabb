@@ -297,7 +297,7 @@ function C.sched_setparam(pid, param)
 end
 
 -- in librt for glibc but use syscalls instead of loading another library
-if not inlibc "clock_getres" then
+if not C.clock_getres then
   function C.clock_nanosleep(clk_id, flags, req, rem)
     return C.syscall(c.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
   end
