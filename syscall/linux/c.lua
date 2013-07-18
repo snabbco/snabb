@@ -37,7 +37,16 @@ else
   arg64u = function(val) return u6432(val) end
 end
 
-local C = setmetatable({}, {__index = ffi.C}) -- fall back to libc if do not overwrite
+local C = setmetatable({}, {
+  __index = function(C, k)
+    if inlibc(k) then
+      C[k] = ffi.C[k] -- add to table, so need not pcall again as slow
+      return C[k]
+    else
+      return nil
+    end
+  end
+})
 
 -- use 64 bit fileops on 32 bit always. As may be missing will use syscalls directly
 if abi.abi32 then
