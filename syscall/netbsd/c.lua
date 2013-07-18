@@ -14,7 +14,18 @@ local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
 
-local C = setmetatable({}, {__index = ffi.C})
+local function inlibc_fn(k) return ffi.C[k] end
+
+local C = setmetatable({}, {
+  __index = function(C, k)
+    if pcall(inlibc_fn, k) then
+      C[k] = ffi.C[k] -- add to table, so no need for this slow path again
+      return C[k]
+    else
+      return nil
+    end
+  end
+})
 
 C.mount = function(fstype, dir, flags, data, data_len)
   return C.syscall(c.SYS.mount50, fstype, dir, t.int(flags), pt.void(data), t.size(data_len))

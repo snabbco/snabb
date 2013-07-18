@@ -39,7 +39,7 @@ local function inlibc_fn(k) return ffi.C[k] end
 local C = setmetatable({}, {
   __index = function(C, k)
     if pcall(inlibc_fn, k) then
-      C[k] = ffi.C[k] -- add to table, so need not pcall again as slow
+      C[k] = ffi.C[k] -- add to table, so no need for this slow path again
       return C[k]
     else
       return nil
