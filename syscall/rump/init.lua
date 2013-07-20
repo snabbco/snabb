@@ -19,10 +19,8 @@ for k, v in pairs(hostabi) do abi[k] = v end
 abi.rump = true
 abi.host = abi.os
 abi.os = "netbsd"
-abi.netbsd = {}
-abi.netbsd.version7 = true -- TODO huge hack! see notes; currently support NetBSD head for rump, 6 for native, this is temporary
-
--- TODO code below (S = require "syscall") means we cannot run a different version of rump as host on netbsd...
+-- note you can run with abi.netbsd = {version = 7} here too
+abi.netbsd = {version = 6}
 
 -- TODO share this init code with syscall.lua
 

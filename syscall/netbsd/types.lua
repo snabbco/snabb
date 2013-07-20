@@ -33,7 +33,7 @@ local addstructs = {
   flock = "struct flock",
 }
 
-if abi.netbsd.version6 then
+if abi.netbsd.version == 6 then
   addstructs.ptmget = "struct compat_60_ptmget"
 else
   addstructs.ptmget = "struct ptmget"

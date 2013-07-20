@@ -28,9 +28,8 @@ if abi.os == "bsd" then abi.os = "netbsd" end
 -- Makes no difference to us I believe
 if abi.arch == "ppcspe" then abi.arch = "ppc" end
 
-if abi.os == "netbsd" then -- huge hack TODO we need to read version
-  abi.netbsd = {}
-  abi.netbsd.version6 = true
+if abi.os == "netbsd" then -- we default to version 6, as stable target; you can monkeypatch to 7 which is also supported
+  abi.netbsd = {version = 6}
 end
 
 return abi
