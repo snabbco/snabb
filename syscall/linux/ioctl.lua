@@ -19,11 +19,7 @@ local arch = require("syscall.linux." .. abi.arch .. ".ioctl")(s)
 local bit = require "bit"
 
 local band = bit.band
-local function bor(...)
-  local r = bit.bor(...)
-  if r < 0 then r = r + 4294967296LL end -- TODO check if we need to do this, odd cast to 64 bit but is failing without 
-  return r
-end
+local bor = bit.bor
 local lshift = bit.lshift
 local rshift = bit.rshift
 
