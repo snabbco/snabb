@@ -131,6 +131,11 @@ function C.getdents(fd, buf, size)
   return C.syscall(c.SYS.getdents64, t.int(fd), buf, t.uint(size))
 end
 
+-- glibc has request as an unsigned long, kernel is unsigned int, other libcs are int, so use syscall directly
+function C.ioctl(fd, request, arg)
+  return C.syscall(c.SYS.ioctl, t.int(fd), t.uint(request), pt.void(arg))
+end
+
 -- getcwd in libc may allocate memory and has inconsistent return value, so use syscall
 function C.getcwd(buf, size)
   return C.syscall(c.SYS.getcwd, pt.void(buf), t.ulong(size))

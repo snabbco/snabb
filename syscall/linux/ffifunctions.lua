@@ -34,6 +34,8 @@ void exit_group(int status);
 
 time_t time(time_t *t);
 
+int ioctl(int d, unsigned int request, ...);
+
 int dup3(int oldfd, int newfd, int flags);
 
 /* down to here have moved to shared calls */
