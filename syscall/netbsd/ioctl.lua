@@ -17,7 +17,7 @@ local bit = require "bit"
 local band = bit.band
 local function bor(...)
   local r = bit.bor(...)
-  if r < 0 then r = r + 4294967296LL end -- TODO see note in Linux.
+  if r < 0 then r = r + 4294967296ULL end -- TODO still needed here but cleaner fix would be nice, needs bit64
   return r
 end
 local lshift = bit.lshift
