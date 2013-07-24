@@ -172,12 +172,7 @@ function S.tcflow(fd, action)
   if cc ~= posix_vdisable and not S.write(fd, t.uchar1(cc), 1) then return nil end
   return true
 end
-function S.tcgetsid(fd)
-  local sid = t.int1()
-  local ok, err = S.ioctl(fd, "TIOCGSID", sid) -- TODO new ioctl will clean up
-  if not ok then return nil, err end
-  return sid[0]
-end
+function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
 
 return S
 

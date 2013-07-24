@@ -54,8 +54,11 @@ local function _IOC(dir, ch, nr, tp)
   if type(ch) == "string" then ch = ch:byte() end
   if type(tp) == "number" then return ioc(dir, ch, nr, tp) end
   local size = s[tp]
+  local singleton = singletonmap[tp] ~= nil
   tp = singletonmap[tp] or tp
-  return {number = ioc(dir, ch, nr, size), read = IOC.IN or IOC.INOUT, write = IOC.OUT or IOC.INOUT, type = t[tp]}
+  return {number = ioc(dir, ch, nr, size),
+          read = dir == IOC.OUT or dir == IOC.INOUT, write = dir == IOC.IN or dir == IOC.INOUT,
+          type = t[tp], singleton = singleton}
 end
 
 local _IO    = function(ch, nr)       return _IOC(IOC.VOID, ch, nr, 0) end
