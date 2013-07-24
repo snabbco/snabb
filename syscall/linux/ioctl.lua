@@ -94,7 +94,7 @@ local IOCSIZE_SHIFT	= IOC.SIZESHIFT
 
 local ioctl = strflag {
 -- termios, non standard values generally 0x54 = 'T'
-  TCGETS          = 0x5401,
+  TCGETS          = {number = 0x5401, read = true, type = t.termios},
   TCSETS          = 0x5402,
   TCSETSW         = 0x5403,
   TCSETSF         = 0x5404,

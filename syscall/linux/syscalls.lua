@@ -761,17 +761,11 @@ end
 function S.grantpt(fd) return true end -- Linux does not need to do anything here (Musl does not)
 function S.unlockpt(fd) return S.ioctl(fd, "TIOCSPTLCK", 0) end
 function S.ptsname(fd)
-  local pts = t.int1()
-  local ret, err = S.ioctl(fd, "TIOCGPTN", pts) -- TODO new ioctl code should return the int
-  if not ret then return nil, err end
-  return "/dev/pts/" .. tostring(pts[0])
+  local pts, err = S.ioctl(fd, "TIOCGPTN")
+  if not pts then return nil, err end
+  return "/dev/pts/" .. tostring(pts)
 end
-function S.tcgetattr(fd)
-  local tio = t.termios()
-  local ok, err = S.ioctl(fd, "TCGETS", tio) -- TODO new ioctl will do this
-  if not ok then return nil, err end
-  return tio
-end
+function S.tcgetattr(fd) return S.ioctl(fd, "TCGETS") end
 local tcsets = {
   [c.TCSA.NOW]   = "TCSETS",
   [c.TCSA.DRAIN] = "TCSETSW",
@@ -793,12 +787,7 @@ end
 function S.tcflow(fd, action)
   return S.ioctl(fd, "TCXONC", pt.void(c.TCFLOW[action]))
 end
-function S.tcgetsid(fd)
-  local sid = t.int1()
-  local ok, err = S.ioctl(fd, "TIOCGSID", sid) -- TODO new ioctl code to clean up
-  if not ok then return nil, err end
-  return sid[0]
-end
+function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
 
 return S
 

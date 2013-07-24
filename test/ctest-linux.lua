@@ -44,6 +44,8 @@ ctypes["struct siginfo"] = nil
 -- TODO seems to be a size issue on Musl, have asked list
 ctypes["struct sysinfo"] = nil
 
+for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
+
 -- internal use
 c.syscall = nil
 c.OMQATTR = nil

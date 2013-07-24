@@ -14,6 +14,8 @@ local ffi = require "ffi"
 local reflect = require "include.reflect.reflect"
 
 -- fixups
+for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
+
 c.AF.DECnet = c.AF.DECNET
 c.AF.DECNET = nil
 
