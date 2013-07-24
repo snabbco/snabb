@@ -124,17 +124,11 @@ end
 function S.grantpt(fd) return S.ioctl(fd, "TIOCGRANTPT") end
 function S.unlockpt(fd) return 0 end
 function S.ptsname(fd)
-  local pm = t.ptmget()
-  local ok, err = S.ioctl(fd, "TIOCPTSNAME", pm) -- TODO new ioctl should return this automatically
-  if not ok then return nil, err end
+  local pm, err = S.ioctl(fd, "TIOCPTSNAME")
+  if not pm then return nil, err end
   return ffi.string(pm.sn)
 end
-function S.tcgetattr(fd)
-  local tio = t.termios()
-  local ok, err = S.ioctl(fd, "TIOCGETA", tio) -- TODO new ioctl will cleanup
-  if not ok then return nil, err end
-  return tio
-end
+function S.tcgetattr(fd) return S.ioctl(fd, "TIOCGETA") end
 local tcsets = {
   [c.TCSA.NOW]   = "TIOCSETA",
   [c.TCSA.DRAIN] = "TIOCSETAW",
