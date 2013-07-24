@@ -36,19 +36,24 @@ local IOC = {
 
 IOC.INOUT = IOC.IN + IOC.OUT
 
-local function _IOC(dir, ch, nr, size)
-  if type(size) == "string" then size = assert(s[size], "missing type " .. size) end
-  if type(ch) == "string" then ch = ch:byte() end
+local function ioc(dir, ch, nr, size)
   return bor(dir,
              lshift(band(size, IOC.PARM_MASK), IOC.PARM_SHIFT),
-             lshift(ch , IOC.GROUP_SHIFT),
+             lshift(ch, IOC.GROUP_SHIFT),
              nr)
 end
 
+local function _IOC(dir, ch, nr, tp)
+  if type(ch) == "string" then ch = ch:byte() end
+  if type(tp) == "number" then return ioc(dir, ch, nr, tp) end
+  local size = s[tp]
+  return ioc(dir, ch, nr, size)
+end
+
 local _IO    = function(ch, nr)       return _IOC(IOC.VOID, ch, nr, 0) end
-local _IOR   = function(ch, nr, size) return _IOC(IOC.OUT, ch, nr, size) end
-local _IOW   = function(ch, nr, size) return _IOC(IOC.IN, ch, nr, size) end
-local _IOWR  = function(ch, nr, size) return _IOC(IOC.INOUT, ch, nr, size) end
+local _IOR   = function(ch, nr, tp) return _IOC(IOC.OUT, ch, nr, tp) end
+local _IOW   = function(ch, nr, tp) return _IOC(IOC.IN, ch, nr, tp) end
+local _IOWR  = function(ch, nr, tp) return _IOC(IOC.INOUT, ch, nr, tp) end
 
 --[[
 #define IOCPARM_LEN(x)  (((x) >> IOCPARM_SHIFT) & IOCPARM_MASK)
