@@ -397,7 +397,11 @@ function S.ioctl(d, request, argp)
     request = ioctl[request]
   end
   if type(request) == "table" then
+    -- should depend on type
+    if type(argp) == "string" then argp = pt.char(argp) end
+    if type(argp) == "number" then argp = t.int1(argp) end
 
+    request = request.number
   else -- some sane defaults if no info
     if type(argp) == "string" then argp = pt.char(argp) end
     if type(argp) == "number" then argp = t.int1(argp) end

@@ -47,7 +47,7 @@ local function _IOC(dir, ch, nr, tp)
   if type(ch) == "string" then ch = ch:byte() end
   if type(tp) == "number" then return ioc(dir, ch, nr, tp) end
   local size = s[tp]
-  return ioc(dir, ch, nr, size)
+  return {number = ioc(dir, ch, nr, size)}
 end
 
 local _IO    = function(ch, nr)       return _IOC(IOC.VOID, ch, nr, 0) end
