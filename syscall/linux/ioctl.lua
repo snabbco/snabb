@@ -47,13 +47,18 @@ IOC.TYPESHIFT = IOC.NRSHIFT + IOC.NRBITS
 IOC.SIZESHIFT = IOC.TYPESHIFT + IOC.TYPEBITS
 IOC.DIRSHIFT  = IOC.SIZESHIFT + IOC.SIZEBITS
 
-local function _IOC(dir, ch, nr, size)
-  if type(ch) == "string" then ch = ch:byte() end
-  if type(size) == "string" then size = s[size] end
+local function ioc(dir, ch, nr, size)
   return bor(lshift(dir, IOC.DIRSHIFT), 
 	     lshift(ch, IOC.TYPESHIFT), 
 	     lshift(nr, IOC.NRSHIFT), 
 	     lshift(size, IOC.SIZESHIFT))
+end
+
+local function _IOC(dir, ch, nr, tp)
+  if type(ch) == "string" then ch = ch:byte() end
+  if type(tp) == "number" then return ioc(dir, ch, nr, tp) end
+  local size = s[tp]
+  return ioc(dir, ch, nr, size)
 end
 
 -- used to create numbers
