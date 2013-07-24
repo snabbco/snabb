@@ -393,14 +393,16 @@ function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, 
 
 -- TODO use more info from ioctl table to sort out type of arg
 function S.ioctl(d, request, argp)
+  local write = false
   if type(request) == "string" then
     request = ioctl[request]
   end
   if type(request) == "table" and type(argp) ~= "string" and type(argp) ~= "cdata" then
     -- should depend on type
-    if request.read and request.type then
+    if request.read or request.write and request.type then
       argp = mktype(request.type, argp)
     end
+    write = request.write
     request = request.number
   else -- some sane defaults if no info
     if type(request) == "table" then request = request.number end
@@ -409,7 +411,8 @@ function S.ioctl(d, request, argp)
   end
   local ret = C.ioctl(getfd(d), request, argp)
   if ret == -1 then return nil, t.error() end
-  return true -- will need override for few linux ones that return numbers... plus should return if a read value
+  if write then return argp end
+  return true -- will need override for few linux ones that return numbers
 end
 
 if C.pipe2 then
