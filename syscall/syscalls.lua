@@ -396,11 +396,15 @@ function S.ioctl(d, request, argp)
   if type(request) == "string" then
     request = ioctl[request]
   end
-  if type(argp) == "string" then argp = pt.char(argp) end
-  if type(argp) == "number" then argp = t.int1(argp) end -- sane default (does not sem to break anything but need to redo code)
+  if type(request) == "table" then
+
+  else -- some sane defaults if no info
+    if type(argp) == "string" then argp = pt.char(argp) end
+    if type(argp) == "number" then argp = t.int1(argp) end
+  end
   local ret = C.ioctl(getfd(d), request, argp)
   if ret == -1 then return nil, t.error() end
-  return true -- will need override for few linux ones that return numbers... plus hsould return if a read value
+  return true -- will need override for few linux ones that return numbers... plus should return if a read value
 end
 
 if C.pipe2 then
