@@ -396,13 +396,14 @@ function S.ioctl(d, request, argp)
   if type(request) == "string" then
     request = ioctl[request]
   end
-  if type(request) == "table" then
+  if type(request) == "table" and type(argp) ~= "string" and type(argp) ~= "cdata" then
     -- should depend on type
-    if type(argp) == "string" then argp = pt.char(argp) end
-    if type(argp) == "number" then argp = t.int1(argp) end
-
+    if request.read and request.type then
+      argp = mktype(request.type, argp)
+    end
     request = request.number
   else -- some sane defaults if no info
+    if type(request) == "table" then request = request.number end
     if type(argp) == "string" then argp = pt.char(argp) end
     if type(argp) == "number" then argp = t.int1(argp) end
   end
