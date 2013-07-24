@@ -47,20 +47,20 @@ IOC.TYPESHIFT = IOC.NRSHIFT + IOC.NRBITS
 IOC.SIZESHIFT = IOC.TYPESHIFT + IOC.TYPEBITS
 IOC.DIRSHIFT  = IOC.SIZESHIFT + IOC.SIZEBITS
 
-local function _IOC(dir, tp, nr, size)
+local function _IOC(dir, ch, nr, size)
+  if type(ch) == "string" then ch = ch:byte() end
   if type(size) == "string" then size = s[size] end
-  if type(tp) == "string" then tp = tp:byte() end
   return bor(lshift(dir, IOC.DIRSHIFT), 
-	     lshift(tp, IOC.TYPESHIFT), 
+	     lshift(ch, IOC.TYPESHIFT), 
 	     lshift(nr, IOC.NRSHIFT), 
 	     lshift(size, IOC.SIZESHIFT))
 end
 
 -- used to create numbers
-local _IO    = function(tp, nr)		return _IOC(IOC.NONE, tp, nr, 0) end
-local _IOR   = function(tp, nr, size)	return _IOC(IOC.READ, tp, nr, size) end
-local _IOW   = function(tp, nr, size)	return _IOC(IOC.WRITE, tp, nr, size) end
-local _IOWR  = function(tp, nr, size)	return _IOC(IOC.READWRITE, tp, nr, size) end
+local _IO    = function(ch, nr)		return _IOC(IOC.NONE, ch, nr, 0) end
+local _IOR   = function(ch, nr, tp)	return _IOC(IOC.READ, ch, nr, tp) end
+local _IOW   = function(ch, nr, tp)	return _IOC(IOC.WRITE, ch, nr, tp) end
+local _IOWR  = function(ch, nr, tp)	return _IOC(IOC.READWRITE, ch, nr, tp) end
 
 -- used to decode ioctl numbers..
 local _IOC_DIR  = function(nr) return band(rshift(nr, IOC.DIRSHIFT), IOC.DIRMASK) end
