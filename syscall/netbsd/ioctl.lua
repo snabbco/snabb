@@ -9,7 +9,7 @@ pcall, type, table, string, math, bit
 
 local function init(abi, types)
 
-local s = types.s
+local s, t = types.s, types.t
 
 local strflag = require("syscall.helpers").strflag
 local bit = require "bit"
@@ -43,11 +43,19 @@ local function ioc(dir, ch, nr, size)
              nr)
 end
 
+local singletonmap = {
+  int = "int1",
+  char = "char1",
+  uint = "uint1",
+  uint64 = "uint64_1",
+}
+
 local function _IOC(dir, ch, nr, tp)
   if type(ch) == "string" then ch = ch:byte() end
   if type(tp) == "number" then return ioc(dir, ch, nr, tp) end
   local size = s[tp]
-  return {number = ioc(dir, ch, nr, size)}
+  tp = singletonmap[tp] or tp
+  return {number = ioc(dir, ch, nr, size), read = IOC.IN or IOC.INOUT, write = IOC.OUT or IOC.INOUT, type = t[tp]}
 end
 
 local _IO    = function(ch, nr)       return _IOC(IOC.VOID, ch, nr, 0) end
@@ -186,6 +194,12 @@ local ioctl = strflag {
 --SIOCSLINKSTR   =  _IOW('i', 136, "ifdrv"),
   SIOCSETPFSYNC  =  _IOW('i', 247, "ifreq"),
   SIOCGETPFSYNC  = _IOWR('i', 248, "ifreq"),
+
+-- allow user defined ioctls
+  _IO = _IO,
+  _IOR = _IOR, 
+  _IOW = _IOW,
+  _IOWR = _IOWR,
 }
 
 ioctl.TIOCM_CD = ioctl.TIOCM_CAR

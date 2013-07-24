@@ -10,7 +10,7 @@ pcall, type, table, string, math, bit
 
 local function init(abi, types)
 
-local s = types.s
+local s, t = types.s, types.t
 
 local strflag = require "syscall.helpers".strflag
 
@@ -54,11 +54,19 @@ local function ioc(dir, ch, nr, size)
 	     lshift(size, IOC.SIZESHIFT))
 end
 
+local singletonmap = {
+  int = "int1",
+  char = "char1",
+  uint = "uint1",
+  uint64 = "uint64_1",
+}
+
 local function _IOC(dir, ch, nr, tp)
   if type(ch) == "string" then ch = ch:byte() end
   if type(tp) == "number" then return ioc(dir, ch, nr, tp) end
   local size = s[tp]
-  return {number = ioc(dir, ch, nr, size)}
+  tp = singletonmap[tp] or tp
+  return {number = ioc(dir, ch, nr, size), read = IOC.READ or IOC.READWRITE, write = IOC.WRITE or IOC.READWRITE, type = t[tp]}
 end
 
 -- used to create numbers
@@ -91,9 +99,9 @@ local ioctl = strflag {
   TCSETA          = 0x5406,
   TCSETAW         = 0x5407,
   TCSETAF         = 0x5408,
-  TCSBRK          = 0x5409,
+  TCSBRK          = 0x5409, -- takes literal number
   TCXONC          = 0x540A,
-  TCFLSH          = 0x540B,
+  TCFLSH          = 0x540B, -- takes literal number
   TIOCEXCL        = 0x540C,
   TIOCNXCL        = 0x540D,
   TIOCSCTTY       = 0x540E,
@@ -153,7 +161,7 @@ local ioctl = strflag {
   TIOCMIWAIT      = 0x545C,
   TIOCGICOUNT     = 0x545D,
   FIOQSIZE        = 0x5460,
--- socket ioctls from linux/sockios.h - for many of these you can use nelink instead
+-- socket ioctls from linux/sockios.h - for many of these you can use netlink instead
   SIOCADDRT       = 0x890B,
   SIOCDELRT       = 0x890C,
   SIOCRTMSG       = 0x890D,
@@ -237,7 +245,7 @@ local ioctl = strflag {
   _IO = _IO,
   _IOR = _IOR, 
   _IOW = _IOW,
-  _IOWR = _IOWR
+  _IOWR = _IOWR,
 }
 
 local override = arch.ioctl or {}
