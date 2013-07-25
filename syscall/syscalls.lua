@@ -400,8 +400,9 @@ function S.ioctl(d, request, argp)
   if type(request) == "table" and type(argp) ~= "string" and type(argp) ~= "cdata" then
     if request.write then
       argp = mktype(request.type, argp)
-    else
-      argp = request.type() -- write, so not initialised
+    end
+    if request.read then
+      argp = argp or request.type()
     end
     read = request.read
     singleton = request.singleton
