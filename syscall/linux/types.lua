@@ -865,6 +865,7 @@ mt.ifreq = {
     netmask = function(ifr) return ifr.ifr_ifru.ifru_netmask end,
     hwaddr = function(ifr) return ifr.ifr_ifru.ifru_hwaddr end,
     flags = function(ifr) return ifr.ifr_ifru.ifru_flags end,
+    ivalue = function(ifr) return ifr.ifr_ifru.ifru_ivalue end,
     -- TODO rest of fields
   },
   newindex = {
