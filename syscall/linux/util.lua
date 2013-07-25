@@ -119,7 +119,7 @@ end
 function util.bridge_add(name) return bridge_ioctl("SIOCBRADDBR", name) end
 function util.bridge_del(name) return bridge_ioctl("SIOCBRDELBR", name) end
 
-local function bridge_if_ioctl(io, bridge, dev)
+local function bridge_if_ioctl(io, name, dev)
   local err, s, ifr, len, ret, ok
   s, err = S.socket(c.AF.LOCAL, c.SOCK.STREAM, 0)
   if not s then return nil, err end
