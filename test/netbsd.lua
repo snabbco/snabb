@@ -145,9 +145,20 @@ test.filesystem_bsd = {
 }
 
 test.network_utils_bsd_root = {
-  test_ifcreate = function()
-    local ifname = "lo99" .. tostring(S.getpid())
+  test_ifcreate_lo = function()
+    local ifname = "lo9" .. tostring(S.getpid())
     assert(util.ifcreate(ifname))
+    assert(util.ifdestroy(ifname))
+  end,
+  test_ifupdown_lo = function()
+    local ifname = "lo9" .. tostring(S.getpid())
+    assert(util.ifcreate(ifname))
+    local flags = assert(util.ifgetflags(ifname))
+    assert(bit.band(flags, c.IFF.UP) == 0)
+    assert(util.ifup(ifname))
+    local flags = assert(util.ifgetflags(ifname))
+    assert(bit.band(flags, c.IFF.UP) ~= 0)
+    -- TODO ifdown
     assert(util.ifdestroy(ifname))
   end,
 }
