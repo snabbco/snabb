@@ -873,9 +873,8 @@ mt.ifreq = {
       assert(#v <= c.IFNAMSIZ, "name too long")
       ifr.ifr_ifrn.ifrn_name = v
     end,
-    flags = function(ifr, v)
-      ifr.ifr_ifru.ifru_flags = c.IFREQ[v]
-    end,
+    flags = function(ifr, v) ifr.ifr_ifru.ifru_flags = c.IFREQ[v] end,
+    ivalue = function(ifr, v) ifr.ifr_ifru.ifru_ivalue = v end,
     -- TODO rest of fields
   },
   __new = newfn,

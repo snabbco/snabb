@@ -102,15 +102,18 @@ function util.ps()
   return setmetatable(ps, mt.ps)
 end
 
--- bridge functions. in error cases use gc to close file.
+-- bridge functions.
 local function bridge_ioctl(io, name)
   local s, err = S.socket(c.AF.LOCAL, c.SOCK.STREAM, 0)
   if not s then return nil, err end
   local ret, err = S.ioctl(s, io, name)
-  if not ret then return nil, err end
+  if not ret then
+    s:close()
+    return nil, err
+  end
   local ok, err = s:close()
   if not ok then return nil, err end
-  return true
+  return ret
 end
 
 function util.bridge_add(name) return bridge_ioctl("SIOCBRADDBR", name) end
@@ -124,16 +127,15 @@ local function bridge_if_ioctl(io, bridge, dev)
     dev, err = if_nametoindex(dev, s)
     if not dev then return nil, err end
   end
-  ifr = t.ifreq()
-  len = #bridge + 1
-  if len > c.IFNAMSIZ then len = c.IFNAMSIZ end
-  ffi.copy(ifr.ifr_ifrn.ifrn_name, bridge, len) -- note not using the short forms as no metatable defined yet...
-  ifr.ifr_ifru.ifru_ivalue = dev
+  ifr = t.ifreq{name = name, ivalue = dev}
   ret, err = S.ioctl(s, io, ifr);
-  if not ret then return nil, err end
+  if not ret then
+    s:close()
+    return nil, err
+  end
   ok, err = s:close()
   if not ok then return nil, err end
-  return true
+  return ret
 end
 
 function util.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOC.BRADDIF, bridge, dev) end
