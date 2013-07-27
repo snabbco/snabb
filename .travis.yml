@@ -15,8 +15,6 @@ script:
  - mkdir -p ./obj
  - luajit test/ctest.lua > ./obj/ctest.c && cc -std=c99 ./obj/ctest.c -o ./obj/ctest && ./obj/ctest
  - ./test/globals.sh
- - cd ./buildrump.sh
- - buildrump.sh -qq -j16 -V NOSTATICLIB=1
- - cd ..
+ - cd ./buildrump.sh && buildrump.sh -qq -j16 -V NOSTATICLIB=1 && cd ..
  - luajit test/test.lua rump
 
