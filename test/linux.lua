@@ -57,6 +57,29 @@ end
 
 local test = {}
 
+-- TODO some issues with NetBSD so moved back here until fixed
+test_signals = {
+  test_signal_ignore = function()
+    assert(S.signal("pipe", "ign"))
+    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
+    assert(S.signal("pipe", "dfl"))
+  end,
+  test_sigaction_ignore = function()
+    assert(S.sigaction("pipe", "ign"))
+    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
+    assert(S.sigaction("pipe", "dfl"))
+  end,
+  test_sigpipe = function() -- TODO BSDs have NOSIGPIPE flag that should do this too
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(sv[1]:shutdown("rd"))
+    assert(S.signal("pipe", "ign"))
+    assert(sv[2]:close())
+    local n, err = sv[1]:write("will get sigpipe")
+    assert(err.PIPE, "should get sigpipe")
+    assert(sv[1]:close())
+  end,
+}
+
 test.file_operations_linux = {
   test_openat = function()
     local dfd = S.open(".")

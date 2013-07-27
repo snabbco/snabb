@@ -1229,27 +1229,6 @@ test_raw_socket = {
 }
 
 if not abi.rump then -- rump has no processes, memory allocation so not applicable
-test_signals = {
-  test_signal_ignore = function()
-    assert(S.signal("pipe", "ign"))
-    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
-    assert(S.signal("pipe", "dfl"))
-  end,
-  test_sigaction_ignore = function()
-    assert(S.sigaction("pipe", "ign"))
-    assert(S.kill(S.getpid(), "pipe")) -- should be ignored
-    assert(S.sigaction("pipe", "dfl"))
-  end,
-  test_sigpipe = function() -- TODO BSDs have NOSIGPIPE flag that should do this too
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(sv[1]:shutdown("rd"))
-    assert(S.signal("pipe", "ign"))
-    assert(sv[2]:close())
-    local n, err = sv[1]:write("will get sigpipe")
-    assert(err.PIPE, "should get sigpipe")
-    assert(sv[1]:close())
-  end,
-}
 test_mmap = {
   test_mmap_fail = function()
     local size = 4096
