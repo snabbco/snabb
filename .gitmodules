@@ -1,3 +1,3 @@
 [submodule "buildrump.sh"]
 	path = buildrump.sh
-	url = git@github.com:anttikantee/buildrump.sh.git
+	url = https://github.com/anttikantee/buildrump.sh.git
