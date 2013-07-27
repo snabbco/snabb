@@ -7,11 +7,14 @@ before_install:
  - sudo apt-get install luarocks -y
  - git submodule update --init --recursive
 
+env:
+  - LD_LIBRARY_PATH=./rump/lib
+  - LD_DYNAMIC_WEAK=1
+
 script: 
  - luajit test/test.lua
  - mkdir -p ./obj
  - luajit test/ctest.lua > ./obj/ctest.c && cc -std=c99 ./obj/ctest.c -o ./obj/ctest && ./obj/ctest
  - ./test/globals.sh
-
-
-
+ - ./buildrump.sh/buildrump.sh
+ - 
