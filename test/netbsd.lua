@@ -150,6 +150,7 @@ test.network_utils_bsd_root = {
     assert(util.ifcreate(ifname))
     assert(util.ifdestroy(ifname))
   end,
+--[[
   test_ifupdown_lo = function()
     local ifname = "lo9" .. tostring(S.getpid())
     assert(util.ifcreate(ifname))
@@ -161,6 +162,7 @@ test.network_utils_bsd_root = {
     -- TODO ifdown
     assert(util.ifdestroy(ifname))
   end,
+]]
 }
 
 test.pipes_bsd = {
