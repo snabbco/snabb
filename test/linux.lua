@@ -58,7 +58,7 @@ end
 local test = {}
 
 -- TODO some issues with NetBSD so moved back here until fixed
-test_signals = {
+test.signals = {
   test_signal_ignore = function()
     assert(S.signal("pipe", "ign"))
     assert(S.kill(S.getpid(), "pipe")) -- should be ignored
