@@ -4,8 +4,6 @@ tmp/*
 *.core
 ktrace.out
 obj/*
-rump/*
-src/*
 
 # ctest files
 test/ctest.c
