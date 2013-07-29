@@ -17,7 +17,7 @@ local bit = require "bit"
 local band = bit.band
 local function bor(...)
   local r = bit.bor(...)
-  if r < 0 then r = r + 4294967296ULL end -- TODO still needed here but cleaner fix would be nice, needs bit64
+  if r < 0 then r = r + 4294967296 end -- want unsigned range
   return r
 end
 local lshift = bit.lshift
@@ -37,10 +37,10 @@ local IOC = {
 IOC.INOUT = IOC.IN + IOC.OUT
 
 local function ioc(dir, ch, nr, size)
-  return bor(dir,
-             lshift(band(size, IOC.PARM_MASK), IOC.PARM_SHIFT),
-             lshift(ch, IOC.GROUP_SHIFT),
-             nr)
+  return t.ulong(bor(dir,
+                 lshift(band(size, IOC.PARM_MASK), IOC.PARM_SHIFT),
+                 lshift(ch, IOC.GROUP_SHIFT),
+                 nr))
 end
 
 local singletonmap = {
