@@ -32,7 +32,7 @@ Android (ARM tested so far) currently passes some tests and fails others, so nee
 
 For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT). NetBSD on other 32 bit platforms should also run; more targets will be added to tests soon. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the (small) differences.
 
-OSX support is tested on x64 and x86. In principle there should be no issues running it on ARM (ie iOS), but I have not had a chance to try yet, so there may be some other differences. Note that currently OSX support has many issues that need further work, and tests are not passing, and will be revisited later.
+A small amount of OSX support was added but it is not well tested or maintained and is likely to be removed to a branch for now.
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
@@ -42,7 +42,7 @@ For the rump kernel functionality, the easiest way at present to install it is u
 netfilter, dhcp, selinux, arp, rump kernel backend, further BSD and OSX work, better sockopt handling, cgroups support, more NetBSD support, more rump kernel support.
 
 ## Release notes
-0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments.
+0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config.
 
 0.8 rump kernel fixes, NetBSD 64 bit fixes, initial arp/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support, initial support of NetBSD network config.
 
