@@ -185,7 +185,7 @@ for k, v in pairs(c) do
         if type(v2) == "cdata" and ffi.sizeof(v2) == 8 then
          print("sassert_u64(" .. name .. k2 .. ", " .. tostring(v2)  .. ', "' .. name .. k2 .. '");')
         else
-         print("sassert(" .. name .. k2 .. ", " .. tostring(v2)  .. ', "' .. name .. k2 .. '");')
+         print("sassert(" .. name .. k2 .. ", " .. tostring(tonumber(v2))  .. ', "' .. name .. k2 .. '");')
         end
       end
     end
