@@ -82,7 +82,7 @@ There is now [Travis CI](https://travis-ci.org/) support, although this will onl
 
 I have used the LuaJIT [reflect library](http://www.corsix.org/lua/reflect/api.html) [which you can download here](http://www.corsix.org/lua/reflect/reflect.lua) for checking struct offsets.
 
-Adding buildbot tests for a wider variety of architectures, as Travis is limited to Linux/Ubuntu. The plan is to build on Linux ARM (glibc and Musl), Linux x64 and x86 (glibc and Musl) and NetBSD (x86, ARM). The [buildbot dashboard is now up](http://build.myriabit.eu:8010/). Currently running: Linux glibc x64, Linux glibc ARM, ctest Linux x64, ctest Linux x86, ctest Linux arm, rump test Linux x64, rump test Linux arm. 
+Adding buildbot tests for a wider variety of architectures, as Travis is limited to Linux/Ubuntu. The plan is to build on Linux ARM (glibc and Musl), Linux x64 and x86 (glibc and Musl) and NetBSD (x86, ARM). The [buildbot dashboard is now up](http://build.myriabit.eu:8010/). Currently running: Linux glibc x64, Linux glibc ARM, ctest Linux x64, ctest Linux x86, ctest Linux arm, rump test Linux x64, rump test Linux arm, NetBSD x86, ctest NetBSD x86. 
 
 
 ## What is implemented?
