@@ -1,8 +1,16 @@
--- generate C test file to check type sizes etc
--- Currently run for BSD TODO split into portable subset and BSD specific
--- would need filtering to only test portable items though to run under Linux
+-- generate C test file to check ABI
 
-local S = require "syscall"
+package.path = "./?.lua;"
+
+local abi = require "syscall.abi"
+
+local S
+
+if abi.os == "netbsd" then -- testing natively
+  S = require "syscall"
+else -- test using rump
+  S = require "syscall.rump.init".init()
+end
 
 local abi = S.abi
 local types = S.types
@@ -59,10 +67,6 @@ print [[
 #define _NETBSD_SOURCE
 #define _INCOMPLETE_XOPEN_C063
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
-
 #include <sys/sched.h>
 #include <sys/termios.h>
 #include <sys/unistd.h>
@@ -77,7 +81,6 @@ print [[
 #include <sys/socket.h>
 #include <sys/utsname.h>
 #include <sys/resource.h>
-#include <sys/time.h>
 #include <sys/un.h>
 #include <sys/mman.h>
 #include <sys/xattr.h>
@@ -95,6 +98,9 @@ print [[
 #include <fs/ptyfs/ptyfs.h>
 #include <fs/tmpfs/tmpfs_args.h>
 
+/* we avoid including system headers just kernel headers */
+int printf(const char *format, ...);
+
 int ret = 0;
 
 void sassert(int a, int b, char *n) {
@@ -104,7 +110,7 @@ void sassert(int a, int b, char *n) {
   }
 }
 
-void sassert_u64(uint64_t a, uint64_t b, char *n) {
+void sassert_u64(unsigned long long a, unsigned long long b, char *n) {
   if (a != b) {
     printf("error with %s: %llu (0x%llx) != %llu (0x%llx)\n", n, (unsigned long long)a, (unsigned long long)a, (unsigned long long)b, (unsigned long long)b);
     ret = 1;
