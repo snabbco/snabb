@@ -14,6 +14,12 @@ local ffi = require "ffi"
 local reflect = require "include.reflect.reflect"
 
 -- fixups
+c.STD = nil
+c.EXIT = nil
+
+-- TODO this should be in system headers surely?
+c.F = nil
+
 for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
 
 c.AF.DECnet = c.AF.DECNET
@@ -24,10 +30,6 @@ c.W_OK = c.OK.W
 c.F_OK = c.OK.F
 c.X_OK = c.OK.X
 c.OK = nil
-
-c.STD.IN = nil
-c.STD.OUT = nil
-c.STD.ERR = nil
 
 c.SIGACT = nil -- TODO cast correctly instead, giving warning
 c.MAP.ANONYMOUS = nil -- compatibility
@@ -55,13 +57,11 @@ print [[
 
 #define _BSD_SOURCE
 #define _NETBSD_SOURCE
-#define _FILE_OFFSET_BITS 64
-#define _LARGE_FILES 1
-#define __USE_FILE_OFFSET64
 #define _INCOMPLETE_XOPEN_C063
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <sys/sched.h>
 #include <sys/termios.h>
