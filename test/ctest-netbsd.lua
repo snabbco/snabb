@@ -17,8 +17,8 @@ local reflect = require "include.reflect.reflect"
 c.STD = nil
 c.EXIT = nil
 
--- TODO this should be in system headers surely?
-c.F = nil
+-- TODO this should be in system headers surely? (F_ULOCK, F_LOCK etc)
+c.LOCKF = nil
 
 for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
 
