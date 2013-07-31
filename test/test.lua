@@ -2,6 +2,8 @@
 
 -- TODO stop using globals for tests
 
+arg = arg or {}
+
 -- only use this installation for tests
 package.path = "./?.lua;"
 
