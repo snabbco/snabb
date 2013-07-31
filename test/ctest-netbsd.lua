@@ -72,6 +72,9 @@ print [[
 #define _NETBSD_SOURCE
 #define _INCOMPLETE_XOPEN_C063
 
+#include <stddef.h>
+#include <stdio.h>
+
 #include <sys/sched.h>
 #include <sys/termios.h>
 #include <sys/unistd.h>
@@ -102,9 +105,6 @@ print [[
 #include <ufs/ufs/ufsmount.h>
 #include <fs/ptyfs/ptyfs.h>
 #include <fs/tmpfs/tmpfs_args.h>
-
-/* we avoid including system headers just kernel headers */
-int printf(const char *format, ...);
 
 int ret = 0;
 
