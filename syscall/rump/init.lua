@@ -9,8 +9,8 @@ pcall, type, table, string, math
 
 local ffi = require "ffi"
 
-local rumpuser = ffi.load("rumpuser")
-local rump = ffi.load("rump")
+local rumpuser = ffi.load("rumpuser", true)
+local rump = ffi.load("rump", true)
 
 local abi = require "syscall.rump.abi"
 
