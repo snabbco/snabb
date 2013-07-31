@@ -19,5 +19,5 @@ script:
  - luajit test/test.lua rump
  - cd ./buildrump.sh/src/sys && ../../obj/tooldir/rumpmake -k includes && cd ../../..
  - cd ./buildrump.sh/src/common && ../../obj/tooldir/rumpmake -k includes && cd ../../..
- - # luajit test/ctest-netbsd.lua > ./obj/ctest.c && cc -nostdinc -Ibuildrump.sh/rump/include -std=c99 ./obj/ctest.c -o ./obj/ctest && ./obj/ctest
+ - # luajit test/ctest-netbsd.lua > ./obj/ctest.c && cc -D_KERNEL -nostdinc -Ibuildrump.sh/rump/include -std=c99 ./obj/ctest.c -o ./obj/ctest && ./obj/ctest
 
