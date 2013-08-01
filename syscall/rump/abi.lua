@@ -18,7 +18,7 @@ abi.os = "netbsd"
 abi.netbsd = {version = 6}
 
 -- test
-abi.os = linux
+--abi.os = "linux"
 
 return abi
 
