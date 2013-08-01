@@ -12,7 +12,9 @@ require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math, bit
 
-local function init(abi, c, errors, ostypes, rumpfn)
+local function init(abi, c, errors, ostypes)
+
+local rumpfn = abi.rumpfn
 
 local ffi = require "ffi"
 local bit = require "bit"
