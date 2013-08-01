@@ -11,6 +11,7 @@ local ffi = require "ffi"
 
 local rumpuser = ffi.load("rumpuser", true)
 local rump = ffi.load("rump", true)
+local rumpcompat, rumpnet, rumpnetnet, rumpvfs
 
 local abi = require "syscall.rump.abi"
 
@@ -64,7 +65,14 @@ end
 local S
 
 if abi.host == abi.os then -- running native
-  -- here we need to reuse a lot of stuff, but noting that depends on C
+  -- here we need to reuse a lot of stuff, but nothing that depends on C
+  if abi.os == "linux" then
+    rumpvfs = ffi.load("rumpvfs", true)
+    rumpnet = ffi.load("rumpnet", true)
+    rumpnetnet = ffi.load("rumpnet_net", true)
+    rumpcompat = ffi.load("rumpkern_sys_linux", true)
+  end
+
   local SS = require "syscall"
   local C = require "syscall.rump.c".init(abi)
 
@@ -102,7 +110,7 @@ S.rump = {}
 
 S.rump.c = require "syscall.rump.constants"
 
-S.rump.__modules = {rump, rumpuser} -- so not garbage collected
+S.rump.__modules = {rump, rumpuser, rumpcompat, rumpnet, rumpnetnet, rumpvfs} -- so not garbage collected
 
 local helpers = require "syscall.helpers"
 local strflag = helpers.strflag
