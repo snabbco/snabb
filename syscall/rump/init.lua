@@ -66,7 +66,7 @@ local S
 if abi.host == abi.os then -- running native
   -- here we need to reuse a lot of stuff, but noting that depends on C
   local SS = require "syscall"
-  local C = require "syscall.rump.c".init(abi, c, types)
+  local C = require "syscall.rump.c".init(abi)
 
   c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps
 
