@@ -75,7 +75,7 @@ else -- running on another OS
   require "syscall.netbsd.ffitypes".init(abi)
   c = require "syscall.netbsd.constants"
   local ostypes = require "syscall.netbsd.types"
-  types = require "syscall.rump.types".init(abi, c, errors, ostypes)
+  types = require "syscall.types".init(abi, c, errors, ostypes)
 end
 
 local C = require "syscall.rump.c".init(abi, c, types, rump)
