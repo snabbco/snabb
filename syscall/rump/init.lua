@@ -9,11 +9,12 @@ pcall, type, table, string, math
 
 local ffi = require "ffi"
 
-local rumpuser = ffi.load("rumpuser", true)
-local rump = ffi.load("rump", true)
-local rumpcompat, rumpnet, rumpnetnet, rumpvfs
-
 local abi = require "syscall.rump.abi"
+
+abi.modules = {
+  rumpuser = ffi.load("rumpuser", true),
+  rump = ffi.load("rump", true),
+}
 
 local unchanged = {
   char = true,
@@ -67,10 +68,10 @@ local S
 if abi.host == abi.os then -- running native
   -- here we need to reuse a lot of stuff, but nothing that depends on C
   if abi.os == "linux" then
-    rumpvfs = ffi.load("rumpvfs", true)
-    rumpnet = ffi.load("rumpnet", true)
-    rumpnetnet = ffi.load("rumpnet_net", true)
-    rumpcompat = ffi.load("rumpkern_sys_linux", true)
+    abi.modules.rumpvfs = ffi.load("rumpvfs", true)
+    abi.modules.rumpnet = ffi.load("rumpnet", true)
+    abi.modules.rumpnetnet = ffi.load("rumpnet_net", true)
+    abi.modules.rumpcompat = ffi.load("rumpkern_sys_linux", true)
   end
 
   local SS = require "syscall"
@@ -110,39 +111,39 @@ S.rump = {}
 
 S.rump.c = require "syscall.rump.constants"
 
-S.rump.__modules = {rump, rumpuser, rumpcompat, rumpnet, rumpnetnet, rumpvfs} -- so not garbage collected
-
 local helpers = require "syscall.helpers"
 local strflag = helpers.strflag
 
 -- We could also use rump_pub_module_init if loading later
 function S.rump.module(s)
-  s = string.gsub(s, "%.", "_")
-  local mod = ffi.load("rump" .. s, true)
-  S.rump.__modules[#S.rump.__modules + 1] = mod
+  s = "rump" .. string.gsub(s, "%.", "_")
+  local mod = ffi.load(s, true)
+  abi.modules[s] = mod
 end
 
 function S.rump.init(modules, ...) -- you must load the factions here eg dev, vfs, net, plus modules
   if type(modules) == "string" then modules = {modules, ...} end
   for i, v in ipairs(modules or {}) do
-    v = string.gsub(v, "%.", "_")
-    local mod = ffi.load("rump" .. v, true)
-    S.rump.__modules[#S.rump.__modules + 1] = mod
+    v = "rump" .. string.gsub(v, "%.", "_")
+    local mod = ffi.load(v, true)
+    abi.modules[v] = mod
   end
-  local ok = ffi.C.rump_init()
+  local ok = abi.modules.rump.rump_init()
   if ok == -1 then return nil, t.error() end
   return S
 end
 
-function S.rump.boot_gethowto() return retnum(ffi.C.rump_boot_gethowto()) end
-function S.rump.boot_sethowto(how) ffi.C.rump_boot_sethowto(how) end
-function S.rump.boot_setsigmodel(model) ffi.C.rump_boot_etsigmodel(model) end
-function S.rump.schedule() ffi.C.rump_schedule() end
-function S.rump.unschedule() ffi.C.rump_unschedule() end
-function S.rump.printevcnts() ffi.C.rump_printevcnts() end
-function S.rump.daemonize_begin() return retbool(ffi.C.rump_daemonize_begin()) end
-function S.rump.daemonize_done(err) return retbool(ffi.C.rump_daemonize_done(err)) end
-function S.rump.init_server(url) return retbool(ffi.C.rump_init_server(url)) end
+local rump = abi.modules.rump
+
+function S.rump.boot_gethowto() return retnum(rump.rump_boot_gethowto()) end
+function S.rump.boot_sethowto(how) rump.rump_boot_sethowto(how) end
+function S.rump.boot_setsigmodel(model) rump.rump_boot_etsigmodel(model) end
+function S.rump.schedule() rump.rump_schedule() end
+function S.rump.unschedule() rump.rump_unschedule() end
+function S.rump.printevcnts() rump.rump_printevcnts() end
+function S.rump.daemonize_begin() return retbool(rump.rump_daemonize_begin()) end
+function S.rump.daemonize_done(err) return retbool(rump.rump_daemonize_done(err)) end
+function S.rump.init_server(url) return retbool(rump.rump_init_server(url)) end
 
 function S.rump.getversion() return rump.rump_pub_getversion() end
 
@@ -158,15 +159,15 @@ function S.rump.etfs_register(key, hostpath, ftype, begin, size)
   return retbool(ret)
 end
 function S.rump.etfs_remove(key)
-  return retbool(ffi.C.rump_pub_etfs_remove(key))
+  return retbool(abi.modules.rumpvfs.rump_pub_etfs_remove(key)) -- rump has weak symbol
 end
 
 -- threading
-function S.rump.rfork(flags) return retbool(ffi.C.rump_pub_lwproc_rfork(S.rump.c.RF[flags])) end
-function S.rump.newlwp(pid) return retbool(ffi.C.rump_pub_lwproc_newlwp(pid)) end
-function S.rump.switchlwp(lwp) ffi.C.rump_pub_lwproc_switch(lwp) end
-function S.rump.releaselwp() ffi.C.rump_pub_lwproc_releaselwp() end
-function S.rump.curlwp() return ffi.C.rump_pub_lwproc_curlwp() end
+function S.rump.rfork(flags) return retbool(rump.rump_pub_lwproc_rfork(S.rump.c.RF[flags])) end
+function S.rump.newlwp(pid) return retbool(rump.rump_pub_lwproc_newlwp(pid)) end
+function S.rump.switchlwp(lwp) rump.rump_pub_lwproc_switch(lwp) end
+function S.rump.releaselwp() rump.rump_pub_lwproc_releaselwp() end
+function S.rump.curlwp() return rump.rump_pub_lwproc_curlwp() end
 
 return S.rump
  
