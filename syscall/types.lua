@@ -12,7 +12,7 @@ require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math, bit
 
-local function init(abi, c, errors, ostypes, rump)
+local function init(abi, c, errors, ostypes, rumpfn)
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -50,7 +50,7 @@ local function ptt(tp)
 end
 
 local function addtype(name, tp, mt)
-  if rump then tp = rump(tp) end
+  if rumpfn then tp = rumpfn(tp) end
   if mt then
     if mt.index and not mt.__index then -- generic index method
       mt.__index = function(tp, k) if mt.index[k] then return mt.index[k](tp) end end
@@ -69,13 +69,13 @@ end
 
 -- for variables length types, ie those with arrays
 local function addtype_var(name, tp, mt)
-  if rump then tp = rump(tp) end
+  if rumpfn then tp = rumpfn(tp) end
   t[name] = ffi.metatype(tp, mt)
   pt[name] = ptt(tp)
 end
 
 local function addtype_fn(name, tp)
-  if rump then tp = rump(tp) end
+  if rumpfn then tp = rumpfn(tp) end
   t[name] = ffi.typeof(tp)
   s[name] = ffi.sizeof(t[name])
 end
@@ -531,7 +531,7 @@ addtype("sigaction", "struct sigaction", mt.sigaction)
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsgtype = "struct cmsghdr"
-if rump then cmsgtype = rump(cmsgtype) end -- might not be this name, could be _netbsd_cmsghdr
+if rumpfn then cmsgtype = rumpfn(cmsgtype) end -- might not be this name, could be _netbsd_cmsghdr
 local cmsg_hdrsize = ffi.sizeof(ffi.typeof(cmsgtype), 0)
 local voidalign = ffi.alignof(ffi.typeof("void *"))
 local function cmsg_align(len) return align(len, voidalign) end -- TODO double check this is correct for all OSs
