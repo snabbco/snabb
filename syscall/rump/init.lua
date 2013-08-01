@@ -14,11 +14,6 @@ local rump = ffi.load("rump", true)
 
 local abi = require "syscall.rump.abi"
 
--- TODO share this init code with syscall.lua
-
-local errors = require "syscall.netbsd.errors"
-local c, types
-
 local unchanged = {
   char = true,
   int = true,
@@ -69,32 +64,22 @@ end
 local S
 
 if abi.host == abi.os then -- running native
+  -- here we need to reuse a lot of stuff, but noting that depends on C
   local SS = require "syscall"
-  c = SS.c
-  types = SS.types
   local C = require "syscall.rump.c".init(abi, c, types)
-  local ioctl = require "syscall.netbsd.ioctl".init(abi, types)
-  local fcntl = require "syscall.netbsd.fcntl".init(abi, c, types)
 
   c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps
 
-  S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
+  S = require "syscall.syscalls".init(abi, SS.c, C, SS.types, SS.c.IOCTL, SS.__fcntl)
 
-  S.abi, S.c, S.C, S.types, S.t = abi, c, C, types, types.t -- add to main table returned
+  S.abi, S.c, S.C, S.types, S.t = abi, SS.c, C, SS.types, SS.types.t
 
-  -- add compatibility code
   S = require "syscall.compat".init(S)
-
-  -- add methods
   S = require "syscall.methods".init(S)
-
-  -- add feature tests
   S.features = require "syscall.features".init(S)
-
-  -- add utils
   S.util = require "syscall.util".init(S)
 else -- running on another OS
-  abi.rumpfn = rumpfn
+  abi.rumpfn = rumpfn -- mangle NetBSD type names to avoid collisions
   S = require "syscall.init".init(abi)
 end
 

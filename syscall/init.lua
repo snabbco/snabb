@@ -25,6 +25,7 @@ local t, pt, s = types.t, types.pt, types.s
 local cmod
 if abi.rump then cmod = "syscall.rump.c" else cmod = "syscall." .. abi.os .. ".c" end
 local C = require(cmod).init(abi, c, types)
+
 local ioctl = require("syscall." .. abi.os .. ".ioctl").init(abi, types)
 local fcntl = require("syscall." .. abi.os .. ".fcntl").init(abi, c, types)
 
@@ -45,6 +46,9 @@ S = require "syscall.methods".init(S)
 
 -- add feature tests
 S.features = require "syscall.features".init(S)
+
+-- link in fcntl
+S.__fcntl = fcntl
 
 -- add utils
 S.util = require "syscall.util".init(S)
