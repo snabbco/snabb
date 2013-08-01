@@ -46,5 +46,7 @@ void rump_pub_lwproc_releaselwp(void);
 struct lwp * rump_pub_lwproc_curlwp(void);
 void rump_pub_lwproc_sysent_usenative(void);
 void rump_pub_allbetsareoff_setid(pid_t, int);
+
+int rump_pub_etfs_register(const char *, const char *, int rump_etfs_type);
 ]]
 
