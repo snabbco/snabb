@@ -121,7 +121,7 @@ function S.rump.init(modules, ...) -- you must load the factions here eg dev, vf
     local mod = ffi.load("rump" .. v, true)
     S.rump.__modules[#S.rump.__modules + 1] = mod
   end
-  local ok = rump.rump_init()
+  local ok = ffi.C.rump_init()
   if ok == -1 then return nil, t.error() end
   return S
 end
