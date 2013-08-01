@@ -19,9 +19,7 @@ local abi = require "syscall.rump.abi"
 local errors = require "syscall.netbsd.errors"
 local c, types
 
-if abi.host == "netbsd" then
-  -- if running rump on netbsd just return normal NetBSD types
-  -- note that we get these by calling the whole thing so we do not get type redefinition errors
+if abi.host == abi.os then -- running native
   local S = require "syscall"
   c = S.c
   types = S.types
