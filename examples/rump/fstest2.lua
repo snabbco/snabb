@@ -13,7 +13,7 @@ local R = require "syscall.rump.init".init("vfs", "fs.sysvbfs", "dev", "dev.disk
 
 local dev = "/de-vice"
 
-assert(R.rump.etfs_register(dev, "test/data/sysvbfs_le.img", "blk"))
+assert(R.rump.etfs_register(dev, "buildrump.sh/tests/sysvbfs_le.img", "blk"))
 
 local stat = assert(R.stat(dev))
 
