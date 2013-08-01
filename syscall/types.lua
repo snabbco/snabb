@@ -531,7 +531,7 @@ addtype("sigaction", "struct sigaction", mt.sigaction)
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsgtype = "struct cmsghdr"
-if rumpfn then cmsgtype = rumpfn(cmsgtype) end -- might not be this name, could be _netbsd_cmsghdr
+if rumpfn then cmsgtype = rumpfn(cmsgtype) end
 local cmsg_hdrsize = ffi.sizeof(ffi.typeof(cmsgtype), 0)
 local voidalign = ffi.alignof(ffi.typeof("void *"))
 local function cmsg_align(len) return align(len, voidalign) end -- TODO double check this is correct for all OSs

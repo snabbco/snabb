@@ -1,5 +1,5 @@
 -- types for rump kernel
--- only called when not on NetBSD so needs types fixing up
+-- only called when not on NetBSD and using NetBSD types so needs types fixing up
 
 local require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
@@ -48,7 +48,7 @@ local unchanged = {
   ["struct winsize"] = true,
 }
 
-local function rumpfn(tp) -- add _netbsd_ to correct types
+local function rumpfn(tp)
   if unchanged[tp] then return tp end
   if tp == "void (*)(int, siginfo_t *, void *)" then return "void (*)(int, _netbsd_siginfo_t *, void *)" end
   if string.find(tp, "struct") then
