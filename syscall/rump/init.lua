@@ -66,18 +66,46 @@ local function rumpfn(tp)
   return "_netbsd_" .. tp
 end
 
+local S
+
 if abi.host == abi.os then -- running native
-  local S = require "syscall"
-  c = S.c
-  types = S.types
+  local SS = require "syscall"
+  c = SS.c
+  types = SS.types
+  local C = require "syscall.rump.c".init(abi, c, types, rump)
+  local ioctl = require "syscall.netbsd.ioctl".init(abi, types)
+  local fcntl = require "syscall.netbsd.fcntl".init(abi, c, types)
+
+  c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps
+
+  S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
+
+  S.abi, S.c, S.C, S.types, S.t = abi, c, C, types, types.t -- add to main table returned
+
+  -- add compatibility code
+  S = require "syscall.compat".init(S)
+
+  -- add methods
+  S = require "syscall.methods".init(S)
+
+  -- add feature tests
+  S.features = require "syscall.features".init(S)
+
+  -- add utils
+  S.util = require "syscall.util".init(S)
 else -- running on another OS
   abi.rumpfn = rumpfn
+  S = require "syscall.init".init(abi)
+--[[
   require "syscall.netbsd.ffitypes".init(abi)
   c = require "syscall.netbsd.constants"
   local ostypes = require "syscall.netbsd.types"
   types = require "syscall.types".init(abi, c, errors, ostypes)
+]]
+  
 end
 
+--[[
 local C = require "syscall.rump.c".init(abi, c, types, rump)
 local ioctl = require("syscall.netbsd.ioctl").init(abi, types)
 local fcntl = require("syscall.netbsd.fcntl").init(abi, c, types)
@@ -99,10 +127,11 @@ S.features = require "syscall.features".init(S)
 
 -- add utils
 S.util = require "syscall.util".init(S)
+]]
 
 require "syscall.rump.ffirump"
 
-local t, pt = types.t, types.pt
+local t, pt = S.types.t, S.types.pt
 
 local modinfo = ffi.typeof("struct modinfo")
 
