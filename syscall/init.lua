@@ -21,7 +21,9 @@ local types = require "syscall.types".init(abi, c, errors, ostypes)
 
 local t, pt, s = types.t, types.pt, types.s
 
-local C = require("syscall." .. abi.os .. ".c").init(abi, c, types)
+local cmod
+if abi.rump then cmod = "syscall.rump.c" else cmod = "syscall." .. abi.os .. ".c" end
+local C = require(cmod).init(abi, c, types)
 local ioctl = require("syscall." .. abi.os .. ".ioctl").init(abi, types)
 local fcntl = require("syscall." .. abi.os .. ".fcntl").init(abi, c, types)
 
