@@ -75,7 +75,9 @@ if abi.host == abi.os then -- running native
   end
 
   local SS = require "syscall"
-  local C = require "syscall.rump.c".init(abi)
+
+  local C
+  if abi.os == "linux" then C = require "syscall.rump.linux".init(abi) else C = require "syscall.rump.c".init(abi) end
 
   S = require "syscall.syscalls".init(abi, SS.c, C, SS.types, SS.c.IOCTL, SS.__fcntl)
 
