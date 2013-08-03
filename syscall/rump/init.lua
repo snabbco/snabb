@@ -65,29 +65,25 @@ end
 
 local S
 
-if abi.host == abi.os then -- running native
-  -- here we need to reuse a lot of stuff, but nothing that depends on C
-  if abi.os == "linux" then
-    modules.rumpvfs = ffi.load("rumpvfs", true)
-    modules.rumpnet = ffi.load("rumpnet", true)
-    modules.rumpnetnet = ffi.load("rumpnet_net", true)
-    modules.rumpcompat = ffi.load("rumpkern_sys_linux", true)
-  end
+if abi.types == "linux" then -- load Linux compat module
+  modules.rumpvfs = ffi.load("rumpvfs", true)
+  modules.rumpnet = ffi.load("rumpnet", true)
+  modules.rumpnetnet = ffi.load("rumpnet_net", true)
+  modules.rumpcompat = ffi.load("rumpkern_sys_linux", true)
+end
 
+if abi.host == "netbsd" then -- running native (NetBSD on NetBSD)
   local SS = require "syscall"
-
-  local C
-  if abi.os == "linux" then C = require "syscall.rump.linux".init(abi) else C = require "syscall.rump.c".init(abi) end
-
+  local C = require "syscall.rump.c".init(abi)
   S = require "syscall.syscalls".init(abi, SS.c, C, SS.types, SS.c.IOCTL, SS.__fcntl)
-
   S.abi, S.c, S.C, S.types, S.t = abi, SS.c, C, SS.types, SS.types.t
-
   S = require "syscall.compat".init(S)
   S = require "syscall.methods".init(S)
   S.features = require "syscall.features".init(S)
   S.util = require "syscall.util".init(S)
-else -- running on another OS
+elseif abi.host == abi.types then -- running Linux types on Linux
+  S = require "syscall.init".init(abi)
+else -- run NetBSD types on another OS
   abi.rumpfn = rumpfn -- mangle NetBSD type names to avoid collisions
   S = require "syscall.init".init(abi)
 end

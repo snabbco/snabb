@@ -17,8 +17,10 @@ abi.os = "netbsd"
 -- note you can run with abi.netbsd = {version = 7} here too
 abi.netbsd = {version = 6}
 
--- testing the rump Linux ABI; not terribly useful
---abi.os = "linux"
+abi.types = "netbsd"
+
+-- testing the rump Linux ABI
+--abi.types = "linux"
 
 return abi
 
