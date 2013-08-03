@@ -28,7 +28,7 @@ local cmod
 if abi.rump then cmod = "syscall.rump.c" else cmod = "syscall." .. abi.os .. ".c" end
 local C = require(cmod).init(abi, c, types)
 
-local ioctl = require("syscall." .. abi.os .. ".ioctl").init(abi, types)
+local ioctl = require("syscall." .. (abi.types or abi.os) .. ".ioctl").init(abi, types)
 local fcntl = require("syscall." .. (abi.types or abi.os) .. ".fcntl").init(abi, c, types)
 
 local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
