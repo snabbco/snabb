@@ -19,7 +19,7 @@ abi.netbsd = {version = 6}
 
 abi.types = "netbsd"
 
--- testing the rump Linux ABI
+-- uncomment to test the rump Linux ABI
 --abi.types = "linux"
 
 return abi

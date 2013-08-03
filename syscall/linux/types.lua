@@ -34,43 +34,45 @@ local mt = {} -- metatables
 local signal_reasons_gen = {}
 local signal_reasons = {}
 
-for k, v in pairs(c.SI) do
+for k, v in pairs(c.SI or {}) do -- if using rump Linux ABI might not be defined TODO NetBSD does have these I think
   signal_reasons_gen[v] = k
 end
 
 signal_reasons[c.SIG.ILL] = {}
-for k, v in pairs(c.SIGILL) do
+for k, v in pairs(c.SIGILL or {}) do
   signal_reasons[c.SIG.ILL][v] = k
 end
 
 signal_reasons[c.SIG.FPE] = {}
-for k, v in pairs(c.SIGFPE) do
+for k, v in pairs(c.SIGFPE or {}) do
   signal_reasons[c.SIG.FPE][v] = k
 end
 
 signal_reasons[c.SIG.SEGV] = {}
-for k, v in pairs(c.SIGSEGV) do
+for k, v in pairs(c.SIGSEGV or {}) do
   signal_reasons[c.SIG.SEGV][v] = k
 end
 
 signal_reasons[c.SIG.BUS] = {}
-for k, v in pairs(c.SIGBUS) do
+for k, v in pairs(c.SIGBUS or {}) do
   signal_reasons[c.SIG.BUS][v] = k
 end
 
 signal_reasons[c.SIG.TRAP] = {}
-for k, v in pairs(c.SIGTRAP) do
+for k, v in pairs(c.SIGTRAP or {}) do
   signal_reasons[c.SIG.TRAP][v] = k
 end
 
 signal_reasons[c.SIG.CHLD] = {}
-for k, v in pairs(c.SIGCLD) do
+for k, v in pairs(c.SIGCLD or {}) do
   signal_reasons[c.SIG.CHLD][v] = k
 end
 
+if c.SIG.POLL then -- rump/NetBSD has no SIGPOLL
 signal_reasons[c.SIG.POLL] = {}
-for k, v in pairs(c.SIGPOLL) do
+for k, v in pairs(c.SIGPOLL or {}) do
   signal_reasons[c.SIG.POLL][v] = k
+end
 end
 
 local addtypes = {
@@ -218,11 +220,13 @@ function t.sa(addr, addrlen)
   return addr
 end
 
+if c.NETLINK then -- rump compat
 local nlgroupmap = { -- map from netlink socket type to group names. Note there are two forms of name though, bits and shifts.
   [c.NETLINK.ROUTE] = c.RTMGRP, -- or RTNLGRP_ and shift not mask TODO make shiftflags function
   -- add rest of these
 --  [c.NETLINK.SELINUX] = c.SELNLGRP,
 }
+end
 
 addtype("sockaddr_nl", "struct sockaddr_nl", {
   index = {
@@ -508,7 +512,7 @@ end
 -- termios
 
 local bits_to_speed = {}
-for k, v in pairs(c.B) do
+for k, v in pairs(c.B or {}) do -- TODO rump compat hack {}
   bits_to_speed[v] = tonumber(k)
 end
 
@@ -775,7 +779,7 @@ mt.epoll_event = {
   end,
 }
 
-for k, v in pairs(c.EPOLL) do
+for k, v in pairs(c.EPOLL or {}) do -- rump compat
   mt.epoll_event.index[k] = function(e) return bit.band(e.events, v) ~= 0 end
 end
 

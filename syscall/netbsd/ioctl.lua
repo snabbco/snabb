@@ -54,6 +54,7 @@ local function _IOC(dir, ch, nr, tp)
   if type(ch) == "string" then ch = ch:byte() end
   if type(tp) == "number" then return ioc(dir, ch, nr, tp) end
   local size = s[tp]
+  if abi.types == "linux" and not size then return nil end -- TODO this is odd, maybe rump Linux needs some extra types?
   local singleton = singletonmap[tp] ~= nil
   tp = singletonmap[tp] or tp
   return {number = ioc(dir, ch, nr, size),
