@@ -40,7 +40,7 @@ local c = S.c
 local features = S.features
 local util = S.util
 
-if rump and not abi.types == "linux" then -- some initial setup TODO linux them temp
+if rump abi.types ~= "linux" then -- some initial setup
   local octal = helpers.octal
   assert(S.mkdir("/tmp", "0700"))
   local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0700")}
