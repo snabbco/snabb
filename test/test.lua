@@ -40,7 +40,15 @@ local c = S.c
 local features = S.features
 local util = S.util
 
-if rump and abi.types ~= "linux" then -- some initial setup
+if rump and abi.types == "linux" then -- Linux rump ABI cannot do much
+  assert(S.chmod("/dev/zero", "0666"))
+  assert(S.mkdir("/tmp", "0777"))
+  assert(S.chown("/tmp", 100, 0))
+  assert(S.chdir("/tmp"))
+  assert(S.seteuid(100))
+end
+
+if rump and S.geteuid() == 0 then -- some initial setup
   local octal = helpers.octal
   assert(S.mkdir("/tmp", "0700"))
   local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0700")}
@@ -53,8 +61,10 @@ end
 local bit = require "bit"
 local ffi = require "ffi"
 
-local test = require("test." .. abi.os).init(S) -- OS specific tests
-for k, v in pairs(test) do _G["test_" .. k] = v end
+if not (rump and abi.types == "linux") then
+  local test = require("test." .. abi.os).init(S) -- OS specific tests
+  for k, v in pairs(test) do _G["test_" .. k] = v end
+end
 if rump then
   local test = require "test.rump".init(S) -- rump specific tests
   for k, v in pairs(test) do _G["test_" .. k] = v end
