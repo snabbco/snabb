@@ -13,7 +13,7 @@ require("syscall." .. (abi.types or abi.os) .. ".ffitypes").init(abi)
 
 if not abi.rump then require "syscall.ffifunctions" end
 
-local c = require("syscall." .. abi.os .. ".constants")
+local c = require("syscall." .. (abi.types or abi.os) .. ".constants")
 local errors = require("syscall." .. abi.os .. ".errors")
 local ostypes = require("syscall." .. (abi.types or abi.os) .. ".types")
 
@@ -29,7 +29,7 @@ if abi.rump then cmod = "syscall.rump.c" else cmod = "syscall." .. abi.os .. ".c
 local C = require(cmod).init(abi, c, types)
 
 local ioctl = require("syscall." .. abi.os .. ".ioctl").init(abi, types)
-local fcntl = require("syscall." .. abi.os .. ".fcntl").init(abi, c, types)
+local fcntl = require("syscall." .. (abi.types or abi.os) .. ".fcntl").init(abi, c, types)
 
 local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
 
