@@ -220,8 +220,9 @@ function t.sa(addr, addrlen)
   return addr
 end
 
+local nlgroupmap = {}
 if c.NETLINK then -- rump compat
-local nlgroupmap = { -- map from netlink socket type to group names. Note there are two forms of name though, bits and shifts.
+  nlgroupmap = { -- map from netlink socket type to group names. Note there are two forms of name though, bits and shifts.
   [c.NETLINK.ROUTE] = c.RTMGRP, -- or RTNLGRP_ and shift not mask TODO make shiftflags function
   -- add rest of these
 --  [c.NETLINK.SELINUX] = c.SELNLGRP,
