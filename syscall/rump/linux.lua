@@ -1,4 +1,5 @@
 -- If using Linux ABI compatibility we need a few extra types from NetBSD
+-- TODO In theory we should not need these, just create a new NetBSD rump instance when we want them instead
 
 local require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
