@@ -257,10 +257,10 @@ struct _netbsd_ifreq {
   } ifr_ifru;
 };
 struct _netbsd_ifaliasreq {
-        char    ifra_name[16];
-        struct  _netbsd_sockaddr ifra_addr;
-        struct  _netbsd_sockaddr ifra_dstaddr;
-        struct  _netbsd_sockaddr ifra_mask;
+  char    ifra_name[16];
+  struct  _netbsd_sockaddr ifra_addr;
+  struct  _netbsd_sockaddr ifra_dstaddr;
+  struct  _netbsd_sockaddr ifra_mask;
 };
 struct _netbsd_pollfd {
   int fd;

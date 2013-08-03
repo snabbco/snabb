@@ -12,7 +12,7 @@ require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math, bit
 
-local function init(abi, c, errors, ostypes)
+local function init(abi, c, errors, ostypes, ostypes2)
 
 local rumpfn = abi.rumpfn
 
@@ -687,6 +687,7 @@ addtype_var("pollfds", "struct {int count; struct pollfd pfd[?];}", mt.pollfds)
 local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
 
 types = ostypes.init(types, hh, abi, c)
+if ostypes2 then types = ostypes2.init(types, hh, abi, c) end
 
 -- this is declared above
 samap_pt = {
