@@ -40,7 +40,7 @@ local c = S.c
 local features = S.features
 local util = S.util
 
-if rump and abi.os == "netbsd" and not abi.types == "linux" then -- some initial setup TODO linux them temp
+if rump and not abi.types == "linux" then -- some initial setup TODO linux them temp
   local octal = helpers.octal
   assert(S.mkdir("/tmp", "0700"))
   local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0700")}
@@ -556,10 +556,12 @@ test_file_operations = {
   end,
   test_getcwd_long = function()
     local cwd = assert(S.getcwd())
+    local cwd2 = cwd
+    if cwd2 == "/" then cwd2 = "" end
     assert(S.mkdir(longfile, "RWXU"))
     assert(S.chdir(longfile))
     local nd = assert(S.getcwd())
-    assert_equal(nd, cwd .. "/" .. longfile, "expect to get filename plus cwd")
+    assert_equal(nd, cwd2 .. "/" .. longfile, "expect to get filename plus cwd")
     assert(S.chdir(cwd))
     assert(S.rmdir(longfile))
   end,
