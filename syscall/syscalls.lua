@@ -393,19 +393,25 @@ function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, 
 
 function S.ioctl(d, request, argp)
   local read, singleton = false, false
-  if type(request) == "string" then
-    request = ioctl[request]
+  local name = request
+  if type(name) == "string" then
+    request = ioctl[name]
   end
-  if type(request) == "table" and type(argp) ~= "string" and type(argp) ~= "cdata" then
-    if request.write then
-      argp = mktype(request.type, argp)
-    end
-    if request.read then
-      argp = argp or request.type()
-    end
+  if type(request) == "table" then
+    local write = request.write
+    local tp = request.type
     read = request.read
     singleton = request.singleton
     request = request.number
+    if type(argp) ~= "string" and type(argp) ~= "cdata" then
+      if write then
+        if not argp then error("no argument supplied for ioctl " .. name) end
+        argp = mktype(tp, argp)
+      end
+      if read then
+        argp = argp or tp()
+      end
+    end
   else -- some sane defaults if no info
     if type(request) == "table" then request = request.number end
     if type(argp) == "string" then argp = pt.char(argp) end
