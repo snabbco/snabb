@@ -84,6 +84,14 @@ function util.touch(file)
   return true
 end
 
+function util.createfile(file) -- touch without timestamp adjustment
+  local fd, err = S.open(file, "wronly,creat,noctty,nonblock", "0666")
+  if not fd then return nil, err end
+  local ok, err = fd:close()
+  if not ok then return nil, err end
+  return true
+end
+
 function util.mapfile(name) -- generally better to use, but no good for sysfs etc
   local fd, err = S.open(name, "rdonly")
   if not fd then return nil, err end

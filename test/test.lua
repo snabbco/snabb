@@ -52,23 +52,22 @@ if rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switc
   local pid = S.getpid()
   assert(S.rump.newlwp(pid))
   local lwp1 = assert(S.rump.curlwp())
-
   assert(S.rump.rfork("CFDG"))
-
   S.rump.i_know_what_i_am_doing_sysent_usenative() -- switch to netBSD syscalls in this thread
   local data = t.tmpfs_args{ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = helpers.octal("0777")}
   assert(S.mount("tmpfs", "/tmp", 0, data, s.tmpfs_args))
   assert(S.mkdir("/dev/pts", "0555"))
-  local data = t.ptyfs_args{version = 2, gid = 0, mode = helpers.octal("0320")}
+  local data = t.ptyfs_args{version = 2, gid = 0, mode = helpers.octal("0555")}
   assert(S.mount("ptyfs", "/dev/pts", 0, data, s.ptyfs_args))
-  assert(S.chdir("/tmp"))
   S.rump.switchlwp(lwp1)
   local ok, err = S.mount("tmpfs", "/tmp", 0, data, s.tmpfs_args)
   assert(err, "mount should fail as not in NetBSD compat now")
-  assert(S.seteuid(100))
-end
-
-if rump and S.geteuid() == 0 then -- some initial setup
+  assert(S.chdir("/tmp"))
+  -- TODO can run as non root
+  --assert(S.rump.rfork("CFDG"))
+  --assert(S.setuid(100))
+  --assert(S.seteuid(100))
+elseif rump and S.geteuid() == 0 then -- some initial setup for non-Linux rump
   local octal = helpers.octal
   assert(S.mkdir("/tmp", "0777"))
   local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0777")}
@@ -756,8 +755,8 @@ test_directory_operations = {
   end,
   test_getdents = function()
     assert(S.mkdir(tmpdir, "rwxu"))
-    assert(util.touch(tmpdir .. "/file1"))
-    assert(util.touch(tmpdir .. "/file2"))
+    assert(util.createfile(tmpdir .. "/file1"))
+    assert(util.createfile(tmpdir .. "/file2"))
     -- with only two files will get in one iteration of getdents
     local fd = assert(S.open(tmpdir, "directory, rdonly"))
     local f, count = {}, 0
@@ -787,8 +786,8 @@ test_directory_operations = {
   end,
   test_ls = function()
     assert(S.mkdir(tmpdir, "rwxu"))
-    assert(util.touch(tmpdir .. "/file1"))
-    assert(util.touch(tmpdir .. "/file2"))
+    assert(util.createfile(tmpdir .. "/file1"))
+    assert(util.createfile(tmpdir .. "/file2"))
     local f, count = {}, 0
     for d in util.ls(tmpdir) do
       f[d] = true
@@ -803,7 +802,7 @@ test_directory_operations = {
   test_ls_long = function()
     assert(S.mkdir(tmpdir, "rwxu"))
     local num = 300 -- sufficient to need more than one getdents call
-    for i = 1, num do assert(util.touch(tmpdir .. "/file" .. i)) end
+    for i = 1, num do assert(util.createfile(tmpdir .. "/file" .. i)) end
     local f, count = {}, 0
     for d in util.ls(tmpdir) do
       f[d] = true
@@ -816,7 +815,7 @@ test_directory_operations = {
   end,
   test_dirtable = function()
     assert(S.mkdir(tmpdir, "0777"))
-    assert(util.touch(tmpdir .. "/file"))
+    assert(util.createfile(tmpdir .. "/file"))
     local list = assert(util.dirtable(tmpdir, true))
     assert_equal(#list, 1, "one item in directory")
     assert_equal(list[1], "file", "one file called file")
@@ -951,7 +950,6 @@ test_sockets_pipes = {
     assert(p:close())
   end,
   test_pipe_nonblock = function()
-    if rump and S.abi.types == "linux" then print("skipping test as blocks"); return end
     local fds = assert(S.pipe())
     assert(fds:nonblock())
     local r, err = fds:read()
