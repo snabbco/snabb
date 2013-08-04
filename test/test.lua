@@ -45,20 +45,31 @@ local c = S.c
 local features = S.features
 local util = S.util
 
-if rump and abi.types == "linux" then -- Linux rump ABI cannot do much
+if rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switch from root so it does not try
   assert(S.chmod("/", "0777"))
   assert(S.chmod("/dev/zero", "0666"))
   assert(S.mkdir("/tmp", "0777"))
-  assert(S.chown("/", 100, 0))
-  assert(S.chown("/tmp", 100, 0))
+  local pid = S.getpid()
+  assert(S.rump.newlwp(pid))
+  local lwp1 = assert(S.rump.curlwp())
+  assert(S.rump.newlwp(pid))
+  local lwp2 = assert(S.rump.curlwp())
+  S.rump.switchlwp(lwp1)
+  S.rump.i_know_what_i_am_doing_sysent_usenative() -- switch to netBSD syscalls in this thread
+  local data = t.tmpfs_args{ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = helpers.octal("0777")}
+  assert(S.mount("tmpfs", "/tmp", 0, data, s.tmpfs_args))
+  assert(S.mkdir("/dev/pts", "0555"))
+  local data = t.ptyfs_args{version = 2, gid = 0, mode = helpers.octal("0320")}
+  assert(S.mount("ptyfs", "/dev/pts", 0, data, s.ptyfs_args))
   assert(S.chdir("/tmp"))
+  S.rump.switchlwp(lwp2)
   assert(S.seteuid(100))
 end
 
 if rump and S.geteuid() == 0 then -- some initial setup
   local octal = helpers.octal
-  assert(S.mkdir("/tmp", "0700"))
-  local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0700")}
+  assert(S.mkdir("/tmp", "0777"))
+  local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0777")}
   assert(S.mount{dir="/tmp", type="tmpfs", data=data})
   assert(S.chdir("/tmp"))
   assert(S.mkdir("/dev/pts", "0555"))
@@ -938,6 +949,7 @@ test_sockets_pipes = {
     assert(p:close())
   end,
   test_pipe_nonblock = function()
+    if rump and S.abi.types == "linux" then print("skipping test as blocks"); return end
     local fds = assert(S.pipe())
     assert(fds:nonblock())
     local r, err = fds:read()

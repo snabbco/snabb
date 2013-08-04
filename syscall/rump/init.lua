@@ -140,6 +140,11 @@ function S.rump.daemonize_begin() return retbool(ffi.C.rump_daemonize_begin()) e
 function S.rump.daemonize_done(err) return retbool(ffi.C.rump_daemonize_done(err)) end
 function S.rump.init_server(url) return retbool(ffi.C.rump_init_server(url)) end
 
+function S.rump.i_know_what_i_am_doing_sysent_usenative()
+  ffi.C.rump_i_know_what_i_am_doing_with_sysents = 1
+  ffi.C.rump_pub_lwproc_sysent_usenative();
+end
+
 function S.rump.getversion() return ffi.C.rump_pub_getversion() end
 
 -- etfs functions

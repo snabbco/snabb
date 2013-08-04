@@ -48,5 +48,8 @@ void rump_pub_lwproc_sysent_usenative(void);
 void rump_pub_allbetsareoff_setid(pid_t, int);
 
 int rump_pub_etfs_register(const char *, const char *, int rump_etfs_type);
+
+extern int rump_i_know_what_i_am_doing_with_sysents;
+void rump_pub_lwproc_sysent_usenative(void);
 ]]
 
