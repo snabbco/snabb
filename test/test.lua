@@ -46,8 +46,10 @@ local features = S.features
 local util = S.util
 
 if rump and abi.types == "linux" then -- Linux rump ABI cannot do much
+  assert(S.chmod("/", "0777"))
   assert(S.chmod("/dev/zero", "0666"))
   assert(S.mkdir("/tmp", "0777"))
+  assert(S.chown("/", 100, 0))
   assert(S.chown("/tmp", 100, 0))
   assert(S.chdir("/tmp"))
   assert(S.seteuid(100))
@@ -717,6 +719,7 @@ test_file_operations = {
 }
 
 test_directory_operations = {
+  teardown = clean,
   test_getdents_dev = function()
     local d = {}
     for fn, f in util.ls("/dev") do
@@ -967,7 +970,7 @@ test_sockets_pipes = {
     assert(c:block())
     assert(c:fcntl("setfd", "cloexec"))
     local ok, err = c:connect(sa)
-    local a = s:accept()
+    local a = assert(s:accept())
     assert(a.fd:block())
     local ok, err = c:connect(sa) -- Linux will have returned INPROGRESS above, other OS may have connected
     assert(s:block()) -- force accept to wait
