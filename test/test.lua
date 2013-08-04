@@ -109,7 +109,8 @@ local buf = t.buffer(size)
 local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 local tmpfile3 = "MMMMMTTTTGGG" .. S.getpid()
-local longfile = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
+local tmpdir = "FFFFGGGGHHH123" .. S.getpid()
+local longdir = "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890" .. S.getpid()
 local efile = "./tmpexXXYYY" .. S.getpid() .. ".sh"
 local largeval = math.pow(2, 33) -- larger than 2^32 for testing
 local mqname = "ljsyscallXXYYZZ" .. S.getpid()
@@ -119,7 +120,8 @@ local clean = function()
   S.unlink(tmpfile)
   S.unlink(tmpfile2)
   S.unlink(tmpfile3)
-  S.unlink(longfile)
+  S.rmdir(tmpdir)
+  S.rmdir(longdir)
   S.unlink(efile)
 end
 
@@ -552,8 +554,8 @@ test_file_operations = {
     assert(err.badf, "bad file descriptor")
   end,
   test_mkdir_rmdir = function()
-    assert(S.mkdir(tmpfile, "RWXU"))
-    assert(S.rmdir(tmpfile))
+    assert(S.mkdir(tmpdir, "RWXU"))
+    assert(S.rmdir(tmpdir))
   end,
   test_chdir = function()
     local cwd = assert(S.getcwd())
@@ -568,12 +570,12 @@ test_file_operations = {
     local cwd = assert(S.getcwd())
     local cwd2 = cwd
     if cwd2 == "/" then cwd2 = "" end
-    assert(S.mkdir(longfile, "RWXU"))
-    assert(S.chdir(longfile))
+    assert(S.mkdir(longdir, "RWXU"))
+    assert(S.chdir(longdir))
     local nd = assert(S.getcwd())
-    assert_equal(nd, cwd2 .. "/" .. longfile, "expect to get filename plus cwd")
+    assert_equal(nd, cwd2 .. "/" .. longdir, "expect to get filename plus cwd")
     assert(S.chdir(cwd))
-    assert(S.rmdir(longfile))
+    assert(S.rmdir(longdir))
   end,
   test_rename = function()
     local fd = assert(S.creat(tmpfile, "rwxu"))
@@ -732,11 +734,11 @@ test_directory_operations = {
     assert(fd:close())
   end,
   test_getdents = function()
-    assert(S.mkdir(tmpfile, "rwxu"))
-    assert(util.touch(tmpfile .. "/file1"))
-    assert(util.touch(tmpfile .. "/file2"))
+    assert(S.mkdir(tmpdir, "rwxu"))
+    assert(util.touch(tmpdir .. "/file1"))
+    assert(util.touch(tmpdir .. "/file2"))
     -- with only two files will get in one iteration of getdents
-    local fd = assert(S.open(tmpfile, "directory, rdonly"))
+    local fd = assert(S.open(tmpdir, "directory, rdonly"))
     local f, count = {}, 0
     for d in fd:getdents() do
       f[d.name] = true
@@ -745,9 +747,9 @@ test_directory_operations = {
     assert_equal(count, 4)
     assert(f.file1 and f.file2 and f["."] and f[".."], "expect four files")
     assert(fd:close())
-    assert(S.unlink(tmpfile .. "/file1"))
-    assert(S.unlink(tmpfile .. "/file2"))
-    assert(S.rmdir(tmpfile))
+    assert(S.unlink(tmpdir .. "/file1"))
+    assert(S.unlink(tmpdir .. "/file2"))
+    assert(S.rmdir(tmpdir))
   end,
   test_dents_stat_conversion = function()
     local st = assert(S.stat("/dev/zero"))
@@ -763,43 +765,43 @@ test_directory_operations = {
     end
   end,
   test_ls = function()
-    assert(S.mkdir(tmpfile, "rwxu"))
-    assert(util.touch(tmpfile .. "/file1"))
-    assert(util.touch(tmpfile .. "/file2"))
+    assert(S.mkdir(tmpdir, "rwxu"))
+    assert(util.touch(tmpdir .. "/file1"))
+    assert(util.touch(tmpdir .. "/file2"))
     local f, count = {}, 0
-    for d in util.ls(tmpfile) do
+    for d in util.ls(tmpdir) do
       f[d] = true
       count = count + 1
     end
     assert_equal(count, 4)
     assert(f.file1 and f.file2 and f["."] and f[".."], "expect four files")
-    assert(S.unlink(tmpfile .. "/file1"))
-    assert(S.unlink(tmpfile .. "/file2"))
-    assert(S.rmdir(tmpfile))
+    assert(S.unlink(tmpdir .. "/file1"))
+    assert(S.unlink(tmpdir .. "/file2"))
+    assert(S.rmdir(tmpdir))
   end,
   test_ls_long = function()
-    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(S.mkdir(tmpdir, "rwxu"))
     local num = 300 -- sufficient to need more than one getdents call
-    for i = 1, num do assert(util.touch(tmpfile .. "/file" .. i)) end
+    for i = 1, num do assert(util.touch(tmpdir .. "/file" .. i)) end
     local f, count = {}, 0
-    for d in util.ls(tmpfile) do
+    for d in util.ls(tmpdir) do
       f[d] = true
       count = count + 1
     end
     assert_equal(count, num + 2)
     for i = 1, num do assert(f["file" .. i]) end
-    for i = 1, num do assert(S.unlink(tmpfile .. "/file" .. i)) end
-    assert(S.rmdir(tmpfile))
+    for i = 1, num do assert(S.unlink(tmpdir .. "/file" .. i)) end
+    assert(S.rmdir(tmpdir))
   end,
   test_dirtable = function()
-    assert(S.mkdir(tmpfile, "rwxu"))
-    assert(util.touch(tmpfile .. "/file"))
-    local list = assert(util.dirtable(tmpfile, true))
+    assert(S.mkdir(tmpdir, "rwxu"))
+    assert(util.touch(tmpdir .. "/file"))
+    local list = assert(util.dirtable(tmpdir, true))
     assert_equal(#list, 1, "one item in directory")
     assert_equal(list[1], "file", "one file called file")
     assert_equal(tostring(list), "file\n")
-    assert(S.unlink(tmpfile .. "/file"))
-    assert(S.rmdir(tmpfile))
+    assert(S.unlink(tmpdir .. "/file"))
+    assert(S.rmdir(tmpdir))
   end,
 }
 
