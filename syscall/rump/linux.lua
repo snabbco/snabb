@@ -1,5 +1,6 @@
 -- If using Linux ABI compatibility we need a few extra types from NetBSD
 -- TODO In theory we should not need these, just create a new NetBSD rump instance when we want them instead
+-- currently just mount support
 
 local require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
@@ -15,19 +16,6 @@ local ffi = require "ffi"
 ffi.cdef [[
 typedef uint32_t _netbsd_mode_t;
 typedef uint64_t _netbsd_ino_t;
-typedef uint8_t _netbsd_sa_family_t;
-struct _netbsd_sockaddr {
-  uint8_t       sa_len;
-  _netbsd_sa_family_t   sa_family;
-  char          sa_data[14];
-};
-struct _netbsd_sockaddr_storage {
-  uint8_t       ss_len;
-  _netbsd_sa_family_t   ss_family;
-  char          __ss_pad1[6];
-  int64_t       __ss_align;
-  char          __ss_pad2[128 - 2 - 8 - 6];
-};
 struct _netbsd_ufs_args {
   char *fspec;
 };
@@ -44,43 +32,6 @@ struct _netbsd_ptyfs_args {
   gid_t gid;
   _netbsd_mode_t mode;
   int flags;
-};
-struct _netbsd_compat_60_ptmget {
-  int     cfd;
-  int     sfd;
-  char    cn[16];
-  char    sn[16];
-};
-struct _netbsd_ptmget {
-  int     cfd;
-  int     sfd;
-  char    cn[1024];
-  char    sn[1024];
-};
-struct _netbsd_ifreq {
-  char ifr_name[16];
-  union {
-    struct  _netbsd_sockaddr ifru_addr;
-    struct  _netbsd_sockaddr ifru_dstaddr;
-    struct  _netbsd_sockaddr ifru_broadaddr;
-    struct  _netbsd_sockaddr_storage ifru_space;
-    short   ifru_flags;
-    int     ifru_metric;
-    int     ifru_mtu;
-    int     ifru_dlt;
-    unsigned int   ifru_value;
-    void *  ifru_data;
-    struct {
-      uint32_t        b_buflen;
-      void            *b_buf;
-    } ifru_b;
-  } ifr_ifru;
-};
-struct _netbsd_ifaliasreq {
-  char    ifra_name[16];
-  struct  _netbsd_sockaddr ifra_addr;
-  struct  _netbsd_sockaddr ifra_dstaddr;
-  struct  _netbsd_sockaddr ifra_mask;
 };
 ]]
 
@@ -105,12 +56,6 @@ local addstructs = {
   tmpfs_args = "struct _netbsd_tmpfs_args",
   ptyfs_args = "struct _netbsd_ptyfs_args",
 }
-
-if abi.netbsd.version == 6 then
-  addstructs.ptmget = "struct _netbsd_compat_60_ptmget"
-else
-  addstructs.ptmget = "struct _netbsd_ptmget"
-end
 
 for k, v in pairs(addtypes) do addtype(k, v) end
 for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
