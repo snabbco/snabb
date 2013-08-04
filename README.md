@@ -4,7 +4,7 @@ What? An FFI implementation of the Linux kernel ABI for LuaJIT. This means you w
 
 Why? First it provides a comprehensive set of system call APIs for programming sockets, files and so on, including the more obscure things (eg file change notifications). Second it provides higher level interfaces such as network interface configuration, so your application can control its entire runtime interface including IP addresses routing and so on. Third it provides tools for added security, such as support for Linux namespaces (containers), system call filtering (seccomp type 2), capabilities and so on, all with a script language interface that is much simpler to use than the C interface. As it is Lua based it can easily be embedded in another language; in the future ports to other scripting languages are planned. It also serves as a way of learning how the operating system interfaces work in a more forgiving environemnt than C.
 
-There is a work in progress port to BSD systems, currently targetting NetBSD and OSX. NetBSD support is relatively good, OSX is currently lagging and not well tested.
+There is a work in progress port to BSD systems, currently targetting NetBSD. NetBSD support is now relatively good, and also works with the NetBSD rump kernel under other operating systems.
 
 This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
 
@@ -14,7 +14,7 @@ There is the [video of my FOSDEM 2013 talk](http://www.myriabit.com/ljsyscall/) 
 
 ## Install
 
-For simples uses, you just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Keep the directory structure there is. You can safely remove files from architectures and operating systems you do not use.
+For simple uses, you just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Keep the directory structure there is. You can safely remove files from architectures and operating systems you do not use.
 
 You can install using ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` or one of the other versions in that directory, which will pull the version from github and install in the right place.
 
