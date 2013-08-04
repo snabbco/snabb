@@ -17,10 +17,7 @@ abi.os = "netbsd"
 -- note you can run with abi.netbsd = {version = 7} here too
 abi.netbsd = {version = 6}
 
-abi.types = "netbsd"
-
--- uncomment to test the rump Linux ABI
---abi.types = "linux"
+abi.types = "netbsd" -- you can set to Linux, or monkeypatch (see tests)
 
 return abi
 

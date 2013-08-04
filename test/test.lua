@@ -19,10 +19,15 @@ local helpers = require "syscall.helpers"
 
 local S, rump
 
-if arg[1] == "rump" then
+if arg[1] == "rump" or arg[1] == "rumplinux" then
+  local abi
   -- it is too late to set this now, needs to be set before executions starts
   if jit.os == "Linux" then
     assert(os.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
+  end
+  if arg[1] == "rumplinux" then
+    abi = require "syscall.rump.abi"
+    abi.types = "linux" -- monkeypatch
   end
   local modules = {"vfs", "kern.tty", "dev", "net", "fs.tmpfs", "fs.kernfs", "fs.ptyfs",
                    "net.net", "net.local", "net.netinet", "net.shmif"}
@@ -794,7 +799,7 @@ test_directory_operations = {
     assert(S.rmdir(tmpdir))
   end,
   test_dirtable = function()
-    assert(S.mkdir(tmpdir, "rwxu"))
+    assert(S.mkdir(tmpdir, "0777"))
     assert(util.touch(tmpdir .. "/file"))
     local list = assert(util.dirtable(tmpdir, true))
     assert_equal(#list, 1, "one item in directory")
