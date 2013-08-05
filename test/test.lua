@@ -59,9 +59,6 @@ if rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switc
   assert(S.mkdir("/dev/pts", "0555"))
   local data = t.ptyfs_args{version = 2, gid = 0, mode = helpers.octal("0555")}
   assert(S.mount("ptyfs", "/dev/pts", 0, data, s.ptyfs_args))
-  --assert(S.mkdir("/proc"))
-  --local data = t.procfs_args{version = 1}
-  --assert(S.mount("procfs", "/proc", 0, data, s.procfs_args))
   S.rump.switchlwp(lwp1)
   local ok, err = S.mount("tmpfs", "/tmp", 0, data, s.tmpfs_args)
   assert(err, "mount should fail as not in NetBSD compat now")
@@ -78,8 +75,6 @@ elseif rump and S.geteuid() == 0 then -- some initial setup for non-Linux rump
   assert(S.chdir("/tmp"))
   assert(S.mkdir("/dev/pts", "0555"))
   assert(S.mount{dir="/dev/pts", type="ptyfs", data = {version = 2, gid = 0, mode = octal("0320")}})
-  assert(S.mkdir("/proc"))
-  assert(S.mount{dir="/proc", type="procfs", data = {version = 1}})
 end
 
 local bit = require "bit"
@@ -1288,37 +1283,12 @@ test_util = {
     assert(util.rm(tmpfile))
     assert(not S.stat(tmpfile), "directory should be deleted")
   end,
-  test_ps = function()
-    local ps = util.ps()
-    local me = S.getpid()
-    local found = false
-    for i = 1, #ps do
-      if ps[i].pid == 1 then
-        assert(ps[i].cmdline:find("init") or ps[i].cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
-      end
-      if ps[i].pid == me then found = true end
-    end
-    assert(found, "expect to find my process in ps")
-    assert(tostring(ps), "can convert ps to string")
-  end,
   test_touch = function()
     assert(not S.stat(tmpfile))
     assert(util.touch(tmpfile))
     assert(S.stat(tmpfile))
     assert(util.touch(tmpfile))
     assert(S.unlink(tmpfile))
-  end,
-  test_proc_self = function()
-    local p = assert(util.proc())
-    assert(not p.wrongname, "test non existent files")
-    assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
-    assert(p.exe and #p.exe > 1, "expect an executable")
-    assert_equal(p.root, "/", "expect our root to be / usually")
-  end,
-  test_proc_init = function()
-    local p = util.proc(1)
-    assert(p and p.cmdline, "expect init to have cmdline")
-    assert(p.cmdline:find("init") or p.cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
   end,
   test_mounts_root = function()
     local cwd = assert(S.getcwd())
@@ -1359,7 +1329,35 @@ test_util = {
   end,
 }
 
-if not abi.rump then -- rump has no processes, memory allocation so not applicable
+if not abi.rump then -- rump has no processes, memory allocation and proc not applicable
+test_proc = {
+  test_ps = function()
+    local ps = util.ps()
+    local me = S.getpid()
+    local found = false
+    for i = 1, #ps do
+      if ps[i].pid == 1 then
+        assert(ps[i].cmdline:find("init") or ps[i].cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
+      end
+      if ps[i].pid == me then found = true end
+    end
+    assert(found, "expect to find my process in ps")
+    assert(tostring(ps), "can convert ps to string")
+  end,
+  test_proc_self = function()
+    local p = assert(util.proc())
+    assert(not p.wrongname, "test non existent files")
+    assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
+    assert(p.exe and #p.exe > 1, "expect an executable")
+    assert_equal(p.root, "/", "expect our root to be / usually")
+  end,
+  test_proc_init = function()
+    local p = util.proc(1)
+    assert(p and p.cmdline, "expect init to have cmdline")
+    assert(p.cmdline:find("init") or p.cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
+  end,
+}
+
 test_mmap = {
   test_mmap_fail = function()
     local size = 4096
