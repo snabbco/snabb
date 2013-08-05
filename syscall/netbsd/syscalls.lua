@@ -116,6 +116,20 @@ function S.fpathconf(fd, name) return retnum(C.fpathconf(getfd(fd), c.PC[name]))
 function S.fsync_range(fd, how, start, length) return retbool(C.fsync_range(getfd(fd), c.FSYNC[how], start, length)) end
 function S.lchmod(path, mode) return retbool(C.lchmod(path, c.MODE[mode])) end
 
+function S.getvfsstat(flags, buf, size) -- note order of args as usually leave buf empty
+  flags = c.VFSMNT[flags or "WAIT"] -- default not zero
+  if not buf then
+    local n, err = C.getvfsstat(nil, 0, flags)
+    if not n then return nil, err end
+    --buf = t.statvfss(n) -- TODO define
+    size = s.statvfs * n
+  end
+  size = size or #buf
+  local n, err = C.getvfsstat(buf, size, flags)
+  if not n then return nil, err end
+  return buf -- TODO need type with number
+end
+
 -- TODO when we define this for osx can go in common code (curently defined in libc.lua)
 function S.getcwd(buf, size)
   size = size or c.PATH_MAX

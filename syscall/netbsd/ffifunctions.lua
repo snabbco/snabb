@@ -30,6 +30,7 @@ int fchflags(int fd, unsigned long flags);
 long pathconf(const char *path, int name);
 long fpathconf(int fd, int name);
 int ioctl(int d, unsigned long request, ...);
+int getvfsstat(struct statvfs *buf, size_t bufsize, int flags);
 
 int syscall(int number, ...);
 ]]

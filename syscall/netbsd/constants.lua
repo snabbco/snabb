@@ -491,6 +491,12 @@ c.MNT = multiflags {
   GETARGS     = 0x00400000,
 }
 
+c.VFSMNT = strflag { -- note renamed, for vfs_sync() and getvfsstat() (also specified as ST_)
+  WAIT       = 1,
+  NOWAIT     = 2,
+  LAZY       = 3,
+}
+
 c.RB = multiflags {
   ASKNAME     = 0x00000001,
   SINGLE      = 0x00000002,
