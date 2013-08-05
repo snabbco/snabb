@@ -1265,30 +1265,31 @@ test_raw_socket = {
 }
 
 test_util = {
+  teardown = clean,
   test_rm_recursive = function()
-    assert(S.mkdir(tmpfile, "rwxu"))
-    assert(S.mkdir(tmpfile .. "/subdir", "rwxu"))
-    assert(util.createfile(tmpfile .. "/file"))
-    assert(util.createfile(tmpfile .. "/subdir/subfile"))
-    assert(S.stat(tmpfile), "directory should be there")
-    assert(S.stat(tmpfile).isdir, "should be a directory")
-    local ok, err = S.rmdir(tmpfile)
-    assert(not ok and err.notempty, "should fail as not empty")
-    assert(util.rm(tmpfile)) -- rm -r
-    assert(not S.stat(tmpfile), "directory should be deleted")
+    assert(S.mkdir(tmpdir, "rwxu"))
+    assert(S.mkdir(tmpdir .. "/subdir", "rwxu"))
+    assert(util.createfile(tmpdir .. "/file"))
+    assert(util.createfile(tmpdir .. "/subdir/subfile"))
+    assert(S.stat(tmpdir), "directory should be there")
+    assert(S.stat(tmpdir).isdir, "should be a directory")
+    local ok, err = S.rmdir(tmpdir)
+    assert(util.rm(tmpdir)) -- rm -r
+    assert(not S.stat(tmpdir), "directory should be deleted")
+    assert(not ok and err.notempty, "should have failed as not empty")
   end,
   test_rm_broken_symlink = function()
-    assert(S.mkdir(tmpfile, "rwxu"))
-    assert(S.symlink(tmpfile .. "/none", tmpfile .. "/link"))
-    assert(util.rm(tmpfile))
-    assert(not S.stat(tmpfile), "directory should be deleted")
+    assert(S.mkdir(tmpdir, "rwxu"))
+    assert(S.symlink(tmpdir .. "/none", tmpdir .. "/link"))
+    assert(util.rm(tmpdir))
+    assert(not S.stat(tmpdir), "directory should be deleted")
   end,
   test_touch = function()
-    assert(not S.stat(tmpfile))
-    assert(util.touch(tmpfile))
-    assert(S.stat(tmpfile))
-    assert(util.touch(tmpfile))
-    assert(S.unlink(tmpfile))
+    assert(not S.stat(tmpfile3))
+    assert(util.touch(tmpfile3))
+    assert(S.stat(tmpfile3))
+    assert(util.touch(tmpfile3))
+    assert(S.unlink(tmpfile3))
   end,
   test_readfile_writefile = function()
     assert(util.writefile(tmpfile, teststring, "RWXU"))
