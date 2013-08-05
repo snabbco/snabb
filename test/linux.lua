@@ -1384,6 +1384,27 @@ test.bridge_linux = {
   end,
 }
 
+test.mounts = {
+  test_mounts_root = function() -- rump has no /proc which alas means no /proc/mounts
+    local cwd = assert(S.getcwd())
+    local dir = cwd .. "/" .. tmpfile
+    assert(S.mkdir(dir))
+    local a = {source = "none", target = dir, type = "tmpfs", flags = "rdonly, noatime"}
+    assert(S.mount(a))
+    local m = assert(util.mounts())
+    assert(#m > 0, "expect at least one mount point")
+    local b = m[#m]
+    assert_equal(b.source, a.source, "expect source match")
+    assert_equal(b.target, a.target, "expect target match")
+    assert_equal(b.type, a.type, "expect type match")
+    assert_equal(c.MS[b.flags], c.MS[a.flags], "expect flags match")
+    assert_equal(b.freq, "0")
+    assert_equal(b.passno, "0")
+    assert(S.umount(dir))
+    assert(S.rmdir(dir))
+  end,
+}
+
 test.bpf = {
   test_bpf_struct_stmt = function()
     local bpf = t.sock_filter("LD,H,ABS", 12)

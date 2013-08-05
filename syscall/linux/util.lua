@@ -239,6 +239,42 @@ function util.capset(f, cap, flags)
   if type(f) == "string" then return S.setxattr(f, seccap, vfs, flags) else return f:getxattr(seccap, vfs, flags) end
 end
 
+-- TODO could add umount method.
+mt.mount = {
+  __tostring = function(m) return m.source .. " on " .. m.target .. " type " .. m.type .. " (" .. m.flags .. ")" end,
+}
+
+mt.mounts = {
+  __tostring = function(ms)
+  local rs = ""
+  for i = 1, #ms do
+    rs = rs .. tostring(ms[i]) .. '\n'
+  end
+  return rs
+end
+}
+
+-- will work on netbsd with Linux compat, but should use getvfsstat()
+function util.mounts(file)
+  local mf, err = util.readfile(file or "/proc/mounts")
+  if not mf then return nil, err end
+  local mounts = {}
+  for line in mf:gmatch("[^\r\n]+") do
+    local l = {}
+    local parts = {"source", "target", "type", "flags", "freq", "passno"}
+    local p = 1
+    for word in line:gmatch("%S+") do
+      l[parts[p]] = word
+      p = p + 1
+    end
+    mounts[#mounts + 1] = setmetatable(l, mt.mount)
+  end
+  -- TODO some of the options you get in /proc/mounts are file system specific and should be moved to l.data
+  -- idea is you can round-trip this data
+  -- a lot of the fs specific options are key=value so easier to recognise
+  return setmetatable(mounts, mt.mounts)
+end
+
 return util
 
 end
