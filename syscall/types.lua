@@ -105,7 +105,7 @@ end
 
 local voidp = ffi.typeof("void *")
 
-pt.void = function(x)
+function pt.void(x)
   return ffi.cast(voidp, x)
 end
 

@@ -373,7 +373,21 @@ local C = {
   writev = ffi.C.rump___sysimpl_writev,
 }
 
--- TODO this mostly works, but not for eg mmap where should return a pointer -1...
+local voidp = ffi.typeof("void *")
+
+local function ptvoid(x)
+  return ffi.cast(voidp, x)
+end
+
+local errpointer
+if abi.abi64 then errpointer = ptvoid(0xffffffffffffffffULL) else errpointer = ptvoid(0xffffffff) end
+
+function C.mmap(...)
+  ffi.errno(78) -- NetBSD ENOSYS
+  return errpointer
+end
+
+-- TODO non integer returns need special casing eg mmap above
 local function nosys()
   ffi.errno(78) -- NetBSD ENOSYS
   return -1

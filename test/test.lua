@@ -709,7 +709,7 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_utimes = function()
-    assert(util.touch(tmpfile))
+    assert(util.createfile(tmpfile))
     local st1 = S.stat(tmpfile)
     assert(S.utimes(tmpfile, {100, 200}))
     local st2 = S.stat(tmpfile)
@@ -1290,7 +1290,30 @@ test_util = {
     assert(util.touch(tmpfile))
     assert(S.unlink(tmpfile))
   end,
-  test_mounts_root = function()
+  test_readfile_writefile = function()
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
+    local ss = assert(util.readfile(tmpfile))
+    assert_equal(ss, teststring, "readfile should get back what writefile wrote")
+    assert(S.unlink(tmpfile))
+  end,
+  test_cp = function()
+    assert(util.writefile(tmpfile, teststring, "rusr,wusr"))
+    assert(util.cp(tmpfile, tmpfile2, "rusr,wusr"))
+    assert_equal(assert(util.readfile(tmpfile2)), teststring)
+    assert(S.unlink(tmpfile))
+    assert(S.unlink(tmpfile2))
+  end,
+}
+
+if not abi.rump then -- rump has no processes, memory allocation, mmap and proc not applicable
+test_util_misc = {
+  test_mapfile = function()
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
+    local ss = assert(util.mapfile(tmpfile))
+    assert_equal(ss, teststring, "mapfile should get back what writefile wrote")
+    assert(S.unlink(tmpfile))
+  end,
+  test_mounts_root = function() -- rump has no /proc which alas means no /proc/mounts
     local cwd = assert(S.getcwd())
     local dir = cwd .. "/" .. tmpfile
     assert(S.mkdir(dir))
@@ -1308,28 +1331,8 @@ test_util = {
     assert(S.umount(dir))
     assert(S.rmdir(dir))
   end,
-  test_readfile_writefile = function()
-    assert(util.writefile(tmpfile, teststring, "RWXU"))
-    local ss = assert(util.readfile(tmpfile))
-    assert_equal(ss, teststring, "readfile should get back what writefile wrote")
-    assert(S.unlink(tmpfile))
-  end,
-  test_mapfile = function()
-    assert(util.writefile(tmpfile, teststring, "RWXU"))
-    local ss = assert(util.mapfile(tmpfile))
-    assert_equal(ss, teststring, "mapfile should get back what writefile wrote")
-    assert(S.unlink(tmpfile))
-  end,
-  test_cp = function()
-    assert(util.writefile(tmpfile, teststring, "rusr,wusr"))
-    assert(util.cp(tmpfile, tmpfile2, "rusr,wusr"))
-    assert_equal(assert(util.mapfile(tmpfile2)), teststring)
-    assert(S.unlink(tmpfile))
-    assert(S.unlink(tmpfile2))
-  end,
 }
 
-if not abi.rump then -- rump has no processes, memory allocation and proc not applicable
 test_proc = {
   test_ps = function()
     local ps = util.ps()
