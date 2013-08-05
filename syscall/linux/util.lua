@@ -89,8 +89,6 @@ end
 function util.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOC.BRADDIF, bridge, dev) end
 function util.bridge_add_interface(bridge, dev) return bridge_if_ioctl(c.SIOC.BRDELIF, bridge, dev) end
 
--- should probably have constant for "/sys/class/net"
-
 local function brinfo(d) -- can be used as subpart of general interface info
   local bd = "/sys/class/net/" .. d .. "/" .. c.SYSFS_BRIDGE_ATTR
   if not S.stat(bd) then return nil end
@@ -151,79 +149,6 @@ function util.bridge_list()
     if d ~= "." and d ~= ".." then b[d] = brinfo(d) end
   end
   return b
-end
-
-local function div(a, b) return math.floor(tonumber(a) / tonumber(b)) end -- would be nicer if replaced with shifts, as only powers of 2
-
--- receive cmsg, extended helper on recvmsg, fairly incomplete at present
-function util.recvcmsg(fd, msg, flags)
-  if not msg then
-    local buf1 = t.buffer(1) -- assume user wants to receive single byte to get cmsg
-    local io = t.iovecs{{buf1, 1}}
-    local bufsize = 1024 -- sane default, build your own structure otherwise
-    local buf = t.buffer(bufsize)
-    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io, msg_control = buf, msg_controllen = bufsize}
-  end
-  local count, err = S.recvmsg(fd, msg, flags)
-  if not count then return nil, err end
-  local ret = {count = count, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
-  for mc, cmsg in msg:cmsgs() do
-    local pid , uid , gid = cmsg:credentials ( )
-    if pid then
-      ret.pid = pid
-      ret.uid = uid
-      ret.gid = gid
-    end
-    local fd_array = { }
-    for fd in cmsg:fds ( ) do
-      fd_array[#fd_array+1] = fd
-    end
-    ret.fd = fd_array
-  end
-  return ret
-end
-
--- helper functions
-
-function util.sendcred(fd, pid, uid, gid) -- only needed for root to send (incorrect!) credentials
-  if not pid then pid = S.getpid() end
-  if not uid then uid = S.getuid() end
-  if not gid then gid = S.getgid() end
-  local ucred = t.ucred()
-  ucred.pid = pid
-  ucred.uid = uid
-  ucred.gid = gid
-  local buf1 = t.buffer(1) -- need to send one byte
-  local io = t.iovecs{{buf1, 1}}
-
-  local cmsg = t.cmsghdr("socket", "credentials", ucred)
-
-  local msg = t.msghdr() -- assume socket connected and so does not need address
-  msg.msg_iov = io.iov
-  msg.msg_iovlen = #io
-  msg.msg_control = cmsg
-  msg.msg_controllen = #cmsg
-
-  return S.sendmsg(fd, msg, 0)
-end
-
-function util.sendfds(fd, ...)
-  local buf1 = t.buffer(1) -- need to send one byte
-  local io = t.iovecs{{buf1, 1}}
-  local fds = {}
-  for i, v in ipairs{...} do fds[i] = v:getfd() end
-  local fa = t.ints(#fds, fds)
-  local fasize = ffi.sizeof(fa)
-
-  local cmsg = t.cmsghdr("socket", "rights", fa, fasize)
-
-  local msg = t.msghdr() -- assume socket connected and so does not need address
-  msg.msg_iov = io.iov
-  msg.msg_iovlen = #io
-  msg.msg_control = cmsg
-  msg.msg_controllen = #cmsg
-
-  return S.sendmsg(fd, msg, 0)
 end
 
 -- eventfd read and write helpers, as in glibc but Lua friendly. Note returns 0 for EAGAIN, as 0 never returned directly

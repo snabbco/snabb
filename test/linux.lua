@@ -1363,27 +1363,6 @@ test.misc_linux_root = {
   end,
 }
 
-test.sendfd = {
-  test_sendcred = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
-    local so = assert(sv[2]:getsockopt(c.SOL.SOCKET, c.SO.PASSCRED))
-    assert(so == 1, "getsockopt should have updated value")
-    assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
-    local r = assert(util.recvcmsg(sv[2]))
-    assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
-    assert(sv:close())
-  end,
-  test_sendfd = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(util.sendfds(sv[1], S.stdin))
-    local r = assert(util.recvcmsg(sv[2]))
-    assert(#r.fd == 1, "expect to get one file descriptor back")
-    assert(r.fd[1]:close())
-    assert(sv:close())
-  end,
-}
-
 test.bridge_linux = {
   test_bridge = function()
     local ok, err = util.bridge_add("br0")

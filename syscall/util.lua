@@ -268,6 +268,75 @@ function util.mounts(file)
   return setmetatable(mounts, mt.mounts)
 end
 
+-- receive cmsg, extended helper on recvmsg, fairly incomplete at present
+function util.recvcmsg(fd, msg, flags)
+  if not msg then
+    local buf1 = t.buffer(1) -- assume user wants to receive single byte to get cmsg
+    local io = t.iovecs{{buf1, 1}}
+    local bufsize = 1024 -- sane default, build your own structure otherwise
+    local buf = t.buffer(bufsize)
+    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io, msg_control = buf, msg_controllen = bufsize}
+  end
+  local count, err = S.recvmsg(fd, msg, flags)
+  if not count then return nil, err end
+  local ret = {count = count, iovec = msg.msg_iov} -- thats the basic return value, and the iovec
+  for mc, cmsg in msg:cmsgs() do
+    local pid , uid , gid = cmsg:credentials ( )
+    if pid then
+      ret.pid = pid
+      ret.uid = uid
+      ret.gid = gid
+    end
+    local fd_array = { }
+    for fd in cmsg:fds ( ) do
+      fd_array[#fd_array+1] = fd
+    end
+    ret.fd = fd_array
+  end
+  return ret
+end
+
+function util.sendcred(fd, pid, uid, gid) -- only needed for root to send (incorrect!) credentials
+  if not pid then pid = S.getpid() end
+  if not uid then uid = S.getuid() end
+  if not gid then gid = S.getgid() end
+  local ucred = t.ucred()
+  ucred.pid = pid
+  ucred.uid = uid
+  ucred.gid = gid
+  local buf1 = t.buffer(1) -- need to send one byte
+  local io = t.iovecs{{buf1, 1}}
+
+  local cmsg = t.cmsghdr("socket", "credentials", ucred)
+
+  local msg = t.msghdr() -- assume socket connected and so does not need address
+  msg.msg_iov = io.iov
+  msg.msg_iovlen = #io
+  msg.msg_control = cmsg
+  msg.msg_controllen = #cmsg
+
+  return S.sendmsg(fd, msg, 0)
+end
+
+function util.sendfds(fd, ...)
+  local buf1 = t.buffer(1) -- need to send one byte
+  local io = t.iovecs{{buf1, 1}}
+  local fds = {}
+  for i, v in ipairs{...} do fds[i] = v:getfd() end
+  local fa = t.ints(#fds, fds)
+  local fasize = ffi.sizeof(fa)
+
+  local cmsg = t.cmsghdr("socket", "rights", fa, fasize)
+
+  local msg = t.msghdr() -- assume socket connected and so does not need address
+  msg.msg_iov = io.iov
+  msg.msg_iovlen = #io
+  msg.msg_control = cmsg
+  msg.msg_controllen = #cmsg
+
+  return S.sendmsg(fd, msg, 0)
+end
+
 return util
 
 end
