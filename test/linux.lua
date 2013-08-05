@@ -1367,8 +1367,8 @@ test.util = {
   test_rm_recursive = function()
     assert(S.mkdir(tmpfile, "rwxu"))
     assert(S.mkdir(tmpfile .. "/subdir", "rwxu"))
-    assert(util.touch(tmpfile .. "/file"))
-    assert(util.touch(tmpfile .. "/subdir/subfile"))
+    assert(util.createfile(tmpfile .. "/file"))
+    assert(util.createfile(tmpfile .. "/subdir/subfile"))
     assert(S.stat(tmpfile), "directory should be there")
     assert(S.stat(tmpfile).isdir, "should be a directory")
     local ok, err = S.rmdir(tmpfile)
@@ -1395,45 +1395,12 @@ test.util = {
     assert(found, "expect to find my process in ps")
     assert(tostring(ps), "can convert ps to string")
   end,
-  test_bridge = function()
-    local ok, err = util.bridge_add("br0")
-    assert(ok or err.NOPKG or err.PERM, err) -- ok not to to have bridge in kernel, may not be root
-    if ok then
-      local i = assert(nl.interfaces())
-      assert(i.br0)
-      local b = assert(util.bridge_list())
-      assert(b.br0, "expect to find bridge in list")
-      assert(b.br0.bridge.root_id, "expect to find root id")
-      assert(util.bridge_del("br0"))
-      i = assert(nl.interfaces())
-      assert(not i.br0, "bridge should be gone")
-    end
-  end,
-  test_bridge_delete_fail = function()
-    local ok, err = util.bridge_del("nosuchbridge99")
-    assert(not ok and (err.NOPKG or err.PERM or err.NXIO), err)
-  end,
   test_touch = function()
+    assert(not S.stat(tmpfile))
+    assert(util.touch(tmpfile))
+    assert(S.stat(tmpfile))
     assert(util.touch(tmpfile))
     assert(S.unlink(tmpfile))
-  end,
-  test_sendcred = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
-    local so = assert(sv[2]:getsockopt(c.SOL.SOCKET, c.SO.PASSCRED))
-    assert(so == 1, "getsockopt should have updated value")
-    assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
-    local r = assert(util.recvcmsg(sv[2]))
-    assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
-    assert(sv:close())
-  end,
-  test_sendfd = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(util.sendfds(sv[1], S.stdin))
-    local r = assert(util.recvcmsg(sv[2]))
-    assert(#r.fd == 1, "expect to get one file descriptor back")
-    assert(r.fd[1]:close())
-    assert(sv:close())
   end,
   test_proc_self = function()
     local p = assert(util.proc())
@@ -1483,6 +1450,48 @@ test.util = {
     assert_equal(assert(util.mapfile(tmpfile2)), teststring)
     assert(S.unlink(tmpfile))
     assert(S.unlink(tmpfile2))
+  end,
+}
+
+test.sendfd = {
+  test_sendcred = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
+    local so = assert(sv[2]:getsockopt(c.SOL.SOCKET, c.SO.PASSCRED))
+    assert(so == 1, "getsockopt should have updated value")
+    assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
+    local r = assert(util.recvcmsg(sv[2]))
+    assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
+    assert(sv:close())
+  end,
+  test_sendfd = function()
+    local sv = assert(S.socketpair("unix", "stream"))
+    assert(util.sendfds(sv[1], S.stdin))
+    local r = assert(util.recvcmsg(sv[2]))
+    assert(#r.fd == 1, "expect to get one file descriptor back")
+    assert(r.fd[1]:close())
+    assert(sv:close())
+  end,
+}
+
+test.bridge_linux = {
+  test_bridge = function()
+    local ok, err = util.bridge_add("br0")
+    assert(ok or err.NOPKG or err.PERM, err) -- ok not to to have bridge in kernel, may not be root
+    if ok then
+      local i = assert(nl.interfaces())
+      assert(i.br0)
+      local b = assert(util.bridge_list())
+      assert(b.br0, "expect to find bridge in list")
+      assert(b.br0.bridge.root_id, "expect to find root id")
+      assert(util.bridge_del("br0"))
+      i = assert(nl.interfaces())
+      assert(not i.br0, "bridge should be gone")
+    end
+  end,
+  test_bridge_delete_fail = function()
+    local ok, err = util.bridge_del("nosuchbridge99")
+    assert(not ok and (err.NOPKG or err.PERM or err.NXIO), err)
   end,
 }
 
