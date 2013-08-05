@@ -69,6 +69,44 @@ function util.ls(name, buf, size)
   end
 end
 
+-- recursive rm TODO use ls iterator, which also returns type
+local function rmhelper(file, prefix)
+  local name
+  if prefix then name = prefix .. "/" .. file else name = file end
+  local st, err = S.lstat(name)
+  if not st then return nil, err end
+  if st.isdir then
+    local files, err = util.dirtable(name, true)
+    if not files then return nil, err end
+    for _, f in pairs(files) do
+      local ok, err = rmhelper(f, name)
+      if not ok then return nil, err end
+    end
+    local ok, err = S.rmdir(name)
+    if not ok then return nil, err end
+  else
+    local ok, err = S.unlink(name)
+    if not ok then return nil, err end
+  end
+  return true
+end
+
+function util.rm(...)
+  for _, f in ipairs{...} do
+    local ok, err = rmhelper(f)
+    if not ok then return nil, err end
+  end
+  return true
+end
+
+function util.cp(source, dest, mode) -- TODO make much more functional, less broken, esp fix mode!
+  local contents, err = util.mapfile(source)
+  if not contents then return nil, err end
+  local ok, err = util.writefile(dest, contents, mode)
+  if not ok then return nil, err end
+  return true
+end
+
 function util.touch(file)
   local fd, err = S.open(file, "wronly,creat,noctty,nonblock", "0666")
   if not fd then return nil, err end
@@ -129,6 +167,104 @@ function util.writefile(name, str, mode, flags)
   local ok, err = fd:close()
   if not ok then return nil, err end
   return true
+end
+
+mt.ps = {
+  __tostring = function(ps)
+    local s = {}
+    for i = 1, #ps do
+      s[#s + 1] = tostring(ps[i])
+    end
+    return table.concat(s, '\n')
+  end
+}
+
+function util.ps()
+  local ls, err = util.dirtable("/proc")
+  if not ls then return nil, err end
+  local ps = {}
+  for i = 1, #ls do
+    if not string.match(ls[i], '[^%d]') then
+      local p = util.proc(tonumber(ls[i]))
+      if p then ps[#ps + 1] = p end
+    end
+  end
+  table.sort(ps, function(a, b) return a.pid < b.pid end)
+  return setmetatable(ps, mt.ps)
+end
+
+mt.proc = {
+  __index = function(p, k)
+    local name = p.dir .. k
+    local st, err = S.lstat(name)
+    if not st then return nil, err end
+    if st.isreg then
+      local fd, err = S.open(p.dir .. k, "rdonly")
+      if not fd then return nil, err end
+      local ret, err = S.read(fd) -- read defaults to 4k, sufficient?
+      if not ret then return nil, err end
+      S.close(fd)
+      return ret -- TODO many could usefully do with some parsing
+    end
+    if st.islnk then
+      local ret, err = S.readlink(name)
+      if not ret then return nil, err end
+      return ret
+    end
+    -- TODO directories
+  end,
+  __tostring = function(p) -- TODO decide what to print
+    local c = p.cmdline
+    if c then
+      if #c == 0 then
+        local comm = p.comm
+        if comm and #comm > 0 then
+          c = '[' .. comm:sub(1, -2) .. ']'
+        end
+      end
+      return p.pid .. '  ' .. c
+    end
+  end
+}
+
+function util.proc(pid)
+  if not pid then pid = S.getpid() end
+  return setmetatable({pid = pid, dir = "/proc/" .. pid .. "/"}, mt.proc)
+end
+
+-- TODO could add umount method.
+mt.mount = {
+  __tostring = function(m) return m.source .. " on " .. m.target .. " type " .. m.type .. " (" .. m.flags .. ")" end,
+}
+
+mt.mounts = {
+  __tostring = function(ms)
+  local rs = ""
+  for i = 1, #ms do
+    rs = rs .. tostring(ms[i]) .. '\n'
+  end
+  return rs
+end
+}
+
+function util.mounts(file)
+  local mf, err = util.readfile(file or "/proc/mounts")
+  if not mf then return nil, err end
+  local mounts = {}
+  for line in mf:gmatch("[^\r\n]+") do
+    local l = {}
+    local parts = {"source", "target", "type", "flags", "freq", "passno"}
+    local p = 1
+    for word in line:gmatch("%S+") do
+      l[parts[p]] = word
+      p = p + 1
+    end
+    mounts[#mounts + 1] = setmetatable(l, mt.mount)
+  end
+  -- TODO some of the options you get in /proc/mounts are file system specific and should be moved to l.data
+  -- idea is you can round-trip this data
+  -- a lot of the fs specific options are key=value so easier to recognise
+  return setmetatable(mounts, mt.mounts)
 end
 
 return util
