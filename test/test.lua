@@ -1264,6 +1264,96 @@ test_raw_socket = {
   end,
 }
 
+test_util = {
+  test_rm_recursive = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(S.mkdir(tmpfile .. "/subdir", "rwxu"))
+    assert(util.createfile(tmpfile .. "/file"))
+    assert(util.createfile(tmpfile .. "/subdir/subfile"))
+    assert(S.stat(tmpfile), "directory should be there")
+    assert(S.stat(tmpfile).isdir, "should be a directory")
+    local ok, err = S.rmdir(tmpfile)
+    assert(not ok and err.notempty, "should fail as not empty")
+    assert(util.rm(tmpfile)) -- rm -r
+    assert(not S.stat(tmpfile), "directory should be deleted")
+  end,
+  test_rm_broken_symlink = function()
+    assert(S.mkdir(tmpfile, "rwxu"))
+    assert(S.symlink(tmpfile .. "/none", tmpfile .. "/link"))
+    assert(util.rm(tmpfile))
+    assert(not S.stat(tmpfile), "directory should be deleted")
+  end,
+  test_ps = function()
+    local ps = util.ps()
+    local me = S.getpid()
+    local found = false
+    for i = 1, #ps do
+      if ps[i].pid == 1 then
+        assert(ps[i].cmdline:find("init") or ps[i].cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
+      end
+      if ps[i].pid == me then found = true end
+    end
+    assert(found, "expect to find my process in ps")
+    assert(tostring(ps), "can convert ps to string")
+  end,
+  test_touch = function()
+    assert(not S.stat(tmpfile))
+    assert(util.touch(tmpfile))
+    assert(S.stat(tmpfile))
+    assert(util.touch(tmpfile))
+    assert(S.unlink(tmpfile))
+  end,
+  test_proc_self = function()
+    local p = assert(util.proc())
+    assert(not p.wrongname, "test non existent files")
+    assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
+    assert(p.exe and #p.exe > 1, "expect an executable")
+    assert_equal(p.root, "/", "expect our root to be / usually")
+  end,
+  test_proc_init = function()
+    local p = util.proc(1)
+    assert(p and p.cmdline, "expect init to have cmdline")
+    assert(p.cmdline:find("init") or p.cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
+  end,
+  test_mounts_root = function()
+    local cwd = assert(S.getcwd())
+    local dir = cwd .. "/" .. tmpfile
+    assert(S.mkdir(dir))
+    local a = {source = "none", target = dir, type = "tmpfs", flags = "rdonly, noatime"}
+    assert(S.mount(a))
+    local m = assert(util.mounts())
+    assert(#m > 0, "expect at least one mount point")
+    local b = m[#m]
+    assert_equal(b.source, a.source, "expect source match")
+    assert_equal(b.target, a.target, "expect target match")
+    assert_equal(b.type, a.type, "expect type match")
+    assert_equal(c.MS[b.flags], c.MS[a.flags], "expect flags match")
+    assert_equal(b.freq, "0")
+    assert_equal(b.passno, "0")
+    assert(S.umount(dir))
+    assert(S.rmdir(dir))
+  end,
+  test_readfile_writefile = function()
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
+    local ss = assert(util.readfile(tmpfile))
+    assert_equal(ss, teststring, "readfile should get back what writefile wrote")
+    assert(S.unlink(tmpfile))
+  end,
+  test_mapfile = function()
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
+    local ss = assert(util.mapfile(tmpfile))
+    assert_equal(ss, teststring, "mapfile should get back what writefile wrote")
+    assert(S.unlink(tmpfile))
+  end,
+  test_cp = function()
+    assert(util.writefile(tmpfile, teststring, "rusr,wusr"))
+    assert(util.cp(tmpfile, tmpfile2, "rusr,wusr"))
+    assert_equal(assert(util.mapfile(tmpfile2)), teststring)
+    assert(S.unlink(tmpfile))
+    assert(S.unlink(tmpfile2))
+  end,
+}
+
 if not abi.rump then -- rump has no processes, memory allocation so not applicable
 test_mmap = {
   test_mmap_fail = function()
