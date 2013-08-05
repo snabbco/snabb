@@ -105,6 +105,7 @@ print [[
 #include <ufs/ufs/ufsmount.h>
 #include <fs/ptyfs/ptyfs.h>
 #include <fs/tmpfs/tmpfs_args.h>
+#include <miscfs/procfs/procfs.h>
 
 int ret = 0;
 
