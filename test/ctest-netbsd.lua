@@ -99,6 +99,7 @@ print [[
 #include <sys/reboot.h>
 #include <sys/module.h>
 #include <sys/syscall.h>
+#inlcude <sys/statvfs.h>
 #include <netinet/in.h>
 #include <net/route.h>
 #include <net/bpf.h>

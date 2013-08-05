@@ -44,11 +44,15 @@ typedef uint64_t _netbsd_ino_t;
 typedef int64_t _netbsd_time_t;
 typedef int64_t _netbsd_daddr_t;
 typedef uint64_t _netbsd_blkcnt_t;
+typedef uint64_t _netbsd_fsblkcnt_t;
+typedef uint64_t _netbsd_fsfilcnt_t;
 typedef uint32_t _netbsd_blksize_t;
 typedef int _netbsd_clockid_t;
 typedef int _netbsd_timer_t;
 typedef int _netbsd_suseconds_t;
 typedef unsigned int useconds_t;
+
+typedef struct { int32_t __fsid_val[2]; } _netbsd_fsid_t;
 
 typedef uint32_t _netbsd_fd_mask;
 typedef struct {
@@ -299,6 +303,32 @@ struct _netbsd_ptmget {
   int     sfd;
   char    cn[1024];
   char    sn[1024];
+};
+struct _netbsd_statvfs {
+  unsigned long   f_flag;
+  unsigned long   f_bsize;
+  unsigned long   f_frsize;
+  unsigned long   f_iosize;
+  _netbsd_fsblkcnt_t      f_blocks;
+  _netbsd_fsblkcnt_t      f_bfree;
+  _netbsd_fsblkcnt_t      f_bavail;
+  _netbsd_fsblkcnt_t      f_bresvd;
+  _netbsd_fsfilcnt_t      f_files;
+  _netbsd_fsfilcnt_t      f_ffree;
+  _netbsd_fsfilcnt_t      f_favail;
+  _netbsd_fsfilcnt_t      f_fresvd;
+  uint64_t        f_syncreads;
+  uint64_t        f_syncwrites;
+  uint64_t        f_asyncreads;
+  uint64_t        f_asyncwrites;
+  _netbsd_fsid_t          f_fsidx;
+  unsigned long   f_fsid;
+  unsigned long   f_namemax;
+  uid_t           f_owner;
+  uint32_t        f_spare[4];
+  char    f_fstypename[32];
+  char    f_mntonname[1024];
+  char    f_mntfromname[1024];
 };
 ]]
 

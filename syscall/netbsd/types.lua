@@ -32,6 +32,7 @@ local addstructs = {
   ptyfs_args = "struct ptyfs_args",
   procfs_args = "struct procfs_args",
   flock = "struct flock",
+  statvfs = "struct statvfs",
 }
 
 if abi.netbsd.version == 6 then
