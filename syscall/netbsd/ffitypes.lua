@@ -230,6 +230,10 @@ struct _netbsd_ptyfs_args {
   _netbsd_mode_t mode;
   int flags;
 };
+struct _netbsd_procfs_args {
+  int version;
+  int flags;
+};
 struct _netbsd_dirent {
   _netbsd_ino_t d_fileno;
   uint16_t d_reclen;

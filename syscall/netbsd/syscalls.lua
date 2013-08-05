@@ -38,11 +38,16 @@ local mntstruct = {
   tmpfs = t.tmpfs_args,
   sysvbfs = t.ufs_args,
   ptyfs = t.ptyfs_args,
+  procfs = t.procfs_args,
 }
 
 -- TODO allow putting data in same table rather than nested table?
 function S.mount(filesystemtype, dir, flags, data, datalen)
-  if type(data) == "string" then data = {fspec = pt.char(data)} end -- common case, for ufs etc
+  local str, str2
+  if type(data) == "string" then -- common case, for ufs etc
+    str = data
+    data = {fspec = pt.char(str)}
+  end
   if type(filesystemtype) == "table" then
     local t = filesystemtype
     dir = t.target or t.dir

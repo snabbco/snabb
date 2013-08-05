@@ -59,6 +59,9 @@ if rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switc
   assert(S.mkdir("/dev/pts", "0555"))
   local data = t.ptyfs_args{version = 2, gid = 0, mode = helpers.octal("0555")}
   assert(S.mount("ptyfs", "/dev/pts", 0, data, s.ptyfs_args))
+  --assert(S.mkdir("/proc"))
+  --local data = t.procfs_args{version = 1}
+  --assert(S.mount("procfs", "/proc", 0, data, s.procfs_args))
   S.rump.switchlwp(lwp1)
   local ok, err = S.mount("tmpfs", "/tmp", 0, data, s.tmpfs_args)
   assert(err, "mount should fail as not in NetBSD compat now")
@@ -75,6 +78,8 @@ elseif rump and S.geteuid() == 0 then -- some initial setup for non-Linux rump
   assert(S.chdir("/tmp"))
   assert(S.mkdir("/dev/pts", "0555"))
   assert(S.mount{dir="/dev/pts", type="ptyfs", data = {version = 2, gid = 0, mode = octal("0320")}})
+  assert(S.mkdir("/proc"))
+  assert(S.mount{dir="/proc", type="procfs", data = {version = 1}})
 end
 
 local bit = require "bit"
