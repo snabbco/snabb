@@ -9,6 +9,7 @@ pcall, type, table, string, math, bit
 
 local function init(abi)
 
+require "syscall.ffitypes"
 require("syscall." .. (abi.types or abi.os) .. ".ffitypes").init(abi)
 
 if not abi.rump then require "syscall.ffifunctions" end

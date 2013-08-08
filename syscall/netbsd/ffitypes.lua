@@ -9,8 +9,6 @@ pcall, type, table, string, math, bit
 
 local function init(abi)
 
-require "syscall.ffitypes"
-
 local ffi = require "ffi"
 
 local cdef
