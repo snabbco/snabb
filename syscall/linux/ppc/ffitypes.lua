@@ -30,6 +30,6 @@ typedef struct {
   fpregset_t fpregs;
   vrregset_t vrregs __attribute__((__aligned__(16)));
 } mcontext_t;
-]].
+]],
 }
 
