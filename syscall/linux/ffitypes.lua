@@ -9,8 +9,6 @@ pcall, type, table, string, math, bit
 
 local function init(abi)
 
-local ffi = require "ffi"
-
 local arch = require("syscall.linux." .. abi.arch .. ".ffitypes") -- architecture specific definitions
 
 local defs = {}
@@ -938,7 +936,7 @@ struct iphdr {
 ]]
 end
 
-ffi.cdef(table.concat(defs, ""))
+return table.concat(defs, "")
 
 end
 

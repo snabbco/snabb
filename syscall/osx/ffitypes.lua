@@ -9,8 +9,6 @@ pcall, type, table, string, math, bit
 
 local function init(abi)
 
-local ffi = require "ffi"
-
 local defs = {}
 
 local function append(str) defs[#defs + 1] = str end
@@ -177,7 +175,7 @@ struct iphdr {
 ]]
 end
 
-ffi.cdef(table.concat(defs, ""))
+return table.concat(defs, "")
 
 end
 
