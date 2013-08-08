@@ -29,7 +29,7 @@ local types = {t = {}, pt = {}, s = {}, ctypes = {}}
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local sharedtypes = require "syscall.sharedtypes"
+local sharedtypes = require "syscall.shared.types"
 
 for k, v in pairs(sharedtypes.t) do t[k] = v end
 for k, v in pairs(sharedtypes.pt) do pt[k] = v end

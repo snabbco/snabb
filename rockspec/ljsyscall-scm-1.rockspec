@@ -27,7 +27,6 @@ build =
       ["syscall.helpers"] = "syscall/helpers.lua";
       ["syscall.syscalls"] = "syscall/syscalls.lua";
       ["syscall.ffifunctions"] = "syscall/ffifunctions.lua";
-      ["syscall.sharedtypes"] = "syscall/sharedtypes.lua";
       ["syscall.features"] = "syscall/features.lua";
       ["syscall.libc"] = "syscall/libc.lua";
       ["syscall.methods"] = "syscall/methods.lua";
@@ -35,6 +34,8 @@ build =
       ["syscall.util"] = "syscall/util.lua";
       ["syscall.compat"] = "syscall/compat.lua";
       ["syscall.init"] = "syscall/init.lua";
+
+      ["syscall.shared.types"] = "syscall/shared/types.lua";
 
       ["syscall.linux.syscalls"] = "syscall/linux/syscalls.lua";
       ["syscall.linux.c"] = "syscall/linux/c.lua";
