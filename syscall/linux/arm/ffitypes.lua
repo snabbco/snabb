@@ -7,12 +7,10 @@ require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math, bit
 
-local ffi = require "ffi"
-
 local arch = {}
 
 arch.ucontext = function()
-ffi.cdef[[
+return [[
 typedef int greg_t, gregset_t[18];
 typedef struct sigcontext {
   unsigned long trap_no, error_code, oldmask;

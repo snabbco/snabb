@@ -7,12 +7,10 @@ require, print, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math, bit
 
-local ffi = require "ffi"
-
 local arch = {}
 
 arch.ucontext = function()
-ffi.cdef [[
+return [[
 typedef struct sigaltstack {
   void *ss_sp;
   size_t ss_size;

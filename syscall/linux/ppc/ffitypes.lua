@@ -12,7 +12,7 @@ local ffi = require "ffi"
 local arch = {}
 
 arch.termio = function()
-ffi.cdef[[
+return [[
 static const int NCC = 10;
 struct termio {
   unsigned short c_iflag;
@@ -26,7 +26,7 @@ struct termio {
 end
 
 arch.ucontext = function()
-ffi.cdef[[
+return [[
 typedef unsigned long greg_t, gregset_t[48];
 typedef struct {
   double fpregs[32];

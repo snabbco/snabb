@@ -5,7 +5,7 @@ local ffi = require "ffi"
 local arch = {}
 
 arch.ucontext = function()
-ffi.cdef [[
+return [[
 typedef int greg_t, gregset_t[19];
 typedef struct _fpstate {
   unsigned long cw, sw, tag, ipoff, cssel, dataoff, datasel;

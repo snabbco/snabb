@@ -5,7 +5,7 @@ local ffi = require "ffi"
 local arch = {}
 
 arch.epoll = function()
-ffi.cdef[[
+return [[
 struct epoll_event {
   uint32_t events;
   epoll_data_t data;
@@ -15,7 +15,7 @@ end
 
 -- packed to match x86
 arch.statfs64 = function()
-ffi.cdef[[
+return [[
 typedef long statfs_word;
 struct statfs64 {
   statfs_word f_type;
@@ -35,7 +35,7 @@ struct statfs64 {
 end
 
 arch.ucontext = function()
-ffi.cdef[[
+return [[
 typedef long long greg_t, gregset_t[23];
 typedef struct _fpstate {
   unsigned short cwd, swd, ftw, fop;

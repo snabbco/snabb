@@ -87,10 +87,10 @@ struct pollfd {
   short int events;
   short int revents;
 };
-typedef struct { /* based on Linux/FreeBSD FD_SETSIZE = 1024, the kernel can do more, so can increase, but bad performance so dont! */
+typedef struct { /* based on Linux FD_SETSIZE = 1024, the kernel can do more, so can increase */
   fd_mask fds_bits[1024 / (sizeof (fd_mask) * 8)];
 } fd_set;
-struct ucred { /* this is Linux specific */
+struct ucred {
   pid_t pid;
   uid_t uid;
   gid_t gid;
@@ -99,7 +99,7 @@ struct rlimit64 {
   rlim64_t rlim_cur;
   rlim64_t rlim_max;
 };
-struct sysinfo { /* Linux only */
+struct sysinfo {
   long uptime;
   unsigned long loads[3];
   unsigned long totalram;
@@ -113,7 +113,7 @@ struct sysinfo { /* Linux only */
   unsigned long totalhigh;
   unsigned long freehigh;
   unsigned int mem_unit;
-  char _f[20-2*sizeof(long)-sizeof(int)];
+  char _f[20-2*sizeof(long)-sizeof(int)]; /* TODO ugh, remove calculation */
 };
 struct timex {
   unsigned int modes;
@@ -169,13 +169,13 @@ struct sockaddr {
 struct sockaddr_storage {
   sa_family_t ss_family;
   unsigned long int __ss_align;
-  char __ss_padding[128 - 2 * sizeof(unsigned long int)]; /* total length 128 */
+  char __ss_padding[128 - 2 * sizeof(unsigned long int)]; /* total length 128 TODO no calculations */
 };
 struct sockaddr_in {
   sa_family_t    sin_family;
   in_port_t      sin_port;
   struct in_addr sin_addr;
-  unsigned char  sin_zero[8]; /* padding, should not vary by arch */
+  unsigned char  sin_zero[8];
 };
 struct sockaddr_in6 {
   sa_family_t    sin6_family;
@@ -211,7 +211,7 @@ struct nlmsghdr {
   uint32_t           nlmsg_pid;
 };
 struct rtgenmsg {
-  unsigned char           rtgen_family;
+  unsigned char rtgen_family;
 };
 struct ifinfomsg {
   unsigned char   ifi_family;
@@ -428,8 +428,8 @@ struct inotify_event {
   char name[?];
 };
 struct linux_dirent64 {
-  uint64_t             d_ino;
-  int64_t              d_off;
+  uint64_t        d_ino;
+  int64_t         d_off;
   unsigned short  d_reclen;
   unsigned char   d_type;
   char            d_name[0];
@@ -758,9 +758,9 @@ struct sigaction {
 ]]
 end
 
-arch.ucontext() -- there is no default for ucontext and related types as very machine specific
+cdef(arch.ucontext()) -- there is no default for ucontext and related types as very machine specific
 
-if arch.termio then arch.termio()
+if arch.termio then cdef(arch.termio())
 else
 cdef[[
 static const int NCC = 8;
@@ -775,7 +775,7 @@ struct termio {
 ]]
 end
 
-if arch.statfs then arch.statfs()
+if arch.statfs then cdef(arch.statfs())
 else
 -- Linux struct statfs/statfs64 depends on 64/32 bit
 if abi.abi64 then
@@ -855,7 +855,7 @@ struct stat { /* only for 32 bit architectures */
 end
 
 -- epoll packed on x86_64 only (so same as x86)
-if arch.epoll then arch.epoll()
+if arch.epoll then cdef(arch.epoll())
 else
 cdef[[
 struct epoll_event {
