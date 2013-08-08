@@ -1,8 +1,7 @@
 -- ppc specific definitions
 
-local arch = {}
-
-arch.termio = [[
+return {
+  termio = [[
 static const int NCC = 10;
 struct termio {
   unsigned short c_iflag;
@@ -12,9 +11,8 @@ struct termio {
   unsigned char c_line;
   unsigned char c_cc[NCC];
 };
-]]
-
-arch.ucontext = [[
+]],
+  ucontext = [[
 typedef unsigned long greg_t, gregset_t[48];
 typedef struct {
   double fpregs[32];
@@ -32,7 +30,6 @@ typedef struct {
   fpregset_t fpregs;
   vrregset_t vrregs __attribute__((__aligned__(16)));
 } mcontext_t;
-]]
-
-return arch
+]].
+}
 

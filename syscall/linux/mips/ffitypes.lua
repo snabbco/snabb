@@ -1,8 +1,7 @@
 -- MIPS specific definitions
 
-local arch = {}
-
-arch.ucontext = [[
+return {
+  ucontext = [[
 typedef struct sigaltstack {
   void *ss_sp;
   size_t ss_size;
@@ -24,7 +23,6 @@ typedef struct __ucontext {
   sigset_t uc_sigmask;
   unsigned long uc_regspace[128];
 } ucontext_t;
-]]
-
-return arch
+]],
+}
 

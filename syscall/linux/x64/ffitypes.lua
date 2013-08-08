@@ -1,16 +1,13 @@
 -- x64 specific definitions
 
-local arch = {}
-
-arch.epoll = [[
+return {
+  epoll = [[
 struct epoll_event {
   uint32_t events;
   epoll_data_t data;
 }  __attribute__ ((packed));
-]]
-
--- packed to match x86
-arch.statfs64 = [[
+]],
+  statfs64 = [[
 typedef long statfs_word;
 struct statfs64 {
   statfs_word f_type;
@@ -26,9 +23,8 @@ struct statfs64 {
   statfs_word f_flags;
   statfs_word f_spare[4];
 } __attribute__((packed,aligned(4)));
-]]
-
-arch.ucontext = [[
+]],
+  ucontext = [[
 typedef long long greg_t, gregset_t[23];
 typedef struct _fpstate {
   unsigned short cwd, swd, ftw, fop;
@@ -55,7 +51,7 @@ typedef struct __ucontext {
   sigset_t uc_sigmask;
   unsigned long __fpregs_mem[64];
 } ucontext_t;
-]]
+]],
+}
 
-return arch
 

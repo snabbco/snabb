@@ -1,8 +1,7 @@
 -- arm specific definitions
 
-local arch = {}
-
-arch.ucontext = [[
+return {
+  ucontext = [[
 typedef int greg_t, gregset_t[18];
 typedef struct sigcontext {
   unsigned long trap_no, error_code, oldmask;
@@ -20,6 +19,6 @@ typedef struct __ucontext {
   sigset_t uc_sigmask;
   unsigned long long uc_regspace[64];
 } ucontext_t;
-]]
+]],
+}
 
-return arch
