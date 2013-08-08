@@ -1,16 +1,8 @@
 -- MIPS specific definitions
 
-local require, print, error, assert, tonumber, tostring,
-setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math, bit = 
-require, print, error, assert, tonumber, tostring,
-setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math, bit
-
 local arch = {}
 
-arch.ucontext = function()
-return [[
+arch.ucontext = [[
 typedef struct sigaltstack {
   void *ss_sp;
   size_t ss_size;
@@ -33,7 +25,6 @@ typedef struct __ucontext {
   unsigned long uc_regspace[128];
 } ucontext_t;
 ]]
-end
 
 return arch
 

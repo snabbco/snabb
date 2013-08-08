@@ -1,18 +1,8 @@
 -- ppc specific definitions
 
-local require, print, error, assert, tonumber, tostring,
-setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math, bit = 
-require, print, error, assert, tonumber, tostring,
-setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math, bit
-
-local ffi = require "ffi"
-
 local arch = {}
 
-arch.termio = function()
-return [[
+arch.termio = [[
 static const int NCC = 10;
 struct termio {
   unsigned short c_iflag;
@@ -23,10 +13,8 @@ struct termio {
   unsigned char c_cc[NCC];
 };
 ]]
-end
 
-arch.ucontext = function()
-return [[
+arch.ucontext = [[
 typedef unsigned long greg_t, gregset_t[48];
 typedef struct {
   double fpregs[32];
@@ -45,7 +33,6 @@ typedef struct {
   vrregset_t vrregs __attribute__((__aligned__(16)));
 } mcontext_t;
 ]]
-end
 
 return arch
 

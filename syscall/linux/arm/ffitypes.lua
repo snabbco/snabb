@@ -1,16 +1,8 @@
 -- arm specific definitions
 
-local require, print, error, assert, tonumber, tostring,
-setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math, bit = 
-require, print, error, assert, tonumber, tostring,
-setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math, bit
-
 local arch = {}
 
-arch.ucontext = function()
-return [[
+arch.ucontext = [[
 typedef int greg_t, gregset_t[18];
 typedef struct sigcontext {
   unsigned long trap_no, error_code, oldmask;
@@ -29,6 +21,5 @@ typedef struct __ucontext {
   unsigned long long uc_regspace[64];
 } ucontext_t;
 ]]
-end
 
 return arch

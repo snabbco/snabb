@@ -743,7 +743,7 @@ typedef struct siginfo {
 } siginfo_t;
 ]]
 
-if arch.sigaction then arch.sigaction()
+if arch.sigaction then cdef(arch.sigaction)
 else
 cdef[[
 struct sigaction {
@@ -758,9 +758,9 @@ struct sigaction {
 ]]
 end
 
-cdef(arch.ucontext()) -- there is no default for ucontext and related types as very machine specific
+cdef(arch.ucontext) -- there is no default for ucontext and related types as very machine specific
 
-if arch.termio then cdef(arch.termio())
+if arch.termio then cdef(arch.termio)
 else
 cdef[[
 static const int NCC = 8;
@@ -775,7 +775,7 @@ struct termio {
 ]]
 end
 
-if arch.statfs then cdef(arch.statfs())
+if arch.statfs then cdef(arch.statfs)
 else
 -- Linux struct statfs/statfs64 depends on 64/32 bit
 if abi.abi64 then
@@ -855,7 +855,7 @@ struct stat { /* only for 32 bit architectures */
 end
 
 -- epoll packed on x86_64 only (so same as x86)
-if arch.epoll then cdef(arch.epoll())
+if arch.epoll then cdef(arch.epoll)
 else
 cdef[[
 struct epoll_event {
