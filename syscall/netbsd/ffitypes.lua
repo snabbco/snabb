@@ -357,6 +357,8 @@ struct iphdr {
 ]]
 end
 
+local ffi = require "ffi"
+
 if abi.rump and abi.host ~= "netbsd" then
   ffi.cdef(table.concat(defs, ""))
 else

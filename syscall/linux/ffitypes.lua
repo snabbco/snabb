@@ -936,6 +936,8 @@ struct iphdr {
 ]]
 end
 
+local ffi = require "ffi"
+
 ffi.cdef(table.concat(defs, ""))
 
 end
