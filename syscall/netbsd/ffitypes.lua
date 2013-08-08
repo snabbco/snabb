@@ -9,6 +9,7 @@ pcall, type, table, string, math, bit
 
 local function init(abi)
 
+
 local defs = {}
 
 local function append(str) defs[#defs + 1] = str end
@@ -357,9 +358,11 @@ struct iphdr {
 end
 
 if abi.rump and abi.host ~= "netbsd" then
-  return table.concat(defs, "")
+  ffi.cdef(table.concat(defs, ""))
 else
-  return string.gsub(table.concat(defs, ""), "_netbsd_", "") -- remove netbsd types
+  local s = table.concat(defs, "")
+  s = string.gsub(s, "_netbsd_", "") -- remove netbsd types
+  ffi.cdef(s)
 end
 
 end

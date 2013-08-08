@@ -936,7 +936,7 @@ struct iphdr {
 ]]
 end
 
-return table.concat(defs, "")
+ffi.cdef(table.concat(defs, ""))
 
 end
 
