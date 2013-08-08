@@ -11,7 +11,7 @@ local function init(abi)
 
 local ffi = require "ffi"
 
-ffi.cdef(require "syscall.ffitypes")
+require "syscall.ffitypes"
 require("syscall." .. (abi.types or abi.os) .. ".ffitypes").init(abi)
 
 if not abi.rump then require "syscall.ffifunctions" end

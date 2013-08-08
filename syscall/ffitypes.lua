@@ -1,9 +1,21 @@
 -- these are types which are currently the same for all ports
 -- in a module so rump does not import twice
 -- note that even if type is same (like pollfd) if the metatype is different cannot be here due to ffi
+
+local require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math, bit = 
+require, print, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math, bit
+
+local ffi = require "ffi"
+
+local cdef = ffi.cdef
+
 -- note that some of the typedefs which are not really needed are not at present created as Lua types, eg speed_t
 
-return [[
+cdef[[
 // 8 bit
 typedef unsigned char cc_t;
 
