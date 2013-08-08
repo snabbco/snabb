@@ -11,29 +11,22 @@ local function init(abi)
 
 local ffi = require "ffi"
 
-local cdef
+local defs = {}
 
-if abi.rump and abi.host ~= "netbsd" then
-  cdef = ffi.cdef
-else
-  cdef = function(s)
-    s = string.gsub(s, "_netbsd_", "") -- remove netbsd types
-    ffi.cdef(s)
-  end
-end
+local function append(str) defs[#defs + 1] = str end
 
 -- these are the same, could just define as uint
 if abi.abi64 then
-cdef [[
+append [[
 typedef unsigned int _netbsd_clock_t;
 ]]
 else
-cdef [[
+append [[
 typedef unsigned long _netbsd_clock_t;
 ]]
 end
 
-cdef [[
+append [[
 typedef uint32_t _netbsd_mode_t;
 typedef uint8_t _netbsd_sa_family_t;
 typedef uint64_t _netbsd_dev_t;
@@ -140,7 +133,7 @@ typedef union _netbsd_sigval {
 ]]
 
 if abi.abi64 then
-cdef [[
+append [[
 struct _ksiginfo {
   int     _signo;
   int     _code;
@@ -171,7 +164,7 @@ struct _ksiginfo {
 };
 ]]
 else
-cdef [[
+append [[
 struct _ksiginfo {
   int     _signo;
   int     _code;
@@ -202,7 +195,7 @@ struct _ksiginfo {
 ]]
 end
 
-cdef [[
+append [[
 typedef union _netbsd_siginfo {
   char    si_pad[128];    /* Total size; for future expansion */
   struct _ksiginfo _info;
@@ -332,7 +325,7 @@ struct _netbsd_statvfs {
 
 -- endian dependent TODO not really, define in independent way
 if abi.le then
-cdef[[
+append [[
 struct iphdr {
   uint8_t  ihl:4,
            version:4;
@@ -348,7 +341,7 @@ struct iphdr {
 };
 ]]
 else
-cdef[[
+append [[
 struct iphdr {
   uint8_t  version:4,
            ihl:4;
@@ -363,6 +356,14 @@ struct iphdr {
   uint32_t daddr;
 };
 ]]
+end
+
+if abi.rump and abi.host ~= "netbsd" then
+  ffi.cdef(table.concat(defs, ""))
+else
+  local s = table.concat(defs, "")
+  s = string.gsub(s, "_netbsd_", "") -- remove netbsd types
+  ffi.cdef(s)
 end
 
 end

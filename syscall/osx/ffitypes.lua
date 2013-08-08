@@ -9,9 +9,13 @@ pcall, type, table, string, math, bit
 
 local function init(abi)
 
-local cdef = require "ffi".cdef
+local ffi = require "ffi"
 
-cdef [[
+local defs = {}
+
+local function append(str) defs[#defs + 1] = str end
+
+append [[
 typedef uint16_t mode_t;
 typedef uint8_t sa_family_t;
 typedef uint32_t dev_t;
@@ -140,7 +144,7 @@ struct dirent {
 
 -- endian dependent TODO not really, define in independent way
 if abi.le then
-cdef[[
+append [[
 struct iphdr {
   uint8_t  ihl:4,
            version:4;
@@ -156,7 +160,7 @@ struct iphdr {
 };
 ]]
 else
-cdef[[
+append [[
 struct iphdr {
   uint8_t  version:4,
            ihl:4;
@@ -172,6 +176,8 @@ struct iphdr {
 };
 ]]
 end
+
+ffi.cdef(table.concat(defs, ""))
 
 end
 

@@ -9,11 +9,15 @@ pcall, type, table, string, math, bit
 
 local function init(abi)
 
-local cdef = require "ffi".cdef
+local ffi = require "ffi"
 
 local arch = require("syscall.linux." .. abi.arch .. ".ffitypes") -- architecture specific definitions
 
-cdef[[
+local defs = {}
+
+local function append(str) defs[#defs + 1] = str end
+
+append [[
 typedef uint32_t mode_t;
 typedef unsigned short int sa_family_t;
 typedef uint64_t rlim64_t;
@@ -684,18 +688,18 @@ struct vhost_memory {
 
 -- Linux struct siginfo padding depends on architecture
 if abi.abi64 then
-cdef[[
+append [[
 static const int SI_MAX_SIZE = 128;
 static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 4;
 ]]
 else
-cdef[[
+append [[
 static const int SI_MAX_SIZE = 128;
 static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 3;
 ]]
 end
 
-cdef[[
+append [[
 typedef struct siginfo {
   int si_signo;
   int si_errno;
@@ -741,9 +745,9 @@ typedef struct siginfo {
 } siginfo_t;
 ]]
 
-if arch.sigaction then cdef(arch.sigaction)
+if arch.sigaction then append(arch.sigaction)
 else
-cdef[[
+append [[
 struct sigaction {
   union {
     sighandler_t sa_handler;
@@ -756,11 +760,11 @@ struct sigaction {
 ]]
 end
 
-cdef(arch.ucontext) -- there is no default for ucontext and related types as very machine specific
+append(arch.ucontext) -- there is no default for ucontext and related types as very machine specific
 
-if arch.termio then cdef(arch.termio)
+if arch.termio then append(arch.termio)
 else
-cdef[[
+append [[
 static const int NCC = 8;
 struct termio {
   unsigned short c_iflag;
@@ -773,19 +777,20 @@ struct termio {
 ]]
 end
 
-if arch.statfs then cdef(arch.statfs)
+if arch.statfs then append(arch.statfs)
 else
 -- Linux struct statfs/statfs64 depends on 64/32 bit
 if abi.abi64 then
-cdef[[
+append [[
 typedef long statfs_word;
 ]]
 else
-cdef[[
+append [[
 typedef uint32_t statfs_word;
 ]]
 end
-cdef[[
+
+append [[
 struct statfs64 {
   statfs_word f_type;
   statfs_word f_bsize;
@@ -804,7 +809,7 @@ struct statfs64 {
 end
 
 if abi.abi64 then
-cdef[[
+append [[
 struct stat {  /* only used on 64 bit architectures */
   unsigned long   st_dev;
   unsigned long   st_ino;
@@ -827,7 +832,7 @@ struct stat {  /* only used on 64 bit architectures */
 };
 ]]
 else
-cdef [[
+append [[
 struct stat { /* only for 32 bit architectures */
   unsigned long long      st_dev;
   unsigned char   __pad0[4];
@@ -853,9 +858,9 @@ struct stat { /* only for 32 bit architectures */
 end
 
 -- epoll packed on x86_64 only (so same as x86)
-if arch.epoll then cdef(arch.epoll)
+if arch.epoll then append(arch.epoll)
 else
-cdef[[
+append [[
 struct epoll_event {
   uint32_t events;
   epoll_data_t data;
@@ -865,7 +870,7 @@ end
 
 -- endian dependent
 if abi.le then
-cdef[[
+append [[
 struct iocb {
   uint64_t   aio_data;
   uint32_t   aio_key, aio_reserved1;
@@ -881,7 +886,7 @@ struct iocb {
 };
 ]]
 else
-cdef[[
+append [[
 struct iocb {
   uint64_t   aio_data;
   uint32_t   aio_reserved1, aio_key;
@@ -900,7 +905,7 @@ end
 
 -- endian dependent TODO not really, define in independent way
 if abi.le then
-cdef[[
+append [[
 struct iphdr {
   uint8_t  ihl:4,
            version:4;
@@ -916,7 +921,7 @@ struct iphdr {
 };
 ]]
 else
-cdef[[
+append [[
 struct iphdr {
   uint8_t  version:4,
            ihl:4;
@@ -932,6 +937,8 @@ struct iphdr {
 };
 ]]
 end
+
+ffi.cdef(table.concat(defs, ""))
 
 end
 
