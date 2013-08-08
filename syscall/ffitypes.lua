@@ -12,7 +12,6 @@ pcall, type, table, string, math, bit
 local ffi = require "ffi"
 
 local cdef = ffi.cdef
-local le = ffi.abi("le") -- normally we would use abi file, but not included here
 
 -- note that some of the typedefs which are not really needed are not at present created as Lua types, eg speed_t
 
@@ -72,39 +71,5 @@ struct udphdr {
 };
 ]]
 
--- endian dependent TODO not really, define in independent way
-if le then
-cdef[[
-struct iphdr {
-  uint8_t  ihl:4,
-           version:4;
-  uint8_t  tos;
-  uint16_t tot_len;
-  uint16_t id;
-  uint16_t frag_off;
-  uint8_t  ttl;
-  uint8_t  protocol;
-  uint16_t check;
-  uint32_t saddr;
-  uint32_t daddr;
-};
-]]
-else
-cdef[[
-struct iphdr {
-  uint8_t  version:4,
-           ihl:4;
-  uint8_t  tos;
-  uint16_t tot_len;
-  uint16_t id;
-  uint16_t frag_off;
-  uint8_t  ttl;
-  uint8_t  protocol;
-  uint16_t check;
-  uint32_t saddr;
-  uint32_t daddr;
-};
-]]
-end
 
 
