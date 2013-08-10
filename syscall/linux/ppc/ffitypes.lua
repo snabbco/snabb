@@ -30,6 +30,18 @@ typedef struct {
   fpregset_t fpregs;
   vrregset_t vrregs __attribute__((__aligned__(16)));
 } mcontext_t;
+typedef struct ucontext {
+  unsigned long int uc_flags;
+  struct ucontext *uc_link;
+  stack_t uc_stack;
+  int uc_pad[7];
+  union uc_regs_ptr {
+    struct pt_regs *regs;
+    mcontext_t *uc_regs;
+  } uc_mcontext;
+  sigset_t    uc_sigmask;
+  char uc_reg_space[sizeof(mcontext_t) + 12];  /* last for extensibility */
+} ucontext_t;
 ]],
 }
 
