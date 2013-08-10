@@ -16,6 +16,7 @@ local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
 
+-- TODO clean up when 64 bit bitops available, remove from types
 local function u6432(x) return t.u6432(x):to32() end
 local function i6432(x) return t.i6432(x):to32() end
 
@@ -33,6 +34,8 @@ else
   arg64 = function(val) return i6432(val) end
   arg64u = function(val) return u6432(val) end
 end
+-- _llseek very odd
+local function llarg64(val) return u6432(val) end
 
 local function inlibc_fn(k) return ffi.C[k] end
 
@@ -96,11 +99,11 @@ if abi.abi32 then
     local off1, off2 = arg64(offset)
     return C.syscall(c.SYS.pwritev, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
   end
-  -- lseek is a mess in 32 bit, use _llseek syscall to get clean result. Note reversed off1, of2
+  -- lseek is a mess in 32 bit, use _llseek syscall to get clean result.
   function C.lseek(fd, offset, whence)
     local result = t.off1()
-    local off1, off2 = arg64u(offset)
-    local ret = C.syscall(c.SYS._llseek, t.int(fd), t.ulong(off2), t.ulong(off1), pt.void(result), t.uint(whence))
+    local off1, off2 = llarg64(offset)
+    local ret = C.syscall(c.SYS._llseek, t.int(fd), t.ulong(off1), t.ulong(off2), pt.void(result), t.uint(whence))
     if ret == -1 then return -1 end
     return result[0]
   end
