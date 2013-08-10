@@ -376,7 +376,7 @@ test_read_write = {
   end,
   test_preadv_pwritev = function()
     if not features.preadv() then return true end
-    local offset = 0
+    local offset = 10
     local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
     assert_equal(n, 13, "expect length 13")
