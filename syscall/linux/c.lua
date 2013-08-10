@@ -34,8 +34,9 @@ else
   arg64 = function(val) return i6432(val) end
   arg64u = function(val) return u6432(val) end
 end
--- _llseek very odd
-local function llarg64(val) return u6432(val) end
+-- _llseek very odd, preadv
+local function llarg64u(val) return u6432(val) end
+local function llarg64(val) return i6432(val) end
 
 local function inlibc_fn(k) return ffi.C[k] end
 
@@ -92,17 +93,17 @@ if abi.abi32 then
   function C.fstatfs(fd, buf) return C.syscall(c.SYS.fstatfs64, t.int(fd), t.uint(s.statfs), pt.void(buf)) end
   -- Note very odd split 64 bit arguments even on 64 bit platform.
   function C.preadv(fd, iov, iovcnt, offset)
-    local off1, off2 = arg64(offset)
-    return C.syscall(c.SYS.preadv, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
+    local off1, off2 = llarg64(offset)
+    return C.syscall(c.SYS.preadv, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off2), t.long(off1))
   end
   function C.pwritev(fd, iov, iovcnt, offset)
-    local off1, off2 = arg64(offset)
-    return C.syscall(c.SYS.pwritev, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off1), t.long(off2))
+    local off1, off2 = llarg64(offset)
+    return C.syscall(c.SYS.pwritev, t.int(fd), pt.void(iov), t.int(iovcnt), t.long(off2), t.long(off1))
   end
   -- lseek is a mess in 32 bit, use _llseek syscall to get clean result.
   function C.lseek(fd, offset, whence)
     local result = t.off1()
-    local off1, off2 = llarg64(offset)
+    local off1, off2 = llarg64u(offset)
     local ret = C.syscall(c.SYS._llseek, t.int(fd), t.ulong(off1), t.ulong(off2), pt.void(result), t.uint(whence))
     if ret == -1 then return -1 end
     return result[0]
