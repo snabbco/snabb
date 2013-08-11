@@ -19,6 +19,8 @@ append [[
 typedef uint32_t mode_t;
 typedef unsigned short int sa_family_t;
 typedef uint64_t rlim64_t;
+typedef uint64_t ino64_t;
+typedef uint64_t blkcnt64_t;
 typedef unsigned long nlink_t;
 typedef unsigned long ino_t;
 typedef long time_t;
