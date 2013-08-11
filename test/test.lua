@@ -1199,13 +1199,14 @@ test_raw_socket = {
       0xb8, 0x61, 0xc0, 0xa8, 0x00, 0x01,
       0xc0, 0xa8, 0x00, 0xc7}
 
-    local expected = 0x61B8 -- note reversed from example at https://en.wikipedia.org/wiki/IPv4_header_checksum#Example:_Calculating_a_checksum due to byte order issue
+    local expected
+    if abi.le then expected = 0x61B8 else expected = 0xB861 end
 
     local buf = t.buffer(#packet, packet)
     local iphdr = pt.iphdr(buf)
     iphdr[0].check = 0
     local cs = iphdr[0]:checksum()
-    assert(cs == expected, "expect correct ip checksum: " .. string.format("%%%04X", cs) .. " " .. string.format("%%%04X", expected))
+    assert(cs == expected, "expect correct ip checksum: got " .. string.format("%%%04X", cs) .. " expected " .. string.format("%%%04X", expected))
   end,
   test_raw_udp_root = function() -- TODO create some helper functions, this is not very nice
 
