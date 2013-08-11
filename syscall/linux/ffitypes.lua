@@ -806,6 +806,8 @@ struct statfs64 {
 ]]
 end
 
+if arch.stat then append(arch.stat)
+else
 if abi.abi64 then
 append [[
 struct stat {  /* only used on 64 bit architectures */
@@ -853,6 +855,7 @@ struct stat { /* only for 32 bit architectures */
   unsigned long long      st_ino;
 };
 ]]
+end
 end
 
 -- epoll packed on x86_64 only (so same as x86)
