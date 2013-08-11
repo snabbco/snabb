@@ -372,13 +372,11 @@ void sassert_u64(uint64_t a, uint64_t b, char *n) {
 int main(int argc, char **argv) {
 ]]
 
--- TODO fix; ignore all __ prefixed ones
+-- TODO fix
 local ignore_offsets = {
   st_atime_nsec = true, -- stat
   st_ctime_nsec = true, -- stat
   st_mtime_nsec = true, -- stat
-  __pad0 = true, -- stat
-  __pad3 = true, -- stat
   val = true, -- sigset_t, I think renamed
   ihl = true, -- bitfield
   version = true, -- bitfield
@@ -394,7 +392,7 @@ for k, v in pairs(ctypes) do
     for r in refct:members() do
       local name = r.name
       -- bit hacky - TODO fix these issues
-      if ignore_offsets[name] then name = nil end
+      if not name or ignore_offsets[name] or name:sub(1,2) == "__" then name = nil end
       if name then
         print("sassert(offsetof(" .. k .. "," .. name .. "), " .. ffi.offsetof(v, name) .. ', " offset of ' .. name .. ' in' .. k .. '");')
       end
