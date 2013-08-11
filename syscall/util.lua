@@ -33,7 +33,9 @@ function util.dirtable(name, nodots) -- return table of directory entries, remov
   local d = {}
   local size = 4096
   local buf = t.buffer(size)
-  for f in util.ls(name, buf, size) do
+  local iter, err = util.ls(name, buf, size)
+  if not iter then return nil, err end
+  for f in iter do
     if not (nodots and (f == "." or f == "..")) then d[#d + 1] = f end
   end
   return setmetatable(d, mt.dir)
