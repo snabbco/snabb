@@ -160,12 +160,24 @@ local function inet6_ntop(src)
   return table.concat(parts, ":")
 end
 
-local function inet4_pton(src, addr)
-  local ip4 = split("%.", src)
-  if #ip4 ~= 4 then return nil end
-  addr = addr or t.in_addr()
-  addr.s_addr = ip4[4] * 0x1000000 + ip4[3] * 0x10000 + ip4[2] * 0x100 + ip4[1]
-  return addr
+-- TODO cleanup, should be generic not testing endianness
+local inet4_pton
+if ffi.abi("le") then
+  inet4_pton = function(src, addr)
+    local ip4 = split("%.", src)
+    if #ip4 ~= 4 then return nil end
+    addr = addr or t.in_addr()
+    addr.s_addr = ip4[4] * 0x1000000 + ip4[3] * 0x10000 + ip4[2] * 0x100 + ip4[1]
+    return addr
+  end
+else
+  inet4_pton = function(src, addr)
+    local ip4 = split("%.", src)
+    if #ip4 ~= 4 then return nil end
+    addr = addr or t.in_addr()
+    addr.s_addr = ip4[1] * 0x1000000 + ip4[2] * 0x10000 + ip4[3] * 0x100 + ip4[4]
+    return addr
+  end
 end
 
 local function hex(str) return tonumber("0x" .. str) end
