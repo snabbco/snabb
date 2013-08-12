@@ -108,6 +108,9 @@ if abi.abi32 then
     if ret == -1 then return -1 end
     return result[0]
   end
+  function C.sendfile(outfd, infd, offset, count)
+    return C.syscall(c.SYS.sendfile64, t.int(outfd), t.int(infd), pt.void(offset), t.size(count))
+  end
   -- on 32 bit systems mmap uses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
   function C.mmap(addr, length, prot, flags, fd, offset)
     local pgoffset = math.floor(offset / 4096)
