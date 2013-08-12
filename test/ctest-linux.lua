@@ -256,6 +256,11 @@ c.NDTPA.QUEUE_LENBYTES = nil
 c.NTF.SELF = nil
 c.NTF.MASTER = nil
 
+-- missing on my ppc box/older kernels
+c.PR.GET_NO_NEW_PRIVS = nil
+c.PR.SET_NO_NEW_PRIVS = nil
+c.IP.MULTICAST_ALL = nil
+
 -- renames
 c.LINUX_CAPABILITY_VERSION = c._LINUX_CAPABILITY_VERSION
 c.LINUX_CAPABILITY_U32S = c._LINUX_CAPABILITY_U32S
