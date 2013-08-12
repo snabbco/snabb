@@ -26,7 +26,7 @@ Requirements: Needs [LuaJIT 2.0.0](http://www.luajit.org/) or later.
 
 The code does not currently support the main Lua implementation, only LuaJIT. It used to support [luaffi](https://github.com/jmckaskill/luaffi) but this has not kept up with LuaJIT ffi features. At some point I intend to support Lua directly, but this will be after the API has stabilised.
 
-On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; intend to support MIPS in future but currently my only MIPS hardwrae does not support LuaJIT. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
+On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; intend to support MIPS in future but currently my only MIPS hardware does not support LuaJIT. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
 Android (ARM tested so far) currently passes some tests and fails others, so needs some more work, probably dealing with things that are not implemented in the kernel or libc and other environment differences.
 
