@@ -609,7 +609,8 @@ test.sendfile = {
     assert(f2:truncate(30))
     local off = 0
     local n = assert(f1:sendfile(f2, off, 16))
-    assert(n.count == 16 and n.offset == 16, "sendfile should send 16 bytes")
+    assert(n.count == 16, "sendfile should send 16 bytes, is " .. n.count)
+    assert(n.offset == 16, "sendfile offset should be 16, is " .. n.offset)
     assert(f1:close())
     assert(f2:close())
   end,
