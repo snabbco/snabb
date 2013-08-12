@@ -16,7 +16,6 @@ local reflect = require "include.reflect.reflect"
 -- TODO fix these, various naming issues
 ctypes["struct linux_dirent64"] = nil
 ctypes["struct fdb_entry"] = nil
---ctypes["struct seccomp_data"] = nil
 ctypes["sighandler_t"] = nil
 ctypes["struct rlimit64"] = nil
 ctypes["struct mq_attr"] = nil
