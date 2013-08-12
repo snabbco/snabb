@@ -418,13 +418,11 @@ function S.inotify_init(flags) return retfd(C.inotify_init1(c.IN_INIT[flags])) e
 function S.inotify_add_watch(fd, pathname, mask) return retnum(C.inotify_add_watch(getfd(fd), pathname, c.IN[mask])) end
 function S.inotify_rm_watch(fd, wd) return retbool(C.inotify_rm_watch(getfd(fd), wd)) end
 
-function S.sendfile(out_fd, in_fd, offset, count) -- bit odd having two different return types...
-  if not offset then return retnum(C.sendfile(getfd(out_fd), getfd(in_fd), nil, count)) end
-  local off = t.off1()
-  off[0] = offset
-  local ret = C.sendfile(getfd(out_fd), getfd(in_fd), off, count)
-  if ret == -1 then return nil, t.error() end
-  return {count = tonumber(ret), offset = tonumber(off[0])}
+function S.sendfile(out_fd, in_fd, offset, count)
+  if type(offset) == "number" then
+    offset = t.off1(offset)
+  end
+  return retnum(C.sendfile(getfd(out_fd), getfd(in_fd), offset, count))
 end
 
 function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, c.EFD[flags])) end
