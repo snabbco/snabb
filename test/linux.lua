@@ -626,6 +626,20 @@ test.sendfile = {
     assert(f1:close())
     assert(f2:close())
   end,
+  test_sendfile_largefile = function()
+    local f1 = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
+    local f2 = assert(S.open(tmpfile2, "rdwr,creat", "rwxu"))
+    assert(S.unlink(tmpfile))
+    assert(f1:truncate(largeval+32))
+    assert(f2:truncate(32))
+    local off = t.off1(largeval)
+    local n = assert(f1:sendfile(f2, off, 16))
+    assert(n == 16, "sendfile should send 16 bytes, is " .. n)
+    local noff = tonumber(off[0])
+    assert(noff == largeval + 16, "sendfile offset should be " .. largeval + 16 .. ", is " .. noff)
+    assert(f1:close())
+    assert(f2:close())
+  end,
 }
 
 test.netlink = {
