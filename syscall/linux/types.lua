@@ -278,8 +278,9 @@ addtype("sockaddr_ll", "struct sockaddr_ll", {
   __len = function(tp) return s.sockaddr_ll end,
 })
 
---TODO sort out stat/stat64
-addtype("stat", "struct stat", {
+local stattype
+if abi.abi32 then stattype = "struct stat64" else stattype = "struct stat" end
+addtype("stat", stattype, {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
     ino = function(st) return tonumber(st.st_ino) end,

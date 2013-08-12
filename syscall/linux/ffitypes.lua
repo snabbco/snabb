@@ -19,8 +19,6 @@ append [[
 typedef uint32_t mode_t;
 typedef unsigned short int sa_family_t;
 typedef uint64_t rlim64_t;
-typedef uint64_t ino64_t;
-typedef uint64_t blkcnt64_t;
 typedef unsigned long nlink_t;
 typedef unsigned long ino_t;
 typedef long time_t;
@@ -808,57 +806,7 @@ struct statfs64 {
 ]]
 end
 
-if arch.stat then append(arch.stat)
-else
-if abi.abi64 then
-append [[
-struct stat {  /* only used on 64 bit architectures */
-  unsigned long   st_dev;
-  unsigned long   st_ino;
-  unsigned long   st_nlink;
-  unsigned int    st_mode;
-  unsigned int    st_uid;
-  unsigned int    st_gid;
-  unsigned int    __pad0;
-  unsigned long   st_rdev;
-  long            st_size;
-  long            st_blksize;
-  long            st_blocks;
-  unsigned long   st_atime;
-  unsigned long   st_atime_nsec;
-  unsigned long   st_mtime;
-  unsigned long   st_mtime_nsec;
-  unsigned long   st_ctime;
-  unsigned long   st_ctime_nsec;
-  long            __unused[3];
-};
-]]
-else
-append [[
-struct stat { /* only for 32 bit architectures */
-  unsigned long long      st_dev;
-  unsigned char   __pad0[4];
-  unsigned long   __st_ino;
-  unsigned int    st_mode;
-  unsigned int    st_nlink;
-  unsigned long   st_uid;
-  unsigned long   st_gid;
-  unsigned long long      st_rdev;
-  unsigned char   __pad3[4];
-  long long       st_size;
-  unsigned long   st_blksize;
-  unsigned long long      st_blocks;
-  unsigned long   st_atime;
-  unsigned long   st_atime_nsec;
-  unsigned long   st_mtime;
-  unsigned int    st_mtime_nsec;
-  unsigned long   st_ctime;
-  unsigned long   st_ctime_nsec;
-  unsigned long long      st_ino;
-};
-]]
-end
-end
+append(arch.stat)
 
 -- epoll packed on x86_64 only (so same as x86)
 if arch.epoll then append(arch.epoll)

@@ -44,22 +44,27 @@ typedef struct ucontext {
 } ucontext_t;
 ]],
   stat = [[
-struct stat {
-  dev_t st_dev;
-  ino64_t st_ino;
-  mode_t st_mode;
-  nlink_t st_nlink;
-  uid_t st_uid;
-  gid_t st_gid;
-  dev_t st_rdev;
-  short __st_rdev_padding;
-  off_t st_size;
-  blksize_t st_blksize;
-  blkcnt64_t st_blocks;
-  struct timespec st_atim;
-  struct timespec st_mtim;
-  struct timespec st_ctim;
-  unsigned __unused[2];
+struct stat64 {
+  unsigned long long st_dev;
+  unsigned long long st_ino;
+  unsigned int    st_mode;
+  unsigned int    st_nlink;
+  unsigned int    st_uid;
+  unsigned int    st_gid;
+  unsigned long long st_rdev;
+  unsigned long long __pad1;
+  long long       st_size;
+  int             st_blksize;
+  int             __pad2;
+  long long       st_blocks;
+  int             st_atime;
+  unsigned int    st_atime_nsec;
+  int             st_mtime;
+  unsigned int    st_mtime_nsec;
+  int             st_ctime;
+  unsigned int    st_ctime_nsec;
+  unsigned int    __unused4;
+  unsigned int    __unused5;
 };
 ]],
 }
