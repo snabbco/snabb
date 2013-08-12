@@ -277,6 +277,9 @@ print [[
 #include <stddef.h>
 #include <stdint.h>
 
+/* there is inconsistent usage of __LITTLE_ENDIAN so if endian.h included before this it fails! */
+#include <linux/aio_abi.h>
+
 #include <stdio.h>
 #include <limits.h>
 #include <errno.h>
@@ -321,7 +324,6 @@ print [[
 #include <sys/swap.h>
 
 #include <linux/capability.h>
-#include <linux/aio_abi.h>
 #include <linux/reboot.h>
 #include <linux/falloc.h>
 #include <linux/mman.h>
