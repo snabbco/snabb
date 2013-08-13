@@ -260,6 +260,15 @@ c.PR.GET_NO_NEW_PRIVS = nil
 c.PR.SET_NO_NEW_PRIVS = nil
 c.IP.MULTICAST_ALL = nil
 
+-- glibc lies about what structure is used on ppc for termios TODO check all these ioctls
+if abi.arch == "ppc" then
+  ctypes["struct termios"] = nil
+  c.IOCTL.TCSETS = nil
+  c.IOCTL.TCGETS = nil
+  c.IOCTL.TCSETSF = nil
+  c.IOCTL.TCSETSW = nil
+end
+
 -- renames
 c.LINUX_CAPABILITY_VERSION = c._LINUX_CAPABILITY_VERSION
 c.LINUX_CAPABILITY_U32S = c._LINUX_CAPABILITY_U32S
