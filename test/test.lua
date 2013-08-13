@@ -1176,9 +1176,11 @@ test_termios = {
 }
 
 test_misc = {
+--[[ -- should test in fork, oddly causing issues in rump
   test_chroot_root = function()
     assert(S.chroot("/"))
   end,
+]]
   test_pathconf = function()
     local pc = assert(S.pathconf(".", "name_max"))
     assert(pc >= 255, "name max should be at least 255")
