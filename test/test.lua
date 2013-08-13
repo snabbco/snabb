@@ -1470,7 +1470,7 @@ else -- remove tests that need root
 end
 
 local f
-if arg[1] and arg[1] ~= "coverage" then f = luaunit:run(arg[1]) else f = luaunit:run() end
+if arg[1] then f = luaunit:run(unpack(arg)) else f = luaunit:run() end
 
 clean()
 
@@ -1484,6 +1484,7 @@ end
 -- also check for non interesting cases, eg fall through to end
 -- TODO this is not working any more, FIXME
 
+--[[
 if arg[1] == "coverage" then
   cov.covered = 0
   cov.count = 0
@@ -1517,6 +1518,7 @@ if arg[1] == "coverage" then
   end
   print("\ncoverage is " .. cov.covered .. " of " .. cov.count .. " " .. math.floor(cov.covered / cov.count * 100) .. "%")
 end
+]]
 
 collectgarbage("collect")
 
