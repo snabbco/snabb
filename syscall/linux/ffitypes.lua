@@ -491,17 +491,6 @@ struct sock_fprog {
 struct mq_attr {
   long mq_flags, mq_maxmsg, mq_msgsize, mq_curmsgs, __unused[4];
 };
-
-struct termios {
-    tcflag_t c_iflag;
-    tcflag_t c_oflag;
-    tcflag_t c_cflag;
-    tcflag_t c_lflag;
-    cc_t c_line;
-    cc_t c_cc[32];
-    speed_t c_ispeed;
-    speed_t c_ospeed;
-  };
 struct termios2 {
     tcflag_t c_iflag;
     tcflag_t c_oflag;
@@ -683,6 +672,22 @@ struct vhost_memory {
   struct vhost_memory_region regions[0];
 };
 ]]
+
+if arch.termios then append(arch.termios)
+else
+append [[
+struct termios {
+  tcflag_t c_iflag;
+  tcflag_t c_oflag;
+  tcflag_t c_cflag;
+  tcflag_t c_lflag;
+  cc_t c_line;
+  cc_t c_cc[32];
+  speed_t c_ispeed;
+  speed_t c_ospeed;
+};
+]]
+end
 
 -- Linux struct siginfo padding depends on architecture
 if abi.abi64 then

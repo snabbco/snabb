@@ -12,6 +12,18 @@ struct termio {
   unsigned char c_cc[NCC];
 };
 ]],
+  termios = [[
+struct __kernel_termios {
+  tcflag_t c_iflag;
+  tcflag_t c_oflag;
+  tcflag_t c_cflag;
+  tcflag_t c_lflag;
+  cc_t c_cc[19];
+  cc_t c_line;
+  speed_t c_ispeed;
+  speed_t c_ospeed;
+};
+]],
   ucontext = [[
 typedef unsigned long greg_t, gregset_t[48];
 typedef struct {
