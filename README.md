@@ -22,17 +22,17 @@ If you want to link into a C program (or something else interfacing to C, such a
 
 ## Requirements
 
-Requirements: Needs [LuaJIT 2.0.0](http://www.luajit.org/) or later.
+Requirements: Needs [LuaJIT 2.0.2](http://www.luajit.org/) or later.
 
-The code does not currently support the main Lua implementation, only LuaJIT. It used to support [luaffi](https://github.com/jmckaskill/luaffi) but this has not kept up with LuaJIT ffi features. At some point I intend to support Lua directly, but this will be after the API has stabilised.
+The code does not currently support the main Lua implementation, only LuaJIT. It used to support [luaffi](https://github.com/jmckaskill/luaffi) but this has not kept up with LuaJIT ffi features. At some point I intend to support Lua directly, probably after the API has stabilised.
 
-On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; intend to support MIPS in future but currently my only MIPS hardware does not support LuaJIT. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
+On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; MIPS support will be completed soon. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
 Android (ARM tested so far) currently passes some tests and fails others, so needs some more work, probably dealing with things that are not implemented in the kernel or libc and other environment differences.
 
-For the BSD support, testing is currently limited to NetBSD x86 32 bit (LuaJIT does not run on x64 at present due to lack of MAP_32BIT). NetBSD on other 32 bit platforms should also run; more targets will be added to tests soon. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the (small) differences.
+For the NetBSD support all platforms should work, more test targets will be added soon. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the differences.
 
-A small amount of OSX support was added but it is not well tested or maintained and is likely to be removed to a branch for now.
+A small amount of OSX support was added but it is not well tested or maintained and is likely to be removed to a branch for now, due to lack of ability to test. This may be re-added after FreeBSD support.
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
