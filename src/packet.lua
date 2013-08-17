@@ -1,5 +1,6 @@
 module(...,package.seeall)
 
+local freelist = require("freelist")
 local memory = require("memory")
 local ffi = require("ffi")
 local C = ffi.C
