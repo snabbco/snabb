@@ -32,7 +32,7 @@ $(HOBJ): obj/%_h.o: %.h Makefile
 	@echo Generating $(basename $@).lua from $< - $(basename $@)
 	@(echo -n "module(...,package.seeall); require(\"ffi\").cdef[=============["; \
 	 cat $<; \
-	 echo "]=============]") >> $(basename $@).lua
+	 echo "]=============]") > $(basename $@).lua
 	luajit -b $(basename $@).lua $@
 
 $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua
