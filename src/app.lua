@@ -48,7 +48,7 @@ end
 function report ()
    print("report")
    for name, l in pairs(links) do
-      print(name, tonumber(l.link.ring.stats.tx) .. " packet(s) transmitted")
+      print(name, lib.comma_value(tostring(tonumber(l.link.ring.stats.tx))) .. " packet(s) transmitted")
    end
 end
 
@@ -136,7 +136,8 @@ function selftest ()
    connect("join",   "out", "split", "in")
    connect("split", "out2", "sink", "in")
    connect("split", "out1", "join", "in2")
-   breathe()
+   local deadline = lib.timer(1e9)
+   repeat breathe() until deadline()
    report()
    print("selftest OK")
 end
