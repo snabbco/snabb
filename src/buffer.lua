@@ -20,7 +20,7 @@ end
 
 -- Return a newly created buffer, or nil if none can be created.
 function new_buffer ()
-   if allocated == max then return nil end
+   assert(allocated < max, "out of buffers")
    allocated = allocated + 1
    local pointer, physical, bytes = memory.dma_alloc(size)
    return ffi.new(buffer_t, pointer, physical, size)
