@@ -2,7 +2,8 @@
 
 module(...,package.seeall)
 
-local C = require("ffi").C
+local ffi = require("ffi")
+local C = ffi.C
 local buffer = require("buffer")
 local packet = require("packet")
 
@@ -68,47 +69,49 @@ function Port:loopback_test (options)
    local inputs, outputs = self.inputs, self.outputs
    options = options or {}
    local verify = options.verify
-   local npackets = options.npackets or 10000
+   local npackets = options.npackets or 100
+   local n = 0 -- XXX Tepmorary debug aid
    print("npackets",npackets)
    -- Allocate receive buffers
    for i = 1,#inputs do
       local input, output = inputs[i], outputs[i]
-      input.sync_receive()
+      input:sync_receive()
       for i = 1, npackets do
-         assert(input.can_add_receive_buffer())
-         input.add_receive_buffer(buffer.allocate())
+         assert(input:can_add_receive_buffer())
+         input:add_receive_buffer(buffer.allocate())
       end
-      -- Fill the pipe with transmited packets
       for i = 1, npackets do
-         local buf = buffer.allocate()
-         buf.size = 60
-         assert(output.can_transmit())
-         output.transmit(buf)
-         assert(buf.refcount == 2)
-         buffer.deref(buf)
+         local p = packet.allocate()
+         local b = buffer.allocate()
+         -- collectgarbage() -- XXX corruption if we don't have this
+         local len = 60
+         ffi.fill(b.pointer, len, 0)
+         n = n + 1
+         packet.add_iovec(p, b, len)
+         assert(output:can_transmit())
+         output:transmit(p)
+         assert(p.refcount == 2)
+         packet.deref(p)
       end
-      output.sync_transmit()
-      assert(not input.can_receive())
+      output:sync_transmit()
+      assert(not input:can_receive())
    end
    -- Read back and write out all of the packets in a loop
    repeat
       for i = 1,#inputs do
          local input, output = inputs[i], outputs[i]
---         if not input.can_add_receive_buffer() and not input.can_receive() then
-            input.sync_receive()
---         end
-         while input.can_add_receive_buffer() do
-            input.add_receive_buffer(buffer.allocate())
+         input:sync_receive()
+         while input:can_add_receive_buffer() do
+            input:add_receive_buffer(buffer.allocate())
          end
-         while input.can_receive() and output.can_transmit() do
-            local buf = input.receive()
---            print("received "..buf.size.." bytes packet")
-            output.transmit(buf)
-            assert(buf.refcount == 2)
-            buffer.deref(buf)
+         while input:can_receive() and output:can_transmit() do
+            local p = input:receive()
+            --print("Got " .. p.iovecs[0].buffer.pointer[0])
+            output:transmit(p)
+            --assert(p.refcount == 2)
+            packet.deref(p)
          end
-         output.sync_transmit()
---         C.usleep(1)
+         output:sync_transmit()
       end
    until coroutine.yield("loopback") == nil
 end
