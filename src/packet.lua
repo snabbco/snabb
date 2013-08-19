@@ -19,7 +19,7 @@ end
 
 -- Return a packet, or nil if none is available.
 function allocate ()
-   return freelist.remove(packets_fl)
+   return freelist.remove(packets_fl) or error("out of packets")
 end
 
 -- Append data to a packet.
