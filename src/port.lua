@@ -70,7 +70,6 @@ function Port:loopback_test (options)
    options = options or {}
    local verify = options.verify
    local npackets = options.npackets or 100
-   local n = 0 -- XXX Tepmorary debug aid
    print("npackets",npackets)
    -- Allocate receive buffers
    for i = 1,#inputs do
@@ -83,10 +82,7 @@ function Port:loopback_test (options)
       for i = 1, npackets do
          local p = packet.allocate()
          local b = buffer.allocate()
-         -- collectgarbage() -- XXX corruption if we don't have this
          local len = 60
-         ffi.fill(b.pointer, len, 0)
-         n = n + 1
          packet.add_iovec(p, b, len)
          assert(output:can_transmit())
          output:transmit(p)
@@ -106,9 +102,8 @@ function Port:loopback_test (options)
          end
          while input:can_receive() and output:can_transmit() do
             local p = input:receive()
-            --print("Got " .. p.iovecs[0].buffer.pointer[0])
             output:transmit(p)
-            --assert(p.refcount == 2)
+            assert(p.refcount == 2)
             packet.deref(p)
          end
          output:sync_transmit()
