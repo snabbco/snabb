@@ -109,25 +109,8 @@ end
 open_devices = {}
 
 -- Load a new instance of the 'driver' module for 'pciaddress'.
--- On success this creates the Lua module 'driver@pciaddress'.
---
--- Example: open_device("intel10g", "0000:83:00.1") creates module
--- "intel10g@0000:83:00.1" which controls that specific device.
 function open_device(pciaddress, driver)
-   local instance = driver.."@"..pciaddress
-   find_loader(driver)(instance, pciaddress)
-   open_devices[pciaddress] = package.loaded[instance]
-   return package.loaded[instance]
-end
-
--- (This could be a Lua builtin.)
--- Return loader function for `module`.
--- Calling the loader function will run the module's code.
-function find_loader (mod)
-   for i = 1, #package.loaders do
-      status, loader = pcall(package.loaders[i], mod)
-      if type(loader) == 'function' then return loader end
-   end
+   return require(driver).new(pciaddress)
 end
 
 --- ### Selftest
@@ -158,19 +141,21 @@ end
 function open_usable_devices (options)
    local drivers = {}
    for _,device in ipairs(devices) do
-      if device.usable == 'yes' then
-         if device.interface ~= nil then
-            print("Unbinding device from linux: "..device.pciaddress)
-            unbind_device_from_linux(device.pciaddress)
+      if #drivers == 0 then
+         if device.usable == 'yes' then
+            if device.interface ~= nil then
+               print("Unbinding device from linux: "..device.pciaddress)
+               unbind_device_from_linux(device.pciaddress)
+            end
+            print("Opening device "..device.pciaddress)
+            local driver = open_device(device.pciaddress, device.driver)
+            driver:open_for_loopback_test()
+            table.insert(drivers, driver)
          end
-         print("Opening device "..device.pciaddress)
-         local driver = open_device(device.pciaddress, device.driver)
-         driver.open_for_loopback_test()
-         table.insert(drivers, driver)
       end
    end
    local port = require("port")
-   local options = {devices=drivers, secs=10,
+   local options = {devices=drivers,
                     program=port.Port.loopback_test,
                     report=true}
    port.selftest(options)

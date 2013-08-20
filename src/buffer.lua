@@ -12,6 +12,7 @@ size      = 4096
 
 buffers = freelist.new("struct buffer *", max)
 buffer_t = ffi.typeof("struct buffer")
+buffer_ptr_t = ffi.typeof("struct buffer *")
 
 -- Return a ready-to-use buffer, or nil if none is available.
 function allocate ()
@@ -20,10 +21,12 @@ end
 
 -- Return a newly created buffer, or nil if none can be created.
 function new_buffer ()
-   if allocated == max then return nil end
+   assert(allocated < max, "out of buffers")
    allocated = allocated + 1
    local pointer, physical, bytes = memory.dma_alloc(size)
-   return ffi.new(buffer_t, pointer, physical, size)
+   local b = ffi.cast(buffer_ptr_t, ffi.C.malloc(ffi.sizeof(buffer_t)))
+   b.pointer, b.physical, b.size = pointer, physical, size
+   return b
 end
 
 -- Free a buffer that is no longer in use.

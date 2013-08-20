@@ -23,4 +23,5 @@ int fork();
 size_t pread(int fd, void *buf, int count, int offset);
 size_t pwrite(int fd, const void *buf, int count, int offset);
 
+// malloc(3) - allocate dynamic memory
 void *malloc(int size);

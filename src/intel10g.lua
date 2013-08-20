@@ -6,14 +6,7 @@
 --- You will need to familiarize yourself with the excellent [data
 --- sheet]() to understand this module.
 
--- This module is loaded once per PCI device. See `pci.lua` for details.
-local moduleinstance,pciaddress = ...
-
-if pciaddress == nil then
-   print("WARNING: intel10g loaded as normal module; should be device-specific.")
-end
-
-module(moduleinstance,package.seeall)
+module(...,package.seeall)
 
 local ffi = require "ffi"
 local C = ffi.C
@@ -23,162 +16,186 @@ local register = require("register")
 local memory = require("memory")
 local test = require("test")
 require("intel_h")
+require("packet_h")
+
 local bits, bitset = lib.bits, lib.bitset
 
 num_descriptors = 32 * 1024
-rxdesc, rxdesc_phy, txdesc, txdesc_phy = nil
-
-r = {} -- Configuration registers
-s = {} -- Statistics registers
+--num_descriptors = 32
 
 --- ### Initialization
 
-function open ()
-   pci.set_bus_master(pciaddress, true)
-   base = ffi.cast("uint32_t*", pci.map_pci_memory(pciaddress, 0))
-   register.define(config_registers_desc, r, base)
-   register.define(statistics_registers_desc, s, base)
-   init()
+function new (pciaddress)
+   local dev = { pciaddress = pciaddress, -- PCI device address
+                 r = {},           -- Configuration registers
+                 s = {},           -- Statistics registers
+                 txdesc = 0,     -- Transmit descriptors (pointer)
+                 txdesc_phy = 0, -- Transmit descriptors (physical address)
+                 txpackets = {},   -- Tx descriptor index -> packet mapping
+                 tdh = 0,          -- Cache of transmit head (TDH) register
+                 tdt = 0,          -- Cache of transmit tail (TDT) register
+                 rxdesc = 0,     -- Receive descriptors (pointer)
+                 rxdesc_phy = 0, -- Receive descriptors (physical address)
+                 rxbuffers = {},   -- Rx descriptor index -> buffer mapping
+                 rdh = 0,          -- Cache of receive head (RDH) register
+                 rdt = 0,          -- Cache of receive tail (RDT) register
+                 rxnext = 0        -- Index of next buffer to receive
+              }
+   setmetatable(dev, {__index = intel10g})
+   return dev
+end
+
+function open (dev)
+   pci.set_bus_master(dev.pciaddress, true)
+   base = ffi.cast("uint32_t*", pci.map_pci_memory(dev.pciaddress, 0))
+   register.define(config_registers_desc, dev.r, base)
+   register.define(statistics_registers_desc, dev.s, base)
+   dev.txpackets = ffi.new("struct packet *[?]", num_descriptors)
+   dev.rxbuffers = ffi.new("struct buffer *[?]", num_descriptors)
+   init(dev)
 end
 
 --- See data sheet section 4.6.3 "Initialization Sequence."
 
-function init ()
-   init_dma_memory()
-   disable_interrupts()
-   global_reset()
-   wait_eeprom_autoread()
-   wait_dma()
-   init_statistics()
-   init_receive()
-   init_transmit()
+function init (dev)
+   init_dma_memory(dev)
+   disable_interrupts(dev)
+   global_reset(dev)
+   wait_eeprom_autoread(dev)
+   wait_dma(dev)
+   init_statistics(dev)
+   init_receive(dev)
+   init_transmit(dev)
 end
 
-function init_dma_memory ()
-   rxdesc, rxdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
-   txdesc, txdesc_phy = memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
+function init_dma_memory (dev)
+   dev.rxdesc, dev.rxdesc_phy =
+      memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
+   dev.txdesc, dev.txdesc_phy =
+      memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
    -- Add bounds checking
-   rxdesc  = lib.bounds_checked(rxdesc_t, rxdesc, 0, num_descriptors)
-   txdesc  = lib.bounds_checked(txdesc_t, txdesc, 0, num_descriptors)
+   dev.rxdesc = lib.bounds_checked(rxdesc_t, dev.rxdesc, 0, num_descriptors)
+   dev.txdesc = lib.bounds_checked(txdesc_t, dev.txdesc, 0, num_descriptors)
 end
 
-function global_reset ()
+function global_reset (dev)
    local reset = bits{LinkReset=3, DeviceReset=26}
-   r.CTRL(reset)
+   dev.r.CTRL(reset)
    C.usleep(1000)
-   r.CTRL:wait(reset, 0)
+   dev.r.CTRL:wait(reset, 0)
 end
 
-function disable_interrupts () end --- XXX do this
-function wait_eeprom_autoread () r.EEC:wait(bits{AutoreadDone=9}) end
-function wait_dma ()             r.RDRXCTL:wait(bits{DMAInitDone=3})  end
+function disable_interrupts (dev) end --- XXX do this
+function wait_eeprom_autoread (dev)
+   dev.r.EEC:wait(bits{AutoreadDone=9})
+end
 
-function init_statistics ()
+function wait_dma (dev)
+   dev.r.RDRXCTL:wait(bits{DMAInitDone=3})
+end
+
+function init_statistics (dev)
    -- Read and then zero each statistic register
-   for _,reg in pairs(s) do reg:read() reg:reset() end
+   for _,reg in pairs(dev.s) do reg:read() reg:reset() end
 end
 
-function init_receive ()
-   set_promiscuous_mode() -- accept all, no need to configure MAC address filter
---   r.RDRXCTL:set(bits{CRCStrip=0})
---   r.HLREG0:clr(bit.bor(bit.lshift(0x1f, 17), -- RSCFRSTSIZE
---                bits({RXLNGTHERREN=27, UndocumentedRXCRCSTRP=1})))
-   r.HLREG0:clr(bits({RXLNGTHERREN=27}))
-   r.RDBAL(rxdesc_phy % 2^32)
-   r.RDBAH(rxdesc_phy / 2^32)
-   r.RDLEN(num_descriptors * ffi.sizeof("union rx"))
-   r.RXDCTL(bits{Enable=25})
-   r.RXDCTL:wait(bits{enable=25})
-   r.RXCTRL:set(bits{RXEN=0})
+function init_receive (dev)
+   set_promiscuous_mode(dev) -- NB: don't need to program MAC address filter
+   dev.r.HLREG0:clr(bits({RXLNGTHERREN=27}))
+   dev.r.RDBAL(dev.rxdesc_phy % 2^32)
+   dev.r.RDBAH(dev.rxdesc_phy / 2^32)
+   dev.r.RDLEN(num_descriptors * ffi.sizeof("union rx"))
+   dev.r.RXDCTL(bits{Enable=25})
+   dev.r.RXDCTL:wait(bits{enable=25})
+   dev.r.RXCTRL:set(bits{RXEN=0})
 end
 
-function set_promiscuous_mode () r.FCTRL(bits({MPE=8, UPE=9, BAM=10})) end
+function set_promiscuous_mode (dev)
+   dev.r.FCTRL(bits({MPE=8, UPE=9, BAM=10}))
+end
 
-function init_transmit ()
-   r.HLREG0:set(bits{TXCRCEN=0})
-   r.TDBAL(txdesc_phy % 2^32)
-   r.TDBAH(txdesc_phy / 2^32)
-   r.TDLEN(num_descriptors * ffi.sizeof("union tx"))
-   r.DMATXCTL(bits{TE=0})
-   r.TXDCTL:wait(bits{Enable=25})
+function init_transmit (dev)
+   dev.r.HLREG0:set(bits{TXCRCEN=0})
+   dev.r.TDBAL(dev.txdesc_phy % 2^32)
+   dev.r.TDBAH(dev.txdesc_phy / 2^32)
+   dev.r.TDLEN(num_descriptors * ffi.sizeof("union tx"))
+   dev.r.DMATXCTL(bits{TE=0})
+   dev.r.TXDCTL:wait(bits{Enable=25})
 end
 
 --- ### Transmit
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
-txbuffers = {}
-tdh, tdt = 0, 0 -- Cached values of TDT and TDH
 txdesc_flags = bits{eop=24,ifcs=25}
-function transmit (buf)
---   print("buf",buf)
-   txdesc[tdt].data.address = buf.phy
-   txdesc[tdt].data.options = bit.bor(buf.size, txdesc_flags)
-   txbuffers[tdt] = buf
-   tdt = (tdt + 1) % num_descriptors
-   buffer.ref(buf)
+function transmit (dev, p)
+   assert(p.niovecs == 1, "only supports one-buffer packets")
+   local iov = p.iovecs[0]
+   assert(iov.offset == 0)
+   dev.txdesc[dev.tdt].data.address = iov.buffer.physical + iov.offset
+   dev.txdesc[dev.tdt].data.options = bit.bor(iov.length, txdesc_flags)
+   dev.txpackets[dev.tdt] = p
+   dev.tdt = (dev.tdt + 1) % num_descriptors
+   packet.ref(p)
 end
 
-function sync_transmit ()
-   local old_tdh = tdh
-   tdh = r.TDH()
+function sync_transmit (dev)
+   local old_tdh = dev.tdh
+   dev.tdh = dev.r.TDH()
    C.full_memory_barrier()
    -- Release processed buffers
-   while old_tdh ~= tdh do
-      buffer.deref(txbuffers[old_tdh])
-      txbuffers[old_tdh] = nil
+   while old_tdh ~= dev.tdh do
+      packet.deref(dev.txpackets[old_tdh])
+      dev.txpackets[old_tdh] = nil
       old_tdh = (old_tdh + 1) % num_descriptors
    end
-   r.TDT(tdt)
+   dev.r.TDT(dev.tdt)
 end
 
-function can_transmit () return (tdt + 1) % num_descriptors ~= tdh end
+function can_transmit (dev)
+   return (dev.tdt + 1) % num_descriptors ~= dev.tdh
+end
 
 --- ### Receive
 
 --- See datasheet section 7.1 "Inline Functions -- Receive Functionality."
 
--- Queued
-rxbuffers = {}
-rdh, rdt, rxnext = 0, 0, 0
-
-function receive ()
-   assert(rdh ~= rxnext)
-   local buf = rxbuffers[rxnext]
-   local wb = rxdesc[rxnext].wb
-   buf.size = wb.length
+function receive (dev)
+   assert(dev.rdh ~= dev.rxnext)
+   local p = packet.allocate()
+   local b = dev.rxbuffers[dev.rxnext]
+   local wb = dev.rxdesc[dev.rxnext].wb
+   assert(wb.length > 0)
    assert(bit.band(wb.status, 1) == 1) -- Descriptor Done
-   rxnext = (rxnext + 1) % num_descriptors
-   buffer.deref(buf)
-   assert(buf.size > 0)
-   return buf
+   packet.add_iovec(p, b, wb.length)
+   dev.rxnext = (dev.rxnext + 1) % num_descriptors
+   return p
 end
 
-function can_receive () return rxnext ~= rdh end
-
-function can_add_receive_buffer ()
-   return (rdt + 1) % num_descriptors ~= rxnext
+function can_receive (dev)
+   return dev.rxnext ~= dev.rdh
 end
 
-function add_receive_buffer (buf)
-   assert(can_add_receive_buffer())
-   local desc = rxdesc[rdt].data
-   desc.address, desc.dd = buf.phy, buf.size
-   rxbuffers[rdt] = buf
-   rdt = (rdt + 1) % num_descriptors
-   buffer.ref(buf)
+function can_add_receive_buffer (dev)
+   return (dev.rdt + 1) % num_descriptors ~= dev.rxnext
 end
 
-function sync_receive ()
+function add_receive_buffer (dev, b)
+   assert(can_add_receive_buffer(dev))
+   local desc = dev.rxdesc[dev.rdt].data
+   desc.address, desc.dd = b.physical, b.size
+   dev.rxbuffers[dev.rdt] = b
+   dev.rdt = (dev.rdt + 1) % num_descriptors
+end
+
+function sync_receive (dev)
    -- XXX I have been surprised to see RDH = num_descriptors,
    --     must check what that means. -luke
-   rdh = math.min(r.RDH(), num_descriptors-1)
-   assert(rdh < num_descriptors)
+   dev.rdh = math.min(dev.r.RDH(), num_descriptors-1)
+   assert(dev.rdh < num_descriptors)
    C.full_memory_barrier()
-   r.RDT(rdt)
+   dev.r.RDT(dev.rdt)
 end
-
-function sync () sync_receive() sync_transmit() end
 
 txdesc_t = ffi.typeof [[
       union { struct { uint64_t address, options; } data;
@@ -194,32 +211,35 @@ rxdesc_t = ffi.typeof [[
             }
 ]]
 
-function wait_linkup ()
-   test.waitfor("linkup", linkup, 20, 250000)
+function wait_linkup (dev)
+   test.waitfor("linkup", function() return linkup(dev) end, 20, 250000)
 end
 
 --- ### Status and diagnostics
 
-function linkup () return bitset(r.LINKS(), 30) end
-
-function get_configuration_state ()
-   return { AUTOC = r.AUTOC(), HLREG0 = r.HLREG0() }
+function linkup (dev)
+   return bitset(dev.r.LINKS(), 30)
 end
 
-function restore_configuration_state (saved_state)
-   r.AUTOC(saved_state.AUTOC)
-   r.HLREG0(saved_state.HLREG0)
+function get_configuration_state (dev)
+   return { AUTOC = dev.r.AUTOC(), HLREG0 = dev.r.HLREG0() }
 end
 
-function enable_mac_loopback ()
-   r.AUTOC:set(bits({ForceLinkUp=0, LMS10G=13}))
-   r.HLREG0:set(bits({Loop=15}))
+function restore_configuration_state (dev, saved_state)
+   dev.r.AUTOC(saved_state.AUTOC)
+   dev.r.HLREG0(saved_state.HLREG0)
+end
+
+function enable_mac_loopback (dev)
+   dev.r.AUTOC:set(bits({ForceLinkUp=0, LMS10G=13}))
+   dev.r.HLREG0:set(bits({Loop=15}))
 end
 
 function selftest (options)
+   assert(options and options.pciaddress, "options.pciaddress required")
+   local dev = new(options.pciaddress)
    local port = require("port")
-   options = options or {}
-   io.write("intel10g selftest: pciaddr="..pciaddress)
+   io.write("intel10g selftest: pciaddress="..pciaddress)
    for key,value in pairs(options) do
       io.write(" "..key.."="..tostring(value))
    end
@@ -228,14 +248,16 @@ function selftest (options)
    options.program = port.Port.loopback_test
    options.module = 'intel10g'
    options.secs = 10
-   open_for_loopback_test()
+   open_for_loopback_test(dev)
    port.selftest(options)
---   register.dump(r)
-   register.dump(s, true)
+   register.dump(dev.r)
+   register.dump(dev.s, true)
 end
 
-function open_for_loopback_test ()
-   open() enable_mac_loopback() test.waitfor("linkup", linkup, 20, 250000)
+function open_for_loopback_test (dev)
+   open(dev)
+   enable_mac_loopback(dev)
+   wait_linkup(dev)
 end
 
 --- ### Configuration register description.
