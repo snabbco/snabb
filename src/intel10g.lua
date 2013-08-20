@@ -16,6 +16,8 @@ local register = require("register")
 local memory = require("memory")
 local test = require("test")
 require("intel_h")
+require("packet_h")
+
 local bits, bitset = lib.bits, lib.bitset
 
 num_descriptors = 32 * 1024
@@ -44,11 +46,12 @@ function new (pciaddress)
 end
 
 function open (dev)
-   print("+++ OPEN +++")
    pci.set_bus_master(dev.pciaddress, true)
    base = ffi.cast("uint32_t*", pci.map_pci_memory(dev.pciaddress, 0))
    register.define(config_registers_desc, dev.r, base)
    register.define(statistics_registers_desc, dev.s, base)
+   dev.txpackets = ffi.new("struct packet *[?]", num_descriptors)
+   dev.rxbuffers = ffi.new("struct buffer *[?]", num_descriptors)
    init(dev)
 end
 
@@ -129,8 +132,6 @@ function transmit (dev, p)
    assert(p.niovecs == 1, "only supports one-buffer packets")
    local iov = p.iovecs[0]
    assert(iov.offset == 0)
-   --C.usleep(100)
-   --print("Snt " .. p.iovecs[0].buffer.pointer[0])
    dev.txdesc[dev.tdt].data.address = iov.buffer.physical + iov.offset
    dev.txdesc[dev.tdt].data.options = bit.bor(iov.length, txdesc_flags)
    dev.txpackets[dev.tdt] = p
@@ -161,7 +162,6 @@ end
 
 function receive (dev)
    assert(dev.rdh ~= dev.rxnext)
-   -- print("receive from descriptor " .. dev.rxnext)
    local p = packet.allocate()
    local b = dev.rxbuffers[dev.rxnext]
    local wb = dev.rxdesc[dev.rxnext].wb
@@ -256,7 +256,6 @@ end
 
 function open_for_loopback_test (dev)
    open(dev)
-   print("LOOPBACK")
    enable_mac_loopback(dev)
    wait_linkup(dev)
 end
