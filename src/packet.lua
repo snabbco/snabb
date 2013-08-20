@@ -3,6 +3,7 @@ module(...,package.seeall)
 local memory = require("memory")
 local ffi = require("ffi")
 local C = ffi.C
+local freelist = require("freelist")
 
 require("packet_h")
 
@@ -25,10 +26,12 @@ end
 -- Append data to a packet.
 function add_iovec (p, b, length,  offset)
    assert(p.niovecs < C.PACKET_IOVEC_MAX, "packet iovec overflow")
+   offset = offset or 0
+   assert(length + offset <= b.size)
    local iovec = p.iovecs[p.niovecs]
    iovec.buffer = b
    iovec.length = length
-   iovec.offset = offset or 0
+   iovec.offset = offset
    p.niovecs = p.niovecs + 1
    p.length = p.length + length
 end
@@ -52,6 +55,9 @@ end
 
 -- Free a packet and all of its buffers.
 function free (p)
+   for i = 0, p.niovecs-1 do
+      buffer.free(p.iovecs[i].buffer)
+   end
    p.info.flags     = 0
    p.info.gso_flags = 0
    p.refcount       = 1
