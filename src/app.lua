@@ -7,10 +7,14 @@ require("packet_h")
 
 -- Dictionary of all instantiated apps (Name -> App).
 apps = {}
+appsi = {}
 links = {}
 
 function new (class)
-   app = { runnable = true, input = {}, output = {} }
+   app = { runnable = true,
+	   input = {}, output = {},
+	   inputi = {}, outputi = {}
+	}
    return setmetatable(app, {__index=class})
 end
 
@@ -19,7 +23,9 @@ function connect (from_app, from_port, to_app, to_port)
    l = new_link(apps[to_app])
    links[name] = l
    apps[from_app].output[from_port] = l
+   table.insert(apps[from_app].outputi, l)
    apps[to_app].input[to_port] = l
+   table.insert(apps[to_app].inputi, l)
 end
 
 function new_link (to_app)
@@ -31,17 +37,25 @@ end
 -- links until the stop.
 function breathe ()
    -- Inhale
-   for _, app in pairs(apps) do
+   for _, app in ipairs(appsi) do
       if app.pull then app:pull() end
    end
    -- Exhale
    repeat
       local progress = false
-      for _, app in pairs(apps) do
+      for _, app in ipairs(appsi) do
 	 if app.runnable and app.push then
 	    app.runnable = false
 	    app:push()
 	    progress = true
+	    -- Free packets
+	    --[[
+	    for an,app in pairs(apps) do
+	       for inn,i in pairs(app.input) do
+		  link_ring.cleanup_after_receive(i.ring)
+	       end
+	    end
+	    --]]
 	 end
       end
    until not progress
@@ -57,22 +71,26 @@ function report ()
    end
 end
 
-function transmit (l, p)
+local link_ring_transmit = link_ring.transmit
+local function transmit (l, p)
    l.to_app.runnable = true
-   link_ring.transmit(l.ring, p)
+   link_ring_transmit(l.ring, p)
 end
 
-function transfer (l, p)
+local packet_deref = packet.deref
+local function transfer (l, p)
    transmit(l, p)
-   packet.deref(p)
+   packet_deref(p)
 end
 
-function receive (l)
-   return link_ring.receive(l.ring)
+local link_ring_receive = link_ring.receive
+local function receive (l)
+   return link_ring_receive(l.ring)
 end
 
-function empty (l)
-   return link_ring.empty(l.ring)
+local link_ring_empty = link_ring.empty
+local function empty (l)
+   return link_ring_empty(l.ring)
 end
 
 --- # Test apps
@@ -80,9 +98,11 @@ end
 -- Source app: pull brings 10 packets onto each output port.
 Source = {}
 function Source:pull ()
-   for _, o in pairs(self.output) do
-      for i = 1, 1000 do
-	 transfer(o, packet.allocate())
+   local o = self.output.out
+   for _, o in ipairs(self.outputi) do
+      for i = 1, 100 do
+	 local p = packet.allocate()
+	 transfer(o, p)
       end
    end
 end
@@ -90,7 +110,7 @@ end
 -- Join app: push sends packets from all inputs onto 'output.link'.
 Join = {}
 function Join:push () 
-   for _, inport in pairs(self.input) do
+   for _, inport in ipairs(self.inputi) do
       while not empty(inport) do
 	 transfer(self.output.out, receive(inport))
       end
@@ -100,9 +120,9 @@ end
 -- Split app: For each input port, push round-robbins packets onto each output.
 Split = {}
 function Split:push ()
-   for _, i in pairs(self.input) do
+   for _, i in ipairs(self.inputi) do
       repeat
-	 for _, o in pairs(self.output) do
+	 for _, o in ipairs(self.outputi) do
 	    if not empty(i) then
 	       transfer(o, receive(i))
 	    end
@@ -114,9 +134,11 @@ end
 -- Sink app: push receives and discards all packets from each input port.
 Sink = {}
 function Sink:push ()
-   for _, i in pairs(self.input) do
+   for _, i in ipairs(self.inputi) do
       while not empty(i) do
-	 packet.deref(receive(i))
+	 local p = receive(i)
+	 assert(p.refcount == 1)
+	 packet.deref(p)
       end
    end
 end
@@ -140,12 +162,17 @@ function selftest ()
    apps["join"] = new(Join)
    apps["split"] = new(Split)
    apps["sink"] = new(Sink)
+   table.insert(appsi, apps.source)
+   table.insert(appsi, apps.join)
+   table.insert(appsi, apps.split)
+   table.insert(appsi, apps.sink)
    connect("source", "out", "join", "in1")
    connect("join",   "out", "split", "in")
    connect("split", "out2", "sink", "in")
    connect("split", "out1", "join", "in2")
-   local deadline = lib.timer(1e9)
+   local deadline = lib.timer(10e9)
    repeat breathe() until deadline()
+   print("zoom")
    report()
    print("selftest OK")
 end
