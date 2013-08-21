@@ -5,6 +5,7 @@ local intel10g = require("intel10g")
 
 Intel82599 = {}
 
+-- Create an Intel82599 App for the device with 'pciaddress'.
 function Intel82599:new (pciaddress)
    local a = app.new(Intel82599)
    a.dev = intel10g.new(pciaddress)
@@ -13,6 +14,7 @@ function Intel82599:new (pciaddress)
    return a
 end
 
+-- Pull in packets from the network and queue them on our 'tx' link.
 function Intel82599:pull ()
    local l = self.output.tx
    if l == nil then return end
@@ -25,6 +27,7 @@ function Intel82599:pull ()
    end
 end
 
+-- Push packets from our 'rx' link onto the network.
 function Intel82599:push ()
    local l = self.input.rx
    if l == nil then return end
@@ -36,13 +39,17 @@ function Intel82599:push ()
    self.dev:sync_transmit()
 end
 
+-- Report on relevant status and statistics.
 function Intel82599:report ()
    print("report on intel device")
-   register.dump(self.dev.r)
+   --register.dump(self.dev.r)
    register.dump(self.dev.s, true)
 end
 
 function selftest ()
+   -- Create a pieline:
+   --   Source --> Intel82599(loopback) --> Sink
+   -- and push packets through it.
    app.apps.intel10g = Intel82599:new("0000:01:00.0")
    app.apps.source = app.new(app.Source)
    app.apps.sink   = app.new(app.Sink)
