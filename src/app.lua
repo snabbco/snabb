@@ -45,12 +45,6 @@ function breathe ()
 	 end
       end
    until not progress
-   -- Free packets
-   for _,app in pairs(apps) do
-      for _,i in pairs(app.input) do
-	 link_ring.cleanup_after_receive(i)
-      end
-   end
    -- (TODO) Timer-driven callbacks
    -- (TODO) Status reporting / counter collection
    -- (TODO) Restart crashed apps after delay
@@ -68,6 +62,11 @@ function transmit (l, p)
    link_ring.transmit(l.ring, p)
 end
 
+function transfer (l, p)
+   transmit(l, p)
+   packet.deref(p)
+end
+
 function receive (l)
    return link_ring.receive(l.ring)
 end
@@ -83,7 +82,7 @@ Source = {}
 function Source:pull ()
    for _, o in pairs(self.output) do
       for i = 1, 1000 do
-	 transmit(o, packet.allocate())
+	 transfer(o, packet.allocate())
       end
    end
 end
@@ -93,7 +92,7 @@ Join = {}
 function Join:push () 
    for _, inport in pairs(self.input) do
       while not empty(inport) do
-	 transmit(self.output.out, receive(inport))
+	 transfer(self.output.out, receive(inport))
       end
    end
 end
@@ -105,7 +104,7 @@ function Split:push ()
       repeat
 	 for _, o in pairs(self.output) do
 	    if not empty(i) then
-	       transmit(o, receive(i))
+	       transfer(o, receive(i))
 	    end
 	 end
       until empty(i)
@@ -116,7 +115,9 @@ end
 Sink = {}
 function Sink:push ()
    for _, i in pairs(self.input) do
-      while not empty(i) do receive(i) end
+      while not empty(i) do
+	 packet.deref(receive(i))
+      end
    end
 end
 
