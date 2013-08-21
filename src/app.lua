@@ -1,6 +1,7 @@
 module(...,package.seeall)
 
-local link = require("link")
+local link_ring = require("link_ring")
+require("packet_h")
 
 --- # App runtime system
 
@@ -15,10 +16,14 @@ end
 
 function connect (from_app, from_port, to_app, to_port)
    local name = from_app.."."..from_port.."->"..to_app.."."..to_port
-   local l = {link = link.new(), to_app = apps[to_app] }
+   l = new_link(apps[to_app])
    links[name] = l
    apps[from_app].output[from_port] = l
    apps[to_app].input[to_port] = l
+end
+
+function new_link (to_app)
+   return { ring = link_ring.new(), to_app = to_app }
 end
 
 -- Take a breath. First "inhale" by pulling in packets from all
@@ -40,6 +45,12 @@ function breathe ()
 	 end
       end
    until not progress
+   -- Free packets
+   for _,app in pairs(apps) do
+      for _,i in pairs(app.input) do
+	 link_ring.cleanup_after_receive(i)
+      end
+   end
    -- (TODO) Timer-driven callbacks
    -- (TODO) Status reporting / counter collection
    -- (TODO) Restart crashed apps after delay
@@ -48,28 +59,24 @@ end
 function report ()
    print("report")
    for name, l in pairs(links) do
-      print(name, lib.comma_value(tostring(tonumber(l.link.ring.stats.tx))) .. " packet(s) transmitted")
+      print(name, lib.comma_value(tostring(tonumber(l.ring.stats.tx))) .. " packet(s) transmitted")
    end
 end
 
---- # Test apps
-
 function transmit (l, p)
    l.to_app.runnable = true
-   link.transmit(l.link, p)
+   link_ring.transmit(l.ring, p)
 end
 
 function receive (l)
-   return link.receive(l.link)
+   return link_ring.receive(l.ring)
 end
 
 function empty (l)
-   return link.empty(l.link)
+   return link_ring.empty(l.ring)
 end
 
-function size2 (l)
-   return link.size2(l.link)
-end
+--- # Test apps
 
 -- Source app: pull brings 10 packets onto each output port.
 Source = {}
