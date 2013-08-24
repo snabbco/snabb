@@ -32,11 +32,11 @@ Android (ARM tested so far) currently passes some tests and fails others, so nee
 
 For the NetBSD support all platforms should work, more test targets will be added soon. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the differences.
 
-A small amount of OSX support was added but it is not well tested or maintained and is likely to be removed to a branch for now, due to lack of ability to test. This may be re-added after FreeBSD support.
+A small amount of OSX support was added but it is not well tested or maintained and is likely to be removed to a branch for now, due to lack of ability to test. This may be re-added after FreeBSD/Darwin support at a future date.
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
-For the rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project. This is now included as a git submodule. Then install the libraries somewhere in your library path. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There are some additional examples in `examples/rump` which is a port of the tests in buildrump. The rump kernel should run on any OS and architecture, but test coverage is currently limited to x64 on Linux and x32 on NetBSD; more targets to be added soon.
+For the rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project, which is included as a git submodule. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There are some additional examples in `examples/rump` which is a port of the tests in buildrump. The rump kernel should run on any OS and architecture in principle, currently tested on Linux x86, x64, ppc, arm but more targets to be added soon.
 
 ## New features planned soon
 netfilter, dhcp, selinux, arp, rump kernel backend, better sockopt handling, cgroups support, more NetBSD support, more rump kernel support.
