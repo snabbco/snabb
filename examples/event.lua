@@ -6,7 +6,7 @@ local EV = S.c.EV
 local MSC = S.c.MSC
 local KEY = S.c.KEY
 local ioctl = S.c.IOCTL
-local t = S.types.t
+local t = S.t
 local s = S.types.s
 
 local kl = {}
@@ -22,18 +22,14 @@ local function ev(dev)
   if not dev then dev = "/dev/input/event0" end
   local fd = assert(S.open(dev, "rdonly"))
 
-  local pversion = t.int1()
-
-  assert(S.ioctl(fd, "EVIOCGVERSION", pversion))
-
-  local version = pversion[0]
+  local version = assert(S.ioctl(fd, "EVIOCGVERSION"))
 
   print(string.format("evdev driver version: %d.%d.%d",
     bit.rshift(version, 16), 
     bit.band(bit.rshift(version, 8), 0xff),
     bit.band(version, 0xff)))
 
-  local ev = S.t.input_event()
+  local ev = t.input_event()
   while true do
     local ok = assert(fd:read(ev, s.input_event))
 
