@@ -6,6 +6,8 @@ local EV = S.c.EV
 local MSC = S.c.MSC
 local KEY = S.c.KEY
 local ioctl = S.c.IOCTL
+local t = S.types.t
+local s = S.types.s
 
 local kl = {}
 for k, v in pairs(KEY) do kl[v] = k end
@@ -20,7 +22,7 @@ local function ev(dev)
   if not dev then dev = "/dev/input/event0" end
   local fd = assert(S.open(dev, "rdonly"))
 
-  local pversion = S.t.int1()
+  local pversion = t.int1()
 
   assert(S.ioctl(fd, "EVIOCGVERSION", pversion))
 
@@ -33,7 +35,7 @@ local function ev(dev)
 
   local ev = S.t.input_event()
   while true do
-    local ok = assert(fd:read(ev, S.s.input_event))
+    local ok = assert(fd:read(ev, s.input_event))
 
     if ev.type == EV.MSC then
       if ev.code == MSC.SCAN then
