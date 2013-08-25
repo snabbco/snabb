@@ -96,8 +96,8 @@ end
 function S.flock(fd, operation) return retbool(C.flock(getfd(fd), c.LOCK[operation])) end
 -- TODO read should have consistent return type but then will differ from other calls.
 function S.read(fd, buf, count)
-  if buf then return retnum(C.read(getfd(fd), buf, count)) end -- user supplied a buffer, standard usage
-  if not count then count = 4096 end
+  if buf then return retnum(C.read(getfd(fd), buf, count or #buf or 4096)) end -- user supplied a buffer, standard usage
+  count = count or 4096
   buf = t.buffer(count)
   local ret = C.read(getfd(fd), buf, count)
   if ret == -1 then return nil, t.error() end
