@@ -5,9 +5,6 @@ local S = require "syscall"
 local EV = S.c.EV
 local MSC = S.c.MSC
 local KEY = S.c.KEY
-local ioctl = S.c.IOCTL
-local t = S.t
-local s = S.types.s
 
 local kl = {}
 for k, v in pairs(KEY) do kl[v] = k end
@@ -29,9 +26,9 @@ local function ev(dev)
     bit.band(bit.rshift(version, 8), 0xff),
     bit.band(version, 0xff)))
 
-  local ev = t.input_event()
+  local ev = S.t.input_event()
   while true do
-    local ok = assert(fd:read(ev, s.input_event))
+    assert(fd:read(ev))
 
     if ev.type == EV.MSC then
       if ev.code == MSC.SCAN then
