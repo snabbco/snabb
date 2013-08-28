@@ -34,6 +34,7 @@ int __mount50(const char *type, const char *dir, int flags, void *data, size_t d
 int __stat50(const char *path, struct stat *sb);
 int __lstat50(const char *path, struct stat *sb);
 int __fstat50(int fd, struct stat *sb);
+int __getdents30(int fd, char *buf, size_t nbytes);
 
 int syscall(int number, ...);
 ]]

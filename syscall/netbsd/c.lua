@@ -31,13 +31,10 @@ C.mount = ffi.C.__mount50
 C.stat = ffi.C.__stat50
 C.fstat = ffi.C.__fstat50
 C.lstat = ffi.C.__lstat50
+C.getdents = ffi.C.__getdents30
 
 C.getcwd = function(buf, size)
   return C.syscall(c.SYS.getcwd, pt.void(buf), t.size(size))
-end
-
-C.getdents = function(fd, buf, nbytes)
-  return C.syscall(c.SYS.getdents30, t.int(fd), pt.void(buf), t.size(nbytes))
 end
 
 return C
