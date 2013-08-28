@@ -19,7 +19,6 @@ int pipe2(int pipefd[2], int flags);
 int unmount(const char *dir, int flags);
 int reboot(int howto, char *bootstr);
 int futimens(int fd, const struct timespec times[2]);
-int utimes(const char *filename, const struct timeval times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 int revoke(const char *path);

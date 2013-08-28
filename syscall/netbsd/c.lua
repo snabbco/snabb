@@ -40,18 +40,6 @@ C.getdents = function(fd, buf, nbytes)
   return C.syscall(c.SYS.getdents30, t.int(fd), pt.void(buf), t.size(nbytes))
 end
 
-C.utimes = function(path, ts)
-  return C.syscall(c.SYS.utimes50, pt.void(path), pt.void(ts))
-end
-
-C.futimes = function(fd, ts)
-  return C.syscall(c.SYS.futimes50, t.int(fd), pt.void(ts))
-end
-
-C.lutimes = function(path, ts)
-  return C.syscall(c.SYS.lutimes50, pt.void(path), pt.void(ts))
-end
-
 return C
 
 end
