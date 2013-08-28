@@ -29,8 +29,8 @@ local C = setmetatable({}, {
 
 C.mount = ffi.C.__mount50
 C.stat = ffi.C.__stat50
-C.fstat = __fstat50
-C.lstat = __lstat50
+C.fstat = ffi.C.__fstat50
+C.lstat = ffi.C.__lstat50
 
 C.getcwd = function(buf, size)
   return C.syscall(c.SYS.getcwd, pt.void(buf), t.size(size))
