@@ -27,9 +27,7 @@ local C = setmetatable({}, {
   end
 })
 
-C.mount = function(fstype, dir, flags, data, data_len)
-  return C.syscall(c.SYS.mount50, fstype, dir, t.int(flags), pt.void(data), t.size(data_len))
-end
+C.mount = ffi.C.__mount50
 
 C.stat = function(path, buf)
   return C.syscall(c.SYS.stat50, pt.void(path), pt.void(buf))

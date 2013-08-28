@@ -16,7 +16,6 @@ int dup3(int oldfd, int newfd, int flags);
 int fsync_range(int fd, int how, off_t start, off_t length);
 int paccept(int s, struct sockaddr *addr, socklen_t *addrlen, const sigset_t *sigmask, int flags);
 int pipe2(int pipefd[2], int flags);
-int mount(const char *type, const char *dir, int flags, void *data, size_t data_len);
 int unmount(const char *dir, int flags);
 int reboot(int howto, char *bootstr);
 int futimens(int fd, const struct timespec times[2]);
@@ -31,6 +30,8 @@ long pathconf(const char *path, int name);
 long fpathconf(int fd, int name);
 int ioctl(int d, unsigned long request, ...);
 int getvfsstat(struct statvfs *buf, size_t bufsize, int flags);
+
+int __mount50(const char *type, const char *dir, int flags, void *data, size_t data_len);
 
 int syscall(int number, ...);
 ]]
