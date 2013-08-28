@@ -33,6 +33,8 @@ int getvfsstat(struct statvfs *buf, size_t bufsize, int flags);
 
 int __mount50(const char *type, const char *dir, int flags, void *data, size_t data_len);
 int __stat50(const char *path, struct stat *sb);
+int __lstat50(const char *path, struct stat *sb);
+int __fstat50(int fd, struct stat *sb);
 
 int syscall(int number, ...);
 ]]
