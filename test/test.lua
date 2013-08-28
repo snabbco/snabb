@@ -144,7 +144,9 @@ local clean = function()
   S.unlink(efile)
 end
 
--- type tests use reflection
+-- type tests use reflection, this does not work on LuaJIT 2.1 at present
+local jit = require "jit"
+if string.find(jit.version, "2.0.") then
 local reflect = require "include.reflect.reflect"
 
 test_types = {
@@ -186,6 +188,7 @@ test_types = {
     end
   end,
 }
+end
 
 test_basic = {
   test_b64 = function()
