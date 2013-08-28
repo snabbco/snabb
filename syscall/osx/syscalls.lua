@@ -26,6 +26,11 @@ function S.accept(sockfd, flags, addr, addrlen)
   return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
 end
 
+function S.utimes(filename, ts)
+  if ts then ts = t.timeval2(ts) end
+  return retbool(C.utimes(filename, ts))
+end
+
 function S.futimes(fd, ts)
   if ts then ts = t.timeval2(ts) end
   return retbool(C.futimes(getfd(fd), ts))

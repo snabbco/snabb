@@ -372,11 +372,6 @@ function S.fcntl(fd, cmd, arg)
   return true
 end
 
-function S.utimes(filename, ts)
-  if ts then ts = t.timeval2(ts) end
-  return retbool(C.utimes(filename, ts))
-end
-
 -- TODO return metatype that has length and can gc?
 function S.mmap(addr, length, prot, flags, fd, offset)
   return retptr(C.mmap(addr, length, c.PROT[prot], c.MAP[flags], getfd(fd or -1), offset or 0))
