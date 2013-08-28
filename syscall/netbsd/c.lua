@@ -28,10 +28,7 @@ local C = setmetatable({}, {
 })
 
 C.mount = ffi.C.__mount50
-
-C.stat = function(path, buf)
-  return C.syscall(c.SYS.stat50, pt.void(path), pt.void(buf))
-end
+C.stat = ffi.C.__stat50
 
 C.fstat = function(fd, path, buf)
   return C.syscall(c.SYS.fstat50, t.int(fd), pt.void(path), pt.void(buf))
