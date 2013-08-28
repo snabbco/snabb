@@ -96,16 +96,6 @@ function S.futimens(fd, ts)
   return retbool(C.futimens(getfd(fd), ts))
 end
 
-function S.futimes(fd, ts)
-  if ts then ts = t.timeval2(ts) end
-  return retbool(C.futimes(getfd(fd), ts))
-end
-
-function S.lutimes(path, ts)
-  if ts then ts = t.timeval2(ts) end
-  return retbool(C.lutimes(path, ts))
-end
-
 function S.revoke(path) return retbool(C.revoke(path)) end
 function S.chflags(path, flags) return retbool(C.chflags(path, c.CHFLAGS[flags])) end
 function S.lchflags(path, flags) return retbool(C.lchflags(path, c.CHFLAGS[flags])) end
