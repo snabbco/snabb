@@ -53,6 +53,12 @@ if S.getdirentries and not S.getdents then -- eg OSX has extra arg
   end
 end
 
+if S.utimensat and not S.utimes then
+  function S.utimes(filename, times)
+    return S.utimensat("FDCWD", filename, times, 0)
+  end
+end
+
 -- TODO we should allow utimbuf and also table of times really; this is the very old 1s precision version, NB Linux has syscall
 if not S.utime then
   function S.utime(path, actime, modtime)
