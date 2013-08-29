@@ -377,6 +377,9 @@ function C.ppoll(fds, nfds, timeout_ts, sigmask)
   if sigmask then size = sigset_size end
   return C.syscall(c.SYS.ppoll, pt.void(fds), t.nfds(nfds), pt.void(timeout_ts), pt.void(sigmask), t.int(size))
 end
+function C.signalfd(fd, mask, flags)
+  return C.syscall(c.SYS.signalfd4, t.int(fd), pt.void(mask), t.int(sigset_size), t.int(flags))
+end
 
 if c.SYS.accept4 then -- on x86 this is a socketcall, which we have not implemented yet, other archs is a syscall
   function C.accept4(sockfd, addr, addrlen, flags)
