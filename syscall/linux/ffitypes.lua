@@ -39,12 +39,15 @@ typedef unsigned long aio_context_t;
 typedef int32_t fd_mask;
 
 // again, should be a long
+// note this should be the kernel size (64 bits), glibc has a larger one. May be wrong for MIPS though where _NSIG=128.
+// need to bypass all libc handling though
 typedef struct {
   int32_t val[1024 / (8 * sizeof (int32_t))];
 } sigset_t;
 
 // again should be a long, and we have wrapped in a struct
 // TODO ok to wrap Lua types but not syscall? https://github.com/justincormack/ljsyscall/issues/36
+// TODO is this size right? check
 struct cpu_set_t {
   int32_t val[1024 / (8 * sizeof (int32_t))];
 };

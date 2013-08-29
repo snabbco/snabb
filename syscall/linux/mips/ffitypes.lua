@@ -1,5 +1,7 @@
 -- MIPS specific definitions
 
+-- TODO sigset_t probably needs to be here as _NSIG = 128 on MIPS
+
 return {
   ucontext = [[
 typedef struct sigaltstack {

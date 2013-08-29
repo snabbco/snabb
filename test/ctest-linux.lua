@@ -26,6 +26,7 @@ ctypes["struct sched_param"] = nil -- libc truncates unused parts
 ctypes["struct cpu_set_t"] = nil -- not actually a struct
 ctypes["dev_t"] = nil -- use kernel value not glibc
 ctypes["struct seccomp_data"] = nil -- not in ppc setup, remove for now
+ctypes["sigset_t"] = nil -- use kernel value not glibc
 
 -- we do not use the ino_t and blkcnt_t types, they are really 64 bit
 if abi.abi32 then
