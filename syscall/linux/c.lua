@@ -321,6 +321,11 @@ function C.clock_settime(clk_id, ts)
   return C.syscall(c.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
 end
 
+-- not in Android Bionic
+function C.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
+  return C.syscall(c.SYS.linkat, t.int(olddirfd), pt.void(oldpath), t.int(newdirfd), pt.void(newpath), t.int(flags))
+end
+
 return C
 
 end
