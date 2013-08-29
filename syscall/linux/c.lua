@@ -336,7 +336,10 @@ end
 function C.readlinkat(dirfd, pathname, buf, bufsiz)
   return C.syscall(c.SYS.readlinkat, t.int(dirfd), pt.void(pathname), pt.void(buf), t.size(bufsiz))
 end
--- TODO add sync_file_range here
+function C.inotify_init1(flags)
+  return C.syscall(c.SYS.inotify_init1, t.int(flags))
+end
+-- TODO add sync_file_range here, needs 64 bit fixups
 
 return C
 
