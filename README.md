@@ -28,7 +28,7 @@ The code does not currently support the main Lua implementation, only LuaJIT. It
 
 On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; MIPS support will be completed soon. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had less testing, and it has a lot of configuration options. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
-Android (ARM tested so far) currently passes some tests and fails others, so needs some more work, probably dealing with things that are not implemented in the kernel or libc and other environment differences.
+Android (ARM tested so far) currently passes most tests now, but needs a little more work; some tests should be skipped as the kernel does not ship with some functionality (aio, mq).
 
 For the NetBSD support all platforms should work, more test targets will be added soon. I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the differences.
 
@@ -42,7 +42,7 @@ For the rump kernel functionality, the easiest way at present to install it is u
 netfilter, dhcp, selinux, arp, rump kernel backend, better sockopt handling, cgroups support, more NetBSD support, more rump kernel support, rump kernel hypercall API, Xen support.
 
 ## Release notes
-0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes.
+0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes (now passing most tests).
 
 0.8 rump kernel fixes, NetBSD 64 bit fixes, initial arp/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support, initial support of NetBSD network config.
 
