@@ -348,7 +348,13 @@ end
 function C.epoll_create1(flags)
   return C.syscall(c.SYS.epoll_create1, t.int(flags))
 end
--- TODO add sync_file_range here, needs 64 bit fixups
+function C.swapon(path, swapflags)
+  return C.syscall(c.SYS.swapon, pt.void(path), t.int(swapflags))
+end
+function C.swapoff(path)
+  return C.syscall(c.SYS.swapoff, pt.void(path))
+end
+-- TODO add sync_file_range, splice here, need 64 bit fixups
 
 return C
 
