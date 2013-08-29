@@ -349,7 +349,9 @@ function C.epoll_wait(epfd, events, maxevents, timeout)
   return C.syscall(c.SYS.epoll_wait, t.int(epfd), pt.void(events), t.int(maxevents), t.int(timeout))
 end
 function C.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
-  return C.syscall(c.SYS.epoll_pwait, t.int(epfd), pt.void(events), t.int(maxevents), t.int(timeout), pt.void(sigmask))
+  local size = 0
+  if sigmask then size = 8 end -- should be s.sigset once switched to kernel sigset not glibc size
+  return C.syscall(c.SYS.epoll_pwait, t.int(epfd), pt.void(events), t.int(maxevents), t.int(timeout), pt.void(sigmask), t.int(size))
 end
 function C.ppoll(fds, nfds, timeout_ts, sigmask)
   local size = 0

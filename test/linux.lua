@@ -1016,7 +1016,7 @@ test.events_epoll = {
     local a, b = sv[1], sv[2]
     local ep = assert(S.epoll_create("cloexec"))
     assert(ep:epoll_ctl("add", a, "in"))
-    local r = assert(ep:epoll_pwait(nil, 1, 0))
+    local r = assert(ep:epoll_pwait(nil, 1, 0, "alrm"))
     assert(#r == 0, "no events yet")
     assert(b:write(teststring))
     r = assert(ep:epoll_wait())
@@ -1027,7 +1027,7 @@ test.events_epoll = {
     assert(a:read()) -- clear event
     assert(b:close())
     assert(a:close())
-  end
+  end,
 }
 
 test.aio = {
