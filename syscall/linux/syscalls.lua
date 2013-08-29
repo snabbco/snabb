@@ -141,14 +141,14 @@ function S.fstatat(fd, path, buf, flags)
   return buf
 end
 
-function S.futimens(fd, ts)
-  if ts then ts = t.timespec2(ts) end
-  return retbool(C.futimens(getfd(fd), ts))
+function S.utimensat(dirfd, path, ts, flags)
+  if ts then ts = t.timespec2(ts) end -- TODO use mktype?
+  return retbool(C.utimensat(c.AT_FDCWD[dirfd], path, ts, c.AT_SYMLINK_NOFOLLOW[flags]))
 end
 
-function S.utimensat(dirfd, path, ts, flags)
-  if ts then ts = t.timespec2(ts) end
-  return retbool(C.utimensat(c.AT_FDCWD[dirfd], path, ts, c.AT_SYMLINK_NOFOLLOW[flags]))
+-- not a syscall in Linux but method of implementation slightly non standard so here not compat
+function S.futimens(fd, times)
+  return S.utimensat(fd, nil, times, 0)
 end
 
 function S.getcwd(buf, size)

@@ -321,6 +321,11 @@ function C.clock_settime(clk_id, ts)
   return C.syscall(c.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
 end
 
+-- glibc will not call this with a null path, which is needed to implement futimens in Linux
+function C.utimensat(fd, path, times, flags)
+  return C.syscall(c.SYS.utimensat, t.int(fd), pt.void(path), pt.void(times), t.int(flags))
+end
+
 -- not in Android Bionic
 function C.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
   return C.syscall(c.SYS.linkat, t.int(olddirfd), pt.void(oldpath), t.int(newdirfd), pt.void(newpath), t.int(flags))

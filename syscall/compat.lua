@@ -69,14 +69,14 @@ if not S.utime then
   end
 end
 
--- the utimes, futimes, lutimes are legacy, but OSX does not support the nanosecond versions; we support both
-S.futimes = S.futimes or S.futimens
-
 if S.utimensat and not S.lutimes then
   function S.lutimes(filename, times)
     return S.utimensat("FDCWD", filename, times, "SYMLINK_NOFOLLOW")
   end
 end
+
+-- the utimes, futimes, lutimes are legacy, but OSX does not support the nanosecond versions; we support both
+S.futimes = S.futimes or S.futimens
 
 -- OSX does not support nanosecond times, emulate to less precision; note we auto convert timeval, timespec anyway
 S.futimens = S.futimens or S.futimes
