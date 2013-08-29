@@ -325,6 +325,9 @@ end
 function C.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
   return C.syscall(c.SYS.linkat, t.int(olddirfd), pt.void(oldpath), t.int(newdirfd), pt.void(newpath), t.int(flags))
 end
+function C.symlinkat(oldpath, newdirfd, newpath)
+  return C.syscall(c.SYS.symlinkat, pt.void(oldpath), t.int(newdirfd), pt.void(newpath))
+end
 
 return C
 
