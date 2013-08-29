@@ -328,6 +328,9 @@ end
 function C.symlinkat(oldpath, newdirfd, newpath)
   return C.syscall(c.SYS.symlinkat, pt.void(oldpath), t.int(newdirfd), pt.void(newpath))
 end
+function C.readlinkat(dirfd, pathname, buf, bufsiz)
+  return C.syscall(c.SYS.readlinkat, t.int(dirfd), pt.void(pathname), pt.void(buf), t.size(bufsiz))
+end
 
 return C
 
