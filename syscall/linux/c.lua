@@ -339,9 +339,6 @@ end
 function C.inotify_init1(flags)
   return C.syscall(c.SYS.inotify_init1, t.int(flags))
 end
-function C.accept4(sockfd, addr, addrlen, flags)
-  return C.syscall(c.SYS.accept4, t.int(sockfd), pt.void(addr), pt.void(addrlen), t.int(flags))
-end
 function C.adjtimex(buf)
   return C.syscall(c.SYS.adjtimex, pt.void(buf))
 end
@@ -375,6 +372,12 @@ function C.timerfd_gettime(fd, curr_value)
   return C.syscall(c.SYS.timerfd_gettime, t.int(fd), pt.void(curr_value))
 end
 -- TODO add sync_file_range, splice here, need 64 bit fixups
+
+if c.SYS.accept4 then -- on x86 this is a socketcall, which we have not implemented yet, other archs is a syscall
+  function C.accept4(sockfd, addr, addrlen, flags)
+    return C.syscall(c.SYS.accept4, t.int(sockfd), pt.void(addr), pt.void(addrlen), t.int(flags))
+  end
+end
 
 return C
 
