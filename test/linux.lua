@@ -497,7 +497,8 @@ test.misc_linux = {
     local i = assert(S.sysinfo()) -- TODO test values returned for some sanity
   end,
   test_sysctl = function()
-    local syslog = assert(S.syslog(10))
+    local syslog, err = S.syslog(10)
+    if not syslog and err.PERM then return end -- Android gives EPERM here
     assert(syslog > 1, "syslog buffer should have positive size")
   end,
   test_rlimit = function()
