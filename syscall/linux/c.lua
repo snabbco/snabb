@@ -365,6 +365,15 @@ end
 function C.swapoff(path)
   return C.syscall(c.SYS.swapoff, pt.void(path))
 end
+function C.timerfd_create(clockid, flags)
+  return C.syscall(c.SYS.timerfd_create, t.int(clockid), t.int(flags))
+end
+function C.timerfd_settime(fd, flags, new_value, old_value)
+  return C.syscall(c.SYS.timerfd_settime, t.int(fd), t.int(flags), pt.void(new_value), pt.void(old_value))
+end
+function C.timerfd_gettime(fd, curr_value)
+  return C.syscall(c.SYS.timerfd_gettime, t.int(fd), pt.void(curr_value))
+end
 -- TODO add sync_file_range, splice here, need 64 bit fixups
 
 return C
