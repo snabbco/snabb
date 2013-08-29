@@ -348,16 +348,6 @@ end
 function C.epoll_wait(epfd, events, maxevents, timeout)
   return C.syscall(c.SYS.epoll_wait, t.int(epfd), pt.void(events), t.int(maxevents), t.int(timeout))
 end
-function C.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
-  local size = 0
-  if sigmask then size = 8 end -- should be s.sigset once switched to kernel sigset not glibc size
-  return C.syscall(c.SYS.epoll_pwait, t.int(epfd), pt.void(events), t.int(maxevents), t.int(timeout), pt.void(sigmask), t.int(size))
-end
-function C.ppoll(fds, nfds, timeout_ts, sigmask)
-  local size = 0
-  if sigmask then size = 8 end -- should be s.sigset once switched to kernel sigset not glibc size
-  return C.syscall(c.SYS.ppoll, pt.void(fds), t.nfds(nfds), pt.void(timeout_ts), pt.void(sigmask), t.int(size))
-end
 function C.swapon(path, swapflags)
   return C.syscall(c.SYS.swapon, pt.void(path), t.int(swapflags))
 end
@@ -374,6 +364,19 @@ function C.timerfd_gettime(fd, curr_value)
   return C.syscall(c.SYS.timerfd_gettime, t.int(fd), pt.void(curr_value))
 end
 -- TODO add sync_file_range, splice here, need 64 bit fixups
+
+local sigset_size = 8 -- TODO should be s.sigset once switched to kernel sigset not glibc size
+
+function C.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
+  local size = 0
+  if sigmask then size = sigset_size end
+  return C.syscall(c.SYS.epoll_pwait, t.int(epfd), pt.void(events), t.int(maxevents), t.int(timeout), pt.void(sigmask), t.int(size))
+end
+function C.ppoll(fds, nfds, timeout_ts, sigmask)
+  local size = 0
+  if sigmask then size = sigset_size end
+  return C.syscall(c.SYS.ppoll, pt.void(fds), t.nfds(nfds), pt.void(timeout_ts), pt.void(sigmask), t.int(size))
+end
 
 if c.SYS.accept4 then -- on x86 this is a socketcall, which we have not implemented yet, other archs is a syscall
   function C.accept4(sockfd, addr, addrlen, flags)
