@@ -345,6 +345,9 @@ end
 function C.adjtimex(buf)
   return C.syscall(c.SYS.adjtimex, pt.void(buf))
 end
+function C.epoll_create1(flags)
+  return C.syscall(c.SYS.epoll_create1, t.int(flags))
+end
 -- TODO add sync_file_range here, needs 64 bit fixups
 
 return C
