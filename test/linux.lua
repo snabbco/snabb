@@ -1033,7 +1033,8 @@ test.events_epoll = {
 test.aio = {
   teardown = clean,
   test_aio_setup = function()
-    local ctx = assert(S.io_setup(8))
+    local ctx, err = S.io_setup(8)
+    if not ctx and err.NOSYS then return end -- may not be supported
     assert(S.io_destroy(ctx))
   end,
 --[[ -- temporarily disabled gc and methods on aio
@@ -1048,13 +1049,14 @@ test.aio = {
   end,
 ]]
   test_aio = function()
+    local ctx, err = S.io_setup(8)
+    if not ctx and err.NOSYS then return end -- may not be supported
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- use O_DIRECT or aio may not work
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
-    local ctx = assert(S.io_setup(8))
     local a = t.iocb_array{{opcode = "pread", data = 42, fildes = fd, buf = abuf, nbytes = 4096, offset = 0}}
     local ret = assert(S.io_submit(ctx, a))
     assert_equal(ret, 1, "expect one event submitted")
@@ -1066,13 +1068,14 @@ test.aio = {
     assert(S.munmap(abuf, 4096))
   end,
   test_aio_cancel = function()
+    local ctx, err = S.io_setup(8)
+    if not ctx and err.NOSYS then return end -- may not be supported
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU")
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
-    local ctx = assert(S.io_setup(8))
     local a = t.iocb_array{{opcode = "pread", data = 42, fildes = fd, buf = abuf, nbytes = 4096, offset = 0}}
     local ret = assert(S.io_submit(ctx, a))
     assert_equal(ret, 1, "expect one event submitted")
@@ -1085,13 +1088,14 @@ test.aio = {
     assert(S.munmap(abuf, 4096))
   end,
   test_aio_eventfd = function()
+    local ctx, err = S.io_setup(8)
+    if not ctx and err.NOSYS then return end -- may not be supported
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- need to use O_DIRECT for aio to work
     assert(S.unlink(tmpfile))
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
-    local ctx = assert(S.io_setup(8))
     local efd = assert(S.eventfd())
     local ep = assert(S.epoll_create())
     assert(ep:epoll_ctl("add", efd, "in"))
