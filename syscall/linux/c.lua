@@ -331,6 +331,7 @@ end
 function C.readlinkat(dirfd, pathname, buf, bufsiz)
   return C.syscall(c.SYS.readlinkat, t.int(dirfd), pt.void(pathname), pt.void(buf), t.size(bufsiz))
 end
+-- TODO add sync_file_range here
 
 return C
 

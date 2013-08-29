@@ -1119,7 +1119,7 @@ test.processes = {
     assert_equal(nn, 1)
     local nn = assert(S.setpriority("process", 0, 1)) -- sets to 1, which it already is
   end,
-  test_fork = function() -- TODO split up
+  test_fork = function()
     local pid0 = S.getpid()
     assert(pid0 > 1, "expecting my pid to be larger than 1")
     assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
@@ -1133,8 +1133,10 @@ test.processes = {
       assert(w.WIFEXITED, "process should have exited normally")
       assert(w.EXITSTATUS == 23, "exit should be 23")
     end
-
-    pid = assert(S.fork())
+  end,
+  test_fork_signal = function()
+    local pid0 = S.getpid()
+    local pid = assert(S.fork())
     if (pid == 0) then -- child
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
@@ -1144,8 +1146,9 @@ test.processes = {
       assert_equal(w.status, 23, "exit should be 23")
       assert_equal(w.code, c.SIGCLD.EXITED, "normal exit expected")
     end
-
-    pid = assert(S.fork())
+  end,
+  test_execve = function()
+    local pid = assert(S.fork())
     if (pid == 0) then -- child
       local script = [[
 #!/bin/sh
