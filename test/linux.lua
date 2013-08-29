@@ -1804,12 +1804,14 @@ test.scheduler = {
 
 test.mq = {
   test_mq_open_close_unlink = function()
-    local mq = assert(S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 512}))
+    local mq, err = S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 512})
+    if not mq and err.NOSYS then return end -- kernel may not support
     assert(S.mq_unlink(mqname)) -- unlink so errors do not leave dangling
     assert(mq:close())
   end,
   test_mq_getsetattr = function()
-    local mq = assert(S.mq_open(mqname, "rdwr,creat, nonblock", "rusr,wusr", {maxmsg = 10, msgsize = 512}))
+    local mq, err = S.mq_open(mqname, "rdwr,creat, nonblock", "rusr,wusr", {maxmsg = 10, msgsize = 512})
+    if not mq and err.NOSYS then return end -- kernel may not support
     assert(S.mq_unlink(mqname))
     local attr = mq:getattr()
     assert_equal(attr.flags, c.O.NONBLOCK)
@@ -1821,7 +1823,8 @@ test.mq = {
     assert(mq:close())
   end,
   test_mq_send_receive = function()
-    local mq = assert(S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 1}))
+    local mq, err = S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 1})
+    if not mq and err.NOSYS then return end -- kernel may not support
     assert(S.mq_unlink(mqname))
     assert(mq:timedsend("a"))  -- default prio is zero so should be behind second message
     assert(mq:send("b", nil, 10, 1)) -- 1 is timeout in seconds
