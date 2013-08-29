@@ -339,6 +339,9 @@ end
 function C.inotify_init1(flags)
   return C.syscall(c.SYS.inotify_init1, t.int(flags))
 end
+function C.accept4(sockfd, addr, addrlen, flags)
+  return C.syscall(c.SYS.accept4, t.int(sockfd), pt.void(addr), pt.void(addrlen), t.int(flags))
+end
 -- TODO add sync_file_range here, needs 64 bit fixups
 
 return C
