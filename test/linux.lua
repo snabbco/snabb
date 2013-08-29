@@ -1832,7 +1832,7 @@ test.shm = {
   test_shm = function()
     local name = "XXXXXYYYY" .. S.getpid()
     local fd, err = S.shm_open(name, "rdwr, creat")
-    if not fd and err.ACCES then return end -- Travis CI does not have mounted...
+    if not fd and (err.ACCES or err.NOENT) then return end -- Travis CI, Android do not have mounted...
     assert(fd, err)
     assert(S.shm_unlink(name))
     assert(fd:truncate(4096))
