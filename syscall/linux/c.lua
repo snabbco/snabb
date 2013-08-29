@@ -308,19 +308,17 @@ function C.sched_setparam(pid, param)
 end
 
 -- in librt for glibc but use syscalls instead of loading another library
-if not C.clock_getres then
-  function C.clock_nanosleep(clk_id, flags, req, rem)
-    return C.syscall(c.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
-  end
-  function C.clock_getres(clk_id, ts)
-    return C.syscall(c.SYS.clock_getres, t.clockid(clk_id), pt.void(ts))
-  end
-  function C.clock_gettime(clk_id, ts)
-    return C.syscall(c.SYS.clock_gettime, t.clockid(clk_id), pt.void(ts))
-  end
-  function C.clock_settime(clk_id, ts)
-    return C.syscall(c.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
-  end
+function C.clock_nanosleep(clk_id, flags, req, rem)
+  return C.syscall(c.SYS.clock_nanosleep, t.clockid(clk_id), t.int(flags), pt.void(req), pt.void(rem))
+end
+function C.clock_getres(clk_id, ts)
+  return C.syscall(c.SYS.clock_getres, t.clockid(clk_id), pt.void(ts))
+end
+function C.clock_gettime(clk_id, ts)
+  return C.syscall(c.SYS.clock_gettime, t.clockid(clk_id), pt.void(ts))
+end
+function C.clock_settime(clk_id, ts)
+  return C.syscall(c.SYS.clock_settime, t.clockid(clk_id), pt.void(ts))
 end
 
 return C
