@@ -122,14 +122,10 @@ if abi.abi32 then
 end
 
 -- glibc caches pid, but this fails to work eg after clone().
-function C.getpid()
-  return syscall(c.SYS.getpid)
-end
+function C.getpid() return syscall(c.SYS.getpid) end
 
 -- exit_group is the normal syscall but not available
-function C.exit_group(status)
-  return syscall(c.SYS.exit_group, t.int(status or 0))
-end
+function C.exit_group(status) return syscall(c.SYS.exit_group, t.int(status)) end
 
 -- clone interface provided is not same as system one, and is less convenient
 function C.clone(flags, signal, stack, ptid, tls, ctid)
@@ -147,15 +143,11 @@ function C.ioctl(fd, request, arg)
 end
 
 -- getcwd in libc may allocate memory and has inconsistent return value, so use syscall
-function C.getcwd(buf, size)
-  return syscall(c.SYS.getcwd, pt.void(buf), t.ulong(size))
-end
+function C.getcwd(buf, size) return syscall(c.SYS.getcwd, pt.void(buf), t.ulong(size)) end
 
 -- nice in libc may or may not return old value, syscall never does; however nice syscall may not exist
 if c.SYS.nice then
-  function C.nice(inc)
-    return syscall(c.SYS.nice, t.int(inc))
-  end
+  function C.nice(inc) return syscall(c.SYS.nice, t.int(inc)) end
 end
 
 -- avoid having to set errno by calling getpriority directly and adjusting return values
@@ -258,19 +250,13 @@ end
 function C.mq_open(name, flags, mode, attr)
   return syscall(c.SYS.mq_open, pt.void(name), t.int(flags), t.mode(mode), pt.void(attr))
 end
-
-function C.mq_unlink(name)
-  return syscall(c.SYS.mq_unlink, pt.void(name))
-end
-
+function C.mq_unlink(name) return syscall(c.SYS.mq_unlink, pt.void(name)) end
 function C.mq_getsetattr(mqd, new, old)
   return syscall(c.SYS.mq_getsetattr, t.int(mqd), pt.void(new), pt.void(old))
 end
-
 function C.mq_timedsend(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   return syscall(c.SYS.mq_timedsend, t.int(mqd), pt.void(msg_ptr), t.size(msg_len), t.uint(msg_prio), pt.void(abs_timeout))
 end
-
 function C.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   return syscall(c.SYS.mq_timedreceive, t.int(mqd), pt.void(msg_ptr), t.size(msg_len), pt.void(msg_prio), pt.void(abs_timeout))
 end
