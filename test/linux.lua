@@ -1018,10 +1018,11 @@ test.events_epoll = {
     local a, b = sv[1], sv[2]
     local ep = assert(S.epoll_create("cloexec"))
     assert(ep:epoll_ctl("add", a, "in"))
-    local r = assert(ep:epoll_pwait(nil, 1, 0, "alrm"))
+    local ev = t.epoll_events(1)
+    local r = assert(ep:epoll_wait(ev, 1, 0))
     assert(#r == 0, "no events yet")
     assert(b:write(teststring))
-    r = assert(ep:epoll_wait())
+    local r = assert(ep:epoll_pwait(ev, 1, 0, "alrm"))
     assert(#r == 1, "one event now")
     assert(r[1].IN, "read event")
     assert(r[1].fd == a:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
