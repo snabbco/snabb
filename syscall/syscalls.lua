@@ -445,6 +445,13 @@ function S.nanosleep(req, rem)
   return true
 end
 
+function S.gettimeofday(tv)
+  tv = tv or t.timeval() -- note it is faster to pass your own tv if you call a lot
+  local ret = C.gettimeofday(tv, nil)
+  if ret == -1 then return nil, t.error() end
+  return tv
+end
+
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
 S.openpt = S.posix_openpt

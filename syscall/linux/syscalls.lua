@@ -211,13 +211,6 @@ function S.setdomainname(s)
   return retbool(C.setdomainname(s, #s))
 end
 
-function S.gettimeofday(tv)
-  tv = tv or t.timeval() -- note it is faster to pass your own tv if you call a lot
-  local ret = C.gettimeofday(tv, nil)
-  if ret == -1 then return nil, t.error() end
-  return tv
-end
-
 function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
 
 function S.time(time) return retnum(C.time(time)) end

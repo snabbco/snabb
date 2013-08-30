@@ -1344,6 +1344,10 @@ test_timers_signals = {
     local rem = assert(S.nanosleep(0.001))
     assert_equal(rem, true, "expect no elapsed time after nanosleep")
   end,
+  test_gettimeofday = function()
+    local tv = assert(S.gettimeofday())
+    assert(math.floor(tv.time) == tv.sec, "should be able to get float time from timeval")
+  end,
 }
 
 test_util_misc = {

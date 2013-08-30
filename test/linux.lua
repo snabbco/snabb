@@ -415,10 +415,6 @@ test.timers_signals_linux = {
     assert_equal(o.value.time, 0, "expect 0 from gettime as expired")
     assert(fd:close())
   end,
-  test_gettimeofday = function()
-    local tv = assert(S.gettimeofday())
-    assert(math.floor(tv.time) == tv.sec, "should be able to get float time from timeval")
-  end,
   test_time = function()
     local tt = S.time()
   end,
