@@ -5,6 +5,7 @@ before_install:
  - sudo apt-get update -y
  - sudo apt-get install luajit -y
  - sudo apt-get install luarocks -y
+   sudo apt-get install strace -y
  - git submodule update --init --recursive
 
 env:
