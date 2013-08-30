@@ -392,11 +392,13 @@ end
 
 local sigset_size = 8 -- TODO should be s.sigset once switched to kernel sigset not glibc size
 
--- now failing on Travis, was ok...
+-- now failing on Travis, was ok... TODO work out why
+if not C.epoll_pwait then
 function C.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
   local size = 0
   if sigmask then size = sigset_size end
   return syscall(c.SYS.epoll_pwait, t.int(epfd), pt.void(events), t.int(maxevents), t.int(timeout), pt.void(sigmask), t.int(size))
+end
 end
 
 function C.ppoll(fds, nfds, timeout_ts, sigmask)
