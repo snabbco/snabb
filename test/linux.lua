@@ -1159,8 +1159,9 @@ test.processes = {
   test_execve = function()
     local pid = assert(S.fork())
     if (pid == 0) then -- child
-      local script = [[
-#!/bin/sh
+      local shell = "/bin/sh"
+      if not S.stat(shell) and S.stat("/system/bin/sh") then shell = "/system/bin/sh" end -- Android has no /bin/sh
+      local script = "#!" .. shell .. [[
 
 [ $1 = "test" ] || (echo "shell assert $1"; exit 1)
 [ $2 = "ing" ] || (echo "shell assert $2"; exit 1)
