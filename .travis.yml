@@ -10,7 +10,8 @@ before_install:
 env:
   - LD_LIBRARY_PATH=./buildrump.sh/rump/lib LD_DYNAMIC_WEAK=1
 
-script: 
+script:
+ - strace luajit test/test.lua test_events_epoll:test_epoll 
  - luajit test/test.lua
  - mkdir -p ./obj
  - luajit test/ctest.lua > ./obj/ctest.c && cc -std=c99 ./obj/ctest.c -o ./obj/ctest && ./obj/ctest
