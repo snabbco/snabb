@@ -308,9 +308,7 @@ test.tee_splice = {
     local s = assert(S.socketpair("unix", "stream, nonblock"))
     local fd = assert(S.open(tmpfile, "rdwr, creat", "RWXU"))
     assert(S.unlink(tmpfile))
-
     local str = teststring
-
     local n = assert(fd:write(str))
     assert(n == #str)
     n = assert(S.splice(fd, 0, p[2], nil, #str, "nonblock")) -- splice file at offset 0 into pipe
@@ -328,7 +326,6 @@ test.tee_splice = {
       assert(#n == #str)
       local buf2 = t.buffer(#str)
       ffi.copy(buf2, str, #str)
-
       n = assert(S.vmsplice(p[2], {{buf2, #str}}, "nonblock")) -- write our memory into pipe
       assert(n == #str)
       n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice out to socket
@@ -338,7 +335,6 @@ test.tee_splice = {
     else
       assert(err.NOSYS, "only allowed error is syscall not suported, as valgrind gives this") -- TODO add to features
     end
-
     assert(fd:close())
     assert(p:close())
     assert(pp:close())
