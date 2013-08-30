@@ -358,6 +358,9 @@ end
 function C.tee(src, dest, len, flags)
   return syscall(c.SYS.tee, t.int(src), t.int(dest), t.size(len), t.uint(flags))
 end
+function C.vmsplice(fd, iovec, cnt, flags)
+  return syscall(c.SYS.vmsplice, t.int(fd), pt.void(iovec), t.size(cnt), t.uint(flags))
+end
 -- note that I think these are correct on 32 bit platforms, but strace is buggy
 if c.SYS.sync_file_range then
   if abi.abi64 then
