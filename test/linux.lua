@@ -347,10 +347,6 @@ test.tee_splice = {
 }
 
 test.timers_signals_linux = {
-  test_nanosleep = function()
-    local rem = assert(S.nanosleep(0.001))
-    assert_equal(rem, true, "expect no elapsed time after nanosleep")
-  end,
   test_alarm = function()
     assert(S.signal("alrm", "ign"))
     assert(S.alarm(10))

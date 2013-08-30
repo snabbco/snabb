@@ -83,6 +83,7 @@ int pipe(int pipefd[2]);
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
+int nanosleep(const struct timespec *req, struct timespec *rem);
 
 uid_t getuid(void);
 uid_t geteuid(void);

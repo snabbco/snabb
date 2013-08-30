@@ -1070,7 +1070,7 @@ test_sockets_pipes = {
   end,
 }
 
-test_timers = {
+test_timespec_timeval = {
   test_timespec = function()
     local ts = t.timespec(1)
     assert_equal(ts.time, 1)
@@ -1338,6 +1338,14 @@ test_sendfd = {
 end
 
 if not abi.rump then -- rump has no processes, memory allocation, mmap and proc not applicable
+
+test_timers_signals = {
+  test_nanosleep = function()
+    local rem = assert(S.nanosleep(0.001))
+    assert_equal(rem, true, "expect no elapsed time after nanosleep")
+  end,
+}
+
 test_util_misc = {
   test_mapfile = function()
     assert(util.writefile(tmpfile, teststring, "RWXU"))

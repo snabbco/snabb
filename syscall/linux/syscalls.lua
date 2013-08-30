@@ -173,15 +173,6 @@ function S.fstatfs(fd)
   return st
 end
 
-function S.nanosleep(req, rem)
-  rem = rem or t.timespec()
-  local ret = C.nanosleep(mktype(t.timespec, req), rem)
-  if ret == -1 then
-    if ffi.errno() == c.E.INTR then return rem else return nil, t.error() end
-  end
-  return true
-end
-
 function S.mremap(old_address, old_size, new_size, flags, new_address)
   return retptr(C.mremap(old_address, old_size, new_size, c.MREMAP[flags], new_address))
 end

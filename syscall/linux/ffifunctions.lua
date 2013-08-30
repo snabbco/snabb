@@ -90,7 +90,6 @@ int mount(const char *source, const char *target, const char *filesystemtype, un
 int umount(const char *target);
 int umount2(const char *target, int flags);
 
-int nanosleep(const struct timespec *req, struct timespec *rem);
 int faccessat(int dirfd, const char *pathname, int mode, int flags);
 int statfs(const char *path, struct statfs64 *buf);
 int fstatfs(int fd, struct statfs64 *buf);
