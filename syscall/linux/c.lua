@@ -352,6 +352,9 @@ end
 function C.timerfd_gettime(fd, curr_value)
   return syscall(c.SYS.timerfd_gettime, t.int(fd), pt.void(curr_value))
 end
+function C.splice(fd_in, off_in, fd_out, off_out, len, flags)
+  return syscall(c.SYS.splice, t.int(fd_in), pt.void(off_in), t.int(fd_out), pt.void(off_out), t.size(len), t.uint(flags))
+end
 -- note that I think these are correct on 32 bit platforms, but strace is buggy
 if c.SYS.sync_file_range then
   if abi.abi64 then
@@ -380,7 +383,6 @@ elseif c.SYS.sync_file_range2 then -- only on 32 bit platforms I believe
     return syscall(c.SYS.sync_file_range2, t.int(fd), t.uint(flags), t.long(pos1), t.long(pos2), t.long(len1), t.long(len2))
   end
 end
--- TODO add splice here, need 64 bit fixups
 
 local sigset_size = 8 -- TODO should be s.sigset once switched to kernel sigset not glibc size
 
