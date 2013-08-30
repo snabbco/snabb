@@ -352,7 +352,35 @@ end
 function C.timerfd_gettime(fd, curr_value)
   return syscall(c.SYS.timerfd_gettime, t.int(fd), pt.void(curr_value))
 end
--- TODO add sync_file_range, splice here, need 64 bit fixups
+-- note that I think these are correct on 32 bit platforms, but strace is buggy
+if c.SYS.sync_file_range then
+  if abi.abi64 then
+    function C.sync_file_range(fd, pos, len, flags)
+      return syscall(c.SYS.sync_file_range, t.int(fd), 0, t.long(pos), t.long(len), t.uint(flags))
+    end
+  else
+    if zeropad then
+      function C.sync_file_range(fd, pos, len, flags)
+        local pos1, pos2 = arg64(pos)
+        local len1, len2 = arg64(len)
+        return syscall(c.SYS.sync_file_range, t.int(fd), 0, t.long(pos1), t.long(pos2), t.long(len1), t.long(len2), t.uint(flags))
+      end
+    else
+      function C.sync_file_range(fd, pos, len, flags)
+       local pos1, pos2 = arg64(pos)
+       local len1, len2 = arg64(len)
+        return syscall(c.SYS.sync_file_range, t.int(fd), t.long(pos1), t.long(pos2), t.long(len1), t.long(len2), t.uint(flags))
+      end
+    end
+  end
+elseif c.SYS.sync_file_range2 then -- only on 32 bit platforms I believe
+  function C.sync_file_range(fd, pos, len, flags)
+    local pos1, pos2 = arg64(pos)
+    local len1, len2 = arg64(len)
+    return syscall(c.SYS.sync_file_range2, t.int(fd), t.uint(flags), t.long(pos1), t.long(pos2), t.long(len1), t.long(len2))
+  end
+end
+-- TODO add splice here, need 64 bit fixups
 
 local sigset_size = 8 -- TODO should be s.sigset once switched to kernel sigset not glibc size
 

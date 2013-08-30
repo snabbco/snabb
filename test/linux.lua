@@ -139,6 +139,8 @@ test.file_operations_linux = {
   test_sync_file_range = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
+    assert(fd:sync_file_range(4096, 0, "wait_before, write, wait_after"))
+    assert(fd:sync_file_range(1, 2, "wait_before, write, wait_after"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
