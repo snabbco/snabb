@@ -355,6 +355,9 @@ end
 function C.splice(fd_in, off_in, fd_out, off_out, len, flags)
   return syscall(c.SYS.splice, t.int(fd_in), pt.void(off_in), t.int(fd_out), pt.void(off_out), t.size(len), t.uint(flags))
 end
+function C.tee(src, dest, len, flags)
+  return syscall(c.SYS.tee, t.int(src), t.int(dest), t.size(len), t.uint(flags))
+end
 -- note that I think these are correct on 32 bit platforms, but strace is buggy
 if c.SYS.sync_file_range then
   if abi.abi64 then
