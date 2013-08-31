@@ -36,6 +36,8 @@ int __lstat50(const char *path, struct stat *sb);
 int __fstat50(int fd, struct stat *sb);
 int __getdents30(int fd, char *buf, size_t nbytes);
 
+int __getcwd(char *buf, size_t size);
+
 int syscall(int number, ...);
 ]]
 
