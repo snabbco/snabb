@@ -3,7 +3,7 @@ language: c
 before_install: 
  - sudo add-apt-repository ppa:mwild1/ppa -y
  - sudo apt-get update -y
- - sudo apt-get install luajit -y
+ - sudo apt-get install luajit -y --force=yes
  - sudo apt-get install luarocks -y
  - sudo apt-get install strace -y
  - git submodule update --init --recursive
@@ -12,7 +12,7 @@ env:
   - LD_LIBRARY_PATH=./buildrump.sh/rump/lib LD_DYNAMIC_WEAK=1
 
 script:
- - strace luajit test/test.lua test_events_epoll:test_epoll_pwait 
+ - #strace luajit test/test.lua test_events_epoll:test_epoll_pwait 
  - luajit test/test.lua
  - mkdir -p ./obj
  - luajit test/ctest.lua > ./obj/ctest.c && cc -std=c99 ./obj/ctest.c -o ./obj/ctest && ./obj/ctest
