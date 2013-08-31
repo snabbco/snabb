@@ -27,15 +27,18 @@ local C = setmetatable({}, {
   end
 })
 
+-- for NetBSD we use libc names not syscalls, as assume you will have libc linked or statically linked with all symbols exported.
+-- this is so we can use NetBSD libc even where syscalls have been redirected to rump calls.
+
+-- use new versions
 C.mount = ffi.C.__mount50
 C.stat = ffi.C.__stat50
 C.fstat = ffi.C.__fstat50
 C.lstat = ffi.C.__lstat50
 C.getdents = ffi.C.__getdents30
 
-C.getcwd = function(buf, size)
-  return C.syscall(c.SYS.getcwd, pt.void(buf), t.size(size))
-end
+-- use underlying syscall not wrapper
+C.getcwd = ffi.C.__getcwd
 
 return C
 
