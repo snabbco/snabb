@@ -41,7 +41,6 @@ local unchanged = {
   id_t = true,
   pid_t = true,
   off_t = true,
-  nfds_t = true,
   size_t = true,
   ssize_t = true,
   socklen_t = true,

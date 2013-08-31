@@ -34,6 +34,7 @@ typedef uint32_t le32; /* this is little endian - not really using it yet */
 typedef uint32_t dev_t;
 
 typedef unsigned long aio_context_t;
+typedef unsigned long nfds_t;
 
 // should be a word, but we use 32 bits as bitops are signed 32 bit in LuaJIT at the moment
 typedef int32_t fd_mask;

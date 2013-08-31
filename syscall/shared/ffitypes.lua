@@ -20,9 +20,6 @@ typedef unsigned int speed_t;
 // 64 bit
 typedef uint64_t off_t;
 
-// typedefs which are word length
-typedef unsigned long nfds_t;
-
 // defined as long even though eg NetBSD defines as int on 32 bit, its the same.
 typedef long ssize_t;
 typedef unsigned long size_t;

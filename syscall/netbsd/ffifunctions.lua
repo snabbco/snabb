@@ -20,7 +20,7 @@ int unmount(const char *dir, int flags);
 int reboot(int howto, char *bootstr);
 int futimens(int fd, const struct timespec times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
-int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+int poll(struct pollfd *fds, _netbsd_nfds_t nfds, int timeout);
 int revoke(const char *path);
 int chflags(const char *path, unsigned long flags);
 int lchflags(const char *path, unsigned long flags);

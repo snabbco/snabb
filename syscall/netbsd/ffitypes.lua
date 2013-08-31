@@ -40,6 +40,9 @@ typedef uint32_t _netbsd_blksize_t;
 typedef int _netbsd_clockid_t;
 typedef int _netbsd_timer_t;
 typedef int _netbsd_suseconds_t;
+typedef unsigned int _netbsd_nfds_t;
+
+/* useconds_t not used in Linux so not renamed */
 typedef unsigned int useconds_t;
 
 typedef struct { int32_t __fsid_val[2]; } _netbsd_fsid_t;
