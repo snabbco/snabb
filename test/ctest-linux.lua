@@ -11,7 +11,7 @@ local c = S.c
 
 local ffi = require "ffi"
 
-local reflect = require "include.reflect.reflect"
+local reflect = require "include.ffi-reflect.reflect"
 
 -- TODO fix these, various naming issues
 ctypes["struct linux_dirent64"] = nil

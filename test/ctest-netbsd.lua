@@ -24,7 +24,7 @@ end
  
 local ffi = require "ffi"
 
-local reflect = require "include.reflect.reflect"
+local reflect = require "include.ffi-reflect.reflect"
 
 -- fixups
 c.STD = nil
