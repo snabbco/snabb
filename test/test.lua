@@ -144,10 +144,10 @@ local clean = function()
   S.unlink(efile)
 end
 
--- type tests use reflection, this does not work on LuaJIT 2.1 at present
+-- type tests use reflection TODO move to seperate test file
 local jit = require "jit"
-if string.find(jit.version, "2.0.") then
-local reflect = require "include.reflect.reflect"
+
+local reflect = require "include.ffi-reflect.reflect"
 
 test_types = {
   test_allocate = function() -- create an element of every ctype
@@ -188,7 +188,6 @@ test_types = {
     end
   end,
 }
-end
 
 test_basic = {
   test_b64 = function()

@@ -1,3 +1,6 @@
 [submodule "buildrump.sh"]
 	path = buildrump.sh
 	url = https://github.com/anttikantee/buildrump.sh.git
+[submodule "include/ffi-reflect"]
+	path = include/ffi-reflect
+	url = https://github.com/corsix/ffi-reflect
