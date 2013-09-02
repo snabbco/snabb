@@ -186,7 +186,6 @@ int rump___sysimpl_mkdirat(int, const char *, _netbsd_mode_t);
 int rump___sysimpl_faccessat(int, const char *, int, int);
 int rump___sysimpl_fchmodat(int, const char *, _netbsd_mode_t, int);
 int rump___sysimpl_fchownat(int, const char *, uid_t, gid_t, int);
-int rump___sysimpl_fexecve(int, char *const *, char *const *);
 int rump___sysimpl_fstatat(int, const char *, struct _netbsd_stat *, int);
 int rump___sysimpl_utimensat(int, const char *, const struct _netbsd_timespec *, int);
 int rump___sysimpl_openat(int, const char *, int, ...);
@@ -235,7 +234,6 @@ local C = {
   fchroot = ffi.C.rump___sysimpl_fchroot,
   fcntl = ffi.C.rump___sysimpl_fcntl,
   fdatasync = ffi.C.rump___sysimpl_fdatasync,
-  fexecve = ffi.C.rump___sysimpl_fexecve,
   fgetxattr = ffi.C.rump___sysimpl_fgetxattr,
   fhopen = ffi.C.rump___sysimpl_fhopen40,
   fhstat = ffi.C.rump___sysimpl_fhstat50,
