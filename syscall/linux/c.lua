@@ -16,6 +16,10 @@ local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
 
+local errpointer
+if abi.abi64 then errpointer = pt.void(0xffffffffffffffffULL) else errpointer = pt.void(0xffffffff) end
+local err64 = 0xffffffffffffffffULL
+
 -- TODO clean up when 64 bit bitops available, remove from types
 local function u6432(x) return t.u6432(x):to32() end
 local function i6432(x) return t.i6432(x):to32() end
@@ -108,7 +112,7 @@ if abi.abi32 then
     local result = t.off1()
     local off1, off2 = llarg64u(offset)
     local ret = syscall(c.SYS._llseek, t.int(fd), t.ulong(off1), t.ulong(off2), pt.void(result), t.uint(whence))
-    if ret == -1 then return -1 end
+    if ret == -1 then return err64 end
     return result[0]
   end
   function C.sendfile(outfd, infd, offset, count)
