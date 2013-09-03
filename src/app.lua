@@ -71,26 +71,22 @@ function report ()
    end
 end
 
-local link_ring_transmit = link_ring.transmit
-local function transmit (l, p)
+function transmit (l, p)
    l.to_app.runnable = true
-   link_ring_transmit(l.ring, p)
+   link_ring.transmit(l.ring, p)
 end
 
-local packet_deref = packet.deref
-local function transfer (l, p)
+function transfer (l, p)
    transmit(l, p)
-   packet_deref(p)
+   packet.deref(p)
 end
 
-local link_ring_receive = link_ring.receive
-local function receive (l)
-   return link_ring_receive(l.ring)
+function receive (l)
+   return link_ring.receive(l.ring)
 end
 
-local link_ring_empty = link_ring.empty
-local function empty (l)
-   return link_ring_empty(l.ring)
+function empty (l)
+   return link_ring.empty(l.ring)
 end
 
 --- # Test apps
@@ -100,7 +96,7 @@ Source = {}
 function Source:pull ()
    local o = self.output.out
    for _, o in ipairs(self.outputi) do
-      for i = 1, 100 do
+      for i = 1, 1000 do
 	 local p = packet.allocate()
 	 transfer(o, p)
       end
@@ -169,8 +165,8 @@ function selftest ()
    connect("source", "out", "join", "in1")
    connect("join",   "out", "split", "in")
    connect("split", "out2", "sink", "in")
-   connect("split", "out1", "join", "in2")
-   local deadline = lib.timer(10e9)
+--   connect("split", "out1", "join", "in2")
+   local deadline = lib.timer(1e9)
    repeat breathe() until deadline()
    print("zoom")
    report()
