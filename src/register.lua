@@ -18,6 +18,8 @@ end
 
 --- Read a counter register
 function Register:readrc ()
+   -- XXX JIT of this function is causing register value to be misread.
+   jit.off(true,true)
    local value = self.ptr[0]
    self.acc = (self.acc or 0) + value
    return self.acc
