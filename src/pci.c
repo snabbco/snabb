@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -21,7 +22,7 @@
 /// and then read and write that memory to access the device.
 
 // Return a point to the mapped memory, or NULL on failure.
-void *map_pci_resource(const char *path)
+uint32_t volatile *map_pci_resource(const char *path)
 {
   int fd;
   void *ptr;
@@ -33,7 +34,7 @@ void *map_pci_resource(const char *path)
   if (ptr == MAP_FAILED) {
     return NULL;
   } else {
-    return ptr;
+    return (uint32_t volatile *)ptr;
   }
 }
 

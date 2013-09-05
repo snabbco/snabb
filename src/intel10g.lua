@@ -47,7 +47,7 @@ end
 
 function open (dev)
    pci.set_bus_master(dev.pciaddress, true)
-   base = ffi.cast("uint32_t*", pci.map_pci_memory(dev.pciaddress, 0))
+   local base = pci.map_pci_memory(dev.pciaddress, 0)
    register.define(config_registers_desc, dev.r, base)
    register.define(statistics_registers_desc, dev.s, base)
    dev.txpackets = ffi.new("struct packet *[?]", num_descriptors)
