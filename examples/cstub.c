@@ -19,7 +19,7 @@ int main(void) {
   L = luaL_newstate();
   luaL_openlibs(L);
 
-  if (luaL_loadstring(L, "require \"hello\""))
+  if (luaL_loadstring(L, "require \"test.test\""))
 	lerror(L, "luaL_loadstring() failed");
   if (lua_pcall(L, 0, 0, 0))
 	lerror(L, "lua_pcall() failed");

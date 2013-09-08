@@ -33,16 +33,22 @@ do
   luajit -b -t o -n ${MODNAME} ${f} obj/${MODNAME}.o
 done
 
-# we will link in hello world
-luajit -b -t o -n hello examples/hello.lua obj/hello.o
+FILES='test/test.lua test/linux.lua test/netbsd.lua test/rump.lua'
+
+for f in $FILES
+do
+  NAME=`echo ${f} | sed 's/\.lua//'`
+  MODNAME=`echo ${NAME} | sed 's@/@.@g'`
+  luajit -b -t o -n ${MODNAME} ${f} obj/${MODNAME}.o
+done
 
 # small stub to create Lua state and call hello world
 cc -c -I${INCDIR} examples/cstub.c -o obj/cstub.o
 
-ar cr obj/libhello.a obj/cstub.o obj/hello.o obj/syscall*.o obj/jit*.o
+ar cr obj/libhello.a obj/cstub.o obj/syscall*.o obj/jit*.o
 
 #ld -o obj/cbuild --whole-archive obj/libhello.a --no-whole-archive ${LIBDIR}/libluajit.a -ldl -lm
-cc -Wl,-E -o obj/cbuild obj/cstub.o obj/hello.o ${LIBDIR}/libluajit.a obj/syscall*.o -ldl -lm
+cc -Wl,-E -o obj/cbuild obj/cstub.o ${LIBDIR}/libluajit.a obj/syscall*.o -ldl -lm
 
 ./obj/cbuild
 
