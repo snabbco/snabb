@@ -6,6 +6,7 @@ cd include/luajit-2.0 && make && cd ../..
 
 LIBDIR=include/luajit-2.0/src
 INCDIR=include/luajit-2.0/src
+JITDIR=include/luajit-2.0/src/jit
 
 # example of how to build a C executable
 
@@ -13,8 +14,6 @@ INCDIR=include/luajit-2.0/src
 
 rm -f ./obj/cbuild
 rm -f ./obj/*.{o,a}
-
-# bc.lua  bcsave.lua  dis_arm.lua  dis_mipsel.lua  dis_mips.lua  dis_ppc.lua  dis_x64.lua  dis_x86.lua  dump.lua  v.lua  vmdef.lua
 
 FILES=`find syscall.lua syscall -name '*.lua'`
 
@@ -25,10 +24,25 @@ do
   luajit -b -t o -n ${MODNAME} ${f} obj/${MODNAME}.o
 done
 
+FILES=`find $JITDIR -name '*.lua'`
+
+for f in $FILES
+do
+  NAME=`echo ${f} | sed "s@$JITDIR@@g" | sed 's/\.lua//'`
+  MODNAME=jit`echo ${NAME} | sed 's@/@.@g'`
+  luajit -b -t o -n ${MODNAME} ${f} obj/${MODNAME}.o
+done
+
 # we will link in hello world
 luajit -b -t o -n hello examples/hello.lua obj/hello.o
 
-cc -Wl,-E -o obj/cbuild -I ${INCDIR} examples/cstub.c obj/hello.o ${LIBDIR}/libluajit.a obj/syscall*.o -ldl -lm
+# small stub to create Lua state and call hello world
+cc -c -I${INCDIR} examples/cstub.c -o obj/cstub.o
+
+ar cr obj/libhello.a obj/cstub.o obj/hello.o obj/syscall*.o obj/jit*.o
+
+#ld -o obj/cbuild --whole-archive obj/libhello.a --no-whole-archive ${LIBDIR}/libluajit.a -ldl -lm
+cc -Wl,-E -o obj/cbuild obj/cstub.o obj/hello.o ${LIBDIR}/libluajit.a obj/syscall*.o -ldl -lm
 
 ./obj/cbuild
 
