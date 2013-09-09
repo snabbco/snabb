@@ -13,7 +13,7 @@ local ffi = require "ffi"
 
 local cdef
 
-if abi.types == abi.host then -- types same on host and rump so no renaming
+if abi.types == abi.host or abi.types == "linux" then -- types same on host and rump or using Linux so no renaming
   cdef = function(s)
     s = string.gsub(s, "_netbsd_", "")
     ffi.cdef(s)
