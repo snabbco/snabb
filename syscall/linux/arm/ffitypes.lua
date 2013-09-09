@@ -21,7 +21,7 @@ typedef struct __ucontext {
 } ucontext_t;
 ]],
   stat = [[
-struct stat64 {
+struct stat {
   unsigned long long      st_dev;
   unsigned char   __pad0[4];
   unsigned long   __st_ino;

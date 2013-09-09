@@ -56,7 +56,7 @@ typedef struct ucontext {
 } ucontext_t;
 ]],
   stat = [[
-struct stat64 {
+struct stat {
   unsigned long long st_dev;
   unsigned long long st_ino;
   unsigned int    st_mode;
