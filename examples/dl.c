@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <fcntl.h>
@@ -21,6 +22,13 @@
 #include <sys/time.h>
 #include <sys/module.h>
 #include <poll.h>
+
+/* these do not seem to be in our libc now */
+int posix_fadvise(int fd, off_t offset, off_t size, int hint) {
+  return 0; /* thanks for advice */
+}
+
+
 
 /* these are not defined in headers, prototype does not matter here as LuaJIT knows it */
 int __getcwd(void);
@@ -414,7 +422,7 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "__getdents30") == 0) return getdents;
   if (strcmp(symbol, "fhopen40") == 0) return fhopen;
   if (strcmp(symbol, "fhstat50") == 0) return fhstat;
-  if (strcmp(symbol, "fhstatvfs140") == 0) return fhstatvfs;
+  --if (strcmp(symbol, "fhstatvfs140") == 0) return fhstatvfs;
   if (strcmp(symbol, "select50") == 0) return select;
   if (strcmp(symbol, "socket30") == 0) return socket;
   if (strcmp(symbol, "stat50") == 0) return stat;
