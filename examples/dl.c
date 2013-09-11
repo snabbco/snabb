@@ -1,4 +1,5 @@
 /* dlopen/dlsym implementation for staticly linking - under development */
+/* this is for the Xen port for now, needs fixes for other ones */
 
 #include <dlfcn.h>
 #include <string.h>
@@ -40,16 +41,9 @@ int extattr_set_fd(void);
 int extattr_set_file(void);
 int extattr_set_link(void);
 int fgetxattr(void);
-int fhopen40(void);
-int fhstat50(void);
-int fhstatvfs140(void);
 int flistxattr(void);
 int fremovexattr(void);
 int fsetxattr(void);
-int fstat50(void);
-int futimes50(void);
-int getdents30(void);
-int getfh30(void);
 int getxattr(void);
 int _ksem_close(void);
 int _ksem_destroy(void);
@@ -65,18 +59,9 @@ int listxattr(void);
 int llistxattr(void);
 int lremovexattr(void);
 int lsetxattr(void);
-int lstat50(void);
-int lutimes50(void);
-int mount50(void);
-int posix_fadvise50(void);
-int pselect50(void);
 int removexattr(void);
-int select50(void);
 int setxattr(void);
-int socket30(void);
-int stat50(void);
 int __sysctl(void);
-int utimes50(void);
 
 /*
 ls ljsyscall/obj/{include,syscall,test}.* | sed 's@ljsyscall/obj/@extern const char *luaJIT_BC_@g' | sed 's/\.o$/[];/g' | sed 's/\./_/g'
@@ -303,27 +288,20 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "fcntl") == 0) return fcntl;
   if (strcmp(symbol, "fdatasync") == 0) return fdatasync;
   if (strcmp(symbol, "fgetxattr") == 0) return fgetxattr;
-  if (strcmp(symbol, "fhopen40") == 0) return fhopen40;
-  if (strcmp(symbol, "fhstat50") == 0) return fhstat50;
-  if (strcmp(symbol, "fhstatvfs140") == 0) return fhstatvfs140;
   if (strcmp(symbol, "flistxattr") == 0) return flistxattr;
   if (strcmp(symbol, "flock") == 0) return flock;
   if (strcmp(symbol, "fpathconf") == 0) return fpathconf;
   if (strcmp(symbol, "fremovexattr") == 0) return fremovexattr;
   if (strcmp(symbol, "fsetxattr") == 0) return fsetxattr;
-  if (strcmp(symbol, "fstat50") == 0) return fstat50;
   if (strcmp(symbol, "fstatat") == 0) return fstatat;
   if (strcmp(symbol, "fstatvfs1") == 0) return fstatvfs1;
   if (strcmp(symbol, "fsync_range") == 0) return fsync_range;
   if (strcmp(symbol, "fsync") == 0) return fsync;
   if (strcmp(symbol, "ftruncate") == 0) return ftruncate;
   if (strcmp(symbol, "futimens") == 0) return futimens;
-  if (strcmp(symbol, "futimes50") == 0) return futimes50;
   if (strcmp(symbol, "__getcwd") == 0) return __getcwd;
-  if (strcmp(symbol, "getdents30") == 0) return getdents30;
   if (strcmp(symbol, "getegid") == 0) return getegid;
   if (strcmp(symbol, "geteuid") == 0) return geteuid;
-  if (strcmp(symbol, "getfh30") == 0) return getfh30;
   if (strcmp(symbol, "getgid") == 0) return getgid;
   if (strcmp(symbol, "getgroups") == 0) return getgroups;
   if (strcmp(symbol, "__getlogin") == 0) return __getlogin;
@@ -365,8 +343,6 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "lremovexattr") == 0) return lremovexattr;
   if (strcmp(symbol, "lseek") == 0) return lseek;
   if (strcmp(symbol, "lsetxattr") == 0) return lsetxattr;
-  if (strcmp(symbol, "lstat50") == 0) return lstat50;
-  if (strcmp(symbol, "lutimes50") == 0) return lutimes50;
   if (strcmp(symbol, "mkdirat") == 0) return mkdirat;
   if (strcmp(symbol, "mkdir") == 0) return mkdir;
   if (strcmp(symbol, "mkfifoat") == 0) return mkfifoat;
@@ -374,7 +350,6 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "mknod") == 0) return mknod;
   if (strcmp(symbol, "mknodat") == 0) return mknodat;
   if (strcmp(symbol, "modctl") == 0) return modctl;
-  if (strcmp(symbol, "mount50") == 0) return mount50;
   if (strcmp(symbol, "nfssvc") == 0) return nfssvc;
   if (strcmp(symbol, "openat") == 0) return openat;
   if (strcmp(symbol, "open") == 0) return open;
@@ -383,10 +358,8 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "pipe2") == 0) return pipe2;
   if (strcmp(symbol, "poll") == 0) return poll;
   if (strcmp(symbol, "pollts") == 0) return pollts;
-  if (strcmp(symbol, "posix_fadvise50") == 0) return posix_fadvise50;
   if (strcmp(symbol, "pread") == 0) return pread;
   if (strcmp(symbol, "preadv") == 0) return preadv;
-  if (strcmp(symbol, "pselect50") == 0) return pselect50;
   if (strcmp(symbol, "pwrite") == 0) return pwrite;
   if (strcmp(symbol, "pwritev") == 0) return pwritev;
   if (strcmp(symbol, "__quotactl") == 0) return __quotactl;
@@ -402,7 +375,6 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "rename") == 0) return rename;
   if (strcmp(symbol, "revoke") == 0) return revoke;
   if (strcmp(symbol, "rmdir") == 0) return rmdir;
-  if (strcmp(symbol, "select50") == 0) return select50;
   if (strcmp(symbol, "sendmsg") == 0) return sendmsg;
   if (strcmp(symbol, "sendto") == 0) return sendto;
   if (strcmp(symbol, "setegid") == 0) return setegid;
@@ -419,9 +391,7 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "setuid") == 0) return setuid;
   if (strcmp(symbol, "setxattr") == 0) return setxattr;
   if (strcmp(symbol, "shutdown") == 0) return shutdown;
-  if (strcmp(symbol, "socket30") == 0) return socket30;
   if (strcmp(symbol, "socketpair") == 0) return socketpair;
-  if (strcmp(symbol, "stat50") == 0) return stat50;
   if (strcmp(symbol, "statvfs1") == 0) return statvfs1;
   if (strcmp(symbol, "symlinkat") == 0) return symlinkat;
   if (strcmp(symbol, "symlink") == 0) return symlink;
@@ -433,7 +403,6 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "unlink") == 0) return unlink;
   if (strcmp(symbol, "unmount") == 0) return unmount;
   if (strcmp(symbol, "utimensat") == 0) return utimensat;
-  if (strcmp(symbol, "utimes50") == 0) return utimes50;
   if (strcmp(symbol, "write") == 0) return write;
   if (strcmp(symbol, "writev") == 0) return writev;
 
@@ -443,6 +412,22 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "__fstat50") == 0) return fstat;
   if (strcmp(symbol, "__lstat50") == 0) return lstat;
   if (strcmp(symbol, "__getdents30") == 0) return getdents;
+  if (strcmp(symbol, "fhopen40") == 0) return fhopen;
+  if (strcmp(symbol, "fhstat50") == 0) return fhstat;
+  if (strcmp(symbol, "fhstatvfs140") == 0) return fhstatvfs;
+  if (strcmp(symbol, "select50") == 0) return select;
+  if (strcmp(symbol, "socket30") == 0) return socket;
+  if (strcmp(symbol, "stat50") == 0) return stat;
+  if (strcmp(symbol, "utimes50") == 0) return utimes;
+  if (strcmp(symbol, "pselect50") == 0) return pselect;
+  if (strcmp(symbol, "posix_fadvise50") == 0) return posix_fadvise;
+  if (strcmp(symbol, "mount50") == 0) return mount;
+  if (strcmp(symbol, "lstat50") == 0) return lstat;
+  if (strcmp(symbol, "lutimes50") == 0) return lutimes;
+  if (strcmp(symbol, "futimes50") == 0) return futimes;
+  if (strcmp(symbol, "fstat50") == 0) return fstat;
+  if (strcmp(symbol, "getfh30") == 0) return getfh;
+  if (strcmp(symbol, "getdents30") == 0) return getdents;
 
   fprintf(stderr, "failed to find %s\n", symbol);
 
