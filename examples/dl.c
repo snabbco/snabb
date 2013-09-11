@@ -14,6 +14,12 @@
 #include <sys/uio.h>
 #include <sys/file.h>
 #include <sys/socket.h>
+#include <sys/resource.h>
+#include <sys/ioctl.h>
+#include <sys/event.h>
+#include <sys/time.h>
+#include <sys/module.h>
+#include <poll.h>
 
 /* these are not defined in headers, prototype does not matter here as LuaJIT knows it */
 int __getcwd();
