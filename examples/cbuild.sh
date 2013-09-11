@@ -47,7 +47,7 @@ done
 # small stub to create Lua state and call hello world
 cc -c -I${INCDIR} examples/cstub.c -o obj/cstub.o
 
-ar cr obj/libtest.a obj/cstub.o obj/syscall*.o obj/jit*.o obj/test*.o obj/include*.o
+ar cr obj/libtest.a obj/cstub.o obj/syscall*.o obj/jit*.o obj/test*.o obj/include*.o obj/netbsd*.o
 
 #ld -o obj/cbuild --whole-archive obj/libhello.a --no-whole-archive ${LIBDIR}/libluajit.a -ldl -lm
 cc -Wl,-E -o obj/cbuild obj/cstub.o ${LIBDIR}/libluajit.a obj/syscall*.o -ldl -lm
