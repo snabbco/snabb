@@ -75,7 +75,7 @@ int __sysctl(void);
 ls ljsyscall/obj/{include,syscall,test}.* | sed 's@ljsyscall/obj/@extern const char *luaJIT_BC_@g' | sed 's/\.o$/[];/g' | sed 's/\./_/g'
 */
 
-//extern const char *luaJIT_BC_include_ffi-reflect_reflect[];
+extern const char *luaJIT_BC_include_ffi_reflect_reflect[];
 extern const char *luaJIT_BC_include_luaunit_luaunit[];
 extern const char *luaJIT_BC_include_strict_strict[];
 extern const char *luaJIT_BC_syscall_abi[];
