@@ -176,7 +176,7 @@ void *dlsym(void *handle, const char *symbol) {
     return NULL;
   /* replace with hash table, or Lua table */
 
-  if (strcmp(symbol, "luaJIT_BC_include_reflect_reflect") == 0) return luaJIT_BC_include_ffi_reflect_reflect; // TODO rename as has -
+  if (strcmp(symbol, "luaJIT_BC_reflect_reflect") == 0) return luaJIT_BC_include_ffi_reflect_reflect; // TODO rename as has -
   if (strcmp(symbol, "luaJIT_BC_include_luaunit_luaunit") == 0) return luaJIT_BC_include_luaunit_luaunit;
   if (strcmp(symbol, "luaJIT_BC_include_strict_strict") == 0) return luaJIT_BC_include_strict_strict;
   if (strcmp(symbol, "luaJIT_BC_syscall_abi") == 0) return luaJIT_BC_syscall_abi;
