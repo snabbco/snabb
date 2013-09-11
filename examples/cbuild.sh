@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# bundle up all the Lua files. This will be more files than you can possibly need...
+
 mkdir -p obj
 
 cd include/luajit-2.0 && make && cd ../..
@@ -33,7 +35,7 @@ do
   luajit -b -t o -n ${MODNAME} ${f} obj/${MODNAME}.o
 done
 
-FILES='test/test.lua test/linux.lua test/netbsd.lua test/rump.lua'
+FILES='test/test.lua test/linux.lua test/netbsd.lua test/rump.lua include/ffi-reflect/reflect.lua include/luaunit/luaunit.lua include/strict/strict.lua'
 
 for f in $FILES
 do
