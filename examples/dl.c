@@ -13,6 +13,7 @@
 #include <dirent.h>
 #include <sys/uio.h>
 #include <sys/file.h>
+#include <sys/socket.h>
 
 /* these are not defined in headers, prototype does not matter here as LuaJIT knows it */
 int __getcwd();
