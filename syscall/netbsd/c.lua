@@ -37,6 +37,8 @@ C.fstat = ffi.C.__fstat50
 C.lstat = ffi.C.__lstat50
 C.getdents = ffi.C.__getdents30
 C.socket = ffi.C.__socket30
+C.select = ffi.C.__select50
+C.pselect = ffi.C.__pselect50
 
 -- use underlying syscall not wrapper
 C.getcwd = ffi.C.__getcwd

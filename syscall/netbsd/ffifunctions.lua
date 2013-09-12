@@ -36,6 +36,8 @@ int __lstat50(const char *path, struct stat *sb);
 int __fstat50(int fd, struct stat *sb);
 int __getdents30(int fd, char *buf, size_t nbytes);
 int __socket30(int domain, int type, int protocol);
+int __select50(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+int __pselect50(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 
 int __getcwd(char *buf, size_t size);
 
