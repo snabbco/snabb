@@ -34,6 +34,10 @@ end
 
 local function inlibc_fn(k) return ffi.C[k] end
 
+ffi.cdef[[
+  int __ljsyscall_under_xen;
+]]
+
 -- Xen generally behaves like NetBSD, but our tests need to do rump-like setup
 if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
 
