@@ -34,6 +34,8 @@ int __getlogin(void);
 int __setlogin(void);
 int __quotactl(void);
 int __socket30(void);
+int __select50(void);
+int __pselect50(void);
 int extattrctl(void);
 int extattr_delete_fd(void);
 int extattr_delete_file(void);
@@ -428,13 +430,13 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "__lstat50") == 0) return lstat;
   if (strcmp(symbol, "__getdents30") == 0) return getdents;
   if (strcmp(symbol, "__socket30") == 0) return __socket30;
+  if (strcmp(symbol, "__select50") == 0) return __select50;
+  if (strcmp(symbol, "__pselect50") == 0) return __pselect50;
   if (strcmp(symbol, "fhopen40") == 0) return fhopen;
   if (strcmp(symbol, "fhstat50") == 0) return fhstat;
   /*if (strcmp(symbol, "fhstatvfs140") == 0) return fhstatvfs;*/
-  if (strcmp(symbol, "select50") == 0) return select;
   if (strcmp(symbol, "stat50") == 0) return stat;
   if (strcmp(symbol, "utimes50") == 0) return utimes;
-  if (strcmp(symbol, "pselect50") == 0) return pselect;
   if (strcmp(symbol, "posix_fadvise50") == 0) return posix_fadvise;
   if (strcmp(symbol, "mount50") == 0) return mount;
   if (strcmp(symbol, "lstat50") == 0) return lstat;
