@@ -67,7 +67,7 @@ if rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switc
   --assert(S.rump.rfork("CFDG"))
   --assert(S.setuid(100))
   --assert(S.seteuid(100))
-elseif rump and S.geteuid() == 0 then -- some initial setup for non-Linux rump
+elseif (rump and S.geteuid() == 0) or abi.xen then -- some initial setup for non-Linux rump, or under Xen
   local octal = helpers.octal
   assert(S.mkdir("/tmp", "0777"))
   local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0777")}
@@ -1461,7 +1461,7 @@ local function removeroottests()
 end
 
 -- basically largefile on NetBSD is always going to work but tests may not use sparse files so run out of memory
-if rump then
+if rump or abi.xen then
   test_largefile = nil
 end
 

@@ -28,8 +28,6 @@ int posix_fadvise(int fd, off_t offset, off_t size, int hint) {
   return 0; /* thanks for advice */
 }
 
-
-
 /* these are not defined in headers, prototype does not matter here as LuaJIT knows it */
 int __getcwd(void);
 int __getlogin(void);
@@ -171,10 +169,18 @@ char *dlerror(void) {
 ls ljsyscall/obj/{include,syscall,test}.* | sed 's@ljsyscall/obj/@@g' | sed 's/\.o$//g' | sed 's/\./_/g' | sed 's/\(.*\)/  if (strcmp(symbol, "luaJIT_BC_\1") == 0) return luaJIT_BC_\1;/g'
 */
 
+static int __ljsyscall_under_xen = 1;
+ 
 void *dlsym(void *handle, const char *symbol) {
   if (! handle)
     return NULL;
+
   /* replace with hash table, or Lua table */
+
+  /* flag to show this is Xen */
+  if (strcmp(symbol, "__ljsyscall_under_xen") == 0) return &__ljsyscall_under_xen;
+
+  /* Lua modules */
 
   if (strcmp(symbol, "luaJIT_BC_reflect_reflect") == 0) return luaJIT_BC_include_ffi_reflect_reflect; // TODO rename as has -
   if (strcmp(symbol, "luaJIT_BC_include_luaunit_luaunit") == 0) return luaJIT_BC_include_luaunit_luaunit;

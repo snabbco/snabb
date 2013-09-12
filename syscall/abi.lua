@@ -32,5 +32,10 @@ if abi.os == "netbsd" then -- we default to version 6, as stable target; you can
   abi.netbsd = {version = 6}
 end
 
+local function inlibc_fn(k) return ffi.C[k] end
+
+-- Xen generally behaves like NetBSD, but our tests need to do rump-like setup
+if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
+
 return abi
 
