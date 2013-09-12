@@ -1336,7 +1336,7 @@ test_sendfd = {
 }
 end
 
-if not abi.rump then -- rump has no processes, memory allocation, mmap and proc not applicable
+if not (abi.rump or abi.xen) then -- rump has no processes, memory allocation, mmap and proc not applicable
 
 test_timers_signals = {
   test_nanosleep = function()
