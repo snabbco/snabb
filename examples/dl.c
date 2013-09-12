@@ -33,6 +33,7 @@ int __getcwd(void);
 int __getlogin(void);
 int __setlogin(void);
 int __quotactl(void);
+int __socket30(void);
 int extattrctl(void);
 int extattr_delete_fd(void);
 int extattr_delete_file(void);
