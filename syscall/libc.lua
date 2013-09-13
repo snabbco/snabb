@@ -70,7 +70,6 @@ int clearenv(void);
 char *getenv(const char *name);
 ]]
 
--- handle environment. Note setenv etc removed as not kernel interfaces, only exec writes a new environment
 function S.environ() -- return whole environment as table
   local environ = ffi.C.environ
   if not environ then return nil end
