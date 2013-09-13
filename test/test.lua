@@ -1432,7 +1432,8 @@ test_mmap = {
 }
 end
 
-if S.environ then -- use this as a proxy for whether libc functions defined (eg not defined in rump)
+-- currently disabled in xen as not much use, probably could add though
+if S.environ and not abi.xen then -- use this as a proxy for whether libc functions defined (eg not defined in rump)
 test_libc = {
   test_environ = function()
     local e = S.environ()
