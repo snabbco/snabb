@@ -17,7 +17,7 @@ end
 
 local helpers = require "syscall.helpers"
 
-local S, rump
+local S
 
 if arg[1] == "rump" or arg[1] == "rumplinux" then
   local abi
@@ -33,7 +33,6 @@ if arg[1] == "rump" or arg[1] == "rumplinux" then
                    "net.net", "net.local", "net.netinet", "net.shmif"}
   S = require "syscall.rump.init".init(modules)
   table.remove(arg, 1)
-  rump = true
 else
   S = require "syscall"
 end
@@ -45,7 +44,7 @@ local c = S.c
 local features = S.features
 local util = S.util
 
-if rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switch from root so it does not try
+if abi.rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switch from root so it does not try
   assert(S.chmod("/", "0777"))
   assert(S.chmod("/dev/zero", "0666"))
   assert(S.mkdir("/tmp", "0777"))
@@ -67,7 +66,7 @@ if rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switc
   --assert(S.rump.rfork("CFDG"))
   --assert(S.setuid(100))
   --assert(S.seteuid(100))
-elseif (rump or abi.xen) and S.geteuid() == 0 then -- some initial setup for non-Linux rump
+elseif (abi.rump or abi.xen) and S.geteuid() == 0 then -- some initial setup for non-Linux rump
   local octal = helpers.octal
   assert(S.mkdir("/tmp", "0777"))
   local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0777")}
@@ -80,11 +79,11 @@ end
 local bit = require "bit"
 local ffi = require "ffi"
 
-if not (rump and abi.types == "linux") then
+if not (abi.rump and abi.types == "linux") then
   local test = require("test." .. abi.os).init(S) -- OS specific tests
   for k, v in pairs(test) do _G["test_" .. k] = v end
 end
-if rump then
+if abi.rump then
   local test = require "test.rump".init(S) -- rump specific tests
   for k, v in pairs(test) do _G["test_" .. k] = v end
 end
@@ -1461,7 +1460,7 @@ local function removeroottests()
 end
 
 -- basically largefile on NetBSD is always going to work but tests may not use sparse files so run out of memory
-if rump or abi.xen then
+if abi.rump or abi.xen then
   test_largefile = nil
 end
 
