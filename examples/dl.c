@@ -435,16 +435,11 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "fhopen40") == 0) return fhopen;
   if (strcmp(symbol, "fhstat50") == 0) return fhstat;
   /*if (strcmp(symbol, "fhstatvfs140") == 0) return fhstatvfs;*/
-  if (strcmp(symbol, "stat50") == 0) return stat;
   if (strcmp(symbol, "utimes50") == 0) return utimes;
   if (strcmp(symbol, "posix_fadvise50") == 0) return posix_fadvise;
-  if (strcmp(symbol, "mount50") == 0) return mount;
-  if (strcmp(symbol, "lstat50") == 0) return lstat;
   if (strcmp(symbol, "lutimes50") == 0) return lutimes;
   if (strcmp(symbol, "futimes50") == 0) return futimes;
-  if (strcmp(symbol, "fstat50") == 0) return fstat;
   if (strcmp(symbol, "getfh30") == 0) return getfh;
-  if (strcmp(symbol, "getdents30") == 0) return getdents;
 
   fprintf(stderr, "failed to find %s\n", symbol);
 
