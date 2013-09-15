@@ -119,6 +119,7 @@ fmeth.pathconf = S.fpathconf
 fmeth.chflags = S.fchflags
 fmeth.chroot = S.fchroot
 fmeth.sync_range = S.fsync_range
+fmeth.kevent = S.kevent
 
 local function nogc(d) return ffi.gc(d, nil) end
 

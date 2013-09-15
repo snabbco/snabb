@@ -11,7 +11,8 @@ local function init(types, hh, abi, c)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local ptt, addtype, lenfn, lenmt, newfn, istype = hh.ptt, hh.addtype, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
+local ptt, addtype, addtype_var, lenfn, lenmt, newfn, istype =
+  hh.ptt, hh.addtype, hh.addtype_var, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -19,6 +20,13 @@ local bit = require "bit"
 local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
+
+-- TODO duplicated
+local function getfd(fd)
+  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
+  return fd:getfd()
+end
+local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
 local mt = {} -- metatables
 
@@ -33,7 +41,6 @@ local addstructs = {
   procfs_args = "struct procfs_args",
   flock = "struct flock",
   statvfs = "struct statvfs",
-  kevent = "struct kevent",
   kfilter_mapping = "struct kfilter_mapping",
 }
 
@@ -270,6 +277,46 @@ for k, i in pairs(c.CC) do
 end
 
 addtype("termios", "struct termios", mt.termios)
+
+mt.kevent = {
+  index = {
+  },
+  newindex = {
+    fd = function(kev, v) kev.ident = t.uintptr(getfd(v)) end,
+  },
+  __new = function(tp, tab)
+    if type(tab) == "table" then
+      tab.flags = c.EV[tab.flags]
+      tab.filter = c.EVFILT[tab.filter] -- TODO this should also support extra ones via ioctl see man page
+      tab.fflags = c.NOTE[tab.fflags]
+    end
+    local obj = ffi.new(tp)
+    for k, v in pairs(tab or {}) do obj[k] = v end
+    return obj
+  end,
+}
+
+addtype("kevent", "struct kevent", mt.kevent)
+
+mt.kevents = {
+  __index = function(kk, k)
+    return kk.kev[k - 1]
+  end,
+  __newindex = function(kk, k, v)
+    v = mktype(t.kevent, v)
+    ffi.copy(kk.kev[k - 1], v, s.kevent)
+  end,
+  __len = function(kk) return kk.count end,
+  __new = function(tp, ks)
+    if type(ks) == 'number' then return ffi.new(tp, ks, ks) end
+    local count = #ks
+    local kks = ffi.new(tp, count, count)
+    for n = 1, count do kks[n] = ks[n] end
+    return kks
+  end,
+}
+
+addtype_var("kevents", "struct {int count; struct kevent kev[?];}", mt.kevents)
 
 return types
 

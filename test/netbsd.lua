@@ -176,9 +176,14 @@ test.pipes_bsd = {
 }
 
 test.kqueue = {
-  test_kqueue = function()
+  test_kqueue_vnode = function()
     local kfd = assert(S.kqueue("cloexec, nosigpipe"))
-    -- kevent
+    local fd = assert(S.creat(tmpfile, "rwxu"))
+    local kevs = t.kevents{{fd = fd, filter = "vnode",
+      flags = "add, enable, clear", fflags = "delete, write, extend, attrib, link, rename, revoke"}}
+    assert(kfd:kevent(kevs, nil, 1))
+    local ret = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(ret, 0) -- no events yet
     assert(kfd:close())
   end,
 }
