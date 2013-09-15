@@ -29,6 +29,9 @@ long pathconf(const char *path, int name);
 long fpathconf(int fd, int name);
 int ioctl(int d, unsigned long request, ...);
 int getvfsstat(struct statvfs *buf, size_t bufsize, int flags);
+int kqueue(void);
+int kqueue1(int flags);
+int kevent(int kq, const struct kevent *changelist, size_t nchanges, struct kevent *eventlist, size_t nevents, const struct timespec *timeout);
 
 int __mount50(const char *type, const char *dir, int flags, void *data, size_t data_len);
 int __stat50(const char *path, struct stat *sb);

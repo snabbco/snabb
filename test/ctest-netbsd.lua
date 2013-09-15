@@ -100,6 +100,7 @@ print [[
 #include <sys/module.h>
 #include <sys/syscall.h>
 #include <sys/statvfs.h>
+#include <sys/event.h>
 #include <netinet/in.h>
 #include <net/route.h>
 #include <net/bpf.h>

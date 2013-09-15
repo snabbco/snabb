@@ -132,6 +132,14 @@ typedef union _netbsd_sigval {
   int     sival_int;
   void    *sival_ptr;
 } _netbsd_sigval_t;
+struct _netbsd_kevent {
+  uintptr_t ident;
+  uint32_t  filter;
+  uint32_t  flags;
+  uint32_t  fflags;
+  int64_t   data;
+  intptr_t  udata;
+};
 ]]
 
 if abi.abi64 then

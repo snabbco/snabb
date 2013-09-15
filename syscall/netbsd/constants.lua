@@ -923,5 +923,52 @@ c.TCFLOW = strflag {
   ION  = 4,
 }
 
+-- kqueue
+c.EV = multiflags {
+  ADD      = 0x0001,
+  DELETE   = 0x0002,
+  ENABLE   = 0x0004,
+  DISABLE  = 0x0008,
+  ONESHOT  = 0x0010,
+  CLEAR    = 0x0020,
+  SYSFLAGS = 0xF000,
+  FLAG1    = 0x2000,
+  EOF      = 0x8000,
+  ERROR    = 0x4000,
+}
+
+c.EVFILT = strflag {
+  READ     = 0,
+  WRITE    = 1,
+  AIO      = 2,
+  VNODE    = 3,
+  PROC     = 4,
+  SIGNAL   = 5,
+  TIMER    = 6,
+  SYSCOUNT = 7,
+}
+
+c.NOTE = multiflags {
+  LOWAT      0x0001,
+
+  DELETE     0x0001,
+  WRITE      0x0002,
+  EXTEND     0x0004,
+  ATTRIB     0x0008,
+  LINK       0x0010,
+  RENAME     0x0020,
+  REVOKE     0x0040,
+
+  EXIT       0x80000000,
+  FORK       0x40000000,
+  EXEC       0x20000000,
+  PCTRLMASK  0xf0000000,
+  PDATAMASK  0x000fffff,
+
+  TRACK      0x00000001,
+  TRACKERR   0x00000002,
+  CHILD      0x00000004,
+}
+
 return c
 
