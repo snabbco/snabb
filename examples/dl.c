@@ -434,7 +434,7 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "__pselect50") == 0) return __pselect50;
   if (strcmp(symbol, "__fhopen40") == 0) return fhopen;
   if (strcmp(symbol, "__fhstat50") == 0) return fhstat;
-  /*if (strcmp(symbol, "__fhstatvfs140") == 0) return fhstatvfs1;*/
+  if (strcmp(symbol, "__fhstatvfs140") == 0) return __fhstatvfs140;
   if (strcmp(symbol, "__utimes50") == 0) return utimes;
   if (strcmp(symbol, "__posix_fadvise50") == 0) return posix_fadvise;
   if (strcmp(symbol, "__lutimes50") == 0) return lutimes;
