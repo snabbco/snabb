@@ -46,7 +46,7 @@ int __getfh30(const char *path, void *fhp, size_t *fh_size);
 int __utimes50(const char *path, const struct timeval times[2]);
 int __lutimes50(const char *path, const struct timeval times[2]);
 int __futimes50(int fd, const struct timeval times[2]);
-int posix_fadvise50(int fd, off_t offset, off_t size, int hint);
+int __posix_fadvise50(int fd, off_t offset, off_t size, int hint);
 
 int __getcwd(char *buf, size_t size);
 
