@@ -184,6 +184,16 @@ test.kqueue = {
     assert(kfd:kevent(kevs, nil, 1))
     local ret = assert(kfd:kevent(nil, kevs, 0))
     assert_equal(ret, 0) -- no events yet
+    assert(S.unlink(tmpfile))
+    local ret = assert(kfd:kevent(nil, kevs, 1))
+    assert_equal(ret, 1)
+    assert(kevs[1].DELETE, "expect delete event")
+    assert(fd:write("something"))
+    local ret = assert(kfd:kevent(nil, kevs, 1))
+    assert_equal(ret, 1)
+    assert(kevs[1].WRITE, "expect write event")
+    assert(kevs[1].EXTEND, "expect extend event")
+    assert(fd:close())
     assert(kfd:close())
   end,
 }

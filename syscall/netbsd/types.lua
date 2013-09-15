@@ -296,6 +296,10 @@ mt.kevent = {
   end,
 }
 
+for k, v in pairs(c.NOTE) do
+  mt.kevent.index[k] = function(kev) return bit.band(kev.fflags, v) ~= 0 end
+end
+
 addtype("kevent", "struct kevent", mt.kevent)
 
 mt.kevents = {
