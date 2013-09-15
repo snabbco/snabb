@@ -33,6 +33,8 @@ local addstructs = {
   procfs_args = "struct procfs_args",
   flock = "struct flock",
   statvfs = "struct statvfs",
+  kevent = "struct kevent",
+  kfilter_mapping = "struct kfilter_mapping",
 }
 
 if abi.netbsd.version == 6 then

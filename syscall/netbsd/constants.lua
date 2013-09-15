@@ -949,25 +949,25 @@ c.EVFILT = strflag {
 }
 
 c.NOTE = multiflags {
-  LOWAT      0x0001,
+  LOWAT     = 0x0001,
 
-  DELETE     0x0001,
-  WRITE      0x0002,
-  EXTEND     0x0004,
-  ATTRIB     0x0008,
-  LINK       0x0010,
-  RENAME     0x0020,
-  REVOKE     0x0040,
+  DELETE    = 0x0001,
+  WRITE     = 0x0002,
+  EXTEND    = 0x0004,
+  ATTRIB    = 0x0008,
+  LINK      = 0x0010,
+  RENAME    = 0x0020,
+  REVOKE    = 0x0040,
 
-  EXIT       0x80000000,
-  FORK       0x40000000,
-  EXEC       0x20000000,
-  PCTRLMASK  0xf0000000,
-  PDATAMASK  0x000fffff,
+  EXIT      = 0x80000000,
+  FORK      = 0x40000000,
+  EXEC      = 0x20000000,
+  PCTRLMASK = 0xf0000000,
+  PDATAMASK = 0x000fffff,
 
-  TRACK      0x00000001,
-  TRACKERR   0x00000002,
-  CHILD      0x00000004,
+  TRACK     = 0x00000001,
+  TRACKERR  = 0x00000002,
+  CHILD     = 0x00000004,
 }
 
 return c

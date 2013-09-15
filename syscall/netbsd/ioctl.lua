@@ -197,6 +197,9 @@ local ioctl = strflag {
 --SIOCSLINKSTR   =  _IOW('i', 136, "ifdrv"),
   SIOCSETPFSYNC  =  _IOW('i', 247, "ifreq"),
   SIOCGETPFSYNC  = _IOWR('i', 248, "ifreq"),
+-- kqueue ioctls
+  KFILTER_BYFILTER = _IOWR('k', 0, "kfilter_mapping"),
+  KFILTER_BYNAME   = _IOWR('k', 1, "kfilter_mapping"),
 
 -- allow user defined ioctls
   _IO = _IO,

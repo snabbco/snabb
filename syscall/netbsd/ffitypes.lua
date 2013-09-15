@@ -140,6 +140,11 @@ struct _netbsd_kevent {
   int64_t   data;
   intptr_t  udata;
 };
+struct _netbsd_kfilter_mapping {
+  char     *name;
+  size_t   len;
+  uint32_t filter;
+};
 ]]
 
 if abi.abi64 then
