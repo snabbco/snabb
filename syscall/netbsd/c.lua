@@ -45,11 +45,11 @@ C.pselect = ffi.C.__pselect50
 C.fhopen = ffi.C.__fhopen40
 C.fhstat = ffi.C.__fhstat50
 C.fhstatvfs1 = ffi.C.__fhstatvfs140
-C.utimes = ffi.C.utimes50
-C.posix_fadvise = ffi.C.posix_fadvise50
-C.lutimes = ffi.C.lutimes50
-C.futimes = ffi.C.futimes50
-C.getfh = ffi.C.getfh30
+C.utimes = ffi.C.__utimes50
+C.posix_fadvise = ffi.C.__posix_fadvise50
+C.lutimes = ffi.C.__lutimes50
+C.futimes = ffi.C.__futimes50
+C.getfh = ffi.C.__getfh30
 
 -- use underlying syscall not wrapper
 C.getcwd = ffi.C.__getcwd
