@@ -36,6 +36,7 @@ int __quotactl(void);
 int __socket30(void);
 int __select50(void);
 int __pselect50(void);
+int __fhstatvfs140(void);
 int extattrctl(void);
 int extattr_delete_fd(void);
 int extattr_delete_file(void);
