@@ -432,14 +432,14 @@ cat syscall/rump/c.lua | grep 'ffi.C.rump___sysimpl_' | grep -v - '--' | sed 's/
   if (strcmp(symbol, "__socket30") == 0) return __socket30;
   if (strcmp(symbol, "__select50") == 0) return __select50;
   if (strcmp(symbol, "__pselect50") == 0) return __pselect50;
-  if (strcmp(symbol, "fhopen40") == 0) return fhopen;
-  if (strcmp(symbol, "fhstat50") == 0) return fhstat;
-  /*if (strcmp(symbol, "fhstatvfs140") == 0) return fhstatvfs;*/
-  if (strcmp(symbol, "utimes50") == 0) return utimes;
-  if (strcmp(symbol, "posix_fadvise50") == 0) return posix_fadvise;
-  if (strcmp(symbol, "lutimes50") == 0) return lutimes;
-  if (strcmp(symbol, "futimes50") == 0) return futimes;
-  if (strcmp(symbol, "getfh30") == 0) return getfh;
+  if (strcmp(symbol, "__fhopen40") == 0) return fhopen;
+  if (strcmp(symbol, "__fhstat50") == 0) return fhstat;
+  /*if (strcmp(symbol, "__fhstatvfs140") == 0) return fhstatvfs1;*/
+  if (strcmp(symbol, "__utimes50") == 0) return utimes;
+  if (strcmp(symbol, "__posix_fadvise50") == 0) return posix_fadvise;
+  if (strcmp(symbol, "__lutimes50") == 0) return lutimes;
+  if (strcmp(symbol, "__futimes50") == 0) return futimes;
+  if (strcmp(symbol, "__getfh30") == 0) return getfh;
 
   fprintf(stderr, "failed to find %s\n", symbol);
 

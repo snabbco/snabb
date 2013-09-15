@@ -39,6 +39,15 @@ int __socket30(int domain, int type, int protocol);
 int __select50(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
 int __pselect50(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 
+int __fhopen40(const void *fhp, size_t fh_size, int flags);
+int __fhstat50(const void *fhp, size_t fh_size, struct stat *sb);
+int __fhstatvfs1(const void *fhp, size_t fh_size, struct statvfs *buf, int flags);
+int __getfh30(const char *path, void *fhp, size_t *fh_size);
+int __utimes50(const char *path, const struct timeval times[2]);
+int __lutimes50(const char *path, const struct timeval times[2]);
+int __futimes50(int fd, const struct timeval times[2]);
+int posix_fadvise50(int fd, off_t offset, off_t size, int hint);
+
 int __getcwd(char *buf, size_t size);
 
 int syscall(int number, ...);
