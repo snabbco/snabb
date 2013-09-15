@@ -175,6 +175,14 @@ test.pipes_bsd = {
   end,
 }
 
+test.kqueue = {
+  test_kqueue = function()
+    local kfd = assert(S.kqueue("cloexec, nosigpipe"))
+    -- kevent
+    assert(kfd:close())
+  end,
+}
+
 --[[ -- need to do in a thread as cannot exit
 test.misc_bsd_root = {
   test_fchroot = function()

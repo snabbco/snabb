@@ -177,6 +177,8 @@ function S.tcflow(fd, action)
 end
 function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
 
+function S.kqueue(flags) return retfd(C.kqueue1(c.O[flags])) end
+
 return S
 
 end
