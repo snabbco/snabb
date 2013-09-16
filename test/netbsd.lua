@@ -213,7 +213,22 @@ test.kqueue = {
     assert_equal(ret, 0) -- no events any more
     assert(pipe[2]:close())
     local ret = assert(kfd:kevent(nil, kevs, 0))
-    assert_equal(ret, 1) -- readable now
+    assert_equal(ret, 1)
+    assert(kevs[1].EOF, "expect EOF event")
+    assert(pipe:close())
+    assert(kfd:close())
+  end,
+  test_kqueue_write = function()
+    local kfd = assert(S.kqueue("cloexec, nosigpipe"))
+    local pipe = S.pipe()
+    local kevs = t.kevents{{fd = pipe[2], filter = "write", flags = "add"}}
+    assert(kfd:kevent(kevs, nil, 1))
+    local ret = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(ret, 1) -- writeable already
+    assert(kevs[1].size > 0) -- size will be amount free in buffer
+    assert(pipe[1]:close()) -- close read end
+    local ret = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(ret, 1)
     assert(kevs[1].EOF, "expect EOF event")
     assert(pipe:close())
     assert(kfd:close())
