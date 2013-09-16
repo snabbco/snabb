@@ -280,6 +280,7 @@ addtype("termios", "struct termios", mt.termios)
 
 mt.kevent = {
   index = {
+    size = function(kev) return tonumber(kev.data) end,
   },
   newindex = {
     fd = function(kev, v) kev.ident = t.uintptr(getfd(v)) end,
@@ -298,6 +299,10 @@ mt.kevent = {
 
 for k, v in pairs(c.NOTE) do
   mt.kevent.index[k] = function(kev) return bit.band(kev.fflags, v) ~= 0 end
+end
+
+for _, k in pairs{"FLAG1", "EOF", "ERROR"} do
+  mt.kevent.index[k] = function(kev) return bit.band(kev.flags, c.EV[k]) ~= 0 end
 end
 
 addtype("kevent", "struct kevent", mt.kevent)

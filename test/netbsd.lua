@@ -196,6 +196,28 @@ test.kqueue = {
     assert(fd:close())
     assert(kfd:close())
   end,
+  test_kqueue_read = function()
+    local kfd = assert(S.kqueue("cloexec, nosigpipe"))
+    local pipe = S.pipe()
+    local kevs = t.kevents{{fd = pipe[1], filter = "read", flags = "add"}}
+    assert(kfd:kevent(kevs, nil, 1))
+    local ret = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(ret, 0) -- no events yet
+    local str = "test"
+    pipe:write(str)
+    local ret = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(ret, 1) -- readable now
+    assert_equal(kevs[1].size, #str) -- size will be amount available to read
+    local r, err = pipe:read()
+    local ret = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(ret, 0) -- no events any more
+    assert(pipe[2]:close())
+    local ret = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(ret, 1) -- readable now
+    assert(kevs[1].EOF, "expect EOF event")
+    assert(pipe:close())
+    assert(kfd:close())
+  end,
 }
 
 --[[ -- need to do in a thread as cannot exit
