@@ -235,11 +235,11 @@ test.kqueue = {
   end,
   test_kqueue_timer = function()
     local kfd = assert(S.kqueue("cloexec, nosigpipe"))
-    local kevs = t.kevents{{ident = 0, filter = "timer", flags = "add, oneshot", data = 10}}
+    local kevs = t.kevents{{ident = 0, filter = "timer", flags = "add", data = 10}}
     assert(kfd:kevent(kevs, nil, 0))
     local ret = assert(kfd:kevent(nil, kevs, 1)) -- 1s timeout, longer than 10ms timer interval
     assert_equal(ret, 1) -- will have expired by now
-    assert_equal(kevs[1].size, 1) -- count of expiries is 1 as oneshot
+    assert(kevs[1].size >= 1, "expect at least one timer expiry, got " .. kevs[1].size)
     assert(kfd:close())
   end,
 }
