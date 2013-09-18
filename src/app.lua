@@ -29,6 +29,14 @@ function connect (from_app, from_port, to_app, to_port)
    table.insert(apps[to_app].inputi, l)
 end
 
+-- Recompute link state. Needed after adding apps and links.
+function relink ()
+   appsi = {}
+   for _,a in pairs(apps) do
+      table.insert(appsi, a)
+   end
+end
+
 function new_link (to_app)
    return { ring = link_ring.new(), to_app = to_app }
 end
@@ -164,18 +172,15 @@ function selftest ()
    -- FIXME: Strictly this is non-terminating, as one packet could get
    -- stuck looping split->join->split endlessly. For now I depend on
    -- this accidentally deterministically not happening.
-   apps["source"] = new(Source)
-   apps["join"] = new(Join)
-   apps["split"] = new(Split)
-   apps["sink"] = new(Sink)
-   table.insert(appsi, apps.source)
-   table.insert(appsi, apps.join)
-   table.insert(appsi, apps.split)
-   table.insert(appsi, apps.sink)
+   apps.source = new(Source)
+   apps.join = new(Join)
+   apps.split = new(Split)
+   apps.sink = new(Sink)
    connect("source", "out", "join", "in1")
    connect("join",   "out", "split", "in")
    connect("split", "out2", "sink", "in")
 --   connect("split", "out1", "join", "in2")
+   relink()
    local deadline = lib.timer(1e9)
    repeat breathe() until deadline()
    print("zoom")
