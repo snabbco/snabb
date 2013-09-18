@@ -233,19 +233,16 @@ test.kqueue = {
     assert(pipe:close())
     assert(kfd:close())
   end,
-}
-
-if not (abi.rump or abi.xen) then -- these interfaces not suited to rump
-test.kqueue.test_kqueue_timer = function()
+  test_kqueue_timer = function()
     local kfd = assert(S.kqueue("cloexec, nosigpipe"))
-    local kevs = t.kevents{{ident = 0, filter = "timer", flags = "add", data = 10}}
+    local kevs = t.kevents{{ident = 0, filter = "timer", flags = "add, oneshot", data = 10}}
     assert(kfd:kevent(kevs, nil, 0))
     local ret = assert(kfd:kevent(nil, kevs, 1)) -- 1s timeout, longer than 10ms timer interval
     assert_equal(ret, 1) -- will have expired by now
-    assert(kevs[1].size >= 1, "expect at least one timer expiry, got " .. kevs[1].size)
+    assert_equal(kevs[1].size, 1) -- count of expiries is 1 as oneshot
     assert(kfd:close())
-  end
-end
+  end,
+}
 
 --[[ -- need to do in a thread as cannot exit
 test.misc_bsd_root = {
