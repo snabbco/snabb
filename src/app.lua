@@ -1,5 +1,6 @@
 module(...,package.seeall)
 
+local buffer = require("buffer")
 local link_ring = require("link_ring")
 require("packet_h")
 
@@ -65,7 +66,11 @@ function breathe ()
 end
 
 function report ()
-   print("report")
+   print("app report")
+   for name, a in pairs(apps) do
+      if a.report then a:report() end
+   end
+   print("link report")
    for name, l in pairs(links) do
       print(name, lib.comma_value(tostring(tonumber(l.ring.stats.tx))) .. " packet(s) transmitted")
    end
@@ -85,6 +90,10 @@ function receive (l)
    return link_ring.receive(l.ring)
 end
 
+function full (l)
+   return link_ring.full(l.ring)
+end
+
 function empty (l)
    return link_ring.empty(l.ring)
 end
@@ -98,6 +107,7 @@ function Source:pull ()
    for _, o in ipairs(self.outputi) do
       for i = 1, 1000 do
 	 local p = packet.allocate()
+         packet.add_iovec(p, buffer.allocate(), 60)
 	 transfer(o, p)
       end
    end
