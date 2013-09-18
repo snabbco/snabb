@@ -18,7 +18,6 @@ function Intel82599:pull ()
    if l == nil then return end
    self.dev:sync_receive()
    while not app.full(l) and self.dev:can_receive() do
-      print('pull packet')
       app.transfer(l, self.dev:receive())
    end
    while self.dev:can_add_receive_buffer() do
@@ -46,9 +45,10 @@ end
 function selftest ()
    app.apps.intel10g = Intel82599:new("0000:01:00.0")
    app.apps.source = app.new(app.Source)
-   table.insert(app.appsi, app.apps.intel10g)
-   table.insert(app.appsi, app.apps.source)
+   app.apps.sink   = app.new(app.Sink)
    app.connect("source", "out", "intel10g", "rx")
+   app.connect("intel10g", "tx", "sink", "in")
+   app.relink()
    local deadline = lib.timer(1e9)
    repeat app.breathe() until deadline()
    app.report()
