@@ -27,8 +27,8 @@ function main ()
    initialize()
    local args = command_line_args()
    if #args == 0 then
-      print("No arguments given (-h for help). Defaulting to: -l selftest")
-      args = { '-l', 'selftest' }
+      print("No arguments given (-h for help). Defaulting to: -l core.selftest")
+      args = { '-l', 'core.selftest' }
    end
    local profiling = false
    local i = 1
