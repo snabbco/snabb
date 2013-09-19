@@ -131,7 +131,7 @@ int rump___sysimpl_fchroot(int);
 int rump___sysimpl_lchflags(const char *, unsigned long);
 int rump___sysimpl_issetugid(void);
 int rump___sysimpl_kqueue(void);
-int rump___sysimpl_kevent(int, const struct _netbsd_kevent *, size_t, struct _netbsd_kevent *, size_t, const struct _netbsd_timespec *);
+int rump___sysimpl_kevent50(int, const struct _netbsd_kevent *, size_t, struct _netbsd_kevent *, size_t, const struct _netbsd_timespec *);
 int rump___sysimpl_fsync_range(int, int, off_t, off_t);
 int rump___sysimpl_getvfsstat(struct _netbsd_statvfs *, size_t, int);
 int rump___sysimpl_statvfs1(const char *, struct _netbsd_statvfs *, int);
@@ -273,7 +273,7 @@ local C = {
   getxattr = ffi.C.rump___sysimpl_getxattr,
   ioctl = ffi.C.rump___sysimpl_ioctl,
   issetugid = ffi.C.rump___sysimpl_issetugid,
-  kevent = ffi.C.rump___sysimpl_kevent,
+  kevent = ffi.C.rump___sysimpl_kevent50,
   kqueue1 = ffi.C.rump___sysimpl_kqueue1,
   kqueue = ffi.C.rump___sysimpl_kqueue,
   _ksem_close = ffi.C.rump___sysimpl__ksem_close,

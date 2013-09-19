@@ -50,6 +50,7 @@ C.posix_fadvise = ffi.C.__posix_fadvise50
 C.lutimes = ffi.C.__lutimes50
 C.futimes = ffi.C.__futimes50
 C.getfh = ffi.C.__getfh30
+C.kevent = ffi.C.__kevent50
 
 -- use underlying syscall not wrapper
 C.getcwd = ffi.C.__getcwd
