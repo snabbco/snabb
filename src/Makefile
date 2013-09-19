@@ -47,7 +47,7 @@ $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	@(echo -n "module(...,package.seeall); require(\"ffi\").cdef[=============["; \
 	 cat $<; \
 	 echo "]=============]") > $(basename $@).luah
-	$(Q) luajit -b $(basename $@).luah $@
+	$(Q) luajit -bg -n $(subst /,.,$*)_h $(basename $@).luah $@
 
 $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"

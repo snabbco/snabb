@@ -2,10 +2,11 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
-local lib = require("lib")
 
-require("clib_h")
-require("pci_h")
+local lib = require("core.lib")
+local port = require("lib.hardware.port")
+
+require("lib.hardware.pci_h")
 
 --- ### Hardware device information
 
@@ -52,9 +53,9 @@ function path(pcidev) return "/sys/bus/pci/devices/"..pcidev end
 -- Return the name of the Lua module that implements support for this device.
 function which_driver (vendor, device)
    if vendor == '0x8086' then
-      if device == '0x10fb' then return 'intel10g' end -- Intel 82599
-      if device == '0x10d3' then return 'intel' end    -- Intel 82574L
-      if device == '0x105e' then return 'intel' end    -- Intel 82571
+      if device == '0x10fb' then return 'apps.intel.intel10g' end -- Intel 82599
+      if device == '0x10d3' then return 'apps.intel.intel' end    -- Intel 82574L
+      if device == '0x105e' then return 'apps.intel.intel' end    -- Intel 82571
    end
 end
 
@@ -154,7 +155,6 @@ function open_usable_devices (options)
          end
       end
    end
-   local port = require("port")
    local options = {devices=drivers,
                     program=port.Port.loopback_test,
                     report=true}

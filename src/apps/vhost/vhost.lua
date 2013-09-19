@@ -4,13 +4,15 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
-local memory = require("memory")
-local buffer = require("buffer")
 
-require("virtio_vring_h")
-require("virtio_vhost_h")
-require("virtio_vhost_client_h")
-require("tuntap_h")
+local memory = require("core.memory")
+local buffer = require("core.buffer")
+
+require("lib.virtio.virtio_vring_h")
+require("lib.tuntap.tuntap_h")
+
+require("apps.vhost.vhost_h")
+require("apps.vhost.vhost_client_h")
 
 vring_size = C.VHOST_VRING_SIZE
 uint64_t = ffi.typeof("uint64_t")

@@ -1,9 +1,10 @@
 module(...,package.seeall)
 
-local lib = require("lib")
 local ffi = require("ffi")
 local C = ffi.C
-require("memory_h")
+
+local lib = require("core.lib")
+require("core.memory_h")
 
 --- ### Serve small allocations from hugepage "chunks"
 

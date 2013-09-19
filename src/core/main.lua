@@ -3,6 +3,8 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C   = ffi.C
 
+require("strict")
+
 ffi.cdef[[
       extern int argc;
       extern char** argv;
@@ -63,9 +65,9 @@ end
 
 --- Globally initialize some things. Module can depend on this being done.
 function initialize ()
-   require("lib")
-   require("clib_h")
-   require("lib_h")
+   require("core.lib")
+   require("core.clib_h")
+   require("core.lib_h")
 end
 
 function command_line_args()

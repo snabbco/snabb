@@ -1,7 +1,7 @@
 module(...,package.seeall)
 
-require("memory").selftest()
-require("virtio").selftest()
-require("pci").selftest()
+require("core.memory").selftest()
+require("lib.virtio.virtio").selftest()
+require("lib.hardware.pci").selftest()
 
 

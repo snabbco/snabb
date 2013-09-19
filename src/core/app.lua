@@ -1,8 +1,10 @@
 module(...,package.seeall)
 
-local buffer = require("buffer")
-local link_ring = require("link_ring")
-require("packet_h")
+local buffer    = require("core.buffer")
+local packet    = require("core.packet")
+local lib       = require("core.lib")
+local link_ring = require("core.link_ring")
+                  require("core.packet_h")
 
 --- # App runtime system
 

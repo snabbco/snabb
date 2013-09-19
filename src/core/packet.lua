@@ -1,12 +1,13 @@
 module(...,package.seeall)
 
-local freelist = require("freelist")
-local memory = require("memory")
 local ffi = require("ffi")
 local C = ffi.C
-local freelist = require("freelist")
 
-require("packet_h")
+local buffer   = require("core.buffer")
+local freelist = require("core.freelist")
+local memory   = require("core.memory")
+
+require("core.packet_h")
 
 initial_fuel = 1000
 max_packets = 1e6
