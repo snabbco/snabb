@@ -31,7 +31,6 @@ int ioctl(int d, unsigned long request, ...);
 int getvfsstat(struct statvfs *buf, size_t bufsize, int flags);
 int kqueue(void);
 int kqueue1(int flags);
-int kevent(int kq, const struct kevent *changelist, size_t nchanges, struct kevent *eventlist, size_t nevents, const struct timespec *timeout);
 
 int __mount50(const char *type, const char *dir, int flags, void *data, size_t data_len);
 int __stat50(const char *path, struct stat *sb);
@@ -50,6 +49,7 @@ int __utimes50(const char *path, const struct timeval times[2]);
 int __lutimes50(const char *path, const struct timeval times[2]);
 int __futimes50(int fd, const struct timeval times[2]);
 int __posix_fadvise50(int fd, off_t offset, off_t size, int hint);
+int __kevent50(int kq, const struct kevent *changelist, size_t nchanges, struct kevent *eventlist, size_t nevents, const struct timespec *timeout);
 
 int __getcwd(char *buf, size_t size);
 
