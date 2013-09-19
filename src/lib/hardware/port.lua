@@ -2,10 +2,12 @@
 
 module(...,package.seeall)
 
-local ffi = require("ffi")
-local C = ffi.C
-local buffer = require("buffer")
-local packet = require("packet")
+local ffi      = require("ffi")
+local C        = ffi.C
+local buffer   = require("core.buffer")
+local packet   = require("core.packet")
+local lib      = require("core.lib")
+local register = require("lib.hardware.register")
 
 -- Dictionary of ports that exist.
 ports = {}
@@ -141,7 +143,7 @@ function selftest (options)
    options = options or {}
    local devices = options.devices
    assert(devices)
-   local port = port.new("test", devices, devices)
+   local port = new("test", devices, devices)
    local program = options.program or Port.spam
    port.coroutine = coroutine.wrap(program)
    local finished = lib.timer((options.secs or 1) * 1e9)

@@ -2,6 +2,8 @@
 
 module(...,package.seeall)
 
+local lib = require("core.lib")
+
 --- ### Register object
 --- There are three types of register objects, set by the mode when created:
 --- * `RO` - read only.

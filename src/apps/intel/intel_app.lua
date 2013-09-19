@@ -1,7 +1,11 @@
 module(...,package.seeall)
 
-local app = require("app")
-local intel10g = require("intel10g")
+local app      = require("core.app")
+local buffer   = require("core.buffer")
+local packet   = require("core.packet")
+local lib      = require("core.lib")
+local register = require("lib.hardware.register")
+local intel10g = require("apps.intel.intel10g")
 
 Intel82599 = {}
 

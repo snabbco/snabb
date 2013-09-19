@@ -1,4 +1,4 @@
-module("freelist",package.seeall)
+module(...,package.seeall)
 
 local ffi = require("ffi")
 

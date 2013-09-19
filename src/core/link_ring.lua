@@ -1,11 +1,11 @@
 module(...,package.seeall)
 
-local packet = require("packet")
 local ffi = require("ffi")
 local C = ffi.C
 
-require("packet_h")
-require("link_ring_h")
+local packet = require("core.packet")
+require("core.packet_h")
+require("core.link_ring_h")
 
 size = C.LINK_RING_SIZE
 max  = C.LINK_RING_MAX_PACKETS

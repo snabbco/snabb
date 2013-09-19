@@ -3,6 +3,8 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C   = ffi.C
 
+require("strict")
+
 ffi.cdef[[
       extern int argc;
       extern char** argv;
@@ -25,8 +27,8 @@ function main ()
    initialize()
    local args = command_line_args()
    if #args == 0 then
-      print("No arguments given (-h for help). Defaulting to: -l selftest")
-      args = { '-l', 'selftest' }
+      print("No arguments given (-h for help). Defaulting to: -l core.selftest")
+      args = { '-l', 'core.selftest' }
    end
    local profiling = false
    local i = 1
@@ -63,9 +65,9 @@ end
 
 --- Globally initialize some things. Module can depend on this being done.
 function initialize ()
-   require("lib")
-   require("clib_h")
-   require("lib_h")
+   require("core.lib")
+   require("core.clib_h")
+   require("core.lib_h")
 end
 
 function command_line_args()

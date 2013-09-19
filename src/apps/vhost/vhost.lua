@@ -1,16 +1,16 @@
--- virtio.lua -- Linux 'vhost' interface for ethernet I/O towards the kernel.
-
 module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
-local memory = require("memory")
-local buffer = require("buffer")
 
-require("virtio_vring_h")
-require("virtio_vhost_h")
-require("virtio_vhost_client_h")
-require("tuntap_h")
+local freelist = require("core.freelist")
+local memory   = require("core.memory")
+local buffer   = require("core.buffer")
+local packet   = require("core.packet")
+                 require("lib.virtio.virtio_vring_h")
+                 require("lib.tuntap.tuntap_h")
+                 require("apps.vhost.vhost_h")
+                 require("apps.vhost.vhost_client_h")
 
 vring_size = C.VHOST_VRING_SIZE
 uint64_t = ffi.typeof("uint64_t")
@@ -32,7 +32,7 @@ function new (tapname)
    dev.rxring.avail.flags = C.VRING_F_NO_INTERRUPT
    dev.txring.avail.flags = C.VRING_F_NO_INTERRUPT
    open(dev, tapname)
-   setmetatable(dev, {__index = virtio})
+   setmetatable(dev, {__index = getfenv()})
    return dev
 end
 
@@ -231,7 +231,7 @@ end
 function selftest (options)
    options = options or {}
    local dev = options.dev or new("snabb%d")
-   local port = require("port")
+   local port = require("lib.hardware.port")
    print("virtio selftest")
    options = options or {}
    options.devices = {dev}

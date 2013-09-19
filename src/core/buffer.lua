@@ -1,10 +1,10 @@
 module(...,package.seeall)
 
-local memory = require("memory")
 local ffi = require("ffi")
-local freelist = require("freelist")
+local memory = require("core.memory")
+local freelist = require("core.freelist")
 
-require("packet_h")
+require("core.packet_h")
 
 max       = 10e5
 allocated = 0

@@ -8,15 +8,15 @@
 
 module(...,package.seeall)
 
-local ffi = require "ffi"
-local C = ffi.C
-local lib = require("lib")
-local pci = require("pci")
-local register = require("register")
-local memory = require("memory")
-local test = require("test")
-require("intel_h")
-require("packet_h")
+local ffi      = require "ffi"
+local C        = ffi.C
+local lib      = require("core.lib")
+local memory   = require("core.memory")
+local packet   = require("core.packet")
+local pci      = require("lib.hardware.pci")
+local register = require("lib.hardware.register")
+                 require("apps.intel.intel_h")
+                 require("core.packet_h")
 
 local bits, bitset = lib.bits, lib.bitset
 
@@ -41,7 +41,7 @@ function new (pciaddress)
                  rdt = 0,          -- Cache of receive tail (RDT) register
                  rxnext = 0        -- Index of next buffer to receive
               }
-   setmetatable(dev, {__index = intel10g})
+   setmetatable(dev, {__index = getfenv()})
    return dev
 end
 
@@ -212,7 +212,7 @@ rxdesc_t = ffi.typeof [[
 ]]
 
 function wait_linkup (dev)
-   test.waitfor("linkup", function() return linkup(dev) end, 20, 250000)
+   lib.waitfor2("linkup", function() return linkup(dev) end, 20, 250000)
 end
 
 --- ### Status and diagnostics
@@ -246,7 +246,7 @@ function selftest (options)
    print()
    options.device = getfenv()
    options.program = port.Port.loopback_test
-   options.module = 'intel10g'
+   options.module = getfenv()
    options.secs = 10
    open_for_loopback_test(dev)
    port.selftest(options)
