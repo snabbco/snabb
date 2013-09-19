@@ -1,12 +1,19 @@
-LUASRC := $(wildcard *.lua)
-CSRC   := $(wildcard *.c)
-CHDR   := $(wildcard *.h)
-# Import jit.* modules from LuaJIT.
-JITSRC := v bc bcsave dump vmdef dis_x86 dis_x64
+Q= @
+E= @echo
+# For verbose command line output, uncomment these lines:
+#Q=
+#E= @:
 
-LUAOBJ := $(patsubst %.lua,obj/lua_%.o,$(LUASRC))
-COBJ   := $(patsubst %.c,obj/%.o,$(CSRC))
-HOBJ   := $(patsubst %.h,obj/%_h.o,$(CHDR))
+SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
+OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
+
+LUASRC = $(shell find . -name '*.lua' -printf '%P ')
+CSRC   = $(shell find . -name '*.c'   -printf '%P ')
+CHDR   = $(shell find . -name '*.h'   -printf '%P ')
+
+LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
+COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
+HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 MDOBJS := $(patsubst %, doc/obj/%.md, $(LUASRC) $(CSRC) $(CHDR)) $(wildcard *.md)
@@ -15,39 +22,51 @@ PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
 all: snabbswitch
 
-snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(JITOBJS) $(EXTRAOBJS)
-	gcc -Wl,-E -Werror -Wall -o $@ $^ \
+snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
+	$(E) "LINK      $@"
+	$(Q) gcc -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt -lpthread
 	@echo -n "Firmware: "
 	@ls -sh snabbswitch
 
-$(LUAOBJ): obj/lua_%.o: %.lua Makefile
-	luajit -bg $< $@
+$(OBJDIR):
+	$(E) "DIR       $@"
+	$(Q) mkdir -p $@
 
-$(COBJ): obj/%.o: %.c $(CHDR) Makefile
-	gcc -Wl,-E -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
+$(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
+	$(E) "LUA       $@"
+	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
 
-$(HOBJ): obj/%_h.o: %.h Makefile
-	@echo Generating $(basename $@).lua from $< - $(basename $@)
+$(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
+	$(E) "C         $@"
+	$(Q) gcc -Wl,-E -I ../deps/luajit/src -I . -c -Wall -Werror -o $@ $<
+
+$(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
+	$(E) "CHEADER   $@"
 	@(echo -n "module(...,package.seeall); require(\"ffi\").cdef[=============["; \
 	 cat $<; \
-	 echo "]=============]") > $(basename $@).lua
-	luajit -b $(basename $@).lua $@
+	 echo "]=============]") > $(basename $@).luah
+	$(Q) luajit -b $(basename $@).luah $@
 
-$(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua
-	luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
+$(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
+	$(E) "LUA       $@"
+	$(Q) luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
 
 
 # extra/ third party bits and pieces
-obj/strict.o: extra/strict.lua
-	luajit -bg $< $@
+obj/strict.o: extra/strict.lua | $(OBJDIR)
+	$(E) "LUA       $@"
+	$(Q) luajit -bg $< $@
 
-obj/jit_tprof.o: extra/tprof.lua
-	luajit -bg -n jit.tprof $< $@
+obj/jit_tprof.o: extra/tprof.lua | $(OBJDIR)
+	$(E) "LUA       $@"
+	$(Q) luajit -bg -n jit.tprof $< $@
 
-obj/jit_vmprof.o: extra/vmprof.c
-	gcc -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
+obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
+	$(E) "C         $@"
+	$(Q) gcc -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
+
 
 doc/obj/%.lua.md : %.lua Makefile
 	awk '/^ *[^-]{3}/ {if (last~/^ *---/) printf("\n")} {print} {last=$$0}' < $< | sed -E -e 's/^/    /g' -e 's/^    --- ?//g' > $@
@@ -64,13 +83,18 @@ doc/snabbswitch.md: $(MDOBJS) Makefile doc/genbook.sh
 	(cd doc; ./genbook.sh) > $@
 
 doc/snabbswitch.pdf: doc/snabbswitch.md
-	pandoc --template=doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o $@ $<
+	$(E) "PANDOC    $@"
+	$(Q) pandoc --template=doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o $@ $<
 
 doc/snabbswitch.html doc/snabbswitch.epub: doc/snabbswitch.md
-	pandoc -S --toc --chapters -o $@ $<
+	$(E) "PANDOC    $@"
+	$(Q) pandoc -S --toc --chapters -o $@ $<
+
+CLEAN = snabbswitch obj doc/snabbswitch.* doc/obj/*.md
 
 clean:
-	-rm snabbswitch
-	-rm obj/*
-	-rm doc/snabbswitch.*
-	-rm doc/obj/*.md
+	$(E) "RM        $(CLEAN)"
+	$(Q)-rm -rf $(CLEAN)
+
+.PHONY: clean
+

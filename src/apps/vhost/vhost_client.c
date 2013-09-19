@@ -9,9 +9,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "virtio_vring.h"
-#include "virtio_vhost.h"
-#include "virtio_vhost_client.h"
+#include "lib/virtio/virtio_vring.h"
+#include "vhost.h"
+#include "vhost_client.h"
 
 static int setup_vring(struct vhost *vhost, int index); // forward declaration
 
