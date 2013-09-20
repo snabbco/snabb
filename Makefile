@@ -10,6 +10,7 @@ all: $(LUAJIT_O)
 
 $(LUAJIT_O): deps/luajit/Makefile
 	(echo 'Building LuaJIT\n'; cd deps/luajit && $(MAKE) PREFIX=`pwd`/usr/local && $(MAKE) DESTDIR=`pwd` install)
+	(cd deps/luajit/usr/local/bin; ln -fs luajit-2.1.0-alpha luajit)
 
 clean:
 	(cd deps/luajit && $(MAKE) clean)

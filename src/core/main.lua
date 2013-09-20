@@ -18,6 +18,8 @@ Available options are:
 -t name      Test module 'name' with selftest().
 -d           Debug unhandled errors with the Lua interactive debugger.
 -jdump file  Trace JIT decisions to 'file'. (Requires LuaJIT jit.* library.)
+-jp          Profile with the LuaJIT statistical profiler.
+-jp=args[,.output]
 ]]
 
 local debug_on_error = false
@@ -46,10 +48,12 @@ function main ()
       elseif args[i] == '-d' then
 	 debug_on_error = true
 	 i = i + 1
-      elseif args[i] == '-p' then
-         require("jit.tprof").start()
-         profiling = true
-         i = i + 1
+      elseif (args[i]):match("-jp") then
+	 local pargs, poutput = (args[i]):gmatch("-jp=(%w*),?(.*)")()
+	 if poutput == '' then poutput = nil end
+	 require("jit.p").start(pargs, poutput)
+	 profiling = true
+	 i = i + 1
       elseif args[i] == '-jdump' and i < #args then
 	 local jit_dump = require "jit.dump"
 	 jit_dump.start("", args[i+1])
@@ -63,7 +67,7 @@ function main ()
 end
 
 function exit (status)
-   if profiling then require("jit.tprof").off() end
+   if profiling then require("jit.p").stop() end
    os.exit(0)
 end
 
