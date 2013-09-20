@@ -53,7 +53,7 @@ local bufsize = 4096
 local buffer = t.buffer(bufsize)
 
 local ss = t.sockaddr_storage()
-local addrlen = t.socklen1(S.s.sockaddr_storage)
+local addrlen = t.socklen1(#ss)
 
 local event = t.epoll_event()
 
