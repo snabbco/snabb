@@ -281,6 +281,7 @@ addtype("termios", "struct termios", mt.termios)
 mt.kevent = {
   index = {
     size = function(kev) return tonumber(kev.data) end,
+    fd = function(kev) return tonumber(kev.ident) end,
   },
   newindex = {
     fd = function(kev, v) kev.ident = t.uintptr(getfd(v)) end,
