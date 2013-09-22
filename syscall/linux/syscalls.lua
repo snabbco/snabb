@@ -359,21 +359,15 @@ function S.epoll_ctl(epfd, op, fd, event, data)
   return retbool(C.epoll_ctl(getfd(epfd), c.EPOLL_CTL[op], getfd(fd), event))
 end
 
-function S.epoll_wait(epfd, events, maxevents, timeout)
-  if events then maxevents = maxevents or #events end
-  maxevents = maxevents or 16
-  events = events or t.epoll_events(maxevents)
-  local ret = C.epoll_wait(getfd(epfd), events, maxevents, timeout or -1)
+function S.epoll_wait(epfd, events, timeout)
+  local ret = C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1)
   if ret == -1 then return nil, t.error() end
   return t.epoll_wait(ret, events)
 end
 
-function S.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
-  if events then maxevents = maxevents or #events end
-  maxevents = maxevents or 16
-  events = events or t.epoll_events(maxevents)
+function S.epoll_pwait(epfd, events, timeout, sigmask)
   if sigmask then sigmask = mktype(t.sigset, sigmask) end
-  local ret = C.epoll_pwait(getfd(epfd), events, maxevents, timeout or -1, sigmask)
+  local ret = C.epoll_pwait(getfd(epfd), events.ep, #events, timeout or -1, sigmask)
   if ret == -1 then return nil, t.error() end
   return t.epoll_wait(ret, events)
 end

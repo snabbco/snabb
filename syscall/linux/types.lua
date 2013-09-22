@@ -144,7 +144,6 @@ for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 t.inotify_event = ffi.typeof("struct inotify_event")
 pt.inotify_event = ptt("struct inotify_event") -- still need pointer to this
 
-t.epoll_events = ffi.typeof("struct epoll_event[?]") -- TODO add metatable, like pollfds
 t.io_events = ffi.typeof("struct io_event[?]")
 t.iocbs = ffi.typeof("struct iocb[?]")
 t.sock_filters = ffi.typeof("struct sock_filter[?]")
@@ -780,12 +779,27 @@ end
 
 addtype("epoll_event", "struct epoll_event", mt.epoll_event)
 
+mt.epoll_events = {
+  __index = function(ep, k)
+    return ep.ep[k - 1]
+  end,
+  __newindex = function(ep, k, v)
+    v = mktype(t.epoll_event, v)
+    ffi.copy(ep.ep[k - 1], v, s.epoll_event)
+  end,
+  __len = function(ep) return ep.count end,
+  __new = function(tp, n) return ffi.new(tp, n, n) end,
+}
+
+addtype_var("epoll_events", "struct {int count; struct epoll_event ep[?];}", mt.epoll_events)
+
 -- this is array form of epoll_events as returned from epoll_wait TODO make constructor for epoll_events?
 -- TODO ugh, this has a loop, remove
+-- TODO remove
 t.epoll_wait = function(n, events)
   local r = {events = events}
   for i = 1, n do
-    r[i] = events[i - 1]
+    r[i] = events[i]
   end
   return r
 end
