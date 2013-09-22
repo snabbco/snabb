@@ -15,10 +15,11 @@ function assert(c, s)
   return oldassert(c, tostring(s))
 end
 
+local maxevents = 1024
+
 local poll
 
 if S.epoll_create then
-  local maxevents = 1024
   poll = {
     init = function(this)
       return setmetatable({fd = assert(S.epoll_create())}, {__index = this})
@@ -28,17 +29,32 @@ if S.epoll_create then
       local event = this.event
       event.events = c.EPOLL.IN
       event.data.fd = s:getfd()
-      return this.fd:epoll_ctl("add", s, event)
+      assert(this.fd:epoll_ctl("add", s, event))
     end,
     events = t.epoll_events(maxevents),
     get = function(this)
       return this.fd:epoll_wait(this.events, maxevents)
     end,
-    eof = function(ev) return ev.HUP or ev.ERR end
+    eof = function(ev) return ev.HUP or ev.ERR or ev.RDHUP end,
   }
 elseif S.kqueue then
   poll = {
-
+    init = function(this)
+      return setmetatable({fd = assert(S.kqueue())}, {__index = this})
+    end,
+    event = t.kevents(1),
+    add = function(this, s)
+      local event = this.event[1]
+      event.fd = s
+      event.setfilter = "read"
+      event.setflags = "add"
+      assert(this.fd:kevent(this.event, nil, 0))
+    end,
+    events = t.kevents(maxevents),
+    get = function(this)
+      return this.fd:kevent(nil, this.events)
+    end,
+    eof = function(ev) return ev.EOF or ev.ERROR end,
   }
 else
   error("no epoll or kqueue support")
@@ -56,7 +72,7 @@ assert(s:listen(128))
 
 ep = poll:init()
 
-assert(ep:add(s))
+ep:add(s)
 
 local w = {}
 
@@ -103,7 +119,7 @@ for i = 1, #r do
     repeat
       local a, err = s:accept("nonblock", ss, addrlen)
       if a then
-        assert(ep:add(a.fd))
+        ep:add(a.fd)
         w[a.fd:getfd()] = a.fd
       end
     until not a

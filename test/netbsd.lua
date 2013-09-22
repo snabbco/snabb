@@ -181,7 +181,7 @@ test.kqueue = {
     local fd = assert(S.creat(tmpfile, "rwxu"))
     local kevs = t.kevents{{fd = fd, filter = "vnode",
       flags = "add, enable, clear", fflags = "delete, write, extend, attrib, link, rename, revoke"}}
-    assert(kfd:kevent(kevs, nil, 0))
+    assert(kfd:kevent(kevs, nil))
     local ret = assert(kfd:kevent(nil, kevs, 0))
     assert_equal(ret, 0) -- no events yet
     assert(S.unlink(tmpfile))
@@ -200,7 +200,7 @@ test.kqueue = {
     local kfd = assert(S.kqueue("cloexec, nosigpipe"))
     local pipe = S.pipe()
     local kevs = t.kevents{{fd = pipe[1], filter = "read", flags = "add"}}
-    assert(kfd:kevent(kevs, nil, 0))
+    assert(kfd:kevent(kevs, nil))
     local ret = assert(kfd:kevent(nil, kevs, 0))
     assert_equal(ret, 0) -- no events yet
     local str = "test"
@@ -222,7 +222,7 @@ test.kqueue = {
     local kfd = assert(S.kqueue("cloexec, nosigpipe"))
     local pipe = S.pipe()
     local kevs = t.kevents{{fd = pipe[2], filter = "write", flags = "add"}}
-    assert(kfd:kevent(kevs, nil, 0))
+    assert(kfd:kevent(kevs, nil))
     local ret = assert(kfd:kevent(nil, kevs, 0))
     assert_equal(ret, 1) -- writeable already
     assert(kevs[1].size > 0) -- size will be amount free in buffer
@@ -236,7 +236,7 @@ test.kqueue = {
   test_kqueue_timer = function()
     local kfd = assert(S.kqueue("cloexec, nosigpipe"))
     local kevs = t.kevents{{ident = 0, filter = "timer", flags = "add, oneshot", data = 10}}
-    assert(kfd:kevent(kevs, nil, 0))
+    assert(kfd:kevent(kevs, nil))
     local ret = assert(kfd:kevent(nil, kevs, 1)) -- 1s timeout, longer than 10ms timer interval
     assert_equal(ret, 1) -- will have expired by now
     assert_equal(kevs[1].size, 1) -- count of expiries is 1 as oneshot

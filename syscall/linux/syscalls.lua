@@ -360,6 +360,7 @@ function S.epoll_ctl(epfd, op, fd, event, data)
 end
 
 function S.epoll_wait(epfd, events, maxevents, timeout)
+  if events then maxevents = maxevents or #events end
   maxevents = maxevents or 16
   events = events or t.epoll_events(maxevents)
   local ret = C.epoll_wait(getfd(epfd), events, maxevents, timeout or -1)
@@ -368,6 +369,7 @@ function S.epoll_wait(epfd, events, maxevents, timeout)
 end
 
 function S.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
+  if events then maxevents = maxevents or #events end
   maxevents = maxevents or 16
   events = events or t.epoll_events(maxevents)
   if sigmask then sigmask = mktype(t.sigset, sigmask) end

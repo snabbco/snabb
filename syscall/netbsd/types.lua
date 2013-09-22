@@ -284,6 +284,9 @@ mt.kevent = {
   },
   newindex = {
     fd = function(kev, v) kev.ident = t.uintptr(getfd(v)) end,
+    -- due to naming, use 'set' names TODO better naming scheme reads oddly as not a function
+    setflags = function(kev, v) kev.flags = c.EV[v] end,
+    setfilter = function(kev, v) kev.filter = c.EVFILT[v] end,
   },
   __new = function(tp, tab)
     if type(tab) == "table" then

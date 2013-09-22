@@ -179,7 +179,7 @@ function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
 
 function S.kqueue(flags) return retfd(C.kqueue1(c.O[flags])) end
 function S.kevent(kq, changelist, eventlist, timeout)
-  timeout = mktype(t.timespec, timeout)
+  if timeout then timeout = mktype(t.timespec, timeout) end
   local changes, changecount, events, eventcount = nil, 0, nil, 0
   if changelist then changes, changecount = changelist.kev, changelist.count end
   if eventlist then events, eventcount = eventlist.kev, eventlist.count end
