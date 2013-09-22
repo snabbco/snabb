@@ -360,16 +360,12 @@ function S.epoll_ctl(epfd, op, fd, event, data)
 end
 
 function S.epoll_wait(epfd, events, timeout)
-  local ret = C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1)
-  if ret == -1 then return nil, t.error() end
-  return t.epoll_wait(ret, events)
+  return retnum(C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1))
 end
 
 function S.epoll_pwait(epfd, events, timeout, sigmask)
   if sigmask then sigmask = mktype(t.sigset, sigmask) end
-  local ret = C.epoll_pwait(getfd(epfd), events.ep, #events, timeout or -1, sigmask)
-  if ret == -1 then return nil, t.error() end
-  return t.epoll_wait(ret, events)
+  return retnum(C.epoll_pwait(getfd(epfd), events.ep, #events, timeout or -1, sigmask))
 end
 
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)

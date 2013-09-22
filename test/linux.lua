@@ -1008,12 +1008,12 @@ test.events_epoll = {
     assert(ep:epoll_ctl("add", a, "in"))
     local ev = t.epoll_events(1)
     local r = assert(ep:epoll_wait(ev, 0))
-    assert(#r == 0, "no events yet")
+    assert(r == 0, "no events yet")
     assert(b:write(teststring))
     local r = assert(ep:epoll_wait(ev, 0))
-    assert(#r == 1, "one event now")
-    assert(r[1].IN, "read event")
-    assert(r[1].fd == a:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
+    assert(r == 1, "one event now")
+    assert(ev[1].IN, "read event")
+    assert(ev[1].fd == a:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
     assert(ep:close())
     assert(a:read()) -- clear event
     assert(b:close())
@@ -1026,12 +1026,12 @@ test.events_epoll = {
     assert(ep:epoll_ctl("add", a, "in"))
     local ev = t.epoll_events(1)
     local r = assert(ep:epoll_pwait(ev, 0, "alrm"))
-    assert(#r == 0, "no events yet")
+    assert(r == 0, "no events yet")
     assert(b:write(teststring))
     local r = assert(ep:epoll_pwait(ev, 0, "alrm"))
-    assert(#r == 1, "one event now")
-    assert(r[1].IN, "read event")
-    assert(r[1].fd == a:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
+    assert(r == 1, "one event now")
+    assert(ev[1].IN, "read event")
+    assert(ev[1].fd == a:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
     assert(ep:close())
     assert(a:read()) -- clear event
     assert(b:close())
@@ -1113,9 +1113,9 @@ test.aio = {
     assert_equal(ret, 1, "expect one event submitted")
     local ev = t.epoll_events(1)
     local r = assert(ep:epoll_wait(ev))
-    assert_equal(#r, 1, "one event now")
-    assert(r[1].IN, "read event")
-    assert(r[1].fd == efd:getfd(), "expect to get fd of eventfd file back")
+    assert_equal(r, 1, "one event now")
+    assert(ev[1].IN, "read event")
+    assert(ev[1].fd == efd:getfd(), "expect to get fd of eventfd file back")
     local e = util.eventfd_read(efd)
     assert_equal(e, 1, "expect to be told one aio event ready")
     local r = assert(S.io_getevents(ctx, 1, 1))

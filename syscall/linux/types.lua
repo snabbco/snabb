@@ -793,17 +793,6 @@ mt.epoll_events = {
 
 addtype_var("epoll_events", "struct {int count; struct epoll_event ep[?];}", mt.epoll_events)
 
--- this is array form of epoll_events as returned from epoll_wait TODO make constructor for epoll_events?
--- TODO ugh, this has a loop, remove
--- TODO remove
-t.epoll_wait = function(n, events)
-  local r = {events = events}
-  for i = 1, n do
-    r[i] = events[i]
-  end
-  return r
-end
-
 mt.cpu_set = {
   index = {
     zero = function(set) ffi.fill(set, s.cpu_set) end,

@@ -108,8 +108,8 @@ while true do
 
 local r = ep:get()
 
-for i = 1, #r do
-  local ev = r[i]
+for i = 1, r do
+  local ev = poll.events[i]
 
   if ep.eof(ev) then
     fd:close()
