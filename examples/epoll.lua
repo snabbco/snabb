@@ -19,6 +19,7 @@ local maxevents = 1024
 
 local poll
 
+-- this is somewhat working toward a common API but needs a lot more work, but has resulted in some improvements
 if S.epoll_create then
   poll = {
     init = function(this)
