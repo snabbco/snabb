@@ -34,7 +34,7 @@ if S.epoll_create then
     end,
     events = t.epoll_events(maxevents),
     get = function(this)
-      return this.fd:epoll_wait(this.events, maxevents)
+      return this.fd:epoll_wait(this.events)
     end,
     eof = function(ev) return ev.HUP or ev.ERR or ev.RDHUP end,
   }
