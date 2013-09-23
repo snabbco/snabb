@@ -9,7 +9,7 @@ before_install:
  - git submodule update --init --recursive
 
 env:
-  - LD_LIBRARY_PATH=./include/buildrump.sh/rump/lib LD_DYNAMIC_WEAK=1 RUMP_NCPU=4
+  - LD_LIBRARY_PATH=./include/buildrump.sh/rump/lib LD_DYNAMIC_WEAK=1
 
 script:
  - luajit test/test.lua
