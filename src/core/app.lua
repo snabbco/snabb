@@ -113,7 +113,6 @@ end
 -- Source app: pull brings 10 packets onto each output port.
 Source = {}
 function Source:pull ()
-   local o = self.output.out
    for _, o in ipairs(self.outputi) do
       for i = 1, 1000 do
 	 local p = packet.allocate()
