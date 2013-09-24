@@ -23,7 +23,7 @@ end
 
 function connect (from_app, from_port, to_app, to_port)
    local name = from_app.."."..from_port.."->"..to_app.."."..to_port
-   l = new_link(apps[to_app])
+   l = new_link(from_app, from_port, to_app, to_port, apps[to_app])
    links[name] = l
    apps[from_app].output[from_port] = l
    table.insert(apps[from_app].outputi, l)
@@ -39,8 +39,9 @@ function relink ()
    end
 end
 
-function new_link (to_app)
-   return { ring = link_ring.new(), to_app = to_app }
+function new_link (iapp, iport, oapp, oport, to_app)
+   return { iapp = iapp, iport = iport, oapp = oapp, oport = oport,
+            ring = link_ring.new(), to_app = to_app }
 end
 
 -- Take a breath. First "inhale" by pulling in packets from all
@@ -102,6 +103,21 @@ end
 
 function empty (l)
    return link_ring.empty(l.ring)
+end
+
+--- # Diagnostics
+
+function graphviz ()
+   local viz = 'digraph app {\n'
+   for appname,app in pairs(apps) do
+      viz = viz..'  '..appname..'\n'
+   end
+   for _,link in pairs(links) do
+      local traffic = lib.comma_value(tonumber(link.ring.stats.tx))
+      viz = viz..'  '..link.iapp.." -> "..link.oapp..' [label="'..traffic..'"]\n'
+   end
+   viz = viz..'}\n'
+   return viz
 end
 
 --- # Test apps
@@ -180,8 +196,12 @@ function selftest ()
    relink()
    local deadline = lib.timer(1e9)
    repeat breathe() until deadline()
-   print("zoom")
    report()
+   local f,err = io.open("app-selftest.dot", "w")
+   if not f then print("Failed to open app-selftest.dot") end
+   f:write(graphviz())
+   f:close()
+   print("wrote app-selftest.dot")
    print("selftest OK")
 end
 
