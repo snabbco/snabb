@@ -21,6 +21,7 @@ Available options are:
 ]]
 
 local debug_on_error = false
+local profiling = false
 
 function main ()
    require "strict"
@@ -30,7 +31,6 @@ function main ()
       print("No arguments given (-h for help). Defaulting to: -l core.selftest")
       args = { '-l', 'core.selftest' }
    end
-   local profiling = false
    local i = 1
    while i <= #args do
       if args[i] == '-l' and i < #args then
@@ -59,6 +59,10 @@ function main ()
 	 os.exit(1)
       end
    end
+   exit(0)
+end
+
+function exit (status)
    if profiling then require("jit.tprof").off() end
    os.exit(0)
 end

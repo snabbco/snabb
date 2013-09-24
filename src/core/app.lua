@@ -76,10 +76,6 @@ function breathe ()
 end
 
 function report ()
-   print("app report")
-   for name, a in pairs(apps) do
-      if a.report then a:report() end
-   end
    print("link report")
    for name, l in pairs(links) do
       print(name, lib.comma_value(tostring(tonumber(l.ring.stats.tx))) .. " packet(s) transmitted")
