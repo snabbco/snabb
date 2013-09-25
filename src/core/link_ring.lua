@@ -1,5 +1,7 @@
 module(...,package.seeall)
 
+local debug = false
+
 local ffi = require("ffi")
 local C = ffi.C
 
@@ -15,7 +17,7 @@ function new (name, from_app, to_app)
 end
 
 function receive (r)
-   assert(not empty(r), "receive on empty link")
+   if debug then assert(not empty(r), "receive on empty link") end
    local p = r.packets[r.read]
    r.read = (r.read + 1) % size
    r.stats.rx = r.stats.rx + 1
@@ -23,7 +25,7 @@ function receive (r)
 end
 
 function transmit (r, p)
-   if full(r) then
+   if debug and full(r) then
       r.stats.drop = r.stats.drop + 1
    else
       packet.ref(p)
