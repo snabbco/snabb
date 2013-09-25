@@ -9,8 +9,8 @@ local packet = require("core.packet")
 require("core.packet_h")
 require("core.link_ring_h")
 
-size = C.LINK_RING_SIZE
-max  = C.LINK_RING_MAX_PACKETS
+local size = C.LINK_RING_SIZE         -- NB: Huge slow-down if this is not local
+max        = C.LINK_RING_MAX_PACKETS
 
 function new (name, from_app, to_app)
    return ffi.new("struct link_ring")
