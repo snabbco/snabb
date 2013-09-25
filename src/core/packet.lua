@@ -1,5 +1,7 @@
 module(...,package.seeall)
 
+local debug = false
+
 local ffi = require("ffi")
 local C = ffi.C
 
@@ -27,9 +29,9 @@ end
 
 -- Append data to a packet.
 function add_iovec (p, b, length,  offset)
-   assert(p.niovecs < C.PACKET_IOVEC_MAX, "packet iovec overflow")
+   if debug then assert(p.niovecs < C.PACKET_IOVEC_MAX, "packet iovec overflow") end
    offset = offset or 0
-   assert(length + offset <= b.size)
+   if debug then assert(length + offset <= b.size) end
    local iovec = p.iovecs[p.niovecs]
    iovec.buffer = b
    iovec.length = length
@@ -40,7 +42,9 @@ end
 
 -- Increase the reference count for packet p.
 function ref (p)
-   p.refcount = p.refcount + 1
+   if p.refcount > 0 then
+      p.refcount = p.refcount + 1
+   end
    return p
 end
 
