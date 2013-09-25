@@ -105,6 +105,14 @@ function empty (l)
    return link_ring.empty(l.ring)
 end
 
+function nreadable (l)
+   return link_ring.nreadable(l.ring)
+end
+
+function nwritable (l)
+   return link_ring.nwritable(l.ring)
+end
+
 --- # Diagnostics
 
 function graphviz ()

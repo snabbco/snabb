@@ -48,10 +48,14 @@ end
 -- Return the number of packets that are ready for read.
 function nreadable (r)
    if r.read > r.write then
-      return max - r.write + r.read
+      return r.write + size - r.read
    else
       return r.write - r.read
    end
+end
+
+function nwritable (r)
+   return max - nreadable(r)
 end
 
 -- deref all newly read packets.
