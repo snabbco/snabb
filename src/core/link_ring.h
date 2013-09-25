@@ -1,5 +1,5 @@
-enum { LINK_RING_SIZE         = 10001,
-       LINK_RING_MAX_PACKETS  = 10000
+enum { LINK_RING_SIZE         = 8192,
+       LINK_RING_MAX_PACKETS  = 8191
 };
 
 struct link_ring {
