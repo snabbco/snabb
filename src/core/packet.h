@@ -44,10 +44,10 @@ enum {
 };
 
 struct packet {
-  uint32_t refcount;
+  int32_t refcount;
   // How much "fuel" does this packet have left before it's dropped?
   // This is like the Time-To-Live (TTL) IP header field.
-  uint32_t fuel;
+  int32_t fuel;
   // XXX do we need a callback when a packet is freed?
   // (that's when we will give back buffers to kvm virtio clients?)
   struct packet_info info;
