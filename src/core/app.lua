@@ -135,7 +135,7 @@ Source = {}
 function Source:pull ()
    for _, o in ipairs(self.outputi) do
       for i = 1, 1000 do
-	 local p = packet.allocate()
+         local p = packet.allocate()
          packet.add_iovec(p, buffer.allocate(), 60)
 	 transfer(o, p)
       end
@@ -146,19 +146,20 @@ end
 Join = {}
 function Join:push () 
    for _, inport in ipairs(self.inputi) do
-      while not empty(inport) do
+      for _ = 1,math.min(nreadable(inport), nwritable(self.output.out)) do
 	 transfer(self.output.out, receive(inport))
       end
    end
 end
 
--- Split app: For each input port, push round-robbins packets onto each output.
+-- Split app: For each input port, push packets onto outputs.
+-- When one output becomes full then continue with the next.
 Split = {}
 function Split:push ()
    for _, i in ipairs(self.inputi) do
       repeat
 	 for _, o in ipairs(self.outputi) do
-	    if not empty(i) then
+            for _ = 1, math.min(nreadable(i), nwritable(o)) do
 	       transfer(o, receive(i))
 	    end
 	 end
@@ -170,7 +171,7 @@ end
 Sink = {}
 function Sink:push ()
    for _, i in ipairs(self.inputi) do
-      while not empty(i) do
+      for _ = 1, nreadable(i) do
 	 local p = receive(i)
 	 assert(p.refcount == 1)
 	 packet.deref(p)
