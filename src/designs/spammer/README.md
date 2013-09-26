@@ -30,7 +30,7 @@ This network is dynamically constructed with an App for each available port.
 ### Performance
 
     Hardware  | commit   | # ports | pktlen | Mpps   | Mpps / port
-    ----------+----------+--------+--------+--------+------------
+    ----------+----------+---------+--------+--------+------------
     chur      | ee7e40ec | 1       | 64     | 12.8   | 12.8
     chur      | ee7e40ec | 2       | 64     | 12.8   |  6.4
     chur      | ee7e40ec | 4       | 64     | 10.0   |  2.5
