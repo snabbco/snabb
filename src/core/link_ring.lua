@@ -28,7 +28,6 @@ function transmit (r, p)
    if debug and full(r) then
       r.stats.drop = r.stats.drop + 1
    else
-      packet.ref(p)
       r.packets[r.write] = p
       r.write = (r.write + 1) % size
       r.stats.tx = r.stats.tx + 1

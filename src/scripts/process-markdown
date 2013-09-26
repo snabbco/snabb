@@ -1,0 +1,34 @@
+#!/bin/bash
+#
+# Markdown preprocessor.
+#
+# Currently implements one extended syntax:
+#
+#     DIAGRAM: foo
+#     ... multi-line ascii-art ...
+#
+# which uses ditaa (http://ditaa.sourceforge.net/) to create a PNG
+# image from the ascii art and put an inline image link in the
+# outpt markdown.
+
+set -e
+if [ $# != 1 ]; then
+    echo "Usage: $0 <filename>" >&2
+    exit 1
+fi
+
+cd $(dirname $1)
+
+awk '/^    DIAGRAM:/ { diagram = $2;
+                       printf("") > diagram
+                       printf("![%s](.images/%s.png)\n", diagram, diagram);
+                       next }
+     diagram == 0    { print; next }
+     /^    /         { print $0 >> diagram; next }
+     # end of diagram
+                     { print;
+                       system("mkdir .images 2>/dev/null || true")
+                       system("ditaa " diagram " .images/" diagram ".png > /dev/null");
+                       system("rm " diagram)
+                       diagram = 0 }' < $(basename $1)
+

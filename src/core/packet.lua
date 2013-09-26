@@ -40,23 +40,26 @@ function add_iovec (p, b, length,  offset)
    p.length = p.length + length
 end
 
--- Increase the reference count for packet p.
-function ref (p)
+-- Increase the reference count for packet p by n (default n=1).
+function ref (p,  n)
    if p.refcount > 0 then
-      p.refcount = p.refcount + 1
+      p.refcount = p.refcount + (n or 1)
    end
    return p
 end
 
 -- Decrease the reference count for packet p.
 -- The packet will be recycled if the reference count reaches 0.
-function deref (p)
-   if p.refcount == 1 then
-      free(p)
-   elseif p.refcount > 1 then
-      p.refcount = p.refcount - 1
+function deref (p,  n)
+   n = n or 1
+   if p.refcount > 0 then
+      assert(p.refcount >= n)
+      if n == p.refcount then
+         free(p)
+      else
+         p.refcount = p.refcount - n
+      end
    end
-   return p
 end
 
 -- Tenured packets are not reused by defref().
