@@ -12,7 +12,18 @@ already in use by the operating system.
 
 ### App network
 
-![app-network](app-network.png)
+    DIAGRAM: app-network
+    +--------+           /-------------\
+    |        |           |             |
+    |        *---------->* Intel10G #1 |
+    |        |           |             |
+    |        |           \-------------/
+    | Source |         
+    |        |           /-------------\
+    |        |           |             |
+    |        *---------->* Intel10G #N |
+    |        |           |             |
+    +--------+           \-------------/
 	     
 This network is dynamically constructed with an App for each available port.
 

@@ -10,17 +10,21 @@ OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
 CSRC   = $(shell find . -regex '[^\#]*\.c'   -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h'   -printf '%P ')
+RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
+RMOBJS := $(patsubst %.src,%,$(RMSRC))
 MDOBJS := $(patsubst %, doc/obj/%.md, $(LUASRC) $(CSRC) $(CHDR)) $(wildcard *.md)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
 all: snabbswitch
+
+markdown: $(RMOBJS)
 
 snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
 	$(E) "LINK      $@"
@@ -53,6 +57,10 @@ $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"
 	$(Q) luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
 
+
+$(RMOBJS): %: %.src
+	$(E) "MARKDOWN  $@"
+	$(Q) scripts/process-markdown $< > $@
 
 # extra/ third party bits and pieces
 obj/strict.o: extra/strict.lua | $(OBJDIR)
@@ -95,6 +103,10 @@ CLEAN = snabbswitch obj doc/snabbswitch.* doc/obj/*.md
 clean:
 	$(E) "RM        $(CLEAN)"
 	$(Q)-rm -rf $(CLEAN)
+
+mrproper: clean
+	$(E) "RM        $(RMOBJS)"
+	$(Q)-rm -rf $(RMOBJS)
 
 .PHONY: clean
 
