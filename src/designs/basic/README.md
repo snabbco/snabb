@@ -15,5 +15,6 @@ Split having only one input and one output.
 
     Hardware  | commit   | Mpps
     ----------+----------+------
+    chur      | 6a3c2651 | 39
     chur      | 5839dd69 | 34
 
