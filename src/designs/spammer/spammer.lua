@@ -1,12 +1,14 @@
 module(...,package.seeall)
 
 local app       = require("core.app")
+local buffer    = require("core.buffer")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
 local intel_app = require("apps.intel.intel_app")
+local basic_apps = require("apps.basic.basic_apps")
 
 function main ()
-   app.apps.source = app.new(app.Source)
+   app.apps.source = app.new(basic_apps.Source:new())
    local nics = 0
    for _,device in ipairs(pci.devices) do
       if device.usable and device.driver == 'apps.intel.intel10g' then
@@ -20,8 +22,9 @@ function main ()
    app.relink()
    timer.init()
    local fn = function () app.report() end
-   local t = timer.new("report", fn, 2e9, 'repeating')
+   local t = timer.new("report", fn, 1e9, 'repeating')
    timer.activate(t)
+   buffer.preallocate(100000)
    while true do
       app.breathe()
       timer.run()
