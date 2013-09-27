@@ -53,7 +53,7 @@ end
 function deref (p,  n)
    n = n or 1
    if p.refcount > 0 then
-      assert(p.refcount <= n)
+      assert(p.refcount >= n)
       if n == p.refcount then
          free(p)
       else
