@@ -74,6 +74,7 @@ local function reviter(array, i)
 end
 
 local function retiter(ret, array)
+  ret = tonumber(ret)
   if ret == -1 then return nil, t.error() end
   return reviter, array, ret
 end

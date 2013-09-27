@@ -9,10 +9,10 @@ package.path = "./?.lua;"
 
 local strict = require "include.strict.strict"
 
-local oldassert = assert
-local function assert(cond, s)
+local function assert(cond, s, ...)
   collectgarbage("collect") -- force gc, to test for bugs
-  return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
+  if cond == nil then error(tostring(s)) end -- annoyingly, assert does not call tostring!
+  return cond, s, ...
 end
 
 local helpers = require "syscall.helpers"

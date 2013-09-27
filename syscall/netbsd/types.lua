@@ -312,21 +312,18 @@ end
 addtype("kevent", "struct kevent", mt.kevent)
 
 mt.kevents = {
-  __index = function(kk, k)
-    return kk.kev[k - 1]
-  end,
-  __newindex = function(kk, k, v)
-    v = mktype(t.kevent, v)
-    ffi.copy(kk.kev[k - 1], v, s.kevent)
-  end,
   __len = function(kk) return kk.count end,
   __new = function(tp, ks)
     if type(ks) == 'number' then return ffi.new(tp, ks, ks) end
     local count = #ks
     local kks = ffi.new(tp, count, count)
-    for n = 1, count do kks[n] = ks[n] end
+    for n = 1, count do -- TODO ideally we use ipairs on both arrays/tables
+      local v = mktype(t.kevent, ks[n])
+      kks.kev[n - 1] = v
+    end
     return kks
   end,
+  __ipairs = function(kk) return reviter, kk.kev, kk.count end
 }
 
 addtype_var("kevents", "struct {int count; struct kevent kev[?];}", mt.kevents)

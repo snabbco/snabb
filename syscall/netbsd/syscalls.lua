@@ -14,7 +14,7 @@ local ffi = require "ffi"
 local t, pt, s = types.t, types.pt, types.s
 
 local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
-local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr
+local ret64, retnum, retfd, retbool, retptr, retiter = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr, hh.retiter
 
 local helpers = require "syscall.helpers"
 
@@ -180,10 +180,12 @@ function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
 function S.kqueue(flags) return retfd(C.kqueue1(c.O[flags])) end
 function S.kevent(kq, changelist, eventlist, timeout)
   if timeout then timeout = mktype(t.timespec, timeout) end
-  local changes, changecount, events, eventcount = nil, 0, nil, 0
+  local changes, changecount = nil, 0
   if changelist then changes, changecount = changelist.kev, changelist.count end
-  if eventlist then events, eventcount = eventlist.kev, eventlist.count end
-  return retnum(C.kevent(getfd(kq), changes, changecount, events, eventcount, timeout))
+  if eventlist then
+    return retiter(C.kevent(getfd(kq), changes, changecount, eventlist.kev, eventlist.count, timeout), eventlist.kev)
+  end
+  return retnum(C.kevent(getfd(kq), changes, changecount, nil, 0, timeout))
 end
 
 return S

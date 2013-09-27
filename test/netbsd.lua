@@ -14,10 +14,10 @@ local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
 
-local oldassert = assert
-local function assert(cond, s)
+local function assert(cond, s, ...)
   collectgarbage("collect") -- force gc, to test for bugs
-  return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
+  if cond == nil then error(tostring(s)) end -- annoyingly, assert does not call tostring!
+  return cond, s, ...
 end
 
 local function fork_assert(cond, str) -- if we have forked we need to fail in main thread not fork
@@ -182,17 +182,23 @@ test.kqueue = {
     local kevs = t.kevents{{fd = fd, filter = "vnode",
       flags = "add, enable, clear", fflags = "delete, write, extend, attrib, link, rename, revoke"}}
     assert(kfd:kevent(kevs, nil))
-    local ret = assert(kfd:kevent(nil, kevs, 0))
-    assert_equal(ret, 0) -- no events yet
+    local _, _, n = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(n, 0) -- no events yet
     assert(S.unlink(tmpfile))
-    local ret = assert(kfd:kevent(nil, kevs, 1))
-    assert_equal(ret, 1)
-    assert(kevs[1].DELETE, "expect delete event")
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 1)) do
+      assert(v.DELETE, "expect delete event")
+      count = count + 1
+    end
+    assert_equal(count, 1)
     assert(fd:write("something"))
-    local ret = assert(kfd:kevent(nil, kevs, 1))
-    assert_equal(ret, 1)
-    assert(kevs[1].WRITE, "expect write event")
-    assert(kevs[1].EXTEND, "expect extend event")
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 1)) do
+      assert(v.WRITE, "expect write event")
+      assert(v.EXTEND, "expect extend event")
+    count = count + 1
+    end
+    assert_equal(count, 1)
     assert(fd:close())
     assert(kfd:close())
   end,
@@ -201,20 +207,26 @@ test.kqueue = {
     local pipe = S.pipe()
     local kevs = t.kevents{{fd = pipe[1], filter = "read", flags = "add"}}
     assert(kfd:kevent(kevs, nil))
-    local ret = assert(kfd:kevent(nil, kevs, 0))
-    assert_equal(ret, 0) -- no events yet
+    local a, b, n = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(n, 0) -- no events yet
     local str = "test"
     pipe:write(str)
-    local ret = assert(kfd:kevent(nil, kevs, 0))
-    assert_equal(ret, 1) -- readable now
-    assert_equal(kevs[1].size, #str) -- size will be amount available to read
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 0)) do
+      assert_equal(v.size, #str) -- size will be amount available to read
+      count = count + 1
+    end
+    assert_equal(count, 1) -- 1 event readable now
     local r, err = pipe:read()
-    local ret = assert(kfd:kevent(nil, kevs, 0))
-    assert_equal(ret, 0) -- no events any more
+    local _, _, n = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(n, 0) -- no events any more
     assert(pipe[2]:close())
-    local ret = assert(kfd:kevent(nil, kevs, 0))
-    assert_equal(ret, 1)
-    assert(kevs[1].EOF, "expect EOF event")
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 0)) do
+      assert(v.EOF, "expect EOF event")
+      count = count + 1
+    end
+    assert_equal(count, 1)
     assert(pipe:close())
     assert(kfd:close())
   end,
@@ -223,13 +235,19 @@ test.kqueue = {
     local pipe = S.pipe()
     local kevs = t.kevents{{fd = pipe[2], filter = "write", flags = "add"}}
     assert(kfd:kevent(kevs, nil))
-    local ret = assert(kfd:kevent(nil, kevs, 0))
-    assert_equal(ret, 1) -- writeable already
-    assert(kevs[1].size > 0) -- size will be amount free in buffer
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 0)) do
+      assert(v.size > 0) -- size will be amount free in buffer
+      count = count + 1
+    end
+    assert_equal(count, 1) -- one event
     assert(pipe[1]:close()) -- close read end
-    local ret = assert(kfd:kevent(nil, kevs, 0))
-    assert_equal(ret, 1)
-    assert(kevs[1].EOF, "expect EOF event")
+    count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 0)) do
+      assert(v.EOF, "expect EOF event")
+      count = count + 1
+    end
+    assert_equal(count, 1)
     assert(pipe:close())
     assert(kfd:close())
   end,
@@ -237,9 +255,12 @@ test.kqueue = {
     local kfd = assert(S.kqueue("cloexec, nosigpipe"))
     local kevs = t.kevents{{ident = 0, filter = "timer", flags = "add, oneshot", data = 10}}
     assert(kfd:kevent(kevs, nil))
-    local ret = assert(kfd:kevent(nil, kevs, 1)) -- 1s timeout, longer than 10ms timer interval
-    assert_equal(ret, 1) -- will have expired by now
-    assert_equal(kevs[1].size, 1) -- count of expiries is 1 as oneshot
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 1)) do -- 1s timeout, longer than 10ms timer interval
+      assert_equal(v.size, 1) -- count of expiries is 1 as oneshot
+      count = count + 1
+    end
+    assert_equal(count, 1) -- will have expired by now
     assert(kfd:close())
   end,
 }
