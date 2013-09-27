@@ -29,3 +29,15 @@ void full_memory_barrier()
   __sync_synchronize();
 }
 
+/* Prefetch memory at address into CPU cache. */
+void prefetch_for_read(const void *address)
+{
+  __builtin_prefetch(address, 0);
+}
+
+/* Prefetch memory at address into CPU cache. */
+void prefetch_for_write(const void *address)
+{
+  __builtin_prefetch(address, 1);
+}
+
