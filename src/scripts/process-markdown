@@ -21,13 +21,14 @@ cd $(dirname $1)
 
 awk '/^    DIAGRAM:/ { diagram = $2;
                        printf("") > diagram
-                       printf("![%s](%s.png)\n", diagram, diagram);
+                       printf("![%s](.images/%s.png)\n", diagram, diagram);
                        next }
      diagram == 0    { print; next }
      /^    /         { print $0 >> diagram; next }
      # end of diagram
                      { print;
-                       system("ditaa " diagram " " diagram ".png > /dev/null");
+                       system("mkdir .images 2>/dev/null || true")
+                       system("ditaa " diagram " .images/" diagram ".png > /dev/null");
                        system("rm " diagram)
                        diagram = 0 }' < $(basename $1)
 

@@ -2,7 +2,7 @@
 
 ## `Source` app: Generate synthetic packets
 
-![Source](Source.png)
+![Source](.images/Source.png)
 
 The `Source` app is a synthetic packet generator. On each breath it
 outputs 1,000 new packets to each attached output port. The packet
@@ -10,7 +10,7 @@ data is uninitialized garbage and each packet is 60 bytes long.
 
 ## `Join` app: Merge multiple inputs onto one output
 
-![Join](Join.png)
+![Join](.images/Join.png)
 
 The `Join` app joins together packets from N input links onto one
 output link. On each breath it outputs as many packets as possible
@@ -18,7 +18,7 @@ from the inputs onto the output.
 
 ## `Split` app: Split multiple inputs across multiple outputs
 
-![Split](Split.png)
+![Split](.images/Split.png)
 
 The `Split` app splits packets from multiple inputs across multiple
 outputs. On each breath it transfers as many packets as possible from
@@ -26,14 +26,14 @@ the input links to the output links.
 
 ## `Sink` app: Receive and discard packets
 
-![Sink](Sink.png)
+![Sink](.images/Sink.png)
 
 The `Sink` app recieves all packets from any number of input links and
 discards them. This can be handy in combination with a `Source`.
 
 ## `Buzz` app: Print a debug message when called
 
-![Buzz](Buzz.png)
+![Buzz](.images/Buzz.png)
 
 The `Buzz` app simply prints a message to stdout each time a callback
 runs. This can be useful for observing the execution of the app
