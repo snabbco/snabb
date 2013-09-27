@@ -10,9 +10,9 @@ end
 
 local t, c = S.t, S.c
 
-local oldassert = assert
-function assert(c, s)
-  return oldassert(c, tostring(s))
+local function assert(cond, s, ...)
+  if cond == nil then error(tostring(s)) end -- annoyingly, assert does not call tostring!
+  return cond, s, ...
 end
 
 local maxevents = 1024
@@ -104,7 +104,7 @@ local buffer = t.buffer(bufsize)
 local ss = t.sockaddr_storage()
 local addrlen = t.socklen1(#ss)
 
-while true do
+local function loop()
 
 for i, ev in ep:get() do
 
@@ -131,7 +131,10 @@ for i, ev in ep:get() do
   end
 end
 
+return loop()
 
 end
+
+loop()
 
 
