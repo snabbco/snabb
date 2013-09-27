@@ -88,11 +88,6 @@ function transmit (l, p)
    link_ring.transmit(l.ring, p)
 end
 
-function transfer (l, p)
-   transmit(l, p)
-   packet.deref(p)
-end
-
 function receive (l)
    return link_ring.receive(l.ring)
 end

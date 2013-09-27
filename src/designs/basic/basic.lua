@@ -5,7 +5,7 @@ local buffer = require("core.buffer")
 local timer = require("core.timer")
 local basic_apps = require("apps.basic.basic_apps")
 
-local graphviz = true
+local graphviz = false
 
 function run ()
    app.apps.source = app.new(basic_apps.Source:new())
