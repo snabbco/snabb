@@ -15,10 +15,10 @@ local t, pt, s = types.t, types.pt, types.s
 
 local nl = S.nl
 
-local oldassert = assert
-local function assert(cond, s)
+local function assert(cond, s, ...)
   collectgarbage("collect") -- force gc, to test for bugs
-  return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
+  if cond == nil then error(tostring(s)) end -- annoyingly, assert does not call tostring!
+  return cond, s, ...
 end
 
 local function fork_assert(cond, str) -- if we have forked we need to fail in main thread not fork
@@ -1007,13 +1007,16 @@ test.events_epoll = {
     local ep = assert(S.epoll_create("cloexec"))
     assert(ep:epoll_ctl("add", a, "in"))
     local ev = t.epoll_events(1)
-    local r = assert(ep:epoll_wait(ev, 0))
+    local _, _, r = assert(ep:epoll_wait(ev, 0))
     assert(r == 0, "no events yet")
     assert(b:write(teststring))
-    local r = assert(ep:epoll_wait(ev, 0))
-    assert(r == 1, "one event now")
-    assert(ev[1].IN, "read event")
-    assert(ev[1].fd == a:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
+    local count = 0
+    for k, v in assert(ep:epoll_wait(ev, 0)) do
+      count = count + 1
+      assert(v.IN, "read event")
+      assert(v.fd == a:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
+    end
+    assert(count == 1, "one event now")
     assert(ep:close())
     assert(a:read()) -- clear event
     assert(b:close())
@@ -1025,13 +1028,16 @@ test.events_epoll = {
     local ep = assert(S.epoll_create("cloexec"))
     assert(ep:epoll_ctl("add", a, "in"))
     local ev = t.epoll_events(1)
-    local r = assert(ep:epoll_pwait(ev, 0, "alrm"))
+    local _, _, r = assert(ep:epoll_pwait(ev, 0, "alrm"))
     assert(r == 0, "no events yet")
     assert(b:write(teststring))
-    local r = assert(ep:epoll_pwait(ev, 0, "alrm"))
-    assert(r == 1, "one event now")
-    assert(ev[1].IN, "read event")
-    assert(ev[1].fd == a:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
+    local count = 0
+    for k, v in assert(ep:epoll_pwait(ev, 0, "alrm")) do
+      count = count + 1
+      assert(v.IN, "read event")
+      assert(v.fd == a:getfd(), "expect to get fd of ready file back") -- by default our epoll_ctl sets this
+    end
+    assert(count == 1, "one event now")
     assert(ep:close())
     assert(a:read()) -- clear event
     assert(b:close())
@@ -1112,10 +1118,13 @@ test.aio = {
     local ret = assert(S.io_submit(ctx, a))
     assert_equal(ret, 1, "expect one event submitted")
     local ev = t.epoll_events(1)
-    local r = assert(ep:epoll_wait(ev))
-    assert_equal(r, 1, "one event now")
-    assert(ev[1].IN, "read event")
-    assert(ev[1].fd == efd:getfd(), "expect to get fd of eventfd file back")
+    local count = 0
+    for k, v in assert(ep:epoll_wait(ev)) do
+      count = count + 1
+      assert(v.IN, "read event")
+      assert(v.fd == efd:getfd(), "expect to get fd of eventfd file back")
+    end
+    assert_equal(count, 1, "one event now")
     local e = util.eventfd_read(efd)
     assert_equal(e, 1, "expect to be told one aio event ready")
     local r = assert(S.io_getevents(ctx, 1, 1))

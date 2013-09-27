@@ -780,13 +780,6 @@ end
 addtype("epoll_event", "struct epoll_event", mt.epoll_event)
 
 mt.epoll_events = {
-  __index = function(ep, k)
-    return ep.ep[k - 1]
-  end,
-  __newindex = function(ep, k, v)
-    v = mktype(t.epoll_event, v)
-    ffi.copy(ep.ep[k - 1], v, s.epoll_event)
-  end,
   __len = function(ep) return ep.count end,
   __new = function(tp, n) return ffi.new(tp, n, n) end,
 }

@@ -359,13 +359,23 @@ function S.epoll_ctl(epfd, op, fd, event, data)
   return retbool(C.epoll_ctl(getfd(epfd), c.EPOLL_CTL[op], getfd(fd), event))
 end
 
+local function reviter(array, i)
+  i = i - 1
+  if i >= 0 then return i, array[i] end
+end
+
+local function retiter(ret, array)
+  if ret == -1 then return nil, t.error() end
+  return reviter, array, ret
+end
+
 function S.epoll_wait(epfd, events, timeout)
-  return retnum(C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1))
+  return retiter(C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1), events.ep)
 end
 
 function S.epoll_pwait(epfd, events, timeout, sigmask)
   if sigmask then sigmask = mktype(t.sigset, sigmask) end
-  return retnum(C.epoll_pwait(getfd(epfd), events.ep, #events, timeout or -1, sigmask))
+  return retiter(C.epoll_pwait(getfd(epfd), events.ep, #events, timeout or -1, sigmask), events.ep)
 end
 
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
