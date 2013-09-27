@@ -1001,6 +1001,12 @@ test.events_epoll = {
     assert(n, 0, "eventfd should return 0 again")
     assert(fd:close())
   end,
+  test_epoll_events_iter = function()
+    local ev = t.epoll_events(8)
+    local count = 0
+    for k, v in ipairs(ev) do count = count + 1 end
+    assert_equal(count, 8)
+  end,
   test_epoll_wait = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local a, b = sv[1], sv[2]

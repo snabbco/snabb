@@ -13,7 +13,8 @@ local function init(types, hh, abi, c)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local ptt, addtype, addtype_var, lenfn, lenmt, newfn, istype = hh.ptt, hh.addtype, hh.addtype_var, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
+local ptt, addtype, addtype_var, lenfn, lenmt, newfn, istype, reviter =
+  hh.ptt, hh.addtype, hh.addtype_var, hh.lenfn, hh.lenmt, hh.newfn, hh.istype, hh.reviter
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -782,7 +783,7 @@ addtype("epoll_event", "struct epoll_event", mt.epoll_event)
 mt.epoll_events = {
   __len = function(ep) return ep.count end,
   __new = function(tp, n) return ffi.new(tp, n, n) end,
-  -- TODO add ipairs
+  __ipairs = function(ep) return reviter, ep.ep, ep.count end
 }
 
 addtype_var("epoll_events", "struct {int count; struct epoll_event ep[?];}", mt.epoll_events)

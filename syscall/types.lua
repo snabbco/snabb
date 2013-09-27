@@ -101,6 +101,12 @@ local function istype(tp, x)
   if ffi.istype(tp, x) then return x else return false end
 end
 
+-- generic iterator that counts down so needs no closure to hold state
+local function reviter(array, i)
+  i = i - 1
+  if i >= 0 then return i, array[i] end
+end
+
 -- generic types
 
 local voidp = ffi.typeof("void *")
@@ -685,7 +691,8 @@ mt.pollfds = {
 addtype_var("pollfds", "struct {int count; struct pollfd pfd[?];}", mt.pollfds)
 
 -- include OS specific types
-local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt, newfn = newfn, istype = istype}
+local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt,
+            newfn = newfn, istype = istype, reviter = reviter}
 
 types = ostypes.init(types, hh, abi, c)
 if ostypes2 then types = ostypes2.init(types, hh, abi, c) end
