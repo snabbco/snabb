@@ -67,6 +67,17 @@ local function retptr(ret)
   return ret
 end
 
+-- generic iterators; these count down to 0 so need no closure
+local function reviter(array, i)
+  i = i - 1
+  if i >= 0 then return i, array[i] end
+end
+
+local function retiter(ret, array)
+  if ret == -1 then return nil, t.error() end
+  return reviter, array, ret
+end
+
 -- generic system calls
 function S.open(pathname, flags, mode) return retfd(C.open(pathname, c.O[flags], c.MODE[mode])) end
 function S.close(fd) return retbool(C.close(getfd(fd))) end
@@ -463,7 +474,7 @@ end
 -- now call OS specific for non-generic calls
 local hh = {
   istype = istype, mktype = mktype, getfd = getfd,
-  ret64 = ret64, retnum = retnum, retfd = retfd, retbool = retbool, retptr = retptr
+  ret64 = ret64, retnum = retnum, retfd = retfd, retbool = retbool, retptr = retptr, retiter = retiter
 }
 
 local S = require("syscall." .. abi.os .. ".syscalls")(S, hh, abi, c, C, types, ioctl)

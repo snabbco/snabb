@@ -782,6 +782,7 @@ addtype("epoll_event", "struct epoll_event", mt.epoll_event)
 mt.epoll_events = {
   __len = function(ep) return ep.count end,
   __new = function(tp, n) return ffi.new(tp, n, n) end,
+  -- TODO add ipairs
 }
 
 addtype_var("epoll_events", "struct {int count; struct epoll_event ep[?];}", mt.epoll_events)

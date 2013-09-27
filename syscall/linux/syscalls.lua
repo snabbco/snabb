@@ -17,7 +17,7 @@ local t, pt, s = types.t, types.pt, types.s
 local h = require "syscall.helpers"
 
 local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
-local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr
+local ret64, retnum, retfd, retbool, retptr, retiter = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr, hh.retiter
 
 if abi.abi32 then
   -- override open call with largefile
@@ -357,16 +357,6 @@ function S.epoll_ctl(epfd, op, fd, event, data)
     if data then event.data.u64 = data else event.data.fd = getfd(fd) end
   end
   return retbool(C.epoll_ctl(getfd(epfd), c.EPOLL_CTL[op], getfd(fd), event))
-end
-
-local function reviter(array, i)
-  i = i - 1
-  if i >= 0 then return i, array[i] end
-end
-
-local function retiter(ret, array)
-  if ret == -1 then return nil, t.error() end
-  return reviter, array, ret
 end
 
 function S.epoll_wait(epfd, events, timeout)
