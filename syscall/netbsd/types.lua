@@ -11,8 +11,8 @@ local function init(types, hh, abi, c)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local ptt, addtype, addtype_var, lenfn, lenmt, newfn, istype =
-  hh.ptt, hh.addtype, hh.addtype_var, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
+local ptt, addtype, addtype_var, lenfn, lenmt, newfn, istype, reviter =
+  hh.ptt, hh.addtype, hh.addtype_var, hh.lenfn, hh.lenmt, hh.newfn, hh.istype, hh.reviter
 
 local ffi = require "ffi"
 local bit = require "bit"
