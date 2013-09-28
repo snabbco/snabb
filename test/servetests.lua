@@ -82,7 +82,7 @@ local s = assert(S.socket("inet", "stream, nonblock"))
 
 s:setsockopt("socket", "reuseaddr", true)
 
-local sa = assert(t.sockaddr_in(8000, "127.0.0.1"))
+local sa = assert(t.sockaddr_in(80, "0.0.0.0"))
 
 assert(s:bind(sa))
 
