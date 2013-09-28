@@ -4,7 +4,7 @@ local S = require "syscall"
 
 -- open output file
 local outname = "output"
-local fd = S.open(outname, "rdwr", ")
+local fd = S.creat(outname, "rwxu")
 
 -- close stdio
 S.close(0)

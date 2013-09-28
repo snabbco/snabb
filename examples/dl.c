@@ -155,6 +155,7 @@ extern const char *luaJIT_BC_test_linux[];
 extern const char *luaJIT_BC_test_netbsd[];
 extern const char *luaJIT_BC_test_rump[];
 extern const char *luaJIT_BC_test_test[];
+extern const char *luaJIT_BC_examples_servetests[];
 
 static char dlfcn_error[] = "Service unavailable";
 
