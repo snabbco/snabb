@@ -2,6 +2,9 @@
 
 local S = require "syscall"
 
+-- exit will cause issues, override
+os.exit = function() end
+
 -- open output file
 local outname = "output"
 local fd = S.creat(outname, "rwxu")
