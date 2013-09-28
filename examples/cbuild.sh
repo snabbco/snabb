@@ -35,7 +35,7 @@ do
   luajit -b -t o -n ${MODNAME} ${f} obj/${MODNAME}.o
 done
 
-FILES='test/test.lua test/linux.lua test/netbsd.lua test/rump.lua include/ffi-reflect/reflect.lua include/luaunit/luaunit.lua include/strict/strict.lua'
+FILES='test/test.lua test/linux.lua test/netbsd.lua test/rump.lua test/servetests.lua include/ffi-reflect/reflect.lua include/luaunit/luaunit.lua include/strict/strict.lua'
 
 for f in $FILES
 do
