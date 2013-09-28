@@ -6,15 +6,10 @@ local S = require "syscall"
 local outname = "output"
 local fd = S.creat(outname, "rwxu")
 
--- close stdio
-S.close(0)
-S.close(1)
-S.close(2)
-
--- set stdio to file
-S.dup2(fd, 0)
-S.dup2(fd, 1)
-S.dup2(fd, 2)
+-- set stdio to file, keep handle so not garbage collected
+local stdin = S.dup2(fd, 0)
+local stdout = S.dup2(fd, 1)
+local stderr = S.dup2(fd, 2)
 
 -- run tests
 require "test.test"

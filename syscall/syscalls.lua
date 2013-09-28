@@ -187,11 +187,14 @@ function S.socketpair(domain, stype, protocol)
   if ret == -1 then return nil, t.error() end
   return t.socketpair(sv2)
 end
+-- TODO maybe this not going along with OS is confusing?
 if C.dup3 then
   -- TODO dup3 can have a race condition (see Linux man page) although Musl fixes, appears eglibc does not
+  -- TODO also emulate if nosys?
   function S.dup(oldfd, newfd, flags)
     if not newfd then return retfd(C.dup(getfd(oldfd))) end
-    return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags or 0))
+    if not flags then return retfd(C.dup2(getfd(oldfd), getfd(newfd))) end
+    return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags))
   end
 else -- OSX does not have dup3
   function S.dup(oldfd, newfd, flags)
@@ -200,6 +203,8 @@ else -- OSX does not have dup3
     return retfd(C.dup2(getfd(oldfd), getfd(newfd))) -- TODO set flags on newfd
   end
 end
+S.dup2 = S.dup
+S.dup3 = S.dup
 function S.sendto(fd, buf, count, flags, addr, addrlen)
   if not addr then addrlen = 0 end
   local saddr = pt.sockaddr(addr)

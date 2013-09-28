@@ -414,6 +414,12 @@ function C.signalfd(fd, mask, flags)
   return syscall(c.SYS.signalfd4, t.int(fd), pt.void(mask), t.int(sigset_size), t.int(flags))
 end
 
+-- adding more
+function C.dup(oldfd) return syscall(c.SYS.dup, t.int(oldfd)) end
+function C.dup2(oldfd, newfd) return syscall(c.SYS.dup2, t.int(oldfd), t.int(newfd)) end
+function C.dup3(oldfd, newfd, flags) return syscall(c.SYS.dup3, t.int(oldfd), t.int(newfd), t.int(flags)) end
+
+-- socketcall related
 if c.SYS.accept4 then -- on x86 this is a socketcall, which we have not implemented yet, other archs is a syscall
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(c.SYS.accept4, t.int(sockfd), pt.void(addr), pt.void(addrlen), t.int(flags))
