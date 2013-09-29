@@ -311,14 +311,11 @@ function S.signalfd(set, flags, fd) -- note different order of args, as fd usual
   return retfd(C.signalfd(fd, t.sigset(set), c.SFD[flags]))
 end
 
--- note that syscall does return timeout remaining but libc does not, due to standard prototype TODO use syscall?
+-- note that syscall does return timeout remaining but libc does not, due to standard prototype TODO use syscall
 function S.ppoll(fds, timeout, set)
-  fds = mktype(t.pollfds, fds)
   if timeout then timeout = mktype(t.timespec, timeout) end
   if set then set = mktype(t.sigset, set) end
-  local ret = C.ppoll(fds.pfd, #fds, timeout, set)
-  if ret == -1 then return nil, t.error() end
-  return fds
+  return retnum(C.ppoll(fds.pfd, #fds, timeout, set))
 end
 
 function S.mount(source, target, filesystemtype, mountflags, data)

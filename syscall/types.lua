@@ -667,25 +667,19 @@ for k, v in pairs(c.POLL) do mt.pollfd.index[k] = function(pfd) return bit.band(
 addtype("pollfd", "struct pollfd", mt.pollfd)
 
 mt.pollfds = {
-  __index = function(p, k)
-    return p.pfd[k - 1]
-  end,
-  __newindex = function(p, k, v)
-    v = istype(t.pollfd, v) or t.pollfd(v)
-    ffi.copy(p.pfd[k - 1], v, s.pollfd)
-  end,
   __len = function(p) return p.count end,
   __new = function(tp, ps)
     if type(ps) == 'number' then return ffi.new(tp, ps, ps) end
     local count = #ps
     local fds = ffi.new(tp, count, count)
-    for n = 1, count do
-      fds[n].fd = ps[n].fd:getfd()
-      fds[n].events = c.POLL[ps[n].events]
-      fds[n].revents = 0
+    for n = 1, count do -- TODO ideally we use ipairs on both arrays/tables
+      fds.pfd[n - 1].fd = ps[n].fd:getfd()
+      fds.pfd[n - 1].events = c.POLL[ps[n].events]
+      fds.pfd[n - 1].revents = 0
     end
     return fds
   end,
+  __ipairs = function(p) return reviter, p.pfd, p.count end
 }
 
 addtype_var("pollfds", "struct {int count; struct pollfd pfd[?];}", mt.pollfds)

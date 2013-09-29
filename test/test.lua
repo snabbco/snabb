@@ -401,12 +401,20 @@ test_poll_select = {
   test_poll = function()
     local sv = assert(S.socketpair("unix", "stream"))
     local a, b = sv[1], sv[2]
-    local pev = {{fd = a, events = "in"}}
+    local pev = t.pollfds{{fd = a, events = "in"}}
     local p = assert(S.poll(pev, 0))
-    assert(p[1].fd == a:getfd() and p[1].revents == 0, "no events")
+    assert_equal(p, 0) -- no events
+    for k, v in ipairs(pev) do
+      assert_equal(v.fd, a:getfd())
+      assert_equal(v.revents, 0)
+    end
     assert(b:write(teststring))
     local p = assert(S.poll(pev, 0))
-    assert(p[1].fd == a:getfd() and p[1].IN, "one event now")
+    assert_equal(p, 1) -- 1 event
+    for k, v in ipairs(pev) do
+      assert_equal(v.fd, a:getfd())
+      assert(v.IN, "one IN event now")
+    end
     assert(a:read())
     assert(b:close())
     assert(a:close())
