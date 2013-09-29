@@ -1081,7 +1081,8 @@ test.aio = {
     local a = t.iocb_array{{opcode = "pread", data = 42, fildes = fd, buf = abuf, nbytes = 4096, offset = 0}}
     local ret = assert(S.io_submit(ctx, a))
     assert_equal(ret, 1, "expect one event submitted")
-    local r = assert(S.io_getevents(ctx, 1, 1))
+    local ev = t.io_events(1)
+    local r = assert(S.io_getevents(ctx, 1, 1, ev))
     assert_equal(#r, 1, "expect one aio event") -- TODO test what is returned
     assert_equal(r[1].data, 42, "expect to get our data back")
     assert_equal(r[1].res, 4096, "expect to get full read")
@@ -1102,7 +1103,8 @@ test.aio = {
     assert_equal(ret, 1, "expect one event submitted")
     -- erroring, giving EINVAL which is odd, man page says means ctx invalid TODO fix
     --local ok = assert(S.io_cancel(ctx, a.iocbs[1]))
-    --r = assert(S.io_getevents(ctx, 1, 1))
+    --local ev = t.io_events(1)
+    --r = assert(S.io_getevents(ctx, 1, 1, ev))
     --assert_equal(r, 0, "expect no aio events")
     assert(S.io_destroy(ctx))
     assert(fd:close())
@@ -1133,7 +1135,8 @@ test.aio = {
     assert_equal(count, 1, "one event now")
     local e = util.eventfd_read(efd)
     assert_equal(e, 1, "expect to be told one aio event ready")
-    local r = assert(S.io_getevents(ctx, 1, 1))
+    local ev = t.io_events(1)
+    local r = assert(S.io_getevents(ctx, 1, 1, ev))
     assert_equal(#r, 1, "expect one aio event")
     assert_equal(r[1].data, 42, "expect to get our data back")
     assert_equal(r[1].res, 4096, "expect to get full read")

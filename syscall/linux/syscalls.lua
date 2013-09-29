@@ -455,7 +455,6 @@ function S.io_cancel(ctx, iocb, result)
 end
 
 function S.io_getevents(ctx, min, nr, events, timeout)
-  events = events or t.io_events(nr)
   if timeout then timeout = mktype(t.timespec, timeout) end
   local ret = C.io_getevents(ctx, min, nr, events, timeout)
   if ret == -1 then return nil, t.error() end
