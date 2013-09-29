@@ -188,6 +188,13 @@ function S.kevent(kq, changelist, eventlist, timeout)
   return retnum(C.kevent(getfd(kq), changes, changecount, nil, 0, timeout))
 end
 
+-- TODO this is the same as ppoll other than if timeout is modified, which Linux syscall but not libc does; could merge
+function S.pollts(fds, timeout, set)
+  if timeout then timeout = mktype(t.timespec, timeout) end
+  if set then set = mktype(t.sigset, set) end
+  return retnum(C.pollts(fds.pfd, #fds, timeout, set))
+end
+
 return S
 
 end

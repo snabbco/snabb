@@ -443,6 +443,31 @@ test_poll_select = {
   end,
 }
 
+test_ppoll = {
+  test_ppoll = function()
+    local ppoll = S.ppoll or S.pollts -- see notes, no differences as far as test is concerned
+    local sv = assert(S.socketpair("unix", "stream"))
+    local a, b = sv[1], sv[2]
+    local pev = t.pollfds{{fd = a, events = c.POLL.IN}}
+    local p = assert(ppoll(pev, 0, nil))
+    assert_equal(p, 0) -- no events yet
+    for k, v in ipairs(pev) do
+      assert_equal(v.fd, a:getfd())
+      assert_equal(v.revents, 0)
+    end
+    assert(b:write(teststring))
+    local p = assert(ppoll(pev, nil, "alrm"))
+    assert_equal(p, 1) -- 1 event
+    for k, v in ipairs(pev) do
+      assert_equal(v.fd, a:getfd())
+      assert(v.IN, "IN event now")
+    end
+    assert(a:read())
+    assert(b:close())
+    assert(a:close())
+  end,
+}
+
 test_address_names = {
   test_ipv4_names = function()
     assert_equal(tostring(t.in_addr("127.0.0.1")), "127.0.0.1")

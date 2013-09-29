@@ -971,30 +971,6 @@ test.netlink = {
   end,
 }
 
-test.ppoll = {
-  test_ppoll = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    local a, b = sv[1], sv[2]
-    local pev = t.pollfds{{fd = a, events = c.POLL.IN}}
-    local p = assert(S.ppoll(pev, 0, nil))
-    assert_equal(p, 0) -- no events yet
-    for k, v in ipairs(pev) do
-      assert_equal(v.fd, a:getfd())
-      assert_equal(v.revents, 0)
-    end
-    assert(b:write(teststring))
-    local p = assert(S.ppoll(pev, nil, "alrm"))
-    assert_equal(p, 1) -- 1 event
-    for k, v in ipairs(pev) do
-      assert_equal(v.fd, a:getfd())
-      assert(v.IN, "IN event now")
-    end
-    assert(a:read())
-    assert(b:close())
-    assert(a:close())
-  end,
-}
-
 test.events_epoll = {
   test_eventfd = function()
     local fd = assert(S.eventfd(0, "nonblock"))

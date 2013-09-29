@@ -312,6 +312,7 @@ function S.signalfd(set, flags, fd) -- note different order of args, as fd usual
 end
 
 -- note that syscall does return timeout remaining but libc does not, due to standard prototype TODO use syscall
+-- note this is the only difference with NetBSD pollts, so could merge them
 function S.ppoll(fds, timeout, set)
   if timeout then timeout = mktype(t.timespec, timeout) end
   if set then set = mktype(t.sigset, set) end
