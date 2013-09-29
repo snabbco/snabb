@@ -145,7 +145,6 @@ for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 t.inotify_event = ffi.typeof("struct inotify_event")
 pt.inotify_event = ptt("struct inotify_event") -- still need pointer to this
 
-t.io_events = ffi.typeof("struct io_event[?]")
 t.iocbs = ffi.typeof("struct iocb[?]")
 t.sock_filters = ffi.typeof("struct sock_filter[?]")
 
@@ -787,6 +786,14 @@ mt.epoll_events = {
 }
 
 addtype_var("epoll_events", "struct {int count; struct epoll_event ep[?];}", mt.epoll_events)
+
+mt.io_events = {
+  __len = function(evs) return evs.count end,
+  __new = function(tp, n) return ffi.new(tp, n, n) end,
+  __ipairs = function(evs) return reviter, evs.ev, evs.count end
+}
+
+addtype_var("io_events", "struct {int count; struct io_event ev[?];}", mt.io_events)
 
 mt.cpu_set = {
   index = {

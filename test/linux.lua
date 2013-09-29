@@ -1082,10 +1082,13 @@ test.aio = {
     local ret = assert(S.io_submit(ctx, a))
     assert_equal(ret, 1, "expect one event submitted")
     local ev = t.io_events(1)
-    local r = assert(S.io_getevents(ctx, 1, 1, ev))
-    assert_equal(#r, 1, "expect one aio event") -- TODO test what is returned
-    assert_equal(r[1].data, 42, "expect to get our data back")
-    assert_equal(r[1].res, 4096, "expect to get full read")
+    local count = 0
+    for k, v in assert(S.io_getevents(ctx, 1, ev)) do
+      assert_equal(v.data, 42, "expect to get our data back")
+      assert_equal(v.res, 4096, "expect to get full read")
+      count = count + 1
+    end
+    assert_equal(count, 1)
     assert(fd:close())
     assert(S.munmap(abuf, 4096))
   end,
@@ -1099,12 +1102,14 @@ test.aio = {
     assert(fd:pwrite(abuf, 4096, 0))
     ffi.fill(abuf, 4096)
     local a = t.iocb_array{{opcode = "pread", data = 42, fildes = fd, buf = abuf, nbytes = 4096, offset = 0}}
-    local ret = assert(S.io_submit(ctx, a))
-    assert_equal(ret, 1, "expect one event submitted")
+    local count = 0
+    assert(S.io_submit(ctx, a))
     -- erroring, giving EINVAL which is odd, man page says means ctx invalid TODO fix
     --local ok = assert(S.io_cancel(ctx, a.iocbs[1]))
+
+    --assert_equal(count, 1)
     --local ev = t.io_events(1)
-    --r = assert(S.io_getevents(ctx, 1, 1, ev))
+    --r = assert(S.io_getevents(ctx, 1, ev))
     --assert_equal(r, 0, "expect no aio events")
     assert(S.io_destroy(ctx))
     assert(fd:close())
@@ -1136,10 +1141,13 @@ test.aio = {
     local e = util.eventfd_read(efd)
     assert_equal(e, 1, "expect to be told one aio event ready")
     local ev = t.io_events(1)
-    local r = assert(S.io_getevents(ctx, 1, 1, ev))
-    assert_equal(#r, 1, "expect one aio event")
-    assert_equal(r[1].data, 42, "expect to get our data back")
-    assert_equal(r[1].res, 4096, "expect to get full read")
+    local count = 0
+    for k, v in assert(S.io_getevents(ctx, 1, ev)) do
+      assert_equal(v.data, 42, "expect to get our data back")
+      assert_equal(v.res, 4096, "expect to get full read")
+      count = count + 1
+    end
+    assert_equal(count, 1)
     assert(efd:close())
     assert(ep:close())
     assert(S.io_destroy(ctx))

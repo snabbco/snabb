@@ -454,20 +454,9 @@ function S.io_cancel(ctx, iocb, result)
   return result
 end
 
-function S.io_getevents(ctx, min, nr, events, timeout)
+function S.io_getevents(ctx, min, events, timeout)
   if timeout then timeout = mktype(t.timespec, timeout) end
-  local ret = C.io_getevents(ctx, min, nr, events, timeout)
-  if ret == -1 then return nil, t.error() end
-  -- TODO convert to metatype for io_event
-  -- TODO metatype should support error type if res is negative
-  local r = {}
-  for i = 0, ret - 1 do
-    r[i + 1] = events[i]
-  end
-  r.timeout = timeout
-  r.events = events
-  r.count = tonumber(ret)
-  return r
+  return retiter(C.io_getevents(ctx, min or events.count, events.count, events.ev, timeout), events.ev)
 end
 
 -- TODO this is broken as iocb must persist until retrieved, and could be gc'd if passed as table...
