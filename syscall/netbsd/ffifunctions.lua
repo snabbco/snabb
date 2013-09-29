@@ -31,6 +31,7 @@ int ioctl(int d, unsigned long request, ...);
 int getvfsstat(struct statvfs *buf, size_t bufsize, int flags);
 int kqueue(void);
 int kqueue1(int flags);
+int pollts(struct pollfd * restrict fds, nfds_t nfds, const struct timespec * restrict ts, const sigset_t * restrict sigmask);
 
 int __mount50(const char *type, const char *dir, int flags, void *data, size_t data_len);
 int __stat50(const char *path, struct stat *sb);

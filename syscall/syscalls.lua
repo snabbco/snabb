@@ -272,6 +272,7 @@ end
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), c.SHUT[how])) end
 function S.poll(fds, timeout) return retnum(C.poll(fds.pfd, #fds, timeout or -1)) end
 
+-- TODO redo as metatype, complete rework
 -- fdset handlers
 local function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
   local set = t.fdset()
@@ -309,6 +310,7 @@ function S.select(sel) -- note same structure as returned
           exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret)}
 end
 
+-- TODO note that actual syscall modifies timeout, which is non standard, like ppoll
 function S.pselect(sel) -- note same structure as returned
   local r, w, e
   local nfds = 0
