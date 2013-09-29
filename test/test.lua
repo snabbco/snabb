@@ -1547,5 +1547,6 @@ end
 
 collectgarbage("collect")
 
+os.exit(0)
 
 
