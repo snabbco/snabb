@@ -1,0 +1,11 @@
+Installation instructions
+
+You need to put the file syscall.lua and the directory syscall and its contents in the ame directory where they will be found by LuaJIT. This can vary by system, but you can find out with `luajit -e 'print(package.path)'` for your system. You do not need all the files, you can delete operating system and architecture files you do not require.
+
+None of the files in include/ are needed to use the code, just to run the tests. You need to run `git submodule update --init --recursive` to load them before running the tests with `luajit test/test.lua`.
+
+The optional NetBSD rump kernel support requires building the libraries using the `include/buildrump.sh` submodule, for more information see https://github.com/anttikantee/buildrump.sh
+
+There is some work in progress towards other build patterns such as building into a single binary, see in the examples directory, this will have more documentation later; this is currently used by the Xen runtime for example, or can be used to make static executables.
+
+
