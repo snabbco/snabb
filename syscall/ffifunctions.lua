@@ -64,8 +64,10 @@ int flock(int fd, int operation);
 
 int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);
+int pipe2(int pipefd[2], int flags);
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
+int dup3(int oldfd, int newfd, int flags);
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
@@ -84,6 +86,7 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 int nanosleep(const struct timespec *req, struct timespec *rem);
+int getrusage(int who, struct rusage *usage);
 
 uid_t getuid(void);
 uid_t geteuid(void);

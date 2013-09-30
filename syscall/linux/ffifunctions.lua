@@ -36,7 +36,34 @@ time_t time(time_t *t);
 
 int ioctl(int d, unsigned int request, ...);
 
-int dup3(int oldfd, int newfd, int flags);
+int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
+int epoll_create1(int flags);
+int epoll_create(int size);
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
+int epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *sigmask);
+int inotify_init1(int flags);
+int inotify_add_watch(int fd, const char *pathname, uint32_t mask);
+int inotify_rm_watch(int fd, uint32_t wd);
+ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
+int eventfd(unsigned int initval, int flags);
+ssize_t splice(int fd_in, off_t *off_in, int fd_out, off_t *off_out, size_t len, unsigned int flags);
+ssize_t vmsplice(int fd, const struct iovec *iov, unsigned long nr_segs, unsigned int flags);
+ssize_t tee(int fd_in, int fd_out, size_t len, unsigned int flags);
+int reboot(int cmd);
+int klogctl(int type, char *bufp, int len);
+int mount(const char *source, const char *target, const char *filesystemtype, unsigned long mountflags, const void *data);
+int umount(const char *target);
+int umount2(const char *target, int flags);
+void *mmap2(void *addr, size_t length, int prot, int flags, int fd, off32_t pgoffset);
+int setns(int fd, int nstype);
+int pivot_root(const char *new_root, const char *put_old);
+int swapon(const char *path, int swapflags);
+int swapoff(const char *path);
+int timerfd_create(int clockid, int flags);
+int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value);
+int timerfd_gettime(int fd, struct itimerspec *curr_value);
+int signalfd(int fd, const sigset_t *mask, int flags);
 
 /* down to here have moved to shared calls */
 int clock_getres(clockid_t clk_id, struct timespec *res);
@@ -48,29 +75,9 @@ int sysinfo(struct sysinfo *info);
 int getpriority(int which, int who);
 int setpriority(int which, int who, int prio);
 int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5);
-int signalfd(int fd, const sigset_t *mask, int flags);
-int timerfd_create(int clockid, int flags);
-int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value);
-int timerfd_gettime(int fd, struct itimerspec *curr_value);
 
-int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
 int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
 
-int epoll_create1(int flags);
-int epoll_create(int size);
-int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
-int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
-int epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *sigmask);
-ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
-int eventfd(unsigned int initval, int flags);
-ssize_t splice(int fd_in, off_t *off_in, int fd_out, off_t *off_out, size_t len, unsigned int flags);
-ssize_t vmsplice(int fd, const struct iovec *iov, unsigned long nr_segs, unsigned int flags);
-ssize_t tee(int fd_in, int fd_out, size_t len, unsigned int flags);
-int reboot(int cmd);
-int klogctl(int type, char *bufp, int len);
-int inotify_init1(int flags);
-int inotify_add_watch(int fd, const char *pathname, uint32_t mask);
-int inotify_rm_watch(int fd, uint32_t wd);
 int adjtimex(struct timex *buf);
 int sync_file_range(int fd, off_t offset, off_t count, unsigned int flags);
 
@@ -80,15 +87,9 @@ int prlimit64(pid_t pid, int resource, const struct rlimit64 *new_limit, struct 
 
 int accept4(int sockfd, void *addr, socklen_t *addrlen, int flags);
 
-void *mmap2(void *addr, size_t length, int prot, int flags, int fd, off32_t pgoffset);
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
 int fallocate(int fd, int mode, off_t offset, off_t len); /* note there are 32 bit issues with glibc */
 ssize_t readahead(int fd, off_t offset, size_t count);
-
-int pipe2(int pipefd[2], int flags);
-int mount(const char *source, const char *target, const char *filesystemtype, unsigned long mountflags, const void *data);
-int umount(const char *target);
-int umount2(const char *target, int flags);
 
 int faccessat(int dirfd, const char *pathname, int mode, int flags);
 int statfs(const char *path, struct statfs64 *buf);
@@ -111,10 +112,6 @@ int lremovexattr(const char *path, const char *name);
 int fremovexattr(int fd, const char *name);
 
 int unshare(int flags);
-int setns(int fd, int nstype);
-int pivot_root(const char *new_root, const char *put_old);
-int swapon(const char *path, int swapflags);
-int swapoff(const char *path);
 
 int syscall(int number, ...);
 
@@ -134,7 +131,7 @@ int sched_setparam(pid_t pid, const struct sched_param *param);
 int sched_getparam(pid_t pid, struct sched_param *param);
 int sched_rr_get_interval(pid_t pid, struct timespec *tp);
 
-/* TODO from here to libc functions are not implemented yet */
+/* TODO from here functions are not implemented yet */
 int tgkill(int tgid, int tid, int sig);
 int brk(void *addr);
 void *sbrk(intptr_t increment);
@@ -144,7 +141,6 @@ void *sbrk(intptr_t increment);
 caddr_t create_module(const char *name, size_t size);
 int init_module(const char *name, struct module *image);
 int get_kernel_syms(struct kernel_sym *table);
-int getrusage(int who, struct rusage *usage);
 int get_thread_area(struct user_desc *u_info);
 long kexec_load(unsigned long entry, unsigned long nr_segments, struct kexec_segment *segments, unsigned long flags);
 int lookup_dcookie(u64 cookie, char *buffer, size_t len);
