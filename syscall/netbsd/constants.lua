@@ -975,5 +975,12 @@ c.RUSAGE = strflag {
   CHILDREN = -1,
 }
 
+-- getpriority, setpriority flags
+c.PRIO = strflag {
+  PROCESS = 0,
+  PGRP = 1,
+  USER = 2,
+}
+
 return c
 

@@ -1583,7 +1583,7 @@ test_processes = {
         S._exit(0)
       end
     else
-      local w = assert(S.waitid("pid", pid, "exited"))
+      local w = assert(S.wait())
       assert(pp1:write("a"))
       local ok = pp2:read(nil, 1)
       assert_equal(ok, "y")

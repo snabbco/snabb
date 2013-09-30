@@ -84,15 +84,6 @@ end
 function S.unshare(flags) return retbool(C.unshare(c.CLONE[flags])) end
 function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), c.CLONE[nstype])) end
 
-function S.fork() return retnum(C.fork()) end
-function S.execve(filename, argv, envp)
-  local cargv = t.string_array(#argv + 1, argv or {})
-  cargv[#argv] = nil -- LuaJIT does not zero rest of a VLA
-  local cenvp = t.string_array(#envp + 1, envp or {})
-  cenvp[#envp] = nil
-  return retbool(C.execve(filename, cargv, cenvp))
-end
-
 -- note that this is not strictly the syscall that has some other arguments, but has same functionality
 function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 

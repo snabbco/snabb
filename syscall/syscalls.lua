@@ -471,6 +471,15 @@ function S.getrusage(who, ru)
   return ru
 end
 
+function S.fork() return retnum(C.fork()) end
+function S.execve(filename, argv, envp)
+  local cargv = t.string_array(#argv + 1, argv or {})
+  cargv[#argv] = nil -- LuaJIT does not zero rest of a VLA
+  local cenvp = t.string_array(#envp + 1, envp or {})
+  cenvp[#envp] = nil
+  return retbool(C.execve(filename, cargv, cenvp))
+end
+
 -- man page says obsolete for Linux, but implemented and useful for compatibility
 function S.wait4(pid, options, ru, status) -- note order of arguments changed as rarely supply status (as waitpid)
   if ru == false then ru = nil else ru = ru or t.rusage() end -- false means no allocation

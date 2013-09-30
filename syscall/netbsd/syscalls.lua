@@ -198,9 +198,9 @@ end
 function S.issetugid() return C.issetugid() end
 
 function S.getpriority(which, who)
-  ffi.errno = 0
+  ffi.errno(0)
   local ret = C.getpriority(c.PRIO[which], who or 0)
-  if ret == -1 and ffi.errno ~= 0 then return nil, t.error() end
+  if ret == -1 and ffi.errno() ~= 0 then return nil, t.error() end
   return ret
 end
 
