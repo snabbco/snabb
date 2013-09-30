@@ -1,6 +1,12 @@
-System call interface for LuaJIT
+The ABI description files (ffifunctions, ffitypes, constants) do not consist of
+copyrightable material and should be considered public domain.
 
-Copyright (C) 2011i-2013 Justin Cormack. All rights reserved.
+Files under the include directory include their own copyright information.
+
+
+ljsyscall: System call interface for LuaJIT
+
+Copyright (C) 2011-2013 Justin Cormack. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

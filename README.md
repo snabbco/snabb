@@ -62,7 +62,9 @@ netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more Ne
 
 ## Examples and documentation
 
-Apart from the tests, there are now some examples at in the examples directory; more to come. There will be documentation before the 1.0 release, trying to work out the best way to incorporate it.
+Apart from the tests, there are now some examples at in the examples directory; more to come.
+
+There will be proper documentation before the 1.0 release, apologies for it not being available sooner. I understand how important it is...
 
 ## Testing
 
@@ -76,12 +78,11 @@ The test script is a copy of [luaunit](https://github.com/rjpcomputing/luaunit).
 
 I have added initial coverage tests (now need fixing), and a C test to check constants and structures. The C test is useful for picking up errors but needs a comprehensive set of headers which eg is not available on most ARM machines so it can be difficult to run. I am putting together a set of hardware to run comprehensive tests on to make this less of an issue.
 
-There is now [Travis CI](https://travis-ci.org/) support, although this will only test on one architecture (x86, glibc) at present (looks like OSX support may come soon). You can [see the test results here](https://travis-ci.org/justincormack/ljsyscall). If you fork the code you should be able to run these tests by setting up your own Travis account, and they will also be run for pull requests.
+There is now [Travis CI](https://travis-ci.org/) support, although this will only test on one architecture (x64, glibc) at present. You can [see the test results here](https://travis-ci.org/justincormack/ljsyscall). If you fork the code you should be able to run these tests by setting up your own Travis account, and they will also be run for pull requests.
 
-I have used the LuaJIT [reflect library](http://www.corsix.org/lua/reflect/api.html) [which you can download here](http://www.corsix.org/lua/reflect/reflect.lua) for checking struct offsets.
+I have used the LuaJIT [reflect library](http://www.corsix.org/lua/reflect/api.html) for checking struct offsets.
 
-Adding buildbot tests for a wider variety of architectures, as Travis is limited to Linux/Ubuntu. The plan is to build on Linux ARM (glibc and Musl), Linux x64 and x86 (glibc and Musl) and NetBSD (x86, ARM). The [buildbot dashboard is now up](http://build.myriabit.eu:8010/). Currently running: Linux glibc x64, Linux glibc ARM, ctest Linux x64, ctest Linux x86, ctest Linux arm, rump test Linux x64, rump test Linux arm, NetBSD x86, ctest NetBSD x86. 
-
+Adding buildbot tests for a wider variety of architectures, as Travis is limited to Linux/Ubuntu. Currently building on Linux ARM, PowerPC, x64 and x86 and NetBSD x86 and x64, more targets to come soon. The [buildbot dashboard is now up](http://build.myriabit.eu:8010/).
 
 ## What is implemented?
 
@@ -89,17 +90,19 @@ This project is in beta! Much stuff is still missing, this is a work in progress
 
 As well as syscalls, there are interfaces to features such as proc, termios and netlink. These are still work in progress, and are being split into separate modules.
 
-Work on the netlink API is progressing. You can now do `print(S.get_interfaces()` to get something much like ifconfig returns, and all the raw data is there as Lua tables. You can then modify these, and add IP addresses, similarly for routes. There is also a raw netlink interface, and you can create new interfaces. There is a lot more functionality that netlink needs to provide, but this is now mostly a matter of configuration. The API needs more work still. Netlink documentation is pretty bad. Useful resources: [blog post](http://maz-programmersdiary.blogspot.co.uk/2011/09/netlink-sockets.html)
+Work on the Linux netlink API is progressing. You can now do `print(S.get_interfaces()` to get something much like ifconfig returns, and all the raw data is there as Lua tables. You can then modify these, and add IP addresses, similarly for routes. There is also a raw netlink interface, and you can create new interfaces. There is a lot more functionality that netlink needs to provide, but this is now mostly a matter of configuration. The API needs more work still. Netlink documentation is pretty bad. Useful resources: [blog post](http://maz-programmersdiary.blogspot.co.uk/2011/09/netlink-sockets.html)
 
-There is also a lot of the `ioctl`, `getsockopt` and `fcntl` interfaces to implement, which are very miscellaneous. Mostly you just need some constants and typecasting, but helper functions are probably useful.
+There is also a lot of the `ioctl`, `getsockopt` and `fcntl` interfaces to implement, which are very miscellaneous. Mostly you just need some constants and typecasting, but helper functions are probably useful. These are being improved so they understand the underlying types and functionality, making them less error prone.
 
 The aim is to provide nice to use, Lua friendly interfaces where possible, but more work needs to be done, as have really started with the raw interfaces, but adding functionality through metatypes. Where possible the aim is to provide cross platform interfaces for higher level functionality that are as close as possible at least in a duck-typing sort of way.
 
 ## Note on libc
 
-Lots of system calls have glibc wrappers, some of these are trivial some less so, and some are broken. In particular some of them expose different ABIs, so we try to avoid these, just using kernel ABIs as these have long term support and we are not trying to be compatible as we are using a different language. `strace` is your friend, although strace is buggy in the nasty edge cases (at some point ljsyscall will implement ptrace so it can debug itself).
+Under Linux, lots of system calls have glibc wrappers, some of these are trivial some less so, and some are broken. In particular some of them expose different ABIs, so we try to avoid these, just using kernel ABIs as these have long term support and we are not trying to be compatible as we are using a different language. `strace` is your friend, although strace is buggy in the nasty edge cases (at some point ljsyscall will implement ptrace so it can debug itself). Therefore under Linux the project is gradually moving to calling system calls directly, bypassing the libc, just keeping directly to the kernel ABI.
 
-As well as eglibc and glibc, everything now runs on [Musl libc](http://www.etalabs.net/musl/). I use [sabotage](https://github.com/rofl0r/sabotage) as a build environment, which now includes luajit, although you may need to update to git head. Musl is much smaller than libc (700k vs 3M), while still implementing everything we need in easy to understand code. It is also MIT licensed, which may be useful as it matches the other licenses for LuaJIT and ljsyscall. Occasionally I find small bugs and missing features which I feed back to the developers.
+As well as eglibc and glibc, everything now runs on [Musl libc](http://www.etalabs.net/musl/). I use [sabotage](https://github.com/rofl0r/sabotage) as a build environment, which now includes luajit, although you may need to update to git head. Musl is much smaller than libc (700k vs 3M), while still implementing everything we need in easy to understand code. It is also MIT licensed, which may be useful as it matches the other licenses for LuaJIT and ljsyscall. Occasionally I find small bugs and missing features which I feed back to the developers. The Android libc, bionic, is also supported now, mainly by bypassing it and calling the system calls directly.
+
+Under NetBSD it is much simpler, the only thing we need to be careful of is versioned systemm calls in libc, where we directly call a specific version as the plain name will always refer to the old version for compatibility.
 
 ### API
 
@@ -111,6 +114,8 @@ String conversions are not done automatically, you get a buffer back, you have t
 
 Many functions that return structs return metatypes exposing additional methods, so you get the raw values eg `st_size` and a Lua number as `size`, and possibly some extra helpful methods. As these are (ffi) metamethods they have no overhead, so more can be added to make the interfaces easier to use.
 
+Where there are variable length arrays, these are bundled together into a structure that has an array and a count, so you do not need to keep passing around the size. These provide iterators, which helps hide the fact that they are 0-based.
+
 Constants should all be available, eg `c.SEEK.SET` etc, note they are namespaced into Lua tables rather than underscore seperated like in C. The constant tables will also let you combine flags where appropriate and you can use lower case, so `c.O["rdonly, create"]` is the same as the bitwise or of `c.O.RDONLY` and `c.O.CREAT`. When you call a function, you can just pass the string, as `fd = S.open("file", "rdonly, creat")` which makes things much more concise.
 
 You do not generally need to use the numbered versions of functions, eg dup can do dup2 or dup3 by adding more arguments (not fully consistent yet).
@@ -121,7 +126,7 @@ The test cases are good examples until there is better documentation!
 
 A very few functions have arguments in a different order to make optional ones easier. This is a bit confusing sometimes, so check the examples or source code.
 
-It would be nice to be API compatible with other projects, especially Luaposix, luasocket, nixio. Unfortunately none of these seem to have good test suites, and there interfaces are problematic for some functions, so this has been put on hold.
+It would be nice to be API compatible with other projects, especially Luaposix, luasocket, nixio. Unfortunately none of these seem to have good test suites, and there interfaces are problematic for some functions, so this has been put on hold, although basic luasocket support is planned fairly soon.
 
 ### Performance
 
@@ -132,8 +137,6 @@ There is an example epoll script that you can test with Apachebench in the examp
 ### Porting
 
 If you wish to port to an unsupported platform, please get in touch for help. All contributions welcomed.
-
-Porting to a different libc should be relatively simple, it is mainly a matter of dealing with anything that is missing (eg for bionic on Android, which partially works).
 
 Porting to different Linux processor architectures is a matter of filling in the constants and types that differ. The `ctest` tests will flag issues with these, although many platforms are also missing headers which makes it more complex. If you can provide qemu target information that would be helpful as the platform can be added to the test suite.
 
@@ -147,6 +150,7 @@ There will no doubt be bugs and missing features, please report them if you find
 
 ### License
 
-All the ljsyscall code is under the MIT license, see LICENSE file. Files in the include directory (luaunit, reflect, strict) may be differently licensed; these are only required for running the tests.
+All the ljsyscall code is under the MIT license, see LICENSE file for further details.
+
 
 
