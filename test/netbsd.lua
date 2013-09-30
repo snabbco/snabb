@@ -265,6 +265,12 @@ test.kqueue = {
   end,
 }
 
+test.misc_bsd = {
+  test_issetugid = function()
+    assert_equal(S.issetugid(), 0) -- assume luajit not suid
+  end,
+}
+
 --[[ -- need to do in a thread as cannot exit
 test.misc_bsd_root = {
   test_fchroot = function()

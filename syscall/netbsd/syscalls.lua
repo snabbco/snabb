@@ -195,6 +195,8 @@ function S.pollts(fds, timeout, set)
   return retnum(C.pollts(fds.pfd, #fds, timeout, set))
 end
 
+function S.issetugid() return C.issetugid() end
+
 return S
 
 end
