@@ -648,11 +648,11 @@ end
 
 mt.msghdr = {
   __index = {
-    cmsg_firsthdr = cmsg_firsthdr ;
-    cmsg_nxthdr = cmsg_nxthdr ;
-    cmsgs = cmsg_headers ;
+    cmsg_firsthdr = cmsg_firsthdr,
+    cmsg_nxthdr = cmsg_nxthdr,
+    cmsgs = cmsg_headers,
   };
-  __len = lenfn;
+  __len = lenfn,
 }
 addtype("msghdr", "struct msghdr", mt.msghdr)
 
@@ -721,6 +721,28 @@ if t.dirent then
     end
   end
 end
+
+mt.rusage = {
+  index = {
+    utime    = function(ru) return ru.ru_utime end,
+    stime    = function(ru) return ru.ru_stime end,
+    maxrss   = function(ru) return tonumber(ru.ru_maxrss) end,
+    ixrss    = function(ru) return tonumber(ru.ru_ixrss) end,
+    idrss    = function(ru) return tonumber(ru.ru_idrss) end,
+    isrss    = function(ru) return tonumber(ru.ru_isrss) end,
+    minflt   = function(ru) return tonumber(ru.ru_minflt) end,
+    majflt   = function(ru) return tonumber(ru.ru_majflt) end,
+    nswap    = function(ru) return tonumber(ru.ru_nswap) end,
+    inblock  = function(ru) return tonumber(ru.ru_inblock) end,
+    oublock  = function(ru) return tonumber(ru.ru_oublock) end,
+    msgsnd   = function(ru) return tonumber(ru.ru_msgsnd) end,
+    msgrcv   = function(ru) return tonumber(ru.ru_msgrcv) end,
+    nsignals = function(ru) return tonumber(ru.ru_nsignals) end,
+    nvcsw    = function(ru) return tonumber(ru.ru_nvcsw) end,
+    nivcsw   = function(ru) return tonumber(ru.ru_nivcsw) end,
+  },
+  __len = lenfn,
+}
 
 return types
 
