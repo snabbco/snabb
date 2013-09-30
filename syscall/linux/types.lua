@@ -13,8 +13,8 @@ local function init(types, hh, abi, c)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local ptt, addtype, addtype_var, lenfn, lenmt, newfn, istype, reviter =
-  hh.ptt, hh.addtype, hh.addtype_var, hh.lenfn, hh.lenmt, hh.newfn, hh.istype, hh.reviter
+local ptt, addtype, addtype_var, lenmt, newfn, istype, reviter =
+  hh.ptt, hh.addtype, hh.addtype_var, hh.lenmt, hh.newfn, hh.istype, hh.reviter
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -303,7 +303,6 @@ addtype("stat", "struct stat", {
     islnk = function(st) return st.type == c.S_I.FLNK end,
     issock = function(st) return st.type == c.S_I.FSOCK end,
   },
-  __len = lenfn,
 })
 
 addtype("siginfo", "struct siginfo", {
@@ -417,7 +416,7 @@ addtype("itimerspec", "struct itimerspec", {
     v.it_interval = istype(t.timespec, v.it_interval) or t.timespec(v.it_interval)
     v.it_value = istype(t.timespec, v.it_value) or t.timespec(v.it_value)
     return ffi.new(tp, v)
-  end
+  end,
 })
 
 addtype("itimerval", "struct itimerval", {
@@ -430,7 +429,7 @@ addtype("itimerval", "struct itimerval", {
     v.it_interval = istype(t.timeval, v.it_interval) or t.timeval(v.it_interval)
     v.it_value = istype(t.timeval, v.it_value) or t.timeval(v.it_value)
     return ffi.new(tp, v)
-  end
+  end,
 })
 
 mt.signalfd = {
@@ -459,7 +458,6 @@ mt.signalfd = {
     if rname == k:upper() then return true end -- TODO use some metatable to hide this?
     if mt.signalfd.index[k] then return mt.signalfd.index[k](ss) end
   end,
-  __len = lenfn,
 }
 
 addtype("signalfd_siginfo", "struct signalfd_siginfo", mt.signalfd)

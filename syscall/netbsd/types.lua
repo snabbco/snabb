@@ -11,8 +11,8 @@ local function init(types, hh, abi, c)
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local ptt, addtype, addtype_var, lenfn, lenmt, newfn, istype, reviter =
-  hh.ptt, hh.addtype, hh.addtype_var, hh.lenfn, hh.lenmt, hh.newfn, hh.istype, hh.reviter
+local ptt, addtype, addtype_var, lenmt, newfn, istype, reviter =
+  hh.ptt, hh.addtype, hh.addtype_var, hh.lenmt, hh.newfn, hh.istype, hh.reviter
 
 local ffi = require "ffi"
 local bit = require "bit"
@@ -127,7 +127,6 @@ addtype("stat", "struct stat", {
     issock = function(st) return st.type == c.S_I.FSOCK end,
     iswht = function(st) return st.type == c.S_I.FWHT end,
   },
-  __len = lenfn,
 })
 
 addtype("siginfo", "siginfo_t", {
@@ -159,7 +158,6 @@ addtype("siginfo", "siginfo_t", {
     band    = function(s, v) s._info._reason._poll._band = v end,
     fd      = function(s, v) s._info._reason._poll._fd = v end,
   },
-  __len = lenfn,
 })
 
 mt.dirent = {

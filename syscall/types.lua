@@ -46,6 +46,8 @@ local mt = {} -- metatables
 --helpers
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
+local function lenfn(tp) return ffi.sizeof(tp) end
+
 local function ptt(tp)
   local ptp = ffi.typeof(tp .. " *")
   return function(x) return ffi.cast(ptp, x) end
@@ -60,6 +62,7 @@ local function addtype(name, tp, mt)
     if mt.newindex and not mt.__newindex then -- generic newindex method
       mt.__newindex = function(tp, k, v) if mt.newindex[k] then mt.newindex[k](tp, v) end end
     end
+    if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof
     t[name] = ffi.metatype(tp, mt)
   else
     t[name] = ffi.typeof(tp)
@@ -72,6 +75,7 @@ end
 -- for variables length types, ie those with arrays
 local function addtype_var(name, tp, mt)
   if rumpfn then tp = rumpfn(tp) end
+  if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof, gives instance size for var lngth
   t[name] = ffi.metatype(tp, mt)
   pt[name] = ptt(tp)
 end
@@ -81,8 +85,6 @@ local function addtype_fn(name, tp)
   t[name] = ffi.typeof(tp)
   s[name] = ffi.sizeof(t[name])
 end
-
-local function lenfn(tp) return ffi.sizeof(tp) end
 
 local lenmt = {__len = lenfn}
 
@@ -383,7 +385,6 @@ addtype("timespec", "struct timespec", {
     ts.time = v
     return ts
   end,
-  __len = lenfn,
 })
 
 -- array so cannot just add metamethods
@@ -497,7 +498,6 @@ addtype("sigset", "sigset_t", {
     end
     return f
   end,
-  __len = lenfn,
 })
 
 -- sigaction
@@ -533,7 +533,6 @@ mt.sigaction = {
     if tab and tab.sigaction then sa.sa_flags = bit.bor(sa.flags, c.SA.SIGINFO) end -- this flag must be set if sigaction set
     return sa
   end,
-  __len = lenfn,
 }
 
 addtype("sigaction", "struct sigaction", mt.sigaction)
@@ -603,7 +602,6 @@ mt.cmsghdr = {
     end
     return self
   end,
-  __len = lenfn,
 }
 addtype_var("cmsghdr", "struct cmsghdr", mt.cmsghdr)
 
@@ -652,7 +650,6 @@ mt.msghdr = {
     cmsg_nxthdr = cmsg_nxthdr,
     cmsgs = cmsg_headers,
   };
-  __len = lenfn,
 }
 addtype("msghdr", "struct msghdr", mt.msghdr)
 
@@ -685,7 +682,7 @@ mt.pollfds = {
 addtype_var("pollfds", "struct {int count; struct pollfd pfd[?];}", mt.pollfds)
 
 -- include OS specific types
-local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenfn = lenfn, lenmt = lenmt,
+local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenmt = lenmt,
             newfn = newfn, istype = istype, reviter = reviter}
 
 types = ostypes.init(types, hh, abi, c)
@@ -741,7 +738,6 @@ mt.rusage = {
     nvcsw    = function(ru) return tonumber(ru.ru_nvcsw) end,
     nivcsw   = function(ru) return tonumber(ru.ru_nivcsw) end,
   },
-  __len = lenfn,
 }
 
 addtype("rusage", "struct rusage", mt.rusage)
