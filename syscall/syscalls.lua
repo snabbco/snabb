@@ -480,6 +480,8 @@ function S.wait4(pid, options, ru, status) -- note order of arguments changed as
   return t.wait(ret, status[0], ru)
 end
 
+function S.setpriority(which, who, prio) return retbool(C.setpriority(c.PRIO[which], who or 0, prio)) end
+
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
 S.openpt = S.posix_openpt

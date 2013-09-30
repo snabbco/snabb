@@ -87,6 +87,8 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask);
 int nanosleep(const struct timespec *req, struct timespec *rem);
 int getrusage(int who, struct rusage *usage);
+int getpriority(int which, int who);
+int setpriority(int which, int who, int prio);
 
 uid_t getuid(void);
 uid_t geteuid(void);

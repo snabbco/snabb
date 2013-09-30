@@ -75,8 +75,6 @@ int clock_settime(clockid_t clk_id, const struct timespec *tp);
 int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *request, struct timespec *remain);
 unsigned int alarm(unsigned int seconds);
 int sysinfo(struct sysinfo *info);
-int getpriority(int which, int who);
-int setpriority(int which, int who, int prio);
 int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5);
 
 int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
