@@ -15,7 +15,7 @@ require("syscall." .. abi.os .. ".ffifunctions")
 
 local cdef = require "ffi".cdef
 
--- common functions for BSD, oSX and and Linux
+-- common functions for BSD, OSX and and Linux
 
 cdef[[
 int open(const char *pathname, int flags, mode_t mode);
@@ -132,8 +132,5 @@ int munlock(const void *addr, size_t len);
 int mlockall(int flags);
 int munlockall(void);
 
-/* TODO in NetBSD these are implemented with wait4, we may want to do this */
-pid_t wait(int *status);
-pid_t waitpid(pid_t pid, int *status, int options);
 ]]
 

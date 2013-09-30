@@ -81,6 +81,8 @@ S.futimes = S.futimes or S.futimens
 -- OSX does not support nanosecond times, emulate to less precision; note we auto convert timeval, timespec anyway
 S.futimens = S.futimens or S.futimes
 
+S.wait3 = function(options, rusage, status) return S.wait4(-1, options, rusage, status) end
+
 -- common libc function
 if S.nanosleep then
   function S.sleep(sec)

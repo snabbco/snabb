@@ -42,7 +42,7 @@ For the (optional) rump kernel functionality, the easiest way at present to inst
 netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD support, more rump kernel support, rump kernel hypercall API.
 
 ## Release notes
-0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements.
+0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls.
 
 0.8 rump kernel fixes, NetBSD 64 bit fixes, initial arp/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support, initial support of NetBSD network config.
 

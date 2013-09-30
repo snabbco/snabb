@@ -499,8 +499,8 @@ mt.wait = {
 }
 
 -- cannot really use metatype here, as status is just an int, and we need to pass pid
-function t.wait(pid, status)
-  return setmetatable({pid = pid, status = status}, mt.wait)
+function t.wait(pid, status, rusage)
+  return setmetatable({pid = pid, status = status, rusage = rusage}, mt.wait)
 end
 
 -- termios

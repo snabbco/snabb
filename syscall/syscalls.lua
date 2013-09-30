@@ -471,6 +471,15 @@ function S.getrusage(who, ru)
   return ru
 end
 
+-- man page says obsolete for Linux, but implemented and useful for compatibility
+function S.wait4(pid, options, ru, status) -- note order of arguments changed as rarely supply status (as waitpid)
+  if ru == false then ru = nil else ru = ru or t.rusage() end -- false means no allocation
+  status = status or t.int1()
+  local ret = C.wait4(pid, status, c.W[options], ru)
+  if ret == -1 then return nil, t.error() end
+  return t.wait(ret, status[0], ru)
+end
+
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
 S.openpt = S.posix_openpt

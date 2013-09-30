@@ -1470,6 +1470,133 @@ test_mmap = {
     assert(S.munlockall())
   end,
 }
+
+test_processes = {
+  test_nice = function()
+    local n = assert(S.getpriority("process"))
+    assert_equal(n, 0, "process should start at priority 0")
+    local nn = assert(S.nice(1))
+    assert_equal(nn, 1)
+    local nn = assert(S.setpriority("process", 0, 1)) -- sets to 1, which it already is
+  end,
+  test_fork_wait = function()
+    local pid0 = S.getpid()
+    assert(pid0 > 1, "expecting my pid to be larger than 1")
+    assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
+    local pid = assert(S.fork())
+    if pid == 0 then -- child
+      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
+      S.exit(23)
+    else -- parent
+      local w = assert(S.wait())
+      assert(w.pid == pid, "expect fork to return same pid as wait")
+      assert(w.WIFEXITED, "process should have exited normally")
+      assert(w.EXITSTATUS == 23, "exit should be 23")
+    end
+  end,
+  test_fork_waitpid = function()
+    local pid0 = S.getpid()
+    assert(pid0 > 1, "expecting my pid to be larger than 1")
+    assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
+    local pid = assert(S.fork())
+    if pid == 0 then -- child
+      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
+      S.exit(23)
+    else -- parent
+      local w = assert(S.waitpid(-1))
+      assert(w.pid == pid, "expect fork to return same pid as wait")
+      assert(w.WIFEXITED, "process should have exited normally")
+      assert(w.EXITSTATUS == 23, "exit should be 23")
+    end
+  end,
+  test_fork_wait4 = function()
+    local pid0 = S.getpid()
+    assert(pid0 > 1, "expecting my pid to be larger than 1")
+    assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
+    local pid = assert(S.fork())
+    if pid == 0 then -- child
+      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
+      S.exit(23)
+    else -- parent
+      local w = assert(S.wait4(-1))
+      assert(w.pid == pid, "expect fork to return same pid as wait")
+      assert(w.WIFEXITED, "process should have exited normally")
+      assert(w.EXITSTATUS == 23, "exit should be 23")
+      assert(w.rusage, "expect to get rusage data back")
+    end
+  end,
+  test_fork_wait3 = function()
+    local pid0 = S.getpid()
+    assert(pid0 > 1, "expecting my pid to be larger than 1")
+    assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
+    local pid = assert(S.fork())
+    if pid == 0 then -- child
+      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
+      S.exit(23)
+    else -- parent
+      local w = assert(S.wait3())
+      assert(w.pid == pid, "expect fork to return same pid as wait")
+      assert(w.WIFEXITED, "process should have exited normally")
+      assert(w.EXITSTATUS == 23, "exit should be 23")
+      assert(w.rusage, "expect to get rusage data back")
+    end
+  end,
+  test_execve = function()
+    local pid = assert(S.fork())
+    if (pid == 0) then -- child
+      local shell = "/bin/sh"
+      if not S.stat(shell) and S.stat("/system/bin/sh") then shell = "/system/bin/sh" end -- Android has no /bin/sh
+      local script = "#!" .. shell .. [[
+
+[ $1 = "test" ] || (echo "shell assert $1"; exit 1)
+[ $2 = "ing" ] || (echo "shell assert $2"; exit 1)
+[ $PATH = "/bin:/usr/bin" ] || (echo "shell assert $PATH"; exit 1)
+
+]]
+      fork_assert(util.writefile(efile, script, "RWXU"))
+      fork_assert(S.execve(efile, {efile, "test", "ing"}, {"PATH=/bin:/usr/bin"})) -- note first param of args overwritten
+      -- never reach here
+      os.exit()
+    else -- parent
+      local w = assert(S.waitpid(-1))
+      assert(w.pid == pid, "expect fork to return same pid as wait")
+      assert(w.WIFEXITED, "process should have exited normally")
+      assert(w.EXITSTATUS == 0, "exit should be 0")
+      assert(S.unlink(efile))
+    end
+  end,
+  test_setsid = function()
+    -- need to fork twice in case start as process leader
+    local pp1 = S.pipe()
+    local pp2 = S.pipe()
+    local pid = assert(S.fork())
+    if (pid == 0) then -- child
+      local pid = assert(S.fork())
+      if (pid == 0) then -- child
+        assert(pp1:read(nil, 1))
+        local ok, err = S.setsid()
+        ok = ok and ok == S.getpid() and ok == S.getsid()
+        if ok then pp2:write("y") else pp2:write("n") end
+        S._exit(0)
+      else
+        S._exit(0)
+      end
+    else
+      local w = assert(S.waitid("pid", pid, "exited"))
+      assert(pp1:write("a"))
+      local ok = pp2:read(nil, 1)
+      assert_equal(ok, "y")
+      pp1:close()
+      pp2:close()
+    end
+  end,
+  test_setpgid = function()
+    S.setpgid()
+    assert_equal(S.getpgid(), S.getpid())
+    assert_equal(S.getpgrp(), S.getpid())
+  end,
+}
+
 end
 
 -- currently disabled in xen as not much use, probably could add though

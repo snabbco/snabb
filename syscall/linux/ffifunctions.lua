@@ -65,6 +65,9 @@ int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struc
 int timerfd_gettime(int fd, struct itimerspec *curr_value);
 int signalfd(int fd, const sigset_t *mask, int flags);
 
+pid_t wait(int *status);
+pid_t waitpid(pid_t pid, int *status, int options);
+
 /* down to here have moved to shared calls */
 int clock_getres(clockid_t clk_id, struct timespec *res);
 int clock_gettime(clockid_t clk_id, struct timespec *tp);

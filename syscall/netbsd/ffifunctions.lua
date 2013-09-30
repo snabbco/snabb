@@ -32,6 +32,7 @@ int kqueue(void);
 int kqueue1(int flags);
 int pollts(struct pollfd * restrict fds, nfds_t nfds, const struct timespec * restrict ts, const sigset_t * restrict sigmask);
 int issetugid(void);
+pid_t wait4(pid_t wpid, int *status, int options, struct rusage *rusage);
 
 int __mount50(const char *type, const char *dir, int flags, void *data, size_t data_len);
 int __stat50(const char *path, struct stat *sb);
@@ -56,12 +57,4 @@ int __getcwd(char *buf, size_t size);
 
 int syscall(int number, ...);
 ]]
-
---[[ -- need more types defined
-pid_t wait4(pid_t wpid, int *status, int options, struct rusage *rusage);
-]]
-
--- setreuid, setregid are deprecated, implement by other means
-
--- setpgrp see man pages, may need these for BSD
 
