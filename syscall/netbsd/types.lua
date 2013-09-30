@@ -19,7 +19,7 @@ local bit = require "bit"
 
 local h = require "syscall.helpers"
 
-local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
+local ntohl, ntohl, ntohs, htons, octal = h.ntohl, h.ntohl, h.ntohs, h.htons, h.octal
 
 -- TODO duplicated
 local function getfd(fd)
@@ -332,15 +332,16 @@ addtype_var("kevents", "struct {int count; struct kevent kev[?];}", mt.kevents)
 
 -- TODO see Linux notes
 mt.wait = { -- TODO port to NetBSD
---[[
   __index = function(w, k)
-    local WTERMSIG = bit.band(w.status, 0x7f)
-    local EXITSTATUS = bit.rshift(bit.band(w.status, 0xff00), 8)
-    local WIFEXITED = (WTERMSIG == 0)
+    local _WSTATUS = bit.band(w.status, octal("0177"))
+    local _WSTOPPED = octal("0177")
+    local WTERMSIG = _WSTATUS
+    local EXITSTATUS = bit.band(bit.rshift(w.status, 8), 0xff)
+    local WIFEXITED = (_WSTATUS == 0)
     local tab = {
       WIFEXITED = WIFEXITED,
-      WIFSTOPPED = bit.band(w.status, 0xff) == 0x7f,
-      WIFSIGNALED = not WIFEXITED and bit.band(w.status, 0x7f) ~= 0x7f -- I think this is right????? TODO recheck, cleanup
+      WIFSTOPPED = bit.band(w.status, 0xff) == _WSTOPPED,
+      WIFSIGNALED = _WSTATUS ~= _WSTOPPED and _WSTATUS ~= 0
     }
     if tab.WIFEXITED then tab.EXITSTATUS = EXITSTATUS end
     if tab.WIFSTOPPED then tab.WSTOPSIG = EXITSTATUS end
@@ -349,7 +350,6 @@ mt.wait = { -- TODO port to NetBSD
     local uc = 'W' .. k:upper()
     if tab[uc] then return tab[uc] end
   end
-]]
 }
 
 function t.wait(pid, status, rusage)

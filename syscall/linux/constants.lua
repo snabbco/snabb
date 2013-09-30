@@ -3308,5 +3308,11 @@ c.RUSAGE = strflag {
   THREAD   =  1,
 }
 
+-- waitpid and wait4 pid
+c.WAIT = strflag {
+  ANY      = -1,
+  MYPGRP   = 0,
+}
+
 return c
 

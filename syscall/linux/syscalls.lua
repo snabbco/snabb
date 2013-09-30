@@ -103,7 +103,7 @@ function S.wait(status)
 end
 function S.waitpid(pid, options, status) -- note order of arguments changed as rarely supply status
   status = status or t.int1()
-  local ret = C.waitpid(pid, status, c.W[options])
+  local ret = C.waitpid(c.WAIT[pid], status, c.W[options])
   if ret == -1 then return nil, t.error() end
   return t.wait(ret, status[0])
 end

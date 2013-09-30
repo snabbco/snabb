@@ -1518,7 +1518,7 @@ test_processes = {
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
-      local w = assert(S.wait4(-1))
+      local w = assert(S.wait4("any"))
       assert(w.pid == pid, "expect fork to return same pid as wait")
       assert(w.WIFEXITED, "process should have exited normally")
       assert(w.EXITSTATUS == 23, "exit should be 23")
@@ -1559,7 +1559,7 @@ test_processes = {
       -- never reach here
       os.exit()
     else -- parent
-      local w = assert(S.waitpid(-1))
+      local w = assert(S.waitpid("any"))
       assert(w.pid == pid, "expect fork to return same pid as wait")
       assert(w.WIFEXITED, "process should have exited normally")
       assert(w.EXITSTATUS == 0, "exit should be 0")

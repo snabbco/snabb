@@ -484,7 +484,7 @@ end
 function S.wait4(pid, options, ru, status) -- note order of arguments changed as rarely supply status (as waitpid)
   if ru == false then ru = nil else ru = ru or t.rusage() end -- false means no allocation
   status = status or t.int1()
-  local ret = C.wait4(pid, status, c.W[options], ru)
+  local ret = C.wait4(c.WAIT[pid], status, c.W[options], ru)
   if ret == -1 then return nil, t.error() end
   return t.wait(ret, status[0], ru)
 end

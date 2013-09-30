@@ -982,5 +982,24 @@ c.PRIO = strflag {
   USER = 2,
 }
 
+c.W = multiflags {
+  NOHANG       = 0x00000001,
+  UNTRACED     = 0x00000002,
+  ALTSIG      = 0x00000004,
+  ALLSIG      = 0x00000008,
+  NOWAIT      = 0x00010000,
+  NOZOMBIE    = 0x00020000,
+  OPTSCHECKED = 0x00040000,
+}
+
+c.W.WCLONE = c.W.WALTSIG -- __WCLONE
+c.W.WALL   = c.W.WALLSIG -- __WALL
+
+-- waitpid and wait4 pid
+c.WAIT = strflag {
+  ANY      = -1,
+  MYPGRP   = 0,
+}
+
 return c
 

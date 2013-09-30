@@ -51,6 +51,9 @@ c.CHFLAGS.IMMUTABLE = nil -- alias
 c.CHFLAGS.APPEND = nil -- alias
 c.CHFLAGS.OPAQUE = nil -- alias
 
+c.W.WCLONE = nil -- underscore in name, changed
+c.W.WALL   = nil -- underscore in name, changed
+
 -- complex rename
 for k, v in pairs(c.FSYNC) do
   c.FSYNC['F' .. k .. 'SYNC'] = v
