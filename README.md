@@ -1,5 +1,7 @@
 # Unix system calls for LuaJIT
 
+[![Build Status](https://travis-ci.org/justincormack/ljsyscall.png)](https://travis-ci.org/justincormack/ljsyscall)
+
 What? An FFI implementation of the Linux and NetBSD kernel ABIs for LuaJIT. This means you will be able to program all the functionality the Linux kernel provides to userspace directly in Lua. You can view it as a high level language equivalent of the busybox project in a way, although the functionality it provides is somewhat different, and the interface very different.
 
 Why? First it provides a comprehensive set of system call APIs for programming sockets, files and so on, including the more obscure things (eg file change notifications). Second it provides higher level interfaces such as network interface configuration, so your application can control its entire runtime interface including IP addresses routing and so on. Third it provides tools for added security, such as support for Linux namespaces (containers), system call filtering (seccomp type 2), capabilities and so on, all with a script language interface that is much simpler to use than the C interface. As it is Lua based it can easily be embedded in another language; in the future ports to other scripting languages are planned. It also serves as a way of learning how the operating system interfaces work in a more forgiving environment than C.
@@ -65,8 +67,6 @@ netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more Ne
 Apart from the tests, there are now some examples at in the examples directory; more to come. There will be documentation before the 1.0 release, trying to work out the best way to incorporate it.
 
 ## Testing
-
-[![Build Status](https://travis-ci.org/justincormack/ljsyscall.png)](https://travis-ci.org/justincormack/ljsyscall)
 
 The test script is fairly comprehensive. Tested on ARM, amd64, x86, with various combinations of libc. I run long test runs as LuaJIT makes random choices in code generation so single runs do not necessarily show errors. Also tested with Valgrind to pick up memory errors, although there are some issues with some of the system calls, which are being gradually resolved (I use Valgrind SVN).
 
