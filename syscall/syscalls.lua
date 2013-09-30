@@ -296,11 +296,10 @@ local function fdisset(fds, set)
 end
 
 -- TODO convert to metatype. Problem is how to deal with nfds
-function S.select(sel) -- note same structure as returned
+function S.select(sel, timeout) -- note same structure as returned
   local r, w, e
   local nfds = 0
-  local timeout
-  if sel.timeout then timeout = mktype(t.timeval, sel.timeout) end
+  if timeout then timeout = mktype(t.timeval, timeout) end
   r, nfds = mkfdset(sel.readfds or {}, nfds or 0)
   w, nfds = mkfdset(sel.writefds or {}, nfds)
   e, nfds = mkfdset(sel.exceptfds or {}, nfds)
@@ -311,19 +310,18 @@ function S.select(sel) -- note same structure as returned
 end
 
 -- TODO note that actual syscall modifies timeout, which is non standard, like ppoll
-function S.pselect(sel) -- note same structure as returned
+function S.pselect(sel, timeout, set) -- note same structure as returned
   local r, w, e
   local nfds = 0
-  local timeout, set
-  if sel.timeout then timeout = mktype(t.timespec, sel.timeout) end
-  if sel.sigset then set = t.sigset(sel.sigset) end
+  if timeout then timeout = mktype(t.timespec, timeout) end
+  if set then set = mktype(t.sigset, set) end
   r, nfds = mkfdset(sel.readfds or {}, nfds or 0)
   w, nfds = mkfdset(sel.writefds or {}, nfds)
   e, nfds = mkfdset(sel.exceptfds or {}, nfds)
   local ret = C.pselect(nfds, r, w, e, timeout, set)
   if ret == -1 then return nil, t.error() end
   return {readfds = fdisset(sel.readfds or {}, r), writefds = fdisset(sel.writefds or {}, w),
-          exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret), sigset = set}
+          exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret)}
 end
 
 function S.getuid() return C.getuid() end
