@@ -18,9 +18,7 @@ There is the [video of my FOSDEM 2013 talk](http://www.myriabit.com/ljsyscall/) 
 
 For simple uses, you just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Keep the directory structure there is. You can safely remove files from architectures and operating systems you do not use.
 
-You can install using ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` or one of the other versions in that directory, which will pull the version from github and install in the right place.
-
-If you want to link into a C program (or something else interfacing to C, such as another scripting language), there are some example scripts. `examples/bytecode.sh` creates an `ar` file with all the bytecode in, and `examples/cbuild.sh` makes a hello world program in C with ljsyscall and luajit linked in. These are only intended as examples to be customised as appropriate, and they link in all files not just the required ones for your architecture.
+There is more information in the INSTALL file.
 
 ## Requirements
 
