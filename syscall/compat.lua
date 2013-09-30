@@ -83,6 +83,14 @@ S.futimens = S.futimens or S.futimes
 
 S.wait3 = function(options, rusage, status) return S.wait4(-1, options, rusage, status) end
 
+if S.wait4 and not S.waitpid then
+  S.waitpid = function(pid, options, status) return S.wait4(pid, options, false, status) end
+end
+
+if S.wait4 and not S.wait then
+  S.wait = function(status) return S.wait4(-1, 0, false, status) end
+end
+
 -- common libc function
 if S.nanosleep then
   function S.sleep(sec)
