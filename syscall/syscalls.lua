@@ -464,6 +464,13 @@ function S.gettimeofday(tv)
   return tv
 end
 
+function S.getrusage(who, ru)
+  ru = ru or t.rusage()
+  local ret = C.getrusage(c.RUSAGE[who], ru)
+  if ret == -1 then return nil, t.error() end
+  return ru
+end
+
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
 S.openpt = S.posix_openpt

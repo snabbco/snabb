@@ -1368,7 +1368,7 @@ test_sendfd = {
 }
 end
 
-if not (abi.rump or abi.xen) then -- rump has no processes, memory allocation, mmap and proc not applicable
+if not (abi.rump or abi.xen) then -- rump has no processes, memory allocation, process accounting, mmap and proc not applicable
 
 test_timers_signals = {
   test_nanosleep = function()
@@ -1387,6 +1387,13 @@ test_util_misc = {
     local ss = assert(util.mapfile(tmpfile))
     assert_equal(ss, teststring, "mapfile should get back what writefile wrote")
     assert(S.unlink(tmpfile))
+  end,
+}
+
+test_rusage = {
+  test_rusage = function()
+    local ru = assert(S.getrusage("self"))
+    assert(ru.utime.time > 0, "should have used some cpu time")
   end,
 }
 

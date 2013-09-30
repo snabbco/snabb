@@ -744,6 +744,8 @@ mt.rusage = {
   __len = lenfn,
 }
 
+addtype("rusage", "struct rusage", mt.rusage)
+
 return types
 
 end
