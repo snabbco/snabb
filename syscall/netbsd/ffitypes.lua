@@ -336,6 +336,24 @@ struct _netbsd_statvfs {
   char    f_mntonname[1024];
   char    f_mntfromname[1024];
 };
+struct _netbsd_rusage {
+  struct _netbsd_timeval ru_utime;
+  struct _netbsd_timeval ru_stime;
+  long    ru_maxrss;
+  long    ru_ixrss;
+  long    ru_idrss;
+  long    ru_isrss;
+  long    ru_minflt;
+  long    ru_majflt;
+  long    ru_nswap;
+  long    ru_inblock;
+  long    ru_oublock;
+  long    ru_msgsnd;
+  long    ru_msgrcv;
+  long    ru_nsignals;
+  long    ru_nvcsw;
+  long    ru_nivcsw;
+};
 ]]
 
 -- endian dependent TODO not really, define in independent way
