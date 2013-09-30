@@ -100,6 +100,9 @@ c.IP.UNICAST_IF = nil
 -- not on travis CI box
 c.ETH_P["802_EX1"] = nil
 
+-- not included in user headers
+c.RUSAGE.BOTH = nil
+
 -- fix these, renamed tables, signals etc
 c.SIGTRAP = nil
 c.SIGPM = nil

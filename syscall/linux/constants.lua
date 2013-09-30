@@ -3301,5 +3301,12 @@ c.PC = strflag {
   ["2_SYMLINKS"]    = 20,
 }
 
+c.RUSAGE = strflag {
+  SELF     =  0,
+  CHILDREN = -1,
+  BOTH     = -2,
+  THREAD   =  1,
+}
+
 return c
 

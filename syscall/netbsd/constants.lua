@@ -970,5 +970,10 @@ c.NOTE = multiflags {
   CHILD     = 0x00000004,
 }
 
+c.RUSAGE = strflag {
+  SELF     =  0,
+  CHILDREN = -1,
+}
+
 return c
 
