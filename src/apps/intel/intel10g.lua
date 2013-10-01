@@ -286,6 +286,8 @@ TDBAH     0x06004 +0x40*0..127 RW Transmit Descriptor Base Address High
 TDH       0x06010 +0x40*0..127 RW Transmit Descriptor Head
 TDT       0x06018 +0x40*0..127 RW Transmit Descriptor Tail
 TDLEN     0x06008 +0x40*0..127 RW Transmit Descriptor Length
+TDWBAL    0x06038 +0x40*0..127 RW Tx Desc Completion Write Back Address Low
+TDWBAH    0x0603C +0x40*0..127 RW Tx Desc Completion Write Back Address High
 TXDCTL    0x06028 +0x40*0..127 RW Transmit Descriptor Control
 ]]
 
