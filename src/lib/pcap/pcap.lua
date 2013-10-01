@@ -13,7 +13,7 @@ struct pcap_file {
     uint32_t sigfigs;        /* accuracy of timestamps */
     uint32_t snaplen;        /* max length of captured packets, in octets */
     uint32_t network;        /* data link type */
-}
+};
 
 struct pcap_record {
     /* record header */
@@ -21,14 +21,14 @@ struct pcap_record {
     uint32_t ts_usec;        /* timestamp microseconds */
     uint32_t incl_len;       /* number of octets of packet saved in file */
     uint32_t orig_len;       /* actual length of packet */
-}
+};
 
 struct pcap_record_extra {
    /* Extra metadata that we append to the pcap record, after the payload. */
    uint32_t port_id; /* port the packet is captured on */
    uint32_t flags;   /* bit 0 set means input, bit 0 clear means output */
    uint64_t reserved0, reserved1, reserved2, reserved3;
-}
+};
 ]]
 
 function write_file_header(file)
