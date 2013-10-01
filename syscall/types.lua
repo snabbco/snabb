@@ -149,27 +149,10 @@ local function singleton(tp)
   return ffi.typeof("$[1]", tp)
 end
 
-t.char1 = singleton(t.char)
-t.uchar1 = singleton(t.uchar)
-t.int1 = singleton(t.int)
-t.uint1 = singleton(t.uint)
-t.int16_1 = singleton(t.int16)
-t.uint16_1 = singleton(t.uint16)
-t.int32_1 = singleton(t.int32)
-t.uint32_1 = singleton(t.uint32)
-t.int64_1 = singleton(t.int64)
-t.uint64_1 = singleton(t.uint64)
 t.socklen1 = singleton(t.socklen)
 t.off1 = singleton(t.off)
 t.uid1 = singleton(t.uid)
 t.gid1 = singleton(t.gid)
-
-t.char2 = ffi.typeof("char[2]")
-t.int2 = ffi.typeof("int[2]")
-t.uint2 = ffi.typeof("unsigned int[2]")
-
--- still need sizes for these, for ioctls
-s.uint2 = ffi.sizeof(t.uint2)
 
 -- 64 to 32 bit conversions via unions TODO use meth not object?
 if abi.le then

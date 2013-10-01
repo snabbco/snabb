@@ -22,6 +22,8 @@ local function ptt(tp)
   return function(x) return ffi.cast(ptp, x) end
 end
 
+local function lenfn(tp) return ffi.sizeof(tp) end
+
 -- TODO share with main definition
 local function addtype(name, tp, mt)
   if mt then
@@ -31,6 +33,7 @@ local function addtype(name, tp, mt)
     if mt.newindex and not mt.__newindex then -- generic newindex method
       mt.__newindex = function(tp, k, v) if mt.newindex[k] then mt.newindex[k](tp, v) end end
     end
+    if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof
     t[name] = ffi.metatype(tp, mt)
   else
     t[name] = ffi.typeof(tp)
@@ -45,7 +48,17 @@ local function addtype_var(name, tp, mt)
   pt[name] = ptt(tp)
 end
 
-local function lenfn(tp) return ffi.sizeof(tp) end
+local function addtype1(name, tp)
+  t[name] = ffi.typeof(tp .. "[1]")
+  ctypes[tp] = t[name]
+  s[name] = ffi.sizeof(t[name])
+end
+
+local function addtype2(name, tp)
+  t[name] = ffi.typeof(tp .. "[2]")
+  ctypes[tp] = t[name]
+  s[name] = ffi.sizeof(t[name])
+end
 
 local addtypes = {
   char = "char",
@@ -65,6 +78,31 @@ local addtypes = {
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
+
+local addtypes1 = {
+  char1 = "char",
+  uchar1 = "unsigned char",
+  int1 = "int",
+  uint1 = "unsigned int",
+  int16_1 = "int16_t",
+  uint16_1 = "uint16_t",
+  int32_1 = "int32_t",
+  uint32_1 = "uint32_t",
+  int64_1 = "int64_t",
+  uint64_1 = "uint64_t",
+  long1 = "long",
+  ulong1 = "unsigned long",
+}
+
+for k, v in pairs(addtypes1) do addtype1(k, v) end
+
+local addtypes2 = {
+  char2 = "char",
+  int2 = "int",
+  uint2 = "unsigned int",
+}
+
+for k, v in pairs(addtypes2) do addtype2(k, v) end
 
 t.ints = ffi.typeof("int[?]")
 t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?

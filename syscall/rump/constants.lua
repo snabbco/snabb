@@ -43,7 +43,7 @@ c.RF = strflag {
 }
 
 c.CN_FREECRED = 0x02
-c.ETFS_SIZE_ENDOFF =0xffffffffffffffffULL
+c.ETFS_SIZE_ENDOFF = h.uint64_max
 
 return c
 
