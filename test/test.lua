@@ -17,12 +17,12 @@ end
 
 local helpers = require "syscall.helpers"
 
-local S
+local S, abi
 
 if arg[1] == "rump" or arg[1] == "rumplinux" then
-  local abi
+  abi = require "syscall.abi"
   -- it is too late to set this now, needs to be set before executions starts
-  if jit.os == "Linux" then
+  if abi.os == "linux" then
     assert(os.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
   end
   if arg[1] == "rumplinux" then
