@@ -9,6 +9,8 @@ pcall, type, table, string, math
 
 local function init(S)
 
+local bit = require "bit"
+
 local abi, types, c = S.abi, S.types, S.c
 local t, pt, s = types.t, types.pt, types.s
 
