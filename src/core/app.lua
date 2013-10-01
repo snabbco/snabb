@@ -51,6 +51,7 @@ function breathe ()
    -- Inhale
    for _, app in ipairs(appsi) do
       if app.pull then app:pull() end
+      app.runnable = true
    end
    -- Exhale
    repeat
@@ -80,6 +81,9 @@ function report ()
    print("link report")
    for name, l in pairs(links) do
       print(name, lib.comma_value(tostring(tonumber(l.ring.stats.tx))) .. " packet(s) transmitted")
+   end
+   for name, app in pairs(apps) do
+      if app.report then app:report() end
    end
 end
 
