@@ -112,7 +112,7 @@ end
 
 -- Print a pretty-printed register dump for a table of register objects.
 function dump (tab, iscounters)
-   print "Register dump:"
+--   print "Register dump:"
    local strings = {}
    for _,reg in pairs(tab) do
       if iscounters == nil or reg() > 0 then
