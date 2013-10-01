@@ -377,8 +377,10 @@ local function ptvoid(x)
   return ffi.cast(voidp, x)
 end
 
+local err64 = ffi.cast("int64_t", -1)
+
 local errpointer
-if abi.abi64 then errpointer = ptvoid(0xffffffffffffffffULL) else errpointer = ptvoid(0xffffffff) end
+if abi.abi64 then errpointer = ptvoid(err64) else errpointer = ptvoid(0xffffffff) end
 
 function C.mmap(...)
   ffi.errno(78) -- NetBSD ENOSYS
