@@ -1,6 +1,6 @@
 module(...,package.seeall)
 
-local debug = false
+local debug = true
 
 local ffi = require("ffi")
 local C = ffi.C
@@ -25,6 +25,7 @@ function receive (r)
 end
 
 function transmit (r, p)
+   assert(p)
    if debug and full(r) then
       r.stats.drop = r.stats.drop + 1
    else
