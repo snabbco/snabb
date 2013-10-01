@@ -50,13 +50,11 @@ end
 
 local function addtype1(name, tp)
   t[name] = ffi.typeof(tp .. "[1]")
-  ctypes[tp] = t[name]
   s[name] = ffi.sizeof(t[name])
 end
 
 local function addtype2(name, tp)
   t[name] = ffi.typeof(tp .. "[2]")
-  ctypes[tp] = t[name]
   s[name] = ffi.sizeof(t[name])
 end
 
