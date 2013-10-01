@@ -366,8 +366,13 @@ addtype("timespec", "struct timespec", {
   end,
 })
 
+local function addraw2(name, tp)
+  if rumpfn then tp = rumpfn(tp) end
+  t[name] = ffi.typeof(tp .. "[2]")
+end
+
 -- array so cannot just add metamethods
-t.timeval2_raw = ffi.typeof("$[2]", t.timeval) -- use $ as netbsd rename may have happened
+addraw2("timeval2_raw", "struct timeval")
 t.timeval2 = function(tv1, tv2)
   if ffi.istype(t.timeval2_raw, tv1) then return tv1 end
   if type(tv1) == "table" then tv1, tv2 = tv1[1], tv1[2] end
@@ -378,7 +383,7 @@ t.timeval2 = function(tv1, tv2)
 end
 
 -- array so cannot just add metamethods
-t.timespec2_raw = ffi.typeof("$[2]", t.timespec) -- use $ as netbsd rename may have happened
+addraw2("timespec2_raw", "struct timespec")
 t.timespec2 = function(ts1, ts2)
   if ffi.istype(t.timespec2_raw, ts1) then return ts1 end
   if type(ts1) == "table" then ts1, ts2 = ts1[1], ts1[2] end
