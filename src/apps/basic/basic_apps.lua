@@ -3,6 +3,7 @@ module(...,package.seeall)
 local app = require("core.app")
 local buffer = require("core.buffer")
 local packet = require("core.packet")
+local link_ring = require("core.link_ring")
 
 --- # `Source` app: generate synthetic packets
 
@@ -72,6 +73,60 @@ function Sink:push ()
 	 local p = app.receive(i)
 	 assert(p.refcount == 1)
 	 packet.deref(p)
+      end
+   end
+end
+
+--- ### `Tee` app: Send inputs to all outputs
+
+Tee = {}
+
+function Tee:new ()
+   return setmetatable({}, {__index=Tee})
+end
+
+function Tee:push ()
+   noutputs = #self.outputi
+   if noutputs > 0 then
+      local maxoutput = link_ring.max
+      for _, o in ipairs(self.outputi) do
+         maxoutput = math.min(maxoutput, app.nwritable(o))
+      end
+      for _, i in ipairs(self.inputi) do
+         for _ = 1, math.min(app.nreadable(i), maxoutput) do
+            local p = app.receive(i)
+            packet.ref(p, noutputs - 1)
+            maxoutput = maxoutput - 1
+            for _, o in ipairs(self.outputi) do
+               app.transmit(o, p)
+            end
+         end
+      end
+   end
+end
+
+--- ### `Repeater` app: Send all received packets in a loop
+
+Repeater = {}
+
+function Repeater:new ()
+   return setmetatable({index = 1, packets = {}},
+                       {__index=Repeater})
+end
+
+function Repeater:push ()
+   local i, o = self.input.input, self.output.output
+   for _ = 1, app.nreadable(i) do
+      local p = app.receive(i)
+      packet.ref(p)
+      table.insert(self.packets, p)
+   end
+   local npackets = #self.packets
+   if npackets > 0 then
+      for i = 1, app.nwritable(o) do
+         assert(self.packets[self.index])
+         app.transmit(o, self.packets[self.index])
+         self.index = (self.index % npackets) + 1
       end
    end
 end
