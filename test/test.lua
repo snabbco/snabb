@@ -144,6 +144,7 @@ local clean = function()
 end
 
 -- type tests use reflection TODO move to seperate test file
+if pcall(require, "jit") then
 local jit = require "jit"
 
 local reflect = require "include.ffi-reflect.reflect"
@@ -187,6 +188,7 @@ test_types = {
     end
   end,
 }
+end
 
 test_basic = {
   test_b64 = function()
