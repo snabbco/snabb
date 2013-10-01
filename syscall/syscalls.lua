@@ -21,9 +21,9 @@ local S = {}
 
 -- helpers
 
+local err64 = t.int64(-1)
 local errpointer
-if abi.abi64 then errpointer = pt.void(0xffffffffffffffffULL) else errpointer = pt.void(0xffffffff) end
-local err64 = 0xffffffffffffffffULL
+if abi.abi64 then errpointer = pt.void(err64) else errpointer = pt.void(0xffffffff) end
 
 local function getfd(fd)
   if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
