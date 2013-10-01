@@ -14,16 +14,14 @@ local ffi = require "ffi"
 local bit = require "bit"
 
 local h = require "syscall.helpers"
+local err64 = h.err64
+local errpointer = h.errpointer
 
 local t, pt, s = types.t, types.pt, types.s
 
 local S = {}
 
 -- helpers
-
-local err64 = t.int64(-1)
-local errpointer
-if abi.abi64 then errpointer = pt.void(err64) else errpointer = pt.void(0xffffffff) end
 
 local function getfd(fd)
   if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end

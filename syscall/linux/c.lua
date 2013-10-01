@@ -16,9 +16,9 @@ local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
 
-local err64 = t.int64(-1)
-local errpointer
-if abi.abi64 then errpointer = pt.void(err64) else errpointer = pt.void(0xffffffff) end
+local h = require "syscall.helpers"
+local err64 = h.err64
+local errpointer = h.errpointer
 
 -- TODO clean up when 64 bit bitops available, remove from types
 local function u6432(x) return t.u6432(x):to32() end

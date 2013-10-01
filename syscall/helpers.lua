@@ -13,6 +13,17 @@ local ffi = require "ffi"
 
 local h = {}
 
+local voidp = ffi.typeof("void *")
+
+local function ptvoid(x)
+  return ffi.cast(voidp, x)
+end
+
+-- constants
+h.uint64_max = ffi.cast("uint64_t", -1)
+h.err64 = h.uint64_max
+if abi.abi64 then h.errpointer = ptvoid(h.err64) else h.errpointer = ptvoid(0xffffffff) end
+
 -- endian conversion
 -- TODO add tests eg for signs.
 if abi.be then -- nothing to do

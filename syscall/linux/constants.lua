@@ -734,7 +734,7 @@ c.RLIMIT = strflag {
 c.RLIMIT.OFILE = c.RLIMIT.NOFILE
 
 c.RLIM = strflag {
-  INFINITY = 0xffffffffffffffffULL,
+  INFINITY = h.uint64_max,
 }
 
 -- timerfd

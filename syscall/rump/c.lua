@@ -9,6 +9,10 @@ pcall, type, table, string, math
 
 local function init(abi)
 
+local h = require "syscall.helpers"
+local err64 = h.err64
+local errpointer = h.errpointer
+
 local ffi = require "ffi"
 
 local cdef
@@ -370,17 +374,6 @@ local C = {
   write = ffi.C.rump___sysimpl_write,
   writev = ffi.C.rump___sysimpl_writev,
 }
-
-local voidp = ffi.typeof("void *")
-
-local function ptvoid(x)
-  return ffi.cast(voidp, x)
-end
-
-local err64 = ffi.cast("int64_t", -1)
-
-local errpointer
-if abi.abi64 then errpointer = ptvoid(err64) else errpointer = ptvoid(0xffffffff) end
 
 function C.mmap(...)
   ffi.errno(78) -- NetBSD ENOSYS
