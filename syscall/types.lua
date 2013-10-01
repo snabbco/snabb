@@ -145,14 +145,10 @@ local addtypes = {
 -- note we cannot add any metatable, as may be declared in os and rump, so not even lenmt added
 for k, v in pairs(addtypes) do addtype(k, v) end
 
-local function singleton(tp)
-  return ffi.typeof("$[1]", tp)
-end
-
-t.socklen1 = singleton(t.socklen)
-t.off1 = singleton(t.off)
-t.uid1 = singleton(t.uid)
-t.gid1 = singleton(t.gid)
+t.socklen1 = ffi.typeof("socklen_t[1]")
+t.off1 = ffi.typeof("off_t[1]")
+t.uid1 = ffi.typeof("uid_t[1]")
+t.gid1 = ffi.typeof("gid_t[1]")
 
 -- 64 to 32 bit conversions via unions TODO use meth not object?
 if abi.le then
