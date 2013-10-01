@@ -22,7 +22,7 @@ local function ptvoid(x)
 end
 
 -- constants
-h.uint64_max = ffi.cast("uint64_t", -1)
+h.uint64_max = ffi.cast("uint64_t", 0) - 1
 h.uerr64 = h.uint64_max
 h.err64 = ffi.cast("int64_t", -1)
 if abi.abi64 then h.errpointer = ptvoid(h.err64) else h.errpointer = ptvoid(0xffffffff) end
