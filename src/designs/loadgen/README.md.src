@@ -36,6 +36,6 @@ app transmits the contents of the pcap input file in a loop.
     ----------+----------+---------+--------+-------+--------+------------
     chur      | 46605d54 | 1       |     64 | Good  |  14.1  | 14.2
     chur      | 46605d54 | 1       |     64 | Bad   |  13.9  | 13.9
-    chur      | 46605d54 | 20      |     64 | Mixed | 204    | 10.2
     chur      | 46605d54 | 20      |     64 | Good  | 266    | 13.3
+    chur      | 46605d54 | 20      |     64 | Bad   | 204    | 10.2
 
