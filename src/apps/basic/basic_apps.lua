@@ -124,7 +124,6 @@ function Repeater:push ()
    local npackets = #self.packets
    if npackets > 0 then
       for i = 1, app.nwritable(o) do
-         print(self.index, self.packets[self.index])
          assert(self.packets[self.index])
          app.transmit(o, self.packets[self.index])
          self.index = (self.index % npackets) + 1
