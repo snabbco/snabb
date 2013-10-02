@@ -65,3 +65,6 @@ app transmits the contents of the pcap input file in a loop.
     chur      | 46605d54 | 20      |     64 | Good  | 266    | 13.3
     chur      | 46605d54 | 20      |     64 | Bad   | 204    | 10.2
 
+NUMA Note: Each PCIe NIC is attached to one physical CPU. NUMA is
+"Good" when DMA for every NIC is accessing the RAM of the CPU that it
+is attached to. Otherwise, it's "Bad".
