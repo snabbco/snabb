@@ -282,7 +282,7 @@ addtype("stat", "struct stat", {
     dev = function(st) return t.device(st.st_dev) end,
     ino = function(st) return tonumber(st.st_ino) end,
     mode = function(st) return st.st_mode end,
-    nlink = function(st) return st.st_nlink end,
+    nlink = function(st) return tonumber(st.st_nlink) end,
     uid = function(st) return st.st_uid end,
     gid = function(st) return st.st_gid end,
     size = function(st) return tonumber(st.st_size) end,

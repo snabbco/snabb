@@ -37,15 +37,16 @@ local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x
 
 -- return helpers.
 
--- straight passthrough, only needed for real 64 bit quantities. Used eg for seek (file might have giant holes!)
+-- 64 bit return helpers. Only use for lseek in fact; we use tonumber but remove if you need files over 56 bits long
+-- TODO only luaffi needs the cast as wont compare to number; hopefully fixed in future with 5.3 or a later luaffi.
 local function ret64(ret)
   if ret == err64 then return nil, t.error() end
-  return ret
+  return tonumber(ret)
 end
 
 local function retu64(ret)
   if ret == uerr64 then return nil, t.error() end
-  return ret
+  return tonumber(ret)
 end
 
 local function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
