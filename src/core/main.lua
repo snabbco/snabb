@@ -11,7 +11,7 @@ ffi.cdef[[
 ]]
 
 local usage = [[
-Usage: snabbswitch [options]
+Usage: snabbswitch [options] <module> [args...]
 Available options are:
 -e chunk     Execute string 'chunk'.
 -l name      Require library 'name'.
@@ -25,13 +25,16 @@ Available options are:
 local debug_on_error = false
 local profiling = false
 
+-- List of parameters passed on the command line.
+parameters = {}
+
 function main ()
    require "strict"
    initialize()
    local args = command_line_args()
    if #args == 0 then
-      print("No arguments given (-h for help). Defaulting to: -l core.selftest")
-      args = { '-l', 'core.selftest' }
+      print(usage)
+      os.exit(1)
    end
    local i = 1
    while i <= #args do
@@ -58,6 +61,15 @@ function main ()
 	 local jit_dump = require "jit.dump"
 	 jit_dump.start("", args[i+1])
 	 i = i + 2
+      elseif i < #args then
+         -- Syntax: <module> [args...]
+         local module = args[i]
+         i = i + 1
+         while i <= #args do
+            table.insert(parameters, args[i])
+            i = i + 1
+         end
+         require(module)
       else
 	 print(usage)
 	 os.exit(1)
