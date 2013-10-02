@@ -26,7 +26,7 @@ Requirements: Needs [LuaJIT 2.0.2](http://www.luajit.org/) or later.
 
 The code does not currently support the main Lua implementation, only LuaJIT.
 
-It now runs again with [luaffi](https://github.com/jmckaskill/luaffi) under standard Lua but fails many tests and crashes. I am working to fix this, currently with Lua 5.2.
+It now runs again with [luaffi](https://github.com/jmckaskill/luaffi) under standard Lua but fails many tests and crashes. I am working to fix this, currently with Lua 5.2. Current blocking issue is lack of support for __new which breaks many tests.
 
 At some point soon I intend to support Lua directly, without luaffi, for maximum portability.
 
