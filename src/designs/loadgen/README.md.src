@@ -34,26 +34,26 @@ app transmits the contents of the pcap input file in a loop.
 
     snabbswitch [opts...] designs.loadgen.loadgen <pcapfile> [port...]
 
-    Generates load by replaying <pcapfile> onto each matched ethernet port.
+Generates load by replaying <pcapfile> onto each matched ethernet port.
 
-    If no port arguments are given then every available port is used.
-    Otherwise each port is a Lua pattern to match with the PCI address
-    of an Intel 82599-based ethernet controller.
+If no port arguments are given then every available port is used.
+Otherwise each port is a Lua pattern to match with the PCI address of
+an Intel 82599-based ethernet controller.
 
-    Examples (from chur.snabb.co test server):
+Examples (from chur.snabb.co test server):
 
-      # Use all NICs
-      snabbswitch designs.loadgen.loadgen foo.pcap
+    # Use all NICs
+    snabbswitch designs.loadgen.loadgen foo.pcap
 
-      # Use two NICs, one from each NUMA node
-      snabbswitch designs.loadgen.loadgen foo.pcap 0000:01:00.1 0000:82:00.1
-      # (shorter version)
-      snabbswitch designs.loadgen.loadgen foo.pcap 01:00.1 82:00.1
+    # Use two NICs, one from each NUMA node
+    snabbswitch designs.loadgen.loadgen foo.pcap 0000:01:00.1 0000:82:00.1
+    # (shorter version)
+    snabbswitch designs.loadgen.loadgen foo.pcap 01:00.1 82:00.1
 
-      # Use all NICs on NUMA node 0
-      snabbswitch designs.loadgen.loadgen foo.pcap 0000:0
-      # Use all NICs on NUMA node 1
-      snabbswitch designs.loadgen.loadgen foo.pcap 0000:8
+    # Use all NICs on NUMA node 0
+    snabbswitch designs.loadgen.loadgen foo.pcap 0000:0
+    # Use all NICs on NUMA node 1
+    snabbswitch designs.loadgen.loadgen foo.pcap 0000:8
 
 
 ### Performance
