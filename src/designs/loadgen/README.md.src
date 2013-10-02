@@ -1,5 +1,7 @@
 ## `loadgen`: Load-generator design
 
+Generate more than 100 Gbps of traffic using less than 10% CPU on a PC.
+
     DIAGRAM: loadgen
     +-----------+     +-----------+     +----------+      +----------+
     |           |     |           |     |          *----->*          |
@@ -29,6 +31,11 @@ The loadgen design reads a PCAP trace file, creates a loop from its
 contents (in case of short traces), and simultaneously loads this
 traffic into a set of LoadGen apps. The result is that each LoadGen
 app transmits the contents of the pcap input file in a loop.
+
+The LoadGen apps generate traffic very quickly: They use a customized
+driver for the Intel 82599 that implements retransmit of up to 32K
+packets directly in hardware. (The trick is reusing existing transmit
+descriptors). See performance notes below.
 
 ### Usage
 

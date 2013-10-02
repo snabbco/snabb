@@ -1,5 +1,7 @@
 ## `loadgen`: Load-generator design
 
+Generate more than 100 Gbps of traffic using less than 10% CPU on a PC.
+
 ![loadgen](.images/loadgen.png)
 
 The loadgen design reads a PCAP trace file, creates a loop from its
@@ -7,15 +9,22 @@ contents (in case of short traces), and simultaneously loads this
 traffic into a set of LoadGen apps. The result is that each LoadGen
 app transmits the contents of the pcap input file in a loop.
 
+The LoadGen apps generate traffic very quickly: They use a customized
+driver for the Intel 82599 that implements retransmit of up to 32K
+packets directly in hardware. (The trick is reusing existing transmit
+descriptors). See performance notes below.
+
 ### Usage
 
     snabbswitch [opts...] designs.loadgen.loadgen <pcapfile> [port...]
 
-Generates load by replaying <pcapfile> onto each matched ethernet port.
+Generates load by replaying the Pcap trace file in a loop on each
+selected ethernet port.
 
 If no port arguments are given then every available port is used.
-Otherwise each port is a Lua pattern to match with the PCI address of
-an Intel 82599-based ethernet controller.
+Otherwise each port is a [Lua pattern](http://www.lua.org/pil/20.2.html)
+to match with the PCI address of an Intel 82599-based ethernet
+controller.
 
 Examples (from chur.snabb.co test server):
 
@@ -39,9 +48,10 @@ Examples (from chur.snabb.co test server):
     ----------+----------+---------+--------+-------+--------+------------
     chur      | 46605d54 | 20      |     64 | Good  | 266    | 13.3
     chur      | 46605d54 | 20      |     64 | Bad   | 204    | 10.2
-    chur      | 46605d54 | 1       |     64 | Good  |  14.1  | 14.2
+    chur      | 46605d54 | 1       |     64 | Good  |  14.1  | 14.1
     chur      | 46605d54 | 1       |     64 | Bad   |  13.9  | 13.9
 
 NUMA Note: Each PCIe NIC is attached to one physical CPU. NUMA is
 "Good" when DMA for every NIC is accessing the RAM of the CPU that it
 is attached to. Otherwise, it's "Bad".
+
