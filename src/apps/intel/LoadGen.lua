@@ -30,7 +30,6 @@ function disable_tx_descriptor_writeback (dev)
 end
 
 function zero_descriptors (dev)
-   print("zd")
    -- Clear unused descriptors
    local b = buffer.allocate()
    for i = 0, dev.num_descriptors-1 do
@@ -38,14 +37,15 @@ function zero_descriptors (dev)
       dev.txdesc[i].data.address = b.physical
       dev.txdesc[i].data.options = bit.lshift(1, 24) -- End of Packet flag
    end
-   print("/zd")
 end
 
 function push (self)
-   assert(self.input.input)
-   while not app.empty(self.input.input) and self.dev:can_transmit() do
-      local p = app.receive(self.input.input)
-      self.dev:transmit(p)
+--   assert(self.input.input)
+   if self.input.input then
+      while not app.empty(self.input.input) and self.dev:can_transmit() do
+         local p = app.receive(self.input.input)
+         self.dev:transmit(p)
+      end
    end
 end
 

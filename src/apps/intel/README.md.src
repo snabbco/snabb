@@ -1,0 +1,40 @@
+# Intel Ethernet Controller Apps
+
+## `Intel10G` app: I/O with Intel 82599 Ethernet controller
+
+    DIAGRAM: Intel10G
+              +----------+
+      input   |          |
+         ---->* Intel10G *---->
+              |          |   output
+              +----------+
+
+`Intel10G` represents one 10G Ethernet port of an Intel 82599
+Ethernet controller. Packets taken from the `input` port are
+transmitted onto the network. Packets received from the network are
+put on the `output` port.
+
+### Performance
+
+`Intel10G` can transmit + receive at approximately 10 Mpps / core.
+
+## `LoadGen` app: Load generation by repeating transmit
+
+    DIAGRAM: LoadGen
+              +----------+
+      input   |          |
+         ---->*  LoadGen |
+              |          |
+              +----------+
+
+`LoadGen` takes up to 32K packets from the `input` port and transmits
+them continuously onto the network. The packets are collected
+incrementally from the `input` port, and only the first 32K packets
+will be fetched.
+
+Packets are not received from the network.
+
+### Performance
+
+`LoadGen` can transmit at line-rate (14 Mpps) using less than 3% CPU.
+
