@@ -9,6 +9,8 @@ pcall, type, table, string, math
 
 local ffi = require "ffi"
 
+local bit = require "bit"
+
 local t, ctypes, pt, s = {}, {}, {}, {}
 
 local h = require "syscall.helpers"
