@@ -791,7 +791,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
   msg = lookup[msg]
 
   tp = ifla_msg_types[tab][msg]
-  if not tp then error("unknown message type " .. rawmsg .. " in " .. tab) end
+  if not tp then error("unknown message type " .. tostring(rawmsg) .. " in " .. tab) end
 
   if tp == "kind" then
     local kinds = {

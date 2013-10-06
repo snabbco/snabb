@@ -11,6 +11,9 @@ local util = S.util
 local bit = require "bit"
 local ffi = require "ffi"
 
+local jit
+if pcall(require, "jit") then jit = require "jit" end
+
 local t, pt, s = types.t, types.pt, types.s
 
 local nl = S.nl
@@ -450,7 +453,7 @@ test.timers_signals_linux = {
   test_sigaction_function_handler = function()
     local sig = t.int1(0)
     local function fh(s) sig[0] = s end
-    jit.off(fh, true)
+    if jit then jit.off(fh, true) end -- TODO sort out if needed/broken
     local f = t.sighandler(fh)
     assert(S.sigaction("pipe", {handler = f}))
     assert(S.kill(S.getpid(), "pipe"))
@@ -1068,8 +1071,8 @@ test.aio = {
     local ev = t.io_events(1)
     local count = 0
     for k, v in assert(S.io_getevents(ctx, 1, ev)) do
-      assert_equal(v.data, 42, "expect to get our data back")
-      assert_equal(v.res, 4096, "expect to get full read")
+      assert_equal(tonumber(v.data), 42, "expect to get our data back")
+      assert_equal(tonumber(v.res), 4096, "expect to get full read")
       count = count + 1
     end
     assert_equal(count, 1)

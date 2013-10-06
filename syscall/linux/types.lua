@@ -843,10 +843,10 @@ addtype("cpu_set", "struct cpu_set_t", mt.cpu_set)
 
 mt.mq_attr = {
   index = {
-    flags = function(mqa) return mqa.mq_flags end,
-    maxmsg = function(mqa) return mqa.mq_maxmsg end,
-    msgsize = function(mqa) return mqa.mq_msgsize end,
-    curmsgs = function(mqa) return mqa.mq_curmsgs end,
+    flags = function(mqa) return tonumber(mqa.mq_flags) end,
+    maxmsg = function(mqa) return tonumber(mqa.mq_maxmsg) end,
+    msgsize = function(mqa) return tonumber(mqa.mq_msgsize) end,
+    curmsgs = function(mqa) return tonumber(mqa.mq_curmsgs) end,
   },
   newindex = {
     flags = function(mqa, v) mqa.mq_flags = c.OMQATTR[v] end, -- only allows O.NONBLOCK
