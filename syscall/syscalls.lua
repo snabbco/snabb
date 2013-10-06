@@ -116,7 +116,7 @@ function S.read(fd, buf, count)
   if buf then return retnum(C.read(getfd(fd), buf, count or #buf or 4096)) end -- user supplied a buffer, standard usage
   count = count or 4096
   buf = t.buffer(count)
-  local ret = C.read(getfd(fd), buf, count)
+  local ret = tonumber(C.read(getfd(fd), buf, count))
   if ret == -1 then return nil, t.error() end
   return ffi.string(buf, ret) -- user gets a string back, can get length from #string
 end
