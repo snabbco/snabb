@@ -68,6 +68,17 @@ function util.ifdown(name)
   return util.ifsetflags(name, flags)
 end
 
+-- table based mount, more cross OS compatible
+function util.mount(tab)
+  local filesystemtype = tab.type
+  local dir = tab.target or tab.dir
+  local flags = tab.flags
+  local data = tab.data
+  local datalen = tab.datalen
+  if tab.fspec then data = tab.fspec end
+  return S.mount(filesystemtype, dir, flags, data, datalen)
+end
+
 return util
 
 end

@@ -275,6 +275,16 @@ function util.mounts(file)
   return setmetatable(mounts, mt.mounts)
 end
 
+-- table based mount, more cross OS compatible
+function util.mount(tab)
+  local source = tab.source or "none" -- standard default
+  local target = tab.target or tab.dir -- netbsd compatible
+  local filesystemtype = tab.type
+  local mountflags = tab.flags
+  local data = tab.data
+  return S.mount(source, target, filesystemtype, mountflags, data)
+end
+
 return util
 
 end

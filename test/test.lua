@@ -70,10 +70,10 @@ elseif (abi.rump or abi.xen) and S.geteuid() == 0 then -- some initial setup for
   local octal = helpers.octal
   assert(S.mkdir("/tmp", "0777"))
   local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0777")}
-  assert(S.mount{dir="/tmp", type="tmpfs", data=data})
+  assert(S.mount("tmpfs", "/tmp", 0, data))
   assert(S.chdir("/tmp"))
   assert(S.mkdir("/dev/pts", "0555"))
-  assert(S.mount{dir="/dev/pts", type="ptyfs", data = {version = 2, gid = 0, mode = octal("0320")}})
+  assert(S.mount("ptyfs", "/dev/pts", 0, {version = 2, gid = 0, mode = octal("0320")}))
 end
 
 local bit = require "bit"

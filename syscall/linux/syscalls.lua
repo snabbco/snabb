@@ -309,16 +309,8 @@ function S.ppoll(fds, timeout, set)
   return retnum(C.ppoll(fds.pfd, #fds, timeout, set))
 end
 
-function S.mount(source, target, filesystemtype, mountflags, data)
-  if type(source) == "table" then
-    local tab = source
-    source = tab.source or "none" -- standard default
-    target = tab.target or tab.dir -- netbsd compatible
-    filesystemtype = tab.type
-    mountflags = tab.flags
-    data = tab.data
-  end
-  return retbool(C.mount(source, target, filesystemtype, c.MS[mountflags], data))
+function S.mount(source, target, fstype, mountflags, data)
+  return retbool(C.mount(source or "none", target, fstype, c.MS[mountflags], data))
 end
 
 function S.umount(target, flags)

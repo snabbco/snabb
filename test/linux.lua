@@ -1289,9 +1289,9 @@ test.mount_linux_root = {
     assert(S.umount(tmpfile))
     assert(S.rmdir(tmpfile))
   end,
-  test_mount_table = function()
+  test_util_mount = function()
     assert(S.mkdir(tmpfile))
-    assert(S.mount{source = "none", target = tmpfile, type = "tmpfs", flags = "rdonly, noatime"})
+    assert(util.mount{source = "none", target = tmpfile, type = "tmpfs", flags = "rdonly, noatime"})
     assert(S.umount(tmpfile))
     assert(S.rmdir(tmpfile))
   end,
@@ -1370,15 +1370,14 @@ test.mounts = {
     local cwd = assert(S.getcwd())
     local dir = cwd .. "/" .. tmpfile
     assert(S.mkdir(dir))
-    local a = {source = "none", target = dir, type = "tmpfs", flags = "rdonly, noatime"}
-    assert(S.mount(a))
+    assert(S.mount("none", dir, "tmpfs", "rdonly, noatime"))
     local m = assert(util.mounts())
     assert(#m > 0, "expect at least one mount point")
     local b = m[#m]
-    assert_equal(b.source, a.source, "expect source match")
-    assert_equal(b.target, a.target, "expect target match")
-    assert_equal(b.type, a.type, "expect type match")
-    assert_equal(c.MS[b.flags], c.MS[a.flags], "expect flags match")
+    assert_equal(b.source, "none", "expect source match")
+    assert_equal(b.target, dir, "expect target match")
+    assert_equal(b.type, "tmpfs", "expect type match")
+    assert_equal(c.MS[b.flags], c.MS["rdonly, noatime"], "expect flags match")
     assert_equal(b.freq, "0")
     assert_equal(b.passno, "0")
     assert(S.umount(dir))
