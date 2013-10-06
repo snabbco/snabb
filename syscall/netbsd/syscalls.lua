@@ -41,20 +41,19 @@ local mntstruct = {
   procfs = t.procfs_args,
 }
 
--- TODO allow putting data in same table rather than nested table?
-function S.mount(filesystemtype, dir, flags, data, datalen)
+function S.mount(fstype, dir, flags, data, datalen)
   local str
   if type(data) == "string" then -- common case, for ufs etc
     str = data
     data = {fspec = pt.char(str)}
   end
   if data then
-    local tp = mntstruct[filesystemtype]
+    local tp = mntstruct[fstype]
     if tp then data = mktype(tp, data) end
   else
     datalen = 0
   end
-  local ret = C.mount(filesystemtype, dir, c.MNT[flags], data, datalen or #data)
+  local ret = C.mount(fstype, dir, c.MNT[flags], data, datalen or #data)
   return retbool(ret)
 end
 
