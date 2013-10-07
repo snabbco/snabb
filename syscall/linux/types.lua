@@ -178,13 +178,18 @@ t.device = function(major, minor)
   return setmetatable({dev = t.dev(dev)}, mt.device)
 end
 
+-- we do provide this directly for compatibility, only use for standard names
 addtype("sockaddr_un", "struct sockaddr_un", {
   index = {
     family = function(sa) return sa.sun_family end,
+    path = function(sa) return ffi.string(sa.sun_path) end, -- only valid for proper names
   },
-  __new = function(tp) return ffi.new(tp, c.AF.UNIX) end,
-  __len = function(tp) return s.sockaddr_un end,
-
+  newindex = {
+    family = function(sa, v) sa.sun_family = v end,
+    path = function(sa, v) ffi.copy(sa.sun_path, v) end,
+  },
+  __new = function(tp, path) return newfn(tp, {family = c.AF.UNIX, path = path}) end, -- TODO accept table initialiser
+  __len = function(tp) return s.sockaddr_un end, -- TODO lenfn (default) instead
 })
 
 -- this is a bit odd, but we actually use Lua metatables for sockaddr_un, and use t.sa to multiplex
@@ -192,7 +197,7 @@ addtype("sockaddr_un", "struct sockaddr_un", {
 mt.sockaddr_un = {
   __index = function(un, k)
     local sa = un.addr
-    if k == 'family' then return tonumber(sa.sun_family) end
+    if k == 'family' then return sa.family end
     local namelen = un.addrlen - s.sun_family
     if namelen > 0 then
       if sa.sun_path[0] == 0 then
@@ -205,6 +210,7 @@ mt.sockaddr_un = {
       if k == 'unnamed' then return true end
     end
   end,
+  __len = function(un) return un.addrlen end,
 }
 
 function t.sa(addr, addrlen)

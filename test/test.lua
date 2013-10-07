@@ -1097,6 +1097,15 @@ test_sockets_pipes = {
     assert(ss:close())
     assert(cs:close())
   end,
+  test_named_unix = function()
+    local sock = assert(S.socket("local", "seqpacket"))
+    local sa = t.sockaddr_un(tmpfile)
+    assert(sock:bind(sa))
+    local st = assert(S.stat(tmpfile))
+    assert(st.issock)
+    assert(sock:close())
+    assert(S.unlink(tmpfile))
+  end,
 }
 
 test_timespec_timeval = {
