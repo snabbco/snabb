@@ -1003,7 +1003,6 @@ test_sockets_pipes = {
     assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
     assert(s:listen()) -- will fail if we did not bind
     local c = assert(S.socket("inet", "stream")) -- client socket
-    assert(c:block())
     local ok, err = c:connect(ba)
     local a = s:accept()
     local ok, err = c:connect(ba)
@@ -1037,7 +1036,7 @@ test_sockets_pipes = {
     assert(a.fd:close())
     assert(s:close())
   end,
-  test_inet_socket_readv = function() -- part of above, no netbsd bug
+  test_inet_socket_readv = function() -- part of above, no netbsd bug (but commenting out writev does trigger)
     local s = assert(S.socket("inet", "stream, nonblock"))
     local sa = assert(t.sockaddr_in(0, "loopback"))
     assert(sa.sin_family == 2, "expect family on inet socket to be 2")
@@ -1046,7 +1045,6 @@ test_sockets_pipes = {
     assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
     assert(s:listen()) -- will fail if we did not bind
     local c = assert(S.socket("inet", "stream")) -- client socket
-    assert(c:block())
     local ok, err = c:connect(ba)
     local a = s:accept()
     local ok, err = c:connect(ba)
