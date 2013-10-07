@@ -109,8 +109,8 @@ local function loop()
 for i, ev in ep:get() do
 
   if ep.eof(ev) then
-    fd:close()
-    w[ev.fileno] = nil
+    ev.fd:close()
+    w[ev.fd] = nil
   end
 
   if ev.fd == s.filenum then -- server socket, accept
