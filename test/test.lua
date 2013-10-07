@@ -992,7 +992,7 @@ test_sockets_pipes = {
     local sa = t.sockaddr_in(1234, "error")
     assert(not sa, "expect nil socket address from invalid ip string")
   end,
-  test_inet_socket = function() -- TODO break this test up
+  test_inet_socket = function() -- TODO break this test up TODO also see bug in netbsd paccept
     local s = assert(S.socket("inet", "stream"))
     assert(s:nonblock())
     local sa = assert(t.sockaddr_in(1234, "loopback"))
@@ -1016,9 +1016,10 @@ test_sockets_pipes = {
     local ok, err = c:connect(sa)
     local a = assert(s:accept())
     assert(a.fd:block())
-    local ok, err = c:connect(sa) -- Linux will have returned INPROGRESS above, other OS may have connected
+    local ok, err = c:connect(sa) -- Linux will have returned INPROGRESS above, other OS may have connected TODO clearly not true
     assert(s:block()) -- force accept to wait
     a = a or assert(s:accept())
+    assert(a.fd:block())
     -- a is a table with the fd, but also the inbound connection details
     assert(a.addr.sin_family == 2, "expect ipv4 connection")
     local ba = assert(c:getpeername())
@@ -1104,6 +1105,17 @@ test_sockets_pipes = {
     local st = assert(S.stat(tmpfile))
     assert(st.issock)
     assert(sock:close())
+    assert(S.unlink(tmpfile))
+  end,
+  test_accept4 = function()
+    local s = S.socket("unix", "seqpacket, nonblock")
+    local sa = t.sockaddr_un(tmpfile)
+    assert(s:bind(sa))
+    assert(s:listen())
+    local sa = t.sockaddr_un()
+    local a, err = s:accept(sa, nil, "nonblock")
+    assert(not a and err.AGAIN, "expect again: " .. tostring(err))
+    assert(s:close())
     assert(S.unlink(tmpfile))
   end,
 }

@@ -171,13 +171,24 @@ test.network_utils_bsd_root = {
   end,
 }
 
-test.pipes_bsd = {
+test.sockets_pipes_bsd = {
   test_nosigpipe = function()
     local p = assert(S.pipe("nosigpipe"))
     assert(p[1]:close())
     local ok, err = p[2]:write("other end closed")
     assert(not ok and err.PIPE, "should get EPIPE")
     assert(p:close())
+  end,
+  test_paccept = function()
+    local s = S.socket("unix", "seqpacket, nonblock, nosigpipe")
+    local sa = t.sockaddr_un(tmpfile)
+    assert(s:bind(sa))
+    assert(s:listen())
+    local sa = t.sockaddr_un()
+    local a, err = s:paccept(sa, nil, "alrm", "nonblock, nosigpipe")
+    assert(not a and err.AGAIN, "expect again: " .. tostring(err))
+    assert(s:close())
+    assert(S.unlink(tmpfile))
   end,
 }
 

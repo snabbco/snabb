@@ -120,6 +120,7 @@ fmeth.chflags = S.fchflags
 fmeth.chroot = S.fchroot
 fmeth.sync_range = S.fsync_range
 fmeth.kevent = S.kevent
+fmeth.paccept = S.paccept
 
 local function nogc(d) return ffi.gc(d, nil) end
 

@@ -75,7 +75,6 @@ t.device = function(major, minor)
   return setmetatable({dev = t.dev(dev)}, mt.device)
 end
 
--- TODO test properly, different from Linux as metatype
 addtype("sockaddr_un", "struct sockaddr_un", {
   index = {
     family = function(sa) return sa.sun_family end,
@@ -83,12 +82,15 @@ addtype("sockaddr_un", "struct sockaddr_un", {
   },
   newindex = {
     family = function(sa, v) sa.sun_family = v end,
-    path = function(sa, v) ffi.copy(sa.sun_path, v) end,
+    path = function(sa, v)
+      ffi.copy(sa.sun_path, v)
+      sa.sun_len = 2 + #sa.path -- does not include terminating 0
+    end,
   },
   __new = function(tp, path) return newfn(tp, {family = c.AF.UNIX, path = path}) end,
   __len = function(sa)
     if sa.sun_len == 0 then -- length not set explicitly
-      return 2 + #sa.path -- does not include terminating 0
+      return s.sockaddr_un 
     else
       return sa.sun_len
     end

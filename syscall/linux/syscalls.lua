@@ -175,13 +175,13 @@ end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), offset, count)) end
 
-function S.accept(sockfd, flags, addr, addrlen) -- TODO emulate netbsd paccept
+function S.accept(sockfd, addr, addrlen, flags)
   addr = addr or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(addrlen or #addr)
+  addrlen = addrlen or t.socklen1(#addr)
   local saddr = pt.sockaddr(addr)
   local ret = C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags])
   if ret == -1 then return nil, t.error() end
-  return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
+  return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])} -- TODO dont like this interface
 end
 
 -- TODO change to type?
@@ -297,8 +297,9 @@ function S.lxattr(path, t) return xattr(S.llistxattr, S.lgetxattr, S.lsetxattr, 
 function S.fxattr(fd, t) return xattr(S.flistxattr, S.fgetxattr, S.fsetxattr, S.fremovexattr, fd, t) end
 
 function S.signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
+  set = mktype(t.sigset, set)
   if fd then fd = getfd(fd) else fd = -1 end
-  return retfd(C.signalfd(fd, t.sigset(set), c.SFD[flags]))
+  return retfd(C.signalfd(fd, set, c.SFD[flags]))
 end
 
 -- note that syscall does return timeout remaining but libc does not, due to standard prototype TODO use syscall

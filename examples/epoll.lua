@@ -114,7 +114,7 @@ for i, ev in ep:get() do
 
   if ev.fd == s:getfd() then -- server socket, accept
     repeat
-      local a, err = s:accept("nonblock", ss)
+      local a, err = s:accept(ss, nil, "nonblock")
       if a then
         ep:add(a.fd)
         w[a.fd:getfd()] = a.fd
