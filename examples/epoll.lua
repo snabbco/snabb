@@ -102,7 +102,6 @@ local bufsize = 4096
 local buffer = t.buffer(bufsize)
 
 local ss = t.sockaddr_storage()
-local addrlen = t.socklen1(#ss)
 
 local function loop()
 
@@ -115,7 +114,7 @@ for i, ev in ep:get() do
 
   if ev.fd == s:getfd() then -- server socket, accept
     repeat
-      local a, err = s:accept("nonblock", ss, addrlen)
+      local a, err = s:accept("nonblock", ss)
       if a then
         ep:add(a.fd)
         w[a.fd:getfd()] = a.fd
