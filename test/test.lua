@@ -122,9 +122,11 @@ end
 
 if arg[1] == "coverage" then debug.sethook(coverage, "lc") end
 
+-- TODO make locals
 local teststring = "this is a test string"
 local size = 512
 local buf = t.buffer(size)
+
 local tmpfile = "XXXXYYYYZZZ4521" .. S.getpid()
 local tmpfile2 = "./666666DDDDDFFFF" .. S.getpid()
 local tmpfile3 = "MMMMMTTTTGGG" .. S.getpid()
@@ -992,31 +994,19 @@ test_sockets_pipes = {
     local sa = t.sockaddr_in(1234, "error")
     assert(not sa, "expect nil socket address from invalid ip string")
   end,
-  test_inet_socket = function() -- TODO break this test up TODO also see bug in netbsd paccept
-    local s = assert(S.socket("inet", "stream"))
-    assert(s:nonblock())
-    local sa = assert(t.sockaddr_in(1234, "loopback"))
+  test_inet_socket = function() -- TODO break this test up TODO also see bug in netbsd paccept, retest in C
+    local s = assert(S.socket("inet", "stream, nonblock"))
+    local sa = assert(t.sockaddr_in(0, "loopback"))
     assert(sa.sin_family == 2, "expect family on inet socket to be 2")
-    -- find a free port
-    local bound = false
-    for port = 32768, 60000 do
-      sa.port = port
-      if s:bind(sa) then
-        bound = true
-        break
-      end
-    end
-    assert(bound, "should be able to bind to a port")
+    assert(s:bind(sa))
     local ba = assert(s:getsockname())
     assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
     assert(s:listen()) -- will fail if we did not bind
     local c = assert(S.socket("inet", "stream")) -- client socket
     assert(c:block())
-    assert(c:fcntl("setfd", "cloexec"))
-    local ok, err = c:connect(sa)
-    local a = assert(s:accept())
-    assert(a.fd:block())
-    local ok, err = c:connect(sa) -- Linux will have returned INPROGRESS above, other OS may have connected TODO clearly not true
+    local ok, err = c:connect(ba)
+    local a = s:accept()
+    local ok, err = c:connect(ba)
     assert(s:block()) -- force accept to wait
     a = a or assert(s:accept())
     assert(a.fd:block())
@@ -1028,15 +1018,47 @@ test_sockets_pipes = {
     assert(ba.sin_addr.s_addr == t.in_addr("loopback").s_addr, "expect peer on localhost")
     local n = assert(c:send(teststring))
     assert(n == #teststring, "should be able to write out short string")
-    n = assert(a.fd:read(buf, size))
-    assert(n == #teststring, "should read back string into buffer")
-    assert(ffi.string(buf, n) == teststring, "we should read back the same string that was sent")
+    local str = assert(a.fd:read(nil, #teststring))
+    assert_equal(str, teststring)
     -- test scatter gather
     local b0 = t.buffer(4)
     local b1 = t.buffer(3)
     ffi.copy(b0, "test", 4) -- string init adds trailing 0 byte
     ffi.copy(b1, "ing", 3)
     n = assert(c:writev({{b0, 4}, {b1, 3}}))
+    assert(n == 7, "expect writev to write 7 bytes")
+    b0 = t.buffer(3)
+    b1 = t.buffer(4)
+    local iov = t.iovecs{{b0, 3}, {b1, 4}}
+    n = assert(a.fd:readv(iov))
+    assert_equal(n, 7, "expect readv to read 7 bytes")
+    assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
+    assert(c:close())
+    assert(a.fd:close())
+    assert(s:close())
+  end,
+  test_inet_socket_readv = function() -- part of above, no netbsd bug
+    local s = assert(S.socket("inet", "stream, nonblock"))
+    local sa = assert(t.sockaddr_in(0, "loopback"))
+    assert(sa.sin_family == 2, "expect family on inet socket to be 2")
+    assert(s:bind(sa))
+    local ba = assert(s:getsockname())
+    assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
+    assert(s:listen()) -- will fail if we did not bind
+    local c = assert(S.socket("inet", "stream")) -- client socket
+    assert(c:block())
+    local ok, err = c:connect(ba)
+    local a = s:accept()
+    local ok, err = c:connect(ba)
+    assert(s:block()) -- force accept to wait
+    a = a or assert(s:accept())
+    assert(a.fd:block())
+    -- a is a table with the fd, but also the inbound connection details
+    local b0 = t.buffer(4)
+    local b1 = t.buffer(3)
+    ffi.copy(b0, "test", 4) -- string init adds trailing 0 byte
+    ffi.copy(b1, "ing", 3)
+    local n = assert(c:writev({{b0, 4}, {b1, 3}}))
     assert(n == 7, "expect writev to write 7 bytes")
     b0 = t.buffer(3)
     b1 = t.buffer(4)
