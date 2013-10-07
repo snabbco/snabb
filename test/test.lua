@@ -17,17 +17,18 @@ end
 
 local helpers = require "syscall.helpers"
 
-local S, abi
+local S
+local tmpabi
 
 if arg[1] == "rump" or arg[1] == "rumplinux" then
-  abi = require "syscall.abi"
+  tmpabi = require "syscall.abi"
   -- it is too late to set this now, needs to be set before executions starts
-  if abi.os == "linux" then
+  if tmpabi.os == "linux" then
     assert(os.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
   end
   if arg[1] == "rumplinux" then
-    abi = require "syscall.rump.abi"
-    abi.types = "linux" -- monkeypatch
+    tmpabi = require "syscall.rump.abi"
+    tmpabi.types = "linux" -- monkeypatch
   end
   local modules = {"vfs", "kern.tty", "dev", "net", "fs.tmpfs", "fs.kernfs", "fs.ptyfs",
                    "net.net", "net.local", "net.netinet", "net.shmif"}
