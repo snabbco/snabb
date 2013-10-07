@@ -24,11 +24,7 @@ There is more information in the INSTALL file.
 
 Requirements: Needs [LuaJIT 2.0.2](http://www.luajit.org/) or later.
 
-The code does not currently support the main Lua implementation, only LuaJIT.
-
-It now runs again with [luaffi](https://github.com/jmckaskill/luaffi) under standard Lua but fails many tests and crashes. I am working to fix this, currently with Lua 5.2. Current blocking issue is lack of support for __new which breaks many tests.
-
-At some point soon I intend to support Lua directly, without luaffi, for maximum portability.
+The code does not currently fully support the main Lua implementation, only LuaJIT. It now runs again with [luaffi](https://github.com/jmckaskill/luaffi) under standard Lua but fails many tests. I am working to fix this, currently with Lua 5.2. Current head luaffi has some fixes, have added support for ```__new```, but more are still needed. At some point soon I intend to support Lua directly, without luaffi, for maximum portability; getting luaffi support working is the intermediate step.
 
 On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; MIPS support will be completed soon. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had little testing. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly.
 
@@ -43,10 +39,10 @@ There will not be Windows support (although in principle Cygwin and similar plat
 For the (optional) rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project, which is now included as a git submodule. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There are some additional examples in `examples/rump` which is a port of the tests in buildrump. The rump kernel runs on many elf/Posix OS and architectures, currently tested on Linux x86, x64, ppc, arm and NetBSD x86, x64, with more targets to be added soon.
 
 ## New features planned soon
-netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD support, more rump kernel support, rump kernel hypercall API.
+netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD support, more rump kernel support, rump kernel hypercall API, osv support.
 
 ## Release notes
-0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, initial luaffi support again.
+0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, initial luaffi support again, luaffi fixes.
 
 0.8 rump kernel fixes, NetBSD 64 bit fixes, initial arp/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support, initial support of NetBSD network config.
 
