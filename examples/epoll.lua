@@ -113,7 +113,7 @@ for i, ev in ep:get() do
     w[ev.fd] = nil
   end
 
-  if ev.fd == s.filenum then -- server socket, accept
+  if ev.fd == s:getfd() then -- server socket, accept
     repeat
       local a, err = s:accept("nonblock", ss, addrlen)
       if a then
