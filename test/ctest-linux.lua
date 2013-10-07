@@ -263,6 +263,9 @@ c.PR.GET_TID_ADDRESS = nil
 c.NDTPA.QUEUE_LENBYTES = nil
 c.NTF.SELF = nil
 c.NTF.MASTER = nil
+-- no vfio on Travis CI
+c.IOCTL.VFIO_GET_API_VERSION = nil
+c.IOCTL.VFIO_CHECK_EXTENSION = nil
 
 -- missing on my ppc box/older kernels
 c.PR.GET_NO_NEW_PRIVS = nil
@@ -365,7 +368,7 @@ print [[
 #include <linux/if_tun.h>
 #include <linux/vhost.h>
 #include <linux/neighbour.h>
-#include <linux/vfio.h>
+//#include <linux/vfio.h>
 
 int ret = 0;
 
