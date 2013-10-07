@@ -48,6 +48,7 @@ IOC.SIZESHIFT = IOC.TYPESHIFT + IOC.TYPEBITS
 IOC.DIRSHIFT  = IOC.SIZESHIFT + IOC.SIZEBITS
 
 local function ioc(dir, ch, nr, size)
+  if type(ch) == "string" then ch = ch:byte() end
   return bor(lshift(dir, IOC.DIRSHIFT), 
 	     lshift(ch, IOC.TYPESHIFT), 
 	     lshift(nr, IOC.NRSHIFT), 
@@ -58,12 +59,12 @@ local singletonmap = {
   int = "int1",
   char = "char1",
   uint = "uint1",
+  uint32 = "uint32_1",
   uint64 = "uint64_1",
 }
 
 local function _IOC(dir, ch, nr, tp)
-  if type(ch) == "string" then ch = ch:byte() end
-  if type(tp) == "number" then return ioc(dir, ch, nr, tp) end
+  if not tp or type(tp) == "number" then return ioc(dir, ch, nr, tp or 0) end
   local size = s[tp]
   local singleton = singletonmap[tp] ~= nil
   tp = singletonmap[tp] or tp
@@ -91,6 +92,17 @@ IOC.OUT		= lshift(IOC.READ, IOC.DIRSHIFT)
 IOC.INOUT		= lshift(bor(IOC.WRITE, IOC.READ), IOC.DIRSHIFT)
 local IOCSIZE_MASK	= lshift(IOC.SIZEMASK, IOC.SIZESHIFT)
 local IOCSIZE_SHIFT	= IOC.SIZESHIFT
+
+-- VFIO driver writer decided not to use standard IOR/IOW alas
+local function vfio(dir, nr, tp)
+  local ch = ";"
+  nr = nr + 100 -- vfio base
+  dir = IOC[string.upper(dir)]
+  local io = _IOC(dir, ch, nr, tp)
+  if type(io) == "number" then return io end -- if just IO, not return
+  io.number = ioc(IOC.NONE, ch, nr, 0) -- number encode nothing, but we want to know anyway
+  return io
+end
 
 local ioctl = strflag {
 -- termios, non standard values generally 0x54 = 'T'
@@ -243,6 +255,9 @@ local ioctl = strflag {
   VHOST_SET_VRING_CALL = _IOW(0xAF, 0x21, "vhost_vring_file"),
   VHOST_SET_VRING_ERR  = _IOW(0xAF, 0x22, "vhost_vring_file"),
   VHOST_NET_SET_BACKEND= _IOW(0xAF, 0x30, "vhost_vring_file"),
+-- from linux/vfio.h type is ';' base is 100
+  VFIO_GET_API_VERSION = vfio('NONE', 0),
+  VFIO_CHECK_EXTENSION = vfio('WRITE', 1, "uint32"),
 
 -- allow user defined ioctls
   _IO = _IO,

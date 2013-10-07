@@ -365,6 +365,7 @@ print [[
 #include <linux/if_tun.h>
 #include <linux/vhost.h>
 #include <linux/neighbour.h>
+#include <linux/vfio.h>
 
 int ret = 0;
 
