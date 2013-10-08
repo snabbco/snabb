@@ -82,19 +82,10 @@ addtype("sockaddr_un", "struct sockaddr_un", {
   },
   newindex = {
     family = function(sa, v) sa.sun_family = v end,
-    path = function(sa, v)
-      ffi.copy(sa.sun_path, v)
-      sa.sun_len = 2 + #sa.path -- does not include terminating 0
-    end,
+    path = function(sa, v) ffi.copy(sa.sun_path, v) end,
   },
-  __new = function(tp, path) return newfn(tp, {family = c.AF.UNIX, path = path}) end,
-  __len = function(sa)
-    if sa.sun_len == 0 then -- length not set explicitly
-      return s.sockaddr_un 
-    else
-      return sa.sun_len
-    end
-  end,
+  __new = function(tp, path) return newfn(tp, {family = c.AF.UNIX, path = path, sun_len = s.sockaddr_un}) end,
+  __len = function(sa) return 2 + #sa.path end,
 })
 
 function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has odd unix handling
