@@ -1127,7 +1127,7 @@ test_sockets_pipes = {
     assert(sock:close())
     assert(S.unlink(tmpfile))
   end,
-  test_accept4 = function()
+  test_accept4 = function() -- TODO this test does not really test anything, as works without nonblock
     local s = S.socket("unix", "seqpacket, nonblock")
     local sa = t.sockaddr_un(tmpfile)
     assert(s:bind(sa))
