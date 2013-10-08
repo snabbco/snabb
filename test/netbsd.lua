@@ -203,7 +203,7 @@ test.sockets_pipes_bsd = {
     assert(ok or err.ISCONN);
     assert(ss:block()) -- force accept to wait
     as = as or assert(ss:paccept())
-    --assert(a:block())
+    assert(a:block())
     local fl = assert(as:fcntl("getfl"))
     assert_equal(bit.band(fl, c.O.NONBLOCK), 0)
 -- TODO commenting out next two lines is issue only with paccept not accept

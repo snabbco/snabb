@@ -1051,7 +1051,6 @@ test_sockets_pipes = {
     assert(s:block()) -- force accept to wait
     a = a or assert(s:accept())
     assert(a:block())
-    -- a is a table with the fd, but also the inbound connection details
     local b0 = t.buffer(4)
     local b1 = t.buffer(3)
     ffi.copy(b0, "test", 4) -- string init adds trailing 0 byte
