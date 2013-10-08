@@ -197,9 +197,10 @@ test.sockets_pipes_bsd = {
     local ba = assert(ss:getsockname())
     assert(ss:listen())
     local cs = assert(S.socket("inet", "stream")) -- client socket
-    local ok, err = cs:connect(ba)
+    local ok, err1 = cs:connect(ba)
     local as = ss:paccept()
-    local ok, err = cs:connect(ba)
+    local ok, err2 = cs:connect(ba)
+    assert(not err1 and err2, "one connect should succeed");
     assert(ss:block()) -- force accept to wait
     as = as or assert(ss:paccept())
     --assert(a:block())

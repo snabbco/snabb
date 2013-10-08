@@ -1003,9 +1003,10 @@ test_sockets_pipes = {
     assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
     assert(s:listen()) -- will fail if we did not bind
     local c = assert(S.socket("inet", "stream")) -- client socket
-    local ok, err = c:connect(ba)
+    local ok, err1 = c:connect(ba)
     local a = s:accept()
-    local ok, err = c:connect(ba)
+    local ok, err2 = c:connect(ba)
+    assert(not err1 and err2, "one connect should succeed");
     assert(s:block()) -- force accept to wait
     a = a or assert(s:accept())
     assert(a:block())
@@ -1043,9 +1044,10 @@ test_sockets_pipes = {
     assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
     assert(s:listen()) -- will fail if we did not bind
     local c = assert(S.socket("inet", "stream")) -- client socket
-    local ok, err = c:connect(ba)
+    local ok, err1 = c:connect(ba)
     local a = s:accept()
-    local ok, err = c:connect(ba)
+    local ok, err2 = c:connect(ba)
+    assert(not err1 and err2, "one connect should succeed");
     assert(s:block()) -- force accept to wait
     a = a or assert(s:accept())
     assert(a:block())
