@@ -190,6 +190,40 @@ test.sockets_pipes_bsd = {
     assert(s:close())
     assert(S.unlink(tmpfile))
   end,
+  test_inet_socket_readv_paccept = function() -- commenting out writev triggers issue
+    local s = assert(S.socket("inet", "stream, nonblock"))
+    local sa = assert(t.sockaddr_in(0, "loopback"))
+    assert(sa.sin_family == 2, "expect family on inet socket to be 2")
+    assert(s:bind(sa))
+    local ba = assert(s:getsockname())
+    assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
+    assert(s:listen()) -- will fail if we did not bind
+    local c = assert(S.socket("inet", "stream")) -- client socket
+    local ok, err = c:connect(ba)
+    local a = s:paccept()
+    local ok, err = c:connect(ba)
+    assert(s:block()) -- force accept to wait
+    a = a or assert(s:paccept())
+    assert(a:block())
+    -- a is a table with the fd, but also the inbound connection details
+    local b0 = t.buffer(4)
+    local b1 = t.buffer(3)
+    ffi.copy(b0, "test", 4) -- string init adds trailing 0 byte
+    ffi.copy(b1, "ing", 3)
+-- TODO commenting out next two lines is issue only with paccept not accept
+    local n = assert(c:writev({{b0, 4}, {b1, 3}}))
+    assert(n == 7, "expect writev to write 7 bytes")
+--
+    b0 = t.buffer(3)
+    b1 = t.buffer(4)
+    local iov = t.iovecs{{b0, 3}, {b1, 4}}
+    n = assert(a:readv(iov))
+    assert_equal(n, 7, "expect readv to read 7 bytes")
+    assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
+    assert(c:close())
+    assert(a:close())
+    assert(s:close())
+  end,
 }
 
 test.kqueue = {

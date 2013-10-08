@@ -83,6 +83,20 @@ test.signals = {
   end,
 }
 
+test.sockets_linux = {
+  test_accept4 = function() -- TODO this test does not really test anything, as works without nonblock
+    local s = S.socket("unix", "seqpacket, nonblock")
+    local sa = t.sockaddr_un(tmpfile)
+    assert(s:bind(sa))
+    assert(s:listen())
+    local sa = t.sockaddr_un()
+    local a, err = s:accept4(sa, nil, "nonblock")
+    assert(not a and err.AGAIN, "expect again: " .. tostring(err))
+    assert(s:close())
+    assert(S.unlink(tmpfile))
+  end,
+}
+
 test.file_operations_linux = {
   test_openat = function()
     local dfd = S.open(".")

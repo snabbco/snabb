@@ -175,13 +175,9 @@ end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), offset, count)) end
 
-function S.accept(sockfd, addr, addrlen, flags)
-  addr = addr or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(#addr)
+function S.accept4(sockfd, addr, addrlen, flags)
   local saddr = pt.sockaddr(addr)
-  local ret = C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags])
-  if ret == -1 then return nil, t.error() end
-  return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])} -- TODO dont like this interface
+  return(C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags]))
 end
 
 -- TODO change to type?

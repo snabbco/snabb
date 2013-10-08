@@ -258,6 +258,10 @@ function S.connect(sockfd, addr, addrlen)
   local saddr = pt.sockaddr(addr)
   return retbool(C.connect(getfd(sockfd), saddr, addrlen or #addr))
 end
+function S.accept(sockfd, addr, addrlen)
+  local saddr = pt.sockaddr(addr)
+  return retfd(C.accept(getfd(sockfd), saddr, addrlen))
+end
 function S.getsockname(sockfd, addr, addrlen)
   addr = addr or t.sockaddr_storage()
   addrlen = addrlen or t.socklen1(#addr)

@@ -994,7 +994,7 @@ test_sockets_pipes = {
     local sa = t.sockaddr_in(1234, "error")
     assert(not sa, "expect nil socket address from invalid ip string")
   end,
-  test_inet_socket = function() -- TODO break this test up TODO also see bug in netbsd paccept, retest in C
+  test_inet_socket = function() -- TODO break this test up
     local s = assert(S.socket("inet", "stream, nonblock"))
     local sa = assert(t.sockaddr_in(0, "loopback"))
     assert(sa.sin_family == 2, "expect family on inet socket to be 2")
@@ -1008,16 +1008,14 @@ test_sockets_pipes = {
     local ok, err = c:connect(ba)
     assert(s:block()) -- force accept to wait
     a = a or assert(s:accept())
-    assert(a.fd:block())
-    -- a is a table with the fd, but also the inbound connection details
-    assert(a.addr.sin_family == 2, "expect ipv4 connection")
+    assert(a:block())
     local ba = assert(c:getpeername())
     assert(ba.sin_family == 2, "expect ipv4 connection")
     assert(tostring(ba.sin_addr) == "127.0.0.1", "expect peer on localhost")
     assert(ba.sin_addr.s_addr == t.in_addr("loopback").s_addr, "expect peer on localhost")
     local n = assert(c:send(teststring))
     assert(n == #teststring, "should be able to write out short string")
-    local str = assert(a.fd:read(nil, #teststring))
+    local str = assert(a:read(nil, #teststring))
     assert_equal(str, teststring)
     -- test scatter gather
     local b0 = t.buffer(4)
@@ -1029,11 +1027,11 @@ test_sockets_pipes = {
     b0 = t.buffer(3)
     b1 = t.buffer(4)
     local iov = t.iovecs{{b0, 3}, {b1, 4}}
-    n = assert(a.fd:readv(iov))
+    n = assert(a:readv(iov))
     assert_equal(n, 7, "expect readv to read 7 bytes")
     assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
     assert(c:close())
-    assert(a.fd:close())
+    assert(a:close())
     assert(s:close())
   end,
   test_inet_socket_readv = function() -- part of above, no netbsd bug (but commenting out writev does trigger)
@@ -1050,7 +1048,7 @@ test_sockets_pipes = {
     local ok, err = c:connect(ba)
     assert(s:block()) -- force accept to wait
     a = a or assert(s:accept())
-    assert(a.fd:block())
+    assert(a:block())
     -- a is a table with the fd, but also the inbound connection details
     local b0 = t.buffer(4)
     local b1 = t.buffer(3)
@@ -1061,11 +1059,11 @@ test_sockets_pipes = {
     b0 = t.buffer(3)
     b1 = t.buffer(4)
     local iov = t.iovecs{{b0, 3}, {b1, 4}}
-    n = assert(a.fd:readv(iov))
+    n = assert(a:readv(iov))
     assert_equal(n, 7, "expect readv to read 7 bytes")
     assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
     assert(c:close())
-    assert(a.fd:close())
+    assert(a:close())
     assert(s:close())
   end,
   test_unix_socketpair = function()
@@ -1125,17 +1123,6 @@ test_sockets_pipes = {
     local st = assert(S.stat(tmpfile))
     assert(st.issock)
     assert(sock:close())
-    assert(S.unlink(tmpfile))
-  end,
-  test_accept4 = function() -- TODO this test does not really test anything, as works without nonblock
-    local s = S.socket("unix", "seqpacket, nonblock")
-    local sa = t.sockaddr_un(tmpfile)
-    assert(s:bind(sa))
-    assert(s:listen())
-    local sa = t.sockaddr_un()
-    local a, err = s:accept(sa, nil, "nonblock")
-    assert(not a and err.AGAIN, "expect again: " .. tostring(err))
-    assert(s:close())
     assert(S.unlink(tmpfile))
   end,
 }

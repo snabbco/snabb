@@ -19,28 +19,16 @@ local ret64, retnum, retfd, retbool, retptr, retiter = hh.ret64, hh.retnum, hh.r
 local helpers = require "syscall.helpers"
 
 function S.paccept(sockfd, addr, addrlen, set, flags)
-  addr = addr or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(#addr)
   if set then set = mktype(t.sigset, set) end
   local saddr = pt.sockaddr(addr)
-  local ret = C.paccept(getfd(sockfd), saddr, addrlen, set, c.SOCK[flags])
-  if ret == -1 then return nil, t.error() end
-  return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])} -- TODO dont like this interface
+  return retfd(C.paccept(getfd(sockfd), saddr, addrlen, set, c.SOCK[flags]))
 end
 -- TODO below should work, but appears to break test test_sockets_pipes:test_inet_socket - BUG?
 --[[
-function S.accept(sockfd, addr, addrlen, flags)
-  return S.paccept(sockfd, addr, addrlen, nil, flags)
+function S.accept(sockfd, addr, addrlen)
+  return S.paccept(sockfd, addr, addrlen, nil, nil)
 end
 ]]
-function S.accept(sockfd, addr, addrlen)
-  addr = addr or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(#addr)
-  local saddr = pt.sockaddr(addr)
-  local ret = C.accept(getfd(sockfd), saddr, addrlen)
-  if ret == -1 then return nil, t.error() end
-  return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])} -- TODO dont like this interface
-end
 
 local mntstruct = {
   ffs = t.ufs_args,
