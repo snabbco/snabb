@@ -200,7 +200,7 @@ test.sockets_pipes_bsd = {
     local ok, err = cs:connect(ba)
     local as = ss:paccept()
     local ok, err = cs:connect(ba)
-    assert(ok or err and err.INPROGRESS);
+    assert(ok or err.ISCONN);
     assert(ss:block()) -- force accept to wait
     as = as or assert(ss:paccept())
     --assert(a:block())

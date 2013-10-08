@@ -1006,7 +1006,7 @@ test_sockets_pipes = {
     local ok, err = c:connect(ba)
     local a = s:accept()
     local ok, err = c:connect(ba)
-    assert(ok or err and err.INPROGRESS);
+    assert(ok or err.ISCONN);
     assert(s:block()) -- force accept to wait
     a = a or assert(s:accept())
     assert(a:block())
@@ -1047,7 +1047,7 @@ test_sockets_pipes = {
     local ok, err = c:connect(ba)
     local a = s:accept()
     local ok, err = c:connect(ba)
-    assert(ok or err and err.INPROGRESS);
+    assert(ok or err.ISCONN);
     assert(s:block()) -- force accept to wait
     a = a or assert(s:accept())
     assert(a:block())
