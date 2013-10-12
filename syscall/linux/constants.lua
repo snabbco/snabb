@@ -2105,9 +2105,6 @@ c.BPF = multiflags {
   TXA        = 0x80,
 }
 
--- termios
-c.NCCS = 32
-
 -- termios - c_cc characters
 c.CC = strflag(arch.CC or {
   VINTR    = 0,
