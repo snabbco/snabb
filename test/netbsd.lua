@@ -190,7 +190,8 @@ test.sockets_pipes_bsd = {
     assert(s:close())
     assert(S.unlink(tmpfile))
   end,
-  test_inet_socket_read_paccept = function() -- commenting out writev triggers PR/48292
+--[[
+  test_inet_socket_read_paccept = function() -- triggers PR/48292
     local ss = assert(S.socket("inet", "stream, nonblock"))
     local sa = t.sockaddr_in(0, "loopback")
     assert(ss:bind(sa))
@@ -215,6 +216,7 @@ test.sockets_pipes_bsd = {
     assert(as:close())
     assert(ss:close())
   end,
+]]
 }
 
 test.kqueue = {
