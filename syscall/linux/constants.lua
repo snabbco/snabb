@@ -31,6 +31,7 @@ c.SYS = arch.SYS
 
 c.REG = arch.REG
 
+-- TODO only define one of these
 c.STD = strflag {
   IN_FILENO = 0,
   OUT_FILENO = 1,
@@ -679,7 +680,7 @@ c.AT_SYMLINK_NOFOLLOW = multiflags {
 
 c.AT_ACCESSAT = multiflags {
   SYMLINK_NOFOLLOW = 0x100,
-  AT_EACCESS       = 0x200,
+  EACCESS          = 0x200,
 }
 
 c.AT_FSTATAT = multiflags {
@@ -1064,7 +1065,7 @@ c.PORT_VDP_RESPONSE = strflag {
   INSUFFICIENT_RESOURCES = 2,
   UNUSED_VTID = 3,
   VTID_VIOLATION = 4,
-  VTID_VERSION_VIOALTION = 5, -- seems to be misspelled in headers
+  VTID_VERSION_VIOALTION = 5, -- seems to be misspelled in headers TODO fix
   OUT_OF_SYNC = 6,
 }
 
@@ -1074,7 +1075,7 @@ c.PORT_PROFILE_RESPONSE = strflag {
   INVALID = 0x102,
   BADSTATE = 0x103,
   INSUFFICIENT_RESOURCES = 0x104,
-  RESPONSE_ERROR = 0x105,
+  ERROR = 0x105,
 }
 
 -- from if_addr.h interface address types and flags
@@ -1793,7 +1794,6 @@ c.PR = strflag {
   SET_NO_NEW_PRIVS = 38,
   GET_NO_NEW_PRIVS = 39,
   GET_TID_ADDRESS = 40,
-  SET_PTRACER   = 0x59616d61, -- Ubuntu extension
 }
 
 -- for PR get/set unalign

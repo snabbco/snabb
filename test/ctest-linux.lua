@@ -56,13 +56,6 @@ for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number e
 c.syscall = nil
 c.OMQATTR = nil
 
--- missing on my ARM box
-c.CAP = nil
-c.AF.NFC = nil
-c.PR.SET_PTRACER = nil
-c.MAP["32BIT"] = nil
-c.SYS.sync_file_range = nil
-
 -- fake constants
 c.MS.RO = nil
 c.MS.RW = nil
@@ -79,6 +72,15 @@ c.MNT.EXPIRE = c.UMOUNT.EXPIRE
 c.UMOUNT.FORCE = nil
 c.UMOUNT.DETACH = nil
 c.UMOUNT.EXPIRE = nil
+
+-- renamed constants
+c.O.NONBLOCK = c.OPIPE.NONBLOCK
+c.O.CLOEXEC = c.OPIPE.CLOEXEC
+c.OPIPE = nil
+
+-- we renamed these for namespacing reasons
+for k, v in pairs(c.IFREQ) do c.IFF[k] = v end
+c.IFREQ = nil
 
 -- TODO find the headers/flags for these if exist, or remove
 c.SA.RESTORER = nil
@@ -175,6 +177,13 @@ c.CLOCK.REALTIME_COARSE = nil
 c.CLOCK.MONOTONIC_RAW = nil
 c.SOCK.DCCP = nil
 
+-- missing on my ARM box
+c.CAP = nil
+c.AF.NFC = nil
+c.PR.SET_PTRACER = nil
+c.MAP["32BIT"] = nil
+c.SYS.sync_file_range = nil
+
 -- these are not in Musl at present TODO send patches to get them in
 c.IPPROTO.UDPLITE = nil
 c.IPPROTO.DCCP = nil
@@ -220,10 +229,6 @@ c.MNT.EXPIRE = nil
 c.MNT.DETACH = nil
 c.SYS.fadvise64_64 = nil
 
--- we renamed these for namespacing reasons
-for k, v in pairs(c.IFREQ) do c.IFF[k] = v end
-c.IFREQ = nil
-
 -- travis missing tun tap stuff etc
 c.IFF.MULTI_QUEUE = nil
 c.IFF.ATTACH_QUEUE = nil
@@ -242,11 +247,6 @@ c.SYS.getdents = nil
 c.O.ACCMODE = nil
 
 if abi.abi64 then c.O.LARGEFILE = nil end
-
--- renamed constants
-c.O.NONBLOCK = c.OPIPE.NONBLOCK
-c.O.CLOEXEC = c.OPIPE.CLOEXEC
-c.OPIPE = nil
 
 -- not included on ppc?
 c.IOCTL.TCSETS2 = nil

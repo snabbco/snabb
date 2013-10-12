@@ -81,8 +81,6 @@ local addtypes = {
   clockid = "clockid_t",
 }
 
--- as an experiment, see https://github.com/justincormack/ljsyscall/issues/28 trying adding a __len method
--- however initially only for the ones with no extra metatype.
 local addstructs = {
   ucred = "struct ucred",
   sysinfo = "struct sysinfo",
