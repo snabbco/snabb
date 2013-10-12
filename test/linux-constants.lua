@@ -196,6 +196,9 @@ struct sockaddr {
 ]]
 
 print [[
+#define __KERNEL__
+
+#include <linux/types.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
 #include <linux/net.h>
