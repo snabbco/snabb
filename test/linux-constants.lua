@@ -275,44 +275,29 @@ void sassert_u64(uint64_t a, uint64_t b, char *n) {
 int main(int argc, char **argv) {
 ]]
 
-arches = {
-  --arm = {larch = "arm", bits = 32},
-  --x86 = {larch = "i386", bits = 32},
-  x64 = {larch = "x86_64", bits = 64},
-  --ppc = {larch = "powerpc", bits = 32},
-  --mips = {larch = "mips", bits = 32},
-}
-
 local abi = require "syscall.abi"
 
 local ffi = require "ffi"
 
-for arch, info in pairs(arches) do -- TODO will not work here need to output multiple programs!
-  abi.arch = arch
-  if info.bits == 32 then abi.abi32, abi.abi64 = true, false else abi.abi32, abi.abi64 = false, true end
-  local c = require "syscall.linux.constants"
+local c = require "syscall.linux.constants"
 
-  c = fixup(abi, c)
+c = fixup(abi, c)
 
-  for k, v in pairs(c) do
-    if type(v) == "number" then
-      print("sassert(" .. k .. ", " .. v .. ', "' .. k .. '");')
-    elseif type(v) == "table" then
-      for k2, v2 in pairs(v) do
-        local name = nm[k] or k .. "_"
-        if type(v2) ~= "function" then
-          if type(v2) == "cdata" and ffi.sizeof(v2) == 8 then -- TODO avoid use of ffi if possible
-           print("sassert_u64(" .. name .. k2 .. ", " .. tostring(v2)  .. ', "' .. name .. k2 .. '");')
-          else
-           print("sassert(" .. name .. k2 .. ", " .. tostring(v2)  .. ', "' .. name .. k2 .. '");')
-          end
+for k, v in pairs(c) do
+  if type(v) == "number" then
+    print("sassert(" .. k .. ", " .. v .. ', "' .. k .. '");')
+  elseif type(v) == "table" then
+    for k2, v2 in pairs(v) do
+      local name = nm[k] or k .. "_"
+      if type(v2) ~= "function" then
+        if type(v2) == "cdata" and ffi.sizeof(v2) == 8 then -- TODO avoid use of ffi if possible
+         print("sassert_u64(" .. name .. k2 .. ", " .. tostring(v2)  .. ', "' .. name .. k2 .. '");')
+        else
+         print("sassert(" .. name .. k2 .. ", " .. tostring(v2)  .. ', "' .. name .. k2 .. '");')
         end
       end
     end
   end
-
-  c = nil
-  package.loaded["syscall.linux.constants"] = nil
 end
 
 print [[
