@@ -1936,8 +1936,8 @@ c.SECCOMP_RET = multiflags {
   TRACE     = 0x7ff00000,
   ALLOW     = 0x7fff0000,
 
-  ACTION    = 0xffff0000, -- note unsigned
-  DATA      = 0x0000ffff,
+  ACTION    = 0x7fff0000, -- mask
+  DATA      = 0x0000ffff, -- mask
 }
 
 -- Elf machine flags

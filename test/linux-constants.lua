@@ -7,7 +7,6 @@
 error with F_SETLK64: 13 (0xd) != 6 (0x6)
 error with F_GETLK64: 12 (0xc) != 5 (0x5)
 error with F_SETLKW64: 14 (0xe) != 7 (0x7)
-error with SECCOMP_RET_ACTION: 2147418112 (0x7fff0000) != -65536 (0xffff0000)
 ]]
 
 local function fixup(abi, c)
