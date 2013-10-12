@@ -1,6 +1,6 @@
 -- test just the constants for Linux, against standard set so cross platform.
 -- test against make headers_install ARCH=i386 INSTALL_HDR_PATH=/tmp
--- plus link with a minimal (Musl) to get stddef.h - make our own as causes warnings
+-- plus link with a minimal (Musl) to get stddef.h - make our own as causes warning
 
 local function fixup(abi, c)
   -- we only use one set
@@ -180,6 +180,7 @@ local nm = {
   LINUX_CAPABILITY_VERSION = "_LINUX_CAPABILITY_VERSION_",
   LINUX_CAPABILITY_U32S = "_LINUX_CAPABILITY_U32S_",
   EPOLLCREATE = "EPOLL_",
+  RLIM = "RLIM64_",
 }
 
 -- not defined by kernel

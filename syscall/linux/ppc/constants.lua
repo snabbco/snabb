@@ -437,7 +437,8 @@ arch.LFLAG = {
 
 -- TODO these will be in a table
 arch.CBAUD      = octal('0000377')
-arch.CBAUDEX    = octal('0000020')
+arch.CBAUDEX    = octal('0000000')
+arch.CIBAUD     = octal('077600000')
 
 arch.CFLAG = {
   CSIZE      = octal('00001400'),

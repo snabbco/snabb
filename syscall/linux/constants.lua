@@ -231,7 +231,7 @@ c.MAP = multiflags {
   TYPE       = 0x0f,
   FIXED      = 0x10,
   ANONYMOUS  = 0x20,
-  ["32BIT"]  = 0x40,
+  ["32BIT"]  = 0x40, -- TODO does not seem to be defined for all architectures eg ppc?
   GROWSDOWN  = 0x00100,
   DENYWRITE  = 0x00800,
   EXECUTABLE = 0x01000,
@@ -2228,8 +2228,8 @@ c.EXTB       = c.B38400
 -- TODO clean up how to handle these (used for custom speeds)
 c.CBAUD      = arch.CBAUD or octal('0010017')
 c.CBAUDEX    = arch.CBAUDEX or octal('0010000')
+c.CIBAUD     = arch.CIBAUD or octal('002003600000') -- input baud rate (not used)
 
-c.CIBAUD     = octal('002003600000') -- input baud rate (not used)
 c.CMSPAR     = octal('010000000000') -- mark or space (stick) parity
 c.CRTSCTS    = octal('020000000000') -- flow control
 
