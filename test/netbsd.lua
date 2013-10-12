@@ -190,7 +190,7 @@ test.sockets_pipes_bsd = {
     assert(s:close())
     assert(S.unlink(tmpfile))
   end,
-  test_inet_socket_read_paccept = function() -- commenting out writev triggers issue
+  test_inet_socket_read_paccept = function() -- commenting out writev triggers PR/48292
     local ss = assert(S.socket("inet", "stream, nonblock"))
     local sa = t.sockaddr_in(0, "loopback")
     assert(ss:bind(sa))
@@ -203,7 +203,6 @@ test.sockets_pipes_bsd = {
     assert(ok or err.ISCONN);
     assert(ss:block()) -- force accept to wait
     as = as or assert(ss:paccept())
-    assert(as:block())
     local fl = assert(as:fcntl("getfl"))
     assert_equal(bit.band(fl, c.O.NONBLOCK), 0)
 -- TODO commenting out next two lines is issue only with paccept not accept
