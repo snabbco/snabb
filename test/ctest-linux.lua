@@ -272,6 +272,9 @@ c.PR.GET_NO_NEW_PRIVS = nil
 c.PR.SET_NO_NEW_PRIVS = nil
 c.IP.MULTICAST_ALL = nil
 
+-- ppc glibc has wrong value, fixed in new constant test
+c.CBAUDEX = nil
+
 -- glibc lies about what structure is used on ppc for termios TODO check all these ioctls
 if abi.arch == "ppc" then
   ctypes["struct termios"] = nil
