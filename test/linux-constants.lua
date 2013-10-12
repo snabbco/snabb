@@ -1,6 +1,8 @@
 -- test just the constants for Linux, against standard set so cross platform.
 -- test against make headers_install ARCH=i386 INSTALL_HDR_PATH=/tmp
--- plus link with a minimal (Musl) to get stddef.h - make our own as causes warning
+-- fix linux/input.h includes which are broken
+
+-- TODO fix up so can test all architectures
 
 local function fixup(abi, c)
   -- we only use one set
