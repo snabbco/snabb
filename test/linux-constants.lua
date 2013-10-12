@@ -2,14 +2,18 @@
 -- test against make headers_install ARCH=i386 INSTALL_HDR_PATH=/tmp
 -- plus link with a minimal (Musl) to get stddef.h - make our own as causes warnings
 
--- current errors on x86_64
---[[
-error with F_SETLK64: 13 (0xd) != 6 (0x6)
-error with F_GETLK64: 12 (0xc) != 5 (0x5)
-error with F_SETLKW64: 14 (0xe) != 7 (0x7)
-]]
-
 local function fixup(abi, c)
+  -- we only use one set
+  if abi.abi64 then
+    c.F.GETLK64   = nil
+    c.F.SETLK64   = nil
+    c.F.SETLKW64  = nil
+  else
+    c.F.GETLK     = nil
+    c.F.SETLK     = nil
+    c.F.SETLKW    = nil
+  end
+
   -- internal use
   c.syscall = nil
   c.OMQATTR = nil
