@@ -48,6 +48,10 @@ local function fixup(abi, c)
   c.E.NOTSUP = nil
   c.SIG.CLD = nil
 
+  -- extra friendly names
+  c.WAIT.ANY = nil
+  c.WAIT.MYPGRP = nil
+
   -- surely part of ABI? not defined in kernel ones we have though
   c.AF = nil
   c.MSG = nil
@@ -91,55 +95,30 @@ local function fixup(abi, c)
   c.AUDIT_ARCH.ARMEB = nil
   c.AUDIT_ARCH.ARM = nil
 
-  -- missing in 3.3.4 header set should be in later/more complete version or not in ABI really TODO update and check
-  c.SI.ASYNCNL = nil
-  c.AT_ACCESSAT.EACCESS = nil
-  c.IOCB_CMD.PREAD = nil
-  c.IOCB_CMD.PWRITE = nil
-  c.IOCB_CMD.NOOP = nil
-  c.IOCB_CMD.FSYNC = nil
-  c.IOCB_CMD.PWRITEV = nil
-  c.IOCB_CMD.PREADV = nil
-  c.IOCB_CMD.FDSYNC = nil
-  c.SECCOMP_MODE = nil
-  c.RLIMIT.OFILE = nil
-  c.EFD = nil
-  c.SO.PEEK_OFF = nil
-  c.SO.GET_FILTER = nil
-  c.SO.NOFCS = nil
-  c.UMOUNT.NOFOLLOW = nil
-  c.TFD_TIMER.ABSTIME = nil
-  c.ETHERTYPE = nil
-  c.IFF.DETACH_QUEUE = nil
-  c.MNT.FORCE = nil
-  c.MNT.EXPIRE = nil
-  c.MNT.DETACH = nil
-  c.PR.SET_NO_NEW_PRIVS = nil
-  c.PR.GET_NO_NEW_PRIVS = nil
-  c.PR.GET_TID_ADDRESS = nil
-  c.SPLICE_F = nil
-  c.TUN.TAP_MQ = nil
-  c.IP.UNICAST_IF = nil
-  c.PR_MCE_KILL_OPT = nil
-  --c.SIGACT.HOLD = nil
-  c.TFD = nil
-  c.WAIT.ANY = nil
-  c.WAIT.MYPGRP = nil
-  c.IFF.MULTI_QUEUE = nil
-  c.IFF.ATTACH_QUEUE = nil
-  c.SWAP_FLAG = nil
-  c.SECCOMP_MODE = nil
-  c.SECCOMP_RET = nil
-  c.SCHED.OTHER = nil
+  -- these are not even in linux git head headers or names wrong
+  c.EM = nil -- some of these defined/some missing even in latest, fix/remove in ljsyscall?
   c.O.ASYNC = nil
   c.O.FSYNC = nil
   c.O.RSYNC = nil
-  c.NTF = nil
-  c.EM = nil -- some of these defined actually
+  c.SPLICE_F = nil
+  c.MNT.FORCE = nil
+  c.MNT.EXPIRE = nil
+  c.MNT.DETACH = nil
   c.EPOLLCREATE.NONBLOCK = nil
-  c.IPPROTO.MTP = nil
-  c.IPPROTO.TP = nil
-  c.IPPROTO.ENCAP = nil
+  c.PR_MCE_KILL_OPT = nil
+  c.SWAP_FLAG = nil
+  c.ETHERTYPE = nil
+  c.TFD = nil
+  c.UMOUNT.NOFOLLOW = nil
+  c.EFD = nil
+  c.SCHED.OTHER = nil
+  c.AT_ACCESSAT.EACCESS = nil
+  c.SI.ASYNCNL = nil
+  c.RLIMIT.OFILE = nil
+  c.TFD_TIMER.ABSTIME = nil
+
+  -- renamed it seems, TODO sort out
+  c.SYS.newfstatat = c.SYS.fstatat
   c.SYS.fstatat = nil
 
   return c
@@ -253,8 +232,8 @@ print [[
 #include <linux/neighbour.h>
 #include <linux/errno.h>
 #include <linux/signalfd.h>
-//#include <linux/vfio.h>
-//#include <linux/seccomp.h>
+#include <linux/vfio.h>
+#include <linux/seccomp.h>
 
 int ret;
 
