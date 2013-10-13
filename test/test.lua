@@ -147,11 +147,8 @@ local clean = function()
 end
 
 -- type tests use reflection TODO move to seperate test file
-if pcall(require, "jit") then
-local jit = require "jit"
-
-local reflect = require "include.ffi-reflect.reflect"
-
+local ok, reflect = pcall(require, "include.ffi-reflect.reflect")
+if ok then
 test_types = {
   test_allocate = function() -- create an element of every ctype
     for k, v in pairs(t) do
