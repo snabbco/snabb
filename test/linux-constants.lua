@@ -126,6 +126,8 @@ local function fixup(abi, c)
   c.IP.UNICAST_IF = nil
   c.NTF.SELF = nil
   c.NTF.MASTER = nil
+  c.SECCOMP_MODE = nil
+  c.SECCOMP_RET = nil
 
   -- these are not even in linux git head headers or names wrong
   c.O.ASYNC = nil
@@ -218,9 +220,6 @@ struct sockaddr {
 ]]
 
 print [[
-/* this should not be here, see https://github.com/sabotage-linux/kernel-headers/issues/3 */
-#define __KERNEL__
-
 #include <linux/types.h>
 #include <linux/stddef.h>
 #include <linux/unistd.h>
@@ -274,8 +273,8 @@ print [[
 #include <linux/neighbour.h>
 #include <linux/errno.h>
 #include <linux/signalfd.h>
-#include <linux/vfio.h>
-#include <linux/seccomp.h>
+//#include <linux/vfio.h>
+//#include <linux/seccomp.h>
 
 int ret;
 
