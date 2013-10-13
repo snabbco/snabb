@@ -271,8 +271,9 @@ c.IOCTL.VFIO_CHECK_EXTENSION = nil
 c.PR.GET_NO_NEW_PRIVS = nil
 c.PR.SET_NO_NEW_PRIVS = nil
 c.IP.MULTICAST_ALL = nil
+c.EM.TI_C6000 = nil
 
--- ppc glibc has wrong value, fixed in new constant test
+-- ppc glibc has wrong value, fixed in new constant test/
 c.CBAUDEX = nil
 
 -- glibc lies about what structure is used on ppc for termios TODO check all these ioctls
