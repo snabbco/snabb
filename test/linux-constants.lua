@@ -109,10 +109,6 @@ local function fixup(abi, c)
   c.EPOLL.OUT = nil
   c.EPOLL.PRI = nil
 
-  -- broken defines in header set
-  c.AUDIT_ARCH.ARMEB = nil -- https://github.com/sabotage-linux/kernel-headers/issues/2
-  c.AUDIT_ARCH.ARM = nil
-
   -- only in very recent headers, not in ones we are testing against, but include seccomp - will upgrade headers or fix soon
   c.IPPROTO.TP = nil
   c.IPPROTO.MTP = nil
@@ -132,7 +128,6 @@ local function fixup(abi, c)
   c.NTF.MASTER = nil
 
   -- these are not even in linux git head headers or names wrong
-  c.EM = nil -- some missing see https://github.com/sabotage-linux/kernel-headers/issues/2
   c.O.ASYNC = nil
   c.O.FSYNC = nil
   c.O.RSYNC = nil
