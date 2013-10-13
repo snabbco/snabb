@@ -13,7 +13,7 @@ local function init(S)
 local nl = {} -- exports
 
 local ffi = require "ffi"
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 

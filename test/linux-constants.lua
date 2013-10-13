@@ -50,8 +50,6 @@ local function fixup(abi, c)
   if abi.abi64 then c.O.LARGEFILE = nil end
 
   -- renamed constants
-  c.O.NONBLOCK = c.OPIPE.NONBLOCK
-  c.O.CLOEXEC = c.OPIPE.CLOEXEC
   c.OPIPE = nil
 
   -- we renamed these for namespacing reasons TODO can just set in nm table
@@ -125,7 +123,7 @@ local function fixup(abi, c)
   c.O.ASYNC = nil
   c.O.FSYNC = nil
   c.O.RSYNC = nil
-  c.SPLICE_F = nil
+  c.SPLICE_F = nil -- not in any exported header, there should be a linux/splice.h for userspace
   c.MNT.FORCE = nil
   c.MNT.EXPIRE = nil
   c.MNT.DETACH = nil

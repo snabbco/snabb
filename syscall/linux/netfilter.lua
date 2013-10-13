@@ -12,7 +12,7 @@ pcall, type, table, string, math
 local nf = {} -- exports
 
 local ffi = require "ffi"
-local bit = require "bit"
+local bit = require "syscall.bit"
 local S = require "syscall"
 local helpers = require "syscall.helpers"
 local c = S.c

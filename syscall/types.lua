@@ -17,7 +17,7 @@ local function init(abi, c, errors, ostypes, ostypes2)
 local rumpfn = abi.rumpfn
 
 local ffi = require "ffi"
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 

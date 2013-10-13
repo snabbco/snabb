@@ -8,7 +8,7 @@ local c = S.c
 local abi = S.abi
 local features = require "syscall.features"
 
-local bit = require "bit"
+local bit = require "syscall.bit"
 local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s

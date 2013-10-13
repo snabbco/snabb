@@ -10,8 +10,7 @@ pcall, type, table, string, math
 local abi = require "syscall.abi"
 
 local ffi = require "ffi"
-
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local h = {}
 

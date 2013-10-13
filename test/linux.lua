@@ -8,7 +8,7 @@ local c = S.c
 local features = S.features
 local util = S.util
 
-local bit = require "bit"
+local bit = require "syscall.bit"
 local ffi = require "ffi"
 
 local jit

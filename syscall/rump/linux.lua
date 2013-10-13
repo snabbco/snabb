@@ -12,6 +12,7 @@ pcall, type, table, string, math
 local function init(types, hh, abi, c)
 
 local ffi = require "ffi"
+local bit = require "syscall.bit"
 
 ffi.cdef [[
 typedef uint32_t _netbsd_mode_t;
@@ -38,9 +39,6 @@ struct _netbsd_ptyfs_args {
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
 local ptt, addtype, lenfn, lenmt, newfn, istype = hh.ptt, hh.addtype, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
-
-local ffi = require "ffi"
-local bit = require "bit"
 
 local h = require "syscall.helpers"
 

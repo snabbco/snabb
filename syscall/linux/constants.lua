@@ -9,7 +9,7 @@ pcall, type, table, string, math
 
 local abi = require "syscall.abi"
 
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local arch = require("syscall.linux." .. abi.arch .. ".constants") -- architecture specific code
 

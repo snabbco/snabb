@@ -16,7 +16,7 @@ local strflag = require "syscall.helpers".strflag
 
 local arch = require("syscall.linux." .. abi.arch .. ".ioctl")(s)
 
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local band = bit.band
 local bor = bit.bor

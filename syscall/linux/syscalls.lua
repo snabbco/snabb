@@ -10,7 +10,7 @@ pcall, type, table, string, math
 return function(S, hh, abi, c, C, types, ioctl)
 
 local ffi = require "ffi"
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local t, pt, s = types.t, types.pt, types.s
 

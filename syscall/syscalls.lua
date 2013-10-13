@@ -11,7 +11,7 @@ pcall, type, table, string, math
 local function init(abi, c, C, types, ioctl, fcntl)
 
 local ffi = require "ffi"
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 local err64 = h.err64

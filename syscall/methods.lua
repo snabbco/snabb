@@ -15,7 +15,7 @@ local c = S.c
 local types = S.types
 local t, s, pt = types.t, types.s, types.pt
 
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local ffi = require "ffi"
 

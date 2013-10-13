@@ -77,7 +77,7 @@ elseif (abi.rump or abi.xen) and S.geteuid() == 0 then -- some initial setup for
   assert(S.mount("ptyfs", "/dev/pts", 0, {version = 2, gid = 0, mode = octal("0320")}))
 end
 
-local bit = require "bit"
+local bit = require "syscall.bit"
 local ffi = require "ffi"
 
 if not (abi.rump and abi.types == "linux") then

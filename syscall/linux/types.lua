@@ -17,7 +17,7 @@ local ptt, addtype, addtype_var, lenmt, newfn, istype, reviter =
   hh.ptt, hh.addtype, hh.addtype_var, hh.lenmt, hh.newfn, hh.istype, hh.reviter
 
 local ffi = require "ffi"
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 

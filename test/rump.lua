@@ -10,7 +10,7 @@ local abi = S.abi
 local features = S.features
 local util = S.util
 
-local bit = require "bit"
+local bit = require "syscall.bit"
 local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s

@@ -14,7 +14,7 @@ local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 local ptt, addtype, lenfn, lenmt, newfn, istype = hh.ptt, hh.addtype, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
 
 local ffi = require "ffi"
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 

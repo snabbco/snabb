@@ -12,7 +12,7 @@ local function init(abi, types)
 local s = types.s
 
 local strflag = require("syscall.helpers").strflag
-local bit = require "bit"
+local bit = require "syscall.bit"
 
 local band = bit.band
 local function bor(...)
