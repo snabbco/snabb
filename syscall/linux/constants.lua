@@ -231,7 +231,6 @@ c.MAP = multiflags {
   TYPE       = 0x0f,
   FIXED      = 0x10,
   ANONYMOUS  = 0x20,
-  ["32BIT"]  = 0x40, -- TODO does not seem to be defined for all architectures eg ppc?
   GROWSDOWN  = 0x00100,
   DENYWRITE  = 0x00800,
   EXECUTABLE = 0x01000,
@@ -245,6 +244,8 @@ addarch(c.MAP, arch.MAP, {
   LOCKED     = 0x02000,
   NORESERVE  = 0x04000,
 })
+
+if abi.abi64 then c.MAP["32BIT"] = 0x40 end
 
 c.MAP.ANON       = c.MAP.ANONYMOUS
 

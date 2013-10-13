@@ -1,6 +1,7 @@
 -- test just the constants for Linux, against standard set so cross platform.
 -- test against make headers_install ARCH=i386 INSTALL_HDR_PATH=/tmp
 -- fix linux/input.h includes which are broken
+-- luajit test/linux-constants.lua > /tmp/c.c && cc -I/tmp/include  -o /tmp/c /tmp/c.c && /tmp/c
 
 -- TODO fix up so can test all architectures
 
@@ -114,7 +115,7 @@ local function fixup(abi, c)
   c.AUDIT_ARCH.ARM = nil
 
   -- these are not even in linux git head headers or names wrong
-  c.EM = nil -- some of these defined/some missing even in latest, fix/remove in ljsyscall?
+  c.EM = nil -- some missing see https://github.com/sabotage-linux/kernel-headers/issues/2
   c.O.ASYNC = nil
   c.O.FSYNC = nil
   c.O.RSYNC = nil
@@ -199,6 +200,7 @@ struct sockaddr {
 ]]
 
 print [[
+/* this should not be here, see https://github.com/sabotage-linux/kernel-headers/issues/3 */
 #define __KERNEL__
 
 #include <linux/types.h>
