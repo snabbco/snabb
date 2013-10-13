@@ -4,6 +4,7 @@
 -- luajit test/linux-constants.lua > /tmp/c.c && cc -I/tmp/include  -o /tmp/c /tmp/c.c && /tmp/c
 
 -- TODO fix up so can test all architectures
+-- TODO 32 bit warnings about signed ranges
 
 local function fixup(abi, c)
   -- we only use one set
@@ -144,6 +145,12 @@ local function fixup(abi, c)
   -- renamed it seems, TODO sort out
   c.SYS.newfstatat = c.SYS.fstatat
   c.SYS.fstatat = nil
+
+  -- also renamed/issues on arm TODO sort out
+  if abi.arch == "arm" then
+    c.SYS.fadvise64_64 = nil
+    c.SYS.sync_file_range = nil
+  end
 
   return c
 end
