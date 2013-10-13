@@ -113,10 +113,23 @@ local function fixup(abi, c)
   c.AUDIT_ARCH.ARMEB = nil -- https://github.com/sabotage-linux/kernel-headers/issues/2
   c.AUDIT_ARCH.ARM = nil
 
-  -- only in very recent headers
+  -- only in very recent headers, not in ones we are testing against, but include seccomp - will upgrade headers or fix soon
   c.IPPROTO.TP = nil
   c.IPPROTO.MTP = nil
   c.IPPROTO.ENCAP = nil
+  c.SO.PEEK_OFF = nil
+  c.SO.GET_FILTER = nil
+  c.SO.NOFCS = nil
+  c.IFF.DETACH_QUEUE = nil
+  c.IFF.ATTACH_QUEUE = nil
+  c.IFF.MULTI_QUEUE = nil
+  c.PR.SET_NO_NEW_PRIVS = nil
+  c.PR.GET_NO_NEW_PRIVS = nil
+  c.PR.GET_TID_ADDRESS = nil
+  c.TUN.TAP_MQ = nil
+  c.IP.UNICAST_IF = nil
+  c.NTF.SELF = nil
+  c.NTF.MASTER = nil
 
   -- these are not even in linux git head headers or names wrong
   c.EM = nil -- some missing see https://github.com/sabotage-linux/kernel-headers/issues/2
