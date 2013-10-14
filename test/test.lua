@@ -175,7 +175,7 @@ test_types = {
         if mt and type(mt.__index) == "table" then
           for kk, _ in pairs(mt.__index) do
             local r = x[kk] -- read value via metatable
-            if mt.__newindex and mt.__newindex[kk] then x[kk] = r end -- write, unlikely to actually test anything
+            if mt.__newindex and type(mt.__newindex) == "table" and mt.__newindex[kk] then x[kk] = r end -- write, unlikely to actually test anything
           end
         end
         if mt and mt.index then
