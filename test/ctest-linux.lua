@@ -2,6 +2,8 @@
 -- Linux specific as there are a lot of workarounds
 -- luajit ctest.lua > ctest.c && cc -std=c99 ctest.c -o ctest && ./ctest
 
+-- TODO we are replacing this with new tests against clean kernel headers, test/linux-constants.lua is first part
+
 local S = require "syscall"
 
 local abi = S.abi

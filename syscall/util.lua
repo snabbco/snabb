@@ -242,7 +242,7 @@ function util.recvcmsg(fd, msg, flags)
     local io = t.iovecs{{buf1, 1}}
     local bufsize = 1024 -- sane default, build your own structure otherwise
     local buf = t.buffer(bufsize)
-    msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io, msg_control = buf, msg_controllen = bufsize}
+    msg = t.msghdr{iov = io, msg_control = buf, msg_controllen = bufsize}
   end
   local count, err = S.recvmsg(fd, msg, flags)
   if not count then return nil, err end
