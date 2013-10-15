@@ -119,19 +119,12 @@ end
 addtype("iovec", "struct iovec", lenmt)
 
 mt.iovecs = {
-  __index = function(io, k)
-    return io.iov[k - 1]
-  end,
-  __newindex = function(io, k, v)
-    v = istype(t.iovec, v) or t.iovec(v)
-    ffi.copy(io.iov[k - 1], v, s.iovec)
-  end,
   __len = function(io) return io.count end,
   __tostring = function(io)
     local s = {}
-    for i=1, io.count do
-      local iovec = io.iov[i-1]
-      s[i] = ffi.string(iovec.iov_base, iovec.iov_len)
+    for i = 0, io.count - 1 do
+      local iovec = io.iov[i]
+      s[i + 1] = ffi.string(iovec.iov_base, iovec.iov_len)
     end
     return table.concat(s)
   end;
@@ -144,18 +137,18 @@ mt.iovecs = {
       if type(i) == 'string' then
         local buf = t.buffer(#i)
         ffi.copy(buf, i, #i)
-        iov[n].iov_base = buf
-        iov[n].iov_len = #i
+        iov.iov[n - 1].iov_base = buf
+        iov.iov[n - 1].iov_len = #i
       elseif type(i) == 'number' then
-        iov[n].iov_base = t.buffer(i)
-        iov[n].iov_len = i
+        iov.iov[n - 1].iov_base = t.buffer(i)
+        iov.iov[n - 1].iov_len = i
       elseif ffi.istype(t.iovec, i) then
         ffi.copy(iov[n], i, s.iovec)
       elseif type(i) == 'cdata' then -- eg buffer or other structure
-        iov[n].iov_base = i
-        iov[n].iov_len = ffi.sizeof(i)
+        iov.iov[n - 1].iov_base = i
+        iov.iov[n - 1].iov_len = ffi.sizeof(i)
       else -- eg table
-        iov[n] = i
+        iov.iov[n - 1] = i
       end
     end
     return iov
