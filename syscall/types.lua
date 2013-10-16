@@ -636,6 +636,7 @@ mt.msghdr = {
   },
   newindex = {
     iov = function(m, io) m.msg_iov, m.msg_iovlen = io.iov, #io end,
+    control = function(m, buf) m.msg_control, m.msg_controllen = buf, #buf end,
   },
   __new = newfn,
 }
