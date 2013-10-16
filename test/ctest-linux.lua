@@ -375,6 +375,7 @@ print [[
 #include <linux/vhost.h>
 #include <linux/neighbour.h>
 //#include <linux/vfio.h>
+#include <linux/virtio_pci.h>
 
 int ret = 0;
 

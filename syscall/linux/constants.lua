@@ -3269,5 +3269,25 @@ c.WAIT = strflag {
   MYPGRP   = 0,
 }
 
+-- virtio functions
+c.VIRTIO = strflag {
+  PCI_HOST_FEATURES       = 0,
+  PCI_GUEST_FEATURES      = 4,
+  PCI_QUEUE_PFN           = 8,
+  PCI_QUEUE_NUM           = 12,
+  PCI_QUEUE_SEL           = 14,
+  PCI_QUEUE_NOTIFY        = 16,
+  PCI_STATUS              = 18,
+  PCI_ISR                 = 19,
+  PCI_ISR_CONFIG          = 0x2,
+  MSI_CONFIG_VECTOR       = 20,
+  MSI_QUEUE_VECTOR        = 22,
+  MSI_NO_VECTOR           = 0xffff,
+  PCI_ABI_VERSION         = 0,
+  PCI_QUEUE_ADDR_SHIFT    = 12,
+  PCI_VRING_ALIGN         = 4096,
+  -- TODO VIRTIO_PCI_CONFIG_OFF(msix_enabled)     ((msix_enabled) ? 24 : 20)
+}
+
 return c
 
