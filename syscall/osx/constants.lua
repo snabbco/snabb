@@ -535,5 +535,54 @@ c.DT = strflag {
   WHT = 14,
 }
 
+-- poll
+c.POLL = multiflags {
+  IN          = 0x001,
+  PRI         = 0x002,
+  OUT         = 0x004,
+  WRNORM      = 0x004,
+  ERR         = 0x008,
+  HUP         = 0x010,
+  NVAL        = 0x020,
+  RDNORM      = 0x040,
+  RDBAND      = 0x080,
+  WRBAND      = 0x100,
+  EXTEND      = 0x200,
+  ATTRIB      = 0x400,
+  NLINK       = 0x8000,
+  WRITE       = 0x1000,
+}
+
+--mmap
+c.PROT = multiflags {
+  NONE  = 0x0,
+  READ  = 0x1,
+  WRITE = 0x2,
+  EXEC  = 0x4,
+}
+
+-- Sharing types
+c.MAP = multiflags {
+  FILE           = 0x0000,
+  SHARED         = 0x0001,
+  PRIVATE        = 0x0002,
+  FIXED          = 0x0010,
+  RENAME         = 0x0020,
+  NORESERVE      = 0x0040,
+  NORESERVE0080  = 0x0080,
+  NOEXTEND       = 0x0100,
+  HASSEMAPHORE   = 0x0200,
+  NOCACHE        = 0x0400,
+  JIT            = 0x0800,
+  ANON           = 0x1000,
+}
+
+-- flags to `msync'. - note was MS_ renamed to MSYNC_
+c.MSYNC = multiflags {
+  ASYNC       = 0x0001,
+  INVALIDATE  = 0x0002,
+  SYNC        = 0x0010,
+}
+
 return c
 
