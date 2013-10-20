@@ -132,24 +132,25 @@ mt.iovecs = {
     if type(is) == 'number' then return ffi.new(tp, is, is) end
     local count = #is
     local iov = ffi.new(tp, count, count)
-    for n = 1, count do
-      local i = is[n]
+    local j = 0
+    for n, i in ipairs(is) do
       if type(i) == 'string' then
         local buf = t.buffer(#i)
         ffi.copy(buf, i, #i)
-        iov.iov[n - 1].iov_base = buf
-        iov.iov[n - 1].iov_len = #i
+        iov.iov[j].iov_base = buf
+        iov.iov[j].iov_len = #i
       elseif type(i) == 'number' then
-        iov.iov[n - 1].iov_base = t.buffer(i)
-        iov.iov[n - 1].iov_len = i
+        iov.iov[j].iov_base = t.buffer(i)
+        iov.iov[j].iov_len = i
       elseif ffi.istype(t.iovec, i) then
         ffi.copy(iov[n], i, s.iovec)
       elseif type(i) == 'cdata' then -- eg buffer or other structure
-        iov.iov[n - 1].iov_base = i
-        iov.iov[n - 1].iov_len = ffi.sizeof(i)
+        iov.iov[j].iov_base = i
+        iov.iov[j].iov_len = ffi.sizeof(i)
       else -- eg table
-        iov.iov[n - 1] = i
+        iov.iov[j] = i
       end
+      j = j + 1
     end
     return iov
   end
