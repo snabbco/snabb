@@ -374,6 +374,7 @@ print [[
 #include <linux/if_tun.h>
 #include <linux/vhost.h>
 #include <linux/neighbour.h>
+#include <linux/pci.h>
 //#include <linux/vfio.h>
 #include <linux/virtio_pci.h>
 

@@ -274,6 +274,7 @@ print [[
 #include <linux/errno.h>
 #include <linux/signalfd.h>
 #include <linux/virtio_pci.h>
+#include <linux/pci.h>
 //#include <linux/vfio.h>
 //#include <linux/seccomp.h>
 
