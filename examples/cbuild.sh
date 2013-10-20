@@ -45,12 +45,15 @@ do
 done
 
 # small stub to create Lua state and call hello world
-cc -c -I${INCDIR} examples/cstub.c -o obj/cstub.o
+cc -c -fPIC -I${INCDIR} examples/cstub.c -o obj/cstub.o
 
 ar cr obj/libtest.a obj/cstub.o obj/syscall*.o obj/jit*.o obj/test*.o obj/include*.o
 
 #ld -o obj/cbuild --whole-archive obj/libhello.a --no-whole-archive ${LIBDIR}/libluajit.a -ldl -lm
 cc -Wl,-E -o obj/cbuild obj/cstub.o ${LIBDIR}/libluajit.a obj/syscall*.o -ldl -lm
 
-./obj/cbuild
+# for OSv - note this requires luajit .o files be built with -fPIC TODO patch and rebuild
+cc -shared -fPIC -Wl,-E -o obj/cbuild.so obj/cstub.o ${LIBDIR}/libluajit.a obj/syscall*.o
+
+#./obj/cbuild
 

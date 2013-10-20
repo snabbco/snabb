@@ -3291,8 +3291,6 @@ c.VIRTIO = strflag {
 
 -- from linux/pci_regs.h
 c.PCI = strflag {
-  STD_HEADER_SIZEOF  = 64,
-
   VENDOR_ID          = 0x00,
   DEVICE_ID          = 0x02,
   COMMAND            = 0x04,
