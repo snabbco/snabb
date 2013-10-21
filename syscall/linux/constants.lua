@@ -3365,5 +3365,19 @@ c.PCI = strflag {
   CB_LEGACY_MODE_BASE    = 0x44,
 }
 
+-- unclear how best to group these, maybe just put everything in PCI and let app fix it
+c.PCI_BASE_ADDRESS = strflag {
+  SPACE         = 0x01,
+  SPACE_IO      = 0x01,
+  SPACE_MEMORY  = 0x00,
+  MEM_TYPE_MASK = 0x06,
+  MEM_TYPE_32   = 0x00,
+  MEM_TYPE_1M   = 0x02,
+  MEM_TYPE_64   = 0x04,
+  MEM_PREFETCH  = 0x08,
+  --MEM_MASK      (~0x0fUL)
+  --IO_MASK       (~0x03UL)
+}
+
 return c
 
