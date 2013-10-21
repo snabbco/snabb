@@ -215,6 +215,7 @@ mt.sockaddr_storage = {
       local cs = st(sa)
       return cs[k]
     end
+    error("invalid index " .. k)
   end,
   __newindex = function(sa, k, v)
     if mt.sockaddr_storage.newindex[k] then
@@ -225,7 +226,9 @@ mt.sockaddr_storage = {
     if st then
       local cs = st(sa)
       cs[k] = v
+      return
     end
+    error("invalid index " .. k)
   end,
   __new = function(tp, init)
     local ss = ffi.new(tp)
