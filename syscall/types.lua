@@ -643,7 +643,7 @@ mt.msghdr = {
       if n then m.msg_name, m.msg_namelen = n, #n else m.msg_name, m.msg_namelen = nil, 0 end
     end,
     iov = function(m, io)
-      if ffi.istype(io, t.iovec) then -- single iovec
+      if ffi.istype(t.iovec, io) then -- single iovec
         m.msg_iov, m.msg_iovlen = io, 1
       else -- iovecs
         m.msg_iov, m.msg_iovlen = io.iov, #io
