@@ -228,7 +228,7 @@ function S.sendmsg(fd, msg, flags)
     local io = t.iovecs{{buf1, 1}}
     msg = t.msghdr{msg_iov = io.iov, msg_iovlen = #io}
   end
-  return retbool(C.sendmsg(getfd(fd), msg, c.MSG[flags]))
+  return retnum(C.sendmsg(getfd(fd), msg, c.MSG[flags]))
 end
 function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG[flags])) end
 -- TODO {get,set}sockopt may need better type handling see new sockopt file

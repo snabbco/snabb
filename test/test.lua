@@ -1376,7 +1376,8 @@ test_sendfd = {
     assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
     local so = assert(sv[2]:getsockopt(c.SOL.SOCKET, c.SO.PASSCRED))
     assert(so == 1, "getsockopt should have updated value")
-    assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
+    local n = assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
+    assert_equal(n, 1)
     local r = assert(util.recvcmsg(sv[2]))
     assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
     assert(sv:close())
