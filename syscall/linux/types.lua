@@ -461,6 +461,7 @@ mt.signalfd = {
     if rname == k then return true end
     if rname == k:upper() then return true end -- TODO use some metatable to hide this?
     if mt.signalfd.index[k] then return mt.signalfd.index[k](ss) end
+    error("invalid index " .. k)
   end,
 }
 
