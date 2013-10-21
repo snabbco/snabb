@@ -44,6 +44,11 @@ t.addrtype = {
 local mt = {} -- metatables
 
 --helpers
+local function getfd(fd)
+  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
+  return fd:getfd()
+end
+
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
 local function lenfn(tp) return ffi.sizeof(tp) end
@@ -574,18 +579,39 @@ mt.cmsghdr = {
       if datalen == nil then datalen = ffi.sizeof(data) end
       ffi.copy(self.cmsg_data, data, datalen)
     end,
+    setfd = function(self, fd) -- single fd
+      local int = pt.int(self.cmsg_data)
+      int[0] = getfd(fd)
+    end,
+    setfds = function(self, fds) -- general case, note does not check size
+      if type(fds) == "number" or fds.getfd then return self:setfd(fds) end
+      local int = pt.int(self.cmsg_data)
+      local off = 0
+      for _, v in ipairs(fds) do
+        int[off] = getfd(v)
+        off = off + 1
+      end
+    end,
   },
-  __new = function (tp, level, type, data, data_size)
+  __new = function (tp, level, scm, data, data_size)
     if not data then data_size = data_size or 0 end
-    data_size = data_size or #data
     level = c.SOL[level]
-    if typemap[level] then type = typemap[level][type] end
+    if typemap[level] then scm = typemap[level][scm] end
+    if level == c.SOL.SOCKET and scm == c.SCM.RIGHTS then
+      if type(data) == "number" then -- slightly odd but useful interfaces for fds - TODO document
+        data_size = data * s.int
+        data = nil
+      elseif type(data) == "table" then data_size = #data * s.int end
+    end
+    data_size = data_size or #data
     local self = ffi.new(tp, data_size, {
       cmsg_len = cmsg_len(data_size),
       cmsg_level = level,
-      cmsg_type = type,
+      cmsg_type = scm,
     })
-    if data then
+    if data and (level == c.SOL.SOCKET and scm == c.SCM.RIGHTS) then
+      self:setfds(data)
+    elseif data then
       ffi.copy(self.cmsg_data, data, data_size)
     end
     return self

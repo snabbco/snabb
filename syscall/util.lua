@@ -288,13 +288,7 @@ end
 function util.sendfds(fd, ...)
   local buf1 = t.buffer(1) -- need to send one byte
   local io = t.iovecs{{buf1, 1}}
-  local fds = {}
-  for i, v in ipairs{...} do fds[i] = v:getfd() end
-  local fa = t.ints(#fds, fds)
-  local fasize = ffi.sizeof(fa)
-
-  local cmsg = t.cmsghdr("socket", "rights", fa, fasize)
-
+  local cmsg = t.cmsghdr("socket", "rights", {...})
   local msg = t.msghdr() -- assume socket connected and so does not need address
   msg.msg_iov = io.iov
   msg.msg_iovlen = #io
