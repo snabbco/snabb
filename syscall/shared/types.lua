@@ -60,6 +60,12 @@ local function addtype2(name, tp)
   s[name] = ffi.sizeof(t[name])
 end
 
+local function addptrtype(name, tp)
+  local ptr = ffi.typeof(tp)
+  t[name] = function(v) return ffi.cast(ptr, v) end
+  s[name] = ffi.sizeof(ptr)
+end
+
 local addtypes = {
   char = "char",
   uchar = "unsigned char",
@@ -73,8 +79,6 @@ local addtypes = {
   uint64 = "uint64_t",
   long = "long",
   ulong = "unsigned long",
-  uintptr = "uintptr_t",
-  intptr = "intptr_t",
 }
 
 for k, v in pairs(addtypes) do addtype(k, v) end
@@ -103,6 +107,13 @@ local addtypes2 = {
 }
 
 for k, v in pairs(addtypes2) do addtype2(k, v) end
+
+local ptrtypes = {
+  uintptr = "uintptr_t",
+  intptr = "intptr_t",
+}
+
+for k, v in pairs(ptrtypes) do addptrtype(k, v) end
 
 t.ints = ffi.typeof("int[?]")
 t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
