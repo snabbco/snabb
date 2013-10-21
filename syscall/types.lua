@@ -572,7 +572,7 @@ mt.cmsghdr = {
     end,
     setdata = function(self, data, datalen)
       if datalen == nil then datalen = ffi.sizeof(data) end
-      ffi.copy(self.cmsg_data, data, #datalen)
+      ffi.copy(self.cmsg_data, data, datalen)
     end,
   },
   __new = function (tp, level, type, data, data_size)
