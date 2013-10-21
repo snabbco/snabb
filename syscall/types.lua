@@ -642,7 +642,13 @@ mt.msghdr = {
     name = function(m, n)
       if n then m.msg_name, m.msg_namelen = n, #n else m.msg_name, m.msg_namelen = nil, 0 end
     end,
-    iov = function(m, io) m.msg_iov, m.msg_iovlen = io.iov, #io end,
+    iov = function(m, io)
+      if ffi.istype(io, t.iovec) then -- single iovec
+        m.msg_iov, m.msg_iovlen = io, 1
+      else -- iovecs
+        m.msg_iov, m.msg_iovlen = io.iov, #io
+      end
+    end,
     control = function(m, buf)
       if buf then m.msg_control, m.msg_controllen = buf, #buf else m.msg_control, m.msg_controllen = nil, 0 end
     end,
