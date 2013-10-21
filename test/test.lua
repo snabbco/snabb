@@ -187,6 +187,30 @@ test_types = {
       end
     end
   end,
+  test_invalid_index_newindex = function()
+    local function index(x, k) return x[k] end
+    local function newindex(x, k) x[k] = x[k] end -- dont know type so assign to self
+    local badindex = "_____this_index_is_not_found"
+    local allok = true
+    for k, v in pairs(t) do
+      if type(v) == "cdata" then
+        local x
+        if reflect.typeof(v).vla then
+          x = v(1)
+        else
+          x = v()
+        end
+        local mt = reflect.getmetatable(x)
+        if mt then
+          local ok, err = pcall(index, x, badindex)
+          if not ok then print("index error on " .. k); allok = false end
+          local ok, err = pcall(newindex, x, badindex)
+          if not ok then print("newindex error on " .. k); allok = false end
+        end
+      end
+    end
+    assert_equal(allok, true)
+  end,
 }
 end
 
