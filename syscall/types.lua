@@ -476,6 +476,7 @@ addtype("sigset", "sigset_t", {
     if k == 'isemptyset' then return sigemptyset(set) end
     local sig = c.SIG[k]
     if sig then return sigismember(set, sig) end
+    error("invalid index " .. k)
   end,
   __new = function(tp, str)
     if ffi.istype(tp, str) then return str end
