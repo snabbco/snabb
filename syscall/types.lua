@@ -635,6 +635,9 @@ mt.msghdr = {
     cmsgs = cmsg_headers,
   },
   newindex = {
+    name = function(m, n)
+      if n then m.msg_name, m.msg_namelen = n, #n else m.msg_name, m.msg_namelen = nil, 0 end
+    end,
     iov = function(m, io) m.msg_iov, m.msg_iovlen = io.iov, #io end,
     control = function(m, buf) m.msg_control, m.msg_controllen = buf, #buf end,
   },
