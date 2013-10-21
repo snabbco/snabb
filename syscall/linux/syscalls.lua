@@ -109,7 +109,6 @@ function S.waitpid(pid, options, status) -- note order of arguments changed as r
 end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
   if not infop then infop = t.siginfo() end
-  infop.si_pid = 0 -- see notes on man page
   local ret = C.waitid(c.P[idtype], id or 0, infop, c.W[options])
   if ret == -1 then return nil, t.error() end
   return infop -- return table here?
