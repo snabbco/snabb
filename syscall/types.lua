@@ -184,6 +184,7 @@ t.error = ffi.metatype("struct {int errno;}", {
     if k == 'sym' then return errsyms[t.errno] end
     if k == 'lsym' then return errsyms[t.errno]:lower() end
     if c.E[k] then return c.E[k] == t.errno end
+    error("invalid index " .. k)
   end,
   __new = function(tp, errno)
     if not errno then errno = ffi.errno() end
