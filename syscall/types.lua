@@ -568,8 +568,12 @@ mt.cmsghdr = {
         return cred.pid, cred.uid, cred.gid
       else
         return nil, "cmsg does not contain credentials"
-      end;
-    end;
+      end
+    end,
+    setdata = function(self, data, datalen)
+      if datalen == nil then datalen = ffi.sizeof(data) end
+      ffi.copy(self.cmsg_data, data, #datalen)
+    end,
   },
   __new = function (tp, level, type, data, data_size)
     if not data then data_size = data_size or 0 end
