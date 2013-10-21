@@ -203,9 +203,9 @@ test_types = {
         local mt = reflect.getmetatable(x)
         if mt then
           local ok, err = pcall(index, x, badindex)
-          if not ok then print("index error on " .. k); allok = false end
+          if ok then print("index error on " .. k); allok = false end
           local ok, err = pcall(newindex, x, badindex)
-          if not ok then print("newindex error on " .. k); allok = false end
+          if ok then print("newindex error on " .. k); allok = false end
         end
       end
     end
