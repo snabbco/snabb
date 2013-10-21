@@ -449,10 +449,10 @@ mt.signalfd = {
     trapno = function(ss) return tonumber(ss.ssi_trapno) end,
     status = function(ss) return tonumber(ss.ssi_status) end,
     int = function(ss) return tonumber(ss.ssi_int) end,
-    ptr = function(ss) return ss.ss_ptr end,
+    ptr = function(ss) return ss.ssi_ptr end,
     utime = function(ss) return tonumber(ss.ssi_utime) end,
     stime = function(ss) return tonumber(ss.ssi_stime) end,
-    addr = function(ss) return ss.ss_addr end,
+    addr = function(ss) return ss.ssi_addr end,
   },
   __index = function(ss, k) -- TODO simplify this
     local sig = c.SIG[k]
