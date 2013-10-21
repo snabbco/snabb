@@ -273,15 +273,10 @@ function util.sendcred(fd, pid, uid, gid) -- only needed for root to send (incor
   ucred.gid = gid
   local buf1 = t.buffer(1) -- need to send one byte
   local io = t.iovecs{{buf1, 1}}
-
   local cmsg = t.cmsghdr("socket", "credentials", ucred)
-
   local msg = t.msghdr() -- assume socket connected and so does not need address
-  msg.msg_iov = io.iov
-  msg.msg_iovlen = #io
-  msg.msg_control = cmsg
-  msg.msg_controllen = #cmsg
-
+  msg.iov = io
+  msg.control = cmsg
   return S.sendmsg(fd, msg, 0)
 end
 
@@ -290,11 +285,8 @@ function util.sendfds(fd, ...)
   local io = t.iovecs{{buf1, 1}}
   local cmsg = t.cmsghdr("socket", "rights", {...})
   local msg = t.msghdr() -- assume socket connected and so does not need address
-  msg.msg_iov = io.iov
-  msg.msg_iovlen = #io
-  msg.msg_control = cmsg
-  msg.msg_controllen = #cmsg
-
+  msg.iov = io
+  msg.control = cmsg
   return S.sendmsg(fd, msg, 0)
 end
 
