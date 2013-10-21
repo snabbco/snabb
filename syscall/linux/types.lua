@@ -626,7 +626,7 @@ local function capflags(val, str)
   local a = h.split(",", str)
   for i, v in ipairs(a) do
     local s = h.trim(v):upper()
-    assert(c.CAP[s], "invalid capability") -- TODO not sure if throw is best solution here, but silent errors otherwise
+    if not c.CAP[s] then error("invalid capability " .. s) end
     val[s] = true
   end
   return val
@@ -635,7 +635,7 @@ end
 mt.cap = {
   __index = function(cap, k)
     local ci = c.CAP[k]
-    if not ci then return end
+    if not ci then error("invalid capability " .. k) end
     local i, shift = h.divmod(ci, 32)
     local mask = bit.lshift(1, shift)
     return bit.band(cap.cap[i], mask) ~= 0
@@ -643,7 +643,7 @@ mt.cap = {
   __newindex = function(cap, k, v)
     if v == true then v = 1 elseif v == false then v = 0 end
     local ci = c.CAP[k]
-    if not ci then return end
+    if not ci then error("invalid capability " .. k) end
     local i, shift = h.divmod(ci, 32)
     local mask = bit.bnot(bit.lshift(1, shift))
     local set = bit.lshift(v, shift)
