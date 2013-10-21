@@ -572,7 +572,7 @@ mt.cmsghdr = {
     end;
   },
   __new = function (tp, level, type, data, data_size)
-    if not data then data_size = 0 end
+    if not data then data_size = data_size or 0 end
     data_size = data_size or #data
     level = c.SOL[level]
     if typemap[level] then type = typemap[level][type] end
