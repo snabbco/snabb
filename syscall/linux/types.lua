@@ -455,7 +455,8 @@ mt.signalfd = {
     addr = function(ss) return ss.ss_addr end,
   },
   __index = function(ss, k) -- TODO simplify this
-    if ss.ssi_signo == c.SIG(k) then return true end
+    local sig = c.SIG[k]
+    if sig then return tonumber(ss.ssi_signo) == sig end
     local rname = signal_reasons_gen[ss.ssi_code]
     if not rname and signal_reasons[ss.ssi_signo] then rname = signal_reasons[ss.ssi_signo][ss.ssi_code] end
     if rname == k then return true end
