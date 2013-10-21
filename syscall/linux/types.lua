@@ -828,8 +828,10 @@ mt.cpu_set = {
   __index = function(set, k)
     if mt.cpu_set.index[k] then return mt.cpu_set.index[k] end
     if type(k) == "number" then return set:get(k) end
+    error("invalid index " .. k)
   end,
   __newindex = function(set, k, v)
+    if type(k) ~= "number" then error("invalid index " .. k) end
     if v then set:set(k) else set:clear(k) end
   end,
   __new = function(tp, tab)
