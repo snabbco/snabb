@@ -733,6 +733,29 @@ mt.pollfds = {
 
 addtype_var("pollfds", "struct {int count; struct pollfd pfd[?];}", mt.pollfds)
 
+mt.rusage = {
+  index = {
+    utime    = function(ru) return ru.ru_utime end,
+    stime    = function(ru) return ru.ru_stime end,
+    maxrss   = function(ru) return tonumber(ru.ru_maxrss) end,
+    ixrss    = function(ru) return tonumber(ru.ru_ixrss) end,
+    idrss    = function(ru) return tonumber(ru.ru_idrss) end,
+    isrss    = function(ru) return tonumber(ru.ru_isrss) end,
+    minflt   = function(ru) return tonumber(ru.ru_minflt) end,
+    majflt   = function(ru) return tonumber(ru.ru_majflt) end,
+    nswap    = function(ru) return tonumber(ru.ru_nswap) end,
+    inblock  = function(ru) return tonumber(ru.ru_inblock) end,
+    oublock  = function(ru) return tonumber(ru.ru_oublock) end,
+    msgsnd   = function(ru) return tonumber(ru.ru_msgsnd) end,
+    msgrcv   = function(ru) return tonumber(ru.ru_msgrcv) end,
+    nsignals = function(ru) return tonumber(ru.ru_nsignals) end,
+    nvcsw    = function(ru) return tonumber(ru.ru_nvcsw) end,
+    nivcsw   = function(ru) return tonumber(ru.ru_nivcsw) end,
+  },
+}
+
+addtype("rusage", "struct rusage", mt.rusage)
+
 -- include OS specific types
 local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenmt = lenmt,
             newfn = newfn, istype = istype, reviter = reviter}
@@ -770,29 +793,6 @@ if t.dirent then
     end
   end
 end
-
-mt.rusage = {
-  index = {
-    utime    = function(ru) return ru.ru_utime end,
-    stime    = function(ru) return ru.ru_stime end,
-    maxrss   = function(ru) return tonumber(ru.ru_maxrss) end,
-    ixrss    = function(ru) return tonumber(ru.ru_ixrss) end,
-    idrss    = function(ru) return tonumber(ru.ru_idrss) end,
-    isrss    = function(ru) return tonumber(ru.ru_isrss) end,
-    minflt   = function(ru) return tonumber(ru.ru_minflt) end,
-    majflt   = function(ru) return tonumber(ru.ru_majflt) end,
-    nswap    = function(ru) return tonumber(ru.ru_nswap) end,
-    inblock  = function(ru) return tonumber(ru.ru_inblock) end,
-    oublock  = function(ru) return tonumber(ru.ru_oublock) end,
-    msgsnd   = function(ru) return tonumber(ru.ru_msgsnd) end,
-    msgrcv   = function(ru) return tonumber(ru.ru_msgrcv) end,
-    nsignals = function(ru) return tonumber(ru.ru_nsignals) end,
-    nvcsw    = function(ru) return tonumber(ru.ru_nvcsw) end,
-    nivcsw   = function(ru) return tonumber(ru.ru_nivcsw) end,
-  },
-}
-
-addtype("rusage", "struct rusage", mt.rusage)
 
 return types
 
