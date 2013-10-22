@@ -29,6 +29,7 @@ ctypes["struct cpu_set_t"] = nil -- not actually a struct
 ctypes["dev_t"] = nil -- use kernel value not glibc
 ctypes["struct seccomp_data"] = nil -- not in ppc setup, remove for now
 ctypes["sigset_t"] = nil -- use kernel value not glibc
+ctypes["struct {dev_t dev;}"] = nil -- not a real type
 
 if abi.abi32 then
   ctypes["struct stat64"] = ctypes["struct stat"]
