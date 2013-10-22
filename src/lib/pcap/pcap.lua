@@ -45,23 +45,17 @@ end
 local pcap_extra = ffi.new("struct pcap_record_extra")
 ffi.fill(pcap_extra, ffi.sizeof(pcap_extra), 0)
 
-function write_record(file, ffi_buffer, length,   port, input)
+function write_record (file, ffi_buffer, length)
+   write_record_header(file, length)
+   file:write(ffi.string(ffi_buffer, length))
+   file:flush()
+end
+
+function write_record_header (file, length)
    local pcap_record = ffi.new("struct pcap_record")
-   local incl_len = length;
-   if port ~= nil then
-      incl_len = incl_len + ffi.sizeof(pcap_extra)
-      pcap_extra.port_id = port
-      pcap_extra.flags = (input and 0) or 1
-   end
-   pcap_record.incl_len = incl_len
+   pcap_record.incl_len = length
    pcap_record.orig_len = length
    file:write(ffi.string(pcap_record, ffi.sizeof(pcap_record)))
-   file:write(ffi.string(ffi_buffer, length))
-   if port ~= nil then
---      print 'write extra bytes...'
-      file:write(ffi.string(pcap_extra, ffi.sizeof(pcap_extra)))
-   end
-   file:flush()
 end
 
 -- Return an iterator for pcap records in FILENAME.
