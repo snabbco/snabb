@@ -167,7 +167,7 @@ mt.iovecs = {
   end
 }
 
-addtype_var("iovecs", "struct { int count; struct iovec iov[?];}", mt.iovecs)
+addtype_var("iovecs", "struct {int count; struct iovec iov[?];}", mt.iovecs)
 
 -- convert strings to inet addresses and the reverse
 local function inet4_ntop(src)
@@ -256,7 +256,7 @@ local in6addr = strflag {
   LOOPBACK = "::1",
 }
 
-addtype("in_addr", "struct in_addr", {
+mt.in_addr = {
   __tostring = inet4_ntop,
   __new = function(tp, s)
     local addr = ffi.new(tp)
@@ -272,7 +272,9 @@ addtype("in_addr", "struct in_addr", {
     return addr
   end,
   __len = lenfn,
-})
+}
+
+addtype("in_addr", "struct in_addr", mt.in_addr)
 
 addtype("in6_addr", "struct in6_addr", {
   __tostring = inet6_ntop,
