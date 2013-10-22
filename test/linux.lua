@@ -517,7 +517,7 @@ test.misc_linux = {
     -- new travis CI does not support this TODO add to features
     if err and err.NOSYS then return end
     assert(not err, "expect no error, got " .. tostring(err))
-    assert(S.setrlimit("nofile", {0, r.rlim_max}))
+    assert(S.setrlimit("nofile", {cur = 0, max = r.rlim_max}))
     local fd, err = S.open("/dev/zero", "rdonly")
     assert(err.MFILE, "should be over rlimit")
     assert(S.setrlimit("nofile", r)) -- reset
@@ -529,7 +529,7 @@ test.misc_linux = {
     -- new travis CI does not support this TODO add to features
     if err and err.NOSYS then return end
     assert(not err, "expect no error")
-    local r2 = assert(S.prlimit(0, "nofile", {512, r.max}))
+    local r2 = assert(S.prlimit(0, "nofile", {cur = 512, max = r.max}))
     assert_equal(r2.cur, r.cur, "old value same")
     assert_equal(r2.max, r.max, "old value same")
     local r3 = assert(S.prlimit(0, "nofile"))
@@ -542,7 +542,7 @@ test.misc_linux = {
   end,
   test_prlimit_root = function()
     local r = assert(S.prlimit(0, "nofile"))
-    local r2 = assert(S.prlimit(0, "nofile", {512, 640}))
+    local r2 = assert(S.prlimit(0, "nofile", {cur = 512, max = 640}))
     assert_equal(r2.cur, r.cur, "old value same")
     assert_equal(r2.max, r.max, "old value same")
     local r3 = assert(S.prlimit(0, "nofile"))

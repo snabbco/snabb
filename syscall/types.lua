@@ -96,7 +96,6 @@ local lenmt = {__len = lenfn}
 -- generic for __new TODO use more
 local function newfn(tp, tab)
   local num = {}
-  if tab then for i = 1, #tab do num[i] = tab[i] end end -- numeric index initialisers TODO remove these as may vary by OS
   local obj = ffi.new(tp, num)
   -- these are split out so __newindex is called, not just initialisers luajit understands
   for k, v in pairs(tab or {}) do if type(k) == "string" then obj[k] = v end end -- set string indexes

@@ -404,10 +404,7 @@ mt.rlimit = {
       r.rlim_max = c.RLIM[v] -- allows use of "infinity"
     end,
   },
-  __new = function(tp, tab)
-    if tab then for k, v in pairs(tab) do tab[k] = c.RLIM[v] end end
-    return newfn(tp, tab)
-  end,
+  __new = newfn,
 }
 
 addtype("rlimit", "struct rlimit64", mt.rlimit)
