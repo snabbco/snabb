@@ -7,14 +7,15 @@ local buffer = require("core.buffer")
 local packet = require("core.packet")
 local pcap = require("lib.pcap.pcap")
 
-Pcap = {}
+PcapReader = {}
 
-function Pcap:new (filename)
+function PcapReader:new (filename)
    local records = pcap.records(filename)
-   return setmetatable({iterator = records, done = false}, {__index = Pcap})
+   return setmetatable({iterator = records, done = false},
+		       {__index = PcapReader})
 end
 
-function Pcap:pull ()
+function PcapReader:pull ()
    assert(self.output.output)
    while not self.done and not app.full(self.output.output) do
       local data, record, extra = self.iterator()
@@ -27,6 +28,28 @@ function Pcap:pull ()
       else
          self.done = true
       end
+   end
+end
+
+PcapWriter = {}
+
+function PcapWriter:new (filename)
+   local file = io.open(filename, "w")
+   pcap.write_file_header(file)
+   return setmetatable({file = file}, {__index = PcapWriter})
+end
+
+function PcapWriter:push ()
+   while not app.empty(self.input.input) do
+      print("write a record")
+      local p = app.receive(self.input.input)
+      pcap.write_record_header(self.file, p.length)
+      for i = 0, p.niovecs-1 do
+	 local iov = p.iovecs[i]
+	 -- XXX expensive to create interned Lua string.
+	 self.file:write(ffi.string(iov.buffer.pointer, iov.length))
+      end
+      self.file:flush()
    end
 end
 

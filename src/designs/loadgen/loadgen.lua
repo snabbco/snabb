@@ -7,7 +7,7 @@ local pci       = require("lib.hardware.pci")
 local intel_app = require("apps.intel.intel_app")
 local basic_apps = require("apps.basic.basic_apps")
 local main      = require("core.main")
-local Pcap      = require("apps.pcap.pcap").Pcap
+local PcapReader= require("apps.pcap.pcap").PcapReader
 local LoadGen   = require("apps.intel.LoadGen")
 local ffi = require("ffi")
 local C = ffi.C
@@ -15,7 +15,7 @@ local C = ffi.C
 function run (args)
    local filename = table.remove(args, 1)
    local patterns = args
-   app.apps.pcap = app.new(Pcap:new(filename))
+   app.apps.pcap = app.new(PcapReader:new(filename))
    app.apps.loop = app.new(basic_apps.Repeater:new())
    app.apps.tee  = app.new(basic_apps.Tee:new(filename))
    app.connect("pcap", "output", "loop", "input")
