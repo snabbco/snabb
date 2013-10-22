@@ -157,7 +157,7 @@ mt.iovecs = {
         iov.iov[j].iov_len = i
       elseif ffi.istype(t.iovec, i) then
         ffi.copy(iov[n], i, s.iovec)
-      elseif type(i) == 'cdata' then -- eg buffer or other structure
+      elseif type(i) == 'cdata' or type(i) == 'userdata' then -- eg buffer or other structure, userdata if luaffi
         iov.iov[j].iov_base = i
         iov.iov[j].iov_len = ffi.sizeof(i)
       else -- eg table
