@@ -82,7 +82,7 @@ mt.device = {
 
 addtype("device", "struct {dev_t dev;}", mt.device)
 
-addtype("sockaddr_un", "struct sockaddr_un", {
+mt.sockaddr_un = {
   index = {
     family = function(sa) return sa.sun_family end,
     path = function(sa) return ffi.string(sa.sun_path) end,
@@ -93,11 +93,13 @@ addtype("sockaddr_un", "struct sockaddr_un", {
   },
   __new = function(tp, path) return newfn(tp, {family = c.AF.UNIX, path = path, sun_len = s.sockaddr_un}) end,
   __len = function(sa) return 2 + #sa.path end,
-})
+}
+
+addtype("sockaddr_un", "struct sockaddr_un", mt.sockaddr_un)
 
 function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has odd unix handling
 
-addtype("stat", "struct stat", {
+mt.stat = {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
     mode = function(st) return st.st_mode end,
@@ -127,9 +129,11 @@ addtype("stat", "struct stat", {
     issock = function(st) return st.type == c.S_I.FSOCK end,
     iswht = function(st) return st.type == c.S_I.FWHT end,
   },
-})
+}
 
-addtype("siginfo", "siginfo_t", {
+addtype("stat", "struct stat", mt.stat)
+
+mt.siginfo = {
   index = {
     signo   = function(s) return s._info._signo end,
     code    = function(s) return s._info._code end,
@@ -158,7 +162,9 @@ addtype("siginfo", "siginfo_t", {
     band    = function(s, v) s._info._reason._poll._band = v end,
     fd      = function(s, v) s._info._reason._poll._fd = v end,
   },
-})
+}
+
+addtype("siginfo", "siginfo_t", mt.siginfo)
 
 mt.dirent = {
   index = {
