@@ -211,6 +211,22 @@ test_types = {
     end
     assert_equal(allok, true)
   end,
+  test_length = function()
+    local nolen = {fd = true, error = true, mqd = true, u6432 = true, i6432 = true} -- internal use
+    local function len(x) return #x end
+    local allok = true
+    for k, v in pairs(t) do
+      if type(v) == "cdata" then
+        if not reflect.typeof(v).vla then
+          local x = v()
+          local mt = reflect.getmetatable(x)
+          local ok, err = pcall(len, x)
+          if mt and not ok and not nolen[k] then print("no len on " .. k); allok = false end
+        end
+      end
+    end
+    assert_equal(allok, true)
+  end,
 }
 end
 
