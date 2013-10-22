@@ -80,7 +80,7 @@ mt.device = {
   end,
 }
 
-addtype("device", "struct {_netbsd_dev_t dev;}", mt.device)
+addtype("device", "struct {dev_t dev;}", mt.device)
 
 addtype("sockaddr_un", "struct sockaddr_un", {
   index = {

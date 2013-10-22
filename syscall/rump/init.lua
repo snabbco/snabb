@@ -56,6 +56,7 @@ local unchanged = {
 local function rumpfn(tp)
   if unchanged[tp] then return tp end
   if tp == "void (*)(int, siginfo_t *, void *)" then return "void (*)(int, _netbsd_siginfo_t *, void *)" end
+    if tp == "struct {dev_t dev;}" then return "struct {_netbsd_dev_t dev;}" end
   if string.find(tp, "struct") then
     return (string.gsub(tp, "struct (%a)", "struct _netbsd_%1"))
   end
