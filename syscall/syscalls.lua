@@ -35,6 +35,12 @@ local function istype(tp, x) if ffi.istype(tp, x) then return x else return fals
 -- even simpler version coerces to type
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
+local function getdev(dev)
+  if type(dev) == "table" then t.device(dev) end
+  if ffi.istype(t.device, dev) then dev = dev.dev end
+  return dev
+end
+
 -- return helpers.
 
 -- 64 bit return helpers. Only use for lseek in fact; we use tonumber but remove if you need files over 56 bits long
@@ -107,7 +113,7 @@ function S.chroot(path) return retbool(C.chroot(path)) end
 function S.umask(mask) return C.umask(c.MODE[mask]) end
 function S.sync() return C.sync() end
 function S.mknod(pathname, mode, dev)
-  if type(dev) == "table" then dev = dev.dev end -- TODO allow array eg {2, 2} - major, minor
+  dev = getdev(dev)
   return retbool(C.mknod(pathname, c.S_I[mode], dev or 0))
 end
 function S.flock(fd, operation) return retbool(C.flock(getfd(fd), c.LOCK[operation])) end

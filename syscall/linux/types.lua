@@ -155,26 +155,35 @@ t.user_cap_data2 = ffi.typeof("struct user_cap_data[2]")
 
 -- types with metatypes
 
--- 32 bit dev_t. Note glibc has 64 bit dev_t but we use syscall API which does not
+-- Note 32 bit dev_t; glibc has 64 bit dev_t but we use syscall API which does not
+
+local function makedev(major, minor)
+  local dev = major or 0
+  if minor then dev = bit.bor(bit.lshift(bit.band(minor, 0xffffff00), 12), bit.band(minor, 0xff), bit.lshift(major, 8)) end
+  return dev
+end
+
 mt.device = {
-  __index = {
+  index = {
     major = function(dev)
-      local d = dev:device()
+      local d = dev.dev
       return bit.band(bit.rshift(d, 8), 0x00000fff)
     end,
     minor = function(dev)
-      local d = dev:device()
+      local d = dev.dev
       return bit.bor(bit.band(d, 0x000000ff), bit.band(bit.rshift(d, 12), 0x000000ff))
     end,
     device = function(dev) return tonumber(dev.dev) end,
   },
+  newindex = {
+    device = function(dev, major, minor) dev.dev = makedev(major, minor) end,
+  },
+  __new = function(tp, major, minor)
+    return ffi.new(tp, makedev(major, minor))
+  end
 }
 
-t.device = function(major, minor)
-  local dev = major
-  if minor then dev = bit.bor(bit.lshift(bit.band(minor, 0xffffff00), 12), bit.band(minor, 0xff), bit.lshift(major, 8)) end
-  return setmetatable({dev = t.dev(dev)}, mt.device)
-end
+addtype("device", "struct {dev_t dev;}", mt.device)
 
 -- we do provide this directly for compatibility, only use for standard names
 addtype("sockaddr_un", "struct sockaddr_un", {

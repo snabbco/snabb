@@ -225,8 +225,8 @@ test_basic = {
   end,
   test_major_minor = function()
     local d = t.device(2, 3)
-    assert_equal(d:major(), 2)
-    assert_equal(d:minor(), 3)
+    assert_equal(d.major, 2)
+    assert_equal(d.minor, 3)
   end,
   test_fd_nums = function() -- TODO should also test on the version from types.lua
     assert_equal(t.fd(18):nogc():getfd(), 18, "should be able to trivially create fd")
@@ -724,9 +724,9 @@ test_file_operations = {
     assert(S.mknod(tmpfile, "fchr,0666", t.device(1, 5)))
     local stat = assert(S.stat(tmpfile))
     assert(stat.ischr, "expect to be a character device")
-    assert_equal(stat.rdev:major(), 1 , "expect major number to be 1")
-    assert_equal(stat.rdev:minor(), 5, "expect minor number to be 5")
-    assert_equal(stat.rdev, t.device(1, 5), "expect raw device to be makedev(1, 5)")
+    assert_equal(stat.rdev.major, 1 , "expect major number to be 1")
+    assert_equal(stat.rdev.minor, 5, "expect minor number to be 5")
+    assert_equal(stat.rdev.device, t.device(1, 5).device, "expect raw device to be makedev(1, 5)")
     assert(S.unlink(tmpfile))
   end,
   test_mkfifo = function()
