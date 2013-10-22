@@ -22,20 +22,59 @@ local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
 local mt = {} -- metatables
 
--- 32 bit dev_t, 24 bit minor, 8 bit major
+--[[
+local function makedev(major, minor)
+  local dev = major or 0
+  if minor then dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff)) end
+  return dev
+end
+
 mt.device = {
-  __index = {
+  index = {
+    major = function(dev)
+      local h, l = t.i6432(dev.dev):to32()
+      return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)))
+    end,
+    minor = function(dev)
+      local h, l = t.i6432(dev.dev):to32()
+      return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)))
+    end,
+    device = function(dev) return tonumber(dev.dev) end,
+  },
+  newindex = {
+    device = function(dev, major, minor) dev.dev = makedev(major, minor) end,
+  },
+  __new = function(tp, major, minor)
+    return ffi.new(tp, makedev(major, minor))
+  end,
+}
+
+addtype("device", "struct {_netbsd_dev_t dev;}", mt.device)
+
+]]
+
+-- 32 bit dev_t, 24 bit minor, 8 bit major
+local function makedev(major, minor)
+  local dev = major or 0
+  if minor then dev = bit.bor(minor, bit.lshift(major, 24)) end
+  return dev
+end
+
+mt.device = {
+  index = {
     major = function(dev) return bit.bor(bit.band(bit.rshift(dev:device(), 24), 0xff)) end,
     minor = function(dev) return bit.band(dev:device(), 0xffffff) end,
     device = function(dev) return tonumber(dev.dev) end,
   },
+  newindex = {
+    device = function(dev, major, minor) dev.dev = makedev(major, minor) end,
+  },
+  __new = function(tp, major, minor)
+    return ffi.new(tp, makedev(major, minor))
+  end,
 }
 
-t.device = function(major, minor)
-  local dev = major
-  if minor then dev = bit.bor(minor, bit.lshift(major, 24)) end
-  return setmetatable({dev = t.dev(dev)}, mt.device)
-end
+addtype("device", "struct {dev_t dev;}", mt.device)
 
 function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has odd unix handling
 
