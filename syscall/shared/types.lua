@@ -129,7 +129,7 @@ end
 
 mt.iovec = {}
 
-addtype("iovec", "struct iovec", {})
+addtype("iovec", "struct iovec", mt.iovec)
 
 mt.iovecs = {
   __len = function(io) return io.count end,

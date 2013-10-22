@@ -185,7 +185,7 @@ mt.device = {
 addtype("device", "struct {dev_t dev;}", mt.device)
 
 -- we do provide this directly for compatibility, only use for standard names
-addtype("sockaddr_un", "struct sockaddr_un", {
+mt.sockaddr_un = {
   index = {
     family = function(sa) return sa.sun_family end,
     path = function(sa) return ffi.string(sa.sun_path) end, -- only valid for proper names
@@ -196,11 +196,14 @@ addtype("sockaddr_un", "struct sockaddr_un", {
   },
   __new = function(tp, path) return newfn(tp, {family = c.AF.UNIX, path = path}) end, -- TODO accept table initialiser
   __len = function(tp) return s.sockaddr_un end, -- TODO lenfn (default) instead
-})
+}
+
+addtype("sockaddr_un", "struct sockaddr_un", mt.sockaddr_un)
 
 -- this is a bit odd, but we actually use Lua metatables for sockaddr_un, and use t.sa to multiplex
 -- basically the lINUX unix socket structure is not possible to interpret without size, but does not have size in struct
-mt.sockaddr_un = {
+-- nasty, but have not thought of a better way yet; could make an ffi type
+local lua_sockaddr_un_mt = {
   __index = function(un, k)
     local sa = un.addr
     if k == 'family' then return sa.family end
@@ -224,7 +227,7 @@ function t.sa(addr, addrlen)
   if family == c.AF.UNIX then -- we return Lua metatable not metatype, as need length to decode
     local sa = t.sockaddr_un()
     ffi.copy(sa, addr, addrlen)
-    return setmetatable({addr = sa, addrlen = addrlen}, mt.sockaddr_un)
+    return setmetatable({addr = sa, addrlen = addrlen}, lua_sockaddr_un_mt)
   end
   return addr
 end
@@ -235,7 +238,7 @@ local nlgroupmap = { -- map from netlink socket type to group names. Note there 
 --  [c.NETLINK.SELINUX] = c.SELNLGRP,
 }
 
-addtype("sockaddr_nl", "struct sockaddr_nl", {
+mt.sockaddr_nl = {
   index = {
     family = function(sa) return sa.nl_family end,
     pid = function(sa) return sa.nl_pid end,
@@ -254,9 +257,11 @@ addtype("sockaddr_nl", "struct sockaddr_nl", {
     return ffi.new(tp, {nl_family = c.AF.NETLINK, nl_pid = pid, nl_groups = groups})
   end,
   __len = function(tp) return s.sockaddr_nl end,
-})
+}
 
-addtype("sockaddr_ll", "struct sockaddr_ll", {
+addtype("sockaddr_nl", "struct sockaddr_nl", mt.sockaddr_nl)
+
+mt.sockaddr_ll = {
   index = {
     family = function(sa) return sa.sll_family end,
     protocol = function(sa) return ntohs(sa.sll_protocol) end,
@@ -287,9 +292,11 @@ addtype("sockaddr_ll", "struct sockaddr_ll", {
     return sa
   end,
   __len = function(tp) return s.sockaddr_ll end,
-})
+}
 
-addtype("stat", "struct stat", {
+addtype("sockaddr_ll", "struct sockaddr_ll", mt.sockaddr_ll)
+
+mt.stat = {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
     ino = function(st) return tonumber(st.st_ino) end,
@@ -315,9 +322,11 @@ addtype("stat", "struct stat", {
     islnk = function(st) return st.type == c.S_I.FLNK end,
     issock = function(st) return st.type == c.S_I.FSOCK end,
   },
-})
+}
 
-addtype("siginfo", "struct siginfo", {
+addtype("stat", "struct stat", mt.stat)
+
+mt.siginfo = {
   index = {
     signo   = function(s) return s.si_signo end,
     errno   = function(s) return s.si_errno end,
@@ -354,9 +363,11 @@ addtype("siginfo", "struct siginfo", {
     band    = function(s, v) s.sifields.sigpoll.si_band = v end,
     fd      = function(s, v) s.sifields.sigpoll.si_fd = v end,
   },
-})
+}
 
-addtype("macaddr", "struct {uint8_t mac_addr[6];}", {
+addtype("siginfo", "struct siginfo", mt.siginfo)
+
+mt.macaddr = {
   __tostring = function(m)
     local hex = {}
     for i = 1, 6 do
@@ -374,9 +385,11 @@ addtype("macaddr", "struct {uint8_t mac_addr[6];}", {
     end
     return mac
   end,
-})
+}
 
-addtype("rlimit", "struct rlimit64", {
+addtype("macaddr", "struct {uint8_t mac_addr[6];}", mt.macaddr)
+
+mt.rlimit = {
   index = {
     cur = function(r) if r.rlim_cur == c.RLIM.INFINITY then return -1 else return tonumber(r.rlim_cur) end end,
     max = function(r) if r.rlim_max == c.RLIM.INFINITY then return -1 else return tonumber(r.rlim_max) end end,
@@ -395,7 +408,9 @@ addtype("rlimit", "struct rlimit64", {
     if tab then for k, v in pairs(tab) do tab[k] = c.RLIM[v] end end
     return newfn(tp, tab)
   end,
-})
+}
+
+addtype("rlimit", "struct rlimit64", mt.rlimit)
 
 local function itnormal(v)
   if not v then v = {{0, 0}, {0, 0}} end
@@ -418,7 +433,7 @@ local function itnormal(v)
   return v
 end
 
-addtype("itimerspec", "struct itimerspec", {
+mt.itimerspec = {
   index = {
     interval = function(it) return it.it_interval end,
     value = function(it) return it.it_value end,
@@ -429,9 +444,11 @@ addtype("itimerspec", "struct itimerspec", {
     v.it_value = istype(t.timespec, v.it_value) or t.timespec(v.it_value)
     return ffi.new(tp, v)
   end,
-})
+}
 
-addtype("itimerval", "struct itimerval", {
+addtype("itimerspec", "struct itimerspec", mt.itimerspec)
+
+mt.itimerval = {
   index = {
     interval = function(it) return it.it_interval end,
     value = function(it) return it.it_value end,
@@ -442,7 +459,9 @@ addtype("itimerval", "struct itimerval", {
     v.it_value = istype(t.timeval, v.it_value) or t.timeval(v.it_value)
     return ffi.new(tp, v)
   end,
-})
+}
+
+addtype("itimerval", "struct itimerval", mt.itimerval)
 
 mt.signalfd = {
   index = {
@@ -487,8 +506,6 @@ mt.siginfos = {
 }
 
 addtype_var("siginfos", "struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
-
--- slightly miscellaneous types, eg need to use Lua metatables
 
 -- TODO convert to use constants? note missing some macros eg WCOREDUMP(). Allow lower case.
 mt.wait = {
@@ -721,6 +738,7 @@ addtype("capabilities", "struct capabilities", mt.capabilities)
 mt.inotify_events = {
   __index = function(tab, k)
     if c.IN[k] then return bit.band(tab.mask, c.IN[k]) ~= 0 end
+    error("invalid index " .. k)
   end
 }
 

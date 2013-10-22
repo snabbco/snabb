@@ -22,37 +22,6 @@ local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
 local mt = {} -- metatables
 
---[[
-local function makedev(major, minor)
-  local dev = major or 0
-  if minor then dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff)) end
-  return dev
-end
-
-mt.device = {
-  index = {
-    major = function(dev)
-      local h, l = t.i6432(dev.dev):to32()
-      return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)))
-    end,
-    minor = function(dev)
-      local h, l = t.i6432(dev.dev):to32()
-      return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)))
-    end,
-    device = function(dev) return tonumber(dev.dev) end,
-  },
-  newindex = {
-    device = function(dev, major, minor) dev.dev = makedev(major, minor) end,
-  },
-  __new = function(tp, major, minor)
-    return ffi.new(tp, makedev(major, minor))
-  end,
-}
-
-addtype("device", "struct {_netbsd_dev_t dev;}", mt.device)
-
-]]
-
 -- 32 bit dev_t, 24 bit minor, 8 bit major
 local function makedev(major, minor)
   local dev = major or 0
@@ -78,7 +47,7 @@ addtype("device", "struct {dev_t dev;}", mt.device)
 
 function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has odd unix handling
 
-addtype("stat", "struct stat", {
+mt.stat = {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
     mode = function(st) return st.st_mode end,
@@ -107,10 +76,11 @@ addtype("stat", "struct stat", {
     islnk = function(st) return st.type == c.S_I.FLNK end,
     issock = function(st) return st.type == c.S_I.FSOCK end,
   },
-  __len = lenfn,
-})
+}
 
-addtype("siginfo", "siginfo_t", {
+addtype("stat", "struct stat", mt.stat)
+
+mt.siginfo = {
   index = {
     signo   = function(s) return s.si_signo end,
     errno   = function(s) return s.si_errno end,
@@ -134,7 +104,9 @@ addtype("siginfo", "siginfo_t", {
     band    = function(s, v) s.si_band = v end,
   },
   __len = lenfn,
-})
+}
+
+addtype("siginfo", "siginfo_t", mt.siginfo)
 
 mt.dirent = {
   index = {
@@ -149,8 +121,6 @@ mt.dirent = {
   __len = function(self) return self.d_reclen end,
 }
 
--- TODO previously this allowed lower case values, but this static version does not
--- could add mt.dirent.index[tolower(k)] = mt.dirent.index[k] but need to do consistently elsewhere
 for k, v in pairs(c.DT) do
   mt.dirent.index[k] = function(self) return self.type == v end
 end

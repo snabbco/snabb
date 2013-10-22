@@ -178,7 +178,7 @@ for k, v in pairs(c.E) do
   errsyms[v] = k
 end
 
-t.error = ffi.metatype("struct {int errno;}", {
+mt.error = {
   __tostring = function(e) return errors[e.errno] end,
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
@@ -190,14 +190,17 @@ t.error = ffi.metatype("struct {int errno;}", {
     if not errno then errno = ffi.errno() end
     return ffi.new(tp, errno)
   end,
-})
+}
 
-addtype("sockaddr", "struct sockaddr", {
+t.error = ffi.metatype("struct {int errno;}", mt.error)
+
+mt.sockaddr = {
   index = {
     family = function(sa) return sa.sa_family end,
   },
-  __len = function(tp) return s.sockaddr end,
-})
+}
+
+addtype("sockaddr", "struct sockaddr", mt.sockaddr)
 
 -- cast socket address to actual type based on family, defined later
 local samap_pt = {}
@@ -263,7 +266,7 @@ mt.sockaddr_storage = {
 -- experiment, see if we can use this as generic type, to avoid allocations.
 addtype("sockaddr_storage", "struct sockaddr_storage", mt.sockaddr_storage)
 
-addtype("sockaddr_in", "struct sockaddr_in", {
+mt.sockaddr_in = {
   index = {
     family = function(sa) return sa.sin_family end,
     port = function(sa) return ntohs(sa.sin_port) end,
@@ -286,9 +289,11 @@ addtype("sockaddr_in", "struct sockaddr_in", {
     return newfn(tp, tab)
   end,
   __len = function(tp) return s.sockaddr_in end,
-})
+}
 
-addtype("sockaddr_in6", "struct sockaddr_in6", {
+addtype("sockaddr_in", "struct sockaddr_in", mt.sockaddr_in)
+
+mt.sockaddr_in6 = {
   index = {
     family = function(sa) return sa.sin6_family end,
     port = function(sa) return ntohs(sa.sin6_port) end,
@@ -313,9 +318,11 @@ addtype("sockaddr_in6", "struct sockaddr_in6", {
     return newfn(tp, tab)
   end,
   __len = function(tp) return s.sockaddr_in6 end,
-})
+}
 
-addtype("timeval", "struct timeval", {
+addtype("sockaddr_in6", "struct sockaddr_in6", mt.sockaddr_in6)
+
+mt.timeval = {
   index = {
     time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_usec) / 1000000 end,
     sec = function(tv) return tonumber(tv.tv_sec) end,
@@ -343,9 +350,11 @@ addtype("timeval", "struct timeval", {
     ts.time = v
     return ts
   end
-})
+}
 
-addtype("timespec", "struct timespec", {
+addtype("timeval", "struct timeval", mt.timeval)
+
+mt.timespec = {
   index = {
     time = function(tv) return tonumber(tv.tv_sec) + tonumber(tv.tv_nsec) / 1000000000 end,
     sec = function(tv) return tonumber(tv.tv_sec) end,
@@ -373,7 +382,9 @@ addtype("timespec", "struct timespec", {
     ts.time = v
     return ts
   end,
-})
+}
+
+addtype("timespec", "struct timespec", mt.timespec)
 
 local function addraw2(name, tp)
   if rumpfn then tp = rumpfn(tp) end
@@ -402,7 +413,7 @@ t.timespec2 = function(ts1, ts2)
   return ts
 end
 
-addtype_var("groups", "struct {int count; gid_t list[?];}", {
+mt.groups = {
   __index = function(g, k)
     return g.list[k - 1]
   end,
@@ -414,9 +425,11 @@ addtype_var("groups", "struct {int count; gid_t list[?];}", {
     return ffi.new(tp, #gs, #gs, gs)
   end,
   __len = function(g) return g.count end,
-})
+}
 
--- signal set handlers TODO replace with metatypes
+addtype_var("groups", "struct {int count; gid_t list[?];}", mt.groups)
+
+-- signal set handlers
 local function sigismember(set, sig)
   local d = bit.rshift(sig - 1, 5) -- always 32 bits
   return bit.band(set.val[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
@@ -469,7 +482,7 @@ local function sigdelsets(set, sigs) -- allow multiple
   return set
 end
 
-addtype("sigset", "sigset_t", {
+mt.sigset = {
   __index = function(set, k)
     if k == 'add' then return sigaddsets end
     if k == 'del' then return sigdelsets end
@@ -492,7 +505,9 @@ addtype("sigset", "sigset_t", {
     end
     return f
   end,
-})
+}
+
+addtype("sigset", "sigset_t", mt.sigset)
 
 -- sigaction
 addtype_fn("sa_sigaction", "void (*)(int, siginfo_t *, void *)")
@@ -622,6 +637,7 @@ mt.cmsghdr = {
     return self
   end,
 }
+
 addtype_var("cmsghdr", "struct cmsghdr", mt.cmsghdr)
 
 -- msg_control is a bunch of cmsg structs, but these are all different lengths, as they have variable size arrays
@@ -686,6 +702,7 @@ mt.msghdr = {
   },
   __new = newfn,
 }
+
 addtype("msghdr", "struct msghdr", mt.msghdr)
 
 mt.pollfd = {
