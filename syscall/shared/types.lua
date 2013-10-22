@@ -127,7 +127,9 @@ local function istype(tp, x)
   if ffi.istype(tp, x) then return x else return false end
 end
 
-addtype("iovec", "struct iovec", lenmt)
+mt.iovec = {}
+
+addtype("iovec", "struct iovec", {})
 
 mt.iovecs = {
   __len = function(io) return io.count end,
@@ -276,7 +278,7 @@ mt.in_addr = {
 
 addtype("in_addr", "struct in_addr", mt.in_addr)
 
-addtype("in6_addr", "struct in6_addr", {
+mt.in6_addr = {
   __tostring = inet6_ntop,
   __new = function(tp, s)
     local addr = ffi.new(tp)
@@ -287,7 +289,9 @@ addtype("in6_addr", "struct in6_addr", {
     return addr
   end,
   __len = lenfn,
-})
+}
+
+addtype("in6_addr", "struct in6_addr", mt.in6_addr)
 
 -- ip, udp types. Need endian conversions.
 local ptchar = ffi.typeof("char *")
@@ -330,7 +334,6 @@ mt.iphdr = {
 addtype("iphdr", "struct iphdr", mt.iphdr)
 
 local udphdr_size = ffi.sizeof("struct udphdr")
-local char2 = ffi.typeof("char [2]")
 
 -- ugh, naming problems as cannot remove namespace as usual
 -- checksum = function(u, ...) return 0 end, -- TODO checksum, needs IP packet info too. as method.
@@ -346,7 +349,7 @@ mt.udphdr = {
       -- checksum pseudo header
       cs = ip_checksum(bip + ffi.offsetof(ip, "saddr"), 4, cs, true)
       cs = ip_checksum(bip + ffi.offsetof(ip, "daddr"), 4, cs, true)
-      local pr = char2(0, 17) -- c.IPPROTO.UDP
+      local pr = t.char2(0, 17) -- c.IPPROTO.UDP
       cs = ip_checksum(pr, 2, cs, true)
       cs = ip_checksum(bup + ffi.offsetof(i, "len"), 2, cs, true)
       -- checksum udp header
