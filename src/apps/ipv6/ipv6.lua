@@ -5,7 +5,7 @@ local C = ffi.C
 
 local app = require("core.app")
 local packet = require("core.packet")
-local Pcap = require("apps.pcap.pcap").Pcap
+local pcap = require("apps.pcap.pcap")
 local Buzz = require("apps.basic.basic_apps").Buzz
 
 local ipv6_t = ffi.typeof[[
@@ -19,8 +19,8 @@ struct {
    int16_t payload_length;
    int8_t  next_header;
    uint8_t hop_limit;
-   char dst_ip[16];
    char src_ip[16];
+   char dst_ip[16];
 } __attribute__((packed)) *
 ]]
 
@@ -113,13 +113,14 @@ function selftest ()
    print("selftest: ipv6")
    local own_ip = "\x20\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
    local own_mac = "\x52\x54\x00\x12\x34\x57"
-   app.apps.pcap = app.new(Pcap:new("apps/ipv6/selftest.cap"))
-   app.apps.ipv6 = app.new(SimpleIPv6:new(own_mac, own_ip))
-   app.apps.sink = app.new(Buzz:new()) -- XXX should write to a pcap file
-   app.connect("pcap", "output", "ipv6", "eth0")
-   app.connect("ipv6", "eth0",   "sink", "input")
+   app.apps.source = app.new(pcap.PcapReader:new("apps/ipv6/selftest.cap"))
+   app.apps.ipv6   = app.new(SimpleIPv6:new(own_mac, own_ip))
+   app.apps.sink   = app.new(pcap.PcapWriter:new("apps/ipv6/selftest-output.cap"))
+   app.connect("source", "output", "ipv6", "eth0")
+   app.connect("ipv6", "eth0",     "sink", "input")
    app.relink()
-   app.breathe()
+   for i = 1, 10 do  app.breathe()  end
+   app.report()
    print("OK.")
 end
 
