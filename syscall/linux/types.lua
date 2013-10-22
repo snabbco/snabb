@@ -156,7 +156,6 @@ t.user_cap_data2 = ffi.typeof("struct user_cap_data[2]")
 -- types with metatypes
 
 -- Note 32 bit dev_t; glibc has 64 bit dev_t but we use syscall API which does not
-
 local function makedev(major, minor)
   local dev = major or 0
   if minor then dev = bit.bor(bit.lshift(bit.band(minor, 0xffffff00), 12), bit.band(minor, 0xff), bit.lshift(major, 8)) end
@@ -180,7 +179,7 @@ mt.device = {
   },
   __new = function(tp, major, minor)
     return ffi.new(tp, makedev(major, minor))
-  end
+  end,
 }
 
 addtype("device", "struct {dev_t dev;}", mt.device)

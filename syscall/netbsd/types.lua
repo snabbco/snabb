@@ -54,8 +54,14 @@ for k, v in pairs(addtypes) do addtype(k, v) end
 for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 
 -- 64 bit dev_t
+local function makedev(major, minor)
+  local dev = major or 0
+  if minor then dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff)) end
+  return dev
+end
+
 mt.device = {
-  __index = {
+  index = {
     major = function(dev)
       local h, l = t.i6432(dev.dev):to32()
       return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)))
@@ -66,14 +72,15 @@ mt.device = {
     end,
     device = function(dev) return tonumber(dev.dev) end,
   },
+  newindex = {
+    device = function(dev, major, minor) dev.dev = makedev(major, minor) end,
+  },
+  __new = function(tp, major, minor)
+    return ffi.new(tp, makedev(major, minor))
+  end,
 }
 
--- note metatable as not a struct...
-t.device = function(major, minor)
-  local dev = major
-  if minor then dev = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12)) + 0x100000000 * bit.band(major, bit.bnot(0xfff)) end
-  return setmetatable({dev = t.dev(dev)}, mt.device)
-end
+addtype("device", "struct {_netbsd_dev_t dev;}", mt.device)
 
 addtype("sockaddr_un", "struct sockaddr_un", {
   index = {
