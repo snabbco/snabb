@@ -62,10 +62,14 @@ local function addtype(name, tp, mt)
   if rumpfn then tp = rumpfn(tp) end
   if mt then
     if mt.index and not mt.__index then -- generic index method
-      mt.__index = function(tp, k) if mt.index[k] then return mt.index[k](tp) else error("invalid index " .. k) end end
+      local index = mt.index
+      mt.index = nil
+      mt.__index = function(tp, k) if index[k] then return index[k](tp) else error("invalid index " .. k) end end
     end
     if mt.newindex and not mt.__newindex then -- generic newindex method
-      mt.__newindex = function(tp, k, v) if mt.newindex[k] then mt.newindex[k](tp, v) else error("invalid index " .. k) end end
+      local newindex = mt.newindex
+      mt.newindex = nil
+      mt.__newindex = function(tp, k, v) if newindex[k] then newindex[k](tp, v) else error("invalid index " .. k) end end
     end
     if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof
     t[name] = ffi.metatype(tp, mt)
