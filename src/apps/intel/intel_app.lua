@@ -24,7 +24,7 @@ function Intel82599:pull ()
    if l == nil then return end
    self.dev:sync_receive()
    while not app.full(l) and self.dev:can_receive() do
-      app.transfer(l, self.dev:receive())
+      app.transmit(l, self.dev:receive())
    end
    while self.dev:can_add_receive_buffer() do
       self.dev:add_receive_buffer(buffer.allocate())
