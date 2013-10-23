@@ -101,6 +101,7 @@ function reclaim_transmitted_packets (dev)
    while dev.txused ~= used_idx do
       local descriptor_index = dev.txring.used.ring[dev.txused % vring_size].id
       repeat
+         packet.deref(dev.txpackets[descriptor_index])
          local descriptor = dev.txring.desc[descriptor_index]
          freelist.add(dev.txfree, descriptor_index)
          descriptor_index = descriptor.next
