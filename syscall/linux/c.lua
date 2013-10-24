@@ -408,7 +408,8 @@ end
 function C.ppoll(fds, nfds, timeout_ts, sigmask)
   local size = 0
   if sigmask then size = sigset_size end
-  return syscall(c.SYS.ppoll, pt.void(fds), t.nfds(nfds), pt.void(timeout_ts), pt.void(sigmask), t.int(size))
+  -- TODO luaffi gets the wrong value for the last param if it is t.int not t.long. See #87.
+  return syscall(c.SYS.ppoll, pt.void(fds), t.nfds(nfds), pt.void(timeout_ts), pt.void(sigmask), t.long(size))
 end
 function C.signalfd(fd, mask, flags)
   return syscall(c.SYS.signalfd4, t.int(fd), pt.void(mask), t.int(sigset_size), t.int(flags))
