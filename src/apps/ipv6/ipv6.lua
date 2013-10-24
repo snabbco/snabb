@@ -4,6 +4,7 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local app = require("core.app")
+local lib = require("core.lib")
 local packet = require("core.packet")
 local pcap = require("apps.pcap.pcap")
 local Buzz = require("apps.basic.basic_apps").Buzz
@@ -21,7 +22,7 @@ struct {
    uint8_t hop_limit;
    char src_ip[16];
    char dst_ip[16];
-} __attribute__((packed)) *
+} __attribute__((packed))
 ]]
 
 local icmpv6_t = ffi.typeof[[
@@ -45,12 +46,14 @@ struct {
       uint8_t length;
       char addr[6];
    } l2addr;
-} __attribute__((packed)) *
+} __attribute__((packed))
 ]]
 
 SimpleIPv6 = {}
 
 function SimpleIPv6:new (own_mac, own_ip)
+   own_mac = own_mac or "\x52\x54\x00\x12\x34\x57"
+   own_ip = own_ip or "\x20\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
    local o = {own_mac = own_mac, own_ip = own_ip}
    return setmetatable(o, {__index = SimpleIPv6})
 end
@@ -63,14 +66,15 @@ function SimpleIPv6:push ()
       for i = 1, app.nreadable(iport) do
          local p = app.receive(iport)
          assert(p.iovecs[0].length >= ffi.sizeof(ipv6_t))
-         local ipv6 = ffi.cast(ipv6_t, p.iovecs[0].buffer.pointer + p.iovecs[0].offset)
+         local ipv6 = ffi.cast(ffi.typeof("$*", ipv6_t), p.iovecs[0].buffer.pointer + p.iovecs[0].offset)
          if ipv6.ethertype == 0xDD86 then -- IPv6 (host byte order) then
             -- Sent to this app?
             if ipv6.hop_limit > 1 then
                if ipv6.next_header == 58 then -- ICMPv6
                   print("Received ICMPv6")
+		  --assert(p.iovecs[0].length >= ffi.sizeof(ipv6_t) + ffi.sizeof(icmpv6_t))
                   local ptr = p.iovecs[0].buffer.pointer + p.iovecs[0].offset + 54
-                  local icmpv6 = ffi.cast(icmpv6_t, ptr)
+                  local icmpv6 = ffi.cast(ffi.typeof("$*", icmpv6_t), ptr)
                   if icmpv6.type == 135 then -- neighbor solicitation
                      print("  Responding to neighbor solicitation.")
                      -- Convert the solicitation into an advertisment.
@@ -81,8 +85,18 @@ function SimpleIPv6:push ()
                      ffi.copy(ipv6.src_ip, self.own_ip, 16)
                      ffi.copy(ipv6.dmac, ipv6.smac, 6)
                      ffi.copy(ipv6.smac, self.own_mac, 6)
+		     checksum_icmpv6(ipv6, icmpv6)
                      -- Transmit
                      app.transmit(oport, p)
+		  elseif icmpv6.type == 128 then -- echo
+		     print("  Responding to ECHO request")
+		     icmpv6.type = 129 -- echo response
+                     ffi.copy(ipv6.dst_ip, ipv6.src_ip, 16)
+                     ffi.copy(ipv6.src_ip, self.own_ip, 16)
+                     ffi.copy(ipv6.dmac, ipv6.smac, 6)
+                     ffi.copy(ipv6.smac, self.own_mac, 6)
+		     checksum_icmpv6(ipv6, icmpv6)
+		     app.transmit(oport, p)
                   end
                elseif C.memcmp(self.own_mac, ipv6.dmac, 6) == 0 then
                   -- Example: "Route" packet back to source.
@@ -107,6 +121,22 @@ function SimpleIPv6:push ()
          end
       end
    end
+end
+
+function checksum_icmpv6 (ipv6, icmpv6)
+   -- IPv6 pseudo-checksum
+   local ipv6_ptr = ffi.cast("uint8_t*", ipv6)
+   local csum = lib.update_csum(ipv6_ptr + ffi.offsetof(ipv6_t, 'src_ip'), 32)
+   csum = lib.update_csum(ipv6_ptr + ffi.offsetof(ipv6_t, 'payload_length'), 2, csum)
+   -- ICMPv6 checksum
+   icmpv6.checksum = 0
+   csum = lib.update_csum(icmpv6, ipv6.payload_length, csum)
+   csum = csum + 58
+   icmpv6.checksum = htons(lib.finish_csum(csum))
+end
+
+function htons (n)
+   return bit.lshift(bit.band(n, 0xff), 8) + bit.rshift(n, 8)
 end
 
 function selftest ()
