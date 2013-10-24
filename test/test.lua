@@ -487,7 +487,7 @@ test_poll_select = {
 
 test_ppoll = {
   test_ppoll = function()
-    local ppoll = S.ppoll or S.pollts -- see notes, no differences as far as test is concerned
+    local ppoll = S.ppoll or S.pollts -- see notes, no differences as far as test is concerned TODO compat should deal with this
     local sv = assert(S.socketpair("unix", "stream"))
     local a, b = sv[1], sv[2]
     local pev = t.pollfds{{fd = a, events = c.POLL.IN}}
