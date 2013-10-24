@@ -119,3 +119,38 @@ function waitfor2(name, test, attempts, interval)
    error("timeout waiting for " .. name)
 end
 
+-- Return "the IP checksum" of ptr:len.
+--
+-- NOTE: Checksums should seldom be computed in software. Packets
+-- carried over hardware ethernet (e.g. 82599) should be checksummed
+-- in hardware, and packets carried over software ethernet (e.g.
+-- virtio) should be flagged as not requiring checksum verification.
+-- So consider it a "code smell" to call this function.
+function csum (ptr, len)
+   return finish_csum(update_csum(ptr, len))
+end
+
+function update_csum (ptr, len,  csum0)
+   ptr = ffi.cast("uint8_t*", ptr)
+   local sum = csum0 or 0LL
+   for i = 0, len-2, 2 do
+      sum = sum + bit.lshift(ptr[i], 8) + ptr[i+1]
+   end
+   if len % 2 == 1 then sum = sum + bit.lshift(ptr[len-1]) end
+   return sum
+end
+
+function finish_csum (sum)
+   while bit.band(sum, 0xffff) ~= sum do
+      sum = bit.band(sum + bit.rshift(sum, 16), 0xffff)
+   end
+   return bit.band(bit.bnot(sum), 0xffff)
+end
+
+function selftest ()
+   print("selftest: lib")
+   local data = "\x45\x00\x00\x73\x00\x00\x40\x00\x40\x11\xc0\xa8\x00\x01\xc0\xa8\x00\xc7"
+   local cs = csum(data, string.len(data))
+   assert(cs == 0xb861, "bad checksum: " .. bit.tohex(cs, 4))
+end
+
