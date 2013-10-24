@@ -5,10 +5,10 @@
 
 -- TODO rework so that items can be methods on fd again, for eventfd, timerfd, signalfd and tty
 
-local require, print, error, assert, tonumber, tostring,
+local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math = 
-require, print, error, assert, tonumber, tostring,
+require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 

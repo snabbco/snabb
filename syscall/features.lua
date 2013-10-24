@@ -4,10 +4,10 @@
 -- cache carefully if you like
 -- TODO add metatable so can call if values not functions?
 
-local require, print, error, assert, tonumber, tostring,
+local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math = 
-require, print, error, assert, tonumber, tostring,
+require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 

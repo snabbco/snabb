@@ -1,10 +1,10 @@
 -- modularize netlink code as it is large and standalone
 -- TODO add init()
 
-local require, print, error, assert, tonumber, tostring,
+local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math = 
-require, print, error, assert, tonumber, tostring,
+require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 
@@ -506,7 +506,7 @@ local function decode_route(buf, len)
   while rta_ok(rtattr, len) do
     if rta_decode[rtattr.rta_type] then
       rta_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
-    else print("NYI", rtattr.rta_type)
+    else error("NYI: " .. rtattr.rta_type)
     end
     rtattr, buf, len = rta_next(rtattr, buf, len)
   end
@@ -523,7 +523,7 @@ local function decode_neigh(buf, len)
   while rta_ok(rtattr, len) do
     if nda_decode[rtattr.rta_type] then
       nda_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
-    else print("NYI", rtattr.rta_type)
+    else error("NYI: " .. rtattr.rta_type)
     end
     rtattr, buf, len = rta_next(rtattr, buf, len)
   end

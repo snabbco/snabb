@@ -2,10 +2,10 @@
 -- TODO In theory we should not need these, just create a new NetBSD rump instance when we want them instead
 -- currently just mount support
 
-local require, print, error, assert, tonumber, tostring,
+local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math = 
-require, print, error, assert, tonumber, tostring,
+require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 
