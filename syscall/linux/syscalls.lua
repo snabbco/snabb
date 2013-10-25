@@ -325,13 +325,9 @@ function S.epoll_create(flags)
   return retfd(C.epoll_create1(c.EPOLLCREATE[flags]))
 end
 
-function S.epoll_ctl(epfd, op, fd, event, data) -- TODO gross
-  if not ffi.istype(t.epoll_event, event) then
-    local events = c.EPOLL[event]
-    event = t.epoll_event()
-    event.events = events
-    if data then event.data.u64 = data else event.data.fd = getfd(fd) end
-  end
+function S.epoll_ctl(epfd, op, fd, event)
+  if type(event) == "string" then event = {events = event, fd = getfd(fd) end
+  event = mktype(t.epoll_event, event)
   return retbool(C.epoll_ctl(getfd(epfd), c.EPOLL_CTL[op], getfd(fd), event))
 end
 
