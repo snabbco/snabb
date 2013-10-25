@@ -793,8 +793,11 @@ mt.epoll_event = {
   __new = function(tp, a)
     local e = ffi.new(tp)
     if a then
-      if a.events then a.events = c.EPOLL[a.events] end
-      for k, v in pairs(a) do e[k] = v end
+      if type(a) == "string" then a.events = c.EPOLL[a]
+      else 
+        if a.events then a.events = c.EPOLL[a.events] end
+        for k, v in pairs(a) do e[k] = v end
+      end
     end
     return e
   end,

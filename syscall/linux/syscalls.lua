@@ -325,7 +325,7 @@ function S.epoll_create(flags)
   return retfd(C.epoll_create1(c.EPOLLCREATE[flags]))
 end
 
-function S.epoll_ctl(epfd, op, fd, event, data)
+function S.epoll_ctl(epfd, op, fd, event, data) -- TODO gross
   if not ffi.istype(t.epoll_event, event) then
     local events = c.EPOLL[event]
     event = t.epoll_event()
