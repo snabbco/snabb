@@ -326,7 +326,7 @@ function S.epoll_create(flags)
 end
 
 function S.epoll_ctl(epfd, op, fd, event)
-  if type(event) == "string" then event = {events = event, fd = getfd(fd)} end
+  if type(event) == "string" or type(event) == "number" then event = {events = event, fd = getfd(fd)} end
   event = mktype(t.epoll_event, event)
   return retbool(C.epoll_ctl(getfd(epfd), c.EPOLL_CTL[op], getfd(fd), event))
 end
