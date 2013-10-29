@@ -1,10 +1,25 @@
 -- test just the constants for Linux, against standard set so cross platform.
--- test against make headers_install ARCH=i386 INSTALL_HDR_PATH=/tmp
--- fix linux/input.h includes which are broken
--- luajit test/linux-constants.lua > /tmp/c.c && cc -I/tmp/include  -o /tmp/c /tmp/c.c && /tmp/c
+
+--[[
+luajit test/linux-constants.lua x64 > ./obj/c.c && cc -U__i386__ -I./include/linux-kernel-headers/x86_64/include -o ./obj/c ./obj/c.c && ./obj/c
+
+luajit test/linux-constants.lua x86 > ./obj/c.c && cc -D__i386__ -I./include/linux-kernel-headers/i386/include -o ./obj/c ./obj/c.c && ./obj/c
+luajit test/linux-constants.lua arm > ./obj/c.c && cc -D__ARM_EABI__ -I./include/linux-kernel-headers/arm/include -o ./obj/c ./obj/c.c && ./obj/c
+luajit test/linux-constants.lua ppc > ./obj/c.c && cc -I./include/linux-kernel-headers/powerpc/include -o ./obj/c ./obj/c.c && ./obj/c
+
+luajit test/linux-constants.lua mips > ./obj/c.c && cc -D__MIPSEL__ -D_MIPS_SIM=_MIPS_SIM_ABI32 -DCONFIG_32BIT -D__LITTLE_ENDIAN_BITFIELD -D__LITTLE_ENDIAN -DCONFIG_CPU_LITTLE_ENDIAN -I./include/linux-kernel-headers/mips/include  -o ./obj/c ./obj/c.c && ./obj/c
+]]
 
 -- TODO fix up so can test all architectures
 -- TODO 32 bit warnings about signed ranges
+
+local abi = require "syscall.abi"
+
+if arg[1] then -- fake arch
+  abi.arch = arg[1]
+  if abi.arch == "x64" then abi.abi32, abi.abi64 = false, true else abi.abi32, abi.abi64 = true, false end
+  if abi.arch == "mips" then abi.mipsabi = "o32" end
+end
 
 local function fixup(abi, c)
   -- we only use one set
@@ -296,8 +311,6 @@ void sassert_u64(uint64_t a, uint64_t b, char *n) {
 
 int main(int argc, char **argv) {
 ]]
-
-local abi = require "syscall.abi"
 
 local ffi = require "ffi"
 

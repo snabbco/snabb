@@ -16,12 +16,15 @@ local abi = {
   abi64 = ffi.abi("64bit"), -- boolean
   le = ffi.abi("le"), -- boolean
   be = ffi.abi("be"), -- boolean
-  eabi = ffi.abi("eabi"), -- boolean
   os = ffi.os:lower(), -- bsd, osx, linux
 }
 
 -- Makes no difference to us I believe
 if abi.arch == "ppcspe" then abi.arch = "ppc" end
+
+if abi.arch == "arm" and not ffi.abi("eabi") then error("only support eabi for arm") end
+
+if abi.arch == "mips" then abi.mipsabi = "o32" end -- only one supported now
 
 -- At the moment we only support NetBSD but do not attempt to detect it
 -- If you want to support eg FreeBSD then will have to detect it

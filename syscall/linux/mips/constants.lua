@@ -1,10 +1,23 @@
 -- mips specific constants
 
+local require, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math = 
+require, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string, math
+
+local abi = require "syscall.abi"
+
 local arch = {}
 
 arch.syscall = {
   zeropad = true,
 }
+
+-- these are different for different ABIs TODO add the rest
+
+assert(abi.mipsabi == "o32", "FIXME: syscalls only defined for o32 MIPS ABI")
 
 arch.SYS = {
   syscall               = 4000,

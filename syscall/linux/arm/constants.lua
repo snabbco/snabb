@@ -9,8 +9,6 @@ pcall, type, table, string, math
 
 local abi = require "syscall.abi"
 
-assert(abi.eabi, "only support eabi for arm")
-
 local octal = function (s) return tonumber(s, 8) end 
 
 local arch = {}
