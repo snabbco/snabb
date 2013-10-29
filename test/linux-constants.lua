@@ -2,7 +2,6 @@
 
 --[[
 luajit test/linux-constants.lua x64 > ./obj/c.c && cc -U__i386__ -I./include/linux-kernel-headers/x86_64/include -o ./obj/c ./obj/c.c && ./obj/c
-
 luajit test/linux-constants.lua x86 > ./obj/c.c && cc -D__i386__ -I./include/linux-kernel-headers/i386/include -o ./obj/c ./obj/c.c && ./obj/c
 luajit test/linux-constants.lua arm > ./obj/c.c && cc -D__ARM_EABI__ -I./include/linux-kernel-headers/arm/include -o ./obj/c ./obj/c.c && ./obj/c
 luajit test/linux-constants.lua ppc > ./obj/c.c && cc -I./include/linux-kernel-headers/powerpc/include -o ./obj/c ./obj/c.c && ./obj/c
@@ -166,13 +165,16 @@ local function fixup(abi, c)
   c.TFD_TIMER.ABSTIME = nil
 
   -- renamed it seems, TODO sort out
-  c.SYS.newfstatat = c.SYS.fstatat
-  c.SYS.fstatat = nil
+  c.SYS.newfstatat, c.SYS.fstatat = c.SYS.fstatat, nil
 
   -- also renamed/issues on arm TODO sort out
   if abi.arch == "arm" then
     c.SYS.fadvise64_64 = nil
     c.SYS.sync_file_range = nil
+  end
+
+  if abi.arch == "mips" then
+     c.SYS._newselect, c.SYS.select = c.SYS.select, nil -- now called _newselect
   end
 
   return c

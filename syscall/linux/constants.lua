@@ -322,7 +322,7 @@ c.SIGACT = strflag {
   HOLD = 2,
 }
 
-c.SIG = strflag {
+c.SIG = strflag(arch.SIG or {
   HUP = 1,
   INT = 2,
   QUIT = 3,
@@ -354,10 +354,10 @@ c.SIG = strflag {
   IO = 29,
   PWR = 30,
   SYS = 31,
-}
+})
 
 c.SIG.IOT = c.SIG.ABRT
-c.SIG.UNUSED     = 31
+--c.SIG.UNUSED     = 31 -- TODO this looks arch dependent
 c.SIG.CLD        = c.SIG.CHLD
 c.SIG.POLL       = c.SIG.IO
 
