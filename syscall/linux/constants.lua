@@ -58,6 +58,9 @@ c.O = multiflags(arch.O or {
   NONBLOCK  = octal('04000'),
   DSYNC     = octal('010000'),
   ASYNC     = octal('020000'),
+  DIRECT    = octal('040000'),
+  DIRECTORY = octal('0200000'),
+  NOFOLLOW  = octal('0400000'),
   NOATIME   = octal('01000000'),
   CLOEXEC   = octal('02000000'),
   SYNC      = octal('04010000'),
@@ -66,13 +69,6 @@ c.O = multiflags(arch.O or {
 c.O.FSYNC     = c.O.SYNC
 c.O.RSYNC     = c.O.SYNC
 c.O.NDELAY    = c.O.NONBLOCK
-
--- these four are arch dependent
-addarch(c.O, arch.O, {
-  DIRECT    = octal('040000'),
-  DIRECTORY = octal('0200000'),
-  NOFOLLOW  = octal('0400000'),
-})
 
 if not c.O.LARGEFILE then -- also can be arch dependent
   if abi.abi32 then c.O.LARGEFILE = octal('0100000') else c.O.LARGEFILE = 0 end
@@ -2977,7 +2973,7 @@ c.FF = strflag {
 }
 
 -- errors
-c.E = strflag {
+c.E = strflag(arch.E or {
   PERM          =  1,
   NOENT         =  2,
   SRCH          =  3,
@@ -3108,7 +3104,7 @@ c.E = strflag {
   OWNERDEAD     = 130,
   NOTRECOVERABLE= 131,
   RFKILL        = 132,
-}
+})
 
 -- alternate names
 c.E.WOULDBLOCK    = c.E.EAGAIN
