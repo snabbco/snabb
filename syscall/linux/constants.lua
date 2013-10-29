@@ -224,7 +224,7 @@ c.PROT = multiflags {
 addarch(c.PROT, arch.PROT, {})
 
 -- Sharing types
-c.MAP = multiflags {
+c.MAP = multiflags(arch.MAP or {
   FILE       = 0,
   SHARED     = 0x01,
   PRIVATE    = 0x02,
@@ -234,15 +234,12 @@ c.MAP = multiflags {
   GROWSDOWN  = 0x00100,
   DENYWRITE  = 0x00800,
   EXECUTABLE = 0x01000,
+  LOCKED     = 0x02000,
+  NORESERVE  = 0x04000,
   POPULATE   = 0x08000,
   NONBLOCK   = 0x10000,
   STACK      = 0x20000,
   HUGETLB    = 0x40000,
-}
-
-addarch(c.MAP, arch.MAP, {
-  LOCKED     = 0x02000,
-  NORESERVE  = 0x04000,
 })
 
 if abi.abi64 then c.MAP["32BIT"] = 0x40 end

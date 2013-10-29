@@ -402,5 +402,22 @@ arch.SIG = {
   XFSZ = 31,
 }
 
+arch.MAP = {
+  SHARED     = 0x001,
+  PRIVATE    = 0x002,
+  TYPE       = 0x00f,
+  FIXED      = 0x010,
+  NORESERVE  = 0x0400,
+  ANONYMOUS  = 0x0800,
+  GROWSDOWN  = 0x1000,
+  DENYWRITE  = 0x2000,
+  EXECUTABLE = 0x4000,
+  LOCKED     = 0x8000,
+  POPULATE   = 0x10000,
+  NONBLOCK   = 0x20000,
+  STACK      = 0x40000,
+  HUGETLB    = 0x80000,
+}
+
 return arch
 

@@ -533,10 +533,23 @@ arch.O = {
   DIRECT       = octal('0400000'),
 }
 
-arch.MAP = {
+c.MAP = {
+  FILE       = 0,
+  SHARED     = 0x01,
+  PRIVATE    = 0x02,
+  TYPE       = 0x0f,
+  FIXED      = 0x10,
+  ANONYMOUS  = 0x20,
   NORESERVE  = 0x40,
   LOCKED     = 0x80,
-}
+  GROWSDOWN  = 0x00100,
+  DENYWRITE  = 0x00800,
+  EXECUTABLE = 0x01000,
+  POPULATE   = 0x08000,
+  NONBLOCK   = 0x10000,
+  STACK      = 0x20000,
+  HUGETLB    = 0x40000,
+})
 
 arch.MCL = {
   CURRENT    = 0x2000,
