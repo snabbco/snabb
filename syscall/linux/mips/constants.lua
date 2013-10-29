@@ -419,5 +419,21 @@ arch.MAP = {
   HUGETLB    = 0x80000,
 }
 
+local __O_SYNC = 0x4000
+
+arch.O = {
+  APPEND   = 0x0008,
+  DSYNC    = 0x0010,
+  NONBLOCK = 0x0080,
+  CREAT    = 0x0100,
+  TRUNC    = 0x0200,
+  EXCL     = 0x0400,
+  NOCTTY   = 0x0800,
+  LARGEFILE= 0x2000,
+  DIRECT   = 0x8000,
+}
+
+arch.O_SYNC = __O_SYNC + arch.O.DSYNC -- compatibility, see notes in header, we do not expose __O_SYNC TODO check if this is best way
+
 return arch
 

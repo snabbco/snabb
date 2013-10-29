@@ -45,7 +45,7 @@ c.STD = strflag {
 c.PATH_MAX = 4096
 
 -- open, fcntl TODO not setting largefile if matches exactly in upper case, potentially confusing
-c.O = multiflags {
+c.O = multiflags(arch.O or {
   RDONLY    = octal('0000'),
   WRONLY    = octal('0001'),
   RDWR      = octal('0002'),
@@ -61,7 +61,7 @@ c.O = multiflags {
   NOATIME   = octal('01000000'),
   CLOEXEC   = octal('02000000'),
   SYNC      = octal('04010000'),
-}
+})
 
 c.O.FSYNC     = c.O.SYNC
 c.O.RSYNC     = c.O.SYNC
