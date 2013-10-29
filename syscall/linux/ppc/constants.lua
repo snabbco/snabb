@@ -548,7 +548,7 @@ arch.O = {
   SYNC      = octal('04010000'),
 }
 
-c.MAP = {
+arch.MAP = {
   FILE       = 0,
   SHARED     = 0x01,
   PRIVATE    = 0x02,
