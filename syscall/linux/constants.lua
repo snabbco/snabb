@@ -2952,24 +2952,24 @@ c.FF_STATUS = strflag {
 -- TODO note these are split into different categories eg EFFECT, WAVEFORM unclear how best to handle (FF_STATUS too?)
 c.FF = strflag {
 -- EFFECT
-  RUMBLE       = 0x50;
-  PERIODIC     = 0x51;
-  CONSTANT     = 0x52;
-  SPRING       = 0x53;
-  FRICTION     = 0x54;
-  DAMPER       = 0x55;
-  INERTIA      = 0x56;
-  RAMP         = 0x57;
+  RUMBLE       = 0x50,
+  PERIODIC     = 0x51,
+  CONSTANT     = 0x52,
+  SPRING       = 0x53,
+  FRICTION     = 0x54,
+  DAMPER       = 0x55,
+  INERTIA      = 0x56,
+  RAMP         = 0x57,
 -- WAVEFORM
-  SQUARE       = 0x58;
-  TRIANGLE     = 0x59;
-  SINE         = 0x5a;
-  SAW_UP       = 0x5b;
-  SAW_DOWN     = 0x5c;
-  CUSTOM       = 0x5d;
+  SQUARE       = 0x58,
+  TRIANGLE     = 0x59,
+  SINE         = 0x5a,
+  SAW_UP       = 0x5b,
+  SAW_DOWN     = 0x5c,
+  CUSTOM       = 0x5d,
 -- dev props
-  GAIN         = 0x60;
-  AUTOCENTER   = 0x61;
+  GAIN         = 0x60,
+  AUTOCENTER   = 0x61,
 }
 
 -- errors
