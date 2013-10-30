@@ -77,6 +77,7 @@ function free (p)
    p.refcount       = 1
    p.fuel           = initial_fuel
    p.niovecs        = 0
+   p.length         = 0
    freelist.add(packets_fl, p)
 end
 
