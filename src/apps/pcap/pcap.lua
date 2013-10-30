@@ -41,7 +41,6 @@ end
 
 function PcapWriter:push ()
    while not app.empty(self.input.input) do
-      print("write a record")
       local p = app.receive(self.input.input)
       pcap.write_record_header(self.file, p.length)
       for i = 0, p.niovecs-1 do
