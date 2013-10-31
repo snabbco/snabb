@@ -1712,10 +1712,10 @@ c.CLONE = multiflags {
 
 -- inotify
 -- flags note rename from IN_ to IN_INIT
-c.IN_INIT = multiflags {
+c.IN_INIT = multiflags(arch.IN_INIT or {
   CLOEXEC = octal("02000000"),
   NONBLOCK = octal("04000"),
-}
+})
 
 -- events
 c.IN = multiflags {

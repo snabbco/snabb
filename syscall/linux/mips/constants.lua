@@ -581,5 +581,10 @@ arch.SFD = {
   NONBLOCK = octal "00000200",
 }
 
+arch.IN_INIT = {
+  CLOEXEC  = octal("02000000"),
+  NONBLOCK = octal("00000200"),
+}
+
 return arch
 
