@@ -355,11 +355,11 @@ c.SIG.CLD        = c.SIG.CHLD
 c.SIG.POLL       = c.SIG.IO
 
 -- sigprocmask note renaming of SIG to SIGPM
-c.SIGPM = strflag {
+c.SIGPM = strflag(arch.SIGPM or {
   BLOCK     = 0,
   UNBLOCK   = 1,
   SETMASK   = 2,
-}
+})
 
 -- signalfd
 c.SFD = multiflags(arch.SFD or {

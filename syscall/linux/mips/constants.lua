@@ -596,5 +596,11 @@ arch.SA = {
   NOCLDSTOP   = 0x00000001,
 }
 
+arch.SIGPM = {
+  BLOCK     = 1,
+  UNBLOCK   = 2,
+  SETMASK   = 3,
+}
+
 return arch
 
