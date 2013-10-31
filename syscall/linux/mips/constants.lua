@@ -7,6 +7,10 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 
+local h = require "syscall.helpers"
+
+local octal = h.octal
+
 local abi = require "syscall.abi"
 
 local arch = {}
@@ -570,6 +574,11 @@ arch.E = {
   RFKILL        = 167,
   HWPOISON      = 168,
   DQUOT         = 1133,
+}
+
+arch.SFD = {
+  CLOEXEC  = octal "02000000",
+  NONBLOCK = octal "00000200",
 }
 
 return arch

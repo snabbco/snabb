@@ -362,10 +362,10 @@ c.SIGPM = strflag {
 }
 
 -- signalfd
-c.SFD = multiflags {
+c.SFD = multiflags(arch.SFD or {
   CLOEXEC  = octal('02000000'),
   NONBLOCK = octal('04000'),
-}
+})
 
 -- sockets note mix of single and multiple flags TODO code to handle temporarily using multi which is kind of ok
 c.SOCK = multiflags {
