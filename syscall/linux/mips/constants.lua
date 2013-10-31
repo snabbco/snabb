@@ -586,5 +586,15 @@ arch.IN_INIT = {
   NONBLOCK = octal("00000200"),
 }
 
+arch.SA = {
+  ONSTACK     = 0x08000000,
+  RESETHAND   = 0x80000000,
+  RESTART     = 0x10000000,
+  SIGINFO     = 0x00000008,
+  NODEFER     = 0x40000000,
+  NOCLDWAIT   = 0x00010000,
+  NOCLDSTOP   = 0x00000001,
+}
+
 return arch
 

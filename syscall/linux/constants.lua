@@ -559,7 +559,7 @@ c.SIGPOLL = strflag {
 }
 
 -- sigaction -- note not cast to (void *)(int) as we do not know type here
-c.SA = multiflags {
+c.SA = multiflags(arch.SA or {
   NOCLDSTOP = 0x00000001,
   NOCLDWAIT = 0x00000002,
   SIGINFO   = 0x00000004,
@@ -568,7 +568,7 @@ c.SA = multiflags {
   NODEFER   = 0x40000000,
   RESETHAND = 0x80000000,
   RESTORER  = 0x04000000,
-}
+})
 
 c.SA.NOMASK    = c.SA.NODEFER
 c.SA.ONESHOT   = c.SA.RESETHAND
