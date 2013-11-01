@@ -745,5 +745,26 @@ arch.TIOCM = {
   LOOP = 0x8000,
 }
 
+arch.CC = {
+  VINTR         =  0,
+  VQUIT         =  1,
+  VERASE        =  2,
+  VKILL         =  3,
+  VMIN          =  4,
+  VTIME         =  5,
+  VEOL2         =  6,
+  VSWTC         =  7,
+  VSTART        =  8,
+  VSTOP         =  9,
+  VSUSP         = 10,
+-- VDSUSP not supported
+  VREPRINT      = 12,
+  VDISCARD      = 13,
+  VWERASE       = 14,
+  VLNEXT        = 15,
+  VEOF          = 16,
+  VEOL          = 17,
+}
+
 return arch
 
