@@ -371,7 +371,7 @@ arch.SYS = {
   process_vm_writev     = 352,
 }
 
-c.SO = strflag(arch.SO or { -- 16-21 differ for ppc
+arch.SO = { -- 16-21 differ for ppc
   DEBUG       = 1,
   REUSEADDR   = 2,
   TYPE        = 3,
