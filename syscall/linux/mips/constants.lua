@@ -652,5 +652,57 @@ arch.RLIMIT = {
 
 -- TODO RLIM64_INFINITY looks like it may vary by ABI for MIPS, but our kernel headers are perhaps incorrect, check this
 
+arch.SO = {
+  DEBUG       = 0x0001,
+  REUSEADDR   = 0x0004,
+  KEEPALIVE   = 0x0008,
+  DONTROUTE   = 0x0010,
+  BROADCAST   = 0x0020,
+  LINGER      = 0x0080,
+  OOBINLINE   = 0x0100,
+--REUSEPORT   = 0x0200, -- not in kernel headers, although MIPS has had for longer
+  TYPE        = 0x1008,
+  ERROR       = 0x1007,
+  SNDBUF      = 0x1001,
+  RCVBUF      = 0x1002,
+  SNDLOWAT    = 0x1003,
+  RCVLOWAT    = 0x1004,
+  SNDTIMEO    = 0x1005,
+  RCVTIMEO    = 0x1006,
+  ACCEPTCONN  = 0x1009,
+  PROTOCOL    = 0x1028,
+  DOMAIN      = 0x1029,
+
+  NO_CHECK    = 11,
+  PRIORITY    = 12,
+  BSDCOMPAT   = 14,
+  PASSCRED    = 17,
+  PEERCRED    = 18,
+
+  SECURITY_AUTHENTICATION = 22,
+  SECURITY_ENCRYPTION_TRANSPORT = 23,
+  SECURITY_ENCRYPTION_NETWORK = 24,
+  BINDTODEVICE       = 25,
+  ATTACH_FILTER      = 26,
+  DETACH_FILTER      = 27,
+  PEERNAME           = 28,
+  TIMESTAMP          = 29,
+  PEERSEC            = 30,
+  SNDBUFFORCE        = 31,
+  RCVBUFFORCE        = 33,
+  PASSSEC            = 34,
+  TIMESTAMPNS        = 35,
+  MARK               = 36,
+  TIMESTAMPING       = 37,
+  RXQ_OVFL           = 40,
+  WIFI_STATUS        = 41,
+  PEEK_OFF           = 42,
+  NOFCS              = 43,
+--LOCK_FILTER        = 44, -- neither in our kernel headers
+--SELECT_ERR_QUEUE   = 45,
+}
+
+arch.SO.STYLE = arch.SO.TYPE
+
 return arch
 

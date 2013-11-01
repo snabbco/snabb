@@ -402,7 +402,7 @@ c.SOL = strflag {
   IRDA       = 266,
 }
 
-c.SO = strflag {
+c.SO = strflag(arch.SO or {
   DEBUG       = 1,
   REUSEADDR   = 2,
   TYPE        = 3,
@@ -418,9 +418,12 @@ c.SO = strflag {
   LINGER      = 13,
   BSDCOMPAT   = 14,
 --REUSEPORT   = 15, -- new, may not be defined yet
-
-  -- see below for 16-21
-
+  PASSCRED    = 16,
+  PEERCRED    = 17,
+  RCVLOWAT    = 18,
+  SNDLOWAT    = 19,
+  RCVTIMEO    = 20,
+  SNDTIMEO    = 21,
   SECURITY_AUTHENTICATION = 22,
   SECURITY_ENCRYPTION_TRANSPORT = 23,
   SECURITY_ENCRYPTION_NETWORK = 24,
@@ -443,18 +446,9 @@ c.SO = strflag {
   WIFI_STATUS        = 41,
   PEEK_OFF           = 42,
   NOFCS              = 43,
-}
+})
 
 c.SO.GET_FILTER = c.SO.ATTACH_FILTER
-
-addarch(c.SO, arch.SO, { -- these vary for ppc
-  PASSCRED    = 16,
-  PEERCRED    = 17,
-  RCVLOWAT    = 18,
-  SNDLOWAT    = 19,
-  RCVTIMEO    = 20,
-  SNDTIMEO    = 21,
-})
 
 -- Maximum queue length specifiable by listen.
 c.SOMAXCONN = 128
