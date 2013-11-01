@@ -139,7 +139,7 @@ c.OK = charflags {
 }
 
 -- fcntl
-c.F = strflag {
+c.F = strflag(arch.F or {
   DUPFD       = 0,
   GETFD       = 1,
   SETFD       = 2,
@@ -163,7 +163,7 @@ c.F = strflag {
   SETPIPE_SZ  = 1031,
   GETPIPE_SZ  = 1032,
   DUPFD_CLOEXEC = 1030,
-}
+})
 
 -- messy
 if abi.abi64 then

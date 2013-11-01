@@ -704,5 +704,31 @@ arch.SO = {
 
 arch.SO.STYLE = arch.SO.TYPE
 
+arch.F = {
+  DUPFD       = 0,
+  GETFD       = 1,
+  SETFD       = 2,
+  GETFL       = 3,
+  SETFL       = 4,
+  GETLK       = 14,
+  SETLK       = 6,
+  SETLKW      = 7,
+  SETOWN      = 24,
+  GETOWN      = 23,
+  SETSIG      = 10,
+  GETSIG      = 11,
+  GETLK64     = 33,
+  SETLK64     = 34,
+  SETLKW64    = 35,
+  SETOWN_EX   = 15,
+  GETOWN_EX   = 16,
+  SETLEASE    = 1024,
+  GETLEASE    = 1025,
+  NOTIFY      = 1026,
+  SETPIPE_SZ  = 1031,
+  GETPIPE_SZ  = 1032,
+  DUPFD_CLOEXEC = 1030,
+}
+
 return arch
 
