@@ -619,5 +619,24 @@ arch.POLL = {
 
 arch.POLL.WRNORM = arch.POLL.OUT
 
+arch.RLIMIT = {
+  CPU        = 0,
+  FSIZE      = 1,
+  DATA       = 2,
+  STACK      = 3,
+  CORE       = 4,
+  NOFILE     = 5,
+  AS         = 6,
+  RSS        = 7,
+  NPROC      = 8,
+  MEMLOCK    = 9,
+  LOCKS      = 10,
+  SIGPENDING = 11,
+  MSGQUEUE   = 12,
+  NICE       = 13,
+  RTPRIO     = 14,
+  RTTIME     = 15,
+}
+
 return arch
 

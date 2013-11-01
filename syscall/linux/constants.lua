@@ -707,7 +707,7 @@ c.MSG = multiflags {
 c.MSG.TRYHARD         = c.MSG.DONTROUTE
 
 -- rlimit
-c.RLIMIT = strflag {
+c.RLIMIT = strflag(arch.RLIMIT or {
   CPU        = 0,
   FSIZE      = 1,
   DATA       = 2,
@@ -724,7 +724,7 @@ c.RLIMIT = strflag {
   NICE       = 13,
   RTPRIO     = 14,
   RTTIME     = 15,
-}
+})
 
 c.RLIMIT.OFILE = c.RLIMIT.NOFILE
 
