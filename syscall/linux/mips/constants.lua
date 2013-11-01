@@ -638,5 +638,7 @@ arch.RLIMIT = {
   RTTIME     = 15,
 }
 
+-- TODO RLIM64_INFINITY looks like it may vary by ABI for MIPS, but our kernel headers are perhaps incorrect, check this
+
 return arch
 
