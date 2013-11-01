@@ -730,5 +730,20 @@ arch.F = {
   DUPFD_CLOEXEC = 1030,
 }
 
+arch.TIOCM = {
+  LE  = 0x001,
+  DTR = 0x002,
+  RTS = 0x004,
+  ST  = 0x010,
+  SR  = 0x020,
+  CTS = 0x040,
+  CAR = 0x100,
+  RNG = 0x200,
+  DSR = 0x400,
+  OUT1 = 0x2000,
+  OUT2 = 0x4000,
+  LOOP = 0x8000,
+}
+
 return arch
 

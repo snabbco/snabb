@@ -2236,7 +2236,7 @@ c.TCSA = strflag {
 }
 
 -- TIOCM
-c.TIOCM = multiflags {
+c.TIOCM = multiflags(arch.TIOCM or {
   LE  = 0x001,
   DTR = 0x002,
   RTS = 0x004,
@@ -2246,7 +2246,7 @@ c.TIOCM = multiflags {
   CAR = 0x040,
   RNG = 0x080,
   DSR = 0x100,
-}
+})
 
 c.TIOCM.CD  = c.TIOCM.CAR
 c.TIOCM.RI  = c.TIOCM.RNG
