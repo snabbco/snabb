@@ -602,5 +602,22 @@ arch.SIGPM = {
   SETMASK   = 3,
 }
 
+arch.POLL = {
+  IN          = 0x001,
+  PRI         = 0x002,
+  OUT         = 0x004,
+  ERR         = 0x008,
+  HUP         = 0x010,
+  NVAL        = 0x020,
+  RDNORM      = 0x040,
+  RDBAND      = 0x080,
+  WRBAND      = 0x100,
+  MSG         = 0x400,
+  REMOVE      = 0x1000,
+  RDHUP       = 0x2000,
+}
+
+arch.POLL.WRNORM = arch.POLL.OUT
+
 return arch
 

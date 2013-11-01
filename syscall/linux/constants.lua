@@ -743,7 +743,7 @@ c.TFD_TIMER = strflag {
 }
 
 -- poll
-c.POLL = multiflags {
+c.POLL = multiflags(arch.POLL or {
   IN          = 0x001,
   PRI         = 0x002,
   OUT         = 0x004,
@@ -757,7 +757,7 @@ c.POLL = multiflags {
   MSG         = 0x400,
   REMOVE      = 0x1000,
   RDHUP       = 0x2000,
-}
+})
 
 -- epoll renamed from EPOLL_ to EPOLLCREATE
 c.EPOLLCREATE = multiflags {
