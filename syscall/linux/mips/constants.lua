@@ -768,5 +768,26 @@ arch.CC = {
 
 arch.CC.VSWTCH = arch.CC.VSWTC
 
+arch.LFLAG = {
+  ISIG    = octal '0000001',
+  ICANON  = octal '0000002',
+  XCASE   = octal '0000004',
+  ECHO    = octal '0000010',
+  ECHOE   = octal '0000020',
+  ECHOK   = octal '0000040',
+  ECHONL  = octal '0000100',
+  NOFLSH  = octal '0000200',
+  IEXTEN  = octal '0000400',
+  ECHOCTL = octal '0001000',
+  ECHOPRT = octal '0002000',
+  ECHOKE  = octal '0004000',
+  FLUSHO  = octal '0020000',
+  PENDIN  = octal '0040000',
+  TOSTOP  = octal '0100000',
+  EXTPROC = octal '0200000',
+}
+
+arch.LFLAG.ITOSTOP = arch.LFLAG.TOSTOP
+
 return arch
 
