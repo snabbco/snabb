@@ -602,6 +602,18 @@ arch.SIGPM = {
   SETMASK   = 3,
 }
 
+arch.SI = {
+  ASYNCNL = -60,
+  TKILL = -6,
+  SIGIO = -5,
+  MESGQ = -4,
+  TIMER = -3,
+  ASYNCIO = -2,
+  QUEUE = -1,
+  USER = 0,
+  KERNEL = 0x80,
+}
+
 arch.POLL = {
   IN          = 0x001,
   PRI         = 0x002,

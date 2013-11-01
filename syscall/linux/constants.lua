@@ -488,7 +488,7 @@ c.P = strflag{
 }
 
 -- struct siginfo, eg waitid
-c.SI = strflag {
+c.SI = strflag(arch.SI or {
   ASYNCNL = -60,
   TKILL = -6,
   SIGIO = -5,
@@ -498,7 +498,7 @@ c.SI = strflag {
   QUEUE = -1,
   USER = 0,
   KERNEL = 0x80,
-}
+})
 
 -- note renamed ILL to SIGILL etc as POLL clashes
 
