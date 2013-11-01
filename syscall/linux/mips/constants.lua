@@ -766,5 +766,7 @@ arch.CC = {
   VEOL          = 17,
 }
 
+arch.CC.VSWTCH = arch.CC.VSWTC
+
 return arch
 

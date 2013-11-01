@@ -2071,8 +2071,6 @@ c.CC = strflag(arch.CC or {
   VEOL2    = 16,
 })
 
-c.CC.VSWTCH = c.CC.VSWTC
-
 -- termios - c_iflag bits
 c.IFLAG = multiflags(arch.IFLAG or {
   IGNBRK  = octal('0000001'),
