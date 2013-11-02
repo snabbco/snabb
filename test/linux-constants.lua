@@ -1,4 +1,4 @@
--- test just the constants for Linux, against standard set so cross platform.
+-- test against clean set of kernel headers, standard set so cross platform.
 
 --[[
 luajit test/linux-constants.lua x64 > ./obj/c.c && cc -U__i386__ -I./include/linux-kernel-headers/x86_64/include -o ./obj/c ./obj/c.c && ./obj/c
@@ -8,7 +8,6 @@ luajit test/linux-constants.lua ppc > ./obj/c.c && cc -I./include/linux-kernel-h
 luajit test/linux-constants.lua mips > ./obj/c.c && cc -D__MIPSEL__ -D_MIPS_SIM=_MIPS_SIM_ABI32 -DCONFIG_32BIT -D__LITTLE_ENDIAN_BITFIELD -D__LITTLE_ENDIAN -DCONFIG_CPU_LITTLE_ENDIAN -I./include/linux-kernel-headers/mips/include  -o ./obj/c ./obj/c.c && ./obj/c
 ]]
 
--- TODO fix up so can test all architectures
 -- TODO 32 bit warnings about signed ranges
 
 local abi = require "syscall.abi"
@@ -19,7 +18,7 @@ if arg[1] then -- fake arch
   if abi.arch == "mips" then abi.mipsabi = "o32" end
 end
 
-local function fixup(abi, c)
+local function fixup_constants(abi, c)
   -- we only use one set
   if abi.abi64 then
     c.F.GETLK64   = nil
@@ -317,7 +316,7 @@ local ffi = require "ffi"
 
 local c = require "syscall.linux.constants"
 
-c = fixup(abi, c)
+c = fixup_constants(abi, c)
 
 for k, v in pairs(c) do
   if type(v) == "number" then

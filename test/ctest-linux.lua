@@ -3,6 +3,7 @@
 -- luajit ctest.lua > ctest.c && cc -std=c99 ctest.c -o ctest && ./ctest
 
 -- TODO we are replacing this with new tests against clean kernel headers, test/linux-constants.lua is first part
+-- however testing against both still useful, could be errors in clean set - headers are a mess.
 
 local S = require "syscall"
 
@@ -32,8 +33,7 @@ ctypes["sigset_t"] = nil -- use kernel value not glibc
 ctypes["struct {dev_t dev;}"] = nil -- not a real type
 
 if abi.abi32 then
-  ctypes["struct stat64"] = ctypes["struct stat"]
-  ctypes["struct stat"] = nil
+  ctypes["struct stat64"], ctypes["struct stat"] = ctypes["struct stat"], nil
 end
 
 -- we do not use the ino_t and blkcnt_t types, they are really 64 bit
@@ -48,8 +48,6 @@ ctypes["struct cap"] = nil
 
 -- TODO seems to be an issue with sockaddr_storage (alignment difference?) on Musl, needs fixing
 ctypes["struct sockaddr_storage"] = nil
--- TODO seems to be a size issue on Musl
-ctypes["struct siginfo"] = nil
 -- TODO seems to be a size issue on Musl, have asked list
 ctypes["struct sysinfo"] = nil
 

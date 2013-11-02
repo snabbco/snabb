@@ -766,7 +766,7 @@ typedef struct siginfo {
       long int si_band;
        int si_fd;
     } sigpoll;
-  } sifields;
+  } _sifields;
 } siginfo_t;
 ]]
 
