@@ -55,7 +55,7 @@ ctypes["struct sysinfo"] = nil
 ctypes["struct siginfo"] = nil
 
 -- both glibc and Musl mess around with kernel sizes, larger so ok.
-ctype["struct termios"] = nil
+ctypes["struct termios"] = nil
 
 for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
 
