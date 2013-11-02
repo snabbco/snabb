@@ -51,6 +51,9 @@ ctypes["struct sockaddr_storage"] = nil
 -- TODO seems to be a size issue on Musl, have asked list
 ctypes["struct sysinfo"] = nil
 
+-- size issue on Musl, incomplete type on glibc
+types["struct siginfo"] = nil
+
 for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
 
 -- internal use
@@ -311,6 +314,7 @@ print [[
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/socket.h>
@@ -318,7 +322,6 @@ print [[
 #include <netinet/udp.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
-#include <signal.h>
 #include <sys/utsname.h>
 #include <time.h>
 #include <sys/resource.h>
