@@ -32,10 +32,16 @@ function S.recv(fd, buf, count, flags) return S.recvfrom(fd, buf, count, flags, 
 function S.send(fd, buf, count, flags) return S.sendto(fd, buf, count, flags, nil, nil) end
 
 -- not a syscall in many systems, defined in terms of sigaction
+local sigret = {}
+for k, v in pairs(c.SIGACT) do if k ~= "ERR" then sigret[v] = k end end
+
 function S.signal(signum, handler) -- defined in terms of sigaction
   local oldact = t.sigaction()
   local ok, err = S.sigaction(signum, handler, oldact)
   if not ok then return nil, err end
+  local num = tonumber(t.intptr(oldact.sa_handler))
+  local ret = sigret[num]
+  if ret then return ret end -- return eg "IGN", "DFL" not a function pointer
   return oldact.sa_handler
 end
 

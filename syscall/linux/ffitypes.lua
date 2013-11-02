@@ -695,6 +695,7 @@ struct rusage {
 };
 ]]
 
+-- both Glibc and Musl have larger termios at least for some architectures; I believe this is correct for kernel
 if arch.termios then append(arch.termios)
 else
 append [[
@@ -768,17 +769,15 @@ typedef struct siginfo {
 } siginfo_t;
 ]]
 
+-- this is the type used by the rt_sigaction syscall NB have renamed the fields to sa_
 if arch.sigaction then append(arch.sigaction)
 else
 append [[
-struct sigaction {
-  union {
-    sighandler_t sa_handler;
-    void (*sa_sigaction) (int, siginfo_t *, void *);
-  } sa_handler;
-  sigset_t sa_mask;
+struct k_sigaction {
+  void (*sa_handler)(int);
   unsigned long sa_flags;
   void (*sa_restorer)(void);
+  unsigned sa_mask[2];
 };
 ]]
 end

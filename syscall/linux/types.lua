@@ -367,6 +367,41 @@ mt.siginfo = {
 
 addtype("siginfo", "struct siginfo", mt.siginfo)
 
+-- Linux internally uses non standard sigaction type k_sigaction
+mt.sigaction = {
+  index = {
+    handler = function(sa) return sa.sa_handler end,
+    sigaction = function(sa) return sa.sa_handler end,
+    mask = function(sa) return sa.sa_mask end, -- TODO would rather return type of sigset_t
+    flags = function(sa) return tonumber(sa.sa_flags) end,
+  },
+  newindex = {
+    handler = function(sa, v)
+      if type(v) == "string" then v = pt.void(c.SIGACT[v]) end
+      if type(v) == "number" then v = pt.void(v) end
+      sa.sa_handler = v
+    end,
+    sigaction = function(sa, v)
+      if type(v) == "string" then v = pt.void(c.SIGACT[v]) end
+      if type(v) == "number" then v = pt.void(v) end
+      sa.sa_handler.sa_sigaction = v
+    end,
+    mask = function(sa, v)
+      if not ffi.istype(t.sigset, v) then v = t.sigset(v) end
+      ffi.copy(sa.sa_mask, v, ffi.sizeof(sa.sa_mask))
+    end,
+    flags = function(sa, v) sa.sa_flags = c.SA[v] end,
+  },
+  __new = function(tp, tab)
+    local sa = ffi.new(tp)
+    if tab then for k, v in pairs(tab) do sa[k] = v end end
+    if tab and tab.sigaction then sa.sa_flags = bit.bor(sa.flags, c.SA.SIGINFO) end -- this flag must be set if sigaction set
+    return sa
+  end,
+}
+
+addtype("sigaction", "struct k_sigaction", mt.sigaction)
+
 mt.macaddr = {
   __tostring = function(m)
     local hex = {}

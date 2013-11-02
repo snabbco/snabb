@@ -420,6 +420,11 @@ function C.dup(oldfd) return syscall(c.SYS.dup, t.int(oldfd)) end
 function C.dup2(oldfd, newfd) return syscall(c.SYS.dup2, t.int(oldfd), t.int(newfd)) end
 function C.dup3(oldfd, newfd, flags) return syscall(c.SYS.dup3, t.int(oldfd), t.int(newfd), t.int(flags)) end
 
+-- kernel sigaction structures actually rather different in Linux from libc ones
+function C.sigaction(signum, act, oldact)
+  return syscall(c.SYS.rt_sigaction, t.int(signum), pt.void(act), pt.void(oldact), t.int(s.int2)) -- size is size of mask field
+end
+
 -- socketcall related
 if c.SYS.accept4 then -- on x86 this is a socketcall, which we have not implemented yet, other archs is a syscall
   function C.accept4(sockfd, addr, addrlen, flags)

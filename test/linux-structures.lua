@@ -2,6 +2,8 @@
 
 --[[
 luajit test/linux-structures.lua x64 > ./obj/s.c && cc -U__i386__ -DBITS_PER_LONG=64 -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
+
+luajit test/linux-structures.lua x86 > ./obj/s.c && cc -D__i386__ -DBITS_PER_LONG=32 -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
 ]]
 
 local abi = require "syscall.abi"
@@ -59,6 +61,7 @@ local function fixup_structs(abi, ctypes)
   ctypes["struct fdb_entry"] = nil -- not defined
   ctypes["struct user_cap_header"] = nil -- not defined
   ctypes["struct sockaddr_storage"] = nil -- uses __kernel_
+  ctypes["struct k_sigaction"] = nil -- seems to be incorrect in headers
 
   return ctypes
 end

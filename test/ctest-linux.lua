@@ -57,6 +57,9 @@ ctypes["struct siginfo"] = nil
 -- both glibc and Musl mess around with kernel sizes, larger so ok.
 ctypes["struct termios"] = nil
 
+-- not defined by glibc
+ctypes["struct k_sigaction"] = nil
+
 for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
 
 -- internal use

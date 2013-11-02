@@ -166,6 +166,43 @@ mt.siginfo = {
 
 addtype("siginfo", "siginfo_t", mt.siginfo)
 
+-- sigaction, standard POSIX behaviour with union of handler and sigaction
+addtype_fn("sa_sigaction", "void (*)(int, siginfo_t *, void *)")
+
+mt.sigaction = {
+  index = {
+    handler = function(sa) return sa._sa_u._sa_handler end,
+    sigaction = function(sa) return sa._sa_u._sa_sigaction end,
+    mask = function(sa) return sa.sa_mask end,
+    flags = function(sa) return tonumber(sa.sa_flags) end,
+  },
+  newindex = {
+    handler = function(sa, v)
+      if type(v) == "string" then v = pt.void(c.SIGACT[v]) end
+      if type(v) == "number" then v = pt.void(v) end
+      sa._sa_u._sa_handler = v
+    end,
+    sigaction = function(sa, v)
+      if type(v) == "string" then v = pt.void(c.SIGACT[v]) end
+      if type(v) == "number" then v = pt.void(v) end
+      sa._sa_u._sa_sigaction = v
+    end,
+    mask = function(sa, v)
+      if not ffi.istype(t.sigset, v) then v = t.sigset(v) end
+      sa.sa_mask = v
+    end,
+    flags = function(sa, v) sa.sa_flags = c.SA[v] end,
+  },
+  __new = function(tp, tab)
+    local sa = ffi.new(tp)
+    if tab then for k, v in pairs(tab) do sa[k] = v end end
+    if tab and tab.sigaction then sa.sa_flags = bit.bor(sa.flags, c.SA.SIGINFO) end -- this flag must be set if sigaction set
+    return sa
+  end,
+}
+
+addtype("sigaction", "struct sigaction", mt.sigaction)
+
 mt.dirent = {
   index = {
     fileno = function(self) return tonumber(self.d_fileno) end,
