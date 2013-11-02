@@ -1,11 +1,11 @@
 -- test against clean set of kernel headers, standard set so cross platform.
 
 --[[
-luajit test/linux-constants.lua x64 > ./obj/c.c && cc -U__i386__ -I./include/linux-kernel-headers/x86_64/include -o ./obj/c ./obj/c.c && ./obj/c
-luajit test/linux-constants.lua x86 > ./obj/c.c && cc -D__i386__ -I./include/linux-kernel-headers/i386/include -o ./obj/c ./obj/c.c && ./obj/c
-luajit test/linux-constants.lua arm > ./obj/c.c && cc -D__ARM_EABI__ -I./include/linux-kernel-headers/arm/include -o ./obj/c ./obj/c.c && ./obj/c
+luajit test/linux-constants.lua x64 > ./obj/c.c && cc -U__i386__ -DBITS_PER_LONG=64 -I./include/linux-kernel-headers/x86_64/include -o ./obj/c ./obj/c.c && ./obj/c
+luajit test/linux-constants.lua x86 > ./obj/c.c && cc -D__i386__ -DBITS_PER_LONG=32 -I./include/linux-kernel-headers/i386/include -o ./obj/c ./obj/c.c && ./obj/c
+luajit test/linux-constants.lua arm > ./obj/c.c && cc -D__ARM_EABI__ -DBITS_PER_LONG=32 -I./include/linux-kernel-headers/arm/include -o ./obj/c ./obj/c.c && ./obj/c
 luajit test/linux-constants.lua ppc > ./obj/c.c && cc -I./include/linux-kernel-headers/powerpc/include -o ./obj/c ./obj/c.c && ./obj/c
-luajit test/linux-constants.lua mips > ./obj/c.c && cc -D__MIPSEL__ -D_MIPS_SIM=_MIPS_SIM_ABI32 -DCONFIG_32BIT -D__LITTLE_ENDIAN_BITFIELD -D__LITTLE_ENDIAN -DCONFIG_CPU_LITTLE_ENDIAN -I./include/linux-kernel-headers/mips/include  -o ./obj/c ./obj/c.c && ./obj/c
+luajit test/linux-constants.lua mips > ./obj/c.c && cc -D__MIPSEL__ -D_MIPS_SIM=_MIPS_SIM_ABI32 -DCONFIG_32BIT -DBITS_PER_LONG=32 -D__LITTLE_ENDIAN_BITFIELD -D__LITTLE_ENDIAN -DCONFIG_CPU_LITTLE_ENDIAN -I./include/linux-kernel-headers/mips/include  -o ./obj/c ./obj/c.c && ./obj/c
 ]]
 
 -- TODO 32 bit warnings about signed ranges

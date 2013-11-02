@@ -52,7 +52,7 @@ ctypes["struct sockaddr_storage"] = nil
 ctypes["struct sysinfo"] = nil
 
 -- size issue on Musl, incomplete type on glibc
-types["struct siginfo"] = nil
+ctypes["struct siginfo"] = nil
 
 for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
 

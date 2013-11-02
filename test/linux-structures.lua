@@ -1,7 +1,7 @@
 -- test Linux structures against standard headers
 
 --[[
-luajit test/linux-structures.lua x64 > ./obj/s.c && cc -U__i386__ -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
+luajit test/linux-structures.lua x64 > ./obj/s.c && cc -U__i386__ -DBITS_PER_LONG=64 -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
 ]]
 
 local abi = require "syscall.abi"
