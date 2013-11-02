@@ -723,7 +723,7 @@ mt.rusage = {
 addtype("rusage", "struct rusage", mt.rusage)
 
 -- include OS specific types
-local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, lenmt = lenmt,
+local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, addtype_fn = addtype_fn, lenmt = lenmt,
             newfn = newfn, istype = istype, reviter = reviter}
 
 types = ostypes.init(types, hh, abi, c)
