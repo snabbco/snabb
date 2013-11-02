@@ -18,8 +18,6 @@ local function fixup_structs(abi, ctypes)
     ctypes["struct stat64"], ctypes["struct stat"] = ctypes["struct stat"], nil
   end
 
-  ctypes["struct ktermios"], ctypes["struct termios"] = ctypes["struct termios"], nil
-
   -- internal only
   ctypes["struct capabilities"] = nil
   ctypes["struct cap"] = nil
