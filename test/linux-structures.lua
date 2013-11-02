@@ -147,16 +147,16 @@ print [[
 
 int ret;
 
-void sassert(int a, int b, char *n) {
+void sassert_size(int a, int b, char *n) {
   if (a != b) {
-    printf("error with %s: %d (0x%x) != %d (0x%x)\n", n, a, a, b, b);
+    printf("size error with %s: %d (0x%x) != %d (0x%x)\n", n, a, a, b, b);
     ret = 1;
   }
 }
 
-void sassert_u64(uint64_t a, uint64_t b, char *n) {
+void sassert_offset(int a, int b, char *n) {
   if (a != b) {
-    printf("error with %s: %llu (0x%llx) != %llu (0x%llx)\n", n, (unsigned long long)a, (unsigned long long)a, (unsigned long long)b, (unsigned long long)b);
+    printf("offset error: %s: %d (0x%x) != %d (0x%x)\n", n, a, a, b, b);
     ret = 1;
   }
 }
@@ -186,7 +186,7 @@ local ignore_offsets = {
 -- iterate over S.ctypes
 for k, v in pairs(ctypes) do
   -- check size
-  print("sassert(sizeof(" .. k .. "), " .. ffi.sizeof(v) .. ', "' .. k .. '");')
+  print("sassert_size(sizeof(" .. k .. "), " .. ffi.sizeof(v) .. ', "' .. k .. '");')
   -- check offset of struct fields
   local refct = reflect.typeof(v)
   if refct.what == "struct" then
@@ -195,7 +195,7 @@ for k, v in pairs(ctypes) do
       -- bit hacky - TODO fix these issues
       if not name or ignore_offsets[name] or name:sub(1,2) == "__" then name = nil end
       if name then
-        print("sassert(offsetof(" .. k .. "," .. name .. "), " .. ffi.offsetof(v, name) .. ', " offset of ' .. name .. ' in ' .. k .. '");')
+        print("sassert_offset(offsetof(" .. k .. "," .. name .. "), " .. ffi.offsetof(v, name) .. ', " offset of ' .. name .. ' in ' .. k .. '");')
       end
     end
   end
