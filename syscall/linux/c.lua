@@ -26,6 +26,9 @@ end
 
 -- basically all types passed to syscalls are int or long, so we do not need to use nicely named types, so we can avoid importing t.
 local int, long = ffi.typeof("int"), ffi.typeof("long")
+local uint, ulong = ffi.typeof("unsigned int"), ffi.typeof("unsigned long")
+
+local uint32 = uint -- TODO not really needed
 
 local h = require "syscall.helpers"
 local err64 = h.err64
@@ -105,8 +108,8 @@ if abi.abi32 then
     end
   end
   -- note statfs,fstatfs pass size of struct
-  function C.statfs(path, buf) return syscall(c.SYS.statfs64, path, t.uint(ffi.sizeof(buf)), void(buf)) end
-  function C.fstatfs(fd, buf) return syscall(c.SYS.fstatfs64, int(fd), t.uint(ffi.sizeof(buf)), void(buf)) end
+  function C.statfs(path, buf) return syscall(c.SYS.statfs64, path, uint(ffi.sizeof(buf)), void(buf)) end
+  function C.fstatfs(fd, buf) return syscall(c.SYS.fstatfs64, int(fd), uint(ffi.sizeof(buf)), void(buf)) end
   -- Note very odd split 64 bit arguments even on 64 bit platform.
   function C.preadv(fd, iov, iovcnt, offset)
     local off1, off2 = llarg64(offset)
@@ -120,7 +123,7 @@ if abi.abi32 then
   function C.lseek(fd, offset, whence)
     local result = t.off1()
     local off1, off2 = llarg64u(offset)
-    local ret = syscall(c.SYS._llseek, int(fd), t.ulong(off1), t.ulong(off2), void(result), t.uint(whence))
+    local ret = syscall(c.SYS._llseek, int(fd), ulong(off1), ulong(off2), void(result), uint(whence))
     if ret == -1 then return err64 end
     return result[0]
   end
@@ -130,7 +133,7 @@ if abi.abi32 then
   -- on 32 bit systems mmap uses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
   function C.mmap(addr, length, prot, flags, fd, offset)
     local pgoffset = bit.rshift(offset, 12)
-    return void(syscall(c.SYS.mmap2, void(addr), t.size(length), int(prot), int(flags), int(fd), t.uint32(pgoffset)))
+    return void(syscall(c.SYS.mmap2, void(addr), t.size(length), int(prot), int(flags), int(fd), uint(pgoffset)))
   end
 end
 
@@ -147,16 +150,16 @@ end
 
 -- getdents is not provided by glibc. Musl has weak alias so not visible.
 function C.getdents(fd, buf, size)
-  return syscall(c.SYS.getdents64, int(fd), buf, t.uint(size))
+  return syscall(c.SYS.getdents64, int(fd), buf, uint(size))
 end
 
 -- glibc has request as an unsigned long, kernel is unsigned int, other libcs are int, so use syscall directly
 function C.ioctl(fd, request, arg)
-  return syscall(c.SYS.ioctl, int(fd), t.uint(request), void(arg))
+  return syscall(c.SYS.ioctl, int(fd), uint(request), void(arg))
 end
 
 -- getcwd in libc may allocate memory and has inconsistent return value, so use syscall
-function C.getcwd(buf, size) return syscall(c.SYS.getcwd, void(buf), t.ulong(size)) end
+function C.getcwd(buf, size) return syscall(c.SYS.getcwd, void(buf), ulong(size)) end
 
 -- nice in libc may or may not return old value, syscall never does; however nice syscall may not exist
 if c.SYS.nice then
@@ -170,7 +173,7 @@ end
 
 -- uClibc only provides a version of eventfd without flags, and we cannot detect this
 function C.eventfd(initval, flags)
-  return syscall(c.SYS.eventfd2, t.uint(initval), int(flags))
+  return syscall(c.SYS.eventfd2, uint(initval), int(flags))
 end
 
 -- glibc does not provide getcpu
@@ -207,7 +210,7 @@ if abi.abi64 then
     return syscall(sys_fadvise64, int(fd), t.off(offset), t.off(len), int(advise))
   end
   function C.fallocate(fd, mode, offset, len)
-    return syscall(c.SYS.fallocate, int(fd), t.uint(mode), t.off(offset), t.off(len))
+    return syscall(c.SYS.fallocate, int(fd), uint(mode), t.off(offset), t.off(len))
   end
 else
   function C.stat(path, buf)
@@ -226,25 +229,25 @@ else
     function C.fadvise64(fd, offset, len, advise)
       local off1, off2 = arg64u(offset)
       local len1, len2 = arg64u(len)
-      return syscall(sys_fadvise64, int(fd), 0, t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2), int(advise))
+      return syscall(sys_fadvise64, int(fd), 0, uint32(off1), uint32(off2), uint32(len1), uint32(len2), int(advise))
     end
   else
     function C.fadvise64(fd, offset, len, advise)
       local off1, off2 = arg64u(offset)
       local len1, len2 = arg64u(len)
-      return syscall(sys_fadvise64, int(fd), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2), int(advise))
+      return syscall(sys_fadvise64, int(fd), uint32(off1), uint32(off2), uint32(len1), uint32(len2), int(advise))
     end
   end
   function C.fallocate(fd, mode, offset, len)
     local off1, off2 = arg64u(offset)
     local len1, len2 = arg64u(len)
-    return syscall(c.SYS.fallocate, int(fd), t.uint(mode), t.uint32(off1), t.uint32(off2), t.uint32(len1), t.uint32(len2))
+    return syscall(c.SYS.fallocate, int(fd), uint(mode), uint32(off1), uint32(off2), uint32(len1), uint32(len2))
   end
 end
 
 -- native Linux aio not generally supported by libc, only posix API
 function C.io_setup(nr_events, ctx)
-  return syscall(c.SYS.io_setup, t.uint(nr_events), void(ctx))
+  return syscall(c.SYS.io_setup, uint(nr_events), void(ctx))
 end
 function C.io_destroy(ctx)
   return syscall(c.SYS.io_destroy, t.aio_context(ctx))
@@ -268,7 +271,7 @@ function C.mq_getsetattr(mqd, new, old)
   return syscall(c.SYS.mq_getsetattr, int(mqd), void(new), void(old))
 end
 function C.mq_timedsend(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
-  return syscall(c.SYS.mq_timedsend, int(mqd), void(msg_ptr), t.size(msg_len), t.uint(msg_prio), void(abs_timeout))
+  return syscall(c.SYS.mq_timedsend, int(mqd), void(msg_ptr), t.size(msg_len), uint(msg_prio), void(abs_timeout))
 end
 function C.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   return syscall(c.SYS.mq_timedreceive, int(mqd), void(msg_ptr), t.size(msg_len), void(msg_prio), void(abs_timeout))
@@ -276,10 +279,10 @@ end
 
 -- note kernel dev_t is 32 bits, use syscall so we can ignore glibc using 64 bit dev_t
 function C.mknod(pathname, mode, dev)
-  return syscall(c.SYS.mknod, pathname, t.mode(mode), t.uint(dev))
+  return syscall(c.SYS.mknod, pathname, t.mode(mode), uint(dev))
 end
 function C.mknodat(fd, pathname, mode, dev)
-  return syscall(c.SYS.mknodat, int(fd), pathname, t.mode(mode), t.uint(dev))
+  return syscall(c.SYS.mknodat, int(fd), pathname, t.mode(mode), uint(dev))
 end
 -- pivot_root is not provided by glibc, is provided by Musl
 function C.pivot_root(new_root, put_old)
@@ -296,10 +299,10 @@ end
 
 -- sched_setaffinity and sched_getaffinity not in Musl at the moment, use syscalls. Could test instead.
 function C.sched_getaffinity(pid, len, mask)
-  return syscall(c.SYS.sched_getaffinity, t.pid(pid), t.uint(len), void(mask))
+  return syscall(c.SYS.sched_getaffinity, t.pid(pid), uint(len), void(mask))
 end
 function C.sched_setaffinity(pid, len, mask)
-  return syscall(c.SYS.sched_setaffinity, t.pid(pid), t.uint(len), void(mask))
+  return syscall(c.SYS.sched_setaffinity, t.pid(pid), uint(len), void(mask))
 end
 -- sched_setparam and sched_getparam in Musl return ENOSYS, probably as they work on threads not processes.
 function C.sched_getparam(pid, param)
@@ -366,32 +369,32 @@ function C.timerfd_gettime(fd, curr_value)
   return syscall(c.SYS.timerfd_gettime, int(fd), void(curr_value))
 end
 function C.splice(fd_in, off_in, fd_out, off_out, len, flags)
-  return syscall(c.SYS.splice, int(fd_in), void(off_in), int(fd_out), void(off_out), t.size(len), t.uint(flags))
+  return syscall(c.SYS.splice, int(fd_in), void(off_in), int(fd_out), void(off_out), t.size(len), uint(flags))
 end
 function C.tee(src, dest, len, flags)
-  return syscall(c.SYS.tee, int(src), int(dest), t.size(len), t.uint(flags))
+  return syscall(c.SYS.tee, int(src), int(dest), t.size(len), uint(flags))
 end
 function C.vmsplice(fd, iovec, cnt, flags)
-  return syscall(c.SYS.vmsplice, int(fd), void(iovec), t.size(cnt), t.uint(flags))
+  return syscall(c.SYS.vmsplice, int(fd), void(iovec), t.size(cnt), uint(flags))
 end
 -- note that I think these are correct on 32 bit platforms, but strace is buggy
 if c.SYS.sync_file_range then
   if abi.abi64 then
     function C.sync_file_range(fd, pos, len, flags)
-      return syscall(c.SYS.sync_file_range, int(fd), 0, long(pos), long(len), t.uint(flags))
+      return syscall(c.SYS.sync_file_range, int(fd), 0, long(pos), long(len), uint(flags))
     end
   else
     if zeropad then
       function C.sync_file_range(fd, pos, len, flags)
         local pos1, pos2 = arg64(pos)
         local len1, len2 = arg64(len)
-        return syscall(c.SYS.sync_file_range, int(fd), 0, long(pos1), long(pos2), long(len1), long(len2), t.uint(flags))
+        return syscall(c.SYS.sync_file_range, int(fd), 0, long(pos1), long(pos2), long(len1), long(len2), uint(flags))
       end
     else
       function C.sync_file_range(fd, pos, len, flags)
        local pos1, pos2 = arg64(pos)
        local len1, len2 = arg64(len)
-        return syscall(c.SYS.sync_file_range, int(fd), long(pos1), long(pos2), long(len1), long(len2), t.uint(flags))
+        return syscall(c.SYS.sync_file_range, int(fd), long(pos1), long(pos2), long(len1), long(len2), uint(flags))
       end
     end
   end
@@ -399,7 +402,7 @@ elseif c.SYS.sync_file_range2 then -- only on 32 bit platforms I believe
   function C.sync_file_range(fd, pos, len, flags)
     local pos1, pos2 = arg64(pos)
     local len1, len2 = arg64(len)
-    return syscall(c.SYS.sync_file_range2, int(fd), t.uint(flags), long(pos1), long(pos2), long(len1), long(len2))
+    return syscall(c.SYS.sync_file_range2, int(fd), uint(flags), long(pos1), long(pos2), long(len1), long(len2))
   end
 end
 
