@@ -142,6 +142,7 @@ print [[
 #include <asm/statfs.h>
 #include <asm/stat.h>
 #include <asm/termbits.h>
+#include <asm/termios.h>
 
 int ret;
 
