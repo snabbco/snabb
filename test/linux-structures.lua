@@ -1,18 +1,15 @@
 -- test Linux structures against standard headers
 
+-- cannot cross test as core type sizes differ
 --[[
-luajit test/linux-structures.lua x64 > ./obj/s.c && cc -U__i386__ -DBITS_PER_LONG=64 -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
+luajit test/linux-structures.lua > ./obj/s.c && cc -U__i386__ -DBITS_PER_LONG=64 -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
 
-luajit test/linux-structures.lua x86 > ./obj/s.c && cc -D__i386__ -DBITS_PER_LONG=32 -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
+luajit32 test/linux-structures.lua > ./obj/s.c && cc -m32 -D__i386__ -DBITS_PER_LONG=32 -D_LARGEFILE_SOURCE -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
+
+luajit test/linux-structures.lua > ./obj/s.c && cc -DBITS_PER_LONG=32 -D_LARGEFILE_SOURCE -I./include/linux-kernel-headers/arm/include -o ./obj/s ./obj/s.c && ./obj/s
 ]]
 
 local abi = require "syscall.abi"
-
-if arg[1] then -- fake arch
-  abi.arch = arg[1]
-  if abi.arch == "x64" then abi.abi32, abi.abi64 = false, true else abi.abi32, abi.abi64 = true, false end
-  if abi.arch == "mips" then abi.mipsabi = "o32" end
-end
 
 local function fixup_structs(abi, ctypes)
 

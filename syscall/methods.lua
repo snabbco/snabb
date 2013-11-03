@@ -149,7 +149,7 @@ t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   end,
 })
 
-if S.mq_open then -- TODO better test. TODO support in BSD but will be slightly different as use -lrt not syscalls
+if S.mq_open then -- TODO better test. TODO support in BSD
 local mqmeth = {
   close = fmeth.close,
   nogc = nogc,
