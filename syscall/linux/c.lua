@@ -16,7 +16,7 @@ local ffi = require "ffi"
 
 local bit = require "syscall.bit"
 
-local t, pt = types.t, types.pt
+local t = types.t
 
 local voidp = ffi.typeof("void *")
 
@@ -172,7 +172,7 @@ end
 
 -- glibc does not provide getcpu
 function C.getcpu(cpu, node, tcache)
-  return syscall(c.SYS.getcpu, pt.uint(node), pt.uint(node), void(tcache))
+  return syscall(c.SYS.getcpu, void(node), void(node), void(tcache))
 end
 
 -- Musl always returns ENOSYS for these
@@ -180,7 +180,7 @@ function C.sched_getscheduler(pid)
   return syscall(c.SYS.sched_getscheduler, t.pid(pid))
 end
 function C.sched_setscheduler(pid, policy, param)
-  return syscall(c.SYS.sched_setscheduler, t.pid(pid), t.int(policy), pt.sched_param(param))
+  return syscall(c.SYS.sched_setscheduler, t.pid(pid), t.int(policy), void(param))
 end
 
 -- for stat we use the syscall as libc might have a different struct stat for compatibility
