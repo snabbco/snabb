@@ -25,7 +25,7 @@ local function void(x)
 end
 
 -- basically all types passed to syscalls are int or long, so we do not need to use nicely named types, so we can avoid importing t.
-local int = ffi.typeof("int")
+local int, long = ffi.typeof("int"), ffi.typeof("long")
 
 local h = require "syscall.helpers"
 local err64 = h.err64
@@ -72,36 +72,36 @@ if abi.abi32 then
   if zeropad then
     function C.truncate(path, length)
       local len1, len2 = arg64u(length)
-      return syscall(c.SYS.truncate64, path, int(0), t.long(len1), t.long(len2))
+      return syscall(c.SYS.truncate64, path, int(0), long(len1), long(len2))
     end
     function C.ftruncate(fd, length)
       local len1, len2 = arg64u(length)
-      return syscall(c.SYS.ftruncate64, int(fd), int(0), t.long(len1), t.long(len2))
+      return syscall(c.SYS.ftruncate64, int(fd), int(0), long(len1), long(len2))
     end
     function C.pread(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pread64, int(fd), void(buf), t.size(size), int(0), t.long(off1), t.long(off2))
+      return syscall(c.SYS.pread64, int(fd), void(buf), t.size(size), int(0), long(off1), long(off2))
     end
     function C.pwrite(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pwrite64, int(fd), void(buf), t.size(size), int(0), t.long(off1), t.long(off2))
+      return syscall(c.SYS.pwrite64, int(fd), void(buf), t.size(size), int(0), long(off1), long(off2))
     end
   else
     function C.truncate(path, length)
       local len1, len2 = arg64u(length)
-      return syscall(c.SYS.truncate64, path, t.long(len1), t.long(len2))
+      return syscall(c.SYS.truncate64, path, long(len1), long(len2))
     end
     function C.ftruncate(fd, length)
       local len1, len2 = arg64u(length)
-      return syscall(c.SYS.ftruncate64, int(fd), t.long(len1), t.long(len2))
+      return syscall(c.SYS.ftruncate64, int(fd), long(len1), long(len2))
     end
     function C.pread(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pread64, int(fd), void(buf), t.size(size), t.long(off1), t.long(off2))
+      return syscall(c.SYS.pread64, int(fd), void(buf), t.size(size), long(off1), long(off2))
     end
     function C.pwrite(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pwrite64, int(fd), void(buf), t.size(size), t.long(off1), t.long(off2))
+      return syscall(c.SYS.pwrite64, int(fd), void(buf), t.size(size), long(off1), long(off2))
     end
   end
   -- note statfs,fstatfs pass size of struct
@@ -110,11 +110,11 @@ if abi.abi32 then
   -- Note very odd split 64 bit arguments even on 64 bit platform.
   function C.preadv(fd, iov, iovcnt, offset)
     local off1, off2 = llarg64(offset)
-    return syscall(c.SYS.preadv, int(fd), void(iov), int(iovcnt), t.long(off2), t.long(off1))
+    return syscall(c.SYS.preadv, int(fd), void(iov), int(iovcnt), long(off2), long(off1))
   end
   function C.pwritev(fd, iov, iovcnt, offset)
     local off1, off2 = llarg64(offset)
-    return syscall(c.SYS.pwritev, int(fd), void(iov), int(iovcnt), t.long(off2), t.long(off1))
+    return syscall(c.SYS.pwritev, int(fd), void(iov), int(iovcnt), long(off2), long(off1))
   end
   -- lseek is a mess in 32 bit, use _llseek syscall to get clean result.
   function C.lseek(fd, offset, whence)
@@ -253,10 +253,10 @@ function C.io_cancel(ctx, iocb, result)
   return syscall(c.SYS.io_cancel, t.aio_context(ctx), void(iocb), void(result))
 end
 function C.io_getevents(ctx, min, nr, events, timeout)
-  return syscall(c.SYS.io_getevents, t.aio_context(ctx), t.long(min), t.long(nr), void(events), void(timeout))
+  return syscall(c.SYS.io_getevents, t.aio_context(ctx), long(min), long(nr), void(events), void(timeout))
 end
 function C.io_submit(ctx, iocb, nr)
-  return syscall(c.SYS.io_submit, t.aio_context(ctx), t.long(nr), void(iocb))
+  return syscall(c.SYS.io_submit, t.aio_context(ctx), long(nr), void(iocb))
 end
 
 -- mq functions in -rt for glibc, plus syscalls differ slightly
@@ -378,20 +378,20 @@ end
 if c.SYS.sync_file_range then
   if abi.abi64 then
     function C.sync_file_range(fd, pos, len, flags)
-      return syscall(c.SYS.sync_file_range, int(fd), 0, t.long(pos), t.long(len), t.uint(flags))
+      return syscall(c.SYS.sync_file_range, int(fd), 0, long(pos), long(len), t.uint(flags))
     end
   else
     if zeropad then
       function C.sync_file_range(fd, pos, len, flags)
         local pos1, pos2 = arg64(pos)
         local len1, len2 = arg64(len)
-        return syscall(c.SYS.sync_file_range, int(fd), 0, t.long(pos1), t.long(pos2), t.long(len1), t.long(len2), t.uint(flags))
+        return syscall(c.SYS.sync_file_range, int(fd), 0, long(pos1), long(pos2), long(len1), long(len2), t.uint(flags))
       end
     else
       function C.sync_file_range(fd, pos, len, flags)
        local pos1, pos2 = arg64(pos)
        local len1, len2 = arg64(len)
-        return syscall(c.SYS.sync_file_range, int(fd), t.long(pos1), t.long(pos2), t.long(len1), t.long(len2), t.uint(flags))
+        return syscall(c.SYS.sync_file_range, int(fd), long(pos1), long(pos2), long(len1), long(len2), t.uint(flags))
       end
     end
   end
@@ -399,7 +399,7 @@ elseif c.SYS.sync_file_range2 then -- only on 32 bit platforms I believe
   function C.sync_file_range(fd, pos, len, flags)
     local pos1, pos2 = arg64(pos)
     local len1, len2 = arg64(len)
-    return syscall(c.SYS.sync_file_range2, int(fd), t.uint(flags), t.long(pos1), t.long(pos2), t.long(len1), t.long(len2))
+    return syscall(c.SYS.sync_file_range2, int(fd), t.uint(flags), long(pos1), long(pos2), long(len1), long(len2))
   end
 end
 
@@ -417,8 +417,8 @@ end
 function C.ppoll(fds, nfds, timeout_ts, sigmask)
   local size = 0
   if sigmask then size = sigset_size end
-  -- TODO luaffi gets the wrong value for the last param if it is int not t.long. See #87.
-  return syscall(c.SYS.ppoll, void(fds), t.nfds(nfds), void(timeout_ts), void(sigmask), t.long(size))
+  -- TODO luaffi gets the wrong value for the last param if it is int not long. See #87.
+  return syscall(c.SYS.ppoll, void(fds), t.nfds(nfds), void(timeout_ts), void(sigmask), long(size))
 end
 function C.signalfd(fd, mask, flags)
   return syscall(c.SYS.signalfd4, int(fd), void(mask), int(sigset_size), int(flags))
