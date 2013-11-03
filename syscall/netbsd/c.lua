@@ -8,7 +8,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(abi)
+local abi = require "syscall.abi"
 
 local ffi = require "ffi"
 
@@ -54,8 +54,4 @@ C.kevent = ffi.C.__kevent50
 C.getcwd = ffi.C.__getcwd
 
 return C
-
-end
-
-return {init = init}
 

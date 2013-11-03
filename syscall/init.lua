@@ -27,9 +27,12 @@ local types = require "syscall.types".init(abi, c, errors, ostypes, ostypes2)
 
 local t, pt, s = types.t, types.pt, types.s
 
-local cmod
-if abi.rump then cmod = "syscall.rump.c" else cmod = "syscall." .. abi.os .. ".c" end
-local C = require(cmod).init(abi)
+local C
+if abi.rump then
+  C = require("syscall.rump.c").init(abi)
+else
+  C = require("syscall." .. abi.os .. ".c")
+end
 
 if abi.rump and abi.types == "linux" then abi.os = "linux" end -- after this, we pretend to be Linux
 

@@ -10,7 +10,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(abi)
+local abi = require "syscall.abi"
 
 local ffi = require "ffi"
 
@@ -447,9 +447,5 @@ if sys.accept4 then -- on x86 this is a socketcall, which we have not implemente
 end
 
 return C
-
-end
-
-return {init = init}
 
 
