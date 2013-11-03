@@ -317,16 +317,16 @@ end
 
 -- in librt for glibc but use syscalls instead of loading another library
 function C.clock_nanosleep(clk_id, flags, req, rem)
-  return syscall(c.SYS.clock_nanosleep, t.clockid(clk_id), int(flags), void(req), void(rem))
+  return syscall(c.SYS.clock_nanosleep, int(clk_id), int(flags), void(req), void(rem))
 end
 function C.clock_getres(clk_id, ts)
-  return syscall(c.SYS.clock_getres, t.clockid(clk_id), void(ts))
+  return syscall(c.SYS.clock_getres, int(clk_id), void(ts))
 end
 function C.clock_gettime(clk_id, ts)
-  return syscall(c.SYS.clock_gettime, t.clockid(clk_id), void(ts))
+  return syscall(c.SYS.clock_gettime, int(clk_id), void(ts))
 end
 function C.clock_settime(clk_id, ts)
-  return syscall(c.SYS.clock_settime, t.clockid(clk_id), void(ts))
+  return syscall(c.SYS.clock_settime, int(clk_id), void(ts))
 end
 
 -- glibc will not call this with a null path, which is needed to implement futimens in Linux
@@ -424,7 +424,7 @@ function C.ppoll(fds, nfds, timeout_ts, sigmask)
   local size = 0
   if sigmask then size = sigset_size end
   -- TODO luaffi gets the wrong value for the last param if it is int not long. See #87.
-  return syscall(c.SYS.ppoll, void(fds), t.nfds(nfds), void(timeout_ts), void(sigmask), long(size))
+  return syscall(c.SYS.ppoll, void(fds), ulong(nfds), void(timeout_ts), void(sigmask), long(size))
 end
 function C.signalfd(fd, mask, flags)
   return syscall(c.SYS.signalfd4, int(fd), void(mask), int(sigset_size), int(flags))
