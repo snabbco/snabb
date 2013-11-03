@@ -357,7 +357,7 @@ struct _netbsd_rusage {
 
 local ffi = require "ffi"
 
-if abi.rump and abi.host ~= "netbsd" then
+if abi.host ~= "netbsd" then
   ffi.cdef(table.concat(defs, ""))
 else
   local s = table.concat(defs, "")
