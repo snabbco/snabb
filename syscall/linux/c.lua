@@ -16,7 +16,7 @@ local ffi = require "ffi"
 
 local bit = require "syscall.bit"
 
-local t, pt, s = types.t, types.pt, types.s
+local t, pt = types.t, types.pt
 
 local h = require "syscall.helpers"
 local err64 = h.err64
@@ -95,9 +95,9 @@ if abi.abi32 then
       return syscall(c.SYS.pwrite64, t.int(fd), pt.void(buf), t.size(size), t.long(off1), t.long(off2))
     end
   end
-  -- note statfs,fstatfs pass size of struct, we hide that here as on 64 bit we use libc call at present
-  function C.statfs(path, buf) return syscall(c.SYS.statfs64, path, t.uint(s.statfs), pt.void(buf)) end
-  function C.fstatfs(fd, buf) return syscall(c.SYS.fstatfs64, t.int(fd), t.uint(s.statfs), pt.void(buf)) end
+  -- note statfs,fstatfs pass size of struct
+  function C.statfs(path, buf) return syscall(c.SYS.statfs64, path, t.uint(ffi.sizeof(buf)), pt.void(buf)) end
+  function C.fstatfs(fd, buf) return syscall(c.SYS.fstatfs64, t.int(fd), t.uint(ffi.sizeof(buf)), pt.void(buf)) end
   -- Note very odd split 64 bit arguments even on 64 bit platform.
   function C.preadv(fd, iov, iovcnt, offset)
     local off1, off2 = llarg64(offset)
@@ -422,7 +422,7 @@ function C.dup3(oldfd, newfd, flags) return syscall(c.SYS.dup3, t.int(oldfd), t.
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
-  return syscall(c.SYS.rt_sigaction, t.int(signum), pt.void(act), pt.void(oldact), t.int(s.int2)) -- size is size of mask field
+  return syscall(c.SYS.rt_sigaction, t.int(signum), pt.void(act), pt.void(oldact), t.int(8)) -- size is size of mask field
 end
 
 -- socketcall related
