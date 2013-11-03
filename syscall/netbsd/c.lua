@@ -12,8 +12,6 @@ local function init(abi, c, types)
 
 local ffi = require "ffi"
 
-local t, pt, s = types.t, types.pt, types.s
-
 local function inlibc_fn(k) return ffi.C[k] end
 
 local C = setmetatable({}, {
