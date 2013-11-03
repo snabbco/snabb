@@ -13,6 +13,8 @@ local octal = h.octal
 
 local abi = require "syscall.abi"
 
+local arch = {}
+
 arch.SIG = {
   HUP = 1,
   INT = 2,
