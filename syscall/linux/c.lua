@@ -31,6 +31,7 @@ local uint, ulong = ffi.typeof("unsigned int"), ffi.typeof("unsigned long")
 -- these could be removed
 local uint32 = uint
 local size = ulong
+local aio_context = ulong
 
 local h = require "syscall.helpers"
 local err64 = h.err64
@@ -252,21 +253,21 @@ function C.io_setup(nr_events, ctx)
   return syscall(c.SYS.io_setup, uint(nr_events), void(ctx))
 end
 function C.io_destroy(ctx)
-  return syscall(c.SYS.io_destroy, t.aio_context(ctx))
+  return syscall(c.SYS.io_destroy, aio_context(ctx))
 end
 function C.io_cancel(ctx, iocb, result)
-  return syscall(c.SYS.io_cancel, t.aio_context(ctx), void(iocb), void(result))
+  return syscall(c.SYS.io_cancel, aio_context(ctx), void(iocb), void(result))
 end
 function C.io_getevents(ctx, min, nr, events, timeout)
-  return syscall(c.SYS.io_getevents, t.aio_context(ctx), long(min), long(nr), void(events), void(timeout))
+  return syscall(c.SYS.io_getevents, aio_context(ctx), long(min), long(nr), void(events), void(timeout))
 end
 function C.io_submit(ctx, iocb, nr)
-  return syscall(c.SYS.io_submit, t.aio_context(ctx), long(nr), void(iocb))
+  return syscall(c.SYS.io_submit, aio_context(ctx), long(nr), void(iocb))
 end
 
 -- mq functions in -rt for glibc, plus syscalls differ slightly
 function C.mq_open(name, flags, mode, attr)
-  return syscall(c.SYS.mq_open, void(name), int(flags), t.mode(mode), void(attr))
+  return syscall(c.SYS.mq_open, void(name), int(flags), uint(mode), void(attr))
 end
 function C.mq_unlink(name) return syscall(c.SYS.mq_unlink, void(name)) end
 function C.mq_getsetattr(mqd, new, old)
@@ -281,10 +282,10 @@ end
 
 -- note kernel dev_t is 32 bits, use syscall so we can ignore glibc using 64 bit dev_t
 function C.mknod(pathname, mode, dev)
-  return syscall(c.SYS.mknod, pathname, t.mode(mode), uint(dev))
+  return syscall(c.SYS.mknod, pathname, uint(mode), uint(dev))
 end
 function C.mknodat(fd, pathname, mode, dev)
-  return syscall(c.SYS.mknodat, int(fd), pathname, t.mode(mode), uint(dev))
+  return syscall(c.SYS.mknodat, int(fd), pathname, uint(mode), uint(dev))
 end
 -- pivot_root is not provided by glibc, is provided by Musl
 function C.pivot_root(new_root, put_old)
