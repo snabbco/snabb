@@ -18,7 +18,11 @@ local bit = require "syscall.bit"
 
 local t, pt = types.t, types.pt
 
-local void = pt.void
+local voidp = ffi.typeof("void *")
+
+local function void(x)
+  return ffi.cast(voidp, x)
+end
 
 local h = require "syscall.helpers"
 local err64 = h.err64
