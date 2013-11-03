@@ -16,6 +16,8 @@ local h = require "syscall.helpers"
 
 local ffi = require "ffi"
 
+local bit = require "syscall.bit"
+
 local octal = h.octal
 
 -- TODO move to helpers? see notes in syscall.lua about reworking though

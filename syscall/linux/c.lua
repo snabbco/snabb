@@ -14,6 +14,8 @@ local function init(abi, c, types)
 
 local ffi = require "ffi"
 
+local bit = require "syscall.bit"
+
 local t, pt, s = types.t, types.pt, types.s
 
 local h = require "syscall.helpers"

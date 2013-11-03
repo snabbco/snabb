@@ -9,6 +9,8 @@ pcall, type, table, string
 
 local h = require "syscall.helpers"
 
+local bit = require "syscall.bit"
+
 local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
   = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag, h.modeflags
 
