@@ -32,7 +32,7 @@ local t, pt, s = types.t, types.pt, types.s
 
 local C
 if abi.rump then
-  C = require("syscall.rump.c").init(abi)
+  C = require("syscall.rump.c")
 else
   C = require("syscall." .. abi.os .. ".c")
 end

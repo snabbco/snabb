@@ -7,7 +7,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(abi)
+local abi = require "syscall.abi"
 
 local h = require "syscall.helpers"
 local err64 = h.err64
@@ -390,7 +390,4 @@ setmetatable(C, {__index = function() return nosys end})
 
 return C
 
-end
-
-return {init = init}
 
