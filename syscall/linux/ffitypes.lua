@@ -882,6 +882,4 @@ local ffi = require "ffi"
 
 ffi.cdef(table.concat(defs, ""))
 
-return {init = function() return true end} -- compat with netbsd
-
 

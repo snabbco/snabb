@@ -7,7 +7,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(abi)
+local abi = require "syscall.abi"
 
 local defs = {}
 
@@ -364,8 +364,4 @@ else
   s = string.gsub(s, "_netbsd_", "") -- remove netbsd types
   ffi.cdef(s)
 end
-
-end
-
-return {init = init}
 
