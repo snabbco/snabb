@@ -28,7 +28,9 @@ end
 local int, long = ffi.typeof("int"), ffi.typeof("long")
 local uint, ulong = ffi.typeof("unsigned int"), ffi.typeof("unsigned long")
 
-local uint32 = uint -- TODO not really needed
+-- these could be removed
+local uint32 = uint
+local size = ulong
 
 local h = require "syscall.helpers"
 local err64 = h.err64
@@ -83,11 +85,11 @@ if abi.abi32 then
     end
     function C.pread(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pread64, int(fd), void(buf), t.size(size), int(0), long(off1), long(off2))
+      return syscall(c.SYS.pread64, int(fd), void(buf), size(size), int(0), long(off1), long(off2))
     end
     function C.pwrite(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pwrite64, int(fd), void(buf), t.size(size), int(0), long(off1), long(off2))
+      return syscall(c.SYS.pwrite64, int(fd), void(buf), size(size), int(0), long(off1), long(off2))
     end
   else
     function C.truncate(path, length)
@@ -100,11 +102,11 @@ if abi.abi32 then
     end
     function C.pread(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pread64, int(fd), void(buf), t.size(size), long(off1), long(off2))
+      return syscall(c.SYS.pread64, int(fd), void(buf), size(size), long(off1), long(off2))
     end
     function C.pwrite(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pwrite64, int(fd), void(buf), t.size(size), long(off1), long(off2))
+      return syscall(c.SYS.pwrite64, int(fd), void(buf), size(size), long(off1), long(off2))
     end
   end
   -- note statfs,fstatfs pass size of struct
@@ -128,12 +130,12 @@ if abi.abi32 then
     return result[0]
   end
   function C.sendfile(outfd, infd, offset, count)
-    return syscall(c.SYS.sendfile64, int(outfd), int(infd), void(offset), t.size(count))
+    return syscall(c.SYS.sendfile64, int(outfd), int(infd), void(offset), size(count))
   end
   -- on 32 bit systems mmap uses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
   function C.mmap(addr, length, prot, flags, fd, offset)
     local pgoffset = bit.rshift(offset, 12)
-    return void(syscall(c.SYS.mmap2, void(addr), t.size(length), int(prot), int(flags), int(fd), uint(pgoffset)))
+    return void(syscall(c.SYS.mmap2, void(addr), size(length), int(prot), int(flags), int(fd), uint(pgoffset)))
   end
 end
 
@@ -183,10 +185,10 @@ end
 
 -- Musl always returns ENOSYS for these
 function C.sched_getscheduler(pid)
-  return syscall(c.SYS.sched_getscheduler, t.pid(pid))
+  return syscall(c.SYS.sched_getscheduler, int(pid))
 end
 function C.sched_setscheduler(pid, policy, param)
-  return syscall(c.SYS.sched_setscheduler, t.pid(pid), int(policy), void(param))
+  return syscall(c.SYS.sched_setscheduler, int(pid), int(policy), void(param))
 end
 
 -- for stat we use the syscall as libc might have a different struct stat for compatibility
@@ -271,10 +273,10 @@ function C.mq_getsetattr(mqd, new, old)
   return syscall(c.SYS.mq_getsetattr, int(mqd), void(new), void(old))
 end
 function C.mq_timedsend(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
-  return syscall(c.SYS.mq_timedsend, int(mqd), void(msg_ptr), t.size(msg_len), uint(msg_prio), void(abs_timeout))
+  return syscall(c.SYS.mq_timedsend, int(mqd), void(msg_ptr), size(msg_len), uint(msg_prio), void(abs_timeout))
 end
 function C.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
-  return syscall(c.SYS.mq_timedreceive, int(mqd), void(msg_ptr), t.size(msg_len), void(msg_prio), void(abs_timeout))
+  return syscall(c.SYS.mq_timedreceive, int(mqd), void(msg_ptr), size(msg_len), void(msg_prio), void(abs_timeout))
 end
 
 -- note kernel dev_t is 32 bits, use syscall so we can ignore glibc using 64 bit dev_t
@@ -294,22 +296,22 @@ function C.setns(fd, nstype)
 end
 -- prlimit64 not in my ARM glibc
 function C.prlimit64(pid, resource, new_limit, old_limit)
-  return syscall(c.SYS.prlimit64, t.pid(pid), int(resource), void(new_limit), void(old_limit))
+  return syscall(c.SYS.prlimit64, int(pid), int(resource), void(new_limit), void(old_limit))
 end
 
 -- sched_setaffinity and sched_getaffinity not in Musl at the moment, use syscalls. Could test instead.
 function C.sched_getaffinity(pid, len, mask)
-  return syscall(c.SYS.sched_getaffinity, t.pid(pid), uint(len), void(mask))
+  return syscall(c.SYS.sched_getaffinity, int(pid), uint(len), void(mask))
 end
 function C.sched_setaffinity(pid, len, mask)
-  return syscall(c.SYS.sched_setaffinity, t.pid(pid), uint(len), void(mask))
+  return syscall(c.SYS.sched_setaffinity, int(pid), uint(len), void(mask))
 end
 -- sched_setparam and sched_getparam in Musl return ENOSYS, probably as they work on threads not processes.
 function C.sched_getparam(pid, param)
-  return syscall(c.SYS.sched_getparam, t.pid(pid), void(param))
+  return syscall(c.SYS.sched_getparam, int(pid), void(param))
 end
 function C.sched_setparam(pid, param)
-  return syscall(c.SYS.sched_setparam, t.pid(pid), void(param))
+  return syscall(c.SYS.sched_setparam, int(pid), void(param))
 end
 
 -- in librt for glibc but use syscalls instead of loading another library
@@ -339,7 +341,7 @@ function C.symlinkat(oldpath, newdirfd, newpath)
   return syscall(c.SYS.symlinkat, void(oldpath), int(newdirfd), void(newpath))
 end
 function C.readlinkat(dirfd, pathname, buf, bufsiz)
-  return syscall(c.SYS.readlinkat, int(dirfd), void(pathname), void(buf), t.size(bufsiz))
+  return syscall(c.SYS.readlinkat, int(dirfd), void(pathname), void(buf), size(bufsiz))
 end
 function C.inotify_init1(flags)
   return syscall(c.SYS.inotify_init1, int(flags))
@@ -369,13 +371,13 @@ function C.timerfd_gettime(fd, curr_value)
   return syscall(c.SYS.timerfd_gettime, int(fd), void(curr_value))
 end
 function C.splice(fd_in, off_in, fd_out, off_out, len, flags)
-  return syscall(c.SYS.splice, int(fd_in), void(off_in), int(fd_out), void(off_out), t.size(len), uint(flags))
+  return syscall(c.SYS.splice, int(fd_in), void(off_in), int(fd_out), void(off_out), size(len), uint(flags))
 end
 function C.tee(src, dest, len, flags)
-  return syscall(c.SYS.tee, int(src), int(dest), t.size(len), uint(flags))
+  return syscall(c.SYS.tee, int(src), int(dest), size(len), uint(flags))
 end
 function C.vmsplice(fd, iovec, cnt, flags)
-  return syscall(c.SYS.vmsplice, int(fd), void(iovec), t.size(cnt), uint(flags))
+  return syscall(c.SYS.vmsplice, int(fd), void(iovec), size(cnt), uint(flags))
 end
 -- note that I think these are correct on 32 bit platforms, but strace is buggy
 if c.SYS.sync_file_range then
