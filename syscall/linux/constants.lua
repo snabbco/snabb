@@ -25,10 +25,6 @@ end
 
 local c = {}
 
-c.syscall = arch.syscall or {} -- special syscall handling
-
-c.SYS = arch.SYS
-
 c.REG = arch.REG
 
 -- TODO only define one of these

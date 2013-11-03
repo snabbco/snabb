@@ -316,6 +316,10 @@ local ffi = require "ffi"
 
 local c = require "syscall.linux.constants"
 
+local nr = require("syscall.linux.nr")
+
+c.SYS = nr.SYS -- add syscalls
+
 c = fixup_constants(abi, c)
 
 for k, v in pairs(c) do

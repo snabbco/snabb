@@ -12,6 +12,10 @@ local types = S.types
 local t, ctypes, s = types.t, types.ctypes, types.s
 local c = S.c
 
+local nr = require("syscall.linux.nr")
+
+c.SYS = nr.SYS -- add syscalls
+
 local ffi = require "ffi"
 
 local reflect = require "include.ffi-reflect.reflect"

@@ -10,7 +10,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(abi, c)
+local function init(abi)
 
 local ffi = require "ffi"
 
@@ -63,9 +63,12 @@ local C = setmetatable({}, {
   end
 })
 
-local zeropad = c.syscall.zeropad
+local nr = require("syscall.linux.nr")
+
+local zeropad = nr.zeropad
+local sys = nr.SYS
+
 local syscall = ffi.C.syscall
-local sys = c.SYS
 
 -- use 64 bit fileops on 32 bit always. As may be missing will use syscalls directly
 if abi.abi32 then

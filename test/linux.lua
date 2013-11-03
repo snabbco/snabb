@@ -11,6 +11,8 @@ local util = S.util
 local bit = require "syscall.bit"
 local ffi = require "ffi"
 
+local nr = require "syscall.linux.nr"
+
 local jit
 if pcall(require, "jit") then jit = require "jit" end
 
@@ -1481,19 +1483,19 @@ test.seccomp = {
         -- get syscall number
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "nr")),
         -- allow syscall getpid
-        t.sock_filter("JMP,JEQ,K", c.SYS.getpid, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.getpid, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall exit_group
-        t.sock_filter("JMP,JEQ,K", c.SYS.exit_group, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.exit_group, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall mprotect in case luajit allocates memory for jitting
-        t.sock_filter("JMP,JEQ,K", c.SYS.mprotect, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.mprotect, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall mmap/mmap2 in case luajit allocates memory
-        t.sock_filter("JMP,JEQ,K", c.SYS.mmap2 or c.SYS.mmap, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.mmap2 or nr.SYS.mmap, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall brk in case luajit allocates memory
-        t.sock_filter("JMP,JEQ,K", c.SYS.brk, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.brk, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- else kill
         t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
@@ -1506,7 +1508,7 @@ test.seccomp = {
     else
       local w = assert(S.waitpid(-1, "clone"))
       if w.EXITSTATUS ~= 0 then -- failed, get debug info
-        assert_equal(w.code , c.SYS.seccomp, "expect reason is seccomp")
+        assert_equal(w.code , nr.SYS.seccomp, "expect reason is seccomp")
       end
       assert(w.EXITSTATUS == 0, "expect normal exit in clone")
     end
@@ -1526,10 +1528,10 @@ test.seccomp = {
         -- get syscall number
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "nr")),
         -- allow syscall getpid
-        t.sock_filter("JMP,JEQ,K", c.SYS.getpid, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.getpid, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall exit_group
-        t.sock_filter("JMP,JEQ,K", c.SYS.exit_group, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.exit_group, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- else kill
         t.sock_filter("RET,K", c.SECCOMP_RET.KILL),
@@ -1560,22 +1562,22 @@ test.seccomp = {
         -- get syscall number
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "nr")),
         -- allow syscall getpid
-        t.sock_filter("JMP,JEQ,K", c.SYS.getpid, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.getpid, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall write
-        t.sock_filter("JMP,JEQ,K", c.SYS.write, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.write, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall exit_group
-        t.sock_filter("JMP,JEQ,K", c.SYS.exit_group, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.exit_group, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall mprotect in case luajit allocates memory for jitting
-        t.sock_filter("JMP,JEQ,K", c.SYS.mprotect, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.mprotect, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall mmap/mmap2 in case luajit allocates memory
-        t.sock_filter("JMP,JEQ,K", c.SYS.mmap2 or c.SYS.mmap, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.mmap2 or nr.SYS.mmap, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- allow syscall brk in case luajit allocates memory
-        t.sock_filter("JMP,JEQ,K", c.SYS.brk, 0, 1),
+        t.sock_filter("JMP,JEQ,K", nr.SYS.brk, 0, 1),
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
         -- else error exit, also return syscall number
         t.sock_filter("ALU,OR,K", c.SECCOMP_RET.ERRNO),
@@ -1587,7 +1589,7 @@ test.seccomp = {
       local pid = S.getpid()
       local ofd, err = S.open("/dev/null", "rdonly") -- not allowed
       fork_assert(not ofd, "should not run open")
-      fork_assert(err.errno == c.SYS.open, "syscall that did not work should be open")
+      fork_assert(err.errno == nr.SYS.open, "syscall that did not work should be open")
       local pid = S.getpid()
       S.exit()
     else
