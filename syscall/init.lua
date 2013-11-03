@@ -11,17 +11,20 @@ local function init(abi)
 
 local ffi = require "ffi"
 
+local useos = abi.os
+if abi.rump and abi.types then useos = abi.types end
+
 require "syscall.ffitypes"
-require("syscall." .. (abi.types or abi.os) .. ".ffitypes")
+require("syscall." .. useos .. ".ffitypes")
 
 if not abi.rump then require "syscall.ffifunctions" end
 
-local c = require("syscall." .. (abi.types or abi.os) .. ".constants")
+local c = require("syscall." .. useos .. ".constants")
 local errors = require("syscall." .. abi.os .. ".errors") -- note this is correct, emulation still gives NetBSD errors
-local ostypes = require("syscall." .. (abi.types or abi.os) .. ".types")
+local ostypes = require("syscall." .. useos .. ".types")
 
 local ostypes2
-if abi.types == "linux" then ostypes2 = require "syscall.rump.linux" end
+if abi.rump and abi.types == "linux" then ostypes2 = require "syscall.rump.linux" end
 
 local types = require "syscall.types".init(abi, c, errors, ostypes, ostypes2)
 
