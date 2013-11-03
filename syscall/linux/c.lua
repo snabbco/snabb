@@ -209,10 +209,10 @@ if abi.abi64 then
     return syscall(c.SYS.fstatat, int(fd), path, void(buf), int(flags))
   end
   function C.fadvise64(fd, offset, len, advise)
-    return syscall(sys_fadvise64, int(fd), t.off(offset), t.off(len), int(advise))
+    return syscall(sys_fadvise64, int(fd), ulong(offset), ulong(len), int(advise))
   end
   function C.fallocate(fd, mode, offset, len)
-    return syscall(c.SYS.fallocate, int(fd), uint(mode), t.off(offset), t.off(len))
+    return syscall(c.SYS.fallocate, int(fd), uint(mode), ulong(offset), ulong(len))
   end
 else
   function C.stat(path, buf)
