@@ -1,6 +1,19 @@
 -- these are types which are currently the same for all ports
 
-return [[
+local require, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string = 
+require, error, assert, tonumber, tostring,
+setmetatable, pairs, ipairs, unpack, rawget, rawset,
+pcall, type, table, string
+
+local abi = require "syscall.abi"
+
+local defs = {}
+
+local function append(str) defs[#defs + 1] = str end
+
+append [[
 // 8 bit
 typedef unsigned char cc_t;
 
@@ -53,5 +66,40 @@ struct udphdr {
 };
 ]]
 
+-- endian dependent TODO not really, define in independent way
+if abi.le then
+append [[
+struct iphdr {
+  uint8_t  ihl:4,
+           version:4;
+  uint8_t  tos;
+  uint16_t tot_len;
+  uint16_t id;
+  uint16_t frag_off;
+  uint8_t  ttl;
+  uint8_t  protocol;
+  uint16_t check;
+  uint32_t saddr;
+  uint32_t daddr;
+};
+]]
+else
+append [[
+struct iphdr {
+  uint8_t  version:4,
+           ihl:4;
+  uint8_t  tos;
+  uint16_t tot_len;
+  uint16_t id;
+  uint16_t frag_off;
+  uint8_t  ttl;
+  uint8_t  protocol;
+  uint16_t check;
+  uint32_t saddr;
+  uint32_t daddr;
+};
+]]
+end
 
+return table.concat(defs, "")
 
