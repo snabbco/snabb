@@ -31,9 +31,8 @@ if abi.arch == "mips" then abi.mipsabi = "o32" end -- only one supported now
 
 if abi.os == "bsd" then abi.os = "netbsd" end
 
-if abi.os == "netbsd" then -- we default to version 6, as stable target; you can monkeypatch to 7 which is also supported
-  abi.netbsd = {version = 6}
-end
+-- you can use version 7 here
+abi.netbsd = {version = 6}
 
 abi.host = abi.os -- real OS, used for rump at present may change this
 
