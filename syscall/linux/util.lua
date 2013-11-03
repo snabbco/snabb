@@ -7,10 +7,10 @@
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math = 
+pcall, type, table, string = 
 require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math
+pcall, type, table, string
 
 local function init(S)
 
@@ -20,6 +20,8 @@ local t, pt, s = types.t, types.pt, types.s
 local h = require "syscall.helpers"
 
 local ffi = require "ffi"
+
+local bit = require "syscall.bit"
 
 local octal = h.octal
 
@@ -124,7 +126,7 @@ local function brinfo(d) -- can be used as subpart of general interface info
 
     local fdbs = pt.fdb_entry(buffer)
 
-    for i = 1, math.floor(n / s.fdb_entry) do
+    for i = 1, bit.rshift(n, 4) do -- fdb_entry is 16 bytes
       local fdb = fdbs[i - 1]
       local mac = t.macaddr()
       ffi.copy(mac, fdb.mac_addr, s.macaddr)
