@@ -16,8 +16,6 @@ local ffi = require "ffi"
 
 local bit = require "syscall.bit"
 
-local t = types.t
-
 local voidp = ffi.typeof("void *")
 
 local function void(x)
@@ -86,11 +84,11 @@ if abi.abi32 then
     end
     function C.pread(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pread64, int(fd), void(buf), size(size), int(0), long(off1), long(off2))
+      return syscall(c.SYS.pread64, int(fd), void(buf), ulong(size), int(0), long(off1), long(off2))
     end
     function C.pwrite(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pwrite64, int(fd), void(buf), size(size), int(0), long(off1), long(off2))
+      return syscall(c.SYS.pwrite64, int(fd), void(buf), ulong(size), int(0), long(off1), long(off2))
     end
   else
     function C.truncate(path, length)
@@ -103,11 +101,11 @@ if abi.abi32 then
     end
     function C.pread(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pread64, int(fd), void(buf), size(size), long(off1), long(off2))
+      return syscall(c.SYS.pread64, int(fd), void(buf), ulong(size), long(off1), long(off2))
     end
     function C.pwrite(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(c.SYS.pwrite64, int(fd), void(buf), size(size), long(off1), long(off2))
+      return syscall(c.SYS.pwrite64, int(fd), void(buf), ulong(size), long(off1), long(off2))
     end
   end
   -- note statfs,fstatfs pass size of struct
@@ -123,20 +121,22 @@ if abi.abi32 then
     return syscall(c.SYS.pwritev, int(fd), void(iov), int(iovcnt), long(off2), long(off1))
   end
   -- lseek is a mess in 32 bit, use _llseek syscall to get clean result.
+  -- TODO move this to syscall.lua
+  local off1 = ffi.typeof("uint64_t[1]")
   function C.lseek(fd, offset, whence)
-    local result = t.off1()
+    local result = off1()
     local off1, off2 = llarg64u(offset)
     local ret = syscall(c.SYS._llseek, int(fd), ulong(off1), ulong(off2), void(result), uint(whence))
     if ret == -1 then return err64 end
     return result[0]
   end
   function C.sendfile(outfd, infd, offset, count)
-    return syscall(c.SYS.sendfile64, int(outfd), int(infd), void(offset), size(count))
+    return syscall(c.SYS.sendfile64, int(outfd), int(infd), void(offset), ulong(count))
   end
   -- on 32 bit systems mmap uses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
   function C.mmap(addr, length, prot, flags, fd, offset)
     local pgoffset = bit.rshift(offset, 12)
-    return void(syscall(c.SYS.mmap2, void(addr), size(length), int(prot), int(flags), int(fd), uint(pgoffset)))
+    return void(syscall(c.SYS.mmap2, void(addr), ulong(length), int(prot), int(flags), int(fd), uint(pgoffset)))
   end
 end
 
@@ -274,10 +274,10 @@ function C.mq_getsetattr(mqd, new, old)
   return syscall(c.SYS.mq_getsetattr, int(mqd), void(new), void(old))
 end
 function C.mq_timedsend(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
-  return syscall(c.SYS.mq_timedsend, int(mqd), void(msg_ptr), size(msg_len), uint(msg_prio), void(abs_timeout))
+  return syscall(c.SYS.mq_timedsend, int(mqd), void(msg_ptr), ulong(msg_len), uint(msg_prio), void(abs_timeout))
 end
 function C.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
-  return syscall(c.SYS.mq_timedreceive, int(mqd), void(msg_ptr), size(msg_len), void(msg_prio), void(abs_timeout))
+  return syscall(c.SYS.mq_timedreceive, int(mqd), void(msg_ptr), ulong(msg_len), void(msg_prio), void(abs_timeout))
 end
 
 -- note kernel dev_t is 32 bits, use syscall so we can ignore glibc using 64 bit dev_t
@@ -342,7 +342,7 @@ function C.symlinkat(oldpath, newdirfd, newpath)
   return syscall(c.SYS.symlinkat, void(oldpath), int(newdirfd), void(newpath))
 end
 function C.readlinkat(dirfd, pathname, buf, bufsiz)
-  return syscall(c.SYS.readlinkat, int(dirfd), void(pathname), void(buf), size(bufsiz))
+  return syscall(c.SYS.readlinkat, int(dirfd), void(pathname), void(buf), ulong(bufsiz))
 end
 function C.inotify_init1(flags)
   return syscall(c.SYS.inotify_init1, int(flags))
@@ -372,13 +372,13 @@ function C.timerfd_gettime(fd, curr_value)
   return syscall(c.SYS.timerfd_gettime, int(fd), void(curr_value))
 end
 function C.splice(fd_in, off_in, fd_out, off_out, len, flags)
-  return syscall(c.SYS.splice, int(fd_in), void(off_in), int(fd_out), void(off_out), size(len), uint(flags))
+  return syscall(c.SYS.splice, int(fd_in), void(off_in), int(fd_out), void(off_out), ulong(len), uint(flags))
 end
 function C.tee(src, dest, len, flags)
-  return syscall(c.SYS.tee, int(src), int(dest), size(len), uint(flags))
+  return syscall(c.SYS.tee, int(src), int(dest), ulong(len), uint(flags))
 end
 function C.vmsplice(fd, iovec, cnt, flags)
-  return syscall(c.SYS.vmsplice, int(fd), void(iovec), size(cnt), uint(flags))
+  return syscall(c.SYS.vmsplice, int(fd), void(iovec), ulong(cnt), uint(flags))
 end
 -- note that I think these are correct on 32 bit platforms, but strace is buggy
 if c.SYS.sync_file_range then
