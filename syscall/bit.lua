@@ -2,10 +2,10 @@
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math = 
+pcall, type, table, string = 
 require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math
+pcall, type, table, string
 
 -- TODO add 64 bit operations here - see test b64 which is currently failing under lua/bit32
 

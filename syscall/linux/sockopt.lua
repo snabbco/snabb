@@ -2,10 +2,10 @@
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math = 
+pcall, type, table, string = 
 require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math
+pcall, type, table, string
 
 -- TODO add typemap for cmsghdr from syscall/types.lua as very similar
 -- like ioctls and so on, socket options are a random interface that needs some help to make it nice to use
