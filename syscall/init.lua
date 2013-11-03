@@ -17,7 +17,7 @@ require("syscall." .. (abi.types or abi.os) .. ".ffitypes")
 if not abi.rump then require "syscall.ffifunctions" end
 
 local c = require("syscall." .. (abi.types or abi.os) .. ".constants")
-local errors = require("syscall." .. abi.os .. ".errors")
+local errors = require("syscall." .. abi.os .. ".errors") -- note this is correct, emulation still gives NetBSD errors
 local ostypes = require("syscall." .. (abi.types or abi.os) .. ".types")
 
 local ostypes2

@@ -34,6 +34,7 @@ if abi.os == "bsd" then abi.os = "netbsd" end
 -- you can use version 7 here
 abi.netbsd = {version = 6}
 
+-- rump params
 abi.host = abi.os -- real OS, used for rump at present may change this
 
 -- perhaps this should be in test suite not here

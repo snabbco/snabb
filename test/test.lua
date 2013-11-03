@@ -1140,7 +1140,7 @@ test_sockets_pipes = {
   test_recvfrom = function()
     local ss = assert(S.socket("inet", "dgram"))
     local cs = assert(S.socket("inet", "dgram"))
-    local sa = assert(t.sockaddr_in(0, "loopback"))
+    local sa = t.sockaddr_in(0, "loopback")
     assert(ss:bind(sa))
     assert(cs:bind(sa))
     local bsa = ss:getsockname()
@@ -1162,6 +1162,13 @@ test_sockets_pipes = {
     assert(st.issock)
     assert(sock:close())
     assert(S.unlink(tmpfile))
+  end,
+  test_notsock_error = function()
+    local fd = assert(S.open("/dev/null", "RDONLY"))
+    local sa = t.sockaddr_in(0, "loopback")
+    local ok, err = fd:bind(sa)
+    assert(not ok and err.NOTSOCK)
+    assert(fd:close())
   end,
 }
 
