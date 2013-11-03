@@ -540,7 +540,7 @@ mt.cmsghdr = {
     fds = function(self)
       if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.RIGHTS then
         local fda = pt.int(self.cmsg_data)
-        local fdc = math.floor(self:datalen() / s.int)
+        local fdc = bit.rshift(self:datalen(), 2) -- shift by int size
         local i = 0
         return function()
           if i < fdc then
