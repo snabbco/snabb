@@ -35,6 +35,8 @@ if abi.os == "netbsd" then -- we default to version 6, as stable target; you can
   abi.netbsd = {version = 6}
 end
 
+abi.host = abi.os -- real OS, used for rump at present may change this
+
 -- perhaps this should be in test suite not here
 local function inlibc_fn(k) return ffi.C[k] end
 
