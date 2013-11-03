@@ -26,11 +26,6 @@ end
 local int, long = ffi.typeof("int"), ffi.typeof("long")
 local uint, ulong = ffi.typeof("unsigned int"), ffi.typeof("unsigned long")
 
--- these could be removed
-local uint32 = uint
-local size = ulong
-local aio_context = ulong
-
 local h = require "syscall.helpers"
 local err64 = h.err64
 local errpointer = h.errpointer
@@ -232,19 +227,19 @@ else
     function C.fadvise64(fd, offset, len, advise)
       local off1, off2 = arg64u(offset)
       local len1, len2 = arg64u(len)
-      return syscall(sys_fadvise64, int(fd), 0, uint32(off1), uint32(off2), uint32(len1), uint32(len2), int(advise))
+      return syscall(sys_fadvise64, int(fd), 0, uint(off1), uint(off2), uint(len1), uint(len2), int(advise))
     end
   else
     function C.fadvise64(fd, offset, len, advise)
       local off1, off2 = arg64u(offset)
       local len1, len2 = arg64u(len)
-      return syscall(sys_fadvise64, int(fd), uint32(off1), uint32(off2), uint32(len1), uint32(len2), int(advise))
+      return syscall(sys_fadvise64, int(fd), uint(off1), uint(off2), uint(len1), uint(len2), int(advise))
     end
   end
   function C.fallocate(fd, mode, offset, len)
     local off1, off2 = arg64u(offset)
     local len1, len2 = arg64u(len)
-    return syscall(c.SYS.fallocate, int(fd), uint(mode), uint32(off1), uint32(off2), uint32(len1), uint32(len2))
+    return syscall(c.SYS.fallocate, int(fd), uint(mode), uint(off1), uint(off2), uint(len1), uint(len2))
   end
 end
 
@@ -253,16 +248,16 @@ function C.io_setup(nr_events, ctx)
   return syscall(c.SYS.io_setup, uint(nr_events), void(ctx))
 end
 function C.io_destroy(ctx)
-  return syscall(c.SYS.io_destroy, aio_context(ctx))
+  return syscall(c.SYS.io_destroy, ulong(ctx))
 end
 function C.io_cancel(ctx, iocb, result)
-  return syscall(c.SYS.io_cancel, aio_context(ctx), void(iocb), void(result))
+  return syscall(c.SYS.io_cancel, ulong(ctx), void(iocb), void(result))
 end
 function C.io_getevents(ctx, min, nr, events, timeout)
-  return syscall(c.SYS.io_getevents, aio_context(ctx), long(min), long(nr), void(events), void(timeout))
+  return syscall(c.SYS.io_getevents, ulong(ctx), long(min), long(nr), void(events), void(timeout))
 end
 function C.io_submit(ctx, iocb, nr)
-  return syscall(c.SYS.io_submit, aio_context(ctx), long(nr), void(iocb))
+  return syscall(c.SYS.io_submit, ulong(ctx), long(nr), void(iocb))
 end
 
 -- mq functions in -rt for glibc, plus syscalls differ slightly
