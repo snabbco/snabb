@@ -36,6 +36,7 @@ abi.netbsd = {version = 6}
 
 -- rump params
 abi.host = abi.os -- real OS, used for rump at present may change this
+abi.types = "netbsd" -- you can set to linux, or monkeypatch (see tests) to use Linux types
 
 -- perhaps this should be in test suite not here
 local function inlibc_fn(k) return ffi.C[k] end

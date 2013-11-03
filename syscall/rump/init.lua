@@ -9,7 +9,10 @@ pcall, type, table, string
 
 local ffi = require "ffi"
 
-local abi = require "syscall.rump.abi"
+local abi = require "syscall.abi"
+
+abi.rump = true
+abi.os = "netbsd"
 
 local modules = {
   rumpuser = ffi.load("rumpuser", true),
@@ -170,6 +173,12 @@ function S.rump.newlwp(pid) return retbool(ffi.C.rump_pub_lwproc_newlwp(pid)) en
 function S.rump.switchlwp(lwp) ffi.C.rump_pub_lwproc_switch(lwp) end
 function S.rump.releaselwp() ffi.C.rump_pub_lwproc_releaselwp() end
 function S.rump.curlwp() return ffi.C.rump_pub_lwproc_curlwp() end
+
+-- revert so can load non rump again
+abi.rump = false
+abi.os = abi.host
+
+S.__rump = true
 
 return S.rump
  

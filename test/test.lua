@@ -27,7 +27,6 @@ if arg[1] == "rump" or arg[1] == "rumplinux" then
     assert(os.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
   end
   if arg[1] == "rumplinux" then
-    tmpabi = require "syscall.rump.abi"
     tmpabi.types = "linux" -- monkeypatch
   end
   local modules = {"vfs", "kern.tty", "dev", "net", "fs.tmpfs", "fs.kernfs", "fs.ptyfs",
@@ -45,7 +44,7 @@ local c = S.c
 local features = S.features
 local util = S.util
 
-if abi.rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switch from root so it does not try
+if S.__rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switch from root so it does not try
   assert(S.chmod("/", "0777"))
   assert(S.chmod("/dev/zero", "0666"))
   assert(S.mkdir("/tmp", "0777"))
@@ -67,7 +66,7 @@ if abi.rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so s
   --assert(S.rump.rfork("CFDG"))
   --assert(S.setuid(100))
   --assert(S.seteuid(100))
-elseif (abi.rump or abi.xen) and S.geteuid() == 0 then -- some initial setup for non-Linux rump
+elseif (S.__rump or abi.xen) and S.geteuid() == 0 then -- some initial setup for non-Linux rump
   local octal = helpers.octal
   assert(S.mkdir("/tmp", "0777"))
   local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0777")}
@@ -80,11 +79,18 @@ end
 local bit = require "syscall.bit"
 local ffi = require "ffi"
 
-if not (abi.rump and abi.types == "linux") then
+if not S.__rump then
   local test = require("test." .. abi.os).init(S) -- OS specific tests
   for k, v in pairs(test) do _G["test_" .. k] = v end
 end
-if abi.rump then
+if S.__rump then
+  if abi.types == "linux" then -- add linux tests
+    local test = require("test.linux").init(S) -- OS specific tests
+    for k, v in pairs(test) do _G["test_" .. k] = v end
+  else
+    local test = require("test.netbsd").init(S) -- OS specific tests
+    for k, v in pairs(test) do _G["test_" .. k] = v end
+  end
   local test = require "test.rump".init(S) -- rump specific tests
   for k, v in pairs(test) do _G["test_" .. k] = v end
 end
@@ -1357,14 +1363,14 @@ test_raw_socket = {
 
     -- TODO in FreeBSD, NetBSD len is in host byte order not net, see Stephens, http://developerweb.net/viewtopic.php?id=4657
     -- TODO the metamethods should take care of this
-    if abi.os == "netbsd" then iphdr[0].tot_len = len end
+    if S.__rump or abi.os == "netbsd" then iphdr[0].tot_len = len end
 
     ca.port = 0 -- should not set port
 
     local n = assert(raw:sendto(buf, len, 0, ca))
 
     -- TODO receive issues on netBSD 
-    if abi.os ~= "netbsd" then
+    if not (S.__rump or abi.os == "netbsd") then
       local f = assert(cl:recvfrom(buf2, #msg))
       assert_equal(f, #msg)
     end
@@ -1416,7 +1422,7 @@ test_util = {
 }
 
 -- TODO work in progress to make work in NetBSD, temp commented out
-if abi.os ~= "netbsd" then
+if not (S.__rump or abi.os == "netbsd") then
 test_sendfd = {
   test_sendcred = function()
     local sv = assert(S.socketpair("unix", "stream"))
@@ -1440,7 +1446,7 @@ test_sendfd = {
 }
 end
 
-if not (abi.rump or abi.xen) then -- rump has no processes, memory allocation, process accounting, mmap and proc not applicable
+if not (S.__rump or abi.xen) then -- rump has no processes, memory allocation, process accounting, mmap and proc not applicable
 
 test_timers_signals = {
   test_nanosleep = function()
@@ -1701,13 +1707,13 @@ local function removeroottests()
 end
 
 -- basically largefile on NetBSD is always going to work but tests may not use sparse files so run out of memory
-if abi.rump or abi.xen then
+if S.__rump or abi.xen then
   test_largefile = nil
 end
 
 -- note at present we check for uid 0, but could check capabilities instead.
 if S.geteuid() == 0 then
-  if abi.os == "linux" then
+  if S.unshare then
     -- cut out this section if you want to (careful!) debug on real interfaces
     -- TODO add to features as may not be supported
     local ok, err = S.unshare("newnet, newns, newuts")
