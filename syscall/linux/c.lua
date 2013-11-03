@@ -22,9 +22,7 @@ local h = require "syscall.helpers"
 local err64 = h.err64
 local errpointer = h.errpointer
 
--- TODO clean up when 64 bit bitops available, remove from types
-local function u6432(x) return t.u6432(x):to32() end
-local function i6432(x) return t.i6432(x):to32() end
+local i6432, u6432 = bit.i6432, bit.u6432
 
 local arg64, arg64u
 if abi.le then

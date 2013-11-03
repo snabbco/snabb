@@ -158,24 +158,6 @@ t.off1 = ffi.typeof("off_t[1]")
 t.uid1 = ffi.typeof("uid_t[1]")
 t.gid1 = ffi.typeof("gid_t[1]")
 
--- 64 to 32 bit conversions via unions TODO use meth not object?
-if abi.le then
-mt.i6432 = {
-  __index = {
-    to32 = function(u) return u.i32[1], u.i32[0] end,
-  }
-}
-else
-mt.i6432 = {
-  __index = {
-    to32 = function(u) return u.i32[0], u.i32[1] end,
-  }
-}
-end
-
-t.i6432 = ffi.metatype("union {int64_t i64; int32_t i32[2];}", mt.i6432)
-t.u6432 = ffi.metatype("union {uint64_t i64; uint32_t i32[2];}", mt.i6432)
-
 local errsyms = {} -- reverse lookup
 for k, v in pairs(c.E) do
   errsyms[v] = k

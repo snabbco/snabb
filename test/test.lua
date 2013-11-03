@@ -212,7 +212,7 @@ test_types = {
     assert_equal(allok, true)
   end,
   test_length = function()
-    local nolen = {fd = true, error = true, mqd = true, u6432 = true, i6432 = true} -- internal use
+    local nolen = {fd = true, error = true, mqd = true} -- internal use
     local function len(x) return #x end
     local allok = true
     for k, v in pairs(t) do
@@ -232,10 +232,10 @@ end
 
 test_basic = {
   test_b64 = function()
-    local h, l = t.i6432(-1):to32()
+    local h, l = bit.i6432(-1)
     assert_equal(h, bit.tobit(0xffffffff))
     assert_equal(l, bit.tobit(0xffffffff))
-    local h, l = t.i6432(0xfffbffff):to32()
+    local h, l = bit.i6432(0xfffbffff)
     assert_equal(h, bit.tobit(0x0))
     assert_equal(l, bit.tobit(0xfffbffff))
   end,

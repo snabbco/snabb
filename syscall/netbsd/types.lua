@@ -17,6 +17,8 @@ local ptt, addtype, addtype_var, addtype_fn, lenmt, newfn, istype, reviter =
 local ffi = require "ffi"
 local bit = require "syscall.bit"
 
+local i6432, u6432 = bit.i6432, bit.u6432
+
 local h = require "syscall.helpers"
 
 local ntohl, ntohl, ntohs, htons, octal = h.ntohl, h.ntohl, h.ntohs, h.htons, h.octal
@@ -63,11 +65,11 @@ end
 mt.device = {
   index = {
     major = function(dev)
-      local h, l = t.i6432(dev.dev):to32()
+      local h, l = i6432(dev.dev)
       return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)))
     end,
     minor = function(dev)
-      local h, l = t.i6432(dev.dev):to32()
+      local h, l = i6432(dev.dev)
       return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)))
     end,
     device = function(dev) return tonumber(dev.dev) end,
