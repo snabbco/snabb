@@ -120,7 +120,7 @@ if abi.abi32 then
   end
   -- on 32 bit systems mmap uses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
   function C.mmap(addr, length, prot, flags, fd, offset)
-    local pgoffset = math.floor(offset / 4096)
+    local pgoffset = bit.rshift(offset, 12)
     return pt.void(syscall(c.SYS.mmap2, pt.void(addr), t.size(length), t.int(prot), t.int(flags), t.int(fd), t.uint32(pgoffset)))
   end
 end
