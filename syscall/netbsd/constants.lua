@@ -18,19 +18,6 @@ local c = {}
 
 c.IFNAMSIZ = 16
 
--- TODO incomplete
-c.SYS = strflag {
-  getcwd = 296,
-  getdents30 = 390,
-  mount50 = 410,
-  utimes50 = 420,
-  futimes50 = 423,
-  lutimes50 = 424,
-  stat50 = 439,
-  fstat50 = 440,
-  lstat50 = 441,
-}
-
 c.STD = strflag {
   IN_FILENO = 0,
   OUT_FILENO = 1,
