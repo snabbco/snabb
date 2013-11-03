@@ -2,10 +2,10 @@
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math = 
+pcall, type, table, string = 
 require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, math
+pcall, type, table, string
 
 local ffi = require "ffi"
 
@@ -241,8 +241,8 @@ local function inet6_pton(src, addr)
     ip8 = split(":", src)
   end
   for i = 1, 8 do
-    addr.s6_addr[i * 2 - 1] = hex(ip8[i]) % 256
-    addr.s6_addr[i * 2 - 2] = math.floor(hex(ip8[i]) / 256)
+    addr.s6_addr[i * 2 - 1] = bit.band(hex(ip8[i]), 0xff)
+    addr.s6_addr[i * 2 - 2] = bit.rshift(hex(ip8[i]), 8)
   end
   return addr
 end
