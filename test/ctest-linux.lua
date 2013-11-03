@@ -64,6 +64,8 @@ ctypes["struct termios"] = nil
 -- not defined by glibc
 ctypes["struct k_sigaction"] = nil
 
+if abi.arch == "arm" then ctypes["struct statfs64"] = nil end -- padding difference, not that important
+
 for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
 
 -- internal use
