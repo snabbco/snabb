@@ -37,7 +37,6 @@ build =
       ["syscall.bit"] = "syscall/bit.lua";
 
       ["syscall.shared.types"] = "syscall/shared/types.lua";
-      ["syscall.shared.ffitypes"] = "syscall/shared/ffitypes.lua";
 
       ["syscall.linux.syscalls"] = "syscall/linux/syscalls.lua";
       ["syscall.linux.c"] = "syscall/linux/c.lua";
