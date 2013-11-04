@@ -1,15 +1,22 @@
 -- test Linux structures against standard headers
 
--- cannot cross test as core type sizes differ
+-- Need to cross compile on correct 32/64 bits
 --[[
-luajit test/linux-structures.lua > ./obj/s.c && cc -U__i386__ -DBITS_PER_LONG=64 -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
+luajit test/linux-structures.lua x64 > ./obj/s.c && cc -U__i386__ -DBITS_PER_LONG=64 -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
 
-luajit32 test/linux-structures.lua > ./obj/s.c && cc -m32 -D__i386__ -DBITS_PER_LONG=32 -D_LARGEFILE_SOURCE -I./include/linux-kernel-headers/x86_64/include -o ./obj/s ./obj/s.c && ./obj/s
-
-luajit test/linux-structures.lua > ./obj/s.c && cc -DBITS_PER_LONG=32 -D_LARGEFILE_SOURCE -I./include/linux-kernel-headers/arm/include -o ./obj/s ./obj/s.c && ./obj/s
+luajit32 test/linux-structures.lua x86 > ./obj/s.c && cc -m32 -D__i386__ -DBITS_PER_LONG=32 -I./include/linux-kernel-headers/i386/include -o ./obj/s ./obj/s.c && ./obj/s
+luajit32 test/linux-structures.lua arm > ./obj/s.c && cc -m32 -D__ARM_EABI__ -DBITS_PER_LONG=32 -I./include/linux-kernel-headers/arm/include -o ./obj/s ./obj/s.c && ./obj/s
+luajit32 test/linux-structures.lua ppc > ./obj/s.c && cc -m32 -DBITS_PER_LONG=32 -I./include/linux-kernel-headers/powerpc/include -o ./obj/s ./obj/s.c && ./obj/s
+luajit32 test/linux-structures.lua mips > ./obj/s.c && cc -m32 -DBITS_PER_LONG=32 -D__MIPSEL__ -D_MIPS_SIM=_MIPS_SIM_ABI32 -DCONFIG_32BIT -DBITS_PER_LONG=32 -D__LITTLE_ENDIAN_BITFIELD -D__LITTLE_ENDIAN -DCONFIG_CPU_LITTLE_ENDIAN -I./include/linux-kernel-headers/mips/include -o ./obj/s ./obj/s.c && ./obj/s
 ]]
 
 local abi = require "syscall.abi"
+
+if arg[1] then -- fake arch
+  abi.arch = arg[1]
+  if abi.arch == "x64" then abi.abi32, abi.abi64 = false, true else abi.abi32, abi.abi64 = true, false end
+  if abi.arch == "mips" then abi.mipsabi = "o32" end
+end
 
 local function fixup_structs(abi, ctypes)
 
@@ -40,6 +47,8 @@ local function fixup_structs(abi, ctypes)
   ctypes.mode_t = nil
   ctypes.nfds_t = nil
   ctypes.blksize_t = nil
+
+  ctypes.off_t = nil -- we use loff_t
 
   -- misc issues
   ctypes["struct user_cap_data"] = nil -- defined as __user_cap_data_struct in new uapi headers, not in old ones at all

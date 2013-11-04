@@ -6,6 +6,7 @@ luajit test/linux-constants.lua x86 > ./obj/c.c && cc -D__i386__ -DBITS_PER_LONG
 luajit test/linux-constants.lua arm > ./obj/c.c && cc -D__ARM_EABI__ -DBITS_PER_LONG=32 -I./include/linux-kernel-headers/arm/include -o ./obj/c ./obj/c.c && ./obj/c
 luajit test/linux-constants.lua ppc > ./obj/c.c && cc -I./include/linux-kernel-headers/powerpc/include -o ./obj/c ./obj/c.c && ./obj/c
 luajit test/linux-constants.lua mips > ./obj/c.c && cc -D__MIPSEL__ -D_MIPS_SIM=_MIPS_SIM_ABI32 -DCONFIG_32BIT -DBITS_PER_LONG=32 -D__LITTLE_ENDIAN_BITFIELD -D__LITTLE_ENDIAN -DCONFIG_CPU_LITTLE_ENDIAN -I./include/linux-kernel-headers/mips/include  -o ./obj/c ./obj/c.c && ./obj/c
+
 ]]
 
 -- TODO 32 bit warnings about signed ranges
