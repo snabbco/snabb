@@ -373,6 +373,8 @@ mt.siginfo = {
 addtype("siginfo", "struct siginfo", mt.siginfo)
 
 -- Linux internally uses non standard sigaction type k_sigaction
+local sa_handler_type = ffi.typeof("void (*)(int)")
+local to_handler = function(v) return ffi.cast(sa_handler_type, t.uintptr(v)) end -- luaffi needs uintptr, and full cast
 mt.sigaction = {
   index = {
     handler = function(sa) return sa.sa_handler end,
@@ -382,13 +384,13 @@ mt.sigaction = {
   },
   newindex = {
     handler = function(sa, v)
-      if type(v) == "string" then v = pt.void(c.SIGACT[v]) end
-      if type(v) == "number" then v = pt.void(v) end
+      if type(v) == "string" then v = to_handler(c.SIGACT[v]) end
+      if type(v) == "number" then v = to_handler(v) end
       sa.sa_handler = v
     end,
     sigaction = function(sa, v)
-      if type(v) == "string" then v = pt.void(c.SIGACT[v]) end
-      if type(v) == "number" then v = pt.void(v) end
+      if type(v) == "string" then v = to_handler(c.SIGACT[v]) end
+      if type(v) == "number" then v = to_handler(v) end
       sa.sa_handler.sa_sigaction = v
     end,
     mask = function(sa, v)
