@@ -710,8 +710,8 @@ addtype("rusage", "struct rusage", mt.rusage)
 local hh = {ptt = ptt, addtype = addtype, addtype_var = addtype_var, addtype_fn = addtype_fn, lenmt = lenmt,
             newfn = newfn, istype = istype, reviter = reviter}
 
-types = ostypes.init(types, hh, abi, c)
-if ostypes2 then types = ostypes2.init(types, hh, abi, c) end
+types = ostypes.init(types, hh, c)
+if ostypes2 then types = ostypes2.init(types, hh, c) end
 
 -- this is declared above
 samap_pt = {
