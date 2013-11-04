@@ -957,12 +957,13 @@ mt.ifreq = {
 addtype("ifreq", "struct ifreq", mt.ifreq)
 
 -- note t.dirents iterator is defined in common types
+local d_name_offset = ffi.offsetof("struct linux_dirent64", "d_name") -- d_name is at end of struct
 mt.dirent = {
   index = {
     ino = function(self) return tonumber(self.d_ino) end,
     off = function(self) return self.d_off end,
     reclen = function(self) return self.d_reclen end,
-    name = function(self) return ffi.string(self.d_name) end,
+    name = function(self) return ffi.string(pt.char(self) + d_name_offset) end,
     type = function(self) return self.d_type end,
     toif = function(self) return bit.lshift(self.d_type, 12) end, -- convert to stat types
   },
