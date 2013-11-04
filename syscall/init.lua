@@ -40,7 +40,7 @@ end
 if abi.rump and abi.types == "linux" then abi.os = "linux" end -- after this, we pretend to be Linux
 
 local ioctl = require("syscall." .. abi.os .. ".ioctl").init(types)
-local fcntl = require("syscall." .. abi.os .. ".fcntl").init(abi, c, types)
+local fcntl = require("syscall." .. abi.os .. ".fcntl").init(c, types)
 
 local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
 
