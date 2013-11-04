@@ -145,15 +145,18 @@ for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 t.inotify_event = ffi.typeof("struct inotify_event")
 pt.inotify_event = ptt("struct inotify_event") -- still need pointer to this
 
-t.iocbs = ffi.typeof("struct iocb[?]")
-t.sock_filters = ffi.typeof("struct sock_filter[?]")
-
-t.iocb_ptrs = ffi.typeof("struct iocb *[?]")
-
 t.aio_context1 = ffi.typeof("aio_context_t[1]")
 t.sock_fprog1 = ffi.typeof("struct sock_fprog[1]")
 
 t.user_cap_data2 = ffi.typeof("struct user_cap_data[2]")
+
+-- luaffi gets confused if call ffi.typeof("...[?]") it calls __new so redefine as functions
+local iocbs = ffi.typeof("struct iocb[?]")
+t.iocbs = function(n, ...) return ffi.new(iocbs, n, ...) end
+local sock_filters = ffi.typeof("struct sock_filter[?]")
+t.sock_filters = function(n, ...) return ffi.new(sock_filters, n, ...) end
+local iocb_ptrs = ffi.typeof("struct iocb *[?]")
+t.iocb_ptrs = function(n, ...) return ffi.new(iocb_ptrs, n, ...) end
 
 -- types with metatypes
 
@@ -657,7 +660,7 @@ addtype("iocb", "struct iocb", mt.iocb)
 
 t.iocb_array = function(tab, ptrs)
   local nr = #tab
-  local a = {nr = nr, iocbs = {}, ptrs = ptrs or ffi.new(t.iocb_ptrs, nr)}
+  local a = {nr = nr, iocbs = {}, ptrs = ptrs or t.iocb_ptrs(nr)}
   for i = 1, nr do
     local iocb = tab[i]
     a.iocbs[i] = istype(t.iocb, iocb) or t.iocb(iocb)
