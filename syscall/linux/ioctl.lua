@@ -8,7 +8,9 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(abi, types)
+local function init(types)
+
+local abi = require "syscall.abi"
 
 local s, t = types.s, types.t
 
