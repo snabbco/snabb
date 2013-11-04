@@ -26,7 +26,7 @@ local ostypes = require("syscall." .. useos .. ".types")
 local ostypes2
 if abi.rump and abi.types == "linux" then ostypes2 = require "syscall.rump.linux" end
 
-local types = require "syscall.types".init(abi, c, errors, ostypes, ostypes2)
+local types = require "syscall.types".init(c, errors, ostypes, ostypes2)
 
 local C
 if abi.rump then
@@ -42,9 +42,9 @@ if abi.rump and abi.types == "linux" then abi.os = "linux" end -- after this, we
 local ioctl = require("syscall." .. abi.os .. ".ioctl").init(types)
 local fcntl = require("syscall." .. abi.os .. ".fcntl").init(types)
 
-local S = require "syscall.syscalls".init(abi, c, C, types, ioctl, fcntl)
+local S = require "syscall.syscalls".init(c, C, types, ioctl, fcntl)
 
-c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps
+c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps  TODO remove see #94
 
 S.abi, S.c, S.C, S.types, S.t = abi, c, C, types, types.t -- add to main table returned
 

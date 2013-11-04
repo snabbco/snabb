@@ -12,7 +12,9 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 
-local function init(abi, c, errors, ostypes, ostypes2)
+local function init(c, errors, ostypes, ostypes2)
+
+local abi = require "syscall.abi"
 
 local rumpfn = abi.rumpfn
 
