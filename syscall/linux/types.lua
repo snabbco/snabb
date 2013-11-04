@@ -645,11 +645,7 @@ mt.iocb = {
       iocb.aio_resfd = getfd(v)
     end,
   },
-  __new = function(tp, ioi)
-    local iocb = ffi.new(tp)
-    if ioi then for k, v in pairs(ioi) do iocb[k] = v end end
-    return iocb
-  end,
+  __new = newfn,
 }
 
 addtype("iocb", "struct iocb", mt.iocb)
