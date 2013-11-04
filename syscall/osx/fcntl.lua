@@ -8,7 +8,9 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(c, types)
+local function init(types)
+
+local c = require "syscall.osx.constants"
 
 local ffi = require "ffi"
 
