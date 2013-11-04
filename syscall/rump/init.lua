@@ -85,10 +85,10 @@ if abi.host == "netbsd" and abi.types == "netbsd" then -- running native (NetBSD
   S.features = require "syscall.features".init(S)
   S.util = require "syscall.util".init(S)
 elseif abi.types == "linux" then -- running Linux types
-  S = require "syscall.init".init(abi)
+  S = require "syscall"
 elseif abi.types == "netbsd" then -- run NetBSD types on another OS
   abi.rumpfn = rumpfn -- mangle NetBSD type names to avoid collisions
-  S = require "syscall.init".init(abi)
+  S = require "syscall"
 else
   error "unsupported ABI"
 end

@@ -9,7 +9,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(types, hh, abi, c)
+local function init(types, hh, c)
 
 local ffi = require "ffi"
 local bit = require "syscall.bit"

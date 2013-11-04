@@ -7,7 +7,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(abi)
+local abi = require "syscall.abi"
 
 local defs = {}
 
@@ -190,7 +190,4 @@ local ffi = require "ffi"
 
 ffi.cdef(table.concat(defs, ""))
 
-end
-
-return {init = init}
 
