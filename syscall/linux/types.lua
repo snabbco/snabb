@@ -657,7 +657,7 @@ addtype("iocb", "struct iocb", mt.iocb)
 
 t.iocb_array = function(tab, ptrs)
   local nr = #tab
-  local a = {nr = nr, iocbs = {}, ptrs = ptrs or t.iocb_ptrs(nr)}
+  local a = {nr = nr, iocbs = {}, ptrs = ptrs or ffi.new(t.iocb_ptrs, nr)}
   for i = 1, nr do
     local iocb = tab[i]
     a.iocbs[i] = istype(t.iocb, iocb) or t.iocb(iocb)

@@ -101,8 +101,7 @@ local lenmt = {__len = lenfn}
 
 -- generic for __new TODO use more
 local function newfn(tp, tab)
-  local num = {}
-  local obj = ffi.new(tp, num)
+  local obj = ffi.new(tp)
   -- these are split out so __newindex is called, not just initialisers luajit understands
   for k, v in pairs(tab or {}) do if type(k) == "string" then obj[k] = v end end -- set string indexes
   return obj
