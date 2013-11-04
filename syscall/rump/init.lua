@@ -112,10 +112,43 @@ end
 
 S.rump = {}
 
-S.rump.c = require "syscall.rump.constants"
+local h = require "syscall.helpers"
+local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
+  = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag, h.modeflags
 
-local helpers = require "syscall.helpers"
-local strflag = helpers.strflag
+local c = {}
+
+c.ETFS = strflag {
+  REG = 0,
+  BLK = 1,
+  CHR = 2,
+  DIR = 3,
+  DIR_SUBDIRS = 4,
+}
+
+c.RUMPUIO = strflag {
+  READ = 0,
+  WRITE = 1,
+}
+
+c.SIGMODEL = strflag {
+  PANIC = 0,
+  IGNORE = 1,
+  HOST = 2,
+  RAISE = 3,
+  RECORD = 4,
+};
+
+c.RF = strflag {
+  NONE    = 0x00, -- not named, see issue https://github.com/anttikantee/buildrump.sh/issues/19
+  FDG     = 0x01,
+  CFDG    = 0x02,
+}
+
+c.CN_FREECRED = 0x02
+c.ETFS_SIZE_ENDOFF = h.uint64_max
+
+S.rump.c = c
 
 -- We could also use rump_pub_module_init if loading later
 function S.rump.module(s)
