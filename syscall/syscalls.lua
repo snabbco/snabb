@@ -419,7 +419,7 @@ function S.ioctl(d, request, argp)
     read = request.read
     singleton = request.singleton
     request = request.number
-    if type(argp) ~= "string" and type(argp) ~= "cdata" then
+    if type(argp) ~= "string" and type(argp) ~= "cdata" and type ~= "userdata" then
       if write then
         if not argp then error("no argument supplied for ioctl " .. name) end
         argp = mktype(tp, argp)
