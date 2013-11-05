@@ -775,11 +775,11 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
     return len, args, messages, values, kind
   end
 
-  if type(msg) == "cdata" then
+  if type(msg) == "cdata" or type(msg) == "userdata" then
     tp = msg
     value = table.remove(args, 1)
     if not value then error("not enough arguments") end
-    if not ffi.istype(tp, value) then value = tp(value) end
+    if not ffi.istype(tp, value) then value = tp(value) end -- TODO mktype()
     len = ffi.sizeof(value)
     messages[#messages + 1] = tp
     values[#values + 1] = value
@@ -866,8 +866,8 @@ local function ifla_f(tab, lookup, af, ...)
 
   local buf, len, offsets = align_types(nlmsg_align(1), messages)
 
-  for i=2,#offsets do -- skip header
-    local result = ffi.cast(ffi.typeof("$ *", messages[i]), buf + offsets[i])
+  for i = 2, #offsets do -- skip header
+    local result = ffi.cast(ffi.typeof("$ *", messages[i]), buf + offsets[i]) -- TODO will not work with luaffi
     local value = values[i]
     if type(value) == "string" then
       ffi.copy(result, value)
