@@ -311,7 +311,8 @@ test.kqueue = {
 
 test.misc_bsd = {
   test_issetugid = function()
-    assert_equal(S.issetugid(), 0) -- assume luajit not suid
+    local res = assert(S.issetugid())
+    assert(res == 0 or res == 1) -- some tests call setuid so might be tainted
   end,
 }
 
