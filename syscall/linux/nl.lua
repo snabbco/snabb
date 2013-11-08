@@ -26,6 +26,11 @@ local align_types = h.align_types
 
 local t, pt, s = types.t, types.pt, types.s
 
+local addrtype = {
+  [c.AF.INET] = t.in_addr,
+  [c.AF.INET6] = t.in6_addr,
+}
+
 local mt = {} -- metatables
 local meth = {}
 
@@ -118,22 +123,22 @@ local ifla_decode = {
 
 local ifa_decode = {
   [c.IFA.ADDRESS] = function(ir, buf, len)
-    ir.addr = t.addrtype[ir.family]()
+    ir.addr = addrtype[ir.family]()
     ffi.copy(ir.addr, buf, ffi.sizeof(ir.addr))
   end,
   [c.IFA.LOCAL] = function(ir, buf, len)
-    ir.loc = t.addrtype[ir.family]()
+    ir.loc = addrtype[ir.family]()
     ffi.copy(ir.loc, buf, ffi.sizeof(ir.loc))
   end,
   [c.IFA.BROADCAST] = function(ir, buf, len)
-    ir.broadcast = t.addrtype[ir.family]()
+    ir.broadcast = addrtype[ir.family]()
     ffi.copy(ir.broadcast, buf, ffi.sizeof(ir.broadcast))
   end,
   [c.IFA.LABEL] = function(ir, buf, len)
     ir.label = ffi.string(buf)
   end,
   [c.IFA.ANYCAST] = function(ir, buf, len)
-    ir.anycast = t.addrtype[ir.family]()
+    ir.anycast = addrtype[ir.family]()
     ffi.copy(ir.anycast, buf, ffi.sizeof(ir.anycast))
   end,
   [c.IFA.CACHEINFO] = function(ir, buf, len)
@@ -144,11 +149,11 @@ local ifa_decode = {
 
 local rta_decode = {
   [c.RTA.DST] = function(ir, buf, len)
-    ir.dst = t.addrtype[ir.family]()
+    ir.dst = addrtype[ir.family]()
     ffi.copy(ir.dst, buf, ffi.sizeof(ir.dst))
   end,
   [c.RTA.SRC] = function(ir, buf, len)
-    ir.src = t.addrtype[ir.family]()
+    ir.src = addrtype[ir.family]()
     ffi.copy(ir.src, buf, ffi.sizeof(ir.src))
   end,
   [c.RTA.IIF] = function(ir, buf, len)
@@ -160,7 +165,7 @@ local rta_decode = {
     ir.oif = tonumber(i[0])
   end,
   [c.RTA.GATEWAY] = function(ir, buf, len)
-    ir.gateway = t.addrtype[ir.family]()
+    ir.gateway = addrtype[ir.family]()
     ffi.copy(ir.gateway, buf, ffi.sizeof(ir.gateway))
   end,
   [c.RTA.PRIORITY] = function(ir, buf, len)
@@ -188,7 +193,7 @@ local rta_decode = {
 
 local nda_decode = {
   [c.NDA.DST] = function(ir, buf, len)
-    ir.dst = t.addrtype[ir.family]()
+    ir.dst = addrtype[ir.family]()
     ffi.copy(ir.dst, buf, ffi.sizeof(ir.dst))
   end,
   [c.NDA.LLADDR] = function(ir, buf, len)
@@ -365,9 +370,9 @@ meth.rtmsg = {
     src_len = function(i) return tonumber(i.rtmsg.rtm_src_len) end,
     index = function(i) return tonumber(i.oif) end,
     flags = function(i) return tonumber(i.rtmsg.rtm_flags) end,
-    dest = function(i) return i.dst or t.addrtype[i.family]() end,
-    source = function(i) return i.src or t.addrtype[i.family]() end,
-    gw = function(i) return i.gateway or t.addrtype[i.family]() end,
+    dest = function(i) return i.dst or addrtype[i.family]() end,
+    source = function(i) return i.src or addrtype[i.family]() end,
+    gw = function(i) return i.gateway or addrtype[i.family]() end,
     -- might not be set in Lua table, so return nil
     iif = function() return nil end,
     oif = function() return nil end,
@@ -837,7 +842,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
     slen = nlmsg_align(s.rtattr) + #value
   else
     if tp == "address" then
-      tp = t.addrtype[af]
+      tp = addrtype[af]
     end
     if not ffi.istype(tp, value) then
       value = tp(value)

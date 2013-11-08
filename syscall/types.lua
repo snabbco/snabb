@@ -38,11 +38,6 @@ for k, v in pairs(sharedtypes.pt) do pt[k] = v end
 for k, v in pairs(sharedtypes.s) do s[k] = v end
 for k, v in pairs(sharedtypes.ctypes) do ctypes[k] = v end
 
-t.addrtype = {
-  [c.AF.INET] = t.in_addr,
-  [c.AF.INET6] = t.in6_addr,
-}
-
 local mt = {} -- metatables
 
 --helpers
