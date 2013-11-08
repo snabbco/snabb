@@ -415,18 +415,17 @@ if not C.epoll_pwait then
 function C.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
   local size = 0
   if sigmask then size = sigset_size end
-  return syscall(sys.epoll_pwait, int(epfd), void(events), int(maxevents), int(timeout), void(sigmask), int(size))
+  return syscall(sys.epoll_pwait, int(epfd), void(events), int(maxevents), int(timeout), void(sigmask), ulong(size))
 end
 end
 
 function C.ppoll(fds, nfds, timeout_ts, sigmask)
   local size = 0
   if sigmask then size = sigset_size end
-  -- TODO luaffi gets the wrong value for the last param if it is int not long. See #87.
-  return syscall(sys.ppoll, void(fds), ulong(nfds), void(timeout_ts), void(sigmask), long(size))
+  return syscall(sys.ppoll, void(fds), ulong(nfds), void(timeout_ts), void(sigmask), ulong(size))
 end
 function C.signalfd(fd, mask, flags)
-  return syscall(sys.signalfd4, int(fd), void(mask), int(sigset_size), int(flags))
+  return syscall(sys.signalfd4, int(fd), void(mask), ulong(sigset_size), int(flags))
 end
 
 -- adding more
