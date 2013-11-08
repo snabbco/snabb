@@ -26,7 +26,7 @@ int lchflags(const char *path, unsigned long flags);
 int fchflags(int fd, unsigned long flags);
 long pathconf(const char *path, int name);
 long fpathconf(int fd, int name);
-int ioctl(int d, unsigned long request, ...);
+int ioctl(int d, unsigned long request, void *arg);
 int getvfsstat(struct statvfs *buf, size_t bufsize, int flags);
 int kqueue(void);
 int kqueue1(int flags);

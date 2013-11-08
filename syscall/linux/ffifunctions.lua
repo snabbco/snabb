@@ -34,7 +34,7 @@ void exit_group(int status);
 
 time_t time(time_t *t);
 
-int ioctl(int d, unsigned int request, ...);
+int ioctl(int d, unsigned int request, void *arg);
 
 int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts, const sigset_t *sigmask);
 int epoll_create1(int flags);
