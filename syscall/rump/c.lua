@@ -59,7 +59,7 @@ gid_t rump___sysimpl_getegid(void);
 gid_t rump___sysimpl_getgid(void);
 int rump___sysimpl___getlogin(char *, size_t);
 int rump___sysimpl___setlogin(const char *);
-int rump___sysimpl_ioctl(int, unsigned long, ...);
+int rump___sysimpl_ioctl(int, unsigned long, void *);
 int rump___sysimpl_revoke(const char *);
 int rump___sysimpl_symlink(const char *, const char *);
 ssize_t rump___sysimpl_readlink(const char *, char *, size_t);
