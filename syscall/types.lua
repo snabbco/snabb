@@ -515,11 +515,10 @@ if c.SOL.IP then typemap[c.SOL.IP] = c.IP end
 
 mt.cmsghdr = {
   __index = {
-    datalen = function(self)
-      return tonumber(self.cmsg_len - cmsg_ahdr)
-    end,
+    len = function(self) return tonumber(self.cmsg_len) end,
+    datalen = function(self) return self:len() - cmsg_ahdr end,
     hdrsize = function(self) return cmsg_hdrsize end, -- constant, but better to have it here
-    align = function(self) return cmsg_align(self.cmsg_len) end,
+    align = function(self) return cmsg_align(self:len()) end,
     fds = function(self)
       if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.RIGHTS then
         local fda = pt.int(self.cmsg_data)
