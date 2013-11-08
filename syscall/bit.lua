@@ -20,10 +20,12 @@ ok, bit = pcall(require, "bit")
 if not ok then
   ok, bit = pcall(require, "bit32")
 
+  local int32 = ffi.typeof("int32_t")
+
   if not ok then error("no suitable bit library found") end
 
   -- fixups to make compatible with luajit
-  bit.tobit = function(x) return tonumber(x) end -- TODO may need to adjust range
+  bit.tobit = function(x) return tonumber(int32(x)) end
   bit.bswap = function(x)
     return bit.bor(bit.lshift(bit.extract(x, 0, 8), 24),
                      bit.lshift(bit.extract(x, 8, 8), 16),
