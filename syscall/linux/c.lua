@@ -435,7 +435,7 @@ function C.dup3(oldfd, newfd, flags) return syscall(sys.dup3, int(oldfd), int(ne
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
-  return syscall(sys.rt_sigaction, int(signum), void(act), void(oldact), int(8)) -- size is size of mask field
+  return syscall(sys.rt_sigaction, int(signum), void(act), void(oldact), ulong(8)) -- size is size of mask field
 end
 
 -- socketcall related
