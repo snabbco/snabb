@@ -574,6 +574,7 @@ test.misc_linux = {
     n = assert(S.prctl("capbset_read", "mknod"))
     assert(n == 0 or n == 1, "capability may or may not be set")
     local nn = assert(S.prctl("get_dumpable"))
+    if nn == 2 then nn = 1 end -- can return 2 but you cannot set this
     assert(S.prctl("set_dumpable", 0))
     n = assert(S.prctl("get_dumpable"))
     assert(n == 0, "process not dumpable after change")

@@ -422,7 +422,6 @@ function S.ioctl(d, request, argp)
     if type(argp) ~= "string" and type(argp) ~= "cdata" and type ~= "userdata" then
       if write then
         if not argp then error("no argument supplied for ioctl " .. name) end
-print(name, tp, argp)
         argp = mktype(tp, argp)
       end
       if read then
