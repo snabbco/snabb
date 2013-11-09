@@ -46,7 +46,7 @@ local S = require "syscall.syscalls".init(c, C, types, ioctl, fcntl)
 
 c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps  TODO remove see #94
 
-S.abi, S.c, S.C, S.types, S.t = abi, c, C, types, types.t -- add to main table returned
+S.abi, S.c, S.types, S.t = abi, c, types, types.t -- add to main table returned
 
 -- add compatibility code
 S = require "syscall.compat".init(S)
