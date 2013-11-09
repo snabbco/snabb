@@ -124,7 +124,6 @@ local addstructs = {
   user_cap_data = "struct user_cap_data",
   xt_get_revision = "struct xt_get_revision",
   vfs_cap_data = "struct vfs_cap_data",
-  sched_param = "struct sched_param",
   ucontext = "ucontext_t",
   mcontext = "mcontext_t",
   tun_pi = "struct tun_pi",
@@ -1012,6 +1011,16 @@ mt.ndmsg = {
 }
 
 addtype("ndmsg", "struct ndmsg", mt.ndmsg)
+
+mt.sched_param = {
+  __new = function(tp, v) -- allow positional parameters as only first is ever used
+    local obj = ffi.new(tp)
+    obj.sched_priority = v or 0
+    return obj
+  end,
+}
+
+addtype("sched_param", "struct sched_param", mt.sched_param)
 
 return types
 
