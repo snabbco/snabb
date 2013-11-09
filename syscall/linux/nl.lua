@@ -31,18 +31,6 @@ local addrtype = {
 
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
--- Give an alignment and a list of values, returns a buffer to fit them, buffer length, and what the offsets would be
-local function align_types(alignment, in_vals)
-  local len = 0
-  local offsets = {}
-  for i, tp in ipairs(in_vals) do
-    local item_alignment = align(ffi.sizeof(tp), alignment)
-    offsets [i] = len
-    len = len + item_alignment
-  end
-  return t.buffer(len), len, offsets
-end
-
 local mt = {} -- metatables
 local meth = {}
 
@@ -879,7 +867,15 @@ local function ifla_f(tab, lookup, af, ...)
     len, args, messages, values, kind = ifla_getmsg(args, messages, values, tab, lookup, kind, af)
   end
 
-  local buf, len, offsets = align_types(nlmsg_align(1), messages)
+  local len = 0
+  local offsets = {}
+  local alignment = nlmsg_align(1)
+  for i, tp in ipairs(messages) do
+    local item_alignment = align(ffi.sizeof(tp), alignment)
+    offsets[i] = len
+    len = len + item_alignment
+  end
+  local buf = t.buffer(len)
 
   for i = 2, #offsets do -- skip header
     local result = ffi.cast(ffi.typeof("$ *", messages[i]), buf + offsets[i]) -- TODO will not work with luaffi
