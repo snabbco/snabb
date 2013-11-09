@@ -24,10 +24,16 @@ local align = h.align
 
 local t, pt, s = types.t, types.pt, types.s
 
-local addrtype = {
+local adtt = {
   [c.AF.INET] = t.in_addr,
   [c.AF.INET6] = t.in6_addr,
 }
+
+local function addrtype(af)
+  local tp = adtt[tonumber(af)]
+  if not tp then error("bad address family") end
+  return tp()
+end
 
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
@@ -123,22 +129,22 @@ local ifla_decode = {
 
 local ifa_decode = {
   [c.IFA.ADDRESS] = function(ir, buf, len)
-    ir.addr = addrtype[ir.family]()
+    ir.addr = addrtype(ir.family)
     ffi.copy(ir.addr, buf, ffi.sizeof(ir.addr))
   end,
   [c.IFA.LOCAL] = function(ir, buf, len)
-    ir.loc = addrtype[ir.family]()
+    ir.loc = addrtype(ir.family)
     ffi.copy(ir.loc, buf, ffi.sizeof(ir.loc))
   end,
   [c.IFA.BROADCAST] = function(ir, buf, len)
-    ir.broadcast = addrtype[ir.family]()
+    ir.broadcast = addrtype(ir.family)
     ffi.copy(ir.broadcast, buf, ffi.sizeof(ir.broadcast))
   end,
   [c.IFA.LABEL] = function(ir, buf, len)
     ir.label = ffi.string(buf)
   end,
   [c.IFA.ANYCAST] = function(ir, buf, len)
-    ir.anycast = addrtype[ir.family]()
+    ir.anycast = addrtype(ir.family)
     ffi.copy(ir.anycast, buf, ffi.sizeof(ir.anycast))
   end,
   [c.IFA.CACHEINFO] = function(ir, buf, len)
@@ -149,11 +155,11 @@ local ifa_decode = {
 
 local rta_decode = {
   [c.RTA.DST] = function(ir, buf, len)
-    ir.dst = addrtype[ir.family]()
+    ir.dst = addrtype(ir.family)
     ffi.copy(ir.dst, buf, ffi.sizeof(ir.dst))
   end,
   [c.RTA.SRC] = function(ir, buf, len)
-    ir.src = addrtype[ir.family]()
+    ir.src = addrtype(ir.family)
     ffi.copy(ir.src, buf, ffi.sizeof(ir.src))
   end,
   [c.RTA.IIF] = function(ir, buf, len)
@@ -165,7 +171,7 @@ local rta_decode = {
     ir.oif = tonumber(i[0])
   end,
   [c.RTA.GATEWAY] = function(ir, buf, len)
-    ir.gateway = addrtype[ir.family]()
+    ir.gateway = addrtype(ir.family)
     ffi.copy(ir.gateway, buf, ffi.sizeof(ir.gateway))
   end,
   [c.RTA.PRIORITY] = function(ir, buf, len)
@@ -193,7 +199,7 @@ local rta_decode = {
 
 local nda_decode = {
   [c.NDA.DST] = function(ir, buf, len)
-    ir.dst = addrtype[ir.family]()
+    ir.dst = addrtype(ir.family)
     ffi.copy(ir.dst, buf, ffi.sizeof(ir.dst))
   end,
   [c.NDA.LLADDR] = function(ir, buf, len)
@@ -370,9 +376,9 @@ meth.rtmsg = {
     src_len = function(i) return tonumber(i.rtmsg.rtm_src_len) end,
     index = function(i) return tonumber(i.oif) end,
     flags = function(i) return tonumber(i.rtmsg.rtm_flags) end,
-    dest = function(i) return i.dst or addrtype[i.family]() end,
-    source = function(i) return i.src or addrtype[i.family]() end,
-    gw = function(i) return i.gateway or addrtype[i.family]() end,
+    dest = function(i) return i.dst or addrtype(i.family) end,
+    source = function(i) return i.src or addrtype(i.family) end,
+    gw = function(i) return i.gateway or addrtype(i.family) end,
     -- might not be set in Lua table, so return nil
     iif = function() return nil end,
     oif = function() return nil end,
@@ -792,7 +798,6 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
   end
 
   local rawmsg = msg
-
   msg = lookup[msg]
 
   tp = ifla_msg_types[tab][msg]
@@ -842,7 +847,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
     slen = nlmsg_align(s.rtattr) + #value
   else
     if tp == "address" then
-      tp = addrtype[af]
+      tp = adtt[tonumber(af)]
     end
     value = mktype(tp, value)
   end
@@ -999,13 +1004,8 @@ end
 
 -- read routes
 function nl.getroute(af, tp, tab, prot, scope, ...)
-  af = c.AF[af]
-  tp = c.RTN[tp]
-  tab = c.RT_TABLE[tab]
-  prot = c.RTPROT[prot]
-  scope = c.RT_SCOPE[scope]
-  local r, err = nlmsg(c.RTM.GETROUTE, "request, dump", af, t.rtmsg,
-                   {rtm_family = af, rtm_table = tab, rtm_protocol = prot, rtm_type = tp, rtm_scope = scope})
+  local rtm = t.rtmsg{family = af, table = tab, protocol = prot, type = tp, scope = scope}
+  local r, err = nlmsg(c.RTM.GETROUTE, "request, dump", af, t.rtmsg, rtm)
   if not r then return nil, err end
   return setmetatable(r, mt.routes)
 end
@@ -1043,29 +1043,15 @@ local function preftable(tab, prefix)
   return tab
 end
 
--- TODO this should be in __new for type
-local function rtm_table(tab)
-  tab = preftable(tab, "rtm_")
-  tab.rtm_family = c.AF[tab.rtm_family]
-  tab.rtm_protocol = c.RTPROT[tab.rtm_protocol]
-  tab.rtm_type = c.RTN[tab.rtm_type]
-  tab.rtm_scope = c.RT_SCOPE[tab.rtm_scope]
-  tab.rtm_flags = c.RTM_F[tab.rtm_flags]
-  tab.rtm_table = c.RT_TABLE[tab.rtm_table]
-  return tab
-end
-
--- this time experiment using table as so many params, plus they are just to init struct. TODO flag cleanup
-function nl.newroute(flags, tab, ...)
-  tab = rtm_table(tab)
+function nl.newroute(flags, rtm, ...)
   flags = c.NLM_F("request", "ack", flags)
-  return nlmsg("newroute", flags, tab.rtm_family, t.rtmsg, tab, ...)
+  rtm = mktype(t.rtmsg, rtm)
+  return nlmsg("newroute", flags, rtm.family, t.rtmsg, rtm, ...)
 end
 
--- TODO flag cleanup
-function nl.delroute(tp, ...)
-  tp = rtm_table(tp)
-  return nlmsg("delroute", "request, ack", tp.rtm_family, t.rtmsg, tp, ...)
+function nl.delroute(rtm, ...)
+  rtm = mktype(t.rtmsg, rtm)
+  return nlmsg("delroute", "request, ack", rtm.family, t.rtmsg, rtm, ...)
 end
 
 -- read addresses from interface TODO flag cleanup
@@ -1079,7 +1065,7 @@ end
 function nl.newaddr(index, af, prefixlen, flags, ...)
   if type(index) == 'table' then index = index.index end
   local family = c.AF[af]
-  local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = c.IFA_F[flags], ifa_index = index}
+  local ifav = {ifa_family = family, ifa_prefixlen = prefixlen or 0, ifa_flags = c.IFA_F[flags], ifa_index = index} --__TODO in __new
   return nlmsg("newaddr", "request, ack", family, t.ifaddrmsg, ifav, ...)
 end
 

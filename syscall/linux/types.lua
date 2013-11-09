@@ -88,7 +88,6 @@ local addstructs = {
   sysinfo = "struct sysinfo",
   nlmsghdr = "struct nlmsghdr",
   rtgenmsg = "struct rtgenmsg",
-  rtmsg = "struct rtmsg",
   ifinfomsg = "struct ifinfomsg",
   ifaddrmsg = "struct ifaddrmsg",
   rtattr = "struct rtattr",
@@ -978,6 +977,26 @@ for k, v in pairs(c.DT) do
 end
 
 addtype("dirent", "struct linux_dirent64", mt.dirent)
+
+mt.rtmsg = {
+  index = {
+    family = function(self) return tonumber(self.rtm_family) end,
+  },
+  newindex = {
+    family = function(self, v) self.rtm_family = c.AF[v] end,
+    protocol = function(self, v) self.rtm_protocol = c.RTPROT[v] end,
+    type = function(self, v) self.rtm_type = c.RTN[v] end,
+    scope = function(self, v) self.rtm_scope = c.RT_SCOPE[v] end,
+    flags = function(self, v) self.rtm_flags = c.RTM_F[v] end,
+    table = function(self, v) self.rtm_table = c.RT_TABLE[v] end,
+    dst_len = function(self, v) self.rtm_dst_len = v end,
+    src_len = function(self, v) self.rtm_src_len = v end,
+    tos = function(self, v) self.rtm_tos = v end,
+  },
+  __new = newfn,
+}
+
+addtype("rtmsg", "struct rtmsg", mt.rtmsg)
 
 return types
 
