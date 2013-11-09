@@ -21,7 +21,6 @@ local c = S.c
 
 local htonl = h.htonl
 local align = h.align
-local align_types = h.align_types
 
 local t, pt, s = types.t, types.pt, types.s
 
@@ -31,6 +30,18 @@ local addrtype = {
 }
 
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
+
+-- Give an alignment and a list of values, returns a buffer to fit them, buffer length, and what the offsets would be
+local function align_types(alignment, in_vals)
+  local len = 0
+  local offsets = {}
+  for i, tp in ipairs(in_vals) do
+    local item_alignment = align(ffi.sizeof(tp), alignment)
+    offsets [i] = len
+    len = len + item_alignment
+  end
+  return t.buffer(len), len, offsets
+end
 
 local mt = {} -- metatables
 local meth = {}

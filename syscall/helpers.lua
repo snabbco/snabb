@@ -221,18 +221,5 @@ function h.ctobool(i) return tonumber(i) ~= 0 end
 local function align(len, a) return bit.band(tonumber(len) + a - 1, bit.bnot(a - 1)) end
 h.align = align
 
-local buffer = ffi.typeof("char[?]")
--- Give an alignment and a list of values, returns a buffer to fit them, it's length, and what the offsets would be
-function h.align_types(alignment, in_vals)
-  local len = 0
-  local offsets = { }
-  for i, tp in ipairs(in_vals) do
-    local item_alignment = align(ffi.sizeof(tp), alignment)
-    offsets [ i ] = len
-    len = len + item_alignment
-  end
-  return buffer(len), len, offsets
-end
-
 return h
 
