@@ -1076,35 +1076,25 @@ function nl.deladdr(index, af, prefixlen, ...)
   return nlmsg("deladdr", "request, ack", family, t.ifaddrmsg, ifav, ...)
 end
 
--- TODO this should be in __new for type
-local function ndm_table(tab)
-  tab = preftable(tab, "ndm_")
-  tab.ndm_family = c.AF[tab.ndm_family]
-  tab.ndm_state = c.NUD[tab.ndm_state]
-  tab.ndm_flags = c.NTF[tab.ndm_flags or 0]
-  tab.ndm_type = tab.ndm_type or 0 -- which lookup?
-  return tab
-end
-
 function nl.getneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
-  tab.ndm_ifindex = index
-  local ndm = ndm_table(tab)
-  return nlmsg("getneigh", "request, dump", tab.ndm_family, t.ndmsg, ndm, ...)
+  tab.ifindex = index
+  local ndm = t.ndmsg(tab)
+  return nlmsg("getneigh", "request, dump", ndm.family, t.ndmsg, ndm, ...)
 end
 
 function nl.newneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
-  tab.ndm_ifindex = index
-  local ndm = ndm_table(tab)
-  return nlmsg("newneigh", "request, ack, excl, create", tab.ndm_family, t.ndmsg, ndm, ...)
+  tab.ifindex = index
+  local ndm = t.ndmsg(tab)
+  return nlmsg("newneigh", "request, ack, excl, create", ndm.family, t.ndmsg, ndm, ...)
 end
 
 function nl.delneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
-  tab.ndm_ifindex = index
-  local ndm = ndm_table(tab)
-  return nlmsg("delneigh", "request, ack", tab.ndm_family, t.ndmsg, ndm, ...)
+  tab.ifindex = index
+  local ndm = t.ndmsg(tab)
+  return nlmsg("delneigh", "request, ack", ndm.family, t.ndmsg, ndm, ...)
 end
 
 function nl.interfaces() -- returns with address info too.

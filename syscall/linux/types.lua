@@ -93,7 +93,6 @@ local addstructs = {
   rtattr = "struct rtattr",
   rta_cacheinfo = "struct rta_cacheinfo",
   nlmsgerr = "struct nlmsgerr",
-  ndmsg = "struct ndmsg",
   nda_cacheinfo = "struct nda_cacheinfo",
   ndt_stats = "struct ndt_stats",
   ndtmsg = "struct ndtmsg",
@@ -997,6 +996,22 @@ mt.rtmsg = {
 }
 
 addtype("rtmsg", "struct rtmsg", mt.rtmsg)
+
+mt.ndmsg = {
+  index = {
+    family = function(self) return tonumber(self.ndm_family) end,
+  },
+  newindex = {
+    family = function(self, v) self.ndm_family = c.AF[v] end,
+    state = function(self, v) self.ndm_state = c.NUD[v] end,
+    flags = function(self, v) self.ndm_flags = c.NTF[v] end,
+    type = function(self, v) self.ndm_type = v end, -- which lookup?
+    ifindex = function(self, v) self.ndm_ifindex = v end,
+  },
+  __new = newfn,
+}
+
+addtype("ndmsg", "struct ndmsg", mt.ndmsg)
 
 return types
 
