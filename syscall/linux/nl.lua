@@ -807,7 +807,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
   end
 
   if type(tp) == "table" then
-    value = {rta_type = msg} -- missing rta_len, but have reference and can fix
+    value = t.rtattr{rta_type = msg} -- missing rta_len, but have reference and can fix
 
     messages[#messages + 1] = t.rtattr
     values[#values + 1] = value
@@ -834,7 +834,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
 
   local slen
 
-  if tp == "asciiz" then
+  if tp == "asciiz" then -- zero terminated
     tp = t.buffer(#value + 1)
     slen = nlmsg_align(s.rtattr) + #value + 1
   elseif tp == "ascii" then -- not zero terminated
@@ -852,7 +852,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
 
   messages[#messages + 1] = t.rtattr
   messages[#messages + 1] = tp
-  values[#values + 1] = {rta_type = msg, rta_len = slen}
+  values[#values + 1] = t.rtattr{rta_type = msg, rta_len = slen}
   values[#values + 1] = value
 
   return len, args, messages, values, kind
@@ -878,12 +878,15 @@ local function ifla_f(tab, lookup, af, ...)
   local buf = t.buffer(len)
 
   for i = 2, #offsets do -- skip header
-    local result = ffi.cast(ffi.typeof("$ *", messages[i]), buf + offsets[i]) -- TODO will not work with luaffi
     local value = values[i]
     if type(value) == "string" then
-      ffi.copy(result, value)
+      ffi.copy(buf + offsets[i], value)
     else
-      result[0] = value
+      -- slightly nasty
+      if ffi.istype(t.uint32, value) then value = t.uint32_1(value) end
+      if ffi.istype(t.uint16, value) then value = t.uint16_1(value) end
+      if ffi.istype(t.uint8, value) then value = t.uint8_1(value) end
+      ffi.copy(buf + offsets[i], value, ffi.sizeof(value))
     end
   end
 
