@@ -1,5 +1,4 @@
 -- modularize netlink code as it is large and standalone
--- TODO add init()
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
@@ -30,6 +29,8 @@ local addrtype = {
   [c.AF.INET] = t.in_addr,
   [c.AF.INET6] = t.in6_addr,
 }
+
+local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
 local mt = {} -- metatables
 local meth = {}
@@ -784,7 +785,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
     tp = msg
     value = table.remove(args, 1)
     if not value then error("not enough arguments") end
-    if not ffi.istype(tp, value) then value = tp(value) end -- TODO mktype()
+    value = mktype(tp, value)
     len = ffi.sizeof(value)
     messages[#messages + 1] = tp
     values[#values + 1] = value
@@ -844,9 +845,7 @@ local function ifla_getmsg(args, messages, values, tab, lookup, kind, af)
     if tp == "address" then
       tp = addrtype[af]
     end
-    if not ffi.istype(tp, value) then
-      value = tp(value)
-    end
+    value = mktype(tp, value)
   end
 
   len = nlmsg_align(s.rtattr) + nlmsg_align(ffi.sizeof(tp))
