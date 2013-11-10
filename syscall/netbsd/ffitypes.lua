@@ -355,13 +355,12 @@ struct _netbsd_rusage {
 };
 ]]
 
-local ffi = require "ffi"
+local s = table.concat(defs, "")
 
-if abi.host ~= "netbsd" then
-  ffi.cdef(table.concat(defs, ""))
-else
-  local s = table.concat(defs, "")
+if abi.host == "netbsd" then
   s = string.gsub(s, "_netbsd_", "") -- remove netbsd types
-  ffi.cdef(s)
 end
+
+local ffi = require "ffi"
+ffi.cdef(s)
 
