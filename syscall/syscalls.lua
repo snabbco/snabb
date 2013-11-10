@@ -192,9 +192,9 @@ function S.socket(domain, stype, protocol)
   domain = c.AF[domain]
   return retfd(C.socket(domain, c.SOCK[stype], sproto(domain, protocol)))
 end
-function S.socketpair(domain, stype, protocol)
+function S.socketpair(domain, stype, protocol, sv2)
   domain = c.AF[domain]
-  local sv2 = t.int2()
+  sv2 = sv2 or t.int2()
   local ret = C.socketpair(domain, c.SOCK[stype], sproto(domain, protocol), sv2)
   if ret == -1 then return nil, t.error() end
   return t.socketpair(sv2)
