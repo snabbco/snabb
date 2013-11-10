@@ -442,20 +442,18 @@ end
 
 -- TODO this should be in compat
 if C.pipe2 then
-  function S.pipe(flags, fd2)
+  function S.pipe2(flags, fd2)
     fd2 = fd2 or t.int2()
     local ret = C.pipe2(fd2, c.OPIPE[flags])
     if ret == -1 then return nil, t.error() end
     return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
   end
-else
-  function S.pipe(flags, fd2)
-    assert(not flags, "TODO add pipe flags emulation") -- TODO emulate flags from Linux pipe2
-    fd2 = fd2 or t.int2()
-    local ret = C.pipe(fd2)
-    if ret == -1 then return nil, t.error() end
-    return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
-  end
+end
+function S.pipe(flags, fd2)
+  fd2 = fd2 or t.int2()
+  local ret = C.pipe(fd2)
+  if ret == -1 then return nil, t.error() end
+  return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
 end
 
 -- TODO not sure about this interface, maybe return rem as extra parameter see #103
