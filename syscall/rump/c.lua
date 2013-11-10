@@ -192,7 +192,7 @@ int rump___sysimpl_fchmodat(int, const char *, _netbsd_mode_t, int);
 int rump___sysimpl_fchownat(int, const char *, uid_t, gid_t, int);
 int rump___sysimpl_fstatat(int, const char *, struct _netbsd_stat *, int);
 int rump___sysimpl_utimensat(int, const char *, const struct _netbsd_timespec *, int);
-int rump___sysimpl_openat(int, const char *, int, ...);
+int rump___sysimpl_openat(int, const char *, int, int);
 int rump___sysimpl_readlinkat(int, const char *, char *, size_t);
 int rump___sysimpl_symlinkat(const char *, int, const char *);
 int rump___sysimpl_unlinkat(int, const char *, int);
