@@ -552,10 +552,17 @@ test_file_operations = {
     assert(fd2:close())
     assert(fd:close())
   end,
-  test_dup_to_number = function()
+  test_dup2 = function()
     local fd = assert(S.open("/dev/zero"))
-    local fd2 = assert(fd:dup(17))
+    local fd2 = assert(fd:dup2(17))
     assert_equal(fd2:getfd(), 17, "dup2 should set file id as specified")
+    assert(fd2:close())
+    assert(fd:close())
+  end,
+  test_dup3 = function()
+    local fd = assert(S.open("/dev/zero"))
+    local fd2 = assert(fd:dup3(17))
+    assert_equal(fd2:getfd(), 17, "dup3 should set file id as specified")
     assert(fd2:close())
     assert(fd:close())
   end,

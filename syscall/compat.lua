@@ -105,6 +105,13 @@ if not S.pipe2 then
 end
 S.pipe = S.pipe2 -- always allow flags
 
+if not S.dup3 then
+  function S.dup3(oldfd, newfd, flags)
+    assert(not flags, "TODO add dup3 flags emulation") -- TODO emulate flags from Linux dup3
+    return S.dup2(oldfd, newfd)
+  end
+end
+
 -- common libc function
 if S.nanosleep then
   function S.sleep(sec)

@@ -69,7 +69,7 @@ end
 
 -- methods on an fd
 -- note could split, so a socket does not have methods only appropriate for a file; sometimes you do not know what type an fd is
-local fdmethods = {'dup', 'read', 'write', 'pread', 'pwrite',
+local fdmethods = {'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'lseek', 'fchdir', 'fsync', 'fdatasync', 'fstat', 'fcntl', 'fchmod',
                    'bind', 'listen', 'connect', 'accept', 'getsockname', 'getpeername',
                    'send', 'sendto', 'recv', 'recvfrom', 'readv', 'writev', 'sendmsg',
