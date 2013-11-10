@@ -108,7 +108,9 @@ Under NetBSD it is much simpler, the only thing we need to be careful of is vers
 
 ### API
 
-All functions return two values, the return value, or true if there is not one other than success, then an error value. This makes it easy to write things like `assert(fd:close())`. The error type can be converted to a string message, or you can retrieve the errno, or test against a symbolic error name.
+This will be documented properly soon, once it stabilises.
+
+All functions return two or more values, the return value, or true if there is not one other than success, then an error value. This makes it easy to write things like `assert(fd:close())`. The error type can be converted to a string message, or you can retrieve the errno, or test against a symbolic error name. Some functions then return additional return values, such as `pipe()` that returns the two file descriptors for the pipe. A few functions return a Lua iterator, such as `epoll_wait()`.
 
 File descriptors are returned as a type not an integer. This is because they are garbage collected by default, ie if they go out of scope the file is closed. You can get the file descriptor using the fileno field. To disable the garbage collection you can call `fd:nogc()`, in which case you need to close the descriptors by hand. They also have methods for operations that take an fd, like `close`, `fsync`, `read`. You can use this type where an fd is required, or a numeric fd, or a string like "stderr".
 
