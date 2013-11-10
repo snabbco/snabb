@@ -9,10 +9,11 @@ package.path = "./?.lua;"
 
 local strict = require "include.strict.strict"
 
-local function assert(cond, s, ...)
+local function assert(cond, err, ...)
   collectgarbage("collect") -- force gc, to test for bugs
-  if cond == nil then error(tostring(s)) end -- annoyingly, assert does not call tostring!
-  return cond, s, ...
+  if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
+  if cond == true then return ... end
+  return cond, ...
 end
 
 local helpers = require "syscall.helpers"
@@ -1451,7 +1452,7 @@ if not (S.__rump or abi.xen) then -- rump has no processes, memory allocation, p
 test_timers_signals = {
   test_nanosleep = function()
     local rem = assert(S.nanosleep(0.001))
-    assert_equal(rem, true, "expect no elapsed time after nanosleep")
+    assert_equal(rem, 0, "expect no elapsed time after nanosleep")
   end,
   test_gettimeofday = function()
     local tv = assert(S.gettimeofday())
