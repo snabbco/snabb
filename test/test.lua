@@ -448,8 +448,7 @@ test_read_write = {
 
 test_poll_select = {
   test_poll = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    local a, b = sv[1], sv[2]
+    local a, b = assert(S.socketpair("unix", "stream"))
     local pev = t.pollfds{{fd = a, events = "in"}}
     local p = assert(S.poll(pev, 0))
     assert_equal(p, 0) -- no events
@@ -469,8 +468,7 @@ test_poll_select = {
     assert(a:close())
   end,
   test_select = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    local a, b = sv[1], sv[2]
+    local a, b = assert(S.socketpair("unix", "stream"))
     local sel = assert(S.select({readfds = {a, b}}, 0))
     assert(sel.count == 0, "nothing to read select now")
     assert(b:write(teststring))
@@ -480,8 +478,7 @@ test_poll_select = {
     assert(a:close())
   end,
   test_pselect = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    local a, b = sv[1], sv[2]
+    local a, b = assert(S.socketpair("unix", "stream"))
     local sel = assert(S.pselect({readfds = {1, b}}, 0, "alrm"))
     assert(sel.count == 0, "nothing to read select now")
     assert(b:write(teststring))
@@ -495,8 +492,7 @@ test_poll_select = {
 test_ppoll = {
   test_ppoll = function()
     local ppoll = S.ppoll or S.pollts -- see notes, no differences as far as test is concerned TODO compat should deal with this
-    local sv = assert(S.socketpair("unix", "stream"))
-    local a, b = sv[1], sv[2]
+    local a, b = assert(S.socketpair("unix", "stream"))
     local pev = t.pollfds{{fd = a, events = c.POLL.IN}}
     local p = assert(ppoll(pev, 0, nil))
     assert_equal(p, 0) -- no events yet
@@ -1112,11 +1108,12 @@ test_sockets_pipes = {
     assert(s:close())
   end,
   test_unix_socketpair = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(sv[1]:write("test"))
-    local r = assert(sv[2]:read())
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    assert(sv1:write("test"))
+    local r = assert(sv2:read())
     assert_equal(r, "test")
-    assert(sv:close())
+    assert(sv1:close())
+    assert(sv2:close())
   end,
   test_udp_socket = function()
     local ss = assert(S.socket("inet", "dgram"))
@@ -1426,23 +1423,25 @@ test_util = {
 if not (S.__rump or abi.os == "netbsd") then
 test_sendfd = {
   test_sendcred = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(sv[2]:setsockopt("socket", "passcred", true)) -- enable receive creds
-    local so = assert(sv[2]:getsockopt(c.SOL.SOCKET, c.SO.PASSCRED))
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    assert(sv2:setsockopt("socket", "passcred", true)) -- enable receive creds
+    local so = assert(sv2:getsockopt(c.SOL.SOCKET, c.SO.PASSCRED))
     assert(so == 1, "getsockopt should have updated value")
-    local n = assert(sv[1]:sendmsg()) -- sends single byte, which is enough to send credentials
+    local n = assert(sv2:sendmsg()) -- sends single byte, which is enough to send credentials
     assert_equal(n, 1)
-    local r = assert(util.recvcmsg(sv[2]))
+    local r = assert(util.recvcmsg(sv1))
     assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
-    assert(sv:close())
+    assert(sv1:close())
+    assert(sv2:close())
   end,
   test_sendfd = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(util.sendfds(sv[1], S.stdin))
-    local r = assert(util.recvcmsg(sv[2]))
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    assert(util.sendfds(sv1, S.stdin))
+    local r = assert(util.recvcmsg(sv2))
     assert(#r.fd == 1, "expect to get one file descriptor back")
     assert(r.fd[1]:close())
-    assert(sv:close())
+    assert(sv1:close())
+    assert(sv2:close())
   end,
 }
 end

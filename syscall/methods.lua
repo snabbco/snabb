@@ -180,45 +180,6 @@ t.mqd = ffi.metatype("struct {mqd_t filenum;}", {
 })
 end
 
--- override socketpair to provide methods
-local mt_socketpair = {
-  __index = {
-    close = function(s)
-      local ok1, err1 = s[1]:close()
-      local ok2, err2 = s[2]:close()
-      if not ok1 then return nil, err1 end
-      if not ok2 then return nil, err2 end
-      return true
-    end,
-    nonblock = function(s)
-      local ok, err = S.nonblock(s[1])
-      if not ok then return nil, err end
-      local ok, err = S.nonblock(s[2])
-      if not ok then return nil, err end
-      return true
-    end,
-    block = function(s)
-      local ok, err = S.block(s[1])
-      if not ok then return nil, err end
-      local ok, err = S.block(s[2])
-      if not ok then return nil, err end
-      return true
-    end,
-    setblocking = function(s, b)
-      local ok, err = S.setblocking(s[1], b)
-      if not ok then return nil, err end
-      local ok, err = S.setblocking(s[2], b)
-      if not ok then return nil, err end
-      return true
-    end,
-  }
-}
-
-t.socketpair = function(s1, s2)
-  if ffi.istype(t.int2, s1) then s1, s2 = s1[0], s1[1] end
-  return setmetatable({t.fd(s1), t.fd(s2)}, mt_socketpair)
-end
-
 -- override pipe to provide methods
 local mt_pipe = {
   __index = {

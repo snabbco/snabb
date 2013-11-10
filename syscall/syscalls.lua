@@ -197,7 +197,7 @@ function S.socketpair(domain, stype, protocol, sv2)
   sv2 = sv2 or t.int2()
   local ret = C.socketpair(domain, c.SOCK[stype], sproto(domain, protocol), sv2)
   if ret == -1 then return nil, t.error() end
-  return t.socketpair(sv2)
+  return true, nil, t.fd(sv2[0]), t.fd(sv2[1])
 end
 -- TODO maybe this not going along with OS is confusing?
 if C.dup3 then
