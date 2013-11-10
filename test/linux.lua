@@ -20,19 +20,22 @@ local t, pt, s = types.t, types.pt, types.s
 
 local nl = S.nl
 
-local function assert(cond, s, ...)
+local function assert(cond, err, ...)
   collectgarbage("collect") -- force gc, to test for bugs
-  if cond == nil then error(tostring(s)) end -- annoyingly, assert does not call tostring!
-  return cond, s, ...
+  if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
+  if type(cond) == "function" then return cond, err, ... end
+  if cond == true then return ... end
+  return cond, ...
 end
 
-local function fork_assert(cond, str) -- if we have forked we need to fail in main thread not fork
+local function fork_assert(cond, err, ...) -- if we have forked we need to fail in main thread not fork
   if not cond then
-    print(tostring(str))
+    print(tostring(err))
     print(debug.traceback())
     S.exit("failure")
   end
-  return cond, str
+  if cond == true then return ... end
+  return cond, ...
 end
 
 local function assert_equal(...)
@@ -75,13 +78,13 @@ test.signals = {
     assert(S.sigaction("pipe", "dfl"))
   end,
   test_sigpipe = function() -- TODO BSDs have NOSIGPIPE flag that should do this too
-    local sv = assert(S.socketpair("unix", "stream"))
-    assert(sv[1]:shutdown("rd"))
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    assert(sv1:shutdown("rd"))
     assert(S.signal("pipe", "ign"))
-    assert(sv[2]:close())
-    local n, err = sv[1]:write("will get sigpipe")
+    assert(sv2:close())
+    local n, err = sv1:write("will get sigpipe")
     assert(err.PIPE, "should get sigpipe")
-    assert(sv[1]:close())
+    assert(sv1:close())
   end,
 }
 
@@ -322,42 +325,45 @@ test.xattr = {
 
 test.tee_splice = {
   test_tee_splice = function()
-    local p = assert(S.pipe("nonblock"))
-    local pp = assert(S.pipe("nonblock"))
-    local s = assert(S.socketpair("unix", "stream, nonblock"))
+    local pr, pw = assert(S.pipe("nonblock"))
+    local ppr, ppw = assert(S.pipe("nonblock"))
+    local s1, s2 = assert(S.socketpair("unix", "stream, nonblock"))
     local fd = assert(S.open(tmpfile, "rdwr, creat", "RWXU"))
     assert(S.unlink(tmpfile))
     local str = teststring
     local n = assert(fd:write(str))
     assert(n == #str)
-    n = assert(S.splice(fd, 0, p[2], nil, #str, "nonblock")) -- splice file at offset 0 into pipe
+    n = assert(S.splice(fd, 0, pw, nil, #str, "nonblock")) -- splice file at offset 0 into pipe
     assert(n == #str)
-    local n, err = S.tee(p[1], pp[2], #str, "nonblock") -- clone our pipe
+    local n, err = S.tee(pr, ppw, #str, "nonblock") -- clone our pipe
     if n then
       assert(n == #str)
-      n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice to socket
+      n = assert(S.splice(pr, nil, s1, nil, #str, "nonblock")) -- splice to socket
       assert(n == #str)
-      n = assert(s[2]:read())
+      n = assert(s2:read())
       assert(#n == #str)
-      n = assert(S.splice(pp[1], nil, s[1], nil, #str, "nonblock")) -- splice the tee'd pipe into our socket
+      n = assert(S.splice(ppr, nil, s1, nil, #str, "nonblock")) -- splice the tee'd pipe into our socket
       assert(n == #str)
-      n = assert(s[2]:read())
+      n = assert(s2:read())
       assert(#n == #str)
       local buf2 = t.buffer(#str)
       ffi.copy(buf2, str, #str)
-      n = assert(S.vmsplice(p[2], {{buf2, #str}}, "nonblock")) -- write our memory into pipe
+      n = assert(S.vmsplice(pw, {{buf2, #str}}, "nonblock")) -- write our memory into pipe
       assert(n == #str)
-      n = assert(S.splice(p[1], nil, s[1], nil, #str, "nonblock")) -- splice out to socket
+      n = assert(S.splice(pr, nil, s1, nil, #str, "nonblock")) -- splice out to socket
       assert(n == #str)
-      n = assert(s[2]:read())
+      n = assert(s2:read())
       assert(#n == #str)
     else
       assert(err.NOSYS, "only allowed error is syscall not suported, as valgrind gives this") -- TODO add to features
     end
     assert(fd:close())
-    assert(p:close())
-    assert(pp:close())
-    assert(s:close())
+    assert(pr:close())
+    assert(pw:close())
+    assert(ppr:close())
+    assert(ppw:close())
+    assert(s1:close())
+    assert(s2:close())
   end,
 }
 
@@ -446,11 +452,10 @@ test.timers_signals_linux = {
   end,
   test_clock_nanosleep = function()
     local rem = assert(S.clock_nanosleep("realtime", nil, 0.001))
-    assert_equal(rem, true, "expect no elapsed time after clock_nanosleep")
+    assert_equal(rem, 0, "expect no elapsed time after clock_nanosleep")
   end,
   test_clock_nanosleep_abs = function()
-    local rem = assert(S.clock_nanosleep("realtime", "abstime", 0)) -- in the past
-    assert_equal(rem, true, "expect no elapsed time after clock_nanosleep")
+    assert(S.clock_nanosleep("realtime", "abstime", 0))
   end,
 --[[ -- segfaulting on Android
   test_sigaction_ucontext = function() -- this test does not do much yet
@@ -1026,8 +1031,7 @@ test.events_epoll = {
     assert_equal(count, 8)
   end,
   test_epoll_wait = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    local a, b = sv[1], sv[2]
+    local a, b = assert(S.socketpair("unix", "stream"))
     local ep = assert(S.epoll_create("cloexec"))
     assert(ep:epoll_ctl("add", a, "in"))
     local ev = t.epoll_events(1)
@@ -1047,8 +1051,7 @@ test.events_epoll = {
     assert(a:close())
   end,
   test_epoll_pwait = function()
-    local sv = assert(S.socketpair("unix", "stream"))
-    local a, b = sv[1], sv[2]
+    local a, b = assert(S.socketpair("unix", "stream"))
     local ep = assert(S.epoll_create("cloexec"))
     assert(ep:epoll_ctl("add", a, "in"))
     local ev = t.epoll_events(1)
@@ -1445,7 +1448,7 @@ test.seccomp = {
       local ok, err = S.prctl("set_no_new_privs", true)
       if err and err.INVAL then S.exit() end -- may not be supported
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
-      fork_assert(nnp == true)
+      fork_assert(nnp == 1)
       S.exit()
     else
       local w = assert(S.waitpid(-1, "clone"))
@@ -1458,7 +1461,7 @@ test.seccomp = {
       local ok, err = S.prctl("set_no_new_privs", true)
       if err and err.INVAL then S.exit() end -- may not be supported
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
-      fork_assert(nnp == true)
+      fork_assert(nnp == 1)
       local program = {
         t.sock_filter("RET,K", c.SECCOMP_RET.ALLOW),
       }
@@ -1478,7 +1481,7 @@ test.seccomp = {
       local ok, err = S.prctl("set_no_new_privs", true)
       if err and err.INVAL then S.exit() end -- may not be supported
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
-      fork_assert(nnp == true)
+      fork_assert(nnp == 1)
       local program = {
         -- test architecture correct
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
@@ -1523,7 +1526,7 @@ test.seccomp = {
       local ok, err = S.prctl("set_no_new_privs", true)
       if err and err.INVAL then S.exit(42) end -- may not be supported
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
-      fork_assert(nnp == true)
+      fork_assert(nnp == 1)
       local program = {
         -- test architecture correct
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),
@@ -1557,7 +1560,7 @@ test.seccomp = {
       local ok, err = S.prctl("set_no_new_privs", true)
       if err and err.INVAL then S.exit(42) end -- may not be supported TODO change to feature test
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
-      fork_assert(nnp == true)
+      fork_assert(nnp == 1)
       local program = {
         -- test architecture correct
         t.sock_filter("LD,W,ABS", ffi.offsetof(t.seccomp_data, "arch")),

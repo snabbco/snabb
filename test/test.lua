@@ -12,6 +12,7 @@ local strict = require "include.strict.strict"
 local function assert(cond, err, ...)
   collectgarbage("collect") -- force gc, to test for bugs
   if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
+  if type(cond) == "function" then return cond, err, ... end
   if cond == true then return ... end
   return cond, ...
 end
@@ -1018,17 +1019,11 @@ test_sockets_pipes = {
     assert_equal(sa.port, 4, "should get port back")
   end,
   test_pipe = function()
-    local p = assert(S.pipe())
-    assert(p:write("test"))
-    assert_equal(p:read(), "test")
-    assert(p:close())
-  end,
-  test_pipe_nonblock = function()
-    local fds = assert(S.pipe())
-    assert(fds:nonblock())
-    local r, err = fds:read()
-    assert(err.AGAIN, "expect AGAIN")
-    assert(fds:close())
+    local pr, pw = assert(S.pipe())
+    assert(pw:write("test"))
+    assert_equal(pr:read(), "test")
+    assert(pr:close())
+    assert(pw:close())
   end,
   test_sockaddr_in_error = function()
     local sa = t.sockaddr_in(1234, "error")
@@ -1646,27 +1641,29 @@ test_processes = {
   end,
   test_setsid = function()
     -- need to fork twice in case start as process leader
-    local pp1 = S.pipe()
-    local pp2 = S.pipe()
+    local pp1r, pp1w = assert(S.pipe())
+    local pp2r, pp2w = assert(S.pipe())
     local pid = assert(S.fork())
     if (pid == 0) then -- child
-      local pid = assert(S.fork())
+      local pid = fork_assert(S.fork())
       if (pid == 0) then -- child
-        assert(pp1:read(nil, 1))
+        fork_assert(pp1r:read(nil, 1))
         local ok, err = S.setsid()
         ok = ok and ok == S.getpid() and ok == S.getsid()
-        if ok then pp2:write("y") else pp2:write("n") end
+        if ok then pp2w:write("y") else pp2w:write("n") end
         S._exit(0)
       else
         S._exit(0)
       end
     else
       local w = assert(S.wait())
-      assert(pp1:write("a"))
-      local ok = pp2:read(nil, 1)
+      assert(pp1w:write("a"))
+      local ok = pp2r:read(nil, 1)
       assert_equal(ok, "y")
-      pp1:close()
-      pp2:close()
+      pp1r:close()
+      pp1w:close()
+      pp2r:close()
+      pp2w:close()
     end
   end,
   test_setpgid = function()

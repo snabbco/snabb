@@ -13,19 +13,22 @@ local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
 
-local oldassert = assert
-local function assert(cond, s)
+local function assert(cond, err, ...)
   collectgarbage("collect") -- force gc, to test for bugs
-  return oldassert(cond, tostring(s)) -- annoyingly, assert does not call tostring!
+  if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
+  if type(cond) == "function" then return cond, err, ... end
+  if cond == true then return ... end
+  return cond, ...
 end
 
-local function fork_assert(cond, str) -- if we have forked we need to fail in main thread not fork
+local function fork_assert(cond, err, ...) -- if we have forked we need to fail in main thread not fork
   if not cond then
-    print(tostring(str))
+    print(tostring(err))
     print(debug.traceback())
     S.exit("failure")
   end
-  return cond, str
+  if cond == true then return ... end
+  return cond, ...
 end
 
 local function assert_equal(...)

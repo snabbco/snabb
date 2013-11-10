@@ -14,19 +14,22 @@ local ffi = require "ffi"
 
 local t, pt, s = types.t, types.pt, types.s
 
-local function assert(cond, s, ...)
+local function assert(cond, err, ...)
   collectgarbage("collect") -- force gc, to test for bugs
-  if cond == nil then error(tostring(s)) end -- annoyingly, assert does not call tostring!
-  return cond, s, ...
+  if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
+  if type(cond) == "function" then return cond, err, ... end
+  if cond == true then return ... end
+  return cond, ...
 end
 
-local function fork_assert(cond, str) -- if we have forked we need to fail in main thread not fork
+local function fork_assert(cond, err, ...) -- if we have forked we need to fail in main thread not fork
   if not cond then
-    print(tostring(str))
+    print(tostring(err))
     print(debug.traceback())
     S.exit("failure")
   end
-  return cond, str
+  if cond == true then return ... end
+  return cond, ...
 end
 
 local function assert_equal(...)
@@ -173,11 +176,11 @@ test.network_utils_bsd_root = {
 
 test.sockets_pipes_bsd = {
   test_nosigpipe = function()
-    local p = assert(S.pipe("nosigpipe"))
-    assert(p[1]:close())
-    local ok, err = p[2]:write("other end closed")
+    local p1, p2 = assert(S.pipe("nosigpipe"))
+    assert(p1:close())
+    local ok, err = p2:write("other end closed")
     assert(not ok and err.PIPE, "should get EPIPE")
-    assert(p:close())
+    assert(p2:close())
   end,
   test_paccept = function()
     local s = S.socket("unix", "seqpacket, nonblock, nosigpipe")
@@ -248,36 +251,36 @@ test.kqueue = {
   end,
   test_kqueue_read = function()
     local kfd = assert(S.kqueue("cloexec, nosigpipe"))
-    local pipe = S.pipe()
-    local kevs = t.kevents{{fd = pipe[1], filter = "read", flags = "add"}}
+    local p1, p2 = assert(S.pipe())
+    local kevs = t.kevents{{fd = p1, filter = "read", flags = "add"}}
     assert(kfd:kevent(kevs, nil))
     local a, b, n = assert(kfd:kevent(nil, kevs, 0))
     assert_equal(n, 0) -- no events yet
     local str = "test"
-    pipe:write(str)
+    p2:write(str)
     local count = 0
     for k, v in assert(kfd:kevent(nil, kevs, 0)) do
       assert_equal(v.size, #str) -- size will be amount available to read
       count = count + 1
     end
     assert_equal(count, 1) -- 1 event readable now
-    local r, err = pipe:read()
+    local r, err = p1:read()
     local _, _, n = assert(kfd:kevent(nil, kevs, 0))
     assert_equal(n, 0) -- no events any more
-    assert(pipe[2]:close())
+    assert(p2:close())
     local count = 0
     for k, v in assert(kfd:kevent(nil, kevs, 0)) do
       assert(v.EOF, "expect EOF event")
       count = count + 1
     end
     assert_equal(count, 1)
-    assert(pipe:close())
+    assert(p1:close())
     assert(kfd:close())
   end,
   test_kqueue_write = function()
     local kfd = assert(S.kqueue("cloexec, nosigpipe"))
-    local pipe = S.pipe()
-    local kevs = t.kevents{{fd = pipe[2], filter = "write", flags = "add"}}
+    local p1, p2 = assert(S.pipe())
+    local kevs = t.kevents{{fd = p2, filter = "write", flags = "add"}}
     assert(kfd:kevent(kevs, nil))
     local count = 0
     for k, v in assert(kfd:kevent(nil, kevs, 0)) do
@@ -285,14 +288,14 @@ test.kqueue = {
       count = count + 1
     end
     assert_equal(count, 1) -- one event
-    assert(pipe[1]:close()) -- close read end
+    assert(p1:close()) -- close read end
     count = 0
     for k, v in assert(kfd:kevent(nil, kevs, 0)) do
       assert(v.EOF, "expect EOF event")
       count = count + 1
     end
     assert_equal(count, 1)
-    assert(pipe:close())
+    assert(p2:close())
     assert(kfd:close())
   end,
   test_kqueue_timer = function()

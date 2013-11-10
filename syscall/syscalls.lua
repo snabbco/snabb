@@ -440,12 +440,13 @@ function S.ioctl(d, request, argp)
   return true -- will need override for few linux ones that return numbers
 end
 
+-- TODO this should be in compat
 if C.pipe2 then
   function S.pipe(flags, fd2)
     fd2 = fd2 or t.int2()
     local ret = C.pipe2(fd2, c.OPIPE[flags])
     if ret == -1 then return nil, t.error() end
-    return t.pipe(fd2)
+    return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
   end
 else
   function S.pipe(flags, fd2)
@@ -453,7 +454,7 @@ else
     fd2 = fd2 or t.int2()
     local ret = C.pipe(fd2)
     if ret == -1 then return nil, t.error() end
-    return t.pipe(fd2)
+    return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
   end
 end
 

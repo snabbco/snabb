@@ -180,48 +180,6 @@ t.mqd = ffi.metatype("struct {mqd_t filenum;}", {
 })
 end
 
--- override pipe to provide methods
-local mt_pipe = {
-  __index = {
-    close = function(p)
-      local ok1, err1 = p[1]:close()
-      local ok2, err2 = p[2]:close()
-      if not ok1 then return nil, err1 end
-      if not ok2 then return nil, err2 end
-      return true
-    end,
-    read = function(p, ...) return S.read(p[1], ...) end,
-    write = function(p, ...) return S.write(p[2], ...) end,
-    nonblock = function(p)
-      local ok, err = p[1]:nonblock()
-      if not ok then return nil, err end
-      local ok, err = p[2]:nonblock()
-      if not ok then return nil, err end
-      return true
-    end,
-    block = function(p)
-      local ok, err = p[1]:block()
-      if not ok then return nil, err end
-      local ok, err = p[2]:block()
-      if not ok then return nil, err end
-      return true
-    end,
-    setblocking = function(p, b)
-      local ok, err = p[1]:setblocking(b)
-      if not ok then return nil, err end
-      local ok, err = p[2]:setblocking(b)
-      if not ok then return nil, err end
-      return true
-    end,
-    -- TODO many useful methods still missing
-  }
-}
-
-t.pipe = function(s1, s2)
-  if ffi.istype(t.int2, s1) then s1, s2 = s1[0], s1[1] end
-  return setmetatable({t.fd(s1), t.fd(s2)}, mt_pipe)
-end
-
 S.stdin = t.fd(c.STD.IN):nogc()
 S.stdout = t.fd(c.STD.OUT):nogc()
 S.stderr = t.fd(c.STD.ERR):nogc()

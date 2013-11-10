@@ -462,9 +462,6 @@ local prctlrint = { -- returns an integer directly TODO add metatables to set na
   [c.PR.GET_SECUREBITS] = true,
   [c.PR.MCE_KILL_GET] = true,
   [c.PR.GET_SECCOMP] = true,
-}
-
-local prctlbool = {
   [c.PR.GET_NO_NEW_PRIVS] = true,
 }
 
@@ -498,7 +495,6 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
   if ret == -1 then return nil, t.error() end
   if prctlrint[option] then return ret end
   if prctlpint[option] then return i[0] end
-  if prctlbool[option] then return ret == 1 end
   if option == c.PR.GET_NAME then
     if name[15] ~= 0 then return ffi.string(name, 16) end -- actually, 15 bytes seems to be longest, aways 0 terminated
     return ffi.string(name)
@@ -548,13 +544,14 @@ function S.clock_settime(clk_id, ts)
   return retbool(C.clock_settime(c.CLOCK[clk_id], ts))
 end
 
+-- TODO see man page if ABSTIME then remaining time never returned
 function S.clock_nanosleep(clk_id, flags, req, rem)
   rem = rem or t.timespec()
   local ret = C.clock_nanosleep(c.CLOCK[clk_id], c.TIMER[flags], mktype(t.timespec, req), rem)
   if ret == -1 then
     if ffi.errno() == c.E.INTR then return rem else return nil, t.error() end
   end
-  return true
+  return 0 -- no time remaining
 end
 
 function S.alarm(s) return C.alarm(s) end
