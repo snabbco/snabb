@@ -222,12 +222,16 @@ function S.sendto(fd, buf, count, flags, addr, addrlen)
   local saddr = pt.sockaddr(addr)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen or #addr))
 end
+-- assume you always want address, as would use recv otherwise, but could support addr = false
 function S.recvfrom(fd, buf, count, flags, addr, addrlen)
-  if not addr then addrlen = 0 end
+  addr = addr or t.sockaddr_storage()
   addrlen = addrlen or #addr
   if type(addrlen) == "number" then addrlen = t.socklen1(addrlen) end
   local saddr = pt.sockaddr(addr)
-  return retnum(C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen))
+  local ret = C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen)
+  ret = tonumber(ret)
+  if ret == -1 then return nil, t.error() end
+  return ret, nil, t.sa(addr, addrlen[0])
 end
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
@@ -440,7 +444,6 @@ function S.ioctl(d, request, argp)
   return true -- will need override for few linux ones that return numbers
 end
 
--- TODO this should be in compat
 if C.pipe2 then
   function S.pipe2(flags, fd2)
     fd2 = fd2 or t.int2()

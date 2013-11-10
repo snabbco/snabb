@@ -1153,6 +1153,22 @@ test_sockets_pipes = {
     assert(ss:close())
     assert(cs:close())
   end,
+  test_recvfrom_alloc = function()
+    local ss = assert(S.socket("inet", "dgram"))
+    local cs = assert(S.socket("inet", "dgram"))
+    local sa = t.sockaddr_in(0, "loopback")
+    assert(ss:bind(sa))
+    assert(cs:bind(sa))
+    local bsa = ss:getsockname()
+    local csa = cs:getsockname()
+    local n = assert(cs:sendto(teststring, #teststring, 0, bsa))
+    local f, rsa = assert(ss:recvfrom(buf, size)) -- will allocate and return address
+    assert_equal(f, #teststring)
+    assert_equal(rsa.port, csa.port)
+    assert_equal(tostring(rsa.addr), "127.0.0.1")
+    assert(ss:close())
+    assert(cs:close())
+  end,
   test_named_unix = function()
     local sock = assert(S.socket("local", "seqpacket"))
     local sa = t.sockaddr_un(tmpfile)
