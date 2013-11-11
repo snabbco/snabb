@@ -107,8 +107,8 @@ if abi.abi32 then
       return syscall(sys.pwrite64, int(fd), void(buf), ulong(size), long(off1), long(off2))
     end
   end
-  -- note statfs,fstatfs pass size of struct
-  function C.statfs(path, buf) return syscall(sys.statfs64, path, uint(ffi.sizeof(buf)), void(buf)) end
+  -- note statfs,fstatfs pass size of struct on 32 bit only
+  function C.statfs(path, buf) return syscall(sys.statfs64, void(path), uint(ffi.sizeof(buf)), void(buf)) end
   function C.fstatfs(fd, buf) return syscall(sys.fstatfs64, int(fd), uint(ffi.sizeof(buf)), void(buf)) end
   -- Note very odd split 64 bit arguments even on 64 bit platform.
   function C.preadv(fd, iov, iovcnt, offset)
@@ -137,6 +137,24 @@ if abi.abi32 then
     local pgoffset = bit.rshift(offset, 12)
     return void(syscall(sys.mmap2, void(addr), ulong(length), int(prot), int(flags), int(fd), uint(pgoffset)))
   end
+else -- 64 bit
+  function C.truncate(path, length) return syscall(sys.truncate, void(path), ulong(length)) end
+  function C.ftruncate(fd, length) return syscall(sys.ftruncate, int(fd), ulong(length)) end
+  function C.pread(fd, buf, count, offset) return syscall(sys.pread64, int(fd), void(buf), ulong(count), ulong(offset)) end
+  function C.pwrite(fd, buf, count, offset) return syscall(sys.pwrite64, int(fd), void(buf), ulong(count), ulong(offset)) end
+  function C.statfs(path, buf) return syscall(sys.statfs, void(path), void(buf)) end
+  function C.fstatfs(fd, buf) return syscall(sys.fstatfs, int(fd), void(buf)) end
+  function C.preadv(fd, iov, iovcnt, offset) return syscall(sys.preadv, int(fd), void(iov), int(iovcnt), ulong(offset)) end
+  function C.pwritev(fd, iov, iovcnt, offset) return syscall(sys.pwritev, int(fd), void(iov), int(iovcnt), ulong(offset)) end
+--[[ -- cannot use this yet, needs syscall to return long
+  function C.lseek(fd, offset, whence) return syscall(sys.lseek, int(fd), ulong(offset), int(whence)) end
+]]
+  function C.sendfile(outfd, infd, offset, count) return syscall(sys.sendfile, int(outfd), int(infd), void(offset), ulong(count)) end
+--[[ -- cannot use this yet, needs syscall to return long
+  function C.mmap(addr, length, prot, flags, fd, offset)
+    return void(syscall(sys.mmap, void(addr), ulong(length), int(prot), int(flags), int(fd), ulong(offset)))
+  end
+]]
 end
 
 -- glibc caches pid, but this fails to work eg after clone().
@@ -432,17 +450,27 @@ end
 function C.dup(oldfd) return syscall(sys.dup, int(oldfd)) end
 function C.dup2(oldfd, newfd) return syscall(sys.dup2, int(oldfd), int(newfd)) end
 function C.dup3(oldfd, newfd, flags) return syscall(sys.dup3, int(oldfd), int(newfd), int(flags)) end
+function C.chmod(path, mode) return syscall(sys.chmod, void(path), uint(mode)) end
+function C.fchmod(fd, mode) return syscall(sys.fchmod, int(fd), uint(mode)) end
+function C.getresuid(ruid, euid, suid) return syscall(sys.getresuid, void(ruid), void(euid), void(suid)) end
+function C.getresgid(rgid, egid, sgid) return syscall(sys.getresgid, void(rgid), void(egid), void(sgid)) end
+function C.setresuid(ruid, euid, suid) return syscall(sys.setresuid, uint(ruid), uint(euid), uint(suid)) end
+function C.setresgid(rgid, egid, sgid) return syscall(sys.setresgid, uint(rgid), uint(egid), uint(sgid)) end
+function C.setreuid(uid, euid) return syscall(sys.setreuid, uint(uid), uint(euid)) end
+function C.setregid(gid, egid) return syscall(sys.setregid, uint(gid), uint(egid)) end
+function C.flock(fd, operation) return syscall(sys.flock, int(fd), int(operation)) end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
   return syscall(sys.rt_sigaction, int(signum), void(act), void(oldact), ulong(8)) -- size is size of mask field
 end
 
--- socketcall related
+-- socketcalls TODO proper arch flag
 if sys.accept4 then -- on x86 this is a socketcall, which we have not implemented yet, other archs is a syscall
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
   end
+  function C.shutdown(sockfd, how) return syscall(sys.shutdown, int(sockfd), int(how)) end
 end
 
 return C
