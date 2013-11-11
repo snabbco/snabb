@@ -68,7 +68,14 @@ local nr = require("syscall.linux.nr")
 local zeropad = nr.zeropad
 local sys = nr.SYS
 
-local syscall = ffi.C.syscall
+local u64 = ffi.typeof("uint64_t")
+
+-- TODO could make these return errno here, also are these best casts?
+local syscall_long = ffi.C.syscall -- returns long
+local function syscall(...) return tonumber(syscall_long(...)) end -- int is default as most common
+local function syscall_uint(...) return uint(syscall_long(...)) end
+local function syscall_void(...) return void(syscall_long(...)) end
+local function syscall_off(...) return u64(syscall_long(...)) end -- off_t
 
 -- use 64 bit fileops on 32 bit always. As may be missing will use syscalls directly
 if abi.abi32 then
@@ -83,11 +90,11 @@ if abi.abi32 then
     end
     function C.pread(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(sys.pread64, int(fd), void(buf), ulong(size), int(0), long(off1), long(off2))
+      return syscall_long(sys.pread64, int(fd), void(buf), ulong(size), int(0), long(off1), long(off2))
     end
     function C.pwrite(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(sys.pwrite64, int(fd), void(buf), ulong(size), int(0), long(off1), long(off2))
+      return syscall_long(sys.pwrite64, int(fd), void(buf), ulong(size), int(0), long(off1), long(off2))
     end
   else
     function C.truncate(path, length)
@@ -100,11 +107,11 @@ if abi.abi32 then
     end
     function C.pread(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(sys.pread64, int(fd), void(buf), ulong(size), long(off1), long(off2))
+      return syscall_long(sys.pread64, int(fd), void(buf), ulong(size), long(off1), long(off2))
     end
     function C.pwrite(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
-      return syscall(sys.pwrite64, int(fd), void(buf), ulong(size), long(off1), long(off2))
+      return syscall_long(sys.pwrite64, int(fd), void(buf), ulong(size), long(off1), long(off2))
     end
   end
   -- note statfs,fstatfs pass size of struct on 32 bit only
@@ -113,11 +120,11 @@ if abi.abi32 then
   -- Note very odd split 64 bit arguments even on 64 bit platform.
   function C.preadv(fd, iov, iovcnt, offset)
     local off1, off2 = llarg64(offset)
-    return syscall(sys.preadv, int(fd), void(iov), int(iovcnt), long(off2), long(off1))
+    return syscall_long(sys.preadv, int(fd), void(iov), int(iovcnt), long(off2), long(off1))
   end
   function C.pwritev(fd, iov, iovcnt, offset)
     local off1, off2 = llarg64(offset)
-    return syscall(sys.pwritev, int(fd), void(iov), int(iovcnt), long(off2), long(off1))
+    return syscall_long(sys.pwritev, int(fd), void(iov), int(iovcnt), long(off2), long(off1))
   end
   -- lseek is a mess in 32 bit, use _llseek syscall to get clean result.
   -- TODO move this to syscall.lua
@@ -130,42 +137,37 @@ if abi.abi32 then
     return result[0]
   end
   function C.sendfile(outfd, infd, offset, count)
-    return syscall(sys.sendfile64, int(outfd), int(infd), void(offset), ulong(count))
+    return syscall_long(sys.sendfile64, int(outfd), int(infd), void(offset), ulong(count))
   end
   -- on 32 bit systems mmap uses off_t so we cannot tell what ABI is. Use underlying mmap2 syscall
   function C.mmap(addr, length, prot, flags, fd, offset)
     local pgoffset = bit.rshift(offset, 12)
-    return void(syscall(sys.mmap2, void(addr), ulong(length), int(prot), int(flags), int(fd), uint(pgoffset)))
+    return syscall_void(sys.mmap2, void(addr), ulong(length), int(prot), int(flags), int(fd), uint(pgoffset))
   end
 else -- 64 bit
   function C.truncate(path, length) return syscall(sys.truncate, void(path), ulong(length)) end
   function C.ftruncate(fd, length) return syscall(sys.ftruncate, int(fd), ulong(length)) end
-  function C.pread(fd, buf, count, offset) return syscall(sys.pread64, int(fd), void(buf), ulong(count), ulong(offset)) end
-  function C.pwrite(fd, buf, count, offset) return syscall(sys.pwrite64, int(fd), void(buf), ulong(count), ulong(offset)) end
+  function C.pread(fd, buf, count, offset) return syscall_long(sys.pread64, int(fd), void(buf), ulong(count), ulong(offset)) end
+  function C.pwrite(fd, buf, count, offset) return syscall_long(sys.pwrite64, int(fd), void(buf), ulong(count), ulong(offset)) end
   function C.statfs(path, buf) return syscall(sys.statfs, void(path), void(buf)) end
   function C.fstatfs(fd, buf) return syscall(sys.fstatfs, int(fd), void(buf)) end
-  function C.preadv(fd, iov, iovcnt, offset) return syscall(sys.preadv, int(fd), void(iov), int(iovcnt), ulong(offset)) end
-  function C.pwritev(fd, iov, iovcnt, offset) return syscall(sys.pwritev, int(fd), void(iov), int(iovcnt), ulong(offset)) end
---[[ -- cannot use this yet, needs syscall to return long
-  function C.lseek(fd, offset, whence) return syscall(sys.lseek, int(fd), ulong(offset), int(whence)) end
-]]
-  function C.sendfile(outfd, infd, offset, count) return syscall(sys.sendfile, int(outfd), int(infd), void(offset), ulong(count)) end
---[[ -- cannot use this yet, needs syscall to return long
+  function C.preadv(fd, iov, iovcnt, offset) return syscall_long(sys.preadv, int(fd), void(iov), int(iovcnt), ulong(offset)) end
+  function C.pwritev(fd, iov, iovcnt, offset) return syscall_long(sys.pwritev, int(fd), void(iov), int(iovcnt), ulong(offset)) end
+  function C.lseek(fd, offset, whence) return syscall_off(sys.lseek, int(fd), ulong(offset), int(whence)) end
+  function C.sendfile(outfd, infd, offset, count) return syscall_long(sys.sendfile, int(outfd), int(infd), void(offset), ulong(count)) end
   function C.mmap(addr, length, prot, flags, fd, offset)
-    return void(syscall(sys.mmap, void(addr), ulong(length), int(prot), int(flags), int(fd), ulong(offset)))
+    return syscall_void(sys.mmap, void(addr), ulong(length), int(prot), int(flags), int(fd), ulong(offset))
   end
-]]
 end
 
 -- glibc caches pid, but this fails to work eg after clone().
 function C.getpid() return syscall(sys.getpid) end
-
 -- exit_group is the normal syscall but not available
-function C.exit_group(status) return syscall(sys.exit_group, int(status)) end
+function C.exit_group(status) return syscall(sys.exit_group, int(status)) end -- void return really
 
 -- clone interface provided is not same as system one, and is less convenient
 function C.clone(flags, signal, stack, ptid, tls, ctid)
-  return syscall(sys.clone, int(flags), void(stack), void(ptid), void(tls), void(ctid))
+  return syscall(sys.clone, int(flags), void(stack), void(ptid), void(tls), void(ctid)) -- technically long
 end
 
 -- getdents is not provided by glibc. Musl has weak alias so not visible.
@@ -187,24 +189,16 @@ if sys.nice then
 end
 
 -- avoid having to set errno by calling getpriority directly and adjusting return values
-function C.getpriority(which, who)
-  return syscall(sys.getpriority, int(which), int(who))
-end
+function C.getpriority(which, who) return syscall(sys.getpriority, int(which), int(who)) end
 
 -- uClibc only provides a version of eventfd without flags, and we cannot detect this
-function C.eventfd(initval, flags)
-  return syscall(sys.eventfd2, uint(initval), int(flags))
-end
+function C.eventfd(initval, flags) return syscall(sys.eventfd2, uint(initval), int(flags)) end
 
 -- glibc does not provide getcpu
-function C.getcpu(cpu, node, tcache)
-  return syscall(sys.getcpu, void(node), void(node), void(tcache))
-end
+function C.getcpu(cpu, node, tcache) return syscall(sys.getcpu, void(node), void(node), void(tcache)) end
 
 -- Musl always returns ENOSYS for these
-function C.sched_getscheduler(pid)
-  return syscall(sys.sched_getscheduler, int(pid))
-end
+function C.sched_getscheduler(pid) return syscall(sys.sched_getscheduler, int(pid)) end
 function C.sched_setscheduler(pid, policy, param)
   return syscall(sys.sched_setscheduler, int(pid), int(policy), void(param))
 end

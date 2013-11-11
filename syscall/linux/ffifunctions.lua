@@ -114,7 +114,7 @@ int fremovexattr(int fd, const char *name);
 
 int unshare(int flags);
 
-int syscall(int number, ...); /* TODO problem, this is not the correct return type */
+long syscall(int number, ...); /* TODO problem, this is not the correct return type */
 
 /* note we use underlying struct not typedefs here */
 int capget(struct user_cap_header *hdrp, struct user_cap_data *datap);
