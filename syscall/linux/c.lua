@@ -459,6 +459,7 @@ function C.setresgid(rgid, egid, sgid) return syscall(sys.setresgid, uint(rgid),
 function C.setreuid(uid, euid) return syscall(sys.setreuid, uint(uid), uint(euid)) end
 function C.setregid(gid, egid) return syscall(sys.setregid, uint(gid), uint(egid)) end
 function C.flock(fd, operation) return syscall(sys.flock, int(fd), int(operation)) end
+function C.getrusage(who, usage) return syscall(sys.getrusage, int(who), void(usage)) end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
