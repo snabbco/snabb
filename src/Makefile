@@ -30,7 +30,7 @@ snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
 	$(E) "LINK      $@"
 	$(Q) gcc -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
-	    -lc -ldl -lm -lrt -lpthread
+	    -lc -ldl -lm -lrt -lpthread -lnuma
 	@echo -n "Firmware: "
 	@ls -sh snabbswitch
 

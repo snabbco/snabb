@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <numaif.h>
 
 /// ### HugeTLB page allocation
 
@@ -20,6 +21,17 @@ void *allocate_huge_page(int size)
   } else {
       return ptr;
   }
+}
+
+void *allocate_huge_page_numa(int size, int numa_node)
+{
+  void *addr;
+  unsigned long nodemask = 1 << numa_node;
+  // don't mind if this fails: it's only a hint.
+  assert(set_mempolicy(MPOL_PREFERRED, &nodemask, sizeof(long)) == 0);
+  addr = allocate_huge_page(size);
+  assert(set_mempolicy(MPOL_DEFAULT, NULL, sizeof(long)) == 0);
+  return addr;
 }
 
 /// ### Stable physical memory access

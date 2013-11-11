@@ -100,14 +100,19 @@ end
 function selftest (options)
    print("selftest: memory")
    print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
-   for i = 1, 4 do
-      io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
-      io.flush()
-      local dmaptr, physptr, dmalen = dma_alloc(huge_page_size)
-      print("Got "..(dmalen/1024^2).."MB "..
-         "at 0x"..tostring(ffi.cast("void*",tonumber(physptr))))
-      ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- try a write
-      assert(dmaptr ~= nil and dmalen == huge_page_size)
+   local node_range = lib.readfile("/sys/devices/system/node/possible", "*a")
+   local numa_max = node_range:gmatch("%d+[-](%d+)")()
+   for node = 0, numa_max do
+      print("numa node #"..node..":")
+      for i = 1, 8 do
+         io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
+         io.flush()
+         local ptr = C.allocate_huge_page_numa(huge_page_size, node)
+         local phys = virtual_to_physical(ptr)
+--         local dmaptr, physptr, dmalen = dma_alloc(huge_page_size)
+         print("Got memory at "..tostring(ffi.cast("void*",tonumber(phys))))
+         ffi.cast("uint32_t*", ptr)[0] = 0xdeadbeef -- try a write
+      end
    end
    print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
    print("HugeTLB page allocation OK.")
