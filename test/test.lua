@@ -1584,10 +1584,10 @@ test_processes = {
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
-      local w = assert(S.wait())
-      assert(w.pid == pid, "expect fork to return same pid as wait")
-      assert(w.WIFEXITED, "process should have exited normally")
-      assert(w.EXITSTATUS == 23, "exit should be 23")
+      local rpid, status = assert(S.wait())
+      assert(rpid == pid, "expect fork to return same pid as wait")
+      assert(status.WIFEXITED, "process should have exited normally")
+      assert(status.EXITSTATUS == 23, "exit should be 23")
     end
   end,
   test_fork_waitpid = function()
@@ -1599,10 +1599,10 @@ test_processes = {
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
-      local w = assert(S.waitpid(-1))
-      assert(w.pid == pid, "expect fork to return same pid as wait")
-      assert(w.WIFEXITED, "process should have exited normally")
-      assert(w.EXITSTATUS == 23, "exit should be 23")
+      local rpid, status = assert(S.waitpid(-1))
+      assert(rpid == pid, "expect fork to return same pid as wait")
+      assert(status.WIFEXITED, "process should have exited normally")
+      assert(status.EXITSTATUS == 23, "exit should be 23")
     end
   end,
   test_fork_wait4 = function()
@@ -1655,10 +1655,10 @@ test_processes = {
       -- never reach here
       os.exit()
     else -- parent
-      local w = assert(S.waitpid("any"))
-      assert(w.pid == pid, "expect fork to return same pid as wait")
-      assert(w.WIFEXITED, "process should have exited normally")
-      assert(w.EXITSTATUS == 0, "exit should be 0")
+      local rpid, status = assert(S.waitpid("any"))
+      assert(rpid == pid, "expect fork to return same pid as wait")
+      assert(status.WIFEXITED, "process should have exited normally")
+      assert(status.EXITSTATUS == 0, "exit should be 0")
       assert(S.unlink(efile))
     end
   end,
@@ -1679,7 +1679,7 @@ test_processes = {
         S._exit(0)
       end
     else
-      local w = assert(S.wait())
+      assert(S.wait())
       assert(pp1w:write("a"))
       local ok = pp2r:read(nil, 1)
       assert_equal(ok, "y")

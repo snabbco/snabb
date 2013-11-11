@@ -543,7 +543,7 @@ mt.siginfos = {
 
 addtype_var("siginfos", "struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
 
--- TODO convert to use constants? note missing some macros eg WCOREDUMP(). Allow lower case.
+-- TODO convert to use constants? note missing some macros eg WCOREDUMP(). Allow lower case. Also do not create table dynamically.
 mt.wait = {
   __index = function(w, k)
     local WTERMSIG = bit.band(w.status, 0x7f)
@@ -563,12 +563,7 @@ mt.wait = {
   end
 }
 
--- cannot really use metatype here, as status is just an int, and we need to pass pid
-function t.wait(pid, status, rusage)
-  return setmetatable({pid = pid, status = status, rusage = rusage}, mt.wait)
-end
-
--- rework just for status
+-- cannot use metatype as just an integer
 function t.waitstatus(status)
   return setmetatable({status = status}, mt.wait)
 end

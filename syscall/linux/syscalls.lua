@@ -99,19 +99,19 @@ function S.wait(status)
   status = status or t.int1()
   local ret = C.wait(status)
   if ret == -1 then return nil, t.error() end
-  return t.wait(ret, status[0])
+  return ret, nil, t.waitstatus(status[0])
 end
 function S.waitpid(pid, options, status) -- note order of arguments changed as rarely supply status
   status = status or t.int1()
   local ret = C.waitpid(c.WAIT[pid], status, c.W[options])
   if ret == -1 then return nil, t.error() end
-  return t.wait(ret, status[0])
+  return ret, nil, t.waitstatus(status[0])
 end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
   if not infop then infop = t.siginfo() end
   local ret = C.waitid(c.P[idtype], id or 0, infop, c.W[options])
   if ret == -1 then return nil, t.error() end
-  return infop -- return table here?
+  return infop
 end
 
 function S.exit(status) C.exit_group(c.EXIT[status]) end

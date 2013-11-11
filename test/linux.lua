@@ -742,8 +742,8 @@ test.netlink = {
       fork_assert(lo.flags.up, "expect lo up now")
       S.exit()
     else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert(status.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
   test_interface_up_down_root = function()
@@ -764,8 +764,8 @@ test.netlink = {
       fork_assert(i.lo.flags.up, "expect lo up now")
       S.exit()
     else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert(status.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
   test_interface_set_mtu_root = function()
@@ -970,8 +970,8 @@ test.netlink = {
       assert(i.dummy0:move_ns(p))
       assert(i:refresh())
       assert(not i.dummy0, "expect dummy0 vanished")
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert(status.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
   test_netlink_veth_root = function()
@@ -1185,10 +1185,10 @@ test.proceses_linux = {
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
-      local w = assert(S.waitid("all", 0, "exited, stopped, continued"))
-      assert_equal(w.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
-      assert_equal(w.status, 23, "exit should be 23")
-      assert_equal(w.code, c.SIGCLD.EXITED, "normal exit expected")
+      local infop = assert(S.waitid("all", 0, "exited, stopped, continued"))
+      assert_equal(infop.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
+      assert_equal(infop.status, 23, "exit should be 23")
+      assert_equal(infop.code, c.SIGCLD.EXITED, "normal exit expected")
     end
   end,
   test_clone = function()
@@ -1198,10 +1198,10 @@ test.proceses_linux = {
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
-      local w = assert(S.waitpid(-1, "clone"))
-      assert_equal(w.pid, p, "expect clone to return same pid as wait")
-      assert(w.WIFEXITED, "process should have exited normally")
-      assert(w.EXITSTATUS == 23, "exit should be 23")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert_equal(rpid, p, "expect clone to return same pid as wait")
+      assert(status.WIFEXITED, "process should have exited normally")
+      assert(status.EXITSTATUS == 23, "exit should be 23")
     end
   end,
 }
@@ -1362,8 +1362,8 @@ test.misc_linux_root = {
       --fork_assert(S.umount("old")) -- returning busy, TODO need to sort out why.
       S.exit()
     else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert(status.EXITSTATUS == 0, "expect normal exit in clone")
     end
     assert(S.rmdir(tmpfile3 .. "/old")) -- until we can unmount above
     assert(S.rmdir(tmpfile3))
@@ -1375,8 +1375,8 @@ test.misc_linux_root = {
       fork_assert(S.reboot("restart")) -- will send SIGHUP to us as in pid namespace NB older kernels may reboot! if so disable test
       S.pause()
     else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.IFSIGNALED, "expect signal killed process")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert(status.IFSIGNALED, "expect signal killed process")
     end
   end,
 }
@@ -1451,8 +1451,8 @@ test.seccomp = {
       fork_assert(nnp == 1)
       S.exit()
     else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert(status.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
   test_seccomp_allow = function()
@@ -1471,8 +1471,8 @@ test.seccomp = {
       local pid = S.getpid()
       S.exit()
     else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert(status.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
   test_seccomp = function()
@@ -1513,11 +1513,11 @@ test.seccomp = {
       local pid = S.getpid()
       S.exit()
     else
-      local w = assert(S.waitpid(-1, "clone"))
-      if w.EXITSTATUS ~= 0 then -- failed, get debug info
-        assert_equal(w.code , nr.SYS.seccomp, "expect reason is seccomp")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      if status.EXITSTATUS ~= 0 then -- failed, get debug info
+        assert_equal(status.code , nr.SYS.seccomp, "expect reason is seccomp")
       end
-      assert(w.EXITSTATUS == 0, "expect normal exit in clone")
+      assert(status.EXITSTATUS == 0, "expect normal exit in clone")
     end
   end,
   test_seccomp_fail = function()
@@ -1550,8 +1550,8 @@ test.seccomp = {
       local fd = fork_assert(S.open("/dev/null", "rdonly")) -- not allowed
       S.exit()
     else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 42 or w.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp (or not implemented)")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert(status.EXITSTATUS == 42 or status.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp (or not implemented)")
     end
   end,
   test_seccomp_fail_errno = function()
@@ -1600,8 +1600,8 @@ test.seccomp = {
       local pid = S.getpid()
       S.exit()
     else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0 or w.EXITSTATUS == 42, "expect normal exit if supported")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert(status.EXITSTATUS == 0 or status.EXITSTATUS == 42, "expect normal exit if supported")
     end
   end,
 }
@@ -1702,8 +1702,8 @@ test.capabilities = {
       fork_assert(not ok and err.PERM, "should not have chroot capability")
       S.exit()
     else
-      local w = assert(S.waitpid(-1, "clone"))
-      assert(w.EXITSTATUS == 0, "expect normal exit")
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert(status.EXITSTATUS == 0, "expect normal exit")
     end
   end,
   test_filesystem_caps_get = function()
