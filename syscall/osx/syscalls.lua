@@ -9,6 +9,9 @@ pcall, type, table, string
 
 return function(S, hh, abi, c, C, types, ioctl)
 
+local ffi = require "ffi"
+local errno = ffi.errno
+
 local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
 local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr
 
@@ -21,8 +24,8 @@ function S.accept(sockfd, flags, addr, addrlen)
   addr = addr or t.sockaddr_storage()
   addrlen = addrlen or t.socklen1(addrlen or #addr)
   local saddr = pt.sockaddr(addr)
-  local ret = C.accept(getfd(sockfd), saddr, addrlen)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.accept(getfd(sockfd), saddr, addrlen)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
 end
 
@@ -41,8 +44,8 @@ end
 function S.getdirentries(fd, buf, size, basep)
   size = size or 4096
   buf = buf or t.buffer(size)
-  local ret = C.getdirentries(getfd(fd), buf, size, basep)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getdirentries(getfd(fd), buf, size, basep)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return t.dirents(buf, ret)
 end
 

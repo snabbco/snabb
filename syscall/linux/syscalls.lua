@@ -10,6 +10,8 @@ pcall, type, table, string
 return function(S, hh, abi, c, C, types, ioctl)
 
 local ffi = require "ffi"
+local errno = ffi.errno
+
 local bit = require "syscall.bit"
 
 local t, pt, s = types.t, types.pt, types.s
@@ -59,8 +61,9 @@ end
 function S.readlinkat(dirfd, path, buffer, size)
   size = size or c.PATH_MAX
   buffer = buffer or t.buffer(size)
-  local ret = tonumber(C.readlinkat(c.AT_FDCWD[dirfd], path, buffer, size))
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.readlinkat(c.AT_FDCWD[dirfd], path, buffer, size)
+  ret = tonumber(ret)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ffi.string(buffer, ret)
 end
 
@@ -70,8 +73,8 @@ function S.mknodat(fd, pathname, mode, dev)
 end
 
 function S.getpriority(which, who)
-  local ret = C.getpriority(c.PRIO[which], who or 0)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getpriority(c.PRIO[which], who or 0)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return 20 - ret -- adjust for kernel returned values as this is syscall not libc
 end
 
@@ -90,27 +93,27 @@ function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 function S.getdents(fd, buf, size)
   size = size or 4096
   buf = buf or t.buffer(size)
-  local ret = C.getdents(getfd(fd), buf, size)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getdents(getfd(fd), buf, size)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return t.dirents(buf, ret)
 end
 
 function S.wait(status)
   status = status or t.int1()
-  local ret = C.wait(status)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.wait(status)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ret, nil, t.waitstatus(status[0])
 end
 function S.waitpid(pid, options, status) -- note order of arguments changed as rarely supply status
   status = status or t.int1()
-  local ret = C.waitpid(c.WAIT[pid], status, c.W[options])
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.waitpid(c.WAIT[pid], status, c.W[options])
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ret, nil, t.waitstatus(status[0])
 end
 function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
   if not infop then infop = t.siginfo() end
-  local ret = C.waitid(c.P[idtype], id or 0, infop, c.W[options])
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.waitid(c.P[idtype], id or 0, infop, c.W[options])
+  if ret == -1 then return nil, t.error(err or errno()) end
   return infop
 end
 
@@ -125,8 +128,8 @@ end
 
 function S.fstatat(fd, path, buf, flags)
   if not buf then buf = t.stat() end
-  local ret = C.fstatat(c.AT_FDCWD[fd], path, buf, c.AT_FSTATAT[flags])
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.fstatat(c.AT_FDCWD[fd], path, buf, c.AT_FSTATAT[flags])
+  if ret == -1 then return nil, t.error(err or errno()) end
   return buf
 end
 
@@ -143,22 +146,22 @@ end
 function S.getcwd(buf, size)
   size = size or c.PATH_MAX
   buf = buf or t.buffer(size)
-  local ret = C.getcwd(buf, size)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getcwd(buf, size)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ffi.string(buf)
 end
 
 function S.statfs(path)
   local st = t.statfs()
-  local ret = C.statfs(path, st)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.statfs(path, st)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return st
 end
 
 function S.fstatfs(fd)
   local st = t.statfs()
-  local ret = C.fstatfs(getfd(fd), st)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.fstatfs(getfd(fd), st)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return st
 end
 
@@ -182,8 +185,8 @@ end
 -- TODO change to type?
 function S.uname()
   local u = t.utsname()
-  local ret = C.uname(u)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.uname(u)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return {sysname = ffi.string(u.sysname), nodename = ffi.string(u.nodename), release = ffi.string(u.release),
           version = ffi.string(u.version), machine = ffi.string(u.machine), domainname = ffi.string(u.domainname)}
 end
@@ -202,8 +205,8 @@ function S.time(time) return retnum(C.time(time)) end
 
 function S.sysinfo(info)
   info = info or t.sysinfo()
-  local ret = C.sysinfo(info)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.sysinfo(info)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return info
 end
 
@@ -211,15 +214,15 @@ end
 local function growattrbuf(f, a, b)
   local len = 512
   local buffer = t.buffer(len)
-  local ret
+  local ret, err
   repeat
     if b then
-      ret = f(a, b, buffer, len)
+      ret, err = f(a, b, buffer, len)
     else
-      ret = f(a, buffer, len)
+      ret, err = f(a, buffer, len)
     end
     ret = tonumber(ret)
-    if ret == -1 and ffi.errno() ~= c.E.RANGE then return nil, t.error() end
+    if ret == -1 and (err or errno()) ~= c.E.RANGE then return nil, t.error(err or errno()) end
     if ret == -1 then
       len = len * 2
       buffer = t.buffer(len)
@@ -316,8 +319,8 @@ end
 function S.prlimit(pid, resource, new_limit, old_limit)
   if new_limit then new_limit = mktype(t.rlimit, new_limit) end
   old_limit = old_limit or t.rlimit()
-  local ret = C.prlimit64(pid or 0, c.RLIMIT[resource], new_limit, old_limit)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.prlimit64(pid or 0, c.RLIMIT[resource], new_limit, old_limit)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return old_limit
 end
 
@@ -332,12 +335,14 @@ function S.epoll_ctl(epfd, op, fd, event)
 end
 
 function S.epoll_wait(epfd, events, timeout)
-  return retiter(C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1), events.ep)
+  local ret, err = C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1)
+  return retiter(ret, err, events.ep)
 end
 
 function S.epoll_pwait(epfd, events, timeout, sigmask)
   if sigmask then sigmask = mktype(t.sigset, sigmask) end
-  return retiter(C.epoll_pwait(getfd(epfd), events.ep, #events, timeout or -1, sigmask), events.ep)
+  local ret, err = C.epoll_pwait(getfd(epfd), events.ep, #events, timeout or -1, sigmask)
+  return retiter(ret, err, events.ep)
 end
 
 function S.splice(fd_in, off_in, fd_out, off_out, len, flags)
@@ -377,15 +382,15 @@ function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, c.EFD[fl
 
 function S.getitimer(which, value)
   value = value or t.itimerval()
-  local ret = C.getitimer(c.ITIMER[which], value)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getitimer(c.ITIMER[which], value)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return value
 end
 
 function S.setitimer(which, it, oldtime)
   oldtime = oldtime or t.itimerval()
-  local ret = C.setitimer(c.ITIMER[which], mktype(t.itimerval, it), oldtime)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.setitimer(c.ITIMER[which], mktype(t.itimerval, it), oldtime)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return oldtime
 end
 
@@ -395,15 +400,15 @@ end
 
 function S.timerfd_settime(fd, flags, it, oldtime)
   oldtime = oldtime or t.itimerspec()
-  local ret = C.timerfd_settime(getfd(fd), c.TFD_TIMER[flags], mktype(t.itimerspec, it), oldtime)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.timerfd_settime(getfd(fd), c.TFD_TIMER[flags], mktype(t.itimerspec, it), oldtime)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return oldtime
 end
 
 function S.timerfd_gettime(fd, curr_value)
   curr_value = curr_value or t.itimerspec()
-  local ret = C.timerfd_gettime(getfd(fd), curr_value)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.timerfd_gettime(getfd(fd), curr_value)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return curr_value
 end
 
@@ -412,8 +417,8 @@ function S.pivot_root(new_root, put_old) return retbool(C.pivot_root(new_root, p
 -- aio functions
 function S.io_setup(nr_events)
   local ctx = t.aio_context1()
-  local ret = C.io_setup(nr_events, ctx)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.io_setup(nr_events, ctx)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ctx[0]
 end
 
@@ -421,14 +426,15 @@ function S.io_destroy(ctx) return retbool(C.io_destroy(ctx)) end
 
 function S.io_cancel(ctx, iocb, result)
   result = result or t.io_event()
-  local ret = C.io_cancel(ctx, iocb, result)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.io_cancel(ctx, iocb, result)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return result
 end
 
 function S.io_getevents(ctx, min, events, timeout)
   if timeout then timeout = mktype(t.timespec, timeout) end
-  return retiter(C.io_getevents(ctx, min or events.count, events.count, events.ev, timeout), events.ev)
+  local ret, err = C.io_getevents(ctx, min or events.count, events.count, events.ev, timeout)
+  return retiter(ret, err, events.ev)
 end
 
 -- TODO this is broken as iocb must persist until retrieved, and could be gc'd if passed as table...
@@ -511,8 +517,8 @@ function S.syslog(tp, buf, len)
     end
     buf = t.buffer(len)
   end
-  local ret = C.klogctl(tp, buf or nil, len or 0)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.klogctl(tp, buf or nil, len or 0)
+  if ret == -1 then return nil, t.error(err or errno()) end
   if tp == 9 or tp == 10 then return tonumber(ret) end
   if tp == 2 or tp == 3 or tp == 4 then return ffi.string(buf, ret) end
   return true
@@ -520,22 +526,22 @@ end
 
 function S.adjtimex(a)
   a = mktype(t.timex, a)
-  local ret = C.adjtimex(a)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.adjtimex(a)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return t.adjtimex(ret, a)
 end
 
 function S.clock_getres(clk_id, ts)
   ts = mktype(t.timespec, ts)
-  local ret = C.clock_getres(c.CLOCK[clk_id], ts)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.clock_getres(c.CLOCK[clk_id], ts)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ts
 end
 
 function S.clock_gettime(clk_id, ts)
   ts = mktype(t.timespec, ts)
-  local ret = C.clock_gettime(c.CLOCK[clk_id], ts)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.clock_gettime(c.CLOCK[clk_id], ts)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ts
 end
 
@@ -547,9 +553,9 @@ end
 -- TODO see man page if ABSTIME then remaining time never returned
 function S.clock_nanosleep(clk_id, flags, req, rem)
   rem = rem or t.timespec()
-  local ret = C.clock_nanosleep(c.CLOCK[clk_id], c.TIMER[flags], mktype(t.timespec, req), rem)
+  local ret, err = C.clock_nanosleep(c.CLOCK[clk_id], c.TIMER[flags], mktype(t.timespec, req), rem)
   if ret == -1 then
-    if ffi.errno() == c.E.INTR then return rem else return nil, t.error() end
+    if (err or errno()) == c.E.INTR then return rem else return nil, t.error(err or errno()) end
   end
   return 0 -- no time remaining
 end
@@ -567,16 +573,16 @@ end
 function S.setreuid(ruid, euid) return retbool(C.setreuid(ruid, euid)) end
 function S.setregid(rgid, egid) return retbool(C.setregid(rgid, egid)) end
 
-function S.getresuid()
+function S.getresuid() -- TODO return multiple values instead
   local ruid, euid, suid = t.uid1(), t.uid1(), t.uid1()
-  local ret = C.getresuid(ruid, euid, suid)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getresuid(ruid, euid, suid)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return {ruid = ruid[0], euid = euid[0], suid = suid[0]}
 end
 function S.getresgid()
   local rgid, egid, sgid = t.gid1(), t.gid1(), t.gid1()
-  local ret = C.getresgid(rgid, egid, sgid)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getresgid(rgid, egid, sgid)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return {rgid = rgid[0], egid = egid[0], sgid = sgid[0]}
 end
 function S.setresuid(ruid, euid, suid)
@@ -609,8 +615,8 @@ function S.swapoff(path) return retbool(C.swapoff(path)) end
 function S.capget(hdr, data) -- normally just leave as nil for get, can pass pid in
   hdr = istype(t.user_cap_header, hdr) or t.user_cap_header(c.LINUX_CAPABILITY_VERSION[3], hdr or 0)
   if not data and hdr.version ~= 0 then data = t.user_cap_data2() end
-  local ret = C.capget(hdr, data)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.capget(hdr, data)
+  if ret == -1 then return nil, t.error(err or errno()) end
   if not data then return hdr end
   return t.capabilities(hdr, data)
 end
@@ -623,8 +629,8 @@ end
 function S.getcpu(cpu, node)
   cpu = cpu or t.uint1()
   node = node or t.uint1()
-  local ret = C.getcpu(cpu, node)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getcpu(cpu, node)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return {cpu = cpu[0], node = node[0]}
 end
 
@@ -637,8 +643,8 @@ function S.sched_yield() return retbool(C.sched_yield()) end
 
 function S.sched_getaffinity(pid, mask, len) -- note len last as rarely used. All parameters optional
   mask = mktype(t.cpu_set, mask)
-  local ret = C.sched_getaffinity(pid or 0, len or s.cpu_set, mask)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.sched_getaffinity(pid or 0, len or s.cpu_set, mask)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return mask
 end
 
@@ -654,22 +660,22 @@ function S.sched_setparam(pid, param)
 end
 function S.sched_getparam(pid, param)
   param = mktype(t.sched_param, param or 0)
-  local ret = C.sched_getparam(pid or 0, param)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.sched_getparam(pid or 0, param)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return param.sched_priority -- only one useful parameter
 end
 
 function S.sched_rr_get_interval(pid, ts)
   ts = mktype(t.timespec, ts)
-  local ret = C.sched_rr_get_interval(pid or 0, ts)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.sched_rr_get_interval(pid or 0, ts)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ts
 end
 
 -- POSIX message queues. Note there is no mq_close as it is just close in Linux
 function S.mq_open(name, flags, mode, attr)
-  local ret = C.mq_open(name, c.O[flags], c.MODE[mode], mktype(t.mq_attr, attr))
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.mq_open(name, c.O[flags], c.MODE[mode], mktype(t.mq_attr, attr))
+  if ret == -1 then return nil, t.error(err or errno()) end
   return t.mqd(ret)
 end
 
@@ -691,12 +697,12 @@ function S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   if abs_timeout then abs_timeout = mktype(t.timespec, abs_timeout) end
   if msg_ptr then return retbool(C.mq_timedreceive(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio, abs_timeout)) end
   msg_ptr = t.buffer(msg_len)
-  local ret = C.mq_timedreceive(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio, abs_timeout)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.mq_timedreceive(getfd(mqd), msg_ptr, msg_len or #msg_ptr, msg_prio, abs_timeout)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ffi.string(msg_ptr,ret)
 end
 
--- pty functions where not in common code
+-- pty functions where not in common code TODO move to linux/libc?
 function S.grantpt(fd) return true end -- Linux does not need to do anything here (Musl does not)
 function S.unlockpt(fd) return S.ioctl(fd, "TIOCSPTLCK", 0) end
 function S.ptsname(fd)

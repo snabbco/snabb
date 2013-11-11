@@ -19,6 +19,8 @@ local err64 = h.err64
 local uerr64 = h.uerr64
 local errpointer = h.errpointer
 
+local errno = ffi.errno
+
 local t, pt, s = types.t, types.pt, types.s
 
 local S = {}
@@ -46,36 +48,36 @@ end
 
 -- 64 bit return helpers. Only use for lseek in fact; we use tonumber but remove if you need files over 56 bits long
 -- TODO only luaffi needs the cast as wont compare to number; hopefully fixed in future with 5.3 or a later luaffi.
-local function ret64(ret)
-  if ret == err64 then return nil, t.error() end
+local function ret64(ret, err)
+  if ret == err64 then return nil, t.error(err or errno()) end
   return tonumber(ret)
 end
 
-local function retu64(ret)
-  if ret == uerr64 then return nil, t.error() end
+local function retu64(ret, err)
+  if ret == uerr64 then return nil, t.error(err or errno()) end
   return tonumber(ret)
 end
 
-local function retnum(ret) -- return Lua number where double precision ok, eg file ops etc
+local function retnum(ret, err) -- return Lua number where double precision ok, eg file ops etc
   ret = tonumber(ret)
-  if ret == -1 then return nil, t.error() end
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ret
 end
 
-local function retfd(ret)
-  if ret == -1 then return nil, t.error() end
+local function retfd(ret, err)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return t.fd(ret)
 end
 
 -- used for no return value, return true for use of assert
-local function retbool(ret)
-  if ret == -1 then return nil, t.error() end
+local function retbool(ret, err)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return true
 end
 
 -- used for pointer returns, -1 is failure
-local function retptr(ret)
-  if ret == errpointer then return nil, t.error() end
+local function retptr(ret, err)
+  if ret == errpointer then return nil, t.error(err or errno()) end
   return ret
 end
 
@@ -85,9 +87,9 @@ local function reviter(array, i)
   if i >= 0 then return i, array[i] end
 end
 
-local function retiter(ret, array)
+local function retiter(ret, err, array)
   ret = tonumber(ret)
-  if ret == -1 then return nil, t.error() end
+  if ret == -1 then return nil, t.error(err or errno()) end
   return reviter, array, ret
 end
 
@@ -123,8 +125,8 @@ function S.read(fd, buf, count)
   if buf then return retnum(C.read(getfd(fd), buf, count or #buf or 4096)) end -- user supplied a buffer, standard usage
   count = count or 4096
   buf = t.buffer(count)
-  local ret = tonumber(C.read(getfd(fd), buf, count))
-  if ret == -1 then return nil, t.error() end
+  local ret, err = tonumber(C.read(getfd(fd), buf, count))
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ffi.string(buf, ret) -- user gets a string back, can get length from #string
 end
 function S.readv(fd, iov)
@@ -155,8 +157,8 @@ end
 function S.readlink(path, buffer, size)
   size = size or c.PATH_MAX
   buffer = buffer or t.buffer(size)
-  local ret = tonumber(C.readlink(path, buffer, size))
-  if ret == -1 then return nil, t.error() end
+  local ret, err = tonumber(C.readlink(path, buffer, size))
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ffi.string(buffer, ret)
 end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
@@ -169,14 +171,14 @@ function S.stat(path, buf)
 end
 function S.lstat(path, buf)
   if not buf then buf = t.stat() end
-  local ret = C.lstat(path, buf)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.lstat(path, buf)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return buf
 end
 function S.fstat(fd, buf)
   if not buf then buf = t.stat() end
-  local ret = C.fstat(getfd(fd), buf)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.fstat(getfd(fd), buf)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return buf
 end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
@@ -195,8 +197,8 @@ end
 function S.socketpair(domain, stype, protocol, sv2)
   domain = c.AF[domain]
   sv2 = sv2 or t.int2()
-  local ret = C.socketpair(domain, c.SOCK[stype], sproto(domain, protocol), sv2)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.socketpair(domain, c.SOCK[stype], sproto(domain, protocol), sv2)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return true, nil, t.fd(sv2[0]), t.fd(sv2[1])
 end
 
@@ -215,9 +217,9 @@ function S.recvfrom(fd, buf, count, flags, addr, addrlen)
   addrlen = addrlen or #addr
   if type(addrlen) == "number" then addrlen = t.socklen1(addrlen) end
   local saddr = pt.sockaddr(addr)
-  local ret = C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen)
+  local ret, err = C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen)
   ret = tonumber(ret)
-  if ret == -1 then return nil, t.error() end
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ret, nil, t.sa(addr, addrlen[0])
 end
 function S.sendmsg(fd, msg, flags)
@@ -243,8 +245,8 @@ function S.getsockopt(fd, level, optname, optval, optlen)
   if not optval then optval, optlen = t.int1(), s.int end
   optlen = optlen or #optval
   local len = t.socklen1(optlen)
-  local ret = C.getsockopt(getfd(fd), level, optname, optval, len)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getsockopt(getfd(fd), level, optname, optval, len)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return optval[0] -- TODO will not work if struct, eg see netfilter
 end
 function S.bind(sockfd, addr, addrlen)
@@ -264,16 +266,16 @@ function S.getsockname(sockfd, addr, addrlen)
   addr = addr or t.sockaddr_storage()
   addrlen = addrlen or t.socklen1(#addr)
   local saddr = pt.sockaddr(addr)
-  local ret = C.getsockname(getfd(sockfd), saddr, addrlen)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getsockname(getfd(sockfd), saddr, addrlen)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return t.sa(addr, addrlen[0])
 end
 function S.getpeername(sockfd, addr, addrlen)
   addr = addr or t.sockaddr_storage()
   addrlen = addrlen or t.socklen1(#addr)
   local saddr = pt.sockaddr(addr)
-  local ret = C.getpeername(getfd(sockfd), saddr, addrlen)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getpeername(getfd(sockfd), saddr, addrlen)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return t.sa(addr, addrlen[0])
 end
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), c.SHUT[how])) end
@@ -310,8 +312,8 @@ function S.select(sel, timeout) -- note same structure as returned
   r, nfds = mkfdset(sel.readfds or {}, nfds or 0)
   w, nfds = mkfdset(sel.writefds or {}, nfds)
   e, nfds = mkfdset(sel.exceptfds or {}, nfds)
-  local ret = C.select(nfds, r, w, e, timeout)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.select(nfds, r, w, e, timeout)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return {readfds = fdisset(sel.readfds or {}, r), writefds = fdisset(sel.writefds or {}, w),
           exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret)}
 end
@@ -325,8 +327,8 @@ function S.pselect(sel, timeout, set) -- note same structure as returned
   r, nfds = mkfdset(sel.readfds or {}, nfds or 0)
   w, nfds = mkfdset(sel.writefds or {}, nfds)
   e, nfds = mkfdset(sel.exceptfds or {}, nfds)
-  local ret = C.pselect(nfds, r, w, e, timeout, set)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.pselect(nfds, r, w, e, timeout, set)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return {readfds = fdisset(sel.readfds or {}, r), writefds = fdisset(sel.writefds or {}, w),
           exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret)}
 end
@@ -360,14 +362,14 @@ function S.setgroups(groups)
 end
 function S.sigprocmask(how, set)
   local oldset = t.sigset()
-  local ret = C.sigprocmask(c.SIGPM[how], t.sigset(set), oldset)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.sigprocmask(c.SIGPM[how], t.sigset(set), oldset)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return oldset
 end
 function S.sigpending()
   local set = t.sigset()
-  local ret = C.sigpending(set)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.sigpending(set)
+  if ret == -1 then return nil, t.error(err or errno()) end
  return set
 end
 function S.sigsuspend(mask) return retbool(C.sigsuspend(t.sigset(mask))) end
@@ -378,8 +380,8 @@ function S._exit(status) C._exit(c.EXIT[status]) end
 function S.fcntl(fd, cmd, arg)
   cmd = c.F[cmd]
   if fcntl.commands[cmd] then arg = fcntl.commands[cmd](arg) end
-  local ret = C.fcntl(getfd(fd), cmd, pt.void(arg or 0))
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.fcntl(getfd(fd), cmd, pt.void(arg or 0))
+  if ret == -1 then return nil, t.error(err or errno()) end
   if fcntl.ret[cmd] then return fcntl.ret[cmd](ret, arg) end
   return true
 end
@@ -424,8 +426,8 @@ function S.ioctl(d, request, argp)
     if type(argp) == "string" then argp = pt.char(argp) end
     if type(argp) == "number" then argp = t.int1(argp) end
   end
-  local ret = C.ioctl(getfd(d), request, argp)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.ioctl(getfd(d), request, argp)
+  if ret == -1 then return nil, t.error(err or errno()) end
   if read and singleton then return argp[0] end
   if read then return argp end
   return true -- will need override for few linux ones that return numbers
@@ -434,39 +436,39 @@ end
 if C.pipe2 then
   function S.pipe2(flags, fd2)
     fd2 = fd2 or t.int2()
-    local ret = C.pipe2(fd2, c.OPIPE[flags])
-    if ret == -1 then return nil, t.error() end
+    local ret, err = C.pipe2(fd2, c.OPIPE[flags])
+    if ret == -1 then return nil, t.error(err or errno()) end
     return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
   end
 end
 function S.pipe(flags, fd2)
   fd2 = fd2 or t.int2()
-  local ret = C.pipe(fd2)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.pipe(fd2)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
 end
 
 -- TODO not sure about this interface, maybe return rem as extra parameter see #103
 function S.nanosleep(req, rem)
   rem = rem or t.timespec()
-  local ret = C.nanosleep(mktype(t.timespec, req), rem)
+  local ret, err = C.nanosleep(mktype(t.timespec, req), rem)
   if ret == -1 then
-    if ffi.errno() == c.E.INTR then return rem else return nil, t.error() end
+    if (err or errno()) == c.E.INTR then return rem else return nil, t.error(err or errno()) end
   end
   return 0 -- no time remaining
 end
 
 function S.gettimeofday(tv)
   tv = tv or t.timeval() -- note it is faster to pass your own tv if you call a lot
-  local ret = C.gettimeofday(tv, nil)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.gettimeofday(tv, nil)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return tv
 end
 
 function S.getrusage(who, ru)
   ru = ru or t.rusage()
-  local ret = C.getrusage(c.RUSAGE[who], ru)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getrusage(c.RUSAGE[who], ru)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ru
 end
 
@@ -483,8 +485,8 @@ end
 function S.wait4(pid, options, ru, status) -- note order of arguments changed as rarely supply status (as waitpid)
   if ru == false then ru = nil else ru = ru or t.rusage() end -- false means no allocation
   status = status or t.int1()
-  local ret = C.wait4(c.WAIT[pid], status, c.W[options], ru)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.wait4(c.WAIT[pid], status, c.W[options], ru)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ret, nil, t.waitstatus(status[0]), ru
 end
 

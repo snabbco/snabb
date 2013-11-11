@@ -11,6 +11,8 @@ return function(S, hh, abi, c, C, types, ioctl)
 
 local ffi = require "ffi"
 
+local errno = ffi.errno
+
 local t, pt, s = types.t, types.pt, types.s
 
 local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
@@ -70,8 +72,8 @@ end
 function S.getdents(fd, buf, size)
   size = size or 4096 -- may have to be equal to at least block size of fs
   buf = buf or t.buffer(size)
-  local ret = C.getdents(getfd(fd), buf, size)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getdents(getfd(fd), buf, size)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return t.dirents(buf, ret)
 end
 
@@ -113,8 +115,8 @@ end
 function S.getcwd(buf, size)
   size = size or c.PATH_MAX
   buf = buf or t.buffer(size)
-  local ret = C.getcwd(buf, size)
-  if ret == -1 then return nil, t.error() end
+  local ret, err = C.getcwd(buf, size)
+  if ret == -1 then return nil, t.error(err or errno()) end
   return ffi.string(buf)
 end
 
@@ -167,12 +169,14 @@ end
 function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
 
 function S.kqueue(flags) return retfd(C.kqueue1(c.O[flags])) end
+
 function S.kevent(kq, changelist, eventlist, timeout)
   if timeout then timeout = mktype(t.timespec, timeout) end
   local changes, changecount = nil, 0
   if changelist then changes, changecount = changelist.kev, changelist.count end
   if eventlist then
-    return retiter(C.kevent(getfd(kq), changes, changecount, eventlist.kev, eventlist.count, timeout), eventlist.kev)
+    local ret, err = C.kevent(getfd(kq), changes, changecount, eventlist.kev, eventlist.count, timeout)
+    return retiter(ret, err, eventlist.kev)
   end
   return retnum(C.kevent(getfd(kq), changes, changecount, nil, 0, timeout))
 end
@@ -187,9 +191,9 @@ end
 function S.issetugid() return C.issetugid() end
 
 function S.getpriority(which, who)
-  ffi.errno(0)
-  local ret = C.getpriority(c.PRIO[which], who or 0)
-  if ret == -1 and ffi.errno() ~= 0 then return nil, t.error() end
+  errno(0)
+  local ret, err = C.getpriority(c.PRIO[which], who or 0)
+  if ret == -1 and (err or errno()) ~= 0 then return nil, t.error(err or errno()) end
   return ret
 end
 
