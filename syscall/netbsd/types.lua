@@ -397,10 +397,6 @@ mt.wait = { -- TODO port to NetBSD
   end
 }
 
-function t.wait(pid, status, rusage)
-  return setmetatable({pid = pid, status = status, rusage = rusage}, mt.wait)
-end
-
 function t.waitstatus(status)
   return setmetatable({status = status}, mt.wait)
 end
