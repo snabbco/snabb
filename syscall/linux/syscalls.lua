@@ -573,17 +573,17 @@ end
 function S.setreuid(ruid, euid) return retbool(C.setreuid(ruid, euid)) end
 function S.setregid(rgid, egid) return retbool(C.setregid(rgid, egid)) end
 
-function S.getresuid() -- TODO return multiple values instead
-  local ruid, euid, suid = t.uid1(), t.uid1(), t.uid1()
+function S.getresuid(ruid, euid, suid)
+  ruid, euid, suid = ruid or t.uid1(), euid or t.uid1(), suid or t.uid1()
   local ret, err = C.getresuid(ruid, euid, suid)
   if ret == -1 then return nil, t.error(err or errno()) end
-  return {ruid = ruid[0], euid = euid[0], suid = suid[0]}
+  return true, nil, ruid[0], euid[0], suid[0]
 end
-function S.getresgid()
-  local rgid, egid, sgid = t.gid1(), t.gid1(), t.gid1()
+function S.getresgid(rgid, egid, sgid)
+  rgid, egid, sgid = rgid or t.gid1(), egid or t.gid1(), sgid or t.gid1()
   local ret, err = C.getresgid(rgid, egid, sgid)
   if ret == -1 then return nil, t.error(err or errno()) end
-  return {rgid = rgid[0], egid = egid[0], sgid = sgid[0]}
+  return true, nil, rgid[0], egid[0], sgid[0]
 end
 function S.setresuid(ruid, euid, suid)
   if type(ruid) == "table" then
