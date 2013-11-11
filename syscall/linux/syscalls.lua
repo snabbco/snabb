@@ -585,24 +585,8 @@ function S.getresgid(rgid, egid, sgid)
   if ret == -1 then return nil, t.error(err or errno()) end
   return true, nil, rgid[0], egid[0], sgid[0]
 end
-function S.setresuid(ruid, euid, suid)
-  if type(ruid) == "table" then
-    local t = ruid
-    ruid = t.ruid
-    euid = t.euid
-    suid = t.suid
-  end
-  return retbool(C.setresuid(ruid, euid, suid))
-end
-function S.setresgid(rgid, egid, sgid)
-  if type(rgid) == "table" then
-    local t = rgid
-    rgid = t.rgid
-    egid = t.egid
-    sgid = t.sgid
-  end
-  return retbool(C.setresgid(rgid, egid, sgid))
-end
+function S.setresuid(ruid, euid, suid) return retbool(C.setresuid(ruid, euid, suid)) end
+function S.setresgid(rgid, egid, sgid) return retbool(C.setresgid(rgid, egid, sgid)) end
 
 function S.vhangup() return retbool(C.vhangup()) end
 
