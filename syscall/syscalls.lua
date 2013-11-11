@@ -485,7 +485,7 @@ function S.wait4(pid, options, ru, status) -- note order of arguments changed as
   status = status or t.int1()
   local ret = C.wait4(c.WAIT[pid], status, c.W[options], ru)
   if ret == -1 then return nil, t.error() end
-  return t.wait(ret, status[0], ru)
+  return ret, nil, t.waitstatus(status[0]), ru
 end
 
 function S.setpriority(which, who, prio) return retbool(C.setpriority(c.PRIO[which], who or 0, prio)) end

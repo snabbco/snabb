@@ -1614,11 +1614,11 @@ test_processes = {
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
-      local w = assert(S.wait4("any"))
-      assert(w.pid == pid, "expect fork to return same pid as wait")
-      assert(w.WIFEXITED, "process should have exited normally")
-      assert(w.EXITSTATUS == 23, "exit should be 23")
-      assert(w.rusage, "expect to get rusage data back")
+      local rpid, status, rusage = assert(S.wait4("any"))
+      assert(rpid == pid, "expect fork to return same pid as wait")
+      assert(status.WIFEXITED, "process should have exited normally")
+      assert(status.EXITSTATUS == 23, "exit should be 23")
+      assert(rusage, "expect to get rusage data back")
     end
   end,
   test_fork_wait3 = function()
@@ -1630,11 +1630,11 @@ test_processes = {
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
-      local w = assert(S.wait3())
-      assert(w.pid == pid, "expect fork to return same pid as wait")
-      assert(w.WIFEXITED, "process should have exited normally")
-      assert(w.EXITSTATUS == 23, "exit should be 23")
-      assert(w.rusage, "expect to get rusage data back")
+      local rpid, status, rusage = assert(S.wait3())
+      assert(rpid == pid, "expect fork to return same pid as wait")
+      assert(status.WIFEXITED, "process should have exited normally")
+      assert(status.EXITSTATUS == 23, "exit should be 23")
+      assert(rusage, "expect to get rusage data back")
     end
   end,
   test_execve = function()

@@ -568,6 +568,11 @@ function t.wait(pid, status, rusage)
   return setmetatable({pid = pid, status = status, rusage = rusage}, mt.wait)
 end
 
+-- rework just for status
+function t.waitstatus(status)
+  return setmetatable({status = status}, mt.wait)
+end
+
 -- termios
 
 local bits_to_speed = {}
