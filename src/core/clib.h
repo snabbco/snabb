@@ -28,3 +28,8 @@ size_t pwrite(int fd, const void *buf, int count, int offset);
 
 // malloc(3) - allocate dynamic memory
 void *malloc(int size);
+
+// readlink(2) - get link's target
+int64_t readlink(const char *path, char *buf, size_t bufsiz);
+char *dirname(char *path);
+char *basename(char *path);

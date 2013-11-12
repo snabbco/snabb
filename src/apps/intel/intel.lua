@@ -16,7 +16,7 @@ module(moduleinstance,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local bit = require("bit")
-local pci = require("pci")
+local bus = require("bus")
 local lib = require("lib")
 local test = require("test")
 local bits, bitset = lib.bits, lib.bitset
@@ -27,7 +27,7 @@ require("intel_h")
 -- FFI definitions for receive and transmit descriptors
 
 -- PCI device ID
-local device = pci.device_info(pciaddress).device
+local device = bus.device_info(pciaddress).device
 
 -- Return a table for protected (bounds-checked) memory access.
 -- 
@@ -101,7 +101,7 @@ local MANC   = 0x05820 / 4 -- Management Control Register (RW / 82571)
 local SWSM   = 0x05B50  / 4 -- Software Semaphore (RW / 82571)
 local EEMNGCTL = 0x01010 / 4 -- MNG EEPROM Control (RW / 82571)
 
-local regs = ffi.cast("uint32_t *", pci.map_pci_memory(pciaddress, 0))
+local regs = ffi.cast("uint32_t *", bus.map_pci_memory(pciaddress, 0))
 
 -- Initialization
 
@@ -124,7 +124,7 @@ end
 
 function init_pci ()
    -- PCI bus mastering has to be enabled for DMA to work.
-   pci.set_bus_master(pciaddress, true)
+   bus.set_bus_master(pciaddress, true)
 end
 
 function init_dma_memory ()

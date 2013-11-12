@@ -13,7 +13,7 @@ local C        = ffi.C
 local lib      = require("core.lib")
 local memory   = require("core.memory")
 local packet   = require("core.packet")
-local pci      = require("lib.hardware.pci")
+local bus      = require("lib.hardware.bus")
 local register = require("lib.hardware.register")
                  require("apps.intel.intel_h")
                  require("core.packet_h")
@@ -27,6 +27,7 @@ num_descriptors = 32 * 1024
 
 function new (pciaddress)
    local dev = { pciaddress = pciaddress, -- PCI device address
+                 info = bus.device_info(pciaddress),
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
                  txdesc = 0,     -- Transmit descriptors (pointer)
@@ -46,8 +47,8 @@ function new (pciaddress)
 end
 
 function open (dev)
-   pci.set_bus_master(dev.pciaddress, true)
-   local base = pci.map_pci_memory(dev.pciaddress, 0)
+   dev.info.set_bus_master(dev.pciaddress, true)
+   local base = dev.info.map_pci_memory(dev.pciaddress, 0)
    register.define(config_registers_desc, dev.r, base)
    register.define(statistics_registers_desc, dev.s, base)
    dev.txpackets = ffi.new("struct packet *[?]", num_descriptors)
@@ -70,9 +71,9 @@ end
 
 function init_dma_memory (dev)
    dev.rxdesc, dev.rxdesc_phy =
-      memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
+      dev.info.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
    dev.txdesc, dev.txdesc_phy =
-      memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
+      dev.info.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
    -- Add bounds checking
    dev.rxdesc = lib.bounds_checked(rxdesc_t, dev.rxdesc, 0, num_descriptors)
    dev.txdesc = lib.bounds_checked(txdesc_t, dev.txdesc, 0, num_descriptors)
