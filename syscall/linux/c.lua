@@ -151,10 +151,12 @@ else -- 64 bit
   function C.pwrite(fd, buf, count, offset) return syscall_long(sys.pwrite64, int(fd), void(buf), ulong(count), ulong(offset)) end
   function C.statfs(path, buf) return syscall(sys.statfs, void(path), void(buf)) end
   function C.fstatfs(fd, buf) return syscall(sys.fstatfs, int(fd), void(buf)) end
-  function C.preadv(fd, iov, iovcnt, offset) return syscall_long(sys.preadv, int(fd), void(iov), int(iovcnt), ulong(offset)) end
-  function C.pwritev(fd, iov, iovcnt, offset) return syscall_long(sys.pwritev, int(fd), void(iov), int(iovcnt), ulong(offset)) end
+  function C.preadv(fd, iov, iovcnt, offset) return syscall_long(sys.preadv, int(fd), void(iov), long(iovcnt), ulong(offset)) end
+  function C.pwritev(fd, iov, iovcnt, offset) return syscall_long(sys.pwritev, int(fd), void(iov), long(iovcnt), ulong(offset)) end
   function C.lseek(fd, offset, whence) return syscall_off(sys.lseek, int(fd), ulong(offset), int(whence)) end
-  function C.sendfile(outfd, infd, offset, count) return syscall_long(sys.sendfile, int(outfd), int(infd), void(offset), ulong(count)) end
+  function C.sendfile(outfd, infd, offset, count)
+    return syscall_long(sys.sendfile, int(outfd), int(infd), void(offset), ulong(count))
+  end
   function C.mmap(addr, length, prot, flags, fd, offset)
     return syscall_void(sys.mmap, void(addr), ulong(length), int(prot), int(flags), int(fd), ulong(offset))
   end
@@ -454,6 +456,28 @@ function C.setreuid(uid, euid) return syscall(sys.setreuid, uint(uid), uint(euid
 function C.setregid(gid, egid) return syscall(sys.setregid, uint(gid), uint(egid)) end
 function C.flock(fd, operation) return syscall(sys.flock, int(fd), int(operation)) end
 function C.getrusage(who, usage) return syscall(sys.getrusage, int(who), void(usage)) end
+function C.chdir(path) return syscall(sys.chdir, void(path)) end
+function C.fchdir(fd) return syscall(sys.fchdir, int(fd)) end
+function C.chown(path, owner, group) return syscall(sys.chown, void(path), uint(owner), uint(group)) end
+function C.fchown(fd, owner, group) return syscall(sys.fchown, int(fd), uint(owner), uint(group)) end
+function C.lchown(path, owner, group) return syscall(sys.lchown, void(path), uint(owner), uint(group)) end
+function C.open(pathname, flags, mode) return syscall(sys.open, void(pathname), int(flags), uint(mode)) end
+function C.openat(dirfd, pathname, flags, mode) return syscall(sys.openat, int(dirfd), void(pathname), int(flags), uint(mode)) end
+function C.creat(pathname, mode) return syscall(sys.creat, void(pathname), uint(mode)) end
+function C.close(fd) return syscall(sys.close, int(fd)) end
+function C.read(fd, buf, count) return syscall_long(sys.read, int(fd), void(buf), ulong(count)) end
+function C.write(fd, buf, count) return syscall_long(sys.write, int(fd), void(buf), ulong(count)) end
+function C.readv(fd, iov, iovcnt) return syscall_long(sys.readv, int(fd), void(iov), long(iovcnt)) end
+function C.writev(fd, iov, iovcnt) return syscall_long(sys.writev, int(fd), void(iov), long(iovcnt)) end
+function C.rename(oldpath, newpath) return syscall(sys.rename, void(oldpath), void(newpath)) end
+function C.renameat(olddirfd, oldpath, newdirfd, newpath)
+  return syscall(sys.renameat, int(olddirfd), void(oldpath), int(newdirfd), void(newpath))
+end
+function C.unlink(pathname) return syscall(sys.unlink, void(pathname)) end
+function C.unlinkat(dirfd, pathname, flags) return syscall(sys.unlinkat, int(dirfd), void(pathname), int(flags)) end
+function C.prctl(option, arg2, arg3, arg4, arg5)
+  return syscall(sys.prctl, int(option), ulong(arg2), ulong(arg3), ulong(arg4), ulong(arg5))
+end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
