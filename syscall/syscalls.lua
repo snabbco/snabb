@@ -231,7 +231,7 @@ function S.sendmsg(fd, msg, flags)
   return retnum(C.sendmsg(getfd(fd), msg, c.MSG[flags]))
 end
 function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG[flags])) end
--- TODO {get,set}sockopt may need better type handling see new sockopt file
+-- TODO {get,set}sockopt may need better type handling see new sockopt file, plus not always c.SO[]
 function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far
   if not optlen and type(optval) == 'boolean' then optval = h.booltoc(optval) end
@@ -245,7 +245,7 @@ function S.getsockopt(fd, level, optname, optval, optlen)
   if not optval then optval, optlen = t.int1(), s.int end
   optlen = optlen or #optval
   local len = t.socklen1(optlen)
-  local ret, err = C.getsockopt(getfd(fd), level, optname, optval, len)
+  local ret, err = C.getsockopt(getfd(fd), c.SOL[level], c.SO[optname], optval, len)
   if ret == -1 then return nil, t.error(err or errno()) end
   return optval[0] -- TODO will not work if struct, eg see netfilter
 end

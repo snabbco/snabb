@@ -1443,7 +1443,7 @@ test_sendfd = {
   test_sendcred = function()
     local sv1, sv2 = assert(S.socketpair("unix", "stream"))
     assert(sv2:setsockopt("socket", "passcred", true)) -- enable receive creds
-    local so = assert(sv2:getsockopt(c.SOL.SOCKET, c.SO.PASSCRED))
+    local so = assert(sv2:getsockopt("socket", "passcred"))
     assert(so == 1, "getsockopt should have updated value")
     local n = assert(sv2:sendmsg()) -- sends single byte, which is enough to send credentials
     assert_equal(n, 1)
