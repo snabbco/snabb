@@ -32,7 +32,7 @@ local function istype(tp, x) if ffi.istype(tp, x) then return x else return fals
 -- even simpler version coerces to type
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
--- easier interfaces to some functions that are in common use
+-- easier interfaces to some functions that are in common use TODO new fcntl code should make easier
 local function nonblock(fd)
   local fl, err = S.fcntl(fd, c.F.GETFL)
   if not fl then return nil, err end
