@@ -437,8 +437,8 @@ function S.io_getevents(ctx, min, events, timeout)
   return retiter(ret, err, events.ev)
 end
 
--- TODO this is broken as iocb must persist until retrieved, and could be gc'd if passed as table...
-function S.io_submit(ctx, iocb) -- takes a t.iocb_array in order to pin for gc
+-- iocb must persist until retrieved (as we get pointer), so cannot be passed as table must take t.iocb_array
+function S.io_submit(ctx, iocb)
   return retnum(C.io_submit(ctx, iocb.ptrs, iocb.nr))
 end
 
