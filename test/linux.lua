@@ -1101,18 +1101,39 @@ test.aio = {
     ffi.fill(abuf, 4096)
     local a = t.iocb_array{{opcode = "pread", data = 42, fildes = fd, buf = abuf, nbytes = 4096, offset = 0}}
     local ret = assert(S.io_submit(ctx, a))
-    assert_equal(ret, 1, "expect one event submitted")
+    assert_equal(ret, 1)
     local ev = t.io_events(1)
     local count = 0
     for k, v in assert(S.io_getevents(ctx, 1, ev)) do
-      assert_equal(tonumber(v.data), 42, "expect to get our data back")
-      assert_equal(tonumber(v.res), 4096, "expect to get full read")
+      assert_equal(tonumber(v.data), 42)
+      assert_equal(tonumber(v.res), 4096)
       count = count + 1
     end
     assert_equal(count, 1)
     assert(fd:close())
     assert(S.munmap(abuf, 4096))
+    assert(S.io_destroy(ctx))
   end,
+--[[ -- no Linux fs supports this it seems...
+  test_aio_fdsync = function()
+    local ctx, err = S.io_setup(8)
+    if not ctx and err.NOSYS then return end -- may not be supported
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- use O_DIRECT or aio may not work
+    local a = t.iocb_array{{opcode = "fdsync", data = 42, fildes = fd, buf = nil, nbytes = 0, offset = 0}}
+    local ret = assert(S.io_submit(ctx, a))
+    assert_equal(ret, 1, "expect one event submitted")
+    local ev = t.io_events(1)
+    local count = 0
+    for k, v in assert(S.io_getevents(ctx, 1, ev)) do
+      assert_equal(tonumber(v.data), 42)
+      assert_equal(tonumber(v.res), 0)
+      count = count + 1
+    end
+    assert_equal(count, 1)
+    assert(fd:close())
+    assert(S.io_destroy(ctx))
+  end,
+]]
   test_aio_cancel = function()
     local ctx, err = S.io_setup(8)
     if not ctx and err.NOSYS then return end -- may not be supported
