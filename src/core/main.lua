@@ -61,7 +61,7 @@ function main ()
 	 local jit_dump = require "jit.dump"
 	 jit_dump.start("", args[i+1])
 	 i = i + 2
-      elseif i < #args then
+      elseif i <= #args then
          -- Syntax: <module> [args...]
          local module = args[i]
          i = i + 1
@@ -70,6 +70,7 @@ function main ()
             i = i + 1
          end
          require(module)
+         os.exit(0)
       else
 	 print(usage)
 	 os.exit(1)
