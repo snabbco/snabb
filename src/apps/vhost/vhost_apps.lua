@@ -45,7 +45,7 @@ function selftest ()
    app.connect("tapvhost", "tx", "sink", "in")
    app.relink()
    buffer.preallocate(100000)
-   local deadline = lib.timer(10e9)
+   local deadline = lib.timer(1e9)
    repeat app.breathe() until deadline()
    app.report()
 end
