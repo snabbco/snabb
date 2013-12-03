@@ -127,3 +127,9 @@ function graphviz ()
    return viz
 end
 
+function module_init ()
+   -- XXX Find a better place for this.
+   require("lib.hardware.bus").scan_devices()
+end
+
+module_init()

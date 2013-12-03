@@ -94,6 +94,7 @@ end
 
 function selftest (options)
    print("selftest: memory")
+   require("lib.hardware.bus")
    print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
    for i = 1, 4 do
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
