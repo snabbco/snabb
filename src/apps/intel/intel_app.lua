@@ -45,7 +45,7 @@ end
 
 -- Report on relevant status and statistics.
 function Intel82599:report ()
-   print("report on intel device")
+   print("report on intel device", self.dev.pciaddress)
    --register.dump(self.dev.r)
    register.dump(self.dev.s, true)
 end

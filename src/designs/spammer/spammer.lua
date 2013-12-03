@@ -3,14 +3,15 @@ module(...,package.seeall)
 local app       = require("core.app")
 local buffer    = require("core.buffer")
 local timer     = require("core.timer")
-local pci       = require("lib.hardware.pci")
+local bus       = require("lib.hardware.bus")
 local intel_app = require("apps.intel.intel_app")
 local basic_apps = require("apps.basic.basic_apps")
 
 function main ()
+   bus.scan_devices()
    app.apps.source = app.new(basic_apps.Source:new())
    local nics = 0
-   for _,device in ipairs(pci.devices) do
+   for _,device in ipairs(bus.devices) do
       if device.usable and device.driver == 'apps.intel.intel10g' then
          nics = nics + 1
          local name = "nic"..nics

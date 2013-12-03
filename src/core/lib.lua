@@ -3,6 +3,23 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 
+
+function can_open(filename, mode)
+    mode = mode or 'r'
+    local f = io.open(filename, mode)
+    if f == nil then return false end
+    f:close()
+    return true
+end
+
+function can_read(filename)
+    return can_open(filename, 'r')
+end
+
+function can_write(filename)
+    return can_open(filename, 'w')
+end
+
 --- Return `command` in the Unix shell and read `what` from the result.
 function readcmd (command, what)
    local f = io.popen(command)
@@ -25,6 +42,31 @@ function writefile (filename, value)
    local result = f:write(value)
    f:close()
    return result
+end
+
+function readlink (path)
+    local buf = ffi.new("char[?]", 512)
+    local len = C.readlink(path, buf, 512)
+    if len < 0 then return nil, ffi.errno() end
+    return ffi.string(buf, len)
+end
+
+function dirname(path)
+    if not path then return path end
+    
+    local buf = ffi.new("char[?]", #path+1)
+    ffi.copy(buf, path)
+    local ptr = C.dirname(buf)
+    return ffi.string(ptr)
+end
+
+function basename(path)
+    if not path then return path end
+    
+    local buf = ffi.new("char[?]", #path+1)
+    ffi.copy(buf, path)
+    local ptr = C.basename(buf)
+    return ffi.string(ptr)
 end
 
 -- Return the name of the first file in `dir`.
@@ -152,5 +194,9 @@ function selftest ()
    local data = "\x45\x00\x00\x73\x00\x00\x40\x00\x40\x11\xc0\xa8\x00\x01\xc0\xa8\x00\xc7"
    local cs = csum(data, string.len(data))
    assert(cs == 0xb861, "bad checksum: " .. bit.tohex(cs, 4))
+   
+--    assert(readlink('/etc/rc2.d/S99rc.local') == '../init.d/rc.local', "bad readlink")
+--    assert(dirname('/etc/rc2.d/S99rc.local') == '/etc/rc2.d', "wrong dirname")
+--    assert(basename('/etc/rc2.d/S99rc.local') == 'S99rc.local', "wrong basename")
 end
 

@@ -4,12 +4,25 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local lib = require("core.lib")
+local pci = require ("lib.hardware.pci")
 local port = require("lib.hardware.port")
 
-require("lib.hardware.pci_h")
+require("lib.hardware.vfio_h")
+
+
+function set_mapping (start_iova)
+    next_iova = ffi.cast("uint64_t", start_iova)      -- better not start at 0x00
+
+    return function (ptr, size)
+        local mem_phy = C.mmap_memory(ptr, size, next_iova, true, true)
+        next_iova = next_iova + size
+        return mem_phy
+    end
+end
 
 --- ### Hardware device information
 
+--- pciaddress -> info dictionary
 devices = {}
 
 --- Array of all supported hardware devices.
@@ -24,79 +37,102 @@ devices = {}
 --- * `driver` Lua module that supports this hardware e.g. `"intel10g"`.
 --- * `usable` device was suitable to use when scanned? `yes` or `no`
 
---- Initialize (or re-initialize) the `devices` table.
-function scan_devices ()
-   for _,device in ipairs(lib.files_in_directory("/sys/bus/pci/devices")) do
-      local info = device_info(device)
-      if info.driver then table.insert(devices, info) end
-   end
-end
-
+--- gets some data from /sys/... files
+--  stores it in the vfio.devices table
 function device_info (pciaddress)
    local info = {}
-   local p = path(pciaddress)
+   local p = pci.path(pciaddress)
    info.pciaddress = pciaddress
    info.vendor = lib.firstline(p.."/vendor")
    info.device = lib.firstline(p.."/device")
+   info.iommu_group = device_group(pciaddress)
    info.interface = lib.firstfile(p.."/net")
-   info.driver = which_driver(info.vendor, info.device)
+   info.driver = pci.which_driver(info.vendor, info.device)
    if info.interface then
       info.status = lib.firstline(p.."/net/"..info.interface.."/operstate")
    end
-   info.usable = lib.yesno(is_usable(info))
+   info.usable = lib.yesno(pci.is_usable(info))
+   devices[pciaddress] = info
    return info
 end
 
---- Return the path to the sysfs directory for `pcidev`.
-function path(pcidev) return "/sys/bus/pci/devices/"..pcidev end
+-- Returns the iommu group of a device
+function device_group(pciaddress)
+    return lib.basename(lib.readlink(pci.path(pciaddress)..'/iommu_group'))
+end
 
--- Return the name of the Lua module that implements support for this device.
-function which_driver (vendor, device)
-   if vendor == '0x8086' then
-      if device == '0x10fb' then return 'apps.intel.intel10g' end -- Intel 82599
-      if device == '0x10d3' then return 'apps.intel.intel' end    -- Intel 82574L
-      if device == '0x105e' then return 'apps.intel.intel' end    -- Intel 82571
-   end
+-- Return all the devices that belong to the same group
+function group_devices(group)
+    if not group then return {} end
+    return lib.files_in_directory('/sys/kernel/iommu_groups/'..group..'/devices/')
 end
 
 --- ### Device manipulation.
 
---- Return true if `device` is safely available for use, or false if
---- the operating systems to be using it.
-function is_usable (info)
-   return info.driver and (info.interface == nil or info.status == 'down')
+--- add a device to the vfio-pci driver
+function bind_device_to_vfio (pciaddress)
+    lib.writefile("/sys/bus/pci/drivers/vfio-pci/bind", pciaddress)
 end
 
---- Force Linux to release the device with `pciaddress`.
---- The corresponding network interface (e.g. `eth0`) will disappear.
-function unbind_device_from_linux (pciaddress)
-    local p = path(pciaddress).."/driver/unbind"
-    if lib.can_write(p) then
-        lib.writefile(path(pciaddress).."/driver/unbind", pciaddress)
+function setup_vfio(pciaddress, do_group)
+    if do_group then
+        for _,f in ipairs(group_devices(device_group(pciaddress))) do
+            local addr = lib.basename(f)
+            print ('addr:', addr)
+            pci.unbind_device_from_linux(addr)
+            bind_device_to_vfio(addr)
+        end
+    else
+        pci.unbind_device_from_linux(pciaddress)
+        bind_device_to_vfio(pciaddress)
     end
+end
+
+function open_device_group(group)
+    if not group then return nil end
+    local groupfd = C.add_group_to_container(group)
+    for _, addr in ipairs(group_devices(group)) do
+        devices[addr].groupfd = groupfd
+    end
+    return groupfd
+end
+
+function get_vfio_fd(pciaddress)
+    local dev = devices[pciaddress]
+    assert(dev, "no such device")
+
+    if not dev.vfio_fd then
+        if not dev.groupfd then
+            open_device_group(tonumber(dev.iommu_group))
+        end
+        assert (dev.groupfd and dev.groupfd>=0, "can't open iommu_group "..dev.iommu_group)
+        dev.vfio_fd = C.open_device_from_vfio_group(dev.groupfd, pciaddress)
+    end
+    assert (dev.vfio_fd and dev.vfio_fd>=0, "can't open device from iommu group")
+    return dev.vfio_fd
 end
 
 --- Return a pointer for MMIO access to `device` resource `n`.
 --- Device configuration registers can be accessed this way.
 function map_pci_memory (device, n)
-   local filepath = path(device).."/resource"..n
-   local addr = C.map_pci_resource(filepath)
-   assert( addr ~= 0 )
-   return addr
+    local vfio_fd = get_vfio_fd(device)
+    local addr = C.mmap_region(vfio_fd, n)
+    assert( addr ~= 0 )
+    return addr
 end
 
 --- Enable or disable PCI bus mastering. DMA only works when bus
 --- mastering is enabled.
 function set_bus_master (device, enable)
-   local fd = C.open_pcie_config(path(device).."/config")
-   local value = ffi.new("uint16_t[1]")
-   assert(C.pread(fd, value, 2, 0x4) == 2)
-   if enable then
-      value[0] = bit.bor(value[0], lib.bits({Master=2}))
-   else
-      value[0] = bit.band(value[0], bit.bnot(lib.bits({Master=2})))
-   end
-   assert(C.pwrite(fd, value, 2, 0x4) == 2)
+    local vfio_fd = get_vfio_fd(device)
+    local value = ffi.new("uint16_t[1]")
+    assert(C.pread_config(vfio_fd, value, 2, 0x4) == 2)
+    if enable then
+        value[0] = bit.bor(value[0], lib.bits({Master=2}))
+    else
+        value[0] = bit.band(value[0], bit.bnot(lib.bits({Master=2})))
+    end
+    assert(C.pwrite_config(vfio_fd, value, 2, 0x4) == 2)
 end
 
 --- ### Open a device
@@ -123,7 +159,7 @@ end
 --- self-test on each of them.
 
 function selftest ()
-   print("selftest: pci")
+   print("selftest: vfio")
    print_device_summary()
    open_usable_devices({selftest=true})
 end
@@ -133,7 +169,7 @@ function print_device_summary ()
                   "driver", "usable"}
    local fmt = "%-13s %-7s %-7s %-10s %-9s %-11s %s"
    print(fmt:format(unpack(attrs)))
-   for _,info in ipairs(devices) do
+   for _,info in pairs(devices) do
       local values = {}
       for _,attr in ipairs(attrs) do
          table.insert(values, info[attr] or "-")
@@ -144,12 +180,12 @@ end
 
 function open_usable_devices (options)
    local drivers = {}
-   for _,device in ipairs(devices) do
+   for _,device in pairs(devices) do
       if #drivers == 0 then
          if device.usable == 'yes' then
             if device.interface ~= nil then
                print("Unbinding device from linux: "..device.pciaddress)
-               unbind_device_from_linux(device.pciaddress)
+               pci.unbind_device_from_linux(device.pciaddress)
             end
             print("Opening device "..device.pciaddress)
             local driver = open_device(device.pciaddress, device.driver)
@@ -163,3 +199,8 @@ function open_usable_devices (options)
                     report=true}
    port.selftest(options)
 end
+
+-- function module_init () scan_devices () end
+
+-- module_init()
+

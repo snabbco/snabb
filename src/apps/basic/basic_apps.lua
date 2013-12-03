@@ -18,7 +18,7 @@ function Source:pull ()
       for i = 1, 1000 do
          local p = packet.allocate()
          packet.add_iovec(p, buffer.allocate(), 60)
-	 app.transmit(o, p)
+         app.transmit(o, p)
       end
    end
 end
@@ -34,7 +34,7 @@ end
 function Join:push () 
    for _, inport in ipairs(self.inputi) do
       for _ = 1,math.min(app.nreadable(inport), app.nwritable(self.output.out)) do
-	 app.transmit(self.output.out, app.receive(inport))
+         app.transmit(self.output.out, app.receive(inport))
       end
    end
 end
@@ -70,9 +70,9 @@ end
 function Sink:push ()
    for _, i in ipairs(self.inputi) do
       for _ = 1, app.nreadable(i) do
-	 local p = app.receive(i)
-	 assert(p.refcount == 1)
-	 packet.deref(p)
+        local p = app.receive(i)
+        assert(p.refcount == 1)
+        packet.deref(p)
       end
    end
 end

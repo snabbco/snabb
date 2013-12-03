@@ -6,6 +6,13 @@ local C = ffi.C
 local lib = require("core.lib")
 require("core.memory_h")
 
+
+-- hook variables
+
+dma_alloc = nil         -- (size) => ram_ptr, io_address
+allocate_RAM = nil      -- (size) => ram_ptr
+ram_to_io_addr = nil    -- (ram_ptr) => io_address
+
 --- ### Serve small allocations from hugepage "chunks"
 
 -- List of all allocated huge pages: {pointer, physical, size, used}
@@ -32,9 +39,10 @@ end
 
 -- Add a new chunk.
 function allocate_next_chunk ()
-   local ptr = allocate_huge_page()
+   local ptr = assert(allocate_RAM(huge_page_size), "Couldn't allocate a chunk of ram")
+   local mem_phy = assert(ram_to_io_addr(ptr, huge_page_size), "Couln't map a chunk of ram to IO address")
    chunks[#chunks + 1] = { pointer = ffi.cast("char*", ptr),
-                           physical = virtual_to_physical(ptr),
+                           physical = mem_phy,
                            size = huge_page_size,
                            used = 0 }
    local addr = tonumber(ffi.cast("uint64_t",ptr))
@@ -46,19 +54,6 @@ end
 
 -- Configuration option: Set to false to disable HugeTLB.
 use_hugetlb = true
-
-function allocate_huge_page ()
-   if use_hugetlb then
-      local attempts = 3
-      for i = 1,attempts do
-         local page = C.allocate_huge_page(huge_page_size)
-         if page ~= nil then  return page  else  reserve_new_page()  end
-      end
-      error("Failed to allocate a huge page.")
-   else
-      return C.malloc(huge_page_size)
-   end
-end
 
 function reserve_new_page ()
    set_hugepages(get_hugepages() + 1)
@@ -117,5 +112,21 @@ end
 
 --- This module requires a stable physical-virtual mapping so this is
 --- enforced automatically at load-time.
-assert(C.lock_memory() == 0)
 
+function set_use_physical_memory()
+    ram_to_io_addr = virtual_to_physical
+    assert(C.lock_memory() == 0)     -- let's hope it's not needed anymore
+end
+
+function set_default_allocator(use_hugetlb)
+    if use_hugetlb then
+        allocate_RAM = function(size)
+            for i =1, 3 do
+                local page = C.allocate_huge_page(size)
+                if page ~= nil then return page else reserve_new_page() end
+            end
+        end
+    else
+        allocate_RAM = C.malloc
+    end
+end
