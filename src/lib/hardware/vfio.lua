@@ -5,7 +5,6 @@ local C = ffi.C
 
 local lib = require("core.lib")
 local pci = require ("lib.hardware.pci")
-local port = require("lib.hardware.port")
 
 require("lib.hardware.vfio_h")
 
@@ -161,7 +160,6 @@ end
 function selftest ()
    print("selftest: vfio")
    print_device_summary()
-   open_usable_devices({selftest=true})
 end
 
 function print_device_summary ()
@@ -177,30 +175,4 @@ function print_device_summary ()
       print(fmt:format(unpack(values)))
    end
 end
-
-function open_usable_devices (options)
-   local drivers = {}
-   for _,device in pairs(devices) do
-      if #drivers == 0 then
-         if device.usable == 'yes' then
-            if device.interface ~= nil then
-               print("Unbinding device from linux: "..device.pciaddress)
-               pci.unbind_device_from_linux(device.pciaddress)
-            end
-            print("Opening device "..device.pciaddress)
-            local driver = open_device(device.pciaddress, device.driver)
-            driver:open_for_loopback_test()
-            table.insert(drivers, driver)
-         end
-      end
-   end
-   local options = {devices=drivers,
-                    program=port.Port.loopback_test,
-                    report=true}
-   port.selftest(options)
-end
-
--- function module_init () scan_devices () end
-
--- module_init()
 

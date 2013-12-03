@@ -236,25 +236,6 @@ function enable_mac_loopback (dev)
    dev.r.HLREG0:set(bits({Loop=15}))
 end
 
-function selftest (options)
-   assert(options and options.pciaddress, "options.pciaddress required")
-   local dev = new(options.pciaddress)
-   local port = require("port")
-   io.write("intel10g selftest: pciaddress="..pciaddress)
-   for key,value in pairs(options) do
-      io.write(" "..key.."="..tostring(value))
-   end
-   print()
-   options.device = getfenv()
-   options.program = port.Port.loopback_test
-   options.module = getfenv()
-   options.secs = 10
-   open_for_loopback_test(dev)
-   port.selftest(options)
-   register.dump(dev.r)
-   register.dump(dev.s, true)
-end
-
 function open_for_loopback_test (dev)
    open(dev)
    enable_mac_loopback(dev)

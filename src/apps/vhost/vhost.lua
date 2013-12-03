@@ -226,28 +226,3 @@ function memory_regions ()
    return mem
 end
 
---- ### Testing
-
--- Selftest procedure to read packets from a tap device and write them back.
-function selftest (options)
-   options = options or {}
-   local dev = options.dev or new("snabb%d")
-   local port = require("lib.hardware.port")
-   print("virtio selftest")
-   options = options or {}
-   options.devices = {dev}
-   options.program = port.Port.spam
-   options.secs = 10
-   port.selftest(options)
-   print("rx.availidx", dev.rxring.avail.idx)
-   print("tx.availidx", dev.txring.avail.idx)
-   print("rx.usedidx", dev.rxring.used.idx)
-   print("tx.usedidx", dev.txring.used.idx)
---   print_stats(dev)
-end
-
-function print_stats (dev)
-   print("packets transmitted: " .. lib.comma_value(dev.txpackets))
-   print("packets received:    " .. lib.comma_value(dev.rxpackets))
-end
-

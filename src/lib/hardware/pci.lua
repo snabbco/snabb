@@ -4,7 +4,6 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local lib = require("core.lib")
-local port = require("lib.hardware.port")
 
 require("lib.hardware.pci_h")
 
@@ -125,7 +124,6 @@ end
 function selftest ()
    print("selftest: pci")
    print_device_summary()
-   open_usable_devices({selftest=true})
 end
 
 function print_device_summary ()
