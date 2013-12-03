@@ -7,6 +7,7 @@ local packet   = require("core.packet")
 local lib      = require("core.lib")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
+local vfio     = require("lib.hardware.vfio")
 
 Intel82599 = {}
 
@@ -55,6 +56,7 @@ function selftest ()
    -- Create a pieline:
    --   Source --> Intel82599(loopback) --> Sink
    -- and push packets through it.
+   vfio.bind_device_to_vfio("0000:01:00.0")
    app.apps.intel10g = Intel82599:new("0000:01:00.0")
    app.apps.source = app.new(basic_apps.Source)
    app.apps.sink   = app.new(basic_apps.Sink)
