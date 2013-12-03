@@ -1,6 +1,7 @@
 module(...,package.seeall)
 
 local app      = require("core.app")
+local basic_apps = require("apps.basic.basic_apps")
 local buffer   = require("core.buffer")
 local packet   = require("core.packet")
 local lib      = require("core.lib")
@@ -55,8 +56,8 @@ function selftest ()
    --   Source --> Intel82599(loopback) --> Sink
    -- and push packets through it.
    app.apps.intel10g = Intel82599:new("0000:01:00.0")
-   app.apps.source = app.new(app.Source)
-   app.apps.sink   = app.new(app.Sink)
+   app.apps.source = app.new(basic_apps.Source)
+   app.apps.sink   = app.new(basic_apps.Sink)
    app.connect("source", "out", "intel10g", "rx")
    app.connect("intel10g", "tx", "sink", "in")
    app.relink()
