@@ -20,6 +20,13 @@ EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
 MDOBJS := $(patsubst %, doc/obj/%.md, $(LUASRC) $(CSRC) $(CHDR)) $(wildcard *.md)
 
+# TESTMODS expands to:
+#   core.memory core.lib ...
+# for each module that has a top-level selftest () function.
+TESTMODS = $(shell find . -regex '[^\#]*\.lua' -printf '%P ' | \
+             xargs grep -l '^function selftest *[[:punct:]]' | \
+             sed -e 's_\.lua__' -e 's_/_._g')
+
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
 all: snabbswitch
@@ -33,6 +40,12 @@ snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
 	    -lc -ldl -lm -lrt -lpthread
 	@echo -n "Firmware: "
 	@ls -sh snabbswitch
+
+test: $(TESTMODS)
+
+$(TESTMODS):
+	$(E) "TEST      $@"
+	$(Q) ./snabbswitch -t $@ > testlog/$@ || (echo "*** EXIT CODE: $?" >> testlog/$@; echo "ERROR     testlog/$@")
 
 $(OBJDIR):
 	$(E) "DIR       $@"
@@ -98,7 +111,7 @@ doc/snabbswitch.html doc/snabbswitch.epub: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
 	$(Q) pandoc -S --toc --chapters -o $@ $<
 
-CLEAN = snabbswitch obj doc/snabbswitch.* doc/obj/*.md
+CLEAN = snabbswitch obj doc/snabbswitch.* doc/obj/*.md testlog/*
 
 clean:
 	$(E) "RM        $(CLEAN)"
@@ -108,5 +121,5 @@ mrproper: clean
 	$(E) "RM        $(RMOBJS)"
 	$(Q)-rm -rf $(RMOBJS)
 
-.PHONY: clean
+.PHONY: clean $(TESTMODS)
 
