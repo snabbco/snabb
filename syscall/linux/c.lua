@@ -131,8 +131,8 @@ if abi.abi32 then
   local off1 = ffi.typeof("uint64_t[1]")
   function C.lseek(fd, offset, whence)
     local result = off1()
-    local off1, off2 = llarg64u(offset)
-    local ret = syscall(sys._llseek, int(fd), ulong(off1), ulong(off2), void(result), uint(whence))
+    local off1, off2 = llarg64(offset)
+    local ret = syscall(sys._llseek, int(fd), long(off1), long(off2), void(result), uint(whence))
     if ret == -1 then return err64 end
     return result[0]
   end

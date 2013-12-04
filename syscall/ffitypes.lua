@@ -35,7 +35,7 @@ typedef unsigned int tcflag_t;
 typedef unsigned int speed_t;
 
 // 64 bit
-typedef uint64_t off_t;
+typedef int64_t off_t;
 
 // defined as long even though eg NetBSD defines as int on 32 bit, its the same.
 typedef long ssize_t;

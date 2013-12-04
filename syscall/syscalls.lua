@@ -152,7 +152,7 @@ if C.preadv and C.pwritev then -- these are missing in eg OSX
 end
 function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
 function S.lseek(fd, offset, whence)
-  return retu64(C.lseek(getfd(fd), offset or 0, c.SEEK[whence]))
+  return ret64(C.lseek(getfd(fd), offset or 0, c.SEEK[whence]))
 end
 function S.readlink(path, buffer, size)
   size = size or c.PATH_MAX

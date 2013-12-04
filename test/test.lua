@@ -915,13 +915,20 @@ test_directory_operations = {
 test_largefile = {
   test_seek = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.unlink(tmpfile))
     local offset = 2^34 -- should work with Lua numbers up to 56 bits, above that need explicit 64 bit type.
     local n
     n = assert(fd:lseek(offset, "set"))
     assert_equal(n, offset, "seek should position at set position")
     n = assert(fd:lseek(offset, "cur"))
     assert_equal(n, offset + offset, "seek should position at set position")
+    assert(fd:close())
+  end,
+  test_seek_error = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.unlink(tmpfile))
+    local off, err = fd:lseek(-1, "cur")
+    assert(not off and err.INVAL)
     assert(fd:close())
   end,
   test_ftruncate = function()
