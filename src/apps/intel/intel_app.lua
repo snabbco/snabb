@@ -3,6 +3,7 @@ module(...,package.seeall)
 local app      = require("core.app")
 local basic_apps = require("apps.basic.basic_apps")
 local buffer   = require("core.buffer")
+local freelist = require("core.freelist")
 local packet   = require("core.packet")
 local lib      = require("core.lib")
 local register = require("lib.hardware.register")
@@ -12,12 +13,13 @@ local vfio     = require("lib.hardware.vfio")
 Intel82599 = {}
 
 -- Create an Intel82599 App for the device with 'pciaddress'.
-function Intel82599:new (pciaddress)
-   local a = app.new(Intel82599)
-   a.dev = intel10g.new(pciaddress)
+function Intel82599:new (pciaddress,  rx_buffer_freelist)
+   local a = { dev = intel10g.new(pciaddress),
+               -- Optional special freelist to allocate RX buffers from.
+               rx_buffer_freelist = rx_buffer_freelist }
    setmetatable(a, {__index = Intel82599 })
    intel10g.open_for_loopback_test(a.dev)
-   return a
+   return app.new(a)
 end
 
 -- Pull in packets from the network and queue them on our 'tx' link.
@@ -28,8 +30,21 @@ function Intel82599:pull ()
    while not app.full(l) and self.dev:can_receive() do
       app.transmit(l, self.dev:receive())
    end
-   while self.dev:can_add_receive_buffer() do
-      self.dev:add_receive_buffer(buffer.allocate())
+   self:add_receive_buffers()
+end
+
+function Intel82599:add_receive_buffers ()
+   if self.rx_buffer_freelist == nil then
+      -- Generic buffers
+      while self.dev:can_add_receive_buffer() do
+         self.dev:add_receive_buffer(buffer.allocate())
+      end
+   else
+      -- Buffers from a special freelist
+      local fl = self.rx_buffer_freelist
+      while self.dev:can_add_receive_buffer() and freelist.nfree(fl) > 0 do
+         self.dev:add_receive_buffer(freelist.remove(fl))
+      end
    end
 end
 
