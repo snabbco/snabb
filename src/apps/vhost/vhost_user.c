@@ -1,13 +1,23 @@
-#include <unistd.h>
+#include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
 
-int vhost_user_open_socket(char *path) {
-  int socket;
+#include "lib/virtio/virtio_vring.h"
+#include "vhost.h"
+#include "vhost_user.h"
+
+int vhost_user_open_socket(const char *path) {
+  int sock;
   struct sockaddr_un un;
-  size_t len;
 
   unlink(path); /* remove old socket if exists */
-  if ((socket = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+  if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
     perror("socket");
     return -1;
   }
@@ -15,17 +25,30 @@ int vhost_user_open_socket(char *path) {
   un.sun_family = AF_UNIX;
   strncpy(un.sun_path, path, sizeof(un.sun_path));
   
-  if (bind(socket, (struct sockaddr *) &un, sizeof(un)) == -1) {
+  if (bind(sock, (struct sockaddr *) &un, sizeof(un)) == -1) {
     perror("bind");
     return -1;
   }
-  if (listen(socket, 1) == -1) {
+  if (listen(sock, 1) == -1) {
     perror("listen");
     return -1;
   }
+  assert(fcntl(sock, F_SETFL, O_NONBLOCK) == 0);
+
+  return sock;
 }
 
-int vhost_user_send(int socket, struct vhost_user_msg *msg) {
+int vhost_user_accept(int sock) {
+  int newsock;
+  if ((newsock = accept(sock, NULL, NULL)) == -1) {
+    assert(errno == EAGAIN);
+  } else {
+    assert(fcntl(newsock, F_SETFL, O_NONBLOCK) == 0);
+  }
+  return newsock;
+}
+
+int vhost_user_send(int sock, struct vhost_user_msg *msg) {
   int ret;
 
   struct msghdr msgh;
@@ -45,7 +68,7 @@ int vhost_user_send(int socket, struct vhost_user_msg *msg) {
   msgh.msg_iovlen = 1;
 
   if (msg->nfds) {
-    msgh.msg_conrol = control;
+    msgh.msg_control = control;
     msgh.msg_controllen = sizeof(control);
 
     cmsg = CMSG_FIRSTHDR(&msgh);
@@ -60,7 +83,7 @@ int vhost_user_send(int socket, struct vhost_user_msg *msg) {
   }
 
   do {
-    ret = sendmsg(fd, &msgh, 0);
+    ret = sendmsg(sock, &msgh, 0);
   } while (ret < 0 && errno == EINTR);
 
   if (ret < 0) {
@@ -70,7 +93,7 @@ int vhost_user_send(int socket, struct vhost_user_msg *msg) {
   return ret;
 }
 
-int vhost_user_receive(int socket, struct vhost_user_msg *msg) {
+int vhost_user_receive(int sock, struct vhost_user_msg *msg) {
   struct msghdr msgh;
   struct iovec iov[1];
   int ret;
@@ -91,7 +114,7 @@ int vhost_user_receive(int socket, struct vhost_user_msg *msg) {
   msgh.msg_control = control;
   msgh.msg_controllen = sizeof(control);
 
-  ret = recvmsg(fd, &msgh, 0);
+  ret = recvmsg(sock, &msgh, 0);
   if (ret > 0) {
     if (msgh.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) {
       ret = -1;
@@ -110,7 +133,7 @@ int vhost_user_receive(int socket, struct vhost_user_msg *msg) {
     }
   }
 
-  if (ret < 0) {
+  if (ret < 0 && errno != EAGAIN) {
     perror("recvmsg");
   }
 
@@ -123,7 +146,7 @@ void* map_guest_memory(int fd, int size) {
 }
 
 int unmap_guest_memory(void *ptr, int size) {
-  munmap(ptr, size);
+  return munmap(ptr, size);
 }
 
 int sync_shm(void *ptr, size_t size) {
