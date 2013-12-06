@@ -54,12 +54,7 @@ int vhost_user_send(int sock, struct vhost_user_msg *msg) {
   struct msghdr msgh;
   struct iovec iov[1];
 
-  size_t fd_size = msg->nfds * sizeof(int);
-  char control[CMSG_SPACE(fd_size)];
-  struct cmsghdr *cmsg;
-
   memset(&msgh, 0, sizeof(msgh));
-  memset(control, 0, sizeof(control));
 
   iov[0].iov_base = (void *)msg;
   iov[0].iov_len = sizeof(struct vhost_user_msg);
@@ -67,20 +62,8 @@ int vhost_user_send(int sock, struct vhost_user_msg *msg) {
   msgh.msg_iov = iov;
   msgh.msg_iovlen = 1;
 
-  if (msg->nfds) {
-    msgh.msg_control = control;
-    msgh.msg_controllen = sizeof(control);
-
-    cmsg = CMSG_FIRSTHDR(&msgh);
-
-    cmsg->cmsg_len = CMSG_LEN(fd_size);
-    cmsg->cmsg_level = SOL_SOCKET;
-    cmsg->cmsg_type = SCM_RIGHTS;
-    memcpy(CMSG_DATA(cmsg), msg->fds, fd_size);
-  } else {
-    msgh.msg_control = 0;
-    msgh.msg_controllen = 0;
-  }
+  msgh.msg_control = 0;
+  msgh.msg_controllen = 0;
 
   do {
     ret = sendmsg(sock, &msgh, 0);
@@ -93,18 +76,18 @@ int vhost_user_send(int sock, struct vhost_user_msg *msg) {
   return ret;
 }
 
-int vhost_user_receive(int sock, struct vhost_user_msg *msg) {
+int vhost_user_receive(int sock, struct vhost_user_msg *msg, int *fds, int *nfds) {
   struct msghdr msgh;
   struct iovec iov[1];
   int ret;
 
-  int fd_size = sizeof(msg->fds);
+  int fd_size = sizeof(int) * VHOST_USER_MEMORY_MAX_NREGIONS;
   char control[CMSG_SPACE(fd_size)];
   struct cmsghdr *cmsg;
 
   memset(&msgh, 0, sizeof(msgh));
   memset(control, 0, sizeof(control));
-  msg->nfds = 0;
+  *nfds = 0;
 
   iov[0].iov_base = (void *) msg;
   iov[0].iov_len = sizeof(*msg);
@@ -126,8 +109,8 @@ int vhost_user_receive(int sock, struct vhost_user_msg *msg) {
           cmsg->cmsg_type == SCM_RIGHTS) {
         if (fd_size >= cmsg->cmsg_len - CMSG_LEN(0)) {
           fd_size = cmsg->cmsg_len - CMSG_LEN(0);
-          memcpy(&msg->fds, CMSG_DATA(cmsg), fd_size);
-          msg->nfds = fd_size / sizeof(int);
+          memcpy(fds, CMSG_DATA(cmsg), fd_size);
+          *nfds = fd_size / sizeof(int);
         }
       }
     }
@@ -140,15 +123,15 @@ int vhost_user_receive(int sock, struct vhost_user_msg *msg) {
   return ret;
 }
 
-void* map_guest_memory(int fd, int size) {
+void* vhost_user_map_guest_memory(int fd, int size) {
   void *ptr = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   return ptr == MAP_FAILED ? 0 : ptr;
 }
 
-int unmap_guest_memory(void *ptr, int size) {
+int vhost_user_unmap_guest_memory(void *ptr, int size) {
   return munmap(ptr, size);
 }
 
-int sync_shm(void *ptr, size_t size) {
+int vhost_user_sync_shm(void *ptr, size_t size) {
   return msync(ptr, size, MS_SYNC | MS_INVALIDATE);
 }
