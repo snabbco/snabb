@@ -66,7 +66,7 @@ netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more Ne
 
 Apart from the tests, there are now some examples at in the examples directory; more to come.
 
-There will be proper documentation before the 1.0 release, apologies for it not being available sooner. I understand how important it is...
+There will be proper documentation before the 1.0 release, apologies for it not being available sooner. I understand how important it is and it is planned shortly.
 
 ## Testing
 
@@ -154,7 +154,7 @@ There will no doubt be bugs and missing features, please report them if you find
 
 ### License
 
-All the ljsyscall code is under the MIT license, see LICENSE file for further details.
+All the ljsyscall code is under the MIT license. The ABI definitions are considered to be non copyrighted or CC0 if you need an official disclaimer. See LICENSE file for further details.
 
 
 
