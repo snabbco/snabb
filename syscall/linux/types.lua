@@ -99,7 +99,6 @@ local addstructs = {
   ndt_config = "struct ndt_config",
   utsname = "struct utsname",
   fdb_entry = "struct fdb_entry",
-  io_event = "struct io_event",
   seccomp_data = "struct seccomp_data",
   rtnl_link_stats = "struct rtnl_link_stats",
   statfs = "struct statfs64",
@@ -851,6 +850,14 @@ mt.epoll_events = {
 }
 
 addtype_var("epoll_events", "struct {int count; struct epoll_event ep[?];}", mt.epoll_events)
+
+mt.io_event = {
+  index = {
+    error = function(ev) if (ev.res < 0) then return t.error(-ev.res) end end,
+  }
+}
+
+addtype("io_event", "struct io_event", mt.io_event)
 
 mt.io_events = {
   __len = function(evs) return evs.count end,

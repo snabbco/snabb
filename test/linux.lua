@@ -1115,6 +1115,31 @@ test.aio = {
     assert(S.munmap(abuf, 4096))
     assert(S.io_destroy(ctx))
   end,
+  test_aio_error = function()
+    local ctx, err = S.io_setup(8)
+    if not ctx and err.NOSYS then return end -- may not be supported
+    local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
+    ffi.copy(abuf, teststring)
+    local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- use O_DIRECT or aio may not work
+    assert(S.unlink(tmpfile))
+    assert(fd:pwrite(abuf, 4096, 0))
+    ffi.fill(abuf, 4096)
+    local a = t.iocb_array{{opcode = "pread", data = 42, fildes = fd, buf = nil, nbytes = 4096, offset = 0}}
+    local ret = assert(S.io_submit(ctx, a))
+    assert_equal(ret, 1)
+    local ev = t.io_events(1)
+    local count = 0
+    for k, v in assert(S.io_getevents(ctx, 1, ev)) do
+      assert_equal(tonumber(v.data), 42)
+      assert(tonumber(v.res) < 0) -- there is an error
+      assert(v.error.FAULT) -- EFAULT as bad address
+      count = count + 1
+    end
+    assert_equal(count, 1)
+    assert(fd:close())
+    assert(S.munmap(abuf, 4096))
+    assert(S.io_destroy(ctx))
+  end,
 --[[ -- no Linux fs supports this it seems...
   test_aio_fdsync = function()
     local ctx, err = S.io_setup(8)
