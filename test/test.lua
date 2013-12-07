@@ -817,6 +817,17 @@ test_file_operations = {
   end,
 }
 
+test_file_operations_at = {
+  teardown = clean,
+  test_linkat = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.linkat("fdcwd", tmpfile, "fdcwd", tmpfile2, "symlink_follow"))
+    assert(S.unlink(tmpfile2))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+}
+
 test_directory_operations = {
   teardown = clean,
   test_getdents_dev = function()

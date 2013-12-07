@@ -119,15 +119,6 @@ test.file_operations_linux = {
     assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
     assert(fd:close())
   end,
-  test_linkat = function()
-    local dirfd = assert(S.open("."))
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(S.linkat(dirfd, tmpfile, dirfd, tmpfile2, "symlink_follow"))
-    assert(S.unlink(tmpfile2))
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-    assert(dirfd:close())
-  end,
   test_symlinkat = function()
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
@@ -159,14 +150,6 @@ test.file_operations_linux = {
     assert(fd:close())
     assert(dirfd:close())
   end,
-  test_sync_file_range = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
-    assert(fd:sync_file_range(4096, 0, "wait_before, write, wait_after"))
-    assert(fd:sync_file_range(1, 2, "wait_before, write, wait_after"))
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
   test_mkdirat_unlinkat = function()
     local fd = assert(S.open("."))
     assert(fd:mkdirat(tmpfile, "RWXU"))
@@ -196,20 +179,6 @@ test.file_operations_linux = {
     assert(stat.size == #teststring, "expect length to br what was written")
     assert(S.unlink(tmpfile))
   end,
-  test_fadvise_etc = function() -- could split
-    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
-    assert(S.unlink(tmpfile))
-    assert(S.fadvise(fd, "random"))
-    local ok, err = S.fallocate(fd, "keep_size", 1024, 4096)
-    assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported")
-    ok, err = S.posix_fallocate(fd, 0, 8192)
-    assert(ok or err.OPNOTSUPP or err.NOSYS, "expect posix_fallocate to succeed if supported")
-    assert(S.readahead(fd, 0, 4096))
-    -- disabled as will often give ENOSPC! TODO better test
-    --local ok, err = S.fallocate(fd, "keep_size", largeval, largeval + 1) -- test 64 bit ops 8589934592, 8589934593
-    --assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported, got " .. tostring(err))
-    assert(fd:close())
-  end,
   test_mknodat_fifo = function()
     local fd = assert(S.open("."))
     assert(fd:mknodat(tmpfile, "fifo,rwxu"))
@@ -225,6 +194,28 @@ test.file_operations_linux = {
     assert(stat.isfifo, "expect to be a fifo")
     assert(fd:close())
     assert(S.unlink(tmpfile))
+  end,
+  test_fadvise_etc = function() -- could split
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
+    assert(S.unlink(tmpfile))
+    assert(S.fadvise(fd, "random"))
+    local ok, err = S.fallocate(fd, "keep_size", 1024, 4096)
+    assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported")
+    ok, err = S.posix_fallocate(fd, 0, 8192)
+    assert(ok or err.OPNOTSUPP or err.NOSYS, "expect posix_fallocate to succeed if supported")
+    assert(S.readahead(fd, 0, 4096))
+    -- disabled as will often give ENOSPC! TODO better test
+    --local ok, err = S.fallocate(fd, "keep_size", largeval, largeval + 1) -- test 64 bit ops 8589934592, 8589934593
+    --assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported, got " .. tostring(err))
+    assert(fd:close())
+  end,
+  test_sync_file_range = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
+    assert(fd:sync_file_range(4096, 0, "wait_before, write, wait_after"))
+    assert(fd:sync_file_range(1, 2, "wait_before, write, wait_after"))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
   end,
 }
 

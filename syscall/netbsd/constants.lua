@@ -989,5 +989,10 @@ c.WAIT = strflag {
   MYPGRP   = 0,
 }
 
+-- linkat
+c.AT_SYMLINK_FOLLOW = multiflags {
+  SYMLINK_FOLLOW = 0x400,
+}
+
 return c
 
