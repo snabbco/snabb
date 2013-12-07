@@ -181,6 +181,7 @@ local nm = {
   OPIPE = "O_",
   MSYNC = "MS_",
   AT_SYMLINK_NOFOLLOW = "AT_",
+  AT_SYMLINK_FOLLOW = "AT_",
   CHFLAGS = "",
   PC = "_PC_",
   FSYNC = "",
