@@ -826,6 +826,13 @@ test_file_operations_at = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_openat = function()
+    local dfd = S.open(".")
+    local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "rwxu"))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+    assert(dfd:close())
+  end,
 }
 
 test_directory_operations = {

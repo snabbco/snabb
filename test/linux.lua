@@ -104,13 +104,6 @@ test.sockets_linux = {
 
 test.file_operations_linux = {
   teardown = clean,
-  test_openat = function()
-    local dfd = S.open(".")
-    local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "rwxu"))
-    assert(dfd:unlinkat(tmpfile))
-    assert(fd:close())
-    assert(dfd:close())
-  end,
   test_faccessat = function()
     local fd = S.open("/dev")
     assert(fd:faccessat("null", "r"), "expect access to say can read /dev/null")
