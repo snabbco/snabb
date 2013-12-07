@@ -1192,11 +1192,12 @@ test_sockets_pipes = {
     assert(sock:close())
     assert(S.unlink(tmpfile))
   end,
-  test_notsock_error = function()
+  test_notsock_error = function() -- this error number differs on NetBSD, Linux so good test of rump/rumplinux error handling
     local fd = assert(S.open("/dev/null", "RDONLY"))
     local sa = t.sockaddr_in(0, "loopback")
     local ok, err = fd:bind(sa)
     assert(not ok and err.NOTSOCK)
+    assert_equal(tostring(err), "Socket operation on non-socket")
     assert(fd:close())
   end,
 }
