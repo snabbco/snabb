@@ -181,10 +181,6 @@ function S.kevent(kq, changelist, eventlist, timeout)
   return retnum(C.kevent(getfd(kq), changes, changecount, nil, 0, timeout))
 end
 
-function S.openat(dirfd, pathname, flags, mode)
-  return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, c.O[flags], c.MODE[mode]))
-end
-
 -- TODO this is the same as ppoll other than if timeout is modified, which Linux syscall but not libc does; could merge
 function S.pollts(fds, timeout, set)
   if timeout then timeout = mktype(t.timespec, timeout) end
@@ -207,6 +203,13 @@ function S.sigaction(signum, handler, oldact)
   end
   if handler then handler = mktype(t.sigaction, handler) end
   return retbool(C.sigaction(c.SIG[signum], handler, oldact))
+end
+
+-- missing in some versions
+if C.openat then
+  function S.openat(dirfd, pathname, flags, mode)
+    return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, c.O[flags], c.MODE[mode]))
+  end
 end
 
 return S

@@ -827,6 +827,7 @@ test_file_operations_at = {
     assert(fd:close())
   end,
   test_openat = function()
+    if not S.openat then return end -- TODO mark as skipped
     local dfd = S.open(".")
     local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "rwxu"))
     assert(S.unlink(tmpfile))
