@@ -124,20 +124,6 @@ test.file_operations_linux = {
     assert(fd:close())
     assert(dirfd:close())
   end,
-  test_fstatat = function()
-    local fd = assert(S.open("."))
-    assert(util.writefile(tmpfile, teststring, "RWXU"))
-    local stat = assert(fd:fstatat(tmpfile))
-    assert(stat.size == #teststring, "expect length to br what was written")
-    assert(fd:close())
-    assert(S.unlink(tmpfile))
-  end,
-  test_fstatat_fdcwd = function()
-    assert(util.writefile(tmpfile, teststring, "RWXU"))
-    local stat = assert(S.fstatat("fdcwd", tmpfile, nil, "no_automount, symlink_nofollow"))
-    assert(stat.size == #teststring, "expect length to br what was written")
-    assert(S.unlink(tmpfile))
-  end,
   test_mknodat_fifo = function() -- TODO mknodat non fifo test
     local fd = assert(S.open("."))
     assert(fd:mknodat(tmpfile, "fifo,rwxu"))
