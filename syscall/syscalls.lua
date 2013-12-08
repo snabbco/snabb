@@ -533,7 +533,20 @@ if C.mknodat then
     return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S_I[mode], dev or 0))
   end
 end
-
+if C.utimensat then
+  function S.utimensat(dirfd, path, ts, flags)
+    if ts then ts = t.timespec2(ts) end -- TODO use mktype?
+    return retbool(C.utimensat(c.AT_FDCWD[dirfd], path, ts, c.AT[flags]))
+  end
+end
+if C.fstatat then
+  function S.fstatat(fd, path, buf, flags)
+    if not buf then buf = t.stat() end
+    local ret, err = C.fstatat(c.AT_FDCWD[fd], path, buf, c.AT[flags])
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return buf
+  end
+end
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
 S.openpt = S.posix_openpt
