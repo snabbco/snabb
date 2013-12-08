@@ -124,15 +124,6 @@ test.file_operations_linux = {
     assert(fd:close())
     assert(dirfd:close())
   end,
-  test_renameat = function()
-    local fd = assert(S.open("."))
-    assert(util.writefile(tmpfile, teststring, "RWXU"))
-    assert(S.renameat(fd, tmpfile, fd, tmpfile2))
-    assert(not S.stat(tmpfile))
-    assert(S.stat(tmpfile2))
-    assert(fd:close())
-    assert(S.unlink(tmpfile2))
-  end,
   test_fstatat = function()
     local fd = assert(S.open("."))
     assert(util.writefile(tmpfile, teststring, "RWXU"))

@@ -862,6 +862,16 @@ test_file_operations_at = {
     assert(fd:unlinkat(tmpfile, "removedir"))
     assert(not S.stat(tmpfile), "expect dir gone")
   end,
+  test_renameat = function()
+    if not S.renameat then return end -- TODO mark as skipped
+    local fd = assert(S.open("."))
+    assert(util.writefile(tmpfile, teststring, "RWXU"))
+    assert(S.renameat(fd, tmpfile, fd, tmpfile2))
+    assert(not S.stat(tmpfile))
+    assert(S.stat(tmpfile2))
+    assert(fd:close())
+    assert(S.unlink(tmpfile2))
+  end,
 }
 
 test_directory_operations = {
