@@ -104,15 +104,6 @@ test.sockets_linux = {
 
 test.file_operations_linux = {
   teardown = clean,
-  test_fchmodat = function()
-    local dirfd = assert(S.open("."))
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(dirfd:fchmodat(tmpfile, "RUSR, WUSR"))
-    assert(S.access(tmpfile, "rw"))
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-    assert(dirfd:close())
-  end,
   test_fchownat_root = function()
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))

@@ -88,9 +88,6 @@ end
 
 function S.exit(status) C.exit_group(c.EXIT[status]) end
 
-function S.fchmodat(dirfd, pathname, mode)
-  return retbool(C.fchmodat(c.AT_FDCWD[dirfd], pathname, c.MODE[mode], 0)) -- no flags actually supported
-end
 function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.sync_file_range(getfd(fd), offset, count, c.SYNC_FILE_RANGE[flags]))
 end

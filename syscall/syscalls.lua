@@ -547,6 +547,12 @@ if C.fstatat then
     return buf
   end
 end
+if C.fchmodat then
+  function S.fchmodat(dirfd, pathname, mode)
+    return retbool(C.fchmodat(c.AT_FDCWD[dirfd], pathname, c.MODE[mode], 0)) -- no flags actually supported
+  end
+end
+
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
 S.openpt = S.posix_openpt

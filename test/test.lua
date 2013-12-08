@@ -888,6 +888,16 @@ test_file_operations_at = {
     assert(stat.size == #teststring, "expect length to be what was written")
     assert(S.unlink(tmpfile))
   end,
+  test_fchmodat = function()
+    if not S.fchmodat then return end -- TODO mark as skipped
+    local dirfd = assert(S.open("."))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(dirfd:fchmodat(tmpfile, "RUSR, WUSR"))
+    assert(S.access(tmpfile, "rw"))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+    assert(dirfd:close())
+  end,
 }
 
 test_directory_operations = {
