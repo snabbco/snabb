@@ -104,7 +104,7 @@ test.sockets_linux = {
 
 test.file_operations_linux = {
   teardown = clean,
-  test_mknodat_fifo = function()
+  test_mknodat_fifo = function() -- this does not work on NetBSD, you need to use mkfifo
     local fd = assert(S.open("."))
     assert(fd:mknodat(tmpfile, "fifo,rwxu"))
     local stat = assert(S.stat(tmpfile))
