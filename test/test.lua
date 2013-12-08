@@ -828,11 +828,9 @@ test_file_operations_at = {
   end,
   test_openat = function()
     if not S.openat then return end -- TODO mark as skipped
-    local dfd = S.open(".")
-    local fd = assert(dfd:openat(tmpfile, "rdwr,creat", "rwxu"))
+    local fd = assert(S.openat("fdcwd", tmpfile, "rdwr,creat", "rwxu"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
-    assert(dfd:close())
   end,
   test_faccessat = function()
     if not S.faccessat then return end -- TODO mark as skipped
@@ -866,12 +864,10 @@ test_file_operations_at = {
   end,
   test_renameat = function()
     if not S.renameat then return end -- TODO mark as skipped
-    local fd = assert(S.open("."))
     assert(util.writefile(tmpfile, teststring, "RWXU"))
-    assert(S.renameat(fd, tmpfile, fd, tmpfile2))
+    assert(S.renameat("fdcwd", tmpfile, fd, tmpfile2))
     assert(not S.stat(tmpfile))
     assert(S.stat(tmpfile2))
-    assert(fd:close())
     assert(S.unlink(tmpfile2))
   end,
   test_fstatat = function()
