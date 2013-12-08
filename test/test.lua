@@ -828,7 +828,8 @@ test_file_operations_at = {
   end,
   test_openat = function()
     if not S.openat then return end -- TODO mark as skipped
-    local fd = assert(S.openat("fdcwd", tmpfile, "rdwr,creat", "rwxu"))
+    local fd, err = S.openat("fdcwd", tmpfile, "rdwr,creat", "rwxu")
+    if not fd and err.NOSYS then return end -- TODO mark as skipped
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
@@ -865,7 +866,8 @@ test_file_operations_at = {
   test_renameat = function()
     if not S.renameat then return end -- TODO mark as skipped
     assert(util.writefile(tmpfile, teststring, "RWXU"))
-    assert(S.renameat("fdcwd", tmpfile, fd, tmpfile2))
+    local ok, err = S.renameat("fdcwd", tmpfile, "fdcwd", tmpfile2)
+    if not ok and err.NOSYS then return end -- TODO mark as skipped
     assert(not S.stat(tmpfile))
     assert(S.stat(tmpfile2))
     assert(S.unlink(tmpfile2))
