@@ -173,10 +173,6 @@ c.AF.UNIX = c.AF.LOCAL
 c.AF.OSI = c.AF.ISO
 c.AF.E164 = c.AF.ISDN
 
-c.AT_FDCWD = atflag {
-  FDCWD = -100,
-}
-
 c.O = multiflags {
   RDONLY      = 0x00000000,
   WRONLY      = 0x00000001,
@@ -989,9 +985,8 @@ c.WAIT = strflag {
   MYPGRP   = 0,
 }
 
--- linkat
-c.AT_SYMLINK_FOLLOW = multiflags {
-  SYMLINK_FOLLOW = 0x400,
+c.AT_FDCWD = atflag {
+  FDCWD = -100,
 }
 
 c.AT = multiflags {
