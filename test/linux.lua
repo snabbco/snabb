@@ -138,7 +138,7 @@ test.file_operations_linux = {
     assert(stat.size == #teststring, "expect length to br what was written")
     assert(S.unlink(tmpfile))
   end,
-  test_mknodat_fifo = function()
+  test_mknodat_fifo = function() -- TODO mknodat non fifo test
     local fd = assert(S.open("."))
     assert(fd:mknodat(tmpfile, "fifo,rwxu"))
     local stat = assert(S.stat(tmpfile))
