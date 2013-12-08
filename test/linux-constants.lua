@@ -162,6 +162,7 @@ local function fixup_constants(abi, c)
   c.SI.ASYNCNL = nil
   c.RLIMIT.OFILE = nil
   c.TFD_TIMER.ABSTIME = nil
+  c.AT.EMPTY_PATH = nil
 
   -- renamed it seems, TODO sort out
   c.SYS.newfstatat, c.SYS.fstatat = c.SYS.fstatat, nil
