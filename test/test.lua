@@ -843,6 +843,18 @@ test_file_operations_at = {
     assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
     assert(fd:close())
   end,
+  test_symlinkat = function()
+    if not S.symlinkat or not S.readlinkat then return end -- TODO mark as skipped
+    local dirfd = assert(S.open("."))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.symlinkat(tmpfile, dirfd, tmpfile2))
+    local s = assert(S.readlinkat(dirfd, tmpfile2))
+    assert_equal(s, tmpfile, "should be able to read symlink")
+    assert(S.unlink(tmpfile2))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+    assert(dirfd:close())
+  end,
 }
 
 test_directory_operations = {
