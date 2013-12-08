@@ -194,6 +194,7 @@ c.AF.NFC = nil
 c.PR.SET_PTRACER = nil
 c.MAP["32BIT"] = nil
 c.SYS.sync_file_range = nil
+c.AT.EMPTY_PATH = nil
 
 -- these are not in Musl at present TODO send patches to get them in
 c.IPPROTO.UDPLITE = nil
