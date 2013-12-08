@@ -17,8 +17,6 @@ local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.
 
 local t, pt, s = types.t, types.pt, types.s
 
-function S.mkfifo(pathname, mode) return retbool(C.mkfifo(pathname, c.S_I[mode])) end
-
 function S.accept(sockfd, flags, addr, addrlen)
   assert(not flags, "TODO add accept flags emulation") -- TODO emulate netbsd paccept/Linux accept4
   addr = addr or t.sockaddr_storage()

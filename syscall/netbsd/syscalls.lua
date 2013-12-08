@@ -62,8 +62,6 @@ function S.unmount(target, flags)
   return retbool(C.unmount(target, c.UMOUNT[flags]))
 end
 
-function S.mkfifo(pathname, mode) return retbool(C.mkfifo(pathname, c.S_I[mode])) end
-
 function S.reboot(how, bootstr)
   return retbool(C.reboot(c.RB[how], bootstr))
 end
