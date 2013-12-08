@@ -548,8 +548,8 @@ if C.fstatat then
   end
 end
 if C.fchmodat then
-  function S.fchmodat(dirfd, pathname, mode)
-    return retbool(C.fchmodat(c.AT_FDCWD[dirfd], pathname, c.MODE[mode], 0)) -- no flags actually supported
+  function S.fchmodat(dirfd, pathname, mode, flags)
+    return retbool(C.fchmodat(c.AT_FDCWD[dirfd], pathname, c.MODE[mode], c.AT[flags]))
   end
 end
 
