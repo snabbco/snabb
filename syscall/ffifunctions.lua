@@ -134,5 +134,13 @@ int munlock(const void *addr, size_t len);
 int mlockall(int flags);
 int munlockall(void);
 
+int openat(int dirfd, const char *pathname, int flags, mode_t mode);
+int mkdirat(int dirfd, const char *pathname, mode_t mode);
+int unlinkat(int dirfd, const char *pathname, int flags);
+int renameat(int olddirfd, const char *oldpath, int newdirfd, const char *newpath);
+int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
+int symlinkat(const char *oldpath, int newdirfd, const char *newpath);
+int mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev);
+int mkfifoat(int dirfd, const char *pathname, mode_t mode);
 ]]
 
