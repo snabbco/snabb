@@ -198,7 +198,7 @@ int rump___sysimpl_symlinkat(const char *, int, const char *);
 int rump___sysimpl_unlinkat(int, const char *, int);
 int rump___sysimpl_futimens(int, const struct _netbsd_timespec *);
 int rump___sysimpl___quotactl(const char *, struct _netbsd_quotactl_args *);
-int rump___sysimpl_pipe(int *);
+int rump_sys_pipe(int *);
 ]]
 
 local C = {
@@ -373,6 +373,8 @@ local C = {
   utimes = ffi.C.rump___sysimpl_utimes50,
   write = ffi.C.rump___sysimpl_write,
   writev = ffi.C.rump___sysimpl_writev,
+
+  pipe = ffi.C.rump_sys_pipe,
 }
 
 function C.mmap(...)
