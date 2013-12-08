@@ -176,7 +176,7 @@ test.network_utils_bsd_root = {
 
 test.sockets_pipes_bsd = {
   test_nosigpipe = function()
-    local p1, p2 = assert(S.pipe("nosigpipe"))
+    local p1, p2 = assert(S.pipe2("nosigpipe"))
     assert(p1:close())
     local ok, err = p2:write("other end closed")
     assert(not ok and err.PIPE, "should get EPIPE")
