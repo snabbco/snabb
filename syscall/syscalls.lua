@@ -548,6 +548,11 @@ if C.fchmodat then
     return retbool(C.fchmodat(c.AT_FDCWD[dirfd], pathname, c.MODE[mode], c.AT[flags]))
   end
 end
+if C.openat then
+  function S.openat(dirfd, pathname, flags, mode)
+    return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, c.O[flags], c.MODE[mode]))
+  end
+end
 
 -- Linux does not have mkfifo syscalls, emulated
 if C.mkfifo then

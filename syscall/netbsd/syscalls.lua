@@ -198,13 +198,6 @@ function S.sigaction(signum, handler, oldact)
   return retbool(C.sigaction(c.SIG[signum], handler, oldact))
 end
 
--- missing in some versions
-if C.openat then
-  function S.openat(dirfd, pathname, flags, mode)
-    return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, c.O[flags], c.MODE[mode]))
-  end
-end
-
 return S
 
 end

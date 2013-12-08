@@ -22,7 +22,7 @@ local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
 local ret64, retnum, retfd, retbool, retptr, retiter = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr, hh.retiter
 
 if abi.abi32 then
-  -- override open call with largefile
+  -- override open call with largefile -- TODO move this hack to c.lua instead
   function S.open(pathname, flags, mode)
     flags = bit.bor(c.O[flags], c.O.LARGEFILE)
     return retfd(C.open(pathname, flags, c.MODE[mode]))
@@ -30,10 +30,6 @@ if abi.abi32 then
   function S.openat(dirfd, pathname, flags, mode)
     flags = bit.bor(c.O[flags], c.O.LARGEFILE)
     return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, flags, c.MODE[mode]))
-  end
-else -- no largefile issues
-  function S.openat(dirfd, pathname, flags, mode)
-    return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, c.O[flags], c.MODE[mode]))
   end
 end
 
