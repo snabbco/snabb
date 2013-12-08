@@ -104,11 +104,22 @@ test.sockets_linux = {
 
 test.file_operations_linux = {
   teardown = clean,
-  test_mknodat_fifo = function() -- TODO mknodat non fifo test
+  test_mknodat_fifo = function()
     local fd = assert(S.open("."))
     assert(fd:mknodat(tmpfile, "fifo,rwxu"))
     local stat = assert(S.stat(tmpfile))
     assert(stat.isfifo, "expect to be a fifo")
+    assert(fd:close())
+    assert(S.unlink(tmpfile))
+  end,
+  test_mknodat_root = function()
+    local fd = assert(S.open("."))
+    assert(fd:mknodat(tmpfile, "fchr,0666", t.device(1, 5)))
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.ischr, "expect to be a character device")
+    assert_equal(stat.rdev.major, 1 , "expect major number to be 1")
+    assert_equal(stat.rdev.minor, 5, "expect minor number to be 5")
+    assert_equal(stat.rdev.device, t.device(1, 5).device, "expect raw device to be makedev(1, 5)")
     assert(fd:close())
     assert(S.unlink(tmpfile))
   end,

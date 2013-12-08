@@ -115,10 +115,7 @@ function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath))
 function S.chroot(path) return retbool(C.chroot(path)) end
 function S.umask(mask) return C.umask(c.MODE[mask]) end
 function S.sync() return C.sync() end
-function S.mknod(pathname, mode, dev)
-  dev = getdev(dev)
-  return retbool(C.mknod(pathname, c.S_I[mode], dev or 0))
-end
+function S.mknod(pathname, mode, dev) return retbool(C.mknod(pathname, c.S_I[mode], getdev(dev) or 0)) end
 function S.flock(fd, operation) return retbool(C.flock(getfd(fd), c.LOCK[operation])) end
 -- TODO read should have consistent return type but then will differ from other calls.
 function S.read(fd, buf, count)
@@ -529,8 +526,7 @@ if C.readlinkat then
 end
 if C.mknodat then
   function S.mknodat(fd, pathname, mode, dev)
-    if type(dev) == "table" then dev = dev.dev end
-    return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S_I[mode], dev or 0))
+    return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S_I[mode], getdev(dev) or 0))
   end
 end
 if C.utimensat then
