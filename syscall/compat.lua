@@ -97,13 +97,14 @@ if S.wait4 and not S.wait then
   S.wait = function(status) return S.wait4(-1, 0, false, status) end
 end
 
+local pipe = S.pipe
 if not S.pipe2 then
   S.pipe2 = function(flags, fd2)
     assert(not flags, "TODO add pipe flags emulation") -- TODO emulate flags from Linux pipe2
-    return S.pipe(fd2)
+    return pipe(fd2)
   end
 end
-S.pipe = S.pipe2 -- always allow flags
+S.pipe = S.pipe2 -- always allow flags TODO not sure if this is best strategy
 
 if not S.dup3 then
   function S.dup3(oldfd, newfd, flags)
