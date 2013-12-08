@@ -441,7 +441,7 @@ if C.pipe2 then
     return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
   end
 end
-function S.pipe(flags, fd2)
+function S.pipe(fd2)
   fd2 = fd2 or t.int2()
   local ret, err = C.pipe(fd2)
   if ret == -1 then return nil, t.error(err or errno()) end

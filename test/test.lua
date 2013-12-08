@@ -1133,6 +1133,13 @@ test_sockets_pipes = {
     assert(pr:close())
     assert(pw:close())
   end,
+  test_pipe2 = function()
+    local pr, pw = assert(S.pipe2("nonblock, cloexec"))
+    assert(pw:write("test"))
+    assert_equal(pr:read(), "test")
+    assert(pr:close())
+    assert(pw:close())
+  end,
   test_sockaddr_in_error = function()
     local sa = t.sockaddr_in(1234, "error")
     assert(not sa, "expect nil socket address from invalid ip string")

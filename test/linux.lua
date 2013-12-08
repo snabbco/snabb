@@ -242,8 +242,8 @@ test.xattr = {
 
 test.tee_splice = {
   test_tee_splice = function()
-    local pr, pw = assert(S.pipe("nonblock"))
-    local ppr, ppw = assert(S.pipe("nonblock"))
+    local pr, pw = assert(S.pipe2("nonblock"))
+    local ppr, ppw = assert(S.pipe2("nonblock"))
     local s1, s2 = assert(S.socketpair("unix", "stream, nonblock"))
     local fd = assert(S.open(tmpfile, "rdwr, creat", "RWXU"))
     assert(S.unlink(tmpfile))
