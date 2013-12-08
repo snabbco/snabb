@@ -994,5 +994,12 @@ c.AT_SYMLINK_FOLLOW = multiflags {
   SYMLINK_FOLLOW = 0x400,
 }
 
+c.AT = multiflags {
+  EACCESS          = 0x100,
+  SYMLINK_NOFOLLOW = 0x200,
+  SYMLINK_FOLLOW   = 0x400,
+  REMOVEDIR        = 0x800,
+}
+
 return c
 

@@ -834,6 +834,15 @@ test_file_operations_at = {
     assert(fd:close())
     assert(dfd:close())
   end,
+  test_faccessat = function()
+    if not S.faccessat then return end -- TODO mark as skipped
+    local fd = S.open("/dev")
+    assert(fd:faccessat("null", "r"), "expect access to say can read /dev/null")
+    assert(fd:faccessat("null", c.OK.R), "expect access to say can read /dev/null")
+    assert(fd:faccessat("null", "w"), "expect access to say can write /dev/null")
+    assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
+    assert(fd:close())
+  end,
 }
 
 test_directory_operations = {

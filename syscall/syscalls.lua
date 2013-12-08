@@ -109,7 +109,7 @@ function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or 
 function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
-  return retbool(C.linkat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath, c.AT_SYMLINK_FOLLOW[flags]))
+  return retbool(C.linkat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath, c.AT[flags]))
 end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 function S.chroot(path) return retbool(C.chroot(path)) end
@@ -497,7 +497,7 @@ if C.symlinkat then
   function S.symlinkat(oldpath, newdirfd, newpath) return retbool(C.symlinkat(oldpath, c.AT_FDCWD[newdirfd], newpath)) end
 end
 if C.unlinkat then
-  function S.unlinkat(dirfd, path, flags) return retbool(C.unlinkat(c.AT_FDCWD[dirfd], path, c.AT_REMOVEDIR[flags])) end
+  function S.unlinkat(dirfd, path, flags) return retbool(C.unlinkat(c.AT_FDCWD[dirfd], path, c.AT[flags])) end
 end
 if C.renameat then
   function S.renameat(olddirfd, oldpath, newdirfd, newpath)
@@ -509,12 +509,12 @@ if C.mkdirat then
 end
 if C.fchownat then
   function S.fchownat(dirfd, path, owner, group, flags)
-    return retbool(C.fchownat(c.AT_FDCWD[dirfd], path, owner or -1, group or -1, c.AT_SYMLINK_NOFOLLOW[flags]))
+    return retbool(C.fchownat(c.AT_FDCWD[dirfd], path, owner or -1, group or -1, c.AT[flags]))
   end
 end
 if C.faccessat then
   function S.faccessat(dirfd, pathname, mode, flags)
-    return retbool(C.faccessat(c.AT_FDCWD[dirfd], pathname, c.OK[mode], c.AT_ACCESSAT[flags]))
+    return retbool(C.faccessat(c.AT_FDCWD[dirfd], pathname, c.OK[mode], c.AT[flags]))
   end
 end
 if C.readlinkat then

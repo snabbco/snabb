@@ -644,32 +644,18 @@ c.UTIME = strflag {
   OMIT = bit.lshift(1, 30) - 2,
 }
 
--- ...at commands note these are valid in different combinations so different tables provided
-
 c.AT_FDCWD = atflag {
   FDCWD = -100,
 }
 
-c.AT_REMOVEDIR = multiflags {
-  REMOVEDIR = 0x200,
-}
-
-c.AT_SYMLINK_FOLLOW = multiflags {
-  SYMLINK_FOLLOW = 0x400,
-}
-
-c.AT_SYMLINK_NOFOLLOW = multiflags {
+-- not all combinations valid
+c.AT = multiflags {
   SYMLINK_NOFOLLOW = 0x100,
-}
-
-c.AT_ACCESSAT = multiflags {
-  SYMLINK_NOFOLLOW = 0x100,
+  REMOVEDIR        = 0x200,
   EACCESS          = 0x200,
-}
-
-c.AT_FSTATAT = multiflags {
-  SYMLINK_NOFOLLOW = 0x100,
+  SYMLINK_FOLLOW   = 0x400,
   NO_AUTOMOUNT     = 0x800,
+  EMPTY_PATH       = 0x1000,
 }
 
 -- send, recv etc
