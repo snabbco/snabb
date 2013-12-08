@@ -124,12 +124,6 @@ test.file_operations_linux = {
     assert(fd:close())
     assert(dirfd:close())
   end,
-  test_mkdirat_unlinkat = function()
-    local fd = assert(S.open("."))
-    assert(fd:mkdirat(tmpfile, "RWXU"))
-    assert(fd:unlinkat(tmpfile, "removedir"))
-    assert(not fd:fstatat(tmpfile), "expect dir gone")
-  end,
   test_renameat = function()
     local fd = assert(S.open("."))
     assert(util.writefile(tmpfile, teststring, "RWXU"))

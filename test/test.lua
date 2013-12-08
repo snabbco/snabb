@@ -844,7 +844,7 @@ test_file_operations_at = {
     assert(fd:close())
   end,
   test_symlinkat = function()
-    if not S.symlinkat or not S.readlinkat then return end -- TODO mark as skipped
+    if not (S.symlinkat and S.readlinkat) then return end -- TODO mark as skipped
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.symlinkat(tmpfile, dirfd, tmpfile2))
@@ -854,6 +854,13 @@ test_file_operations_at = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
     assert(dirfd:close())
+  end,
+  test_mkdirat_unlinkat = function()
+    if not (S.mkdirat and S.unlinkat) then return end -- TODO mark as skipped
+    local fd = assert(S.open("."))
+    assert(fd:mkdirat(tmpfile, "RWXU"))
+    assert(fd:unlinkat(tmpfile, "removedir"))
+    assert(not S.stat(tmpfile), "expect dir gone")
   end,
 }
 
