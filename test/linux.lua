@@ -112,14 +112,6 @@ test.file_operations_linux = {
     assert(fd:close())
     assert(S.unlink(tmpfile))
   end,
-  test_mkfifoat = function()
-    local fd = assert(S.open("."))
-    assert(S.mkfifoat(fd, tmpfile, "rwxu"))
-    local stat = assert(S.stat(tmpfile))
-    assert(stat.isfifo, "expect to be a fifo")
-    assert(fd:close())
-    assert(S.unlink(tmpfile))
-  end,
   test_fadvise_etc = function() -- could split
     local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))

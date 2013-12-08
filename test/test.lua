@@ -899,6 +899,7 @@ test_file_operations_at = {
     assert(dirfd:close())
   end,
   test_fchownat_root = function()
+    if not S.fchownat then return end -- TODO mark as skipped
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(dirfd:fchownat(tmpfile, 66, 55, "symlink_nofollow"))
@@ -908,6 +909,15 @@ test_file_operations_at = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
     assert(dirfd:close())
+  end,
+  test_mkfifoat = function()
+    if not S.mkfifoat then return end -- TODO mark as skipped
+    local fd = assert(S.open("."))
+    assert(S.mkfifoat(fd, tmpfile, "rwxu"))
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.isfifo, "expect to be a fifo")
+    assert(fd:close())
+    assert(S.unlink(tmpfile))
   end,
 }
 
