@@ -858,9 +858,11 @@ test_file_operations_at = {
   test_mkdirat_unlinkat = function()
     if not (S.mkdirat and S.unlinkat) then return end -- TODO mark as skipped
     local fd = assert(S.open("."))
-    assert(fd:mkdirat(tmpfile, "RWXU"))
+    local ok, err = fd:mkdirat(tmpfile, "RWXU")
+    if not ok and err.NOSYS then return end -- TODO mark as skipped
     assert(fd:unlinkat(tmpfile, "removedir"))
     assert(not S.stat(tmpfile), "expect dir gone")
+    assert(fd:close())
   end,
   test_renameat = function()
     if not S.renameat then return end -- TODO mark as skipped
@@ -913,7 +915,8 @@ test_file_operations_at = {
   test_mkfifoat = function()
     if not S.mkfifoat then return end -- TODO mark as skipped
     local fd = assert(S.open("."))
-    assert(S.mkfifoat(fd, tmpfile, "rwxu"))
+    local ok, err = S.mkfifoat(fd, tmpfile, "rwxu")
+    if not ok and err.NOSYS then return end -- TODO mark as skipped
     local stat = assert(S.stat(tmpfile))
     assert(stat.isfifo, "expect to be a fifo")
     assert(fd:close())
