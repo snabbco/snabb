@@ -492,6 +492,48 @@ end
 
 function S.setpriority(which, who, prio) return retbool(C.setpriority(c.PRIO[which], who or 0, prio)) end
 
+-- these may not always exist, but where they do they have the same interface
+if C.symlinkat then
+  function S.symlinkat(oldpath, newdirfd, newpath) return retbool(C.symlinkat(oldpath, c.AT_FDCWD[newdirfd], newpath)) end
+end
+if C.unlinkat then
+  function S.unlinkat(dirfd, path, flags) return retbool(C.unlinkat(c.AT_FDCWD[dirfd], path, c.AT_REMOVEDIR[flags])) end
+end
+if C.renameat then
+  function S.renameat(olddirfd, oldpath, newdirfd, newpath)
+    return retbool(C.renameat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath))
+  end
+end
+if C.mkdirat then
+  function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(c.AT_FDCWD[fd], path, c.MODE[mode])) end
+end
+if C.fchownat then
+  function S.fchownat(dirfd, path, owner, group, flags)
+    return retbool(C.fchownat(c.AT_FDCWD[dirfd], path, owner or -1, group or -1, c.AT_SYMLINK_NOFOLLOW[flags]))
+  end
+end
+if C.faccessat then
+  function S.faccessat(dirfd, pathname, mode, flags)
+    return retbool(C.faccessat(c.AT_FDCWD[dirfd], pathname, c.OK[mode], c.AT_ACCESSAT[flags]))
+  end
+end
+if C.readlinkat then
+  function S.readlinkat(dirfd, path, buffer, size)
+    size = size or c.PATH_MAX
+    buffer = buffer or t.buffer(size)
+    local ret, err = C.readlinkat(c.AT_FDCWD[dirfd], path, buffer, size)
+    ret = tonumber(ret)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return ffi.string(buffer, ret)
+  end
+end
+if C.mknodat then
+  function S.mknodat(fd, pathname, mode, dev)
+    if type(dev) == "table" then dev = dev.dev end
+    return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S_I[mode], dev or 0))
+  end
+end
+
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
 S.openpt = S.posix_openpt

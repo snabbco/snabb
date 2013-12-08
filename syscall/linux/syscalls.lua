@@ -41,35 +41,6 @@ function S.pause() return retbool(C.pause()) end
 
 function S.acct(filename) return retbool(C.acct(filename)) end
 
-function S.unlinkat(dirfd, path, flags)
-  return retbool(C.unlinkat(c.AT_FDCWD[dirfd], path, c.AT_REMOVEDIR[flags]))
-end
-function S.renameat(olddirfd, oldpath, newdirfd, newpath)
-  return retbool(C.renameat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath))
-end
-function S.mkdirat(fd, path, mode) return retbool(C.mkdirat(c.AT_FDCWD[fd], path, c.MODE[mode])) end
-function S.symlinkat(oldpath, newdirfd, newpath) return retbool(C.symlinkat(oldpath, c.AT_FDCWD[newdirfd], newpath)) end
-function S.fchownat(dirfd, path, owner, group, flags)
-  return retbool(C.fchownat(c.AT_FDCWD[dirfd], path, owner or -1, group or -1, c.AT_SYMLINK_NOFOLLOW[flags]))
-end
-function S.faccessat(dirfd, pathname, mode, flags)
-  return retbool(C.faccessat(c.AT_FDCWD[dirfd], pathname, c.OK[mode], c.AT_ACCESSAT[flags]))
-end
-
-function S.readlinkat(dirfd, path, buffer, size)
-  size = size or c.PATH_MAX
-  buffer = buffer or t.buffer(size)
-  local ret, err = C.readlinkat(c.AT_FDCWD[dirfd], path, buffer, size)
-  ret = tonumber(ret)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return ffi.string(buffer, ret)
-end
-
-function S.mknodat(fd, pathname, mode, dev)
-  if type(dev) == "table" then dev = dev.dev end
-  return retbool(C.mknodat(c.AT_FDCWD[fd], pathname, c.S_I[mode], dev or 0))
-end
-
 function S.getpriority(which, who)
   local ret, err = C.getpriority(c.PRIO[which], who or 0)
   if ret == -1 then return nil, t.error(err or errno()) end
