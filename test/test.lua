@@ -898,6 +898,17 @@ test_file_operations_at = {
     assert(fd:close())
     assert(dirfd:close())
   end,
+  test_fchownat_root = function()
+    local dirfd = assert(S.open("."))
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(dirfd:fchownat(tmpfile, 66, 55, "symlink_nofollow"))
+    local stat = S.stat(tmpfile)
+    assert_equal(stat.uid, 66, "expect uid changed")
+    assert_equal(stat.gid, 55, "expect gid changed")
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+    assert(dirfd:close())
+  end,
 }
 
 test_directory_operations = {
