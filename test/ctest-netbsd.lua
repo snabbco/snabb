@@ -104,6 +104,7 @@ print [[
 #include <sys/syscall.h>
 #include <sys/statvfs.h>
 #include <sys/event.h>
+#include <sys/ktrace.h>
 #include <netinet/in.h>
 #include <net/route.h>
 #include <net/bpf.h>
