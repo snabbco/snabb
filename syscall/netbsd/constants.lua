@@ -992,5 +992,45 @@ c.AT = multiflags {
   REMOVEDIR        = 0x800,
 }
 
+c.KTR = strflag {
+  SYSCALL  = 1,
+  SYSRET   = 2,
+  NAMEI    = 3,
+  GENIO    = 4,
+  PSIG     = 5,
+  CSW      = 6,
+  EMUL     = 7,
+  USER     = 8,
+  EXEC_ARG = 10,
+  EXEC_ENV = 11,
+  SAUPCALL = 13,
+  MIB      = 14,
+  EXEC_FD  = 15,
+}
+
+c.KTRFAC = multiflags {
+  MASK       = 0x00ffffff,
+  SYSCALL    = bit.lshift(1, c.KTR.SYSCALL),
+  SYSRET     = bit.lshift(1, c.KTR.SYSRET),
+  NAMEI      = bit.lshift(1, c.KTR.NAMEI),
+  GENIO      = bit.lshift(1, c.KTR.GENIO),
+  PSIG       = bit.lshift(1, c.KTR.PSIG),
+  CSW        = bit.lshift(1, c.KTR.CSW),
+  EMUL       = bit.lshift(1, c.KTR.EMUL),
+  USER       = bit.lshift(1, c.KTR.USER),
+  EXEC_ARG   = bit.lshift(1, c.KTR.EXEC_ARG),
+  EXEC_ENV   = bit.lshift(1, c.KTR.EXEC_ENV),
+  SAUPCALL   = bit.lshift(1, c.KTR.SAUPCALL),
+  MIB        = bit.lshift(1, c.KTR.MIB),
+  EXEC_FD    = bit.lshift(1, c.KTR.EXEC_FD),
+  PERSISTENT = 0x80000000,
+  INHERIT    = 0x40000000,
+  TRC_EMUL   = 0x10000000,
+  VER_MASK   = 0x0f000000,
+  V0         = bit.lshift(0, 24),
+  V1         = bit.lshift(1, 24),
+  V2         = bit.lshift(2, 24),
+}
+
 return c
 
