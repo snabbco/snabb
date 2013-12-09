@@ -33,6 +33,8 @@ int kqueue1(int flags);
 int pollts(struct pollfd * restrict fds, nfds_t nfds, const struct timespec * restrict ts, const sigset_t * restrict sigmask);
 int issetugid(void);
 pid_t wait4(pid_t wpid, int *status, int options, struct rusage *rusage);
+int ktrace(const char *tracefile, int ops, int trpoints, pid_t pid);
+int fktrace(int fd, int ops, int trpoints, pid_t pid);
 
 int __mount50(const char *type, const char *dir, int flags, void *data, size_t data_len);
 int __stat50(const char *path, struct stat *sb);
