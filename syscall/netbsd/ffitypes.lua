@@ -41,8 +41,9 @@ typedef int _netbsd_timer_t;
 typedef int _netbsd_suseconds_t;
 typedef unsigned int _netbsd_nfds_t;
 
-/* useconds_t not used in Linux so not renamed */
+/* these are not used in Linux so not renamed */
 typedef unsigned int useconds_t;
+typedef int32_t lwpid_t;
 
 typedef struct { int32_t __fsid_val[2]; } _netbsd_fsid_t;
 
@@ -354,6 +355,68 @@ struct _netbsd_rusage {
   long    ru_nivcsw;
 };
 ]]
+
+if abi.le then
+append [[
+struct ktr_header {
+  int     ktr_len;
+  short   ktr_type;
+  short   ktr_version;
+  pid_t   ktr_pid;
+  char    ktr_comm[17];
+  union {
+    struct {
+      struct {
+        int32_t tv_sec;
+        long tv_usec;
+      } _tv;
+      const void *_buf;
+    } _v0;
+    struct {
+      struct {
+        int32_t tv_sec;
+        long tv_nsec;
+      } _ts;
+      lwpid_t _lid;
+    } _v1;
+    struct {
+      struct _netbsd_timespec _ts;
+      lwpid_t _lid;
+    } _v2;
+  } _v;
+};
+]]
+else
+append [[
+struct ktr_header {
+  int     ktr_len;
+  short   ktr_version;
+  short   ktr_type;
+  pid_t   ktr_pid;
+  char    ktr_comm[17];
+  union {
+    struct {
+      struct {
+        int32_t tv_sec;
+        long tv_usec;
+      } _tv;
+      const void *_buf;
+    } _v0;
+    struct {
+      struct {
+        int32_t tv_sec;
+        long tv_nsec;
+      } _ts;
+      lwpid_t _lid;
+    } _v1;
+    struct {
+      struct _netbsd_timespec _ts;
+      lwpid_t _lid;
+    } _v2;
+  } _v;
+};
+]]
+end
 
 local s = table.concat(defs, "")
 
