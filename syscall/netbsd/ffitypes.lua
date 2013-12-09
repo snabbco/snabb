@@ -358,7 +358,7 @@ struct _netbsd_rusage {
 
 if abi.le then
 append [[
-struct ktr_header {
+struct _netbsd_ktr_header {
   int     ktr_len;
   short   ktr_type;
   short   ktr_version;
@@ -388,7 +388,7 @@ struct ktr_header {
 ]]
 else
 append [[
-struct ktr_header {
+struct _netbsd_ktr_header {
   int     ktr_len;
   short   ktr_version;
   short   ktr_type;

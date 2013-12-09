@@ -373,6 +373,19 @@ mt.kevents = {
 
 addtype_var("kevents", "struct {int count; struct kevent kev[?];}", mt.kevents)
 
+mt.ktr_header = {
+  index = {
+    lid = function(ktr) return ktr._v._v2._lid end,
+    olid = function(ktr) return ktr._v._v1._lid end,
+    time = function(ktr) return ktr._v._v2._ts end,
+    otv = function(ktr) return ktr._v._v0._tv end,
+    ots = function(ktr) return ktr._v._v1._ts end,
+    unused = function(ktr) return ktr._v._v0._buf end,
+  },
+}
+
+addtype("ktr_header", "struct ktr_header", mt.ktr_header)
+
 -- slightly miscellaneous types, eg need to use Lua metatables
 
 -- TODO see Linux notes
