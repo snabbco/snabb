@@ -1032,5 +1032,11 @@ c.KTRFAC = multiflags {
   V2         = bit.lshift(2, 24),
 }
 
+-- enum uio
+c.UIO = strflag {
+  READ = 0,
+  WRITE = 1,
+}
+
 return c
 

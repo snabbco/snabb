@@ -24,6 +24,27 @@ typedef unsigned long _netbsd_clock_t;
 ]]
 end
 
+-- register_t varies by arch
+local register_t = {
+  x86 = "int",
+  x64 = "long int",
+  mips = "int32_t",
+  mips64 = "int64_t",
+  sparc = "unsigned long int",
+  sparc64 = "unsigned long int",
+  ia64 = "long int",
+  alpha = "long int",
+  ppc = "long int",
+  ppc64 = "long int",
+  arm = "int",
+  sh3 = "int",
+  m68k = "int",
+  hppa = "int",
+  vax = "int",
+}
+
+append("typedef " .. register_t[abi.arch] .. " _netbsd_register_t;")
+
 append [[
 typedef uint32_t _netbsd_mode_t;
 typedef uint8_t _netbsd_sa_family_t;
@@ -417,6 +438,48 @@ struct _netbsd_ktr_header {
 };
 ]]
 end
+
+append [[
+struct ktr_syscall {
+  int     ktr_code;
+  int     ktr_argsize;
+};
+struct ktr_sysret {
+  short   ktr_code;
+  short   ktr_eosys;
+  int     ktr_error;
+  _netbsd_register_t ktr_retval;
+  _netbsd_register_t ktr_retval_1;
+};
+struct ktr_genio {
+  int     ktr_fd;
+  int     ktr_rw; /* enum uoi_rw, changed to constant */
+};
+struct ktr_psig {
+  int     signo;
+  sig_t   action;
+  _netbsd_sigset_t mask;
+  int     code;
+};
+struct ktr_csw {
+  int     out;
+  int     user;
+};
+struct ktr_user {
+  char    ktr_id[20];
+};
+struct ktr_saupcall {
+  int ktr_type;
+  int ktr_nevent;
+  int ktr_nint;
+  void *ktr_sas;
+  void *ktr_ap;
+};
+struct ktr_execfd {
+  int   ktr_fd;
+  unsigned int ktr_dtype;
+};
+]]
 
 local s = table.concat(defs, "")
 

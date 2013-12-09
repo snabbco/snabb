@@ -41,6 +41,9 @@ typedef int64_t off_t;
 typedef long ssize_t;
 typedef unsigned long size_t;
 
+// sighandler in Linux
+typedef void (*sig_t)(int);
+
 struct iovec {
   void *iov_base;
   size_t iov_len;
