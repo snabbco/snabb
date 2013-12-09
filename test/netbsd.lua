@@ -340,7 +340,18 @@ test.ktrace = {
     assert_equal(pid, S.getpid())
     assert(S.ktrace(tmpfile, "clear", "syscall, sysret", pid))
     -- TODO kdump here
-    S.unlink(tmpfile)
+    assert(S.unlink(tmpfile))
+  end,
+  test_fktrace = function()
+    local p1, p2 = assert(S.pipe())
+    local pid = S.getpid()
+    local ok, err = p2:ktrace("set", "syscall, sysret", pid)
+    -- now do something that should be in trace
+    assert_equal(pid, S.getpid())
+    assert(p2:ktrace("clear", "syscall, sysret", pid))
+    -- TODO kdump here
+    assert(p1:close())
+    assert(p2:close())
   end,
 }
 
