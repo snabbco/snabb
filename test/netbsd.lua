@@ -349,7 +349,11 @@ test.ktrace = {
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
     assert(p2:ktrace("clear", "syscall, sysret", pid))
-    -- TODO kdump here
+    local buf = t.buffer(4096)
+    local n = assert(p1:read(buf, 4096))
+    for _, v in util.kdump(buf, n) do
+      print(v)
+    end
     assert(p1:close())
     assert(p2:close())
   end,

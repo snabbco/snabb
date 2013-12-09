@@ -375,6 +375,11 @@ addtype_var("kevents", "struct {int count; struct kevent kev[?];}", mt.kevents)
 
 mt.ktr_header = {
   index = {
+    len = function(ktr) return ktr.ktr_len end,
+    version = function(ktr) return ktr.ktr_version end,
+    type = function(ktr) return ktr.ktr_type end,
+    pid = function(ktr) return ktr.ktr_pid end,
+    comm = function(ktr) return tostring(ktr.ktr_comm) end,
     lid = function(ktr) return ktr._v._v2._lid end,
     olid = function(ktr) return ktr._v._v1._lid end,
     time = function(ktr) return ktr._v._v2._ts end,
@@ -382,6 +387,7 @@ mt.ktr_header = {
     ots = function(ktr) return ktr._v._v1._ts end,
     unused = function(ktr) return ktr._v._v0._buf end,
   },
+  __len = function(ktr) return s.ktr_header + ktr.ktr_len end
 }
 
 addtype("ktr_header", "struct ktr_header", mt.ktr_header)

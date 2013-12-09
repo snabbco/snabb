@@ -81,6 +81,19 @@ function util.mount(tab)
   return S.mount(filesystemtype, dir, flags, data, datalen)
 end
 
+local function kdumpfn(len)
+  return function(buf, pos)
+    if pos >= len then return nil end
+    local ktr = pt.ktr_header(buf + pos)
+    local len = #ktr
+    return pos + len, ktr
+  end
+end
+
+function util.kdump(buf, len)
+  return kdumpfn(len), buf, 0
+end
+
 return util
 
 end
