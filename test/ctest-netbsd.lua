@@ -51,6 +51,9 @@ c.CHFLAGS.IMMUTABLE = nil -- alias
 c.CHFLAGS.APPEND = nil -- alias
 c.CHFLAGS.OPAQUE = nil -- alias
 
+c.KTRFLAG = {DESCEND = c.KTROP.DESCEND}
+c.KTROP.DESCEND = nil
+
 c.W.WCLONE = nil -- underscore in name, changed
 c.W.WALL   = nil -- underscore in name, changed
 

@@ -1032,6 +1032,13 @@ c.KTRFAC = multiflags {
   V2         = bit.lshift(2, 24),
 }
 
+c.KTROP = multiflags {
+  SET              = 0,
+  CLEAR            = 1,
+  CLEARFILE        = 2,
+  DESCEND          = 4,
+}
+
 -- enum uio
 c.UIO = strflag {
   READ = 0,

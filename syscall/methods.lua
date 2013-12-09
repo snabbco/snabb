@@ -85,7 +85,7 @@ local fdmethods = {'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'preadv', 'pwritev', 'epoll_pwait', 'ioctl', 'flock', 'fpathconf',
                    'grantpt', 'unlockpt', 'ptsname', 'tcgetattr', 'tcsetattr', 'isatty',
                    'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
-                   'fchflags', 'fchroot', 'fsync_range', 'kevent', 'paccept' -- netbsd only
+                   'fchflags', 'fchroot', 'fsync_range', 'kevent', 'paccept', 'fktrace' -- netbsd only
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end
@@ -119,6 +119,7 @@ fmeth.pathconf = S.fpathconf
 fmeth.chflags = S.fchflags
 fmeth.chroot = S.fchroot
 fmeth.sync_range = S.fsync_range
+fmeth.ktrace = S.fktrace
 
 local function nogc(d) return ffi.gc(d, nil) end
 

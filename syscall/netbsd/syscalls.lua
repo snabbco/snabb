@@ -198,6 +198,16 @@ function S.sigaction(signum, handler, oldact)
   return retbool(C.sigaction(c.SIG[signum], handler, oldact))
 end
 
+function S.ktrace(tracefile, ops, trpoints, pid)
+  return retbool(C.ktrace(tracefile, c.KTROP[ops], c.KTRFAC[trpoints], pid))
+end
+function S.fktrace(fd, ops, trpoints, pid)
+  return retbool(C.fktrace(fd, c.KTROP[ops], c.KTRFAC[trpoints], pid))
+end
+function S.utrace(label, addr, len)
+  return retbool(C.utrace(label, addr, len)) -- TODO allow string to be passed as addr?
+end
+
 return S
 
 end
