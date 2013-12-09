@@ -198,6 +198,9 @@ int rump___sysimpl_symlinkat(const char *, int, const char *);
 int rump___sysimpl_unlinkat(int, const char *, int);
 int rump___sysimpl_futimens(int, const struct _netbsd_timespec *);
 int rump___sysimpl___quotactl(const char *, struct _netbsd_quotactl_args *);
+int rump___sysimpl_ktrace(const char *tracefile, int ops, int trpoints, pid_t pid);
+int rump___sysimpl_fktrace(int fd, int ops, int trpoints, pid_t pid);
+
 int rump_sys_pipe(int *);
 ]]
 
@@ -242,6 +245,7 @@ local C = {
   fhopen = ffi.C.rump___sysimpl_fhopen40,
   fhstat = ffi.C.rump___sysimpl_fhstat50,
   fhstatvfs = ffi.C.rump___sysimpl_fhstatvfs140,
+  fktrace = ffi.C.rump___sysimpl_fktrace,
   flistxattr = ffi.C.rump___sysimpl_flistxattr,
   flock = ffi.C.rump___sysimpl_flock,
   fpathconf = ffi.C.rump___sysimpl_fpathconf,
@@ -290,6 +294,7 @@ local C = {
   _ksem_trywait = ffi.C.rump___sysimpl__ksem_trywait,
   _ksem_unlink = ffi.C.rump___sysimpl__ksem_unlink,
   _ksem_wait = ffi.C.rump___sysimpl__ksem_wait,
+  ktrace = ffi.C.rump___sysimpl_ktrace,
   lchflags = ffi.C.rump___sysimpl_lchflags,
   lchmod = ffi.C.rump___sysimpl_lchmod,
   lchown = ffi.C.rump___sysimpl_lchown,
