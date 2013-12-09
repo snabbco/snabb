@@ -329,6 +329,21 @@ test.misc_bsd_root = {
 }
 ]]
 
+test.ktrace = {
+  teardown = clean,
+  test_ktrace = function()
+    local fd = assert(S.creat(tmpfile, "rwxu"))
+    local pid = S.getpid()
+    assert(fd:close())
+    local ok, err = S.ktrace(tmpfile, "set", "syscall, sysret", pid)
+    -- now do something that should be in trace
+    assert_equal(pid, S.getpid())
+    assert(S.ktrace(tmpfile, "clear", "syscall, sysret", pid))
+    -- TODO kdump here
+    S.unlink(tmpfile)
+  end,
+}
+
 return test
 
 end
