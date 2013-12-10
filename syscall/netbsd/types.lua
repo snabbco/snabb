@@ -380,7 +380,17 @@ for k, v in pairs(c.KTR) do ktr_type[v] = k end
 local ktr_val_tp = {
   SYSCALL = "ktr_syscall",
   SYSRET = "ktr_sysret",
-  -- TODO rest
+  NAMEI = "string",
+  -- TODO GENIO
+  -- TODO PSIG
+  CSW = "ktr_csw",
+  EMUL = "string",
+  -- TODO USER
+  EXEC_ARG = "string",
+  EXEC_ENV = "string",
+  -- TODO SAUPCALL
+  MIB = "string",
+  -- TODO EXEC_FD
 }
 
 mt.ktr_header = {
@@ -397,10 +407,11 @@ mt.ktr_header = {
     otv = function(ktr) return ktr._v._v0._tv end,
     ots = function(ktr) return ktr._v._v1._ts end,
     unused = function(ktr) return ktr._v._v0._buf end,
-    valptr = function(ktr) return pt.char(ktr + s.ktr_header) end, -- assumes ktr is a pointer
+    valptr = function(ktr) return pt.char(ktr) + s.ktr_header end, -- assumes ktr is a pointer
     values = function(ktr)
       local tpnam = ktr_val_tp[ktr.typename]
-      if not tpnam then print "unimplemented ktrace type" end
+      if not tpnam then return "unimplemented ktrace type" end
+      if tpnam == "string" then return ffi.string(ktr.valptr, ktr.len) end
       return pt[tpnam](ktr.valptr)
     end,
   },
@@ -444,6 +455,14 @@ mt.ktr_sysret = {
 }
 
 addtype("ktr_sysret", "struct ktr_sysret", mt.ktr_sysret)
+
+mt.ktr_csw = {
+  __tostring = function(ktr)
+    return "context switch" -- TODO
+  end,
+}
+
+addtype("ktr_csw", "struct ktr_csw", mt.ktr_csw)
 
 -- slightly miscellaneous types, eg need to use Lua metatables
 

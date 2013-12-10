@@ -361,14 +361,24 @@ test.ktrace = {
     local buf = t.buffer(4096)
     local n = assert(p1:read(buf, 4096))
     for _, ktr in util.kdump(buf, n) do
-    --assert_equal(ktr.pid, pid) -- failing on 32 bit why?
-    -- TODO fix, odddly getting all zero data here
-    --for i = 0, ktr.len do print(ktr.valptr[i]) end
+    assert_equal(ktr.pid, pid) -- failing on 32 bit why?
       print(ktr.pid .. " " .. ktr.comm .. " " .. ktr.typename .. " " .. tostring(ktr.values))
     end
     assert(p1:close())
     assert(p2:close())
   end,
+--[[ -- useful but needs some traces for 32/64 bit checked in
+  test_ktrace_file = function()
+    assert(S.rump.etfs_register("/ktrace.out", "ktrace.out", "chr"))
+    local fd = assert(S.open("/ktrace.out", "rdonly"))
+    local buf = t.buffer(32768)
+    local n = assert(fd:read(buf, 32768))
+    for _, ktr in util.kdump(buf, n) do
+      print(ktr.pid .. " " .. ktr.comm .. " " .. ktr.typename .. " " .. tostring(ktr.values))
+    end
+    assert(fd:close())
+  end,
+]]
 }
 
 return test
