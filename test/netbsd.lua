@@ -357,6 +357,7 @@ test.ktrace = {
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
     local ok, err = S.open("/thisfiledoes not exist", "rdonly")
+    local ok, err = S.ioctl(-1, "TIOCMGET")
     assert(p2:ktrace("clear", "syscall, sysret", pid))
     local buf = t.buffer(4096)
     local n = assert(p1:read(buf, 4096))

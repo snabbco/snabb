@@ -423,6 +423,28 @@ addtype("ktr_header", "struct ktr_header", mt.ktr_header)
 local sysname = {}
 for k, v in pairs(c.SYS) do sysname[v] = k end
 
+local ioctlname
+
+-- TODO this is a temporary hack, needs better code
+local special = {
+  ioctl = function(fd, request, val)
+    if not ioctlname then
+      ioctlname = {}
+      local IOCTL = require "syscall.netbsd.constants".IOCTL -- see #94 as well, we cannot load early as ioctl depends on types
+      for k, v in pairs(IOCTL) do
+        if type(v) == "table" then v = v.number end
+        v = tonumber(v)
+        if v then ioctlname[v] = k end
+      end
+    end
+    fd = tonumber(t.int(fd))
+    request = tonumber(t.int(request))
+    val = tonumber(val)
+    local ionm = ioctlname[request] or tostring(request)
+    return tostring(fd) .. ", " .. ionm .. ", " .. tostring(val)
+  end,
+}
+
 mt.ktr_syscall = {
   index = {
     code = function(ktr) return ktr.ktr_code end,
@@ -434,6 +456,11 @@ mt.ktr_syscall = {
   __len = function(ktr) return s.ktr_syscall + ktr.argsize end,
   __tostring = function(ktr)
     local rtab = {}
+    for i = 0, ktr.nreg - 1 do rtab[i + 1] = tostring(ktr.registers[i]) end
+    if special[ktr.name] then
+      for i = 0, ktr.nreg - 1 do rtab[i + 1] = ktr.registers[i] end
+      return ktr.name .. " (" .. special[ktr.name](unpack(rtab)) .. ")"
+    end
     for i = 0, ktr.nreg - 1 do rtab[i + 1] = tostring(ktr.registers[i]) end
     return ktr.name .. " (" .. table.concat(rtab, ",") .. ")"
   end,
