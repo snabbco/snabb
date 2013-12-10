@@ -332,20 +332,28 @@ test.misc_bsd_root = {
 test.ktrace = {
   teardown = clean,
   test_ktrace = function()
-    local fd = assert(S.creat(tmpfile, "rwxu"))
+    local fd = assert(S.open(tmpfile, "creat, trunc, rdwr", "0666"))
     local pid = S.getpid()
-    assert(fd:close())
-    local ok, err = S.ktrace(tmpfile, "set", "syscall, sysret", pid)
+    local kfd = assert(S.kqueue())
+    local kevs = t.kevents{{fd = fd, filter = "vnode", flags = "add, enable, clear", fflags = "extend"}}
+    assert(kfd:kevent(kevs, nil))
+    assert(S.ktrace(tmpfile, "set", "syscall, sysret", pid))
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
     assert(S.ktrace(tmpfile, "clear", "syscall, sysret", pid))
-    -- TODO kdump here
+    assert(kfd:kevent(nil, kevs, 1)) -- block until extend
+    local buf = t.buffer(4096)
+    local n = assert(fd:read(buf, 4096))
+    for _, ktr in util.kdump(buf, n) do
+      print(ktr.pid .. " " .. ktr.comm .. " " .. ktr.typename .. " " .. tostring(ktr.values))
+    end
     assert(S.unlink(tmpfile))
+    assert(fd:close())
   end,
   test_fktrace = function()
     local p1, p2 = assert(S.pipe())
     local pid = S.getpid()
-    local ok, err = p2:ktrace("set", "syscall, sysret", pid)
+    assert(p2:ktrace("set", "syscall, sysret", pid))
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
     local ok, err = S.open("/thisfiledoes not exist", "rdonly")
