@@ -362,7 +362,7 @@ test.ktrace = {
     local buf = t.buffer(4096)
     local n = assert(p1:read(buf, 4096))
     for _, ktr in util.kdump(buf, n) do
-    assert_equal(ktr.pid, pid) -- failing on 32 bit why?
+      assert_equal(ktr.pid, pid) -- TODO failing on 32 bit why?
       print(ktr.pid .. " " .. ktr.comm .. " " .. ktr.typename .. " " .. tostring(ktr.values))
     end
     assert(p1:close())
