@@ -426,6 +426,7 @@ for k, v in pairs(c.SYS) do sysname[v] = k end
 mt.ktr_syscall = {
   index = {
     code = function(ktr) return ktr.ktr_code end,
+    name = function(ktr) return sysname[ktr.code] or tostring(ktr.code) end,
     argsize = function(ktr) return ktr.ktr_argsize end,
     nreg = function(ktr) return ktr.argsize / s.register end,
     registers = function(ktr) return pt.register(pt.char(ktr) + s.ktr_syscall) end -- assumes ktr is a pointer
@@ -434,8 +435,7 @@ mt.ktr_syscall = {
   __tostring = function(ktr)
     local rtab = {}
     for i = 0, ktr.nreg - 1 do rtab[i + 1] = tostring(ktr.registers[i]) end
-    local nam = sysname[ktr.code] or tostring(ktr.code)
-    return nam .. " (" .. table.concat(rtab, ",") .. ")"
+    return ktr.name .. " (" .. table.concat(rtab, ",") .. ")"
   end,
 }
 
@@ -444,14 +444,14 @@ addtype("ktr_syscall", "struct ktr_syscall", mt.ktr_syscall)
 mt.ktr_sysret = {
   index = {
     code = function(ktr) return ktr.ktr_code end,
-    error = function(ktr) return ktr.ktr_error end,
+    name = function(ktr) return sysname[ktr.code] or tostring(ktr.code) end,
+    error = function(ktr) return t.error(ktr.ktr_error) end,
     retval = function(ktr) return ktr.ktr_retval end,
     retval1 = function(ktr) return ktr.ktr_retval1 end,
   },
   __tostring = function(ktr)
     if ktr.retval == -1 then
-      local err = t.error(ktr.error)
-      return ktr.code .. " " .. tostring(ktr.retval) .. " " .. err.sym .. " " .. tostring(err)
+      return ktr.code .. " " .. tostring(ktr.retval) .. " " .. ktr.error.sym .. " " .. tostring(ktr.error)
     else
       return ktr.code .. " " .. tostring(ktr.retval) -- and second one if applicable for code
     end
