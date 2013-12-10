@@ -420,6 +420,9 @@ mt.ktr_header = {
 
 addtype("ktr_header", "struct ktr_header", mt.ktr_header)
 
+local sysname = {}
+for k, v in pairs(c.SYS) do sysname[v] = k end
+
 mt.ktr_syscall = {
   index = {
     code = function(ktr) return ktr.ktr_code end,
@@ -431,7 +434,8 @@ mt.ktr_syscall = {
   __tostring = function(ktr)
     local rtab = {}
     for i = 0, ktr.nreg - 1 do rtab[i + 1] = tostring(ktr.registers[i]) end
-    return ktr.code .. " (" .. table.concat(rtab, ",") .. ")"
+    local nam = sysname[ktr.code] or tostring(ktr.code)
+    return nam .. " (" .. table.concat(rtab, ",") .. ")"
   end,
 }
 
