@@ -400,7 +400,7 @@ mt.ktr_header = {
     valptr = function(ktr) return pt.char(ktr + s.ktr_header) end, -- assumes ktr is a pointer
     values = function(ktr)
       local tpnam = ktr_val_tp[ktr.typename]
-      if not tpnam then error "unimplemented ktrace type" end
+      if not tpnam then print "unimplemented ktrace type" end
       return pt[tpnam](ktr.valptr)
     end,
   },
