@@ -348,11 +348,15 @@ test.ktrace = {
     local ok, err = p2:ktrace("set", "syscall, sysret", pid)
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
+    local ok, err = S.open("/thisfiledoes not exist", "rdonly")
     assert(p2:ktrace("clear", "syscall, sysret", pid))
     local buf = t.buffer(4096)
     local n = assert(p1:read(buf, 4096))
-    for _, v in util.kdump(buf, n) do
-      print(v)
+    for _, ktr in util.kdump(buf, n) do
+      assert_equal(ktr.pid, pid)
+    -- TODO fix, odddly getting all zero data here
+    --for i = 0, ktr.len do print(ktr.valptr[i]) end
+      print(ktr.pid .. " " .. ktr.comm .. " " .. ktr.typename .. " " .. tostring(ktr.values))
     end
     assert(p1:close())
     assert(p2:close())

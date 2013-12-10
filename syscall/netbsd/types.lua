@@ -36,6 +36,7 @@ local mt = {} -- metatables
 
 local addtypes = {
   clockid = "clockid_t",
+  register = "register_t",
 }
 
 local addstructs = {
@@ -373,24 +374,76 @@ mt.kevents = {
 
 addtype_var("kevents", "struct {int count; struct kevent kev[?];}", mt.kevents)
 
+local ktr_type = {}
+for k, v in pairs(c.KTR) do ktr_type[v] = k end
+
+local ktr_val_tp = {
+  SYSCALL = "ktr_syscall",
+  SYSRET = "ktr_sysret",
+  -- TODO rest
+}
+
 mt.ktr_header = {
   index = {
     len = function(ktr) return ktr.ktr_len end,
     version = function(ktr) return ktr.ktr_version end,
     type = function(ktr) return ktr.ktr_type end,
+    typename = function(ktr) return ktr_type[ktr.ktr_type] end,
     pid = function(ktr) return ktr.ktr_pid end,
-    comm = function(ktr) return tostring(ktr.ktr_comm) end,
+    comm = function(ktr) return ffi.string(ktr.ktr_comm) end,
     lid = function(ktr) return ktr._v._v2._lid end,
     olid = function(ktr) return ktr._v._v1._lid end,
     time = function(ktr) return ktr._v._v2._ts end,
     otv = function(ktr) return ktr._v._v0._tv end,
     ots = function(ktr) return ktr._v._v1._ts end,
     unused = function(ktr) return ktr._v._v0._buf end,
+    valptr = function(ktr) return pt.char(ktr + s.ktr_header) end, -- assumes ktr is a pointer
+    values = function(ktr)
+      local tpnam = ktr_val_tp[ktr.typename]
+      if not tpnam then error "unimplemented ktrace type" end
+      return pt[tpnam](ktr.valptr)
+    end,
   },
   __len = function(ktr) return s.ktr_header + ktr.ktr_len end
 }
 
 addtype("ktr_header", "struct ktr_header", mt.ktr_header)
+
+mt.ktr_syscall = {
+  index = {
+    code = function(ktr) return ktr.ktr_code end,
+    argsize = function(ktr) return ktr.ktr_argsize end,
+    nreg = function(ktr) return ktr.argsize / s.register end,
+    registers = function(ktr) return pt.register(pt.char(ktr) + s.ktr_syscall) end -- assumes ktr is a pointer
+  },
+  __len = function(ktr) return s.ktr_syscall + ktr.argsize end,
+  __tostring = function(ktr)
+    local rtab = {}
+    for i = 0, ktr.nreg - 1 do rtab[i + 1] = tostring(ktr.registers[i]) end
+    return ktr.code .. " (" .. table.concat(rtab, ",") .. ")"
+  end,
+}
+
+addtype("ktr_syscall", "struct ktr_syscall", mt.ktr_syscall)
+
+mt.ktr_sysret = {
+  index = {
+    code = function(ktr) return ktr.ktr_code end,
+    error = function(ktr) return ktr.ktr_error end,
+    retval = function(ktr) return ktr.ktr_retval end,
+    retval1 = function(ktr) return ktr.ktr_retval1 end,
+  },
+  __tostring = function(ktr)
+    if ktr.retval == -1 then
+      local err = t.error(ktr.error)
+      return ktr.code .. " " .. tostring(ktr.retval) .. " " .. err.sym .. " " .. tostring(err)
+    else
+      return ktr.code .. " " .. tostring(ktr.retval) -- and second one if applicable for code
+    end
+  end
+}
+
+addtype("ktr_sysret", "struct ktr_sysret", mt.ktr_sysret)
 
 -- slightly miscellaneous types, eg need to use Lua metatables
 
