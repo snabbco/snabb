@@ -179,7 +179,6 @@ local nm = {
   CC = "",
   IOCTL = "",
   B = "B",
-  SYS = "SYS___",
   AT_FDCWD = "AT_",
   FCNTL_LOCK = "F_",
   LOCKF = "F_",
