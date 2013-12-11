@@ -926,9 +926,9 @@ test_file_operations_at = {
     assert(fd:mknodat(tmpfile, "fchr,0666", t.device(1, 5)))
     local stat = assert(S.stat(tmpfile))
     assert(stat.ischr, "expect to be a character device")
-    assert_equal(stat.rdev.major, 1 , "expect major number to be 1")
-    assert_equal(stat.rdev.minor, 5, "expect minor number to be 5")
-    assert_equal(stat.rdev.device, t.device(1, 5).device, "expect raw device to be makedev(1, 5)")
+    assert_equal(stat.rdev.major, 1)
+    assert_equal(stat.rdev.minor, 5)
+    assert_equal(stat.rdev.device, t.device(1, 5).device)
     assert(fd:close())
     assert(S.unlink(tmpfile))
   end,
