@@ -199,10 +199,10 @@ function S.sigaction(signum, handler, oldact)
 end
 
 function S.ktrace(tracefile, ops, trpoints, pid)
-  return retbool(C.ktrace(tracefile, c.KTROP[ops], c.KTRFAC[trpoints], pid))
+  return retbool(C.ktrace(tracefile, c.KTROP[ops], c.KTRFAC(trpoints, "V2"), pid))
 end
 function S.fktrace(fd, ops, trpoints, pid)
-  return retbool(C.fktrace(getfd(fd), c.KTROP[ops], c.KTRFAC[trpoints], pid))
+  return retbool(C.fktrace(getfd(fd), c.KTROP[ops], c.KTRFAC(trpoints, "V2"), pid))
 end
 function S.utrace(label, addr, len)
   return retbool(C.utrace(label, addr, len)) -- TODO allow string to be passed as addr?
