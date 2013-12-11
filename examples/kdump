@@ -1,7 +1,6 @@
 #!/usr/bin/env luajit
 
 local function assert(cond, err, ...)
-  collectgarbage("collect") -- force gc, to test for bugs
   if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
   if type(cond) == "function" then return cond, err, ... end
   if cond == true then return ... end
