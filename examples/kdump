@@ -1,0 +1,24 @@
+#!/usr/bin/env luajit
+
+local function assert(cond, err, ...)
+  collectgarbage("collect") -- force gc, to test for bugs
+  if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
+  if type(cond) == "function" then return cond, err, ... end
+  if cond == true then return ... end
+  return cond, ...
+end
+
+local kfile = arg[1] or "ktrace.out"
+
+local modules = {"vfs", "dev", "net", "fs.tmpfs", "fs.kernfs"}
+local S = require "syscall.rump.init".init(modules)
+local t = S.t
+
+assert(S.rump.etfs_register("/ktrace.out", kfile, "chr"))
+local fd = assert(S.open("/ktrace.out", "rdonly"))
+local buf = t.buffer(32768)
+local n = assert(fd:read(buf, 32768))
+for _, ktr in S.util.kdump(buf, n) do
+  print(ktr.pid .. " " .. ktr.comm .. " " .. ktr.typename .. " " .. tostring(ktr.values))
+end
+assert(fd:close())

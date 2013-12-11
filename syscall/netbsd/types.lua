@@ -478,9 +478,9 @@ mt.ktr_sysret = {
   },
   __tostring = function(ktr)
     if ktr.retval == -1 then
-      return ktr.code .. " " .. tostring(ktr.retval) .. " " .. ktr.error.sym .. " " .. tostring(ktr.error)
+      return ktr.name .. " " .. tostring(ktr.retval) .. " " .. ktr.error.sym .. " " .. tostring(ktr.error)
     else
-      return ktr.code .. " " .. tostring(ktr.retval) -- and second one if applicable for code
+      return ktr.name .. " " .. tostring(ktr.retval) -- and second one if applicable for code
     end
   end
 }
