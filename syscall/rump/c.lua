@@ -200,6 +200,7 @@ int rump___sysimpl_futimens(int, const struct _netbsd_timespec *);
 int rump___sysimpl___quotactl(const char *, struct _netbsd_quotactl_args *);
 int rump___sysimpl_ktrace(const char *tracefile, int ops, int trpoints, pid_t pid);
 int rump___sysimpl_fktrace(int fd, int ops, int trpoints, pid_t pid);
+int rump___sysimpl_utrace(const char *, void *, size_t);
 
 int rump_sys_pipe(int *);
 ]]
@@ -376,6 +377,7 @@ local C = {
   unmount = ffi.C.rump___sysimpl_unmount,
   utimensat = ffi.C.rump___sysimpl_utimensat,
   utimes = ffi.C.rump___sysimpl_utimes50,
+  utrace = ffi.C.rump___sysimpl_utrace,
   write = ffi.C.rump___sysimpl_write,
   writev = ffi.C.rump___sysimpl_writev,
 
