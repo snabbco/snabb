@@ -363,7 +363,7 @@ test.ktrace = {
     local n = assert(p1:read(buf, 4096))
     for _, ktr in util.kdump(buf, n) do
       assert_equal(ktr.pid, pid) -- TODO failing on 32 bit why?
-      print(ktr.pid .. " " .. ktr.comm .. " " .. ktr.typename .. " " .. tostring(ktr.values))
+      print(ktr.pid .. " " .. ktr.comm .. " " .. (ktr.typename or "??") .. " " .. tostring(ktr.values))
     end
     assert(p1:close())
     assert(p2:close())
