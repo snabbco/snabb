@@ -859,6 +859,7 @@ test_file_operations_at = {
     local fd = assert(S.open("."))
     local ok, err = fd:mkdirat(tmpfile, "RWXU")
     if not ok and err.NOSYS then return end -- TODO mark as skipped
+    assert(ok)
     assert(fd:unlinkat(tmpfile, "removedir"))
     assert(not S.stat(tmpfile), "expect dir gone")
     assert(fd:close())
@@ -868,6 +869,7 @@ test_file_operations_at = {
     assert(util.writefile(tmpfile, teststring, "RWXU"))
     local ok, err = S.renameat("fdcwd", tmpfile, "fdcwd", tmpfile2)
     if not ok and err.NOSYS then return end -- TODO mark as skipped
+    assert(ok)
     assert(not S.stat(tmpfile))
     assert(S.stat(tmpfile2))
     assert(S.unlink(tmpfile2))
@@ -902,7 +904,9 @@ test_file_operations_at = {
     if not S.fchownat then return end -- TODO mark as skipped
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(dirfd:fchownat(tmpfile, 66, 55, "symlink_nofollow"))
+    local ok, err = dirfd:fchownat(tmpfile, 66, 55, "symlink_nofollow")
+    if not ok and err.NOSYS then return end -- TODO mark as skipped
+    assert(ok)
     local stat = S.stat(tmpfile)
     assert_equal(stat.uid, 66, "expect uid changed")
     assert_equal(stat.gid, 55, "expect gid changed")
@@ -915,6 +919,7 @@ test_file_operations_at = {
     local fd = assert(S.open("."))
     local ok, err = S.mkfifoat(fd, tmpfile, "rwxu")
     if not ok and err.NOSYS then return end -- TODO mark as skipped
+    assert(ok)
     local stat = assert(S.stat(tmpfile))
     assert(stat.isfifo, "expect to be a fifo")
     assert(fd:close())
@@ -923,7 +928,9 @@ test_file_operations_at = {
   test_mknodat_root = function()
     if not S.mknodat then return end -- TODO mark as skipped
     local fd = assert(S.open("."))
-    assert(fd:mknodat(tmpfile, "fchr,0666", t.device(1, 5)))
+    local ok, err = fd:mknodat(tmpfile, "fchr,0666", t.device(1, 5))
+    if not ok and err.NOSYS then return end -- TODO mark as skipped
+    assert(ok)
     local stat = assert(S.stat(tmpfile))
     assert(stat.ischr, "expect to be a character device")
     assert_equal(stat.rdev.major, 1)
