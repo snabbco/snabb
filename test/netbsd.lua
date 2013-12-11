@@ -337,7 +337,7 @@ test.ktrace = {
     local kfd = assert(S.kqueue())
     local kevs = t.kevents{{fd = fd, filter = "vnode", flags = "add, enable, clear", fflags = "extend"}}
     assert(kfd:kevent(kevs, nil))
-    assert(S.ktrace(tmpfile, "set", "syscall, sysret", pid))
+    assert(S.ktrace(tmpfile, "set", "syscall, sysret, v2", pid))
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
     assert(S.ktrace(tmpfile, "clear", "syscall, sysret", pid))
@@ -353,7 +353,7 @@ test.ktrace = {
   test_fktrace = function()
     local p1, p2 = assert(S.pipe())
     local pid = S.getpid()
-    assert(p2:ktrace("set", "syscall, sysret", pid))
+    assert(p2:ktrace("set", "syscall, sysret, v2", pid))
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
     local ok, err = S.open("/thisfiledoes not exist", "rdonly")

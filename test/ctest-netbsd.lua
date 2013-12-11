@@ -159,7 +159,7 @@ for k, v in pairs(ctypes) do
       -- bit hacky - TODO fix these issues
       if ignore_offsets[name] then name = nil end
       if name then
-        print("sassert(offsetof(" .. k .. "," .. name .. "), " .. ffi.offsetof(v, name) .. ', " offset of ' .. name .. ' in' .. k .. '");')
+        print("sassert(offsetof(" .. k .. "," .. name .. "), " .. ffi.offsetof(v, name) .. ', " offset of ' .. name .. ' in ' .. k .. '");')
       end
     end
   end
