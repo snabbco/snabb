@@ -72,11 +72,13 @@ end
 mt.device = {
   index = {
     major = function(dev)
-      local h, l = i6432(dev.dev)
+      local dev = dev.dev
+      local h, l = i6432(dev)
       return bit.bor(bit.band(bit.rshift(l, 8), 0xfff), bit.band(h, bit.bnot(0xfff)))
     end,
     minor = function(dev)
-      local h, l = i6432(dev.dev)
+      local dev = dev.dev
+      local h, l = i6432(dev)
       return bit.bor(bit.band(l, 0xff), bit.band(bit.rshift(l, 12), bit.bnot(0xff)))
     end,
     device = function(dev) return tonumber(dev.dev) end,
