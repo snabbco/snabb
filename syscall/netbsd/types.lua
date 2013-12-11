@@ -413,6 +413,7 @@ mt.ktr_header = {
     unused = function(ktr) return ktr._v._v0._buf end,
     valptr = function(ktr) return pt.char(ktr) + s.ktr_header end, -- assumes ktr is a pointer
     values = function(ktr)
+      if not ktr.typename then return "bad ktrace type" end
       local tpnam = ktr_val_tp[ktr.typename]
       if not tpnam then return "unimplemented ktrace type" end
       if tpnam == "string" then return ffi.string(ktr.valptr, ktr.len) end
