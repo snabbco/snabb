@@ -928,7 +928,6 @@ test_file_operations_at = {
     assert(stat.ischr, "expect to be a character device")
     assert_equal(stat.rdev.major, 1)
     assert_equal(stat.rdev.minor, 5)
-    assert_equal(stat.rdev.device, t.device(1, 5).device)
     assert(fd:close())
     assert(S.unlink(tmpfile))
   end,
