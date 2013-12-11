@@ -345,7 +345,7 @@ test.ktrace = {
     local buf = t.buffer(4096)
     local n = assert(fd:read(buf, 4096))
     for _, ktr in util.kdump(buf, n) do
-      print(ktr.pid .. " " .. ktr.comm .. " " .. (ktr.typename or "??" .. " " .. tostring(ktr.values))
+      print(ktr.pid .. " " .. ktr.comm .. " " .. (ktr.typename or "??") .. " " .. tostring(ktr.values))
     end
     assert(S.unlink(tmpfile))
     assert(fd:close())
