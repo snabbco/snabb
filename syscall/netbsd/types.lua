@@ -420,7 +420,7 @@ mt.ktr_header = {
       return pt[tpnam](ktr.valptr)
     end,
   },
-  __len = function(ktr) return s.ktr_header + ktr.ktr_len end
+  __len = function(ktr) return s.ktr_header + ktr.len end
 }
 
 addtype("ktr_header", "struct ktr_header", mt.ktr_header)

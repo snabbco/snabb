@@ -83,10 +83,10 @@ end
 
 local function kdumpfn(len)
   return function(buf, pos)
-    if pos >= len then return nil end
+    if pos + s.ktr_header >= len then return nil end
     local ktr = pt.ktr_header(buf + pos)
-    local len = #ktr
-    return pos + len, ktr
+    if pos + s.ktr_header + ktr.len >= len then return nil end
+    return pos + #ktr, ktr
   end
 end
 
