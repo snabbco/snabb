@@ -368,18 +368,6 @@ test.ktrace = {
     assert(p1:close())
     assert(p2:close())
   end,
---[[ -- useful but needs some traces for 32/64 bit checked in
-  test_ktrace_file = function()
-    assert(S.rump.etfs_register("/ktrace.out", "ktrace.out", "chr"))
-    local fd = assert(S.open("/ktrace.out", "rdonly"))
-    local buf = t.buffer(32768)
-    local n = assert(fd:read(buf, 32768))
-    for _, ktr in util.kdump(buf, n) do
-      print(ktr.pid .. " " .. ktr.comm .. " " .. ktr.typename .. " " .. tostring(ktr.values))
-    end
-    assert(fd:close())
-  end,
-]]
 }
 
 return test
