@@ -60,7 +60,7 @@ for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
 
 -- 64 bit dev_t
 local function makedev(major, minor)
-  local dev = t.dev(major) or 0ULL
+  local dev = t.dev(major or 0)
   if minor then
     local low = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12))
     local high = bit.band(major, bit.bnot(0xfff))
