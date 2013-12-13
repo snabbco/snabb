@@ -35,7 +35,7 @@ int rump___sysimpl_link(const char *, const char *);
 int rump___sysimpl_unlink(const char *);
 int rump___sysimpl_chdir(const char *);
 int rump___sysimpl_fchdir(int);
-int rump___sysimpl_mknod(const char *, _netbsd_mode_t, uint32_t);
+int rump___sysimpl_mknod50(const char *, _netbsd_mode_t, _netbsd_dev_t);
 int rump___sysimpl_chmod(const char *, _netbsd_mode_t);
 int rump___sysimpl_chown(const char *, uid_t, gid_t);
 pid_t rump___sysimpl_getpid(void);
@@ -185,7 +185,7 @@ int rump___sysimpl_paccept(int, struct _netbsd_sockaddr *, socklen_t *, const _n
 int rump___sysimpl_linkat(int, const char *, int, const char *, int);
 int rump___sysimpl_renameat(int, const char *, int, const char *);
 int rump___sysimpl_mkfifoat(int, const char *, _netbsd_mode_t);
-int rump___sysimpl_mknodat(int, const char *, _netbsd_mode_t, uint32_t);
+int rump___sysimpl_mknodat(int, const char *, _netbsd_mode_t, _netbsd_dev_t);
 int rump___sysimpl_mkdirat(int, const char *, _netbsd_mode_t);
 int rump___sysimpl_faccessat(int, const char *, int, int);
 int rump___sysimpl_fchmodat(int, const char *, _netbsd_mode_t, int);
@@ -314,7 +314,7 @@ local C = {
   mkdir = ffi.C.rump___sysimpl_mkdir,
   mkfifoat = ffi.C.rump___sysimpl_mkfifoat,
   mkfifo = ffi.C.rump___sysimpl_mkfifo,
-  mknod = ffi.C.rump___sysimpl_mknod,
+  mknod = ffi.C.rump___sysimpl_mknod50,
   mknodat = ffi.C.rump___sysimpl_mknodat,
   modctl = ffi.C.rump___sysimpl_modctl,
   mount = ffi.C.rump___sysimpl_mount50,
