@@ -317,6 +317,15 @@ test.misc_bsd = {
     local res = assert(S.issetugid())
     assert(res == 0 or res == 1) -- some tests call setuid so might be tainted
   end,
+  test_mknod_64bit_root = function()
+    assert(S.mknod(tmpfile, "fchr,0666", t.device(1999, 515)))
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.ischr, "expect to be a character device")
+    assert_equal(stat.rdev.major, 1999)
+    assert_equal(stat.rdev.minor, 515)
+    assert_equal(stat.rdev.device, t.device(1999, 515).device)
+    assert(S.unlink(tmpfile))
+  end,
 }
 
 --[[ -- need to do in a thread as cannot exit
