@@ -20,7 +20,8 @@ function VhostUser:new (socket_path)
                msg = ffi.new("struct vhost_user_msg"),
                nfds = ffi.new("int[1]"),
                fds = ffi.new("int[?]", C.VHOST_USER_MEMORY_MAX_NREGIONS),
-               listen_socket = socket
+               listen_socket = socket,
+               vring_base = {}
             }
    return setmetatable(o, {__index = VhostUser})
 end
@@ -33,7 +34,9 @@ function VhostUser:pull ()
       local msg = self.msg
       if C.vhost_user_receive(self.socket, msg, self.fds, self.nfds) > 0 then
          assert(msg.request >= 0 and msg.request <= C.VHOST_USER_MAX)
-         print("Got " .. handler_names[msg.request] .. "(" .. msg.request..")")
+         if msg.request ~= 1 then
+            print("Got " .. handler_names[msg.request] .. "(" .. msg.request..")")
+         end
          local method = self[handler_names[msg.request]]
          if method then
             method(self, msg, self.fds, self.nfds[0])
@@ -42,10 +45,41 @@ function VhostUser:pull ()
             print("vhost_user: no handler for " .. handler_names[msg.request])
          end
       end
+   end
+   if self.rxring and self.txring then
+--[[
+      print("running")
+      print("rx")
+      print("desc[0].len", self.rxring.desc[0].len)
+      print("avail.idx", self.rxring.avail.idx)
+      print("used.idx", self.rxring.used.idx)
+      print("tx")
+      print("desc[0].len", self.txring.desc[0].len)
+      print("avail.idx", self.txring.avail.idx)
+      print("used.idx", self.txring.used.idx)
+--]]
+      while self.rxavail ~= self.rxring.avail.idx do
+         local descriptor_index = self.rxring.avail.ring[self.rxavail % self.vring_num]
+         local descriptor = self.rxring.desc[descriptor_index]
+         local guest_addr = descriptor.addr
+         local snabb_addr = map_from_guest(guest_addr, self.mem_table)
+         print(ptr(guest_addr), ptr(snabb_addr))
+         local len = descriptor.len
+         io.write(("received %d byte packet: "):format(len))
+         local p = ffi.cast("char*", snabb_addr)
+         for i = 0, 13 do
+            io.write(string.format("%02X ", p[i]))
+         end
+         io.write("\n")
+         self.rxavail = (self.rxavail + 1) % 65536
+      end
       -- Receive from virtio vring
-
       -- Kick virtio vring if needed
    end
+end
+
+function VhostUser:receive ()
+   
 end
 
 function VhostUser:push ()
@@ -73,6 +107,7 @@ end
 
 function VhostUser:set_vring_num (msg)
    self.vring_num = tonumber(msg.state.num)
+   print("vring_num = " .. msg.state.num)
 end
 
 function VhostUser:set_vring_call (msg, fds, nfds)
@@ -93,13 +128,28 @@ function VhostUser:set_vring_addr (msg)
    local desc  = map_from_guest(msg.addr.desc_user_addr, self.mem_table)
    local used  = map_from_guest(msg.addr.used_user_addr, self.mem_table)
    local avail = map_from_guest(msg.addr.avail_user_addr, self.mem_table)
+   local ring = { desc  = ffi.cast("struct vring_desc *", desc),
+                  used  = ffi.cast("struct vring_used &", used),
+                  avail = ffi.cast("struct vring_avail &", avail) }
+   if msg.addr.index == 0 then
+      self.txring = ring
+   else
+      self.rxring = ring
+      self.rxavail = 0
+   end
+
    print("vring", ffi.cast("void*",desc))
    local x = ffi.cast("struct { uint64_t addr; uint32_t len; uint16_t flags; uint16_t next; } *", desc)
    print("vring[0]", x[0].addr, x[0].len, x[0].flags, x[0].next)
 end
 
 function VhostUser:set_vring_base (msg)
-   print("set_vring_base", msg.state.num)
+   self.vring_base[msg.state.index] = msg.state.num
+end
+
+function VhostUser:get_vring_base (msg)
+   msg.u64 = self.vring_base[msg.state.index] or 0
+   self:reply(msg)
 end
 
 function VhostUser:set_mem_table (msg, fds, nfds)
@@ -109,18 +159,13 @@ function VhostUser:set_mem_table (msg, fds, nfds)
    for i = 0, msg.memory.nregions - 1 do
       assert(fds[i] > 0) -- XXX vapp_server.c uses 'if'
       local size = msg.memory.regions[i].memory_size
-      local ptr = C.vhost_user_map_guest_memory(fds[i], size)
+      local pointer = C.vhost_user_map_guest_memory(fds[i], size)
       local guest = msg.memory.regions[i].guest_phys_addr
       table.insert(self.mem_table, { guest = guest,
-                                     snabb = ffi.cast("int64_t", ptr),
+                                     snabb = ffi.cast("int64_t", pointer),
                                      size  = tonumber(size) })
+      print("mapping", ptr(pointer), ptr(guest), size)
    end
-   for k,v in ipairs(self.mem_table) do
-      for kk,vv in pairs(v) do
-         print(kk,vv)
-      end
-   end
-   print("#mem", #self.mem_table)
 end
 
 function map_to_guest (addr, mem_table)
@@ -133,14 +178,16 @@ function map_to_guest (addr, mem_table)
 end
 
 function map_from_guest (addr, mem_table)
+   print("mapping from guest", ptr(addr))
+   print("#mem_table", #mem_table)
    for _,m in ipairs(mem_table) do
+      print(ptr(addr), "guest:", ptr(m.guest), "snabb:", ptr(m.snabb))
       if addr >= m.guest and addr < m.guest + m.size then
          return addr + m.snabb - m.guest
-      else
-         print(addr, m.guest, m.guest+m.size)
       end
    end
-   error("mapping to host address failed")
+   --error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
+   return addr
 end
 
 -- Table of request code -> name of handler method
@@ -165,13 +212,15 @@ handler_names = {
 
 function selftest ()
    print("selftest: vhost_user")
-   app.apps.vhost_user = app.new(VhostUser:new("vapp.sock"))
+   app.apps.vhost_user = app.new(VhostUser:new("/home/luke/qemu.sock"))
+--   app.apps.vhost_user = app.new(VhostUser:new("vapp.sock"))
    app.relink()
-   local deadline = lib.timer(1e11)
+   local deadline = lib.timer(1e15)
    repeat
       app.breathe()
       C.usleep(1e5)
-   until deadline()
+   until false
 end
 
 
+function ptr (x) return ffi.cast("void*",x) end
