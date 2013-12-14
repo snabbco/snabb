@@ -287,6 +287,18 @@ function util.mount(tab)
   return S.mount(source, target, filesystemtype, mountflags, data)
 end
 
+function util.sendcred(fd, pid, uid, gid)
+  if not pid then pid = S.getpid() end
+  if not uid then uid = S.getuid() end
+  if not gid then gid = S.getgid() end
+  local ucred = t.ucred{pid = pid, uid = uid, gid = gid}
+  local buf1 = t.buffer(1) -- need to send one byte
+  local io = t.iovecs{{buf1, 1}}
+  local cmsg = t.cmsghdr("socket", "credentials", ucred)
+  local msg = t.msghdr{iov = io, control = cmsg}
+  return S.sendmsg(fd, msg, 0)
+end
+
 return util
 
 end

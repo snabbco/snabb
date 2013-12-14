@@ -536,6 +536,18 @@ test.misc_linux = {
     assert(S.setdomainname("domainnametest"))
     assert_equal(S.getdomainname(), "domainnametest")
   end,
+  test_sendcred = function()
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    assert(sv2:setsockopt("socket", "passcred", true)) -- enable receive creds
+    assert(sv1:setsockopt("socket", "passcred", true)) -- enable receive creds
+    local so = assert(sv2:getsockopt("socket", "passcred"))
+    assert(so == 1, "getsockopt should have updated value")
+    assert(util.sendcred(sv2))
+    local r, err = assert(util.recvcmsg(sv1))
+    assert_equal(r.pid, S.getpid())
+    assert(sv1:close())
+    assert(sv2:close())
+  end,
 }
 
 test.sendfile = {
@@ -1132,7 +1144,7 @@ test.aio = {
   end,
 }
 
-test.proceses_linux = {
+test.processes_linux = {
   test_fork_waitid = function()
     local pid0 = S.getpid()
     local pid = assert(S.fork())

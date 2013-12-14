@@ -263,19 +263,6 @@ function util.recvcmsg(fd, msg, flags)
   return ret
 end
 
--- TODO seems to be Linux only
-function util.sendcred(fd, pid, uid, gid)
-  if not pid then pid = S.getpid() end
-  if not uid then uid = S.getuid() end
-  if not gid then gid = S.getgid() end
-  local ucred = t.ucred{pid = pid, uid = uid, gid = gid}
-  local buf1 = t.buffer(1) -- need to send one byte
-  local io = t.iovecs{{buf1, 1}}
-  local cmsg = t.cmsghdr("socket", "credentials", ucred)
-  local msg = t.msghdr{iov = io, control = cmsg}
-  return S.sendmsg(fd, msg, 0)
-end
-
 function util.sendfds(fd, ...)
   local buf1 = t.buffer(1) -- need to send one byte
   local io = t.iovecs{{buf1, 1}}

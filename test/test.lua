@@ -1579,18 +1579,6 @@ test_util = {
 -- TODO work in progress to make work in NetBSD, temp commented out
 if not (S.__rump or abi.os == "netbsd") then
 test_sendfd = {
-  test_sendcred = function()
-    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
-    assert(sv2:setsockopt("socket", "passcred", true)) -- enable receive creds
-    assert(sv1:setsockopt("socket", "passcred", true)) -- enable receive creds
-    local so = assert(sv2:getsockopt("socket", "passcred"))
-    assert(so == 1, "getsockopt should have updated value")
-    assert(util.sendcred(sv2))
-    local r, err = assert(util.recvcmsg(sv1))
-    assert_equal(r.pid, S.getpid())
-    assert(sv1:close())
-    assert(sv2:close())
-  end,
   test_sendfd = function()
     local sv1, sv2 = assert(S.socketpair("unix", "stream"))
     assert(util.sendfds(sv1, S.stdin))

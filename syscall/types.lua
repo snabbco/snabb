@@ -491,7 +491,6 @@ mt.sigset = {
 addtype("sigset", "sigset_t", mt.sigset)
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
-if rumpfn then cmsgtype = rumpfn(cmsgtype) end
 local cmsg_hdrsize = ffi.sizeof(ffi.typeof("struct cmsghdr"), 0)
 local voidalign = ffi.alignof(ffi.typeof("void *"))
 local function cmsg_align(len) return align(len, voidalign) end -- TODO double check this is correct for all OSs
@@ -530,7 +529,7 @@ mt.cmsghdr = {
         return function() end
       end
     end,
-    credentials = function(self)
+    credentials = function(self) -- TODO Linux only, probably does not need its own function?
       if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.CREDENTIALS then
         local cred = pt.ucred(self:data())
         return cred.pid, cred.uid, cred.gid
