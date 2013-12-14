@@ -1047,5 +1047,12 @@ c.UIO = strflag {
   WRITE = 1,
 }
 
+c.SCM = multiflags {
+  RIGHTS     = 0x01,
+--           = 0x02,
+  CREDS      = 0x04,
+  TIMESTAMP  = 0x08,
+}
+
 return c
 

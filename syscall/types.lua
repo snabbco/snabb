@@ -529,7 +529,7 @@ mt.cmsghdr = {
         return function() end
       end
     end,
-    credentials = function(self) -- TODO Linux only, probably does not need its own function?
+    credentials = function(self) -- TODO Linux only, NetBSD uses SCM_CREDS
       if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.CREDENTIALS then
         local cred = pt.ucred(self:data())
         return cred.pid, cred.uid, cred.gid

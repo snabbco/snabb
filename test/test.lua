@@ -1577,6 +1577,7 @@ test_util = {
 }
 
 -- TODO work in progress to make work in NetBSD, temp commented out
+-- note send creds moved, as varies by OS
 if not (S.__rump or abi.os == "netbsd") then
 test_sendfd = {
   test_sendfd = function()
