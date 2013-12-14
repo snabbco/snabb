@@ -241,26 +241,26 @@ test.tee_splice = {
     assert(S.unlink(tmpfile))
     local str = teststring
     local n = assert(fd:write(str))
-    assert(n == #str)
+    assert_equal(n, #str)
     n = assert(S.splice(fd, 0, pw, nil, #str, "nonblock")) -- splice file at offset 0 into pipe
     assert(n == #str)
     local n, err = S.tee(pr, ppw, #str, "nonblock") -- clone our pipe
     if n then
-      assert(n == #str)
+      assert_equal(n, #str)
       n = assert(S.splice(pr, nil, s1, nil, #str, "nonblock")) -- splice to socket
       assert(n == #str)
       n = assert(s2:read())
       assert(#n == #str)
       n = assert(S.splice(ppr, nil, s1, nil, #str, "nonblock")) -- splice the tee'd pipe into our socket
-      assert(n == #str)
+      assert_equal(n, #str)
       n = assert(s2:read())
       assert(#n == #str)
       local buf2 = t.buffer(#str)
       ffi.copy(buf2, str, #str)
       n = assert(S.vmsplice(pw, {{buf2, #str}}, "nonblock")) -- write our memory into pipe
-      assert(n == #str)
+      assert_equal(n, #str)
       n = assert(S.splice(pr, nil, s1, nil, #str, "nonblock")) -- splice out to socket
-      assert(n == #str)
+      assert_equal(n, #str)
       n = assert(s2:read())
       assert(#n == #str)
     else
@@ -301,7 +301,7 @@ test.timers_signals_linux = {
     assert(S.nanosleep(0.1)) -- nanosleep does not interact with itimer
 
     local sig = assert(util.signalfd_read(fd))
-    assert(#sig == 1, "expect one signal")
+    assert_equal(#sig, 1)
     assert(sig[1].alrm, "expect alarm clock to have rung")
     assert(fd:close())
     assert(S.sigprocmask("unblock", ss))
@@ -340,12 +340,12 @@ test.timers_signals_linux = {
   test_timerfd = function()
     local fd = assert(S.timerfd_create("monotonic", "nonblock, cloexec"))
     local n = assert(util.timerfd_read(fd))
-    assert(n == 0, "no timer events yet")
+    assert_equal(n, 0)
     assert(fd:block())
     local o = assert(fd:timerfd_settime(nil, {0, 0.000001}))
     assert(o.interval.time == 0 and o.value.time == 0, "old timer values zero")
     n = assert(util.timerfd_read(fd))
-    assert(n == 1, "should have exactly one timer expiry")
+    assert_equal(n, 1)
     local o = assert(fd:timerfd_gettime())
     assert_equal(o.interval.time, 0, "expect 0 from gettime as expired")
     assert_equal(o.value.time, 0, "expect 0 from gettime as expired")
@@ -1408,7 +1408,7 @@ test.bpf = {
   end,
 }
 
--- TODO remove. Unclear if my ppc does not support or a bug, retest later
+-- TODO remove arch tests. Unclear if my ppc does not support or a bug, retest later
 if abi.arch ~= "ppc" then
 test.seccomp = {
   test_no_new_privs = function() -- this must be done for non root to call type 2 seccomp
@@ -1421,7 +1421,7 @@ test.seccomp = {
       S.exit()
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
-      assert(status.EXITSTATUS == 0, "expect normal exit in clone")
+      assert_equal(status.EXITSTATUS, 0)
     end
   end,
   test_seccomp_allow = function()
@@ -1441,7 +1441,7 @@ test.seccomp = {
       S.exit()
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
-      assert(status.EXITSTATUS == 0, "expect normal exit in clone")
+      assert_equal(status.EXITSTATUS, 0)
     end
   end,
   test_seccomp = function()
@@ -1484,9 +1484,9 @@ test.seccomp = {
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
       if status.EXITSTATUS ~= 0 then -- failed, get debug info
-        assert_equal(status.code , nr.SYS.seccomp, "expect reason is seccomp")
+        assert_equal(status.code, nr.SYS.seccomp)
       end
-      assert(status.EXITSTATUS == 0, "expect normal exit in clone")
+      assert_equal(status.EXITSTATUS, 0)
     end
   end,
   test_seccomp_fail = function()
@@ -1672,7 +1672,7 @@ test.capabilities = {
       S.exit()
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
-      assert(status.EXITSTATUS == 0, "expect normal exit")
+      assert_equal(status.EXITSTATUS, 0)
     end
   end,
   test_filesystem_caps_get = function()
