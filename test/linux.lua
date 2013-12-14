@@ -1408,8 +1408,8 @@ test.bpf = {
   end,
 }
 
--- TODO remove arch tests. Unclear if my ppc does not support or a bug, retest later
-if abi.arch ~= "ppc" then
+-- TODO remove arch tests. Unclear if my ppc/arm does not support or a bug, retest later with newer kernel
+if not (abi.arch == "ppc" or abi.arch == "arm") then
 test.seccomp = {
   test_no_new_privs = function() -- this must be done for non root to call type 2 seccomp
     local p = assert(S.clone())
