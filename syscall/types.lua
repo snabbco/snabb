@@ -565,7 +565,7 @@ mt.cmsghdr = {
       elseif type(data) == "table" then data_size = #data * s.int end
     end
     data_size = data_size or #data
-    local self = ffi.new(tp, cmsg_len(data_size), {
+    local self = ffi.new(tp, data_size, {
       cmsg_len = cmsg_len(data_size),
       cmsg_level = level,
       cmsg_type = scm,

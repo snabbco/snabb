@@ -418,16 +418,6 @@ test.timers_signals_linux = {
 ]]
 }
 
-test.mremap = { -- differs in prototype by OS
-  test_mremap = function()
-    local size = 4096
-    local size2 = size * 2
-    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
-    mem = assert(S.mremap(mem, size, size2, "maymove"))
-    assert(S.munmap(mem, size2))
-  end,
-}
-
 test.misc_linux = {
   test_sysinfo = function()
     local i = assert(S.sysinfo()) -- TODO test values returned for some sanity
@@ -1146,35 +1136,6 @@ test.aio = {
   end,
 }
 
-test.processes_linux = {
-  test_fork_waitid = function()
-    local pid0 = S.getpid()
-    local pid = assert(S.fork())
-    if (pid == 0) then -- child
-      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
-      S.exit(23)
-    else -- parent
-      local infop = assert(S.waitid("all", 0, "exited, stopped, continued"))
-      assert_equal(infop.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
-      assert_equal(infop.status, 23, "exit should be 23")
-      assert_equal(infop.code, c.SIGCLD.EXITED, "normal exit expected")
-    end
-  end,
-  test_clone = function()
-    local pid0 = S.getpid()
-    local p = assert(S.clone()) -- no flags, should be much like fork.
-    if p == 0 then -- child
-      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
-      S.exit(23)
-    else -- parent
-      local rpid, status = assert(S.waitpid(-1, "clone"))
-      assert_equal(rpid, p, "expect clone to return same pid as wait")
-      assert(status.WIFEXITED, "process should have exited normally")
-      assert(status.EXITSTATUS == 23, "exit should be 23")
-    end
-  end,
-}
-
 test.ids_linux = {
   test_setreuid = function()
     assert(S.setreuid(S.geteuid(), S.getuid()))
@@ -1803,6 +1764,46 @@ test.shm = {
     assert(fd:close())
   end,
 }
+
+if not S.__rump then -- rump has no processes, memory allocation, process accounting, mmap and proc not applicable
+test.mremap = { -- differs in prototype by OS
+  test_mremap = function()
+    local size = 4096
+    local size2 = size * 2
+    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    mem = assert(S.mremap(mem, size, size2, "maymove"))
+    assert(S.munmap(mem, size2))
+  end,
+}
+test.processes_linux = {
+  test_fork_waitid = function()
+    local pid0 = S.getpid()
+    local pid = assert(S.fork())
+    if (pid == 0) then -- child
+      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
+      S.exit(23)
+    else -- parent
+      local infop = assert(S.waitid("all", 0, "exited, stopped, continued"))
+      assert_equal(infop.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
+      assert_equal(infop.status, 23, "exit should be 23")
+      assert_equal(infop.code, c.SIGCLD.EXITED, "normal exit expected")
+    end
+  end,
+  test_clone = function()
+    local pid0 = S.getpid()
+    local p = assert(S.clone()) -- no flags, should be much like fork.
+    if p == 0 then -- child
+      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
+      S.exit(23)
+    else -- parent
+      local rpid, status = assert(S.waitpid(-1, "clone"))
+      assert_equal(rpid, p, "expect clone to return same pid as wait")
+      assert(status.WIFEXITED, "process should have exited normally")
+      assert(status.EXITSTATUS == 23, "exit should be 23")
+    end
+  end,
+}
+end -- exclude rump
 
 return test
 
