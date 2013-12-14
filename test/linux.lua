@@ -96,7 +96,7 @@ test.sockets_linux = {
     assert(s:listen())
     local sa = t.sockaddr_un()
     local a, err = s:accept4(sa, nil, "nonblock")
-    assert(not a and err.AGAIN, "expect again: " .. tostring(err))
+    assert((not a) and err.AGAIN, "expect again: " .. tostring(err))
     assert(s:close())
     assert(S.unlink(tmpfile))
   end,

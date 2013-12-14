@@ -129,7 +129,7 @@ function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), of
 
 function S.accept4(sockfd, addr, addrlen, flags)
   local saddr = pt.sockaddr(addr)
-  return(C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags]))
+  return retfd(C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags]))
 end
 
 -- TODO change to type?
