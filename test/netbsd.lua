@@ -355,9 +355,18 @@ test.ktrace = {
     assert(kfd:kevent(nil, kevs, 1)) -- block until extend
     local buf = t.buffer(4096)
     local n = assert(fd:read(buf, 4096))
+    local syscall, sysret = {}, {} -- on real OS luajit may do some meory allocations so may be extra calls occasionally
     for _, ktr in util.kdump(buf, n) do
-      print(ktr.pid .. " " .. ktr.comm .. " " .. (ktr.typename or "??") .. " " .. tostring(ktr.values))
+      assert_equal(ktr.pid, pid)
+      if ktr.typename == "SYSCALL" then
+        syscall[ktr.values.name] = true
+      elseif ktr.typename == "SYSRET" then
+        sysret[ktr.values.name] = true
+        if ktr.values.name == "getpid" then assert_equal(tonumber(ktr.values.retval), S.getpid()) end
+      end
     end
+    assert(syscall.getpid, "expect call getpid")
+    assert(sysret.getpid, "expect return from getpid")
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
@@ -367,15 +376,25 @@ test.ktrace = {
     assert(p2:ktrace("set", "syscall, sysret", pid))
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
-    local ok, err = S.open("/thisfiledoes not exist", "rdonly")
+    local ok, err = S.open("/thisfiledoesnotexist", "rdonly")
     local ok, err = S.ioctl(-1, "TIOCMGET")
     assert(p2:ktrace("clear", "syscall, sysret", pid))
     local buf = t.buffer(4096)
     local n = assert(p1:read(buf, 4096))
+    local syscall, sysret = {}, {}
     for _, ktr in util.kdump(buf, n) do
-      assert_equal(ktr.pid, pid) -- TODO failing on 32 bit why?
-      print(ktr.pid .. " " .. ktr.comm .. " " .. (ktr.typename or "??") .. " " .. tostring(ktr.values))
+      assert_equal(ktr.pid, pid)      assert_equal(ktr.pid, pid)
+      if ktr.typename == "SYSCALL" then
+        syscall[ktr.values.name] = true
+      elseif ktr.typename == "SYSRET" then
+        sysret[ktr.values.name] = true
+        if ktr.values.name == "open" then assert(ktr.values.error.NOENT) end
+        if ktr.values.name == "ioctl" then assert(ktr.values.error.BADF) end
+      end
     end
+    assert(syscall.getpid and sysret.getpid, "expect getpid")
+    assert(syscall.open and sysret.open, "expect open")
+    assert(syscall.ioctl and sysret.ioctl, "expect open")
     assert(p1:close())
     assert(p2:close())
   end,

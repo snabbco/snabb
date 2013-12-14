@@ -19,6 +19,6 @@ local buf = t.buffer(32768)
 local n = assert(fd:read(buf, 32768))
 for _, ktr in S.util.kdump(buf, n) do
   if ktr.version ~= 2 then error "currently only v2 supported" end
-  print(ktr.pid .. " " .. ktr.comm .. " " .. ktr.typename .. " " .. tostring(ktr.values))
+  print(ktr)
 end
 assert(fd:close())

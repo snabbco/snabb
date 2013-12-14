@@ -420,7 +420,10 @@ mt.ktr_header = {
       return pt[tpnam](ktr.valptr)
     end,
   },
-  __len = function(ktr) return s.ktr_header + ktr.len end
+  __len = function(ktr) return s.ktr_header + ktr.len end,
+  __tostring = function(ktr)
+    return ktr.pid .. " " .. ktr.comm .. " " .. (ktr.typename or "??") .. " " .. tostring(ktr.values)
+  end,
 }
 
 addtype("ktr_header", "struct ktr_header", mt.ktr_header)
@@ -477,15 +480,15 @@ mt.ktr_sysret = {
   index = {
     code = function(ktr) return ktr.ktr_code end,
     name = function(ktr) return sysname[ktr.code] or tostring(ktr.code) end,
-    error = function(ktr) return t.error(ktr.ktr_error) end,
+    error = function(ktr) if ktr.ktr_error ~= 0 then return t.error(ktr.ktr_error) end end,
     retval = function(ktr) return ktr.ktr_retval end,
-    retval1 = function(ktr) return ktr.ktr_retval1 end,
+    retval1 = function(ktr) return ktr.ktr_retval_1 end,
   },
   __tostring = function(ktr)
-    if ktr.retval == -1 then
-      return ktr.name .. " " .. tostring(ktr.retval) .. " " .. ktr.error.sym .. " " .. tostring(ktr.error)
+    if ktr.error then
+      return ktr.name .. " " .. (ktr.error.sym or ktr.error.errno) .. " " .. (tostring(ktr.error) or "")
     else
-      return ktr.name .. " " .. tostring(ktr.retval) -- and second one if applicable for code
+      return ktr.name .. " " .. tostring(ktr.retval) .. " " .. tostring(ktr.retval1) .. " "
     end
   end
 }
