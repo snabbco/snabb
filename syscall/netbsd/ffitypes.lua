@@ -72,21 +72,6 @@ typedef uint32_t _netbsd_fd_mask;
 typedef struct {
   _netbsd_fd_mask fds_bits[8]; /* kernel can cope with more */
 } _netbsd_fd_set;
-struct _netbsd_msghdr {
-  void *msg_name;
-  socklen_t msg_namelen;
-  struct iovec *msg_iov;
-  int msg_iovlen;
-  void *msg_control;
-  socklen_t msg_controllen;
-  int msg_flags;
-};
-struct _netbsd_cmsghdr {
-  size_t cmsg_len;
-  int cmsg_level;
-  int cmsg_type;
-  unsigned char cmsg_data[?];
-};
 struct _netbsd_timespec {
   _netbsd_time_t tv_sec;
   long   tv_nsec;

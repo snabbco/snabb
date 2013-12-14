@@ -42,21 +42,6 @@ struct pollfd
   short   events;
   short   revents;
 };
-struct msghdr {
-  void *msg_name;
-  socklen_t msg_namelen;
-  struct iovec *msg_iov;
-  int msg_iovlen;
-  void *msg_control;
-  socklen_t msg_controllen;
-  int msg_flags;
-};
-struct cmsghdr {
-  size_t cmsg_len;
-  int cmsg_level;
-  int cmsg_type;
-  unsigned char cmsg_data[?];
-};
 struct timespec {
   time_t tv_sec;
   long   tv_nsec;

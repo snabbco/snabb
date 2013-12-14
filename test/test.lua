@@ -11,7 +11,7 @@ local strict = require "include.strict.strict"
 
 local function assert(cond, err, ...)
   collectgarbage("collect") -- force gc, to test for bugs
-  if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
+  if not cond then error(tostring(err)) end -- annoyingly, assert does not call tostring!
   if type(cond) == "function" then return cond, err, ... end
   if cond == true then return ... end
   return cond, ...
@@ -1582,12 +1582,12 @@ test_sendfd = {
   test_sendcred = function()
     local sv1, sv2 = assert(S.socketpair("unix", "stream"))
     assert(sv2:setsockopt("socket", "passcred", true)) -- enable receive creds
+    assert(sv1:setsockopt("socket", "passcred", true)) -- enable receive creds
     local so = assert(sv2:getsockopt("socket", "passcred"))
     assert(so == 1, "getsockopt should have updated value")
-    local n = assert(sv2:sendmsg()) -- sends single byte, which is enough to send credentials
-    assert_equal(n, 1)
-    local r = assert(util.recvcmsg(sv1))
-    assert(r.pid == S.getpid(), "expect to get my pid from sending credentials")
+    assert(util.sendcred(sv2))
+    local r, err = assert(util.recvcmsg(sv1))
+    assert_equal(r.pid, S.getpid())
     assert(sv1:close())
     assert(sv2:close())
   end,

@@ -60,6 +60,21 @@ struct in_addr {
 struct in6_addr {
   unsigned char  s6_addr[16];
 };
+struct msghdr {
+  void *msg_name;
+  socklen_t msg_namelen;
+  struct iovec *msg_iov;
+  size_t msg_iovlen;
+  void *msg_control;
+  size_t msg_controllen;
+  int msg_flags;
+};
+struct cmsghdr {
+  size_t cmsg_len;
+  int cmsg_level;
+  int cmsg_type;
+  char cmsg_data[?];
+};
 struct ethhdr {
   unsigned char   h_dest[6];
   unsigned char   h_source[6];

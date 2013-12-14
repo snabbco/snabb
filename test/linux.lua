@@ -22,7 +22,7 @@ local nl = S.nl
 
 local function assert(cond, err, ...)
   collectgarbage("collect") -- force gc, to test for bugs
-  if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
+  if not cond then error(tostring(err)) end -- annoyingly, assert does not call tostring!
   if type(cond) == "function" then return cond, err, ... end
   if cond == true then return ... end
   return cond, ...

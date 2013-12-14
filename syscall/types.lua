@@ -491,9 +491,8 @@ mt.sigset = {
 addtype("sigset", "sigset_t", mt.sigset)
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
-local cmsgtype = "struct cmsghdr"
 if rumpfn then cmsgtype = rumpfn(cmsgtype) end
-local cmsg_hdrsize = ffi.sizeof(ffi.typeof(cmsgtype), 0)
+local cmsg_hdrsize = ffi.sizeof(ffi.typeof("struct cmsghdr"), 0)
 local voidalign = ffi.alignof(ffi.typeof("void *"))
 local function cmsg_align(len) return align(len, voidalign) end -- TODO double check this is correct for all OSs
 local cmsg_ahdr = cmsg_align(cmsg_hdrsize)
@@ -511,12 +510,13 @@ if c.SOL.IP then typemap[c.SOL.IP] = c.IP end
 mt.cmsghdr = {
   __index = {
     len = function(self) return tonumber(self.cmsg_len) end,
+    data = function(self) return self.cmsg_data end,
     datalen = function(self) return self:len() - cmsg_ahdr end,
     hdrsize = function(self) return cmsg_hdrsize end, -- constant, but better to have it here
     align = function(self) return cmsg_align(self:len()) end,
     fds = function(self)
       if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.RIGHTS then
-        local fda = pt.int(self.cmsg_data)
+        local fda = pt.int(self:data())
         local fdc = bit.rshift(self:datalen(), 2) -- shift by int size
         local i = 0
         return function()
@@ -532,23 +532,22 @@ mt.cmsghdr = {
     end,
     credentials = function(self)
       if self.cmsg_level == c.SOL.SOCKET and self.cmsg_type == c.SCM.CREDENTIALS then
-        local cred = pt.ucred(self.cmsg_data)
+        local cred = pt.ucred(self:data())
         return cred.pid, cred.uid, cred.gid
       else
         return nil, "cmsg does not contain credentials"
       end
     end,
     setdata = function(self, data, datalen)
-      if datalen == nil then datalen = ffi.sizeof(data) end
-      ffi.copy(self.cmsg_data, data, datalen)
+      ffi.copy(self:data(), data, datalen or #data)
     end,
     setfd = function(self, fd) -- single fd
-      local int = pt.int(self.cmsg_data)
+      local int = pt.int(self:data())
       int[0] = getfd(fd)
     end,
     setfds = function(self, fds) -- general case, note does not check size
       if type(fds) == "number" or fds.getfd then return self:setfd(fds) end
-      local int = pt.int(self.cmsg_data)
+      local int = pt.int(self:data())
       local off = 0
       for _, v in ipairs(fds) do
         int[off] = getfd(v)
@@ -567,7 +566,7 @@ mt.cmsghdr = {
       elseif type(data) == "table" then data_size = #data * s.int end
     end
     data_size = data_size or #data
-    local self = ffi.new(tp, data_size, {
+    local self = ffi.new(tp, cmsg_len(data_size), {
       cmsg_len = cmsg_len(data_size),
       cmsg_level = level,
       cmsg_type = scm,
@@ -575,7 +574,7 @@ mt.cmsghdr = {
     if data and (level == c.SOL.SOCKET and scm == c.SCM.RIGHTS) then
       self:setfds(data)
     elseif data then
-      ffi.copy(self.cmsg_data, data, data_size)
+      self:setdata(data, data_size)
     end
     return self
   end,
