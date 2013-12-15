@@ -23,14 +23,8 @@ local i6432, u6432 = bit.i6432, bit.u6432
 
 local h = require "syscall.helpers"
 
-local ptt, reviter, mktype, istype, lenfn, lenmt = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt
+local ptt, reviter, mktype, istype, lenfn, lenmt, getfd = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd
 local ntohl, ntohl, ntohs, htons, octal = h.ntohl, h.ntohl, h.ntohs, h.htons, h.octal
-
--- TODO duplicated
-local function getfd(fd)
-  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
-  return fd:getfd()
-end
 
 local mt = {} -- metatables
 

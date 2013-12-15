@@ -20,7 +20,7 @@ local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 
-local ptt, reviter, mktype, istype, lenfn, lenmt = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt
+local ptt, reviter, mktype, istype, lenfn, lenmt, getfd = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
 local mt = {} -- metatables

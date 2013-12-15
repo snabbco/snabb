@@ -21,16 +21,7 @@ local ffi = require "ffi"
 
 local h = require "syscall.helpers"
 
-local function getfd(fd)
-  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
-  return fd:getfd()
-end
-
--- makes code tidier
-local function istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
-
--- even simpler version coerces to type
-local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
+local getfd, istype, mktype = h.getds, h.istype, h.mktype
 
 -- easier interfaces to some functions that are in common use TODO new fcntl code should make easier
 local function nonblock(fd)

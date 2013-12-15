@@ -23,7 +23,7 @@ local h = require "syscall.helpers"
 
 local c = require("syscall." .. abi.os .. ".constants")
 
-local ptt, reviter, mktype, istype, lenfn, lenmt = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt
+local ptt, reviter, mktype, istype, lenfn, lenmt, getfd = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
@@ -42,11 +42,6 @@ for k, v in pairs(sharedtypes.ctypes) do ctypes[k] = v end
 local mt = {} -- metatables
 
 --helpers
-local function getfd(fd)
-  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
-  return fd:getfd()
-end
-
 local function addtype(name, tp, mt)
   if abi.rumpfn then tp = abi.rumpfn(tp) end
   if mt then

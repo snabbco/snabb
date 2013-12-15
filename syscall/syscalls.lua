@@ -16,6 +16,7 @@ local h = require "syscall.helpers"
 local err64 = h.err64
 local uerr64 = h.uerr64
 local errpointer = h.errpointer
+local getfd, istype, mktype = h.getfd, h.istype, h.mktype
 
 local function init(C, types, ioctl)
 
@@ -28,19 +29,6 @@ local errno = ffi.errno
 local t, pt, s = types.t, types.pt, types.s
 
 local S = {}
-
--- helpers
-
-local function getfd(fd)
-  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
-  return fd:getfd()
-end
-
--- makes code tidier
-local function istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
-
--- even simpler version coerces to type
-local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
 local function getdev(dev)
   if type(dev) == "table" then t.device(dev) end
