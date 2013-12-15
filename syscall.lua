@@ -33,9 +33,8 @@ else
 end
 
 local ioctl = require("syscall." .. abi.os .. ".ioctl").init(types)
-local fcntl = require("syscall." .. abi.os .. ".fcntl").init(types)
 
-local S = require "syscall.syscalls".init(C, types, ioctl, fcntl)
+local S = require "syscall.syscalls".init(C, types, ioctl)
 
 S.abi, S.types, S.t = abi, types, types.t -- add to main table returned
 
@@ -54,9 +53,6 @@ S = require "syscall.methods".init(S)
 
 -- add feature tests
 S.features = require "syscall.features".init(S)
-
--- link in fcntl
-S.__fcntl = fcntl
 
 -- add utils
 S.util = require "syscall.util".init(S)
