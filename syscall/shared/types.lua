@@ -15,14 +15,10 @@ local t, ctypes, pt, s = {}, {}, {}, {}
 
 local h = require "syscall.helpers"
 
+local ptt = h.ptt
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
-
-local function ptt(tp)
-  local ptp = ffi.typeof(tp .. " *")
-  return function(x) return ffi.cast(ptp, x) end
-end
 
 local function lenfn(tp) return ffi.sizeof(tp) end
 

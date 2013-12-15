@@ -20,6 +20,11 @@ local function ptvoid(x)
   return ffi.cast(voidp, x)
 end
 
+function h.ptt(tp)
+  local ptp = ffi.typeof(tp .. " *")
+  return function(x) return ffi.cast(ptp, x) end
+end
+
 -- constants
 h.uint64_max = ffi.cast("uint64_t", 0) - ffi.cast("uint64_t", 1)
 h.uerr64 = h.uint64_max

@@ -15,14 +15,15 @@ local abi = require "syscall.abi"
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local ptt, addtype, addtype_var, lenmt, newfn, istype, reviter =
-  hh.ptt, hh.addtype, hh.addtype_var, hh.lenmt, hh.newfn, hh.istype, hh.reviter
+local addtype, addtype_var, lenmt, newfn, istype, reviter =
+  hh.addtype, hh.addtype_var, hh.lenmt, hh.newfn, hh.istype, hh.reviter
 
 local ffi = require "ffi"
 local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 
+local ptt = h.ptt
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim = h.split, h.trim
 

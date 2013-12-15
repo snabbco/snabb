@@ -13,8 +13,8 @@ local abi = require "syscall.abi"
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local ptt, addtype, addtype_var, addtype_fn, lenmt, newfn, istype, reviter =
-  hh.ptt, hh.addtype, hh.addtype_var, hh.addtype_fn, hh.lenmt, hh.newfn, hh.istype, hh.reviter
+local addtype, addtype_var, addtype_fn, lenmt, newfn, istype, reviter =
+  hh.addtype, hh.addtype_var, hh.addtype_fn, hh.lenmt, hh.newfn, hh.istype, hh.reviter
 
 local ffi = require "ffi"
 local bit = require "syscall.bit"
@@ -22,6 +22,8 @@ local bit = require "syscall.bit"
 local i6432, u6432 = bit.i6432, bit.u6432
 
 local h = require "syscall.helpers"
+
+local ptt = h.ptt
 
 local ntohl, ntohl, ntohs, htons, octal = h.ntohl, h.ntohl, h.ntohs, h.htons, h.octal
 

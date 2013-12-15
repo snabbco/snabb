@@ -23,6 +23,8 @@ local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 
+local ptt = h.ptt
+
 local c = require("syscall." .. abi.os .. ".constants")
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
@@ -51,11 +53,6 @@ end
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
 local function lenfn(tp) return ffi.sizeof(tp) end
-
-local function ptt(tp)
-  local ptp = ffi.typeof(tp .. " *")
-  return function(x) return ffi.cast(ptp, x) end
-end
 
 local function addtype(name, tp, mt)
   if rumpfn then tp = rumpfn(tp) end
