@@ -17,10 +17,11 @@ local errno = ffi.errno
 
 local t, pt, s = types.t, types.pt, types.s
 
-local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
 local ret64, retnum, retfd, retbool, retptr, retiter = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr, hh.retiter
 
-local helpers = require "syscall.helpers"
+local h = require "syscall.helpers"
+local istype, mktype, getfd = h.istype, h.mktype, h.getfd
+local octal = h.octal
 
 function S.paccept(sockfd, addr, addrlen, set, flags)
   if set then set = mktype(t.sigset, set) end
@@ -148,7 +149,7 @@ end
 function S.tcflush(fd, com)
   return S.ioctl(fd, "TIOCFLUSH", c.TCFLUSH[com]) -- while defined as FREAD, FWRITE, values same
 end
-local posix_vdisable = helpers.octal "0377" -- move to constants?
+local posix_vdisable = octal "0377" -- move to constants?
 function S.tcflow(fd, action)
   action = c.TCFLOW[action]
   if action == c.TCFLOW.OOFF then return S.ioctl(fd, "TIOCSTOP") end

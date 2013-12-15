@@ -11,6 +11,8 @@ local abi = require "syscall.abi"
 
 return function(S, hh, c, C, types, ioctl)
 
+local ret64, retnum, retfd, retbool, retptr, retiter = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr, hh.retiter
+
 local ffi = require "ffi"
 local errno = ffi.errno
 
@@ -20,8 +22,7 @@ local t, pt, s = types.t, types.pt, types.s
 
 local h = require "syscall.helpers"
 
-local istype, mktype, getfd = hh.istype, hh.mktype, hh.getfd
-local ret64, retnum, retfd, retbool, retptr, retiter = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr, hh.retiter
+local istype, mktype, getfd = h.istype, h.mktype, h.getfd
 
 if abi.abi32 then
   -- override open call with largefile -- TODO move this hack to c.lua instead

@@ -564,7 +564,6 @@ end
 
 -- now call OS specific for non-generic calls
 local hh = {
-  istype = istype, mktype = mktype, getfd = getfd,
   ret64 = ret64, retnum = retnum, retfd = retfd, retbool = retbool, retptr = retptr, retiter = retiter
 }
 
