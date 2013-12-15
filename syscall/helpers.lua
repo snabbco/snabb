@@ -43,6 +43,14 @@ function h.getfd(fd)
   return fd:getfd()
 end
 
+-- generic function for __new
+function h.newfn(tp, tab)
+  local obj = ffi.new(tp)
+  -- these are split out so __newindex is called, not just initialisers luajit understands
+  for k, v in pairs(tab or {}) do if type(k) == "string" then obj[k] = v end end -- set string indexes
+  return obj
+end
+
 -- constants
 h.uint64_max = ffi.cast("uint64_t", 0) - ffi.cast("uint64_t", 1)
 h.uerr64 = h.uint64_max

@@ -23,7 +23,8 @@ local h = require "syscall.helpers"
 
 local c = require("syscall." .. abi.os .. ".constants")
 
-local ptt, reviter, mktype, istype, lenfn, lenmt, getfd = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd
+local ptt, reviter, mktype, istype, lenfn, lenmt, getfd, newfn
+  = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd, h.newfn
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
@@ -82,14 +83,6 @@ end
 local function addraw2(name, tp)
   if abi.rumpfn then tp = abi.rumpfn(tp) end
   t[name] = ffi.typeof(tp .. "[2]")
-end
-
--- generic for __new TODO use more
-local function newfn(tp, tab)
-  local obj = ffi.new(tp)
-  -- these are split out so __newindex is called, not just initialisers luajit understands
-  for k, v in pairs(tab or {}) do if type(k) == "string" then obj[k] = v end end -- set string indexes
-  return obj
 end
 
 -- generic types
@@ -674,7 +667,7 @@ mt.rusage = {
 addtype("rusage", "struct rusage", mt.rusage)
 
 -- include OS specific types
-local hh = {addtype = addtype, addtype_var = addtype_var, addtype_fn = addtype_fn, newfn = newfn}
+local hh = {addtype = addtype, addtype_var = addtype_var, addtype_fn = addtype_fn}
 
 types = ostypes.init(types, hh, c)
 if ostypes2 then types = ostypes2.init(types, hh, c) end
