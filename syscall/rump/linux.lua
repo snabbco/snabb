@@ -12,7 +12,6 @@ pcall, type, table, string
 local function init(types, c)
 
 local ffi = require "ffi"
-local bit = require "syscall.bit"
 
 ffi.cdef [[
 typedef uint32_t _netbsd_mode_t;
@@ -36,18 +35,9 @@ struct _netbsd_ptyfs_args {
 };
 ]]
 
-local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
-
 local h = require "syscall.helpers"
 
 local addtype = h.addtype
-local ptt, reviter, mktype, istype, lenfn, lenmt, newfn = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.newfn
-local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
-
-local mt = {} -- metatables
-
-local addtypes = {
-}
 
 local addstructs = {
   ufs_args = "struct _netbsd_ufs_args",
@@ -55,8 +45,7 @@ local addstructs = {
   ptyfs_args = "struct _netbsd_ptyfs_args",
 }
 
-for k, v in pairs(addtypes) do addtype(types, k, v) end
-for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
+for k, v in pairs(addstructs) do addtype(types, k, v, {}) end
 
 return types
 
