@@ -18,7 +18,6 @@ require("syscall." .. abi.os .. ".ffitypes")
 
 if not abi.rump then require "syscall.ffifunctions" end
 
-local c = require("syscall." .. abi.os .. ".constants")
 local ostypes = require("syscall." .. abi.os .. ".types")
 
 local ostypes2
@@ -36,11 +35,13 @@ end
 local ioctl = require("syscall." .. abi.os .. ".ioctl").init(types)
 local fcntl = require("syscall." .. abi.os .. ".fcntl").init(types)
 
-local S = require "syscall.syscalls".init(c, C, types, ioctl, fcntl)
+local S = require "syscall.syscalls".init(C, types, ioctl, fcntl)
 
-c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps  TODO remove see #94
+S.abi, S.types, S.t = abi, types, types.t -- add to main table returned
 
-S.abi, S.c, S.types, S.t = abi, c, types, types.t -- add to main table returned
+-- add constants
+S.c = require("syscall." .. abi.os .. ".constants")
+S.c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps  TODO remove see #94
 
 -- add compatibility code
 S = require "syscall.compat".init(S)

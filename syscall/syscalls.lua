@@ -8,7 +8,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(c, C, types, ioctl, fcntl)
+local function init(C, types, ioctl, fcntl)
 
 local abi = require "syscall.abi"
 local ffi = require "ffi"
@@ -18,6 +18,8 @@ local h = require "syscall.helpers"
 local err64 = h.err64
 local uerr64 = h.uerr64
 local errpointer = h.errpointer
+
+local c = require("syscall." .. abi.os .. ".constants")
 
 local errno = ffi.errno
 
