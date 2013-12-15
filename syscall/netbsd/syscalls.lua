@@ -116,6 +116,53 @@ function S.getcwd(buf, size)
   return ffi.string(buf)
 end
 
+function S.kqueue(flags) return retfd(C.kqueue1(c.O[flags])) end
+
+function S.kevent(kq, changelist, eventlist, timeout)
+  if timeout then timeout = mktype(t.timespec, timeout) end
+  local changes, changecount = nil, 0
+  if changelist then changes, changecount = changelist.kev, changelist.count end
+  if eventlist then
+    local ret, err = C.kevent(getfd(kq), changes, changecount, eventlist.kev, eventlist.count, timeout)
+    return retiter(ret, err, eventlist.kev)
+  end
+  return retnum(C.kevent(getfd(kq), changes, changecount, nil, 0, timeout))
+end
+
+-- TODO this is the same as ppoll other than if timeout is modified, which Linux syscall but not libc does; could merge
+function S.pollts(fds, timeout, set)
+  if timeout then timeout = mktype(t.timespec, timeout) end
+  if set then set = mktype(t.sigset, set) end
+  return retnum(C.pollts(fds.pfd, #fds, timeout, set))
+end
+
+function S.issetugid() return C.issetugid() end
+
+function S.getpriority(which, who)
+  errno(0)
+  local ret, err = C.getpriority(c.PRIO[which], who or 0)
+  if ret == -1 and (err or errno()) ~= 0 then return nil, t.error(err or errno()) end
+  return ret
+end
+
+function S.sigaction(signum, handler, oldact)
+  if type(handler) == "string" or type(handler) == "function" then
+    handler = {handler = handler, mask = "", flags = 0} -- simple case like signal
+  end
+  if handler then handler = mktype(t.sigaction, handler) end
+  return retbool(C.sigaction(c.SIG[signum], handler, oldact))
+end
+
+function S.ktrace(tracefile, ops, trpoints, pid)
+  return retbool(C.ktrace(tracefile, c.KTROP[ops], c.KTRFAC(trpoints, "V2"), pid))
+end
+function S.fktrace(fd, ops, trpoints, pid)
+  return retbool(C.fktrace(getfd(fd), c.KTROP[ops], c.KTRFAC(trpoints, "V2"), pid))
+end
+function S.utrace(label, addr, len)
+  return retbool(C.utrace(label, addr, len)) -- TODO allow string to be passed as addr?
+end
+
 -- pty functions
 function S.grantpt(fd) return S.ioctl(fd, "TIOCGRANTPT") end
 function S.unlockpt(fd) return 0 end
@@ -163,53 +210,6 @@ function S.tcflow(fd, action)
   return true
 end
 function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
-
-function S.kqueue(flags) return retfd(C.kqueue1(c.O[flags])) end
-
-function S.kevent(kq, changelist, eventlist, timeout)
-  if timeout then timeout = mktype(t.timespec, timeout) end
-  local changes, changecount = nil, 0
-  if changelist then changes, changecount = changelist.kev, changelist.count end
-  if eventlist then
-    local ret, err = C.kevent(getfd(kq), changes, changecount, eventlist.kev, eventlist.count, timeout)
-    return retiter(ret, err, eventlist.kev)
-  end
-  return retnum(C.kevent(getfd(kq), changes, changecount, nil, 0, timeout))
-end
-
--- TODO this is the same as ppoll other than if timeout is modified, which Linux syscall but not libc does; could merge
-function S.pollts(fds, timeout, set)
-  if timeout then timeout = mktype(t.timespec, timeout) end
-  if set then set = mktype(t.sigset, set) end
-  return retnum(C.pollts(fds.pfd, #fds, timeout, set))
-end
-
-function S.issetugid() return C.issetugid() end
-
-function S.getpriority(which, who)
-  errno(0)
-  local ret, err = C.getpriority(c.PRIO[which], who or 0)
-  if ret == -1 and (err or errno()) ~= 0 then return nil, t.error(err or errno()) end
-  return ret
-end
-
-function S.sigaction(signum, handler, oldact)
-  if type(handler) == "string" or type(handler) == "function" then
-    handler = {handler = handler, mask = "", flags = 0} -- simple case like signal
-  end
-  if handler then handler = mktype(t.sigaction, handler) end
-  return retbool(C.sigaction(c.SIG[signum], handler, oldact))
-end
-
-function S.ktrace(tracefile, ops, trpoints, pid)
-  return retbool(C.ktrace(tracefile, c.KTROP[ops], c.KTRFAC(trpoints, "V2"), pid))
-end
-function S.fktrace(fd, ops, trpoints, pid)
-  return retbool(C.fktrace(getfd(fd), c.KTROP[ops], c.KTRFAC(trpoints, "V2"), pid))
-end
-function S.utrace(label, addr, len)
-  return retbool(C.utrace(label, addr, len)) -- TODO allow string to be passed as addr?
-end
 
 return S
 
