@@ -9,7 +9,7 @@ pcall, type, table, string
 
 -- TODO add __len to metatables of more
 
-local function init(types, c)
+local function init(types)
 
 local abi = require "syscall.abi"
 
@@ -25,6 +25,8 @@ local ptt, reviter, mktype, istype, lenfn, lenmt, getfd, newfn
   = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd, h.newfn
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim = h.split, h.trim
+
+local c = require "syscall.linux.constants"
 
 local mt = {} -- metatables
 

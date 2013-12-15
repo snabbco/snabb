@@ -7,7 +7,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(types, c)
+local function init(types)
 
 local abi = require "syscall.abi"
 
@@ -21,6 +21,8 @@ local h = require "syscall.helpers"
 local addtype, addtype_var, addtype_fn, addraw2 = h.addtype, h.addtype_var, h.addtype_fn, h.addraw2
   = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd, h.newfn
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
+
+local c = require "syscall.osx.constants"
 
 local mt = {} -- metatables
 

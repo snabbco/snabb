@@ -623,8 +623,8 @@ mt.rusage = {
 addtype(types, "rusage", "struct rusage", mt.rusage)
 
 -- include OS specific types
-types = ostypes.init(types, c)
-if ostypes2 then types = ostypes2.init(types, c) end
+types = ostypes.init(types)
+if ostypes2 then types = ostypes2.init(types) end
 
 -- this is declared above
 samap_pt = {
