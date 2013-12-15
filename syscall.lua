@@ -11,16 +11,15 @@ local abi = require "syscall.abi"
 
 local ffi = require "ffi"
 
-local useos = abi.os
-if abi.rump and abi.types then useos = abi.types end
+if abi.rump and abi.types then abi.os = abi.types end -- pretend to be Linux for rumplinux
 
 require "syscall.ffitypes"
-require("syscall." .. useos .. ".ffitypes")
+require("syscall." .. abi.os .. ".ffitypes")
 
 if not abi.rump then require "syscall.ffifunctions" end
 
-local c = require("syscall." .. useos .. ".constants")
-local ostypes = require("syscall." .. useos .. ".types")
+local c = require("syscall." .. abi.os .. ".constants")
+local ostypes = require("syscall." .. abi.os .. ".types")
 
 local ostypes2
 if abi.rump and abi.types == "linux" then ostypes2 = require "syscall.rump.linux" end
@@ -33,10 +32,6 @@ if abi.rump then
 else
   C = require("syscall." .. abi.os .. ".c")
 end
-
-if abi.rump and abi.types == "linux" then abi.os = "linux" end -- after this, we pretend to be Linux
-
--- from now useos and abi.os the same
 
 local ioctl = require("syscall." .. abi.os .. ".ioctl").init(types)
 local fcntl = require("syscall." .. abi.os .. ".fcntl").init(types)
