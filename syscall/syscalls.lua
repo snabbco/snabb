@@ -15,7 +15,7 @@ local bit = require "syscall.bit"
 local h = require "syscall.helpers"
 local err64 = h.err64
 local errpointer = h.errpointer
-local getfd, istype, mktype = h.getfd, h.istype, h.mktype
+local getfd, istype, mktype, reviter = h.getfd, h.istype, h.mktype, h.reviter
 
 local function init(C, c, types)
 
@@ -66,12 +66,7 @@ local function retptr(ret, err)
   return ret
 end
 
--- generic iterators; these count down to 0 so need no closure
-local function reviter(array, i)
-  i = i - 1
-  if i >= 0 then return i, array[i] end
-end
-
+-- generic iterator; this counts down to 0 so need no closure
 local function retiter(ret, err, array)
   ret = tonumber(ret)
   if ret == -1 then return nil, t.error(err or errno()) end
