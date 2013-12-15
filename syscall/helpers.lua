@@ -20,10 +20,11 @@ local function ptvoid(x)
   return ffi.cast(voidp, x)
 end
 
-function h.ptt(tp)
+local function ptt(tp)
   local ptp = ffi.typeof(tp .. " *")
   return function(x) return ffi.cast(ptp, x) end
 end
+h.ptt = ptt
 
 -- generic iterator that counts down so needs no closure to hold state
 function h.reviter(array, i)
@@ -34,8 +35,9 @@ end
 function h.mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 function h.istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
 
-function h.lenfn(tp) return ffi.sizeof(tp) end
-h.lenmt = {__len = h.lenfn}
+local function lenfn(tp) return ffi.sizeof(tp) end
+h.lenfn = lenfn
+h.lenmt = {__len = lenfn}
 
 local tint = ffi.typeof("int")
 function h.getfd(fd)
@@ -50,6 +52,31 @@ function h.newfn(tp, tab)
   for k, v in pairs(tab or {}) do if type(k) == "string" then obj[k] = v end end -- set string indexes
   return obj
 end
+
+-- type initialisation helpers
+function h.addtype(types, name, tp, mt)
+  if abi.rumpfn then tp = abi.rumpfn(tp) end
+  if mt then
+    if mt.index and not mt.__index then -- generic index method
+      local index = mt.index
+      mt.index = nil
+      mt.__index = function(tp, k) if index[k] then return index[k](tp) else error("invalid index " .. k) end end
+    end
+    if mt.newindex and not mt.__newindex then -- generic newindex method
+      local newindex = mt.newindex
+      mt.newindex = nil
+      mt.__newindex = function(tp, k, v) if newindex[k] then newindex[k](tp, v) else error("invalid index " .. k) end end
+    end
+    if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof
+    types.t[name] = ffi.metatype(tp, mt)
+  else
+    types.t[name] = ffi.typeof(tp)
+  end
+  types.ctypes[tp] = types.t[name]
+  types.pt[name] = ptt(tp)
+  types.s[name] = ffi.sizeof(types.t[name])
+end
+
 
 -- constants
 h.uint64_max = ffi.cast("uint64_t", 0) - ffi.cast("uint64_t", 1)

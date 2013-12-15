@@ -25,6 +25,7 @@ local c = require("syscall." .. abi.os .. ".constants")
 
 local ptt, reviter, mktype, istype, lenfn, lenmt, getfd, newfn
   = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd, h.newfn
+local addtype = h.addtype
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
@@ -43,28 +44,6 @@ for k, v in pairs(sharedtypes.ctypes) do ctypes[k] = v end
 local mt = {} -- metatables
 
 --helpers
-local function addtype(types, name, tp, mt)
-  if abi.rumpfn then tp = abi.rumpfn(tp) end
-  if mt then
-    if mt.index and not mt.__index then -- generic index method
-      local index = mt.index
-      mt.index = nil
-      mt.__index = function(tp, k) if index[k] then return index[k](tp) else error("invalid index " .. k) end end
-    end
-    if mt.newindex and not mt.__newindex then -- generic newindex method
-      local newindex = mt.newindex
-      mt.newindex = nil
-      mt.__newindex = function(tp, k, v) if newindex[k] then newindex[k](tp, v) else error("invalid index " .. k) end end
-    end
-    if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof
-    types.t[name] = ffi.metatype(tp, mt)
-  else
-    types.t[name] = ffi.typeof(tp)
-  end
-  types.ctypes[tp] = types.t[name]
-  types.pt[name] = ptt(tp)
-  types.s[name] = ffi.sizeof(types.t[name])
-end
 
 -- for variables length types, ie those with arrays
 local function addtype_var(types, name, tp, mt)
