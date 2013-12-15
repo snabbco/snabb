@@ -25,7 +25,7 @@ local c = require("syscall." .. abi.os .. ".constants")
 
 local ptt, reviter, mktype, istype, lenfn, lenmt, getfd, newfn
   = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd, h.newfn
-local addtype = h.addtype
+local addtype, addtype_var, addtype_fn, addraw2 = h.addtype, h.addtype_var, h.addtype_fn, h.addraw2
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
@@ -42,27 +42,6 @@ for k, v in pairs(sharedtypes.s) do s[k] = v end
 for k, v in pairs(sharedtypes.ctypes) do ctypes[k] = v end
 
 local mt = {} -- metatables
-
---helpers
-
--- for variables length types, ie those with arrays
-local function addtype_var(types, name, tp, mt)
-  if abi.rumpfn then tp = abi.rumpfn(tp) end
-  if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof, gives instance size for var lngth
-  types.t[name] = ffi.metatype(tp, mt)
-  types.pt[name] = ptt(tp)
-end
-
-local function addtype_fn(types, name, tp)
-  if abi.rumpfn then tp = abi.rumpfn(tp) end
-  types.t[name] = ffi.typeof(tp)
-  types.s[name] = ffi.sizeof(types.t[name])
-end
-
-local function addraw2(types, name, tp)
-  if abi.rumpfn then tp = abi.rumpfn(tp) end
-  types.t[name] = ffi.typeof(tp .. "[2]")
-end
 
 -- generic types
 

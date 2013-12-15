@@ -77,6 +77,24 @@ function h.addtype(types, name, tp, mt)
   types.s[name] = ffi.sizeof(types.t[name])
 end
 
+-- for variables length types, ie those with arrays
+function h.addtype_var(types, name, tp, mt)
+  if abi.rumpfn then tp = abi.rumpfn(tp) end
+  if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof, gives instance size for var lngth
+  types.t[name] = ffi.metatype(tp, mt)
+  types.pt[name] = ptt(tp)
+end
+
+function h.addtype_fn(types, name, tp)
+  if abi.rumpfn then tp = abi.rumpfn(tp) end
+  types.t[name] = ffi.typeof(tp)
+  types.s[name] = ffi.sizeof(types.t[name])
+end
+
+function h.addraw2(types, name, tp)
+  if abi.rumpfn then tp = abi.rumpfn(tp) end
+  types.t[name] = ffi.typeof(tp .. "[2]")
+end
 
 -- constants
 h.uint64_max = ffi.cast("uint64_t", 0) - ffi.cast("uint64_t", 1)
