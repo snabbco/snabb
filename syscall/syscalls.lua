@@ -14,7 +14,6 @@ local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 local err64 = h.err64
-local uerr64 = h.uerr64
 local errpointer = h.errpointer
 local getfd, istype, mktype = h.getfd, h.istype, h.mktype
 
@@ -41,11 +40,6 @@ end
 -- TODO only luaffi needs the cast as wont compare to number; hopefully fixed in future with 5.3 or a later luaffi.
 local function ret64(ret, err)
   if ret == err64 then return nil, t.error(err or errno()) end
-  return tonumber(ret)
-end
-
-local function retu64(ret, err)
-  if ret == uerr64 then return nil, t.error(err or errno()) end
   return tonumber(ret)
 end
 
