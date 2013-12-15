@@ -17,16 +17,7 @@ local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.
 
 local t, pt, s = types.t, types.pt, types.s
 
-function S.accept(sockfd, flags, addr, addrlen)
-  assert(not flags, "TODO add accept flags emulation") -- TODO emulate netbsd paccept/Linux accept4
-  addr = addr or t.sockaddr_storage()
-  addrlen = addrlen or t.socklen1(addrlen or #addr)
-  local saddr = pt.sockaddr(addr)
-  local ret, err = C.accept(getfd(sockfd), saddr, addrlen)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return {fd = t.fd(ret), addr = t.sa(addr, addrlen[0])}
-end
-
+-- TODO these should be in generic code, although they are obsolete in most systems
 function S.utimes(filename, ts)
   if ts then ts = t.timeval2(ts) end
   return retbool(C.utimes(filename, ts))
