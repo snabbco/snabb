@@ -47,7 +47,7 @@ mt.device = {
   end,
 }
 
-addtype("device", "struct {dev_t dev;}", mt.device)
+addtype(types, "device", "struct {dev_t dev;}", mt.device)
 
 function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has odd unix handling
 
@@ -82,7 +82,7 @@ mt.stat = {
   },
 }
 
-addtype("stat", "struct stat", mt.stat)
+addtype(types, "stat", "struct stat", mt.stat)
 
 mt.siginfo = {
   index = {
@@ -110,7 +110,7 @@ mt.siginfo = {
   __len = lenfn,
 }
 
-addtype("siginfo", "siginfo_t", mt.siginfo)
+addtype(types, "siginfo", "siginfo_t", mt.siginfo)
 
 mt.dirent = {
   index = {
@@ -129,7 +129,7 @@ for k, v in pairs(c.DT) do
   mt.dirent.index[k] = function(self) return self.type == v end
 end
 
-addtype("dirent", "struct dirent", mt.dirent)
+addtype(types, "dirent", "struct dirent", mt.dirent)
 
 return types
 

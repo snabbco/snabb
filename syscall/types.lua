@@ -43,7 +43,7 @@ for k, v in pairs(sharedtypes.ctypes) do ctypes[k] = v end
 local mt = {} -- metatables
 
 --helpers
-local function addtype(name, tp, mt)
+local function addtype(types, name, tp, mt)
   if abi.rumpfn then tp = abi.rumpfn(tp) end
   if mt then
     if mt.index and not mt.__index then -- generic index method
@@ -57,32 +57,32 @@ local function addtype(name, tp, mt)
       mt.__newindex = function(tp, k, v) if newindex[k] then newindex[k](tp, v) else error("invalid index " .. k) end end
     end
     if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof
-    t[name] = ffi.metatype(tp, mt)
+    types.t[name] = ffi.metatype(tp, mt)
   else
-    t[name] = ffi.typeof(tp)
+    types.t[name] = ffi.typeof(tp)
   end
-  ctypes[tp] = t[name]
-  pt[name] = ptt(tp)
-  s[name] = ffi.sizeof(t[name])
+  types.ctypes[tp] = types.t[name]
+  types.pt[name] = ptt(tp)
+  types.s[name] = ffi.sizeof(types.t[name])
 end
 
 -- for variables length types, ie those with arrays
-local function addtype_var(name, tp, mt)
+local function addtype_var(types, name, tp, mt)
   if abi.rumpfn then tp = abi.rumpfn(tp) end
   if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof, gives instance size for var lngth
-  t[name] = ffi.metatype(tp, mt)
-  pt[name] = ptt(tp)
+  types.t[name] = ffi.metatype(tp, mt)
+  types.pt[name] = ptt(tp)
 end
 
-local function addtype_fn(name, tp)
+local function addtype_fn(types, name, tp)
   if abi.rumpfn then tp = abi.rumpfn(tp) end
-  t[name] = ffi.typeof(tp)
-  s[name] = ffi.sizeof(t[name])
+  types.t[name] = ffi.typeof(tp)
+  types.s[name] = ffi.sizeof(types.t[name])
 end
 
-local function addraw2(name, tp)
+local function addraw2(types, name, tp)
   if abi.rumpfn then tp = abi.rumpfn(tp) end
-  t[name] = ffi.typeof(tp .. "[2]")
+  types.t[name] = ffi.typeof(tp .. "[2]")
 end
 
 -- generic types
@@ -119,7 +119,7 @@ local addtypes = {
 }
 
 -- note we cannot add any metatable, as may be declared in os and rump, so not even lenmt added
-for k, v in pairs(addtypes) do addtype(k, v) end
+for k, v in pairs(addtypes) do addtype(types, k, v) end
 
 t.socklen1 = ffi.typeof("socklen_t[1]")
 t.off1 = ffi.typeof("off_t[1]")
@@ -153,7 +153,7 @@ mt.sockaddr = {
   },
 }
 
-addtype("sockaddr", "struct sockaddr", mt.sockaddr)
+addtype(types, "sockaddr", "struct sockaddr", mt.sockaddr)
 
 -- cast socket address to actual type based on family, defined later
 local samap_pt = {}
@@ -217,7 +217,7 @@ mt.sockaddr_storage = {
 }
 
 -- experiment, see if we can use this as generic type, to avoid allocations.
-addtype("sockaddr_storage", "struct sockaddr_storage", mt.sockaddr_storage)
+addtype(types, "sockaddr_storage", "struct sockaddr_storage", mt.sockaddr_storage)
 
 mt.sockaddr_in = {
   index = {
@@ -244,7 +244,7 @@ mt.sockaddr_in = {
   __len = function(tp) return s.sockaddr_in end,
 }
 
-addtype("sockaddr_in", "struct sockaddr_in", mt.sockaddr_in)
+addtype(types, "sockaddr_in", "struct sockaddr_in", mt.sockaddr_in)
 
 mt.sockaddr_in6 = {
   index = {
@@ -273,7 +273,7 @@ mt.sockaddr_in6 = {
   __len = function(tp) return s.sockaddr_in6 end,
 }
 
-addtype("sockaddr_in6", "struct sockaddr_in6", mt.sockaddr_in6)
+addtype(types, "sockaddr_in6", "struct sockaddr_in6", mt.sockaddr_in6)
 
 mt.timeval = {
   index = {
@@ -305,7 +305,7 @@ mt.timeval = {
   end
 }
 
-addtype("timeval", "struct timeval", mt.timeval)
+addtype(types, "timeval", "struct timeval", mt.timeval)
 
 mt.timespec = {
   index = {
@@ -337,10 +337,10 @@ mt.timespec = {
   end,
 }
 
-addtype("timespec", "struct timespec", mt.timespec)
+addtype(types, "timespec", "struct timespec", mt.timespec)
 
 -- array so cannot just add metamethods
-addraw2("timeval2_raw", "struct timeval")
+addraw2(types, "timeval2_raw", "struct timeval")
 t.timeval2 = function(tv1, tv2)
   if ffi.istype(t.timeval2_raw, tv1) then return tv1 end
   if type(tv1) == "table" then tv1, tv2 = tv1[1], tv1[2] end
@@ -351,7 +351,7 @@ t.timeval2 = function(tv1, tv2)
 end
 
 -- array so cannot just add metamethods
-addraw2("timespec2_raw", "struct timespec")
+addraw2(types, "timespec2_raw", "struct timespec")
 t.timespec2 = function(ts1, ts2)
   if ffi.istype(t.timespec2_raw, ts1) then return ts1 end
   if type(ts1) == "table" then ts1, ts2 = ts1[1], ts1[2] end
@@ -375,7 +375,7 @@ mt.groups = {
   __len = function(g) return g.count end,
 }
 
-addtype_var("groups", "struct {int count; gid_t list[?];}", mt.groups)
+addtype_var(types, "groups", "struct {int count; gid_t list[?];}", mt.groups)
 
 -- signal set handlers
 local function sigismember(set, sig)
@@ -455,7 +455,7 @@ mt.sigset = {
   end,
 }
 
-addtype("sigset", "sigset_t", mt.sigset)
+addtype(types, "sigset", "sigset_t", mt.sigset)
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsgtype = "struct cmsghdr"
@@ -548,7 +548,7 @@ mt.cmsghdr = {
   end,
 }
 
-addtype_var("cmsghdr", "struct cmsghdr", mt.cmsghdr)
+addtype_var(types, "cmsghdr", "struct cmsghdr", mt.cmsghdr)
 
 -- msg_control is a bunch of cmsg structs, but these are all different lengths, as they have variable size arrays
 
@@ -613,7 +613,7 @@ mt.msghdr = {
   __new = newfn,
 }
 
-addtype("msghdr", "struct msghdr", mt.msghdr)
+addtype(types, "msghdr", "struct msghdr", mt.msghdr)
 
 mt.pollfd = {
   index = {
@@ -623,7 +623,7 @@ mt.pollfd = {
 
 for k, v in pairs(c.POLL) do mt.pollfd.index[k] = function(pfd) return bit.band(pfd.revents, v) ~= 0 end end
 
-addtype("pollfd", "struct pollfd", mt.pollfd)
+addtype(types, "pollfd", "struct pollfd", mt.pollfd)
 
 mt.pollfds = {
   __len = function(p) return p.count end,
@@ -641,7 +641,7 @@ mt.pollfds = {
   __ipairs = function(p) return reviter, p.pfd, p.count end
 }
 
-addtype_var("pollfds", "struct {int count; struct pollfd pfd[?];}", mt.pollfds)
+addtype_var(types, "pollfds", "struct {int count; struct pollfd pfd[?];}", mt.pollfds)
 
 mt.rusage = {
   index = {
@@ -664,7 +664,7 @@ mt.rusage = {
   },
 }
 
-addtype("rusage", "struct rusage", mt.rusage)
+addtype(types, "rusage", "struct rusage", mt.rusage)
 
 -- include OS specific types
 local hh = {addtype = addtype, addtype_var = addtype_var, addtype_fn = addtype_fn}

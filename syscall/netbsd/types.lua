@@ -49,8 +49,8 @@ else
   addstructs.ptmget = "struct ptmget"
 end
 
-for k, v in pairs(addtypes) do addtype(k, v) end
-for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
+for k, v in pairs(addtypes) do addtype(types, k, v) end
+for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
 
 -- 64 bit dev_t
 local function makedev(major, minor)
@@ -83,7 +83,7 @@ mt.device = {
   end,
 }
 
-addtype("device", "struct {dev_t dev;}", mt.device)
+addtype(types, "device", "struct {dev_t dev;}", mt.device)
 
 mt.sockaddr_un = {
   index = {
@@ -98,7 +98,7 @@ mt.sockaddr_un = {
   __len = function(sa) return 2 + #sa.path end,
 }
 
-addtype("sockaddr_un", "struct sockaddr_un", mt.sockaddr_un)
+addtype(types, "sockaddr_un", "struct sockaddr_un", mt.sockaddr_un)
 
 function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has odd unix handling
 
@@ -134,7 +134,7 @@ mt.stat = {
   },
 }
 
-addtype("stat", "struct stat", mt.stat)
+addtype(types, "stat", "struct stat", mt.stat)
 
 mt.siginfo = {
   index = {
@@ -167,10 +167,10 @@ mt.siginfo = {
   },
 }
 
-addtype("siginfo", "siginfo_t", mt.siginfo)
+addtype(types, "siginfo", "siginfo_t", mt.siginfo)
 
 -- sigaction, standard POSIX behaviour with union of handler and sigaction
-addtype_fn("sa_sigaction", "void (*)(int, siginfo_t *, void *)")
+addtype_fn(types, "sa_sigaction", "void (*)(int, siginfo_t *, void *)")
 
 mt.sigaction = {
   index = {
@@ -204,7 +204,7 @@ mt.sigaction = {
   end,
 }
 
-addtype("sigaction", "struct sigaction", mt.sigaction)
+addtype(types, "sigaction", "struct sigaction", mt.sigaction)
 
 mt.dirent = {
   index = {
@@ -226,7 +226,7 @@ for k, v in pairs(c.DT) do
   mt.dirent.index[k] = function(self) return self.type == v end
 end
 
-addtype("dirent", "struct dirent", mt.dirent)
+addtype(types, "dirent", "struct dirent", mt.dirent)
 
 mt.ifreq = {
   index = {
@@ -255,7 +255,7 @@ mt.ifreq = {
   __new = newfn,
 }
 
-addtype("ifreq", "struct ifreq", mt.ifreq)
+addtype(types, "ifreq", "struct ifreq", mt.ifreq)
 
 mt.ifaliasreq = {
   index = {
@@ -279,7 +279,7 @@ mt.ifaliasreq = {
 mt.ifaliasreq.index.broadaddr = mt.ifaliasreq.index.dstaddr
 mt.ifaliasreq.newindex.broadaddr = mt.ifaliasreq.newindex.dstaddr
 
-addtype("ifaliasreq", "struct ifaliasreq", mt.ifaliasreq)
+addtype(types, "ifaliasreq", "struct ifaliasreq", mt.ifaliasreq)
 
 -- TODO need to check in detail all this as ported form Linux and may differ
 mt.termios = {
@@ -320,7 +320,7 @@ for k, i in pairs(c.CC) do
   mt.termios.newindex[k] = function(termios, v) termios.c_cc[i] = v end
 end
 
-addtype("termios", "struct termios", mt.termios)
+addtype(types, "termios", "struct termios", mt.termios)
 
 mt.kevent = {
   index = {
@@ -353,7 +353,7 @@ for _, k in pairs{"FLAG1", "EOF", "ERROR"} do
   mt.kevent.index[k] = function(kev) return bit.band(kev.flags, c.EV[k]) ~= 0 end
 end
 
-addtype("kevent", "struct kevent", mt.kevent)
+addtype(types, "kevent", "struct kevent", mt.kevent)
 
 mt.kevents = {
   __len = function(kk) return kk.count end,
@@ -370,7 +370,7 @@ mt.kevents = {
   __ipairs = function(kk) return reviter, kk.kev, kk.count end
 }
 
-addtype_var("kevents", "struct {int count; struct kevent kev[?];}", mt.kevents)
+addtype_var(types, "kevents", "struct {int count; struct kevent kev[?];}", mt.kevents)
 
 local ktr_type = {}
 for k, v in pairs(c.KTR) do ktr_type[v] = k end
@@ -420,7 +420,7 @@ mt.ktr_header = {
   end,
 }
 
-addtype("ktr_header", "struct ktr_header", mt.ktr_header)
+addtype(types, "ktr_header", "struct ktr_header", mt.ktr_header)
 
 local sysname = {}
 for k, v in pairs(c.SYS) do sysname[v] = k end
@@ -468,7 +468,7 @@ mt.ktr_syscall = {
   end,
 }
 
-addtype("ktr_syscall", "struct ktr_syscall", mt.ktr_syscall)
+addtype(types, "ktr_syscall", "struct ktr_syscall", mt.ktr_syscall)
 
 mt.ktr_sysret = {
   index = {
@@ -487,7 +487,7 @@ mt.ktr_sysret = {
   end
 }
 
-addtype("ktr_sysret", "struct ktr_sysret", mt.ktr_sysret)
+addtype(types, "ktr_sysret", "struct ktr_sysret", mt.ktr_sysret)
 
 mt.ktr_csw = {
   __tostring = function(ktr)
@@ -495,7 +495,7 @@ mt.ktr_csw = {
   end,
 }
 
-addtype("ktr_csw", "struct ktr_csw", mt.ktr_csw)
+addtype(types, "ktr_csw", "struct ktr_csw", mt.ktr_csw)
 
 -- slightly miscellaneous types, eg need to use Lua metatables
 

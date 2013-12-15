@@ -130,8 +130,8 @@ local addstructs = {
   vhost_memory = "struct vhost_memory",
 }
 
-for k, v in pairs(addtypes) do addtype(k, v) end
-for k, v in pairs(addstructs) do addtype(k, v, lenmt) end
+for k, v in pairs(addtypes) do addtype(types, k, v) end
+for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
 
 -- these ones not in table as not helpful with vararg or arrays TODO add more addtype variants
 t.inotify_event = ffi.typeof("struct inotify_event")
@@ -179,7 +179,7 @@ mt.device = {
   end,
 }
 
-addtype("device", "struct {dev_t dev;}", mt.device)
+addtype(types, "device", "struct {dev_t dev;}", mt.device)
 
 -- we do provide this directly for compatibility, only use for standard names
 mt.sockaddr_un = {
@@ -195,7 +195,7 @@ mt.sockaddr_un = {
   __len = function(tp) return s.sockaddr_un end, -- TODO lenfn (default) instead
 }
 
-addtype("sockaddr_un", "struct sockaddr_un", mt.sockaddr_un)
+addtype(types, "sockaddr_un", "struct sockaddr_un", mt.sockaddr_un)
 
 -- this is a bit odd, but we actually use Lua metatables for sockaddr_un, and use t.sa to multiplex
 -- basically the lINUX unix socket structure is not possible to interpret without size, but does not have size in struct
@@ -256,7 +256,7 @@ mt.sockaddr_nl = {
   __len = function(tp) return s.sockaddr_nl end,
 }
 
-addtype("sockaddr_nl", "struct sockaddr_nl", mt.sockaddr_nl)
+addtype(types, "sockaddr_nl", "struct sockaddr_nl", mt.sockaddr_nl)
 
 mt.sockaddr_ll = {
   index = {
@@ -291,7 +291,7 @@ mt.sockaddr_ll = {
   __len = function(tp) return s.sockaddr_ll end,
 }
 
-addtype("sockaddr_ll", "struct sockaddr_ll", mt.sockaddr_ll)
+addtype(types, "sockaddr_ll", "struct sockaddr_ll", mt.sockaddr_ll)
 
 mt.stat = {
   index = {
@@ -321,7 +321,7 @@ mt.stat = {
   },
 }
 
-addtype("stat", "struct stat", mt.stat)
+addtype(types, "stat", "struct stat", mt.stat)
 
 mt.siginfo = {
   index = {
@@ -362,7 +362,7 @@ mt.siginfo = {
   },
 }
 
-addtype("siginfo", "struct siginfo", mt.siginfo)
+addtype(types, "siginfo", "struct siginfo", mt.siginfo)
 
 -- Linux internally uses non standard sigaction type k_sigaction
 local sa_handler_type = ffi.typeof("void (*)(int)")
@@ -399,7 +399,7 @@ mt.sigaction = {
   end,
 }
 
-addtype("sigaction", "struct k_sigaction", mt.sigaction)
+addtype(types, "sigaction", "struct k_sigaction", mt.sigaction)
 
 mt.macaddr = {
   __tostring = function(m)
@@ -421,7 +421,7 @@ mt.macaddr = {
   end,
 }
 
-addtype("macaddr", "struct {uint8_t mac_addr[6];}", mt.macaddr)
+addtype(types, "macaddr", "struct {uint8_t mac_addr[6];}", mt.macaddr)
 
 mt.rlimit = {
   index = {
@@ -441,7 +441,7 @@ mt.rlimit = {
   __new = newfn,
 }
 
-addtype("rlimit", "struct rlimit64", mt.rlimit)
+addtype(types, "rlimit", "struct rlimit64", mt.rlimit)
 
 local function itnormal(v)
   if not v then v = {{0, 0}, {0, 0}} end
@@ -477,7 +477,7 @@ mt.itimerspec = {
   end,
 }
 
-addtype("itimerspec", "struct itimerspec", mt.itimerspec)
+addtype(types, "itimerspec", "struct itimerspec", mt.itimerspec)
 
 mt.itimerval = {
   index = {
@@ -492,7 +492,7 @@ mt.itimerval = {
   end,
 }
 
-addtype("itimerval", "struct itimerval", mt.itimerval)
+addtype(types, "itimerval", "struct itimerval", mt.itimerval)
 
 mt.signalfd = {
   index = {
@@ -524,7 +524,7 @@ mt.signalfd = {
   end,
 }
 
-addtype("signalfd_siginfo", "struct signalfd_siginfo", mt.signalfd)
+addtype(types, "signalfd_siginfo", "struct signalfd_siginfo", mt.signalfd)
 
 mt.siginfos = {
   __index = function(ss, k)
@@ -536,7 +536,7 @@ mt.siginfos = {
   end,
 }
 
-addtype_var("siginfos", "struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
+addtype_var(types, "siginfos", "struct {int count, bytes; struct signalfd_siginfo sfd[?];}", mt.siginfos)
 
 -- TODO convert to use constants? note missing some macros eg WCOREDUMP(). Allow lower case. Also do not create table dynamically.
 mt.wait = {
@@ -613,8 +613,8 @@ for k, i in pairs(c.CC) do
   mt.termios.newindex[k] = function(termios, v) termios.c_cc[i] = v end
 end
 
-addtype("termios", "struct termios", mt.termios)
-addtype("termios2", "struct termios2", mt.termios)
+addtype(types, "termios", "struct termios", mt.termios)
+addtype(types, "termios2", "struct termios2", mt.termios)
 
 mt.iocb = {
   index = {
@@ -645,7 +645,7 @@ mt.iocb = {
   __new = newfn,
 }
 
-addtype("iocb", "struct iocb", mt.iocb)
+addtype(types, "iocb", "struct iocb", mt.iocb)
 
 -- aio operations want an array of pointers to struct iocb. To make sure no gc, we provide a table with array and pointers
 -- easiest to do as Lua table not ffi type. 
@@ -669,7 +669,7 @@ mt.sock_filter = {
   end
 }
 
-addtype("sock_filter", "struct sock_filter", mt.sock_filter)
+addtype(types, "sock_filter", "struct sock_filter", mt.sock_filter)
 
 -- capabilities data is an array so cannot put metatable on it. Also depends on version, so combine into one structure.
 
@@ -717,7 +717,7 @@ mt.cap = {
   end,
 }
 
-addtype("cap", "struct cap", mt.cap)
+addtype(types, "cap", "struct cap", mt.cap)
 
 mt.capabilities = {
     hdrdata = function(cap)
@@ -759,7 +759,7 @@ mt.capabilities = {
   end,
 }
 
-addtype("capabilities", "struct capabilities", mt.capabilities)
+addtype(types, "capabilities", "struct capabilities", mt.capabilities)
 
 -- difficult to sanely use an ffi metatype for inotify events, so use Lua table
 mt.inotify_events = {
@@ -793,7 +793,7 @@ mt.timex = {
   end,
 }
 
-addtype("timex", "struct timex", mt.timex)
+addtype(types, "timex", "struct timex", mt.timex)
 
 -- not sane to convert to ffi metatype, only used as adjtimex needs to return ret and a struct
 mt.adjtimex = {
@@ -837,7 +837,7 @@ for k, v in pairs(c.EPOLL) do
   mt.epoll_event.index[k] = function(e) return bit.band(e.events, v) ~= 0 end
 end
 
-addtype("epoll_event", "struct epoll_event", mt.epoll_event)
+addtype(types, "epoll_event", "struct epoll_event", mt.epoll_event)
 
 mt.epoll_events = {
   __len = function(ep) return ep.count end,
@@ -845,7 +845,7 @@ mt.epoll_events = {
   __ipairs = function(ep) return reviter, ep.ep, ep.count end
 }
 
-addtype_var("epoll_events", "struct {int count; struct epoll_event ep[?];}", mt.epoll_events)
+addtype_var(types, "epoll_events", "struct {int count; struct epoll_event ep[?];}", mt.epoll_events)
 
 mt.io_event = {
   index = {
@@ -853,7 +853,7 @@ mt.io_event = {
   }
 }
 
-addtype("io_event", "struct io_event", mt.io_event)
+addtype(types, "io_event", "struct io_event", mt.io_event)
 
 mt.io_events = {
   __len = function(evs) return evs.count end,
@@ -861,7 +861,7 @@ mt.io_events = {
   __ipairs = function(evs) return reviter, evs.ev, evs.count end
 }
 
-addtype_var("io_events", "struct {int count; struct io_event ev[?];}", mt.io_events)
+addtype_var(types, "io_events", "struct {int count; struct io_event ev[?];}", mt.io_events)
 
 mt.cpu_set = {
   index = {
@@ -911,7 +911,7 @@ mt.cpu_set = {
   end,
 }
 
-addtype("cpu_set", "struct cpu_set_t", mt.cpu_set)
+addtype(types, "cpu_set", "struct cpu_set_t", mt.cpu_set)
 
 mt.mq_attr = {
   index = {
@@ -929,7 +929,7 @@ mt.mq_attr = {
   __new = newfn,
 }
 
-addtype("mq_attr", "struct mq_attr", mt.mq_attr)
+addtype(types, "mq_attr", "struct mq_attr", mt.mq_attr)
 
 mt.ifreq = {
   index = {
@@ -955,7 +955,7 @@ mt.ifreq = {
   __new = newfn,
 }
 
-addtype("ifreq", "struct ifreq", mt.ifreq)
+addtype(types, "ifreq", "struct ifreq", mt.ifreq)
 
 -- note t.dirents iterator is defined in common types
 local d_name_offset = ffi.offsetof("struct linux_dirent64", "d_name") -- d_name is at end of struct
@@ -977,7 +977,7 @@ for k, v in pairs(c.DT) do
   mt.dirent.index[k] = function(self) return self.type == v end
 end
 
-addtype("dirent", "struct linux_dirent64", mt.dirent)
+addtype(types, "dirent", "struct linux_dirent64", mt.dirent)
 
 mt.rtmsg = {
   index = {
@@ -997,7 +997,7 @@ mt.rtmsg = {
   __new = newfn,
 }
 
-addtype("rtmsg", "struct rtmsg", mt.rtmsg)
+addtype(types, "rtmsg", "struct rtmsg", mt.rtmsg)
 
 mt.ndmsg = {
   index = {
@@ -1013,7 +1013,7 @@ mt.ndmsg = {
   __new = newfn,
 }
 
-addtype("ndmsg", "struct ndmsg", mt.ndmsg)
+addtype(types, "ndmsg", "struct ndmsg", mt.ndmsg)
 
 mt.sched_param = {
   __new = function(tp, v) -- allow positional parameters as only first is ever used
@@ -1023,7 +1023,7 @@ mt.sched_param = {
   end,
 }
 
-addtype("sched_param", "struct sched_param", mt.sched_param)
+addtype(types, "sched_param", "struct sched_param", mt.sched_param)
 
 return types
 
