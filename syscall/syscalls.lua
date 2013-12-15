@@ -8,8 +8,6 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(C, types, ioctl)
-
 local abi = require "syscall.abi"
 local ffi = require "ffi"
 local bit = require "syscall.bit"
@@ -18,6 +16,8 @@ local h = require "syscall.helpers"
 local err64 = h.err64
 local uerr64 = h.uerr64
 local errpointer = h.errpointer
+
+local function init(C, types, ioctl)
 
 local c = require("syscall." .. abi.os .. ".constants")
 
@@ -580,7 +580,7 @@ local hh = {
   ret64 = ret64, retnum = retnum, retfd = retfd, retbool = retbool, retptr = retptr, retiter = retiter
 }
 
-local S = require("syscall." .. abi.os .. ".syscalls")(S, hh, abi, c, C, types, ioctl)
+local S = require("syscall." .. abi.os .. ".syscalls")(S, hh, c, C, types, ioctl)
 
 return S
 

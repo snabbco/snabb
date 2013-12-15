@@ -7,7 +7,9 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-return function(S, hh, abi, c, C, types, ioctl)
+local abi = require "syscall.abi"
+
+return function(S, hh, c, C, types, ioctl)
 
 local ffi = require "ffi"
 
