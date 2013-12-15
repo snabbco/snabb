@@ -384,6 +384,7 @@ local C = {
   pipe = ffi.C.rump_sys_pipe,
 }
 
+-- TODO these shoudl explicitly return errors now that is allowed.
 function C.mmap(...)
   ffi.errno(78) -- NetBSD ENOSYS
   return errpointer

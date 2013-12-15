@@ -100,6 +100,7 @@ local t, pt = S.types.t, S.types.pt
 
 local modinfo = ffi.typeof("struct modinfo")
 
+-- TODO make this explcitly refer to NetBSD error codes
 local function retbool(ret)
   if ret == -1 then return nil, t.error() end
   return true
