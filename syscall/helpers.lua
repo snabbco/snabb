@@ -37,8 +37,9 @@ function h.istype(tp, x) if ffi.istype(tp, x) then return x else return false en
 function h.lenfn(tp) return ffi.sizeof(tp) end
 h.lenmt = {__len = h.lenfn}
 
+local tint = ffi.typeof("int")
 function h.getfd(fd)
-  if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
+  if type(fd) == "number" or ffi.istype(tint, fd) then return fd end
   return fd:getfd()
 end
 

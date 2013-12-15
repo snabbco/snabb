@@ -21,7 +21,7 @@ local ffi = require "ffi"
 
 local h = require "syscall.helpers"
 
-local getfd, istype, mktype = h.getds, h.istype, h.mktype
+local getfd, istype, mktype = h.getfd, h.istype, h.mktype
 
 -- easier interfaces to some functions that are in common use TODO new fcntl code should make easier
 local function nonblock(fd)
