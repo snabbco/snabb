@@ -42,6 +42,12 @@ struct pollfd
   short   events;
   short   revents;
 };
+struct cmsghdr {
+  size_t cmsg_len;
+  int cmsg_level;
+  int cmsg_type;
+  char cmsg_data[?];
+};
 struct msghdr {
   void *msg_name;
   socklen_t msg_namelen;
