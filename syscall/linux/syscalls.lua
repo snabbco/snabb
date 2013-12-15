@@ -9,7 +9,7 @@ pcall, type, table, string
 
 local abi = require "syscall.abi"
 
-return function(S, hh, c, C, types, ioctl)
+return function(S, hh, c, C, types)
 
 local ret64, retnum, retfd, retbool, retptr, retiter = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr, hh.retiter
 

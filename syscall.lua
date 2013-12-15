@@ -34,13 +34,12 @@ else
   C = require("syscall." .. abi.os .. ".c")
 end
 
-local ioctl = require("syscall." .. abi.os .. ".ioctl").init(types)
+-- cannot put in S, needed for tests, cannot be put in c earlier due to deps  TODO remove see #94
+c.IOCTL = require("syscall." .. abi.os .. ".ioctl").init(types)
 
-local S = require "syscall.syscalls".init(C, types, ioctl)
+local S = require "syscall.syscalls".init(C, c, types)
 
 S.abi, S.types, S.t, S.c = abi, types, types.t, c -- add to main table returned
-
-c.IOCTL = ioctl -- cannot put in S, needed for tests, cannot be put in c earlier due to deps  TODO remove see #94
 
 -- add compatibility code
 S = require "syscall.compat".init(S)

@@ -18,10 +18,9 @@ local uerr64 = h.uerr64
 local errpointer = h.errpointer
 local getfd, istype, mktype = h.getfd, h.istype, h.mktype
 
-local function init(C, types, ioctl)
+local function init(C, c, types)
 
-local c = require("syscall." .. abi.os .. ".constants")
-
+-- this could be an arguments, fcntl syscall is a function of this
 local fcntl = require("syscall." .. abi.os .. ".fcntl").init(types)
 
 local errno = ffi.errno
@@ -393,7 +392,7 @@ function S.ioctl(d, request, argp)
   local read, singleton = false, false
   local name = request
   if type(name) == "string" then
-    request = ioctl[name]
+    request = c.IOCTL[name]
   end
   if type(request) == "table" then
     local write = request.write
@@ -567,7 +566,7 @@ local hh = {
   ret64 = ret64, retnum = retnum, retfd = retfd, retbool = retbool, retptr = retptr, retiter = retiter
 }
 
-local S = require("syscall." .. abi.os .. ".syscalls")(S, hh, c, C, types, ioctl)
+local S = require("syscall." .. abi.os .. ".syscalls")(S, hh, c, C, types)
 
 return S
 

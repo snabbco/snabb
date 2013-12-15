@@ -81,7 +81,7 @@ abi.rumpfn = nil
 if abi.host == "netbsd" and abi.types == "netbsd" then -- running native (NetBSD on NetBSD)
   local SS = require "syscall"
   local C = require "syscall.rump.c"
-  S = require "syscall.syscalls".init(C, SS.types, SS.c.IOCTL)
+  S = require "syscall.syscalls".init(C, SS.c, SS.types)
   S.abi, S.c, S.types, S.t = abi, SS.c, SS.types, SS.types.t
   S = require "syscall.compat".init(S)
   S = require "syscall.methods".init(S)
