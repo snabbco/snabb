@@ -33,6 +33,7 @@ local function fixup_constants(abi, c)
 
   -- internal use
   c.syscall = nil
+  c.errornames = nil
   c.OMQATTR = nil
 
   -- misleading, Musl has higher than Linux

@@ -14,6 +14,8 @@ local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
 
 local c = {}
 
+c.errornames = require "syscall.osx.errors"
+
 c.STD = strflag {
   IN_FILENO = 0,
   OUT_FILENO = 1,

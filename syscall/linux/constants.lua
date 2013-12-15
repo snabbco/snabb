@@ -25,6 +25,8 @@ end
 
 local c = {}
 
+c.errornames = require "syscall.linux.errors"
+
 c.REG = arch.REG
 
 -- TODO only define one of these

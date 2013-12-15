@@ -71,6 +71,7 @@ for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number e
 -- internal use
 c.syscall = nil
 c.OMQATTR = nil
+c.errornames = nil
 
 -- fake constants
 c.MS.RO = nil

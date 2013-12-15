@@ -12,6 +12,9 @@ local ffi = require "ffi"
 
 local reflect = require "include.ffi-reflect.reflect"
 
+-- internal
+c.errornames = nil
+
 -- fixups
 c.AF.DECnet = c.AF.DECNET
 c.AF.DECNET = nil

@@ -12,7 +12,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 
-local function init(c, errornames, ostypes, ostypes2)
+local function init(c, ostypes, ostypes2)
 
 local abi = require "syscall.abi"
 
@@ -160,7 +160,7 @@ for k, v in pairs(c.E) do
 end
 
 mt.error = {
-  __tostring = function(e) return errornames[e.sym] end,
+  __tostring = function(e) return c.errornames[e.sym] end,
   __index = function(t, k)
     if k == 'sym' then return errsyms[t.errno] end
     if k == 'lsym' then return errsyms[t.errno]:lower() end

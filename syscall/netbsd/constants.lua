@@ -16,6 +16,8 @@ local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
 
 local c = {}
 
+c.errornames = require "syscall.netbsd.errors"
+
 c.SYS = require "syscall.netbsd.nr".SYS
 
 c.IFNAMSIZ = 16
