@@ -23,7 +23,7 @@ local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 
-local ptt = h.ptt
+local ptt, reviter = h.ptt, h.reviter
 
 local c = require("syscall." .. abi.os .. ".constants")
 
@@ -104,12 +104,6 @@ end
 -- makes code tidier
 local function istype(tp, x)
   if ffi.istype(tp, x) then return x else return false end
-end
-
--- generic iterator that counts down so needs no closure to hold state
-local function reviter(array, i)
-  i = i - 1
-  if i >= 0 then return i, array[i] end
 end
 
 -- generic types
@@ -700,7 +694,7 @@ addtype("rusage", "struct rusage", mt.rusage)
 
 -- include OS specific types
 local hh = {addtype = addtype, addtype_var = addtype_var, addtype_fn = addtype_fn, lenmt = lenmt,
-            newfn = newfn, istype = istype, reviter = reviter}
+            newfn = newfn, istype = istype}
 
 types = ostypes.init(types, hh, c)
 if ostypes2 then types = ostypes2.init(types, hh, c) end

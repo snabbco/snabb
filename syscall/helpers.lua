@@ -25,6 +25,12 @@ function h.ptt(tp)
   return function(x) return ffi.cast(ptp, x) end
 end
 
+-- generic iterator that counts down so needs no closure to hold state
+function h.reviter(array, i)
+  i = i - 1
+  if i >= 0 then return i, array[i] end
+end
+
 -- constants
 h.uint64_max = ffi.cast("uint64_t", 0) - ffi.cast("uint64_t", 1)
 h.uerr64 = h.uint64_max
