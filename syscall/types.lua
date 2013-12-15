@@ -12,7 +12,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 
-local function init(c, ostypes, ostypes2)
+local function init(ostypes, ostypes2)
 
 local abi = require "syscall.abi"
 
@@ -22,6 +22,8 @@ local ffi = require "ffi"
 local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
+
+local c = require("syscall." .. abi.os .. ".constants")
 
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
