@@ -13,8 +13,8 @@ local abi = require "syscall.abi"
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local addtype, addtype_var, addtype_fn, lenmt, newfn, istype =
-  hh.addtype, hh.addtype_var, hh.addtype_fn, hh.lenmt, hh.newfn, hh.istype
+local addtype, addtype_var, addtype_fn, lenmt, newfn =
+  hh.addtype, hh.addtype_var, hh.addtype_fn, hh.lenmt, hh.newfn
 
 local ffi = require "ffi"
 local bit = require "syscall.bit"
@@ -23,8 +23,7 @@ local i6432, u6432 = bit.i6432, bit.u6432
 
 local h = require "syscall.helpers"
 
-local ptt, reviter = h.ptt, h.reviter
-
+local ptt, reviter, mktype, istype = h.ptt, h.reviter, h.mktype, h.istype
 local ntohl, ntohl, ntohs, htons, octal = h.ntohl, h.ntohl, h.ntohs, h.htons, h.octal
 
 -- TODO duplicated
@@ -32,7 +31,6 @@ local function getfd(fd)
   if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
   return fd:getfd()
 end
-local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
 local mt = {} -- metatables
 

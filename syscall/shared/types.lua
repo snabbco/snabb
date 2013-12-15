@@ -15,7 +15,7 @@ local t, ctypes, pt, s = {}, {}, {}, {}
 
 local h = require "syscall.helpers"
 
-local ptt = h.ptt
+local ptt, reviter, mktype, istype = h.ptt, h.reviter, h.mktype, h.istype
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align

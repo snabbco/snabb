@@ -23,10 +23,9 @@ local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 
-local ptt, reviter = h.ptt, h.reviter
-
 local c = require("syscall." .. abi.os .. ".constants")
 
+local ptt, reviter, mktype, istype = h.ptt, h.reviter, h.mktype, h.istype
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
@@ -49,8 +48,6 @@ local function getfd(fd)
   if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
   return fd:getfd()
 end
-
-local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
 local function lenfn(tp) return ffi.sizeof(tp) end
 
@@ -99,11 +96,6 @@ local function newfn(tp, tab)
   -- these are split out so __newindex is called, not just initialisers luajit understands
   for k, v in pairs(tab or {}) do if type(k) == "string" then obj[k] = v end end -- set string indexes
   return obj
-end
-
--- makes code tidier
-local function istype(tp, x)
-  if ffi.istype(tp, x) then return x else return false end
 end
 
 -- generic types
@@ -694,7 +686,7 @@ addtype("rusage", "struct rusage", mt.rusage)
 
 -- include OS specific types
 local hh = {addtype = addtype, addtype_var = addtype_var, addtype_fn = addtype_fn, lenmt = lenmt,
-            newfn = newfn, istype = istype}
+            newfn = newfn}
 
 types = ostypes.init(types, hh, c)
 if ostypes2 then types = ostypes2.init(types, hh, c) end

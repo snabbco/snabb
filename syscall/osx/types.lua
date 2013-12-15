@@ -13,14 +13,14 @@ local abi = require "syscall.abi"
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local addtype, lenfn, lenmt, newfn, istype = hh.addtype, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
+local addtype, lenfn, lenmt, newfn = hh.addtype, hh.lenfn, hh.lenmt, hh.newfn
 
 local ffi = require "ffi"
 local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 
-local ptt = h.ptt
+local ptt, reviter, mktype, istype = h.ptt, h.reviter, h.mktype, h.istype
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
 local mt = {} -- metatables
