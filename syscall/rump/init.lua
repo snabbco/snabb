@@ -75,6 +75,8 @@ if abi.types == "linux" then -- load Linux compat module
   modules.rumpcompat = ffi.load("rumpkern_sys_linux", true)
 end
 
+abi.rumpfn = nil
+
 if abi.host == "netbsd" and abi.types == "netbsd" then -- running native (NetBSD on NetBSD)
   local SS = require "syscall"
   local C = require "syscall.rump.c"

@@ -16,8 +16,6 @@ local function init(ostypes, ostypes2)
 
 local abi = require "syscall.abi"
 
-local rumpfn = abi.rumpfn
-
 local ffi = require "ffi"
 local bit = require "syscall.bit"
 
@@ -50,7 +48,7 @@ local function getfd(fd)
 end
 
 local function addtype(name, tp, mt)
-  if rumpfn then tp = rumpfn(tp) end
+  if abi.rumpfn then tp = abi.rumpfn(tp) end
   if mt then
     if mt.index and not mt.__index then -- generic index method
       local index = mt.index
@@ -74,16 +72,21 @@ end
 
 -- for variables length types, ie those with arrays
 local function addtype_var(name, tp, mt)
-  if rumpfn then tp = rumpfn(tp) end
+  if abi.rumpfn then tp = abi.rumpfn(tp) end
   if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof, gives instance size for var lngth
   t[name] = ffi.metatype(tp, mt)
   pt[name] = ptt(tp)
 end
 
 local function addtype_fn(name, tp)
-  if rumpfn then tp = rumpfn(tp) end
+  if abi.rumpfn then tp = abi.rumpfn(tp) end
   t[name] = ffi.typeof(tp)
   s[name] = ffi.sizeof(t[name])
+end
+
+local function addraw2(name, tp)
+  if abi.rumpfn then tp = abi.rumpfn(tp) end
+  t[name] = ffi.typeof(tp .. "[2]")
 end
 
 -- generic for __new TODO use more
@@ -348,11 +351,6 @@ mt.timespec = {
 
 addtype("timespec", "struct timespec", mt.timespec)
 
-local function addraw2(name, tp)
-  if rumpfn then tp = rumpfn(tp) end
-  t[name] = ffi.typeof(tp .. "[2]")
-end
-
 -- array so cannot just add metamethods
 addraw2("timeval2_raw", "struct timeval")
 t.timeval2 = function(tv1, tv2)
@@ -473,7 +471,7 @@ addtype("sigset", "sigset_t", mt.sigset)
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsgtype = "struct cmsghdr"
-if abi.rump and rumpfn then cmsgtype = rumpfn(cmsgtype) end
+if abi.rumpfn then cmsgtype = abi.rumpfn(cmsgtype) end
 local cmsg_hdrsize = ffi.sizeof(ffi.typeof(cmsgtype), 0)
 local voidalign = ffi.alignof(ffi.typeof("void *"))
 local function cmsg_align(len) return align(len, voidalign) end -- TODO double check this is correct for all OSs
