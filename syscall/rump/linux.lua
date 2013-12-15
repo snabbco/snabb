@@ -9,7 +9,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(types, c)
+local function init(types)
 
 require "syscall.netbsd.ffitypes"
 
