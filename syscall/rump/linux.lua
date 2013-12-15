@@ -38,10 +38,11 @@ struct _netbsd_ptyfs_args {
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
-local ptt, addtype, lenfn, lenmt, newfn, istype = hh.ptt, hh.addtype, hh.lenfn, hh.lenmt, hh.newfn, hh.istype
+local addtype, newfn = hh.addtype, hh.newfn
 
 local h = require "syscall.helpers"
 
+local ptt, reviter, mktype, istype, lenfn, lenmt = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
 local mt = {} -- metatables

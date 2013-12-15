@@ -25,7 +25,7 @@ local h = require "syscall.helpers"
 
 local c = require("syscall." .. abi.os .. ".constants")
 
-local ptt, reviter, mktype, istype = h.ptt, h.reviter, h.mktype, h.istype
+local ptt, reviter, mktype, istype, lenfn, lenmt = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
@@ -48,8 +48,6 @@ local function getfd(fd)
   if type(fd) == "number" or ffi.istype(t.int, fd) then return fd end
   return fd:getfd()
 end
-
-local function lenfn(tp) return ffi.sizeof(tp) end
 
 local function addtype(name, tp, mt)
   if rumpfn then tp = rumpfn(tp) end
@@ -87,8 +85,6 @@ local function addtype_fn(name, tp)
   t[name] = ffi.typeof(tp)
   s[name] = ffi.sizeof(t[name])
 end
-
-local lenmt = {__len = lenfn}
 
 -- generic for __new TODO use more
 local function newfn(tp, tab)
@@ -477,7 +473,7 @@ addtype("sigset", "sigset_t", mt.sigset)
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsgtype = "struct cmsghdr"
-if abi.rump then cmsgtype = rumpfn(cmsgtype) end
+if abi.rump and rumpfn then cmsgtype = rumpfn(cmsgtype) end
 local cmsg_hdrsize = ffi.sizeof(ffi.typeof(cmsgtype), 0)
 local voidalign = ffi.alignof(ffi.typeof("void *"))
 local function cmsg_align(len) return align(len, voidalign) end -- TODO double check this is correct for all OSs
@@ -685,7 +681,7 @@ mt.rusage = {
 addtype("rusage", "struct rusage", mt.rusage)
 
 -- include OS specific types
-local hh = {addtype = addtype, addtype_var = addtype_var, addtype_fn = addtype_fn, lenmt = lenmt,
+local hh = {addtype = addtype, addtype_var = addtype_var, addtype_fn = addtype_fn,
             newfn = newfn}
 
 types = ostypes.init(types, hh, c)

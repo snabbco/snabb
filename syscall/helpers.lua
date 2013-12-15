@@ -34,6 +34,9 @@ end
 function h.mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 function h.istype(tp, x) if ffi.istype(tp, x) then return x else return false end end
 
+function h.lenfn(tp) return ffi.sizeof(tp) end
+h.lenmt = {__len = h.lenfn}
+
 -- constants
 h.uint64_max = ffi.cast("uint64_t", 0) - ffi.cast("uint64_t", 1)
 h.uerr64 = h.uint64_max

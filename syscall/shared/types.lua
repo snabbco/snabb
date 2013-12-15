@@ -15,12 +15,10 @@ local t, ctypes, pt, s = {}, {}, {}, {}
 
 local h = require "syscall.helpers"
 
-local ptt, reviter, mktype, istype = h.ptt, h.reviter, h.mktype, h.istype
+local ptt, reviter, mktype, istype, lenfn, lenmt = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
-
-local function lenfn(tp) return ffi.sizeof(tp) end
 
 -- TODO share with main definition
 local function addtype(name, tp, mt)
@@ -116,8 +114,6 @@ for k, v in pairs(ptrtypes) do addptrtype(k, v) end
 t.ints = ffi.typeof("int[?]")
 t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
 t.string_array = ffi.typeof("const char *[?]")
-
-local lenmt = {__len = lenfn}
 
 local mt = {}
 
