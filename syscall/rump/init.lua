@@ -87,8 +87,18 @@ if abi.host == "netbsd" and abi.types == "netbsd" then -- running native (NetBSD
   S = require "syscall.methods".init(S)
   S.features = require "syscall.features".init(S)
   S.util = require "syscall.util".init(S)
-elseif abi.types == "linux" then -- running Linux types
+elseif abi.types == "linux" then -- running Linux types, just need to use rump C which it will do if abi.rump set
   S = require "syscall"
+  -- add a few netbsd types so can use mount
+  require "syscall.netbsd.ffitypes"
+
+  local addtype = require "syscall.helpers".addtype
+  local addstructs = {
+    ufs_args = "struct _netbsd_ufs_args",
+    tmpfs_args = "struct _netbsd_tmpfs_args",
+    ptyfs_args = "struct _netbsd_ptyfs_args",
+  }
+  for k, v in pairs(addstructs) do addtype(S.types, k, v, {}) end
 elseif abi.types == "netbsd" then -- run NetBSD types on another OS
   abi.rumpfn = rumpfn -- mangle NetBSD type names to avoid collisions
   S = require "syscall"

@@ -20,12 +20,9 @@ if not abi.rump then require "syscall.ffifunctions" end
 
 local ostypes = require("syscall." .. abi.os .. ".types")
 
-local ostypes2
-if abi.rump and abi.types == "linux" then ostypes2 = require "syscall.rump.linux" end
-
 local c = require("syscall." .. abi.os .. ".constants")
 
-local types = require "syscall.types".init(c, ostypes, ostypes2)
+local types = require "syscall.types".init(c, ostypes)
 
 local C
 if abi.rump then
