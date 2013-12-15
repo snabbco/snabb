@@ -96,6 +96,22 @@ function h.addraw2(types, name, tp)
   types.t[name] = ffi.typeof(tp .. "[2]")
 end
 
+function h.addtype1(types, name, tp)
+  types.t[name] = ffi.typeof(tp .. "[1]")
+  types.s[name] = ffi.sizeof(types.t[name])
+end
+
+function h.addtype2(types, name, tp)
+  types.t[name] = ffi.typeof(tp .. "[2]")
+  types.s[name] = ffi.sizeof(types.t[name])
+end
+
+function h.addptrtype(types, name, tp)
+  local ptr = ffi.typeof(tp)
+  types.t[name] = function(v) return ffi.cast(ptr, v) end
+  types.s[name] = ffi.sizeof(ptr)
+end
+
 -- constants
 h.uint64_max = ffi.cast("uint64_t", 0) - ffi.cast("uint64_t", 1)
 h.uerr64 = h.uint64_max

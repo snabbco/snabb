@@ -12,54 +12,17 @@ local ffi = require "ffi"
 local bit = require "syscall.bit"
 
 local t, ctypes, pt, s = {}, {}, {}, {}
+local types = {t = t, pt = pt, s = s, ctypes = ctypes}
 
 local h = require "syscall.helpers"
 
+local addtype, addtype_var, addtype_fn, addraw2 = h.addtype, h.addtype_var, h.addtype_fn, h.addraw2
+local addtype1, addtype2, addptrtype = h.addtype1, h.addtype2, h.addptrtype
 local ptt, reviter, mktype, istype, lenfn, lenmt, getfd, newfn
   = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd, h.newfn
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
-
--- TODO share with main definition
-local function addtype(name, tp, mt)
-  if mt then
-    if mt.index and not mt.__index then -- generic index method
-      mt.__index = function(tp, k) if mt.index[k] then return mt.index[k](tp) else error("invalid index " .. k) end end
-    end
-    if mt.newindex and not mt.__newindex then -- generic newindex method
-      mt.__newindex = function(tp, k, v) if mt.newindex[k] then mt.newindex[k](tp, v) else error("invalid index " .. k) end end
-    end
-    if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof
-    t[name] = ffi.metatype(tp, mt)
-  else
-    t[name] = ffi.typeof(tp)
-  end
-  ctypes[tp] = t[name]
-  pt[name] = ptt(tp)
-  s[name] = ffi.sizeof(t[name])
-end
-
-local function addtype_var(name, tp, mt)
-  t[name] = ffi.metatype(tp, mt)
-  pt[name] = ptt(tp)
-end
-
-local function addtype1(name, tp)
-  t[name] = ffi.typeof(tp .. "[1]")
-  s[name] = ffi.sizeof(t[name])
-end
-
-local function addtype2(name, tp)
-  t[name] = ffi.typeof(tp .. "[2]")
-  s[name] = ffi.sizeof(t[name])
-end
-
-local function addptrtype(name, tp)
-  local ptr = ffi.typeof(tp)
-  t[name] = function(v) return ffi.cast(ptr, v) end
-  s[name] = ffi.sizeof(ptr)
-end
 
 local addtypes = {
   char = "char",
@@ -78,7 +41,7 @@ local addtypes = {
   ulong = "unsigned long",
 }
 
-for k, v in pairs(addtypes) do addtype(k, v) end
+for k, v in pairs(addtypes) do addtype(types, k, v) end
 
 local addtypes1 = {
   char1 = "char",
@@ -95,7 +58,7 @@ local addtypes1 = {
   ulong1 = "unsigned long",
 }
 
-for k, v in pairs(addtypes1) do addtype1(k, v) end
+for k, v in pairs(addtypes1) do addtype1(types, k, v) end
 
 local addtypes2 = {
   char2 = "char",
@@ -103,14 +66,14 @@ local addtypes2 = {
   uint2 = "unsigned int",
 }
 
-for k, v in pairs(addtypes2) do addtype2(k, v) end
+for k, v in pairs(addtypes2) do addtype2(types, k, v) end
 
 local ptrtypes = {
   uintptr = "uintptr_t",
   intptr = "intptr_t",
 }
 
-for k, v in pairs(ptrtypes) do addptrtype(k, v) end
+for k, v in pairs(ptrtypes) do addptrtype(types, k, v) end
 
 t.ints = ffi.typeof("int[?]")
 t.buffer = ffi.typeof("char[?]") -- TODO rename as chars?
@@ -118,13 +81,9 @@ t.string_array = ffi.typeof("const char *[?]")
 
 local mt = {}
 
-local function istype(tp, x)
-  if ffi.istype(tp, x) then return x else return false end
-end
-
 mt.iovec = {}
 
-addtype("iovec", "struct iovec", mt.iovec)
+addtype(types, "iovec", "struct iovec", mt.iovec)
 
 mt.iovecs = {
   __len = function(io) return io.count end,
@@ -164,7 +123,7 @@ mt.iovecs = {
   end,
 }
 
-addtype_var("iovecs", "struct {int count; struct iovec iov[?];}", mt.iovecs)
+addtype_var(types, "iovecs", "struct {int count; struct iovec iov[?];}", mt.iovecs)
 
 -- convert strings to inet addresses and the reverse
 local function inet4_ntop(src)
@@ -271,7 +230,7 @@ mt.in_addr = {
   __len = lenfn,
 }
 
-addtype("in_addr", "struct in_addr", mt.in_addr)
+addtype(types, "in_addr", "struct in_addr", mt.in_addr)
 
 mt.in6_addr = {
   __tostring = inet6_ntop,
@@ -286,7 +245,7 @@ mt.in6_addr = {
   __len = lenfn,
 }
 
-addtype("in6_addr", "struct in6_addr", mt.in6_addr)
+addtype(types, "in6_addr", "struct in6_addr", mt.in6_addr)
 
 -- ip, udp types. Need endian conversions.
 local ptchar = ffi.typeof("char *")
@@ -326,7 +285,7 @@ mt.iphdr = {
   },
 }
 
-addtype("iphdr", "struct iphdr", mt.iphdr)
+addtype(types, "iphdr", "struct iphdr", mt.iphdr)
 
 local udphdr_size = ffi.sizeof("struct udphdr")
 
@@ -364,13 +323,13 @@ mt.udphdr = {
   },
 }
 
-addtype("udphdr", "struct udphdr", mt.udphdr)
+addtype(types, "udphdr", "struct udphdr", mt.udphdr)
 
 mt.ethhdr = {
   -- TODO
 }
 
-addtype("ethhdr", "struct ethhdr", mt.ethhdr)
+addtype(types, "ethhdr", "struct ethhdr", mt.ethhdr)
 
-return {t = t, pt = pt, s = s, ctypes = ctypes}
+return types
 

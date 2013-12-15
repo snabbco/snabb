@@ -54,6 +54,7 @@ local unchanged = {
   ["struct udphdr"] = true,
   ["struct ethhdr"] = true,
   ["struct winsize"] = true,
+  ["struct {int count; struct iovec iov[?];}"] = true,
 }
 
 local function rumpfn(tp)
