@@ -384,15 +384,22 @@ local C = {
   pipe = ffi.C.rump_sys_pipe,
 }
 
+local enosys
+if abi.types == "netbsd" then enosys = 78
+elseif abi.types == "linux" then
+  if abi.arch == "mips" then enosys = 89 else enosys = 38 end
+else error "unknown OS mapping"
+end
+
 -- TODO these shoudl explicitly return errors now that is allowed.
 function C.mmap(...)
-  ffi.errno(78) -- NetBSD ENOSYS
+  ffi.errno(enosys)
   return errpointer
 end
 
 -- TODO non integer returns need special casing eg mmap above
 local function nosys()
-  ffi.errno(78) -- NetBSD ENOSYS
+  ffi.errno(enosys)
   return -1
 end
 
