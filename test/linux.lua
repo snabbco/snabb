@@ -127,7 +127,7 @@ test.file_operations_linux = {
     assert(fd:close())
   end,
   test_sync_file_range = function()
-    local fd = assert(S.creat(tmpfile, "RWXU", "0666"))
+    local fd = assert(S.creat(tmpfile, "0666"))
     assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
     assert(fd:sync_file_range(4096, 0, "wait_before, write, wait_after"))
     assert(fd:sync_file_range(1, 2, "wait_before, write, wait_after"))
@@ -163,7 +163,7 @@ test.inotify = {
 test.xattr = {
   teardown = clean,
   test_xattr = function()
-    assert(S.creat(tmpfile, "RWXU", "0666"))
+    assert(S.creat(tmpfile, "0666"))
     local l, err = S.listxattr(tmpfile)
     assert(l or err.NOTSUP or err.NOSYS, "expect to get xattr or not supported on fs")
     if l then
