@@ -213,6 +213,7 @@ local nm = {
   TCFLUSH = "TC",
   TCFLOW = "TC",
   VFSMNT = "MNT_",
+  BRDG = "BRDG",
 }
 
 for k, v in pairs(c) do

@@ -479,6 +479,20 @@ struct _netbsd_ktr_execfd {
   int   ktr_fd;
   unsigned int ktr_dtype;
 };
+struct _netbsd_ifdrv {
+  char          ifd_name[16];
+  unsigned long ifd_cmd;
+  size_t        ifd_len;
+  void         *ifd_data;
+};
+struct _netbsd_ifbreq {
+  char     ifbr_ifsname[16];
+  uint32_t ifbr_ifsflags;
+  uint8_t  ifbr_state;
+  uint8_t  ifbr_priority;
+  uint8_t  ifbr_path_cost;
+  uint8_t  ifbr_portno;
+};
 ]]
 
 local s = table.concat(defs, "")

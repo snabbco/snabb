@@ -526,6 +526,42 @@ function t.waitstatus(status)
   return setmetatable({status = status}, mt.wait)
 end
 
+mt.ifdrv = {
+  index = {
+    name = function(self) return ffi.string(self.ifd_name) end,
+  },
+  newindex = {
+    name = function(self, v)
+      assert(#v < c.IFNAMSIZ, "name too long")
+      self.ifd_name = v
+    end,
+    cmd = function(self, v) self.ifd_cmd = cmd end, -- TODO which namespace(s)?
+    data = function(self, v)
+      self.ifd_data = data
+      self.ifd_len = #data
+    end,
+    len = function(self, v) self.ifd_len = v end,
+  },
+  __new = newfn,
+}
+
+addtype(types, "ifdrv", "struct ifdrv", mt.ifdrv)
+
+mt.ifbreq = {
+  index = {
+    ifsname = function(self) return ffi.string(self.ifbr_ifsname) end,
+  },
+  newindex = {
+    ifsname = function(self, v)
+      assert(#v < c.IFNAMSIZ, "name too long")
+      self.ifbr_ifsname = v
+    end,
+  },
+  __new = newfn,
+}
+
+addtype(types, "ifbreq", "struct ifbreq", mt.ifbreq)
+
 return types
 
 end

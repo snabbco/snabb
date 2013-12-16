@@ -1056,5 +1056,33 @@ c.SCM = multiflags {
   TIMESTAMP  = 0x08,
 }
 
+c.BRDG = strflag {
+  ADD      = 0,
+  DEL      = 1,
+  GIFFLGS  = 2,
+  SIFFLGS  = 3,
+  SCACHE   = 4,
+  GCACHE   = 5,
+  GIFS     = 6,
+  RTS      = 7,
+  SADDR    = 8,
+  STO      = 9,
+  GTO      = 10,
+  DADDR    = 11,
+  FLUSH    = 12,
+  GPRI     = 13,
+  SPRI     = 14,
+  GHT      = 15,
+  SHT      = 16,
+  GFD      = 17,
+  SFD      = 18,
+  GMA      = 19,
+  SMA      = 20,
+  SIFPRIO  = 21,
+  SIFCOST  = 22,
+  GFILT    = 23,
+  SFILT    = 24,
+}
+
 return c
 
