@@ -127,7 +127,7 @@ test.file_operations_linux = {
     assert(fd:close())
   end,
   test_sync_file_range = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
+    local fd = assert(S.creat(tmpfile, "RWXU", "0666"))
     assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
     assert(fd:sync_file_range(4096, 0, "wait_before, write, wait_after"))
     assert(fd:sync_file_range(1, 2, "wait_before, write, wait_after"))
@@ -163,7 +163,7 @@ test.inotify = {
 test.xattr = {
   teardown = clean,
   test_xattr = function()
-    assert(util.writefile(tmpfile, "test", "RWXU"))
+    assert(S.creat(tmpfile, "RWXU", "0666"))
     local l, err = S.listxattr(tmpfile)
     assert(l or err.NOTSUP or err.NOSYS, "expect to get xattr or not supported on fs")
     if l then
@@ -223,7 +223,7 @@ test.xattr = {
     assert(S.unlink(tmpfile))
   end,
   test_xattr_long = function()
-    assert(util.touch(tmpfile))
+    assert(S.creat(tmpfile, "RWXU", "0666"))
     local l = string.rep("test", 500)
     local ok, err = S.setxattr(tmpfile, "user.test", l, "create")
     if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr TODO add to features
