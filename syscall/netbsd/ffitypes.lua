@@ -497,6 +497,7 @@ struct _netbsd_ifbreq {
 
 local s = table.concat(defs, "")
 
+-- TODO broken, makes this module not a proper function, see #120
 if abi.host == "netbsd" then
   s = string.gsub(s, "_netbsd_", "") -- remove netbsd types
 end
