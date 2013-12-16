@@ -89,6 +89,7 @@ test.signals = {
 }
 
 test.sockets_linux = {
+  teardown = clean,
   test_accept4 = function() -- TODO this test does not really test anything, as works without nonblock
     local s = S.socket("unix", "seqpacket, nonblock")
     local sa = t.sockaddr_un(tmpfile)
@@ -1273,6 +1274,7 @@ test.mount_linux_root = {
 }
 
 test.misc_linux_root = {
+  teardown = clean,
   test_acct = function()
     S.acct() -- may not be configured
   end,
@@ -1341,6 +1343,7 @@ test.bridge_linux = {
 }
 
 test.mounts = {
+  teardown = clean,
   test_mounts_root = function() -- rump has no /proc which alas means no /proc/mounts
     local cwd = assert(S.getcwd())
     local dir = cwd .. "/" .. tmpfile
@@ -1578,6 +1581,7 @@ test.tuntap_root = {
 ]]
 
 test.capabilities = {
+  teardown = clean,
   test_cap_tostring = function()
     local cap = t.cap()
     cap.SYSLOG = true

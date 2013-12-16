@@ -1037,6 +1037,7 @@ test_directory_operations = {
 }
 
 test_largefile = {
+  teardown = clean,
   test_seek = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.unlink(tmpfile))
@@ -1145,6 +1146,7 @@ test_ids = {
 }
 
 test_sockets_pipes = {
+  teardown = clean,
   test_sockaddr_storage = function()
     local sa = t.sockaddr_storage{family = "inet6", port = 2}
     assert_equal(sa.family, c.AF.INET6, "inet6 family")
@@ -1357,6 +1359,7 @@ test_timespec_timeval = {
 }
 
 test_locking = {
+  teardown = clean,
   test_fcntl_setlk = function()
     local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
     assert(S.unlink(tmpfile))
@@ -1606,6 +1609,7 @@ test_timers_signals = {
 }
 
 test_util_misc = {
+  teardown = clean,
   test_mapfile = function()
     assert(util.writefile(tmpfile, teststring, "RWXU"))
     local ss = assert(util.mapfile(tmpfile))
@@ -1650,6 +1654,7 @@ test_proc = {
 }
 
 test_mmap = {
+  teardown = clean,
   test_mmap_fail = function()
     local size = 4096
     local mem, err = S.mmap(pt.void(1), size, "read", "private, fixed, anonymous", -1, 0)
