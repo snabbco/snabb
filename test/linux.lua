@@ -163,7 +163,7 @@ test.xattr = {
   test_xattr = function()
     assert(util.writefile(tmpfile, "test", "RWXU"))
     local l, err = S.listxattr(tmpfile)
-    assert(l or err.NOTSUP, "expect to get xattr or not supported on fs")
+    assert(l or err.NOTSUP or err.NOSYS, "expect to get xattr or not supported on fs")
     if l then
       local fd = assert(S.open(tmpfile, "rdwr"))
       assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
@@ -227,22 +227,23 @@ test.xattr = {
     if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr TODO add to features
       local tt = assert(S.getxattr(tmpfile, "user.test"))
       assert_equal(tt, l, "should match string")
-    else assert(err.NOTSUP or err.OPNOTSUPP, "only ok error is xattr not supported, got " .. tostring(err) .. " (" .. err.errno .. ")") end
+    else assert(err.NOTSUP or err.OPNOTSUPP or err.NOSYS, "only ok error is xattr not supported, got " .. tostring(err) .. " (" .. err.errno .. ")") end
     assert(S.unlink(tmpfile))
   end,
 }
 
 test.tee_splice = {
   test_tee_splice = function()
-    local pr, pw = assert(S.pipe2("nonblock"))
-    local ppr, ppw = assert(S.pipe2("nonblock"))
+    local pr, pw = assert(S.pipe())
+    local ppr, ppw = assert(S.pipe())
     local s1, s2 = assert(S.socketpair("unix", "stream, nonblock"))
     local fd = assert(S.open(tmpfile, "rdwr, creat", "RWXU"))
     assert(S.unlink(tmpfile))
     local str = teststring
     local n = assert(fd:write(str))
     assert_equal(n, #str)
-    n = assert(S.splice(fd, 0, pw, nil, #str, "nonblock")) -- splice file at offset 0 into pipe
+    local n, err = S.splice(fd, 0, pw, nil, #str, "nonblock") -- splice file at offset 0 into pipe
+    if not n and err.NOSYS then return end -- TODO mark as skipped
     assert(n == #str)
     local n, err = S.tee(pr, ppw, #str, "nonblock") -- clone our pipe
     if n then
