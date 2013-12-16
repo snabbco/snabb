@@ -535,10 +535,10 @@ mt.ifdrv = {
       assert(#v < c.IFNAMSIZ, "name too long")
       self.ifd_name = v
     end,
-    cmd = function(self, v) self.ifd_cmd = cmd end, -- TODO which namespace(s)?
+    cmd = function(self, v) self.ifd_cmd = v end, -- TODO which namespace(s)?
     data = function(self, v)
-      self.ifd_data = data
-      self.ifd_len = #data
+      self.ifd_data = v
+      self.ifd_len = #v
     end,
     len = function(self, v) self.ifd_len = v end,
   },
