@@ -134,6 +134,7 @@ print [[
 #include <netinet/in.h>
 #include <net/route.h>
 #include <net/bpf.h>
+#include <net/if_ether.h>
 #include <net/if_bridgevar.h>
 #include <ufs/ufs/ufsmount.h>
 #include <fs/ptyfs/ptyfs.h>
