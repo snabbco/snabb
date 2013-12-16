@@ -90,7 +90,28 @@ if abi.host == "netbsd" and abi.types == "netbsd" then -- running native (NetBSD
 elseif abi.types == "linux" then -- running Linux types, just need to use rump C which it will do if abi.rump set
   S = require "syscall"
   -- add a few netbsd types so can use mount
-  require "syscall.netbsd.ffitypes"
+  -- TODO ideally we would require netbsd.ffitypes but this is somewhat complex now
+  ffi.cdef [[
+typedef uint32_t _netbsd_mode_t;
+typedef uint64_t _netbsd_ino_t;
+struct _netbsd_ufs_args {
+  char *fspec;
+};
+struct _netbsd_tmpfs_args {
+  int ta_version;
+  _netbsd_ino_t ta_nodes_max;
+  off_t ta_size_max;
+  uid_t ta_root_uid;
+  gid_t ta_root_gid;
+  _netbsd_mode_t ta_root_mode;
+};
+struct _netbsd_ptyfs_args {
+  int version;
+  gid_t gid;
+  _netbsd_mode_t mode;
+  int flags;
+};
+]]
 
   local addtype = require "syscall.helpers".addtype
   local addstructs = {
