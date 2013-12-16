@@ -1657,66 +1657,6 @@ test.capabilities = {
   end,
 }
 
-test.scheduler = {
-  test_getcpu = function()
-    local r, err = S.getcpu()
-    assert((err and err.NOSYS) or type(r) == "table", "table returned if supported")
-  end,
-  test_sched_set_getscheduler = function()
-    assert(S.sched_setscheduler(0, "normal"))
-    local sched = assert(S.sched_getscheduler())
-    assert_equal(sched, c.SCHED.NORMAL)
-  end,
-  test_sched_set_getscheduler_root = function()
-    assert(S.sched_setscheduler(0, "idle"))
-    local sched = assert(S.sched_getscheduler())
-    assert_equal(sched, c.SCHED.IDLE)
-    assert(S.sched_setscheduler(0, "normal"))
-  end,
-  test_sched_yield = function()
-    assert(S.sched_yield())
-  end,
-  test_cpu_set = function()
-    local set = t.cpu_set{0, 1}
-    assert_equal(set.val[0], 3)
-    assert(set:get(0) and set:get(1) and not set:get(2))
-    assert(set[0] and set[1] and not set[2])
-  end,
-  test_sched_getaffinity = function()
-    local set = S.sched_getaffinity()
-    assert(set[0], "should be able to run on cpu 0")
-  end,
-  test_sched_setaffinity = function()
-    local set = S.sched_getaffinity()
-    set[1] = false
-    assert(not set[1])
-    assert(S.sched_setaffinity(0, set))
-  end,
-  test_get_sched_priority_minmax = function()
-    local min = S.sched_get_priority_min("fifo")
-    local max = S.sched_get_priority_max("fifo")
-    assert_equal(min, 1) -- values for Linux
-    assert_equal(max, 99) -- values for Linux
-  end,
-  test_sched_getparam = function()
-    local prio = S.sched_getparam()
-    assert_equal(prio, 0, "standard schedular has no priority value")
-  end,
-    test_sched_setgetparam_root = function()
-    assert(S.sched_setscheduler(0, "fifo", 1))
-    assert_equal(S.sched_getscheduler(), c.SCHED.FIFO)
-    local prio = S.sched_getparam()
-    assert_equal(prio, 1, "set to 1")
-    S.sched_setparam(0, 50)
-    local prio = S.sched_getparam()
-    assert_equal(prio, 50, "set to 50")
-    assert(S.sched_setscheduler(0, "normal"))
-  end,
-  test_sched_rr_get_interval = function()
-    local ts = assert(S.sched_rr_get_interval())
-  end,
-}
-
 test.mq = {
   test_mq_open_close_unlink = function()
     local mq, err = S.mq_open(mqname, "rdwr,creat", "rusr,wusr", {maxmsg = 10, msgsize = 512})
@@ -1802,6 +1742,65 @@ test.processes_linux = {
       assert(status.WIFEXITED, "process should have exited normally")
       assert(status.EXITSTATUS == 23, "exit should be 23")
     end
+  end,
+}
+test.scheduler = {
+  test_getcpu = function()
+    local r, err = S.getcpu()
+    assert((err and err.NOSYS) or type(r) == "table", "table returned if supported")
+  end,
+  test_sched_set_getscheduler = function()
+    assert(S.sched_setscheduler(0, "normal"))
+    local sched = assert(S.sched_getscheduler())
+    assert_equal(sched, c.SCHED.NORMAL)
+  end,
+  test_sched_set_getscheduler_root = function()
+    assert(S.sched_setscheduler(0, "idle"))
+    local sched = assert(S.sched_getscheduler())
+    assert_equal(sched, c.SCHED.IDLE)
+    assert(S.sched_setscheduler(0, "normal"))
+  end,
+  test_sched_yield = function()
+    assert(S.sched_yield())
+  end,
+  test_cpu_set = function()
+    local set = t.cpu_set{0, 1}
+    assert_equal(set.val[0], 3)
+    assert(set:get(0) and set:get(1) and not set:get(2))
+    assert(set[0] and set[1] and not set[2])
+  end,
+  test_sched_getaffinity = function()
+    local set = S.sched_getaffinity()
+    assert(set[0], "should be able to run on cpu 0")
+  end,
+  test_sched_setaffinity = function()
+    local set = S.sched_getaffinity()
+    set[1] = false
+    assert(not set[1])
+    assert(S.sched_setaffinity(0, set))
+  end,
+  test_get_sched_priority_minmax = function()
+    local min = S.sched_get_priority_min("fifo")
+    local max = S.sched_get_priority_max("fifo")
+    assert_equal(min, 1) -- values for Linux
+    assert_equal(max, 99) -- values for Linux
+  end,
+  test_sched_getparam = function()
+    local prio = S.sched_getparam()
+    assert_equal(prio, 0, "standard schedular has no priority value")
+  end,
+    test_sched_setgetparam_root = function()
+    assert(S.sched_setscheduler(0, "fifo", 1))
+    assert_equal(S.sched_getscheduler(), c.SCHED.FIFO)
+    local prio = S.sched_getparam()
+    assert_equal(prio, 1, "set to 1")
+    S.sched_setparam(0, 50)
+    local prio = S.sched_getparam()
+    assert_equal(prio, 50, "set to 50")
+    assert(S.sched_setscheduler(0, "normal"))
+  end,
+  test_sched_rr_get_interval = function()
+    local ts = assert(S.sched_rr_get_interval())
   end,
 }
 end -- exclude rump
