@@ -594,6 +594,11 @@ test.sendfile = {
 }
 
 test.netlink = {
+  test_netlink_socket = function()
+    local sock, err = S.socket("netlink", "raw", "route")
+    assert(sock, "Cannot open netlink socket: " .. tostring(err))
+    sock:close()
+  end,
   test_getlink = function()
     local i = assert(nl.getlink())
     local df = assert(util.dirtable("/sys/class/net", true))
