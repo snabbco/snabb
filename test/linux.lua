@@ -1230,6 +1230,7 @@ test.namespaces_root = {
 }
 
 test.filesystem_linux = {
+  teardown = clean,
   test_statfs = function()
     local st = assert(S.statfs("."))
     assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
@@ -1255,6 +1256,7 @@ test.filesystem_linux = {
 }
 
 test.mount_linux_root = {
+  teardown = clean,
   test_mount = function()
     assert(S.mkdir(tmpfile))
     assert(S.mount("none", tmpfile, "tmpfs", "rdonly, noatime"))
