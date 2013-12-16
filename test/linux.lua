@@ -575,7 +575,7 @@ test.sendfile = {
     assert(f2:close())
   end,
   test_sendfile_largefile = function()
-    if not S.__rump then return end -- TODO mark as skipped, runs out of space
+    if S.__rump then return end -- TODO mark as skipped, runs out of space
     local f1 = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local f2 = assert(S.open(tmpfile2, "rdwr,creat", "rwxu"))
     assert(S.unlink(tmpfile))
