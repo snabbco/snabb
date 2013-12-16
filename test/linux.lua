@@ -137,6 +137,7 @@ test.file_operations_linux = {
 }
 
 test.inotify = {
+  teardown = clean,
   test_inotify = function()
     assert(S.mkdir(tmpfile, "RWXU")) -- do in directory so ok to run in parallel
     local fd = assert(S.inotify_init("cloexec, nonblock"))
@@ -160,6 +161,7 @@ test.inotify = {
 }
 
 test.xattr = {
+  teardown = clean,
   test_xattr = function()
     assert(util.writefile(tmpfile, "test", "RWXU"))
     local l, err = S.listxattr(tmpfile)
@@ -233,6 +235,7 @@ test.xattr = {
 }
 
 test.tee_splice = {
+  teardown = clean,
   test_tee_splice = function()
     local pr, pw = assert(S.pipe())
     local ppr, ppw = assert(S.pipe())
@@ -544,6 +547,7 @@ test.misc_linux = {
 }
 
 test.sendfile = {
+  teardown = clean,
   test_sendfile = function()
     local f1 = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local f2 = assert(S.open(tmpfile2, "rdwr,creat", "rwxu"))
