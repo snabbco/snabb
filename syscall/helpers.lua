@@ -26,6 +26,12 @@ local function ptt(tp)
 end
 h.ptt = ptt
 
+-- constants
+h.uint64_max = ffi.cast("uint64_t", 0) - ffi.cast("uint64_t", 1)
+h.err64 = ffi.cast("int64_t", -1)
+if abi.abi64 then h.errpointer = ptvoid(h.err64) else h.errpointer = ptvoid(0xffffffff) end
+h.uint32_max = ffi.cast("uint32_t", 0xffffffff)
+
 -- generic iterator that counts down so needs no closure to hold state
 function h.reviter(array, i)
   i = i - 1
@@ -111,11 +117,6 @@ function h.addptrtype(types, name, tp)
   types.t[name] = function(v) return ffi.cast(ptr, v) end
   types.s[name] = ffi.sizeof(ptr)
 end
-
--- constants
-h.uint64_max = ffi.cast("uint64_t", 0) - ffi.cast("uint64_t", 1)
-h.err64 = ffi.cast("int64_t", -1)
-if abi.abi64 then h.errpointer = ptvoid(h.err64) else h.errpointer = ptvoid(0xffffffff) end
 
 -- endian conversion
 -- TODO add tests eg for signs.

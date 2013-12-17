@@ -571,6 +571,14 @@ struct _netbsd_in6_ifreq {
     struct _netbsd_icmp6_ifstat ifru_icmp6stat;
   } ifr_ifru;
 };
+struct _netbsd_in6_aliasreq {
+  char    ifra_name[16];
+  struct  _netbsd_sockaddr_in6 ifra_addr;
+  struct  _netbsd_sockaddr_in6 ifra_dstaddr;
+  struct  _netbsd_sockaddr_in6 ifra_prefixmask;
+  int     ifra_flags;
+  struct  _netbsd_in6_addrlifetime ifra_lifetime;
+};
 ]]
 
 local s = table.concat(defs, "")

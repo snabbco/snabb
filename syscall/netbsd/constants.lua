@@ -1084,5 +1084,9 @@ c.BRDG = strflag {
   SFILT    = 24,
 }
 
+c.ND6 = strflag {
+  INFINITE_LIFETIME = h.uint32_max,
+}
+
 return c
 
