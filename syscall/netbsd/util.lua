@@ -94,6 +94,15 @@ function util.kdump(buf, len)
   return kdumpfn(len), buf, 0
 end
 
+local function do_bridge_setcmd(name, op, arg)
+  return sockioctl("inet", "dgram", "SIOCSDRVSPEC", {name = name, cms = op, data = arg})
+end
+local function do_bridge_getcmd(name, op, arg) -- TODO should allocate correct arg type here based on arg
+  local data, err = sockioctl("inet", "dgram", "SIOCGDRVSPEC", {name = name, cms = op, data = arg})
+  if not data then return nil, err end
+  return arg
+end
+
 return util
 
 end
