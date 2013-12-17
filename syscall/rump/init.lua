@@ -12,7 +12,6 @@ local ffi = require "ffi"
 local abi = require "syscall.abi"
 
 abi.rump = true
-abi.os = "netbsd"
 
 local modules = {
   rumpuser = ffi.load("rumpuser", true),
