@@ -275,7 +275,7 @@ function util.sendfds(fd, ...)
 end
 
 -- generic inet name to ip, also with netmask support
--- TODO convert to a type?
+-- TODO convert to a type? either way should not really be in util, probably helpers
 function util.inet_name(src, netmask)
   local addr
   if not netmask then
@@ -297,7 +297,7 @@ function util.inet_name(src, netmask)
   return addr, netmask
 end
 
--- get broadcast address for ipv4 address and netmask
+-- get broadcast address for ipv4 address and netmask TODO not in util
 function util.broadcast(address, netmask)
   if type(address) == "string" then address, netmask = util.inet_name(address, netmask) end
   if not address or not ffi.istype(t.in_addr, address) then return nil end

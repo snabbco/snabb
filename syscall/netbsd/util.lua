@@ -75,7 +75,7 @@ end
 function util.ifaddr_inet4(ifname, addr, netmask)
   addr, netmask = util.inet_name(addr, netmask)
 
-  ia = t.ifaliasreq{name = name, addr = addr}
+  ia = t.ifaliasreq{name = name, addr = {family = "inet", addr = addr}}
 
   -- TODO unfinished
 end

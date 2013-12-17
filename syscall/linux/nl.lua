@@ -16,7 +16,7 @@ local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 
-local util = require "syscall.util"
+local util = S.util
 
 local types = S.types
 local c = S.c

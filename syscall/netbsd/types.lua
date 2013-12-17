@@ -274,9 +274,9 @@ mt.ifaliasreq = {
       assert(#v < c.IFNAMSIZ, "name too long")
       ifra.ifra_name = v
     end,
-    addr = function(ifra, v) ifra.ifra_addr = v end, -- TODO type constructor?
-    dstaddr = function(ifra, v) ifra.ifra_dstaddr = v end,
-    mask = function(ifra, v) ifra.ifra_mask = v end,
+    addr = function(ifra, v) ifra.ifra_addr = mktype(t.sockaddr, v) end,
+    dstaddr = function(ifra, v) ifra.ifra_dstaddr = mktype(t.sockaddr, v) end,
+    mask = function(ifra, v) ifra.ifra_mask = v end, -- TODO mask in form of sockaddr
   },
   __new = newfn,
 }
@@ -299,9 +299,9 @@ mt.in6_aliasreq = {
       assert(#v < c.IFNAMSIZ, "name too long")
       ifra.ifra_name = v
     end,
-    addr = function(ifra, v) ifra.ifra_addr = v end, -- TODO type constructor?
-    dstaddr = function(ifra, v) ifra.ifra_dstaddr = v end,
-    mask = function(ifra, v) ifra.ifra_prefixmask = v end,
+    addr = function(ifra, v) ifra.ifra_addr = mktype(t.sockaddr_in6, v) end,
+    dstaddr = function(ifra, v) ifra.ifra_dstaddr = mktype(t.sockaddr_in6, v) end,
+    mask = function(ifra, v) ifra.ifra_prefixmask = v end, -- TODO mask in form of sockaddr
     lifetime = function(ifra) ifra.ifra_lifetime = v end,
   },
   __new = newfn,
