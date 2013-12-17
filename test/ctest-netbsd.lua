@@ -132,6 +132,8 @@ print [[
 #include <sys/event.h>
 #include <sys/ktrace.h>
 #include <netinet/in.h>
+#include <netinet6/in6.h>
+#include <netinet6/in6_var.h>
 #include <net/route.h>
 #include <net/bpf.h>
 #include <net/if_ether.h>
