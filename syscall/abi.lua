@@ -28,14 +28,14 @@ if abi.arch == "mips" then abi.mipsabi = "o32" end -- only one supported now
 
 -- BSD detection, we assume they all have a compatible sysctlbyname in libc, WIP
 if abi.os == "bsd" then
-ffi.cdef [[
-int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
-]]
-local buf = ffi.new("char[32]")
-local lenp = ffi.new("unsigned long[1]", 32)
-local ok = ffi.C.sysctlbyname("kern.ostype", buf, lenp, nil, 0)
-if not ok then error("cannot identify BSD version") end
-abi.os = ffi.string(buf):lower()
+  ffi.cdef [[
+  int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
+  ]]
+  local buf = ffi.new("char[32]")
+  local lenp = ffi.new("unsigned long[1]", 32)
+  local ok = ffi.C.sysctlbyname("kern.ostype", buf, lenp, nil, 0)
+  if not ok then error("cannot identify BSD version") end
+  abi.os = ffi.string(buf):lower()
 end
 
 -- you can use version 7 here
