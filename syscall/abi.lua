@@ -26,10 +26,17 @@ if abi.arch == "arm" and not ffi.abi("eabi") then error("only support eabi for a
 
 if abi.arch == "mips" then abi.mipsabi = "o32" end -- only one supported now
 
--- At the moment we only support NetBSD but do not attempt to detect it
--- If you want to support eg FreeBSD then will have to detect it
-
-if abi.os == "bsd" then abi.os = "netbsd" end
+-- BSD detection, we assume they all have a compatible sysctlbyname in libc, WIP
+if abi.os == "bsd" then
+ffi.cdef [[
+int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
+]]
+local buf = ffi.new("char[32]")
+local lenp = ffi.new("unsigned long[1]", 32)
+local ok = ffi.C.sysctlbyname("kern.ostype", buf, lenp, nil, 0)
+if not ok then error("cannot identify BSD version") end
+abi.os = ffi.string(buf):lower()
+end
 
 -- you can use version 7 here
 abi.netbsd = {version = 6}
