@@ -184,18 +184,11 @@ mt.sockaddr_in = {
   newindex = {
     family = function(sa, v) sa.sin_family = v end,
     port = function(sa, v) sa.sin_port = htons(v) end,
-    addr = function(sa, v) sa.sin_addr = v end,
+    addr = function(sa, v) sa.sin_addr = mktype(t.in_addr, v) end,
   },
   __new = function(tp, port, addr)
-    local tab
-    if type(port) == "table" then
-      tab = port
-    else
-      tab = {family = c.AF.INET, port = port, addr = addr}
-    end
-    tab.addr = mktype(t.in_addr, tab.addr)
-    if not tab.addr then return nil end
-    return newfn(tp, tab)
+    if type(port) == "table" then return newfn(tp, port) end
+    return newfn(tp, {family = c.AF.INET, port = port, addr = addr})
   end,
   __len = function(tp) return s.sockaddr_in end,
 }
@@ -211,20 +204,13 @@ mt.sockaddr_in6 = {
   newindex = {
     family = function(sa, v) sa.sin6_family = v end,
     port = function(sa, v) sa.sin6_port = htons(v) end,
-    addr = function(sa, v) sa.sin6_addr = v end,
+    addr = function(sa, v) sa.sin6_addr = mktype(t.in6_addr, v) end,
     flowinfo = function(sa, v) sa.sin6_flowinfo = v end,
     scope_id = function(sa, v) sa.sin6_scope_id = v end,
   },
   __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers.
-    local tab
-    if type(port) == "table" then
-      tab = port
-    else
-      tab = {family = c.AF.INET6, port = port, addr = addr, flowinfo = flowinfo, scope_id = scope_id}
-    end
-    tab.addr = mktype(t.in6_addr, tab.addr)
-    if not tab.addr then return nil end
-    return newfn(tp, tab)
+    if type(port) == "table" then return newfn(tp, port) end
+    return newfn(tp, {family = c.AF.INET6, port = port, addr = addr, flowinfo = flowinfo, scope_id = scope_id})
   end,
   __len = function(tp) return s.sockaddr_in6 end,
 }

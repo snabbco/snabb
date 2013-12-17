@@ -1181,10 +1181,6 @@ test_sockets_pipes = {
     assert(pr:close())
     assert(pw:close())
   end,
-  test_sockaddr_in_error = function()
-    local sa = t.sockaddr_in(1234, "error")
-    assert(not sa, "expect nil socket address from invalid ip string")
-  end,
   test_inet_socket = function() -- TODO break this test up
     local s = assert(S.socket("inet", "stream, nonblock"))
     local sa = assert(t.sockaddr_in(0, "loopback"))

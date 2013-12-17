@@ -72,6 +72,20 @@ end
 function util.ifsetlinkstr(name, str) -- used to pass (optional) string to rump virtif (eg name of underlying tap device)
   return sockioctl("inet", "dgram", "SIOCSLINKSTR", {name = name, cmd = 0, data = str})
 end
+function util.ifaddr_inet4(ifname, addr, netmask)
+  addr, netmask = util.inet_name(addr, netmask)
+
+  ia = t.ifaliasreq{name = name, addr = addr}
+
+  -- TODO unfinished
+end
+function util.ifaddr_inet6(ifname, addr, netmask)
+  addr, netmask = util.inet_name(addr, netmask)
+
+  ia = t.in6_aliasreq{name = name}
+
+  -- TODO unfinished
+end
 
 -- table based mount, more cross OS compatible
 function util.mount(tab)

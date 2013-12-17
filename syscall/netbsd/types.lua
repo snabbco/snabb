@@ -46,7 +46,6 @@ local addstructs = {
   icmp6_ifstat = "struct icmp6_ifstat",
   in6_ifreq = "struct in6_ifreq",
   in6_addrlifetime = "struct in6_addrlifetime",
-  in6_aliasreq = "struct in6_aliasreq",
 }
 
 if abi.netbsd.version == 6 then
@@ -286,6 +285,29 @@ mt.ifaliasreq.index.broadaddr = mt.ifaliasreq.index.dstaddr
 mt.ifaliasreq.newindex.broadaddr = mt.ifaliasreq.newindex.dstaddr
 
 addtype(types, "ifaliasreq", "struct ifaliasreq", mt.ifaliasreq)
+
+mt.in6_aliasreq = {
+  index = {
+    name = function(ifra) return ffi.string(ifra.ifra_name) end,
+    addr = function(ifra) return ifra.ifra_addr end,
+    dstaddr = function(ifra) return ifra.ifra_dstaddr end,
+    prefixmask = function(ifra) return ifra.ifra_prefixmask end,
+    lifetime = function(ifra) return ifra.ifra_lifetime end,
+  },
+  newindex = {
+    name = function(ifra, v)
+      assert(#v < c.IFNAMSIZ, "name too long")
+      ifra.ifra_name = v
+    end,
+    addr = function(ifra, v) ifra.ifra_addr = v end, -- TODO type constructor?
+    dstaddr = function(ifra, v) ifra.ifra_dstaddr = v end,
+    mask = function(ifra, v) ifra.ifra_prefixmask = v end,
+    lifetime = function(ifra) ifra.ifra_lifetime = v end,
+  },
+  __new = newfn,
+}
+
+addtype(types, "in6_aliasreq", "struct in6_aliasreq", mt.in6_aliasreq)
 
 -- TODO need to check in detail all this as ported form Linux and may differ
 mt.termios = {
