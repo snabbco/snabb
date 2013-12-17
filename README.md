@@ -34,14 +34,14 @@ Android (ARM tested so far) currently passes all the non root tests now; some te
 
 For the NetBSD support all platforms should work in principle; more test targets will be added soon, currently tests being run on x86 and amd64, an ARM test target will be added soon.
 
-I am not currently supporting other BSDs (eg FreeBSD); it should not be difficult but there is an issue of how to detect which one is being used in order to deal with the differences. A small amount of OSX support was added but it is not well tested or maintained and is likely to be removed to a branch for now, due to lack of ability to test. This may be re-added after FreeBSD/Darwin support at a future date.
+There is a small stub of FreeBSD support, not yet enough to run any code (although rump works on FreeBSD). A small amount of OSX support was added but there is no test environment at present.
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
 For the (optional) rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project, which is now included as a git submodule. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There are some additional examples in `examples/rump` which is a port of the tests in buildrump. The rump kernel runs on many elf/Posix OS and architectures, currently tested on Linux x86, x64, ppc, arm and NetBSD x86, x64, with more targets to be added soon.
 
 ## New features planned soon
-netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD support, rump kernel hypercall API, OSv support, Lua support, more introspection.
+netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD support, rump kernel hypercall API, OSv support, Lua support, more introspection, FreeBSD support.
 
 ## Release notes
 0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, luaffi support again, better kernel headers and fixes against them, more MIPS support, improved APIs with multiple return values, initial NetBSD and Rump ktrace support.

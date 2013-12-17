@@ -101,6 +101,7 @@ build =
       ["syscall.osx.util"] = "syscall/osx/util.lua";
 
       ["syscall.freebsd.ffitypes"] = "syscall/freebsd/ffitypes.lua";
+      ["syscall.freebsd.ffifunctions"] = "syscall/freebsd/ffifunctions.lua";
 
       ["syscall.rump.init"] = "syscall/rump/init.lua";
       ["syscall.rump.c"] = "syscall/rump/c.lua";
