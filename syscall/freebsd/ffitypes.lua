@@ -39,6 +39,12 @@ typedef int           cpulevel_t;
 typedef int           cpusetid_t;
 typedef uint32_t      dev_t;
 typedef uint32_t      fixpt_t;
+
+/* can be changed, TODO also should be long */
+typedef uint32_t __fd_mask;
+typedef struct fd_set {
+  __fd_mask __fds_bits[4];
+} fd_set;
 ]]
 
 local s = table.concat(defs, "")
