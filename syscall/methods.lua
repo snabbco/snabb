@@ -27,7 +27,7 @@ local getfd, istype, mktype = h.getfd, h.istype, h.mktype
 local function nonblock(fd)
   local fl, err = S.fcntl(fd, c.F.GETFL)
   if not fl then return nil, err end
-  fl, err = S.fcntl(fd, c.F.SETFL, bit.bor(fl, c.O.NONBLOCK))
+  fl, err = S.fcntl(fd, c.F.SETFL, c.O(fl, "nonblock"))
   if not fl then return nil, err end
   return true
 end
@@ -35,7 +35,7 @@ end
 local function block(fd)
   local fl, err = S.fcntl(fd, c.F.GETFL)
   if not fl then return nil, err end
-  fl, err = S.fcntl(fd, c.F.SETFL, bit.band(fl, bit.bnot(c.O.NONBLOCK)))
+  fl, err = S.fcntl(fd, c.F.SETFL, c.O(fl, "~nonblock"))
   if not fl then return nil, err end
   return true
 end

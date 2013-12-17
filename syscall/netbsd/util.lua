@@ -66,8 +66,7 @@ end
 function util.ifdown(name)
   local flags, err = util.ifgetflags(name)
   if not flags then return nil, err end
-  flags = bit.band(bit.bnot(flags, c.IFF.UP))
-  return util.ifsetflags(name, flags)
+  return util.ifsetflags(name, c.IFF(flags, "~up"))
 end
 
 -- table based mount, more cross OS compatible
