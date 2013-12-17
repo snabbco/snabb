@@ -69,6 +69,10 @@ function util.ifdown(name)
   return util.ifsetflags(name, c.IFF(flags, "~up"))
 end
 
+function util.ifsetlinkstr(name, str) -- used to pass (optional) string to rump virtif (eg name of underlying tap device)
+  return sockioctl("inet", "dgram", "SIOCSLINKSTR", {name = name, cmd = 0, data = str})
+end
+
 -- table based mount, more cross OS compatible
 function util.mount(tab)
   local filesystemtype = tab.type
