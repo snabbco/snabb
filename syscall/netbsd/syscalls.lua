@@ -87,11 +87,9 @@ function S.revoke(path) return retbool(C.revoke(path)) end
 function S.chflags(path, flags) return retbool(C.chflags(path, c.CHFLAGS[flags])) end
 function S.lchflags(path, flags) return retbool(C.lchflags(path, c.CHFLAGS[flags])) end
 function S.fchflags(fd, flags) return retbool(C.fchflags(getfd(fd), c.CHFLAGS[flags])) end
-function S.fchroot(fd) return retbool(C.fchroot(getfd(fd))) end
 function S.pathconf(path, name) return retnum(C.pathconf(path, c.PC[name])) end
 function S.fpathconf(fd, name) return retnum(C.fpathconf(getfd(fd), c.PC[name])) end
 function S.fsync_range(fd, how, start, length) return retbool(C.fsync_range(getfd(fd), c.FSYNC[how], start, length)) end
-function S.lchmod(path, mode) return retbool(C.lchmod(path, c.MODE[mode])) end
 
 function S.getvfsstat(flags, buf, size) -- note order of args as usually leave buf empty
   flags = c.VFSMNT[flags or "WAIT"] -- default not zero

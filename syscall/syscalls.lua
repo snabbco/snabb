@@ -534,6 +534,13 @@ if C.openat then
   end
 end
 
+if C.fchroot then
+  function S.fchroot(fd) return retbool(C.fchroot(getfd(fd))) end
+end
+if C.lchmod then
+  function S.lchmod(path, mode) return retbool(C.lchmod(path, c.MODE[mode])) end
+end
+
 -- Linux does not have mkfifo syscalls, emulated
 if C.mkfifo then
   function S.mkfifo(pathname, mode) return retbool(C.mkfifo(pathname, c.S_I[mode])) end

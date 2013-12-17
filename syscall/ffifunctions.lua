@@ -16,6 +16,7 @@ require("syscall." .. abi.os .. ".ffifunctions")
 local cdef = require "ffi".cdef
 
 -- common functions for BSD, OSX and and Linux
+-- note that some functions may not be available in all, but so long as prototype is standard they can go here
 
 cdef[[
 int open(const char *pathname, int flags, mode_t mode);
@@ -142,5 +143,8 @@ int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flag
 int symlinkat(const char *oldpath, int newdirfd, const char *newpath);
 int mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev);
 int mkfifoat(int dirfd, const char *pathname, mode_t mode);
+
+int lchmod(const char *path, mode_t mode);
+int fchroot(int fd);
 ]]
 

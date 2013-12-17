@@ -1,4 +1,4 @@
--- define system calls for ffi, BSD specific calls
+-- define system calls for ffi, NetBSD specific calls
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
@@ -10,8 +10,6 @@ pcall, type, table, string
 local cdef = require "ffi".cdef
 
 cdef[[
-int lchmod(const char *path, mode_t mode);
-int fchroot(int fd);
 int fsync_range(int fd, int how, off_t start, off_t length);
 int paccept(int s, struct sockaddr *addr, socklen_t *addrlen, const sigset_t *sigmask, int flags);
 int pipe2(int pipefd[2], int flags);
