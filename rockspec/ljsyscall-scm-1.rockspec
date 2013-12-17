@@ -100,6 +100,8 @@ build =
       ["syscall.osx.errors"] = "syscall/osx/errors.lua";
       ["syscall.osx.util"] = "syscall/osx/util.lua";
 
+      ["syscall.freebsd.ffitypes"] = "syscall/freebsd/ffitypes.lua";
+
       ["syscall.rump.init"] = "syscall/rump/init.lua";
       ["syscall.rump.c"] = "syscall/rump/c.lua";
       ["syscall.rump.types"] = "syscall/rump/types.lua";
