@@ -37,6 +37,8 @@ typedef unsigned int  useconds_t;
 typedef int           cpuwhich_t;
 typedef int           cpulevel_t;
 typedef int           cpusetid_t;
+typedef uint32_t      dev_t;
+typedef uint32_t      fixpt_t;
 ]]
 
 local s = table.concat(defs, "")
