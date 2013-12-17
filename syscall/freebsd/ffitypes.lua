@@ -46,6 +46,9 @@ typedef uint32_t __fd_mask;
 typedef struct fd_set {
   __fd_mask __fds_bits[4];
 } fd_set;
+typedef struct __sigset {
+  uint32_t __bits[4];
+} sigset_t;
 ]]
 
 local s = table.concat(defs, "")
