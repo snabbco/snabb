@@ -102,6 +102,7 @@ build =
 
       ["syscall.freebsd.ffitypes"] = "syscall/freebsd/ffitypes.lua";
       ["syscall.freebsd.ffifunctions"] = "syscall/freebsd/ffifunctions.lua";
+      ["syscall.freebsd.constants"] = "syscall/freebsd/constants.lua";
 
       ["syscall.rump.init"] = "syscall/rump/init.lua";
       ["syscall.rump.c"] = "syscall/rump/c.lua";

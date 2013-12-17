@@ -1,4 +1,4 @@
--- tables of constants for BSD
+-- tables of constants for NetBSD
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
