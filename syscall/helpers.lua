@@ -201,7 +201,7 @@ function h.multiflags(tab)
     local f = 0
     local a = split(",", str)
     if #a == 1 and str == str:upper() then return nil end -- this is to allow testing for presense, while catching errors
-    for i, v in ipairs(a) do
+    for _, v in ipairs(a) do
       local s = trim(v):upper()
       if #s == 0 then error("empty flag") end
       local val = rawget(tab, s)
@@ -213,11 +213,27 @@ function h.multiflags(tab)
   end
   return setmetatable(tab, {
     __index = setmetatable({}, {__index = flag}),
-    -- this allows easily adding a flag TODO some mechanism to remove eg using ~ would be nice here or elsewhere
-    __call = function(t, ...)
-      local a = 0
+    __call = function(tab, x, ...) -- this allows easily adding or removing a flag
+      local a = tab[x]
       for _, v in ipairs{...} do
-        a = bit.bor(a, t[v])
+        if type(v) == "string" and v:find("~") then -- allow negation eg c.IFF(old, "~UP")
+          local sa = split(",", v)
+          for _, vv in ipairs(sa) do
+            local s = trim(vv):upper()
+            if #s == 0 then error("empty flag") end
+            local negate = false
+            if s:sub(1, 1) == "~" then
+              negate = true
+              s = trim(s:sub(2))
+              if #s == 0 then error("empty flag") end
+            end
+            local val = rawget(tab, s)
+            if not val then error("invalid flag " .. s) end
+            if negate then a = bit.band(a, bit.bnot(val)) else a = bit.bor(a, val) end
+          end
+        else
+          a = bit.bor(a, tab[v])
+        end
       end
       return a
     end,

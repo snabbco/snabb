@@ -297,6 +297,10 @@ test_basic = {
   test_multiflags = function()
     assert_equal(c.O["creat, excl, rdwr"], c.O("creat", "excl", "rdwr")) -- function form takes multiple arguments
   end,
+  test_multiflags_negation = function()
+    assert_equal(c.O("creat", "~creat"), 0) -- negating flag should clear
+    assert_equal(c.O("creat, excl", "~creat", "rdwr", "~rdwr"), c.O.EXCL)
+  end,
 }
 
 test_open_close = {
