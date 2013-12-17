@@ -765,11 +765,6 @@ test.netlink = {
     local i = assert(nl.interfaces())
     assert(not i.dummy0, "expect dummy interface gone")
   end,
-  test_broadcast = function()
-    assert_equal(tostring(nl.broadcast("0.0.0.0", 32)), "0.0.0.0")
-    assert_equal(tostring(nl.broadcast("10.10.20.1", 24)), "10.10.20.255")
-    assert_equal(tostring(nl.broadcast("0.0.0.0", 0)), "255.255.255.255")
-  end,
   test_newaddr6_root = function()
     local lo = assert(nl.interface("lo"))
     assert(nl.newaddr(lo, "inet6", 128, "permanent", "local", "::2"))

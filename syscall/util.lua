@@ -12,6 +12,9 @@ pcall, type, table, string
 
 local function init(S)
 
+local h = require "syscall.helpers"
+local htonl = h.htonl
+
 local ffi = require "ffi"
 
 local abi, types, c = S.abi, S.types, S.c
@@ -269,6 +272,38 @@ function util.sendfds(fd, ...)
   local cmsg = t.cmsghdr("socket", "rights", {...})
   local msg = t.msghdr{iov = io, control = cmsg}
   return S.sendmsg(fd, msg, 0)
+end
+
+-- generic inet name to ip, also with netmask support
+-- TODO convert to a type?
+function util.inet_name(src, netmask)
+  local addr
+  if not netmask then
+    local a, b = src:find("/", 1, true)
+    if a then
+      netmask = tonumber(src:sub(b + 1))
+      src = src:sub(1, a - 1)
+    end
+  end
+  if src:find(":", 1, true) then -- ipv6
+    addr = t.in6_addr(src)
+    if not addr then return nil end
+    if not netmask then netmask = 128 end
+  else
+    addr = t.in_addr(src)
+    if not addr then return nil end
+    if not netmask then netmask = 32 end
+  end
+  return addr, netmask
+end
+
+-- get broadcast address for ipv4 address and netmask
+function util.broadcast(address, netmask)
+  if type(address) == "string" then address, netmask = util.inet_name(address, netmask) end
+  if not address or not ffi.istype(t.in_addr, address) then return nil end
+  local bcast = t.in_addr(address)
+  if netmask < 32 then bcast.s_addr = bit.bor(tonumber(address.s_addr), htonl(bit.rshift(-1, netmask))) end
+  return bcast
 end
 
 return util

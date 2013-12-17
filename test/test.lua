@@ -546,6 +546,11 @@ test_address_names = {
       assert_equal(tostring(addr), a)
     end
   end,
+  test_util_broadcast = function()
+    assert_equal(tostring(util.broadcast("0.0.0.0", 32)), "0.0.0.0")
+    assert_equal(tostring(util.broadcast("10.10.20.1", 24)), "10.10.20.255")
+    assert_equal(tostring(util.broadcast("0.0.0.0", 0)), "255.255.255.255")
+  end,
 }
 
 test_file_operations = {

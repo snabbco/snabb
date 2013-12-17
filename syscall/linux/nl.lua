@@ -16,6 +16,8 @@ local bit = require "syscall.bit"
 
 local h = require "syscall.helpers"
 
+local util = require "syscall.util"
+
 local types = S.types
 local c = S.c
 
@@ -39,29 +41,6 @@ local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x
 
 local mt = {} -- metatables
 local meth = {}
-
--- generic inet name to ip, also with netmask support
--- TODO convert to a type?
-local function inet_name(src, netmask)
-  local addr
-  if not netmask then
-    local a, b = src:find("/", 1, true)
-    if a then
-      netmask = tonumber(src:sub(b + 1))
-      src = src:sub(1, a - 1)
-    end
-  end
-  if src:find(":", 1, true) then -- ipv6
-    addr = t.in6_addr(src)
-    if not addr then return nil end
-    if not netmask then netmask = 128 end
-  else
-    addr = t.in_addr(src)
-    if not addr then return nil end
-    if not netmask then netmask = 32 end
-  end
-  return addr, netmask
-end
 
 -- similar functions for netlink messages
 local function nlmsg_align(len) return align(len, 4) end
@@ -259,15 +238,6 @@ mt.iflinks = {
   end
 }
 
--- get broadcast address for ipv4 address and netmask TODO move to util?
-function nl.broadcast(address, netmask)
-  if type(address) == "string" then address, netmask = inet_name(address, netmask) end
-  if not address or not ffi.istype(t.in_addr, address) then return nil end
-  local bcast = t.in_addr(address)
-  if netmask < 32 then bcast.s_addr = bit.bor(tonumber(address.s_addr), htonl(bit.rshift(-1, netmask))) end
-  return bcast
-end
-
 meth.iflink = {
   index = {
     family = function(i) return tonumber(i.ifinfo.ifi_family) end,
@@ -299,19 +269,19 @@ meth.iflink = {
       return i:refresh()
     end,
     address = function(i, address, netmask) -- add address
-      if type(address) == "string" then address, netmask = inet_name(address, netmask) end
+      if type(address) == "string" then address, netmask = util.inet_name(address, netmask) end
       if not address then return nil end
       local ok, err
       if ffi.istype(t.in6_addr, address) then
         ok, err = nl.newaddr(i.index, c.AF.INET6, netmask, "permanent", "local", address)
       else
-        ok, err = nl.newaddr(i.index, c.AF.INET, netmask, "permanent", "local", address, "broadcast", nl.broadcast(address, netmask))
+        ok, err = nl.newaddr(i.index, c.AF.INET, netmask, "permanent", "local", address, "broadcast", util.broadcast(address, netmask))
       end
       if not ok then return nil, err end
       return i:refresh()
     end,
     deladdress = function(i, address, netmask)
-      if type(address) == "string" then address, netmask = inet_name(address, netmask) end
+      if type(address) == "string" then address, netmask = util.inet_name(address, netmask) end
       if not address then return nil end
       local af
       if ffi.istype(t.in6_addr, address) then af = c.AF.INET6 else af = c.AF.INET end
