@@ -164,6 +164,10 @@ local ioctl = strflag {
   SIOCSIFADDRPREF=  _IOW('i', 31, "if_addrprefreq"),
   SIOCGIFADDRPREF= _IOWR('i', 32, "if_addrprefreq"),
 ]]
+-- ipv6 ioctls
+  SIOCSIFADDR_IN6 =  _IOW('i', 12, "in6_ifreq"),
+  SIOCGIFADDR_IN6 = _IOWR('i', 33, "in6_ifreq"),
+
   SIOCADDMULTI   =  _IOW('i', 49, "ifreq"),
   SIOCDELMULTI   =  _IOW('i', 50, "ifreq"),
 --SIOCGETVIFCNT  = _IOWR('u', 51, "sioc_vif_req"),

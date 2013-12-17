@@ -42,6 +42,9 @@ local addstructs = {
   flock = "struct flock",
   statvfs = "struct statvfs",
   kfilter_mapping = "struct kfilter_mapping",
+  in6_ifstat = "struct in6_ifstat",
+  icmp6_ifstat = "struct icmp6_ifstat",
+  in6_ifreq = "struct in6_ifreq",
 }
 
 if abi.netbsd.version == 6 then

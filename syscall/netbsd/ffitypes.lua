@@ -493,6 +493,84 @@ struct _netbsd_ifbreq {
   uint8_t  ifbr_path_cost;
   uint8_t  ifbr_portno;
 };
+struct _netbsd_in6_addrlifetime {
+  _netbsd_time_t ia6t_expire;
+  _netbsd_time_t ia6t_preferred;
+  uint32_t ia6t_vltime;
+  uint32_t ia6t_pltime;
+};
+struct _netbsd_in6_ifstat {
+  u_quad_t ifs6_in_receive;
+  u_quad_t ifs6_in_hdrerr;
+  u_quad_t ifs6_in_toobig;
+  u_quad_t ifs6_in_noroute;
+  u_quad_t ifs6_in_addrerr;
+  u_quad_t ifs6_in_protounknown;
+  u_quad_t ifs6_in_truncated;
+  u_quad_t ifs6_in_discard;
+  u_quad_t ifs6_in_deliver;
+  u_quad_t ifs6_out_forward;
+  u_quad_t ifs6_out_request;
+  u_quad_t ifs6_out_discard;
+  u_quad_t ifs6_out_fragok;
+  u_quad_t ifs6_out_fragfail;
+  u_quad_t ifs6_out_fragcreat;
+  u_quad_t ifs6_reass_reqd;
+  u_quad_t ifs6_reass_ok;
+  u_quad_t ifs6_reass_fail;
+  u_quad_t ifs6_in_mcast;
+  u_quad_t ifs6_out_mcast;
+};
+struct _netbsd_icmp6_ifstat {
+  u_quad_t ifs6_in_msg;
+  u_quad_t ifs6_in_error;
+  u_quad_t ifs6_in_dstunreach;
+  u_quad_t ifs6_in_adminprohib;
+  u_quad_t ifs6_in_timeexceed;
+  u_quad_t ifs6_in_paramprob;
+  u_quad_t ifs6_in_pkttoobig;
+  u_quad_t ifs6_in_echo;
+  u_quad_t ifs6_in_echoreply;
+  u_quad_t ifs6_in_routersolicit;
+  u_quad_t ifs6_in_routeradvert;
+  u_quad_t ifs6_in_neighborsolicit;
+  u_quad_t ifs6_in_neighboradvert;
+  u_quad_t ifs6_in_redirect;
+  u_quad_t ifs6_in_mldquery;
+  u_quad_t ifs6_in_mldreport;
+  u_quad_t ifs6_in_mlddone;
+  u_quad_t ifs6_out_msg;
+  u_quad_t ifs6_out_error;
+  u_quad_t ifs6_out_dstunreach;
+  u_quad_t ifs6_out_adminprohib;
+  u_quad_t ifs6_out_timeexceed;
+  u_quad_t ifs6_out_paramprob;
+  u_quad_t ifs6_out_pkttoobig;
+  u_quad_t ifs6_out_echo;
+  u_quad_t ifs6_out_echoreply;
+  u_quad_t ifs6_out_routersolicit;
+  u_quad_t ifs6_out_routeradvert;
+  u_quad_t ifs6_out_neighborsolicit;
+  u_quad_t ifs6_out_neighboradvert;
+  u_quad_t ifs6_out_redirect;
+  u_quad_t ifs6_out_mldquery;
+  u_quad_t ifs6_out_mldreport;
+  u_quad_t ifs6_out_mlddone;
+};
+struct _netbsd_in6_ifreq {
+  char ifr_name[16];
+  union {
+    struct _netbsd_sockaddr_in6 ifru_addr;
+    struct _netbsd_sockaddr_in6 ifru_dstaddr;
+    short  ifru_flags;
+    int    ifru_flags6;
+    int    ifru_metric;
+    void * ifru_data;
+    struct _netbsd_in6_addrlifetime ifru_lifetime;
+    struct _netbsd_in6_ifstat ifru_stat;
+    struct _netbsd_icmp6_ifstat ifru_icmp6stat;
+  } ifr_ifru;
+};
 ]]
 
 local s = table.concat(defs, "")
