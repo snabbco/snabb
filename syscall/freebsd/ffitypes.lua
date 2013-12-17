@@ -39,6 +39,7 @@ typedef int           cpulevel_t;
 typedef int           cpusetid_t;
 typedef uint32_t      dev_t;
 typedef uint32_t      fixpt_t;
+typedef	unsigned int  nfds_t;
 
 /* can be changed, TODO also should be long */
 typedef uint32_t __fd_mask;
