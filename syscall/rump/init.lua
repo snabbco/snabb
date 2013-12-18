@@ -87,6 +87,15 @@ if abi.host == "netbsd" and abi.types == "netbsd" then -- running native (NetBSD
   S.util = require "syscall.util".init(S)
 elseif abi.types == "linux" then -- running Linux types, just need to use rump C which it will do if abi.rump set
   S = require "syscall"
+  -- TODO lots of syscalls simply don't exist, so make some do ENOSYS
+  local function nosys()
+    ffi.errno(S.c.E.NOSYS)
+    return -1
+  end
+  local C = require "syscall.rump.c"
+  local nolist = {"io_setup"} -- TODO can add more here
+  for _, sys in ipairs(nolist) do C[sys] = nosys end
+
   -- add a few netbsd types so can use mount
   -- TODO ideally we would require netbsd.ffitypes but this is somewhat complex now
   ffi.cdef [[

@@ -474,6 +474,7 @@ test.sendfile = {
   end,
 }
 
+if not S.__rump then -- uses clone() so cannot test with rump
 test.netlink = {
   test_netlink_socket = function()
     local sock, err = S.socket("netlink", "raw", "route")
@@ -533,7 +534,7 @@ test.netlink = {
     end
   end,
   test_interfaces = function()
-    local i = nl.interfaces()
+    local i = assert(nl.interfaces())
     assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
     assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
   end,
@@ -810,6 +811,7 @@ test.netlink = {
     assert(i.dummy0:delete())
   end,
 }
+end
 
 test.events_epoll = {
   test_eventfd = function()
@@ -1431,22 +1433,6 @@ test.seccomp = {
 }
 end
 
-test.swap = {
-  test_swap_constants = function()
-    assert_equal(c.SWAP_FLAG["23, discard"], c.SWAP_FLAG["prefer, discard"] + bit.lshift(23, c.SWAP_FLAG["prio_shift"]))
-  end,
-  test_swap_fail = function()
-    local ex = "PERM" -- EPERM if not root
-    if S.geteuid() == 0 then ex = "INVAL" end
-    local ok, err = S.swapon("/dev/null", "23, discard")
-    if not ok and err.NOSYS then return end -- Android does not implement swap, so skip test
-    assert(not ok and err[ex], "should not create swap on /dev/null")
-    local ok, err = S.swapoff("/dev/null")
-    assert(not ok and err[ex], "no swap on /dev/null")
-  end,
-  -- TODO need mkswap to test success
-}
-
 --[[ -- TODO fix, ioctl set to want an int not an ifreq, probably needs tweaking to get right number
 test.tuntap_root = {
   test_tuntap_root = function()
@@ -1810,6 +1796,22 @@ test.scheduler = {
   test_sched_rr_get_interval = function()
     local ts = assert(S.sched_rr_get_interval())
   end,
+}
+
+test.swap = {
+  test_swap_constants = function()
+    assert_equal(c.SWAP_FLAG["23, discard"], c.SWAP_FLAG["prefer, discard"] + bit.lshift(23, c.SWAP_FLAG["prio_shift"]))
+  end,
+  test_swap_fail = function()
+    local ex = "PERM" -- EPERM if not root
+    if S.geteuid() == 0 then ex = "INVAL" end
+    local ok, err = S.swapon("/dev/null", "23, discard")
+    if not ok and err.NOSYS then return end -- Android does not implement swap, so skip test
+    assert(not ok and err[ex], "should not create swap on /dev/null")
+    local ok, err = S.swapoff("/dev/null")
+    assert(not ok and err[ex], "no swap on /dev/null")
+  end,
+  -- TODO need mkswap to test success
 }
 end -- exclude rump
 
