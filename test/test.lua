@@ -43,7 +43,6 @@ local abi = S.abi
 local types = S.types
 local t, pt, s = types.t, types.pt, types.s
 local c = S.c
-local features = S.features
 local util = S.util
 
 if S.__rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switch from root so it does not try
@@ -430,7 +429,7 @@ test_read_write = {
     assert(S.unlink(tmpfile))
   end,
   test_preadv_pwritev = function()
-    if not features.preadv() then return true end
+    if not S.preadv then error "skipped" end
     local offset = 10
     local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
@@ -1084,7 +1083,7 @@ test_largefile = {
     assert(fd:close())
   end,
   test_preadv_pwritev = function()
-    if not features.preadv() then return true end
+    if not S.preadv then error "skipped" end
     local offset = largeval
     local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local n = assert(fd:pwritev({"test", "ing", "writev"}, offset))
@@ -1275,9 +1274,10 @@ test_sockets_pipes = {
     assert(cs:close())
   end,
   test_ipv6_socket = function()
-    if not features.ipv6() then return true end -- TODO rump temporarily failing for ipv6, need to init lo0
     local loop6 = "::1"
-    local ss = assert(S.socket("inet6", "dgram"))
+    local ss, err = S.socket("inet6", "dgram")
+    if not ss and err.AFNOSUPPORT then error "skipped" end
+    assert(ss)
     local cs = assert(S.socket("inet6", "dgram"))
     local sa = assert(t.sockaddr_in6(0, loop6))
     assert(ss:bind(sa))
@@ -1873,7 +1873,6 @@ end
 if S.geteuid() == 0 then
   if S.unshare then
     -- cut out this section if you want to (careful!) debug on real interfaces
-    -- TODO add to features as may not be supported
     local ok, err = S.unshare("newnet, newns, newuts")
     if not ok then removeroottests() -- remove if you like, but may interfere with networking
     else

@@ -5,7 +5,6 @@ local function init(S)
 local abi = S.abi
 local types = S.types
 local c = S.c
-local features = S.features
 local util = S.util
 
 local bit = require "syscall.bit"
@@ -246,27 +245,25 @@ test.tee_splice = {
     if not n and err.NOSYS then error "skipped" end
     assert(n == #str)
     local n, err = S.tee(pr, ppw, #str, "nonblock") -- clone our pipe
-    if n then
-      assert_equal(n, #str)
-      n = assert(S.splice(pr, nil, s1, nil, #str, "nonblock")) -- splice to socket
-      assert(n == #str)
-      n = assert(s2:read())
-      assert(#n == #str)
-      n = assert(S.splice(ppr, nil, s1, nil, #str, "nonblock")) -- splice the tee'd pipe into our socket
-      assert_equal(n, #str)
-      n = assert(s2:read())
-      assert(#n == #str)
-      local buf2 = t.buffer(#str)
-      ffi.copy(buf2, str, #str)
-      n = assert(S.vmsplice(pw, {{buf2, #str}}, "nonblock")) -- write our memory into pipe
-      assert_equal(n, #str)
-      n = assert(S.splice(pr, nil, s1, nil, #str, "nonblock")) -- splice out to socket
-      assert_equal(n, #str)
-      n = assert(s2:read())
-      assert(#n == #str)
-    else
-      assert(err.NOSYS, "only allowed error is syscall not suported, as valgrind gives this") -- TODO add to features
-    end
+    if not n and err.NOSYS then error "skipped" end
+    assert(n)
+    assert_equal(n, #str)
+    n = assert(S.splice(pr, nil, s1, nil, #str, "nonblock")) -- splice to socket
+    assert(n == #str)
+    n = assert(s2:read())
+    assert(#n == #str)
+    n = assert(S.splice(ppr, nil, s1, nil, #str, "nonblock")) -- splice the tee'd pipe into our socket
+    assert_equal(n, #str)
+    n = assert(s2:read())
+    assert(#n == #str)
+    local buf2 = t.buffer(#str)
+    ffi.copy(buf2, str, #str)
+    n = assert(S.vmsplice(pw, {{buf2, #str}}, "nonblock")) -- write our memory into pipe
+    assert_equal(n, #str)
+    n = assert(S.splice(pr, nil, s1, nil, #str, "nonblock")) -- splice out to socket
+    assert_equal(n, #str)
+    n = assert(s2:read())
+    assert(#n == #str)
     assert(fd:close())
     assert(pr:close())
     assert(pw:close())
@@ -430,8 +427,7 @@ test.misc_linux = {
   end,
   test_rlimit = function()
     local r, err = S.getrlimit("nofile")
-    -- new travis CI does not support this TODO add to features
-    if err and err.NOSYS then return end
+    if err and err.NOSYS then error "skipped" end
     assert(not err, "expect no error, got " .. tostring(err))
     assert(S.setrlimit("nofile", {cur = 0, max = r.rlim_max}))
     local fd, err = S.open("/dev/zero", "rdonly")
@@ -442,8 +438,7 @@ test.misc_linux = {
   end,
   test_prlimit = function()
     local r, err = S.prlimit(0, "nofile")
-    -- new travis CI does not support this TODO add to features
-    if err and err.NOSYS then return end
+    if err and err.NOSYS then error "skipped" end
     assert(not err, "expect no error")
     local r2 = assert(S.prlimit(0, "nofile", {cur = 512, max = r.max}))
     assert_equal(r2.cur, r.cur, "old value same")

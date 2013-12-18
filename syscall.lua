@@ -47,9 +47,6 @@ S = require "syscall.libc".init(S)
 -- add methods
 S = require "syscall.methods".init(S)
 
--- add feature tests
-S.features = require "syscall.features".init(S)
-
 -- add utils
 S.util = require "syscall.util".init(S)
 

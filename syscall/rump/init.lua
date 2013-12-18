@@ -84,7 +84,6 @@ if abi.host == "netbsd" and abi.types == "netbsd" then -- running native (NetBSD
   S.abi, S.c, S.types, S.t = abi, SS.c, SS.types, SS.types.t
   S = require "syscall.compat".init(S)
   S = require "syscall.methods".init(S)
-  S.features = require "syscall.features".init(S)
   S.util = require "syscall.util".init(S)
 elseif abi.types == "linux" then -- running Linux types, just need to use rump C which it will do if abi.rump set
   S = require "syscall"
