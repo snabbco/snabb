@@ -166,6 +166,8 @@ end
 function C.getpid() return syscall(sys.getpid) end
 -- exit_group is the normal syscall but not available
 function C.exit_group(status) return syscall(sys.exit_group, int(status)) end -- void return really
+-- TODO we do not call exit at present, as we call _exit which is the same for comaptibility
+function C.exit(status) return syscall(sys.exit, int(status)) end -- void return really
 
 -- clone interface provided is not same as system one, and is less convenient
 function C.clone(flags, signal, stack, ptid, tls, ctid)
