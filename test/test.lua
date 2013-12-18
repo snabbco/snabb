@@ -836,14 +836,14 @@ test_file_operations_at = {
     assert(fd:close())
   end,
   test_openat = function()
-    if not S.openat then return end -- TODO mark as skipped
+    if not S.openat then error "skipped" end
     local fd, err = S.openat("fdcwd", tmpfile, "rdwr,creat", "rwxu")
-    if not fd and err.NOSYS then return end -- TODO mark as skipped
+    if not fd and err.NOSYS then error "skipped" end
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
   test_faccessat = function()
-    if not S.faccessat then return end -- TODO mark as skipped
+    if not S.faccessat then error "skipped" end
     local fd = S.open("/dev")
     assert(fd:faccessat("null", "r"), "expect access to say can read /dev/null")
     assert(fd:faccessat("null", c.OK.R), "expect access to say can read /dev/null")
@@ -852,7 +852,7 @@ test_file_operations_at = {
     assert(fd:close())
   end,
   test_symlinkat = function()
-    if not (S.symlinkat and S.readlinkat) then return end -- TODO mark as skipped
+    if not (S.symlinkat and S.readlinkat) then error "skipped" end
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.symlinkat(tmpfile, dirfd, tmpfile2))
@@ -864,27 +864,27 @@ test_file_operations_at = {
     assert(dirfd:close())
   end,
   test_mkdirat_unlinkat = function()
-    if not (S.mkdirat and S.unlinkat) then return end -- TODO mark as skipped
+    if not (S.mkdirat and S.unlinkat) then error "skipped" end
     local fd = assert(S.open("."))
     local ok, err = fd:mkdirat(tmpfile, "RWXU")
-    if not ok and err.NOSYS then return end -- TODO mark as skipped
+    if not ok and err.NOSYS then error "skipped" end
     assert(ok)
     assert(fd:unlinkat(tmpfile, "removedir"))
     assert(not S.stat(tmpfile), "expect dir gone")
     assert(fd:close())
   end,
   test_renameat = function()
-    if not S.renameat then return end -- TODO mark as skipped
+    if not S.renameat then error "skipped" end
     assert(util.writefile(tmpfile, teststring, "RWXU"))
     local ok, err = S.renameat("fdcwd", tmpfile, "fdcwd", tmpfile2)
-    if not ok and err.NOSYS then return end -- TODO mark as skipped
+    if not ok and err.NOSYS then error "skipped" end
     assert(ok)
     assert(not S.stat(tmpfile))
     assert(S.stat(tmpfile2))
     assert(S.unlink(tmpfile2))
   end,
   test_fstatat = function()
-    if not S.fstatat then return end -- TODO mark as skipped
+    if not S.fstatat then error "skipped" end
     local fd = assert(S.open("."))
     assert(util.writefile(tmpfile, teststring, "RWXU"))
     local stat = assert(fd:fstatat(tmpfile))
@@ -893,14 +893,14 @@ test_file_operations_at = {
     assert(S.unlink(tmpfile))
   end,
   test_fstatat_fdcwd = function()
-    if not S.fstatat then return end -- TODO mark as skipped
+    if not S.fstatat then error "skipped" end
     assert(util.writefile(tmpfile, teststring, "RWXU"))
     local stat = assert(S.fstatat("fdcwd", tmpfile, nil, "symlink_nofollow"))
     assert(stat.size == #teststring, "expect length to be what was written")
     assert(S.unlink(tmpfile))
   end,
   test_fchmodat = function()
-    if not S.fchmodat then return end -- TODO mark as skipped
+    if not S.fchmodat then error "skipped" end
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(dirfd:fchmodat(tmpfile, "RUSR, WUSR"))
@@ -910,11 +910,11 @@ test_file_operations_at = {
     assert(dirfd:close())
   end,
   test_fchownat_root = function()
-    if not S.fchownat then return end -- TODO mark as skipped
+    if not S.fchownat then error "skipped" end
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
     local ok, err = dirfd:fchownat(tmpfile, 66, 55, "symlink_nofollow")
-    if not ok and err.NOSYS then return end -- TODO mark as skipped
+    if not ok and err.NOSYS then error "skipped" end
     assert(ok)
     local stat = S.stat(tmpfile)
     assert_equal(stat.uid, 66, "expect uid changed")
@@ -924,10 +924,10 @@ test_file_operations_at = {
     assert(dirfd:close())
   end,
   test_mkfifoat = function()
-    if not S.mkfifoat then return end -- TODO mark as skipped
+    if not S.mkfifoat then error "skipped" end
     local fd = assert(S.open("."))
     local ok, err = S.mkfifoat(fd, tmpfile, "rwxu")
-    if not ok and err.NOSYS then return end -- TODO mark as skipped
+    if not ok and err.NOSYS then error "skipped" end
     assert(ok)
     local stat = assert(S.stat(tmpfile))
     assert(stat.isfifo, "expect to be a fifo")
@@ -935,10 +935,10 @@ test_file_operations_at = {
     assert(S.unlink(tmpfile))
   end,
   test_mknodat_root = function()
-    if not S.mknodat then return end -- TODO mark as skipped
+    if not S.mknodat then error "skipped" end
     local fd = assert(S.open("."))
     local ok, err = fd:mknodat(tmpfile, "fchr,0666", t.device(1, 5))
-    if not ok and err.NOSYS then return end -- TODO mark as skipped
+    if not ok and err.NOSYS then error "skipped" end
     assert(ok)
     local stat = assert(S.stat(tmpfile))
     assert(stat.ischr, "expect to be a character device")

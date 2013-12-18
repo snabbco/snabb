@@ -9,6 +9,8 @@ More improvements by Ryan P. <rjpcomputing@gmail.com>
 Version: 2.0
 License: X11 License, see LICENSE.txt
 
+- Justin Cormack added slightly hacky method for marking tests as skipped, not really suitable for upstream yet.
+
 Changes between 2.0 and 1.3:
 - This is a major update that has some breaking changes to make it much more easy to use and code in many different styles
 - Made the module only touch the global table for the asserts. You now use the module much more like Lua 5.2 when you require it.
@@ -258,11 +260,13 @@ end
 --
 local UnitResult = { -- class
 	failureCount = 0,
+	skipCount = 0,
 	testCount = 0,
 	errorList = {},
 	currentClassName = "",
 	currentTestName = "",
 	testHasFailure = false,
+        testSkipped = false,
 	verbosity = 1
 }
 	function UnitResult:displayClassName()
@@ -295,6 +299,14 @@ local UnitResult = { -- class
 		end
 	end
 
+	function UnitResult:displaySkip()
+		if self.verbosity == 0 then
+			io.stdout:write(".")
+		else 
+			print("", "Skipped")
+		end
+	end
+
 	function UnitResult:displayOneFailedTest(failure)
 		local testName, errorMsg = unpack(failure)
 		print(">>> "..testName.." failed")
@@ -316,9 +328,9 @@ local UnitResult = { -- class
 		if self.testCount == 0 then
 			failurePercent = 0
 		else
-			failurePercent = 100 * self.failureCount / self.testCount
+			failurePercent = 100 * (self.failureCount + self.skipCount) / self.testCount
 		end
-		local successCount = self.testCount - self.failureCount
+		local successCount = self.testCount - self.failureCount - self.skipCount
 		print( string.format("Success : %d%% - %d / %d",
 			100-math.ceil(failurePercent), successCount, self.testCount) )
 		return self.failureCount
@@ -334,8 +346,9 @@ local UnitResult = { -- class
 	function UnitResult:startTest(testName)
 		self.currentTestName = testName
 		self:displayTestName()
-        self.testCount = self.testCount + 1
+        	self.testCount = self.testCount + 1
 		self.testHasFailure = false
+		self.testSkipped = false
 	end
 
 	function UnitResult:addFailure( errorMsg )
@@ -345,9 +358,18 @@ local UnitResult = { -- class
 		self:displayFailure( errorMsg )
 	end
 
+	function UnitResult:addSkip()
+		self.testSkipped = true
+		self.skipCount = self.skipCount + 1
+	end
+
 	function UnitResult:endTest()
 		if not self.testHasFailure then
-			self:displaySuccess()
+			if self.testSkipped then
+				self:displaySkip()
+			else
+				self:displaySuccess()
+			end
 		end
 	end
 
@@ -450,16 +472,16 @@ local LuaUnit = {
 			aClassInstance:setup()
 		end
 
-		local function err_handler(e)
-			return e..'\n'..debug.traceback()
-		end
-
 		-- run testMethod()
-        local ok, errorMsg = xpcall( aMethod, err_handler )
+        	local ok, errorMsg, ret = pcall( aMethod )
 		if not ok then
 			errorMsg  = self.strip_luaunit_stack(errorMsg)
-			LuaUnit.result:addFailure( errorMsg )
-        end
+                        if type(errorMsg) == "string" and errorMsg:sub(-9):lower() == ": skipped" then
+				LuaUnit.result:addSkip()
+			else
+				LuaUnit.result:addFailure( errorMsg ..'\n'..debug.traceback())
+			end
+		end
 
 		-- lastly, run tearDown(if any)
 		if self.isFunction(aClassInstance.tearDown) then

@@ -166,71 +166,67 @@ test.xattr = {
   test_xattr = function()
     assert(S.creat(tmpfile, "0666"))
     local l, err = S.listxattr(tmpfile)
-    assert(l or err.NOTSUP or err.NOSYS, "expect to get xattr or not supported on fs")
-    if l then
-      local fd = assert(S.open(tmpfile, "rdwr"))
-      assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
-      l = assert(S.llistxattr(tmpfile))
-      assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
-      l = assert(fd:flistxattr())
-      assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
-      local nn = #l
-      local ok, err = S.setxattr(tmpfile, "user.test", "42", "create")
-      if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr TODO add to features
-        l = assert(S.listxattr(tmpfile))
-        assert(#l == nn + 1, "expect another attribute set")
-        assert(S.lsetxattr(tmpfile, "user.test", "44", "replace"))
-        assert(fd:fsetxattr("user.test2", "42"))
-        l = assert(S.listxattr(tmpfile))
-        assert(#l == nn + 2, "expect another attribute set")
-        local s = assert(S.getxattr(tmpfile, "user.test"))
-        assert(s == "44", "expect to read set value of xattr")
-        s = assert(S.lgetxattr(tmpfile, "user.test"))
-        assert(s == "44", "expect to read set value of xattr")
-        s = assert(fd:fgetxattr("user.test2"))
-        assert(s == "42", "expect to read set value of xattr")
-        local s, err = fd:fgetxattr("user.test3")
-        assert(err and err.nodata, "expect to get NODATA (=NOATTR) from non existent xattr")
-        s = assert(S.removexattr(tmpfile, "user.test"))
-        s = assert(S.lremovexattr(tmpfile, "user.test2"))
-        l = assert(S.listxattr(tmpfile))
-        assert(#l == nn, "expect no xattr now")
-        local s, err = fd:fremovexattr("user.test3")
-        assert(err and err.nodata, "expect to get NODATA (=NOATTR) from remove non existent xattr")
-        -- table helpers
-        local tt = assert(S.xattr(tmpfile))
-        local n = 0
-        for k, v in pairs(tt) do n = n + 1 end
-        assert(n == nn, "expect no xattr now")
-        tt = {}
-        for k, v in pairs{test = "42", test2 = "44"} do tt["user." .. k] = v end
-        assert(S.xattr(tmpfile, tt))
-        tt = assert(S.lxattr(tmpfile))
-        assert(tt["user.test2"] == "44" and tt["user.test"] == "42", "expect to return values set")
-        n = 0
-        for k, v in pairs(tt) do n = n + 1 end
-        assert(n == nn + 2, "expect 2 xattr now")
-        tt = {}
-        for k, v in pairs{test = "42", test2 = "44", test3="hello"} do tt["user." .. k] = v end
-        assert(fd:fxattr(tt))
-        tt = assert(fd:fxattr())
-        assert(tt["user.test2"] == "44" and tt["user.test"] == "42" and tt["user.test3"] == "hello", "expect to return values set")
-        n = 0
-        for k, v in pairs(tt) do n = n + 1 end
-        assert(n == nn + 3, "expect 3 xattr now")
-      end
-      assert(fd:close())
-    end
+    if not l and err.NOSYS then error "skipped" end
+    local fd = assert(S.open(tmpfile, "rdwr"))
+    assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
+    l = assert(S.llistxattr(tmpfile))
+    assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
+    l = assert(fd:flistxattr())
+    assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
+    local nn = #l
+    local ok, err = S.setxattr(tmpfile, "user.test", "42", "create")
+    if not ok and err.NOTSUP then error "skipped" end
+    l = assert(S.listxattr(tmpfile))
+    assert(#l == nn + 1, "expect another attribute set")
+    assert(S.lsetxattr(tmpfile, "user.test", "44", "replace"))
+    assert(fd:fsetxattr("user.test2", "42"))
+    l = assert(S.listxattr(tmpfile))
+    assert(#l == nn + 2, "expect another attribute set")
+    local s = assert(S.getxattr(tmpfile, "user.test"))
+    assert(s == "44", "expect to read set value of xattr")
+    s = assert(S.lgetxattr(tmpfile, "user.test"))
+    assert(s == "44", "expect to read set value of xattr")
+    s = assert(fd:fgetxattr("user.test2"))
+    assert(s == "42", "expect to read set value of xattr")
+    local s, err = fd:fgetxattr("user.test3")
+    assert(err and err.nodata, "expect to get NODATA (=NOATTR) from non existent xattr")
+    s = assert(S.removexattr(tmpfile, "user.test"))
+    s = assert(S.lremovexattr(tmpfile, "user.test2"))
+    l = assert(S.listxattr(tmpfile))
+    assert(#l == nn, "expect no xattr now")
+    local s, err = fd:fremovexattr("user.test3")
+    assert(err and err.nodata, "expect to get NODATA (=NOATTR) from remove non existent xattr")
+    -- table helpers
+    local tt = assert(S.xattr(tmpfile))
+    local n = 0
+    for k, v in pairs(tt) do n = n + 1 end
+    assert(n == nn, "expect no xattr now")
+    tt = {}
+    for k, v in pairs{test = "42", test2 = "44"} do tt["user." .. k] = v end
+    assert(S.xattr(tmpfile, tt))
+    tt = assert(S.lxattr(tmpfile))
+    assert(tt["user.test2"] == "44" and tt["user.test"] == "42", "expect to return values set")
+    n = 0
+    for k, v in pairs(tt) do n = n + 1 end
+    assert(n == nn + 2, "expect 2 xattr now")
+    tt = {}
+    for k, v in pairs{test = "42", test2 = "44", test3="hello"} do tt["user." .. k] = v end
+    assert(fd:fxattr(tt))
+    tt = assert(fd:fxattr())
+    assert(tt["user.test2"] == "44" and tt["user.test"] == "42" and tt["user.test3"] == "hello", "expect to return values set")
+    n = 0
+    for k, v in pairs(tt) do n = n + 1 end
+    assert(n == nn + 3, "expect 3 xattr now")
+    assert(fd:close())
     assert(S.unlink(tmpfile))
   end,
   test_xattr_long = function()
     assert(S.creat(tmpfile, "RWXU", "0666"))
     local l = string.rep("test", 500)
     local ok, err = S.setxattr(tmpfile, "user.test", l, "create")
-    if ok then -- likely to get err.NOTSUP here if fs not mounted with user_xattr TODO add to features
-      local tt = assert(S.getxattr(tmpfile, "user.test"))
-      assert_equal(tt, l, "should match string")
-    else assert(err.NOTSUP or err.OPNOTSUPP or err.NOSYS, "only ok error is xattr not supported, got " .. tostring(err) .. " (" .. err.errno .. ")") end
+    if not ok and (err.NOTSUP or err.NOSYS or err.OPNOTSUPP) then error "skipped" end
+    local tt = assert(S.getxattr(tmpfile, "user.test"))
+    assert_equal(tt, l, "should match string")
     assert(S.unlink(tmpfile))
   end,
 }
@@ -247,7 +243,7 @@ test.tee_splice = {
     local n = assert(fd:write(str))
     assert_equal(n, #str)
     local n, err = S.splice(fd, 0, pw, nil, #str, "nonblock") -- splice file at offset 0 into pipe
-    if not n and err.NOSYS then return end -- TODO mark as skipped
+    if not n and err.NOSYS then error "skipped" end
     assert(n == #str)
     local n, err = S.tee(pr, ppw, #str, "nonblock") -- clone our pipe
     if n then
@@ -575,7 +571,7 @@ test.sendfile = {
     assert(f2:close())
   end,
   test_sendfile_largefile = function()
-    if S.__rump then return end -- TODO mark as skipped, runs out of space
+    if S.__rump then error "skipped" end -- runs out of space
     local f1 = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     local f2 = assert(S.open(tmpfile2, "rdwr,creat", "rwxu"))
     assert(S.unlink(tmpfile))
@@ -1651,14 +1647,14 @@ test.capabilities = {
   test_filesystem_caps_get = function()
     assert(util.touch(tmpfile))
     local c, err = util.capget(tmpfile)
-    if not c and err.NOTSUP then return end -- xattr/fs caps might not be supported
+    if not c and err.NOTSUP then error "skipped" end -- xattr/fs caps might not be supported
     assert(not c and err.NODATA, "expect no caps")
     assert(S.unlink(tmpfile))
   end,
   test_filesystem_caps_getset_root = function()
     assert(util.touch(tmpfile))
     local cap, err = util.capget(tmpfile)
-    if not c and err.NOTSUP then return end -- xattr/fs caps might not be supported
+    if not c and err.NOTSUP then error "skipped" end -- xattr/fs caps might not be supported
     assert(not cap and err.NODATA, "expect no caps")
     assert(util.capset(tmpfile, {permitted = "sys_chroot, sys_admin", inheritable = "chown, mknod"}, "create"))
     local cap = assert(util.capget(tmpfile))
