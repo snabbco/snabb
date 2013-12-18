@@ -274,67 +274,7 @@ test.tee_splice = {
   end,
 }
 
-test.timers_signals_linux = {
-  test_signal_return = function()
-    local ret = assert(S.signal("alrm", "ign"))
-    assert_equal(ret, "DFL")
-    local ret = assert(S.signal("alrm", "dfl"))
-    assert_equal(ret, "IGN")
-  end,
-  test_alarm = function()
-    assert(S.signal("alrm", "ign"))
-    assert(S.alarm(10))
-    assert(S.alarm(0)) -- cancel again
-    assert(S.signal("alrm", "dfl"))
-  end,
-  test_itimer = function()
-    local tt = assert(S.getitimer("real"))
-    assert(tt.interval.sec == 0, "expect timer not set")
-    local ss = "alrm"
-
-    local fd = assert(S.signalfd(ss, "nonblock"))
-    assert(S.sigprocmask("block", ss))
-
-    assert(S.setitimer("real", {0, 0.01}))
-    assert(S.nanosleep(0.1)) -- nanosleep does not interact with itimer
-
-    local sig = assert(util.signalfd_read(fd))
-    assert_equal(#sig, 1)
-    assert(sig[1].alrm, "expect alarm clock to have rung")
-    assert(fd:close())
-    assert(S.sigprocmask("unblock", ss))
-  end,
-  test_sigprocmask = function()
-    local m = assert(S.sigprocmask())
-    assert(m.isemptyset, "expect initial sigprocmask to be empty")
-    assert(not m.winch, "expect set empty")
-    m = m:add(c.SIG.WINCH)
-    assert(not m.isemptyset, "expect set not empty")
-    assert(m.winch, "expect to have added SIGWINCH")
-    m = m:del("WINCH, pipe")
-    assert(not m.winch, "expect set empty again")
-    assert(m.isemptyset, "expect initial sigprocmask to be empty")
-    m = m:add("winch")
-    m = assert(S.sigprocmask("block", m))
-    assert(m.isemptyset, "expect old sigprocmask to be empty")
-    assert(S.kill(S.getpid(), "winch")) -- should be blocked but pending
-    local p = assert(S.sigpending())
-    assert(p.winch, "expect pending winch")
-
-    -- signalfd. TODO Should be in another test
-    local ss = "winch, pipe, usr1, usr2"
-    local fd = assert(S.signalfd(ss, "nonblock"))
-    assert(S.sigprocmask("block", ss))
-    assert(S.kill(S.getpid(), "usr1"))
-    local ss = assert(util.signalfd_read(fd))
-    assert(#ss == 2, "expect to read two signals") -- previous pending winch, plus USR1
-    assert((ss[1].winch and ss[2].usr1) or (ss[2].winch and ss[1].usr1), "expect a winch and a usr1 signal") -- unordered
-    assert(ss[1].user, "signal sent by user")
-    assert(ss[2].user, "signal sent by user")
-    assert_equal(ss[1].pid, S.getpid(), "signal sent by my pid")
-    assert_equal(ss[2].pid, S.getpid(), "signal sent by my pid")
-    assert(fd:close())
-  end,
+test.timers_linux = {
   test_timerfd = function()
     local fd = assert(S.timerfd_create("monotonic", "nonblock, cloexec"))
     local n = assert(util.timerfd_read(fd))
@@ -364,56 +304,6 @@ test.timers_signals_linux = {
   test_clock_nanosleep_abs = function()
     assert(S.clock_nanosleep("realtime", "abstime", 0))
   end,
---[[ -- segfaulting on Android
-  test_sigaction_ucontext = function() -- this test does not do much yet
-    local sig = t.int1(0)
-    local pid = t.int32_1(0)
-    local function fh(s, info, uc)
-      local ucontext = pt.ucontext(uc)
-      sig[0] = s
-      pid[0] = info.pid
-      local mcontext = ucontext.uc_mcontext
-    end
-    jit.off(fh, true)
-    local f = t.sa_sigaction(fh)
-    assert(S.sigaction("pipe", {sigaction = f}))
-    assert(S.kill(S.getpid(), "pipe"))
-    assert(S.sigaction("pipe", "dfl"))
-    assert_equal(sig[0], c.SIG.PIPE)
-    assert_equal(pid[0], S.getpid())
-    f:free() -- free ffi slot for function
-  end,
-]]
--- broken since updating sigaction, may well need a restorer
---[[
-  test_sigaction_function_handler = function()
-    local sig = t.int1(0)
-    local function fh(s) sig[0] = s end
-    if jit then jit.off(fh, true) end -- TODO sort out if needed/broken
-    local f = t.sighandler(fh)
-    assert(S.sigaction("pipe", {handler = f}))
-    assert(S.kill(S.getpid(), "pipe"))
-    assert(S.sigaction("pipe", "dfl"))
-    assert_equal(sig[0], c.SIG.PIPE)
-    f:free() -- free ffi slot for function
-  end,
-]]
---[[ -- failing on Android, uncertain about correctness with LuaJIT
-  test_sigaction_function_sigaction = function()
-    local sig = t.int1(0)
-    local pid = t.int32_1(0)
-    local f = t.sa_sigaction(function(s, info, ucontext)
-      sig[0] = s
-      pid[0] = info.pid
-    end)
-    assert(S.sigaction("pipe", {sigaction = f}))
-    assert(S.kill(S.getpid(), "pipe"))
-    assert(S.sigaction("pipe", "dfl"))
-    assert_equal(sig[0], c.SIG.PIPE)
-    assert_equal(pid[0], S.getpid())
-    f:free() -- free ffi slot for function
-  end,
-]]
 }
 
 test.misc_linux = {
@@ -1179,6 +1069,7 @@ test.ids_linux = {
   end,
 }
 
+if not S.__rump then -- rump cannot do clone so cannot run test
 test.namespaces_root = {
   test_netns = function()
     local p = assert(S.clone("newnet"))
@@ -1221,6 +1112,7 @@ test.namespaces_root = {
     assert(fd:close())
   end,
 }
+end
 
 test.filesystem_linux = {
   teardown = clean,
@@ -1718,6 +1610,120 @@ test.mremap = { -- differs in prototype by OS
     assert(S.munmap(mem, size2))
   end,
 }
+
+test.signals_linux = {
+  test_signal_return = function()
+    local ret = assert(S.signal("alrm", "ign"))
+    assert_equal(ret, "DFL")
+    local ret = assert(S.signal("alrm", "dfl"))
+    assert_equal(ret, "IGN")
+  end,
+  test_alarm = function()
+    assert(S.signal("alrm", "ign"))
+    assert(S.alarm(10))
+    assert(S.alarm(0)) -- cancel again
+    assert(S.signal("alrm", "dfl"))
+  end,
+  test_itimer = function()
+    local tt = assert(S.getitimer("real"))
+    assert(tt.interval.sec == 0, "expect timer not set")
+    local ss = "alrm"
+
+    local fd = assert(S.signalfd(ss, "nonblock"))
+    assert(S.sigprocmask("block", ss))
+
+    assert(S.setitimer("real", {0, 0.01}))
+    assert(S.nanosleep(0.1)) -- nanosleep does not interact with itimer
+
+    local sig = assert(util.signalfd_read(fd))
+    assert_equal(#sig, 1)
+    assert(sig[1].alrm, "expect alarm clock to have rung")
+    assert(fd:close())
+    assert(S.sigprocmask("unblock", ss))
+  end,
+  test_sigprocmask = function()
+    local m = assert(S.sigprocmask())
+    assert(m.isemptyset, "expect initial sigprocmask to be empty")
+    assert(not m.winch, "expect set empty")
+    m = m:add(c.SIG.WINCH)
+    assert(not m.isemptyset, "expect set not empty")
+    assert(m.winch, "expect to have added SIGWINCH")
+    m = m:del("WINCH, pipe")
+    assert(not m.winch, "expect set empty again")
+    assert(m.isemptyset, "expect initial sigprocmask to be empty")
+    m = m:add("winch")
+    m = assert(S.sigprocmask("block", m))
+    assert(m.isemptyset, "expect old sigprocmask to be empty")
+    assert(S.kill(S.getpid(), "winch")) -- should be blocked but pending
+    local p = assert(S.sigpending())
+    assert(p.winch, "expect pending winch")
+
+    -- signalfd. TODO Should be in another test
+    local ss = "winch, pipe, usr1, usr2"
+    local fd = assert(S.signalfd(ss, "nonblock"))
+    assert(S.sigprocmask("block", ss))
+    assert(S.kill(S.getpid(), "usr1"))
+    local ss = assert(util.signalfd_read(fd))
+    assert(#ss == 2, "expect to read two signals") -- previous pending winch, plus USR1
+    assert((ss[1].winch and ss[2].usr1) or (ss[2].winch and ss[1].usr1), "expect a winch and a usr1 signal") -- unordered
+    assert(ss[1].user, "signal sent by user")
+    assert(ss[2].user, "signal sent by user")
+    assert_equal(ss[1].pid, S.getpid(), "signal sent by my pid")
+    assert_equal(ss[2].pid, S.getpid(), "signal sent by my pid")
+    assert(fd:close())
+  end,
+--[[ -- segfaulting on Android
+  test_sigaction_ucontext = function() -- this test does not do much yet
+    local sig = t.int1(0)
+    local pid = t.int32_1(0)
+    local function fh(s, info, uc)
+      local ucontext = pt.ucontext(uc)
+      sig[0] = s
+      pid[0] = info.pid
+      local mcontext = ucontext.uc_mcontext
+    end
+    jit.off(fh, true)
+    local f = t.sa_sigaction(fh)
+    assert(S.sigaction("pipe", {sigaction = f}))
+    assert(S.kill(S.getpid(), "pipe"))
+    assert(S.sigaction("pipe", "dfl"))
+    assert_equal(sig[0], c.SIG.PIPE)
+    assert_equal(pid[0], S.getpid())
+    f:free() -- free ffi slot for function
+  end,
+]]
+-- broken since updating sigaction, may well need a restorer
+--[[
+  test_sigaction_function_handler = function()
+    local sig = t.int1(0)
+    local function fh(s) sig[0] = s end
+    if jit then jit.off(fh, true) end -- TODO sort out if needed/broken
+    local f = t.sighandler(fh)
+    assert(S.sigaction("pipe", {handler = f}))
+    assert(S.kill(S.getpid(), "pipe"))
+    assert(S.sigaction("pipe", "dfl"))
+    assert_equal(sig[0], c.SIG.PIPE)
+    f:free() -- free ffi slot for function
+  end,
+]]
+--[[ -- failing on Android, uncertain about correctness with LuaJIT
+  test_sigaction_function_sigaction = function()
+    local sig = t.int1(0)
+    local pid = t.int32_1(0)
+    local f = t.sa_sigaction(function(s, info, ucontext)
+      sig[0] = s
+      pid[0] = info.pid
+    end)
+    assert(S.sigaction("pipe", {sigaction = f}))
+    assert(S.kill(S.getpid(), "pipe"))
+    assert(S.sigaction("pipe", "dfl"))
+    assert_equal(sig[0], c.SIG.PIPE)
+    assert_equal(pid[0], S.getpid())
+    f:free() -- free ffi slot for function
+  end,
+]]
+}
+
 test.processes_linux = {
   test_fork_waitid = function()
     local pid0 = S.getpid()

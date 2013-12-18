@@ -111,6 +111,14 @@ if not S.dup3 then
   end
 end
 
+if not S.nanosleep then
+  function S.nanosleep(req, rem)
+    S.select({}, req)
+    if rem then rem = 0 end -- cannot tell how much time left, could be interrupted by a signal.
+    return 0
+  end
+end
+
 -- common libc function
 if S.nanosleep then
   function S.sleep(sec)

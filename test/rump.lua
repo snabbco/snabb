@@ -61,7 +61,7 @@ test.rump_threads = {
     assert(pid1 ~= pid2, "should have new pid")
     local n, err = fd:read() -- should not be able to read this fd
     assert(not n and err, "should not be able to access an fd")
-    S._exit() -- exit this process
+    --S.rump.releaselwp() -- exit this process TODO dies, FIXME
     S.rump.switchlwp(origlwp) -- probably back to implicit context
     assert_equal(pid1, S.getpid())
     assert(fd:read()) -- should be able to read /dev/zero now

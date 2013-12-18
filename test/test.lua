@@ -496,6 +496,7 @@ test_poll_select = {
 test_ppoll = {
   test_ppoll = function()
     local ppoll = S.ppoll or S.pollts -- see notes, no differences as far as test is concerned TODO compat should deal with this
+    if not ppoll then error "skipped" end
     local a, b = assert(S.socketpair("unix", "stream"))
     local pev = t.pollfds{{fd = a, events = c.POLL.IN}}
     local p = assert(ppoll(pev, 0, nil))
@@ -1600,13 +1601,15 @@ test_sendfd = {
 }
 end
 
-if not (S.__rump or abi.xen) then -- rump has no processes, memory allocation, process accounting, mmap and proc not applicable
-
-test_timers_signals = {
+test_sleep = {
   test_nanosleep = function()
     local rem = assert(S.nanosleep(0.001))
     assert_equal(rem, 0, "expect no elapsed time after nanosleep")
   end,
+}
+
+if not (S.__rump or abi.xen) then -- rump has no processes, memory allocation, process accounting, mmap and proc not applicable
+test_gettimeofday = {
   test_gettimeofday = function()
     local tv = assert(S.gettimeofday())
     assert(math.floor(tv.time) == tv.sec, "should be able to get float time from timeval")

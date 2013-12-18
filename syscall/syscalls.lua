@@ -425,16 +425,6 @@ function S.pipe(fd2)
   return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
 end
 
--- TODO not sure about this interface, maybe return rem as extra parameter see #103
-function S.nanosleep(req, rem)
-  rem = rem or t.timespec()
-  local ret, err = C.nanosleep(mktype(t.timespec, req), rem)
-  if ret == -1 then
-    if (err or errno()) == c.E.INTR then return rem else return nil, t.error(err or errno()) end
-  end
-  return 0 -- no time remaining
-end
-
 function S.gettimeofday(tv)
   tv = tv or t.timeval() -- note it is faster to pass your own tv if you call a lot
   local ret, err = C.gettimeofday(tv, nil)
@@ -547,6 +537,18 @@ if C.mkfifo then
 end
 if C.mkfifoat then
   function S.mkfifoat(dirfd, pathname, mode) return retbool(C.mkfifoat(c.AT_FDCWD[dirfd], pathname, c.S_I[mode])) end
+end
+
+-- TODO not sure about this interface, maybe return rem as extra parameter see #103
+if C.nanosleep then
+  function S.nanosleep(req, rem)
+    rem = rem or t.timespec()
+    local ret, err = C.nanosleep(mktype(t.timespec, req), rem)
+    if ret == -1 then
+      if (err or errno()) == c.E.INTR then return rem else return nil, t.error(err or errno()) end
+    end
+    return 0 -- no time remaining
+  end
 end
 
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
