@@ -131,11 +131,12 @@ print [[
 #include <sys/statvfs.h>
 #include <sys/event.h>
 #include <sys/ktrace.h>
-#include <netinet/in.h>
+#include <net/if.h>
 #include <net/if_ether.h>
 #include <net/if_bridgevar.h>
 #include <net/route.h>
 #include <net/bpf.h>
+#include <netinet/in.h>
 #include <netinet6/in6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
