@@ -150,7 +150,6 @@ struct dirent {
   char      d_name[1024];
 };
 ]]
-end
 
 local ffi = require "ffi"
 

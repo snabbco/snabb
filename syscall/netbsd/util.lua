@@ -72,17 +72,17 @@ end
 function util.ifsetlinkstr(name, str) -- used to pass (optional) string to rump virtif (eg name of underlying tap device)
   return sockioctl("inet", "dgram", "SIOCSLINKSTR", {name = name, cmd = 0, data = str})
 end
-function util.ifaddr_inet4(ifname, addr, netmask)
+function util.ifaddr_inet4(name, addr, netmask)
   addr, netmask = util.inet_name(addr, netmask)
 
-  ia = t.ifaliasreq{name = name, addr = {family = "inet", addr = addr}}
+  local ia = t.ifaliasreq{name = name, addr = {family = "inet", addr = addr}}
 
   -- TODO unfinished
 end
-function util.ifaddr_inet6(ifname, addr, netmask)
+function util.ifaddr_inet6(name, addr, netmask)
   addr, netmask = util.inet_name(addr, netmask)
 
-  ia = t.in6_aliasreq{name = name}
+  local ia = t.in6_aliasreq{name = name}
 
   -- TODO unfinished
 end

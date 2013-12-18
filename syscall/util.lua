@@ -16,6 +16,7 @@ local h = require "syscall.helpers"
 local htonl = h.htonl
 
 local ffi = require "ffi"
+local bit = require "syscall.bit"
 
 local abi, types, c = S.abi, S.types, S.c
 local t, pt, s = types.t, types.pt, types.s

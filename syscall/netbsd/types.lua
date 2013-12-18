@@ -302,7 +302,7 @@ mt.in6_aliasreq = {
     addr = function(ifra, v) ifra.ifra_addr = mktype(t.sockaddr_in6, v) end,
     dstaddr = function(ifra, v) ifra.ifra_dstaddr = mktype(t.sockaddr_in6, v) end,
     mask = function(ifra, v) ifra.ifra_prefixmask = v end, -- TODO mask in form of sockaddr
-    lifetime = function(ifra) ifra.ifra_lifetime = v end,
+    lifetime = function(ifra, v) ifra.ifra_lifetime = v end,
   },
   __new = newfn,
 }
