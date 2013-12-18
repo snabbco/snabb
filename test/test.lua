@@ -46,11 +46,10 @@ local c = S.c
 local util = S.util
 
 if S.__rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so switch from root so it does not try
+  assert(S.rump.newlwp(S.getpid()))
   assert(S.chmod("/", "0777"))
   assert(S.chmod("/dev/zero", "0666"))
   assert(S.mkdir("/tmp", "0777"))
-  local pid = S.getpid()
-  assert(S.rump.newlwp(pid))
   local lwp1 = assert(S.rump.curlwp())
   assert(S.rump.rfork("CFDG"))
   S.rump.i_know_what_i_am_doing_sysent_usenative() -- switch to netBSD syscalls in this thread
@@ -68,6 +67,7 @@ if S.__rump and abi.types == "linux" then -- Linux rump ABI cannot do much, so s
   --assert(S.setuid(100))
   --assert(S.seteuid(100))
 elseif (S.__rump or abi.xen) and S.geteuid() == 0 then -- some initial setup for non-Linux rump
+  assert(S.rump.newlwp(S.getpid()))
   local octal = helpers.octal
   assert(S.mkdir("/tmp", "0777"))
   local data = {ta_version = 1, ta_nodes_max=1000, ta_size_max=104857600, ta_root_mode = octal("0777")}
