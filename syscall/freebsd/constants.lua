@@ -16,7 +16,7 @@ local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
 
 local c = {}
 
---c.errornames = require "syscall.freebsd.errors"
+c.errornames = require "syscall.freebsd.errors"
 
 c.STD = strflag {
   IN_FILENO = 0,
