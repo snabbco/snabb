@@ -20,7 +20,8 @@ local h = require "syscall.helpers"
 
 local ctobool, booltoc = h.ctobool, h.booltoc
 
--- TODO
+local fcntl = {
+}
 
 return fcntl
 
