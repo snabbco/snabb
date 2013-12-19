@@ -175,6 +175,10 @@ c.AF = strflag {
   INET6_SDP   = 42,
 }
 
+c.AF.UNIX = c.AF.LOCAL
+c.AF.OSI = c.AF.ISO
+c.AF.E164 = c.AF.ISDN
+
 c.O = multiflags {
   RDONLY      = 0x0000,
   WRONLY      = 0x0001,
