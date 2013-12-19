@@ -251,5 +251,24 @@ c.SOL = strflag {
   SOCKET    = 0xffff,
 }
 
+
+
+
+c.POLL = multiflags {
+  IN         = 0x0001,
+  PRI        = 0x0002,
+  OUT        = 0x0004,
+  RDNORM     = 0x0040,
+  RDBAND     = 0x0080,
+  WRBAND     = 0x0100,
+  INIGNEOF   = 0x2000,
+  ERR        = 0x0008,
+  HUP        = 0x0010,
+  NVAL       = 0x0020,
+}
+
+c.POLL.WRNORM = c.POLL.OUT
+c.POLL.STANDARD = c.POLL["IN,PRI,OUT,RDNORM,RDBAND,WRBAND,ERR,HUP,NVAL"]
+
 return c
 
