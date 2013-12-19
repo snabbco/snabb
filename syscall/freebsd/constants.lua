@@ -203,6 +203,52 @@ c.O = multiflags {
   CLOEXEC     = 0x00100000,
 }
 
+-- sigaction, note renamed SIGACT from SIG_
+c.SIGACT = strflag {
+  ERR = -1,
+  DFL =  0,
+  IGN =  1,
+  HOLD = 3,
+}
+
+c.SIG = strflag {
+  HUP = 1,
+  INT = 2,
+  QUIT = 3,
+  ILL = 4,
+  TRAP = 5,
+  ABRT = 6,
+  EMT = 7,
+  FPE = 8,
+  KILL = 9,
+  BUS = 10,
+  SEGV = 11,
+  SYS = 12,
+  PIPE = 13,
+  ALRM = 14,
+  TERM = 15,
+  URG = 16,
+  STOP = 17,
+  TSTP = 18,
+  CONT = 19,
+  CHLD = 20,
+  TTIN = 21,
+  TTOU = 22,
+  IO   = 23,
+  XCPU = 24,
+  XFSZ = 25,
+  VTALRM = 26,
+  PROF = 27,
+  WINCH = 28,
+  INFO = 29,
+  USR1 = 30,
+  USR2 = 31,
+  THR = 32,
+  LIBRT = 33,
+}
+
+c.SIG.LWP = c.SIG.THR
+
 c.EXIT = strflag {
   SUCCESS = 0,
   FAILURE = 1,
