@@ -312,6 +312,29 @@ test.kqueue = {
   end,
 }
 
+test.pollts = {
+  test_pollts = function()
+    local a, b = assert(S.socketpair("unix", "stream"))
+    local pev = t.pollfds{{fd = a, events = c.POLL.IN}}
+    local p = assert(S.pollts(pev, 0, nil))
+    assert_equal(p, 0) -- no events yet
+    for k, v in ipairs(pev) do
+      assert_equal(v.fd, a:getfd())
+      assert_equal(v.revents, 0)
+    end
+    assert(b:write(teststring))
+    local p = assert(S.pollts(pev, nil, "alrm"))
+    assert_equal(p, 1) -- 1 event
+    for k, v in ipairs(pev) do
+      assert_equal(v.fd, a:getfd())
+      assert(v.IN, "IN event now")
+    end
+    assert(a:read())
+    assert(b:close())
+    assert(a:close())
+  end,
+}
+
 test.misc_bsd = {
   test_issetugid = function()
     local res = assert(S.issetugid())
