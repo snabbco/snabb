@@ -4,6 +4,12 @@ local app    = require("core.app")
 local lib    = require("core.lib")
 local ffi = require("ffi")
 local C   = ffi.C
+local packet   = require("core.packet")
+
+local timer     = require("core.timer")
+local register = require("lib.hardware.register")
+local vfio = require("lib.hardware.vfio")
+local intel10g = require("apps.intel.intel10g")
 
 require("lib.virtio.virtio_vring_h")
 require("apps.vhost.vhost_h")
@@ -13,18 +19,31 @@ assert(ffi.sizeof("struct vhost_user_msg") == 208, "ABI error")
 
 VhostUser = {}
 
+-- avoid GC
+keepalive = {}
+
 function VhostUser:new (socket_path)
    local socket = C.vhost_user_open_socket(socket_path)
    assert(socket >= 0, "failed to open socket: " .. socket_path)
+   vfio.bind_device_to_vfio("0000:01:00.0")
+   local nic = intel10g.new("0000:01:00.0")
    local o = { state = 'init',
                msg = ffi.new("struct vhost_user_msg"),
                nfds = ffi.new("int[1]"),
                fds = ffi.new("int[?]", C.VHOST_USER_MEMORY_MAX_NREGIONS),
                listen_socket = socket,
-               vring_base = {}
+               vring_base = {},
+               nic = nic,
+               callfd = {},
+               kickfd = {}
             }
    return setmetatable(o, {__index = VhostUser})
 end
+
+id   = {}
+idaddr = {}
+prev = {}
+prevaddr = {}
 
 function VhostUser:pull ()
    if self.socket == nil then
@@ -47,44 +66,87 @@ function VhostUser:pull ()
       end
    end
    if self.rxring and self.txring then
---[[
-      print("running")
-      print("rx")
-      print("desc[0].len", self.rxring.desc[0].len)
-      print("avail.idx", self.rxring.avail.idx)
-      print("used.idx", self.rxring.used.idx)
-      print("tx")
-      print("desc[0].len", self.txring.desc[0].len)
-      print("avail.idx", self.txring.avail.idx)
-      print("used.idx", self.txring.used.idx)
---]]
+      if self.nic.txdesc == 0 then
+         self.nic:open()
+         self.nic:enable_mac_loopback()
+         self.nic:wait_linkup()
+         for i, t in ipairs(self.mem_table) do
+            print("dma mapping", ptr(t.snabb), ptr(t.guest), t.size)
+            C.mmap_memory(ptr(t.snabb), t.size, ffi.cast("uint64_t", t.snabb), true, true)
+         end
+      end
       while self.rxavail ~= self.rxring.avail.idx do
          local descriptor_index = self.rxring.avail.ring[self.rxavail % self.vring_num]
-         local descriptor = self.rxring.desc[descriptor_index]
-         local guest_addr = descriptor.addr
-         local snabb_addr = map_from_guest(guest_addr, self.mem_table)
-         print(ptr(guest_addr), ptr(snabb_addr))
-         local len = descriptor.len
-         io.write(("received %d byte packet: "):format(len))
-         local p = ffi.cast("char*", snabb_addr)
-         for i = 0, 13 do
-            io.write(string.format("%02X ", p[i]))
-         end
-         io.write("\n")
+         repeat
+            print("idx = " .. tostring(descriptor_index))
+            local descriptor = self.rxring.desc[descriptor_index]
+            local guest_addr = descriptor.addr
+            local snabb_addr = map_from_guest(guest_addr, self.mem_table)
+            local len = descriptor.len
+            local p = packet.allocate()
+            local b = ffi.new("struct buffer")
+            table.insert(keepalive, b)
+            b.pointer = ptr(snabb_addr)
+            b.physical = snabb_addr
+            b.size = len
+            p.niovecs = 1
+            p.iovecs[0].buffer = b
+            p.iovecs[0].offset = 0
+            p.iovecs[0].length = len
+            assert(self.nic:can_transmit())
+            self.nic:transmit(p)
+            self.nic:sync_transmit()
+            while self.nic:has_transmitted_packet() do
+               local p = self.nic:get_transmitted_packet()
+               local used = self.rxring.used.ring[self.rxring.used.idx]
+               used.id = self.rxring.avail.ring[self.rxring.used.idx]
+               used.len = p.iovecs[0].length
+               print(("use buffer %d size %d"):format(used.id, used.len))
+               self.rxring.used.idx = (self.rxring.used.idx + 1) % 65536
+            end
+            descriptor_index = descriptor.next
+         until descriptor.flags == 0
          self.rxavail = (self.rxavail + 1) % 65536
       end
+
+      while self.nic:can_add_receive_buffer() and self.txavail ~= self.txring.avail.idx do
+         local hdridx = self.txring.avail.ring[self.txavail]
+         local hdrdesc = self.txring.desc[hdridx]
+         assert(bit.band(hdrdesc.flags, C.VIRTIO_DESC_F_NEXT) ~= 0)
+         local bufidx = hdrdesc.next
+         local bufdesc = self.txring.desc[bufidx]
+         local key = tonumber(map_from_guest(bufdesc.addr, self.mem_table))
+         id[key] = bufidx
+         idaddr[key] = bufdesc.addr
+         prev[key] = hdridx
+         prevaddr[key] = hdrdesc.addr
+         print("used", "hdridx", hdridx, "hdrlen", hdrdesc.len, "bufidx", bufidx, "buflen", bufdesc.len)
+         local b = ffi.new("struct buffer")
+         table.insert(keepalive, b)
+         b.physical = map_from_guest(bufdesc.addr, self.mem_table)
+         b.pointer = ffi.cast("char*", b.physical)
+         b.size = bufdesc.len
+         print("receive buffer address", b.pointer)
+         self.nic:add_receive_buffer(b)
+         self.txavail = (self.txavail + 1) % 65536
+      end
+      while self.nic:can_receive() do -- and self.txring.used.idx ~= self.txused do
+         local p = self.nic:receive()
+         local b = p.iovecs[0].buffer
+         local key = tonumber(ffi.cast("uint64_t", b.pointer))
+         self.txring.used.ring[self.txused].id = prev[key]
+         self.txring.used.ring[self.txused].len = p.iovecs[0].length + 10 -- 10 is virtio info
+         self.txused = (self.txused + 1) % 65536
+         self.txring.used.idx = self.txused
+         print(("used sent packet %d bytes buffer %d hdr %d"):format(p.iovecs[0].length, id[key], prev[key]))
+         local value = ffi.new("uint64_t[1]")
+         value[0] = 1
+         C.write(self.callfd[0], value, 8)
+      end
+      self.nic:sync_receive()
       -- Receive from virtio vring
       -- Kick virtio vring if needed
    end
-end
-
-function VhostUser:receive ()
-   
-end
-
-function VhostUser:push ()
-   -- Transmit to virtio vring
-
 end
 
 function VhostUser:reply (req)
@@ -102,6 +164,10 @@ function VhostUser:get_features (msg)
    self:reply(msg)
 end
 
+function VhostUser:set_features (msg)
+   print("features = " .. tostring(msg.u64))
+end
+
 function VhostUser:set_owner (msg)
 end
 
@@ -114,14 +180,14 @@ function VhostUser:set_vring_call (msg, fds, nfds)
    local idx = msg.file.index
    assert(idx < 42)
    assert(nfds == 1)
-   print("call["..idx.."] = " .. fds[0])
+   self.callfd[idx] = fds[0]
 end
 
 function VhostUser:set_vring_kick (msg, fds, nfds)
    local idx = msg.file.index
    assert(idx < 42)
    assert(nfds == 1)
-   print("kick["..idx.."] = " .. fds[0])
+   self.kickfd[idx] = fds[0]
 end
 
 function VhostUser:set_vring_addr (msg)
@@ -133,9 +199,12 @@ function VhostUser:set_vring_addr (msg)
                   avail = ffi.cast("struct vring_avail &", avail) }
    if msg.addr.index == 0 then
       self.txring = ring
+      self.txavail = 0
+      self.txused = 0
    else
       self.rxring = ring
       self.rxavail = 0
+      self.rxused = 0
    end
 
    print("vring", ffi.cast("void*",desc))
@@ -161,10 +230,10 @@ function VhostUser:set_mem_table (msg, fds, nfds)
       local size = msg.memory.regions[i].memory_size
       local pointer = C.vhost_user_map_guest_memory(fds[i], size)
       local guest = msg.memory.regions[i].guest_phys_addr
+      -- register with vfio
       table.insert(self.mem_table, { guest = guest,
                                      snabb = ffi.cast("int64_t", pointer),
                                      size  = tonumber(size) })
-      print("mapping", ptr(pointer), ptr(guest), size)
    end
 end
 
@@ -178,10 +247,10 @@ function map_to_guest (addr, mem_table)
 end
 
 function map_from_guest (addr, mem_table)
-   print("mapping from guest", ptr(addr))
-   print("#mem_table", #mem_table)
+--   print("mapping from guest", ptr(addr))
+--   print("#mem_table", #mem_table)
    for _,m in ipairs(mem_table) do
-      print(ptr(addr), "guest:", ptr(m.guest), "snabb:", ptr(m.snabb))
+--      print(ptr(addr), "guest:", ptr(m.guest), "snabb:", ptr(m.snabb))
       if addr >= m.guest and addr < m.guest + m.size then
          return addr + m.snabb - m.guest
       end
@@ -212,12 +281,21 @@ handler_names = {
 
 function selftest ()
    print("selftest: vhost_user")
-   app.apps.vhost_user = app.new(VhostUser:new("/home/luke/qemu.sock"))
+   local vu = VhostUser:new("/home/luke/qemu.sock")
+   app.apps.vhost_user = app.new(vu)
 --   app.apps.vhost_user = app.new(VhostUser:new("vapp.sock"))
    app.relink()
    local deadline = lib.timer(1e15)
+   local fn = function ()
+                 print("REPORT")
+                 register.dump(vu.nic.r)
+                 register.dump(vu.nic.s, true)
+              end
+   timer.init()
+   timer.activate(timer.new("report", fn, 3e9, 'repeating'))
    repeat
       app.breathe()
+--      timer.run()
       C.usleep(1e5)
    until false
 end
