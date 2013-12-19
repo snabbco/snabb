@@ -13,6 +13,16 @@ local defs = {}
 
 local function append(str) defs[#defs + 1] = str end
 
+if abi.abi64 then
+append [[
+typedef int32_t clock_t;
+]]
+else
+append [[
+typedef unsigned long clock_t;
+]]
+end
+
 append [[
 typedef uint32_t      blksize_t;
 typedef int64_t       blkcnt_t;
