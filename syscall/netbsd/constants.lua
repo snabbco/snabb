@@ -402,6 +402,7 @@ c.FCNTL_LOCK = strflag {
 
 c.S_I = modeflags {
   FMT   = octal('0170000'),
+  FWHT  = octal('0160000'),
   FSOCK = octal('0140000'),
   FLNK  = octal('0120000'),
   FREG  = octal('0100000'),

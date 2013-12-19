@@ -301,9 +301,6 @@ c.SOL = strflag {
   SOCKET    = 0xffff,
 }
 
-
-
-
 c.POLL = multiflags {
   IN         = 0x0001,
   PRI        = 0x0002,
@@ -319,6 +316,42 @@ c.POLL = multiflags {
 
 c.POLL.WRNORM = c.POLL.OUT
 c.POLL.STANDARD = c.POLL["IN,PRI,OUT,RDNORM,RDBAND,WRBAND,ERR,HUP,NVAL"]
+
+c.AT_FDCWD = atflag {
+  FDCWD = -100,
+}
+
+c.S_I = modeflags {
+  FMT   = octal('0170000'),
+  FWHT  = octal('0160000'),
+  FSOCK = octal('0140000'),
+  FLNK  = octal('0120000'),
+  FREG  = octal('0100000'),
+  FBLK  = octal('0060000'),
+  FDIR  = octal('0040000'),
+  FCHR  = octal('0020000'),
+  FIFO  = octal('0010000'),
+  SUID  = octal('0004000'),
+  SGID  = octal('0002000'),
+  SVTX  = octal('0001000'),
+  STXT  = octal('0001000'),
+  RWXU  = octal('00700'),
+  RUSR  = octal('00400'),
+  WUSR  = octal('00200'),
+  XUSR  = octal('00100'),
+  RWXG  = octal('00070'),
+  RGRP  = octal('00040'),
+  WGRP  = octal('00020'),
+  XGRP  = octal('00010'),
+  RWXO  = octal('00007'),
+  ROTH  = octal('00004'),
+  WOTH  = octal('00002'),
+  XOTH  = octal('00001'),
+}
+
+c.S_I.READ  = c.S_I.RUSR
+c.S_I.WRITE = c.S_I.WUSR
+c.S_I.EXEC  = c.S_I.XUSR
 
 return c
 
