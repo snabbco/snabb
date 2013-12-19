@@ -76,7 +76,7 @@ end
 -- TODO merge into one ifaddr function
 function util.ifaddr_inet4(name, addr, mask)
 -- TODO this function needs mask as in inaddr, so need to fix this if passed as / format or number
-  addr, mask = util.inet_name(addr, mask)
+  local addr, mask = util.inet_name(addr, mask)
 
   local broadcast -- TODO
 
@@ -85,7 +85,7 @@ function util.ifaddr_inet4(name, addr, mask)
   -- TODO unfinished
 end
 function util.ifaddr_inet6(name, addr, mask)
-  addr, netmask = util.inet_name(addr, mask)
+  local addr, netmask = util.inet_name(addr, mask)
 
   local ia = t.in6_aliasreq{name = name}
 
