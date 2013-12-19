@@ -43,7 +43,6 @@ function S.getdirentries(fd, buf, size, basep)
   return t.dirents(buf, ret)
 end
 
-
 return S
 
 end
