@@ -40,7 +40,8 @@ function new (pciaddress)
                  rxbuffers = {},   -- Rx descriptor index -> buffer mapping
                  rdh = 0,          -- Cache of receive head (RDH) register
                  rdt = 0,          -- Cache of receive tail (RDT) register
-                 rxnext = 0        -- Index of next buffer to receive
+                 rxnext = 0,       -- Index of next buffer to receive
+                 transmitted_packets = {}
               }
    setmetatable(dev, {__index = getfenv()})
    return dev
@@ -138,6 +139,7 @@ function transmit (dev, p)
    dev.txpackets[dev.tdt] = p
    dev.tdt = (dev.tdt + 1) % num_descriptors
    packet.ref(p)
+   print(("transmitting %d bytes at %s"):format(iov.length, tostring(ffi.cast("void*", iov.buffer.physical))))
 end
 
 function sync_transmit (dev)
@@ -146,11 +148,20 @@ function sync_transmit (dev)
    C.full_memory_barrier()
    -- Release processed buffers
    while old_tdh ~= dev.tdh do
+      table.insert(dev.transmitted_packets, dev.txpackets[old_tdh])
       packet.deref(dev.txpackets[old_tdh])
       dev.txpackets[old_tdh] = nil
       old_tdh = (old_tdh + 1) % num_descriptors
    end
    dev.r.TDT(dev.tdt)
+end
+
+function has_transmitted_packet (dev)
+   return #dev.transmitted_packets > 0
+end
+
+function get_transmitted_packet (dev)
+   return table.remove(dev.transmitted_packets, 1)
 end
 
 function can_transmit (dev)
@@ -174,8 +185,8 @@ function receive (dev)
 end
 
 function can_receive (dev)
-   return bit.band(dev.rxdesc[dev.rxnext].wb.status, 1) == 1
-   -- return dev.rxnext ~= dev.rdh
+--   return bit.band(dev.rxdesc[dev.rxnext].wb.status, 1) == 1
+   return dev.rxnext ~= dev.rdh
 end
 
 function can_add_receive_buffer (dev)
