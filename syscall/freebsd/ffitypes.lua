@@ -41,7 +41,7 @@ typedef uint32_t      dev_t;
 typedef uint32_t      fixpt_t;
 typedef	unsigned int  nfds_t;
 typedef int64_t       daddr_t;
-typedef long          time_t
+typedef long          time_t;
 
 /* can be changed, TODO also should be long */
 typedef uint32_t __fd_mask;
