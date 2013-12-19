@@ -106,6 +106,9 @@ build =
       ["syscall.freebsd.ffifunctions"] = "syscall/freebsd/ffifunctions.lua";
       ["syscall.freebsd.ioctl"] = "syscall/freebsd/ioctl.lua";
       ["syscall.freebsd.types"] = "syscall/freebsd/types.lua";
+      ["syscall.freebsd.fcntl"] = "syscall/freebsd/fcntl.lua";
+      ["syscall.freebsd.errors"] = "syscall/freebsd/errors.lua";
+      ["syscall.freebsd.util"] = "syscall/freebsd/util.lua";
 
       ["syscall.rump.init"] = "syscall/rump/init.lua";
       ["syscall.rump.c"] = "syscall/rump/c.lua";
