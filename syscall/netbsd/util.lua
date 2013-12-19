@@ -72,15 +72,20 @@ end
 function util.ifsetlinkstr(name, str) -- used to pass (optional) string to rump virtif (eg name of underlying tap device)
   return sockioctl("inet", "dgram", "SIOCSLINKSTR", {name = name, cmd = 0, data = str})
 end
-function util.ifaddr_inet4(name, addr, netmask)
-  addr, netmask = util.inet_name(addr, netmask)
 
-  local ia = t.ifaliasreq{name = name, addr = {family = "inet", addr = addr}}
+-- TODO merge into one ifaddr function
+function util.ifaddr_inet4(name, addr, mask)
+-- TODO this function needs mask as in inaddr, so need to fix this if passed as / format or number
+  addr, mask = util.inet_name(addr, mask)
+
+  local broadcast -- TODO
+
+  local ia = t.ifaliasreq{name = name, addr = {family = "inet", addr = addr, mask = mask, dstaddr = broadcast}}
 
   -- TODO unfinished
 end
-function util.ifaddr_inet6(name, addr, netmask)
-  addr, netmask = util.inet_name(addr, netmask)
+function util.ifaddr_inet6(name, addr, mask)
+  addr, netmask = util.inet_name(addr, mask)
 
   local ia = t.in6_aliasreq{name = name}
 
