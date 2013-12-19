@@ -61,7 +61,14 @@ typedef struct fd_set {
 typedef struct __sigset {
   uint32_t __bits[4];
 } sigset_t;
-
+struct timespec {
+  time_t tv_sec;
+  long   tv_nsec;
+};
+struct timeval {
+  time_t tv_sec;
+  suseconds_t tv_usec;
+};
 struct sockaddr {
   uint8_t       sa_len;
   sa_family_t   sa_family;
