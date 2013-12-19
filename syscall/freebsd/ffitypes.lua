@@ -116,6 +116,11 @@ struct sockaddr_un {
   sa_family_t     sun_family;
   char            sun_path[104];
 };
+struct pollfd {
+  int fd;
+  short events;
+  short revents;
+};
 ]]
 
 local s = table.concat(defs, "")
