@@ -21,6 +21,9 @@ local helpers = require "syscall.helpers"
 
 local S
 local tmpabi
+local short
+
+if arg[1] == "rumplinuxshort" then short, arg[1] = true, "rumplinux" end -- don't run Linux tests
 
 if arg[1] == "rump" or arg[1] == "rumplinux" then
   tmpabi = require "syscall.abi"
@@ -85,10 +88,10 @@ if not S.__rump then
   for k, v in pairs(test) do _G["test_" .. k] = v end
 end
 if S.__rump then
-  if abi.types == "linux" then -- add linux tests
+  if abi.types == "linux" and not short then -- add linux tests unless running short tests
     local test = require("test.linux").init(S) -- OS specific tests
     for k, v in pairs(test) do _G["test_" .. k] = v end
-  else
+  elseif abi.types == "netbsd" then
     local test = require("test.netbsd").init(S) -- OS specific tests
     for k, v in pairs(test) do _G["test_" .. k] = v end
   end
