@@ -92,8 +92,8 @@ uint64_t mmap_memory(void *buffer, uint64_t size, uint64_t iova, uint8_t read, u
     dma_map.size = size;
     dma_map.iova = iova;
     dma_map.flags = 0 |
-        read ? VFIO_DMA_MAP_FLAG_READ : 0 |
-        write ? VFIO_DMA_MAP_FLAG_WRITE: 0;
+        (read ? VFIO_DMA_MAP_FLAG_READ : 0) |
+        (write ? VFIO_DMA_MAP_FLAG_WRITE : 0);
 
     if (ioctl(_container, VFIO_IOMMU_MAP_DMA, &dma_map)) {
         return 0;
