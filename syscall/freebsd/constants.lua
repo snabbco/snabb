@@ -161,7 +161,7 @@ c.AF = strflag {
 -- pseudo_AF_PIP   25
   ISDN        = 26,
 -- pseudo_AF_KEY   27
-  AF_INET6    = 28,
+  INET6       = 28,
   NATM        = 29,
   ATM         = 30,
 -- pseudo_AF_HDRCMPLT 31
