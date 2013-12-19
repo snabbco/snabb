@@ -99,6 +99,7 @@ build =
       ["syscall.osx.errors"] = "syscall/osx/errors.lua";
       ["syscall.osx.util"] = "syscall/osx/util.lua";
 
+      ["syscall.freebsd.c"] = "syscall/freebsd/c.lua";
       ["syscall.freebsd.ffitypes"] = "syscall/freebsd/ffitypes.lua";
       ["syscall.freebsd.ffifunctions"] = "syscall/freebsd/ffifunctions.lua";
       ["syscall.freebsd.constants"] = "syscall/freebsd/constants.lua";
