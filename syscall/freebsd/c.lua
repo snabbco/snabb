@@ -1,5 +1,4 @@
 -- This sets up the table of C functions
--- For OSX we hope we do not need many overrides
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
@@ -35,17 +34,5 @@ local C = setmetatable({}, {
   end
 })
 
--- new stat structure, else get legacy one; could use syscalls instead
-C.stat = C.stat64
-C.fstat = C.fstat64
-C.lstat = C.lstat64
-
-local getdirentries = 196 -- TODO create syscall table
-
-function C.getdirentries(fd, buf, len, basep)
-  return C.syscall(getdirentries, int(fd), void(buf), int(len), void(basep))
-end
-
 return C
-
 
