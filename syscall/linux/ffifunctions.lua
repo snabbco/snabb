@@ -174,7 +174,6 @@ int shmdt(const void *shmaddr);
 int swapon(const char *path, int swapflags);
 int swapoff(const char *path);
 void syncfs(int fd);
-pid_t wait4(pid_t pid, int *status, int options, struct rusage *rusage);
 
 pid_t gettid(void);
 int setfsgid(uid_t fsgid);
