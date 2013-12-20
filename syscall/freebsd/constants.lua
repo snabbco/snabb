@@ -396,6 +396,11 @@ if abi.abi64 then c.MAP["32BIT"] = 0x00080000 end
 
 c.MAP.ANONYMOUS = c.MAP.ANON -- for compatibility
 
+c.MCL = strflag {
+  CURRENT    = 0x01,
+  FUTURE     = 0x02,
+}
+
 -- flags to `msync'. - note was MS_ renamed to MSYNC_
 c.MSYNC = multiflags {
   ASYNC       = 0x00,
@@ -530,6 +535,57 @@ c.SCM = multiflags {
   TIMESTAMP  = 0x02,
   CREDS      = 0x03,
   BINTIME    = 0x04,
+}
+
+c.F = strflag {
+  DUPFD       = 0,
+  GETFD       = 1,
+  SETFD       = 2,
+  GETFL       = 3,
+  SETFL       = 4,
+  GETOWN      = 5,
+  SETOWN      = 6,
+  OGETLK      = 7,
+  OSETLK      = 8,
+  OSETLKW     = 9,
+  DUP2FD      = 10,
+  GETLK       = 11,
+  SETLK       = 12,
+  SETLKW      = 13,
+  SETLK_REMOTE= 14,
+  READAHEAD   = 15,
+  RDAHEAD     = 16,
+  DUPFD_CLOEXEC= 17,
+  DUP2FD_CLOEXEC= 18,
+}
+
+c.FD = multiflags {
+  CLOEXEC = 1,
+}
+
+-- note changed from F_ to FCNTL_LOCK
+c.FCNTL_LOCK = strflag {
+  RDLCK = 1,
+  UNLCK = 2,
+  WRLCK = 3,
+  UNLCKSYS = 4,
+  CANCEL = 5,
+}
+
+-- lockf, changed from F_ to LOCKF_
+c.LOCKF = strflag {
+  ULOCK = 0,
+  LOCK  = 1,
+  TLOCK = 2,
+  TEST  = 3,
+}
+
+-- for flock (2)
+c.LOCK = multiflags {
+  SH        = 0x01,
+  EX        = 0x02,
+  NB        = 0x04,
+  UN        = 0x08,
 }
 
 return c
