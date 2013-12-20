@@ -329,6 +329,13 @@ c.AT_FDCWD = atflag {
   FDCWD = -100,
 }
 
+c.AT = multiflags {
+  EACCESS          = 0x100,
+  SYMLINK_NOFOLLOW = 0x200,
+  SYMLINK_FOLLOW   = 0x400,
+  REMOVEDIR        = 0x800,
+}
+
 c.S_I = modeflags {
   FMT   = octal('0170000'),
   FWHT  = octal('0160000'),
@@ -516,6 +523,13 @@ c.IPPROTO = strflag {
   PGM            = 113,
   MPLS           = 137,
   PFSYNC         = 240,
+}
+
+c.SCM = multiflags {
+  RIGHTS     = 0x01,
+  TIMESTAMP  = 0x02,
+  CREDS      = 0x03,
+  BINTIME    = 0x04,
 }
 
 return c
