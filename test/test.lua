@@ -756,6 +756,7 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
   end,
   test_futimens = function()
+    if not S.futimens then error "skipped" end
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:futimens())
     local st1 = fd:stat()

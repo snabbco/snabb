@@ -59,12 +59,6 @@ if S.getdirentries and not S.getdents then -- eg OSX has extra arg
   end
 end
 
-if S.utimensat and not S.utimes then
-  function S.utimes(filename, times)
-    return S.utimensat("FDCWD", filename, times, 0)
-  end
-end
-
 -- TODO we should allow utimbuf and also table of times really; this is the very old 1s precision version, NB Linux has syscall
 if not S.utime then
   function S.utime(path, actime, modtime)
@@ -75,17 +69,19 @@ if not S.utime then
   end
 end
 
+-- the utimes, futimes, lutimes are legacy, but OSX/FreeBSD do not support the nanosecond versions
+-- we support the legacy versions but do not fake the more precise ones
+S.futimes = S.futimes or S.futimens
 if S.utimensat and not S.lutimes then
   function S.lutimes(filename, times)
     return S.utimensat("FDCWD", filename, times, "SYMLINK_NOFOLLOW")
   end
 end
-
--- the utimes, futimes, lutimes are legacy, but OSX/FreeBSD do not support the nanosecond versions; we support both
-S.futimes = S.futimes or S.futimens
-
--- OSX/FreeBSD do not support nanosecond times, emulate to less precision; note we auto convert timeval, timespec anyway
-S.futimens = S.futimens or S.futimes
+if S.utimensat and not S.utimes then
+  function S.utimes(filename, times)
+    return S.utimensat("FDCWD", filename, times, 0)
+  end
+end
 
 S.wait3 = function(options, rusage, status) return S.wait4(-1, options, rusage, status) end
 
