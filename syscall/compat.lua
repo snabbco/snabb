@@ -81,10 +81,10 @@ if S.utimensat and not S.lutimes then
   end
 end
 
--- the utimes, futimes, lutimes are legacy, but OSX does not support the nanosecond versions; we support both
+-- the utimes, futimes, lutimes are legacy, but OSX/FreeBSD do not support the nanosecond versions; we support both
 S.futimes = S.futimes or S.futimens
 
--- OSX does not support nanosecond times, emulate to less precision; note we auto convert timeval, timespec anyway
+-- OSX/FreeBSD do not support nanosecond times, emulate to less precision; note we auto convert timeval, timespec anyway
 S.futimens = S.futimens or S.futimes
 
 S.wait3 = function(options, rusage, status) return S.wait4(-1, options, rusage, status) end

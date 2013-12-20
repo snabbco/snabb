@@ -147,7 +147,7 @@ int mkfifoat(int dirfd, const char *pathname, mode_t mode);
 int lchmod(const char *path, mode_t mode);
 int fchroot(int fd);
 int utimes(const char *filename, const struct timeval times[2]);
-int futimes(int, const struct timeval *);
+int futimes(int, const struct timeval times[2]);
 int lutimes(const char *filename, const struct timeval times[2]);
 
 ]]
