@@ -205,6 +205,12 @@ c.O = multiflags {
   CLOEXEC     = 0x00100000,
 }
 
+-- for pipe2, selected flags from c.O
+c.OPIPE = multiflags {
+  NONBLOCK  = 0x0004,
+  CLOEXEC   = 0x00100000,
+}
+
 -- sigaction, note renamed SIGACT from SIG_
 c.SIGACT = strflag {
   ERR = -1,
