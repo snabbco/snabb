@@ -139,7 +139,6 @@ function S.readlink(path, buffer, size)
   return ffi.string(buffer, ret)
 end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
-function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
 function S.stat(path, buf)
   if not buf then buf = t.stat() end
   local ret = C.stat(path, buf)
@@ -531,6 +530,9 @@ if C.lchmod then
   function S.lchmod(path, mode) return retbool(C.lchmod(path, c.MODE[mode])) end
 end
 
+if C.fdatasync then
+  function S.fdatasync(fd) return retbool(C.fdatasync(getfd(fd))) end
+end
 -- Linux does not have mkfifo syscalls, emulated
 if C.mkfifo then
   function S.mkfifo(pathname, mode) return retbool(C.mkfifo(pathname, c.S_I[mode])) end
