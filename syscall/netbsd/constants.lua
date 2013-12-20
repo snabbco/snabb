@@ -968,8 +968,8 @@ c.PRIO = strflag {
 }
 
 c.W = multiflags {
-  NOHANG       = 0x00000001,
-  UNTRACED     = 0x00000002,
+  NOHANG      = 0x00000001,
+  UNTRACED    = 0x00000002,
   ALTSIG      = 0x00000004,
   ALLSIG      = 0x00000008,
   NOWAIT      = 0x00010000,

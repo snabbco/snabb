@@ -588,6 +588,18 @@ c.LOCK = multiflags {
   UN        = 0x08,
 }
 
+c.W = multiflags {
+  NOHANG      = 1,
+  UNTRACED    = 2,
+  CONTINUED   = 4,
+  NOWAIT      = 8,
+  EXITED      = 16,
+  TRAPPED     = 32,
+  LINUXCLONE  = 0x80000000,
+}
+
+c.W.STOPPED = c.W.UNTRACED
+
 -- waitpid and wait4 pid
 c.WAIT = strflag {
   ANY      = -1,
