@@ -588,5 +588,28 @@ c.LOCK = multiflags {
   UN        = 0x08,
 }
 
+-- waitpid and wait4 pid
+c.WAIT = strflag {
+  ANY      = -1,
+  MYPGRP   = 0,
+}
+
+c.MSG = multiflags {
+  OOB             = 0x1,
+  PEEK            = 0x2,
+  DONTROUTE       = 0x4,
+  EOR             = 0x8,
+  TRUNC           = 0x10,
+  CTRUNC          = 0x20,
+  WAITALL         = 0x40,
+  DONTWAIT        = 0x80,
+  EOF             = 0x100,
+  NOTIFICATION    = 0x2000,
+  NBIO            = 0x4000,
+  COMPAT          = 0x8000,
+  NOSIGNAL        = 0x20000,
+  CMSG_CLOEXEC    = 0x40000,
+}
+
 return c
 
