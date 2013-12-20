@@ -374,7 +374,9 @@ c.MAP = multiflags {
   HASSEMAPHORE = 0x0200,
   STACK      = 0x0400,
   NOSYNC     = 0x0800,
+  ANON       = 0x1000,
   NOCORE     = 0x00020000,
+-- TODO add aligned maps in
 }
 
 if abi.abi64 then c.MAP["32BIT"] = 0x00080000 end
