@@ -34,5 +34,9 @@ local C = setmetatable({}, {
   end
 })
 
+C.futimes = ffi.C.__sys_futimes
+C.lutimes = ffi.C.__sys_lutimes
+C.utimes = ffi.C.__sys_utimes
+
 return C
 
