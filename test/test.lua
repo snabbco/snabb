@@ -1160,6 +1160,7 @@ test_sockets_pipes = {
     assert(pw:close())
   end,
   test_pipe2 = function()
+    if not S.pipe2 then error "skipped" end
     local pr, pw = assert(S.pipe2("nonblock, cloexec"))
     assert(pw:write("test"))
     assert_equal(pr:read(), "test")
