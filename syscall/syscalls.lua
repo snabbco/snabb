@@ -541,6 +541,25 @@ if C.mkfifoat then
   function S.mkfifoat(dirfd, pathname, mode) return retbool(C.mkfifoat(c.AT_FDCWD[dirfd], pathname, c.S_I[mode])) end
 end
 
+if C.utimes then
+  function S.utimes(filename, ts)
+    if ts then ts = t.timeval2(ts) end
+    return retbool(C.utimes(filename, ts))
+  end
+end
+if C.lutimes then
+  function S.lutimes(filename, ts)
+    if ts then ts = t.timeval2(ts) end
+    return retbool(C.lutimes(filename, ts))
+  end
+end
+if C.futimes then
+  function S.futimes(fd, ts)
+    if ts then ts = t.timeval2(ts) end
+    return retbool(C.futimes(getfd(fd), ts))
+  end
+end
+
 -- TODO not sure about this interface, maybe return rem as extra parameter see #103
 if C.nanosleep then
   function S.nanosleep(req, rem)

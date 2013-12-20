@@ -22,17 +22,6 @@ local istype, mktype, getfd = h.istype, h.mktype, h.getfd
 
 local t, pt, s = types.t, types.pt, types.s
 
--- TODO these should be in generic code, although they are obsolete in most systems
-function S.utimes(filename, ts)
-  if ts then ts = t.timeval2(ts) end
-  return retbool(C.utimes(filename, ts))
-end
-
-function S.futimes(fd, ts)
-  if ts then ts = t.timeval2(ts) end
-  return retbool(C.futimes(getfd(fd), ts))
-end
-
 -- TODO lutimes is implemented using setattrlist(2) in OSX
 
 function S.getdirentries(fd, buf, size, basep)
