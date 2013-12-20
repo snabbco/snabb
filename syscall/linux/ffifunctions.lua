@@ -47,7 +47,6 @@ int klogctl(int type, char *bufp, int len);
 int mount(const char *source, const char *target, const char *filesystemtype, unsigned long mountflags, const void *data);
 int umount(const char *target);
 int umount2(const char *target, int flags);
-void *mmap2(void *addr, size_t length, int prot, int flags, int fd, off32_t pgoffset);
 int setns(int fd, int nstype);
 int pivot_root(const char *new_root, const char *put_old);
 int swapon(const char *path, int swapflags);
@@ -69,12 +68,9 @@ unsigned int alarm(unsigned int seconds);
 int sysinfo(struct sysinfo *info);
 int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5);
 
-int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
-
 int adjtimex(struct timex *buf);
 int sync_file_range(int fd, off_t offset, off_t count, unsigned int flags);
 
-int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
 int pause(void);
 int prlimit64(pid_t pid, int resource, const struct rlimit64 *new_limit, struct rlimit64 *old_limit);
 
@@ -84,11 +80,8 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, voi
 int fallocate(int fd, int mode, off_t offset, off_t len); /* note there are 32 bit issues with glibc */
 ssize_t readahead(int fd, off_t offset, size_t count);
 
-int faccessat(int dirfd, const char *pathname, int mode, int flags);
 int statfs(const char *path, struct statfs64 *buf);
 int fstatfs(int fd, struct statfs64 *buf);
-int futimens(int fd, const struct timespec times[2]);
-int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 int utimes(const char *filename, const struct timeval times[2]);
 
 ssize_t listxattr(const char *path, char *list, size_t size);
@@ -156,7 +149,6 @@ int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
 ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);
 
 int delete_module(const char *name);
-int flock(int fd, int operation);
 int get_mempolicy(int *mode, unsigned long *nodemask, unsigned long maxnode, unsigned long addr, unsigned long flags);
 int mbind(void *addr, unsigned long len, int mode, unsigned long *nodemask, unsigned long maxnode, unsigned flags);
 long migrate_pages(int pid, unsigned long maxnode, const unsigned long *old_nodes, const unsigned long *new_nodes);

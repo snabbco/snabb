@@ -110,6 +110,9 @@ build =
       ["syscall.freebsd.errors"] = "syscall/freebsd/errors.lua";
       ["syscall.freebsd.util"] = "syscall/freebsd/util.lua";
 
+      ["syscall.bsd.syscalls"] = "syscall/bsd/syscalls.lua";
+      ["syscall.bsd.ffifunctions"] = "syscall/bsd/ffifunctions.lua";
+
       ["syscall.rump.init"] = "syscall/rump/init.lua";
       ["syscall.rump.c"] = "syscall/rump/c.lua";
       ["syscall.rump.types"] = "syscall/rump/types.lua";

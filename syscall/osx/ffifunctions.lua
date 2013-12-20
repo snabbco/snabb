@@ -10,7 +10,6 @@ pcall, type, table, string
 local cdef = require "ffi".cdef
 
 cdef[[
-int getdirentries(int fd, char *buf, int nbytes, long *basep);
 int ioctl(int d, unsigned long request, void *arg);
 
 int stat64(const char *path, struct stat *sb);

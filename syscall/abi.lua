@@ -27,6 +27,7 @@ if abi.arch == "arm" and not ffi.abi("eabi") then error("only support eabi for a
 if abi.arch == "mips" then abi.mipsabi = "o32" end -- only one supported now
 
 -- BSD detection, we assume they all have a compatible sysctlbyname in libc, WIP
+if abi.os == "bsd" or abi.os == "osx" then abi.bsd = true end -- some shared BSD functionality
 if abi.os == "bsd" then
   ffi.cdef [[
   int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);

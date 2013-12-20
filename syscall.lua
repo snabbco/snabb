@@ -16,7 +16,11 @@ if abi.rump and abi.types then abi.os = abi.types end -- pretend to be NetBSD fo
 require "syscall.ffitypes"
 require("syscall." .. abi.os .. ".ffitypes")
 
-if not abi.rump then require "syscall.ffifunctions" end
+if not abi.rump then
+  require "syscall.ffifunctions"
+  require("syscall." .. abi.os .. ".ffifunctions")
+  if abi.bsd then require "syscall.bsd.ffifunctions" end
+end
 
 local ostypes = require("syscall." .. abi.os .. ".types")
 

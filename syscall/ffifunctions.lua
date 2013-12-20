@@ -9,10 +9,6 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local abi = require "syscall.abi"
-
-require("syscall." .. abi.os .. ".ffifunctions")
-
 local cdef = require "ffi".cdef
 
 -- common functions for BSD, OSX and and Linux
@@ -143,6 +139,12 @@ int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flag
 int symlinkat(const char *oldpath, int newdirfd, const char *newpath);
 int mknodat(int dirfd, const char *pathname, mode_t mode, dev_t dev);
 int mkfifoat(int dirfd, const char *pathname, mode_t mode);
+int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
+int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
+int faccessat(int dirfd, const char *pathname, int mode, int flags);
+
+int futimens(int fd, const struct timespec times[2]);
+int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);
 
 int lchmod(const char *path, mode_t mode);
 int fchroot(int fd);
@@ -150,6 +152,5 @@ int utimes(const char *filename, const struct timeval times[2]);
 int futimes(int, const struct timeval times[2]);
 int lutimes(const char *filename, const struct timeval times[2]);
 pid_t wait4(pid_t wpid, int *status, int options, struct rusage *rusage);
-
 ]]
 

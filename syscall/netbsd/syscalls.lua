@@ -28,12 +28,6 @@ function S.paccept(sockfd, addr, addrlen, set, flags)
   local saddr = pt.sockaddr(addr)
   return retfd(C.paccept(getfd(sockfd), saddr, addrlen, set, c.SOCK[flags]))
 end
--- TODO below should work, but appears to break test test_sockets_pipes:test_inet_socket - BUG?
---[[
-function S.accept(sockfd, addr, addrlen)
-  return S.paccept(sockfd, addr, addrlen, nil, nil)
-end
-]]
 
 local mntstruct = {
   ffs = t.ufs_args,
@@ -61,10 +55,6 @@ function S.mount(fstype, dir, flags, data, datalen)
   return retbool(ret)
 end
 
-function S.unmount(target, flags)
-  return retbool(C.unmount(target, c.UMOUNT[flags]))
-end
-
 function S.reboot(how, bootstr)
   return retbool(C.reboot(c.RB[how], bootstr))
 end
@@ -83,10 +73,6 @@ function S.futimens(fd, ts)
   return retbool(C.futimens(getfd(fd), ts))
 end
 
-function S.revoke(path) return retbool(C.revoke(path)) end
-function S.chflags(path, flags) return retbool(C.chflags(path, c.CHFLAGS[flags])) end
-function S.lchflags(path, flags) return retbool(C.lchflags(path, c.CHFLAGS[flags])) end
-function S.fchflags(fd, flags) return retbool(C.fchflags(getfd(fd), c.CHFLAGS[flags])) end
 function S.pathconf(path, name) return retnum(C.pathconf(path, c.PC[name])) end
 function S.fpathconf(fd, name) return retnum(C.fpathconf(getfd(fd), c.PC[name])) end
 function S.fsync_range(fd, how, start, length) return retbool(C.fsync_range(getfd(fd), c.FSYNC[how], start, length)) end
@@ -135,13 +121,6 @@ function S.pollts(fds, timeout, set)
 end
 
 function S.issetugid() return C.issetugid() end
-
-function S.getpriority(which, who)
-  errno(0)
-  local ret, err = C.getpriority(c.PRIO[which], who or 0)
-  if ret == -1 and (err or errno()) ~= 0 then return nil, t.error(err or errno()) end
-  return ret
-end
 
 function S.sigaction(signum, handler, oldact)
   if type(handler) == "string" or type(handler) == "function" then

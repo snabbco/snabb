@@ -1,5 +1,6 @@
 -- choose correct syscalls for OS, plus shared calls
 -- note that where functions are identical if present but may be missing they can also go here
+-- note that OS specific calls are loaded at the end so they may override generic calls here
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
@@ -457,6 +458,13 @@ function S.wait4(pid, options, ru, status) -- note order of arguments changed as
 end
 
 function S.setpriority(which, who, prio) return retbool(C.setpriority(c.PRIO[which], who or 0, prio)) end
+-- Linux overrides getpriority as it offsets return values so that they are not negative
+function S.getpriority(which, who)
+  errno(0)
+  local ret, err = C.getpriority(c.PRIO[which], who or 0)
+  if ret == -1 and (err or errno()) ~= 0 then return nil, t.error(err or errno()) end
+  return ret
+end
 
 -- these may not always exist, but where they do they have the same interface
 if C.symlinkat then
@@ -585,7 +593,10 @@ local hh = {
   ret64 = ret64, retnum = retnum, retfd = retfd, retbool = retbool, retptr = retptr, retiter = retiter
 }
 
-local S = require("syscall." .. abi.os .. ".syscalls")(S, hh, c, C, types)
+if (abi.rump and abi.types == "netbsd") or (not abi.rump and abi.bsd) then
+  S = require("syscall.bsd.syscalls")(S, hh, c, C, types)
+end
+S = require("syscall." .. abi.os .. ".syscalls")(S, hh, c, C, types)
 
 return S
 
