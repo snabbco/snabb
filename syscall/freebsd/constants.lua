@@ -353,5 +353,52 @@ c.S_I.READ  = c.S_I.RUSR
 c.S_I.WRITE = c.S_I.WUSR
 c.S_I.EXEC  = c.S_I.XUSR
 
+c.PROT = multiflags {
+  NONE  = 0x0,
+  READ  = 0x1,
+  WRITE = 0x2,
+  EXEC  = 0x4,
+}
+
+c.MAP = multiflags {
+  SHARED     = 0x0001,
+  PRIVATE    = 0x0002,
+  FILE       = 0x0000,
+  FIXED      = 0x0010,
+  RENAME     = 0x0020,
+  NORESERVE  = 0x0040,
+  RESERVED0080 = 0x0080,
+  RESERVED0100 = 0x0100,
+  HASSEMAPHORE = 0x0200,
+  STACK      = 0x0400,
+  NOSYNC     = 0x0800,
+  NOCORE     = 0x00020000,
+}
+
+if abi.abi64 then c.MAP.["32BIT"] = 0x00080000
+
+c.MAP.ANONYMOUS = c.MAP.ANON -- for compatibility
+
+-- flags to `msync'. - note was MS_ renamed to MSYNC_
+c.MSYNC = multiflags {
+  ASYNC       = 0x00,
+  INVALIDATE  = 0x01,
+  SYNC        = 0x02,
+}
+
+c.MADV = strflag {
+  NORMAL      = 0,
+  RANDOM      = 1,
+  SEQUENTIAL  = 2,
+  WILLNEED    = 3,
+  DONTNEED    = 4,
+  FREE        = 5,
+  NOSYNC      = 6,
+  AUTOSYNC    = 7,
+  NOCORE      = 8,
+  CORE        = 9,
+  PROTECT     = 10,
+}
+
 return c
 
