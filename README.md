@@ -34,7 +34,7 @@ Android (ARM tested so far) currently passes all the non root tests now; some te
 
 For the NetBSD support all platforms should work in principle; more test targets will be added soon, currently tests being run on x86 and amd64, an ARM test target will be added soon.
 
-There is a small stub of FreeBSD support, not yet enough to run any code (although rump works on FreeBSD). A small amount of OSX support was added but there is no test environment at present.
+There is a small amount of FreeBSD support, so some tests pass, more will be added. A small amount of OSX support was added but there is no test environment at present.
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
@@ -44,7 +44,7 @@ For the (optional) rump kernel functionality, the easiest way at present to inst
 netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD support, rump kernel hypercall API, OSv support, Lua support, more introspection, FreeBSD support.
 
 ## Release notes
-0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, luaffi support again, better kernel headers and fixes against them, more MIPS support, improved APIs with multiple return values, initial NetBSD and Rump ktrace support, initial stub FreeBSD support.
+0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, luaffi support again, better kernel headers and fixes against them, more MIPS support, improved APIs with multiple return values, initial NetBSD and Rump ktrace support, initial FreeBSD support.
 
 0.8 rump kernel fixes, NetBSD 64 bit fixes, initial arp/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support, initial support of NetBSD network config.
 
