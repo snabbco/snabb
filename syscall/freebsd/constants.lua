@@ -375,7 +375,7 @@ c.MAP = multiflags {
   NOCORE     = 0x00020000,
 }
 
-if abi.abi64 then c.MAP.["32BIT"] = 0x00080000
+if abi.abi64 then c.MAP["32BIT"] = 0x00080000
 
 c.MAP.ANONYMOUS = c.MAP.ANON -- for compatibility
 
