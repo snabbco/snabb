@@ -10,9 +10,9 @@ There is a work in progress port to BSD systems, currently targetting NetBSD. Ne
 
 This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
 
-## Introductory talk
+## Introductory talks
 
-There is the [video of my FOSDEM 2013 talk](http://www.myriabit.com/ljsyscall/) here.
+The [video of my FOSDEM 2013 talk](http://www.myriabit.com/ljsyscall/) here, and the [video of my Lua Workshop 2013 talk](http://2013.capitoledulibre.org/conferences/lua-workshop/towards-a-lua-scripted-operating-system.html) is here.
 
 ## Install
 
