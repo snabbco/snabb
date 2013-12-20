@@ -34,9 +34,11 @@ local C = setmetatable({}, {
   end
 })
 
+-- quite a few FreeBSD functions are weak aliases to __sys_ prefixed versions, some seem to resolve but others do not, odd.
 C.futimes = ffi.C.__sys_futimes
 C.lutimes = ffi.C.__sys_lutimes
 C.utimes = ffi.C.__sys_utimes
+C.wait4 = ffi.C.__sys_wait4
 
 return C
 

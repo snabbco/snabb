@@ -14,5 +14,6 @@ int ioctl(int d, unsigned long request, void *arg);
 int __sys_utimes(const char *filename, const struct timeval times[2]);
 int __sys_futimes(int, const struct timeval times[2]);
 int __sys_lutimes(const char *filename, const struct timeval times[2]);
+pid_t __sys_wait4(pid_t wpid, int *status, int options, struct rusage *rusage);
 ]]
 
