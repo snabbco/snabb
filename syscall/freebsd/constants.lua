@@ -7,6 +7,8 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
+local abi = require "syscall.abi"
+
 local h = require "syscall.helpers"
 
 local bit = require "syscall.bit"
