@@ -830,7 +830,9 @@ test_file_operations_at = {
   test_faccessat = function()
     if not S.faccessat then error "skipped" end
     local fd = S.open("/dev")
-    assert(fd:faccessat("null", "r"), "expect access to say can read /dev/null")
+    local ok, err = fd:faccessat("null", "r")
+    if not ok and err.NOSYS then error "skipped" end -- NetBSD 6 has symbols but they do nothing
+    assert(ok)
     assert(fd:faccessat("null", c.OK.R), "expect access to say can read /dev/null")
     assert(fd:faccessat("null", "w"), "expect access to say can write /dev/null")
     assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
@@ -840,7 +842,9 @@ test_file_operations_at = {
     if not (S.symlinkat and S.readlinkat) then error "skipped" end
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(S.symlinkat(tmpfile, dirfd, tmpfile2))
+    local ok, err = S.symlinkat(tmpfile, dirfd, tmpfile2)
+    if not ok and err.NOSYS then error "skipped" end -- Netbsd6 partial implementation
+    assert(ok)
     local s = assert(S.readlinkat(dirfd, tmpfile2))
     assert_equal(s, tmpfile, "should be able to read symlink")
     assert(S.unlink(tmpfile2))
@@ -888,7 +892,9 @@ test_file_operations_at = {
     if not S.fchmodat then error "skipped" end
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(dirfd:fchmodat(tmpfile, "RUSR, WUSR"))
+    local ok, err = dirfd:fchmodat(tmpfile, "RUSR, WUSR")
+    if not ok and err.NOSYS then error "skipped" end -- NetBSD6 has symbol
+    assert(ok)
     assert(S.access(tmpfile, "rw"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
