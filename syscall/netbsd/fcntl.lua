@@ -19,6 +19,7 @@ local h = require "syscall.helpers"
 
 local ctobool, booltoc = h.ctobool, h.booltoc
 
+-- TODO this should just be __new
 local function getflock(arg)
   arg = arg or t.flock()
   if not ffi.istype(t.flock, arg) then
