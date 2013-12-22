@@ -12,7 +12,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 
-local function init(c, ostypes)
+local function init(c, ostypes, bsdtypes)
 
 local abi = require "syscall.abi"
 
@@ -610,6 +610,7 @@ addtype(types, "rusage", "struct rusage", mt.rusage)
 
 -- include OS specific types
 types = ostypes.init(types)
+if bsdtypes then types = bsdtypes.init(types) end
 
 -- this is declared above
 samap_pt = {

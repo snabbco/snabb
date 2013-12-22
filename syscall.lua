@@ -26,7 +26,11 @@ local ostypes = require("syscall." .. abi.os .. ".types")
 
 local c = require("syscall." .. abi.os .. ".constants")
 
-local types = require "syscall.types".init(c, ostypes)
+local bsdtypes
+if (abi.rump and abi.types == "netbsd") or (not abi.rump and abi.bsd) then
+  bsdtypes = require("syscall.bsd.types")
+end
+local types = require "syscall.types".init(c, ostypes, bsdtypes)
 
 local C
 if abi.rump then

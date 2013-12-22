@@ -90,23 +90,6 @@ mt.device = {
 
 addtype(types, "device", "struct {dev_t dev;}", mt.device)
 
-mt.sockaddr_un = {
-  index = {
-    family = function(sa) return sa.sun_family end,
-    path = function(sa) return ffi.string(sa.sun_path) end,
-  },
-  newindex = {
-    family = function(sa, v) sa.sun_family = v end,
-    path = function(sa, v) ffi.copy(sa.sun_path, v) end,
-  },
-  __new = function(tp, path) return newfn(tp, {family = c.AF.UNIX, path = path, sun_len = s.sockaddr_un}) end,
-  __len = function(sa) return 2 + #sa.path end,
-}
-
-addtype(types, "sockaddr_un", "struct sockaddr_un", mt.sockaddr_un)
-
-function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has odd unix handling
-
 mt.stat = {
   index = {
     dev = function(st) return t.device(st.st_dev) end,

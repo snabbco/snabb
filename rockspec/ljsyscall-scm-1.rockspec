@@ -112,6 +112,7 @@ build =
 
       ["syscall.bsd.syscalls"] = "syscall/bsd/syscalls.lua";
       ["syscall.bsd.ffifunctions"] = "syscall/bsd/ffifunctions.lua";
+      ["syscall.bsd.types"] = "syscall/bsd/types.lua";
 
       ["syscall.rump.init"] = "syscall/rump/init.lua";
       ["syscall.rump.c"] = "syscall/rump/c.lua";
