@@ -1631,7 +1631,9 @@ test_rusage = {
 
 test_proc = {
   test_ps = function()
-    local ps = util.ps()
+    local ps, err = util.ps()
+    if not ps and err.NOENT then error "skipped" end -- FreeBSD usually does not have proc mounted
+    assert(ps)
     local me = S.getpid()
     local found = false
     for i = 1, #ps do
@@ -1644,7 +1646,7 @@ test_proc = {
     assert(tostring(ps), "can convert ps to string")
   end,
   test_proc_self = function()
-    local p = assert(util.proc())
+    local p = util.proc()
     assert(not p.wrongname, "test non existent files")
     assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
     assert(p.exe and #p.exe > 1, "expect an executable")

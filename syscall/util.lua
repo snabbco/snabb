@@ -186,6 +186,7 @@ mt.ps = {
   end
 }
 
+-- note that Linux and NetBSD have /proc but FreeBSD does not usually have it mounted, although it is an option
 function util.ps()
   local ls, err = util.dirtable("/proc")
   if not ls then return nil, err end
