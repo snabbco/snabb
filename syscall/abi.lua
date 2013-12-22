@@ -10,6 +10,8 @@ pcall, type, table, string
 
 local ffi = require "ffi"
 
+local function inlibc_fn(k) return ffi.C[k] end
+
 local abi = {
   arch = ffi.arch, -- ppc, x86, arm, x64, mips
   abi32 = ffi.abi("32bit"), -- boolean
@@ -26,9 +28,17 @@ if abi.arch == "arm" and not ffi.abi("eabi") then error("only support eabi for a
 
 if abi.arch == "mips" then abi.mipsabi = "o32" end -- only one supported now
 
--- BSD detection, we assume they all have a compatible sysctlbyname in libc, WIP
 if abi.os == "bsd" or abi.os == "osx" then abi.bsd = true end -- some shared BSD functionality
-if abi.os == "bsd" then
+
+-- BSD detection, we assume they all have a compatible sysctlbyname in libc, WIP
+ffi.cdef[[
+  int __ljsyscall_under_xen;
+]]
+
+-- Xen generally behaves like NetBSD, but our tests need to do rump-like setup; bit of a hack
+if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
+
+if not abi.xen and abi.os == "bsd" then
   ffi.cdef [[
   int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
   ]]
@@ -45,16 +55,6 @@ abi.netbsd = {version = 6}
 -- rump params
 abi.host = abi.os -- real OS, used for rump at present may change this
 abi.types = "netbsd" -- you can set to linux, or monkeypatch (see tests) to use Linux types
-
--- perhaps this should be in test suite not here
-local function inlibc_fn(k) return ffi.C[k] end
-
-ffi.cdef[[
-  int __ljsyscall_under_xen;
-]]
-
--- Xen generally behaves like NetBSD, but our tests need to do rump-like setup
-if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
 
 return abi
 
