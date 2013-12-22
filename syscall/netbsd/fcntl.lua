@@ -1,4 +1,4 @@
--- BSD fcntl
+-- NetBSD fcntl
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
