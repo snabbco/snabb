@@ -168,6 +168,13 @@ struct flock {
   short   l_whence;
   int     l_sysid;
 };
+struct dirent {
+  uint32_t d_fileno;
+  uint16_t d_reclen;
+  uint8_t  d_type;
+  uint8_t  d_namlen;
+  char     d_name[255 + 1];
+};
 ]]
 
 local s = table.concat(defs, "")
