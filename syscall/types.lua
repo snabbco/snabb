@@ -70,7 +70,6 @@ local addtypes = {
   nlink = "nlink_t",
   ino = "ino_t",
   nfds = "nfds_t",
-  fdset = "fd_set",
   winsize = "struct winsize",
 }
 

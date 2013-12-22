@@ -27,6 +27,15 @@ local c = require "syscall.freebsd.constants"
 
 local mt = {} -- metatables
 
+local addtypes = {
+}
+
+local addstructs = {
+}
+
+for k, v in pairs(addtypes) do addtype(types, k, v) end
+for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
+
 mt.stat = {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
@@ -104,6 +113,14 @@ for k, v in pairs(c.DT) do
 end
 
 addtype(types, "dirent", "struct dirent", mt.dirent)
+
+mt.fdset = {
+  index = {
+    fds_bits = function(self) return self.__fds_bits end,
+  },
+}
+
+addtype(types, "fdset", "fd_set", mt.fdset)
 
 return types
 

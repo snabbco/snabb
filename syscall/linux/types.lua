@@ -74,6 +74,7 @@ for k, v in pairs(c.SIGPOLL or {}) do
 end
 
 local addtypes = {
+  fdset = "fd_set",
   clockid = "clockid_t",
   sighandler = "sighandler_t",
   aio_context = "aio_context_t",

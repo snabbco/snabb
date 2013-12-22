@@ -27,6 +27,16 @@ local c = require "syscall.osx.constants"
 
 local mt = {} -- metatables
 
+local addtypes = {
+  fdset = "fd_set",
+}
+
+local addstructs = {
+}
+
+for k, v in pairs(addtypes) do addtype(types, k, v) end
+for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
+
 -- 32 bit dev_t, 24 bit minor, 8 bit major
 local function makedev(major, minor)
   local dev = major or 0

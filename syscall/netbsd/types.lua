@@ -30,6 +30,7 @@ local c = require "syscall.netbsd.constants"
 local mt = {} -- metatables
 
 local addtypes = {
+  fdset = "fd_set",
   clockid = "clockid_t",
   register = "register_t",
 }
