@@ -51,7 +51,6 @@ local fcntl = { -- TODO some functionality missing
     [c.F.GETFL] = function(ret) return tonumber(ret) end,
     [c.F.GETOWN] = function(ret) return tonumber(ret) end,
     [c.F.GETLK] = function(ret, arg) return arg end,
-    [c.F.MAXFD] = function(ret) return tonumber(ret) end,
   }
 }
 
