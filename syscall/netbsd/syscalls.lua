@@ -73,8 +73,6 @@ function S.futimens(fd, ts)
   return retbool(C.futimens(getfd(fd), ts))
 end
 
-function S.pathconf(path, name) return retnum(C.pathconf(path, c.PC[name])) end
-function S.fpathconf(fd, name) return retnum(C.fpathconf(getfd(fd), c.PC[name])) end
 function S.fsync_range(fd, how, start, length) return retbool(C.fsync_range(getfd(fd), c.FSYNC[how], start, length)) end
 
 function S.getvfsstat(flags, buf, size) -- note order of args as usually leave buf empty

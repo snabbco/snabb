@@ -43,6 +43,12 @@ function S.lchflags(path, flags) return retbool(C.lchflags(path, c.CHFLAGS[flags
 function S.fchflags(fd, flags) return retbool(C.fchflags(getfd(fd), c.CHFLAGS[flags])) end
 -- TODO chflagsat
 
+function S.pathconf(path, name) return retnum(C.pathconf(path, c.PC[name])) end
+function S.fpathconf(fd, name) return retnum(C.fpathconf(getfd(fd), c.PC[name])) end
+if C.lpathconf then
+  function S.lpathconf(path, name) return retnum(C.lpathconf(path, c.PC[name])) end
+end
+
 return S
 
 end
