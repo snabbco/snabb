@@ -669,5 +669,42 @@ c.RUSAGE = strflag {
 
 c.SOMAXCONN = 128
 
+c.SO = strflag {
+  DEBUG        = 0x0001,
+  ACCEPTCONN   = 0x0002,
+  REUSEADDR    = 0x0004,
+  KEEPALIVE    = 0x0008,
+  DONTROUTE    = 0x0010,
+  BROADCAST    = 0x0020,
+  USELOOPBACK  = 0x0040,
+  LINGER       = 0x0080,
+  OOBINLINE    = 0x0100,
+  REUSEPORT    = 0x0200,
+  TIMESTAMP    = 0x0400,
+  NOSIGPIPE    = 0x0800,
+  ACCEPTFILTER = 0x1000,
+  BINTIME      = 0x2000,
+  NO_OFFLOAD   = 0x4000,
+  NO_DDP       = 0x8000,
+  SNDBUF       = 0x1001,
+  RCVBUF       = 0x1002,
+  SNDLOWAT     = 0x1003,
+  RCVLOWAT     = 0x1004,
+  SNDTIMEO     = 0x1005,
+  RCVTIMEO     = 0x1006,
+  ERROR        = 0x1007,
+  TYPE         = 0x1008,
+  LABEL        = 0x1009,
+  PEERLABEL    = 0x1010,
+  LISTENQLIMIT = 0x1011,
+  LISTENQLEN   = 0x1012,
+  LISTENINCQLEN= 0x1013,
+  SETFIB       = 0x1014,
+  USER_COOKIE  = 0x1015,
+  PROTOCOL     = 0x1016,
+}
+
+c.SO.PROTOTYPE = c.SO.PROTOCOL
+
 return c
 
