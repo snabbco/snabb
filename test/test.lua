@@ -1581,9 +1581,9 @@ test_util = {
   end,
 }
 
--- TODO work in progress to make work in NetBSD, temp commented out
+-- TODO work in progress to make work in BSD, temp commented out
 -- note send creds moved, as varies by OS
-if not (S.__rump or abi.os == "netbsd") then
+if not (S.__rump or abi.bsd) then
 test_sendfd = {
   test_sendfd = function()
     local sv1, sv2 = assert(S.socketpair("unix", "stream"))
