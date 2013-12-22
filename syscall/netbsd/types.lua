@@ -39,7 +39,6 @@ local addstructs = {
   tmpfs_args = "struct tmpfs_args",
   ptyfs_args = "struct ptyfs_args",
   procfs_args = "struct procfs_args",
-  flock = "struct flock",
   statvfs = "struct statvfs",
   kfilter_mapping = "struct kfilter_mapping",
   in6_ifstat = "struct in6_ifstat",

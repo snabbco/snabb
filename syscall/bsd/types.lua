@@ -7,7 +7,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local function init(types)
+local function init(c, types)
 
 local abi = require "syscall.abi"
 
@@ -23,9 +23,17 @@ local ptt, reviter, mktype, istype, lenfn, lenmt, getfd, newfn
   = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd, h.newfn
 local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
 
-local c = require "syscall.osx.constants"
-
 local mt = {} -- metatables
+
+local addtypes = {
+}
+
+local addstructs = {
+  flock = "struct flock",
+}
+
+for k, v in pairs(addtypes) do addtype(types, k, v) end
+for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
 
 mt.sockaddr_un = {
   index = {
