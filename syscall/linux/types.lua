@@ -100,7 +100,6 @@ local addstructs = {
   rtnl_link_stats = "struct rtnl_link_stats",
   statfs = "struct statfs64",
   ifa_cacheinfo = "struct ifa_cacheinfo",
-  flock = "struct flock64",
   input_event = "struct input_event",
   input_id = "struct input_id",
   input_absinfo = "struct input_absinfo",
@@ -1025,6 +1024,25 @@ mt.sched_param = {
 }
 
 addtype(types, "sched_param", "struct sched_param", mt.sched_param)
+
+mt.flock = {
+  index = {
+    type = function(self) return self.l_type end,
+    whence = function(self) return self.l_whence end,
+    start = function(self) return self.l_start end,
+    len = function(self) return self.l_len end,
+    pid = function(self) return self.l_pid end,
+  },
+  newindex = {
+    type = function(self, v) self.l_type = c.FCNTL_LOCK[v] end,
+    whence = function(self, v) self.l_whence = c.SEEK[v] end,
+    start = function(self, v) self.l_start = v end,
+    len = function(self, v) self.l_len = v end,
+    pid = function(self, v) self.l_pid = v end,
+  },
+}
+
+addtype(types, "flock", "struct flock64", mt.flock)
 
 return types
 
