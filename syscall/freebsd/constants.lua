@@ -623,5 +623,34 @@ c.MSG = multiflags {
   CMSG_CLOEXEC    = 0x40000,
 }
 
+c.PC = strflag {
+  LINK_MAX          = 1,
+  MAX_CANON         = 2,
+  MAX_INPUT         = 3,
+  NAME_MAX          = 4,
+  PATH_MAX          = 5,
+  PIPE_BUF          = 6,
+  CHOWN_RESTRICTED  = 7,
+  NO_TRUNC          = 8,
+  VDISABLE          = 9,
+  ALLOC_SIZE_MIN    = 10,
+  FILESIZEBITS      = 12,
+  REC_INCR_XFER_SIZE= 14,
+  REC_MAX_XFER_SIZE = 15,
+  REC_MIN_XFER_SIZE = 16,
+  REC_XFER_ALIGN    = 17,
+  SYMLINK_MAX       = 18,
+  MIN_HOLE_SIZE     = 21,
+  ASYNC_IO          = 53,
+  PRIO_IO           = 54,
+  SYNC_IO           = 55,
+  ACL_EXTENDED      = 59,
+  ACL_PATH_MAX      = 60,
+  CAP_PRESENT       = 61,
+  INF_PRESENT       = 62,
+  MAC_PRESENT       = 63,
+  ACL_NFS4          = 64,
+}
+
 return c
 
