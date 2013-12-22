@@ -1632,16 +1632,17 @@ test_rusage = {
 test_proc = {
   test_ps = function()
     local ps, err = util.ps()
-    if not ps and err.NOENT then error "skipped" end -- FreeBSD usually does not have proc mounted
+    if not ps and err.NOENT then error "skipped" end -- FreeBSD usually does not have proc mounted, although usually mount point
     assert(ps)
     local me = S.getpid()
-    local found = false
+    local found, count = false, 0
     for i = 1, #ps do
       if ps[i].pid == 1 then
         assert(ps[i].cmdline:find("init") or ps[i].cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
       end
       if ps[i].pid == me then found = true end
     end
+    if count == 0 then error "skipped" end -- not monted but mount point exists
     assert(found, "expect to find my process in ps")
     assert(tostring(ps), "can convert ps to string")
   end,
