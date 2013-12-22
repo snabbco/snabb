@@ -667,5 +667,7 @@ c.RUSAGE = strflag {
   THREAD   = 1,
 }
 
+c.SOMAXCONN = 128
+
 return c
 
