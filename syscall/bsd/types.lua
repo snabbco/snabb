@@ -29,7 +29,6 @@ local addtypes = {
 }
 
 local addstructs = {
-  flock = "struct flock",
 }
 
 for k, v in pairs(addtypes) do addtype(types, k, v) end
