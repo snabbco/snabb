@@ -10,7 +10,7 @@ pcall, type, table, string
 
 local function init(types)
 
-local c = require "syscall.osx.constants"
+local c = require "syscall.freebsd.constants"
 
 local ffi = require "ffi"
 
