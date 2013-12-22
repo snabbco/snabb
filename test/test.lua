@@ -876,7 +876,9 @@ test_file_operations_at = {
     if not S.fstatat then error "skipped" end
     local fd = assert(S.open("."))
     assert(util.writefile(tmpfile, teststring, "RWXU"))
-    local stat = assert(fd:fstatat(tmpfile))
+    local stat, err = fd:fstatat(tmpfile)
+    if not stat and err.NOSYS then error "skipped" end
+    assert(stat)
     assert(stat.size == #teststring, "expect length to br what was written")
     assert(fd:close())
     assert(S.unlink(tmpfile))
@@ -884,7 +886,9 @@ test_file_operations_at = {
   test_fstatat_fdcwd = function()
     if not S.fstatat then error "skipped" end
     assert(util.writefile(tmpfile, teststring, "RWXU"))
-    local stat = assert(S.fstatat("fdcwd", tmpfile, nil, "symlink_nofollow"))
+    local stat, err = S.fstatat("fdcwd", tmpfile, nil, "symlink_nofollow")
+    if not stat and err.NOSYS then error "skipped" end
+    assert(stat)
     assert(stat.size == #teststring, "expect length to be what was written")
     assert(S.unlink(tmpfile))
   end,
