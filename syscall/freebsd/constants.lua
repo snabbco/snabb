@@ -652,5 +652,20 @@ c.PC = strflag {
   ACL_NFS4          = 64,
 }
 
+-- getpriority, setpriority flags
+c.PRIO = strflag {
+  PROCESS = 0,
+  PGRP = 1,
+  USER = 2,
+  MIN = -20, -- TODO useful to have for other OSs
+  MAX = 20,
+}
+
+c.RUSAGE = strflag {
+  SELF     =  0,
+  CHILDREN = -1,
+  THREAD   = 1,
+}
+
 return c
 
