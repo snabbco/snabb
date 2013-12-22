@@ -58,14 +58,6 @@ function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), c.CLONE[nstype]))
 -- note that this is not strictly the syscall that has some other arguments, but has same functionality
 function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 
-function S.getdents(fd, buf, size)
-  size = size or 4096
-  buf = buf or t.buffer(size)
-  local ret, err = C.getdents(getfd(fd), buf, size)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return t.dirents(buf, ret)
-end
-
 function S.wait(status)
   status = status or t.int1()
   local ret, err = C.wait(status)

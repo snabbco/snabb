@@ -568,6 +568,16 @@ if C.futimes then
   end
 end
 
+if C.getdents then
+  function S.getdents(fd, buf, size)
+    size = size or 4096 -- may have to be equal to at least block size of fs
+    buf = buf or t.buffer(size)
+    local ret, err = C.getdents(getfd(fd), buf, size)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return t.dirents(buf, ret)
+  end
+end
+
 -- TODO not sure about this interface, maybe return rem as extra parameter see #103
 if C.nanosleep then
   function S.nanosleep(req, rem)

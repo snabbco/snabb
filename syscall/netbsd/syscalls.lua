@@ -59,15 +59,6 @@ function S.reboot(how, bootstr)
   return retbool(C.reboot(c.RB[how], bootstr))
 end
 
--- this is identical to Linux, may be able to share TODO find out how OSX works
-function S.getdents(fd, buf, size)
-  size = size or 4096 -- may have to be equal to at least block size of fs
-  buf = buf or t.buffer(size)
-  local ret, err = C.getdents(getfd(fd), buf, size)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return t.dirents(buf, ret)
-end
-
 function S.futimens(fd, ts)
   if ts then ts = t.timespec2(ts) end
   return retbool(C.futimens(getfd(fd), ts))
