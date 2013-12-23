@@ -591,9 +591,14 @@ if C.nanosleep then
 end
 
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
--- TODO Freebsd has no /dev/ptmx apparently, need to override this
-function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
+-- Freebsd has a syscall, other OSs use /dev/ptmx
+if C.posix_openpt then
+  function S.posix_openpt(flags) return retbool(C.posix_openpt(c.O[flags])) end
+else
+  function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
+end
 S.openpt = S.posix_openpt
+
 function S.isatty(fd)
   local tc = S.tcgetattr(fd)
   if tc then return true else return false end
