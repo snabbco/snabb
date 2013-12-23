@@ -80,7 +80,6 @@ print [[
 #include <sys/resource.h>
 #include <sys/un.h>
 #include <sys/mman.h>
-#include <sys/xattr.h>
 #include <sys/mount.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
