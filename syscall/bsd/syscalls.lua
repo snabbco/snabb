@@ -19,6 +19,7 @@ local errno = ffi.errno
 local h = require "syscall.helpers"
 
 local istype, mktype, getfd = h.istype, h.mktype, h.getfd
+local octal = h.octal
 
 local t, pt, s = types.t, types.pt, types.s
 
