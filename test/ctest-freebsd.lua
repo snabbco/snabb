@@ -64,8 +64,8 @@ print [[
 #include <stddef.h>
 #include <stdio.h>
 
+#include <termios.h>
 #include <sys/sched.h>
-#include <sys/termios.h>
 #include <sys/unistd.h>
 #include <sys/dirent.h>
 #include <sys/time.h>
