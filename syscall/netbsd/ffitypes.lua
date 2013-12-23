@@ -61,6 +61,7 @@ typedef int _netbsd_clockid_t;
 typedef int _netbsd_timer_t;
 typedef int _netbsd_suseconds_t;
 typedef unsigned int _netbsd_nfds_t;
+typedef uint32_t _netbsd_id_t;
 
 /* these are not used in Linux so not renamed */
 typedef unsigned int useconds_t;

@@ -29,7 +29,6 @@ typedef uint16_t in_port_t;
 // 32 bit
 typedef uint32_t uid_t;
 typedef uint32_t gid_t;
-typedef uint32_t id_t;
 typedef int32_t pid_t;
 
 typedef unsigned int socklen_t;

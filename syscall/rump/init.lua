@@ -40,7 +40,6 @@ local unchanged = {
   in_port_t = true,
   uid_t = true,
   gid_t = true,
-  id_t = true,
   pid_t = true,
   off_t = true,
   size_t = true,

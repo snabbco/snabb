@@ -29,6 +29,7 @@ typedef int32_t clockid_t;
 typedef long clock_t;
 typedef uint32_t off32_t; /* only used for eg mmap2 on Linux */
 typedef uint32_t le32; /* this is little endian - not really using it yet */
+typedef uint32_t id_t;
 
 /* despite glibc, Linux uses 32 bit dev_t */
 typedef uint32_t dev_t;
