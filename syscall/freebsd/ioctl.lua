@@ -46,7 +46,7 @@ local singletonmap = {
   char = "char1",
   uint = "uint1",
   uint64 = "uint64_1",
-  off_t = "off1",
+  off = "off1",
 }
 
 local function _IOC(dir, ch, nr, tp)
@@ -109,8 +109,8 @@ local ioctl = strflag {
   FIODGNAME      = _IOW('f', 120, "fiodgname_arg"),
   FIONWRITE      = _IOR('f', 119, "int"),
   FIONSPACE      = _IOR('f', 118, "int"),
-  FIOSEEKDATA    = _IOWR('f', 97, "off_t"),
-  FIOSEEKHOLE    = _IOWR('f', 98, "off_t"),
+  FIOSEEKDATA    = _IOWR('f', 97, "off"),
+  FIOSEEKHOLE    = _IOWR('f', 98, "off"),
 
 -- allow user defined ioctls
   _IO = _IO,
