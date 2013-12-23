@@ -511,7 +511,7 @@ addtype(types, "ktr_csw", "struct ktr_csw", mt.ktr_csw)
 -- slightly miscellaneous types, eg need to use Lua metatables
 
 -- TODO see Linux notes
-mt.wait = { -- TODO port to NetBSD
+mt.wait = {
   __index = function(w, k)
     local _WSTATUS = bit.band(w.status, octal("0177"))
     local _WSTOPPED = octal("0177")
