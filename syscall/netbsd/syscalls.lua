@@ -137,20 +137,6 @@ function S.ptsname(fd)
   if not pm then return nil, err end
   return ffi.string(pm.sn)
 end
-function S.tcsendbreak(fd, duration)
-  local ok, err = S.ioctl(fd, "TIOCSBRK")
-  if not ok then return nil, err end
-  S.nanosleep(0.4) -- NetBSD just does constant time
-  local ok, err = S.ioctl(fd, "TIOCCBRK")
-  if not ok then return nil, err end
-  return true
-end
-function S.tcdrain(fd)
-  return S.ioctl(fd, "TIOCDRAIN")
-end
-function S.tcflush(fd, com)
-  return S.ioctl(fd, "TIOCFLUSH", c.TCFLUSH[com]) -- while defined as FREAD, FWRITE, values same
-end
 local posix_vdisable = octal "0377" -- move to constants?
 function S.tcflow(fd, action)
   action = c.TCFLOW[action]
