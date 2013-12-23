@@ -66,7 +66,8 @@ local _IOWR   = function(ch, nr, tp) return _IOC(IOC.INOUT, ch, nr, tp) end
 local _IOWINT = function(ch, nr)     return _IOC(IOC.VOID, ch, nr, "int") end
 
 local ioctl = strflag {
-  TIOCPTMASTER = _IO('t', 28),
+  TIOCGETA     = _IOR('t', 19, "termios"),
+  TIOCPTMASTER =  _IO('t', 28),
 
 -- allow user defined ioctls
   _IO = _IO,

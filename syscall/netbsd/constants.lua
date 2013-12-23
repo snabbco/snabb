@@ -795,7 +795,8 @@ c.FSYNC = multiflags {
   DISK = 0x0040,
 }
 
--- TODO maybe provide c.B Baud rate table compatible with Linux, but its just the identity function in NetBSD...
+-- Baud rates just the identity function in NetBSD...
+c.B = strflag {}
 
 c.CC = strflag {
   VEOF           = 0,

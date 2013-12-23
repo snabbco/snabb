@@ -175,6 +175,15 @@ struct dirent {
   uint8_t  d_namlen;
   char     d_name[255 + 1];
 };
+struct termios {
+  tcflag_t        c_iflag;
+  tcflag_t        c_oflag;
+  tcflag_t        c_cflag;
+  tcflag_t        c_lflag;
+  cc_t            c_cc[20];
+  speed_t         c_ispeed;
+  speed_t         c_ospeed;
+};
 ]]
 
 local s = table.concat(defs, "")

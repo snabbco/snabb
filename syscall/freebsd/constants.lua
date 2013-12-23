@@ -778,5 +778,100 @@ c.IP = strflag {
 
 c.IP.SENDSRCADDR = c.IP.RECVDSTADDR
 
+-- Baud rates just the identity function  other than EXTA, EXTB
+c.B = strflag {
+  EXTA = 19200,
+  EXTB = 38400,
+}
+
+c.CC = strflag {
+  VEOF           = 0,
+  VEOL           = 1,
+  VEOL2          = 2,
+  VERASE         = 3,
+  VWERASE        = 4,
+  VKILL          = 5,
+  VREPRINT       = 6,
+  VINTR          = 8,
+  VQUIT          = 9,
+  VSUSP          = 10,
+  VDSUSP         = 11,
+  VSTART         = 12,
+  VSTOP          = 13,
+  VLNEXT         = 14,
+  VDISCARD       = 15,
+  VMIN           = 16,
+  VTIME          = 17,
+  VSTATUS        = 18,
+}
+
+c.IFLAG = multiflags {
+  IGNBRK         = 0x00000001,
+  BRKINT         = 0x00000002,
+  IGNPAR         = 0x00000004,
+  PARMRK         = 0x00000008,
+  INPCK          = 0x00000010,
+  ISTRIP         = 0x00000020,
+  INLCR          = 0x00000040,
+  IGNCR          = 0x00000080,
+  ICRNL          = 0x00000100,
+  IXON           = 0x00000200,
+  IXOFF          = 0x00000400,
+  IXANY          = 0x00000800,
+  IMAXBEL        = 0x00002000,
+}
+
+c.OFLAG = multiflags {
+  OPOST          = 0x00000001,
+  ONLCR          = 0x00000002,
+  OXTABS         = 0x00000004,
+  ONOEOT         = 0x00000008,
+  OCRNL          = 0x00000010,
+  ONOCR          = 0x00000020,
+  ONLRET         = 0x00000040,
+}
+
+c.CFLAG = multiflags {
+  CIGNORE        = 0x00000001,
+  CSIZE          = 0x00000300,
+  CS5            = 0x00000000,
+  CS6            = 0x00000100,
+  CS7            = 0x00000200,
+  CS8            = 0x00000300,
+  CSTOPB         = 0x00000400,
+  CREAD          = 0x00000800,
+  PARENB         = 0x00001000,
+  PARODD         = 0x00002000,
+  HUPCL          = 0x00004000,
+  CLOCAL         = 0x00008000,
+  CRTSCTS        = 0x00010000,
+  CDTRCTS        = 0x00020000,
+  MDMBUF         = 0x00100000,
+}
+
+c.CFLAG.CRTS_IFLOW = c.CFLAG.CRTSCTS
+c.CFLAG.CCTS_OFLOW = c.CFLAG.CRTSCTS
+c.CFLAG.CHWFLOW    = c.CFLAG.MDMBUF + c.CFLAG.CRTSCTS + c.CFLAG.CDTRCTS
+
+c.LFLAG = multiflags {
+  ECHOKE         = 0x00000001,
+  ECHOE          = 0x00000002,
+  ECHOK          = 0x00000004,
+  ECHO           = 0x00000008,
+  ECHONL         = 0x00000010,
+  ECHOPRT        = 0x00000020,
+  ECHOCTL        = 0x00000040,
+  ISIG           = 0x00000080,
+  ICANON         = 0x00000100,
+  ALTWERASE      = 0x00000200,
+  IEXTEN         = 0x00000400,
+  EXTPROC        = 0x00000800,
+  TOSTOP         = 0x00400000,
+  FLUSHO         = 0x00800000,
+  NOKERNINFO     = 0x02000000,
+  PENDIN         = 0x20000000,
+  NOFLSH         = 0x80000000,
+}
+
 return c
 
