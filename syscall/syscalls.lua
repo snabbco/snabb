@@ -593,7 +593,7 @@ end
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 -- Freebsd has a syscall, other OSs use /dev/ptmx
 if C.posix_openpt then
-  function S.posix_openpt(flags) return retbool(C.posix_openpt(c.O[flags])) end
+  function S.posix_openpt(flags) return retfd(C.posix_openpt(c.O[flags])) end
 else
   function S.posix_openpt(flags) return S.open("/dev/ptmx", flags) end
 end
