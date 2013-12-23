@@ -36,7 +36,7 @@ For the NetBSD support all platforms should work in principle; more test targets
 
 FreeBSD support is currently only for FreeBSD 10, and only tested on AMD64. FreeBSD 9 support should be fairly easy to add, but there are some type changes eg ino_t. Other architectures should work, but are currently untested. More code will be moved from NetBSD to generic BSD so it can be used by FreeBSD.
 
-A small amount of OSX support was added but there is no test environment at present.
+Some OSX support was added but there is no test environment at present. The FreeBSD support can generally be ported to OSX with small changes.
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
