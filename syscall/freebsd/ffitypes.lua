@@ -56,7 +56,7 @@ typedef long          time_t;
 /* can be changed, TODO also should be long */
 typedef uint32_t __fd_mask;
 typedef struct fd_set {
-  __fd_mask __fds_bits[4];
+  __fd_mask __fds_bits[32];
 } fd_set;
 typedef struct __sigset {
   uint32_t val[4]; // note renamed to match Linux
