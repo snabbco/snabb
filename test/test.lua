@@ -749,6 +749,19 @@ test_file_operations = {
     assert_equal(stat.rdev.device, t.device(1, 5).device)
     assert(S.unlink(tmpfile))
   end,
+  test_copy_dev_zero_root = function()
+    local st = assert(S.stat("/dev/zero"))
+    assert(S.mknod(tmpfile, "fchr,0666", st.rdev)) -- copy device node
+    local st2 = assert(S.stat(tmpfile))
+    assert_equal(st2.rdev.dev, st.rdev.dev)
+    local fd = assert(S.open(tmpfile, "rdonly"))
+    assert(S.unlink(tmpfile))
+    local buf = t.buffer(64)
+    local n = assert(fd:read(buf, 64))
+    assert_equal(n, 64)
+    for i = 0, 63 do assert_equal(buf[i], 0) end
+    assert(fd:close())
+  end,
   test_mkfifo = function()
     assert(S.mkfifo(tmpfile, "rwxu"))
     local stat = assert(S.stat(tmpfile))
