@@ -9,7 +9,7 @@ pcall, type, table, string
 
 local function init(types)
 
-local s = types.s
+local s, t = types.s, types.t
 
 local strflag = require("syscall.helpers").strflag
 local bit = require "syscall.bit"
