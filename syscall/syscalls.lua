@@ -603,6 +603,7 @@ function S.isatty(fd)
   local tc = S.tcgetattr(fd)
   if tc then return true else return false end
 end
+function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
 
 -- now call OS specific for non-generic calls
 local hh = {

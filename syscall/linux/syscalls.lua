@@ -661,7 +661,6 @@ end
 function S.tcflow(fd, action)
   return S.ioctl(fd, "TCXONC", pt.void(c.TCFLOW[action]))
 end
-function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
 
 return S
 
