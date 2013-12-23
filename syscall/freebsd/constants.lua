@@ -461,6 +461,7 @@ c.IPPROTO = strflag {
   CMTP           = 38,
   TPXX           = 39,
   IL             = 40,
+  IPV6           = 41,
   SDRP           = 42,
   ROUTING        = 43,
   FRAGMENT       = 44,
@@ -479,7 +480,7 @@ c.IPPROTO = strflag {
   SKIP           = 57,
   ICMPV6         = 58,
   NONE           = 59,
-  DSTOPTS        = 60 ,
+  DSTOPTS        = 60,
   AHIP           = 61,
   CFTP           = 62,
   HELLO          = 63,
@@ -528,6 +529,7 @@ c.IPPROTO = strflag {
   PGM            = 113,
   MPLS           = 137,
   PFSYNC         = 240,
+  RAW            = 255,
 }
 
 c.SCM = multiflags {
