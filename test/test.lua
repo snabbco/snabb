@@ -754,7 +754,9 @@ test_file_operations = {
     assert(S.mknod(tmpfile, "fchr,0666", st.rdev)) -- copy device node
     local st2 = assert(S.stat(tmpfile))
     assert_equal(st2.rdev.dev, st.rdev.dev)
-    local fd = assert(S.open(tmpfile, "rdonly"))
+    local fd, err = S.open(tmpfile, "rdonly")
+    if not fd and err.OPNOTSUPP then error "skipped" end -- FreeBSD only allows device nodes to be used on devfs
+    assert(fd)
     assert(S.unlink(tmpfile))
     local buf = t.buffer(64)
     local n = assert(fd:read(buf, 64))
