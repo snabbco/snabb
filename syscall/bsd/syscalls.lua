@@ -49,6 +49,8 @@ if C.lpathconf then
   function S.lpathconf(path, name) return retnum(C.lpathconf(path, c.PC[name])) end
 end
 
+function S.tcgetattr(fd) return S.ioctl(fd, "TIOCGETA") end
+
 return S
 
 end

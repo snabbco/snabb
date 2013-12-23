@@ -137,7 +137,6 @@ function S.ptsname(fd)
   if not pm then return nil, err end
   return ffi.string(pm.sn)
 end
-function S.tcgetattr(fd) return S.ioctl(fd, "TIOCGETA") end
 local tcsets = {
   [c.TCSA.NOW]   = "TIOCSETA",
   [c.TCSA.DRAIN] = "TIOCSETAW",
