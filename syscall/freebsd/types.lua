@@ -36,6 +36,27 @@ local addstructs = {
 for k, v in pairs(addtypes) do addtype(types, k, v) end
 for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
 
+-- 32 bit dev_t, 24 bit minor, 8 bit major, but minor is a cookie and neither really used just legacy
+local function makedev(major, minor)
+  local dev = major or 0
+  if minor then dev = bit.bor(minor, bit.lshift(major, 8)) end
+  return dev
+end
+
+mt.device = {
+  index = {
+    major = function(dev) return bit.bor(bit.band(bit.rshift(dev:device(), 8), 0xff)) end,
+    minor = function(dev) return bit.band(dev:device(), 0xffff00ff) end,
+    device = function(dev) return tonumber(dev.dev) end,
+  },
+  newindex = {
+    device = function(dev, major, minor) dev.dev = makedev(major, minor) end,
+  },
+  __new = function(tp, major, minor)
+    return ffi.new(tp, makedev(major, minor))
+  end,
+}
+
 mt.stat = {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
