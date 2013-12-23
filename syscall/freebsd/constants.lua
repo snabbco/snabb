@@ -873,5 +873,27 @@ c.LFLAG = multiflags {
   NOFLSH         = 0x80000000,
 }
 
+c.TCSA = multiflags { -- this is another odd one, where you can have one flag plus SOFT
+  NOW   = 0,
+  DRAIN = 1,
+  FLUSH = 2,
+  SOFT  = 0x10,
+}
+
+-- tcflush(), renamed from TC to TCFLUSH
+c.TCFLUSH = strflag {
+  IFLUSH  = 1,
+  OFLUSH  = 2,
+  IOFLUSH = 3,
+}
+
+-- termios - tcflow() and TCXONC use these. renamed from TC to TCFLOW
+c.TCFLOW = strflag {
+  OOFF = 1,
+  OON  = 2,
+  IOFF = 3,
+  ION  = 4,
+}
+
 return c
 

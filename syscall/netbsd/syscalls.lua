@@ -137,16 +137,6 @@ function S.ptsname(fd)
   if not pm then return nil, err end
   return ffi.string(pm.sn)
 end
-local tcsets = {
-  [c.TCSA.NOW]   = "TIOCSETA",
-  [c.TCSA.DRAIN] = "TIOCSETAW",
-  [c.TCSA.FLUSH] = "TIOCSETAF",
-}
-function S.tcsetattr(fd, optional_actions, tio)
-  -- TODO also implement TIOCSOFT, which needs to make a modified copy of tio
-  local inc = c.TCSA[optional_actions]
-  return S.ioctl(fd, tcsets[inc], tio)
-end
 function S.tcsendbreak(fd, duration)
   local ok, err = S.ioctl(fd, "TIOCSBRK")
   if not ok then return nil, err end

@@ -50,6 +50,16 @@ if C.lpathconf then
 end
 
 function S.tcgetattr(fd) return S.ioctl(fd, "TIOCGETA") end
+local tcsets = {
+  [c.TCSA.NOW]   = "TIOCSETA",
+  [c.TCSA.DRAIN] = "TIOCSETAW",
+  [c.TCSA.FLUSH] = "TIOCSETAF",
+}
+function S.tcsetattr(fd, optional_actions, tio)
+  -- TODO also implement TIOCSOFT, which needs to make a modified copy of tio
+  local inc = c.TCSA[optional_actions]
+  return S.ioctl(fd, tcsets[inc], tio)
+end
 
 return S
 
