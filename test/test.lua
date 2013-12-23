@@ -1538,14 +1538,14 @@ test_raw_socket = {
 
     -- TODO in FreeBSD, NetBSD len is in host byte order not net, see Stephens, http://developerweb.net/viewtopic.php?id=4657
     -- TODO the metamethods should take care of this
-    if S.__rump or abi.os == "netbsd" then iphdr[0].tot_len = len end
+    if S.__rump or abi.bsd then iphdr[0].tot_len = len end
 
     ca.port = 0 -- should not set port
 
     local n = assert(raw:sendto(buf, len, 0, ca))
 
     -- TODO receive issues on netBSD 
-    if not (S.__rump or abi.os == "netbsd") then
+    if not (S.__rump or abi.bsd) then
       local f = assert(cl:recvfrom(buf2, #msg))
       assert_equal(f, #msg)
     end
