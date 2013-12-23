@@ -57,6 +57,8 @@ mt.device = {
   end,
 }
 
+addtype(types, "device", "struct {dev_t dev;}", mt.device)
+
 mt.stat = {
   index = {
     dev = function(st) return t.device(st.st_dev) end,
