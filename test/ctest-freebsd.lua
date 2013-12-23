@@ -94,9 +94,6 @@ print [[
 #include <net/route.h>
 #include <net/bpf.h>
 #include <netinet/in.h>
-#include <netinet6/in6.h>
-#include <netinet6/in6_var.h>
-#include <netinet6/nd6.h>
 
 int ret = 0;
 
@@ -156,7 +153,7 @@ local nm = {
   CFLAG = "",
   CC = "",
   IOCTL = "",
-  B = "B",
+  B = "",
   AT_FDCWD = "AT_",
   FCNTL_LOCK = "F_",
   LOCKF = "F_",
