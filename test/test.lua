@@ -1642,19 +1642,21 @@ test_proc = {
       end
       if ps[i].pid == me then found = true end
     end
-    if count == 0 then error "skipped" end -- not monted but mount point exists
+    if count == 0 then error "skipped" end -- not mounted but mount point exists
     assert(found, "expect to find my process in ps")
     assert(tostring(ps), "can convert ps to string")
   end,
   test_proc_self = function()
     local p = util.proc()
-    assert(not p.wrongname, "test non existent files")
+    if not c.cmdline then error "skipped" end -- no files found, /proc not mounted
     assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
+    assert(not p.wrongname, "test non existent files")
     assert(p.exe and #p.exe > 1, "expect an executable")
     assert_equal(p.root, "/", "expect our root to be / usually")
   end,
   test_proc_init = function()
     local p = util.proc(1)
+    if not c.cmdline then error "skipped" end -- no files found, /proc not mounted
     assert(p and p.cmdline, "expect init to have cmdline")
     assert(p.cmdline:find("init") or p.cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
   end,
