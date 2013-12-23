@@ -771,7 +771,7 @@ c.PC = strflag {
   MIN_HOLE_SIZE     = 15,
 }
 
--- constants for fsync - note complex rename from FDATASYNC to FSYNC.DATA
+-- constants for fsync_range - note complex rename from FDATASYNC to FSYNC.DATA
 c.FSYNC = multiflags {
   DATA = 0x0010,
   FILE = 0x0020,

@@ -51,12 +51,6 @@ c.CHFLAGS.OPAQUE = nil -- alias
 c.W.WCLONE = nil -- underscore in name, changed
 c.W.WALL   = nil -- underscore in name, changed
 
--- complex rename
-for k, v in pairs(c.FSYNC) do
-  c.FSYNC['F' .. k .. 'SYNC'] = v
-  c.FSYNC[k] = nil
-end
-
 -- these are Linux names TODO are there actually BSD names?
 ctypes["struct ethhdr"] = nil
 ctypes["struct iphdr"] = nil
