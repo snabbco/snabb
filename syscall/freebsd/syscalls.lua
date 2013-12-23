@@ -26,6 +26,18 @@ local function isptmaster(fd) return fd:ioctl("TIOCPTMASTER") end
 S.grantpt = isptmaster
 S.unlockpt = isptmaster
 
+local SPECNAMELEN = 63
+
+function S.ptsname(fd)
+  local ok, err = isptmaster(fd)
+  if not ok then return nil, err end
+  local buf = t.buffer(SPECNAMELEN)
+  local fgn = t.fiodgname_arg{buf = buf, len = SPECNAMELEN}
+  local ok, err = fd:ioctl("FIODGNAME", fgn)
+  if not ok then return nil, err end
+  return ffi.string(buf)
+end
+
 return S
 
 end

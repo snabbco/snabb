@@ -46,6 +46,7 @@ local singletonmap = {
   char = "char1",
   uint = "uint1",
   uint64 = "uint64_1",
+  off_t = "off1",
 }
 
 local function _IOC(dir, ch, nr, tp)
@@ -66,6 +67,7 @@ local _IOWR   = function(ch, nr, tp) return _IOC(IOC.INOUT, ch, nr, tp) end
 local _IOWINT = function(ch, nr)     return _IOC(IOC.VOID, ch, nr, "int") end
 
 local ioctl = strflag {
+  -- tty ioctls
   TIOCEXCL       =  _IO('t', 13),
   TIOCNXCL       =  _IO('t', 14),
   TIOCGPTN       = _IOR('t', 15, "int"),
@@ -93,6 +95,22 @@ local ioctl = strflag {
   TIOCSWINSZ     = _IOW('t', 103, "winsize"),
   TIOCGWINSZ     = _IOR('t', 104, "winsize"),
   TIOCMGET       = _IOR('t', 106, "int"),
+
+  -- file descriptor ioctls
+  FIOCLEX        =  _IO('f', 1),
+  FIONCLEX       =  _IO('f', 2),
+  FIONREAD       = _IOR('f', 127, "int"),
+  FIONBIO        = _IOW('f', 126, "int"),
+  FIOASYNC       = _IOW('f', 125, "int"),
+  FIOSETOWN      = _IOW('f', 124, "int"),
+  FIOGETOWN      = _IOR('f', 123, "int"),
+  FIODTYPE       = _IOR('f', 122, "int"),
+  FIOGETLBA      = _IOR('f', 121, "int"),
+  FIODGNAME      = _IOW('f', 120, "fiodgname_arg"),
+  FIONWRITE      = _IOR('f', 119, "int"),
+  FIONSPACE      = _IOR('f', 118, "int"),
+  FIOSEEKDATA    = _IOWR('f', 97, "off_t"),
+  FIOSEEKHOLE    = _IOWR('f', 98, "off_t"),
 
 -- allow user defined ioctls
   _IO = _IO,

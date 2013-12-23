@@ -184,6 +184,10 @@ struct termios {
   speed_t         c_ispeed;
   speed_t         c_ospeed;
 };
+struct fiodgname_arg {
+  int     len;
+  void    *buf;
+};
 ]]
 
 local s = table.concat(defs, "")

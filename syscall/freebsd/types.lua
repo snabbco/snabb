@@ -31,6 +31,7 @@ local addtypes = {
 }
 
 local addstructs = {
+  fiodgname_arg = "struct fiodgname_arg",
 }
 
 for k, v in pairs(addtypes) do addtype(types, k, v) end
