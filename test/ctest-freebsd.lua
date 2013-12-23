@@ -4,13 +4,7 @@ package.path = "./?.lua;"
 
 local abi = require "syscall.abi"
 
-local S
-
-if abi.os == "netbsd" then -- testing natively
-  S = require "syscall"
-else -- test using rump
-  S = require "syscall.rump.init".init()
-end
+local S = require "syscall"
 
 local abi = S.abi
 local types = S.types
