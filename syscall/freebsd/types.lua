@@ -45,8 +45,8 @@ end
 
 mt.device = {
   index = {
-    major = function(dev) return bit.bor(bit.band(bit.rshift(dev:device(), 8), 0xff)) end,
-    minor = function(dev) return bit.band(dev:device(), 0xffff00ff) end,
+    major = function(dev) return bit.bor(bit.band(bit.rshift(dev.dev, 8), 0xff)) end,
+    minor = function(dev) return bit.band(dev.dev, 0xffff00ff) end,
     device = function(dev) return tonumber(dev.dev) end,
   },
   newindex = {
