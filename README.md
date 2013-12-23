@@ -34,7 +34,7 @@ Android (ARM tested so far) currently passes all the non root tests now; some te
 
 For the NetBSD support all platforms should work in principle; more test targets will be added soon, currently tests being run on x86 and amd64, an ARM test target will be added soon.
 
-FreeBSD support is currently only for FreeBSD 10. FreeBSD 9 support should be fairly easy to add, but there are some type changes eg ino_t. More code can be moved from NetBSD to generic BSD so it can be used by FreeBSD.
+FreeBSD support is currently only for FreeBSD 10, and only tested on AMD64. FreeBSD 9 support should be fairly easy to add, but there are some type changes eg ino_t. Other architectures should work, but are currently untested. More code will be moved from NetBSD to generic BSD so it can be used by FreeBSD.
 
 A small amount of OSX support was added but there is no test environment at present.
 
