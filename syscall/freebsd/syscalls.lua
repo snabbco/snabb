@@ -35,7 +35,7 @@ function S.ptsname(fd)
   local fgn = t.fiodgname_arg{buf = buf, len = SPECNAMELEN}
   local ok, err = fd:ioctl("FIODGNAME", fgn)
   if not ok then return nil, err end
-  return ffi.string(buf)
+  return "/dev/" .. ffi.string(buf)
 end
 
 return S
