@@ -74,6 +74,19 @@ end
 function S.tcflush(fd, com)
   return S.ioctl(fd, "TIOCFLUSH", c.TCFLUSH[com]) -- while defined as FREAD, FWRITE, values same
 end
+local posix_vdisable = octal "0377" -- TODO move to constants? check in all BSDs
+function S.tcflow(fd, action)
+  action = c.TCFLOW[action]
+  if action == c.TCFLOW.OOFF then return S.ioctl(fd, "TIOCSTOP") end
+  if action == c.TCFLOW.OON then return S.ioctl(fd, "TIOCSTART") end
+  if action ~= c.TCFLOW.ION and action ~= c.TCFLOW.IOFF then return nil end
+  local term, err = S.tcgetattr(fd)
+  if not term then return nil, err end
+  local cc
+  if action == c.TCFLOW.IOFF then cc = term.VSTOP else cc = term.VSTART end
+  if cc ~= posix_vdisable and not S.write(fd, t.uchar1(cc), 1) then return nil end
+  return true
+end
 
 return S
 
