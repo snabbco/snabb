@@ -375,6 +375,7 @@ test.ktrace = {
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
     assert(S.ktrace(tmpfile, "clear", "syscall, sysret", pid))
+    S.nanosleep(0.01) -- can be flaky and only get one event otherwise
     assert(kfd:kevent(nil, kevs, 1)) -- block until extend
     local buf = t.buffer(4096)
     local n = assert(fd:read(buf, 4096))
@@ -402,6 +403,7 @@ test.ktrace = {
     local ok, err = S.open("/thisfiledoesnotexist", "rdonly")
     local ok, err = S.ioctl(-1, "TIOCMGET")
     assert(p2:ktrace("clear", "syscall, sysret", pid))
+    S.nanosleep(0.01) -- can be flaky and only get one event otherwise
     local buf = t.buffer(4096)
     local n = assert(p1:read(buf, 4096))
     local syscall, sysret = {}, {}
