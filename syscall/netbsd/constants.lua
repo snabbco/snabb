@@ -753,6 +753,23 @@ c.BPF = multiflags {
   TXA        = 0x80,
 }
 
+-- for chflags and stat. note these have no prefix
+c.CHFLAGS = multiflags {
+  UF_IMMUTABLE   = 0x00000002,
+  UF_APPEND      = 0x00000004,
+  UF_OPAQUE      = 0x00000008,
+  SF_ARCHIVED    = 0x00010000,
+  SF_IMMUTABLE   = 0x00020000,
+  SF_APPEND      = 0x00040000,
+  SF_SNAPSHOT    = 0x00200000,
+  SF_LOG         = 0x00400000,
+  SF_SNAPINVAL   = 0x00800000,
+}
+
+c.CHFLAGS.IMMUTABLE = c.CHFLAGS.UF_IMMUTABLE -- common forms
+c.CHFLAGS.APPEND = c.CHFLAGS.UF_APPEND
+c.CHFLAGS.OPAQUE = c.CHFLAGS.UF_OPAQUE
+
 c.PC = strflag {
   LINK_MAX          =  1,
   MAX_CANON         =  2,
