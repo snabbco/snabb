@@ -6,7 +6,7 @@ What? An FFI implementation of the Linux and NetBSD kernel ABIs for LuaJIT. This
 
 Why? First it provides a comprehensive set of system call APIs for programming sockets, files and so on, including the more obscure things (eg file change notifications). Second it provides higher level interfaces such as network interface configuration, so your application can control its entire runtime interface including IP addresses routing and so on. Third it provides tools for added security, such as support for Linux namespaces (containers), system call filtering (seccomp type 2), capabilities and so on, all with a script language interface that is much simpler to use than the C interface. As it is Lua based it can easily be embedded in another language; in the future ports to other scripting languages are planned. It also serves as a way of learning how the operating system interfaces work in a more forgiving environment than C.
 
-There is a work in progress port to BSD systems, currently targetting NetBSD. NetBSD support is now relatively good and working towards parity with Linux. This also works with the NetBSD rump kernel under other operating systems and natively without an operating system under Xen - see https://github.com/justincormack/rumpuser-xen for details.
+There is a work in progress port to BSD systems, currently targetting NetBSD and FreeBSD. NetBSD support is now relatively good and working towards parity with Linux. This also works with the NetBSD rump kernel under other operating systems and natively without an operating system under Xen - see https://github.com/justincormack/rumpuser-xen for details.
 
 This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
 
@@ -34,17 +34,19 @@ Android (ARM tested so far) currently passes all the non root tests now; some te
 
 For the NetBSD support all platforms should work in principle; more test targets will be added soon, currently tests being run on x86 and amd64, an ARM test target will be added soon.
 
-There is a small amount of FreeBSD support, so some tests pass, more will be added. A small amount of OSX support was added but there is no test environment at present.
+FreeBSD support is currently only for FreeBSD 10. FreeBSD 9 support should be fairly easy to add, but there are some type changes eg ino_t. More code can be moved from NetBSD to generic BSD so it can be used by FreeBSD.
+
+A small amount of OSX support was added but there is no test environment at present.
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
 For the (optional) rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project, which is now included as a git submodule. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There are some additional examples in `examples/rump` which is a port of the tests in buildrump. The rump kernel runs on many elf/Posix OS and architectures, currently tested on Linux x86, x64, ppc, arm and NetBSD x86, x64, with more targets to be added soon.
 
 ## New features planned soon
-netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD support, rump kernel hypercall API, OSv support, Lua support, more introspection, FreeBSD support.
+netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD and FreeBSD support, rump kernel hypercall API, OSv support, Lua support, more introspection.
 
 ## Release notes
-0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, luaffi support again, better kernel headers and fixes against them, more MIPS support, improved APIs with multiple return values, initial NetBSD and Rump ktrace support, initial FreeBSD support.
+0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, luaffi support again, better kernel headers and fixes against them, more MIPS support, improved APIs with multiple return values, initial NetBSD and rump ktrace support, FreeBSD support.
 
 0.8 rump kernel fixes, NetBSD 64 bit fixes, initial arp/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support, initial support of NetBSD network config.
 
