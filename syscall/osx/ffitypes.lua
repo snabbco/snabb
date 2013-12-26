@@ -166,6 +166,24 @@ struct termios {
   speed_t         c_ispeed;
   speed_t         c_ospeed;
 };
+struct rusage {
+  struct timeval ru_utime;
+  struct timeval ru_stime;
+  long    ru_maxrss;
+  long    ru_ixrss;
+  long    ru_idrss;
+  long    ru_isrss;
+  long    ru_minflt;
+  long    ru_majflt;
+  long    ru_nswap;
+  long    ru_inblock;
+  long    ru_oublock;
+  long    ru_msgsnd;
+  long    ru_msgrcv;
+  long    ru_nsignals;
+  long    ru_nvcsw;
+  long    ru_nivcsw;
+};
 ]]
 
 local ffi = require "ffi"

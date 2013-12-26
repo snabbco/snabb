@@ -722,5 +722,20 @@ c.TCFLOW = strflag {
   ION  = 4,
 }
 
+-- waitpid and wait4 pid
+c.WAIT = strflag {
+  ANY      = -1,
+  MYPGRP   = 0,
+}
+
+-- getpriority, setpriority flags
+c.PRIO = strflag {
+  PROCESS = 0,
+  PGRP = 1,
+  USER = 2,
+  MIN = -20, -- TODO useful to have for other OSs
+  MAX = 20,
+}
+
 return c
 
