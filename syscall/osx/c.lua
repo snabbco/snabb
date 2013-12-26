@@ -40,10 +40,12 @@ C.stat = C.stat64
 C.fstat = C.fstat64
 C.lstat = C.lstat64
 
-local getdirentries = 196 -- TODO create syscall table
+-- TODO create syscall table
+local getdirentries = 196
+local getdirentries64 = 344
 
 function C.getdirentries(fd, buf, len, basep)
-  return C.syscall(getdirentries, int(fd), void(buf), int(len), void(basep))
+  return C.syscall(getdirentries64, int(fd), void(buf), int(len), void(basep))
 end
 
 return C
