@@ -24,6 +24,9 @@ local t, pt, s = types.t, types.pt, types.s
 
 -- TODO lutimes is implemented using setattrlist(2) in OSX
 
+function S.grantpt(fd) return S.ioctl(fd, "TIOCPTYGRANT") end
+function S.unlockpt(fd) return S.ioctl(fd, "TIOCPTYUNLK") end
+
 return S
 
 end
