@@ -1681,13 +1681,13 @@ test_mmap = {
   teardown = clean,
   test_mmap_fail = function()
     local size = 4096
-    local mem, err = S.mmap(pt.void(1), size, "read", "private, fixed, anonymous", -1, 0)
+    local mem, err = S.mmap(pt.void(1), size, "read", "private, fixed, anon", -1, 0)
     assert(err, "expect non aligned fixed map to fail")
     assert(err.INVAL, "expect non aligned map to return EINVAL")
   end,
   test_mmap_anon = function()
     local size = 4096
-    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    local mem = assert(S.mmap(nil, size, "read", "private, anon", -1, 0))
     assert(S.munmap(mem, size))
   end,
   test_mmap_file = function()
@@ -1700,19 +1700,19 @@ test_mmap = {
   end,
   test_msync = function()
     local size = 4096
-    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    local mem = assert(S.mmap(nil, size, "read", "private, anon", -1, 0))
     assert(S.msync(mem, size, "sync"))
     assert(S.munmap(mem, size))
   end,
   test_madvise = function()
     local size = 4096
-    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    local mem = assert(S.mmap(nil, size, "read", "private, anon", -1, 0))
     assert(S.madvise(mem, size, "random"))
     assert(S.munmap(mem, size))
   end,
   test_mlock = function()
     local size = 4096
-    local mem = assert(S.mmap(nil, size, "read", "private, anonymous", -1, 0))
+    local mem = assert(S.mmap(nil, size, "read", "private, anon", -1, 0))
     assert(S.mlock(mem, size))
     assert(S.munlock(mem, size))
     assert(S.munmap(mem, size))
