@@ -31,6 +31,8 @@ c.STD.ERR = nil
 
 c.SIGACT = nil -- TODO cast correctly instead, giving warning
 
+for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
+
 -- these are Linux names TODO are there actually BSD names?
 ctypes["struct ethhdr"] = nil
 ctypes["struct iphdr"] = nil
