@@ -89,9 +89,6 @@ function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, g
 function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
 function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
-function S.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
-  return retbool(C.linkat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath, c.AT[flags]))
-end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 function S.chroot(path) return retbool(C.chroot(path)) end
 function S.umask(mask) return C.umask(c.MODE[mask]) end
@@ -467,6 +464,11 @@ function S.getpriority(which, who)
 end
 
 -- these may not always exist, but where they do they have the same interface
+if C.linkat then
+  function S.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
+    return retbool(C.linkat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath, c.AT[flags]))
+  end
+end
 if C.symlinkat then
   function S.symlinkat(oldpath, newdirfd, newpath) return retbool(C.symlinkat(oldpath, c.AT_FDCWD[newdirfd], newpath)) end
 end
