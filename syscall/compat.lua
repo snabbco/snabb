@@ -93,20 +93,6 @@ if S.wait4 and not S.wait then
   S.wait = function(status) return S.wait4(-1, 0, false, status) end
 end
 
-if not S.pipe2 then
-  S.pipe2 = function(flags, fd2)
-    assert(not flags, "TODO add pipe flags emulation") -- TODO emulate flags from Linux pipe2
-    return S.pipe(fd2)
-  end
-end
-
-if not S.dup3 then
-  function S.dup3(oldfd, newfd, flags)
-    assert(not flags, "TODO add dup3 flags emulation") -- TODO emulate flags from Linux dup3
-    return S.dup2(oldfd, newfd)
-  end
-end
-
 if not S.nanosleep then
   function S.nanosleep(req, rem)
     S.select({}, req)
