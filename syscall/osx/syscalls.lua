@@ -24,10 +24,6 @@ local t, pt, s = types.t, types.pt, types.s
 
 -- TODO lutimes is implemented using setattrlist(2) in OSX
 
-local function isptmaster(fd) return fd:ioctl("TIOCPTMASTER") end
-S.grantpt = isptmaster
-S.unlockpt = isptmaster
-
 return S
 
 end
