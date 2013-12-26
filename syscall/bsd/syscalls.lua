@@ -28,6 +28,7 @@ if C.getdirentries then
   function S.getdirentries(fd, buf, size, basep)
     size = size or 4096
     buf = buf or t.buffer(size)
+    basep = basep or t.long1()
     local ret, err = C.getdirentries(getfd(fd), buf, size, basep)
     if ret == -1 then return nil, t.error(err or errno()) end
     return t.dirents(buf, ret)
