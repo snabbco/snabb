@@ -513,8 +513,6 @@ c.W = multiflags {
   CONTINUED   = 4,
   NOWAIT      = 8,
   EXITED      = 16,
-  TRAPPED     = 32,
-  LINUXCLONE  = 0x80000000,
 }
 
 c.W.STOPPED = c.W.UNTRACED
@@ -599,7 +597,6 @@ c.MAP = multiflags {
   FIXED          = 0x0010,
   RENAME         = 0x0020,
   NORESERVE      = 0x0040,
-  NORESERVE0080  = 0x0080,
   NOEXTEND       = 0x0100,
   HASSEMAPHORE   = 0x0200,
   NOCACHE        = 0x0400,
@@ -633,11 +630,8 @@ c.MADV = strflag {
   PROTECT     = 10,
 }
 
--- Baud rates just the identity function  other than EXTA, EXTB
-c.B = strflag {
-  EXTA = 19200,
-  EXTB = 38400,
-}
+-- Baud rates just the identity function
+c.B = strflag {}
 
 c.CC = strflag {
   VEOF           = 0,
@@ -772,19 +766,11 @@ c.RUSAGE = strflag {
 }
 
 c.PC = strflag {
-  LINK_MAX          = 1,
   MAX_CANON         = 2,
-  MAX_INPUT         = 3,
-  NAME_MAX          = 4,
   PATH_MAX          = 5,
-  PIPE_BUF          = 6,
   CHOWN_RESTRICTED  = 7,
-  NO_TRUNC          = 8,
-  VDISABLE          = 9,
   ALLOC_SIZE_MIN    = 10,
-  FILESIZEBITS      = 12,
   REC_INCR_XFER_SIZE= 14,
-  REC_MAX_XFER_SIZE = 15,
   REC_MIN_XFER_SIZE = 16,
   REC_XFER_ALIGN    = 17,
   SYMLINK_MAX       = 18,
@@ -796,8 +782,6 @@ c.PC = strflag {
   ACL_PATH_MAX      = 60,
   CAP_PRESENT       = 61,
   INF_PRESENT       = 62,
-  MAC_PRESENT       = 63,
-  ACL_NFS4          = 64,
 }
 
 return c
