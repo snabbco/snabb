@@ -162,6 +162,32 @@ mt.flock = {
 
 addtype(types, "flock", "struct flock", mt.flock)
 
+-- TODO see Linux notes. Also maybe can be shared with BSDs, have not checked properly
+mt.wait = {
+  __index = function(w, k)
+    local _WSTATUS = bit.band(w.status, octal("0177"))
+    local _WSTOPPED = octal("0177")
+    local WTERMSIG = _WSTATUS
+    local EXITSTATUS = bit.band(bit.rshift(w.status, 8), 0xff)
+    local WIFEXITED = (_WSTATUS == 0)
+    local tab = {
+      WIFEXITED = WIFEXITED,
+      WIFSTOPPED = bit.band(w.status, 0xff) == _WSTOPPED,
+      WIFSIGNALED = _WSTATUS ~= _WSTOPPED and _WSTATUS ~= 0
+    }
+    if tab.WIFEXITED then tab.EXITSTATUS = EXITSTATUS end
+    if tab.WIFSTOPPED then tab.WSTOPSIG = EXITSTATUS end
+    if tab.WIFSIGNALED then tab.WTERMSIG = WTERMSIG end
+    if tab[k] then return tab[k] end
+    local uc = 'W' .. k:upper()
+    if tab[uc] then return tab[uc] end
+  end
+}
+
+function t.waitstatus(status)
+  return setmetatable({status = status}, mt.wait)
+end
+
 return types
 
 end
