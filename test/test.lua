@@ -1722,6 +1722,7 @@ test_mmap = {
     assert(S.munmap(mem, size))
   end,
   test_mlockall = function()
+    if not S.mlockall then error "skipped" end
     local ok, err = S.mlockall("current")
     assert(ok or err.nomem, "expect mlockall to succeed, or fail due to rlimit")
     assert(S.munlockall())

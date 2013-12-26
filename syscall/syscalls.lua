@@ -370,7 +370,6 @@ end
 function S.msync(addr, length, flags) return retbool(C.msync(addr, length, c.MSYNC[flags])) end
 function S.mlock(addr, len) return retbool(C.mlock(addr, len)) end
 function S.munlock(addr, len) return retbool(C.munlock(addr, len)) end
-function S.mlockall(flags) return retbool(C.mlockall(c.MCL[flags])) end
 function S.munlockall() return retbool(C.munlockall()) end
 function S.madvise(addr, length, advice) return retbool(C.madvise(addr, length, c.MADV[advice])) end
 
@@ -407,14 +406,6 @@ function S.ioctl(d, request, argp)
   return true -- will need override for few linux ones that return numbers
 end
 
-if C.pipe2 then
-  function S.pipe2(flags, fd2)
-    fd2 = fd2 or t.int2()
-    local ret, err = C.pipe2(fd2, c.OPIPE[flags])
-    if ret == -1 then return nil, t.error(err or errno()) end
-    return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
-  end
-end
 function S.pipe(fd2)
   fd2 = fd2 or t.int2()
   local ret, err = C.pipe(fd2)
@@ -464,6 +455,17 @@ function S.getpriority(which, who)
 end
 
 -- these may not always exist, but where they do they have the same interface
+if C.pipe2 then
+  function S.pipe2(flags, fd2)
+    fd2 = fd2 or t.int2()
+    local ret, err = C.pipe2(fd2, c.OPIPE[flags])
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
+  end
+end
+if C.mlockall then
+  function S.mlockall(flags) return retbool(C.mlockall(c.MCL[flags])) end
+end
 if C.linkat then
   function S.linkat(olddirfd, oldpath, newdirfd, newpath, flags)
     return retbool(C.linkat(c.AT_FDCWD[olddirfd], oldpath, c.AT_FDCWD[newdirfd], newpath, c.AT[flags]))
