@@ -52,6 +52,8 @@ end
 
 --C.getdirentries = C._getdirentries -- this is the legacy one
 
+C,getdirectries = function() error "work in progress" end
+
 return C
 
 
