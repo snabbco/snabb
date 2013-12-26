@@ -829,6 +829,7 @@ test_file_operations = {
 test_file_operations_at = {
   teardown = clean,
   test_linkat = function()
+    if not S.linkat then error "skipped" end
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.linkat("fdcwd", tmpfile, "fdcwd", tmpfile2, "symlink_follow"))
     assert(S.unlink(tmpfile2))
