@@ -21,7 +21,11 @@ local arch = require("syscall.linux." .. abi.arch .. ".ioctl")(s)
 local bit = require "syscall.bit"
 
 local band = bit.band
-local bor = bit.bor
+local function bor(...)
+  local r = bit.bor(...)
+  if r < 0 then r = r + 4294967296 end -- TODO see note in NetBSD
+  return r
+end
 local lshift = bit.lshift
 local rshift = bit.rshift
 
