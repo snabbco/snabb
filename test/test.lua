@@ -1654,20 +1654,20 @@ test_proc = {
     if not ps and err.NOENT then error "skipped" end -- FreeBSD usually does not have proc mounted, although usually mount point
     assert(ps)
     local me = S.getpid()
-    local found, count = false, 0
+    local found = false
+    if #ps == 0 then error "skipped" end -- not mounted but mount point exists
     for i = 1, #ps do
       if ps[i].pid == 1 then
         assert(ps[i].cmdline:find("init") or ps[i].cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
       end
       if ps[i].pid == me then found = true end
     end
-    if count == 0 then error "skipped" end -- not mounted but mount point exists
     assert(found, "expect to find my process in ps")
     assert(tostring(ps), "can convert ps to string")
   end,
   test_proc_self = function()
     local p = util.proc()
-    if not c.cmdline then error "skipped" end -- no files found, /proc not mounted
+    if not p.cmdline then error "skipped" end -- no files found, /proc not mounted
     assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
     assert(not p.wrongname, "test non existent files")
     assert(p.exe and #p.exe > 1, "expect an executable")
@@ -1675,7 +1675,7 @@ test_proc = {
   end,
   test_proc_init = function()
     local p = util.proc(1)
-    if not c.cmdline then error "skipped" end -- no files found, /proc not mounted
+    if not p.cmdline then error "skipped" end -- no files found, /proc not mounted
     assert(p and p.cmdline, "expect init to have cmdline")
     assert(p.cmdline:find("init") or p.cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
   end,
