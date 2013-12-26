@@ -77,6 +77,7 @@ print [[
 #include <sys/ioctl.h>
 #include <sys/reboot.h>
 #include <sys/syscall.h>
+#include <sys/ttycom.h>
 
 int ret = 0;
 
