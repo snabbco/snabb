@@ -23,6 +23,49 @@ end
 local lshift = bit.lshift
 local rshift = bit.rshift
 
+local IOC = {
+  VOID  = 0x20000000,
+  OUT   = 0x40000000,
+  IN    = 0x80000000,
+  PARM_SHIFT  = 13,
+}
+
+IOC.PARM_MASK = lshift(1, IOC.PARM_SHIFT) - 1
+IOC.INOUT = IOC.IN + IOC.OUT
+IOC.DIRMASK = IOC.IN + IOC.OUT + IOC.VOID
+
+local function ioc(dir, ch, nr, size)
+  return t.ulong(bor(dir,
+                 lshift(band(size, IOC.PARM_MASK), 16),
+                 lshift(ch, 8),
+                 nr))
+end
+
+local singletonmap = {
+  int = "int1",
+  char = "char1",
+  uint = "uint1",
+  uint64 = "uint64_1",
+  off = "off1",
+}
+
+local function _IOC(dir, ch, nr, tp)
+  if type(ch) == "string" then ch = ch:byte() end
+  if type(tp) == "number" then return ioc(dir, ch, nr, tp) end
+  local size = s[tp]
+  local singleton = singletonmap[tp] ~= nil
+  tp = singletonmap[tp] or tp
+  return {number = ioc(dir, ch, nr, size),
+          read = dir == IOC.OUT or dir == IOC.INOUT, write = dir == IOC.IN or dir == IOC.INOUT,
+          type = t[tp], singleton = singleton}
+end
+
+local _IO     = function(ch, nr)     return _IOC(IOC.VOID, ch, nr, 0) end
+local _IOR    = function(ch, nr, tp) return _IOC(IOC.OUT, ch, nr, tp) end
+local _IOW    = function(ch, nr, tp) return _IOC(IOC.IN, ch, nr, tp) end
+local _IOWR   = function(ch, nr, tp) return _IOC(IOC.INOUT, ch, nr, tp) end
+local _IOWINT = function(ch, nr)     return _IOC(IOC.VOID, ch, nr, "int") end
+
 local ioctl = strflag {
   -- tty ioctls
   TIOCEXCL       =  _IO('t', 13),
