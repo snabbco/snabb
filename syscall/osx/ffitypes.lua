@@ -157,6 +157,15 @@ struct flock {
   short  l_type;
   short  l_whence;
 };
+struct termios {
+  tcflag_t        c_iflag;
+  tcflag_t        c_oflag;
+  tcflag_t        c_cflag;
+  tcflag_t        c_lflag;
+  cc_t            c_cc[20];
+  speed_t         c_ispeed;
+  speed_t         c_ospeed;
+};
 ]]
 
 local ffi = require "ffi"
