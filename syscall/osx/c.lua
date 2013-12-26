@@ -50,7 +50,7 @@ function C.getdirentries(fd, buf, len, basep)
 end
 ]]
 
-C.getdirentries = C._getdirentries -- this is the legacy one
+--C.getdirentries = C._getdirentries -- this is the legacy one
 
 return C
 
