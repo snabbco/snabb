@@ -41,18 +41,16 @@ C.fstat = C.fstat64
 C.lstat = C.lstat64
 
 -- TODO create syscall table. Except I cannot find how to call them, neither C.syscall nor C._syscall seems to exist
---[[
+
 local getdirentries = 196
 local getdirentries64 = 344
 
 function C.getdirentries(fd, buf, len, basep)
   return C._syscall(getdirentries64, int(fd), void(buf), int(len), void(basep))
 end
-]]
+
 
 --C.getdirentries = C._getdirentries -- this is the legacy one
-
-C.getdirectries = function() error "work in progress" end
 
 return C
 
