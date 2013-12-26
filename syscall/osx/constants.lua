@@ -508,14 +508,13 @@ c.LOCK = multiflags {
 }
 
 c.W = multiflags {
-  NOHANG      = 1,
-  UNTRACED    = 2,
-  CONTINUED   = 4,
-  NOWAIT      = 8,
-  EXITED      = 16,
+  NOHANG      = 0x00000001,
+  UNTRACED    = 0x00000002,
+  EXITED      = 0x00000004,
+  STOPPED     = 0x00000008,
+  CONTINUED   = 0x00000010,
+  NOWAIT      = 0x00000020,
 }
-
-c.W.STOPPED = c.W.UNTRACED
 
 c.S_I = modeflags {
   FMT   = octal('0170000'),
@@ -577,7 +576,7 @@ c.POLL = multiflags {
   WRBAND      = 0x100,
   EXTEND      = 0x200,
   ATTRIB      = 0x400,
-  NLINK       = 0x8000,
+  NLINK       = 0x800,
   WRITE       = 0x1000,
 }
 
