@@ -623,11 +623,10 @@ c.MADV = strflag {
   WILLNEED    = 3,
   DONTNEED    = 4,
   FREE        = 5,
-  NOSYNC      = 6,
-  AUTOSYNC    = 7,
-  NOCORE      = 8,
-  CORE        = 9,
-  PROTECT     = 10,
+  ZERO_WIRED_PAGES = 6,
+  FREE_REUSABLE    = 7,
+  FREE_REUSE       = 8,
+  CAN_REUSE        = 9,
 }
 
 -- Baud rates just the identity function
@@ -762,7 +761,6 @@ c.PRIO = strflag {
 c.RUSAGE = strflag {
   SELF     =  0,
   CHILDREN = -1,
-  THREAD   = 1,
 }
 
 c.PC = strflag {

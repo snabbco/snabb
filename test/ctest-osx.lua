@@ -149,6 +149,9 @@ local nm = {
   FCNTL_LOCK = "F_",
   LOCKF = "F_",
   PC = "_PC_",
+  TCSA = "TCSA",
+  TCFLUSH = "TC",
+  TCFLOW = "TC",
 }
 
 for k, v in pairs(c) do

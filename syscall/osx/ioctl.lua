@@ -87,7 +87,6 @@ local ioctl = strflag {
   TIOCEXT        = _IOW('t', 96, "int"),
   TIOCSCTTY      =  _IO('t', 97),
   TIOCCONS       = _IOW('t', 98, "int"),
-  TIOCGSID       = _IOR('t', 99, "int"),
   TIOCSTAT       =  _IO('t', 101),
   TIOCUCNTL      = _IOW('t', 102, "int"),
   TIOCSWINSZ     = _IOW('t', 103, "winsize"),
