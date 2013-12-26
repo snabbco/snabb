@@ -32,8 +32,6 @@ typedef uint32_t gid_t;
 typedef int32_t pid_t;
 
 typedef unsigned int socklen_t;
-typedef unsigned int tcflag_t;
-typedef unsigned int speed_t;
 
 // 64 bit
 typedef int64_t off_t;

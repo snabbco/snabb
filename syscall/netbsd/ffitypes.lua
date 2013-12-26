@@ -62,6 +62,8 @@ typedef int _netbsd_timer_t;
 typedef int _netbsd_suseconds_t;
 typedef unsigned int _netbsd_nfds_t;
 typedef uint32_t _netbsd_id_t;
+typedef unsigned int _netbsd_tcflag_t;
+typedef unsigned int _netbsd_speed_t;
 
 /* these are not used in Linux so not renamed */
 typedef unsigned int useconds_t;
@@ -311,13 +313,13 @@ struct _netbsd_flock {
   short   l_whence;
 };
 struct _netbsd_termios {
-        tcflag_t        c_iflag;        /* input flags */
-        tcflag_t        c_oflag;        /* output flags */
-        tcflag_t        c_cflag;        /* control flags */
-        tcflag_t        c_lflag;        /* local flags */
-        cc_t            c_cc[20];       /* control chars */
-        int             c_ispeed;       /* input speed */
-        int             c_ospeed;       /* output speed */
+  _netbsd_tcflag_t        c_iflag;
+  _netbsd_tcflag_t        c_oflag;
+  _netbsd_tcflag_t        c_cflag;
+  _netbsd_tcflag_t        c_lflag;
+  cc_t            c_cc[20];
+  int             c_ispeed;
+  int             c_ospeed;
 };
 /* compat issues */
 struct _netbsd_compat_60_ptmget {
