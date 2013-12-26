@@ -1338,7 +1338,7 @@ test_sockets_pipes = {
     assert(cs:close())
   end,
   test_named_unix = function()
-    local sock = assert(S.socket("local", "seqpacket"))
+    local sock = assert(S.socket("local", "stream"))
     local sa = t.sockaddr_un(tmpfile)
     assert(sock:bind(sa))
     local st = assert(S.stat(tmpfile))
