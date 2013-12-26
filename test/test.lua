@@ -1194,7 +1194,8 @@ test_sockets_pipes = {
     assert(pw:close())
   end,
   test_inet_socket = function() -- TODO break this test up
-    local s = assert(S.socket("inet", "stream, nonblock"))
+    local s = assert(S.socket("inet", "stream"))
+    assert(s:nonblock())
     local sa = assert(t.sockaddr_in(0, "loopback"))
     assert(sa.sin_family == 2, "expect family on inet socket to be 2")
     assert(s:bind(sa))
@@ -1235,7 +1236,8 @@ test_sockets_pipes = {
     assert(s:close())
   end,
   test_inet_socket_readv = function() -- part of above, no netbsd bug (but commenting out writev does trigger)
-    local s = assert(S.socket("inet", "stream, nonblock"))
+    local s = assert(S.socket("inet", "stream"))
+    assert(s:nonblock())
     local sa = assert(t.sockaddr_in(0, "loopback"))
     assert(sa.sin_family == 2, "expect family on inet socket to be 2")
     assert(s:bind(sa))
