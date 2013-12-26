@@ -650,13 +650,13 @@ function S.tcsetattr(fd, optional_actions, tio)
   return S.ioctl(fd, tcsets[inc], tio)
 end
 function S.tcsendbreak(fd, duration)
-  return S.ioctl(fd, "TCSBRK") -- Linux ignores duration
+  return S.ioctl(fd, "TCSBRK", pt.void(0)) -- Linux ignores duration
 end
 function S.tcdrain(fd)
-  return S.ioctl(fd, "TCSBRK", t.int(1)) -- note use of literal 1, not pointer
+  return S.ioctl(fd, "TCSBRK", pt.void(1)) -- note use of literal 1 cast to pointer
 end
 function S.tcflush(fd, queue_selector)
-  return S.ioctl(fd, "TCFLSH", t.int(c.TCFLUSH[queue_selector]))
+  return S.ioctl(fd, "TCFLSH", pt.void(c.TCFLUSH[queue_selector]))
 end
 function S.tcflow(fd, action)
   return S.ioctl(fd, "TCXONC", pt.void(c.TCFLOW[action]))
