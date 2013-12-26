@@ -491,6 +491,34 @@ c.FCNTL_LOCK = strflag {
   WRLCK = 3,
 }
 
+-- lockf, changed from F_ to LOCKF_
+c.LOCKF = strflag {
+  ULOCK = 0,
+  LOCK  = 1,
+  TLOCK = 2,
+  TEST  = 3,
+}
+
+-- for flock (2)
+c.LOCK = multiflags {
+  SH        = 0x01,
+  EX        = 0x02,
+  NB        = 0x04,
+  UN        = 0x08,
+}
+
+c.W = multiflags {
+  NOHANG      = 1,
+  UNTRACED    = 2,
+  CONTINUED   = 4,
+  NOWAIT      = 8,
+  EXITED      = 16,
+  TRAPPED     = 32,
+  LINUXCLONE  = 0x80000000,
+}
+
+c.W.STOPPED = c.W.UNTRACED
+
 c.S_I = modeflags {
   FMT   = octal('0170000'),
   FSOCK = octal('0140000'),
@@ -735,6 +763,12 @@ c.PRIO = strflag {
   USER = 2,
   MIN = -20, -- TODO useful to have for other OSs
   MAX = 20,
+}
+
+c.RUSAGE = strflag {
+  SELF     =  0,
+  CHILDREN = -1,
+  THREAD   = 1,
 }
 
 return c
