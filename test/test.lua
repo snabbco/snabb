@@ -547,6 +547,7 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_dup3 = function()
+    if not S.dup3 then error "skipped" end
     local fd = assert(S.open("/dev/zero"))
     local fd2 = assert(fd:dup3(17))
     assert_equal(fd2:getfd(), 17, "dup3 should set file id as specified")
