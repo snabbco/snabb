@@ -152,6 +152,13 @@ struct dirent {
   uint8_t   d_type;
   char      d_name[1024];
 };
+struct legacy_dirent {
+  uint32_t d_ino;
+  uint16_t d_reclen;
+  uint8_t  d_type;
+  uint8_t  d_namlen;
+  char d_name[256];
+};
 struct flock {
   off_t  l_start;
   off_t  l_len;

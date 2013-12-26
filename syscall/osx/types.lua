@@ -126,7 +126,7 @@ addtype(types, "siginfo", "siginfo_t", mt.siginfo)
 mt.dirent = {
   index = {
     ino = function(self) return self.d_ino end,
-    seekoff = function(self) return self.d_seekoff end,
+    --seekoff = function(self) return self.d_seekoff end, -- not in legacy dirent
     reclen = function(self) return self.d_reclen end,
     namlen = function(self) return self.d_namlen end,
     type = function(self) return self.d_type end,
@@ -140,7 +140,7 @@ for k, v in pairs(c.DT) do
   mt.dirent.index[k] = function(self) return self.type == v end
 end
 
-addtype(types, "dirent", "struct dirent", mt.dirent)
+addtype(types, "dirent", "struct legacy_dirent", mt.dirent)
 
 mt.flock = {
   index = {
