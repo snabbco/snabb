@@ -42,7 +42,6 @@ c.X_OK = c.OK.X
 c.OK = nil
 
 c.SIGACT = nil -- TODO cast correctly instead, giving warning
-c.MAP.ANONYMOUS = nil -- compatibility
 c.CHFLAGS.NODUMP = nil -- alias
 c.CHFLAGS.IMMUTABLE = nil -- alias
 c.CHFLAGS.APPEND = nil -- alias

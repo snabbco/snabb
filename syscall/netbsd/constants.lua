@@ -582,8 +582,6 @@ c.MAP = multiflags {
   ALIGNMENT_64PB   = map_aligned(56),
 }
 
-c.MAP.ANONYMOUS = c.MAP.ANON -- for compatibility
-
 c.MCL = strflag {
   CURRENT    = 0x01,
   FUTURE     = 0x02,

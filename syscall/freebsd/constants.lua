@@ -394,8 +394,6 @@ c.MAP = multiflags {
 
 if abi.abi64 then c.MAP["32BIT"] = 0x00080000 end
 
-c.MAP.ANONYMOUS = c.MAP.ANON -- for compatibility
-
 c.MCL = strflag {
   CURRENT    = 0x01,
   FUTURE     = 0x02,
