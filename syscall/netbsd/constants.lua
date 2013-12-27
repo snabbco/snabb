@@ -1088,5 +1088,16 @@ c.ND6 = strflag {
   INFINITE_LIFETIME = h.uint32_max,
 }
 
+c.TCP = strflag {
+  NODELAY    = 1,
+  MAXSEG     = 2,
+  KEEPIDLE   = 3,
+  KEEPINTVL  = 5,
+  KEEPCNT    = 6,
+  KEEPINIT   = 7,
+  MD5SIG     = 0x10,
+  CONGCTL    = 0x20,
+}
+
 return c
 

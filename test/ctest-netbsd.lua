@@ -136,6 +136,7 @@ print [[
 #include <net/route.h>
 #include <net/bpf.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <netinet6/in6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
