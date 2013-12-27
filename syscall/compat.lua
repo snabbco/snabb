@@ -69,6 +69,13 @@ if not S.utime then
   end
 end
 
+-- not a syscall in Linux
+if S.utimensat and not S.futimens then
+  function S.futimens(fd, times)
+    return S.utimensat(fd, nil, times, 0)
+  end
+end
+
 -- the utimes, futimes, lutimes are legacy, but OSX/FreeBSD do not support the nanosecond versions
 -- we support the legacy versions but do not fake the more precise ones
 S.futimes = S.futimes or S.futimens

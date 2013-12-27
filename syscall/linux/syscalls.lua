@@ -83,11 +83,6 @@ function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.sync_file_range(getfd(fd), offset, count, c.SYNC_FILE_RANGE[flags]))
 end
 
--- not a syscall in Linux but method of implementation slightly non standard so here not compat
-function S.futimens(fd, times)
-  return S.utimensat(fd, nil, times, 0)
-end
-
 function S.getcwd(buf, size)
   size = size or c.PATH_MAX
   buf = buf or t.buffer(size)

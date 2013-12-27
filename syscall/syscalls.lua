@@ -581,6 +581,12 @@ if C.getdents then
     return t.dirents(buf, ret)
   end
 end
+if C.futimens then
+  function S.futimens(fd, ts)
+    if ts then ts = t.timespec2(ts) end
+    return retbool(C.futimens(getfd(fd), ts))
+  end
+end
 
 -- TODO not sure about this interface, maybe return rem as extra parameter see #103
 if C.nanosleep then

@@ -59,11 +59,6 @@ function S.reboot(how, bootstr)
   return retbool(C.reboot(c.RB[how], bootstr))
 end
 
-function S.futimens(fd, ts)
-  if ts then ts = t.timespec2(ts) end
-  return retbool(C.futimens(getfd(fd), ts))
-end
-
 function S.fsync_range(fd, how, start, length) return retbool(C.fsync_range(getfd(fd), c.FSYNC[how], start, length)) end
 
 function S.getvfsstat(flags, buf, size) -- note order of args as usually leave buf empty
