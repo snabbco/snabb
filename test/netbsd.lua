@@ -152,7 +152,7 @@ test.sockets_pipes_netbsd = {
 
 test.kqueue = {
   test_kqueue_vnode = function()
-    local kfd = assert(S.kqueue("cloexec, nosigpipe"))
+    local kfd = assert(S.kqueue())
     local fd = assert(S.creat(tmpfile, "rwxu"))
     local kevs = t.kevents{{fd = fd, filter = "vnode",
       flags = "add, enable, clear", fflags = "delete, write, extend, attrib, link, rename, revoke"}}
@@ -178,7 +178,7 @@ test.kqueue = {
     assert(kfd:close())
   end,
   test_kqueue_read = function()
-    local kfd = assert(S.kqueue("cloexec, nosigpipe"))
+    local kfd = assert(S.kqueue())
     local p1, p2 = assert(S.pipe())
     local kevs = t.kevents{{fd = p1, filter = "read", flags = "add"}}
     assert(kfd:kevent(kevs, nil))
@@ -206,7 +206,7 @@ test.kqueue = {
     assert(kfd:close())
   end,
   test_kqueue_write = function()
-    local kfd = assert(S.kqueue("cloexec, nosigpipe"))
+    local kfd = assert(S.kqueue())
     local p1, p2 = assert(S.pipe())
     local kevs = t.kevents{{fd = p2, filter = "write", flags = "add"}}
     assert(kfd:kevent(kevs, nil))
@@ -227,7 +227,7 @@ test.kqueue = {
     assert(kfd:close())
   end,
   test_kqueue_timer = function()
-    local kfd = assert(S.kqueue("cloexec, nosigpipe"))
+    local kfd = assert(S.kqueue())
     local kevs = t.kevents{{ident = 0, filter = "timer", flags = "add, oneshot", data = 10}}
     assert(kfd:kevent(kevs, nil))
     local count = 0

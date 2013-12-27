@@ -84,7 +84,8 @@ function S.getcwd(buf, size)
   return ffi.string(buf)
 end
 
-function S.kqueue(flags) return retfd(C.kqueue1(c.O[flags])) end
+function S.kqueue1(flags) return retfd(C.kqueue1(c.O[flags])) end
+function S.kqueue() return retfd(C.kqueue()) end
 
 function S.kevent(kq, changelist, eventlist, timeout)
   if timeout then timeout = mktype(t.timespec, timeout) end
