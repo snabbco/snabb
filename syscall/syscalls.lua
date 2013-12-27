@@ -604,8 +604,8 @@ end
 S.openpt = S.posix_openpt
 
 function S.isatty(fd)
-  local tc = S.tcgetattr(fd)
-  if tc then return true else return false end
+  local tc, err = S.tcgetattr(fd)
+  if tc then return true else return nil, err end
 end
 function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
 
