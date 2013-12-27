@@ -1355,10 +1355,18 @@ test_sockets_pipes = {
     assert(fd:close())
   end,
   test_getsockopt_acceptconn = function()
-    local s = assert(S.socket("inet", "dgram"))
+    local s = assert(S.socket("inet", "stream"))
     local sa = t.sockaddr_in(0, "loopback")
     assert(s:bind(sa))
-    assert_equal(s:getsockopt("socket", "acceptconn"), 0)
+    local ok, err = s:getsockopt("socket", "acceptconn")
+    if not ok and err.NOPROTOOPT then error "skipped" end -- NetBSD 6, OSX do not support this on socket level
+    assert_equal(ok, 0)
+    assert(s:close())
+  end,
+  test_sockopt_sndbuf = function()
+    local s = assert(S.socket("inet", "stream"))
+    local n = assert(s:getsockopt("socket", "sndbuf"))
+    assert(n > 0)
     assert(s:close())
   end,
   test_setsockopt_keepalive = function()
