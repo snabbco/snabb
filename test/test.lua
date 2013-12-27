@@ -1375,7 +1375,7 @@ test_sockets_pipes = {
     assert(s:bind(sa))
     assert_equal(s:getsockopt("socket", "keepalive"), 0)
     assert(s:setsockopt("socket", "keepalive", 1))
-    assert_equal(s:getsockopt("socket", "keepalive"), 1)
+    assert(s:getsockopt("socket", "keepalive") ~= 0) -- FreeBSD does not return 1
     assert(s:close())
   end,
 }
