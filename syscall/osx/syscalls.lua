@@ -26,6 +26,12 @@ local t, pt, s = types.t, types.pt, types.s
 
 function S.grantpt(fd) return S.ioctl(fd, "TIOCPTYGRANT") end
 function S.unlockpt(fd) return S.ioctl(fd, "TIOCPTYUNLK") end
+function S.ptsname(fd)
+  local buf = t.buffer(128)
+  local ok, err = S.ioctl(fd, "TIOCPTYGNAME", buf)
+  if not ok then return nil, err end
+  return ffi.string(buf)
+end
 
 return S
 
