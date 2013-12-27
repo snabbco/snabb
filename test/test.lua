@@ -1481,13 +1481,13 @@ test_termios = {
     termios.speed = 115200
     assert_equal(termios.ispeed, 115200)
     assert_equal(termios.ospeed, 115200)
-    assert(bit.band(termios.c_lflag, c.LFLAG.ICANON) ~= 0)
+    assert(bit.band(termios.lflag, c.LFLAG.ICANON) ~= 0)
     termios:makeraw()
-    assert(bit.band(termios.c_lflag, c.LFLAG.ICANON) == 0)
+    assert(bit.band(termios.lflag, c.LFLAG.ICANON) == 0)
     assert(pts:tcsetattr("now", termios))
     termios = assert(pts:tcgetattr())
     assert_equal(termios.ospeed, 115200)
-    assert(bit.band(termios.c_lflag, c.LFLAG.ICANON) == 0)
+    assert(bit.band(termios.lflag, c.LFLAG.ICANON) == 0)
     local ok, err = pts:tcsendbreak(0) -- as this is not actually a serial line, NetBSD seems to fail here
     assert(pts:tcdrain())
     assert(pts:tcflush('ioflush'))

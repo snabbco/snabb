@@ -63,10 +63,10 @@ mt.termios = {
     return true
   end,
   index = {
-    iflag = function(termios) return termios.c_iflag end,
-    oflag = function(termios) return termios.c_oflag end,
-    cflag = function(termios) return termios.c_cflag end,
-    lflag = function(termios) return termios.c_lflag end,
+    iflag = function(termios) return tonumber(termios.c_iflag) end,
+    oflag = function(termios) return tonumber(termios.c_oflag) end,
+    cflag = function(termios) return tonumber(termios.c_cflag) end,
+    lflag = function(termios) return tonumber(termios.c_lflag) end,
     makeraw = function(termios) return mt.termios.makeraw end,
     ispeed = function(termios) return termios.c_ispeed end,
     ospeed = function(termios) return termios.c_ospeed end,
