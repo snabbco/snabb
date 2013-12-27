@@ -1020,8 +1020,6 @@ c.NOTE = multiflags {
   TRACK     = 0x00000001,
   TRACKERR  = 0x00000002,
   CHILD     = 0x00000004,
---proc and signal
-  SIGNAL    = 0x08000000,
 }
 
 return c
