@@ -859,5 +859,74 @@ c.CHFLAGS.IMMUTABLE = c.CHFLAGS.UF_IMMUTABLE + c.CHFLAGS.SF_IMMUTABLE
 c.CHFLAGS.APPEND = c.CHFLAGS.UF_APPEND + c.CHFLAGS.SF_APPEND
 c.CHFLAGS.OPAQUE = c.CHFLAGS.UF_OPAQUE
 
+-- kqueue
+c.EV = multiflags {
+  ADD      = 0x0001,
+  DELETE   = 0x0002,
+  ENABLE   = 0x0004,
+  DISABLE  = 0x0008,
+  ONESHOT  = 0x0010,
+  CLEAR    = 0x0020,
+  RECEIPT  = 0x0040,
+  DISPATCH = 0x0080,
+  SYSFLAGS = 0xF000,
+  FLAG0    = 0x1000,
+  FLAG1    = 0x2000,
+  EOF      = 0x8000,
+  ERROR    = 0x4000,
+}
+
+c.EVFILT = strflag {
+  READ     = -1,
+  WRITE    = -2,
+  AIO      = -3,
+  VNODE    = -4,
+  PROC     = -5,
+  SIGNAL   = -6,
+  TIMER    = -7,
+  MACHPORT = -8,
+  FS       = -9,
+  USER     = -10,
+  VM       = -12,
+  SYSCOUNT = 13,
+}
+
+c.NOTE = multiflags {
+-- user
+  FFNOP      = 0x00000000,
+  FFAND      = 0x40000000,
+  FFOR       = 0x80000000,
+  FFCOPY     = 0xc0000000,
+  FFCTRLMASK = 0xc0000000,
+  FFLAGSMASK = 0x00ffffff,
+  TRIGGER    = 0x01000000,
+-- read and write
+  LOWAT     = 0x0001,
+-- vnode
+  DELETE    = 0x0001,
+  WRITE     = 0x0002,
+  EXTEND    = 0x0004,
+  ATTRIB    = 0x0008,
+  LINK      = 0x0010,
+  RENAME    = 0x0020,
+  REVOKE    = 0x0040,
+-- proc
+  EXIT      = 0x80000000,
+  FORK      = 0x40000000,
+  EXEC      = 0x20000000,
+  REAP      = 0x10000000,
+  SIGNAL    = 0x08000000,
+  EXITSTATUS= 0x04000000,
+  RESOURCEEND=0x02000000,
+-- app states
+--[[
+  APPACTIVE         = 0x00800000,
+  APPBACKGROUND     = 0x00400000,
+  APPNONUI          = 0x00200000,
+  APPINACTIVE       = 0x00100000,
+  APPALLSTATES      = 0x00f00000,
+--]]
+}
+
 return c
 
