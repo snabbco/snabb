@@ -89,6 +89,7 @@ function S.tcflow(fd, action)
   if cc ~= posix_vdisable and not S.write(fd, t.uchar1(cc), 1) then return nil end
   return true
 end
+function S.issetugid() return C.issetugid() end
 
 return S
 

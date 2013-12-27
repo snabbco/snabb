@@ -335,11 +335,7 @@ test.pollts = {
   end,
 }
 
-test.misc_bsd = {
-  test_issetugid = function()
-    local res = assert(S.issetugid())
-    assert(res == 0 or res == 1) -- some tests call setuid so might be tainted
-  end,
+test.misc_netbsd = {
   test_mknod_64bit_root = function()
     local dev = t.device(1999875, 515)
     assert(dev.dev > t.dev(0xffffffff))

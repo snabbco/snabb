@@ -104,8 +104,6 @@ function S.pollts(fds, timeout, set)
   return retnum(C.pollts(fds.pfd, #fds, timeout, set))
 end
 
-function S.issetugid() return C.issetugid() end
-
 function S.sigaction(signum, handler, oldact)
   if type(handler) == "string" or type(handler) == "function" then
     handler = {handler = handler, mask = "", flags = 0} -- simple case like signal

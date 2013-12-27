@@ -86,6 +86,10 @@ local ffi = require "ffi"
 if not S.__rump then
   local test = require("test." .. abi.os).init(S) -- OS specific tests
   for k, v in pairs(test) do _G["test_" .. k] = v end
+  if abi.bsd then
+    local test = require("test.bsd").init(S) -- BSD tests
+    for k, v in pairs(test) do _G["test_" .. k] = v end
+  end
 end
 if S.__rump then
   if abi.types == "linux" and not short then -- add linux tests unless running short tests
@@ -93,6 +97,8 @@ if S.__rump then
     for k, v in pairs(test) do _G["test_" .. k] = v end
   elseif abi.types == "netbsd" then
     local test = require("test.netbsd").init(S) -- OS specific tests
+    for k, v in pairs(test) do _G["test_" .. k] = v end
+    local test = require("test.bsd").init(S) -- BSD tests
     for k, v in pairs(test) do _G["test_" .. k] = v end
   end
   local test = require "test.rump".init(S) -- rump specific tests
