@@ -3350,5 +3350,31 @@ c.PCI_BASE_ADDRESS = strflag {
   --IO_MASK       (~0x03UL)
 }
 
+c.TCP = strflag {
+  NODELAY            = 1,
+  MAXSEG             = 2,
+  CORK               = 3,
+  KEEPIDLE           = 4,
+  KEEPINTVL          = 5,
+  KEEPCNT            = 6,
+  SYNCNT             = 7,
+  LINGER2            = 8,
+  DEFER_ACCEPT       = 9,
+  WINDOW_CLAMP       = 10,
+  INFO               = 11,
+  QUICKACK           = 12,
+  CONGESTION         = 13,
+  MD5SIG             = 14,
+  THIN_LINEAR_TIMEOUTS= 16,
+  THIN_DUPACK        = 17,
+  USER_TIMEOUT       = 18,
+  REPAIR             = 19,
+  REPAIR_QUEUE       = 20,
+  QUEUE_SEQ          = 21,
+  REPAIR_OPTIONS     = 22,
+  FASTOPEN           = 23,
+  TIMESTAMP          = 24,
+}
+
 return c
 

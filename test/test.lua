@@ -1378,6 +1378,15 @@ test_sockets_pipes = {
     assert(s:getsockopt("socket", "keepalive") ~= 0) -- FreeBSD does not return 1
     assert(s:close())
   end,
+  test_sockopt_tcp_nodelay = function()
+    local s = assert(S.socket("inet", "stream"))
+    local sa = t.sockaddr_in(0, "loopback")
+    assert(s:bind(sa))
+    assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 0)
+    assert(s:setsockopt(c.IPPROTO.TCP, c.TCP.NODELAY, 1))
+    assert(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY) ~= 0)
+    assert(s:close())
+  end,
 }
 
 test_timespec_timeval = {
