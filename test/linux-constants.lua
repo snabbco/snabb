@@ -288,6 +288,7 @@ print [[
 #include <linux/signalfd.h>
 #include <linux/virtio_pci.h>
 #include <linux/pci.h>
+#include <linux/tcp.h>
 //#include <linux/vfio.h>
 //#include <linux/seccomp.h>
 

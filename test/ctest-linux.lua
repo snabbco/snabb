@@ -360,6 +360,7 @@ print [[
 #include <elf.h>
 #include <net/ethernet.h>
 #include <sys/swap.h>
+#include <netinet/tcp.h>
 
 #include <linux/capability.h>
 #include <linux/reboot.h>
