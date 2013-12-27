@@ -94,6 +94,7 @@ print [[
 #include <net/route.h>
 #include <net/bpf.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 
 int ret = 0;
 
