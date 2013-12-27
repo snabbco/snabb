@@ -63,7 +63,7 @@ local function makedev(major, minor)
   if minor then
     local low = bit.bor(bit.band(minor, 0xff), bit.lshift(bit.band(major, 0xfff), 8), bit.lshift(bit.band(minor, bit.bnot(0xff)), 12))
     local high = bit.band(major, bit.bnot(0xfff))
-    dev = t.dev(low) + 0x100000000ULL * t.dev(high)
+    dev = t.dev(low) + 0x100000000 * t.dev(high)
   end
   return dev
 end
