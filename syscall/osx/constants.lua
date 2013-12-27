@@ -863,5 +863,17 @@ c.SO = strflag {
 
 c.SO.PROTOTYPE = c.SO.PROTOCOL
 
+c.TCP = strflag {
+  NODELAY            = 0x01,
+  MAXSEG             = 0x02,
+  NOPUSH             = 0x04,
+  NOOPT              = 0x08,
+  KEEPALIVE          = 0x10,
+  CONNECTIONTIMEOUT  = 0x20,
+--PERSIST_TIMEOUT    = 0x40, -- header defines not namespaced as TCP, bug?
+  RXT_CONNDROPTIME   = 0x80,
+  RXT_FINDROP 	     = 0x100,
+}
+
 return c
 
