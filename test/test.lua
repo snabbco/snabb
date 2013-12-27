@@ -1354,6 +1354,13 @@ test_sockets_pipes = {
     assert_equal(tostring(err), "Socket operation on non-socket")
     assert(fd:close())
   end,
+  test_sockopt_acceptconn = function()
+    local s = assert(S.socket("inet", "dgram"))
+    local sa = t.sockaddr_in(0, "loopback")
+    assert(s:bind(sa))
+    assert_equal(s:getsockopt("socket", "acceptconn"), 0)
+    assert(s:close())
+  end,
 }
 
 test_timespec_timeval = {

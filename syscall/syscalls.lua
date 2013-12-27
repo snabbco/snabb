@@ -205,7 +205,7 @@ function S.sendmsg(fd, msg, flags)
   return retnum(C.sendmsg(getfd(fd), msg, c.MSG[flags]))
 end
 function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG[flags])) end
--- TODO {get,set}sockopt may need better type handling see new sockopt file, plus not always c.SO[]
+-- TODO {get,set}sockopt may need better type handling see new unfinished sockopt file, plus not always c.SO[]
 function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far
   if not optlen and type(optval) == 'boolean' then optval = h.booltoc(optval) end
