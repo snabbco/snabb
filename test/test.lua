@@ -1354,11 +1354,20 @@ test_sockets_pipes = {
     assert_equal(tostring(err), "Socket operation on non-socket")
     assert(fd:close())
   end,
-  test_sockopt_acceptconn = function()
+  test_getsockopt_acceptconn = function()
     local s = assert(S.socket("inet", "dgram"))
     local sa = t.sockaddr_in(0, "loopback")
     assert(s:bind(sa))
     assert_equal(s:getsockopt("socket", "acceptconn"), 0)
+    assert(s:close())
+  end,
+  test_setsockopt_keepalive = function()
+    local s = assert(S.socket("inet", "stream"))
+    local sa = t.sockaddr_in(0, "loopback")
+    assert(s:bind(sa))
+    assert_equal(s:getsockopt("socket", "keepalive"), 0)
+    assert(s:setsockopt("socket", "keepalive", 1))
+    assert_equal(s:getsockopt("socket", "keepalive"), 1)
     assert(s:close())
   end,
 }
