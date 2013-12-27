@@ -32,8 +32,8 @@ build =
       ["syscall.ffitypes"] = "syscall/ffitypes.lua";
       ["syscall.util"] = "syscall/util.lua";
       ["syscall.compat"] = "syscall/compat.lua";
-      ["syscall.init"] = "syscall/init.lua";
       ["syscall.bit"] = "syscall/bit.lua";
+      ["syscall.types"] = "syscall/types.lua";
 
       ["syscall.shared.types"] = "syscall/shared/types.lua";
 
@@ -116,9 +116,7 @@ build =
 
       ["syscall.rump.init"] = "syscall/rump/init.lua";
       ["syscall.rump.c"] = "syscall/rump/c.lua";
-      ["syscall.rump.types"] = "syscall/rump/types.lua";
       ["syscall.rump.ffirump"] = "syscall/rump/ffirump.lua";
-      ["syscall.rump.linux"] = "syscall/rump/linux.lua";
     };
   };
 }
