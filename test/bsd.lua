@@ -67,10 +67,15 @@ test.bsd_ids = {
 
 test.filesystem_bsd = {
   test_revoke = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(S.revoke(tmpfile))
-    local n, err = fd:read()
+    local fd = assert(S.posix_openpt("rdwr, noctty"))
+    assert(fd:grantpt())
+    assert(fd:unlockpt())
+    local pts_name = assert(fd:ptsname())
+    local pts = assert(S.open(pts_name, "rdwr, noctty"))
+    assert(S.revoke(pts_name))
+    local n, err = pts:read()
     assert(not n and err.BADF, "access should be revoked")
+    assert(pts:close())
     assert(fd:close())
   end,
   test_chflags = function()
