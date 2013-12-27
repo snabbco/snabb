@@ -54,9 +54,9 @@ function t.sa(addr, addrlen) return addr end -- non Linux is trivial, Linux has 
 -- TODO need to check in detail all this as ported from Linux and may differ
 mt.termios = {
   makeraw = function(termios)
-    termios.c_iflag = bit.band(termios.c_iflag, bit.bnot(c.IFLAG["IGNBRK,BRKINT,PARMRK,ISTRIP,INLCR,IGNCR,ICRNL,IXON"]))
-    termios.c_oflag = bit.band(termios.c_oflag, bit.bnot(c.OFLAG["OPOST"]))
-    termios.c_lflag = bit.band(termios.c_lflag, bit.bnot(c.LFLAG["ECHO,ECHONL,ICANON,ISIG,IEXTEN"]))
+    termios.c_iflag = bit.band(termios.iflag, bit.bnot(c.IFLAG["IGNBRK,BRKINT,PARMRK,ISTRIP,INLCR,IGNCR,ICRNL,IXON"]))
+    termios.c_oflag = bit.band(termios.oflag, bit.bnot(c.OFLAG["OPOST"]))
+    termios.c_lflag = bit.band(termios.lflag, bit.bnot(c.LFLAG["ECHO,ECHONL,ICANON,ISIG,IEXTEN"]))
     termios.c_cflag = bit.bor(bit.band(termios.c_cflag, bit.bnot(c.CFLAG["CSIZE,PARENB"])), c.CFLAG.CS8)
     termios.c_cc[c.CC.VMIN] = 1
     termios.c_cc[c.CC.VTIME] = 0
