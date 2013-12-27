@@ -190,6 +190,15 @@ struct fiodgname_arg {
   int     len;
   void    *buf;
 };
+struct kevent {
+  uintptr_t       ident;
+  short           filter;
+  unsigned short  flags;
+  unsigned int    fflags;
+  intptr_t        data;
+  void            *udata;
+};
+
 ]]
 
 local s = table.concat(defs, "")

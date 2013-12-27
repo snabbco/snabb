@@ -92,6 +92,56 @@ end
 
 addtype(types, "termios", "struct termios", mt.termios)
 
+mt.kevent = {
+  index = {
+    size = function(kev) return tonumber(kev.data) end,
+    fd = function(kev) return tonumber(kev.ident) end,
+  },
+  newindex = {
+    fd = function(kev, v) kev.ident = t.uintptr(getfd(v)) end,
+    -- due to naming, use 'set' names TODO better naming scheme reads oddly as not a function
+    setflags = function(kev, v) kev.flags = c.EV[v] end,
+    setfilter = function(kev, v) kev.filter = c.EVFILT[v] end,
+  },
+  __new = function(tp, tab)
+    if type(tab) == "table" then
+      tab.flags = c.EV[tab.flags]
+      tab.filter = c.EVFILT[tab.filter] -- TODO this should also support extra ones via ioctl see man page
+      tab.fflags = c.NOTE[tab.fflags]
+    end
+    local obj = ffi.new(tp)
+    for k, v in pairs(tab or {}) do obj[k] = v end
+    return obj
+  end,
+}
+
+for k, v in pairs(c.NOTE) do
+  mt.kevent.index[k] = function(kev) return bit.band(kev.fflags, v) ~= 0 end
+end
+
+for _, k in pairs{"FLAG1", "EOF", "ERROR"} do
+  mt.kevent.index[k] = function(kev) return bit.band(kev.flags, c.EV[k]) ~= 0 end
+end
+
+addtype(types, "kevent", "struct kevent", mt.kevent)
+
+mt.kevents = {
+  __len = function(kk) return kk.count end,
+  __new = function(tp, ks)
+    if type(ks) == 'number' then return ffi.new(tp, ks, ks) end
+    local count = #ks
+    local kks = ffi.new(tp, count, count)
+    for n = 1, count do -- TODO ideally we use ipairs on both arrays/tables
+      local v = mktype(t.kevent, ks[n])
+      kks.kev[n - 1] = v
+    end
+    return kks
+  end,
+  __ipairs = function(kk) return reviter, kk.kev, kk.count end
+}
+
+addtype_var(types, "kevents", "struct {int count; struct kevent kev[?];}", mt.kevents)
+
 return types
 
 end

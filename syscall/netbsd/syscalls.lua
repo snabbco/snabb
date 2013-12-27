@@ -85,18 +85,6 @@ function S.getcwd(buf, size)
 end
 
 function S.kqueue1(flags) return retfd(C.kqueue1(c.O[flags])) end
-function S.kqueue() return retfd(C.kqueue()) end
-
-function S.kevent(kq, changelist, eventlist, timeout)
-  if timeout then timeout = mktype(t.timespec, timeout) end
-  local changes, changecount = nil, 0
-  if changelist then changes, changecount = changelist.kev, changelist.count end
-  if eventlist then
-    local ret, err = C.kevent(getfd(kq), changes, changecount, eventlist.kev, eventlist.count, timeout)
-    return retiter(ret, err, eventlist.kev)
-  end
-  return retnum(C.kevent(getfd(kq), changes, changecount, nil, 0, timeout))
-end
 
 -- TODO this is the same as ppoll other than if timeout is modified, which Linux syscall but not libc does; could merge
 function S.pollts(fds, timeout, set)

@@ -11,7 +11,7 @@ local abi = require "syscall.abi"
 
 return function(S, hh, c, C, types)
 
-local ret64, retnum, retfd, retbool, retptr = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr
+local ret64, retnum, retfd, retbool, retptr, retiter = hh.ret64, hh.retnum, hh.retfd, hh.retbool, hh.retptr, hh.retiter
 
 local ffi = require "ffi"
 local errno = ffi.errno
@@ -49,6 +49,20 @@ function S.pathconf(path, name) return retnum(C.pathconf(path, c.PC[name])) end
 function S.fpathconf(fd, name) return retnum(C.fpathconf(getfd(fd), c.PC[name])) end
 if C.lpathconf then
   function S.lpathconf(path, name) return retnum(C.lpathconf(path, c.PC[name])) end
+end
+
+function S.kqueue() return retfd(C.kqueue()) end
+
+-- note osx has kevent64 too, different type
+function S.kevent(kq, changelist, eventlist, timeout)
+  if timeout then timeout = mktype(t.timespec, timeout) end
+  local changes, changecount = nil, 0
+  if changelist then changes, changecount = changelist.kev, changelist.count end
+  if eventlist then
+    local ret, err = C.kevent(getfd(kq), changes, changecount, eventlist.kev, eventlist.count, timeout)
+    return retiter(ret, err, eventlist.kev)
+  end
+  return retnum(C.kevent(getfd(kq), changes, changecount, nil, 0, timeout))
 end
 
 function S.tcgetattr(fd) return S.ioctl(fd, "TIOCGETA") end
