@@ -842,5 +842,22 @@ c.TCP = strflag {
   RXT_FINDROP 	     = 0x100,
 }
 
+-- for chflags and stat. note these have no prefix
+c.CHFLAGS = multiflags {
+  UF_NODUMP      = 0x00000001,
+  UF_IMMUTABLE   = 0x00000002,
+  UF_APPEND      = 0x00000004,
+  UF_OPAQUE      = 0x00000008,
+  UF_HIDDEN      = 0x00008000,
+
+  SF_ARCHIVED    = 0x00010000,
+  SF_IMMUTABLE   = 0x00020000,
+  SF_APPEND      = 0x00040000,
+}
+
+c.CHFLAGS.IMMUTABLE = c.CHFLAGS.UF_IMMUTABLE + c.CHFLAGS.SF_IMMUTABLE
+c.CHFLAGS.APPEND = c.CHFLAGS.UF_APPEND + c.CHFLAGS.SF_APPEND
+c.CHFLAGS.OPAQUE = c.CHFLAGS.UF_OPAQUE
+
 return c
 
