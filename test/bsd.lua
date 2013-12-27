@@ -123,6 +123,96 @@ test.filesystem_bsd = {
   end,
 }
 
+test.kqueue = {
+  test_kqueue_vnode = function()
+    local kfd = assert(S.kqueue())
+    local fd = assert(S.creat(tmpfile, "rwxu"))
+    local kevs = t.kevents{{fd = fd, filter = "vnode",
+      flags = "add, enable, clear", fflags = "delete, write, extend, attrib, link, rename, revoke"}}
+    assert(kfd:kevent(kevs, nil))
+    local _, _, n = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(n, 0) -- no events yet
+    assert(S.unlink(tmpfile))
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 1)) do
+      assert(v.DELETE, "expect delete event")
+      count = count + 1
+    end
+    assert_equal(count, 1)
+    assert(fd:write("something"))
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 1)) do
+      assert(v.WRITE, "expect write event")
+      assert(v.EXTEND, "expect extend event")
+    count = count + 1
+    end
+    assert_equal(count, 1)
+    assert(fd:close())
+    assert(kfd:close())
+  end,
+  test_kqueue_read = function()
+    local kfd = assert(S.kqueue())
+    local p1, p2 = assert(S.pipe())
+    local kevs = t.kevents{{fd = p1, filter = "read", flags = "add"}}
+    assert(kfd:kevent(kevs, nil))
+    local a, b, n = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(n, 0) -- no events yet
+    local str = "test"
+    p2:write(str)
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 0)) do
+      assert_equal(v.size, #str) -- size will be amount available to read
+      count = count + 1
+    end
+    assert_equal(count, 1) -- 1 event readable now
+    local r, err = p1:read()
+    local _, _, n = assert(kfd:kevent(nil, kevs, 0))
+    assert_equal(n, 0) -- no events any more
+    assert(p2:close())
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 0)) do
+      assert(v.EOF, "expect EOF event")
+      count = count + 1
+    end
+    assert_equal(count, 1)
+    assert(p1:close())
+    assert(kfd:close())
+  end,
+  test_kqueue_write = function()
+    local kfd = assert(S.kqueue())
+    local p1, p2 = assert(S.pipe())
+    local kevs = t.kevents{{fd = p2, filter = "write", flags = "add"}}
+    assert(kfd:kevent(kevs, nil))
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 0)) do
+      assert(v.size > 0) -- size will be amount free in buffer
+      count = count + 1
+    end
+    assert_equal(count, 1) -- one event
+    assert(p1:close()) -- close read end
+    count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 0)) do
+      assert(v.EOF, "expect EOF event")
+      count = count + 1
+    end
+    assert_equal(count, 1)
+    assert(p2:close())
+    assert(kfd:close())
+  end,
+  test_kqueue_timer = function()
+    local kfd = assert(S.kqueue())
+    local kevs = t.kevents{{ident = 0, filter = "timer", flags = "add, oneshot", data = 10}}
+    assert(kfd:kevent(kevs, nil))
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 1)) do -- 1s timeout, longer than 10ms timer interval
+      assert_equal(v.size, 1) -- count of expiries is 1 as oneshot
+      count = count + 1
+    end
+    assert_equal(count, 1) -- will have expired by now
+    assert(kfd:close())
+  end,
+}
+
 return test
 
 end
