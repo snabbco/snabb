@@ -935,5 +935,31 @@ c.TCP = strflag {
   KEEPCNT    = 1024,
 }
 
+c.RB = multiflags {
+  AUTOBOOT    = 0,
+  ASKNAME     = 0x001,
+  SINGLE      = 0x002,
+  NOSYNC      = 0x004,
+  HALT        = 0x008,
+  INITNAME    = 0x010,
+  DFLTROOT    = 0x020,
+  KDB         = 0x040,
+  RDONLY      = 0x080,
+  DUMP        = 0x100,
+  MINIROOT    = 0x200,
+  VERBOSE     = 0x800,
+  SERIAL      = 0x1000,
+  CDROM       = 0x2000,
+  POWEROFF    = 0x4000,
+  GDB         = 0x8000,
+  MUTE        = 0x10000,
+  SELFTEST    = 0x20000,
+  RESERVED1   = 0x40000,
+  RESERVED2   = 0x80000,
+  PAUSE       = 0x100000,
+  MULTIPLE    = 0x20000000,
+  BOOTINFO    = 0x80000000,
+}
+
 return c
 

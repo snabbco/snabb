@@ -22,6 +22,8 @@ local istype, mktype, getfd = h.istype, h.mktype, h.getfd
 
 local t, pt, s = types.t, types.pt, types.s
 
+function S.reboot(howto) return C.reboot(c.RB[howto]) end
+
 local function isptmaster(fd) return fd:ioctl("TIOCPTMASTER") end
 S.grantpt = isptmaster
 S.unlockpt = isptmaster
