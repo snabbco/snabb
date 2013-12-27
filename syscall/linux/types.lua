@@ -1041,6 +1041,7 @@ mt.flock = {
     len = function(self, v) self.l_len = v end,
     pid = function(self, v) self.l_pid = v end,
   },
+  __new = newfn,
 }
 
 addtype(types, "flock", "struct flock64", mt.flock)
