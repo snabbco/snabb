@@ -65,6 +65,59 @@ test.bsd_ids = {
   end,
 }
 
+test.filesystem_bsd = {
+  test_revoke = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.revoke(tmpfile))
+    local n, err = fd:read()
+    assert(not n and err.BADF, "access should be revoked")
+    assert(fd:close())
+  end,
+  test_chflags = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:write("append"))
+    assert(S.chflags(tmpfile, "append"))
+    assert(fd:write("append"))
+    assert(fd:seek(0, "set"))
+    local n, err = fd:write("not append")
+    if not (S.__rump or abi.xen) then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
+    assert(S.chflags(tmpfile)) -- clear flags
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_lchflags = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:write("append"))
+    assert(S.lchflags(tmpfile, "append"))
+    assert(fd:write("append"))
+    assert(fd:seek(0, "set"))
+    local n, err = fd:write("not append")
+    if not (S.__rump or abi.xen) then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
+    assert(S.lchflags(tmpfile)) -- clear flags
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_fchflags = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:write("append"))
+    assert(fd:chflags("append"))
+    assert(fd:write("append"))
+    assert(fd:seek(0, "set"))
+    local n, err = fd:write("not append")
+    if not (S.__rump or abi.xen) then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
+    assert(fd:chflags()) -- clear flags
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+  test_lchmod = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(S.lchmod(tmpfile, "RUSR, WUSR"))
+    assert(S.access(tmpfile, "rw"))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
+}
+
 return test
 
 end

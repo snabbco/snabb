@@ -59,7 +59,7 @@ end
 
 local test = {}
 
-test.mount_bsd_root = {
+test.mount_netbsd_root = {
   test_mount_kernfs = function()
     assert(S.mkdir(tmpfile))
     assert(S.mount("kernfs", tmpfile))
@@ -81,79 +81,7 @@ test.mount_bsd_root = {
   end,
 }
 
-test.filesystem_bsd = {
--- BSD utimensat as same specification as Linux, but some functionality missing, so test simpler
-  test_utimensat = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    local dfd = assert(S.open("."))
-    assert(S.utimensat(nil, tmpfile))
-    local st1 = fd:stat()
-    assert(S.utimensat("fdcwd", tmpfile, {"omit", "omit"}))
-    local st2 = fd:stat()
-    assert(st1.atime == st2.atime and st1.mtime == st2.mtime, "atime and mtime unchanged")
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-    assert(dfd:close())
-  end,
-  test_revoke = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(S.revoke(tmpfile))
-    local n, err = fd:read()
-    assert(not n and err.BADF, "access should be revoked")
-    assert(fd:close())
-  end,
-  test_chflags = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(fd:write("append"))
-    assert(S.chflags(tmpfile, "append"))
-    assert(fd:write("append"))
-    assert(fd:seek(0, "set"))
-    local n, err = fd:write("not append")
-    if not (S.__rump or abi.xen) then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
-    assert(S.chflags(tmpfile)) -- clear flags
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_lchflags = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(fd:write("append"))
-    assert(S.lchflags(tmpfile, "append"))
-    assert(fd:write("append"))
-    assert(fd:seek(0, "set"))
-    local n, err = fd:write("not append")
-    if not (S.__rump or abi.xen) then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
-    assert(S.lchflags(tmpfile)) -- clear flags
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_fchflags = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(fd:write("append"))
-    assert(fd:chflags("append"))
-    assert(fd:write("append"))
-    assert(fd:seek(0, "set"))
-    local n, err = fd:write("not append")
-    if not (S.__rump or abi.xen) then assert(err and err.PERM, "non append write should fail") end -- TODO I think this is due to tmpfs mount??
-    assert(fd:chflags()) -- clear flags
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_fsync_range = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(fd:sync_range("data", 0, 4096))
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-  test_lchmod = function()
-    local fd = assert(S.creat(tmpfile, "RWXU"))
-    assert(S.lchmod(tmpfile, "RUSR, WUSR"))
-    assert(S.access(tmpfile, "rw"))
-    assert(S.unlink(tmpfile))
-    assert(fd:close())
-  end,
-}
-
-test.network_utils_bsd_root = {
+test.network_utils_netbsd_root = {
   test_ifcreate_lo = function()
     local ifname = "lo9" .. tostring(S.getpid())
     assert(util.ifcreate(ifname))
@@ -174,7 +102,7 @@ test.network_utils_bsd_root = {
   end,
 }
 
-test.sockets_pipes_bsd = {
+test.sockets_pipes_netbsd = {
   test_nosigpipe = function()
     local p1, p2 = assert(S.pipe2("nosigpipe"))
     assert(p1:close())
@@ -312,7 +240,24 @@ test.kqueue = {
   end,
 }
 
-test.pollts = {
+test.misc_netbsd = {
+  test_mknod_64bit_root = function()
+    local dev = t.device(1999875, 515)
+    assert(dev.dev > t.dev(0xffffffff))
+    assert(S.mknod(tmpfile, "fchr,0666", dev))
+    local stat = assert(S.stat(tmpfile))
+    assert(stat.ischr, "expect to be a character device")
+    assert_equal(stat.rdev.major, dev.major)
+    assert_equal(stat.rdev.minor, dev.minor)
+    assert_equal(stat.rdev.device, dev.device)
+    assert(S.unlink(tmpfile))
+  end,
+  test_fsync_range = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:sync_range("data", 0, 4096))
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
   test_pollts = function()
     local a, b = assert(S.socketpair("unix", "stream"))
     local pev = t.pollfds{{fd = a, events = c.POLL.IN}}
@@ -333,19 +278,18 @@ test.pollts = {
     assert(b:close())
     assert(a:close())
   end,
-}
-
-test.mknod_netbsd = {
-  test_mknod_64bit_root = function()
-    local dev = t.device(1999875, 515)
-    assert(dev.dev > t.dev(0xffffffff))
-    assert(S.mknod(tmpfile, "fchr,0666", dev))
-    local stat = assert(S.stat(tmpfile))
-    assert(stat.ischr, "expect to be a character device")
-    assert_equal(stat.rdev.major, dev.major)
-    assert_equal(stat.rdev.minor, dev.minor)
-    assert_equal(stat.rdev.device, dev.device)
+-- BSD utimensat as same specification as Linux, but some functionality missing, so test simpler
+  test_utimensat = function()
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    local dfd = assert(S.open("."))
+    assert(S.utimensat(nil, tmpfile))
+    local st1 = fd:stat()
+    assert(S.utimensat("fdcwd", tmpfile, {"omit", "omit"}))
+    local st2 = fd:stat()
+    assert(st1.atime == st2.atime and st1.mtime == st2.mtime, "atime and mtime unchanged")
     assert(S.unlink(tmpfile))
+    assert(fd:close())
+    assert(dfd:close())
   end,
 }
 
