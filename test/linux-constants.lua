@@ -123,6 +123,17 @@ local function fixup_constants(abi, c)
   c.EPOLL.OUT = nil
   c.EPOLL.PRI = nil
 
+  -- recent additions
+  c.TCP.THIN_DUPACK = nil
+  c.TCP.FASTOPEN = nil
+  c.TCP.REPAIR_OPTIONS = nil
+  c.TCP.THIN_LINEAR_TIMEOUTS = nil
+  c.TCP.REPAIR = nil
+  c.TCP.QUEUE_SEQ = nil
+  c.TCP.TIMESTAMP = nil
+  c.TCP.USER_TIMEOUT = nil
+  c.TCP.REPAIR_QUEUE = nil
+
   -- only in very recent headers, not in ones we are testing against, but include seccomp - will upgrade headers or fix soon
   c.IPPROTO.TP = nil
   c.IPPROTO.MTP = nil

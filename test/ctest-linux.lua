@@ -197,6 +197,17 @@ c.MAP["32BIT"] = nil
 c.SYS.sync_file_range = nil
 c.AT.EMPTY_PATH = nil
 
+-- missing on Travis
+c.TCP.THIN_DUPACK = nil
+c.TCP.FASTOPEN = nil
+c.TCP.REPAIR_OPTIONS = nil
+c.TCP.THIN_LINEAR_TIMEOUTS = nil
+c.TCP.REPAIR = nil
+c.TCP.QUEUE_SEQ = nil
+c.TCP.TIMESTAMP = nil
+c.TCP.USER_TIMEOUT = nil
+c.TCP.REPAIR_QUEUE = nil
+
 -- these are not in Musl at present TODO send patches to get them in
 c.IPPROTO.UDPLITE = nil
 c.IPPROTO.DCCP = nil
