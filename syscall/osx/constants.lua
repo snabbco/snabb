@@ -791,39 +791,6 @@ c.PC = strflag {
   XATTR_SIZE_BITS   = 26,
 }
 
---[[
-
-#define SO_SNDBUF       0x1001          /* send buffer size */
-#define SO_RCVBUF       0x1002          /* receive buffer size */
-#define SO_SNDLOWAT     0x1003          /* send low-water mark */
-#define SO_RCVLOWAT     0x1004          /* receive low-water mark */
-#define SO_SNDTIMEO     0x1005          /* send timeout */
-#define SO_RCVTIMEO     0x1006          /* receive timeout */
-#define SO_ERROR        0x1007          /* get error status and clear */
-#define SO_TYPE         0x1008          /* get socket type */
-/*efine SO_PRIVSTATE    0x1009             get/deny privileged state */
-#define SO_LABEL        0x1010          /* socket's MAC label */
-#define SO_PEERLABEL    0x1011          /* socket's peer MAC label */
-#ifdef __APPLE__
-#define SO_NREAD        0x1020          /* APPLE: get 1st-packet byte count */
-#define SO_NKE          0x1021          /* APPLE: Install socket-level NKE */
-#define SO_NOSIGPIPE    0x1022          /* APPLE: No SIGPIPE on EPIPE */
-#define SO_NOADDRERR    0x1023          /* APPLE: Returns EADDRNOTAVAIL when src is not available anymore */
-#define SO_NWRITE       0x1024          /* APPLE: Get number of bytes currently in send socket buffer */
-#define SO_REUSESHAREUID        0x1025          /* APPLE: Allow reuse of port/socket by different userids */
-#ifdef __APPLE_API_PRIVATE
-#define SO_NOTIFYCONFLICT       0x1026  /* APPLE: send notification if there is a bind on a port which is already in use */
-#define SO_UPCALLCLOSEWAIT      0x1027  /* APPLE: block on close until an upcall returns */
-#endif
-#define SO_LINGER_SEC   0x1080          /* linger on close if data present (in seconds) */
-#define SO_RESTRICTIONS 0x1081  /* APPLE: deny inbound/outbound/both/flag set */
-#define SO_RESTRICT_DENYIN              0x00000001      /* flag for SO_RESTRICTIONS - deny inbound */
-#define SO_RESTRICT_DENYOUT             0x00000002      /* flag for SO_RESTRICTIONS - deny outbound */
-#define SO_RESTRICT_DENYSET             0x80000000      /* flag for SO_RESTRICTIONS - deny has been set */
-#define SO_RANDOMPORT   0x1082  /* APPLE: request local port randomization */
-#define SO_NP_EXTENSIONS        0x1083  /* To turn off some POSIX behavior */
-]]
-
 c.SO = strflag {
   DEBUG        = 0x0001,
   ACCEPTCONN   = 0x0002,

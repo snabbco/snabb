@@ -335,7 +335,7 @@ test.pollts = {
   end,
 }
 
-test.misc_netbsd = {
+test.mknod_netbsd = {
   test_mknod_64bit_root = function()
     local dev = t.device(1999875, 515)
     assert(dev.dev > t.dev(0xffffffff))
