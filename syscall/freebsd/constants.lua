@@ -961,5 +961,68 @@ c.RB = multiflags {
   BOOTINFO    = 0x80000000,
 }
 
+-- kqueue
+c.EV = multiflags {
+  ADD      = 0x0001,
+  DELETE   = 0x0002,
+  ENABLE   = 0x0004,
+  DISABLE  = 0x0008,
+  ONESHOT  = 0x0010,
+  CLEAR    = 0x0020,
+  RECEIPT  = 0x0040,
+  DISPATCH = 0x0080,
+  SYSFLAGS = 0xF000,
+  DROP     = 0x1000,
+  FLAG1    = 0x2000,
+  EOF      = 0x8000,
+  ERROR    = 0x4000,
+}
+
+c.EVFILT = strflag {
+  READ     = -1,
+  WRITE    = -2,
+  AIO      = -3,
+  VNODE    = -4,
+  PROC     = -5,
+  SIGNAL   = -6,
+  TIMER    = -7,
+  FS       = -9,
+  LIO      = -10,
+  USER     = -11,
+  SYSCOUNT = 11,
+}
+
+c.NOTE = multiflags {
+-- user
+  FFNOP      = 0x00000000,
+  FFAND      = 0x40000000,
+  FFOR       = 0x80000000,
+  FFCOPY     = 0xc0000000,
+  FFCTRLMASK = 0xc0000000,
+  FFLAGSMASK = 0x00ffffff,
+  TRIGGER    = 0x01000000,
+-- read and write
+  LOWAT     = 0x0001,
+-- vnode
+  DELETE    = 0x0001,
+  WRITE     = 0x0002,
+  EXTEND    = 0x0004,
+  ATTRIB    = 0x0008,
+  LINK      = 0x0010,
+  RENAME    = 0x0020,
+  REVOKE    = 0x0040,
+-- proc
+  EXIT      = 0x80000000,
+  FORK      = 0x40000000,
+  EXEC      = 0x20000000,
+  PCTRLMASK = 0xf0000000,
+  PDATAMASK = 0x000fffff,
+  TRACK     = 0x00000001,
+  TRACKERR  = 0x00000002,
+  CHILD     = 0x00000004,
+--proc and signal
+  SIGNAL    = 0x08000000,
+}
+
 return c
 
