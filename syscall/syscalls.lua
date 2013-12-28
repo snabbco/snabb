@@ -589,6 +589,12 @@ if C.futimens then
     return retbool(C.futimens(getfd(fd), ts))
   end
 end
+if C.accept4 then
+  function S.accept4(sockfd, addr, addrlen, flags)
+    local saddr = pt.sockaddr(addr)
+    return retfd(C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags]))
+  end
+end
 
 -- legacy in many OSs, implemented using recvfrom, sendto
 if C.send then

@@ -74,8 +74,6 @@ int sync_file_range(int fd, off_t offset, off_t count, unsigned int flags);
 int pause(void);
 int prlimit64(pid_t pid, int resource, const struct rlimit64 *new_limit, struct rlimit64 *old_limit);
 
-int accept4(int sockfd, void *addr, socklen_t *addrlen, int flags);
-
 void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, void *new_address);
 int fallocate(int fd, int mode, off_t offset, off_t len); /* note there are 32 bit issues with glibc */
 ssize_t readahead(int fd, off_t offset, size_t count);

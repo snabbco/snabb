@@ -119,11 +119,6 @@ end
 function S.posix_fallocate(fd, offset, len) return S.fallocate(fd, 0, offset, len) end
 function S.readahead(fd, offset, count) return retbool(C.readahead(getfd(fd), offset, count)) end
 
-function S.accept4(sockfd, addr, addrlen, flags)
-  local saddr = pt.sockaddr(addr)
-  return retfd(C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags]))
-end
-
 -- TODO change to type?
 function S.uname()
   local u = t.utsname()
