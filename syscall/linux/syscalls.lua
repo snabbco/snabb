@@ -756,6 +756,10 @@ local pathconf_values = {
 function S.pathconf(_, name) return pathconf_values[c.PC[name]] end
 function S.fpathconf(_, name) return pathconf_values[c.PC[name]] end
 
+-- setegid and set euid are not syscalls
+function S.seteuid(euid) return S.setresuid(-1, euid, -1) end
+function S.setegid(egid) return S.setresgid(-1, egid, -1) end
+
 return S
 
 end

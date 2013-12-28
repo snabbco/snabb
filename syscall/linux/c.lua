@@ -52,16 +52,7 @@ local function llarg64(val) return i6432(val) end
 
 local function inlibc_fn(k) return ffi.C[k] end
 
-local C = setmetatable({}, {
-  __index = function(C, k)
-    if pcall(inlibc_fn, k) then
-      C[k] = ffi.C[k] -- add to table, so no need for this slow path again
-      return C[k]
-    else
-      return nil
-    end
-  end
-})
+local C = {}
 
 local nr = require("syscall.linux.nr")
 
@@ -450,14 +441,24 @@ function C.dup2(oldfd, newfd) return syscall(sys.dup2, int(oldfd), int(newfd)) e
 function C.dup3(oldfd, newfd, flags) return syscall(sys.dup3, int(oldfd), int(newfd), int(flags)) end
 function C.chmod(path, mode) return syscall(sys.chmod, void(path), uint(mode)) end
 function C.fchmod(fd, mode) return syscall(sys.fchmod, int(fd), uint(mode)) end
+function C.umask(mode) return syscall(sys.umask, uint(mode)) end
+function C.access(path, mode) return syscall(sys.access, void(path), uint(mode)) end
+function C.getppid() return syscall(sys.getppid) end
+function C.getuid() return syscall(sys.getuid) end
+function C.geteuid() return syscall(sys.geteuid) end
+function C.getgid() return syscall(sys.getgid) end
+function C.getegid() return syscall(sys.getegid) end
 function C.getresuid(ruid, euid, suid) return syscall(sys.getresuid, void(ruid), void(euid), void(suid)) end
 function C.getresgid(rgid, egid, sgid) return syscall(sys.getresgid, void(rgid), void(egid), void(sgid)) end
+function C.setuid(id) return syscall(sys.setuid, uint(id)) end
+function C.setgid(id) return syscall(sys.setgid, uint(id)) end
 function C.setresuid(ruid, euid, suid) return syscall(sys.setresuid, uint(ruid), uint(euid), uint(suid)) end
 function C.setresgid(rgid, egid, sgid) return syscall(sys.setresgid, uint(rgid), uint(egid), uint(sgid)) end
 function C.setreuid(uid, euid) return syscall(sys.setreuid, uint(uid), uint(euid)) end
 function C.setregid(gid, egid) return syscall(sys.setregid, uint(gid), uint(egid)) end
 function C.flock(fd, operation) return syscall(sys.flock, int(fd), int(operation)) end
 function C.getrusage(who, usage) return syscall(sys.getrusage, int(who), void(usage)) end
+function C.rmdir(path) return syscall(sys.rmdir, void(path)) end
 function C.chdir(path) return syscall(sys.chdir, void(path)) end
 function C.fchdir(fd) return syscall(sys.fchdir, int(fd)) end
 function C.chown(path, owner, group) return syscall(sys.chown, void(path), uint(owner), uint(group)) end
@@ -480,19 +481,42 @@ function C.unlinkat(dirfd, pathname, flags) return syscall(sys.unlinkat, int(dir
 function C.prctl(option, arg2, arg3, arg4, arg5)
   return syscall(sys.prctl, int(option), ulong(arg2), ulong(arg3), ulong(arg4), ulong(arg5))
 end
+function C.pipe(pipefd) return syscall(sys.pipe, void(pipefd)) end
+function C.pipe2(pipefd, flags) return syscall(sys.pipe, void(pipefd), int(flags)) end
+function C.mknod(path, mode, dev) return syscall(sys.mknod, void(path), uint(mode), uint(dev)) end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
   return syscall(sys.rt_sigaction, int(signum), void(act), void(oldact), ulong(8)) -- size is size of mask field
 end
 
--- socketcalls TODO proper arch flag
+-- socketcalls TODO proper arch flag, using ffi.C temporarily
 if sys.accept4 then -- on x86 this is a socketcall, which we have not implemented yet, other archs is a syscall
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
   end
   function C.shutdown(sockfd, how) return syscall(sys.shutdown, int(sockfd), int(how)) end
+else
+  C.accept4 = ffi.C.accept4
+  C.shutdown = ffi.C.shutdown
 end
+C.socket = ffi.C.socket
+C.bind = ffi.C.bind
+C.listen = ffi.C.listen
+C.sendmsg = ffi.C.sendmsg
+C.recvmsg = ffi.C.recvmsg
+C.setsockopt = ffi.C.setsockopt
+C.getsockopt = ffi.C.getsockopt
+C.sendto = ffi.C.sendto
+C.recvfrom = ffi.C.recvfrom
+C.connect = ffi.C.connect
+C.accept = ffi.C.accept
+C.getpeername = ffi.C.getpeername
+
+-- these should be converted to syscalls
+local extra = {"socketpair", "select", "fork", "waitid", "waitpid", "epoll_ctl", "getsockname", "pselect", "kill", "readlink", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "symlink", "fsync", "mkdir", "link", "mremap", "getgroups", "fcntl", "gettimeofday", "time", "uname", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait", "wait4", "setsid", "setitimer", "getpgid", "execve", "getsid", "sigpending", "getpgrp", "_exit", "listxattr", "llistxattr", "flistxattr", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "fdatasync", "unshare", "mount", "umount", "umount2", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "chroot", "fchownat"}
+
+for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
 return C
 
