@@ -1393,6 +1393,16 @@ test_sockets_pipes = {
     --assert(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY) ~= 0) -- TODO why does this fail on FreeBSD?
     assert(s:close())
   end,
+  test_accept_noaddr = function()
+    local s = S.socket("unix", "stream, nonblock")
+    local sa = t.sockaddr_un(tmpfile)
+    assert(s:bind(sa))
+    assert(s:listen())
+    local a, err = s:accept()
+    assert((not a) and err.AGAIN, "expect again: " .. tostring(err))
+    assert(s:close())
+    assert(S.unlink(tmpfile))
+  end,
   test_accept4 = function()
     if not S.accept4 then error "skipped" end
     local s = S.socket("unix", "stream, nonblock")
