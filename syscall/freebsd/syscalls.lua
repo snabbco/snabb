@@ -51,7 +51,7 @@ function S.pdkill(fd, sig) return retbool(C.pdkill(getfd(fd), c.SIG[sig])) end
 
 function S.cap_enter() return retbool(C.cap_enter()) end
 function S.cap_getmode(modep)
-  modep = modep or t.uint()
+  modep = modep or t.uint1()
   local ok, err = C.cap_getmode(modep)
   if ok == -1 then return nil, t.error(err or errno()) end
   return modep[0]
