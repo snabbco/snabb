@@ -555,7 +555,6 @@ end
 if C.mkfifoat then
   function S.mkfifoat(dirfd, pathname, mode) return retbool(C.mkfifoat(c.AT_FDCWD[dirfd], pathname, c.S_I[mode])) end
 end
-
 if C.utimes then
   function S.utimes(filename, ts)
     if ts then ts = t.timeval2(ts) end
@@ -589,6 +588,14 @@ if C.futimens then
     if ts then ts = t.timespec2(ts) end
     return retbool(C.futimens(getfd(fd), ts))
   end
+end
+
+-- legacy in many OSs, implemented using recvfrom, sendto
+if C.send then
+  function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, c.MSG[flags])) end
+end
+if C.recv then
+  function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, c.MSG[flags])) end
 end
 
 -- TODO not sure about this interface, maybe return rem as extra parameter see #103

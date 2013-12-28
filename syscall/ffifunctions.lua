@@ -65,6 +65,9 @@ int pipe2(int pipefd[2], int flags);
 int dup(int oldfd);
 int dup2(int oldfd, int newfd);
 int dup3(int oldfd, int newfd, int flags);
+
+ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+ssize_t send(int sockfd, const void *buf, size_t len, int flags);
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen);
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
