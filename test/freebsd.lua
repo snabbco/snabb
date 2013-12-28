@@ -59,7 +59,7 @@ local test = {}
 
 test.freebsd_shm = {
   test_shm_anon = function()
-    local fd = assert(S.shm_open(c.SHM.ANON, "rdwr, creat")
+    local fd = assert(S.shm_open(c.SHM.ANON, "rdwr, creat"))
     assert(fd:truncate(4096))
     assert(fd:close())
   end,
