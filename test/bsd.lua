@@ -231,15 +231,16 @@ if not S.__rump then
   test.kqueue.test_kqueue_proc = function()
     local pid = S.fork()
     if pid == 0 then -- child
-      S.exit(42)
+      S.pause()
+      S.exit()
     else -- parent
       local kfd = assert(S.kqueue())
       local kevs = t.kevents{{ident = pid, filter = "proc", flags = "add", data = 10}}
       assert(kfd:kevent(kevs, nil))
+      S.kill(pid, "term")
       local count = 0
       for k, v in assert(kfd:kevent(nil, kevs)) do
         assert(v.EXIT)
-        assert_equal(v.data, 42) -- exit code
         count = count + 1
       end
       assert_equal(count, 1)
