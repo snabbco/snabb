@@ -1418,7 +1418,7 @@ test_timespec_timeval = {
   end,
 }
 
-test.shm = {
+test_shm = {
   test_shm = function()
     if not S.shm_open then error "skipped" end
     local name = "XXXXXYYYY" .. S.getpid()
