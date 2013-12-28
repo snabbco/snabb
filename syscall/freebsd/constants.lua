@@ -1133,16 +1133,16 @@ c.CAP_UNUSED1_22     = CAPRIGHT(1, 0x0000000000200000ULL)
 c.CAP_UNUSED1_57     = CAPRIGHT(1, 0x0100000000000000ULL)
 
 c.CAP_FCNTL = multiflags {
-  GETFL  = bit.shift(1, c.F.GETFL)
-  SETFL  = bit.shift(1, c.F.SETFL)
-  GETOWN = bit.shift(1, c.F.GETOWN)
-  SETOWN = bit.shift(1, c.F.SETOWN)
+  GETFL  = bit.shift(1, c.F.GETFL),
+  SETFL  = bit.shift(1, c.F.SETFL),
+  GETOWN = bit.shift(1, c.F.GETOWN),
+  SETOWN = bit.shift(1, c.F.SETOWN),
 }
 
 c.CAP_FCNTL.ALL = bit.bor(c.CAP_FCNTL.GETFL, c.CAP_FCNTL.SETFL, c.CAP_FCNTL.GETOWN, c.CAP_FCNTL.SETOWN)
 
 c.CAP_IOCTLS = multiflags {
-  ALL = h.longmax
+  ALL = h.longmax,
 }
 
 return c
