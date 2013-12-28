@@ -65,15 +65,17 @@ bit.i6432 = function(x) return i6432(x):to32() end
 bit.u6432 = function(x) return u6432(x):to32() end
 
 -- initial 64 bit ops. TODO for luajit 2.1 these are not needed, as accepts 64 bit cdata
-function bit.bor64(a, b) -- TODO support more arguments
+function bit.bor64(a, b, ...)
   local aa, bb, cc = i6432(a), i6432(b), i6432()
   cc.i32[0], cc.i32[1] = bit.bor(aa.i32[0], bb.i32[0]), bit.bor(aa.i32[1], bb.i32[1])
+  if select('#', ...) > 0 then return bit.bor64(cc.i64, ...) end
   return cc.i64
 end
 
-function bit.band64(a, b) -- TODO support more arguments
+function bit.band64(a, b, ...)
   local aa, bb, cc = i6432(a), i6432(b), i6432()
   cc.i32[0], cc.i32[1] = bit.band(aa.i32[0], bb.i32[0]), bit.band(aa.i32[1], bb.i32[1])
+  if select('#', ...) > 0 then return bit.band64(cc.i64, ...) end
   return cc.i64
 end
 

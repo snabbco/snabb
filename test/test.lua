@@ -258,10 +258,12 @@ test_basic = {
   test_bor64 = function()
     local a, b = t.int64(0x10ffff0000), t.int64(0x020000ffff)
     assert_equal(tonumber(bit.bor64(a, b)), 0x12ffffffff)
+    assert_equal(tonumber(bit.bor64(a, b, a, b)), 0x12ffffffff)
   end,
   test_band64 = function()
     local a, b = t.int64(0x12ffffffff), t.int64(0x020000ffff)
     assert_equal(tonumber(bit.band64(a, b)), 0x020000ffff)
+    assert_equal(tonumber(bit.band64(a, b, a, b)), 0x020000ffff)
   end,
   test_lshift64 = function()
     assert_equal(tonumber(bit.lshift64(1, 0)), 1)
