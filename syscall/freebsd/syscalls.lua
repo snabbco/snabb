@@ -28,7 +28,7 @@ function S.bindat(dirfd, sockfd, addr, addrlen)
   local saddr = pt.sockaddr(addr)
   return retbool(C.bindat(c.AT_FDCWD[dirfd], getfd(sockfd), saddr, addrlen or #addr))
 end
-function S.connect(dirfd, sockfd, addr, addrlen)
+function S.connectat(dirfd, sockfd, addr, addrlen)
   local saddr = pt.sockaddr(addr)
   return retbool(C.connectat(c.AT_FDCWD[dirfd], getfd(sockfd), saddr, addrlen or #addr))
 end
