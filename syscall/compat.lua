@@ -14,9 +14,12 @@ local t, pt, s = types.t, types.pt, types.s
 
 local ffi = require "ffi"
 
+-- TODO get from helpers
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
-function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
+if not S.creat then
+  function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
+end
 
 function S.nice(inc)
   local prio = S.getpriority("process", 0) -- this cannot fail with these args.

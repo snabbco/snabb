@@ -34,6 +34,8 @@ if abi.abi32 then
     flags = bit.bor(c.O[flags], c.O.LARGEFILE)
     return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, flags, c.MODE[mode]))
   end
+  -- creat has no largefile flag so cannot be used
+  function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
 end
 
 function S.pause() return retbool(C.pause()) end

@@ -455,6 +455,9 @@ function S.getpriority(which, who)
 end
 
 -- these may not always exist, but where they do they have the same interface
+if C.creat then
+  function S.creat(pathname, mode) return retfd(C.creat(pathname, c.MODE[mode])) end
+end
 if C.pipe2 then
   function S.pipe2(flags, fd2)
     fd2 = fd2 or t.int2()
