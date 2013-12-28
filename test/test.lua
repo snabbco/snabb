@@ -1673,7 +1673,7 @@ test_gettimeofday = {
 test_shm = {
   test_shm = function()
     if not S.shm_open then error "skipped" end
-    local name = "XXXXXYYYY" .. S.getpid()
+    local name = "/XXXXXYYYY" .. S.getpid()
     local fd, err = S.shm_open(name, "rdwr, creat")
     if not fd and (err.ACCES or err.NOENT) then error "skipped" end -- Travis CI, Android do not have mounted...
     assert(fd, err)

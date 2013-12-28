@@ -107,6 +107,7 @@ function S.issetugid() return C.issetugid() end
 
 -- these are not in NetBSD; they are syscalls in FreeBSD, OSX, libs functions in Linux; they could be in main syscall.
 if C.shm_open then
+  if type(pathname) == "string" and pathname:sub(1, 1) ~= "/" then pathname = "/" .. pathname end
   function S.shm_open(pathname, flags, mode) return retfd(C.shm_open(pathname, c.O[flags], c.MODE[mode])) end
 end
 if C.shm_unlink then
