@@ -37,7 +37,7 @@ function S.pdfork(flags, fdp) -- changed order as rarely supply fdp
   fdp = fdp or t.int1()
   local pid, err = C.pdfork(fdp, c.PD[flags])
   if pid == -1 then return nil, t.error(err or errno()) end
-  if pid == 0 then return 0 end -- presuming the child does not get an fd TODO test
+  if pid == 0 then return 0 end -- the child does not get an fd
   return pid, nil, t.fd(fdp[0])
 end
 function S.pdgetpid(fd, pidp)
