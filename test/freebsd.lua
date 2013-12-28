@@ -88,7 +88,7 @@ test.freebsd_shm = {
 
 test.freebsd_procdesc = {
   test_procdesc = function()
-    local pid, pfd = assert(pdfork())
+    local pid, pfd = assert(S.pdfork())
     if pid == 0 then -- child
       S.pause()
       S.exit()
