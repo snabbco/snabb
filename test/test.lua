@@ -255,6 +255,14 @@ test_basic = {
     assert_equal(h, bit.tobit(0x0))
     assert_equal(l, bit.tobit(0xfffbffff))
   end,
+  test_bor64 = function()
+    local a, b = t.int64(0x10ffff0000), t.int64(0x020000ffff)
+    assert_equal(tonumber(bit.bor64(a, b)), 0x12ffffffff)
+  end,
+  test_band64 = function()
+    local a, b = t.int64(0x12ffffffff), t.int64(0x020000ffff)
+    assert_equal(tonumber(bit.band64(a, b)), 0x020000ffff)
+  end,
   test_major_minor = function()
     local d = t.device(2, 3)
     assert_equal(d.major, 2)
