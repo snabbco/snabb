@@ -1034,22 +1034,17 @@ c.PD = multiflags {
   DAEMON = 0x00000001,
 }
 
---[[
---#define CAPRIGHT(idx, bit)      ((1ULL << (57 + (idx))) | (bit))
-local function CAPRIGHT(idx, bit) return end
-c.CAP = multiflags {
 
-/* Allows for openat(O_RDONLY), read(2), readv(2). */
-#define CAP_READ                CAPRIGHT(0, 0x0000000000000001ULL)
-/* Allows for openat(O_WRONLY | O_APPEND), write(2), writev(2). */
-#define CAP_WRITE               CAPRIGHT(0, 0x0000000000000002ULL)
-/* Allows for lseek(fd, 0, SEEK_CUR). */
-#define CAP_SEEK_TELL           CAPRIGHT(0, 0x0000000000000004ULL)
-/* Allows for lseek(2). */
-#define CAP_SEEK                (CAP_SEEK_TELL | 0x0000000000000008ULL)
-/* Allows for aio_read(2), pread(2), preadv(2). */
-#define CAP_PREAD               (CAP_SEEK | CAP_READ)
-]]
+--#define CAPRIGHT(idx, bit)      ((1ULL << (57 + (idx))) | (bit))
+local function CAPRIGHT(idx, bit) return bit.bor64(bit.lshift64(1, 57 + idx), bit) end
+
+c.CAP = multiflags {
+  READ      = CAPRIGHT(0, 0x0000000000000001ULL),
+  WRITE     = CAPRIGHT(0, 0x0000000000000002ULL),
+  SEEK_TELL = CAPRIGHT(0, 0x0000000000000004ULL),
+  SEEK      = CAP_SEEK_TELL + 0x0000000000000008ULL,
+  PREAD     = CAP_SEEK + CAP_READ,
+}
 
 return c
 
