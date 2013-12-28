@@ -32,7 +32,7 @@ h.err64 = ffi.cast("int64_t", -1)
 if abi.abi64 then h.errpointer = ptvoid(h.err64) else h.errpointer = ptvoid(0xffffffff) end
 h.uint32_max = ffi.cast("uint32_t", 0xffffffff)
 h.int32_max = 0x7fffffff
-if abi.abi64 then h.longmax = 0x7fffffffffffffffLL else h.longmax = 0x7fffffff end
+if abi.abi64 then h.longmax = bit.rshift64(h.err64, 1) else h.longmax = h.int32_max end
 
 -- generic iterator that counts down so needs no closure to hold state
 function h.reviter(array, i)
