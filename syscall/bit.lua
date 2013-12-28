@@ -40,12 +40,14 @@ if abi.le then
 mt = {
   __index = {
     to32 = function(u) return u.i32[1], u.i32[0] end,
+    from32 = function(u, a, b) u.i32[1], u.i32[0] = a, b end,
   }
 }
 else
 mt = {
   __index = {
     to32 = function(u) return u.i32[0], u.i32[1] end,
+    from32 = function(u, a, b) u.i32[0], u.i32[1] = a, b end,
   }
 }
 end
@@ -73,6 +75,21 @@ function bit.band64(a, b) -- TODO support more arguments
   local aa, bb, cc = i6432(a), i6432(b), i6432()
   cc.i32[0], cc.i32[1] = bit.band(aa.i32[0], bb.i32[0]), bit.band(aa.i32[1], bb.i32[1])
   return cc.i64
+end
+
+function bit.lshift64(a, n)
+  if n == 0 then return a end
+  local aa, bb = i6432(a), i6432(0)
+  local ah, al = aa:to32()
+  local bl, bh = 0, 0
+  if n < 32 then
+    bh, bl = bit.lshift(ah, n), bit.lshift(al, n)
+    bh = bit.bor(bh, bit.rshift(al, 32 - n))
+  else
+    bh, bl = bit.lshift(al, n - 32), 0
+  end
+  bb:from32(bh, bl)
+  return bb.i64
 end
 
 return bit
