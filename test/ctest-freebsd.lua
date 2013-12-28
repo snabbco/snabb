@@ -91,7 +91,7 @@ print [[
 #include <sys/event.h>
 #include <sys/ktrace.h>
 #include <sys/procdesc.h>
-#include <sys/sys/caprights.h>
+#include <sys/caprights.h>
 #include <sys/capability.h>
 #include <net/if.h>
 #include <net/route.h>
