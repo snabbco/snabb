@@ -89,6 +89,8 @@ fmeth.lockf = lockf
 
 -- fd not first argument
 fmeth.mmap = function(fd, addr, length, prot, flags, offset) return S.mmap(addr, length, prot, flags, fd, offset) end
+if S.bindat then fmeth.bindat = function(s, dirfd, addr, addrlen) return S.bindat(dirfd, s, addr, addrlen) end end
+if S.connectat then fmeth.connectat = function(s, dirfd, addr, addrlen) return S.connectat(dirfd, s, addr, addrlen) end end
 
 -- allow calling without leading f
 fmeth.stat = S.fstat
