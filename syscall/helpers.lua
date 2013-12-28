@@ -46,10 +46,11 @@ h.lenfn = lenfn
 h.lenmt = {__len = lenfn}
 
 local tint = ffi.typeof("int")
-function h.getfd(fd)
+local function getfd(fd)
   if type(fd) == "number" or ffi.istype(tint, fd) then return fd end
   return fd:getfd()
 end
+h.getfd = getfd
 
 -- generic function for __new
 function h.newfn(tp, tab)
@@ -164,7 +165,7 @@ function h.atflag(tab)
   local function flag(cache, str)
     if not str then return tab.FDCWD end
     if type(str) == "number" then return str end
-    if type(str) ~= "string" then return str:getfd() end
+    if type(str) ~= "string" then return getfd(str) end
     if #str == 0 then return 0 end
     local s = trim(str):upper()
     if #s == 0 then return 0 end
