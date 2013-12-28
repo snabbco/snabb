@@ -1674,7 +1674,7 @@ test_shm = {
   test_shm = function()
     if not S.shm_open then error "skipped" end
     local name = "/XXXXXYYYY" .. S.getpid()
-    local fd, err = S.shm_open(name, "rdwr, creat")
+    local fd, err = S.shm_open(name, "rdwr, creat", "0600")
     if not fd and (err.ACCES or err.NOENT) then error "skipped" end -- Travis CI, Android do not have mounted...
     assert(fd, err)
     assert(S.shm_unlink(name))
