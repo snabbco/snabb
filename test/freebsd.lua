@@ -57,6 +57,26 @@ end
 
 local test = {}
 
+test.freebsd_unix_at = {
+  teardown = clean,
+  test_bindat = function()
+    local s = assert(S.socket("unix", "stream"))
+    local sa = t.sockaddr_un(tmpfile)
+    assert(S.bindat("fdcwd", sa))
+    assert(s:close())
+    assert(S.unlink(tmpfile))
+  end,
+  test_connectat = function()
+    local s1 = assert(S.socket("unix", "stream"))
+    local sa = t.sockaddr_un(tmpfile)
+    assert(S.bindat("fdcwd", sa))
+    local s2 = assert(S.socket("unix", "stream"))
+    assert(S.connectat("fdcwd", s2, tmpfile))
+    assert(s1:close())
+    assert(S.unlink(tmpfile))
+  end,
+}
+
 test.freebsd_shm = {
   test_shm_anon = function()
     local fd = assert(S.shm_open(c.SHM.ANON, "rdwr, creat"))

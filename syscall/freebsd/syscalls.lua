@@ -24,6 +24,15 @@ local t, pt, s = types.t, types.pt, types.s
 
 function S.reboot(howto) return C.reboot(c.RB[howto]) end
 
+function S.bindat(dirfd, sockfd, addr, addrlen)
+  local saddr = pt.sockaddr(addr)
+  return retbool(C.bindat(c.AT_FDCWD[dirfd], getfd(sockfd), saddr, addrlen or #addr))
+end
+function S.connect(dirfd, sockfd, addr, addrlen)
+  local saddr = pt.sockaddr(addr)
+  return retbool(C.connectat(c.AT_FDCWD[dirfd], getfd(sockfd), saddr, addrlen or #addr))
+end
+
 local function isptmaster(fd) return fd:ioctl("TIOCPTMASTER") end
 S.grantpt = isptmaster
 S.unlockpt = isptmaster

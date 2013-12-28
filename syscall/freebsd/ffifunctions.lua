@@ -13,6 +13,9 @@ cdef[[
 int reboot(int howto);
 int ioctl(int d, unsigned long request, void *arg);
 
+int connectat(int fd, int s, const struct sockaddr *name, socklen_t namelen);
+int bindat(int fd, int s, const struct sockaddr *addr, socklen_t addrlen);
+
 int __sys_utimes(const char *filename, const struct timeval times[2]);
 int __sys_futimes(int, const struct timeval times[2]);
 int __sys_lutimes(const char *filename, const struct timeval times[2]);
