@@ -234,6 +234,7 @@ function S.connect(sockfd, addr, addrlen)
 end
 function S.accept(sockfd, addr, addrlen)
   local saddr = pt.sockaddr(addr)
+  if addr then addrlen = addrlen or t.socklen1() end
   return retfd(C.accept(getfd(sockfd), saddr, addrlen))
 end
 function S.getsockname(sockfd, addr, addrlen)
@@ -592,6 +593,7 @@ end
 if C.accept4 then
   function S.accept4(sockfd, addr, addrlen, flags)
     local saddr = pt.sockaddr(addr)
+    if addr then addrlen = addrlen or t.socklen1() end
     return retfd(C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags]))
   end
 end
