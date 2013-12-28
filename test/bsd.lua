@@ -235,7 +235,7 @@ if not S.__rump then
       S.exit()
     else -- parent
       local kfd = assert(S.kqueue())
-      local kevs = t.kevents{{ident = pid, filter = "proc", flags = "add"}}
+      local kevs = t.kevents{{ident = pid, filter = "proc", flags = "add", fflags = "exit, fork, exec"}}
       assert(kfd:kevent(kevs, nil))
       assert(S.kill(pid, "term"))
       local count = 0
