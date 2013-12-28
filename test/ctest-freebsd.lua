@@ -51,6 +51,8 @@ c.CHFLAGS.NOUNLINK = nil -- alias
 c.W.WCLONE = nil -- underscore in name, changed
 c.W.WALL   = nil -- underscore in name, changed
 
+c.SHM.ANON = tonumber(c.SHM.ANON) -- it is cast to a pointer
+
 -- these are Linux names TODO are there actually BSD names?
 ctypes["struct ethhdr"] = nil
 ctypes["struct iphdr"] = nil
