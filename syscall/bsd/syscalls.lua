@@ -45,7 +45,7 @@ function S.lchflags(path, flags) return retbool(C.lchflags(path, c.CHFLAGS[flags
 function S.fchflags(fd, flags) return retbool(C.fchflags(getfd(fd), c.CHFLAGS[flags])) end
 if C.chflagsat then
   function S.chflagsat(fd, path, flags, atflag)
-    return retbool(C.chflagsat(c.AT_FDCWD[dirfd], path, c.CHFLAGS[flags], c.AT[flags])) end
+    return retbool(C.chflagsat(c.AT_FDCWD[dirfd], path, c.CHFLAGS[flags], c.AT[flags]))
   end
 end
 
