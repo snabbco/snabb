@@ -16,6 +16,10 @@ local bit = require "syscall.bit"
 local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
   = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag, h.modeflags
 
+local ffi = require "ffi"
+
+local function charp(n) return ffi.cast("char *", n) end
+
 local c = {}
 
 c.errornames = require "syscall.freebsd.errors"
@@ -1020,6 +1024,10 @@ c.NOTE = multiflags {
   TRACK     = 0x00000001,
   TRACKERR  = 0x00000002,
   CHILD     = 0x00000004,
+}
+
+c.SHM = {
+  ANON = charp(1),
 }
 
 return c
