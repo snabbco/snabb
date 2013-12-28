@@ -247,6 +247,7 @@ if not S.__rump then
       assert(kfd:close())
     end
   end
+--[[ -- TODO temporarily disabled until signal functions added to the BSDs
   test.kqueue.test_kqueue_signal = function()
     assert(S.signal("alrm", "ign"))
     local kfd = assert(S.kqueue())
@@ -262,6 +263,7 @@ if not S.__rump then
     assert_equal(count, 1)
     assert(S.signal("alrm", "dfl"))
   end
+]]
 end
 
 return test
