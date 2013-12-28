@@ -226,6 +226,28 @@ test.kqueue = {
   end,
 }
 
+-- skip as no processes in rump
+if not S.__rump then
+  test.kqueue.test_kqueue_proc = function()
+    local pid = fork()
+    if pid == 0 then -- child
+      S.exit(42)
+    else -- parent
+      local kfd = assert(S.kqueue())
+      local kevs = t.kevents{{ident = pid, filter = "proc", flags = "add", data = 10}}
+      assert(kfd:kevent(kevs, nil))
+      local count = 0
+      for k, v in assert(kfd:kevent(nil, kevs, 0)) do
+        assert(v.EXIT)
+        assert_equal(v.data, 42) -- exit code
+        count = count + 1
+      end
+      assert_equal(count, 1)
+      assert(kfd:close())
+    end
+  end
+end
+
 return test
 
 end
