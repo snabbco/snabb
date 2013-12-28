@@ -19,6 +19,8 @@ int pdfork(int *fdp, int flags);
 int pdgetpid(int fd, pid_t *pidp);
 int pdkill(int fd, int signum);
 int pdwait4(int fd, int *status, int options, struct rusage *rusage);
+int cap_fcntls_limit(int fd, uint32_t fcntlrights);
+int cap_fcntls_get(int fd, uint32_t *fcntlrightsp);
 
 int __sys_utimes(const char *filename, const struct timeval times[2]);
 int __sys_futimes(int, const struct timeval times[2]);
