@@ -71,7 +71,7 @@ test.freebsd_unix_at = {
     local sa = t.sockaddr_un(tmpfile)
     assert(S.bindat("fdcwd", s1, sa))
     local s2 = assert(S.socket("unix", "stream"))
-    assert(S.connectat("fdcwd", s2, tmpfile))
+    assert(S.connectat("fdcwd", s2, sa))
     assert(s1:close())
     assert(S.unlink(tmpfile))
   end,
