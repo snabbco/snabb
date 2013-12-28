@@ -94,4 +94,19 @@ function bit.lshift64(a, n)
   return bb.i64
 end
 
+function bit.rshift64(a, n)
+  if n == 0 then return a end
+  local aa, bb = i6432(a), i6432(0)
+  local ah, al = aa:to32()
+  local bl, bh = 0, 0
+  if n < 32 then
+    bh, bl = bit.rshift(ah, n), bit.rshift(al, n)
+    bl = bit.bor(bl, bit.lshift(ah, 32 - n))
+  else
+    bh, bl = 0, bit.rshift(ah, n - 32)
+  end
+  bb:from32(bh, bl)
+  return bb.i64
+end
+
 return bit

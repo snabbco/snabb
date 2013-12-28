@@ -273,6 +273,14 @@ test_basic = {
     assert_equal(tonumber(bit.lshift64(1, 32)), 0x100000000)
     assert_equal(tonumber(bit.lshift64(1, 36)), 0x1000000000)
   end,
+  test_rshift64 = function()
+    assert_equal(tonumber(bit.rshift64(1, 0)), 1)
+    assert_equal(tonumber(bit.rshift64(2, 1)), 1)
+    assert_equal(tonumber(bit.rshift64(0xffffffff0, 4)), 0xffffffff)
+    assert_equal(tonumber(bit.rshift64(0xffffffff00, 8)), 0xffffffff)
+    assert_equal(tonumber(bit.rshift64(0x100000000, 32)), 1)
+    assert_equal(tonumber(bit.rshift64(0x1000000000, 36)), 1)
+  end,
   test_major_minor = function()
     local d = t.device(2, 3)
     assert_equal(d.major, 2)
