@@ -14,8 +14,6 @@ local t, pt, s = types.t, types.pt, types.s
 
 local ffi = require "ffi"
 
-if abi.os == "linux" then S = require "syscall.linux.compat".init(S) end
-
 local function mktype(tp, x) if ffi.istype(tp, x) then return x else return tp(x) end end
 
 function S.creat(pathname, mode) return S.open(pathname, "CREAT,WRONLY,TRUNC", mode) end
