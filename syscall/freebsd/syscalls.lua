@@ -33,6 +33,23 @@ function S.connectat(dirfd, sockfd, addr, addrlen)
   return retbool(C.connectat(c.AT_FDCWD[dirfd], getfd(sockfd), saddr, addrlen or #addr))
 end
 
+function S.pdfork(flags, fdp) -- changed order as rarely supply fdp
+  fdp = fdp or t.int1()
+  local pid, err = C.pdfork(fdp, c.PD[flags])
+  if pid == -1 then return nil, t.error(err or errno()) end
+  if pid == 0 then return 0 end -- presuming the child does not get an fd TODO test
+  return pid, nil, t.fd(fdp[0])
+end
+function S.pdgetpid(fd, pidp)
+  pidp = pidp or t.int1()
+  local ok, err = C.pdgetpid(getfd(fd), pidp)
+  if ok == -1 then return nil, t.error(err or errno()) end
+  return pidp[0]
+end
+function S.pdkill(fd, sig) return retbool(C.pdkill(getfd(fd), c.SIG[sig])) end
+-- pdwait4 not implemented in FreeBSD yet
+
+-- pty functions
 local function isptmaster(fd) return fd:ioctl("TIOCPTMASTER") end
 S.grantpt = isptmaster
 S.unlockpt = isptmaster

@@ -1026,8 +1026,12 @@ c.NOTE = multiflags {
   CHILD     = 0x00000004,
 }
 
-c.SHM = {
+c.SHM = strflag {
   ANON = charp(1),
+}
+
+c.PD = multiflags {
+  DAEMON = 0x00000001,
 }
 
 return c

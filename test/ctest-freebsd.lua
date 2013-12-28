@@ -90,6 +90,7 @@ print [[
 #include <sys/statvfs.h>
 #include <sys/event.h>
 #include <sys/ktrace.h>
+#include <sys/procdesc.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <net/bpf.h>

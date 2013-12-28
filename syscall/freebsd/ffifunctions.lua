@@ -15,6 +15,10 @@ int ioctl(int d, unsigned long request, void *arg);
 
 int connectat(int fd, int s, const struct sockaddr *name, socklen_t namelen);
 int bindat(int fd, int s, const struct sockaddr *addr, socklen_t addrlen);
+int pdfork(int *fdp, int flags);
+int pdgetpid(int fd, pid_t *pidp);
+int pdkill(int fd, int signum);
+int pdwait4(int fd, int *status, int options, struct rusage *rusage);
 
 int __sys_utimes(const char *filename, const struct timeval times[2]);
 int __sys_futimes(int, const struct timeval times[2]);

@@ -86,6 +86,23 @@ test.freebsd_shm = {
   end,
 }
 
+test.freebsd_procdesc = {
+  test_procdesc = function()
+    local pid, pfd = assert(pdfork())
+    if pid == 0 then -- child
+      S.pause()
+      S.exit()
+    else -- parent
+      assert_equal(assert(pfd:pdgetpid()), pid)
+      assert(pfd:pdkill("term"))
+      local pev = t.pollfds{{fd = pfd, events = "hup"}} -- HUP is process termination
+      local p = assert(S.poll(pev, -1))
+      assert_equal(p, 1)
+      pfd:close()
+    end
+  end,
+}
+
 return test
 
 end
