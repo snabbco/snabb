@@ -237,7 +237,7 @@ if not S.__rump then
       local kevs = t.kevents{{ident = pid, filter = "proc", flags = "add", data = 10}}
       assert(kfd:kevent(kevs, nil))
       local count = 0
-      for k, v in assert(kfd:kevent(nil, kevs, 0)) do
+      for k, v in assert(kfd:kevent(nil, kevs)) do
         assert(v.EXIT)
         assert_equal(v.data, 42) -- exit code
         count = count + 1
