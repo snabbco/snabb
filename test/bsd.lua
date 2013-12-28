@@ -229,7 +229,7 @@ test.kqueue = {
 -- skip as no processes in rump
 if not S.__rump then
   test.kqueue.test_kqueue_proc = function()
-    local pid = fork()
+    local pid = S.fork()
     if pid == 0 then -- child
       S.exit(42)
     else -- parent
