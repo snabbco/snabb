@@ -49,6 +49,19 @@ end
 function S.pdkill(fd, sig) return retbool(C.pdkill(getfd(fd), c.SIG[sig])) end
 -- pdwait4 not implemented in FreeBSD yet
 
+function S.cap_enter() return retbool(C.cap_enter()) end
+function S.cap_getmode(modep)
+  modep = modep or t.uint()
+  local ok, err = C.cap_getmode(modep)
+  if ok == -1 then return nil, t.error(err or errno()) end
+  return modep[0]
+end
+function S.cap_sandboxed()
+  local modep = S.cap_getmode()
+  if not modep then return false
+  return modep ~= 0
+end
+
 -- pty functions
 local function isptmaster(fd) return fd:ioctl("TIOCPTMASTER") end
 S.grantpt = isptmaster

@@ -1145,5 +1145,7 @@ c.CAP_IOCTLS = multiflags {
   ALL = h.longmax,
 }
 
+c.CAP_RIGHTS_VERSION = 0 -- we do not understand others
+
 return c
 

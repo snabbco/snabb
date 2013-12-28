@@ -103,6 +103,13 @@ test.freebsd_procdesc = {
   end,
 }
 
+-- this is available as a patch for Linux, so these tests could be ported
+test.capsicum = {
+  test_cap_sandboxed_not = function()
+    assert(not S.cap_sandboxed())
+  end,
+}
+
 return test
 
 end
