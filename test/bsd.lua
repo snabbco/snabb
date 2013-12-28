@@ -229,7 +229,7 @@ test.kqueue = {
 -- skip as no processes in rump
 if not S.__rump then
   test.kqueue.test_kqueue_proc = function()
-    local pid = S.fork()
+    local pid = assert(S.fork())
     if pid == 0 then -- child
       S.pause()
       S.exit()
@@ -237,9 +237,9 @@ if not S.__rump then
       local kfd = assert(S.kqueue())
       local kevs = t.kevents{{ident = pid, filter = "proc", flags = "add", data = 10}}
       assert(kfd:kevent(kevs, nil))
-      S.kill(pid, "term")
+      assert(S.kill(pid, "term"))
       local count = 0
-      for k, v in assert(kfd:kevent(nil, kevs)) do
+      for k, v in assert(kfd:kevent(nil, kevs, 1)) do
         assert(v.EXIT)
         count = count + 1
       end
