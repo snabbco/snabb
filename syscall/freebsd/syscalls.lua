@@ -58,7 +58,7 @@ function S.cap_getmode(modep)
 end
 function S.cap_sandboxed()
   local modep = S.cap_getmode()
-  if not modep then return false
+  if not modep then return false end
   return modep ~= 0
 end
 
