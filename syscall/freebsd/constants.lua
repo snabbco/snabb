@@ -1034,7 +1034,7 @@ c.PD = multiflags {
   DAEMON = 0x00000001,
 }
 
-local function CAPRIGHT(idx, b) return b.bor64(bit.lshift64(1, 57 + idx), b) end
+local function CAPRIGHT(idx, b) return bit.bor64(bit.lshift64(1, 57 + idx), b) end
 
 c.CAP = multiflags {
   READ      = CAPRIGHT(0, 0x0000000000000001ULL),
