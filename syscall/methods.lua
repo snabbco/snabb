@@ -76,7 +76,7 @@ local fdmethods = {'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'preadv', 'pwritev', 'epoll_pwait', 'ioctl', 'flock', 'fpathconf',
                    'grantpt', 'unlockpt', 'ptsname', 'tcgetattr', 'tcsetattr', 'isatty',
                    'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
-                   'fchflags', 'fchroot', 'fsync_range', 'kevent', 'paccept', 'fktrace' -- netbsd only
+                   'fchflags', 'fchroot', 'fsync_range', 'kevent', 'paccept', 'fktrace' -- bsd only
                    }
 local fmeth = {}
 for _, v in ipairs(fdmethods) do fmeth[v] = S[v] end

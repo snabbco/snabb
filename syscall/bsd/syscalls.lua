@@ -43,7 +43,11 @@ function S.revoke(path) return retbool(C.revoke(path)) end
 function S.chflags(path, flags) return retbool(C.chflags(path, c.CHFLAGS[flags])) end
 function S.lchflags(path, flags) return retbool(C.lchflags(path, c.CHFLAGS[flags])) end
 function S.fchflags(fd, flags) return retbool(C.fchflags(getfd(fd), c.CHFLAGS[flags])) end
--- TODO chflagsat
+if C.chflagsat then
+  function S.chflagsat(fd, path, flags, atflag)
+    return retbool(C.chflagsat(c.AT_FDCWD[dirfd], path, c.CHFLAGS[flags], c.AT[flags])) end
+  end
+end
 
 function S.pathconf(path, name) return retnum(C.pathconf(path, c.PC[name])) end
 function S.fpathconf(fd, name) return retnum(C.fpathconf(getfd(fd), c.PC[name])) end

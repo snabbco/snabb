@@ -114,6 +114,19 @@ test.filesystem_bsd = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_chflagsat = function()
+    if not S.chflagsat then error "skipped" end
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    assert(fd:write("append"))
+    assert(S.chflagsat("fdcwd", tmpfile, "uf_append", "symlink_nofollow"))
+    assert(fd:write("append"))
+    assert(fd:seek(0, "set"))
+    local n, err = fd:write("not append")
+    assert(err and err.PERM, "non append write should fail")
+    assert(S.chflagsat("fdcwd", tmpfile)) -- clear flags
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+  end,
   test_lchmod = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.lchmod(tmpfile, "RUSR, WUSR"))
