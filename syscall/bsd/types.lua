@@ -96,9 +96,11 @@ mt.kevent = {
   index = {
     size = function(kev) return tonumber(kev.data) end,
     fd = function(kev) return tonumber(kev.ident) end,
+    signal = function(kev) return tonumber(kev.ident) end,
   },
   newindex = {
     fd = function(kev, v) kev.ident = t.uintptr(getfd(v)) end,
+    signal = function(kev, v) kev.ident = c.SIG[v] end,
     -- due to naming, use 'set' names TODO better naming scheme reads oddly as not a function
     setflags = function(kev, v) kev.flags = c.EV[v] end,
     setfilter = function(kev, v) kev.filter = c.EVFILT[v] end,

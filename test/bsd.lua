@@ -247,6 +247,21 @@ if not S.__rump then
       assert(kfd:close())
     end
   end
+  test.kqueue.test_kqueue_signal = function()
+    assert(S.signal("alrm", "ign"))
+    local kfd = assert(S.kqueue())
+    local kevs = t.kevents{{signal = "alrm", filter = "signal", flags = "add"}}
+    assert(kfd:kevent(kevs, nil))
+    assert(S.kill(0, "alrm"))
+    assert(S.kill(0, "alrm"))
+    local count = 0
+    for k, v in assert(kfd:kevent(nil, kevs, 1)) do
+      assert_equal(v.data, 2) -- event happened twice
+      count = count + 1
+    end
+    assert_equal(count, 1)
+    assert(S.signal("alrm", "dfl"))
+  end
 end
 
 return test
