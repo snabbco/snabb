@@ -1420,7 +1420,8 @@ test_sockets_pipes = {
     assert(s:close())
   end,
   test_accept_noaddr = function()
-    local s = S.socket("unix", "stream, nonblock")
+    local s = S.socket("unix", "stream")
+    assert(s:nonblock())
     local sa = t.sockaddr_un(tmpfile)
     assert(s:bind(sa))
     assert(s:listen())
