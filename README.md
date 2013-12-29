@@ -18,6 +18,8 @@ The [video of my FOSDEM 2013 talk](http://www.myriabit.com/ljsyscall/) here, and
 
 For simple uses, you just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Keep the directory structure there is. You can safely remove files from architectures and operating systems you do not use.
 
+You can install using luarocks; this is not in the repo but you can install with ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` for the HEAD version, or one of the specific version files in that directory.
+
 If you are using Lua rather than LuaJIT you need to install [luaffi](https://github.com/jmckaskill/luaffi) first; this is largely working now, but there will be more support for standard Lua coming soon.
 
 There is more information in the INSTALL file.
@@ -43,10 +45,10 @@ There will not be Windows support (although in principle Cygwin and similar plat
 For the (optional) rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/anttikantee/buildrump.sh) project, which is now included as a git submodule. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://www.netbsd.org/docs/rump/). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There are some additional examples in `examples/rump` which is a port of the tests in buildrump. The rump kernel runs on many elf/Posix OS and architectures, currently tested on Linux x86, x64, ppc, arm and NetBSD x86, x64, FreeBSD 10 (with gcc). It does not currently run on OSX or Windows.
 
 ## New features planned soon
-netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD, FreeBSD, OSX support, rump kernel hypercall API, OSv support, Lua support, more introspection.
+netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD, FreeBSD (inc FreeBSD 9), and OSX support, rump kernel hypercall API, OSv support, Lua support, more introspection. Plus whatever users request.
 
 ## Release notes
-0.9pre bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, luaffi support again, better kernel headers and fixes against them, more MIPS support, improved APIs with multiple return values, initial NetBSD and rump ktrace support, FreeBSD support, more OSX support, sharing of BSD code.
+0.9 bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, luaffi support again, better kernel headers and fixes against them, more MIPS support, improved APIs with multiple return values, initial NetBSD ktrace support, FreeBSD support, more OSX support, sharing of BSD code.
 
 0.8 rump kernel fixes, NetBSD 64 bit fixes, initial arp/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support, initial support of NetBSD network config.
 
@@ -108,11 +110,11 @@ The aim is to provide nice to use, Lua friendly interfaces where possible, but m
 
 ## Note on libc
 
-Under Linux, lots of system calls have glibc wrappers, some of these are trivial some less so, and some are broken. In particular some of them expose different ABIs, so we try to avoid these, just using kernel ABIs as these have long term support and we are not trying to be compatible as we are using a different language. `strace` is your friend, although strace is buggy in the nasty edge cases (at some point ljsyscall will implement ptrace so it can debug itself). Therefore under Linux the project is gradually moving to calling system calls directly, bypassing the libc, just keeping directly to the kernel ABI.
+Under Linux, lots of system calls have glibc wrappers, some of these are trivial some less so, and some are broken. In particular some of them expose different ABIs, so we try to avoid these, just using kernel ABIs as these have long term support and we are not trying to be compatible as we are using a different language. `strace` is your friend, although strace is buggy in the nasty edge cases (at some point ljsyscall will implement ptrace so it can debug itself; it implements `ktrace` in NetBSD). Therefore under Linux the project is gradually moving to calling system calls directly, bypassing the libc, just keeping directly to the kernel ABI.
 
 As well as eglibc and glibc, everything now runs on [Musl libc](http://www.etalabs.net/musl/). I use [sabotage](https://github.com/rofl0r/sabotage) as a build environment, which now includes luajit, although you may need to update to git head. Musl is much smaller than libc (700k vs 3M), while still implementing everything we need in easy to understand code. It is also MIT licensed, which may be useful as it matches the other licenses for LuaJIT and ljsyscall. Occasionally I find small bugs and missing features which I feed back to the developers. The Android libc, bionic, is also supported now, mainly by bypassing it and calling the system calls directly.
 
-Under NetBSD it is much simpler, the only thing we need to be careful of is versioned systemm calls in libc, where we directly call a specific version as the plain name will always refer to the old version for compatibility.
+Under NetBSD it is much simpler, the only thing we need to be careful of is versioned system calls in libc, where we directly call a specific version as the plain name will always refer to the old version for compatibility. FreeBSD does a more transparent versioning, so the syscall names stay the same.
 
 ### API
 
@@ -150,9 +152,9 @@ There is an example epoll script that you can test with Apachebench in the examp
 
 If you wish to port to an unsupported platform, please get in touch for help. All contributions welcomed.
 
-Porting to different Linux processor architectures is a matter of filling in the constants and types that differ. The `ctest` tests will flag issues with these, although many platforms are also missing headers which makes it more complex. If you can provide qemu target information that would be helpful as the platform can be added to the test suite.
+Porting to different Linux processor architectures is a matter of filling in the constants and types that differ. The `ctest` tests will flag issues with these, although many platforms are also missing headers which makes it more complex. If you can provide qemu target information that would be helpful as the platform can be added to the test suite, or easily available hardware.
 
-Porting to different OSs is a fair amount of work, but can generally be done gradually. The other BSDs should be very similar to NetBSD and OSX. Solaris has an ABI defined by libc not the kernel ABI, which would mean that you should probably target that. The first thing to do is check the base shared types, and work out if there are issues with large file support if it is a 32 bit platform. There are more sharing opportunities between OSs that should be dealt with, at the moment for example there is some repetition with OSX and NetBSD, so some restructuring would be helpful. 
+Porting to different OSs is a fair amount of work, but can generally be done gradually. The other BSDs are very similar to NetBSD, FreeBSD and OSX. Solaris has an ABI defined by libc not the kernel ABI, which would mean that you should probably target that. The first thing to do is check the base shared types, and work out if there are issues with large file support if it is a 32 bit platform. There is a fair amount of shared code that should just work once the types and constants are defined.
 
 If you want to port this to a different language, then get in touch, as I have some ideas and plans along this route, though I am trying to get a good fairly stable interface in Lua first. Pypy and Ruby ought to be suitable targets as they have an ffi; I also intend to do a classic Lua port using the C API. I intend to use reflection to generate more generic data for the ports, and rework how files are included. The first thing to do is just prototype some basic functions to see what is needed. Get in touch if you are interested in a port!
 
