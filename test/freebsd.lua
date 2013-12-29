@@ -108,6 +108,22 @@ test.capsicum = {
   test_cap_sandboxed_not = function()
     assert(not S.cap_sandboxed())
   end,
+  test_cap_enter = function()
+    assert(not S.cap_sandboxed())
+    local pid = assert(S.fork())
+    if pid == 0 then -- child
+      fork_assert(S.cap_enter())
+      fork_assert(S.cap_sandboxed())
+      local ok, err = S.open("/dev/null", "rdwr") -- all filesystem access should be disallowed
+      fork_assert(not ok and err.CAPMODE)
+      S.exit(23)
+    else -- parent
+      local rpid, status = assert(S.waitpid(-1))
+      assert(status.WIFEXITED, "process should have exited normally")
+      assert(status.EXITSTATUS == 23, "exit should be 23")
+    end
+    assert(not S.cap_sandboxed())
+  end,
 }
 
 return test
