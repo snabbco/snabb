@@ -1552,7 +1552,8 @@ test_termios = {
     assert(fd:close())
   end,
   test_ioctl_winsize = function()
-    local ws = assert(S.stdout:ioctl("TIOCGWINSZ"))
+    local ws, err = S.stdout:ioctl("TIOCGWINSZ")
+    if not ws and err.NOTTY then error "skipped" end -- stdout might not be a tty in test env
     assert(ws.row > 0 and ws.col > 0)
   end,
 }
