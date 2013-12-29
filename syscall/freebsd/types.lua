@@ -147,6 +147,7 @@ mt.fdset = {
 addtype(types, "fdset", "fd_set", mt.fdset)
 
 -- TODO see Linux notes. Also maybe can be shared with BSDs, have not checked properly
+-- TODO also remove WIF prefixes.
 mt.wait = {
   __index = function(w, k)
     local _WSTATUS = bit.band(w.status, octal("0177"))

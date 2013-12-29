@@ -1942,9 +1942,9 @@ test_processes = {
         local ok, err = S.setsid()
         ok = ok and ok == S.getpid() and ok == S.getsid()
         if ok then pp2w:write("y") else pp2w:write("n") end
-        S._exit(0)
+        S.exit(0)
       else
-        S._exit(0)
+        S.exit(0)
       end
     else
       assert(S.wait())

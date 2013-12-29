@@ -350,7 +350,8 @@ end
 function S.sigsuspend(mask) return retbool(C.sigsuspend(t.sigset(mask))) end
 function S.kill(pid, sig) return retbool(C.kill(pid, c.SIG[sig])) end
 
-function S._exit(status) C._exit(c.EXIT[status]) end
+-- _exit is the real exist syscall, or whatever is suitable if overridden in c.lua; libc.lua may override
+function S.exit(status) C._exit(c.EXIT[status]) end
 
 function S.fcntl(fd, cmd, arg)
   cmd = c.F[cmd]

@@ -10,6 +10,7 @@ pcall, type, table, string
 local cdef = require "ffi".cdef
 
 cdef[[
+void exit_group(int status);
 int uname(struct utsname *buf);
 int sethostname(const char *name, size_t len);
 int setdomainname(const char *name, size_t len);
@@ -22,7 +23,6 @@ int setresuid(uid_t ruid, uid_t euid, uid_t suid);
 int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
 
 int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
-void exit_group(int status);
 
 time_t time(time_t *t);
 

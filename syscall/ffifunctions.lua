@@ -109,6 +109,7 @@ pid_t getpgrp(void);
 
 pid_t fork(void);
 int execve(const char *filename, const char *argv[], const char *envp[]);
+void exit(int status);
 void _exit(int status);
 int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
 int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);

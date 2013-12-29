@@ -40,11 +40,8 @@ char *getcwd(char *buf, size_t size);
   end
 end
 
--- in NetBSD, OSX exit defined in libc
+-- in NetBSD, OSX exit defined in libc, no _exit syscall available
 if not S.exit then
-ffi.cdef[[
-void exit(int status);
-]]
   function S.exit(status) ffi.C.exit(c.EXIT[status]) end
 end
 
