@@ -70,6 +70,12 @@ Apart from the tests, there are now some examples at in the examples directory; 
 
 There will be proper documentation before the 1.0 release, apologies for it not being available sooner. I understand how important it is and it is planned shortly.
 
+## Projects using ljsyscall
+
+This project is being used ina variety of places, such as for testing the Linux compatibility code in NetBSD, among other things. If your project is not listed here please let me know or send a pull request.
+
+. [ljlinenoise](https://github.com/fperrad/ljlinenoise) a Lua implementation of the linenoise (readline) library.
+
 ## Testing
 
 The test script is fairly comprehensive. Tested on ARM, amd64, x86, with various combinations of libc. I run long test runs as LuaJIT makes random choices in code generation so single runs do not necessarily show errors. Also tested with Valgrind to pick up memory errors, although there are some issues with some of the system calls, which are being gradually resolved (I use Valgrind SVN).
@@ -78,7 +84,7 @@ Some tests need to be run as root, and will not be run otherwise. You cannot tes
 
 Some tests may fail if you do not have kernel support for some feature (eg namespacing, ipv6, bridges). Starting to add feature testing to work around this, but the way this works needs improving.
 
-The test script is a copy of [luaunit](https://github.com/rjpcomputing/luaunit). I have pushed all my changes upstream, including Lua 5.2 support and fixes to not allocate globals.
+The test script is a copy of [luaunit](https://github.com/rjpcomputing/luaunit). I have made some modifications to allow tests to be skipped, which are not really general enough to push upstream, although I would like a nicer solution.
 
 I have added initial coverage tests (now need fixing), and a C test to check constants and structures. The C test is useful for picking up errors but needs a comprehensive set of headers which eg is not available on most ARM machines so it can be difficult to run. I am putting together a set of hardware to run comprehensive tests on to make this less of an issue.
 
