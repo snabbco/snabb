@@ -1283,7 +1283,7 @@ test.seccomp = {
       if err and err.INVAL then S.exit() end -- may not be supported
       local nnp = fork_assert(S.prctl("get_no_new_privs"))
       fork_assert(nnp == 1)
-      S.exit()
+      S._exit()
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
       assert_equal(status.EXITSTATUS, 0)
@@ -1303,7 +1303,7 @@ test.seccomp = {
       local p = t.sock_fprog1{{#program, pp}}
       fork_assert(S.prctl("set_seccomp", "filter", p))
       local pid = S.getpid()
-      S.exit()
+      S._exit()
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
       assert_equal(status.EXITSTATUS, 0)
@@ -1345,7 +1345,7 @@ test.seccomp = {
       local p = t.sock_fprog1{{#program, pp}}
       fork_assert(S.prctl("set_seccomp", "filter", p))
       local pid = S.getpid()
-      S.exit()
+      S._exit() -- use _exit as normal exit might call syscalls
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
       if status.EXITSTATUS ~= 0 then -- failed, get debug info
@@ -1382,7 +1382,7 @@ test.seccomp = {
       fork_assert(S.prctl("set_seccomp", "filter", p))
       local pid = S.getpid()
       local fd = fork_assert(S.open("/dev/null", "rdonly")) -- not allowed
-      S.exit()
+      S._exit()
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
       assert(status.EXITSTATUS == 42 or status.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp (or not implemented)")
@@ -1432,7 +1432,7 @@ test.seccomp = {
       fork_assert(not ofd, "should not run open")
       fork_assert(err.errno == nr.SYS.open, "syscall that did not work should be open")
       local pid = S.getpid()
-      S.exit()
+      S._exit()
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
       assert(status.EXITSTATUS == 0 or status.EXITSTATUS == 42, "expect normal exit if supported")

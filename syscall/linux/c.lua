@@ -50,8 +50,6 @@ end
 local function llarg64u(val) return u6432(val) end
 local function llarg64(val) return i6432(val) end
 
-local function inlibc_fn(k) return ffi.C[k] end
-
 local C = {}
 
 local nr = require("syscall.linux.nr")
