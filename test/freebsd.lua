@@ -118,7 +118,7 @@ test.capsicum = {
       fork_assert(not ok and err.CAPMODE)
       S.exit(23)
     else -- parent
-      local rpid, status = assert(S.waitpid(-1))
+      local rpid, status = assert(S.waitpid(pid))
       assert(status.WIFEXITED, "process should have exited normally")
       assert(status.EXITSTATUS == 23, "exit should be 23")
     end

@@ -245,6 +245,7 @@ if not S.__rump then
       end
       assert_equal(count, 1)
       assert(kfd:close())
+      assert(S.waitpid(pid))
     end
   end
 --[[ -- TODO temporarily disabled until signal functions added to the BSDs
