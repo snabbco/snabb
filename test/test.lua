@@ -1551,6 +1551,10 @@ test_termios = {
     assert(not fd:isatty(), "not a tty")
     assert(fd:close())
   end,
+  test_ioctl_winsize = function()
+    local ws = assert(S.stdout:ioctl("TIOCGWINSZ"))
+    assert(ws.row > 0 and ws.col > 0)
+  end,
 }
 
 test_misc = {

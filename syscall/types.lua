@@ -70,7 +70,6 @@ local addtypes = {
   nlink = "nlink_t",
   ino = "ino_t",
   nfds = "nfds_t",
-  winsize = "struct winsize",
 }
 
 -- note we cannot add any metatable, as may be declared in os and rump, so not even lenmt added
@@ -606,6 +605,24 @@ mt.rusage = {
 }
 
 addtype(types, "rusage", "struct rusage", mt.rusage)
+
+mt.winsize = {
+  index = {
+    row = function(ws) return ws.ws_row end,
+    col = function(ws) return ws.ws_col end,
+    xpixel = function(ws) return ws.ws_xpixel end,
+    ypixel = function(ws) return ws.ws_ypixel end,
+  },
+  newindex = {
+    row = function(ws, v) ws.ws_row = v end,
+    col = function(ws, v) ws.ws_col = v end,
+    xpixel = function(ws, v) ws.ws_xpixel = v end,
+    ypixel = function(ws, v) ws.ws_ypixel = v end,
+  },
+  __new = newfn,
+}
+
+addtype(types, "winsize", "struct winsize", mt.winsize)
 
 -- include OS specific types
 types = ostypes.init(types)
