@@ -28,6 +28,33 @@ typedef struct __ucontext {
   -- note this is struct stat64
   stat = [[
 struct stat {
+  unsigned long long st_dev;
+  unsigned long long st_ino;
+  unsigned int    st_mode;
+  unsigned int    st_nlink;
+  unsigned int    st_uid;
+  unsigned int    st_gid;
+  unsigned long long st_rdev;
+  unsigned long long __pad1;
+  long long       st_size;
+  int             st_blksize;
+  int             __pad2;
+  long long       st_blocks;
+  int             st_atime;
+  unsigned int    st_atime_nsec;
+  int             st_mtime;
+  unsigned int    st_mtime_nsec;
+  int             st_ctime;
+  unsigned int    st_ctime_nsec;
+  unsigned int    __unused4;
+  unsigned int    __unused5;
+};
+]],
+}
+
+--[[ -- this is what Musl uses, I think it is the n32 stat?
+
+struct stat {
   dev_t st_dev;
   long __st_padding1[2];
   ino_t st_ino;
@@ -46,6 +73,6 @@ struct stat {
   blkcnt_t st_blocks;
   long __st_padding4[14];
 };
-]],
-}
+]]
+
 
