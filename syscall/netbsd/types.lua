@@ -48,7 +48,7 @@ local addstructs = {
   in6_addrlifetime = "struct in6_addrlifetime",
 }
 
-if abi.netbsd.version == 6 then
+if abi.netbsd == 6 then
   addstructs.ptmget = "struct compat_60_ptmget"
 else
   addstructs.ptmget = "struct ptmget"
