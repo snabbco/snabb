@@ -30,7 +30,7 @@ Requirements: Needs [LuaJIT 2.0.2](http://www.luajit.org/) or later.
 
 The code does not currently portably support the main Lua implementation, only LuaJIT. It now runs again with [luaffi](https://github.com/jmckaskill/luaffi) under standard Lua 5.2 (and probably 5.1, untested). Because the function calls in luaffi use dynasm they are not fully portable, so I will be adding support for Lua C interface function calls as well shortly. This is not yet integrated into the test suite.
 
-On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; MIPS support will be completed soon. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had little testing. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly; tests should be skipped if unsupported, raise an issue if not.
+On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; MIPS support is partial, with some issues still. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had little testing. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly; tests should be skipped if unsupported, raise an issue if not.
 
 Android (ARM tested so far) currently passes all the non root tests now; some tests are be skipped as the kernel does not ship with some functionality (aio, mq). Generally much functionality is available even though it is not in Bionic libc.
 
@@ -48,7 +48,7 @@ For the (optional) rump kernel functionality, the easiest way at present to inst
 netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD, FreeBSD and OSX support, rump kernel hypercall API, OSv support, Lua support, more introspection. Plus whatever users request.
 
 ## Release notes
-0.10pre more ioctls, FreeBSD 9 support.
+0.10pre more ioctls, FreeBSD 9 support, some Linux MIPS fixes.
 
 0.9 bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, luaffi support again, better kernel headers and fixes against them, more MIPS support, improved APIs with multiple return values, initial NetBSD ktrace support, FreeBSD support, more OSX support, sharing of BSD code.
 
