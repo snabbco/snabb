@@ -69,6 +69,10 @@ arch.MAP = {
 local __O_SYNC = 0x4000
 
 arch.O = {
+  RDONLY   = 0x0000,
+  WRONLY   = 0x0001,
+  RDWR     = 0x0002,
+  ACCMODE  = 0x0003,
   APPEND   = 0x0008,
   DSYNC    = 0x0010,
   NONBLOCK = 0x0080,
