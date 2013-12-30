@@ -315,6 +315,7 @@ c.LINUX_CAPABILITY_U32S = c._LINUX_CAPABILITY_U32S
 
 -- testing on pretty old MIPS box, may update when upgraded
 if abi.arch == "mips" then
+  ctypes["ucontext_t"] = nil -- differs in regs after or not
   ctypes["struct vhost_vring_file"] = nil
   ctypes["struct vhost_vring_addr"] = nil
   ctypes["struct vhost_memory"] = nil

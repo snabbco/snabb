@@ -24,6 +24,7 @@ typedef struct __ucontext {
   sigset_t uc_sigmask;
   unsigned long uc_regspace[128];
 } ucontext_t;
+typedef struct ucontext
 ]],
   stat = [[
 struct stat {
