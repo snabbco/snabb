@@ -111,6 +111,14 @@ local ioctl = strflag {
   TIOCSDTR       =  _IO('t', 121),
   TIOCCBRK       =  _IO('t', 122),
   TIOCSBRK       =  _IO('t', 123),
+  FIOCLEX        =  _IO('f', 1),
+  FIONCLEX       =  _IO('f', 2),
+  FIONREAD       = _IOR('f', 127, "int"),
+  FIONBIO        = _IOW('f', 126, "int"),
+  FIOASYNC       = _IOW('f', 125, "int"),
+  FIOSETOWN      = _IOW('f', 124, "int"),
+  FIOGETOWN      = _IOR('f', 123, "int"),
+  FIODTYPE       = _IOR('f', 122, "int"),
 }
 
 return ioctl
