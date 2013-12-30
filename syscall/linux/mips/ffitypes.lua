@@ -28,18 +28,18 @@ typedef struct __ucontext {
   -- note this is struct stat64
   stat = [[
 struct stat {
-  unsigned long   st_dev;
-  unsigned long   st_ino;
+  unsigned long long st_dev;
+  unsigned long long st_ino;
   unsigned int    st_mode;
   unsigned int    st_nlink;
   unsigned int    st_uid;
   unsigned int    st_gid;
-  unsigned long   st_rdev;
-  unsigned long   __pad1;
-  long            st_size;
+  unsigned long long st_rdev;
+  unsigned long long __pad1;
+  long long       st_size;
   int             st_blksize;
   int             __pad2;
-  long            st_blocks;
+  long long       st_blocks;
   int             st_atime;
   unsigned int    st_atime_nsec;
   int             st_mtime;
