@@ -102,6 +102,7 @@ print [[
 if abi.freebsd >= 10 then print [[
 #include <sys/caprights.h>
 ]]
+end
 
 print [[
 
