@@ -48,6 +48,7 @@ struct stat {
   unsigned int    st_ctime_nsec;
   unsigned int    __unused4;
   unsigned int    __unused5;
+};
 ]],
 }
 
