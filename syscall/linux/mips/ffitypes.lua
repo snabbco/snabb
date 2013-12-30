@@ -47,6 +47,7 @@ struct stat {
   unsigned long   st_blksize;
   unsigned long   __st_pad2;
   long long       st_blocks;
+  long __st_padding4[14];
 };
 ]],
 }
