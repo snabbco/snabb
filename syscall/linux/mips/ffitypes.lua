@@ -25,7 +25,8 @@ typedef struct __ucontext {
   unsigned long uc_regspace[128];
 } ucontext_t;
 ]],
-  stat = [[ -- note this is struct stat64
+  -- note this is struct stat64
+  stat = [[
 struct stat {
   unsigned long   st_dev;
   unsigned long   st_pad0[3];
@@ -41,7 +42,7 @@ struct stat {
   unsigned long   st_atime_nsec;
   time_t          st_mtime;
   unsigned long   st_mtime_nsec;
-  time_t    st_ctime;
+  time_t          st_ctime;
   unsigned long   st_ctime_nsec;
   unsigned long   st_blksize;
   unsigned long   st_pad2;
