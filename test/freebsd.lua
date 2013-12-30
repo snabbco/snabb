@@ -60,6 +60,7 @@ local test = {}
 test.freebsd_unix_at = {
   teardown = clean,
   test_bindat = function()
+    if not S.bindat then error "skipped" end
     local s = assert(S.socket("unix", "stream"))
     local sa = t.sockaddr_un(tmpfile)
     assert(s:bindat("fdcwd", sa))
@@ -67,6 +68,7 @@ test.freebsd_unix_at = {
     assert(S.unlink(tmpfile))
   end,
   test_connectat = function()
+    if not S.connectat then error "skipped" end
     local s1 = assert(S.socket("unix", "stream"))
     local sa = t.sockaddr_un(tmpfile)
     assert(s1:bindat("fdcwd", sa))
@@ -106,9 +108,11 @@ test.freebsd_procdesc = {
 -- this is available as a patch for Linux, so these tests could be ported
 test.capsicum = {
   test_cap_sandboxed_not = function()
+    if not S.cap_sandboxed then error "skipped" end
     assert(not S.cap_sandboxed())
   end,
   test_cap_enter = function()
+    if not S.cap_sandboxed then error "skipped" end
     assert(not S.cap_sandboxed())
     local pid = assert(S.fork())
     if pid == 0 then -- child
