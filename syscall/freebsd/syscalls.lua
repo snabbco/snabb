@@ -53,10 +53,10 @@ end
 function S.pdkill(fd, sig) return retbool(C.pdkill(getfd(fd), c.SIG[sig])) end
 -- pdwait4 not implemented in FreeBSD yet
 
-if C.cap_enter then
+if C.cap_enter and abi.freebsd >= 10 then -- do not supprot on FreeBSD 9, only partial implementation
   function S.cap_enter() return retbool(C.cap_enter()) end
 end
-if C.cap_getmode then
+if C.cap_getmode and abi.freebsd >= 10 then
   function S.cap_getmode(modep)
     modep = modep or t.uint1()
     local ok, err = C.cap_getmode(modep)
