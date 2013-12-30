@@ -324,6 +324,11 @@ if abi.arch == "mips" then
 
   -- TODO lots of constants
   c.RTA.MARK = nil
+  c.SO.RXQ_OVFL = nil
+  c.MACVLAN.MODE_PASSTHRU = nil
+  c.PORT.PROFILE_MAX = nil
+  c.PORT.UUID_MAX = nil
+  c.PORT.SELF_VF = nil
 end
 
 -- include kitchen sink, garbage can etc
