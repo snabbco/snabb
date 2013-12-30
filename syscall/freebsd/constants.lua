@@ -131,12 +131,15 @@ c.E = strflag {
   PROTO         = 92,
   NOTCAPABLE    = 93,
   CAPMODE       = 94,
-  NOTRECOVERABLE= 95,
-  OWNERDEAD     = 96,
 }
 
 -- alternate names
 c.E.WOULDBLOCK    = c.E.AGAIN
+
+if abi.freebsd >=10 then
+  c.E.NOTRECOVERABLE= 95
+  c.E.OWNERDEAD     = 96
+end
 
 c.AF = strflag {
   UNSPEC      = 0,
@@ -634,7 +637,7 @@ c.MSG = multiflags {
   NOSIGNAL        = 0x20000,
 }
 
-if abi.freebsd >= 01 then c.MSG.CMSG_CLOEXEC = 0x40000 end
+if abi.freebsd >= 10 then c.MSG.CMSG_CLOEXEC = 0x40000 end
 
 c.PC = strflag {
   LINK_MAX          = 1,
