@@ -91,13 +91,19 @@ print [[
 #include <sys/event.h>
 #include <sys/ktrace.h>
 #include <sys/procdesc.h>
-#include <sys/caprights.h>
 #include <sys/capability.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <net/bpf.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+]]
+
+if abi.freebsd >= 10 then print [[
+#include <sys/caprights.h>
+]]
+
+print [[
 
 int ret = 0;
 
