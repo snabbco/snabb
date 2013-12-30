@@ -1823,7 +1823,9 @@ test_mmap = {
   test_mlock = function()
     local size = 4096
     local mem = assert(S.mmap(nil, size, "read", "private, anon", -1, 0))
-    assert(S.mlock(mem, size))
+    local ok, err = S.mlock(mem, size)
+    if not ok and err.PERM then error "skipped" end -- may not be allowed by default
+    assert(ok)
     assert(S.munlock(mem, size))
     assert(S.munmap(mem, size))
   end,
@@ -1831,6 +1833,7 @@ test_mmap = {
     if not S.mlockall then error "skipped" end
     local ok, err = S.mlockall("current")
     if not ok and err.NOSYS then error "skipped" end
+    if not ok and err.PERM then error "skipped" end -- may not be allowed by default
     assert(ok or err.nomem, "expect mlockall to succeed, or fail due to rlimit")
     assert(S.munlockall())
   end,
