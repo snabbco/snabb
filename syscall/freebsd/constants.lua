@@ -177,13 +177,16 @@ c.AF = strflag {
   ARP         = 35,
   BLUETOOTH   = 36,
   IEEE80211   = 37,
-  INET_SDP    = 40,
-  INET6_SDP   = 42,
 }
 
 c.AF.UNIX = c.AF.LOCAL
 c.AF.OSI = c.AF.ISO
 c.AF.E164 = c.AF.ISDN
+
+if abi.freebsd >= 10 then
+  c.AF.INET_SDP  = 40
+  c.AF.INET6_SDP = 42
+end
 
 c.O = multiflags {
   RDONLY      = 0x0000,
@@ -256,8 +259,10 @@ c.SIG = strflag {
   USR1 = 30,
   USR2 = 31,
   THR = 32,
-  LIBRT = 33,
 }
+
+if abi.freebsd >=10 then c.SIG.LIBRT = 33 end
+
 
 c.SIG.LWP = c.SIG.THR
 
@@ -305,9 +310,12 @@ c.SOCK = multiflags {
   RAW       = 3,
   RDM       = 4,
   SEQPACKET = 5,
-  CLOEXEC   = 0x10000000,
-  NONBLOCK  = 0x20000000,
 }
+
+if abi.freebsd >= 10 then
+  c.SOCK.CLOEXEC  = 0x10000000
+  c.SOCK.NONBLOCK = 0x20000000
+end
 
 c.SOL = strflag {
   SOCKET    = 0xffff,
@@ -396,7 +404,7 @@ c.MAP = multiflags {
 -- TODO add aligned maps in
 }
 
-if abi.abi64 then c.MAP["32BIT"] = 0x00080000 end
+if abi.abi64 and abi.freebsd >= 10 then c.MAP["32BIT"] = 0x00080000 end
 
 c.MCL = strflag {
   CURRENT    = 0x01,
@@ -624,8 +632,9 @@ c.MSG = multiflags {
   NBIO            = 0x4000,
   COMPAT          = 0x8000,
   NOSIGNAL        = 0x20000,
-  CMSG_CLOEXEC    = 0x40000,
 }
+
+if abi.freebsd >= 01 then c.MSG.CMSG_CLOEXEC = 0x40000 end
 
 c.PC = strflag {
   LINK_MAX          = 1,
@@ -905,14 +914,6 @@ c.CHFLAGS = multiflags {
   UF_OPAQUE      = 0x00000008,
   UF_NOUNLINK    = 0x00000010,
 
-  UF_SYSTEM      = 0x00000080,
-  UF_SPARSE      = 0x00000100,
-  UF_OFFLINE     = 0x00000200,
-  UF_REPARSE     = 0x00000400,
-  UF_ARCHIVE     = 0x00000800,
-  UF_READONLY    = 0x00001000,
-  UF_HIDDEN      = 0x00008000,
-
   SF_ARCHIVED    = 0x00010000,
   SF_IMMUTABLE   = 0x00020000,
   SF_APPEND      = 0x00040000,
@@ -924,6 +925,16 @@ c.CHFLAGS.IMMUTABLE = c.CHFLAGS.UF_IMMUTABLE + c.CHFLAGS.SF_IMMUTABLE
 c.CHFLAGS.APPEND = c.CHFLAGS.UF_APPEND + c.CHFLAGS.SF_APPEND
 c.CHFLAGS.OPAQUE = c.CHFLAGS.UF_OPAQUE
 c.CHFLAGS.NOUNLINK = c.CHFLAGS.UF_NOUNLINK + c.CHFLAGS.SF_NOUNLINK
+
+if abi.freebsd >=10 then
+  c.CHFLAGS.UF_SYSTEM   = 0x00000080
+  c.CHFLAGS.UF_SPARSE   = 0x00000100
+  c.CHFLAGS.UF_OFFLINE  = 0x00000200
+  c.CHFLAGS.UF_REPARSE  = 0x00000400
+  c.CHFLAGS.UF_ARCHIVE  = 0x00000800
+  c.CHFLAGS.UF_READONLY = 0x00001000
+  c.CHFLAGS.UF_HIDDEN   = 0x00008000
+end
 
 c.TCP = strflag {
   NODELAY    = 1,
@@ -976,11 +987,12 @@ c.EV = multiflags {
   RECEIPT  = 0x0040,
   DISPATCH = 0x0080,
   SYSFLAGS = 0xF000,
-  DROP     = 0x1000,
   FLAG1    = 0x2000,
   EOF      = 0x8000,
   ERROR    = 0x4000,
 }
+
+if abi.freebsd >= 10 then c.EV.DROP = 0x1000 end
 
 c.EVFILT = strflag {
   READ     = -1,
@@ -1033,6 +1045,8 @@ c.SHM = strflag {
 c.PD = multiflags {
   DAEMON = 0x00000001,
 }
+
+if abi.freebsd >= 10 then -- not supporting on freebsd 9 as different ABI, recommend upgrade to use
 
 local function CAPRIGHT(idx, b) return bit.bor64(bit.lshift64(1, 57 + idx), b) end
 
@@ -1146,6 +1160,8 @@ c.CAP_IOCTLS = multiflags {
 }
 
 c.CAP_RIGHTS_VERSION = 0 -- we do not understand others
+
+end -- freebsd >= 10
 
 return c
 

@@ -47,10 +47,19 @@ if not abi.xen and abi.os == "bsd" then
   local ok = ffi.C.sysctlbyname("kern.ostype", buf, lenp, nil, 0)
   if not ok then error("cannot identify BSD version") end
   abi.os = ffi.string(buf):lower()
-end
 
--- you can use version 7 here
-abi.netbsd = {version = 6}
+  -- FreeBSD ABI version
+  if abi.os == "freebsd" then
+    local ok = ffi.C.sysctlbyname("kern.osreldate", buf, lenp, nil, 0)
+    if not ok then error("canot identify FreeBSD version") end
+    local vs = ffi.string(buf)
+    abi.freebsd = tonumber(vs:sub(1, #vs - 5)) -- major version ie 9, 10
+  end
+
+  -- NetBSD ABI version; you can use version 7 here TODO autodetect
+  abi.netbsd = {version = 6}
+
+end
 
 -- rump params
 abi.host = abi.os -- real OS, used for rump at present may change this
