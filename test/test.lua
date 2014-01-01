@@ -1330,7 +1330,7 @@ test_sockets_pipes = {
     local sa = assert(t.sockaddr_in6(0, loop6))
     assert(ss:bind(sa))
     local bsa = ss:getsockname() -- find bound address
-    local n = assert(cs:sendto(teststring, nil, 0, bsa))
+    local n = assert(cs:sendto(teststring, nil, c.MSG.NOSIGNAL or 0, bsa)) -- got a sigpipe here on MIPS
     local f = assert(ss:recv(buf, size))
     assert_equal(f, #teststring)
     assert(cs:close())
