@@ -1344,7 +1344,7 @@ test_sockets_pipes = {
     assert(cs:bind(sa))
     local bsa = ss:getsockname()
     local csa = cs:getsockname()
-    local n = assert(cs:sendto(teststring, #teststring, 0, bsa))
+    local n = assert(cs:sendto(teststring, #teststring, c.MSG.NOSIGNAL or 0, bsa))
     local rsa = t.sockaddr_in()
     local f = assert(ss:recvfrom(buf, size, "", rsa))
     assert_equal(f, #teststring)
@@ -1361,7 +1361,7 @@ test_sockets_pipes = {
     assert(cs:bind(sa))
     local bsa = ss:getsockname()
     local csa = cs:getsockname()
-    local n = assert(cs:sendto(teststring, #teststring, 0, bsa))
+    local n = assert(cs:sendto(teststring, #teststring, c.MSG.NOSIGNAL or 0, bsa))
     local f, rsa = assert(ss:recvfrom(buf, size)) -- will allocate and return address
     assert_equal(f, #teststring)
     assert_equal(rsa.port, csa.port)
