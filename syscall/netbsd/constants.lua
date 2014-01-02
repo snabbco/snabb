@@ -1007,7 +1007,7 @@ c.KTR = strflag {
   USER     = 8,
   EXEC_ARG = 10,
   EXEC_ENV = 11,
-  SAUPCALL = 13,
+  SAUPCALL = 13, 
   MIB      = 14,
   EXEC_FD  = 15,
 }
@@ -1024,7 +1024,7 @@ c.KTRFAC = multiflags {
   USER       = bit.lshift(1, c.KTR.USER),
   EXEC_ARG   = bit.lshift(1, c.KTR.EXEC_ARG),
   EXEC_ENV   = bit.lshift(1, c.KTR.EXEC_ENV),
-  SAUPCALL   = bit.lshift(1, c.KTR.SAUPCALL),
+--SAUPCALL   = bit.lshift(1, c.KTR.SAUPCALL), -- appears to be gone in NetBSD 7
   MIB        = bit.lshift(1, c.KTR.MIB),
   EXEC_FD    = bit.lshift(1, c.KTR.EXEC_FD),
   PERSISTENT = 0x80000000,
