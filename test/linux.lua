@@ -1600,6 +1600,18 @@ test.signals_linux = {
     local ret = assert(S.signal("alrm", "dfl"))
     assert_equal(ret, "IGN")
   end,
+  test_pause = function()
+    local pid = assert(S.fork())
+    if pid == 0 then -- child
+      S.pause()
+      S.exit(23)
+    else -- parent
+      S.kill(pid, "term")
+      local _, status = assert(S.waitpid(pid))
+      assert(status.WIFSIGNALED, "expect normal exit in clone")
+      assert_equal(status.WTERMSIG, c.SIG.TERM)
+    end
+  end,
   test_alarm = function()
     assert(S.signal("alrm", "ign"))
     assert(S.alarm(10))
@@ -1710,7 +1722,7 @@ test.processes_linux = {
   test_fork_waitid = function()
     local pid0 = S.getpid()
     local pid = assert(S.fork())
-    if (pid == 0) then -- child
+    if pid == 0 then -- child
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
