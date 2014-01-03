@@ -1226,6 +1226,14 @@ test_sockets_pipes = {
     assert(pr:close())
     assert(pw:close())
   end,
+  test_socketpair = function()
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    assert(sv1:write("test"))
+    local r = assert(sv2:read())
+    assert_equal(r, "test")
+    assert(sv1:close())
+    assert(sv2:close())
+  end,
   test_inet_socket = function() -- TODO break this test up
     local ss = assert(S.socket("inet", "stream"))
     assert(ss:nonblock())
@@ -1301,13 +1309,46 @@ test_sockets_pipes = {
     assert(as:close())
     assert(ss:close())
   end,
-  test_unix_socketpair = function()
-    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
-    assert(sv1:write("test"))
-    local r = assert(sv2:read())
-    assert_equal(r, "test")
-    assert(sv1:close())
-    assert(sv2:close())
+  test_inet6_socket = function() -- TODO break this test up
+    local ss = assert(S.socket("inet6", "stream"))
+    assert(ss:nonblock())
+    local sa = assert(t.sockaddr_in6(0, "loopback"))
+    assert_equal(sa.family, c.AF.INET6)
+    assert(ss:bind(sa))
+    local ba = assert(ss:getsockname())
+    assert_equal(ba.family, c.AF.INET6)
+    assert(ss:listen()) -- will fail if we did not bind
+    local cs = assert(S.socket("inet6", "stream")) -- client socket
+    local ok, err = cs:connect(ba)
+    local as = ss:accept()
+    local ok, err = cs:connect(ba)
+    assert(ok or err.ISCONN);
+    assert(ss:block()) -- force accept to wait
+    as = as or assert(ss:accept())
+    assert(as:block())
+    local ba = assert(cs:getpeername())
+    assert_equal(ba.family, c.AF.INET6)
+    assert_equal(tostring(ba.addr), "::1")
+    local n = assert(cs:send(teststring))
+    assert(n == #teststring, "should be able to write out short string")
+    local str = assert(as:read(nil, #teststring))
+    assert_equal(str, teststring)
+    -- test scatter gather
+    local b0 = t.buffer(4)
+    local b1 = t.buffer(3)
+    ffi.copy(b0, "test", 4) -- string init adds trailing 0 byte
+    ffi.copy(b1, "ing", 3)
+    n = assert(cs:writev({{b0, 4}, {b1, 3}}))
+    assert_equal(n, 7)
+    b0 = t.buffer(3)
+    b1 = t.buffer(4)
+    local iov = t.iovecs{{b0, 3}, {b1, 4}}
+    n = assert(as:readv(iov))
+    assert_equal(n, 7)
+    assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
+    assert(cs:close())
+    assert(as:close())
+    assert(ss:close())
   end,
   test_udp_socket = function()
     local ss = assert(S.socket("inet", "dgram"))
@@ -1321,7 +1362,7 @@ test_sockets_pipes = {
     assert(ss:close())
     assert(cs:close())
   end,
-  test_ipv6_udp_socket = function()
+  test_inet6_udp_socket = function()
     local loop6 = "::1"
     local ss, err = S.socket("inet6", "dgram")
     if not ss and err.AFNOSUPPORT then error "skipped" end
@@ -1401,6 +1442,12 @@ test_sockets_pipes = {
     assert(n > 0)
     assert(s:close())
   end,
+  test_sockopt_sndbuf_inet6 = function()
+    local s = assert(S.socket("inet6", "stream"))
+    local n = assert(s:getsockopt("socket", "sndbuf"))
+    assert(n > 0)
+    assert(s:close())
+  end,
   test_setsockopt_keepalive = function()
     local s = assert(S.socket("inet", "stream"))
     local sa = t.sockaddr_in(0, "loopback")
@@ -1410,9 +1457,27 @@ test_sockets_pipes = {
     assert(s:getsockopt("socket", "keepalive") ~= 0) -- FreeBSD does not return 1
     assert(s:close())
   end,
+  test_setsockopt_keepalive_inet6 = function()
+    local s = assert(S.socket("inet6", "stream"))
+    local sa = t.sockaddr_in6(0, "loopback")
+    assert(s:bind(sa))
+    assert_equal(s:getsockopt("socket", "keepalive"), 0)
+    assert(s:setsockopt("socket", "keepalive", 1))
+    assert(s:getsockopt("socket", "keepalive") ~= 0) -- FreeBSD does not return 1
+    assert(s:close())
+  end,
   test_sockopt_tcp_nodelay = function()
     local s = assert(S.socket("inet", "stream"))
     local sa = t.sockaddr_in(0, "loopback")
+    assert(s:bind(sa))
+    assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 0)
+    assert(s:setsockopt(c.IPPROTO.TCP, c.TCP.NODELAY, 1))
+    --assert(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY) ~= 0) -- TODO why does this fail on FreeBSD?
+    assert(s:close())
+  end,
+  test_sockopt_tcp_nodelay_inet6 = function()
+    local s = assert(S.socket("inet6", "stream"))
+    local sa = t.sockaddr_in6(0, "loopback")
     assert(s:bind(sa))
     assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 0)
     assert(s:setsockopt(c.IPPROTO.TCP, c.TCP.NODELAY, 1))
