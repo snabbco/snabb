@@ -1256,7 +1256,7 @@ test_sockets_pipes = {
     assert_equal(tostring(ba.addr), "127.0.0.1")
     assert_equal(ba.sin_addr.s_addr, t.in_addr("loopback").s_addr)
     local n = assert(cs:send(teststring))
-    assert(n == #teststring, "should be able to write out short string")
+    assert_equal(n, #teststring)
     local str = assert(as:read(nil, #teststring))
     assert_equal(str, teststring)
     -- test scatter gather
@@ -1330,7 +1330,7 @@ test_sockets_pipes = {
     assert_equal(ba.family, c.AF.INET6)
     assert_equal(tostring(ba.addr), "::1")
     local n = assert(cs:send(teststring))
-    assert(n == #teststring, "should be able to write out short string")
+    assert_equal(n, #teststring)
     local str = assert(as:read(nil, #teststring))
     assert_equal(str, teststring)
     -- test scatter gather
@@ -1346,6 +1346,92 @@ test_sockets_pipes = {
     n = assert(as:readv(iov))
     assert_equal(n, 7)
     assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
+    assert(cs:close())
+    assert(as:close())
+    assert(ss:close())
+  end,
+  test_inet4_inet6_socket = function() -- TODO break this test up
+    local ss = assert(S.socket("inet6", "stream"))
+    assert(ss:nonblock())
+    assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 0))
+    local sa = assert(t.sockaddr_in6(0, "any"))
+    assert_equal(sa.family, c.AF.INET6)
+    assert(ss:bind(sa))
+    local ba = assert(ss:getsockname())
+    assert_equal(ba.family, c.AF.INET6)
+    assert(ss:listen()) -- will fail if we did not bind
+    local cs = assert(S.socket("inet6", "stream")) -- ipv6 client socket, ok
+    local ok, err = cs:connect(ba)
+    local as = ss:accept()
+    local ok, err = cs:connect(ba)
+    assert(ok or err.ISCONN);
+    assert(ss:block()) -- force accept to wait
+    as = as or assert(ss:accept())
+    assert(as:block())
+    local ba = assert(cs:getpeername())
+    assert_equal(ba.family, c.AF.INET6)
+    assert_equal(tostring(ba.addr), "::1")
+    local n = assert(cs:send(teststring))
+    assert_equal(n, #teststring)
+    local str = assert(as:read(nil, #teststring))
+    assert_equal(str, teststring)
+    assert(cs:close())
+    assert(as:close())
+    -- second connection
+    assert(ss:nonblock())
+    local cs = assert(S.socket("inet", "stream")) -- ipv4 client socket, ok
+    local ba4 = t.sockaddr_in(ba.port, "loopback") -- TODO add function to convert sockaddr in6 to in4
+    local ok, err = cs:connect(ba4)
+    local as = ss:accept()
+    local ok, err = cs:connect(ba4)
+    assert(ok or err.ISCONN);
+    assert(ss:block()) -- force accept to wait
+    as = as or assert(ss:accept())
+    assert(as:block())
+    local ba = assert(cs:getpeername())
+    assert_equal(ba.family, c.AF.INET)
+    assert_equal(tostring(ba.addr), "127.0.0.1")
+    local n = assert(cs:send(teststring))
+    assert_equal(n, #teststring)
+    local str = assert(as:read(nil, #teststring))
+    assert_equal(str, teststring)
+    assert(cs:close())
+    assert(as:close())
+    assert(ss:close())
+  end,
+  test_inet6_only_socket = function() -- TODO break this test up
+    local ss = assert(S.socket("inet6", "stream"))
+    assert(ss:nonblock())
+    assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 1))
+    local sa = assert(t.sockaddr_in6(0, "any"))
+    assert_equal(sa.family, c.AF.INET6)
+    assert(ss:bind(sa))
+    local ba = assert(ss:getsockname())
+    assert_equal(ba.family, c.AF.INET6)
+    assert(ss:listen()) -- will fail if we did not bind
+    local cs = assert(S.socket("inet6", "stream")) -- ipv6 client socket, ok
+    local ok, err = cs:connect(ba)
+    local as = ss:accept()
+    local ok, err = cs:connect(ba)
+    assert(ok or err.ISCONN);
+    assert(ss:block()) -- force accept to wait
+    as = as or assert(ss:accept())
+    assert(as:block())
+    local ba = assert(cs:getpeername())
+    assert_equal(ba.family, c.AF.INET6)
+    assert_equal(tostring(ba.addr), "::1")
+    local n = assert(cs:send(teststring))
+    assert_equal(n, #teststring)
+    local str = assert(as:read(nil, #teststring))
+    assert_equal(str, teststring)
+    assert(cs:close())
+    assert(as:close())
+    -- second connection
+    assert(ss:nonblock())
+    local cs = assert(S.socket("inet", "stream")) -- ipv4 client socket, will fail
+    local ba4 = t.sockaddr_in(ba.port, "loopback") -- TODO add function to convert sockaddr in6 to in4
+    local ok, err = cs:connect(ba4)
+    assert(not ok and err.CONNREFUSED)
     assert(cs:close())
     assert(as:close())
     assert(ss:close())
