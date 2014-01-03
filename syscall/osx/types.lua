@@ -193,8 +193,8 @@ addtype_fn(types, "sa_sigaction", "void (*)(int, siginfo_t *, void *)")
 
 mt.sigaction = {
   index = {
-    handler = function(sa) return sa.__sigaction_u._sa_handler end,
-    sigaction = function(sa) return sa.__sigaction_u._sa_sigaction end,
+    handler = function(sa) return sa.__sigaction_u.__sa_handler end,
+    sigaction = function(sa) return sa.__sigaction_u.__sa_sigaction end,
     mask = function(sa) return sa.sa_mask end,
     flags = function(sa) return tonumber(sa.sa_flags) end,
   },
@@ -202,12 +202,12 @@ mt.sigaction = {
     handler = function(sa, v)
       if type(v) == "string" then v = pt.void(c.SIGACT[v]) end
       if type(v) == "number" then v = pt.void(v) end
-      sa.__sigaction_u._sa_handler = v
+      sa.__sigaction_u.__sa_handler = v
     end,
     sigaction = function(sa, v)
       if type(v) == "string" then v = pt.void(c.SIGACT[v]) end
       if type(v) == "number" then v = pt.void(v) end
-      sa.__sigaction_u._sa_sigaction = v
+      sa.__sigaction_u.__sa_sigaction = v
     end,
     mask = function(sa, v)
       if not ffi.istype(t.sigset, v) then v = t.sigset(v) end
