@@ -53,6 +53,14 @@ if not S.pause and S.sigsuspend then -- NetBSD and OSX deprecate pause
   function S.pause() return S.sigsuspend(t.sigset()) end
 end
 
+if not S.alarm and S.setitimer then -- usually implemented via itimer, although Linux provides alarm as syscall
+  function S.alarm(sec)
+    local oldit, err = S.setitimer(c.ITIMER.REAL, {0, sec})
+    if not oldit then return nil, err end -- alarm not supposed to return errors but hey
+    return oldit.value.sec
+  end
+end
+
 -- non standard names
 if not S.umount then S.umount = S.unmount end
 if not S.unmount then S.unmount = S.umount end
