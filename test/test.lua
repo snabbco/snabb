@@ -1454,7 +1454,7 @@ test_sockets_pipes = {
     assert(s:bind(sa))
     assert_equal(s:getsockopt("socket", "keepalive"), 0)
     assert(s:setsockopt("socket", "keepalive", 1))
-    assert_equal(s:getsockopt("socket", "keepalive"), 1)
+    assert(s:getsockopt("socket", "keepalive") ~= 0)
     assert(s:close())
   end,
   test_setsockopt_keepalive_inet6 = function()
@@ -1463,7 +1463,7 @@ test_sockets_pipes = {
     assert(s:bind(sa))
     assert_equal(s:getsockopt("socket", "keepalive"), 0)
     assert(s:setsockopt("socket", "keepalive", 1))
-    assert_equal(s:getsockopt("socket", "keepalive"), 1)
+    assert(s:getsockopt("socket", "keepalive") ~= 0)
     assert(s:close())
   end,
   test_sockopt_tcp_nodelay = function()
@@ -1472,7 +1472,7 @@ test_sockets_pipes = {
     assert(s:bind(sa))
     assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 0)
     assert(s:setsockopt(c.IPPROTO.TCP, c.TCP.NODELAY, 1))
-    assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 1)
+    assert(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY) ~= 0)
     assert(s:close())
   end,
   test_sockopt_tcp_nodelay_inet6 = function()
@@ -1481,7 +1481,7 @@ test_sockets_pipes = {
     assert(s:bind(sa))
     assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 0)
     assert(s:setsockopt(c.IPPROTO.TCP, c.TCP.NODELAY, 1))
-    assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 1)
+    assert(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY) ~= 0)
     assert(s:close())
   end,
   test_accept_noaddr = function()
