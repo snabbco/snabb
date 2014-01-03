@@ -1726,10 +1726,11 @@ test_gettimeofday = {
 
 test_signals = {
   test_signal_return = function()
-    local ret = assert(S.signal("alrm", "ign"))
-    assert_equal(ret, "DFL")
+    local orig = assert(S.signal("alrm", "ign"))
     local ret = assert(S.signal("alrm", "dfl"))
     assert_equal(ret, "IGN")
+    local ret = assert(S.signal("alrm", orig))
+    assert_equal(ret, "DFL")
   end,
   test_pause = function()
     local pid = assert(S.fork())
