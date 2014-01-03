@@ -444,27 +444,6 @@ mt.rlimit = {
 
 addtype(types, "rlimit", "struct rlimit64", mt.rlimit)
 
-local function itnormal(v)
-  if not v then v = {{0, 0}, {0, 0}} end
-  if v.interval then
-    v.it_interval = v.interval
-    v.interval = nil
-  end
-  if v.value then
-    v.it_value = v.value
-    v.value = nil
-  end
-  if not v.it_interval then
-    v.it_interval = v[1]
-    v[1] = nil
-  end
-  if not v.it_value then
-    v.it_value = v[2]
-    v[2] = nil
-  end
-  return v
-end
-
 mt.signalfd = {
   index = {
     signo = function(ss) return tonumber(ss.ssi_signo) end,
