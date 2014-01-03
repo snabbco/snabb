@@ -1227,79 +1227,79 @@ test_sockets_pipes = {
     assert(pw:close())
   end,
   test_inet_socket = function() -- TODO break this test up
-    local s = assert(S.socket("inet", "stream"))
-    assert(s:nonblock())
+    local ss = assert(S.socket("inet", "stream"))
+    assert(ss:nonblock())
     local sa = assert(t.sockaddr_in(0, "loopback"))
-    assert(sa.sin_family == 2, "expect family on inet socket to be 2")
-    assert(s:bind(sa))
-    local ba = assert(s:getsockname())
-    assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
-    assert(s:listen()) -- will fail if we did not bind
-    local c = assert(S.socket("inet", "stream")) -- client socket
-    local ok, err = c:connect(ba)
-    local a = s:accept()
-    local ok, err = c:connect(ba)
+    assert_equal(sa.family, c.AF.INET)
+    assert(ss:bind(sa))
+    local ba = assert(ss:getsockname())
+    assert_equal(ba.family, c.AF.INET)
+    assert(ss:listen()) -- will fail if we did not bind
+    local cs = assert(S.socket("inet", "stream")) -- client socket
+    local ok, err = cs:connect(ba)
+    local as = ss:accept()
+    local ok, err = cs:connect(ba)
     assert(ok or err.ISCONN);
-    assert(s:block()) -- force accept to wait
-    a = a or assert(s:accept())
-    assert(a:block())
-    local ba = assert(c:getpeername())
-    assert(ba.sin_family == 2, "expect ipv4 connection")
-    assert(tostring(ba.sin_addr) == "127.0.0.1", "expect peer on localhost")
-    assert(ba.sin_addr.s_addr == t.in_addr("loopback").s_addr, "expect peer on localhost")
-    local n = assert(c:send(teststring))
+    assert(ss:block()) -- force accept to wait
+    as = as or assert(ss:accept())
+    assert(as:block())
+    local ba = assert(cs:getpeername())
+    assert_equal(ba.family, c.AF.INET)
+    assert_equal(tostring(ba.addr), "127.0.0.1")
+    assert_equal(ba.sin_addr.s_addr, t.in_addr("loopback").s_addr)
+    local n = assert(cs:send(teststring))
     assert(n == #teststring, "should be able to write out short string")
-    local str = assert(a:read(nil, #teststring))
+    local str = assert(as:read(nil, #teststring))
     assert_equal(str, teststring)
     -- test scatter gather
     local b0 = t.buffer(4)
     local b1 = t.buffer(3)
     ffi.copy(b0, "test", 4) -- string init adds trailing 0 byte
     ffi.copy(b1, "ing", 3)
-    n = assert(c:writev({{b0, 4}, {b1, 3}}))
-    assert(n == 7, "expect writev to write 7 bytes")
+    n = assert(cs:writev({{b0, 4}, {b1, 3}}))
+    assert_equal(n, 7)
     b0 = t.buffer(3)
     b1 = t.buffer(4)
     local iov = t.iovecs{{b0, 3}, {b1, 4}}
-    n = assert(a:readv(iov))
-    assert_equal(n, 7, "expect readv to read 7 bytes")
+    n = assert(as:readv(iov))
+    assert_equal(n, 7)
     assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
-    assert(c:close())
-    assert(a:close())
-    assert(s:close())
+    assert(cs:close())
+    assert(as:close())
+    assert(ss:close())
   end,
   test_inet_socket_readv = function() -- part of above, no netbsd bug (but commenting out writev does trigger)
-    local s = assert(S.socket("inet", "stream"))
-    assert(s:nonblock())
+    local ss = assert(S.socket("inet", "stream"))
+    assert(ss:nonblock())
     local sa = assert(t.sockaddr_in(0, "loopback"))
-    assert(sa.sin_family == 2, "expect family on inet socket to be 2")
-    assert(s:bind(sa))
-    local ba = assert(s:getsockname())
-    assert_equal(ba.sin_family, 2, "expect family on getsockname to be 2")
-    assert(s:listen()) -- will fail if we did not bind
-    local c = assert(S.socket("inet", "stream")) -- client socket
-    local ok, err = c:connect(ba)
-    local a = s:accept()
-    local ok, err = c:connect(ba)
+    assert_equal(sa.family, c.AF.INET)
+    assert(ss:bind(sa))
+    local ba = assert(ss:getsockname())
+    assert_equal(ba.family, c.AF.INET)
+    assert(ss:listen()) -- will fail if we did not bind
+    local cs = assert(S.socket("inet", "stream")) -- client socket
+    local ok, err = cs:connect(ba)
+    local as = ss:accept()
+    local ok, err = cs:connect(ba)
     assert(ok or err.ISCONN);
-    assert(s:block()) -- force accept to wait
-    a = a or assert(s:accept())
-    assert(a:block())
+    assert(ss:block()) -- force accept to wait
+    as = as or assert(ss:accept())
+    assert(as:block())
     local b0 = t.buffer(4)
     local b1 = t.buffer(3)
     ffi.copy(b0, "test", 4) -- string init adds trailing 0 byte
     ffi.copy(b1, "ing", 3)
-    local n = assert(c:writev({{b0, 4}, {b1, 3}}))
+    local n = assert(cs:writev({{b0, 4}, {b1, 3}}))
     assert(n == 7, "expect writev to write 7 bytes")
     b0 = t.buffer(3)
     b1 = t.buffer(4)
     local iov = t.iovecs{{b0, 3}, {b1, 4}}
-    n = assert(a:readv(iov))
+    n = assert(as:readv(iov))
     assert_equal(n, 7, "expect readv to read 7 bytes")
     assert(ffi.string(b0, 3) == "tes" and ffi.string(b1, 4) == "ting", "expect to get back same stuff")
-    assert(c:close())
-    assert(a:close())
-    assert(s:close())
+    assert(cs:close())
+    assert(as:close())
+    assert(ss:close())
   end,
   test_unix_socketpair = function()
     local sv1, sv2 = assert(S.socketpair("unix", "stream"))
@@ -1321,7 +1321,7 @@ test_sockets_pipes = {
     assert(ss:close())
     assert(cs:close())
   end,
-  test_ipv6_socket = function()
+  test_ipv6_udp_socket = function()
     local loop6 = "::1"
     local ss, err = S.socket("inet6", "dgram")
     if not ss and err.AFNOSUPPORT then error "skipped" end
