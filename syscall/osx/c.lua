@@ -50,7 +50,7 @@ function C.getdirentries(fd, buf, len, basep)
 end
 ]]
 
-C.getdirentries = ffi.C._getdirentries -- this is the legacy one
+--C.getdirentries = ffi.C._getdirentries -- cannot find this anywhere!
 C.sigaction = ffi.C._sigaction
 
 return C
