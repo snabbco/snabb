@@ -934,5 +934,48 @@ c.ITIMER = strflag {
   PROF    = 2,
 }
 
+-- ipv6 sockopts
+c.IPV6 = strflag {
+  SOCKOPT_RESERVED1 = 3,
+  UNICAST_HOPS      = 4,
+  MULTICAST_IF      = 9,
+  MULTICAST_HOPS    = 10,
+  MULTICAST_LOOP    = 11,
+  JOIN_GROUP        = 12,
+  LEAVE_GROUP       = 13,
+  PORTRANGE         = 14,
+  PORTALGO          = 17,
+--ICMP6_FILTER      = 18, -- not namespaced as IPV6
+  2292PKTINFO       = 19,
+  2292HOPLIMIT      = 20,
+  2292NEXTHOP       = 21,
+  2292HOPOPTS       = 22,
+  2292DSTOPTS       = 23,
+  2292RTHDR         = 24,
+  2292PKTOPTIONS    = 25,
+  CHECKSUM          = 26,
+  V6ONLY            = 27,
+  IPSEC_POLICY      = 28,
+  FAITH             = 29,
+  RTHDRDSTOPTS      = 35,
+  RECVPKTINFO       = 36,
+  RECVHOPLIMIT      = 37,
+  RECVRTHDR         = 38,
+  RECVHOPOPTS       = 39,
+  RECVDSTOPTS       = 40,
+  USE_MIN_MTU       = 42,
+  RECVPATHMTU       = 43,
+  PATHMTU           = 44,
+  PKTINFO           = 46,
+  HOPLIMIT          = 47,
+  NEXTHOP           = 48,
+  HOPOPTS           = 49,
+  DSTOPTS           = 50,
+  RTHDR             = 51,
+  RECVTCLASS        = 57,
+  TCLASS            = 61,
+  DONTFRAG          = 62,
+}
+
 return c
 

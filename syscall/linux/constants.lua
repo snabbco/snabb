@@ -3376,5 +3376,33 @@ c.TCP = strflag {
   TIMESTAMP          = 24,
 }
 
+-- ipv6 sockopts
+c.IPV6 = strflag {
+  ADDRFORM          = 1,
+  ["2292PKTINFO"]   = 2,
+  ["2292HOPOPTS"]   = 3,
+  ["2292DSTOPTS"]   = 4,
+  ["2292RTHDR"]     = 5,
+  ["2292PKTOPTIONS"]= 6,
+  CHECKSUM          = 7,
+  ["2292HOPLIMIT"]  = 8,
+  NEXTHOP           = 9,
+  AUTHHDR           = 10,
+  FLOWINFO          = 11,
+  UNICAST_HOPS      = 16,
+  MULTICAST_IF      = 17,
+  MULTICAST_HOPS    = 18,
+  MULTICAST_LOOP    = 19,
+  ADD_MEMBERSHIP    = 20,
+  DROP_MEMBERSHIP   = 21,
+  ROUTER_ALERT      = 22,
+  MTU_DISCOVER      = 23,
+  MTU               = 24,
+  RECVERR           = 25,
+  V6ONLY            = 26,
+  JOIN_ANYCAST      = 27,
+  LEAVE_ANYCAST     = 28,
+}
+
 return c
 
