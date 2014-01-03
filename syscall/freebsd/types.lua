@@ -192,7 +192,7 @@ mt.siginfo = {
     trapno  = function(s) return s._fault._trapno end,
     timerid = function(s) return s._timer._timerid end,
     overrun = function(s) return s._timer._overrun end,
-    mqd     = function(s) return s._mesgq._mqd end
+    mqd     = function(s) return s._mesgq._mqd end,
     band    = function(s) return s._poll._band end,
   },
   newindex = {
@@ -207,7 +207,7 @@ mt.siginfo = {
     trapno  = function(s, v) s._fault._trapno = v end,
     timerid = function(s, v) s._timer._timerid = v end,
     overrun = function(s, v) s._timer._overrun = v end,
-    mqd     = function(s, v) s._mesgq._mqd = v end
+    mqd     = function(s, v) s._mesgq._mqd = v end,
     band    = function(s, v) s._poll._band = v end,
   },
   __len = lenfn,
