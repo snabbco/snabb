@@ -179,7 +179,7 @@ function t.waitstatus(status)
   return setmetatable({status = status}, mt.wait)
 end
 
-- sigaction, standard POSIX behaviour with union of handler and sigaction
+-- sigaction, standard POSIX behaviour with union of handler and sigaction
 addtype_fn(types, "sa_sigaction", "void (*)(int, siginfo_t *, void *)")
 
 mt.sigaction = {
