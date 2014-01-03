@@ -53,5 +53,7 @@ C.kevent = ffi.C.__kevent50
 -- use underlying syscall not wrapper
 C.getcwd = ffi.C.__getcwd
 
+C.sigaction = ffi.C.__libc_sigaction14
+
 return C
 
