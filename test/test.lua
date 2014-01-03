@@ -1361,10 +1361,11 @@ test_sockets_pipes = {
     assert_equal(ba.family, c.AF.INET6)
     assert(ss:listen()) -- will fail if we did not bind
     local cs = assert(S.socket("inet6", "stream")) -- ipv6 client socket, ok
-    local ok, err = cs:connect(ba)
+    local ba6 = t.sockaddr_in6(ba.port, "loopback") 
+    local ok, err = cs:connect(ba6)
     local as = ss:accept()
-    local ok, err = cs:connect(ba)
-    assert(ok or err.ISCONN);
+    local ok, err = cs:connect(ba6)
+    assert(ok or err.ISCONN, "unexpected error " .. tostring(err));
     assert(ss:block()) -- force accept to wait
     as = as or assert(ss:accept())
     assert(as:block())
@@ -1384,7 +1385,7 @@ test_sockets_pipes = {
     local ok, err = cs:connect(ba4)
     local as = ss:accept()
     local ok, err = cs:connect(ba4)
-    assert(ok or err.ISCONN);
+    assert(ok or err.ISCONN, "unexpected error " .. tostring(err));
     assert(ss:block()) -- force accept to wait
     as = as or assert(ss:accept())
     assert(as:block())
@@ -1403,7 +1404,7 @@ test_sockets_pipes = {
     local ss = assert(S.socket("inet6", "stream"))
     assert(ss:nonblock())
     assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 1))
-    local sa = assert(t.sockaddr_in6(0, "any"))
+    local sa = assert(t.sockaddr_in6(0, "loopback"))
     assert_equal(sa.family, c.AF.INET6)
     assert(ss:bind(sa))
     local ba = assert(ss:getsockname())
@@ -1413,7 +1414,7 @@ test_sockets_pipes = {
     local ok, err = cs:connect(ba)
     local as = ss:accept()
     local ok, err = cs:connect(ba)
-    assert(ok or err.ISCONN);
+    assert(ok or err.ISCONN, "unexpected error " .. tostring(err));
     assert(ss:block()) -- force accept to wait
     as = as or assert(ss:accept())
     assert(as:block())
