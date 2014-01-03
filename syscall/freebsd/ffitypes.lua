@@ -86,6 +86,14 @@ struct timeval {
   time_t tv_sec;
   suseconds_t tv_usec;
 };
+struct itimerspec {
+  struct timespec it_interval;
+  struct timespec it_value;
+};
+struct itimerval {
+  struct timeval it_interval;
+  struct timeval it_value;
+};
 struct sockaddr {
   uint8_t       sa_len;
   sa_family_t   sa_family;

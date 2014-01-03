@@ -98,6 +98,14 @@ struct _netbsd_timeval {
   _netbsd_time_t tv_sec;
   _netbsd_suseconds_t tv_usec;
 };
+struct _netbsd_itimerspec {
+  struct _netbsd_timespec it_interval;
+  struct _netbsd_timespec it_value;
+};
+struct _netbsd_itimerval {
+  struct _netbsd_timeval it_interval;
+  struct _netbsd_timeval it_value;
+};
 typedef struct {
   uint32_t      val[4]; // note renamed to match Linux
 } _netbsd_sigset_t;

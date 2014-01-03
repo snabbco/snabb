@@ -465,36 +465,6 @@ local function itnormal(v)
   return v
 end
 
-mt.itimerspec = {
-  index = {
-    interval = function(it) return it.it_interval end,
-    value = function(it) return it.it_value end,
-  },
-  __new = function(tp, v)
-    v = itnormal(v)
-    v.it_interval = istype(t.timespec, v.it_interval) or t.timespec(v.it_interval)
-    v.it_value = istype(t.timespec, v.it_value) or t.timespec(v.it_value)
-    return ffi.new(tp, v)
-  end,
-}
-
-addtype(types, "itimerspec", "struct itimerspec", mt.itimerspec)
-
-mt.itimerval = {
-  index = {
-    interval = function(it) return it.it_interval end,
-    value = function(it) return it.it_value end,
-  },
-  __new = function(tp, v)
-    v = itnormal(v)
-    v.it_interval = istype(t.timeval, v.it_interval) or t.timeval(v.it_interval)
-    v.it_value = istype(t.timeval, v.it_value) or t.timeval(v.it_value)
-    return ffi.new(tp, v)
-  end,
-}
-
-addtype(types, "itimerval", "struct itimerval", mt.itimerval)
-
 mt.signalfd = {
   index = {
     signo = function(ss) return tonumber(ss.ssi_signo) end,

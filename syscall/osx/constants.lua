@@ -928,5 +928,11 @@ c.NOTE = multiflags {
 --]]
 }
 
+c.ITIMER = strflag {
+  REAL    = 0,
+  VIRTUAL = 1,
+  PROF    = 2,
+}
+
 return c
 

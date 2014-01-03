@@ -599,7 +599,6 @@ if C.accept4 then
     return retfd(C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags]))
   end
 end
-
 if C.sigaction then
   function S.sigaction(signum, handler, oldact)
     if type(handler) == "string" or type(handler) == "function" then
@@ -607,6 +606,22 @@ if C.sigaction then
     end
     if handler then handler = mktype(t.sigaction, handler) end
     return retbool(C.sigaction(c.SIG[signum], handler, oldact))
+  end
+end
+if C.getitimer then
+  function S.getitimer(which, value)
+    value = value or t.itimerval()
+    local ret, err = C.getitimer(c.ITIMER[which], value)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return value
+  end
+end
+if C.setitimer then
+  function S.setitimer(which, it, oldtime)
+    oldtime = oldtime or t.itimerval()
+    local ret, err = C.setitimer(c.ITIMER[which], mktype(t.itimerval, it), oldtime)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return oldtime
   end
 end
 

@@ -1099,5 +1099,12 @@ c.TCP = strflag {
   CONGCTL    = 0x20,
 }
 
+c.ITIMER = strflag {
+  REAL    = 0,
+  VIRTUAL = 1,
+  PROF    = 2,
+  MONOTONIC = 3,
+}
+
 return c
 

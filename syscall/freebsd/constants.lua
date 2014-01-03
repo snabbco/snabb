@@ -1049,6 +1049,12 @@ c.PD = multiflags {
   DAEMON = 0x00000001,
 }
 
+c.ITIMER = strflag {
+  REAL    = 0,
+  VIRTUAL = 1,
+  PROF    = 2,
+}
+
 if abi.freebsd >= 10 then -- not supporting on freebsd 9 as different ABI, recommend upgrade to use
 
 local function CAPRIGHT(idx, b) return bit.bor64(bit.lshift64(1, 57 + idx), b) end

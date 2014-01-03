@@ -317,20 +317,6 @@ end
 
 function S.eventfd(initval, flags) return retfd(C.eventfd(initval or 0, c.EFD[flags])) end
 
-function S.getitimer(which, value)
-  value = value or t.itimerval()
-  local ret, err = C.getitimer(c.ITIMER[which], value)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return value
-end
-
-function S.setitimer(which, it, oldtime)
-  oldtime = oldtime or t.itimerval()
-  local ret, err = C.setitimer(c.ITIMER[which], mktype(t.itimerval, it), oldtime)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return oldtime
-end
-
 function S.timerfd_create(clockid, flags)
   return retfd(C.timerfd_create(c.CLOCK[clockid], c.TFD[flags]))
 end
