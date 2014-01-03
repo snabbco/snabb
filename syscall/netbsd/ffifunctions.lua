@@ -37,5 +37,6 @@ int __futimes50(int fd, const struct timeval times[2]);
 int __posix_fadvise50(int fd, off_t offset, off_t size, int hint);
 int __kevent50(int kq, const struct kevent *changelist, size_t nchanges, struct kevent *eventlist, size_t nevents, const struct timespec *timeout);
 int __getcwd(char *buf, size_t size);
+int __libc_sigaction14(int signum, const struct sigaction *act, struct sigaction *oldact);
 ]]
 
