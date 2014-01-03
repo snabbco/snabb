@@ -42,10 +42,10 @@ if S.sigaction then
     local oldact = t.sigaction()
     local ok, err = S.sigaction(signum, handler, oldact)
     if not ok then return nil, err end
-    local num = tonumber(t.intptr(oldact.sa_handler))
+    local num = tonumber(t.intptr(oldact.handler))
     local ret = sigret[num]
     if ret then return ret end -- return eg "IGN", "DFL" not a function pointer
-    return oldact.sa_handler
+    return oldact.handler
   end
 end
 
