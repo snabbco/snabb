@@ -436,11 +436,14 @@ c.MADV = strflag {
 }
 
 c.IPPROTO = strflag {
+  IP             = 0,
   HOPOPTS        = 0,
+  ICMP           = 1,
   IGMP           = 2,
   GGP            = 3,
   IPV4           = 4,
   IPIP           = 4,
+  TCP            = 6,
   ST             = 7,
   EGP            = 8,
   PIGP           = 9,
@@ -451,6 +454,7 @@ c.IPPROTO = strflag {
   EMCON          = 14,
   XNET           = 15,
   CHAOS          = 16,
+  UDP            = 17,
   MUX            = 18,
   MEAS           = 19,
   HMP            = 20,
