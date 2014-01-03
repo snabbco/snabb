@@ -1055,6 +1055,16 @@ c.ITIMER = strflag {
   PROF    = 2,
 }
 
+c.SA = multiflags {
+  ONSTACK   = 0x0001,
+  RESTART   = 0x0002,
+  RESETHAND = 0x0004,
+  NOCLDSTOP = 0x0008,
+  NODEFER   = 0x0010,
+  NOCLDWAIT = 0x0020,
+  SIGINFO   = 0x0040,
+}
+
 if abi.freebsd >= 10 then -- not supporting on freebsd 9 as different ABI, recommend upgrade to use
 
 local function CAPRIGHT(idx, b) return bit.bor64(bit.lshift64(1, 57 + idx), b) end
