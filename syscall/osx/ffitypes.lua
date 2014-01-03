@@ -76,6 +76,7 @@ struct itimerval {
   struct timeval it_interval;
   struct timeval it_value;
 };
+
 struct sockaddr {
   uint8_t       sa_len;
   sa_family_t   sa_family;
@@ -144,11 +145,12 @@ typedef struct __siginfo {
   long    si_band;
   unsigned long   __pad[7];
 } siginfo_t;
+union __sigaction_u {
+  void    (*__sa_handler)(int);
+  void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+};
 struct sigaction {
-  union {
-    void (*sa_handler)(int);
-    void (*sa_sigaction)(int, siginfo_t *, void *);
-  } sa_handler; // renamed as in Linux definition
+  union __sigaction_u __sigaction_u;
   sigset_t sa_mask;
   int sa_flags;
 };

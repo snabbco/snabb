@@ -210,6 +210,14 @@ struct cap_rights {
   uint64_t cr_rights[0 + 2]; // for version 0
 };
 typedef struct cap_rights cap_rights_t;
+struct sigaction {
+  union {
+    void    (*__sa_handler)(int);
+    void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+  } __sigaction_u;
+  int     sa_flags;
+  sigset_t sa_mask;
+};
 ]]
 
 local s = table.concat(defs, "")
