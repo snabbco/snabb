@@ -1431,7 +1431,7 @@ test_sockets_pipes = {
     local cs = assert(S.socket("inet", "stream")) -- ipv4 client socket, will fail
     local ba4 = t.sockaddr_in(ba.port, "loopback") -- TODO add function to convert sockaddr in6 to in4
     local ok, err = cs:connect(ba4)
-    assert(not ok and err.CONNREFUSED)
+    assert(not ok and err.CONNREFUSED, "expect to get connection refused")
     assert(cs:close())
     assert(as:close())
     assert(ss:close())
