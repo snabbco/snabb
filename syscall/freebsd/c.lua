@@ -39,6 +39,7 @@ C.futimes = ffi.C.__sys_futimes
 C.lutimes = ffi.C.__sys_lutimes
 C.utimes = ffi.C.__sys_utimes
 C.wait4 = ffi.C.__sys_wait4
+C.sigaction = ffi.C.__sys_sigaction
 
 return C
 
