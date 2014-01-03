@@ -484,6 +484,7 @@ end
 function C.pipe(pipefd) return syscall(sys.pipe, void(pipefd)) end
 function C.pipe2(pipefd, flags) return syscall(sys.pipe, void(pipefd), int(flags)) end
 function C.mknod(path, mode, dev) return syscall(sys.mknod, void(path), uint(mode), uint(dev)) end
+function C.pause() return syscall(sys.pause) end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
