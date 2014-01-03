@@ -15,5 +15,8 @@ int ioctl(int d, unsigned long request, void *arg);
 int stat64(const char *path, struct stat *sb);
 int lstat64(const char *path, struct stat *sb);
 int fstat64(int fd, struct stat *sb);
+
+int _getdirentries(int fd, char *buf, int nbytes, long *basep);
+int _sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
 ]]
 
