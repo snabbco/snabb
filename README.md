@@ -6,7 +6,7 @@ What? An FFI implementation of the Linux, NetBSD, FreeBSD and OSX kernel ABIs fo
 
 Why? First it provides a comprehensive set of system call APIs for programming sockets, files and so on, including the more obscure things (eg file change notifications). Second it provides higher level interfaces such as network interface configuration, so your application can control its entire runtime interface including IP addresses routing and so on. Third it provides tools for added security, such as support for Linux namespaces (containers), system call filtering (seccomp type 2), capabilities and so on, all with a script language interface that is much simpler to use than the C interface. As it is Lua based it can easily be embedded in another language; in the future ports to other scripting languages are planned. It also serves as a way of learning how the operating system interfaces work in a more forgiving environment than C.
 
-Thhere is support for the [NetBSD rump kernel](http://www.netbsd.org/docs/rump/) under other operating systems and [natively without an operating system under Xen](https://github.com/justincormack/rumpuser-xen).
+There is support for the [NetBSD rump kernel](http://www.netbsd.org/docs/rump/) under other operating systems and [natively without an operating system under Xen](https://github.com/justincormack/rumpuser-xen).
 
 This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
 
@@ -48,7 +48,7 @@ For the (optional) rump kernel functionality, the easiest way at present to inst
 netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD, FreeBSD and OSX support, rump kernel hypercall API, OSv support, Lua support, more introspection. Plus whatever users request.
 
 ## Release notes
-0.10pre more ioctls, FreeBSD 9 support, some Linux MIPS fixes.
+0.10pre more ioctls, FreeBSD 9 support, some Linux MIPS fixes, more timer and signal functions for BSDs.
 
 0.9 bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, luaffi support again, better kernel headers and fixes against them, more MIPS support, improved APIs with multiple return values, initial NetBSD ktrace support, FreeBSD support, more OSX support, sharing of BSD code.
 
