@@ -1075,7 +1075,6 @@ c.IPV6 = strflag {
   JOIN_GROUP        = 12,
   LEAVE_GROUP       = 13,
   PORTRANGE         = 14,
-  PORTALGO          = 17,
 --ICMP6_FILTER      = 18, -- not namespaced as IPV6
   CHECKSUM          = 26,
   V6ONLY            = 27,
