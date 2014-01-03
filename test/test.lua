@@ -1470,7 +1470,7 @@ test_sockets_pipes = {
     local s = assert(S.socket("inet", "stream"))
     local sa = t.sockaddr_in(0, "loopback")
     assert(s:bind(sa))
-    assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 0)
+    assert_equal(assert(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY)), 0)
     assert(s:setsockopt(c.IPPROTO.TCP, c.TCP.NODELAY, 1))
     --assert(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY) ~= 0) -- TODO why does this fail on FreeBSD?
     assert(s:close())
@@ -1479,7 +1479,7 @@ test_sockets_pipes = {
     local s = assert(S.socket("inet6", "stream"))
     local sa = t.sockaddr_in6(0, "loopback")
     assert(s:bind(sa))
-    assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 0)
+    assert_equal(assert(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY)), 0)
     assert(s:setsockopt(c.IPPROTO.TCP, c.TCP.NODELAY, 1))
     --assert(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY) ~= 0) -- TODO why does this fail on FreeBSD?
     assert(s:close())
