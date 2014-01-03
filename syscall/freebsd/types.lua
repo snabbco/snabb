@@ -150,7 +150,7 @@ mt.cap_rights = {
   -- TODO
 }
 
-addtype(types), "cap_rights", "cap_rights_t", mt.cap_rights)
+addtype(types, "cap_rights", "cap_rights_t", mt.cap_rights)
 
 -- TODO see Linux notes. Also maybe can be shared with BSDs, have not checked properly
 -- TODO also remove WIF prefixes.
