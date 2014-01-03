@@ -179,6 +179,42 @@ function t.waitstatus(status)
   return setmetatable({status = status}, mt.wait)
 end
 
+mt.siginfo = {
+  index = {
+    signo   = function(s) return s.si_signo end,
+    errno   = function(s) return s.si_errno end,
+    code    = function(s) return s.si_code end,
+    pid     = function(s) return s.si_pid end,
+    uid     = function(s) return s.si_uid end,
+    status  = function(s) return s.si_status end,
+    addr    = function(s) return s.si_addr end,
+    value   = function(s) return s.si_value end,
+    trapno  = function(s) return s._fault._trapno end,
+    timerid = function(s) return s._timer._timerid end,
+    overrun = function(s) return s._timer._overrun end,
+    mqd     = function(s) return s._mesgq._mqd end
+    band    = function(s) return s._poll._band end,
+  },
+  newindex = {
+    signo   = function(s, v) s.si_signo = v end,
+    errno   = function(s, v) s.si_errno = v end,
+    code    = function(s, v) s.si_code = v end,
+    pid     = function(s, v) s.si_pid = v end,
+    uid     = function(s, v) s.si_uid = v end,
+    status  = function(s, v) s.si_status = v end,
+    addr    = function(s, v) s.si_addr = v end,
+    value   = function(s, v) s.si_value = v end,
+    trapno  = function(s, v) s._fault._trapno = v end,
+    timerid = function(s, v) s._timer._timerid = v end,
+    overrun = function(s, v) s._timer._overrun = v end,
+    mqd     = function(s, v) s._mesgq._mqd = v end
+    band    = function(s, v) s._poll._band = v end,
+  },
+  __len = lenfn,
+}
+
+addtype(types, "siginfo", "siginfo_t", mt.siginfo)
+
 -- sigaction, standard POSIX behaviour with union of handler and sigaction
 addtype_fn(types, "sa_sigaction", "void (*)(int, siginfo_t *, void *)")
 

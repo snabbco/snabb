@@ -210,6 +210,41 @@ struct cap_rights {
   uint64_t cr_rights[0 + 2]; // for version 0
 };
 typedef struct cap_rights cap_rights_t;
+union sigval {
+  int     sival_int;
+  void    *sival_ptr;
+  int     sigval_int;
+  void    *sigval_ptr;
+};
+typedef struct __siginfo {
+  int     si_signo;
+  int     si_errno;
+  int     si_code;
+  pid_t   si_pid;
+  uid_t   si_uid;
+  int     si_status;
+  void    *si_addr;
+  union sigval si_value;
+  union   {
+    struct {
+      int     _trapno;
+    } _fault;
+    struct {
+      int     _timerid;
+      int     _overrun;
+    } _timer;
+    struct {
+      int     _mqd;
+    } _mesgq;
+    struct {
+      long    _band;
+    } _poll;
+    struct {
+      long    __spare1__;
+      int     __spare2__[7];
+    } __spare__;
+  } _reason;
+} siginfo_t;
 struct sigaction {
   union {
     void    (*__sa_handler)(int);
