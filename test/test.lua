@@ -1724,6 +1724,33 @@ test_gettimeofday = {
   end,
 }
 
+test_signals = {
+  test_signal_return = function()
+    local ret = assert(S.signal("alrm", "ign"))
+    assert_equal(ret, "DFL")
+    local ret = assert(S.signal("alrm", "dfl"))
+    assert_equal(ret, "IGN")
+  end,
+  test_pause = function()
+    local pid = assert(S.fork())
+    if pid == 0 then -- child
+      S.pause()
+      S.exit(23)
+    else -- parent
+      S.kill(pid, "term")
+      local _, status = assert(S.waitpid(pid))
+      assert(status.WIFSIGNALED, "expect normal exit in clone")
+      assert_equal(status.WTERMSIG, c.SIG.TERM)
+    end
+  end,
+  test_alarm = function()
+    assert(S.signal("alrm", "ign"))
+    assert(S.alarm(10))
+    assert(S.alarm(0)) -- cancel again
+    assert(S.signal("alrm", "dfl"))
+  end,
+}
+
 test_shm = {
   test_shm = function()
     if not S.shm_open then error "skipped" end

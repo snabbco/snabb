@@ -499,14 +499,6 @@ end
 
 function S.alarm(s) return C.alarm(s) end
 
-function S.sigaction(signum, handler, oldact)
-  if type(handler) == "string" or type(handler) == "function" then
-    handler = {handler = handler, mask = "", flags = c.SA.RESTART} -- simple case like signal
-  end
-  if handler then handler = mktype(t.sigaction, handler) end
-  return retbool(C.sigaction(c.SIG[signum], handler, oldact))
-end
-
 function S.setreuid(ruid, euid) return retbool(C.setreuid(ruid, euid)) end
 function S.setregid(rgid, egid) return retbool(C.setregid(rgid, egid)) end
 

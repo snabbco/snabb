@@ -335,6 +335,7 @@ function S.setgroups(groups)
   if type(groups) == "table" then groups = t.groups(groups) end
   return retbool(C.setgroups(groups.count, groups.list))
 end
+
 function S.sigprocmask(how, set)
   local oldset = t.sigset()
   local ret, err = C.sigprocmask(c.SIGPM[how], t.sigset(set), oldset)
@@ -596,6 +597,16 @@ if C.accept4 then
     local saddr = pt.sockaddr(addr)
     if addr then addrlen = addrlen or t.socklen1() end
     return retfd(C.accept4(getfd(sockfd), saddr, addrlen, c.SOCK[flags]))
+  end
+end
+
+if C.sigaction then
+  function S.sigaction(signum, handler, oldact)
+    if type(handler) == "string" or type(handler) == "function" then
+      handler = {handler = handler, mask = "", flags = 0} -- simple case like signal
+    end
+    if handler then handler = mktype(t.sigaction, handler) end
+    return retbool(C.sigaction(c.SIG[signum], handler, oldact))
   end
 end
 
