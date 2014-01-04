@@ -634,8 +634,8 @@ c.TIME = strflag {
 
 c.TIME.BAD        = c.TIME.ERROR
 
--- xattr
-c.XATTR = strflag {
+-- xattr; defined as multi as 0 is default, even though both flags makes no sense
+c.XATTR = multiflags {
   CREATE  = 1,
   REPLACE = 2,
 }
