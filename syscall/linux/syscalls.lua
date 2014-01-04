@@ -50,7 +50,7 @@ end
 
 -- we could allocate ptid, ctid, tls if required in flags instead. TODO add signal into flag parsing directly
 function S.clone(flags, signal, stack, ptid, tls, ctid)
-  flags = c.CLONE[flags] + c.SIG[signal]
+  flags = c.CLONE[flags] + c.SIG[signal or 0]
   return retnum(C.clone(flags, stack, ptid, tls, ctid))
 end
 
