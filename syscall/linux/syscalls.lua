@@ -323,7 +323,7 @@ end
 
 function S.timerfd_settime(fd, flags, it, oldtime)
   oldtime = oldtime or t.itimerspec()
-  local ret, err = C.timerfd_settime(getfd(fd), c.TFD_TIMER[flags], mktype(t.itimerspec, it), oldtime)
+  local ret, err = C.timerfd_settime(getfd(fd), c.TFD_TIMER[flags or 0], mktype(t.itimerspec, it), oldtime)
   if ret == -1 then return nil, t.error(err or errno()) end
   return oldtime
 end
