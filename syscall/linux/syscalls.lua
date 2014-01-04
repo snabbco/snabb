@@ -79,7 +79,7 @@ function S.waitid(idtype, id, options, infop) -- note order of args, as usually 
   return infop
 end
 
-function S.exit(status) C.exit_group(c.EXIT[status]) end
+function S.exit(status) C.exit_group(c.EXIT[status or 0]) end
 
 function S.sync_file_range(fd, offset, count, flags)
   return retbool(C.sync_file_range(getfd(fd), offset, count, c.SYNC_FILE_RANGE[flags]))

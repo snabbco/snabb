@@ -42,7 +42,7 @@ end
 
 -- in NetBSD, OSX exit defined in libc, no _exit syscall available
 if not S.exit then
-  function S.exit(status) return retbool(ffi.C.exit(c.EXIT[status])) end
+  function S.exit(status) return retbool(ffi.C.exit(c.EXIT[status or 0])) end
 end
 
 S._exit = S.exit -- provide syscall exit if possible
@@ -54,7 +54,7 @@ int __cxa_atexit(void (*func) (void *), void * arg, void * dso_handle);
 local function inlibc(k) return ffi.C[k] end
 
 if pcall(inlibc, "exit") and pcall(inlibc, "__cxa_atexit") then
-  function S.exit(status) return retbool(ffi.C.exit(c.EXIT[status])) end -- use libc exit instead
+  function S.exit(status) return retbool(ffi.C.exit(c.EXIT[status or 0])) end -- use libc exit instead
   function S.atexit(f) return retbool(ffi.C.__cxa_atexit(f, nil, nil)) end
 end
 
