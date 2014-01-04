@@ -182,7 +182,6 @@ end
 -- for single valued flags
 function h.strflag(tab)
   local function flag(cache, str)
-    --if not str then return 0 end
     if type(str) ~= "string" then return str end
     if #str == 0 then return 0 end
     local s = trim(str):upper()
