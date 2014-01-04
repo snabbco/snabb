@@ -881,7 +881,7 @@ test_file_operations_at = {
     local fd = S.open("/dev")
     local ok, err = fd:faccessat("null", "r")
     if not ok and err.NOSYS then error "skipped" end -- NetBSD 6 has symbols but they do nothing
-    assert(ok)
+    assert(ok, err)
     assert(fd:faccessat("null", c.OK.R), "expect access to say can read /dev/null")
     assert(fd:faccessat("null", "w"), "expect access to say can write /dev/null")
     assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
@@ -893,7 +893,7 @@ test_file_operations_at = {
     local fd = assert(S.creat(tmpfile, "RWXU"))
     local ok, err = S.symlinkat(tmpfile, dirfd, tmpfile2)
     if not ok and err.NOSYS then error "skipped" end -- Netbsd6 partial implementation
-    assert(ok)
+    assert(ok, err)
     local s = assert(S.readlinkat(dirfd, tmpfile2))
     assert_equal(s, tmpfile, "should be able to read symlink")
     assert(S.unlink(tmpfile2))
@@ -906,7 +906,7 @@ test_file_operations_at = {
     local fd = assert(S.open("."))
     local ok, err = fd:mkdirat(tmpfile, "RWXU")
     if not ok and err.NOSYS then error "skipped" end
-    assert(ok)
+    assert(ok, err)
     assert(fd:unlinkat(tmpfile, "removedir"))
     assert(not S.stat(tmpfile), "expect dir gone")
     assert(fd:close())
@@ -916,7 +916,7 @@ test_file_operations_at = {
     assert(util.writefile(tmpfile, teststring, "RWXU"))
     local ok, err = S.renameat("fdcwd", tmpfile, "fdcwd", tmpfile2)
     if not ok and err.NOSYS then error "skipped" end
-    assert(ok)
+    assert(ok, err)
     assert(not S.stat(tmpfile))
     assert(S.stat(tmpfile2))
     assert(S.unlink(tmpfile2))
@@ -947,7 +947,7 @@ test_file_operations_at = {
     local fd = assert(S.creat(tmpfile, "RWXU"))
     local ok, err = dirfd:fchmodat(tmpfile, "RUSR, WUSR")
     if not ok and err.NOSYS then error "skipped" end -- NetBSD6 has symbol
-    assert(ok)
+    assert(ok, err)
     assert(S.access(tmpfile, "rw"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
@@ -959,7 +959,7 @@ test_file_operations_at = {
     local fd = assert(S.creat(tmpfile, "RWXU"))
     local ok, err = dirfd:fchownat(tmpfile, 66, 55, "symlink_nofollow")
     if not ok and err.NOSYS then error "skipped" end
-    assert(ok)
+    assert(ok, err)
     local stat = S.stat(tmpfile)
     assert_equal(stat.uid, 66, "expect uid changed")
     assert_equal(stat.gid, 55, "expect gid changed")
@@ -972,7 +972,7 @@ test_file_operations_at = {
     local fd = assert(S.open("."))
     local ok, err = S.mkfifoat(fd, tmpfile, "rwxu")
     if not ok and err.NOSYS then error "skipped" end
-    assert(ok)
+    assert(ok, err)
     local stat = assert(S.stat(tmpfile))
     assert(stat.isfifo, "expect to be a fifo")
     assert(fd:close())
@@ -983,7 +983,7 @@ test_file_operations_at = {
     local fd = assert(S.open("."))
     local ok, err = fd:mknodat(tmpfile, "fchr,0666", t.device(1, 5))
     if not ok and err.NOSYS then error "skipped" end
-    assert(ok)
+    assert(ok, err)
     local stat = assert(S.stat(tmpfile))
     assert(stat.ischr, "expect to be a character device")
     assert_equal(stat.rdev.major, 1)
@@ -1520,6 +1520,7 @@ test_sockets_pipes = {
     assert(s:bind(sa))
     local ok, err = s:getsockopt("socket", "acceptconn")
     if not ok and err.NOPROTOOPT then error "skipped" end -- NetBSD 6, OSX do not support this on socket level
+    assert(ok, err)
     assert_equal(ok, 0)
     assert(s:close())
   end,
@@ -2005,7 +2006,7 @@ test_mmap = {
     local mem = assert(S.mmap(nil, size, "read", "private, anon", -1, 0))
     local ok, err = S.mlock(mem, size)
     if not ok and err.PERM then error "skipped" end -- may not be allowed by default
-    assert(ok)
+    assert(ok, err)
     assert(S.munlock(mem, size))
     assert(S.munmap(mem, size))
   end,
