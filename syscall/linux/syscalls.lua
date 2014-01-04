@@ -476,7 +476,7 @@ end
 -- TODO see man page if ABSTIME then remaining time never returned
 function S.clock_nanosleep(clk_id, flags, req, rem)
   rem = rem or t.timespec()
-  local ret, err = C.clock_nanosleep(c.CLOCK[clk_id], c.TIMER[flags], mktype(t.timespec, req), rem)
+  local ret, err = C.clock_nanosleep(c.CLOCK[clk_id], c.TIMER[flags or 0], mktype(t.timespec, req), rem)
   if ret == -1 then
     if (err or errno()) == c.E.INTR then return rem else return nil, t.error(err or errno()) end
   end
