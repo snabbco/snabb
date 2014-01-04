@@ -337,8 +337,9 @@ function S.setgroups(groups)
   return retbool(C.setgroups(groups.count, groups.list))
 end
 
-function S.sigprocmask(how, set)
-  local oldset = t.sigset()
+function S.sigprocmask(how, set, oldset)
+  oldset = oldset or t.sigset()
+  if not set then how = c.SIGPM.SETMASK end -- value does not matter if set nil, just returns old set
   local ret, err = C.sigprocmask(c.SIGPM[how], t.sigset(set), oldset)
   if ret == -1 then return nil, t.error(err or errno()) end
   return oldset
