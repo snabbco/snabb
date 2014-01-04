@@ -408,7 +408,8 @@ function S.prctl(option, arg2, arg3, arg4, arg5)
   option = c.PR[option]
   local m = prctlmap[option]
   if m then arg2 = m[arg2] end
-  if option == c.PR.MCE_KILL and arg2 == c.PR.MCE_KILL_SET then arg3 = c.PR_MCE_KILL_OPT[arg3]
+  if option == c.PR.MCE_KILL and arg2 == c.PR_MCE_KILL.SET then
+    arg3 = c.PR_MCE_KILL_OPT[arg3]
   elseif prctlpint[option] then
     i = t.int1()
     arg2 = ffi.cast(t.ulong, i)
