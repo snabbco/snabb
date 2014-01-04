@@ -1350,7 +1350,7 @@ test_sockets_pipes = {
     assert(as:close())
     assert(ss:close())
   end,
-  test_inet4_inet6_socket = function() -- TODO break this test up
+  test_inet6_inet_conn_socket = function() -- TODO break this test up
     local ss = assert(S.socket("inet6", "stream"))
     assert(ss:nonblock())
     assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 0))
@@ -1400,7 +1400,7 @@ test_sockets_pipes = {
     assert(as:close())
     assert(ss:close())
   end,
-  test_inet6_only_socket = function() -- TODO break this test up
+  test_inet6_only_inet_conn_socket = function()
     local ss = assert(S.socket("inet6", "stream"))
     assert(ss:nonblock())
     assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 1))
