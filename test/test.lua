@@ -35,7 +35,7 @@ if arg[1] == "rump" or arg[1] == "rumplinux" then
     tmpabi.types = "linux" -- monkeypatch
   end
   local modules = {"vfs", "kern.tty", "dev", "net", "fs.tmpfs", "fs.kernfs", "fs.ptyfs",
-                   "net.net", "net.local", "net.netinet", "net_netinet6", "net.shmif"}
+                   "net.net", "net.local", "net_netinet", "net_netinet6"}
   S = require "syscall.rump.init".init(modules)
   table.remove(arg, 1)
 else
@@ -1235,7 +1235,9 @@ test_sockets_pipes = {
     assert(sv2:close())
   end,
   test_inet_socket = function() -- TODO break this test up
-    local ss = assert(S.socket("inet", "stream"))
+    local ss, err = S.socket("inet", "stream")
+    if not ss and err.AFNOSUPPORT then error "skipped" end
+    assert(ss, err)
     assert(ss:nonblock())
     local sa = assert(t.sockaddr_in(0, "loopback"))
     assert_equal(sa.family, c.AF.INET)
@@ -1243,7 +1245,9 @@ test_sockets_pipes = {
     local ba = assert(ss:getsockname())
     assert_equal(ba.family, c.AF.INET)
     assert(ss:listen()) -- will fail if we did not bind
-    local cs = assert(S.socket("inet", "stream")) -- client socket
+    local cs, err = S.socket("inet", "stream")
+    if not cs and err.AFNOSUPPORT then error "skipped" end
+    assert(cs, err)
     local ok, err = cs:connect(ba)
     local as = ss:accept()
     local ok, err = cs:connect(ba)
@@ -1277,7 +1281,9 @@ test_sockets_pipes = {
     assert(ss:close())
   end,
   test_inet_socket_readv = function() -- part of above, no netbsd bug (but commenting out writev does trigger)
-    local ss = assert(S.socket("inet", "stream"))
+    local ss, err = S.socket("inet", "stream")
+    if not ss and err.AFNOSUPPORT then error "skipped" end
+    assert(ss, err)
     assert(ss:nonblock())
     local sa = assert(t.sockaddr_in(0, "loopback"))
     assert_equal(sa.family, c.AF.INET)
@@ -1310,7 +1316,9 @@ test_sockets_pipes = {
     assert(ss:close())
   end,
   test_inet6_socket = function() -- TODO break this test up
-    local ss = assert(S.socket("inet6", "stream"))
+    local ss, err = S.socket("inet6", "stream")
+    if not ss and err.AFNOSUPPORT then error "skipped" end
+    assert(ss, err)
     assert(ss:nonblock())
     local sa = assert(t.sockaddr_in6(0, "loopback"))
     assert_equal(sa.family, c.AF.INET6)
@@ -1351,7 +1359,9 @@ test_sockets_pipes = {
     assert(ss:close())
   end,
   test_inet6_inet_conn_socket = function() -- TODO break this test up
-    local ss = assert(S.socket("inet6", "stream"))
+    local ss, err = S.socket("inet6", "stream")
+    if not ss and err.AFNOSUPPORT then error "skipped" end
+    assert(ss, err)
     assert(ss:nonblock())
     assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 0))
     local sa = assert(t.sockaddr_in6(0, "any"))
@@ -1380,7 +1390,9 @@ test_sockets_pipes = {
     assert(as:close())
     -- second connection
     assert(ss:nonblock())
-    local cs = assert(S.socket("inet", "stream")) -- ipv4 client socket, ok
+    local cs, err = S.socket("inet", "stream") -- ipv4 client socket, ok
+    if not cs and err.AFNOSUPPORT then error "skipped" end
+    assert(cs, err)
     local ba4 = t.sockaddr_in(ba.port, "loopback") -- TODO add function to convert sockaddr in6 to in4
     local ok, err = cs:connect(ba4)
     local as = ss:accept()
@@ -1401,7 +1413,9 @@ test_sockets_pipes = {
     assert(ss:close())
   end,
   test_inet6_only_inet_conn_socket = function()
-    local ss = assert(S.socket("inet6", "stream"))
+    local ss, err = S.socket("inet6", "stream")
+    if not ss and err.AFNOSUPPORT then error "skipped" end
+    assert(ss, err)
     assert(ss:nonblock())
     assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 1))
     local sa = assert(t.sockaddr_in6(0, "loopback"))
@@ -1429,7 +1443,9 @@ test_sockets_pipes = {
     assert(as:close())
     -- second connection
     assert(ss:nonblock())
-    local cs = assert(S.socket("inet", "stream")) -- ipv4 client socket, will fail
+    local cs, err = S.socket("inet", "stream") -- ipv4 client socket, will fail to connect
+    if not cs and err.AFNOSUPPORT then error "skipped" end
+    assert(cs, err)
     local ba4 = t.sockaddr_in(ba.port, "loopback") -- TODO add function to convert sockaddr in6 to in4
     local ok, err = cs:connect(ba4)
     assert(not ok and err.CONNREFUSED, "expect to get connection refused")
@@ -1438,8 +1454,12 @@ test_sockets_pipes = {
     assert(ss:close())
   end,
   test_udp_socket = function()
-    local ss = assert(S.socket("inet", "dgram"))
-    local cs = assert(S.socket("inet", "dgram"))
+    local ss, err = S.socket("inet", "dgram")
+    if not ss and err.AFNOSUPPORT then error "skipped" end
+    assert(ss, err)
+    local cs, err = S.socket("inet", "dgram")
+    if not cs and err.AFNOSUPPORT then error "skipped" end
+    assert(cs, err)
     local sa = assert(t.sockaddr_in(0, "loopback"))
     assert(ss:bind(sa))
     local bsa = ss:getsockname() -- find bound address
@@ -1450,10 +1470,10 @@ test_sockets_pipes = {
     assert(cs:close())
   end,
   test_inet6_udp_socket = function()
-    local loop6 = "::1"
     local ss, err = S.socket("inet6", "dgram")
     if not ss and err.AFNOSUPPORT then error "skipped" end
-    assert(ss)
+    assert(ss, err)
+    local loop6 = "::1"
     local cs = assert(S.socket("inet6", "dgram"))
     local sa = assert(t.sockaddr_in6(0, loop6))
     assert(ss:bind(sa))
@@ -1465,8 +1485,12 @@ test_sockets_pipes = {
     assert(ss:close())
   end,
   test_recvfrom = function()
-    local ss = assert(S.socket("inet", "dgram"))
-    local cs = assert(S.socket("inet", "dgram"))
+    local ss, err = S.socket("inet", "dgram")
+    if not ss and err.AFNOSUPPORT then error "skipped" end
+    assert(ss, err)
+    local cs, err = S.socket("inet", "dgram")
+    if not cs and err.AFNOSUPPORT then error "skipped" end
+    assert(cs, err)
     local sa = t.sockaddr_in(0, "loopback")
     assert(ss:bind(sa))
     assert(cs:bind(sa))
@@ -1482,8 +1506,12 @@ test_sockets_pipes = {
     assert(cs:close())
   end,
   test_recvfrom_alloc = function()
-    local ss = assert(S.socket("inet", "dgram"))
-    local cs = assert(S.socket("inet", "dgram"))
+    local ss, err = S.socket("inet", "dgram")
+    if not ss and err.AFNOSUPPORT then error "skipped" end
+    assert(ss, err)
+    local cs, err = S.socket("inet", "dgram")
+    if not cs and err.AFNOSUPPORT then error "skipped" end
+    assert(cs, err)
     local sa = t.sockaddr_in(0, "loopback")
     assert(ss:bind(sa))
     assert(cs:bind(sa))
@@ -1515,7 +1543,9 @@ test_sockets_pipes = {
     assert(fd:close())
   end,
   test_getsockopt_acceptconn = function()
-    local s = assert(S.socket("inet", "stream"))
+    local s, err = S.socket("inet", "stream")
+    if not s and err.AFNOSUPPORT then error "skipped" end
+    assert(s, err)
     local sa = t.sockaddr_in(0, "loopback")
     assert(s:bind(sa))
     local ok, err = s:getsockopt("socket", "acceptconn")
@@ -1525,19 +1555,25 @@ test_sockets_pipes = {
     assert(s:close())
   end,
   test_sockopt_sndbuf = function()
-    local s = assert(S.socket("inet", "stream"))
+    local s, err = S.socket("inet", "stream")
+    if not s and err.AFNOSUPPORT then error "skipped" end
+    assert(s, err)
     local n = assert(s:getsockopt("socket", "sndbuf"))
     assert(n > 0)
     assert(s:close())
   end,
   test_sockopt_sndbuf_inet6 = function()
-    local s = assert(S.socket("inet6", "stream"))
+    local s, err = S.socket("inet6", "stream")
+    if not s and err.AFNOSUPPORT then error "skipped" end
+    assert(s, err)
     local n = assert(s:getsockopt("socket", "sndbuf"))
     assert(n > 0)
     assert(s:close())
   end,
   test_setsockopt_keepalive = function()
-    local s = assert(S.socket("inet", "stream"))
+    local s, err = S.socket("inet", "stream")
+    if not s and err.AFNOSUPPORT then error "skipped" end
+    assert(s, err)
     local sa = t.sockaddr_in(0, "loopback")
     assert(s:bind(sa))
     assert_equal(s:getsockopt("socket", "keepalive"), 0)
@@ -1546,6 +1582,9 @@ test_sockets_pipes = {
     assert(s:close())
   end,
   test_setsockopt_keepalive_inet6 = function()
+    local s, err = S.socket("inet6", "stream")
+    if not s and err.AFNOSUPPORT then error "skipped" end
+    assert(s, err)
     local s = assert(S.socket("inet6", "stream"))
     local sa = t.sockaddr_in6(0, "loopback")
     assert(s:bind(sa))
@@ -1555,7 +1594,9 @@ test_sockets_pipes = {
     assert(s:close())
   end,
   test_sockopt_tcp_nodelay = function()
-    local s = assert(S.socket("inet", "stream"))
+    local s, err = S.socket("inet", "stream")
+    if not s and err.AFNOSUPPORT then error "skipped" end
+    assert(s, err)
     local sa = t.sockaddr_in(0, "loopback")
     assert(s:bind(sa))
     assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 0)
@@ -1564,6 +1605,9 @@ test_sockets_pipes = {
     assert(s:close())
   end,
   test_sockopt_tcp_nodelay_inet6 = function()
+    local s, err = S.socket("inet6", "stream")
+    if not s and err.AFNOSUPPORT then error "skipped" end
+    assert(s, err)
     local s = assert(S.socket("inet6", "stream"))
     local sa = t.sockaddr_in6(0, "loopback")
     assert(s:bind(sa))
