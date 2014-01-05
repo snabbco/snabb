@@ -556,10 +556,19 @@ test_address_names = {
       assert_equal(tostring(addr), a)
     end
   end,
-  test_util_broadcast = function()
-    assert_equal(tostring(util.broadcast("0.0.0.0", 32)), "0.0.0.0")
-    assert_equal(tostring(util.broadcast("10.10.20.1", 24)), "10.10.20.255")
-    assert_equal(tostring(util.broadcast("0.0.0.0", 0)), "255.255.255.255")
+  test_util_netmask_broadcast = function()
+    local addr = t.in_addr("0.0.0.0")
+    local nb = addr:get_mask_bcast(32)
+    assert_equal(tostring(nb.broadcast), "0.0.0.0")
+    assert_equal(tostring(nb.netmask), "0.0.0.0")
+    local addr = t.in_addr("10.10.20.1")
+    local nb = addr:get_mask_bcast(24)
+    assert_equal(tostring(nb.broadcast), "10.10.20.255")
+    assert_equal(tostring(nb.netmask), "0.0.0.255")
+    local addr = t.in_addr("0.0.0.0")
+    local nb = addr:get_mask_bcast(0)
+    assert_equal(tostring(nb.broadcast), "255.255.255.255")
+    assert_equal(tostring(nb.netmask), "255.255.255.255")
   end,
 }
 

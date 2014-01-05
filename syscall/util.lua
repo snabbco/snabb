@@ -278,6 +278,7 @@ end
 
 -- generic inet name to ip, also with netmask support
 -- TODO convert to a type? either way should not really be in util, probably helpers
+-- better as a type that returns inet, mask
 function util.inet_name(src, netmask)
   local addr
   if not netmask then
@@ -297,15 +298,6 @@ function util.inet_name(src, netmask)
     if not netmask then netmask = 32 end
   end
   return addr, netmask
-end
-
--- get broadcast address for ipv4 address and netmask TODO not in util
-function util.broadcast(address, netmask)
-  if type(address) == "string" then address, netmask = util.inet_name(address, netmask) end
-  if not address or not ffi.istype(t.in_addr, address) then return nil end
-  local bcast = t.in_addr(address)
-  if netmask < 32 then bcast.s_addr = bit.bor(tonumber(address.s_addr), htonl(bit.rshift(-1, netmask))) end
-  return bcast
 end
 
 return util

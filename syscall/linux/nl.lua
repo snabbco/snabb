@@ -275,7 +275,8 @@ meth.iflink = {
       if ffi.istype(t.in6_addr, address) then
         ok, err = nl.newaddr(i.index, c.AF.INET6, netmask, "permanent", "local", address)
       else
-        ok, err = nl.newaddr(i.index, c.AF.INET, netmask, "permanent", "local", address, "broadcast", util.broadcast(address, netmask))
+        local broadcast = address:get_mask_bcast(netmask).broadcast
+        ok, err = nl.newaddr(i.index, c.AF.INET, netmask, "permanent", "local", address, "broadcast", broadcast)
       end
       if not ok then return nil, err end
       return i:refresh()

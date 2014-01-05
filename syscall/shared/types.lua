@@ -199,13 +199,18 @@ local in6addr = strflag {
 }
 
  -- given this address and a mask, return a netmask and broadcast as in_addr
-local function get_mask_bcast(addr, mask)
-  -- TODO
+local function mask_bcast(address, netmask)
+  local bcast = t.in_addr()
+  local nmask = t.in_addr() -- TODO
+  if netmask > 32 then error "bad netmask" end
+  if netmask < 32 then nmask.s_addr = htonl(bit.rshift(-1, netmask)) end
+  bcast.s_addr = bit.bor(tonumber(address.s_addr), nmask.s_addr)
+  return {address = address, broadcast = bcast, netmask = nmask}
 end
 
 mt.in_addr = {
-  index = {
-    get_mask_bcast = function(addr) return function(mask) return get_mask_bcast(addr, mask) end end,
+  __index = {
+    get_mask_bcast = function(addr, mask) return mask_bcast(addr, mask) end,
   },
   newindex = {
     addr = function(addr, s)

@@ -78,9 +78,10 @@ function util.ifaddr_inet4(name, addr, mask)
 -- TODO this function needs mask as an inaddr, so need to fix this if passed as / format or number
   local addr, mask = util.inet_name(addr, mask)
 
-  local broadcast -- TODO
+  local bn = addr:get_mask_bcast(mask)
+  local broadcast, netmask = bn.broadcast, bn.netmask
 
-  local ia = t.ifaliasreq{name = name, addr = {family = "inet", addr = addr, mask = mask, dstaddr = broadcast}}
+  local ia = t.ifaliasreq{name = name, addr = {family = "inet", addr = addr, mask = netmask, dstaddr = broadcast}}
 
   -- TODO unfinished
 end
