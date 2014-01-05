@@ -75,7 +75,7 @@ end
 
 -- TODO merge into one ifaddr function
 function util.ifaddr_inet4(name, addr, mask)
--- TODO this function needs mask as in inaddr, so need to fix this if passed as / format or number
+-- TODO this function needs mask as an inaddr, so need to fix this if passed as / format or number
   local addr, mask = util.inet_name(addr, mask)
 
   local broadcast -- TODO

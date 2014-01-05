@@ -20,7 +20,7 @@ local addtype, addtype_var, addtype_fn, addraw2 = h.addtype, h.addtype_var, h.ad
 local addtype1, addtype2, addptrtype = h.addtype1, h.addtype2, h.addptrtype
 local ptt, reviter, mktype, istype, lenfn, lenmt, getfd, newfn
   = h.ptt, h.reviter, h.mktype, h.istype, h.lenfn, h.lenmt, h.getfd, h.newfn
-local ntohl, ntohl, ntohs, htons = h.ntohl, h.ntohl, h.ntohs, h.htons
+local ntohl, ntohl, ntohs, htons, htonl = h.ntohl, h.ntohl, h.ntohs, h.htons, h.htonl
 local split, trim, strflag = h.split, h.trim, h.strflag
 local align = h.align
 
@@ -159,30 +159,16 @@ local function inet6_ntop(src)
   return table.concat(parts, ":")
 end
 
--- TODO cleanup, should be generic not testing endianness
-local inet4_pton
-if ffi.abi("le") then
-  inet4_pton = function(src, addr)
-    local ip4 = split("%.", src)
-    if #ip4 ~= 4 then return nil end
-    addr = addr or t.in_addr()
-    addr.s_addr = ip4[4] * 0x1000000 + ip4[3] * 0x10000 + ip4[2] * 0x100 + ip4[1]
-    return addr
-  end
-else
-  inet4_pton = function(src, addr)
-    local ip4 = split("%.", src)
-    if #ip4 ~= 4 then return nil end
-    addr = addr or t.in_addr()
-    addr.s_addr = ip4[1] * 0x1000000 + ip4[2] * 0x10000 + ip4[3] * 0x100 + ip4[4]
-    return addr
-  end
+local function inet4_pton(src)
+  local ip4 = split("%.", src)
+  if #ip4 ~= 4 then error "malformed IP address" end
+  return htonl(tonumber(ip4[1]) * 0x1000000 + tonumber(ip4[2]) * 0x10000 + tonumber(ip4[3]) * 0x100 + tonumber(ip4[4]))
 end
 
 local function hex(str) return tonumber("0x" .. str) end
 
 local function inet6_pton(src, addr)
-  -- TODO allow form with decimals at end
+  -- TODO allow form with decimals at end for ipv4 addresses
   local ip8 = split(":", src)
   if #ip8 > 8 then return nil end
   local before, after = src:find("::")
@@ -212,19 +198,31 @@ local in6addr = strflag {
   LOOPBACK = "::1",
 }
 
+ -- given this address and a mask, return a netmask and broadcast as in_addr
+local function get_mask_bcast(addr, mask)
+  -- TODO
+end
+
 mt.in_addr = {
+  index = {
+    get_mask_bcast = function(addr) return function(mask) return get_mask_bcast(addr, mask) end end,
+  },
+  newindex = {
+    addr = function(addr, s)
+      if ffi.istype(t.in_addr, s) then
+        addr.s_addr = s.s_addr
+      elseif type(s) == "string" then
+        if inaddr[s] then s = inaddr[s] end
+        addr.s_addr = inet4_pton(s)
+      else -- number
+        addr.s_addr = htonl(s)
+      end
+    end,
+  },
   __tostring = inet4_ntop,
   __new = function(tp, s)
     local addr = ffi.new(tp)
-    if s then
-      if ffi.istype(tp, s) then
-        addr.s_addr = s.s_addr
-      else
-        if inaddr[s] then s = inaddr[s] end
-        addr = inet4_pton(s, addr)
-        if not addr then return nil end
-      end
-    end
+    if s then addr.addr = s end
     return addr
   end,
   __len = lenfn,
