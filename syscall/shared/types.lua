@@ -202,7 +202,7 @@ local in6addr = strflag {
 local function mask_bcast(address, netmask)
   local bcast = t.in_addr()
   local nmask = t.in_addr() -- TODO
-  if netmask > 32 then error "bad netmask" end
+  if netmask > 32 then error("bad netmask " .. netmask) end
   if netmask < 32 then nmask.s_addr = htonl(bit.rshift(-1, netmask)) end
   bcast.s_addr = bit.bor(tonumber(address.s_addr), nmask.s_addr)
   return {address = address, broadcast = bcast, netmask = nmask}

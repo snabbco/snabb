@@ -245,6 +245,14 @@ mt.ifreq = {
 
 addtype(types, "ifreq", "struct ifreq", mt.ifreq)
 
+-- ifaliasreq takes sockaddr, but often want to supply in_addr or in6_addr as port irrelevant
+-- TODO want to return a sockaddr so can asign vs ffi.copy below, or fix sockaddr to be more like sockaddr_storage
+local function tosockaddr(v)
+  if ffi.istype(t.in_addr, v) then return t.sockaddr_in(0, v) end
+  if ffi.istype(t.in6_addr, v) then return t.sockaddr_in6(0, v) end
+  return mktype(t.sockaddr, v)
+end
+
 mt.ifaliasreq = {
   index = {
     name = function(ifra) return ffi.string(ifra.ifra_name) end,
@@ -257,9 +265,18 @@ mt.ifaliasreq = {
       assert(#v < c.IFNAMSIZ, "name too long")
       ifra.ifra_name = v
     end,
-    addr = function(ifra, v) ifra.ifra_addr = mktype(t.sockaddr, v) end,
-    dstaddr = function(ifra, v) ifra.ifra_dstaddr = mktype(t.sockaddr, v) end,
-    mask = function(ifra, v) ifra.ifra_mask = v end, -- TODO mask in form of sockaddr
+    addr = function(ifra, v)
+      local addr = tosockaddr(v)
+      ffi.copy(ifra.ifra_addr, addr, #addr)
+    end,
+    dstaddr = function(ifra, v)
+      local addr = tosockaddr(v)
+      ffi.copy(ifra.ifra_dstaddr, addr, #addr)
+    end,
+    mask = function(ifra, v)
+      local addr = tosockaddr(v)
+      ffi.copy(ifra.ifra_mask, addr, #addr)
+    end,
   },
   __new = newfn,
 }

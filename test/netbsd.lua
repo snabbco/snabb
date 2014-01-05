@@ -100,6 +100,14 @@ test.network_utils_netbsd_root = {
     assert(bit.band(flags, c.IFF.UP) == 0)
     assert(util.ifdestroy(ifname))
   end,
+  test_ifaddr_inet4 = function()
+    local ifname = "lo8" .. tostring(S.getpid())
+    assert(util.ifcreate(ifname))
+    assert(util.ifup(ifname))
+    assert(util.ifaddr_inet4(ifname, "127.1.0.1/24"))
+    assert(util.ifdown(ifname))
+    assert(util.ifdestroy(ifname))
+  end,
 }
 
 test.sockets_pipes_netbsd = {

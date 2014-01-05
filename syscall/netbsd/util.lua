@@ -81,9 +81,9 @@ function util.ifaddr_inet4(name, addr, mask)
   local bn = addr:get_mask_bcast(mask)
   local broadcast, netmask = bn.broadcast, bn.netmask
 
-  local ia = t.ifaliasreq{name = name, addr = {family = "inet", addr = addr, mask = netmask, dstaddr = broadcast}}
+  local ia = t.ifaliasreq{name = name, addr = addr, mask = netmask, broadaddr = broadcast}
 
-  -- TODO unfinished
+  return sockioctl("inet", "dgram", "SIOCAIFADDR", ia)
 end
 function util.ifaddr_inet6(name, addr, mask)
   local addr, netmask = util.inet_name(addr, mask)

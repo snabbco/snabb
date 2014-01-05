@@ -2238,7 +2238,7 @@ if S.__rump or abi.xen then
 end
 
 -- note at present we check for uid 0, but could check capabilities instead.
-if S.geteuid() == 0 and not S.__rump then
+if S.geteuid() == 0 then
   if S.unshare then
     -- cut out this section if you want to (careful!) debug on real interfaces
     local ok, err = S.unshare("newnet, newns, newuts")
