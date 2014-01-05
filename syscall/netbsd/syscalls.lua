@@ -112,6 +112,9 @@ function S.ptsname(fd)
   return ffi.string(pm.sn)
 end
 
+-- TODO we need to fix sigaction in NetBSD, syscall seems to have changed to sigaction_tramp
+function S.pause() return S.select({}) end -- select on nothing forever
+
 return S
 
 end

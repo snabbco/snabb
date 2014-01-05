@@ -53,7 +53,7 @@ C.kevent = ffi.C.__kevent50
 -- use underlying syscall not wrapper
 C.getcwd = ffi.C.__getcwd
 
-C.sigaction = ffi.C.__libc_sigaction14
+C.sigaction = ffi.C.__libc_sigaction14 -- TODO not working I think need to use tramp_sigaction, see also netbsd pause()
 
 return C
 
