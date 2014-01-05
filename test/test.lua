@@ -2010,7 +2010,6 @@ test_proc = {
     if not p.cmdline then error "skipped" end -- no files found, /proc not mounted
     assert(p.cmdline and #p.cmdline > 1, "expect cmdline to exist")
     assert(not p.wrongname, "test non existent files")
-    assert(p.exe and #p.exe > 1, "expect an executable")
     assert_equal(p.root, "/", "expect our root to be / usually")
   end,
   test_proc_init = function()
