@@ -245,7 +245,7 @@ mt.ifreq = {
 
 addtype(types, "ifreq", "struct ifreq", mt.ifreq)
 
--- ifaliasreq takes sockaddr, but often want to supply in_addr or in6_addr as port irrelevant
+-- ifaliasreq takes sockaddr, but often want to supply in_addr as port irrelevant
 -- TODO want to return a sockaddr so can asign vs ffi.copy below, or fix sockaddr to be more like sockaddr_storage
 local function tosockaddr(v)
   if ffi.istype(t.in_addr, v) then return t.sockaddr_in(0, v) end

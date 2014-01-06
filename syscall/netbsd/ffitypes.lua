@@ -595,6 +595,7 @@ struct _netbsd_in6_aliasreq {
 local s = table.concat(defs, "")
 
 -- TODO broken, makes this module not a proper function, see #120
+-- although this will not ever actually happen...
 if abi.host == "netbsd" then
   s = string.gsub(s, "_netbsd_", "") -- remove netbsd types
 end
