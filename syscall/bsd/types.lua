@@ -34,6 +34,137 @@ local addstructs = {
 for k, v in pairs(addtypes) do addtype(types, k, v) end
 for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
 
+mt.sockaddr = {
+  index = {
+    len = function(sa) return sa.sa_len end,
+    family = function(sa) return sa.sa_family end,
+  },
+  newindex = {
+    len = function(sa, v) sa.sa_len = v end,
+  },
+}
+
+addtype(types, "sockaddr", "struct sockaddr", mt.sockaddr)
+
+-- cast socket address to actual type based on family, defined later
+local samap_pt = {}
+
+mt.sockaddr_storage = {
+  index = {
+    len = function(sa) return sa.ss_len end,
+    family = function(sa) return sa.ss_family end,
+  },
+  newindex = {
+    len = function(sa, v) sa.ss_len = v end,
+    family = function(sa, v) sa.ss_family = c.AF[v] end,
+  },
+  __index = function(sa, k)
+    if mt.sockaddr_storage.index[k] then return mt.sockaddr_storage.index[k](sa) end
+    local st = samap_pt[sa.ss_family]
+    if st then
+      local cs = st(sa)
+      return cs[k]
+    end
+    error("invalid index " .. k)
+  end,
+  __newindex = function(sa, k, v)
+    if mt.sockaddr_storage.newindex[k] then
+      mt.sockaddr_storage.newindex[k](sa, v)
+      return
+    end
+    local st = samap_pt[sa.ss_family]
+    if st then
+      local cs = st(sa)
+      cs[k] = v
+      return
+    end
+    error("invalid index " .. k)
+  end,
+  __new = function(tp, init)
+    local ss = ffi.new(tp)
+    local family
+    if init and init.family then family = c.AF[init.family] end
+    local st
+    if family then
+      st = samap_pt[family]
+      ss.ss_family = family
+      init.family = nil
+    end
+    if st then
+      local cs = st(ss)
+      for k, v in pairs(init) do
+        cs[k] = v
+      end
+    end
+    ss.len = #ss
+    return ss
+  end,
+  -- netbsd likes to see the correct size when it gets a sockaddr; Linux was ok with a longer one
+  __len = function(sa)
+    if samap_pt[sa.family] then
+      local cs = samap_pt[sa.family](sa)
+      return #cs
+    else
+      return s.sockaddr_storage
+    end
+  end,
+}
+
+-- experiment, see if we can use this as generic type, to avoid allocations.
+addtype(types, "sockaddr_storage", "struct sockaddr_storage", mt.sockaddr_storage)
+
+mt.sockaddr_in = {
+  index = {
+    len = function(sa) return sa.sin_len end,
+    family = function(sa) return sa.sin_family end,
+    port = function(sa) return ntohs(sa.sin_port) end,
+    addr = function(sa) return sa.sin_addr end,
+  },
+  newindex = {
+    len = function(sa, v) sa.sin_len = v end,
+    family = function(sa, v) sa.sin_family = v end,
+    port = function(sa, v) sa.sin_port = htons(v) end,
+    addr = function(sa, v) sa.sin_addr = mktype(t.in_addr, v) end,
+  },
+  __new = function(tp, port, addr)
+    if type(port) == "table" then
+      port.len = s.sockaddr_in
+      return newfn(tp, port)
+    end
+   return newfn(tp, {len = s.sockaddr_in, family = c.AF.INET, port = port, addr = addr})
+  end,
+  __len = function(tp) return s.sockaddr_in end,
+}
+
+addtype(types, "sockaddr_in", "struct sockaddr_in", mt.sockaddr_in)
+
+mt.sockaddr_in6 = {
+  index = {
+    len = function(sa) return sa.sin6_len end,
+    family = function(sa) return sa.sin6_family end,
+    port = function(sa) return ntohs(sa.sin6_port) end,
+    addr = function(sa) return sa.sin6_addr end,
+  },
+  newindex = {
+    len = function(sa, v) sa.sin6_len = v end,
+    family = function(sa, v) sa.sin6_family = v end,
+    port = function(sa, v) sa.sin6_port = htons(v) end,
+    addr = function(sa, v) sa.sin6_addr = mktype(t.in6_addr, v) end,
+    flowinfo = function(sa, v) sa.sin6_flowinfo = v end,
+    scope_id = function(sa, v) sa.sin6_scope_id = v end,
+  },
+  __new = function(tp, port, addr, flowinfo, scope_id) -- reordered initialisers.
+    if type(port) == "table" then
+      port.len = s.sockaddr_in6
+      return newfn(tp, port)
+    end
+    return newfn(tp, {len = s.sockaddr_in6, family = c.AF.INET6, port = port, addr = addr, flowinfo = flowinfo, scope_id = scope_id})
+  end,
+  __len = function(tp) return s.sockaddr_in6 end,
+}
+
+addtype(types, "sockaddr_in6", "struct sockaddr_in6", mt.sockaddr_in6)
+
 mt.sockaddr_un = {
   index = {
     family = function(sa) return sa.sun_family end,
@@ -143,6 +274,13 @@ mt.kevents = {
 }
 
 addtype_var(types, "kevents", "struct {int count; struct kevent kev[?];}", mt.kevents)
+
+-- this is declared above
+samap_pt = {
+  [c.AF.UNIX] = pt.sockaddr_un,
+  [c.AF.INET] = pt.sockaddr_in,
+  [c.AF.INET6] = pt.sockaddr_in6,
+}
 
 return types
 
