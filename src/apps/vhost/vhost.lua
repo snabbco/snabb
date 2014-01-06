@@ -27,6 +27,7 @@ function new (tapname)
                  txused  = 0, rxused  = 0,   -- 'used' ring cursors  (0..65535)
                  txavail = 0, rxavail = 0,   -- 'avail' ring cursors (0..65535)
                  txdirty = false, rxdirty = false, -- we have state to sync?
+                 vhost_mapped_chunks = 0 -- # DMA memory regions already mapped
               }
    -- Disable interrupts (eventfd "call"). We are polling anyway.
    dev.rxring.avail.flags = C.VRING_F_NO_INTERRUPT
@@ -194,15 +195,12 @@ end
 
 --- ### DMA memory map update
 
--- How many chunks were allocated the last time we updated the vhost memory map?
-vhost_mapped_chunks = 0
-
 -- Make all of our DMA memory usable as vhost packet buffers.
 function update_vhost_memory_map (dev)
    -- Has a new chunk been allocated since last time?
-   if #memory.chunks > vhost_mapped_chunks then
+   if #memory.chunks > dev.vhost_mapped_chunks then
       assert(C.vhost_set_memory(dev.vhost, memory_regions()) == 0, "vhost memory")
-      vhost_mapped_chunks = #memory.chunks
+      dev.vhost_mapped_chunks = #memory.chunks
    end
 end
 
