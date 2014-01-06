@@ -299,15 +299,40 @@ mt.in6_aliasreq = {
       assert(#v < c.IFNAMSIZ, "name too long")
       ifra.ifra_name = v
     end,
-    addr = function(ifra, v) ifra.ifra_addr = mktype(t.sockaddr_in6, v) end,
-    dstaddr = function(ifra, v) ifra.ifra_dstaddr = mktype(t.sockaddr_in6, v) end,
-    mask = function(ifra, v) ifra.ifra_prefixmask = v end, -- TODO mask in form of sockaddr
-    lifetime = function(ifra, v) ifra.ifra_lifetime = v end,
+    addr = function(ifra, v)
+      local addr = tosockaddr(v)
+      ffi.copy(ifra.ifra_addr, addr, #addr)
+    end,
+    dstaddr = function(ifra, v)
+      local addr = tosockaddr(v)
+      ffi.copy(ifra.ifra_dstaddr, addr, #addr)
+    end,
+    prefixmask = function(ifra, v)
+      local addr = tosockaddr(v)
+      ffi.copy(ifra.ifra_prefixmask, addr, #addr)
+    end,
+    lifetime = function(ifra, v) ifra.ifra_lifetime = mktype(t.in6_addrlifetime, v) end,
   },
   __new = newfn,
 }
 
 addtype(types, "in6_aliasreq", "struct in6_aliasreq", mt.in6_aliasreq)
+
+mt.in6_addrlifetime = {
+  index = {
+    expire = function(self) return self.ia6t_expire end,
+    preferred = function(self) return self.ia6t_preferred end,
+    vltime = function(self) return self.ia6t_vltime end,
+    pltime = function(self) return self.ia6t_pltime end,
+  },
+  newindex = {
+    expire = function(self, v) self.ia6t_expire = mktype(t.time, v) end,
+    preferred = function(self, v) self.ia6t_preferred = mktype(t.time, v) end,
+    vltime = function(self, v) self.ia6t_vltime = c.ND6[v] end,
+    pltime = function(self, v) self.ia6t_pltime = c.ND6[v] end,
+  },
+  __new = newfn,
+}
 
 local ktr_type = {}
 for k, v in pairs(c.KTR) do ktr_type[v] = k end

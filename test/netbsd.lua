@@ -104,7 +104,17 @@ test.network_utils_netbsd_root = {
     local ifname = "lo8" .. tostring(S.getpid())
     assert(util.ifcreate(ifname))
     assert(util.ifup(ifname))
-    assert(util.ifaddr_inet4(ifname, "127.1.0.1/24"))
+    assert(util.ifaddr_inet4(ifname, "127.1.0.1/24")) -- TODO fail gracefully if no ipv4 support
+    -- TODO need read functionality to test it worked correctly
+    assert(util.ifdown(ifname))
+    assert(util.ifdestroy(ifname))
+  end,
+  test_ifaddr_inet6 = function()
+    local ifname = "lo8" .. tostring(S.getpid())
+    assert(util.ifcreate(ifname))
+    assert(util.ifup(ifname))
+    assert(util.ifaddr_inet6(ifname, "fd97:fab9:44c2::1/48")) -- TODO this is my private registration (SIXXS), should be random
+    -- TODO need read functionality to test it worked correctly
     assert(util.ifdown(ifname))
     assert(util.ifdestroy(ifname))
   end,

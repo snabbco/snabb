@@ -13,6 +13,7 @@ local abi, types, c = S.abi, S.types, S.c
 local t, pt, s = types.t, types.pt, types.s
 
 local h = require "syscall.helpers"
+local divmod = h.divmod
 
 local ffi = require "ffi"
 
@@ -39,12 +40,8 @@ local function sockioctl(domain, tp, io, data)
   local sock, err = S.socket(domain, tp)
   if not sock then return nil, err end
   local io, err = sock:ioctl(io, data)
-  if not io then
-    sock:close()
-    return nil, err
-  end
-  local ok, err = sock:close()
-  if not ok then return nil, err end
+  sock:close()
+  if not io then return nil, err end
   return io
 end
 
@@ -86,11 +83,18 @@ function util.ifaddr_inet4(name, addr, mask)
   return sockioctl("inet", "dgram", "SIOCAIFADDR", ia)
 end
 function util.ifaddr_inet6(name, addr, mask)
-  local addr, netmask = util.inet_name(addr, mask)
+  local addr, mask = util.inet_name(addr, mask)
+  assert(ffi.istype(t.in6_addr, addr), "not an ipv6 address") -- TODO remove once merged
 
-  local ia = t.in6_aliasreq{name = name}
+  local prefixmask = t.in6_addr()
+  local bb, b = divmod(mask, 8)
+  for i = 0, bb - 1 do prefixmask.s6_addr[i] = 0xff end
+  if bb < 16 then prefixmask.s6_addr[bb] = bit.lshift(0xff, 8 - b) end -- TODO needs test!
 
-  -- TODO unfinished
+  local ia = t.in6_aliasreq{name = name, addr = addr, prefixmask = prefixmask,
+                            lifetime = {pltime = "infinite_lifetime", vltime = "infinite_lifetime"}}
+
+  return sockioctl("inet6", "dgram", "SIOCAIFADDR_IN6", ia)
 end
 
 -- table based mount, more cross OS compatible
