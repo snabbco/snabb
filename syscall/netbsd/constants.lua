@@ -1189,5 +1189,41 @@ c.RTM = strflag {
   CHGADDR    = 0x15,
 }
 
+c.RTV = multiflags {
+  MTU        = 0x1,
+  HOPCOUNT   = 0x2,
+  EXPIRE     = 0x4,
+  RPIPE      = 0x8,
+  SPIPE      = 0x10,
+  SSTHRESH   = 0x20,
+  RTT        = 0x40,
+  RTTVAR     = 0x80,
+}
+
+c.RTA = multiflags {
+  DST        = 0x1,
+  GATEWAY    = 0x2,
+  NETMASK    = 0x4,
+  GENMASK    = 0x8,
+  IFP        = 0x10,
+  IFA        = 0x20,
+  AUTHOR     = 0x40,
+  BRD        = 0x80,
+  TAG        = 0x100,
+}
+
+c.RTAX = strflag {
+  DST       = 0,
+  GATEWAY   = 1,
+  NETMASK   = 2,
+  GENMASK   = 3,
+  IFP       = 4,
+  IFA       = 5,
+  AUTHOR    = 6,
+  BRD       = 7,
+  TAG       = 8,
+  MAX       = 9,
+}
+
 return c
 
