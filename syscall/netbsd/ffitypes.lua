@@ -65,6 +65,9 @@ typedef uint32_t _netbsd_id_t;
 typedef unsigned int _netbsd_tcflag_t;
 typedef unsigned int _netbsd_speed_t;
 
+typedef unsigned short u_short;
+typedef unsigned char u_char;
+
 /* these are not used in Linux so not renamed */
 typedef unsigned int useconds_t;
 typedef int32_t lwpid_t;
@@ -589,6 +592,32 @@ struct _netbsd_in6_aliasreq {
   struct  _netbsd_sockaddr_in6 ifra_prefixmask;
   int     ifra_flags;
   struct  _netbsd_in6_addrlifetime ifra_lifetime;
+};
+struct _netbsd_rt_metrics {
+  uint64_t rmx_locks;
+  uint64_t rmx_mtu;
+  uint64_t rmx_hopcount;
+  uint64_t rmx_recvpipe;
+  uint64_t rmx_sendpipe;
+  uint64_t rmx_ssthresh;
+  uint64_t rmx_rtt;
+  uint64_t rmx_rttvar;
+  _netbsd_time_t  rmx_expire;
+  _netbsd_time_t  rmx_pksent;
+};
+struct _netbsd_rt_msghdr {
+  u_short rtm_msglen __attribute__ ((aligned (8)));
+  u_char  rtm_version;
+  u_char  rtm_type;
+  u_short rtm_index;
+  int     rtm_flags;
+  int     rtm_addrs;
+  pid_t   rtm_pid;
+  int     rtm_seq;
+  int     rtm_errno;
+  int     rtm_use;
+  int     rtm_inits;
+  struct  _netbsd_rt_metrics rtm_rmx __attribute__ ((aligned (8)));
 };
 ]]
 
