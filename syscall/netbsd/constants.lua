@@ -1141,5 +1141,53 @@ c.IPV6 = strflag {
   TCLASS            = 61,
   DONTFRAG          = 62,
 }
+
+c.RTF = multiflags {
+  UP         = 0x1,
+  GATEWAY    = 0x2,
+  HOST       = 0x4,
+  REJECT     = 0x8,
+  DYNAMIC    = 0x10,
+  MODIFIED   = 0x20,
+  DONE       = 0x40,
+  MASK       = 0x80,
+  CLONING    = 0x100,
+  XRESOLVE   = 0x200,
+  LLINFO     = 0x400,
+  STATIC     = 0x800,
+  BLACKHOLE  = 0x1000,
+  CLONED     = 0x2000,
+  PROTO2     = 0x4000,
+  PROTO1     = 0x8000,
+  SRC        = 0x10000,
+  ANNOUNCE   = 0x20000,
+}
+
+c.RTM = strflag {
+  VERSION    = 4,
+
+  ADD        = 0x1,
+  DELETE     = 0x2,
+  CHANGE     = 0x3,
+  GET        = 0x4,
+  LOSING     = 0x5,
+  REDIRECT   = 0x6,
+  MISS       = 0x7,
+  LOCK       = 0x8,
+  OLDADD     = 0x9,
+  OLDDEL     = 0xa,
+  RESOLVE    = 0xb,
+  NEWADDR    = 0xc,
+  DELADDR    = 0xd,
+  OOIFINFO   = 0xe,
+  OIFINFO    = 0xf,
+  IFANNOUNCE = 0x10,
+  IEEE80211  = 0x11,
+  SETGATE    = 0x12,
+  LLINFO_UPD = 0x13,
+  IFINFO     = 0x14,
+  CHGADDR    = 0x15,
+}
+
 return c
 
