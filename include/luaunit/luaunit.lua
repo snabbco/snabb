@@ -325,14 +325,15 @@ local UnitResult = { -- class
 		print("=========================================================")
 		self:displayFailedTests()
 		local failurePercent, successCount
-		if self.testCount == 0 then
+		local totalTested = self.testCount - self.skipCount
+		if totalTested == 0 then
 			failurePercent = 0
 		else
-			failurePercent = 100 * (self.failureCount + self.skipCount) / self.testCount
+			failurePercent = 100 * self.failureCount / totalTested
 		end
-		local successCount = self.testCount - self.failureCount - self.skipCount
-		print( string.format("Success : %d%% - %d / %d",
-			100-math.ceil(failurePercent), successCount, self.testCount) )
+		local successCount = totalTested - self.failureCount
+		print( string.format("Success : %d%% - %d / %d (total of %d tests, %d skipped)",
+			100-math.ceil(failurePercent), successCount, totalTested, self.testCount, self.skipCount ) )
 		return self.failureCount
     end
 
