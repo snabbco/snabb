@@ -54,8 +54,12 @@ function S.clone(flags, signal, stack, ptid, tls, ctid)
   return retnum(C.clone(flags, stack, ptid, tls, ctid))
 end
 
-function S.unshare(flags) return retbool(C.unshare(c.CLONE[flags])) end
-function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), c.CLONE[nstype])) end
+if C.unshare then -- quite new, also not defined in rump yet
+  function S.unshare(flags) return retbool(C.unshare(c.CLONE[flags])) end
+end
+if C.setns then
+  function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), c.CLONE[nstype])) end
+end
 
 -- note that this is not strictly the syscall that has some other arguments, but has same functionality
 function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
