@@ -86,27 +86,37 @@ three service VMs over two 10G ethernet ports:
 
 ### Neutron configuration
 
-    # Create security groups and rules
-    neutron secgroup-create SecGroupA && neutron secgroup-add-rule SecGroupA ...
-    neutron secgroup-create SecGroupB && neutron secgroup-add-rule SecGroupB ...
-    neutron secgroup-create SecGroupC && neutron secgroup-add-rule SecGroupC ...
+    # Create security groups
+    neutron security-group-create SecGroupA --description "security group for VirtioA"
+    neutron security-group-create SecGroupB --description "security group for VirtioB"
+    neutron security-group-create SecGroupC --description "security group for VirtioC"
 
-    # Create QoS policies
-    neutron qos-create QosA type=ratelimit policy=6Gbps
-    neutron qos-create QosB type=ratelimit policy=1Gbps
+    # Create security group rules
+    neutron security-group-rule-create ... <SecGroupA_uuid>
+    neutron security-group-rule-create ... <SecGroupB_uuid>
+    neutron security-group-rule-create ... <SecGroupC_uuid>
 
-    # Create tunnel encapsulations.
-    neutron tunnel-create TunnelB type=L2TPv3 tunnel_id=3000 peer_tunnel_id=4000 encap=udp local=2001:DB8::1 remote=2001:DB8::2
+    # Create QoS policies [ Neutron QoS API example: https://gist.github.com/sc68cal/6689999 ]
+    neutron qos-create --type ratelimit --policies kbps=6000000 --description "QosA"
+    neutron qos-create --type ratelimit --policies kbps=1000000 --description "QosB"
 
-    # Create networks.
-    neutron net-create NetworkA --provider:network_type=snabb --provider:physical_network=Router1/Port1/VF1 --provider:segmentation_id=42
-    neutron net-create NetworkB --provider:network_type=snabb --provider:physical_network=Router1/Port1/VF2 --provider:segmentation_id=42 --tunnel=TunnelB
-    neutron net-create NetworkC --provider:network_type=snabb --provider:physical_network=Router1/Port2
+    # Create Networks
+    neutron net-create NetworkA --provider:network_type vlan --provider:physical_network "Router1/Port1/VF1" --provider:segmentation_id 42 --router:external=True
+    neutron net-create NetworkB --provider:network_type vlan --provider:physical_network "Router1/Port1/VF2" --provider:segmentation_id 42 --router:external=True
+    neutron net-create NetworkC --provider:network_type flat --provider:physical_network "Router1/Port2" --router:external=True
 
-    # Create ports.
-    neutron port-create VirtioA --network=NetworkA binding:vif_type=snabb --qos=QosA
-    neutron port-create VirtioB --network=NetworkB binding:vif_type=snabb --qos=QosB
-    neutron port-create VirtioC --network=NetworkC binding:vif_type=snabb
+    # Create Ports
+    neutron port-create --name VirtioA --security-group <SecGroupA_uuid> --qos <QosA_uuid> NetworkA
+    neutron port-create --name VirtioB --security-group <SecGroupB_uuid> --qos <QosB_uuid> NetworkB
+    neutron port-create --name VirtioC --security-group <SecGroupC_uuid> NetworkC
+
+    # Create Gateway [ Gateway extension API: https://docs.google.com/document/d/1Zae1uaphj_tifFfKKGmEyLgTGR0K5LeP7to4FcfA2-0/edit?pli=1  ]
+    neutron gateway-create --name GatewayTunnel1 --mode route --admin_state_up True
+    neutron gateway-add-port --port <VirtioB_uuid> <GatewayTunnel1_uuid>
+
+    # I guess a metadata field maybe necessary in gateway table (to hold tunnel related info)
+    # and hopefully something like this might be used:
+    neutron gateway-create --name GatewayTunnel1 --mode route --admin_state_up True --metadata '{tunnel: {type:L2TPv3, id:3000, peer_id=4000, encap=udp, local="2001:DB8::1", Remote="2001:DB8::2"}}'
 
 #### Snabb Switch configuration
 
@@ -189,5 +199,11 @@ Packets that ingress and egress with the same color are zero-copy.
                +-------*-------+              +-------*-------+
                        :                              :
                        |                              |
-                 router-1/port-1                router-1/port-2
+                  Router1/Port1                  Router1/Port2
+
+## Learn more and get involved
+
+* Subscribe to the [snabb-devel mailing list](https://groups.google.com/d/forum/snabb-devel): [mailto:snabb-devel+subscribe@googlegroups.com](mailto:snabb-devel+subscribe@googlegroups.com).
+* Learn more about [Snabb Switch](http://snabb.co/snabbswitch/).
+* Learn more about TeraStream from Peter Löthberg's [RIPE67 presentation](https://ripe67.ripe.net/archives/video/3/).
 
