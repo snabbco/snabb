@@ -57,8 +57,8 @@ There will be proper documentation before the 1.0 release, apologies for it not 
 
 This project is being used ina variety of places, such as for testing the Linux compatibility code in NetBSD, among other things. If your project is not listed here please let me know or send a pull request.
 
-. [ljlinenoise](https://github.com/fperrad/ljlinenoise) a Lua implementation of the linenoise (readline) library.
-. [nodish](https://github.com/lipp/nodish) A Lightweight Lua equivalent to Node.js.
+* [ljlinenoise](https://github.com/fperrad/ljlinenoise) a Lua implementation of the linenoise (readline) library.
+* [nodish](https://github.com/lipp/nodish) A Lightweight Lua equivalent to Node.js.
 
 ## Testing
 
