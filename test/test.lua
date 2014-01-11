@@ -1932,15 +1932,18 @@ test_gettimeofday = {
 
 test_clock = {
   test_clock_gettime = function()
+    if not S.clock_gettime then error "skipped" end
     local tt = assert(S.clock_getres("realtime"))
     local tt = assert(S.clock_gettime("realtime"))
     -- TODO add settime
   end,
   test_clock_nanosleep = function()
+    if not S.clock_nanosleep then error "skipped" end
     local rem = assert(S.clock_nanosleep("realtime", nil, 0.001))
     assert_equal(rem, nil)
   end,
   test_clock_nanosleep_abs = function()
+    if not S.clock_nanosleep then error "skipped" end
     assert(S.clock_nanosleep("realtime", "abstime", 0))
   end,
 }
