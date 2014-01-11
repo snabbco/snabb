@@ -1104,6 +1104,23 @@ c.IPV6 = strflag {
   DONTFRAG          = 62,
 }
 
+c.CLOCK = strflag {
+  REALTIME           = 0,
+  VIRTUAL            = 1,
+  PROF               = 2,
+  MONOTONIC          = 4,
+  UPTIME             = 5,
+  UPTIME_PRECISE     = 7,
+  UPTIME_FAST        = 8,
+  REALTIME_PRECISE   = 9,
+  REALTIME_FAST      = 10,
+  MONOTONIC_PRECISE  = 11,
+  MONOTONIC_FAST     = 12,
+  SECOND             = 13,
+  THREAD_CPUTIME_ID  = 14,
+  PROCESS_CPUTIME_ID = 15,
+}
+
 if abi.freebsd >= 10 then -- not supporting on freebsd 9 as different ABI, recommend upgrade to use
 
 local function CAPRIGHT(idx, b) return bit.bor64(bit.lshift64(1, 57 + idx), b) end

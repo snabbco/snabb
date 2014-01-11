@@ -1225,5 +1225,12 @@ c.RTAX = strflag {
   MAX       = 9,
 }
 
+c.CLOCK = strflag {
+  REALTIME           = 0,
+  VIRTUAL            = 1,
+  PROF               = 2,
+  MONOTONIC          = 3,
+}
+
 return c
 
