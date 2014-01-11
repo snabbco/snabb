@@ -284,7 +284,7 @@ test.timers_linux = {
   end,
   test_clock_nanosleep = function()
     local rem = assert(S.clock_nanosleep("realtime", nil, 0.001))
-    assert_equal(rem, 0, "expect no elapsed time after clock_nanosleep")
+    assert_equal(rem, nil)
   end,
   test_clock_nanosleep_abs = function()
     assert(S.clock_nanosleep("realtime", "abstime", 0))
