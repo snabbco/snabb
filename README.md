@@ -47,27 +47,6 @@ For the (optional) rump kernel functionality, the easiest way at present to inst
 ## New features planned soon
 netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD, FreeBSD and OSX support, rump kernel hypercall API, OSv support, Lua support, more introspection. Plus whatever users request.
 
-## Release notes
-0.10pre more ioctls, FreeBSD 9 support, some Linux MIPS fixes, more timer and signal functions for BSDs.
-
-0.9 bug fixes, better tests, reworking of how methods are called, more NetBSD support, termios interface rework, improved ioctl that understands type and direction of arguments, more NetBSD network config, rump kernel Linux ABI support, cleanups, full ppc support, endian fixes, Android fixes, Xen support, kqueue, poll and epoll interface improvements, additional syscalls, luaffi support again, better kernel headers and fixes against them, more MIPS support, improved APIs with multiple return values, initial NetBSD ktrace support, FreeBSD support, more OSX support, sharing of BSD code.
-
-0.8 rump kernel fixes, NetBSD 64 bit fixes, initial arp/neighbour support, towards MIPS support, cmsg cleanup, shm_open, iterators for directory iteration and ls, more OSX and NetBSD support, initial cgroups support, initial support of NetBSD network config.
-
-0.7 bug fixes, general cleanups, filesystem capabilities, xattr bug fixes, signal handler functions, cpu affinity support, scheduler functions, POSIX message queues, tun/tap support, ioctl additions and improvements, initial NetBSD and OSX support, initial NetBSD rump kernel support, some fixes to allow Android to work.
-
-0.6 adds support for raw sockets, BPF, seccomp mode 2 (syscall filtering), capabilities, feature tests, plus bug fixes.
-
-0.5 adds support for ppc, has some bug fixes for 64 bit file handling on 32 bit architectures, and better organisation of files.
-
-0.4 is a release that works well with LuaJIT 2.0.0 and has had extensive testing. The code is somewhat modular now, which makes it easier to use and understand.
-
-0.3 was the last release to work with luaffi. There are significant bugs.
-
-0.2 work in progress release.
-
-0.1 very early prototype.
-
 ## Examples and documentation
 
 Apart from the tests, there are now some examples at in the examples directory; more to come.
