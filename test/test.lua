@@ -1930,6 +1930,21 @@ test_gettimeofday = {
   end,
 }
 
+test_clock = {
+  test_clock_gettime = function()
+    local tt = assert(S.clock_getres("realtime"))
+    local tt = assert(S.clock_gettime("realtime"))
+    -- TODO add settime
+  end,
+  test_clock_nanosleep = function()
+    local rem = assert(S.clock_nanosleep("realtime", nil, 0.001))
+    assert_equal(rem, nil)
+  end,
+  test_clock_nanosleep_abs = function()
+    assert(S.clock_nanosleep("realtime", "abstime", 0))
+  end,
+}
+
 test_signals = {
   test_signal_return = function()
     local orig = assert(S.signal("alrm", "ign"))

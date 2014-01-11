@@ -626,6 +626,38 @@ if C.setitimer then
     return oldtime
   end
 end
+if C.clock_getres then
+  function S.clock_getres(clk_id, ts)
+    ts = mktype(t.timespec, ts)
+    local ret, err = C.clock_getres(c.CLOCK[clk_id], ts)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return ts
+  end
+end
+if C.clock_gettime then
+  function S.clock_gettime(clk_id, ts)
+    ts = mktype(t.timespec, ts)
+    local ret, err = C.clock_gettime(c.CLOCK[clk_id], ts)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return ts
+  end
+end
+if C.clock_settime then
+  function S.clock_settime(clk_id, ts)
+    ts = mktype(t.timespec, ts)
+    return retbool(C.clock_settime(c.CLOCK[clk_id], ts))
+  end
+end
+if C.clock_nanosleep then
+  function S.clock_nanosleep(clk_id, flags, req, rem)
+    rem = rem or t.timespec()
+    local ret, err = C.clock_nanosleep(c.CLOCK[clk_id], c.TIMER[flags or 0], mktype(t.timespec, req), rem)
+    if ret == -1 then
+      if (err or errno()) == c.E.INTR then return true, nil, rem else return nil, t.error(err or errno()) end
+    end
+    return true -- no time remaining
+  end
+end
 
 -- legacy in many OSs, implemented using recvfrom, sendto
 if C.send then
