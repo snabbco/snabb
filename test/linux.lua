@@ -274,7 +274,7 @@ test.timers_linux = {
     assert_equal(o.value.time, 0, "expect 0 from gettime as expired")
     assert(fd:close())
   end,
-  test_time = function()
+  test_time = function() -- this interface is not a syscall for other OSs, probably won't make compat interface
     local tt = S.time()
   end,
 }
