@@ -30,7 +30,7 @@ int     extattrctl(const char *path, int cmd, const char *filename, int attrname
 int     extattr_delete_fd(int fd, int attrnamespace, const char *attrname);
 int     extattr_delete_file(const char *path, int attrnamespace, const char *attrname);
 int     extattr_delete_link(const char *path, int attrnamespace, const char *attrname);
-ssize_t extattr_get_fd(int fd, int attrnamespace, const char *attrname, void *data, sizet nbytes);
+ssize_t extattr_get_fd(int fd, int attrnamespace, const char *attrname, void *data, size_t nbytes);
 ssize_t extattr_get_file(const char *path, int attrnamespace, const char *attrname, void *data, size_t nbytes);
 ssize_t extattr_get_link(const char *path, int attrnamespace, const char *attrname, void *data, size_t nbytes);
 ssize_t extattr_list_fd(int fd, int attrnamespace, void *data, size_t nbytes);
