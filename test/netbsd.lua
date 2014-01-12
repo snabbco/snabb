@@ -169,6 +169,7 @@ test.sockets_pipes_netbsd = {
 }
 
 test.misc_netbsd = {
+--[[ -- should not be using major, minor as not defined over 32 bit, plus also ffs does not support
   test_mknod_64bit_root = function()
     local dev = t.device(1999875, 515)
     assert(dev.dev > t.dev(0xffffffff))
@@ -180,6 +181,7 @@ test.misc_netbsd = {
     assert_equal(stat.rdev.device, dev.device)
     assert(S.unlink(tmpfile))
   end,
+]]
   test_fsync_range = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:sync_range("data", 0, 4096))
