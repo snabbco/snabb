@@ -169,6 +169,7 @@ test.sockets_pipes_netbsd = {
 }
 
 test.misc_netbsd = {
+  teardown = clean,
 --[[ -- should not be using major, minor as not defined over 32 bit, plus also ffs does not support
   test_mknod_64bit_root = function()
     local dev = t.device(1999875, 515)
