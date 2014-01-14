@@ -14,6 +14,10 @@ buffers = freelist.new("struct buffer *", max)
 buffer_t = ffi.typeof("struct buffer")
 buffer_ptr_t = ffi.typeof("struct buffer *")
 
+-- Array of registered virtio devices.
+-- This is used to return freed buffers to their devices.
+virtio_devices = {}
+
 -- Return a ready-to-use buffer, or nil if none is available.
 function allocate ()
    return freelist.remove(buffers) or new_buffer()
@@ -32,6 +36,9 @@ end
 -- Free a buffer that is no longer in use.
 function free (b)
    freelist.add(buffers, b)
+   if b.origin.type == C.BUFFER_ORIGIN_VIRTIO then
+      virtio_devices[b.origin.device_id]:return_virtio_buffer(b)
+   end
 end
 
 -- Create buffers until at least N are ready for use.

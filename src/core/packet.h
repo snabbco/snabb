@@ -1,8 +1,36 @@
 // A buffer describes a piece of memory with known size and physical address.
+struct color {
+  uint16_t kind;
+  union {
+    struct {
+      uint16_t node;
+    } numa;
+    struct {
+      uint16_t device;
+      uint16_t descriptor_index;
+    } vhost;
+  } info;
+};
+
+struct buffer_origin {
+  enum buffer_origin_type {
+    ORIGIN_UNKNOWN = 0,
+    ORIGIN_VIRTIO  = 1
+    // NUMA...
+  } type;
+  union buffer_origin_info {
+    struct buffer_origin_info_virtio {
+      int16_t device_id;
+      int16_t descriptor_index;
+    } virtio;
+  } info;
+};
+
 struct buffer {
   char     *pointer; // virtual address in this process
   uint64_t physical; // stable physical address
   uint32_t size;     // how many bytes in the buffer?
+  struct origin origin;
 };
 
 // A packet_iovec describes a portion of a buffer.
@@ -48,8 +76,7 @@ struct packet {
   // How much "fuel" does this packet have left before it's dropped?
   // This is like the Time-To-Live (TTL) IP header field.
   int32_t fuel;
-  // XXX do we need a callback when a packet is freed?
-  // (that's when we will give back buffers to kvm virtio clients?)
+  int32_t color;
   struct packet_info info;
   int niovecs;
   int length;

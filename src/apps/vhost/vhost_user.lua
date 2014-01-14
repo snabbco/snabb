@@ -25,15 +25,12 @@ keepalive = {}
 function VhostUser:new (socket_path)
    local socket = C.vhost_user_open_socket(socket_path)
    assert(socket >= 0, "failed to open socket: " .. socket_path)
-   vfio.bind_device_to_vfio("0000:01:00.0")
-   local nic = intel10g.new("0000:01:00.0")
    local o = { state = 'init',
                msg = ffi.new("struct vhost_user_msg"),
                nfds = ffi.new("int[1]"),
                fds = ffi.new("int[?]", C.VHOST_USER_MEMORY_MAX_NREGIONS),
                listen_socket = socket,
                vring_base = {},
-               nic = nic,
                callfd = {},
                kickfd = {}
             }
@@ -46,15 +43,30 @@ prev = {}
 prevaddr = {}
 
 function VhostUser:pull ()
-   if self.socket == nil then
-      local res = C.vhost_user_accept(self.listen_socket)
-      if res >= 0 then self.socket = res end
+   -- Connected?
+   if not self.connected then
+      self:poll_accept()
    else
-      local msg = self.msg
-      if C.vhost_user_receive(self.socket, msg, self.fds, self.nfds) > 0 then
-         assert(msg.request >= 0 and msg.request <= C.VHOST_USER_MAX)
-         if msg.request ~= 1 then
-            print("Got " .. handler_names[msg.request] .. "(" .. msg.request..")")
+      self:poll_request()
+      self:poll_virtio()
+   end
+end
+
+function VhostUser:poll_accept ()
+   local res = C.vhost_user_accept(self.listen_socket)
+   if res >= 0 then
+      self.socket = res
+      self.connected = true
+   end
+end
+
+function VhostUser:poll_request ()
+   local msg = self.msg
+   if C.vhost_user_receive(self.socket, msg, self.fds, self.nfds) > 0 then
+      -- Got a message
+      assert(msg.request >= 0 and msg.request <= C.VHOST_USER_MAX)
+      if msg.request ~= 1 then
+         print("Got " .. handler_names[msg.request] .. "(" .. msg.request..")")
          end
          local method = self[handler_names[msg.request]]
          if method then
@@ -65,49 +77,96 @@ function VhostUser:pull ()
          end
       end
    end
-   if self.rxring and self.txring then
-      if self.nic.txdesc == 0 then
-         self.nic:open()
-         self.nic:enable_mac_loopback()
-         self.nic:wait_linkup()
-         for i, t in ipairs(self.mem_table) do
-            print("dma mapping", ptr(t.snabb), ptr(t.guest), t.size)
-            C.mmap_memory(ptr(t.snabb), t.size, ffi.cast("uint64_t", t.snabb), true, true)
+end
+
+function VhostUser:poll_virtio ()
+   if self.vhost_initialized then
+      self:poll_virtio_rx()
+      self:poll_virtio_tx()
+   end
+end
+
+function VhostUser:poll_virtio_rx ()
+   -- Poll while packets are available
+   while self.rxavail ~= self.rxring.avail.idx do
+      -- First descriptor
+      local descriptor_index = self.rxring.avail.ring[self.rxavail % self.vring_num]
+
+      -- Create packet.
+      -- Assign color.
+      -- Install iovecs.
+      -- Output.
+
+      -- Copy each descriptor into an iovec
+      repeat
+         print("idx = " .. tostring(descriptor_index))
+         local descriptor = self.rxring.desc[descriptor_index]
+         local guest_addr = descriptor.addr
+         local snabb_addr = map_from_guest(guest_addr, self.mem_table)
+         local len = descriptor.len
+         local p = packet.allocate()
+         local b = ffi.new("struct buffer")
+         table.insert(keepalive, b)
+         b.pointer = ptr(snabb_addr)
+         b.physical = snabb_addr
+         b.size = len
+         b.origin.type = C.BUFFER_ORIGIN_VIRTIO
+         b.origin.virtio.device_id = self.virtio_device_id
+         b.origin.virtio.descriptor_index = descriptor_index
+         p.niovecs = 1
+         p.iovecs[0].buffer = b
+         p.iovecs[0].offset = 0
+         p.iovecs[0].length = len
+      end
+      -- TODO: output the packet
+   end
+end
+
+--[[
+Free the buffers of transmitted packets.
+         assert(self.nic:can_transmit())
+         self.nic:transmit(p)
+         self.nic:sync_transmit()
+         while self.nic:has_transmitted_packet() do
+            local p = self.nic:get_transmitted_packet()
+            local used = self.rxring.used.ring[self.rxring.used.idx]
+            used.id = self.rxring.avail.ring[self.rxring.used.idx]
+            used.len = p.iovecs[0].length
+            print(("use buffer %d size %d"):format(used.id, used.len))
+            self.rxring.used.idx = (self.rxring.used.idx + 1) % 65536
          end
-      end
-      while self.rxavail ~= self.rxring.avail.idx do
-         local descriptor_index = self.rxring.avail.ring[self.rxavail % self.vring_num]
-         repeat
-            print("idx = " .. tostring(descriptor_index))
-            local descriptor = self.rxring.desc[descriptor_index]
-            local guest_addr = descriptor.addr
-            local snabb_addr = map_from_guest(guest_addr, self.mem_table)
-            local len = descriptor.len
-            local p = packet.allocate()
-            local b = ffi.new("struct buffer")
-            table.insert(keepalive, b)
-            b.pointer = ptr(snabb_addr)
-            b.physical = snabb_addr
-            b.size = len
-            p.niovecs = 1
-            p.iovecs[0].buffer = b
-            p.iovecs[0].offset = 0
-            p.iovecs[0].length = len
-            assert(self.nic:can_transmit())
-            self.nic:transmit(p)
-            self.nic:sync_transmit()
-            while self.nic:has_transmitted_packet() do
-               local p = self.nic:get_transmitted_packet()
-               local used = self.rxring.used.ring[self.rxring.used.idx]
-               used.id = self.rxring.avail.ring[self.rxring.used.idx]
-               used.len = p.iovecs[0].length
-               print(("use buffer %d size %d"):format(used.id, used.len))
-               self.rxring.used.idx = (self.rxring.used.idx + 1) % 65536
-            end
-            descriptor_index = descriptor.next
-         until descriptor.flags == 0
-         self.rxavail = (self.rxavail + 1) % 65536
-      end
+         descriptor_index = descriptor.next
+      until descriptor.flags == 0
+      self.rxavail = (self.rxavail + 1) % 65536
+]]--
+
+function VhostUser:poll_virtio_tx ()
+   -- WHILE: input link has packets & we can transmit
+   while self.nic:can_receive() do -- and self.txring.used.idx ~= self.txused do
+      local p = self.nic:receive()
+      -- Check color
+      -- Find buffer index
+      local b = p.iovecs[0].buffer
+      local key = tonumber(ffi.cast("uint64_t", b.pointer))
+      self.txring.used.ring[self.txused].id = prev[key]
+      self.txring.used.ring[self.txused].len = p.iovecs[0].length + 10 -- 10 is virtio info
+      self.txused = (self.txused + 1) % 65536
+      self.txring.used.idx = self.txused
+      print(("used sent packet %d bytes buffer %d hdr %d"):format(p.iovecs[0].length, id[key], prev[key]))
+      local value = ffi.new("uint64_t[1]")
+      value[0] = 1
+   end
+   -- just once
+   C.write(self.callfd[0], value, 8)
+end
+
+function return_virtio_buffer (b)
+   assert(...)
+   
+end
+
+--[[
+Give buffers to the NIC
 
       while self.nic:can_add_receive_buffer() and self.txavail ~= self.txring.avail.idx do
          local hdridx = self.txring.avail.ring[self.txavail]
@@ -130,22 +189,7 @@ function VhostUser:pull ()
          self.nic:add_receive_buffer(b)
          self.txavail = (self.txavail + 1) % 65536
       end
-      while self.nic:can_receive() do -- and self.txring.used.idx ~= self.txused do
-         local p = self.nic:receive()
-         local b = p.iovecs[0].buffer
-         local key = tonumber(ffi.cast("uint64_t", b.pointer))
-         self.txring.used.ring[self.txused].id = prev[key]
-         self.txring.used.ring[self.txused].len = p.iovecs[0].length + 10 -- 10 is virtio info
-         self.txused = (self.txused + 1) % 65536
-         self.txring.used.idx = self.txused
-         print(("used sent packet %d bytes buffer %d hdr %d"):format(p.iovecs[0].length, id[key], prev[key]))
-         local value = ffi.new("uint64_t[1]")
-         value[0] = 1
-         C.write(self.callfd[0], value, 8)
-      end
-      self.nic:sync_receive()
-      -- Receive from virtio vring
-      -- Kick virtio vring if needed
+]]--
    end
 end
 
