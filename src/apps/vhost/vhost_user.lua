@@ -32,7 +32,11 @@ function VhostUser:new (socket_path)
                listen_socket = socket,
                vring_base = {},
                callfd = {},
-               kickfd = {}
+               kickfd = {},
+               -- buffer records that are not currently in use
+               buffer_recs = freelist.new("struct buffer *", 32*1024),
+               -- buffer records populated with available VM memory
+               vm_rxbuffers = freelist.new("struct buffer *", 32*1024)
             }
    return setmetatable(o, {__index = VhostUser})
 end
@@ -62,14 +66,13 @@ function VhostUser:poll_request ()
       assert(msg.request >= 0 and msg.request <= C.VHOST_USER_MAX)
       if msg.request ~= 1 then
          print("Got " .. handler_names[msg.request] .. "(" .. msg.request..")")
-         end
-         local method = self[handler_names[msg.request]]
-         if method then
-            method(self, msg, self.fds, self.nfds[0])
-         else
-            print(msg.request, C.VHOST_USER_GET_FEATURES)
-            print("vhost_user: no handler for " .. handler_names[msg.request])
-         end
+      end
+      local method = self[handler_names[msg.request]]
+      if method then
+         method(self, msg, self.fds, self.nfds[0])
+      else
+         print(msg.request, C.VHOST_USER_GET_FEATURES)
+         print("vhost_user: no handler for " .. handler_names[msg.request])
       end
    end
 end
@@ -107,35 +110,60 @@ function VhostUser:poll_virtio_rx ()
          b.size = len
          b.origin.type = C.BUFFER_ORIGIN_VIRTIO
          b.origin.virtio.device_id = self.virtio_device_id
-         b.origin.virtio.ring_id    = 
+         b.origin.virtio.ring_id = 1 -- rxring
          b.origin.virtio.descriptor_id = descriptor_id
          p.niovecs = 1
          p.iovecs[0].buffer = b
          p.iovecs[0].offset = 0
          p.iovecs[0].length = len
-      end
+      until descriptor.flags == 0
       -- TODO: output the packet
    end
 end
 
+-- Poll transmission towards the VM.
 function VhostUser:poll_virtio_tx ()
-   -- WHILE: input link has packets & we can transmit
-   while self.nic:can_receive() do -- and self.txring.used.idx ~= self.txused do
-      local p = self.nic:receive()
-      -- Check color
-      -- Find buffer index
-      local b = p.iovecs[0].buffer
-      local key = tonumber(ffi.cast("uint64_t", b.pointer))
-      self.txring.used.ring[self.txused].id = prev[key]
-      self.txring.used.ring[self.txused].len = p.iovecs[0].length + 10 -- 10 is virtio info
-      self.txused = (self.txused + 1) % 65536
-      self.txring.used.idx = self.txused
-      print(("used sent packet %d bytes buffer %d hdr %d"):format(p.iovecs[0].length, id[key], prev[key]))
-      local value = ffi.new("uint64_t[1]")
-      value[0] = 1
+   -- Extract new transmit buffers.
+   while self.txavail ~= self.txring.avail.idx do
+      -- Extract a transmit buffer.
+      local index = self.txring.avail.ring[self.txavail]
+      local desc  = self.txring.desc[index]
+      local b = freelist.remove(self.buffer_recs)
+      local addr = map_from_guest(desc.addr, self.mem_table)
+      b.pointer = ffi.cast("char*", addr)
+      b.physical = 0 -- XXX need to populate ?
+      b.size = desc.len
+      b.origin.type = C.BUFFER_ORIGIN_VIRTIO
+      b.origin.device_id = self.virtio_device_id
+      b.origin.ring_id = 1
+      b.origin.descriptor_id = index
+      freelist.add(self.vm_rxbuffers, b)
    end
-   -- just once
-   C.write(self.callfd[0], value, 8)
+   -- Transmit packets
+   local l = self.input.rx
+   local transmitted = false
+   while not app.empty(l) and self.txring.used.idx ~= self.txused do
+      local p = app.receive(l)
+      for i = 0, p.niovecs-1 do
+         local iovec = p.iovecs[i]
+         local used = self.txring.used.ring[self.txused]
+         -- XXX Copy into appropriate buffer if needed
+         assert(iovec.buffer.origin.virtio.device_id == self.virtio_device_id)
+         assert(iovec.buffer.origin.virtio.ring_id   == 1)
+         -- XXX Fix alignment if needed.
+         assert(iovec.offset == 0)
+         used.id = iovec.buffer.origin.virtio.descriptor_index
+         used.len = iovec.len
+         self.txused = (self.txused + 1) % 65536
+      end
+      transmitted = true
+   end
+   if transmitted then
+      self.txring.used.idx = self.txused
+      local value = ffi.new("uint64_t[1]") -- XXX cache
+      value[0] = 1
+      C.write(self.callfd[0], value, 8)
+   end
 end
 
 function VhostUser:return_virtio_buffer (b)
@@ -294,7 +322,7 @@ function selftest ()
    timer.activate(timer.new("report", fn, 3e9, 'repeating'))
    repeat
       app.breathe()
---      timer.run()
+      timer.run()
       C.usleep(1e5)
    until false
 end

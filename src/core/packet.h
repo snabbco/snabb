@@ -23,7 +23,7 @@ struct buffer {
   char     *pointer; // virtual address in this process
   uint64_t physical; // stable physical address
   uint32_t size;     // how many bytes in the buffer?
-  struct origin origin;
+  struct buffer_origin origin;
 };
 
 // A packet_iovec describes a portion of a buffer.
