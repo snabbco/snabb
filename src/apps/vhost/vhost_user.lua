@@ -37,11 +37,6 @@ function VhostUser:new (socket_path)
    return setmetatable(o, {__index = VhostUser})
 end
 
-id   = {}
-idaddr = {}
-prev = {}
-prevaddr = {}
-
 function VhostUser:pull ()
    -- Connected?
    if not self.connected then
@@ -90,7 +85,7 @@ function VhostUser:poll_virtio_rx ()
    -- Poll while packets are available
    while self.rxavail ~= self.rxring.avail.idx do
       -- First descriptor
-      local descriptor_index = self.rxring.avail.ring[self.rxavail % self.vring_num]
+      local descriptor_id = self.rxring.avail.ring[self.rxavail % self.vring_num]
 
       -- Create packet.
       -- Assign color.
@@ -99,8 +94,8 @@ function VhostUser:poll_virtio_rx ()
 
       -- Copy each descriptor into an iovec
       repeat
-         print("idx = " .. tostring(descriptor_index))
-         local descriptor = self.rxring.desc[descriptor_index]
+         print("idx = " .. tostring(descriptor_id))
+         local descriptor = self.rxring.desc[descriptor_id]
          local guest_addr = descriptor.addr
          local snabb_addr = map_from_guest(guest_addr, self.mem_table)
          local len = descriptor.len
@@ -112,7 +107,8 @@ function VhostUser:poll_virtio_rx ()
          b.size = len
          b.origin.type = C.BUFFER_ORIGIN_VIRTIO
          b.origin.virtio.device_id = self.virtio_device_id
-         b.origin.virtio.descriptor_index = descriptor_index
+         b.origin.virtio.ring_id    = 
+         b.origin.virtio.descriptor_id = descriptor_id
          p.niovecs = 1
          p.iovecs[0].buffer = b
          p.iovecs[0].offset = 0
@@ -121,24 +117,6 @@ function VhostUser:poll_virtio_rx ()
       -- TODO: output the packet
    end
 end
-
---[[
-Free the buffers of transmitted packets.
-         assert(self.nic:can_transmit())
-         self.nic:transmit(p)
-         self.nic:sync_transmit()
-         while self.nic:has_transmitted_packet() do
-            local p = self.nic:get_transmitted_packet()
-            local used = self.rxring.used.ring[self.rxring.used.idx]
-            used.id = self.rxring.avail.ring[self.rxring.used.idx]
-            used.len = p.iovecs[0].length
-            print(("use buffer %d size %d"):format(used.id, used.len))
-            self.rxring.used.idx = (self.rxring.used.idx + 1) % 65536
-         end
-         descriptor_index = descriptor.next
-      until descriptor.flags == 0
-      self.rxavail = (self.rxavail + 1) % 65536
-]]--
 
 function VhostUser:poll_virtio_tx ()
    -- WHILE: input link has packets & we can transmit
@@ -160,36 +138,13 @@ function VhostUser:poll_virtio_tx ()
    C.write(self.callfd[0], value, 8)
 end
 
-function return_virtio_buffer (b)
-   assert(...)
-   
-end
-
---[[
-Give buffers to the NIC
-
-      while self.nic:can_add_receive_buffer() and self.txavail ~= self.txring.avail.idx do
-         local hdridx = self.txring.avail.ring[self.txavail]
-         local hdrdesc = self.txring.desc[hdridx]
-         assert(bit.band(hdrdesc.flags, C.VIRTIO_DESC_F_NEXT) ~= 0)
-         local bufidx = hdrdesc.next
-         local bufdesc = self.txring.desc[bufidx]
-         local key = tonumber(map_from_guest(bufdesc.addr, self.mem_table))
-         id[key] = bufidx
-         idaddr[key] = bufdesc.addr
-         prev[key] = hdridx
-         prevaddr[key] = hdrdesc.addr
-         print("used", "hdridx", hdridx, "hdrlen", hdrdesc.len, "bufidx", bufidx, "buflen", bufdesc.len)
-         local b = ffi.new("struct buffer")
-         table.insert(keepalive, b)
-         b.physical = map_from_guest(bufdesc.addr, self.mem_table)
-         b.pointer = ffi.cast("char*", b.physical)
-         b.size = bufdesc.len
-         print("receive buffer address", b.pointer)
-         self.nic:add_receive_buffer(b)
-         self.txavail = (self.txavail + 1) % 65536
-      end
-]]--
+function VhostUser:return_virtio_buffer (b)
+   assert(b.origin.virtio.device_id == self.virtio_device_id)
+   if b.origin.virtio.ring_id == 1 then -- Receive buffer?
+      local used = self.rxring.used.ring[self.rxring.used.idx]
+      used.id = b.origin.virtio.descriptor_id
+      used.len = b.size
+      self.rxring.used.idx = (self.rxring.used.idx + 1) % 65536
    end
 end
 

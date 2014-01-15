@@ -47,3 +47,13 @@ function preallocate (n)
    while freelist.nfree(buffers) < n do free(new_buffer()) end
 end
 
+function add_virtio_device (d)
+   local index = #virtio_devices + 1
+   virtio_devices[index] = d
+   return index
+end
+
+function delete_virtio_device (index)
+   virtio_devices[index] = nil
+end
+

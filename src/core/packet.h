@@ -1,16 +1,7 @@
-// A buffer describes a piece of memory with known size and physical address.
-struct color {
-  uint16_t kind;
-  union {
-    struct {
-      uint16_t node;
-    } numa;
-    struct {
-      uint16_t device;
-      uint16_t descriptor_index;
-    } vhost;
-  } info;
-};
+// Buffers can be treated specially depending on their origin.
+//
+// For example, buffers belonging to Virtio devices need to be
+// returned to the device when freed.
 
 struct buffer_origin {
   enum buffer_origin_type {
@@ -21,11 +12,13 @@ struct buffer_origin {
   union buffer_origin_info {
     struct buffer_origin_info_virtio {
       int16_t device_id;
+      int16_t ring_id;
       int16_t descriptor_index;
     } virtio;
   } info;
 };
 
+// A buffer describes a piece of memory with known size and physical address.
 struct buffer {
   char     *pointer; // virtual address in this process
   uint64_t physical; // stable physical address
