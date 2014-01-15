@@ -60,10 +60,6 @@ pid_t wait(int *status);
 pid_t waitpid(pid_t pid, int *status, int options);
 
 /* down to here have moved to shared calls */
-int clock_getres(clockid_t clk_id, struct timespec *res);
-int clock_gettime(clockid_t clk_id, struct timespec *tp);
-int clock_settime(clockid_t clk_id, const struct timespec *tp);
-int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *request, struct timespec *remain);
 unsigned int alarm(unsigned int seconds);
 int sysinfo(struct sysinfo *info);
 int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5);

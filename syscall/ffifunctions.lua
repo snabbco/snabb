@@ -159,5 +159,11 @@ int futimes(int, const struct timeval times[2]);
 int lutimes(const char *filename, const struct timeval times[2]);
 pid_t wait4(pid_t wpid, int *status, int options, struct rusage *rusage);
 int posix_openpt(int oflag);
+
+int clock_getres(clockid_t clk_id, struct timespec *res);
+int clock_gettime(clockid_t clk_id, struct timespec *tp);
+int clock_settime(clockid_t clk_id, const struct timespec *tp);
+int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *request, struct timespec *remain);
+
 ]]
 
