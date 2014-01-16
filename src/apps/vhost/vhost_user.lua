@@ -4,12 +4,14 @@ local app    = require("core.app")
 local lib    = require("core.lib")
 local ffi = require("ffi")
 local C   = ffi.C
+local buffer = require("core.buffer")
 local packet   = require("core.packet")
 
 local timer     = require("core.timer")
 local register = require("lib.hardware.register")
 local vfio = require("lib.hardware.vfio")
 local intel10g = require("apps.intel.intel10g")
+local freelist = require("core.freelist")
 
 require("lib.virtio.virtio_vring_h")
 require("apps.vhost.vhost_h")
@@ -78,7 +80,7 @@ function VhostUser:poll_request ()
 end
 
 function VhostUser:poll_virtio ()
-   if self.vhost_initialized then
+   if self.vhost_ready then
       self:poll_virtio_rx()
       self:poll_virtio_tx()
    end
@@ -86,6 +88,7 @@ end
 
 function VhostUser:poll_virtio_rx ()
    -- Poll while packets are available
+   assert(self.connected)
    while self.rxavail ~= self.rxring.avail.idx do
       -- First descriptor
       local descriptor_id = self.rxring.avail.ring[self.rxavail % self.vring_num]
@@ -109,14 +112,16 @@ function VhostUser:poll_virtio_rx ()
          b.physical = snabb_addr
          b.size = len
          b.origin.type = C.BUFFER_ORIGIN_VIRTIO
-         b.origin.virtio.device_id = self.virtio_device_id
-         b.origin.virtio.ring_id = 1 -- rxring
-         b.origin.virtio.descriptor_id = descriptor_id
+         b.origin.info.virtio.device_id = self.virtio_device_id
+         b.origin.info.virtio.ring_id = 1 -- rxring
+         b.origin.info.virtio.descriptor_id = descriptor_id
          p.niovecs = 1
          p.iovecs[0].buffer = b
          p.iovecs[0].offset = 0
          p.iovecs[0].length = len
+         descriptor_id = descriptor.next
       until descriptor.flags == 0
+      self.rxavail = (self.rxavail + 1) % 65536
       -- TODO: output the packet
    end
 end
@@ -126,23 +131,28 @@ function VhostUser:poll_virtio_tx ()
    -- Extract new transmit buffers.
    while self.txavail ~= self.txring.avail.idx do
       -- Extract a transmit buffer.
-      local index = self.txring.avail.ring[self.txavail]
-      local desc  = self.txring.desc[index]
-      local b = freelist.remove(self.buffer_recs)
-      local addr = map_from_guest(desc.addr, self.mem_table)
-      b.pointer = ffi.cast("char*", addr)
-      b.physical = 0 -- XXX need to populate ?
-      b.size = desc.len
-      b.origin.type = C.BUFFER_ORIGIN_VIRTIO
-      b.origin.device_id = self.virtio_device_id
-      b.origin.ring_id = 1
-      b.origin.descriptor_id = index
-      freelist.add(self.vm_rxbuffers, b)
+      local index = self.txring.avail.ring[self.txavail % self.vring_num]
+      repeat
+         local desc  = self.txring.desc[index]
+         local b = freelist.remove(self.buffer_recs) or lib.malloc("struct buffer")
+         local addr = map_from_guest(desc.addr, self.mem_table)
+         b.pointer = ffi.cast("char*", addr)
+         b.physical = 0 -- XXX need to populate ?
+         b.size = desc.len
+         b.origin.type = C.BUFFER_ORIGIN_VIRTIO
+         b.origin.info.virtio.device_id = self.virtio_device_id
+         b.origin.info.virtio.ring_id = 1
+         b.origin.info.virtio.descriptor_id = index
+         freelist.add(self.vm_rxbuffers, b)
+         self.txavail = (self.txavail + 1) % 65536
+         print("Pulled a buffer", index, desc.len, self.txavail, desc.next, desc.flags)
+         index = desc.next
+      until bit.band(desc.flags, C.VIRTIO_DESC_F_NEXT) == 0
    end
    -- Transmit packets
-   local l = self.input.rx
    local transmitted = false
-   while not app.empty(l) and self.txring.used.idx ~= self.txused do
+   local l = self.input.rx
+   while l and not app.empty(l) and self.txring.used.idx ~= self.txused do
       local p = app.receive(l)
       for i = 0, p.niovecs-1 do
          local iovec = p.iovecs[i]
@@ -233,7 +243,11 @@ function VhostUser:set_vring_addr (msg)
       self.rxavail = 0
       self.rxused = 0
    end
-
+   if self.rxring and self.txring then
+      self.vhost_ready = true
+      self.virtio_device_id = buffer.add_virtio_device(self)
+      print("CONNECTED")
+   end
    print("vring", ffi.cast("void*",desc))
    local x = ffi.cast("struct { uint64_t addr; uint32_t len; uint16_t flags; uint16_t next; } *", desc)
    print("vring[0]", x[0].addr, x[0].len, x[0].flags, x[0].next)
@@ -310,6 +324,7 @@ function selftest ()
    print("selftest: vhost_user")
    local vu = VhostUser:new("/home/luke/qemu.sock")
    app.apps.vhost_user = app.new(vu)
+   -- packet generator, sink
 --   app.apps.vhost_user = app.new(VhostUser:new("vapp.sock"))
    app.relink()
    local deadline = lib.timer(1e15)
@@ -322,7 +337,7 @@ function selftest ()
    timer.activate(timer.new("report", fn, 3e9, 'repeating'))
    repeat
       app.breathe()
-      timer.run()
+--      timer.run()
       C.usleep(1e5)
    until false
 end

@@ -5,15 +5,15 @@
 
 struct buffer_origin {
   enum buffer_origin_type {
-    ORIGIN_UNKNOWN = 0,
-    ORIGIN_VIRTIO  = 1
+    BUFFER_ORIGIN_UNKNOWN = 0,
+    BUFFER_ORIGIN_VIRTIO  = 1
     // NUMA...
   } type;
   union buffer_origin_info {
     struct buffer_origin_info_virtio {
       int16_t device_id;
       int16_t ring_id;
-      int16_t descriptor_index;
+      int16_t descriptor_id;
     } virtio;
   } info;
 };
