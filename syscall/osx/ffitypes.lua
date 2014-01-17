@@ -30,6 +30,9 @@ typedef uint32_t id_t; // check as not true in freebsd
 typedef unsigned long tcflag_t;
 typedef unsigned long speed_t;
 
+/* osx does not have the clock_ functions so clockid undefined, but so headers work, define it
+typedef uint32_t clockid_t;
+
 /* actually not a struct at all in osx, just a uint32_t but for compatibility fudge it */
 /* TODO this should work, otherwise need to move all sigset_t handling out of common types */
 typedef struct {
