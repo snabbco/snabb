@@ -300,8 +300,8 @@ print [[
 #include <linux/virtio_pci.h>
 #include <linux/pci.h>
 #include <linux/tcp.h>
-//#include <linux/vfio.h>
-//#include <linux/seccomp.h>
+#include <linux/vfio.h>
+#include <linux/seccomp.h>
 
 int ret;
 
