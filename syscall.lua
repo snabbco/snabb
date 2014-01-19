@@ -9,8 +9,6 @@ pcall, type, table, string, math
 
 local abi = require "syscall.abi"
 
-local ffi = require "ffi"
-
 if abi.rump and abi.types then abi.os = abi.types end -- pretend to be NetBSD for normal rump, Linux for rumplinux
 
 require "syscall.ffitypes"
@@ -22,10 +20,9 @@ if not abi.rump then
   if abi.bsd then require "syscall.bsd.ffifunctions" end
 end
 
-local c = require("syscall." .. abi.os .. ".constants")
-
--- TODO we could move this all to types
 local ostypes = require("syscall." .. abi.os .. ".types")
+
+local c = require("syscall." .. abi.os .. ".constants")
 
 local bsdtypes
 if (abi.rump and abi.types == "netbsd") or (not abi.rump and abi.bsd) then
@@ -66,5 +63,4 @@ if abi.os == "linux" then
 end
 
 return S
-
 

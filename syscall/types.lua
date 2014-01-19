@@ -492,24 +492,6 @@ mt.rusage = {
 
 addtype(types, "rusage", "struct rusage", mt.rusage)
 
-mt.winsize = {
-  index = {
-    row = function(ws) return ws.ws_row end,
-    col = function(ws) return ws.ws_col end,
-    xpixel = function(ws) return ws.ws_xpixel end,
-    ypixel = function(ws) return ws.ws_ypixel end,
-  },
-  newindex = {
-    row = function(ws, v) ws.ws_row = v end,
-    col = function(ws, v) ws.ws_col = v end,
-    xpixel = function(ws, v) ws.ws_xpixel = v end,
-    ypixel = function(ws, v) ws.ws_ypixel = v end,
-  },
-  __new = newfn,
-}
-
-addtype(types, "winsize", "struct winsize", mt.winsize)
-
 local function itnormal(v)
   if not v then v = {{0, 0}, {0, 0}} end
   if v.interval then

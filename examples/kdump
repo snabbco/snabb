@@ -9,16 +9,15 @@ end
 
 local kfile = arg[1] or "ktrace.out"
 
-local modules = {"vfs", "dev", "net", "fs.tmpfs", "fs.kernfs"}
-local S = require "syscall.rump.init".init(modules)
-local t = S.t
+local S = require "syscall"
+local N = require "syscall.netbsd.init"
 
-assert(S.rump.etfs_register("/ktrace.out", kfile, "chr"))
-local fd = assert(S.open("/ktrace.out", "rdonly"))
-local buf = t.buffer(32768)
+local fd = assert(S.open(kfile, "rdonly"))
+local buf = S.t.buffer(32768)
 local n = assert(fd:read(buf, 32768))
-for _, ktr in S.util.kdump(buf, n) do
+for _, ktr in N.util.kdump(buf, n) do
   if ktr.version ~= 2 then error "currently only v2 supported" end
   print(ktr)
 end
 assert(fd:close())
+

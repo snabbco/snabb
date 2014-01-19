@@ -86,6 +86,7 @@ build =
       ["syscall.netbsd.errors"] = "syscall/netbsd/errors.lua";
       ["syscall.netbsd.util"] = "syscall/netbsd/util.lua";
       ["syscall.netbsd.nr"] = "syscall/netbsd/nr.lua";
+      ["syscall.netbsd.init"] = "syscall/netbsd/init.lua";
 
       ["syscall.osx.syscalls"] = "syscall/osx/syscalls.lua";
       ["syscall.osx.c"] = "syscall/osx/c.lua";

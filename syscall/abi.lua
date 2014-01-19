@@ -57,10 +57,12 @@ if not abi.xen and abi.os == "bsd" then
     local vs = tostring(buf[0])
     abi.freebsd = tonumber(vs:sub(1, #vs - 5)) -- major version ie 9, 10
   end
-end
 
--- NetBSD ABI version; you can use version 7 here TODO autodetect
-abi.netbsd = 6
+  -- NetBSD ABI version; you can use version 7 here TODO autodetect
+  if abi.os == "netbsd" then
+    abi.netbsd = 6
+  end
+end
 
 -- rump params
 abi.host = abi.os -- real OS, used for rump at present may change this
