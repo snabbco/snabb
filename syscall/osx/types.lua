@@ -39,6 +39,7 @@ for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
 
 -- 32 bit dev_t, 24 bit minor, 8 bit major
 local function makedev(major, minor)
+  if type(major) == "table" then major, minor = major[1], major[2] end
   local dev = major or 0
   if minor then dev = bit.bor(minor, bit.lshift(major, 24)) end
   return dev

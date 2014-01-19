@@ -155,6 +155,7 @@ t.iocb_ptrs = function(n, ...) return ffi.new(iocb_ptrs, n, ...) end
 
 -- Note 32 bit dev_t; glibc has 64 bit dev_t but we use syscall API which does not
 local function makedev(major, minor)
+  if type(major) == "table" then major, minor = major[1], major[2] end
   local dev = major or 0
   if minor then dev = bit.bor(bit.lshift(bit.band(minor, 0xffffff00), 12), bit.band(minor, 0xff), bit.lshift(major, 8)) end
   return dev

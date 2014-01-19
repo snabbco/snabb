@@ -30,7 +30,7 @@ local t, pt, s = types.t, types.pt, types.s
 local S = {}
 
 local function getdev(dev)
-  if type(dev) == "table" then t.device(dev) end
+  if type(dev) == "table" then return t.device(dev).dev end
   if ffi.istype(t.device, dev) then dev = dev.dev end
   return dev
 end
