@@ -783,7 +783,7 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_mknod_chr_root = function()
-    assert(S.mknod(tmpfile, "fchr,0666", t.device(1, 5)))
+    assert(S.mknod(tmpfile, "fchr,0666", {1, 5}))
     local stat = assert(S.stat(tmpfile))
     assert(stat.ischr, "expect to be a character device")
     assert_equal(stat.rdev.major, 1)
