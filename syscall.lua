@@ -22,9 +22,10 @@ if not abi.rump then
   if abi.bsd then require "syscall.bsd.ffifunctions" end
 end
 
-local ostypes = require("syscall." .. abi.os .. ".types")
-
 local c = require("syscall." .. abi.os .. ".constants")
+
+-- TODO we could move this all to types
+local ostypes = require("syscall." .. abi.os .. ".types")
 
 local bsdtypes
 if (abi.rump and abi.types == "netbsd") or (not abi.rump and abi.bsd) then
