@@ -158,7 +158,7 @@ if C.extattr_set_fd then
    function S.extattr_set_fd(fd, attrnamespace, attrname, data, nbytes)
      local str = data -- do not gc
      if type(data) == "string" then data, nbytes = pt.char(str), #str end
-     return retnum(C.extattr_get_fd(getfd(fd), c.EXTATTR_NAMESPACE[attrnamespace], attrname, data, nbytes or #data))
+     return retnum(C.extattr_set_fd(getfd(fd), c.EXTATTR_NAMESPACE[attrnamespace], attrname, data, nbytes or #data))
    end
 end
 
