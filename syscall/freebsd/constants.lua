@@ -1121,6 +1121,12 @@ c.CLOCK = strflag {
   PROCESS_CPUTIME_ID = 15,
 }
 
+c.EXTATTR_NAMESPACE = strflag {
+  EMPTY        = 0x00000000,
+  USER         = 0x00000001,
+  SYSTEM       = 0x00000002,
+}
+
 if abi.freebsd >= 10 then -- not supporting on freebsd 9 as different ABI, recommend upgrade to use
 
 local function CAPRIGHT(idx, b) return bit.bor64(bit.lshift64(1, 57 + idx), b) end

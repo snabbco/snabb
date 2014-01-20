@@ -1232,5 +1232,10 @@ c.CLOCK = strflag {
   MONOTONIC          = 3,
 }
 
+c.EXTATTR_NAMESPACE = strflag {
+  USER         = 0x00000001,
+  SYSTEM       = 0x00000002,
+}
+
 return c
 

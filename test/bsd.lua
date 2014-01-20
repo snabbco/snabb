@@ -226,6 +226,36 @@ test.kqueue = {
   end,
 }
 
+test.bsd_extattr = {
+  teardown = clean,
+  test_extattr_empty_fd = function()
+    if not S.extattr_get_fd then error "skipped" end
+    local fd = assert(S.creat(tmpfile, "rwxu"))
+    assert(S.unlink(tmpfile))
+-- TODO allow as a method for fd
+    local n, err = S.extattr_get_fd(fd, "user", "myattr", false) -- false does raw call with no buffer to return length
+    assert(not n and err.NOATTR)
+    assert(fd:close())
+  end,
+  test_extattr_getsetdel_fd = function()
+    if not S.extattr_get_fd then error "skipped" end
+    local fd = assert(S.creat(tmpfile, "rwxu"))
+    assert(S.unlink(tmpfile))
+-- TODO allow as a method for fd
+    local n, err = S.extattr_get_fd(fd, "user", "myattr", false) -- false does raw call with no buffer to return length
+    assert(not n and err.NOATTR)
+    local n, err = S.extattr_set_fd(fd, "user", "myattr", "myvalue")
+    if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support setting extattr
+    assert_equal(n, #"myvalue")
+    local str = assert(S.extattr_get_fd(fd, "user", "myattr"))
+    assert_equal(str, "myvalue")
+    local ok = assert(S.extattr_delete_fd(fd, "user", "myattr"))
+    local str, err = S.extattr_get_fd(fd, "user", "myattr")
+    assert(not str and err.NOATTR)
+    assert(fd:close())
+  end,
+}
+
 -- skip as no processes in rump
 if not S.__rump then
   test.kqueue.test_kqueue_proc = function()

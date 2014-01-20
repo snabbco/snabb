@@ -120,6 +120,54 @@ if C.shm_unlink then
   function S.shm_unlink(pathname) return retbool(C.shm_unlink(pathname)) end
 end
 
+--[[
+int     extattr_delete_fd(int fd, int attrnamespace, const char *attrname);
+int     extattr_delete_file(const char *path, int attrnamespace, const char *attrname);
+int     extattr_delete_link(const char *path, int attrnamespace, const char *attrname);
+ssize_t extattr_get_fd(int fd, int attrnamespace, const char *attrname, void *data, size_t nbytes);
+ssize_t extattr_get_file(const char *path, int attrnamespace, const char *attrname, void *data, size_t nbytes);
+ssize_t extattr_get_link(const char *path, int attrnamespace, const char *attrname, void *data, size_t nbytes);
+ssize_t extattr_list_fd(int fd, int attrnamespace, void *data, size_t nbytes);
+ssize_t extattr_list_file(const char *path, int attrnamespace, void *data, size_t nbytes);
+ssize_t extattr_list_link(const char *path, int attrnamespace, void *data, size_t nbytes);
+ssize_t extattr_set_fd(int fd, int attrnamespace, const char *attrname, const void *data, size_t nbytes);
+ssize_t extattr_set_file(const char *path, int attrnamespace, const char *attrname, const void *data, size_t nbytes);
+ssize_t extattr_set_link(const char *path, int attrnamespace, const char *attrname, const void *data, size_t nbytes);
+]]
+
+-- doc says behaves like read, write, slightly unclear if that means can just use fixed size buffer and iterate instead
+-- maybe use helper function as in Linux for sizing
+if C.extattr_get_fd then
+   function S.extattr_get_fd(fd, attrnamespace, attrname, data, nbytes)
+     if data or data == false then
+       if data == false then data, nbytes = nil, 0 end
+       return retnum(C.extattr_get_fd(getfd(fd), c.EXTATTR_NAMESPACE[attrnamespace], attrname, data, nbytes or #data))
+     end
+     local nbytes, err = C.extattr_get_fd(getfd(fd), c.EXTATTR_NAMESPACE[attrnamespace], attrname, nil, 0)
+     nbytes = tonumber(nbytes)
+     if nbytes == -1 then return nil, t.error(err or errno()) end
+     local data = t.buffer(nbytes)
+     local n, err = C.extattr_get_fd(getfd(fd), c.EXTATTR_NAMESPACE[attrnamespace], attrname, data, nbytes)
+     n = tonumber(n)
+     if n == -1 then return nil, t.error(err or errno()) end
+     return ffi.string(data, n)
+   end
+end
+
+if C.extattr_set_fd then
+   function S.extattr_set_fd(fd, attrnamespace, attrname, data, nbytes)
+     local str = data -- do not gc
+     if type(data) == "string" then data, nbytes = pt.char(str), #str end
+     return retnum(C.extattr_get_fd(getfd(fd), c.EXTATTR_NAMESPACE[attrnamespace], attrname, data, nbytes or #data))
+   end
+end
+
+if C.extattr_delete_fd then
+  function S.extattr_delete_fd(fd, attrnamespace, attrname)
+    return retbool(C.extattr_delete_fd(getfd(fd), c.EXTATTR_NAMESPACE[attrnamespace], attrname))
+  end
+end
+
 return S
 
 end
