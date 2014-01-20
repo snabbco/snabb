@@ -246,6 +246,7 @@ test.bsd_extattr = {
     assert(not n and err.NOATTR)
     local n, err = S.extattr_set_fd(fd, "user", "myattr", "myvalue")
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support setting extattr
+    assert(n, err)
     assert_equal(n, #"myvalue")
     local str = assert(S.extattr_get_fd(fd, "user", "myattr"))
     assert_equal(str, "myvalue")
