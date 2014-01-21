@@ -92,6 +92,7 @@ print [[
 #include <sys/ktrace.h>
 #include <sys/procdesc.h>
 #include <sys/capability.h>
+#include <sys/extattr.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <net/bpf.h>

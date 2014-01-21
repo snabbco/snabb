@@ -130,6 +130,7 @@ print [[
 #include <sys/statvfs.h>
 #include <sys/event.h>
 #include <sys/ktrace.h>
+#include <sys/extattr.h>
 #include <net/if.h>
 #include <net/if_ether.h>
 #include <net/if_bridgevar.h>
