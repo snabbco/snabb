@@ -135,23 +135,43 @@ ssize_t extattr_set_file(const char *path, int attrnamespace, const char *attrna
 ssize_t extattr_set_link(const char *path, int attrnamespace, const char *attrname, const void *data, size_t nbytes);
 ]]
 
+-- TODO move these to FreeBSD only as apparently NetBSD deprecates the non Linux xattr interfaces
+-- although there are no man pages for the Linux ones...
 -- doc says behaves like read, write, slightly unclear if that means can just use fixed size buffer and iterate instead
 -- maybe use helper function as in Linux for sizing
+
+local function extattr_get_helper(fn, ff, attrnamespace, attrname, data, nbytes)
+  attrnamespace = c.EXTATTR_NAMESPACE[attrnamespace]
+  if data or data == false then
+    if data == false then data, nbytes = nil, 0 end
+    return retnum(fn(ff, attrnamespace, attrname, data, nbytes or #data))
+  end
+  local nbytes, err = fn(ff, attrnamespace, attrname, nil, 0)
+  nbytes = tonumber(nbytes)
+  if nbytes == -1 then return nil, t.error(err or errno()) end
+  local data = t.buffer(nbytes)
+  local n, err = fn(ff, attrnamespace, attrname, data, nbytes)
+  n = tonumber(n)
+  if n == -1 then return nil, t.error(err or errno()) end
+  return ffi.string(data, n)
+end
+
 if C.extattr_get_fd then
-   function S.extattr_get_fd(fd, attrnamespace, attrname, data, nbytes)
-     if data or data == false then
-       if data == false then data, nbytes = nil, 0 end
-       return retnum(C.extattr_get_fd(getfd(fd), c.EXTATTR_NAMESPACE[attrnamespace], attrname, data, nbytes or #data))
-     end
-     local nbytes, err = C.extattr_get_fd(getfd(fd), c.EXTATTR_NAMESPACE[attrnamespace], attrname, nil, 0)
-     nbytes = tonumber(nbytes)
-     if nbytes == -1 then return nil, t.error(err or errno()) end
-     local data = t.buffer(nbytes)
-     local n, err = C.extattr_get_fd(getfd(fd), c.EXTATTR_NAMESPACE[attrnamespace], attrname, data, nbytes)
-     n = tonumber(n)
-     if n == -1 then return nil, t.error(err or errno()) end
-     return ffi.string(data, n)
-   end
+  function S.extattr_get_fd(fd, attrnamespace, attrname, data, nbytes)
+    return extattr_get_helper(C.extattr_get_fd, getfd(fd), attrnamespace, attrname, data, nbytes)
+  end
+end
+
+if C.extattr_get_file then
+  function S.extattr_get_file(file, attrnamespace, attrname, data, nbytes)
+    return extattr_get_helper(C.extattr_get_file, file, attrnamespace, attrname, data, nbytes)
+  end
+end
+
+if C.extattr_get_link then
+  function S.extattr_get_link(file, attrnamespace, attrname, data, nbytes)
+    return extattr_get_helper(C.extattr_get_link, file, attrnamespace, attrname, data, nbytes)
+  end
 end
 
 if C.extattr_set_fd then

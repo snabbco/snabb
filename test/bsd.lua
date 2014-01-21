@@ -253,7 +253,6 @@ test.bsd_extattr = {
     assert(not str and err.NOATTR)
     assert(fd:close())
   end,
---[[
   test_extattr_getsetdel_file = function()
     if not S.extattr_get_fd then error "skipped" end
     local fd = assert(S.creat(tmpfile, "rwxu"))
@@ -287,7 +286,6 @@ test.bsd_extattr = {
     assert(not str and err.NOATTR)
     assert(S.unlink(tmpfile))
   end,
-]]
 }
 
 -- skip as no processes in rump
