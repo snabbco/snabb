@@ -977,5 +977,13 @@ c.IPV6 = strflag {
   DONTFRAG          = 62,
 }
 
+c.XATTR = multiflags {
+  NOFOLLOW   = 0x0001,
+  CREATE     = 0x0002,
+  REPLACE    = 0x0004,
+  NOSECURITY = 0x0008,
+  NODEFAULT  = 0x0010,
+}
+
 return c
 

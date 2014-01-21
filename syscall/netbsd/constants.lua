@@ -1237,5 +1237,10 @@ c.EXTATTR_NAMESPACE = strflag {
   SYSTEM       = 0x00000002,
 }
 
+c.XATTR = multiflags {
+  CREATE           = 0x01,
+  REPLACE          = 0x02,
+}
+
 return c
 
