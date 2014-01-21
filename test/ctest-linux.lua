@@ -376,6 +376,7 @@ print [[
 #include <sys/mman.h>
 #include <sched.h>
 #include <sys/xattr.h>
+#include <attr/xattr.h>
 #include <termios.h>
 #include <unistd.h>
 #include <sys/prctl.h>
