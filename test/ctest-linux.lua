@@ -376,7 +376,6 @@ print [[
 #include <sys/mman.h>
 #include <sched.h>
 #include <sys/xattr.h>
-#include <attr/xattr.h>
 #include <termios.h>
 #include <unistd.h>
 #include <sys/prctl.h>
@@ -421,6 +420,9 @@ print [[
 #include <linux/pci.h>
 //#include <linux/vfio.h>
 #include <linux/virtio_pci.h>
+
+/* not always defined */
+#define ENOATTR ENODATA
 
 int ret = 0;
 
