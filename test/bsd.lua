@@ -272,6 +272,22 @@ test.bsd_extattr = {
     assert(not str and err.NOATTR)
     assert(S.unlink(tmpfile))
   end,
+  test_extattr_getsetdel_link = function()
+    if not S.extattr_get_fd then error "skipped" end
+    assert(S.symlink(tmpfile2, tmpfile))
+    local n, err = S.extattr_get_link(tmpfile, "user", "myattr", false) -- false does raw call with no buffer to return length
+    assert(not n and err.NOATTR)
+    local n, err = S.extattr_set_link(tmpfile, "user", "myattr", "myvalue")
+    if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support setting extattr
+    assert(n, err)
+    assert_equal(n, #"myvalue")
+    local str = assert(S.extattr_get_link(tmpfile, "user", "myattr"))
+    assert_equal(str, "myvalue")
+    local ok = assert(S.extattr_delete_link(tmpfile, "user", "myattr"))
+    local str, err = S.extattr_get_link(tmpfile, "user", "myattr")
+    assert(not str and err.NOATTR)
+    assert(S.unlink(tmpfile))
+  end,
 ]]
 }
 

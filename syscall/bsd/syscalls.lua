@@ -168,6 +168,34 @@ if C.extattr_delete_fd then
   end
 end
 
+if C.extattr_set_file then
+   function S.extattr_set_file(file, attrnamespace, attrname, data, nbytes)
+     local str = data -- do not gc
+     if type(data) == "string" then data, nbytes = pt.char(str), #str end
+     return retnum(C.extattr_set_file(file, c.EXTATTR_NAMESPACE[attrnamespace], attrname, data, nbytes or #data))
+   end
+end
+
+if C.extattr_delete_file then
+  function S.extattr_delete_file(file, attrnamespace, attrname)
+    return retbool(C.extattr_delete_file(file, c.EXTATTR_NAMESPACE[attrnamespace], attrname))
+  end
+end
+
+if C.extattr_set_link then
+   function S.extattr_set_link(file, attrnamespace, attrname, data, nbytes)
+     local str = data -- do not gc
+     if type(data) == "string" then data, nbytes = pt.char(str), #str end
+     return retnum(C.extattr_set_link(file, c.EXTATTR_NAMESPACE[attrnamespace], attrname, data, nbytes or #data))
+   end
+end
+
+if C.extattr_delete_link then
+  function S.extattr_delete_link(file, attrnamespace, attrname)
+    return retbool(C.extattr_delete_link(file, c.EXTATTR_NAMESPACE[attrnamespace], attrname))
+  end
+end
+
 return S
 
 end
