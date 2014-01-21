@@ -679,6 +679,92 @@ if C.nanosleep then
   end
 end
 
+-- this is recommended way to size buffers for xattr
+local function growattrbuf(f, a, b)
+  local len = 512
+  local buffer = t.buffer(len)
+  local ret, err
+  repeat
+    if b then
+      ret, err = f(a, b, buffer, len)
+    else
+      ret, err = f(a, buffer, len)
+    end
+    ret = tonumber(ret)
+    if ret == -1 and (err or errno()) ~= c.E.RANGE then return nil, t.error(err or errno()) end
+    if ret == -1 then
+      len = len * 2
+      buffer = t.buffer(len)
+    end
+  until ret >= 0
+
+  return ffi.string(buffer, ret)
+end
+
+local function lattrbuf(sys, a)
+  local s, err = growattrbuf(sys, a)
+  if not s then return nil, err end
+  local tab = h.split('\0', s)
+  tab[#tab] = nil -- there is a trailing \0 so one extra
+  return tab
+end
+
+if C.listxattr then -- if this exists, assume all do
+function S.listxattr(path) return lattrbuf(C.listxattr, path) end
+function S.llistxattr(path) return lattrbuf(C.llistxattr, path) end
+function S.flistxattr(fd) return lattrbuf(C.flistxattr, getfd(fd)) end
+
+function S.setxattr(path, name, value, flags)
+  return retbool(C.setxattr(path, name, value, #value, c.XATTR[flags]))
+end
+function S.lsetxattr(path, name, value, flags)
+  return retbool(C.lsetxattr(path, name, value, #value, c.XATTR[flags]))
+end
+function S.fsetxattr(fd, name, value, flags)
+  return retbool(C.fsetxattr(getfd(fd), name, value, #value, c.XATTR[flags]))
+end
+
+function S.getxattr(path, name) return growattrbuf(C.getxattr, path, name) end
+function S.lgetxattr(path, name) return growattrbuf(C.lgetxattr, path, name) end
+function S.fgetxattr(fd, name) return growattrbuf(C.fgetxattr, getfd(fd), name) end
+
+function S.removexattr(path, name) return retbool(C.removexattr(path, name)) end
+function S.lremovexattr(path, name) return retbool(C.lremovexattr(path, name)) end
+function S.fremovexattr(fd, name) return retbool(C.fremovexattr(getfd(fd), name)) end
+
+-- helper function to set and return attributes in tables
+-- TODO this would make more sense as types?
+-- TODO listxattr should return an iterator not a table?
+local function xattr(list, get, set, remove, path, t)
+  local l, err = list(path)
+  if not l then return nil, err end
+  if not t then -- no table, so read
+    local r = {}
+    for _, name in ipairs(l) do
+      r[name] = get(path, name) -- ignore errors
+    end
+    return r
+  end
+  -- write
+  for _, name in ipairs(l) do
+    if t[name] then
+      set(path, name, t[name]) -- ignore errors, replace
+      t[name] = nil
+    else
+      remove(path, name)
+    end
+  end
+  for name, value in pairs(t) do
+    set(path, name, value) -- ignore errors, create
+  end
+  return true
+end
+
+function S.xattr(path, t) return xattr(S.listxattr, S.getxattr, S.setxattr, S.removexattr, path, t) end
+function S.lxattr(path, t) return xattr(S.llistxattr, S.lgetxattr, S.lsetxattr, S.lremovexattr, path, t) end
+function S.fxattr(fd, t) return xattr(S.flistxattr, S.fgetxattr, S.fsetxattr, S.fremovexattr, fd, t) end
+end -- if C.listxattr
+
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 -- Freebsd has a syscall, other OSs use /dev/ptmx
 if C.posix_openpt then
