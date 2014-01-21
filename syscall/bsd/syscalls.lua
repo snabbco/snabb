@@ -123,7 +123,6 @@ end
 -- TODO move these to FreeBSD only as apparently NetBSD deprecates the non Linux xattr interfaces
 -- although there are no man pages for the Linux ones...
 -- doc says behaves like read, write, slightly unclear if that means can just use fixed size buffer and iterate instead
--- maybe use helper function as in Linux for sizing
 
 --[[ TODO
 ssize_t extattr_list_fd(int fd, int attrnamespace, void *data, size_t nbytes);
