@@ -76,7 +76,7 @@ local fdmethods = {'dup', 'dup2', 'dup3', 'read', 'write', 'pread', 'pwrite',
                    'preadv', 'pwritev', 'epoll_pwait', 'ioctl', 'flock', 'fpathconf',
                    'grantpt', 'unlockpt', 'ptsname', 'tcgetattr', 'tcsetattr', 'isatty',
                    'tcsendbreak', 'tcdrain', 'tcflush', 'tcflow', 'tcgetsid',
-                   'fchflags', 'fchroot', 'fsync_range', 'kevent', 'paccept', 'fktrace', -- netbsd/bsd only
+                   'fchflags', 'fchroot', 'fsync_range', 'kevent', 'paccept', 'fktrace', -- bsd only
                    'pdgetpid', 'pdkill' -- freebsd only
                    }
 local fmeth = {}
@@ -114,6 +114,10 @@ fmeth.chflags = S.fchflags
 fmeth.chroot = S.fchroot
 fmeth.sync_range = S.fsync_range
 fmeth.ktrace = S.fktrace
+-- no point having fd in name - bsd only
+fmeth.extattr_get = S.extattr_get_fd
+fmeth.extattr_set = S.extattr_set_fd
+fmeth.extattr_delete = S.extattr_delete_fd
 
 local function nogc(d) return ffi.gc(d, nil) end
 

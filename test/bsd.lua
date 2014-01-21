@@ -241,20 +241,38 @@ test.bsd_extattr = {
     if not S.extattr_get_fd then error "skipped" end
     local fd = assert(S.creat(tmpfile, "rwxu"))
     assert(S.unlink(tmpfile))
--- TODO allow as a method for fd
-    local n, err = S.extattr_get_fd(fd, "user", "myattr", false) -- false does raw call with no buffer to return length
+    local n, err = fd:extattr_get("user", "myattr", false) -- false does raw call with no buffer to return length
     assert(not n and err.NOATTR)
-    local n, err = S.extattr_set_fd(fd, "user", "myattr", "myvalue")
+    local n, err = fd:extattr_set("user", "myattr", "myvalue")
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support setting extattr
     assert(n, err)
     assert_equal(n, #"myvalue")
-    local str = assert(S.extattr_get_fd(fd, "user", "myattr"))
+    local str = assert(fd:extattr_get("user", "myattr"))
     assert_equal(str, "myvalue")
-    local ok = assert(S.extattr_delete_fd(fd, "user", "myattr"))
-    local str, err = S.extattr_get_fd(fd, "user", "myattr")
+    local ok = assert(fd:extattr_delete("user", "myattr"))
+    local str, err = fd:extattr_get("user", "myattr")
     assert(not str and err.NOATTR)
     assert(fd:close())
   end,
+--[[
+  test_extattr_getsetdel_file = function()
+    if not S.extattr_get_fd then error "skipped" end
+    local fd = assert(S.creat(tmpfile, "rwxu"))
+    assert(fd:close())
+    local n, err = S.extattr_get_file(tmpfile, "user", "myattr", false) -- false does raw call with no buffer to return length
+    assert(not n and err.NOATTR)
+    local n, err = S.extattr_set_file(tmpfile, "user", "myattr", "myvalue")
+    if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support setting extattr
+    assert(n, err)
+    assert_equal(n, #"myvalue")
+    local str = assert(S.extattr_get_file(tmpfile, "user", "myattr"))
+    assert_equal(str, "myvalue")
+    local ok = assert(S.extattr_delete_file(tmpfile, "user", "myattr"))
+    local str, err = S.extattr_get_file(tmpfile, "user", "myattr")
+    assert(not str and err.NOATTR)
+    assert(S.unlink(tmpfile))
+  end,
+]]
 }
 
 -- skip as no processes in rump
