@@ -3084,11 +3084,13 @@ c.E = strflag(arch.E or {
   RFKILL        = 132,
 })
 
+if arch.EDEADLOCK then c.E.DEADLOCK = arch.EDEADLOCK end
+
 -- alternate names
 c.E.WOULDBLOCK    = c.E.AGAIN
-c.E.DEADLOCK      = c.E.DEADLK
 c.E.NOATTR        = c.E.NODATA
 c.E.NOTSUP        = c.E.OPNOTSUPP
+if not c.E.DEADLOCK then c.E.DEADLOCK = c.E.DEADLK end
 
 c.SWAP_FLAG = swapflags {
   PREFER       = 0x8000,

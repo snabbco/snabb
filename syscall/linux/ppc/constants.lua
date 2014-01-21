@@ -13,6 +13,8 @@ local octal = h.octal
 
 local arch = {}
 
+arch.EDEADLOCK = 58 -- only error that differs from generic
+
 arch.SO = { -- 16-21 differ for ppc
   DEBUG       = 1,
   REUSEADDR   = 2,
