@@ -303,6 +303,9 @@ print [[
 #include <linux/vfio.h>
 #include <linux/seccomp.h>
 
+/* defined in attr/xattr.h */
+#define ENOATTR ENODATA
+
 int ret;
 
 void sassert(int a, int b, char *n) {
