@@ -3085,9 +3085,9 @@ c.E = strflag(arch.E or {
 })
 
 -- alternate names
-c.E.WOULDBLOCK    = c.E.EAGAIN
-c.E.DEADLOCK      = c.E.EDEADLK
-c.E.NOATTR        = c.E.ENODATA
+c.E.WOULDBLOCK    = c.E.AGAIN
+c.E.DEADLOCK      = c.E.DEADLK
+c.E.NOATTR        = c.E.NODATA
 c.E.NOTSUP        = c.E.OPNOTSUPP
 
 c.SWAP_FLAG = swapflags {

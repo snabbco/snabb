@@ -1767,6 +1767,16 @@ test_termios = {
 
 test_xattr = {
   teardown = clean,
+  test_xattr_empty_fd = function()
+    if not S.fgetxattr then error "skipped" end
+    local fd = assert(S.creat(tmpfile, "rwxu"))
+    assert(S.unlink(tmpfile))
+    local n, err = fd:fgetxattr("user.myattr")
+    assert(not n, "expect failure ")
+    assert(not n and (err.NOATTR or err.NOSYS or err.NOTSUP))
+    assert(not n, err)
+    assert(fd:close())
+  end,
   test_xattr = function()
     if not S.listxattr then error "skipped" end
     assert(S.creat(tmpfile, "0666"))

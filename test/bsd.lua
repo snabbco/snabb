@@ -232,8 +232,7 @@ test.bsd_extattr = {
     if not S.extattr_get_fd then error "skipped" end
     local fd = assert(S.creat(tmpfile, "rwxu"))
     assert(S.unlink(tmpfile))
--- TODO allow as a method for fd
-    local n, err = S.extattr_get_fd(fd, "user", "myattr", false) -- false does raw call with no buffer to return length
+    local n, err = fd:extattr_get("user", "myattr", false) -- false does raw call with no buffer to return length
     assert(not n and err.NOATTR)
     assert(fd:close())
   end,
