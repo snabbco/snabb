@@ -1771,7 +1771,8 @@ test_xattr = {
     if not S.listxattr then error "skipped" end
     assert(S.creat(tmpfile, "0666"))
     local l, err = S.listxattr(tmpfile)
-    if not l and err.NOSYS then error "skipped" end
+    if not l and (err.NOSYS or err.NOTSUP) then error "skipped" end
+    assert(l, err)
     local fd = assert(S.open(tmpfile, "rdwr"))
     assert(#l == 0 or (#l == 1 and l[1] == "security.selinux"), "expect no xattr on new file")
     l = assert(S.llistxattr(tmpfile))
