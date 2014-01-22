@@ -216,22 +216,37 @@ local function parse_extattr(buf, n)
   return tab
 end
 
+local function extattr_list_helper(fn, ff, attrnamespace, data, nbytes)
+  attrnamespace = c.EXTATTR_NAMESPACE[attrnamespace]
+  if data == false then return retnum(fn(ff, attrnamespace, nil, 0)) end
+  if data then
+    return retnum(fn(ff, attrnamespace, data, nbytes or #data)) -- TODO should we parse?
+  end
+  local nbytes, err = fn(ff, attrnamespace, nil, 0)
+  nbytes = tonumber(nbytes)
+  if nbytes == -1 then return nil, t.error(err or errno()) end
+  local data = t.buffer(nbytes)
+  local n, err = fn(ff, attrnamespace, data, nbytes)
+  n = tonumber(n)
+  if n == -1 then return nil, t.error(err or errno()) end
+  return parse_extattr(data, n)
+end
+
 if C.extattr_list_fd then
   function S.extattr_list_fd(fd, attrnamespace, data, nbytes)
-    fd = getfd(fd)
-    attrnamespace = c.EXTATTR_NAMESPACE[attrnamespace]
-    if data or data == false then
-      if data == false then data, nbytes = nil, 0 end
-      return retnum(C.extattr_list_fd(fd, attrnamespace, data, nbytes or #data)) -- TODO should we parse?
-    end
-    local nbytes, err = C.extattr_list_fd(fd, attrnamespace, nil, 0)
-    nbytes = tonumber(nbytes)
-    if nbytes == -1 then return nil, t.error(err or errno()) end
-    local data = t.buffer(nbytes)
-    local n, err = C.extattr_list_fd(fd, attrnamespace, data, nbytes)
-    n = tonumber(n)
-    if n == -1 then return nil, t.error(err or errno()) end
-    return parse_extattr(data, n)
+    return extattr_list_helper(C.extattr_list_fd, getfd(fd), attrnamespace, data, nbytes)
+  end
+end
+
+if C.extattr_list_file then
+  function S.extattr_list_file(file, attrnamespace, data, nbytes)
+    return extattr_list_helper(C.extattr_list_file, file, attrnamespace, data, nbytes)
+  end
+end
+
+if C.extattr_list_link then
+  function S.extattr_list_link(file, attrnamespace, data, nbytes)
+    return extattr_list_helper(C.extattr_list_link, file, attrnamespace, data, nbytes)
   end
 end
 

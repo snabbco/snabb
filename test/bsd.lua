@@ -304,6 +304,40 @@ test.bsd_extattr = {
     assert((attrs[1] == "myattr" and attrs[2] == "newattr") or (attrs[2] == "myattr" and attrs[1] == "newattr"))
     assert(fd:close())
   end,
+  test_extattr_list_file = function()
+    if not S.extattr_list_file then error "skipped" end
+    local fd = assert(S.creat(tmpfile, "rwxu"))
+    local attrs, err = S.extattr_list_file(tmpfile, "user")
+    if not attrs and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
+    assert(attrs, err)
+    assert_equal(#attrs, 0)
+    assert(S.extattr_set_file(tmpfile, "user", "myattr", "myvalue"))
+    local attrs = assert(S.extattr_list_file(tmpfile, "user"))
+    assert_equal(#attrs, 1)
+    assert_equal(attrs[1], "myattr")
+    assert(S.extattr_set_file(tmpfile, "user", "newattr", "newvalue"))
+    local attrs = assert(S.extattr_list_file(tmpfile, "user"))
+    assert_equal(#attrs, 2)
+    assert((attrs[1] == "myattr" and attrs[2] == "newattr") or (attrs[2] == "myattr" and attrs[1] == "newattr"))
+    assert(S.unlink(tmpfile))
+  end,
+  test_extattr_list_link = function()
+    if not S.extattr_list_file then error "skipped" end
+    assert(S.symlink(tmpfile2, tmpfile))
+    local attrs, err = S.extattr_list_link(tmpfile, "user")
+    if not attrs and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
+    assert(attrs, err)
+    assert_equal(#attrs, 0)
+    assert(S.extattr_set_link(tmpfile, "user", "myattr", "myvalue"))
+    local attrs = assert(S.extattr_list_link(tmpfile, "user"))
+    assert_equal(#attrs, 1)
+    assert_equal(attrs[1], "myattr")
+    assert(S.extattr_set_link(tmpfile, "user", "newattr", "newvalue"))
+    local attrs = assert(S.extattr_list_link(tmpfile, "user"))
+    assert_equal(#attrs, 2)
+    assert((attrs[1] == "myattr" and attrs[2] == "newattr") or (attrs[2] == "myattr" and attrs[1] == "newattr"))
+    assert(S.unlink(tmpfile))
+  end,
 }
 
 -- skip as no processes in rump
