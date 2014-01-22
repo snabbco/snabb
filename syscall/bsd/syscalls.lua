@@ -232,7 +232,7 @@ if C.extattr_list_fd then
     local n, err = C.extattr_list_fd(fd, attrnamespace, data, nbytes)
     n = tonumber(n)
     if n == -1 then return nil, t.error(err or errno()) end
-    return parse_extattr(buffer, n)
+    return parse_extattr(data, n)
   end
 end
 
