@@ -118,6 +118,7 @@ fmeth.ktrace = S.fktrace
 fmeth.extattr_get = S.extattr_get_fd
 fmeth.extattr_set = S.extattr_set_fd
 fmeth.extattr_delete = S.extattr_delete_fd
+fmeth.extattr_list = S.extattr_list_fd
 
 local function nogc(d) return ffi.gc(d, nil) end
 

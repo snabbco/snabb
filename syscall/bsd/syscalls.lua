@@ -206,6 +206,36 @@ if C.extattr_delete_link then
   end
 end
 
+local function parse_extattr(buf, n)
+  local tab = {}
+  local i = 0
+  while n > 0 do
+    local len = buf[i]
+    tab[#tab + 1] = ffi.string(buf + i + 1, len)
+    i, n = i + (len + 1), n - (len + 1)
+  end
+  return tab
+end
+
+if C.extattr_list_fd then
+  function S.extattr_list_fd(fd, attrnamespace, data, nbytes)
+    fd = getfd(fd)
+    attrnamespace = c.EXTATTR_NAMESPACE[attrnamespace]
+    if data or data == false then
+      if data == false then data, nbytes = nil, 0 end
+      return retnum(C.extattr_list_fd(fd, attrnamespace, data, nbytes or #data)) -- TODO should we parse?
+    end
+    local nbytes, err = C.extattr_list_fd(fd, attrnamespace, nil, 0)
+    nbytes = tonumber(nbytes)
+    if nbytes == -1 then return nil, t.error(err or errno()) end
+    local data = t.buffer(nbytes)
+    local n, err = C.extattr_list_fd(fd, attrnamespace, data, nbytes)
+    n = tonumber(n)
+    if n == -1 then return nil, t.error(err or errno()) end
+    return parse_extattr(buffer, n)
+  end
+end
+
 return S
 
 end
