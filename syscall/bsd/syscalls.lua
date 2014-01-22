@@ -207,8 +207,7 @@ if C.extattr_delete_link then
 end
 
 local function parse_extattr(buf, n)
-  local tab = {}
-  local i = 0
+  local tab, i = {}, 0
   while n > 0 do
     local len = buf[i]
     tab[#tab + 1] = ffi.string(buf + i + 1, len)
