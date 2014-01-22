@@ -124,12 +124,6 @@ end
 -- although there are no man pages for the Linux ones...
 -- doc says behaves like read, write, slightly unclear if that means can just use fixed size buffer and iterate instead
 
---[[ TODO
-ssize_t extattr_list_fd(int fd, int attrnamespace, void *data, size_t nbytes);
-ssize_t extattr_list_file(const char *path, int attrnamespace, void *data, size_t nbytes);
-ssize_t extattr_list_link(const char *path, int attrnamespace, void *data, size_t nbytes);
-]]
-
 local function extattr_get_helper(fn, ff, attrnamespace, attrname, data, nbytes)
   attrnamespace = c.EXTATTR_NAMESPACE[attrnamespace]
   if data or data == false then
