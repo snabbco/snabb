@@ -71,7 +71,7 @@ assert(s:bind(sa))
 
 assert(s:listen(128))
 
-ep = poll:init()
+local ep = poll:init()
 
 ep:add(s)
 
