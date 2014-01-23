@@ -200,3 +200,16 @@ function selftest ()
 --    assert(basename('/etc/rc2.d/S99rc.local') == 'S99rc.local', "wrong basename")
 end
 
+-- Iterator factory for splitting a string by pattern
+-- (http://lua-users.org/lists/lua-l/2006-12/msg00414.html)
+function string:split(pat)
+  local st, g = 1, self:gmatch("()("..pat..")")
+  local function getter(self, segs, seps, sep, cap1, ...)
+    st = sep and seps + #sep
+    return self:sub(segs, (seps or 0) - 1), cap1 or sep, ...
+  end
+  local function splitter(self)
+    if st then return getter(self, st, g()) end
+  end
+  return splitter, self
+end

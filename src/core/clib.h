@@ -33,3 +33,9 @@ void *malloc(int size);
 int64_t readlink(const char *path, char *buf, size_t bufsiz);
 char *dirname(char *path);
 char *basename(char *path);
+
+// Conversions between host and network byte order
+uint16_t htons(uint16_t);
+uint16_t ntohs(uint16_t);
+uint32_t htonl(uint32_t);
+uint32_t ntohl(uint32_t);

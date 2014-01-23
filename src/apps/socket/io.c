@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <strings.h>
 #include <stdio.h>
+#include <errno.h>
 #include "core/packet.h"
 
 int send_packet(int fd, struct packet *p) {

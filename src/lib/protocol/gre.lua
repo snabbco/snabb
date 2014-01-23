@@ -2,7 +2,6 @@ require("class")
 local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
-local ethernet = require("lib.protocol.ethernet")
 
 -- Only support minimal header for now
 local gre_t = ffi.typeof[[

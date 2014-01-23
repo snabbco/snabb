@@ -13,6 +13,7 @@ struct {
 } __attribute__((packed))
 ]]
 
+local mac_addr_t = ffi.typeof("uint8_t[6]")
 local ether_header_ptr_t = ffi.typeof("$ *", ether_header_t)
 
 local ethernet = subClass(header)
@@ -32,6 +33,30 @@ function ethernet:_init_new(src, dst, type)
    ffi.copy(header.ether_shost, src, 6)
    header.ether_type = C.htons(type)
    self._header = header
+end
+
+-- Convert printable address to numeric
+function ethernet:pton(p)
+   local result = mac_addr_t()
+   local i = 0
+   for v in p:split(":") do
+      if string.match(v:lower(), '^[0-9a-f][0-9a-f]$') then
+	 result[i] = tonumber("0x"..v)
+      else
+	 error("invalid mac address "..p)
+      end
+      i = i+1
+   end
+   assert(i == 6, "invalid mac address "..p)
+   return result
+end
+
+function ethernet:ntop(n)
+   local p = {}
+   for i = 0, 5, 1 do
+      table.insert(p, string.format("%02x", n[i]))
+   end
+   return table.concat(p, ":")
 end
 
 -- Instance methods

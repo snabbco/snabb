@@ -123,7 +123,7 @@ function SimpleIPv6:push ()
 	       ffi.copy(new_ipv6.smac, self.own_mac, 6)
 	       new_ipv6.ethertype = 0xDD86
 	       new_ipv6.flow_id = 0x60 -- version=6
-	       new_ipv6.payload_length = htons(size.icmpv6expired + excerpt_len)
+	       new_ipv6.payload_length = C.htons(size.icmpv6expired + excerpt_len)
 	       new_ipv6.next_header = 58 -- icmpv6
 	       new_ipv6.hop_limit = 255
 	       ffi.copy(new_ipv6.src_ip, self.own_ip, 16)
@@ -161,16 +161,9 @@ function checksum_icmpv6 (ipv6, icmpv6, icmpv6_len)
    csum = lib.update_csum(ipv6_ptr + ffi.offsetof(ipv6_t, 'payload_length'), 2, csum)
    -- ICMPv6 checksum
    icmpv6.checksum = 0
-   csum = lib.update_csum(icmpv6, htons(ipv6.payload_length), csum)
+   csum = lib.update_csum(icmpv6, C.htons(ipv6.payload_length), csum)
    csum = csum + 58
-   icmpv6.checksum = htons(lib.finish_csum(csum))
-end
-
-function htons (n)
-   return bit.lshift(bit.band(n, 0xff), 8) + bit.rshift(n, 8)
-end
-function ntohs (n)
-   return htons(n)
+   icmpv6.checksum = C.htons(lib.finish_csum(csum))
 end
 
 function selftest ()

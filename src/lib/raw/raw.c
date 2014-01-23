@@ -18,7 +18,7 @@ int open_raw(const char *name)
     struct ifreq ifr;
     struct sockaddr_ll sll;
     int fd;
-    if ((fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) < 0) {
+    if ((fd = socket(AF_PACKET, SOCK_RAW | SOCK_NONBLOCK, htons(ETH_P_ALL))) < 0) {
         perror("open raw socket");
         return -1;
     }
@@ -35,12 +35,5 @@ int open_raw(const char *name)
       perror("bind raw socket to interface");
       return -1;
     }
-    /* if (setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, (void *)&ifr, */
-    /* 		   sizeof(ifr)) < 0) { */
-    /*     perror("bind raw socket to device"); */
-    /* 	close(fd); */
-    /*     return -1; */
-    /* } */
-    printf("open_raw %d\n", fd);
     return fd;
 }

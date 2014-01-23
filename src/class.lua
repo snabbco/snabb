@@ -1,6 +1,19 @@
--- Support for basic OO programming.
--- Snarfed from http://lua-users.org/wiki/InheritanceTutorial
-
+-- Support for basic OO programming.  Copied from
+-- http://lua-users.org/wiki/InheritanceTutorial with a few
+-- modifications.
+--
+-- Usage:
+-- local require("class")
+-- local myclass = subClass(baseClass | nil, [constructor_method, ...])
+--
+-- myclass inherits all public methods and class variables from
+-- baseClass as well as all constructor methods. The default
+-- constructor method is called new().  Each constructor executes the
+-- method called _init_<construcor> if it exists, where <constructor>
+-- is the name of the constructor method.  All arguments supplied to
+-- the constructor are passed unmodified to the corresponding _init
+-- method.
+--
 function subClass(baseClass, ... )
    local new_class = {}
    local class_mt = { __index = new_class }

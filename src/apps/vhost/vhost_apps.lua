@@ -9,12 +9,19 @@ local basic_apps = require("apps.basic.basic_apps")
 
 TapVhost = {}
 
-function TapVhost:new (ifname)
-   local dev = vhost.new(ifname)
-   return setmetatable({ dev = dev }, {__index = TapVhost})
+function TapVhost:new ()
+   self.__index = self
+   return setmetatable({}, self)
+end
+
+function TapVhost:open (ifname)
+   assert(ifname)
+   self.dev = vhost.new(ifname)
+   return self
 end
 
 function TapVhost:pull ()
+   assert(self.dev)
    self.dev:sync_receive()
    self.dev:sync_transmit()
    local l = self.output.tx
@@ -28,6 +35,7 @@ function TapVhost:pull ()
 end
 
 function TapVhost:push ()
+   assert(self.dev)
    local l = self.input.rx
    if l == nil then return end
    while not app.empty(l) and self.dev:can_transmit() do
@@ -39,7 +47,7 @@ end
 
 function selftest ()
    app.apps.source   = app.new(basic_apps.Source)
-   app.apps.tapvhost = app.new(TapVhost:new("snabb%d"))
+   app.apps.tapvhost = app.new(TapVhost:new():open("snabb%d"))
    app.apps.sink     = app.new(basic_apps.Sink)
    app.connect("source", "out", "tapvhost", "rx")
    app.connect("tapvhost", "tx", "sink", "in")

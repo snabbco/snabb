@@ -25,6 +25,8 @@ local ipv6hdr_pseudo_t = ffi.typeof[[
       } __attribute__((packed))
 ]]
 
+local ipv6_addr_t = ffi.typeof("uint16_t[8]")
+
 local ipv6 = subClass(header)
 
 -- Class variables
@@ -46,6 +48,29 @@ function ipv6:_init_new(class, flow_label, next_header, hop_limit, src, dst)
    self._header = header
    self:next_header(next_header)
    self:hop_limit(hop_limit)
+end
+
+function ipv6:pton(p)
+   local result = ipv6_addr_t()
+   local i = 0
+   for v in p:split(":") do
+      if string.match(v:lower(), '^[0-9a-f]?[0-9a-f]?[0-9a-f]?[0-9a-f]$') then
+	 result[i] = C.htons(tonumber("0x"..v))
+      else
+	 error("invalid ipv6 address "..p.." "..v)
+      end
+      i = i+1
+   end
+   assert(i == 8, "invalid ipv6 address "..p.." "..i)
+   return result
+end
+
+function ipv6:ntop(n)
+   local p = {}
+   for i = 0, 7, 1 do
+      table.insert(p, string.format("%x", C.ntohs(n[i])))
+   end
+   return table.concat(p, ":")
 end
 
 -- Instance methods
