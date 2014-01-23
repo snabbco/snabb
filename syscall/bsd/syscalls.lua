@@ -122,7 +122,7 @@ end
 
 -- TODO move these to FreeBSD only as apparently NetBSD deprecates the non Linux xattr interfaces
 -- although there are no man pages for the Linux ones...
--- doc says behaves like read, write, slightly unclear if that means can just use fixed size buffer and iterate instead
+-- TODO doc says behaves like read, write, slightly unclear if that means can use fixed size buffer and iterate instead
 
 local function extattr_get_helper(fn, ff, attrnamespace, attrname, data, nbytes)
   attrnamespace = c.EXTATTR_NAMESPACE[attrnamespace]

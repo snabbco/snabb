@@ -338,6 +338,22 @@ test.bsd_extattr = {
     assert((attrs[1] == "myattr" and attrs[2] == "newattr") or (attrs[2] == "myattr" and attrs[1] == "newattr"))
     assert(S.unlink(tmpfile))
   end,
+  test_extattr_list_long = function()
+    if not S.extattr_list_fd then error "skipped" end
+    local fd = assert(S.creat(tmpfile, "rwxu"))
+    assert(S.unlink(tmpfile))
+    local attrs, err = fd:extattr_list("user")
+    if not attrs and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
+    assert(attrs, err)
+    assert_equal(#attrs, 0)
+    local count = 1000
+    for i = 1, count do
+      assert(fd:extattr_set("user", "myattr" .. i, "myvalue"))
+    end
+    local attrs = assert(fd:extattr_list("user"))
+    assert_equal(#attrs, count)
+    assert(fd:close())
+  end,
 }
 
 -- skip as no processes in rump
