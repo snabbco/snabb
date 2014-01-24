@@ -346,7 +346,7 @@ test.bsd_extattr = {
     if not attrs and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
     assert(attrs, err)
     assert_equal(#attrs, 0)
-    local count = 1000
+    local count = 100
     for i = 1, count do
       assert(fd:extattr_set("user", "myattr" .. i, "myvalue"))
     end
