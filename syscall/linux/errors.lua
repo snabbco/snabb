@@ -133,6 +133,7 @@ return {
   RFKILL = "Operation not possible due to RF-kill",
   -- only on some platforms
   DEADLOCK = "File locking deadlock error",
+  INIT = "Reserved EINIT", -- what is correct message?
   REMDEV = "Remote device", -- what is correct message?
 }
 
