@@ -133,13 +133,15 @@ c.E = strflag {
   CAPMODE       = 94,
 }
 
--- alternate names
-c.E.WOULDBLOCK    = c.E.AGAIN
-
-if abi.freebsd >=10 then
+if abi.freebsd >= 10 then
   c.E.NOTRECOVERABLE= 95
   c.E.OWNERDEAD     = 96
 end
+
+-- alternate names
+c.EALIAS = {
+  WOULDBLOCK    = c.E.AGAIN,
+}
 
 c.AF = strflag {
   UNSPEC      = 0,

@@ -93,7 +93,7 @@ return {
   NOPROTOOPT = "Protocol not available",
   PROTONOSUPPORT = "Protocol not supported",
   SOCKTNOSUPPORT = "Socket type not supported",
-  NOTSUP = "Operation not supported",
+  OPNOTSUPP = "Operation not supported",
   PFNOSUPPORT = "Protocol family not supported",
   AFNOSUPPORT = "Address family not supported by protocol",
   ADDRINUSE = "Address already in use",

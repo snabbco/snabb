@@ -137,8 +137,10 @@ c.E = strflag {
 }
 
 -- alternate names
-c.E.WOULDBLOCK    = c.E.EAGAIN
-c.E.DEADLOCK      = c.E.EDEADLK
+c.EALIAS = {
+  WOULDBLOCK    = c.E.AGAIN,
+  DEADLOCK      = c.E.EDEADLK,
+}
 
 c.AF = strflag {
   UNSPEC      = 0,

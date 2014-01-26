@@ -80,17 +80,24 @@ t.off1 = ffi.typeof("off_t[1]")
 t.uid1 = ffi.typeof("uid_t[1]")
 t.gid1 = ffi.typeof("gid_t[1]")
 
-local errsyms = {} -- reverse lookup
+local errsyms = {} -- reverse lookup by number
+local errnames = {} -- lookup error message by number
 for k, v in pairs(c.E) do
   errsyms[v] = k
+  errnames[v] = assert(c.errornames[k], "missing error name " .. k)
 end
 
+for k, v in pairs(c.EALIAS or {}) do
+  c.E[k] = v
+end
+c.EALIAS = nil
+
 mt.error = {
-  __tostring = function(e) return c.errornames[e.sym] end,
-  __index = function(t, k)
-    if k == 'sym' then return errsyms[t.errno] end
-    if k == 'lsym' then return errsyms[t.errno]:lower() end
-    if c.E[k] then return c.E[k] == t.errno end
+  __tostring = function(e) return errnames[e.errno] end,
+  __index = function(e, k)
+    if k == 'sym' then return errsyms[e.errno] end
+    if k == 'lsym' then return errsyms[e.errno]:lower() end
+    if c.E[k] then return c.E[k] == e.errno end
     error("invalid error " .. k)
   end,
   __new = function(tp, errno)

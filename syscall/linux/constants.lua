@@ -3084,13 +3084,17 @@ c.E = strflag(arch.E or {
   RFKILL        = 132,
 })
 
+-- ppc only redefines DEADLOCK, mips redefines all
 if arch.EDEADLOCK then c.E.DEADLOCK = arch.EDEADLOCK end
 
 -- alternate names
-c.E.WOULDBLOCK    = c.E.AGAIN
-c.E.NOATTR        = c.E.NODATA
-c.E.NOTSUP        = c.E.OPNOTSUPP
-if not c.E.DEADLOCK then c.E.DEADLOCK = c.E.DEADLK end
+c.EALIAS = {
+  WOULDBLOCK    = c.E.AGAIN,
+  NOATTR        = c.E.NODATA,
+  NOTSUP        = c.E.OPNOTSUPP,
+}
+-- for most architectures this is an alias, but not ppc, mips
+if not c.E.DEADLOCK then c.EALIAS.DEADLOCK = c.E.DEADLK end
 
 c.SWAP_FLAG = swapflags {
   PREFER       = 0x8000,
