@@ -30,22 +30,23 @@ if abi.arch == "mips" then abi.mipsabi = "o32" end -- only one supported now
 
 if abi.os == "bsd" or abi.os == "osx" then abi.bsd = true end -- some shared BSD functionality
 
--- BSD detection, we assume they all have a compatible sysctlbyname in libc, WIP
+-- Xen generally behaves like NetBSD, but our tests need to do rump-like setup; bit of a hack
 ffi.cdef[[
   int __ljsyscall_under_xen;
 ]]
-
--- Xen generally behaves like NetBSD, but our tests need to do rump-like setup; bit of a hack
 if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
 
+-- BSD detection, we assume they all have a compatible sysctlbyname in libc, WIP
 if not abi.xen and abi.os == "bsd" then
   ffi.cdef [[
   int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
   ]]
   local buf = ffi.new("char[32]")
   local lenp = ffi.new("unsigned long[1]", 32)
-  local ok = ffi.C.sysctlbyname("kern.ostype", buf, lenp, nil, 0)
-  if not ok then error("cannot identify BSD version") end
+  local ok, sysctlbyname = pcall(inlibc_fn, "sysctlbyname")
+  if not ok then error("cannot identify BSD version") end -- OpenBSD does not have sysctlbyname, need different version
+  local ok = sysctlbyname("kern.ostype", buf, lenp, nil, 0)
+  if ok ~= 0 then error("cannot identify BSD version") end
   abi.os = ffi.string(buf):lower()
 
   -- FreeBSD ABI version
@@ -53,7 +54,7 @@ if not abi.xen and abi.os == "bsd" then
     local buf = ffi.new("int[1]")
     local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
     local ok = ffi.C.sysctlbyname("kern.osreldate", buf, lenp, nil, 0)
-    if not ok then error("canot identify FreeBSD version") end
+    if ok ~= 0 then error("canot identify FreeBSD version") end
     local vs = tostring(buf[0])
     abi.freebsd = tonumber(vs:sub(1, #vs - 5)) -- major version ie 9, 10
   end
