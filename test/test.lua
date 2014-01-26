@@ -138,7 +138,7 @@ end
 
 if arg[1] == "coverage" then debug.sethook(coverage, "lc") end
 
--- TODO make locals
+-- TODO make locals in each test
 local teststring = "this is a test string"
 local size = 512
 local buf = t.buffer(size)
@@ -407,6 +407,8 @@ test_read_write = {
   teardown = clean,
   test_read = function()
     local fd = assert(S.open("/dev/zero"))
+    local size = 64
+    local buf = t.buffer(size)
     for i = 0, size - 1 do buf[i] = 255 end
     local n = assert(fd:read(buf, size))
     assert(n >= 0, "should not get error reading from /dev/zero")
