@@ -368,6 +368,8 @@ arch.SO = {
 
 arch.SO.STYLE = arch.SO.TYPE
 
+arch.SOLSOCKET = 0xffff -- remainder of SOL values same
+
 arch.F = {
   DUPFD       = 0,
   GETFD       = 1,

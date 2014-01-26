@@ -388,7 +388,6 @@ c.SCM = strflag {
 -- setsockopt
 c.SOL = strflag {
   IP         = 0,
-  SOCKET     = 1,
   IPV6       = 41,
   ICMPV6     = 58,
   RAW        = 255,
@@ -399,6 +398,8 @@ c.SOL = strflag {
   AAL        = 265,
   IRDA       = 266,
 }
+
+if arch.SOLSOCKET then c.SOL.SOCKET = arch.SOLSOCKET else c.SOL.SOCKET = 1 end
 
 c.SO = strflag(arch.SO or {
   DEBUG       = 1,
