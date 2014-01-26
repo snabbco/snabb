@@ -82,10 +82,10 @@ arch.O = {
   NOCTTY   = 0x0800,
   LARGEFILE= 0x2000,
   DIRECT   = 0x8000,
-  DIRECTORY= 0x10000
+  DIRECTORY= 0x10000,
   NOFOLLOW = 0x20000,
   NOATIME  = 0x40000,
-  CLOEXEC  = octal '02000000'
+  CLOEXEC  = octal '02000000',
 }
 
 arch.O_SYNC = __O_SYNC + arch.O.DSYNC -- compatibility, see notes in header, we do not expose __O_SYNC TODO check if this is best way
