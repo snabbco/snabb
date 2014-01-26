@@ -135,5 +135,6 @@ return {
   DEADLOCK = "File locking deadlock error",
   INIT = "Reserved EINIT", -- what is correct message?
   REMDEV = "Remote device", -- what is correct message?
+  HWPOISON = "Reserved EHWPOISON", -- what is correct message?
 }
 
