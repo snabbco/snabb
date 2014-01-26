@@ -35,6 +35,7 @@ local function fixup_constants(abi, c)
   c.syscall = nil
   c.errornames = nil
   c.OMQATTR = nil
+  c.EALIAS = nil
 
   -- misleading, Musl has higher than Linux
   c.HOST_NAME_MAX = nil
