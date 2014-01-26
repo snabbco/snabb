@@ -1774,7 +1774,7 @@ test_xattr = {
     local fd = assert(S.creat(tmpfile, "rwxu"))
     assert(S.unlink(tmpfile))
     local n, err = fd:fgetxattr("user.myattr")
-    assert(not n, "expect failure ")
+    assert(not n, "expect failure")
     assert(not n and (err.NOATTR or err.NOSYS or err.NOTSUP))
     assert(not n, err)
     assert(fd:close())
