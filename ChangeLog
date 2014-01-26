@@ -4,6 +4,8 @@
 + FreeBSD 9 support
 + Linux MIPS fixes
 + more timer, clock and signal functions for BSDs.
++ error message fixes
++ FreeBSD, OSX extended attribute support
 
     0.9 release
 
