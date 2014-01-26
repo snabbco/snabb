@@ -366,7 +366,7 @@ c.SFD = multiflags(arch.SFD or {
 })
 
 -- sockets note mix of single and multiple flags TODO code to handle temporarily using multi which is kind of ok
-c.SOCK = multiflags {
+c.SOCK = multiflags(arch.SOCK or {
   STREAM    = 1,
   DGRAM     = 2,
   RAW       = 3,
@@ -377,7 +377,7 @@ c.SOCK = multiflags {
 
   CLOEXEC  = octal('02000000'),
   NONBLOCK = octal('04000'),
-}
+})
 
 -- misc socket constants
 c.SCM = strflag {

@@ -49,6 +49,19 @@ arch.SIG = {
   XFSZ = 31,
 }
 
+arch.SOCK = {
+  DGRAM     = 1,
+  STREAM    = 2,
+  RAW       = 3,
+  RDM       = 4,
+  SEQPACKET = 5,
+  DCCP      = 6,
+  PACKET    = 10,
+
+  CLOEXEC  = octal('02000000'),
+  NONBLOCK = octal('0200'),
+}
+
 arch.MAP = {
   SHARED     = 0x001,
   PRIVATE    = 0x002,
