@@ -44,10 +44,11 @@ if not abi.xen and abi.os == "bsd" then
   local buf = ffi.new("char[32]")
   local lenp = ffi.new("unsigned long[1]", 32)
   local ok, sysctlbyname = pcall(inlibc_fn, "sysctlbyname")
-  if not ok then error("cannot identify BSD version") end -- OpenBSD does not have sysctlbyname, need different version
-  local ok = sysctlbyname("kern.ostype", buf, lenp, nil, 0)
-  if ok ~= 0 then error("cannot identify BSD version") end
-  abi.os = ffi.string(buf):lower()
+  if not ok then abi.os = "unknownbsd" else
+    local ok = sysctlbyname("kern.ostype", buf, lenp, nil, 0)
+    if ok ~= 0 then error("cannot identify BSD version") end
+    abi.os = ffi.string(buf):lower()
+  end
 
   -- FreeBSD ABI version
   if abi.os == "freebsd" then
