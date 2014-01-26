@@ -133,5 +133,6 @@ return {
   RFKILL = "Operation not possible due to RF-kill",
   -- only on some platforms
   DEADLOCK = "File locking deadlock error",
+  REMDEV = "Remote device", -- what is correct message?
 }
 
