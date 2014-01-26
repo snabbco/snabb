@@ -131,5 +131,7 @@ return {
   OWNERDEAD = "Owner died",
   NOTRECOVERABLE = "State not recoverable",
   RFKILL = "Operation not possible due to RF-kill",
+  -- only on some platforms
+  DEADLOCK = "File locking deadlock error",
 }
 
