@@ -6,6 +6,7 @@
 + more timer, clock and signal functions for BSDs.
 + error message fixes
 + FreeBSD, OSX extended attribute support
++ Linux PPC fixes
 
     0.9 release
 
