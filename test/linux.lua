@@ -806,6 +806,7 @@ test.aio = {
   test_aio_setup = function()
     local ctx, err = S.io_setup(8)
     if not ctx and err.NOSYS then error "skipped" end
+    assert(ctx, err)
     assert(S.io_destroy(ctx))
   end,
 --[[ -- temporarily disabled gc and methods on aio
@@ -822,6 +823,7 @@ test.aio = {
   test_aio = function()
     local ctx, err = S.io_setup(8)
     if not ctx and err.NOSYS then error "skipped" end
+    assert(ctx, err)
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- use O_DIRECT or aio may not work
@@ -846,6 +848,7 @@ test.aio = {
   test_aio_error = function()
     local ctx, err = S.io_setup(8)
     if not ctx and err.NOSYS then error "skipped" end
+    assert(ctx, err)
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- use O_DIRECT or aio may not work
@@ -872,6 +875,7 @@ test.aio = {
   test_aio_fdsync = function()
     local ctx, err = S.io_setup(8)
     if not ctx and err.NOSYS then error "skipped" end
+    assert(ctx, err)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- use O_DIRECT or aio may not work
     local a = t.iocb_array{{opcode = "fdsync", data = 42, fildes = fd, buf = nil, nbytes = 0, offset = 0}}
     local ret = assert(S.io_submit(ctx, a))
@@ -891,6 +895,7 @@ test.aio = {
   test_aio_cancel = function()
     local ctx, err = S.io_setup(8)
     if not ctx and err.NOSYS then error "skipped" end
+    assert(ctx, err)
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU")
@@ -914,6 +919,7 @@ test.aio = {
   test_aio_eventfd = function()
     local ctx, err = S.io_setup(8)
     if not ctx and err.NOSYS then error "skipped" end
+    assert(ctx, err)
     local abuf = assert(S.mmap(nil, 4096, "read, write", "private, anonymous", -1, 0))
     ffi.copy(abuf, teststring)
     local fd = S.open(tmpfile, "creat, direct, rdwr", "RWXU") -- need to use O_DIRECT for aio to work
