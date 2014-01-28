@@ -183,6 +183,14 @@ local ioctl = strflag {
   TIOCGICOUNT     = 0x545D,
   FIOQSIZE        = 0x5460,
 -- socket ioctls from linux/sockios.h - for many of these you can use netlink instead
+  FIOSETOWN       = 0x8901,
+  SIOCSPGRP       = 0x8902,
+  FIOGETOWN       = 0x8903,
+  SIOCGPGRP       = 0x8904,
+  SIOCATMARK      = 0x8905,
+  SIOCGSTAMP      = 0x8906,
+  SIOCGSTAMPNS    = 0x8907,
+
   SIOCADDRT       = 0x890B,
   SIOCDELRT       = 0x890C,
   SIOCRTMSG       = 0x890D,
