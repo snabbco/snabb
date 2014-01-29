@@ -758,6 +758,12 @@ test_file_operations = {
     assert(S.unlink(tmpfile))
     assert(S.unlink(tmpfile2))
   end,
+  test_stat_aliases = function()
+    local st = S.stat(".")
+    assert(st.access)
+    assert(st.modification)
+    assert(st.change)
+  end,
   test_lstat_symlink = function()
     local fd = assert(S.creat(tmpfile2, "rwxu"))
     assert(fd:close())

@@ -123,6 +123,10 @@ mt.stat = {
   },
 }
 
+mt.stat.index.access = mt.stat.index.atime
+mt.stat.index.modification = mt.stat.index.mtime
+mt.stat.index.change = mt.stat.index.ctime
+
 addtype(types, "stat", "struct stat", mt.stat)
 
 mt.siginfo = {
