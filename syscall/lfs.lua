@@ -78,12 +78,12 @@ function lfs.mkdir(path)
   return ret
 end
 
-function dir_close(dir)
+local function dir_close(dir)
   dir.fd:close()
   dir.fd = nil
 end
 
-function dir_next(dir)
+local function dir_next(dir)
   if not dir.fd then error "dir ended" end
   local d
   repeat
