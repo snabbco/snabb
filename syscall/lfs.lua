@@ -51,7 +51,7 @@ local function attr(st, aname)
     aname = attributes[aname]
     return st[aname]
   end
-  ret = {}
+  local ret = {}
   for k, v in pairs(attributes) do ret[k] = st[v] end
   return ret
 end
@@ -104,7 +104,7 @@ local function dir_next(dir)
         return nil
       end
     end
-    first = false
+    dir.first = false
   until d
   return d.name
 end
