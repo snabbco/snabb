@@ -123,7 +123,7 @@ The test cases are good examples until there is better documentation!
 
 A very few functions have arguments in a different order to make optional ones easier. This is a bit confusing sometimes, so check the examples or source code.
 
-It would be nice to be API compatible with other projects, especially Luaposix, luasocket, nixio. Unfortunately none of these seem to have good test suites, and there interfaces are problematic for some functions, so this has been put on hold, although basic luasocket support is planned fairly soon.
+There is now an expreimental luafilesystem interface available, use `lfs = require "syscall.lfs"`. It would be nice to be API compatible with other projects, especially Luaposix, luasocket, nixio. Unfortunately none of these seem to have good test suites, and there interfaces are problematic for some functions, so this has been put on hold, although basic luasocket support is planned fairly soon.
 
 ### Performance
 
