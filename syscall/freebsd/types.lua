@@ -93,9 +93,25 @@ mt.stat = {
   },
 }
 
+-- add some friendlier names to stat, also for luafilesystem compatibility
 mt.stat.index.access = mt.stat.index.atime
 mt.stat.index.modification = mt.stat.index.mtime
 mt.stat.index.change = mt.stat.index.ctime
+
+local namemap = {
+  file             = mt.stat.index.isreg,
+  directory        = mt.stat.index.isdir,
+  link             = mt.stat.index.islnk,
+  socket           = mt.stat.index.issock,
+  ["char device"]  = mt.stat.index.ischr,
+  ["block device"] = mt.stat.index.isblk,
+  ["named pipe"]   = mt.stat.index.isfifo,
+}
+
+mt.stat.index.typename = function(st)
+  for k, v in pairs(namemap) do if v(st) then return k end end
+  return "other"
+end
 
 addtype(types, "stat", "struct stat", mt.stat)
 

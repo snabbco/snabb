@@ -732,6 +732,7 @@ test_file_operations = {
     local stat = assert(S.stat("/dev/zero"))
     assert_equal(stat.nlink, 1, "expect link count on /dev/zero to be 1")
     assert(stat.ischr, "expect /dev/zero to be a character device")
+    assert_equal(stat.typename, "char device")
   end,
   test_stat_file = function()
     local fd = assert(S.creat(tmpfile, "rwxu"))
@@ -740,12 +741,14 @@ test_file_operations = {
     local stat = assert(S.stat(tmpfile))
     assert_equal(stat.size, 4, "expect size 4")
     assert(stat.isreg, "regular file")
+    assert_equal(stat.typename, "file")
     assert(S.unlink(tmpfile))
   end,
   test_stat_directory = function()
     local fd = assert(S.open("/"))
     local stat = assert(fd:stat())
     assert(stat.isdir, "expect / to be a directory")
+    assert_equal(stat.typename, "directory")
     assert(fd:close())
   end,
   test_stat_symlink = function()
@@ -763,6 +766,7 @@ test_file_operations = {
     assert(st.access)
     assert(st.modification)
     assert(st.change)
+    assert_equal(st.typename, "directory")
   end,
   test_lstat_symlink = function()
     local fd = assert(S.creat(tmpfile2, "rwxu"))
@@ -770,6 +774,7 @@ test_file_operations = {
     assert(S.symlink(tmpfile2, tmpfile))
     local stat = assert(S.lstat(tmpfile))
     assert(stat.islnk, "expect lstat to stat the symlink")
+    assert_equal(stat.typename, "link")
     assert(not stat.isreg, "lstat should find symlink not regular file")
     assert(S.unlink(tmpfile))
     assert(S.unlink(tmpfile2))
