@@ -34,6 +34,7 @@ build =
       ["syscall.compat"] = "syscall/compat.lua";
       ["syscall.bit"] = "syscall/bit.lua";
       ["syscall.types"] = "syscall/types.lua";
+      ["syscall.lfs"] = "syscall/lfs.lua";
 
       ["syscall.shared.types"] = "syscall/shared/types.lua";
 
