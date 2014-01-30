@@ -1,5 +1,5 @@
 package = "ljsyscall"
-version = "0.9-1"
+version = "0.9-2"
 source =
 {
   url = "https://github.com/justincormack/ljsyscall/archive/v0.9.tar.gz";
@@ -35,10 +35,6 @@ build =
     ["syscall.types"] = "syscall/types.lua";
 
     ["syscall.shared.types"] = "syscall/shared/types.lua";
-
-    ["syscall.rump.init"] = "syscall/rump/init.lua";
-    ["syscall.rump.c"] = "syscall/rump/c.lua";
-    ["syscall.rump.ffirump"] = "syscall/rump/ffirump.lua";
   };
   platforms =
   {
@@ -84,23 +80,6 @@ build =
         ["syscall.linux.x86.nr"] = "syscall/linux/x86/nr.lua";
       }
     };
-    netbsd =
-    {
-      modules =
-      {
-        ["syscall.netbsd.syscalls"] = "syscall/netbsd/syscalls.lua";
-        ["syscall.netbsd.c"] = "syscall/netbsd/c.lua";
-        ["syscall.netbsd.constants"] = "syscall/netbsd/constants.lua";
-        ["syscall.netbsd.ffitypes"] = "syscall/netbsd/ffitypes.lua";
-        ["syscall.netbsd.ffifunctions"] = "syscall/netbsd/ffifunctions.lua";
-        ["syscall.netbsd.ioctl"] = "syscall/netbsd/ioctl.lua";
-        ["syscall.netbsd.types"] = "syscall/netbsd/types.lua";
-        ["syscall.netbsd.fcntl"] = "syscall/netbsd/fcntl.lua";
-        ["syscall.netbsd.errors"] = "syscall/netbsd/errors.lua";
-        ["syscall.netbsd.util"] = "syscall/netbsd/util.lua";
-        ["syscall.netbsd.nr"] = "syscall/netbsd/nr.lua";
-      }
-    };
     macosx =
     {
       modules =
@@ -131,6 +110,23 @@ build =
         ["syscall.freebsd.fcntl"] = "syscall/freebsd/fcntl.lua";
         ["syscall.freebsd.errors"] = "syscall/freebsd/errors.lua";
         ["syscall.freebsd.util"] = "syscall/freebsd/util.lua";
+      }
+    };
+    netbsd =
+    {
+      modules =
+      {
+        ["syscall.netbsd.syscalls"] = "syscall/netbsd/syscalls.lua";
+        ["syscall.netbsd.c"] = "syscall/netbsd/c.lua";
+        ["syscall.netbsd.constants"] = "syscall/netbsd/constants.lua";
+        ["syscall.netbsd.ffitypes"] = "syscall/netbsd/ffitypes.lua";
+        ["syscall.netbsd.ffifunctions"] = "syscall/netbsd/ffifunctions.lua";
+        ["syscall.netbsd.ioctl"] = "syscall/netbsd/ioctl.lua";
+        ["syscall.netbsd.types"] = "syscall/netbsd/types.lua";
+        ["syscall.netbsd.fcntl"] = "syscall/netbsd/fcntl.lua";
+        ["syscall.netbsd.errors"] = "syscall/netbsd/errors.lua";
+        ["syscall.netbsd.util"] = "syscall/netbsd/util.lua";
+        ["syscall.netbsd.nr"] = "syscall/netbsd/nr.lua";
       }
     };
     bsd =
