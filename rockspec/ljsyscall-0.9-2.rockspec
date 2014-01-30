@@ -15,12 +15,6 @@ description =
 dependencies =
 {
   "lua == 5.1"; -- In fact this should be "luajit >= 2.0.0"
-  platforms =
-  {
-    netbsd = {
-      "ljsyscall-netbsd == 0.9";
-    };
-  };
 }
 build =
 {
@@ -116,6 +110,23 @@ build =
         ["syscall.freebsd.fcntl"] = "syscall/freebsd/fcntl.lua";
         ["syscall.freebsd.errors"] = "syscall/freebsd/errors.lua";
         ["syscall.freebsd.util"] = "syscall/freebsd/util.lua";
+      }
+    };
+    netbsd =
+    {
+      modules =
+      {
+        ["syscall.netbsd.syscalls"] = "syscall/netbsd/syscalls.lua";
+        ["syscall.netbsd.c"] = "syscall/netbsd/c.lua";
+        ["syscall.netbsd.constants"] = "syscall/netbsd/constants.lua";
+        ["syscall.netbsd.ffitypes"] = "syscall/netbsd/ffitypes.lua";
+        ["syscall.netbsd.ffifunctions"] = "syscall/netbsd/ffifunctions.lua";
+        ["syscall.netbsd.ioctl"] = "syscall/netbsd/ioctl.lua";
+        ["syscall.netbsd.types"] = "syscall/netbsd/types.lua";
+        ["syscall.netbsd.fcntl"] = "syscall/netbsd/fcntl.lua";
+        ["syscall.netbsd.errors"] = "syscall/netbsd/errors.lua";
+        ["syscall.netbsd.util"] = "syscall/netbsd/util.lua";
+        ["syscall.netbsd.nr"] = "syscall/netbsd/nr.lua";
       }
     };
     bsd =
