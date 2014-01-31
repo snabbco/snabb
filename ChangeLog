@@ -8,6 +8,7 @@
 + FreeBSD, OSX extended attribute support
 + Linux PPC fixes
 + Luafilesystem compatibility module
++ New rockspecs for stable version, thanks to Hisham
 
     0.9 release
 

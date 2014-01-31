@@ -16,6 +16,8 @@ The [video of my FOSDEM 2013 talk](http://www.myriabit.com/ljsyscall/) here, and
 
 ## Install
 
+The stable release is now available in the luarocks repository, so you should be able to run ```luarocks install ljsyscall```.
+
 For simple uses, you just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Keep the directory structure there is. You can safely remove files from architectures and operating systems you do not use.
 
 You can install using luarocks; this is not in the repo but you can install with ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` for the HEAD version, or one of the specific version files in that directory.
