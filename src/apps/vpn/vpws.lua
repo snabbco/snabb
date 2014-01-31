@@ -20,15 +20,15 @@ local packet = require("core.packet")
 local vpws = subClass(nil)
 local in_to_out = { customer = 'uplink', uplink = 'customer' }
 
-function vpws:_init_new(name, local_ip, remote_ip, ll,
+function vpws:_init_new(name, label, local_ip, remote_ip, ll,
 			src_mac, dst_mac)
    self._name = name
-   self._config = { local_ip = local_ip,
+   self._config = { label = label, local_ip = local_ip,
 		    ll = ll, src_mac = src_mac }
    self._encap = {
-      ether = ethernet:new(src_mac, dst_mac, 0x86dd),
-      ipv6  = ipv6:new(nil, nil, 47, 64, local_ip, remote_ip),
-      gre   = gre:new(0x6558)
+      ether = ethernet:new({ src = src_mac, dst = dst_mac, type = 0x86dd }),
+      ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = local_ip, dst = remote_ip}),
+      gre   = gre:new({ protocol = 0x6558, key = label })
    }
 end
 
@@ -45,12 +45,15 @@ function vpws:push()
 	 local datagram = datagram:new(p, ethernet)
 	 if port_in == 'customer' then
 	    -- Encapsulate Ethernet frame coming in on customer port
-	    datagram:push(ethernet:new_clone(self._encap.ether))
-	    local ipv6 = datagram:push(ipv6:new_clone(self._encap.ipv6))
-	    local gre = datagram:push(gre:new_clone(self._encap.gre))
+	    datagram:push(self._encap.ether:clone())
+	    local ipv6 = datagram:push(self._encap.ipv6:clone())
+	    local gre = datagram:push(self._encap.gre:clone())
 	    -- IPv6 payload length consist of the size of the GRE header plus
 	    -- the size of the original packet
 	    ipv6:payload_length(gre:sizeof() + p.length)
+	    if gre:use_checksum() then
+	       gre:checksum(datagram:payload())
+	    end
 	 else
 	    -- Check for encapsulated frame coming in on uplink
 	    if datagram:parse(
@@ -59,7 +62,10 @@ function vpws:push()
 		   function(ipv6) 
 		      return(ipv6:dst_eq(self._config.local_ip)) 
 		   end }, 
-		 { gre } }) then
+		 { gre,
+		   function(gre) 
+		      return(not gre:use_key() or gre:key() == self._config.label)
+		   end } }) then
 	       -- Remove encapsulation to restore the original
 	       -- Ethernet frame
 	       datagram:pop(3)

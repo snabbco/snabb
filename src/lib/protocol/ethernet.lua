@@ -3,8 +3,6 @@ local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
 
--- From net/ethernet.h
--- All fields user network byte order
 local ether_header_t = ffi.typeof[[
 struct {
    uint8_t  ether_dhost[6];
@@ -14,8 +12,6 @@ struct {
 ]]
 
 local mac_addr_t = ffi.typeof("uint8_t[6]")
-local ether_header_ptr_t = ffi.typeof("$ *", ether_header_t)
-
 local ethernet = subClass(header)
 
 -- Class variables
@@ -27,11 +23,11 @@ ethernet._ulp = {
 
 -- Class methods
 
-function ethernet:_init_new(src, dst, type)
+function ethernet:_init_new(config)
    local header = ether_header_t()
-   ffi.copy(header.ether_dhost, dst, 6)
-   ffi.copy(header.ether_shost, src, 6)
-   header.ether_type = C.htons(type)
+   ffi.copy(header.ether_dhost, config.dst, 6)
+   ffi.copy(header.ether_shost, config.src, 6)
+   header.ether_type = C.htons(config.type)
    self._header = header
 end
 
@@ -51,6 +47,7 @@ function ethernet:pton(p)
    return result
 end
 
+-- Convert numeric address to printable
 function ethernet:ntop(n)
    local p = {}
    for i = 0, 5, 1 do
@@ -61,32 +58,26 @@ end
 
 -- Instance methods
 
-function ethernet:swap()
-   local tmp = ffi.new("uint8_t[6]")
-   local h = self._header
-   ffi.copy(tmp, h.ether_dhost, 6)
-   ffi.copy(h.ether_dhost, h.ether_shost,6)
-   ffi.copy(h.ether_shost, tmp, 6)
-end
-
 function ethernet:src(a)
    local h = self._header
    if a ~= nil then
       ffi.copy(h.ether_shost, a, 6)
+   else
+      return h.ether_shost
    end
-   return h.ether_shost
 end
 
 function ethernet:dst(a)
    local h = self._header
    if a ~= nil then
       ffi.copy(h.ether_dhost, a, 6)
+   else
+      return h.ether_dhost
    end
-   return h.ether_dhost
 end
 
 function ethernet:swap()
-   local tmp = ffi.new("uint8_t[6]")
+   local tmp = mac_addr_t()
    local h = self._header
    ffi.copy(tmp, h.ether_dhost, 6)
    ffi.copy(h.ether_dhost, h.ether_shost,6)
@@ -97,8 +88,9 @@ function ethernet:type(t)
    local h = self._header
    if t ~= nil then
       h.ether_type = C.htons(t)
+   else
+      return(C.ntohs(h.ether_type))
    end
-   return(C.ntohs(h.ether_type))
 end
 
 return ethernet

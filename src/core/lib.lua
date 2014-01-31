@@ -2,7 +2,8 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
-
+local bit = require("bit")
+require("core.clib_h")
 
 function can_open(filename, mode)
     mode = mode or 'r'
@@ -212,4 +213,39 @@ function string:split(pat)
     if st then return getter(self, st, g()) end
   end
   return splitter, self
+end
+
+-- Manipulation of bit fields in uint{8,16,32)_t stored in network
+-- byte order.  Using bit fields in C structs is compiler-dependent
+-- and a little awkward for handling endianness and fields that cross
+-- byte boundaries.  We're bound to the LuaJIT compiler, so I guess
+-- this would be save, but masking and shifting is guaranteed to be
+-- portable.  Performance could be an issue, though
+
+local bitfield_endian_conversion = 
+   { [16] = { ntoh = C.ntohs, hton = C.htons },
+     [32] = { ntoh = C.ntohl, hton = C.htonl }
+  }
+
+function bitfield(size, struct, member, offset, nbits, value)
+   local conv = bitfield_endian_conversion[size]
+   local field
+   if conv then
+      field = conv.ntoh(struct[member])
+   else
+      field = struct[member]
+   end
+   local shift = size-(nbits+offset)
+   local mask = bit.lshift(2^nbits-1, shift)
+   local imask = bit.bnot(mask)
+   if value then
+      field = bit.bor(bit.band(field, imask), bit.lshift(value, shift))
+      if conv then
+	 struct[member] = conv.hton(field)
+      else
+	 struct[member] = field
+      end
+   else
+      return bit.rshift(bit.band(field, mask), shift)
+   end
 end

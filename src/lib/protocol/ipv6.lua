@@ -1,14 +1,15 @@
 require("class")
 local ffi = require("ffi")
 local C = ffi.C
+local lib = require("core.lib")
 local header = require("lib.protocol.header")
 
 local ipv6hdr_t = ffi.typeof[[
       struct {
-	 uint32_t flow_id; // version, tc, flow_id
+	 uint32_t v_tc_fl; // version, tc, flow_label
 	 uint16_t payload_length;
 	 uint8_t  next_header;
-	 uint8_t hop_limit;
+	    uint8_t hop_limit;
 	 char src_ip[16];
 	 char dst_ip[16];
       } __attribute__((packed))
@@ -26,7 +27,6 @@ local ipv6hdr_pseudo_t = ffi.typeof[[
 ]]
 
 local ipv6_addr_t = ffi.typeof("uint16_t[8]")
-
 local ipv6 = subClass(header)
 
 -- Class variables
@@ -40,14 +40,16 @@ ipv6._ulp = {
 
 -- Class methods
 
-function ipv6:_init_new(class, flow_label, next_header, hop_limit, src, dst)
+function ipv6:_init_new(config)
    local header = ipv6hdr_t()
-   header.flow_id = C.htonl(0x60000000)
-   ffi.copy(header.src_ip, src, 16)
-   ffi.copy(header.dst_ip, dst, 16)
+   header.v_tc_fl = C.htonl(0x60000000)
+   ffi.copy(header.src_ip, config.src, 16)
+   ffi.copy(header.dst_ip, config.dst, 16)
    self._header = header
-   self:next_header(next_header)
-   self:hop_limit(hop_limit)
+   self:traffic_class(config.traffic_class)
+   self:flow_label(config.flow_label)
+   self:next_header(config.next_header)
+   self:hop_limit(config.hop_limit)
 end
 
 function ipv6:pton(p)
@@ -75,11 +77,44 @@ end
 
 -- Instance methods
 
+function ipv6:traffic_class(tc)
+   return lib.bitfield(32, self._header, 'v_tc_fl', 4, 8, tc)
+end
+
+function ipv6:flow_label(fl)
+   return lib.bitfield(32, self._header, 'v_tc_fl', 12, 20, fl)
+end
+
+function ipv6:payload_length(length)
+   if length ~= nil then
+      self._header.payload_length = C.htons(length)
+   else
+      return(C.ntohs(self._header.payload_length))
+   end
+end
+
+function ipv6:next_header(nh)
+   if nh ~= nil then
+      self._header.next_header = nh
+   else
+      return(self._header.next_header)
+   end
+end
+
+function ipv6:hop_limit(limit)
+   if limit ~= nil then
+      self._header.hop_limit = limit
+   else
+      return(self._header.hop_limit)
+   end
+end
+
 function ipv6:src(ip)
    if ip ~= nil then
       ffi.copy(self._header.src_ip, ip, 16)
+   else
+      return self._header.src_ip
    end
-   return self._header.src_ip
 end
 
 function ipv6:src_eq(ip)
@@ -89,33 +124,13 @@ end
 function ipv6:dst(ip)
    if ip ~= nil then
       ffi.copy(self._header.dst_ip, ip, 16)
+   else
+      return self._header.dst_ip
    end
-   return self._header.dst_ip
 end
 
 function ipv6:dst_eq(ip)
    return C.memcmp(ip, self._header.dst_ip, 16) == 0
-end
-
-function ipv6:payload_length(length)
-   if length ~= nil then
-      self._header.payload_length = C.htons(length)
-   end
-   return(C.ntohs(self._header.payload_length))
-end
-
-function ipv6:hop_limit(limit)
-   if limit ~= nil then
-      self._header.hop_limit = limit
-   end
-   return(self._header.hop_limit)
-end
-
-function ipv6:next_header(nh)
-   if nh ~= nil then
-      self._header.next_header = nh
-   end
-   return(self._header.next_header)
 end
 
 -- Return a pseudo header for checksum calculation in a upper-layer

@@ -51,7 +51,8 @@ local function process(self, dgram)
       option[1]:type(2)
       option[1]:option():addr(self._lladdr)
       icmp:type(136)
-      -- Undo/redo icmp and ns headers to obtain
+      -- Undo/redo icmp and ns headers to get
+      -- payload and set solicited flag
       dgram:unparse(2)
       dgram:parse() -- icmp
       local payload, length = dgram:payload()

@@ -9,7 +9,7 @@ local icmp_t = ffi.typeof[[
 	 uint8_t type;
 	 uint8_t code;
 	 int16_t checksum;
-      }
+      } __attribute__((packed))
 ]]
 
 local icmp = subClass(header)
@@ -36,15 +36,17 @@ end
 function icmp:type(type)
    if type ~= nil then
       self._header.type = type
+   else
+      return self._header.type
    end
-   return self._header.type
 end
 
 function icmp:code(code)
    if code ~= nil then
       self._header.code = code
+   else
+      return self._header.code
    end
-   return self._header.code
 end
 
 function icmp:checksum(payload, length, ipv6)

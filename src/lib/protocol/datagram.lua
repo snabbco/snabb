@@ -102,23 +102,6 @@ function datagram:push(proto)
    return proto
 end
 
--- Create a protocol header from the packet's payload according to the
--- current ULP and push it onto the parse stack. Returns the newly
--- created protocol object.
-function datagram:parse_foo()
-   assert(self._parse, "non-parseable datagram")
-   local parse = self._parse
-   if not parse.ulp then return nil end
-   local sizeof = parse.ulp:sizeof()
-   local iovec = self._packet.iovecs[parse.iovec]
-   local proto = parse.ulp:new_from_mem(iovec.buffer.pointer + iovec.offset
-					+ parse.offset, iovec.length - parse.offset)
-   table.insert(parse.stack, proto)
-   parse.ulp = proto:upper_layer()
-   parse.offset = parse.offset + sizeof
-   return proto
-end
-
 -- Create protocol header objects from the packet's payload.  If
 -- called with argument nil and the packets ULP is non-nil, a single
 -- protocol header of type ULP is created.  The caller can specify
@@ -152,15 +135,14 @@ function datagram:parse(seq)
       if not parse.ulp or (class and class ~= parse.ulp) then
 	 return nil
       end
-      local sizeof = parse.ulp:sizeof()
       proto = parse.ulp:new_from_mem(iovec.buffer.pointer + iovec.offset
 				     + parse.offset, iovec.length - parse.offset)
-      if check and not check(proto) then
+      if proto == nil or (check and not check(proto)) then
 	 return nil
       end
       table.insert(parse.stack, proto)
       parse.ulp = proto:upper_layer()
-      parse.offset = parse.offset + sizeof
+      parse.offset = parse.offset + proto:sizeof()
    end
    return proto
 end

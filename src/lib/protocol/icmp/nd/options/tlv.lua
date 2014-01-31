@@ -21,6 +21,9 @@ tlv._types = {
    },
 }
 
+-- Will be overriden for known types
+tlv._name = "unkown"
+
 function tlv:_init_new(type)
 end
 
