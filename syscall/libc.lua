@@ -107,6 +107,8 @@ function S.setenv(name, value, overwrite)
 end
 function S.clearenv() return retbool(ffi.C.clearenv()) end
 
+S.errno = ffi.errno
+
 return S
 
 end
