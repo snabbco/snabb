@@ -114,6 +114,9 @@ end
 function S.mremap(old_address, old_size, new_size, flags, new_address)
   return retptr(C.mremap(old_address, old_size, new_size, c.MREMAP[flags], new_address))
 end
+function S.remap_file_pages(addr, size, prot, pgoff, flags)
+  return retbool(C.remap_file_pages(addr, size, c.PROT[prot], pgoff, c.MAP[flags]))
+end
 function S.fadvise(fd, advice, offset, len) -- note argument order TODO change back?
   return retbool(C.fadvise64(getfd(fd), offset or 0, len or 0, c.POSIX_FADV[advice]))
 end

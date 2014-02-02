@@ -1518,6 +1518,18 @@ test.mremap = { -- differs in prototype by OS
   end,
 }
 
+test.remap_file_pages = {
+  test_remap_file_pages = function()
+    local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
+    assert(S.unlink(tmpfile))
+    local size = 4096
+    local mem = assert(fd:mmap(nil, size, "read", "shared", 0))
+    assert(S.remap_file_pages(mem, 4096, 0, 0, 0))
+    assert(S.munmap(mem, size))
+    assert(fd:close())
+  end,
+}
+
 test.signals_linux = {
   test_itimer = function()
     local tt = assert(S.getitimer("real"))
