@@ -178,5 +178,6 @@ int removexattr(const char *path, const char *name);
 int lremovexattr(const char *path, const char *name);
 int fremovexattr(int fd, const char *name);
 
+int getpagesize(void);
 ]]
 

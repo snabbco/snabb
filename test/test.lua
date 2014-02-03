@@ -2137,6 +2137,10 @@ test_proc = {
 
 test_mmap = {
   teardown = clean,
+  test_getpagesize = function()
+    local pagesize = assert(S.getpagesize())
+    assert(pagesize >= 4096, "pagesize at least 4k")
+  end,
   test_mmap_fail = function()
     local size = 4096
     local mem, err = S.mmap(pt.void(1), size, "read", "private, fixed, anon", -1, 0)

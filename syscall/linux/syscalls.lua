@@ -567,6 +567,26 @@ end
 function S.mkfifo(path, mode) return S.mknod(path, bit.bor(c.MODE[mode], c.S_I.FIFO)) end
 function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(c.MODE[mode], c.S_I.FIFO), 0) end
 
+-- in Linux getpagesize is not a syscall for most architectures.
+-- It is pretty obscure how you get the page size for architectures that have variable page size, I think it is coded into libc
+-- that matches kernel. Which is not much use for us.
+-- fortunately Linux (unlike BSD) checks correct offsets on mapping /dev/zero
+if not S.getpagesize then
+  function S.getpagesize()
+    local sz = 4096
+    local fd, err = S.open("/dev/zero", "rdwr")
+    if not fd then return nil, err end
+    while sz < 4096 * 1024 + 1024 do
+      local mm, err = S.mmap(nil, sz, "read", "shared", fd, sz)
+      if mm then
+        S.munmap(mm, sz)
+        return sz
+      end
+      sz = sz * 2
+    end
+  end
+end
+
 -- in Linux shm_open and shm_unlink are not syscalls
 local shm = "/dev/shm"
 
@@ -586,8 +606,8 @@ end
 
 -- in Linux pathconf can just return constants
 
--- TODO these could go into constants, although maybe better to get from here, and some are slightly bogus eg PAGE_SIZE
-local PAGE_SIZE = 4096
+-- TODO these could go into constants, although maybe better to get from here
+local PAGE_SIZE = S.getpagesize
 local NAME_MAX = 255
 local PATH_MAX = 4096 -- TODO this is in constants, inconsistently
 local PIPE_BUF = 4096
@@ -621,8 +641,12 @@ local pathconf_values = {
   [c.PC["2_SYMLINKS"]] = 1,
 }
 
-function S.pathconf(_, name) return pathconf_values[c.PC[name]] end
-function S.fpathconf(_, name) return pathconf_values[c.PC[name]] end
+function S.pathconf(_, name)
+  local pc = pathconf_values[c.PC[name]]
+  if type(pc) == "function" then pc = pc() end
+  return pc
+end
+S.fpathconf = S.pathconf
 
 -- setegid and set euid are not syscalls
 function S.seteuid(euid) return S.setresuid(-1, euid, -1) end

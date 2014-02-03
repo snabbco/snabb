@@ -765,6 +765,11 @@ function S.lxattr(path, t) return xattr(S.llistxattr, S.lgetxattr, S.lsetxattr, 
 function S.fxattr(fd, t) return xattr(S.flistxattr, S.fgetxattr, S.fsetxattr, S.fremovexattr, fd, t) end
 end -- if C.listxattr
 
+-- getpagesize might be a syscall, or in libc, or may not exist
+if C.getpagesize then
+  function S.getpagesize() return retnum(C.getpagesize()) end
+end
+
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
 -- Freebsd has a syscall, other OSs use /dev/ptmx
 if C.posix_openpt then
