@@ -9,6 +9,8 @@
 + Linux PPC fixes
 + Luafilesystem compatibility module
 + New rockspecs for stable version, thanks to Hisham
++ Add remap_file_pages, thanks to Brian Downing
++ Add getpagesize
 
     0.9 release
 
