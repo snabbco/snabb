@@ -2163,7 +2163,7 @@ test_mmap = {
   test_mmap_page_offset = function()
     local fd = assert(S.open(tmpfile, "rdwr,creat", "rwxu"))
     assert(S.unlink(tmpfile))
-    local size = S.getpagesize()
+    local pagesize = S.getpagesize()
     local mem = assert(fd:mmap(nil, pagesize, "read", "shared", pagesize))
     assert(S.munmap(mem, size))
     assert(fd:close())
