@@ -571,8 +571,11 @@ function S.mkfifoat(fd, path, mode) return S.mknodat(fd, path, bit.bor(c.MODE[mo
 -- It is pretty obscure how you get the page size for architectures that have variable page size, I think it is coded into libc
 -- that matches kernel. Which is not much use for us.
 -- fortunately Linux (unlike BSD) checks correct offsets on mapping /dev/zero
+local pagesize -- store so we do not repeat this
+
 if not S.getpagesize then
   function S.getpagesize()
+    if pagesize then return pagesize end
     local sz = 4096
     local fd, err = S.open("/dev/zero", "rdwr")
     if not fd then return nil, err end
@@ -580,6 +583,7 @@ if not S.getpagesize then
       local mm, err = S.mmap(nil, sz, "read", "shared", fd, sz)
       if mm then
         S.munmap(mm, sz)
+        pagesize = sz
         return sz
       end
       sz = sz * 2
