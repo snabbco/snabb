@@ -543,8 +543,10 @@ C.gettimeofday = ffi.C.gettimeofday
 
 -- glibc does not provide getcpu; it is however VDSO
 function C.getcpu(cpu, node, tcache) return syscall(sys.getcpu, void(node), void(node), void(tcache)) end
--- time is VDSO but not really performance critical
-function C.time(t) return syscall(sys.time, void(t)) end
+-- time is VDSO but not really performance critical; does not exist for some architectures
+if pcall(function(k) return ffi.C[k] end, "time") then
+  function C.time(t) return syscall(sys.time, void(t)) end
+end
 
 -- socketcalls TODO proper arch flag, using ffi.C temporarily
 if sys.accept4 then -- on x86 this is a socketcall, which we have not implemented yet, other archs is a syscall
