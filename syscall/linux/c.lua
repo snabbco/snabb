@@ -508,19 +508,27 @@ else
 end
 C.socket = ffi.C.socket
 C.bind = ffi.C.bind
+C.connect = ffi.C.connect
 C.listen = ffi.C.listen
-C.sendmsg = ffi.C.sendmsg
-C.recvmsg = ffi.C.recvmsg
-C.setsockopt = ffi.C.setsockopt
-C.getsockopt = ffi.C.getsockopt
+C.accept = ffi.C.accept
+C.getsockname = ffi.C.getsockname
+C.getpeername = ffi.C.getpeername
+C.socketpair = ffi.C.socketpair
+C.send = ffi.C.send
+C.recv = ffi.C.recv
 C.sendto = ffi.C.sendto
 C.recvfrom = ffi.C.recvfrom
-C.connect = ffi.C.connect
-C.accept = ffi.C.accept
-C.getpeername = ffi.C.getpeername
+-- shutdown above
+C.setsockopt = ffi.C.setsockopt
+C.getsockopt = ffi.C.getsockopt
+C.sendmsg = ffi.C.sendmsg
+C.recvmsg = ffi.C.recvmsg
+-- accept4 above
+-- recvmmsg missing
+-- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"socketpair", "select", "waitid", "waitpid", "epoll_ctl", "getsockname", "pselect", "readlink", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "symlink", "fsync", "mkdir", "link", "mremap", "getgroups", "fcntl", "gettimeofday", "time", "uname", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setsid", "setitimer", "getpgid", "execve", "getsid", "sigpending", "getpgrp", "_exit", "listxattr", "llistxattr", "flistxattr", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "fdatasync", "unshare", "mount", "umount", "umount2", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "chroot", "fchownat"}
+local extra = {"select", "waitid", "waitpid", "epoll_ctl", "pselect", "readlink", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "symlink", "fsync", "mkdir", "link", "mremap", "getgroups", "fcntl", "gettimeofday", "time", "uname", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setsid", "setitimer", "getpgid", "execve", "getsid", "sigpending", "getpgrp", "_exit", "listxattr", "llistxattr", "flistxattr", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "fdatasync", "unshare", "mount", "umount", "umount2", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "chroot", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
