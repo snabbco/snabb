@@ -490,6 +490,9 @@ function C.remap_file_pages(addr, size, prot, pgoff, flags)
 end
 function C.fork() return syscall(sys.fork) end
 function C.kill(pid, sig) return syscall(sys.kill, int(pid), int(sig)) end
+function C.mkdir(pathname, mode) return syscall(sys.mkdir, void(pathname), uint(mode)) end
+function C.fsync(fd) return syscall(sys.fsync, int(fd)) end
+function C.fdatasync(fd) return syscall(sys.fdatasync, int(fd)) end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
@@ -528,7 +531,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"select", "waitid", "waitpid", "epoll_ctl", "pselect", "readlink", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "symlink", "fsync", "mkdir", "link", "mremap", "getgroups", "fcntl", "gettimeofday", "time", "uname", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setsid", "setitimer", "getpgid", "execve", "getsid", "sigpending", "getpgrp", "_exit", "listxattr", "llistxattr", "flistxattr", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "fdatasync", "unshare", "mount", "umount", "umount2", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "chroot", "fchownat"}
+local extra = {"select", "waitid", "waitpid", "epoll_ctl", "pselect", "readlink", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "symlink", "link", "mremap", "getgroups", "fcntl", "gettimeofday", "time", "uname", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setsid", "setitimer", "getpgid", "execve", "getsid", "sigpending", "getpgrp", "_exit", "listxattr", "llistxattr", "flistxattr", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "mount", "umount", "umount2", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "chroot", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
