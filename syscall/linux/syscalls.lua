@@ -64,12 +64,6 @@ end
 -- note that this is not strictly the syscall that has some other arguments, but has same functionality
 function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
 
-function S.wait(status)
-  status = status or t.int1()
-  local ret, err = C.wait(status)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return ret, nil, t.waitstatus(status[0])
-end
 function S.waitpid(pid, options, status) -- note order of arguments changed as rarely supply status
   status = status or t.int1()
   local ret, err = C.waitpid(c.WAIT[pid], status, c.W[options])

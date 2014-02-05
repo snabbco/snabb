@@ -102,6 +102,10 @@ if S.utimensat and not S.utimes then
   end
 end
 
+if not S.wait then
+  function S.wait(status) return S.waitpid(-1, 0, status) end
+end
+
 S.wait3 = function(options, rusage, status) return S.wait4(-1, options, rusage, status) end
 
 if S.wait4 and not S.waitpid then
