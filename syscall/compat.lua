@@ -88,6 +88,15 @@ if S.utimensat and not S.futimens then
   end
 end
 
+-- some linux arhcitectures eg ARM do not have a time syscall
+if not S.time then
+  function S.time(t)
+    local tv = S.gettimeofday()
+    if t then t[0] = tv.sec
+    return tv.sec
+  end
+end
+
 -- the utimes, futimes, lutimes are legacy, but OSX/FreeBSD do not support the nanosecond versions
 -- we support the legacy versions but do not fake the more precise ones
 S.futimes = S.futimes or S.futimens
