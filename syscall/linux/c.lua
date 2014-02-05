@@ -492,11 +492,7 @@ function C.fsync(fd) return syscall(sys.fsync, int(fd)) end
 function C.fdatasync(fd) return syscall(sys.fdatasync, int(fd)) end
 function C.link(oldpath, newpath) return syscall(sys.link, void(oldpath), void(newpath)) end
 function C.symlink(oldpath, newpath) return syscall(sys.symlink, void(oldpath), void(newpath)) end
-function C.select(nfds, readfds, writefds, exceptfds, timeout)
-  return syscall(sys.select, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout))
-end
 function C.epoll_ctl(epfd, op, fd, event) return syscall(sys.epoll_ctl, int(epfd), int(op), int(fd), void(event)) end
-function C._exit(status) return syscall(sys.exit, int(status)) end
 function C.uname(buf) return syscall(sys.uname, void(buf)) end
 function C.getsid(pid) return syscall(sys.getsid, int(pid)) end
 function C.getpgid(pid) return syscall(sys.getpgid, int(pid)) end
@@ -511,6 +507,12 @@ function C.umount2(target, flags) return syscall(sys.umount2, void(target), int(
 function C.listxattr(path, list, size) return syscall_long(sys.listxattr, void(path), void(list), ulong(size)) end
 function C.llistxattr(path, list, size) return syscall_long(sys.llistxattr, void(path), void(list), ulong(size)) end
 function C.flistxattr(fd, list, size) return syscall_long(sys.flistxattr, int(fd), void(list), ulong(size)) end
+
+-- need _newselect syscall on some platforms
+local select = sys._newselect or sys.select
+function C.select(nfds, readfds, writefds, exceptfds, timeout)
+  return syscall(select, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout))
+end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
