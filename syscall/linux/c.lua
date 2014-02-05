@@ -504,9 +504,13 @@ function C.mount(source, target, filesystemtype, mountflags, data)
 end
 function C.umount(target) return syscall(sys.umount, void(target)) end
 function C.umount2(target, flags) return syscall(sys.umount2, void(target), int(flags)) end
+function C.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask)
+  return syscall(sys.pselect, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout), void(sigmask))
+end
 function C.listxattr(path, list, size) return syscall_long(sys.listxattr, void(path), void(list), ulong(size)) end
 function C.llistxattr(path, list, size) return syscall_long(sys.llistxattr, void(path), void(list), ulong(size)) end
 function C.flistxattr(fd, list, size) return syscall_long(sys.flistxattr, int(fd), void(list), ulong(size)) end
+
 
 -- need _newselect syscall on some platforms
 local select = sys._newselect or sys.select
