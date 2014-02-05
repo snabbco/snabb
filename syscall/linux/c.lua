@@ -413,19 +413,21 @@ end
 
 local sigset_size = 8 -- TODO should be s.sigset once switched to kernel sigset not glibc size
 
+local function sigmasksize(sigmask)
+  local size = 0
+  if sigmask then size = sigset_size end
+  return ulong(size)
+end
+
 -- now failing on Travis, was ok... TODO work out why
 if not C.epoll_pwait then
 function C.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
-  local size = 0
-  if sigmask then size = sigset_size end
-  return syscall(sys.epoll_pwait, int(epfd), void(events), int(maxevents), int(timeout), void(sigmask), ulong(size))
+  return syscall(sys.epoll_pwait, int(epfd), void(events), int(maxevents), int(timeout), void(sigmask), sigmasksize(sigmask))
 end
 end
 
 function C.ppoll(fds, nfds, timeout_ts, sigmask)
-  local size = 0
-  if sigmask then size = sigset_size end
-  return syscall(sys.ppoll, void(fds), ulong(nfds), void(timeout_ts), void(sigmask), ulong(size))
+  return syscall(sys.ppoll, void(fds), ulong(nfds), void(timeout_ts), void(sigmask), sigmasksize(sigmask))
 end
 function C.signalfd(fd, mask, flags)
   return syscall(sys.signalfd4, int(fd), void(mask), ulong(sigset_size), int(flags))
@@ -504,13 +506,19 @@ function C.mount(source, target, filesystemtype, mountflags, data)
 end
 function C.umount(target) return syscall(sys.umount, void(target)) end
 function C.umount2(target, flags) return syscall(sys.umount2, void(target), int(flags)) end
-function C.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask)
-  return syscall(sys.pselect, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout), void(sigmask))
-end
 function C.listxattr(path, list, size) return syscall_long(sys.listxattr, void(path), void(list), ulong(size)) end
 function C.llistxattr(path, list, size) return syscall_long(sys.llistxattr, void(path), void(list), ulong(size)) end
 function C.flistxattr(fd, list, size) return syscall_long(sys.flistxattr, int(fd), void(list), ulong(size)) end
 
+-- defined in libc as a pair of longs, but lets by typed
+local pst = ffi.typeof("struct {void *sigmask; long size;}")
+
+function C.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask)
+  local size = 0
+  if sigmask then size = sigset_size end
+  local data = pst(sigmask, size)
+  return syscall(sys.pselect6, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout), void(data))
+end
 
 -- need _newselect syscall on some platforms
 local select = sys._newselect or sys.select
@@ -570,7 +578,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "pselect", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "execve", "sigpending", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "fchownat"}
+local extra = {"waitid", "waitpid", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "execve", "sigpending", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
