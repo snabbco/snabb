@@ -19,17 +19,17 @@ local ns_responder = subClass(nil)
 function ns_responder:_init_new(target, lladdr)
    self._target = target
    self._lladdr = lladdr
+   self._match = { { ethernet },
+		   { ipv6 },
+		   { icmp },
+		   { ns,
+		     function(ns)
+			return(ns:target_eq(self._target))
+		     end } }
 end
 
 local function process(self, dgram)
-   if dgram:parse(
-      { { ethernet },
-	{ ipv6 },
-	{ icmp },
-	{ ns,
-	  function(ns)
-	     return(ns:target_eq(self._target))
-	  end } }) then
+   if dgram:parse(self._match) then
       local eth, ipv6, icmp, ns = unpack(dgram:stack())
       local option = ns:options(dgram:payload())
       if not (#option == 1 and option[1]:type() == 1) then

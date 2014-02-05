@@ -30,6 +30,15 @@ function vpws:_init_new(name, label, local_ip, remote_ip, ll,
       ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = local_ip, dst = remote_ip}),
       gre   = gre:new({ protocol = 0x6558, key = label })
    }
+   self._match = { { ethernet },
+		   { ipv6, 
+		     function(ipv6) 
+			return(ipv6:dst_eq(self._config.local_ip)) 
+		     end }, 
+		   { gre,
+		     function(gre) 
+			return(not gre:use_key() or gre:key() == self._config.label)
+		     end } }
 end
 
 function vpws:name()
@@ -37,7 +46,8 @@ function vpws:name()
 end
 
 function vpws:push()
-   for port_in, l_in in pairs(self.input) do
+   for _, l_in in pairs(self.inputi) do
+      local port_in = l_in.oport
       local l_out = self.output[in_to_out[port_in]]
       assert(l_out)
       while not app.full(l_out) and not app.empty(l_in) do
@@ -56,16 +66,7 @@ function vpws:push()
 	    end
 	 else
 	    -- Check for encapsulated frame coming in on uplink
-	    if datagram:parse(
-	       { { ethernet },
-		 { ipv6, 
-		   function(ipv6) 
-		      return(ipv6:dst_eq(self._config.local_ip)) 
-		   end }, 
-		 { gre,
-		   function(gre) 
-		      return(not gre:use_key() or gre:key() == self._config.label)
-		   end } }) then
+	    if datagram:parse(self._match) then
 	       -- Remove encapsulation to restore the original
 	       -- Ethernet frame
 	       datagram:pop(3)

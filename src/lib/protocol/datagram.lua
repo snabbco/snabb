@@ -131,7 +131,7 @@ function datagram:parse(seq)
    local iovec = self._packet.iovecs[parse.iovec]
 
    for _, elt in ipairs(seq) do
-      local class, check = unpack(elt)
+      local class, check = elt[1], elt[2]
       if not parse.ulp or (class and class ~= parse.ulp) then
 	 return nil
       end
