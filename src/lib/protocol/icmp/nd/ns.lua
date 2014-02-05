@@ -15,6 +15,7 @@ local ns = subClass(nd_header)
 -- Class variables
 ns._name = "neighbor solicitation"
 ns._header_type = ns_t
+ns._header_ptr_type = ffi.typeof("$*", ns_t)
 ns._ulp = { method = nil }
 
 -- Class methods

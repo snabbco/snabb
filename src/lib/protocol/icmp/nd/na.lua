@@ -32,6 +32,7 @@ local na = subClass(nd_header)
 -- Class variables
 na._name = "neighbor advertisement"
 na._header_type = na_t
+na._header_ptr_type = ffi.typeof("$*", na_t)
 na._ulp = { method = nil }
 
 -- Class methods

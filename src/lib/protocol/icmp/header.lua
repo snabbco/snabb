@@ -17,6 +17,7 @@ local icmp = subClass(header)
 -- Class variables
 icmp._name = "icmp"
 icmp._header_type = icmp_t
+icmp._header_ptr_type = ffi.typeof("$*", icmp_t)
 icmp._ulp = { 
    class_map = { [135] = "lib.protocol.icmp.nd.ns",
 		 [136] = "lib.protocol.icmp.nd.na" },

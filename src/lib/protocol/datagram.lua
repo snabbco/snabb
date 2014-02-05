@@ -15,13 +15,16 @@
 -- header stacks, called the "parse stack" and the "push stack".  The
 -- parse stack is built from the data contained in an existing packet
 -- while the push stack is built from newly created protocol headers.
--- In each case, the headers themselves are always located in the
--- actual packet buffers.  The topmost protocol header on each stack
--- defines which protocol type is expected next.  This is referred to
--- as the "upper-layer protocol" (ULP).  For the parse stack, it
--- defines how the next call of the parse() method will interpret the
--- next piece of the packet data.  For the push stack, it provides a
--- consistency check for the next call of the push() method.
+-- For the parse stack, the protocol object's data is the actual
+-- memory region in the packet buffer, where as the push() method
+-- merely creates a copy of the header in the packet buffer.
+-- Therefore, all manipulations performed with the protocol object
+-- must be completed before the header is push()-ed onto the packet.
+--
+-- The parse stack uses the notion of an "upper-layer protocol" (ULP)
+-- to identify which protocol class to use to parse the next chunk of
+-- data in the packet payload.  The ULP is determined by calling the
+-- upper_layer() method of the topmost protocol on the parse stack.
 --
 -- When a datagram is created from an existing packet, the packet's
 -- buffers are first coalesced into a single buffer to make the entire
@@ -70,8 +73,7 @@ end
 -- we're dealing with a datagram that has been created from scratch.
 -- In this case, we add another empty buffer and set the ULP to nil,
 -- which makes this packet effectively non-parseable, but it can still
--- hold the packet's payload.  The method returns the input for
--- convenience.
+-- hold the packet's payload.
 function datagram:push(proto)
    local push = self._push
    if not push then
@@ -85,21 +87,14 @@ function datagram:push(proto)
       -- If the parse stack already exists, its associated iovec was
       -- moved to slot 1 by packet.prepend_iovec()
       self._parse.iovec = 1
-      push = { stack = {} }
-      self._push = push
-   else
-      assert(proto:isa(push.ulp), "header type "..proto:name()
-       .." does not match expected ulp "..push.ulp:name())
+      self._push = true
    end
    local sizeof = proto:sizeof()
    local iovec = self._packet.iovecs[0]
    assert(iovec.offset + iovec.length + sizeof <= iovec.buffer.size,
 	  "not enough space in buffer to push header of type " ..proto:name())
-   proto:moveto(iovec.buffer.pointer + iovec.offset + iovec.length)
+   proto:copy(iovec.buffer.pointer + iovec.offset + iovec.length)
    iovec.length = iovec.length + sizeof
-   table.insert(push.stack, proto)
-   push.ulp = proto:upper_layer()
-   return proto
 end
 
 -- Create protocol header objects from the packet's payload.  If

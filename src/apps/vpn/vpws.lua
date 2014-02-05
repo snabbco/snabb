@@ -46,7 +46,7 @@ function vpws:name()
 end
 
 function vpws:push()
-   for _, l_in in pairs(self.inputi) do
+   for _, l_in in ipairs(self.inputi) do
       local port_in = l_in.oport
       local l_out = self.output[in_to_out[port_in]]
       assert(l_out)
@@ -54,16 +54,18 @@ function vpws:push()
 	 local p = app.receive(l_in)
 	 local datagram = datagram:new(p, ethernet)
 	 if port_in == 'customer' then
+	    local encap = self._encap
 	    -- Encapsulate Ethernet frame coming in on customer port
-	    datagram:push(self._encap.ether:clone())
-	    local ipv6 = datagram:push(self._encap.ipv6:clone())
-	    local gre = datagram:push(self._encap.gre:clone())
 	    -- IPv6 payload length consist of the size of the GRE header plus
 	    -- the size of the original packet
-	    ipv6:payload_length(gre:sizeof() + p.length)
-	    if gre:use_checksum() then
-	       gre:checksum(datagram:payload())
+	    encap.ipv6:payload_length(encap.gre:sizeof() + p.length)
+	    if encap.gre:use_checksum() then
+	       encap.gre:checksum(datagram:payload())
 	    end
+	    -- Copy the finished headers into the packet
+	    datagram:push(encap.ether)
+	    datagram:push(encap.ipv6)
+	    datagram:push(encap.gre)
 	 else
 	    -- Check for encapsulated frame coming in on uplink
 	    if datagram:parse(self._match) then

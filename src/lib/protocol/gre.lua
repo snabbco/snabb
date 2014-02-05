@@ -5,7 +5,7 @@ local header = require("lib.protocol.header")
 local lib = require("core.lib")
 -- 
 
-gre_template = [[
+local gre_template = [[
       struct {
 	 uint16_t bits; // Flags, version
 	 uint16_t protocol;
@@ -13,12 +13,18 @@ gre_template = [[
       }
 ]]
 
-local gre_t = ffi.typeof(gre_template, 0)
+local gre_types = { [0] = ffi.typeof(gre_template, 0),
+		    [4] = ffi.typeof(gre_template, 4),
+		    [8] = ffi.typeof(gre_template, 8), }
+local gre_ptr_types = { [0] = ffi.typeof("$*", gre_types[0]),
+			[4] = ffi.typeof("$*", gre_types[4]),
+			[8] = ffi.typeof("$*", gre_types[8]) }
 local gre = subClass(header)
 
 -- Class variables
 gre._name = "gre"
-gre._header_type = gre_t
+gre._header_type = gre_types[0]
+gre._header_ptr_type = gre_ptr_types[0]
 gre._ulp = { 
    class_map = { [0x6558] = "lib.protocol.ethernet" },
    method    = 'protocol' }
@@ -35,7 +41,8 @@ function gre:_init_new(config)
       self._key_offset = opt_size
       opt_size = opt_size + 4
    end
-   self._header_type = ffi.typeof(gre_template, opt_size)
+   self._header_type = gre_types[opt_size]
+   self._header_ptr_type = gre_ptr_types[opt_size]
    self._header = self._header_type()
    if self._checksum then
       lib.bitfield(16, self._header, 'bits', 0, 1, 1)
@@ -48,9 +55,9 @@ function gre:_init_new(config)
 end
 
 function gre:_init_new_from_mem(mem, size)
-   local sizeof = ffi.sizeof(gre_t)
+   local sizeof = ffi.sizeof(gre._header_type)
    assert(sizeof <= size)
-   local header = ffi.cast(ffi.typeof("$*", gre_t), mem)[0]
+   local header = ffi.cast(gre._header_ptr_type, mem)[0]
    -- Reserved bits and version MUST be zero
    if lib.bitfield(16, header, 'bits', 4, 12) ~= 0 then
       self = nil
@@ -67,8 +74,9 @@ function gre:_init_new_from_mem(mem, size)
       opt_size = opt_size + 4
    end
    if opt_size > 0 then
-      self._header_type = ffi.typeof(gre_template, opt_size)
-      self._header = ffi.cast(ffi.typeof("$*", self._header_type), self._header)[0]
+      self._header_type = gre_types[opt_size]
+      self._header_ptr_type = gre_ptr_types[opt_size]
+      self._header = ffi.cast(self._header_ptr_type, self._header)[0]
    end
 end
 

@@ -17,6 +17,7 @@ local ethernet = subClass(header)
 -- Class variables
 ethernet._name = "ethernet"
 ethernet._header_type = ether_header_t
+ethernet._header_ptr_type = ffi.typeof("$*", ether_header_t)
 ethernet._ulp = { 
    class_map = { [0x86dd] = "lib.protocol.ipv6" },
    method    = 'type' }
