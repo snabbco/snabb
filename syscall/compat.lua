@@ -92,7 +92,7 @@ end
 if not S.time then
   function S.time(t)
     local tv = S.gettimeofday()
-    if t then t[0] = tv.sec
+    if t then t[0] = tv.sec end
     return tv.sec
   end
 end
