@@ -191,9 +191,6 @@ function C.getpriority(which, who) return syscall(sys.getpriority, int(which), i
 -- uClibc only provides a version of eventfd without flags, and we cannot detect this
 function C.eventfd(initval, flags) return syscall(sys.eventfd2, uint(initval), int(flags)) end
 
--- glibc does not provide getcpu
-function C.getcpu(cpu, node, tcache) return syscall(sys.getcpu, void(node), void(node), void(tcache)) end
-
 -- Musl always returns ENOSYS for these
 function C.sched_getscheduler(pid) return syscall(sys.sched_getscheduler, int(pid)) end
 function C.sched_setscheduler(pid, policy, param)
@@ -329,9 +326,6 @@ function C.clock_nanosleep(clk_id, flags, req, rem)
 end
 function C.clock_getres(clk_id, ts)
   return syscall(sys.clock_getres, int(clk_id), void(ts))
-end
-function C.clock_gettime(clk_id, ts)
-  return syscall(sys.clock_gettime, int(clk_id), void(ts))
 end
 function C.clock_settime(clk_id, ts)
   return syscall(sys.clock_settime, int(clk_id), void(ts))
@@ -512,6 +506,16 @@ function C.sigaction(signum, act, oldact)
   return syscall(sys.rt_sigaction, int(signum), void(act), void(oldact), ulong(8)) -- size is size of mask field
 end
 
+-- in VDSO for many archs, so use ffi for now for speed TODO read VDSO
+--function C.clock_gettime(clk_id, ts) return syscall(sys.clock_gettime, int(clk_id), void(ts)) end
+C.clock_gettime = ffi.C.clock_gettime
+C.gettimeofday = ffi.C.gettimeofday
+
+-- glibc does not provide getcpu; it is however VDSO
+function C.getcpu(cpu, node, tcache) return syscall(sys.getcpu, void(node), void(node), void(tcache)) end
+-- time is VDSO but not really performance critical
+function C.time(t) return syscall(sys.time, void(t)) end
+
 -- socketcalls TODO proper arch flag, using ffi.C temporarily
 if sys.accept4 then -- on x86 this is a socketcall, which we have not implemented yet, other archs is a syscall
   function C.accept4(sockfd, addr, addrlen, flags)
@@ -544,7 +548,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "pselect", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "gettimeofday", "time", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "getpgid", "execve", "sigpending", "getpgrp", "listxattr", "llistxattr", "flistxattr", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "mount", "umount", "umount2", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "chroot", "fchownat"}
+local extra = {"waitid", "waitpid", "pselect", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "getpgid", "execve", "sigpending", "getpgrp", "listxattr", "llistxattr", "flistxattr", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "mount", "umount", "umount2", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "chroot", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
