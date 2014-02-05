@@ -139,7 +139,9 @@ end
 
 function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
 
-function S.time(time) return retnum(C.time(time)) end
+if C.time then
+  function S.time(time) return retnum(C.time(time)) end
+end
 
 function S.sysinfo(info)
   info = info or t.sysinfo()
