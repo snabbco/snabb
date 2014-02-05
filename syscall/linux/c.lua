@@ -508,8 +508,7 @@ function C.sigaction(signum, act, oldact)
 end
 
 -- in VDSO for many archs, so use ffi for speed; TODO read VDSO to find functions there, needs elf reader
-local function inlibc(k) return ffi.C[k] end
-if pcall(inlibc, "clock_gettime") then
+if pcall(function(k) return ffi.C[k] end, "clock_gettime") then
   C.clock_gettime = ffi.C.clock_gettime
 else
   function C.clock_gettime(clk_id, ts) return syscall(sys.clock_gettime, int(clk_id), void(ts)) end
