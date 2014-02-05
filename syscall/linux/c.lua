@@ -503,6 +503,11 @@ function C.getpgid(pid) return syscall(sys.getpgid, int(pid)) end
 function C.getpgrp() return syscall(sys.getpgrp) end
 function C.setsid() return syscall(sys.setsid) end
 function C.chroot(path) return syscall(sys.chroot, void(path)) end
+function C.mount(source, target, filesystemtype, mountflags, data)
+  return syscall(sys.mount, void(source), void(target), void(filesystemtype), ulong(mountflags), void(data))
+end
+function C.umount(target) return syscall(sys.umount, void(target)) end
+function C.umount2(target, flags) return syscall(sys.umount2, void(target), int(flags)) end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
@@ -556,7 +561,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "pselect", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "execve", "sigpending", "listxattr", "llistxattr", "flistxattr", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "mount", "umount", "umount2", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "fchownat"}
+local extra = {"waitid", "waitpid", "pselect", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "execve", "sigpending", "listxattr", "llistxattr", "flistxattr", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
