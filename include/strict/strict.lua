@@ -1,10 +1,9 @@
---
 -- strict.lua
 -- checks uses of undeclared global variables
 -- All global variables must be 'declared' through a regular assignment
 -- (even assigning nil will do) in a main chunk before being used
 -- anywhere or assigned to inside a function.
---
+-- distributed under the Lua license: http://www.lua.org/license.html
 
 local getinfo, error, rawset, rawget = debug.getinfo, error, rawset, rawget
 
@@ -31,7 +30,7 @@ mt.__newindex = function (t, n, v)
   end
   rawset(t, n, v)
 end
-
+  
 mt.__index = function (t, n)
   if not mt.__declared[n] and what() ~= "C" then
     error("variable '"..n.."' is not declared", 2)
