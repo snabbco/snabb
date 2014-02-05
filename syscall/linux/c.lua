@@ -544,7 +544,7 @@ C.gettimeofday = ffi.C.gettimeofday
 -- glibc does not provide getcpu; it is however VDSO
 function C.getcpu(cpu, node, tcache) return syscall(sys.getcpu, void(node), void(node), void(tcache)) end
 -- time is VDSO but not really performance critical; does not exist for some architectures
-if pcall(function(k) return ffi.C[k] end, "time") then
+if sys.time then
   function C.time(t) return syscall(sys.time, void(t)) end
 end
 
