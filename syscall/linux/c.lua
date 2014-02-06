@@ -634,7 +634,7 @@ if sys.time then
   function C.time(t) return syscall(sys.time, void(t)) end
 end
 
--- socketcalls, using ffi.C temporarily
+-- socketcalls
 if not sys.socketcall then
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
@@ -671,7 +671,7 @@ C.recvmsg = ffi.C.recvmsg
 -- recvmmsg missing
 -- sendmmsg missing
 
--- these should be converted to syscalls
+-- TODO these should be converted to syscalls
 local extra = {"waitid", "waitpid", "mremap", "fcntl", "wait4", "sigpending"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
