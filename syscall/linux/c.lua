@@ -553,6 +553,7 @@ function C.acct(filename) return syscall(sys.acct, void(filename)) end
 function C.munmap(addr, length) return syscall(sys.munmap, void(addr), ulong(length)) end
 function C.faccessat(dirfd, path, mode, flags) return syscall(sys.faccessat, int(dirfd), void(path), uint(mode), int(flags)) end
 function C.fchmodat(dirfd, path, mode, flags) return syscall(sys.fchmodat, int(dirfd), void(path), uint(mode), int(flags)) end
+function C.mkdirat(dirfd, pathname, mode) return syscall(sys.mkdirat, int(dirfd), void(pathname), uint(mode)) end
 
 -- defined in libc as a pair of longs, but let's be typed
 local pst = ffi.typeof("struct {void *sigmask; long size;}")
@@ -624,7 +625,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "capget", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "sigprocmask", "alarm", "setpriority", "wait4", "execve", "sigpending", "mkdirat", "unlinkat", "setgroups", "capset", "fchownat"}
+local extra = {"waitid", "waitpid", "capget", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "sigprocmask", "alarm", "setpriority", "wait4", "execve", "sigpending", "setgroups", "capset", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
