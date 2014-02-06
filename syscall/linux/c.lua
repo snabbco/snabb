@@ -640,6 +640,10 @@ if not sys.socketcall then
   function C.bind(sockfd, addr, addrlen) return syscall(sys.bind, int(sockfd), void(addr), uint(addrlen)) end
   function C.connect(sockfd, addr, addrlen) return syscall(sys.connect, int(sockfd), void(addr), uint(addrlen)) end
   function C.listen(sockfd, backlog) return syscall(sys.listen, int(sockfd), int(backlog)) end
+  function C.accept(sockfd, addr, addrlen)
+    return syscall(sys.accept, int(sockfd), void(addr), void(addrlen))
+  end
+  function C.getsockname(sockfd, addr, addrlen) return syscall(sys.getsockname, int(sockfd), void(addr), void(addrlen)) end
 
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
@@ -662,6 +666,14 @@ else
     local args = longs(sockfd, backlog)
     return syscall(sys.socketcall, int(socketcalls.LISTEN), void(args))
   end
+  function C.accept(sockfd, addr, addrlen)
+    local args = longs(sockfd, void(addr), void(addrlen))
+    return syscall(sys.socketcall, int(socketcalls.ACCEPT), void(args))
+  end
+  function C.getsockname(sockfd, addr, addrlen)
+    local args = longs(sockfd, void(addr), void(addrlen))
+    return syscall(sys.socketcall, int(socketcalls.GETSOCKNAME), void(args))
+  end
 
   function C.accept4(sockfd, addr, addrlen, flags)
     local args = longs(sockfd, void(addr), void(addrlen), flags)
@@ -672,8 +684,7 @@ else
     return syscall(sys.socketcall, int(socketcalls.SHUTDOWN), void(args))
   end
 end
-C.accept = ffi.C.accept
-C.getsockname = ffi.C.getsockname
+
 C.getpeername = ffi.C.getpeername
 C.socketpair = ffi.C.socketpair
 C.send = ffi.C.send
