@@ -639,6 +639,8 @@ if not sys.socketcall then
   function C.socket(domain, tp, protocol) return syscall(sys.socket, int(domain), int(tp), int(protocol)) end
   function C.bind(sockfd, addr, addrlen) return syscall(sys.bind, int(sockfd), void(addr), uint(addrlen)) end
   function C.connect(sockfd, addr, addrlen) return syscall(sys.connect, int(sockfd), void(addr), uint(addrlen)) end
+  function C.listen(sockfd, backlog) return syscall(sys.listen, int(sockfd), int(backlog)) end
+
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
   end
@@ -656,6 +658,11 @@ else
     local args = longs(sockfd, void(addr), addrlen)
     return syscall(sys.socketcall, int(socketcalls.CONNECT), void(args))
   end
+  function C.listen(sockfd, backlog)
+    local args = longs(sockfd, backlog)
+    return syscall(sys.socketcall, int(socketcalls.LISTEN), void(args))
+  end
+
   function C.accept4(sockfd, addr, addrlen, flags)
     local args = longs(sockfd, void(addr), void(addrlen), flags)
     return syscall(sys.socketcall, int(socketcalls.ACCEPT4), void(args))
