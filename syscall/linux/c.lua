@@ -592,7 +592,7 @@ function C.klogctl(tp, bufp, len) return syscall(sys.syslog, int(tp), void(bufp)
 function C.sigprocmask(how, set, oldset)
   return syscall(sys.rt_sigprocmask, int(how), void(set), void(oldset), sigmasksize(set or oldset))
 end
-
+function C.sigpending(set) return syscall(sys.rt_sigpending, void(set), sigmasksize(set)) end
 
 function C.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask)
   local size = 0
@@ -742,7 +742,7 @@ else
 end
 
 -- TODO these should be converted to syscalls
-local extra = {"waitid", "waitpid", "mremap", "fcntl", "wait4", "sigpending"}
+local extra = {"waitid", "waitpid", "mremap", "fcntl", "wait4"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
