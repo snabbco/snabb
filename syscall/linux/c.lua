@@ -573,6 +573,7 @@ function C.capset(hdrp, datap) return syscall(sys.capset, void(hdrp), void(datap
 function C.alarm(seconds) return syscall(sys.alarm, uint(seconds)) end
 function C.sysinfo(info) return syscall(sys.sysinfo, void(info)) end
 function C.execve(filename, argv, envp) return syscall(sys.execve, void(filename), void(argv), void(envp)) end
+function C.getgroups(size, list) return syscall(sys.getgroups, int(size), void(list)) end
 
 -- defined in libc as a pair of longs, but let's be typed
 local pst = ffi.typeof("struct {void *sigmask; long size;}")
@@ -644,7 +645,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "mremap", "getgroups", "fcntl", "klogctl", "sigprocmask", "wait4", "sigpending", "setgroups"}
+local extra = {"waitid", "waitpid", "mremap", "fcntl", "klogctl", "sigprocmask", "wait4", "sigpending", "setgroups"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
