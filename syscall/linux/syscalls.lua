@@ -130,13 +130,8 @@ function S.uname()
           version = ffi.string(u.version), machine = ffi.string(u.machine), domainname = ffi.string(u.domainname)}
 end
 
-function S.sethostname(s) -- only accept Lua string, do not see use case for buffer as well
-  return retbool(C.sethostname(s, #s))
-end
-
-function S.setdomainname(s)
-  return retbool(C.setdomainname(s, #s))
-end
+function S.sethostname(s, len) return retbool(C.sethostname(s, len or #s)) end
+function S.setdomainname(s, len) return retbool(C.setdomainname(s, len or #s)) end
 
 function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
 
