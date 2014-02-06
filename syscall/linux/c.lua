@@ -79,6 +79,10 @@ if abi.abi32 then
       local len1, len2 = arg64u(length)
       return syscall(sys.ftruncate64, int(fd), int(0), long(len1), long(len2))
     end
+    function C.readahead(fd, offset, count)
+      local off1, off2 = arg64u(offset)
+      return syscall(sys.readahead, int(fd), int(0), long(off1), long(off2), ulong(count))
+    end
     function C.pread(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
       return syscall_long(sys.pread64, int(fd), void(buf), ulong(size), int(0), long(off1), long(off2))
@@ -95,6 +99,10 @@ if abi.abi32 then
     function C.ftruncate(fd, length)
       local len1, len2 = arg64u(length)
       return syscall(sys.ftruncate64, int(fd), long(len1), long(len2))
+    end
+    function C.readahead(fd, offset, count)
+      local off1, off2 = arg64u(offset)
+      return syscall(sys.readahead, int(fd), long(off1), long(off2), ulong(count))
     end
     function C.pread(fd, buf, size, offset)
       local off1, off2 = arg64(offset)
@@ -138,6 +146,7 @@ if abi.abi32 then
 else -- 64 bit
   function C.truncate(path, length) return syscall(sys.truncate, void(path), ulong(length)) end
   function C.ftruncate(fd, length) return syscall(sys.ftruncate, int(fd), ulong(length)) end
+  function C.readahead(fd, offset, count) return syscall(sys.readahead, int(fd), ulong(offset), ulong(count)) end
   function C.pread(fd, buf, count, offset) return syscall_long(sys.pread64, int(fd), void(buf), ulong(count), ulong(offset)) end
   function C.pwrite(fd, buf, count, offset) return syscall_long(sys.pwrite64, int(fd), void(buf), ulong(count), ulong(offset)) end
   function C.statfs(path, buf) return syscall(sys.statfs, void(path), void(buf)) end
@@ -613,7 +622,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "capget", "readahead", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "sigprocmask", "alarm", "setpriority", "wait4", "execve", "sigpending", "faccessat", "fchmodat", "mkdirat", "unlinkat", "setgroups", "capset", "fchownat"}
+local extra = {"waitid", "waitpid", "capget", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "sigprocmask", "alarm", "setpriority", "wait4", "execve", "sigpending", "faccessat", "fchmodat", "mkdirat", "unlinkat", "setgroups", "capset", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
