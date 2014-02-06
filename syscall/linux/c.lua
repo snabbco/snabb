@@ -537,6 +537,8 @@ function C.unshare(flags) return syscall(sys.unshare, int(flags)) end
 function C.reboot(magic, magic2, cmd) return syscall(sys.reboot, int(magic), int(magic2), int(cmd)) end
 function C.sethostname(name, len) return syscall(sys.sethostname, void(name), ulong(len)) end
 function C.setdomainname(name, len) return syscall(sys.setdomainname, void(name), ulong(len)) end
+function C.getitimer(which, curr_value) return syscall(sys.getitimer, int(which), void(curr_value)) end
+function C.setitimer(which, new_value, old_value) return syscall(sys.setitimer, int(which), void(new_value), void(old_value)) end
 
 -- defined in libc as a pair of longs, but let's be typed
 local pst = ffi.typeof("struct {void *sigmask; long size;}")
@@ -608,7 +610,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "sigprocmask", "getitimer", "alarm", "setpriority", "wait4", "setitimer", "execve", "sigpending", "faccessat", "fchmodat", "mkdirat", "unlinkat", "acct", "setgroups", "capset", "fchownat"}
+local extra = {"waitid", "waitpid", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "sigprocmask", "alarm", "setpriority", "wait4", "execve", "sigpending", "faccessat", "fchmodat", "mkdirat", "unlinkat", "acct", "setgroups", "capset", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
