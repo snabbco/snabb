@@ -642,7 +642,7 @@ if not sys.socketcall then
   function C.shutdown(sockfd, how) return syscall(sys.shutdown, int(sockfd), int(how)) end
 else
   function C.accept4(sockfd, addr, addrlen, flags)
-    local args = longs(sockfd, addr, addrlen, flags)
+    local args = longs(sockfd, void(addr), void(addrlen), flags)
     return syscall(sys.socketcall, int(socketcalls.ACCEPT4), void(args))
   end
   function C.shutdown(sockfd, how)
