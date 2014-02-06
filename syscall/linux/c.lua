@@ -560,6 +560,7 @@ end
 function C.setpriority(which, who, prio) return syscall(sys.setpriority, int(which), int(who), int(prio)) end
 function C.sched_get_priority_min(policy) return syscall(sys.sched_get_priority_min, int(policy)) end
 function C.sched_get_priority_max(policy) return syscall(sys.sched_get_priority_max, int(policy)) end
+function C.sched_rr_get_interval(pid, tp) return syscall(sys.sched_rr_get_interval, int(pid), void(tp)) end
 
 -- defined in libc as a pair of longs, but let's be typed
 local pst = ffi.typeof("struct {void *sigmask; long size;}")
@@ -631,7 +632,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "capget", "poll", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "sigprocmask", "alarm", "wait4", "execve", "sigpending", "setgroups", "capset"}
+local extra = {"waitid", "waitpid", "capget", "poll", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "sigprocmask", "alarm", "wait4", "execve", "sigpending", "setgroups", "capset"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
