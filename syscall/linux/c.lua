@@ -591,7 +591,7 @@ function C.getgroups(size, list) return syscall(sys.getgroups, int(size), void(l
 function C.setgroups(size, list) return syscall(sys.setgroups, int(size), void(list)) end
 function C.klogctl(tp, bufp, len) return syscall(sys.syslog, int(tp), void(bufp), int(len)) end
 function C.sigprocmask(how, set, oldset)
-  return syscall(sys.rt_sigprocmask, int(how), void(set), void(oldset), sigmasksize(set or old))
+  return syscall(sys.rt_sigprocmask, int(how), void(set), void(oldset), sigmasksize(set or oldset))
 end
 
 
