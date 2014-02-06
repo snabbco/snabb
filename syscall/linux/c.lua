@@ -593,6 +593,9 @@ function C.sigprocmask(how, set, oldset)
   return syscall(sys.rt_sigprocmask, int(how), void(set), void(oldset), sigmasksize(set or oldset))
 end
 function C.sigpending(set) return syscall(sys.rt_sigpending, void(set), sigmasksize(set)) end
+function C.mremap(old_address, old_size, new_size, flags, new_address)
+  return syscall_void(sys.mremap, void(old_address), ulong(old_size), ulong(new_size), int(flags), void(new_address))
+end
 
 function C.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask)
   local size = 0
@@ -742,7 +745,7 @@ else
 end
 
 -- TODO these should be converted to syscalls
-local extra = {"waitid", "waitpid", "mremap", "fcntl", "wait4"}
+local extra = {"waitid", "waitpid", "fcntl", "wait4"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
