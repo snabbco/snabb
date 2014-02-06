@@ -246,7 +246,7 @@ test.ktrace = {
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
     assert(S.ktrace(tmpfile, "clear", "syscall, sysret", pid))
-    S.nanosleep(0.01) -- can be flaky and only get one event otherwise
+    S.nanosleep(0.05) -- can be flaky and only get one event otherwise, TODO non racy fix
     assert(kfd:kevent(nil, kevs, 1)) -- block until extend
     local buf = t.buffer(4096)
     local n = assert(fd:read(buf, 4096))
