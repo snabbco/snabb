@@ -117,7 +117,7 @@ end
 
 S.wait3 = function(options, rusage, status) return S.wait4(-1, options, rusage, status) end
 
-if S.wait4 and not S.waitpid then
+if not S.waitpid and S.wait4 then
   S.waitpid = function(pid, options, status) return S.wait4(pid, options, false, status) end
 end
 

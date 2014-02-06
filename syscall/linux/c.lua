@@ -597,6 +597,10 @@ function C.mremap(old_address, old_size, new_size, flags, new_address)
   return syscall_void(sys.mremap, void(old_address), ulong(old_size), ulong(new_size), int(flags), void(new_address))
 end
 
+-- only on some architectures
+if sys.waitpid then
+  function C.waitpid(pid, status, options) return syscall(sys.waitpid, int(pid), void(status), int(options)) end
+end
 
 -- fcntl needs a cast as last argument may be int or pointer
 function C.fcntl(fd, cmd, arg) return syscall(sys.fcntl, int(fd), int(cmd), ffi.cast(long, arg)) end
@@ -749,7 +753,7 @@ else
 end
 
 -- TODO these should be converted to syscalls
-local extra = {"waitid", "waitpid", "wait4"}
+local extra = {"waitid", "wait4"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
