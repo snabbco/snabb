@@ -701,19 +701,19 @@ else
   end
   function C.send(sockfd, buf, len, flags)
     local args = longs(sockfd, void(buf), len, flags)
-    return syscall(sys.socketcall, int(socketcalls.SEND), void(args))
+    return syscall_long(sys.socketcall, int(socketcalls.SEND), void(args))
   end
   function C.recv(sockfd, buf, len, flags)
     local args = longs(sockfd, void(buf), len, flags)
-    return syscall(sys.socketcall, int(socketcalls.RECV), void(args))
+    return syscall_long(sys.socketcall, int(socketcalls.RECV), void(args))
   end
   function C.sendto(sockfd, buf, len, flags, dest_addr, addrlen)
     local args = longs(sockfd, void(buf), len, flags, void(dest_addr), addrlen)
-    return syscall(sys.socketcall, int(socketcalls.SENDTO), void(args))
+    return syscall_long(sys.socketcall, int(socketcalls.SENDTO), void(args))
   end
   function C.recvfrom(sockfd, buf, len, flags, src_addr, addrlen)
     local args = longs(sockfd, void(buf), len, flags, void(src_addr), void(addrlen))
-    return syscall(sys.socketcall, int(socketcalls.RECVFROM), void(args))
+    return syscall_long(sys.socketcall, int(socketcalls.RECVFROM), void(args))
   end
   function C.shutdown(sockfd, how)
     local args = longs(sockfd, how)
@@ -729,7 +729,7 @@ else
   end
   function C.sendmsg(sockfd, msg, flags)
     local args = longs(sockfd, void(msg), flags)
-    return syscall(sys.socketcall, int(socketcalls.SENDMSG), void(args))
+    return syscall_long(sys.socketcall, int(socketcalls.SENDMSG), void(args))
   end
 
   function C.accept4(sockfd, addr, addrlen, flags)
