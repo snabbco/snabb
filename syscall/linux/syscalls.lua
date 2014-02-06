@@ -61,8 +61,9 @@ if C.setns then
   function S.setns(fd, nstype) return retbool(C.setns(getfd(fd), c.CLONE[nstype])) end
 end
 
--- note that this is not strictly the syscall that has some other arguments, but has same functionality
-function S.reboot(cmd) return retbool(C.reboot(c.LINUX_REBOOT_CMD[cmd])) end
+function S.reboot(cmd)
+  return retbool(C.reboot(c.LINUX_REBOOT.MAGIC1, c.LINUX_REBOOT.MAGIC2, c.LINUX_REBOOT_CMD[cmd]))
+end
 
 function S.waitpid(pid, options, status) -- note order of arguments changed as rarely supply status
   status = status or t.int1()

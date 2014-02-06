@@ -11,6 +11,8 @@ local abi = require "syscall.abi"
 
 local bit = require "syscall.bit"
 
+local tobit = bit.tobit
+
 local arch = require("syscall.linux." .. abi.arch .. ".constants") -- architecture specific code
 
 local h = require "syscall.helpers"
@@ -3409,6 +3411,15 @@ c.IPV6 = strflag {
   V6ONLY            = 26,
   JOIN_ANYCAST      = 27,
   LEAVE_ANYCAST     = 28,
+}
+
+-- need to use tobit to make sure within int range
+c.LINUX_REBOOT = strflag {
+  MAGIC1    = tobit(0xfee1dead),
+  MAGIC2    = tobit(672274793),
+  MAGIC2A   = tobit(85072278),
+  MAGIC2B   = tobit(369367448),
+  MAGIC2C   = tobit(537993216),
 }
 
 return c
