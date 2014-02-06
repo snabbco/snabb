@@ -603,7 +603,8 @@ if sys.waitpid then
 end
 
 -- fcntl needs a cast as last argument may be int or pointer
-function C.fcntl(fd, cmd, arg) return syscall(sys.fcntl, int(fd), int(cmd), ffi.cast(long, arg)) end
+local fcntl = sys.fcntl64 or sys.fcntl
+function C.fcntl(fd, cmd, arg) return syscall(fcntl, int(fd), int(cmd), ffi.cast(long, arg)) end
 
 function C.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask)
   local size = 0
