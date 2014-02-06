@@ -645,6 +645,7 @@ if not sys.socketcall then
   end
   function C.getsockname(sockfd, addr, addrlen) return syscall(sys.getsockname, int(sockfd), void(addr), void(addrlen)) end
   function C.getpeername(sockfd, addr, addrlen) return syscall(sys.getpeername, int(sockfd), void(addr), void(addrlen)) end
+  function C.socketpair(domain, tp, protocol, sv) return syscall(sys.socketpair, int(domain), int(tp), int(protocol), void(sv)) end
 
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
@@ -679,6 +680,10 @@ else
     local args = longs(sockfd, void(addr), void(addrlen))
     return syscall(sys.socketcall, int(socketcalls.GETPEERNAME), void(args))
   end
+  function C.socketpair(domain, tp, protocol, sv)
+    local args = longs(domain, tp, protocol, void(sv))
+    return syscall(sys.socketcall, int(socketcalls.SOCKETPAIR), void(args))
+  end
 
   function C.accept4(sockfd, addr, addrlen, flags)
     local args = longs(sockfd, void(addr), void(addrlen), flags)
@@ -690,7 +695,6 @@ else
   end
 end
 
-C.socketpair = ffi.C.socketpair
 C.send = ffi.C.send
 C.recv = ffi.C.recv
 C.sendto = ffi.C.sendto
