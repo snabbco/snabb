@@ -250,7 +250,7 @@ test.ktrace = {
     assert(kfd:kevent(nil, kevs, 1)) -- block until extend
     local buf = t.buffer(4096)
     local n = assert(fd:read(buf, 4096))
-    local syscall, sysret = {}, {} -- on real OS luajit may do some meory allocations so may be extra calls occasionally
+    local syscall, sysret = {}, {} -- on real OS luajit may do some memory allocations so may be extra calls occasionally
     for _, ktr in util.kdump(buf, n) do
       assert_equal(ktr.pid, pid)
       if ktr.typename == "SYSCALL" then
