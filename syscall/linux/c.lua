@@ -562,6 +562,12 @@ function C.sched_get_priority_min(policy) return syscall(sys.sched_get_priority_
 function C.sched_get_priority_max(policy) return syscall(sys.sched_get_priority_max, int(policy)) end
 function C.sched_rr_get_interval(pid, tp) return syscall(sys.sched_rr_get_interval, int(pid), void(tp)) end
 function C.poll(fds, nfds, timeout) return syscall(sys.poll, void(fds), int(nfds), int(timeout)) end
+function C.msync(addr, length, flags) return syscall(sys.msync, void(addr), ulong(length), int(flags)) end
+function C.madvise(addr, length, advice) return syscall(sys.madvise, void(addr), ulong(length), int(advice)) end
+function C.mlock(addr, len) return syscall(sys.mlock, void(addr), ulong(len)) end
+function C.munlock(addr, len) return syscall(sys.munlock, void(addr), ulong(len)) end
+function C.mlockall(flags) return syscall(sys.mlockall, int(flags)) end
+function C.munlockall() return syscall(sys.munlockall) end
 
 
 -- defined in libc as a pair of longs, but let's be typed
@@ -634,7 +640,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "capget", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "sigprocmask", "alarm", "wait4", "execve", "sigpending", "setgroups", "capset"}
+local extra = {"waitid", "waitpid", "capget", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "sigprocmask", "alarm", "wait4", "execve", "sigpending", "setgroups", "capset"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
