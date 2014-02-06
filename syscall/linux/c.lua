@@ -1,7 +1,4 @@
--- This sets up the table of C functions, overriding libc where necessary with direct syscalls
-
--- ffi.C (ie libc) is the default fallback via the metatable, but we override stuff that might be missing, has different semantics
--- or which we cannot detect sanely which ABI is being presented.
+-- This sets up the table of C functions
 
 -- this should be generated ideally, as it is the ABI spec
 
@@ -596,8 +593,9 @@ function C.sigpending(set) return syscall(sys.rt_sigpending, void(set), sigmasks
 function C.mremap(old_address, old_size, new_size, flags, new_address)
   return syscall_void(sys.mremap, void(old_address), ulong(old_size), ulong(new_size), int(flags), void(new_address))
 end
+function C.wait4(pid, status, options, rusage) return syscall(sys.wait4, int(pid), void(status), int(options), void(rusage)) end
 
--- note waitid also provides rusage that Posix does not have
+-- note waitid also provides rusage that Posix does not have, maybe we should expose
 function C.waitid(idtype, id, infop, options, rusage)
   return syscall(sys.waitid, int(idtype), uint(id), void(infop), int(options), void(rusage))
 end
@@ -757,11 +755,6 @@ else
     return syscall(sys.socketcall, int(socketcalls.ACCEPT4), void(args))
   end
 end
-
--- TODO these should be converted to syscalls
-local extra = {"wait4"}
-
-for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
 return C
 
