@@ -509,6 +509,15 @@ function C.umount2(target, flags) return syscall(sys.umount2, void(target), int(
 function C.listxattr(path, list, size) return syscall_long(sys.listxattr, void(path), void(list), ulong(size)) end
 function C.llistxattr(path, list, size) return syscall_long(sys.llistxattr, void(path), void(list), ulong(size)) end
 function C.flistxattr(fd, list, size) return syscall_long(sys.flistxattr, int(fd), void(list), ulong(size)) end
+function C.setxattr(path, name, value, size, flags)
+  return syscall(sys.setxattr, void(path), void(name), void(value), ulong(size), int(flags))
+end
+function C.lsetxattr(path, name, value, size, flags)
+  return syscall(sys.lsetxattr, void(path), void(name), void(value), ulong(size), int(flags))
+end
+function C.fsetxattr(fd, name, value, size, flags)
+  return syscall(sys.fsetxattr, int(fd), void(name), void(value), ulong(size), int(flags))
+end
 
 -- defined in libc as a pair of longs, but lets by typed
 local pst = ffi.typeof("struct {void *sigmask; long size;}")
@@ -580,7 +589,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "execve", "sigpending", "setxattr", "lsetxattr", "fsetxattr", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "fchownat"}
+local extra = {"waitid", "waitpid", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "execve", "sigpending", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
