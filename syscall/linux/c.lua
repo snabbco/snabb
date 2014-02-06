@@ -595,7 +595,7 @@ function C.sigprocmask(how, set, oldset)
 end
 
 
--- defined in libc as a pair of longs, but let's be typed
+-- defined in libc as a pair of longs, but let's be typed TODO use longs()
 local pst = ffi.typeof("struct {void *sigmask; long size;}")
 
 function C.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask)
