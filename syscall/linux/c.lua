@@ -568,6 +568,8 @@ function C.mlock(addr, len) return syscall(sys.mlock, void(addr), ulong(len)) en
 function C.munlock(addr, len) return syscall(sys.munlock, void(addr), ulong(len)) end
 function C.mlockall(flags) return syscall(sys.mlockall, int(flags)) end
 function C.munlockall() return syscall(sys.munlockall) end
+function C.capget(hdrp, datap) return syscall(sys.capget, void(hdrp), void(datap)) end
+function C.capset(hdrp, datap) return syscall(sys.capset, void(hdrp), void(datap)) end
 
 
 -- defined in libc as a pair of longs, but let's be typed
@@ -640,7 +642,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "capget", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "sigprocmask", "alarm", "wait4", "execve", "sigpending", "setgroups", "capset"}
+local extra = {"waitid", "waitpid", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "sigprocmask", "alarm", "wait4", "execve", "sigpending", "setgroups"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
