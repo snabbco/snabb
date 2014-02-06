@@ -65,11 +65,9 @@ This project is being used ina variety of places, such as for testing the Linux 
 
 ## Testing
 
-The test script is fairly comprehensive. Tested on ARM, amd64, x86, with various combinations of libc. I run long test runs as LuaJIT makes random choices in code generation so single runs do not necessarily show errors. Also tested with Valgrind to pick up memory errors, although there are some issues with some of the system calls, which are being gradually resolved (I use Valgrind SVN).
+The test script is fairly comprehensive. Tested on ARM, amd64, x86, PowerPC. I run long test runs as LuaJIT makes random choices in code generation so single runs do not necessarily show errors. Also tested with Valgrind to pick up memory errors, although there are some issues with some of the system calls, which are being gradually resolved (I use Valgrind SVN).
 
 Some tests need to be run as root, and will not be run otherwise. You cannot test a lot of system calls otherwise. Under Linux the testing is now done in isolated containers so should not affect the host system, although on old kernels reboot in a container could reboot the host.
-
-Some tests may fail if you do not have kernel support for some feature (eg namespacing, ipv6, bridges). Starting to add feature testing to work around this, but the way this works needs improving.
 
 The test script is a copy of [luaunit](https://github.com/rjpcomputing/luaunit). I have made some modifications to allow tests to be skipped, which are not really general enough to push upstream, although I would like a nicer solution.
 
@@ -95,9 +93,7 @@ The aim is to provide nice to use, Lua friendly interfaces where possible, but m
 
 ## Note on libc
 
-Under Linux, lots of system calls have glibc wrappers, some of these are trivial some less so, and some are broken. In particular some of them expose different ABIs, so we try to avoid these, just using kernel ABIs as these have long term support and we are not trying to be compatible as we are using a different language. `strace` is your friend, although strace is buggy in the nasty edge cases (at some point ljsyscall will implement ptrace so it can debug itself; it implements `ktrace` in NetBSD). Therefore under Linux the project is gradually moving to calling system calls directly, bypassing the libc, just keeping directly to the kernel ABI.
-
-As well as eglibc and glibc, everything now runs on [Musl libc](http://www.etalabs.net/musl/). I use [sabotage](https://github.com/rofl0r/sabotage) as a build environment, which now includes luajit, although you may need to update to git head. Musl is much smaller than libc (700k vs 3M), while still implementing everything we need in easy to understand code. It is also MIT licensed, which may be useful as it matches the other licenses for LuaJIT and ljsyscall. Occasionally I find small bugs and missing features which I feed back to the developers. The Android libc, bionic, is also supported now, mainly by bypassing it and calling the system calls directly.
+Under Linux, there are several alternative C libraries as well as the standard Glibc, such as [Musl libc](http://www.musl-libc.org/), uClibc, Dietlibc and Bionic, which is the C library used on Android. These are not ABI compatible, so in order to allow use of any of them, we just call system calls directly on Linux, bypassing libc completely.
 
 Under NetBSD it is much simpler, the only thing we need to be careful of is versioned system calls in libc, where we directly call a specific version as the plain name will always refer to the old version for compatibility. FreeBSD does a more transparent versioning, so the syscall names stay the same.
 

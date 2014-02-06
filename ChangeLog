@@ -11,6 +11,7 @@
 + New rockspecs for stable version, thanks to Hisham
 + Add remap_file_pages, thanks to Brian Downing
 + Add getpagesize
++ All syscalls now direct not via libc on Linux
 
     0.9 release
 
