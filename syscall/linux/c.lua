@@ -595,13 +595,10 @@ function C.sigprocmask(how, set, oldset)
 end
 
 
--- defined in libc as a pair of longs, but let's be typed TODO use longs()
-local pst = ffi.typeof("struct {void *sigmask; long size;}")
-
 function C.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask)
   local size = 0
   if sigmask then size = sigset_size end
-  local data = pst(sigmask, size)
+  local data = longs(void(sigmask), size)
   return syscall(sys.pselect6, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout), void(data))
 end
 
