@@ -651,11 +651,14 @@ if not sys.socketcall then
   function C.sendto(sockfd, buf, len, flags, dest_addr, addrlen)
     return syscall_long(sys.sendto, int(sockfd), void(buf), ulong(len), int(flags), void(dest_addr), uint(addrlen))
   end
+  function C.recvfrom(sockfd, buf, len, flags, dest_addr, addrlen)
+    return syscall_long(sys.recvfrom, int(sockfd), void(buf), ulong(len), int(flags), void(dest_addr), void(addrlen))
+  end
+  function C.shutdown(sockfd, how) return syscall(sys.shutdown, int(sockfd), int(how)) end
 
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
   end
-  function C.shutdown(sockfd, how) return syscall(sys.shutdown, int(sockfd), int(how)) end
 else
   function C.socket(domain, tp, protocol)
     local args = longs(domain, tp, protocol)
@@ -701,19 +704,21 @@ else
     local args = longs(sockfd, void(buf), len, flags, void(dest_addr), addrlen)
     return syscall(sys.socketcall, int(socketcalls.SENDTO), void(args))
   end
-
-  function C.accept4(sockfd, addr, addrlen, flags)
-    local args = longs(sockfd, void(addr), void(addrlen), flags)
-    return syscall(sys.socketcall, int(socketcalls.ACCEPT4), void(args))
+  function C.recvfrom(sockfd, buf, len, flags, src_addr, addrlen)
+    local args = longs(sockfd, void(buf), len, flags, void(src_addr), void(addrlen))
+    return syscall(sys.socketcall, int(socketcalls.RECVFROM), void(args))
   end
   function C.shutdown(sockfd, how)
     local args = longs(sockfd, how)
     return syscall(sys.socketcall, int(socketcalls.SHUTDOWN), void(args))
   end
+
+  function C.accept4(sockfd, addr, addrlen, flags)
+    local args = longs(sockfd, void(addr), void(addrlen), flags)
+    return syscall(sys.socketcall, int(socketcalls.ACCEPT4), void(args))
+  end
 end
 
-C.recvfrom = ffi.C.recvfrom
--- shutdown above
 C.setsockopt = ffi.C.setsockopt
 C.getsockopt = ffi.C.getsockopt
 C.sendmsg = ffi.C.sendmsg
