@@ -658,6 +658,9 @@ if not sys.socketcall then
   function C.setsockopt(sockfd, level, optname, optval, optlen)
     return syscall(sys.setsockopt, int(sockfd), int(level), int(optname), void(optval), uint(optlen))
   end
+  function C.getsockopt(sockfd, level, optname, optval, optlen)
+    return syscall(sys.getsockopt, int(sockfd), int(level), int(optname), void(optval), void(optlen))
+  end
 
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
@@ -719,6 +722,10 @@ else
     local args = longs(sockfd, level, optname, void(optval), optlen)
     return syscall(sys.socketcall, int(socketcalls.SETSOCKOPT), void(args))
   end
+  function C.getsockopt(sockfd, level, optname, optval, optlen)
+    local args = longs(sockfd, level, optname, void(optval), void(optlen))
+    return syscall(sys.socketcall, int(socketcalls.GETSOCKOPT), void(args))
+  end
 
   function C.accept4(sockfd, addr, addrlen, flags)
     local args = longs(sockfd, void(addr), void(addrlen), flags)
@@ -726,7 +733,6 @@ else
   end
 end
 
-C.getsockopt = ffi.C.getsockopt
 C.sendmsg = ffi.C.sendmsg
 C.recvmsg = ffi.C.recvmsg
 -- accept4 above
