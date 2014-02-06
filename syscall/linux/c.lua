@@ -597,6 +597,11 @@ function C.mremap(old_address, old_size, new_size, flags, new_address)
   return syscall_void(sys.mremap, void(old_address), ulong(old_size), ulong(new_size), int(flags), void(new_address))
 end
 
+-- note waitid also provides rusage that Posix does not have
+function C.waitid(idtype, id, infop, options, rusage)
+  return syscall(sys.waitid, int(idtype), uint(id), void(infop), int(options), void(rusage))
+end
+
 -- only on some architectures
 if sys.waitpid then
   function C.waitpid(pid, status, options) return syscall(sys.waitpid, int(pid), void(status), int(options)) end
@@ -754,7 +759,7 @@ else
 end
 
 -- TODO these should be converted to syscalls
-local extra = {"waitid", "wait4"}
+local extra = {"wait4"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
