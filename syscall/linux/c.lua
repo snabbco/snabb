@@ -576,6 +576,10 @@ function C.execve(filename, argv, envp) return syscall(sys.execve, void(filename
 function C.getgroups(size, list) return syscall(sys.getgroups, int(size), void(list)) end
 function C.setgroups(size, list) return syscall(sys.setgroups, int(size), void(list)) end
 function C.klogctl(tp, bufp, len) return syscall(sys.syslog, int(tp), void(bufp), int(len)) end
+function C.sigprocmask(how, set, oldset)
+  return syscall(sys.rt_sigprocmask, int(how), void(set), void(oldset), sigmasksize(set or old))
+end
+
 
 -- defined in libc as a pair of longs, but let's be typed
 local pst = ffi.typeof("struct {void *sigmask; long size;}")
@@ -647,7 +651,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "mremap", "fcntl", "sigprocmask", "wait4", "sigpending"}
+local extra = {"waitid", "waitpid", "mremap", "fcntl", "wait4", "sigpending"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
