@@ -672,7 +672,6 @@ else
     return syscall(sys.socketcall, int(socketcalls.SHUTDOWN), void(args))
   end
 end
-C.listen = ffi.C.listen
 C.accept = ffi.C.accept
 C.getsockname = ffi.C.getsockname
 C.getpeername = ffi.C.getpeername
