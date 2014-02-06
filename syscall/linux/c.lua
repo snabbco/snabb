@@ -584,7 +584,6 @@ function C.mlockall(flags) return syscall(sys.mlockall, int(flags)) end
 function C.munlockall() return syscall(sys.munlockall) end
 function C.capget(hdrp, datap) return syscall(sys.capget, void(hdrp), void(datap)) end
 function C.capset(hdrp, datap) return syscall(sys.capset, void(hdrp), void(datap)) end
-function C.alarm(seconds) return syscall(sys.alarm, uint(seconds)) end
 function C.sysinfo(info) return syscall(sys.sysinfo, void(info)) end
 function C.execve(filename, argv, envp) return syscall(sys.execve, void(filename), void(argv), void(envp)) end
 function C.getgroups(size, list) return syscall(sys.getgroups, int(size), void(list)) end
@@ -606,6 +605,11 @@ end
 local select = sys._newselect or sys.select
 function C.select(nfds, readfds, writefds, exceptfds, timeout)
   return syscall(select, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout))
+end
+
+-- missing on some platforms eg ARM
+if sys.alarm then
+  function C.alarm(seconds) return syscall(sys.alarm, uint(seconds)) end
 end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
