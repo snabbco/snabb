@@ -105,10 +105,17 @@ test.file_operations_linux = {
     assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported")
     ok, err = S.posix_fallocate(fd, 0, 8192)
     assert(ok or err.OPNOTSUPP or err.NOSYS, "expect posix_fallocate to succeed if supported")
-    assert(S.readahead(fd, 0, 4096))
     -- disabled as will often give ENOSPC! TODO better test
     --local ok, err = S.fallocate(fd, "keep_size", largeval, largeval + 1) -- test 64 bit ops 8589934592, 8589934593
     --assert(ok or err.OPNOTSUPP or err.NOSYS, "expect fallocate to succeed if supported, got " .. tostring(err))
+    assert(fd:close())
+  end,
+  test_readahead = function()
+    local fd = assert(S.open(tmpfile, "creat, rdwr", "RWXU"))
+    assert(S.unlink(tmpfile))
+    local pagesize = S.getpagesize()
+    assert(fd:readahead(0, pagesize))
+    assert(fd:readahead(largeval, pagesize))
     assert(fd:close())
   end,
   test_sync_file_range = function()
