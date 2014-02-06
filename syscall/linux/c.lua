@@ -527,6 +527,9 @@ end
 function C.fgetxattr(fd, name, value, size)
   return syscall_long(sys.fgetxattr, int(fd), void(name), void(value), ulong(size))
 end
+function C.removexattr(path, name) return syscall(sys.removexattr, void(path), void(name)) end
+function C.lremovexattr(path, name) return syscall(sys.lremovexattr, void(path), void(name)) end
+function C.fremovexattr(fd, name) return syscall(sys.fremovexattr, int(fd), void(name)) end
 
 
 -- defined in libc as a pair of longs, but lets by typed
@@ -599,7 +602,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "execve", "sigpending", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "fchownat"}
+local extra = {"waitid", "waitpid", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "execve", "sigpending", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
