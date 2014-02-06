@@ -518,6 +518,16 @@ end
 function C.fsetxattr(fd, name, value, size, flags)
   return syscall(sys.fsetxattr, int(fd), void(name), void(value), ulong(size), int(flags))
 end
+function C.getxattr(path, name, value, size)
+  return syscall_long(sys.getxattr, void(path), void(name), void(value), ulong(size))
+end
+function C.lgetxattr(path, name, value, size)
+  return syscall_long(sys.lgetxattr, void(path), void(name), void(value), ulong(size))
+end
+function C.fgetxattr(fd, name, value, size)
+  return syscall_long(sys.fgetxattr, int(fd), void(name), void(value), ulong(size))
+end
+
 
 -- defined in libc as a pair of longs, but lets by typed
 local pst = ffi.typeof("struct {void *sigmask; long size;}")
@@ -589,7 +599,7 @@ C.recvmsg = ffi.C.recvmsg
 -- sendmmsg missing
 
 -- these should be converted to syscalls
-local extra = {"waitid", "waitpid", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "execve", "sigpending", "getxattr", "lgetxattr", "fgetxattr", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "fchownat"}
+local extra = {"waitid", "waitpid", "capget", "readahead", "munmap", "sched_yield", "poll", "sched_get_priority_min", "sched_get_priority_max", "sched_rr_get_interval", "mremap", "getgroups", "fcntl", "sysinfo", "klogctl", "msync", "madvise", "mlock", "munlock", "mlockall", "munlockall", "inotify_add_watch", "inotify_rm_watch", "sigprocmask", "getitimer", "alarm", "setpgid", "setpriority", "wait4", "setitimer", "execve", "sigpending", "removexattr", "lremovexattr", "fremovexattr", "faccessat", "fchmodat", "mkdirat", "unlinkat", "unshare", "reboot", "sethostname", "setdomainname", "acct", "setgroups", "capset", "fchownat"}
 
 for _, v in ipairs(extra) do C[v] = ffi.C[v] end
 
