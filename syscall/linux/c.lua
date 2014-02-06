@@ -662,7 +662,7 @@ if not sys.socketcall then
     return syscall(sys.getsockopt, int(sockfd), int(level), int(optname), void(optval), void(optlen))
   end
   function C.sendmsg(sockfd, msg, flags) return syscall_long(sys.sendmsg, int(sockfd), void(msg), int(flags)) end
-
+  function C.recvmsg(sockfd, msg, flags) return syscall_long(sys.recvmsg, int(sockfd), void(msg), int(flags)) end
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
   end
@@ -731,17 +731,15 @@ else
     local args = longs(sockfd, void(msg), flags)
     return syscall_long(sys.socketcall, int(socketcalls.SENDMSG), void(args))
   end
-
+  function C.recvmsg(sockfd, msg, flags)
+    local args = longs(sockfd, void(msg), flags)
+    return syscall_long(sys.socketcall, int(socketcalls.RECVMSG), void(args))
+  end
   function C.accept4(sockfd, addr, addrlen, flags)
     local args = longs(sockfd, void(addr), void(addrlen), flags)
     return syscall(sys.socketcall, int(socketcalls.ACCEPT4), void(args))
   end
 end
-
-C.recvmsg = ffi.C.recvmsg
--- accept4 above
--- recvmmsg missing
--- sendmmsg missing
 
 -- TODO these should be converted to syscalls
 local extra = {"waitid", "waitpid", "mremap", "fcntl", "wait4", "sigpending"}
