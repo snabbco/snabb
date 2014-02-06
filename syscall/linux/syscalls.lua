@@ -370,7 +370,9 @@ function S.adjtimex(a)
   return t.adjtimex(ret, a)
 end
 
-function S.alarm(s) return C.alarm(s) end
+if C.alarm then
+  function S.alarm(s) return C.alarm(s) end
+end
 
 function S.setreuid(ruid, euid) return retbool(C.setreuid(ruid, euid)) end
 function S.setregid(rgid, egid) return retbool(C.setregid(rgid, egid)) end
