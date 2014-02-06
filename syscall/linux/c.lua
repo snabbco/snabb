@@ -633,12 +633,11 @@ function C.getcpu(cpu, node, tcache) return syscall(sys.getcpu, void(node), void
 if sys.time then
   function C.time(t) return syscall(sys.time, void(t)) end
 end
---socket(int domain, int type, int protocol);
 
 -- socketcalls
 if not sys.socketcall then
   function C.socket(domain, tp, protocol) return syscall(sys.socket, int(domain), int(tp), int(protocol)) end
-
+  function C.bind(sockfd, addr, addrlen) return syscall(sys.bind, int(sockfd), void(addr), uint(addrlen)) end
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
   end
@@ -647,6 +646,10 @@ else
   function C.socket(domain, tp, protocol)
     local args = longs(domain, tp, protocol)
     return syscall(sys.socketcall, int(socketcalls.SOCKET), void(args))
+  end
+  function C.bind(sockfd, addr, addrlen)
+    local args = longs(sockfd, void(addr), addrlen)
+    return syscall(sys.socketcall, int(socketcalls.BIND), void(args))
   end
   function C.accept4(sockfd, addr, addrlen, flags)
     local args = longs(sockfd, void(addr), void(addrlen), flags)
@@ -657,7 +660,6 @@ else
     return syscall(sys.socketcall, int(socketcalls.SHUTDOWN), void(args))
   end
 end
-C.bind = ffi.C.bind
 C.connect = ffi.C.connect
 C.listen = ffi.C.listen
 C.accept = ffi.C.accept
