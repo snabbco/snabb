@@ -7,10 +7,10 @@
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string = 
+pcall, type, table, string, select = 
 require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string
+pcall, type, table, string, select
 
 local abi = require "syscall.abi"
 
@@ -58,6 +58,7 @@ local nr = require("syscall.linux.nr")
 
 local zeropad = nr.zeropad
 local sys = nr.SYS
+local socketcalls = nr.socketcalls
 
 local u64 = ffi.typeof("uint64_t")
 
@@ -67,6 +68,19 @@ local function syscall(...) return tonumber(syscall_long(...)) end -- int is def
 local function syscall_uint(...) return uint(syscall_long(...)) end
 local function syscall_void(...) return void(syscall_long(...)) end
 local function syscall_off(...) return u64(syscall_long(...)) end -- off_t
+
+local longstype = ffi.typeof("long[?]")
+
+local function longs(...)
+  local n = select('#', ...)
+  local ll = ffi.new(longstype, n)
+  for i = 1, n do
+    ll[i - 1] = ffi.cast(long, select(i, ...))
+  end
+  return ll
+end
+
+-- now for the system calls
 
 -- use 64 bit fileops on 32 bit always. As may be missing will use syscalls directly
 if abi.abi32 then
@@ -619,15 +633,21 @@ if sys.time then
   function C.time(t) return syscall(sys.time, void(t)) end
 end
 
--- socketcalls TODO proper arch flag, using ffi.C temporarily
-if sys.accept4 then -- on x86 this is a socketcall, which we have not implemented yet, other archs is a syscall
+-- socketcalls, using ffi.C temporarily
+if not sys.socketcall then
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
   end
   function C.shutdown(sockfd, how) return syscall(sys.shutdown, int(sockfd), int(how)) end
 else
-  C.accept4 = ffi.C.accept4
-  C.shutdown = ffi.C.shutdown
+  function C.accept4(sockfd, addr, addrlen, flags)
+    local args = longs(sockfd, addr, addrlen, flags)
+    return syscall(sys.socketcall, int(socketcalls.ACCEPT4), void(args))
+  end
+  function C.shutdown(sockfd, how)
+    local args = longs(sockfd, how)
+    return syscall(sys.socketcall, int(socketcalls.SHUTDOWN), void(args))
+  end
 end
 C.socket = ffi.C.socket
 C.bind = ffi.C.bind
