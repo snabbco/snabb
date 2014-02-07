@@ -65,20 +65,13 @@ function S.reboot(cmd)
   return retbool(C.reboot(c.LINUX_REBOOT.MAGIC1, c.LINUX_REBOOT.MAGIC2, c.LINUX_REBOOT_CMD[cmd]))
 end
 
-if C.waitpid then
-  function S.waitpid(pid, options, status) -- note order of arguments changed as rarely supply status
-    status = status or t.int1()
-    local ret, err = C.waitpid(c.WAIT[pid], status, c.W[options])
-    if ret == -1 then return nil, t.error(err or errno()) end
-    return ret, nil, t.waitstatus(status[0])
-  end
-end
-
-function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
+-- note waitid also provides rusage that Posix does not have, override default
+function S.waitid(idtype, id, options, infop, rusage) -- note order of args, as usually dont supply infop, rusage
   if not infop then infop = t.siginfo() end
-  local ret, err = C.waitid(c.P[idtype], id or 0, infop, c.W[options])
+  if not rusage and rusage ~= false then rusage = t.rusage() end
+  local ret, err = C.waitid(c.P[idtype], id or 0, infop, c.W[options], rusage)
   if ret == -1 then return nil, t.error(err or errno()) end
-  return infop
+  return infop, nil, rusage
 end
 
 function S.exit(status) C.exit_group(c.EXIT[status or 0]) end

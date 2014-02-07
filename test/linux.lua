@@ -1639,17 +1639,18 @@ test.signals_linux = {
 }
 
 test.processes_linux = {
-  test_fork_waitid = function()
+  test_fork_waitid_linux = function() -- uses Linux specific waitid extension
     local pid0 = S.getpid()
     local pid = assert(S.fork())
     if pid == 0 then -- child
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
-      local infop = assert(S.waitid("all", 0, "exited, stopped, continued"))
+      local infop, rusage = assert(S.waitid("all", 0, "exited, stopped, continued"))
       assert_equal(infop.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
       assert_equal(infop.status, 23, "exit should be 23")
       assert_equal(infop.code, c.SIGCLD.EXITED, "normal exit expected")
+      assert(rusage)
     end
   end,
   test_clone = function()

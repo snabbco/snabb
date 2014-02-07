@@ -2237,6 +2237,20 @@ test_processes = {
       assert(status.EXITSTATUS == 23, "exit should be 23")
     end
   end,
+  test_fork_waitid = function()
+    if not S.waitid then error "skipped" end -- NetBSD at least has no waitid
+    local pid0 = S.getpid()
+    local pid = assert(S.fork())
+    if pid == 0 then -- child
+      fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
+      S.exit(23)
+    else -- parent
+      local infop = assert(S.waitid("all", 0, "exited, stopped, continued"))
+      assert_equal(infop.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
+      assert_equal(infop.status, 23, "exit should be 23")
+      assert_equal(infop.code, c.SIGCLD.EXITED, "normal exit expected")
+    end
+  end,
   test_fork_wait4 = function()
     local pid0 = S.getpid()
     assert(pid0 > 1, "expecting my pid to be larger than 1")

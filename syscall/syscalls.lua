@@ -450,6 +450,24 @@ function S.wait4(pid, options, ru, status) -- note order of arguments changed as
   return ret, nil, t.waitstatus(status[0]), ru
 end
 
+if C.waitpid then
+  function S.waitpid(pid, options, status) -- note order of arguments changed as rarely supply status
+    status = status or t.int1()
+    local ret, err = C.waitpid(c.WAIT[pid], status, c.W[options])
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return ret, nil, t.waitstatus(status[0])
+  end
+end
+
+if S.waitid then
+  function S.waitid(idtype, id, options, infop) -- note order of args, as usually dont supply infop
+    if not infop then infop = t.siginfo() end
+    local ret, err = C.waitid(c.P[idtype], id or 0, infop, c.W[options])
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return infop
+  end
+end
+
 function S.setpriority(which, who, prio) return retbool(C.setpriority(c.PRIO[which], who or 0, prio)) end
 -- Linux overrides getpriority as it offsets return values so that they are not negative
 function S.getpriority(which, who)

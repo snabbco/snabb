@@ -595,7 +595,6 @@ function C.mremap(old_address, old_size, new_size, flags, new_address)
 end
 function C.wait4(pid, status, options, rusage) return syscall(sys.wait4, int(pid), void(status), int(options), void(rusage)) end
 
--- note waitid also provides rusage that Posix does not have, maybe we should expose
 function C.waitid(idtype, id, infop, options, rusage)
   return syscall(sys.waitid, int(idtype), uint(id), void(infop), int(options), void(rusage))
 end
