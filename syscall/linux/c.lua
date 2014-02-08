@@ -593,6 +593,7 @@ function C.sigpending(set) return syscall(sys.rt_sigpending, void(set), sigmasks
 function C.mremap(old_address, old_size, new_size, flags, new_address)
   return syscall_void(sys.mremap, void(old_address), ulong(old_size), ulong(new_size), int(flags), void(new_address))
 end
+function C.nanosleep(req, rem) return syscall(sys.nanosleep, void(req), void(rem)) end
 function C.wait4(pid, status, options, rusage) return syscall(sys.wait4, int(pid), void(status), int(options), void(rusage)) end
 
 function C.waitid(idtype, id, infop, options, rusage)
