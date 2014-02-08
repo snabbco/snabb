@@ -2030,8 +2030,7 @@ end
 
 test_sleep = {
   test_nanosleep = function()
-    local ok, rem = assert(S.nanosleep(0.001))
-    assert(ok and not rem)
+    assert(S.nanosleep(0.001))
   end,
   test_sleep = function()
     assert(S.sleep(0))
