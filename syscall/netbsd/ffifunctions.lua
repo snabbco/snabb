@@ -19,6 +19,19 @@ int pollts(struct pollfd * restrict fds, nfds_t nfds, const struct timespec * re
 int utrace(const char *label, void *addr, size_t len);
 int fktrace(int fd, int ops, int trpoints, pid_t pid);
 
+ssize_t listxattr(const char *path, char *list, size_t size);
+ssize_t llistxattr(const char *path, char *list, size_t size);
+ssize_t flistxattr(int fd, char *list, size_t size);
+ssize_t getxattr(const char *path, const char *name, void *value, size_t size);
+ssize_t lgetxattr(const char *path, const char *name, void *value, size_t size);
+ssize_t fgetxattr(int fd, const char *name, void *value, size_t size);
+int setxattr(const char *path, const char *name, const void *value, size_t size, int flags);
+int lsetxattr(const char *path, const char *name, const void *value, size_t size, int flags);
+int fsetxattr(int fd, const char *name, const void *value, size_t size, int flags);
+int removexattr(const char *path, const char *name);
+int lremovexattr(const char *path, const char *name);
+int fremovexattr(int fd, const char *name);
+
 int __mount50(const char *type, const char *dir, int flags, void *data, size_t data_len);
 int __stat50(const char *path, struct stat *sb);
 int __lstat50(const char *path, struct stat *sb);

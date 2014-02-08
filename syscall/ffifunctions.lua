@@ -165,19 +165,6 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp);
 int clock_settime(clockid_t clk_id, const struct timespec *tp);
 int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *request, struct timespec *remain);
 
-ssize_t listxattr(const char *path, char *list, size_t size);
-ssize_t llistxattr(const char *path, char *list, size_t size);
-ssize_t flistxattr(int fd, char *list, size_t size);
-ssize_t getxattr(const char *path, const char *name, void *value, size_t size);
-ssize_t lgetxattr(const char *path, const char *name, void *value, size_t size);
-ssize_t fgetxattr(int fd, const char *name, void *value, size_t size);
-int setxattr(const char *path, const char *name, const void *value, size_t size, int flags);
-int lsetxattr(const char *path, const char *name, const void *value, size_t size, int flags);
-int fsetxattr(int fd, const char *name, const void *value, size_t size, int flags);
-int removexattr(const char *path, const char *name);
-int lremovexattr(const char *path, const char *name);
-int fremovexattr(int fd, const char *name);
-
 int getpagesize(void);
 ]]
 
