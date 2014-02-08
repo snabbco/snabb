@@ -134,12 +134,12 @@ if not S.nanosleep then
 end
 
 -- common libc function
-if S.nanosleep then
+if not S.sleep and S.nanosleep then
   function S.sleep(sec)
-    local rem, err = S.nanosleep(sec)
-    if not rem then return nil, err end
-    if rem == true then return 0 end
-    return tonumber(rem.tv_sec)
+    local ok, err, rem = S.nanosleep(sec)
+    if not ok then return nil, err end
+    if rem then return tonumber(rem.tv_sec) end
+    return 0
   end
 end
 

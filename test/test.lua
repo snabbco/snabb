@@ -2017,6 +2017,9 @@ test_sleep = {
     local rem = assert(S.nanosleep(0.001))
     assert_equal(rem, 0, "expect no elapsed time after nanosleep")
   end,
+  test_sleep = function()
+    assert(S.sleep(0))
+  end,
 }
 
 if not (S.__rump or abi.xen) then -- rump has no processes, memory allocation, process accounting, mmap and proc not applicable

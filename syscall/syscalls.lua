@@ -691,9 +691,9 @@ if C.nanosleep then
     rem = rem or t.timespec()
     local ret, err = C.nanosleep(mktype(t.timespec, req), rem)
     if ret == -1 then
-      if (err or errno()) == c.E.INTR then return rem else return nil, t.error(err or errno()) end
+      if (err or errno()) == c.E.INTR then return true, nil, remrem else return nil, t.error(err or errno()) end
     end
-    return 0 -- no time remaining
+    return true -- no time remaining
   end
 end
 
