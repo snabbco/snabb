@@ -2030,8 +2030,8 @@ end
 
 test_sleep = {
   test_nanosleep = function()
-    local rem = assert(S.nanosleep(0.001))
-    assert_equal(rem, 0, "expect no elapsed time after nanosleep")
+    local ok, rem = assert(S.nanosleep(0.001))
+    assert(ok and not rem)
   end,
   test_sleep = function()
     assert(S.sleep(0))
