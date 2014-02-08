@@ -727,11 +727,13 @@ local function lattrbuf(sys, a)
   return tab
 end
 
-if C.listxattr then -- if this exists, assume all do
+if C.listxattr then -- if this exists, assume all do TODO better tests (something odd on OSX)
 function S.listxattr(path) return lattrbuf(C.listxattr, path) end
 function S.llistxattr(path) return lattrbuf(C.llistxattr, path) end
 function S.flistxattr(fd) return lattrbuf(C.flistxattr, getfd(fd)) end
+end
 
+if C.setxattr then
 function S.setxattr(path, name, value, flags)
   return retbool(C.setxattr(path, name, value, #value, c.XATTR[flags]))
 end
@@ -741,14 +743,19 @@ end
 function S.fsetxattr(fd, name, value, flags)
   return retbool(C.fsetxattr(getfd(fd), name, value, #value, c.XATTR[flags]))
 end
+end
 
+if C.getxattr then
 function S.getxattr(path, name) return growattrbuf(C.getxattr, path, name) end
 function S.lgetxattr(path, name) return growattrbuf(C.lgetxattr, path, name) end
 function S.fgetxattr(fd, name) return growattrbuf(C.fgetxattr, getfd(fd), name) end
+end
 
+if C.removexattr then
 function S.removexattr(path, name) return retbool(C.removexattr(path, name)) end
 function S.lremovexattr(path, name) return retbool(C.lremovexattr(path, name)) end
 function S.fremovexattr(fd, name) return retbool(C.fremovexattr(getfd(fd), name)) end
+end
 
 -- helper function to set and return attributes in tables
 -- TODO this would make more sense as types?
@@ -778,10 +785,11 @@ local function xattr(list, get, set, remove, path, t)
   return true
 end
 
+if S.listxattr and S.getxattr then
 function S.xattr(path, t) return xattr(S.listxattr, S.getxattr, S.setxattr, S.removexattr, path, t) end
 function S.lxattr(path, t) return xattr(S.llistxattr, S.lgetxattr, S.lsetxattr, S.lremovexattr, path, t) end
 function S.fxattr(fd, t) return xattr(S.flistxattr, S.fgetxattr, S.fsetxattr, S.fremovexattr, fd, t) end
-end -- if C.listxattr
+end
 
 -- getpagesize might be a syscall, or in libc, or may not exist
 if C.getpagesize then
