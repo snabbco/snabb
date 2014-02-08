@@ -1994,6 +1994,22 @@ test_util = {
     assert(S.unlink(tmpfile))
     assert(S.unlink(tmpfile2))
   end,
+  test_basename_dirname = function()
+    assert_equal(util.dirname  "/usr/lib", "/usr")
+    assert_equal(util.basename "/usr/lib", "lib")
+    assert_equal(util.dirname  "/usr/", "/")
+    assert_equal(util.basename "/usr/", "usr")
+    assert_equal(util.dirname  "usr", ".")
+    assert_equal(util.basename "usr", "usr")
+    assert_equal(util.dirname  "/", "/")
+    assert_equal(util.basename "/", "/")
+    assert_equal(util.dirname  ".", ".")
+    assert_equal(util.basename ".", ".")
+    assert_equal(util.dirname  "..", ".")
+    assert_equal(util.basename "..", "..")
+    assert_equal(util.dirname  "", ".")
+    assert_equal(util.basename "", ".")
+  end,
 }
 
 -- TODO work in progress to make work in BSD, temp commented out
