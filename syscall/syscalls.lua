@@ -719,18 +719,23 @@ local function growattrbuf(f, a, b)
   return ffi.string(buffer, ret)
 end
 
-local function lattrbuf(sys, a)
-  local s, err = growattrbuf(sys, a)
+local function lattrbuf(f, a)
+  local s, err = growattrbuf(f, a)
   if not s then return nil, err end
   local tab = h.split('\0', s)
   tab[#tab] = nil -- there is a trailing \0 so one extra
   return tab
 end
 
-if C.listxattr then -- if this exists, assume all do TODO better tests (something odd on OSX)
-function S.listxattr(path) return lattrbuf(C.listxattr, path) end
-function S.llistxattr(path) return lattrbuf(C.llistxattr, path) end
-function S.flistxattr(fd) return lattrbuf(C.flistxattr, getfd(fd)) end
+-- TODO OSX has different functions, need to override
+if C.listxattr then
+  function S.listxattr(path) return lattrbuf(C.listxattr, path) end
+end
+if C.llistxattr then
+  function S.llistxattr(path) return lattrbuf(C.llistxattr, path) end
+end
+if C.flistxattr then
+  function S.flistxattr(fd) return lattrbuf(C.flistxattr, getfd(fd)) end
 end
 
 if C.setxattr then
