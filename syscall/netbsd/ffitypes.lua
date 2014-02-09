@@ -110,7 +110,7 @@ struct _netbsd_itimerval {
   struct _netbsd_timeval it_value;
 };
 typedef struct {
-  uint32_t      val[4]; // note renamed to match Linux
+  uint32_t      sig[4]; // note renamed to match Linux
 } _netbsd_sigset_t;
 struct _netbsd_sockaddr {
   uint8_t       sa_len;

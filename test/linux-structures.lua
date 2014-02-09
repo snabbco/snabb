@@ -185,7 +185,6 @@ local ignore_offsets = {
   st_atime_nsec = true, -- stat
   st_ctime_nsec = true, -- stat
   st_mtime_nsec = true, -- stat
-  val = true, -- sigset_t, I think renamed
   ihl = true, -- bitfield
   version = true, -- bitfield
 }

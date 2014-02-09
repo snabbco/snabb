@@ -36,7 +36,7 @@ typedef uint32_t clockid_t;
 /* actually not a struct at all in osx, just a uint32_t but for compatibility fudge it */
 /* TODO this should work, otherwise need to move all sigset_t handling out of common types */
 typedef struct {
-  uint32_t      val[1];
+  uint32_t      sig[1];
 } sigset_t;
 
 typedef struct fd_set {

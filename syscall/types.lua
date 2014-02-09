@@ -213,12 +213,12 @@ addtype_var(types, "groups", "struct {int count; gid_t list[?];}", mt.groups)
 -- signal set handlers
 local function sigismember(set, sig)
   local d = bit.rshift(sig - 1, 5) -- always 32 bits
-  return bit.band(set.val[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
+  return bit.band(set.sig[d], bit.lshift(1, (sig - 1) % 32)) ~= 0
 end
 
 local function sigemptyset(set)
   for i = 0, s.sigset / 4 - 1 do
-    if set.val[i] ~= 0 then return false end
+    if set.sig[i] ~= 0 then return false end
   end
   return true
 end
@@ -226,14 +226,14 @@ end
 local function sigaddset(set, sig)
   set = t.sigset(set)
   local d = bit.rshift(sig - 1, 5)
-  set.val[d] = bit.bor(set.val[d], bit.lshift(1, (sig - 1) % 32))
+  set.sig[d] = bit.bor(set.sig[d], bit.lshift(1, (sig - 1) % 32))
   return set
 end
 
 local function sigdelset(set, sig)
   set = t.sigset(set)
   local d = bit.rshift(sig - 1, 5)
-  set.val[d] = bit.band(set.val[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
+  set.sig[d] = bit.band(set.sig[d], bit.bnot(bit.lshift(1, (sig - 1) % 32)))
   return set
 end
 
@@ -282,7 +282,7 @@ mt.sigset = {
       local sig = c.SIG[st]
       if not sig then error("invalid signal: " .. v) end -- don't use this format if you don't want exceptions, better than silent ignore
       local d = bit.rshift(sig - 1, 5) -- always 32 bits
-      f.val[d] = bit.bor(f.val[d], bit.lshift(1, (sig - 1) % 32))
+      f.sig[d] = bit.bor(f.sig[d], bit.lshift(1, (sig - 1) % 32))
     end
     return f
   end,

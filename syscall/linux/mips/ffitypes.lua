@@ -66,5 +66,8 @@ struct statfs64 {
   uint32_t   f_spare[6];
 };
 ]],
+  nsig = [[
+static const int _NSIG = 128;
+]],
 }
 

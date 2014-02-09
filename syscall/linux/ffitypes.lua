@@ -42,13 +42,6 @@ typedef unsigned long nfds_t;
 // should be a word, but we use 32 bits as bitops are signed 32 bit in LuaJIT at the moment
 typedef int32_t fd_mask;
 
-// again, should be a long
-// note this should be the kernel size (64 bits), glibc has a larger one. May be wrong for MIPS though where _NSIG=128.
-// need to bypass all libc handling though
-typedef struct {
-  int32_t val[1024 / (8 * sizeof (int32_t))];
-} sigset_t;
-
 // again should be a long, and we have wrapped in a struct
 // TODO ok to wrap Lua types but not syscall? https://github.com/justincormack/ljsyscall/issues/36
 // TODO is this size right? check
@@ -696,6 +689,22 @@ struct rusage {
   long    ru_nvcsw;
   long    ru_nivcsw;
 };
+]]
+
+if arch.nsig then append(arch.nsig)
+else
+append [[
+static const int _NSIG = 64;
+]]
+end
+append [[
+// again, should be a long
+static const int _NSIG_BPW = 32;
+// note this should be the kernel size (64 bits), glibc has a larger one. May be wrong for MIPS though where _NSIG=128.
+// need to bypass all libc handling though
+typedef struct {
+  int32_t sig[_NSIG / _NSIG_BPW];
+} sigset_t;
 ]]
 
 -- both Glibc and Musl have larger termios at least for some architectures; I believe this is correct for kernel

@@ -61,7 +61,7 @@ typedef struct fd_set {
   __fd_mask __fds_bits[32];
 } fd_set;
 typedef struct __sigset {
-  uint32_t val[4]; // note renamed to match Linux
+  uint32_t sig[4]; // note renamed to match Linux
 } sigset_t;
 struct cmsghdr {
   socklen_t cmsg_len;
