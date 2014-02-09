@@ -145,8 +145,8 @@ print [[
 #include <linux/mqueue.h>
 #include <linux/virtio_pci.h>
 #include <linux/pci.h>
-//#include <linux/vfio.h>
-//#include <linux/seccomp.h>
+#include <linux/vfio.h>
+#include <linux/seccomp.h>
 
 #include <asm/statfs.h>
 #include <asm/stat.h>
