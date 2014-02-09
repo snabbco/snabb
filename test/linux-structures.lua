@@ -55,7 +55,6 @@ local function fixup_structs(abi, ctypes)
   ctypes["fd_set"] = nil -- just a pointer for the kernel, you define size
   ctypes["struct sched_param"] = nil -- not defined in our headers yet
   ctypes["struct udphdr"] = nil -- not a kernel define
-  ctypes["struct seccomp_data"] = nil -- not defined yet
   ctypes["struct ucred"] = nil -- not defined yet
   ctypes["struct msghdr"] = nil -- not defined
   ctypes.mcontext_t = nil -- not defined
@@ -68,6 +67,8 @@ local function fixup_structs(abi, ctypes)
   ctypes["struct user_cap_header"] = nil -- not defined
   ctypes["struct sockaddr_storage"] = nil -- uses __kernel_
   ctypes["struct k_sigaction"] = nil -- seems to be incorrect in headers
+
+  ctypes["sigset_t"] = nil -- still some issues
 
   return ctypes
 end
