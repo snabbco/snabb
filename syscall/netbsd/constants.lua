@@ -1261,7 +1261,7 @@ else
   c.CTLTYPE_LONG = c.CTLTYPE.INT
 end
 
-c. CTLFLAG = multiflags {
+c.CTLFLAG = multiflags {
   READONLY       = 0x00000000,
   READWRITE      = 0x00000070,
   ANYWRITE       = 0x00000080,

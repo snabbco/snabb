@@ -63,6 +63,9 @@ c.KTRFAC.V2 = nil
 c.W.WCLONE = nil -- underscore in name, changed
 c.W.WALL   = nil -- underscore in name, changed
 
+-- v7 only
+c.CTLFLAG.UNSIGNED = nil
+
 -- complex rename
 for k, v in pairs(c.FSYNC) do
   c.FSYNC['F' .. k .. 'SYNC'] = v
