@@ -127,6 +127,7 @@ print [[
 #include <sys/reboot.h>
 #include <sys/module.h>
 #include <sys/syscall.h>
+#include <sys/sysctl.h>
 #include <sys/statvfs.h>
 #include <sys/event.h>
 #include <sys/ktrace.h>

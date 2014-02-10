@@ -7,6 +7,8 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
+local abi = require "syscall.abi"
+
 local h = require "syscall.helpers"
 
 local bit = require "syscall.bit"
@@ -1242,6 +1244,39 @@ c.EXTATTR_NAMESPACE = strflag {
 c.XATTR = multiflags {
   CREATE           = 0x01,
   REPLACE          = 0x02,
+}
+
+c.CTLTYPE = strflag {
+  NODE    = 1,
+  INT     = 2,
+  STRING  = 3,
+  QUAD    = 4,
+  STRUCT  = 5,
+  BOOL    = 6,
+}
+
+if abi.abi64 then
+  c.CTLTYPE.LONG = c.CTLTYPE.QUAD
+else
+  c.CTLTYPE_LONG = c.CTLTYPE.INT
+end
+
+c. CTLFLAG = multiflags {
+  READONLY       = 0x00000000,
+  READWRITE      = 0x00000070,
+  ANYWRITE       = 0x00000080,
+  PRIVATE        = 0x00000100,
+  PERMANENT      = 0x00000200,
+  OWNDATA        = 0x00000400,
+  IMMEDIATE      = 0x00000800,
+  HEX            = 0x00001000,
+  ROOT           = 0x00002000,
+  ANYNUMBER      = 0x00004000,
+  HIDDEN         = 0x00008000,
+  ALIAS          = 0x00010000,
+  MMAP           = 0x00020000,
+  OWNDESC        = 0x00040000,
+  UNSIGNED       = 0x00080000,
 }
 
 return c
