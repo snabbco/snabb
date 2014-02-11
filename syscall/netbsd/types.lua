@@ -33,6 +33,7 @@ local addtypes = {
   fdset = "fd_set",
   clockid = "clockid_t",
   register = "register_t",
+  lwpid = "lwpid_t",
 }
 
 local addstructs = {

@@ -64,6 +64,7 @@ typedef unsigned int _netbsd_nfds_t;
 typedef uint32_t _netbsd_id_t;
 typedef unsigned int _netbsd_tcflag_t;
 typedef unsigned int _netbsd_speed_t;
+typedef int32_t _netbsd_lwpid_t;
 
 typedef unsigned short u_short;
 typedef unsigned char u_char;
