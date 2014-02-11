@@ -54,7 +54,7 @@ int __libc_sigaction14(int signum, const struct sigaction *act, struct sigaction
 int __sysctl(const int *, unsigned int, void *, size_t *, const void *, size_t);
 
 int __ksem_init(unsigned int, intptr_t *);
-int __ksem_open(const char *, int, _netbsd_mode_t, unsigned int, intptr_t *);
+int __ksem_open(const char *, int, mode_t, unsigned int, intptr_t *);
 int __ksem_unlink(const char *);
 int __ksem_close(intptr_t);
 int __ksem_post(intptr_t);
@@ -62,6 +62,6 @@ int __ksem_wait(intptr_t);
 int __ksem_trywait(intptr_t);
 int __ksem_getvalue(intptr_t, unsigned int *);
 int __ksem_destroy(intptr_t);
-int __ksem_timedwait(intptr_t, const struct _netbsd_timespec *);
+int __ksem_timedwait(intptr_t, const struct timespec *);
 ]]
 
