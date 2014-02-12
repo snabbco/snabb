@@ -296,6 +296,13 @@ test.ktrace = {
   end,
 }
 
+test.ksem = {
+  test_ksem_init = function()
+    local sem = assert(S.ksem_init(3))
+    assert(S.ksem_destroy(sem))
+  end,
+}
+
 return test
 
 end

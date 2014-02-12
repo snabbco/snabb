@@ -56,6 +56,7 @@ local addtypes1 = {
   uint64_1 = "uint64_t",
   long1 = "long",
   ulong1 = "unsigned long",
+  intptr1 = "intptr_t",
 }
 
 for k, v in pairs(addtypes1) do addtype1(types, k, v) end

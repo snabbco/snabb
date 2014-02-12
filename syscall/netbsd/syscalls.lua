@@ -65,7 +65,7 @@ function S.getvfsstat(flags, buf, size) -- note order of args as usually leave b
   flags = c.VFSMNT[flags or "WAIT"] -- default not zero
   if not buf then
     local n, err = C.getvfsstat(nil, 0, flags)
-    if not n then return nil, err end
+    if not n then return nil, t.error(err or errno()) end
     --buf = t.statvfss(n) -- TODO define
     size = s.statvfs * n
   end
@@ -114,6 +114,18 @@ end
 
 -- TODO we need to fix sigaction in NetBSD, syscall seems to have changed to sigaction_tramp
 function S.pause() return S.select({}) end -- select on nothing forever
+
+-- ksem functions. Not very well documented! You shoudl probably use pthreads in most cases
+function S.ksem_init(value, semid)
+  semid = semid or t.intptr1()
+  local ok, err = C._ksem_init(value, semid)
+  if not ok then return nil, t.error(err or errno()) end
+  return semid[0]
+end
+
+function S.ksem_destroy(semid)
+  return retbool(C._ksem_destroy(semid))
+end
 
 return S
 

@@ -53,15 +53,15 @@ int __getcwd(char *buf, size_t size);
 int __libc_sigaction14(int signum, const struct sigaction *act, struct sigaction *oldact);
 int __sysctl(const int *, unsigned int, void *, size_t *, const void *, size_t);
 
-int __ksem_init(unsigned int, intptr_t *);
-int __ksem_open(const char *, int, mode_t, unsigned int, intptr_t *);
-int __ksem_unlink(const char *);
-int __ksem_close(intptr_t);
-int __ksem_post(intptr_t);
-int __ksem_wait(intptr_t);
-int __ksem_trywait(intptr_t);
-int __ksem_getvalue(intptr_t, unsigned int *);
-int __ksem_destroy(intptr_t);
-int __ksem_timedwait(intptr_t, const struct timespec *);
+int _ksem_init(unsigned int, intptr_t *);
+int _ksem_open(const char *, int, mode_t, unsigned int, intptr_t *);
+int _ksem_unlink(const char *);
+int _ksem_close(intptr_t);
+int _ksem_post(intptr_t);
+int _ksem_wait(intptr_t);
+int _ksem_trywait(intptr_t);
+int _ksem_getvalue(intptr_t, unsigned int *);
+int _ksem_destroy(intptr_t);
+int _ksem_timedwait(intptr_t, const struct timespec *);
 ]]
 
