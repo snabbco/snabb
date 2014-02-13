@@ -45,6 +45,7 @@ typedef int64_t       daddr_t;
 typedef int64_t       time_t;
 typedef unsigned int  tcflag_t;
 typedef unsigned int  speed_t;
+typedef char *        caddr_t;
 
 /* can be changed, TODO also should be long */
 typedef uint32_t __fd_mask;
