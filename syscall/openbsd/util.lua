@@ -1,4 +1,4 @@
--- FreeBSD utils
+-- OpenBSD utils
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,

@@ -1,4 +1,4 @@
--- FreeBSD error messages
+-- OpenBSD error messages
 
 local require = require
 
@@ -100,11 +100,6 @@ local errors = {
   NOTCAPABLE = "Capabilities insufficient",
   CAPMODE = "Not permitted in capability mode",
 }
-
-if abi.freebsd >= 10 then
-  errors.NOTRECOVERABLE = "State not recoverable"
-  errors.OWNERDEAD = "Previous owner died"
-end
 
 return errors
 

@@ -1,4 +1,4 @@
--- This are the types for FreeBSD
+-- This are the types for OpenBSD
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,

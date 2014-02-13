@@ -1,4 +1,4 @@
--- FreeBSD fcntl
+-- OpenBSD fcntl
 -- TODO incomplete, lots missing
 
 local require, error, assert, tonumber, tostring,
@@ -10,7 +10,7 @@ pcall, type, table, string
 
 local function init(types)
 
-local c = require "syscall.freebsd.constants"
+local c = require "syscall.openbsd.constants"
 
 local ffi = require "ffi"
 

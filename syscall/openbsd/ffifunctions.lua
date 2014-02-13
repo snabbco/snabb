@@ -1,4 +1,4 @@
--- define system calls for ffi, FreeBSD specific calls
+-- define system calls for ffi, OpenBSD specific calls
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,

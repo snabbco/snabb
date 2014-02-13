@@ -1,4 +1,4 @@
--- FreeBSD specific syscalls
+-- OpenBSD specific syscalls
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
@@ -51,24 +51,7 @@ function S.pdgetpid(fd, pidp)
   return pidp[0]
 end
 function S.pdkill(fd, sig) return retbool(C.pdkill(getfd(fd), c.SIG[sig])) end
--- pdwait4 not implemented in FreeBSD yet
-
-if C.cap_enter and abi.freebsd >= 10 then -- do not supprot on FreeBSD 9, only partial implementation
-  function S.cap_enter() return retbool(C.cap_enter()) end
-end
-if C.cap_getmode and abi.freebsd >= 10 then
-  function S.cap_getmode(modep)
-    modep = modep or t.uint1()
-    local ok, err = C.cap_getmode(modep)
-    if ok == -1 then return nil, t.error(err or errno()) end
-    return modep[0]
-  end
-  function S.cap_sandboxed()
-    local modep = S.cap_getmode()
-    if not modep then return false end
-    return modep ~= 0
-  end
-end
+-- pdwait4 not implemented in OpenBSD yet
 
 -- pty functions
 local function isptmaster(fd) return fd:ioctl("TIOCPTMASTER") end
