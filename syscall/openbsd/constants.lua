@@ -241,9 +241,6 @@ c.SIG = strflag {
   THR = 32,
 }
 
-
-c.SIG.LWP = c.SIG.THR
-
 c.EXIT = strflag {
   SUCCESS = 0,
   FAILURE = 1,
@@ -301,14 +298,12 @@ c.POLL = multiflags {
   RDNORM     = 0x0040,
   RDBAND     = 0x0080,
   WRBAND     = 0x0100,
-  INIGNEOF   = 0x2000,
   ERR        = 0x0008,
   HUP        = 0x0010,
   NVAL       = 0x0020,
 }
 
 c.POLL.WRNORM = c.POLL.OUT
-c.POLL.STANDARD = c.POLL["IN,PRI,OUT,RDNORM,RDBAND,WRBAND,ERR,HUP,NVAL"]
 
 c.AT_FDCWD = atflag {
   FDCWD = -100,
@@ -587,11 +582,6 @@ c.SO = strflag {
   OOBINLINE    = 0x0100,
   REUSEPORT    = 0x0200,
   TIMESTAMP    = 0x0400,
-  NOSIGPIPE    = 0x0800,
-  ACCEPTFILTER = 0x1000,
-  BINTIME      = 0x2000,
-  NO_OFFLOAD   = 0x4000,
-  NO_DDP       = 0x8000,
   SNDBUF       = 0x1001,
   RCVBUF       = 0x1002,
   SNDLOWAT     = 0x1003,
@@ -600,17 +590,7 @@ c.SO = strflag {
   RCVTIMEO     = 0x1006,
   ERROR        = 0x1007,
   TYPE         = 0x1008,
-  LABEL        = 0x1009,
-  PEERLABEL    = 0x1010,
-  LISTENQLIMIT = 0x1011,
-  LISTENQLEN   = 0x1012,
-  LISTENINCQLEN= 0x1013,
-  SETFIB       = 0x1014,
-  USER_COOKIE  = 0x1015,
-  PROTOCOL     = 0x1016,
 }
-
-c.SO.PROTOTYPE = c.SO.PROTOCOL
 
 c.DT = strflag {
   UNKNOWN = 0,
@@ -621,7 +601,6 @@ c.DT = strflag {
   REG = 8,
   LNK = 10,
   SOCK = 12,
-  WHT = 14,
 }
 
 c.IP = strflag {
