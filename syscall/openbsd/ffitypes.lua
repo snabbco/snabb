@@ -13,19 +13,10 @@ local defs = {}
 
 local function append(str) defs[#defs + 1] = str end
 
-if abi.abi64 then
-append [[
-typedef int32_t clock_t;
-]]
-else
-append [[
-typedef unsigned long clock_t;
-]]
-end
-
 append [[
 typedef uint32_t      blksize_t;
 typedef int64_t       blkcnt_t;
+typedef int64_t       clockid_t;
 typedef int32_t       clockid_t;
 typedef uint32_t      fflags_t;
 typedef uint64_t      fsblkcnt_t;
@@ -51,7 +42,7 @@ typedef uint32_t      dev_t;
 typedef uint32_t      fixpt_t;
 typedef	unsigned int  nfds_t;
 typedef int64_t       daddr_t;
-typedef long          time_t;
+typedef int64_t       time_t;
 typedef unsigned int  tcflag_t;
 typedef unsigned int  speed_t;
 
