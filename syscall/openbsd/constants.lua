@@ -122,13 +122,6 @@ c.E = strflag {
   CANCELED      = 85,
   ILSEQ         = 86,
   NOATTR        = 87,
-  DOOFUS        = 88,
-  BADMSG        = 89,
-  MULTIHOP      = 90,
-  NOLINK        = 91,
-  PROTO         = 92,
-  NOTCAPABLE    = 93,
-  CAPMODE       = 94,
 }
 
 -- alternate names
