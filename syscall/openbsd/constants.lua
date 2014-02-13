@@ -145,7 +145,6 @@ c.AF = strflag {
   IMPLINK     = 3,
   PUP         = 4,
   CHAOS       = 5,
-  NETBIOS     = 6,
   ISO         = 7,
   ECMA        = 8,
   DATAKIT     = 9,
@@ -158,25 +157,14 @@ c.AF = strflag {
   APPLETALK   = 16,
   ROUTE       = 17,
   LINK        = 18,
--- #define pseudo_AF_XTP   19
   COIP        = 20,
   CNT         = 21,
--- #define pseudo_AF_RTIP  22
   IPX         = 23,
   SIP         = 24,
--- pseudo_AF_PIP   25
   ISDN        = 26,
--- pseudo_AF_KEY   27
   INET6       = 28,
   NATM        = 29,
-  ATM         = 30,
--- pseudo_AF_HDRCMPLT 31
-  NETGRAPH    = 32,
-  SLOW        = 33,
-  SCLUSTER    = 34,
-  ARP         = 35,
   BLUETOOTH   = 36,
-  IEEE80211   = 37,
 }
 
 c.AF.UNIX = c.AF.LOCAL
@@ -200,10 +188,7 @@ c.O = multiflags {
   TRUNC       = 0x0400,
   EXCL        = 0x0800,
   NOCTTY      = 0x8000,
-  DIRECT      = 0x00010000,
   DIRECTORY   = 0x00020000,
-  EXEC        = 0x00040000,
-  TTY_INIT    = 0x00080000,
   CLOEXEC     = 0x00100000,
 }
 
@@ -570,8 +555,6 @@ c.FCNTL_LOCK = strflag {
   RDLCK = 1,
   UNLCK = 2,
   WRLCK = 3,
-  UNLCKSYS = 4,
-  CANCEL = 5,
 }
 
 -- lockf, changed from F_ to LOCKF_
@@ -1044,7 +1027,6 @@ c.IPV6 = strflag {
 --ICMP6_FILTER      = 18, -- not namespaced as IPV6
   CHECKSUM          = 26,
   V6ONLY            = 27,
-  IPSEC_POLICY      = 28,
   FAITH             = 29,
   RTHDRDSTOPTS      = 35,
   RECVPKTINFO       = 36,
