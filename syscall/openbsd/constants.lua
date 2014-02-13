@@ -122,6 +122,14 @@ c.E = strflag {
   CANCELED      = 85,
   ILSEQ         = 86,
   NOATTR        = 87,
+  ILSEQ         = 84,
+  NOMEDIUM      = 85,
+  MEDIUMTYPE    = 86,
+  OVERFLOW      = 87,
+  CANCELED      = 88,
+  IDRM          = 89,
+  NOMSG         = 90,
+  NOTSUP        = 91,
 }
 
 -- alternate names
