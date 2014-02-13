@@ -93,9 +93,9 @@ struct sockaddr {
 struct sockaddr_storage {
   uint8_t       ss_len;
   sa_family_t   ss_family;
-  char          __ss_pad1[6];
-  int64_t       __ss_align;
-  char          __ss_pad2[128 - 2 - 8 - 6];
+  unsigned char __ss_pad1[6];
+  uint64_t      __ss_pad2;
+  unsigned char __ss_pad3[240];
 };
 struct sockaddr_in {
   uint8_t         sin_len;
