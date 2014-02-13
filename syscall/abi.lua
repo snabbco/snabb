@@ -60,7 +60,6 @@ int uname(struct utsname *);
     local ubuf = ffi.new("struct utsname [1]")
     ffi.C.uname(ubuf)
     abi.os = ffi.string(ubuf[0].sysname):lower()
-    print("os is ", abi.os)
   else
     local ok = sysctlbyname("kern.ostype", buf, lenp, nil, 0)
     if ok ~= 0 then error("cannot identify BSD version") end
