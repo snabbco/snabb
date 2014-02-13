@@ -729,9 +729,6 @@ c.CFLAG = multiflags {
   CLOCAL         = 0x00008000,
   CCTS_OFLOW     = 0x00010000,
   CRTS_IFLOW     = 0x00020000,
-  CDTR_IFLOW     = 0x00040000,
-  CDSR_OFLOW     = 0x00080000,
-  CCAR_OFLOW     = 0x00100000,
 }
 
 c.CFLAG.CRTSCTS	= c.CFLAG.CCTS_OFLOW + c.CFLAG.CRTS_IFLOW
@@ -795,17 +792,10 @@ c.CHFLAGS.APPEND = c.CHFLAGS.UF_APPEND + c.CHFLAGS.SF_APPEND
 c.CHFLAGS.OPAQUE = c.CHFLAGS.UF_OPAQUE
 
 c.TCP = strflag {
-  NODELAY    = 1,
-  MAXSEG     = 2,
-  NOPUSH     = 4,
-  NOOPT      = 8,
-  MD5SIG     = 16,
-  INFO       = 32,
-  CONGESTION = 64,
-  KEEPINIT   = 128,
-  KEEPIDLE   = 256,
-  KEEPINTVL  = 512,
-  KEEPCNT    = 1024,
+  NODELAY     = 0x01,
+  MAXSEG      = 0x02,
+  MD5SIG      = 0x04,
+  SACK_ENABLE = 0x08,
 }
 
 c.RB = multiflags {
