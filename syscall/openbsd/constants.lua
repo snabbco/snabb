@@ -33,8 +33,6 @@ c.STD = strflag {
   ERR = 2,
 }
 
-c.PATH_MAX = 1024
-
 c.E = strflag {
   PERM          =  1,
   NOENT         =  2,
@@ -541,16 +539,9 @@ c.PC = strflag {
   REC_MIN_XFER_SIZE = 16,
   REC_XFER_ALIGN    = 17,
   SYMLINK_MAX       = 18,
-  MIN_HOLE_SIZE     = 21,
   ASYNC_IO          = 53,
   PRIO_IO           = 54,
   SYNC_IO           = 55,
-  ACL_EXTENDED      = 59,
-  ACL_PATH_MAX      = 60,
-  CAP_PRESENT       = 61,
-  INF_PRESENT       = 62,
-  MAC_PRESENT       = 63,
-  ACL_NFS4          = 64,
 }
 
 -- getpriority, setpriority flags
@@ -640,8 +631,6 @@ c.IP = strflag {
   RTABLE             = 0x1021,
   DIVERTFL           = 0x1022,
 }
-
-c.IP.SENDSRCADDR = c.IP.RECVDSTADDR
 
 -- Baud rates just the identity function  other than EXTA, EXTB
 c.B = strflag {
@@ -827,14 +816,6 @@ c.EVFILT = strflag {
 }
 
 c.NOTE = multiflags {
--- user
-  FFNOP      = 0x00000000,
-  FFAND      = 0x40000000,
-  FFOR       = 0x80000000,
-  FFCOPY     = 0xc0000000,
-  FFCTRLMASK = 0xc0000000,
-  FFLAGSMASK = 0x00ffffff,
-  TRIGGER    = 0x01000000,
 -- read and write
   LOWAT     = 0x0001,
 -- vnode
