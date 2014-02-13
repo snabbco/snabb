@@ -24,51 +24,10 @@ local t, pt, s = types.t, types.pt, types.s
 
 function S.reboot(howto) return C.reboot(c.RB[howto]) end
 
-if C.bindat then
-  function S.bindat(dirfd, sockfd, addr, addrlen)
-    local saddr = pt.sockaddr(addr)
-    return retbool(C.bindat(c.AT_FDCWD[dirfd], getfd(sockfd), saddr, addrlen or #addr))
-  end
-end
-if C.connectat then
-  function S.connectat(dirfd, sockfd, addr, addrlen)
-    local saddr = pt.sockaddr(addr)
-    return retbool(C.connectat(c.AT_FDCWD[dirfd], getfd(sockfd), saddr, addrlen or #addr))
-  end
-end
-
-function S.pdfork(flags, fdp) -- changed order as rarely supply fdp
-  fdp = fdp or t.int1()
-  local pid, err = C.pdfork(fdp, c.PD[flags])
-  if pid == -1 then return nil, t.error(err or errno()) end
-  if pid == 0 then return 0 end -- the child does not get an fd
-  return pid, nil, t.fd(fdp[0])
-end
-function S.pdgetpid(fd, pidp)
-  pidp = pidp or t.int1()
-  local ok, err = C.pdgetpid(getfd(fd), pidp)
-  if ok == -1 then return nil, t.error(err or errno()) end
-  return pidp[0]
-end
-function S.pdkill(fd, sig) return retbool(C.pdkill(getfd(fd), c.SIG[sig])) end
--- pdwait4 not implemented in OpenBSD yet
-
 -- pty functions
 local function isptmaster(fd) return fd:ioctl("TIOCPTMASTER") end
 S.grantpt = isptmaster
 S.unlockpt = isptmaster
-
-local SPECNAMELEN = 63
-
-function S.ptsname(fd)
-  local ok, err = isptmaster(fd)
-  if not ok then return nil, err end
-  local buf = t.buffer(SPECNAMELEN)
-  local fgn = t.fiodgname_arg{buf = buf, len = SPECNAMELEN}
-  local ok, err = fd:ioctl("FIODGNAME", fgn)
-  if not ok then return nil, err end
-  return "/dev/" .. ffi.string(buf)
-end
 
 return S
 
