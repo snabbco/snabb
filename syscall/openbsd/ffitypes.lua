@@ -198,34 +198,33 @@ union sigval {
   int     sigval_int;
   void    *sigval_ptr;
 };
-typedef struct __siginfo {
+static const int SI_MAXSZ = 128
+static const int SI_PAD = ((SI_MAXSZ / sizeof (int)) - 3)
+typedef struct {
   int     si_signo;
-  int     si_errno;
   int     si_code;
-  pid_t   si_pid;
-  uid_t   si_uid;
-  int     si_status;
-  void    *si_addr;
-  union sigval si_value;
-  union   {
-    struct {
-      int     _trapno;
-    } _fault;
-    struct {
-      int     _timerid;
-      int     _overrun;
-    } _timer;
-    struct {
-      int     _mqd;
-    } _mesgq;
-    struct {
-      long    _band;
-    } _poll;
-    struct {
-      long    __spare1__;
-      int     __spare2__[7];
-    } __spare__;
-  } _reason;
+  int     si_errno;
+  union {
+    int     _pad[SI_PAD];
+      struct {
+        pid_t   _pid;
+        union {
+          struct {
+            uid_t   _uid;
+            union sigval    _value;
+          } _kill;
+          struct {
+            clock_t _utime;
+            int     _status;
+            clock_t _stime;
+          } _cld;
+        } _pdata;
+      } _proc;
+      struct {
+        caddr_t _addr;
+        int     _trapno;
+      } _fault;
+   } _data;
 } siginfo_t;
 struct sigaction {
   union {
