@@ -449,17 +449,10 @@ c.F = strflag {
   GETOWN      = 5,
   SETOWN      = 6,
   OGETLK      = 7,
-  OSETLK      = 8,
-  OSETLKW     = 9,
-  DUP2FD      = 10,
   GETLK       = 11,
   SETLK       = 12,
   SETLKW      = 13,
-  SETLK_REMOTE= 14,
-  READAHEAD   = 15,
-  RDAHEAD     = 16,
   DUPFD_CLOEXEC= 17,
-  DUP2FD_CLOEXEC= 18,
 }
 
 c.FD = multiflags {
@@ -797,8 +790,6 @@ c.EV = multiflags {
   DISABLE  = 0x0008,
   ONESHOT  = 0x0010,
   CLEAR    = 0x0020,
-  RECEIPT  = 0x0040,
-  DISPATCH = 0x0080,
   SYSFLAGS = 0xF000,
   FLAG1    = 0x2000,
   EOF      = 0x8000,
