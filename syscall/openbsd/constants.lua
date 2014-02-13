@@ -274,8 +274,6 @@ c.SEEK = strflag {
   SET  = 0,
   CUR  = 1,
   END  = 2,
-  DATA = 3,
-  HOLE = 4,
 }
 
 c.SOCK = multiflags {
@@ -361,14 +359,8 @@ c.MAP = multiflags {
   FIXED      = 0x0010,
   RENAME     = 0x0020,
   NORESERVE  = 0x0040,
-  RESERVED0080 = 0x0080,
-  RESERVED0100 = 0x0100,
   HASSEMAPHORE = 0x0200,
-  STACK      = 0x0400,
-  NOSYNC     = 0x0800,
   ANON       = 0x1000,
-  NOCORE     = 0x00020000,
--- TODO add aligned maps in
 }
 
 c.MCL = strflag {
@@ -436,8 +428,6 @@ c.IPPROTO = strflag {
 c.SCM = multiflags {
   RIGHTS     = 0x01,
   TIMESTAMP  = 0x02,
-  CREDS      = 0x03,
-  BINTIME    = 0x04,
 }
 
 c.F = strflag {
@@ -448,7 +438,6 @@ c.F = strflag {
   SETFL       = 4,
   GETOWN      = 5,
   SETOWN      = 6,
-  OGETLK      = 7,
   GETLK       = 11,
   SETLK       = 12,
   SETLKW      = 13,
