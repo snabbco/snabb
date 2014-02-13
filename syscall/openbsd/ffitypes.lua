@@ -167,7 +167,6 @@ struct flock {
   pid_t   l_pid;
   short   l_type;
   short   l_whence;
-  int     l_sysid;
 };
 struct dirent {
   uint32_t d_fileno;
