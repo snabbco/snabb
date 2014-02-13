@@ -197,10 +197,6 @@ struct kevent {
   intptr_t        data;
   void            *udata;
 };
-struct cap_rights {
-  uint64_t cr_rights[0 + 2]; // for version 0
-};
-typedef struct cap_rights cap_rights_t;
 union sigval {
   int     sival_int;
   void    *sival_ptr;
