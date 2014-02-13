@@ -876,9 +876,6 @@ c.EVFILT = strflag {
   PROC     = -5,
   SIGNAL   = -6,
   TIMER    = -7,
-  FS       = -9,
-  LIO      = -10,
-  USER     = -11,
   SYSCOUNT = 11,
 }
 
@@ -914,10 +911,6 @@ c.NOTE = multiflags {
 
 c.SHM = strflag {
   ANON = charp(1),
-}
-
-c.PD = multiflags {
-  DAEMON = 0x00000001,
 }
 
 c.ITIMER = strflag {
@@ -974,7 +967,6 @@ c.CLOCK = strflag {
   REALTIME           = 0,
   VIRTUAL            = 1,
   MONOTONIC          = 4,
-  UPTIME             = 5,
   THREAD_CPUTIME_ID  = 14,
   PROCESS_CPUTIME_ID = 15,
 }
