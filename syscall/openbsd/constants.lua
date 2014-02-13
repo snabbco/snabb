@@ -116,12 +116,8 @@ c.E = strflag {
   FTYPE         = 79,
   AUTH          = 80,
   NEEDAUTH      = 81,
-  IDRM          = 82,
-  NOMSG         = 83,
-  OVERFLOW      = 84,
-  CANCELED      = 85,
-  ILSEQ         = 86,
-  NOATTR        = 87,
+  IPSEC         = 82,
+  NOATTR        = 83,
   ILSEQ         = 84,
   NOMEDIUM      = 85,
   MEDIUMTYPE    = 86,
@@ -187,14 +183,14 @@ c.O = multiflags {
   TRUNC       = 0x0400,
   EXCL        = 0x0800,
   NOCTTY      = 0x8000,
-  DIRECTORY   = 0x00020000,
-  CLOEXEC     = 0x00100000,
+  CLOEXEC     = 0x10000,
+  DIRECTORY   = 0x20000,
 }
 
 -- for pipe2, selected flags from c.O
 c.OPIPE = multiflags {
   NONBLOCK  = 0x0004,
-  CLOEXEC   = 0x00100000,
+  CLOEXEC   = 0x10000,
 }
 
 -- sigaction, note renamed SIGACT from SIG_
