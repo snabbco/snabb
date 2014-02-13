@@ -131,18 +131,18 @@ struct stat {
   uid_t     st_uid;
   gid_t     st_gid;
   dev_t     st_rdev;
-  struct timespec st_atim;
-  struct timespec st_mtim;
-  struct timespec st_ctim;
+  int32_t   st_lspare0;
+  struct  timespec st_atim;
+  struct  timespec st_mtim;
+  struct  timespec st_ctim;
   off_t     st_size;
-  blkcnt_t  st_blocks;
-  blksize_t st_blksize;
-  fflags_t  st_flags;
+  int64_t   st_blocks;
+  uint32_t  st_blksize;
+  uint32_t  st_flags;
   uint32_t  st_gen;
-  int32_t   st_lspare;
-  struct timespec st_birthtim;
-  unsigned int :(8 / 2) * (16 - (int)sizeof(struct timespec));
-  unsigned int :(8 / 2) * (16 - (int)sizeof(struct timespec));
+  int32_t   st_lspare1;
+  struct  timespec __st_birthtim;
+  int64_t   st_qspare[2];
 };
 struct rusage {
   struct timeval ru_utime;
