@@ -133,11 +133,6 @@ c.E = strflag {
   CAPMODE       = 94,
 }
 
-if abi.freebsd >= 10 then
-  c.E.NOTRECOVERABLE= 95
-  c.E.OWNERDEAD     = 96
-end
-
 -- alternate names
 c.EALIAS = {
   WOULDBLOCK    = c.E.AGAIN,
