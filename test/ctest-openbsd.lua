@@ -95,10 +95,8 @@ print [[
 #include <net/bpf.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-#include <netinet6/in6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
-#include <ufs/ufs/ufsmount.h>
 #include <fs/ptyfs/ptyfs.h>
 #include <fs/tmpfs/tmpfs_args.h>
 #include <miscfs/procfs/procfs.h>

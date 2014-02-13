@@ -315,7 +315,6 @@ c.AT = multiflags {
 
 c.S_I = modeflags {
   FMT   = octal('0170000'),
-  FWHT  = octal('0160000'),
   FSOCK = octal('0140000'),
   FLNK  = octal('0120000'),
   FREG  = octal('0100000'),
@@ -382,11 +381,6 @@ c.MADV = strflag {
   WILLNEED    = 3,
   DONTNEED    = 4,
   FREE        = 5,
-  NOSYNC      = 6,
-  AUTOSYNC    = 7,
-  NOCORE      = 8,
-  CORE        = 9,
-  PROTECT     = 10,
 }
 
 c.IPPROTO = strflag {
@@ -494,10 +488,6 @@ c.MSG = multiflags {
   CTRUNC          = 0x20,
   WAITALL         = 0x40,
   DONTWAIT        = 0x80,
-  EOF             = 0x100,
-  NOTIFICATION    = 0x2000,
-  NBIO            = 0x4000,
-  COMPAT          = 0x8000,
   NOSIGNAL        = 0x20000,
 }
 
@@ -611,10 +601,8 @@ c.IP = strflag {
   DIVERTFL           = 0x1022,
 }
 
--- Baud rates just the identity function  other than EXTA, EXTB
+-- Baud rates just the identity function  other than EXTA, EXTB TODO check
 c.B = strflag {
-  EXTA = 19200,
-  EXTB = 38400,
 }
 
 c.CC = strflag {
@@ -870,12 +858,6 @@ c.CLOCK = strflag {
   MONOTONIC          = 4,
   THREAD_CPUTIME_ID  = 14,
   PROCESS_CPUTIME_ID = 15,
-}
-
-c.EXTATTR_NAMESPACE = strflag {
-  EMPTY        = 0x00000000,
-  USER         = 0x00000001,
-  SYSTEM       = 0x00000002,
 }
 
 return c
