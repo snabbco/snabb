@@ -3,6 +3,8 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local memory = require("core.memory")
 local freelist = require("core.freelist")
+local lib = require("core.lib")
+local C = ffi.C
 
 require("core.packet_h")
 
@@ -28,7 +30,7 @@ function new_buffer ()
    assert(allocated < max, "out of buffers")
    allocated = allocated + 1
    local pointer, physical, bytes = memory.dma_alloc(size)
-   local b = ffi.cast(buffer_ptr_t, ffi.C.malloc(ffi.sizeof(buffer_t)))
+   local b = lib.malloc("struct buffer")
    b.pointer, b.physical, b.size = pointer, physical, size
    return b
 end
