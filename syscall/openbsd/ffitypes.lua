@@ -185,10 +185,6 @@ struct termios {
   speed_t         c_ispeed;
   speed_t         c_ospeed;
 };
-struct fiodgname_arg {
-  int     len;
-  void    *buf;
-};
 struct kevent {
   uintptr_t       ident;
   short           filter;
