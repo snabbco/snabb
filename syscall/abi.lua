@@ -44,7 +44,23 @@ if not abi.xen and abi.os == "bsd" then
   local buf = ffi.new("char[32]")
   local lenp = ffi.new("unsigned long[1]", 32)
   local ok, sysctlbyname = pcall(inlibc_fn, "sysctlbyname")
-  if not ok then abi.os = "unknownbsd" else
+  if not ok then
+    -- OpenBSD doesn't have sysctlbyname
+    -- The good news is every defines utsname with the same sizes
+    ffi.cdef[[
+struct utsname {
+char    sysname[256];
+char    nodename[256];
+char    release[256];
+char    version[256];
+char    machine[256];
+};
+int uname(struct utsname *);
+]]
+    local ubuf = ffi.new("struct utsname [1]")
+    ffi.C.uname(ubuf)
+    abi.os = ffi.string(ubuf[0].sysname):lower()
+  else
     local ok = sysctlbyname("kern.ostype", buf, lenp, nil, 0)
     if ok ~= 0 then error("cannot identify BSD version") end
     abi.os = ffi.string(buf):lower()
