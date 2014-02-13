@@ -48,7 +48,10 @@ typedef uint32_t __fd_mask;
 typedef struct fd_set {
   __fd_mask fds_bits[32];
 } fd_set;
-typedef unsigned int sigset_t;
+typedef struct __sigset {
+  uint32_t sig[1]; // note renamed to match Linux
+} sigset_t;
+// typedef unsigned int sigset_t; /* this is correct TODO fix */
 struct cmsghdr {
   socklen_t cmsg_len;
   int cmsg_level;
