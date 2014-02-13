@@ -9,14 +9,12 @@ local pci = require ("lib.hardware.pci")
 require("lib.hardware.vfio_h")
 
 
-function set_mapping (start_iova)
-    next_iova = ffi.cast("uint64_t", start_iova)      -- better not start at 0x00
-
-    return function (ptr, size)
-        local mem_phy = C.mmap_memory(ptr, size, next_iova, true, true)
-        next_iova = next_iova + size
-        return mem_phy
-    end
+-- Map memory to the IOMMU so that it can be used for DMA.
+function map_memory_to_iommu (pointer, size)
+   -- Create a 1:1 address mapping for this memory.
+   local ret = C.mmap_memory(pointer, size, ffi.cast("uint64_t", pointer), true, true)
+   assert(ret ~= 0ULL)
+   return ret
 end
 
 --- ### Hardware device information
