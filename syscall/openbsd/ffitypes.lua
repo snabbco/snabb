@@ -17,7 +17,7 @@ append [[
 typedef uint32_t      blksize_t;
 typedef int64_t       blkcnt_t;
 typedef int64_t       clockid_t;
-typedef int32_t       clockid_t;
+typedef int32_t       clock_t;
 typedef uint32_t      fflags_t;
 typedef uint64_t      fsblkcnt_t;
 typedef uint64_t      fsfilcnt_t;
