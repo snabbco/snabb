@@ -14,8 +14,6 @@ local defs = {}
 local function append(str) defs[#defs + 1] = str end
 
 append [[
-typedef uint32_t      blksize_t;
-typedef int64_t       blkcnt_t;
 typedef int64_t       clockid_t;
 typedef int32_t       clock_t;
 typedef uint32_t      fflags_t;
@@ -50,7 +48,7 @@ typedef char *        caddr_t;
 /* can be changed, TODO also should be long */
 typedef uint32_t __fd_mask;
 typedef struct fd_set {
-  __fd_mask __fds_bits[32];
+  __fd_mask fds_bits[32];
 } fd_set;
 typedef struct __sigset {
   uint32_t sig[4]; // note renamed to match Linux
