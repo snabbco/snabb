@@ -111,9 +111,6 @@ local ioctl = strflag {
   FIOASYNC       = _IOW('f', 125, "int"),
   FIOSETOWN      = _IOW('f', 124, "int"),
   FIOGETOWN      = _IOR('f', 123, "int"),
-  FIODTYPE       = _IOR('f', 122, "int"),
-  FIOGETLBA      = _IOR('f', 121, "int"),
-  FIOSEEKDATA    = _IOWR('f', 97, "off"),
 
 -- allow user defined ioctls
   _IO = _IO,
