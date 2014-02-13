@@ -81,24 +81,17 @@ print [[
 #include <sys/wait.h>
 #include <sys/ioctl.h>
 #include <sys/reboot.h>
-#include <sys/module.h>
 #include <sys/syscall.h>
 #include <sys/sysctl.h>
 #include <sys/statvfs.h>
 #include <sys/event.h>
-#include <sys/ktrace.h>
-#include <sys/extattr.h>
 #include <net/if.h>
-#include <net/if_ether.h>
-#include <net/if_bridgevar.h>
 #include <net/route.h>
 #include <net/bpf.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
-#include <fs/ptyfs/ptyfs.h>
-#include <fs/tmpfs/tmpfs_args.h>
 #include <miscfs/procfs/procfs.h>
 
 int ret = 0;
