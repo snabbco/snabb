@@ -111,6 +111,17 @@ build =
       ["syscall.freebsd.errors"] = "syscall/freebsd/errors.lua";
       ["syscall.freebsd.util"] = "syscall/freebsd/util.lua";
 
+      ["syscall.openbsd.syscalls"] = "syscall/openbsd/syscalls.lua";
+      ["syscall.openbsd.c"] = "syscall/openbsd/c.lua";
+      ["syscall.openbsd.constants"] = "syscall/openbsd/constants.lua";
+      ["syscall.openbsd.ffitypes"] = "syscall/openbsd/ffitypes.lua";
+      ["syscall.openbsd.ffifunctions"] = "syscall/openbsd/ffifunctions.lua";
+      ["syscall.openbsd.ioctl"] = "syscall/openbsd/ioctl.lua";
+      ["syscall.openbsd.types"] = "syscall/openbsd/types.lua";
+      ["syscall.openbsd.fcntl"] = "syscall/openbsd/fcntl.lua";
+      ["syscall.openbsd.errors"] = "syscall/openbsd/errors.lua";
+      ["syscall.openbsd.util"] = "syscall/openbsd/util.lua";
+
       ["syscall.bsd.syscalls"] = "syscall/bsd/syscalls.lua";
       ["syscall.bsd.ffifunctions"] = "syscall/bsd/ffifunctions.lua";
       ["syscall.bsd.types"] = "syscall/bsd/types.lua";
