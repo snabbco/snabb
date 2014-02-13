@@ -40,7 +40,7 @@ function PcapWriter:new (filename)
 end
 
 function PcapWriter:push ()
-   while not app.empty(self.input.input) do
+   while self.input.input and not app.empty(self.input.input) do
       local p = app.receive(self.input.input)
       pcap.write_record_header(self.file, p.length)
       for i = 0, p.niovecs-1 do
@@ -49,6 +49,7 @@ function PcapWriter:push ()
 	 self.file:write(ffi.string(iov.buffer.pointer, iov.length))
       end
       self.file:flush()
+      packet.deref(p)
    end
 end
 
