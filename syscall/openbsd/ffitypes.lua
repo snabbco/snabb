@@ -198,8 +198,8 @@ union sigval {
   int     sigval_int;
   void    *sigval_ptr;
 };
-static const int SI_MAXSZ = 128
-static const int SI_PAD = ((SI_MAXSZ / sizeof (int)) - 3)
+static const int SI_MAXSZ = 128;
+static const int SI_PAD = ((SI_MAXSZ / sizeof (int)) - 3);
 typedef struct {
   int     si_signo;
   int     si_code;
