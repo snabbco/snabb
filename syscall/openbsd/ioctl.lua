@@ -70,7 +70,6 @@ local ioctl = strflag {
   -- tty ioctls
   TIOCEXCL       =  _IO('t', 13),
   TIOCNXCL       =  _IO('t', 14),
-  TIOCGPTN       = _IOR('t', 15, "int"),
   TIOCFLUSH      = _IOW('t', 16, "int"),
   TIOCGETA       = _IOR('t', 19, "termios"),
   TIOCSETA       = _IOW('t', 20, "termios"),
@@ -78,10 +77,6 @@ local ioctl = strflag {
   TIOCSETAF      = _IOW('t', 22, "termios"),
   TIOCGETD       = _IOR('t', 26, "int"),
   TIOCSETD       = _IOW('t', 27, "int"),
-  TIOCPTMASTER   =  _IO('t', 28),
-  TIOCGDRAINWAIT = _IOR('t', 86, "int"),
-  TIOCSDRAINWAIT = _IOW('t', 87, "int"),
-  TIOCTIMESTAMP  = _IOR('t', 89, "timeval"),
   TIOCDRAIN      =  _IO('t', 94),
   TIOCSIG        = _IOWINT('t', 95),
   TIOCEXT        = _IOW('t', 96, "int"),
@@ -119,7 +114,6 @@ local ioctl = strflag {
   FIODTYPE       = _IOR('f', 122, "int"),
   FIOGETLBA      = _IOR('f', 121, "int"),
   FIOSEEKDATA    = _IOWR('f', 97, "off"),
-  FIOSEEKHOLE    = _IOWR('f', 98, "off"),
 
 -- allow user defined ioctls
   _IO = _IO,
