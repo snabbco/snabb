@@ -46,7 +46,7 @@ if not abi.xen and abi.os == "bsd" then
   local ok, sysctlbyname = pcall(inlibc_fn, "sysctlbyname")
   if not ok then
     -- OpenBSD doesn't have sysctlbyname
-    -- The good news is everybody defines utsname with the same sizes
+    -- The good news is every BSD defines utsname with the same sizes
     ffi.cdef[[
 struct utsname {
 char    sysname[256];
