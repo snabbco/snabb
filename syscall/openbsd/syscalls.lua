@@ -25,9 +25,9 @@ local t, pt, s = types.t, types.pt, types.s
 function S.reboot(howto) return C.reboot(c.RB[howto]) end
 
 -- pty functions
-local function isptmaster(fd) return fd:ioctl("TIOCPTMASTER") end
-S.grantpt = isptmaster
-S.unlockpt = isptmaster
+local function ptmname(fd) return error "NYI" end -- TODO see lib/libc/stdlib/posix_pty.c for details
+S.grantpt = ptmname
+S.unlockpt = ptmname
 
 return S
 
