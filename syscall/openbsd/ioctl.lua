@@ -116,7 +116,6 @@ local ioctl = strflag {
   _IOR = _IOR, 
   _IOW = _IOW,
   _IOWR = _IOWR,
-  _IOWINT = _IOWINT,
 }
 
 return ioctl
