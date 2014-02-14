@@ -849,11 +849,11 @@ c.IPV6 = strflag {
 }
 
 c.CLOCK = strflag {
-  REALTIME           = 0,
-  VIRTUAL            = 1,
-  MONOTONIC          = 4,
-  THREAD_CPUTIME_ID  = 14,
-  PROCESS_CPUTIME_ID = 15,
+  REALTIME                 = 0,
+  VIRTUAL                  = 1,
+  PROCESS_CPUTIME_ID       = 2,
+  MONOTONIC                = 3,
+  THREAD_CPUTIME_ID        = 4,
 }
 
 return c
