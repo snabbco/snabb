@@ -549,7 +549,8 @@ c.SO = strflag {
   LINGER       = 0x0080,
   OOBINLINE    = 0x0100,
   REUSEPORT    = 0x0200,
-  TIMESTAMP    = 0x0400,
+  TIMESTAMP    = 0x0800,
+  BINDANY      = 0x1000,
   SNDBUF       = 0x1001,
   RCVBUF       = 0x1002,
   SNDLOWAT     = 0x1003,
@@ -558,6 +559,10 @@ c.SO = strflag {
   RCVTIMEO     = 0x1006,
   ERROR        = 0x1007,
   TYPE         = 0x1008,
+  NETPROC      = 0x1020,
+  RTABLE       = 0x1021,
+  PEERCRED     = 0x1022,
+  SPLICE       = 0x1023,
 }
 
 c.DT = strflag {
