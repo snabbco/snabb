@@ -374,9 +374,9 @@ c.MCL = strflag {
 
 -- flags to `msync'. - note was MS_ renamed to MSYNC_
 c.MSYNC = multiflags {
-  SYNC       = 0x0000,
-  ASYNC      = 0x0001,
-  INVALIDATE = 0x0002,
+  ASYNC       = 0x01,
+  SYNC        = 0x02,
+  INVALIDATE  = 0x04,
 }
 
 c.MADV = strflag {
