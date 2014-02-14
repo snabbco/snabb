@@ -873,5 +873,10 @@ c.CLOCK = strflag {
   THREAD_CPUTIME_ID        = 4,
 }
 
+c.UTIME = strflag {
+  NOW      = -2,
+  OMIT     = -1,
+}
+
 return c
 
