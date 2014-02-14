@@ -183,11 +183,11 @@ struct termios {
   speed_t         c_ospeed;
 };
 struct kevent {
-  uintptr_t       ident;
+  unsigned int    ident;
   short           filter;
   unsigned short  flags;
   unsigned int    fflags;
-  intptr_t        data;
+  int             data;
   void            *udata;
 };
 union sigval {
