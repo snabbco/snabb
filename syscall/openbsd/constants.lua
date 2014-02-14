@@ -476,9 +476,8 @@ c.W = multiflags {
   UNTRACED    = 2,
   ALTSIG      = 4,
   CONTINUED   = 8,
+  STOPPED     = octal "0177",
 }
-
-c.W.STOPPED = c.W.UNTRACED
 
 -- waitpid and wait4 pid
 c.WAIT = strflag {
