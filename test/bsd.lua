@@ -128,6 +128,7 @@ test.filesystem_bsd = {
     assert(fd:close())
   end,
   test_lchmod = function()
+    if not C.lchmod then error "skipped" end
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(S.lchmod(tmpfile, "RUSR, WUSR"))
     assert(S.access(tmpfile, "rw"))
