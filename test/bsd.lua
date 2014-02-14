@@ -91,6 +91,7 @@ test.filesystem_bsd = {
     assert(fd:close())
   end,
   test_lchflags = function()
+    if not S.lchflags then error "skipped" end
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:write("append"))
     assert(S.lchflags(tmpfile, "uf_append"))
