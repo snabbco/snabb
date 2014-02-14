@@ -152,14 +152,23 @@ c.AF = strflag {
   APPLETALK   = 16,
   ROUTE       = 17,
   LINK        = 18,
+-- pseudo_AF_XTP   19
   COIP        = 20,
   CNT         = 21,
+-- pseudo_AF_RTIP  22
   IPX         = 23,
-  SIP         = 24,
+  INET6       = 24,
+-- pseudo_AF_PIP   25
   ISDN        = 26,
-  INET6       = 28,
-  NATM        = 29,
-  BLUETOOTH   = 36,
+  NATM        = 27,
+  ENCAP       = 28,
+  SIP         = 29,
+  KEY         = 30,
+-- pseudo_AF_HDRCMPLT 31
+  BLUETOOTH   = 32,
+  MPLS        = 33,
+-- pseudo_AF_PFLOW 34
+-- pseudo_AF_PIPEX 35
 }
 
 c.AF.UNIX = c.AF.LOCAL
