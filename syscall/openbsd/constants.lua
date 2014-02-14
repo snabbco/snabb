@@ -303,10 +303,10 @@ c.AT_FDCWD = atflag {
 }
 
 c.AT = multiflags {
-  EACCESS          = 0x100,
-  SYMLINK_NOFOLLOW = 0x200,
-  SYMLINK_FOLLOW   = 0x400,
-  REMOVEDIR        = 0x800,
+  EACCESS             = 0x01,
+  SYMLINK_NOFOLLOW    = 0x02,
+  SYMLINK_FOLLOW      = 0x04,
+  REMOVEDIR           = 0x08,
 }
 
 c.S_I = modeflags {
