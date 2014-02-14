@@ -880,5 +880,7 @@ c.UTIME = strflag {
   OMIT     = -1,
 }
 
+c.PATH_MAX = 1024
+
 return c
 
