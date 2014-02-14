@@ -385,7 +385,8 @@ c.MADV = strflag {
   SEQUENTIAL  = 2,
   WILLNEED    = 3,
   DONTNEED    = 4,
-  FREE        = 5,
+  SPACEAVAIL  = 5,
+  FREE        = 6,
 }
 
 c.IPPROTO = strflag {
