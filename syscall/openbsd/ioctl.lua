@@ -64,7 +64,6 @@ local _IO     = function(ch, nr)     return _IOC(IOC.VOID, ch, nr, 0) end
 local _IOR    = function(ch, nr, tp) return _IOC(IOC.OUT, ch, nr, tp) end
 local _IOW    = function(ch, nr, tp) return _IOC(IOC.IN, ch, nr, tp) end
 local _IOWR   = function(ch, nr, tp) return _IOC(IOC.INOUT, ch, nr, tp) end
-local _IOWINT = function(ch, nr)     return _IOC(IOC.VOID, ch, nr, "int") end
 
 local ioctl = strflag {
   -- tty ioctls
@@ -78,11 +77,11 @@ local ioctl = strflag {
   TIOCGETD       = _IOR('t', 26, "int"),
   TIOCSETD       = _IOW('t', 27, "int"),
   TIOCDRAIN      =  _IO('t', 94),
-  TIOCSIG        = _IOWINT('t', 95),
+  TIOCSIG        = _IOW('t', 95, int),
   TIOCEXT        = _IOW('t', 96, "int"),
   TIOCSCTTY      =  _IO('t', 97),
   TIOCCONS       = _IOW('t', 98, "int"),
-  TIOCSTAT       =  _IO('t', 101),
+  TIOCSTAT       = _IOW('t', 101, "int"),
   TIOCUCNTL      = _IOW('t', 102, "int"),
   TIOCSWINSZ     = _IOW('t', 103, "winsize"),
   TIOCGWINSZ     = _IOR('t', 104, "winsize"),
