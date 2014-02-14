@@ -783,7 +783,7 @@ c.EVFILT = strflag {
   PROC     = -5,
   SIGNAL   = -6,
   TIMER    = -7,
-  SYSCOUNT = 11,
+  SYSCOUNT = 7,
 }
 
 c.NOTE = multiflags {
