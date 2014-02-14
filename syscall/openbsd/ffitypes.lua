@@ -20,7 +20,6 @@ typedef uint32_t      fflags_t;
 typedef uint64_t      fsblkcnt_t;
 typedef uint64_t      fsfilcnt_t;
 typedef int32_t       id_t;
-typedef uint32_t      ino_t;
 typedef long          key_t;
 typedef int32_t       lwpid_t;
 typedef uint32_t      mode_t;
@@ -38,7 +37,15 @@ typedef uint32_t      dev_t;
 typedef uint32_t      fixpt_t;
 typedef	unsigned int  nfds_t;
 typedef int64_t       daddr_t;
-typedef int32_t       time_t;  /* TODO changed in CURRENT to 64 bit */
+]]
+if abi.openbsd < 5.5 then append [[
+typedef uint32_t      ino_t;
+typedef int32_t       time_t;
+]] else append [[
+typedef uint64_t      ino_t;
+typedef int64_t       time_t;
+]] end
+append [[
 typedef unsigned int  tcflag_t;
 typedef unsigned int  speed_t;
 typedef char *        caddr_t;
@@ -120,6 +127,8 @@ struct pollfd {
   short events;
   short revents;
 };
+]]
+if abi.openbsd < 5.5 then append [[
 struct stat {
   dev_t     st_dev;
   ino_t     st_ino;
@@ -141,6 +150,26 @@ struct stat {
   struct  timespec __st_birthtim;
   int64_t   st_qspare[2];
 };
+]] else append [[
+struct stat {
+  mode_t    st_mode;
+  dev_t     st_dev;
+  ino_t     st_ino;
+  nlink_t   st_nlink;
+  uid_t     st_uid;
+  gid_t     st_gid;
+  dev_t     st_rdev;
+  struct  timespec st_atim;
+  struct  timespec st_mtim;
+  struct  timespec st_ctim;
+  off_t     st_size;
+  int64_t   st_blocks;
+  uint32_t  st_blksize;
+  uint32_t  st_flags;
+  uint32_t  st_gen;
+  struct  timespec __st_birthtim;
+};
+]] end append [[
 struct rusage {
   struct timeval ru_utime;
   struct timeval ru_stime;
@@ -166,13 +195,6 @@ struct flock {
   short   l_type;
   short   l_whence;
 };
-struct dirent {
-  uint32_t d_fileno;
-  uint16_t d_reclen;
-  uint8_t  d_type;
-  uint8_t  d_namlen;
-  char     d_name[255 + 1];
-};
 struct termios {
   tcflag_t        c_iflag;
   tcflag_t        c_oflag;
@@ -182,6 +204,15 @@ struct termios {
   speed_t         c_ispeed;
   speed_t         c_ospeed;
 };
+]]
+if abi.openbsd < 5.5 then append [[
+struct dirent {
+  uint32_t d_fileno;
+  uint16_t d_reclen;
+  uint8_t  d_type;
+  uint8_t  d_namlen;
+  char     d_name[255 + 1];
+};
 struct kevent {
   unsigned int    ident;
   short           filter;
@@ -190,6 +221,26 @@ struct kevent {
   int             data;
   void            *udata;
 };
+]] else append [[
+struct dirent {
+  uint64_t d_fileno;
+  int64_t  d_off;
+  uint16_t d_reclen;
+  uint8_t  d_type;
+  uint8_t  d_namlen;
+  char     __d_padding[4];
+  char     d_name[255 + 1];
+};
+struct kevent {
+  intptr_t	  ident;
+  short           filter;
+  unsigned short  flags;
+  unsigned int    fflags;
+  int64_t         data;
+  void            *udata;
+};
+]] end
+append [[
 union sigval {
   int     sival_int;
   void    *sival_ptr;
