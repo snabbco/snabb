@@ -486,15 +486,17 @@ c.WAIT = strflag {
 }
 
 c.MSG = multiflags {
-  OOB             = 0x1,
-  PEEK            = 0x2,
-  DONTROUTE       = 0x4,
-  EOR             = 0x8,
-  TRUNC           = 0x10,
-  CTRUNC          = 0x20,
-  WAITALL         = 0x40,
-  DONTWAIT        = 0x80,
-  NOSIGNAL        = 0x20000,
+  OOB         = 0x1,
+  PEEK        = 0x2,
+  DONTROUTE   = 0x4,
+  EOR         = 0x8,
+  TRUNC       = 0x10,
+  CTRUNC      = 0x20,
+  WAITALL     = 0x40,
+  DONTWAIT    = 0x80,
+  BCAST       = 0x100,
+  MCAST       = 0x200,
+  NOSIGNAL    = 0x400,
 }
 
 c.PC = strflag {
