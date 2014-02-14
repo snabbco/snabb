@@ -474,7 +474,8 @@ c.LOCK = multiflags {
 c.W = multiflags {
   NOHANG      = 1,
   UNTRACED    = 2,
-  CONTINUED   = 4,
+  ALTSIG      = 4,
+  CONTINUED   = 8,
 }
 
 c.W.STOPPED = c.W.UNTRACED
