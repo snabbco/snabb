@@ -438,10 +438,10 @@ c.F = strflag {
   SETFL       = 4,
   GETOWN      = 5,
   SETOWN      = 6,
-  GETLK       = 11,
-  SETLK       = 12,
-  SETLKW      = 13,
-  DUPFD_CLOEXEC= 17,
+  GETLK       = 7,
+  SETLK       = 8,
+  SETLKW      = 9,
+  DUPFD_CLOEXEC= 10,
 }
 
 c.FD = multiflags {
