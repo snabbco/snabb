@@ -427,7 +427,7 @@ c.IPPROTO = strflag {
 
 c.SCM = multiflags {
   RIGHTS     = 0x01,
-  TIMESTAMP  = 0x02,
+  TIMESTAMP  = 0x04,
 }
 
 c.F = strflag {
