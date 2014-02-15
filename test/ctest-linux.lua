@@ -304,6 +304,11 @@ c.CBAUDEX = nil
 -- missing on my mips box
 c.AUDIT_ARCH.H8300 = nil
 
+-- defined only in linux/termios.h which we cannot include on mips
+c.TIOCM.OUT1 = nil
+c.TIOCM.OUT2 = nil
+c.TIOCM.LOOP = nil
+
 -- glibc lies about what structure is used on ppc for termios TODO check all these ioctls
 if abi.arch == "ppc" then
   ctypes["struct termios"] = nil
