@@ -275,13 +275,13 @@ typedef struct {
       } _fault;
    } _data;
 } siginfo_t;
-struct sigaction {
+struct  sigaction {
   union {
     void    (*__sa_handler)(int);
-    void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+    void    (*__sa_sigaction)(int, siginfo_t *, void *);
   } __sigaction_u;
-  int     sa_flags;
   sigset_t sa_mask;
+  int     sa_flags;
 };
 ]]
 
