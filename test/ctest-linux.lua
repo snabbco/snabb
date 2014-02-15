@@ -387,7 +387,7 @@ print [[
 #include <sys/wait.h>
 #include <dirent.h>
 #include <sys/eventfd.h>
-#include <syscall.h>
+#include <sys/syscall.h>
 #include <sys/ioctl.h>
 #include <elf.h>
 #include <net/ethernet.h>
