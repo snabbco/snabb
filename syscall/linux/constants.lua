@@ -1600,8 +1600,8 @@ c.ETHERTYPE = strflag {
 -- eventfd
 c.EFD = multiflags {
   SEMAPHORE = 1,
-  CLOEXEC = octal("02000000"),
-  NONBLOCK = octal("04000"),
+  CLOEXEC = c.O.CLOEXEC,
+  NONBLOCK = c.O.NONBLOCK,
 }
 
 -- mount
