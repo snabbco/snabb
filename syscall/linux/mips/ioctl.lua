@@ -3,6 +3,13 @@
 return function(s)
 
 local arch = {
+  IOC = {
+    SIZEBITS = 13,
+    DIRBITS = 3,
+    NONE = 1,
+    WRITE = 2,
+    READ = 4,
+  },
   ioctl = function(_IO, _IOR, _IOW, _IORW)
     return {
       FIOGETOWN      = _IOR('f', 123, "int"),
