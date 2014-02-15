@@ -76,8 +76,8 @@ end
 
 -- just for pipe2
 c.OPIPE = multiflags {
-  NONBLOCK  = octal('04000'),
-  CLOEXEC   = octal('02000000'),
+  NONBLOCK  = c.O.NONBLOCK,
+  CLOEXEC   = c.O.CLOEXEC,
 }
 
 -- for mq_attr NONBLOCK only flag allowed
