@@ -663,8 +663,9 @@ c.OFLAG = multiflags {
   OXTABS         = 0x00000004,
   ONOEOT         = 0x00000008,
   OCRNL          = 0x00000010,
-  ONOCR          = 0x00000020,
-  ONLRET         = 0x00000040,
+  OLCUC          = 0x00000020,
+  ONOCR          = 0x00000040,
+  ONLRET         = 0x00000080,
 }
 
 c.CFLAG = multiflags {
