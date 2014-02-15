@@ -16,6 +16,7 @@ local arch = {
       TCSBRK	     = 0x5405,
       TCXONC	     = 0x5406,
       TCFLSH	     = 0x5407,
+      TCGETS	     = 0x540d,
       TCSETS	     = 0x540e,
       TCSETSW	     = 0x540f,
       TCSETSF	     = 0x5410,
