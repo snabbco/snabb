@@ -24,9 +24,12 @@ local arch = {
       TIOCSSERIAL    = 0x5485,
       TCSBRKP	     = 0x5486,
       TIOCSERSWILD   = 0x548a,
+      TIOCSLCKTRMIOS = 0x548c,
       TIOCSERGSTRUCT = 0x548d,
+      TIOCSERGETLSR  = 0x548e,
       TIOCSERSETMULTI= 0x5490,
       TIOCMIWAIT     = 0x5491,
+      FIOASYNC	     = 0x667d,
       TIOCSETD	     = 0x7401,
       TIOCMSET	     = 0x741a,
       TIOCOUTQ	     = 0x7472,
@@ -37,6 +40,7 @@ local arch = {
       SIOCGPGRP      = _IOR('s', 9, "pid"),
       TIOCSWINSZ     = _IOW('t', 103, "winsize"),
       TIOCSPGRP	     = _IOW('t', 118, "int"),
+      TIOCGPGRP	     = _IOR('t', 119, "int"),
     }
   end,
 }
