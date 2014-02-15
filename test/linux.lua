@@ -1289,8 +1289,8 @@ test.bpf = {
 }
 
 -- TODO remove arch tests. Unclear if my ppc/arm does not support or a bug, retest later with newer kernel
--- still ppc issues with 3.12.6 ppc, nned to debug more
-if not (abi.arch == "ppc" or abi.arch == "arm" or S.__rump) then -- cannot test on rump as uses clone()
+-- still ppc issues with 3.12.6 ppc, need to debug more, and mips issues
+if not (abi.arch == "ppc" or abi.arch == "arm" or abi.arch == "mips" or S.__rump) then -- cannot test on rump as uses clone()
 test.seccomp = {
   test_no_new_privs = function() -- this must be done for non root to call type 2 seccomp
     local p = assert(S.clone())
