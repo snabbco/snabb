@@ -16,7 +16,7 @@ local s, t = types.s, types.t
 
 local strflag = require "syscall.helpers".strflag
 
-local arch = require("syscall.linux." .. abi.arch .. ".ioctl")(s)
+local arch = require("syscall.linux." .. abi.arch .. ".ioctl")
 
 local bit = require "syscall.bit"
 

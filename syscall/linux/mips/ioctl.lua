@@ -1,7 +1,5 @@
 -- MIPS ioctl differences
 
-return function(s)
-
 local arch = {
   IOC = {
     SIZEBITS = 13,
@@ -22,6 +20,7 @@ local arch = {
       TIOCNOTTY	     = 0x5471,
       TCSBRKP	     = 0x5486,
       TIOCSERSWILD   = 0x548a,
+      TIOCMIWAIT     = 0x5491,
       FIOGETOWN      = _IOR('f', 123, "int"),
       FIOSETOWN      = _IOW('f', 124, "int"),
       SIOCATMARK     = _IOR('s', 7, "int"),
@@ -32,6 +31,4 @@ local arch = {
 }
 
 return arch
-
-end
 

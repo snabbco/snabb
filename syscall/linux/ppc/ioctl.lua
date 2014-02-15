@@ -1,7 +1,5 @@
 -- ppc ioctl differences
 
-return function(s)
-
 local arch = {
   IOC = {
     SIZEBITS  = 13,
@@ -39,6 +37,4 @@ local arch = {
 }
 
 return arch
-
-end
 
