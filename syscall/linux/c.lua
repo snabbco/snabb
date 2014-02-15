@@ -439,11 +439,8 @@ local function sigmasksize(sigmask)
   return ulong(size)
 end
 
--- now failing on Travis, was ok... TODO work out why
-if not C.epoll_pwait then
 function C.epoll_pwait(epfd, events, maxevents, timeout, sigmask)
   return syscall(sys.epoll_pwait, int(epfd), void(events), int(maxevents), int(timeout), void(sigmask), sigmasksize(sigmask))
-end
 end
 
 function C.ppoll(fds, nfds, timeout_ts, sigmask)
