@@ -12,6 +12,10 @@ local arch = {
   },
   ioctl = function(_IO, _IOR, _IOW, _IORW)
     return {
+      TCSETA	     = 0x5402,
+      TCSETAW	     = 0x5403,
+      TCSETAF	     = 0x5404,
+      TIOCNOTTY	     = 0x5471,
       FIOGETOWN      = _IOR('f', 123, "int"),
       FIOSETOWN      = _IOW('f', 124, "int"),
       SIOCATMARK     = _IOR('s', 7, "int"),
