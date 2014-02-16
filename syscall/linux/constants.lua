@@ -78,6 +78,7 @@ end
 c.OPIPE = multiflags {
   NONBLOCK  = c.O.NONBLOCK,
   CLOEXEC   = c.O.CLOEXEC,
+  DIRECT    = c.O.DIRECT,
 }
 
 -- for mq_attr NONBLOCK only flag allowed
