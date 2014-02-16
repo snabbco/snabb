@@ -30,19 +30,19 @@ There is more information in the INSTALL file.
 
 Requirements: Needs [LuaJIT 2.0.2](http://www.luajit.org/) or later.
 
-The code does not currently portably support the main Lua implementation, only LuaJIT. It now runs again with [luaffi](https://github.com/jmckaskill/luaffi) under standard Lua 5.2 (and probably 5.1, untested). Because the function calls in luaffi use dynasm they are not fully portable, so I will be adding support for Lua C interface function calls as well shortly. This is not yet integrated into the test suite.
+The code does not currently portably support the main Lua implementation, only LuaJIT. It now runs again with [luaffi](https://github.com/jmckaskill/luaffi) under standard Lua 5.2 (and probably 5.1, untested). Because the function calls in luaffi use dynasm they are not fully portable, so I will be adding support for Lua C interface function calls as well shortly. This is not yet integrated into the test suite so there may be regressions and issues still.
 
-On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; MIPS support is partial, with some issues still. Either glibc/eglibc, [Musl libc](http://www.musl-libc.org/) or uClibc should work on Linux. Note that uClibc has had little testing. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly; tests should be skipped if unsupported, raise an issue if not.
+On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; MIPS support is almost complete now. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly; tests should be skipped if unsupported, raise an issue if not.
 
 Android (ARM tested so far) currently passes all the non root tests now; some tests are be skipped as the kernel does not ship with some functionality (aio, mq). Generally much functionality is available even though it is not in Bionic libc.
 
-For the NetBSD support all platforms should work in principle; more test targets will be added soon, currently tests being run on x86 and amd64, an ARM test target will be added.
+For the NetBSD support all platforms should work in principle; more test targets will be added soon, currently tests being run on x86 and amd64, an ARM test target will be added. The port currently targets NetBSD 6, although some NetBSD current (7) differences are there too.
 
 FreeBSD support is currently for FreeBSD 9 and 10, and only tested on amd64. Other architectures should work, but are currently untested.
 
-OpenBSD support is tested under 5.4 and 5.5.
+OpenBSD support is tested under 5.4 and 5.5, on amd64. Other architectures should work, but are currently untested.
 
-OSX support is currently tested only on amd64, and on a recent release (currently testing on Mountain Lion). It should work on other recent releases, and should work on ARM, ie iOS, although some tweaks.
+OSX support is currently tested only on amd64, and on a recent release (currently testing on Mountain Lion). It should work on other recent releases, and should work on ARM, ie iOS, although some tweaks might be necessary. As I do not have a suitable test machine for OSX support, testing is intermittent and there may be regressions.
 
 There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
 
@@ -79,7 +79,7 @@ There is now [Travis CI](https://travis-ci.org/) support, although this will onl
 
 I have used the LuaJIT [reflect library](http://www.corsix.org/lua/reflect/api.html) for checking struct offsets.
 
-Adding buildbot tests for a wider variety of architectures, as Travis is limited to Linux/Ubuntu. Currently building on Linux ARM, PowerPC, x64 and x86, NetBSD x86 and x64, FreeBSD x64; more targets to come soon. The [buildbot dashboard is now up](http://build.myriabit.eu:8010/).
+Adding buildbot tests for a wider variety of architectures, as Travis is limited to Linux/Ubuntu. Currently building on Linux ARM, PowerPC, x64 and x86, NetBSD x86 and x64, FreeBSD x64, OpenBSD x64; more targets to come soon. The [buildbot dashboard is now up](http://build.myriabit.eu:8010/).
 
 ## What is implemented?
 
@@ -97,7 +97,7 @@ The aim is to provide nice to use, Lua friendly interfaces where possible, but m
 
 Under Linux, there are several alternative C libraries as well as the standard Glibc, such as [Musl libc](http://www.musl-libc.org/), uClibc, Dietlibc and Bionic, which is the C library used on Android. These are not ABI compatible, so in order to allow use of any of them, we just call system calls directly on Linux, bypassing libc completely.
 
-Under NetBSD it is much simpler, the only thing we need to be careful of is versioned system calls in libc, where we directly call a specific version as the plain name will always refer to the old version for compatibility. FreeBSD does a more transparent versioning, so the syscall names stay the same.
+Under NetBSD it is much simpler, the only thing we need to be careful of is versioned system calls in libc, where we directly call a specific version as the plain name will always refer to the old version for compatibility. FreeBSD and OpenBSD do a more transparent versioning, so the syscall names stay the same.
 
 ### API
 
@@ -135,9 +135,9 @@ There is an example epoll script that you can test with Apachebench in the examp
 
 If you wish to port to an unsupported platform, please get in touch for help. All contributions welcomed.
 
-Porting to different Linux processor architectures is a matter of filling in the constants and types that differ. The `ctest` tests will flag issues with these, although many platforms are also missing headers which makes it more complex. If you can provide qemu target information that would be helpful as the platform can be added to the test suite, or easily available hardware.
+Porting to different Linux processor architectures is a matter of filling in the constants and types that differ. The `ctest` tests will flag issues with these, although many platforms are also missing headers which makes it more complex. If you can provide qemu target information that would be helpful as the platform can be added to the test suite, or easily available hardware. We currently support all the platforms that LuaJIT does, so new platforms will require Lua support or new LuJIT ports.
 
-Porting to different OSs is a fair amount of work, but can generally be done gradually. The other BSDs are very similar to NetBSD, FreeBSD and OSX. Solaris has an ABI defined by libc not the kernel ABI, which would mean that you should probably target that. The first thing to do is check the base shared types, and work out if there are issues with large file support if it is a 32 bit platform. There is a fair amount of shared code that should just work once the types and constants are defined.
+Porting to different OSs is a fair amount of work, but can generally be done gradually. There is a lot of code sharing with the BSD operating systems so porting to new ones is just a matter of finding the differences; DragonflyBSD is the main one left to support. Solaris support would be nice to have, but it differs more than the BSDs. The first thing to do is check the base shared types, and work out if there are issues with large file support if it is a 32 bit platform. There is a fair amount of shared code that should just work once the types and constants are defined.
 
 If you want to port this to a different language, then get in touch, as I have some ideas and plans along this route, though I am trying to get a good fairly stable interface in Lua first. Pypy and Ruby ought to be suitable targets as they have an ffi; I also intend to do a classic Lua port using the C API. I intend to use reflection to generate more generic data for the ports, and rework how files are included. The first thing to do is just prototype some basic functions to see what is needed. Get in touch if you are interested in a port!
 
