@@ -498,7 +498,7 @@ function C.prctl(option, arg2, arg3, arg4, arg5)
   return syscall(sys.prctl, int(option), ulong(arg2), ulong(arg3), ulong(arg4), ulong(arg5))
 end
 function C.pipe(pipefd) return syscall(sys.pipe, void(pipefd)) end
-function C.pipe2(pipefd, flags) return syscall(sys.pipe, void(pipefd), int(flags)) end
+function C.pipe2(pipefd, flags) return syscall(sys.pipe2, void(pipefd), int(flags)) end
 function C.mknod(path, mode, dev) return syscall(sys.mknod, void(path), uint(mode), uint(dev)) end
 function C.pause() return syscall(sys.pause) end
 function C.remap_file_pages(addr, size, prot, pgoff, flags)
