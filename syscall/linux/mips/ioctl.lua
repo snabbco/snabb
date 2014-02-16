@@ -51,7 +51,7 @@ local arch = {
       SIOCSPGRP      = _IOW('s', 8, "pid"),
       SIOCGPGRP      = _IOR('s', 9, "pid"),
       TIOCSWINSZ     = _IOW('t', 103, "winsize"),
-      TIOCGWINSZ     = _IOR('t', 104, "winsize")
+      TIOCGWINSZ     = _IOR('t', 104, "winsize"),
       TIOCSPGRP	     = _IOW('t', 118, "int"),
       TIOCGPGRP	     = _IOR('t', 119, "int"),
     }
