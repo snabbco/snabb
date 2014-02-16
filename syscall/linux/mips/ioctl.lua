@@ -10,6 +10,8 @@ local arch = {
   },
   ioctl = function(_IO, _IOR, _IOW, _IORW)
     return {
+      FIONREAD	     = 0x467f,
+      TCGETA	     = 0x5401,
       TCSETA	     = 0x5402,
       TCSETAW	     = 0x5403,
       TCSETAF	     = 0x5404,
@@ -20,7 +22,9 @@ local arch = {
       TCSETS	     = 0x540e,
       TCSETSW	     = 0x540f,
       TCSETSF	     = 0x5410,
+      TIOCPKT	     = 0x5470,
       TIOCNOTTY	     = 0x5471,
+      TIOCSTI	     = 0x5472,
       TIOCSCTTY	     = 0x5480,
       TIOCGSOFTCAR   = 0x5481,
       TIOCSSOFTCAR   = 0x5482,
@@ -46,9 +50,11 @@ local arch = {
       FIOQSIZE	     = 0x667f,
       TIOCGETD	     = 0x7400,
       TIOCSETD	     = 0x7401,
+      TIOCEXCL	     = 0x740d,
       TIOCNXCL	     = 0x740e,
       TIOCGSID	     = 0x7416,
       TIOCMSET	     = 0x741a,
+      TIOCMBIS	     = 0x741b,
       TIOCMBIC	     = 0x741c,
       TIOCMGET	     = 0x741d,
       TIOCOUTQ	     = 0x7472,
@@ -61,6 +67,7 @@ local arch = {
       TIOCGWINSZ     = _IOR('t', 104, "winsize"),
       TIOCSPGRP	     = _IOW('t', 118, "int"),
       TIOCGPGRP	     = _IOR('t', 119, "int"),
+      TIOCCONS	     = _IOW('t', 120, "int"),
     }
   end,
 }
