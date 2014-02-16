@@ -11,10 +11,6 @@ local arch = {
   ioctl = function(_IO, _IOR, _IOW, _IORW)
     return {
       FIONREAD	     = 0x467f,
-      TCGETA	     = 0x5401,
-      TCSETA	     = 0x5402,
-      TCSETAW	     = 0x5403,
-      TCSETAF	     = 0x5404,
       TCSBRK	     = 0x5405,
       TCXONC	     = 0x5406,
       TCFLSH	     = 0x5407,

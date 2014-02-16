@@ -114,7 +114,6 @@ local addstructs = {
   ff_periodic_effect = "struct ff_periodic_effect",
   ff_rumble_effect = "struct ff_rumble_effect",
   ff_effect = "struct ff_effect",
-  termio = "struct termio",
   sock_fprog = "struct sock_fprog",
   user_cap_header = "struct user_cap_header",
   user_cap_data = "struct user_cap_data",

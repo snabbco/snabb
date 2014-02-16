@@ -796,21 +796,6 @@ end
 
 append(arch.ucontext) -- there is no default for ucontext and related types as very machine specific
 
-if arch.termio then append(arch.termio)
-else
-append [[
-static const int NCC = 8;
-struct termio {
-  unsigned short c_iflag;
-  unsigned short c_oflag;
-  unsigned short c_cflag;
-  unsigned short c_lflag;
-  unsigned char c_line;
-  unsigned char c_cc[NCC];
-};
-]]
-end
-
 if arch.statfs then append(arch.statfs)
 else
 -- Linux struct statfs/statfs64 depends on 64/32 bit
