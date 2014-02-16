@@ -497,7 +497,11 @@ function C.unlinkat(dirfd, pathname, flags) return syscall(sys.unlinkat, int(dir
 function C.prctl(option, arg2, arg3, arg4, arg5)
   return syscall(sys.prctl, int(option), ulong(arg2), ulong(arg3), ulong(arg4), ulong(arg5))
 end
-function C.pipe(pipefd) return syscall(sys.pipe, void(pipefd)) end
+if abi.arch == "mips" then -- mips uses old style dual register return calling convention that we caanot use
+  function C.pipe(pipefd) return syscall(sys.pipe2, void(pipefd), 0) end
+else
+  function C.pipe(pipefd) return syscall(sys.pipe, void(pipefd)) end
+end
 function C.pipe2(pipefd, flags) return syscall(sys.pipe2, void(pipefd), int(flags)) end
 function C.mknod(path, mode, dev) return syscall(sys.mknod, void(path), uint(mode), uint(dev)) end
 function C.pause() return syscall(sys.pause) end
