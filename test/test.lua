@@ -1386,7 +1386,7 @@ test_sockets_pipes = {
     assert(ss, err)
     assert(ss:nonblock())
     local ok, err = ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 0)
-    if not ok then err.INVAL then error "skipped" end -- OpenBSD does not support inet on inet6 sockets
+    if not ok and err.INVAL then error "skipped" end -- OpenBSD does not support inet on inet6 sockets
     local sa = assert(t.sockaddr_in6(0, "any"))
     assert_equal(sa.family, c.AF.INET6)
     assert(ss:bind(sa))
