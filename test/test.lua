@@ -1742,8 +1742,10 @@ test_termios = {
     local pts_name = assert(ptm:ptsname())
     local pts = assert(S.open(pts_name, "rdwr, noctty"))
     assert(pts:isatty(), "should be a tty")
-    local ok, err = pts:tcgetsid()
-    assert(not ok, "should not get sid as noctty")
+    if S.tcgetsid then
+      local ok, err = pts:tcgetsid()
+      assert(not ok, "should not get sid as noctty")
+    end
     local termios = assert(pts:tcgetattr())
     assert(termios.ospeed ~= 115200)
     termios.speed = 115200
