@@ -63,7 +63,8 @@ struct statfs64 {
   uint64_t   f_bavail;
   kernel_fsid_t f_fsid;
   uint32_t   f_namelen;
-  uint32_t   f_spare[6];
+  uint32_t   f_flags;
+  uint32_t   f_spare[5];
 };
 ]],
   nsig = [[
