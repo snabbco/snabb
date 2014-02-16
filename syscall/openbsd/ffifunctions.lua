@@ -12,5 +12,10 @@ local cdef = require "ffi".cdef
 cdef[[
 int reboot(int howto);
 int ioctl(int d, unsigned long request, void *arg);
+
+/* not syscalls, but using for now */
+int grantpt(int fildes);
+int unlockpt(int fildes);
+char *ptsname(int fildes);
 ]]
 

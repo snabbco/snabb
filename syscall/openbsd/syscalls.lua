@@ -24,10 +24,10 @@ local t, pt, s = types.t, types.pt, types.s
 
 function S.reboot(howto) return C.reboot(c.RB[howto]) end
 
--- pty functions
-local function ptmname(fd) return error "NYI" end -- TODO see lib/libc/stdlib/posix_pty.c for details
-S.grantpt = ptmname
-S.unlockpt = ptmname
+-- pty functions, using libc ones for now; the libc ones use a database of name to dev mappings
+S.ptsname = ffi.C.ptsname
+S.grantpt = ffi.C.grantpt
+S.unlockpt = ffi.C.unlockpt
 
 return S
 
