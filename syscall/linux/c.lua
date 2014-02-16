@@ -634,7 +634,7 @@ end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
-  return syscall(sys.rt_sigaction, int(signum), void(act), void(oldact), ulong(8)) -- size is size of mask field
+  return syscall(sys.rt_sigaction, int(signum), void(act), void(oldact), ulong(sigset_size)) -- size is size of sigaction field
 end
 
 -- in VDSO for many archs, so use ffi for speed; TODO read VDSO to find functions there, needs elf reader
