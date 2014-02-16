@@ -69,5 +69,16 @@ struct statfs64 {
   nsig = [[
 static const int _NSIG = 128;
 ]],
+-- termio in mips looks like a typo, defines NCC=8 then uses NCCS=23 for x_cc size...
+  termio = [[
+struct termio {
+  unsigned short c_iflag;
+  unsigned short c_oflag;
+  unsigned short c_cflag;
+  unsigned short c_lflag;
+  char c_line;
+  unsigned char c_cc[23];
+};
+]],
 }
 
