@@ -715,7 +715,10 @@ function S.isatty(fd)
   local tc, err = S.tcgetattr(fd)
   if tc then return true else return nil, err end
 end
-function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
+
+if c.IOCTL.TIOCGSID then -- OpenBSD only has in legacy ioctls
+  function S.tcgetsid(fd) return S.ioctl(fd, "TIOCGSID") end
+end
 
 -- now call OS specific for non-generic calls
 local hh = {
