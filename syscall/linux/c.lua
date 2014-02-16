@@ -409,11 +409,12 @@ if sys.sync_file_range then
       return syscall(sys.sync_file_range, int(fd), long(pos), long(len), uint(flags))
     end
   else
-    if zeropad then
+    if zeropad then -- only on mips
       function C.sync_file_range(fd, pos, len, flags)
         local pos1, pos2 = arg64(pos)
         local len1, len2 = arg64(len)
-        return syscall(sys.sync_file_range, int(fd), 0, long(pos1), long(pos2), long(len1), long(len2), uint(flags))
+        -- TODO these args appear to be reversed but is this mistaken/endianness/also true elsewhere? strace broken...
+        return syscall(sys.sync_file_range, int(fd), 0, long(pos2), long(pos1), long(len2), long(len1), uint(flags))
       end
     else
       function C.sync_file_range(fd, pos, len, flags)
@@ -423,7 +424,7 @@ if sys.sync_file_range then
       end
     end
   end
-elseif sys.sync_file_range2 then -- only on 32 bit platforms I believe
+elseif sys.sync_file_range2 then -- only on 32 bit platforms
   function C.sync_file_range(fd, pos, len, flags)
     local pos1, pos2 = arg64(pos)
     local len1, len2 = arg64(len)
