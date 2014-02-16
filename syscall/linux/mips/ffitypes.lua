@@ -3,6 +3,9 @@
 -- TODO sigset_t probably needs to be here as _NSIG = 128 on MIPS
 
 return {
+  nsig = [[
+static const int _NSIG = 128;
+]],
   ucontext = [[
 typedef struct sigaltstack {
   void *ss_sp;
