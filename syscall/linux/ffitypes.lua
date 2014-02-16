@@ -691,12 +691,11 @@ struct rusage {
 };
 ]]
 
-if arch.nsig then append(arch.nsig)
-else
-append [[
+append(arch.nsig or [[
 static const int _NSIG = 64;
 ]]
-end
+)
+
 append [[
 // again, should be a long
 static const int _NSIG_BPW = 32;
@@ -708,9 +707,7 @@ typedef struct {
 ]]
 
 -- both Glibc and Musl have larger termios at least for some architectures; I believe this is correct for kernel
-if arch.termios then append(arch.termios)
-else
-append [[
+append(arch.termios or [[
 struct termios {
   tcflag_t c_iflag;
   tcflag_t c_oflag;
@@ -720,7 +717,7 @@ struct termios {
   cc_t c_cc[19];
 };
 ]]
-end
+)
 
 -- Linux struct siginfo padding depends on architecture
 if abi.abi64 then
@@ -782,9 +779,7 @@ typedef struct siginfo {
 ]]
 
 -- this is the type used by the rt_sigaction syscall NB have renamed the fields to sa_
-if arch.sigaction then append(arch.sigaction)
-else
-append [[
+append(arch.sigaction or [[
 struct k_sigaction {
   void (*sa_handler)(int);
   unsigned long sa_flags;
@@ -792,7 +787,7 @@ struct k_sigaction {
   unsigned sa_mask[2];
 };
 ]]
-end
+)
 
 append(arch.ucontext) -- there is no default for ucontext and related types as very machine specific
 
@@ -830,15 +825,13 @@ end
 append(arch.stat)
 
 -- epoll packed on x86_64 only (so same as x86)
-if arch.epoll then append(arch.epoll)
-else
-append [[
+append(arch.epoll or [[
 struct epoll_event {
   uint32_t events;
   epoll_data_t data;
 };
 ]]
-end
+)
 
 -- endian dependent
 if abi.le then
