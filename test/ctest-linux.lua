@@ -152,7 +152,6 @@ c.STD = nil
 c.PORT_PROFILE_RESPONSE = nil
 c.AT_FDCWD = nil
 c.SYS.fstatat = nil
-c.TFD = nil
 c.TFD_TIMER = nil
 
 -- this lot are not in uClibc at present
@@ -387,6 +386,7 @@ print [[
 #include <net/ethernet.h>
 #include <sys/swap.h>
 #include <netinet/tcp.h>
+#include <sys/timerfd.h>
 
 #include <linux/capability.h>
 #include <linux/reboot.h>

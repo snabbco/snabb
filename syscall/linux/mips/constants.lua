@@ -103,6 +103,11 @@ arch.O = {
 
 arch.O_SYNC = __O_SYNC + arch.O.DSYNC -- compatibility, see notes in header, we do not expose __O_SYNC TODO check if this is best way
 
+arch.TFD = {
+  CLOEXEC = octal '02000000',
+  NONBLOCK = octal '00000200',
+}
+
 arch.E = {
   PERM          =  1,
   NOENT         =  2,
