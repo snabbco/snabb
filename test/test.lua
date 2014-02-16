@@ -1385,7 +1385,8 @@ test_sockets_pipes = {
     if not ss and err.AFNOSUPPORT then error "skipped" end
     assert(ss, err)
     assert(ss:nonblock())
-    assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 0))
+    local ok, err = ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 0)
+    if not ok then err.INVAL then error "skipped" end -- OpenBSD does not support inet on inet6 sockets
     local sa = assert(t.sockaddr_in6(0, "any"))
     assert_equal(sa.family, c.AF.INET6)
     assert(ss:bind(sa))
