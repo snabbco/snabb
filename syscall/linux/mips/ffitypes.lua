@@ -29,7 +29,7 @@ typedef struct __ucontext {
 } ucontext_t;
 ]],
 sigaction = [[
-struct sigaction {
+struct k_sigaction {
   unsigned int    sa_flags;
   void (*sa_handler)(int);
   sigset_t        sa_mask;
