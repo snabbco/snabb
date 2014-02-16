@@ -406,7 +406,7 @@ end
 if sys.sync_file_range then
   if abi.abi64 then
     function C.sync_file_range(fd, pos, len, flags)
-      return syscall(sys.sync_file_range, int(fd), 0, long(pos), long(len), uint(flags))
+      return syscall(sys.sync_file_range, int(fd), long(pos), long(len), uint(flags))
     end
   else
     if zeropad then
