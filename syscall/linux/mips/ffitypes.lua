@@ -28,6 +28,13 @@ typedef struct __ucontext {
   unsigned long uc_regspace[128];
 } ucontext_t;
 ]],
+sigaction = [[
+struct sigaction {
+  unsigned int    sa_flags;
+  void (*sa_handler)(int);
+  sigset_t        sa_mask;
+};
+]],
   -- note this is struct stat64
   stat = [[
 struct stat {
