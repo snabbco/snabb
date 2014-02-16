@@ -431,7 +431,11 @@ elseif sys.sync_file_range2 then -- only on 32 bit platforms I believe
   end
 end
 
-local sigset_size = 8 -- TODO should be s.sigset once switched to kernel sigset not glibc size
+-- TODO this should be got from somewhere more generic
+local sigset_size = 8
+if abi.arch == "mips" then
+  sigset_size = 16
+end
 
 local function sigmasksize(sigmask)
   local size = 0

@@ -699,8 +699,6 @@ static const int _NSIG = 64;
 append(arch.sigset or [[
 // again, should be a long
 static const int _NSIG_BPW = 32;
-// note this should be the kernel size (64 bits), glibc has a larger one.
-// need to bypass all libc handling though
 typedef struct {
   int32_t sig[_NSIG / _NSIG_BPW];
 } sigset_t;
