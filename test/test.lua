@@ -810,8 +810,8 @@ test_file_operations = {
     local st2 = assert(S.stat(tmpfile))
     assert_equal(st2.rdev.dev, st.rdev.dev)
     local fd, err = S.open(tmpfile, "rdonly")
-    if not fd and err.OPNOTSUPP then error "skipped" end -- FreeBSD only allows device nodes to be used on devfs
-    assert(fd)
+    if not fd and (err.OPNOTSUPP or err.NXIO) then error "skipped" end -- FreeBSD, OpenBSD have restrictibe device policies
+    assert(fd, err)
     assert(S.unlink(tmpfile))
     local buf = t.buffer(64)
     local n = assert(fd:read(buf, 64))
