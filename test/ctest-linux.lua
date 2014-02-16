@@ -318,6 +318,10 @@ if abi.arch == "ppc" then
   c.IOCTL.TCSETSW = nil
 end
 
+if abi.arch == "mips" then
+  c.RLIM.INFINITY = nil -- incorrect in all but very recent glibc
+end
+
 c.IPV6.FLOWINFO = nil
 
 -- renames
