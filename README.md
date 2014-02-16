@@ -40,7 +40,7 @@ For the NetBSD support all platforms should work in principle; more test targets
 
 FreeBSD support is currently for FreeBSD 9 and 10, and only tested on amd64. Other architectures should work, but are currently untested.
 
-OpenBSD support is under development, for 5.4 and 5.5; there are some issues still being resolved.
+OpenBSD support is tested under 5.4 and 5.5.
 
 OSX support is currently tested only on amd64, and on a recent release (currently testing on Mountain Lion). It should work on other recent releases, and should work on ARM, ie iOS, although some tweaks.
 
