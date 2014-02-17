@@ -17,5 +17,6 @@ int ioctl(int d, unsigned long request, void *arg);
 int grantpt(int fildes);
 int unlockpt(int fildes);
 char *ptsname(int fildes);
+int getdents(int fd, void *buf, size_t nbytes);
 ]]
 
