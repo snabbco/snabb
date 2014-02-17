@@ -14,8 +14,7 @@ local defs = {}
 local function append(str) defs[#defs + 1] = str end
 
 append [[
-typedef int64_t       clockid_t;
-typedef int32_t       clock_t;
+typedef int32_t       clockid_t;
 typedef uint32_t      fflags_t;
 typedef uint64_t      fsblkcnt_t;
 typedef uint64_t      fsfilcnt_t;
@@ -41,9 +40,11 @@ typedef int64_t       daddr_t;
 if abi.openbsd < 5.5 then append [[
 typedef uint32_t      ino_t;
 typedef int32_t       time_t;
+typedef int32_t       clock_t;
 ]] else append [[
 typedef uint64_t      ino_t;
 typedef int64_t       time_t;
+typedef int64_t       clock_t;
 ]] end
 append [[
 typedef unsigned int  tcflag_t;
