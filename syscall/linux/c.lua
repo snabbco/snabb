@@ -402,7 +402,7 @@ end
 function C.vmsplice(fd, iovec, cnt, flags)
   return syscall(sys.vmsplice, int(fd), void(iovec), ulong(cnt), uint(flags))
 end
--- note that I think these are correct on 32 bit platforms, but strace is buggy
+-- TODO note that I think these may be incorrect on 32 bit platforms, and strace is buggy
 if sys.sync_file_range then
   if abi.abi64 then
     function C.sync_file_range(fd, pos, len, flags)
