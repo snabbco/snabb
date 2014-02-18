@@ -35,6 +35,68 @@ struct k_sigaction {
   sigset_t        sa_mask;
 };
 ]],
+siginfo = [[
+typedef struct siginfo {
+  int si_signo;
+  int si_code;
+  int si_errno;
+  int __pad0[SI_MAX_SIZE / sizeof(int) - SI_PAD_SIZE - 3];
+
+  union {
+    int _pad[SI_PAD_SIZE];
+
+    struct {
+      pid_t _pid;
+      uid_t _uid;
+    } _kill;
+
+    struct {
+      timer_t _tid;
+      int _overrun;
+      char _pad[sizeof(uid_t) - sizeof(int)];
+      sigval_t _sigval;
+      int _sys_private;
+    } _timer;
+
+    struct {
+      pid_t _pid;
+      uid_t _uid;
+      sigval_t _sigval;
+    } _rt;
+
+    struct {
+      pid_t _pid;
+      uid_t _uid;
+      int _status;
+      clock_t _utime;
+      clock_t _stime;
+    } _sigchld;
+
+    struct {
+      pid_t _pid;
+      clock_t _utime;
+      int _status;
+      clock_t _stime;
+    } _irix_sigchld;
+
+    struct {
+      void *_addr;
+      short _addr_lsb;
+    } _sigfault;
+
+    struct {
+      long _band;
+      int _fd;
+    } _sigpoll;
+
+    struct {
+      void *_call_addr;
+      int _syscall;
+      unsigned int _arch;
+    } _sigsys;
+  } _sifields;
+} siginfo_t;
+]],
   -- note this is struct stat64
   stat = [[
 struct stat {

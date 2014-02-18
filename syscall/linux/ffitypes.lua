@@ -731,7 +731,7 @@ static const int SI_PAD_SIZE = (SI_MAX_SIZE / sizeof (int)) - 3;
 ]]
 end
 
-append [[
+append(arch.siginfo or [[
 typedef struct siginfo {
   int si_signo;
   int si_errno;
@@ -776,6 +776,7 @@ typedef struct siginfo {
   } _sifields;
 } siginfo_t;
 ]]
+)
 
 -- this is the type used by the rt_sigaction syscall NB have renamed the fields to sa_
 append(arch.sigaction or [[
