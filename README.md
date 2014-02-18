@@ -44,7 +44,7 @@ OpenBSD support is tested under 5.4 and 5.5, on amd64. Other architectures shoul
 
 OSX support is currently tested only on amd64, and on a recent release (currently testing on Mountain Lion). It should work on other recent releases, and should work on ARM, ie iOS, although some tweaks might be necessary. As I do not have a suitable test machine for OSX support, testing is intermittent and there may be regressions.
 
-There will not be Windows support (although in principle Cygwin and similar platforms could be supported). If you want to do similar things on Windows you should try [TINN](https://github.com/Wiladams/TINN).
+There is currently no Windows support, although in principle Cygwin or Windows Services for Unix could be supported. If you want to do similar things using the Windows native APIs you should try [TINN](https://github.com/Wiladams/TINN).
 
 For the (optional) rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/rumpkernel/buildrump.sh) project, which is now included as a git submodule. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://rumpkernel.org). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There are some additional examples in `examples/rump` which is a port of the tests in buildrump. The rump kernel runs on many elf/Posix OS and architectures, currently tested on Linux x86, x64, ppc, arm and NetBSD x86, x64, FreeBSD 10 (with gcc). It does not currently run on OSX or Windows.
 
