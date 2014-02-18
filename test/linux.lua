@@ -1245,7 +1245,7 @@ test.xattr_linux = {
     assert(S.creat(tmpfile, "RWXU", "0666"))
     local l = string.rep("test", 500)
     local ok, err = S.setxattr(tmpfile, "user.test", l, "create")
-    if not ok and (err.NOTSUP or err.NOSYS or err.OPNOTSUPP) then error "skipped" end
+    if not ok and (err.NOTSUP or err.NOSYS or err.OPNOTSUPP or err.NOSPC) then error "skipped" end
     local tt = assert(S.getxattr(tmpfile, "user.test"))
     assert_equal(tt, l, "should match string")
     assert(S.unlink(tmpfile))
