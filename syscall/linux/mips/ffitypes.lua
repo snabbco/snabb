@@ -37,6 +37,7 @@ struct k_sigaction {
 ]],
 siginfo = [[
 typedef int timer_t;
+/* note renamed members of struct to match other architectures */
 typedef struct siginfo {
   int si_signo;
   int si_code;
@@ -47,53 +48,53 @@ typedef struct siginfo {
     int _pad[SI_PAD_SIZE];
 
     struct {
-      pid_t _pid;
-      uid_t _uid;
+      pid_t si_pid;
+      uid_t si_uid;
     } kill;
 
     struct {
-      timer_t _tid;
-      int _overrun;
+      timer_t si_tid;
+      int si_overrun;
       char _pad[sizeof(uid_t) - sizeof(int)];
-      sigval_t _sigval;
+      sigval_t si_sigval;
       int _sys_private;
     } timer;
 
     struct {
-      pid_t _pid;
-      uid_t _uid;
-      sigval_t _sigval;
+      pid_t si_pid;
+      uid_t si_uid;
+      sigval_t si_sigval;
     } rt;
 
     struct {
-      pid_t _pid;
-      uid_t _uid;
-      int _status;
-      clock_t _utime;
-      clock_t _stime;
+      pid_t si_pid;
+      uid_t si_uid;
+      int si_status;
+      clock_t si_utime;
+      clock_t si_stime;
     } sigchld;
 
     struct {
-      pid_t _pid;
-      clock_t _utime;
-      int _status;
-      clock_t _stime;
+      pid_t si_pid;
+      clock_t si_utime;
+      int si_status;
+      clock_t si_stime;
     } irix_sigchld;
 
     struct {
-      void *_addr;
-      short _addr_lsb;
+      void *si_addr;
+      short si_addr_lsb;
     } sigfault;
 
     struct {
-      long _band;
-      int _fd;
+      long si_band;
+      int si_fd;
     } sigpoll;
 
     struct {
-      void *_call_addr;
-      int _syscall;
-      unsigned int _arch;
+      void *si_call_addr;
+      int si_syscall;
+      unsigned int si_arch;
     } sigsys;
   } _sifields;
 } siginfo_t;
