@@ -1752,11 +1752,11 @@ test_termios = {
     termios.speed = 115200
     assert_equal(termios.ispeed, 115200)
     assert_equal(termios.ospeed, 115200)
-    --assert(bit.band(termios.lflag, c.LFLAG.ICANON) ~= 0, "CANON non zero") -- default seems to differ
+    --assert(bit.band(termios.lflag, c.LFLAG.ICANON) ~= 0, "CANON non zero") -- default seems to differ on mips?
     termios:makeraw()
     assert_equal(bit.band(termios.lflag, c.LFLAG.ICANON), 0)
     assert(pts:tcsetattr("now", termios))
-    termios = assert(pts:tcgetattr())
+    termios = assert(pts:tcgetattr()) -- TODO failing on mips
     assert_equal(termios.ospeed, 115200)
     assert_equal(bit.band(termios.lflag, c.LFLAG.ICANON), 0)
     local ok, err = pts:tcsendbreak(0) -- as this is not actually a serial line, NetBSD seems to fail here
