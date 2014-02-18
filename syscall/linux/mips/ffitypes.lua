@@ -49,7 +49,7 @@ typedef struct siginfo {
     struct {
       pid_t _pid;
       uid_t _uid;
-    } _kill;
+    } kill;
 
     struct {
       timer_t _tid;
@@ -57,13 +57,13 @@ typedef struct siginfo {
       char _pad[sizeof(uid_t) - sizeof(int)];
       sigval_t _sigval;
       int _sys_private;
-    } _timer;
+    } timer;
 
     struct {
       pid_t _pid;
       uid_t _uid;
       sigval_t _sigval;
-    } _rt;
+    } rt;
 
     struct {
       pid_t _pid;
@@ -71,30 +71,30 @@ typedef struct siginfo {
       int _status;
       clock_t _utime;
       clock_t _stime;
-    } _sigchld;
+    } sigchld;
 
     struct {
       pid_t _pid;
       clock_t _utime;
       int _status;
       clock_t _stime;
-    } _irix_sigchld;
+    } irix_sigchld;
 
     struct {
       void *_addr;
       short _addr_lsb;
-    } _sigfault;
+    } sigfault;
 
     struct {
       long _band;
       int _fd;
-    } _sigpoll;
+    } sigpoll;
 
     struct {
       void *_call_addr;
       int _syscall;
       unsigned int _arch;
-    } _sigsys;
+    } sigsys;
   } _sifields;
 } siginfo_t;
 ]],
