@@ -112,7 +112,7 @@ end
 
 local ioctl = strflag {
 -- termios, non standard values generally 0x54 = 'T'
-  TCGETS          = {number = 0x5401, read = true, type = t.termios},
+  TCGETS          = {number = 0x5401, read = true, type = "termios"},
   TCSETS          = 0x5402,
   TCSETSW         = 0x5403,
   TCSETSF         = 0x5404,
@@ -126,8 +126,8 @@ local ioctl = strflag {
   TIOCSPGRP       = 0x5410,
   TIOCOUTQ        = 0x5411,
   TIOCSTI         = 0x5412,
-  TIOCGWINSZ      = {number = 0x5413, read = true, type = t.winsize},
-  TIOCSWINSZ      = {number = 0x5414, write = true, type = t.winsize},
+  TIOCGWINSZ      = {number = 0x5413, read = true, type = "winsize"},
+  TIOCSWINSZ      = {number = 0x5414, write = true, type = "winsize"},
   TIOCMGET        = 0x5415,
   TIOCMBIS        = 0x5416,
   TIOCMBIC        = 0x5417,
@@ -277,6 +277,9 @@ local ioctl = strflag {
 local override = arch.ioctl or {}
 if type(override) == "function" then override = override(_IO, _IOR, _IOW, _IOWR) end
 for k, v in pairs(override) do ioctl[k] = v end
+
+-- allow names for types in table ioctls
+for k, v in pairs(ioctl) do if type(v) == "table" and type(v.type) == "string" then v.type = t[v.type] end end
 
 -- alternate names
 ioctl.TIOCINQ = ioctl.FIONREAD
