@@ -1748,7 +1748,7 @@ test_termios = {
       assert(not ok, "should not get sid as noctty")
     end
     local termios = assert(pts:tcgetattr())
-    assert(termios.ospeed ~= 115200)
+    assert(termios.ospeed ~= 115200, "speed should not be 115200")
     termios.speed = 115200
     assert_equal(termios.ispeed, 115200)
     assert_equal(termios.ospeed, 115200)
@@ -1758,7 +1758,7 @@ test_termios = {
     assert(pts:tcsetattr("now", termios))
     termios = assert(pts:tcgetattr())
     assert_equal(termios.ospeed, 115200)
-    assert(bit.band(termios.lflag, c.LFLAG.ICANON) == 0)
+    assert_equal(bit.band(termios.lflag, c.LFLAG.ICANON), 0)
     local ok, err = pts:tcsendbreak(0) -- as this is not actually a serial line, NetBSD seems to fail here
     assert(pts:tcdrain())
     assert(pts:tcflush('ioflush'))
