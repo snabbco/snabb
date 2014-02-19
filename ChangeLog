@@ -2,7 +2,7 @@
 
 + Additional ioctls
 + FreeBSD 9 support
-+ Linux MIPS fixes
++ Linux MIPS now fully supported
 + more timer, clock and signal functions for BSDs.
 + error message fixes
 + FreeBSD, OSX extended attribute support
@@ -12,7 +12,7 @@
 + Add remap_file_pages, thanks to Brian Downing
 + Add getpagesize
 + All syscalls now direct not via libc on Linux
-+ OpenBSD support
++ OpenBSD support (5.4 and 5.5), thanks to tedu
 
     0.9 release
 

@@ -32,7 +32,7 @@ Requirements: Needs [LuaJIT 2.0.2](http://www.luajit.org/) or later.
 
 The code does not currently portably support the main Lua implementation, only LuaJIT. It now runs again with [luaffi](https://github.com/jmckaskill/luaffi) under standard Lua 5.2 (and probably 5.1, untested). Because the function calls in luaffi use dynasm they are not fully portable, so I will be adding support for Lua C interface function calls as well shortly. This is not yet integrated into the test suite so there may be regressions and issues still.
 
-On Linux ARM (soft or hard float), x86, AMD64 and PPC architectures are supported; MIPS support is almost complete now. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly; tests should be skipped if unsupported, raise an issue if not.
+On Linux ARM (soft or hard float), x86, AMD64, and PPC32 and MIPS32 (o32 ABI) architectures are supported; this is the complete set of architectures that LuaJIT supports. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly; tests should be skipped if unsupported, raise an issue if not. Other architectures will require a LuaJIT port or the in-progress pure Lua port.
 
 Android (ARM tested so far) currently passes all the non root tests now; some tests are be skipped as the kernel does not ship with some functionality (aio, mq). Generally much functionality is available even though it is not in Bionic libc.
 
