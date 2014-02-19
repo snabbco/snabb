@@ -144,5 +144,15 @@ struct statfs64 {
   nsig = [[
 static const int _NSIG = 128;
 ]],
+  termios = [[
+struct termios {
+  tcflag_t c_iflag;
+  tcflag_t c_oflag;
+  tcflag_t c_cflag;
+  tcflag_t c_lflag;
+  cc_t c_line;
+  cc_t c_cc[23];
+};
+]],
 }
 
