@@ -14,7 +14,7 @@ local arch = {
       TCSBRK	     = 0x5405,
       TCXONC	     = 0x5406,
       TCFLSH	     = 0x5407,
-      TCGETS	     = {number = 0x5401, read = true, type = "termios"},
+      TCGETS	     = {number = 0x540d, read = true, type = "termios"},
       TCSETS	     = 0x540e,
       TCSETSW	     = 0x540f,
       TCSETSF	     = 0x5410,
