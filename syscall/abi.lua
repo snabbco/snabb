@@ -36,37 +36,28 @@ ffi.cdef[[
 ]]
 if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
 
--- BSD detection, we assume they all have a compatible sysctlbyname in libc, WIP
+-- BSD detection
+-- OpenBSD doesn't have sysctlbyname
+-- The good news is every BSD defines utsname with the same sizes
 if not abi.xen and abi.os == "bsd" then
   ffi.cdef [[
   int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
+  struct utsname {
+  char    sysname[256];
+  char    nodename[256];
+  char    release[256];
+  char    version[256];
+  char    machine[256];
+  };
+  int uname(struct utsname *);
   ]]
-  local buf = ffi.new("char[32]")
-  local lenp = ffi.new("unsigned long[1]", 32)
-  local ok, sysctlbyname = pcall(inlibc_fn, "sysctlbyname")
-  if not ok then
-    -- OpenBSD doesn't have sysctlbyname
-    -- The good news is every BSD defines utsname with the same sizes
-    ffi.cdef[[
-struct utsname {
-char    sysname[256];
-char    nodename[256];
-char    release[256];
-char    version[256];
-char    machine[256];
-};
-int uname(struct utsname *);
-]]
-    local ubuf = ffi.new("struct utsname")
-    ffi.C.uname(ubuf)
-    abi.os = ffi.string(ubuf.sysname):lower()
-    if abi.os == "openbsd" then
-    	abi.openbsd = tonumber(ffi.string(ubuf.release))
-    end
-  else
-    local ok = sysctlbyname("kern.ostype", buf, lenp, nil, 0)
-    if ok ~= 0 then error("cannot identify BSD version") end
-    abi.os = ffi.string(buf):lower()
+  local ubuf = ffi.new("struct utsname")
+  ffi.C.uname(ubuf)
+  abi.os = ffi.string(ubuf.sysname):lower()
+
+  -- openbsd ABI version
+  if abi.os == "openbsd" then
+    abi.openbsd = tonumber(ffi.string(ubuf.release))
   end
 
   -- FreeBSD ABI version
