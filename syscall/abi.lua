@@ -57,11 +57,11 @@ char    machine[256];
 };
 int uname(struct utsname *);
 ]]
-    local ubuf = ffi.new("struct utsname [1]")
+    local ubuf = ffi.new("struct utsname")
     ffi.C.uname(ubuf)
-    abi.os = ffi.string(ubuf[0].sysname):lower()
+    abi.os = ffi.string(ubuf.sysname):lower()
     if abi.os == "openbsd" then
-    	abi.openbsd = tonumber(ffi.string(ubuf[0].release))
+    	abi.openbsd = tonumber(ffi.string(ubuf.release))
     end
   else
     local ok = sysctlbyname("kern.ostype", buf, lenp, nil, 0)
