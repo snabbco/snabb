@@ -38,7 +38,9 @@ if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
 
 -- BSD detection
 -- OpenBSD doesn't have sysctlbyname
--- The good news is every BSD defines utsname with the same sizes
+-- The good news is every BSD has utsname
+-- The bad news is that on FreeBSD it is a legacy version that has 32 byte unless you use __xuname
+-- fortunately sysname is first so we can use this value
 if not abi.xen and abi.os == "bsd" then
   ffi.cdef [[
   int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
