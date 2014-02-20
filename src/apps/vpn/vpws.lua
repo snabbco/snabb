@@ -75,10 +75,10 @@ function vpws:push()
 	    else
 	       -- Packet doesn't belong to VPN, discard
 	       packet.deref(p)
-	       return
+	       p = nil
 	    end
 	 end
-	 app.transmit(l_out, p)
+	 if p then app.transmit(l_out, p) end
       end
    end
 end

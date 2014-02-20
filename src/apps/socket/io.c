@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <strings.h>
@@ -31,21 +32,48 @@ int send_packet(int fd, struct packet *p) {
   return(0);
 }
 
-int receive_packet(int fd, struct buffer *b) {
+int receive_packet(int fd, struct packet *p) {
   struct msghdr msg;
-  struct iovec iovec;
-  ssize_t s;
+  struct iovec iovecs[p->niovecs];
+  int i;
+  ssize_t s, len;
 
   bzero(&msg, sizeof(msg));
-  iovec.iov_base = b->pointer;
-  iovec.iov_len  = b->size;
-  msg.msg_iov = &iovec;
-  msg.msg_iovlen = 1;
+  for (i=0; i<p->niovecs; i++) {
+    iovecs[i].iov_base = p->iovecs[i].buffer->pointer;
+    iovecs[i].iov_len  = p->iovecs[i].buffer->size;
+  }
+  msg.msg_iov = iovecs;
+  msg.msg_iovlen = p->niovecs;
   if ((s = recvmsg(fd, &msg, 0)) == -1) {
     perror("recvmsg");
     return(-1);
   }
+  if (msg.msg_flags && MSG_TRUNC) {
+    printf("truncated\n");
+    return(-1);
+  }
+  len = s;
+  for (i=0; i<p->niovecs; i++) {
+    ssize_t iov_len = msg.msg_iov[i].iov_len;
+    if (len > iov_len) {
+      p->iovecs[i].length = iov_len;
+      len -= iov_len;
+    } else {
+      p->iovecs[i].length = len;
+    }
+  }
+  p->length = s;
   return(s);
+}
+
+int msg_size(int fd) {
+  int size;
+  if (ioctl(fd, FIONREAD, &size) == -1) {
+    perror("get message size");
+    return(-1);
+  }
+  return(size);
 }
 
 int can_receive(int fd) {
