@@ -1110,6 +1110,11 @@ c.ITIMER = strflag {
   MONOTONIC = 3,
 }
 
+c.TIMER = strflag {
+  RELTIME = 0x0,
+  ABSTIME = 0x1,
+}
+
 -- ipv6 sockopts
 c.IPV6 = strflag {
   SOCKOPT_RESERVED1 = 3,
