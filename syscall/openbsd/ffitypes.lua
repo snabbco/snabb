@@ -9,6 +9,10 @@ pcall, type, table, string
 
 local abi = require "syscall.abi"
 
+local ffi = require "ffi"
+
+abi.openbsd = tonumber(ffi.string(abi.uname.release)) -- TODO probably best to not do as floating point
+
 local defs = {}
 
 local function append(str) defs[#defs + 1] = str end
@@ -288,6 +292,5 @@ struct  sigaction {
 
 local s = table.concat(defs, "")
 
-local ffi = require "ffi"
 ffi.cdef(s)
 

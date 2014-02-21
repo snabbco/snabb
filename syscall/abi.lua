@@ -71,16 +71,12 @@ if not abi.xen and abi.os == "bsd" then
   };
   int uname(struct utsname *);
   ]]
-  local ubuf = ffi.new("struct utsname")
-  ffi.C.uname(ubuf)
-  abi.os = ffi.string(ubuf.sysname):lower()
+  local uname = ffi.new("struct utsname")
+  ffi.C.uname(uname)
+  abi.os = ffi.string(uname.sysname):lower()
+  abi.uname = uname
 
   -- TODO move these to their OS files
-
-  -- openbsd ABI version
-  if abi.os == "openbsd" then
-    abi.openbsd = tonumber(ffi.string(ubuf.release))
-  end
 
   -- FreeBSD ABI version
   if abi.os == "freebsd" then
@@ -97,7 +93,7 @@ if not abi.xen and abi.os == "bsd" then
 
   -- NetBSD ABI version
   if abi.os == "netbsd" then
-    local r = split(ffi.string(ubuf.release), ".")
+    local r = split(ffi.string(uname.release), ".")
     local maj, min = tonumber(r[1]), tonumber(r[2])
     if min == 99 then maj = maj + 1 end
     abi.netbsd = maj
