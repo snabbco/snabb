@@ -3,7 +3,7 @@ module(...,package.seeall)
 local app = require("core.app")
 local buffer = require("core.buffer")
 local packet = require("core.packet")
-local link_ring = require("core.link_ring")
+local link = require("core.link")
 
 --- # `Source` app: generate synthetic packets
 
@@ -14,11 +14,13 @@ function Source:new()
 end
 
 function Source:pull ()
+   self.outputi = {}
+   for _,x in pairs(self.output) do table.insert(self.outputi, x) end
    for _, o in ipairs(self.outputi) do
-      for i = 1, math.min(1000, app.nwritable(o)) do
+      for i = 1, link.nwritable(o) do
          local p = packet.allocate()
          packet.add_iovec(p, buffer.allocate(), 60)
-         app.transmit(o, p)
+         link.transmit(o, p)
       end
    end
 end
@@ -68,9 +70,11 @@ function Sink:new ()
 end
 
 function Sink:push ()
+   self.inputi = {}
+   for _,x in pairs(self.output) do table.insert(self.inputi, x) end
    for _, i in ipairs(self.inputi) do
-      for _ = 1, app.nreadable(i) do
-        local p = app.receive(i)
+      for _ = 1, link.nreadable(i) do
+        local p = link.receive(i)
         assert(p.refcount == 1)
         packet.deref(p)
       end
@@ -88,7 +92,7 @@ end
 function Tee:push ()
    noutputs = #self.outputi
    if noutputs > 0 then
-      local maxoutput = link_ring.max
+      local maxoutput = ring.max
       for _, o in ipairs(self.outputi) do
          maxoutput = math.min(maxoutput, app.nwritable(o))
       end
