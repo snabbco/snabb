@@ -62,7 +62,6 @@ end
 -- fortunately sysname is first so we can use this value
 if not abi.xen and abi.os == "bsd" then
   ffi.cdef [[
-  int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
   struct utsname {
   char    sysname[256];
   char    nodename[256];
@@ -76,6 +75,8 @@ if not abi.xen and abi.os == "bsd" then
   ffi.C.uname(ubuf)
   abi.os = ffi.string(ubuf.sysname):lower()
 
+  -- TODO move these to their OS files
+
   -- openbsd ABI version
   if abi.os == "openbsd" then
     abi.openbsd = tonumber(ffi.string(ubuf.release))
@@ -83,6 +84,9 @@ if not abi.xen and abi.os == "bsd" then
 
   -- FreeBSD ABI version
   if abi.os == "freebsd" then
+    ffi.cdef [[
+    int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
+    ]]
     local buf = ffi.new("int[1]")
     local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
     local ok = ffi.C.sysctlbyname("kern.osreldate", buf, lenp, nil, 0)
