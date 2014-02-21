@@ -36,8 +36,8 @@ ffi.cdef[[
 ]]
 if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
 
--- TODO simplify for one use case only
-function split(delimiter, text)
+-- TODO remove when move code
+local function split(delimiter, text)
   if delimiter == "" then return {text} end
   if #text == 0 then return {} end
   local list = {}
