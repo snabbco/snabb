@@ -4,78 +4,147 @@ local buffer    = require("core.buffer")
 local packet    = require("core.packet")
 local lib       = require("core.lib")
 local link_ring = require("core.link_ring")
-                  require("core.packet_h")
+local config = require("core.config")
+require("core.packet_h")
 
---- # App runtime system
+-- The set of all active apps and links in the system.
+-- Indexed both by name (in a table) and by number (in an array).
+app_table,  app_array  = {}, {}
+link_table, link_array = {}, {}
 
--- Dictionary of all instantiated apps (Name -> App).
-apps = {}
-appsi = {}
-links = {}
+configuration = config.new()
 
-function new (class)
-   app = { runnable = true,
-	   input = {}, output = {},
-	   inputi = {}, outputi = {}
-	}
-   return setmetatable(app, {__index=class})
+function configure (new_config)
+   local actions = compute_config_actions(configuration, new_config)
+   apply_config_actions(actions)
 end
 
-function connect (from_app, from_port, to_app, to_port)
-   local name = from_app.."."..from_port.."->"..to_app.."."..to_port
-   l = new_link(from_app, from_port, to_app, to_port, apps[to_app])
-   links[name] = l
-   apps[from_app].output[from_port] = l
-   table.insert(apps[from_app].outputi, l)
-   apps[to_app].input[to_port] = l
-   table.insert(apps[to_app].inputi, l)
-end
-
--- Recompute link state. Needed after adding apps and links.
-function relink ()
-   appsi = {}
-   for _,a in pairs(apps) do
-      table.insert(appsi, a)
+-- Return the configuration actions needed to migrate from old config to new.
+-- The return value is a table:
+--   app_name -> stop | start | keep | restart | reconfig
+function compute_config_actions (old, new)
+   local actions = {}
+   for appname, info in pairs(new.apps) do
+      local class, config = unpack(info)
+      local action = nil
+      if not old.apps[appname]                  then action = 'start'
+      elseif old.apps[appname].class ~= class   then action = 'restart'
+      elseif old.apps[appname].config ~= config then action = 'reconfig'
+      else                                           action = 'keep'  end
+      actions[appname] = action
    end
+   for appname in pairs(old.apps) do
+      if not new.apps[appname] then actions[appname] = 'stop' end
+   end
+   return actions
 end
 
-function new_link (iapp, iport, oapp, oport, to_app)
-   return { iapp = iapp, iport = iport, oapp = oapp, oport = oport,
-            ring = link_ring.new(), to_app = to_app }
+-- Update the active app network by applying the necessary actions.
+function apply_config_actions (actions, config)
+   -- The purpose of this function is to populate these tables:
+   local new_app_table,  new_app_array  = {}, {}, {}
+   local new_link_table, new_link_array = {}, {}, {}
+   -- Temporary name->index table for use in link renumbering
+   local app_name_to_index = {}
+   -- Table of functions that execute config actions
+   local ops = {}
+   function ops.stop (name)
+      if app_table[name].stop then app_table[name]:stop() end
+   end
+   function ops.keep (name)
+      new_app_table[name] = app_table[name]
+      table.insert(new_app_array, app_table[name])
+      app_name_to_index[name] = #new_app_array
+   end
+   function ops.start (name)
+      local class, config = unpack(config[name])
+      local app = class:new(config)
+      new_app_table[name] = app
+      table.insert(new_app_array, app)
+      app_name_to_index[name] = #new_app_array
+   end
+   function ops.restart (name)
+      ops.stop(name)
+      ops.start(name)
+   end
+   function ops.reconfig (name)
+      if app_table[name].reconfig then
+         app_table[name]:reconfig(config)
+      else
+         ops.restart(name)
+      end
+   end
+   -- dispatch all actions
+   for name, action in pairs(actions) do
+      ops[action](name)
+   end
+   -- Setup links: create (or reuse) and renumber.
+   for linkspec in pairs(config.links) do
+      local fa, fl, ta, tl = config.parse_link(linkspec)
+      assert(new_app_table[fa], "'from' app does not exist for link")
+      assert(new_app_table[ta], "'to' app does not exist for link")
+      -- Create or reuse a link and assign/update receiving app index
+      local link = linktable[linkspec] or link.new()
+      link.receiving_app = app_name_to_index[ta]
+      -- Add link to apps
+      new_app_table[fa].output[fl] = link
+      new_app_table[ta].input[tl] = link
+      -- Remember link
+      new_link_table[name] = link
+      table.insert(new_link_array, link)
+   end
+   -- commit changes
+   app_table, link_table = new_app_table, new_link_table
+   app_array, link_array = new_app_array, new_link_array
 end
 
--- Take a breath. First "inhale" by pulling in packets from all
--- available sources. Then "exhale" by pushing the packets through
--- links until the stop.
+-- Call this to "run snabb switch".
+function main ()
+   while true do breathe() end
+end
+
 function breathe ()
-   -- Inhale
-   for _, app in ipairs(appsi) do
+   -- Inhale: pull work into the app network
+   for _, app in ipairs(active_apps) do
       if app.pull then app:pull() end
-      app.runnable = true
    end
-   -- Exhale
+   -- Exhale: push work out through the app network
    repeat
       local progress = false
-      for _, app in ipairs(appsi) do
-	 if app.runnable and app.push then
-	    app.runnable = false
-	    app:push()
-	    progress = true
-	    -- Free packets
-	    --[[
-	    for an,app in pairs(apps) do
-	       for inn,i in pairs(app.input) do
-		  link_ring.cleanup_after_receive(i.ring)
-	       end
-	    end
-	    --]]
-	 end
+      -- For each link that has new data, run the receiving app
+      for _, link in ipairs(active_links) do
+         if link.has_new_data then
+            link.has_new_data = false
+            local receiver = active_apps[link.receiving_app]
+            if receiver.push then
+               receiver:push()
+               progress = true
+            end
+         end
       end
-   until not progress
-   -- (TODO) Timer-driven callbacks
-   -- (TODO) Status reporting / counter collection
-   -- (TODO) Restart crashed apps after delay
+   until not progress  -- Stop after no link had new data
 end
+
+function selftest ()
+   local c = config.new()
+   c.app.vhost_user = {VhostUser, [[{path = "/home/luke/qemu.sock"}]]}
+   config.app(c, "vhost_user", VhostUser, [[{path = "/home/luke/qemu.sock"}]])
+   config.app(c, "intel",      Intel82599, [[{pciaddr = "0000:01:00.0"}]])
+   config.app(c, "vhost_tee",  Tee)
+   config.app(c, "intel_tee",  Tee)
+   config.app(c, "vhost_dump", PcapWriter, [[{filename = "/tmp/vhost.cap"}]])
+   config.app(c, "intel_dump", PcapWriter, [[{filename = "/tmp/intel.cap"}]])
+   -- VM->Network path
+   config.link(c, "vhost_user.tx -> vhost_tee.input")
+   config.link(c, " vhost_tee.dump -> vhost_dump.input")
+   config.link(c, " vhost_tee.xmit -> intel.rx")
+   -- Network->VM path
+   config.link(c, "intel.tx -> intel_tee.input")
+   config.link(c, " intel_tee.dump -> intel_dump.input")
+   config.link(c, " intel_tee.xmit -> vhost_user.rx")
+end
+
+--[[ Have to fix all of this.
 
 function report ()
    print("link report")
@@ -85,31 +154,6 @@ function report ()
    for name, app in pairs(apps) do
       if app.report then app:report() end
    end
-end
-
-function transmit (l, p)
-   l.to_app.runnable = true
-   link_ring.transmit(l.ring, p)
-end
-
-function receive (l)
-   return link_ring.receive(l.ring)
-end
-
-function full (l)
-   return link_ring.full(l.ring)
-end
-
-function empty (l)
-   return link_ring.empty(l.ring)
-end
-
-function nreadable (l)
-   return link_ring.nreadable(l.ring)
-end
-
-function nwritable (l)
-   return link_ring.nwritable(l.ring)
 end
 
 --- # Diagnostics
@@ -126,6 +170,8 @@ function graphviz ()
    viz = viz..'}\n'
    return viz
 end
+
+--]]
 
 function module_init ()
    -- XXX Find a better place for this.
