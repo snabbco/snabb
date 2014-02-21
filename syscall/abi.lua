@@ -36,6 +36,25 @@ ffi.cdef[[
 ]]
 if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
 
+-- TODO simplify for one use case only
+function split(delimiter, text)
+  if delimiter == "" then return {text} end
+  if #text == 0 then return {} end
+  local list = {}
+  local pos = 1
+  while true do
+    local first, last = text:find(delimiter, pos)
+    if first then
+      list[#list + 1] = text:sub(pos, first - 1)
+      pos = last + 1
+    else
+      list[#list + 1] = text:sub(pos)
+      break
+    end
+  end
+  return list
+end
+
 -- BSD detection
 -- OpenBSD doesn't have sysctlbyname
 -- The good news is every BSD has utsname
@@ -72,9 +91,12 @@ if not abi.xen and abi.os == "bsd" then
     abi.freebsd = tonumber(vs:sub(1, #vs - 5)) -- major version ie 9, 10
   end
 
-  -- NetBSD ABI version; you can use version 7 here TODO autodetect
+  -- NetBSD ABI version
   if abi.os == "netbsd" then
-    abi.netbsd = 6
+    local r = split(ubuf.release, ".")
+    local maj, min = tonumber(r[1]), tonumber(r[2])
+    if min == 99 then maj = maj + 1 end
+    abi.netbsd = maj
   end
 end
 
