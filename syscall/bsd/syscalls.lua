@@ -74,7 +74,6 @@ function S.sysctl(name, old, new) -- TODO may need to change arguments
   end
   if new then newlen = #new else newlen = 0 end
   local ok, err = sysctl(name, namelen, old, oldlenp, new, newlen)
-print("call", name, namelen, old, oldlenp[0], new, newlen)
   if not ok then return nil, t.error(err or errno()) end
   return true, nil, old, oldlenp[0]
 end
