@@ -9,6 +9,16 @@ pcall, type, table, string
 
 local abi = require "syscall.abi"
 
+local ffi = require "ffi"
+
+local helpers = require "syscall.helpers"
+
+-- NetBSD ABI version
+local r = helpers.split("%.", ffi.string(abi.uname.release))
+local maj, min = tonumber(r[1]), tonumber(r[2])
+if min == 99 then maj = maj + 1 end
+abi.netbsd = maj
+
 local defs = {}
 
 local function append(str) defs[#defs + 1] = str end
@@ -630,6 +640,5 @@ if abi.host == "netbsd" then
   s = string.gsub(s, "_netbsd_", "") -- remove netbsd types
 end
 
-local ffi = require "ffi"
 ffi.cdef(s)
 

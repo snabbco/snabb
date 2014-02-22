@@ -36,25 +36,6 @@ ffi.cdef[[
 ]]
 if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
 
--- TODO remove when move code
-local function split(delimiter, text)
-  if delimiter == "" then return {text} end
-  if #text == 0 then return {} end
-  local list = {}
-  local pos = 1
-  while true do
-    local first, last = text:find(delimiter, pos)
-    if first then
-      list[#list + 1] = text:sub(pos, first - 1)
-      pos = last + 1
-    else
-      list[#list + 1] = text:sub(pos)
-      break
-    end
-  end
-  return list
-end
-
 -- BSD detection
 -- OpenBSD doesn't have sysctlbyname
 -- The good news is every BSD has utsname
@@ -75,16 +56,6 @@ if not abi.xen and abi.os == "bsd" then
   ffi.C.uname(uname)
   abi.os = ffi.string(uname.sysname):lower()
   abi.uname = uname
-
-  -- TODO move these to their OS files
-
-  -- NetBSD ABI version
-  if abi.os == "netbsd" then
-    local r = split("%.", ffi.string(uname.release))
-    local maj, min = tonumber(r[1]), tonumber(r[2])
-    if min == 99 then maj = maj + 1 end
-    abi.netbsd = maj
-  end
 end
 
 -- rump params
