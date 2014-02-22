@@ -93,6 +93,7 @@ print [[
 #include <sys/procdesc.h>
 #include <sys/capability.h>
 #include <sys/extattr.h>
+#include >sys/sysctl.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <net/bpf.h>
