@@ -61,10 +61,17 @@ function S.kqueue() return retfd(C.kqueue()) end
 
 local sysctl = C.sysctl or C.__sysctl -- NetBSD has __sysctl
 
+-- TODO may become OS dependent as add more
+local sysctlmap = {
+  [c.CTL.KERN] = c.KERN,
+}
+
 function S.sysctl(name, old, new) -- TODO may need to change arguments
   -- TODO namespaces for name
   local oldlenp, newlen
   local namelen = #name
+  name[1] = c.CTL[name[1]]
+  if sysctlmap[name[1]] then name[2] = sysctlmap[name[1]][name[2]] end
   local name = t.ints(namelen, name)
   if type(old) == "number" then -- specified length
     oldlenp = t.size1(old)
