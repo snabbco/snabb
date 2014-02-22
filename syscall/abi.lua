@@ -93,11 +93,10 @@ if not abi.xen and abi.os == "bsd" then
 
   -- NetBSD ABI version
   if abi.os == "netbsd" then
-    local r = split(ffi.string(uname.release), ".")
+    local r = split("%.", ffi.string(uname.release))
     local maj, min = tonumber(r[1]), tonumber(r[2])
     if min == 99 then maj = maj + 1 end
     abi.netbsd = maj
-    abi.netbsd = 6 -- TODO FIX
   end
 end
 
