@@ -886,17 +886,17 @@ c.UTIME = strflag {
 c.PATH_MAX = 1024
 
 c.CTL = strflag {
-  UNSPEC      0,
-  KERN        1,
-  VM          2,
-  FS          3,
-  NET         4,
-  DEBUG       5,
-  HW          6,
-  MACHDEP     7,
-  DDB         9,
-  VFS         10,
-  MAXID       11,
+  UNSPEC     = 0,
+  KERN       = 1,
+  VM         = 2,
+  FS         = 3,
+  NET        = 4,
+  DEBUG      = 5,
+  HW         = 6,
+  MACHDEP    = 7,
+  DDB        = 9,
+  VFS        = 10,
+  MAXID      = 11,
 }
 
 c.KERN = strflag {
