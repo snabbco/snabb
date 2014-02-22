@@ -70,7 +70,7 @@ test.sysctl_bsd = {
     local os = abi.os
     if S.__rump then os = "netbsd" end
     if S.__rump then error "skipped" end -- rump missing sysctl nodes TODO add a few more
-    local val, len = assert(S.sysctl({c.CTL.KERN, c.KERN.OSTYPE}, 256))
+    local val = ffi.string(assert(S.sysctl({c.CTL.KERN, c.KERN.OSTYPE}, 256)))
     assert_equal(val:lower(), os)
   end,
 }
