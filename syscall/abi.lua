@@ -78,19 +78,6 @@ if not abi.xen and abi.os == "bsd" then
 
   -- TODO move these to their OS files
 
-  -- FreeBSD ABI version
-  if abi.os == "freebsd" then
-    ffi.cdef [[
-    int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
-    ]]
-    local buf = ffi.new("int[1]")
-    local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
-    local ok = ffi.C.sysctlbyname("kern.osreldate", buf, lenp, nil, 0)
-    if ok ~= 0 then error("canot identify FreeBSD version") end
-    local vs = tostring(buf[0])
-    abi.freebsd = tonumber(vs:sub(1, #vs - 5)) -- major version ie 9, 10
-  end
-
   -- NetBSD ABI version
   if abi.os == "netbsd" then
     local r = split("%.", ffi.string(uname.release))

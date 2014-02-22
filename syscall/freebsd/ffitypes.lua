@@ -9,6 +9,19 @@ pcall, type, table, string
 
 local abi = require "syscall.abi"
 
+local ffi = require "ffi"
+
+-- detect freebsd version
+ffi.cdef [[
+int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
+]]
+local buf = ffi.new("int[1]")
+local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
+local ok = ffi.C.sysctlbyname("kern.osreldate", buf, lenp, nil, 0)
+if ok ~= 0 then error("canot identify FreeBSD version") end
+local vs = tostring(buf[0])
+abi.freebsd = tonumber(vs:sub(1, #vs - 5)) -- major version ie 9, 10
+
 local defs = {}
 
 local function append(str) defs[#defs + 1] = str end
@@ -257,6 +270,5 @@ struct sigaction {
 
 local s = table.concat(defs, "")
 
-local ffi = require "ffi"
 ffi.cdef(s)
 
