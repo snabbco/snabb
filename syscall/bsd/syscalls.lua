@@ -66,12 +66,13 @@ local sysctlmap = {
   [c.CTL.KERN] = c.KERN,
 }
 
+-- TODO understand return types
 function S.sysctl(name, old, new) -- TODO may need to change arguments
-  -- TODO namespaces for name
-  local oldlenp, newlen
+  if type(name) == "string" then name = h.split("%.", name) end
   local namelen = #name
   name[1] = c.CTL[name[1]]
   if sysctlmap[name[1]] then name[2] = sysctlmap[name[1]][name[2]] end
+  local oldlenp, newlen
   local name = t.ints(namelen, name)
   if type(old) == "number" then -- specified length
     oldlenp = t.size1(old)
