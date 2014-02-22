@@ -59,6 +59,26 @@ end
 
 function S.kqueue() return retfd(C.kqueue()) end
 
+local sysctl = C.sysctl or C.__sysctl -- NetBSD has __sysctl
+
+function S.sysctl(name, old, new) -- TODO may need to change arguments
+  -- TODO namespaces for name
+  local oldlenp, newlen
+  local namelen = #name
+  local name = t.ints(namelen, name)
+  if type(old) == "number" then -- specified length
+    oldlenp = t.size1(old)
+    old = t.buffer(old)
+  else
+    oldlenp = t.size1(#old)
+  end
+  if new then newlen = #new else newlen = 0 end
+  local ok, err = sysctl(name, namelen, old, oldlenp, new, newlen)
+print("call", name, namelen, old, oldlenp[0], new, newlen)
+  if not ok then return nil, t.error(err or errno()) end
+  return true, nil, old, oldlenp[0]
+end
+
 -- note osx has kevent64 too, different type
 function S.kevent(kq, changelist, eventlist, timeout)
   if timeout then timeout = mktype(t.timespec, timeout) end

@@ -26,6 +26,8 @@ int kevent(int kq, const struct kevent *changelist, size_t nchanges, struct keve
 int issetugid(void);
 int ktrace(const char *tracefile, int ops, int trpoints, pid_t pid);
 
+int sysctl(const int *name, unisgned int namelen, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
+
 int     extattrctl(const char *path, int cmd, const char *filename, int attrnamespace, const char *attrname);
 int     extattr_delete_fd(int fd, int attrnamespace, const char *attrname);
 int     extattr_delete_file(const char *path, int attrnamespace, const char *attrname);

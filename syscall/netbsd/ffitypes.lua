@@ -14,10 +14,12 @@ local ffi = require "ffi"
 local helpers = require "syscall.helpers"
 
 -- NetBSD ABI version
+if not abi.uname then abi.netbsd = 6 else -- TODO temporary; no uname in rump
 local r = helpers.split("%.", ffi.string(abi.uname.release))
 local maj, min = tonumber(r[1]), tonumber(r[2])
 if min == 99 then maj = maj + 1 end
 abi.netbsd = maj
+end
 
 local defs = {}
 
