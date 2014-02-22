@@ -1129,6 +1129,61 @@ c.EXTATTR_NAMESPACE = strflag {
   SYSTEM       = 0x00000002,
 }
 
+c.CTL = strflag {
+  UNSPEC     = 0,
+  KERN       = 1,
+  VM         = 2,
+  VFS        = 3,
+  NET        = 4,
+  DEBUG      = 5,
+  HW         = 6,
+  MACHDEP    = 7,
+  USER       = 8,
+  P1003_1B   = 9,
+  MAXID      = 10,
+}
+
+c.KERN = {
+  OSTYPE              1,
+  OSRELEASE           2,
+  OSREV               3,
+  VERSION             4,
+  MAXVNODES           5,
+  MAXPROC             6,
+  MAXFILES            7,
+  ARGMAX              8,
+  SECURELVL           9,
+  HOSTNAME           10,
+  HOSTID             11,
+  CLOCKRATE          12,
+  VNODE              13,
+  PROC               14,
+  FILE               15,
+  PROF               16,
+  POSIX1             17,
+  NGROUPS            18,
+  JOB_CONTROL        19,
+  SAVED_IDS          20,
+  BOOTTIME           21,
+  NISDOMAINNAME      22,
+  UPDATEINTERVAL     23,
+  OSRELDATE          24,
+  NTP_PLL            25,
+  BOOTFILE           26,
+  MAXFILESPERPROC    27,
+  MAXPROCPERUID      28,
+  DUMPDEV            29,
+  IPC                30,
+  DUMMY              31,
+  PS_STRINGS         32,
+  USRSTACK           33,
+  LOGSIGEXIT         34,
+  IOV_MAX            35,
+  HOSTUUID           36,
+  ARND               37,
+  MAXID              38,
+}
+
 if abi.freebsd >= 10 then -- not supporting on freebsd 9 as different ABI, recommend upgrade to use
 
 local function CAPRIGHT(idx, b) return bit.bor64(bit.lshift64(1, 57 + idx), b) end
