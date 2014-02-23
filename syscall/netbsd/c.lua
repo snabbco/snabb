@@ -41,7 +41,6 @@ C.getdents = ffi.C.__getdents30
 C.socket = ffi.C.__socket30
 C.select = ffi.C.__select50
 C.pselect = ffi.C.__pselect50
-
 C.fhopen = ffi.C.__fhopen40
 C.fhstat = ffi.C.__fhstat50
 C.fhstatvfs1 = ffi.C.__fhstatvfs140
@@ -51,6 +50,7 @@ C.lutimes = ffi.C.__lutimes50
 C.futimes = ffi.C.__futimes50
 C.getfh = ffi.C.__getfh30
 C.kevent = ffi.C.__kevent50
+C.mknod = ffi.C.__mknod50
 
 -- use underlying syscall not wrapper
 C.getcwd = ffi.C.__getcwd
