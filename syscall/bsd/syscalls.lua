@@ -66,23 +66,58 @@ local sysctlmap = {
   [c.CTL.KERN] = c.KERN,
 }
 
+-- TODO incomplete, may also be OS dependent, so may need to split into per OS file
+local sysctltypes = {
+  [c.CTL.KERN] = {
+    [c.KERN.OSTYPE]    = "string",
+    [c.KERN.OSRELEASE] = "string",
+    [c.KERN.OSREV]     = "int",
+    [c.KERN.VERSION]   = "string",
+    [c.KERN.MAXVNODES] = "int",
+    [c.KERN.MAXPROC]   = "int",
+    [c.KERN.MAXFILES]  = "int",
+    [c.KERN.ARGMAX]    = "int",
+    [c.KERN.SECURELVL] = "int",
+    [c.KERN.HOSTNAME]  = "string",
+    [c.KERN.HOSTID]    = "int",
+  }
+}
+
 -- TODO understand return types
-function S.sysctl(name, old, new) -- TODO may need to change arguments
+function S.sysctl(name, new, old) -- TODO may need to change arguments, note order as should not need to specify old
   if type(name) == "string" then name = h.split("%.", name) end
   local namelen = #name
   name[1] = c.CTL[name[1]]
   if sysctlmap[name[1]] then name[2] = sysctlmap[name[1]][name[2]] end
   local oldlenp, newlen
-  local name = t.ints(namelen, name)
-  if type(old) == "number" then -- specified length
+  local tp
+  if sysctltypes[name[1]] and sysctltypes[name[1]][name[2]] then
+    tp = sysctltypes[name[1]][name[2]]
+    if tp == "string" then
+      oldlenp = t.size1(256) -- TODO adapt if too small
+      old = t.buffer(oldlenp[0])
+    elseif tp == "int" then
+      oldlenp = t.size1(s.int)
+      old = t.int1()
+    else
+      oldlenp = t.size1(s[tp])
+      old = t[tp]()
+    end
+  elseif type(old) == "number" then -- specified length of buffer
     oldlenp = t.size1(old)
     old = t.buffer(old)
   else
     oldlenp = t.size1(#old)
   end
   if new then newlen = #new else newlen = 0 end
+  local name = t.ints(namelen, name)
   local ok, err = sysctl(name, namelen, old, oldlenp, new, newlen)
   if not ok then return nil, t.error(err or errno()) end
+  if tp then -- we know type of value being returned
+    if tp == "string" then return ffi.string(old) end
+    if tp == "int" then return tonumber(old[0]) end
+    return old
+  end
   return true, nil, old, oldlenp[0]
 end
 
