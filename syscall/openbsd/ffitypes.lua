@@ -292,7 +292,27 @@ struct  sigaction {
 };
 ]]
 
+-- functions
+append [[
+int reboot(int howto);
+int ioctl(int d, unsigned long request, void *arg);
+
+/* not syscalls, but using for now */
+int grantpt(int fildes);
+int unlockpt(int fildes);
+char *ptsname(int fildes);
+]]
+
+if abi.openbsd >= 5.5 then
+append [[
+int getdents(int fd, void *buf, size_t nbytes);
+]]
+end
+
 local s = table.concat(defs, "")
 
 ffi.cdef(s)
+
+require "syscall.ffifunctions"
+require "syscall.bsd.ffifunctions"
 
