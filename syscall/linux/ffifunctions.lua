@@ -13,5 +13,8 @@ local cdef = require "ffi".cdef
 
 cdef[[
 long syscall(int number, ...);
+
+int gettimeofday(struct timeval *tv, void *tz);
+
 ]]
 
