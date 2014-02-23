@@ -9,6 +9,8 @@ pcall, type, table, string
 
 local abi = require "syscall.abi"
 
+local ffi = require "ffi"
+
 require "syscall.ffitypes"
 
 local defs = {}
@@ -216,11 +218,22 @@ struct kevent {
   intptr_t        data;
   void            *udata;
 };
-
 ]]
 
-local ffi = require "ffi"
+append [[
+int ioctl(int d, unsigned long request, void *arg);
+
+int stat64(const char *path, struct stat *sb);
+int lstat64(const char *path, struct stat *sb);
+int fstat64(int fd, struct stat *sb);
+
+int _getdirentries(int fd, char *buf, int nbytes, long *basep);
+int _sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
+]]
 
 ffi.cdef(table.concat(defs, ""))
+
+require "syscall.ffifunctions"
+require "syscall.bsd.ffifunctions"
 
 
