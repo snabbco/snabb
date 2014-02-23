@@ -9,6 +9,8 @@ pcall, type, table, string
 
 local abi = require "syscall.abi"
 
+local ffi = require "ffi"
+
 local arch = require("syscall.linux." .. abi.arch .. ".ffitypes") -- architecture specific definitions
 
 local defs = {}
@@ -867,8 +869,6 @@ struct iocb {
 };
 ]]
 end
-
-local ffi = require "ffi"
 
 ffi.cdef(table.concat(defs, ""))
 
