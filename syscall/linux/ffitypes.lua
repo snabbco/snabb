@@ -872,6 +872,13 @@ struct iocb {
 ]]
 end
 
-ffi.cdef(table.concat(defs, ""))
+-- functions, minimal for Linux as mainly use syscall
+append [[
+long syscall(int number, ...);
 
+int gettimeofday(struct timeval *tv, void *tz);
+int clock_gettime(clockid_t clk_id, struct timespec *tp);
+]]
+
+ffi.cdef(table.concat(defs, ""))
 
