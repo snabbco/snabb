@@ -109,7 +109,7 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
   else
     oldlenp = t.size1(#old)
   end
-  if new then newlen = #new else newlen = 0 end
+  if new then newlen = #new else newlen = 0 end -- TODO set based on known types too
   local name = t.ints(namelen, name)
   local ok, err = sysctl(name, namelen, old, oldlenp, new, newlen)
   if not ok then return nil, t.error(err or errno()) end
