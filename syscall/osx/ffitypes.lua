@@ -9,6 +9,8 @@ pcall, type, table, string
 
 local abi = require "syscall.abi"
 
+require "syscall.ffitypes"
+
 local defs = {}
 
 local function append(str) defs[#defs + 1] = str end

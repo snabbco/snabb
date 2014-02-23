@@ -11,6 +11,8 @@ local abi = require "syscall.abi"
 
 local ffi = require "ffi"
 
+require "syscall.ffitypes"
+
 -- detect freebsd version
 ffi.cdef [[
 int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);

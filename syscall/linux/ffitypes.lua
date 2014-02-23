@@ -11,6 +11,8 @@ local abi = require "syscall.abi"
 
 local ffi = require "ffi"
 
+require "syscall.ffitypes"
+
 local arch = require("syscall.linux." .. abi.arch .. ".ffitypes") -- architecture specific definitions
 
 local defs = {}

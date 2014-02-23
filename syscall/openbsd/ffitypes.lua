@@ -11,6 +11,8 @@ local abi = require "syscall.abi"
 
 local ffi = require "ffi"
 
+require "syscall.ffitypes"
+
 abi.openbsd = tonumber(ffi.string(abi.uname.release)) -- TODO probably best to not do as floating point
 
 local defs = {}

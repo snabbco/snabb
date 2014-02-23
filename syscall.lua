@@ -11,7 +11,6 @@ local abi = require "syscall.abi"
 
 if abi.rump and abi.types then abi.os = abi.types end -- pretend to be NetBSD for normal rump, Linux for rumplinux
 
-require "syscall.ffitypes"
 require("syscall." .. abi.os .. ".ffitypes")
 
 -- TODO rump should use same ffifunctions, but with modified names
@@ -19,10 +18,9 @@ if not abi.rump then
   require("syscall." .. abi.os .. ".ffifunctions")
 end
 
-local ostypes = require("syscall." .. abi.os .. ".types")
-
 local c = require("syscall." .. abi.os .. ".constants")
 
+local ostypes = require("syscall." .. abi.os .. ".types")
 local bsdtypes
 if (abi.rump and abi.types == "netbsd") or (not abi.rump and abi.bsd) then
   bsdtypes = require("syscall.bsd.types")
@@ -36,7 +34,7 @@ else
   C = require("syscall." .. abi.os .. ".c")
 end
 
--- cannot put in S, needed for tests, cannot be put in c earlier due to deps  TODO remove see #94
+-- cannot put in S, needed for tests, cannot be put in c earlier due to deps TODO remove see #94
 c.IOCTL = require("syscall." .. abi.os .. ".ioctl").init(types)
 
 local S = require "syscall.syscalls".init(C, c, types)
