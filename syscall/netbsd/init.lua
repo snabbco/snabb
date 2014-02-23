@@ -69,11 +69,11 @@ abi.types = "netbsd"
 local S = {}
 
 require "syscall.ffitypes"
-require("syscall.netbsd.ffitypes")
+require "syscall.netbsd.ffitypes"
 
-local ostypes = require("syscall.netbsd.types")
-local c = require("syscall.netbsd.constants")
-local bsdtypes = require("syscall.bsd.types")
+local ostypes = require "syscall.netbsd.types"
+local c = require "syscall.netbsd.constants"
+local bsdtypes = require "syscall.bsd.types"
 local types = require "syscall.types".init(c, ostypes, bsdtypes)
 
 c.IOCTL = require("syscall." .. abi.os .. ".ioctl").init(types)
