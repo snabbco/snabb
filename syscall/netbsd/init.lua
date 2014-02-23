@@ -68,7 +68,6 @@ abi.types = "netbsd"
 
 local S = {}
 
-require "syscall.ffitypes"
 require "syscall.netbsd.ffitypes"
 
 local ostypes = require "syscall.netbsd.types"
