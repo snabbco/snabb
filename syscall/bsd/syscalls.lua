@@ -80,6 +80,8 @@ local sysctltypes = {
     [c.KERN.SECURELVL] = "int",
     [c.KERN.HOSTNAME]  = "string",
     [c.KERN.HOSTID]    = "int",
+-- some missing
+    [c.KERN.DOMAINNAME] = "string",
   }
 }
 
