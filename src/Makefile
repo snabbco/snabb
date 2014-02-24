@@ -1,8 +1,8 @@
-Q= @
-E= @echo
+#Q= @
+#E= @echo
 # For verbose command line output, uncomment these lines:
-#Q=
-#E= @:
+Q=
+E= @:
 
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
@@ -10,11 +10,13 @@ OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
 CSRC   = $(shell find . -regex '[^\#]*\.c'   -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h'   -printf '%P ')
+ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
 RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
+ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
@@ -33,7 +35,7 @@ all: snabbswitch
 
 markdown: $(RMOBJS)
 
-snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
+snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 	$(E) "LINK      $@"
 	$(Q) gcc -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
@@ -60,11 +62,16 @@ $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(Q) gcc -Wl,-E -I ../deps/luajit/src -I . -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
-	$(E) "CHEADER   $@"
+	$(E) "H         $@"
 	@(echo -n "module(...,package.seeall); require(\"ffi\").cdef[=============["; \
 	 cat $<; \
 	 echo "]=============]") > $(basename $@).luah
 	$(Q) luajit -bg -n $(subst /,.,$*)_h $(basename $@).luah $@
+
+$(ASMOBJ): obj/%_dasc.o: %.dasc $(CHDR) Makefile | $(OBJDIR)
+	$(E) "ASM       $@"
+	$(Q) luajit ../deps/luajit/dynasm/dynasm.lua -o $@.gen $<
+	$(Q) gcc -Wl,-E -I ../deps/luajit/src -I . -I ../deps/luajit -c -Wall -Werror -x c -o $@ $@.gen
 
 $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"
