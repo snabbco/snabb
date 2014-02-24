@@ -106,6 +106,9 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
   elseif type(old) == "number" then -- specified length of buffer
     oldlenp = t.size1(old)
     old = t.buffer(old)
+  elseif not old then -- default size
+    oldlenp = t.size1(256)
+    old = t.buffer(256)
   else
     oldlenp = t.size1(#old)
   end
