@@ -66,7 +66,7 @@ local sysctlmap = {
   [c.CTL.KERN] = c.KERN,
 }
 
--- TODO incomplete, may also be OS dependent, so may need to split into per OS file
+-- TODO incomplete, also OS dependent, so need to split into per OS file
 local sysctltypes = {
   [c.CTL.KERN] = {
     [c.KERN.OSTYPE]    = "string",
