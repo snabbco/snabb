@@ -15,7 +15,7 @@ end
 
 function Source:pull ()
    for _, o in ipairs(self.outputi) do
-      for i = 1, 1000 do
+      for i = 1, math.min(1000, app.nwritable(o)) do
          local p = packet.allocate()
          packet.add_iovec(p, buffer.allocate(), 60)
          app.transmit(o, p)

@@ -189,6 +189,13 @@ function finish_csum (sum)
    return bit.band(bit.bnot(sum), 0xffff)
 end
 
+function malloc (type)
+   local ffi_type = ffi.typeof(type)
+   local size = ffi.sizeof(ffi_type)
+   local ptr = C.malloc(size)
+   return ffi.cast(ffi.typeof("$*", ffi_type), ptr)
+end
+
 function selftest ()
    print("selftest: lib")
    local data = "\x45\x00\x00\x73\x00\x00\x40\x00\x40\x11\xc0\xa8\x00\x01\xc0\xa8\x00\xc7"

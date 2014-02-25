@@ -9,7 +9,7 @@ struct vhost_memory_region {
   uint64_t flags_padding; // no flags currently specified
 };
 
-enum { VHOST_MEMORY_MAX_NREGIONS = 64 };
+enum { VHOST_MEMORY_MAX_NREGIONS = 8 };
 
 struct vhost_memory {
   uint32_t nregions;

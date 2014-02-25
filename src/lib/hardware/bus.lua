@@ -80,7 +80,7 @@ function selftest ()
 end
 
 if host_has_vfio() then
-    memory.ram_to_io_addr = vfio.set_mapping(memory.huge_page_size)
+    memory.ram_to_io_addr = vfio.map_memory_to_iommu
 else
     memory.set_use_physical_memory()
 end
