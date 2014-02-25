@@ -82,6 +82,7 @@ local sysctltypes = {
     [c.KERN.HOSTID]    = "int",
 -- some missing
     [c.KERN.DOMAINNAME] = "string",
+    [c.KERN.RAWPARTITION] = "int",
   }
 }
 
