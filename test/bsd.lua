@@ -65,6 +65,7 @@ test.bsd_ids = {
   end,
 }
 
+-- TODO also works on Linux, but via /proc/sys not syscall
 test.sysctl_bsd = {
   test_sysctl = function()
     local os = abi.os
