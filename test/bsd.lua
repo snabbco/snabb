@@ -65,17 +65,6 @@ test.bsd_ids = {
   end,
 }
 
--- TODO also works on Linux, but via /proc/sys not syscall
-test.sysctl_bsd = {
-  test_sysctl = function()
-    local os = abi.os
-    if S.__rump then os = "netbsd" end
-    if S.__rump then error "skipped" end -- rump missing sysctl nodes TODO add a few more
-    local val = assert(S.sysctl("kern.ostype"))
-    assert_equal(val:lower(), os)
-  end,
-}
-
 test.filesystem_bsd = {
   test_revoke = function()
     local fd = assert(S.posix_openpt("rdwr, noctty"))

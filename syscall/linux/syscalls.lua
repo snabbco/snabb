@@ -735,6 +735,24 @@ S.fpathconf = S.pathconf
 function S.seteuid(euid) return S.setresuid(-1, euid, -1) end
 function S.setegid(egid) return S.setresgid(-1, egid, -1) end
 
+-- in Linux sysctl is not a sycall any more (well it is but legacy)
+-- note currently all returned as strings, may want to list which should be numbers
+function S.sysctl(name, new)
+  name = "/proc/sys/" .. name:gsub("%.", "/")
+  local flag = c.O.RDONLY
+  if new then flag = c.O.RDWR end
+  local fd, err = S.open(name, flag)
+  if not fd then return nil, err end
+  local len = 1024
+  local old, err = S.read(fd, nil, len)
+  if not old then return nil, err end
+  old = old:sub(1, #old - 1) -- remove trailing newline
+  if not new then return old end
+  local ok, err = S.write(fd, new)
+  if not ok then return nil, err end
+  return old
+end
+
 return S
 
 end
