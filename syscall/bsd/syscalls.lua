@@ -81,8 +81,8 @@ local sysctltypes = {
     [c.KERN.HOSTNAME]  = "string",
     [c.KERN.HOSTID]    = "int",
 -- some missing
-    [c.KERN.DOMAINNAME] = "string",
-    [c.KERN.RAWPARTITION] = "int",
+--    [c.KERN.DOMAINNAME] = "string", -- not on freebsd
+--    [c.KERN.RAWPARTITION] = "int",
   }
 }
 
