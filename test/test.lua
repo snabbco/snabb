@@ -1801,7 +1801,6 @@ test_misc = {
   test_sysctl = function()
     local os = abi.os
     if S.__rump then os = "netbsd" end
-    if S.__rump then error "skipped" end -- rump missing sysctl nodes TODO add a few more
     local sc = "kern.ostype"
     if os == "linux" then sc = "kernel.ostype" end
     local val = assert(S.sysctl(sc))
