@@ -87,6 +87,7 @@ build =
       ["syscall.netbsd.errors"] = "syscall/netbsd/errors.lua";
       ["syscall.netbsd.util"] = "syscall/netbsd/util.lua";
       ["syscall.netbsd.nr"] = "syscall/netbsd/nr.lua";
+      ["syscall.netbsd.sysctl"] = "syscall/netbsd/sysctl.lua";
       ["syscall.netbsd.init"] = "syscall/netbsd/init.lua";
 
       ["syscall.osx.syscalls"] = "syscall/osx/syscalls.lua";
@@ -99,6 +100,7 @@ build =
       ["syscall.osx.fcntl"] = "syscall/osx/fcntl.lua";
       ["syscall.osx.errors"] = "syscall/osx/errors.lua";
       ["syscall.osx.util"] = "syscall/osx/util.lua";
+      ["syscall.osx.sysctl"] = "syscall/osx/sysctl.lua";
 
       ["syscall.freebsd.syscalls"] = "syscall/freebsd/syscalls.lua";
       ["syscall.freebsd.c"] = "syscall/freebsd/c.lua";
@@ -110,6 +112,7 @@ build =
       ["syscall.freebsd.fcntl"] = "syscall/freebsd/fcntl.lua";
       ["syscall.freebsd.errors"] = "syscall/freebsd/errors.lua";
       ["syscall.freebsd.util"] = "syscall/freebsd/util.lua";
+      ["syscall.freebsd.sysctl"] = "syscall/freebsd/sysctl.lua";
 
       ["syscall.openbsd.syscalls"] = "syscall/openbsd/syscalls.lua";
       ["syscall.openbsd.c"] = "syscall/openbsd/c.lua";
@@ -121,6 +124,7 @@ build =
       ["syscall.openbsd.fcntl"] = "syscall/openbsd/fcntl.lua";
       ["syscall.openbsd.errors"] = "syscall/openbsd/errors.lua";
       ["syscall.openbsd.util"] = "syscall/openbsd/util.lua";
+      ["syscall.openbsd.sysctl"] = "syscall/openbsd/sysctl.lua";
 
       ["syscall.bsd.syscalls"] = "syscall/bsd/syscalls.lua";
       ["syscall.bsd.ffifunctions"] = "syscall/bsd/ffifunctions.lua";

@@ -66,25 +66,7 @@ local sysctlmap = {
   [c.CTL.KERN] = c.KERN,
 }
 
--- TODO incomplete, also OS dependent, so need to split into per OS file
-local sysctltypes = {
-  [c.CTL.KERN] = {
-    [c.KERN.OSTYPE]    = "string",
-    [c.KERN.OSRELEASE] = "string",
-    [c.KERN.OSREV]     = "int",
-    [c.KERN.VERSION]   = "string",
-    [c.KERN.MAXVNODES] = "int",
-    [c.KERN.MAXPROC]   = "int",
-    [c.KERN.MAXFILES]  = "int",
-    [c.KERN.ARGMAX]    = "int",
-    [c.KERN.SECURELVL] = "int",
-    [c.KERN.HOSTNAME]  = "string",
-    [c.KERN.HOSTID]    = "int",
--- some missing
---    [c.KERN.DOMAINNAME] = "string", -- not on freebsd
---    [c.KERN.RAWPARTITION] = "int",
-  }
-}
+local sysctltypes = require("syscall." .. abi.os .. ".sysctl")
 
 -- TODO understand return types
 function S.sysctl(name, new, old) -- TODO may need to change arguments, note order as should not need to specify old
