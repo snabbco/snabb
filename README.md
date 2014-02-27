@@ -38,6 +38,20 @@ be: "Is that really all there is to it?"
 4. Kill your darlings.
 5. Start with slow code. Later, profile and optimize it.
 
+### Budget
+
+> *If I look back at my own life and try to pick out the parts that
+> were most creative, I can't help but notice that they occurred when
+> I was forced to work under the toughest constraints.* -- Donald Knuth
+
+Snabb Switch has adopted these limits:
+
+* 10,000 lines of source.
+* 1 MB executable size.
+* 1 second to compile snabbswitch.
+* 1 minute to compile with dependencies (LuaJIT, etc).
+* 0.1% of source lines wider than 80 columns.
+
 ### Rules
 
 Be conservative and follow the rules below when you are working on the
@@ -60,20 +74,6 @@ code you have written. This is a fine compliment between programmers.
 Everybody's code can be improved. (So can everybody's improvements.)
 
 Use `module()`.
-
-### Budget
-
-> *If I look back at my own life and try to pick out the parts that
-> were most creative, I can't help but notice that they occurred when
-> I was forced to work under the toughest constraints.* -- Donald Knuth
-
-Snabb Switch has adopted these limits:
-
-* 10,000 lines of source.
-* 1 MB executable size.
-* 1 second to compile snabbswitch.
-* 1 minute to compile with dependencies (LuaJIT, etc).
-* 0.1% of source lines wider than 80 columns.
 
 ### Github workflow
 
