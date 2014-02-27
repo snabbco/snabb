@@ -63,6 +63,9 @@ c.KTRFAC.V2 = nil
 c.W.WCLONE = nil -- underscore in name, changed
 c.W.WALL   = nil -- underscore in name, changed
 
+-- the #define and the name used are different, very odd
+c.KERN_PIPE.MAXLOANKVASZ = nil
+
 -- v7 only
 c.CTLFLAG.UNSIGNED = nil
 
