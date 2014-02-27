@@ -73,6 +73,7 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
     name = h.split("%.", name)
   end
   local namelen = #name
+  -- TODO make more general to support deeper nesting
   name[1] = c.CTL[name[1]]
   if sysctlmap[name[1]] then
     name[2] = sysctlmap[name[1]][name[2]]
