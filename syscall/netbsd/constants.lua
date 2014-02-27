@@ -1398,5 +1398,7 @@ c.KERN_PIPE = strflag {
   KVASIZE           = 5,
 }
 
+c.KERN_PIPE.MAXLOANKVASZ = c.KERN_PIPE.LIMITKVA -- alternate name
+
 return c
 
