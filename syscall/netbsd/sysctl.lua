@@ -6,6 +6,7 @@ local c = require "syscall.netbsd.constants"
 
 local map = {
   [c.CTL.KERN] = c.KERN,
+  [c.CTL.HW] = c.HW,
 }
 
 local map2 = {
