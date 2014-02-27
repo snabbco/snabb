@@ -61,12 +61,8 @@ function S.kqueue() return retfd(C.kqueue()) end
 
 local sysctl = C.sysctl or C.__sysctl -- NetBSD has __sysctl
 
--- TODO may become OS dependent as add more
-local sysctlmap = {
-  [c.CTL.KERN] = c.KERN,
-}
-
-local sysctltypes = require("syscall." .. abi.os .. ".sysctl")
+local sc = require("syscall." .. abi.os .. ".sysctl")
+local sysctltypes, sysctlmap, sysctlmap2 = sc.types, sc.map, sc.map2
 
 -- TODO understand return types
 function S.sysctl(name, new, old) -- TODO may need to change arguments, note order as should not need to specify old

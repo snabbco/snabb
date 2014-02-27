@@ -4,7 +4,13 @@ local require = require
 
 local c = require "syscall.openbsd.constants"
 
-return {
+local map = {
+  [c.CTL.KERN] = c.KERN,
+}
+
+local map2 = {}
+
+local types = {
   ["kern.ostype"]    = "string",
   ["kern.osrelease"] = "string",
   ["kern.osrev"]     = "int",
@@ -17,4 +23,6 @@ return {
   ["kern.hostname"]  = "string",
   ["kern.hostid"]    = "int",
 }
+
+return {types = types, map = map, map2 = map2}
 

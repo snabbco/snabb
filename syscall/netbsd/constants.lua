@@ -1390,5 +1390,13 @@ c.KERN = strflag {
   MAXID             = 85,
 }
 
+c.KERN_PIPE = strflag {
+  MAXKVASZ          = 1,
+  LIMITKVA          = 2,
+  MAXBIGPIPES       = 3,
+  NBIGPIPES         = 4,
+  KVASIZE           = 5,
+}
+
 return c
 

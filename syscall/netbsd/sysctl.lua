@@ -4,8 +4,18 @@ local require = require
 
 local c = require "syscall.netbsd.constants"
 
+local map = {
+  [c.CTL.KERN] = c.KERN,
+}
+
+local map2 = {
+  [c.CTL.KERN] = {
+    [c.KERN.PIPE] = c.KERN_PIPE,
+  }
+}
+
 -- TODO note some could be considered bool not int eg KERN_FSYNC
-return {
+local types = {
   ["kern.ostype"]    = "string",
   ["kern.osrelease"] = "string",
   ["kern.osrev"]     = "int",
@@ -88,4 +98,6 @@ return {
 -- KERN_BOOTTIME           83      /* struct: time kernel was booted */
 -- KERN_EVCNT              84      /* struct: evcnts */
 }
+
+return {types = types, map = map, map2 = map2}
 
