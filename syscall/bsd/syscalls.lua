@@ -89,6 +89,9 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
     elseif tp == "int" then
       oldlenp = t.size1(s.int)
       old = t.int1()
+    elseif tp == "int64" then
+      oldlenp = t.size1(s.int64)
+      old = t.int64_1()
     else
       oldlenp = t.size1(s[tp])
       old = t[tp]()
@@ -107,8 +110,10 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
   local ok, err = sysctl(name, namelen, old, oldlenp, new, newlen)
   if not ok then return nil, t.error(err or errno()) end
   if tp then -- we know type of value being returned
-    if tp == "string" then return ffi.string(old) end
-    if tp == "int" then return tonumber(old[0]) end
+    if tp == "string" then return ffi.string(old)
+    elseif tp == "int" then return tonumber(old[0])
+    elseif tp == "int64" then return old[0]
+    end
     return old
   end
   return true, nil, old, oldlenp[0]
