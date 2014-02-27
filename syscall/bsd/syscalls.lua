@@ -70,14 +70,17 @@ local sysctltypes = require("syscall." .. abi.os .. ".sysctl")
 
 -- TODO understand return types
 function S.sysctl(name, new, old) -- TODO may need to change arguments, note order as should not need to specify old
-  if type(name) == "string" then name = h.split("%.", name) end
+  local tp
+  if type(name) == "string" then
+    name = name:lower()
+    tp = sysctltypes[name]
+    name = h.split("%.", name)
+  end
   local namelen = #name
   name[1] = c.CTL[name[1]]
   if sysctlmap[name[1]] then name[2] = sysctlmap[name[1]][name[2]] end
   local oldlenp, newlen
-  local tp
-  if sysctltypes[name[1]] and sysctltypes[name[1]][name[2]] then
-    tp = sysctltypes[name[1]][name[2]]
+  if tp then
     if tp == "string" then
       oldlenp = t.size1(256) -- TODO adapt if too small
       old = t.buffer(oldlenp[0])

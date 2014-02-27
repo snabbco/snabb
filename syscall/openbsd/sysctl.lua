@@ -5,18 +5,16 @@ local require = require
 local c = require "syscall.openbsd.constants"
 
 return {
-  [c.CTL.KERN] = {
-    [c.KERN.OSTYPE]    = "string",
-    [c.KERN.OSRELEASE] = "string",
-    [c.KERN.OSREV]     = "int",
-    [c.KERN.VERSION]   = "string",
-    [c.KERN.MAXVNODES] = "int",
-    [c.KERN.MAXPROC]   = "int",
-    [c.KERN.MAXFILES]  = "int",
-    [c.KERN.ARGMAX]    = "int",
-    [c.KERN.SECURELVL] = "int",
-    [c.KERN.HOSTNAME]  = "string",
-    [c.KERN.HOSTID]    = "int",
-  }
+  ["kern.ostype"]    = "string",
+  ["kern.osrelease"] = "string",
+  ["kern.osrev"]     = "int",
+  ["kern.version"]   = "string",
+  ["kern.maxvnodes"] = "int",
+  ["kern.maxproc"]   = "int",
+  ["kern.maxfiles"]  = "int",
+  ["kern.argmax"]    = "int",
+  ["kern.securelvl"] = "int",
+  ["kern.hostname"]  = "string",
+  ["kern.hostid"]    = "int",
 }
 
