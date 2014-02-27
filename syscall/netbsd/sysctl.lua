@@ -97,6 +97,22 @@ local types = {
 -- KERN_SYSVIPC            82      /* node: SysV IPC parameters */
 -- KERN_BOOTTIME           83      /* struct: time kernel was booted */
 -- KERN_EVCNT              84      /* struct: evcnts */
+
+  ["hw.machine"] = "string",
+  ["hw.model"] = "string",
+  ["hw.ncpu"] = "int",
+  ["hw.byteorder"] = "int",
+  ["hw.physmem"] = "int",
+  ["hw.usermem"] = "int",
+  ["hw.pagesize"] = "int",
+  ["hw.drivenames"] = "string",
+--["hw.drivestats"] = CTLTYPE_STRUCT
+  ["hw.machine_arch"] = "string",
+  ["hw.alignbytes"] = "int",
+  ["hw.cnmagic"] = "string",
+  ["hw.physmem64"] = "int64",
+  ["hw.usermem64"] = "int64",
+  ["hw.ncpuonline"] = "int",
 }
 
 return {types = types, map = map, map2 = map2}

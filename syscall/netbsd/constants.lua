@@ -1400,5 +1400,24 @@ c.KERN_PIPE = strflag {
 
 c.KERN_PIPE.MAXLOANKVASZ = c.KERN_PIPE.LIMITKVA -- alternate name
 
+c.HW = strflag {
+  MACHINE       1,
+  MODEL         2,
+  NCPU          3,
+  BYTEORDER     4,
+  PHYSMEM       5,
+  USERMEM       6,
+  PAGESIZE      7,
+  DISKNAMES     8,
+  IOSTATS       9,
+  MACHINE_ARCH 10,
+  ALIGNBYTES   11,
+  CNMAGIC      12,
+  PHYSMEM64    13,
+  USERMEM64    14,
+  IOSTATNAMES  15,
+  NCPUONLINE   16,
+}
+
 return c
 
