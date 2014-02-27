@@ -77,7 +77,7 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
   name[1] = c.CTL[name[1]]
   if sysctlmap[name[1]] then
     name[2] = sysctlmap[name[1]][name[2]]
-    if sysctlmap2[name[1]][name[2]] then
+    if sysctlmap2[name[1]] and sysctlmap2[name[1]][name[2]] then
       name[3] = sysctlmap2[name[1]][name[2]][name[3]]
     end
   end
