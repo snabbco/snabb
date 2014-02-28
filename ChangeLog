@@ -13,6 +13,7 @@
 + Add getpagesize
 + All syscalls now direct not via libc on Linux
 + OpenBSD support (5.4 and 5.5), thanks to tedu
++ sysctl support
 
     0.9 release
 
