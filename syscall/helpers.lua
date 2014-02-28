@@ -63,7 +63,7 @@ function h.newfn(tp, tab)
 end
 
 -- generic function for __tostring
-function simpleprint(pt, x)
+local function simpleprint(pt, x)
   local out = {}
   for _, v in ipairs(pt) do out[#out + 1] = v .. " = " .. tostring(x[v]) end
   return "{ " .. table.concat(out, ", ") .. " }"
