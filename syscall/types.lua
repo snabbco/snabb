@@ -133,7 +133,8 @@ mt.timeval = {
     local ts = ffi.new(tp)
     ts.time = v
     return ts
-  end
+  end,
+  __tostring = function(tv) return tostring(tv.time) end,
 }
 
 addtype(types, "timeval", "struct timeval", mt.timeval)
@@ -166,6 +167,7 @@ mt.timespec = {
     ts.time = v
     return ts
   end,
+  __tostring = function(tv) return tostring(tv.time) end,
 }
 
 addtype(types, "timespec", "struct timespec", mt.timespec)
@@ -493,6 +495,8 @@ mt.rusage = {
     nvcsw    = function(ru) return tonumber(ru.ru_nvcsw) end,
     nivcsw   = function(ru) return tonumber(ru.ru_nivcsw) end,
   },
+  print = {"utime", "stime", "maxrss", "ixrss", "idrss", "isrss", "minflt", "majflt", "nswap",
+           "inblock", "oublock", "msgsnd", "msgrcv", "nsignals", "nvcsw", "nivcsw"},
 }
 
 addtype(types, "rusage", "struct rusage", mt.rusage)

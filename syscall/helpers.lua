@@ -62,6 +62,13 @@ function h.newfn(tp, tab)
   return obj
 end
 
+-- generic function for __tostring
+function simpleprint(pt, x)
+  local out = {}
+  for _, v in ipairs(pt) do out[#out + 1] = v .. " = " .. tostring(x[v]) end
+  return "{ " .. table.concat(out, ", ") .. " }"
+end
+
 -- type initialisation helpers
 function h.addtype(types, name, tp, mt)
   if abi.rumpfn then tp = abi.rumpfn(tp) end
@@ -77,6 +84,7 @@ function h.addtype(types, name, tp, mt)
       mt.__newindex = function(tp, k, v) if newindex[k] then newindex[k](tp, v) else error("invalid index " .. k) end end
     end
     if not mt.__len then mt.__len = lenfn end -- default length function is just sizeof
+    if not mt.__tostring and mt.print then mt.__tostring = function(x) return simpleprint(mt.print, x) end end
     types.t[name] = ffi.metatype(tp, mt)
   else
     types.t[name] = ffi.typeof(tp)
