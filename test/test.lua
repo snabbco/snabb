@@ -1787,8 +1787,8 @@ test_misc = {
   test_chroot_root = function()
     local cwd = assert(S.open(".", "rdonly"))
     local root = assert(S.open("/", "rdonly"))
-    assert(S.chdir("/"))
     assert(S.mkdir(tmpfile, "0700"))
+    assert(S.chdir("/"))
     assert(S.chroot(tmpfile))
     local ok, err = S.stat("/dev")
     assert(not ok, "should not find /dev after chroot")
@@ -1799,6 +1799,7 @@ test_misc = {
       assert(S.chroot("."))
     end
     assert(cwd:chdir())
+    assert(S.unlink(tmpfile))
   end,
   test_pathconf = function()
     local pc = assert(S.pathconf(".", "name_max"))
