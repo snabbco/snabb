@@ -28,7 +28,7 @@ local types = {
   ["kern.securelvl"] = "int",
   ["kern.hostname"]  = "string",
   ["kern.hostid"]    = "int",
--- KERN_CLOCKRATE          12      /* struct: struct clockinfo */
+  ["kern.clockrate"] = "clockinfo",
 -- KERN_VNODE              13      /* struct: vnode structures */
 -- KERN_PROC               14      /* struct: process entries */
 -- KERN_FILE               15      /* struct: file entries */

@@ -47,6 +47,7 @@ local addstructs = {
   icmp6_ifstat = "struct icmp6_ifstat",
   in6_ifreq = "struct in6_ifreq",
   in6_addrlifetime = "struct in6_addrlifetime",
+  clockinfo = "struct clockinfo",
 }
 
 if abi.netbsd == 6 then

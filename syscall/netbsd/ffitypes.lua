@@ -634,6 +634,13 @@ struct _netbsd_rt_msghdr {
   int     rtm_inits;
   struct  _netbsd_rt_metrics rtm_rmx __attribute__ ((aligned (8)));
 };
+struct _netbsd_clockinfo {
+  int     hz;
+  int     tick;
+  int     tickadj;
+  int     stathz;
+  int     profhz;
+};
 ]]
 
 local s = table.concat(defs, "")
