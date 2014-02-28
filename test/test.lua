@@ -165,7 +165,7 @@ end
 -- type tests use reflection TODO move to seperate test file
 local ok, reflect = pcall(require, "include.ffi-reflect.reflect")
 if ok then
-test_types = {
+test_types_reflect = {
   test_allocate = function() -- create an element of every ctype
     for k, v in pairs(t) do
       if type(v) == "cdata" then
@@ -242,6 +242,20 @@ test_types = {
       end
     end
     assert_equal(allok, true)
+  end,
+  test_tostring = function()
+    for k, v in pairs(t) do
+      if type(v) == "cdata" then
+        local x, s
+        if reflect.typeof(v).vla then
+          x = v(1)
+          s = tostring(v)
+        else
+          x = v()
+          s = tostring(v)
+        end
+      end
+    end
   end,
 }
 end
