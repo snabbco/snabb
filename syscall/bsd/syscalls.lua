@@ -113,10 +113,11 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
     if tp == "string" then return ffi.string(old)
     elseif tp == "int" then return tonumber(old[0])
     elseif tp == "int64" then return old[0]
+    else return old
     end
     return old
   end
-  return true, nil, old, oldlenp[0]
+  return old, nil, oldlenp[0] -- not ideal, but add the sysctls you want to sysctl.lua...
 end
 
 -- note osx has kevent64 too, different type
