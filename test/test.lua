@@ -1786,10 +1786,11 @@ test_misc = {
   teardown = clean,
   test_chroot_root = function()
     local cwd = assert(S.open(".", "rdonly"))
+    local cname = assert(S.getcwd())
     local root = assert(S.open("/", "rdonly"))
     assert(S.mkdir(tmpfile, "0700"))
     assert(S.chdir("/"))
-    assert(S.chroot(tmpfile))
+    assert(S.chroot(cname .. "/" .. tmpfile))
     local ok, err = S.stat("/dev")
     assert(not ok, "should not find /dev after chroot")
     -- note that NetBSD will chdir after chroot, so chroot(".") will not work, but does provide fchroot, which Linux does not
@@ -1799,7 +1800,7 @@ test_misc = {
       assert(S.chroot("."))
     end
     assert(cwd:chdir())
-    assert(S.unlink(tmpfile))
+    assert(S.rmdir(tmpfile))
   end,
   test_pathconf = function()
     local pc = assert(S.pathconf(".", "name_max"))
