@@ -20,7 +20,9 @@ The stable release is now available in the luarocks repository, so you should be
 
 For simple uses, you just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Keep the directory structure there is. You can safely remove files from architectures and operating systems you do not use.
 
-You can install using luarocks; this is not in the repo but you can install with ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` for the HEAD version, or one of the specific version files in that directory.
+You can also install the head version using luarocks: ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` .
+
+It is also available as a package in [buildroot](http://buildroot.uclibc.org/), a build system for embedded systems.
 
 If you are using Lua rather than LuaJIT you need to install [luaffi](https://github.com/jmckaskill/luaffi) first; this is largely working now, but there will be more support for standard Lua coming soon.
 
@@ -63,7 +65,8 @@ This project is being used ina variety of places, such as for testing the Linux 
 
 * [ljlinenoise](https://github.com/fperrad/ljlinenoise) a Lua implementation of the linenoise (readline) library.
 * [nodish](https://github.com/lipp/nodish) a lightweight Lua equivalent to Node.js.
-* [lua-mmapfile](https://github.com/geoffleyland/lua-mmapfile) a simple Lua interface to mmap
+* [lua-mmapfile](https://github.com/geoffleyland/lua-mmapfile) a simple Lua interface to mmap.
+* [buildroot](http://buildroot.uclibc.org/) has an ljsyscall package.
 
 ## Testing
 
