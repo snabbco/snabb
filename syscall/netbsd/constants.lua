@@ -1400,6 +1400,13 @@ c.KERN_PIPE = strflag {
 
 c.KERN_PIPE.MAXLOANKVASZ = c.KERN_PIPE.LIMITKVA -- alternate name
 
+KERN_TKSTAT = strflag {
+  NIN               = 1,
+  NOUT              = 2,
+  CANCC             = 3,
+  RAWCC             = 4,
+}
+
 c.HW = strflag {
   MACHINE     =  1,
   MODEL       =  2,

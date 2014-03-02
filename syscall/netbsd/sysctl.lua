@@ -12,6 +12,7 @@ local map = {
 local map2 = {
   [c.CTL.KERN] = {
     [c.KERN.PIPE] = c.KERN_PIPE,
+    [c.KERN.TKSTAT] = c.KERN_TKSTAT,
   }
 }
 
@@ -72,7 +73,10 @@ local types = {
   ["kern.pipe.kvasize"] = "int",
   ["kern.maxphys"] = "int",
   ["kern.sbmax"] = "int",
--- KERN_TKSTAT             59      /* tty in/out counters */
+  ["kern.tkstat.nin"] = "int64",
+  ["kern.tkstat.nout"] = "int64",
+  ["kern.tkstat.cancc"] = "int64",
+  ["kern.tkstat.rawcc"] = "int64",
   ["kern.monotonic_clock"] = "int",
   ["kern.urnd"] = "int",
   ["kern.labelsector"] = "int",
