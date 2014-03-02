@@ -66,6 +66,12 @@ local sysctltypes, sysctlmap, sysctlmap2 = sc.types, sc.map, sc.map2
 
 -- TODO understand return types
 function S.sysctl(name, new, old) -- TODO may need to change arguments, note order as should not need to specify old
+  -- "-a" functionality, well all the ones we know about
+  if not name then
+    local all = {}
+    for k, _ in pairs(sysctltypes) do all[k] = S.sysctl(k) end
+    return all -- TODO return tostring metatable
+  end
   local tp
   if type(name) == "string" then
     name = name:lower()
