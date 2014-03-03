@@ -64,13 +64,15 @@ local sysctl = C.sysctl or C.__sysctl -- NetBSD has __sysctl
 local sc = require("syscall." .. abi.os .. ".sysctl")
 local sysctltypes, sysctlmap, sysctlmap2 = sc.types, sc.map, sc.map2
 
+local allmeta = {__tostring = function(t) return table.concat(t, '\n') end}
+
 -- TODO understand return types
 function S.sysctl(name, new, old) -- TODO may need to change arguments, note order as should not need to specify old
   -- "-a" functionality, well all the ones we know about
   if not name then
     local all = {}
     for k, _ in pairs(sysctltypes) do all[k] = S.sysctl(k) end
-    return all -- TODO return tostring metatable
+    return setmetatable(all, allmeta)
   end
   local tp
   if type(name) == "string" then
