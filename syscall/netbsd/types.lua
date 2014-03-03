@@ -47,7 +47,6 @@ local addstructs = {
   icmp6_ifstat = "struct icmp6_ifstat",
   in6_ifreq = "struct in6_ifreq",
   in6_addrlifetime = "struct in6_addrlifetime",
-  clockinfo = "struct clockinfo",
 }
 
 if abi.netbsd == 6 then
@@ -565,6 +564,13 @@ mt.flock = {
 }
 
 addtype(types, "flock", "struct flock", mt.flock)
+
+mt.clockinfo = {
+  print = {"tick", "tickadj", "hz", "profhz", "stathz"},
+  __new = newfn,
+}
+
+addtype(types, "clockinfo", "struct clockinfo", mt.clockinfo)
 
 return types
 
