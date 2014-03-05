@@ -1,9 +1,9 @@
 module(...,package.seeall)
 
-local buffer    = require("core.buffer")
-local packet    = require("core.packet")
-local lib       = require("core.lib")
-local link_ring = require("core.link_ring")
+local buffer = require("core.buffer")
+local packet = require("core.packet")
+local lib    = require("core.lib")
+local link   = require("core.link")
 local config = require("core.config")
 require("core.packet_h")
 
@@ -16,7 +16,7 @@ configuration = config.new()
 
 function configure (new_config)
    local actions = compute_config_actions(configuration, new_config)
-   apply_config_actions(actions)
+   apply_config_actions(actions, new_config)
 end
 
 -- Return the configuration actions needed to migrate from old config to new.
@@ -40,7 +40,7 @@ function compute_config_actions (old, new)
 end
 
 -- Update the active app network by applying the necessary actions.
-function apply_config_actions (actions, config)
+function apply_config_actions (actions, conf)
    -- The purpose of this function is to populate these tables:
    local new_app_table,  new_app_array  = {}, {}, {}
    local new_link_table, new_link_array = {}, {}, {}
@@ -57,11 +57,15 @@ function apply_config_actions (actions, config)
       app_name_to_index[name] = #new_app_array
    end
    function ops.start (name)
-      local class, config = unpack(config[name])
-      local app = class:new(config)
+      local class = conf.apps[name].class
+      local arg = conf.apps[name].arg
+      local app = class:new(arg)
+      app.output = {}
+      app.input = {}
       new_app_table[name] = app
       table.insert(new_app_array, app)
       app_name_to_index[name] = #new_app_array
+      print("started " .. name)
    end
    function ops.restart (name)
       ops.stop(name)
@@ -76,21 +80,24 @@ function apply_config_actions (actions, config)
    end
    -- dispatch all actions
    for name, action in pairs(actions) do
+      print(name, action)
       ops[action](name)
    end
    -- Setup links: create (or reuse) and renumber.
-   for linkspec in pairs(config.links) do
+   for linkspec in pairs(conf.links) do
       local fa, fl, ta, tl = config.parse_link(linkspec)
+      print(("%q %q %q %q %q"):format(linkspec, fa, fl, ta, tl))
       assert(new_app_table[fa], "'from' app does not exist for link")
-      assert(new_app_table[ta], "'to' app does not exist for link")
+      assert(new_app_table[ta], "'to' app does not exist for link: " .. ta)
       -- Create or reuse a link and assign/update receiving app index
-      local link = linktable[linkspec] or link.new()
+      local link = link_table[linkspec] or link.new()
+      print("link", link)
       link.receiving_app = app_name_to_index[ta]
       -- Add link to apps
       new_app_table[fa].output[fl] = link
       new_app_table[ta].input[tl] = link
       -- Remember link
-      new_link_table[name] = link
+      new_link_table[linkspec] = link
       table.insert(new_link_array, link)
    end
    -- commit changes
@@ -100,19 +107,24 @@ end
 
 -- Call this to "run snabb switch".
 function main ()
-   while true do breathe() end
+   local deadline = lib.timer(1e6)
+   repeat breathe() until deadline()
+   print("link report")
+   for name, l in pairs(link_table) do
+      print(name, lib.comma_value(tostring(tonumber(l.stats.txpackets))) .. " packet(s) transmitted")
+   end
 end
 
 function breathe ()
    -- Inhale: pull work into the app network
-   for _, app in ipairs(active_apps) do
+   for _, app in ipairs(app_array) do
       if app.pull then app:pull() end
    end
    -- Exhale: push work out through the app network
    repeat
       local progress = false
       -- For each link that has new data, run the receiving app
-      for _, link in ipairs(active_links) do
+      for _, link in ipairs(link_array) do
          if link.has_new_data then
             link.has_new_data = false
             local receiver = active_apps[link.receiving_app]

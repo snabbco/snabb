@@ -16,7 +16,7 @@ struct link {
   // Set when a new packet is added to the ring and cleared after
   // 'receiving_app' runs.
   bool has_new_data;
-  struct packet* packets[LINK_SIZE];
+  struct packet* packets[LINK_RING_SIZE];
   struct {
     double txbytes, rxbytes, txpackets, rxpackets, txdrop;
   } stats;
