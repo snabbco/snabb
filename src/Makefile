@@ -43,11 +43,11 @@ snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ)
 
 test: $(TESTMODS)
 
-$(TESTMODS):
+$(TESTMODS): testlog snabbswitch
 	$(E) "TEST      $@"
 	$(Q) ./snabbswitch -t $@ > testlog/$@ || (echo "*** EXIT CODE: $?" >> testlog/$@; echo "ERROR     testlog/$@")
 
-$(OBJDIR):
+$(OBJDIR) testlog:
 	$(E) "DIR       $@"
 	$(Q) mkdir -p $@
 
@@ -111,7 +111,7 @@ doc/snabbswitch.html doc/snabbswitch.epub: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
 	$(Q) pandoc -S --toc --chapters -o $@ $<
 
-CLEAN = snabbswitch obj doc/snabbswitch.* doc/obj/*.md testlog/*
+CLEAN = snabbswitch obj doc/snabbswitch.* doc/obj/*.md testlog
 
 clean:
 	$(E) "RM        $(CLEAN)"
