@@ -1,5 +1,5 @@
 language: c
 compiler:
   - gcc
-before_install: "sudo apt-get install linux-libc-dev"
+before_install: "sudo apt-get update && sudo apt-get install -y linux-libc-dev"
 script: "make"
