@@ -1,17 +1,57 @@
 |// Example app written in x86-64 assembly language.
 |.arch x64
-|.actionlist foo_actionlist
-|.section code, code2
 
 #include <dynasm/dasm_proto.h> // For declarations of the dasm_ functions
 #include <dynasm/dasm_x86.h>   // For x64 implementations of the dasm_ functions
 
-void foo (Dst_DECL) {
-  | .code
-  | xor rax, rax
-  | .code2
-  | add rax, r8
-  | mov r9, r10
+#include <assert.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <sys/mman.h>
+#include <core/link.h>
+
+#define DEBUG
+
+// Status word. The assembler code writes 0xdeadbeef here to show that it ran.
+uint64_t status;
+
+// Links to operate on. These can be setup via FFI.
+struct link *asm_link_in;
+struct link *asm_link_out;
+
+void asm_emit_push (Dst_DECL) {
+  | mov dword [status], eax
+  | ret
+}
+
+| .actionlist push_actionlist
+| .section code
+void* asm_make_push()
+{
+  dasm_State *state;
+  int status;
+  size_t code_size;
+  void *memory;
+  dasm_init(&state, DASM_MAXSECTION);
+  dasm_setup(&state, push_actionlist);
+  asm_emit_push(&state);
+  status = dasm_link(&state, &code_size);
+  assert(status == DASM_S_OK);
+  memory = mmap(NULL, code_size,
+                PROT_READ | PROT_WRITE,
+                MAP_ANON | MAP_PRIVATE, -1, 0);
+  assert(memory != MAP_FAILED);
+  printf("memory = %p code_size = %ld \n", memory, code_size);
+  dasm_encode(&state, memory);
+  // Switch memory to executable and read-only
+  assert(mprotect(memory, code_size, PROT_EXEC | PROT_READ) == 0);
+#ifdef DEBUG
+  FILE *f = fopen("/tmp/asm_push.bin", "wb");
+  fwrite(memory, code_size, 1, f);
+  fclose(f);
+#endif
+  return (void(*)())memory;
 }
 
 /* -*- c -*- */
