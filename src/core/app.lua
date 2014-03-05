@@ -127,7 +127,7 @@ function breathe ()
       for _, link in ipairs(link_array) do
          if link.has_new_data then
             link.has_new_data = false
-            local receiver = active_apps[link.receiving_app]
+            local receiver = app_array[link.receiving_app]
             if receiver.push then
                receiver:push()
                progress = true

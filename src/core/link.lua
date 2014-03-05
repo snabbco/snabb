@@ -34,6 +34,7 @@ function transmit (r, p)
       r.write = (r.write + 1) % size
       r.stats.txpackets = r.stats.txpackets + 1
       r.stats.txbytes   = r.stats.txbytes + p.length
+      r.has_new_data = true
    end
 end
 
