@@ -3,6 +3,7 @@ module(...,package.seeall)
 local ffi = require("ffi")
 
 local app  = require("core.app")
+local link = require("core.link")
 local buffer = require("core.buffer")
 local packet = require("core.packet")
 local pcap = require("lib.pcap.pcap")
@@ -17,14 +18,14 @@ end
 
 function PcapReader:pull ()
    assert(self.output.output)
-   while not self.done and not app.full(self.output.output) do
+   while not self.done and not link.full(self.output.output) do
       local data, record, extra = self.iterator()
       if data then
          local p = packet.allocate()
          local b = buffer.allocate()
          ffi.copy(b.pointer, data)
          packet.add_iovec(p, b, string.len(data))
-         app.transmit(self.output.output, p)
+         link.transmit(self.output.output, p)
       else
          self.done = true
       end
@@ -40,8 +41,8 @@ function PcapWriter:new (filename)
 end
 
 function PcapWriter:push ()
-   while not app.empty(self.input.input) do
-      local p = app.receive(self.input.input)
+   while not link.empty(self.input.input) do
+      local p = link.receive(self.input.input)
       pcap.write_record_header(self.file, p.length)
       for i = 0, p.niovecs-1 do
 	 local iov = p.iovecs[i]
