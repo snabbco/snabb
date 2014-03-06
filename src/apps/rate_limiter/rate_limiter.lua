@@ -1,6 +1,8 @@
 module(..., package.seeall)
 
 local app = require("core.app")
+local link = require("core.link")
+local config = require("core.config")
 local packet = require("core.packet")
 local timer = require("core.timer")
 local basic_apps = require("apps.basic.basic_apps")
@@ -27,15 +29,16 @@ local NS_PER_TICK = 1e9 / TICKS_PER_SECOND
 -- Source produces synthetic packets of such size
 local PACKET_SIZE = 60
 
-function RateLimiter.new (rate, bucket_capacity, initial_capacity)
-   assert(rate)
-   assert(bucket_capacity)
-   initial_capacity = initial_capacity or bucket_capacity
+function RateLimiter:new (arg)
+   local conf = arg and config.parse_app_arg(arg) or {}
+   assert(conf.rate)
+   assert(conf.bucket_capacity)
+   conf.initial_capacity = conf.initial_capacity or conf.bucket_capacity
    local o =
    {
-      tokens_on_tick = rate / TICKS_PER_SECOND,
-      bucket_capacity = bucket_capacity,
-      bucket_content = initial_capacity
+      tokens_on_tick = conf.rate / TICKS_PER_SECOND,
+      bucket_capacity = conf.bucket_capacity,
+      bucket_content = conf.initial_capacity
     }
    return setmetatable(o, {__index=RateLimiter})
 end
@@ -62,8 +65,8 @@ end
 function RateLimiter:get_stat_snapshot ()
    return
    {
-      rx = self.input.input.ring.stats.tx,
-      tx = self.output.output.ring.stats.tx,
+      rx = self.input.input.stats.txpackets,
+      tx = self.output.output.stats.txpackets,
       time = tonumber(C.get_time_ns()),
    }
 end
@@ -80,19 +83,19 @@ function RateLimiter:push ()
    local o = assert(self.output.output, "output port not found")
 
    local tx_packets = 0
-   local max_packets_to_send = app.nwritable(o)
+   local max_packets_to_send = link.nwritable(o)
    if max_packets_to_send == 0 then
       return
    end
 
-   local nreadable = app.nreadable(i)
+   local nreadable = link.nreadable(i)
    for _ = 1, nreadable do
-      local p = app.receive(i)
+      local p = link.receive(i)
       local length = p.length
 
       if length <= self.bucket_content then
          self.bucket_content = self.bucket_content - length
-         app.transmit(o, p)
+         link.transmit(o, p)
          tx_packets = tx_packets + 1
 
          if tx_packets == max_packets_to_send then
@@ -108,7 +111,7 @@ end
 local function compute_effective_rate (rl, rate, snapshot)
    local elapsed_time =
       (tonumber(C.get_time_ns()) - snapshot.time) / 1e9
-   local tx = tonumber(rl.output.output.ring.stats.tx - snapshot.tx)
+   local tx = tonumber(rl.output.output.stats.txpackets - snapshot.tx)
    return floor(tx * PACKET_SIZE / elapsed_time)
 end
 
@@ -117,7 +120,9 @@ function selftest ()
    timer.init()
    buffer.preallocate(10000)
    
-   app.apps.source = app.new(basic_apps.Source:new())
+   local c = config.new()
+   config.app(c, "source", basic_apps.Source)
+--   app.apps.source = app.new(basic_apps.Source:new())
 
    local ok = true
    local rate_non_busy_loop = 200000
@@ -128,16 +133,21 @@ function selftest ()
    -- during 100 ms - internal RateLimiter timer resolution
    -- small value may limit effective rate
 
-   local rl = app.new(RateLimiter.new(rate_non_busy_loop, bucket_size))
-   app.apps.rate_limiter = rl
-   rl:init_timer()
-   app.apps.sink = app.new(basic_apps.Sink:new())
+   local arg = ([[ {rate = %d, bucket_capacity = %d} ]]):format(rate_non_busy_loop,
+                                                                rate_non_busy_loop / 4)
+   print("arg", type(arg), arg)
+   config.app(c, "ratelimiter", RateLimiter, arg)
+   config.app(c, "sink", basic_apps.Sink)
 
    -- Create a pipeline:
    -- Source --> RateLimiter --> Sink
-   app.connect("source", "output", "rate_limiter", "input")
-   app.connect("rate_limiter", "output", "sink", "input")
-   app.relink()
+   config.link(c, "source.output -> ratelimiter.input")
+   config.link(c, "ratelimiter.output -> sink.input")
+   app.configure(c)
+   
+   -- XXX do this in new () ?
+   local rl = app.app_table.ratelimiter
+   rl:init_timer()
 
    local seconds_to_run = 5
    -- print packets statistics every second
@@ -212,7 +222,7 @@ function selftest ()
          (tonumber(C.get_time_ns()) - snapshot.time) / 1e9
       print("elapsed time ", elapsed_time, "seconds")
 
-      local rx = tonumber(rl.input.input.ring.stats.tx - snapshot.rx)
+      local rx = tonumber(rl.input.input.stats.txpackets - snapshot.rx)
       print("packets received", rx, floor(rx / elapsed_time / 1e6), "Mpps")
 
       effective_rate_busy_loop = compute_effective_rate(
