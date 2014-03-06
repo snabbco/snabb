@@ -4,6 +4,8 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local app = require("core.app")
+local link = require("core.link")
+local config = require("core.config")
 local lib = require("core.lib")
 local packet = require("core.packet")
 local buffer = require("core.buffer")
@@ -58,9 +60,11 @@ struct {
 
 SimpleIPv6 = {}
 
-function SimpleIPv6:new (own_mac, own_ip)
-   own_mac = own_mac or "\x52\x54\x00\x12\x34\x57"
-   own_ip = own_ip or "\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+function SimpleIPv6:new (confstring)
+   print("confstring", confstring)
+   local conf = confstring and loadstring("return " .. confstring)() or {}
+   own_mac = conf.own_mac or "\x52\x54\x00\x12\x34\x57"
+   own_ip = conf.own_ip or "\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
    local o = {own_mac = own_mac, own_ip = own_ip}
    return setmetatable(o, {__index = SimpleIPv6})
 end
@@ -70,8 +74,8 @@ function SimpleIPv6:push ()
       -- Output to the port with the same name as the input port (e.g. "eth0")
       local oport = self.output[name]
       assert(oport, "output port not found")
-      for i = 1, app.nreadable(iport) do
-         local p = app.receive(iport)
+      for i = 1, link.nreadable(iport) do
+         local p = link.receive(iport)
          assert(p.iovecs[0].length >= ffi.sizeof(ipv6_t))
          local ipv6 = ffi.cast(ffi.typeof("$*", ipv6_t), p.iovecs[0].buffer.pointer + p.iovecs[0].offset)
          if ipv6.ethertype == 0xDD86 then -- IPv6 (host byte order) then
@@ -93,7 +97,7 @@ function SimpleIPv6:push ()
                      ffi.copy(ipv6.smac, self.own_mac, 6)
 		     checksum_icmpv6(ipv6, icmpv6)
                      -- Transmit
-                     app.transmit(oport, p)
+                     link.transmit(oport, p)
 		  elseif icmpv6.type == 128 then -- echo
 		     print("  Responding to ECHO request")
 		     icmpv6.type = 129 -- echo response
@@ -102,14 +106,14 @@ function SimpleIPv6:push ()
                      ffi.copy(ipv6.dmac, ipv6.smac, 6)
                      ffi.copy(ipv6.smac, self.own_mac, 6)
 		     checksum_icmpv6(ipv6, icmpv6)
-		     app.transmit(oport, p)
+		     link.transmit(oport, p)
                   end
                elseif C.memcmp(self.own_mac, ipv6.dmac, 6) == 0 then
                   -- Example: "Route" packet back to source.
                   -- (rewrite dmac, decrement hop limit)
                   ffi.copy(ipv6.dmac, ipv6.smac, 6)
                   ipv6.hop_limit = ipv6.hop_limit - 1
-                  app.transmit(oport, p)
+                  link.transmit(oport, p)
 	       end
 	    else
 	       print("  Sending ICMPv6 Time Exceeded")
@@ -139,7 +143,7 @@ function SimpleIPv6:push ()
 			excerpt_len)
 	       checksum_icmpv6(new_ipv6, new_icmpv6)
 	       packet.add_iovec(new_p, new_b, size.eth + size.ipv6 + size.icmpv6expired + excerpt_len)
-	       app.transmit(oport, new_p)
+	       link.transmit(oport, new_p)
 	       packet.deref(p)
             end
          else
@@ -177,14 +181,16 @@ function selftest ()
    print("selftest: ipv6")
    local own_ip = "\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
    local own_mac = "\x52\x54\x00\x12\x34\x57"
-   app.apps.source = app.new(pcap.PcapReader:new("apps/ipv6/selftest.cap.input"))
-   app.apps.ipv6   = app.new(SimpleIPv6:new(own_mac, own_ip))
-   app.apps.sink   = app.new(pcap.PcapWriter:new("apps/ipv6/selftest.cap.output"))
-   app.connect("source", "output", "ipv6", "eth0")
-   app.connect("ipv6", "eth0",     "sink", "input")
-   app.relink()
-   for i = 1, 10 do  app.breathe()  end
-   app.report()
+   local c = config.new()
+   config.app(c, "source", pcap.PcapReader, "apps/ipv6/selftest.cap.input")
+   config.app(c, "ipv6", SimpleIPv6,
+              [[ { own_ip  = "\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
+                   own_mac = "\x52\x54\x00\x12\x34\x57" } ]])
+   config.app(c, "sink", pcap.PcapWriter, "apps/ipv6/selftest.cap.output")
+   config.link(c, "source.output -> ipv6.eth0")
+   config.link(c, "ipv6.eth0 -> sink.input")
+   app.configure(c)
+   app.main({duration = 0.25}) -- should be long enough...
    -- Check results
    if io.open("apps/ipv6/selftest.cap.output"):read('*a') ~=
       io.open("apps/ipv6/selftest.cap.expect"):read('*a') then
