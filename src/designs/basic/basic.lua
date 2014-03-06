@@ -4,25 +4,30 @@ local app = require("core.app")
 local buffer = require("core.buffer")
 local timer = require("core.timer")
 local basic_apps = require("apps.basic.basic_apps")
+local config = require("core.config")
 
 local graphviz = false
 
 function run ()
-   app.apps.source = app.new(basic_apps.Source:new())
-   app.apps.join   = app.new(basic_apps.Join:new())
-   app.apps.split  = app.new(basic_apps.Split:new())
-   app.apps.sink   = app.new(basic_apps.Sink:new())
-   app.connect("source", "out", "join",  "in")
-   app.connect("join",   "out", "split", "in")
-   app.connect("split",  "out", "sink",  "in")
-   app.relink()
+   local c = config.new()
+   config.app(c, "source", basic_apps.Source)
+   config.app(c, "join", basic_apps.Join)
+   config.app(c, "split", basic_apps.Split)
+   config.app(c, "sink", basic_apps.Sink)
+   config.link(c, "source.out -> join.in")
+   config.link(c, "join.out -> split.in")
+   config.link(c, "split.out -> sink.in")
+   app.configure(c)
    buffer.preallocate(10000)
+   app.main({duration = 1})
+--[[
    timer.init()
    timer.activate(timer.new("report", report, 1e9, 'repeating'))
    while true do
       app.breathe()
       timer.run()
    end
+--]]
 end
 
 function report ()
