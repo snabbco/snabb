@@ -7,7 +7,7 @@ local ffi = require("ffi")
 local C = ffi.C
 
 ffi.cdef[[
-      extern int asm_status;
+      extern uint32_t asm_status;
       extern struct link *asm_link_in;
       extern struct link *asm_link_out;
       void* asm_make_push();
@@ -23,23 +23,17 @@ function Asm:new ()
 end
 
 function Asm:pull ()
-   print("asm:pull()")
 end
 
 function Asm:push ()
-   print("asm:push()")
    if self.output.tx then C.asm_link_out = self.output.tx end
-   print("x")
    if self.input.rx  then C.asm_link_in  = self.input.rx  end
    -- Deep breath... into the machine code!
-   print("machine code...")
-   print("status before: " .. bit.tohex(C.asm_status))
    self.push_machine_code()
-   print("status after:  " .. bit.tohex(C.asm_status))
 end
 
 function selftest ()
-   print("test")
+   print("selftest: asm")
    local c = config.new()
    config.app(c, "source", basic_apps.Source)
    config.app(c, "sink",   basic_apps.Sink)
@@ -47,5 +41,6 @@ function selftest ()
    config.link(c, "source.tx -> asm.rx")
    config.link(c, "asm.tx    -> sink.rx")
    app.configure(c)
-   app.main()
+   app.main({duration = 1.0})
+   assert(tonumber(C.asm_status) == 0xdeadbeef, "bad magic: " .. tostring(C.asm_status))
 end

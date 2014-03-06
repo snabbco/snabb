@@ -14,7 +14,7 @@
 #define DEBUG
 
 // Status word. The assembler code writes 0xdeadbeef here to show that it ran.
-int asm_status;
+uint32_t asm_status;
 
 // Links to operate on. These can be setup via FFI.
 struct link *asm_link_in;
