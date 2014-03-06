@@ -1,8 +1,9 @@
--- 'config' data structure to describe an app network.
+-- 'config' is a data structure that describes an app network.
 
 module(..., package.seeall)
 
--- Create a new configuration. Initially there are no apps or links.
+-- API: Create a new configuration.
+-- Initially there are no apps or links.
 function new ()
    return {
       apps = {},         -- list of {name, class, args}
@@ -10,7 +11,13 @@ function new ()
    }
 end
 
--- Add an app to the configuration.
+-- API: Add an app to the configuration.
+--
+-- config.app(c, name, class, arg):
+--   c is a config object.
+--   name is the name of this app in the network (a string).
+--   class is the Lua object with a class:new(arg) method to create the app.
+--   arg is the app's configuration (as a string to be passed to new()).
 --
 -- Example: config.app(c, "nic", Intel82599, [[{pciaddr = "0000:00:01.00"}]])
 function app (config, name, class, arg)
@@ -21,9 +28,9 @@ function app (config, name, class, arg)
    config.apps[name] = { class = class, arg = arg}
 end
 
--- Add a link to the configuration.
+-- API: Add a link to the configuration.
 --
--- Example: link(myconfig, "nic.tx -> vm.rx")
+-- Example: config.link(c, "nic.tx -> vm.rx")
 function link (config, spec)
    config.links[canonical_link(spec)] = true
 end
@@ -46,5 +53,14 @@ end
 
 function canonical_link (spec)
    return format_link(parse_link(spec))
+end
+
+-- Return a Lua object for the arg to an app.
+-- Example:
+--   parse_app_arg("{ timeout = 5 * 10 }") => { timeout = 50 }
+function parse_app_arg (s)
+   print("s", type(s), s)
+   assert(type(s) == 'string')
+   return loadstring("return " .. s)()
 end
 
