@@ -27,7 +27,7 @@ end
 
 function transmit (r, p)
    assert(p)
-   if debug and full(r) then
+   if full(r) then
       r.stats.txdrop = r.stats.txdrop + 1
    else
       r.packets[r.write] = p
@@ -80,7 +80,6 @@ function selftest ()
    transmit(r, p)
    assert(r.stats.txpackets == max and r.stats.txdrop == 1)
    assert(not empty(r) and full(r))
-   assert(r.deref == 0)
    while not empty(r) do
       receive(r)
    end
