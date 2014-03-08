@@ -119,19 +119,19 @@ local types = {
   ["hw.usermem64"] = "int64",
   ["hw.ncpuonline"] = "int",
 
---["vm.meter", "struct vmmeter", -- also named vm.vmmeter?
---["vm.loadavg", "struct loadavg",
---["vm.uvmexp", "struct uvmexp",
-  ["vm.nkmempages"], "int",
---["vm.uvmexp2"], "struct uvmexp_sysctl",
-  ["vm.anonmin"], "int",
-  ["vm.execmin"], "int",
-  ["vm.filemin"], "int",
-  ["vm.maxslp"], "int",
-  ["vm.uspace"], "int",
-  ["vm.anonmax"], "int",
-  ["vm.execmax"], "int",
-  ["vm.filemax"], "int",
+--["vm.meter" = "struct vmmeter", -- also named vm.vmmeter?
+--["vm.loadavg" = "struct loadavg",
+--["vm.uvmexp" = "struct uvmexp",
+  ["vm.nkmempages"] = "int",
+--["vm.uvmexp2"] = "struct uvmexp_sysctl",
+  ["vm.anonmin"] = "int",
+  ["vm.execmin"] = "int",
+  ["vm.filemin"] = "int",
+  ["vm.maxslp"] = "int",
+  ["vm.uspace"] = "int",
+  ["vm.anonmax"] = "int",
+  ["vm.execmax"] = "int",
+  ["vm.filemax"] = "int",
 }
 
 return {types = types, map = map, map2 = map2}
