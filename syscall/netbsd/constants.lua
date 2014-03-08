@@ -1426,5 +1426,21 @@ c.HW = strflag {
   NCPUONLINE  = 16,
 }
 
+c.VM = strflag {
+  METER       = 1,
+  LOADAVG     = 2,
+  UVMEXP      = 3,
+  NKMEMPAGES  = 4,
+  UVMEXP2     = 5,
+  ANONMIN     = 6,
+  EXECMIN     = 7,
+  FILEMIN     = 8,
+  MAXSLP      = 9,
+  USPACE      = 10,
+  ANONMAX     = 11,
+  EXECMAX     = 12,
+  FILEMAX     = 13,
+}
+
 return c
 
