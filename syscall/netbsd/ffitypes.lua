@@ -79,6 +79,7 @@ typedef uint32_t _netbsd_id_t;
 typedef unsigned int _netbsd_tcflag_t;
 typedef unsigned int _netbsd_speed_t;
 typedef int32_t _netbsd_lwpid_t;
+typedef uint32_t _netbsd_fixpt_t;
 
 typedef unsigned short u_short;
 typedef unsigned char u_char;
@@ -640,6 +641,10 @@ struct _netbsd_clockinfo {
   int     tickadj;
   int     stathz;
   int     profhz;
+};
+struct _netbsd_loadavg {
+  _netbsd_fixpt_t ldavg[3];
+  long    fscale;
 };
 ]]
 

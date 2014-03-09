@@ -572,6 +572,21 @@ mt.clockinfo = {
 
 addtype(types, "clockinfo", "struct clockinfo", mt.clockinfo)
 
+mt.loadavg = {
+  index = {
+    loadavg = function(self) return {tonumber(self.ldavg[0]) / tonumber(self.fscale),
+                                     tonumber(self.ldavg[1]) / tonumber(self.fscale),
+                                     tonumber(self.ldavg[2]) / tonumber(self.fscale)}
+    end,
+  },
+  print = function(self)
+    local loadavg = self.loadavg
+    return "{ " .. loadavg[1] .. ", " .. loadavg[2] .. ", " .. loadavg[3] .. " }"
+  end,
+}
+
+addtype(types, "loadavg", "struct loadavg", mt.loadavg)
+
 return types
 
 end
