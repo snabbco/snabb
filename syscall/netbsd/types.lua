@@ -587,6 +587,27 @@ mt.loadavg = {
 
 addtype(types, "loadavg", "struct loadavg", mt.loadavg)
 
+mt.vmtotal = {
+  index = {
+    rq = function(self) return self.t_rq end,
+    dw = function(self) return self.t_dw end,
+    pw = function(self) return self.t_pw end,
+    sl = function(self) return self.t_sl end,
+    vm = function(self) return self.t_vm end,
+    avm = function(self) return self.t_avm end,
+    rm = function(self) return self.t_rm end,
+    arm = function(self) return self.t_arm end,
+    vmshr= function(self) return self.t_vmshr end,
+    avmshr= function(self) return self.t_avmshr end,
+    rmshr = function(self) return self.t_rmshr end,
+    armshr = function(self) return self.t_armshr end,
+    free = function(self) return self.t_free end,
+  },
+  print = {"rq", "dw", "pw", "sl", "vm", "avm", "rm", "arm", "vmshr", "avmshr", "rmshr", "armshr", "free"},
+}
+
+addtype(types, "vmtotal", "struct vmtotal", mt.vmtotal)
+
 return types
 
 end

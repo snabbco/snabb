@@ -646,6 +646,23 @@ struct _netbsd_loadavg {
   _netbsd_fixpt_t ldavg[3];
   long    fscale;
 };
+struct _netbsd_vmtotal
+{
+  int16_t t_rq;
+  int16_t t_dw;
+  int16_t t_pw;
+  int16_t t_sl;
+  int16_t _reserved1;
+  int32_t t_vm;
+  int32_t t_avm;
+  int32_t t_rm;
+  int32_t t_arm;
+  int32_t t_vmshr;
+  int32_t t_avmshr;
+  int32_t t_rmshr;
+  int32_t t_armshr;
+  int32_t t_free;
+};
 ]]
 
 local s = table.concat(defs, "")
