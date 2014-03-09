@@ -579,7 +579,7 @@ mt.loadavg = {
                                      tonumber(self.ldavg[2]) / tonumber(self.fscale)}
     end,
   },
-  print = function(self)
+  __tostring = function(self)
     local loadavg = self.loadavg
     return "{ " .. loadavg[1] .. ", " .. loadavg[2] .. ", " .. loadavg[3] .. " }"
   end,
