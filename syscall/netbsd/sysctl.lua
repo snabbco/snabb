@@ -121,7 +121,7 @@ local types = {
   ["hw.ncpuonline"] = "int",
 
 --["vm.meter" = "struct vmmeter", -- also named vm.vmmeter?
-  ["vm.loadavg" = "struct loadavg",
+  ["vm.loadavg"] = "struct loadavg",
 --["vm.uvmexp" = "struct uvmexp",
   ["vm.nkmempages"] = "int",
 --["vm.uvmexp2"] = "struct uvmexp_sysctl",
