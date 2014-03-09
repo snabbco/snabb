@@ -120,11 +120,11 @@ local types = {
   ["hw.usermem64"] = "int64",
   ["hw.ncpuonline"] = "int",
 
---["vm.meter" = "struct vmmeter", -- also named vm.vmmeter?
-  ["vm.loadavg"] = "struct loadavg",
---["vm.uvmexp" = "struct uvmexp",
+--["vm.meter" = "vmmeter", -- also named vm.vmmeter?
+  ["vm.loadavg"] = "loadavg",
+--["vm.uvmexp" = "uvmexp",
   ["vm.nkmempages"] = "int",
---["vm.uvmexp2"] = "struct uvmexp_sysctl",
+--["vm.uvmexp2"] = "uvmexp_sysctl",
   ["vm.anonmin"] = "int",
   ["vm.execmin"] = "int",
   ["vm.filemin"] = "int",
