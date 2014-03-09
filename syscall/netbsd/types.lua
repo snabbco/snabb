@@ -581,7 +581,7 @@ mt.loadavg = {
   },
   __tostring = function(self)
     local loadavg = self.loadavg
-    return "{ " .. loadavg[1] .. ", " .. loadavg[2] .. ", " .. loadavg[3] .. " }"
+    return string.format("{ %.2f, %.2f, %.2f }", loadavg[1], loadavg[2], loadavg[3])
   end,
 }
 
