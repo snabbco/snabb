@@ -4,6 +4,9 @@ local require = require
 
 local c = require "syscall.netbsd.constants"
 
+-- TODO we need to support more levels, and simplify a bit
+-- TODO maybe we put these into the table below eg "kern" = c.KERN, "kern.pipe" = c.KERN_PIPE
+-- note also some of the node constants do not have names, will just have to put numbers in
 local map = {
   [c.CTL.KERN] = c.KERN,
   [c.CTL.HW] = c.HW,
@@ -16,6 +19,8 @@ local map2 = {
     [c.KERN.TKSTAT] = c.KERN_TKSTAT,
   }
 }
+
+-- TODO some of the friendly names do not map exactly to the constants, what should we do?
 
 -- TODO note some could be considered bool not int eg KERN_FSYNC
 local types = {
@@ -133,6 +138,34 @@ local types = {
   ["vm.anonmax"] = "int",
   ["vm.execmax"] = "int",
   ["vm.filemax"] = "int",
+
+-- ip
+--[[
+        { "forwarding", CTLTYPE_INT }, \
+        { "redirect", CTLTYPE_INT }, \
+        { "ttl", CTLTYPE_INT }, \
+        { "mtu", CTLTYPE_INT }, \
+        { "forwsrcrt", CTLTYPE_INT }, \
+        { "directed-broadcast", CTLTYPE_INT }, \
+        { "allowsrcrt", CTLTYPE_INT }, \
+        { "subnetsarelocal", CTLTYPE_INT }, \
+        { "mtudisc", CTLTYPE_INT }, \
+        { "anonportmin", CTLTYPE_INT }, \
+        { "anonportmax", CTLTYPE_INT }, \
+        { "mtudisctimeout", CTLTYPE_INT }, \
+        { "maxflows", CTLTYPE_INT }, \
+        { "hostzerobroadcast", CTLTYPE_INT }, \
+        { "gifttl", CTLTYPE_INT }, \
+        { "lowportmin", CTLTYPE_INT }, \
+        { "lowportmax", CTLTYPE_INT }, \
+        { "maxfragpackets", CTLTYPE_INT }, \
+        { "grettl", CTLTYPE_INT }, \
+        { "checkinterface", CTLTYPE_INT }, \
+        { "ifq", CTLTYPE_NODE }, \
+        { "random_id", CTLTYPE_INT }, \
+        { "do_loopback_cksum", CTLTYPE_INT }, \
+        { "stats", CTLTYPE_STRUCT }, \
+--]]
 }
 
 return {types = types, map = map, map2 = map2}
