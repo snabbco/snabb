@@ -20,6 +20,24 @@ local map2 = {
   }
 }
 
+-- new top level
+--[[
+  "unspec" = CTL.UNSPEC,
+  "kern" = CTL.KERN,
+  "vm" = CTL.VM,
+  "vfs" = CTL.VFS,
+  "net" = CTL.NET,
+  "debug" = CTL.DEBUG,
+  "hw" = CTL.HW,
+  "machdep" = CTL.MACHDEP,
+  "user" = CTL.USER,
+  "ddb" = CTL.DDB,
+  "proc" = CTL.PROC,
+  "vendor" = CTL.VENDOR,
+  "emul" = CTL.EMUL,
+  "security" = CTL.SECURITY,
+]]
+
 -- TODO these have no constant names
 --[[
 { -- CTL_NET_NAMES
