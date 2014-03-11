@@ -20,6 +20,45 @@ local map2 = {
   }
 }
 
+-- TODO these have no constants
+--[[
+#define CTL_NET_NAMES { \
+        { 0, 0 }, \
+        { "local", CTLTYPE_NODE }, \
+        { "inet", CTLTYPE_NODE }, \
+        { "implink", CTLTYPE_NODE }, \
+        { "pup", CTLTYPE_NODE }, \
+        { "chaos", CTLTYPE_NODE }, \
+        { "xerox_ns", CTLTYPE_NODE }, \
+        { "iso", CTLTYPE_NODE }, \
+        { "emca", CTLTYPE_NODE }, \
+        { "datakit", CTLTYPE_NODE }, \
+        { "ccitt", CTLTYPE_NODE }, \
+        { "ibm_sna", CTLTYPE_NODE }, \
+        { "decnet", CTLTYPE_NODE }, \
+        { "dec_dli", CTLTYPE_NODE }, \
+        { "lat", CTLTYPE_NODE }, \
+        { "hylink", CTLTYPE_NODE }, \
+        { "appletalk", CTLTYPE_NODE }, \
+        { "oroute", CTLTYPE_NODE }, \
+        { "link_layer", CTLTYPE_NODE }, \
+        { "xtp", CTLTYPE_NODE }, \
+        { "coip", CTLTYPE_NODE }, \
+        { "cnt", CTLTYPE_NODE }, \
+        { "rtip", CTLTYPE_NODE }, \
+        { "ipx", CTLTYPE_NODE }, \
+        { "inet6", CTLTYPE_NODE }, \
+        { "pip", CTLTYPE_NODE }, \
+        { "isdn", CTLTYPE_NODE }, \
+        { "natm", CTLTYPE_NODE }, \
+        { "arp", CTLTYPE_NODE }, \
+        { "key", CTLTYPE_NODE }, \
+        { "ieee80211", CTLTYPE_NODE }, \
+        { "mlps", CTLTYPE_NODE }, \
+        { "route", CTLTYPE_NODE }, \
+}
+]]
+
 -- TODO some of the friendly names do not map exactly to the constants, what should we do?
 
 -- TODO note some could be considered bool not int eg KERN_FSYNC
