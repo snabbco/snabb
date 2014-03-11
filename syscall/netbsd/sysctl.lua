@@ -179,30 +179,30 @@ local types = {
 
 -- ip
 --[[
-  "forwarding", CTLTYPE_INT }, \
-  "redirect", CTLTYPE_INT }, \
-  "ttl", CTLTYPE_INT }, \
-  "mtu", CTLTYPE_INT }, \
-  "forwsrcrt", CTLTYPE_INT }, \
-  "directed-broadcast", CTLTYPE_INT }, \
-  "allowsrcrt", CTLTYPE_INT }, \
-  "subnetsarelocal", CTLTYPE_INT }, \
-  "mtudisc", CTLTYPE_INT }, \
-  "anonportmin", CTLTYPE_INT }, \
-  "anonportmax", CTLTYPE_INT }, \
-  "mtudisctimeout", CTLTYPE_INT }, \
-  "maxflows", CTLTYPE_INT }, \
-  "hostzerobroadcast", CTLTYPE_INT }, \
-  "gifttl", CTLTYPE_INT }, \
-  "lowportmin", CTLTYPE_INT }, \
-  "lowportmax", CTLTYPE_INT }, \
-  "maxfragpackets", CTLTYPE_INT }, \
-  "grettl", CTLTYPE_INT }, \
-  "checkinterface", CTLTYPE_INT }, \
-  "ifq", CTLTYPE_NODE }, \
-  "random_id", CTLTYPE_INT }, \
-  "do_loopback_cksum", CTLTYPE_INT }, \
-  "stats", CTLTYPE_STRUCT }, \
+  "[net.inet.forwarding"] = "int",
+  "[net.inet.redirect"] = "int",
+  "[net.inet.ttl"] = "int",
+  "[net.inet.mtu"] = "int",
+  "[net.inet.forwsrcrt"] = "int",
+  "[net.inet.directed-broadcast"] = "int",
+  "[net.inet.allowsrcrt"] = "int",
+  "[net.inet.subnetsarelocal"] = "int",
+  "[net.inet.mtudisc"] = "int",
+  "[net.inet.anonportmin"] = "int",
+  "[net.inet.anonportmax"] = "int",
+  "[net.inet.mtudisctimeout"] = "int",
+  "[net.inet.maxflows"] = "int",
+  "[net.inet.hostzerobroadcast"] = "int",
+  "[net.inet.gifttl"] = "int",
+  "[net.inet.lowportmin"] = "int",
+  "[net.inet.lowportmax"] = "int",
+  "[net.inet.maxfragpackets"] = "int",
+  "[net.inet.grettl"] = "int",
+  "[net.inet.checkinterface"] = "int",
+--"ifq", CTLTYPE_NODE
+  "[net.inet.random_id"] = "int",
+  "[net.inet.do_loopback_cksum"] = "int",
+--"[net.inet.stats", CTLTYPE_STRUCT
 --]]
 }
 
