@@ -20,42 +20,41 @@ local map2 = {
   }
 }
 
--- TODO these have no constants
+-- TODO these have no constant names
 --[[
-#define CTL_NET_NAMES { \
-        { 0, 0 }, \
-        { "local", CTLTYPE_NODE }, \
-        { "inet", CTLTYPE_NODE }, \
-        { "implink", CTLTYPE_NODE }, \
-        { "pup", CTLTYPE_NODE }, \
-        { "chaos", CTLTYPE_NODE }, \
-        { "xerox_ns", CTLTYPE_NODE }, \
-        { "iso", CTLTYPE_NODE }, \
-        { "emca", CTLTYPE_NODE }, \
-        { "datakit", CTLTYPE_NODE }, \
-        { "ccitt", CTLTYPE_NODE }, \
-        { "ibm_sna", CTLTYPE_NODE }, \
-        { "decnet", CTLTYPE_NODE }, \
-        { "dec_dli", CTLTYPE_NODE }, \
-        { "lat", CTLTYPE_NODE }, \
-        { "hylink", CTLTYPE_NODE }, \
-        { "appletalk", CTLTYPE_NODE }, \
-        { "oroute", CTLTYPE_NODE }, \
-        { "link_layer", CTLTYPE_NODE }, \
-        { "xtp", CTLTYPE_NODE }, \
-        { "coip", CTLTYPE_NODE }, \
-        { "cnt", CTLTYPE_NODE }, \
-        { "rtip", CTLTYPE_NODE }, \
-        { "ipx", CTLTYPE_NODE }, \
-        { "inet6", CTLTYPE_NODE }, \
-        { "pip", CTLTYPE_NODE }, \
-        { "isdn", CTLTYPE_NODE }, \
-        { "natm", CTLTYPE_NODE }, \
-        { "arp", CTLTYPE_NODE }, \
-        { "key", CTLTYPE_NODE }, \
-        { "ieee80211", CTLTYPE_NODE }, \
-        { "mlps", CTLTYPE_NODE }, \
-        { "route", CTLTYPE_NODE }, \
+{ -- CTL_NET_NAMES
+  "[net.local]" = 1,
+  "[net.inet]" = 2,
+  "[net.implink]" = 3,
+  "[net.pup]" = 4,
+  "[net.chaos]" = 5,
+  "[net.xerox_ns]" = 6,
+  "[net.iso]" = 7,
+  "[net.emca]" = 8,
+  "[net.datakit]" = 9,
+  "[net.ccitt]", 10,
+  "[net.ibm_sna]" = 11,
+  "[net.decnet]" = 12,
+  "[net.dec_dli]" = 13,
+  "[net.lat]" = 14,
+  "[net.hylink]" = 15,
+  "[net.appletalk]" = 16,
+  "[net.oroute]" = 17,
+  "[net.link_layer]" = 18,
+  "[net.xtp]" = 19,
+  "[net.coip]" = 20,
+  "[net.cnt]" = 21,
+  "[net.rtip]" = 22,
+  "[net.ipx]" = 23,
+  "[net.inet6]" = 24,
+  "[net.pip]" = 25,
+  "[net.isdn]" = 26,
+  "[net.natm]" = 27,
+  "[net.arp]" = 28,
+  "[net.key]" = 29,
+  "[net.ieee80211]" = 30,
+  "[net.mlps]" = 31,
+  "[net.route]" = 32,
 }
 ]]
 
@@ -180,30 +179,30 @@ local types = {
 
 -- ip
 --[[
-        { "forwarding", CTLTYPE_INT }, \
-        { "redirect", CTLTYPE_INT }, \
-        { "ttl", CTLTYPE_INT }, \
-        { "mtu", CTLTYPE_INT }, \
-        { "forwsrcrt", CTLTYPE_INT }, \
-        { "directed-broadcast", CTLTYPE_INT }, \
-        { "allowsrcrt", CTLTYPE_INT }, \
-        { "subnetsarelocal", CTLTYPE_INT }, \
-        { "mtudisc", CTLTYPE_INT }, \
-        { "anonportmin", CTLTYPE_INT }, \
-        { "anonportmax", CTLTYPE_INT }, \
-        { "mtudisctimeout", CTLTYPE_INT }, \
-        { "maxflows", CTLTYPE_INT }, \
-        { "hostzerobroadcast", CTLTYPE_INT }, \
-        { "gifttl", CTLTYPE_INT }, \
-        { "lowportmin", CTLTYPE_INT }, \
-        { "lowportmax", CTLTYPE_INT }, \
-        { "maxfragpackets", CTLTYPE_INT }, \
-        { "grettl", CTLTYPE_INT }, \
-        { "checkinterface", CTLTYPE_INT }, \
-        { "ifq", CTLTYPE_NODE }, \
-        { "random_id", CTLTYPE_INT }, \
-        { "do_loopback_cksum", CTLTYPE_INT }, \
-        { "stats", CTLTYPE_STRUCT }, \
+  "forwarding", CTLTYPE_INT }, \
+  "redirect", CTLTYPE_INT }, \
+  "ttl", CTLTYPE_INT }, \
+  "mtu", CTLTYPE_INT }, \
+  "forwsrcrt", CTLTYPE_INT }, \
+  "directed-broadcast", CTLTYPE_INT }, \
+  "allowsrcrt", CTLTYPE_INT }, \
+  "subnetsarelocal", CTLTYPE_INT }, \
+  "mtudisc", CTLTYPE_INT }, \
+  "anonportmin", CTLTYPE_INT }, \
+  "anonportmax", CTLTYPE_INT }, \
+  "mtudisctimeout", CTLTYPE_INT }, \
+  "maxflows", CTLTYPE_INT }, \
+  "hostzerobroadcast", CTLTYPE_INT }, \
+  "gifttl", CTLTYPE_INT }, \
+  "lowportmin", CTLTYPE_INT }, \
+  "lowportmax", CTLTYPE_INT }, \
+  "maxfragpackets", CTLTYPE_INT }, \
+  "grettl", CTLTYPE_INT }, \
+  "checkinterface", CTLTYPE_INT }, \
+  "ifq", CTLTYPE_NODE }, \
+  "random_id", CTLTYPE_INT }, \
+  "do_loopback_cksum", CTLTYPE_INT }, \
+  "stats", CTLTYPE_STRUCT }, \
 --]]
 }
 
