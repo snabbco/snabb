@@ -100,7 +100,7 @@ end
 function Tee:push ()
    noutputs = #self.outputi
    if noutputs > 0 then
-      local maxoutput = ring.max
+      local maxoutput = link.max
       for _, o in ipairs(self.outputi) do
          maxoutput = math.min(maxoutput, link.nwritable(o))
       end
