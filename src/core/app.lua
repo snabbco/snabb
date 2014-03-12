@@ -5,6 +5,7 @@ local packet = require("core.packet")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local config = require("core.config")
+local timer  = require("core.timer")
 require("core.packet_h")
 
 -- The set of all active apps and links in the system.
@@ -112,8 +113,12 @@ end
 function main (options)
    local done = nil
    options = options or {}
+   local no_timers = options.no_timers
    if options.duration then done = lib.timer(options.duration * 1e9) end
-   repeat breathe() until done and done()
+   repeat
+      breathe()
+      if not no_timers then timer.run() end
+   until done and done()
    report()
 end
 
