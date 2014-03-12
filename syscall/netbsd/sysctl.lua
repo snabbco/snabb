@@ -195,7 +195,7 @@ local types = {
   ["vm.execmax"] = "int",
   ["vm.filemax"] = "int",
 
--- ip
+-- ip IPCTL_NAMES
 --[[
   "[net.inet.forwarding"] = "int",
   "[net.inet.redirect"] = "int",
@@ -222,6 +222,57 @@ local types = {
   "[net.inet.do_loopback_cksum"] = "int",
 --"[net.inet.stats", CTLTYPE_STRUCT
 --]]
+
+-- ipv6
+--[[
+#define IPV6CTL_NAMES { \
+        { 0, 0 }, \
+        { "forwarding", CTLTYPE_INT }, \
+        { "redirect", CTLTYPE_INT }, \
+        { "hlim", CTLTYPE_INT }, \
+        { "mtu", CTLTYPE_INT }, \
+        { "forwsrcrt", CTLTYPE_INT }, \
+        { "stats", CTLTYPE_STRUCT }, \
+        { 0, 0 }, \
+        { "mrtproto", CTLTYPE_INT }, \
+        { "maxfragpackets", CTLTYPE_INT }, \
+        { "sourcecheck", CTLTYPE_INT }, \
+        { "sourcecheck_logint", CTLTYPE_INT }, \
+        { "accept_rtadv", CTLTYPE_INT }, \
+        { "keepfaith", CTLTYPE_INT }, \
+        { "log_interval", CTLTYPE_INT }, \
+        { "hdrnestlimit", CTLTYPE_INT }, \
+        { "dad_count", CTLTYPE_INT }, \
+        { "auto_flowlabel", CTLTYPE_INT }, \
+        { "defmcasthlim", CTLTYPE_INT }, \
+        { "gifhlim", CTLTYPE_INT }, \
+        { "kame_version", CTLTYPE_STRING }, \
+        { "use_deprecated", CTLTYPE_INT }, \
+        { "rr_prune", CTLTYPE_INT }, \
+        { 0, 0 }, \
+        { "v6only", CTLTYPE_INT }, \
+        { 0, 0 }, \
+        { 0, 0 }, \
+        { 0, 0 }, \
+        { "anonportmin", CTLTYPE_INT }, \
+        { "anonportmax", CTLTYPE_INT }, \
+        { "lowportmin", CTLTYPE_INT }, \
+        { "lowportmax", CTLTYPE_INT }, \
+        { 0, 0 }, \
+        { 0, 0 }, \
+        { 0, 0 }, \
+        { 0, 0 }, \
+        { 0, 0 }, \
+        { 0, 0 }, \
+        { 0, 0 }, \
+        { 0, 0 }, \
+        { 0, 0 }, \
+        { "maxfrags", CTLTYPE_INT }, \
+        { "ifq", CTLTYPE_NODE }, \
+        { "rtadv_maxroutes", CTLTYPE_INT }, \
+        { "rtadv_numroutes", CTLTYPE_INT }, \
+--]]
+
 }
 
 return {types = types, map = map, map2 = map2}
