@@ -5,6 +5,8 @@
 module(...,package.seeall)
 
 local app       = require("core.app")
+local link      = require("core.link")
+local config    = require("core.config")
 local basic_apps= require("apps.basic.basic_apps")
 local buffer    = require("core.buffer")
 local ffi       = require("ffi")
@@ -134,7 +136,7 @@ function VhostUser:receive_packets_from_vm ()
       until bit.band(descriptor.flags, C.VIO_DESC_F_NEXT) == 0
       self.rxavail = (self.rxavail + 1) % 65536
       if self.output.tx then
-         app.transmit(self.output.tx, p)
+         link.transmit(self.output.tx, p)
       else
          debug("droprx", "len", p.length, "niovecs", p.niovecs)
          packet.deref(p)
@@ -144,10 +146,6 @@ end
 
 -- Populate the `self.vring_transmit_buffers` freelist with buffers from the VM.
 function VhostUser:get_transmit_buffers_from_vm ()
-   debug("txavail", self.txring.avail.idx,
-         "txused", self.txring.used.idx,
-         "rxavail", self.rxring.avail.idx,
-         "rxused", self.rxring.used.idx)
    while self.txavail ~= self.txring.avail.idx do
       -- Extract the first buffer and any that are chained to it via NEXT flag
       local index = self.txring.avail.ring[self.txavail % self.tx_vring_num]
@@ -195,8 +193,8 @@ function VhostUser:transmit_packets_to_vm ()
    local notify_needed = false
    local l = self.input.rx
    if l == nil then return end
-   while not app.empty(l) and (self.txring.used.idx + 1) % 65536 ~= self.txused do
-      local p = app.receive(l)
+   while not link.empty(l) and (self.txring.used.idx + 1) % 65536 ~= self.txused do
+      local p = link.receive(l)
       assert(p.niovecs == 1, "NYI: multi-buffer packets")
       local iovec = p.iovecs[0]
       if self:can_zerocopy_transmit(iovec) then
@@ -437,45 +435,46 @@ function selftest ()
    --           v
    --       intel pcap
    -- 
-   app.apps.vhost_user = app.new(VhostUser:new("/home/luke/qemu.sock"))
-   app.apps.vhost_dump = app.new(pcap.PcapWriter:new("/tmp/vhost.cap"))
    pci.unbind_device_from_linux('0000:01:00.0')
    vfio.setup_vfio('0000:01:00.0')
    vfio.bind_device_to_vfio("0000:01:00.0")
-   app.apps.intel = intel_app.Intel82599:new("0000:01:00.0",
-                                             -- Intel NIC allocates RX buffers
-                                             -- from pool of VM TX buffers.
-                                             -- That enables zero-copy.
-                                             app.apps.vhost_user.vring_transmit_buffers)
-   app.apps.intel_dump = app.new(pcap.PcapWriter:new("/tmp/intel.cap"))
-   app.apps.vhost_tee = app.new(basic_apps.Tee:new())
-   app.apps.intel_tee = app.new(basic_apps.Tee:new())
-   app.apps.source = app.new(basic_apps.Source:new())
-   app.connect("vhost_user", "tx",      "vhost_tee", "input")
-   app.connect("vhost_tee",  "dump",    "vhost_dump", "input")
-   app.connect("vhost_tee",  "traffic", "intel", "rx")
-   app.connect("intel",      "tx",      "intel_tee", "input")
-   app.connect("intel_tee",  "dump",    "intel_dump", "input")
-   app.connect("intel_tee",  "traffic", "vhost_user", "rx")
-   app.relink()
-   local deadline = lib.timer(1e15)
+   local c = config.new()
+   config.app(c, "vhost_user", VhostUser, "vhost_user_test.sock")
+   config.app(c, "vhost_dump", pcap.PcapWriter, "vhost_vm_dump.cap")
+   config.app(c, "vhost_tee", basic_apps.Tee)
+   config.app(c, "intel", intel_app.Intel82599, "0000:01:00.0")
+   config.app(c, "intel_dump", pcap.PcapWriter, "vhost_nic_dump.cap")
+   config.app(c, "intel_tee", basic_apps.Tee)
+   config.link(c, "vhost_user.tx -> vhost_tee.input")
+   config.link(c, "vhost_tee.dump -> vhost_dump.input")
+   config.link(c, "vhost_tee.traffic -> intel.rx")
+   config.link(c, "intel.tx -> intel_tee.input")
+   config.link(c, "intel_tee.dump -> intel_dump.input")
+   config.link(c, "intel_tee.traffic -> vhost_user.rx")
+   app.configure(c)
+   local vhost_user = app.app_table.vhost_user
+   local intel = app.app_table.intel
+   intel:set_rx_buffer_freelist(vhost_user.vring_transmit_buffers)
    local fn = function ()
                  local vu = app.apps.vhost_user
                  app.report()
+                 if vhost_user.vhost_ready then
+                    debug("txavail", vhost_user.txring.avail.idx,
+                          "txused", vhost_user.txring.used.idx,
+                          "rxavail", vhost_user.rxring.avail.idx,
+                          "rxused", vhost_user.rxring.used.idx)
+                 end
               end
    timer.init()
-   timer.activate(timer.new("report", fn, 3e9, 'repeating'))
-   repeat
-      app.breathe()
-      timer.run()
-      -- Slow things way down for ease of monitoring in the console.
---      C.usleep(0.5e6)
-   until false
+   timer.activate(timer.new("report", fn, 1e9, 'repeating'))
+   -- For interactive testing, uncommon this line to run without time limit:
+   -- app.main()
+   app.main({duration = 3.5})
 end
 
 function ptr (x) return ffi.cast("void*",x) end
 
 function debug (...)
---   print(...)
+   print(...)
 end
 

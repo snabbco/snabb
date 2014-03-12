@@ -5,6 +5,7 @@ local packet = require("core.packet")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local config = require("core.config")
+local timer  = require("core.timer")
 require("core.packet_h")
 
 -- The set of all active apps and links in the system.
@@ -88,8 +89,8 @@ function apply_config_actions (actions, conf)
    -- Setup links: create (or reuse) and renumber.
    for linkspec in pairs(conf.links) do
       local fa, fl, ta, tl = config.parse_link(linkspec)
-      assert(new_app_table[fa], "'from' app does not exist for link")
-      assert(new_app_table[ta], "'to' app does not exist for link: " .. ta)
+      if not new_app_table[fa] then error("no such app: " .. fa) end
+      if not new_app_table[ta] then error("no such app: " .. ta) end
       -- Create or reuse a link and assign/update receiving app index
       local link = link_table[linkspec] or link.new()
       link.receiving_app = app_name_to_index[ta]
@@ -112,8 +113,12 @@ end
 function main (options)
    local done = nil
    options = options or {}
+   local no_timers = options.no_timers
    if options.duration then done = lib.timer(options.duration * 1e9) end
-   repeat breathe() until done and done()
+   repeat
+      breathe()
+      if not no_timers then timer.run() end
+   until done and done()
    report()
 end
 
@@ -144,7 +149,7 @@ end
 function report ()
    print("link report")
    for name, l in pairs(link_table) do
-      print(name, lib.comma_value(tostring(tonumber(l.stats.txpackets))) .. " packet(s) transmitted", "nreadable", link.nreadable(l), "nwritable", link.nwritable(l))
+      print(lib.comma_value(tostring(tonumber(l.stats.txpackets))), "sent on", name)
    end
 end
 

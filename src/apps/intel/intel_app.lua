@@ -15,11 +15,16 @@ local config = require("core.config")
 Intel82599 = {}
 
 -- Create an Intel82599 App for the device with 'pciaddress'.
-function Intel82599:new (pciaddress) -- XXX rx_buffer_freelist
+function Intel82599:new (pciaddress)
    local a = { dev = intel10g.new(pciaddress) }
    setmetatable(a, {__index = Intel82599 })
    intel10g.open_for_loopback_test(a.dev)
    return a
+end
+
+-- Allocate receive buffers from the given freelist.
+function Intel82599:set_rx_buffer_freelist (fl)
+   self.rx_buffer_freelist = fl
 end
 
 -- Pull in packets from the network and queue them on our 'tx' link.

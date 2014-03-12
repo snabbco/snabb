@@ -45,7 +45,7 @@ function parse_link (spec)
    end
 end
 
-link_syntax = [[ *(%w+).(%w+) *-> *(%w+).(%w+) *]]
+link_syntax = [[ *([%w_]+)%.([%w_]+) *-> *([%w_]+)%.([%w_]+) *]]
 
 function format_link (fa, fl, ta, tl)
    return ("%s.%s -> %s.%s"):format(fa, fl, ta, tl)
