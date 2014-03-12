@@ -8,13 +8,24 @@ local pci = require ("lib.hardware.pci")
 
 require("lib.hardware.vfio_h")
 
+-- Is VFIO initialized yet?
+initialized = false
+
+-- Array of mappings that were requested before vfio was initialized.
+-- 
+-- These must then be mapped at initialization time.
+pending_mappings = {}
 
 -- Map memory to the IOMMU so that it can be used for DMA.
 function map_memory_to_iommu (pointer, size)
-   -- Create a 1:1 address mapping for this memory.
-   local ret = C.mmap_memory(pointer, size, ffi.cast("uint64_t", pointer), true, true)
-   assert(ret ~= 0ULL)
-   return ret
+   local addr = ffi.cast("uint64_t", pointer)
+   if initialized then
+      -- Create a 1:1 address mapping for this memory.
+      assert(C.mmap_memory(pointer, size, addr, true, true) ~= 0ULL)
+   else
+      table.insert(pending_mappings, {pointer = pointer, size = size})
+   end
+   return addr
 end
 
 --- ### Hardware device information
@@ -82,6 +93,13 @@ function setup_vfio(pciaddress, do_group)
     else
         pci.unbind_device_from_linux(pciaddress)
         bind_device_to_vfio(pciaddress)
+    end
+    if not initialized then
+       for _, m in ipairs(pending_mappings) do
+          mmap_memory_to_iommu(m.pointer, m.size)
+       end
+       pending_mappings = {}
+       initialized = true
     end
 end
 
