@@ -27,7 +27,6 @@ int vhost_user_connect(const char *path) {
   strncpy(un.sun_path, path, sizeof(un.sun_path));
   
   if (connect(sock, (struct sockaddr *) &un, sizeof(un)) == -1) {
-    perror("connect");
     close(sock);
     return -1;
   }
