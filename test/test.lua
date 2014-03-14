@@ -2013,10 +2013,12 @@ test_clock = {
 
 test_timeofday = {
   test_gettimeofday = function()
+    if not S.gettimeofday then error "skipped" end
     local tv = assert(S.gettimeofday())
     assert(math.floor(tv.time) == tv.sec, "should be able to get float time from timeval")
   end,
   test_settimeofday_fail = function()
+    if not S.settimeofday then error "skipped" end
     local ok, err = S.settimeofday()
     -- eg NetBSD does nothing on null, Linux errors
     assert(ok or (err.PERM or err.INVAL or err.FAULT), "null settimeofday should succeed or fail correctly")
