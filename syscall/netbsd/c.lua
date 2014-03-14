@@ -50,6 +50,18 @@ C.getfh = ffi.C.__getfh30
 C.kevent = ffi.C.__kevent50
 C.mknod = ffi.C.__mknod50
 
+C.gettimeofday = ffi.C.__gettimeofday50
+C.settimeofday = ffi.C.__settimeofday50
+C.adjtime = ffi.C.__adjtime50
+C.setitimer = ffi.C.__setitimer50
+C.getitimer = ffi.C.__getitimer50
+C.clock_gettime = ffi.C.__clock_gettime50
+C.clock_settime = ffi.C.__clock_settime50
+C.clock_setres = ffi.C.__clock_setres50
+C.nanosleep = ffi.C.__nanosleep50
+C.timer_settime = ffi.C.__timer_settime50
+C.timer_gettime = ffi.C.__timer_gettime50
+
 -- use underlying syscall not wrapper
 C.getcwd = ffi.C.__getcwd
 
