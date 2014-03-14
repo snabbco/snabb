@@ -418,14 +418,18 @@ function S.pipe(fd2)
   return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
 end
 
-function S.gettimeofday(tv)
-  tv = tv or t.timeval() -- note it is faster to pass your own tv if you call a lot
-  local ret, err = C.gettimeofday(tv, nil)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return tv
+if C.gettimeofday then
+  function S.gettimeofday(tv)
+    tv = tv or t.timeval() -- note it is faster to pass your own tv if you call a lot
+    local ret, err = C.gettimeofday(tv, nil)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return tv
+  end
 end
 
-function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
+if C.settimeofday then
+  function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
+end
 
 function S.getrusage(who, ru)
   ru = ru or t.rusage()
