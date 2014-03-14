@@ -68,5 +68,17 @@ int _ksem_trywait(intptr_t);
 int _ksem_getvalue(intptr_t, unsigned int *);
 int _ksem_destroy(intptr_t);
 int _ksem_timedwait(intptr_t, const struct timespec *);
+
+int __gettimeofday50(struct timeval *tv, void *tz);
+int __settimeofday50(const struct timeval *tv, const void *tz);
+int __getitimer50(int which, struct itimerval *curr_value);
+int __setitimer50(int which, const struct itimerval *new_value, struct itimerval *old_value);
+int __clock_getres50(clockid_t clk_id, struct timespec *res);
+int __clock_gettime50(clockid_t clk_id, struct timespec *tp);
+int __clock_settime50(clockid_t clk_id, const struct timespec *tp);
+int __nanosleep50(const struct timespec *req, struct timespec *rem);
+int __timer_settime50(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec * old_value);
+int __timer_gettime50(timer_t timerid, struct itimerspec *curr_value);
+int __adjtime50(const struct timeval *delta, struct timeval *olddelta);
 ]]
 

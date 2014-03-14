@@ -1,6 +1,5 @@
--- choose correct ffi functions for OS
-
--- TODO many are common and can be shared here
+-- Common ffi functions for all OSs
+-- note that some functions may not be available in all, but so long as prototype is standard they can go here
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
@@ -10,9 +9,6 @@ setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
 local cdef = require "ffi".cdef
-
--- common functions for BSD, OSX and and Linux
--- note that some functions may not be available in all, but so long as prototype is standard they can go here
 
 cdef[[
 int open(const char *pathname, int flags, mode_t mode);
@@ -166,5 +162,11 @@ int clock_settime(clockid_t clk_id, const struct timespec *tp);
 int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *request, struct timespec *remain);
 
 int getpagesize(void);
+
+int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid);
+int timer_settime(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec * old_value);
+int timer_gettime(timer_t timerid, struct itimerspec *curr_value);
+
+int adjtime(const struct timeval *delta, struct timeval *olddelta);
 ]]
 
