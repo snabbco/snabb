@@ -129,8 +129,6 @@ end
 function S.sethostname(s, len) return retbool(C.sethostname(s, len or #s)) end
 function S.setdomainname(s, len) return retbool(C.setdomainname(s, len or #s)) end
 
-function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
-
 if C.time then
   function S.time(time) return retnum(C.time(time)) end
 end

@@ -425,6 +425,8 @@ function S.gettimeofday(tv)
   return tv
 end
 
+function S.settimeofday(tv) return retbool(C.settimeofday(tv, nil)) end
+
 function S.getrusage(who, ru)
   ru = ru or t.rusage()
   local ret, err = C.getrusage(c.RUSAGE[who], ru)

@@ -1627,10 +1627,9 @@ test.signals_linux = {
   test_itimer = function()
     local tt = assert(S.getitimer("real"))
     assert(tt.interval.sec == 0, "expect timer not set")
-    local ss = "alrm"
 
-    local fd = assert(S.signalfd(ss, "nonblock")) -- TODO make test portable
-    assert(S.sigprocmask("block", ss))
+    local fd = assert(S.signalfd("alrm", "nonblock")) -- TODO make test portable
+    assert(S.sigprocmask("block", "alrm"))
 
     assert(S.setitimer("real", {0, 0.01}))
     assert(S.nanosleep(0.1)) -- nanosleep does not interact with itimer

@@ -606,6 +606,10 @@ function C.waitid(idtype, id, infop, options, rusage)
   return syscall(sys.waitid, int(idtype), uint(id), void(infop), int(options), void(rusage))
 end
 
+function C.settimeofday(tv, tz)
+  return syscall(sys.settimeofday, void(tv), void(tz))
+end
+
 -- only on some architectures
 if sys.waitpid then
   function C.waitpid(pid, status, options) return syscall(sys.waitpid, int(pid), void(status), int(options)) end

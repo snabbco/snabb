@@ -30,8 +30,6 @@ local C = setmetatable({}, {
 
 C.sysctl = ffi.C.__sysctl
 
--- TODO if the NetBSD is not compiled with compat syscalls these will be missing, and we should use unversioned ones.
-
 -- use new versions
 C.mount = ffi.C.__mount50
 C.stat = ffi.C.__stat50

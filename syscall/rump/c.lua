@@ -1,5 +1,7 @@
 -- define C functions for rump
 
+-- TODO merge into NetBSD ones, generate
+
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string = 
@@ -202,6 +204,22 @@ int rump___sysimpl_ktrace(const char *tracefile, int ops, int trpoints, pid_t pi
 int rump___sysimpl_fktrace(int fd, int ops, int trpoints, pid_t pid);
 int rump___sysimpl_utrace(const char *, void *, size_t);
 
+int rump___sysimpl_gettimeofday50(struct _netbsd_timeval *, void *);
+int rump___sysimpl_settimeofday50(const struct _netbsd_timeval *, const void *);
+int rump___sysimpl_adjtime50(const struct _netbsd_timeval *, struct _netbsd_timeval *);
+int rump___sysimpl_setitimer50(int, const struct _netbsd_itimerval *, struct _netbsd_itimerval *);
+int rump___sysimpl_getitimer50(int, struct _netbsd_itimerval *);
+int rump___sysimpl_clock_gettime50(_netbsd_clockid_t, struct _netbsd_timespec *);
+int rump___sysimpl_clock_settime50(_netbsd_clockid_t, const struct _netbsd_timespec *);
+int rump___sysimpl_clock_getres50(_netbsd_clockid_t, struct _netbsd_timespec *);
+int rump___sysimpl_nanosleep50(const struct _netbsd_timespec *, struct _netbsd_timespec *);
+int rump___sysimpl_timer_settime50(_netbsd_timer_t, int, const struct _netbsd_itimerspec *, struct _netbsd_itimerspec *);
+int rump___sysimpl_timer_gettime50(_netbsd_timer_t, struct _netbsd_itimerspec *);
+int rump___sysimpl_clock_nanosleep(_netbsd_clockid_t, int, const struct _netbsd_timespec *, struct _netbsd_timespec *);
+int rump___sysimpl_timer_create(_netbsd_clockid_t, struct _netbsd_sigevent *, _netbsd_timer_t *);
+int rump___sysimpl_timer_delete(_netbsd_timer_t);
+int rump___sysimpl_timer_getoverrun(_netbsd_timer_t);
+
 int rump_sys_pipe(int *);
 ]]
 
@@ -362,7 +380,7 @@ local clist = {
   utrace = "utrace",
   write = "write",
   writev = "writev",
--- version calls TODO fix so works without compat
+-- version calls
   fhopen = "fhopen40",
   fhstat = "fhstat50",
   fhstatvfs = "fhstatvfs140",
@@ -381,12 +399,31 @@ local clist = {
   socket = "socket30",
   stat = "stat50",
   utimes = "utimes50",
+-- time functions
+--[[
+  gettimeofday = "gettimeofday50",
+  settimeofday = "settimeofday50",
+  adjtime = "adjtime50",
+  setitimer = "setitimer50",
+  getitimer = "getitimer50",
+  clock_gettime = "clock_gettime50",
+  clock_settime = "clock_settime50",
+  clock_getres = "clock_getres50",
+  nanosleep = "nanosleep50",
+  timer_settime = "timer_settime50",
+  timer_gettime = "timer_gettime50",
+  clock_nanosleep = "clock_nanosleep",
+  timer_create = "timer_create",
+  timer_delete = "timer_delete",
+  timer_getoverrun = "timer_getoverrun",
+]]
 }
 
 local C = {}
 
 for k, v in pairs(clist) do C[k] = ffi.C["rump___sysimpl_" .. v] end
 
+-- different naming convention due to return value
 C.pipe = ffi.C.rump_sys_pipe
 
 return C

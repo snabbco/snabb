@@ -35,7 +35,7 @@ if arg[1] == "rump" or arg[1] == "rumplinux" then
     tmpabi.types = "linux" -- monkeypatch
   end
   local modules = {"vfs", "kern.tty", "dev", "net", "fs.tmpfs", "fs.kernfs", "fs.ptyfs",
-                   "net.net", "net.local", "net_netinet", "net_netinet6"}
+                   "net.net", "net.local", "net_netinet", "net_netinet6", "kern.time"}
   S = require "syscall.rump.init".init(modules)
   table.remove(arg, 1)
 else
@@ -1993,14 +1993,6 @@ test_sleep = {
   end,
 }
 
-if not (S.__rump or abi.xen) then -- rump has no processes, memory allocation, process accounting, mmap and proc not applicable
-test_gettimeofday = {
-  test_gettimeofday = function()
-    local tv = assert(S.gettimeofday())
-    assert(math.floor(tv.time) == tv.sec, "should be able to get float time from timeval")
-  end,
-}
-
 test_clock = {
   test_clock_gettime = function()
     if not S.clock_gettime then error "skipped" end
@@ -2018,6 +2010,20 @@ test_clock = {
     assert(S.clock_nanosleep("realtime", "abstime", 0))
   end,
 }
+
+test_timeofday = {
+  test_gettimeofday = function()
+    local tv = assert(S.gettimeofday())
+    assert(math.floor(tv.time) == tv.sec, "should be able to get float time from timeval")
+  end,
+  test_settimeofday_fail = function()
+    local ok, err = S.settimeofday()
+    -- eg NetBSD does nothing on null, Linux errors
+    assert(ok or (err.PERM or err.INVAL or err.FAULT), "null settimeofday should succeed or fail correctly")
+  end,
+}
+
+if not (S.__rump or abi.xen) then -- rump has no processes, memory allocation, process accounting, mmap and proc not applicable
 
 test_signals = {
   test_signal_return = function()
