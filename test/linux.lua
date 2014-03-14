@@ -1638,7 +1638,7 @@ test.signals_linux = {
     assert_equal(#sig, 1)
     assert(sig[1].alrm, "expect alarm clock to have rung")
     assert(fd:close())
-    assert(S.sigprocmask("unblock", ss))
+    assert(S.sigprocmask("unblock", "alrm"))
   end,
   test_sigprocmask = function()
     local m = assert(S.sigprocmask())
