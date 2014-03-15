@@ -197,82 +197,65 @@ local types = {
 
 -- ip IPCTL_NAMES
 --[[
-  "[net.inet.forwarding"] = "int",
-  "[net.inet.redirect"] = "int",
-  "[net.inet.ttl"] = "int",
-  "[net.inet.mtu"] = "int",
-  "[net.inet.forwsrcrt"] = "int",
-  "[net.inet.directed-broadcast"] = "int",
-  "[net.inet.allowsrcrt"] = "int",
-  "[net.inet.subnetsarelocal"] = "int",
-  "[net.inet.mtudisc"] = "int",
-  "[net.inet.anonportmin"] = "int",
-  "[net.inet.anonportmax"] = "int",
-  "[net.inet.mtudisctimeout"] = "int",
-  "[net.inet.maxflows"] = "int",
-  "[net.inet.hostzerobroadcast"] = "int",
-  "[net.inet.gifttl"] = "int",
-  "[net.inet.lowportmin"] = "int",
-  "[net.inet.lowportmax"] = "int",
-  "[net.inet.maxfragpackets"] = "int",
-  "[net.inet.grettl"] = "int",
-  "[net.inet.checkinterface"] = "int",
---"ifq", CTLTYPE_NODE
-  "[net.inet.random_id"] = "int",
-  "[net.inet.do_loopback_cksum"] = "int",
---"[net.inet.stats", CTLTYPE_STRUCT
+  ["net.inet.forwarding"] = "int",
+  ["net.inet.redirect"] = "int",
+  ["net.inet.ttl"] = "int",
+  ["net.inet.mtu"] = "int",
+  ["net.inet.forwsrcrt"] = "int",
+  ["net.inet.directed-broadcast"] = "int",
+  ["net.inet.allowsrcrt"] = "int",
+  ["net.inet.subnetsarelocal"] = "int",
+  ["net.inet.mtudisc"] = "int",
+  ["net.inet.anonportmin"] = "int",
+  ["net.inet.anonportmax"] = "int",
+  ["net.inet.mtudisctimeout"] = "int",
+  ["net.inet.maxflows"] = "int",
+  ["net.inet.hostzerobroadcast"] = "int",
+  ["net.inet.gifttl"] = "int",
+  ["net.inet.lowportmin"] = "int",
+  ["net.inet.lowportmax"] = "int",
+  ["net.inet.maxfragpackets"] = "int",
+  ["net.inet.grettl"] = "int",
+  ["net.inet.checkinterface"] = "int",
+--["net.inet.ifq"], CTLTYPE_NODE
+  ["net.inet.random_id"] = "int",
+  ["net.inet.do_loopback_cksum"] = "int",
+--["net.inet.stats", CTLTYPE_STRUCT
 --]]
 
 -- ipv6
 --[[
-#define IPV6CTL_NAMES { \
-        { 0, 0 }, \
-        { "forwarding", CTLTYPE_INT }, \
-        { "redirect", CTLTYPE_INT }, \
-        { "hlim", CTLTYPE_INT }, \
-        { "mtu", CTLTYPE_INT }, \
-        { "forwsrcrt", CTLTYPE_INT }, \
-        { "stats", CTLTYPE_STRUCT }, \
-        { 0, 0 }, \
-        { "mrtproto", CTLTYPE_INT }, \
-        { "maxfragpackets", CTLTYPE_INT }, \
-        { "sourcecheck", CTLTYPE_INT }, \
-        { "sourcecheck_logint", CTLTYPE_INT }, \
-        { "accept_rtadv", CTLTYPE_INT }, \
-        { "keepfaith", CTLTYPE_INT }, \
-        { "log_interval", CTLTYPE_INT }, \
-        { "hdrnestlimit", CTLTYPE_INT }, \
-        { "dad_count", CTLTYPE_INT }, \
-        { "auto_flowlabel", CTLTYPE_INT }, \
-        { "defmcasthlim", CTLTYPE_INT }, \
-        { "gifhlim", CTLTYPE_INT }, \
-        { "kame_version", CTLTYPE_STRING }, \
-        { "use_deprecated", CTLTYPE_INT }, \
-        { "rr_prune", CTLTYPE_INT }, \
-        { 0, 0 }, \
-        { "v6only", CTLTYPE_INT }, \
-        { 0, 0 }, \
-        { 0, 0 }, \
-        { 0, 0 }, \
-        { "anonportmin", CTLTYPE_INT }, \
-        { "anonportmax", CTLTYPE_INT }, \
-        { "lowportmin", CTLTYPE_INT }, \
-        { "lowportmax", CTLTYPE_INT }, \
-        { 0, 0 }, \
-        { 0, 0 }, \
-        { 0, 0 }, \
-        { 0, 0 }, \
-        { 0, 0 }, \
-        { 0, 0 }, \
-        { 0, 0 }, \
-        { 0, 0 }, \
-        { 0, 0 }, \
-        { "maxfrags", CTLTYPE_INT }, \
-        { "ifq", CTLTYPE_NODE }, \
-        { "rtadv_maxroutes", CTLTYPE_INT }, \
-        { "rtadv_numroutes", CTLTYPE_INT }, \
+  ["net.inet6.forwarding"] = "int",
+  ["net.inet6.redirect"] = "int",
+  ["net.inet6.hlim"] = "int",
+  ["net.inet6.mtu"] = "int",
+  ["net.inet6.forwsrcrt"] = "int",
+  ["net.inet6.stats"] = "int",
+  ["net.inet6.mrtproto"] = "int",
+  ["net.inet6.maxfragpackets"] = "int",
+  ["net.inet6.sourcecheck"] = "int",
+  ["net.inet6.sourcecheck_logint"] = "int",
+  ["net.inet6.accept_rtadv"] = "int",
+  ["net.inet6.keepfaith"] = "int",
+  ["net.inet6.log_interval"] = "int",
+  ["net.inet6.hdrnestlimit"] = "int",
+  ["net.inet6.dad_count"] = "int",
+  ["net.inet6.auto_flowlabel"] = "int",
+  ["net.inet6.defmcasthlim"] = "int",
+  ["net.inet6.gifhlim"] = "int",
+  ["net.inet6.kame_version"] = "int",
+  ["net.inet6.use_deprecated"] = "int",
+  ["net.inet6.rr_prune"] = "int",
+  ["net.inet6.v6only"] = "int",
+  ["net.inet6.anonportmin"] = "int",
+  ["net.inet6.anonportmax"] = "int",
+  ["net.inet6.lowportmin"] = "int",
+  ["net.inet6.lowportmax"] = "int",
+  ["net.inet6.maxfrags"] = "int",
+--["net.inet6.ifq"], CTLTYPE_NODE }, \
+  ["net.inet6.rtadv_maxroutes"] = "int",
+  ["net.inet6.rtadv_numroutes"] = "int",
 --]]
-
 }
 
 return {types = types, map = map, map2 = map2}
