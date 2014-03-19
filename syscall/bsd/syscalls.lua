@@ -63,6 +63,7 @@ local sysctl = C.sysctl or C.__sysctl -- NetBSD has __sysctl
 
 local sc = require("syscall." .. abi.os .. ".sysctl")
 local sysctltypes, sysctlmap, sysctlmap2 = sc.types, sc.map, sc.map2
+local sysctlaliases = sc.aliases or {}
 
 local allmeta = {__tostring = function(t)
   local tt = {}
@@ -81,6 +82,7 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
   local tp
   if type(name) == "string" then
     name = name:lower()
+    name = sysctlaliases[name] or name
     tp = sysctltypes[name]
     name = h.split("%.", name)
   end

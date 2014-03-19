@@ -77,13 +77,11 @@ local map2 = {
 ]]
 
 -- TODO some of the friendly names do not map exactly to the constants, add an alias map.
---[[
 local aliases = {
   ["hw.drivenames"] = "hw.disknames",
   ["hw.drivestats"] = "hw.iostats",
   ["vm.vmmeter"] = "vm.meter",
 }
-]]
 
 -- TODO note some could be considered bool not int eg KERN_FSYNC
 local types = {
@@ -265,5 +263,5 @@ local types = {
 --]]
 }
 
-return {types = types, map = map, map2 = map2}
+return {types = types, map = map, map2 = map2, aliases = aliases}
 
