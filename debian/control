@@ -1,0 +1,26 @@
+Source: snabbswitch
+Section: unknown
+Priority: optional
+Maintainer: Vladislav Naumov <vnaum@vnaum.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: http://www.snabb.co/
+Vcs-Git: https://github.com/SnabbCo/snabbswitch.git
+Vcs-Browser: https://github.com/SnabbCo/snabbswitch
+
+Package: snabbswitch
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: toolkit for solving novel problems in networking
+ Snabb Switch is a toolkit for solving novel problems in networking. If you are
+ building a new packet-processing network appliance then you can use Snabb
+ Switch to get the job done more quickly.
+ .
+ Highlights of the software:
+ .
+  * Processes millions of ethernet packets per second per core. Suitable for ISPs.
+  * Speaks natively to Ethernet hardware, Hypervisors, and the Linux kernel.
+  * You can program it with LuaJIT extensions to do anything you want.
+ .
+ Snabb Switch is 100% open source and runs as a stand-alone Linux userspace
+ executable.
