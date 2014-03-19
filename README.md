@@ -76,13 +76,13 @@ Some tests need to be run as root, and will not be run otherwise. You cannot tes
 
 The test script is a copy of [luaunit](https://github.com/rjpcomputing/luaunit). I have made some modifications to allow tests to be skipped, which are not really general enough to push upstream, although I would like a nicer solution.
 
-I have added initial coverage tests (now need fixing), and a C test to check constants and structures. The C test is useful for picking up errors but needs a comprehensive set of headers which eg is not available on most ARM machines so it can be difficult to run. I am putting together a set of hardware to run comprehensive tests on to make this less of an issue.
+I have added initial coverage tests (now needs fixing), and a C test to check constants and structures. The C test is useful for picking up errors but needs a comprehensive set of headers which eg is not available on most ARM machines so it can be difficult to run. I am putting together a set of hardware to run comprehensive tests on to make this less of an issue.
 
 There is now [Travis CI](https://travis-ci.org/) support, although this will only test on one architecture (x64, glibc) at present. You can [see the test results here](https://travis-ci.org/justincormack/ljsyscall). If you fork the code you should be able to run these tests by setting up your own Travis account, and they will also be run for pull requests.
 
 I have used the LuaJIT [reflect library](http://www.corsix.org/lua/reflect/api.html) for checking struct offsets.
 
-Adding buildbot tests for a wider variety of architectures, as Travis is limited to Linux/Ubuntu. Currently building on Linux ARM, PowerPC, x64 and x86, NetBSD x86 and x64, FreeBSD x64, OpenBSD x64; more targets to come soon. The [buildbot dashboard is now up](http://build.myriabit.eu:8010/).
+There are buildbot tests for a wider variety of architectures, as Travis is limited to Linux/Ubuntu. Currently building on Linux ARM, PowerPC, x64 and x86, NetBSD x86 and x64, FreeBSD x64, OpenBSD x64; more targets to come soon. The [buildbot dashboard is now up](http://build.myriabit.eu:8010/).
 
 ## What is implemented?
 
