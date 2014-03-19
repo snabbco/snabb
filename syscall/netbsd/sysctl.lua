@@ -83,6 +83,7 @@ local aliases = {
   ["hw.drivestats"] = "hw.iostats",
   ["vm.vmmeter"] = "vm.meter",
 }
+]]
 
 -- TODO note some could be considered bool not int eg KERN_FSYNC
 local types = {
