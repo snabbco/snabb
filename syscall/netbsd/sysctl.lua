@@ -76,7 +76,13 @@ local map2 = {
 }
 ]]
 
--- TODO some of the friendly names do not map exactly to the constants, what should we do?
+-- TODO some of the friendly names do not map exactly to the constants, add an alias map.
+--[[
+local aliases = {
+  ["hw.drivenames"] = "hw.disknames",
+  ["hw.drivestats"] = "hw.iostats",
+  ["vm.vmmeter"] = "vm.meter",
+}
 
 -- TODO note some could be considered bool not int eg KERN_FSYNC
 local types = {
@@ -172,8 +178,8 @@ local types = {
   ["hw.physmem"] = "int",
   ["hw.usermem"] = "int",
   ["hw.pagesize"] = "int",
-  ["hw.disknames"] = "string", -- also called drivenames
---["hw.iostats"] = "iostat[]" -- also called drivestats
+  ["hw.disknames"] = "string",
+--["hw.iostats"] = "iostat[]"
   ["hw.machine_arch"] = "string",
   ["hw.alignbytes"] = "int",
   ["hw.cnmagic"] = "string",
@@ -181,7 +187,7 @@ local types = {
   ["hw.usermem64"] = "int64",
   ["hw.ncpuonline"] = "int",
 
-  ["vm.meter"] = "vmtotal", -- also named vm.vmmeter
+  ["vm.meter"] = "vmtotal",
   ["vm.loadavg"] = "loadavg",
 --["vm.uvmexp" = "uvmexp",
   ["vm.nkmempages"] = "int",
