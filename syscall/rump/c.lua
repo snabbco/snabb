@@ -400,7 +400,6 @@ local clist = {
   stat = "stat50",
   utimes = "utimes50",
 -- time functions
---[[
   gettimeofday = "gettimeofday50",
   settimeofday = "settimeofday50",
   adjtime = "adjtime50",
@@ -416,7 +415,6 @@ local clist = {
   timer_create = "timer_create",
   timer_delete = "timer_delete",
   timer_getoverrun = "timer_getoverrun",
-]]
 }
 
 local C = {}
