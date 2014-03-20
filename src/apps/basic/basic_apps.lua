@@ -130,7 +130,7 @@ function Repeater:push ()
    local i, o = self.input.input, self.output.output
    for _ = 1, link.nreadable(i) do
       local p = link.receive(i)
-      packet.ref(p)
+      packet.tenure(p)
       table.insert(self.packets, p)
    end
    local npackets = #self.packets
