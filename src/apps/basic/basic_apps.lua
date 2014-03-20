@@ -83,7 +83,6 @@ function Sink:push ()
    for _, i in ipairs(self.inputi) do
       for _ = 1, link.nreadable(i) do
         local p = link.receive(i)
-        assert(p.refcount == 1)
         packet.deref(p)
       end
    end
