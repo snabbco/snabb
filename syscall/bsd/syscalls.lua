@@ -59,8 +59,6 @@ end
 
 function S.kqueue() return retfd(C.kqueue()) end
 
-local sysctl = C.sysctl or C.__sysctl -- NetBSD has __sysctl
-
 local sc = require("syscall." .. abi.os .. ".sysctl")
 local sysctltypes, sysctlmap, sysctlmap2 = sc.types, sc.map, sc.map2
 local sysctlaliases = sc.aliases or {}
@@ -121,7 +119,7 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
   end
   if new then newlen = #new else newlen = 0 end -- TODO set based on known types too
   local name = t.ints(namelen, name)
-  local ok, err = sysctl(name, namelen, old, oldlenp, new, newlen)
+  local ok, err = C.sysctl(name, namelen, old, oldlenp, new, newlen)
   if not ok then return nil, t.error(err or errno()) end
   if tp then -- we know type of value being returned
     if tp == "string" then return ffi.string(old)
