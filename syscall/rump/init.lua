@@ -198,12 +198,32 @@ function S.rump.module(s)
   modules[s] = mod
 end
 
+local function loadmodules(ms)
+  local len = #ms
+  local remains = #ms
+  local succeeded = false
+  while remains > 0 do
+    for i = 1, #ms do
+      local v = ms[i]
+      if v then
+        v = "rump" .. string.gsub(v, "%.", "_")
+        local ok, mod = pcall(ffi.load, v, true)
+        if ok then
+          modules[v] = mod
+          ms[i] = nil
+          succeeded = true
+          remains = remains - 1
+        end
+      end
+    end
+    if not succeeded then break end
+  end
+  if not succeeded then error "cannot load rump modules" end
+end
+
 function S.rump.init(ms, ...) -- you must load the factions here eg dev, vfs, net, plus modules
   if type(ms) == "string" then ms = {ms, ...} end
-  for i, v in ipairs(ms or {}) do
-    v = "rump" .. string.gsub(v, "%.", "_")
-    modules[v] = ffi.load(v, true)
-  end
+  if ms then loadmodules(ms) end
   local ok = ffi.C.rump_init()
   if ok == -1 then return nil, t.error() end
   return S
