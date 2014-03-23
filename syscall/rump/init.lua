@@ -201,8 +201,9 @@ end
 local function loadmodules(ms)
   local len = #ms
   local remains = #ms
-  local succeeded = false
+  local succeeded = true
   while remains > 0 do
+    succeeded = false
     for i = 1, #ms do
       local v = ms[i]
       if v then
