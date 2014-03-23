@@ -19,7 +19,7 @@ local errno = ffi.errno
 local h = require "syscall.helpers"
 
 local istype, mktype, getfd = h.istype, h.mktype, h.getfd
-local octal = h.octal
+local octal, split = h.octal, h.split
 
 local t, pt, s = types.t, types.pt, types.s
 
@@ -59,9 +59,7 @@ end
 
 function S.kqueue() return retfd(C.kqueue()) end
 
-local sc = require("syscall." .. abi.os .. ".sysctl")
-local sysctltypes, sysctlmap, sysctlmap2 = sc.types, sc.map, sc.map2
-local sysctlaliases = sc.aliases or {}
+local sysctltypes = require("syscall." .. abi.os .. ".sysctl")
 
 local allmeta = {__tostring = function(t)
   local tt = {}
@@ -71,28 +69,40 @@ end}
 
 -- TODO understand return types
 function S.sysctl(name, new, old) -- TODO may need to change arguments, note order as should not need to specify old
+  local origname = name
   -- "-a" functionality, well all the ones we know about
   if not name then
     local all = {}
-    for k, _ in pairs(sysctltypes) do all[k] = S.sysctl(k) end
+    for k, v in pairs(sysctltypes) do
+      if type(v) == "table" and type(v[2]) == "string" then v = v[2] end
+      if type(v) == "string" then
+        local res, err = S.sysctl(k)
+        if res then all[k] = res end
+      end
+    end
     return setmetatable(all, allmeta)
   end
   local tp
   if type(name) == "string" then
     name = name:lower()
-    name = sysctlaliases[name] or name
     tp = sysctltypes[name]
-    name = h.split("%.", name)
-  end
-  local namelen = #name
-  -- TODO make more general to support deeper nesting; TODO deal with nil lookups
-  name[1] = c.CTL[name[1]]
-  if sysctlmap[name[1]] then
-    name[2] = sysctlmap[name[1]][name[2]]
-    if sysctlmap2[name[1]] and sysctlmap2[name[1]][name[2]] then
-      name[3] = sysctlmap2[name[1]][name[2]][name[3]]
+    if type(tp) == "table" then tp = tp[2] end
+    name = split("%.", name)
+    local prefix
+    local tab
+    for i = 1, #name do
+      if not prefix then prefix = name[i] else prefix = prefix .. "." .. name[i] end
+      local part = sysctltypes[prefix]
+      if i == #name then
+        if type(part) == "table" then name[i] = part[1] else
+          if tab and tab[name[i]] then name[i] = tab[name[i]] else error(name[i] .. " in " .. origname) end
+        end
+      else
+        if type(part) == "table" then name[i], tab = part[1], part[2] else name[i] = part end
+      end
     end
   end
+  local namelen = #name
   local oldlenp, newlen
   if tp then
     if tp == "string" then
@@ -111,14 +121,19 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
   elseif type(old) == "number" then -- specified length of buffer
     oldlenp = t.size1(old)
     old = t.buffer(old)
-  elseif not old then -- default size
-    oldlenp = t.size1(256)
-    old = t.buffer(256)
+  elseif not old then -- default to int
+    tp = "int"
+    oldlenp = t.size1(s.int)
+    old = t.int1()
   else
     oldlenp = t.size1(#old)
   end
   if new then newlen = #new else newlen = 0 end -- TODO set based on known types too
   local name = t.ints(namelen, name)
+  local specoldlen = t.size1()
+  local ok, err = C.sysctl(name, namelen, nil, specoldlen, nil, 0)
+  if specoldlen[0] == 0 then return nil end -- only way to show does not exist!
+  -- TODO check if specified size wrong, but allow for strings
   local ok, err = C.sysctl(name, namelen, old, oldlenp, new, newlen)
   if not ok then return nil, t.error(err or errno()) end
   if tp then -- we know type of value being returned

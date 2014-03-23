@@ -1398,7 +1398,7 @@ c.KERN_PIPE = strflag {
   KVASIZE           = 5,
 }
 
-c.KERN_PIPE.MAXLOANKVASZ = c.KERN_PIPE.LIMITKVA -- alternate name
+c.KERN_PIPE.MAXLOANKVASZ = c.KERN_PIPE.LIMITKVA -- alternate name TODO move to aliases
 
 c.KERN_TKSTAT = strflag {
   NIN               = 1,
@@ -1446,7 +1446,7 @@ c.IPCTL = strflag {
   FORWARDING      =  1,
   SENDREDIRECTS   =  2,
   DEFTTL          =  3,
---DEFMTU          =  4,
+  DEFMTU          =  4,
   FORWSRCRT       =  5,
   DIRECTEDBCAST   =  6,
   ALLOWSRCRT      =  7,
@@ -1473,7 +1473,7 @@ c.IPV6CTL = strflag {
   FORWARDING     = 1,
   SENDREDIRECTS  = 2,
   DEFHLIM        = 3,
---IPV6CTL_DEFMTU = 4,
+  DEFMTU         = 4,
   FORWSRCRT      = 5,
   STATS          = 6,
   MRTSTATS       = 7,

@@ -4,88 +4,24 @@ local require = require
 
 local c = require "syscall.netbsd.constants"
 
--- TODO we need to support more levels, and simplify a bit
--- TODO maybe we put these into the table below eg "kern" = c.KERN, "kern.pipe" = c.KERN_PIPE
--- note also some of the node constants do not have names, will just have to put numbers in
-local map = {
-  [c.CTL.KERN] = c.KERN,
-  [c.CTL.HW] = c.HW,
-  [c.CTL.VM] = c.VM,
-}
-
-local map2 = {
-  [c.CTL.KERN] = {
-    [c.KERN.PIPE] = c.KERN_PIPE,
-    [c.KERN.TKSTAT] = c.KERN_TKSTAT,
-  }
-}
-
--- new top level
---[[
-  "unspec" = CTL.UNSPEC,
-  "kern" = CTL.KERN,
-  "vm" = CTL.VM,
-  "vfs" = CTL.VFS,
-  "net" = CTL.NET,
-  "debug" = CTL.DEBUG,
-  "hw" = CTL.HW,
-  "machdep" = CTL.MACHDEP,
-  "user" = CTL.USER,
-  "ddb" = CTL.DDB,
-  "proc" = CTL.PROC,
-  "vendor" = CTL.VENDOR,
-  "emul" = CTL.EMUL,
-  "security" = CTL.SECURITY,
-]]
-
--- TODO these have no constant names
---[[
-{ -- CTL_NET_NAMES
-  "[net.local]" = 1,
-  "[net.inet]" = 2,
-  "[net.implink]" = 3,
-  "[net.pup]" = 4,
-  "[net.chaos]" = 5,
-  "[net.xerox_ns]" = 6,
-  "[net.iso]" = 7,
-  "[net.emca]" = 8,
-  "[net.datakit]" = 9,
-  "[net.ccitt]", 10,
-  "[net.ibm_sna]" = 11,
-  "[net.decnet]" = 12,
-  "[net.dec_dli]" = 13,
-  "[net.lat]" = 14,
-  "[net.hylink]" = 15,
-  "[net.appletalk]" = 16,
-  "[net.oroute]" = 17,
-  "[net.link_layer]" = 18,
-  "[net.xtp]" = 19,
-  "[net.coip]" = 20,
-  "[net.cnt]" = 21,
-  "[net.rtip]" = 22,
-  "[net.ipx]" = 23,
-  "[net.inet6]" = 24,
-  "[net.pip]" = 25,
-  "[net.isdn]" = 26,
-  "[net.natm]" = 27,
-  "[net.arp]" = 28,
-  "[net.key]" = 29,
-  "[net.ieee80211]" = 30,
-  "[net.mlps]" = 31,
-  "[net.route]" = 32,
-}
-]]
-
--- TODO some of the friendly names do not map exactly to the constants, add an alias map.
-local aliases = {
-  ["hw.drivenames"] = "hw.disknames",
-  ["hw.drivestats"] = "hw.iostats",
-  ["vm.vmmeter"] = "vm.meter",
-}
-
 -- TODO note some could be considered bool not int eg KERN_FSYNC
 local types = {
-  ["kern.ostype"]    = "string",
+  unspec   = c.CTL.UNSPEC,
+  kern     = {c.CTL.KERN, c.KERN}, -- TODO maybe change to preferred form below
+  vm       = {c.CTL.VM, c.VM},
+  vfs      = c.CTL.VFS,
+  net      = c.CTL.NET,
+  debug    = c.CTL.DEBUG,
+  hw       = {c.CTL.HW, c.HW},
+  machdep  = c.CTL.MACHDEP,
+  user     = c.CTL.USER,
+  ddb      = c.CTL.DDB,
+  proc     = c.CTL.PROC,
+  vendor   = c.CTL.VENDOR,
+  emul     = c.CTL.EMUL,
+  security = c.CTL.SECURITY,
+
+  ["kern.ostype"]    = {c.KERN.OSTYPE, "string"}, -- TODO preferred form
   ["kern.osrelease"] = "string",
   ["kern.osrev"]     = "int",
   ["kern.version"]   = "string",
@@ -133,6 +69,7 @@ local types = {
 -- KERN_MSGBUF             53      /* kernel message buffer */
 -- KERN_CONSDEV            54      /* dev_t: console terminal device */
   ["kern.maxptys"] = "int",
+  ["kern.pipe"] = {c.KERN.PIPE, c.KERN_PIPE},
   ["kern.pipe.maxkvasz"] = "int",
   ["kern.pipe.maxloankvasz"] = "int",
   ["kern.pipe.maxbigpipes"] = "int",
@@ -140,6 +77,7 @@ local types = {
   ["kern.pipe.kvasize"] = "int",
   ["kern.maxphys"] = "int",
   ["kern.sbmax"] = "int",
+  ["kern.tkstat"] = {c.KERN.TKSTAT, c.KERN_TKSTAT},
   ["kern.tkstat.nin"] = "int64",
   ["kern.tkstat.nout"] = "int64",
   ["kern.tkstat.cancc"] = "int64",
@@ -177,8 +115,8 @@ local types = {
   ["hw.physmem"] = "int",
   ["hw.usermem"] = "int",
   ["hw.pagesize"] = "int",
-  ["hw.disknames"] = "string",
---["hw.iostats"] = "iostat[]"
+  ["hw.drivenames"] = {c.HW.DISKNAMES, "string"},
+--["hw.drivestats"] = {c.HW.IOSTATS, "iostat[]"},
   ["hw.machine_arch"] = "string",
   ["hw.alignbytes"] = "int",
   ["hw.cnmagic"] = "string",
@@ -186,7 +124,7 @@ local types = {
   ["hw.usermem64"] = "int64",
   ["hw.ncpuonline"] = "int",
 
-  ["vm.meter"] = "vmtotal",
+  ["vm.vmmeter"] = {c.VM.METER, "vmtotal"},
   ["vm.loadavg"] = "loadavg",
 --["vm.uvmexp" = "uvmexp",
   ["vm.nkmempages"] = "int",
@@ -200,68 +138,113 @@ local types = {
   ["vm.execmax"] = "int",
   ["vm.filemax"] = "int",
 
+-- net.*, no constant names
+  ["net.local"] = 1,
+  ["net.inet"] = 2,
+  ["net.implink"] = 3,
+  ["net.pup"] = 4,
+  ["net.chaos"] = 5,
+  ["net.xerox_ns"] = 6,
+  ["net.iso"] = 7,
+  ["net.emca"] = 8,
+  ["net.datakit"] = 9,
+  ["net.ccitt"] = 10,
+  ["net.ibm_sna"] = 11,
+  ["net.decnet"] = 12,
+  ["net.dec_dli"] = 13,
+  ["net.lat"] = 14,
+  ["net.hylink"] = 15,
+  ["net.appletalk"] = 16,
+  ["net.oroute"] = 17,
+  ["net.link_layer"] = 18,
+  ["net.xtp"] = 19,
+  ["net.coip"] = 20,
+  ["net.cnt"] = 21,
+  ["net.rtip"] = 22,
+  ["net.ipx"] = 23,
+  ["net.inet6"] = 24,
+  ["net.pip"] = 25,
+  ["net.isdn"] = 26,
+  ["net.natm"] = 27,
+  ["net.arp"] = 28,
+  ["net.key"] = 29,
+  ["net.ieee80211"] = 30,
+  ["net.mlps"] = 31,
+  ["net.route"] = 32,
+-- inet protocol names CTL_IPPROTO_NAMES
+  ["net.inet.ip"] = {0, c.IPCTL},
+  ["net.inet.icmp"] = 1,
+  ["net.inet.igmp"] = 2,
+  ["net.inet.ggp"] = 3,
+  ["net.inet.tcp"] = 6,
+  ["net.inet.egp"] = 8,
+  ["net.inet.pup"] = 12,
+  ["net.inet.udp"] = 17,
+  ["net.inet.idp"] = 22,
+  ["net.inet.ipsec"] = 51,
+  ["net.inet.pim"] = 103,
+
 -- ip IPCTL_NAMES
---[[
-  ["net.inet.forwarding"] = "int",
-  ["net.inet.redirect"] = "int",
-  ["net.inet.ttl"] = "int",
-  ["net.inet.mtu"] = "int",
-  ["net.inet.forwsrcrt"] = "int",
-  ["net.inet.directed-broadcast"] = "int",
-  ["net.inet.allowsrcrt"] = "int",
-  ["net.inet.subnetsarelocal"] = "int",
-  ["net.inet.mtudisc"] = "int",
-  ["net.inet.anonportmin"] = "int",
-  ["net.inet.anonportmax"] = "int",
-  ["net.inet.mtudisctimeout"] = "int",
-  ["net.inet.maxflows"] = "int",
-  ["net.inet.hostzerobroadcast"] = "int",
-  ["net.inet.gifttl"] = "int",
-  ["net.inet.lowportmin"] = "int",
-  ["net.inet.lowportmax"] = "int",
-  ["net.inet.maxfragpackets"] = "int",
-  ["net.inet.grettl"] = "int",
-  ["net.inet.checkinterface"] = "int",
---["net.inet.ifq"], CTLTYPE_NODE
-  ["net.inet.random_id"] = "int",
-  ["net.inet.do_loopback_cksum"] = "int",
---["net.inet.stats", CTLTYPE_STRUCT
---]]
+  ["net.inet.ip.forwarding"] = "int",
+  ["net.inet.ip.redirect"] = {c.IPCTL.SENDREDIRECTS, "int"},
+  ["net.inet.ip.ttl"] = {c.IPCTL.DEFTTL, "int"},
+  ["net.inet.ip.mtu"] = {c.IPCTL.DEFMTU, "int"},
+  ["net.inet.ip.forwsrcrt"] = "int",
+  ["net.inet.ip.directed-broadcast"] = {c.IPCTL.DIRECTEDBCAST, "int"},
+  ["net.inet.ip.allowsrcrt"] = "int",
+  ["net.inet.ip.subnetsarelocal"] = "int",
+  ["net.inet.ip.mtudisc"] = "int",
+  ["net.inet.ip.anonportmin"] = "int",
+  ["net.inet.ip.anonportmax"] = "int",
+  ["net.inet.ip.mtudisctimeout"] = "int",
+  ["net.inet.ip.maxflows"] = "int",
+  ["net.inet.ip.hostzerobroadcast"] = "int",
+  ["net.inet.ip.gifttl"] = {c.IPCTL.GIF_TTL, "int"},
+  ["net.inet.ip.lowportmin"] = "int",
+  ["net.inet.ip.lowportmax"] = "int",
+  ["net.inet.ip.maxfragpackets"] = "int",
+  ["net.inet.ip.grettl"] = {c.IPCTL.GRE_TTL, "int"},
+  ["net.inet.ip.checkinterface"] = "int",
+--["net.inet.ip.ifq"], CTLTYPE_NODE
+  ["net.inet.ip.random_id"] = {c.IPCTL.RANDOMID, "int"},
+  ["net.inet.ip.do_loopback_cksum"] = {c.IPCTL.LOOPBACKCKSUM, "int"},
+--["net.inet.ip.stats", CTLTYPE_STRUCT
 
 -- ipv6
---[[
-  ["net.inet6.forwarding"] = "int",
-  ["net.inet6.redirect"] = "int",
-  ["net.inet6.hlim"] = "int",
-  ["net.inet6.mtu"] = "int",
-  ["net.inet6.forwsrcrt"] = "int",
-  ["net.inet6.stats"] = "int",
-  ["net.inet6.mrtproto"] = "int",
-  ["net.inet6.maxfragpackets"] = "int",
-  ["net.inet6.sourcecheck"] = "int",
-  ["net.inet6.sourcecheck_logint"] = "int",
-  ["net.inet6.accept_rtadv"] = "int",
-  ["net.inet6.keepfaith"] = "int",
-  ["net.inet6.log_interval"] = "int",
-  ["net.inet6.hdrnestlimit"] = "int",
-  ["net.inet6.dad_count"] = "int",
-  ["net.inet6.auto_flowlabel"] = "int",
-  ["net.inet6.defmcasthlim"] = "int",
-  ["net.inet6.gifhlim"] = "int",
-  ["net.inet6.kame_version"] = "int",
-  ["net.inet6.use_deprecated"] = "int",
-  ["net.inet6.rr_prune"] = "int",
-  ["net.inet6.v6only"] = "int",
-  ["net.inet6.anonportmin"] = "int",
-  ["net.inet6.anonportmax"] = "int",
-  ["net.inet6.lowportmin"] = "int",
-  ["net.inet6.lowportmax"] = "int",
-  ["net.inet6.maxfrags"] = "int",
---["net.inet6.ifq"], CTLTYPE_NODE }, \
-  ["net.inet6.rtadv_maxroutes"] = "int",
-  ["net.inet6.rtadv_numroutes"] = "int",
---]]
+-- TODO rest of values
+  ["net.inet6.ip6"] = {0, c.IPV6CTL},
+
+  ["net.inet6.ip6.forwarding"] = "int",
+  ["net.inet6.ip6.redirect"] = {c.IPV6CTL.SENDREDIRECTS, "int"},
+  ["net.inet6.ip6.hlim"] = {c.IPV6CTL.DEFHLIM, "int"},
+  ["net.inet6.ip6.mtu"] = {c.IPV6CTL.DEFMTU, "int"},
+  ["net.inet6.ip6.forwsrcrt"] = "int",
+  ["net.inet6.ip6.stats"] = "int",
+  ["net.inet6.ip6.mrtproto"] = "int",
+  ["net.inet6.ip6.maxfragpackets"] = "int",
+  ["net.inet6.ip6.sourcecheck"] = "int",
+  ["net.inet6.ip6.sourcecheck_logint"] = "int",
+  ["net.inet6.ip6.accept_rtadv"] = "int",
+  ["net.inet6.ip6.keepfaith"] = "int",
+  ["net.inet6.ip6.log_interval"] = "int",
+  ["net.inet6.ip6.hdrnestlimit"] = "int",
+  ["net.inet6.ip6.dad_count"] = "int",
+  ["net.inet6.ip6.auto_flowlabel"] = "int",
+  ["net.inet6.ip6.defmcasthlim"] = "int",
+  ["net.inet6.ip6.gifhlim"] = {c.IPV6CTL.GIF_HLIM, "int"},
+  ["net.inet6.ip6.kame_version"] = "int",
+  ["net.inet6.ip6.use_deprecated"] = "int",
+  ["net.inet6.ip6.rr_prune"] = "int",
+  ["net.inet6.ip6.v6only"] = "int",
+  ["net.inet6.ip6.anonportmin"] = "int",
+  ["net.inet6.ip6.anonportmax"] = "int",
+  ["net.inet6.ip6.lowportmin"] = "int",
+  ["net.inet6.ip6.lowportmax"] = "int",
+  ["net.inet6.ip6.maxfrags"] = "int",
+--["net.inet6.ip6.ifq"], CTLTYPE_NODE }, \
+  ["net.inet6.ip6.rtadv_maxroutes"] = "int",
+  ["net.inet6.ip6.rtadv_numroutes"] = "int",
 }
 
-return {types = types, map = map, map2 = map2, aliases = aliases}
+return types
 
