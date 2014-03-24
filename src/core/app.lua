@@ -7,6 +7,7 @@ local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
 require("core.packet_h")
+local dump = require("jit.dump")
 
 -- The set of all active apps and links in the system.
 -- Indexed both by name (in a table) and by number (in an array).
@@ -115,16 +116,22 @@ function main (options)
    options = options or {}
    local no_timers = options.no_timers
    if options.duration then done = lib.timer(options.duration * 1e9) end
+   dump.on("birsmA")
    repeat
       breathe()
       if not no_timers then timer.run() end
    until done and done()
    report()
+   dump.set_output(io.stdout)
+   dump.off()
+   for _,t in pairs(traces) do io.close(t) end
+   traces = {}
 end
 
 function breathe ()
    -- Inhale: pull work into the app network
-   for _, app in ipairs(app_array) do
+   for n, app in ipairs(app_array) do
+      trace_to(n)
       if app.pull then app:pull() end
    end
    -- Exhale: push work out through the app network
@@ -136,6 +143,7 @@ function breathe ()
          if firstloop or link.has_new_data then
             link.has_new_data = false
             local receiver = app_array[link.receiving_app]
+            trace_to(link.receiving_app)
             if receiver.push then
                receiver:push()
                progress = true
@@ -144,6 +152,18 @@ function breathe ()
       end
       firstloop = false
    until not progress  -- Stop after no link had new data
+end
+
+traces = {}
+function trace_to (appnum)
+   local appname = nil
+   for name, app in pairs(app_table) do
+      if app_array[appnum] == app then appname = name end
+   end
+   if not traces[appname] then
+      traces[appname] = io.open(tostring(appname)..".trace", 'w')
+   end
+   dump.set_output(traces[appname])
 end
 
 function report ()
