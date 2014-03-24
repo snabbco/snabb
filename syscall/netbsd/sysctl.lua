@@ -7,7 +7,7 @@ local c = require "syscall.netbsd.constants"
 -- TODO note some could be considered bool not int eg KERN_FSYNC
 local types = {
   unspec   = c.CTL.UNSPEC,
-  kern     = {c.CTL.KERN, c.KERN}, -- TODO maybe change to preferred form below
+  kern     = {c.CTL.KERN, c.KERN}, -- TODO maybe change to preferred form where end node has {c.KERN.OSTYPE, "string"}
   vm       = {c.CTL.VM, c.VM},
   vfs      = c.CTL.VFS,
   net      = c.CTL.NET,
@@ -21,7 +21,7 @@ local types = {
   emul     = c.CTL.EMUL,
   security = c.CTL.SECURITY,
 
-  ["kern.ostype"]    = {c.KERN.OSTYPE, "string"}, -- TODO preferred form
+  ["kern.ostype"]    = "string",
   ["kern.osrelease"] = "string",
   ["kern.osrev"]     = "int",
   ["kern.version"]   = "string",
