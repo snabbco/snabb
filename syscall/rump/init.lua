@@ -227,6 +227,8 @@ function S.rump.init(ms, ...) -- you must load the factions here eg dev, vfs, ne
   if ms then loadmodules(ms) end
   local ok = ffi.C.rump_init()
   if ok == -1 then return nil, t.error() end
+  S.__modules = modules
+  S.abi = abi
   return S
 end
 
