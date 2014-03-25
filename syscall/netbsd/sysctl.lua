@@ -212,7 +212,12 @@ local types = {
 
 -- ipv6
 -- TODO rest of values
-  ["net.inet6.ip6"] = {0, c.IPV6CTL},
+  ["net.inet6.tcp6"] = 6,
+  ["net.inet6.udp6"] = 17,
+  ["net.inet6.ip6"] = {41, c.IPV6CTL},
+  ["net.inet6.ipsec6"] = 51,
+  ["net.inet6.icmp6"] = 58,
+  ["net.inet6.pim6"] = 103,
 
   ["net.inet6.ip6.forwarding"] = "int",
   ["net.inet6.ip6.redirect"] = {c.IPV6CTL.SENDREDIRECTS, "int"},

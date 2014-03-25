@@ -86,7 +86,11 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
   if type(name) == "string" then
     name = name:lower()
     tp = sysctltypes[name]
+    if not tp then error("unknown sysctl " .. name) end
     if type(tp) == "table" then tp = tp[2] end
+    -- an internal node will be a number or line above will have pulled out table
+    -- we do allow calls on internal node to see if that subsystem is there though
+    if type(tp) == "number" or type(tp) == "table" then tp = "none" end
     name = split("%.", name)
     local prefix
     local tab
@@ -94,8 +98,10 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
       if not prefix then prefix = name[i] else prefix = prefix .. "." .. name[i] end
       local part = sysctltypes[prefix]
       if i == #name then
-        if type(part) == "table" then name[i] = part[1] else
-          if tab and tab[name[i]] then name[i] = tab[name[i]] else error(name[i] .. " in " .. origname) end
+        if type(part) == "table" then name[i] = part[1]
+        elseif type(part) == "number" then name[i] = part
+        else
+          if tab and tab[name[i]] then name[i] = tab[name[i]] else error("sysctl unknown " .. name[i] .. " in " .. origname) end
         end
       else
         if type(part) == "table" then name[i], tab = part[1], part[2] else name[i] = part end
@@ -114,6 +120,9 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
     elseif tp == "int64" then
       oldlenp = t.size1(s.int64)
       old = t.int64_1()
+    elseif tp == "none" then -- TODO not apparently working, maybe just list all children for internal node case
+      oldlenp = t.size1(s.int)
+      old = t.int1()
     else
       oldlenp = t.size1(s[tp])
       old = t[tp]()
@@ -130,16 +139,13 @@ function S.sysctl(name, new, old) -- TODO may need to change arguments, note ord
   end
   if new then newlen = #new else newlen = 0 end -- TODO set based on known types too
   local name = t.ints(namelen, name)
-  local specoldlen = t.size1()
-  local ok, err = C.sysctl(name, namelen, nil, specoldlen, nil, 0)
-  if specoldlen[0] == 0 then return nil end -- only way to show does not exist!
-  -- TODO check if specified size wrong, but allow for strings
-  local ok, err = C.sysctl(name, namelen, old, oldlenp, new, newlen)
-  if not ok then return nil, t.error(err or errno()) end
+  local ret, err = C.sysctl(name, namelen, old, oldlenp, new, newlen)
+  if ret == -1 then return nil, t.error(err or errno()) end
   if tp then -- we know type of value being returned
     if tp == "string" then return ffi.string(old)
     elseif tp == "int" then return tonumber(old[0])
     elseif tp == "int64" then return old[0]
+    elseif tp == "none" then return true
     else return old
     end
     return old
