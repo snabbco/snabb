@@ -16,7 +16,7 @@ devices = {}
 map_devices = {}
 
 function scan_devices ()
-    for _,device in ipairs(lib.files_in_directory("/sys/bus/pci/devices")) do
+    for _,device in ipairs(lib.files_in_directory(pci.get_pci_device_path())) do
         local info = device_info(device)
         if info.driver and not map_devices[device] then
             table.insert(devices, info)
@@ -26,7 +26,7 @@ function scan_devices ()
 end
 
 function host_has_vfio()
-    local files = lib.files_in_directory('/sys/kernel/iommu_groups/')
+    local files = lib.files_in_directory(vfio.get_iommu_groups_path())
     return files and #files > 0
 end
 
