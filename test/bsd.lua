@@ -57,6 +57,13 @@ end
 
 local test = {}
 
+test.bsd_misc = {
+  test_sysctl_all = function()
+    local all, err = S.sysctl()
+    assert(all and type(all) == "string", "expect a string from all sysctls")
+  end,
+}
+
 test.bsd_ids = {
   test_issetugid = function()
     if not S.issetugid then error "skipped" end
