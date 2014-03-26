@@ -1504,5 +1504,29 @@ c.IPV6CTL = strflag {
   RTADV_NUMROUTES= 44,
 }
 
+c.USER = strflag {
+  CS_PATH           =  1,
+  BC_BASE_MAX       =  2,
+  BC_DIM_MAX        =  3,
+  BC_SCALE_MAX      =  4,
+  BC_STRING_MAX     =  5,
+  COLL_WEIGHTS_MAX  =  6,
+  EXPR_NEST_MAX     =  7,
+  LINE_MAX          =  8,
+  RE_DUP_MAX        =  9,
+  POSIX2_VERSION    = 10,
+  POSIX2_C_BIND     = 11,
+  POSIX2_C_DEV      = 12,
+  POSIX2_CHAR_TERM  = 13,
+  POSIX2_FORT_DEV   = 14,
+  POSIX2_FORT_RUN   = 15,
+  POSIX2_LOCALEDEF  = 16,
+  POSIX2_SW_DEV     = 17,
+  POSIX2_UPE        = 18,
+  STREAM_MAX        = 19,
+  TZNAME_MAX        = 20,
+  ATEXIT_MAX        = 21,
+}
+
 return c
 

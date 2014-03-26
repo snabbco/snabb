@@ -14,7 +14,7 @@ local types = {
   debug    = c.CTL.DEBUG,
   hw       = {c.CTL.HW, c.HW},
   machdep  = c.CTL.MACHDEP,
-  user     = c.CTL.USER,
+  user     = {c.CTL.USER, c.USER},
   ddb      = c.CTL.DDB,
   proc     = c.CTL.PROC,
   vendor   = c.CTL.VENDOR,
@@ -249,6 +249,29 @@ local types = {
 --["net.inet6.ip6.ifq"], CTLTYPE_NODE }, \
   ["net.inet6.ip6.rtadv_maxroutes"] = "int",
   ["net.inet6.ip6.rtadv_numroutes"] = "int",
+
+-- these are provided by libc, so we don't get any values from syscall
+  ["user.cs_path"] = "string",
+  ["user.bc_base_max"] = "int",
+  ["user.bc_dim_max"] = "int",
+  ["user.bc_scale_max"] = "int",
+  ["user.bc_string_max"] = "int",
+  ["user.coll_weights_max"] = "int",
+  ["user.expr_nest_max"] = "int",
+  ["user.line_max"] = "int",
+  ["user.re_dup_max"] = "int",
+  ["user.posix2_version"] = "int",
+  ["user.posix2_c_bind"] = "int",
+  ["user.posix2_c_dev"] = "int",
+  ["user.posix2_char_term"] = "int",
+  ["user.posix2_fort_dev"] = "int",
+  ["user.posix2_fort_run"] = "int",
+  ["user.posix2_localedef"] = "int",
+  ["user.posix2_sw_dev"] = "int",
+  ["user.posix2_upe"] = "int",
+  ["user.stream_max"] = "int",
+  ["user.tzname_max"] = "int",
+  ["user.atexit_max"] = "int",
 }
 
 return types
