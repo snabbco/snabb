@@ -67,46 +67,54 @@ local allmeta = {__tostring = function(t)
   return table.concat(tt, '\n')
 end}
 
+-- "-a" functionality, well all the ones we know about
+-- TODO also use for all under one node
+local function allsysctl()
+  local all = {}
+  for k, v in pairs(sysctltypes) do
+    if type(v) == "table" and type(v[2]) == "string" then v = v[2] end
+    if type(v) == "string" then
+      local res, err = S.sysctl(k)
+      if res then all[k] = res end
+    end
+  end
+  return setmetatable(all, allmeta)
+end
+
+local function sysctlnametomib(name)
+  local origname = name
+  name = name:lower()
+  local tp = sysctltypes[name]
+  if not tp then error("unknown sysctl " .. name) end
+  if type(tp) == "table" then tp = tp[2] end
+  -- an internal node will be a number or line above will have pulled out table
+  -- we do allow calls on internal node to see if that subsystem is there though
+  if type(tp) == "number" or type(tp) == "table" then tp = "none" end
+  name = split("%.", name)
+  local prefix
+  local tab
+  for i = 1, #name do
+    if not prefix then prefix = name[i] else prefix = prefix .. "." .. name[i] end
+    local part = sysctltypes[prefix]
+    if i == #name then
+      if type(part) == "table" then name[i] = part[1]
+      elseif type(part) == "number" then name[i] = part
+      else
+        if tab and tab[name[i]] then name[i] = tab[name[i]] else error("sysctl unknown " .. name[i] .. " in " .. origname) end
+      end
+    else
+      if type(part) == "table" then name[i], tab = part[1], part[2] else name[i] = part end
+    end
+  end
+  return name, tp
+end
+
 -- TODO understand return types
 function S.sysctl(name, new, old) -- TODO may need to change arguments, note order as should not need to specify old
-  local origname = name
-  -- "-a" functionality, well all the ones we know about
-  if not name then
-    local all = {}
-    for k, v in pairs(sysctltypes) do
-      if type(v) == "table" and type(v[2]) == "string" then v = v[2] end
-      if type(v) == "string" then
-        local res, err = S.sysctl(k)
-        if res then all[k] = res end
-      end
-    end
-    return setmetatable(all, allmeta)
-  end
+  if not name then return allsysctl() end
   local tp
   if type(name) == "string" then
-    name = name:lower()
-    tp = sysctltypes[name]
-    if not tp then error("unknown sysctl " .. name) end
-    if type(tp) == "table" then tp = tp[2] end
-    -- an internal node will be a number or line above will have pulled out table
-    -- we do allow calls on internal node to see if that subsystem is there though
-    if type(tp) == "number" or type(tp) == "table" then tp = "none" end
-    name = split("%.", name)
-    local prefix
-    local tab
-    for i = 1, #name do
-      if not prefix then prefix = name[i] else prefix = prefix .. "." .. name[i] end
-      local part = sysctltypes[prefix]
-      if i == #name then
-        if type(part) == "table" then name[i] = part[1]
-        elseif type(part) == "number" then name[i] = part
-        else
-          if tab and tab[name[i]] then name[i] = tab[name[i]] else error("sysctl unknown " .. name[i] .. " in " .. origname) end
-        end
-      else
-        if type(part) == "table" then name[i], tab = part[1], part[2] else name[i] = part end
-      end
-    end
+    name, tp = sysctlnametomib(name)
   end
   local namelen = #name
   local oldlenp, newlen
