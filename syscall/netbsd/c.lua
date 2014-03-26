@@ -28,7 +28,8 @@ local C = setmetatable({}, {
 -- for NetBSD we use libc names not syscalls, as assume you will have libc linked or statically linked with all symbols exported.
 -- this is so we can use NetBSD libc even where syscalls have been redirected to rump calls.
 
-C.sysctl = ffi.C.__sysctl
+-- was using __sysctl, but many sysctls provided by libc
+C.sysctl = ffi.C.sysctl
 
 -- use new versions
 C.mount = ffi.C.__mount50

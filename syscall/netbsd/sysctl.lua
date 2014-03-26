@@ -250,7 +250,7 @@ local types = {
   ["net.inet6.ip6.rtadv_maxroutes"] = "int",
   ["net.inet6.ip6.rtadv_numroutes"] = "int",
 
--- these are provided by libc, so we don't get any values from syscall
+-- these are provided by libc, so we don't get any values from syscall on rump
   ["user.cs_path"] = "string",
   ["user.bc_base_max"] = "int",
   ["user.bc_dim_max"] = "int",
