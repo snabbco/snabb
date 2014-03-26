@@ -64,6 +64,7 @@ local sysctltypes = require("syscall." .. abi.os .. ".sysctl")
 local allmeta = {__tostring = function(t)
   local tt = {}
   for k, v in pairs(t) do tt[#tt + 1] = k .. " = " .. tostring(v) end
+  table.sort(tt)
   return table.concat(tt, '\n')
 end}
 
