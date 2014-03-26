@@ -4,7 +4,10 @@ local require = require
 
 local c = require "syscall.netbsd.constants"
 
--- TODO note some could be considered bool not int eg KERN_FSYNC
+-- TODO note might be considered bool, CTLTYPE_BOOL is defined.
+
+-- TODO we should traverse tree and read types instead of predefined values
+
 local types = {
   unspec   = c.CTL.UNSPEC,
   kern     = {c.CTL.KERN, c.KERN}, -- TODO maybe change to preferred form where end node has {c.KERN.OSTYPE, "string"}
