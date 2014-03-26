@@ -61,27 +61,6 @@ function S.kqueue() return retfd(C.kqueue()) end
 
 local sysctltypes = require("syscall." .. abi.os .. ".sysctl")
 
-local allmeta = {__tostring = function(t)
-  local tt = {}
-  for k, v in pairs(t) do tt[#tt + 1] = k .. " = " .. tostring(v) end
-  table.sort(tt)
-  return table.concat(tt, '\n')
-end}
-
--- "-a" functionality, well all the ones we know about
--- TODO also use for all under one node
-local function allsysctl()
-  local all = {}
-  for k, v in pairs(sysctltypes) do
-    if type(v) == "table" and type(v[2]) == "string" then v = v[2] end
-    if type(v) == "string" then
-      local res, err = S.sysctl(k)
-      if res then all[k] = res end
-    end
-  end
-  return setmetatable(all, allmeta)
-end
-
 local function sysctlnametomib(name)
   local origname = name
   name = name:lower()
@@ -108,6 +87,42 @@ local function sysctlnametomib(name)
     end
   end
   return name, tp
+end
+
+local function sysctlsort(a, b)
+  local a = sysctlnametomib(a)
+  local b = sysctlnametomib(b)
+  for i = 1, #a do
+    if i > #b then return true end
+    if a[i] < b[i] then return true end
+    if b[i] < a[i] then return false end
+  end
+  return true
+end
+
+local allmeta = {
+  __tostring = function(t)
+    local names = {}
+    for k, v in pairs(t) do names[#names + 1] = k end
+    table.sort(names, sysctlsort)
+    local tt = {}
+    for i, v in pairs(names) do tt[i] = v .. " = " .. tostring(t[v]) end
+    return table.concat(tt, '\n')
+  end,
+}
+
+-- "-a" functionality, well all the ones we know about
+-- TODO also use for all under one node
+local function allsysctl()
+  local all = {}
+  for k, v in pairs(sysctltypes) do
+    if type(v) == "table" and type(v[2]) == "string" then v = v[2] end
+    if type(v) == "string" then
+      local res, err = S.sysctl(k)
+      if res then all[k] = res end
+    end
+  end
+  return setmetatable(all, allmeta)
 end
 
 -- TODO understand return types
