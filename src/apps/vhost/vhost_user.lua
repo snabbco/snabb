@@ -418,6 +418,10 @@ end
 
 function selftest ()
    print("selftest: vhost_user")
+   if not vfio.is_vfio_available() then
+      print("VFIO not available\nTest skipped")
+      os.exit(app.TEST_SKIPPED_CODE)
+   end
    -- Create an app network that proxies packets between a vhost_user
    -- port (qemu) and an Intel port (in loopback mode). Create
    -- separate pcap traces for packets received from vhost and intel.
