@@ -73,6 +73,11 @@ function Intel82599:report ()
 end
 
 function selftest ()
+   print("selftest: intel_app")
+   if not vfio.is_vfio_available() then
+      print("VFIO not available\nTest skipped")
+      os.exit(app.TEST_SKIPPED_CODE)
+   end
    -- Create a pieline:
    --   Source --> Intel82599(loopback) --> Sink
    -- and push packets through it.
