@@ -23,6 +23,16 @@ if min == 99 then maj = maj + 1 end
 abi.netbsd = maj
 end
 
+--[[
+local sc = ffi.new("int[2]", 0, 3) -- kern.osrev
+local osrevision = ffi.new("int[1]")
+local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
+local ok, res = pcall(C.sysctl, sc, 2, osrevision, lenp, nil, 0)
+local maj, min = osrevision[0] / 1000000000, osrevision[0] / 10000000
+if min == 99 then maj = maj + 1 end
+abi.netbsd = maj
+]]
+
 local defs = {}
 
 local function append(str) defs[#defs + 1] = str end
