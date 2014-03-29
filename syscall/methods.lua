@@ -191,6 +191,17 @@ t.mqd = metatype("struct {mqd_t filenum;}", {
 })
 end
 
+t.timer = metatype("struct {timer_t timerid[1];}", {
+  __index = {
+    gettimer = function(self) return self.timerid end,
+    settime = S.timer_settime,
+    gettime = S.timer_gettime,
+    delete = S.timer_delete,
+    getoverrun = S.timer_getoverrun,
+  },
+  __gc = S.timer_delete,
+}
+
 -- TODO reinstate this, more like fd is, hence changes to destroy
 --[[
 t.aio_context = metatype("struct {aio_context_t ctx;}", {
