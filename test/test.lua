@@ -2036,6 +2036,13 @@ test_timers = {
     local tid, err = S.timer_create("monotonic")
     if not tid and err.NOSYS then error "skipped" end
     assert(tid, err)
+    local it = tid:gettime()
+    assert_equal(it.value.time, 0)
+    assert(tid:settime(0, {0, 10000}))
+    local it = tid:gettime()
+    assert(it.value.time > 0, "expect some time left")
+    local over = assert(tid:getoverrun())
+    assert_equal(over, 0)
     assert(tid:delete())
   end,
 }
