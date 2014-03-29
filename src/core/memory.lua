@@ -70,7 +70,9 @@ end
 function get_huge_page_size ()
    local meminfo = lib.readfile("/proc/meminfo", "*a")
    local _,_,hugesize = meminfo:find("Hugepagesize: +([0-9]+) kB")
-   return tonumber(hugesize) * 1024
+   return hugesize
+      and tonumber(hugesize) * 1024
+       or 2048 -- A typical x86 system will have a Huge Page Size of 2048 kBytes
 end
 
 base_page_size = 4096
