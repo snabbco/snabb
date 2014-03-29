@@ -12,6 +12,10 @@ local intel10g = require("apps.intel.intel10g")
 local vfio     = require("lib.hardware.vfio")
 local config = require("core.config")
 
+-- default id of pci device used in test
+-- This ID is used if the "SNABB_TEST_PCI_ID" environment variable is not defined
+DEFAULT_TEST_PCI_ID = "0000:01:00.0"
+
 Intel82599 = {}
 
 -- Create an Intel82599 App for the device with 'pciaddress'.
@@ -72,25 +76,30 @@ function Intel82599:report ()
    register.dump(self.dev.s, true)
 end
 
+function getTestPCIID()
+   return os.getenv("SNABB_TEST_PCI_ID") or DEFAULT_TEST_PCI_ID
+end
+
 function selftest ()
    print("selftest: intel_app")
    if not vfio.is_vfio_available() then
       print("VFIO not available\nTest skipped")
       os.exit(app.TEST_SKIPPED_CODE)
    end
+   local pciid = getTestPCIID()
    -- Create a pieline:
    --   Source --> Intel82599(loopback) --> Sink
    -- and push packets through it.
-   vfio.bind_device_to_vfio("0000:01:00.0")
+   vfio.bind_device_to_vfio(pciid)
    local c = config.new()
-   config.app(c, "intel10g", Intel82599, "0000:01:00.0")
+   config.app(c, "intel10g", Intel82599, pciid)
    config.app(c, "source", basic_apps.Source)
    config.app(c, "sink", basic_apps.Sink)
    config.link(c, "source.out -> intel10g.rx")
    config.link(c, "intel10g.tx -> sink.in")
    app.configure(c)
 --[[
-   app.apps.intel10g = Intel82599:new("0000:01:00.0")
+   app.apps.intel10g = Intel82599:new(pciid)
    app.apps.source = app.new(basic_apps.Source)
    app.apps.sink   = app.new(basic_apps.Sink)
    app.connect("source", "out", "intel10g", "rx")
