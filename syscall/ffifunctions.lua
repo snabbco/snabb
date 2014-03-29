@@ -163,11 +163,11 @@ int clock_nanosleep(clockid_t clock_id, int flags, const struct timespec *reques
 
 int getpagesize(void);
 
-/* timer_t not defined yet, plus there are complexities re threads
 int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid);
 int timer_settime(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec * old_value);
 int timer_gettime(timer_t timerid, struct itimerspec *curr_value);
-*/
+int timer_delete(timer_t timerid);
+int timer_getoverrun(timer_t timerid);
 
 int adjtime(const struct timeval *delta, struct timeval *olddelta);
 ]]
