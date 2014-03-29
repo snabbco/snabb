@@ -13,6 +13,8 @@ initialized = false
 
 -- This path is used if the "SNABB_VFIO_DRIVER" environment variable is not defined
 VFIO_DEFAULT_DRIVER_PATH = "/sys/bus/pci/drivers/vfio-pci"
+-- This path is used if the "SNABB_VFIO_IOMMU_GROUPS" environment variable is not defined
+VFIO_DEFAULT_IOMMU_GROUP_PATH = "/sys/kernel/iommu_groups"
 
 -- Array of mappings that were requested before vfio was initialized.
 -- 
@@ -72,10 +74,16 @@ function device_group(pciaddress)
     return lib.basename(lib.readlink(pci.path(pciaddress)..'/iommu_group'))
 end
 
+function get_iommu_groups_path()
+   return os.getenv("SNABB_VFIO_IOMMU_GROUPS") or VFIO_DEFAULT_IOMMU_GROUP_PATH
+end
+
 -- Return all the devices that belong to the same group
 function group_devices(group)
-    if not group then return {} end
-    return lib.files_in_directory('/sys/kernel/iommu_groups/'..group..'/devices/')
+   if not group then return {} end
+   return lib.files_in_directory(
+         get_iommu_groups_path() .. '/' .. group .. '/devices/'
+      )
 end
 
 --- ### Device manipulation.
