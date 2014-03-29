@@ -601,14 +601,19 @@ function C.mremap(old_address, old_size, new_size, flags, new_address)
 end
 function C.nanosleep(req, rem) return syscall(sys.nanosleep, void(req), void(rem)) end
 function C.wait4(pid, status, options, rusage) return syscall(sys.wait4, int(pid), void(status), int(options), void(rusage)) end
-
 function C.waitid(idtype, id, infop, options, rusage)
   return syscall(sys.waitid, int(idtype), uint(id), void(infop), int(options), void(rusage))
 end
-
 function C.settimeofday(tv, tz)
   return syscall(sys.settimeofday, void(tv), void(tz))
 end
+function C.timer_create(clockid, sevp, timerid) return syscall(sys.timer_create, int(clockid), void(sevp), void(timerid)) end
+function C.timer_settime(timerid, flags, new_value, old_value)
+  return syscall(sys.timer_settime, int(timerid), int(flags), void(new_value), void(old_value))
+end
+function C.timer_gettime(timerid, curr_value) return syscall(sys.timer_gettime, int(timerid), void(curr_value)) end
+function C.timer_delete(timerid) return syscall(sys.timer_delete, int(timerid)) end
+function C.timer_getoverrun(timerid) return syscall(sys.timer_getoverrun, int(timerid)) end
 
 -- only on some architectures
 if sys.waitpid then

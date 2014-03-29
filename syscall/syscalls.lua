@@ -687,11 +687,11 @@ if C.timer_create then
   function S.timer_create(clk_id, sigev, timerid)
     timerid = timerid or t.timer()
     -- TODO sigev handling
-    local ret, err = C.timer_create(c.CLOCK[clk_id], sigev, timerid:gettimer())
+    local ret, err = C.timer_create(c.CLOCK[clk_id], sigev, timerid:gettimerp())
     if ret == -1 then return nil, t.error(err or errno()) end
     return timerid
   end
-  function S.timer_delete(timerid) return retbool(C.timer_delete(timerid)) end
+  function S.timer_delete(timerid) return retbool(C.timer_delete(timerid:gettimer())) end
   function S.timer_settime(timerid, flags, new_value, old_value)
     if old_value ~= false then old_value = old_value or t.itimerspec() else old_value = nil end
     new_value = mktype(t.itimerspec, new_value)
