@@ -228,7 +228,7 @@ test_types_reflect = {
     assert_equal(allok, true)
   end,
   test_length = function()
-    local nolen = {fd = true, error = true, mqd = true} -- internal use
+    local nolen = {fd = true, error = true, mqd = true, timer = true} -- internal use
     local function len(x) return #x end
     local allok = true
     for k, v in pairs(t) do
@@ -237,7 +237,10 @@ test_types_reflect = {
           local x = v()
           local mt = reflect.getmetatable(x)
           local ok, err = pcall(len, x)
-          if mt and not ok and not nolen[k] then print("no len on " .. k); allok = false end
+          if mt and not ok and not nolen[k] then
+            print("no len on " .. k)
+            allok = false
+            end
         end
       end
     end
@@ -2023,6 +2026,15 @@ test_timeofday = {
     local ok, err = S.settimeofday()
     -- eg NetBSD does nothing on null, Linux errors
     assert(ok or (err.PERM or err.INVAL or err.FAULT), "null settimeofday should succeed or fail correctly")
+  end,
+}
+
+-- on rump these may not deliver signals, but for our tests we will not let them expire
+test_timers = {
+  test_timers = function()
+    if not S.timer_create then error "skipped" end
+    local tid = assert(S.timer_create("monotonic"))
+    assert(tid:delete())
   end,
 }
 
