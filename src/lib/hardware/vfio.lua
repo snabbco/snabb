@@ -11,6 +11,9 @@ require("lib.hardware.vfio_h")
 -- Is VFIO initialized yet?
 initialized = false
 
+-- This path is used if the "SNABB_VFIO_DRIVER" environment variable is not defined
+VFIO_DEFAULT_DRIVER_PATH = "/sys/bus/pci/drivers/vfio-pci"
+
 -- Array of mappings that were requested before vfio was initialized.
 -- 
 -- These must then be mapped at initialization time.
@@ -77,9 +80,13 @@ end
 
 --- ### Device manipulation.
 
+function get_driver_path ()
+   return os.getenv("SNABB_VFIO_DRIVER") or VFIO_DEFAULT_DRIVER_PATH
+end
+
 --- add a device to the vfio-pci driver
 function bind_device_to_vfio (pciaddress)
-    lib.writefile("/sys/bus/pci/drivers/vfio-pci/bind", pciaddress)
+   lib.writefile(get_driver_path() .. "/bind", pciaddress)
 end
 
 function setup_vfio(pciaddress, do_group)
