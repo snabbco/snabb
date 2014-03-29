@@ -36,7 +36,6 @@ struct k_sigaction {
 };
 ]],
 siginfo = [[
-typedef int timer_t;
 /* note renamed members of struct to match other architectures */
 typedef struct siginfo {
   int si_signo;

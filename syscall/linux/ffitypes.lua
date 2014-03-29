@@ -36,6 +36,7 @@ typedef uint32_t le32; /* this is little endian - not really using it yet */
 typedef uint32_t id_t;
 typedef unsigned int tcflag_t;
 typedef unsigned int speed_t;
+typedef int timer_t;
 
 /* despite glibc, Linux uses 32 bit dev_t */
 typedef uint32_t dev_t;
