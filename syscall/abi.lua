@@ -43,16 +43,16 @@ if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
 -- fortunately sysname is first so we can use this value
 if not abi.xen and not abi.rump and abi.os == "bsd" then
   ffi.cdef [[
-  struct utsname {
+  struct _utsname {
   char    sysname[256];
   char    nodename[256];
   char    release[256];
   char    version[256];
   char    machine[256];
   };
-  int uname(struct utsname *);
+  int uname(struct _utsname *);
   ]]
-  local uname = ffi.new("struct utsname")
+  local uname = ffi.new("struct _utsname")
   ffi.C.uname(uname)
   abi.os = ffi.string(uname.sysname):lower()
   abi.uname = uname
