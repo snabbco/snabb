@@ -149,6 +149,10 @@ t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
   end,
 })
 
+S.stdin = t.fd(c.STD.IN):nogc()
+S.stdout = t.fd(c.STD.OUT):nogc()
+S.stderr = t.fd(c.STD.ERR):nogc()
+
 if S.mq_open then -- TODO better test. TODO support in BSD
 local mqmeth = {
   close = fmeth.close,
@@ -180,10 +184,6 @@ t.mqd = ffi.metatype("struct {mqd_t filenum;}", {
 })
 end
 
-S.stdin = t.fd(c.STD.IN):nogc()
-S.stdout = t.fd(c.STD.OUT):nogc()
-S.stderr = t.fd(c.STD.ERR):nogc()
-
 -- TODO reinstate this, more like fd is, hence changes to destroy
 --[[
 t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
@@ -191,7 +191,6 @@ t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
   __gc = S.io_destroy
 })
 ]]
-
 
 return S
 

@@ -683,6 +683,22 @@ if C.clock_nanosleep then
   end
 end
 
+--[[
+int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid);
+int timer_settime(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec * old_value);
+int timer_gettime(timer_t timerid, struct itimerspec *curr_value);
+int timer_delete(timer_t timerid);
+int timer_getoverrun(timer_t timerid);
+]]
+
+--[[
+if C.timer_create then
+  function S.timer_create(clk_id, sigev, timerid)
+
+  end
+end
+]]
+
 -- legacy in many OSs, implemented using recvfrom, sendto
 if C.send then
   function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, c.MSG[flags])) end
