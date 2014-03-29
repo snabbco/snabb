@@ -11,6 +11,8 @@ pcall, type, table, string
 
 local function init(S)
 
+local abi = S.abi
+
 local c = S.c
 local types = S.types
 local t, s, pt = types.t, types.s, types.pt
@@ -22,6 +24,11 @@ local ffi = require "ffi"
 local h = require "syscall.helpers"
 
 local getfd, istype, mktype = h.getfd, h.istype, h.mktype
+
+local function metatype(tp, mt)
+  if abi.rumpfn then tp = abi.rumpfn(tp) end
+  return ffi.metatype(tp, mt)
+end
 
 -- easier interfaces to some functions that are in common use TODO new fcntl code should make easier
 local function nonblock(fd)
@@ -141,7 +148,7 @@ end
 
 fmeth.getfd = function(fd) return fd.filenum end
 
-t.fd = ffi.metatype("struct {int filenum; int sequence;}", {
+t.fd = metatype("struct {int filenum; int sequence;}", {
   __index = fmeth,
   __gc = fmeth.close,
   __new = function(tp, i)
@@ -175,7 +182,7 @@ local mqmeth = {
   receive = function(mqd, msg_ptr, msg_len, msg_prio) return S.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio) end,
 }
 
-t.mqd = ffi.metatype("struct {mqd_t filenum;}", {
+t.mqd = metatype("struct {mqd_t filenum;}", {
   __index = mqmeth,
   __gc = mqmeth.close,
   __new = function(tp, i)
@@ -186,7 +193,7 @@ end
 
 -- TODO reinstate this, more like fd is, hence changes to destroy
 --[[
-t.aio_context = ffi.metatype("struct {aio_context_t ctx;}", {
+t.aio_context = metatype("struct {aio_context_t ctx;}", {
   __index = {destroy = S.io_destroy, submit = S.io_submit, getevents = S.io_getevents, cancel = S.io_cancel, nogc = nogc},
   __gc = S.io_destroy
 })
