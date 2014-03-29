@@ -231,6 +231,14 @@ c.SIGACT = strflag {
   HOLD = 3,
 }
 
+c.SIGEV = strflag {
+  NONE      = 0,
+  SIGNAL    = 1,
+  THREAD    = 2,
+  KEVENT    = 3,
+  THREAD_ID = 4,
+}
+
 c.SIG = strflag {
   HUP = 1,
   INT = 2,

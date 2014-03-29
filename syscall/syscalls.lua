@@ -686,7 +686,7 @@ end
 if C.timer_create then
   function S.timer_create(clk_id, sigev, timerid)
     timerid = timerid or t.timer()
--- TODO sigev
+    -- TODO sigev handling
     local ret, err = C.timer_create(c.CLOCK[clk_id], sigev, timerid:gettimer())
     if ret == -1 then return nil, t.error(err or errno()) end
     return timerid

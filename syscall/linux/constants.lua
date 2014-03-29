@@ -316,6 +316,13 @@ c.SIGACT = strflag {
   HOLD = 2,
 }
 
+c.SIGEV = strflag {
+  SIGNAL    = 0,
+  NONE      = 1,
+  THREAD    = 2,
+  THREAD_ID = 4,
+}
+
 c.SIG = strflag(arch.SIG or {
   HUP = 1,
   INT = 2,
