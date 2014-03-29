@@ -2033,7 +2033,9 @@ test_timeofday = {
 test_timers = {
   test_timers = function()
     if not S.timer_create then error "skipped" end
-    local tid = assert(S.timer_create("monotonic"))
+    local tid, err = S.timer_create("monotonic")
+    if not tid and err.NOSYS then error "skipped" end
+    assert(tid, err)
     assert(tid:delete())
   end,
 }
