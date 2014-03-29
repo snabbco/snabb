@@ -41,7 +41,7 @@ if pcall(inlibc_fn, "__ljsyscall_under_xen") then abi.xen = true end
 -- The good news is every BSD has utsname
 -- The bad news is that on FreeBSD it is a legacy version that has 32 byte unless you use __xuname
 -- fortunately sysname is first so we can use this value
-if not abi.xen and abi.os == "bsd" then
+if not abi.xen and not abi.rump and abi.os == "bsd" then
   ffi.cdef [[
   struct utsname {
   char    sysname[256];
