@@ -200,7 +200,7 @@ t.timer = metatype("struct {timer_t timerid[1];}", {
     getoverrun = S.timer_getoverrun,
   },
   __gc = S.timer_delete,
-}
+})
 
 -- TODO reinstate this, more like fd is, hence changes to destroy
 --[[
