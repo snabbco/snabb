@@ -42,6 +42,7 @@ typedef uint32_t      dev_t;
 typedef uint32_t      fixpt_t;
 typedef	unsigned int  nfds_t;
 typedef int64_t       daddr_t;
+typedef int32_t       timer_t;
 ]]
 if abi.openbsd < 5.5 then append [[
 typedef uint32_t      ino_t;
