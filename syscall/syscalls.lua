@@ -683,21 +683,30 @@ if C.clock_nanosleep then
   end
 end
 
---[[
-int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid);
-int timer_settime(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec * old_value);
-int timer_gettime(timer_t timerid, struct itimerspec *curr_value);
-int timer_delete(timer_t timerid);
-int timer_getoverrun(timer_t timerid);
-]]
-
---[[
 if C.timer_create then
   function S.timer_create(clk_id, sigev, timerid)
-
+    timerid = timerid or t.timer()
+-- TODO sigev
+    local ret, err = C.timer_create(c.CLOCK[clk_id], sigev, timerid:gettimer())
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return timerid
   end
+  function S.timer_delete(timerid) return retbool(C.timer_delete(timerid)) end
+  function S.timer_settime(timerid, flags, new_value, old_value)
+    if old_value ~= false then old_value = old_value or t.itimerspec() else old_value = nil end
+    new_value = mktype(t.itimerspec, new_value)
+    local ret, err = C.timer_settime(timerid:gettimer(), c.TIMER[flags], new_value, old_value)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return true, nil, old_value
+  end
+  function S.timer_gettime(timerid, curr_value)
+    curr_value = curr_value or t.itimerspec()
+    local ret, err = C.timer_gettime(timerid:gettimer(), curr_value)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return curr_value
+  end
+  function S.timer_getoverrun(timerid) return retnum(C.timer_getoverrun(timerid:gettimer())) end
 end
-]]
 
 -- legacy in many OSs, implemented using recvfrom, sendto
 if C.send then

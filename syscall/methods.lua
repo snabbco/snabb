@@ -191,6 +191,7 @@ t.mqd = metatype("struct {mqd_t filenum;}", {
 })
 end
 
+-- TODO deal with delete twice issue with delet and gc
 t.timer = metatype("struct {timer_t timerid[1];}", {
   __index = {
     gettimer = function(self) return self.timerid end,
