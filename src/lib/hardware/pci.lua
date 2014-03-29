@@ -7,6 +7,9 @@ local lib = require("core.lib")
 
 require("lib.hardware.pci_h")
 
+-- This path is used if the "SNABB_PCI_DEVICE" environment variable is not defined
+PCI_DEFAULT_DEVICE_PATH = "/sys/bus/pci/devices"
+
 --- ### Hardware device information
 
 devices = {}
@@ -25,7 +28,7 @@ devices = {}
 
 --- Initialize (or re-initialize) the `devices` table.
 function scan_devices ()
-   for _,device in ipairs(lib.files_in_directory("/sys/bus/pci/devices")) do
+   for _,device in ipairs(lib.files_in_directory(get_pci_device_path())) do
       local info = device_info(device)
       if info.driver then table.insert(devices, info) end
    end
@@ -46,8 +49,14 @@ function device_info (pciaddress)
    return info
 end
 
+function get_pci_device_path()
+   return os.getenv("SNABB_PCI_DEVICE") or PCI_DEFAULT_DEVICE_PATH
+end
+
 --- Return the path to the sysfs directory for `pcidev`.
-function path(pcidev) return "/sys/bus/pci/devices/"..pcidev end
+function path(pcidev)
+   return get_pci_device_path() .. "/" .. pcidev
+end
 
 -- Return the name of the Lua module that implements support for this device.
 function which_driver (vendor, device)
