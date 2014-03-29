@@ -8,6 +8,8 @@ require("core.memory_h")
 
 -- This path is used if the "SNABB_HUGEPAGES" environment variable is not defined
 DEFAULT_HUGEPAGES_PATH = "/proc/sys/vm/nr_hugepages"
+-- This path is used if the "SNABB_MEMINFO" environment variable is not defined
+DEFAULT_MEMINFO_PATH = "/proc/meminfo"
 
 -- hook variables
 
@@ -65,6 +67,10 @@ function get_hugepages_path()
    return os.getenv("SNABB_HUGEPAGES") or DEFAULT_HUGEPAGES_PATH
 end
 
+function get_meminfo_path()
+   return os.getenv("SNABB_MEMINFO") or DEFAULT_MEMINFO_PATH
+end
+
 function get_hugepages ()
    return lib.readfile(get_hugepages_path(), "*n")
 end
@@ -74,7 +80,7 @@ function set_hugepages (n)
 end
 
 function get_huge_page_size ()
-   local meminfo = lib.readfile("/proc/meminfo", "*a")
+   local meminfo = lib.readfile(get_meminfo_path(), "*a")
    local _,_,hugesize = meminfo:find("Hugepagesize: +([0-9]+) kB")
    return hugesize
       and tonumber(hugesize) * 1024
