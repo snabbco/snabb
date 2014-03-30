@@ -4,6 +4,8 @@ E= @echo
 #Q=
 #E= @:
 
+TEST_SKIPPED="43"
+
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 
@@ -47,7 +49,18 @@ test: $(TESTMODS)
 
 $(TESTMODS): testlog snabbswitch
 	$(E) "TEST      $@"
-	$(Q) ./snabbswitch -t $@ > testlog/$@ || (echo "*** EXIT CODE: $?" >> testlog/$@; echo "ERROR     testlog/$@")
+	$(Q) ./snabbswitch -t $@ > testlog/$@ || ( \
+		EXITCODE="$$?"; \
+		[ "$$EXITCODE" -eq $(TEST_SKIPPED) ] \
+		&& ( \
+			echo "SKIPPED   testlog/$@"; \
+			echo "EXITCODE: $$EXITCODE" >> testlog/$@; \
+		) \
+		|| ( \
+			echo "ERROR     testlog/$@"; \
+			echo "EXITCODE: $$EXITCODE" >> testlog/$@; \
+		) \
+	)
 
 $(OBJDIR) testlog:
 	$(E) "DIR       $@"
