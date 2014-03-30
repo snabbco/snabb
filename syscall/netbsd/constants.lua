@@ -1292,6 +1292,15 @@ c.CTLFLAG = multiflags {
 }
 
 c.CTL = strflag {
+  -- meta
+  EOL        = -1,
+  QUERY      = -2,
+  CREATE     = -3,
+  CREATESYM  = -4,
+  DESTROY    = -5,
+  MMAP       = -6,
+  DESCRIBE   = -7,
+  -- top level
   UNSPEC     = 0,
   KERN       = 1,
   VM         = 2,
