@@ -1,3 +1,9 @@
+snabbswitch (2014.4) UNRELEASED; urgency=medium
+
+  * bump version
+
+ -- Vladislav Naumov <vnaum@vnaum.com>  Mon, 31 Mar 2014 14:48:40 +0700
+
 snabbswitch (0.0.1) unstable; urgency=low
 
   * Initial Release.
