@@ -12,10 +12,6 @@ local intel10g = require("apps.intel.intel10g")
 local vfio     = require("lib.hardware.vfio")
 local config = require("core.config")
 
--- default id of pci device used in test
--- This ID is used if the "SNABB_TEST_PCI_ID" environment variable is not defined
-DEFAULT_TEST_PCI_ID = "0000:01:00.0"
-
 Intel82599 = {}
 
 -- Create an Intel82599 App for the device with 'pciaddress'.
@@ -77,16 +73,21 @@ function Intel82599:report ()
 end
 
 function getTestPCIID()
-   return os.getenv("SNABB_TEST_PCI_ID") or DEFAULT_TEST_PCI_ID
+   return os.getenv("SNABB_TEST_PCI_ID")
 end
 
 function selftest ()
    print("selftest: intel_app")
    if not vfio.is_vfio_available() then
       print("VFIO not available\nTest skipped")
-      os.exit(app.TEST_SKIPPED_CODE)
+      os.exit(app.test_skipped_code)
    end
+
    local pciid = getTestPCIID()
+   if not pciid then
+      print("SNABB_sPCI_ID was not set\nTest skipped")
+      os.exit(app.test_skipped_code)
+   end
    -- Create a pieline:
    --   Source --> Intel82599(loopback) --> Sink
    -- and push packets through it.
