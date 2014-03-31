@@ -241,7 +241,7 @@ function selftest ()
             floor(effective_rate_busy_loop / PACKET_SIZE / 1e6),
             "Mpps")
 
-      -- on poor comuter effective rate may be to small
+      -- on poor computer effective rate may be too small
       -- so no formal checks
    end
 

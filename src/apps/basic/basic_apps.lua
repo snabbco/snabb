@@ -5,6 +5,9 @@ local buffer = require("core.buffer")
 local packet = require("core.packet")
 local link = require("core.link")
 
+local ffi = require("ffi")
+local C = ffi.C
+
 Basic = {}
 
 function Basic:relink ()
@@ -83,10 +86,29 @@ function Sink:push ()
    for _, i in ipairs(self.inputi) do
       for _ = 1, link.nreadable(i) do
         local p = link.receive(i)
-        assert(p.refcount == 1)
         packet.deref(p)
       end
    end
+end
+
+--- ### `FastSink` app: Receive and discard packets
+
+-- It is hacked Sink with very low packet processing overhead
+-- Only for test purpose, never use it in real world application
+-- Assumed to be used in pair with FastRepeater
+-- FastSink doesn't calculate rx statistics
+
+FastSink = setmetatable({}, {__index = Basic})
+
+function FastSink:new ()
+   return setmetatable({}, {__index=Sink})
+end
+
+function FastSink:push ()
+   local i = self.input.input
+   -- make link empty
+   i.read = 0
+   i.write = 0
 end
 
 --- ### `Tee` app: Send inputs to all outputs
@@ -130,7 +152,7 @@ function Repeater:push ()
    local i, o = self.input.input, self.output.output
    for _ = 1, link.nreadable(i) do
       local p = link.receive(i)
-      packet.ref(p)
+      packet.tenure(p)
       table.insert(self.packets, p)
    end
    local npackets = #self.packets
@@ -140,6 +162,50 @@ function Repeater:push ()
          link.transmit(o, self.packets[self.index])
          self.index = (self.index % npackets) + 1
       end
+   end
+end
+
+--- ### `FastRepeater` app: Send all received packets in a loop
+
+-- It is hacked Repeater with very low packet processing overhead
+-- Only for test purpose, never use it in real world application
+-- Assumed to be used in pair with FastSink
+
+FastRepeater = setmetatable({}, {__index = Basic})
+
+function FastRepeater:new ()
+   return setmetatable({init = true},
+                       {__index=FastRepeater})
+end
+
+do
+   local ring_size = C.LINK_RING_SIZE
+   local max_packets = C.LINK_MAX_PACKETS
+
+   function FastRepeater:push ()
+      local o = self.output.output
+      -- on first call read all packets
+      if self.init then
+         local i = self.input.input
+         local npackets = link.nreadable(i)
+         for index = 1, npackets do
+            local p = link.receive(i)
+            packet.tenure(p)
+            o.packets[index - 1] = p
+         end
+         --  and fullfil output link buffer
+         for index = npackets, max_packets do
+            o.packets[index] = o.packets[index % npackets]
+         end
+         o.stats.txpackets = ring_size
+         self.init = false
+         return
+      end
+      -- reset output link, make it full again
+      o.write = (o.write + link.nwritable(o)) % ring_size
+      -- assert(link.full(o)) -- hint how to debug
+      o.stats.txpackets = o.stats.txpackets + ring_size
+      -- intentionally don't calculate txbytes
    end
 end
 
