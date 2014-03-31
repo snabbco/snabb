@@ -8,7 +8,7 @@ local config = require("core.config")
 local timer  = require("core.timer")
 require("core.packet_h")
 
-TEST_SKIPPED_CODE = 43
+test_skipped_code = 43
 
 -- The set of all active apps and links in the system.
 -- Indexed both by name (in a table) and by number (in an array).

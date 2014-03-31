@@ -8,7 +8,7 @@ local lib = require("core.lib")
 require("lib.hardware.pci_h")
 
 -- This path is used if the "SNABB_PCI_DEVICE" environment variable is not defined
-PCI_DEFAULT_DEVICE_PATH = "/sys/bus/pci/devices"
+pci_default_device_path = "/sys/bus/pci/devices"
 
 --- ### Hardware device information
 
@@ -50,7 +50,7 @@ function device_info (pciaddress)
 end
 
 function get_pci_device_path()
-   return os.getenv("SNABB_PCI_DEVICE") or PCI_DEFAULT_DEVICE_PATH
+   return os.getenv("SNABB_PCI_DEVICE") or pci_default_device_path
 end
 
 --- Return the path to the sysfs directory for `pcidev`.

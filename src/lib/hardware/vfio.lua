@@ -12,9 +12,9 @@ require("lib.hardware.vfio_h")
 initialized = false
 
 -- This path is used if the "SNABB_VFIO_DRIVER" environment variable is not defined
-VFIO_DEFAULT_DRIVER_PATH = "/sys/bus/pci/drivers/vfio-pci"
+vfio_default_driver_path = "/sys/bus/pci/drivers/vfio-pci"
 -- This path is used if the "SNABB_VFIO_IOMMU_GROUPS" environment variable is not defined
-VFIO_DEFAULT_IOMMU_GROUP_PATH = "/sys/kernel/iommu_groups"
+vfio_default_iommu_group_path = "/sys/kernel/iommu_groups"
 
 -- Array of mappings that were requested before vfio was initialized.
 -- 
@@ -75,7 +75,7 @@ function device_group(pciaddress)
 end
 
 function get_iommu_groups_path()
-   return os.getenv("SNABB_VFIO_IOMMU_GROUPS") or VFIO_DEFAULT_IOMMU_GROUP_PATH
+   return os.getenv("SNABB_VFIO_IOMMU_GROUPS") or vfio_default_iommu_group_path
 end
 
 -- Return all the devices that belong to the same group
@@ -89,7 +89,7 @@ end
 --- ### Device manipulation.
 
 function get_driver_path ()
-   return os.getenv("SNABB_VFIO_DRIVER") or VFIO_DEFAULT_DRIVER_PATH
+   return os.getenv("SNABB_VFIO_DRIVER") or vfio_default_driver_path
 end
 
 --- add a device to the vfio-pci driver
