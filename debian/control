@@ -10,7 +10,25 @@ Vcs-Browser: https://github.com/SnabbCo/snabbswitch
 
 Package: snabbswitch
 Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: toolkit for solving novel problems in networking
+ Snabb Switch is a toolkit for solving novel problems in networking. If you are
+ building a new packet-processing network appliance then you can use Snabb
+ Switch to get the job done more quickly.
+ .
+ Highlights of the software:
+ .
+  * Processes millions of ethernet packets per second per core. Suitable for ISPs.
+  * Speaks natively to Ethernet hardware, Hypervisors, and the Linux kernel.
+  * You can program it with LuaJIT extensions to do anything you want.
+ .
+ Snabb Switch is 100% open source and runs as a stand-alone Linux userspace
+ executable.
+
+Package: snabbswitch-nfv
+Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends},
+ snabbswitch,
  libvirt0 (= 1.2.2-1snabb1),
  libvirt0-dbg (= 1.2.2-1snabb1),
  libvirt-bin (= 1.2.2-1snabb1),
@@ -123,3 +141,5 @@ Description: toolkit for solving novel problems in networking
  .
  Snabb Switch is 100% open source and runs as a stand-alone Linux userspace
  executable.
+ .
+ This meta-package depends on snabbswitch and Openstack packages
