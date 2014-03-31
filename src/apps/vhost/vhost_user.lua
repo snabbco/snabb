@@ -28,10 +28,6 @@ require("apps.vhost.vhost_user_h")
 
 assert(ffi.sizeof("struct vhost_user_msg") == 212, "ABI error")
 
--- default id of pci device used in test
--- This ID is used if the "SNABB_TEST_PCI_ID" environment variable is not defined
-DEFAULT_TEST_PCI_ID = "0000:01:00.0"
-
 VhostUser = {}
 
 function VhostUser:new (socket_path)
@@ -421,14 +417,18 @@ function map_from_qemu (addr, mem_table)
 end
 
 function getTestPCIID()
-   return os.getenv("SNABB_TEST_PCI_ID") or DEFAULT_TEST_PCI_ID
+   return os.getenv("SNABB_TEST_PCI_ID")
+end
+
+function getVhostUserSocketFile()
+   return os.getenv("SNABB_VHOST_USER_SOCKET_FILE")
 end
 
 function selftest ()
    print("selftest: vhost_user")
    if not vfio.is_vfio_available() then
       print("VFIO not available\nTest skipped")
-      os.exit(app.TEST_SKIPPED_CODE)
+      os.exit(app.test_skipped_code)
    end
    -- Create an app network that proxies packets between a vhost_user
    -- port (qemu) and an Intel port (in loopback mode). Create
@@ -448,12 +448,22 @@ function selftest ()
    --       intel pcap
    -- 
    local pciid = getTestPCIID()
+   if not pciid then
+      print("SNABB_TEST_PCI_ID was not set\nTest skipped")
+      os.exit(app.test_skipped_code)
+   end
+
+   local vhost_user_sock = getVhostUserSocketFile()
+   if not vhost_user_sock then
+      print("SNABB_VHOST_USER_SOCKET_FILE was not set\nTest skipped")
+      os.exit(app.test_skipped_code)
+   end
 
    pci.unbind_device_from_linux(pciid)
    vfio.setup_vfio(pciid)
    vfio.bind_device_to_vfio(pciid)
    local c = config.new()
-   config.app(c, "vhost_user", VhostUser, "vhost_user_test.sock")
+   config.app(c, "vhost_user", VhostUser, vhost_user_sock)
    config.app(c, "vhost_dump", pcap.PcapWriter, "vhost_vm_dump.cap")
    config.app(c, "vhost_tee", basic_apps.Tee)
    config.app(c, "intel", intel_app.Intel82599, pciid)
