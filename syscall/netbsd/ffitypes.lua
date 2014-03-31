@@ -673,6 +673,10 @@ struct _netbsd_vmtotal
   int32_t t_armshr;
   int32_t t_free;
 };
+struct _netbsd_ctlname {
+  const char *ctl_name;
+  int     ctl_type;
+};
 ]]
 
 local s = table.concat(defs, "")
