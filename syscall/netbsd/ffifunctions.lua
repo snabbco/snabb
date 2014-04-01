@@ -56,7 +56,6 @@ int __mknod50(const char *path, mode_t mode, dev_t dev);
 
 int __getcwd(char *buf, size_t size);
 int __libc_sigaction14(int signum, const struct sigaction *act, struct sigaction *oldact);
-int __sysctl(const int *, unsigned int, void *, size_t *, const void *, size_t);
 
 int _ksem_init(unsigned int, intptr_t *);
 int _ksem_open(const char *, int, mode_t, unsigned int, intptr_t *);

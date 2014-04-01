@@ -15,23 +15,34 @@ require "syscall.ffitypes"
 
 local helpers = require "syscall.helpers"
 
+-- TODO constants probably needs version, so may need its own module
 -- NetBSD ABI version
+--[[
 if not abi.uname then abi.netbsd = 6 else -- TODO temporary; no uname in rump
 local r = helpers.split("%.", ffi.string(abi.uname.release))
 local maj, min = tonumber(r[1]), tonumber(r[2])
 if min == 99 then maj = maj + 1 end
 abi.netbsd = maj
 end
+]]
 
---[[
-local sc = ffi.new("int[2]", 0, 3) -- kern.osrev
+ffi.cdef[[
+int __sysctl(const int *, unsigned int, void *, size_t *, const void *, size_t);
+int rump___sysimpl___sysctl(const int *, unsigned int, void *, size_t *, const void *, size_t);
+]]
+local sc = ffi.new("int[2]", 1, 3) -- kern.osrev
 local osrevision = ffi.new("int[1]")
 local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
-local ok, res = pcall(C.sysctl, sc, 2, osrevision, lenp, nil, 0)
-local maj, min = osrevision[0] / 1000000000, osrevision[0] / 10000000
-if min == 99 then maj = maj + 1 end
-abi.netbsd = maj
-]]
+local ok, res = pcall(ffi.C.__sysctl, sc, 2, osrevision, lenp, nil, 0)
+-- TODO will not work with rump as not called rumpinit() yet...
+if not ok then ok, res = pcall(ffi.C.rump___sysimpl___sysctl, sc, 2, osrevision, lenp, nil, 0) end
+if not ok or res == -1 then 
+  abi.netbsd = 7
+else
+  local maj, min = osrevision[0] / 1000000000, osrevision[0] / 10000000
+  if min == 99 then maj = maj + 1 end
+  abi.netbsd = maj
+end
 
 local defs = {}
 

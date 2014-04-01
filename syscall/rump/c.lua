@@ -109,7 +109,6 @@ int rump___sysimpl_setrlimit(int, const struct _netbsd_rlimit *);
 off_t rump___sysimpl_lseek(int, off_t, int);
 int rump___sysimpl_truncate(const char *, off_t);
 int rump___sysimpl_ftruncate(int, off_t);
-int rump___sysimpl___sysctl(const int *, unsigned int, void *, size_t *, const void *, size_t);
 int rump___sysimpl_futimes50(int, const struct _netbsd_timeval *);
 pid_t rump___sysimpl_getpgid(pid_t);
 int rump___sysimpl_reboot(int, char *);
@@ -219,6 +218,10 @@ int rump___sysimpl_clock_nanosleep(_netbsd_clockid_t, int, const struct _netbsd_
 int rump___sysimpl_timer_create(_netbsd_clockid_t, struct _netbsd_sigevent *, _netbsd_timer_t *);
 int rump___sysimpl_timer_delete(_netbsd_timer_t);
 int rump___sysimpl_timer_getoverrun(_netbsd_timer_t);
+
+/*
+int rump___sysimpl___sysctl(const int *, unsigned int, void *, size_t *, const void *, size_t);
+*/
 
 int rump_sys_pipe(int *);
 ]]

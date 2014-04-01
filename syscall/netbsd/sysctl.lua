@@ -26,7 +26,7 @@ local types = {
 
   ["kern.ostype"]    = "string",
   ["kern.osrelease"] = "string",
-  ["kern.osrev"]     = "int",
+  ["kern.osrevision"]= {c.KERN.OSREV, "int"},
   ["kern.version"]   = "string",
   ["kern.maxvnodes"] = "int",
   ["kern.maxproc"]   = "int",
