@@ -174,8 +174,7 @@ function receive (dev)
 end
 
 function can_receive (dev)
-   return bit.band(dev.rxdesc[dev.rxnext].wb.status, 1) == 1
-   -- return dev.rxnext ~= dev.rdh
+   return dev.rxnext ~= dev.rdh and bit.band(dev.rxdesc[dev.rxnext].wb.status, 1) == 1
 end
 
 function can_add_receive_buffer (dev)
