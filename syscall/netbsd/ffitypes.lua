@@ -39,7 +39,8 @@ if not ok then ok, res = pcall(ffi.C.rump___sysimpl___sysctl, sc, 2, osrevision,
 if not ok or res == -1 then 
   abi.netbsd = 7
 else
-  local maj, min = osrevision[0] / 1000000000, osrevision[0] / 10000000
+  local maj = math.floor(osrevision[0] / 100000000)
+  local min = math.floor(osrevision[0] / 1000000) - maj * 100
   if min == 99 then maj = maj + 1 end
   abi.netbsd = maj
 end
