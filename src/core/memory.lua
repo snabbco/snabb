@@ -6,6 +6,7 @@ local C = ffi.C
 local lib = require("core.lib")
 require("core.memory_h")
 
+hugepages_path = "/proc/sys/vm/nr_hugepages"
 
 -- hook variables
 
@@ -60,11 +61,11 @@ function reserve_new_page ()
 end
 
 function get_hugepages ()
-   return lib.readfile("/proc/sys/vm/nr_hugepages", "*n")
+   return lib.readfile(hugepages_path, "*n")
 end
 
 function set_hugepages (n)
-   lib.writefile("/proc/sys/vm/nr_hugepages", tostring(n))
+   lib.writefile(hugepages_path, tostring(n))
 end
 
 function get_huge_page_size ()
@@ -97,7 +98,7 @@ end
 function selftest (options)
    print("selftest: memory")
    require("lib.hardware.bus")
-   print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
+   print("HugeTLB pages (" .. hugepages_path .. "): " .. get_hugepages())
    for i = 1, 4 do
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
       io.flush()
@@ -107,7 +108,7 @@ function selftest (options)
       ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- try a write
       assert(dmaptr ~= nil and dmalen == huge_page_size)
    end
-   print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
+   print("HugeTLB pages (" .. hugepages_path .. "): " .. get_hugepages())
    print("HugeTLB page allocation OK.")
 end
 
