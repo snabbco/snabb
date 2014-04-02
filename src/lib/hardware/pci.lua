@@ -7,6 +7,8 @@ local lib = require("core.lib")
 
 require("lib.hardware.pci_h")
 
+devices_path = "/sys/bus/pci/devices"
+
 --- ### Hardware device information
 
 devices = {}
@@ -25,7 +27,7 @@ devices = {}
 
 --- Initialize (or re-initialize) the `devices` table.
 function scan_devices ()
-   for _,device in ipairs(lib.files_in_directory("/sys/bus/pci/devices")) do
+   for _,device in ipairs(lib.files_in_directory(devices_path)) do
       local info = device_info(device)
       if info.driver then table.insert(devices, info) end
    end
@@ -47,7 +49,9 @@ function device_info (pciaddress)
 end
 
 --- Return the path to the sysfs directory for `pcidev`.
-function path(pcidev) return "/sys/bus/pci/devices/"..pcidev end
+function path(pcidev)
+   return devices_path .. "/" .. pcidev
+end
 
 -- Return the name of the Lua module that implements support for this device.
 function which_driver (vendor, device)
