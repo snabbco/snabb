@@ -87,6 +87,10 @@ function bind_device_to_vfio (pciaddress)
     lib.writefile(drivers_path .. "/bind", pciaddress)
 end
 
+function is_vfio_available()
+   return lib.can_write(drivers_path .. "/bind")
+end
+
 function setup_vfio(pciaddress, do_group)
     if do_group then
         for _,f in ipairs(group_devices(device_group(pciaddress))) do
