@@ -1,0 +1,145 @@
+Source: snabbswitch
+Section: unknown
+Priority: optional
+Maintainer: Vladislav Naumov <vnaum@vnaum.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: http://www.snabb.co/
+Vcs-Git: https://github.com/SnabbCo/snabbswitch.git
+Vcs-Browser: https://github.com/SnabbCo/snabbswitch
+
+Package: snabbswitch
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: toolkit for solving novel problems in networking
+ Snabb Switch is a toolkit for solving novel problems in networking. If you are
+ building a new packet-processing network appliance then you can use Snabb
+ Switch to get the job done more quickly.
+ .
+ Highlights of the software:
+ .
+  * Processes millions of ethernet packets per second per core. Suitable for ISPs.
+  * Speaks natively to Ethernet hardware, Hypervisors, and the Linux kernel.
+  * You can program it with LuaJIT extensions to do anything you want.
+ .
+ Snabb Switch is 100% open source and runs as a stand-alone Linux userspace
+ executable.
+
+Package: snabbswitch-nfv
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},
+ snabbswitch,
+ libvirt0 (= 1.2.2-1snabb1),
+ libvirt0-dbg (= 1.2.2-1snabb1),
+ libvirt-bin (= 1.2.2-1snabb1),
+ libvirt-dev (= 1.2.2-1snabb1),
+ libvirt-doc (= 1.2.2-1snabb1),
+ neutron-common (= 2013.2~rc3-1snabb1),
+ neutron-dhcp-agent (= 2013.2~rc3-1snabb1),
+ neutron-l3-agent (= 2013.2~rc3-1snabb1),
+ neutron-lbaas-agent (= 2013.2~rc3-1snabb1),
+ neutron-metadata-agent (= 2013.2~rc3-1snabb1),
+ neutron-plugin-bigswitch (= 2013.2~rc3-1snabb1),
+ neutron-plugin-brocade (= 2013.2~rc3-1snabb1),
+ neutron-plugin-cisco (= 2013.2~rc3-1snabb1),
+ neutron-plugin-hyperv (= 2013.2~rc3-1snabb1),
+ neutron-plugin-linuxbridge (= 2013.2~rc3-1snabb1),
+ neutron-plugin-linuxbridge-agent (= 2013.2~rc3-1snabb1),
+ neutron-plugin-metaplugin (= 2013.2~rc3-1snabb1),
+ neutron-plugin-metering-agent (= 2013.2~rc3-1snabb1),
+ neutron-plugin-midonet (= 2013.2~rc3-1snabb1),
+ neutron-plugin-mlnx-agent (= 2013.2~rc3-1snabb1),
+ neutron-plugin-nec (= 2013.2~rc3-1snabb1),
+ neutron-plugin-nec-agent (= 2013.2~rc3-1snabb1),
+ neutron-plugin-nicira (= 2013.2~rc3-1snabb1),
+ neutron-plugin-openvswitch (= 2013.2~rc3-1snabb1),
+ neutron-plugin-openvswitch-agent (= 2013.2~rc3-1snabb1),
+ neutron-plugin-plumgrid (= 2013.2~rc3-1snabb1),
+ neutron-plugin-ryu (= 2013.2~rc3-1snabb1),
+ neutron-plugin-ryu-agent (= 2013.2~rc3-1snabb1),
+ neutron-plugin-vpn-agent (= 2013.2~rc3-1snabb1),
+ neutron-server (= 2013.2~rc3-1snabb1),
+ nova-ajax-console-proxy (= 2014.1~b3-1snabb1),
+ nova-api (= 2014.1~b3-1snabb1),
+ nova-api-ec2 (= 2014.1~b3-1snabb1),
+ nova-api-metadata (= 2014.1~b3-1snabb1),
+ nova-api-os-compute (= 2014.1~b3-1snabb1),
+ nova-api-os-volume (= 2014.1~b3-1snabb1),
+ nova-baremetal (= 2014.1~b3-1snabb1),
+ nova-cells (= 2014.1~b3-1snabb1),
+ nova-cert (= 2014.1~b3-1snabb1),
+ nova-common (= 2014.1~b3-1snabb1),
+ nova-compute (= 2014.1~b3-1snabb1),
+ nova-compute-kvm (= 2014.1~b3-1snabb1),
+ nova-compute-libvirt (= 2014.1~b3-1snabb1),
+ nova-compute-lxc (= 2014.1~b3-1snabb1),
+ nova-compute-qemu (= 2014.1~b3-1snabb1),
+ nova-compute-vmware (= 2014.1~b3-1snabb1),
+ nova-compute-xen (= 2014.1~b3-1snabb1),
+ nova-conductor (= 2014.1~b3-1snabb1),
+ nova-console (= 2014.1~b3-1snabb1),
+ nova-consoleauth (= 2014.1~b3-1snabb1),
+ nova-doc (= 2014.1~b3-1snabb1),
+ nova-network (= 2014.1~b3-1snabb1),
+ nova-novncproxy (= 2014.1~b3-1snabb1),
+ nova-objectstore (= 2014.1~b3-1snabb1),
+ nova-scheduler (= 2014.1~b3-1snabb1),
+ nova-spiceproxy (= 2014.1~b3-1snabb1),
+ nova-volume (= 2014.1~b3-1snabb1),
+ nova-xvpvncproxy (= 2014.1~b3-1snabb1),
+ python-neutron (= 2013.2~rc3-1snabb1),
+ python-nova (= 2014.1~b3-1snabb1),
+ python-quantum (= 2013.2~rc3-1snabb1),
+ qemu (= 1.7.0+dfsg-4snabb1),
+ qemu-common (= 1.7.0+dfsg-4snabb1),
+ qemu-guest-agent (= 1.7.0+dfsg-4snabb1),
+ qemu-keymaps (= 1.7.0+dfsg-4snabb1),
+ qemu-kvm (= 1.7.0+dfsg-4snabb1),
+ qemu-system (= 1.7.0+dfsg-4snabb1),
+ qemu-system-arm (= 1.7.0+dfsg-4snabb1),
+ qemu-system-common (= 1.7.0+dfsg-4snabb1),
+ qemu-system-mips (= 1.7.0+dfsg-4snabb1),
+ qemu-system-misc (= 1.7.0+dfsg-4snabb1),
+ qemu-system-ppc (= 1.7.0+dfsg-4snabb1),
+ qemu-system-sparc (= 1.7.0+dfsg-4snabb1),
+ qemu-system-x86 (= 1.7.0+dfsg-4snabb1),
+ qemu-user (= 1.7.0+dfsg-4snabb1),
+ qemu-user-static (= 1.7.0+dfsg-4snabb1),
+ qemu-utils (= 1.7.0+dfsg-4snabb1),
+ quantum-common (= 2013.2~rc3-1snabb1),
+ quantum-dhcp-agent (= 2013.2~rc3-1snabb1),
+ quantum-l3-agent (= 2013.2~rc3-1snabb1),
+ quantum-lbaas-agent (= 2013.2~rc3-1snabb1),
+ quantum-metadata-agent (= 2013.2~rc3-1snabb1),
+ quantum-plugin-bigswitch (= 2013.2~rc3-1snabb1),
+ quantum-plugin-brocade (= 2013.2~rc3-1snabb1),
+ quantum-plugin-cisco (= 2013.2~rc3-1snabb1),
+ quantum-plugin-hyperv (= 2013.2~rc3-1snabb1),
+ quantum-plugin-linuxbridge (= 2013.2~rc3-1snabb1),
+ quantum-plugin-linuxbridge-agent (= 2013.2~rc3-1snabb1),
+ quantum-plugin-metaplugin (= 2013.2~rc3-1snabb1),
+ quantum-plugin-midonet (= 2013.2~rc3-1snabb1),
+ quantum-plugin-nec (= 2013.2~rc3-1snabb1),
+ quantum-plugin-nec-agent (= 2013.2~rc3-1snabb1),
+ quantum-plugin-nicira (= 2013.2~rc3-1snabb1),
+ quantum-plugin-openvswitch (= 2013.2~rc3-1snabb1),
+ quantum-plugin-openvswitch-agent (= 2013.2~rc3-1snabb1),
+ quantum-plugin-plumgrid (= 2013.2~rc3-1snabb1),
+ quantum-plugin-ryu (= 2013.2~rc3-1snabb1),
+ quantum-plugin-ryu-agent (= 2013.2~rc3-1snabb1),
+ quantum-server (= 2013.2~rc3-1snabb1)
+Description: toolkit for solving novel problems in networking
+ Snabb Switch is a toolkit for solving novel problems in networking. If you are
+ building a new packet-processing network appliance then you can use Snabb
+ Switch to get the job done more quickly.
+ .
+ Highlights of the software:
+ .
+  * Processes millions of ethernet packets per second per core. Suitable for ISPs.
+  * Speaks natively to Ethernet hardware, Hypervisors, and the Linux kernel.
+  * You can program it with LuaJIT extensions to do anything you want.
+ .
+ Snabb Switch is 100% open source and runs as a stand-alone Linux userspace
+ executable.
+ .
+ This meta-package depends on snabbswitch and Openstack packages

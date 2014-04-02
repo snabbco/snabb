@@ -33,6 +33,10 @@ PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
 all: snabbswitch
 
+install: snabbswitch
+	install -d -m 755 $(DESTDIR)/usr/sbin
+	install -m 755 snabbswitch $(DESTDIR)/usr/sbin
+
 markdown: $(RMOBJS)
 
 snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
