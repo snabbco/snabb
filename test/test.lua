@@ -1836,7 +1836,7 @@ test_misc = {
     local sc = "kern.ostype"
     if os == "linux" then sc = "kernel.ostype" end
     local val = assert(S.sysctl(sc))
-    if val == "darwin" then val = "osx" end
+    if val:lower() == "darwin" then val = "osx" end
     assert_equal(val:lower(), os)
   end,
 }
