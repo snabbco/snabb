@@ -218,6 +218,28 @@ end
 
 --- ### Status and diagnostics
 
+function negotiated_autoc(dev, f)
+   lib.waitfor(function()
+      local accessible = false
+      dev.r.SWSM:wait(bits{SMBI=0})        -- TODO: expire at 10ms
+      dev.r.SWSM:set(bits{SWESMBI=1})
+      dev.r.SWSM:wait(bits{SWESMBI=1})     -- TODO: expire at 3s
+      accessible = bit.band(dev.r.SW_FW_SYNC(), 0x8) == 0
+      if accessible then
+         dev.r.SW_FW_SYNC:set(0x8)
+      end
+      dev.r.SWSM:clr(bits{SMBI=0, SWESMBI=1})
+      if not accessible then C.usleep(3000000) end
+      return accessible
+   end)   -- TODO: only twice
+   f(dev)
+   dev.r.SWSM:wait(bits{SMBI=0})        -- TODO: expire at 10ms
+   dev.r.SWSM:set(bits{SWESMBI=1})
+   dev.r.SWSM:wait(bits{SWESMBI=1})     -- TODO: expire at 3s
+   dev.r.SW_FW_SYNC:clr(0x8)
+   dev.r.SWSM:clr(bits{SMBI=0, SWESMBI=1})
+end
+
 function linkup (dev)
    return bitset(dev.r.LINKS(), 30)
 end
@@ -231,8 +253,29 @@ function restore_configuration_state (dev, saved_state)
    dev.r.HLREG0(saved_state.HLREG0)
 end
 
+function force_link_up(dev)
+   dev.r.AUTOC:set(bits({ForceLinkUp=0}))
+end
+
+function set_SFI(dev)
+   local autoc = dev.r.AUTOC()
+   autoc = bit.bor(
+      bit.band(autoc, 0xFFFF0C7E),          -- clears FLU, 10g_pma, 1g_pma, restart_AN, LMS
+      bit.lshift(0x3, 13)                   -- LMS(15:13) = 011b
+   )
+   dev.r.AUTOC(autoc)                       -- TODO: firmware synchronization
+end
+
+function autonegotiate_sfi(dev)
+   negotiated_autoc(dev, function()
+      set_SFI(dev)
+      dev.r.AUTOC:set(bits{reastat_AN=12})
+      dev.r.AUTOC2(0x00020000)
+   end)
+end
+
 function enable_mac_loopback (dev)
-   dev.r.AUTOC:set(bits({ForceLinkUp=0, LMS10G=13}))
+   dev.r.AUTOC:set(bits({ForceLinkUp=0, LMS10G=13, sfi=14}))
    dev.r.HLREG0:set(bits({Loop=15}))
 end
 
@@ -246,12 +289,14 @@ end
 
 config_registers_desc = [[
 AUTOC     0x042A0 -            RW Auto Negotiation Control
+AUTOC2    0x042A8 -            RW Auto Negotiation Control 2
 CTRL      0x00000 -            RW Device Control
 DMATXCTL  0x04A80 -            RW DMA Tx Control
 EEC       0x10010 -            RW EEPROM/Flash Control
 FCTRL     0x05080 -            RW Filter Control
 HLREG0    0x04240 -            RW MAC Core Control 0
 LINKS     0x042A4 -            RO Link Status Register
+LINKS2    0x04324 -            RO Second status link register
 RDBAL     0x01000 +0x40*0..63  RW Receive Descriptor Base Address Low
 RDBAH     0x01004 +0x40*0..63  RW Receive Descriptor Base Address High
 RDLEN     0x01008 +0x40*0..63  RW Receive Descriptor Length
@@ -263,6 +308,8 @@ RTTDCS    0x04900 -            RW DCB Transmit Descriptor Plane Control
 RXCTRL    0x03000 -            RW Receive Control
 SECRX_DIS 0x08D00 -            RW Security RX Control
 STATUS    0x00008 -            RO Device Status
+SWSM      0x10140 -            RW Software Semaphore Register
+SW_FW_SYNC 0x10160 -           RW Software–Firmware Synchronization
 TDBAL     0x06000 +0x40*0..127 RW Transmit Descriptor Base Address Low
 TDBAH     0x06004 +0x40*0..127 RW Transmit Descriptor Base Address High
 TDH       0x06010 +0x40*0..127 RW Transmit Descriptor Head
