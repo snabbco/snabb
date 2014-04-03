@@ -6,6 +6,10 @@ local C = ffi.C
 local lib = require("core.lib")
 require("core.memory_h")
 
+-- This path is used if the "SNABB_HUGEPAGES" environment variable is not defined
+DEFAULT_HUGEPAGES_PATH = "/proc/sys/vm/nr_hugepages"
+-- This path is used if the "SNABB_MEMINFO" environment variable is not defined
+DEFAULT_MEMINFO_PATH = "/proc/meminfo"
 
 -- hook variables
 
@@ -59,18 +63,28 @@ function reserve_new_page ()
    set_hugepages(get_hugepages() + 1)
 end
 
+function get_hugepages_path()
+   return os.getenv("SNABB_HUGEPAGES") or DEFAULT_HUGEPAGES_PATH
+end
+
+function get_meminfo_path()
+   return os.getenv("SNABB_MEMINFO") or DEFAULT_MEMINFO_PATH
+end
+
 function get_hugepages ()
-   return lib.readfile("/proc/sys/vm/nr_hugepages", "*n")
+   return lib.readfile(get_hugepages_path(), "*n")
 end
 
 function set_hugepages (n)
-   lib.writefile("/proc/sys/vm/nr_hugepages", tostring(n))
+   lib.writefile(get_hugepages_path(), tostring(n))
 end
 
 function get_huge_page_size ()
-   local meminfo = lib.readfile("/proc/meminfo", "*a")
+   local meminfo = lib.readfile(get_meminfo_path(), "*a")
    local _,_,hugesize = meminfo:find("Hugepagesize: +([0-9]+) kB")
-   return tonumber(hugesize) * 1024
+   return hugesize
+      and tonumber(hugesize) * 1024
+       or 2048 -- A typical x86 system will have a Huge Page Size of 2048 kBytes
 end
 
 base_page_size = 4096
@@ -95,7 +109,7 @@ end
 function selftest (options)
    print("selftest: memory")
    require("lib.hardware.bus")
-   print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
+   print("HugeTLB pages (" .. get_hugepages_path() .. "): " .. get_hugepages())
    for i = 1, 4 do
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
       io.flush()
@@ -105,7 +119,7 @@ function selftest (options)
       ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- try a write
       assert(dmaptr ~= nil and dmalen == huge_page_size)
    end
-   print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
+   print("HugeTLB pages (" .. get_hugepages_path() .. "): " .. get_hugepages())
    print("HugeTLB page allocation OK.")
 end
 

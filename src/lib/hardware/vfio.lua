@@ -11,6 +11,11 @@ require("lib.hardware.vfio_h")
 -- Is VFIO initialized yet?
 initialized = false
 
+-- This path is used if the "SNABB_VFIO_DRIVER" environment variable is not defined
+vfio_default_driver_path = "/sys/bus/pci/drivers/vfio-pci"
+-- This path is used if the "SNABB_VFIO_IOMMU_GROUPS" environment variable is not defined
+vfio_default_iommu_group_path = "/sys/kernel/iommu_groups"
+
 -- Array of mappings that were requested before vfio was initialized.
 -- 
 -- These must then be mapped at initialization time.
@@ -69,17 +74,31 @@ function device_group(pciaddress)
     return lib.basename(lib.readlink(pci.path(pciaddress)..'/iommu_group'))
 end
 
+function get_iommu_groups_path()
+   return os.getenv("SNABB_VFIO_IOMMU_GROUPS") or vfio_default_iommu_group_path
+end
+
 -- Return all the devices that belong to the same group
 function group_devices(group)
-    if not group then return {} end
-    return lib.files_in_directory('/sys/kernel/iommu_groups/'..group..'/devices/')
+   if not group then return {} end
+   return lib.files_in_directory(
+         get_iommu_groups_path() .. '/' .. group .. '/devices/'
+      )
 end
 
 --- ### Device manipulation.
 
+function get_driver_path ()
+   return os.getenv("SNABB_VFIO_DRIVER") or vfio_default_driver_path
+end
+
 --- add a device to the vfio-pci driver
 function bind_device_to_vfio (pciaddress)
-    lib.writefile("/sys/bus/pci/drivers/vfio-pci/bind", pciaddress)
+   lib.writefile(get_driver_path() .. "/bind", pciaddress)
+end
+
+function is_vfio_available()
+   return lib.can_write(get_driver_path() .. "/bind")
 end
 
 function setup_vfio(pciaddress, do_group)
