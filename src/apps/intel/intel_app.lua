@@ -18,7 +18,9 @@ Intel82599 = {}
 function Intel82599:new (pciaddress)
    local a = { dev = intel10g.new(pciaddress) }
    setmetatable(a, {__index = Intel82599 })
-   intel10g.open_for_loopback_test(a.dev)
+   intel10g.open(a.dev)
+   intel10g.autonegotiate_sfi(a.dev)
+   intel10g.wait_linkup(a.dev)
    return a
 end
 
@@ -70,31 +72,31 @@ function Intel82599:report ()
    print("report on intel device", self.dev.pciaddress)
    --register.dump(self.dev.r)
    register.dump(self.dev.s, true)
+   register.dump({
+      self.dev.r.TDH, self.dev.r.TDT,
+      self.dev.r.RDH, self.dev.r.RDT,
+      self.dev.r.AUTOC, self.dev.r.AUTOC2,
+      self.dev.r.LINKS, self.dev.r.LINKS2,
+   })
 end
 
 function selftest ()
    -- Create a pieline:
    --   Source --> Intel82599(loopback) --> Sink
    -- and push packets through it.
-   vfio.bind_device_to_vfio("0000:01:00.0")
    local c = config.new()
-   config.app(c, "intel10g", Intel82599, "0000:01:00.0")
-   config.app(c, "source", basic_apps.Source)
-   config.app(c, "sink", basic_apps.Sink)
-   config.link(c, "source.out -> intel10g.rx")
-   config.link(c, "intel10g.tx -> sink.in")
+   config.app(c, 'source1', basic_apps.Source)
+   config.app(c, 'source2', basic_apps.Source)
+   config.app(c, 'intel10g_05', Intel82599, '0000:05:00.0')
+   config.app(c, 'intel10g_8a', Intel82599, '0000:8a:00.0')
+   config.app(c, 'sink', basic_apps.Sink)
+   config.link(c, 'source1.out -> intel10g_05.rx')
+   config.link(c, 'source2.out -> intel10g_8a.rx')
+   config.link(c, 'intel10g_05.tx -> sink.in1')
+   config.link(c, 'intel10g_8a.tx -> sink.in2')
    app.configure(c)
---[[
-   app.apps.intel10g = Intel82599:new("0000:01:00.0")
-   app.apps.source = app.new(basic_apps.Source)
-   app.apps.sink   = app.new(basic_apps.Sink)
-   app.connect("source", "out", "intel10g", "rx")
-   app.connect("intel10g", "tx", "sink", "in")
-   app.relink()
---]]
+
    buffer.preallocate(100000)
    app.main({duration = 1})
---   repeat app.breathe() until deadline()
---   app.report()
 end
 

@@ -100,6 +100,94 @@ function bitset (value, n)
    return bit.band(value, bit.lshift(1, n)) ~= 0
 end
 
+--- Hex dump and undump functions
+
+function hexdump(s)
+   if #s < 1 then return '' end
+   local frm = ('%02X '):rep(#s-1)..'%02X'
+   return string.format(frm, s:byte(1, #s))
+end
+
+function hexundump(h, n)
+   local buf = ffi.new('char[?]', n)
+   local i = 0
+   for b in h:gmatch('[0-9a-fA-F][0-9a-fA-F]') do
+      buf[i] = tonumber(b, 16)
+      i = i+1
+      if i >= n then break end
+   end
+   return ffi.string(buf, n)
+end
+
+do
+   --- MAC address handling object.
+   -- depends on LuaJIT's 64-bit capabilities,
+   -- both for nubmers and bit.* library
+
+   local mac_t = ffi.typeof('union { int64_t bits; uint8_t bytes[6];}')
+
+   local mac_mt = {}
+   mac_mt.__index = mac_mt
+
+   function new_mac(m)
+      if ffi.istype(mac_t, m) then
+         return m
+      end
+      local macobj = mac_t()
+      local i = 0;
+      for b in m:gmatch('[0-9a-fA-F][0-9a-fA-F]') do
+         macobj.bytes[i] = tonumber(b, 16)
+         i = i + 1
+      end
+      return macobj
+   end
+
+   function mac_mt:__tostring()
+      return string.format('%02X:%02X:%02X:%02X:%02X:%02X',
+         self.bytes[0], self.bytes[1], self.bytes[2],
+         self.bytes[3], self.bytes[4], self.bytes[5])
+   end
+
+   function mac_mt.__eq(a, b)
+      return a.bits == b.bits
+   end
+
+   function mac_mt:subbits(i,j)
+      local b = bit.rshift(self.bits, i)
+      local mask = bit.bnot(bit.lshift(0xffffffffffffLL, j-i))
+      return tonumber(bit.band(b, mask))
+   end
+
+  mac_t = ffi.metatype(mac_t, mac_mt)
+end
+
+--- index set object: keeps a set of indexed values
+local NDX_mt = {}
+NDX_mt.__index = NDX_mt
+
+-- trivial constructor
+function new_index_set(max, name)
+   return setmetatable({
+      __nxt = 0,
+      __max = max,
+      __name = name,
+   }, NDX_mt)
+end
+
+-- add a value to the set
+-- if new, returns a new index and true
+-- if it already existed, returns given index and false
+function NDX_mt:add(v)
+   assert(self.__nxt < self.__max, self.__name.." overflow")
+   if self[v] then
+      return self[v], false
+   end
+   self[v] = self.__nxt
+   self.__nxt = self.__nxt + 1
+   return self[v],true
+end
+
+
 function comma_value(n) -- credit http://richard.warburton.it
    local left,num,right = string.match(n,'^([^%d]*%d)(%d*)(.-)$')
    return left..(num:reverse():gsub('(%d%d%d)','%1,'):reverse())..right
@@ -205,5 +293,31 @@ function selftest ()
 --    assert(readlink('/etc/rc2.d/S99rc.local') == '../init.d/rc.local', "bad readlink")
 --    assert(dirname('/etc/rc2.d/S99rc.local') == '/etc/rc2.d', "wrong dirname")
 --    assert(basename('/etc/rc2.d/S99rc.local') == 'S99rc.local', "wrong basename")
+   assert(hexdump('\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11'):upper()
+         :match('^45.00.B6.7D.00.FA.40.00.40.11$'), "wrong hex dump")
+   assert(hexundump('4500 B67D 00FA400040 11', 10)
+         =='\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11', "wrong hex undump")
+
+   local macA = new_mac('00-01-02-0a-0b-0c')
+   local macB = new_mac('0001020A0B0C')
+   local macC = new_mac('0A:0B:0C:00:01:02')
+   print ('macA', macA)
+   assert (tostring(macA) == '00:01:02:0A:0B:0C', "bad canonical MAC")
+   assert (macA == macB, "macA and macB should be equal")
+   assert (macA ~= macC, "macA and macC should be different")
+   assert (macA:subbits(0,31)==0x0a020100, "low A")
+   assert (macA:subbits(32,48)==0x0c0b, ("hi A (%X)"):format(macA:subbits(32,48)))
+   assert (macC:subbits(0,31)==0x000c0b0a, "low C")
+   assert (macC:subbits(32,48)==0x0201," hi C")
+
+   local ndx_set = new_index_set(4, 'test ndx')
+   assert (string.format('%d/%s', ndx_set:add('a'))=='0/true', "indexes start with 0, and is new")
+   assert (string.format('%d/%s', ndx_set:add('b'))=='1/true', "second new index")
+   assert (string.format('%d/%s', ndx_set:add('c'))=='2/true', "third new")
+   assert (string.format('%d/%s', ndx_set:add('b'))=='1/false', "that's an old one")
+   assert (string.format('%d/%s', ndx_set:add('a'))=='0/false', "the very first one")
+   assert (string.format('%d/%s', ndx_set:add('A'))=='3/true', "almost, but new")
+   assert (string.format('%s/%s', pcall(ndx_set.add, ndx_set,'B'))
+         :match('^false/core/lib.lua:%d+: test ndx overflow'), 'should overflow')
 end
 
