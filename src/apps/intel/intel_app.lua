@@ -72,25 +72,35 @@ function Intel82599:report ()
    register.dump(self.dev.s, true)
 end
 
+function getTestPCIID()
+   return os.getenv("SNABB_TEST_INTEL10G_PCI_ID")
+end
+
 function selftest ()
    print("selftest: intel_app")
    if not vfio.is_vfio_available() then
       print("VFIO not available\nTest skipped")
       os.exit(app.test_skipped_code)
    end
+
+   local pciid = getTestPCIID()
+   if not pciid then
+      print("SNABB_TEST_INTEL10G_PCI_ID was not set\nTest skipped")
+      os.exit(app.test_skipped_code)
+   end
    -- Create a pieline:
    --   Source --> Intel82599(loopback) --> Sink
    -- and push packets through it.
-   vfio.bind_device_to_vfio("0000:01:00.0")
+   vfio.bind_device_to_vfio(pciid)
    local c = config.new()
-   config.app(c, "intel10g", Intel82599, "0000:01:00.0")
+   config.app(c, "intel10g", Intel82599, pciid)
    config.app(c, "source", basic_apps.Source)
    config.app(c, "sink", basic_apps.Sink)
    config.link(c, "source.out -> intel10g.rx")
    config.link(c, "intel10g.tx -> sink.in")
    app.configure(c)
 --[[
-   app.apps.intel10g = Intel82599:new("0000:01:00.0")
+   app.apps.intel10g = Intel82599:new(pciid)
    app.apps.source = app.new(basic_apps.Source)
    app.apps.sink   = app.new(basic_apps.Sink)
    app.connect("source", "out", "intel10g", "rx")
