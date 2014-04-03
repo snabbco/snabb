@@ -987,5 +987,17 @@ c.XATTR = multiflags {
   NODEFAULT  = 0x0010,
 }
 
+c.CTL = strflag {
+  UNSPEC     = 0,
+  KERN       = 1,
+  VM         = 2,
+  VFS        = 3,
+  NET        = 4,
+  DEBUG      = 5,
+  HW         = 6,
+  MACHDEP    = 7,
+  USER       = 8,
+}
+
 return c
 
