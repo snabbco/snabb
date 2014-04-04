@@ -47,6 +47,10 @@ snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 
 test: $(TESTMODS)
 
+test_ci: FAIL_ON_FIRST="true"
+
+test_ci: $(TESTMODS)
+
 $(TESTMODS): testlog snabbswitch
 	$(E) "TEST      $@"
 	$(Q) ./snabbswitch -t $@ > testlog/$@ || ( \
@@ -59,6 +63,7 @@ $(TESTMODS): testlog snabbswitch
 		|| ( \
 			echo "ERROR     testlog/$@"; \
 			echo "EXITCODE: $$EXITCODE" >> testlog/$@; \
+			if [ -n "$(FAIL_ON_FIRST)" ]; then exit $$EXITCODE; fi;\
 		) \
 	)
 
