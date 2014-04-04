@@ -433,6 +433,7 @@ elseif sys.sync_file_range2 then -- only on 32 bit platforms
 end
 
 -- TODO this should be got from somewhere more generic
+-- started moving into linux/syscall.lua som explicit (see signalfd) but needs some more cleanups
 local sigset_size = 8
 if abi.arch == "mips" then
   sigset_size = 16
@@ -644,7 +645,7 @@ end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
-  return syscall(sys.rt_sigaction, int(signum), void(act), void(oldact), ulong(sigset_size)) -- size is size of sigaction field
+  return syscall(sys.rt_sigaction, int(signum), void(act), void(oldact), ulong(sigset_size)) -- size is size of sigset field
 end
 
 -- in VDSO for many archs, so use ffi for speed; TODO read VDSO to find functions there, needs elf reader

@@ -294,7 +294,7 @@ function S.select(sel, timeout) -- note same structure as returned
           exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret)}
 end
 
--- TODO note that actual syscall modifies timeout, which is non standard, like ppoll
+-- TODO note that in Linux syscall modifies timeout, which is non standard, like ppoll
 function S.pselect(sel, timeout, set) -- note same structure as returned
   local r, w, e
   local nfds = 0
