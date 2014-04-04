@@ -451,8 +451,8 @@ end
 function C.ppoll(fds, nfds, timeout_ts, sigmask)
   return syscall(sys.ppoll, void(fds), ulong(nfds), void(timeout_ts), void(sigmask), sigmasksize(sigmask))
 end
-function C.signalfd(fd, mask, flags)
-  return syscall(sys.signalfd4, int(fd), void(mask), ulong(sigset_size), int(flags))
+function C.signalfd(fd, mask, size, flags)
+  return syscall(sys.signalfd4, int(fd), void(mask), ulong(size), int(flags))
 end
 
 -- adding more

@@ -143,7 +143,8 @@ end
 function S.signalfd(set, flags, fd) -- note different order of args, as fd usually empty. See also signalfd_read()
   set = mktype(t.sigset, set)
   if fd then fd = getfd(fd) else fd = -1 end
-  return retfd(C.signalfd(fd, set, c.SFD[flags]))
+  -- note includes (hidden) size argument
+  return retfd(C.signalfd(fd, set, s.sigset, c.SFD[flags]))
 end
 
 -- note that syscall does return timeout remaining but libc does not, due to standard prototype TODO use syscall

@@ -1,6 +1,6 @@
 -- MIPS specific definitions
 
--- TODO sigset_t probably needs to be here as _NSIG = 128 on MIPS
+-- sigset_t size is set from _NSIG here
 
 return {
   nsig = [[
