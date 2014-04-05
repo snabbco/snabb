@@ -35,7 +35,7 @@ if arg[1] == "rump" or arg[1] == "rumplinux" then
     tmpabi.types = "linux" -- monkeypatch
   end
   local modules = {"kern.tty", "dev", "net", "fs.tmpfs", "fs.kernfs", "fs.ptyfs",
-                   "net.net", "net.local", "net.netinet", "net.netinet6", "vfs", "kern.time"}
+                   "net.net", "net.local", "net.netinet", "net.netinet6", "vfs"}
   S = require "syscall.rump.init".init(modules)
   table.remove(arg, 1)
 else
