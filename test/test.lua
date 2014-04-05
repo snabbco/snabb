@@ -1802,7 +1802,6 @@ test_termios = {
 test_misc = {
   teardown = clean,
   test_chroot_root = function()
-    if S.__rump and abi.arch == "ppc" then error "skipped" end -- TODO fix this odd case
     local cwd = assert(S.open(".", "rdonly"))
     local cname = assert(S.getcwd())
     local root = assert(S.open("/", "rdonly"))
