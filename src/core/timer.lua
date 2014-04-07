@@ -7,7 +7,7 @@ local lib = require("core.lib")
 
 debug = false     -- verbose printouts?
 
-ticks = nil       -- current time, in ticks
+ticks = false     -- current time, in ticks
 ns_per_tick = 1e6 -- tick resolution (millisecond)
 timers = {}       -- table of {tick->timerlist}
 
@@ -17,7 +17,7 @@ end
 
 -- Run all timers that have expired.
 function run ()
-   run_to_time(C.get_time_ns())
+   if ticks then run_to_time(C.get_time_ns()) end
 end
 
 -- Run all timers up to the given new time.

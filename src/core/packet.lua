@@ -105,12 +105,9 @@ function free (p)
    for i = 0, p.niovecs-1 do
       buffer.free(p.iovecs[i].buffer)
    end
-   p.info.flags     = 0
-   p.info.gso_flags = 0
+   ffi.fill(p, ffi.sizeof("struct packet"), 0)
    p.refcount       = 1
    p.fuel           = initial_fuel
-   p.niovecs        = 0
-   p.length         = 0
    freelist.add(packets_fl, p)
 end
 
