@@ -70,7 +70,7 @@ function main ()
             i = i + 1
          end
          require(module)
-         os.exit(0)
+         exit(0)
       else
 	 print(usage)
 	 os.exit(1)

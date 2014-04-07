@@ -33,3 +33,6 @@ void *malloc(int size);
 int64_t readlink(const char *path, char *buf, size_t bufsiz);
 char *dirname(char *path);
 char *basename(char *path);
+
+// inet_pton(3) - convert IPv4 and IPv6 addresses from text to binary form
+int inet_pton(int af, const char *src, void *dst);
