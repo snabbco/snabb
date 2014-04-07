@@ -439,14 +439,26 @@ function selftest ()
    --           v
    --       intel pcap
    -- 
-   pci.unbind_device_from_linux('0000:01:00.0')
-   vfio.setup_vfio('0000:01:00.0')
-   vfio.bind_device_to_vfio("0000:01:00.0")
+   local pciid = os.getenv("SNABB_TEST_INTEL10G_PCI_ID")
+   if not pciid then
+      print("SNABB_TEST_INTEL10G_PCI_ID was not set\nTest skipped")
+      os.exit(app.test_skipped_code)
+   end
+
+   local vhost_user_sock = os.getenv("SNABB_TEST_VHOST_USER_SOCKET")
+   if not vhost_user_sock then
+      print("SNABB_TEST_VHOST_USER_SOCKET was not set\nTest skipped")
+      os.exit(app.test_skipped_code)
+   end
+
+   pci.unbind_device_from_linux(pciid)
+   vfio.setup_vfio(pciid)
+   vfio.bind_device_to_vfio(pciid)
    local c = config.new()
-   config.app(c, "vhost_user", VhostUser, "vhost_user_test.sock")
+   config.app(c, "vhost_user", VhostUser, vhost_user_sock)
    config.app(c, "vhost_dump", pcap.PcapWriter, "vhost_vm_dump.cap")
    config.app(c, "vhost_tee", basic_apps.Tee)
-   config.app(c, "intel", intel_app.Intel82599, "0000:01:00.0")
+   config.app(c, "intel", intel_app.Intel82599, pciid)
    config.app(c, "intel_dump", pcap.PcapWriter, "vhost_nic_dump.cap")
    config.app(c, "intel_tee", basic_apps.Tee)
    config.link(c, "vhost_user.tx -> vhost_tee.input")
