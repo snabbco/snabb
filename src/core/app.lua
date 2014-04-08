@@ -35,7 +35,8 @@ function compute_config_actions (old, new)
       local action = nil
       if not old.apps[appname]                then action = 'start'
       elseif old.apps[appname].class ~= class then action = 'restart'
-      elseif old.apps[appname].arg ~= arg     then action = 'reconfig'
+      elseif (type(old.apps[appname].arg) == "string" and
+	   old.apps[appname].arg ~= arg)      then action = 'reconfig'
       else                                         action = 'keep'  end
       actions[appname] = action
    end

@@ -7,6 +7,7 @@
 require("class")
 local ffi = require("ffi")
 local app = require("core.app")
+local link = require("core.link")
 local packet = require("core.packet")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
@@ -16,15 +17,14 @@ local ns = require("lib.protocol.icmp.nd.ns")
 
 local ns_responder = subClass(nil)
 
-function ns_responder:_init_new(target, lladdr)
-   self._target = target
-   self._lladdr = lladdr
+function ns_responder:_init_new(config)
+   self._config = config
    self._match = { { ethernet },
 		   { ipv6 },
 		   { icmp },
 		   { ns,
 		     function(ns)
-			return(ns:target_eq(self._target))
+			return(ns:target_eq(config.local_ip))
 		     end } }
 end
 
@@ -41,15 +41,15 @@ local function process(self, dgram)
       
       -- Ethernet
       eth:swap()
-      eth:src(self._lladdr)
+      eth:src(self._config.local_mac)
       
       -- IPv6
       ipv6:dst(ipv6:src())
-      ipv6:src(self._target)
+      ipv6:src(self._config.local_ip)
       
       -- ICMP
       option[1]:type(2)
-      option[1]:option():addr(self._lladdr)
+      option[1]:option():addr(self._config.local_mac)
       icmp:type(136)
       -- Undo/redo icmp and ns headers to get
       -- payload and set solicited flag
@@ -67,15 +67,15 @@ function ns_responder:push()
    local l_in = self.input.north
    local l_out = self.output.south
    assert(l_in and l_out)
-   while not app.empty(l_in) and not app.full(l_out) do
+   while not link.empty(l_in) and not link.full(l_out) do
       -- Pass everything on north -> south
-      app.transmit(l_out, app.receive(l_in))
+      link.transmit(l_out, link.receive(l_in))
    end
    l_in = self.input.south
    l_out = self.output.north
    local l_reply = self.output.south
-   while not app.empty(l_in) and not app.full(l_out) do
-      local p = app.receive(l_in)
+   while not link.empty(l_in) and not link.full(l_out) do
+      local p = link.receive(l_in)
       local datagram = datagram:new(p, ethernet)
       local status = process(self, datagram)
       if status == nil then
@@ -83,10 +83,10 @@ function ns_responder:push()
 	 packet.deref(p)
       elseif status == true then
 	 -- Send NA back south
-	 app.transmit(l_reply, p)
+	 link.transmit(l_reply, p)
       else
 	 -- Send transit traffic up north
-	 app.transmit(l_out, p)
+	 link.transmit(l_out, p)
       end
    end
 end

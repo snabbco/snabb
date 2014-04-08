@@ -11,6 +11,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
 local app = require("core.app")
+local link = require("core.link")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
@@ -20,38 +21,45 @@ local packet = require("core.packet")
 local vpws = subClass(nil)
 local in_to_out = { customer = 'uplink', uplink = 'customer' }
 
-function vpws:_init_new(name, label, local_ip, remote_ip, ll,
-			src_mac, dst_mac)
-   self._name = name
-   self._config = { label = label, local_ip = local_ip,
-		    ll = ll, src_mac = src_mac }
+function vpws:_init_new(config)
+   self._config = config
    self._encap = {
-      ether = ethernet:new({ src = src_mac, dst = dst_mac, type = 0x86dd }),
-      ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = local_ip, dst = remote_ip}),
-      gre   = gre:new({ protocol = 0x6558, key = label })
+      ether = ethernet:new({ src = config.local_mac, dst = config.remote_mac, type = 0x86dd }),
+      ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = config.local_vpn_ip,
+			 dst = config.remote_vpn_ip}),
+      gre   = gre:new({ protocol = 0x6558, key = config.label })
    }
    self._match = { { ethernet },
 		   { ipv6, 
 		     function(ipv6) 
-			return(ipv6:dst_eq(self._config.local_ip)) 
+			return(ipv6:dst_eq(config.local_vpn_ip)) 
 		     end }, 
 		   { gre,
 		     function(gre) 
-			return(not gre:use_key() or gre:key() == self._config.label)
+			return(not gre:use_key() or gre:key() == config.label)
 		     end } }
 end
 
 function vpws:name()
-   return self._name
+   return self.config.name
+end
+
+function vpws:relink()
+   self.inputi = {}
+   self.iport_names = {}
+   for port,l in pairs(self.input) do
+      table.insert(self.inputi, l)
+      self.iport_names[l] = port
+   end
 end
 
 function vpws:push()
-   for _, l_in in ipairs(self.inputi) do
-      local port_in = l_in.oport
+   for _, port_in in ipairs({"customer", "uplink"}) do
+      local l_in  = self.input[port_in]
       local l_out = self.output[in_to_out[port_in]]
       assert(l_out)
-      while not app.full(l_out) and not app.empty(l_in) do
-	 local p = app.receive(l_in)
+      while not link.full(l_out) and not link.empty(l_in) do
+	 local p = link.receive(l_in)
 	 local datagram = datagram:new(p, ethernet)
 	 if port_in == 'customer' then
 	    local encap = self._encap
@@ -78,7 +86,7 @@ function vpws:push()
 	       p = nil
 	    end
 	 end
-	 if p then app.transmit(l_out, p) end
+	 if p then link.transmit(l_out, p) end
       end
    end
 end
