@@ -5,18 +5,21 @@ local C = ffi.C
 
 local lib = require("core.lib")
 local app = require("core.app")
+local link = require("core.link")
 local buffer = require("core.buffer")
 local intel10g = require("apps.intel.intel10g")
 local memory = require("core.memory")
 local register = require("lib.hardware.register")
 
-function new (self, pciaddress)
+LoadGen = {}
+
+function LoadGen:new (pciaddress)
    local o = { pciaddress = pciaddress,
                dev = intel10g.new(pciaddress) }
    intel10g.open_for_loopback_test(o.dev)
    disable_tx_descriptor_writeback(o.dev)
    zero_descriptors(o.dev)
-   return setmetatable(o, {__index = getfenv()})
+   return setmetatable(o, {__index = LoadGen})
 end
 
 function disable_tx_descriptor_writeback (dev)
@@ -39,21 +42,19 @@ function zero_descriptors (dev)
    end
 end
 
-function push (self)
---   assert(self.input.input)
+function LoadGen:push ()
    if self.input.input then
-      while not app.empty(self.input.input) and self.dev:can_transmit() do
-         local p = app.receive(self.input.input)
+      while not link.empty(self.input.input) and self.dev:can_transmit() do
+         local p = link.receive(self.input.input)
          self.dev:transmit(p)
       end
    end
 end
 
-function pull (self)
+function LoadGen:pull ()
    -- Set TDT behind TDH to make all descriptors available for TX.
    local dev = self.dev
    local tdh = dev.r.TDH()
---   print("tdh", tdh, "tdt", dev.r.TDT(), "dev.tdt", dev.tdt)
    if dev.tdt == 0 then return end
    C.full_memory_barrier()
    if tdh == 0 then
@@ -63,8 +64,7 @@ function pull (self)
    end
 end
 
-function report (self)
---   print(self.pciaddress, self.dev.s.TXDGPC)
+function LoadGen:report ()
    print(self.pciaddress,
          "TXDGPC (TX packets)", lib.comma_value(tonumber(self.dev.s.TXDGPC())),
          "GOTCL (TX octets)", lib.comma_value(tonumber(self.dev.s.GOTCL())))

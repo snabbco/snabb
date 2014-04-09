@@ -2,47 +2,47 @@ module(...,package.seeall)
 
 local app       = require("core.app")
 local buffer    = require("core.buffer")
+local config    = require("core.config")
 local timer     = require("core.timer")
+local bus       = require("lib.hardware.bus")
 local pci       = require("lib.hardware.pci")
 local intel_app = require("apps.intel.intel_app")
 local basic_apps = require("apps.basic.basic_apps")
 local main      = require("core.main")
 local PcapReader= require("apps.pcap.pcap").PcapReader
-local LoadGen   = require("apps.intel.LoadGen")
+local LoadGen   = require("apps.intel.loadgen").LoadGen
 local ffi = require("ffi")
 local C = ffi.C
 
 function run (args)
    local filename = table.remove(args, 1)
    local patterns = args
-   app.apps.pcap = app.new(PcapReader:new(filename))
-   app.apps.loop = app.new(basic_apps.Repeater:new())
-   app.apps.tee  = app.new(basic_apps.Tee:new(filename))
-   app.connect("pcap", "output", "loop", "input")
-   app.connect("loop", "output", "tee", "input")
+   local c = config.new()
+   config.app(c, "pcap", PcapReader, filename)
+   config.app(c, "loop", basic_apps.Repeater)
+   config.app(c, "tee", basic_apps.Tee)
+   config.link(c, "pcap.output -> loop.input")
+   config.link(c, "loop.output -> tee.input")
    local nics = 0
-   for _,device in ipairs(pci.devices) do
+   bus.scan_devices()
+   for _,device in ipairs(bus.devices) do
       if is_device_suitable(device, patterns) then
          nics = nics + 1
          local name = "nic"..nics
-         app.apps[name] = app.new(LoadGen:new(device.pciaddress))
-         app.connect("tee", tostring(nics),
-                     name, "input")
+         config.app(c, name, LoadGen, device.pciaddress)
+         config.link(c, "tee."..tostring(nics).."->"..name..".input")
       end
    end
-   app.relink()
+   app.configure(c)
    timer.init()
    local fn = function ()
-                 app.report()
+                 print("Transmissions (last 1 sec):")
+                 app.report_each_app()
               end
    local t = timer.new("report", fn, 1e9, 'repeating')
    timer.activate(t)
    buffer.preallocate(100000)
-   while true do
-      app.breathe()
-      timer.run()
-      C.usleep(1000)
-   end
+   app.main()
 end
 
 function is_device_suitable (pcidev, patterns)
