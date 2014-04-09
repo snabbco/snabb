@@ -15,17 +15,8 @@ require "syscall.ffitypes"
 
 local helpers = require "syscall.helpers"
 
--- TODO constants probably needs version, so may need its own module
+-- TODO constants probably needs version, so may need moving
 -- NetBSD ABI version
---[[
-if not abi.uname then abi.netbsd = 6 else -- TODO temporary; no uname in rump
-local r = helpers.split("%.", ffi.string(abi.uname.release))
-local maj, min = tonumber(r[1]), tonumber(r[2])
-if min == 99 then maj = maj + 1 end
-abi.netbsd = maj
-end
-]]
-
 ffi.cdef[[
 int __sysctl(const int *, unsigned int, void *, size_t *, const void *, size_t);
 int rump_getversion(void);
