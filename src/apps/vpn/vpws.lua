@@ -44,15 +44,6 @@ function vpws:name()
    return self.config.name
 end
 
-function vpws:relink()
-   self.inputi = {}
-   self.iport_names = {}
-   for port,l in pairs(self.input) do
-      table.insert(self.inputi, l)
-      self.iport_names[l] = port
-   end
-end
-
 function vpws:push()
    for _, port_in in ipairs({"customer", "uplink"}) do
       local l_in  = self.input[port_in]
