@@ -4,6 +4,8 @@ E= @echo
 #Q=
 #E= @:
 
+TEST_SKIPPED="43"
+
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 
@@ -45,9 +47,25 @@ snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 
 test: $(TESTMODS)
 
+test_ci: FAIL_ON_FIRST="true"
+
+test_ci: $(TESTMODS)
+
 $(TESTMODS): testlog snabbswitch
 	$(E) "TEST      $@"
-	$(Q) ./snabbswitch -t $@ > testlog/$@ || (echo "*** EXIT CODE: $?" >> testlog/$@; echo "ERROR     testlog/$@")
+	$(Q) ./snabbswitch -t $@ > testlog/$@ || ( \
+		EXITCODE="$$?"; \
+		[ "$$EXITCODE" -eq $(TEST_SKIPPED) ] \
+		&& ( \
+			echo "SKIPPED   testlog/$@"; \
+			echo "EXITCODE: $$EXITCODE" >> testlog/$@; \
+		) \
+		|| ( \
+			echo "ERROR     testlog/$@"; \
+			echo "EXITCODE: $$EXITCODE" >> testlog/$@; \
+			if [ -n "$(FAIL_ON_FIRST)" ]; then exit $$EXITCODE; fi;\
+		) \
+	)
 
 $(OBJDIR) testlog:
 	$(E) "DIR       $@"
