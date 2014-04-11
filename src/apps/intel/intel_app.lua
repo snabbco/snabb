@@ -18,7 +18,6 @@ Intel82599 = {}
 function Intel82599:new (pciaddress)
    local a = { dev = intel10g.new(pciaddress) }
    setmetatable(a, {__index = Intel82599 })
-   --intel10g.open_for_loopback_test(a.dev)
    intel10g.open(a.dev)
    intel10g.wait_linkup(a.dev)
   return a

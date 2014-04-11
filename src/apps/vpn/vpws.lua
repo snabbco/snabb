@@ -6,7 +6,6 @@
 -- frames encapsulated in IP/GRE.  The push() method performs the
 -- appropriate operation depending on the input port.
 
-require("class")
 local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")

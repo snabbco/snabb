@@ -1,4 +1,3 @@
-require("class")
 local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")

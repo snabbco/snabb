@@ -1,4 +1,3 @@
-require("class")
 local ffi = require("ffi")
 
 local tlv = subClass(nil, 'new_from_mem')

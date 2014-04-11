@@ -1,4 +1,3 @@
-require("class")
 local ffi = require("ffi")
 
 local lladdr = subClass(nil, 'new_from_mem')

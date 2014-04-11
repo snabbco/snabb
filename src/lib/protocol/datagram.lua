@@ -40,7 +40,6 @@
 -- Another new buffer is allocated for the packet's payload.  The
 -- parse() method is not applicable to such a datagram.
 
-require("class")
 local packet = require("core.packet")
 local buffer = require("core.buffer")
 

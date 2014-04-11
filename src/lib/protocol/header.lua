@@ -1,6 +1,5 @@
 -- Protocol header base class
 
-require("class")
 local ffi = require("ffi")
 
 local header = subClass(nil, 'new_from_mem')
