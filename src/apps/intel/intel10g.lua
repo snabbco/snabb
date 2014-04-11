@@ -13,6 +13,7 @@ local C        = ffi.C
 local lib      = require("core.lib")
 local memory   = require("core.memory")
 local packet   = require("core.packet")
+local buffer   = require("core.buffer")
 local bus      = require("lib.hardware.bus")
 local register = require("lib.hardware.register")
                  require("apps.intel.intel_h")
@@ -22,6 +23,16 @@ local bits, bitset = lib.bits, lib.bitset
 
 num_descriptors = 32 * 1024
 --num_descriptors = 32
+
+-- This value determines the maximum size that the payload of an
+-- incoming frame can have to be accepted by the NIC.  The actual
+-- value that gets written to the corresponding hardware register
+-- (MAXFRS) includes the Ethernet header and the CRC, i.e. 18
+-- additional bytes.  If the value is larger than 1500, support for
+-- jumbo frames is enabled as well.
+--
+-- This should be settable per device through the constructor method.
+MTU = 1500
 
 --- ### Initialization
 
@@ -103,6 +114,21 @@ end
 function init_receive (dev)
    set_promiscuous_mode(dev) -- NB: don't need to program MAC address filter
    dev.r.HLREG0:clr(bits({RXLNGTHERREN=27}))
+   if MTU ~= 1500 then
+      -- The actual MAXFRS includes the Ethernet header and the CRC
+      dev.r.MAXFRS:write(bit.lshift(MTU+18, 16))
+      if MTU > 1500 then
+	 dev.r.HLREG0:set(bits({JUMBOEN=2}))
+      end
+   end
+   -- Set the buffer size.  This is in units of 1KiB and should match
+   -- the value of core.buffer.size.  Currently, this is a private
+   -- variable.  We need a better way define global parameters like
+   -- this.
+   local b_size = math.floor(buffer.size/1024)
+   assert(b_size > 0)
+   dev.r.SRRCTL(bit.bor(bit.band(dev.r.SRRCTL(),0xFFFFFFF0),
+			math.min(15, b_size)))
    dev.r.RDBAL(dev.rxdesc_phy % 2^32)
    dev.r.RDBAH(dev.rxdesc_phy / 2^32)
    dev.r.RDLEN(num_descriptors * ffi.sizeof("union rx"))
@@ -130,9 +156,10 @@ end
 
 txdesc_flags = bits{eop=24,ifcs=25}
 function transmit (dev, p)
-   assert(p.niovecs == 1, "only supports one-buffer packets")
+   if p.niovecs > 1 then
+      packet.coalesce(p)
+   end
    local iov = p.iovecs[0]
-   assert(iov.offset == 0)
    dev.txdesc[dev.tdt].data.address = iov.buffer.physical + iov.offset
    dev.txdesc[dev.tdt].data.options = bit.bor(iov.length, txdesc_flags)
    dev.txpackets[dev.tdt] = p
@@ -167,7 +194,8 @@ function receive (dev)
    local b = dev.rxbuffers[dev.rxnext]
    local wb = dev.rxdesc[dev.rxnext].wb
    assert(wb.length > 0)
-   assert(bit.band(wb.status, 1) == 1) -- Descriptor Done
+   -- Multi-buffer packets are currently not supported
+   assert(bit.band(wb.status, 3) == 3) -- Descriptor Done & End Of Packet
    packet.add_iovec(p, b, wb.length)
    dev.rxnext = (dev.rxnext + 1) % num_descriptors
    return p
@@ -251,6 +279,7 @@ DMATXCTL  0x04A80 -            RW DMA Tx Control
 EEC       0x10010 -            RW EEPROM/Flash Control
 FCTRL     0x05080 -            RW Filter Control
 HLREG0    0x04240 -            RW MAC Core Control 0
+MAXFRS    0x04268 -            RW Max Frame Size
 LINKS     0x042A4 -            RO Link Status Register
 RDBAL     0x01000 +0x40*0..63  RW Receive Descriptor Base Address Low
 RDBAH     0x01004 +0x40*0..63  RW Receive Descriptor Base Address High
@@ -258,6 +287,7 @@ RDLEN     0x01008 +0x40*0..63  RW Receive Descriptor Length
 RDH       0x01010 +0x40*0..63  RO Receive Descriptor Head
 RDT       0x01018 +0x40*0..63  RW Receive Descriptor Tail
 RXDCTL    0x01028 +0x40*0..63  RW Receive Descriptor Control
+SRRCTL    0x01014 +0x40*0..63  RW Split Receive Control Register
 RDRXCTL   0x02F00 -            RW Receive DMA Control
 RTTDCS    0x04900 -            RW DCB Transmit Descriptor Plane Control
 RXCTRL    0x03000 -            RW Receive Control
