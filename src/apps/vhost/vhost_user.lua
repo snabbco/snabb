@@ -11,14 +11,12 @@ local basic_apps= require("apps.basic.basic_apps")
 local buffer    = require("core.buffer")
 local ffi       = require("ffi")
 local freelist  = require("core.freelist")
-local intel_app = require("apps.intel.intel_app")
 local lib       = require("core.lib")
 local packet    = require("core.packet")
 local pcap      = require("apps.pcap.pcap")
 local pci       = require("lib.hardware.pci")
 local register  = require("lib.hardware.register")
 local timer     = require("core.timer")
-local vfio      = require("lib.hardware.vfio")
 local C         = ffi.C
 
 require("lib.virtio.virtio.h")
@@ -428,59 +426,33 @@ end
 
 function selftest ()
    print("selftest: vhost_user")
-   if not vfio.is_vfio_available() then
-      print("VFIO not available\nTest skipped")
-      os.exit(app.test_skipped_code)
-   end
    -- Create an app network that proxies packets between a vhost_user
-   -- port (qemu) and an Intel port (in loopback mode). Create
-   -- separate pcap traces for packets received from vhost and intel.
+   -- port (qemu) and a sink. Create
+   -- separate pcap traces for packets received from vhost.
    --
    -- schema for traffic from the VM:
    --
-   -- vhost -> tee -> intel
+   -- vhost -> tee -> sink
    --           |
    --           v
    --       vhost pcap
    --
-   -- schema for traffic from the intel NIC:
-   -- vhost <- tee <- intel
-   --           |
-   --           v
-   --       intel pcap
-   -- 
-   local pciid = os.getenv("SNABB_TEST_INTEL10G_PCI_ID")
-   if not pciid then
-      print("SNABB_TEST_INTEL10G_PCI_ID was not set\nTest skipped")
-      os.exit(app.test_skipped_code)
-   end
 
    local vhost_user_sock = os.getenv("SNABB_TEST_VHOST_USER_SOCKET")
    if not vhost_user_sock then
       print("SNABB_TEST_VHOST_USER_SOCKET was not set\nTest skipped")
       os.exit(app.test_skipped_code)
    end
-
-   pci.unbind_device_from_linux(pciid)
-   vfio.setup_vfio(pciid)
-   vfio.bind_device_to_vfio(pciid)
    local c = config.new()
    config.app(c, "vhost_user", VhostUser, vhost_user_sock)
-   config.app(c, "vhost_dump", pcap.PcapWriter, "vhost_vm_dump.cap")
+   --config.app(c, "vhost_dump", pcap.PcapWriter, "vhost_vm_dump.cap")
    config.app(c, "vhost_tee", basic_apps.Tee)
-   config.app(c, "intel", intel_app.Intel82599, pciid)
-   config.app(c, "intel_dump", pcap.PcapWriter, "vhost_nic_dump.cap")
-   config.app(c, "intel_tee", basic_apps.Tee)
+   config.app(c, "sink", basic_apps.Sink)
    config.link(c, "vhost_user.tx -> vhost_tee.input")
-   config.link(c, "vhost_tee.dump -> vhost_dump.input")
-   config.link(c, "vhost_tee.traffic -> intel.rx")
-   config.link(c, "intel.tx -> intel_tee.input")
-   config.link(c, "intel_tee.dump -> intel_dump.input")
-   config.link(c, "intel_tee.traffic -> vhost_user.rx")
+   --config.link(c, "vhost_tee.dump -> vhost_dump.input")
+   config.link(c, "vhost_tee.traffic -> sink.in")
    app.configure(c)
    local vhost_user = app.app_table.vhost_user
-   local intel = app.app_table.intel
-   intel:set_rx_buffer_freelist(vhost_user.vring_transmit_buffers)
    local fn = function ()
       local vu = app.apps.vhost_user
       app.report()
