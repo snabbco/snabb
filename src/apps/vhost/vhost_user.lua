@@ -264,16 +264,32 @@ handler_names = {
 -- Process all vhost_user requests from QEMU.
 function VhostUser:process_qemu_requests ()
    local msg = self.msg
-   while C.vhost_user_receive(self.socket, msg, self.fds, self.nfds) >= 0 do
-      assert(msg.request >= 0 and msg.request <= C.VHOST_USER_MAX)
-      debug("Got vhost_user request", handler_names[msg.request], msg.request)
-      local method = self[handler_names[msg.request]]
-      if method then
-         method(self, msg, self.fds, self.nfds[0])
+   local stop = false
+
+   repeat
+      local ret = C.vhost_user_receive(self.socket, msg, self.fds, self.nfds)
+
+      if ret > 0 then
+         assert(msg.request >= 0 and msg.request <= C.VHOST_USER_MAX)
+         debug("Got vhost_user request", handler_names[msg.request], msg.request)
+         local method = self[handler_names[msg.request]]
+         if method then
+            method(self, msg, self.fds, self.nfds[0])
+         else
+            error(string.format("vhost_user unrecognized request: %d", msg.request))
+         end
+         msg.request = -1;
       else
-         error(string.format("vhost_user unrecognized request: %d", msg.request))
+         stop = true
+         if ret == 0 then
+            print ("Connection went down")
+            self.socket = -1
+            self.connected = false
+            self.vhost_ready = false
+         end
       end
-   end
+   until stop
+
 end
 
 function VhostUser:none (msg)
