@@ -5,6 +5,7 @@
 module(...,package.seeall)
 
 local app       = require("core.app")
+local main      = require("core.main")
 local link      = require("core.link")
 local config    = require("core.config")
 local basic_apps= require("apps.basic.basic_apps")
@@ -291,6 +292,7 @@ function VhostUser:process_qemu_requests ()
             self.socket = -1
             self.connected = false
             self.vhost_ready = false
+            if self.link_down_proc then self.link_down_proc() end
          end
       end
    until stop
@@ -474,6 +476,9 @@ function selftest ()
    config.link(c, "vhost_tee.traffic -> sink.in")
    app.configure(c)
    local vhost_user = app.app_table.vhost_user
+   vhost_user.link_down_proc = function()
+      main.exit(0)
+   end
    local fn = function ()
       local vu = app.apps.vhost_user
       app.report()
