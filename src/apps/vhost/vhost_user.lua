@@ -360,8 +360,8 @@ function VhostUser:set_vring_addr (msg)
    local used  = map_from_qemu(msg.addr.used_user_addr, self.mem_table)
    local avail = map_from_qemu(msg.addr.avail_user_addr, self.mem_table)
    local ring = { desc  = ffi.cast("struct vring_desc *", desc),
-      used  = ffi.cast("struct vring_used &", used),
-      avail = ffi.cast("struct vring_avail &", avail) }
+      used  = ffi.cast("struct vring_used *", used),
+      avail = ffi.cast("struct vring_avail *", avail) }
    if msg.addr.index == 0 then
       self.txring = ring
       self.txused = ring.used.idx
