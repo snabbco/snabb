@@ -196,6 +196,14 @@ function malloc (type)
    return ffi.cast(ffi.typeof("$*", ffi_type), ptr)
 end
 
+-- Function that should always trigger a LuaJIT "NYI".
+-- 
+-- That is: no JIT trace should be able to span across a call to
+-- trace_barrier().
+function trace_barrier (...)
+   return {...}
+end
+
 function selftest ()
    print("selftest: lib")
    local data = "\x45\x00\x00\x73\x00\x00\x40\x00\x40\x11\xc0\xa8\x00\x01\xc0\xa8\x00\xc7"
