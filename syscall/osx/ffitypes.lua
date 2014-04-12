@@ -236,6 +236,6 @@ int _sigaction(int signum, const struct sigaction *act, struct sigaction *oldact
 ffi.cdef(table.concat(defs, ""))
 
 require "syscall.ffifunctions"
-require "syscall.bsd.ffifunctions"
+require "syscall.bsd.ffi"
 
 

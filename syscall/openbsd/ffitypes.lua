@@ -315,5 +315,5 @@ local s = table.concat(defs, "")
 ffi.cdef(s)
 
 require "syscall.ffifunctions"
-require "syscall.bsd.ffifunctions"
+require "syscall.bsd.ffi"
 

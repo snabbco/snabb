@@ -8,7 +8,7 @@ setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
 require "syscall.ffifunctions"
-require "syscall.bsd.ffifunctions"
+require "syscall.bsd.ffi"
 
 local cdef = require "ffi".cdef
 

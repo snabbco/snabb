@@ -303,5 +303,5 @@ ffi.cdef(s)
 
 -- TODO these should return strings?
 require "syscall.ffifunctions"
-require "syscall.bsd.ffifunctions"
+require "syscall.bsd.ffi"
 

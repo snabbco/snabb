@@ -127,7 +127,7 @@ build =
       ["syscall.openbsd.sysctl"] = "syscall/openbsd/sysctl.lua";
 
       ["syscall.bsd.syscalls"] = "syscall/bsd/syscalls.lua";
-      ["syscall.bsd.ffifunctions"] = "syscall/bsd/ffifunctions.lua";
+      ["syscall.bsd.ffi"] = "syscall/bsd/ffi.lua";
       ["syscall.bsd.types"] = "syscall/bsd/types.lua";
 
       ["syscall.rump.init"] = "syscall/rump/init.lua";
