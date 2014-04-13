@@ -18,7 +18,7 @@ if abi.os == "netbsd" then
     require("syscall.netbsd.ffifunctions")
   end
 else
-  require("syscall." .. abi.os .. ".ffitypes")
+  require("syscall." .. abi.os .. ".ffi")
 end
 
 local c = require("syscall." .. abi.os .. ".constants")
