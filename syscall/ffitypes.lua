@@ -18,8 +18,6 @@ local defs = {}
 local function append(str) defs[#defs + 1] = str end
 
 append [[
-typedef uint64_t u_quad_t;
-
 // 8 bit
 typedef unsigned char cc_t;
 

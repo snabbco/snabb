@@ -95,6 +95,7 @@ typedef uint32_t _netbsd_fixpt_t;
 
 typedef unsigned short u_short;
 typedef unsigned char u_char;
+typedef uint64_t u_quad_t;
 
 /* these are not used in Linux so not renamed */
 typedef unsigned int useconds_t;
