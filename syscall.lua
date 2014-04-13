@@ -11,11 +11,14 @@ local abi = require "syscall.abi"
 
 if abi.rump and abi.types then abi.os = abi.types end -- pretend to be NetBSD for normal rump, Linux for rumplinux
 
-require("syscall." .. abi.os .. ".ffitypes")
-
--- TODO rump should use same ffifunctions, but with modified names
-if not abi.rump then
-  require("syscall." .. abi.os .. ".ffifunctions")
+if abi.os == "netbsd" then
+  -- TODO merge
+  require("syscall.netbsd.ffitypes")
+  if not abi.rump then
+    require("syscall.netbsd.ffifunctions")
+  end
+else
+  require("syscall." .. abi.os .. ".ffitypes")
 end
 
 local c = require("syscall." .. abi.os .. ".constants")
