@@ -2,6 +2,8 @@
 -- in a module so rump does not import twice
 -- note that even if type is same (like pollfd) if the metatype is different cannot be here due to ffi
 
+-- TODO not sure we want these long term, merge to individual OS files.
+
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string = 
