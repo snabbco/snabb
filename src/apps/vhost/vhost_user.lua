@@ -39,7 +39,9 @@ function VhostUser:new (socket_path)
       -- buffer records that are not currently in use
       buffer_recs = freelist.new("struct buffer *", 32*1024),
       -- buffer records populated with available VM memory
-      vring_transmit_buffers = freelist.new("struct buffer *", 32*1024)
+      vring_transmit_buffers = freelist.new("struct buffer *", 32*1024),
+      -- process qemu messages delay counter
+      process_qemu_counter = 0
    }
    return setmetatable(o, {__index = VhostUser})
 end
@@ -263,6 +265,9 @@ handler_names = {
 
 -- Process all vhost_user requests from QEMU.
 function VhostUser:process_qemu_requests ()
+   self.process_qemu_counter = self.process_qemu_counter + 1
+   if self.vhost_ready and self.process_qemu_counter % 10000 ~= 0 then return end
+
    local msg = self.msg
    local stop = false
 
