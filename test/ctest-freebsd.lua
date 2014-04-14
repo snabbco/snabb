@@ -54,7 +54,7 @@ ctypes["struct iphdr"] = nil
 ctypes["struct udphdr"] = nil
 
 if abi.freebsd < 10 then
-  ctypes.cap_rights = nil
+  ctypes.cap_rights_t = nil
 end
 
 print [[
