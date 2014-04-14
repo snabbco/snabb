@@ -15,14 +15,15 @@ require "syscall.ffitypes"
 
 -- detect freebsd version
 ffi.cdef [[
-int sysctlbyname(const char *sname, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
+int sysctl(const int *name, unsigned int namelen, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
 ]]
-local buf = ffi.new("int[1]")
+
+local sc = ffi.new("int[2]", 1, 24) -- kern.osreldate
+local osrevision = ffi.new("int[1]")
 local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
-local ok = ffi.C.sysctlbyname("kern.osreldate", buf, lenp, nil, 0)
-if ok ~= 0 then error("canot identify FreeBSD version") end
-local vs = tostring(buf[0])
-abi.freebsd = tonumber(vs:sub(1, #vs - 5)) -- major version ie 9, 10
+local res = ffi.C.sysctl(sc, 2, osrevision, lenp, nil, 0)
+if res == -1 then error("cannot identify FreeBSD version") end
+abi.freebsd = math.floor(osrevision[0] / 100000) -- major version ie 9, 10
 
 local defs = {}
 

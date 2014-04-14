@@ -13,6 +13,11 @@ local ffi = require "ffi"
 
 require "syscall.ffitypes"
 
+-- for version detection - not implemented yet
+ffi.cdef [[
+int sysctl(const int *name, unsigned int namelen, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
+]]
+
 local defs = {}
 
 local function append(str) defs[#defs + 1] = str end

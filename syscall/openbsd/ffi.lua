@@ -13,6 +13,11 @@ local ffi = require "ffi"
 
 require "syscall.ffitypes"
 
+ffi.cdef [[
+int sysctl(const int *name, unsigned int namelen, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
+]]
+
+-- TODO use sysctl, as integer
 abi.openbsd = tonumber(ffi.string(abi.uname.release)) -- TODO probably best to not do as floating point
 
 local defs = {}
