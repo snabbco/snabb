@@ -418,6 +418,8 @@ test.netlink = {
   end,
   test_getlink = function()
     local i = assert(nl.getlink())
+    local st, err = S.stat("/sys/class/net") -- just in case sysfs not mounted
+    if not st then error "skipped" end
     local df = assert(util.dirtable("/sys/class/net", true))
     assert_equal(#df, #i, "expect same number of interfaces as /sys/class/net")
     assert(i.lo, "expect a loopback interface")
