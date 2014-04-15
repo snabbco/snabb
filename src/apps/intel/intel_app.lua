@@ -115,6 +115,7 @@ function selftest ()
 
    mq_sq('0000:05:00.0', '0000:8a:00.0')
    app.main({duration = 1, report={showlinks=true, showapps=false}})
+   require ("test")('src/apps/intel/intel10g_t')
 end
 
 -- open two singlequeue drivers on both ends of the wire
