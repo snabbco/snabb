@@ -28,6 +28,7 @@ if arg[1] == "rumplinuxshort" then short, arg[1] = true, "rumplinux" end -- don'
 if arg[1] == "rump" or arg[1] == "rumplinux" then
   tmpabi = require "syscall.abi"
   -- it is too late to set this now, needs to be set before executions starts
+  -- not required for Musl, but required for libc, but better to set it
   if tmpabi.os == "linux" then
     assert(os.getenv("LD_DYNAMIC_WEAK"), "you need to set LD_DYNAMIC_WEAK=1 before running this test")
   end
