@@ -120,7 +120,7 @@ function main (options)
       breathe()
       if not no_timers then timer.run() end
    until done and done()
-   report()
+   report(options.report)
 end
 
 function breathe ()
@@ -147,10 +147,21 @@ function breathe ()
    until not progress  -- Stop after no link had new data
 end
 
-function report ()
-   print("link report")
-   for name, l in pairs(link_table) do
-      print(lib.comma_value(tostring(tonumber(l.stats.txpackets))), "sent on", name)
+function report (options)
+   if not options or options.showlinks then
+      print("link report")
+      for name, l in pairs(link_table) do
+         print(lib.comma_value(tostring(tonumber(l.stats.txpackets))), "sent on", name)
+      end
+   end
+   if options and options.showapps then
+      print ("apps report")
+      for name, a in pairs(app_table) do
+         if a.report then
+            print (name)
+            a:report()
+         end
+      end
    end
 end
 
