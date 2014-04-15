@@ -41,8 +41,8 @@ function Register:clr (bitmask) self(bit.band(self(), bit.bnot(bitmask))) end
 --- If `value` is not given then until all bits in the mask are set.
 function Register:wait (bitmask, value)
    lib.waitfor(function ()
-		  return bit.band(self(), bitmask) == (value or bitmask)
-	       end)
+      return bit.band(self(), bitmask) == (value or bitmask)
+   end)
 end
 
 --- For type `RC`: Reset the accumulator to 0.
@@ -60,7 +60,7 @@ end
 
 --- Registers print as `$NAME:$HEXVALUE` to make debugging easy.
 function Register:__tostring ()
-   return self.name..":"..bit.tohex(self())
+   return self.name.."["..bit.tohex(self.offset).."]:"..bit.tohex(self())
 end
 
 --- Metatables for the three different types of register
@@ -79,11 +79,50 @@ local mt = {
 --- Example:
 ---     register.new("TPT", "Total Packets Transmitted", 0x040D4, ptr, "RC")
 function new (name, longname, offset, base_ptr, mode)
-   local o = { name=name, longname=longname,
-	       ptr=base_ptr + offset/4 }
+   local o = { name=name, longname=longname, offset=offset,
+               ptr=base_ptr + offset/4 }
    local mt = mt[mode]
    assert(mt)
    return setmetatable(o, mt)
+end
+
+--- returns true if an index string represents a range of registers
+function is_range (index)
+   return index:match('^%+[0-9xa-fA-F]+%*%d+%.%.%d+$') ~= nil
+end
+
+--- iterates the offset as defined in a range of registers
+function iter_range (offset, index)
+   local step,s,e =  string.match(index, '+([%dxa-fA-F]+)%*(%d+)%.%.(%d+)')
+   step, s, e = tonumber(step), tonumber(s), tonumber(e)
+   local function iter(e, i)
+      i = i + 1
+      if i > e then return nil end
+      return i, offset+step*(i-s)
+   end
+   return iter, e, s-1
+end
+
+--- returns the n-th offset in a register range
+function in_range (offset, index, n)
+   offset = tonumber(offset)
+   if offset == nil then return nil end
+   n = tonumber(n) or 0
+   local step,s,e =  string.match(index, '+([%dxa-fA-F]+)%*(%d+)%.%.(%d+)')
+   if not step then return offset end
+   step, s, e = tonumber(step), tonumber(s), tonumber(e)
+   if s <= n and n <= e then
+      return offset + step * (n-s)
+   end
+   return nil
+end
+
+--- formats a name for a specific member of a register range
+function range_name (index, name, i)
+   local step,s,e =  string.match(index, '+([%dxa-fA-F]+)%*(%d+)%.%.(%d+)')
+   local ndigits = #(tostring(tonumber(e)))
+   local fmt = string.format('%%s[%%0%dd]', ndigits)
+   return string.format(fmt, name, i)
 end
 
 --- ### Define registers from string description.
@@ -102,29 +141,63 @@ end
 ---     Mode       ::= "RO" | "RW" | "RC"
 ---     Longname   ::= <string>
 ---     Offset ::= OffsetStep ::= Min ::= Max ::= <number>
-function define (description, table, base_ptr)
+---
+--- the optional 'n' argument specifies which register of an array gets
+--- created (default 0)
+function define (description, table, base_ptr, n)
    local pattern = [[ *(%S+) +(%S+) +(%S+) +(%S+) (.-)
 ]]
    for name,offset,index,perm,longname in description:gmatch(pattern) do
-      table[name] = new(name, longname, tonumber(offset), base_ptr, perm)
+      local offs = in_range(offset, index, n)
+      if offs ~= nil then
+         table[name] = new(name, longname, offs, base_ptr, perm)
+      end
    end
 end
+
+-- registers of the form '+0xXX*j..k' are converted to
+-- an array of registers.
+-- naïve implementation: actually create the whole array
+function define_array (description, table, base_ptr)
+   local pattern = [[ *(%S+) +(%S+) +(%S+) +(%S+) (.-)
+]]
+   for name,offset,index,perm,longname in description:gmatch(pattern) do
+      if is_range(index) then
+         table[name] = table[name] or {name=name}
+         for i, offset in iter_range(offset, index) do
+            table[name][i] = new(range_name(index,name,i), longname, offset, base_ptr, perm)
+         end
+      else
+         table[name] = new(name, longname, offset, base_ptr, perm)
+      end
+   end
+end
+
+
+function is_array (t)
+   return type(t)=='table' and getmetatable(t)==nil
+end
+
 
 -- Print a pretty-printed register dump for a table of register objects.
 function dump (tab, iscounters)
 --   print "Register dump:"
    local strings = {}
    for _,reg in pairs(tab) do
-      if iscounters == nil or reg() > 0 then
+      if type(reg)=='table' and (iscounters == nil or is_array(reg) or reg() > 0) then
          table.insert(strings, reg)
       end
    end
    table.sort(strings, function(a,b) return a.name < b.name end)
-   for _,reg in pairs(strings) do
-      if iscounters then
-         io.write(("%20s %16s %s\n"):format(reg.name, lib.comma_value(reg()), reg.longname))
+   for _,reg in ipairs(strings) do
+      if is_array(reg) then
+         dump(reg, iscounters)
       else
-         io.write(("%20s %s\n"):format(reg, reg.longname))
+         if iscounters then
+            io.write(("%40s %16s %s\n"):format(reg.name, lib.comma_value(reg()), reg.longname))
+         else
+            io.write(("%40s %s\n"):format(reg, reg.longname))
+         end
       end
    end
 end
