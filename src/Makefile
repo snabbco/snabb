@@ -9,7 +9,7 @@ TEST_SKIPPED="43"
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 
-LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
+LUASRC = $(shell find . -regex '[^\#]*\.lua' ! -name '*_t.lua' -printf '%P ')
 CSRC   = $(shell find . -regex '[^\#]*\.c'   -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h'   -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
@@ -24,12 +24,7 @@ EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
 MDOBJS := $(patsubst %, doc/obj/%.md, $(LUASRC) $(CSRC) $(CHDR)) $(wildcard *.md)
 
-# TESTMODS expands to:
-#   core.memory core.lib ...
-# for each module that has a top-level selftest () function.
-TESTMODS = $(shell find . -regex '[^\#]*\.lua' -printf '%P ' | \
-             xargs grep -l '^function selftest *[[:punct:]]' | \
-             sed -e 's_\.lua__' -e 's_/_._g')
+TESTFILES = $(shell find . -name '*_t.lua' | sed -e 's/_t.lua/_t/g')
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
@@ -45,27 +40,10 @@ snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 	@echo -n "Firmware: "
 	@ls -sh snabbswitch
 
-test: $(TESTMODS)
+# test: $(TESTMODS)
 
-test_ci: FAIL_ON_FIRST="true"
-
-test_ci: $(TESTMODS)
-
-$(TESTMODS): testlog snabbswitch
-	$(E) "TEST      $@"
-	$(Q) ./snabbswitch -t $@ > testlog/$@ || ( \
-		EXITCODE="$$?"; \
-		[ "$$EXITCODE" -eq $(TEST_SKIPPED) ] \
-		&& ( \
-			echo "SKIPPED   testlog/$@"; \
-			echo "EXITCODE: $$EXITCODE" >> testlog/$@; \
-		) \
-		|| ( \
-			echo "ERROR     testlog/$@"; \
-			echo "EXITCODE: $$EXITCODE" >> testlog/$@; \
-			if [ -n "$(FAIL_ON_FIRST)" ]; then exit $$EXITCODE; fi;\
-		) \
-	)
+test:
+	./snabbswitch lib.test .
 
 $(OBJDIR) testlog:
 	$(E) "DIR       $@"

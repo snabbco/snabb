@@ -1,5 +1,6 @@
 module(...,package.seeall)
 
+local lib = require("core.lib")
 local app = require("core.app")
 local buffer = require("core.buffer")
 local packet = require("core.packet")
@@ -220,4 +221,53 @@ end
 function Buzz:pull () print "bzzz pull" end
 function Buzz:push () print "bzzz push" end
 
+
+--- ### Classifier app:
+--- records history of packets
+Classifier = setmetatable({}, {__index = Basic})
+function Classifier:new()
+   return setmetatable(
+      {_patterns={}, _rev={}, _counters={}, _seq={}}, 
+      {__index=Classifier})
+end
+
+function Classifier:setPatterns(pats)
+   self._patterns = pats
+   self._seq = {}
+   self._rev = {}
+   self._counters = {}
+   for k,v in pairs(pats) do
+      self._rev[v] = k
+      self._counters[k] = 0
+   end
+end
+
+function Classifier:count(ln, d)
+   local packet_name = self._rev[d]
+   if packet_name == nil then
+     packet_name = #self._patterns+1
+     self._patterns[packet_name] = d
+     self._rev[d] = packet_name
+   end
+   self._seq[#self._seq+1] = ln..':'..packet_name
+   self._counters[packet_name] = (self._counters[packet_name] or 0) + 1
+end
+
+function Classifier:repConters()
+   return table.concat(self._counters, ',')
+end
+
+function Classifier:repSequence()
+   return table.concat(self._seq, ',')
+end
+
+function Classifier:push ()
+   for ln, l in pairs(self.input) do
+      for _ = 1, link.nreadable(l) do
+        local p = link.receive(l)
+        self:count(ln, packet.tostring(p))
+        packet.deref(p)
+      end
+   end
+end
 

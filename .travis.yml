@@ -5,7 +5,7 @@ compiler:
 before_install: "sudo apt-get update && sudo apt-get install -y linux-libc-dev"
 
 script:
-  - make && cd src && sudo make test_ci;
+  - make && cd src && sudo make test;
 
 after_script:
   - ls testlog/* | xargs -l1 cat;
