@@ -3,7 +3,8 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C   = ffi.C
 
-require("strict")
+require("lib.lua.strict")
+require("lib.lua.class")
 
 ffi.cdef[[
       extern int argc;
@@ -29,7 +30,7 @@ local profiling = false
 parameters = {}
 
 function main ()
-   require "strict"
+   require "lib.lua.strict"
    initialize()
    local args = command_line_args()
    if #args == 0 then
