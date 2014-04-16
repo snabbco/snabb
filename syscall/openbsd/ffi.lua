@@ -30,7 +30,7 @@ local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
 local ok, res = ffi.C.sysctl(sc, 2, osrevision, lenp, nil, 0)
 if not ok or res == -1 then error "cannot determinate openbsd version" end
 
-osrevision = osrevision[0]
+abi.openbsd = osrevision[0]
 
 if not abi.openbsd then error "unsupported openbsd version" end
 
