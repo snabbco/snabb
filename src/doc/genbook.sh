@@ -14,30 +14,36 @@ cat <<EOF
         awk 'NR > 1 { printf("; ") } { printf("%s", $0) } END { print("") }')
 
 # Memory
-$(cat memory.md)
+$(cat $(find . -name memory.md))
 ## \`memory.c\`: Operating system support
-$(cat obj/memory.c.md)
+$(cat obj/core/memory.c.md)
 ## \`memory.lua\`: Allocate physical memory in Lua
-$(cat obj/memory.lua.md)
+$(cat obj/core/memory.lua.md)
 ## \`buffer.lua\`: Allocate packet buffers from a pool
-$(cat obj/buffer.lua.md)
+$(cat obj/core/buffer.lua.md)
 
 # PCI
 ## \`pci.c\`: Operating system support
-$(cat obj/pci.c.md)
+$(cat obj/lib/hardware/pci.c.md)
 ## \`pci.lua\`: PCI access in Lua
-$(cat obj/pci.lua.md)
+$(cat obj/lib/hardware/pci.lua.md)
+
+# Packets and datagrams
+## \`packet.h\` low level structures
+$(cat obj/core/packet.h.md)
+## \`packet.lua\` basic handling operations
+$(cat obj/core/packet.lua.md)
 
 # Hardware ethernet I/O
 ## Hardware device register access
-$(cat obj/register.lua.md)
+$(cat obj/lib/hardware/register.lua.md)
 ## Intel 82599 (10-Gigabit) ethernet device driver
-$(cat obj/intel10g.lua.md)
+$(cat obj/apps/intel/intel10g.lua.md)
 
 # Software ethernet I/O (virtio)
 $(cat virtio.md)
 ## \`virtio_vring.h\`: vring DMA ring buffer data structure
-$(cat obj/virtio_vring.h.md)
+$(cat obj/lib/virtio/virtio_vring.h.md)
 ## \`virtio_vhost.h\`: vhost Linux kernel `ioctl` data structures
 $(cat obj/virtio_vhost.h.md)
 ## \`virtio_vhost_client.c\`: Linux \`/dev/vhost-net\` vhost client
@@ -52,21 +58,26 @@ $(cat kvm.md)
 $(cat obj/port.lua.md)
 ## \`hub2.lua\`: 2-port ethernet hub
 $(cat obj/hub2.lua.md)
+$(cat core/buffer.lua.md)
 
 $(cat openstack.md)
 
 # *DRAFT* Library
-## \`clib.h\`: Standard C function prototypes
-$(cat obj/clib.h.md)
+## \`lib.h\`: Standard C function prototypes
+$(cat obj/core/lib.h.md)
+## \`lib.c\`:
+$(cat obj/core/lib.c.md)
 ## \`lib.lua\`: Lua library routines
-$(cat obj/lib.lua.md)
+$(cat obj/core/lib.lua.md)
 
 # Startup
 ## \`snabbswitch.c\`: C \`main()\` entry point
-$(cat obj/snabbswitch.c.md)
+$(cat obj/core/snabbswitch.c.md)
 ## \`main.lua\`: Lua entry point
-$(cat obj/main.lua.md)
+$(cat obj/core/main.lua.md)
 ## \`snabb_lib_init.c\`: Customized Lua initialization
 $(cat obj/snabb_lib_init.c.md)
+
+$(cat test.md)
 
 EOF

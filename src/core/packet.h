@@ -1,7 +1,7 @@
-// Buffers can be treated specially depending on their origin.
-//
-// For example, buffers belonging to Virtio devices need to be
-// returned to the device when freed.
+/// Buffers can be treated specially depending on their origin.
+///
+/// For example, buffers belonging to Virtio devices need to be
+/// returned to the device when freed.
 
 struct buffer_origin {
   enum buffer_origin_type {
@@ -18,7 +18,7 @@ struct buffer_origin {
   } info;
 };
 
-// A buffer describes a piece of memory with known size and physical address.
+/// A buffer describes a piece of memory with known size and physical address.
 struct buffer {
   char     *pointer; // virtual address in this process
   uint64_t physical; // stable physical address
@@ -26,7 +26,7 @@ struct buffer {
   struct buffer_origin origin;
 };
 
-// A packet_iovec describes a portion of a buffer.
+/// A packet_iovec describes a portion of a buffer.
 struct packet_iovec {
   struct buffer *buffer;
   uint32_t offset;
@@ -36,10 +36,10 @@ struct packet_iovec {
 // Maximum number of packet_iovec's per packet.
 enum { PACKET_IOVEC_MAX = 16 };
 
-// Packet info (metadata) for checksum and segmentation offload.
-//
-// This is intentionally bit-compatible with the Virtio structure
-// 'virtio_net_hdr' because that seems a reasonable starting point.
+/// Packet info (metadata) for checksum and segmentation offload.
+///
+/// This is intentionally bit-compatible with the Virtio structure
+/// 'virtio_net_hdr' because that seems a reasonable starting point.
 struct packet_info {
   uint8_t flags;        // see below
   uint8_t gso_flags;    // see below
@@ -64,6 +64,9 @@ enum {
   PACKET_GSO_ECN   = 0x80  // TCP has ECN set
 };
 
+/// Packet data structure.
+///
+/// Holds a number of iovecs, reference counting and other housekeeping info
 struct packet {
   int32_t refcount;
   // How much "fuel" does this packet have left before it's dropped?
