@@ -17,8 +17,22 @@ ffi.cdef [[
 int sysctl(const int *name, unsigned int namelen, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
 ]]
 
--- TODO use sysctl, as integer
-abi.openbsd = tonumber(ffi.string(abi.uname.release)) -- TODO probably best to not do as floating point
+-- TODO we could probably support some earlier versions easily
+
+-- 201211 = 5.2
+-- 201305 = 5.3
+-- 201311 = 5.4
+-- 201405 = 5.5
+
+local sc = ffi.new("int[2]", 1, 3) -- kern.osrev
+local osrevision = ffi.new("int[1]")
+local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
+local ok, res = ffi.C.sysctl(sc, 2, osrevision, lenp, nil, 0)
+if not ok or res == -1 then error "cannot determinate openbsd version" end
+
+osrevision = osrevision[0]
+
+if not abi.openbsd then error "unsupported openbsd version" end
 
 local defs = {}
 
@@ -49,7 +63,7 @@ typedef	unsigned int  nfds_t;
 typedef int64_t       daddr_t;
 typedef int32_t       timer_t;
 ]]
-if abi.openbsd < 5.5 then append [[
+if abi.openbsd == 201311 then append [[
 typedef uint32_t      ino_t;
 typedef int32_t       time_t;
 typedef int32_t       clock_t;
@@ -141,7 +155,7 @@ struct pollfd {
   short revents;
 };
 ]]
-if abi.openbsd < 5.5 then append [[
+if abi.openbsd == 201311 then append [[
 struct stat {
   dev_t     st_dev;
   ino_t     st_ino;
@@ -218,7 +232,7 @@ struct termios {
   speed_t         c_ospeed;
 };
 ]]
-if abi.openbsd < 5.5 then append [[
+if abi.openbsd == 201311 then append [[
 struct dirent {
   uint32_t d_fileno;
   uint16_t d_reclen;
@@ -309,7 +323,7 @@ int unlockpt(int fildes);
 char *ptsname(int fildes);
 ]]
 
-if abi.openbsd >= 5.5 then
+if abi.openbsd >= 201405 then
 append [[
 int getdents(int fd, void *buf, size_t nbytes);
 ]]
