@@ -40,6 +40,43 @@ function add_iovec (p, b, length,  offset)
    p.length = p.length + length
 end
 
+-- Prepend data to a packet.
+function prepend_iovec (p, b, length,  offset)
+   if debug then assert(p.niovecs < C.PACKET_IOVEC_MAX, "packet iovec overflow") end
+   offset = offset or 0
+   if debug then assert(length + offset <= b.size) end
+   for i = p.niovecs, 1, -1 do
+      ffi.copy(p.iovecs[i], p.iovecs[i-1], ffi.sizeof("struct packet_iovec"))
+   end
+   local iovec = p.iovecs[0]
+   iovec.buffer = b
+   iovec.length = length
+   iovec.offset = offset
+   p.niovecs = p.niovecs + 1
+   p.length = p.length + length
+end
+
+-- Merge all buffers into one. Throws an exception if a single buffer
+-- cannot hold the entire packet.
+--
+-- XXX Should work also with packets that are bigger than a single
+-- buffer, i.e. reduce the number of buffers to the minimal set
+-- required to hold the entire packet.
+function coalesce (p)
+   if p.niovecs == 1 then return end
+   local b = buffer.allocate()
+   assert(p.length <= b.size, "packet too big to coalesce")
+   local length = 0
+   for i = 0, p.niovecs-1, 1 do
+      local iovec = p.iovecs[i]
+      ffi.copy(b.pointer + length, iovec.buffer.pointer + iovec.offset, iovec.length)
+      buffer.free(iovec.buffer)
+      length = length + iovec.length
+   end
+   p.niovecs, p.length = 0, 0
+   add_iovec(p, b, length)
+end
+
 -- fill's an allocated packet with data from a string
 function fill_data (p, d, offset)
    offset = offset or 0
