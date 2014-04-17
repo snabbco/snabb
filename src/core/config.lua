@@ -24,7 +24,8 @@ function app (config, name, class, arg)
    arg = arg or "nil"
    assert(type(name) == "string", "name must be a string")
    assert(type(class) == "table", "class must be a table")
-   assert(type(arg)   == "string", "arg must be a string")
+   assert(type(arg)   == "string" or type(arg) == "table",
+	  "arg must be a string or a table")
    config.apps[name] = { class = class, arg = arg}
 end
 

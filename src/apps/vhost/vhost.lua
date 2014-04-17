@@ -9,13 +9,14 @@ local buffer   = require("core.buffer")
 local packet   = require("core.packet")
                  require("lib.virtio.virtio_vring_h")
                  require("lib.tuntap.tuntap_h")
+                 require("lib.raw.raw_h")
                  require("apps.vhost.vhost_h")
                  require("apps.vhost.vhost_client_h")
 
 vring_size = C.VHOST_VRING_SIZE
 uint64_t = ffi.typeof("uint64_t")
 
-function new (tapname)
+function new (name, type)
    local vhost = ffi.new("struct vhost")
    local dev = { vhost = vhost,
                  rxring = vhost.vring[0],    -- vring 0 is for receiving
@@ -32,15 +33,20 @@ function new (tapname)
    -- Disable interrupts (eventfd "call"). We are polling anyway.
    dev.rxring.avail.flags = C.VRING_F_NO_INTERRUPT
    dev.txring.avail.flags = C.VRING_F_NO_INTERRUPT
-   open(dev, tapname)
+   open(dev, name, type)
    setmetatable(dev, {__index = getfenv()})
    return dev
 end
 
-function open (dev, tapname)
-   os.execute("modprobe tun; modprobe vhost_net")
-   local tapfd = C.open_tap(tapname);
-   assert(C.vhost_open(dev.vhost, tapfd, memory_regions()) == 0)
+function open (dev, name, type)
+   local fd
+   if type == "raw" then
+      fd = C.open_raw(name)
+   else
+      os.execute("modprobe tun; modprobe vhost_net")
+      fd = C.open_tap(name);
+   end
+   assert(C.vhost_open(dev.vhost, fd, memory_regions()) == 0)
 end
 
 --- ### Data structures: buffer table and descriptor freelist
@@ -62,11 +68,14 @@ end
 function transmit (dev, p)
    assert(can_transmit(dev, p), "transmit overflow")
    local prev_descriptor = nil
+   if p.niovecs > 1 then
+      packet.coalesce(p)
+   end
    for i = 0, p.niovecs-1 do
       local iovec = p.iovecs[i]
       local descriptor_index = freelist.remove(dev.txfree)
       local descriptor = dev.txring.desc[descriptor_index]
-      descriptor.addr  = ffi.cast(uint64_t, iovec.buffer.pointer)
+      descriptor.addr  = ffi.cast(uint64_t, iovec.buffer.pointer + iovec.offset)
       descriptor.len   = iovec.length
       descriptor.flags = 0
       if prev_descriptor == nil then -- first descriptor
