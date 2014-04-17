@@ -68,11 +68,14 @@ end
 function transmit (dev, p)
    assert(can_transmit(dev, p), "transmit overflow")
    local prev_descriptor = nil
+   if p.niovecs > 1 then
+      packet.coalesce(p)
+   end
    for i = 0, p.niovecs-1 do
       local iovec = p.iovecs[i]
       local descriptor_index = freelist.remove(dev.txfree)
       local descriptor = dev.txring.desc[descriptor_index]
-      descriptor.addr  = ffi.cast(uint64_t, iovec.buffer.pointer)
+      descriptor.addr  = ffi.cast(uint64_t, iovec.buffer.pointer + iovec.offset)
       descriptor.len   = iovec.length
       descriptor.flags = 0
       if prev_descriptor == nil then -- first descriptor
