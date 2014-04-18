@@ -77,7 +77,29 @@ function coalesce (p)
    add_iovec(p, b, length)
 end
 
---- ### Refcounting
+-- fill's an allocated packet with data from a string
+function fill_data (p, d, offset)
+   offset = offset or 0
+   for i = 0, p.niovecs-1 do
+      local iovec = p.iovecs[i]
+      if iovec.length > offset then
+         ffi.copy(iovec.buffer.pointer + offset, d, math.min(#d, iovec.length - offset))
+         d = d:sub(iovec.length - offset + 1)
+         if d == '' then return end
+         offset = 0
+      else
+         offset = offset - iovec.length
+      end
+   end
+   error("didn't find given offset")
+end
+
+-- creates a packet from a given binary string
+function from_data (d)
+   local p = allocate()
+   add_iovec(p, buffer.from_data(d), #d)
+   return p
+end
 
 --- Increase the reference count for packet p by n (default n=1).
 function ref (p,  n)
@@ -117,16 +139,13 @@ function free (p)
    freelist.add(packets_fl, p)
 end
 
---- ### to/from binary strings
-
---- Returns a Lua binary string with the whole contents of the packet
 function tostring(p)
    local out = {}
-   for i = 0, p.niovecs-1 do
-      local iovec = p.iovecs[i]
+   for i = 1, p.niovecs do
+      local iovec = p.iovecs[i-1]
       out[i] = ffi.string(iovec.buffer.pointer + iovec.offset, iovec.length)
    end
-   return table.concat(out, '', 0)
+   return table.concat(out, '')
 end
 
 --- Writes data from a string into an existing packet at a specified offset
@@ -147,9 +166,12 @@ function fill_data (p, d, offset)
 end
 
 --- Creates a packet from a given binary string
-function from_data (d)
+function from_data (...)
    local p = allocate()
-   add_iovec(p, buffer.from_data(d), #d)
+   for i = 1, select('#', ...) do
+      local d = select(i, ...)
+      add_iovec(p, buffer.from_data(d), #d)
+   end
    return p
 end
 

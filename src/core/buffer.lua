@@ -61,16 +61,14 @@ function delete_virtio_device (index)
    virtio_devices[index] = nil
 end
 
---- ### to/from binary strings
-
---- copies data from a string to an allocated buffer
+-- fill's an allocated buffer with data from a string
 function fill_data (b, d, offset)
    offset = offset or 0
    assert (offset+#d <= b.size, "can't fit on buffer")
    ffi.copy (b.pointer + offset, d, math.min(#d, b.size-offset))
 end
 
---- creates a buffer from a given binary string
+-- creates a buffer from a given binary string
 function from_data (d)
    local b = allocate()
    local size = math.min(#d, b.size)
@@ -78,7 +76,6 @@ function from_data (d)
    return b
 end
 
---- returns a string with buffer's content
 function tostring(b, size)
    return ffi.string(b.pointer, size or b.size)
 end

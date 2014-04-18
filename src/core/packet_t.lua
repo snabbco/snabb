@@ -8,11 +8,25 @@ local packet = require "core.packet"
 
 
 return {
-   from_data = function ()
-      local p = packet.from_data('abcdefghijklmnopqrstuvwxyz')
-      assert (packet.tostring(p) == 'abcdefghijklmnopqrstuvwxyz')
-   end,
-   
+   from_data = {
+      no_parts = function ()
+         local p = packet.from_data()
+         assert (p.niovecs == 0)
+         assert (packet.tostring(p) == '')
+      end,
+      
+      single_part = function ()
+         local p = packet.from_data('abcdefghijklmnopqrstuvwxyz')
+         assert (p.niovecs == 1)
+         assert (packet.tostring(p) == 'abcdefghijklmnopqrstuvwxyz')
+      end,
+         
+      multiple_parts = function ()
+         local p = packet.from_data('abcdef','ghijklmnopqr','stuvwx','yz')
+         assert (p.niovecs == 4)
+         assert (packet.tostring(p) == 'abcdefghijklmnopqrstuvwxyz')
+      end,
+   },
    add_iovec = {
       
       to_empty_packet = function ()
