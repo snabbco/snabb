@@ -34,8 +34,8 @@ abi.openbsd = osrevision[0]
 
 -- TODO test and support other versions properly
 -- this is the main recent ABI change, but so far untested...
-if openbsd < 201311 thenabi.openbsd = 201311 end
-if openbsd > 201405 then abi.openbsd = 201405 end
+if abi.openbsd < 201311 then abi.openbsd = 201311 end
+if abi.openbsd > 201405 then abi.openbsd = 201405 end
 if abi.openbsd < 201311 or abi.openbsd > 201405 then error "unsupported openbsd version" end
 
 local defs = {}
