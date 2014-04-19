@@ -252,8 +252,6 @@ append [[
 union sigval {
   int     sival_int;
   void    *sival_ptr;
-  int     sigval_int;
-  void    *sigval_ptr;
 };
 static const int SI_MAXSZ = 128;
 static const int SI_PAD = ((SI_MAXSZ / sizeof (int)) - 3);
