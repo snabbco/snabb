@@ -122,6 +122,7 @@ build =
       ["syscall.openbsd.errors"] = "syscall/openbsd/errors.lua";
       ["syscall.openbsd.util"] = "syscall/openbsd/util.lua";
       ["syscall.openbsd.sysctl"] = "syscall/openbsd/sysctl.lua";
+      ["syscall.openbsd.version"] = "syscall/openbsd/version.lua";
 
       ["syscall.bsd.syscalls"] = "syscall/bsd/syscalls.lua";
       ["syscall.bsd.ffi"] = "syscall/bsd/ffi.lua";

@@ -7,6 +7,8 @@ if abi.os ~= "freebsd" then return 10 end
 
 local ffi = require "ffi"
 
+require "syscall.ffitypes"
+
 ffi.cdef [[
 int sysctl(const int *name, unsigned int namelen, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
 ]]
