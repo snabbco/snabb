@@ -16,6 +16,8 @@ local bit = require "syscall.bit"
 local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
   = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag, h.modeflags
 
+local version = require "syscall.freebsd.version"
+
 local ffi = require "ffi"
 
 local function charp(n) return ffi.cast("char *", n) end
@@ -133,7 +135,7 @@ c.E = strflag {
   CAPMODE       = 94,
 }
 
-if abi.freebsd >= 10 then
+if version >= 10 then
   c.E.NOTRECOVERABLE= 95
   c.E.OWNERDEAD     = 96
 end
@@ -188,7 +190,7 @@ c.AF.UNIX = c.AF.LOCAL
 c.AF.OSI = c.AF.ISO
 c.AF.E164 = c.AF.ISDN
 
-if abi.freebsd >= 10 then
+if version >= 10 then
   c.AF.INET_SDP  = 40
   c.AF.INET6_SDP = 42
 end
@@ -274,7 +276,7 @@ c.SIG = strflag {
   THR = 32,
 }
 
-if abi.freebsd >=10 then c.SIG.LIBRT = 33 end
+if version >=10 then c.SIG.LIBRT = 33 end
 
 
 c.SIG.LWP = c.SIG.THR
@@ -325,7 +327,7 @@ c.SOCK = multiflags {
   SEQPACKET = 5,
 }
 
-if abi.freebsd >= 10 then
+if version >= 10 then
   c.SOCK.CLOEXEC  = 0x10000000
   c.SOCK.NONBLOCK = 0x20000000
 end
@@ -417,7 +419,7 @@ c.MAP = multiflags {
 -- TODO add aligned maps in
 }
 
-if abi.abi64 and abi.freebsd >= 10 then c.MAP["32BIT"] = 0x00080000 end
+if abi.abi64 and version >= 10 then c.MAP["32BIT"] = 0x00080000 end
 
 c.MCL = strflag {
   CURRENT    = 0x01,
@@ -651,7 +653,7 @@ c.MSG = multiflags {
   NOSIGNAL        = 0x20000,
 }
 
-if abi.freebsd >= 10 then c.MSG.CMSG_CLOEXEC = 0x40000 end
+if version >= 10 then c.MSG.CMSG_CLOEXEC = 0x40000 end
 
 c.PC = strflag {
   LINK_MAX          = 1,
@@ -943,7 +945,7 @@ c.CHFLAGS.APPEND = c.CHFLAGS.UF_APPEND + c.CHFLAGS.SF_APPEND
 c.CHFLAGS.OPAQUE = c.CHFLAGS.UF_OPAQUE
 c.CHFLAGS.NOUNLINK = c.CHFLAGS.UF_NOUNLINK + c.CHFLAGS.SF_NOUNLINK
 
-if abi.freebsd >=10 then
+if version >=10 then
   c.CHFLAGS.UF_SYSTEM   = 0x00000080
   c.CHFLAGS.UF_SPARSE   = 0x00000100
   c.CHFLAGS.UF_OFFLINE  = 0x00000200
@@ -1009,7 +1011,7 @@ c.EV = multiflags {
   ERROR    = 0x4000,
 }
 
-if abi.freebsd >= 10 then c.EV.DROP = 0x1000 end
+if version >= 10 then c.EV.DROP = 0x1000 end
 
 c.EVFILT = strflag {
   READ     = -1,
@@ -1192,7 +1194,7 @@ c.KERN = strflag {
   MAXID             = 38,
 }
 
-if abi.freebsd >= 10 then -- not supporting on freebsd 9 as different ABI, recommend upgrade to use
+if version >= 10 then -- not supporting on freebsd 9 as different ABI, recommend upgrade to use
 
 local function CAPRIGHT(idx, b) return bit.bor64(bit.lshift64(1, 57 + idx), b) end
 

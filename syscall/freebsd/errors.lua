@@ -2,7 +2,7 @@
 
 local require = require
 
-local abi = require "syscall.abi"
+local version = require "syscall.freebsd.version"
 
 local errors = {
   PERM = "Operation not permitted",
@@ -101,7 +101,7 @@ local errors = {
   CAPMODE = "Not permitted in capability mode",
 }
 
-if abi.freebsd >= 10 then
+if version >= 10 then
   errors.NOTRECOVERABLE = "State not recoverable"
   errors.OWNERDEAD = "Previous owner died"
 end

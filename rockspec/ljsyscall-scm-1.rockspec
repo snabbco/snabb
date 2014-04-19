@@ -110,6 +110,7 @@ build =
       ["syscall.freebsd.errors"] = "syscall/freebsd/errors.lua";
       ["syscall.freebsd.util"] = "syscall/freebsd/util.lua";
       ["syscall.freebsd.sysctl"] = "syscall/freebsd/sysctl.lua";
+      ["syscall.freebsd.version"] = "syscall/freebsd/version.lua";
 
       ["syscall.openbsd.syscalls"] = "syscall/openbsd/syscalls.lua";
       ["syscall.openbsd.c"] = "syscall/openbsd/c.lua";
