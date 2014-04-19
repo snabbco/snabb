@@ -178,6 +178,13 @@ typedef union _netbsd_sigval {
   int     sival_int;
   void    *sival_ptr;
 } _netbsd_sigval_t;
+struct  _netbsd_sigevent {
+  int     sigev_notify;
+  int     sigev_signo;
+  union _netbsd_sigval    sigev_value;
+  void    (*sigev_notify_function)(union _netbsd_sigval);
+  void /* pthread_attr_t */       *sigev_notify_attributes;
+};
 struct _netbsd_kevent {
   uintptr_t ident;
   uint32_t  filter;
