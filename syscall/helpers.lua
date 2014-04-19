@@ -57,8 +57,9 @@ h.getfd = getfd
 -- generic function for __new
 function h.newfn(tp, tab)
   local obj = ffi.new(tp)
+  if not tab then return obj end
   -- these are split out so __newindex is called, not just initialisers luajit understands
-  for k, v in pairs(tab or {}) do if type(k) == "string" then obj[k] = v end end -- set string indexes
+  for k, v in pairs(tab) do if type(k) == "string" then obj[k] = v end end -- set string indexes
   return obj
 end
 

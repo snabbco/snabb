@@ -290,6 +290,25 @@ mt.sigset = {
 
 addtype(types, "sigset", "sigset_t", mt.sigset)
 
+mt.sigval = {
+  index = {
+    int = function(self) return self.sival_int end,
+    ptr = function(self) return self.sival_ptr end,
+  },
+  newindex = {
+    int = function(self, v) self.sival_int = v end,
+    ptr = function(self, v) self.sival_ptr = v end,
+  },
+  __new = function(tp, v)
+    if not v or type(v) == "table" then return newfn(tp, v) end
+    local siv = ffi.new(tp)
+    if type(v) == "number" then siv.int = v else siv.ptr = v end
+    return siv
+  end,
+}
+
+addtype(types, "sigval", "sigval_t", mt.sigval)
+
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsgtype = "struct cmsghdr"
 if abi.rumpfn then cmsgtype = abi.rumpfn(cmsgtype) end

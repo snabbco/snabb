@@ -554,6 +554,22 @@ mt.rlimit = {
   __new = newfn,
 }
 
+mt.sigevent = {
+  index = {
+    notify = function(self) return self.sigev_notify end,
+    signo = function(self) return self.sigev_signo end,
+    value = function(self) return self.sigev_value end,
+  },
+  newindex = {
+    notify = function(self, v) self.sigev_notify = c.SIGEV[v] end,
+    signo = function(self, v) self.sigev_signo = c.SIG[v] end,
+    value = function(self, v) self.sigev_value = t.sigval(v) end, -- auto assigns based on type
+  },
+  __new = newfn,
+}
+
+addtype(types, "sigevent", "struct sigevent", mt.sigevent)
+
 addtype(types, "rlimit", "struct rlimit64", mt.rlimit)
 
 mt.signalfd = {
