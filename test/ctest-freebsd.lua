@@ -4,6 +4,8 @@ package.path = "./?.lua;"
 
 local abi = require "syscall.abi"
 
+local version = require "syscall.freebsd.version"
+
 local S = require "syscall"
 
 local abi = S.abi
@@ -53,7 +55,7 @@ ctypes["struct ethhdr"] = nil
 ctypes["struct iphdr"] = nil
 ctypes["struct udphdr"] = nil
 
-if abi.freebsd < 10 then
+if version < 10 then
   ctypes.cap_rights_t = nil
 end
 
@@ -101,7 +103,7 @@ print [[
 #include <netinet/tcp.h>
 ]]
 
-if abi.freebsd >= 10 then print [[
+if version >= 10 then print [[
 #include <sys/caprights.h>
 ]]
 end
