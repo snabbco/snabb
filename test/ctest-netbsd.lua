@@ -139,6 +139,7 @@ print [[
 #include <sys/ktrace.h>
 #include <sys/extattr.h>
 #include <sys/pipe.h>
+#include <sys/aio.h>
 #include <net/if.h>
 #include <net/if_ether.h>
 #include <net/if_bridgevar.h>

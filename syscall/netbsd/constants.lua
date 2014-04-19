@@ -1258,6 +1258,22 @@ c.XATTR = multiflags {
   REPLACE          = 0x02,
 }
 
+c.AIO = strflag {
+  CANCELED         = 0x1,
+  NOTCANCELED      = 0x2,
+  ALLDONE          = 0x3,
+}
+
+c.LIO = strflag {
+-- LIO opcodes
+  NOP                = 0x0
+  WRITE              = 0x1
+  READ               = 0x2
+-- LIO modes
+  NOWAIT             = 0x0
+  WAIT               = 0x1
+}
+
 c.CTLTYPE = strflag {
   NODE    = 1,
   INT     = 2,
