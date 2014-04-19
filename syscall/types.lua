@@ -552,6 +552,28 @@ mt.itimerval = {
 
 addtype(types, "itimerval", "struct itimerval", mt.itimerval)
 
+mt.macaddr = {
+  __tostring = function(m)
+    local hex = {}
+    for i = 1, 6 do
+      hex[i] = string.format("%02x", m.mac_addr[i - 1])
+    end
+    return table.concat(hex, ":")
+  end,
+  __new = function(tp, str)
+    local mac = ffi.new(tp)
+    if str then
+      for i = 1, 6 do
+        local n = tonumber(str:sub(i * 3 - 2, i * 3 - 1), 16) -- TODO more checks on syntax
+        mac.mac_addr[i - 1] = n
+      end
+    end
+    return mac
+  end,
+}
+
+addtype(types, "macaddr", "struct {uint8_t mac_addr[6];}", mt.macaddr)
+
 -- include OS specific types
 types = ostypes.init(types)
 if bsdtypes then types = bsdtypes.init(c, types) end
