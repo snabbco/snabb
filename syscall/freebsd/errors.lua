@@ -2,7 +2,7 @@
 
 local require = require
 
-local version = require "syscall.freebsd.version"
+local version = require "syscall.freebsd.version".version
 
 local errors = {
   PERM = "Operation not permitted",

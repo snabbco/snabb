@@ -7,7 +7,7 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
 
-local version = require "syscall.freebsd.version"
+local version = require "syscall.freebsd.version".version
 
 return function(S, hh, c, C, types)
 

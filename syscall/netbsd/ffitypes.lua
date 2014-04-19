@@ -15,7 +15,7 @@ require "syscall.ffitypes"
 
 local helpers = require "syscall.helpers"
 
-local version = require "syscall.netbsd.version"
+local version = require "syscall.netbsd.version".version
 
 local defs = {}
 

@@ -6,7 +6,7 @@ local ffi = require "ffi"
 
 require "syscall.ffitypes"
 
-local version
+local version, major, minor
 
 -- NetBSD ABI version
 -- TODO if running rump on NetBSD the version detection is a bit flaky if the host and rump differ
@@ -27,11 +27,11 @@ if not ok or res == -1 then ok, res = pcall(ffi.C.rump_getversion) end
 if not ok or res == -1 then 
   version = 7
 else
-  local maj = math.floor(osrevision[0] / 100000000)
-  local min = math.floor(osrevision[0] / 1000000) - maj * 100
-  if min == 99 then maj = maj + 1 end
-  version = maj
+  local major = math.floor(osrevision[0] / 100000000)
+  local minor = math.floor(osrevision[0] / 1000000) - major * 100
+  version = major
+  if minor == 99 then version = version + 1 end
 end
 
-return version
+return {version = version, major = major, minor = minor}
 

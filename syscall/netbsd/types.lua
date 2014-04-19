@@ -11,7 +11,7 @@ local function init(types)
 
 local abi = require "syscall.abi"
 
-local version = require "syscall.netbsd.version"
+local version = require "syscall.netbsd.version".version
 
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 

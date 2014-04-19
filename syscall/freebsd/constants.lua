@@ -16,7 +16,7 @@ local bit = require "syscall.bit"
 local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
   = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag, h.modeflags
 
-local version = require "syscall.freebsd.version"
+local version = require "syscall.freebsd.version".version
 
 local ffi = require "ffi"
 

@@ -3,7 +3,7 @@
 local abi = require "syscall.abi"
 
 -- if not on OpenBSD just return most recent
-if abi.os ~= "openbsd" then return 201405 end
+if abi.os ~= "openbsd" then return {version = 201405} end
 
 local ffi = require "ffi"
 
@@ -32,5 +32,5 @@ local version = osrevision[0]
 if version < 201311 then version = 201311 end
 if version < 201311 or version > 201405 then error "unsupported openbsd version" end
 
-return version
+return {version = version}
 

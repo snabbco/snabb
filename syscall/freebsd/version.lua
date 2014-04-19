@@ -3,7 +3,7 @@
 local abi = require "syscall.abi"
 
 -- if not on FreeBSD just return most recent
-if abi.os ~= "freebsd" then return 10 end
+if abi.os ~= "freebsd" then return {version = 10} end
 
 local ffi = require "ffi"
 
@@ -19,5 +19,7 @@ local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
 local res = ffi.C.sysctl(sc, 2, osrevision, lenp, nil, 0)
 if res == -1 then error("cannot identify FreeBSD version") end
 
-return math.floor(osrevision[0] / 100000) -- major version ie 9, 10
+local version = math.floor(osrevision[0] / 100000) -- major version ie 9, 10
+
+return {version = version}
 

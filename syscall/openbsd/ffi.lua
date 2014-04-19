@@ -13,7 +13,7 @@ local ffi = require "ffi"
 
 require "syscall.ffitypes"
 
-local version = require "syscall.openbsd.version"
+local version = require "syscall.openbsd.version".version
 
 local defs = {}
 

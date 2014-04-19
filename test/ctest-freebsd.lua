@@ -4,7 +4,7 @@ package.path = "./?.lua;"
 
 local abi = require "syscall.abi"
 
-local version = require "syscall.freebsd.version"
+local version = require "syscall.freebsd.version".version
 
 local S = require "syscall"
 
