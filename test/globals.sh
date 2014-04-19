@@ -2,6 +2,15 @@
 
 EXIT=0
 
+# not comprehensive
+find . -name syscall.lua -o -name constants.lua | xargs -n1 luajit
+echo $?
+if [ $? != 0 ]
+then
+  echo "Lua error"
+  EXIT=1
+fi
+
 # test for use of globals variables in ways that are not allowed
 
 # test for set globals, never allowed
