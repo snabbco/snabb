@@ -794,6 +794,26 @@ struct k_sigaction {
 ]]
 )
 
+-- these could vary be arch but do not yet
+append [[
+static const int sigev_preamble_size = sizeof(int) * 2 + sizeof(sigval_t);
+static const int sigev_max_size = 64;
+static const int sigev_pad_size = (sigev_max_size - sigev_preamble_size) / sizeof(int);
+typedef struct sigevent {
+  sigval_t sigev_value;
+  int sigev_signo;
+  int sigev_notify;
+  union {
+    int _pad[sigev_pad_size];
+    int _tid;
+    struct {
+      void (*_function)(sigval_t);
+      void *_attribute;
+    } _sigev_thread;
+  } _sigev_un;
+} sigevent_t;
+]]
+
 append(arch.ucontext) -- there is no default for ucontext and related types as very machine specific
 
 if arch.statfs then append(arch.statfs)
