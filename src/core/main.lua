@@ -40,28 +40,28 @@ function main ()
    local i = 1
    while i <= #args do
       if args[i] == '-l' and i < #args then
-	 require(args[i+1])
-	 i = i + 2
+         require(args[i+1])
+         i = i + 2
       elseif args[i] == '-t' and i < #args then
          require(args[i+1]).selftest()
          i = i + 2
       elseif args[i] == '-e' and i < #args then
-	 local thunk, error = loadstring(args[i+1])
-	 if thunk then thunk() else print(error) end
-	 i = i + 2
+         local thunk, error = loadstring(args[i+1])
+         if thunk then thunk() else print(error) end
+         i = i + 2
       elseif args[i] == '-d' then
-	 debug_on_error = true
-	 i = i + 1
+         debug_on_error = true
+         i = i + 1
       elseif (args[i]):match("-jp") then
-	 local pargs, poutput = (args[i]):gmatch("-jp=(%w*),?(.*)")()
-	 if poutput == '' then poutput = nil end
-	 require("jit.p").start(pargs, poutput)
-	 profiling = true
-	 i = i + 1
+         local pargs, poutput = (args[i]):gmatch("-jp=(%w*),?(.*)")()
+         if poutput == '' then poutput = nil end
+         require("jit.p").start(pargs, poutput)
+         profiling = true
+         i = i + 1
       elseif args[i] == '-jdump' and i < #args then
-	 local jit_dump = require "jit.dump"
-	 jit_dump.start("", args[i+1])
-	 i = i + 2
+         local jit_dump = require "jit.dump"
+         jit_dump.start("", args[i+1])
+         i = i + 2
       elseif i <= #args then
          -- Syntax: <module> [args...]
          local module = args[i]
@@ -73,8 +73,8 @@ function main ()
          require(module)
          exit(0)
       else
-	 print(usage)
-	 os.exit(1)
+         print(usage)
+         os.exit(1)
       end
    end
    exit(0)
