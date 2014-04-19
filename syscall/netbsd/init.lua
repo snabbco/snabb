@@ -11,7 +11,6 @@ local abi = require "syscall.abi"
 local oldos, oldbsd = abi.os, abi.bsd
 
 abi.os = "netbsd"
-abi.netbsd = 6
 abi.bsd = true
 
 -- TODO this should be shared with rump! temporarily here

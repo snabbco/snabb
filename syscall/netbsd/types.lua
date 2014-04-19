@@ -11,6 +11,8 @@ local function init(types)
 
 local abi = require "syscall.abi"
 
+local version = require "syscall.netbsd.version"
+
 local t, pt, s, ctypes = types.t, types.pt, types.s, types.ctypes
 
 local ffi = require "ffi"
@@ -49,7 +51,7 @@ local addstructs = {
   in6_addrlifetime = "struct in6_addrlifetime",
 }
 
-if abi.netbsd == 6 then
+if version == 6 then
   addstructs.ptmget = "struct compat_60_ptmget"
 else
   addstructs.ptmget = "struct ptmget"
