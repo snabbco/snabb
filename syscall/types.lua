@@ -307,7 +307,7 @@ mt.sigval = {
   end,
 }
 
-addtype(types, "sigval", "sigval_t", mt.sigval)
+addtype(types, "sigval", "union sigval", mt.sigval) -- not always called sigval_t
 
 -- cmsg functions, try to hide some of this nasty stuff from the user
 local cmsgtype = "struct cmsghdr"
