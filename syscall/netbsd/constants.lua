@@ -1266,12 +1266,12 @@ c.AIO = strflag {
 
 c.LIO = strflag {
 -- LIO opcodes
-  NOP                = 0x0
-  WRITE              = 0x1
-  READ               = 0x2
+  NOP                = 0x0,
+  WRITE              = 0x1,
+  READ               = 0x2,
 -- LIO modes
-  NOWAIT             = 0x0
-  WAIT               = 0x1
+  NOWAIT             = 0x0,
+  WAIT               = 0x1,
 }
 
 c.CTLTYPE = strflag {
