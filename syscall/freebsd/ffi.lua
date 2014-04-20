@@ -259,13 +259,6 @@ struct sigaction {
   int     sa_flags;
   sigset_t sa_mask;
 };
-union sigval {
-  int     sival_int;
-  void    *sival_ptr;
-  /* 6.0 compatibility */
-  int     sigval_int;
-  void    *sigval_ptr;
-};
 ]]
 
 -- functions
