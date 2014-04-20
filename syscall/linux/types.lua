@@ -554,6 +554,7 @@ mt.rlimit = {
   __new = newfn,
 }
 
+-- TODO some fields still missing
 mt.sigevent = {
   index = {
     notify = function(self) return self.sigev_notify end,
