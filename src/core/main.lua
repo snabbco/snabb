@@ -1,6 +1,7 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
+local zone = require("jit.zone")
 local C   = ffi.C
 
 require("lib.lua.strict")
@@ -30,6 +31,7 @@ local profiling = false
 parameters = {}
 
 function main ()
+   zone("startup")
    require "lib.lua.strict"
    initialize()
    local args = command_line_args()
@@ -43,7 +45,7 @@ function main ()
 	 require(args[i+1])
 	 i = i + 2
       elseif args[i] == '-t' and i < #args then
-         require(args[i+1]).selftest()
+         zone("selftest")  require(args[i+1]).selftest()  zone()
          i = i + 2
       elseif args[i] == '-e' and i < #args then
 	 local thunk, error = loadstring(args[i+1])
@@ -70,6 +72,7 @@ function main ()
             table.insert(parameters, args[i])
             i = i + 1
          end
+         zone("module "..module)
          require(module)
          exit(0)
       else

@@ -6,6 +6,7 @@ local lib    = require("core.lib")
 local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
+local zone   = require("jit.zone")
 require("core.packet_h")
 
 -- The set of all active apps and links in the system.
@@ -67,11 +68,13 @@ function apply_config_actions (actions, conf)
       local class = conf.apps[name].class
       local arg = conf.apps[name].arg
       local app = class:new(arg)
+      local zone = app.zone or getfenv(class.new)._NAME or name
       app.output = {}
       app.input = {}
       new_app_table[name] = app
       table.insert(new_app_array, app)
       app_name_to_index[name] = #new_app_array
+      app.zone = zone
    end
    function ops.restart (name)
       ops.stop(name)
@@ -127,7 +130,9 @@ end
 function breathe ()
    -- Inhale: pull work into the app network
    for _, app in ipairs(app_array) do
-      if app.pull then app:pull() end
+      if app.pull then
+         zone(app.zone) app:pull() zone()
+      end
    end
    -- Exhale: push work out through the app network
    local firstloop = true
@@ -139,7 +144,7 @@ function breathe ()
             link.has_new_data = false
             local receiver = app_array[link.receiving_app]
             if receiver.push then
-               receiver:push()
+               zone(receiver.zone) receiver:push() zone()
                progress = true
             end
          end
