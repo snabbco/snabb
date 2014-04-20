@@ -72,7 +72,7 @@ function get_huge_page_size ()
    local _,_,hugesize = meminfo:find("Hugepagesize: +([0-9]+) kB")
    return hugesize
       and tonumber(hugesize) * 1024
-       or 2048 -- A typical x86 system will have a Huge Page Size of 2048 kBytes
+       or base_page_size -- use base page size as default value
 end
 
 base_page_size = 4096
