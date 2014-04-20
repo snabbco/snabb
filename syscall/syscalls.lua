@@ -686,7 +686,7 @@ end
 if C.timer_create then
   function S.timer_create(clk_id, sigev, timerid)
     timerid = timerid or t.timer()
-    -- TODO sigev handling
+    if sigev then sigev = mktype(t.sigevent, sigev) end
     local ret, err = C.timer_create(c.CLOCK[clk_id], sigev, timerid:gettimerp())
     if ret == -1 then return nil, t.error(err or errno()) end
     return timerid
