@@ -148,6 +148,7 @@ end
 
 addtype(types, "stat", "struct stat", mt.stat)
 
+-- TODO see note in Linux, we should be consistently using the correct union
 mt.siginfo = {
   index = {
     signo   = function(s) return s._info._signo end,
