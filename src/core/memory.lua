@@ -122,7 +122,7 @@ function set_use_physical_memory()
 end
 
 function set_default_allocator(use_hugetlb)
-    if use_hugetlb then
+    if use_hugetlb and lib.can_write("/proc/sys/vm/nr_hugepages") then
         allocate_RAM = function(size)
             for i =1, 3 do
                 local page = C.allocate_huge_page(size)
