@@ -459,7 +459,7 @@ end
 addtype(types, "stat", "struct stat", mt.stat)
 
 -- TODO this is broken, need to use fields from the correct union technically
--- ie check which of the unions we should be using and get all fields form that
+-- ie check which of the unions we should be using and get all fields from that
 -- (note as per Musl list the standard kernel,glibc definitions are wrong too...)
 mt.siginfo = {
   index = {
