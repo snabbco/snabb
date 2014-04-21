@@ -7,7 +7,7 @@ E= @echo
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 
-LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
+LUASRC = $(shell find . -regex '[^\#]*\.lua' ! -name '*_t.lua' -printf '%P ')
 CSRC   = $(shell find . -regex '[^\#]*\.c'   -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h'   -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')

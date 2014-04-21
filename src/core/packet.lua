@@ -27,7 +27,7 @@ function allocate ()
    return freelist.remove(packets_fl) or error("out of packets")
 end
 
--- Append data to a packet.
+--- Append data to a packet.
 function add_iovec (p, b, length,  offset)
    if debug then assert(p.niovecs < C.PACKET_IOVEC_MAX, "packet iovec overflow") end
    offset = offset or 0
@@ -80,22 +80,28 @@ end
 -- fill's an allocated packet with data from a string
 function fill_data (p, d, offset)
    offset = offset or 0
-   local iovec = p.iovecs[0]
-   assert (offset+#d <= iovec.length, "can't fit on first iovec")       -- TODO: handle more iovecs
-   ffi.copy (iovec.buffer.pointer + iovec.offset + offset, d, #d)
+   for i = 0, p.niovecs-1 do
+      local iovec = p.iovecs[i]
+      if iovec.length > offset then
+         ffi.copy(iovec.buffer.pointer + offset, d, math.min(#d, iovec.length - offset))
+         d = d:sub(iovec.length - offset + 1)
+         if d == '' then return end
+         offset = 0
+      else
+         offset = offset - iovec.length
+      end
+   end
+   error("didn't find given offset")
 end
 
 -- creates a packet from a given binary string
 function from_data (d)
    local p = allocate()
-   local b = buffer.allocate()
-   local size = math.min(#d, b.size)
-   add_iovec(p, b, size)
-   fill_data(p, d)
+   add_iovec(p, buffer.from_data(d), #d)
    return p
 end
 
--- Increase the reference count for packet p by n (default n=1).
+--- Increase the reference count for packet p by n (default n=1).
 function ref (p,  n)
    if p.refcount > 0 then
       p.refcount = p.refcount + (n or 1)
@@ -103,8 +109,8 @@ function ref (p,  n)
    return p
 end
 
--- Decrease the reference count for packet p.
--- The packet will be recycled if the reference count reaches 0.
+--- Decrease the reference count for packet p.
+--- The packet will be recycled if the reference count reaches 0.
 function deref (p,  n)
    n = n or 1
    if p.refcount > 0 then
@@ -117,12 +123,12 @@ function deref (p,  n)
    end
 end
 
--- Tenured packets are not reused by defref().
+--- Tenured packets are not reused by defref().
 function tenure (p)
    p.refcount = 0
 end
 
--- Free a packet and all of its buffers.
+--- Free a packet and all of its buffers.
 function free (p)
    for i = 0, p.niovecs-1 do
       buffer.free(p.iovecs[i].buffer)
@@ -131,6 +137,42 @@ function free (p)
    p.refcount       = 1
    p.fuel           = initial_fuel
    freelist.add(packets_fl, p)
+end
+
+function tostring(p)
+   local out = {}
+   for i = 1, p.niovecs do
+      local iovec = p.iovecs[i-1]
+      out[i] = ffi.string(iovec.buffer.pointer + iovec.offset, iovec.length)
+   end
+   return table.concat(out, '')
+end
+
+--- Writes data from a string into an existing packet at a specified offset
+function fill_data (p, d, offset)
+   offset = offset or 0
+   for i = 0, p.niovecs-1 do
+      local iovec = p.iovecs[i]
+      if iovec.length > offset then
+         ffi.copy(iovec.buffer.pointer + offset, d, math.min(#d, iovec.length - offset))
+         d = d:sub(iovec.length - offset + 1)
+         if d == '' then return end
+         offset = 0
+      else
+         offset = offset - iovec.length
+      end
+   end
+   error("didn't find given offset")
+end
+
+--- Creates a packet from a given binary string
+function from_data (...)
+   local p = allocate()
+   for i = 1, select('#', ...) do
+      local d = select(i, ...)
+      add_iovec(p, buffer.from_data(d), #d)
+   end
+   return p
 end
 
 function iovec_dump (iovec)

@@ -168,21 +168,17 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
-txdesc_flags = bits{eop=24,ifcs=25, dext=29, dtyp0=20, dtyp1=21}
+txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21}
 txdesc_flags_last = bits({eop=24}, txdesc_flags)
 function M_sf:transmit (p)
-   if p.niovecs > 1 then
-      packet.coalesce(p)
-   end
    for i = 0, p.niovecs - 1 do
       local iov = p.iovecs[i]
       local flags = (i + 1 < p.niovecs) and txdesc_flags or txdesc_flags_last
       self.txdesc[self.tdt].address = iov.buffer.physical + iov.offset
       self.txdesc[self.tdt].options = bit.bor(iov.length, flags, bit.lshift(p.length+0ULL, 46))
-      self.txpackets[self.tdt] = p
+      self.txpackets[self.tdt] = packet.ref(p)
       self.tdt = (self.tdt + 1) % num_descriptors
    end
-   return packet.ref(p)
 end
 
 function M_sf:sync_transmit ()
