@@ -9,7 +9,6 @@ local packet   = require("core.packet")
 local lib      = require("core.lib")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
-local vfio     = require("lib.hardware.vfio")
 local config = require("core.config")
 
 Intel82599 = {}
@@ -109,6 +108,15 @@ function Intel82599:report ()
 end
 
 function selftest ()
+   print("selftest: intel_app")
+
+   local pcideva = os.getenv("SNABB_TEST_INTEL10G_PCIDEVA")
+   local pcidevb = os.getenv("SNABB_TEST_INTEL10G_PCIDEVB")
+   if not pcideva or not pcidevb then
+      print("SNABB_TEST_INTEL10G_[PCIDEVA | PCIDEVB] was not set\nTest skipped")
+      os.exit(app.test_skipped_code)
+   end
+
    buffer.preallocate(100000)
    sq_sq('0000:05:00.0', '0000:8a:00.0')
    app.main({duration = 1, report={showlinks=true, showapps=false}})
