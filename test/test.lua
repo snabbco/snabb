@@ -2030,11 +2030,25 @@ test_timeofday = {
   end,
 }
 
--- on rump these may not deliver signals, but for our tests we will not let them expire
+-- on rump timers may not deliver signals, but for our tests we will not let them expire, or disable signals
 test_timers = {
   test_timers = function()
     if not S.timer_create then error "skipped" end
     local tid, err = S.timer_create("monotonic")
+    if not tid and err.NOSYS then error "skipped" end
+    assert(tid, err)
+    local it = tid:gettime()
+    assert_equal(it.value.time, 0)
+    assert(tid:settime(0, {0, 10000}))
+    local it = tid:gettime()
+    assert(it.value.time > 0, "expect some time left")
+    local over = assert(tid:getoverrun())
+    assert_equal(over, 0)
+    assert(tid:delete())
+  end,
+  test_timers_nosig = function()
+    if not S.timer_create then error "skipped" end
+    local tid, err = S.timer_create("monotonic", {notify = "none"})
     if not tid and err.NOSYS then error "skipped" end
     assert(tid, err)
     local it = tid:gettime()
