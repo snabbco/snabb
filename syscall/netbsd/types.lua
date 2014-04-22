@@ -219,6 +219,23 @@ mt.sigaction = {
 
 addtype(types, "sigaction", "struct sigaction", mt.sigaction)
 
+-- TODO some fields still missing
+mt.sigevent = {
+  index = {
+    notify = function(self) return self.sigev_notify end,
+    signo = function(self) return self.sigev_signo end,
+    value = function(self) return self.sigev_value end,
+  },
+  newindex = {
+    notify = function(self, v) self.sigev_notify = c.SIGEV[v] end,
+    signo = function(self, v) self.sigev_signo = c.SIG[v] end,
+    value = function(self, v) self.sigev_value = t.sigval(v) end, -- auto assigns based on type
+  },
+  __new = newfn,
+}
+
+addtype(types, "sigevent", "struct sigevent", mt.sigevent)
+
 mt.dirent = {
   index = {
     fileno = function(self) return tonumber(self.d_fileno) end,
