@@ -60,6 +60,7 @@ typedef int64_t       daddr_t;
 typedef long          time_t;
 typedef unsigned int  tcflag_t;
 typedef unsigned int  speed_t;
+typedef	int32_t       __lwpid_t;
 
 /* can be changed, TODO also should be long */
 typedef uint32_t __fd_mask;
@@ -258,6 +259,20 @@ struct sigaction {
   } __sigaction_u;
   int     sa_flags;
   sigset_t sa_mask;
+};
+struct sigevent {
+  int     sigev_notify;
+  int     sigev_signo;
+  union sigval sigev_value;
+  union {
+    __lwpid_t _threadid;
+    struct {
+      void (*_function)(union sigval);
+      void *_attribute;
+    } _sigev_thread;
+    unsigned short _kevent_flags;
+    long __spare__[8];
+  } _sigev_un;
 };
 ]]
 
