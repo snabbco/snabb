@@ -7,7 +7,8 @@ local basic_apps = require("apps.basic.basic_apps")
 local Intel82599 = require "apps.intel.intel_app".Intel82599
 
 
-local PCIdevA, PCIdevB = '0000:05:00.0', '0000:8a:00.0'
+local PCIdevA = os.getenv("SNABB_TEST_INTEL10G_PCIDEVA")
+local PCIdevB = os.getenv("SNABB_TEST_INTEL10G_PCIDEVB")
 
 
 local function _unhex(s)
@@ -59,7 +60,7 @@ end
 
 
 return {   
-   sf_to_sf = {
+   sf_to_sf = PCIdevA and PCIdevB and {
       __setup = function ()
          local c = config.new()
          config.app(c, 'source1', basic_apps.Join)
@@ -113,9 +114,9 @@ return {
             end,
          },
       },
-   },
+   } or false,
    
-   sf_to_vf = {
+   sf_to_vf = PCIdevA and PCIdevB and {
       __setup = function ()
          local c = config.new()
          config.app(c, 'source1', basic_apps.Join)
@@ -183,17 +184,5 @@ return {
          
          
       },
-   },
-   
-   local_A_dev = {
-      Broadcast = function ()
-         local p = packet.from_data(
-            _unhex('FF:FF:FF:FF:FF:FF')..
-            _unhex('52:54:00:01:01:01')..
-            _unhex('08:00')..
-            'this is the payload'..
-            _unhex('00:00:00:00')
-         )
-      end,
-   },
+   } or false,
 }
