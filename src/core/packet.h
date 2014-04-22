@@ -3,6 +3,8 @@
 // For example, buffers belonging to Virtio devices need to be
 // returned to the device when freed.
 
+struct buffer;
+
 struct buffer_origin {
   enum buffer_origin_type {
     BUFFER_ORIGIN_UNKNOWN = 0,
@@ -13,7 +15,9 @@ struct buffer_origin {
     struct buffer_origin_info_virtio {
       int16_t device_id;
       int16_t ring_id;
-      int16_t descriptor_id;
+      int16_t header_id;
+      char    *header_pointer;  // virtual address in this process
+      uint32_t header_size;            // how many bytes in the buffer?
     } virtio;
   } info;
 };
