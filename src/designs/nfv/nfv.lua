@@ -40,7 +40,7 @@ function main ()
    app.configure(c)
    -- Setup zero-copy
    local nic, vm = app.app_table.nic, app.app_table.vm
-   nic:set_rx_buffer_freelist(vm.vring_transmit_buffers)
+   nic:set_rx_buffer_freelist(vm:rx_buffers())
    timer.init()
    timer.activate(timer.new("report", app.report, 1e9, 'repeating'))
    print("Entering app.main()")
