@@ -10,12 +10,32 @@ pcall, type, table, string
 
 local abi = require "syscall.abi"
 
+local version = require "syscall.netbsd.version".version
+
 local ffi = require "ffi"
 
 local function inlibc_fn(k) return ffi.C[k] end
 
+-- Syscalls that just return ENOSYS but are in libc.
+local nosys_calls
+if version == 6 then nosys_calls = {
+  openat = true,
+  faccessat = true,
+  symlinkat = true,
+  mkdirat = true,
+  unlinkat = true,
+  renameat = true,
+  fstatat = true,
+  fchmodat = true,
+  fchownat = true,
+  mkfifoat = true,
+  mknodat = true,
+}
+end
+
 local C = setmetatable({}, {
   __index = function(C, k)
+    if nosys_calls and nosys_calls[k] then return nil end
     if pcall(inlibc_fn, k) then
       C[k] = ffi.C[k] -- add to table, so no need for this slow path again
       return C[k]
