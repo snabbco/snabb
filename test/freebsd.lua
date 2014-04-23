@@ -90,9 +90,9 @@ test.freebsd_shm = {
 
 test.freebsd_procdesc = {
   test_procdesc = function()
+    if not S.pdfork then error "skipped" end
     local pid, err, pfd = S.pdfork()
-    if not pid and err.NOSYS then error "skipped" end
-    assert(pid)
+    assert(pid, err)
     if pid == 0 then -- child
       S.pause()
       S.exit()
