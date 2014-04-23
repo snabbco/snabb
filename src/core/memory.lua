@@ -70,7 +70,9 @@ end
 function get_huge_page_size ()
    local meminfo = lib.readfile("/proc/meminfo", "*a")
    local _,_,hugesize = meminfo:find("Hugepagesize: +([0-9]+) kB")
-   return tonumber(hugesize) * 1024
+   return hugesize
+      and tonumber(hugesize) * 1024
+       or base_page_size -- use base page size as default value
 end
 
 base_page_size = 4096
@@ -120,7 +122,7 @@ function set_use_physical_memory()
 end
 
 function set_default_allocator(use_hugetlb)
-    if use_hugetlb then
+    if use_hugetlb and lib.can_write("/proc/sys/vm/nr_hugepages") then
         allocate_RAM = function(size)
             for i =1, 3 do
                 local page = C.allocate_huge_page(size)

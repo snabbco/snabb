@@ -40,6 +40,11 @@ function TapVhost:push ()
 end
 
 function selftest ()
+   if not vhost.is_tuntap_available() then
+      print("/dev/net/tun absent or not avaiable\nTest skipped")
+      os.exit(app.test_skipped_code)
+   end
+
    local c = config.new()
    config.app(c, "source", basic_apps.Source)
    config.app(c, "tapvhost", TapVhost, "snabb%d")
