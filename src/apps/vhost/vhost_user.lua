@@ -32,17 +32,17 @@ VhostUser = {}
 
 function VhostUser:new (socket_path)
    local o = { state = 'init',
-               msg = ffi.new("struct vhost_user_msg"),
-               nfds = ffi.new("int[1]"),
-               fds = ffi.new("int[?]", C.VHOST_USER_MEMORY_MAX_NREGIONS),
-               socket_path = socket_path,
-               callfd = {},
-               kickfd = {},
-               -- buffer records that are not currently in use
-               buffer_recs = freelist.new("struct buffer *", 32*1024),
-               -- buffer records populated with available VM memory
-               vring_transmit_buffers = freelist.new("struct buffer *", 32*1024)
-            }
+      msg = ffi.new("struct vhost_user_msg"),
+      nfds = ffi.new("int[1]"),
+      fds = ffi.new("int[?]", C.VHOST_USER_MEMORY_MAX_NREGIONS),
+      socket_path = socket_path,
+      callfd = {},
+      kickfd = {},
+      -- buffer records that are not currently in use
+      buffer_recs = freelist.new("struct buffer *", 32*1024),
+      -- buffer records populated with available VM memory
+      vring_transmit_buffers = freelist.new("struct buffer *", 32*1024)
+   }
    return setmetatable(o, {__index = VhostUser})
 end
 
@@ -159,7 +159,7 @@ function VhostUser:get_transmit_buffers_from_vm ()
          -- before buffer.pointer, so that we can fill in the header
          -- later without having to copy/move the rest of the packet
          -- data.
-         -- 
+         --
          -- This assumption breaks down for multi-buffer packets.
          -- Haven't worked out how to avoid copies there yet.
          local headroom = ffi.sizeof("struct virtio_net_hdr_mrg_rxbuf")
@@ -186,7 +186,7 @@ function VhostUser:get_transmit_buffers_from_vm ()
 end
 
 -- Prepared argument for writing a 1 to an eventfd.
-eventfd_one = ffi.new("uint64_t[1]", {1})
+local eventfd_one = ffi.new("uint64_t[1]", {1})
 
 -- Transmit packets from the app input queue to the VM.
 function VhostUser:transmit_packets_to_vm ()
@@ -260,9 +260,7 @@ handler_names = {
    [C.VHOST_USER_GET_VRING_BASE]  = 'get_vring_base',
    [C.VHOST_USER_SET_VRING_KICK]  = 'set_vring_kick',
    [C.VHOST_USER_SET_VRING_CALL]  = 'set_vring_call',
-   [C.VHOST_USER_SET_VRING_ERR]   = 'set_vring_err',
-   [C.VHOST_USER_NET_SET_BACKEND] = 'net_set_backend',
-   [C.VHOST_USER_ECHO]            = 'echo'
+   [C.VHOST_USER_SET_VRING_ERR]   = 'set_vring_err'
 }
 
 -- Process all vhost_user requests from QEMU.
@@ -281,11 +279,12 @@ function VhostUser:process_qemu_requests ()
 end
 
 function VhostUser:none (msg)
+   error(string.format("vhost_user unrecognized request: %d", msg.request))
 end
 
 function VhostUser:get_features (msg)
-   msg.size = 8
    msg.u64 = C.VIRTIO_NET_F_MRG_RXBUF + C.VIRTIO_NET_F_CSUM
+   msg.size = ffi.sizeof("uint64_t")
    -- In future add TSO4/TSO6/UFO/ECN and control channel
    self:reply(msg)
 end
@@ -295,6 +294,11 @@ function VhostUser:set_features (msg)
 end
 
 function VhostUser:set_owner (msg)
+   debug("set_owner")
+end
+
+function VhostUser:reset_owner (msg)
+   debug("reset_owner")
 end
 
 function VhostUser:set_vring_num (msg)
@@ -307,16 +311,26 @@ function VhostUser:set_vring_num (msg)
 end
 
 function VhostUser:set_vring_call (msg, fds, nfds)
-   assert(nfds == 1)
-   local idx = tonumber(msg.u64)
-   self.callfd[idx] = fds[0]
+   local idx = tonumber(bit.band(msg.u64, C.VHOST_USER_VRING_IDX_MASK))
+   local validfd = bit.band(msg.u64, C.VHOST_USER_VRING_NOFD_MASK) == 0
+
+   assert(idx<42)
+   if validfd then
+      assert(nfds == 1)
+      self.callfd[idx] = fds[0]
+   end
 end
 
 function VhostUser:set_vring_kick (msg, fds, nfds)
-   local idx = tonumber(msg.u64)
+   local idx = tonumber(bit.band(msg.u64, C.VHOST_USER_VRING_IDX_MASK))
+   local validfd = bit.band(msg.u64, C.VHOST_USER_VRING_NOFD_MASK) == 0
+
    assert(idx < 42)
-   if nfds == 1 then
+   if validfd then
+      assert(nfds == 1)
       self.kickfd[idx] = fds[0]
+   else
+      print("Should start polling on virtq "..tonum(idx))
    end
 end
 
@@ -325,8 +339,8 @@ function VhostUser:set_vring_addr (msg)
    local used  = map_from_qemu(msg.addr.used_user_addr, self.mem_table)
    local avail = map_from_qemu(msg.addr.avail_user_addr, self.mem_table)
    local ring = { desc  = ffi.cast("struct vring_desc *", desc),
-                  used  = ffi.cast("struct vring_used &", used),
-                  avail = ffi.cast("struct vring_avail &", avail) }
+      used  = ffi.cast("struct vring_used &", used),
+      avail = ffi.cast("struct vring_avail &", avail) }
    if msg.addr.index == 0 then
       self.txring = ring
       self.txused = ring.used.idx
@@ -351,10 +365,10 @@ function VhostUser:set_vring_base (msg)
 end
 
 function VhostUser:get_vring_base (msg)
-   msg.size = 8
    local n
    if msg.state.index == 0 then n = self.txavail else n = self.rxavail end
-   msg.u64 = n or 0
+   msg.state.num = n or 0
+   msg.size = ffi.sizeof("struct vhost_vring_state")
    self:reply(msg)
 end
 
@@ -371,14 +385,10 @@ function VhostUser:set_mem_table (msg, fds, nfds)
       local qemu = msg.memory.regions[i].userspace_addr
       -- register with vfio
       table.insert(self.mem_table, { guest = guest,
-                                     qemu  = qemu,
-                                     snabb = ffi.cast("int64_t", pointer),
-                                     size  = tonumber(size) })
+         qemu  = qemu,
+         snabb = ffi.cast("int64_t", pointer),
+         size  = tonumber(size) })
    end
-end
-
-function VhostUser:echo (msg)
-   self:reply(msg)
 end
 
 function VhostUser:reply (req)
@@ -425,14 +435,14 @@ function selftest ()
    -- Create an app network that proxies packets between a vhost_user
    -- port (qemu) and an Intel port (in loopback mode). Create
    -- separate pcap traces for packets received from vhost and intel.
-   -- 
+   --
    -- schema for traffic from the VM:
-   -- 
+   --
    -- vhost -> tee -> intel
    --           |
    --           v
    --       vhost pcap
-   -- 
+   --
    -- schema for traffic from the intel NIC:
    -- vhost <- tee <- intel
    --           |
@@ -472,15 +482,15 @@ function selftest ()
    local intel = app.app_table.intel
    intel:set_rx_buffer_freelist(vhost_user.vring_transmit_buffers)
    local fn = function ()
-                 local vu = app.apps.vhost_user
-                 app.report()
-                 if vhost_user.vhost_ready then
-                    debug("txavail", vhost_user.txring.avail.idx,
-                          "txused", vhost_user.txring.used.idx,
-                          "rxavail", vhost_user.rxring.avail.idx,
-                          "rxused", vhost_user.rxring.used.idx)
-                 end
-              end
+      local vu = app.apps.vhost_user
+      app.report()
+      if vhost_user.vhost_ready then
+         debug("txavail", vhost_user.txring.avail.idx,
+            "txused", vhost_user.txring.used.idx,
+            "rxavail", vhost_user.rxring.avail.idx,
+            "rxused", vhost_user.rxring.used.idx)
+      end
+   end
    timer.init()
    timer.activate(timer.new("report", fn, 1e9, 'repeating'))
    -- For interactive testing, uncommon this line to run without time limit:
