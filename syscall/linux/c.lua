@@ -2,6 +2,11 @@
 
 -- this should be generated ideally, as it is the ABI spec
 
+--[[
+Note a fair number are being deprecated, see include/uapi/asm-generic/unistd.h under __ARCH_WANT_SYSCALL_NO_AT, __ARCH_WANT_SYSCALL_NO_FLAGS, and __ARCH_WANT_SYSCALL_DEPRECATED
+Some of these we already don't use, but some we do, eg use open not openat etc.
+]]
+
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, select = 
