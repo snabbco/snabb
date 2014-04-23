@@ -1198,6 +1198,17 @@ test_largefile = {
     assert_equal(n, offset + offset, "seek should position at set position")
     assert(fd:close())
   end,
+  test_openat = function()
+    local fd = assert(S.openat("fdcwd", tmpfile, "creat,wronly,trunc", "RWXU"))
+    assert(S.unlink(tmpfile))
+    local offset = 2^34
+    local n
+    n = assert(fd:lseek(offset, "set"))
+    assert_equal(n, offset, "seek should position at set position")
+    n = assert(fd:lseek(offset, "cur"))
+    assert_equal(n, offset + offset, "seek should position at set position")
+    assert(fd:close())
+  end,
 }
 
 test_ids = {
