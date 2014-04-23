@@ -22,7 +22,7 @@ end
 
 --- # `Source` app: generate synthetic packets
 
-Source = setmetatable({}, {__index = Basic})
+Source = setmetatable({zone = "Source"}, {__index = Basic})
 
 function Source:new()
    return setmetatable({}, {__index=Source})
@@ -40,7 +40,7 @@ end
 
 --- # `Join` app: Merge multiple inputs onto one output
 
-Join = setmetatable({}, {__index = Basic})
+Join = setmetatable({zone = "Join"}, {__index = Basic})
 
 function Join:new()
    return setmetatable({}, {__index=Join})
@@ -58,7 +58,7 @@ end
 
 -- For each input port, push packets onto outputs. When one output
 -- becomes full then continue with the next.
-Split = setmetatable({}, {__index = Basic})
+Split = setmetatable({zone = "Split"}, {__index = Basic})
 
 function Split:new ()
    return setmetatable({}, {__index=Split})
@@ -76,7 +76,7 @@ end
 
 --- ### `Sink` app: Receive and discard packets
 
-Sink = setmetatable({}, {__index = Basic})
+Sink = setmetatable({zone = "Sink"}, {__index = Basic})
 
 function Sink:new ()
    return setmetatable({}, {__index=Sink})
@@ -98,7 +98,7 @@ end
 -- Assumed to be used in pair with FastRepeater
 -- FastSink doesn't calculate rx statistics
 
-FastSink = setmetatable({}, {__index = Basic})
+FastSink = setmetatable({zone = "FastSink"}, {__index = Basic})
 
 function FastSink:new ()
    return setmetatable({}, {__index=Sink})
@@ -113,7 +113,7 @@ end
 
 --- ### `Tee` app: Send inputs to all outputs
 
-Tee = setmetatable({}, {__index = Basic})
+Tee = setmetatable({zone = "Tee"}, {__index = Basic})
 
 function Tee:new ()
    return setmetatable({}, {__index=Tee})
@@ -141,7 +141,7 @@ end
 
 --- ### `Repeater` app: Send all received packets in a loop
 
-Repeater = setmetatable({}, {__index = Basic})
+Repeater = setmetatable({zone = "Repeater"}, {__index = Basic})
 
 function Repeater:new ()
    return setmetatable({index = 1, packets = {}},
@@ -171,7 +171,7 @@ end
 -- Only for test purpose, never use it in real world application
 -- Assumed to be used in pair with FastSink
 
-FastRepeater = setmetatable({}, {__index = Basic})
+FastRepeater = setmetatable({zone = "FastRepeater"}, {__index = Basic})
 
 function FastRepeater:new ()
    return setmetatable({init = true},
@@ -211,7 +211,7 @@ end
 
 --- ### `Buzz` app: Print a debug message when called
 
-Buzz = setmetatable({}, {__index = Basic})
+Buzz = setmetatable({zone = "Buzz"}, {__index = Basic})
 
 function Buzz:new ()
    return setmetatable({}, {__index=Buzz})
