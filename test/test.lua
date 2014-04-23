@@ -2032,9 +2032,7 @@ test_timeofday = {
 test_timers = {
   test_timers = function()
     if not S.timer_create then error "skipped" end
-    local tid, err = S.timer_create("monotonic")
-    if not tid and err.NOSYS then error "skipped" end
-    assert(tid, err)
+    local tid = assert(S.timer_create("monotonic"))
     local it = tid:gettime()
     assert_equal(it.value.time, 0)
     assert(tid:settime(0, {0, 10000}))
@@ -2046,9 +2044,7 @@ test_timers = {
   end,
   test_timers_nosig = function()
     if not S.timer_create then error "skipped" end
-    local tid, err = S.timer_create("monotonic", {notify = "none"})
-    if not tid and err.NOSYS then error "skipped" end
-    assert(tid, err)
+    local tid = assert(S.timer_create("monotonic", {notify = "none"}))
     local it = tid:gettime()
     assert_equal(it.value.time, 0)
     assert(tid:settime(0, {0, 10000}))
