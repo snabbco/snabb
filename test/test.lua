@@ -2205,9 +2205,9 @@ test_mmap = {
   test_mlockall = function()
     if not S.mlockall then error "skipped" end
     local ok, err = S.mlockall("current")
-    if not ok and err.NOSYS then error "skipped" end
     if not ok and err.PERM then error "skipped" end -- may not be allowed by default
-    assert(ok or err.nomem, "expect mlockall to succeed, or fail due to rlimit")
+    if not ok and err.NOMEM then error "skipped" end -- may fail due to rlimit
+    assert(ok, err)
     assert(S.munlockall())
   end,
 }
