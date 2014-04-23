@@ -27,11 +27,11 @@ local istype, mktype, getfd = h.istype, h.mktype, h.getfd
 if abi.abi32 then
   -- override open call with largefile -- TODO move this hack to c.lua instead
   function S.open(pathname, flags, mode)
-    flags = bit.bor(c.O[flags], c.O.LARGEFILE)
+    flags = c.O(flags, "LARGEFILE")
     return retfd(C.open(pathname, flags, c.MODE[mode]))
   end
   function S.openat(dirfd, pathname, flags, mode)
-    flags = bit.bor(c.O[flags], c.O.LARGEFILE)
+    flags = c.O(flags, "LARGEFILE")
     return retfd(C.openat(c.AT_FDCWD[dirfd], pathname, flags, c.MODE[mode]))
   end
   -- creat has no largefile flag so cannot be used

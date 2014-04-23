@@ -1189,24 +1189,20 @@ test_largefile = {
   end,
   test_open = function()
     local fd = assert(S.open(tmpfile, "creat,wronly,trunc", "RWXU"))
+    local offset = largeval
+    assert(fd:truncate(offset))
+    local st = assert(fd:stat())
+    assert_equal(st.size, offset)
     assert(S.unlink(tmpfile))
-    local offset = 2^34
-    local n
-    n = assert(fd:lseek(offset, "set"))
-    assert_equal(n, offset, "seek should position at set position")
-    n = assert(fd:lseek(offset, "cur"))
-    assert_equal(n, offset + offset, "seek should position at set position")
     assert(fd:close())
   end,
   test_openat = function()
     local fd = assert(S.openat("fdcwd", tmpfile, "creat,wronly,trunc", "RWXU"))
+    local offset = largeval
+    assert(fd:truncate(offset))
+    local st = assert(fd:stat())
+    assert_equal(st.size, offset)
     assert(S.unlink(tmpfile))
-    local offset = 2^34
-    local n
-    n = assert(fd:lseek(offset, "set"))
-    assert_equal(n, offset, "seek should position at set position")
-    n = assert(fd:lseek(offset, "cur"))
-    assert_equal(n, offset + offset, "seek should position at set position")
     assert(fd:close())
   end,
 }
