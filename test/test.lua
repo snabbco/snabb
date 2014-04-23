@@ -1197,6 +1197,7 @@ test_largefile = {
     assert(fd:close())
   end,
   test_openat = function()
+    if not S.openat then error "skipped" end
     local fd = assert(S.openat("fdcwd", tmpfile, "creat,wronly,trunc", "RWXU"))
     local offset = largeval
     assert(fd:truncate(offset))
