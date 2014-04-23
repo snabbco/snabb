@@ -1187,6 +1187,17 @@ test_largefile = {
     assert_equal(ffi.string(b3, 3), "tev")
     assert(S.unlink(tmpfile))
   end,
+  test_open = function()
+    local fd = assert(S.open(tmpfile, "creat,wronly,trunc", "RWXU"))
+    assert(S.unlink(tmpfile))
+    local offset = 2^34
+    local n
+    n = assert(fd:lseek(offset, "set"))
+    assert_equal(n, offset, "seek should position at set position")
+    n = assert(fd:lseek(offset, "cur"))
+    assert_equal(n, offset + offset, "seek should position at set position")
+    assert(fd:close())
+  end,
 }
 
 test_ids = {
