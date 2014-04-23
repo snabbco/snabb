@@ -1,5 +1,7 @@
 # Snabb Switch
 
+[![Build Status](https://travis-ci.org/SnabbCo/snabbswitch.svg?branch=master)](https://travis-ci.org/SnabbCo/snabbswitch)
+
 Check out the [Snabb Switch
 wiki](https://github.com/SnabbCo/snabbswitch/wiki) to learn about the
 project.
