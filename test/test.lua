@@ -911,17 +911,14 @@ test_file_operations_at = {
   end,
   test_openat = function()
     if not S.openat then error "skipped" end
-    local fd, err = S.openat("fdcwd", tmpfile, "rdwr,creat", "rwxu")
-    if not fd and err.NOSYS then error "skipped" end
+    local fd = assert(S.openat("fdcwd", tmpfile, "rdwr,creat", "rwxu"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
   test_faccessat = function()
     if not S.faccessat then error "skipped" end
     local fd = S.open("/dev")
-    local ok, err = fd:faccessat("null", "r")
-    if not ok and err.NOSYS then error "skipped" end -- NetBSD 6 has symbols but they do nothing
-    assert(ok, err)
+    assert(fd:faccessat("null", "r"))
     assert(fd:faccessat("null", c.OK.R), "expect access to say can read /dev/null")
     assert(fd:faccessat("null", "w"), "expect access to say can write /dev/null")
     assert(not fd:faccessat("/dev/null", "x"), "expect access to say cannot execute /dev/null")
@@ -931,9 +928,7 @@ test_file_operations_at = {
     if not (S.symlinkat and S.readlinkat) then error "skipped" end
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
-    local ok, err = S.symlinkat(tmpfile, dirfd, tmpfile2)
-    if not ok and err.NOSYS then error "skipped" end -- Netbsd6 partial implementation
-    assert(ok, err)
+    assert(S.symlinkat(tmpfile, dirfd, tmpfile2))
     local s = assert(S.readlinkat(dirfd, tmpfile2))
     assert_equal(s, tmpfile, "should be able to read symlink")
     assert(S.unlink(tmpfile2))
@@ -944,9 +939,7 @@ test_file_operations_at = {
   test_mkdirat_unlinkat = function()
     if not (S.mkdirat and S.unlinkat) then error "skipped" end
     local fd = assert(S.open("."))
-    local ok, err = fd:mkdirat(tmpfile, "RWXU")
-    if not ok and err.NOSYS then error "skipped" end
-    assert(ok, err)
+    assert(fd:mkdirat(tmpfile, "RWXU"))
     assert(fd:unlinkat(tmpfile, "removedir"))
     assert(not S.stat(tmpfile), "expect dir gone")
     assert(fd:close())
@@ -954,9 +947,7 @@ test_file_operations_at = {
   test_renameat = function()
     if not S.renameat then error "skipped" end
     assert(util.writefile(tmpfile, teststring, "RWXU"))
-    local ok, err = S.renameat("fdcwd", tmpfile, "fdcwd", tmpfile2)
-    if not ok and err.NOSYS then error "skipped" end
-    assert(ok, err)
+    assert(S.renameat("fdcwd", tmpfile, "fdcwd", tmpfile2))
     assert(not S.stat(tmpfile))
     assert(S.stat(tmpfile2))
     assert(S.unlink(tmpfile2))
@@ -965,9 +956,7 @@ test_file_operations_at = {
     if not S.fstatat then error "skipped" end
     local fd = assert(S.open("."))
     assert(util.writefile(tmpfile, teststring, "RWXU"))
-    local stat, err = fd:fstatat(tmpfile)
-    if not stat and err.NOSYS then error "skipped" end
-    assert(stat)
+    local stat = assert(fd:fstatat(tmpfile))
     assert(stat.size == #teststring, "expect length to br what was written")
     assert(fd:close())
     assert(S.unlink(tmpfile))
@@ -975,9 +964,7 @@ test_file_operations_at = {
   test_fstatat_fdcwd = function()
     if not S.fstatat then error "skipped" end
     assert(util.writefile(tmpfile, teststring, "RWXU"))
-    local stat, err = S.fstatat("fdcwd", tmpfile, nil, "symlink_nofollow")
-    if not stat and err.NOSYS then error "skipped" end
-    assert(stat)
+    local stat = assert(S.fstatat("fdcwd", tmpfile, nil, "symlink_nofollow"))
     assert(stat.size == #teststring, "expect length to be what was written")
     assert(S.unlink(tmpfile))
   end,
@@ -985,9 +972,7 @@ test_file_operations_at = {
     if not S.fchmodat then error "skipped" end
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
-    local ok, err = dirfd:fchmodat(tmpfile, "RUSR, WUSR")
-    if not ok and err.NOSYS then error "skipped" end -- NetBSD6 has symbol
-    assert(ok, err)
+    assert(dirfd:fchmodat(tmpfile, "RUSR, WUSR"))
     assert(S.access(tmpfile, "rw"))
     assert(S.unlink(tmpfile))
     assert(fd:close())
@@ -997,9 +982,7 @@ test_file_operations_at = {
     if not S.fchownat then error "skipped" end
     local dirfd = assert(S.open("."))
     local fd = assert(S.creat(tmpfile, "RWXU"))
-    local ok, err = dirfd:fchownat(tmpfile, 66, 55, "symlink_nofollow")
-    if not ok and err.NOSYS then error "skipped" end
-    assert(ok, err)
+    assert(dirfd:fchownat(tmpfile, 66, 55, "symlink_nofollow"))
     local stat = S.stat(tmpfile)
     assert_equal(stat.uid, 66, "expect uid changed")
     assert_equal(stat.gid, 55, "expect gid changed")
@@ -1010,9 +993,7 @@ test_file_operations_at = {
   test_mkfifoat = function()
     if not S.mkfifoat then error "skipped" end
     local fd = assert(S.open("."))
-    local ok, err = S.mkfifoat(fd, tmpfile, "rwxu")
-    if not ok and err.NOSYS then error "skipped" end
-    assert(ok, err)
+    assert(S.mkfifoat(fd, tmpfile, "rwxu"))
     local stat = assert(S.stat(tmpfile))
     assert(stat.isfifo, "expect to be a fifo")
     assert(fd:close())
@@ -1021,9 +1002,7 @@ test_file_operations_at = {
   test_mknodat_root = function()
     if not S.mknodat then error "skipped" end
     local fd = assert(S.open("."))
-    local ok, err = fd:mknodat(tmpfile, "fchr,0666", t.device(1, 5))
-    if not ok and err.NOSYS then error "skipped" end
-    assert(ok, err)
+    assert(fd:mknodat(tmpfile, "fchr,0666", t.device(1, 5)))
     local stat = assert(S.stat(tmpfile))
     assert(stat.ischr, "expect to be a character device")
     assert_equal(stat.rdev.major, 1)
