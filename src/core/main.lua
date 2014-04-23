@@ -37,6 +37,10 @@ function main ()
       print(usage)
       os.exit(1)
    end
+   if C.geteuid() ~= 0 then
+      print("error: snabb has to run as root.")
+      os.exit(1)
+   end
    local i = 1
    while i <= #args do
       if args[i] == '-l' and i < #args then
