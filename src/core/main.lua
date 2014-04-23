@@ -13,7 +13,7 @@ ffi.cdef[[
 ]]
 
 local usage = [[
-Usage: snabbswitch [options] <module> [args...]
+Usage: snabb [options] <script> [args...]
 Available options are:
 -e chunk     Execute string 'chunk'.
 -l name      Require library 'name'.
@@ -69,7 +69,7 @@ function main ()
 	 jit_dump.start("", args[i+1])
 	 i = i + 2
       elseif i <= #args then
-         -- Syntax: <module> [args...]
+         -- Syntax: <script> [args...]
          local module = args[i]
          i = i + 1
          while i <= #args do
@@ -77,7 +77,7 @@ function main ()
             i = i + 1
          end
          zone("module "..module)
-         require(module)
+         dofile(module)
          exit(0)
       else
 	 print(usage)
