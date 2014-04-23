@@ -33,17 +33,21 @@ TESTMODS = $(shell find . -regex '[^\#]*\.lua' -printf '%P ' | \
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-all: snabbswitch
+all: snabb
+
+install: snabb
+	cp snabb /usr/local/bin/
 
 markdown: $(RMOBJS)
 
-snabbswitch: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
+snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 	$(E) "LINK      $@"
 	$(Q) gcc -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt -lpthread
 	@echo -n "Firmware: "
-	@ls -sh snabbswitch
+	@ln -fs snabb snabbswitch
+	@ls -sh snabb
 
 test: $(TESTMODS)
 
@@ -51,9 +55,9 @@ test_ci: FAIL_ON_FIRST="true"
 
 test_ci: $(TESTMODS)
 
-$(TESTMODS): testlog snabbswitch
+$(TESTMODS): testlog snabb
 	$(E) "TEST      $@"
-	$(Q) ./snabbswitch -t $@ > testlog/$@ || ( \
+	$(Q) ./snabb -t $@ > testlog/$@ || ( \
 		EXITCODE="$$?"; \
 		[ "$$EXITCODE" -eq $(TEST_SKIPPED) ] \
 		&& ( \
@@ -136,7 +140,7 @@ doc/snabbswitch.html doc/snabbswitch.epub: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
 	$(Q) pandoc -S --toc --chapters -o $@ $<
 
-CLEAN = snabbswitch obj doc/snabbswitch.* doc/obj/*.md testlog
+CLEAN = snabb snabbswitch obj doc/snabbswitch.* doc/obj/*.md testlog
 
 clean:
 	$(E) "RM        $(CLEAN)"
