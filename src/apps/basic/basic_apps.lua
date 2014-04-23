@@ -2,6 +2,7 @@ module(...,package.seeall)
 
 local app = require("core.app")
 local buffer = require("core.buffer")
+local freelist = require("core.freelist")
 local packet = require("core.packet")
 local link = require("core.link")
 
@@ -24,15 +25,32 @@ end
 
 Source = setmetatable({}, {__index = Basic})
 
-function Source:new()
-   return setmetatable({}, {__index=Source})
+function Source:new(size)
+   return setmetatable({size=tonumber(size) or 60}, {__index=Source})
+end
+
+-- Allocate receive buffers from the given freelist.
+function Source:set_rx_buffer_freelist (fl)
+   assert(fl)
+   self.rx_buffer_freelist = fl
 end
 
 function Source:pull ()
+   local fl = self.rx_buffer_freelist
    for _, o in ipairs(self.outputi) do
       for i = 1, link.nwritable(o) do
+         local b = nil
+         if fl then
+            if freelist.nfree(fl) > 0 then
+               b = freelist.remove(fl)
+            else
+               return
+            end
+         else
+            b = buffer.allocate()
+         end
          local p = packet.allocate()
-         packet.add_iovec(p, buffer.allocate(), 60)
+         packet.add_iovec(p, b, self.size)
          link.transmit(o, p)
       end
    end
