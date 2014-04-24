@@ -72,7 +72,7 @@ test.filesystem_bsd = {
     assert(fd:grantpt())
     assert(fd:unlockpt())
     local pts_name = assert(fd:ptsname())
-    local pts = assert(S.open(pts_name, "rdwr, noctty"))
+    local pts = assert(S.open(pts_name, "rdwr, noctty")) -- TODO occasional failure in rump, may be fixed in -current
     assert(S.revoke(pts_name))
     local n, err = pts:read()
     if n then -- correct behaviour according to man page
