@@ -7,12 +7,26 @@ require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string, math
 
+local debug, collectgarbage = require "debug", collectgarbage
+
 local abi = require "syscall.abi"
 
 local ffi = require "ffi"
 local bit = require "syscall.bit"
 
 local h = {}
+
+-- generic assert helper, mainly for tests
+function h.assert(cond, err, ...)
+  if not cond then
+    print(debug.traceback()) -- by the time the test framework sees the backtrace, it has returned from useful function TODO fix
+    error(tostring(err or "unspecified error")) -- annoyingly, assert does not call tostring!
+  end
+  collectgarbage("collect") -- force gc, to test for bugs
+  if type(cond) == "function" then return cond, err, ... end
+  if cond == true then return ... end
+  return cond, ...
+end
 
 local voidp = ffi.typeof("void *")
 

@@ -2,6 +2,7 @@
 
 local function init(S)
 
+local helpers = require "syscall.helpers"
 local abi = S.abi
 local types = S.types
 local c = S.c
@@ -19,16 +20,7 @@ local t, pt, s = types.t, types.pt, types.s
 
 local nl = S.nl
 
-local function assert(cond, err, ...)
-  if not cond then
-    print(debug.traceback()) -- by the time the test framework sees the backtrace, it has returned from useful function
-    error(tostring(err)) -- annoyingly, assert does not call tostring!
-  end
-  collectgarbage("collect") -- force gc, to test for bugs
-  if type(cond) == "function" then return cond, err, ... end
-  if cond == true then return ... end
-  return cond, ...
-end
+local assert = helpers.assert
 
 local function fork_assert(cond, err, ...) -- if we have forked we need to fail in main thread not fork
   if not cond then

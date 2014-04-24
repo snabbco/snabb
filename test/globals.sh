@@ -27,7 +27,7 @@ fi
 # this is not a complete test the local assignment could be missing
 # these are the ones we use at present
 
-OK="require|print|error|assert|tonumber|tostring|setmetatable|pairs|ipairs|unpack|rawget|rawset|pcall|type|table|string|math|select|_G"
+OK="require|print|error|assert|tonumber|tostring|setmetatable|pairs|ipairs|unpack|rawget|rawset|pcall|type|table|string|math|select|collectgarbage|_G"
 
 GGET=`find syscall syscall.lua -name '*.lua' | xargs -n1 luajit -bl | grep GGET | egrep -v "$OK"`
 

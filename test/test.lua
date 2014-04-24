@@ -9,18 +9,9 @@ package.path = "./?.lua;"
 
 local strict = require "include.strict.strict"
 
-local function assert(cond, err, ...)
-  if not cond then
-    print(debug.traceback()) -- by the time the test framework sees the backtrace, it has returned from useful function
-    error(tostring(err)) -- annoyingly, assert does not call tostring!
-  end
-  collectgarbage("collect") -- force gc, to test for bugs
-  if type(cond) == "function" then return cond, err, ... end
-  if cond == true then return ... end
-  return cond, ...
-end
-
 local helpers = require "syscall.helpers"
+
+local assert = helpers.assert
 
 local S
 local tmpabi
