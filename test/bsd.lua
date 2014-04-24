@@ -13,8 +13,11 @@ local ffi = require "ffi"
 local t, pt, s = types.t, types.pt, types.s
 
 local function assert(cond, err, ...)
+  if not cond then
+    print(debug.traceback()) -- by the time the test framework sees the backtrace, it has returned from useful function
+    error(tostring(err)) -- annoyingly, assert does not call tostring!
+  end
   collectgarbage("collect") -- force gc, to test for bugs
-  if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
   if type(cond) == "function" then return cond, err, ... end
   if cond == true then return ... end
   return cond, ...
@@ -74,7 +77,7 @@ test.bsd_ids = {
 
 test.filesystem_bsd = {
   test_revoke = function()
-    -- TODO this test seems to randomly fail occasionally, not sure why...
+    -- TODO this test seems to randomly fail occasionally with "No such file or directory", not sure why...
     local fd = assert(S.posix_openpt("rdwr, noctty"))
     assert(fd:grantpt())
     assert(fd:unlockpt())

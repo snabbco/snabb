@@ -15,8 +15,11 @@ local ffi = require "ffi"
 local t, pt, s = types.t, types.pt, types.s
 
 local function assert(cond, err, ...)
+  if not cond then
+    print(debug.traceback()) -- by the time the test framework sees the backtrace, it has returned from useful function
+    error(tostring(err)) -- annoyingly, assert does not call tostring!
+  end
   collectgarbage("collect") -- force gc, to test for bugs
-  if not cond then error(tostring(err)) end -- annoyingly, assert does not call tostring!
   if type(cond) == "function" then return cond, err, ... end
   if cond == true then return ... end
   return cond, ...
