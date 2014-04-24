@@ -9,8 +9,8 @@
 
 /// ### HugeTLB page allocation
 
-// Allocate a HugeTLB memory page of 'size' bytes.
-// Return a pointer to the start of the page, or NULL on failure.
+/// Allocate a HugeTLB memory page of 'size' bytes.
+/// Return a pointer to the start of the page, or NULL on failure.
 void *allocate_huge_page(int size)
 {
   void *ptr = mmap(NULL, size, PROT_READ | PROT_WRITE,

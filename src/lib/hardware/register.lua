@@ -131,9 +131,11 @@ end
 --- The register objects become named entries in `table`.
 ---
 --- This is an example line for a register description:
+---
 ---     TXDCTL    0x06028 +0x40*0..127 (RW) Transmit Descriptor Control
 ---
 --- and this is the grammar:
+---
 ---     Register   ::= Name Offset Indexing Mode Longname
 ---     Name       ::= <identifier>
 ---     Indexing   ::= "-"
@@ -155,9 +157,9 @@ function define (description, table, base_ptr, n)
    end
 end
 
--- registers of the form '+0xXX*j..k' are converted to
--- an array of registers.
--- naïve implementation: actually create the whole array
+--- registers of the form `+0xXX*j..k` are converted to
+--- an array of registers.
+--- naïve implementation: actually create the whole array
 function define_array (description, table, base_ptr)
    local pattern = [[ *(%S+) +(%S+) +(%S+) +(%S+) (.-)
 ]]
