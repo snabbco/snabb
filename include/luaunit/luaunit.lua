@@ -474,13 +474,18 @@ local LuaUnit = {
 		end
 
 		-- run testMethod()
-        	local ok, errorMsg, ret = pcall( aMethod )
+                local tracemsg
+                local function trace(err)
+                  tracemsg = debug.traceback()
+                  return err
+                end
+        	local ok, errorMsg, ret = xpcall( aMethod, trace )
 		if not ok then
 			errorMsg  = self.strip_luaunit_stack(errorMsg)
                         if type(errorMsg) == "string" and errorMsg:sub(-9):lower() == ": skipped" then
 				LuaUnit.result:addSkip()
 			else
-				LuaUnit.result:addFailure( errorMsg ..'\n'..debug.traceback())
+				LuaUnit.result:addFailure( errorMsg ..'\n'.. tracemsg)
 			end
 		end
 

@@ -19,7 +19,6 @@ local h = {}
 -- generic assert helper, mainly for tests
 function h.assert(cond, err, ...)
   if not cond then
-    print(debug.traceback()) -- by the time the test framework sees the backtrace, it has returned from useful function TODO fix
     error(tostring(err or "unspecified error")) -- annoyingly, assert does not call tostring!
   end
   collectgarbage("collect") -- force gc, to test for bugs
