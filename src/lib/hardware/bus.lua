@@ -71,14 +71,6 @@ function set_bus_master(pciaddress, enable)
     return map_devices[pciaddress].set_bus_master(pciaddress, enable)
 end
 
-function selftest ()
-    print("selftest: bus")
-    scan_devices()
-    for _,info in ipairs(devices) do
-        print (string.format("device %s: %s", info.pciaddress, info.bus))
-    end
-end
-
 if host_has_vfio() then
     memory.ram_to_io_addr = vfio.map_memory_to_iommu
 else

@@ -263,19 +263,3 @@ function malloc (type)
    local ptr = C.malloc(size)
    return ffi.cast(ffi.typeof("$*", ffi_type), ptr)
 end
-
-function selftest ()
-   print("selftest: lib")
-   local data = "\x45\x00\x00\x73\x00\x00\x40\x00\x40\x11\xc0\xa8\x00\x01\xc0\xa8\x00\xc7"
-   local cs = csum(data, string.len(data))
-   assert(cs == 0xb861, "bad checksum: " .. bit.tohex(cs, 4))
-   
---    assert(readlink('/etc/rc2.d/S99rc.local') == '../init.d/rc.local', "bad readlink")
---    assert(dirname('/etc/rc2.d/S99rc.local') == '/etc/rc2.d', "wrong dirname")
---    assert(basename('/etc/rc2.d/S99rc.local') == 'S99rc.local', "wrong basename")
-   assert(hexdump('\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11'):upper()
-         :match('^45.00.B6.7D.00.FA.40.00.40.11$'), "wrong hex dump")
-   assert(hexundump('4500 B67D 00FA400040 11', 10)
-         =='\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11', "wrong hex undump")
-end
-

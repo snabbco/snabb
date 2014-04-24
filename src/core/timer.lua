@@ -53,28 +53,3 @@ function new (name, fn, nanos, mode)
             ticks = math.ceil(nanos / ns_per_tick),
             repeating = (mode == 'repeating') }
 end
-
-function selftest ()
-   print("selftest: timer")
-   ticks = 0
-   local ntimers, runtime = 10000, 100000
-   local count, expected_count = 0, 0
-   local fn = function (t) count = count + 1 end
-   -- Start timers, each counting at a different frequency
-   for freq = 1, ntimers do
-      local t = new("timer"..freq, fn, ns_per_tick * freq, 'repeating')
-      activate(t)
-      expected_count = expected_count + math.floor(runtime / freq)
-   end
-   -- Run timers for 'runtime' in random sized time steps
-   local now_ticks = 0
-   while now_ticks < runtime do
-      now_ticks = math.min(runtime, now_ticks + math.random(5))
-      local old_count = count
-      run_to_time(now_ticks * ns_per_tick)
-      assert(count > old_count, "count increasing")
-   end
-   assert(count == expected_count, "final count correct")
-   print("ok ("..lib.comma_value(count).." callbacks)")
-end
-

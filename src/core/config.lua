@@ -60,7 +60,7 @@ end
 -- Example:
 --   parse_app_arg("{ timeout = 5 * 10 }") => { timeout = 50 }
 function parse_app_arg (s)
-   print("s", type(s), s)
+--   print("s", type(s), s)
    assert(type(s) == 'string')
    return loadstring("return " .. s)()
 end
