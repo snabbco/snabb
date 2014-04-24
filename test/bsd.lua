@@ -54,7 +54,7 @@ local test = {}
 test.bsd_misc = {
   test_sysctl_all = function()
     local all, err = S.sysctl()
-    assert(all and type(all) == "string", "expect a string from all sysctls")
+    assert(all and type(all) == "table", "expect a table from all sysctls got " .. type(all))
   end,
 }
 
@@ -76,6 +76,7 @@ test.filesystem_bsd = {
     local pts = assert(S.open(pts_name, "rdwr, noctty"))
     assert(S.revoke(pts_name))
     local n, err = pts:read()
+    -- TODO failing on rump, returning empty string...
     assert(not n and err.BADF, "access should be revoked")
     assert(pts:close())
     assert(fd:close())
