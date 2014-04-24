@@ -77,7 +77,7 @@ test.filesystem_bsd = {
     local n, err = pts:read()
     if n then -- correct behaviour according to man page
       assert_equal(#n, 0) -- read returns EOF after revoke
-    else -- FreeBSD. Filed PR.
+    else -- FreeBSD. Filed http://www.freebsd.org/cgi/query-pr.cgi?pr=188952
       assert(not n and err.NXIO)
     end
     local n, err = pts:write("test") -- write fails after revoke
