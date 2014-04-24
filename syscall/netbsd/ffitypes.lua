@@ -669,6 +669,20 @@ struct _netbsd_ctlname {
   const char *ctl_name;
   int     ctl_type;
 };
+/* volatile may be an issue... */
+struct _netbsd_aiocb {
+  off_t aio_offset;
+  volatile void *aio_buf;
+  size_t aio_nbytes;
+  int aio_fildes;
+  int aio_lio_opcode;
+  int aio_reqprio;
+  struct _netbsd_sigevent aio_sigevent;
+  /* Internal kernel variables */
+  int _state;
+  int _errno;
+  ssize_t _retval;
+};
 ]]
 
 local s = table.concat(defs, "")
