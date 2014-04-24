@@ -74,6 +74,7 @@ test.bsd_ids = {
 
 test.filesystem_bsd = {
   test_revoke = function()
+    -- TODO this test seems to randomly fail occasionally, not sure why...
     local fd = assert(S.posix_openpt("rdwr, noctty"))
     assert(fd:grantpt())
     assert(fd:unlockpt())
