@@ -81,7 +81,7 @@ test.filesystem_bsd = {
       assert(not n and err.NXIO)
     end
     local n, err = pts:write("test") -- write fails after revoke
-    assert(not n and err.IO, "access should be revoked")
+    assert(not n and (err.IO or err.NXIO), "access should be revoked")
     assert(pts:close()) -- close succeeds after revoke
     assert(fd:close())
   end,
