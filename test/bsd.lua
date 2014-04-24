@@ -75,7 +75,11 @@ test.filesystem_bsd = {
     local pts = assert(S.open(pts_name, "rdwr, noctty"))
     assert(S.revoke(pts_name))
     local n, err = pts:read()
-    assert_equal(#n, 0) -- read returns EOF after revoke
+    if n then -- correct behaviour according to man page
+      assert_equal(#n, 0) -- read returns EOF after revoke
+    else -- FreeBSD. Filed PR.
+      assert(not n and err.NXIO)
+    end
     local n, err = pts:write("test") -- write fails after revoke
     assert(not n and err.IO, "access should be revoked")
     assert(pts:close()) -- close succeeds after revoke
