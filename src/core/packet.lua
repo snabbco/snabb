@@ -77,6 +77,35 @@ function coalesce (p)
    add_iovec(p, b, length)
 end
 
+-- The same as coalesce(), but allocate new packet
+-- while leaving original packet unchanged
+function clone (p)
+   local new_p = allocate()
+   local b = buffer.allocate()
+   assert(p.length <= b.size, "packet too big to coalesce")
+   p.iovec[0].buffer = b
+
+   local length = 0
+   for i = 0, p.niovecs - 1 do
+      local iovec = p.iovecs[i]
+      ffi.copy(b.pointer + length, iovec.buffer.pointer + iovec.offset, iovec.length)
+      length = length + iovec.length
+   end
+   add_iovec(mew_p, b, length)
+   return new_p
+end
+
+-- use this function if you want to modify a packet received by an app
+-- you cannot modify a packet if it is owned more then one app
+-- it will create a copy for you as needed
+function want_modify (p)
+   if p.refcount == 1 then
+      return p
+   end
+   packet.deref(p)
+   return clone(p)
+end
+
 -- fill's an allocated packet with data from a string
 function fill_data (p, d, offset)
    offset = offset or 0
