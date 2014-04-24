@@ -68,7 +68,6 @@ test.bsd_ids = {
 
 test.filesystem_bsd = {
   test_revoke = function()
-    -- TODO this test seems to randomly fail occasionally with "No such file or directory", not sure why...
     local fd = assert(S.posix_openpt("rdwr, noctty"))
     assert(fd:grantpt())
     assert(fd:unlockpt())
@@ -76,9 +75,10 @@ test.filesystem_bsd = {
     local pts = assert(S.open(pts_name, "rdwr, noctty"))
     assert(S.revoke(pts_name))
     local n, err = pts:read()
-    -- TODO failing on rump, returning empty string...
-    assert(not n and err.BADF, "access should be revoked")
-    assert(pts:close())
+    assert_equal(#n, 0) -- read returns EOF after revoke
+    local n, err = pts:write("test") -- write fails after revoke
+    assert(not n and err.IO, "access should be revoked")
+    assert(pts:close()) -- close succeeds after revoke
     assert(fd:close())
   end,
   test_chflags = function()
