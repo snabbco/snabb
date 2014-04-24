@@ -47,7 +47,7 @@ function PcapWriter:push ()
       for i = 0, p.niovecs-1 do
 	 local iov = p.iovecs[i]
 	 -- XXX expensive to create interned Lua string.
-	 self.file:write(ffi.string(iov.buffer.pointer, iov.length))
+	 self.file:write(ffi.string(iov.buffer.pointer + iov.offset, iov.length))
       end
       self.file:flush()
       packet.deref(p)
