@@ -172,16 +172,6 @@ function open_device(pciaddress, driver)
    return require(driver).new(pciaddress)
 end
 
---- ### Selftest
----
---- PCI selftest scans for available devices and performs our driver's
---- self-test on each of them.
-
-function selftest ()
-   print("selftest: vfio")
-   print_device_summary()
-end
-
 function print_device_summary ()
    local attrs = {"pciaddress", "vendor", "device", "interface", "status",
                   "driver", "usable"}

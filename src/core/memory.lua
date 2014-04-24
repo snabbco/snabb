@@ -92,25 +92,6 @@ function virtual_to_physical (virt_addr)
    return ffi.cast("uint64_t", phys_page * base_page_size + offset)
 end
 
---- ### selftest
-
-function selftest (options)
-   print("selftest: memory")
-   require("lib.hardware.bus")
-   print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
-   for i = 1, 4 do
-      io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
-      io.flush()
-      local dmaptr, physptr, dmalen = dma_alloc(huge_page_size)
-      print("Got "..(dmalen/1024^2).."MB "..
-         "at 0x"..tostring(ffi.cast("void*",tonumber(physptr))))
-      ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- try a write
-      assert(dmaptr ~= nil and dmalen == huge_page_size)
-   end
-   print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
-   print("HugeTLB page allocation OK.")
-end
-
 --- ### module init: `mlock()` at load time
 
 --- This module requires a stable physical-virtual mapping so this is

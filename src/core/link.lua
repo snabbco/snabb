@@ -60,30 +60,3 @@ end
 function nwritable (r)
    return max - nreadable(r)
 end
-
-function selftest ()
-   print("selftest: link")
-   local r = new()
-   local p = packet.allocate()
-   packet.tenure(p)
-   assert(r.stats.txpackets == 0 and empty(r) == true  and full(r) == false)
-   assert(nreadable(r) == 0)
-   transmit(r, p)
-   assert(r.stats.txpackets == 1 and empty(r) == false and full(r) == false)
-   for i = 1, max-2 do
-      transmit(r, p)
-   end
-   assert(r.stats.txpackets == max-1 and empty(r) == false and full(r) == false)
-   assert(nreadable(r) == r.stats.txpackets)
-   transmit(r, p)
-   assert(r.stats.txpackets == max   and empty(r) == false and full(r) == true)
-   transmit(r, p)
-   assert(r.stats.txpackets == max and r.stats.txdrop == 1)
-   assert(not empty(r) and full(r))
-   while not empty(r) do
-      receive(r)
-   end
-   assert(r.stats.rxpackets == max)
-   print("selftest OK")
-end
-
