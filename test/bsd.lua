@@ -237,6 +237,7 @@ test.bsd_extattr = {
     local fd = assert(S.creat(tmpfile, "rwxu"))
     assert(S.unlink(tmpfile))
     local n, err = fd:extattr_get("user", "myattr", false) -- false does raw call with no buffer to return length
+    if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
     assert(not n and err.NOATTR)
     assert(fd:close())
   end,
@@ -245,6 +246,7 @@ test.bsd_extattr = {
     local fd = assert(S.creat(tmpfile, "rwxu"))
     assert(S.unlink(tmpfile))
     local n, err = fd:extattr_get("user", "myattr", false) -- false does raw call with no buffer to return length
+    if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
     assert(not n and err.NOATTR)
     local n, err = fd:extattr_set("user", "myattr", "myvalue")
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support setting extattr
@@ -262,6 +264,7 @@ test.bsd_extattr = {
     local fd = assert(S.creat(tmpfile, "rwxu"))
     assert(fd:close())
     local n, err = S.extattr_get_file(tmpfile, "user", "myattr", false) -- false does raw call with no buffer to return length
+    if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
     assert(not n and err.NOATTR)
     local n, err = S.extattr_set_file(tmpfile, "user", "myattr", "myvalue")
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support setting extattr
@@ -278,6 +281,7 @@ test.bsd_extattr = {
     if not S.extattr_get_fd then error "skipped" end
     assert(S.symlink(tmpfile2, tmpfile))
     local n, err = S.extattr_get_link(tmpfile, "user", "myattr", false) -- false does raw call with no buffer to return length
+    if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
     assert(not n and err.NOATTR)
     local n, err = S.extattr_set_link(tmpfile, "user", "myattr", "myvalue")
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support setting extattr
