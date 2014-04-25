@@ -79,14 +79,5 @@ int __nanosleep50(const struct timespec *req, struct timespec *rem);
 int __timer_settime50(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec * old_value);
 int __timer_gettime50(timer_t timerid, struct itimerspec *curr_value);
 int __adjtime50(const struct timeval *delta, struct timeval *olddelta);
-
-int aio_cancel(int, struct aiocb *);
-int aio_error(const struct aiocb *);
-int aio_fsync(int, struct aiocb *);
-int aio_read(struct aiocb *);
-int aio_return(struct aiocb *);
-int aio_write(struct aiocb *);
-int lio_listio(int, struct aiocb *const *, int, struct sigevent *);
-int aio_suspend(const struct aiocb *const *, int, const struct timespec *);
 ]]
 

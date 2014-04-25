@@ -170,5 +170,15 @@ int timer_delete(timer_t timerid);
 int timer_getoverrun(timer_t timerid);
 
 int adjtime(const struct timeval *delta, struct timeval *olddelta);
+
+int aio_cancel(int, struct aiocb *);
+int aio_error(const struct aiocb *);
+int aio_fsync(int, struct aiocb *);
+int aio_read(struct aiocb *);
+int aio_return(struct aiocb *);
+int aio_write(struct aiocb *);
+int lio_listio(int, struct aiocb *const *, int, struct sigevent *);
+int aio_suspend(const struct aiocb *const *, int, const struct timespec *);
+int aio_waitcomplete(struct aiocb **, struct timespec *);
 ]]
 
