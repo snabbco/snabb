@@ -17,7 +17,7 @@ struct buffer_origin {
       int16_t ring_id;
       int16_t header_id;
       char    *header_pointer;  // virtual address in this process
-      uint32_t header_size;            // how many bytes in the buffer?
+      uint32_t total_size;      // how many bytes in all buffers
     } virtio;
   } info;
 };

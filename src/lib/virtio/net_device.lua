@@ -20,6 +20,8 @@ local char_ptr_t = ffi.typeof("char *")
 local virtio_net_hdr_size = ffi.sizeof("struct virtio_net_hdr")
 local packet_info_size = ffi.sizeof("struct packet_info")
 
+local invalid_header_id = 0xffff
+
 --[[
    A list of what needs to be implemented in order to fully support
    some of the options.
@@ -64,9 +66,11 @@ function VirtioNetDevice:new(owner)
    return setmetatable(o, {__index = VirtioNetDevice})
 end
 
-
 function VirtioNetDevice:poll_vring_packets ()
+   -- RX
    self:receive_packets_from_vm()
+   self:rx_signal_used()
+   -- TX
    self:get_transmit_buffers_from_vm()
    self:transmit_packets_to_vm()
 end
@@ -80,7 +84,8 @@ function VirtioNetDevice:receive_packets_from_vm ()
       local header_id = self.rxring.avail.ring[self.rxavail % self.rx_vring_num]
       local header_desc  = self.rxring.desc[header_id]
       local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(header_desc.addr))
-      local header_size = header_desc.len
+      --assert(header_desc.len == virtio_net_hdr_size)
+      local total_size = virtio_net_hdr_size
       local data_desc = header_desc
       --assert(bit.band(header_desc.flags, C.VIRTIO_DESC_F_NEXT) ~= 0)
 
@@ -88,25 +93,34 @@ function VirtioNetDevice:receive_packets_from_vm ()
       ffi.copy(p.info, header_pointer, packet_info_size)
 
       -- Data buffer
-      data_desc  = self.rxring.desc[data_desc.next]
-      local b = freelist.remove(self.buffer_recs) or lib.malloc("struct buffer")
+      repeat
+         data_desc  = self.rxring.desc[data_desc.next]
+         local b = freelist.remove(self.buffer_recs) or lib.malloc("struct buffer")
 
-      local addr = self:map_from_guest(data_desc.addr)
-      b.pointer = ffi.cast(char_ptr_t, addr)
-      b.physical = self:translate_physical_addr(addr)
-      b.size = data_desc.len
+         local addr = self:map_from_guest(data_desc.addr)
+         b.pointer = ffi.cast(char_ptr_t, addr)
+         b.physical = self:translate_physical_addr(addr)
+         b.size = data_desc.len
 
-      -- Fill buffer origin info
-      b.origin.type = C.BUFFER_ORIGIN_VIRTIO
-      local v = b.origin.info.virtio
+         -- The total size will be added to the first buffer virtio info
+         total_size = total_size + b.size
+
+         -- Fill buffer origin info
+         b.origin.type = C.BUFFER_ORIGIN_VIRTIO
+         -- Set invalid header_id for all buffers. The first will contain
+         -- the real header_id, set after the loop
+         b.origin.info.virtio.header_id = invalid_header_id
+
+         packet.add_iovec(p, b, b.size)
+      until bit.band(data_desc.flags, C.VIRTIO_DESC_F_NEXT) == 0
+
+      -- Fill in the first buffer with header info
+      local v = p.iovecs[0].buffer.origin.info.virtio
       v.device_id     = self.virtio_device_id
       v.ring_id       = 1 -- rx ring
       v.header_id = header_id
       v.header_pointer = header_pointer
-      v.header_size = header_size
-
-      packet.add_iovec(p, b, b.size)
-      --assert(bit.band(data_desc.flags, C.VIRTIO_DESC_F_NEXT) == 0)
+      v.total_size = total_size
 
       self.rxavail = (self.rxavail + 1) % 65536
 
@@ -127,11 +141,12 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
       local header_id = self.txring.avail.ring[self.txavail % self.tx_vring_num]
       local header_desc  = self.txring.desc[header_id]
       local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(header_desc.addr))
-      local header_size = header_desc.len
+      --assert(header_desc.len == virtio_net_hdr_size)
+      local total_size = virtio_net_hdr_size
       local data_desc = header_desc
       --assert(bit.band(header_desc.flags, C.VIRTIO_DESC_F_NEXT) ~= 0)
 
-      -- Data buffers
+      -- Data buffer
       data_desc  = self.txring.desc[data_desc.next]
       local b = freelist.remove(self.buffer_recs) or lib.malloc("struct buffer")
 
@@ -140,6 +155,9 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
       b.physical = self:translate_physical_addr(addr)
       b.size = data_desc.len
 
+      -- The total size will be added to the first buffer virtio info
+      total_size = total_size + b.size
+
       -- Fill buffer origin info
       b.origin.type = C.BUFFER_ORIGIN_VIRTIO
       local v = b.origin.info.virtio
@@ -147,7 +165,7 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
       v.ring_id       = 0 -- tx ring
       v.header_id = header_id
       v.header_pointer = header_pointer
-      v.header_size = header_size
+      v.total_size = total_size
 
       freelist.add(self.vring_transmit_buffers, b)
 
@@ -174,8 +192,9 @@ function VirtioNetDevice:transmit_packets_to_vm ()
 
       local used = self.txring.used.ring[self.txused%self.tx_vring_num]
       local v = b.origin.info.virtio
+      --assert(v.header_id ~= invalid_header_id)
       used.id = v.header_id
-      used.len = v.header_size + iovec.length
+      used.len = virtio_net_hdr_size + iovec.length
       self.txused = (self.txused + 1) % 65536
 
       packet.deref(p)
@@ -188,16 +207,29 @@ function VirtioNetDevice:transmit_packets_to_vm ()
 end
 
 -- Return a buffer to the virtual machine.
---- Return a buffer to the virtual machine.
 function VirtioNetDevice:return_virtio_buffer (b)
    freelist.add(self.buffer_recs, b)
    if b.origin.info.virtio.ring_id == 1 then -- Receive buffer?
-      local used = self.rxring.used.ring[self.rxring.used.idx % self.rx_vring_num]
-      used.id = b.origin.info.virtio.header_id
-      used.len = b.origin.info.virtio.header_size + b.size
 
-      self.rxring.used.idx = (self.rxring.used.idx + 1) % 65536
-      -- XXX Call at most once per pull()
+      -- Only do this for the first buffer in the chain.
+      -- Distiguish it by the valid header_id
+      -- Other buffers in the chain are safe as long as
+      -- rx_signal_used() is not called. So be sure to free
+      -- all of them at one poll.
+      if b.origin.info.virtio.header_id ~= invalid_header_id then
+         local used = self.rxring.used.ring[self.rxused % self.rx_vring_num]
+         used.id = b.origin.info.virtio.header_id
+         used.len = b.origin.info.virtio.total_size
+
+         self.rxused = (self.rxused + 1) % 65536
+      end
+   end
+end
+
+-- Advance the rx used ring and sugnal up
+function VirtioNetDevice:rx_signal_used()
+   if self.rxring.used.idx ~= self.rxused then
+      self.rxring.used.idx = self.rxused
       C.write(self.callfd[1], eventfd_one, 8)
    end
 end
