@@ -219,6 +219,15 @@ int rump___sysimpl_timer_create(_netbsd_clockid_t, struct _netbsd_sigevent *, _n
 int rump___sysimpl_timer_delete(_netbsd_timer_t);
 int rump___sysimpl_timer_getoverrun(_netbsd_timer_t);
 
+int rump___sysimpl_aio_cancel(int, struct aiocb *);
+int rump___sysimpl_aio_error(const struct aiocb *);
+int rump___sysimpl_aio_fsync(int, struct aiocb *);
+int rump___sysimpl_aio_read(struct aiocb *);
+int rump___sysimpl_aio_return(struct aiocb *);
+int rump___sysimpl_aio_write(struct aiocb *);
+int rump___sysimpl_lio_listio(int, struct aiocb *const *, int, struct sigevent *);
+int rump___sysimpl_aio_suspend(const struct aiocb *const *, int, const struct timespec *);
+
 int rump___sysimpl___sysctl(const int *, unsigned int, void *, size_t *, const void *, size_t);
 
 int rump_sys_pipe(int *);
