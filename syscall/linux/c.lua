@@ -687,8 +687,8 @@ if not sys.socketcall then
   function C.sendto(sockfd, buf, len, flags, dest_addr, addrlen)
     return syscall_long(sys.sendto, int(sockfd), void(buf), ulong(len), int(flags), void(dest_addr), uint(addrlen))
   end
-  function C.recvfrom(sockfd, buf, len, flags, dest_addr, addrlen)
-    return syscall_long(sys.recvfrom, int(sockfd), void(buf), ulong(len), int(flags), void(dest_addr), void(addrlen))
+  function C.recvfrom(sockfd, buf, len, flags, src_addr, addrlen)
+    return syscall_long(sys.recvfrom, int(sockfd), void(buf), ulong(len), int(flags), void(src_addr), void(addrlen))
   end
   function C.shutdown(sockfd, how) return syscall(sys.shutdown, int(sockfd), int(how)) end
   function C.setsockopt(sockfd, level, optname, optval, optlen)

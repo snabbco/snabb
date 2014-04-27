@@ -202,8 +202,8 @@ int rump___sysimpl___quotactl(const char *, struct _netbsd_quotactl_args *);
 int rump___sysimpl_ktrace(const char *tracefile, int ops, int trpoints, pid_t pid);
 int rump___sysimpl_fktrace(int fd, int ops, int trpoints, pid_t pid);
 int rump___sysimpl_utrace(const char *, void *, size_t);
-int rump___sysimpl_recvmmsg(int, struct mmsghdr *, unsigned int, unsigned int, struct timespec *);
-int rump___sysimpl_sendmmsg(int, struct mmsghdr *, unsigned int, unsigned int);
+int rump___sysimpl_recvmmsg(int, struct _netbsd_mmsghdr *, unsigned int, unsigned int, struct _netbsd_timespec *);
+int rump___sysimpl_sendmmsg(int, struct _netbsd_mmsghdr *, unsigned int, unsigned int);
 
 int rump___sysimpl_gettimeofday50(struct _netbsd_timeval *, void *);
 int rump___sysimpl_settimeofday50(const struct _netbsd_timeval *, const void *);
@@ -391,6 +391,8 @@ local clist = {
   utrace = "utrace",
   write = "write",
   writev = "writev",
+  recvmmsg = "recvmmsg",
+  sendmmsg = "sendmmsg",
 -- version calls
   fhopen = "fhopen40",
   fhstat = "fhstat50",

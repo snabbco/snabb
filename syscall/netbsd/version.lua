@@ -19,19 +19,20 @@ int rump_getversion(void);
 local sc = ffi.new("int[2]", 1, 3) -- kern.osrev
 local osrevision = ffi.new("int[1]")
 local lenp = ffi.new("unsigned long[1]", ffi.sizeof("int"))
+local major, minor
 local ok, res
 if abi.host == "netbsd" then
   ok, res = pcall(ffi.C.sysctl, sc, 2, osrevision, lenp, nil, 0)
+  osrevision = osrevision[0]
 end
-if not ok or res == -1 then ok, res = pcall(ffi.C.rump_getversion) end
-if not ok or res == -1 then 
+if not ok or res == -1 then ok, osrevision = pcall(ffi.C.rump_getversion) end
+if not ok then 
   version = 7
 else
-  local major = math.floor(osrevision[0] / 100000000)
-  local minor = math.floor(osrevision[0] / 1000000) - major * 100
+  major = math.floor(osrevision / 100000000)
+  minor = math.floor(osrevision / 1000000) - major * 100
   version = major
   if minor == 99 then version = version + 1 end
 end
-
 return {version = version, major = major, minor = minor}
 

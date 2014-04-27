@@ -191,15 +191,19 @@ function S.recvfrom(fd, buf, count, flags, addr, addrlen)
     addr = nil
     addrlen = nil
   else
-    addr = addr or t.sockaddr_storage()
-    addrlen = addrlen or #addr
+    if addr then
+      addrlen = addrlen or #addr
+    else
+      addr = t.sockaddr_storage()
+      addrlen = addrlen or s.sockaddr_storage
+    end
     if type(addrlen) == "number" then addrlen = t.socklen1(addrlen) end
     saddr = pt.sockaddr(addr)
   end
-  local ret, err = C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen)
+  local ret, err = C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen) -- TODO addrlen 0 here???
   ret = tonumber(ret)
   if ret == -1 then return nil, t.error(err or errno()) end
-  if addr then return ret, nil, t.sa(addr, addrlen[0]) else return ret, nil end
+  if addr then return ret, nil, t.sa(addr, addrlen[0]) else return ret end
 end
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
@@ -213,14 +217,16 @@ function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG
 
 -- TODO better handling of msgvec, create one structure/table
 if C.sendmmsg then
-  function S.sendmmsg(fd, msgvec, vlen, flags)
-    return retbool(C.sendmmsg(getfd(fd), msgvec, vlen, c.MSG[flags]))
+  function S.sendmmsg(fd, msgvec, flags)
+    msgvec = mktype(t.mmsghdrs, msgvec)
+    return retbool(C.sendmmsg(getfd(fd), msgvec.msg, msgvec.count, c.MSG[flags]))
   end
 end
 if C.recvmmsg then
-  function S.recvmmsg(fd, msgvec, vlen, flags, timeout)
+  function S.recvmmsg(fd, msgvec, flags, timeout)
     if timeout then timeout = mktype(t.timespec, timeout) end
-    return retbool(C.recvmmsg(getfd(fd), msgvec, vlen, c.MSG[flags]))
+    msgvec = mktype(t.mmsghdrs, msgvec)
+    return retbool(C.recvmmsg(getfd(fd), msgvec.msg, msgvec.count, c.MSG[flags], timeout))
   end
 end
 

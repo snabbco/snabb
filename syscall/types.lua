@@ -446,10 +446,11 @@ mt.msghdr = {
     cmsg_firsthdr = cmsg_firsthdr,
     cmsg_nxthdr = cmsg_nxthdr,
     cmsgs = cmsg_headers,
+    -- TODO add iov
   },
   newindex = {
     name = function(m, n)
-      if n then m.msg_name, m.msg_namelen = n, #n else m.msg_name, m.msg_namelen = nil, 0 end
+      m.msg_name, m.msg_namelen = n, #n
     end,
     iov = function(m, io)
       if ffi.istype(t.iovec, io) then -- single iovec

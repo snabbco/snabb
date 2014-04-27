@@ -83,7 +83,12 @@ t.string_array = ffi.typeof("const char *[?]")
 
 local mt = {}
 
-mt.iovec = {}
+mt.iovec = {
+  index = {
+    base = function(self) return self.iov_base end,
+    len = function(self) return self.iov_len end,
+  },
+}
 
 addtype(types, "iovec", "struct iovec", mt.iovec)
 

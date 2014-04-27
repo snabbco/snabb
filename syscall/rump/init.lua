@@ -63,6 +63,7 @@ local function rumpfn(tp)
   if tp == "struct {dev_t dev;}" then return "struct {_netbsd_dev_t dev;}" end
   if tp == "struct {timer_t timerid[1];}" then return "struct {_netbsd_timer_t timerid[1];}" end
   if tp == "union sigval" then return "union _netbsd_sigval" end
+  if tp == "struct {int count; struct mmsghdr msg[?];}" then return "struct {int count; struct _netbsd_mmsghdr msg[?];}" end
   if string.find(tp, "struct") then
     return (string.gsub(tp, "struct (%a)", "struct _netbsd_%1"))
   end

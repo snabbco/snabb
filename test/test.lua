@@ -1677,6 +1677,62 @@ test_sockets_pipes = {
     assert(sv1:close())
     assert(sv2:close())
   end,
+  test_sendto = function()
+    local buf = t.buffer(10)
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    assert(sv1:sendto("test"))
+    local r, addr = assert(sv2:recvfrom(buf, 10))
+    assert_equal(r, #"test")
+    assert_equal(ffi.string(buf, r), "test")
+    --assert_equal(addr.family, c.AF.UNIX) -- TODO addrlen seen as 0 so not filled in?
+    assert(sv1:close())
+    assert(sv2:close())
+  end,
+  test_sendto_src = function()
+    local buf = t.buffer(10)
+    local sa = t.sockaddr_un()
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    assert(sv1:sendto("test"))
+    local r = assert(sv2:recvfrom(buf, 10, 0, sa))
+    assert_equal(r, #"test")
+    assert_equal(ffi.string(buf, r), "test")
+    assert_equal(sa.family, c.AF.UNIX) -- TODO addrlen seen as 0 so not filled in?
+    assert(sv1:close())
+    assert(sv2:close())
+  end,
+  test_sendmsg = function()
+    local buf = t.buffer(4)
+    ffi.copy(buf, "test", 4)
+    local iov = t.iovecs{{buf, 4}}
+    local sa = t.sockaddr_storage()
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    local msg = t.msghdr{iov = iov}
+    assert(sv1:sendmsg(msg))
+    local msg = t.msghdr{name = sa, iov = iov}
+    local r = assert(sv2:recvmsg(msg))
+    assert_equal(r, #"test")
+    assert_equal(ffi.string(buf, r), "test")
+    --assert_equal(sa.family, c.AF.UNIX) -- TODO addrlen seen as 0 so not filled in?
+    assert(sv1:close())
+    assert(sv2:close())
+  end,
+  test_sendmmsg = function()
+    if not S.sendmmsg then error "skipped" end
+    local buf = t.buffer(4)
+    ffi.copy(buf, "test", 4)
+    local iov = t.iovecs{{buf, 4}}
+    local sa = t.sockaddr_storage()
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    local msg = t.mmsghdrs{{iov = iov}}
+    assert(sv1:sendmmsg(msg))
+    local msg = t.mmsghdrs{{name = sa, iov = iov}}
+    assert(sv2:recvmmsg(msg))
+    assert_equal(msg.msg[0].len, #"test")
+    assert_equal(ffi.string(msg.msg[0].hdr.msg_iov[0].base, msg.msg[0].len), "test")
+    --assert_equal(sa.family, c.AF.UNIX) -- TODO addrlen seen as 0 so not filled in?
+    assert(sv1:close())
+    assert(sv2:close())
+  end,
 }
 
 test_timespec_timeval = {

@@ -128,7 +128,6 @@ local addstructs = {
   vhost_vring_addr = "struct vhost_vring_addr",
   vhost_memory_region = "struct vhost_memory_region",
   vhost_memory = "struct vhost_memory",
-  mmsghdr = "struct mmsghdr",
 }
 
 for k, v in pairs(addtypes) do addtype(types, k, v) end
@@ -1127,6 +1126,35 @@ mt.flock = {
 }
 
 addtype(types, "flock", "struct flock64", mt.flock)
+
+mt.mmsghdr = {
+  index = {
+    hdr = function(self) return self.msg_hdr end,
+    len = function(self) return self.msg_len end,
+  },
+  newindex = {
+    hdr = function(self, v) self.hdr = v end,
+  },
+  __new = newfn,
+}
+
+addtype(types, "mmsghdr", "struct mmsghdr", mt.mmsghdr)
+
+mt.mmsghdrs = {
+  __len = function(p) return p.count end,
+  __new = function(tp, ps)
+    if type(ps) == 'number' then return ffi.new(tp, ps, ps) end
+    local count = #ps
+    local mms = ffi.new(tp, count, count)
+    for n = 1, count do
+      mms.msg[n - 1].msg_hdr = mktype(t.msghdr, ps[n])
+    end
+    return mms
+  end,
+  __ipairs = function(p) return reviter, p.msg, p.count end -- TODO want forward iterator really...
+}
+
+addtype_var(types, "mmsghdrs", "struct {int count; struct mmsghdr msg[?];}", mt.mmsghdrs)
 
 -- this is declared above
 samap_pt = {
