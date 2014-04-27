@@ -39,7 +39,7 @@ descriptors). See performance notes below.
 
 ### Usage
 
-    snabbswitch [opts...] designs.loadgen.loadgen <pcapfile> [port...]
+    loadgen <pcapfile> [port...]
 
 Generates load by replaying the Pcap trace file in a loop on each
 selected ethernet port.
@@ -52,17 +52,17 @@ controller.
 Examples (from chur.snabb.co test server):
 
     # Use all NICs
-    snabbswitch designs.loadgen.loadgen foo.pcap
+    loadgen foo.pcap
 
     # Use two NICs, one from each NUMA node
-    snabbswitch designs.loadgen.loadgen foo.pcap 0000:01:00.1 0000:82:00.1
+    loadgen foo.pcap 0000:01:00.1 0000:82:00.1
     # (shorter version)
-    snabbswitch designs.loadgen.loadgen foo.pcap 01:00.1 82:00.1
+    loadgen foo.pcap 01:00.1 82:00.1
 
     # Use all NICs on NUMA node 0
-    taskset -c <cpu0> snabbswitch designs.loadgen.loadgen foo.pcap 0000:0
+    taskset -c <cpu0> loadgen foo.pcap 0000:0
     # Use all NICs on NUMA node 1
-    taskset -c <cpu1> snabbswitch designs.loadgen.loadgen foo.pcap 0000:8
+    taskset -c <cpu1> loadgen foo.pcap 0000:8
 
 
 ### Performance

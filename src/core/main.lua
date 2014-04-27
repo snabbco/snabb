@@ -1,5 +1,9 @@
 module(...,package.seeall)
 
+-- Default to not using any Lua code on the filesystem.
+-- (Can be overridden with -P argument: see below.)
+package.path = ''
+
 local ffi = require("ffi")
 local zone = require("jit.zone")
 local C   = ffi.C
@@ -17,8 +21,9 @@ ffi.cdef[[
 ]]
 
 local usage = [[
-Usage: snabbswitch [options] <module> [args...]
+Usage: snabb [options] <module> [args...]
 Available options are:
+-P pathspec  Set library load path (Lua 'package.path').
 -e chunk     Execute string 'chunk'.
 -l name      Require library 'name'.
 -t name      Test module 'name' with selftest().
@@ -45,7 +50,10 @@ function main ()
    end
    local i = 1
    while i <= #args do
-      if args[i] == '-l' and i < #args then
+      if args[i] == '-P' and i < #args then
+         package.path = args[i+1]
+         i = i + 2
+      elseif args[i] == '-l' and i < #args then
 	 require(args[i+1])
 	 i = i + 2
       elseif args[i] == '-t' and i < #args then
@@ -69,7 +77,7 @@ function main ()
 	 jit_dump.start("", args[i+1])
 	 i = i + 2
       elseif i <= #args then
-         -- Syntax: <module> [args...]
+         -- Syntax: <script> [args...]
          local module = args[i]
          i = i + 1
          while i <= #args do
@@ -77,7 +85,7 @@ function main ()
             i = i + 1
          end
          zone("module "..module)
-         require(module)
+         dofile(module)
          exit(0)
       else
 	 print(usage)

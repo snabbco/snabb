@@ -4,5 +4,4 @@ obj
 *.o
 *#
 /src/snabbswitch
-
-/src/app-selftest.dot
+/src/snabb
