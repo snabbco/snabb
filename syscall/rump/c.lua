@@ -155,7 +155,7 @@ ssize_t rump___sysimpl_extattr_list_fd(int, int, void *, size_t);
 ssize_t rump___sysimpl_extattr_list_file(const char *, int, void *, size_t);
 ssize_t rump___sysimpl_extattr_list_link(const char *, int, void *, size_t);
 int rump___sysimpl_pselect50(int, _netbsd_fd_set *, _netbsd_fd_set *, _netbsd_fd_set *, const struct _netbsd_timespec *, const _netbsd_sigset_t *);
-int rump___sysimpl_pollts(struct _netbsd_pollfd *, unsigned int, const struct _netbsd_timespec *, const _netbsd_sigset_t *);
+int rump___sysimpl_pollts50(struct _netbsd_pollfd *, unsigned int, const struct _netbsd_timespec *, const _netbsd_sigset_t *);
 int rump___sysimpl_setxattr(const char *, const char *, const void *, size_t, int);
 int rump___sysimpl_lsetxattr(const char *, const char *, const void *, size_t, int);
 int rump___sysimpl_fsetxattr(int, const char *, const void *, size_t, int);
