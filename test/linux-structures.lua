@@ -67,6 +67,7 @@ local function fixup_structs(abi, ctypes)
   ctypes["struct user_cap_header"] = nil -- not defined
   ctypes["struct sockaddr_storage"] = nil -- uses __kernel_
   ctypes["struct k_sigaction"] = nil -- seems to be incorrect in headers
+  ctypes["struct mmsghdr"] = nil -- too new for our headers
 
   ctypes["sigset_t"] = nil -- still some issues
 
