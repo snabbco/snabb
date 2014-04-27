@@ -7,6 +7,10 @@ local C   = ffi.C
 require("lib.lua.strict")
 require("lib.lua.class")
 
+-- Reserve names that we want to use for global module.
+-- (This way we avoid errors from the 'strict' module.)
+_G.config, _G.engine, _G.link, _G.buffer, _G.packet, _G.timer, _G.main = nil
+
 ffi.cdef[[
       extern int argc;
       extern char** argv;
@@ -37,10 +41,6 @@ function main ()
    local args = command_line_args()
    if #args == 0 then
       print(usage)
-      os.exit(1)
-   end
-   if C.geteuid() ~= 0 then
-      print("error: snabb has to run as root.")
       os.exit(1)
    end
    local i = 1
@@ -97,6 +97,18 @@ function initialize ()
    require("core.lib")
    require("core.clib_h")
    require("core.lib_h")
+   if C.geteuid() ~= 0 then
+      print("error: snabb has to run as root.")
+      os.exit(1)
+   end
+   -- Global API
+   _G.config = require("core.config")
+   _G.engine = require("core.app")
+   _G.link   = require("core.link")
+   _G.buffer = require("core.buffer")
+   _G.packet = require("core.packet")
+   _G.timer  = require("core.timer")
+   _G.main   = getfenv()
 end
 
 function command_line_args()
