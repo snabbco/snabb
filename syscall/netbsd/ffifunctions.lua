@@ -18,7 +18,6 @@ int paccept(int s, struct sockaddr *addr, socklen_t *addrlen, const sigset_t *si
 int reboot(int howto, char *bootstr);
 int ioctl(int d, unsigned long request, void *arg);
 int getvfsstat(struct statvfs *buf, size_t bufsize, int flags);
-int pollts(struct pollfd * restrict fds, nfds_t nfds, const struct timespec * restrict ts, const sigset_t * restrict sigmask);
 int utrace(const char *label, void *addr, size_t len);
 int fktrace(int fd, int ops, int trpoints, pid_t pid);
 
@@ -53,6 +52,7 @@ int __futimes50(int fd, const struct timeval times[2]);
 int __posix_fadvise50(int fd, off_t offset, off_t size, int hint);
 int __kevent50(int kq, const struct kevent *changelist, size_t nchanges, struct kevent *eventlist, size_t nevents, const struct timespec *timeout);
 int __mknod50(const char *path, mode_t mode, dev_t dev);
+int __pollts50(struct pollfd * restrict fds, nfds_t nfds, const struct timespec * restrict ts, const sigset_t * restrict sigmask);
 
 int __getcwd(char *buf, size_t size);
 int __libc_sigaction14(int signum, const struct sigaction *act, struct sigaction *oldact);

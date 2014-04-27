@@ -70,6 +70,7 @@ C.futimes = ffi.C.__futimes50
 C.getfh = ffi.C.__getfh30
 C.kevent = ffi.C.__kevent50
 C.mknod = ffi.C.__mknod50
+C.pollts = ffi.C.__pollts50
 
 C.gettimeofday = ffi.C.__gettimeofday50
 C.settimeofday = ffi.C.__settimeofday50
