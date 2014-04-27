@@ -55,11 +55,11 @@ build =
       ["syscall.linux.cgroup"] = "syscall/linux/cgroup.lua";
 
       ["syscall.linux.arm.constants"] = "syscall/linux/arm/constants.lua";
-      ["syscall.linux.arm.ffitypes"] = "syscall/linux/arm/ffitypes.lua";
+      ["syscall.linux.arm.ffi"] = "syscall/linux/arm/ffi.lua";
       ["syscall.linux.arm.ioctl"] = "syscall/linux/arm/ioctl.lua";
       ["syscall.linux.arm.nr"] = "syscall/linux/arm/nr.lua";
       ["syscall.linux.mips.constants"] = "syscall/linux/mips/constants.lua";
-      ["syscall.linux.mips.ffitypes"] = "syscall/linux/mips/ffitypes.lua";
+      ["syscall.linux.mips.ffi"] = "syscall/linux/mips/ffi.lua";
       ["syscall.linux.mips.ioctl"] = "syscall/linux/mips/ioctl.lua";
       ["syscall.linux.mips.nr"] = "syscall/linux/mips/nr.lua";
       ["syscall.linux.ppc.constants"] = "syscall/linux/ppc/constants.lua";
@@ -67,11 +67,11 @@ build =
       ["syscall.linux.ppc.ioctl"] = "syscall/linux/ppc/ioctl.lua";
       ["syscall.linux.ppc.nr"] = "syscall/linux/ppc/nr.lua";
       ["syscall.linux.x64.constants"] = "syscall/linux/x64/constants.lua";
-      ["syscall.linux.x64.ffitypes"] = "syscall/linux/x64/ffitypes.lua";
+      ["syscall.linux.x64.ffi"] = "syscall/linux/x64/ffi.lua";
       ["syscall.linux.x64.ioctl"] = "syscall/linux/x64/ioctl.lua";
       ["syscall.linux.x64.nr"] = "syscall/linux/x64/nr.lua";
       ["syscall.linux.x86.constants"] = "syscall/linux/x86/constants.lua";
-      ["syscall.linux.x86.ffitypes"] = "syscall/linux/x86/ffitypes.lua";
+      ["syscall.linux.x86.ffi"] = "syscall/linux/x86/ffi.lua";
       ["syscall.linux.x86.ioctl"] = "syscall/linux/x86/ioctl.lua";
       ["syscall.linux.x86.nr"] = "syscall/linux/x86/nr.lua";
 
