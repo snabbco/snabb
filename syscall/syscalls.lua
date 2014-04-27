@@ -205,6 +205,20 @@ function S.sendmsg(fd, msg, flags)
   return retnum(C.sendmsg(getfd(fd), msg, c.MSG[flags]))
 end
 function S.recvmsg(fd, msg, flags) return retnum(C.recvmsg(getfd(fd), msg, c.MSG[flags])) end
+
+-- TODO better handling of msgvec, create one structure/table
+if C.sendmmsg then
+  function S.sendmmsg(fd, msgvec, vlen, flags)
+    return retbool(C.sendmmsg(getfd(fd), msgvec, vlen, c.MSG[flags]))
+  end
+end
+if C.recvmmsg then
+  function S.recvmmsg(fd, msgvec, vlen, flags, timeout)
+    if timeout then timeout = mktype(t.timespec, timeout) end
+    return retbool(C.recvmmsg(getfd(fd), msgvec, vlen, c.MSG[flags]))
+  end
+end
+
 -- TODO {get,set}sockopt may need better type handling see new unfinished sockopt file, plus not always c.SO[]
 function S.setsockopt(fd, level, optname, optval, optlen)
    -- allocate buffer for user, from Lua type if know how, int and bool so far
