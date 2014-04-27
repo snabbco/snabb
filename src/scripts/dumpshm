@@ -1,2 +1,0 @@
-#!/bin/bash
-exec snabb lua $SNABB/src/lua/dumpshm.lua "$@"

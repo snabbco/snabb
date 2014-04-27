@@ -1,4 +1,0 @@
-#!/bin/bash
-set -e
-tush-check $SNABB/src/tush/tracemaker.tush
-echo "OK: Tests passed."

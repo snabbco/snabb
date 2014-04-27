@@ -1,3 +1,0 @@
-#!/bin/bash
-exec snabb lua $SNABB/src/lua/run.lua "$@"
-
