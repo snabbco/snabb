@@ -341,7 +341,6 @@ local clist = {
   pathconf = "pathconf",
   pipe2 = "pipe2",
   poll = "poll",
-  pollts = "pollts",
   pread = "pread",
   preadv = "preadv",
   pwrite = "pwrite",
@@ -409,6 +408,7 @@ local clist = {
   socket = "socket30",
   stat = "stat50",
   utimes = "utimes50",
+  pollts = "pollts50"
 -- time functions
   gettimeofday = "gettimeofday50",
   settimeofday = "settimeofday50",
