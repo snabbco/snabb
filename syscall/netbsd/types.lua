@@ -49,13 +49,16 @@ local addstructs = {
   icmp6_ifstat = "struct icmp6_ifstat",
   in6_ifreq = "struct in6_ifreq",
   in6_addrlifetime = "struct in6_addrlifetime",
-  mmsghdr = "struct mmsghdr",
 }
 
 if version == 6 then
   addstructs.ptmget = "struct compat_60_ptmget"
 else
   addstructs.ptmget = "struct ptmget"
+end
+
+if version == 7 then
+  addstructs.mmsghdr = "struct mmsghdr"
 end
 
 for k, v in pairs(addtypes) do addtype(types, k, v) end
