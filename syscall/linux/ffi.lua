@@ -167,6 +167,10 @@ struct msghdr {
   size_t msg_controllen;
   int msg_flags;
 };
+struct mmsghdr {
+  struct msghdr msg_hdr;
+  unsigned int msg_len;
+};
 struct sockaddr {
   sa_family_t sa_family;
   char sa_data[14];

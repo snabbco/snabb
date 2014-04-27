@@ -104,6 +104,10 @@ struct _netbsd_msghdr {
   socklen_t msg_controllen;
   int msg_flags;
 };
+struct _netbsd_mmsghdr {
+  struct _netbsd_msghdr msg_hdr;
+  unsigned int msg_len;
+};
 struct _netbsd_timespec {
   _netbsd_time_t tv_sec;
   long   tv_nsec;

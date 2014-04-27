@@ -128,6 +128,7 @@ local addstructs = {
   vhost_vring_addr = "struct vhost_vring_addr",
   vhost_memory_region = "struct vhost_memory_region",
   vhost_memory = "struct vhost_memory",
+  mmsghdr = "struct mmsghdr",
 }
 
 for k, v in pairs(addtypes) do addtype(types, k, v) end
