@@ -408,7 +408,7 @@ local clist = {
   socket = "socket30",
   stat = "stat50",
   utimes = "utimes50",
-  pollts = "pollts50"
+  pollts = "pollts50",
 -- time functions
   gettimeofday = "gettimeofday50",
   settimeofday = "settimeofday50",
