@@ -1667,6 +1667,16 @@ test_sockets_pipes = {
     assert(s:close())
     assert(S.unlink(tmpfile))
   end,
+  test_send = function()
+    local buf = t.buffer(10)
+    local sv1, sv2 = assert(S.socketpair("unix", "stream"))
+    assert(sv1:send("test"))
+    local r = assert(sv2:recv(buf, 10))
+    assert_equal(r, #"test")
+    assert_equal(ffi.string(buf, r), "test")
+    assert(sv1:close())
+    assert(sv2:close())
+  end,
 }
 
 test_timespec_timeval = {

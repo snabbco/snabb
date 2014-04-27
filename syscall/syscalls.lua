@@ -185,16 +185,21 @@ function S.sendto(fd, buf, count, flags, addr, addrlen)
   local saddr = pt.sockaddr(addr)
   return retnum(C.sendto(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen or #addr))
 end
--- assume you always want address, as would use recv otherwise, but could support addr = false
 function S.recvfrom(fd, buf, count, flags, addr, addrlen)
-  addr = addr or t.sockaddr_storage()
-  addrlen = addrlen or #addr
-  if type(addrlen) == "number" then addrlen = t.socklen1(addrlen) end
-  local saddr = pt.sockaddr(addr)
+  local saddr
+  if addr == false then
+    addr = nil
+    addrlen = nil
+  else
+    addr = addr or t.sockaddr_storage()
+    addrlen = addrlen or #addr
+    if type(addrlen) == "number" then addrlen = t.socklen1(addrlen) end
+    saddr = pt.sockaddr(addr)
+  end
   local ret, err = C.recvfrom(getfd(fd), buf, count or #buf, c.MSG[flags], saddr, addrlen)
   ret = tonumber(ret)
   if ret == -1 then return nil, t.error(err or errno()) end
-  return ret, nil, t.sa(addr, addrlen[0])
+  if addr then return ret, nil, t.sa(addr, addrlen[0]) else return ret, nil end
 end
 function S.sendmsg(fd, msg, flags)
   if not msg then -- send a single byte message, eg enough to send credentials
@@ -724,10 +729,10 @@ end
 
 -- legacy in many OSs, implemented using recvfrom, sendto
 if C.send then
-  function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count or #buf, c.MSG[flags])) end
+  function S.send(fd, buf, count, flags) return retnum(C.send(getfd(fd), buf, count, c.MSG[flags])) end
 end
 if C.recv then
-  function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count or #buf, c.MSG[flags])) end
+  function S.recv(fd, buf, count, flags) return retnum(C.recv(getfd(fd), buf, count, c.MSG[flags], false)) end
 end
 
 -- TODO not sure about this interface, maybe return rem as extra parameter see #103
