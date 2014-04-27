@@ -86,6 +86,8 @@ int nanosleep(const struct timespec *req, struct timespec *rem);
 int getrusage(int who, struct rusage *usage);
 int getpriority(int which, int who);
 int setpriority(int which, int who, int prio);
+int sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, unsigned int flags);
+int recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, unsigned int flags, struct timespec *timeout);
 
 uid_t getuid(void);
 uid_t geteuid(void);
