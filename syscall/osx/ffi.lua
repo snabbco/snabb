@@ -173,7 +173,7 @@ struct sigevent {
   int             sigev_signo;
   union sigval    sigev_value;
   void            (*sigev_notify_function)(union sigval);
-  pthread_attr_t  *sigev_notify_attributes;
+  void            *sigev_notify_attributes; /* pthread_attr_t */
 };
 struct dirent {
   uint64_t  d_ino;
