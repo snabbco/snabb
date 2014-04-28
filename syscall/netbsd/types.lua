@@ -628,7 +628,6 @@ mt.vmtotal = {
 
 addtype(types, "vmtotal", "struct vmtotal", mt.vmtotal)
 
-if version >= 7 then
 mt.mmsghdr = {
   index = {
     hdr = function(self) return self.msg_hdr end,
@@ -657,7 +656,6 @@ mt.mmsghdrs = {
 }
 
 addtype_var(types, "mmsghdrs", "struct {int count; struct mmsghdr msg[?];}", mt.mmsghdrs)
-end
 
 return types
 
