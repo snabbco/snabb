@@ -18,6 +18,7 @@
 + time functions for rump kernel
 + fix backtraces on error
 + improved tests for OS versions
++ add recvmmsg, sendmmsg
 
     0.9 release
 
