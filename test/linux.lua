@@ -1133,9 +1133,10 @@ test.misc_linux_root = {
   end,
 ]]
   test_reboot = function()
+    error "skipped" -- rebooting machine so not helpful
     local p = assert(S.clone("newpid"))
     if p == 0 then
-      fork_assert(S.reboot("restart")) -- will send SIGHUP to us as in pid namespace NB older kernels may reboot! if so disable test
+      fork_assert(S.reboot("restart")) -- will send SIGHUP to us as in pid namespace NB older kernels may reboot!
       S.pause()
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
