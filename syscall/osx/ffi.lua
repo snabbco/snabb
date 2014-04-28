@@ -168,6 +168,13 @@ struct sigaction {
   sigset_t sa_mask;
   int sa_flags;
 };
+struct sigevent {
+  int             sigev_notify;
+  int             sigev_signo;
+  union sigval    sigev_value;
+  void            (*sigev_notify_function)(union sigval);
+  pthread_attr_t  *sigev_notify_attributes;
+};
 struct dirent {
   uint64_t  d_ino;
   uint64_t  d_seekoff;
