@@ -957,12 +957,6 @@ c.IPV6 = strflag {
   V6ONLY            = 27,
   IPSEC_POLICY      = 28,
   FAITH             = 29,
-  RTHDRDSTOPTS      = 35,
-  RECVPKTINFO       = 36,
-  RECVPATHMTU       = 43,
-  PATHMTU           = 44,
-  HOPOPTS           = 49,
-  DSTOPTS           = 50,
   RECVTCLASS        = 57,
   TCLASS            = 61,
 }
