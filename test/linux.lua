@@ -529,7 +529,8 @@ test.netlink = {
     assert(lo:setmtu(mtu))
   end,
   test_interface_rename_root = function()
-    assert(nl.create_interface{name = "dummy0", type = "dummy"})
+    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    if not ok and err.OPNOTSUPP then error "skipped" end
     local i = assert(nl.interfaces())
     assert(i.dummy0)
     assert(i.dummy0:rename("newname"))
@@ -538,7 +539,8 @@ test.netlink = {
     assert(i.newname:delete())
   end,
   test_interface_set_macaddr_root = function()
-    assert(nl.create_interface{name = "dummy0", type = "dummy"})
+    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    if not ok and err.OPNOTSUPP then error "skipped" end
     local i = assert(nl.interfaces())
     assert(i.dummy0)
     assert(i.dummy0:setmac("46:9d:c9:06:dd:dd"))
@@ -559,6 +561,7 @@ test.netlink = {
   end,
   test_newlink_newif_dummy_root = function()
     local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    if not ok and err.OPNOTSUPP then error "skipped" end
     local i = assert(nl.interfaces())
     assert(i.dummy0, "expect dummy interface")
     assert(i.dummy0:delete())
@@ -572,7 +575,8 @@ test.netlink = {
     assert(i.br0:delete())
   end,
   test_dellink_by_name_root = function()
-    assert(nl.create_interface{name = "dummy0", type = "dummy"})
+    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    if not ok and err.OPNOTSUPP then error "skipped" end
     local i = assert(nl.interfaces())
     assert(i.dummy0, "expect dummy interface")
     assert(nl.dellink(0, "ifname", "dummy0"))
@@ -598,6 +602,7 @@ test.netlink = {
   end,
   test_newaddr_root = function()
     local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    if not ok and err.OPNOTSUPP then error "skipped" end
     local i = assert(nl.interfaces())
     assert(i.dummy0:up())
     local af, netmask, address, bcast = c.AF.INET, 24, t.in_addr("10.10.10.1"), t.in_addr("10.10.10.255")
@@ -610,6 +615,7 @@ test.netlink = {
   end,
   test_newaddr_helper_root = function()
     local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    if not ok and err.OPNOTSUPP then error "skipped" end
     local i = assert(nl.interfaces())
     assert(i.dummy0:up())
     assert(i.dummy0:address("10.10.10.1/24"))
@@ -669,7 +675,8 @@ test.netlink = {
   end,
   test_netlink_events_root = function()
     local sock = assert(nl.socket("route", {groups = "link"}))
-    assert(nl.create_interface{name = "dummy1", type = "dummy"})
+    local ok, err = nl.create_interface{name = "dummy1", type = "dummy"}
+    if not ok and err.OPNOTSUPP then error "skipped" end
     local m = assert(nl.read(sock))
     assert(m.dummy1, "should find dummy 1 in returned info")
     assert_equal(m.dummy1.op, "newlink", "new interface")
@@ -682,7 +689,8 @@ test.netlink = {
     assert(sock:close())
   end,
   test_move_interface_ns_root = function()
-    assert(nl.create_interface{name = "dummy0", type = "dummy"})
+    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    if not ok and err.OPNOTSUPP then error "skipped" end
     local i = assert(nl.interfaces())
     assert(i.dummy0, "expect dummy0 interface")
     local p = assert(S.clone("newnet"))
@@ -730,7 +738,8 @@ test.netlink = {
     assert(not i.veth1, "expect no veth1")
   end,
   test_newneigh_root = function()
-    assert(nl.create_interface{name = "dummy0", type = "dummy"})
+    local ok, err = nl.create_interface{name = "dummy0", type = "dummy"}
+    if not ok and err.OPNOTSUPP then error "skipped" end
     local i = assert(nl.interfaces())
     assert(i.dummy0:up())
     assert(i.dummy0:address("10.0.0.1/32"))
