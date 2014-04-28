@@ -936,6 +936,41 @@ c.ITIMER = strflag {
   PROF    = 2,
 }
 
+c.IP = strflag {
+  OPTIONS            = 1,
+  HDRINCL            = 2,
+  TOS                = 3,
+  TTL                = 4,
+  RECVOPTS           = 5,
+  RECVRETOPTS        = 6,
+  RECVDSTADDR        = 7,
+  RETOPTS            = 8,
+  MULTICAST_IF       = 9,
+  MULTICAST_TTL      = 10,
+  MULTICAST_LOOP     = 11,
+  ADD_MEMBERSHIP     = 12,
+  DROP_MEMBERSHIP    = 13,
+  MULTICAST_VIF      = 14,
+  RSVP_ON            = 15,
+  RSVP_OFF           = 16,
+  RSVP_VIF_ON        = 17,
+  RSVP_VIF_OFF       = 18,
+  PORTRANGE          = 19,
+  RECVIF             = 20,
+  IPSEC_POLICY       = 21,
+  FAITH              = 22,
+  STRIPHDR           = 23,
+  RECVTTL            = 24,
+  BOUND_IF           = 25,
+  PKTINFO            = 26,
+  FW_ADD             = 40,
+  FW_DEL             = 41,
+  FW_FLUSH           = 42,
+  FW_ZERO            = 43,
+  FW_GET             = 44,
+  FW_RESETLOG        = 45,
+}
+
 -- ipv6 sockopts
 c.IPV6 = strflag {
   SOCKOPT_RESERVED1 = 3,
