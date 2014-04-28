@@ -61,7 +61,7 @@ print [[
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/kevent.h>
+#include <sys/event.h>
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
