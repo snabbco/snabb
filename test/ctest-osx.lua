@@ -19,6 +19,10 @@ c.errornames = nil
 c.AF.DECnet = c.AF.DECNET
 c.AF.DECNET = nil
 
+c.CHFLAGS.IMMUTABLE = nil -- alias
+c.CHFLAGS.APPEND = nil -- alias
+c.CHFLAGS.OPAQUE = nil -- alias
+
 c.R_OK = c.OK.R
 c.W_OK = c.OK.W
 c.F_OK = c.OK.F
