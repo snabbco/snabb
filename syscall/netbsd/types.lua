@@ -628,7 +628,6 @@ mt.vmtotal = {
 
 addtype(types, "vmtotal", "struct vmtotal", mt.vmtotal)
 
-print("version", version)
 if version >= 7 then
 mt.mmsghdr = {
   index = {
