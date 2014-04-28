@@ -1865,9 +1865,11 @@ test_misc = {
     local ok, err = S.stat("/dev")
     assert(not ok, "should not find /dev after chroot")
     -- note that NetBSD will chdir after chroot, so chroot(".") will not work, but does provide fchroot, which Linux does not
+    -- however other BSDs also do this; we could only test with fork so give up
     if S.fchroot then
       assert(root:chroot())
     else
+      if abi.os ~= "linux" then error "skipped" end
       assert(S.chroot("."))
     end
     assert(cwd:chdir())
