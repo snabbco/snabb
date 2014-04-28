@@ -2477,46 +2477,6 @@ if f ~= 0 then
   os.exit(1)
 end
 
--- TODO iterate through all functions in S and upvalues for active rather than trace
--- also check for non interesting cases, eg fall through to end
--- TODO this is not working any more, FIXME
-
---[[
-if arg[1] == "coverage" then
-  cov.covered = 0
-  cov.count = 0
-  cov.nocov = {}
-  cov.max = 1
-  for k, _ in pairs(cov.active) do
-    cov.count = cov.count + 1
-    if k > cov.max then cov.max = k end
-  end
-  for k, _ in pairs(cov.cov) do
-    cov.active[k] = nil
-    cov.covered = cov.covered + 1
-  end
-  for k, _ in pairs(cov.active) do
-    cov.nocov[k] = true
-  end
-  local gs, ge
-  for i = 1, cov.max do
-    if cov.nocov[i] then
-      if gs then ge = i else gs, ge = i, i end
-    else
-      if gs then
-        if gs == ge then
-          print("no coverage of line " .. gs)
-        else
-          print("no coverage of lines " .. gs .. "-" .. ge)
-        end
-      end
-      gs, ge = nil, nil
-    end
-  end
-  print("\ncoverage is " .. cov.covered .. " of " .. cov.count .. " " .. math.floor(cov.covered / cov.count * 100) .. "%")
-end
-]]
-
 collectgarbage("collect")
 
 os.exit(0)
