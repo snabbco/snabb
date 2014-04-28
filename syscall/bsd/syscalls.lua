@@ -36,7 +36,7 @@ if C.getdirentries then
 end
 
 function S.unmount(target, flags)
-  return retbool(C.unmount(target, c.UMOUNT[flags]))
+  return retbool(C.unmount(target, c.MNT[flags]))
 end
 
 function S.revoke(path) return retbool(C.revoke(path)) end

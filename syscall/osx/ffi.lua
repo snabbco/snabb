@@ -245,6 +245,7 @@ struct aiocb {
 
 append [[
 int ioctl(int d, unsigned long request, void *arg);
+int mount(const char *type, const char *dir, int flags, void *data);
 
 int stat64(const char *path, struct stat *sb);
 int lstat64(const char *path, struct stat *sb);

@@ -450,11 +450,6 @@ c.SHUT = strflag {
   RDWR = 2,
 }
 
-c.UMOUNT = multiflags {
-  FORCE    = 0x00080000,
-}
-
--- note equivalent of MS_ in Linux
 c.MNT = multiflags {
   RDONLY      = 0x00000001,
   SYNCHRONOUS = 0x00000002,
@@ -465,6 +460,7 @@ c.MNT = multiflags {
   ASYNC       = 0x00000040,
   NOCOREDUMP  = 0x00008000,
   RELATIME    = 0x00020000,
+  FORCE       = 0x00080000,
   IGNORE      = 0x00100000,
   EXTATTR     = 0x01000000,
   LOG         = 0x02000000,

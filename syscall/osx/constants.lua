@@ -969,6 +969,20 @@ c.XATTR = multiflags {
   NODEFAULT  = 0x0010,
 }
 
+-- TODO many missing, see also freebsd
+c.MNT = strflag {
+  RDONLY      = 0x00000001,
+  SYNCHRONOUS = 0x00000002,
+  NOEXEC      = 0x00000004,
+  NOSUID      = 0x00000008,
+  NODEV       = 0x00000010,
+  UNION       = 0x00000020,
+  ASYNC       = 0x00000040,
+  CPROTECT    = 0x00000080,
+
+  FORCE       = 0x00080000,
+}
+
 c.CTL = strflag {
   UNSPEC     = 0,
   KERN       = 1,

@@ -101,6 +101,7 @@ print [[
 #include <net/bpf.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <sys/mount.h>
 ]]
 
 if version >= 10 then print [[
@@ -173,7 +174,6 @@ local nm = {
   FCNTL_LOCK = "F_",
   LOCKF = "F_",
   SIGACT = "SIG_",
-  UMOUNT = "MNT_",
   SIGPM = "SIG_",
   OPIPE = "O_",
   MSYNC = "MS_",

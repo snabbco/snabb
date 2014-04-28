@@ -225,7 +225,6 @@ local nm = {
   FCNTL_LOCK = "F_",
   LOCKF = "F_",
   SIGACT = "SIG_",
-  UMOUNT = "MNT_",
   SIGPM = "SIG_",
   OPIPE = "O_",
   MSYNC = "MS_",

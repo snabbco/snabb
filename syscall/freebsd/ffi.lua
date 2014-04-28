@@ -280,6 +280,8 @@ struct sigevent {
 append [[
 int reboot(int howto);
 int ioctl(int d, unsigned long request, void *arg);
+int mount(const char *type, const char *dir, int flags, void *data);
+int nmount(struct iovec *iov, unisgned int niov, int flags);
 
 int connectat(int fd, int s, const struct sockaddr *name, socklen_t namelen);
 int bindat(int fd, int s, const struct sockaddr *addr, socklen_t addrlen);
