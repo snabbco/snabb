@@ -957,8 +957,8 @@ c.IPV6 = strflag {
   V6ONLY            = 27,
   IPSEC_POLICY      = 28,
   FAITH             = 29,
-  RECVTCLASS        = 57,
-  TCLASS            = 61,
+  RECVTCLASS        = 35,
+  TCLASS            = 36,
 }
 
 c.XATTR = multiflags {
