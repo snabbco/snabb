@@ -162,6 +162,7 @@ local nm = {
   TCSA = "TCSA",
   TCFLUSH = "TC",
   TCFLOW = "TC",
+  CHFLAGS = "",
 }
 
 for k, v in pairs(c) do
