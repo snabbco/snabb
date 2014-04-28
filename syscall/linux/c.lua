@@ -702,6 +702,12 @@ if not sys.socketcall then
   function C.accept4(sockfd, addr, addrlen, flags)
     return syscall(sys.accept4, int(sockfd), void(addr), void(addrlen), int(flags))
   end
+  function C.recvmmsg(sockfd, msgvec, vlen, flags, timeout)
+    return syscall(sys.recvmmsg, int(sockfd), void(msgvec), uint(vlen), int(flags), void(timeout))
+  end
+  function C.sendmmsg(sockfd, msgvec, vlen, flags)
+    return syscall(sys.sendmmsg, int(sockfd), void(msgvec), uint(vlen), int(flags))
+  end
 else
   function C.socket(domain, tp, protocol)
     local args = longs(domain, tp, protocol)
@@ -774,6 +780,14 @@ else
   function C.accept4(sockfd, addr, addrlen, flags)
     local args = longs(sockfd, void(addr), void(addrlen), flags)
     return syscall(sys.socketcall, int(socketcalls.ACCEPT4), void(args))
+  end
+  function C.recvmmsg(sockfd, msgvec, vlen, flags, timeout)
+    local args = longs(sockfd, void(msgvec), vlen, flags, void(timeout))
+    return syscall(sys.socketcall, int(socketcalls.RECVMMSG), void(args))
+  end
+  function C.sendmmsg(sockfd, msgvec, vlen, flags)
+    local args = longs(sockfd, void(msgvec), vlen, flags)
+    return syscall(sys.socketcall, int(socketcalls.SENDMMSG), void(args))
   end
 end
 
