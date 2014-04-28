@@ -89,6 +89,7 @@ print [[
 #include <sys/ttycom.h>
 #include <netinet/tcp.h>
 #include <netinet/in.h>
+#include <sys/ioctl_compat.h>
 
 int ret = 0;
 
