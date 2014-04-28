@@ -62,6 +62,7 @@ print [[
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/event.h>
+#include <sys/sysctl.h>
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
