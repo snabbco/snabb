@@ -62,5 +62,9 @@ if abi.os == "linux" then
   -- TODO add the other Linux specific modules here
 end
 
+S._VERSION = "v0.11pre"
+S._DESCRIPTION = "ljsyscall: A Unix system call API for LuaJIT"
+S._COPYRIGHT = "Copyright (C) 2011-2014 Justin Cormack. MIT licensed."
+
 return S
 
