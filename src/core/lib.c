@@ -11,6 +11,13 @@ uint64_t get_time_ns()
     return ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
+double get_unix_time()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return ts.tv_sec + (ts.tv_nsec / 1000000000.0);
+}
+
 /* Sleep for a given number of nanoseconds.
    Must be less than 1 second. */
 void sleep_ns(int nanoseconds)
