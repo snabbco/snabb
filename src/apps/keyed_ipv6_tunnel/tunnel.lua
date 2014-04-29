@@ -48,6 +48,7 @@ local pcookie_ctype = ffi.typeof("uint64_t*")
 local address_ctype = ffi.typeof("uint64_t[2]")
 local paddress_ctype = ffi.typeof("uint64_t*")
 local plength_ctype = ffi.typeof("int16_t*")
+local psession_id_ctype = ffi.typeof("int32_t*")
 
 local SRC_IP_OFFSET = ffi.offsetof(header_struct_ctype, 'src_ip')
 local DST_IP_OFFSET = ffi.offsetof(header_struct_ctype, 'dst_ip')
@@ -87,6 +88,7 @@ local function prepare_header_template ()
    -- For cases where both tunnel endpoints support one-stage resolution
    -- (IPv6 Address only), this specification recommends setting the
    -- Session ID to all ones for easy identification in case of troubleshooting.
+   -- may be overridden by local_session options
    header_template[SESSION_ID_OFFSET] = 0xFF
    header_template[SESSION_ID_OFFSET + 1] = 0xFF
    header_template[SESSION_ID_OFFSET + 2] = 0xFF
@@ -98,10 +100,12 @@ SimpleKeyedTunnel = {}
 function SimpleKeyedTunnel:new (confstring)
    local config = confstring and loadstring("return " .. confstring)() or {}
    -- required fields:
-   -- local_address, string, ipv6 address 
-   -- remote_address, string, ipv6 address
-   -- local_cookie, 8 bytes string 
-   -- remote_cookie, 8 bytes string
+   --   local_address, string, ipv6 address
+   --   remote_address, string, ipv6 address
+   --   local_cookie, 8 bytes string
+   --   remote_cookie, 8 bytes string
+   -- optional fields:
+   --   local_session, signed number, must fit to int32_t
    assert(
          type(config.local_cookie) == "string"
          and #config.local_cookie == 8,
@@ -135,6 +139,11 @@ function SimpleKeyedTunnel:new (confstring)
 
    local remote_cookie = ffi.cast(pcookie_ctype, config.remote_cookie)
 
+   if config.local_session then
+      local psession = ffi.cast(psession_id_ctype, header + SESSION_ID_OFFSET)
+      psession[0] = config.local_session
+   end
+
    local o =
    {
       header = header,
@@ -142,6 +151,7 @@ function SimpleKeyedTunnel:new (confstring)
       local_address = local_address,
       remote_cookie = remote_cookie[0]
    }
+
    return setmetatable(o, {__index = SimpleKeyedTunnel})
 end
 
@@ -291,5 +301,3 @@ function selftest ()
    print("selftest passed")
 
 end
-
-
