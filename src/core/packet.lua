@@ -57,6 +57,14 @@ function prepend_iovec (p, b, length,  offset)
    p.length = p.length + length
 end
 
+function niovecs (p)
+   return p.niovecs
+end
+
+function iovec (p, n)
+   return p.iovecs[n]
+end
+
 -- Merge all buffers into one. Throws an exception if a single buffer
 -- cannot hold the entire packet.
 --

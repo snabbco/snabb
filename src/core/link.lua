@@ -61,6 +61,10 @@ function nwritable (r)
    return max - nreadable(r)
 end
 
+function stats (r)
+   return r.stats
+end
+
 function selftest ()
    print("selftest: link")
    local r = new()

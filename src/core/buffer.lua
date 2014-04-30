@@ -44,6 +44,11 @@ function free (b)
    end
 end
 
+-- Accessors for important structure elements.
+function pointer (b)  return b.pointer  end
+function physical (b) return b.physical end
+function size (b)     return b.size     end
+
 -- Create buffers until at least N are ready for use.
 -- This is a way to pay the cost of allocating buffer memory in advance.
 function preallocate (n)
