@@ -11,11 +11,23 @@ uint64_t get_time_ns()
     return ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
+static double get_time(int clock)
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  return ts.tv_sec + (ts.tv_nsec / 1000000000.0);
+}
+
+/* Return monotonic time (in seconds) suitable for timers. */
+double get_monotonic_time()
+{
+  return get_time(CLOCK_MONOTONIC);
+}
+
+/* Return real wall-clock time in seconds since the epoch. */
 double get_unix_time()
 {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return ts.tv_sec + (ts.tv_nsec / 1000000000.0);
+  return get_time(CLOCK_REALTIME);
 }
 
 /* Sleep for a given number of nanoseconds.
