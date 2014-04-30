@@ -135,7 +135,6 @@ function selftest ()
 
    local arg = ([[ {rate = %d, bucket_capacity = %d} ]]):format(rate_non_busy_loop,
                                                                 rate_non_busy_loop / 4)
-   print("arg", type(arg), arg)
    config.app(c, "ratelimiter", RateLimiter, arg)
    config.app(c, "sink", basic_apps.Sink)
 
