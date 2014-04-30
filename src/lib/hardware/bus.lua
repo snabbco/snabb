@@ -84,4 +84,4 @@ if host_has_vfio() then
 else
     memory.set_use_physical_memory()
 end
-memory.set_default_allocator(true)
+memory.set_default_allocator()

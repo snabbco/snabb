@@ -26,7 +26,7 @@ dma_min_addr, dma_max_addr = false, false
 -- Allocate DMA-friendly memory.
 -- Return virtual memory pointer, physical address, and actual size.
 function dma_alloc (bytes)
-   assert(bytes <= huge_page_size)
+   if use_hugetlb then assert(bytes <= huge_page_size) end
    bytes = lib.align(bytes, 128)
    if #chunks == 0 or bytes + chunks[#chunks].used > chunks[#chunks].size then
       allocate_next_chunk()
@@ -70,9 +70,14 @@ end
 function get_huge_page_size ()
    local meminfo = lib.readfile("/proc/meminfo", "*a")
    local _,_,hugesize = meminfo:find("Hugepagesize: +([0-9]+) kB")
-   return hugesize
-      and tonumber(hugesize) * 1024
-       or base_page_size -- use base page size as default value
+   if true or hugesize == nil then
+      -- Huge pages not available.
+      -- Use a reasonable default value, but inhibit HugeTLB allocation.
+      use_hugetlb = false
+      return 2048*1024
+   else
+      return tonumber(hugesize) * 1024
+   end
 end
 
 base_page_size = 4096
@@ -97,6 +102,10 @@ end
 function selftest (options)
    print("selftest: memory")
    require("lib.hardware.bus")
+   if not use_hugetlb then
+      print("Skipping test because use_hugetlb = false.")
+      os.exit(43)
+   end
    print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
    for i = 1, 4 do
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
@@ -116,13 +125,13 @@ end
 --- This module requires a stable physical-virtual mapping so this is
 --- enforced automatically at load-time.
 
-function set_use_physical_memory()
+function set_use_physical_memory ()
     ram_to_io_addr = virtual_to_physical
     assert(C.lock_memory() == 0)     -- let's hope it's not needed anymore
 end
 
-function set_default_allocator(use_hugetlb)
-    if use_hugetlb and lib.can_write("/proc/sys/vm/nr_hugepages") then
+function set_default_allocator ()
+    if use_hugetlb and huge_page_size and lib.can_write("/proc/sys/vm/nr_hugepages") then
         allocate_RAM = function(size)
             for i =1, 3 do
                 local page = C.allocate_huge_page(size)
