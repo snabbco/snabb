@@ -4,6 +4,7 @@ module(...,package.seeall)
 -- (Can be overridden with -P argument: see below.)
 package.path = ''
 
+local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
 local zone = require("jit.zone")
 local C   = ffi.C
@@ -28,6 +29,7 @@ Available options are:
 -l name      Require library 'name'.
 -t name      Test module 'name' with selftest().
 -d           Debug unhandled errors with the Lua interactive debugger.
+-S           Print enhanced stack traces with more debug information.
 -jdump file  Trace JIT decisions to 'file'. (Requires LuaJIT jit.* library.)
 -jp          Profile with the LuaJIT statistical profiler.
 -jp=args[,.output]
@@ -66,6 +68,9 @@ function main ()
       elseif args[i] == '-d' then
 	 debug_on_error = true
 	 i = i + 1
+      elseif args[i] == '-S' then
+         debug.traceback = STP.stacktrace
+        i = i + 1
       elseif (args[i]):match("-jp") then
 	 local pargs, poutput = (args[i]):gmatch("-jp=(%w*),?(.*)")()
 	 if poutput == '' then poutput = nil end
