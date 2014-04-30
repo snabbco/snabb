@@ -8,9 +8,9 @@ local C = ffi.C
 
 require("core.packet_h")
 
-max       = 10e5
-allocated = 0
-size      = 4096
+max        = 10e5
+allocated  = 0
+buffersize = 4096
 
 buffers = freelist.new("struct buffer *", max)
 buffer_t = ffi.typeof("struct buffer")
@@ -29,9 +29,9 @@ end
 function new_buffer ()
    assert(allocated < max, "out of buffers")
    allocated = allocated + 1
-   local pointer, physical, bytes = memory.dma_alloc(size)
+   local pointer, physical, bytes = memory.dma_alloc(buffersize)
    local b = lib.malloc("struct buffer")
-   b.pointer, b.physical, b.size = pointer, physical, size
+   b.pointer, b.physical, b.size = pointer, physical, buffersize
    return b
 end
 
