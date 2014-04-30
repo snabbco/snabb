@@ -5,3 +5,6 @@ obj
 *#
 /src/snabbswitch
 /src/snabb
+/src/testlog
+/src/apps/ipv6/selftest.cap.output
+/src/apps/keyed_ipv6_tunnel/selftest.cap.output
