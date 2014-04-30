@@ -7,6 +7,8 @@ local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
 local zone   = require("jit.zone")
+local ffi    = require("ffi")
+local C      = ffi.C
 require("core.packet_h")
 
 test_skipped_code = 43
@@ -17,6 +19,14 @@ app_table,  app_array  = {}, {}
 link_table, link_array = {}, {}
 
 configuration = config.new()
+
+monotinic_now = false
+
+-- Return current monotonic time in seconds.
+-- Can be used to drive timers in apps.
+function now ()
+   return monotonic_now
+end
 
 -- Configure the running app network to match new_configuration.
 -- 
@@ -130,6 +140,7 @@ function main (options)
 end
 
 function breathe ()
+   monotonic_now = C.get_monotonic_time()
    -- Inhale: pull work into the app network
    for _, app in ipairs(app_array) do
       if app.pull then
