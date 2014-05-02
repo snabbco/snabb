@@ -70,7 +70,7 @@ end
 function get_huge_page_size ()
    local meminfo = lib.readfile("/proc/meminfo", "*a")
    local _,_,hugesize = meminfo:find("Hugepagesize: +([0-9]+) kB")
-   if true or hugesize == nil then
+   if hugesize == nil then
       -- Huge pages not available.
       -- Use a reasonable default value, but inhibit HugeTLB allocation.
       use_hugetlb = false
