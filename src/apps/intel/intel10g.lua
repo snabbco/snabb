@@ -11,12 +11,8 @@ module(...,package.seeall)
 local ffi      = require "ffi"
 local C        = ffi.C
 local lib      = require("core.lib")
-local memory   = require("core.memory")
-local packet   = require("core.packet")
 local bus      = require("lib.hardware.bus")
 local register = require("lib.hardware.register")
-                 require("apps.intel.intel_h")
-                 require("core.packet_h")
 local index_set = require("lib.index_set")
 local macaddress = require("lib.macaddress")
 
@@ -63,6 +59,9 @@ function M_sf:open ()
    self.txpackets = ffi.new("struct packet *[?]", num_descriptors)
    self.rxbuffers = ffi.new("struct buffer *[?]", num_descriptors)
    return self:init()
+end
+
+function M_sf:close()
 end
 
 --- See data sheet section 4.6.3 "Initialization Sequence."
@@ -124,6 +123,7 @@ function M_sf:init_receive ()
       TXCRCEN=0, RXCRCSTRP=1, JUMBOEN=2, rsv2=3, TXPADEN=10,
       rsvd3=11, rsvd4=13, MDCSPD=16, RXLNGTHERREN=27,
    })
+   self.r.MAXFRS(bit.lshift(9000+18, 16))
    self:set_receive_descriptors()
    self.r.RXCTRL:set(bits{RXEN=0})
    return self
@@ -133,7 +133,7 @@ function M_sf:set_receive_descriptors ()
    self.r.SRRCTL(bits({DesctypeLSB=25}, 4))
    self.r.RDBAL(self.rxdesc_phy % 2^32)
    self.r.RDBAH(self.rxdesc_phy / 2^32)
-   self.r.RDLEN(num_descriptors * ffi.sizeof("union rx"))
+   self.r.RDLEN(num_descriptors * ffi.sizeof(rxdesc_t))
    return self
 end
 
@@ -159,7 +159,7 @@ end
 function M_sf:set_transmit_descriptors ()
    self.r.TDBAL(self.txdesc_phy % 2^32)
    self.r.TDBAH(self.txdesc_phy / 2^32)
-   self.r.TDLEN(num_descriptors * ffi.sizeof("union tx"))
+   self.r.TDLEN(num_descriptors * ffi.sizeof(txdesc_t))
    return self
 end
 
@@ -168,21 +168,17 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
-txdesc_flags = bits{eop=24,ifcs=25, dext=29, dtyp0=20, dtyp1=21}
+txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21}
 txdesc_flags_last = bits({eop=24}, txdesc_flags)
 function M_sf:transmit (p)
-   if p.niovecs > 1 then
-      packet.coalesce(p)
-   end
    for i = 0, p.niovecs - 1 do
       local iov = p.iovecs[i]
       local flags = (i + 1 < p.niovecs) and txdesc_flags or txdesc_flags_last
       self.txdesc[self.tdt].address = iov.buffer.physical + iov.offset
       self.txdesc[self.tdt].options = bit.bor(iov.length, flags, bit.lshift(p.length+0ULL, 46))
-      self.txpackets[self.tdt] = p
+      self.txpackets[self.tdt] = packet.ref(p)
       self.tdt = (self.tdt + 1) % num_descriptors
    end
-   return packet.ref(p)
 end
 
 function M_sf:sync_transmit ()
@@ -209,17 +205,27 @@ end
 function M_sf:receive ()
    assert(self.rdh ~= self.rxnext)
    local p = packet.allocate()
-   local b = self.rxbuffers[self.rxnext]
-   local wb = self.rxdesc[self.rxnext].wb
-   assert(wb.pkt_len > 0)
-   assert(bit.band(wb.xstatus_xerror, 1) == 1) -- Descriptor Done
-   packet.add_iovec(p, b, wb.pkt_len)
-   self.rxnext = (self.rxnext + 1) % num_descriptors
+   repeat
+      local b = self.rxbuffers[self.rxnext]
+      local wb = self.rxdesc[self.rxnext].wb
+      assert(wb.pkt_len > 0)
+      assert(bit.band(wb.xstatus_xerror, 1) == 1) -- Descriptor Done
+      packet.add_iovec(p, b, wb.pkt_len)
+      self.rxnext = (self.rxnext + 1) % num_descriptors
+   until bit.band(wb.xstatus_xerror, 2) == 2
    return p
 end
 
 function M_sf:can_receive ()
-   return self.rxnext ~= self.rdh and bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 1) == 1
+--   return self.rxnext ~= self.rdh and bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 1) == 1
+   local nxt = self.rxnext
+   while nxt ~= self.rdh do
+      local flags = bit.band(self.rxdesc[nxt].wb.xstatus_xerror, 3)
+      if flags == 3 then return true end
+      if flags == 0 then return false end
+      nxt = (nxt + 1) % num_descriptors
+   end
+   return false
 end
 
 function M_sf:can_add_receive_buffer ()
@@ -334,6 +340,7 @@ function M_pf:init ()
       :wait_linkup()
 end
 
+M_pf.close = M_sf.close
 M_pf.global_reset = M_sf.global_reset
 M_pf.disable_interrupts = M_sf.disable_interrupts
 M_pf.set_receive_descriptors = pass
@@ -447,6 +454,7 @@ function M_vf:init (opts)
       :set_tx_stats(opts.txcounter)
 end
 
+M_vf.close = M_sf.close
 M_vf.init_dma_memory = M_sf.init_dma_memory
 M_vf.set_receive_descriptors = M_sf.set_receive_descriptors
 M_vf.set_transmit_descriptors = M_sf.set_transmit_descriptors
@@ -677,6 +685,7 @@ FCCFG     0x03D00 -            RW Flow Control Configuration
 HLREG0    0x04240 -            RW MAC Core Control 0
 LINKS     0x042A4 -            RO Link Status Register
 LINKS2    0x04324 -            RO Second status link register
+MAXFRS    0x04268 -            RW Max Frame Size
 MNGTXMAP  0x0CD10 -            RW Mangeability Tranxmit TC Mapping
 MFLCN     0x04294 -            RW MAC Flow Control Register
 PFQDE     0x02F04 -            RW PF Queue Drop Enable Register
