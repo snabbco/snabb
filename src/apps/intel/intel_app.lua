@@ -1,21 +1,24 @@
 module(...,package.seeall)
 
-local app      = require("core.app")
-local link     = require("core.link")
 local basic_apps = require("apps.basic.basic_apps")
-local buffer   = require("core.buffer")
-local freelist = require("core.freelist")
-local packet   = require("core.packet")
 local lib      = require("core.lib")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
-local config = require("core.config")
 
 Intel82599 = {}
 Intel82599.__index = Intel82599
 
 -- table pciaddr => {pf, vflist}
 local devices = {}
+
+
+local function firsthole(t)
+   for i = 1, #t+1 do
+      if t[i] == nil then
+         return i
+      end
+   end
+end
 
 
 -- Create an Intel82599 App for the device with 'pciaddress'.
@@ -27,8 +30,9 @@ function Intel82599:new (args)
          devices[args.pciaddr] = {pf=intel10g.new_pf(args.pciaddr):open(), vflist={}}
       end
       local dev = devices[args.pciaddr]
-      local vf = dev.pf:new_vf(#dev.vflist)
-      dev.vflist[#dev.vflist+1] = vf
+      local poolnum = firsthole(dev.vflist)-1
+      local vf = dev.pf:new_vf(poolnum)
+      dev.vflist[poolnum+1] = vf
       return setmetatable({dev=vf:open(args)}, Intel82599)
    else
       local dev = intel10g.new_sf(args.pciaddr)
@@ -36,6 +40,26 @@ function Intel82599:new (args)
          :autonegotiate_sfi()
          :wait_linkup()
       return setmetatable({dev=dev}, Intel82599)
+   end
+end
+
+function Intel82599:stop()
+   local close_pf = nil
+   if self.dev.pf and devices[self.dev.pf.pciaddress] then
+      local poolnum = self.dev.poolnum
+      local pciaddress = self.dev.pf.pciaddress
+      local dev = devices[pciaddress]
+      if dev.vflist[poolnum+1] == self.dev then
+         dev.vflist[poolnum+1] = nil
+      end
+      if next(dev.vflist) == nil then
+         close_pf = devices[pciaddress].pf
+         devices[pciaddress] = nil
+      end
+   end
+   self.dev:close()
+   if close_pf then
+      close_pf:close()
    end
 end
 
@@ -114,15 +138,15 @@ function selftest ()
    local pcidevb = os.getenv("SNABB_TEST_INTEL10G_PCIDEVB")
    if not pcideva or not pcidevb then
       print("SNABB_TEST_INTEL10G_[PCIDEVA | PCIDEVB] was not set\nTest skipped")
-      os.exit(app.test_skipped_code)
+      os.exit(engine.test_skipped_code)
    end
 
    buffer.preallocate(100000)
    sq_sq('0000:05:00.0', '0000:8a:00.0')
-   app.main({duration = 1, report={showlinks=true, showapps=false}})
+   engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    mq_sq('0000:05:00.0', '0000:8a:00.0')
-   app.main({duration = 1, report={showlinks=true, showapps=false}})
+   engine.main({duration = 1, report={showlinks=true, showapps=false}})
 end
 
 -- open two singlequeue drivers on both ends of the wire
@@ -137,7 +161,7 @@ function sq_sq(pcidevA, pcidevB)
    config.link(c, 'source2.out -> nicB.rx')
    config.link(c, 'nicA.tx -> sink.in1')
    config.link(c, 'nicB.tx -> sink.in2')
-   app.configure(c)
+   engine.configure(c)
 end
 
 -- one singlequeue driver and a multiqueue at the other end
@@ -188,7 +212,7 @@ function mq_sq(pcidevA, pcidevB)
    config.link(c, 'nicAs.tx -> sink_ms.in1')
    config.link(c, 'nicBm0.tx -> sink_ms.in2')
    config.link(c, 'nicBm1.tx -> sink_ms.in3')
-   app.configure(c)
-   link.transmit(app.app_table.source_ms.output.out, packet.from_data(d1))
-   link.transmit(app.app_table.source_ms.output.out, packet.from_data(d2))
+   engine.configure(c)
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
 end
