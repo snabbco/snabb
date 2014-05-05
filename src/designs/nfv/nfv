@@ -1,4 +1,4 @@
-module(...,package.seeall)
+#!/usr/bin/env snabb
 
 local app        = require("core.app")
 local basic_apps = require("apps.basic.basic_apps")
