@@ -204,10 +204,10 @@ function VhostUser:set_mem_table (msg, fds, nfds)
       C.mmap_memory(pointer, size, ffi.cast("uint64_t",pointer), true, true)
       local guest = msg.memory.regions[i].guest_phys_addr
       local qemu = msg.memory.regions[i].userspace_addr
-      table.insert(mem_table, { guest = guest,
+      mem_table[i] = { guest = guest,
          qemu  = qemu,
          snabb = ffi.cast("int64_t", pointer),
-         size  = tonumber(size) })
+         size  = tonumber(size) }
    end
    self.dev:set_mem_table(mem_table)
 end

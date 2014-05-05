@@ -241,7 +241,8 @@ end
 
 -- Address space remapping.
 function VirtioNetDevice:map_to_guest (addr)
-   for _,m in ipairs(self.mem_table) do
+   for i = 0, table.getn(self.mem_table) do
+      local m = self.mem_table[i]
       if addr >= m.snabb and addr < m.snabb + m.size then
          return addr + m.guest - m.snabb
       end
@@ -250,7 +251,8 @@ function VirtioNetDevice:map_to_guest (addr)
 end
 
 function VirtioNetDevice:map_from_guest (addr)
-   for _,m in ipairs(self.mem_table) do
+   for i = 0, table.getn(self.mem_table) do
+      local m = self.mem_table[i]
       if addr >= m.guest and addr < m.guest + m.size then
          return addr + m.snabb - m.guest
       end
@@ -259,7 +261,8 @@ function VirtioNetDevice:map_from_guest (addr)
 end
 
 function VirtioNetDevice:map_from_qemu (addr)
-   for _,m in ipairs(self.mem_table) do
+   for i = 0, table.getn(self.mem_table) do
+      local m = self.mem_table[i]
       if addr >= m.qemu and addr < m.qemu + m.size then
          return addr + m.snabb - m.qemu
       end
