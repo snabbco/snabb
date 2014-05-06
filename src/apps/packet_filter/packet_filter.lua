@@ -242,9 +242,7 @@ local function generatePortMatch(T, offset, port_min, port_max, name)
    if port_min == port_max then
       -- specialization for single port matching
       -- avoid conversion to host order on runtime
-      local port_network_order =
-         bit.lshift(bit.band(port_min, 0xff), 8) + bit.rshift(port_min, 8)
-      -- TODO: generalize htons()
+      local port_network_order = lib.htons(ourt_min)
 
       T("local ",name," = ffi.cast(\"uint16_t*\", buffer + ",offset,")")
       T("if ",name,"[0] ~= ",port_network_order," then break end")
