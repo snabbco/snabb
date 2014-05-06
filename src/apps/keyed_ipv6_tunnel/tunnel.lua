@@ -48,7 +48,7 @@ local pcookie_ctype = ffi.typeof("uint64_t*")
 local address_ctype = ffi.typeof("uint64_t[2]")
 local paddress_ctype = ffi.typeof("uint64_t*")
 local plength_ctype = ffi.typeof("int16_t*")
-local psession_id_ctype = ffi.typeof("int32_t*")
+local psession_id_ctype = ffi.typeof("uint32_t*")
 
 local SRC_IP_OFFSET = ffi.offsetof(header_struct_ctype, 'src_ip')
 local DST_IP_OFFSET = ffi.offsetof(header_struct_ctype, 'dst_ip')
@@ -105,7 +105,7 @@ function SimpleKeyedTunnel:new (confstring)
    --   local_cookie, 8 bytes string
    --   remote_cookie, 8 bytes string
    -- optional fields:
-   --   local_session, signed number, must fit to int32_t
+   --   local_session, unsigned number, must fit to uint32_t
    assert(
          type(config.local_cookie) == "string"
          and #config.local_cookie == 8,
@@ -141,7 +141,7 @@ function SimpleKeyedTunnel:new (confstring)
 
    if config.local_session then
       local psession = ffi.cast(psession_id_ctype, header + SESSION_ID_OFFSET)
-      psession[0] = config.local_session
+      psession[0] = lib.htonl(config.local_session)
    end
 
    local o =
@@ -171,7 +171,7 @@ function SimpleKeyedTunnel:push()
 
       -- set payload size
       local plength = ffi.cast(plength_ctype, new_b.pointer + LENGTH_OFFSET)
-      plength[0] = C.htons(SESSION_COOKIE_SIZE + p.length)
+      plength[0] = lib.htons(SESSION_COOKIE_SIZE + p.length)
 
       packet.prepend_iovec(p, new_b, HEADER_SIZE)
       link.transmit(l_out, p)
