@@ -6,6 +6,7 @@
 -- frames encapsulated in IP/GRE.  The push() method performs the
 -- appropriate operation depending on the input port.
 
+module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
@@ -20,6 +21,7 @@ local packet = require("core.packet")
 local vpws = subClass(nil)
 local in_to_out = { customer = 'uplink', uplink = 'customer' }
 
+--_NAME = nil
 function vpws:new(config)
    local o = self:superClass().new(self)
    o._config = config

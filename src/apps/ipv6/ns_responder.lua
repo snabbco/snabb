@@ -4,6 +4,7 @@
 -- on which NS messages are expected.  Non-NS packets are sent on
 -- north.  All packets received on the north port are passed south.
 
+module(..., package.seeall)
 local ffi = require("ffi")
 local app = require("core.app")
 local link = require("core.link")
