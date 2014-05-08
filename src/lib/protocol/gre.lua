@@ -37,53 +37,56 @@ gre._ulp = {
 
 -- Class methods
 
-function gre:_init_new (config)
+function gre:new (config)
+   local o = gre:superClass().new(self)
    local opt_size = 0
    if config.checksum then
       opt_size = opt_size + 4
-      self._checksum = true
+      o._checksum = true
    end
    if config.key ~= nil then
-      self._key_offset = opt_size
-      opt_size = opt_size + 4
-   end
-   self._header_type = gre_types[opt_size]
-   self._header_ptr_type = gre_ptr_types[opt_size]
-   self._header = self._header_type()
-   if self._checksum then
-      lib.bitfield(16, self._header, 'bits', 0, 1, 1)
-   end
-   if self._key_offset ~= nil then
-      lib.bitfield(16, self._header, 'bits', 2, 1, 1)
-      self:key(config.key)
-   end
-   self:protocol(config.protocol)
-end
-
-function gre:_init_new_from_mem (mem, size)
-   local sizeof = ffi.sizeof(gre._header_type)
-   assert(sizeof <= size)
-   local header = ffi.cast(gre._header_ptr_type, mem)[0]
-   -- Reserved bits and version MUST be zero
-   if lib.bitfield(16, header, 'bits', 4, 12) ~= 0 then
-      self = nil
-      return
-   end
-   self._header = header
-   local opt_size = 0
-   if self:use_checksum() then
-      opt_size = opt_size + 4
-      self._checksum = true
-   end
-   if self:use_key() then
-      self._key_offset = opt_size
+      o._key_offset = opt_size
       opt_size = opt_size + 4
    end
    if opt_size > 0 then
-      self._header_type = gre_types[opt_size]
-      self._header_ptr_type = gre_ptr_types[opt_size]
-      self._header = ffi.cast(self._header_ptr_type, self._header)[0]
+      o._header_type = gre_types[opt_size]
+      o._header_ptr_type = gre_ptr_types[opt_size]
+      o._header = o._header_type()
    end
+   if o._checksum then
+      lib.bitfield(16, o._header, 'bits', 0, 1, 1)
+   end
+   if o._key_offset ~= nil then
+      lib.bitfield(16, o._header, 'bits', 2, 1, 1)
+      self:key(config.key)
+   end
+   o:protocol(config.protocol)
+   return o
+end
+
+function gre:new_from_mem (mem, size)
+   local o = gre:superClass().new_from_mem(self, mem, size)
+   -- Reserved bits and version MUST be zero
+   if lib.bitfield(16, o._header, 'bits', 4, 12) ~= 0 then
+      self:free()
+      self = nil
+      return
+   end
+   local opt_size = 0
+   if o:use_checksum() then
+      opt_size = opt_size + 4
+      o._checksum = true
+   end
+   if o:use_key() then
+      o._key_offset = opt_size
+      opt_size = opt_size + 4
+   end
+   if opt_size > 0 then
+      o._header_type = gre_types[opt_size]
+      o._header_ptr_type = gre_ptr_types[opt_size]
+      o._header = ffi.cast(o._header_ptr_type, mem)[0]
+   end
+   return o
 end
 
 -- Instance methods

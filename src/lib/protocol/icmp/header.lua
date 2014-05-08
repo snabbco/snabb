@@ -28,11 +28,11 @@ icmp._ulp = {
 
 -- Class methods
 
-function icmp:_init_new (type, code)
-   local header = icmp_t()
-   self._header = header
-   header.type = type
-   header.code = code
+function icmp:new (type, code)
+   local o = icmp:superClass().new(self)
+   o._header.type = type
+   o._header.code = code
+   return o
 end
 
 -- Instance methods
