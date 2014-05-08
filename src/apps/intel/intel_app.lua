@@ -4,6 +4,7 @@ local basic_apps = require("apps.basic.basic_apps")
 local lib      = require("core.lib")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
+local freelist = require("core.freelist")
 
 Intel82599 = {}
 Intel82599.__index = Intel82599
