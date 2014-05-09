@@ -142,10 +142,10 @@ function selftest ()
    end
 
    buffer.preallocate(100000)
-   sq_sq('0000:05:00.0', '0000:8a:00.0')
+   sq_sq(pcideva, pcidevb)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
-   mq_sq('0000:05:00.0', '0000:8a:00.0')
+   mq_sq(pcideva, pcidevb)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 end
 
