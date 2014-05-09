@@ -152,7 +152,7 @@ end
 function M_sf:init_transmit ()
    self.r.HLREG0:set(bits{TXCRCEN=0})
    self:set_transmit_descriptors()
-   self.r.DMATXCTL(bits{TE=0})
+   self.r.DMATXCTL:set(bits{TE=0})
    return self
 end
 
@@ -366,6 +366,7 @@ function M_pf:set_vmdq_mode ()
    self.r.TXPBTHRESH[0](0xA0)
    self.r.FCRTH[0](0x10000)
    self.r.RXDSTATCTRL(0x10)                 -- Rx DMA Statistic for all queues
+   self.r.VLNCTRL:set(bits{VFE=30})         -- Vlan filter enable
    for i = 1, 7 do
       self.r.RXPBSIZE[i](0x00)
       self.r.TXPBSIZE[i](0x00)
@@ -381,10 +382,15 @@ function M_pf:set_vmdq_mode ()
    for i = 0, 127 do
       self.r.PFQDE(bit.bor(bit.lshift(1,16), bit.lshift(i,8)))
       self.r.FTQF[i](0x00)                 -- disable L3/4 filter
+      self.r.RAH[i](0)
+      self.r.RAL[i](0)
+      self.r.VFTA[i](0)
+      self.r.PFVLVFB[i](0)
    end
    for i = 0, 63 do
       self.r.RTTDQSEL(i)
       self.r.RTTDT1C(0x00)
+      self.r.PFVLVF[i](0)
    end
    for i = 0, 31 do
       self.r.RETA[i](0x00)                 -- clear redirection table
@@ -473,7 +479,7 @@ function M_vf:init_receive ()
    self.r.RSCCTL(0x0)                   -- no RSC
    self:set_receive_descriptors()
    self.pf.r.PFVML2FLT[poolnum]:set(bits{BAM=27, AUPE=24})
-   self.r.RXDCTL(bits{Enable=25})
+   self.r.RXDCTL(bits{Enable=25, VME=30})
    self.r.RXDCTL:wait(bits{enable=25})
    self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
    self.pf.r.PFVFRE[math.floor(poolnum/32)]:set(bits{VFRE=poolnum%32})
@@ -579,7 +585,6 @@ end
 
 function M_vf:set_VLAN (vlan)
    if not vlan then return self end
-
    assert(vlan>=0 and vlan<4096, "bad VLAN number")
    if not vlan then return self end
    return self
@@ -601,7 +606,9 @@ function M_vf:add_receive_VLAN (vlan)
 end
 
 function M_vf:set_tag_VLAN(vlan)
-   -- TODO
+   local poolnum = self.poolnum or 0
+   self.pf.r.PFVFSPOOF[math.floor(poolnum/8)]:set(bits{VLANAS=poolnum%8+8})
+   self.pf.r.PFVMVIR[poolnum](bits({VLANA=30}, vlan))  -- always add VLAN tag
    return self
 end
 
@@ -685,6 +692,7 @@ FCCFG     0x03D00 -            RW Flow Control Configuration
 HLREG0    0x04240 -            RW MAC Core Control 0
 LINKS     0x042A4 -            RO Link Status Register
 LINKS2    0x04324 -            RO Second status link register
+MANC      0x05820 -            RW Management Control Register
 MAXFRS    0x04268 -            RW Max Frame Size
 MNGTXMAP  0x0CD10 -            RW Mangeability Tranxmit TC Mapping
 MFLCN     0x04294 -            RW MAC Flow Control Register
@@ -714,11 +722,12 @@ PFMRVM    0x0F630 +0x04*0..7    RW PF Mirror Rule Pool
 PFVFRE    0x051E0 +0x04*0..1    RW PF VF Receive Enable
 PFVFTE    0x08110 +0x04*0..1    RW PF VF Transmit Enable
 PFVMTXSW  0x05180 +0x04*0..1    RW PF VM Tx Switch Loopback Enable
+PFVMVIR   0x08000 +0x04*0..63   RW PF VM VLAN Insert Register
 PFVFSPOOF 0x08200 +0x04*0..7    RW PF VF Anti Spoof control
 PFDTXGSWC 0x08220 -             RW PFDMA Tx General Switch Control
 RTTDT2C   0x04910 +0x04*0..7    RW DCB Transmit Descriptor Plane T2 Config
 RTTPT2C   0x0CD20 +0x04*0..7    RW DCB Transmit Packet Plane T2 Config
-RXPBSIZE  0X03C00 +0x04*0..7    RW Receive Packet Buffer Size
+RXPBSIZE  0x03C00 +0x04*0..7    RW Receive Packet Buffer Size
 TXPBSIZE  0x0CC00 +0x04*0..7    RW Transmit Packet Buffer Size
 TXPBTHRESH 0x04950 +0x04*0..7   RW Tx Packet Buffer Threshold
 ]]
