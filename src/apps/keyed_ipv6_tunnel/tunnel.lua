@@ -16,6 +16,8 @@ local packet = require("core.packet")
 local buffer = require("core.buffer")
 local config = require("core.config")
 
+local macaddress = require("lib.macaddress")
+
 local pcap = require("apps.pcap.pcap")
 local basic_apps = require("apps.basic.basic_apps")
 
@@ -48,8 +50,9 @@ local pcookie_ctype = ffi.typeof("uint64_t*")
 local address_ctype = ffi.typeof("uint64_t[2]")
 local paddress_ctype = ffi.typeof("uint64_t*")
 local plength_ctype = ffi.typeof("int16_t*")
-local psession_id_ctype = ffi.typeof("int32_t*")
+local psession_id_ctype = ffi.typeof("uint32_t*")
 
+local DST_MAC_OFFSET = ffi.offsetof(header_struct_ctype, 'dmac')
 local SRC_IP_OFFSET = ffi.offsetof(header_struct_ctype, 'src_ip')
 local DST_IP_OFFSET = ffi.offsetof(header_struct_ctype, 'dst_ip')
 local COOKIE_OFFSET = ffi.offsetof(header_struct_ctype, 'cookie')
@@ -105,7 +108,8 @@ function SimpleKeyedTunnel:new (confstring)
    --   local_cookie, 8 bytes string
    --   remote_cookie, 8 bytes string
    -- optional fields:
-   --   local_session, signed number, must fit to int32_t
+   --   local_session, unsigned number, must fit to uint32_t
+   --   default_gateway_MAC, useful for testing
    assert(
          type(config.local_cookie) == "string"
          and #config.local_cookie == 8,
@@ -141,7 +145,12 @@ function SimpleKeyedTunnel:new (confstring)
 
    if config.local_session then
       local psession = ffi.cast(psession_id_ctype, header + SESSION_ID_OFFSET)
-      psession[0] = config.local_session
+      psession[0] = lib.htonl(config.local_session)
+   end
+   
+   if config.default_gateway_MAC then
+      local mac = assert(macaddress:new(config.default_gateway_MAC))
+      ffi.copy(header + DST_MAC_OFFSET, mac.bytes, 6)
    end
 
    local o =
@@ -171,7 +180,7 @@ function SimpleKeyedTunnel:push()
 
       -- set payload size
       local plength = ffi.cast(plength_ctype, new_b.pointer + LENGTH_OFFSET)
-      plength[0] = C.htons(SESSION_COOKIE_SIZE + p.length)
+      plength[0] = lib.htons(SESSION_COOKIE_SIZE + p.length)
 
       packet.prepend_iovec(p, new_b, HEADER_SIZE)
       link.transmit(l_out, p)
@@ -260,7 +269,8 @@ function selftest ()
       local_address = "00::2:1",
       remote_address = "00::2:1",
       local_cookie = "12345678",
-      remote_cookie = "12345678"
+      remote_cookie = "12345678",
+      default_gateway_MAC = "a1:b2:c3:d4:e5:f6"
       }
       ]] -- should be symmetric for local "loop-back" test
 

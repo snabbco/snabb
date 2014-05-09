@@ -264,6 +264,19 @@ function malloc (type)
    return ffi.cast(ffi.typeof("$*", ffi_type), ptr)
 end
 
+-- endian conversion helpers written in Lua
+-- avoid C function call overhead while using C.xxxx counterparts
+if ffi.abi("be") then
+   -- nothing to do
+   function htonl(b) return b end
+   function htons(b) return b end
+else
+   function htonl(b) return bit.bswap(b) end
+   function htons(b) return bit.rshift(bit.bswap(b), 16) end
+end
+ntohl = htonl
+ntohs = htons
+
 function selftest ()
    print("selftest: lib")
    local data = "\x45\x00\x00\x73\x00\x00\x40\x00\x40\x11\xc0\xa8\x00\x01\xc0\xa8\x00\xc7"
@@ -278,4 +291,3 @@ function selftest ()
    assert(hexundump('4500 B67D 00FA400040 11', 10)
          =='\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11', "wrong hex undump")
 end
-
