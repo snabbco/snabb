@@ -490,7 +490,7 @@ function M_vf:init_transmit ()
    local poolnum = self.poolnum or 0
    self.r.TXDCTL:clr(bits{Enable=25})
    self:set_transmit_descriptors()
-   self.pf.r.PFVMTXSW[math.floor(poolnum/32)]:set(bits{LLE=poolnum%32})
+   self.pf.r.PFVMTXSW[math.floor(poolnum/32)]:clr(bits{LLE=poolnum%32})
    self.pf.r.PFVFTE[math.floor(poolnum/32)]:set(bits{VFTE=poolnum%32})
    self.pf.r.RTTDQSEL(poolnum)
    self.pf.r.RTTDT1C(0x2000)
