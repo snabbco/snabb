@@ -1,0 +1,166 @@
+#!/usr/bin/env snabb
+
+if #main.parameters ~= 2 then
+   print[[Usage: neutron2snabb <csv-dir> <output-dir>
+
+Generate configuration files for Snabb Switch traffic processes based
+on an OpenStack Neutron database dump in CSV format (from mysqldump).
+
+<csv-dir> must contain ports.txt, networks.txt, and ml2_nework_segments.txt.
+
+<output-dir> will be populated with one file for each physical_network
+describing how Neutron ports should be connected to provider networks.
+]]
+   main.exit(1)
+end
+
+-- Create a Snabb Switch traffic process configuration.
+--
+-- INPUT_DIR contains the Neutron database dump.
+--
+-- OUTPUT_DIR will be populated with one file per physical_network.
+-- The file says how to connect Neutron ports with provider VLANs.
+function create_config (input_dir, output_dir)
+   local segments = parse_csv(input_dir.."/ml2_network_segments.txt",
+                              {'id', 'network_id', 'network_type', 'physical_network', 'segmentation_id'},
+                              'network_id')
+   local networks = parse_csv(input_dir.."/networks.txt",
+                              {'tenant_id', 'id', 'name', 'status', 'admin_state_up', 'shared'},
+                              'id')
+   local ports = parse_csv(input_dir.."/ports.txt",
+                           {'tenant_id', 'id', 'name', 'network_id', 'mac_address', 'admin_state_up', 'status', 'device_id', 'device_owner'},
+                           'id')
+   local secgroups = parse_csv(input_dir.."/securitygroups.txt",
+                               {'tenant_id', 'id', 'name', 'description'},
+                               'id')
+   local secrules = parse_csv(input_dir.."/securitygrouprules.txt",
+                              {'tenant_id', 'id', 'security_group_id', 'remote_group_id', 'direction', 'ethertype', 'protocol', 'port_range_min', 'port_range_max', 'remote_ip_prefix'},
+                              'security_group_id', true)
+   local secbindings = parse_csv(input_dir.."/securitygroupportbindings.txt",
+                                 {'port_id', 'security_group_id'},
+                                 'port_id')
+   local qoses = parse_csv(input_dir.."/qoses.txt",
+                           {'tenant_id', 'id', 'type', 'description'},
+                           'id')
+   local qos_policies = parse_csv(input_dir.."/qos_policies.txt",
+                                  {'id', 'qos_id', 'key', 'value'},
+                                  'qos_id', true)
+   local portqosmappings = parse_csv(input_dir.."/portqosmappings.txt",
+                                     {'port_id', 'qos_id'},
+                                     'port_id')
+   local port_count = 0
+   local outputs = {}
+   for _, port in pairs(ports) do
+      local segment = segments[port.network_id]
+      local physical = (segment.physical_network):gsub("%p", "_")
+      if not outputs[physical] then
+         local output_path = output_dir.."/"..physical
+         local output = io.open(output_path, 'w')
+         if output then
+            print("Created " .. output_path)
+            outputs[physical] = io.open(output_path, 'w')
+            outputs[physical]:write("return {\n")
+         else
+            error("Failed to create " .. output_path)
+         end
+      end
+      if port.admin_state_up ~= '0' then
+         local vlan = segment.segmentation_id
+         local mac = port.mac_address
+         local ingressfilter = filter(port, secbindings, secrules)
+         local gbps, tunnel = qos(port, qoses, qos_policies, portqosmappings)
+         outputs[physical]:write(('  { vlan = %d,\n    mac_address = "%s",\n    port_id = "%s",\n    ingress_filter = %s,\n    gbps = %s,\n    tunnel = %s\n  },\n'):format(vlan, mac, port.id, ingressfilter, gbps, tunnel))
+      end
+      port_count = port_count + 1
+   end
+   for _, file in pairs(outputs) do
+      file:write("}\n")
+      file:close()
+   end
+   print("Done. Wrote " .. port_count .. " record(s).")
+end
+
+-- Return the packet filter expression.
+-- XXX This is assumed to be ingress-only. Egress is simply NYI.
+function filter (port, secbindings, secrules)
+   local rules
+   if secbindings[port.id] then
+      for _,r in ipairs(secrules[secbindings[port.id].security_group_id]) do
+         if r.direction:lower() == "ingress" then
+            local NULL = "\\N" -- SQL null
+            local rule = ""
+            if r.ethertype ~= NULL then rule = rule .. " ethertype='"..(r.ethertype:lower()).."'," end
+            if r.protocol ~= NULL then rule = rule .. " protocol='"..r.protocol.."'," end
+            if r.port_range_min ~= NULL and r.port_range_max ~= NULL then
+               rule = rule .. " dest_port_min=" .. r.port_range_min .. ", dest_port_max=" .. r.port_range_max..","
+            end
+            if r.remote_ip_prefix ~= NULL then rule = rule .. " source_cidr='"..rule.remote_ip_prefix.."'," end
+            print("direction", r.direction)
+            rules = "{" .. rule .. " },"
+         end
+      end
+   end
+   if rules then return "[[{ " .. rules .. " }]]" else return nil end
+end
+
+function qos (port, qoses, qos_policies, portqosmappings)
+   local qos = portqosmappings[port.id]
+   if not qos then return nil end
+   local policies = qos_policies[qos.qos_id]
+   if not policies then return nil end
+   local t = {}
+   for _,p in ipairs(policies) do t[p.key] = p.value end
+   local gbps = t.limit_gbps
+   local tunnel
+   if t.tunnel_type == "L2TPv3" then
+      tunnel = ("[[{type = %s, remote_ip = %s, remote_mac = %s, local_ip = %s, local_mac = %s, cookie = %s, session = %s'}]]"):format(q(t.tunnel_type), q(t.tunnel_remote_ip), q(t.tunnel_remote_mac), q(t.tunnel_local_ip), q(t.tunnel_local_mac), q(t.tunnel_cookie), q(t.tunnel_session))
+   end
+   return gbps, tunnel
+end
+
+-- q(nil) => "nil" ; q("foo") -> '"foo"'
+function q (object)
+   if object == nil then return "nil" else return '"'..object..'"' end
+end
+
+-- Parse FILENAME as a .csv file containing FIELDS.
+-- Return a table from the KEY field to a record of all field values.
+--
+-- Example:
+--   parse_csv("Luke	Gorrie	Lua\nJoe	Smith	C\n",
+--             {"first", "last", "lang"},
+--             "first")
+-- Returns:
+--   { Luke = { first = "Luke", last = "Gorrie", lang = "Lua" },
+--     Joe  = { first = "Joe",  last = "Smith",  lang = "C" }
+--   }
+function parse_csv (filename, fields, key,  has_duplicates)
+   local t = {}
+   for line in io.lines(filename) do
+      local record = {}
+      local words = splitline(line)
+      for i = 1, #words do
+         record[fields[i]] = words[i]
+      end
+      if has_duplicates then
+         if t[record[key]] == nil then t[record[key]] = {} end
+         table.insert(t[record[key]], record)
+      else
+         t[record[key]] = record
+      end
+   end
+   return t
+end
+
+-- Return an array of line's tab-delimited tokens.
+function splitline (line)
+   local words = {}
+   for w in (line .. "\t"):gmatch("([^\t]*)\t") do 
+      table.insert(words, w) 
+   end
+   return words
+end
+
+-- Run as main()
+create_config(unpack(main.parameters))
+
