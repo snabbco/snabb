@@ -918,7 +918,6 @@ c.KERN = strflag {
   HOSTID            = 11,
   CLOCKRATE         = 12,
   VNODE             = 13,
-  FILE              = 15,
   PROF              = 16,
   POSIX1            = 17,
   NGROUPS           = 18,
@@ -976,13 +975,18 @@ c.KERN = strflag {
   MAXLOCKSPERUID    = 70,
   CPTIME2           = 71,
   CACHEPCT          = 72,
-  FILE2             = 73,
+  FILE              = 73,
   CONSDEV           = 75,
   NETLIVELOCKS      = 76,
   POOL_DEBUG        = 77,
   PROC_CWD          = 78,
   MAXID             = 79,
 }
+
+if version < 201405 then
+  c.KERN.FILE = 15
+  c.KERN.FILE2 = 73
+end
 
 return c
 
