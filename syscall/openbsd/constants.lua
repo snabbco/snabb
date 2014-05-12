@@ -13,6 +13,8 @@ local h = require "syscall.helpers"
 
 local bit = require "syscall.bit"
 
+local version = require "syscall.openbsd.version".version
+
 local octal, multiflags, charflags, swapflags, strflag, atflag, modeflags
   = h.octal, h.multiflags, h.charflags, h.swapflags, h.strflag, h.atflag, h.modeflags
 
@@ -474,10 +476,13 @@ c.LOCK = multiflags {
 c.W = multiflags {
   NOHANG      = 1,
   UNTRACED    = 2,
-  ALTSIG      = 4,
   CONTINUED   = 8,
   STOPPED     = octal "0177",
 }
+
+if version < 201405 then
+  c.W.ALTSIG = 4
+end
 
 -- waitpid and wait4 pid
 c.WAIT = strflag {
