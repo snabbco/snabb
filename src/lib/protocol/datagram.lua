@@ -42,6 +42,7 @@
 
 local packet = require("core.packet")
 local buffer = require("core.buffer")
+local ffi    = require("ffi")
 
 local datagram = subClass(nil)
 
@@ -194,7 +195,7 @@ function datagram:payload (mem, size)
    if mem ~= nil then
       assert(size <= iovec.buffer.size - (iovec.offset + iovec.length),
 	     "not enough space in buffer to add payload of size "..size)
-      ff.copy(iovec.buffer.pointer + iovec.offset + iovec.length,
+      ffi.copy(iovec.buffer.pointer + iovec.offset + iovec.length,
 	      mem, size)
       p_size = p_size + size
    end
