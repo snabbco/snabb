@@ -56,14 +56,16 @@ local datagram = subClass(nil)
 function datagram:_init_new (p, class)
    if p then
       packet.coalesce(p)
-      self._parse = { stack = {},
-		      ulp = class,
-		      iovec = 0,
-		      offset = 0 }
+      self._packet = p
    else
-      p = packet.allocate()
+      self._packet = packet.allocate()
+      local b = buffer.allocate()
+      packet.add_iovec(self._packet, b, 0)
    end
-   self._packet = p
+   self._parse = { stack = {},
+      ulp = class,
+      iovec = 0,
+      offset = 0 }
 end
 
 -- Instance methods
