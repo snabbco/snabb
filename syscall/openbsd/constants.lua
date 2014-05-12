@@ -843,7 +843,6 @@ c.SA = multiflags {
 
 -- ipv6 sockopts
 c.IPV6 = strflag {
-  SOCKOPT_RESERVED1 = 3,
   UNICAST_HOPS      = 4,
   MULTICAST_IF      = 9,
   MULTICAST_HOPS    = 10,
@@ -854,7 +853,6 @@ c.IPV6 = strflag {
 --ICMP6_FILTER      = 18, -- not namespaced as IPV6
   CHECKSUM          = 26,
   V6ONLY            = 27,
-  FAITH             = 29,
   RTHDRDSTOPTS      = 35,
   RECVPKTINFO       = 36,
   RECVHOPLIMIT      = 37,
@@ -874,6 +872,11 @@ c.IPV6 = strflag {
   TCLASS            = 61,
   DONTFRAG          = 62,
 }
+
+if version < 201405 then
+  c.IPV6.SOCKOPT_RESERVED1 = 3
+  c.IPV6.FAITH = 29
+end
 
 c.CLOCK = strflag {
   REALTIME                 = 0,
