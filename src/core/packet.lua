@@ -92,7 +92,6 @@ function clone (p)
    local new_p = allocate()
    local b = buffer.allocate()
    assert(p.length <= b.size, "packet too big to coalesce")
-   p.iovec[0].buffer = b
 
    local length = 0
    for i = 0, p.niovecs - 1 do
@@ -100,7 +99,7 @@ function clone (p)
       ffi.copy(b.pointer + length, iovec.buffer.pointer + iovec.offset, iovec.length)
       length = length + iovec.length
    end
-   add_iovec(mew_p, b, length)
+   add_iovec(new_p, b, length)
    return new_p
 end
 
