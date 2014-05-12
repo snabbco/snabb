@@ -173,6 +173,15 @@ function comma_value(n) -- credit http://richard.warburton.it
    return left..(num:reverse():gsub('(%d%d%d)','%1,'):reverse())..right
 end
 
+function random_data(length)
+   result = ""
+   math.randomseed(os.time())
+   for i=1,length do
+      result = result..string.char(math.random(0, 255))
+   end
+   return result
+end
+
 -- Return a table for bounds-checked array access.
 function bounds_checked (type, base, offset, size)
    type = ffi.typeof(type)
