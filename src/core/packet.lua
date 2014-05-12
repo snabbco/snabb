@@ -7,6 +7,7 @@ local C = ffi.C
 
 local buffer   = require("core.buffer")
 local freelist = require("core.freelist")
+local lib      = require("core.lib")
 local memory   = require("core.memory")
 
 require("core.packet_h")
@@ -101,6 +102,43 @@ function clone (p)
    end
    add_iovec(new_p, b, length)
    return new_p
+end
+
+-- The opposite of coalesce
+-- Scatters the data through chunks
+function scatter (p, sg_list)
+   assert(#sg_list + 1 <= C.PACKET_IOVEC_MAX)
+   local cloned = clone(p) -- provide coalesced copy
+   local result = allocate()
+   local iovec = cloned.iovecs[0]
+   local offset = 0 -- the offset in the cloned buffer
+
+   -- always append one big chunk in the end, to cover the case
+   -- where the supplied sgs are not sufficient to hold all the data
+   -- also if we get an empty sg_list this will make a single iovec packet
+   local pattern_list = lib.deepcopy(sg_list)
+   pattern_list[#pattern_list + 1] = {4096}
+
+   for _,sg in ipairs(pattern_list) do
+      local sg_len = sg[1]
+      local sg_offset = sg[2] or 0
+      local b = buffer.allocate()
+
+      assert(sg_len + sg_offset <= b.size)
+      local to_copy = math.min(sg_len, iovec.length - offset)
+      ffi.copy(b.pointer + sg_offset, iovec.buffer.pointer + iovec.offset + offset, to_copy)
+      add_iovec(result, b, to_copy, sg_offset)
+
+      -- advance the offset in the source buffer
+      offset = offset + to_copy
+      assert(offset <= iovec.length)
+      if offset == iovec.length then
+         -- we don't have more data to copy
+         break
+      end
+   end
+   packet.deref(cloned)
+   return result
 end
 
 -- use this function if you want to modify a packet received by an app
