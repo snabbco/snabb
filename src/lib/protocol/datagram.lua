@@ -193,14 +193,15 @@ function datagram:payload (mem, size)
    local parse = self._parse
    local iovec = self._packet.iovecs[parse.iovec]
    local payload = iovec.buffer.pointer + iovec.offset + parse.offset
-   local p_size = iovec.length - parse.offset
    if mem ~= nil then
       assert(size <= iovec.buffer.size - (iovec.offset + iovec.length),
 	     "not enough space in buffer to add payload of size "..size)
       ffi.copy(iovec.buffer.pointer + iovec.offset + iovec.length,
 	      mem, size)
-      p_size = p_size + size
+      iovec.length = iovec.length + size
+      self._packet.length = self._packet.length + size
    end
+   local p_size = iovec.length - parse.offset
    return payload, p_size
 end
 
