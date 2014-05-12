@@ -18,7 +18,10 @@ ethernet._name = "ethernet"
 ethernet._header_type = ether_header_t
 ethernet._header_ptr_type = ffi.typeof("$*", ether_header_t)
 ethernet._ulp = { 
-   class_map = { [0x86dd] = "lib.protocol.ipv6" },
+   class_map = {
+                  [0x0800] = "lib.protocol.ipv4",
+                  [0x86dd] = "lib.protocol.ipv6",
+                },
    method    = 'type' }
 
 -- Class methods
