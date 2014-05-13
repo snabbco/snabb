@@ -273,6 +273,26 @@ function malloc (type)
    return ffi.cast(ffi.typeof("$*", ffi_type), ptr)
 end
 
+-- deepcopy from http://lua-users.org/wiki/CopyTable
+-- with naive ctype support
+function deepcopy(orig)
+   local orig_type = type(orig)
+   local copy
+   if orig_type == 'table' then
+      copy = {}
+      for orig_key, orig_value in next, orig, nil do
+         copy[deepcopy(orig_key)] = deepcopy(orig_value)
+      end
+      setmetatable(copy, deepcopy(getmetatable(orig)))
+   elseif orig_type == 'ctype' then
+      copy = ffi.new(ffi.typeof(orig))
+      ffi.copy(copy, orig, ffi.sizeof(orig))
+   else -- number, string, boolean, etc
+      copy = orig
+   end
+   return copy
+end
+
 -- endian conversion helpers written in Lua
 -- avoid C function call overhead while using C.xxxx counterparts
 if ffi.abi("be") then
