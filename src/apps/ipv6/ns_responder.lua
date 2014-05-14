@@ -65,16 +65,17 @@ end
 function ns_responder:push()
    local l_in = self.input.north
    local l_out = self.output.south
-   assert(l_in and l_out)
-   while not link.empty(l_in) and not link.full(l_out) do
-      -- Pass everything on north -> south
-      link.transmit(l_out, link.receive(l_in))
+   if l_in and l_out then
+      while not link.empty(l_in) and not link.full(l_out) do
+	 -- Pass everything on north -> south
+	 link.transmit(l_out, link.receive(l_in))
+      end
    end
    l_in = self.input.south
    l_out = self.output.north
    local l_reply = self.output.south
    while not link.empty(l_in) and not link.full(l_out) do
-      local p = link.receive(l_in)
+      local p = packet.want_modify(link.receive(l_in))
       local datagram = datagram:new(p, ethernet)
       local status = process(self, datagram)
       if status == nil then
