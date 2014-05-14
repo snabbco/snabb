@@ -79,8 +79,20 @@ end
 
 -- Instance methods
 
+function ipv6:version (v)
+   return lib.bitfield(32, self._header, 'v_tc_fl', 0, 4, v)
+end
+
 function ipv6:traffic_class (tc)
    return lib.bitfield(32, self._header, 'v_tc_fl', 4, 8, tc)
+end
+
+function ipv6:dscp (dscp)
+   return lib.bitfield(32, self._header, 'v_tc_fl', 4, 6, dscp)
+end
+
+function ipv6:ecn (ecn)
+   return lib.bitfield(32, self._header, 'v_tc_fl', 10, 2, ecn)
 end
 
 function ipv6:flow_label (fl)
