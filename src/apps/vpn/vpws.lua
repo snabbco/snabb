@@ -17,6 +17,7 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local gre = require("lib.protocol.gre")
 local packet = require("core.packet")
+local matcher = require("lib.protocol.matcher")
 
 local vpws = subClass(nil)
 local in_to_out = { customer = 'uplink', uplink = 'customer' }
@@ -31,15 +32,10 @@ function vpws:new(config)
 			 dst = config.remote_vpn_ip}),
       gre   = gre:new({ protocol = 0x6558, key = config.label })
    }
-   o._match = { { ethernet },
-		   { ipv6, 
-		     function(ipv6) 
-			return(ipv6:dst_eq(config.local_vpn_ip)) 
-		     end }, 
-		   { gre,
-		     function(gre) 
-			return(not gre:use_key() or gre:key() == config.label)
-		     end } }
+   o._matcher = matcher:new()
+   o._matcher:add(12, 2, ffi.new("uint16_t[1]", C.htons(0x86dd))) -- ipv6
+   o._matcher:add(38, 16, config.local_vpn_ip) -- ipv6 destination
+   o._matcher:add(20, 1, ffi.new("uint8_t[1]", 47)) -- gre
    return o
 end
 
@@ -70,10 +66,24 @@ function vpws:push()
 	    datagram:push(encap.gre)
 	 else
 	    -- Check for encapsulated frame coming in on uplink
-	    if datagram:parse(self._match) then
+	    if self._matcher:compare(datagram:payload()) then
 	       -- Remove encapsulation to restore the original
 	       -- Ethernet frame
-	       datagram:pop(3)
+	       datagram:pop_raw(ethernet:sizeof())
+	       datagram:pop_raw(ipv6:sizeof(), gre)
+	       local gre = datagram:parse()
+
+	       -- Check for matching labels.  Checksum is currently ignored.
+	       local use_key = gre:use_key()
+	       if ((self._config.label and use_key and gre:key() == self._config.label) or
+		not (self._config.label or use_key)) then
+		  datagram:pop(1)
+	       else
+		  print(self:name()..": GRE key mismatch: local "
+		     ..(self._config.label or 'none')..", remote "..(gre:key() or 'none'))
+		  packet.deref(p)
+		  p = nil
+	       end
 	    else
 	       -- Packet doesn't belong to VPN, discard
 	       packet.deref(p)
