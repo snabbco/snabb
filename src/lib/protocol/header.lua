@@ -109,7 +109,7 @@ function header:header ()
 end
 
 function header:sizeof ()
-   return ffi.sizeof(self._header)
+   return ffi.sizeof(self._header_type)
 end
 
 -- Copy the header to some location in memory (usually a packet
