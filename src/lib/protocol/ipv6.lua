@@ -33,9 +33,11 @@ ipv6._name = "ipv6"
 ipv6._header_type = ipv6hdr_t
 ipv6._header_ptr_type = ffi.typeof("$*", ipv6hdr_t)
 ipv6._ulp = {
-   class_map = { [47] = "lib.protocol.gre",
-		 [58] = "lib.protocol.icmp.header",
-	      },
+   class_map = {
+      [17] = "lib.protocol.udp",
+      [47] = "lib.protocol.gre",
+      [58] = "lib.protocol.icmp.header",
+   },
    method    = 'next_header' }
 
 -- Class methods
