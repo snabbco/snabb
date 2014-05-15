@@ -58,7 +58,7 @@ function gre:new (config)
    end
    if o._key_offset ~= nil then
       lib.bitfield(16, o._header, 'bits', 2, 1, 1)
-      self:key(config.key)
+      o:key(config.key)
    end
    o:protocol(config.protocol)
    return o
@@ -106,7 +106,9 @@ function gre:use_checksum ()
 end
 
 function gre:key (key)
-   assert(self._key_offset)
+   if not self._key_offset then
+	 return nil
+   end
    local key_ptr = ffi.cast(ffi.typeof("uint32_t *"),
 			    ffi.cast(ffi.typeof("uint8_t*"), self._header)
 			    + ffi.offsetof(self._header, 'options')
