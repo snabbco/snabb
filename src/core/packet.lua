@@ -188,7 +188,7 @@ function iovec_dump (iovec)
 end
 
 function report (p)
-   print (string.format([[
+   local result = string.format([[
          refcount: %d
          fuel: %d
          info.flags: %X
@@ -203,12 +203,14 @@ function report (p)
       p.refcount, p.fuel, p.info.flags, p.info.gso_flags,
       p.info.hdr_len, p.info.gso_size, p.info.csum_start,
       p.info.csum_offset, p.niovecs, p.length
-   ))
+   )
    for i = 0, p.niovecs-1 do
-      print(string.format([[
+      result = result .. string.format([[
             iovec #%d: %s
-         ]], i, iovec_dump(p.iovecs[i])))
+         ]], i, iovec_dump(p.iovecs[i]))
    end
+
+   return result
 end
 
 module_init()
