@@ -90,6 +90,11 @@ function header:sizeof ()
    return ffi.sizeof(self._header)
 end
 
+-- default equality method, can be overriden in the ancestors
+function header:eq (other)
+   return ffi.string(self._header, self:sizeof()) == ffi.string(other._header,self:sizeof())
+end
+
 -- Copy the header to some location in memory (usually a packet
 -- buffer).  The caller must make sure that there is enough space at
 -- the destination.
