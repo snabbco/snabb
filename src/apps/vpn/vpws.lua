@@ -22,25 +22,21 @@ local matcher = require("lib.protocol.matcher")
 local vpws = subClass(nil)
 local in_to_out = { customer = 'uplink', uplink = 'customer' }
 
---_NAME = nil
 function vpws:new(config)
    local o = self:superClass().new(self)
    o._config = config
+   o._name = config.name
    o._encap = {
       ether = ethernet:new({ src = config.local_mac, dst = config.remote_mac, type = 0x86dd }),
       ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = config.local_vpn_ip,
 			 dst = config.remote_vpn_ip}),
-      gre   = gre:new({ protocol = 0x6558, key = config.label })
+      gre   = gre:new({ protocol = 0x6558, checksum = config.checksum, key = config.label })
    }
    o._matcher = matcher:new()
    o._matcher:add(12, 2, ffi.new("uint16_t[1]", C.htons(0x86dd))) -- ipv6
    o._matcher:add(38, 16, config.local_vpn_ip) -- ipv6 destination
    o._matcher:add(20, 1, ffi.new("uint8_t[1]", 47)) -- gre
    return o
-end
-
-function vpws:name()
-   return self.config.name
 end
 
 function vpws:push()
@@ -57,7 +53,7 @@ function vpws:push()
 	    -- IPv6 payload length consist of the size of the GRE header plus
 	    -- the size of the original packet
 	    encap.ipv6:payload_length(encap.gre:sizeof() + p.length)
-	    if encap.gre:use_checksum() then
+	    if encap.gre:checksum() then
 	       encap.gre:checksum(datagram:payload())
 	    end
 	    -- Copy the finished headers into the packet
@@ -72,15 +68,22 @@ function vpws:push()
 	       datagram:pop_raw(ethernet:sizeof())
 	       datagram:pop_raw(ipv6:sizeof(), gre)
 	       local gre = datagram:parse()
-
-	       -- Check for matching labels.  Checksum is currently ignored.
-	       local use_key = gre:use_key()
-	       if ((self._config.label and use_key and gre:key() == self._config.label) or
-		not (self._config.label or use_key)) then
-		  datagram:pop(1)
+	       local valid = true
+	       if not gre:checksum_check(datagram:payload()) then
+		  print(self:name()..": GRE bad checksum")
+		  valid = false
 	       else
-		  print(self:name()..": GRE key mismatch: local "
-		     ..(self._config.label or 'none')..", remote "..(gre:key() or 'none'))
+		  local key = gre:key()
+		  if ((self._config.label and key and key == self._config.label) or
+		   not (self._config.label or key)) then
+		     datagram:pop(1)
+		  else
+		     print(self:name()..": GRE key mismatch: local "
+			..(self._config.label or 'none')..", remote "..(gre:key() or 'none'))
+		     valid = false
+		  end
+	       end
+	       if not valid then
 		  packet.deref(p)
 		  p = nil
 	       end

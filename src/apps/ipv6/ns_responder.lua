@@ -18,6 +18,7 @@ local ns = require("lib.protocol.icmp.nd.ns")
 local matcher = require("lib.protocol.matcher")
 
 local ns_responder = subClass(nil)
+ns_responder._name = "ipv6 neighbor solicitation responder"
 
 function ns_responder:new(config)
    local o = ns_responder:superClass().new(self)
@@ -37,9 +38,13 @@ local function process(self, dgram)
       return false
    end
    -- Parse the ethernet, ipv6 amd icmp headers
-   --dgram:parse_n(3)
-   dgram:parse_seq({ {}, {}, {} })
+   dgram:parse_n(3)
    local eth, ipv6, icmp = unpack(dgram:stack())
+   local payload, length = dgram:payload()
+   if not icmp:checksum_check(payload, length, ipv6) then
+      print(self:name()..": bad icmp checksum")
+      return nil
+   end
    -- Parse the neighbor solicitation and check if it contains our own
    -- address as target
    local ns = dgram:parse(nil, self._match_ns)
