@@ -1,0 +1,133 @@
+The bench_env directory includes a number of test cases in order to create 
+guests and snabbswitch instances, connected together through vhost_user. The
+target is to have an easy to use benchmarking environment to extract real-world
+measurements.
+
+To use this environment the following are needed:
+- Linux kernel image
+- Linux userspace rootfs
+- ~/bench_conf.sh script that includes proper variables as described further
+
+Building an Ubuntu kernel:
+
+    git clone git://kernel.ubuntu.com/ubuntu/ubuntu-trusty.git
+    cat debian.master/config/config.common.ubuntu \
+        debian.master/config/amd64/config.common.amd64 \
+        debian.master/config/amd64/config.flavour.generic > .config
+    make bzImage -j4
+
+The resulting bzImage should be pointed by bench_conf.sh in the KERNEL variable
+
+Building an Ubuntu trusty userspace:
+
+- Create a virtual disk image with dd and format it properly:
+    $ dd if=/dev/zero of=./ubuntu-trusty.img bs=1MiB count=2048
+    $ sudo mkfs.ext4 ./ubuntu-trusty.img
+    $ sudo mount -o loop ubuntu-trusty.img mnt
+    $ sudo debootstrap  --arch=amd64 trusty mnt
+
+Once done you can "sudo chroot mnt" form the host machine.
+The following are needed:
+- passwd: to set the password of the system
+- Copy /etc/init/tty1.conf to /etc/init/ttyS0.conf and change the last line to:
+    exec /sbin/getty -8 115200 ttyS0 linux -a root
+- Edit /etc/network/interfaces for networking. Minimal example setup:
+    auto eth0
+    iface eth0 inet manual
+    dns-nameserver 8.8.8.8
+- Usual "apt-get update" "apt-get install package_name" to install software
+- locale-gen en_us.utf-8: To resolve any locale issues that apt-get might raise
+- Unmount the image and point to it from ~/bench_conf.sh in the IMAGE variables
+
+Script test cases:
+
+For the following scripts to be executed properly, another script is sourced
+(default: ~/bench_conf.sh), which contains all the configurable environmental
+variables needed. Copy example_conf.sh to ~/bench_conf.sh and edit it
+accordingly as per the details of the system.
+
+Configuration overview
+A basic description of all the needed variables in ~/bench_conf.sh follows:
+SNAB: Location of the snabbswitch binary
+NFV: Location of the nfv snabbswitch design
+LOADGEN: Location of the loadgen snabbswitch design
+PCAP: pcap file to use with loadgen
+
+NODE_BIND: Number of the CPU/Memory node to attach an instance of snabbswitch/QEMU
+SNAB_LOG: File to store the output of a snabbswitch instance
+NFV_PCI: PCI device address that snabbswitch will use (eg. 0000:07:00.0)
+NFV_SOCKET: Filename of the socket used by snabbswitch and QEMU
+
+GUEST_MEM: Memory size of each guest used
+HUGETLBFS: Path to where hugetlbfs is mounted
+KERNEL: Linux kernel image of the guests
+QEMU: Location of the QEMU binary
+
+TAP: Name of the tap interface under ifconfig
+TELNET_PORT: Telnet port that the user needs to access the guest terminal
+GUEST_IP: The preferred IP of the guest (can be "dhcp" if there is a server)
+IMAGE: Location of the guest disk image
+BOOTARGS: Linux kernel arguments to boot the guest with
+
+The following test cases are provided by script execution. Most of these
+scripts, in order to be usable, assume that the selected PCI NICs are wired
+together. Consult interfaces_wiring.txt for details on the naming and
+connections of the Intel network interfaces available. Adjust ~/bench_conf.sh
+accordingly:
+
+--- guest-snab-nics-snab-guest.sh: Two guests are instantiated which connect to
+    two NFV Snabbswitch instances respectively. Each NFV instance corresponds to
+    a NIC which according to the PCI address selection, should be physically
+    wired together, to form a LAN between the guests.
+
+    Topology: guest0 -> snabbswitch nfv0 -> NIC0 = NIC1 <- snabbswitch nfv1 <- guest1
+    
+    With this test case the two guests can communicate through Snabbswitch and
+    run real benchmarks between them. Guest terminals are detached and can be
+    accessed separately through a telnet connection.
+
+--- host-nic-snab-guest.sh: Creation of one guest and one NFV instance with
+    Snabbswitch. On the other side of the connected NIC, the host system can
+    communicate with the guest and run benchmarks as per the previous test case.
+
+    Topology: guest0 -> snabbswitch nfv0 -> NIC0 = NIC1 <- host
+
+--- loadgen-snab-nic-guest.sh: In this test case, on one side we create a normal
+    guest, and on the other side Snabbswitch is used with the loadgen design to
+    generate traffic that is routed to the guest. From the guest we can measure
+    the incoming packets by executing the ifpps utility (netsniff-ng package).
+    eg.: ifpps -d eth0 -t 1000 -p
+
+    Topology: snabbswitch loadgen -> NIC_0 = NIC_1 <- snabbswitch nfv <- guest
+
+The rest of the scripts provide additional functionality and reference
+measurements without Snabbswitch:
+
+--- user-networking-qemu.sh: A simple instantiation of a guest which is
+    connected to the host system through QEMU's user networking. Helpful for
+    providing a real connection to the VM in order to update it and connect it
+    to the outside network.
+
+    Topology: guest -> user_networking <- host 
+                              |
+                              V
+                             WAN
+
+--- vhost-guest-taps-guest.sh: Same setup as guest-snab-nics-snab-guest.sh but
+    instead of using Snabbswitch, connection happens normally through vhost-net
+    and tap devices. Two tap devices are needed to have a working setup and it
+    can be used in conjunction with create-delete-bridge.sh. Can be used to make
+    reference measurements to compare with the respective Snabbswitch version of
+    the test case.
+
+    Topology: guest0 -> vhost,tap0 -> bridge <- vhost,tap1 <- guest1
+
+--- create-delete-bridge.sh: Basic helper script to create or delete a network 
+    bridge with two tap devices.
+
+    Usage: ./create-delete-bridge.sh [add | del] [bridge_name] [tap0_name] [tap1_name]
+
+--- rebind-nic.sh: Helper function to rebind the NIC to the kernel after
+    Snabbswitch removed it from its normal driver.
+
+    Usage: ./rebind-nic.sh [PCI address]
