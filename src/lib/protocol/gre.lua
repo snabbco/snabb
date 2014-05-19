@@ -95,9 +95,8 @@ function gre:new_from_mem (mem, size)
    -- the sequence number option, i.e. the 'S' flag (bit 3) must
    -- be cleared as well
    if lib.bitfield(16, o._header, 'bits', 3, 13) ~= 0 then
-      self:free()
-      self = nil
-      return
+      o:free()
+      return nil
    end
    local type = nil
    if lib.bitfield(16, o._header, 'bits', 0, 1) == 1 then
@@ -125,6 +124,15 @@ function gre:new_from_mem (mem, size)
 end
 
 -- Instance methods
+
+function gre:free ()
+   -- Make sure that this object uses the base header from the gre
+   -- class when it is being recycled
+   self._header_type = nil
+   self._header_ptr_type = nil
+   gre:superClass().free(self)
+end
+
 
 local function checksum(header, payload, length)
    local csum_in = header.csum;
