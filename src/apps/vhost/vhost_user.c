@@ -136,13 +136,13 @@ int vhost_user_receive(int sock, struct vhost_user_msg *msg, int *fds,
     return ret;
 }
 
-void* vhost_user_map_guest_memory(int fd, int size)
+void* vhost_user_map_guest_memory(int fd, uint64_t size)
 {
     void *ptr = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     return ptr == MAP_FAILED ? 0 : ptr;
 }
 
-int vhost_user_unmap_guest_memory(void *ptr, int size)
+int vhost_user_unmap_guest_memory(void *ptr, uint64_t size)
 {
     return munmap(ptr, size);
 }
