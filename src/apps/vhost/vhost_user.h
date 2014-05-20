@@ -58,6 +58,6 @@ int vhost_user_connect(const char *path);
 int vhost_user_send(int sock, struct vhost_user_msg *msg);
 int vhost_user_receive(int sock, struct vhost_user_msg *msg, int *fds,
         int *nfds);
-void* vhost_user_map_guest_memory(int fd, int size);
-int vhost_user_unmap_guest_memory(void *ptr, int size);
+void* vhost_user_map_guest_memory(int fd, uint64_t size);
+int vhost_user_unmap_guest_memory(void *ptr, uint64_t size);
 int vhost_user_sync_shm(void *ptr, size_t size);

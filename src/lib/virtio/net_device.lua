@@ -176,18 +176,53 @@ end
 -- Prepared argument for writing a 1 to an eventfd.
 local eventfd_one = ffi.new("uint64_t[1]", {1})
 
+function VirtioNetDevice:more_vm_buffers ()
+   return freelist.nfree(self.vring_transmit_buffers) > 2
+end
+
+-- return the buffer from a iovec, ensuring it originates from the vm
+function VirtioNetDevice:vm_buffer (iovec)
+   local should_continue = true
+   local b = iovec.buffer
+   -- check if this is a zero-copy packet
+   if b.origin.type ~= C.BUFFER_ORIGIN_VIRTIO then
+      -- get buffer from the once supplied by the VM
+      local old_b = b
+      b = freelist.remove(self.vring_transmit_buffers)
+      --assert(iovec.offset + iovec.length <= b.size)
+
+      -- copy the whole buffer data, including offset
+      ffi.copy(b.pointer, old_b.pointer, iovec.offset + iovec.length)
+      buffer.free(old_b)
+      iovec.buffer = b
+
+      if not self:more_vm_buffers() then
+         -- no more buffers, stop the loop
+         should_continue = false
+      end
+   end
+   return should_continue, b
+end
+
 -- Transmit packets from the app input queue to the VM.
 function VirtioNetDevice:transmit_packets_to_vm ()
    local l = self.owner.input.rx
    if not l then return end
-   while not link.empty(l) do
+   local should_continue = not self.not_enough_vm_bufers
+
+   while (not link.empty(l)) and should_continue do
       local p = link.receive(l)
+
+      -- ensure all data is in a single buffer
+      if p.niovecs > 1 then
+         packet.coalesce(p)
+      end
+
       local iovec = p.iovecs[0]
-      local b = iovec.buffer
+      should_continue, b = self:vm_buffer(iovec)
+
+      -- fill in the virtio header
       local virtio_hdr = b.origin.info.virtio.header_pointer
-
-      --assert(b.origin.type == C.BUFFER_ORIGIN_VIRTIO)
-
       ffi.copy(virtio_hdr, p.info, packet_info_size)
 
       local used = self.txring.used.ring[self.txused%self.tx_vring_num]
@@ -198,6 +233,11 @@ function VirtioNetDevice:transmit_packets_to_vm ()
       self.txused = (self.txused + 1) % 65536
 
       packet.deref(p)
+   end
+
+   if not should_continue then
+      -- not enough buffers detected, verify once again
+      self.not_enough_vm_bufers = not self:more_vm_buffers()
    end
 
    if self.txring.used.idx ~= self.txused then
