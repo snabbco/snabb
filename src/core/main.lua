@@ -72,7 +72,7 @@ function main ()
          debug.traceback = STP.stacktrace
         i = i + 1
       elseif (args[i]):match("-jp") then
-	 local pargs, poutput = (args[i]):gmatch("-jp=(%w*),?(.*)")()
+	 local pargs, poutput = (args[i]):gmatch("-jp=([^,]*),?(.*)")()
 	 if poutput == '' then poutput = nil end
 	 require("jit.p").start(pargs, poutput)
 	 profiling = true
