@@ -8,9 +8,9 @@ local ipv6hdr_t = ffi.typeof[[
 	 uint32_t v_tc_fl; // version, tc, flow_label
 	 uint16_t payload_length;
 	 uint8_t  next_header;
-	    uint8_t hop_limit;
-	 char src_ip[16];
-	 char dst_ip[16];
+	 uint8_t hop_limit;
+	 uint8_t src_ip[16];
+	 uint8_t dst_ip[16];
       } __attribute__((packed))
 ]]
 
@@ -40,16 +40,17 @@ ipv6._ulp = {
 
 -- Class methods
 
-function ipv6:_init_new (config)
-   local header = ipv6hdr_t()
+function ipv6:new (config)
+   local o = ipv6:superClass().new(self)
+   local header = o._header
    header.v_tc_fl = C.htonl(0x60000000)
    ffi.copy(header.src_ip, config.src, 16)
    ffi.copy(header.dst_ip, config.dst, 16)
-   self._header = header
-   self:traffic_class(config.traffic_class)
-   self:flow_label(config.flow_label)
-   self:next_header(config.next_header)
-   self:hop_limit(config.hop_limit)
+   o:traffic_class(config.traffic_class)
+   o:flow_label(config.flow_label)
+   o:next_header(config.next_header)
+   o:hop_limit(config.hop_limit)
+   return o
 end
 
 -- XXX should probably use inet_pton(3)
@@ -71,8 +72,9 @@ end
 -- XXX should probably use inet_ntop(3)
 function ipv6:ntop (n)
    local p = {}
-   for i = 0, 7, 1 do
-      table.insert(p, string.format("%x", C.ntohs(n[i])))
+   local n = ffi.cast("uint8_t *", n)
+   for i = 0, 14, 2 do
+      table.insert(p, string.format("%02x%02x", n[i], n[i+1]))
    end
    return table.concat(p, ":")
 end

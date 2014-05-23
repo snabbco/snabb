@@ -23,12 +23,12 @@ ethernet._ulp = {
 
 -- Class methods
 
-function ethernet:_init_new (config)
-   local header = ether_header_t()
-   ffi.copy(header.ether_dhost, config.dst, 6)
-   ffi.copy(header.ether_shost, config.src, 6)
-   header.ether_type = C.htons(config.type)
-   self._header = header
+function ethernet:new (config)
+   local o = ethernet:superClass().new(self)
+   ffi.copy(o._header.ether_dhost, config.dst, 6)
+   ffi.copy(o._header.ether_shost, config.src, 6)
+   o._header.ether_type = C.htons(config.type)
+   return o
 end
 
 -- Convert printable address to numeric
