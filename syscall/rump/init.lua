@@ -14,8 +14,8 @@ local abi = require "syscall.abi"
 abi.rump = true
 
 local modules = {
-  rumpuser = ffi.load("rumpuser", true),
   rump = ffi.load("rump", true),
+  rumpuser = ffi.load("rumpuser", true),
 }
 
 _G[{}] = modules -- if you unload rump kernel crashes are likely, so hang on to them
