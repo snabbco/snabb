@@ -478,7 +478,7 @@ function M_vf:init_receive ()
    self.pf.r.PSRTYPE[poolnum](0)        -- no splitting, use pool's first queue
    self.r.RSCCTL(0x0)                   -- no RSC
    self:set_receive_descriptors()
-   self.pf.r.PFVML2FLT[poolnum]:set(bits{BAM=27, AUPE=24})
+   self.pf.r.PFVML2FLT[poolnum]:set(bits{MPE=28, BAM=27, AUPE=24})
    self.r.RXDCTL(bits{Enable=25, VME=30})
    self.r.RXDCTL:wait(bits{enable=25})
    self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
