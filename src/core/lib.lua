@@ -173,6 +173,15 @@ function comma_value(n) -- credit http://richard.warburton.it
    return left..(num:reverse():gsub('(%d%d%d)','%1,'):reverse())..right
 end
 
+function random_data(length)
+   result = ""
+   math.randomseed(os.time())
+   for i=1,length do
+      result = result..string.char(math.random(0, 255))
+   end
+   return result
+end
+
 -- Return a table for bounds-checked array access.
 function bounds_checked (type, base, offset, size)
    type = ffi.typeof(type)
@@ -262,6 +271,26 @@ function malloc (type)
    local size = ffi.sizeof(ffi_type)
    local ptr = C.malloc(size)
    return ffi.cast(ffi.typeof("$*", ffi_type), ptr)
+end
+
+-- deepcopy from http://lua-users.org/wiki/CopyTable
+-- with naive ctype support
+function deepcopy(orig)
+   local orig_type = type(orig)
+   local copy
+   if orig_type == 'table' then
+      copy = {}
+      for orig_key, orig_value in next, orig, nil do
+         copy[deepcopy(orig_key)] = deepcopy(orig_value)
+      end
+      setmetatable(copy, deepcopy(getmetatable(orig)))
+   elseif orig_type == 'ctype' then
+      copy = ffi.new(ffi.typeof(orig))
+      ffi.copy(copy, orig, ffi.sizeof(orig))
+   else -- number, string, boolean, etc
+      copy = orig
+   end
+   return copy
 end
 
 -- endian conversion helpers written in Lua

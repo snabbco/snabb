@@ -33,9 +33,12 @@ ipv6._name = "ipv6"
 ipv6._header_type = ipv6hdr_t
 ipv6._header_ptr_type = ffi.typeof("$*", ipv6hdr_t)
 ipv6._ulp = {
-   class_map = { [47] = "lib.protocol.gre",
-		 [58] = "lib.protocol.icmp.header",
-	      },
+   class_map = {
+       [6] = "lib.protocol.tcp",
+      [17] = "lib.protocol.udp",
+      [47] = "lib.protocol.gre",
+      [58] = "lib.protocol.icmp.header",
+   },
    method    = 'next_header' }
 
 -- Class methods
@@ -79,8 +82,20 @@ end
 
 -- Instance methods
 
+function ipv6:version (v)
+   return lib.bitfield(32, self._header, 'v_tc_fl', 0, 4, v)
+end
+
 function ipv6:traffic_class (tc)
    return lib.bitfield(32, self._header, 'v_tc_fl', 4, 8, tc)
+end
+
+function ipv6:dscp (dscp)
+   return lib.bitfield(32, self._header, 'v_tc_fl', 4, 6, dscp)
+end
+
+function ipv6:ecn (ecn)
+   return lib.bitfield(32, self._header, 'v_tc_fl', 10, 2, ecn)
 end
 
 function ipv6:flow_label (fl)

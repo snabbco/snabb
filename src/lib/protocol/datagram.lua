@@ -42,6 +42,7 @@
 
 local packet = require("core.packet")
 local buffer = require("core.buffer")
+local ffi    = require("ffi")
 
 local datagram = subClass(nil)
 
@@ -55,14 +56,16 @@ local datagram = subClass(nil)
 function datagram:_init_new (p, class)
    if p then
       packet.coalesce(p)
-      self._parse = { stack = {},
-		      ulp = class,
-		      iovec = 0,
-		      offset = 0 }
+      self._packet = p
    else
-      p = packet.allocate()
+      self._packet = packet.allocate()
+      local b = buffer.allocate()
+      packet.add_iovec(self._packet, b, 0)
    end
-   self._packet = p
+   self._parse = { stack = {},
+      ulp = class,
+      iovec = 0,
+      offset = 0 }
 end
 
 -- Instance methods
@@ -190,14 +193,15 @@ function datagram:payload (mem, size)
    local parse = self._parse
    local iovec = self._packet.iovecs[parse.iovec]
    local payload = iovec.buffer.pointer + iovec.offset + parse.offset
-   local p_size = iovec.length - parse.offset
    if mem ~= nil then
       assert(size <= iovec.buffer.size - (iovec.offset + iovec.length),
 	     "not enough space in buffer to add payload of size "..size)
-      ff.copy(iovec.buffer.pointer + iovec.offset + iovec.length,
+      ffi.copy(iovec.buffer.pointer + iovec.offset + iovec.length,
 	      mem, size)
-      p_size = p_size + size
+      iovec.length = iovec.length + size
+      self._packet.length = self._packet.length + size
    end
+   local p_size = iovec.length - parse.offset
    return payload, p_size
 end
 
