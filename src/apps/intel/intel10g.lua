@@ -458,6 +458,7 @@ function M_vf:init (opts)
       :set_VLAN(opts.vlan)
       :set_rx_stats(opts.rxcounter)
       :set_tx_stats(opts.txcounter)
+      :set_tx_rate(opts.rate_limit)
 end
 
 M_vf.close = M_sf.close
@@ -647,6 +648,15 @@ function M_vf:get_txstats ()
       bytes = tonumber(bit.lshift(self.pf.qs.QBTC_H[self.txstats]()+0LL, 32)
                + self.pf.qs.QBTC_L[self.txstats]())
    }
+end
+
+function M_vf:set_tx_rate (limit)
+   if not limit then return self end
+   local factor = 10000 / tonumber(limit)       -- line rate = 10,000 Mb/s
+   factor = bit.band(math.floor(factor*2^14+0.5), 2^24-1) -- 10.14 bits
+   self.pf.r.RTTDQSEL(self.poolnum)
+   self.pf.r.RTTBCNRC(bits({RS_ENA=31}, factor))
+   return self
 end
 
 
