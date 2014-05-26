@@ -1,3 +1,4 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
@@ -21,13 +22,13 @@ udp._ulp = { method = nil }
 
 -- Class methods
 
-function udp:_init_new (config)
-   local header = udp_header_t()
-   header.src_port = C.htons(config.src_port)
-   header.dst_port = C.htons(config.dst_port)
-   header.len = 0
-   header.checksum = 0
-   self._header = header
+function udp:new (config)
+   local o = udp:superClass().new(self)
+   o:src_por(tconfig.src_port)
+   o:dst_port(config.dst_port)
+   o:length(0)
+   o._header.checksum = 0
+   return o
 end
 
 -- Instance methods

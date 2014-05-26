@@ -1,3 +1,4 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
@@ -49,22 +50,22 @@ ipv4._ulp = {
 
 -- Class methods
 
-function ipv4:_init_new (config)
-   local header = ipv4hdr_t()
-   header.ihl_v_tos = C.htonl(0x4000) -- v4
-   self._header = header
-   self:ihl(self:sizeof() / 4)
-   self:dscp(config.dscp or 0)
-   self:ecn(config.ecn or 0)
-   self:total_length(self:sizeof()) -- default to header only
-   self:id(config.id or 0)
-   self:flags(config.flags or 0)
-   self:frag_off(config.frag_off or 0)
-   self:ttl(config.ttl or 0)
-   self:protocol(config.protocol or 0xff)
-   self:src(config.src)
-   self:dst(config.dst)
-   self:checksum()
+function ipv4:new (config)
+   local o = ipv4:superClass().new(self)
+   o._header.ihl_v_tos = C.htonl(0x4000) -- v4
+   o:ihl(o:sizeof() / 4)
+   o:dscp(config.dscp or 0)
+   o:ecn(config.ecn or 0)
+   o:total_length(o:sizeof()) -- default to header only
+   o:id(config.id or 0)
+   o:flags(config.flags or 0)
+   o:frag_off(config.frag_off or 0)
+   o:ttl(config.ttl or 0)
+   o:protocol(config.protocol or 0xff)
+   o:src(config.src)
+   o:dst(config.dst)
+   o:checksum()
+   return o
 end
 
 function ipv4:pton (p)

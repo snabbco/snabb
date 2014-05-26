@@ -4,6 +4,7 @@
 -- on which NS messages are expected.  Non-NS packets are sent on
 -- north.  All packets received on the north port are passed south.
 
+module(..., package.seeall)
 local ffi = require("ffi")
 local app = require("core.app")
 local link = require("core.link")
@@ -15,16 +16,19 @@ local icmp = require("lib.protocol.icmp.header")
 local ns = require("lib.protocol.icmp.nd.ns")
 
 local ns_responder = subClass(nil)
+ns_responder._name = "ipv6 neighbor solicitation responder"
 
-function ns_responder:_init_new(config)
-   self._config = config
-   self._match = { { ethernet },
-		   { ipv6 },
-		   { icmp },
-		   { ns,
-		     function(ns)
-			return(ns:target_eq(config.local_ip))
-		     end } }
+function ns_responder:new(config)
+   local o = ns_responder:superClass().new(self)
+   o._config = config
+   o._match = { { ethernet },
+		{ ipv6 },
+		{ icmp },
+		{ ns,
+		  function(ns)
+		     return(ns:target_eq(config.local_ip))
+		  end } }
+   return o
 end
 
 local function process(self, dgram)
@@ -88,6 +92,7 @@ function ns_responder:push()
 	 -- Send transit traffic up north
 	 link.transmit(l_out, p)
       end
+      datagram:free()
    end
 end
 
