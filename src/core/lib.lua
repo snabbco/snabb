@@ -255,7 +255,7 @@ function update_csum (ptr, len,  csum0)
    for i = 0, len-2, 2 do
       sum = sum + bit.lshift(ptr[i], 8) + ptr[i+1]
    end
-   if len % 2 == 1 then sum = sum + bit.lshift(ptr[len-1]) end
+   if len % 2 == 1 then sum = sum + bit.lshift(ptr[len-1], 1) end
    return sum
 end
 
