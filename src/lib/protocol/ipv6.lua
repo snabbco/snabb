@@ -9,9 +9,9 @@ local ipv6hdr_t = ffi.typeof[[
 	 uint32_t v_tc_fl; // version, tc, flow_label
 	 uint16_t payload_length;
 	 uint8_t  next_header;
-	    uint8_t hop_limit;
-	 char src_ip[16];
-	 char dst_ip[16];
+	 uint8_t hop_limit;
+	 uint8_t src_ip[16];
+	 uint8_t dst_ip[16];
       } __attribute__((packed))
 ]]
 
@@ -75,8 +75,9 @@ end
 -- XXX should probably use inet_ntop(3)
 function ipv6:ntop (n)
    local p = {}
-   for i = 0, 7, 1 do
-      table.insert(p, string.format("%x", C.ntohs(n[i])))
+   local n = ffi.cast("uint8_t *", n)
+   for i = 0, 14, 2 do
+      table.insert(p, string.format("%02x%02x", n[i], n[i+1]))
    end
    return table.concat(p, ":")
 end
