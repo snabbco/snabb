@@ -30,8 +30,10 @@ function vpws:new(config)
       ether = ethernet:new({ src = config.local_mac, dst = config.remote_mac, type = 0x86dd }),
       ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = config.local_vpn_ip,
 			 dst = config.remote_vpn_ip}),
-      gre   = gre:new({ protocol = 0x6558, key = config.label })
+      gre   = gre:new({ protocol = 0x6558, checksum = config.checksum, key = config.label })
    }
+   -- Pre-computed size of combined Ethernet and IPv6 header
+   o._eth_ipv6_size = ethernet:sizeof() + ipv6:sizeof()
    local program = "ip6 and dst host "..ipv6:ntop(config.local_vpn_ip) .." and ip6 proto 47"
    local filter, errmsg = filter:new(program)
    assert(filter, errmsg and ffi.string(errmsg))
@@ -53,7 +55,7 @@ function vpws:push()
 	    -- IPv6 payload length consist of the size of the GRE header plus
 	    -- the size of the original packet
 	    encap.ipv6:payload_length(encap.gre:sizeof() + p.length)
-	    if encap.gre:use_checksum() then
+	    if encap.gre:checksum() then
 	       encap.gre:checksum(datagram:payload())
 	    end
 	    -- Copy the finished headers into the packet
@@ -65,7 +67,32 @@ function vpws:push()
 	    if self._filter:match(datagram:payload()) then
 	       -- Remove encapsulation to restore the original
 	       -- Ethernet frame
-	       datagram:pop(3)
+	       datagram:pop_raw(self._eth_ipv6_size, gre)
+	       local valid = true
+	       local gre = datagram:parse()
+	       if gre then
+		  if not gre:checksum_check(datagram:payload()) then
+		     print(self:name()..": GRE bad checksum")
+		     valid = false
+		  else
+		     local key = gre:key()
+		     if ((self._config.label and key and key == self._config.label) or
+		      not (self._config.label or key)) then
+			datagram:pop()
+		     else
+			print(self:name()..": GRE key mismatch: local "
+			   ..(self._config.label or 'none')..", remote "..(gre:key() or 'none'))
+			valid = false
+		     end
+		  end
+	       else
+		 -- Unsupported GRE options or flags
+		  valid = false
+	       end
+	       if not valid then
+		  packet.deref(p)
+		  p = nil
+	       end
 	    else
 	       -- Packet doesn't belong to VPN, discard
 	       packet.deref(p)
