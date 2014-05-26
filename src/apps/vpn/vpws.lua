@@ -17,6 +17,7 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local gre = require("lib.protocol.gre")
 local packet = require("core.packet")
+local filter = require("lib.pcap.filter")
 
 local vpws = subClass(nil)
 local in_to_out = { customer = 'uplink', uplink = 'customer' }
@@ -24,26 +25,18 @@ local in_to_out = { customer = 'uplink', uplink = 'customer' }
 function vpws:new(config)
    local o = vpws:superClass().new(self)
    o._config = config
+   o._name = config.name
    o._encap = {
       ether = ethernet:new({ src = config.local_mac, dst = config.remote_mac, type = 0x86dd }),
       ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = config.local_vpn_ip,
 			 dst = config.remote_vpn_ip}),
       gre   = gre:new({ protocol = 0x6558, key = config.label })
    }
-   o._match = { { ethernet },
-		   { ipv6, 
-		     function(ipv6) 
-			return(ipv6:dst_eq(config.local_vpn_ip)) 
-		     end }, 
-		   { gre,
-		     function(gre) 
-			return(not gre:use_key() or gre:key() == config.label)
-		     end } }
+   local program = "ip6 and dst host "..ipv6:ntop(config.local_vpn_ip) .." and ip6 proto 47"
+   local filter, errmsg = filter:new(program)
+   assert(filter, errmsg and ffi.string(errmsg))
+   o._filter = filter
    return o
-end
-
-function vpws:name()
-   return self.config.name
 end
 
 function vpws:push()
@@ -69,7 +62,7 @@ function vpws:push()
 	    datagram:push(encap.gre)
 	 else
 	    -- Check for encapsulated frame coming in on uplink
-	    if datagram:parse(self._match) then
+	    if self._filter:match(datagram:payload()) then
 	       -- Remove encapsulation to restore the original
 	       -- Ethernet frame
 	       datagram:pop(3)
