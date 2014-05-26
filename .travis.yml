@@ -2,7 +2,7 @@ language: c
 compiler:
   - gcc
 
-before_install: "sudo apt-get update && sudo apt-get install -y linux-libc-dev"
+before_install: "sudo apt-get update && sudo apt-get install -y linux-libc-dev libpcap-dev"
 
 script:
   - make && cd src && sudo make test_ci;
