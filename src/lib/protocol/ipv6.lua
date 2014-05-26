@@ -1,3 +1,4 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
@@ -43,16 +44,16 @@ ipv6._ulp = {
 
 -- Class methods
 
-function ipv6:_init_new (config)
-   local header = ipv6hdr_t()
-   header.v_tc_fl = C.htonl(0x60000000)
-   ffi.copy(header.src_ip, config.src, 16)
-   ffi.copy(header.dst_ip, config.dst, 16)
-   self._header = header
-   self:traffic_class(config.traffic_class)
-   self:flow_label(config.flow_label)
-   self:next_header(config.next_header)
-   self:hop_limit(config.hop_limit)
+function ipv6:new (config)
+   local o = ipv6:superClass().new(self)
+   o:version(6)
+   o:traffic_class(config.traffic_class)
+   o:flow_label(config.flow_label)
+   o:next_header(config.next_header)
+   o:hop_limit(config.hop_limit)
+   o:src(config.src)
+   o:dst(config.dst)
+   return o
 end
 
 -- XXX should probably use inet_pton(3)

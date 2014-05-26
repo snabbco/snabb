@@ -6,6 +6,7 @@
 -- frames encapsulated in IP/GRE.  The push() method performs the
 -- appropriate operation depending on the input port.
 
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
@@ -20,15 +21,16 @@ local packet = require("core.packet")
 local vpws = subClass(nil)
 local in_to_out = { customer = 'uplink', uplink = 'customer' }
 
-function vpws:_init_new(config)
-   self._config = config
-   self._encap = {
+function vpws:new(config)
+   local o = vpws:superClass().new(self)
+   o._config = config
+   o._encap = {
       ether = ethernet:new({ src = config.local_mac, dst = config.remote_mac, type = 0x86dd }),
       ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = config.local_vpn_ip,
 			 dst = config.remote_vpn_ip}),
       gre   = gre:new({ protocol = 0x6558, key = config.label })
    }
-   self._match = { { ethernet },
+   o._match = { { ethernet },
 		   { ipv6, 
 		     function(ipv6) 
 			return(ipv6:dst_eq(config.local_vpn_ip)) 
@@ -37,6 +39,7 @@ function vpws:_init_new(config)
 		     function(gre) 
 			return(not gre:use_key() or gre:key() == config.label)
 		     end } }
+   return o
 end
 
 function vpws:name()
@@ -77,6 +80,7 @@ function vpws:push()
 	    end
 	 end
 	 if p then link.transmit(l_out, p) end
+	 datagram:free()
       end
    end
 end

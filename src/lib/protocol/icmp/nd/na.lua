@@ -1,3 +1,4 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local nd_header = require("lib.protocol.icmp.nd.header")
@@ -11,7 +12,6 @@ if ffi.abi("le") then
 	             solicited:1,
 	             router:1,
 	             reserved2:24;
-	    uint8_t  target[16];
 	 } __attribute__((packed))
    ]]
 else
@@ -21,8 +21,7 @@ else
                      solicited:1,
                      override:1,
                      reserved:29;
-	    uint8_t  target[16];
-	 }
+	 } __attribute__((packed))
    ]]
 end
 
@@ -36,12 +35,13 @@ na._ulp = { method = nil }
 
 -- Class methods
 
-function na:_init_new (target, router, solicited, override)
-   self._header = na_t()
-   ffi.copy(self._header.target, target, 16)
-   self._header.router = router
-   self._header.solicited = solicited
-   self._header.override = override
+function na:new (target, router, solicited, override)
+   local o = na:superClass().new(self)
+   o:target(target)
+   o:router(router)
+   o:solicited(solicited)
+   o:override(override)
+   return o
 end
 
 -- Instance methods

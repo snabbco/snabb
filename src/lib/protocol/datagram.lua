@@ -40,6 +40,7 @@
 -- Another new buffer is allocated for the packet's payload.  The
 -- parse() method is not applicable to such a datagram.
 
+module(..., package.seeall)
 local packet = require("core.packet")
 local buffer = require("core.buffer")
 local ffi    = require("ffi")
@@ -53,19 +54,30 @@ local datagram = subClass(nil)
 -- initialized for it.  If p == nil, a new empty packet is allocated.
 -- The allocation of buffers is delayed until the first call of the
 -- push() method.
-function datagram:_init_new (p, class)
+function datagram:new (p, class)
+   local o = datagram:superClass().new(self)
    if p then
       packet.coalesce(p)
-      self._packet = p
+      o._packet = p
    else
-      self._packet = packet.allocate()
+      o._packet = packet.allocate()
       local b = buffer.allocate()
-      packet.add_iovec(self._packet, b, 0)
+      packet.add_iovec(o._packet, b, 0)
    end
-   self._parse = { stack = {},
-      ulp = class,
-      iovec = 0,
-      offset = 0 }
+   if not o._recycled then
+      o._parse = { stack = {}, index = 0 }
+   else
+      for i, _ in ipairs(o._parse.stack) do
+	 o._parse.stack[i]:free()
+	 o._parse.stack[i] = nil
+      end
+      o._parse.index = 0
+      o._push = nil
+   end
+   o._parse.ulp = class
+   o._parse.iovec = 0
+   o._parse.offset = 0
+   return o
 end
 
 -- Instance methods
@@ -138,7 +150,9 @@ function datagram:parse (seq)
       if proto == nil or (check and not check(proto)) then
 	 return nil
       end
-      table.insert(parse.stack, proto)
+      local index = parse.index + 1
+      parse.stack[index] = proto
+      parse.index = index
       parse.ulp = proto:upper_layer()
       parse.offset = parse.offset + proto:sizeof()
    end
@@ -151,8 +165,11 @@ function datagram:unparse (n)
    assert(self._parse, "non-parseable datagram")
    local parse = self._parse
    local proto
-   while n > 0 and #parse.stack ~= 0 do
-      proto = table.remove(parse.stack)
+   while n > 0 and parse.index ~= 0 do
+      -- Don't use table.remove to avoid garbage
+      proto = parse.stack[parse.index]
+      parse.index = parse.index - 1
+      proto:free()
       parse.offset = parse.offset - proto:sizeof()
       parse.ulp = proto:class()
       n = n - 1
@@ -160,22 +177,29 @@ function datagram:unparse (n)
 end
 
 -- Remove the bottom n elements from the parse stack by adjusting the
--- offset of the relevant iovec.  Returns the last popped protocol
--- object.
+-- offset of the relevant iovec.
 function datagram:pop (n)
    local parse = self._parse
    assert(parse, "non-parseable datagram") 
+   assert(n <= parse.index)
    local proto
    local iovec = self._packet.iovecs[parse.iovec]
-   while n > 0 and #parse.stack ~= 0 do
-      proto = table.remove(parse.stack, 1)
-      local sizeof = proto:sizeof()
-      iovec.offset = iovec.offset + sizeof
-      iovec.length = iovec.length - sizeof
-      self._packet.length = self._packet.length - sizeof
-      n = n - 1
-   end
-   return proto
+   -- Don't use table.remove to avoid garbage
+   for i = 1, parse.index do
+      if i <= n then
+	 proto = parse.stack[i]
+	 local sizeof = proto:sizeof()
+	 proto:free()
+	 iovec.offset = iovec.offset + sizeof
+	 iovec.length = iovec.length - sizeof
+	 self._packet.length = self._packet.length - sizeof
+      end
+      if i+n <= parse.index then
+	 parse.stack[i] = parse.stack[i+n]
+      else
+	 parse.stack[i] = nil
+      end
+  end
 end
 
 function datagram:stack ()
