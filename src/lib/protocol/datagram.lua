@@ -112,49 +112,81 @@ function datagram:push (proto)
    self._packet.length = self._packet.length + sizeof
 end
 
--- Create protocol header objects from the packet's payload.  If
--- called with argument nil and the packets ULP is non-nil, a single
--- protocol header of type ULP is created.  The caller can specify
--- matching criteria by passing an array of templates to match for
--- each parsed header.  Each criteria consists of a reference to a
--- header class to match and a function that is evaluated with the
--- protocol object as input.  A header is only pushed onto the parse
--- stack if it matches the class and the function returns a true
--- value.  The class and function can both be nil to provide "wildcard
--- matching".  For example, the following code fragment will match a
--- packet that contains an ethernet header, followed by an arbitrary
--- (but supported) header, followed by an icmp header of type 135.
+-- The following methods create protocol header objects from the
+-- packet's payload.  The basic method parse_match() takes two
+-- arguments, which can both be nil.
 --
--- local eth = require("lib.protocol.ethernet")
--- local icmp = require("lib.protocol.icmp")
--- dgram:parse({ { ethernet, nil }, { nil, nil },
---               { icmp, function(icmp) return(icmp:type() == 135) end } })
+-- The first argument is a protocol class object which is used to
+-- create a protocol instance from the start of the as yet unparsed
+-- part of the packet.  If class is nil, the current ULP of the packet
+-- is used.  If the ULP is not set (nil) or the constructor of the
+-- protocol instance returns nil, the parsing operation has failed and
+-- the method returns nil.  The packet remains unchanged.
 --
--- The method returns the protocol object of the last parsed header or
--- nil if either an unsupported ULP is encountered or one of the match
--- criteria is not met.
-function datagram:parse (seq)
+-- If the protocol instance has been created successfully, it is
+-- passed as single argument to the anonymous function that has been
+-- passed as the second argument to the method.  The function can
+-- execute any checks that should be performed on the protocol, like
+-- matching of a particular value of a header field.  It must return
+-- either true or false.
+--
+-- If the checking function returns false, the parsing has failed and
+-- the method returns nil.  The packet remains unchanged.
+--
+-- If no checking function is supplied or it returns a true value, the
+-- parsing has succeeded.  The protocol object is pushed onto the
+-- datagrams parse stack and returned to the caller.
+function datagram:parse_match (class, check)
    assert(self._parse, "non-parseable datagram")
    local parse = self._parse
-   local seq = seq or { { parse.ulp } }
-   local proto
+   local class = class or parse.ulp
    local iovec = self._packet.iovecs[parse.iovec]
 
-   for _, elt in ipairs(seq) do
-      local class, check = elt[1], elt[2]
-      if not parse.ulp or (class and class ~= parse.ulp) then
-	 return nil
-      end
-      proto = parse.ulp:new_from_mem(iovec.buffer.pointer + iovec.offset
-				     + parse.offset, iovec.length - parse.offset)
-      if proto == nil or (check and not check(proto)) then
-	 return nil
-      end
-      local index = parse.index + 1
-      parse.stack[index] = proto
-      parse.index = index
-      parse.ulp = proto:upper_layer()
-      parse.offset = parse.offset + proto:sizeof()
+   if not parse.ulp or (class and class ~= parse.ulp) then
+      return nil
+   end
+   local proto = parse.ulp:new_from_mem(iovec.buffer.pointer + iovec.offset
+					+ parse.offset, iovec.length - parse.offset)
+   if proto == nil or (check and not check(proto)) then
+      if proto then proto:free() end
+      return nil
+   end
+   local index = parse.index + 1
+   parse.stack[index] = proto
+   parse.index = index
+   parse.ulp = proto:upper_layer()
+   parse.offset = parse.offset + proto:sizeof()
+   return proto
+end
+
+-- This method is a wrapper for parse_match() that allows parsing of a
+-- sequence of headers with a single method call.  The method returns
+-- the protocol object of the final parsed header or nil if any of the
+-- calls to parse_match() return nil.  If called with a nil argument,
+-- this method is equivalent to parse_match() without arguments.
+function datagram:parse (seq)
+   if not seq then
+      return self:parse_match()
+   end
+   local proto = nil
+   local i = 1
+   while seq[i] do
+      proto = self:parse_match(seq[i][1], seq[i][2])
+      if not proto then break end
+      i = i+1
+   end
+   return proto
+end
+
+-- This method is a wrapper for parse_match() that parses the next n
+-- protocol headers.  It returns the last protocol object or nil if
+-- less than n headers could be parsed successfully.
+function datagram:parse_n (n)
+   local n = n or 1
+   local proto
+   for i = 1, n do
+      proto = self:parse_match()
+      if not proto then break end
    end
    return proto
 end
@@ -179,6 +211,7 @@ end
 -- Remove the bottom n elements from the parse stack by adjusting the
 -- offset of the relevant iovec.
 function datagram:pop (n)
+   local n = n or 1
    local parse = self._parse
    assert(parse, "non-parseable datagram") 
    assert(n <= parse.index)
@@ -193,13 +226,31 @@ function datagram:pop (n)
 	 iovec.offset = iovec.offset + sizeof
 	 iovec.length = iovec.length - sizeof
 	 self._packet.length = self._packet.length - sizeof
+	 parse.offset = parse.offset - sizeof
       end
       if i+n <= parse.index then
 	 parse.stack[i] = parse.stack[i+n]
       else
 	 parse.stack[i] = nil
       end
-  end
+   end
+   parse.index = parse.index - n
+end
+
+-- Remove <length> bytes from the start of the packet.  It is intended
+-- as an efficient version of pop() if the caller already knows what
+-- type of header is at the start of the packet, for example after a
+-- successful match of matcher:compare().  If the caller also knows
+-- the type of the subsequent header, it can pass the corresponding
+-- protocol class as second argument to pop_raw().  This will set the
+-- datagram's upper-layer protocol to this class such that the parse()
+-- method can be used to process the datagram further.
+function datagram:pop_raw (length, ulp)
+   local iovec = self._packet.iovecs[self._parse.iovec]
+   iovec.offset = iovec.offset + length
+   iovec.length = iovec.length - length
+   self._packet.length = self._packet.length - length
+   self._parse.ulp = ulp
 end
 
 function datagram:stack ()
