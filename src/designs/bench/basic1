@@ -1,0 +1,54 @@
+#!/usr/bin/env snabb
+
+-- Benchmark using only basic functions:
+--   Basic apps (Source, Sink, Tee).
+--   Repeated calls to engine.main() for short intervals.
+--   Timers.
+-- Intended to exercise a small amount of core code paths: breathe,
+-- timers, packet and buffer allocation/refcount/free, and so on.
+
+local basic_apps = require("apps.basic.basic_apps")
+local C = require("ffi").C
+
+if #main.parameters ~= 1 then
+   print([[Usage: basic1 <npackets>
+
+Process a number of packets (npackets) through a simple app network
+and report on processing time.
+
+Example usage with 10 million packets:
+  basic1 10e6]])
+   main.exit(1)
+end
+
+function run (npackets)
+   npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
+   local c = config.new()
+   -- Simple topology:
+   --               .------.
+   -- Source ---> Tee      Sink
+   --               `------'
+   -- Source generates packets, Tee duplicates them, Sink receives
+   -- both duplicates.
+   config.app(c, "Source", basic_apps.Source)
+   config.app(c, "Tee", basic_apps.Tee)
+   config.app(c, "Sink", basic_apps.Sink)
+   config.link(c, "Source.tx -> Tee.rx")
+   config.link(c, "Tee.tx1 -> Sink.rx1")
+   config.link(c, "Tee.tx2 -> Sink.rx2")
+   engine.configure(c)
+   local start = C.get_monotonic_time()
+   timer.init()
+   timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
+   while engine.app_table.Source.output.tx.stats.txpackets < npackets do
+      engine.main({duration = 0.01, no_report = true})
+   end
+   local finish = C.get_monotonic_time()
+   local runtime = finish - start
+   local packets = engine.app_table.Source.output.tx.stats.txpackets
+   engine.report()
+   print()
+   print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps)."):format(packets / 1e6, runtime, packets / runtime / 1e6))
+end
+
+run(unpack(main.parameters))
