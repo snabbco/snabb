@@ -136,7 +136,7 @@ function main (options)
       breathe()
       if not no_timers then timer.run() end
    until done and done()
-   report(options.report)
+   if not options.no_report then report(options.report) end
 end
 
 function breathe ()
