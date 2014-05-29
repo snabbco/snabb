@@ -148,8 +148,9 @@ function want_modify (p)
    if p.refcount == 1 then
       return p
    end
+   local new_p = clone(p)
    packet.deref(p)
-   return clone(p)
+   return new_p
 end
 
 -- fill's an allocated packet with data from a string
