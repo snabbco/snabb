@@ -347,10 +347,16 @@ end
 function VirtioNetDevice:set_vring_addr(idx, ring)
    if idx == 0 then
       self.txring = ring
-      self.txused = ring.used.idx
+      self.txused = tonumber(ring.used.idx)
+      -- reconnect
+      self.txavail = tonumber(ring.used.idx)
+      print(string.format("txavail = %d txused = %d", self.txavail, self.txused))
    else
       self.rxring = ring
-      self.rxused = ring.used.idx
+      self.rxused = tonumber(ring.used.idx)
+      -- reconnect
+      self.rxavail = tonumber(ring.used.idx)
+      print(string.format("rxavail = %d rxused = %d", self.rxavail, self.rxused))
    end
 end
 
