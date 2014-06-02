@@ -20,7 +20,7 @@ link_table, link_array = {}, {}
 
 configuration = config.new()
 
-monotinic_now = false
+monotonic_now = false
 
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
