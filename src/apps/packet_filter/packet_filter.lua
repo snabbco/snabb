@@ -395,8 +395,8 @@ function PacketFilter:new (confstring)
 end
 
 function PacketFilter:push ()
-   local i = assert(self.input.input, "input port not found")
-   local o = assert(self.output.output, "output port not found")
+   local i = assert(self.input.input or self.input.rx, "input port not found")
+   local o = assert(self.output.output or self.output.tx, "output port not found")
 
    local packets_tx = 0
    local max_packets_to_send = link.nwritable(o)

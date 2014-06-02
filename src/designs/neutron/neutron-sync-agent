@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Neutron synchronization slave process to run on the Compute Nodes.
+
+function error() { 
+    echo "ERROR: $@"
+    exit 1 
+}
+
+[ ! -z "$NEUTRON_DIR" ]      || export NEUTRON_DIR=/var/snabbswitch/neutron
+[ ! -z "$SNABB_DIR"   ]      || export SNABB_DIR=/var/snabbswitch/networks
+[ ! -z "$NEUTRON2SNABB" ]    || error "check_env_vars: \$NEUTRON2SNABB not set"
+#[ -x "$NEUTRON2SNABB" ]      || error "check_env_vars: \$NEUTRON2SNABB not an executable"
+[ ! -z "$SYNC_PATH" ]        || error "check_env_vars: \$SYNC_PATH not set"
+[ ! -z "$SYNC_HOST" ]        || error "check_env_vars: \$SYNC_HOST not set"
+#[ ! -z "$SYNC_LISTEN_PORT" ] || error "check_env_vars: \$SYNC_LISTEN_PORT not set"
+[ ! -z "$SYNC_INTERVAL" ]    || error "check_env_vars: \$SYNC_INTERVAL not set"
+
+# Remove old repository if it exists
+if [ -d $NEUTRON_DIR ]; then
+    rm -rf $NEUTRON_DIR
+fi
+
+if [ ! -d $SNABB_DIR ]; then
+    mkdir -p $SNABB_DIR
+fi
+
+# Loop pulling/cloning the repo.
+while true; do
+    if [ ! -d $NEUTRON_DIR ]; then
+	git clone --depth 1 git://$SYNC_HOST/$SYNC_PATH $NEUTRON_DIR
+    fi
+    cd $NEUTRON_DIR
+    git fetch
+    if ! git diff --quiet origin/master; then
+	git merge --ff origin/master
+	echo "Generating new configuration"
+	$NEUTRON2SNABB $NEUTRON_DIR $SNABB_DIR
+    fi
+    sleep 3
+done
+

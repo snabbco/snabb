@@ -65,3 +65,13 @@ function parse_app_arg (s)
    return loadstring("return " .. s)()
 end
 
+function graphviz (c)
+   local viz = 'digraph config {\n'
+   local function trim (name) return name:sub(0, 12) end
+   for linkspec,_ in pairs(c.links) do
+      local fa, fl, ta, tl = config.parse_link(linkspec)
+      viz = viz..'  '..trim(fa).." -> "..trim(ta)..' [taillabel="'..fl..'" headlabel="'..tl..'"]\n'
+   end
+   viz = viz..'}\n'
+   return viz
+end
