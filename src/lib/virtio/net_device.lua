@@ -294,6 +294,10 @@ function VirtioNetDevice:map_from_guest (addr)
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.guest and addr < m.guest + m.size then
+         if i ~= 0 then
+            self.mem_table[i] = self.mem_table[0]
+            self.mem_table[0] = m
+         end
          return addr + m.snabb - m.guest
       end
    end
