@@ -24,7 +24,7 @@ struct buffer_origin {
 
 // A buffer describes a piece of memory with known size and physical address.
 struct buffer {
-  char     *pointer; // virtual address in this process
+  unsigned char *pointer; // virtual address in this process
   uint64_t physical; // stable physical address
   uint32_t size;     // how many bytes in the buffer?
   struct buffer_origin origin;

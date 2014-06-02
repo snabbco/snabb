@@ -102,7 +102,7 @@ end
 
 function exit (status)
    if profiling then require("jit.p").stop() end
-   os.exit(0)
+   os.exit(status)
 end
 
 --- Globally initialize some things. Module can depend on this being done.
