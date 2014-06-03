@@ -18,6 +18,7 @@ local ipv6 = require("lib.protocol.ipv6")
 local gre = require("lib.protocol.gre")
 local packet = require("core.packet")
 local filter = require("lib.pcap.filter")
+local pcap = require("apps.pcap.pcap")
 
 local vpws = subClass(nil)
 local in_to_out = { customer = 'uplink', uplink = 'customer' }
@@ -105,8 +106,44 @@ function vpws:push()
    end
 end
 
-function vpws.selftest()
-   print("vpws selftest not implemented")
+function selftest()
+   local local_mac     = ethernet:pton("90:e2:ba:62:86:e5")
+   local remote_mac    = ethernet:pton("28:94:0f:fd:49:40")
+   local local_ip      = ipv6:pton("2001:620:0:C101:0:0:0:2")
+   local local_vpn_ip  = ipv6:pton("2001:620:0:C000:0:0:0:FC")
+   local remote_vpn_ip = ipv6:pton("2001:620:0:C000:0:0:0:FE")
+   local c = config.new()
+
+   config.app(c, "from_uplink", pcap.PcapReader, "apps/vpn/vpws-selftest-uplink.cap.input")
+   config.app(c, "from_customer", pcap.PcapReader, "apps/vpn/vpws-selftest-customer.cap.input")
+   config.app(c, "to_customer", pcap.PcapWriter, "apps/vpn/vpws-selftest-customer.cap.output")
+   config.app(c, "to_uplink", pcap.PcapWriter, "apps/vpn/vpws-selftest-uplink.cap.output")
+   config.app(c, "vpntp", vpws, { name          = "vpntp1",
+				  checksum      = true,
+				  label         = 0x12345678,
+				  local_vpn_ip  = local_vpn_ip,
+				  remote_vpn_ip = remote_vpn_ip,
+				  local_ip      = local_ip,
+				  local_mac     = local_mac,
+				  remote_mac    = remote_mac })
+   config.link(c, "from_uplink.output -> vpntp.uplink")
+   config.link(c, "vpntp.customer -> to_customer.input")
+   config.link(c, "from_customer.output -> vpntp.customer")
+   config.link(c, "vpntp.uplink -> to_uplink.input")
+   app.configure(c)
+   app.main({duration = 1})
+   if (io.open("apps/vpn/vpws-selftest-customer.cap.output"):read('*a') ~=
+ io.open("apps/vpn/vpws-selftest-customer.cap.expect"):read('*a')) then
+      print('vpws decapsulation selftest failed.')
+      os.exit(1)
+   end
+   if (io.open("apps/vpn/vpws-selftest-uplink.cap.output"):read('*a') ~=
+ io.open("apps/vpn/vpws-selftest-uplink.cap.expect"):read('*a')) then
+      print('vpws encapsulation selftest failed.')
+      os.exit(1)
+   end
 end
+
+vpws.selftest = selftest
 
 return vpws
