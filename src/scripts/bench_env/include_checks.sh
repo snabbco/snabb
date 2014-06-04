@@ -44,15 +44,53 @@ on_exit () {
     printf "Finished.\n"
 }
 
+detect_snabb () {
+    for f in "$@"; do
+        if [ -x "$f/snabb" ]; then
+            export SNABB=$f/snabb
+        fi
+    done
+}
+
 # Check if the script was executed as root
 if [ ! $(id -u) = 0 ]; then
     printf "This script must be run as root.\n"
     exit 1
 fi
 
+#save overridable values
+_SNABB=$SNABB
+
+# import the global config
 import_env "/etc" || ( printf "No /etc/bench_conf.sh found\n" && exit 1 )
 # overrirde from home folder
 import_env "$HOME"
+
+# patch imported variables
+if [ -n "$_SNABB" ]; then
+    export SNABB=$_SNABB
+else
+    # detect snabb in the current path if run from inside the snabb tree
+    # and not overried on the command line
+    detect_snabb ./ ./src $(dirname $0)/../../
+fi
+
+# detect designs
+printf "SNABB=$SNABB\n"
+SNABB_PATH=$(dirname $SNABB)
+if [ -f $SNABB_PATH/designs/nfv/nfv ]; then
+    export NFV=$SNABB_PATH/designs/nfv/nfv
+else
+    printf "NFV design not found\n"
+    exit 1
+fi
+
+if [ -f $SNABB_PATH/designs/loadgen/loadgen ]; then
+    export LOADGEN=$SNABB_PATH/designs/loadgen/loadgen
+else
+    printf "LOADGEN design not found\n"
+    exit 1
+fi
 
 # Check if the guest memory will fit in hugetlbfs
 PAGES=`cat /proc/meminfo | grep HugePages_Free | awk  '{ print $2; }'`

@@ -1,7 +1,5 @@
 # Snabbswitch instance variables
 SNABB="src/snabbswitch/src/snabbswitch"
-NFV="src/snabbswitch/src/designs/nfv/nfv"
-LOADGEN="src/snabbswitch/src/designs/loadgen/loadgen"
 PCAP="var/http.cap"
 
 NODE_BIND0="0"

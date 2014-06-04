@@ -63,8 +63,6 @@ accordingly as per the details of the system.
 Configuration overview
 A basic description of all the needed variables in ~/bench_conf.sh follows:
 SNABB: Location of the snabbswitch binary
-NFV: Location of the nfv snabbswitch design
-LOADGEN: Location of the loadgen snabbswitch design
 PCAP: pcap file to use with loadgen
 
 NODE_BIND: Number of the CPU/Memory node to attach an instance of snabbswitch/QEMU
