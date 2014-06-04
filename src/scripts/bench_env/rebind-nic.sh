@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /bin/sh
 #
 # Usage: sudo ./rebind-nic.sh 0000:07:00.0
 #
@@ -9,19 +9,19 @@
 #
 
 # Check if the script was executed as root
-if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root"
-   exit 1
+if [ $(id -u) -ne 0 ]; then
+    printf "This script must be run as root\n"
+    exit 1
 fi
 
 # Check if called properly and rebind the PCI device if so
 if [ -n "$1" ] && [ -f "/sys/bus/pci/devices/$1/remove" ] ; then
-	echo 1 > /sys/bus/pci/devices/$1/remove
-	echo 1 > /sys/bus/pci/rescan
-	echo "Re-bind successfull"
+    echo 1 > /sys/bus/pci/devices/$1/remove
+    echo 1 > /sys/bus/pci/rescan
+    printf "Re-bind successfull\n"
 else
-	echo "Usage: sudo ./rebind-nic.sh <PCI address>"
-	echo "Check if PCI device exists: /sys/bus/pci/devices/$1/remove"
-	exit 1
+    printf "Usage: sudo ./rebind-nic.sh <PCI address>\n"
+    printf "Check if PCI device exists: /sys/bus/pci/devices/$1/remove\n"
+    exit 1
 fi
 

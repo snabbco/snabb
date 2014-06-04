@@ -6,15 +6,18 @@ measurements.
 To use this environment the following are needed:
 - Linux kernel image
 - Linux userspace rootfs
-- ~/bench_conf.sh script that includes proper variables as described further
+- /etc/bench_conf.sh and ~/bench_conf.sh script that includes
+  proper variables as described further
+- QEMU with vhost-user enabled
 
 Building an Ubuntu kernel:
 
-    git clone git://kernel.ubuntu.com/ubuntu/ubuntu-trusty.git
-    cat debian.master/config/config.common.ubuntu \
+    $ git clone git://kernel.ubuntu.com/ubuntu/ubuntu-trusty.git
+    $ cd ubuntu-trusty
+    $ cat debian.master/config/config.common.ubuntu \
         debian.master/config/amd64/config.common.amd64 \
         debian.master/config/amd64/config.flavour.generic > .config
-    make bzImage -j4
+    $ make bzImage -j4
 
 The resulting bzImage should be pointed by bench_conf.sh in the KERNEL variable
 
@@ -23,10 +26,11 @@ Building an Ubuntu trusty userspace:
 - Create a virtual disk image with dd and format it properly:
     $ dd if=/dev/zero of=./ubuntu-trusty.img bs=1MiB count=2048
     $ sudo mkfs.ext4 ./ubuntu-trusty.img
+    $ mkdir mnt
     $ sudo mount -o loop ubuntu-trusty.img mnt
-    $ sudo debootstrap  --arch=amd64 trusty mnt
+    $ sudo debootstrap --arch=amd64 trusty mnt
 
-Once done you can "sudo chroot mnt" form the host machine.
+Once done you can "sudo chroot mnt" from the host machine.
 The following are needed:
 - passwd: to set the password of the system
 - Copy /etc/init/tty1.conf to /etc/init/ttyS0.conf and change the last line to:
@@ -35,9 +39,19 @@ The following are needed:
     auto eth0
     iface eth0 inet manual
     dns-nameserver 8.8.8.8
+- Put the VM hostname in /etc/hostname
 - Usual "apt-get update" "apt-get install package_name" to install software
 - locale-gen en_us.utf-8: To resolve any locale issues that apt-get might raise
 - Unmount the image and point to it from ~/bench_conf.sh in the IMAGE variables
+
+QEMU compilation (while not upstream)
+    git clone -b vhost-user-v10 https://github.com/virtualopensystems/qemu.git
+    mkdir qemu/obj
+    cd qemu/obj
+    ../configure --target-list=x86_64-softmmu
+    make -j4
+
+In bench_conf.sh point to qemu/obj/x86_64-softmmu/qemu-system-x86_64.
 
 Script test cases:
 
@@ -48,13 +62,13 @@ accordingly as per the details of the system.
 
 Configuration overview
 A basic description of all the needed variables in ~/bench_conf.sh follows:
-SNAB: Location of the snabbswitch binary
+SNABB: Location of the snabbswitch binary
 NFV: Location of the nfv snabbswitch design
 LOADGEN: Location of the loadgen snabbswitch design
 PCAP: pcap file to use with loadgen
 
 NODE_BIND: Number of the CPU/Memory node to attach an instance of snabbswitch/QEMU
-SNAB_LOG: File to store the output of a snabbswitch instance
+SNABB_LOG: File to store the output of a snabbswitch instance
 NFV_PCI: PCI device address that snabbswitch will use (eg. 0000:07:00.0)
 NFV_SOCKET: Filename of the socket used by snabbswitch and QEMU
 

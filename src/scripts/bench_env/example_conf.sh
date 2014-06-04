@@ -1,16 +1,16 @@
 # Snabbswitch instance variables
-SNAB="src/snabbswitch/src/snabbswitch"
+SNABB="src/snabbswitch/src/snabbswitch"
 NFV="src/snabbswitch/src/designs/nfv/nfv"
 LOADGEN="src/snabbswitch/src/designs/loadgen/loadgen"
 PCAP="var/http.cap"
 
 NODE_BIND0="0"
-SNAB_LOG0="/dev/null"
+SNABB_LOG0="/dev/null"
 NFV_PCI0="0000:07:00.0"
 NFV_SOCKET0="vhost$$_0.sock"
 
 NODE_BIND1="1"
-SNAB_LOG1="/dev/null"
+SNABB_LOG1="/dev/null"
 NFV_PCI1="0000:84:00.0"
 NFV_SOCKET1="vhost$$_1.sock"
 
