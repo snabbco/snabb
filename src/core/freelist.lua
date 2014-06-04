@@ -11,7 +11,7 @@ end
 
 function add (freelist, element)
    -- Safety check
-   assert(freelist.nfree < freelist.max, "freelist overflow")
+   if freelist.nfree == freelist.max then assert(freelist.nfree < freelist.max, "freelist overflow") end
    freelist.list[freelist.nfree] = element
    freelist.nfree = freelist.nfree + 1
 end

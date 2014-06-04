@@ -19,6 +19,7 @@ packets    = ffi.new("struct packet[?]", max_packets)
 local packet_size = ffi.sizeof("struct packet")
 
 function module_init ()
+   ffi.fill(packets, max_packets * packet_size)
    for i = 0, max_packets-1 do
       free(packets[i])
    end
@@ -184,7 +185,7 @@ end
 function deref (p,  n)
    n = n or 1
    if p.refcount > 0 then
-      assert(p.refcount >= n)
+      if debug then assert(p.refcount >= n) end
       if n == p.refcount then
          free(p)
       else
@@ -203,9 +204,10 @@ function free (p)
    for i = 0, p.niovecs-1 do
       buffer.free(p.iovecs[i].buffer)
    end
-   ffi.fill(p, packet_size, 0)
    p.refcount       = 1
    p.fuel           = initial_fuel
+   p.niovecs        = 0
+   p.length         = 0
    freelist.add(packets_fl, p)
 end
 

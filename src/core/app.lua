@@ -11,6 +11,7 @@ local ffi    = require("ffi")
 local C      = ffi.C
 require("core.packet_h")
 
+debug = false
 test_skipped_code = 43
 
 -- The set of all active apps and links in the system.
@@ -128,10 +129,13 @@ end
 
 -- Call this to "run snabb switch".
 function main (options)
-   local done = nil
    options = options or {}
+   local done = options.done
    local no_timers = options.no_timers
-   if options.duration then done = lib.timer(options.duration * 1e9) end
+   if options.duration then
+      assert(not done, "You can not have both 'duration' and 'done'")
+      done = lib.timer(options.duration * 1e9)
+   end
    repeat
       breathe()
       if not no_timers then timer.run() end
@@ -144,7 +148,9 @@ function breathe ()
    -- Inhale: pull work into the app network
    for _, app in ipairs(app_array) do
       if app.pull then
-         zone(app.zone) app:pull() zone()
+         if debug then zone(app.zone) end
+         app:pull()
+         if debug  then zone() end
       end
    end
    -- Exhale: push work out through the app network
@@ -157,7 +163,9 @@ function breathe ()
             link.has_new_data = false
             local receiver = app_array[link.receiving_app]
             if receiver.push then
-               zone(receiver.zone) receiver:push() zone()
+               if debug then zone(receiver.zone) end
+               receiver:push()
+               if debug then zone() end
                progress = true
             end
          end
