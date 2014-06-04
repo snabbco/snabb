@@ -78,10 +78,14 @@ end
 -- Receive all available packets from the virtual machine.
 function VirtioNetDevice:receive_packets_from_vm ()
 
-   while self.rxavail ~= self.rxring.avail.idx do
+   local rxavail = self.rxavail
+   local idx = self.rxring.avail.idx
+
+   while idx ~= rxavail do
+      if idx == 0 then idx = 65535 else idx = idx - 1 end
       local p = packet.allocate()
       -- Header
-      local header_id = self.rxring.avail.ring[self.rxavail % self.rx_vring_num]
+      local header_id = self.rxring.avail.ring[idx % self.rx_vring_num]
       local header_desc  = self.rxring.desc[header_id]
       local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(header_desc.addr))
       --assert(header_desc.len == virtio_net_hdr_size)
@@ -136,9 +140,13 @@ end
 
 -- Populate the `self.vring_transmit_buffers` freelist with buffers from the VM.
 function VirtioNetDevice:get_transmit_buffers_from_vm ()
-   while self.txavail ~= self.txring.avail.idx do
+   local txavail = self.txavail
+   local idx = self.txring.avail.idx
+
+   while idx ~= txavail do
+      if idx == 0 then idx = 65535 else idx = idx - 1 end
       -- Header
-      local header_id = self.txring.avail.ring[self.txavail % self.tx_vring_num]
+      local header_id = self.txring.avail.ring[idx % self.tx_vring_num]
       local header_desc  = self.txring.desc[header_id]
       local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(header_desc.addr))
       --assert(header_desc.len == virtio_net_hdr_size)
@@ -339,10 +347,16 @@ end
 function VirtioNetDevice:set_vring_addr(idx, ring)
    if idx == 0 then
       self.txring = ring
-      self.txused = ring.used.idx
+      self.txused = tonumber(ring.used.idx)
+      -- reconnect
+      self.txavail = tonumber(ring.used.idx)
+      print(string.format("txavail = %d txused = %d", self.txavail, self.txused))
    else
       self.rxring = ring
-      self.rxused = ring.used.idx
+      self.rxused = tonumber(ring.used.idx)
+      -- reconnect
+      self.rxavail = tonumber(ring.used.idx)
+      print(string.format("rxavail = %d rxused = %d", self.rxavail, self.rxused))
    end
 end
 
