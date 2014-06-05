@@ -42,7 +42,7 @@ The following are needed:
 - Put the VM hostname in /etc/hostname
 - Usual "apt-get update" "apt-get install package_name" to install software
 - locale-gen en_us.utf-8: To resolve any locale issues that apt-get might raise
-- Unmount the image and point to it from ~/bench_conf.sh in the IMAGE variables
+- Unmount the image and point to it from bench_conf.sh in the IMAGE variables
 
 QEMU compilation (while not upstream)
     git clone -b vhost-user-v10 https://github.com/virtualopensystems/qemu.git
@@ -55,13 +55,14 @@ In bench_conf.sh point to qemu/obj/x86_64-softmmu/qemu-system-x86_64.
 
 Script test cases:
 
-For the following scripts to be executed properly, another script is sourced
-(default: ~/bench_conf.sh), which contains all the configurable environmental
-variables needed. Copy example_conf.sh to ~/bench_conf.sh and edit it
-accordingly as per the details of the system.
+The configuration of the scripts is done in 2 levels:
+ - global /etc/bench_conf.sh
+ - per user $HOME/bench_conf.sh
+
+Use example_conf.sh as a referece how to setup the global or user specific script.
 
 Configuration overview
-A basic description of all the needed variables in ~/bench_conf.sh follows:
+A basic description of all the needed variables in bench_conf.sh follows:
 SNABB: Location of the snabbswitch binary
 PCAP: pcap file to use with loadgen
 
@@ -85,7 +86,7 @@ BOOTARGS: Linux kernel arguments to boot the guest with
 The following test cases are provided by script execution. Most of these
 scripts, in order to be usable, assume that the selected PCI NICs are wired
 together. Consult interfaces_wiring.txt for details on the naming and
-connections of the Intel network interfaces available. Adjust ~/bench_conf.sh
+connections of the Intel network interfaces available. Adjust bench_conf.sh
 accordingly:
 
 --- guest-snab-nics-snab-guest.sh: Two guests are instantiated which connect to
