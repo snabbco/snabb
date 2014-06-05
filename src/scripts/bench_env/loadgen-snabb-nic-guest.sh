@@ -36,9 +36,3 @@ numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
         -kernel $KERNEL -append "$BOOTARGS0" \
         -drive if=virtio,file=$IMAGE0 \
         -nographic
-
-# Kill snabbswitch instances
-kill $SNABB_PID0 $SNABB_PID1
-rm $NFV_SOCKET0
-
-printf "Exit.\n"

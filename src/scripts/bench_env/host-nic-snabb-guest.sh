@@ -32,8 +32,3 @@ numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
         -drive if=virtio,file=$IMAGE0 \
         -nographic
 
-# Kill snabbswitch instance and clean lef over socket files
-kill $SNABB_PID0
-rm $NFV_SOCKET0
-
-printf "Exit.\n"

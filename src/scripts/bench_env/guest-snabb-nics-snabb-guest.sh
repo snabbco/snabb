@@ -59,13 +59,3 @@ printf "All instances running.\n"
 printf "Connect to guests with:\n"
 printf "telnet localhost $TELNET_PORT0\n"
 printf "telnet localhost $TELNET_PORT1\n"
-
-printf "Waiting QEMU processes to terminate...\n"
-
-wait $QEMU_PID0 $QEMU_PID1
-
-# Kill snabbswitch instances and clean left over socket files
-kill $SNABB_PID0 $SNABB_PID1
-rm $NFV_SOCKET0 $NFV_SOCKET1
-
-printf "Exit.\n"
