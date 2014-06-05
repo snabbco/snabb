@@ -1,35 +1,125 @@
-# Check if the script was executed as root
-if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root."
-   exit 1
-fi
 
-# Check if configuration file is present on home directory
-ENV_FILE="${HOME}/bench_conf.sh"
+import_env () {
+    # Check if configuration file is present on etc directory
+    ENV_FILE="$1/bench_conf.sh"
+    [ -f $ENV_FILE ] && . $ENV_FILE || \
+    {
+        printf "Configuration file $ENV_FILE not found.\n" && \
+        return 1
+    }
 
-source $ENV_FILE || \
-{
-        echo "Configuration file missing!" && \
-        echo "Copy $ENV_FILE to your home directory and modify accordingly." && \
-        exit 1
+    printf "Sourced $ENV_FILE\n"
+    printf "\n------\n"
+    cat $ENV_FILE
+    printf "\n------\n"
+    return 0
 }
 
-echo "Sourced $ENV_FILE"
-echo -e "\n------"
-cat $ENV_FILE
-echo -e "------\n"
+wait_pid () {
+    for pid in "$@"; do
+        wait $pid
+    done
+}
+
+kill_pid () {
+    for pid in "$@"; do
+        kill -9 $pid > /dev/null 2>&1 || true
+    done
+}
+
+rm_file () {
+    for f in "$@"; do
+        [ -f "$f" ] && rm $f
+    done
+}
+
+on_exit () {
+    # cleanup on exit
+    printf "Waiting QEMU processes to terminate...\n"
+    wait_pid $QEMU_PID0 $QEMU_PID1
+
+    # Kill qemu and snabbswitch instances and clean left over socket files
+    kill_pid $QEMU_PID0 $QEMU_PID1 $SNABB_PID0 $SNABB_PID1
+    rm_file $NFV_SOCKET0 $NFV_SOCKET1
+    printf "Finished.\n"
+}
+
+detect_snabb () {
+    for f in "$@"; do
+        if [ -x "$f/snabb" ]; then
+            export SNABB=$f/snabb
+        fi
+    done
+}
+
+# Check if the script was executed as root
+if [ ! $(id -u) = 0 ]; then
+    printf "This script must be run as root.\n"
+    exit 1
+fi
+
+#save overridable values
+_SNABB=$SNABB
+
+# import the global config
+import_env "/etc" || ( printf "No /etc/bench_conf.sh found\n" && exit 1 )
+# overrirde from home folder
+import_env "$HOME"
+
+# patch imported variables
+if [ -n "$_SNABB" ]; then
+    export SNABB=$_SNABB
+else
+    # detect snabb in the current path if run from inside the snabb tree
+    # and not overried on the command line
+    detect_snabb ./ ./src $(dirname $0)/../../
+fi
+
+# detect designs
+printf "SNABB=$SNABB\n"
+SNABB_PATH=$(dirname $SNABB)
+if [ -f $SNABB_PATH/designs/nfv/nfv ]; then
+    export NFV=$SNABB_PATH/designs/nfv/nfv
+else
+    printf "NFV design not found\n"
+    exit 1
+fi
+
+if [ -f $SNABB_PATH/designs/loadgen/loadgen ]; then
+    export LOADGEN=$SNABB_PATH/designs/loadgen/loadgen
+else
+    printf "LOADGEN design not found\n"
+    exit 1
+fi
 
 # Check if the guest memory will fit in hugetlbfs
-PAGES=`cat /proc/meminfo | grep HugePages_Free`
-PAGES=${PAGES:16}
+PAGES=`cat /proc/meminfo | grep HugePages_Free | awk  '{ print $2; }'`
 PAGES=`expr $PAGES \* 2`
 
 TOTAL_MEM=`expr $GUEST_MEM \* $GUESTS`
 if [ "$PAGES" -lt "$TOTAL_MEM" ] ; then
-        echo "Exiting: Free HugePages are too low!"
-        echo "Increase /proc/sys/vm/nr_hugepages"
-        echo "and/or /proc/sys/vm/nr_hugepages_mempolicy"
-        echo "Hugepages should be set at: (guests memory / 2) + QEMU bookkeeping."
-        exit 1
+    printf "Exiting: Free HugePages are too low!\n"
+    printf "Increase /proc/sys/vm/nr_hugepages\n"
+    printf "and/or /proc/sys/vm/nr_hugepages_mempolicy\n"
+    printf "Hugepages should be set at: (guests memory / 2) + QEMU bookkeeping.\n"
+    exit 1
 fi
 
+# setup a trap hook
+trap on_exit EXIT HUP INT QUIT TERM
+
+# lock the resources
+do_lock () {
+    printf "Locking $1\n"
+    eval "exec $2>\"/var/run/bench$1.pid\""
+    flock -n -x $2
+
+	if [ $? != 0 ]; then
+	    printf "can't get lock on $1"
+	    exit 1
+	fi
+    echo $$ 1>&$2
+}
+
+do_lock $NFV_PCI0 8
+do_lock $NFV_PCI1 9

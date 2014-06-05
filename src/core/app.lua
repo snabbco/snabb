@@ -128,10 +128,13 @@ end
 
 -- Call this to "run snabb switch".
 function main (options)
-   local done = nil
    options = options or {}
+   local done = options.done
    local no_timers = options.no_timers
-   if options.duration then done = lib.timer(options.duration * 1e9) end
+   if options.duration then
+      assert(not done, "You can not have both 'duration' and 'done'")
+      done = lib.timer(options.duration * 1e9)
+   end
    repeat
       breathe()
       if not no_timers then timer.run() end

@@ -10,8 +10,9 @@ local timer      = require("core.timer")
 local pci        = require("lib.hardware.pci")
 local vfio       = require("lib.hardware.vfio")
 local vhost_user = require("apps.vhost.vhost_user")
+local C = require("ffi").C
 
-function main ()
+function run (npackets)
    print("Starting NFV...")
    local pciaddr = os.getenv("NFV_PCI") or error("No $NFV_PCI set.")
    local socket  = os.getenv("NFV_SOCKET") or error("No $NFV_SOCKET set.")
@@ -42,10 +43,33 @@ function main ()
    local nic, vm = app.app_table.nic, app.app_table.vm
    nic:set_rx_buffer_freelist(vm:rx_buffers())
    timer.init()
-   timer.activate(timer.new("report", app.report, 1e9, 'repeating'))
-   print("Entering app.main()")
-   app.main()
+   if not npackets then
+      timer.activate(timer.new("report", app.report, 1e9, 'repeating'))
+      print("Entering app.main()")
+      app.main()
+   else
+      npackets = tonumber(npackets)
+      print(app.app_table.vm.input.rx.stats.rxpackets)
+      local start, packets = 0, 0
+      local done = function ()
+         if start == 0 and app.app_table.vm.input.rx.stats.rxpackets > 0 then
+            -- started receiving, record time and packet count
+            packets = app.app_table.vm.input.rx.stats.rxpackets
+            start = C.get_monotonic_time()
+         end
+         return app.app_table.vm.input.rx.stats.rxpackets - packets >= npackets
+      end
+
+      app.main({done = done, no_report = true})
+      local finish = C.get_monotonic_time()
+
+      local runtime = finish - start
+      packets = app.app_table.vm.input.rx.stats.rxpackets - packets
+      engine.report()
+      print()
+      print(("Processed %.1f million packets in %.2f seconds\nRate(Mpps):\t%.3f"):format(packets / 1e6, runtime, packets / runtime / 1e6))
+   end
 end
 
-main()
+run(unpack(main.parameters))
 
