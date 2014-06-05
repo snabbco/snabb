@@ -107,3 +107,19 @@ fi
 
 # setup a trap hook
 trap on_exit EXIT HUP INT QUIT TERM
+
+# lock the resources
+do_lock () {
+    printf "Locking $1\n"
+    eval "exec $2>\"/var/run/bench$1.pid\""
+    flock -n -x $2
+
+	if [ $? != 0 ]; then
+	    printf "can't get lock on $1"
+	    exit 1
+	fi
+    echo $$ 1>&$2
+}
+
+do_lock $NFV_PCI0 8
+do_lock $NFV_PCI1 9
