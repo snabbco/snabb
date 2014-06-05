@@ -29,7 +29,9 @@ kill_pid () {
 
 rm_file () {
     for f in "$@"; do
-        [ -f "$f" ] && rm $f
+        if [ -e $f ]; then
+            rm -f $f
+        fi
     done
 }
 
