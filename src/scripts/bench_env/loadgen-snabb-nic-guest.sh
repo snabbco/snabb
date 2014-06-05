@@ -38,7 +38,7 @@ printf "telnet localhost $TELNET_PORT0\n"
 
 # Execute snabbswitch and pin it to a proper node (CPU and memory)
 export NFV_PCI=$NFV_PCI0 NFV_SOCKET=$NFV_SOCKET0
-numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND0 \
+numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
     $SNABB $NFV $NFV_PACKETS
 
 { echo "poweroff"; sleep 1; } | telnet localhost $TELNET_PORT0 > /dev/null 2>&1
