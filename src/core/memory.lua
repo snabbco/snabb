@@ -92,17 +92,16 @@ local virt_page_cache = {}
 function virtual_to_physical (virt_addr)
    virt_addr = ffi.cast("uint64_t", virt_addr)
    local virt_page = tonumber(virt_addr / base_page_size)
-   local offset    = tonumber(virt_addr % base_page_size)
    local phys_page = virt_page_cache[virt_page]
    if not phys_page then
-      phys_page = C.phys_page(virt_page)
+      phys_page = C.phys_page(virt_page) * base_page_size
       virt_page_cache[virt_page] = phys_page
    end
    if phys_page == 0 then
       error("Failed to resolve physical address of "..tostring(virt_addr))
    end
    --assert(phys_page == C.phys_page(virt_page))
-   return ffi.cast("uint64_t", phys_page * base_page_size + offset)
+   return ffi.cast("uint64_t", phys_page + virt_addr % base_page_size)
 end
 
 --- ### selftest
