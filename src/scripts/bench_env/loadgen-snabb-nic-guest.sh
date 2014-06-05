@@ -18,12 +18,6 @@ numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND1 \
     $SNABB $LOADGEN $PCAP $NFV_PCI1 > $SNABB_LOG1 2>&1 &
 SNABB_PID1=$!
 
-# Execute snabbswitch and pin it to a proper node (CPU and memory)
-export NFV_PCI=$NFV_PCI0 NFV_SOCKET=$NFV_SOCKET0
-numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND0 \
-    $SNABB $NFV > $SNABB_LOG0 2>&1 &
-SNABB_PID0=$!
-
 # Execute QEMU on the same node
 numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
     $QEMU \
@@ -32,7 +26,19 @@ numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
         -object memory-file,id=mem,size=$GUEST_MEM"M",mem-path=$HUGETLBFS,share=on \
         -chardev socket,id=char0,path=$NFV_SOCKET0,server \
         -netdev type=vhost-user,id=net0,chardev=char0 \
+        -serial telnet:localhost:$TELNET_PORT0,server,nowait \
         -device virtio-net-pci,netdev=net0,mac=$GUEST_MAC0 \
         -kernel $KERNEL -append "$BOOTARGS0" \
         -drive if=virtio,file=$IMAGE0 \
-        -nographic
+        -nographic > /dev/null 2>&1 &
+QEMU_PID0=$!
+
+printf "Connect to guests with:\n"
+printf "telnet localhost $TELNET_PORT0\n"
+
+# Execute snabbswitch and pin it to a proper node (CPU and memory)
+export NFV_PCI=$NFV_PCI0 NFV_SOCKET=$NFV_SOCKET0
+numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND0 \
+    $SNABB $NFV $NFV_PACKETS
+
+{ echo "poweroff"; sleep 1; } | telnet localhost $TELNET_PORT0 > /dev/null 2>&1

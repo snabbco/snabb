@@ -69,6 +69,7 @@ NODE_BIND: Number of the CPU/Memory node to attach an instance of snabbswitch/QE
 SNABB_LOG: File to store the output of a snabbswitch instance
 NFV_PCI: PCI device address that snabbswitch will use (eg. 0000:07:00.0)
 NFV_SOCKET: Filename of the socket used by snabbswitch and QEMU
+NFV_PACKETS: The number of packets that the VM in the NFV desing will receive before it exits
 
 GUEST_MEM: Memory size of each guest used
 HUGETLBFS: Path to where hugetlbfs is mounted
