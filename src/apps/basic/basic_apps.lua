@@ -5,6 +5,8 @@ local buffer = require("core.buffer")
 local freelist = require("core.freelist")
 local packet = require("core.packet")
 local link = require("core.link")
+local transmit, receive = link.transmit, link.receive
+
 
 local ffi = require("ffi")
 local C = ffi.C
@@ -51,7 +53,7 @@ function Source:pull ()
          end
          local p = packet.allocate()
          packet.add_iovec(p, b, self.size)
-         link.transmit(o, p)
+         transmit(o, p)
       end
    end
 end
@@ -67,7 +69,7 @@ end
 function Join:push () 
    for _, inport in ipairs(self.inputi) do
       for n = 1,math.min(link.nreadable(inport), link.nwritable(self.output.out)) do
-         link.transmit(self.output.out, link.receive(inport))
+         transmit(self.output.out, receive(inport))
       end
    end
 end
@@ -86,7 +88,7 @@ function Split:push ()
    for _, i in ipairs(self.inputi) do
       for _, o in ipairs(self.outputi) do
          for _ = 1, math.min(link.nreadable(i), link.nwritable(o)) do
-            link.transmit(o, link.receive(i))
+            transmit(o, receive(i))
          end
       end
    end
@@ -103,7 +105,7 @@ end
 function Sink:push ()
    for _, i in ipairs(self.inputi) do
       for _ = 1, link.nreadable(i) do
-        local p = link.receive(i)
+        local p = receive(i)
         packet.deref(p)
       end
    end
@@ -146,11 +148,11 @@ function Tee:push ()
       end
       for _, i in ipairs(self.inputi) do
          for _ = 1, math.min(link.nreadable(i), maxoutput) do
-            local p = link.receive(i)
+            local p = receive(i)
             packet.ref(p, noutputs - 1)
             maxoutput = maxoutput - 1
             for _, o in ipairs(self.outputi) do
-               link.transmit(o, p)
+               transmit(o, p)
             end
          end
       end
@@ -169,7 +171,7 @@ end
 function Repeater:push ()
    local i, o = self.input.input, self.output.output
    for _ = 1, link.nreadable(i) do
-      local p = link.receive(i)
+      local p = receive(i)
       packet.tenure(p)
       table.insert(self.packets, p)
    end
@@ -177,7 +179,7 @@ function Repeater:push ()
    if npackets > 0 then
       for i = 1, link.nwritable(o) do
          assert(self.packets[self.index])
-         link.transmit(o, self.packets[self.index])
+         transmit(o, self.packets[self.index])
          self.index = (self.index % npackets) + 1
       end
    end
@@ -207,7 +209,7 @@ do
          local i = self.input.input
          local npackets = link.nreadable(i)
          for index = 1, npackets do
-            local p = link.receive(i)
+            local p = receive(i)
             packet.tenure(p)
             o.packets[index - 1] = p
          end
