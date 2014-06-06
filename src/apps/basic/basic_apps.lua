@@ -151,9 +151,11 @@ function Tee:push ()
             local p = receive(i)
             packet.ref(p, noutputs - 1)
             maxoutput = maxoutput - 1
-            for _, o in ipairs(self.outputi) do
-               transmit(o, p)
-            end
+	    do local outputi = self.outputi
+	       for k = 1, #outputi do
+		  transmit(outputi[k], p)
+	       end
+	    end
          end
       end
    end
