@@ -32,6 +32,7 @@ function new_buffer ()
    local pointer, physical, bytes = memory.dma_alloc(buffersize)
    local b = lib.malloc("struct buffer")
    b.pointer, b.physical, b.size = pointer, physical, buffersize
+   b.origin.type = C.BUFFER_ORIGIN_UNKNOWN
    return b
 end
 
