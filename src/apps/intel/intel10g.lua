@@ -235,7 +235,7 @@ end
 function M_sf:add_receive_buffer (b)
    assert(self:can_add_receive_buffer())
    local desc = self.rxdesc[self.rdt].data
-   desc.address, desc.dd = b.physical, b.size
+   desc.address, desc.dd = b.physical, 0
    self.rxbuffers[self.rdt] = b
    self.rdt = (self.rdt + 1) % num_descriptors
 end
