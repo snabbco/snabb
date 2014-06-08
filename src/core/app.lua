@@ -20,12 +20,14 @@ link_table, link_array = {}, {}
 
 configuration = config.new()
 
+-- Count of the number of breaths taken
 breaths = 0
-
-monotonic_now = false
+-- Ideal number of breaths per second
+Hz = 10000
 
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
+monotonic_now = false
 function now ()
    return monotonic_now
 end
@@ -137,11 +139,27 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
+   monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
       if not no_timers then timer.run() end
+      pace_breathing()
    until done and done()
    if not options.no_report then report(options.report) end
+end
+
+local nextbreath
+-- Wait between breaths to keep frequency with Hz.
+function pace_breathing ()
+   if Hz then
+      nextbreath = nextbreath or monotonic_now
+      local sleep = tonumber(nextbreath - monotonic_now)
+      if sleep > 1e-6 then
+         C.usleep(sleep * 1e6)
+         monotonic_now = C.get_monotonic_time()
+      end
+      nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
+   end
 end
 
 function breathe ()
