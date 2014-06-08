@@ -20,10 +20,14 @@ link_table, link_array = {}, {}
 
 configuration = config.new()
 
-monotonic_now = false
+-- Count of the number of breaths taken
+breaths = 0
+-- Ideal number of breaths per second
+Hz = 10000
 
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
+monotonic_now = false
 function now ()
    return monotonic_now
 end
@@ -135,17 +139,34 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
+   monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
       if not no_timers then timer.run() end
+      pace_breathing()
    until done and done()
    if not options.no_report then report(options.report) end
+end
+
+local nextbreath
+-- Wait between breaths to keep frequency with Hz.
+function pace_breathing ()
+   if Hz then
+      nextbreath = nextbreath or monotonic_now
+      local sleep = tonumber(nextbreath - monotonic_now)
+      if sleep > 1e-6 then
+         C.usleep(sleep * 1e6)
+         monotonic_now = C.get_monotonic_time()
+      end
+      nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
+   end
 end
 
 function breathe ()
    monotonic_now = C.get_monotonic_time()
    -- Inhale: pull work into the app network
-   for _, app in ipairs(app_array) do
+   for i = 1, #app_array do
+      local app = app_array[i]
       if app.pull then
          zone(app.zone) app:pull() zone()
       end
@@ -155,7 +176,8 @@ function breathe ()
    repeat
       local progress = false
       -- For each link that has new data, run the receiving app
-      for _, link in ipairs(link_array) do
+      for i = 1, #link_array do
+         local link = link_array[i]
          if firstloop or link.has_new_data then
             link.has_new_data = false
             local receiver = app_array[link.receiving_app]
@@ -167,13 +189,14 @@ function breathe ()
       end
       firstloop = false
    until not progress  -- Stop after no link had new data
+   breaths = breaths + 1
 end
 
 function report (options)
    if not options or options.showlinks then
       print("link report")
       for name, l in pairs(link_table) do
-         print(lib.comma_value(tostring(tonumber(l.stats.txpackets))), "sent on", name)
+         print(lib.comma_value(tostring(tonumber(l.stats.txpackets))), "sent on", name, "(loss rate: " .. (tonumber(l.stats.txdrop) * 100 / tonumber(l.stats.txpackets)) .. "%)")
       end
    end
    if options and options.showapps then

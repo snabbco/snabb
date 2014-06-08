@@ -66,10 +66,13 @@ function VirtioNetDevice:new(owner)
    return setmetatable(o, {__index = VirtioNetDevice})
 end
 
-function VirtioNetDevice:poll_vring_packets ()
+function VirtioNetDevice:poll_vring_receive ()
    -- RX
    self:receive_packets_from_vm()
    self:rx_signal_used()
+end
+
+function VirtioNetDevice:poll_vring_transmit ()
    -- TX
    self:get_transmit_buffers_from_vm()
    self:transmit_packets_to_vm()
