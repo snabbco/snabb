@@ -20,6 +20,8 @@ link_table, link_array = {}, {}
 
 configuration = config.new()
 
+breaths = 0
+
 monotonic_now = false
 
 -- Return current monotonic time in seconds.
@@ -167,6 +169,7 @@ function breathe ()
       end
       firstloop = false
    until not progress  -- Stop after no link had new data
+   breaths = breaths + 1
 end
 
 function report (options)
