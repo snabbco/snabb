@@ -67,7 +67,9 @@ function run (npackets)
       packets = app.app_table.vm.input.rx.stats.rxpackets - packets
       engine.report()
       print()
-      print(("Processed %.1f million packets in %.2f seconds\nRate(Mpps):\t%.3f"):format(packets / 1e6, runtime, packets / runtime / 1e6))
+      print(("Processed %.1f million packets in %.2f seconds"):format(packets / 1e6, runtime))
+      print(("Made %s breaths: %.2f packets per breath; %.2fus per breath"):format(lib.comma_value(engine.breaths), packets / engine.breaths, runtime / engine.breaths * 1e6))
+      print(("Rate(Mpps):\t%.3f"):format(packets / runtime / 1e6))
    end
 end
 
