@@ -44,7 +44,7 @@ function VhostUser:pull ()
    else
       self:process_qemu_requests()
       if self.vhost_ready then
-         self.dev:poll_vring_packets()
+         self.dev:poll_vring_receive()
       end
    end
 end
@@ -53,6 +53,12 @@ end
 function VhostUser:connect ()
    local res = C.vhost_user_connect(self.socket_path)
    if res >= 0 then
+function VhostUser:push ()
+   if self.vhost_ready then
+      self.dev:poll_vring_transmit()
+   end
+end
+
       self.socket = res
       self.connected = true
    end
