@@ -41,9 +41,9 @@ function new_sf (pciaddress)
                  rxdesc = 0,     -- Receive descriptors (pointer)
                  rxdesc_phy = 0, -- Receive descriptors (physical address)
                  rxbuffers = {},   -- Rx descriptor index -> buffer mapping
-                 rdh = 0,          -- Cache of receive head (RDH) register
                  rdt = 0,          -- Cache of receive tail (RDT) register
-                 rxnext = 0        -- Index of next buffer to receive
+                 rxnext = 0,       -- Index of next buffer to receive
+                 txdone = 0        -- Index of next descriptor that may be done
               }
    return setmetatable(dev, M_sf)
 end
@@ -83,8 +83,10 @@ end
 function M_sf:init_dma_memory ()
    self.rxdesc, self.rxdesc_phy =
       self.info.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
+   ffi.fill(self.rxdesc, num_descriptors * ffi.sizeof(rxdesc_t))
    self.txdesc, self.txdesc_phy =
       self.info.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
+   ffi.fill(self.txdesc, num_descriptors * ffi.sizeof(txdesc_t))
    -- Add bounds checking
    self.rxdesc = lib.bounds_checked(rxdesc_t, self.rxdesc, 0, num_descriptors)
    self.txdesc = lib.bounds_checked(txdesc_t, self.txdesc, 0, num_descriptors)
@@ -182,15 +184,14 @@ function M_sf:transmit (p)
 end
 
 function M_sf:sync_transmit ()
-   local old_tdh = self.tdh
-   self.tdh = self.r.TDH()
-   C.full_memory_barrier()
-   -- Release processed buffers
-   while old_tdh ~= self.tdh do
-      packet.deref(self.txpackets[old_tdh])
-      self.txpackets[old_tdh] = nil
-      old_tdh = (old_tdh + 1) % num_descriptors
+   -- Process completed transmissions by hardware
+   while bit.band(self.txdesc[self.txdone].options, bit.lshift(1,32)) == 1 do
+      packet.deref(self.txpackets[self.txdone])
+      self.txdone = (self.txdone + 1) % num_descriptors
+      -- Clear DD to avoid processing the same descriptor again
+      self.txdesc[self.txdone].options = 0
    end
+   -- Advertise new packets to hardware
    self.r.TDT(self.tdt)
 end
 
@@ -203,7 +204,6 @@ end
 --- See datasheet section 7.1 "Inline Functions -- Receive Functionality."
 
 function M_sf:receive ()
-   assert(self.rdh ~= self.rxnext)
    local p = packet.allocate()
    repeat
       local b = self.rxbuffers[self.rxnext]
@@ -211,21 +211,20 @@ function M_sf:receive ()
       assert(wb.pkt_len > 0)
       assert(bit.band(wb.xstatus_xerror, 1) == 1) -- Descriptor Done
       packet.add_iovec(p, b, wb.pkt_len)
+      -- Clear DD to protect against processing this descriptor twice
+      wb.xstatus_xerror = bit.bxor(wb.xstatus_xerror, 1)
       self.rxnext = (self.rxnext + 1) % num_descriptors
    until bit.band(wb.xstatus_xerror, 2) == 2
    return p
 end
 
 function M_sf:can_receive ()
---   return self.rxnext ~= self.rdh and bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 1) == 1
-   local nxt = self.rxnext
-   while nxt ~= self.rdh do
-      local flags = bit.band(self.rxdesc[nxt].wb.xstatus_xerror, 3)
-      if flags == 3 then return true end
-      if flags == 0 then return false end
-      nxt = (nxt + 1) % num_descriptors
+   -- Fast forward past non-terminal descriptors (DD=1 EoP=0)
+   while bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 3) == 1 do
+      self.rxnext = self.rxnext + 1
    end
-   return false
+   -- Got a packet if DD=1 and EoP=1
+   return bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 3) == 3
 end
 
 function M_sf:can_add_receive_buffer ()
@@ -235,17 +234,12 @@ end
 function M_sf:add_receive_buffer (b)
    assert(self:can_add_receive_buffer())
    local desc = self.rxdesc[self.rdt].data
-   desc.address, desc.dd = b.physical, b.size
+   desc.address, desc.dd = b.physical, 0
    self.rxbuffers[self.rdt] = b
    self.rdt = (self.rdt + 1) % num_descriptors
 end
 
 function M_sf:sync_receive ()
-   -- XXX I have been surprised to see RDH = num_descriptors,
-   --     must check what that means. -luke
-   self.rdh = math.min(self.r.RDH(), num_descriptors-1)
-   assert(self.rdh < num_descriptors)
-   C.full_memory_barrier()
    self.r.RDT(self.rdt)
 end
 
@@ -433,9 +427,9 @@ function M_pf:new_vf (poolnum)
       rxdesc = 0,                   -- Receive descriptors (pointer)
       rxdesc_phy = 0,               -- Receive descriptors (physical address)
       rxbuffers = {},               -- Rx descriptor index -> buffer mapping
-      rdh = 0,                      -- Cache of receive head (RDH) register
       rdt = 0,                      -- Cache of receive tail (RDT) register
       rxnext = 0,                   -- Index of next buffer to receive
+      txdone = 0,                   -- Index of next descriptor that may be done
    }
    return setmetatable(vf, M_vf)
 end
