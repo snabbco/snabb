@@ -178,7 +178,7 @@ function report (options)
    if not options or options.showlinks then
       print("link report")
       for name, l in pairs(link_table) do
-         print(lib.comma_value(tostring(tonumber(l.stats.txpackets))), "sent on", name)
+         print(lib.comma_value(tostring(tonumber(l.stats.txpackets))), "sent on", name, "(loss rate: " .. (tonumber(l.stats.txdrop) * 100 / tonumber(l.stats.txpackets)) .. "%)")
       end
    end
    if options and options.showapps then
