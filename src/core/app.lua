@@ -147,7 +147,8 @@ end
 function breathe ()
    monotonic_now = C.get_monotonic_time()
    -- Inhale: pull work into the app network
-   for _, app in ipairs(app_array) do
+   for i = 1, #app_array do
+      local app = app_array[i]
       if app.pull then
          zone(app.zone) app:pull() zone()
       end
@@ -157,7 +158,8 @@ function breathe ()
    repeat
       local progress = false
       -- For each link that has new data, run the receiving app
-      for _, link in ipairs(link_array) do
+      for i = 1, #link_array do
+         local link = link_array[i]
          if firstloop or link.has_new_data then
             link.has_new_data = false
             local receiver = app_array[link.receiving_app]
