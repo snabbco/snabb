@@ -221,7 +221,7 @@ end
 function M_sf:can_receive ()
    -- Fast forward past non-terminal descriptors (DD=1 EoP=0)
    while bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 3) == 1 do
-      self.rxnext = self.rxnext + 1
+      self.rxnext = (self.rxnext + 1) % num_descriptors
    end
    -- Got a packet if DD=1 and EoP=1
    return bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 3) == 3
