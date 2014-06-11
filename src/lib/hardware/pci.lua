@@ -37,10 +37,12 @@ function device_info (pciaddress)
    info.pciaddress = pciaddress
    info.vendor = lib.firstline(p.."/vendor")
    info.device = lib.firstline(p.."/device")
-   info.interface = lib.firstfile(p.."/net")
    info.driver = which_driver(info.vendor, info.device)
-   if info.interface then
-      info.status = lib.firstline(p.."/net/"..info.interface.."/operstate")
+   if info.driver then
+      info.interface = lib.firstfile(p.."/net")
+      if info.interface then
+         info.status = lib.firstline(p.."/net/"..info.interface.."/operstate")
+      end
    end
    info.usable = lib.yesno(is_usable(info))
    return info
