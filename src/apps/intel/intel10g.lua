@@ -453,7 +453,7 @@ function M_vf:init (opts)
       :set_VLAN(opts.vlan)
       :set_rx_stats(opts.rxcounter)
       :set_tx_stats(opts.txcounter)
-      :set_tx_rate(opts.rate_limit)
+      :set_tx_rate(opts.rate_limit, opts.priority)
 end
 
 M_vf.close = M_sf.close
@@ -489,7 +489,7 @@ function M_vf:init_transmit ()
    self.pf.r.PFVMTXSW[math.floor(poolnum/32)]:clr(bits{LLE=poolnum%32})
    self.pf.r.PFVFTE[math.floor(poolnum/32)]:set(bits{VFTE=poolnum%32})
    self.pf.r.RTTDQSEL(poolnum)
-   self.pf.r.RTTDT1C(0x2000)
+   self.pf.r.RTTDT1C(0x80)
    self.pf.r.RTTBCNRC(0x00)         -- no rate limiting
    self.pf.r.DMATXCTL:set(bits{TE=0})
    self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26})
@@ -645,12 +645,19 @@ function M_vf:get_txstats ()
    }
 end
 
-function M_vf:set_tx_rate (limit)
-   if not limit then return self end
-   local factor = 10000 / tonumber(limit)       -- line rate = 10,000 Mb/s
-   factor = band(math.floor(factor*2^14+0.5), 2^24-1) -- 10.14 bits
+function M_vf:set_tx_rate (limit, priority)
+   limit = tonumber(limit) or 0
    self.pf.r.RTTDQSEL(self.poolnum)
-   self.pf.r.RTTBCNRC(bits({RS_ENA=31}, factor))
+   if limit >= 10 then
+      local factor = 10000 / tonumber(limit)       -- line rate = 10,000 Mb/s
+      factor = bit.band(math.floor(factor*2^14+0.5), 2^24-1) -- 10.14 bits
+      self.pf.r.RTTBCNRC(bits({RS_ENA=31}, factor))
+   else
+      self.pf.r.RTTBCNRC(0x00)
+   end
+
+   priority = tonumber(priority) or 1.0
+   self.pf.r.RTTDT1C(bit.band(math.floor(priority * 0x80), 0x3FF))
    return self
 end
 
