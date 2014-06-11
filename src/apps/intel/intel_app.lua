@@ -1,5 +1,6 @@
 module(...,package.seeall)
 
+local zone = require("jit.zone")
 local basic_apps = require("apps.basic.basic_apps")
 local lib      = require("core.lib")
 local register = require("lib.hardware.register")
@@ -40,7 +41,8 @@ function Intel82599:new (args)
          :open()
          :autonegotiate_sfi()
          :wait_linkup()
-      return setmetatable({dev=dev}, Intel82599)
+      if not dev then return null end
+      return setmetatable({dev=dev, zone="intel"}, Intel82599)
    end
 end
 
@@ -143,7 +145,7 @@ function selftest ()
       os.exit(engine.test_skipped_code)
    end
 
-   buffer.preallocate(100000)
+   zone('buffer') buffer.preallocate(100000) zone()
    sq_sq(pcideva, pcidevb)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
@@ -153,6 +155,7 @@ end
 
 -- open two singlequeue drivers on both ends of the wire
 function sq_sq(pcidevA, pcidevB)
+   engine.configure(config.new())
    local c = config.new()
    config.app(c, 'source1', basic_apps.Source)
    config.app(c, 'source2', basic_apps.Source)
@@ -186,6 +189,7 @@ function mq_sq(pcidevA, pcidevB)
       26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
       36 37
    ]], 98)                  -- src: As    dst: Bm1
+   engine.configure(config.new())
    local c = config.new()
    config.app(c, 'source_ms', basic_apps.Join)
    config.app(c, 'repeater_ms', basic_apps.Repeater)
