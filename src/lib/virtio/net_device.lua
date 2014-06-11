@@ -292,16 +292,22 @@ end
 
 -- Address space remapping.
 function VirtioNetDevice:map_to_guest (addr)
+   local result = nil
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.snabb and addr < m.snabb + m.size then
-         return addr + m.guest - m.snabb
+         result = addr + m.guest - m.snabb
+         break
       end
    end
-   error("mapping to guest address failed")
+   if not result then
+      error("mapping to guest address failed")
+   end
+   return result
 end
 
 function VirtioNetDevice:map_from_guest (addr)
+   local result = nil
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.guest and addr < m.guest + m.size then
@@ -309,20 +315,29 @@ function VirtioNetDevice:map_from_guest (addr)
             self.mem_table[i] = self.mem_table[0]
             self.mem_table[0] = m
          end
-         return addr + m.snabb - m.guest
+         result = addr + m.snabb - m.guest
+         break
       end
    end
-   error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
+   if not result then
+      error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
+   end
+   return result
 end
 
 function VirtioNetDevice:map_from_qemu (addr)
+   local result = nil
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.qemu and addr < m.qemu + m.size then
-         return addr + m.snabb - m.qemu
+         result = addr + m.snabb - m.qemu
+         break
       end
    end
-   error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
+   if not result then
+      error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
+   end
+   return result
 end
 
 function VirtioNetDevice:get_features()
