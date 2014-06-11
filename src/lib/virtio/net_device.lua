@@ -253,7 +253,9 @@ function VirtioNetDevice:transmit_packets_to_vm ()
 
    if self.txring.used.idx ~= self.txused then
       self.txring.used.idx = self.txused
-      C.write(self.callfd[0], eventfd_one, 8)
+      if bit.band(self.txring.avail.flags, C.VRING_F_NO_INTERRUPT) == 0 then
+         C.write(self.callfd[0], eventfd_one, 8)
+      end
    end
 end
 
@@ -277,11 +279,13 @@ function VirtioNetDevice:return_virtio_buffer (b)
    end
 end
 
--- Advance the rx used ring and sugnal up
+-- Advance the rx used ring and signal up
 function VirtioNetDevice:rx_signal_used()
    if self.rxring.used.idx ~= self.rxused then
       self.rxring.used.idx = self.rxused
-      C.write(self.callfd[1], eventfd_one, 8)
+      if bit.band(self.rxring.avail.flags, C.VRING_F_NO_INTERRUPT) == 0 then
+         C.write(self.callfd[1], eventfd_one, 8)
+      end
    end
 end
 
@@ -380,6 +384,7 @@ function VirtioNetDevice:set_vring_addr(idx, ring)
       self.rxavail = tonumber(ring.used.idx)
       print(string.format("rxavail = %d rxused = %d", self.rxavail, self.rxused))
    end
+   ring.used.flags = C.VRING_F_NO_NOTIFY
 end
 
 function VirtioNetDevice:ready()
