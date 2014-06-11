@@ -253,7 +253,9 @@ function VirtioNetDevice:transmit_packets_to_vm ()
 
    if self.txring.used.idx ~= self.txused then
       self.txring.used.idx = self.txused
-      C.write(self.callfd[0], eventfd_one, 8)
+      if bit.band(self.txring.avail.flags, C.VRING_F_NO_INTERRUPT) == 0 then
+         C.write(self.callfd[0], eventfd_one, 8)
+      end
    end
 end
 
@@ -277,11 +279,13 @@ function VirtioNetDevice:return_virtio_buffer (b)
    end
 end
 
--- Advance the rx used ring and sugnal up
+-- Advance the rx used ring and signal up
 function VirtioNetDevice:rx_signal_used()
    if self.rxring.used.idx ~= self.rxused then
       self.rxring.used.idx = self.rxused
-      C.write(self.callfd[1], eventfd_one, 8)
+      if bit.band(self.rxring.avail.flags, C.VRING_F_NO_INTERRUPT) == 0 then
+         C.write(self.callfd[1], eventfd_one, 8)
+      end
    end
 end
 
@@ -292,16 +296,22 @@ end
 
 -- Address space remapping.
 function VirtioNetDevice:map_to_guest (addr)
+   local result = nil
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.snabb and addr < m.snabb + m.size then
-         return addr + m.guest - m.snabb
+         result = addr + m.guest - m.snabb
+         break
       end
    end
-   error("mapping to guest address failed")
+   if not result then
+      error("mapping to guest address failed")
+   end
+   return result
 end
 
 function VirtioNetDevice:map_from_guest (addr)
+   local result = nil
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.guest and addr < m.guest + m.size then
@@ -309,20 +319,29 @@ function VirtioNetDevice:map_from_guest (addr)
             self.mem_table[i] = self.mem_table[0]
             self.mem_table[0] = m
          end
-         return addr + m.snabb - m.guest
+         result = addr + m.snabb - m.guest
+         break
       end
    end
-   error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
+   if not result then
+      error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
+   end
+   return result
 end
 
 function VirtioNetDevice:map_from_qemu (addr)
+   local result = nil
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.qemu and addr < m.qemu + m.size then
-         return addr + m.snabb - m.qemu
+         result = addr + m.snabb - m.qemu
+         break
       end
    end
-   error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
+   if not result then
+      error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
+   end
+   return result
 end
 
 function VirtioNetDevice:get_features()
@@ -365,6 +384,7 @@ function VirtioNetDevice:set_vring_addr(idx, ring)
       self.rxavail = tonumber(ring.used.idx)
       print(string.format("rxavail = %d rxused = %d", self.rxavail, self.rxused))
    end
+   ring.used.flags = C.VRING_F_NO_NOTIFY
 end
 
 function VirtioNetDevice:ready()

@@ -30,8 +30,13 @@ function VhostUser:new (socket_path)
       nfds = ffi.new("int[1]"),
       fds = ffi.new("int[?]", C.VHOST_USER_MEMORY_MAX_NREGIONS),
       socket_path = socket_path,
-      -- process qemu messages delay counter
-      process_qemu_counter = 0
+      -- process qemu messages timer
+      process_qemu_timer = timer.new(
+         "process qemu timer",
+         function () self:process_qemu_requests() end,
+         5e8,-- 500 ms
+         'non-repeating'
+      )
    }
    self = setmetatable(o, {__index = VhostUser})
    self.dev = net_device.VirtioNetDevice:new(self)
@@ -42,10 +47,15 @@ function VhostUser:pull ()
    if not self.connected then
       self:connect()
    else
-      self:process_qemu_requests()
       if self.vhost_ready then
          self.dev:poll_vring_receive()
       end
+   end
+end
+
+function VhostUser:push ()
+   if self.vhost_ready then
+      self.dev:poll_vring_transmit()
    end
 end
 
@@ -53,14 +63,10 @@ end
 function VhostUser:connect ()
    local res = C.vhost_user_connect(self.socket_path)
    if res >= 0 then
-function VhostUser:push ()
-   if self.vhost_ready then
-      self.dev:poll_vring_transmit()
-   end
-end
-
       self.socket = res
       self.connected = true
+      -- activate the process timer once
+      timer.activate(self.process_qemu_timer)
    end
 end
 
@@ -87,9 +93,6 @@ handler_names = {
 
 -- Process all vhost_user requests from QEMU.
 function VhostUser:process_qemu_requests ()
-   self.process_qemu_counter = self.process_qemu_counter + 1
-   if self.vhost_ready and self.process_qemu_counter % 1000000 ~= 0 then return end
-
    local msg = self.msg
    local stop = false
 
@@ -118,6 +121,8 @@ function VhostUser:process_qemu_requests ()
       end
    until stop
 
+   -- if we're still connected activate the timer once again
+   if self.connected then timer.activate(self.process_qemu_timer) end
 end
 
 function VhostUser:none (msg)
