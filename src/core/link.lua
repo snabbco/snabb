@@ -17,16 +17,20 @@ function new (receiving_app)
 end
 
 function receive (r)
-   if debug then assert(not empty(r), "receive on empty link") end
+--   if debug then assert(not empty(r), "receive on empty link") end
    local p = r.packets[r.read]
-   r.read = (r.read + 1) % size
+   do local n = r.read + 1
+      if n >= size then n = 0 end
+      r.read = n
+   end
+
    r.stats.rxpackets = r.stats.rxpackets + 1
    r.stats.rxbytes   = r.stats.rxbytes + p.length
    return p
 end
 
 function transmit (r, p)
-   assert(p)
+--   assert(p)
    if full(r) then
       r.stats.txdrop = r.stats.txdrop + 1
    else
