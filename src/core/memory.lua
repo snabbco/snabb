@@ -91,17 +91,18 @@ huge_page_size = get_huge_page_size()
 local virt_page_cache = {}
 function virtual_to_physical (virt_addr)
    virt_addr = ffi.cast("uint64_t", virt_addr)
-   local virt_page = tonumber(virt_addr / base_page_size)
-   local phys_page = virt_page_cache[virt_page]
-   if not phys_page then
-      phys_page = C.phys_page(virt_page) * base_page_size
-      virt_page_cache[virt_page] = phys_page
+   local virt_huge_page = tonumber(virt_addr / huge_page_size)
+   local phys_page_addr = virt_page_cache[virt_huge_page]
+   if not phys_page_addr  then
+      local virt_base_page = tonumber(virt_addr / base_page_size)
+      phys_page_addr = C.phys_page(virt_base_page) * base_page_size / huge_page_size * huge_page_size
+      virt_page_cache[virt_huge_page] = phys_page_addr
    end
-   if phys_page == 0 then
-      error("Failed to resolve physical address of "..tostring(virt_addr))
+   if phys_page_addr == 0 then
+      local ptrstring = tostring(ffi.cast("void*", virt_addr))
+      error("Failed to resolve physical address of "..ptrstring)
    end
-   --assert(phys_page == C.phys_page(virt_page))
-   return ffi.cast("uint64_t", phys_page + virt_addr % base_page_size)
+   return ffi.cast("uint64_t", phys_page_addr + virt_addr % huge_page_size)
 end
 
 --- ### selftest
