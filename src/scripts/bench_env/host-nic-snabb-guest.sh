@@ -24,7 +24,7 @@ numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
     $QEMU \
         -M pc -cpu kvm64 -smp 1 -cpu host --enable-kvm \
         -m $GUEST_MEM -numa node,memdev=mem \
-        -object memory-file,id=mem,size=$GUEST_MEM"M",mem-path=$HUGETLBFS,share=on \
+        -object memory-backend-file,id=mem,size=$GUEST_MEM"M",mem-path=$HUGETLBFS,share=on \
         -chardev socket,id=char0,path=$NFV_SOCKET0,server \
         -netdev type=vhost-user,id=net0,chardev=char0 \
         -device virtio-net-pci,netdev=net0,mac=$GUEST_MAC0 \
