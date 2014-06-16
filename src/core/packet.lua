@@ -12,10 +12,10 @@ local memory   = require("core.memory")
 
 require("core.packet_h")
 
-initial_fuel = 1000
-max_packets = 1e6
-packets_fl = freelist.new("struct packet *", max_packets)
-packets    = ffi.new("struct packet[?]", max_packets)
+local initial_fuel = 1000
+local max_packets = 1e6
+local packets_fl = freelist.new("struct packet *", max_packets)
+local packets    = ffi.new("struct packet[?]", max_packets)
 local packet_size = ffi.sizeof("struct packet")
 
 function module_init ()
@@ -203,7 +203,8 @@ function free (p)
    for i = 0, p.niovecs-1 do
       buffer.free(p.iovecs[i].buffer)
    end
-   ffi.fill(p, packet_size, 0)
+
+   p.niovecs        = 0
    p.refcount       = 1
    p.fuel           = initial_fuel
    freelist.add(packets_fl, p)
