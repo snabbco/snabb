@@ -9,6 +9,8 @@ local packet = require("core.packet")
 require("core.packet_h")
 require("core.link_h")
 
+local band = require("bit").band
+
 local size = C.LINK_RING_SIZE         -- NB: Huge slow-down if this is not local
 max        = C.LINK_MAX_PACKETS
 
@@ -19,10 +21,7 @@ end
 function receive (r)
 --   if debug then assert(not empty(r), "receive on empty link") end
    local p = r.packets[r.read]
-   do local n = r.read + 1
-      if n >= size then n = 0 end
-      r.read = n
-   end
+   r.read = band(r.read + 1, size - 1)
 
    r.stats.rxpackets = r.stats.rxpackets + 1
    r.stats.rxbytes   = r.stats.rxbytes + p.length
@@ -35,7 +34,7 @@ function transmit (r, p)
       r.stats.txdrop = r.stats.txdrop + 1
    else
       r.packets[r.write] = p
-      r.write = (r.write + 1) % size
+      r.write = band(r.write + 1, size - 1)
       r.stats.txpackets = r.stats.txpackets + 1
       r.stats.txbytes   = r.stats.txbytes + p.length
       r.has_new_data = true
@@ -49,7 +48,7 @@ end
 
 -- Return true if the ring is full.
 function full (r)
-   return (r.write + 1) % size == r.read
+   return band(r.write + 1, size - 1) == r.read
 end
 
 -- Return the number of packets that are ready for read.
