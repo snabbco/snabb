@@ -78,7 +78,7 @@ EOF
 
 # Abbreviate rehash $1.
 function shorthash {
-    echo "${1:0:6}"
+    echo "${1:0:7}"
 }
 
 # Plot records for commits in $1.
@@ -159,7 +159,7 @@ function check_mode {
 
     # Print header.
     echo "Comparing with SAMPLESIZE=$SAMPLESIZE)"
-    echo "(benchmark, mean score, standard deviation, abbrev. sha1 sum)"
+    echo "(benchmark, abbrev. sha1 sum, mean score, standard deviation)"
 
     # Iterate over benchmarks.
     for benchmark in "$benchmarks"/*; do
@@ -181,7 +181,7 @@ function check_mode {
             fi
 
             # Print result.
-            echo "$(basename "$benchmark") $result $(shorthash "$commit")"
+            echo "$(basename "$benchmark") $(shorthash "$commit") $result"
 
         done
 

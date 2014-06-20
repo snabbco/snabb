@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# A GitHub reposiory identifier (<owner>/<repo>).
+export REPO=SnabbCo/snabbswitch
+
+# Directory with a subdirectory `tasks' which must contain the task
+# scripts. Logs will also be stored here.
+export SNABBBOTDIR=/var/snabb_bot
+
+# Unless `jq' is installed in a place where bash(1) can find it, you will
+# need to point this variable to the `jq' executable.
+export JQ=./jq
+
+# GitHub credentials used to post comments (<username>:<password>).
+export GITHUB_CREDENTIALS="SnabbBot:<PASSWORD>"
