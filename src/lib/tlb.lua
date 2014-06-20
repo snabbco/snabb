@@ -20,10 +20,12 @@ function add (tlb, from, to)
    tlb[page] = offset
 end
 
+local rshift = bit.rshift
+
 -- Cache lookup. Retrun translated address or nil.
 function lookup (tlb, pointer)
    local address = u64(pointer)
-   local page = tonumber(bit.rshift(address, tlb.pagesize))
+   local page = tonumber(rshift(address, tlb.pagesize))
    if tlb[page] then
       local address = u64(pointer) + tlb[page]
       return ffi.cast(ffi.typeof(pointer), address)
