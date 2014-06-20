@@ -17,6 +17,7 @@ local index_set = require("lib.index_set")
 local macaddress = require("lib.macaddress")
 
 local bits, bitset = lib.bits, lib.bitset
+local band = require("bit").band
 
 num_descriptors = 32 * 1024
 --num_descriptors = 32
@@ -177,7 +178,7 @@ function M_sf:transmit (p)
       self.txdesc[self.tdt].address = iov.buffer.physical + iov.offset
       self.txdesc[self.tdt].options = bit.bor(iov.length, flags, bit.lshift(p.length+0ULL, 46))
       self.txpackets[self.tdt] = packet.ref(p)
-      self.tdt = (self.tdt + 1) % num_descriptors
+      self.tdt = band(self.tdt + 1, num_descriptors - 1)
    end
 end
 
@@ -189,13 +190,13 @@ function M_sf:sync_transmit ()
    while old_tdh ~= self.tdh do
       packet.deref(self.txpackets[old_tdh])
       self.txpackets[old_tdh] = nil
-      old_tdh = (old_tdh + 1) % num_descriptors
+      old_tdh = band(old_tdh + 1, num_descriptors - 1)
    end
    self.r.TDT(self.tdt)
 end
 
 function M_sf:can_transmit ()
-   return (self.tdt + 1) % num_descriptors ~= self.tdh
+   return band(self.tdt + 1, num_descriptors - 1) ~= self.tdh
 end
 
 --- ### Receive
@@ -207,21 +208,21 @@ function M_sf:receive ()
    local p = packet.allocate()
    repeat
       local wb = self.rxdesc[self.rxnext].wb
-      if bit.band(wb.xstatus_xerror, 1) == 1 then -- Descriptor Done
+      if band(wb.xstatus_xerror, 1) == 1 then -- Descriptor Done
          local b = self.rxbuffers[self.rxnext]
          packet.add_iovec(p, b, wb.pkt_len)
-         self.rxnext = (self.rxnext + 1) % num_descriptors
+         self.rxnext = band(self.rxnext + 1, num_descriptors - 1)
       end
-   until bit.band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
+   until band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
    return p
 end
 
 function M_sf:can_receive ()
-   return self.rxnext ~= self.rdh and bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 1) == 1
+   return self.rxnext ~= self.rdh and band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 1) == 1
 end
 
 function M_sf:can_add_receive_buffer ()
-   return (self.rdt + 1) % num_descriptors ~= self.rxnext
+   return band(self.rdt + 1, num_descriptors - 1) ~= self.rxnext
 end
 
 function M_sf:add_receive_buffer (b)
@@ -229,7 +230,7 @@ function M_sf:add_receive_buffer (b)
    local desc = self.rxdesc[self.rdt].data
    desc.address, desc.dd = b.physical, 0
    self.rxbuffers[self.rdt] = b
-   self.rdt = (self.rdt + 1) % num_descriptors
+   self.rdt = band(self.rdt + 1, num_descriptors - 1)
 end
 
 function M_sf:sync_receive ()
@@ -254,7 +255,7 @@ function negotiated_autoc (dev, f)
       dev.r.SWSM:wait(bits{SMBI=0})        -- TODO: expire at 10ms
       dev.r.SWSM:set(bits{SWESMBI=1})
       dev.r.SWSM:wait(bits{SWESMBI=1})     -- TODO: expire at 3s
-      accessible = bit.band(dev.r.SW_FW_SYNC(), 0x8) == 0
+      accessible = band(dev.r.SW_FW_SYNC(), 0x8) == 0
       if accessible then
          dev.r.SW_FW_SYNC:set(0x8)
       end
@@ -274,7 +275,7 @@ end
 function set_SFI (dev)
    local autoc = dev.r.AUTOC()
    autoc = bit.bor(
-      bit.band(autoc, 0xFFFF0C7E),          -- clears FLU, 10g_pma, 1g_pma, restart_AN, LMS
+      band(autoc, 0xFFFF0C7E),          -- clears FLU, 10g_pma, 1g_pma, restart_AN, LMS
       bit.lshift(0x3, 13)                   -- LMS(15:13) = 011b
    )
    dev.r.AUTOC(autoc)                       -- TODO: firmware synchronization
@@ -645,7 +646,7 @@ end
 function M_vf:set_tx_rate (limit)
    if not limit then return self end
    local factor = 10000 / tonumber(limit)       -- line rate = 10,000 Mb/s
-   factor = bit.band(math.floor(factor*2^14+0.5), 2^24-1) -- 10.14 bits
+   factor = band(math.floor(factor*2^14+0.5), 2^24-1) -- 10.14 bits
    self.pf.r.RTTDQSEL(self.poolnum)
    self.pf.r.RTTBCNRC(bits({RS_ENA=31}, factor))
    return self
