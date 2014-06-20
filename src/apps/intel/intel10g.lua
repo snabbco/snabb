@@ -206,26 +206,18 @@ function M_sf:receive ()
    assert(self.rdh ~= self.rxnext)
    local p = packet.allocate()
    repeat
-      local b = self.rxbuffers[self.rxnext]
       local wb = self.rxdesc[self.rxnext].wb
-      assert(wb.pkt_len > 0)
-      assert(bit.band(wb.xstatus_xerror, 1) == 1) -- Descriptor Done
-      packet.add_iovec(p, b, wb.pkt_len)
-      self.rxnext = (self.rxnext + 1) % num_descriptors
-   until bit.band(wb.xstatus_xerror, 2) == 2
+      if bit.band(wb.xstatus_xerror, 1) == 1 then -- Descriptor Done
+         local b = self.rxbuffers[self.rxnext]
+         packet.add_iovec(p, b, wb.pkt_len)
+         self.rxnext = (self.rxnext + 1) % num_descriptors
+      end
+   until bit.band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
    return p
 end
 
 function M_sf:can_receive ()
---   return self.rxnext ~= self.rdh and bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 1) == 1
-   local nxt = self.rxnext
-   while nxt ~= self.rdh do
-      local flags = bit.band(self.rxdesc[nxt].wb.xstatus_xerror, 3)
-      if flags == 3 then return true end
-      if flags == 0 then return false end
-      nxt = (nxt + 1) % num_descriptors
-   end
-   return false
+   return self.rxnext ~= self.rdh and bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 1) == 1
 end
 
 function M_sf:can_add_receive_buffer ()
