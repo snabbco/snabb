@@ -6,6 +6,7 @@ local C = ffi.C
 local lib = require("core.lib")
 local app = require("core.app")
 local link = require("core.link")
+local receive = link.receive
 local buffer = require("core.buffer")
 local intel10g = require("apps.intel.intel10g")
 local memory = require("core.memory")
@@ -46,8 +47,9 @@ end
 function LoadGen:push ()
    if self.input.input then
       while not link.empty(self.input.input) and self.dev:can_transmit() do
-         local p = link.receive(self.input.input)
-         self.dev:transmit(p)
+         do local p = receive(self.input.input)
+	    self.dev:transmit(p)
+	 end
       end
    end
 end
