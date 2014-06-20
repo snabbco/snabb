@@ -10,6 +10,7 @@ local link      = require("core.link")
 local memory    = require("core.memory")
 local packet    = require("core.packet")
 local timer     = require("core.timer")
+local tlb       = require("lib.tlb")
 local ffi       = require("ffi")
 local C         = ffi.C
 
@@ -295,12 +296,15 @@ function VirtioNetDevice:translate_physical_addr (addr)
 end
 
 -- Address space remapping.
+local host2guest = tlb.new(21)
 function VirtioNetDevice:map_to_guest (addr)
-   local result = nil
+   local result = tlb.lookup(host2guest, addr)
+   if result ~= nil then return result end
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.snabb and addr < m.snabb + m.size then
          result = addr + m.guest - m.snabb
+         tlb.add(host2guest, addr, result)
          break
       end
    end
@@ -310,8 +314,10 @@ function VirtioNetDevice:map_to_guest (addr)
    return result
 end
 
+local guest2host = tlb.new(21)
 function VirtioNetDevice:map_from_guest (addr)
-   local result = nil
+   local result = tlb.lookup(guest2host, addr)
+   if result ~= nil then return result end
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.guest and addr < m.guest + m.size then
@@ -320,6 +326,7 @@ function VirtioNetDevice:map_from_guest (addr)
             self.mem_table[0] = m
          end
          result = addr + m.snabb - m.guest
+         tlb.add(guest2host, addr, result)
          break
       end
    end
@@ -329,12 +336,15 @@ function VirtioNetDevice:map_from_guest (addr)
    return result
 end
 
+local qemu2host = tlb.new(21)
 function VirtioNetDevice:map_from_qemu (addr)
-   local result = nil
+   local result = tlb.lookup(qemu2host, addr)
+   if result ~= nil then return result end
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.qemu and addr < m.qemu + m.size then
          result = addr + m.snabb - m.qemu
+         tlb.add(qemu2host, addr, result)
          break
       end
    end
