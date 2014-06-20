@@ -85,23 +85,21 @@ huge_page_size = get_huge_page_size()
 
 --- ### Physical address translation
 
--- Convert from virtual address (pointer) to physical address (uint64_t).
--- Use local caching of virtual to physical page translation. This will work
--- only if the mlockall was called.
-local virt_page_cache = {}
+local tlb = require("lib.tlb")
+local phystlb = tlb.new(math.log(huge_page_size, 2))
+
 function virtual_to_physical (virt_addr)
+   local cached = tlb.lookup(phystlb, virt_addr)
+   if cached then return cached end
    virt_addr = ffi.cast("uint64_t", virt_addr)
    local virt_page = tonumber(virt_addr / base_page_size)
-   local phys_page = virt_page_cache[virt_page]
-   if not phys_page then
-      phys_page = C.phys_page(virt_page) * base_page_size
-      virt_page_cache[virt_page] = phys_page
-   end
+   local phys_page = C.phys_page(virt_page) * base_page_size
    if phys_page == 0 then
       error("Failed to resolve physical address of "..tostring(virt_addr))
    end
-   --assert(phys_page == C.phys_page(virt_page))
-   return ffi.cast("uint64_t", phys_page + virt_addr % base_page_size)
+   local phys_addr = ffi.cast("uint64_t", phys_page + virt_addr % base_page_size)
+   tlb.add(phystlb, virt_addr, phys_addr)
+   return phys_addr
 end
 
 --- ### selftest
