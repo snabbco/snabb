@@ -169,8 +169,9 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
-txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21}
-txdesc_flags_last = bits({eop=24}, txdesc_flags)
+local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21}
+local txdesc_flags_last = bits({eop=24}, txdesc_flags)
+
 function M_sf:transmit (p)
    for i = 0, p.niovecs - 1 do
       local iov = p.iovecs[i]
