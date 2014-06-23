@@ -12,7 +12,6 @@ local memory   = require("core.memory")
 
 require("core.packet_h")
 
-initial_fuel = 1000
 max_packets = 1e6
 packets_fl = freelist.new("struct packet *", max_packets)
 packets    = ffi.new("struct packet[?]", max_packets)
@@ -205,7 +204,6 @@ function free (p)
    end
    ffi.fill(p, packet_size, 0)
    p.refcount       = 1
-   p.fuel           = initial_fuel
    freelist.add(packets_fl, p)
 end
 
@@ -229,7 +227,6 @@ end
 function report (p)
    local result = string.format([[
          refcount: %d
-         fuel: %d
          info.flags: %X
          info.gso_flags: %X
          info.hdr_len: %d
@@ -239,7 +236,7 @@ function report (p)
          niovecs: %d
          length: %d
       ]],
-      p.refcount, p.fuel, p.info.flags, p.info.gso_flags,
+      p.refcount, p.info.flags, p.info.gso_flags,
       p.info.hdr_len, p.info.gso_size, p.info.csum_start,
       p.info.csum_offset, p.niovecs, p.length
    )

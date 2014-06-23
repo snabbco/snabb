@@ -70,9 +70,6 @@ enum {
 
 struct packet {
   int32_t refcount;
-  // How much "fuel" does this packet have left before it's dropped?
-  // This is like the Time-To-Live (TTL) IP header field.
-  int32_t fuel;
   int32_t color;
   struct packet_info info;
   int niovecs;
