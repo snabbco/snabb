@@ -202,7 +202,8 @@ function free (p)
    for i = 0, p.niovecs-1 do
       buffer.free(p.iovecs[i].buffer)
    end
-   ffi.fill(p, packet_size, 0)
+   p.length         = 0
+   p.niovecs        = 0
    p.refcount       = 1
    freelist.add(packets_fl, p)
 end
