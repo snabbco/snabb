@@ -88,12 +88,7 @@ huge_page_bits = math.log(huge_page_size, 2)
 
 --- ### Physical address translation
 
-local tlb = require("lib.tlb")
-local phystlb = tlb.new(math.log(huge_page_size, 2))
-
 function virtual_to_physical (virt_addr)
-   local cached = tlb.lookup(phystlb, virt_addr)
-   if cached then return cached end
    virt_addr = ffi.cast("uint64_t", virt_addr)
    local virt_page = tonumber(virt_addr / base_page_size)
    local phys_page = C.phys_page(virt_page) * base_page_size
@@ -101,7 +96,6 @@ function virtual_to_physical (virt_addr)
       error("Failed to resolve physical address of "..tostring(virt_addr))
    end
    local phys_addr = ffi.cast("uint64_t", phys_page + virt_addr % base_page_size)
-   tlb.add(phystlb, virt_addr, phys_addr)
    return phys_addr
 end
 
