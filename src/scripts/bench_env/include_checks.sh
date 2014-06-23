@@ -100,13 +100,6 @@ PAGES=`cat /proc/meminfo | grep HugePages_Free | awk  '{ print $2; }'`
 PAGES=`expr $PAGES \* 2`
 
 TOTAL_MEM=`expr $GUEST_MEM \* $GUESTS`
-if [ "$PAGES" -lt "$TOTAL_MEM" ] ; then
-    printf "Exiting: Free HugePages are too low!\n"
-    printf "Increase /proc/sys/vm/nr_hugepages\n"
-    printf "and/or /proc/sys/vm/nr_hugepages_mempolicy\n"
-    printf "Hugepages should be set at: (guests memory / 2) + QEMU bookkeeping.\n"
-    exit 1
-fi
 
 # setup a trap hook
 trap on_exit EXIT HUP INT QUIT TERM
