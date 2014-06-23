@@ -75,4 +75,4 @@ struct packet {
   int niovecs;
   int length;
   struct packet_iovec iovecs[PACKET_IOVEC_MAX];
-};
+} __attribute__ ((aligned(64)));
