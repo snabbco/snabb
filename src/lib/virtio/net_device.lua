@@ -290,34 +290,28 @@ function VirtioNetDevice:rx_signal_used()
    end
 end
 
+local pagebits = memory.huge_page_bits
+
+-- Cache of the latest referenced physical page.
+local last_virt_page = false
+local last_virt_offset = false
 function VirtioNetDevice:translate_physical_addr (addr)
-   -- Assuming no-IOMMU
-   return memory.virtual_to_physical(addr)
+   local page = bit.rshift(addr, pagebits)
+   if page == last_virt_page then
+      return addr + last_virt_offset
+   end
+   local phys = memory.virtual_to_physical(addr)
+   last_virt_page = page
+   last_virt_offset = phys - addr
+   return phys
 end
 
--- Address space remapping.
-local host2guest = tlb.new(21)
-function VirtioNetDevice:map_to_guest (addr)
-   local result = tlb.lookup(host2guest, addr)
-   if result ~= nil then return result end
-   for i = 0, table.getn(self.mem_table) do
-      local m = self.mem_table[i]
-      if addr >= m.snabb and addr < m.snabb + m.size then
-         result = addr + m.guest - m.snabb
-         tlb.add(host2guest, addr, result)
-         break
-      end
-   end
-   if not result then
-      error("mapping to guest address failed")
-   end
-   return result
-end
-
-local guest2host = tlb.new(21)
+local last_guest_page = false
+local last_guest_offset = false
 function VirtioNetDevice:map_from_guest (addr)
-   local result = tlb.lookup(guest2host, addr)
-   if result ~= nil then return result end
+   local page = bit.rshift(addr, pagebits)
+   if page == last_guest_page then return addr + last_guest_offset end
+   local result
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.guest and addr < m.guest + m.size then
@@ -326,7 +320,8 @@ function VirtioNetDevice:map_from_guest (addr)
             self.mem_table[0] = m
          end
          result = addr + m.snabb - m.guest
-         tlb.add(guest2host, addr, result)
+         last_guest_page = page
+         last_guest_offset = m.snabb - m.guest
          break
       end
    end
@@ -336,15 +331,12 @@ function VirtioNetDevice:map_from_guest (addr)
    return result
 end
 
-local qemu2host = tlb.new(21)
 function VirtioNetDevice:map_from_qemu (addr)
-   local result = tlb.lookup(qemu2host, addr)
-   if result ~= nil then return result end
+   local result = nil
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.qemu and addr < m.qemu + m.size then
          result = addr + m.snabb - m.qemu
-         tlb.add(qemu2host, addr, result)
          break
       end
    end

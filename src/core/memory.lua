@@ -81,7 +81,10 @@ function get_huge_page_size ()
 end
 
 base_page_size = 4096
+-- Huge page size in bytes
 huge_page_size = get_huge_page_size()
+-- Address bits per huge page (2MB = 21 bits; 1GB = 30 bits)
+huge_page_bits = math.log(huge_page_size, 2)
 
 --- ### Physical address translation
 
