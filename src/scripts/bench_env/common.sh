@@ -68,6 +68,20 @@ run_qemu_tap () {
     run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV"
 }
 
+run_loadgen () {
+    if [ "$#" -ne 3 ]; then
+        print "wrong run_loadgen args\n"
+        exit 1
+    fi
+    NUMANODE=$1
+    PCI=$2
+    LOG=$3
+    numactl --cpunodebind=$NUMANODE --membind=$NUMANODE \
+        $SNABB $LOADGEN $PCAP $PCI > $LOG 2>&1 &
+
+    LOADGENPIDS="$LOADGENPIDS $!"
+}
+
 import_env () {
     # Check if configuration file is present on etc directory
     ENV_FILE="$1/bench_conf.sh"
@@ -117,7 +131,7 @@ on_exit () {
     wait_pid $QEMUPIDS
 
     # Kill qemu and snabbswitch instances and clean left over socket files
-    kill_pid $QEMUPIDS $SNABB_PID0 $SNABB_PID1
+    kill_pid $QEMUPIDS $LOADGENPIDS $SNABB_PID0 $SNABB_PID1
     rm_file $NFV_SOCKET0 $NFV_SOCKET1
     printf "Finished.\n"
 }
