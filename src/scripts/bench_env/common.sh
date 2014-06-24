@@ -82,6 +82,22 @@ run_loadgen () {
     LOADGENPIDS="$LOADGENPIDS $!"
 }
 
+run_nfv () {
+    if [ "$#" -ne 4 ]; then
+        print "wrong run_nfv args\n"
+        exit 1
+    fi
+    NUMANODE=$1
+    export NFV_PCI=$2
+    export NFV_SOCKET=$3
+    LOG=$4
+
+    numactl --cpunodebind=$NUMANODE --membind=$NUMANODE \
+        $SNABB $NFV $NFV_PACKETS > $LOG 2>&1 &
+
+    SNABBPIDS="$SNABBPIDS $!"
+}
+
 import_env () {
     # Check if configuration file is present on etc directory
     ENV_FILE="$1/bench_conf.sh"
@@ -100,6 +116,12 @@ import_env () {
 
 wait_qemus () {
     for pid in "$QEMUPIDS"; do
+        wait $pid
+    done
+}
+
+wait_snabbs () {
+    for pid in "$SNABBPIDS"; do
         wait $pid
     done
 }
@@ -131,7 +153,7 @@ on_exit () {
     wait_pid $QEMUPIDS
 
     # Kill qemu and snabbswitch instances and clean left over socket files
-    kill_pid $QEMUPIDS $LOADGENPIDS $SNABB_PID0 $SNABB_PID1
+    kill_pid $QEMUPIDS $SNABBPIDS $LOADGENPIDS $SNABB_PID0 $SNABB_PID1
     rm_file $NFV_SOCKET0 $NFV_SOCKET1
     printf "Finished.\n"
 }
