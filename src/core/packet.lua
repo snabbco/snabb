@@ -9,6 +9,7 @@ local buffer   = require("core.buffer")
 local freelist = require("core.freelist")
 local lib      = require("core.lib")
 local memory   = require("core.memory")
+local freelist_add, freelist_remove = freelist.add, freelist.remove
 
 require("core.packet_h")
 
@@ -25,7 +26,7 @@ end
 
 -- Return a packet, or nil if none is available.
 function allocate ()
-   return freelist.remove(packets_fl) or error("out of packets")
+   return freelist_remove(packets_fl) or error("out of packets")
 end
 
 -- Append data to a packet.
@@ -205,7 +206,7 @@ function free (p)
    p.length         = 0
    p.niovecs        = 0
    p.refcount       = 1
-   freelist.add(packets_fl, p)
+   freelist_add(packets_fl, p)
 end
 
 function iovec_dump (iovec)

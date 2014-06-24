@@ -17,7 +17,8 @@ local index_set = require("lib.index_set")
 local macaddress = require("lib.macaddress")
 
 local bits, bitset = lib.bits, lib.bitset
-local band = require("bit").band
+local band, bor, lshift = bit.band, bit.bor, bit.lshift
+local packet_ref = packet.ref
 
 num_descriptors = 32 * 1024
 --num_descriptors = 32
@@ -124,7 +125,7 @@ function M_sf:init_receive ()
       TXCRCEN=0, RXCRCSTRP=1, JUMBOEN=2, rsv2=3, TXPADEN=10,
       rsvd3=11, rsvd4=13, MDCSPD=16, RXLNGTHERREN=27,
    })
-   self.r.MAXFRS(bit.lshift(9000+18, 16))
+   self.r.MAXFRS(lshift(9000+18, 16))
    self:set_receive_descriptors()
    self.r.RXCTRL:set(bits{RXEN=0})
    return self
@@ -177,8 +178,8 @@ function M_sf:transmit (p)
       local iov = p.iovecs[i]
       local flags = (i + 1 < p.niovecs) and txdesc_flags or txdesc_flags_last
       self.txdesc[self.tdt].address = iov.buffer.physical + iov.offset
-      self.txdesc[self.tdt].options = bit.bor(iov.length, flags, bit.lshift(p.length+0ULL, 46))
-      self.txpackets[self.tdt] = packet.ref(p)
+      self.txdesc[self.tdt].options = bor(iov.length, flags, lshift(p.length+0ULL, 46))
+      self.txpackets[self.tdt] = packet_ref(p)
       self.tdt = band(self.tdt + 1, num_descriptors - 1)
    end
 end
@@ -275,9 +276,9 @@ end
 
 function set_SFI (dev)
    local autoc = dev.r.AUTOC()
-   autoc = bit.bor(
+   autoc = bor(
       band(autoc, 0xFFFF0C7E),          -- clears FLU, 10g_pma, 1g_pma, restart_AN, LMS
-      bit.lshift(0x3, 13)                   -- LMS(15:13) = 011b
+      lshift(0x3, 13)                   -- LMS(15:13) = 011b
    )
    dev.r.AUTOC(autoc)                       -- TODO: firmware synchronization
    return dev
@@ -374,7 +375,7 @@ function M_pf:set_vmdq_mode ()
    end
    -- clear PFQDE.QDE (queue drop enable) for each queue
    for i = 0, 127 do
-      self.r.PFQDE(bit.bor(bit.lshift(1,16), bit.lshift(i,8)))
+      self.r.PFQDE(bor(lshift(1,16), lshift(i,8)))
       self.r.FTQF[i](0x00)                 -- disable L3/4 filter
       self.r.RAH[i](0)
       self.r.RAL[i](0)
@@ -536,7 +537,7 @@ function M_vf:set_mirror (want_mirror)
 
       -- mirror some or all pools
       if want_mirror.pool then
-         mirror_rule = bit.bor(bits{VPME=0}, mirror_rule)
+         mirror_rule = bor(bits{VPME=0}, mirror_rule)
          if want_mirror.pool == true then       -- mirror all pools
             self.pf.r.PFMRVM[mirror_ndx](0xFFFFFFFF)
             self.pf.r.PFMRVM[mirror_ndx+4](0xFFFFFFFF)
@@ -545,9 +546,9 @@ function M_vf:set_mirror (want_mirror)
             local bm1 = self.pf.r.PFMRVM[mirror_ndx+4]
             for _, pool in ipairs(want_mirror.pool) do
                if pool <= 32 then
-                  bm0 = bit.bor(bit.lshift(1, pool), bm0)
+                  bm0 = bor(lshift(1, pool), bm0)
                else
-                  bm1 = bit.bor(bit.lshift(1, pool-32), bm1)
+                  bm1 = bor(lshift(1, pool-32), bm1)
                end
             end
             self.pf.r.PFMRVM[mirror_ndx](bm0)
@@ -558,20 +559,20 @@ function M_vf:set_mirror (want_mirror)
       -- mirror hardware port
       if want_mirror.port then
          if want_mirror.port == true or want_mirror.port == 'in' or want_mirror.port == 'inout' then
-            mirror_rule = bit.bor(bits{UPME=1}, mirror_rule)
+            mirror_rule = bor(bits{UPME=1}, mirror_rule)
          end
          if want_mirror.port == true or want_mirror.port == 'out' or want_mirror.port == 'inout' then
-            mirror_rule = bit.bor(bits{DPME=2}, mirror_rule)
+            mirror_rule = bor(bits{DPME=2}, mirror_rule)
          end
       end
 
       -- mirror some or all vlans
       if want_mirror.vlan then
-         mirror_rule = bit.bor(bits{VLME=3}, mirror_rule)
+         mirror_rule = bor(bits{VLME=3}, mirror_rule)
             -- TODO: set which vlan's want to mirror
       end
       if mirror_rule ~= 0 then
-         mirror_rule = bit.bor(mirror_rule, bit.lshift(self.poolnum, 8))
+         mirror_rule = bor(mirror_rule, lshift(self.poolnum, 8))
          self.pf.r.PFMRCTL[mirror_ndx]:set(mirror_rule)
       end
    end
@@ -611,7 +612,7 @@ function M_vf:set_rx_stats (counter)
    if not counter then return self end
    assert(counter>=0 and counter<16, "bad Rx counter")
    self.rxstats = counter
-   self.pf.qs.RQSMR[math.floor(self.rxqn/4)]:set(bit.lshift(counter,8*(self.rxqn%4)))
+   self.pf.qs.RQSMR[math.floor(self.rxqn/4)]:set(lshift(counter,8*(self.rxqn%4)))
    return self
 end
 
@@ -619,7 +620,7 @@ function M_vf:set_tx_stats (counter)
    if not counter then return self end
    assert(counter>=0 and counter<16, "bad Tx counter")
    self.txstats = counter
-   self.pf.qs.TQSM[math.floor(self.txqn/4)]:set(bit.lshift(counter,8*(self.txqn%4)))
+   self.pf.qs.TQSM[math.floor(self.txqn/4)]:set(lshift(counter,8*(self.txqn%4)))
    return self
 end
 
@@ -629,7 +630,7 @@ function M_vf:get_rxstats ()
       counter_id = self.rxstats,
       packets = tonumber(self.pf.qs.QPRC[self.rxstats]()),
       dropped = tonumber(self.pf.qs.QPRDC[self.rxstats]()),
-      bytes = tonumber(bit.lshift(self.pf.qs.QBRC_H[self.rxstats]()+0LL, 32)
+      bytes = tonumber(lshift(self.pf.qs.QBRC_H[self.rxstats]()+0LL, 32)
                + self.pf.qs.QBRC_L[self.rxstats]())
    }
 end
@@ -639,7 +640,7 @@ function M_vf:get_txstats ()
    return {
       counter_id = self.txstats,
       packets = tonumber(self.pf.qs.QPTC[self.txstats]()),
-      bytes = tonumber(bit.lshift(self.pf.qs.QBTC_H[self.txstats]()+0LL, 32)
+      bytes = tonumber(lshift(self.pf.qs.QBTC_H[self.txstats]()+0LL, 32)
                + self.pf.qs.QBTC_L[self.txstats]())
    }
 end
