@@ -7,22 +7,24 @@
 # - PORT for telnet serial
 # - NETDEV the netdev line
 run_qemu () {
-    if [ "$#" -ne 6 ]; then
-        print "wrong run_qemu args\n"
-        exit 1
-    fi
     NUMANODE=$1
     ARGS=$2
     IMG=$3
     MAC=$4
     TELNETPORT=$5
     NETDEV=$6
+    CPU=$7
 
     MEM="-m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on"
     NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC"
+    if [ -n "$CPU" ]; then
+        NUMA="--membind=$NUMANODE --physcpubind=$CPU"
+    else
+        NUMA="--cpunodebind=$NUMANODE --membind=$NUMANODE"
+    fi
 
     # Execute QEMU on the designated node
-    numactl --cpunodebind=$NUMANODE --membind=$NUMANODE \
+    numactl $NUMA \
         $QEMU \
             -kernel $KERNEL -append "$ARGS" \
             $MEM $NET \
@@ -40,14 +42,11 @@ run_qemu () {
 # - MAC address
 # - PORT for telnet serial
 # - vhost-user SOCKET
+# - optional CPU to execute on
 run_qemu_vhost_user () {
-    if [ "$#" -ne 6 ]; then
-        print "wrong run_qemu_vhost_user args\n"
-        exit 1
-    fi
     SOCKET=$6
     NETDEV="-netdev type=vhost-user,id=net0,chardev=char0 -chardev socket,id=char0,path=$SOCKET,server"
-    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV"
+    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7"
     QEMUSOCKS="$QEMUSOCKS $SOCKET"
 }
 
@@ -58,15 +57,11 @@ run_qemu_vhost_user () {
 # - MAC address
 # - PORT for telnet serial
 # - tap name
-# Execute QEMU, remove redirection for verbosity
+# - optional CPU to execute on
 run_qemu_tap () {
-    if [ "$#" -ne 6 ]; then
-        print "wrong run_qemu_vhost_user args\n"
-        exit 1
-    fi
     TAP=$6
     NETDEV="-netdev type=tap,id=net0,script=no,downscript=no,vhost=on,ifname=$TAP"
-    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV"
+    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7"
 }
 
 run_loadgen () {
@@ -77,6 +72,7 @@ run_loadgen () {
     NUMANODE=$1
     PCI=$2
     LOG=$3
+    CPU=$4
     numactl --cpunodebind=$NUMANODE --membind=$NUMANODE \
         $SNABB $LOADGEN $PCAP $PCI > $LOG 2>&1 &
 
@@ -84,16 +80,19 @@ run_loadgen () {
 }
 
 run_nfv () {
-    if [ "$#" -ne 4 ]; then
-        print "wrong run_nfv args\n"
-        exit 1
-    fi
     NUMANODE=$1
     export NFV_PCI=$2
     export NFV_SOCKET=$3
     LOG=$4
+    CPU=$5
 
-    numactl --cpunodebind=$NUMANODE --membind=$NUMANODE \
+    if [ -n "$CPU" ]; then
+        NUMA="--membind=$NUMANODE --physcpubind=$CPU"
+    else
+        NUMA="--cpunodebind=$NUMANODE --membind=$NUMANODE"
+    fi
+
+    numactl $NUMA \
         $SNABB $NFV $NFV_PACKETS > $LOG 2>&1 &
 
     SNABBPIDS="$SNABBPIDS $!"

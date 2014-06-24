@@ -28,12 +28,27 @@ VMNFVSOCK=$NFV_SOCKET0
 
 # Execute snabbswitch loadgen instance
 if [ -n "$RUN_LOADGEN" ]; then
-    run_loadgen "$LOADGENNODE" "$LOADGENPCIS" "$SNABB_LOG1"
+    # up to 4 numa nodes
+    for n in 0 1 2 3; do
+        ports=""
+        for pci in $LOADGENPCIS; do
+            node=`awk -F' ' "/$pci/ {print \\$2}" /etc/pci_affinity.conf`
+            if [ "$node" -eq "$n" ]; then
+                ports="$ports $pci"
+            fi
+        done
+        if [ -n "$ports" ]; then
+            run_loadgen "$n" "$ports" "$SNABB_LOG1"
+        fi
+    done
 fi
 
 printf "Connect to guests with:\n"
 count=0
 for pci in $VMPCIS; do
+    node=`awk -F' ' "/$pci/ {print \\$2}" /etc/pci_affinity.conf`
+    cpu=`awk -F' ' "/$pci/ {print \\$3}" /etc/pci_affinity.conf`
+
     img=${VMIMAGE}${count}
     if [ ! -f $img ]; then
         printf "$img not found\n"
@@ -43,13 +58,15 @@ for pci in $VMPCIS; do
     port=$((VMPORT+count))
     socket=${VMNFVSOCK}${count}
     # Execute QEMU on the same node
-    run_qemu_vhost_user "$VMNODE" "$VMARGS" "$img" "$VMMAC" "$port" "$socket"
+    run_qemu_vhost_user "$node" "$VMARGS" "$img" "$VMMAC" "$port" "$socket" "$cpu"
     printf "telnet localhost $port\n"
 
+    # snabb will use "next" cpu
+    cpu=$((cpu+1))
     log=${VMNFVLOG}${count}
     # Execute snabbswitch and pin it to a proper node (CPU and memory)
-    run_nfv "$VMNODE" "$pci" "$socket" "$log"
-    
+    run_nfv "$node" "$pci" "$socket" "$log" "$cpu"
+
     count=$((count+1))
 done
 
