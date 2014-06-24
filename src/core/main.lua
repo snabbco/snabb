@@ -14,7 +14,7 @@ require("lib.lua.class")
 
 -- Reserve names that we want to use for global module.
 -- (This way we avoid errors from the 'strict' module.)
-_G.config, _G.engine, _G.link, _G.buffer, _G.packet, _G.timer, _G.main = nil
+_G.config, _G.engine, _G.link, _G.buffer, _G.packet, _G.timer, _G.memory, _G.main = nil
 
 ffi.cdef[[
       extern int argc;
@@ -121,6 +121,7 @@ function initialize ()
    _G.buffer = require("core.buffer")
    _G.packet = require("core.packet")
    _G.timer  = require("core.timer")
+   _G.memory = require("core.memory")
    _G.main   = getfenv()
 end
 
