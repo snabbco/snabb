@@ -15,6 +15,7 @@ GUESTS="1"
 
 LOADGENPCIS=$NFV_PCI1
 LOADGENNODE=$NODE_BIND1
+LOADGENLOG=$SNABB_LOG1
 
 VMPCIS=$NFV_PCI0
 VMNODE=$NODE_BIND0
@@ -38,7 +39,12 @@ if [ -n "$RUN_LOADGEN" ]; then
             fi
         done
         if [ -n "$ports" ]; then
-            run_loadgen "$n" "$ports" "$SNABB_LOG1"
+            if [ "$LOADGENLOG" = "/dev/null" ]; then
+                log=$LOADGENLOG
+            else
+                log=${LOADGENLOG}${n}
+            fi
+            run_loadgen "$n" "$ports" "$log"
         fi
     done
 fi
@@ -63,7 +69,12 @@ for pci in $VMPCIS; do
 
     # snabb will use "next" cpu
     cpu=$((cpu+1))
-    log=${VMNFVLOG}${count}
+    if [ "$VMNFVLOG" = "/dev/null" ]; then
+        log="/tmp/nfv${pci}"
+    else
+        log=${VMNFVLOG}${count}
+    fi
+
     # Execute snabbswitch and pin it to a proper node (CPU and memory)
     run_nfv "$node" "$pci" "$socket" "$log" "$cpu"
 
@@ -77,7 +88,11 @@ wait_snabbs
 count=0
 totalmpps=0
 for pci in $VMPCIS; do
-    log=${VMNFVLOG}${count}
+    if [ "$VMNFVLOG" = "/dev/null" ]; then
+        log="/tmp/nfv${pci}"
+    else
+        log=${VMNFVLOG}${count}
+    fi
     mpps=`awk -F' ' '/Mpps/ {print $2}' $log`
     printf "On $pci got $mpps\n"
     count=$((count+1))
