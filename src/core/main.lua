@@ -35,8 +35,8 @@ Available options are:
 -jp=args[,.output]
 ]]
 
-local debug_on_error = false
-local profiling = false
+debug_on_error = false
+profiling = false
 
 -- List of parameters passed on the command line.
 parameters = {}
