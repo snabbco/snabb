@@ -10,7 +10,7 @@
 #
 
 GUESTS="2"
-. $(dirname $0)/include_checks.sh
+. $(dirname $0)/common.sh
 
 # Execute QEMU, remove redirection for verbosity
 numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \

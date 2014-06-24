@@ -11,7 +11,7 @@
 #
 
 GUESTS="1"
-. $(dirname $0)/include_checks.sh
+. $(dirname $0)/common.sh
 
 # Execute snabbswitch and pin it to the proper node (CPU and memory)
 export NFV_PCI=$NFV_PCI0 NFV_SOCKET=$NFV_SOCKET0

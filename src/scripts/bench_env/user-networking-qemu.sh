@@ -9,7 +9,7 @@
 #
 
 GUESTS="1"
-. $(dirname $0)/include_checks.sh
+. $(dirname $0)/common.sh
 
 # Execute QEMU
     $QEMU \

@@ -11,7 +11,7 @@
 #
 
 GUESTS="1"
-. $(dirname $0)/include_checks.sh
+. $(dirname $0)/common.sh
 
 # Execute snabbswitch loadgen instance
 numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND1 \

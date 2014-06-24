@@ -11,7 +11,7 @@
 #
 
 GUESTS="2"
-. $(dirname $0)/include_checks.sh
+. $(dirname $0)/common.sh
 
 # Execute snabbswitch - QEMU instance
 export NFV_PCI=$NFV_PCI0 NFV_SOCKET=$NFV_SOCKET0
