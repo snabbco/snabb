@@ -216,17 +216,22 @@ TOTAL_MEM=`expr $GUEST_MEM \* $GUESTS`
 trap on_exit EXIT HUP INT QUIT TERM
 
 # lock the resources
+# NOTE: running this on dash will crash if more than 7 arguments given
+#       search for "dash multidigit file descriptors" to understand why
 do_lock () {
-    printf "Locking $1\n"
-    eval "exec $2>\"/var/run/bench$1.pid\""
-    flock -n -x $2
+    fd=3
+    for pci in "$@"; do
+        printf "Locking $pci\n"
+        eval "exec $fd>\"/var/run/bench$pci.lock\""
+        flock -n -x $fd
 
-	if [ $? != 0 ]; then
-	    printf "can't get lock on $1"
-	    exit 1
-	fi
-    echo $$ 1>&$2
+        if [ $? != 0 ]; then
+            printf "can't get lock on $pci"
+            exit 1
+        fi
+        echo $$ 1>&$fd
+        fd=$((fd+1))
+    done
 }
 
-do_lock $NFV_PCI0 8
-do_lock $NFV_PCI1 9
+do_lock $NFV_PCI0 $NFV_PCI1
