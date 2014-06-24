@@ -5,7 +5,7 @@ local lib      = require("core.lib")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
 local freelist = require("core.freelist")
-
+local receive, transmit, full, empty = link.receive, link.transmit, link.full, link.empty
 Intel82599 = {}
 Intel82599.__index = Intel82599
 
@@ -74,8 +74,8 @@ function Intel82599:pull ()
    local l = self.output.tx
    if l == nil then return end
    self.dev:sync_receive()
-   while not link.full(l) and self.dev:can_receive() do
-      link.transmit(l, self.dev:receive())
+   while not full(l) and self.dev:can_receive() do
+      transmit(l, self.dev:receive())
    end
    self:add_receive_buffers()
 end
@@ -99,10 +99,11 @@ end
 function Intel82599:push ()
    local l = self.input.rx
    if l == nil then return end
-   while not link.empty(l) and self.dev:can_transmit() do
-      local p = link.receive(l)
-      self.dev:transmit(p)
-      packet.deref(p)
+   while not empty(l) and self.dev:can_transmit() do
+      do local p = receive(l)
+	 self.dev:transmit(p)
+	 packet.deref(p)
+      end
    end
    self.dev:sync_transmit()
 end

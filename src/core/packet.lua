@@ -9,10 +9,10 @@ local buffer   = require("core.buffer")
 local freelist = require("core.freelist")
 local lib      = require("core.lib")
 local memory   = require("core.memory")
+local freelist_add, freelist_remove = freelist.add, freelist.remove
 
 require("core.packet_h")
 
-initial_fuel = 1000
 max_packets = 1e6
 packets_fl = freelist.new("struct packet *", max_packets)
 packets    = ffi.new("struct packet[?]", max_packets)
@@ -26,7 +26,7 @@ end
 
 -- Return a packet, or nil if none is available.
 function allocate ()
-   return freelist.remove(packets_fl) or error("out of packets")
+   return freelist_remove(packets_fl) or error("out of packets")
 end
 
 -- Append data to a packet.
@@ -203,10 +203,10 @@ function free (p)
    for i = 0, p.niovecs-1 do
       buffer.free(p.iovecs[i].buffer)
    end
-   ffi.fill(p, packet_size, 0)
+   p.length         = 0
+   p.niovecs        = 0
    p.refcount       = 1
-   p.fuel           = initial_fuel
-   freelist.add(packets_fl, p)
+   freelist_add(packets_fl, p)
 end
 
 function iovec_dump (iovec)
@@ -229,7 +229,6 @@ end
 function report (p)
    local result = string.format([[
          refcount: %d
-         fuel: %d
          info.flags: %X
          info.gso_flags: %X
          info.hdr_len: %d
@@ -239,7 +238,7 @@ function report (p)
          niovecs: %d
          length: %d
       ]],
-      p.refcount, p.fuel, p.info.flags, p.info.gso_flags,
+      p.refcount, p.info.flags, p.info.gso_flags,
       p.info.hdr_len, p.info.gso_size, p.info.csum_start,
       p.info.csum_offset, p.niovecs, p.length
    )

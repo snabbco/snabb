@@ -17,6 +17,8 @@ local index_set = require("lib.index_set")
 local macaddress = require("lib.macaddress")
 
 local bits, bitset = lib.bits, lib.bitset
+local band, bor, lshift = bit.band, bit.bor, bit.lshift
+local packet_ref = packet.ref
 
 num_descriptors = 32 * 1024
 --num_descriptors = 32
@@ -123,7 +125,7 @@ function M_sf:init_receive ()
       TXCRCEN=0, RXCRCSTRP=1, JUMBOEN=2, rsv2=3, TXPADEN=10,
       rsvd3=11, rsvd4=13, MDCSPD=16, RXLNGTHERREN=27,
    })
-   self.r.MAXFRS(bit.lshift(9000+18, 16))
+   self.r.MAXFRS(lshift(9000+18, 16))
    self:set_receive_descriptors()
    self.r.RXCTRL:set(bits{RXEN=0})
    return self
@@ -168,16 +170,17 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
-txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21}
-txdesc_flags_last = bits({eop=24}, txdesc_flags)
+local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21}
+local txdesc_flags_last = bits({eop=24}, txdesc_flags)
+
 function M_sf:transmit (p)
    for i = 0, p.niovecs - 1 do
       local iov = p.iovecs[i]
       local flags = (i + 1 < p.niovecs) and txdesc_flags or txdesc_flags_last
       self.txdesc[self.tdt].address = iov.buffer.physical + iov.offset
-      self.txdesc[self.tdt].options = bit.bor(iov.length, flags, bit.lshift(p.length+0ULL, 46))
-      self.txpackets[self.tdt] = packet.ref(p)
-      self.tdt = (self.tdt + 1) % num_descriptors
+      self.txdesc[self.tdt].options = bor(iov.length, flags, lshift(p.length+0ULL, 46))
+      self.txpackets[self.tdt] = packet_ref(p)
+      self.tdt = band(self.tdt + 1, num_descriptors - 1)
    end
 end
 
@@ -189,13 +192,13 @@ function M_sf:sync_transmit ()
    while old_tdh ~= self.tdh do
       packet.deref(self.txpackets[old_tdh])
       self.txpackets[old_tdh] = nil
-      old_tdh = (old_tdh + 1) % num_descriptors
+      old_tdh = band(old_tdh + 1, num_descriptors - 1)
    end
    self.r.TDT(self.tdt)
 end
 
 function M_sf:can_transmit ()
-   return (self.tdt + 1) % num_descriptors ~= self.tdh
+   return band(self.tdt + 1, num_descriptors - 1) ~= self.tdh
 end
 
 --- ### Receive
@@ -207,21 +210,21 @@ function M_sf:receive ()
    local p = packet.allocate()
    repeat
       local wb = self.rxdesc[self.rxnext].wb
-      if bit.band(wb.xstatus_xerror, 1) == 1 then -- Descriptor Done
+      if band(wb.xstatus_xerror, 1) == 1 then -- Descriptor Done
          local b = self.rxbuffers[self.rxnext]
          packet.add_iovec(p, b, wb.pkt_len)
-         self.rxnext = (self.rxnext + 1) % num_descriptors
+         self.rxnext = band(self.rxnext + 1, num_descriptors - 1)
       end
-   until bit.band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
+   until band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
    return p
 end
 
 function M_sf:can_receive ()
-   return self.rxnext ~= self.rdh and bit.band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 1) == 1
+   return self.rxnext ~= self.rdh and band(self.rxdesc[self.rxnext].wb.xstatus_xerror, 1) == 1
 end
 
 function M_sf:can_add_receive_buffer ()
-   return (self.rdt + 1) % num_descriptors ~= self.rxnext
+   return band(self.rdt + 1, num_descriptors - 1) ~= self.rxnext
 end
 
 function M_sf:add_receive_buffer (b)
@@ -229,7 +232,7 @@ function M_sf:add_receive_buffer (b)
    local desc = self.rxdesc[self.rdt].data
    desc.address, desc.dd = b.physical, 0
    self.rxbuffers[self.rdt] = b
-   self.rdt = (self.rdt + 1) % num_descriptors
+   self.rdt = band(self.rdt + 1, num_descriptors - 1)
 end
 
 function M_sf:sync_receive ()
@@ -254,7 +257,7 @@ function negotiated_autoc (dev, f)
       dev.r.SWSM:wait(bits{SMBI=0})        -- TODO: expire at 10ms
       dev.r.SWSM:set(bits{SWESMBI=1})
       dev.r.SWSM:wait(bits{SWESMBI=1})     -- TODO: expire at 3s
-      accessible = bit.band(dev.r.SW_FW_SYNC(), 0x8) == 0
+      accessible = band(dev.r.SW_FW_SYNC(), 0x8) == 0
       if accessible then
          dev.r.SW_FW_SYNC:set(0x8)
       end
@@ -273,9 +276,9 @@ end
 
 function set_SFI (dev)
    local autoc = dev.r.AUTOC()
-   autoc = bit.bor(
-      bit.band(autoc, 0xFFFF0C7E),          -- clears FLU, 10g_pma, 1g_pma, restart_AN, LMS
-      bit.lshift(0x3, 13)                   -- LMS(15:13) = 011b
+   autoc = bor(
+      band(autoc, 0xFFFF0C7E),          -- clears FLU, 10g_pma, 1g_pma, restart_AN, LMS
+      lshift(0x3, 13)                   -- LMS(15:13) = 011b
    )
    dev.r.AUTOC(autoc)                       -- TODO: firmware synchronization
    return dev
@@ -372,7 +375,7 @@ function M_pf:set_vmdq_mode ()
    end
    -- clear PFQDE.QDE (queue drop enable) for each queue
    for i = 0, 127 do
-      self.r.PFQDE(bit.bor(bit.lshift(1,16), bit.lshift(i,8)))
+      self.r.PFQDE(bor(lshift(1,16), lshift(i,8)))
       self.r.FTQF[i](0x00)                 -- disable L3/4 filter
       self.r.RAH[i](0)
       self.r.RAL[i](0)
@@ -534,7 +537,7 @@ function M_vf:set_mirror (want_mirror)
 
       -- mirror some or all pools
       if want_mirror.pool then
-         mirror_rule = bit.bor(bits{VPME=0}, mirror_rule)
+         mirror_rule = bor(bits{VPME=0}, mirror_rule)
          if want_mirror.pool == true then       -- mirror all pools
             self.pf.r.PFMRVM[mirror_ndx](0xFFFFFFFF)
             self.pf.r.PFMRVM[mirror_ndx+4](0xFFFFFFFF)
@@ -543,9 +546,9 @@ function M_vf:set_mirror (want_mirror)
             local bm1 = self.pf.r.PFMRVM[mirror_ndx+4]
             for _, pool in ipairs(want_mirror.pool) do
                if pool <= 32 then
-                  bm0 = bit.bor(bit.lshift(1, pool), bm0)
+                  bm0 = bor(lshift(1, pool), bm0)
                else
-                  bm1 = bit.bor(bit.lshift(1, pool-32), bm1)
+                  bm1 = bor(lshift(1, pool-32), bm1)
                end
             end
             self.pf.r.PFMRVM[mirror_ndx](bm0)
@@ -556,20 +559,20 @@ function M_vf:set_mirror (want_mirror)
       -- mirror hardware port
       if want_mirror.port then
          if want_mirror.port == true or want_mirror.port == 'in' or want_mirror.port == 'inout' then
-            mirror_rule = bit.bor(bits{UPME=1}, mirror_rule)
+            mirror_rule = bor(bits{UPME=1}, mirror_rule)
          end
          if want_mirror.port == true or want_mirror.port == 'out' or want_mirror.port == 'inout' then
-            mirror_rule = bit.bor(bits{DPME=2}, mirror_rule)
+            mirror_rule = bor(bits{DPME=2}, mirror_rule)
          end
       end
 
       -- mirror some or all vlans
       if want_mirror.vlan then
-         mirror_rule = bit.bor(bits{VLME=3}, mirror_rule)
+         mirror_rule = bor(bits{VLME=3}, mirror_rule)
             -- TODO: set which vlan's want to mirror
       end
       if mirror_rule ~= 0 then
-         mirror_rule = bit.bor(mirror_rule, bit.lshift(self.poolnum, 8))
+         mirror_rule = bor(mirror_rule, lshift(self.poolnum, 8))
          self.pf.r.PFMRCTL[mirror_ndx]:set(mirror_rule)
       end
    end
@@ -609,7 +612,7 @@ function M_vf:set_rx_stats (counter)
    if not counter then return self end
    assert(counter>=0 and counter<16, "bad Rx counter")
    self.rxstats = counter
-   self.pf.qs.RQSMR[math.floor(self.rxqn/4)]:set(bit.lshift(counter,8*(self.rxqn%4)))
+   self.pf.qs.RQSMR[math.floor(self.rxqn/4)]:set(lshift(counter,8*(self.rxqn%4)))
    return self
 end
 
@@ -617,7 +620,7 @@ function M_vf:set_tx_stats (counter)
    if not counter then return self end
    assert(counter>=0 and counter<16, "bad Tx counter")
    self.txstats = counter
-   self.pf.qs.TQSM[math.floor(self.txqn/4)]:set(bit.lshift(counter,8*(self.txqn%4)))
+   self.pf.qs.TQSM[math.floor(self.txqn/4)]:set(lshift(counter,8*(self.txqn%4)))
    return self
 end
 
@@ -627,7 +630,7 @@ function M_vf:get_rxstats ()
       counter_id = self.rxstats,
       packets = tonumber(self.pf.qs.QPRC[self.rxstats]()),
       dropped = tonumber(self.pf.qs.QPRDC[self.rxstats]()),
-      bytes = tonumber(bit.lshift(self.pf.qs.QBRC_H[self.rxstats]()+0LL, 32)
+      bytes = tonumber(lshift(self.pf.qs.QBRC_H[self.rxstats]()+0LL, 32)
                + self.pf.qs.QBRC_L[self.rxstats]())
    }
 end
@@ -637,7 +640,7 @@ function M_vf:get_txstats ()
    return {
       counter_id = self.txstats,
       packets = tonumber(self.pf.qs.QPTC[self.txstats]()),
-      bytes = tonumber(bit.lshift(self.pf.qs.QBTC_H[self.txstats]()+0LL, 32)
+      bytes = tonumber(lshift(self.pf.qs.QBTC_H[self.txstats]()+0LL, 32)
                + self.pf.qs.QBTC_L[self.txstats]())
    }
 end
@@ -645,7 +648,7 @@ end
 function M_vf:set_tx_rate (limit)
    if not limit then return self end
    local factor = 10000 / tonumber(limit)       -- line rate = 10,000 Mb/s
-   factor = bit.band(math.floor(factor*2^14+0.5), 2^24-1) -- 10.14 bits
+   factor = band(math.floor(factor*2^14+0.5), 2^24-1) -- 10.14 bits
    self.pf.r.RTTDQSEL(self.poolnum)
    self.pf.r.RTTBCNRC(bits({RS_ENA=31}, factor))
    return self
