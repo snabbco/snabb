@@ -48,6 +48,7 @@ run_qemu_vhost_user () {
     SOCKET=$6
     NETDEV="-netdev type=vhost-user,id=net0,chardev=char0 -chardev socket,id=char0,path=$SOCKET,server"
     run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV"
+    QEMUSOCKS="$QEMUSOCKS $SOCKET"
 }
 
 # run QEMU with args
@@ -154,7 +155,7 @@ on_exit () {
 
     # Kill qemu and snabbswitch instances and clean left over socket files
     kill_pid $QEMUPIDS $SNABBPIDS $LOADGENPIDS $SNABB_PID0 $SNABB_PID1
-    rm_file $NFV_SOCKET0 $NFV_SOCKET1
+    rm_file $QEMUSOCKS $NFV_SOCKET0 $NFV_SOCKET1
     printf "Finished.\n"
 }
 

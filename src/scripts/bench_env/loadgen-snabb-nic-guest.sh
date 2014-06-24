@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 #
 # Create a snabbswitch loadgen and nfv instance which connect to the
 # selected NICs and one guest. The selected NICs should be physically
@@ -13,21 +13,64 @@
 GUESTS="1"
 . $(dirname $0)/common.sh
 
-# Execute snabbswitch loadgen instance
-run_loadgen "$NODE_BIND1" "$NFV_PCI1" "$SNABB_LOG1"
+LOADGENPCIS=$NFV_PCI1
+LOADGENNODE=$NODE_BIND1
 
-# Execute QEMU on the same node
-run_qemu_vhost_user "$NODE_BIND0" "$BOOTARGS0" "$IMAGE0" "$GUEST_MAC0" "$TELNET_PORT0" "$NFV_SOCKET0"
+VMPCIS=$NFV_PCI0
+VMNODE=$NODE_BIND0
+VMARGS=$BOOTARGS0
+#All VMs same MAC - fix that if important!
+VMMAC=$GUEST_MAC0
+VMPORT=$TELNET_PORT0
+VMIMAGE=$IMAGE0
+VMNFVLOG=$SNABB_LOG0
+VMNFVSOCK=$NFV_SOCKET0
+
+# Execute snabbswitch loadgen instance
+if [ -n "$RUN_LOADGEN" ]; then
+    run_loadgen "$LOADGENNODE" "$LOADGENPCIS" "$SNABB_LOG1"
+fi
 
 printf "Connect to guests with:\n"
-printf "telnet localhost $TELNET_PORT0\n"
+count=0
+for pci in $VMPCIS; do
+    img=${VMIMAGE}${count}
+    if [ ! -f $img ]; then
+        printf "$img not found\n"
+        exit 1
+    fi
 
-# Execute snabbswitch and pin it to a proper node (CPU and memory)
-run_nfv "$NODE_BIND0" "$NFV_PCI0" "$NFV_SOCKET0" "$SNABB_LOG0"
+    port=$((VMPORT+count))
+    socket=${VMNFVSOCK}${count}
+    # Execute QEMU on the same node
+    run_qemu_vhost_user "$VMNODE" "$VMARGS" "$img" "$VMMAC" "$port" "$socket"
+    printf "telnet localhost $port\n"
+
+    log=${VMNFVLOG}${count}
+    # Execute snabbswitch and pin it to a proper node (CPU and memory)
+    run_nfv "$VMNODE" "$pci" "$socket" "$log"
+    
+    count=$((count+1))
+done
 
 # wait it to end
 wait_snabbs
 
-grep Mpps $SNABB_LOG0
+# print stats
+count=0
+totalmpps=0
+for pci in $VMPCIS; do
+    log=${VMNFVLOG}${count}
+    mpps=`awk -F' ' '/Mpps/ {print $2}' $log`
+    printf "On $pci got $mpps\n"
+    count=$((count+1))
+    totalmpps=`echo $totalmpps $mpps|awk '{ print $1+$2 }'`
+done
+printf "Rate(Mpps):\t$totalmpps\n"
 
-{ echo "poweroff"; sleep 1; } | telnet localhost $TELNET_PORT0 > /dev/null 2>&1
+# shutdown VMs
+port=$VMPORT
+for pci in $VMPCIS; do
+    port=$((port+1))
+    { echo "poweroff"; sleep 1; } | telnet localhost $port > /dev/null 2>&1
+done
