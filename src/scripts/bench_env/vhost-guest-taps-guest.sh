@@ -13,32 +13,14 @@ GUESTS="2"
 . $(dirname $0)/common.sh
 
 # Execute QEMU, remove redirection for verbosity
-numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
-    $QEMU \
-        -M pc -cpu kvm64 -smp 1 -cpu host --enable-kvm \
-        -m $GUEST_MEM -numa node,memdev=mem \
-        -object memory-backend-file,id=mem,size=$GUEST_MEM"M",mem-path=$HUGETLBFS,share=on \
-        -netdev type=tap,id=net0,script=no,downscript=no,vhost=on,ifname=$TAP0 \
-        -device virtio-net-pci,netdev=net0,mac=$GUEST_MAC0 \
-        -serial telnet:localhost:$TELNET_PORT0,server,nowait \
-        -kernel $KERNEL -append "$BOOTARGS0" \
-        -drive if=virtio,file=$IMAGE0 \
-        -nographic > /dev/null 2>&1 &
+run_qemu_tap "$NODE_BIND0" "$BOOTARGS0" "$IMAGE0" "$GUEST_MAC0" "$TELNET_PORT0" "$TAP0"
 
 # Execute 2nd instance
-numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND1 \
-    $QEMU \
-        -M pc -cpu kvm64 -smp 1 -cpu host --enable-kvm \
-        -m $GUEST_MEM -numa node,memdev=mem \
-        -object memory-backend-file,id=mem,size=$GUEST_MEM"M",mem-path=$HUGETLBFS,share=on \
-        -netdev type=tap,id=net0,script=no,downscript=no,vhost=on,ifname=$TAP1 \
-        -device virtio-net-pci,netdev=net0,mac=$GUEST_MAC1 \
-        -serial telnet:localhost:$TELNET_PORT1,server,nowait \
-        -kernel $KERNEL -append "$BOOTARGS1" \
-        -drive if=virtio,file=$IMAGE1 \
-        -nographic > /dev/null 2>&1 &
+run_qemu_tap "$NODE_BIND1" "$BOOTARGS1" "$IMAGE1" "$GUEST_MAC1" "$TELNET_PORT1" "$TAP1"
 
 printf "All instances running.\n"
 printf "Connect to guests with:\n"
 printf "telnet localhost $TELNET_PORT0\n"
 printf "telnet localhost $TELNET_PORT1\n"
+
+wait_qemus

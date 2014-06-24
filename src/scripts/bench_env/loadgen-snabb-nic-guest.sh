@@ -19,19 +19,7 @@ numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND1 \
 SNABB_PID1=$!
 
 # Execute QEMU on the same node
-numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
-    $QEMU \
-        -M pc -cpu kvm64 -smp 1 -cpu host --enable-kvm \
-        -m $GUEST_MEM -numa node,memdev=mem \
-        -object memory-backend-file,id=mem,size=$GUEST_MEM"M",mem-path=$HUGETLBFS,share=on \
-        -chardev socket,id=char0,path=$NFV_SOCKET0,server \
-        -netdev type=vhost-user,id=net0,chardev=char0 \
-        -serial telnet:localhost:$TELNET_PORT0,server,nowait \
-        -device virtio-net-pci,netdev=net0,mac=$GUEST_MAC0 \
-        -kernel $KERNEL -append "$BOOTARGS0" \
-        -drive if=virtio,file=$IMAGE0 \
-        -nographic > /dev/null 2>&1 &
-QEMU_PID0=$!
+run_qemu_vhost_user "$NODE_BIND0" "$BOOTARGS0" "$IMAGE0" "$GUEST_MAC0" "$TELNET_PORT0" "$NFV_SOCKET0"
 
 printf "Connect to guests with:\n"
 printf "telnet localhost $TELNET_PORT0\n"

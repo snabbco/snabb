@@ -1,4 +1,73 @@
 
+# run QEMU with args
+# - NUMA node
+# - kernel ARGS
+# - IMG name
+# - MAC address
+# - PORT for telnet serial
+# - NETDEV the netdev line
+run_qemu () {
+    if [ "$#" -ne 6 ]; then
+        print "wrong run_qemu args\n"
+        exit 1
+    fi
+    NUMANODE=$1
+    ARGS=$2
+    IMG=$3
+    MAC=$4
+    TELNETPORT=$5
+    NETDEV=$6
+
+    MEM="-m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on"
+    NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC"
+
+    # Execute QEMU on the designated node
+    numactl --cpunodebind=$NUMANODE --membind=$NUMANODE \
+        $QEMU \
+            -kernel $KERNEL -append "$ARGS" \
+            $MEM $NET \
+            -M pc -smp 1 -cpu host --enable-kvm \
+            -serial telnet:localhost:$TELNETPORT,server,nowait \
+            -drive if=virtio,file=$IMG \
+            -nographic > /dev/null 2>&1 &
+    QEMUPIDS="$QEMUPIDS $!"
+}
+
+# run QEMU with args
+# - NUMA node
+# - kernel ARGS
+# - IMG name
+# - MAC address
+# - PORT for telnet serial
+# - vhost-user SOCKET
+run_qemu_vhost_user () {
+    if [ "$#" -ne 6 ]; then
+        print "wrong run_qemu_vhost_user args\n"
+        exit 1
+    fi
+    SOCKET=$6
+    NETDEV="-netdev type=vhost-user,id=net0,chardev=char0 -chardev socket,id=char0,path=$SOCKET,server"
+    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV"
+}
+
+# run QEMU with args
+# - NUMA node
+# - kernel ARGS
+# - IMG name
+# - MAC address
+# - PORT for telnet serial
+# - tap name
+# Execute QEMU, remove redirection for verbosity
+run_qemu_tap () {
+    if [ "$#" -ne 6 ]; then
+        print "wrong run_qemu_vhost_user args\n"
+        exit 1
+    fi
+    TAP=$6
+    NETDEV="-netdev type=tap,id=net0,script=no,downscript=no,vhost=on,ifname=$TAP"
+    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV"
+}
+
 import_env () {
     # Check if configuration file is present on etc directory
     ENV_FILE="$1/bench_conf.sh"
@@ -13,6 +82,12 @@ import_env () {
     cat $ENV_FILE
     printf "\n------\n"
     return 0
+}
+
+wait_qemus () {
+    for pid in "$QEMUPIDS"; do
+        wait $pid
+    done
 }
 
 wait_pid () {
@@ -39,10 +114,10 @@ rm_file () {
 on_exit () {
     # cleanup on exit
     printf "Waiting QEMU processes to terminate...\n"
-    wait_pid $QEMU_PID0 $QEMU_PID1
+    wait_pid $QEMUPIDS
 
     # Kill qemu and snabbswitch instances and clean left over socket files
-    kill_pid $QEMU_PID0 $QEMU_PID1 $SNABB_PID0 $SNABB_PID1
+    kill_pid $QEMUPIDS $SNABB_PID0 $SNABB_PID1
     rm_file $NFV_SOCKET0 $NFV_SOCKET1
     printf "Finished.\n"
 }

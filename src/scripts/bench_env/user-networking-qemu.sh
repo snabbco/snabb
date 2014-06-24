@@ -11,13 +11,7 @@
 GUESTS="1"
 . $(dirname $0)/common.sh
 
-# Execute QEMU
-    $QEMU \
-        -M pc -cpu kvm64 -smp 1 -cpu host --enable-kvm \
-        -m $GUEST_MEM -numa node,memdev=mem \
-        -object memory-backend-file,id=mem,size=$GUEST_MEM"M",mem-path=$HUGETLBFS,share=on \
-        -device virtio-net-pci,netdev=net0,mac=$GUEST_MAC0 \
-        -netdev type=user,id=net0 \
-        -kernel $KERNEL -append "$BOOTARGS0" \
-        -drive if=virtio,file=$IMAGE0 \
-        -nographic
+# Execute QEMU without NETDEV
+run_qemu "$NODE_BIND0" "$BOOTARGS0" "$IMAGE0" "$GUEST_MAC0" "$TELNET_PORT0" "-netdev user,id=net0"
+
+wait_qemus
