@@ -56,16 +56,9 @@ local datagram = subClass(nil)
 -- push() method.
 function datagram:new (p, class)
    local o = datagram:superClass().new(self)
-   if p then
-      packet.coalesce(p)
-      o._packet = p
-   else
-      o._packet = packet.allocate()
-      local b = buffer.allocate()
-      packet.add_iovec(o._packet, b, 0)
-   end
    if not o._recycled then
       o._parse = { stack = {}, index = 0 }
+      o._packet = ffi.new("struct packet *[1]")
    else
       for i, _ in ipairs(o._parse.stack) do
 	 o._parse.stack[i]:free()
@@ -77,6 +70,14 @@ function datagram:new (p, class)
    o._parse.ulp = class
    o._parse.iovec = 0
    o._parse.offset = 0
+   if p then
+      packet.coalesce(p)
+      o._packet[0] = p
+   else
+      o._packet[0] = packet.allocate()
+      local b = buffer.allocate()
+      packet.add_iovec(o._packet[0], b, 0)
+   end
    return o
 end
 
@@ -92,10 +93,10 @@ function datagram:push (proto)
    local push = self._push
    if not push then
       local b = buffer.allocate()
-      packet.prepend_iovec(self._packet, b, 0)
+      packet.prepend_iovec(self._packet[0], b, 0)
       if not self._parse then
 	 b = buffer.allocate()
-	 packet.add_iovec(self._packet, b, 0)
+	 packet.add_iovec(self._packet[0], b, 0)
 	 self._parse = { ulp = nil, offset = 0 }
       end
       -- If the parse stack already exists, its associated iovec was
@@ -104,12 +105,12 @@ function datagram:push (proto)
       self._push = true
    end
    local sizeof = proto:sizeof()
-   local iovec = self._packet.iovecs[0]
+   local iovec = self._packet[0].iovecs[0]
    assert(iovec.offset + iovec.length + sizeof <= iovec.buffer.size,
 	  "not enough space in buffer to push header")
    proto:copy(iovec.buffer.pointer + iovec.offset + iovec.length)
    iovec.length = iovec.length + sizeof
-   self._packet.length = self._packet.length + sizeof
+   self._packet[0].length = self._packet[0].length + sizeof
 end
 
 -- The following methods create protocol header objects from the
@@ -140,7 +141,7 @@ function datagram:parse_match (class, check)
    assert(self._parse, "non-parseable datagram")
    local parse = self._parse
    local class = class or parse.ulp
-   local iovec = self._packet.iovecs[parse.iovec]
+   local iovec = self._packet[0].iovecs[parse.iovec]
 
    if not parse.ulp or (class and class ~= parse.ulp) then
       return nil
@@ -216,7 +217,7 @@ function datagram:pop (n)
    assert(parse, "non-parseable datagram") 
    assert(n <= parse.index)
    local proto
-   local iovec = self._packet.iovecs[parse.iovec]
+   local iovec = self._packet[0].iovecs[parse.iovec]
    -- Don't use table.remove to avoid garbage
    for i = 1, parse.index do
       if i <= n then
@@ -225,7 +226,7 @@ function datagram:pop (n)
 	 proto:free()
 	 iovec.offset = iovec.offset + sizeof
 	 iovec.length = iovec.length - sizeof
-	 self._packet.length = self._packet.length - sizeof
+	 self._packet[0].length = self._packet[0].length - sizeof
 	 parse.offset = parse.offset - sizeof
       end
       if i+n <= parse.index then
@@ -246,10 +247,10 @@ end
 -- datagram's upper-layer protocol to this class such that the parse()
 -- method can be used to process the datagram further.
 function datagram:pop_raw (length, ulp)
-   local iovec = self._packet.iovecs[self._parse.iovec]
+   local iovec = self._packet[0].iovecs[self._parse.iovec]
    iovec.offset = iovec.offset + length
    iovec.length = iovec.length - length
-   self._packet.length = self._packet.length - length
+   self._packet[0].length = self._packet[0].length - length
    self._parse.ulp = ulp
 end
 
@@ -258,7 +259,7 @@ function datagram:stack ()
 end
 
 function datagram:packet ()
-   return(self._packet)
+   return(self._packet[0])
 end
 
 -- Return the location and size of the packet's payload.  If mem is
@@ -266,7 +267,7 @@ end
 -- appended to the packet's payload first.
 function datagram:payload (mem, size)
    local parse = self._parse
-   local iovec = self._packet.iovecs[parse.iovec]
+   local iovec = self._packet[0].iovecs[parse.iovec]
    local payload = iovec.buffer.pointer + iovec.offset + parse.offset
    if mem ~= nil then
       assert(size <= iovec.buffer.size - (iovec.offset + iovec.length),
@@ -274,7 +275,7 @@ function datagram:payload (mem, size)
       ffi.copy(iovec.buffer.pointer + iovec.offset + iovec.length,
 	      mem, size)
       iovec.length = iovec.length + size
-      self._packet.length = self._packet.length + size
+      self._packet[0].length = self._packet[0].length + size
    end
    local p_size = iovec.length - parse.offset
    return payload, p_size

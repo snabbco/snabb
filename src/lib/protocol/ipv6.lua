@@ -46,6 +46,9 @@ ipv6._ulp = {
 
 function ipv6:new (config)
    local o = ipv6:superClass().new(self)
+   if not o._recycled then
+      o._ph = ipv6hdr_pseudo_t()
+   end
    o:version(6)
    o:traffic_class(config.traffic_class)
    o:flow_label(config.flow_label)
@@ -53,6 +56,14 @@ function ipv6:new (config)
    o:hop_limit(config.hop_limit)
    o:src(config.src)
    o:dst(config.dst)
+   return o
+end
+
+function ipv6:new_from_mem(mem, size)
+   local o = ipv6:superClass().new_from_mem(self, mem, size)
+   if not o._recycled then
+      o._ph = ipv6hdr_pseudo_t()
+   end
    return o
 end
 
@@ -158,7 +169,8 @@ end
 -- protocol.  They differ from the respective values of the ipv6
 -- header if extension headers are present.
 function ipv6:pseudo_header (plen, nh)
-   local ph = ipv6hdr_pseudo_t()
+   local ph = self._ph
+   ffi.fill(ph, ffi.sizeof(ph))
    local h = self._header
    ffi.copy(ph, h.src_ip, 32)  -- Copy source and destination
    ph.ulp_length = C.htons(plen)

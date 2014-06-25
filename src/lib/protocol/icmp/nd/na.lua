@@ -1,30 +1,14 @@
 module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
+local lib = require("core.lib")
 local nd_header = require("lib.protocol.icmp.nd.header")
 
-local na_t
-if ffi.abi("le") then
-   na_t = ffi.typeof[[
-	 struct {
-	    uint32_t reserved:5,
-	             override:1,
-	             solicited:1,
-	             router:1,
-	             reserved2:24;
-	 } __attribute__((packed))
-   ]]
-else
-   na_t = ffi.typeof[[
-	 struct {
-	    uint32_t router:1,
-                     solicited:1,
-                     override:1,
-                     reserved:29;
-	 } __attribute__((packed))
-   ]]
-end
-
+local na_t = ffi.typeof[[
+      struct {
+	 uint32_t flags;
+      } __attribute__((packed))
+]]
 local na = subClass(nd_header)
 
 -- Class variables
@@ -58,24 +42,15 @@ function na:target_eq (target)
 end
 
 function na:router (r)
-   if r ~= nil then
-      self._header.router = r
-   end
-   return self._header.router
+   return lib.bitfield(32, self._header, 'flags', 0, 1, r)
 end
 
 function na:solicited (s)
-   if s ~= nil then
-      self._header.solicited = s
-   end
-   return self._header.solicited
+   return lib.bitfield(32, self._header, 'flags', 1, 1, s)
 end
 
 function na:override (o)
-   if o ~= nil then
-      self._header.override = o
-   end
-   return self._header.override
+   return lib.bitfield(32, self._header, 'flags', 2, 1, o)
 end
 
 return na
