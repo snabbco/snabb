@@ -40,17 +40,17 @@ end
 
 function icmp:type (type)
    if type ~= nil then
-      self._header.type = type
+      self:header().type = type
    else
-      return self._header.type
+      return self:header().type
    end
 end
 
 function icmp:code (code)
    if code ~= nil then
-      self._header.code = code
+      self:header().code = code
    else
-      return self._header.code
+      return self:header().code
    end
 end
 
@@ -72,12 +72,12 @@ local function checksum(header, payload, length, ipv6)
 end
 
 function icmp:checksum (payload, length, ipv6)
-   local header = self._header
+   local header = self:header()
    header.checksum = C.htons(checksum(header, payload, length, ipv6))
 end
 
 function icmp:checksum_check (payload, length, ipv6)
-   return checksum(self._header, payload, length, ipv6) == C.ntohs(self._header.checksum)
+   return checksum(self:header(), payload, length, ipv6) == C.ntohs(self:header().checksum)
 end
 
 return icmp

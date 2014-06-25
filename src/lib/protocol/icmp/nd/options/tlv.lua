@@ -10,6 +10,7 @@ local tlv_t = ffi.typeof[[
       } __attribute__((packed))
 ]]
 
+local tlv_ptr_t = ffi.typeof("$ *", tlv_t)
 tlv._types = {
    [1] = {
       name  = "src_ll_addr",
@@ -28,7 +29,7 @@ function tlv:new_from_mem (mem, size)
    local o = tlv:superClass().new(self)
    local tlv_t_size = ffi.sizeof(tlv_t)
    assert(tlv_t_size <= size)
-   local tlv = ffi.cast(ffi.typeof("$ *", tlv_t), mem) 
+   local tlv = ffi.cast(tlv_ptr_t, mem) 
    o._tlv = tlv
    local class = o._types[tlv.type].class
    if class ~= nil then

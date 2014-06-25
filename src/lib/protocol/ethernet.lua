@@ -63,7 +63,7 @@ end
 -- Instance methods
 
 function ethernet:src (a)
-   local h = self._header
+   local h = self:header()
    if a ~= nil then
       ffi.copy(h.ether_shost, a, 6)
    else
@@ -72,11 +72,11 @@ function ethernet:src (a)
 end
 
 function ethernet:src_eq (a)
-   return C.memcmp(a, self._header.ether_shost, 6) == 0
+   return C.memcmp(a, self:header().ether_shost, 6) == 0
 end
 
 function ethernet:dst (a)
-   local h = self._header
+   local h = self:header()
    if a ~= nil then
       ffi.copy(h.ether_dhost, a, 6)
    else
@@ -85,19 +85,19 @@ function ethernet:dst (a)
 end
 
 function ethernet:dst_eq (a)
-   return C.memcmp(a, self._header.ether_dhost, 6) == 0
+   return C.memcmp(a, self:header().ether_dhost, 6) == 0
 end
 
 function ethernet:swap ()
    local tmp = mac_addr_t()
-   local h = self._header
+   local h = self:header()
    ffi.copy(tmp, h.ether_dhost, 6)
    ffi.copy(h.ether_dhost, h.ether_shost,6)
    ffi.copy(h.ether_shost, tmp, 6)
 end
 
 function ethernet:type (t)
-   local h = self._header
+   local h = self:header()
    if t ~= nil then
       h.ether_type = C.htons(t)
    else

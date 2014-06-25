@@ -50,34 +50,34 @@ end
 
 function na:target (target)
    if target ~= nil then
-      ffi.copy(self._header.target, target, 16)
+      ffi.copy(self:header().target, target, 16)
    end
-   return self._header.target
+   return self:header().target
 end
 
 function na:target_eq (target)
-   return C.memcmp(target, self._header.target, 16) == 0
+   return C.memcmp(target, self:header().target, 16) == 0
 end
 
 function na:router (r)
    if r ~= nil then
-      self._header.router = r
+      self:header().router = r
    end
-   return self._header.router
+   return self:header().router
 end
 
 function na:solicited (s)
    if s ~= nil then
-      self._header.solicited = s
+      self:header().solicited = s
    end
-   return self._header.solicited
+   return self:header().solicited
 end
 
 function na:override (o)
    if o ~= nil then
-      self._header.override = o
+      self:header().override = o
    end
-   return self._header.override
+   return self:header().override
 end
 
 return na

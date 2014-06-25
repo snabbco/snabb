@@ -78,6 +78,26 @@
 -- the constructors must override the _header* class variables in the
 -- header instance.  See lib/protocol/gre.lua for an example of how
 -- this can look like.
+--
+-- The header is stored in the instance variable _header. To avoid the
+-- creation of garbage, this is actually an array of pointers with a
+-- single element defined as
+--
+--   ffi.typeof("$*[1]", self._header_ptr_type)
+--
+-- The pointer points to either a ctype object or a region of buffer
+-- memory, depending on whether the instance was created via the new()
+-- or new_from_mem() methods, respectively.  This array is allocated
+-- once upon instance creation and avoids the overhead of "boxing"
+-- when the instance is recycled by new_from_mem().  As a consequence,
+-- the header must be accessed by indexing this array, e.g.
+--
+--   self._header[0].some_header_element
+--
+-- Caution: to access the actual header, e.g. for ffi.sizeof(), you
+-- need to dereference the pointer, i.e. _header[0][0].  This is what
+-- the header() method does.
+--
 
 module(..., package.seeall)
 local ffi = require("ffi")
@@ -87,9 +107,17 @@ local header = subClass(nil)
 -- Class methods
 
 -- The standard constructor creates a new ctype object for the header.
+-- Note: unlike the new_from_mem() method, the new() method creates
+-- garbage when an object is recycled.  This is not trivial to avoid
+-- for header classes with variably-sized headers, because there is
+-- currently only a single free list per class.
 function header:new ()
    local o = header:superClass().new(self)
-   o._header = self._header_type()
+   if not o._recycled then
+      o._header = ffi.typeof("$[1]", o._header_ptr_type)()
+   end
+   o._header_aux = self._header_type()
+   o._header[0] = ffi.cast(o._header_ptr_type, o._header_aux)
    return o
 end
 
@@ -97,17 +125,20 @@ end
 -- of memory by "overlaying" a header structure.
 function header:new_from_mem (mem, size)
    local o = header:superClass().new(self)
+   if not o._recycled then
+      o._header = ffi.typeof("$[1]", o._header_ptr_type)()
+   end
    -- Using the class variables here does the right thing even if the
    -- instance is recycled
    assert(ffi.sizeof(self._header_type) <= size)
-   o._header = ffi.cast(self._header_ptr_type, mem)[0]
+   o._header[0] = ffi.cast(self._header_ptr_type, mem)
    return o
 end
 
 -- Instance methods
 
 function header:header ()
-   return self._header
+   return self._header[0][0]
 end
 
 function header:sizeof ()
@@ -116,14 +147,15 @@ end
 
 -- default equality method, can be overriden in the ancestors
 function header:eq (other)
-   return ffi.string(self._header, self:sizeof()) == ffi.string(other._header,self:sizeof())
+   return (ffi.string(self._header[0], self:sizeof()) ==
+	ffi.string(other._header[0],self:sizeof()))
 end
 
 -- Copy the header to some location in memory (usually a packet
 -- buffer).  The caller must make sure that there is enough space at
 -- the destination.
 function header:copy (dst)
-   ffi.copy(dst, self._header, ffi.sizeof(self._header))
+   ffi.copy(dst, self._header[0], ffi.sizeof(self._header[0][0]))
 end
 
 -- Create a new protocol instance that is a copy of this instance.
@@ -132,7 +164,7 @@ end
 function header:clone ()
    local header = self._header_type()
    local sizeof = ffi.sizeof(header)
-   ffi.copy(header, self._header, sizeof)
+   ffi.copy(header, self._header[0], sizeof)
    return self:class():new_from_mem(header, sizeof)
 end
 

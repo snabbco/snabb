@@ -78,13 +78,13 @@ function gre:new (config)
    if type then
       o._header_type = gre_types[type]
       o._header_ptr_type = gre_ptr_types[type]
-      o._header = o._header_type()
+      o._header[0] = o._header_type()
    end
    if o._checksum then
-      lib.bitfield(16, o._header, 'bits', 0, 1, 1)
+      lib.bitfield(16, o:header(), 'bits', 0, 1, 1)
    end
    if o._key then
-      lib.bitfield(16, o._header, 'bits', 2, 1, 1)
+      lib.bitfield(16, o:header(), 'bits', 2, 1, 1)
       o:key(config.key)
    end
    o:protocol(config.protocol)
@@ -96,18 +96,18 @@ function gre:new_from_mem (mem, size)
    -- Reserved bits and version MUST be zero.  We don't support
    -- the sequence number option, i.e. the 'S' flag (bit 3) must
    -- be cleared as well
-   if lib.bitfield(16, o._header, 'bits', 3, 13) ~= 0 then
+   if lib.bitfield(16, o:header(), 'bits', 3, 13) ~= 0 then
       o:free()
       return nil
    end
    local type = nil
-   if lib.bitfield(16, o._header, 'bits', 0, 1) == 1 then
+   if lib.bitfield(16, o:header(), 'bits', 0, 1) == 1 then
       o._checksum = true
       type = 'csum'
    else
       o._checksum = false
    end
-   if lib.bitfield(16, o._header, 'bits', 2, 1) == 1 then
+   if lib.bitfield(16, o:header(), 'bits', 2, 1) == 1 then
       o._key = true
       if type then
 	 type = 'csum_key'
@@ -120,7 +120,7 @@ function gre:new_from_mem (mem, size)
    if type then
       o._header_type = gre_types[type]
       o._header_ptr_type = gre_ptr_types[type]
-      o._header = ffi.cast(o._header_ptr_type, mem)[0]
+      o._header[0] = ffi.cast(o._header_ptr_type, mem)[0]
    end
    return o
 end
@@ -154,16 +154,16 @@ function gre:checksum (payload, length)
    end
    if payload ~= nil then
       -- Calculate and set the checksum
-      self._header.csum = C.htons(checksum(self._header, payload, length))
+      self:header().csum = C.htons(checksum(self:header(), payload, length))
    end
-   return C.ntohs(self._header.csum)
+   return C.ntohs(self:header().csum)
 end
 
 function gre:checksum_check (payload, length)
    if not self._checksum then
       return true
    end
-   return checksum(self._header, payload, length) == C.ntohs(self._header.csum)
+   return checksum(self:header(), payload, length) == C.ntohs(self:header().csum)
 end
 
 -- Returns nil if keying is disabled. Otherwise, the key is set to the
@@ -174,17 +174,17 @@ function gre:key (key)
       return nil
    end
    if key ~= nil then
-      self._header.key = C.htonl(key)
+      self:header().key = C.htonl(key)
    else
-      return C.ntohl(self._header.key)
+      return C.ntohl(self:header().key)
    end
 end
 
 function gre:protocol (protocol)
    if protocol ~= nil then
-      self._header.protocol = C.htons(protocol)
+      self:header().protocol = C.htons(protocol)
    end
-   return(C.ntohs(self._header.protocol))
+   return(C.ntohs(self:header().protocol))
 end
 
 return gre
