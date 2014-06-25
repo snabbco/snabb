@@ -11,7 +11,7 @@
 #
 
 GUESTS="2"
-. $(dirname $0)/include_checks.sh
+. $(dirname $0)/common.sh
 
 # Execute snabbswitch - QEMU instance
 export NFV_PCI=$NFV_PCI0 NFV_SOCKET=$NFV_SOCKET0
@@ -20,19 +20,7 @@ numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
 SNABB_PID0=$!
 
 # Execute QEMU, remove redirection for verbosity
-numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
-    $QEMU \
-        -M pc -cpu kvm64 -smp 1 -cpu host --enable-kvm \
-        -m $GUEST_MEM -numa node,memdev=mem \
-        -object memory-backend-file,id=mem,size=$GUEST_MEM"M",mem-path=$HUGETLBFS,share=on \
-        -chardev socket,id=char0,path=$NFV_SOCKET0,server \
-        -netdev type=vhost-user,id=net0,chardev=char0 \
-        -device virtio-net-pci,netdev=net0,mac=$GUEST_MAC0 \
-        -serial telnet:localhost:$TELNET_PORT0,server,nowait \
-        -kernel $KERNEL -append "$BOOTARGS0" \
-        -drive if=virtio,file=$IMAGE0 \
-        -nographic > /dev/null 2>&1 &
-QEMU_PID0=$!
+run_qemu_vhost_user "$NODE_BIND0" "$BOOTARGS0" "$IMAGE0" "$GUEST_MAC0" "$TELNET_PORT0" "$NFV_SOCKET0"
 
 # Add another snabbswitch - QEMU instance
 export NFV_PCI=$NFV_PCI1 NFV_SOCKET=$NFV_SOCKET1
@@ -41,21 +29,11 @@ numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND1 \
 SNABB_PID1=$!
 
 # Execute QEMU, remove redirection for verbosity
-numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND1 \
-    $QEMU \
-        -M pc -cpu kvm64 -smp 1 -cpu host --enable-kvm \
-        -m $GUEST_MEM -numa node,memdev=mem \
-        -object memory-backend-file,id=mem,size=$GUEST_MEM"M",mem-path=$HUGETLBFS,share=on \
-        -chardev socket,id=char0,path=$NFV_SOCKET1,server \
-        -netdev type=vhost-user,id=net0,chardev=char0 \
-        -device virtio-net-pci,netdev=net0,mac=$GUEST_MAC1 \
-        -serial telnet:localhost:$TELNET_PORT1,server,nowait \
-        -kernel $KERNEL -append "$BOOTARGS1" \
-        -drive if=virtio,file=$IMAGE1 \
-        -nographic > /dev/null 2>&1 &
-QEMU_PID1=$!
+run_qemu_vhost_user "$NODE_BIND1" "$BOOTARGS1" "$IMAGE1" "$GUEST_MAC1" "$TELNET_PORT1" "$NFV_SOCKET1"
 
 printf "All instances running.\n"
 printf "Connect to guests with:\n"
 printf "telnet localhost $TELNET_PORT0\n"
 printf "telnet localhost $TELNET_PORT1\n"
+
+wait_qemus

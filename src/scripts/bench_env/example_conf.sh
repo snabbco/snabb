@@ -3,14 +3,16 @@
 #PCAP=/opt/bench/10000x256.cap
 PCAP=/opt/bench/http.cap
 
+RUN_LOADGEN=true
+
 NODE_BIND0=0
 SNABB_LOG0=/dev/null
-NFV_PCI0=0000:07:00.0
+NFV_PCI0="0000:07:00.0"
 NFV_SOCKET0=vhost$$_0.sock
 
 NODE_BIND1=1
 SNABB_LOG1=/dev/null
-NFV_PCI1=0000:84:00.0
+NFV_PCI1="0000:84:00.0"
 NFV_SOCKET1=vhost$$_1.sock
 NFV_PACKETS=10e6
 
