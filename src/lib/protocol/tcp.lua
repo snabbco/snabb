@@ -1,3 +1,4 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
@@ -26,26 +27,26 @@ tcp._ulp = { method = nil }
 
 -- Class methods
 
-function tcp:_init_new (config)
-   local header = tcp_header_t()
-   header.src_port = C.htons(config.src_port)
-   header.dst_port = C.htons(config.dst_port)
-   header.seq = C.htonl(config.seq)
-   header.ack = C.htonl(config.ack)
-   header.window_size = C.htons(config.window_size)
-   header.pad = 0
-   self._header = header
-   self:offset(config.offset or 0)
-   self:ns(config.ns or 0)
-   self:cwr(config.cwr or 0)
-   self:ece(config.ece or 0)
-   self:urg(config.urg or 0)
-   self:ack(config.ack or 0)
-   self:psh(config.psh or 0)
-   self:rst(config.rst or 0)
-   self:syn(config.syn or 0)
-   self:fin(config.fin or 0)
-   self:checksum()
+function tcp:new (config)
+   local o tcp:superClass().new(self)
+   o:src_port(config.src_port)
+   o:dst_port(config.dst_port)
+   o:seq_num(config.seq)
+   o:ack_num(config.ack)
+   o:window_size(config.window_size)
+   o._header.pad = 0
+   o:offset(config.offset or 0)
+   o:ns(config.ns or 0)
+   o:cwr(config.cwr or 0)
+   o:ece(config.ece or 0)
+   o:urg(config.urg or 0)
+   o:ack(config.ack or 0)
+   o:psh(config.psh or 0)
+   o:rst(config.rst or 0)
+   o:syn(config.syn or 0)
+   o:fin(config.fin or 0)
+   o:checksum()
+   return o
 end
 
 -- Instance methods

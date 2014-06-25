@@ -1,3 +1,4 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
@@ -28,11 +29,11 @@ icmp._ulp = {
 
 -- Class methods
 
-function icmp:_init_new (type, code)
-   local header = icmp_t()
-   self._header = header
-   header.type = type
-   header.code = code
+function icmp:new (type, code)
+   local o = icmp:superClass().new(self)
+   o:type(type)
+   o:code(code)
+   return o
 end
 
 -- Instance methods
@@ -53,20 +54,30 @@ function icmp:code (code)
    end
 end
 
-function icmp:checksum (payload, length, ipv6)
-   local h = self._header
+local function checksum(header, payload, length, ipv6)
    local csum = 0
    if ipv6 then
       -- Checksum IPv6 pseudo-header
-      local ph = ipv6:pseudo_header(length + self:sizeof(), 58)
+      local ph = ipv6:pseudo_header(length + ffi.sizeof(header), 58)
       csum = lib.update_csum(ph, ffi.sizeof(ph), csum)
    end
    -- Add ICMP header
-   h.checksum = 0
-   csum = lib.update_csum(h, self:sizeof(), csum)
+   local csum_rcv = header.checksum
+   header.checksum = 0
+   csum = lib.update_csum(header, ffi.sizeof(header), csum)
+   header.checksum = csum_rcv
    -- Add ICMP payload
    csum = lib.update_csum(payload, length, csum)
-   h.checksum = C.htons(lib.finish_csum(csum))
+   return lib.finish_csum(csum)
+end
+
+function icmp:checksum (payload, length, ipv6)
+   local header = self._header
+   header.checksum = C.htons(checksum(header, payload, length, ipv6))
+end
+
+function icmp:checksum_check (payload, length, ipv6)
+   return checksum(self._header, payload, length, ipv6) == C.ntohs(self._header.checksum)
 end
 
 return icmp

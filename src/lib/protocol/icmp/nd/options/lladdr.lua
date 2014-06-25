@@ -1,6 +1,7 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 
-local lladdr = subClass(nil, 'new_from_mem')
+local lladdr = subClass(nil)
 
 local lladdr_t = ffi.typeof[[
       struct {
@@ -8,13 +9,17 @@ local lladdr_t = ffi.typeof[[
       }
 ]]
 
+local lladdr_ptr_t = ffi.typeof("$ *", lladdr_t)
+
 -- Class variables
 lladdr._name = 'll_addr'
 
 -- Class methods
-function lladdr:_init_new_from_mem (mem, size)
+function lladdr:new_from_mem (mem, size)
+   local o = lladdr:superClass().new(self)
    assert(size >= ffi.sizeof(lladdr_t))
-   self._lladdr = ffi.cast(ffi.typeof("$ *", lladdr_t), mem)
+   o._lladdr = ffi.cast(lladdr_ptr_t, mem)
+   return o
 end
 
 -- Instance methods

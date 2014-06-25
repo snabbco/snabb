@@ -51,43 +51,67 @@
 -- only the type value 0x86dd is defined, which is mapped to the class
 -- that handles IPv6 headers.
 --
--- The initializer for the standard constructor new() will typically
--- allocate an instance of _header_type and initialize it, e.g.
+-- Header-dependent initializations can be handled by overriding the
+-- standard constructor, e.g.
 --
--- function ethernet:_init_new (config)
---    local header = ether_header_t()
---    ffi.copy(header.ether_dhost, config.dst, 6)
---    ffi.copy(header.ether_shost, config.src, 6)
---    header.ether_type = C.htons(config.type)
---    self._header = header
+-- function ethernet:new (config)
+--    local o = ethernet:superClass().new(self)
+--    o:dst(config.dst)
+--    o:src(config.src)
+--    o:type(config.type)
+--    return o
 -- end
 --
--- The header class provides an additional constructor called
--- new_from_mem() that interprets a chunk of memory as a protocol
--- header using ffi.cast(). A header that requires more sophisticated
--- initialization (e.g. variably-sized headers whose actual size
--- depends on the contents on the header) must over ride the
--- _init_new_from_mem() method.
+-- Protocol headers with a variable format can be handled with a
+-- little extra work as follows.
+--
+-- The class for such a protocl defines just the alternative that can
+-- be considered to be the "fundamental" header.  It must be
+-- sufficient for the new_from_mem() method to determine the actual
+-- header.
+--
+-- The standard constructors will initialize the header instance with
+-- the fundamental type.  The protocol class must override both
+-- constructor methods to determine the actual header, either from the
+-- configuration or the chunk of memory for the new() and
+-- new_from_mem() methods, respectively.  The important part is that
+-- the constructors must override the _header* class variables in the
+-- header instance.  See lib/protocol/gre.lua for an example of how
+-- this can look like.
 
+module(..., package.seeall)
 local ffi = require("ffi")
 
-local header = subClass(nil, 'new_from_mem')
+local header = subClass(nil)
 
-function header:_init_new_from_mem (mem, size)
-   assert(ffi.sizeof(self._header_type) <= size)
-   self._header = ffi.cast(self._header_ptr_type, mem)[0]
+-- Class methods
+
+-- The standard constructor creates a new ctype object for the header.
+function header:new ()
+   local o = header:superClass().new(self)
+   o._header = self._header_type()
+   return o
 end
+
+-- This alternative constructor creates a protocol header from a chunk
+-- of memory by "overlaying" a header structure.
+function header:new_from_mem (mem, size)
+   local o = header:superClass().new(self)
+   -- Using the class variables here does the right thing even if the
+   -- instance is recycled
+   assert(ffi.sizeof(self._header_type) <= size)
+   o._header = ffi.cast(self._header_ptr_type, mem)[0]
+   return o
+end
+
+-- Instance methods
 
 function header:header ()
    return self._header
 end
 
-function header:name ()
-   return self._name
-end
-
 function header:sizeof ()
-   return ffi.sizeof(self._header)
+   return ffi.sizeof(self._header_type)
 end
 
 -- default equality method, can be overriden in the ancestors

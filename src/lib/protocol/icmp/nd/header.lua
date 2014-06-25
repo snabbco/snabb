@@ -1,3 +1,4 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local proto_header = require("lib.protocol.header")
 local tlv = require("lib.protocol.icmp.nd.options.tlv")
