@@ -51,55 +51,111 @@
 -- only the type value 0x86dd is defined, which is mapped to the class
 -- that handles IPv6 headers.
 --
--- The initializer for the standard constructor new() will typically
--- allocate an instance of _header_type and initialize it, e.g.
+-- Header-dependent initializations can be handled by overriding the
+-- standard constructor, e.g.
 --
--- function ethernet:_init_new (config)
---    local header = ether_header_t()
---    ffi.copy(header.ether_dhost, config.dst, 6)
---    ffi.copy(header.ether_shost, config.src, 6)
---    header.ether_type = C.htons(config.type)
---    self._header = header
+-- function ethernet:new (config)
+--    local o = ethernet:superClass().new(self)
+--    o:dst(config.dst)
+--    o:src(config.src)
+--    o:type(config.type)
+--    return o
 -- end
 --
--- The header class provides an additional constructor called
--- new_from_mem() that interprets a chunk of memory as a protocol
--- header using ffi.cast(). A header that requires more sophisticated
--- initialization (e.g. variably-sized headers whose actual size
--- depends on the contents on the header) must over ride the
--- _init_new_from_mem() method.
+-- Protocol headers with a variable format can be handled with a
+-- little extra work as follows.
+--
+-- The class for such a protocl defines just the alternative that can
+-- be considered to be the "fundamental" header.  It must be
+-- sufficient for the new_from_mem() method to determine the actual
+-- header.
+--
+-- The standard constructors will initialize the header instance with
+-- the fundamental type.  The protocol class must override both
+-- constructor methods to determine the actual header, either from the
+-- configuration or the chunk of memory for the new() and
+-- new_from_mem() methods, respectively.  The important part is that
+-- the constructors must override the _header* class variables in the
+-- header instance.  See lib/protocol/gre.lua for an example of how
+-- this can look like.
+--
+-- The header is stored in the instance variable _header. To avoid the
+-- creation of garbage, this is actually an array of pointers with a
+-- single element defined as
+--
+--   ffi.typeof("$*[1]", self._header_ptr_type)
+--
+-- The pointer points to either a ctype object or a region of buffer
+-- memory, depending on whether the instance was created via the new()
+-- or new_from_mem() methods, respectively.  This array is allocated
+-- once upon instance creation and avoids the overhead of "boxing"
+-- when the instance is recycled by new_from_mem().  As a consequence,
+-- the header must be accessed by indexing this array, e.g.
+--
+--   self._header[0].some_header_element
+--
+-- Caution: to access the actual header, e.g. for ffi.sizeof(), you
+-- need to dereference the pointer, i.e. _header[0][0].  This is what
+-- the header() method does.
+--
 
+module(..., package.seeall)
 local ffi = require("ffi")
 
-local header = subClass(nil, 'new_from_mem')
+local header = subClass(nil)
 
-function header:_init_new_from_mem (mem, size)
-   assert(ffi.sizeof(self._header_type) <= size)
-   self._header = ffi.cast(self._header_ptr_type, mem)[0]
+-- Class methods
+
+-- The standard constructor creates a new ctype object for the header.
+-- Note: unlike the new_from_mem() method, the new() method creates
+-- garbage when an object is recycled.  This is not trivial to avoid
+-- for header classes with variably-sized headers, because there is
+-- currently only a single free list per class.
+function header:new ()
+   local o = header:superClass().new(self)
+   if not o._recycled then
+      o._header = ffi.typeof("$[1]", o._header_ptr_type)()
+   end
+   o._header_aux = self._header_type()
+   o._header[0] = ffi.cast(o._header_ptr_type, o._header_aux)
+   return o
 end
+
+-- This alternative constructor creates a protocol header from a chunk
+-- of memory by "overlaying" a header structure.
+function header:new_from_mem (mem, size)
+   local o = header:superClass().new(self)
+   if not o._recycled then
+      o._header = ffi.typeof("$[1]", o._header_ptr_type)()
+   end
+   -- Using the class variables here does the right thing even if the
+   -- instance is recycled
+   assert(ffi.sizeof(self._header_type) <= size)
+   o._header[0] = ffi.cast(self._header_ptr_type, mem)
+   return o
+end
+
+-- Instance methods
 
 function header:header ()
-   return self._header
-end
-
-function header:name ()
-   return self._name
+   return self._header[0][0]
 end
 
 function header:sizeof ()
-   return ffi.sizeof(self._header)
+   return ffi.sizeof(self._header_type)
 end
 
 -- default equality method, can be overriden in the ancestors
 function header:eq (other)
-   return ffi.string(self._header, self:sizeof()) == ffi.string(other._header,self:sizeof())
+   return (ffi.string(self._header[0], self:sizeof()) ==
+	ffi.string(other._header[0],self:sizeof()))
 end
 
 -- Copy the header to some location in memory (usually a packet
 -- buffer).  The caller must make sure that there is enough space at
 -- the destination.
 function header:copy (dst)
-   ffi.copy(dst, self._header, ffi.sizeof(self._header))
+   ffi.copy(dst, self._header[0], ffi.sizeof(self._header[0][0]))
 end
 
 -- Create a new protocol instance that is a copy of this instance.
@@ -108,7 +164,7 @@ end
 function header:clone ()
    local header = self._header_type()
    local sizeof = ffi.sizeof(header)
-   ffi.copy(header, self._header, sizeof)
+   ffi.copy(header, self._header[0], sizeof)
    return self:class():new_from_mem(header, sizeof)
 end
 
