@@ -135,6 +135,16 @@ static uint8_t            local_mac[6];
 static uint8_t            remote_mac[6];
 
 static int remain;
+static int n_send_remain;
+
+static void
+transmit_buffer(unsigned buf_id)
+{
+  struct pkt_buf* pb = pkt_bufs[buf_id];
+  *((int*)(pb->dma_buf + cfg_tx_align + ETH_HLEN)) = cfg_iter - n_send_remain;
+  ef_vi_transmit(&vi, pb->dma_buf_addr, tx_frame_len, buf_id);
+  n_send_remain--;
+}
 
 static void tx_loop(void)
 {
@@ -142,13 +152,12 @@ static void tx_loop(void)
   static volatile long long waste_cycles;
   static long empty_polls;
   static long nonempty_polls;
-  int n_send_remain = cfg_iter;
 
   remain = cfg_iter;
+  n_send_remain = cfg_iter;
 
   for (int buf_id = 0; buf_id < N_BUFS; buf_id++) {
-    ef_vi_transmit(&vi, pkt_bufs[buf_id]->dma_buf_addr, tx_frame_len, buf_id);
-    n_send_remain--;
+    transmit_buffer(buf_id);
   }
     
   while (1) {
@@ -176,9 +185,7 @@ static void tx_loop(void)
             n_tx_done = n_send_remain;
           }
           for (int i = 0; i < n_tx_done; i++) {
-            int buf_id = ids[i];
-            ef_vi_transmit(&vi, pkt_bufs[buf_id]->dma_buf_addr, tx_frame_len, buf_id);
-            n_send_remain--;
+            transmit_buffer(ids[i]);
           }
         }
         break;
@@ -226,7 +233,7 @@ int init_pkt(void* pkt_buf, int payload_length)
   {
     char* blurb = "the quick brown fox jumps over the lazy dog ";
     int blurb_len = strlen(blurb);
-    char* payload = pkt_buf + sizeof(ci_ether_hdr);
+    char* payload = pkt_buf + sizeof(ci_ether_hdr) + sizeof(int);
     for (int i = 0; i < payload_length; i++) {
       payload[i] = blurb[i % blurb_len];
     }
