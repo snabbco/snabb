@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <ctype.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <errno.h>
@@ -72,7 +73,27 @@ static ef_pd             pd;
 static ef_memreg         memreg;
 static unsigned          rx_posted, rx_completed;
 
+struct timeval start, end;
+
 static int remain;
+static char* received;
+
+void
+report_missing_packets()
+{
+  printf("missing:");
+  for (int i = 0, printed = 0; i < cfg_iter; i++) {
+    if (!received[i]) {
+      printf(" %d", i);
+      printed++;
+      if (printed == 100) {
+        printf(" and probably more");
+        break;
+      }
+    }
+  }
+  putchar('\n');
+}
 
 void
 show_status(int sig)
@@ -84,10 +105,13 @@ show_status(int sig)
   }
   printf("remain: %d\n", remain);
   prev_remain = remain;
+
+  report_missing_packets();
 }
 
 static void rx_loop(void)
 {
+  static int next_expected = 0;
   remain = cfg_iter;
 
   for (int buf_id = 0; buf_id < N_BUFS; buf_id++) {
@@ -99,19 +123,31 @@ static void rx_loop(void)
     ef_event evs[EF_VI_EVENT_POLL_MIN_EVS];
     int n_ev = ef_eventq_poll(&vi, evs, sizeof(evs) / sizeof(evs[0]));
     int n_recv = 0;
+    int seq;
 
     for (int i = 0; i < n_ev; ++i) {
       switch (EF_EVENT_TYPE(evs[i])) {
       case EF_EVENT_TYPE_RX:
         TEST(EF_EVENT_RX_SOP(evs[i]) == 1);
         TEST(EF_EVENT_RX_CONT(evs[i]) == 0);
-        remain--;
-        if (remain <= 0) {
-          return;
-        }
         {
           int buf_id = EF_EVENT_RX_RQ_ID(evs[i]);
-          TRY(ef_vi_receive_init(&vi, pkt_bufs[buf_id]->dma_buf_addr, buf_id));
+          struct pkt_buf* pb = pkt_bufs[buf_id];
+          char* payload = (pb->dma_buf + cfg_rx_align + ETH_HLEN + 16);
+          unsigned int seq = *((int*)payload);
+          if (seq >= cfg_iter) {
+            fprintf(stderr, "received sequence number %d which is out of expected range (max %d)\n", seq, cfg_iter);
+          } else {
+            received[seq] = 1;
+          }
+          if (remain == cfg_iter) {
+            gettimeofday(&start, NULL);
+          }
+          remain--;
+          if (remain <= 0) {
+            return;
+          }
+          TRY(ef_vi_receive_init(&vi, pb->dma_buf_addr, buf_id));
           n_recv++;
         }
         break;
@@ -135,10 +171,7 @@ static void rx_loop(void)
 
 static void recv_test(void)
 {
-  struct timeval start, end;
-
   int i, usec;
-  gettimeofday(&start, NULL);
   rx_loop();
   gettimeofday(&end, NULL);
 
@@ -257,11 +290,15 @@ int main(int argc, char* argv[])
     printf("# iterations: %d\n", cfg_iter);
     printf("# rx align: %d\n", cfg_rx_align);
 
+    received = calloc(cfg_iter * sizeof(char), 1);
+
     do_init(ifindex);
 
     signal(SIGINT, show_status);
 
     recv_test();
+
+    report_missing_packets();
   }
 
   return 0;
