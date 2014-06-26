@@ -373,6 +373,7 @@ int main(int argc, char* argv[])
   printf("# frame len: %d\n", tx_frame_len);
   printf("# tx align: %d\n", cfg_tx_align);
   send_test();
+  sleep(1);
 
   return 0;
 }

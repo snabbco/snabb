@@ -116,8 +116,8 @@ static void rx_loop(void)
         }
         break;
       case EF_EVENT_TYPE_RX_DISCARD:
-        fprintf(stderr, "ERROR: RX_DISCARD type=%d\n",
-                EF_EVENT_RX_DISCARD_TYPE(evs[i]));
+        fprintf(stderr, "ERROR: RX_DISCARD type=%d, subtype=%d\n",
+                EF_EVENT_RX_DISCARD_TYPE(evs[i]), evs[i].rx_discard.subtype);
         break;
       case EF_EVENT_TYPE_TX_ERROR:
         fprintf(stderr, "ERROR: TX_ERROR type=%d\n",
