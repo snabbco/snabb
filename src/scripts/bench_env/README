@@ -45,7 +45,7 @@ The following are needed:
 - Unmount the image and point to it from bench_conf.sh in the IMAGE variables
 
 QEMU compilation (while not upstream)
-    git clone -b vhost-user-v10 https://github.com/virtualopensystems/qemu.git
+    git clone -b large-vring https://github.com/virtualopensystems/qemu.git
     mkdir qemu/obj
     cd qemu/obj
     ../configure --target-list=x86_64-softmmu
