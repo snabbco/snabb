@@ -3,144 +3,111 @@ local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
 local lib = require("core.lib")
--- 
+local bitfield, update_csum, finish_csum = lib.bitfield, lib.update_csum, lib.finish_csum
 
 -- GRE uses a variable-length header as specified by RFCs 2784 and
 -- 2890.  The actual size is determined by flag bits in the base
 -- header.  This implementation only supports the checksum and key
 -- extensions.  Note that most of the flags specified in the original
 -- specification of RFC1701 have been deprecated.
+--
+-- The gre class implements the base header (without checksum and
+-- key).  The combinations with checksum and key are handled by the
+-- subclasses gre_csum, gre_key and gre_csum_key
 
 local gre = subClass(header)
 
--- Four different headers depending on the options used
-local gre_types = { base = ffi.typeof[[
-			  struct {
-			     uint16_t bits; // Flags, version
-			     uint16_t protocol;
-			  }]],
-		    csum = ffi.typeof[[
-			  struct {
-			     uint16_t bits; // Flags, version
-			     uint16_t protocol;
-			     uint16_t csum;
-			     uint16_t reserved1;
-			  }]],
-		    key = ffi.typeof[[
-			  struct {
-			     uint16_t bits; // Flags, version
-			     uint16_t protocol;
-			     uint32_t key;
-			  }]],
-		    csum_key = ffi.typeof[[
-			  struct {
-			     uint16_t bits; // Flags, version
-			     uint16_t protocol;
-			     uint16_t csum;
-			     uint16_t reserved1;
-			     uint32_t key;
-			  }]],
-		 }
-local gre_ptr_types = {}
-for k, v in pairs(gre_types) do
-   gre_ptr_types[k] = ffi.typeof("$*", v)
-end
+local gre_t = ffi.typeof[[
+      struct {
+	 uint16_t bits; // Flags, version
+	 uint16_t protocol;
+      }
+]]
+
+local subclasses = { csum     = "lib.protocol.gre_csum",
+		     key      = "lib.protocol.gre_key",
+		     csum_key = "lib.protocol.gre_csum_key" }
 
 -- Class variables
 gre._name = "gre"
-gre._header_type = gre_types.base
-gre._header_ptr_type = gre_ptr_types.base
+gre._header_type = gre_t
+gre._header_ptr_type = ffi.typeof("$*", gre_t)
 gre._ulp = { 
    class_map = { [0x6558] = "lib.protocol.ethernet" },
    method    = 'protocol' }
 
+-- Pre-allocated array for initial parsing in new_from_mem()
+local parse_mem = ffi.typeof("$[1]", gre._header_ptr_type)()
+
 -- Class methods
 
 function gre:new (config)
-   local o = gre:superClass().new(self)
    local type = nil
-   if config.checksum then
-      o._checksum = true
-      type = 'csum'
-   else
-      o._checksum = false
-   end
-   if config.key ~= nil then
-      o._key = true
-      if type then
-	 type = 'csum_key'
-      else
-	 type = 'key'
+   if config then
+      if config.checksum then
+	 type = 'csum'
       end
-   else
-      o._key = false
+      if config.key ~= nil then
+	 if type then
+	    type = 'csum_key'
+	 else
+	    type = 'key'
+	 end
+      end
    end
+
+   local o
    if type then
-      o._header_type = gre_types[type]
-      o._header_ptr_type = gre_ptr_types[type]
-      o._header[0] = o._header_type()
-   end
-   if o._checksum then
-      lib.bitfield(16, o:header(), 'bits', 0, 1, 1)
-   end
-   if o._key then
-      lib.bitfield(16, o:header(), 'bits', 2, 1, 1)
-      o:key(config.key)
+      local subclass = subclasses[type]
+      o = (package.loaded[subclass] or require(subclass)):new(config)
+   else
+      o = gre:superClass().new(self)
    end
    o:protocol(config.protocol)
    return o
 end
 
 function gre:new_from_mem (mem, size)
-   local o = gre:superClass().new_from_mem(self, mem, size)
+   parse_mem[0] = ffi.cast(self._header_ptr_type, mem)
    -- Reserved bits and version MUST be zero.  We don't support
    -- the sequence number option, i.e. the 'S' flag (bit 3) must
    -- be cleared as well
-   if lib.bitfield(16, o:header(), 'bits', 3, 13) ~= 0 then
-      o:free()
+   if bitfield(16, parse_mem[0], 'bits', 3, 13) ~= 0 then
       return nil
    end
    local type = nil
-   if lib.bitfield(16, o:header(), 'bits', 0, 1) == 1 then
-      o._checksum = true
+   local has_csum, has_key = false, false
+   if bitfield(16, parse_mem[0], 'bits', 0, 1) == 1 then
       type = 'csum'
-   else
-      o._checksum = false
+      has_csum = true
    end
-   if lib.bitfield(16, o:header(), 'bits', 2, 1) == 1 then
-      o._key = true
+   if bitfield(16, parse_mem[0], 'bits', 2, 1) == 1 then
       if type then
 	 type = 'csum_key'
       else
 	 type = 'key'
       end
-   else
-      o._key = false
+      has_key = true
    end
+   local class = self
    if type then
-      o._header_type = gre_types[type]
-      o._header_ptr_type = gre_ptr_types[type]
-      o._header[0] = ffi.cast(o._header_ptr_type, mem)[0]
+      local subclass = subclasses[type]
+      class = package.loaded[subclass] or require(subclass)
    end
+   local o = gre:superClass().new_from_mem(class, mem, size)
+   o._checksum = has_csum
+   o._key = has_key
    return o
 end
 
 -- Instance methods
 
-function gre:free ()
-   -- Make sure that this object uses the base header from the gre
-   -- class when it is being recycled
-   self._header_type = nil
-   self._header_ptr_type = nil
-   gre:superClass().free(self)
-end
-
 local function checksum(header, payload, length)
    local csum_in = header.csum;
    header.csum = 0;
    header.reserved1 = 0;
-   local csum = lib.finish_csum(lib.update_csum(payload, length,
-						lib.update_csum(header, ffi.sizeof(header), 0)))
+   local csum = finish_csum(update_csum(payload, length,
+					update_csum(header, ffi.sizeof(header), 0)))
    header.csum = csum_in
    return csum
 end

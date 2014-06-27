@@ -62,13 +62,14 @@
 --    return o
 -- end
 --
--- Protocol headers with a variable format can be handled with a
--- little extra work as follows.
---
--- The class for such a protocl defines just the alternative that can
--- be considered to be the "fundamental" header.  It must be
--- sufficient for the new_from_mem() method to determine the actual
--- header.
+-- The generic code here assumes that every protocol has a fixed
+-- header of a given type.  This is required by the garbage-saving
+-- hacks and the object recycling mechanism of the OOP system.
+-- Protocols of variable header types must be handled by subclasses,
+-- each of which must implement exactly one variant.  The base class
+-- must implement at least as much as is necessary to determine which
+-- subclass needs to be selected. The GRE protocol serves as an
+-- example of how this can be implemented.
 --
 -- The standard constructors will initialize the header instance with
 -- the fundamental type.  The protocol class must override both
@@ -107,30 +108,35 @@ local header = subClass(nil)
 -- Class methods
 
 -- The standard constructor creates a new ctype object for the header.
--- Note: unlike the new_from_mem() method, the new() method creates
--- garbage when an object is recycled.  This is not trivial to avoid
--- for header classes with variably-sized headers, because there is
--- currently only a single free list per class.
+-- Note that ffi.typeof with a cdecl cannot be compiled (reported as
+-- "NYI" by the compiler).  Due to the recycling mechanism, it is not
+-- expected that this code will ever be called in a hot trace.  If
+-- this turns out to be a problem, the ctype can be created in
+-- advance.
+--
+-- Note that the header is initialized to zero in all cases, i.e. the
+-- protocol-specific constructors must perform all initialization even
+-- if the object is recycled.
 function header:new ()
    local o = header:superClass().new(self)
    if not o._recycled then
       o._header = ffi.typeof("$[1]", o._header_ptr_type)()
+      o._header_aux = self._header_type()
+      o._header[0] = ffi.cast(o._header_ptr_type, o._header_aux)
+   else
+      ffi.fill(o._header[0], ffi.sizeof(o._header[0][0]))
    end
-   o._header_aux = self._header_type()
-   o._header[0] = ffi.cast(o._header_ptr_type, o._header_aux)
    return o
 end
 
 -- This alternative constructor creates a protocol header from a chunk
 -- of memory by "overlaying" a header structure.
 function header:new_from_mem (mem, size)
+   assert(ffi.sizeof(self._header_type) <= size)
    local o = header:superClass().new(self)
    if not o._recycled then
       o._header = ffi.typeof("$[1]", o._header_ptr_type)()
    end
-   -- Using the class variables here does the right thing even if the
-   -- instance is recycled
-   assert(ffi.sizeof(self._header_type) <= size)
    o._header[0] = ffi.cast(self._header_ptr_type, mem)
    return o
 end
