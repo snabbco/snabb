@@ -198,6 +198,20 @@ c.MAP["32BIT"] = nil
 c.SYS.sync_file_range = nil
 c.AT.EMPTY_PATH = nil
 
+-- now missing on mips, not sure why
+c.IFF.MACVLAN_PORT = nil
+c.IFF.TX_SKB_SHARING = nil
+c.IFF.XMIT_DST_RELEASE = nil
+c.IFF.DISABLE_NETPOLL = nil
+c.IFF.UNICAST_FLT = nil
+c.IFF.OVS_DATAPATH = nil
+c.IFF.SLAVE_NEEDARP = nil
+c.IFF.ISATAP = nil
+c.IFF.MASTER_ARPMON = nil
+c.IFF.WAN_HDLC = nil
+c.IFF.DONT_BRIDGE = nil
+c.IFF.BRIDGE_PORT = nil
+
 -- missing on Travis
 c.TCP.THIN_DUPACK = nil
 c.TCP.FASTOPEN = nil
