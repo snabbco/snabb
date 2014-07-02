@@ -266,8 +266,11 @@ function finish_csum (sum)
    return bit.band(bit.bnot(sum), 0xffff)
 end
 
-function malloc (type)
-   local ffi_type = ffi.typeof(type)
+function malloc_s (str)
+   return malloc(ffi.typeof(str))
+end
+
+function malloc (ffi_type)
    local size = ffi.sizeof(ffi_type)
    local ptr = C.malloc(size)
    return ffi.cast(ffi.typeof("$*", ffi_type), ptr)
