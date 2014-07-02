@@ -1,3 +1,4 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
@@ -49,22 +50,22 @@ ipv4._ulp = {
 
 -- Class methods
 
-function ipv4:_init_new (config)
-   local header = ipv4hdr_t()
-   header.ihl_v_tos = C.htonl(0x4000) -- v4
-   self._header = header
-   self:ihl(self:sizeof() / 4)
-   self:dscp(config.dscp or 0)
-   self:ecn(config.ecn or 0)
-   self:total_length(self:sizeof()) -- default to header only
-   self:id(config.id or 0)
-   self:flags(config.flags or 0)
-   self:frag_off(config.frag_off or 0)
-   self:ttl(config.ttl or 0)
-   self:protocol(config.protocol or 0xff)
-   self:src(config.src)
-   self:dst(config.dst)
-   self:checksum()
+function ipv4:new (config)
+   local o = ipv4:superClass().new(self)
+   o:header().ihl_v_tos = C.htonl(0x4000) -- v4
+   o:ihl(o:sizeof() / 4)
+   o:dscp(config.dscp or 0)
+   o:ecn(config.ecn or 0)
+   o:total_length(o:sizeof()) -- default to header only
+   o:id(config.id or 0)
+   o:flags(config.flags or 0)
+   o:frag_off(config.frag_off or 0)
+   o:ttl(config.ttl or 0)
+   o:protocol(config.protocol or 0xff)
+   o:src(config.src)
+   o:dst(config.dst)
+   o:checksum()
+   return o
 end
 
 function ipv4:pton (p)
@@ -88,89 +89,89 @@ end
 -- Instance methods
 
 function ipv4:version (v)
-   return lib.bitfield(16, self._header, 'ihl_v_tos', 0, 4, v)
+   return lib.bitfield(16, self:header(), 'ihl_v_tos', 0, 4, v)
 end
 
 function ipv4:ihl (ihl)
-   return lib.bitfield(16, self._header, 'ihl_v_tos', 4, 4, ihl)
+   return lib.bitfield(16, self:header(), 'ihl_v_tos', 4, 4, ihl)
 end
 
 function ipv4:dscp (dscp)
-   return lib.bitfield(16, self._header, 'ihl_v_tos', 8, 6, dscp)
+   return lib.bitfield(16, self:header(), 'ihl_v_tos', 8, 6, dscp)
 end
 
 function ipv4:ecn (ecn)
-   return lib.bitfield(16, self._header, 'ihl_v_tos', 14, 2, ecn)
+   return lib.bitfield(16, self:header(), 'ihl_v_tos', 14, 2, ecn)
 end
 
 function ipv4:total_length (length)
    if length ~= nil then
-      self._header.total_length = C.htons(length)
+      self:header().total_length = C.htons(length)
    else
-      return(C.ntohs(self._header.total_length))
+      return(C.ntohs(self:header().total_length))
    end
 end
 
 function ipv4:id (id)
    if id ~= nil then
-      self._header.id = C.htons(id)
+      self:header().id = C.htons(id)
    else
-      return(C.ntohs(self._header.id))
+      return(C.ntohs(self:header().id))
    end
 end
 
 function ipv4:flags (flags)
-   return lib.bitfield(16, self._header, 'frag_off', 0, 3, flags)
+   return lib.bitfield(16, self:header(), 'frag_off', 0, 3, flags)
 end
 
 function ipv4:frag_off (frag_off)
-   return lib.bitfield(16, self._header, 'frag_off', 3, 13, frag_off)
+   return lib.bitfield(16, self:header(), 'frag_off', 3, 13, frag_off)
 end
 
 function ipv4:ttl (ttl)
    if ttl ~= nil then
-      self._header.ttl = ttl
+      self:header().ttl = ttl
    else
-      return self._header.ttl
+      return self:header().ttl
    end
 end
 
 function ipv4:protocol (protocol)
    if protocol ~= nil then
-      self._header.protocol = protocol
+      self:header().protocol = protocol
    else
-      return self._header.protocol
+      return self:header().protocol
    end
 end
 
 function ipv4:checksum ()
-   local csum = lib.update_csum(self._header, self:sizeof())
-   self._header.checksum = C.htons(lib.finish_csum(csum))
-   return C.ntohs(self._header.checksum)
+   local csum = lib.update_csum(self:header(), self:sizeof())
+   self:header().checksum = C.htons(lib.finish_csum(csum))
+   return C.ntohs(self:header().checksum)
 end
 
 function ipv4:src (ip)
    if ip ~= nil then
-      ffi.copy(self._header.src_ip, ip, ipv4_addr_t_size)
+      ffi.copy(self:header().src_ip, ip, ipv4_addr_t_size)
    else
-      return self._header.src_ip
+      return self:header().src_ip
    end
 end
 
 function ipv4:src_eq (ip)
-   return C.memcmp(ip, self._header.src_ip, ipv4_addr_t_size) == 0
+   return C.memcmp(ip, self:header().src_ip, ipv4_addr_t_size) == 0
 end
 
 function ipv4:dst (ip)
    if ip ~= nil then
-      ffi.copy(self._header.dst_ip, ip, ipv4_addr_t_size)
+      ffi.copy(self:header().dst_ip, ip, ipv4_addr_t_size)
    else
-      return self._header.dst_ip
+      return self:header().dst_ip
    end
 end
 
 function ipv4:dst_eq (ip)
-   return C.memcmp(ip, self._header.dst_ip, ipv4_addr_t_size) == 0
+   return C.memcmp(ip, self:header().dst_ip, ipv4_addr_t_size) == 0
 end
 
 -- override the default equality method
@@ -189,7 +190,7 @@ end
 -- header if extension headers are present.
 function ipv4:pseudo_header (ulplen, proto)
    local ph = ipv4hdr_pseudo_t()
-   local h = self._header
+   local h = self:header()
    ffi.copy(ph, h.src_ip, 2*ipv4_addr_t_size)  -- Copy source and destination
    ph.ulp_length = C.htons(ulplen)
    ph.ulp_proto = C.htons(proto)

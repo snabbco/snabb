@@ -42,7 +42,7 @@ markdown: $(RMOBJS)
 
 snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 	$(E) "LINK      $@"
-	$(Q) gcc -Wl,-E -Werror -Wall -o $@ $^ \
+	$(Q) gcc -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt -lpthread
 	@echo -n "Firmware: "

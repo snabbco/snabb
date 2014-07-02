@@ -1,32 +1,17 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
+local bitfield = require("core.lib").bitfield
 local nd_header = require("lib.protocol.icmp.nd.header")
 
-local na_t
-if ffi.abi("le") then
-   na_t = ffi.typeof[[
-	 struct {
-	    uint32_t reserved:5,
-	             override:1,
-	             solicited:1,
-	             router:1,
-	             reserved2:24;
-	    uint8_t  target[16];
-	 } __attribute__((packed))
-   ]]
-else
-   na_t = ffi.typeof[[
-	 struct {
-	    uint32_t router:1,
-                     solicited:1,
-                     override:1,
-                     reserved:29;
-	    uint8_t  target[16];
-	 }
-   ]]
-end
-
 local na = subClass(nd_header)
+
+local na_t = ffi.typeof[[
+      struct {
+	 uint32_t flags;
+	 uint8_t  target[16];
+      } __attribute__((packed))
+]]
 
 -- Class variables
 na._name = "neighbor advertisement"
@@ -36,46 +21,38 @@ na._ulp = { method = nil }
 
 -- Class methods
 
-function na:_init_new (target, router, solicited, override)
-   self._header = na_t()
-   ffi.copy(self._header.target, target, 16)
-   self._header.router = router
-   self._header.solicited = solicited
-   self._header.override = override
+function na:new (target, router, solicited, override)
+   local o = na:superClass().new(self)
+   o:target(target)
+   o:router(router)
+   o:solicited(solicited)
+   o:override(override)
+   return o
 end
 
 -- Instance methods
 
 function na:target (target)
    if target ~= nil then
-      ffi.copy(self._header.target, target, 16)
+      ffi.copy(self:header().target, target, 16)
    end
-   return self._header.target
+   return self:header().target
 end
 
 function na:target_eq (target)
-   return C.memcmp(target, self._header.target, 16) == 0
+   return C.memcmp(target, self:header().target, 16) == 0
 end
 
 function na:router (r)
-   if r ~= nil then
-      self._header.router = r
-   end
-   return self._header.router
+   return bitfield(32, self:header(), 'flags', 0, 1, r)
 end
 
 function na:solicited (s)
-   if s ~= nil then
-      self._header.solicited = s
-   end
-   return self._header.solicited
+   return bitfield(32, self:header(), 'flags', 1, 1, s)
 end
 
 function na:override (o)
-   if o ~= nil then
-      self._header.override = o
-   end
-   return self._header.override
+   return bitfield(32, self:header(), 'flags', 2, 1, o)
 end
 
 return na
