@@ -1,129 +1,157 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
 local lib = require("core.lib")
--- 
+local bitfield, update_csum, finish_csum = lib.bitfield, lib.update_csum, lib.finish_csum
 
 -- GRE uses a variable-length header as specified by RFCs 2784 and
 -- 2890.  The actual size is determined by flag bits in the base
 -- header.  This implementation only supports the checksum and key
 -- extensions.  Note that most of the flags specified in the original
 -- specification of RFC1701 have been deprecated.
+--
+-- The gre class implements the base header (without checksum and
+-- key).  The combinations with checksum and key are handled by the
+-- subclasses gre_csum, gre_key and gre_csum_key
 
-local gre_template = [[
+local gre = subClass(header)
+
+local gre_t = ffi.typeof[[
       struct {
 	 uint16_t bits; // Flags, version
 	 uint16_t protocol;
-	 uint8_t  options[$];
       }
 ]]
 
--- Three different sizes depending on the options used
-local gre_types = { [0] = ffi.typeof(gre_template, 0),
-		    [4] = ffi.typeof(gre_template, 4),
-		    [8] = ffi.typeof(gre_template, 8), }
-local gre_ptr_types = { [0] = ffi.typeof("$*", gre_types[0]),
-			[4] = ffi.typeof("$*", gre_types[4]),
-			[8] = ffi.typeof("$*", gre_types[8]) }
-local gre = subClass(header)
+local subclasses = { csum     = "lib.protocol.gre_csum",
+		     key      = "lib.protocol.gre_key",
+		     csum_key = "lib.protocol.gre_csum_key" }
 
 -- Class variables
 gre._name = "gre"
-gre._header_type = gre_types[0]
-gre._header_ptr_type = gre_ptr_types[0]
+gre._header_type = gre_t
+gre._header_ptr_type = ffi.typeof("$*", gre_t)
 gre._ulp = { 
    class_map = { [0x6558] = "lib.protocol.ethernet" },
    method    = 'protocol' }
 
+-- Pre-allocated array for initial parsing in new_from_mem()
+local parse_mem = ffi.typeof("$[1]", gre._header_ptr_type)()
+
 -- Class methods
 
-function gre:_init_new (config)
-   local opt_size = 0
-   if config.checksum then
-      opt_size = opt_size + 4
-      self._checksum = true
+function gre:new (config)
+   local type = nil
+   if config then
+      if config.checksum then
+	 type = 'csum'
+      end
+      if config.key ~= nil then
+	 if type then
+	    type = 'csum_key'
+	 else
+	    type = 'key'
+	 end
+      end
    end
-   if config.key ~= nil then
-      self._key_offset = opt_size
-      opt_size = opt_size + 4
+
+   local o
+   if type then
+      local subclass = subclasses[type]
+      o = (package.loaded[subclass] or require(subclass)):new(config)
+   else
+      o = gre:superClass().new(self)
    end
-   self._header_type = gre_types[opt_size]
-   self._header_ptr_type = gre_ptr_types[opt_size]
-   self._header = self._header_type()
-   if self._checksum then
-      lib.bitfield(16, self._header, 'bits', 0, 1, 1)
-   end
-   if self._key_offset ~= nil then
-      lib.bitfield(16, self._header, 'bits', 2, 1, 1)
-      self:key(config.key)
-   end
-   self:protocol(config.protocol)
+   o:protocol(config.protocol)
+   return o
 end
 
-function gre:_init_new_from_mem (mem, size)
-   local sizeof = ffi.sizeof(gre._header_type)
-   assert(sizeof <= size)
-   local header = ffi.cast(gre._header_ptr_type, mem)[0]
-   -- Reserved bits and version MUST be zero
-   if lib.bitfield(16, header, 'bits', 4, 12) ~= 0 then
-      self = nil
-      return
+function gre:new_from_mem (mem, size)
+   parse_mem[0] = ffi.cast(self._header_ptr_type, mem)
+   -- Reserved bits and version MUST be zero.  We don't support
+   -- the sequence number option, i.e. the 'S' flag (bit 3) must
+   -- be cleared as well
+   if bitfield(16, parse_mem[0], 'bits', 3, 13) ~= 0 then
+      return nil
    end
-   self._header = header
-   local opt_size = 0
-   if self:use_checksum() then
-      opt_size = opt_size + 4
-      self._checksum = true
+   local type = nil
+   local has_csum, has_key = false, false
+   if bitfield(16, parse_mem[0], 'bits', 0, 1) == 1 then
+      type = 'csum'
+      has_csum = true
    end
-   if self:use_key() then
-      self._key_offset = opt_size
-      opt_size = opt_size + 4
+   if bitfield(16, parse_mem[0], 'bits', 2, 1) == 1 then
+      if type then
+	 type = 'csum_key'
+      else
+	 type = 'key'
+      end
+      has_key = true
    end
-   if opt_size > 0 then
-      self._header_type = gre_types[opt_size]
-      self._header_ptr_type = gre_ptr_types[opt_size]
-      self._header = ffi.cast(self._header_ptr_type, self._header)[0]
+   local class = self
+   if type then
+      local subclass = subclasses[type]
+      class = package.loaded[subclass] or require(subclass)
    end
+   local o = gre:superClass().new_from_mem(class, mem, size)
+   o._checksum = has_csum
+   o._key = has_key
+   return o
 end
 
 -- Instance methods
 
+local function checksum(header, payload, length)
+   local csum_in = header.csum;
+   header.csum = 0;
+   header.reserved1 = 0;
+   local csum = finish_csum(update_csum(payload, length,
+					update_csum(header, ffi.sizeof(header), 0)))
+   header.csum = csum_in
+   return csum
+end
+
+-- Returns nil if checksumming is disabled.  If payload and length is
+-- supplied, the checksum is written to the header and returned to the
+-- caller.  With nil arguments, the current checksum is returned.
 function gre:checksum (payload, length)
-   assert(self._checksum)
-   local csum_ptr = ffi.cast(ffi.typeof("uint16_t *"),
-			    ffi.cast(ffi.typeof("uint8_t*"), self._header)
-			    + ffi.offsetof(self._header, 'options'))
-   local csum = lib.update_csum(self._header, ffi.sizeof(self._header), 0)
-   csum = lib.update_csum(payload, length, csum)
-   csum_ptr[0] = C.htons(lib.finish_csum(csum))
-end
-
-function gre:use_checksum ()
-   return lib.bitfield(16, self._header, 'bits', 0, 1) == 1
-end
-
-function gre:key (key)
-   assert(self._key_offset)
-   local key_ptr = ffi.cast(ffi.typeof("uint32_t *"),
-			    ffi.cast(ffi.typeof("uint8_t*"), self._header)
-			    + ffi.offsetof(self._header, 'options')
-			 + self._key_offset)
-   if key ~= nil then
-      key_ptr[0] = C.htonl(key)
-   else
-      return C.ntohl(key_ptr[0])
+   if not self._checksum then
+      return nil
    end
+   if payload ~= nil then
+      -- Calculate and set the checksum
+      self:header().csum = C.htons(checksum(self:header(), payload, length))
+   end
+   return C.ntohs(self:header().csum)
 end
 
-function gre:use_key ()
-   return lib.bitfield(16, self._header, 'bits', 2, 1) == 1
+function gre:checksum_check (payload, length)
+   if not self._checksum then
+      return true
+   end
+   return checksum(self:header(), payload, length) == C.ntohs(self:header().csum)
+end
+
+-- Returns nil if keying is disabled. Otherwise, the key is set to the
+-- given value or the current key is returned if called with a nil
+-- argument.
+function gre:key (key)
+   if not self._key then
+      return nil
+   end
+   if key ~= nil then
+      self:header().key = C.htonl(key)
+   else
+      return C.ntohl(self:header().key)
+   end
 end
 
 function gre:protocol (protocol)
    if protocol ~= nil then
-      self._header.protocol = C.htons(protocol)
+      self:header().protocol = C.htons(protocol)
    end
-   return(C.ntohs(self._header.protocol))
+   return(C.ntohs(self:header().protocol))
 end
 
 return gre
