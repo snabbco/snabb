@@ -272,7 +272,7 @@ end
 
 function malloc (ffi_type)
    local size = ffi.sizeof(ffi_type)
-   local ptr = C.malloc(size)
+   local ptr = memory.dma_alloc(size)
    return ffi.cast(ffi.typeof("$*", ffi_type), ptr)
 end
 
