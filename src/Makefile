@@ -44,7 +44,7 @@ snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 	$(E) "LINK      $@"
 	$(Q) gcc -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
-	    -lc -ldl -lm -lrt -lpthread -lpcap
+	    -lc -ldl -lm -lrt -lpthread
 	@echo -n "Firmware: "
 	@ln -fs snabb snabbswitch
 	@ls -sh snabb

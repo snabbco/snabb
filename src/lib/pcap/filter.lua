@@ -3,6 +3,8 @@ local ffi = require("ffi")
 local C = ffi.C
 require ("lib.pcap.filter_h")
 
+ffi.load("pcap", true)
+
 local filter = subClass(nil)
 filter._name = "pcap packet filter"
 
