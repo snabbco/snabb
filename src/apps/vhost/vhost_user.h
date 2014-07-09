@@ -56,6 +56,8 @@ struct vhost_user_msg {
 }__attribute__((packed));
 
 int vhost_user_connect(const char *path);
+int vhost_user_listen(const char *path);
+int vhost_user_accept(int sock);
 int vhost_user_send(int sock, struct vhost_user_msg *msg);
 int vhost_user_receive(int sock, struct vhost_user_msg *msg, int *fds,
         int *nfds);
