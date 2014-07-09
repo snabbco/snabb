@@ -68,7 +68,11 @@ function run (npackets)
          return app.app_table.vm.input.rx.stats.rxpackets - packets >= npackets
       end
 
-      app.main({done = done, no_report = true})
+      if npackets == 0 then
+         app.main({no_report = true})
+      else
+         app.main({done = done, no_report = true})
+      end
       local finish = C.get_monotonic_time()
 
       local runtime = finish - start
