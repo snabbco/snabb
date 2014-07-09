@@ -26,6 +26,7 @@ struct vhost_user_memory_region {
     uint64_t guest_phys_addr;
     uint64_t memory_size;
     uint64_t userspace_addr;
+    uint64_t mmap_offset;
 };
 
 struct vhost_user_memory {
