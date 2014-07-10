@@ -48,7 +48,7 @@ function load_config (file, pciaddr, sockpath)
 		     mirror={},
 		     macaddr = '%s',
 		     vlan=%d}]]):format(pciaddr, mac_address, vlan))
-      config.app(c, Virtio, VhostUser, sockpath:format(port_id))
+      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(port_id)})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
       if t.ingress_filter then
          local Filter = "Filter_"..name
