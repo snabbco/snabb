@@ -15,10 +15,17 @@ require("core.packet_h")
 
 max_packets = 1e6
 packets_fl = freelist.new("struct packet *", max_packets)
-packets    = ffi.new("struct packet[?]", max_packets)
+packets    = nil
 local packet_size = ffi.sizeof("struct packet")
 
+
 function module_init ()
+   -- XXX fragile. It initializes memory, but shouldn't probably.
+   -- We cannot even require it from memory (no _G.memory yet)
+   require("lib.hardware.bus")
+
+   packets = ffi.cast("struct packet *", memory.dma_alloc(max_packets * packet_size))
+
    for i = 0, max_packets-1 do
       free(packets[i])
    end

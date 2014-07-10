@@ -30,16 +30,22 @@ function new_buffer ()
    assert(allocated < max, "out of buffers")
    allocated = allocated + 1
    local pointer, physical, bytes = memory.dma_alloc(buffersize)
-   local b = lib.malloc("struct buffer")
+   local b = lib.malloc(buffer_t)
    b.pointer, b.physical, b.size = pointer, physical, buffersize
    b.origin.type = C.BUFFER_ORIGIN_UNKNOWN
    return b
 end
 
+
+local net_device = require("lib.virtio.net_device")
+local return_virtio_buffer = net_device.VirtioNetDevice.return_virtio_buffer
+
+
 -- Free a buffer that is no longer in use.
 function free (b)
    if b.origin.type == C.BUFFER_ORIGIN_VIRTIO then
-      virtio_devices[b.origin.info.virtio.device_id]:return_virtio_buffer(b)
+      local dev = virtio_devices[b.origin.info.virtio.device_id]
+      return_virtio_buffer(dev, b)
    else
       freelist.add(buffers, b)
    end
