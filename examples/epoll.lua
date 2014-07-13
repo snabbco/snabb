@@ -19,6 +19,8 @@ local maxevents = 1024
 
 local poll
 
+local function nilf() return nil end
+
 -- this is somewhat working toward a common API but needs a lot more work, but has resulted in some improvements
 if S.epoll_create then
   poll = {
@@ -34,7 +36,13 @@ if S.epoll_create then
     end,
     events = t.epoll_events(maxevents),
     get = function(this)
-      return this.fd:epoll_wait(this.events)
+      local f, a, r = this.fd:epoll_wait(this.events)
+      if not f then
+        print("error on fd", a)
+        return nilf
+      else
+        return f, a, r
+      end
     end,
     eof = function(ev) return ev.HUP or ev.ERR or ev.RDHUP end,
   }
@@ -53,7 +61,13 @@ elseif S.kqueue then
     end,
     events = t.kevents(maxevents),
     get = function(this)
-      return this.fd:kevent(nil, this.events)
+      local f, a, r = this.fd:kevent(nil, this.events)
+      if not f then
+        print("error on fd", a)
+        return nilf
+      else
+        return f, a, r
+      end
     end,
     eof = function(ev) return ev.EOF or ev.ERROR end,
   }
