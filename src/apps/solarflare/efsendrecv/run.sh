@@ -1,8 +1,10 @@
-#!/bin/sh
+#!/bin/bash
+
+. defs.sh
 
 OPTS="-p"
-LIBPATH=$HOME/openonload-201310-u3/build/gnu_x86_64/lib/ciul
+SEND_WASTE=0
 
-sudo taskset 010 env LD_LIBRARY_PATH=$LIBPATH ./recv $OPTS p10p1 &
+sudo taskset 010 env LD_LIBRARY_PATH=$LIBPATH ./recv $OPTS $RECV_DEV &
 sleep 1
-sudo taskset 020 env LD_LIBRARY_PATH=$LIBPATH ./send -w 120 $OPTS p10p2 00:0f:53:0c:d5:3c
+sudo taskset 020 env LD_LIBRARY_PATH=$LIBPATH ./send -w $SEND_WASTE $OPTS $SEND_DEV $(ifconfig $RECV_DEV | perl -ne 'print $1 if (/HWaddr (\S*)/)')
