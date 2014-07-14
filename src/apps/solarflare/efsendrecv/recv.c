@@ -111,7 +111,8 @@ show_status(int sig)
 
 static void rx_loop(void)
 {
-  static int next_expected = 0;
+  int next_expected = 0;
+  int n_recv_queued = 0;
   remain = cfg_iter;
 
   for (int buf_id = 0; buf_id < N_BUFS; buf_id++) {
@@ -120,9 +121,8 @@ static void rx_loop(void)
   ef_vi_receive_push(&vi);
     
   while (1) {
-    ef_event evs[EF_VI_EVENT_POLL_MIN_EVS];
+    ef_event evs[32];
     int n_ev = ef_eventq_poll(&vi, evs, sizeof(evs) / sizeof(evs[0]));
-    int n_recv = 0;
     int seq;
 
     for (int i = 0; i < n_ev; ++i) {
@@ -136,7 +136,8 @@ static void rx_loop(void)
           char* payload = (pb->dma_buf + cfg_rx_align + ETH_HLEN + 16);
           unsigned int seq = *((int*)payload);
           if (seq >= cfg_iter) {
-            fprintf(stderr, "received sequence number %d which is out of expected range (max %d)\n", seq, cfg_iter);
+            fprintf(stderr, "received sequence number %d which is out of expected range (max %d) at iteration %d\n", seq, cfg_iter, i);
+            exit(1);
           } else {
             received[seq] = 1;
           }
@@ -148,7 +149,7 @@ static void rx_loop(void)
             return;
           }
           TRY(ef_vi_receive_init(&vi, pb->dma_buf_addr, buf_id));
-          n_recv++;
+          n_recv_queued++;
         }
         break;
       case EF_EVENT_TYPE_RX_DISCARD:
@@ -161,8 +162,9 @@ static void rx_loop(void)
         break;
       }
     }
-    if (n_recv) {
+    if (n_recv_queued > 16) {
       ef_vi_receive_push(&vi);
+      n_recv_queued = 0;
     }
   }
 }

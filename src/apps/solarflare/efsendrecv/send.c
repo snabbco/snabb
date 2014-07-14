@@ -161,7 +161,7 @@ static void tx_loop(void)
   }
     
   while (1) {
-    ef_event evs[EF_VI_EVENT_POLL_MIN_EVS];
+    ef_event evs[32];
     int n_ev = ef_eventq_poll(&vi, evs, sizeof(evs) / sizeof(evs[0]));
     for (int i = 0; i < cfg_waste_cycles; i++) {
       waste_cycles += i;
@@ -291,9 +291,11 @@ static void do_init(int ifindex)
 static int parse_interface(const char* s, int* ifindex_out)
 {
   char dummy;
-  if ((*ifindex_out = if_nametoindex(s)) == 0)
-    if (sscanf(s, "%d%c", ifindex_out, &dummy) != 1)
+  if ((*ifindex_out = if_nametoindex(s)) == 0) {
+    if (sscanf(s, "%d%c", ifindex_out, &dummy) != 1) {
       return 0;
+    }
+  }
   return 1;
 }
 

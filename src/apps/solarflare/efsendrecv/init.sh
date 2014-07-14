@@ -1,3 +1,7 @@
-sudo onload_tool reload
-sudo ifconfig p10p1 192.168.99.1
-sudo ifconfig p10p2 192.168.99.2
+#!/bin/bash
+
+. defs.sh
+
+#sudo onload_tool reload
+sudo ifconfig $SEND_DEV $SEND_IP
+sudo ifconfig $RECV_DEV $RECV_IP
