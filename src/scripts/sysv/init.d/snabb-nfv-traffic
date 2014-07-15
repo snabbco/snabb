@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+
+### BEGIN INIT INFO
+# Provides:             traffic
+# Required-Start:       
+# Required-Stop:        
+# Should-Start:         
+# Should-Stop:          
+# Default-Start:        2 3 4 5
+# Default-Stop:         0 1 6
+# Short-Description:    SnabbSwitch NFV traffic, runs on compute node
+### END INIT INFO
+
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+DAEMON=/opt/snabbswitch/bin/snabbnfv-traffic
+CONF=/etc/default/snabb-nfv-traffic
+
+# Read configuration variable file if it is present
+[ -r /etc/default/snabb-nfv-sync-agent ] && . /etc/default/snabb-nfv-sync-agent
+
+test -f $DAEMON || exit 0
+test -f $CONF || exit 0
+
+
+grep -v '^#' $CONF | while read pci node cpu
+do
+
+PIDFILE="/var/snabbnfv-traffic-${pci}.pid"
+case "$1" in
+  start)
+    log_begin_msg "Starting SnabbSwitch NFV traffic on $pci"
+
+    numactl --membind=$node --physcpubind=$cpu \
+    start-stop-daemon --start --quiet --background --make-pidfile --pidfile $PIDFILE \
+        --exec $DAEMON -- $pci "$SNABB_DIR" "$SOCK_DIR" < /dev/null > /dev/null 2>&1
+
+    log_end_msg $?   
+    ;;
+  stop)
+    log_begin_msg "Stopping SnabbSwitch NFV traffic"
+    start-stop-daemon --stop --quiet --pidfile $PIDFILE --exec $DAEMON
+    log_end_msg $?
+    ;;
+  #reload)
+    #
+    # If the daemon can reload its config files on the fly
+    # for example by sending it SIGHUP, do it here.
+    #
+    # If the daemon responds to changes in its config file
+    # directly anyway, make this a do-nothing entry.
+    #
+    # start-stop-daemon --stop --signal 1 --verbose --exec $DAEMON
+    # ;;
+  restart|force-reload)
+  #
+  # If the "reload" option is implemented, move the "force-reload"
+  # option to the "reload" entry above. If not, "force-reload" is
+  # just the same as "restart".
+  #
+    log_begin_msg "Restarting SnabbSwitch NFV traffic"
+    numactl --membind=$node --physcpubind=$cpu \
+    start-stop-daemon --start --quiet --background --make-pidfile --pidfile $PIDFILE \
+                      --exec $DAEMON -- $pci "$SNABB_DIR" "$SOCK_DIR" 
+    sleep 1
+    start-stop-daemon --stop --quiet --pidfile $PIDFILE --exec $DAEMON < /dev/null > /dev/null 2>&1
+    log_end_msg $?
+    ;;
+  *)
+    echo "Usage: /etc/init.d/snabb-nfv-traffic {start|stop|restart|force-reload}"
+    exit 1
+    ;;
+esac
+done
+
+exit 0
