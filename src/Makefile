@@ -35,9 +35,6 @@ PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
 all: snabb
 
-install: snabb
-	cp snabb /usr/local/bin/
-
 markdown: $(RMOBJS)
 
 snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
