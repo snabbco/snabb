@@ -253,6 +253,8 @@ int fstat64(int fd, struct stat *sb);
 
 int _getdirentries(int fd, char *buf, int nbytes, long *basep);
 int _sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
+
+uint64_t mach_absolute_time(void);
 ]]
 
 ffi.cdef(table.concat(defs, ""))

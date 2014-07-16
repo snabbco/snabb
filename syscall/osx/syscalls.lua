@@ -33,6 +33,8 @@ function S.ptsname(fd)
   return ffi.string(buf)
 end
 
+function S.mach_absolute_time() return C.mach_absolute_time() end
+
 return S
 
 end
