@@ -234,17 +234,20 @@ function VirtioNetDevice:transmit_packets_to_vm ()
       should_continue, b = self:vm_buffer(iovec)
 
       -- fill in the virtio header
-      local virtio_hdr = b.origin.info.virtio.header_pointer
-      ffi.copy(virtio_hdr, p.info, packet_info_size)
+      do local virtio_hdr = b.origin.info.virtio.header_pointer
+	 ffi.copy(virtio_hdr, p.info, packet_info_size)
+      end
 
-      local used = self.txring.used.ring[self.txused%self.tx_vring_num]
-      local v = b.origin.info.virtio
-      --assert(v.header_id ~= invalid_header_id)
-      used.id = v.header_id
-      used.len = virtio_net_hdr_size + iovec.length
-      self.txused = (self.txused + 1) % 65536
+      do local used = self.txring.used.ring[self.txused%self.tx_vring_num]
+	 local v = b.origin.info.virtio
+	 --assert(v.header_id ~= invalid_header_id)
+	 used.id = v.header_id
+	 used.len = virtio_net_hdr_size + iovec.length
+      end
 
       packet.deref(p)
+
+      self.txused = (self.txused + 1) % 65536
    end
 
    if not should_continue then
