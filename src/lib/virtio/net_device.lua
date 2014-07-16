@@ -22,6 +22,7 @@ require("lib.virtio.virtio_vring_h")
 local char_ptr_t = ffi.typeof("char *")
 local virtio_net_hdr_size = ffi.sizeof("struct virtio_net_hdr")
 local packet_info_size = ffi.sizeof("struct packet_info")
+local buffer_t = ffi.typeof("struct buffer")
 
 local invalid_header_id = 0xffff
 
@@ -105,7 +106,7 @@ function VirtioNetDevice:receive_packets_from_vm ()
       -- Data buffer
       repeat
          data_desc  = self.rxring.desc[data_desc.next]
-         local b = freelist.remove(self.buffer_recs) or lib.malloc("struct buffer")
+         local b = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
 
          local addr = self:map_from_guest(data_desc.addr)
          b.pointer = ffi.cast(char_ptr_t, addr)
@@ -162,7 +163,7 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
 
       -- Data buffer
       data_desc  = self.txring.desc[data_desc.next]
-      local b = freelist.remove(self.buffer_recs) or lib.malloc("struct buffer")
+      local b = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
 
       local addr = self:map_from_guest(data_desc.addr)
       b.pointer = ffi.cast(char_ptr_t, addr)
