@@ -13,6 +13,8 @@ local timer     = require("core.timer")
 local tlb       = require("lib.tlb")
 local ffi       = require("ffi")
 local C         = ffi.C
+local band = bit.band
+
 
 require("lib.virtio.virtio.h")
 require("lib.virtio.virtio_vring_h")
@@ -89,7 +91,7 @@ function VirtioNetDevice:receive_packets_from_vm ()
       if idx == 0 then idx = 65535 else idx = idx - 1 end
       local p = packet.allocate()
       -- Header
-      local header_id = self.rxring.avail.ring[idx % self.rx_vring_num]
+      local header_id = self.rxring.avail.ring[band(idx, self.rx_vring_num-1)]
       local header_desc  = self.rxring.desc[header_id]
       local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(header_desc.addr))
       --assert(header_desc.len == virtio_net_hdr_size)
@@ -130,7 +132,7 @@ function VirtioNetDevice:receive_packets_from_vm ()
       v.header_pointer = header_pointer
       v.total_size = total_size
 
-      self.rxavail = (self.rxavail + 1) % 65536
+      self.rxavail = band(self.rxavail + 1, 65535)
 
       local l = self.owner.output.tx
       if l then
@@ -150,7 +152,7 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
    while idx ~= txavail do
       if idx == 0 then idx = 65535 else idx = idx - 1 end
       -- Header
-      local header_id = self.txring.avail.ring[idx % self.tx_vring_num]
+      local header_id = self.txring.avail.ring[band(idx, self.tx_vring_num-1)]
       local header_desc  = self.txring.desc[header_id]
       local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(header_desc.addr))
       --assert(header_desc.len == virtio_net_hdr_size)
@@ -181,7 +183,7 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
 
       freelist.add(self.vring_transmit_buffers, b)
 
-      self.txavail = (self.txavail + 1) % 65536
+      self.txavail = band(self.txavail + 1, 65535)
    end
 end
 
@@ -238,7 +240,7 @@ function VirtioNetDevice:transmit_packets_to_vm ()
 	 ffi.copy(virtio_hdr, p.info, packet_info_size)
       end
 
-      do local used = self.txring.used.ring[self.txused%self.tx_vring_num]
+      do local used = self.txring.used.ring[band(self.txused, self.tx_vring_num-1)]
 	 local v = b.origin.info.virtio
 	 --assert(v.header_id ~= invalid_header_id)
 	 used.id = v.header_id
@@ -247,7 +249,7 @@ function VirtioNetDevice:transmit_packets_to_vm ()
 
       packet.deref(p)
 
-      self.txused = (self.txused + 1) % 65536
+      self.txused = band(self.txused + 1, 65535)
    end
 
    if not should_continue then
@@ -274,11 +276,11 @@ function VirtioNetDevice:return_virtio_buffer (b)
       -- rx_signal_used() is not called. So be sure to free
       -- all of them at one poll.
       if b.origin.info.virtio.header_id ~= invalid_header_id then
-         local used = self.rxring.used.ring[self.rxused % self.rx_vring_num]
+         local used = self.rxring.used.ring[band(self.rxused, self.rx_vring_num-1)]
          used.id = b.origin.info.virtio.header_id
          used.len = b.origin.info.virtio.total_size
 
-         self.rxused = (self.rxused + 1) % 65536
+         self.rxused = band(self.rxused + 1, 65535)
       end
    end
 end
@@ -358,8 +360,11 @@ function VirtioNetDevice:set_features(features)
 end
 
 function VirtioNetDevice:set_vring_num(idx, num)
-
    local n = tonumber(num)
+   if band(n, n - 1) ~= 0 then
+      error("vring_num should be power of 2")
+   end
+
    if idx == 0 then
       self.tx_vring_num = n
    else
