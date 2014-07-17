@@ -677,7 +677,7 @@ if C.setitimer then
 end
 if C.clock_getres then
   function S.clock_getres(clk_id, ts)
-    ts = mktype(t.timespec, ts)
+    ts = ts or t.timespec()
     local ret, err = C.clock_getres(c.CLOCK[clk_id], ts)
     if ret == -1 then return nil, t.error(err or errno()) end
     return ts
@@ -685,7 +685,7 @@ if C.clock_getres then
 end
 if C.clock_gettime then
   function S.clock_gettime(clk_id, ts)
-    ts = mktype(t.timespec, ts)
+    ts = ts or t.timespec()
     local ret, err = C.clock_gettime(c.CLOCK[clk_id], ts)
     if ret == -1 then return nil, t.error(err or errno()) end
     return ts
