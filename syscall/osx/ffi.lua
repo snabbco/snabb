@@ -38,6 +38,7 @@ typedef unsigned int nfds_t;
 typedef uint32_t id_t; // check as not true in freebsd
 typedef unsigned long tcflag_t;
 typedef unsigned long speed_t;
+typedef	int kern_return_t;
 
 /* osx does not have the clock_ functions so clockid undefined, but so headers work, define it
    similarly with timer_t */
@@ -241,6 +242,12 @@ struct aiocb {
   struct sigevent aio_sigevent;
   int             aio_lio_opcode;
 };
+struct mach_timebase_info {
+  uint32_t	numer;
+  uint32_t	denom;
+};
+typedef struct mach_timebase_info	*mach_timebase_info_t;
+typedef struct mach_timebase_info	mach_timebase_info_data_t;
 ]]
 
 append [[
@@ -254,7 +261,10 @@ int fstat64(int fd, struct stat *sb);
 int _getdirentries(int fd, char *buf, int nbytes, long *basep);
 int _sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
 
+/* these don't have man pages, maybe not supposed to be used? */
 uint64_t mach_absolute_time(void);
+kern_return_t mach_timebase_info(mach_timebase_info_t info);
+kern_return_t mach_wait_until(uint64_t deadline);
 ]]
 
 ffi.cdef(table.concat(defs, ""))
