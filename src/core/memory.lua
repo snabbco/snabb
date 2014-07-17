@@ -144,3 +144,7 @@ function set_default_allocator ()
         allocate_RAM = C.malloc
     end
 end
+
+
+require("lib.hardware.bus").set_memory_allocator()
+
