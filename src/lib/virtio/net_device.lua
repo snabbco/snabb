@@ -234,6 +234,7 @@ function VirtioNetDevice:transmit_packets_to_vm ()
       end
 
       local iovec = p.iovecs[0]
+      local b
       should_continue, b = self:vm_buffer(iovec)
 
       -- fill in the virtio header
