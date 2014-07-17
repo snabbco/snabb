@@ -29,13 +29,17 @@ local mt = {} -- metatables
 
 local addtypes = {
   fdset = "fd_set",
+  clock_serv = "clock_serv_t",
 }
 
 local addstructs = {
+  mach_timespec = "struct mach_timespec",
 }
 
 for k, v in pairs(addtypes) do addtype(types, k, v) end
 for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
+
+t.clock_serv1 = ffi.typeof("clock_serv_t[1]")
 
 -- 32 bit dev_t, 24 bit minor, 8 bit major
 local function makedev(major, minor)

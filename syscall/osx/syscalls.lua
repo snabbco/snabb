@@ -34,6 +34,24 @@ function S.ptsname(fd)
 end
 
 function S.mach_absolute_time() return C.mach_absolute_time() end
+function S.mach_task_self() return C.mach_tast_self_ end
+function S.mach_host_self() return C.mach_host_self() end
+function S.mach_port_deallocate(task, name) return retbool(C.mach_port_deallocate(task or S.mach_task_self(), name)) end
+
+function S.host_get_clock_service(host, clock_id, clock_serv)
+  clock_serv = clock_serv or t.clock_serv1()
+  local ok, err = S.host_get_clock_service(host or S.mach_host_self(), c.CLOCKTYPE[clock_id or "SYSTEM"], clock_serv)
+  if not ok then return nil, err end
+  return clock_serv[0]
+end
+
+-- TODO when mach ports do gc, can add 'clock_serv or S.host_get_clock_service()'
+function S.clock_get_time(clock_serv, cur_time)
+  cur_time = cur_time or t.mach_timespec()
+  local ok, err = C.clock_get_time(clock_serv, cur_time)
+  if not ok then return nil, err end
+  return cur_time
+end
 
 return S
 

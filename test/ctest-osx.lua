@@ -23,6 +23,10 @@ c.CHFLAGS.IMMUTABLE = nil -- alias
 c.CHFLAGS.APPEND = nil -- alias
 c.CHFLAGS.OPAQUE = nil -- alias
 
+c.CLOCKTYPE.SYSTEM_CLOCK, c.CLOCKTYPE.SYSTEM = c.CLOCKTYPE.SYSTEM, nil
+c.CLOCKTYPE.CALENDAR_CLOCK, c.CLOCKTYPE.CALENDAR = c.CLOCKTYPE.CALENDAR, nil
+c.CLOCKTYPE.REALTIME_CLOCK, c.CLOCKTYPE.REALTIME = c.CLOCKTYPE.REALTIME, nil
+
 c.R_OK = c.OK.R
 c.W_OK = c.OK.W
 c.F_OK = c.OK.F
@@ -95,6 +99,8 @@ print [[
 #include <netinet/in.h>
 #include <sys/ioctl_compat.h>
 #include <sys/mount.h>
+#include <mach/clock.h>
+#include <mach/mach.h>
 
 int ret = 0;
 
@@ -168,6 +174,7 @@ local nm = {
   TCFLUSH = "TC",
   TCFLOW = "TC",
   CHFLAGS = "",
+  CLOCKTYPE = "",
 }
 
 for k, v in pairs(c) do

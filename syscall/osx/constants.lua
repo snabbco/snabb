@@ -1101,5 +1101,13 @@ c.KERN = strflag {
   THREADNAME        = 71,
 }
 
+-- actually SYSTEM_CLOCK etc, renamed
+c.CLOCKTYPE = {
+  SYSTEM   = 0,
+  CALENDAR = 1,
+}
+
+c.CLOCKTYPE.REALTIME = c.CLOCKTYPE.SYSTEM
+
 return c
 

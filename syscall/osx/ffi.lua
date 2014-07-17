@@ -301,6 +301,11 @@ uint64_t mach_absolute_time(void);
 kern_return_t mach_timebase_info(mach_timebase_info_t info);
 kern_return_t mach_wait_until(uint64_t deadline);
 
+extern mach_port_t mach_task_self_;
+mach_port_t mach_host_self(void);
+kern_return_t mach_port_deallocate(ipc_space_t task, mach_port_name_t name);
+
+kern_return_t host_get_clock_service(host_t host, clock_id_t clock_id, clock_serv_t *clock_serv);
 kern_return_t clock_get_time(clock_serv_t clock_serv, mach_timespec_t *cur_time);
 ]]
 
