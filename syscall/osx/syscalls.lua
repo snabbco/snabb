@@ -40,7 +40,7 @@ function S.mach_port_deallocate(task, name) return retbool(C.mach_port_deallocat
 
 function S.host_get_clock_service(host, clock_id, clock_serv)
   clock_serv = clock_serv or t.clock_serv1()
-  local ok, err = S.host_get_clock_service(host or S.mach_host_self(), c.CLOCKTYPE[clock_id or "SYSTEM"], clock_serv)
+  local ok, err = C.host_get_clock_service(host or S.mach_host_self(), c.CLOCKTYPE[clock_id or "SYSTEM"], clock_serv)
   if not ok then return nil, err end
   return clock_serv[0]
 end
