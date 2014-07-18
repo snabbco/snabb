@@ -34,7 +34,7 @@ function S.ptsname(fd)
 end
 
 function S.mach_absolute_time() return C.mach_absolute_time() end
-function S.mach_task_self() return C.mach_tast_self_ end
+function S.mach_task_self() return C.mach_task_self_ end
 function S.mach_host_self() return C.mach_host_self() end
 function S.mach_port_deallocate(task, name) return retbool(C.mach_port_deallocate(task or S.mach_task_self(), name)) end
 
