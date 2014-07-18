@@ -51,6 +51,15 @@ end
 
 local test = {}
 
+test.time = {
+  -- example of how to emulate clock_gettime() https://gist.github.com/jbenet/1087739
+  test_clock_get_time = function()
+    local clock = assert(S.host_get_clock_service(S.mach_host_self(), "CALENDAR"))
+    local mts = assert(S.clock_get_time(clock))
+    assert(S.mach_port_deallocate(nil, clock)) -- TODO this should be gc
+  end
+}
+
 return test
 
 end
