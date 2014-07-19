@@ -83,10 +83,10 @@ static int              cfg_iter = 10000000;
 static unsigned		cfg_payload_len = DEFAULT_PAYLOAD_SIZE;
 static int              cfg_waste_cycles = 0;
 static int              cfg_phys_mode;
-static int              cfg_disable_tx_push;
 static int              cfg_tx_align;
 
-#define N_BUFS	EF_VI_TRANSMIT_BATCH
+#define EVENTS_PER_POLL 64
+#define N_BUFS		511
 #define BUF_SIZE        2048
 
 
@@ -137,12 +137,24 @@ static uint8_t            remote_mac[6];
 static int remain;
 static int n_send_remain;
 
+void
+show_status(int sig)
+{
+  static int prev_remain;
+  if (remain == prev_remain) {
+    printf("exiting\n");
+    exit(0);
+  }
+  printf("n_send_remain: %d remain: %d\n", n_send_remain, remain);
+  prev_remain = remain;
+}
+
 static void
 transmit_buffer(unsigned buf_id)
 {
   struct pkt_buf* pb = pkt_bufs[buf_id];
   *((int*)(pb->dma_buf + cfg_tx_align + ETH_HLEN)) = cfg_iter - n_send_remain;
-  ef_vi_transmit(&vi, pb->dma_buf_addr, tx_frame_len, buf_id);
+  ef_vi_transmit_init(&vi, pb->dma_buf_addr, tx_frame_len, buf_id);
   n_send_remain--;
 }
 
@@ -159,13 +171,17 @@ static void tx_loop(void)
   for (int buf_id = 0; buf_id < N_BUFS; buf_id++) {
     transmit_buffer(buf_id);
   }
+  ef_vi_transmit_push(&vi);
     
   while (1) {
-    ef_event evs[32];
-    int n_ev = ef_eventq_poll(&vi, evs, sizeof(evs) / sizeof(evs[0]));
+    ef_event evs[EVENTS_PER_POLL];
+    int n_ev = ef_eventq_poll(&vi, evs, EVENTS_PER_POLL);
+    int push = 0;
+
     for (int i = 0; i < cfg_waste_cycles; i++) {
       waste_cycles += i;
     }
+
     if (n_ev) {
       nonempty_polls++;
     } else {
@@ -181,11 +197,9 @@ static void tx_loop(void)
             goto done;
           }
 
-          if (n_tx_done > n_send_remain) {
-            n_tx_done = n_send_remain;
-          }
-          for (int i = 0; i < n_tx_done; i++) {
+          for (int i = 0; i < ((n_tx_done > n_send_remain) ? n_send_remain : n_tx_done); i++) {
             transmit_buffer(ids[i]);
+            push = 1;
           }
         }
         break;
@@ -198,6 +212,10 @@ static void tx_loop(void)
                 EF_EVENT_PRI_ARG(evs[i]));
         break;
       }
+    }
+
+    if (push) {
+      ef_vi_transmit_push(&vi);
     }
   }
  done:
@@ -252,8 +270,8 @@ static void do_init(int ifindex)
 
   if (cfg_phys_mode)
     pd_flags |= EF_PD_PHYS_MODE;
-  if (cfg_disable_tx_push)
-    vi_flags |= EF_VI_TX_PUSH_DISABLE;
+
+  vi_flags |= EF_VI_TX_PUSH_DISABLE;
 
   /* Allocate virtual interface. */
   TRY(ef_driver_open(&driver_handle));
@@ -323,7 +341,6 @@ static void usage(void)
   fprintf(stderr, "  -s <message-size>       - set udp payload size\n");
   fprintf(stderr, "  -w <count>              - set tx cycle waste counter\n");
   fprintf(stderr, "  -p                      - physical address mode\n");
-  fprintf(stderr, "  -t                      - disable TX push\n");
   exit(1);
 }
 
@@ -353,9 +370,6 @@ int main(int argc, char* argv[])
     case 'p':
       cfg_phys_mode = 1;
       break;
-    case 't':
-      cfg_disable_tx_push = 1;
-      break;
     case 'a':
       cfg_tx_align = atoi(optarg);
       break;
@@ -375,6 +389,8 @@ int main(int argc, char* argv[])
     usage();
   CL_CHK(parse_interface(argv[0], &ifindex));
   CL_CHK(parse_mac(argv[1], remote_mac));
+
+  signal(SIGINT, show_status);
 
   printf("# payload len: %d\n", cfg_payload_len);
   printf("# iterations: %d\n", cfg_iter);

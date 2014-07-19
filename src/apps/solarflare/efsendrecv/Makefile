@@ -6,3 +6,5 @@ LDFLAGS +=	-L$(OPENONLOAD)/build/gnu_x86_64/lib/ciul -L$(OPENONLOAD)/build/gnu_x
 LDLIBS +=	-lciul -lcitools1 -lm
 
 all: recv send
+
+recv send: hexdump.o
