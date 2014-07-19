@@ -22,19 +22,22 @@
 #include <math.h>
 #include <sys/signal.h>
 
+void hexDump (char *desc, void *addr, int len);
+
 #define CACHE_ALIGN           __attribute__((aligned(EF_VI_DMA_ALIGN)))
 
 static int              cfg_iter = 10000000;
 static int              cfg_phys_mode;
 static int              cfg_rx_align;
 
-#define N_BUFS          64u
+#define EVENTS_PER_POLL 32
+#define N_BUFS          256u
 #define BUF_SIZE        2048
 
 
-#define TEST(x)                                                  \
+#define TEST(x)                                                 \
   do {                                                          \
-    if (! (x)) {                                               \
+    if (! (x)) {                                                \
       fprintf(stderr, "ERROR: '%s' failed\n", #x);              \
       fprintf(stderr, "ERROR: at %s:%d\n", __FILE__, __LINE__); \
       exit(1);                                                  \
@@ -44,7 +47,7 @@ static int              cfg_rx_align;
 #define TRY(x)                                                  \
   do {                                                          \
     int __rc = (x);                                             \
-    if (__rc < 0) {                                            \
+    if (__rc < 0) {                                             \
       fprintf(stderr, "ERROR: '%s' failed\n", #x);              \
       fprintf(stderr, "ERROR: at %s:%d\n", __FILE__, __LINE__); \
       fprintf(stderr, "ERROR: rc=%d errno=%d (%s)\n",           \
@@ -55,7 +58,6 @@ static int              cfg_rx_align;
 
 #define MEMBER_OFFSET(c_type, mbr_name)  \
   ((uint32_t) (uintptr_t)(&((c_type*)0)->mbr_name))
-
 
 struct pkt_buf {
   struct pkt_buf* next;
@@ -76,22 +78,40 @@ static unsigned          rx_posted, rx_completed;
 struct timeval start, end;
 
 static int remain;
-static char* received;
+
+struct error {
+  int start;
+  int end;
+  struct error* next;
+};
+
+struct error*
+note_gap(struct error* error, int start, int end)
+{
+  struct error* retval = malloc(sizeof(*error));
+  retval->start = start;
+  retval->end = end;
+  retval->next = error;
+  return retval;
+}
 
 void
-report_missing_packets()
+report_errors_internal(struct error* error)
 {
-  printf("missing:");
-  for (int i = 0, printed = 0; i < cfg_iter; i++) {
-    if (!received[i]) {
-      printf(" %d", i);
-      printed++;
-      if (printed == 100) {
-        printf(" and probably more");
-        break;
-      }
+  if (error) {
+    report_errors_internal(error->next);
+    if (error->next) {
+      printf("+%d+ ", error->start - (error->next ? error->next->end : 0));
     }
+    printf("-%d- ", error->end - error->start);
   }
+}
+
+void
+report_errors(struct error* error)
+{
+  printf("Gaps:\n");
+  report_errors_internal(error);
   putchar('\n');
 }
 
@@ -105,13 +125,14 @@ show_status(int sig)
   }
   printf("remain: %d\n", remain);
   prev_remain = remain;
-
-  report_missing_packets();
 }
 
 static void rx_loop(void)
 {
   int next_expected = 0;
+  int in_gap = 0;
+  int gap_start;
+  struct error* error = 0;
   int n_recv_queued = 0;
   remain = cfg_iter;
 
@@ -119,11 +140,10 @@ static void rx_loop(void)
     TRY(ef_vi_receive_init(&vi, pkt_bufs[buf_id]->dma_buf_addr, buf_id));
   }
   ef_vi_receive_push(&vi);
-    
+
   while (1) {
-    ef_event evs[32];
-    int n_ev = ef_eventq_poll(&vi, evs, sizeof(evs) / sizeof(evs[0]));
-    int seq;
+    ef_event evs[EVENTS_PER_POLL];
+    int n_ev = ef_eventq_poll(&vi, evs, EVENTS_PER_POLL);
 
     for (int i = 0; i < n_ev; ++i) {
       switch (EF_EVENT_TYPE(evs[i])) {
@@ -133,19 +153,38 @@ static void rx_loop(void)
         {
           int buf_id = EF_EVENT_RX_RQ_ID(evs[i]);
           struct pkt_buf* pb = pkt_bufs[buf_id];
-          char* payload = (pb->dma_buf + cfg_rx_align + ETH_HLEN + 16);
+          char* payload = (pb->dma_buf + cfg_rx_align + ETH_HLEN);
           unsigned int seq = *((int*)payload);
           if (seq >= cfg_iter) {
             fprintf(stderr, "received sequence number %d which is out of expected range (max %d) at iteration %d\n", seq, cfg_iter, i);
+            hexDump("received", pb->dma_buf, 256);
             exit(1);
-          } else {
-            received[seq] = 1;
           }
+          
+          if (seq == next_expected) {
+            if (in_gap) {
+              in_gap = 0;
+              error = note_gap(error, gap_start, seq - 1);
+            }
+          } else {
+            if (!in_gap) {
+              in_gap = 1;
+              gap_start = next_expected;
+            }
+          }
+          next_expected = seq + 1;
+
           if (remain == cfg_iter) {
             gettimeofday(&start, NULL);
           }
           remain--;
           if (remain <= 0) {
+            printf("all packets received\n");
+            return;
+          }
+          if (seq == cfg_iter - 1) {
+            printf("finished with errors, %d packets not received\n", remain);
+            report_errors(error);
             return;
           }
           TRY(ef_vi_receive_init(&vi, pb->dma_buf_addr, buf_id));
@@ -162,7 +201,7 @@ static void rx_loop(void)
         break;
       }
     }
-    if (n_recv_queued > 16) {
+    if (n_recv_queued >= 16) {
       ef_vi_receive_push(&vi);
       n_recv_queued = 0;
     }
@@ -292,15 +331,11 @@ int main(int argc, char* argv[])
     printf("# iterations: %d\n", cfg_iter);
     printf("# rx align: %d\n", cfg_rx_align);
 
-    received = calloc(cfg_iter * sizeof(char), 1);
-
     do_init(ifindex);
 
     signal(SIGINT, show_status);
 
     recv_test();
-
-    report_missing_packets();
   }
 
   return 0;
