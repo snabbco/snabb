@@ -401,3 +401,19 @@ extern int ef_vi_set_filter_add(ef_vi_set*, ef_driver_handle,
 extern int ef_vi_set_filter_del(ef_vi_set*, ef_driver_handle,
 				ef_filter_cookie *);
 
+/* etherfabric/memreg.h */
+
+typedef struct ef_memreg {
+  unsigned mr_resource_id;
+  ef_addr* mr_dma_addrs;
+} ef_memreg;
+
+extern int ef_memreg_alloc(ef_memreg*, ef_driver_handle,
+			   struct ef_pd*, ef_driver_handle pd_dh,
+			   void* p_mem, int len_bytes);
+
+extern int ef_memreg_free(ef_memreg*, ef_driver_handle);
+
+static const int EF_VI_NIC_PAGE_SIZE = 0x1000;
+static const int EF_VI_NIC_PAGE_MASK = 0x0FFF;
+static const int CI_PAGE_SIZE = 0x1000;
