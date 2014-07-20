@@ -154,7 +154,7 @@ transmit_buffer(unsigned buf_id)
 {
   struct pkt_buf* pb = pkt_bufs[buf_id];
   *((int*)(pb->dma_buf + cfg_tx_align + ETH_HLEN)) = cfg_iter - n_send_remain;
-  ef_vi_transmit_init(&vi, pb->dma_buf_addr, tx_frame_len, buf_id);
+  TRY(ef_vi_transmit_init(&vi, pb->dma_buf_addr, tx_frame_len, buf_id));
   n_send_remain--;
 }
 
@@ -219,7 +219,7 @@ static void tx_loop(void)
     }
   }
  done:
-  printf("Polls: %ld Empty: %ld (%.f%%)\n",
+  printf("Send polls: %ld Empty: %ld (%.f%%)\n",
          empty_polls + nonempty_polls, empty_polls,
          (double) empty_polls / ((double) (empty_polls + nonempty_polls) / 100.));
 }
