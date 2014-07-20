@@ -85,14 +85,21 @@ struct error {
   struct error* next;
 };
 
+#define MAX_ERROR_DETAILS 20
+static int error_count;
+
 struct error*
 note_gap(struct error* error, int start, int end)
 {
-  struct error* retval = malloc(sizeof(*error));
-  retval->start = start;
-  retval->end = end;
-  retval->next = error;
-  return retval;
+  if (++error_count < MAX_ERROR_DETAILS) {
+    struct error* retval = malloc(sizeof(*error));
+    retval->start = start;
+    retval->end = end;
+    retval->next = error;
+    return retval;
+  } else {
+    return error;
+  }
 }
 
 void
@@ -113,6 +120,9 @@ report_errors(struct error* error)
   printf("Gaps:\n");
   report_errors_internal(error);
   putchar('\n');
+  if (error_count > MAX_ERROR_DETAILS) {
+    printf("%d more errors not shown\n", error_count - MAX_ERROR_DETAILS);
+  }
 }
 
 void
@@ -125,6 +135,12 @@ show_status(int sig)
   }
   printf("remain: %d\n", remain);
   prev_remain = remain;
+}
+
+void show_status_and_exit(int sig)
+{
+  show_status(sig);
+  exit(1);
 }
 
 static void rx_loop(void)
@@ -334,6 +350,7 @@ int main(int argc, char* argv[])
     do_init(ifindex);
 
     signal(SIGINT, show_status);
+    signal(SIGTERM, show_status_and_exit);
 
     recv_test();
   }
