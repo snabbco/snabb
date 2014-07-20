@@ -207,7 +207,7 @@ static void rx_loop(void)
             goto done;
           }
           if (seq == cfg_iter - 1) {
-            printf("finished with errors, %d packets not received\n", remain);
+            printf("receiver finished with errors, %d packets lost (%.3f%%)\n", remain, (double) remain / ((double) cfg_iter / 100.));
             report_errors(error);
             goto done;
           }
@@ -231,8 +231,7 @@ static void rx_loop(void)
     }
   }
  done:
-  printf("Receive polls: %ld Empty: %ld (%.f%%)\n",
-         empty_polls + nonempty_polls, empty_polls,
+  printf("%.f%% receiver polls returned no data\n",
          (double) empty_polls / ((double) (empty_polls + nonempty_polls) / 100.));
 }
 
@@ -269,9 +268,11 @@ static void do_init(int ifindex)
                           -1, -1, -1, NULL, -1, vi_flags));
 
   ef_vi_get_mac(&vi, driver_handle, mac);
-  printf("Local MAC address %02x:%02x:%02x:%02x:%02x:%02x, MTU %d\n",
+#if 0
+  printf("# Local MAC address %02x:%02x:%02x:%02x:%02x:%02x, MTU %d\n",
          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
          ef_vi_mtu(&vi, driver_handle));
+#endif
 
   ef_filter_spec_init(&filter_spec, EF_FILTER_FLAG_NONE);
   TRY(ef_filter_spec_set_eth_local(&filter_spec, EF_FILTER_VLAN_ID_ANY, mac));
@@ -327,7 +328,9 @@ int main(int argc, char* argv[])
 {
   int c;
 
+#if 0
   printf("# ef_vi_version_str: %s\n", ef_vi_version_str());
+#endif
 
   while ((c = getopt (argc, argv, "n:pa:")) != -1)
     switch (c) {
@@ -356,8 +359,10 @@ int main(int argc, char* argv[])
     int ifindex;
     CL_CHK(parse_interface(argv[0], &ifindex));
 
+#if 0
     printf("# iterations: %d\n", cfg_iter);
     printf("# rx align: %d\n", cfg_rx_align);
+#endif
 
     do_init(ifindex);
 
