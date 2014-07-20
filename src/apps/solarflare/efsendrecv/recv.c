@@ -150,6 +150,8 @@ static void rx_loop(void)
   int gap_start;
   struct error* error = 0;
   int n_recv_queued = 0;
+  static long empty_polls;
+  static long nonempty_polls;
   remain = cfg_iter;
 
   for (int buf_id = 0; buf_id < N_BUFS; buf_id++) {
@@ -160,6 +162,12 @@ static void rx_loop(void)
   while (1) {
     ef_event evs[EVENTS_PER_POLL];
     int n_ev = ef_eventq_poll(&vi, evs, EVENTS_PER_POLL);
+
+    if (n_ev) {
+      nonempty_polls++;
+    } else {
+      empty_polls++;
+    }
 
     for (int i = 0; i < n_ev; ++i) {
       switch (EF_EVENT_TYPE(evs[i])) {
@@ -196,12 +204,12 @@ static void rx_loop(void)
           remain--;
           if (remain <= 0) {
             printf("all packets received\n");
-            return;
+            goto done;
           }
           if (seq == cfg_iter - 1) {
             printf("finished with errors, %d packets not received\n", remain);
             report_errors(error);
-            return;
+            goto done;
           }
           TRY(ef_vi_receive_init(&vi, pb->dma_buf_addr, buf_id));
           n_recv_queued++;
@@ -222,6 +230,10 @@ static void rx_loop(void)
       n_recv_queued = 0;
     }
   }
+ done:
+  printf("Receive polls: %ld Empty: %ld (%.f%%)\n",
+         empty_polls + nonempty_polls, empty_polls,
+         (double) empty_polls / ((double) (empty_polls + nonempty_polls) / 100.));
 }
 
 /**********************************************************************/
