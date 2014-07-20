@@ -1,19 +1,19 @@
 #!/usr/bin/env snabb
 
-local app        = require("core.app")
-local buffer     = require("core.buffer")
-local config     = require("core.config")
-local timer      = require("core.timer")
-local bus        = require("lib.hardware.bus")
-local pci        = require("lib.hardware.pci")
-local basic_apps = require("apps.basic.basic_apps")
-local solarflare = require("apps.solarflare.solarflare")
-local main       = require("core.main")
-local PcapReader = require("apps.pcap.pcap").PcapReader
+local app           = require("core.app")
+local buffer        = require("core.buffer")
+local config        = require("core.config")
+local timer         = require("core.timer")
+local bus           = require("lib.hardware.bus")
+local pci           = require("lib.hardware.pci")
+local basic_apps    = require("apps.basic.basic_apps")
+local SolarFlareNic = require("apps.solarflare.solarflare").SolarFlareNic;
+local main          = require("core.main")
 
 local ffi = require("ffi")
 local C = ffi.C
 
 print("Hello")
-solarflare.SolarFlareNic.open_device("p7p2")
+device = SolarFlareNic:new{ ifname = "p7p2" }
+device:open();
 print("Good bye")
