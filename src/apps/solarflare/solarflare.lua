@@ -19,6 +19,7 @@ print("ef_vi loaded, version " .. ef_vi_version)
 
 ffi.cdef[[
 char *strerror(int errnum);
+int posix_memalign(uint64_t* memptr, size_t alignment, size_t size);
 ]]
 
 local function try (rc, message)
@@ -86,3 +87,23 @@ function SolarFlareNic:test()
    packet.add_iovec(p, b, 100);
    print(string.format("done testing"))
 end
+
+assert(C.CI_PAGE_SIZE == 4096)
+
+memory.allocate_RAM = function (size)
+   local p = ffi.new("uint64_t[1]", 0)
+   local result = C.posix_memalign(p, C.CI_PAGE_SIZE, size)
+   if result ~= 0 then
+      error(string.format("could not allocate %d buffers of %d bytes with posix_memalign: %s",
+                          count, size, ffi.string(C.strerror(result))))
+   end
+   local memreg_p = ffi.new("ef_memreg[1]")
+   try(ciul.ef_memreg_alloc(memreg_p,
+                            driver_handle,
+                            pd,
+                            driver_handle,
+                            p,
+                            size), "ef_memreg_alloc")
+end
+
+
