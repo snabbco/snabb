@@ -1,52 +1,12 @@
-/*
-** Copyright 2005-2014  Solarflare Communications Inc.
-**                      7505 Irvine Center Drive, Irvine, CA 92618, USA
-** Copyright 2002-2005  Level 5 Networks Inc.
-**
-** This library is free software; you can redistribute it and/or
-** modify it under the terms of version 2.1 of the GNU Lesser General Public
-** License as published by the Free Software Foundation.
-**
-** This library is distributed in the hope that it will be useful,
-** but WITHOUT ANY WARRANTY; without even the implied warranty of
-** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-** Lesser General Public License for more details.
-*/
 
-/****************************************************************************
- * Copyright 2002-2005: Level 5 Networks Inc.
- * Copyright 2005-2008: Solarflare Communications Inc,
- *                      9501 Jeronimo Road, Suite 250,
- *                      Irvine, CA 92618, USA
- *
- * Maintained by Solarflare Communications
- *  <linux-xen-drivers@solarflare.com>
- *  <onload-dev@solarflare.com>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published
- * by the Free Software Foundation, incorporated herein by reference.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- ****************************************************************************
- */
+/* etherfabric/base.h */
 
-/*
- *  \brief  Virtual Interface
- *   \date  2007/05/16
- */
+typedef int                     ef_driver_handle;
 
+extern int ef_driver_open(ef_driver_handle* dh_out);
+extern int ef_driver_close(ef_driver_handle);
 
-/**********************************************************************
- * Primitive types ****************************************************
- **********************************************************************/
+/* etherfabric/ef_vi.h */
 
 typedef uint32_t                ef_eventq_ptr;
 typedef uint64_t                ef_addr;
@@ -318,4 +278,126 @@ extern int ef_vi_receive_query_layout(ef_vi* vi,
 extern int ef_vi_receive_get_timestamp(ef_vi* vi, const void* pkt,
 				       struct timespec* ts_out);
 
+/* etherfabric/pd.h */
+
+enum ef_pd_flags {
+	EF_PD_DEFAULT   = 0x0,
+	EF_PD_VF        = 0x1,
+	EF_PD_PHYS_MODE = 0x2,
+};
+
+typedef struct ef_pd {
+	enum ef_pd_flags pd_flags;
+	unsigned         pd_resource_id;
+
+	/* Support for application clusters */
+	char*            pd_cluster_name;
+	int              pd_cluster_sock;
+	ef_driver_handle pd_cluster_dh;
+	unsigned         pd_cluster_viset_resource_id;
+} ef_pd;
+
+/*! Allocate a protection domain. */
+extern int ef_pd_alloc(ef_pd*, ef_driver_handle, int ifindex,
+		       enum ef_pd_flags flags);
+
+extern int ef_pd_alloc_by_name(ef_pd*, ef_driver_handle,
+                               const char* cluster_or_intf_name,
+                               enum ef_pd_flags flags);
+
+/*! Unregister a memory region. */
+extern int ef_pd_free(ef_pd*, ef_driver_handle);
+
+/* etherfabric/vi.h */
+
+static const int EF_VI_DEFAULT_INTERFACE = -1;
+
+extern int ef_vi_alloc_from_pd(ef_vi* vi,
+                               ef_driver_handle vi_dh,
+			       struct ef_pd* pd,
+                               ef_driver_handle pd_dh,
+			       int evq_capacity,
+                               int rxq_capacity,
+			       int txq_capacity,
+			       ef_vi* evq_opt,
+                               ef_driver_handle evq_dh,
+			       enum ef_vi_flags flags);
+
+extern int ef_vi_free(ef_vi* vi, ef_driver_handle nic);
+
+extern int ef_vi_flush(ef_vi* vi, ef_driver_handle nic);
+
+extern int ef_vi_pace(ef_vi* vi, ef_driver_handle nic, int val);
+
+extern unsigned ef_vi_mtu(ef_vi* vi, ef_driver_handle);
+
+extern int ef_vi_get_mac(ef_vi*, ef_driver_handle, void* mac_out);
+
+extern int ef_eventq_put(unsigned resource_id,
+                         ef_driver_handle, unsigned ev_bits);
+
+typedef struct {
+	unsigned      vis_res_id;
+	struct ef_pd* vis_pd;
+} ef_vi_set;
+
+extern int ef_vi_set_alloc_from_pd(ef_vi_set*, ef_driver_handle,
+				   struct ef_pd* pd, ef_driver_handle pd_dh,
+				   int n_vis);
+
+extern int ef_vi_alloc_from_set(ef_vi* vi, ef_driver_handle vi_dh,
+				ef_vi_set* vi_set, ef_driver_handle vi_set_dh,
+				int index_in_vi_set, int evq_capacity,
+				int rxq_capacity, int txq_capacity,
+				ef_vi* evq_opt, ef_driver_handle evq_dh,
+				enum ef_vi_flags flags);
+
+enum ef_filter_flags {
+	EF_FILTER_FLAG_NONE           = 0x0,
+	EF_FILTER_FLAG_REPLACE        = 0x1,
+};
+
+typedef struct {
+	unsigned type;
+	unsigned flags;
+	unsigned data[6];
+} ef_filter_spec;
+
+enum {
+	EF_FILTER_VLAN_ID_ANY = -1,
+};
+
+typedef struct {
+	int filter_id;
+	int filter_type;
+} ef_filter_cookie;
+
+
+extern void ef_filter_spec_init(ef_filter_spec *, enum ef_filter_flags);
+extern int ef_filter_spec_set_ip4_local(ef_filter_spec *, int protocol,
+					unsigned host_be32, int port_be16);
+extern int ef_filter_spec_set_ip4_full(ef_filter_spec *, int protocol,
+				       unsigned host_be32, int port_be16,
+				       unsigned rhost_be32, int rport_be16);
+extern int ef_filter_spec_set_vlan(ef_filter_spec *fs, int vlan_id);
+extern int ef_filter_spec_set_eth_local(ef_filter_spec *, int vlan_id,
+					const void *mac);
+extern int ef_filter_spec_set_unicast_all(ef_filter_spec *);
+extern int ef_filter_spec_set_multicast_all(ef_filter_spec *);
+extern int ef_filter_spec_set_unicast_mismatch(ef_filter_spec *);
+extern int ef_filter_spec_set_multicast_mismatch(ef_filter_spec *);
+extern int ef_filter_spec_set_port_sniff(ef_filter_spec *, int promiscuous);
+extern int ef_filter_spec_set_block_kernel(ef_filter_spec *);
+extern int ef_filter_spec_set_block_kernel_multicast(ef_filter_spec *);
+extern int ef_filter_spec_set_block_kernel_unicast(ef_filter_spec *);
+
+extern int ef_vi_filter_add(ef_vi*, ef_driver_handle, const ef_filter_spec*,
+			    ef_filter_cookie *filter_cookie_out);
+extern int ef_vi_filter_del(ef_vi*, ef_driver_handle, ef_filter_cookie *);
+
+extern int ef_vi_set_filter_add(ef_vi_set*, ef_driver_handle,
+				const ef_filter_spec*,
+				ef_filter_cookie *filter_cookie_out);
+extern int ef_vi_set_filter_del(ef_vi_set*, ef_driver_handle,
+				ef_filter_cookie *);
 
