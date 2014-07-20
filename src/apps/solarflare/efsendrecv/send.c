@@ -219,8 +219,7 @@ static void tx_loop(void)
     }
   }
  done:
-  printf("Send polls: %ld Empty: %ld (%.f%%)\n",
-         empty_polls + nonempty_polls, empty_polls,
+  printf("%.f%% sender polls returned no data\n",
          (double) empty_polls / ((double) (empty_polls + nonempty_polls) / 100.));
 }
 
@@ -280,9 +279,11 @@ static void do_init(int ifindex)
                           -1, -1, -1, NULL, -1, vi_flags));
 
   ef_vi_get_mac(&vi, driver_handle, local_mac);
+#if 0
   printf("Local MAC address %02x:%02x:%02x:%02x:%02x:%02x, MTU %d\n",
          local_mac[0], local_mac[1], local_mac[2], local_mac[3], local_mac[4], local_mac[5],
          ef_vi_mtu(&vi, driver_handle));
+#endif
 
   {
     int bytes = N_BUFS * BUF_SIZE;
@@ -351,13 +352,14 @@ static void usage(void)
       usage();                                  \
   }while(0)
 
-
 int main(int argc, char* argv[])
 {
   int ifindex;
   int c;
 
+#if 0
   printf("# ef_vi_version_str: %s\n", ef_vi_version_str());
+#endif
 
   while ((c = getopt (argc, argv, "n:s:w:pta:")) != -1)
     switch (c) {
@@ -392,11 +394,15 @@ int main(int argc, char* argv[])
 
   signal(SIGINT, show_status);
 
-  printf("# payload len: %d\n", cfg_payload_len);
-  printf("# iterations: %d\n", cfg_iter);
+#if 0
+    printf("# payload len: %d\n", cfg_payload_len);
+    printf("# iterations: %d\n", cfg_iter);
+#endif
   do_init(ifindex);
+#if 0
   printf("# frame len: %d\n", tx_frame_len);
   printf("# tx align: %d\n", cfg_tx_align);
+#endif
   send_test();
   sleep(1);
 
