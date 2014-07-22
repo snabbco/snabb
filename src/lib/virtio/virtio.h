@@ -38,6 +38,7 @@ struct vio_used {
 enum {
   VIRTIO_NET_F_CSUM       = 1 << 0,      // Host handles pkts w/ partial csum
   VIRTIO_NET_F_GUEST_CSUM = 1 << 1,      // Guest handles pkts w/ partial csum
+  VIRTIO_NET_F_CTRL_GUEST_OFFLOADS = 1 << 2, // Control channel offloads reconfiguration support.
   VIRTIO_NET_F_MAC        = 1 << 5,      // Host has given MAC address.
   VIRTIO_NET_F_GSO        = 1 << 6,      // Host handles pkts w/ any GSO type
   VIRTIO_NET_F_GUEST_TSO4 = 1 << 7,      // Guest can handle TSOv4 in.
