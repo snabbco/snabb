@@ -18,6 +18,8 @@ require("lib.virtio.virtio_vring_h")
 --[[
 --]]
 
+local vring_desc_ptr_t = ffi.typeof("struct vring_desc *")
+
 VirtioVirtq = {}
 
 function VirtioVirtq:new()
@@ -25,11 +27,28 @@ function VirtioVirtq:new()
    return setmetatable(o, {__index = VirtioVirtq})
 end
 
+-- support indirect descriptors
+function VirtioVirtq:get_desc(header_id)
+   local ring_desc = self.virtq.desc
+   local device = self.device
+   local desc, id
+   -- Indirect desriptors
+   if band(ring_desc[header_id].flags, C.VIRTIO_DESC_F_INDIRECT) == 0 then
+      desc = ring_desc
+      id = header_id
+   else
+      local addr = device.map_from_guest(device,ring_desc[header_id].addr)
+      desc = ffi.cast(vring_desc_ptr_t, addr)
+      id = 0
+   end
+
+   return desc, id
+end
+
 -- Receive all available packets from the virtual machine.
 function VirtioVirtq:get_buffers (packet_start, buffer_add, packet_end)
 
    local ring = self.virtq.avail.ring
-   local desc = self.virtq.desc
    local device = self.device
    local idx = self.virtq.avail.idx
    local avail, vring_mask = self.avail, self.vring_num-1
@@ -38,7 +57,9 @@ function VirtioVirtq:get_buffers (packet_start, buffer_add, packet_end)
 
       -- Header
       local header_id = ring[band(avail,vring_mask)]
-      local data_desc = desc[header_id]
+      local desc, id = self:get_desc(header_id)
+
+      local data_desc = desc[id]
 
       local header_len = packet_start(device, header_id, data_desc.addr, data_desc.len)
 
