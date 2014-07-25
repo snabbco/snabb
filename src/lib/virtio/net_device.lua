@@ -162,13 +162,23 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
       --assert(bit.band(header_desc.flags, C.VIRTIO_DESC_F_NEXT) ~= 0)
 
       -- Data buffer
-      data_desc  = self.txring.desc[data_desc.next]
       local b = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
+      local addr = nil
+      local len = 0
 
-      local addr = self:map_from_guest(data_desc.addr)
+      if header_desc.len == virtio_net_hdr_size then
+         data_desc  = self.txring.desc[data_desc.next]
+         addr = data_desc.addr
+         len = data_desc.len
+      else
+         addr = data_desc.addr + virtio_net_hdr_size
+         len = data_desc.len - virtio_net_hdr_size
+      end
+      addr = self:map_from_guest(addr)
+
       b.pointer = ffi.cast(char_ptr_t, addr)
       b.physical = self:translate_physical_addr(addr)
-      b.size = data_desc.len
+      b.size = len
 
       -- The total size will be added to the first buffer virtio info
       total_size = total_size + b.size
