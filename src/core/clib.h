@@ -1,5 +1,14 @@
+// sleep(3) - suspend execution for second intervals
+unsigned int sleep(unsigned int seconds);
+
 // usleep(3) - suspend execution for microsecond intervals
 int usleep(unsigned long usec);
+
+// alarm(3) - schedule signal after given number of seconds 
+unsigned alarm(unsigned seconds);
+
+// ualarm(3) - schedule signal after given number of microseconds 
+unsigned long ualarm(unsigned long usecs, unsigned long interval);
 
 // memcpy(3) - copy memory area
 void memcpy(void *dest, const void *src, size_t n);
