@@ -47,7 +47,7 @@ local invalid_header_id = 0xffff
    - VIRTIO_NET_F_CTRL_VQ - creates a separate control virt queue
 
    - VIRTIO_NET_F_MQ - multiple RX/TX queues, usefull for SMP (host/guest).
-      Requires VIRTIO_NET_F_MQ
+      Requires VIRTIO_NET_F_CTRL_VQ
 
 --]]
 local supported_features = 0
@@ -354,11 +354,12 @@ function VirtioNetDevice:map_from_qemu (addr)
 end
 
 function VirtioNetDevice:get_features()
+   print(string.format("Get features 0x%x\n%s", tonumber(supported_features), get_feature_names(supported_features)))
    return supported_features
 end
 
 function VirtioNetDevice:set_features(features)
-   print(string.format("Set features 0x%x", tonumber(features)))
+   print(string.format("Set features 0x%x\n%s", tonumber(features), get_feature_names(features)))
 end
 
 function VirtioNetDevice:set_vring_num(idx, num)
@@ -438,6 +439,45 @@ end
 
 function VirtioNetDevice:set_virtio_device_id(virtio_device_id)
    self.virtio_device_id = virtio_device_id
+end
+
+feature_names = {
+   [C.VIRTIO_F_NOTIFY_ON_EMPTY]                 = "VIRTIO_F_NOTIFY_ON_EMPTY",
+   [C.VIRTIO_RING_F_INDIRECT_DESC]              = "VIRTIO_RING_F_INDIRECT_DESC",
+   [C.VIRTIO_RING_F_EVENT_IDX]                  = "VIRTIO_RING_F_EVENT_IDX",
+
+   [C.VIRTIO_F_ANY_LAYOUT]                      = "VIRTIO_F_ANY_LAYOUT",
+   [C.VIRTIO_NET_F_CSUM]                        = "VIRTIO_NET_F_CSUM",
+   [C.VIRTIO_NET_F_GUEST_CSUM]                  = "VIRTIO_NET_F_GUEST_CSUM",
+   [C.VIRTIO_NET_F_GSO]                         = "VIRTIO_NET_F_GSO",
+   [C.VIRTIO_NET_F_GUEST_TSO4]                  = "VIRTIO_NET_F_GUEST_TSO4",
+   [C.VIRTIO_NET_F_GUEST_TSO6]                  = "VIRTIO_NET_F_GUEST_TSO6",
+   [C.VIRTIO_NET_F_GUEST_ECN]                   = "VIRTIO_NET_F_GUEST_ECN",
+   [C.VIRTIO_NET_F_GUEST_UFO]                   = "VIRTIO_NET_F_GUEST_UFO",
+   [C.VIRTIO_NET_F_HOST_TSO4]                   = "VIRTIO_NET_F_HOST_TSO4",
+   [C.VIRTIO_NET_F_HOST_TSO6]                   = "VIRTIO_NET_F_HOST_TSO6",
+   [C.VIRTIO_NET_F_HOST_ECN]                    = "VIRTIO_NET_F_HOST_ECN",
+   [C.VIRTIO_NET_F_HOST_UFO]                    = "VIRTIO_NET_F_HOST_UFO",
+   [C.VIRTIO_NET_F_MRG_RXBUF]                   = "VIRTIO_NET_F_MRG_RXBUF",
+   [C.VIRTIO_NET_F_STATUS]                      = "VIRTIO_NET_F_STATUS",
+   [C.VIRTIO_NET_F_CTRL_VQ]                     = "VIRTIO_NET_F_CTRL_VQ",
+   [C.VIRTIO_NET_F_CTRL_RX]                     = "VIRTIO_NET_F_CTRL_RX",
+   [C.VIRTIO_NET_F_CTRL_VLAN]                   = "VIRTIO_NET_F_CTRL_VLAN",
+   [C.VIRTIO_NET_F_CTRL_RX_EXTRA]               = "VIRTIO_NET_F_CTRL_RX_EXTRA",
+   [C.VIRTIO_NET_F_CTRL_MAC_ADDR]               = "VIRTIO_NET_F_CTRL_MAC_ADDR",
+   [C.VIRTIO_NET_F_CTRL_GUEST_OFFLOADS]         = "VIRTIO_NET_F_CTRL_GUEST_OFFLOADS",
+
+   [C.VIRTIO_NET_F_MQ]                          = "VIRTIO_NET_F_MQ"
+}
+
+function get_feature_names(bits)
+local string = ""
+   for mask,name in pairs(feature_names) do
+      if (bit.band(bits,mask) == mask) then
+         string = string .. " " .. name
+      end
+   end
+   return string
 end
 
 function debug (...)
