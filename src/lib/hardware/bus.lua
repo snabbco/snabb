@@ -79,9 +79,13 @@ function selftest ()
     end
 end
 
-if host_has_vfio() then
-    memory.ram_to_io_addr = vfio.map_memory_to_iommu
-else
-    memory.set_use_physical_memory()
+function set_memory_allocator ()
+   if host_has_vfio() then
+      memory.ram_to_io_addr = vfio.map_memory_to_iommu
+   else
+      memory.set_use_physical_memory()
+   end
+
+   memory.set_default_allocator()
 end
-memory.set_default_allocator()
+

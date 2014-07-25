@@ -13,14 +13,14 @@ local freelist_add, freelist_remove = freelist.add, freelist.remove
 
 require("core.packet_h")
 
-max_packets = 1e6
+local max_packets = 1e6
 packets_fl = freelist.new("struct packet *", max_packets)
-packets    = ffi.new("struct packet[?]", max_packets)
 local packet_size = ffi.sizeof("struct packet")
+
 
 function module_init ()
    for i = 0, max_packets-1 do
-      free(packets[i])
+      free(ffi.cast("struct packet *", memory.malloc(packet_size)))
    end
 end
 

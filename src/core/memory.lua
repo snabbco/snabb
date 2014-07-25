@@ -10,8 +10,9 @@ require("core.memory_h")
 -- hook variables
 
 dma_alloc = nil         -- (size) => ram_ptr, io_address
-allocate_RAM = nil      -- (size) => ram_ptr
+allocate_RAM_chunk = nil  -- (size) => ram_ptr
 ram_to_io_addr = nil    -- (ram_ptr) => io_address
+malloc = nil
 
 --- ### Serve small allocations from hugepage "chunks"
 
@@ -39,7 +40,7 @@ end
 
 -- Add a new chunk.
 function allocate_next_chunk ()
-   local ptr = assert(allocate_RAM(huge_page_size), "Couldn't allocate a chunk of ram")
+   local ptr = assert(allocate_RAM_chunk(huge_page_size), "Couldn't allocate a chunk of ram")
    local mem_phy = assert(ram_to_io_addr(ptr, huge_page_size), "Couln't map a chunk of ram to IO address")
    chunks[#chunks + 1] = { pointer = ffi.cast("char*", ptr),
                            physical = mem_phy,
@@ -134,13 +135,19 @@ end
 
 function set_default_allocator ()
     if use_hugetlb and huge_page_size and lib.can_write("/proc/sys/vm/nr_hugepages") then
-        allocate_RAM = function(size)
+        allocate_RAM_chunk = function(size)
             for i =1, 3 do
                 local page = C.allocate_huge_page(size)
                 if page ~= nil then return page else reserve_new_page() end
             end
         end
+	malloc = dma_alloc
     else
-        allocate_RAM = C.malloc
+        allocate_RAM_chunk = C.malloc
+	malloc = C.malloc
     end
 end
+
+
+require("lib.hardware.bus").set_memory_allocator()
+
