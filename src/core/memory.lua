@@ -46,6 +46,7 @@ function allocate_next_chunk ()
                            physical = mem_phy,
                            size = huge_page_size,
                            used = 0 }
+   register_RAM(ptr, mem_phy, huge_page_size)
    local addr = tonumber(ffi.cast("uint64_t",ptr))
    dma_min_addr = math.min(dma_min_addr or addr, addr)
    dma_max_addr = math.max(dma_max_addr or 0, addr + huge_page_size)
@@ -125,3 +126,6 @@ function module_init ()
 end
 
 module_init()
+
+function register_RAM (ptr, physical, size)
+end

@@ -33,6 +33,10 @@ SolarFlareNic = {}
 SolarFlareNic.__index = SolarFlareNic
 SolarFlareNic.version = ef_vi_version
 
+-- List of open devices is kept to be able to register memory regions with them
+
+open_devices = {}
+
 function SolarFlareNic:new(args)
    assert(args.ifname)
    return setmetatable(args, { __index = SolarFlareNic })
@@ -63,12 +67,14 @@ function SolarFlareNic:open()
                                 -1,
                                 nil,
                                 -1,
-                                C.EF_VI_TX_PUSH_DISABLE))
+                                C.EF_VI_TX_PUSH_DISABLE),
+       "ef_vi_alloc_from_pd")
 
    self.mac_address = ffi.new("unsigned char[6]");
    try(ciul.ef_vi_get_mac(self.ef_vi_p,
                           self.driver_handle,
-                          self.mac_address))
+                          self.mac_address),
+       "ef_vi_get_mac")
    self.mtu = try(ciul.ef_vi_mtu(self.ef_vi_p, self.driver_handle))
    print(string.format("Opened SolarFlare interface %s (MAC address %02x:%02x:%02x:%02x:%02x:%02x, MTU %d)",
                        self.ifname,
@@ -79,6 +85,7 @@ function SolarFlareNic:open()
                        self.mac_address[4],
                        self.mac_address[5],
                        self.mtu));
+   open_devices[#open_devices + 1] = self
 end
    
 function SolarFlareNic:test()
@@ -90,20 +97,17 @@ end
 
 assert(C.CI_PAGE_SIZE == 4096)
 
-memory.allocate_RAM = function (size)
-   local p = ffi.new("uint64_t[1]", 0)
-   local result = C.posix_memalign(p, C.CI_PAGE_SIZE, size)
-   if result ~= 0 then
-      error(string.format("could not allocate %d buffers of %d bytes with posix_memalign: %s",
-                          count, size, ffi.string(C.strerror(result))))
+local old_register_RAM = memory.register_RAM
+
+function memory.register_RAM(p, physical, size)
+   for _, device in ipairs(open_devices) do
+      local memreg_p = ffi.new("ef_memreg[1]")
+      try(ciul.ef_memreg_alloc(memreg_p,
+                               device.driver_handle,
+                               device.pd_p,
+                               device.driver_handle,
+                               p,
+                               size), "ef_memreg_alloc")
    end
-   local memreg_p = ffi.new("ef_memreg[1]")
-   try(ciul.ef_memreg_alloc(memreg_p,
-                            driver_handle,
-                            pd,
-                            driver_handle,
-                            p,
-                            size), "ef_memreg_alloc")
+   old_register_RAM(p, physical, size)
 end
-
-
