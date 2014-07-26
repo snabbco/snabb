@@ -43,8 +43,10 @@ open_devices = {}
 
 function SolarFlareNic:new(args)
    assert(args.ifname)
+   print('New SolarFlare nic ' .. args.ifname)
    args.receives_enqueued = 0
-   return setmetatable(args, { __index = SolarFlareNic })
+   local dev = setmetatable(args, { __index = SolarFlareNic })
+   return dev:open()
 end
 
 function SolarFlareNic:enqueue_receive(id)
@@ -110,6 +112,10 @@ function SolarFlareNic:open()
    self.ef_vi_receive_init = self.ef_vi_p[0].ops.receive_init
    self.ef_vi_receive_push = self.ef_vi_p[0].ops.receive_push
 
+   -- initialize statistics
+   self.stats = {}
+
+   -- set up receive buffers
    self.rxbuffers = {}
    for id = 1, RECEIVE_BUFFER_COUNT do
       self:enqueue_receive(id)
@@ -127,9 +133,12 @@ function SolarFlareNic:open()
                        self.mac_address[5],
                        self.mtu))
    open_devices[#open_devices + 1] = self
+
+   return self
 end
 
 function SolarFlareNic:pull()
+   self.stats.pull = (self.stats.pull or 0) + 1
    local n_ev
    repeat
       n_ev = self.ef_vi_eventq_poll(self.ef_vi_p, self.events, EVENTS_PER_POLL)
@@ -137,21 +146,23 @@ function SolarFlareNic:pull()
          for i = 0, n_ev - 1 do
             local e = self.events[i];
             if e.generic.type == C.EF_EVENT_TYPE_RX then
+               self.stats.rx = (self.stats.rx or 0) + 1
                local p = packet.allocate()
                local b = self.rxbuffers[e.rx.rq_id]
                packet.add_iovec(p, b, e.rx.len)
                self:enqueue_receive(e.rx.rq_id)
-               local l = self.output and self.output.tx
-               if l and not link.full(l) then
+               local l = self.output.tx
+               if not link.full(l) then
                   link.transmit(l, p)
-                  -- fixme: what if link _is_ full?
+               else
+                  packet.deref(p)
                end
             elseif e.generic.type == C.EF_EVENT_TYPE_RX_DISCARD then
-               print("RX DISCARD")
+               self.stats.rx_discard = (self.stats.rx_discard or 0) + 1
             elseif e.generic.type == C.EF_EVENT_TYPE_TX then
-               print("TX")
+               self.stats.tx = (self.stats.tx or 0) + 1
             elseif e.generic.type == C.EF_EVENT_TYPE_TX_ERROR then
-               print("TX ERROR")
+               self.stats.tx_error = (self.stats.tx_error or 0) + 1
             else
                print("Unexpected event, type " .. e.generic.type)
             end
@@ -159,18 +170,26 @@ function SolarFlareNic:pull()
       end
    until n_ev < EVENTS_PER_POLL
    if self.receives_enqueued >= FLUSH_RECEIVE_QUEUE_THRESHOLD then
+      self.stats.rx_flushes = (self.stats.rx_flushes or 0) + 1
       self:flush_receives()
    end
 end
 
 function SolarFlareNic:push()
+   self.stats.push = (self.stats.push or 0) + 1
+   local l = self.input.rx
+   if l == nil then return end
+   while not link.empty(l) do
+      local p = link.receive(l)
+      packet.deref(p)
+   end
 end
 
-function SolarFlareNic:test()
-   local b = buffer.allocate()
-   local p = packet.allocate()
-   packet.add_iovec(p, b, 100)
-   print(string.format("done testing"))
+function SolarFlareNic:report()
+   print("report on solarflare device", self.ifname)
+   for key, value in pairs(self.stats) do
+      print(string.format("%s: %d", key, value))
+   end
 end
 
 assert(C.CI_PAGE_SIZE == 4096)
@@ -179,6 +198,7 @@ local old_register_RAM = memory.register_RAM
 
 function memory.register_RAM(p, physical, size)
    for _, device in ipairs(open_devices) do
+      device.stats.memreg_alloc = (device.stats.memreg_alloc or 0) + 1
       local memreg_p = ffi.new("ef_memreg[1]")
       try(ciul.ef_memreg_alloc(memreg_p,
                                device.driver_handle,
