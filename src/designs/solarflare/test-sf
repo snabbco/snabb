@@ -17,4 +17,6 @@ print("Hello")
 device = SolarFlareNic:new{ ifname = "p7p2" }
 device:open()
 device:test()
+
+buffer.preallocate(100000)
 print("Good bye")
