@@ -19,7 +19,6 @@ LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
 ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
-JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
 MDOBJS := $(patsubst %, doc/obj/%.md, $(LUASRC) $(CSRC) $(CHDR)) $(wildcard *.md)
@@ -31,8 +30,6 @@ TESTMODS = $(shell find . -regex '[^\#]*\.lua' -printf '%P ' | \
              xargs grep -l '^function selftest *[[:punct:]]' | \
              sed -e 's_\.lua__' -e 's_/_._g')
 
-PATH := ../deps/luajit/usr/local/bin:$(PATH)
-
 all: snabb
 
 install: snabb
@@ -43,8 +40,7 @@ markdown: $(RMOBJS)
 snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 	$(E) "LINK      $@"
 	$(Q) gcc -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
-	    ../deps/luajit/src/libluajit.a \
-	    -lc -ldl -lm -lrt -lpthread
+	    -lc -ldl -lm -lrt -lpthread $(CFLAGS_LUAJIT)
 	@echo -n "Firmware: "
 	@ln -fs snabb snabbswitch
 	@ls -sh snabb
@@ -77,28 +73,23 @@ $(OBJDIR) testlog:
 
 $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 	$(E) "LUA       $@"
-	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
+	$(Q) $(LUAJIT) -bg -n $(subst /,.,$*) $< $@
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc -Wl,-E -I ../deps/luajit/src -I ../deps/include -I . -c -Wall -Werror -o $@ $<
+	$(Q) gcc -Wl,-E $(CFLAGS_DEPS) -I . -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"
 	@(echo -n "module(...,package.seeall); require(\"ffi\").cdef[=============["; \
 	 cat $<; \
 	 echo "]=============]") > $(basename $@).luah
-	$(Q) luajit -bg -n $(subst /,.,$*)_h $(basename $@).luah $@
+	$(Q) $(LUAJIT) -bg -n $(subst /,.,$*)_h $(basename $@).luah $@
 
 $(ASMOBJ): obj/%_dasc.o: %.dasc $(CHDR) Makefile | $(OBJDIR)
 	$(E) "ASM       $@"
-	$(Q) luajit ../deps/luajit/dynasm/dynasm.lua -o $@.gen $<
-	$(Q) gcc -Wl,-E -I ../deps/luajit/src -I . -I ../deps/luajit -c -Wall -Werror -x c -o $@ $@.gen
-
-$(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
-	$(E) "LUA       $@"
-	$(Q) luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
-
+	$(Q) $(LUAJIT) $(DYNASM_LUA) -o $@.gen $<
+	$(Q) gcc -Wl,-E $(CFLAGS_DEPS) -I . -c -Wall -Werror -x c -o $@ $@.gen
 
 $(RMOBJS): %: %.src
 	$(E) "MARKDOWN  $@"
@@ -107,15 +98,15 @@ $(RMOBJS): %: %.src
 # extra/ third party bits and pieces
 obj/strict.o: extra/strict.lua | $(OBJDIR)
 	$(E) "LUA       $@"
-	$(Q) luajit -bg $< $@
+	$(Q) $(LUAJIT) -bg $< $@
 
 obj/jit_tprof.o: extra/tprof.lua | $(OBJDIR)
 	$(E) "LUA       $@"
-	$(Q) luajit -bg -n jit.tprof $< $@
+	$(Q) $(LUAJIT) -bg -n jit.tprof $< $@
 
 obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
+	$(Q) gcc -Wl,-E -O2 $(CFLAGS_DEPS) -c -Wall -Werror -o $@ $<
 
 
 doc/obj/%.lua.md : %.lua Makefile
