@@ -76,6 +76,14 @@ function SolarFlareNic:open()
                           self.mac_address),
        "ef_vi_get_mac")
    self.mtu = try(ciul.ef_vi_mtu(self.ef_vi_p, self.driver_handle))
+
+   filter_spec_p = ffi.new("ef_filter_spec[1]")
+   ciul.ef_filter_spec_init(filter_spec_p, C.EF_FILTER_FLAG_NONE);
+   try(ciul.ef_filter_spec_set_eth_local(filter_spec_p, C.EF_FILTER_VLAN_ID_ANY, self.mac_address),
+       "ef_filter_spec_set_eth_local")
+   try(ciul.ef_vi_filter_add(self.ef_vi_p, self.driver_handle, filter_spec_p, nil),
+       "ef_vi_filter_add")
+
    print(string.format("Opened SolarFlare interface %s (MAC address %02x:%02x:%02x:%02x:%02x:%02x, MTU %d)",
                        self.ifname,
                        self.mac_address[0],
