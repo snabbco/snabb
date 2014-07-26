@@ -19,4 +19,9 @@ device:open()
 device:test()
 
 buffer.preallocate(100000)
+
+while true do
+   device:pull()
+end
+
 print("Good bye")
