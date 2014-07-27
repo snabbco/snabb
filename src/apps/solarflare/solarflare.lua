@@ -138,6 +138,8 @@ function SolarFlareNic:open()
 end
 
 function SolarFlareNic:pull()
+   local o = assert(self.output.output, "output port not found")
+
    self.stats.pull = (self.stats.pull or 0) + 1
    local n_ev
    repeat
@@ -151,9 +153,8 @@ function SolarFlareNic:pull()
                local b = self.rxbuffers[e.rx.rq_id]
                packet.add_iovec(p, b, e.rx.len)
                self:enqueue_receive(e.rx.rq_id)
-               local l = self.output.tx
-               if not link.full(l) then
-                  link.transmit(l, p)
+               if not link.full(o) then
+                  link.transmit(o, p)
                else
                   self.stats.link_full = (self.stats.link_full or 0) + 1
                   packet.deref(p)
