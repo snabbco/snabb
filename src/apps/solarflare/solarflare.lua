@@ -204,10 +204,18 @@ function SolarFlareNic:push()
    self.stats.push = (self.stats.push or 0) + 1
    local l = self.input.input
    local push
+   -- FIXME: The self_tx_packets[self.tx_id] check is not sufficient.
+   -- There must be enough free tx_packets slots for all buffers in
+   -- the next packet on the link.
    while not link.empty(l) and not self.tx_packets[self.tx_id] do
       local p = link.receive(l)
       self:enqueue_transmit(p)
       push = true
+      -- enqueue_transmit references the packet once for each buffer
+      -- that it contains.  Whenever a DMA fishes, the packet is
+      -- dereferenced once so that it will be freed when the
+      -- transmission of the last buffer has been confirmed.  Thus, it
+      -- can be dereferenced here.
       packet.deref(p)
    end
    if push then
