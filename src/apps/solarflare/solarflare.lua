@@ -155,6 +155,7 @@ function SolarFlareNic:pull()
                if not link.full(l) then
                   link.transmit(l, p)
                else
+                  self.stats.link_full = (self.stats.link_full or 0) + 1
                   packet.deref(p)
                end
             elseif e.generic.type == C.EF_EVENT_TYPE_RX_DISCARD then
@@ -187,9 +188,11 @@ end
 
 function SolarFlareNic:report()
    print("report on solarflare device", self.ifname)
-   for key, value in pairs(self.stats) do
-      print(string.format("%s: %d", key, value))
+   
+   for name,value in pairs(self.stats) do
+      io.write(string.format('%s: %d ', name, value))
    end
+   io.write("\n")
 end
 
 assert(C.CI_PAGE_SIZE == 4096)
