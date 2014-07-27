@@ -29,6 +29,10 @@ function receive (r)
    return p
 end
 
+function front (r)
+   return (r.read ~= r.write) and r.packets[r.read] or nil
+end
+
 function transmit (r, p)
 --   assert(p)
    if full(r) then

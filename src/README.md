@@ -65,6 +65,7 @@ packets via API functions.
 * `link.empty(l)` Return true if the link is empty.
 * `link.full(l)` Return true if the link is full.
 * `link.receive(l)` Return the next available packet (and advance the read cursor). If the link is empty then an error is signaled.
+* `link.front(l)` Return the next available packet without advancing the read cursor.  If the link is empty, `nil` is returned.
 * `link.transmit(l, p)` Transmit a packet onto the link. If the link is full then the packet is dropped (and the drop counter increased).
 * `link.stats(l)` Return a structure holding ring statistics:
     * `txbytes` and `rxbytes` count of transferred bytes.

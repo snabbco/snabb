@@ -77,6 +77,7 @@ function SolarFlareNic:enqueue_transmit(p)
           "ef_vi_transmit_init")
       self.tx_id = (self.tx_id + 1) % TX_BUFFER_COUNT
    end
+   self.tx_space = self.tx_space - packet.niovecs(p)
 end
 
 function SolarFlareNic:open()
@@ -149,6 +150,7 @@ function SolarFlareNic:open()
    self.tx_request_ids = ffi.new("ef_request_id[" .. C.EF_VI_TRANSMIT_BATCH .. "]")
    self.tx_packets = {}
    self.tx_id = 0
+   self.tx_space = TX_BUFFER_COUNT
 
    -- Done
    print(string.format("Opened SolarFlare interface %s (MAC address %02x:%02x:%02x:%02x:%02x:%02x, MTU %d)",
@@ -178,7 +180,6 @@ function SolarFlareNic:pull()
                local p = packet.allocate()
                local b = self.rxbuffers[e.rx.rq_id]
                packet.add_iovec(p, b, e.rx.len)
-               self:enqueue_receive(e.rx.rq_id)
                local l = self.output.output
                if not link.full(l) then
                   link.transmit(l, p)
@@ -186,6 +187,7 @@ function SolarFlareNic:pull()
                   self.stats.link_full = (self.stats.link_full or 0) + 1
                   packet.deref(p)
                end
+               self:enqueue_receive(e.rx.rq_id)
             elseif e.generic.type == C.EF_EVENT_TYPE_RX_DISCARD then
                self.stats.rx_discard = (self.stats.rx_discard or 0) + 1
             elseif e.generic.type == C.EF_EVENT_TYPE_TX then
@@ -198,6 +200,7 @@ function SolarFlareNic:pull()
                   packet.deref(self.tx_packets[tx_request_id])
                   self.tx_packets[tx_request_id] = nil
                end
+               self.tx_space = self.tx_space + n_tx_done
             elseif e.generic.type == C.EF_EVENT_TYPE_TX_ERROR then
                self.stats.tx_error = (self.stats.tx_error or 0) + 1
             else
@@ -216,10 +219,7 @@ function SolarFlareNic:push()
    self.stats.push = (self.stats.push or 0) + 1
    local l = self.input.input
    local push
-   -- FIXME: The self_tx_packets[self.tx_id] check is not sufficient.
-   -- There must be enough free tx_packets slots for all buffers in
-   -- the next packet on the link.
-   while not link.empty(l) and not self.tx_packets[self.tx_id] do
+   while not link.empty(l) and self.tx_space >= packet.niovecs(link.front(l)) do
       local p = link.receive(l)
       self:enqueue_transmit(p)
       push = true
