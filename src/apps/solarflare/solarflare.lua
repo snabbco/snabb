@@ -44,7 +44,6 @@ open_devices = {}
 
 function SolarFlareNic:new(args)
    assert(args.ifname)
-   print('New SolarFlare nic ' .. args.ifname)
    args.receives_enqueued = 0
    local dev = setmetatable(args, { __index = SolarFlareNic })
    return dev:open()
