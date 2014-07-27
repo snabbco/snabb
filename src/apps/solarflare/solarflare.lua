@@ -13,6 +13,7 @@ local packet   = require("core.packet")
 local EVENTS_PER_POLL = 32
 local RECEIVE_BUFFER_COUNT = 256
 local FLUSH_RECEIVE_QUEUE_THRESHOLD = 32
+local TX_BUFFER_COUNT = 256
 
 local ciul = ffi.load("ciul")
 
@@ -63,6 +64,17 @@ function SolarFlareNic:flush_receives(id)
    end
 end
 
+function SolarFlareNic:enqueue_transmit(p)
+   for i = 0, packet.niovecs(p) - 1 do
+      assert(not self.tx_packets[self.tx_id], "tx buffer overrun")
+      self.tx_packets[self.tx_id] = packet.ref(p)
+      local iov = packet.iovec(p, i)
+      try(ciul.ef_vi_transmit_init(self.ef_vi_p, buffer.physical(iov.buffer) + iov.offset, iov.length, self.tx_id),
+          "ef_vi_transmit_init")
+      self.tx_id = (self.tx_id + 1) % TX_BUFFER_COUNT
+   end
+end
+
 function SolarFlareNic:open()
    local try_ = try
    local function try (rc, message)
@@ -106,11 +118,13 @@ function SolarFlareNic:open()
        "ef_vi_filter_add")
 
    self.events = ffi.new("ef_event[" .. EVENTS_PER_POLL .. "]")
+   self.memregs = {}
 
    -- cache ops
    self.ef_vi_eventq_poll = self.ef_vi_p[0].ops.eventq_poll
    self.ef_vi_receive_init = self.ef_vi_p[0].ops.receive_init
    self.ef_vi_receive_push = self.ef_vi_p[0].ops.receive_push
+   self.ef_vi_transmit_push = self.ef_vi_p[0].ops.transmit_push
 
    -- initialize statistics
    self.stats = {}
@@ -121,6 +135,11 @@ function SolarFlareNic:open()
       self:enqueue_receive(id)
    end
    self:flush_receives()
+
+   -- set up transmit variables
+   self.tx_request_ids = ffi.new("ef_request_id[" .. C.EF_VI_TRANSMIT_BATCH .. "]")
+   self.tx_packets = {}
+   self.tx_id = 0
 
    -- Done
    print(string.format("Opened SolarFlare interface %s (MAC address %02x:%02x:%02x:%02x:%02x:%02x, MTU %d)",
@@ -161,7 +180,13 @@ function SolarFlareNic:pull()
             elseif e.generic.type == C.EF_EVENT_TYPE_RX_DISCARD then
                self.stats.rx_discard = (self.stats.rx_discard or 0) + 1
             elseif e.generic.type == C.EF_EVENT_TYPE_TX then
-               self.stats.tx = (self.stats.tx or 0) + 1
+               local n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p, self.events[i], self.tx_request_ids)
+               self.stats.tx = (self.stats.tx or 0) + n_tx_done
+               for i = 0, (n_tx_done - 1) do
+                  local tx_request_id = self.tx_request_ids[i]
+                  packet.deref(self.tx_packets[tx_request_id])
+                  self.tx_packets[tx_request_id] = nil
+               end
             elseif e.generic.type == C.EF_EVENT_TYPE_TX_ERROR then
                self.stats.tx_error = (self.stats.tx_error or 0) + 1
             else
@@ -178,11 +203,16 @@ end
 
 function SolarFlareNic:push()
    self.stats.push = (self.stats.push or 0) + 1
-   local l = self.input.rx
-   if l == nil then return end
-   while not link.empty(l) do
+   local l = self.input.input
+   local push
+   while not link.empty(l) and not self.tx_packets[self.tx_id] do
       local p = link.receive(l)
+      self:enqueue_transmit(p)
+      push = true
       packet.deref(p)
+   end
+   if push then
+      self.ef_vi_transmit_push(self.ef_vi_p)
    end
 end
 
@@ -198,8 +228,12 @@ end
 assert(C.CI_PAGE_SIZE == 4096)
 
 local old_register_RAM = memory.register_RAM
+local registered = {}
 
 function memory.register_RAM(p, physical, size)
+   local physical_num = tonumber(ffi.cast('intptr_t', ffi.cast('void *', physical)))
+   assert(not registered[physical_num], string.format("duplicate registration for physical address 0x%x", physical_num))
+   registered[physical_num] = true
    for _, device in ipairs(open_devices) do
       device.stats.memreg_alloc = (device.stats.memreg_alloc or 0) + 1
       local memreg_p = ffi.new("ef_memreg[1]")
@@ -209,6 +243,10 @@ function memory.register_RAM(p, physical, size)
                                device.driver_handle,
                                p,
                                size), "ef_memreg_alloc")
+      assert(tonumber(ffi.cast('intptr_t', ffi.cast('void *', physical)))
+             == tonumber(ffi.cast('intptr_t', ffi.cast('void *', memreg_p[0].mr_dma_addrs[0]))),
+             "SolarFlare library did not map region to physical address")
+      device.memregs[#device.memregs] = memreg_p
    end
    old_register_RAM(p, physical, size)
 end
