@@ -28,7 +28,8 @@ char *strerror(int errnum);
 
 local function try (rc, message)
    if rc < 0 then
-      error(string.format("%s failed: %s", message, ffi.string(C.strerror(ffi.errno()))))
+      error(string.format("%s failed: %s", message,
+                          ffi.string(C.strerror(ffi.errno()))))
    end
    return rc
 end
@@ -51,7 +52,9 @@ end
 
 function SolarFlareNic:enqueue_receive(id)
    self.rxbuffers[id] = buffer.allocate()
-   try(self.ef_vi_receive_init(self.ef_vi_p, buffer.physical(self.rxbuffers[id]), id),
+   try(self.ef_vi_receive_init(self.ef_vi_p,
+                               buffer.physical(self.rxbuffers[id]),
+                               id),
        "ef_vi_receive_init")
    self.receives_enqueued = self.receives_enqueued + 1
 end
@@ -68,7 +71,10 @@ function SolarFlareNic:enqueue_transmit(p)
       assert(not self.tx_packets[self.tx_id], "tx buffer overrun")
       self.tx_packets[self.tx_id] = packet.ref(p)
       local iov = packet.iovec(p, i)
-      try(ciul.ef_vi_transmit_init(self.ef_vi_p, buffer.physical(iov.buffer) + iov.offset, iov.length, self.tx_id),
+      try(ciul.ef_vi_transmit_init(self.ef_vi_p,
+                                   buffer.physical(iov.buffer) + iov.offset,
+                                   iov.length,
+                                   self.tx_id),
           "ef_vi_transmit_init")
       self.tx_id = (self.tx_id + 1) % TX_BUFFER_COUNT
    end
@@ -111,9 +117,14 @@ function SolarFlareNic:open()
 
    filter_spec_p = ffi.new("ef_filter_spec[1]")
    ciul.ef_filter_spec_init(filter_spec_p, C.EF_FILTER_FLAG_NONE)
-   try(ciul.ef_filter_spec_set_eth_local(filter_spec_p, C.EF_FILTER_VLAN_ID_ANY, self.mac_address),
+   try(ciul.ef_filter_spec_set_eth_local(filter_spec_p,
+                                         C.EF_FILTER_VLAN_ID_ANY,
+                                         self.mac_address),
        "ef_filter_spec_set_eth_local")
-   try(ciul.ef_vi_filter_add(self.ef_vi_p, self.driver_handle, filter_spec_p, nil),
+   try(ciul.ef_vi_filter_add(self.ef_vi_p,
+                             self.driver_handle,
+                             filter_spec_p,
+                             nil),
        "ef_vi_filter_add")
 
    self.events = ffi.new("ef_event[" .. EVENTS_PER_POLL .. "]")
@@ -179,7 +190,9 @@ function SolarFlareNic:pull()
             elseif e.generic.type == C.EF_EVENT_TYPE_RX_DISCARD then
                self.stats.rx_discard = (self.stats.rx_discard or 0) + 1
             elseif e.generic.type == C.EF_EVENT_TYPE_TX then
-               local n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p, self.events[i], self.tx_request_ids)
+               local n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p,
+                                                              self.events[i],
+                                                              self.tx_request_ids)
                self.stats.tx = (self.stats.tx or 0) + n_tx_done
                for i = 0, (n_tx_done - 1) do
                   local tx_request_id = self.tx_request_ids[i]
@@ -237,9 +250,15 @@ assert(C.CI_PAGE_SIZE == 4096)
 local old_register_RAM = memory.register_RAM
 local registered = {}
 
+local function address_to_number(address)
+   return tonumber(ffi.cast('intptr_t', ffi.cast('void *', address)))
+end
+
 function memory.register_RAM(p, physical, size)
-   local physical_num = tonumber(ffi.cast('intptr_t', ffi.cast('void *', physical)))
-   assert(not registered[physical_num], string.format("duplicate registration for physical address 0x%x", physical_num))
+   local physical_num = address_to_number(physical)
+   assert(not registered[physical_num],
+          string.format("duplicate registration for physical address 0x%x",
+                        physical_num))
    registered[physical_num] = true
    for _, device in ipairs(open_devices) do
       device.stats.memreg_alloc = (device.stats.memreg_alloc or 0) + 1
@@ -250,8 +269,7 @@ function memory.register_RAM(p, physical, size)
                                device.driver_handle,
                                p,
                                size), "ef_memreg_alloc")
-      assert(tonumber(ffi.cast('intptr_t', ffi.cast('void *', physical)))
-             == tonumber(ffi.cast('intptr_t', ffi.cast('void *', memreg_p[0].mr_dma_addrs[0]))),
+      assert(physical_num == address_to_number(memreg_p[0].mr_dma_addrs[0]),
              "SolarFlare library did not map region to physical address")
       device.memregs[#device.memregs] = memreg_p
    end
