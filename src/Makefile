@@ -42,7 +42,7 @@ markdown: $(RMOBJS)
 
 snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 	$(E) "LINK      $@"
-	$(Q) gcc -Wl,-E -Werror -Wall -o $@ $^ \
+	$(Q) gcc $(DEBUG) -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt -lpthread
 	@echo -n "Firmware: "
@@ -81,7 +81,7 @@ $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc -Wl,-E -I ../deps/luajit/src -I ../deps/include -I . -c -Wall -Werror -o $@ $<
+	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I ../deps/include -I . -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"
@@ -93,7 +93,7 @@ $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 $(ASMOBJ): obj/%_dasc.o: %.dasc $(CHDR) Makefile | $(OBJDIR)
 	$(E) "ASM       $@"
 	$(Q) luajit ../deps/luajit/dynasm/dynasm.lua -o $@.gen $<
-	$(Q) gcc -Wl,-E -I ../deps/luajit/src -I . -I ../deps/luajit -c -Wall -Werror -x c -o $@ $@.gen
+	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -I ../deps/luajit -c -Wall -Werror -x c -o $@ $@.gen
 
 $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"
@@ -115,7 +115,7 @@ obj/jit_tprof.o: extra/tprof.lua | $(OBJDIR)
 
 obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
+	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
 
 doc/obj/%.lua.md : %.lua Makefile
