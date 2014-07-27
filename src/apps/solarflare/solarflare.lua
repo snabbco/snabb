@@ -24,7 +24,6 @@ print("ef_vi loaded, version " .. ef_vi_version)
 
 ffi.cdef[[
 char *strerror(int errnum);
-int posix_memalign(uint64_t* memptr, size_t alignment, size_t size);
 ]]
 
 local function try (rc, message)
