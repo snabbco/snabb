@@ -229,6 +229,12 @@ Returns the next available packet (and advances the read cursor) on
 *link*. If the link is empty an error is signaled.
 
 
+— Function **link.front** *link*
+
+Return the next available packet without advancing the read cursor on
+*link*. If the link is empty, `nil` is returned.
+
+
 — Function **link.transmit** *link*, *packet*
 
 Transmits *packet* onto *link*. If the link is full *packet* is dropped
