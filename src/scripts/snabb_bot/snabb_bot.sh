@@ -40,62 +40,98 @@ curl "https://api.github.com/repos/$REPO/pulls" > "$tmpdir/pulls" \
 for number in $("$JQ" ".[].number" "$tmpdir/pulls"); do
     pull=$("$JQ" "map(select(.number == $number))[0]" "$tmpdir/pulls")
 
-    # Unless log for $pull exists...
-    if [ ! -f "$logdir/$number" ]; then
+    # `status' is success unless something goes wrong.
+    status=success
 
-        # Clone and checkout HEAD.
+    head="$(echo "$pull" | "$JQ" -r ".head.sha")"
+    log="$logdir/$head"
+
+    # Unless log for $pull exists...
+    if [ ! -f "$log" ]; then
+
+        # Clone repo.
         repo="$(echo "$pull" | "$JQ" -r ".head.repo.clone_url")"
-        head="$(echo "$pull" | "$JQ" -r ".head.sha")"
         base="$(echo "$pull" | "$JQ" -r ".base.sha")"
         git clone "$repo" "$tmpdir/repo" \
             || continue
-        (
-            cd "$tmpdir/repo"
-            git checkout "$head"
 
-            # Build.
-            git submodule update --init > /dev/null 2>&1
-            make > /dev/null 2>&1
+        # Prepare submodules.
+        (cd "$tmpdir/repo"
+            git submodule update --init > /dev/null 2>&1)
             
-            # If buid was successful run tasks.
-            if [ "$?" = "0" ]; then
+        # If buid was successful run tasks.
+        if [ "$?" = "0" ]; then
 
-                echo "Running integration tasks for ${head:0:7} on \`$(hostname)\`:" \
-                    >> "$logdir/$number"
-                for task in "$tasksdir"/*; do
-                    printf "\n\`$task\`\n\n" >> "$logdir/$number"
-                    out=$("$task" "$base" "$head" 2>&1)
-                    if [ "$?" = "0" ]; then
-                        echo "$out" >> "$logdir/$number"
-                    else
-                        echo "\`$task\` failed." >> "$logdir/$number"
-                    fi
-                done
-                # Blank line.
-                echo >> "$logdir/$number"
+            echo "Running integration tasks for ${head:0:7} on $(hostname):" \
+                >> "$log"
+            for task in "$tasksdir"/*; do
+                printf "\n$task" >> "$log"
 
-            else
+                # Ensure `head' is checked out and (re)built.
+                (cd "$tmpdir/repo"
+                    git checkout "$head"
+                    make > /dev/null 2>&1)
 
-                echo "Build failed." >> "$logdir/$number"
+                # Run task and record results.
+                out=$( (cd "$tmpdir/repo"
+                        "$task" "$base" "$head" 2>&1) )
+                if [ "$?" != "0" ]; then
+                    echo ": failed" >> "$log"
+                    status=failure
+                else
+                    echo ": success" >> "$log"
+                fi
 
-            fi
-        )
+                # Print task output to `log'.
+                echo "$out" >> "$log"
+            done
+
+            # Blank line to seperate task output.
+            echo >> "$log"
+
+        else
+
+            # Fail on build error.
+            echo "Build failed." >> "$log"
+            status=failure
+
+        fi
+
         # Delete cloned repository.
         rm -rf  "$tmpdir/repo"
 
-        # Add comment (if we got credentials).
+        # Post gist and set status (if we got credentials).
         if [ ! "$GITHUB_CREDENTIALS" = "" ]; then
-            # Create API request body.
-            cat "$logdir/$number" \
-                |"$JQ" -s -R "{body: .}" \
+
+            # Create API request body for Gist API.
+            cat "$log" \
+                | "$JQ" -s -R "{public: true, files: {log: {content: .}}}" \
                 > "$tmpdir/request"
 
-            # POST it to GitHub
+            # Create Gist.
+            www_log=$(curl -X POST \
+                -u "$GITHUB_CREDENTIALS" \
+                -d @"$tmpdir/request" \
+                "https://api.github.com/gists" \
+                | "$JQ" .html_url)
+
+            # Create API request body for status API.
+            cat > "$tmpdir/request" \
+                <<EOF
+{"context": "snabb_bot",
+ "description": "SnabbBot",
+ "state": "$status",
+ "target_url": $www_log }
+EOF
+
+            # POST status.
             curl \
-            -X POST \
-            -u "$GITHUB_CREDENTIALS" \
-            -d @"$tmpdir/request" \
-            "https://api.github.com/repos/$REPO/issues/$number/comments"
+                -X POST \
+                -u "$GITHUB_CREDENTIALS" \
+                -d @"$tmpdir/request" \
+                "https://api.github.com/repos/$REPO/statuses/$head" \
+                > /dev/null
+
         fi
 
     fi

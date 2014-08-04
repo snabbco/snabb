@@ -3,6 +3,8 @@
 # Run benchmarks. This task requires the `CPERF' and `CPERFDIR'
 # environment variables to be set. `CPERF' must point to `cperf.sh'.
 
+set -e
+
 "$CPERF" check "$1" "$2" | awk '
 BEGIN {
     minratio = 0.85;
@@ -18,6 +20,7 @@ BEGIN {
         ratio = $3 / score;
         if (ratio < minratio) {
             print "REGRESSION:", bench, "on", $2, ":", ratio, "of", score;
+            exit 1;
         } else {
             print "OK:", bench, "on", $2, ":", ratio, "of", score;
         }
