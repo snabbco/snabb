@@ -3,7 +3,7 @@ module(...,package.seeall)
 ffi = require("ffi")
 C   = ffi.C
 
--- Watchdog timeout in .
+-- Watchdog timeout in unit defined by `precision' (just below).
 timeout = nil
 
 -- Watchdog precision.
