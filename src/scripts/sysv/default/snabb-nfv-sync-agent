@@ -1,0 +1,9 @@
+NEUTRON_DIR=/var/snabbswitch/neutron
+SNABB_DIR=/var/snabbswitch/networks
+SOCK_DIR=/var/snabbswitch/socks
+NEUTRON2SNABB=
+NEUTRON2SNABB=
+SYNC_PATH=
+SYNC_HOST=
+SYNC_LISTEN_PORT=
+SYNC_INTERVAL=
