@@ -63,7 +63,7 @@ function load_config (file, pciaddr, sockpath)
       then
          local Tunnel = "Tunnel_"..name
          local conf = (([[{eth_dst  = %q,
-                              eth_src  = "%q,
+                              eth_src  = %q,
                               ipv6_dst = %q,
                               ipv6_src = %q,
                               session  = %q,
