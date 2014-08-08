@@ -43,10 +43,10 @@ function load_config (file, pciaddr, sockpath)
       local NIC = "NIC_"..name
       local Virtio = "Virtio_"..name
       config.app(c, NIC, Intel82599,
-		 ([[{pciaddr = '%s',
+		 ([[{pciaddr = %q,
 		     vmdq=true,
 		     mirror={},
-		     macaddr = '%s',
+		     macaddr = %q,
 		     vlan=%d}]]):format(pciaddr, mac_address, vlan))
       config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(port_id)})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
