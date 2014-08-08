@@ -98,8 +98,8 @@ function load_config (file, pciaddr, sockpath)
       config.link(c, VM_tx.." -> "..NIC..".rx")
       zerocopy[NIC] = Virtio
    end
-   print(config.graphviz(c))
-   main.exit(0)
+--   print(config.graphviz(c))
+--   main.exit(0)
    engine.configure(c)
    for nic, virtio in pairs(zerocopy) do
       local n = engine.app_table[nic]
