@@ -64,6 +64,7 @@ local NEXT_HEADER_OFFSET =
 local SESSION_ID_OFFSET =
    ffi.offsetof(header_struct_ctype, 'session_id')
 local FLOW_ID_OFFSET = ffi.offsetof(header_struct_ctype, 'flow_id')
+local HOP_LIMIT_OFFSET = ffi.offsetof(header_struct_ctype, 'hop_limit')
 
 local SESSION_COOKIE_SIZE = 12 -- 32 bit session and 64 bit cookie
 
@@ -84,8 +85,9 @@ local function prepare_header_template ()
    -- Ver. Set to 0x6 to indicate IPv6.
    -- version is 4 first bits at this offset
    -- no problem to set others 4 bits to zeros - it is already zeros
-   header_template[FLOW_ID_OFFSET] = 0x06
+   header_template[FLOW_ID_OFFSET] = 0x60
 
+   header_template[HOP_LIMIT_OFFSET] = 64
    header_template[NEXT_HEADER_OFFSET] = L2TPV3_NEXT_HEADER
 
    -- For cases where both tunnel endpoints support one-stage resolution
@@ -110,6 +112,7 @@ function SimpleKeyedTunnel:new (confstring)
    -- optional fields:
    --   local_session, unsigned number, must fit to uint32_t
    --   default_gateway_MAC, useful for testing
+   --   hop_limit, override default hop limit 64
    assert(
          type(config.local_cookie) == "string"
          and #config.local_cookie == 8,
@@ -151,6 +154,12 @@ function SimpleKeyedTunnel:new (confstring)
    if config.default_gateway_MAC then
       local mac = assert(macaddress:new(config.default_gateway_MAC))
       ffi.copy(header + DST_MAC_OFFSET, mac.bytes, 6)
+   end
+
+   if config.hop_limit then
+      assert(type(config.hop_limit) == 'number' and
+	  config.hop_limit <= 255, "invalid hop limit")
+      header[HOP_LIMIT_OFFSET] = config.hop_limit
    end
 
    local o =
