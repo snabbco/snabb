@@ -20,7 +20,6 @@ end
 
 function run (pciaddr, confpath, sockpath)
    local mtime = 0
-   load_config(confpath, pciaddr, sockpath)
    while true do
       local mtime2 = C.stat_mtime(confpath)
       if mtime2 ~= mtime then
