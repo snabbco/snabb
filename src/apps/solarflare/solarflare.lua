@@ -174,12 +174,12 @@ function SolarFlareNic:pull()
       n_ev = self.ef_vi_eventq_poll(self.ef_vi_p, self.events, EVENTS_PER_POLL)
       if n_ev > 0 then
          for i = 0, n_ev - 1 do
-            local e = self.events[i];
-            if e.generic.type == C.EF_EVENT_TYPE_RX then
+            local event_type = self.events[i].generic.type
+            if event_type == C.EF_EVENT_TYPE_RX then
                self.stats.rx = (self.stats.rx or 0) + 1
                local p = packet.allocate()
-               local b = self.rxbuffers[e.rx.rq_id]
-               packet.add_iovec(p, b, e.rx.len)
+               local b = self.rxbuffers[self.events[i].rx.rq_id]
+               packet.add_iovec(p, b, self.events[i].rx.len)
                local l = self.output.output
                if not link.full(l) then
                   link.transmit(l, p)
@@ -187,10 +187,10 @@ function SolarFlareNic:pull()
                   self.stats.link_full = (self.stats.link_full or 0) + 1
                   packet.deref(p)
                end
-               self:enqueue_receive(e.rx.rq_id)
-            elseif e.generic.type == C.EF_EVENT_TYPE_RX_DISCARD then
+               self:enqueue_receive(self.events[i].rx.rq_id)
+            elseif event_type == C.EF_EVENT_TYPE_RX_DISCARD then
                self.stats.rx_discard = (self.stats.rx_discard or 0) + 1
-            elseif e.generic.type == C.EF_EVENT_TYPE_TX then
+            elseif event_type == C.EF_EVENT_TYPE_TX then
                local n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p,
                                                               self.events[i],
                                                               self.tx_request_ids)
@@ -201,10 +201,10 @@ function SolarFlareNic:pull()
                   self.tx_packets[tx_request_id] = nil
                end
                self.tx_space = self.tx_space + n_tx_done
-            elseif e.generic.type == C.EF_EVENT_TYPE_TX_ERROR then
+            elseif event_type == C.EF_EVENT_TYPE_TX_ERROR then
                self.stats.tx_error = (self.stats.tx_error or 0) + 1
             else
-               print("Unexpected event, type " .. e.generic.type)
+               print("Unexpected event, type " .. event_type)
             end
          end
       end
