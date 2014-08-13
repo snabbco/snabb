@@ -55,7 +55,7 @@ function Register:noop () end
 ---     reg()      <=> reg:read()
 ---     reg(value) <=> reg:write(value)
 function Register:__call (value)
-   if value then return self:write(value) else return self:read() end
+   if value then return (self:write(value)) else return (self:read()) end
 end
 
 --- Registers print as `$NAME:$HEXVALUE` to make debugging easy.
