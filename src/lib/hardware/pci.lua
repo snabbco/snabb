@@ -59,6 +59,7 @@ function which_driver (vendor, device)
       if device == '0x105e' then return 'apps.intel.intel' end    -- Intel 82571
    elseif vendor == '0x1924' then
       if device == '0x0903' then return 'apps.solarflare.solarflare' end
+--      if device == '0x0803' then return 'apps.solarflare.solarflare' end
    end
 end
 
