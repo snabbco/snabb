@@ -10,7 +10,7 @@ local buffer   = require("core.buffer")
 local packet   = require("core.packet")
                  require("apps.solarflare.ef_vi_h")
 
-local EVENTS_PER_POLL = 32
+local EVENTS_PER_POLL = 256
 local RECEIVE_BUFFER_COUNT = 256
 local FLUSH_RECEIVE_QUEUE_THRESHOLD = 32
 local TX_BUFFER_COUNT = 256
