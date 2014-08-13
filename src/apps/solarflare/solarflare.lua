@@ -172,6 +172,7 @@ function SolarFlareNic:pull()
    local n_ev
    repeat
       n_ev = self.ef_vi_eventq_poll(self.ef_vi_p, self.events, EVENTS_PER_POLL)
+      self.stats.max_n_ev = math.max(n_ev, self.stats.max_n_ev or 0)
       if n_ev > 0 then
          for i = 0, n_ev - 1 do
             local event_type = self.events[i].generic.type
@@ -194,6 +195,7 @@ function SolarFlareNic:pull()
                local n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p,
                                                               self.events[i],
                                                               self.tx_request_ids)
+               self.stats.max_n_tx_done = math.max(n_tx_done, self.stats.max_n_tx_done or 0)
                self.stats.tx = (self.stats.tx or 0) + n_tx_done
                for i = 0, (n_tx_done - 1) do
                   local tx_request_id = self.tx_request_ids[i]
@@ -229,19 +231,53 @@ function SolarFlareNic:push()
       -- transmission of the last buffer has been confirmed.  Thus, it
       -- can be dereferenced here.
       packet.deref(p)
+      self.stats.max_tx_space = math.max(self.tx_space, self.stats.max_tx_space or 0)
+      self.stats.min_tx_space = math.min(self.tx_space, self.stats.min_tx_space or TX_BUFFER_COUNT)
+   end
+   if link.empty(l) then
+      self.stats.link_empty = (self.stats.link_empty or 0) + 1
+   end
+   if not link.empty(l) and self.tx_space < packet.niovecs(link.front(l)) then
+      self.stats.no_tx_space = (self.stats.no_tx_space or 0) + 1
    end
    if push then
       self.ef_vi_transmit_push(self.ef_vi_p)
    end
 end
 
+function spairs(t, order)
+   -- collect the keys
+   local keys = {}
+   for k in pairs(t) do keys[#keys+1] = k end
+
+   -- if order function given, sort by it by passing the table and keys a, b,
+   -- otherwise just sort the keys
+   if order then
+      table.sort(keys, function(a,b) return order(t, a, b) end)
+   else
+      table.sort(keys)
+   end
+
+   -- return the iterator function
+   local i = 0
+   return function()
+      i = i + 1
+      if keys[i] then
+         return keys[i], t[keys[i]]
+      end
+   end
+end
+
 function SolarFlareNic:report()
    print("report on solarflare device", self.ifname)
    
-   for name,value in pairs(self.stats) do
+   for name,value in spairs(self.stats) do
       io.write(string.format('%s: %d ', name, value))
    end
    io.write("\n")
+   self.stats = {}
+--   print("exiting")
+--   main.exit(0)
 end
 
 assert(C.CI_PAGE_SIZE == 4096)
