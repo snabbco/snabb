@@ -180,9 +180,8 @@ function SolarFlareNic:pull()
                                 self.rxbuffers[self.events[i].rx.rq_id],
                                 self.events[i].rx.len)
                if not bit.band(self.events[i].rx.flags, C_EF_EVENT_FLAG_CONT) then
-                  local l = self.output.output
-                  if not link.full(l) then
-                     link.transmit(l, self.rxpacket)
+                  if not link.full(self.output.output) then
+                     link.transmit(self.output.output, self.rxpacket)
                   else
                      self.stats.link_full = (self.stats.link_full or 0) + 1
                      packet.deref(self.rxpacket)
