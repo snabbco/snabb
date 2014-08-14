@@ -5,7 +5,6 @@ local C = ffi.C
 
 local lib      = require("core.lib")
 local freelist = require("core.freelist")
-local memory   = require("core.memory")
 local buffer   = require("core.buffer")
 local packet   = require("core.packet")
                  require("apps.solarflare.ef_vi_h")
@@ -37,10 +36,6 @@ end
 SolarFlareNic = {}
 SolarFlareNic.__index = SolarFlareNic
 SolarFlareNic.version = ef_vi_version
-
--- List of open devices is kept to be able to register memory regions with them
-
-open_devices = {}
 
 function SolarFlareNic:new(args)
    assert(args.ifname)
@@ -162,7 +157,6 @@ function SolarFlareNic:open()
                        self.mac_address[4],
                        self.mac_address[5],
                        self.mtu))
-   open_devices[#open_devices + 1] = self
 
    return self
 end
@@ -281,32 +275,3 @@ function SolarFlareNic:report()
 end
 
 assert(C.CI_PAGE_SIZE == 4096)
-
-local old_register_RAM = memory.register_RAM
-local registered = {}
-
-local function address_to_number(address)
-   return tonumber(ffi.cast('intptr_t', ffi.cast('void *', address)))
-end
-
-function memory.register_RAM(p, physical, size)
-   local physical_num = address_to_number(physical)
-   assert(not registered[physical_num],
-          string.format("duplicate registration for physical address 0x%x",
-                        physical_num))
-   registered[physical_num] = true
-   for _, device in ipairs(open_devices) do
-      device.stats.memreg_alloc = (device.stats.memreg_alloc or 0) + 1
-      local memreg_p = ffi.new("ef_memreg[1]")
-      try(ciul.ef_memreg_alloc(memreg_p,
-                               device.driver_handle,
-                               device.pd_p,
-                               device.driver_handle,
-                               p,
-                               size), "ef_memreg_alloc")
-      assert(physical_num == address_to_number(memreg_p[0].mr_dma_addrs[0]),
-             "SolarFlare library did not map region to physical address")
-      device.memregs[#device.memregs] = memreg_p
-   end
-   old_register_RAM(p, physical, size)
-end
