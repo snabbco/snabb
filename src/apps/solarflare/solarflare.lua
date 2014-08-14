@@ -169,8 +169,7 @@ function SolarFlareNic:pull()
       self.stats.max_n_ev = math.max(n_ev, self.stats.max_n_ev or 0)
       if n_ev > 0 then
          for i = 0, n_ev - 1 do
-            local event_type = self.events[i].generic.type
-            if event_type == C.EF_EVENT_TYPE_RX then
+            if self.events[i].generic.type == C.EF_EVENT_TYPE_RX then
                self.stats.rx = (self.stats.rx or 0) + 1
                local p = packet.allocate()
                local b = self.rxbuffers[self.events[i].rx.rq_id]
@@ -183,9 +182,9 @@ function SolarFlareNic:pull()
                   packet.deref(p)
                end
                self:enqueue_receive(self.events[i].rx.rq_id)
-            elseif event_type == C.EF_EVENT_TYPE_RX_DISCARD then
+            elseif self.events[i].generic.type == C.EF_EVENT_TYPE_RX_DISCARD then
                self.stats.rx_discard = (self.stats.rx_discard or 0) + 1
-            elseif event_type == C.EF_EVENT_TYPE_TX then
+            elseif self.events[i].generic.type == C.EF_EVENT_TYPE_TX then
                local n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p,
                                                               self.events[i],
                                                               self.tx_request_ids)
@@ -197,10 +196,10 @@ function SolarFlareNic:pull()
                   self.tx_packets[tx_request_id] = nil
                end
                self.tx_space = self.tx_space + n_tx_done
-            elseif event_type == C.EF_EVENT_TYPE_TX_ERROR then
+            elseif self.events[i].generic.type == C.EF_EVENT_TYPE_TX_ERROR then
                self.stats.tx_error = (self.stats.tx_error or 0) + 1
             else
-               print("Unexpected event, type " .. event_type)
+               print("Unexpected event, type " .. self.events[i].generic.type)
             end
          end
       end
