@@ -38,7 +38,7 @@ SolarFlareNic.__index = SolarFlareNic
 SolarFlareNic.version = ef_vi_version
 
 function SolarFlareNic:new(args)
-   assert(args.ifname)
+   assert(args.ifname, "missing ifname argument")
    args.receives_enqueued = 0
    local dev = setmetatable(args, { __index = SolarFlareNic })
    return dev:open()
@@ -171,15 +171,22 @@ function SolarFlareNic:pull()
          for i = 0, n_ev - 1 do
             if self.events[i].generic.type == C.EF_EVENT_TYPE_RX then
                self.stats.rx = (self.stats.rx or 0) + 1
-               local p = packet.allocate()
-               local b = self.rxbuffers[self.events[i].rx.rq_id]
-               packet.add_iovec(p, b, self.events[i].rx.len)
-               local l = self.output.output
-               if not link.full(l) then
-                  link.transmit(l, p)
-               else
-                  self.stats.link_full = (self.stats.link_full or 0) + 1
-                  packet.deref(p)
+               if bit.band(self.events[i].rx.flags, C.EF_EVENT_FLAG_SOP) then
+                  self.rxpacket = packet.allocate()
+               end
+               assert(self.rxpacket, "no rxpacket in device, non-SOP buffer received")
+               packet.add_iovec(self.rxpacket,
+                                self.rxbuffers[self.events[i].rx.rq_id],
+                                self.events[i].rx.len)
+               if not bit.band(self.events[i].rx.flags, C_EF_EVENT_FLAG_CONT) then
+                  local l = self.output.output
+                  if not link.full(l) then
+                     link.transmit(l, self.rxpacket)
+                  else
+                     self.stats.link_full = (self.stats.link_full or 0) + 1
+                     packet.deref(self.rxpacket)
+                  end
+                  self.rxpacket = nil
                end
                self:enqueue_receive(self.events[i].rx.rq_id)
             elseif self.events[i].generic.type == C.EF_EVENT_TYPE_RX_DISCARD then
@@ -273,4 +280,4 @@ function SolarFlareNic:report()
 --   main.exit(0)
 end
 
-assert(C.CI_PAGE_SIZE == 4096)
+assert(C.CI_PAGE_SIZE == 4096, "unexpected C.CI_PAGE_SIZE, needs to be 4096")
