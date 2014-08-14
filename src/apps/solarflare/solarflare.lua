@@ -33,6 +33,9 @@ local function try (rc, message)
    return rc
 end
 
+events = ffi.new("ef_event[" .. EVENTS_PER_POLL .. "]")
+tx_request_ids = ffi.new("ef_request_id[" .. C.EF_VI_TRANSMIT_BATCH .. "]")
+
 SolarFlareNic = {}
 SolarFlareNic.__index = SolarFlareNic
 SolarFlareNic.version = ef_vi_version
@@ -122,7 +125,6 @@ function SolarFlareNic:open()
                              nil),
        "ef_vi_filter_add")
 
-   self.events = ffi.new("ef_event[" .. EVENTS_PER_POLL .. "]")
    self.memregs = {}
 
    -- cache ops
@@ -142,7 +144,6 @@ function SolarFlareNic:open()
    self:flush_receives()
 
    -- set up transmit variables
-   self.tx_request_ids = ffi.new("ef_request_id[" .. C.EF_VI_TRANSMIT_BATCH .. "]")
    self.tx_packets = {}
    self.tx_id = 0
    self.tx_space = TX_BUFFER_COUNT
@@ -161,25 +162,27 @@ function SolarFlareNic:open()
    return self
 end
 
+local n_ev, event_type, n_tx_done
+
 function SolarFlareNic:pull()
    self.stats.pull = (self.stats.pull or 0) + 1
-   local n_ev
    repeat
-      n_ev = self.ef_vi_eventq_poll(self.ef_vi_p, self.events, EVENTS_PER_POLL)
-      self.stats.max_n_ev = math.max(n_ev, self.stats.max_n_ev or 0)
+      n_ev = self.ef_vi_eventq_poll(self.ef_vi_p, events, EVENTS_PER_POLL)
+--      self.stats.max_n_ev = math.max(n_ev, self.stats.max_n_ev or 0)
       if n_ev > 0 then
          for i = 0, n_ev - 1 do
-            if self.events[i].generic.type == C.EF_EVENT_TYPE_RX then
+            event_type = events[i].generic.type
+            if event_type == C.EF_EVENT_TYPE_RX then
                self.stats.rx = (self.stats.rx or 0) + 1
-               if bit.band(self.events[i].rx.flags, C.EF_EVENT_FLAG_SOP) then
+               if bit.band(events[i].rx.flags, C.EF_EVENT_FLAG_SOP) then
                   self.rxpacket = packet.allocate()
                else
                   assert(self.rxpacket, "no rxpacket in device, non-SOP buffer received")
                end
                packet.add_iovec(self.rxpacket,
-                                self.rxbuffers[self.events[i].rx.rq_id],
-                                self.events[i].rx.len)
-               if not bit.band(self.events[i].rx.flags, C_EF_EVENT_FLAG_CONT) then
+                                self.rxbuffers[events[i].rx.rq_id],
+                                events[i].rx.len)
+               if not bit.band(events[i].rx.flags, C_EF_EVENT_FLAG_CONT) then
                   if not link.full(self.output.output) then
                      link.transmit(self.output.output, self.rxpacket)
                   else
@@ -188,25 +191,22 @@ function SolarFlareNic:pull()
                   end
                   self.rxpacket = nil
                end
-               self:enqueue_receive(self.events[i].rx.rq_id)
-            elseif self.events[i].generic.type == C.EF_EVENT_TYPE_RX_DISCARD then
-               self.stats.rx_discard = (self.stats.rx_discard or 0) + 1
-            elseif self.events[i].generic.type == C.EF_EVENT_TYPE_TX then
-               local n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p,
-                                                              self.events[i],
-                                                              self.tx_request_ids)
-               self.stats.max_n_tx_done = math.max(n_tx_done, self.stats.max_n_tx_done or 0)
+               self:enqueue_receive(events[i].rx.rq_id)
+            elseif event_type == C.EF_EVENT_TYPE_TX then
+               n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p,
+                                                        events[i],
+                                                        tx_request_ids)
+--               self.stats.max_n_tx_done = math.max(n_tx_done, self.stats.max_n_tx_done or 0)
                self.stats.tx = (self.stats.tx or 0) + n_tx_done
                for i = 0, (n_tx_done - 1) do
-                  local tx_request_id = self.tx_request_ids[i]
-                  packet.deref(self.tx_packets[tx_request_id])
-                  self.tx_packets[tx_request_id] = nil
+                  packet.deref(self.tx_packets[tx_request_ids[i]])
+                  self.tx_packets[tx_request_ids[i]] = nil
                end
                self.tx_space = self.tx_space + n_tx_done
-            elseif self.events[i].generic.type == C.EF_EVENT_TYPE_TX_ERROR then
+            elseif event_type == C.EF_EVENT_TYPE_TX_ERROR then
                self.stats.tx_error = (self.stats.tx_error or 0) + 1
             else
-               print("Unexpected event, type " .. self.events[i].generic.type)
+               print("Unexpected event, type " .. event_type)
             end
          end
       end
@@ -217,12 +217,14 @@ function SolarFlareNic:pull()
    until n_ev < EVENTS_PER_POLL
 end
 
+local p, push
+
 function SolarFlareNic:push()
    self.stats.push = (self.stats.push or 0) + 1
    local l = self.input.input
-   local push
+   push = false
    while not link.empty(l) and self.tx_space >= packet.niovecs(link.front(l)) do
-      local p = link.receive(l)
+      p = link.receive(l)
       self:enqueue_transmit(p)
       push = true
       -- enqueue_transmit references the packet once for each buffer
@@ -231,8 +233,8 @@ function SolarFlareNic:push()
       -- transmission of the last buffer has been confirmed.  Thus, it
       -- can be dereferenced here.
       packet.deref(p)
-      self.stats.max_tx_space = math.max(self.tx_space, self.stats.max_tx_space or 0)
-      self.stats.min_tx_space = math.min(self.tx_space, self.stats.min_tx_space or TX_BUFFER_COUNT)
+--      self.stats.max_tx_space = math.max(self.tx_space, self.stats.max_tx_space or 0)
+--      self.stats.min_tx_space = math.min(self.tx_space, self.stats.min_tx_space or TX_BUFFER_COUNT)
    end
    if link.empty(l) then
       self.stats.link_empty = (self.stats.link_empty or 0) + 1
@@ -268,6 +270,8 @@ function spairs(t, order)
    end
 end
 
+local count = 0
+
 function SolarFlareNic:report()
    print("report on solarflare device", self.ifname)
    
@@ -276,8 +280,13 @@ function SolarFlareNic:report()
    end
    io.write("\n")
    self.stats = {}
---   print("exiting")
---   main.exit(0)
+   --[[
+   count = count + 1
+   if count == 10 then
+      print("exiting")
+      main.exit(0)
+   end
+   ]]
 end
 
 assert(C.CI_PAGE_SIZE == 4096, "unexpected C.CI_PAGE_SIZE, needs to be 4096")
