@@ -210,11 +210,11 @@ function SolarFlareNic:pull()
             end
          end
       end
+      if self.receives_enqueued >= FLUSH_RECEIVE_QUEUE_THRESHOLD then
+         self.stats.rx_flushes = (self.stats.rx_flushes or 0) + 1
+         self:flush_receives()
+      end
    until n_ev < EVENTS_PER_POLL
-   if self.receives_enqueued >= FLUSH_RECEIVE_QUEUE_THRESHOLD then
-      self.stats.rx_flushes = (self.stats.rx_flushes or 0) + 1
-      self:flush_receives()
-   end
 end
 
 function SolarFlareNic:push()
