@@ -173,8 +173,9 @@ function SolarFlareNic:pull()
                self.stats.rx = (self.stats.rx or 0) + 1
                if bit.band(self.events[i].rx.flags, C.EF_EVENT_FLAG_SOP) then
                   self.rxpacket = packet.allocate()
+               else
+                  assert(self.rxpacket, "no rxpacket in device, non-SOP buffer received")
                end
-               assert(self.rxpacket, "no rxpacket in device, non-SOP buffer received")
                packet.add_iovec(self.rxpacket,
                                 self.rxbuffers[self.events[i].rx.rq_id],
                                 self.events[i].rx.len)
