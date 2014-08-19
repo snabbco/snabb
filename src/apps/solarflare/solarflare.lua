@@ -172,6 +172,7 @@ function SolarFlareNic:stop()
 end
 
 local n_ev, event_type, n_tx_done
+local band = bit.band
 
 function SolarFlareNic:pull()
    self.stats.pull = (self.stats.pull or 0) + 1
@@ -183,7 +184,7 @@ function SolarFlareNic:pull()
             event_type = events[i].generic.type
             if event_type == C.EF_EVENT_TYPE_RX then
                self.stats.rx = (self.stats.rx or 0) + 1
-               if bit.band(events[i].rx.flags, C.EF_EVENT_FLAG_SOP) then
+               if band(events[i].rx.flags, C.EF_EVENT_FLAG_SOP) then
                   self.rxpacket = packet.allocate()
                else
                   assert(self.rxpacket, "no rxpacket in device, non-SOP buffer received")
@@ -191,7 +192,7 @@ function SolarFlareNic:pull()
                packet.add_iovec(self.rxpacket,
                                 self.rxbuffers[events[i].rx.rq_id],
                                 events[i].rx.len)
-               if not bit.band(events[i].rx.flags, C_EF_EVENT_FLAG_CONT) then
+               if not band(events[i].rx.flags, C_EF_EVENT_FLAG_CONT) then
                   if not link.full(self.output.output) then
                      link.transmit(self.output.output, self.rxpacket)
                   else
