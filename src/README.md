@@ -107,6 +107,11 @@ implemented the app instance is discarded and a new instance is created.
 *Optional*. Print a report of the current app status.
 
 
+— Method **myapp:stop**
+
+*Optional*. Stop the app and release associated external resources.
+
+
 — Field **myapp.zone**
 
 *Optional*. Name of the LuaJIT *profiling zone* used for this app
