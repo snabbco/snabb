@@ -54,6 +54,7 @@ port, while a packet recorder may have only an input port.
 * `myapp:reconfig(arg)` Reconfigure with a new arg. (Optional.): recreation of the app is used as a fallback.)
 * `myapp:report()` Print a report of the current status.
 * `myapp.zone` Name of the LuaJIT profiling zone for this app (a descriptive string). (Optional: module name used as a default.)
+* `myapp.stop()` Stop the app and release associated external resources. (Optional.)
 
 ## `link`
 
