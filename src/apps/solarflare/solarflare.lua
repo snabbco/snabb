@@ -162,6 +162,15 @@ function SolarFlareNic:open()
    return self
 end
 
+function SolarFlareNic:stop()
+   try(ciul.ef_vi_free(self.ef_vi_p, self.driver_handle),
+       "ef_vi_free")
+   try(ciul.ef_pd_free(self.pd_p, self.driver_handle),
+       "ef_pd_free")
+   try(ciul.ef_driver_close(self.driver_handle),
+       "ef_driver_close")
+end
+
 local n_ev, event_type, n_tx_done
 
 function SolarFlareNic:pull()
