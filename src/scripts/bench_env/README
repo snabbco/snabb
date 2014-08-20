@@ -59,7 +59,7 @@ The configuration of the scripts is done in 2 levels:
  - global /etc/bench_conf.sh
  - per user $HOME/bench_conf.sh
 
-Use example_conf.sh as a referece how to setup the global or user specific script.
+Use example_conf.sh as a reference how to setup the global or user specific script.
 
 Configuration overview
 A basic description of all the needed variables in bench_conf.sh follows:
