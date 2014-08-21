@@ -71,15 +71,6 @@
 -- subclass needs to be selected. The GRE protocol serves as an
 -- example of how this can be implemented.
 --
--- The standard constructors will initialize the header instance with
--- the fundamental type.  The protocol class must override both
--- constructor methods to determine the actual header, either from the
--- configuration or the chunk of memory for the new() and
--- new_from_mem() methods, respectively.  The important part is that
--- the constructors must override the _header* class variables in the
--- header instance.  See lib/protocol/gre.lua for an example of how
--- this can look like.
---
 -- The header is stored in the instance variable _header. To avoid the
 -- creation of garbage, this is actually an array of pointers with a
 -- single element defined as
@@ -88,10 +79,12 @@
 --
 -- The pointer points to either a ctype object or a region of buffer
 -- memory, depending on whether the instance was created via the new()
--- or new_from_mem() methods, respectively.  This array is allocated
--- once upon instance creation and avoids the overhead of "boxing"
--- when the instance is recycled by new_from_mem().  As a consequence,
--- the header must be accessed by indexing this array, e.g.
+-- or new_from_mem() methods, respectively (or whether the header has
+-- been relocated by a call of the copy() method with the relocate
+-- argument set to true).  This array is allocated once upon instance
+-- creation and avoids the overhead of "boxing" when the instance is
+-- recycled by new_from_mem().  As a consequence, the header must be
+-- accessed by indexing this array, e.g.
 --
 --   self._header[0].some_header_element
 --
@@ -159,9 +152,13 @@ end
 
 -- Copy the header to some location in memory (usually a packet
 -- buffer).  The caller must make sure that there is enough space at
--- the destination.
-function header:copy (dst)
+-- the destination.  If relocate is a true value, the copy is promoted
+-- to be the active storage of the header.
+function header:copy (dst, relocate)
    ffi.copy(dst, self._header[0], ffi.sizeof(self._header[0][0]))
+   if relocate then
+      self._header[0] = ffi.cast(self._header_ptr_type, dst)
+   end
 end
 
 -- Create a new protocol instance that is a copy of this instance.
