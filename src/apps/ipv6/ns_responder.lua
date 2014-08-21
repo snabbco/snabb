@@ -28,13 +28,17 @@ function ns_responder:new(config)
    local filter, errmsg = filter:new("icmp6 and ip6[40] = 135")
    assert(filter, errmsg and ffi.string(errmsg))
    o._filter = filter
+   o._dgram = datagram:new()
+   packet.deref(o._dgram:packet())
    return o
 end
 
-local function process(self, dgram)
-   if not self._filter:match(dgram:payload()) then
+local function process (self, p)
+   local iov = p.iovecs[0]
+   if not self._filter:match(iov.buffer.pointer + iov.offset, iov.length) then
       return false
    end
+   local dgram = self._dgram:reuse(p, ethernet)
    -- Parse the ethernet, ipv6 amd icmp headers
    dgram:parse_n(3)
    local eth, ipv6, icmp = unpack(dgram:stack())
@@ -93,8 +97,7 @@ function ns_responder:push()
    local l_reply = self.output.south
    while not link.empty(l_in) and not link.full(l_out) do
       local p = packet.want_modify(link.receive(l_in))
-      local datagram = datagram:new(p, ethernet)
-      local status = process(self, datagram)
+      local status = process(self, p)
       if status == nil then
 	 -- Discard
 	 packet.deref(p)
@@ -105,7 +108,6 @@ function ns_responder:push()
 	 -- Send transit traffic up north
 	 link.transmit(l_out, p)
       end
-      datagram:free()
    end
 end
 

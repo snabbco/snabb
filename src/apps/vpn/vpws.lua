@@ -39,6 +39,8 @@ function vpws:new(config)
    local filter, errmsg = filter:new(program)
    assert(filter, errmsg and ffi.string(errmsg))
    o._filter = filter
+   o._dgram = datagram:new()
+   packet.deref(o._dgram:packet())
    return o
 end
 
@@ -49,7 +51,7 @@ function vpws:push()
       assert(l_out)
       while not link.full(l_out) and not link.empty(l_in) do
 	 local p = link.receive(l_in)
-	 local datagram = datagram:new(p, ethernet)
+	 local datagram = self._dgram:reuse(p, ethernet)
 	 if port_in == 'customer' then
 	    local encap = self._encap
 	    -- Encapsulate Ethernet frame coming in on customer port
@@ -60,9 +62,9 @@ function vpws:push()
 	       encap.gre:checksum(datagram:payload())
 	    end
 	    -- Copy the finished headers into the packet
-	    datagram:push(encap.ether)
-	    datagram:push(encap.ipv6)
 	    datagram:push(encap.gre)
+	    datagram:push(encap.ipv6)
+	    datagram:push(encap.ether)
 	 else
 	    -- Check for encapsulated frame coming in on uplink
 	    if self._filter:match(datagram:payload()) then
@@ -101,7 +103,6 @@ function vpws:push()
 	    end
 	 end
 	 if p then link.transmit(l_out, p) end
-	 datagram:free()
       end
    end
 end
