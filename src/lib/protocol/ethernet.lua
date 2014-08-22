@@ -2,6 +2,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
+local ipv6 = require("lib.protocol.ipv6")
 
 local ether_header_t = ffi.typeof[[
 struct {
@@ -58,6 +59,16 @@ function ethernet:ntop (n)
       table.insert(p, string.format("%02x", n[i]))
    end
    return table.concat(p, ":")
+end
+
+-- Mapping of an IPv6 multicast address to a MAC address per RFC2464,
+-- section 7
+function ethernet:ipv6_mcast(ip)
+   local result = self:pton("33:33:00:00:00:00")
+   local n = ffi.cast("uint8_t *", ip)
+   assert(n[0] == 0xff, "invalid multiast address: "..ipv6:ntop(ip))
+   ffi.copy(ffi.cast("uint8_t *", result)+2, n+12, 4)
+   return result
 end
 
 -- Instance methods
