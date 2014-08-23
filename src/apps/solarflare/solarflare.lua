@@ -47,8 +47,23 @@ function SolarFlareNic:new(args)
    return dev:open()
 end
 
+-- Allocate receive buffers from the given freelist.
+function SolarFlareNic:set_rx_buffer_freelist (fl)
+   assert(fl)
+   self.rx_buffer_freelist = fl
+end
+
 function SolarFlareNic:enqueue_receive(id)
-   self.rxbuffers[id] = buffer.allocate()
+   local fl = self.rx_buffer_freelist
+   if fl then
+      if freelist.nfree(fl) > 0 then
+         self.rxbuffers[id] = freelist.remove(fl)
+      else
+         return
+      end
+   else
+      self.rxbuffers[id] = buffer.allocate()
+   end
    try(self.ef_vi_receive_init(self.ef_vi_p,
                                buffer.physical(self.rxbuffers[id]),
                                id),
