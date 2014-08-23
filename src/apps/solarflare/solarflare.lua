@@ -208,8 +208,8 @@ function SolarFlareNic:pull()
                                 self.rxbuffers[events[i].rx.rq_id],
                                 events[i].rx.len)
                if not band(events[i].rx.flags, C_EF_EVENT_FLAG_CONT) then
-                  if not link.full(self.output.output) then
-                     link.transmit(self.output.output, self.rxpacket)
+                  if not link.full(self.output.tx) then
+                     link.transmit(self.output.tx, self.rxpacket)
                   else
                      self.stats.link_full = (self.stats.link_full or 0) + 1
                      packet.deref(self.rxpacket)
@@ -222,7 +222,7 @@ function SolarFlareNic:pull()
                                                         events[i],
                                                         tx_request_ids)
 --               self.stats.max_n_tx_done = math.max(n_tx_done, self.stats.max_n_tx_done or 0)
-               self.stats.tx = (self.stats.tx or 0) + n_tx_done
+               self.stats.txpackets = (self.stats.txpackets or 0) + n_tx_done
                for i = 0, (n_tx_done - 1) do
                   packet.deref(self.tx_packets[tx_request_ids[i]])
                   self.tx_packets[tx_request_ids[i]] = nil
@@ -246,7 +246,7 @@ local p, push
 
 function SolarFlareNic:push()
    self.stats.push = (self.stats.push or 0) + 1
-   local l = self.input.input
+   local l = self.input.rx
    push = false
    while not link.empty(l) and self.tx_space >= packet.niovecs(link.front(l)) do
       p = link.receive(l)
