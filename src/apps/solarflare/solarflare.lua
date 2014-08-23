@@ -290,13 +290,6 @@ function SolarFlareNic:report()
    end
    io.write("\n")
    self.stats = {}
-   --[[
-   count = count + 1
-   if count == 10 then
-      print("exiting")
-      main.exit(0)
-   end
-   ]]
 end
 
 assert(C.CI_PAGE_SIZE == 4096, "unexpected C.CI_PAGE_SIZE, needs to be 4096")
