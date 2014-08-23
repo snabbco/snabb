@@ -199,7 +199,7 @@ function SolarFlareNic:pull()
             event_type = events[i].generic.type
             if event_type == C.EF_EVENT_TYPE_RX then
                self.stats.rx = (self.stats.rx or 0) + 1
-               if band(events[i].rx.flags, C.EF_EVENT_FLAG_SOP) then
+               if band(events[i].rx.flags, C.EF_EVENT_FLAG_SOP) == 1 then
                   self.rxpacket = packet.allocate()
                else
                   assert(self.rxpacket, "no rxpacket in device, non-SOP buffer received")
@@ -207,7 +207,7 @@ function SolarFlareNic:pull()
                packet.add_iovec(self.rxpacket,
                                 self.rxbuffers[events[i].rx.rq_id],
                                 events[i].rx.len)
-               if not band(events[i].rx.flags, C_EF_EVENT_FLAG_CONT) then
+               if band(events[i].rx.flags, C.EF_EVENT_FLAG_CONT) == 0 then
                   if not link.full(self.output.tx) then
                      link.transmit(self.output.tx, self.rxpacket)
                   else
