@@ -333,15 +333,18 @@ if abi.arch == "ppc" then
 end
 
 -- new syscalls not in headers yet
-SYS.kcmp = nil
-SYS.finit_module = nil
-SYS.sched_setattr = nil
-SYS.sched_getattr = nil
-SYS.renameat2 = nil
-SYS.seccomp = nil
-SYS.getrandom = nil
-SYS.memfd_create = nil
-SYS.kexec_file_load = nil
+c.SYS.kcmp = nil
+c.SYS.finit_module = nil
+c.SYS.sched_setattr = nil
+c.SYS.sched_getattr = nil
+c.SYS.renameat2 = nil
+c.SYS.seccomp = nil
+c.SYS.getrandom = nil
+c.SYS.memfd_create = nil
+c.SYS.kexec_file_load = nil
+
+-- constants for new syscalls
+c.GRND = nil
 
 if abi.arch == "mips" then
   c.RLIM.INFINITY = nil -- incorrect in all but very recent glibc

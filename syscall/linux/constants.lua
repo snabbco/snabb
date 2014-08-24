@@ -3430,5 +3430,10 @@ c.LINUX_REBOOT = strflag {
   MAGIC2C   = tobit(537993216),
 }
 
+c.GRND = multiflags {
+  NONBLOCK = 0x0001,
+  RANDOM   = 0x0002,
+}
+
 return c
 

@@ -392,6 +392,12 @@ function S.vhangup() return retbool(C.vhangup()) end
 function S.swapon(path, swapflags) return retbool(C.swapon(path, c.SWAP_FLAG[swapflags])) end
 function S.swapoff(path) return retbool(C.swapoff(path)) end
 
+if C.getrandom then
+  function S.getrandom(buf, count, flags)
+    return retnum(C.getrandom(buf, count or #buf or 64, c.GRND[flags]))
+  end
+end
+
 -- capabilities. Somewhat complex kernel interface due to versioning, Posix requiring malloc in API.
 -- only support version 3, should be ok for recent kernels, or pass your own hdr, data in
 -- to detect capability API version, pass in hdr with empty version, version will be set

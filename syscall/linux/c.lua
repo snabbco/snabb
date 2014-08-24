@@ -648,6 +648,11 @@ if sys.alarm then
   function C.alarm(seconds) return syscall(sys.alarm, uint(seconds)) end
 end
 
+-- new system call, may be missing
+if sys.getrandom then
+  function C.getrandom(buf, count, flags) return syscall(sys.getrandom, void(buf), uint(count), uint(flags)) end
+end
+
 -- kernel sigaction structures actually rather different in Linux from libc ones
 function C.sigaction(signum, act, oldact)
   return syscall(sys.rt_sigaction, int(signum), void(act), void(oldact), ulong(sigset_size)) -- size is size of sigset field

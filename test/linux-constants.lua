@@ -201,6 +201,9 @@ local function fixup_constants(abi, c)
   c.SYS.memfd_create = nil
   c.SYS.kexec_file_load = nil
 
+  -- new constants
+  c.GRND = nil
+
   return c
 end
 
