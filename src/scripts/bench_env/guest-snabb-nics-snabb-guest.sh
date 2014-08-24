@@ -31,7 +31,7 @@ numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
         -serial telnet:localhost:$TELNET_PORT0,server,nowait \
         -kernel $KERNEL -append "$BOOTARGS0" \
         -drive if=virtio,file=$IMAGE0 \
-        -nographic > /dev/null 2>&1 &
+        -nographic > ${QEMU_LOG0-/dev/null} 2>&1 &
 QEMU_PID0=$!
 
 # Add another snabbswitch - QEMU instance
@@ -52,7 +52,7 @@ numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND1 \
         -serial telnet:localhost:$TELNET_PORT1,server,nowait \
         -kernel $KERNEL -append "$BOOTARGS1" \
         -drive if=virtio,file=$IMAGE1 \
-        -nographic > /dev/null 2>&1 &
+        -nographic > ${QEMU_LOG1-/dev/null} 2>&1 &
 QEMU_PID1=$!
 
 printf "All instances running.\n"
