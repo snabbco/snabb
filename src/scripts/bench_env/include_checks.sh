@@ -17,8 +17,7 @@ import_env () {
 
 wait_pid () {
     for pid in "$@"; do
-        #wait $pid
-	sleep 1
+        wait $pid
     done
 }
 
