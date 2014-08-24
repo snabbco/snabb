@@ -1,13 +1,14 @@
 module(...,package.seeall)
 
-local ffi = require("ffi")
-local C = ffi.C
-
 local lib      = require("core.lib")
 local freelist = require("core.freelist")
 local buffer   = require("core.buffer")
 local packet   = require("core.packet")
                  require("apps.solarflare.ef_vi_h")
+local pci      = require("lib.hardware.pci")
+
+local ffi = require("ffi")
+local C = ffi.C
 
 local EVENTS_PER_POLL = 256
 local RECEIVE_BUFFER_COUNT = 256
@@ -40,8 +41,21 @@ SolarFlareNic = {}
 SolarFlareNic.__index = SolarFlareNic
 SolarFlareNic.version = ef_vi_version
 
+driver = SolarFlareNic
+
 function SolarFlareNic:new(args)
-   assert(args.ifname, "missing ifname argument")
+   if type(args) == "string" then
+      args = config.parse_app_arg(args)
+   end
+
+   if not args.ifname then
+      local device_info = pci.device_info(args.pciaddr)
+      assert(device_info.interface,
+             string.format("interface for chosen pci device %s is not up",
+                           args.pciaddr))
+      args.ifname = device_info.interface
+   end
+
    args.receives_enqueued = 0
    local dev = setmetatable(args, { __index = SolarFlareNic })
    return dev:open()
