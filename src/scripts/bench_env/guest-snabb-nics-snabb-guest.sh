@@ -14,7 +14,7 @@ GUESTS="2"
 . $(dirname $0)/common.sh
 
 # Execute snabbswitch - QEMU instance
-export NFV_PCI=$NFV_PCI0 NFV_SOCKET=$NFV_SOCKET0
+export NFV_PCI=$NFV_PCI0 NFV_SOCKET=$NFV_SOCKET0 NFV_TRACE=$NFV_TRACE0
 numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
     $SNABB $NFV > $SNABB_LOG0 2>&1 &
 SNABB_PID0=$!
@@ -23,7 +23,7 @@ SNABB_PID0=$!
 run_qemu_vhost_user "$NODE_BIND0" "$BOOTARGS0" "$IMAGE0" "$GUEST_MAC0" "$TELNET_PORT0" "$NFV_SOCKET0"
 
 # Add another snabbswitch - QEMU instance
-export NFV_PCI=$NFV_PCI1 NFV_SOCKET=$NFV_SOCKET1
+export NFV_PCI=$NFV_PCI1 NFV_SOCKET=$NFV_SOCKET1 NFV_TRACE=$NFV_TRACE1
 numactl --cpunodebind=$NODE_BIND1 --membind=$NODE_BIND1 \
     $SNABB $NFV > $SNABB_LOG1 2>&1 &
 SNABB_PID1=$!
