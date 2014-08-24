@@ -14,7 +14,6 @@ run_qemu () {
     TELNETPORT=$5
     NETDEV=$6
     CPU=$7
-    LOG=$8
 
     MEM="-m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on"
     NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC"
@@ -32,7 +31,7 @@ run_qemu () {
             -M pc -smp 1 -cpu host --enable-kvm \
             -serial telnet:localhost:$TELNETPORT,server,nowait \
             -drive if=virtio,file=$IMG \
-            -nographic > ${LOG-/dev/null} 2>&1 &
+            -nographic > /dev/null 2>&1 &
     QEMUPIDS="$QEMUPIDS $!"
 }
 
