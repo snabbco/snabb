@@ -5,9 +5,12 @@ local lib      = require("core.lib")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
 local freelist = require("core.freelist")
+local pci      = require("lib.hardware.pci")
 
 Intel82599 = {}
 Intel82599.__index = Intel82599
+
+driver = Intel82599
 
 -- table pciaddr => {pf, vflist}
 local devices = {}
@@ -26,7 +29,7 @@ end
 function Intel82599:new (args)
    args = config.parse_app_arg(args)
 
-   unbind_device_from_linux(args.pciaddr)
+   pci.unbind_device_from_linux(args.pciaddr)
 
    if args.vmdq then
       if devices[args.pciaddr] == nil then

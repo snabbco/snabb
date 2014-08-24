@@ -3,7 +3,6 @@
 local app        = require("core.app")
 local basic_apps = require("apps.basic.basic_apps")
 local config     = require("core.config")
-local intel_app  = require("apps.intel.intel_app")
 local lib        = require("core.lib")
 local pcap       = require("apps.pcap.pcap")
 local timer      = require("core.timer")
@@ -17,10 +16,16 @@ function run (npackets)
    local pciaddr = os.getenv("NFV_PCI") or error("No $NFV_PCI set.")
    local socket  = os.getenv("NFV_SOCKET") or error("No $NFV_SOCKET set.")
    local trace   = os.getenv("NFV_TRACE")
-   pci.unbind_device_from_linux(pciaddr)
+
+   local device_info = pci.device_info(pciaddr)
+   if not device_info then
+      print(format("could not find device information for PCI address %s", pciaddr))
+      main.exit(1)
+   end
+
    local c = config.new()
    config.app(c, "vm", vhost_user.VhostUser, socket)
-   config.app(c, "nic", intel_app.Intel82599, ([[{pciaddr='%s'}]]):format(pciaddr))
+   config.app(c, "nic", require(device_info.driver).driver, ([[{pciaddr='%s'}]]):format(pciaddr))
    if not trace then
       print("No trace file ($NFV_TRACE) configured.")
       config.link(c, "vm.tx -> nic.rx")
