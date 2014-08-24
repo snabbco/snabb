@@ -55,6 +55,9 @@ In bench_conf.sh point to qemu/obj/x86_64-softmmu/qemu-system-x86_64.
 
 Script test cases:
 
+The script loadgen-snab-nic-guest.sh reads global /etc/pci_affinity.conf.
+See the example pci_affinity.conf for refrence how to set this file up.
+
 The configuration of the scripts is done in 2 levels:
  - global /etc/bench_conf.sh
  - per user $HOME/bench_conf.sh
@@ -66,9 +69,22 @@ A basic description of all the needed variables in bench_conf.sh follows:
 SNABB: Location of the snabbswitch binary
 PCAP: pcap file to use with loadgen
 
+RUN_LOADGEN: if set enable running the loadgen inside the loadgen-snab-nic-guest.sh
+
 NODE_BIND: Number of the CPU/Memory node to attach an instance of snabbswitch/QEMU
 SNABB_LOG: File to store the output of a snabbswitch instance
-NFV_PCI: PCI device address that snabbswitch will use (eg. 0000:07:00.0)
+    in loadgen-snab-nic-guest.sh:
+    SNABB_LOG0 - the file for NFV design. There will be multiple of then appending the
+                 counter value in the name. When set to /dev/null, the file will be created
+                 as /tmp/nfv${{PCIADDRESS}
+    SNABB_LOG1 - the log file for loadgen design. There will be multiple of them appending
+    to this name the NUMA node number
+
+NFV_PCI: PCI device addresses that snabbswitch will use (eg. "0000:07:00.0 0000:81:00.0")
+    in loadgen-snab-nic-guest.sh:
+    NFV_PCI0 - the PCI addresses for NFV/QEMU pair
+    NFV_PCI1 - the PCI addresses for loadgen design
+
 NFV_SOCKET: Filename of the socket used by snabbswitch and QEMU
 NFV_PACKETS: The number of packets that the VM in the NFV desing will receive before it exits
 

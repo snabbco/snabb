@@ -19,17 +19,17 @@ local C         = ffi.C
 require("apps.vhost.vhost_h")
 require("apps.vhost.vhost_user_h")
 
-assert(ffi.sizeof("struct vhost_user_msg") == 212, "ABI error")
+assert(ffi.sizeof("struct vhost_user_msg") == 276, "ABI error")
 
 VhostUser = {}
 
-function VhostUser:new (socket_path)
+function VhostUser:new (args)
    local o = { state = 'init',
       dev = nil,
       msg = ffi.new("struct vhost_user_msg"),
       nfds = ffi.new("int[1]"),
       fds = ffi.new("int[?]", C.VHOST_USER_MEMORY_MAX_NREGIONS),
-      socket_path = socket_path,
+      socket_path = args.socket_path,
       -- process qemu messages timer
       process_qemu_timer = timer.new(
          "process qemu timer",
@@ -40,6 +40,13 @@ function VhostUser:new (socket_path)
    }
    self = setmetatable(o, {__index = VhostUser})
    self.dev = net_device.VirtioNetDevice:new(self)
+   if args.is_server then
+      self.listen_socket = C.vhost_user_listen(self.socket_path)
+      assert(self.listen_socket >= 0)
+      self.qemu_connect = self.server_connect
+   else
+      self.qemu_connect = self.client_connect
+   end
    return self
 end
 
@@ -60,8 +67,16 @@ function VhostUser:push ()
 end
 
 -- Try to connect to QEMU.
+function VhostUser:client_connect ()
+   return C.vhost_user_connect(self.socket_path)
+end
+
+function VhostUser:server_connect ()
+   return C.vhost_user_accept(self.listen_socket)
+end
+
 function VhostUser:connect ()
-   local res = C.vhost_user_connect(self.socket_path)
+   local res = self:qemu_connect()
    if res >= 0 then
       self.socket = res
       self.connected = true
@@ -208,13 +223,17 @@ function VhostUser:set_mem_table (msg, fds, nfds)
    mem_table = {}
    assert(nfds == msg.memory.nregions)
    for i = 0, msg.memory.nregions - 1 do
-      assert(fds[i] > 0) -- XXX vapp_server.c uses 'if'
-      local size = msg.memory.regions[i].memory_size
-      local pointer = C.vhost_user_map_guest_memory(fds[i], size)
-      -- XXX Find a more elegant way to map this as IO memory.
-      C.mmap_memory(pointer, size, ffi.cast("uint64_t",pointer), true, true)
+      assert(fds[i] > 0)
+
       local guest = msg.memory.regions[i].guest_phys_addr
+      local size = msg.memory.regions[i].memory_size
       local qemu = msg.memory.regions[i].userspace_addr
+      local offset = msg.memory.regions[i].mmap_offset
+
+      local pointer = C.vhost_user_map_guest_memory(fds[i], offset + size)
+      pointer = ffi.cast("char *", pointer)
+      pointer = pointer + offset -- advance to the offset
+
       mem_table[i] = { guest = guest,
          qemu  = qemu,
          snabb = ffi.cast("int64_t", pointer),
@@ -256,8 +275,9 @@ function selftest ()
       print("SNABB_TEST_VHOST_USER_SOCKET was not set\nTest skipped")
       os.exit(app.test_skipped_code)
    end
+   local server = os.getenv("SNABB_TEST_VHOST_USER_SERVER")
    local c = config.new()
-   config.app(c, "vhost_user", VhostUser, vhost_user_sock)
+   config.app(c, "vhost_user", VhostUser, {socket_path=vhost_user_sock, is_server=server})
    --config.app(c, "vhost_dump", pcap.PcapWriter, "vhost_vm_dump.cap")
    config.app(c, "vhost_tee", basic_apps.Tee)
    config.app(c, "sink", basic_apps.Sink)
@@ -297,4 +317,3 @@ function ptr (x) return ffi.cast("void*",x) end
 function debug (...)
    print(...)
 end
-

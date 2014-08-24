@@ -10,8 +10,11 @@ local link      = require("core.link")
 local memory    = require("core.memory")
 local packet    = require("core.packet")
 local timer     = require("core.timer")
+local tlb       = require("lib.tlb")
 local ffi       = require("ffi")
 local C         = ffi.C
+local band = bit.band
+
 
 require("lib.virtio.virtio.h")
 require("lib.virtio.virtio_vring_h")
@@ -19,6 +22,7 @@ require("lib.virtio.virtio_vring_h")
 local char_ptr_t = ffi.typeof("char *")
 local virtio_net_hdr_size = ffi.sizeof("struct virtio_net_hdr")
 local packet_info_size = ffi.sizeof("struct packet_info")
+local buffer_t = ffi.typeof("struct buffer")
 
 local invalid_header_id = 0xffff
 
@@ -88,7 +92,7 @@ function VirtioNetDevice:receive_packets_from_vm ()
       if idx == 0 then idx = 65535 else idx = idx - 1 end
       local p = packet.allocate()
       -- Header
-      local header_id = self.rxring.avail.ring[idx % self.rx_vring_num]
+      local header_id = self.rxring.avail.ring[band(idx, self.rx_vring_num-1)]
       local header_desc  = self.rxring.desc[header_id]
       local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(header_desc.addr))
       --assert(header_desc.len == virtio_net_hdr_size)
@@ -102,7 +106,7 @@ function VirtioNetDevice:receive_packets_from_vm ()
       -- Data buffer
       repeat
          data_desc  = self.rxring.desc[data_desc.next]
-         local b = freelist.remove(self.buffer_recs) or lib.malloc("struct buffer")
+         local b = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
 
          local addr = self:map_from_guest(data_desc.addr)
          b.pointer = ffi.cast(char_ptr_t, addr)
@@ -129,7 +133,7 @@ function VirtioNetDevice:receive_packets_from_vm ()
       v.header_pointer = header_pointer
       v.total_size = total_size
 
-      self.rxavail = (self.rxavail + 1) % 65536
+      self.rxavail = band(self.rxavail + 1, 65535)
 
       local l = self.owner.output.tx
       if l then
@@ -149,7 +153,7 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
    while idx ~= txavail do
       if idx == 0 then idx = 65535 else idx = idx - 1 end
       -- Header
-      local header_id = self.txring.avail.ring[idx % self.tx_vring_num]
+      local header_id = self.txring.avail.ring[band(idx, self.tx_vring_num-1)]
       local header_desc  = self.txring.desc[header_id]
       local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(header_desc.addr))
       --assert(header_desc.len == virtio_net_hdr_size)
@@ -158,13 +162,23 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
       --assert(bit.band(header_desc.flags, C.VIRTIO_DESC_F_NEXT) ~= 0)
 
       -- Data buffer
-      data_desc  = self.txring.desc[data_desc.next]
-      local b = freelist.remove(self.buffer_recs) or lib.malloc("struct buffer")
+      local b = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
+      local addr = nil
+      local len = 0
 
-      local addr = self:map_from_guest(data_desc.addr)
+      if header_desc.len == virtio_net_hdr_size then
+         data_desc  = self.txring.desc[data_desc.next]
+         addr = data_desc.addr
+         len = data_desc.len
+      else
+         addr = data_desc.addr + virtio_net_hdr_size
+         len = data_desc.len - virtio_net_hdr_size
+      end
+      addr = self:map_from_guest(addr)
+
       b.pointer = ffi.cast(char_ptr_t, addr)
       b.physical = self:translate_physical_addr(addr)
-      b.size = data_desc.len
+      b.size = len
 
       -- The total size will be added to the first buffer virtio info
       total_size = total_size + b.size
@@ -180,7 +194,7 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
 
       freelist.add(self.vring_transmit_buffers, b)
 
-      self.txavail = (self.txavail + 1) % 65536
+      self.txavail = band(self.txavail + 1, 65535)
    end
 end
 
@@ -230,20 +244,24 @@ function VirtioNetDevice:transmit_packets_to_vm ()
       end
 
       local iovec = p.iovecs[0]
+      local b
       should_continue, b = self:vm_buffer(iovec)
 
       -- fill in the virtio header
-      local virtio_hdr = b.origin.info.virtio.header_pointer
-      ffi.copy(virtio_hdr, p.info, packet_info_size)
+      do local virtio_hdr = b.origin.info.virtio.header_pointer
+	 ffi.copy(virtio_hdr, p.info, packet_info_size)
+      end
 
-      local used = self.txring.used.ring[self.txused%self.tx_vring_num]
-      local v = b.origin.info.virtio
-      --assert(v.header_id ~= invalid_header_id)
-      used.id = v.header_id
-      used.len = virtio_net_hdr_size + iovec.length
-      self.txused = (self.txused + 1) % 65536
+      do local used = self.txring.used.ring[band(self.txused, self.tx_vring_num-1)]
+	 local v = b.origin.info.virtio
+	 --assert(v.header_id ~= invalid_header_id)
+	 used.id = v.header_id
+	 used.len = virtio_net_hdr_size + iovec.length
+      end
 
       packet.deref(p)
+
+      self.txused = band(self.txused + 1, 65535)
    end
 
    if not should_continue then
@@ -270,11 +288,11 @@ function VirtioNetDevice:return_virtio_buffer (b)
       -- rx_signal_used() is not called. So be sure to free
       -- all of them at one poll.
       if b.origin.info.virtio.header_id ~= invalid_header_id then
-         local used = self.rxring.used.ring[self.rxused % self.rx_vring_num]
+         local used = self.rxring.used.ring[band(self.rxused, self.rx_vring_num-1)]
          used.id = b.origin.info.virtio.header_id
          used.len = b.origin.info.virtio.total_size
 
-         self.rxused = (self.rxused + 1) % 65536
+         self.rxused = band(self.rxused + 1, 65535)
       end
    end
 end
@@ -289,29 +307,28 @@ function VirtioNetDevice:rx_signal_used()
    end
 end
 
+local pagebits = memory.huge_page_bits
+
+-- Cache of the latest referenced physical page.
+local last_virt_page = false
+local last_virt_offset = false
 function VirtioNetDevice:translate_physical_addr (addr)
-   -- Assuming no-IOMMU
-   return memory.virtual_to_physical(addr)
+   local page = bit.rshift(addr, pagebits)
+   if page == last_virt_page then
+      return addr + last_virt_offset
+   end
+   local phys = memory.virtual_to_physical(addr)
+   last_virt_page = page
+   last_virt_offset = phys - addr
+   return phys
 end
 
--- Address space remapping.
-function VirtioNetDevice:map_to_guest (addr)
-   local result = nil
-   for i = 0, table.getn(self.mem_table) do
-      local m = self.mem_table[i]
-      if addr >= m.snabb and addr < m.snabb + m.size then
-         result = addr + m.guest - m.snabb
-         break
-      end
-   end
-   if not result then
-      error("mapping to guest address failed")
-   end
-   return result
-end
-
+local last_guest_page = false
+local last_guest_offset = false
 function VirtioNetDevice:map_from_guest (addr)
-   local result = nil
+   local page = bit.rshift(addr, pagebits)
+   if page == last_guest_page then return addr + last_guest_offset end
+   local result
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
       if addr >= m.guest and addr < m.guest + m.size then
@@ -320,6 +337,8 @@ function VirtioNetDevice:map_from_guest (addr)
             self.mem_table[0] = m
          end
          result = addr + m.snabb - m.guest
+         last_guest_page = page
+         last_guest_offset = m.snabb - m.guest
          break
       end
    end
@@ -353,8 +372,11 @@ function VirtioNetDevice:set_features(features)
 end
 
 function VirtioNetDevice:set_vring_num(idx, num)
-
    local n = tonumber(num)
+   if band(n, n - 1) ~= 0 then
+      error("vring_num should be power of 2")
+   end
+
    if idx == 0 then
       self.tx_vring_num = n
    else

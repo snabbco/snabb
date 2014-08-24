@@ -1,3 +1,4 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
@@ -8,9 +9,9 @@ local ipv6hdr_t = ffi.typeof[[
 	 uint32_t v_tc_fl; // version, tc, flow_label
 	 uint16_t payload_length;
 	 uint8_t  next_header;
-	    uint8_t hop_limit;
-	 char src_ip[16];
-	 char dst_ip[16];
+	 uint8_t hop_limit;
+	 uint8_t src_ip[16];
+	 uint8_t dst_ip[16];
       } __attribute__((packed))
 ]]
 
@@ -43,16 +44,27 @@ ipv6._ulp = {
 
 -- Class methods
 
-function ipv6:_init_new (config)
-   local header = ipv6hdr_t()
-   header.v_tc_fl = C.htonl(0x60000000)
-   ffi.copy(header.src_ip, config.src, 16)
-   ffi.copy(header.dst_ip, config.dst, 16)
-   self._header = header
-   self:traffic_class(config.traffic_class)
-   self:flow_label(config.flow_label)
-   self:next_header(config.next_header)
-   self:hop_limit(config.hop_limit)
+function ipv6:new (config)
+   local o = ipv6:superClass().new(self)
+   if not o._recycled then
+      o._ph = ipv6hdr_pseudo_t()
+   end
+   o:version(6)
+   o:traffic_class(config.traffic_class)
+   o:flow_label(config.flow_label)
+   o:next_header(config.next_header)
+   o:hop_limit(config.hop_limit)
+   o:src(config.src)
+   o:dst(config.dst)
+   return o
+end
+
+function ipv6:new_from_mem(mem, size)
+   local o = ipv6:superClass().new_from_mem(self, mem, size)
+   if not o._recycled then
+      o._ph = ipv6hdr_pseudo_t()
+   end
+   return o
 end
 
 -- XXX should probably use inet_pton(3)
@@ -74,8 +86,9 @@ end
 -- XXX should probably use inet_ntop(3)
 function ipv6:ntop (n)
    local p = {}
-   for i = 0, 7, 1 do
-      table.insert(p, string.format("%x", C.ntohs(n[i])))
+   local n = ffi.cast("uint8_t *", n)
+   for i = 0, 14, 2 do
+      table.insert(p, string.format("%02x%02x", n[i], n[i+1]))
    end
    return table.concat(p, ":")
 end
@@ -83,71 +96,71 @@ end
 -- Instance methods
 
 function ipv6:version (v)
-   return lib.bitfield(32, self._header, 'v_tc_fl', 0, 4, v)
+   return lib.bitfield(32, self:header(), 'v_tc_fl', 0, 4, v)
 end
 
 function ipv6:traffic_class (tc)
-   return lib.bitfield(32, self._header, 'v_tc_fl', 4, 8, tc)
+   return lib.bitfield(32, self:header(), 'v_tc_fl', 4, 8, tc)
 end
 
 function ipv6:dscp (dscp)
-   return lib.bitfield(32, self._header, 'v_tc_fl', 4, 6, dscp)
+   return lib.bitfield(32, self:header(), 'v_tc_fl', 4, 6, dscp)
 end
 
 function ipv6:ecn (ecn)
-   return lib.bitfield(32, self._header, 'v_tc_fl', 10, 2, ecn)
+   return lib.bitfield(32, self:header(), 'v_tc_fl', 10, 2, ecn)
 end
 
 function ipv6:flow_label (fl)
-   return lib.bitfield(32, self._header, 'v_tc_fl', 12, 20, fl)
+   return lib.bitfield(32, self:header(), 'v_tc_fl', 12, 20, fl)
 end
 
 function ipv6:payload_length (length)
    if length ~= nil then
-      self._header.payload_length = C.htons(length)
+      self:header().payload_length = C.htons(length)
    else
-      return(C.ntohs(self._header.payload_length))
+      return(C.ntohs(self:header().payload_length))
    end
 end
 
 function ipv6:next_header (nh)
    if nh ~= nil then
-      self._header.next_header = nh
+      self:header().next_header = nh
    else
-      return(self._header.next_header)
+      return(self:header().next_header)
    end
 end
 
 function ipv6:hop_limit (limit)
    if limit ~= nil then
-      self._header.hop_limit = limit
+      self:header().hop_limit = limit
    else
-      return(self._header.hop_limit)
+      return(self:header().hop_limit)
    end
 end
 
 function ipv6:src (ip)
    if ip ~= nil then
-      ffi.copy(self._header.src_ip, ip, 16)
+      ffi.copy(self:header().src_ip, ip, 16)
    else
-      return self._header.src_ip
+      return self:header().src_ip
    end
 end
 
 function ipv6:src_eq (ip)
-   return C.memcmp(ip, self._header.src_ip, 16) == 0
+   return C.memcmp(ip, self:header().src_ip, 16) == 0
 end
 
 function ipv6:dst (ip)
    if ip ~= nil then
-      ffi.copy(self._header.dst_ip, ip, 16)
+      ffi.copy(self:header().dst_ip, ip, 16)
    else
-      return self._header.dst_ip
+      return self:header().dst_ip
    end
 end
 
 function ipv6:dst_eq (ip)
-   return C.memcmp(ip, self._header.dst_ip, 16) == 0
+   return C.memcmp(ip, self:header().dst_ip, 16) == 0
 end
 
 -- Return a pseudo header for checksum calculation in a upper-layer
@@ -156,8 +169,9 @@ end
 -- protocol.  They differ from the respective values of the ipv6
 -- header if extension headers are present.
 function ipv6:pseudo_header (plen, nh)
-   local ph = ipv6hdr_pseudo_t()
-   local h = self._header
+   local ph = self._ph
+   ffi.fill(ph, ffi.sizeof(ph))
+   local h = self:header()
    ffi.copy(ph, h.src_ip, 32)  -- Copy source and destination
    ph.ulp_length = C.htons(plen)
    ph.next_header = nh

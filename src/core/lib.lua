@@ -255,7 +255,7 @@ function update_csum (ptr, len,  csum0)
    for i = 0, len-2, 2 do
       sum = sum + bit.lshift(ptr[i], 8) + ptr[i+1]
    end
-   if len % 2 == 1 then sum = sum + bit.lshift(ptr[len-1]) end
+   if len % 2 == 1 then sum = sum + bit.lshift(ptr[len-1], 1) end
    return sum
 end
 
@@ -266,12 +266,16 @@ function finish_csum (sum)
    return bit.band(bit.bnot(sum), 0xffff)
 end
 
-function malloc (type)
-   local ffi_type = ffi.typeof(type)
-   local size = ffi.sizeof(ffi_type)
-   local ptr = C.malloc(size)
-   return ffi.cast(ffi.typeof("$*", ffi_type), ptr)
+
+function malloc (etype)
+   if type(etype) == 'string' then
+      etype = ffi.typeof(etype)
+   end
+   local size = ffi.sizeof(etype)
+   local ptr = memory.malloc(size)
+   return ffi.cast(ffi.typeof("$*", etype), ptr)
 end
+
 
 -- deepcopy from http://lua-users.org/wiki/CopyTable
 -- with naive ctype support

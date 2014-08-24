@@ -1,0 +1,84 @@
+#!/usr/bin/env snabb
+
+local ffi      = require("ffi")
+local C        = ffi.C
+local watchdog = require("lib.watchdog.watchdog")
+
+test = {}
+
+test["ualert"] = function ()
+   watchdog.set(400)
+   watchdog.reset()
+   print("Set timeout, now sleeping...")
+
+   C.usleep(300000)
+   print("Resetting watchdog.")
+   watchdog.reset()
+
+   C.usleep(300000)
+   print("Exit normally.")
+end
+
+test["ualert_stop"] = function ()
+   watchdog.set(400)
+   watchdog.reset()
+   print("Set timeout, now sleeping...")
+
+   C.usleep(300000)
+   print("Stopping watchdog.")
+   watchdog.stop()
+
+   C.usleep(300000)
+   print("Exit normally.")
+end
+
+test["ualert_timeout"] = function ()
+   watchdog.set(400)
+   watchdog.reset()
+   print("Set timeout, now sleeping until watchdog times out.")
+
+   C.usleep(800000)
+   print("Error: SIGABRT not received.")
+end
+
+test["alert"] = function ()
+   watchdog.set(2000)
+   watchdog.reset()
+   print("Set timeout, now sleeping...")
+
+   C.sleep(1)
+   print("Resetting watchdog.")
+   watchdog.reset()
+
+   C.sleep(1)
+   print("Exit normally.")
+end
+
+test["alert_stop"] = function ()
+   watchdog.set(2000)
+   watchdog.reset()
+   print("Set timeout, now sleeping...")
+
+   C.sleep(1)
+   print("Stopping watchdog.")
+   watchdog.stop()
+
+   C.sleep(1)
+   print("Exit normally.")
+end
+
+test["alert_timeout"] = function ()
+   watchdog.set(2000)
+   watchdog.reset()
+   print("Set timeout, now sleeping until watchdog times out.")
+
+   C.sleep(800000)
+   print("Error: SIGABRT not received.")
+end
+
+function run (testcase)
+   print("[testing "..testcase.."]")
+   test[testcase]()
+end
+
+run(unpack(main.parameters))

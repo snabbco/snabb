@@ -10,6 +10,8 @@ local buffer = require("core.buffer")
 local intel10g = require("apps.intel.intel10g")
 local memory = require("core.memory")
 local register = require("lib.hardware.register")
+local receive, empty = link.receive, link.empty
+local can_transmit, transmit
 
 LoadGen = {}
 
@@ -20,6 +22,7 @@ function LoadGen:new (pciaddress)
    o.dev:wait_linkup()
    disable_tx_descriptor_writeback(o.dev)
    zero_descriptors(o.dev)
+   can_transmit, transmit = o.dev.can_transmit, o.dev.transmit
    return setmetatable(o, {__index = LoadGen})
 end
 
@@ -45,9 +48,10 @@ end
 
 function LoadGen:push ()
    if self.input.input then
-      while not link.empty(self.input.input) and self.dev:can_transmit() do
-         local p = link.receive(self.input.input)
-         self.dev:transmit(p)
+      while not link.empty(self.input.input) and can_transmit(self.dev) do
+         do local p = receive(self.input.input)
+	    transmit(self.dev, p)
+	 end
       end
    end
 end

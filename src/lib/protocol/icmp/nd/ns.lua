@@ -1,3 +1,4 @@
+module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local nd_header = require("lib.protocol.icmp.nd.header")
@@ -19,22 +20,23 @@ ns._ulp = { method = nil }
 
 -- Class methods
 
-function ns:_init_new (target)
-   self._header = ns_t()
-   ffi.copy(self._header.target, target, 16)
+function ns:new (target)
+   local o = ns:superClass().new(self)
+   o:target(target)
+   return o
 end
 
 -- Instance methods
 
 function ns:target (target)
    if target ~= nil then
-      ffi.copy(self._header.target, target, 16)
+      ffi.copy(self:header().target, target, 16)
    end
-   return self._header.target
+   return self:header().target
 end
 
 function ns:target_eq (target)
-   return C.memcmp(target, self._header.target, 16) == 0
+   return C.memcmp(target, self:header().target, 16) == 0
 end
 
 return ns

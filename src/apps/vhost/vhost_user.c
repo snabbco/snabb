@@ -17,6 +17,8 @@
                             + MEMB_SIZE(struct vhost_user_msg,flags) \
                             + MEMB_SIZE(struct vhost_user_msg,size))
 
+#define VHOST_USER_LISTEN   1
+
 int vhost_user_connect(const char *path)
 {
     int sock;
@@ -35,6 +37,31 @@ int vhost_user_connect(const char *path)
         return -1;
     }
 
+    return sock;
+}
+
+int vhost_user_listen(const char *path)
+{
+    int sock;
+    struct sockaddr_un un;
+
+    if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        return -1;
+    }
+
+    un.sun_family = AF_UNIX;
+    strncpy(un.sun_path, path, sizeof(un.sun_path));
+    unlink(un.sun_path);
+    if (bind(sock, (struct sockaddr *) &un, sizeof(un)) == -1) {
+        close(sock);
+        return -1;
+    }
+
+    if (listen(sock, VHOST_USER_LISTEN) == -1) {
+        close(sock);
+        return -1;
+    }
     return sock;
 }
 

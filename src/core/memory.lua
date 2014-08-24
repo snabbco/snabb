@@ -10,8 +10,9 @@ require("core.memory_h")
 -- hook variables
 
 dma_alloc = nil         -- (size) => ram_ptr, io_address
-allocate_RAM = nil      -- (size) => ram_ptr
+allocate_RAM_chunk = nil  -- (size) => ram_ptr
 ram_to_io_addr = nil    -- (ram_ptr) => io_address
+malloc = nil
 
 --- ### Serve small allocations from hugepage "chunks"
 
@@ -39,7 +40,7 @@ end
 
 -- Add a new chunk.
 function allocate_next_chunk ()
-   local ptr = assert(allocate_RAM(huge_page_size), "Couldn't allocate a chunk of ram")
+   local ptr = assert(allocate_RAM_chunk(huge_page_size), "Couldn't allocate a chunk of ram")
    local mem_phy = assert(ram_to_io_addr(ptr, huge_page_size), "Couln't map a chunk of ram to IO address")
    chunks[#chunks + 1] = { pointer = ffi.cast("char*", ptr),
                            physical = mem_phy,
@@ -81,27 +82,22 @@ function get_huge_page_size ()
 end
 
 base_page_size = 4096
+-- Huge page size in bytes
 huge_page_size = get_huge_page_size()
+-- Address bits per huge page (2MB = 21 bits; 1GB = 30 bits)
+huge_page_bits = math.log(huge_page_size, 2)
 
 --- ### Physical address translation
 
--- Convert from virtual address (pointer) to physical address (uint64_t).
--- Use local caching of virtual to physical page translation. This will work
--- only if the mlockall was called.
-local virt_page_cache = {}
 function virtual_to_physical (virt_addr)
    virt_addr = ffi.cast("uint64_t", virt_addr)
    local virt_page = tonumber(virt_addr / base_page_size)
-   local phys_page = virt_page_cache[virt_page]
-   if not phys_page then
-      phys_page = C.phys_page(virt_page) * base_page_size
-      virt_page_cache[virt_page] = phys_page
-   end
+   local phys_page = C.phys_page(virt_page) * base_page_size
    if phys_page == 0 then
       error("Failed to resolve physical address of "..tostring(virt_addr))
    end
-   --assert(phys_page == C.phys_page(virt_page))
-   return ffi.cast("uint64_t", phys_page + virt_addr % base_page_size)
+   local phys_addr = ffi.cast("uint64_t", phys_page + virt_addr % base_page_size)
+   return phys_addr
 end
 
 --- ### selftest
@@ -139,13 +135,19 @@ end
 
 function set_default_allocator ()
     if use_hugetlb and huge_page_size and lib.can_write("/proc/sys/vm/nr_hugepages") then
-        allocate_RAM = function(size)
+        allocate_RAM_chunk = function(size)
             for i =1, 3 do
                 local page = C.allocate_huge_page(size)
                 if page ~= nil then return page else reserve_new_page() end
             end
         end
+	malloc = dma_alloc
     else
-        allocate_RAM = C.malloc
+        allocate_RAM_chunk = C.malloc
+	malloc = C.malloc
     end
 end
+
+
+require("lib.hardware.bus").set_memory_allocator()
+

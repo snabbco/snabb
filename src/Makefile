@@ -31,29 +31,31 @@ TESTMODS = $(shell find . -regex '[^\#]*\.lua' -printf '%P ' | \
              xargs grep -l '^function selftest *[[:punct:]]' | \
              sed -e 's_\.lua__' -e 's_/_._g')
 
+# TESTSCRIPTS expands to:
+#   lib/watchdog/selftest.sh ...
+# for each executable selftext.sh script in src.
+TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
+
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
 all: snabb
-
-install: snabb
-	cp snabb /usr/local/bin/
 
 markdown: $(RMOBJS)
 
 snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 	$(E) "LINK      $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -Werror -Wall -o $@ $^ \
+	$(Q) gcc $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt -lpthread
 	@echo -n "Firmware: "
 	@ln -fs snabb snabbswitch
 	@ls -sh snabb
 
-test: $(TESTMODS)
+test: $(TESTMODS) $(TESTSCRIPTS)
 
 test_ci: FAIL_ON_FIRST="true"
 
-test_ci: $(TESTMODS)
+test_ci: $(TESTMODS) $(TESTSCRIPTS)
 
 $(TESTMODS): testlog snabb
 	$(E) "TEST      $@"
@@ -67,6 +69,23 @@ $(TESTMODS): testlog snabb
 		|| ( \
 			echo "ERROR     testlog/$@"; \
 			echo "EXITCODE: $$EXITCODE" >> testlog/$@; \
+			if [ -n "$(FAIL_ON_FIRST)" ]; then exit $$EXITCODE; fi;\
+		) \
+	)
+
+testlog = testlog/$(shell echo "$(@)" | sed -e 's_/_._g')
+$(TESTSCRIPTS): testlog snabb
+	$(E) "TEST      $@"
+	$(Q) ./$@ > $(testlog) || ( \
+		EXITCODE="$$?"; \
+		[ "$$EXITCODE" -eq $(TEST_SKIPPED) ] \
+		&& ( \
+			echo "SKIPPED   $(testlog)"; \
+			echo "EXITCODE: $$EXITCODE" >> $(testlog); \
+		) \
+		|| ( \
+			echo "ERROR     $(testlog)"; \
+			echo "EXITCODE: $$EXITCODE" >> $(testlog); \
 			if [ -n "$(FAIL_ON_FIRST)" ]; then exit $$EXITCODE; fi;\
 		) \
 	)
