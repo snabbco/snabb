@@ -83,8 +83,10 @@ function run (npackets)
 
    local send_device = sf_devices[1]
    local receive_device = sf_devices[2]
-
-   print("Sending through " .. send_device.interface .. ", receiving through " .. receive_device.interface)
+   
+   print(string.format("Sending through %s (%s), receiving through %s (%s)",
+                       send_device.interface, send_device.pciaddress,
+                       receive_device.interface, receive_device.pciaddress))
 
    local c = config.new()
 
