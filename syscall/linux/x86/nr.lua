@@ -342,6 +342,14 @@ local nr = {
   setns		  = 346,
   process_vm_readv = 347,
   process_vm_writev = 348,
+  kcmp            = 349,
+  finit_module    = 350,
+  sched_setattr   = 351,
+  sched_getattr   = 352,
+  renameat2       = 353,
+  seccomp         = 354,
+  getrandom       = 355,
+  memfd_create    = 356,
 }
 }
 

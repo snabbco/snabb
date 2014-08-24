@@ -332,6 +332,17 @@ if abi.arch == "ppc" then
   c.IOCTL.TCSETSW = nil
 end
 
+-- new syscalls not in headers yet
+SYS.kcmp = nil
+SYS.finit_module = nil
+SYS.sched_setattr = nil
+SYS.sched_getattr = nil
+SYS.renameat2 = nil
+SYS.seccomp = nil
+SYS.getrandom = nil
+SYS.memfd_create = nil
+SYS.kexec_file_load = nil
+
 if abi.arch == "mips" then
   c.RLIM.INFINITY = nil -- incorrect in all but very recent glibc
 end

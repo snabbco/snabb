@@ -314,6 +314,15 @@ local nr = {
   getcpu       = 309,
   process_vm_readv = 310,
   process_vm_writev = 311,
+  kcmp         = 312,
+  finit_module = 313,
+  sched_setattr= 314,
+  sched_getattr= 315,
+  renameat2    = 316,
+  seccomp      = 317,
+  getrandom    = 318,
+  memfd_create = 319,
+  kexec_file_load = 320,
 }
 }
 
