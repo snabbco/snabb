@@ -333,6 +333,14 @@ test.misc_linux = {
     assert(sv1:close())
     assert(sv2:close())
   end,
+  test_getrandom = function()
+    if not S.getrandom then error "skipped" end
+    local buf = t.buffer(64)
+    local count, err = S.getrandom(buf, 64, "nonblock")
+    if not count then if err.NOSYS or err.AGAIN then error "skipped" end end
+    assert(count, err)
+    assert_equal(count, 64)
+  end,
 }
 
 test.sendfile = {
