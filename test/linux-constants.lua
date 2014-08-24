@@ -190,6 +190,17 @@ local function fixup_constants(abi, c)
      c.SYS._newselect, c.SYS.select = c.SYS.select, nil -- now called _newselect
   end
 
+  -- new syscalls not in headers yet
+  c.SYS.kcmp = nil
+  c.SYS.finit_module = nil
+  c.SYS.sched_setattr = nil
+  c.SYS.sched_getattr = nil
+  c.SYS.renameat2 = nil
+  c.SYS.seccomp = nil
+  c.SYS.getrandom = nil
+  c.SYS.memfd_create = nil
+  c.SYS.kexec_file_load = nil
+
   return c
 end
 
