@@ -26,6 +26,8 @@ end
 function Intel82599:new (args)
    args = config.parse_app_arg(args)
 
+   unbind_device_from_linux(args.pciaddr)
+
    if args.vmdq then
       if devices[args.pciaddr] == nil then
          devices[args.pciaddr] = {pf=intel10g.new_pf(args.pciaddr):open(), vflist={}}
