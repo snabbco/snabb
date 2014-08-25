@@ -785,7 +785,7 @@ PFVFTE    0x08110 +0x04*0..1    RW PF VF Transmit Enable
 MTA       0x05200 +0x04*0..127  RW Multicast Table Array
 RAL       0x0A200 +0x08*0..127  RW Receive Address Low
 RAH       0x0A204 +0x08*0..127  RW Receive Address High
-MPSAR     0x0A600 +0x04*0..127  RW MAC Pool Select Array
+MPSAR     0x0A600 +0x04*0..255  RW MAC Pool Select Array
 VFTA      0x0A000 +0x04*0..127  RW VLAN Filter Table Array
 MTQC      0x08120 -             RW Multiple Transmit Queues Command Register
 MRQC      0x0EC80 -             RW Multiple Receive Queues Command Register
