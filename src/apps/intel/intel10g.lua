@@ -430,6 +430,7 @@ local M_vf = {}; M_vf.__index = M_vf
 
 -- it's the PF who creates a VF
 function M_pf:new_vf (poolnum)
+   assert(poolnum < 64, "Pool overflow: Intel 82599 can only have up to 64 virtualized devices.")
    local txqn = poolnum*2
    local rxqn = poolnum*2
    local vf = {
