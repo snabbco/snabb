@@ -335,10 +335,8 @@ local function generateConformFunctionString(rules)
    local T = make_code_concatter()
    T"local ffi = require(\"ffi\")"
    T"local bit = require(\"bit\")"
-   T"local jit = require(\"jit\")"
    T"return function(buffer, size)"
    T:indent()
-   T"jit.off(true,true)"
 
    for i = 1, #rules do
       if rules[i].ethertype == "ipv4" then
