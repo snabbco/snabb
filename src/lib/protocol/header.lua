@@ -144,11 +144,11 @@ end
 -- Instance methods
 
 function header:header ()
-   return self._header[0][0]
+   return (self._header[0][0])
 end
 
 function header:sizeof ()
-   return ffi.sizeof(self._header_type)
+   return (ffi.sizeof(self._header_type))
 end
 
 -- default equality method, can be overriden in the ancestors
