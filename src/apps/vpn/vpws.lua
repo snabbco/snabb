@@ -28,17 +28,26 @@ function vpws:new(config)
    o._config = config
    o._name = config.name
    o._encap = {
-      ether = ethernet:new({ src = config.local_mac, dst = config.remote_mac, type = 0x86dd }),
       ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = config.local_vpn_ip,
 			 dst = config.remote_vpn_ip}),
       gre   = gre:new({ protocol = 0x6558, checksum = config.checksum, key = config.label })
    }
+   if config.remote_mac then
+      -- If the MAC address of the peer is not set, we assume that
+      -- some form of dynamic neighbor discovery is in effect
+      -- (e.g. through the nd_light app), which adds the ethernet header
+      -- separately
+      o._encap.ether = ethernet:new({ src = config.local_mac, dst = config.remote_mac,
+				      type = 0x86dd })
+   end
    -- Pre-computed size of combined Ethernet and IPv6 header
    o._eth_ipv6_size = ethernet:sizeof() + ipv6:sizeof()
    local program = "ip6 and dst host "..ipv6:ntop(config.local_vpn_ip) .." and ip6 proto 47"
    local filter, errmsg = filter:new(program)
    assert(filter, errmsg and ffi.string(errmsg))
    o._filter = filter
+   o._dgram = datagram:new()
+   packet.deref(o._dgram:packet())
    return o
 end
 
@@ -49,7 +58,7 @@ function vpws:push()
       assert(l_out)
       while not link.full(l_out) and not link.empty(l_in) do
 	 local p = link.receive(l_in)
-	 local datagram = datagram:new(p, ethernet)
+	 local datagram = self._dgram:reuse(p, ethernet)
 	 if port_in == 'customer' then
 	    local encap = self._encap
 	    -- Encapsulate Ethernet frame coming in on customer port
@@ -60,9 +69,11 @@ function vpws:push()
 	       encap.gre:checksum(datagram:payload())
 	    end
 	    -- Copy the finished headers into the packet
-	    datagram:push(encap.ether)
-	    datagram:push(encap.ipv6)
 	    datagram:push(encap.gre)
+	    datagram:push(encap.ipv6)
+	    if encap.ether then
+	       datagram:push(encap.ether)
+	    end
 	 else
 	    -- Check for encapsulated frame coming in on uplink
 	    if self._filter:match(datagram:payload()) then
@@ -101,7 +112,6 @@ function vpws:push()
 	    end
 	 end
 	 if p then link.transmit(l_out, p) end
-	 datagram:free()
       end
    end
 end

@@ -43,11 +43,11 @@ function RawSocket.selftest ()
    local src = ethernet:pton("00:00:00:00:00:01")
    local dst = ethernet:pton("00:00:00:00:00:02")
    local localhost = ipv6:pton("0:0:0:0:0:0:0:1")
-   dg_tx:push(ethernet:new({src = src, dst = dst, type = 0x86dd}))
    dg_tx:push(ipv6:new({src = localhost,
 			dst = localhost,
 			next_header = 59, -- no next header
 			hop_limit = 1}))
+   dg_tx:push(ethernet:new({src = src, dst = dst, type = 0x86dd}))
 
    local link = require("core.link")
    local lo = RawSocket:new("lo")
