@@ -91,7 +91,7 @@ end
 -- Return the packet filter expression.
 -- XXX This is assumed to be ingress-only. Egress is simply NYI.
 function filter (port, secbindings, secrules)
-   local rules
+   local rules = ''
    if secbindings[port.id] then
       for _,r in ipairs(secrules[secbindings[port.id].security_group_id]) do
          if r.direction:lower() == "ingress" then
@@ -102,13 +102,13 @@ function filter (port, secbindings, secrules)
             if r.port_range_min ~= NULL and r.port_range_max ~= NULL then
                rule = rule .. " dest_port_min=" .. r.port_range_min .. ", dest_port_max=" .. r.port_range_max..","
             end
-            if r.remote_ip_prefix ~= NULL then rule = rule .. " source_cidr='"..rule.remote_ip_prefix.."'," end
+            if r.remote_ip_prefix ~= NULL then rule = rule .. " source_cidr='"..r.remote_ip_prefix.."'," end
             print("direction", r.direction)
-            rules = "{" .. rule .. " },"
+            rules = rules .. "{" .. rule .. " },"
          end
       end
    end
-   if rules then return "[[{ " .. rules .. " }]]" else return nil end
+   if #rules > 0 then return "[[{ " .. rules .. " }]]" else return nil end
 end
 
 -- Return the L2TPv3 tunnel expresion.
