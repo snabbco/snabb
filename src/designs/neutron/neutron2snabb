@@ -80,6 +80,23 @@ function create_config (input_dir, output_dir, hostname)
             port_count = port_count + 1
          end
       end
+      if port.admin_state_up ~= '0' then
+         local vlan = segment.segmentation_id
+         local mac = port.mac_address
+         local ingressfilter = filter(port, secbindings, secrules, 'ingress')
+         local egressfilter =  filter(port, secbindings, secrules, 'egress')
+         local gbps, tunnel = qos(port, qoses, qos_policies, portqosmappings)
+         outputs[physical]:write((
+[[  { vlan = %d,
+    mac_address = "%s",
+    port_id = "%s",
+    ingress_filter = %s,
+    egress_filter = %s,
+    gbps = %s,
+    tunnel = %s
+},]]):format(vlan, mac, port.id, ingressfilter, egressfilter, gbps, tunnel))
+      end
+      port_count = port_count + 1
    end
    for _, file in pairs(outputs) do
       file:write("}\n")
@@ -90,11 +107,12 @@ end
 
 -- Return the packet filter expression.
 -- XXX This is assumed to be ingress-only. Egress is simply NYI.
-function filter (port, secbindings, secrules)
+function filter (port, secbindings, secrules, direction)
    local rules = ''
+   direction = direction:lower()
    if secbindings[port.id] then
       for _,r in ipairs(secrules[secbindings[port.id].security_group_id]) do
-         if r.direction:lower() == "ingress" then
+         if r.direction:lower() == direction then
             local NULL = "\\N" -- SQL null
             local rule = ""
             if r.ethertype ~= NULL then rule = rule .. " ethertype='"..(r.ethertype:lower()).."'," end
@@ -164,8 +182,8 @@ end
 -- Return an array of line's tab-delimited tokens.
 function splitline (line)
    local words = {}
-   for w in (line .. "\t"):gmatch("([^\t]*)\t") do 
-      table.insert(words, w) 
+   for w in (line .. "\t"):gmatch("([^\t]*)\t") do
+      table.insert(words, w)
    end
    return words
 end
