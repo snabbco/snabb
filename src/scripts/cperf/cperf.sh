@@ -158,7 +158,7 @@ function plot_mode {
 function check_mode {
 
     # Print header.
-    echo "Comparing with SAMPLESIZE=$SAMPLESIZE)"
+    echo "Comparing with SAMPLESIZE=$SAMPLESIZE"
     echo "(benchmark, abbrev. sha1 sum, mean score, standard deviation)"
 
     # Iterate over benchmarks.
