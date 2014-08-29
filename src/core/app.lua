@@ -49,8 +49,8 @@ function equal (x, y)
       for k, v in pairs(x) do
          if not equal(v, y[k]) then return false end
       end
-      for k, _ in pairs(x) do
-         if y[k] == nil then return false end
+      for k, _ in pairs(y) do
+         if x[k] == nil then return false end
       end
       return true
    else
@@ -277,6 +277,10 @@ function selftest ()
    configure(config.new())
    assert(#app_array == 0)
    assert(#link_array == 0)
+   print("Testing equal")
+   assert(true == equal({foo="bar"}, {foo="bar"}))
+   assert(false == equal({foo="bar"}, {foo="bar", baz="foo"}))
+   assert(false == equal({foo="bar", baz="foo"}, {foo="bar"}))
    print("OK")
 end
 
