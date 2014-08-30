@@ -199,9 +199,23 @@ function tenure (p)
 end
 
 -- Free a packet and all of its buffers.
+
+local function free_aux(p, i)
+   buffer.free(p.iovecs[i].buffer)
+end
+
 function free (p)
-   for i = 0, p.niovecs-1 do
-      buffer.free(p.iovecs[i].buffer)
+   local niovecs = p.niovecs
+   if niovecs > 0 then
+      free_aux(p, 0)
+   end
+   if niovecs > 1 then
+      free_aux(p, 1)
+   end
+   if niovecs > 2 then
+      for i = 2, p.niovecs-1 do
+	 free_aux(p, i)
+      end
    end
    p.length         = 0
    p.niovecs        = 0

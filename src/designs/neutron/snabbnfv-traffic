@@ -1,15 +1,8 @@
 #!/usr/bin/env snabb
 
-local Intel82599 = require("apps.intel.intel_app").Intel82599
-local VhostUser = require("apps.vhost.vhost_user").VhostUser
-local PacketFilter = require("apps.packet_filter.packet_filter").PacketFilter
-local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
-local L2TPv3 = {}
-local ns_responder = require("apps.ipv6.ns_responder")
 local ffi = require("ffi")
 local C = ffi.C
-local AF_INET6 = 10
-local lib = require("core.lib")
+local config = require("lib.nfv.config")
 
 if #main.parameters ~= 3 then
    print([[Usage: snabbnfv-traffic <pci-address> <config-file> <socket-path>
@@ -20,91 +13,15 @@ end
 
 function run (pciaddr, confpath, sockpath)
    local mtime = 0
-   load_config(confpath, pciaddr, sockpath)
    while true do
       local mtime2 = C.stat_mtime(confpath)
       if mtime2 ~= mtime then
          print("Loading " .. confpath)
-         load_config(confpath, pciaddr, sockpath)
+         config.apply(config.load(confpath, pciaddr, sockpath))
          mtime = mtime2
       end
       engine.main({duration=1})
       engine.report()
-   end
-end
-
-function load_config (file, pciaddr, sockpath)
-   local ports = dofile(file)
-   local c = config.new()
-   local zerocopy = {} -- {NIC->Virtio} app names to zerocopy link
-   for _,t in ipairs(ports) do
-      local vlan, mac_address, port_id = t.vlan, t.mac_address, t.port_id
-      local name = port_id:gsub("-", "_")
-      local NIC = "NIC_"..name
-      local Virtio = "Virtio_"..name
-      config.app(c, NIC, Intel82599,
-		 ([[{pciaddr = '%s',
-		     vmdq=true,
-		     mirror={},
-		     macaddr = '%s',
-		     vlan=%d}]]):format(pciaddr, mac_address, vlan))
-      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(port_id)})
-      local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
-      if t.ingress_filter then
-         local Filter = "Filter_"..name
-         config.app(c, Filter, PacketFilter, t.ingress_filter)
-         config.link(c, Filter..".tx -> " .. VM_rx)
-         VM_rx = Filter..".rx"
-      end
-      if t.tunnel and t.tunnel.type == "L2TPv3" --and
---         t.tunnel_remote_ip and t.tunnel.remote_mac and
---         t.tunnel.local_ip and t.tunnel.local_mac and
---         t.tunnel.cookie and t.tunnel.session
-      then
-         local Tunnel = "Tunnel_"..name
-         local conf = (([[{eth_dst  = %q,
-                              eth_src  = "%q,
-                              ipv6_dst = %q,
-                              ipv6_src = %q,
-                              session  = %q,
-                              cookie   = %q}]])
-                       :format(t.tunnel.remote_mac, t.tunnel.local_mac,
-                               t.tunnel.remote_ip, t.tunnel.local_ip,
-                               t.tunnel.session, t.tunnel.cookie))
-         config.app(c, Tunnel, L2TPv3, conf)
-         -- Setup an IPv6 neighbor solicitation responder.
-         -- This will talk to our local gateway.
-         local NS = "NS_"..name
-         local local_ip = ffi.new("char[16]")
-         C.inet_pton(AF_INET6, t.tunnel.local_ip, local_ip)
-         local local_mac = lib.hexundump(t.tunnel.local_mac, 6)
-         config.app(c, NS, ns_responder, {local_ip=ffi.string(local_ip, 16),
-                                          local_mac=local_mac})
-         -- VM -> Tunnel -> Network
-         config.link(c, VM_tx.." -> "..Tunnel..".decap")
-         -- Network -> ns_responder -> Tunnel -> VM
-         config.link(c, NS..".north -> "..Tunnel..".encap")
-         config.link(c, Tunnel..".decap -> "..VM_rx)
-         VM_rx, VM_tx = NS..".south", Tunnel..".encap"
-      end
-      if t.gbps then
-         local QoS = "QoS_"..name
-         local rate = t.gbps * 1000000 / 8
-         config.app(c, QoS, RateLimiter, ([[{rate = %d, bucket_capacity = %d}]]):format(rate, rate))
-         config.link(c, VM_tx.." -> "..QoS..".rx")
-         VM_tx = QoS..".tx"
-      end
-      config.link(c, NIC..".tx -> "..VM_rx)
-      config.link(c, VM_tx.." -> "..NIC..".rx")
-      zerocopy[NIC] = Virtio
-   end
-   print(config.graphviz(c))
-   main.exit(0)
-   engine.configure(c)
-   for nic, virtio in pairs(zerocopy) do
-      local n = engine.app_table[nic]
-      local v = engine.app_table[virtio]
-      n:set_rx_buffer_freelist(v:rx_buffers())
    end
 end
 

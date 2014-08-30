@@ -93,6 +93,15 @@ function ipv6:ntop (n)
    return table.concat(p, ":")
 end
 
+-- Construct the solicited-node multicast address from the given
+-- unicast address by appending the last 24 bits to ff02::1:ff00:0/104
+function ipv6:solicited_node_mcast (n)
+   local n = ffi.cast("uint8_t *", n)
+   local result = self:pton("ff02:0:0:0:0:1:ff00:0")
+   ffi.copy(ffi.cast("uint8_t *", result)+13, n+13, 3)
+   return result
+end
+
 -- Instance methods
 
 function ipv6:version (v)

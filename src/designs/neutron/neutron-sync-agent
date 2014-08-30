@@ -14,7 +14,7 @@ function error() {
 [ ! -z "$SYNC_PATH" ]        || error "check_env_vars: \$SYNC_PATH not set"
 [ ! -z "$SYNC_HOST" ]        || error "check_env_vars: \$SYNC_HOST not set"
 #[ ! -z "$SYNC_LISTEN_PORT" ] || error "check_env_vars: \$SYNC_LISTEN_PORT not set"
-[ ! -z "$SYNC_INTERVAL" ]    || error "check_env_vars: \$SYNC_INTERVAL not set"
+[ ! -z "$SYNC_INTERVAL" ]    || export SYNC_INTERVAL=1
 
 # Remove old repository if it exists
 if [ -d $NEUTRON_DIR ]; then
@@ -33,10 +33,10 @@ while true; do
     cd $NEUTRON_DIR
     git fetch
     if ! git diff --quiet origin/master; then
-	git merge --ff origin/master
+	git pull --rebase origin master
 	echo "Generating new configuration"
 	$NEUTRON2SNABB $NEUTRON_DIR $SNABB_DIR
     fi
-    sleep 3
+    sleep $SYNC_INTERVAL
 done
 

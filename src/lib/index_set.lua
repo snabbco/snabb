@@ -15,10 +15,10 @@ end
 -- if new, returns a new index and true
 -- if it already existed, returns given index and false
 function NDX_mt:add (v)
-   assert(self.__nxt < self.__max, self.__name.." overflow")
    if self[v] then
       return self[v], false
    end
+   assert(self.__nxt < self.__max, self.__name.." overflow")
    self[v] = self.__nxt
    self.__nxt = self.__nxt + 1
    return self[v],true

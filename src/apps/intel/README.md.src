@@ -18,6 +18,16 @@ put on the `output` port.
 
 `Intel10G` can transmit + receive at approximately 10 Mpps / core.
 
+### Hardware limits
+
+Each physical `Intel10G` port supports up to:
+
+* 64 *pools* (virtualized `Intel10G` app instances, e.g. apps per PCI
+  address)
+* 127 MAC addresses (see the `macaddr` configuration option)
+* 64 VLANs (see the `vlan` configuration option)
+* 4 *mirror pools* (see the `mirror` configuration option)
+
 ## `LoadGen` app: Load generation by repeating transmit
 
     DIAGRAM: LoadGen

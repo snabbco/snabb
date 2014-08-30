@@ -75,20 +75,21 @@ function records (filename)
       local packet = file:read(datalen)
       local extra = nil
       if record.incl_len == #packet + ffi.sizeof("struct pcap_record_extra") then
-	 extra = readc(file, "struct pcap_record_extra")
+         extra = readc(file, "struct pcap_record_extra")
       end
       return packet, record, extra
    end
    return pcap_records_it, true, true
 end
 
--- Read a C object of TYPE from FILE. Return a pointer to the result.
+-- Read a C object of TYPE from FILE
 function readc(file, type)
    local string = file:read(ffi.sizeof(type))
    if string == nil then return nil end
    if #string ~= ffi.sizeof(type) then
       error("short read of " .. type .. " from " .. tostring(file))
    end
-   return ffi.cast(type.."*", string)
+   local obj = ffi.new(type)
+   ffi.copy(obj, string)
+   return obj
 end
-

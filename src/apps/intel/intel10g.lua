@@ -173,14 +173,27 @@ end
 local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21}
 local txdesc_flags_last = bits({eop=24}, txdesc_flags)
 
+local function transmit_aux (self, p, i, niovecs)
+   local iov = p.iovecs[i]
+   local flags = (i + 1 < niovecs) and txdesc_flags or txdesc_flags_last
+   self.txdesc[self.tdt].address = iov.buffer.physical + iov.offset
+   self.txdesc[self.tdt].options = bor(iov.length, flags, lshift(p.length+0ULL, 46))
+   self.txpackets[self.tdt] = packet_ref(p)
+   self.tdt = band(self.tdt + 1, num_descriptors - 1)
+end
+
 function M_sf:transmit (p)
-   for i = 0, p.niovecs - 1 do
-      local iov = p.iovecs[i]
-      local flags = (i + 1 < p.niovecs) and txdesc_flags or txdesc_flags_last
-      self.txdesc[self.tdt].address = iov.buffer.physical + iov.offset
-      self.txdesc[self.tdt].options = bor(iov.length, flags, lshift(p.length+0ULL, 46))
-      self.txpackets[self.tdt] = packet_ref(p)
-      self.tdt = band(self.tdt + 1, num_descriptors - 1)
+   local niovecs = p.niovecs
+   if niovecs > 0 then
+      transmit_aux(self, p, 0, niovecs)
+   end
+   if niovecs > 1 then
+      transmit_aux(self, p, 1, niovecs)
+   end
+   if niovecs > 2 then
+      for i = 2, niovecs - 1 do
+	 transmit_aux(self, p, i, niovecs)
+      end
    end
 end
 
@@ -189,10 +202,12 @@ function M_sf:sync_transmit ()
    self.tdh = self.r.TDH()
    C.full_memory_barrier()
    -- Release processed buffers
-   while old_tdh ~= self.tdh do
-      packet.deref(self.txpackets[old_tdh])
-      self.txpackets[old_tdh] = nil
-      old_tdh = band(old_tdh + 1, num_descriptors - 1)
+   if old_tdh ~= self.tdh then
+      while old_tdh ~= self.tdh do
+	 packet.deref(self.txpackets[old_tdh])
+	 self.txpackets[old_tdh] = nil
+	 old_tdh = band(old_tdh + 1, num_descriptors - 1)
+      end
    end
    self.r.TDT(self.tdt)
 end
@@ -205,17 +220,25 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Receive Functionality."
 
+local function receive_aux(self, p)
+   local wb = self.rxdesc[self.rxnext].wb
+   if band(wb.xstatus_xerror, 1) == 1 then -- Descriptor Done
+      local b = self.rxbuffers[self.rxnext]
+      packet.add_iovec(p, b, wb.pkt_len)
+      self.rxnext = band(self.rxnext + 1, num_descriptors - 1)
+   end
+   return band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
+end
+
 function M_sf:receive ()
    assert(self.rdh ~= self.rxnext)
    local p = packet.allocate()
-   repeat
-      local wb = self.rxdesc[self.rxnext].wb
-      if band(wb.xstatus_xerror, 1) == 1 then -- Descriptor Done
-         local b = self.rxbuffers[self.rxnext]
-         packet.add_iovec(p, b, wb.pkt_len)
-         self.rxnext = band(self.rxnext + 1, num_descriptors - 1)
+   if not receive_aux(self, p) then
+      if not receive_aux(self, p) then
+	 repeat
+	 until receive_aux(self, p)
       end
-   until band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
+   end
    return p
 end
 
@@ -407,6 +430,7 @@ local M_vf = {}; M_vf.__index = M_vf
 
 -- it's the PF who creates a VF
 function M_pf:new_vf (poolnum)
+   assert(poolnum < 64, "Pool overflow: Intel 82599 can only have up to 64 virtualized devices.")
    local txqn = poolnum*2
    local rxqn = poolnum*2
    local vf = {
@@ -453,7 +477,7 @@ function M_vf:init (opts)
       :set_VLAN(opts.vlan)
       :set_rx_stats(opts.rxcounter)
       :set_tx_stats(opts.txcounter)
-      :set_tx_rate(opts.rate_limit)
+      :set_tx_rate(opts.rate_limit, opts.priority)
 end
 
 M_vf.close = M_sf.close
@@ -489,7 +513,7 @@ function M_vf:init_transmit ()
    self.pf.r.PFVMTXSW[math.floor(poolnum/32)]:clr(bits{LLE=poolnum%32})
    self.pf.r.PFVFTE[math.floor(poolnum/32)]:set(bits{VFTE=poolnum%32})
    self.pf.r.RTTDQSEL(poolnum)
-   self.pf.r.RTTDT1C(0x2000)
+   self.pf.r.RTTDT1C(0x80)
    self.pf.r.RTTBCNRC(0x00)         -- no rate limiting
    self.pf.r.DMATXCTL:set(bits{TE=0})
    self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26})
@@ -645,12 +669,19 @@ function M_vf:get_txstats ()
    }
 end
 
-function M_vf:set_tx_rate (limit)
-   if not limit then return self end
-   local factor = 10000 / tonumber(limit)       -- line rate = 10,000 Mb/s
-   factor = band(math.floor(factor*2^14+0.5), 2^24-1) -- 10.14 bits
+function M_vf:set_tx_rate (limit, priority)
+   limit = tonumber(limit) or 0
    self.pf.r.RTTDQSEL(self.poolnum)
-   self.pf.r.RTTBCNRC(bits({RS_ENA=31}, factor))
+   if limit >= 10 then
+      local factor = 10000 / tonumber(limit)       -- line rate = 10,000 Mb/s
+      factor = bit.band(math.floor(factor*2^14+0.5), 2^24-1) -- 10.14 bits
+      self.pf.r.RTTBCNRC(bits({RS_ENA=31}, factor))
+   else
+      self.pf.r.RTTBCNRC(0x00)
+   end
+
+   priority = tonumber(priority) or 1.0
+   self.pf.r.RTTDT1C(bit.band(math.floor(priority * 0x80), 0x3FF))
    return self
 end
 
@@ -785,7 +816,7 @@ PFVFTE    0x08110 +0x04*0..1    RW PF VF Transmit Enable
 MTA       0x05200 +0x04*0..127  RW Multicast Table Array
 RAL       0x0A200 +0x08*0..127  RW Receive Address Low
 RAH       0x0A204 +0x08*0..127  RW Receive Address High
-MPSAR     0x0A600 +0x04*0..127  RW MAC Pool Select Array
+MPSAR     0x0A600 +0x04*0..255  RW MAC Pool Select Array
 VFTA      0x0A000 +0x04*0..127  RW VLAN Filter Table Array
 MTQC      0x08120 -             RW Multiple Transmit Queues Command Register
 MRQC      0x0EC80 -             RW Multiple Receive Queues Command Register
