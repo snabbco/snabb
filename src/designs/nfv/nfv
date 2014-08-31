@@ -18,6 +18,13 @@ function run (npackets)
    local trace   = os.getenv("NFV_TRACE")
    local server  = os.getenv("NFV_SERVER")
 
+   if trace == "" then
+      trace = nil
+   end
+   if server == "" then
+      server = nil
+   end
+
    local device_info = pci.device_info(pciaddr)
    if not device_info then
       print(format("could not find device information for PCI address %s", pciaddr))
