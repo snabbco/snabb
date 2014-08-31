@@ -50,9 +50,6 @@ There is currently no Windows support, although in principle Cygwin or Windows S
 
 For the (optional) rump kernel functionality, the easiest way at present to install it is usually using the [buildrump.sh](https://github.com/rumpkernel/buildrump.sh) project, which is now included as a git submodule. The rump kernel is a way of [running parts of the NetBSD kernel in userspace as libraries](http://rumpkernel.org). At the moment support is partially implemented, planning to add more soon, in particular to be able to script the backend "hypervisor" part. There are some additional examples in `examples/rump` which is a port of the tests in buildrump. The rump kernel runs on many elf/Posix OS and architectures, currently tested on Linux x86, x64, ppc, arm and NetBSD x86, x64, FreeBSD 10 (with gcc). It does not currently run on OSX or Windows.
 
-## New features planned soon
-netfilter, dhcp, selinux, arp, better sockopt handling, cgroups support, more NetBSD, FreeBSD and OSX support, rump kernel hypercall API, OSv support, Lua support, more introspection. Plus whatever users request.
-
 ## Examples and documentation
 
 Apart from the tests, there are now some examples at in the examples directory; more to come.
