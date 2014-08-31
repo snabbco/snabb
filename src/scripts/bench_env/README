@@ -62,7 +62,7 @@ The configuration of the scripts is done in 2 levels:
  - global /etc/bench_conf.sh
  - per user $HOME/bench_conf.sh
 
-Use example_conf.sh as a referece how to setup the global or user specific script.
+Use example_conf.sh as a reference how to setup the global or user specific script.
 
 Configuration overview
 A basic description of all the needed variables in bench_conf.sh follows:
@@ -118,7 +118,7 @@ accordingly:
     run real benchmarks between them. Guest terminals are detached and can be
     accessed separately through a telnet connection.
 
---- host-nic-snab-guest.sh: Creation of one guest and one NFV instance with
+--- host-nic-snabb-guest.sh: Creation of one guest and one NFV instance with
     Snabbswitch. On the other side of the connected NIC, the host system can
     communicate with the guest and run benchmarks as per the previous test case.
 
