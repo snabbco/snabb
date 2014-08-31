@@ -1075,12 +1075,12 @@ test.filesystem_linux = {
   teardown = clean,
   test_statfs = function()
     local st = assert(S.statfs("."))
-    assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
+    assert(st.f_bfree <= st.f_blocks, "expect fewer free blocks than total blocks")
   end,
   test_fstatfs = function()
     local fd = assert(S.open(".", "rdonly"))
     local st = assert(S.fstatfs(fd))
-    assert(st.f_bfree < st.f_blocks, "expect less free space than blocks")
+    assert(st.f_bfree <= st.f_blocks, "expect fewer free blocks than total blocks")
     assert(fd:close())
   end,
   test_utimensat = function()
