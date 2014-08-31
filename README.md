@@ -61,12 +61,13 @@ There will be proper documentation before the 1.0 release, apologies for it not 
 
 ## Projects using ljsyscall
 
-This project is being used ina variety of places, such as for testing the Linux compatibility code in NetBSD, among other things. If your project is not listed here please let me know or send a pull request.
+This project is being used in a variety of places, such as for testing the Linux compatibility code in NetBSD, among other things. If your project is not listed here please let me know or send a pull request.
 
 * [ljlinenoise](https://github.com/fperrad/ljlinenoise) a Lua implementation of the linenoise (readline) library.
 * [nodish](https://github.com/lipp/nodish) a lightweight Lua equivalent to Node.js.
 * [lua-mmapfile](https://github.com/geoffleyland/lua-mmapfile) a simple Lua interface to mmap.
 * [buildroot](http://buildroot.uclibc.org/) has an ljsyscall package.
+* [luatz](https://github.com/daurnimator/luatz) uses ljsyscall when available
 
 ## Testing
 
