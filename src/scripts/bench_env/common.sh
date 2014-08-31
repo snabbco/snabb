@@ -24,6 +24,7 @@ run_qemu () {
     fi
 
     # Execute QEMU on the designated node
+    echo -n "starting qemu on network device $NETDEV: "
     numactl $NUMA \
         $QEMU \
             -kernel $KERNEL -append "$ARGS" \
@@ -32,6 +33,7 @@ run_qemu () {
             -serial telnet:localhost:$TELNETPORT,server,nowait \
             -drive if=virtio,file=$IMG \
             -nographic > /dev/null 2>&1 &
+    echo done
     QEMUPIDS="$QEMUPIDS $!"
 }
 
@@ -85,6 +87,12 @@ run_nfv () {
     export NFV_SOCKET=$3
     LOG=$4
     CPU=$5
+    export NFV_TRACE=$6
+    if [ "$7" != "" ]
+    then
+        # special intermediate hack to set Solarflare MAC address
+        export SF_MAC=$7
+    fi
 
     if [ -n "$CPU" ]; then
         NUMA="--membind=$NUMANODE --physcpubind=$CPU"
@@ -92,8 +100,10 @@ run_nfv () {
         NUMA="--cpunodebind=$NUMANODE --membind=$NUMANODE"
     fi
 
+    echo -n "starting snabb on $NFV_PCI with socket $NFV_SOCKET: "
     numactl $NUMA \
         $SNABB $NFV $NFV_PACKETS > $LOG 2>&1 &
+    echo done
 
     SNABBPIDS="$SNABBPIDS $!"
 }
@@ -234,4 +244,8 @@ do_lock () {
     done
 }
 
-do_lock $NFV_PCI0 $NFV_PCI1
+do_lock $NFV_PCI0
+if [ "$NFV_PCI0" != "$NFV_PCI1" ]
+then
+    do_lock $NFV_PCI1
+fi
