@@ -4,9 +4,6 @@
 [submodule "include/ffi-reflect"]
 	path = include/ffi-reflect
 	url = https://github.com/corsix/ffi-reflect
-[submodule "include/luajit-2.0"]
-	path = include/luajit-2.0
-	url = http://luajit.org/git/luajit-2.0.git
 [submodule "include/linux-kernel-headers"]
 	path = include/linux-kernel-headers
 	url = https://github.com/sabotage-linux/kernel-headers.git
