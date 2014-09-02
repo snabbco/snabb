@@ -1,5 +1,7 @@
 #!/usr/bin/env snabb
 
+local json = require("lib.json")
+
 if #main.parameters ~= 2 then
    print[[Usage: neutron2snabb <csv-dir> <output-dir>
 
@@ -30,48 +32,44 @@ function create_config (input_dir, output_dir)
    local ports = parse_csv(input_dir.."/ports.txt",
                            {'tenant_id', 'id', 'name', 'network_id', 'mac_address', 'admin_state_up', 'status', 'device_id', 'device_owner'},
                            'id')
-   local secgroups = parse_csv(input_dir.."/securitygroups.txt",
-                               {'tenant_id', 'id', 'name', 'description'},
-                               'id')
+   local port_bindings = parse_csv(input_dir.."/ml2_port_bindings.txt",
+                                   {'id', 'host', 'vif_type', 'driver', 'segment', 'vnic_type', 'vif_details', 'profile'},
+                                   'id')
    local secrules = parse_csv(input_dir.."/securitygrouprules.txt",
                               {'tenant_id', 'id', 'security_group_id', 'remote_group_id', 'direction', 'ethertype', 'protocol', 'port_range_min', 'port_range_max', 'remote_ip_prefix'},
                               'security_group_id', true)
    local secbindings = parse_csv(input_dir.."/securitygroupportbindings.txt",
                                  {'port_id', 'security_group_id'},
                                  'port_id')
-   local qoses = parse_csv(input_dir.."/qoses.txt",
-                           {'tenant_id', 'id', 'type', 'description'},
-                           'id')
-   local qos_policies = parse_csv(input_dir.."/qos_policies.txt",
-                                  {'id', 'qos_id', 'key', 'value'},
-                                  'qos_id', true)
-   local portqosmappings = parse_csv(input_dir.."/portqosmappings.txt",
-                                     {'port_id', 'qos_id'},
-                                     'port_id')
    local port_count = 0
    local outputs = {}
    for _, port in pairs(ports) do
-      local segment = segments[port.network_id]
-      local physical = (segment.physical_network):gsub("%p", "_")
-      if not outputs[physical] then
-         local output_path = output_dir.."/"..physical
-         local output = io.open(output_path, 'w')
-         if output then
-            print("Created " .. output_path)
-            outputs[physical] = io.open(output_path, 'w')
-            outputs[physical]:write("return {\n")
-         else
-            error("Failed to create " .. output_path)
+      local binding = port_bindings[port.id]
+      if binding.driver == "snabb" then
+         local vif_details = json.decode(binding.vif_details)
+         local port_name = vif_details.zone_port
+         if not outputs[port_name] then
+            local output_path = output_dir.."/"..port_name
+            local output = io.open(output_path, 'w')
+            if output then
+               print("Created " .. output_path)
+               outputs[port_name] = io.open(output_path, 'w')
+               outputs[port_name]:write("return {\n")
+            else
+               error("Failed to create " .. output_path)
+            end
          end
+         if port.admin_state_up ~= '0' then
+            local vlan = segments[port.network_id].segmentation_id
+            local mac = port.mac_address
+            local ingressfilter = filter(port, secbindings, secrules)
+            local gbps = vif_details.zone_gbps
+            local tunnel = tunnel(port, vif_details)
+            outputs[port_name]:write(('  { vlan = %d,\n    mac_address = %q,\n    port_id = %q,\n    ingress_filter = %s,\n    gbps = %s,\n    tunnel = %s\n  },\n')
+                                     :format(vlan, mac, port.id, ingressfilter, gbps, tunnel))
+         end
+         port_count = port_count + 1
       end
-      if port.admin_state_up ~= '0' then
-         local vlan = segment.segmentation_id
-         local mac = port.mac_address
-         local ingressfilter = filter(port, secbindings, secrules)
-         local gbps, tunnel = qos(port, qoses, qos_policies, portqosmappings)
-         outputs[physical]:write(('  { vlan = %d,\n    mac_address = "%s",\n    port_id = "%s",\n    ingress_filter = %s,\n    gbps = %s,\n    tunnel = %s\n  },\n'):format(vlan, mac, port.id, ingressfilter, gbps, tunnel))
-      end
-      port_count = port_count + 1
    end
    for _, file in pairs(outputs) do
       file:write("}\n")
@@ -103,24 +101,29 @@ function filter (port, secbindings, secrules)
    if rules then return "[[{ " .. rules .. " }]]" else return nil end
 end
 
-function qos (port, qoses, qos_policies, portqosmappings)
-   local qos = portqosmappings[port.id]
-   if not qos then return nil end
-   local policies = qos_policies[qos.qos_id]
-   if not policies then return nil end
-   local t = {}
-   for _,p in ipairs(policies) do t[p.key] = p.value end
-   local gbps = t.limit_gbps
-   local tunnel
-   if t.tunnel_type == "L2TPv3" then
-      tunnel = ("[[{type = %s, remote_ip = %s, remote_mac = %s, local_ip = %s, local_mac = %s, cookie = %s, session = %s'}]]"):format(q(t.tunnel_type), q(t.tunnel_remote_ip), q(t.tunnel_remote_mac), q(t.tunnel_local_ip), q(t.tunnel_local_mac), q(t.tunnel_cookie), q(t.tunnel_session))
+-- Return the L2TPv3 tunnel expresion.
+function tunnel (port, vif_details)
+   if vif_details.tunnel_type == "L2TPv3" then
+      return ([[{type = "L2TPv3",
+              remote_mac = %q,
+              local_mac = %q,
+              remote_ip = %q,
+              local_ip = %q,
+              session = %d,
+              local_cookie = %q,
+              remote_cookie = %q,
+              next_hop = %q }]])
+      :format(vif_details.l2tpv3_remote_mac,
+              port.mac_address,
+              vif_details.l2tpv3_remote_ip,
+              vif_details.l2tpv3_local_ip,
+              vif_details.l2tpv3_session,
+              vif_details.l2tpv3_local_cookie,
+              vif_details.l2tpv3_remote_cookie,
+              vif_details.l2tpv3_next_hop)
+   else
+      return nil
    end
-   return gbps, tunnel
-end
-
--- q(nil) => "nil" ; q("foo") -> '"foo"'
-function q (object)
-   if object == nil then return "nil" else return '"'..object..'"' end
 end
 
 -- Parse FILENAME as a .csv file containing FIELDS.
