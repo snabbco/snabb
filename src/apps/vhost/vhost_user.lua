@@ -187,7 +187,7 @@ function VhostUser:set_vring_kick (msg, fds, nfds)
       assert(nfds == 1)
       self.dev:set_vring_kick(idx, fds[0])
    else
-      print("Should start polling on virtq "..tonum(idx))
+      print("Should start polling on virtq "..tonumber(idx))
    end
 end
 
