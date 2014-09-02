@@ -106,7 +106,6 @@ function create_config (input_dir, output_dir, hostname)
 end
 
 -- Return the packet filter expression.
--- XXX This is assumed to be ingress-only. Egress is simply NYI.
 function filter (port, secbindings, secrules, direction)
    local rules = ''
    direction = direction:lower()
