@@ -9,6 +9,7 @@ function error() {
 
 [ ! -z "$NEUTRON_DIR" ]      || export NEUTRON_DIR=/var/snabbswitch/neutron
 [ ! -z "$SNABB_DIR"   ]      || export SNABB_DIR=/var/snabbswitch/networks
+[ ! -z "$TMP_DIR"   ]        || export TMP_DIR=/tmp/snabbswitch
 [ ! -z "$NEUTRON2SNABB" ]    || error "check_env_vars: \$NEUTRON2SNABB not set"
 #[ -x "$NEUTRON2SNABB" ]      || error "check_env_vars: \$NEUTRON2SNABB not an executable"
 [ ! -z "$SYNC_PATH" ]        || error "check_env_vars: \$SYNC_PATH not set"
@@ -25,6 +26,12 @@ if [ ! -d $SNABB_DIR ]; then
     mkdir -p $SNABB_DIR
 fi
 
+# (Re)create TMP_DIR
+if [ -d $TMP_DIR ]; then
+    rm -rf $TMP_DIR
+fi
+mkdir -p $TMP_DIR
+
 # Loop pulling/cloning the repo.
 while true; do
     if [ ! -d $NEUTRON_DIR ]; then
@@ -35,7 +42,12 @@ while true; do
     if ! git diff --quiet origin/master; then
 	git merge --ff origin/master
 	echo "Generating new configuration"
-	$NEUTRON2SNABB $NEUTRON_DIR $SNABB_DIR
+	$NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR
+        # Only (atomically) replace configurations that have changed.
+        for conf in $TMP_DIR/*; do
+            dest=$SNABB_DIR/$(basename $conf)
+            if ! diff $conf $dest; then mv $conf $dest; fi
+        done
     fi
     sleep $SYNC_INTERVAL
 done
