@@ -327,17 +327,77 @@ local function generateRule(
          end
       end
    end
+   if rule.stateful then
+      T'if connKey then resetExpiry(connKey) end'
+   end
    T"return true"
    T:unindent()
    T"until false"
 end
 
+
+local function anyStatefulRule(rules, ethertype)
+   for _, rule in ipairs(rules) do
+      if rule.stateful and (rule.ethertype == ethertype or ethertype==nil)  then
+         return true
+      end
+   end
+   return false
+end
+
+
+local function generateStatefulPass(T, ethertype, proto_offset, offset, length)
+   T'local connKey = nil'
+   T'repeat'
+   T:indent()
+   T    (('local ethertype = ffi.cast("uint16_t*", buffer + %d)'):format(ETHERTYPE_OFFSET))
+   T    (('if ethertype[0] ~= %s then break end'):format(ethertype))
+   T    (('local protocol = buffer[%d]'):format(proto_offset))
+   T    (('if protocol ~= %d or protocol ~= %d then break end'):format(IP_TCP, IP_UDP))
+   T    (('connKey = string.char(protocol)..ffi.string(buffer + %d, %d)'):format(offset, length))
+   T    'if trackTable[connKey] ~= nil then'
+   T    :indent()
+   T        'resetExpiry(connKey)'
+   T        'return true'
+   T    :unindent()
+   T    'end'
+   T:unindent()
+   T'until false'
+end
+
+
 local function generateConformFunctionString(rules)
    local T = make_code_concatter()
    T"local ffi = require(\"ffi\")"
    T"local bit = require(\"bit\")"
+
+   if anyStatefulRule(rules) then
+      T'local trackTable, expiryBuckets = {}, {}'
+      T'local function resetExpiry(k) trackTable[k]=true end'
+   end
+
    T"return function(buffer, size)"
    T:indent()
+
+   if anyStatefulRule(rules, 'ipv4') then
+      generateStatefulPass(
+         T,
+         ETHERTYPE_IPV4,
+         IPV4_PROTOCOL_OFFSET,
+         IPV4_SOURCE_OFFSET,
+         2*IPV4_ADDRESS_LEN + 2*PORT_LEN
+      )
+   end
+
+   if anyStatefulRule(rules, 'ipv6') then
+      generateStatefulPass(
+         T,
+         ETHERTYPE_IPV6,
+         IPV6_NEXT_HEADER_OFFSET,
+         IPV6_SOURCE_OFFSET,
+         2*IPV6_ADDRESS_LEN + 2*PORT_LEN
+      )
+   end
 
    for i = 1, #rules do
       if rules[i].ethertype == "ipv4" then
@@ -432,23 +492,25 @@ function selftest ()
    local V6_RULE_DNS_PACKETS =  3 -- packets within v6.pcap
       
    local v6_rules = {
-   {
-      ethertype = "ipv6",
-      protocol = "icmp",
-      source_cidr = "3ffe:501:0:1001::2/128", -- single IP, match 128bit
-      dest_cidr =
-         "3ffe:507:0:1:200:86ff:fe05:8000/116", -- match first 64bit and mask next 52 bit
-   },
-   {
-      ethertype = "ipv6",
-      protocol = "udp",
-      source_cidr = "3ffe:507:0:1:200:86ff::/28", -- mask first 28 bit
-      dest_cidr = "3ffe:501:4819::/64",           -- match first 64bit
-      source_port_min = 2397, -- port range, in v6.pcap there are values on
-      source_port_max = 2399, -- both borders and in the middle
-      dest_port_min = 53,     -- single port match
-      dest_port_max = 53,
-   }}
+      {
+         ethertype = "ipv6",
+         protocol = "icmp",
+         source_cidr = "3ffe:501:0:1001::2/128", -- single IP, match 128bit
+         dest_cidr =
+            "3ffe:507:0:1:200:86ff:fe05:8000/116", -- match first 64bit and mask next 52 bit
+      },
+      {
+         ethertype = "ipv6",
+         protocol = "udp",
+         source_cidr = "3ffe:507:0:1:200:86ff::/28", -- mask first 28 bit
+         dest_cidr = "3ffe:501:4819::/64",           -- match first 64bit
+         source_port_min = 2397, -- port range, in v6.pcap there are values on
+         source_port_max = 2399, -- both borders and in the middle
+         dest_port_min = 53,     -- single port match
+         dest_port_max = 53,
+         stateful = true,
+      }
+   }
 
    local c = config.new()
    config.app(
@@ -470,22 +532,24 @@ function selftest ()
    local V4_RULE_TCP_PACKETS = 18 -- packets within v4.pcap
 
    local v4_rules = {
-   {
-      ethertype = "ipv4",
-      protocol = "udp",
-      dest_port_min = 53,     -- single port match, DNS
-      dest_port_max = 53,
-   },
-   {
-      ethertype = "ipv4",
-      protocol = "tcp",
-      source_cidr = "65.208.228.223/32", -- match 32bit
-      dest_cidr = "145.240.0.0/12",      -- mask 12bit
-      source_port_min = 80, -- our port (80) is on the border of range
-      source_port_max = 81,
-      dest_port_min = 3371, -- our port (3372) is in the middle of range
-      dest_port_max = 3373,
-   }}
+      {
+         ethertype = "ipv4",
+         protocol = "udp",
+         dest_port_min = 53,     -- single port match, DNS
+         dest_port_max = 53,
+      },
+      {
+         ethertype = "ipv4",
+         protocol = "tcp",
+         source_cidr = "65.208.228.223/32", -- match 32bit
+         dest_cidr = "145.240.0.0/12",      -- mask 12bit
+         source_port_min = 80, -- our port (80) is on the border of range
+         source_port_max = 81,
+         dest_port_min = 3371, -- our port (3372) is in the middle of range
+         dest_port_max = 3373,
+         stateful = true,
+      }
+   }
 
    config.app(
          c,
