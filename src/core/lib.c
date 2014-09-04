@@ -26,6 +26,12 @@ double get_monotonic_time()
   return get_time(CLOCK_MONOTONIC);
 }
 
+/* fast time that avoids access to hardware, suitable for tight loops. */
+double get_fast_time()
+{
+    return get_time(CLOCK_MONOTONIC_COARSE);
+}
+
 /* Return real wall-clock time in seconds since the epoch. */
 double get_unix_time()
 {
