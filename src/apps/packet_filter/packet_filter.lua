@@ -328,7 +328,7 @@ local function generateRule(
       end
    end
    if rule.stateful then
-      T'if connKey then resetExpiry(connKey) end'
+      T'if connKey then new_conns[connKey] = true end'
    end
    T"return true"
    T:unindent()
@@ -347,6 +347,13 @@ end
 
 
 local function generateStatefulPass(T, ethertype, proto_offset, offset, length)
+   T'if C.get_fast_time() > next_expiry_swap then'
+   T:indent()
+   T    'old_conns, new_conns = new_conns, {}'
+   T    'next_expiry_swap = C.get_fast_time() + 7200'
+   T:unindent()
+   T'end'
+   T''
    T'local connKey = nil'
    T'repeat'
    T:indent()
@@ -355,9 +362,9 @@ local function generateStatefulPass(T, ethertype, proto_offset, offset, length)
    T    (('local protocol = buffer[%d]'):format(proto_offset))
    T    (('if protocol ~= %d or protocol ~= %d then break end'):format(IP_TCP, IP_UDP))
    T    (('connKey = string.char(protocol)..ffi.string(buffer + %d, %d)'):format(offset, length))
-   T    'if trackTable[connKey] ~= nil then'
+   T    'if new_conns[connKey] or old_conns[connKey] then'
    T    :indent()
-   T        'resetExpiry(connKey)'
+   T        'new_conns[connKey] = true'
    T        'return true'
    T    :unindent()
    T    'end'
@@ -370,10 +377,13 @@ local function generateConformFunctionString(rules)
    local T = make_code_concatter()
    T"local ffi = require(\"ffi\")"
    T"local bit = require(\"bit\")"
+   T'local C   = ffi.C'
 
    if anyStatefulRule(rules) then
-      T'local trackTable, expiryBuckets = {}, {}'
-      T'local function resetExpiry(k) trackTable[k]=true end'
+      T''
+      T'local new_conns, old_conns = {}, {}'
+      T'local next_expiry_swap = C.get_fast_time() + 7200'
+      T''
    end
 
    T"return function(buffer, size)"
