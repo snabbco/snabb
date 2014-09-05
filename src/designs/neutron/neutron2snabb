@@ -69,7 +69,9 @@ function create_config (input_dir, output_dir, hostname)
             if port.admin_state_up ~= '0' then
                local vlan = segments[port.network_id].segmentation_id
                local mac = port.mac_address
-               local ingressfilter = filter(port, secbindings, secrules)
+               -- Skipping filter for now.
+               print("Warning: Ignoring security group configuration.")
+               local ingressfilter = nil --filter(port, secbindings, secrules)
                local gbps = vif_details.zone_gbps
                local tunnel = tunnel(port, vif_details)
                outputs[port_id]:write(('  { vlan = %d,\n    mac_address = %q,\n    port_id = %q,\n    ingress_filter = %s,\n    gbps = %s,\n    tunnel = %s\n  },\n')
