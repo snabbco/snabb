@@ -57,6 +57,10 @@ function SolarFlareNic:new(args)
       args.ifname = device_info.interface
    end
 
+   if args.macaddr then
+      self.mac_address = ethernet:pton(args.macaddr)
+   end
+
    args.receives_enqueued = 0
    local dev = setmetatable(args, { __index = SolarFlareNic })
    return dev:open()
@@ -138,14 +142,16 @@ function SolarFlareNic:open()
 
    local env_mac = os.getenv("SF_MAC")
 
-   if env_mac then
-      self.mac_address = ethernet:pton(env_mac)
-   else
-      self.mac_address = ffi.new("unsigned char[6]")
-      try(ciul.ef_vi_get_mac(self.ef_vi_p,
-                             self.driver_handle,
-                             self.mac_address),
-          "ef_vi_get_mac")
+   if not self.mac_address then
+      if env_mac then
+         self.mac_address = ethernet:pton(env_mac)
+      else
+         self.mac_address = ffi.new("unsigned char[6]")
+         try(ciul.ef_vi_get_mac(self.ef_vi_p,
+                                self.driver_handle,
+                                self.mac_address),
+             "ef_vi_get_mac")
+      end
    end
 
    self.mtu = try(ciul.ef_vi_mtu(self.ef_vi_p, self.driver_handle))
@@ -155,32 +161,32 @@ function SolarFlareNic:open()
                                          C.EF_FILTER_VLAN_ID_ANY,
                                          self.mac_address),
        "ef_filter_spec_set_eth_local")
+
    try(ciul.ef_vi_filter_add(self.ef_vi_p,
                              self.driver_handle,
                              filter_spec_p,
                              nil),
        "ef_vi_filter_add")
 
-   if not env_mac then
-      local broadcast_mac_p = ffi.new("unsigned char[6]")
-      broadcast_mac_p[0] = 255
-      broadcast_mac_p[1] = 255
-      broadcast_mac_p[2] = 255
-      broadcast_mac_p[3] = 255
-      broadcast_mac_p[4] = 255
-      broadcast_mac_p[5] = 255
-      filter_spec_p = ffi.new("ef_filter_spec[1]")
-      ciul.ef_filter_spec_init(filter_spec_p, C.EF_FILTER_FLAG_NONE)
-      try(ciul.ef_filter_spec_set_eth_local(filter_spec_p,
-                                            C.EF_FILTER_VLAN_ID_ANY,
-                                            broadcast_mac_p),
-          "ef_filter_spec_set_eth_local")
-      try(ciul.ef_vi_filter_add(self.ef_vi_p,
-                                self.driver_handle,
-                                filter_spec_p,
-                                nil),
-          "ef_vi_filter_add")
-   end
+   local broadcast_mac_p = ffi.new("unsigned char[6]")
+   broadcast_mac_p[0] = 255
+   broadcast_mac_p[1] = 255
+   broadcast_mac_p[2] = 255
+   broadcast_mac_p[3] = 255
+   broadcast_mac_p[4] = 255
+   broadcast_mac_p[5] = 255
+   filter_spec_p = ffi.new("ef_filter_spec[1]")
+   ciul.ef_filter_spec_init(filter_spec_p, C.EF_FILTER_FLAG_NONE)
+   try(ciul.ef_filter_spec_set_eth_local(filter_spec_p,
+                                         C.EF_FILTER_VLAN_ID_ANY,
+                                         broadcast_mac_p),
+       "ef_filter_spec_set_eth_local")
+
+   try(ciul.ef_vi_filter_add(self.ef_vi_p,
+                             self.driver_handle,
+                             filter_spec_p,
+                             nil),
+       "ef_vi_filter_add")
 
    self.memregs = {}
 
