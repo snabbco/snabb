@@ -56,7 +56,7 @@ function load (file, pciaddr, sockpath)
          -- Setup IPv6 neighbor discovery/solicitation responder.
          -- This will talk to our local gateway.
          local ND = "ND_"..name
-         config.app(c, ND, nd_light, {local_mac = t.tunnel.local_mac,
+         config.app(c, ND, nd_light, {local_mac = mac_address,
                                       local_ip = t.tunnel.local_ip,
                                       next_hop = t.tunnel.next_hop})
          -- VM -> Tunnel -> Network

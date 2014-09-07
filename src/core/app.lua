@@ -32,6 +32,40 @@ function now ()
    return monotonic_now
 end
 
+-- Run fn in protected mode (pcall). If it throws an error app will be
+-- marked as dead and restarted eventually.
+function with_restart (app, fn)
+   -- Run fn in protected mode using pcall.
+   local status, err = pcall(fn)
+
+   -- If pcall caught an error mark app as "dead" (record time and cause
+   -- of death).
+   if not status then app.dead = { error = err, time = now() } end
+end
+
+-- Restart dead apps.
+function restart_dead_apps ()
+   local restart_delay = 2 -- seconds
+   local actions = {}
+   local restart = false
+
+   -- Collect 'restart' actions for dead apps and log their errors.
+   for i = 1, #app_array do
+      local app = app_array[i]
+      if app.dead and (now() - app.dead.time) >= restart_delay then
+         restart = true
+         io.stderr:write(("Restarting %s (died at %f: %s)\n")
+                         :format(app.name, app.dead.time, app.dead.error))
+         actions[app.name] = 'restart'
+      else
+         actions[app.name] = 'keep'
+      end
+   end
+
+   -- Restart dead apps if necessary.
+   if restart then apply_config_actions(actions, configuration) end
+end
+
 -- Configure the running app network to match new_configuration.
 -- 
 -- Successive calls to configure() will migrate from the old to the
@@ -101,6 +135,7 @@ function apply_config_actions (actions, conf)
       local arg = conf.apps[name].arg
       local app = class:new(arg)
       local zone = app.zone or getfenv(class.new)._NAME or name
+      app.name = name
       app.output = {}
       app.input = {}
       new_app_table[name] = app
@@ -180,11 +215,15 @@ end
 
 function breathe ()
    monotonic_now = C.get_monotonic_time()
+   -- Restart: restart dead apps
+   restart_dead_apps()
    -- Inhale: pull work into the app network
    for i = 1, #app_array do
       local app = app_array[i]
-      if app.pull then
-         zone(app.zone) app:pull() zone()
+      if app.pull and not app.dead then
+         zone(app.zone)
+         with_restart(app, function () app:pull() end)
+         zone()
       end
    end
    -- Exhale: push work out through the app network
@@ -197,8 +236,10 @@ function breathe ()
          if firstloop or link.has_new_data then
             link.has_new_data = false
             local receiver = app_array[link.receiving_app]
-            if receiver.push then
-               zone(receiver.zone) receiver:push() zone()
+            if receiver.push and not receiver.dead then
+               zone(receiver.zone)
+               with_restart(receiver, function () receiver:push() end)
+               zone()
                progress = true
             end
          end
@@ -217,10 +258,12 @@ function report (options)
    end
    if options and options.showapps then
       print ("apps report")
-      for name, a in pairs(app_table) do
-         if a.report then
+      for name, app in pairs(app_table) do
+         if app.dead then
+            print (name, ("[dead: %s]"):format(app.dead.error))
+         elseif app.report then
             print (name)
-            a:report()
+            with_restart(app, function () app:report() end)
          end
       end
    end
@@ -281,6 +324,40 @@ function selftest ()
    assert(true == equal({foo="bar"}, {foo="bar"}))
    assert(false == equal({foo="bar"}, {foo="bar", baz="foo"}))
    assert(false == equal({foo="bar", baz="foo"}, {foo="bar"}))
+   -- Test app restarts on failure.
+   print("c_fail")
+   local App1 = {zone="test"}
+   function App1:new () return setmetatable({}, {__index = App1}) end
+   function App1:pull () error("Pull error.") end
+   function App1:push () return true end
+   function App1:report () return true end
+   local App2 = {zone="test"}
+   function App2:new () return setmetatable({}, {__index = App2}) end
+   function App2:pull () return true end
+   function App2:push () error("Push error.") end
+   function App2:report () return true end
+   local App3 = {zone="test"}
+   function App3:new () return setmetatable({}, {__index = App3}) end
+   function App3:pull () return true end
+   function App3:push () return true end
+   function App3:report () error("Report error.") end
+   local c_fail = config.new()
+   config.app(c_fail, "app1", App1)
+   config.app(c_fail, "app2", App2)
+   config.app(c_fail, "app3", App3)
+   config.link(c_fail, "app1.x -> app2.x")
+   configure(c_fail)
+   local orig_app1 = app_table.app1
+   local orig_app2 = app_table.app2
+   local orig_app3 = app_table.app3
+   local orig_link1 = link_array[1]
+   local orig_link2 = link_array[2]
+   main({duration = 4, report = {showapps = true}})
+   assert(app_table.app1 ~= orig_app1) -- should be restarted
+   assert(app_table.app2 ~= orig_app2) -- should be restarted
+   assert(app_table.app3 == orig_app3) -- should be the same
+   main({duration = 4, report = {showapps = true}})
+   assert(app_table.app3 ~= orig_app3) -- should be restarted
    print("OK")
 end
 
