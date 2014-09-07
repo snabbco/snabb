@@ -1,12 +1,12 @@
 module(...,package.seeall)
 
-local Intel82599 = require("apps.intel.intel_app").Intel82599
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local PacketFilter = require("apps.packet_filter.packet_filter").PacketFilter
 local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
 local nd_light = require("apps.ipv6.nd_light")
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
 local ns_responder = require("apps.ipv6.ns_responder")
+local pci = require("lib.hardware.pci")
 local ffi = require("ffi")
 local C = ffi.C
 local AF_INET6 = 10
@@ -15,6 +15,12 @@ local lib = require("core.lib")
 -- Compile app configuration from <file> for <pciaddr> and vhost_user
 -- <socket>. Returns configuration and zerocopy pairs.
 function load (file, pciaddr, sockpath)
+   local device_info = pci.device_info(pciaddr)
+   if not device_info then
+      print(format("could not find device information for PCI address %s", pciaddr))
+      main.exit(1)
+   end
+
    local ports = dofile(file)
    local c = config.new()
    local zerocopy = {} -- {NIC->Virtio} app names to zerocopy link
@@ -23,7 +29,7 @@ function load (file, pciaddr, sockpath)
       local name = port_id:gsub("-", "_")
       local NIC = "NIC_"..name
       local Virtio = "Virtio_"..name
-      config.app(c, NIC, Intel82599,
+      config.app(c, NIC, require(device_info.driver).driver,
 		 ([[{pciaddr = %q,
 		     vmdq=true,
 		     macaddr = %q,
