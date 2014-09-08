@@ -12,6 +12,7 @@ Process traffic between Neutron ports and a physical NIC.]])
 end
 
 function run (pciaddr, confpath, sockpath)
+   engine.log = true
    local mtime = 0
    while true do
       local mtime2 = C.stat_mtime(confpath)
