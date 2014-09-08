@@ -262,7 +262,8 @@ local function generateRule(
       protocol_offset,
       icmp_type,
       source_port_offset,
-      dest_port_offset
+      dest_port_offset,
+      conntrack
    )
    T"repeat"
    T:indent()
@@ -327,8 +328,8 @@ local function generateRule(
          end
       end
    end
-   if rule.stateful then
-      T'if connKey then new_conns[connKey] = true end'
+   if conntrack then
+      T'track(buffer)'
    end
    T"return true"
    T:unindent()
@@ -336,77 +337,25 @@ local function generateRule(
 end
 
 
-local function anyStatefulRule(rules, ethertype)
-   for _, rule in ipairs(rules) do
-      if rule.stateful and (rule.ethertype == ethertype or ethertype==nil)  then
-         return true
-      end
-   end
-   return false
-end
-
-
-local function generateStatefulPass(T, ethertype, proto_offset, offset, length)
-   T'if C.get_fast_time() > next_expiry_swap then'
-   T:indent()
-   T    'old_conns, new_conns = new_conns, {}'
-   T    'next_expiry_swap = C.get_fast_time() + 7200'
-   T:unindent()
-   T'end'
-   T''
-   T'local connKey = nil'
-   T'repeat'
-   T:indent()
-   T    (('local ethertype = ffi.cast("uint16_t*", buffer + %d)'):format(ETHERTYPE_OFFSET))
-   T    (('if ethertype[0] ~= %s then break end'):format(ethertype))
-   T    (('local protocol = buffer[%d]'):format(proto_offset))
-   T    (('if protocol ~= %d or protocol ~= %d then break end'):format(IP_TCP, IP_UDP))
-   T    (('connKey = string.char(protocol)..ffi.string(buffer + %d, %d)'):format(offset, length))
-   T    'if new_conns[connKey] or old_conns[connKey] then'
-   T    :indent()
-   T        'new_conns[connKey] = true'
-   T        'return true'
-   T    :unindent()
-   T    'end'
-   T:unindent()
-   T'until false'
-end
-
-
-local function generateConformFunctionString(rules)
+local function generateConformFunctionString(conf)
+   local rules = conf.rules
    local T = make_code_concatter()
    T"local ffi = require(\"ffi\")"
    T"local bit = require(\"bit\")"
    T'local C   = ffi.C'
 
-   if anyStatefulRule(rules) then
-      T''
-      T'local new_conns, old_conns = {}, {}'
-      T'local next_expiry_swap = C.get_fast_time() + 7200'
-      T''
+   if conf.track_connections then
+      T(([[local track = require('apps.packet_filter.conntrack')(%q).track]]):format(conf.track_connections))
+   end
+   if conf.pass_connections then
+      T(([[local pass = require('apps.packet_filter.conntrack')(%q).check]]):format(conf.pass_connections))
    end
 
    T"return function(buffer, size)"
    T:indent()
 
-   if anyStatefulRule(rules, 'ipv4') then
-      generateStatefulPass(
-         T,
-         ETHERTYPE_IPV4,
-         IPV4_PROTOCOL_OFFSET,
-         IPV4_SOURCE_OFFSET,
-         2*IPV4_ADDRESS_LEN + 2*PORT_LEN
-      )
-   end
-
-   if anyStatefulRule(rules, 'ipv6') then
-      generateStatefulPass(
-         T,
-         ETHERTYPE_IPV6,
-         IPV6_NEXT_HEADER_OFFSET,
-         IPV6_SOURCE_OFFSET,
-         2*IPV6_ADDRESS_LEN + 2*PORT_LEN
-      )
+   if conf.pass_connections then
+      T'if pass(buffer) then return true end'
    end
 
    for i = 1, #rules do
@@ -420,7 +369,8 @@ local function generateConformFunctionString(rules)
                IPV4_PROTOCOL_OFFSET,
                IP_ICMP,
                IPV4_SOURCE_PORT_OFFSET,
-               IPV4_DEST_PORT_OFFSET
+               IPV4_DEST_PORT_OFFSET,
+               conf.track_connections
             )
 
       elseif rules[i].ethertype == "ipv6" then
@@ -433,7 +383,8 @@ local function generateConformFunctionString(rules)
                IPV6_NEXT_HEADER_OFFSET,
                IPV6_ICMP,
                IPV6_SOURCE_PORT_OFFSET,
-               IPV6_DEST_PORT_OFFSET
+               IPV6_DEST_PORT_OFFSET,
+               conf.track_connections
             )
       else
          error("unknown ethertype")
@@ -450,14 +401,14 @@ end
 PacketFilter = {}
 
 function PacketFilter:new (arg)
-   local rules = arg and config.parse_app_arg(arg) or {}
-   assert(rules)
-   assert(#rules > 0)
+   local conf = arg and config.parse_app_arg(arg) or {}
+   assert(conf.rules)
+   assert(#conf.rules > 0)
 
    local o =
    {
       conform = assert(loadstring(
-            generateConformFunctionString(rules)
+            generateConformFunctionString(conf)
          ))()
    }
    return setmetatable(o, {__index = PacketFilter})

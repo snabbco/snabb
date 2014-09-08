@@ -28,13 +28,25 @@ local IPV6_DEST_PORT_OFFSET = 56
 --- connection spec structures
 ---
 
-local conn_spec_ipv4 = ffi.typeof [[
-   struct {
-      uint32_t src_ip, dst_ip,
-      uint16_t src_port, dst_port,
-      uint8_t protocol
+ffi.cdef [[
+   typedef struct {
+      uint32_t src_ip, dst_ip;
+      uint16_t src_port, dst_port;
+      uint8_t protocol;
    } __attribute__((packed)) conn_spec_ipv4;
+
+   typedef struct {
+      uint64_t a, b;
+   } __attribute__((packed)) ipv6_addr;
+
+   typedef struct {
+      ipv6_addr src_ip, dst_ip;
+      uint16_t src_port, dst_port;
+      uint8_t protocol;
+   } __attribute__((packed)) conn_spec_ipv6;
 ]]
+
+local conn_spec_ipv4 = ffi.typeof 'conn_spec_ipv4'
 
 
 local function conn_spec_from_ipv4_header(b)
@@ -54,25 +66,17 @@ local function conn_spec_from_ipv4_header(b)
 end
 
 
-local conn_spec_ipv6 = ffi.typeof [[
-   struct {
-      uint64_t[2] src_ip, dst_ip,
-      uint16_t src_port, dst_port,
-      uint8_t protocol
-   } __attribute__((packed)) conn_spec_ipv6;
-]]
+local conn_spec_ipv6 = ffi.typeof 'conn_spec_ipv6'
 
 local function conn_spec_from_ipv6_header(b)
    local spec = conn_spec_ipv6()
    do
-      local hdr_ips = ffi.cast('uint64_t[4]', b+IPV6_SOURCE_OFFSET)
-      spec.src_ip[0] = hdr_ips[0]
-      spec.src_ip[1] = hdr_ips[1]
-      spec.dst_ip[0] = hdr_ips[2]
-      spec.dst_ip[1] = hdr_ips[3]
+      local hdr_ips = ffi.cast('ipv6_addr*', b+IPV6_SOURCE_OFFSET)
+      spec.src_ip = hdr_ips[0]
+      spec.dst_ip = hdr_ips[1]
    end
    do
-      local hdr_ports = ffi.cast('uint16_t[2]', b+IPV6_SOURCE_PORT_OFFSET)
+      local hdr_ports = ffi.cast('uint16_t*', b+IPV6_SOURCE_PORT_OFFSET)
       spec.src_port = hdr_ports[0]
       spec.dst_port = hdr_ports[1]
    end
@@ -82,12 +86,12 @@ end
 
 
 local function spec_from_header(b)
-   local ethertype = ffi.cast('uint16_t[1]', b+ETHERTYPE_OFFSET)[0]
+   local ethertype = ffi.cast('uint16_t*', b+ETHERTYPE_OFFSET)[0]
    if ethertype == ETHERTYPE_IPV4 then
-      return conn_spec_from_ipv4_header
+      return conn_spec_from_ipv4_header(b)
    end
    if ethertype == ETHERTYPE_IPV6 then
-      return conn_spec_from_ipv6_header
+      return conn_spec_from_ipv6_header(b)
    end
 end
 
@@ -125,18 +129,19 @@ end
 ---
 --- track bidirectional connections for packet (header) buffers
 ---
-
+local lib = require 'core.lib'
 local function register_conntrack(name)
    local put, get, age = register_name(name)
    return {
       track = function(b)
          local spec = spec_from_header(b)
+         do return end
          put(spec_tostring(spec), true)
          reverse_spec(spec)
          put(spec_tostring(spec), true)
       end,
-      check = function(b) return get(spec_tostring(spec_from_header(b))) end
-      age = age
+      check = function(b) return get(spec_tostring(spec_from_header(b))) end,
+      age = age,
    }
 end
 
