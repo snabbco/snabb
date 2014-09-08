@@ -1,6 +1,7 @@
 #!/usr/bin/env snabb
 
 local ffi = require("ffi")
+local timer = require("core.timer")
 local C = ffi.C
 local config = require("lib.nfv.config")
 
@@ -13,6 +14,7 @@ end
 
 function run (pciaddr, confpath, sockpath)
    local mtime = 0
+   timer.init()
    while true do
       local mtime2 = C.stat_mtime(confpath)
       if mtime2 ~= mtime then

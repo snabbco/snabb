@@ -14,6 +14,12 @@ run_qemu () {
     TELNETPORT=$5
     NETDEV=$6
     CPU=$7
+    LOG=$8
+
+    if [ "$LOG" = "" ]
+    then
+        LOG=/dev/null
+    fi
 
     MEM="-m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on"
     NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC"
@@ -32,7 +38,7 @@ run_qemu () {
             -M pc -smp 1 -cpu host --enable-kvm \
             -serial telnet:localhost:$TELNETPORT,server,nowait \
             -drive if=virtio,file=$IMG \
-            -nographic > /dev/null 2>&1 &
+            -nographic > $LOG 2>&1 &
     echo done
     QEMUPIDS="$QEMUPIDS $!"
 }
@@ -45,10 +51,11 @@ run_qemu () {
 # - PORT for telnet serial
 # - vhost-user SOCKET
 # - optional CPU to execute on
+# - Log file
 run_qemu_vhost_user () {
     SOCKET=$6
     NETDEV="-netdev type=vhost-user,id=net0,chardev=char0 -chardev socket,id=char0,path=$SOCKET,server"
-    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7"
+    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7" "$8"
     QEMUSOCKS="$QEMUSOCKS $SOCKET"
 }
 
@@ -60,10 +67,11 @@ run_qemu_vhost_user () {
 # - PORT for telnet serial
 # - tap name
 # - optional CPU to execute on
+# - Log file
 run_qemu_tap () {
     TAP=$6
     NETDEV="-netdev type=tap,id=net0,script=no,downscript=no,vhost=on,ifname=$TAP"
-    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7"
+    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7" "$8"
 }
 
 run_loadgen () {
@@ -103,6 +111,28 @@ run_nfv () {
     echo -n "starting snabb on $NFV_PCI with socket $NFV_SOCKET: "
     numactl $NUMA \
         $SNABB $NFV $NFV_PACKETS > $LOG 2>&1 &
+    echo done
+
+    SNABBPIDS="$SNABBPIDS $!"
+}
+
+run_neutron_nfv () {
+    NUMANODE=$1
+    PCI=$2
+    SOCKET_TEMPLATE=$3
+    LOG=$4
+    CPU=$5
+    export NFV_TRACE=$6
+
+    if [ -n "$CPU" ]; then
+        NUMA="--membind=$NUMANODE --physcpubind=$CPU"
+    else
+        NUMA="--cpunodebind=$NUMANODE --membind=$NUMANODE"
+    fi
+
+    echo -n "starting neutron NFV on $PCI with socket $SOCKET_TEMPLATE: "
+    numactl $NUMA \
+        $SNABB $NEUTRON_NFV $PCI $NEUTRON_NFV_CONFIG $CONFIG $SOCKET_TEMPLATE > $LOG 2>&1 &
     echo done
 
     SNABBPIDS="$SNABBPIDS $!"
@@ -213,6 +243,14 @@ if [ -f $SNABB_PATH/designs/loadgen/loadgen ]; then
     export LOADGEN=$SNABB_PATH/designs/loadgen/loadgen
 else
     printf "LOADGEN design not found\n"
+    exit 1
+fi
+
+if [ -f $SNABB_PATH/designs/neutron/snabbnfv-traffic ]; then
+    export NEUTRON_NFV=$SNABB_PATH/designs/neutron/snabbnfv-traffic
+    export NEUTRON_NFV_CONFIG=$SNABB_PATH/scripts/bench_env/neutron.config
+else
+    printf "NEUTRONNFV design not found\n"
     exit 1
 fi
 
