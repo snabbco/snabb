@@ -109,40 +109,48 @@ end
 
 
 ---
---- named expiration tables
+--- named connection track tables
 ---
 
-local named_conntracks = {}
-
-local function register_name(name)
-   if named_conntracks[name] == nil then
-      named_conntracks[name] = {{},{}}
+local conntracks = {}
+local time = lib.get_fast_time
+local function new(t) return {{}, {}, time()+t} end
+local function put(p, k, v) p[0][k] = v end
+local function get(p, k) return p[0][k] or p[1][k] end
+local function age(p, t)
+   if time() > p[2] then
+      p[0], p[1], p[2] = {}, p[0], time()+t
    end
-   local pair = named_conntracks[name]
-   local function put(k, v) pair[0][k] = v                  end
-   local function get(k)    return pair[0][k] or pair[1][k] end
-   local function age()     pair[0], pair[1] = {}, pair[0]  end
-   return put, get, age
 end
 
-
----
---- track bidirectional connections for packet (header) buffers
----
-local lib = require 'core.lib'
-local function register_conntrack(name)
-   local put, get, age = register_name(name)
-   return {
-      track = function(b)
-         local spec = spec_from_header(b)
-         do return end
-         put(spec_tostring(spec), true)
-         reverse_spec(spec)
-         put(spec_tostring(spec), true)
-      end,
-      check = function(b) return get(spec_tostring(spec_from_header(b))) end,
-      age = age,
-   }
+return function (name)
+   if name == '*' then
+      return {
+         clear = function ()
+            for name, p in pairs(conntracks) do
+               p[0], p[1], p[2] = {}, {}, time()+t
+            end
+            conntracks = {}
+         end,
+         age = function ()
+            for name, p in pairs(conntracks) do
+               age(p, 7200)
+            end
+         end,
+      }
+   else
+      local p = conntracks[name] or new(7200)
+      return {
+         track = function (b)
+            local spec = spec_from_header(b)
+            put(p, spec_tostring(spec), true)
+            reverse_spec(spec)
+            put(p, spec_tostring(spec), true)
+         end,
+         check = function (b)
+            return get(p, spec_tostring(spec_from_header(b)))
+         end
+         age = function() age(p, 7200) end
+      }
 end
 
-return register_conntrack
