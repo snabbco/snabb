@@ -117,7 +117,6 @@ end
 
 function selftest ()
    print("Rate limiter selftest")
-   timer.init()
    buffer.preallocate(10000)
    
    local c = config.new()
