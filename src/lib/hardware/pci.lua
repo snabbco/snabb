@@ -98,24 +98,6 @@ function set_bus_master (device, enable)
    assert(C.pwrite(fd, value, 2, 0x4) == 2)
 end
 
---- ### Open a device
----
---- Load a device driver for a devie. A fresh copy of the device
---- driver's Lua module is loaded for each device and the module is
---- told at load-time the PCI address of the device it is controlling.
---- This makes the driver source code short because it can assume that
---- it's always talking to the same device.
----
---- This is achieved with our own require()-like function that loads a
---- fresh copy and passes the PCI address as an argument.
-
-open_devices = {}
-
--- Load a new instance of the 'driver' module for 'pciaddress'.
-function open_device(pciaddress, driver)
-   return require(driver).new(pciaddress)
-end
-
 --- ### Selftest
 ---
 --- PCI selftest scans for available devices and performs our driver's
@@ -123,6 +105,7 @@ end
 
 function selftest ()
    print("selftest: pci")
+   scan_devices()
    print_device_summary()
 end
 
