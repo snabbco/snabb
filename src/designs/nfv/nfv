@@ -58,7 +58,6 @@ function run (npackets)
    -- Setup zero-copy
    local nic, vm = app.app_table.nic, app.app_table.vm
    nic:set_rx_buffer_freelist(vm:rx_buffers())
-   timer.init()
    io.flush()
    if not npackets then
       timer.activate(timer.new("report", app.report, 1e9, 'repeating'))

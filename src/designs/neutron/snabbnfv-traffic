@@ -13,6 +13,7 @@ Process traffic between Neutron ports and a physical NIC.]])
 end
 
 function run (pciaddr, confpath, sockpath)
+   engine.log = true
    local mtime = 0
    timer.init()
    while true do

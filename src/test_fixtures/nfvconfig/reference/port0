@@ -2,7 +2,7 @@ return {
   { vlan = 43,
     mac_address = "fa:16:3e:1e:b0:20",
     port_id = "523276c7-73e3-4154-8b67-9c7199bdbb8c",
-    ingress_filter = [[{ { ethertype='ipv6', }, }]],
+    ingress_filter = nil,
     gbps = 8,
     tunnel = {type = "L2TPv3",
               remote_ip = "1:2:3:4:5:6:7:8",

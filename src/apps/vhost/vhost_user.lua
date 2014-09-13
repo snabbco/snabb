@@ -306,7 +306,6 @@ function selftest ()
          vhost_user:report()
       end
    end
-   timer.init()
    timer.activate(timer.new("report", fn, 10e9, 'repeating'))
 
    app.main()

@@ -34,7 +34,6 @@ function run (args)
       end
    end
    app.configure(c)
-   timer.init()
    local fn = function ()
                  print("Transmissions (last 1 sec):")
                  app.report_each_app()

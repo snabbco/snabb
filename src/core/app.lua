@@ -11,6 +11,9 @@ local ffi    = require("ffi")
 local C      = ffi.C
 require("core.packet_h")
 
+-- Set to true to enable logging
+log = false
+
 test_skipped_code = 43
 
 -- The set of all active apps and links in the system.
@@ -32,11 +35,11 @@ function now ()
    return monotonic_now
 end
 
--- Run fn in protected mode (pcall). If it throws an error app will be
--- marked as dead and restarted eventually.
-function with_restart (app, fn)
+-- Run app:methodname() in protected mode (pcall). If it throws an
+-- error app will be marked as dead and restarted eventually.
+local function with_restart (app, methodname)
    -- Run fn in protected mode using pcall.
-   local status, err = pcall(fn)
+   local status, err = pcall(app[methodname], app)
 
    -- If pcall caught an error mark app as "dead" (record time and cause
    -- of death).
@@ -156,6 +159,9 @@ function apply_config_actions (actions, conf)
    end
    -- dispatch all actions
    for name, action in pairs(actions) do
+      if log and action ~= 'keep' then 
+	 io.write("engine: ", action, " app ", name, "\n") 
+      end
       ops[action](name)
    end
    -- Setup links: create (or reuse) and renumber.
@@ -220,10 +226,12 @@ function breathe ()
    -- Inhale: pull work into the app network
    for i = 1, #app_array do
       local app = app_array[i]
+--      if app.pull then
+--         zone(app.zone) app:pull() zone()
       if app.pull and not app.dead then
-         zone(app.zone)
-         with_restart(app, function () app:pull() end)
-         zone()
+	 zone(app.zone)
+	 with_restart(app, 'pull')
+	 zone()
       end
    end
    -- Exhale: push work out through the app network
@@ -238,7 +246,7 @@ function breathe ()
             local receiver = app_array[link.receiving_app]
             if receiver.push and not receiver.dead then
                zone(receiver.zone)
-               with_restart(receiver, function () receiver:push() end)
+               with_restart(receiver, 'push')
                zone()
                progress = true
             end
@@ -263,7 +271,7 @@ function report (options)
             print (name, ("[dead: %s]"):format(app.dead.error))
          elseif app.report then
             print (name)
-            with_restart(app, function () app:report() end)
+            with_restart(app, 'report')
          end
       end
    end
