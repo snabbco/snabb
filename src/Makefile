@@ -59,7 +59,7 @@ test_ci: $(TESTMODS) $(TESTSCRIPTS)
 
 $(TESTMODS): testlog snabb
 	$(E) "TEST      $@"
-	$(Q) ./snabb -t $@ > testlog/$@ || ( \
+	$(Q) ./snabb -t $@ > testlog/$@ 2>&1 || ( \
 		EXITCODE="$$?"; \
 		[ "$$EXITCODE" -eq $(TEST_SKIPPED) ] \
 		&& ( \
@@ -76,7 +76,7 @@ $(TESTMODS): testlog snabb
 testlog = testlog/$(shell echo "$(@)" | sed -e 's_/_._g')
 $(TESTSCRIPTS): testlog snabb
 	$(E) "TEST      $@"
-	$(Q) ./$@ > $(testlog) || ( \
+	$(Q) ./$@ > $(testlog) 2>&1 || ( \
 		EXITCODE="$$?"; \
 		[ "$$EXITCODE" -eq $(TEST_SKIPPED) ] \
 		&& ( \

@@ -11,6 +11,9 @@ local ffi    = require("ffi")
 local C      = ffi.C
 require("core.packet_h")
 
+-- Set to true to enable logging
+log = false
+
 test_skipped_code = 43
 
 -- The set of all active apps and links in the system.
@@ -156,6 +159,9 @@ function apply_config_actions (actions, conf)
    end
    -- dispatch all actions
    for name, action in pairs(actions) do
+      if log and action ~= 'keep' then 
+	 io.write("engine: ", action, " app ", name, "\n") 
+      end
       ops[action](name)
    end
    -- Setup links: create (or reuse) and renumber.
