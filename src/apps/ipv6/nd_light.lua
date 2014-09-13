@@ -104,7 +104,6 @@ function nd_light:new (config)
 		 end
    nh.timer = timer.new("ns retransmit", nh.timer_cb, 1e6 * config.delay)
    self._next_hop = nh
-   timer.init()
    self._dgram = datagram:new()
    packet.deref(self._dgram:packet())
    return o

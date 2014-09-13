@@ -11,8 +11,11 @@ ticks = false     -- current time, in ticks
 ns_per_tick = 1e6 -- tick resolution (millisecond)
 timers = {}       -- table of {tick->timerlist}
 
+-- This function can be removed in the future.
+-- For now it exists to help people understand why their code now
+-- breaks if it calls timer.init().
 function init ()
-   ticks = math.floor(tonumber(C.get_time_ns() / ns_per_tick))
+   error("timer.init() function is gone (timer module auto-initializes)")
 end
 
 -- Run all timers that have expired.
@@ -39,6 +42,10 @@ function run_to_time (ns)
 end
 
 function activate (t)
+   -- Initialize time
+   if not ticks then
+      ticks = math.floor(tonumber(C.get_time_ns() / ns_per_tick))
+   end
    local tick = ticks + t.ticks
    if timers[tick] then
       table.insert(timers[tick], t)

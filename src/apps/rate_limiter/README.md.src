@@ -22,8 +22,6 @@ Otherwise it may limit effective rate.
 
 Use following pattern to create and init Rate Limiter instance:
 
-    timer.init()
-    ...
     app.apps.rate_limiter = app.new(RateLimiter.new(rate, bucket_size))
     app.apps.rate_limiter:init_timer()
 

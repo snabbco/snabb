@@ -268,7 +268,6 @@ prepare_header_template()
 
 function selftest ()
    print("Keyed IPv6 tunnel selftest")
-   -- timer.init()
    local ok = true
 
    local input_file = "apps/keyed_ipv6_tunnel/selftest.cap.input"
