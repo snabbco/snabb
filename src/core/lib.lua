@@ -272,7 +272,7 @@ function malloc (etype)
       etype = ffi.typeof(etype)
    end
    local size = ffi.sizeof(etype)
-   local ptr = memory.malloc(size)
+   local ptr = memory.dma_alloc(size)
    return ffi.cast(ffi.typeof("$*", etype), ptr)
 end
 

@@ -11,7 +11,7 @@ module(...,package.seeall)
 local ffi      = require "ffi"
 local C        = ffi.C
 local lib      = require("core.lib")
-local bus      = require("lib.hardware.bus")
+local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local index_set = require("lib.index_set")
 local macaddress = require("lib.macaddress")
@@ -32,7 +32,6 @@ local M_sf = {}; M_sf.__index = M_sf
 
 function new_sf (pciaddress)
    local dev = { pciaddress = pciaddress, -- PCI device address
-                 info = bus.device_info(pciaddress),
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
                  txdesc = 0,     -- Transmit descriptors (pointer)
@@ -52,8 +51,8 @@ end
 
 
 function M_sf:open ()
-   self.info.set_bus_master(self.pciaddress, true)
-   local base = self.info.map_pci_memory(self.pciaddress, 0)
+   pci.set_bus_master(self.pciaddress, true)
+   local base = pci.map_pci_memory(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, base)
    register.define(transmit_registers_desc, self.r, base)
    register.define(receive_registers_desc, self.r, base)
@@ -84,9 +83,9 @@ end
 
 function M_sf:init_dma_memory ()
    self.rxdesc, self.rxdesc_phy =
-      self.info.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
+      memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
    self.txdesc, self.txdesc_phy =
-      self.info.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
+      memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
    -- Add bounds checking
    self.rxdesc = lib.bounds_checked(rxdesc_t, self.rxdesc, 0, num_descriptors)
    self.txdesc = lib.bounds_checked(txdesc_t, self.txdesc, 0, num_descriptors)
@@ -322,7 +321,6 @@ local M_pf = {}; M_pf.__index = M_pf
 
 function new_pf (pciaddress)
    local dev = { pciaddress = pciaddress, -- PCI device address
-                 info = bus.device_info(pciaddress),
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
                  qs = {},          -- queue statistic registers
@@ -334,8 +332,8 @@ function new_pf (pciaddress)
 end
 
 function M_pf:open ()
-   self.info.set_bus_master(self.pciaddress, true)
-   self.base = self.info.map_pci_memory(self.pciaddress, 0)
+   pci.set_bus_master(self.pciaddress, true)
+   self.base = pci.map_pci_memory(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, self.base)
    register.define_array(switch_config_registers_desc, self.r, self.base)
    register.define_array(packet_filter_desc, self.r, self.base)
@@ -436,7 +434,6 @@ function M_pf:new_vf (poolnum)
    local vf = {
       pf = self,
       -- some things are shared with the main device...
-      info = self.info,             -- pci device info
       base = self.base,             -- mmap()ed register file
       s = self.s,                   -- Statistics registers
       -- and others are our own
