@@ -32,6 +32,7 @@ local M_sf = {}; M_sf.__index = M_sf
 
 function new_sf (pciaddress)
    local dev = { pciaddress = pciaddress, -- PCI device address
+                 fd = false,       -- File descriptor for PCI memory
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
                  txdesc = 0,     -- Transmit descriptors (pointer)
@@ -52,17 +53,21 @@ end
 
 function M_sf:open ()
    pci.set_bus_master(self.pciaddress, true)
-   local base = pci.map_pci_memory(self.pciaddress, 0)
-   register.define(config_registers_desc, self.r, base)
-   register.define(transmit_registers_desc, self.r, base)
-   register.define(receive_registers_desc, self.r, base)
-   register.define(statistics_registers_desc, self.s, base)
+   self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
+   register.define(config_registers_desc, self.r, self.base)
+   register.define(transmit_registers_desc, self.r, self.base)
+   register.define(receive_registers_desc, self.r, self.base)
+   register.define(statistics_registers_desc, self.s, self.base)
    self.txpackets = ffi.new("struct packet *[?]", num_descriptors)
    self.rxbuffers = ffi.new("struct buffer *[?]", num_descriptors)
    return self:init()
 end
 
 function M_sf:close()
+   if self.fd then 
+      pci.close_pci_resource(self.fd) 
+      self.fd = false
+   end
 end
 
 --- See data sheet section 4.6.3 "Initialization Sequence."
@@ -333,13 +338,20 @@ end
 
 function M_pf:open ()
    pci.set_bus_master(self.pciaddress, true)
-   self.base = pci.map_pci_memory(self.pciaddress, 0)
+   self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, self.base)
    register.define_array(switch_config_registers_desc, self.r, self.base)
    register.define_array(packet_filter_desc, self.r, self.base)
    register.define(statistics_registers_desc, self.s, self.base)
    register.define_array(queue_statistics_registers_desc, self.qs, self.base)
    return self:init()
+end
+
+function M_pf:close()
+   if self.fd then 
+      pci.close_pci_resource(self.fd) 
+      self.fd = false
+   end
 end
 
 function M_pf:init ()
