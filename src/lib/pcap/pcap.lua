@@ -90,6 +90,6 @@ function readc(file, type)
       error("short read of " .. type .. " from " .. tostring(file))
    end
    local obj = ffi.new(type)
-   ffi.copy(obj, string)
+   ffi.copy(obj, string, ffi.sizeof(type))
    return obj
 end
