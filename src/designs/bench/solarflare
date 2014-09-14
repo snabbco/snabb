@@ -109,7 +109,6 @@ function run (npackets)
    engine.Hz = false
    
    local start = C.get_monotonic_time()
-   timer.init()
    timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
    while engine.app_table.source.output.tx.stats.txpackets < npackets do
       engine.main({duration = 0.01, no_report = true})
