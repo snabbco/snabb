@@ -32,22 +32,26 @@ if [ -d $TMP_DIR ]; then
 fi
 mkdir -p $TMP_DIR
 
+initial=true
+
 # Loop pulling/cloning the repo.
 while true; do
     if [ ! -d $NEUTRON_DIR ]; then
-	git clone --depth 1 git://$SYNC_HOST/$SYNC_PATH $NEUTRON_DIR
+    git clone --depth 1 git://$SYNC_HOST/$SYNC_PATH $NEUTRON_DIR
     fi
     cd $NEUTRON_DIR
     git fetch
-    if ! git diff --quiet origin/master; then
-	git pull --rebase origin master
-	echo "Generating new configuration"
-	$NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR
+    git diff --quiet origin/master
+    if [ $? != 0 -o $initial = true ]; then
+        git pull --rebase origin master
+        echo "Generating new configuration"
+        sudo $NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR
         # Only (atomically) replace configurations that have changed.
         for conf in $TMP_DIR/*; do
             dest=$SNABB_DIR/$(basename $conf)
-            if ! diff $conf $dest; then mv $conf $dest; fi
+            if ! diff $conf $dest; then mv -f $conf $dest; fi
         done
+        initial=false
     fi
     sleep $SYNC_INTERVAL
 done
