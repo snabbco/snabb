@@ -31,9 +31,39 @@ typedef union {
  */
 
 typedef union {
-  uint64_t quads[2];
-  uint32_t longs[4];
-  uint16_t shorts[8];
+  struct {
+    uint16_t       type;
+  } generic;
+  struct {
+    uint16_t       type;
+    uint16_t       q_id;
+    uint32_t       rq_id;
+    uint16_t       len;
+    uint16_t       flags;
+  } rx;
+  struct {  /* This *must* have same initial layout as [rx]. */
+    uint16_t       type;
+    uint16_t       q_id;
+    uint32_t       rq_id;
+    uint16_t       len;
+    uint16_t       flags;
+    uint16_t       subtype;
+  } rx_discard;
+  struct {
+    uint16_t       type;
+    uint16_t       q_id;
+    uint16_t       desc_id;
+  } tx;
+  struct {  /* This *must* have same layout as [tx]. */
+    uint16_t       type;
+    uint16_t       q_id;
+    uint16_t       desc_id;
+    uint16_t       subtype;
+  } tx_error;
+  struct {
+    uint16_t       type;
+    uint16_t       q_id;
+  } rx_no_desc_trunc;
 } ef_event;
 
 enum {
