@@ -234,28 +234,50 @@ function SolarFlareNic:stop()
        "ef_driver_close")
 end
 
-local n_ev, event_type, n_tx_done
 local band = bit.band
+
+-- Access to ef_event structure without using C bitfields
+
+local function ef_event_type(event)
+   return event.shorts[0];
+end
+
+local function ef_event_q_id(event)
+   return event.shorts[1];
+end
+
+local function ef_event_rx_rq_id(event)
+   return event.longs[1];
+end
+
+local function ef_event_rx_len(event)
+   return event.shorts[4];
+end
+
+local function ef_event_rx_flags(event)
+   return event.shorts[5];
+end
 
 function SolarFlareNic:pull()
    self.stats.pull = (self.stats.pull or 0) + 1
    repeat
-      n_ev = self.ef_vi_eventq_poll(self.ef_vi_p, events, EVENTS_PER_POLL)
+      local n_ev = self.ef_vi_eventq_poll(self.ef_vi_p, events, EVENTS_PER_POLL)
 --      self.stats.max_n_ev = math.max(n_ev, self.stats.max_n_ev or 0)
       if n_ev > 0 then
          for i = 0, n_ev - 1 do
-            event_type = events[i].generic.type
+            local event = events[i]
+            local event_type = ef_event_type(event)
             if event_type == C.EF_EVENT_TYPE_RX then
                self.stats.rx = (self.stats.rx or 0) + 1
-               if band(events[i].rx.flags, C.EF_EVENT_FLAG_SOP) == 1 then
+               if band(ef_event_rx_flags(event), C.EF_EVENT_FLAG_SOP) == 1 then
                   self.rxpacket = packet.allocate()
                else
                   assert(self.rxpacket, "no rxpacket in device, non-SOP buffer received")
                end
                packet.add_iovec(self.rxpacket,
-                                self.rxbuffers[events[i].rx.rq_id],
-                                events[i].rx.len)
-               if band(events[i].rx.flags, C.EF_EVENT_FLAG_CONT) == 0 then
+                                self.rxbuffers[ef_event_rx_rq_id(event)],
+                                ef_event_rx_len(event))
+               if band(ef_event_rx_flags(event), C.EF_EVENT_FLAG_CONT) == 0 then
                   if not link.full(self.output.tx) then
                      link.transmit(self.output.tx, self.rxpacket)
                   else
@@ -264,11 +286,11 @@ function SolarFlareNic:pull()
                   end
                   self.rxpacket = nil
                end
-               self:enqueue_receive(events[i].rx.rq_id)
+               self:enqueue_receive(ef_event_rx_rq_id(event))
             elseif event_type == C.EF_EVENT_TYPE_TX then
-               n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p,
-                                                        events[i],
-                                                        tx_request_ids)
+               local n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p,
+                                                              event,
+                                                              tx_request_ids)
 --               self.stats.max_n_tx_done = math.max(n_tx_done, self.stats.max_n_tx_done or 0)
                self.stats.txpackets = (self.stats.txpackets or 0) + n_tx_done
                for i = 0, (n_tx_done - 1) do

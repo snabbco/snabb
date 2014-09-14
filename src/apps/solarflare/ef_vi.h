@@ -23,44 +23,17 @@ typedef union {
   uint16_t  u16[4];
 } ef_vi_qword;
 
+/* LuaJIT does not currently compile code which contains accesses to C
+ * bit fields.  As a workaround, we are treating the event structure
+ * as union of arrays of the integers that are contained in the
+ * structure and access them through LUA helper functions in
+ * solarflare.lua.
+ */
+
 typedef union {
-  struct {
-    unsigned       type       :16;
-  } generic;
-  struct {
-    unsigned       type       :16;
-    unsigned       q_id       :16;
-    unsigned       rq_id      :32;
-    unsigned       len        :16;
-    unsigned       flags      :16;
-  } rx;
-  struct {  /* This *must* have same initial layout as [rx]. */
-    unsigned       type       :16;
-    unsigned       q_id       :16;
-    unsigned       rq_id      :32;
-    unsigned       len        :16;
-    unsigned       flags      :16;
-    unsigned       subtype    :16;
-  } rx_discard;
-  struct {
-    unsigned       type       :16;
-    unsigned       q_id       :16;
-    unsigned       desc_id    :16;
-  } tx;
-  struct {  /* This *must* have same layout as [tx]. */
-    unsigned       type       :16;
-    unsigned       q_id       :16;
-    unsigned       desc_id    :16;
-    unsigned       subtype    :16;
-  } tx_error;
-  struct {
-    unsigned       type       :16;
-    unsigned       q_id       :16;
-  } rx_no_desc_trunc;
-  struct {
-    unsigned       type       :16;
-    unsigned       data;
-  } sw;
+  uint64_t quads[2];
+  uint32_t longs[4];
+  uint16_t shorts[8];
 } ef_event;
 
 enum {
