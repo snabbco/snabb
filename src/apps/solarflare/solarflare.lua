@@ -290,14 +290,12 @@ function SolarFlareNic:pull()
    until n_ev < EVENTS_PER_POLL
 end
 
-local p, push
-
 function SolarFlareNic:push()
    self.stats.push = (self.stats.push or 0) + 1
    local l = self.input.rx
-   push = false
+   local push = false
    while not link.empty(l) and self.tx_space >= packet.niovecs(link.front(l)) do
-      p = link.receive(l)
+      local p = link.receive(l)
       self.enqueue_transmit(self, p)
       push = true
       -- enqueue_transmit references the packet once for each buffer
@@ -342,8 +340,6 @@ function spairs(t, order)
       end
    end
 end
-
-local count = 0
 
 function SolarFlareNic:report()
    print("report on solarflare device", self.ifname)
