@@ -202,9 +202,9 @@ function SolarFlareNic:open()
    -- set up receive buffers
    self.rxbuffers = {}
    for id = 1, RECEIVE_BUFFER_COUNT do
-      self:enqueue_receive(id)
+      self.enqueue_receive(self, id)
    end
-   self:flush_receives()
+   self.flush_receives(self)
 
    -- set up transmit variables
    self.tx_packets = {}
@@ -286,7 +286,7 @@ function SolarFlareNic:pull()
                   end
                   self.rxpacket = nil
                end
-               self:enqueue_receive(ef_event_rx_rq_id(event))
+               self.enqueue_receive(self, ef_event_rx_rq_id(event))
             elseif event_type == C.EF_EVENT_TYPE_TX then
                local n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p,
                                                               event,
@@ -307,7 +307,7 @@ function SolarFlareNic:pull()
       end
       if self.receives_enqueued >= FLUSH_RECEIVE_QUEUE_THRESHOLD then
          self.stats.rx_flushes = (self.stats.rx_flushes or 0) + 1
-         self:flush_receives()
+         self.flush_receives(self)
       end
    until n_ev < EVENTS_PER_POLL
 end
@@ -320,7 +320,7 @@ function SolarFlareNic:push()
    push = false
    while not link.empty(l) and self.tx_space >= packet.niovecs(link.front(l)) do
       p = link.receive(l)
-      self:enqueue_transmit(p)
+      self.enqueue_transmit(self, p)
       push = true
       -- enqueue_transmit references the packet once for each buffer
       -- that it contains.  Whenever a DMA fishes, the packet is
