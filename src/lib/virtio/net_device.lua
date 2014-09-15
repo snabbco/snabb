@@ -310,24 +310,20 @@ end
 local pagebits = memory.huge_page_bits
 
 -- Cache of the latest referenced physical page.
-local last_virt_page = false
-local last_virt_offset = false
 function VirtioNetDevice:translate_physical_addr (addr)
    local page = bit.rshift(addr, pagebits)
-   if page == last_virt_page then
-      return addr + last_virt_offset
+   if page == self.last_virt_page then
+      return addr + self.last_virt_offset
    end
    local phys = memory.virtual_to_physical(addr)
-   last_virt_page = page
-   last_virt_offset = phys - addr
+   self.last_virt_page = page
+   self.last_virt_offset = phys - addr
    return phys
 end
 
-local last_guest_page = false
-local last_guest_offset = false
 function VirtioNetDevice:map_from_guest (addr)
    local page = bit.rshift(addr, pagebits)
-   if page == last_guest_page then return addr + last_guest_offset end
+   if page == self.last_guest_page then return addr + self.last_guest_offset end
    local result
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
@@ -337,8 +333,8 @@ function VirtioNetDevice:map_from_guest (addr)
             self.mem_table[0] = m
          end
          result = addr + m.snabb - m.guest
-         last_guest_page = page
-         last_guest_offset = m.snabb - m.guest
+         self.last_guest_page = page
+         self.last_guest_offset = m.snabb - m.guest
          break
       end
    end
