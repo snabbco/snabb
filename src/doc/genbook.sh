@@ -12,11 +12,15 @@ for png in $(find .. -name "*.png"); do
 done
 
 cat <<EOF
-% Snabb Switch
+% Snabb Switch Reference Manual
 % $(git log --pretty=format:%an | \
         grep -v -e '^root$' | \
         sort | uniq -c | sort -nr | sed 's/^[0-9 ]*//' | \
-        awk 'NR > 1 { printf("; ") } { printf("%s", $0) } END { print("") }')
+        awk 'BEGIN     { first=1; }
+             (NF >= 2) { if (first) { first=0 } else { printf("; ") };
+                         printf("%s", $0) }
+             END { print("") }')
+% Version $(git log -n1 --format="format:%h, %ad%n")
 
 $(cat ../README.md)
 
