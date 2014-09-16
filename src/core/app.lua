@@ -49,7 +49,7 @@ end
 -- Restart dead apps.
 function restart_dead_apps ()
    local restart_delay = 2 -- seconds
-   local actions = {}
+   local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
    local restart = false
 
    -- Collect 'restart' actions for dead apps and log their errors.
@@ -59,9 +59,9 @@ function restart_dead_apps ()
          restart = true
          io.stderr:write(("Restarting %s (died at %f: %s)\n")
                          :format(app.name, app.dead.time, app.dead.error))
-         actions[app.name] = 'restart'
+         table.insert(actions.restart, app.name)
       else
-         actions[app.name] = 'keep'
+         table.insert(actions.keep, app.name)
       end
    end
 
@@ -96,10 +96,17 @@ function equal (x, y)
 end
 
 -- Return the configuration actions needed to migrate from old config to new.
--- The return value is a table:
---   app_name -> stop | start | keep | restart | reconfig
+--
+-- Here is an example return value for a case where two apps must
+-- start, one must stop, and one is kept as it is:
+--   { start = {'newapp1', 'newapp2'},
+--     stop  = {'deadapp1'},
+--     keep  = {'oldapp1'},
+--     restart = {},
+--     reconfig = {}
+--   }
 function compute_config_actions (old, new)
-   local actions = {}
+   local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
    for appname, info in pairs(new.apps) do
       local class, arg = info.class, info.arg
       local action = nil
@@ -108,10 +115,12 @@ function compute_config_actions (old, new)
       elseif not equal(old.apps[appname].arg, arg)
                                               then action = 'reconfig'
       else                                         action = 'keep'  end
-      actions[appname] = action
+      table.insert(actions[action], appname)
    end
    for appname in pairs(old.apps) do
-      if not new.apps[appname] then actions[appname] = 'stop' end
+      if not new.apps[appname] then
+	 table.insert(actions['stop'], appname)
+      end
    end
    return actions
 end
@@ -157,12 +166,14 @@ function apply_config_actions (actions, conf)
          ops.restart(name)
       end
    end
-   -- dispatch all actions
-   for name, action in pairs(actions) do
-      if log and action ~= 'keep' then 
-	 io.write("engine: ", action, " app ", name, "\n") 
+   -- Dispatch actions in a suitable sequence.
+   for _, action in ipairs({'stop', 'restart', 'keep', 'reconfig', 'start'}) do
+      for _, name in ipairs(actions[action]) do
+	 if log and action ~= 'keep' then
+            io.write("engine: ", action, " app ", name, "\n") 
+         end
+	 ops[action](name)
       end
-      ops[action](name)
    end
    -- Setup links: create (or reuse) and renumber.
    for linkspec in pairs(conf.links) do
@@ -371,9 +382,3 @@ end
 
 -- XXX add graphviz() function back.
 
-function module_init ()
-   -- XXX Find a better place for this.
-   require("lib.hardware.bus").scan_devices()
-end
-
-module_init()

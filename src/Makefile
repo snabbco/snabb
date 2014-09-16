@@ -100,7 +100,7 @@ $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc -Wl,-E -I ../deps/luajit/src -I ../deps/include -I . -c -Wall -Werror -o $@ $<
+	$(Q) gcc -Wl,-E -I ../deps/luajit/src -I . -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"

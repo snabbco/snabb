@@ -1,9 +1,12 @@
 #include <assert.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdint.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <stdio.h>
+#include <sys/file.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 /// ### Access PCI devices using Linux sysfs (`/sys`) filesystem
@@ -21,21 +24,40 @@
 ///         /sys/bus/pci/devices/0000:00:04.0/resource0
 /// and then read and write that memory to access the device.
 
-// Return a point to the mapped memory, or NULL on failure.
-uint32_t volatile *map_pci_resource(const char *path)
+// Open a PCI resource for memory-mapped I/O.
+// Lock the resource for exclusive access.
+int open_pci_resource(const char *path)
 {
   int fd;
+  if ((fd = open(path, O_RDWR | O_SYNC)) == -1) {
+    return -1;
+  }
+  if (flock(fd, LOCK_EX|LOCK_NB) == -1) {
+    fprintf(stderr, "failed to lock %s\n", path);
+    close(fd);
+    return -1;
+  }
+  return fd;
+}
+
+// Return a point to the mapped memory, or NULL on failure.
+uint32_t volatile *map_pci_resource(int fd)
+{
   void *ptr;
   struct stat st;
-  assert( (fd = open(path, O_RDWR | O_SYNC)) >= 0 );
   assert( fstat(fd, &st) == 0 );
   ptr = mmap(NULL, st.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-  close(fd);
   if (ptr == MAP_FAILED) {
     return NULL;
   } else {
     return (uint32_t volatile *)ptr;
   }
+}
+
+void close_pci_resource(int fd)
+{
+  flock(fd, LOCK_UN);
+  close(fd);
 }
 
 /// Little convenience function for Lua to open the `config` PCI sysfs

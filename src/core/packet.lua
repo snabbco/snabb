@@ -20,7 +20,7 @@ local packet_size = ffi.sizeof("struct packet")
 
 function module_init ()
    for i = 0, max_packets-1 do
-      free(ffi.cast("struct packet *", memory.malloc(packet_size)))
+      free(ffi.cast("struct packet *", memory.dma_alloc(packet_size)))
    end
 end
 

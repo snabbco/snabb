@@ -95,6 +95,7 @@ function selftest ()
       print("SNABB_TEST_INTEL10G_PCIDEVA was not set\nTest skipped")
       os.exit(engine.test_skipped_code)
    end
+   engine.log = true
    for i, confpath in ipairs({"test_fixtures/nfvconfig/switch_nic/x",
                               "test_fixtures/nfvconfig/switch_filter/x",
                               "test_fixtures/nfvconfig/switch_qos/x",
@@ -104,6 +105,7 @@ function selftest ()
                               "test_fixtures/nfvconfig/scale_change/x",
                               "test_fixtures/nfvconfig/scale_change/y"})
    do
+      print("testing:", confpath)
       apply(load(confpath, pcideva, "/dev/null"))
    end
 end
