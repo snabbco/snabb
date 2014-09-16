@@ -142,13 +142,17 @@ doc/snabbswitch.md: markdown Makefile doc/genbook.sh
 
 doc/snabbswitch.pdf: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
-	$(Q) pandoc --template=doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o $@ $<
+	$(Q) (cd doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o snabbswitch.pdf snabbswitch.md)
 
-doc/snabbswitch.html doc/snabbswitch.epub: doc/snabbswitch.md
+doc/snabbswitch.html: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
-	$(Q) pandoc -S --toc --chapters -o $@ $<
+	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.html snabbswitch.md)
 
-CLEAN = snabb snabbswitch obj doc/snabbswitch.* testlog
+doc/snabbswitch.epub: doc/snabbswitch.md
+	$(E) "PANDOC    $@"
+	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
+
+CLEAN = snabb snabbswitch obj doc/snabbswitch.* doc/.images/* testlog
 
 clean:
 	$(E) "RM        $(CLEAN)"
