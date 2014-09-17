@@ -12,6 +12,9 @@ local C = ffi.C
 local AF_INET6 = 10
 local lib = require("core.lib")
 
+-- Set to true to enable traffic policing via the rate limiter app
+policing = false
+
 -- Compile app configuration from <file> for <pciaddr> and vhost_user
 -- <socket>. Returns configuration and zerocopy pairs.
 function load (file, pciaddr, sockpath)
@@ -60,7 +63,7 @@ function load (file, pciaddr, sockpath)
          config.link(c, Tunnel..".decapsulated -> "..VM_rx)
          VM_rx, VM_tx = ND..".south", Tunnel..".encapsulated"
       end
-      if t.gbps then
+      if policing and t.gbps then
          local QoS = "QoS_"..name
          local rate = t.gbps * 1000000 / 8
          config.app(c, QoS, RateLimiter, ([[{rate = %d, bucket_capacity = %d}]]):format(rate, rate))
