@@ -68,9 +68,17 @@ for number in $("$JQ" ".[].number" "$tmpdir/pulls"); do
                 printf "\n$task" >> "$log"
 
                 # Ensure `head' is checked out and (re)built.
-                (cd "$tmpdir/repo"
+                out=$(cd "$tmpdir/repo"
                     git checkout "$head"
-                    make > /dev/null 2>&1)
+                    make 2>&1)
+
+                # If build failed, fail the task.
+                if [ "$?" != "0" ]; then
+                    echo ": build failure" >> "$log"
+                    echo "$out" >> "$log"
+                    status=failure
+                    continue
+                fi
 
                 # Run task and record results.
                 out=$( (cd "$tmpdir/repo"
