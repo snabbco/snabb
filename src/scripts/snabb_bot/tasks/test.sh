@@ -14,5 +14,7 @@ if echo "$test_out" | grep ERROR > /dev/null; then
     exit 1
 else
     echo "Tests successful."
+    echo
+    echo "$test_out"
     exit 0
 fi
