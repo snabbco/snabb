@@ -149,8 +149,9 @@ return function (name)
          end,
          check = function (b)
             return get(p, spec_tostring(spec_from_header(b)))
-         end
-         age = function() age(p, 7200) end
+         end,
+         age = function() age(p, 7200) end,
       }
+   end
 end
 
