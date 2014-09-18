@@ -149,8 +149,38 @@ function selftest ()
    sq_sq(pcideva, pcidevb)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
+   do
+      local aSends = engine.app_table.nicA.input.rx.stats.txpackets
+      local aGets = engine.app_table.nicA.output.tx.stats.rxpackets
+      local bSends = engine.app_table.nicB.input.rx.stats.txpackets
+      local bGets = engine.app_table.nicB.output.tx.stats.rxpackets
+
+      if bGets < aSends/2
+         or aGets < bSends/2
+         or bGets < aGets/2
+         or aGets < bGets/2
+      then
+         print ('not enought packets somewhere')
+         os.exit (1)
+      end
+   end
+
    mq_sq(pcideva, pcidevb)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
+
+   do
+      local aSends = engine.app_table.nicAs.input.rx.stats.txpackets
+      local b0Gets = engine.app_table.nicBm0.output.tx.stats.rxpackets
+      local b1Gets = engine.app_table.nicBm1.output.tx.stats.rxpackets
+
+      if b0Gets < b1Gets/2 or
+         b1Gets < b0Gets/2 or
+         b0Gets+b1Gets < aSends/2
+      then
+         print ('not enought packets somewhere')
+         os.exit (1)
+      end
+   end
 end
 
 -- open two singlequeue drivers on both ends of the wire
