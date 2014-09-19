@@ -399,6 +399,7 @@ local function generateConformFunctionString(conf)
 end
 
 PacketFilter = {}
+local conntrack = require('apps.packet_filter.conntrack')('*')
 
 function PacketFilter:new (arg)
    local conf = arg and config.parse_app_arg(arg) or {}
@@ -485,6 +486,7 @@ function selftest ()
          PacketFilter,
          v6_rules
       )
+   config.app(c, "statefull_pass1", PacketFilter)
    config.app(c, "sink1", basic_apps.Sink )
    config.link(c, "source1.output -> packet_filter1.input")
    config.link(c, "packet_filter1.output -> sink1.input")
@@ -535,6 +537,7 @@ function selftest ()
    app.breathe()
 
    app.report()
+   print (conntrack.dump())
 
    local packet_filter1_passed =
       app.app_table.packet_filter1.output.output.stats.txpackets

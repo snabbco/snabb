@@ -52,12 +52,12 @@ local conn_spec_ipv4 = ffi.typeof 'conn_spec_ipv4'
 local function conn_spec_from_ipv4_header(b)
    local spec = conn_spec_ipv4()
    do
-      local hdr_ips = ffi.cast('uint32_t[2]', b+IPV4_SOURCE_OFFSET)
+      local hdr_ips = ffi.cast('uint32_t*', b+IPV4_SOURCE_OFFSET)
       spec.src_ip = hdr_ips[0]
       spec.dst_ip = hdr_ips[1]
    end
    do
-      local hdr_ports = ffi.cast('uint16_t[2]', b+IPV4_SOURCE_PORT_OFFSET)
+      local hdr_ports = ffi.cast('uint16_t*', b+IPV4_SOURCE_PORT_OFFSET)
       spec.src_port = hdr_ports[0]
       spec.dst_port = hdr_ports[1]
    end
@@ -108,18 +108,65 @@ local function spec_tostring(spec)
 end
 
 
+-- show a spec from a binary string
+local function dump_from_string(k)
+   local ip_tostring, spec = nil, nil
+
+   if #k == ffi.sizeof(conn_spec_ipv6) then
+      ip_tostring = function (ip)
+         return string.format(
+            '%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x',
+            tonumber(bit.band(bit.rshift(ip.a, 56), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.a, 48), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.a, 40), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.a, 32), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.a, 24), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.a, 16), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.a,  8), 0xFF)),
+            tonumber(bit.band(ip.a, 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.b, 56), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.b, 48), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.b, 40), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.b, 32), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.b, 24), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.b, 16), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip.b,  8), 0xFF)),
+            tonumber(bit.band(ip.b, 0xFF)))
+      end
+      spec = conn_spec_ipv6()
+
+   elseif #k == ffi.sizeof(conn_spec_ipv4) then
+      ip_tostring = function (ip)
+         return string.format(
+            '%d.%d.%d.%d',
+            tonumber(bit.band(bit.rshift(ip, 24), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip, 16), 0xFF)),
+            tonumber(bit.band(bit.rshift(ip,  8), 0xFF)),
+            tonumber(bit.band(ip, 0xFF)))
+      end
+      spec = conn_spec_ipv4()
+   end
+
+   ffi.copy(spec, k, ffi.sizeof(spec))
+   return string.format(
+      '[%d] %s/%d - %s/%d',
+      spec.protocol,
+      ip_tostring(spec.src_ip), spec.src_port,
+      ip_tostring(spec.dst_ip), spec.dst_port)
+end
+
 ---
 --- named connection track tables
 ---
 
 local conntracks = {}
-local time = lib.get_fast_time
+local time = ffi.C.get_fast_time
 local function new(t) return {{}, {}, time()+t} end
-local function put(p, k, v) p[0][k] = v end
-local function get(p, k) return p[0][k] or p[1][k] end
+local function put(p, k, v) p[1][k] = v end
+local function get(p, k) return p[1][k] or p[2][k] end
 local function age(p, t)
-   if time() > p[2] then
-      p[0], p[1], p[2] = {}, p[0], time()+t
+   if time() > p[3] then
+      p[1], p[2], p[3] = {}, p[1], time()+t
    end
 end
 
@@ -128,7 +175,7 @@ return function (name)
       return {
          clear = function ()
             for name, p in pairs(conntracks) do
-               p[0], p[1], p[2] = {}, {}, time()+t
+               p[1], p[2], p[3] = {}, {}, time()+t
             end
             conntracks = {}
          end,
@@ -137,9 +184,28 @@ return function (name)
                age(p, 7200)
             end
          end,
+         dump = function ()
+            for name, p in pairs(conntracks) do
+               print (string.format('---- %s -----', name))
+               local rem_time = p[3] - time()
+               print ('current connections')
+               for k,v in pairs(p[1]) do
+                  print (dump_from_string(k))
+               end
+               print (string.format('to expire in %g seconds', rem_time))
+               for k,v in pairs(p[2]) do
+                  if not p[1][k] then
+                     print (dump_from_string(k))
+                  end
+               end
+               print ('-----------')
+            end
+         end,
       }
+
    else
       local p = conntracks[name] or new(7200)
+      conntracks[name] = p
       return {
          track = function (b)
             local spec = spec_from_header(b)
