@@ -338,11 +338,10 @@ end
 
 
 local function generateConformFunctionString(conf)
-   local rules = conf.rules
+   local rules = conf.rules or {}
    local T = make_code_concatter()
    T"local ffi = require(\"ffi\")"
    T"local bit = require(\"bit\")"
-   T'local C   = ffi.C'
 
    if conf.track_connections then
       T(([[local track = require('apps.packet_filter.conntrack')(%q).track]]):format(conf.track_connections))
@@ -486,7 +485,7 @@ function selftest ()
          PacketFilter,
          v6_rules
       )
-   config.app(c, "statefull_pass1", PacketFilter)
+   config.app(c, "statefull_pass1", PacketFilter, [[ { pass_connections = 'app_v6' } ]])
    config.app(c, "sink1", basic_apps.Sink )
    config.link(c, "source1.output -> packet_filter1.input")
    config.link(c, "packet_filter1.output -> sink1.input")
