@@ -41,6 +41,12 @@ function run()
         git add *.txt >/dev/null
         git commit -m "Configuration update" >/dev/null
         sleep "$SYNC_INTERVAL"
+        #check that the daemon is still running
+        GITPID=$(cat /tmp/neutron-sync-master.pid)
+        if ! ps -p $GITPID > /dev/null
+        then
+            error "git daemon with $GITPID is down"
+        fi
     done
 }
 
