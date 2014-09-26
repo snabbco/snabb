@@ -1,9 +1,9 @@
 -- This app implements a small subset of IPv6 neighbor discovery
 -- (RFC4861).  It has two ports, north and south.  The south port
 -- attaches to a port on which ND must be performed.  The north port
--- attaches to any app that transmits IPv6 packets and receives
--- Ethernet packets (in a future version, the app should strip the
--- Ethernet header to behave more like a true Ethernet layer).
+-- attaches to an app that processes IPv6 packets.  Packets
+-- transmitted to and received from the north port contain full
+-- Ethernet frames.
 --
 -- The app replies to neighbor solicitations for which it is
 -- configured as target and performs rudimentary address resolution
@@ -14,14 +14,18 @@
 -- advertisements.
 --
 -- If address resolution succeeds, the app constructs an Ethernet
--- header and attaches it to all frames received from the north port.
--- The resulting packets are transmitted to the south port.  All
--- packets from the north port are discarded as long as ND has not yet
--- succeeded.
+-- header with the discovered destination address, configured source
+-- address and ethertype 0x86dd and overwrites the headers of all
+-- packets received from the north port with it.  The resulting
+-- packets are transmitted to the south port.  All packets from the
+-- north port are discarded as long as ND has not yet succeeded.
 --
 -- Address resolution is not repeated for the lifetime of the app.
 -- The app terminates if address resolution has not succeeded after
 -- all retransmits have been performed.
+--
+-- Packets received from the south port are transmitted to the north
+-- port unaltered, i.e. including the Ethernet header.
 
 module(..., package.seeall)
 local ffi = require("ffi")
@@ -145,10 +149,6 @@ function nd_light:new (config)
    sna.icmp = icmp
    sna.dgram = dgram
    o._sna = sna
-
-   -- Pre-allocate datagram for use during packet processing
-   o._dgram = datagram:new()
-   packet.deref(o._dgram:packet())
    return o
 end
 
@@ -247,9 +247,6 @@ function nd_light:push ()
 	 link.transmit(l_reply, self._sna.packet)
       else
 	 -- Send transit traffic up north
-	 -- XXX We should remove the Ethernet header here
-	 --     to make this app behave more like a true
-	 --     Ethernet layer.
 	 link.transmit(l_out, p)
       end
    end
@@ -263,8 +260,8 @@ function nd_light:push ()
 	 packet.deref(link.receive(l_in))
       else
 	 local p = link.receive(l_in)
-	 self._dgram:reuse(p)
-	 self._dgram:push(self._eth_header)
+	 local iov = p.iovecs[0]
+	 self._eth_header:copy(iov.buffer.pointer + iov.offset)
 	 link.transmit(l_out, p)
       end
    end

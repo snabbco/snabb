@@ -32,14 +32,14 @@ function vpws:new(config)
 			 dst = config.remote_vpn_ip}),
       gre   = gre:new({ protocol = 0x6558, checksum = config.checksum, key = config.label })
    }
-   if config.remote_mac then
-      -- If the MAC address of the peer is not set, we assume that
-      -- some form of dynamic neighbor discovery is in effect
-      -- (e.g. through the nd_light app), which adds the ethernet header
-      -- separately
-      o._encap.ether = ethernet:new({ src = config.local_mac, dst = config.remote_mac,
-				      type = 0x86dd })
-   end
+   -- Use a dummy value for the destination MAC address in case it is
+   -- omitted from the configuration.  In this case, the app needs to
+   -- be connected to something that performs address resolution and
+   -- overwrites the Ethernet header (e.g. the nd_light app)
+   -- accordinly.
+   o._encap.ether = ethernet:new({ src = config.local_mac,
+				   dst = config.remote_mac or ethernet:pton('00:00:00:00:00:00'),
+				   type = 0x86dd })
    -- Pre-computed size of combined Ethernet and IPv6 header
    o._eth_ipv6_size = ethernet:sizeof() + ipv6:sizeof()
    local program = "ip6 and dst host "..ipv6:ntop(config.local_vpn_ip) .." and ip6 proto 47"
@@ -71,9 +71,7 @@ function vpws:push()
 	    -- Copy the finished headers into the packet
 	    datagram:push(encap.gre)
 	    datagram:push(encap.ipv6)
-	    if encap.ether then
-	       datagram:push(encap.ether)
-	    end
+	    datagram:push(encap.ether)
 	 else
 	    -- Check for encapsulated frame coming in on uplink
 	    if self._filter:match(datagram:payload()) then
