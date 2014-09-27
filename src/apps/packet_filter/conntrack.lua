@@ -142,6 +142,14 @@ end
 --- named connection track tables
 ---
 
+-- conntracks is the global named directory of connection track tables.
+-- each track table is a three-element Lua array, 'p' in these functions.
+-- p[1] is the 'current' set of connections.  all new tracks go there.
+-- p[2] is the 'previous' set of connections. a connection is considered
+--      active if it's on either the current or previous set.
+-- p[3] is the next expiration time. after that time, the age() function
+--      expires all connections on p[2] but not on p[1] when time p[3]
+
 local conntracks = {}
 local time = engine.now
 local function new(t) return {{}, {}, (time() or 0)+t} end
@@ -153,12 +161,30 @@ local function age(p, t)
    end
 end
 
+-- this function is the main interface to the module
+--
+-- the code-generated tracking filter function should use a line like:
+--    local track = require('apps.packet_filter.conntrack')('name').track
+-- the track() closure returned receives a packet buffer and
+-- registers its conneciton spec in the named conntrack table.
+--
+-- the code-generated connection-pass function uses:
+--    local check = require('apps.packet_filter.conntrack')('name').check
+-- the check() closure returns true if the given packet belongs to
+-- a connection in the named conntrack table.
+--
+-- the main app itself should use:
+--    local conntrack = require('apps.packet_filter.conntrack')('*')
+-- to get a module with clear(), age() and dump() functions that
+-- operate on the whole named directory.
+
 return function (name)
    if name == '*' then
+      -- returns module of global operations
       return {
          clear = function ()
             for name, p in pairs(conntracks) do
-               p[1], p[2], p[3] = {}, {}, time()+t
+               p[1], p[2], p[3] = {}, {}, time()+7200
             end
             conntracks = {}
          end,
@@ -187,6 +213,7 @@ return function (name)
       }
 
    else
+      -- return name-specialized closures
       local p = conntracks[name] or new(7200)
       conntracks[name] = p
       return {
