@@ -110,49 +110,32 @@ end
 
 -- show a spec from a binary string
 local function dump_from_string(k)
-   local ip_tostring, spec = nil, nil
+   local ptr = ffi.cast('char *', k)
+   local af_inet, strmaxlen = 0, 0
+   local spec = nil, nil
 
    if #k == ffi.sizeof(conn_spec_ipv6) then
-      ip_tostring = function (ip)
-         return string.format(
-            '%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x',
-            tonumber(bit.band(bit.rshift(ip.a, 56), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.a, 48), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.a, 40), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.a, 32), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.a, 24), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.a, 16), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.a,  8), 0xFF)),
-            tonumber(bit.band(ip.a, 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.b, 56), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.b, 48), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.b, 40), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.b, 32), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.b, 24), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.b, 16), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip.b,  8), 0xFF)),
-            tonumber(bit.band(ip.b, 0xFF)))
-      end
+      af_inet, strmaxlen = 10, 46
       spec = conn_spec_ipv6()
 
    elseif #k == ffi.sizeof(conn_spec_ipv4) then
-      ip_tostring = function (ip)
-         return string.format(
-            '%d.%d.%d.%d',
-            tonumber(bit.band(bit.rshift(ip, 24), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip, 16), 0xFF)),
-            tonumber(bit.band(bit.rshift(ip,  8), 0xFF)),
-            tonumber(bit.band(ip, 0xFF)))
-      end
+      af_inet, strmaxlen = 2, 16
       spec = conn_spec_ipv4()
+   end
+
+   local function ip_tostring (offset)
+      local buf = ffi.new('char[?]', strmaxlen)
+      local r = ffi.C.inet_ntop(af_inet, ptr+offset, buf, strmaxlen)
+      if r == nil then return nil end
+      return ffi.string(buf)
    end
 
    ffi.copy(spec, k, ffi.sizeof(spec))
    return string.format(
       '[%d] %s/%d - %s/%d',
       spec.protocol,
-      ip_tostring(spec.src_ip), spec.src_port,
-      ip_tostring(spec.dst_ip), spec.dst_port)
+      ip_tostring(ffi.offsetof(spec, 'src_ip')), spec.src_port,
+      ip_tostring(ffi.offsetof(spec, 'dst_ip')), spec.dst_port)
 end
 
 ---
@@ -160,8 +143,8 @@ end
 ---
 
 local conntracks = {}
-local time = ffi.C.get_fast_time
-local function new(t) return {{}, {}, time()+t} end
+local time = engine.now
+local function new(t) return {{}, {}, (time() or 0)+t} end
 local function put(p, k, v) p[1][k] = v end
 local function get(p, k) return p[1][k] or p[2][k] end
 local function age(p, t)
