@@ -80,7 +80,7 @@ function M_sf:init (args)
       :wait_eeprom_autoread()
       :wait_dma()
       :init_statistics()
-      :init_receive(args.rx_buffsize)
+      :init_receive(args.rx_buffersize)
       :init_transmit()
       :wait_enable()
 end
@@ -122,7 +122,7 @@ function M_sf:init_statistics ()
    return self
 end
 
-function M_sf:init_receive (rx_buffsize)
+function M_sf:init_receive (rx_buffersize)
    self.r.RXCTRL:clr(bits{RXEN=0})
    self:set_promiscuous_mode() -- NB: don't need to program MAC address filter
    self.r.HLREG0(bits{
@@ -130,17 +130,17 @@ function M_sf:init_receive (rx_buffsize)
       rsvd3=11, rsvd4=13, MDCSPD=16, RXLNGTHERREN=27,
    })
    self.r.MAXFRS(lshift(9000+18, 16))
-   self:set_receive_descriptors(rx_buffsize)
+   self:set_receive_descriptors(rx_buffersize)
    self.r.RXCTRL:set(bits{RXEN=0})
    return self
 end
 
-function M_sf:set_receive_descriptors (rx_buffsize)
-   rx_buffsize = math.min(16, math.floor((rx_buffsize or 4096) / 1024))  -- size in KB, max 16KB
-   assert (rx_buffsize > 0, "rx_buffsize must be more than 1024")
-   self.rx_buffsize = rx_buffsize * 1024
+function M_sf:set_receive_descriptors (rx_buffersize)
+   rx_buffersize = math.min(16, math.floor((rx_buffersize or 4096) / 1024))  -- size in KB, max 16KB
+   assert (rx_buffersize > 0, "rx_buffersize must be more than 1024")
+   self.rx_buffersize = rx_buffersize * 1024
 
-   self.r.SRRCTL(bits({DesctypeLSB=25}, rx_buffsize))
+   self.r.SRRCTL(bits({DesctypeLSB=25}, rx_buffersize))
    self.r.RDBAL(self.rxdesc_phy % 2^32)
    self.r.RDBAH(self.rxdesc_phy / 2^32)
    self.r.RDLEN(num_descriptors * ffi.sizeof(rxdesc_t))
@@ -260,7 +260,7 @@ end
 
 function M_sf:add_receive_buffer (b)
    assert(self:can_add_receive_buffer())
-   assert(b.size >= self.rx_buffsize)
+   assert(b.size >= self.rx_buffersize)
    local desc = self.rxdesc[self.rdt].data
    desc.address, desc.dd = b.physical, 0
    self.rxbuffers[self.rdt] = b
@@ -523,7 +523,7 @@ end
 function M_vf:init (opts)
    return self
       :init_dma_memory()
-      :init_receive(opts.rx_buffsize)
+      :init_receive(opts.rx_buffersize)
       :init_transmit()
       :set_MAC(opts.macaddr)
       :set_mirror(opts.mirror)
@@ -546,11 +546,11 @@ M_vf.can_add_receive_buffer = M_sf.can_add_receive_buffer
 M_vf.add_receive_buffer = M_sf.add_receive_buffer
 M_vf.sync_receive = M_sf.sync_receive
 
-function M_vf:init_receive (rx_buffsize)
+function M_vf:init_receive (rx_buffersize)
    local poolnum = self.poolnum or 0
    self.pf.r.PSRTYPE[poolnum](0)        -- no splitting, use pool's first queue
    self.r.RSCCTL(0x0)                   -- no RSC
-   self:set_receive_descriptors(rx_buffsize)
+   self:set_receive_descriptors(rx_buffersize)
    self.pf.r.PFVML2FLT[poolnum]:set(bits{MPE=28, BAM=27, AUPE=24})
    self.r.RXDCTL(bits{Enable=25, VME=30})
    self.r.RXDCTL:wait(bits{enable=25})

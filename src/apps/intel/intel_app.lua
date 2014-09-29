@@ -66,24 +66,9 @@ function Intel82599:stop()
    end
 end
 
--- checks that all buffers in a freelist are big enough
-local function all_buffers_ok(fl, minsize)
-   for i = 1, fl.nfree-1 do
-      if fl.list[i].size < minsize then
-         print (string.format(
-            'Buffer #%d is only %d bytes, need %d minimum.  Rejecting whole list',
-            i, fl.list[i].size, minsize))
-         return false
-      end
-   end
-   return true
-end
-
 -- Allocate receive buffers from the given freelist.
 function Intel82599:set_rx_buffer_freelist (fl)
-   if all_buffers_ok(fl, self.dev.rx_buffsize) then
-      self.rx_buffer_freelist = fl
-   end
+   self.rx_buffer_freelist = fl
 end
 
 -- Pull in packets from the network and queue them on our 'tx' link.
@@ -107,7 +92,12 @@ function Intel82599:add_receive_buffers ()
       -- Buffers from a special freelist
       local fl = self.rx_buffer_freelist
       while self.dev:can_add_receive_buffer() and freelist.nfree(fl) > 0 do
-         self.dev:add_receive_buffer(freelist.remove(fl))
+         local b = freelist.remove(fl)
+         if b.size >= self.dev.rx_buffersize then
+            self.dev:add_receive_buffer(b)
+         else
+            self.dev:add_receive_buffer(buffer.allocate())
+         end
       end
    end
 end
