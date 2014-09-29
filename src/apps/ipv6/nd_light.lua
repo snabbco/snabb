@@ -47,15 +47,48 @@ local nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
 
 -- config:
---   local_mac  MAC address of the interface attached to "south"
---   local_ip   IPv6 address of the interface
---   next_hop   IPv6 address of next-hop for all packets to south
+--   local_mac  MAC address of the interface attached to "south".
+--              Accepted formats:
+--                6-byte on-the-wire representaion, either as a cdata
+--                object (e.g. as returned by lib.protocol.ethernet:pton())
+--                or a Lua string of lengh 6.
+--
+--                String with regular colon-notation.
+--   local_ip   IPv6 address of the interface. Accepted formats:
+--                16-byte on-the-wire representation, either as a cdata
+--                object (e.g as returned by lib.protocol.ipv6:pton()) or
+--                a Lus string of length 16.
+--   next_hop   IPv6 address of next-hop for all packets to south.  Accepted
+--              formats as for local_ip.
 --   delay      NS retransmit delay in ms (default 1000ms)
 --   retrans    Number of NS retransmits (default 10)
+local function check_ip_address(ip, desc)
+   assert(ip, "nd_light: missing "..desc.." IP address")
+   if type(ip) == "string" and string.len(ip) ~= 16 then
+      ip = ipv6:pton(ip)
+   else
+      assert(type(ip) == "cdata",
+	     "nd_light: invalid type of "..desc.." IP address, expected cdata, got "
+		..type(ip))
+   end
+   return ip
+end
+
 function nd_light:new (config)
    local o = nd_light:superClass().new(self)
    config.delay = config.delay or 1000
    config.retrans = config.retrans or 10
+   assert(config.local_mac, "nd_light: missing local MAC address")
+   if type(config.local_mac) == "string" and string.len(config.local_mac) ~= 6 then
+      config.local_mac = ethernet:pton(config.local_mac)
+   else
+      assert(type(config.local_mac) == "cdata",
+	     "nd_light: invalid type for local MAC address, expected cdata, got "
+		..type(config.local_mac))
+   end
+   config.local_ip = check_ip_address(config.local_ip, "local")
+   config.next_hop = check_ip_address(config.next_hop, "next-hop")
+
    o._config = config
    o._match_ns = function(ns)
 		    return(ns:target_eq(config.local_ip))
