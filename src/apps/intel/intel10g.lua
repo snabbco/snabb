@@ -137,8 +137,8 @@ end
 
 function M_sf:set_receive_descriptors (rx_buffsize)
    rx_buffsize = math.min(16, math.floor((rx_buffsize or 4096) / 1024))  -- size in KB, max 16KB
-   assert (rx_buffsize > 0)
-   self.rx_buffsize = rx_buffsize
+   assert (rx_buffsize > 0, "rx_buffsize must be more than 1024")
+   self.rx_buffsize = rx_buffsize * 1024
 
    self.r.SRRCTL(bits({DesctypeLSB=25}, rx_buffsize))
    self.r.RDBAL(self.rxdesc_phy % 2^32)

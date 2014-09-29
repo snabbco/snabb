@@ -68,7 +68,7 @@ end
 
 -- checks that all buffers in a freelist are big enough
 local function all_buffers_ok(fl, minsize)
-   for i = 0, fl.nfree do
+   for i = 1, fl.nfree-1 do
       if fl.list[i].size < minsize then
          print (string.format(
             'Buffer #%d is only %d bytes, need %d minimum.  Rejecting whole list',
@@ -82,7 +82,6 @@ end
 -- Allocate receive buffers from the given freelist.
 function Intel82599:set_rx_buffer_freelist (fl)
    if all_buffers_ok(fl, self.dev.rx_buffsize) then
-      print ('All given buffers ok')
       self.rx_buffer_freelist = fl
    end
 end
