@@ -22,13 +22,6 @@ struct pcap_record {
     uint32_t incl_len;       /* number of octets of packet saved in file */
     uint32_t orig_len;       /* actual length of packet */
 };
-
-struct pcap_record_extra {
-   /* Extra metadata that we append to the pcap record, after the payload. */
-   uint32_t port_id; /* port the packet is captured on */
-   uint32_t flags;   /* bit 0 set means input, bit 0 clear means output */
-   uint64_t reserved0, reserved1, reserved2, reserved3;
-};
 ]]
 
 function write_file_header(file)
@@ -41,9 +34,6 @@ function write_file_header(file)
    file:write(ffi.string(pcap_file, ffi.sizeof(pcap_file)))
    file:flush()
 end
-
-local pcap_extra = ffi.new("struct pcap_record_extra")
-ffi.fill(pcap_extra, ffi.sizeof(pcap_extra), 0)
 
 function write_record (file, ffi_buffer, length)
    write_record_header(file, length)
@@ -73,11 +63,7 @@ function records (filename)
       if record == nil then return nil end
       local datalen = math.min(record.orig_len, record.incl_len)
       local packet = file:read(datalen)
-      local extra = nil
-      if record.incl_len == #packet + ffi.sizeof("struct pcap_record_extra") then
-         extra = readc(file, "struct pcap_record_extra")
-      end
-      return packet, record, extra
+      return packet, record
    end
    return pcap_records_it, true, true
 end
@@ -90,6 +76,6 @@ function readc(file, type)
       error("short read of " .. type .. " from " .. tostring(file))
    end
    local obj = ffi.new(type)
-   ffi.copy(obj, string)
+   ffi.copy(obj, string, ffi.sizeof(type))
    return obj
 end

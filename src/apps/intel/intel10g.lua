@@ -11,7 +11,7 @@ module(...,package.seeall)
 local ffi      = require "ffi"
 local C        = ffi.C
 local lib      = require("core.lib")
-local bus      = require("lib.hardware.bus")
+local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local index_set = require("lib.index_set")
 local macaddress = require("lib.macaddress")
@@ -32,7 +32,7 @@ local M_sf = {}; M_sf.__index = M_sf
 
 function new_sf (pciaddress)
    local dev = { pciaddress = pciaddress, -- PCI device address
-                 info = bus.device_info(pciaddress),
+                 fd = false,       -- File descriptor for PCI memory
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
                  txdesc = 0,     -- Transmit descriptors (pointer)
@@ -52,18 +52,22 @@ end
 
 
 function M_sf:open ()
-   self.info.set_bus_master(self.pciaddress, true)
-   local base = self.info.map_pci_memory(self.pciaddress, 0)
-   register.define(config_registers_desc, self.r, base)
-   register.define(transmit_registers_desc, self.r, base)
-   register.define(receive_registers_desc, self.r, base)
-   register.define(statistics_registers_desc, self.s, base)
+   pci.set_bus_master(self.pciaddress, true)
+   self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
+   register.define(config_registers_desc, self.r, self.base)
+   register.define(transmit_registers_desc, self.r, self.base)
+   register.define(receive_registers_desc, self.r, self.base)
+   register.define(statistics_registers_desc, self.s, self.base)
    self.txpackets = ffi.new("struct packet *[?]", num_descriptors)
    self.rxbuffers = ffi.new("struct buffer *[?]", num_descriptors)
    return self:init()
 end
 
 function M_sf:close()
+   if self.fd then 
+      pci.close_pci_resource(self.fd) 
+      self.fd = false
+   end
 end
 
 --- See data sheet section 4.6.3 "Initialization Sequence."
@@ -84,9 +88,9 @@ end
 
 function M_sf:init_dma_memory ()
    self.rxdesc, self.rxdesc_phy =
-      self.info.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
+      memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
    self.txdesc, self.txdesc_phy =
-      self.info.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
+      memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
    -- Add bounds checking
    self.rxdesc = lib.bounds_checked(rxdesc_t, self.rxdesc, 0, num_descriptors)
    self.txdesc = lib.bounds_checked(txdesc_t, self.txdesc, 0, num_descriptors)
@@ -192,7 +196,7 @@ function M_sf:transmit (p)
    end
    if niovecs > 2 then
       for i = 2, niovecs - 1 do
-	 transmit_aux(self, p, i, niovecs)
+         transmit_aux(self, p, i, niovecs)
       end
    end
 end
@@ -204,9 +208,9 @@ function M_sf:sync_transmit ()
    -- Release processed buffers
    if old_tdh ~= self.tdh then
       while old_tdh ~= self.tdh do
-	 packet.deref(self.txpackets[old_tdh])
-	 self.txpackets[old_tdh] = nil
-	 old_tdh = band(old_tdh + 1, num_descriptors - 1)
+         packet.deref(self.txpackets[old_tdh])
+         self.txpackets[old_tdh] = nil
+         old_tdh = band(old_tdh + 1, num_descriptors - 1)
       end
    end
    self.r.TDT(self.tdt)
@@ -235,8 +239,8 @@ function M_sf:receive ()
    local p = packet.allocate()
    if not receive_aux(self, p) then
       if not receive_aux(self, p) then
-	 repeat
-	 until receive_aux(self, p)
+         repeat
+         until receive_aux(self, p)
       end
    end
    return p
@@ -268,49 +272,88 @@ function M_sf:sync_receive ()
 end
 
 function M_sf:wait_linkup ()
-   self.r.LINKS:wait(bits{Link_up=30})
+   io.write('waiting...\n')
+   local mask = bits{Link_up=30}
+   for count = 1, 500 do
+      if band(self.r.LINKS(), mask) == mask then
+         return self
+      end
+      C.usleep(1000)
+   end
    return self
 end
 
 --- ### Status and diagnostics
 
+
+-- negotiate access to software/firmware shared resource
+-- section 10.5.4
 function negotiated_autoc (dev, f)
-   lib.waitfor(function()
+   local function waitfor (test, attempts, interval)
+      interval = interval or 100
+      for count = 1,attempts do
+         if test() then return true end
+         C.usleep(interval)
+         io.flush()
+      end
+      return false
+   end
+   local function tb (reg, mask, val)
+      return function() return bit.band(reg(), mask) == (val or mask) end
+   end
+
+   local gotresource = waitfor(function()
       local accessible = false
-      dev.r.SWSM:wait(bits{SMBI=0})        -- TODO: expire at 10ms
+      local softOK = waitfor (tb(dev.r.SWSM, bits{SMBI=0},0), 30100)
       dev.r.SWSM:set(bits{SWESMBI=1})
-      dev.r.SWSM:wait(bits{SWESMBI=1})     -- TODO: expire at 3s
-      accessible = band(dev.r.SW_FW_SYNC(), 0x8) == 0
+      local firmOK = waitfor (tb(dev.r.SWSM, bits{SWESMBI=1}), 30000)
+      accessible = bit.band(dev.r.SW_FW_SYNC(), 0x108) == 0
+      if not firmOK then
+         dev.r.SW_FW_SYNC:clr(0x03E0)   -- clear all firmware bits
+         accessible = true
+      end
+      if not softOK then
+         dev.r.SW_FW_SYNC:clr(0x1F)     -- clear all software bits
+         accessible = true
+      end
       if accessible then
          dev.r.SW_FW_SYNC:set(0x8)
       end
       dev.r.SWSM:clr(bits{SMBI=0, SWESMBI=1})
-      if not accessible then C.usleep(3000000) end
+      if not accessible then C.usleep(100) end
       return accessible
-   end)   -- TODO: only twice
+   end, 10000)   -- TODO: only twice
+   if not gotresource then error("Can't acquire shared resource") end
+
    local r = f(dev)
-   dev.r.SWSM:wait(bits{SMBI=0})        -- TODO: expire at 10ms
+
+   waitfor (tb(dev.r.SWSM, bits{SMBI=0},0), 30100)
    dev.r.SWSM:set(bits{SWESMBI=1})
-   dev.r.SWSM:wait(bits{SWESMBI=1})     -- TODO: expire at 3s
-   dev.r.SW_FW_SYNC:clr(0x8)
+   waitfor (tb(dev.r.SWSM, bits{SWESMBI=1}), 30000)
+   dev.r.SW_FW_SYNC:clr(0x108)
    dev.r.SWSM:clr(bits{SMBI=0, SWESMBI=1})
    return r
 end
 
-function set_SFI (dev)
+
+function set_SFI (dev, lms)
+   lms = lms or bit.lshift(0x3, 13)         -- 10G SFI
    local autoc = dev.r.AUTOC()
-   autoc = bor(
-      band(autoc, 0xFFFF0C7E),          -- clears FLU, 10g_pma, 1g_pma, restart_AN, LMS
-      lshift(0x3, 13)                   -- LMS(15:13) = 011b
-   )
-   dev.r.AUTOC(autoc)                       -- TODO: firmware synchronization
+   if bit.band(autoc, bit.lshift(0x7, 13)) == lms then
+      dev.r.AUTOC(bits({restart_AN=12}, bit.bxor(autoc, 0x8000)))      -- flip LMS[2] (15)
+      lib.waitfor(function ()
+         return bit.band(dev.r.ANLP1(), 0xF0000) ~= 0
+      end)
+   end
+
+   dev.r.AUTOC(bit.bor(bit.band(autoc, 0xFFFF1FFF), lms))
    return dev
 end
 
 function M_sf:autonegotiate_sfi ()
    return negotiated_autoc(self, function()
       set_SFI(self)
-      self.r.AUTOC:set(bits{reastat_AN=12})
+      self.r.AUTOC:set(bits{restart_AN=12})
       self.r.AUTOC2(0x00020000)
       return self
    end)
@@ -322,7 +365,6 @@ local M_pf = {}; M_pf.__index = M_pf
 
 function new_pf (pciaddress)
    local dev = { pciaddress = pciaddress, -- PCI device address
-                 info = bus.device_info(pciaddress),
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
                  qs = {},          -- queue statistic registers
@@ -334,14 +376,21 @@ function new_pf (pciaddress)
 end
 
 function M_pf:open ()
-   self.info.set_bus_master(self.pciaddress, true)
-   self.base = self.info.map_pci_memory(self.pciaddress, 0)
+   pci.set_bus_master(self.pciaddress, true)
+   self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, self.base)
    register.define_array(switch_config_registers_desc, self.r, self.base)
    register.define_array(packet_filter_desc, self.r, self.base)
    register.define(statistics_registers_desc, self.s, self.base)
    register.define_array(queue_statistics_registers_desc, self.qs, self.base)
    return self:init()
+end
+
+function M_pf:close()
+   if self.fd then 
+      pci.close_pci_resource(self.fd) 
+      self.fd = false
+   end
 end
 
 function M_pf:init ()
@@ -436,7 +485,6 @@ function M_pf:new_vf (poolnum)
    local vf = {
       pf = self,
       -- some things are shared with the main device...
-      info = self.info,             -- pci device info
       base = self.base,             -- mmap()ed register file
       s = self.s,                   -- Statistics registers
       -- and others are our own
@@ -712,6 +760,8 @@ txdesc_t = ffi.typeof [[
 --- ### Configuration register description.
 
 config_registers_desc = [[
+ANLP1     0x042B0 -            RO Auto Negotiation Link Partner
+ANLP2     0x042B4 -            RO Auto Negotiation Link Partner 2
 AUTOC     0x042A0 -            RW Auto Negotiation Control
 AUTOC2    0x042A8 -            RW Auto Negotiation Control 2
 CTRL      0x00000 -            RW Device Control

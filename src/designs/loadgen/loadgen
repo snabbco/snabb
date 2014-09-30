@@ -4,7 +4,6 @@ local app       = require("core.app")
 local buffer    = require("core.buffer")
 local config    = require("core.config")
 local timer     = require("core.timer")
-local bus       = require("lib.hardware.bus")
 local pci       = require("lib.hardware.pci")
 local intel_app = require("apps.intel.intel_app")
 local basic_apps = require("apps.basic.basic_apps")
@@ -24,8 +23,8 @@ function run (args)
    config.link(c, "pcap.output -> loop.input")
    config.link(c, "loop.output -> tee.input")
    local nics = 0
-   bus.scan_devices()
-   for _,device in ipairs(bus.devices) do
+   pci.scan_devices()
+   for _,device in ipairs(pci.devices) do
       if is_device_suitable(device, patterns) then
          nics = nics + 1
          local name = "nic"..nics

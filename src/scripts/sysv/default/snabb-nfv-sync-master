@@ -5,8 +5,8 @@ DB_HOST=localhost
 DB_PORT=3306
 DB_NEUTRON=neutron_ml2
 DB_NEUTRON_TABLES="networks \
-        ports ml2_network_segments securitygroups securitygrouprules \
-        securitygroupportbindings qos_policies qoses portqosmappings"
+        ml2_port_bindings ports ml2_network_segments securitygroups securitygrouprules \
+        securitygroupportbindings"
 SYNC_LISTEN_HOST=127.0.0.1
 SYNC_LISTEN_PORT=9418
 SYNC_INTERVAL=1

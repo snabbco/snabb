@@ -31,6 +31,9 @@ int write(int fd, void *buf, size_t count);
 // fork(2) - create a child process
 int fork();
 
+// close(2) - close a file descriptor
+int close(int fd);
+
 // pread(2), pwrite(2) - read/write from a file descriptor at an offset
 size_t pread(int fd, void *buf, int count, int offset);
 size_t pwrite(int fd, const void *buf, int count, int offset);

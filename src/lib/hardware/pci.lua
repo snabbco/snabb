@@ -37,10 +37,12 @@ function device_info (pciaddress)
    info.pciaddress = pciaddress
    info.vendor = lib.firstline(p.."/vendor")
    info.device = lib.firstline(p.."/device")
-   info.interface = lib.firstfile(p.."/net")
    info.driver = which_driver(info.vendor, info.device)
-   if info.interface then
-      info.status = lib.firstline(p.."/net/"..info.interface.."/operstate")
+   if info.driver then
+      info.interface = lib.firstfile(p.."/net")
+      if info.interface then
+         info.status = lib.firstline(p.."/net/"..info.interface.."/operstate")
+      end
    end
    info.usable = lib.yesno(is_usable(info))
    return info
@@ -78,13 +80,23 @@ function unbind_device_from_linux (pciaddress)
     end
 end
 
---- Return a pointer for MMIO access to `device` resource `n`.
---- Device configuration registers can be accessed this way.
+-- Memory map PCI device configuration space.
+-- Return two values:
+--   Pointer for memory-mapped access.
+--   File descriptor for the open sysfs resource file.
 function map_pci_memory (device, n)
    local filepath = path(device).."/resource"..n
-   local addr = C.map_pci_resource(filepath)
+   local fd = C.open_pci_resource(filepath)
+   assert(fd >= 0)
+   local addr = C.map_pci_resource(fd)
    assert( addr ~= 0 )
-   return addr
+   return addr, fd
+end
+
+-- Close a file descriptor opened by map_pci_memory().
+-- XXX should also unmap the memory.
+function close_pci_resource (fd)
+   C.close_pci_resource(fd)
 end
 
 --- Enable or disable PCI bus mastering. DMA only works when bus
@@ -99,6 +111,7 @@ function set_bus_master (device, enable)
       value[0] = bit.band(value[0], bit.bnot(lib.bits({Master=2})))
    end
    assert(C.pwrite(fd, value, 2, 0x4) == 2)
+   C.close(fd)
 end
 
 --- ### Open a device
@@ -126,6 +139,7 @@ end
 
 function selftest ()
    print("selftest: pci")
+   scan_devices()
    print_device_summary()
 end
 
