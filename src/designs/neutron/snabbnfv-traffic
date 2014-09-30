@@ -15,7 +15,6 @@ end
 function run (pciaddr, confpath, sockpath)
    engine.log = true
    local mtime = 0
-   timer.init()
    while true do
       local mtime2 = C.stat_mtime(confpath)
       if mtime2 ~= mtime then
