@@ -231,7 +231,17 @@ local function receive_aux(self, p)
       packet.add_iovec(p, b, wb.pkt_len)
       self.rxnext = band(self.rxnext + 1, num_descriptors - 1)
    end
-   return band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
+   local eop = band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
+   if eop then
+      local checksdone = band(wp.xstatus_xerror, 0x60)  -- which checks have been done? (IPv4, L4)
+      if checksdone ~= 0 then
+         checksdone = lshift(checksdone, 24)            -- shift to errors area
+         if band(wp.xstatus_xerror, checksdone) == 0 then
+            p.info.flags = PACKET_CSUM_VALID
+         end
+      end
+   end
+   return eop
 end
 
 function M_sf:receive ()
