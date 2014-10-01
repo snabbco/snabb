@@ -2,7 +2,8 @@
 
 -- Benchmark Solarflare send & receive
 
-local bus           = require("lib.hardware.bus")
+local pci           = require("lib.hardware.pci")
+local ethernet      = require("lib.protocol.ethernet")
 local basic_apps    = require("apps.basic.basic_apps")
 local SolarFlareNic = require("apps.solarflare.solarflare").SolarFlareNic;
 local freelist      = require("core.freelist")
@@ -22,10 +23,10 @@ Example usage with 10 million packets:
 end
 
 function get_sf_devices()
-   bus.scan_devices()
+   pci.scan_devices()
 
    local sf_devices = {}
-   for _, device in pairs(bus.devices) do
+   for _, device in pairs(pci.devices) do
       if device.usable and device.driver == 'apps.solarflare.solarflare' then
          sf_devices[#sf_devices + 1] = device
       end
@@ -94,8 +95,8 @@ function run (npackets)
    -- Source -> Solarflare NIC#1 => Solarflare NIC#2 -> Sink
 
    config.app(c, "source", Source)
-   config.app(c, send_device.interface, SolarFlareNic, {ifname=send_device.interface})
-   config.app(c, receive_device.interface, SolarFlareNic, {ifname=receive_device.interface})
+   config.app(c, send_device.interface, SolarFlareNic, {ifname=send_device.interface, mac_address = ethernet:pton("02:00:00:00:00:01")})
+   config.app(c, receive_device.interface, SolarFlareNic, {ifname=receive_device.interface, mac_address = ethernet:pton("02:00:00:00:00:02")})
    config.app(c, "sink", basic_apps.Sink)
 
    config.link(c, "source.tx -> " .. send_device.interface .. ".rx")
