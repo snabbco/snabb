@@ -125,7 +125,7 @@ function SolarFlareNic:open()
    try(ciul.ef_pd_alloc_by_name(self.pd_p,
                                 self.driver_handle,
                                 self.ifname,
-                                C.EF_PD_DEFAULT + C.EF_PD_PHYS_MODE),
+                                C.EF_PD_DEFAULT + C.EF_PD_PHYS_MODE + C.EF_PD_VPORT),
        "ef_pd_alloc_by_name")
    self.ef_vi_p = ffi.new("ef_vi[1]")
    try(ciul.ef_vi_alloc_from_pd(self.ef_vi_p,
