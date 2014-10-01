@@ -168,19 +168,10 @@ function SolarFlareNic:open()
                              nil),
        "ef_vi_filter_add")
 
-   local broadcast_mac_p = ffi.new("unsigned char[6]")
-   broadcast_mac_p[0] = 255
-   broadcast_mac_p[1] = 255
-   broadcast_mac_p[2] = 255
-   broadcast_mac_p[3] = 255
-   broadcast_mac_p[4] = 255
-   broadcast_mac_p[5] = 255
    filter_spec_p = ffi.new("ef_filter_spec[1]")
    ciul.ef_filter_spec_init(filter_spec_p, C.EF_FILTER_FLAG_NONE)
-   try(ciul.ef_filter_spec_set_eth_local(filter_spec_p,
-                                         C.EF_FILTER_VLAN_ID_ANY,
-                                         broadcast_mac_p),
-       "ef_filter_spec_set_eth_local")
+   try(ciul.ef_filter_spec_set_multicast_all(filter_spec_p),
+       "ef_filter_spec_set_set_mulicast_all")
 
    try(ciul.ef_vi_filter_add(self.ef_vi_p,
                              self.driver_handle,
