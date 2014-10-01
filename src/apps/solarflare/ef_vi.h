@@ -152,6 +152,8 @@ typedef struct {
   uint32_t  removed;
   uint32_t  in_jumbo;                           /* ef10 only */
   uint32_t  bytes_acc;                          /* ef10 only */
+  uint16_t  rx_ps_pkt_count;                    /* ef10 only */
+  uint16_t  rx_ps_credit_avail;                 /* ef10 only */
 } ef_vi_rxq_state;
 
 typedef struct {
@@ -202,11 +204,12 @@ typedef struct ef_vi {
   unsigned                      rx_prefix_len;
   int                           rx_ts_correction;
 
-  char*			      vi_mem_mmap_ptr;
+  char*			        vi_mem_mmap_ptr;
   int                           vi_mem_mmap_bytes;
-  char*			      vi_io_mmap_ptr;
+  char*			        vi_io_mmap_ptr;
   int                           vi_io_mmap_bytes;
   int                           vi_clustered;
+  int                           vi_is_packed_stream;
 
   ef_vi_ioaddr_t                io;
 
@@ -222,12 +225,12 @@ typedef struct ef_vi {
   ef_vi_rxq                     vi_rxq;
   ef_vi_state*                  ep_state;
   enum ef_vi_flags              vi_flags;
-  ef_vi_stats*		      vi_stats;
+  ef_vi_stats*		        vi_stats;
 
-  struct ef_vi*		      vi_qs[EF_VI_MAX_QS];
+  struct ef_vi*		        vi_qs[EF_VI_MAX_QS];
   int                           vi_qs_n;
 
-  struct ef_vi_nic_type	      nic_type;
+  struct ef_vi_nic_type	        nic_type;
 
   struct ops {
     int (*transmit)(struct ef_vi*, ef_addr base, int len,
@@ -284,14 +287,17 @@ extern int ef_vi_receive_get_timestamp(ef_vi* vi, const void* pkt,
 /* etherfabric/pd.h */
 
 enum ef_pd_flags {
-	EF_PD_DEFAULT   = 0x0,
-	EF_PD_VF        = 0x1,
-	EF_PD_PHYS_MODE = 0x2,
+	EF_PD_DEFAULT          = 0x0,
+	EF_PD_VF               = 0x1,
+	EF_PD_PHYS_MODE        = 0x2,
+	EF_PD_RX_PACKED_STREAM = 0x4,  /* ef10 only */
+	EF_PD_VPORT            = 0x8   /* ef10 only */
 };
 
 typedef struct ef_pd {
 	enum ef_pd_flags pd_flags;
 	unsigned         pd_resource_id;
+        char*            pd_intf_name;
 
 	/* Support for application clusters */
 	char*            pd_cluster_name;
@@ -310,6 +316,8 @@ extern int ef_pd_alloc_by_name(ef_pd*, ef_driver_handle,
 
 /*! Unregister a memory region. */
 extern int ef_pd_free(ef_pd*, ef_driver_handle);
+
+extern const char* ef_pd_interface_name(ef_pd*);
 
 /* etherfabric/vi.h */
 
@@ -390,6 +398,7 @@ extern int ef_filter_spec_set_multicast_all(ef_filter_spec *);
 extern int ef_filter_spec_set_unicast_mismatch(ef_filter_spec *);
 extern int ef_filter_spec_set_multicast_mismatch(ef_filter_spec *);
 extern int ef_filter_spec_set_port_sniff(ef_filter_spec *, int promiscuous);
+extern int ef_filter_spec_set_tx_port_sniff(ef_filter_spec *);
 extern int ef_filter_spec_set_block_kernel(ef_filter_spec *);
 extern int ef_filter_spec_set_block_kernel_multicast(ef_filter_spec *);
 extern int ef_filter_spec_set_block_kernel_unicast(ef_filter_spec *);
@@ -404,11 +413,49 @@ extern int ef_vi_set_filter_add(ef_vi_set*, ef_driver_handle,
 extern int ef_vi_set_filter_del(ef_vi_set*, ef_driver_handle,
 				ef_filter_cookie *);
 
+extern int ef_vi_prime(ef_vi* vi, ef_driver_handle dh, unsigned current_ptr);
+
+/**********************************************************************
+ * Get VI stats *******************************************************
+ **********************************************************************/
+
+typedef struct {
+  char* evsfl_name;
+  int   evsfl_offset;
+  int   evsfl_size;
+} ef_vi_stats_field_layout;
+
+typedef struct {
+  int                      evsl_data_size;
+  int                      evsl_fields_num;
+  ef_vi_stats_field_layout evsl_fields[];
+} ef_vi_stats_layout;
+
+/* Retrieve layout for available statistics. */
+extern int
+ef_vi_stats_query_layout(ef_vi* vi,
+                         const ef_vi_stats_layout**const layout_out);
+
+/* Retrieve a set of statistic values.
+ *
+ * The data size should be equal to evsl_data_bytes from
+ * the layout description.
+ *
+ * If do_reset reset is true, the statistics is reset after reading.
+ *
+ * Data is provided in little-endian.
+ */
+extern int
+ef_vi_stats_query(ef_vi* vi, ef_driver_handle dh,
+                  void* data, int do_reset);
+
+
 /* etherfabric/memreg.h */
 
 typedef struct ef_memreg {
   unsigned mr_resource_id;
   ef_addr* mr_dma_addrs;
+  ef_addr* mr_dma_addrs_base;
 } ef_memreg;
 
 extern int ef_memreg_alloc(ef_memreg*, ef_driver_handle,
