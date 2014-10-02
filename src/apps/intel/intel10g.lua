@@ -233,11 +233,11 @@ local function receive_aux(self, p)
    end
    local eop = band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
    if eop then
-      local checksdone = band(wp.xstatus_xerror, 0x60)  -- which checks have been done? (IPv4, L4)
+      local checksdone = band(wb.xstatus_xerror, 0x60)  -- which checks have been done? (IPv4, L4)
       if checksdone ~= 0 then
          checksdone = lshift(checksdone, 24)            -- shift to errors area
-         if band(wp.xstatus_xerror, checksdone) == 0 then
-            p.info.flags = PACKET_CSUM_VALID
+         if band(wb.xstatus_xerror, checksdone) == 0 then
+            p.info.flags = C.PACKET_CSUM_VALID
          end
       end
    end
