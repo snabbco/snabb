@@ -83,6 +83,7 @@ function Intel82599:pull ()
 end
 
 function Intel82599:add_receive_buffers ()
+   self.dev:set_rx_buffersize()        -- revert to default buffersize (16KB)
    if self.rx_buffer_freelist == nil then
       -- Generic buffers
       while self.dev:can_add_receive_buffer() do
@@ -93,11 +94,11 @@ function Intel82599:add_receive_buffers ()
       local fl = self.rx_buffer_freelist
       while self.dev:can_add_receive_buffer() and freelist.nfree(fl) > 0 do
          local b = freelist.remove(fl)
-         if b.size >= self.dev.rx_buffersize then
-            self.dev:add_receive_buffer(b)
-         else
-            self.dev:add_receive_buffer(buffer.allocate())
+         if b.size < 1024 then
+            buffer.free(b)
+            b = buffer.allocate()
          end
+         self.dev:add_receive_buffer(b)
       end
    end
 end
