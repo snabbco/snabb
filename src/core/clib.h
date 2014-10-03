@@ -19,6 +19,9 @@ void *memset(void *s, int c, size_t n);
 // memcmp(3)
 int memcmp(const void *s1, const void *s2, int n);
 
+// memmove(3)
+void *memmove(void *dest, const void *src, int n);
+
 // strncpy(3) - copy a string
 char *strncpy(char *dest, const char *src, size_t n);
 

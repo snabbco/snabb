@@ -225,6 +225,12 @@ function VirtioNetDevice:vm_buffer (iovec)
          -- no more buffers, stop the loop
          should_continue = false
       end
+   else
+      if iovec.offset ~= 0 then
+         -- Virtio requires the offset to be 0. Move the memory to make it so.
+         C.memmove(b.pointer, b.pointer + iovec.offset, iovec.length)
+         iovec.offset = 0
+      end
    end
    return should_continue, b
 end
