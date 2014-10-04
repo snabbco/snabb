@@ -38,7 +38,7 @@ function Intel82599:new (args)
       return setmetatable({dev=vf:open(args)}, Intel82599)
    else
       local dev = intel10g.new_sf(args.pciaddr)
-         :open(args)
+         :open()
          :autonegotiate_sfi()
          :wait_linkup()
       if not dev then return null end
@@ -83,7 +83,6 @@ function Intel82599:pull ()
 end
 
 function Intel82599:add_receive_buffers ()
-   self.dev:set_rx_buffersize()        -- revert to default buffersize (16KB)
    if self.rx_buffer_freelist == nil then
       -- Generic buffers
       while self.dev:can_add_receive_buffer() do

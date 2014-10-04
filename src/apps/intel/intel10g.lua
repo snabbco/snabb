@@ -51,7 +51,7 @@ function new_sf (pciaddress)
 end
 
 
-function M_sf:open (args)
+function M_sf:open ()
    pci.set_bus_master(self.pciaddress, true)
    self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, self.base)
@@ -60,7 +60,7 @@ function M_sf:open (args)
    register.define(statistics_registers_desc, self.s, self.base)
    self.txpackets = ffi.new("struct packet *[?]", num_descriptors)
    self.rxbuffers = ffi.new("struct buffer *[?]", num_descriptors)
-   return self:init(args)
+   return self:init()
 end
 
 function M_sf:close()
@@ -72,7 +72,7 @@ end
 
 --- See data sheet section 4.6.3 "Initialization Sequence."
 
-function M_sf:init (args)
+function M_sf:init ()
    return self
       :init_dma_memory()
       :disable_interrupts()
@@ -80,7 +80,7 @@ function M_sf:init (args)
       :wait_eeprom_autoread()
       :wait_dma()
       :init_statistics()
-      :init_receive(args.rx_buffersize)
+      :init_receive()
       :init_transmit()
       :wait_enable()
 end
@@ -122,7 +122,7 @@ function M_sf:init_statistics ()
    return self
 end
 
-function M_sf:init_receive (rx_buffersize)
+function M_sf:init_receive ()
    self.r.RXCTRL:clr(bits{RXEN=0})
    self:set_promiscuous_mode() -- NB: don't need to program MAC address filter
    self.r.HLREG0(bits{
@@ -130,7 +130,7 @@ function M_sf:init_receive (rx_buffersize)
       rsvd3=11, rsvd4=13, MDCSPD=16, RXLNGTHERREN=27,
    })
    self.r.MAXFRS(lshift(9000+18, 16))
-   self:set_receive_descriptors(rx_buffersize)
+   self:set_receive_descriptors()
    self.r.RXCTRL:set(bits{RXEN=0})
    return self
 end
@@ -139,13 +139,13 @@ function M_sf:set_rx_buffersize(rx_buffersize)
    rx_buffersize = math.min(16, math.floor((rx_buffersize or 16384) / 1024))  -- size in KB, max 16KB
    assert (rx_buffersize > 0, "rx_buffersize must be more than 1024")
    self.rx_buffersize = rx_buffersize * 1024
+   self.r.SRRCTL(bits({DesctypeLSB=25}, rx_buffersize))
    return self
 end
 
-function M_sf:set_receive_descriptors (rx_buffersize)
-   self:set_rx_buffersize(rx_buffersize)
+function M_sf:set_receive_descriptors ()
+   self:set_rx_buffersize(16384)        -- start at max
 
-   self.r.SRRCTL(bits({DesctypeLSB=25}, rx_buffersize))
    self.r.RDBAL(self.rxdesc_phy % 2^32)
    self.r.RDBAH(self.rxdesc_phy / 2^32)
    self.r.RDLEN(num_descriptors * ffi.sizeof(rxdesc_t))
@@ -530,7 +530,7 @@ end
 function M_vf:init (opts)
    return self
       :init_dma_memory()
-      :init_receive(opts.rx_buffersize)
+      :init_receive()
       :init_transmit()
       :set_MAC(opts.macaddr)
       :set_mirror(opts.mirror)
@@ -554,11 +554,11 @@ M_vf.set_rx_buffersize = M_sf.set_rx_buffersize
 M_vf.add_receive_buffer = M_sf.add_receive_buffer
 M_vf.sync_receive = M_sf.sync_receive
 
-function M_vf:init_receive (rx_buffersize)
+function M_vf:init_receive ()
    local poolnum = self.poolnum or 0
    self.pf.r.PSRTYPE[poolnum](0)        -- no splitting, use pool's first queue
    self.r.RSCCTL(0x0)                   -- no RSC
-   self:set_receive_descriptors(rx_buffersize)
+   self:set_receive_descriptors()
    self.pf.r.PFVML2FLT[poolnum]:set(bits{MPE=28, BAM=27, AUPE=24})
    self.r.RXDCTL(bits{Enable=25, VME=30})
    self.r.RXDCTL:wait(bits{enable=25})
