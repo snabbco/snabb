@@ -20,6 +20,19 @@ local bits, bitset = lib.bits, lib.bitset
 local band, bor, lshift = bit.band, bit.bor, bit.lshift
 local packet_ref = packet.ref
 
+local ETHERTYPE_OFFSET = 12
+local ETHERTYPE_IPV6 = 0xDD86
+local ETHERTYPE_IPV4 = 0x0008
+
+local IP_UDP = 0x11
+local IP_TCP = 6
+local IP_ICMP = 1
+local IPV6_ICMP = 0x3a
+
+local IPV4_IHL_OFFSET = 14
+local IPV4_PROTOCOL_OFFSET = 23
+local IPV6_NEXT_HEADER_OFFSET = 20 -- protocol
+
 num_descriptors = 32 * 1024
 --num_descriptors = 32
 
@@ -174,7 +187,46 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
-local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21}
+local function keep_offload_ctx(self, iovec)
+   local b = iovec.buffer.pointer + iovec.offset
+   local ctx_desc_a = 0ULL
+   local ctx_desc_b = 0x0000000fe0200000ULL
+   local iplen, maclen, ctx_l4t = 0ULL, 14ULL, 3ULL
+   local ethtype = ffi.cast('uint16_t *', b+ETHERTYPE_OFFSET)[0]
+
+   if ethtype == ETHERTYPE_IPV4 then
+      ctx_desc_b = bor(ctx_desc_b, 2^10)     -- TUCMD.IPV4
+      iplen = lshift(band(ffi.cast('uint8_t *', b+IPV4_IHL_OFFSET)[0], 0xF), 2)
+      local proto = ffi.cast('uint8_t *', b+IPV4_PROTOCOL_OFFSET)[0]
+      if proto == IP_TCP then
+         ctx_l4t = 0x02ULL
+      elseif proto == IP_UDP then
+         ctx_l4t = 0x01ULL
+      end
+
+   elseif ethtype == ETHERTYPE_IPV6 then
+      iplen = 40ULL
+      local proto = ffi.cast('uint8_t *', b+IPV6_NEXT_HEADER_OFFSET)[0]
+      if proto == IP_TCP then
+         ctx_l4t = 0x02ULL
+      elseif proto == IP_UDP then
+         ctx_l4t = 0x01ULL
+      end
+   end
+
+   ctx_desc_a = bor(ctx_desc_a, lshift(band(maclen, 0x7F), 9), band(iplen, 0x1FF))
+   ctx_desc_b = bor(ctx_desc_b, lshift(ctx_l4t, 11))
+   if ctx_desc_a ~= self.prev_ctx_desc_a or ctx_desc_b ~= self.prev_ctx_desc_b then
+      self.txdesc[self.tdt].address = ctx_desc_a
+      self.txdesc[self.tdt].options = ctx_desc_b
+      self.txpackets[self.tdt] = nil
+      self.tdt = band(self.tdt + 1, num_descriptors - 1)
+      self.prev_ctx_desc_a = ctx_desc_a
+      self.prev_ctx_desc_b = ctx_desc_b
+   end
+end
+
+local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21, txsm=41, ixsm=40, cc=39}
 local txdesc_flags_last = bits({eop=24}, txdesc_flags)
 
 local function transmit_aux (self, p, i, niovecs)
@@ -189,6 +241,7 @@ end
 function M_sf:transmit (p)
    local niovecs = p.niovecs
    if niovecs > 0 then
+      keep_offload_ctx(self, p.iovecs[0])        -- assume the header is in the first iovec
       transmit_aux(self, p, 0, niovecs)
    end
    if niovecs > 1 then
@@ -208,8 +261,10 @@ function M_sf:sync_transmit ()
    -- Release processed buffers
    if old_tdh ~= self.tdh then
       while old_tdh ~= self.tdh do
-         packet.deref(self.txpackets[old_tdh])
-         self.txpackets[old_tdh] = nil
+         if self.txpackets[old_tdh] ~= nil then
+            packet.deref(self.txpackets[old_tdh])
+            self.txpackets[old_tdh] = nil
+         end
          old_tdh = band(old_tdh + 1, num_descriptors - 1)
       end
    end
