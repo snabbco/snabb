@@ -3435,5 +3435,10 @@ c.GRND = multiflags {
   RANDOM   = 0x0002,
 }
 
+c.MFD = multiflags {
+  CLOEXEC            = 0x0001,
+  ALLOW_SEALING      = 0x0002,
+}
+
 return c
 

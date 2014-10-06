@@ -648,9 +648,12 @@ if sys.alarm then
   function C.alarm(seconds) return syscall(sys.alarm, uint(seconds)) end
 end
 
--- new system call, may be missing
+-- new system calls, may be missing TODO fix so is not
 if sys.getrandom then
   function C.getrandom(buf, count, flags) return syscall(sys.getrandom, void(buf), uint(count), uint(flags)) end
+end
+if sys.memfd_create then
+  function C.memfd_create(name, flags) return syscall(sys.memfd_create, void(name), uint(flags)) end
 end
 
 -- kernel sigaction structures actually rather different in Linux from libc ones

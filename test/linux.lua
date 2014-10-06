@@ -341,6 +341,13 @@ test.misc_linux = {
     assert(count, err)
     assert_equal(count, 64)
   end,
+  test_memfd = function()
+    if not S.memfd_create then error "skipped" end
+    local fd, err = S.memfd_create("", "cloexec")
+    if not fd and err.NOSYS then error "skipped" end
+    assert(fd, err)
+    assert(fd:close())
+  end,
 }
 
 test.sendfile = {

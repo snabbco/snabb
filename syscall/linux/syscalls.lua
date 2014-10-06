@@ -398,6 +398,10 @@ if C.getrandom then
   end
 end
 
+if C.memfd_create then
+  function S.memfd_create(name, flags) return retfd(C.memfd_create(name, c.MFD[flags])) end
+end
+
 -- capabilities. Somewhat complex kernel interface due to versioning, Posix requiring malloc in API.
 -- only support version 3, should be ok for recent kernels, or pass your own hdr, data in
 -- to detect capability API version, pass in hdr with empty version, version will be set
