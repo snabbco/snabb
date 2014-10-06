@@ -154,6 +154,7 @@ local function fixup_constants(abi, c)
   c.NTF.MASTER = nil
   c.SECCOMP_MODE = nil
   c.SECCOMP_RET = nil
+  c.MFD = nil
 
   -- these are not even in linux git head headers or names wrong
   c.O.ASYNC = nil

@@ -154,6 +154,7 @@ c.PORT_PROFILE_RESPONSE = nil
 c.AT_FDCWD = nil
 c.SYS.fstatat = nil
 c.TFD_TIMER = nil
+c.MFD = nil
 
 -- this lot are not in uClibc at present
 c.ADJ.OFFSET_SS_READ = nil
