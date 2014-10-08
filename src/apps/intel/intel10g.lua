@@ -190,12 +190,12 @@ end
 local function keep_offload_ctx(self, iovec)
    local b = iovec.buffer.pointer + iovec.offset
    local ctx_desc_a = 0ULL
-   local ctx_desc_b = 0x0000000fe0200000ULL
+   local ctx_desc_b = 0x0000000fe0200000ULL -- DTYP=2, DEXT=1, BCNTLEN=0x3F
    local iplen, maclen, ctx_l4t = 0ULL, 14ULL, 3ULL
    local ethtype = ffi.cast('uint16_t *', b+ETHERTYPE_OFFSET)[0]
 
    if ethtype == ETHERTYPE_IPV4 then
-      ctx_desc_b = bor(ctx_desc_b, 2^10)     -- TUCMD.IPV4
+      ctx_desc_b = bor(ctx_desc_b, 0x0400ULL)     -- TUCMD.IPV4
       iplen = lshift(band(ffi.cast('uint8_t *', b+IPV4_IHL_OFFSET)[0], 0xF), 2)
       local proto = ffi.cast('uint8_t *', b+IPV4_PROTOCOL_OFFSET)[0]
       if proto == IP_TCP then
@@ -226,14 +226,20 @@ local function keep_offload_ctx(self, iovec)
    end
 end
 
-local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21, txsm=41, ixsm=40, cc=39}
+local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21}
 local txdesc_flags_last = bits({eop=24}, txdesc_flags)
 
 local function transmit_aux (self, p, i, niovecs)
    local iov = p.iovecs[i]
    local flags = (i + 1 < niovecs) and txdesc_flags or txdesc_flags_last
+   if band(self.prev_ctx_desc_b, 0x0400ULL) ~= 0ULL then        -- TUCMD.IPV4
+      flags = bor(flags, bit.lshift(1ULL, 40))      -- IXSM
+   end
+   if band(self.prev_ctx_desc_b, 0x1800ULL) ~= 0x1800ULL then   -- TUCMD.L4T
+      flags = bor(flags, bit.lshift(1ULL, 41))      -- TXSM
+   end
    self.txdesc[self.tdt].address = iov.buffer.physical + iov.offset
-   self.txdesc[self.tdt].options = bor(iov.length, flags, lshift(p.length+0ULL, 46))
+   self.txdesc[self.tdt].options = bor(iov.length+0ULL, flags, lshift(p.length+0ULL, 46))
    self.txpackets[self.tdt] = packet_ref(p)
    self.tdt = band(self.tdt + 1, num_descriptors - 1)
 end
