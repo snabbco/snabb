@@ -131,6 +131,15 @@ function test_iperf {
     assert IPERF $?
 }
 
+# Usage: port_probe <telnet_port0> <telnet_port1> <dest_ip> <port> [-u]
+# Returns `true' if VM listening on <telnet_port0> can connect to
+# <dest_ip>/<port> on VM listening on <telnet_port1>. If `-u' is appended
+# UDP is used instead of TCP.
+function port_probe {
+    run_telnet $2 "nohup echo | nc $5 -l $3 $4 &" 2>&1 >/dev/null
+    run_telnet $1 "nc -v $5 $3 $4" 5 | grep succeeded
+}
+
 function same_vlan_tests {
     start_bench_env test_fixtures/nfvconfig/test_functions/same_vlan.ports
     echo "TESTING same_vlan.ports"
@@ -157,8 +166,41 @@ function tunnel_tests {
     stop_bench_env
 }
 
+function filter_tests {
+    start_bench_env test_fixtures/nfvconfig/test_functions/filter.ports
+    echo "TESTING filter.ports"
+
+    # port B allows ICMP and TCP/12345
+    # The test cases were more involved at first but I found it quite
+    # hard to use netcat reliably (see `port_probe'), e.g. once you
+    # listen on *any* UDP port, any subsequent netcat listens will fail?!
+    #
+    # If you add any test cases, make *sure* that they fail without the
+    # filter enabled, e.g. watch out for false negatives! I had my fair
+    # share of trouble with those.
+    #
+    # Regards, Max Rottenkolber <max@mr.gy>
+
+    test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
+
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12345
+    assert PORTPROBE $?
+
+    # Assert TCP/12346 is filtered.
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12346
+    test 0 -ne $?
+    assert FILTER $?
+
+    # Assert UDP/12345 is filtered.
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12345 -u
+    test 0 -ne $?
+    assert FILTER $?
+
+    stop_bench_env
+}
 
 # Run test configs.
 
 same_vlan_tests
 tunnel_tests
+filter_tests
