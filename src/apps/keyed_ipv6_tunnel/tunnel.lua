@@ -107,22 +107,24 @@ function SimpleKeyedTunnel:new (confstring)
    -- required fields:
    --   local_address, string, ipv6 address
    --   remote_address, string, ipv6 address
-   --   local_cookie, 8 bytes string
-   --   remote_cookie, 8 bytes string
+   --   local_cookie, 8 bytes hex string
+   --   remote_cookie, 8 bytes hex string
    -- optional fields:
    --   local_session, unsigned number, must fit to uint32_t
    --   default_gateway_MAC, useful for testing
    --   hop_limit, override default hop limit 64
    assert(
          type(config.local_cookie) == "string"
-         and #config.local_cookie == 8,
-         "local_cookie should be 8 bytes string"
+         and #config.local_cookie <= 16,
+         "local_cookie should be 8 bytes hex string"
       )
+   config.local_cookie = lib.hexundump(config.local_cookie, 8)
    assert(
          type(config.remote_cookie) == "string"
-         and #config.remote_cookie == 8,
-         "remote_cookie should be 8 bytes string"
+         and #config.remote_cookie <= 16,
+         "remote_cookie should be 8 bytes hex string"
       )
+   config.remote_cookie = lib.hexundump(config.remote_cookie, 8)
    local header = header_array_ctype(HEADER_SIZE)
    ffi.copy(header, header_template, HEADER_SIZE)
    ffi.copy(
