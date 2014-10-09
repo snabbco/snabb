@@ -4,6 +4,8 @@ local C = ffi.C
 local lib = require("core.lib")
 local header = require("lib.protocol.header")
 
+local AF_INET6 = 10
+
 local ipv6hdr_t = ffi.typeof[[
       struct {
 	 uint32_t v_tc_fl; // version, tc, flow_label
@@ -67,20 +69,13 @@ function ipv6:new_from_mem(mem, size)
    return o
 end
 
--- XXX should probably use inet_pton(3)
 function ipv6:pton (p)
-   local result = ipv6_addr_t()
-   local i = 0
-   for v in p:split(":") do
-      if string.match(v:lower(), '^[0-9a-f]?[0-9a-f]?[0-9a-f]?[0-9a-f]$') then
-	 result[i] = C.htons(tonumber("0x"..v))
-      else
-	 error("invalid ipv6 address "..p.." "..v)
-      end
-      i = i+1
+   local in_addr  = ffi.new("uint8_t[16]")
+   local result = ffi.C.inet_pton(AF_INET6, p, in_addr)
+   if result ~= 1 then
+      return false, "malformed IPv6 address: " .. address
    end
-   assert(i == 8, "invalid ipv6 address "..p.." "..i)
-   return result
+   return in_addr
 end
 
 -- XXX should probably use inet_ntop(3)
