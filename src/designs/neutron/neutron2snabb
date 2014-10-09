@@ -115,14 +115,14 @@ end
 function tunnel (port, vif_details)
    if vif_details.tunnel_type == "L2TPv3" then
       return ([[{type = "L2TPv3",
-              remote_ip = %q,
               local_ip = %q,
+              remote_ip = %q,
               session = %d,
               local_cookie = %q,
               remote_cookie = %q,
               next_hop = %q }]])
-      :format(vif_details.l2tpv3_remote_ip,
-              vif_details.l2tpv3_local_ip,
+      :format(vif_details.zone_ip,
+              vif_details.l2tpv3_remote_ip,
               vif_details.l2tpv3_session,
               vif_details.l2tpv3_local_cookie,
               vif_details.l2tpv3_remote_cookie,
