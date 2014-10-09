@@ -6,7 +6,6 @@ local PacketFilter = require("apps.packet_filter.packet_filter").PacketFilter
 local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
 local nd_light = require("apps.ipv6.nd_light")
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
-local ns_responder = require("apps.ipv6.ns_responder")
 local ffi = require("ffi")
 local C = ffi.C
 local AF_INET6 = 10
@@ -53,15 +52,17 @@ function load (file, pciaddr, sockpath)
          -- Setup IPv6 neighbor discovery/solicitation responder.
          -- This will talk to our local gateway.
          local ND = "ND_"..name
-         config.app(c, ND, nd_light, {local_mac = mac_address,
-                                      local_ip = t.tunnel.local_ip,
-                                      next_hop = t.tunnel.next_hop})
-         -- VM -> Tunnel -> Network
+         config.app(c, ND, nd_light,
+                    {local_mac = mac_address,
+                     local_ip = t.tunnel.local_ip,
+                     next_hop = t.tunnel.next_hop})
+         -- VM -> Tunnel -> ND <-> Network
          config.link(c, VM_tx.." -> "..Tunnel..".decapsulated")
-         -- Network -> ND -> Tunnel -> VM
+         config.link(c, Tunnel..".encapsulated -> "..ND..".north")
+         -- Network <-> ND -> Tunnel -> VM
          config.link(c, ND..".north -> "..Tunnel..".encapsulated")
          config.link(c, Tunnel..".decapsulated -> "..VM_rx)
-         VM_rx, VM_tx = ND..".south", Tunnel..".encapsulated"
+         VM_rx, VM_tx = ND..".south", ND..".south"
       end
       if policing and t.gbps then
          local QoS = "QoS_"..name
@@ -110,5 +111,6 @@ function selftest ()
    do
       print("testing:", confpath)
       apply(load(confpath, pcideva, "/dev/null"))
+      engine.main({duration = 0.25})
    end
 end
