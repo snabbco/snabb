@@ -146,9 +146,9 @@ function same_vlan_tests {
 
     test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
     test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
-    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
-    test_checksum $TELNET_PORT0
-    test_checksum $TELNET_PORT1
+#    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+#    test_checksum $TELNET_PORT0
+#    test_checksum $TELNET_PORT1
 
     stop_bench_env
 }
