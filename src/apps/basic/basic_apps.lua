@@ -41,19 +41,23 @@ function Source:pull ()
    local fl = self.rx_buffer_freelist
    for _, o in ipairs(self.outputi) do
       for i = 1, link.nwritable(o) do
-         local b = nil
-         if fl then
-            if freelist.nfree(fl) > 0 then
-               b = freelist.remove(fl)
+         local len, p, b = 0, nil, nil
+         while len < self.size do
+            if fl then
+               if freelist.nfree(fl) > 0 then
+                  b = freelist.remove(fl)
+               else
+                  break
+               end
             else
-               return
+               b = buffer.allocate()
             end
-         else
-            b = buffer.allocate()
+            if not p then p = packet.allocate() end
+            local size = math.min(b.size, self.size - len)
+            packet.add_iovec(p, b, size)
+            len = len + size
          end
-         local p = packet.allocate()
-         packet.add_iovec(p, b, self.size)
-         transmit(o, p)
+         if p then transmit(o, p) end
       end
    end
 end
