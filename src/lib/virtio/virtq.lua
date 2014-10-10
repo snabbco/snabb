@@ -7,7 +7,6 @@ local buffer    = require("core.buffer")
 local freelist  = require("core.freelist")
 local lib       = require("core.lib")
 local memory    = require("core.memory")
-local packet    = require("core.packet")
 local ffi       = require("ffi")
 local C         = ffi.C
 local band      = bit.band
@@ -56,25 +55,35 @@ function VirtioVirtq:get_buffers (kind, ops)
    while idx ~= avail do
 
       -- Header
-      local header_id = ring[band(avail,vring_mask)]
-      local desc, id = self:get_desc(header_id)
+      local v_header_id = ring[band(avail,vring_mask)]
+      local desc, id = self:get_desc(v_header_id)
 
       local data_desc = desc[id]
 
-      local header_len = ops.packet_start(device, header_id, data_desc.addr, data_desc.len)
+      local header_id, header_pointer, header_len, total_size, packet =
+         ops.packet_start(device, v_header_id, data_desc.addr, data_desc.len)
+
+      local buf
 
       -- support ANY_LAYOUT
       if header_len < data_desc.len then
-         ops.buffer_add(device, data_desc.addr + header_len, data_desc.len - header_len)
+         local addr = data_desc.addr + header_len
+         local len = data_desc.len - header_len
+         buf, total_size = ops.buffer_add(device, packet,
+            addr, len,
+            total_size)
       end
 
       -- Data buffer
       while band(data_desc.flags, C.VIRTIO_DESC_F_NEXT) ~= 0 do
          data_desc  = desc[data_desc.next]
-         ops.buffer_add(device, data_desc.addr, data_desc.len)
+         buf, total_size = ops.buffer_add(device, packet,
+            data_desc.addr,
+            data_desc.len,
+            total_size)
       end
 
-      ops.packet_end(device)
+      ops.packet_end(device, header_id, header_pointer, total_size, packet, buf)
 
       avail = band(avail + 1, 65535)
 
