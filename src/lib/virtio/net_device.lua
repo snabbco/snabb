@@ -50,7 +50,7 @@ local invalid_header_id = 0xffff
       Requires VIRTIO_NET_F_CTRL_VQ
 
 --]]
-local supported_features = C.VIRTIO_F_ANY_LAYOUT
+local supported_features = C.VIRTIO_F_ANY_LAYOUT + C.VIRTIO_RING_F_INDIRECT_DESC
 
 VirtioNetDevice = {}
 
