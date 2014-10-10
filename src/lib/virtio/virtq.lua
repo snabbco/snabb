@@ -46,7 +46,7 @@ function VirtioVirtq:get_desc(header_id)
 end
 
 -- Receive all available packets from the virtual machine.
-function VirtioVirtq:get_buffers (packet_start, buffer_add, packet_end)
+function VirtioVirtq:get_buffers (kind, ops)
 
    local ring = self.virtq.avail.ring
    local device = self.device
@@ -61,20 +61,20 @@ function VirtioVirtq:get_buffers (packet_start, buffer_add, packet_end)
 
       local data_desc = desc[id]
 
-      local header_len = packet_start(device, header_id, data_desc.addr, data_desc.len)
+      local header_len = ops.packet_start(device, header_id, data_desc.addr, data_desc.len)
 
       -- support ANY_LAYOUT
       if header_len < data_desc.len then
-         buffer_add(device, data_desc.addr + header_len, data_desc.len - header_len)
+         ops.buffer_add(device, data_desc.addr + header_len, data_desc.len - header_len)
       end
 
       -- Data buffer
       while band(data_desc.flags, C.VIRTIO_DESC_F_NEXT) ~= 0 do
          data_desc  = desc[data_desc.next]
-         buffer_add(device, data_desc.addr, data_desc.len)
+         ops.buffer_add(device, data_desc.addr, data_desc.len)
       end
 
-      packet_end(device)
+      ops.packet_end(device)
 
       avail = band(avail + 1, 65535)
 

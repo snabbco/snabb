@@ -15,6 +15,7 @@ local vq        = require("lib.virtio.virtq")
 local ffi       = require("ffi")
 local C         = ffi.C
 local band      = bit.band
+local get_buffers = vq.VirtioVirtq.get_buffers
 
 require("lib.virtio.virtio.h")
 require("lib.virtio.virtio_vring_h")
@@ -163,7 +164,12 @@ function VirtioNetDevice:receive_packets_from_vm ()
    for i = 0, self.virtq_pairs-1 do
       self.ring_id = 2*i+1
       local virtq = self.virtq[self.ring_id]
-      virtq:get_buffers(self.rx_packet_start, self.rx_buffer_add, self.rx_packet_end)
+      local ops = {
+         packet_start = self.rx_packet_start,
+         buffer_add   = self.rx_buffer_add,
+         packet_end   = self.rx_packet_end
+      }
+      get_buffers(virtq, 'rx', ops)
    end
 end
 
@@ -213,7 +219,12 @@ function VirtioNetDevice:get_transmit_buffers_from_vm ()
    for i = 0, self.virtq_pairs-1 do
       self.ring_id = 2*i
       local virtq = self.virtq[self.ring_id]
-      virtq:get_buffers(self.tx_packet_start, self.tx_buffer_add, self.tx_packet_end)
+      local ops = {
+         packet_start = self.tx_packet_start,
+         buffer_add   = self.tx_buffer_add,
+         packet_end   = self.tx_packet_end
+      }
+      get_buffers(virtq, 'tx', ops)
    end
 end
 
