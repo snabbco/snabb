@@ -111,51 +111,53 @@ function VirtioNetDevice:poll_vring_transmit ()
 end
 
 function VirtioNetDevice:rx_packet_start(header_id, addr, len)
-   self.rx.p = packet.allocate()
-   self.rx.header_id = header_id
-   self.rx.header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(addr))
-   self.rx.total_size = virtio_net_hdr_size
+   local rx_p = packet.allocate()
+   local header_id = header_id
+   local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(addr))
+   local total_size = virtio_net_hdr_size
+   local header_len = virtio_net_hdr_size
 
-   return virtio_net_hdr_size
+   return header_id, header_pointer, total_size, header_len, rx_p
 end
 
-function VirtioNetDevice:rx_buffer_add(addr, len)
-   local b = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
+function VirtioNetDevice:rx_buffer_add(rx_p, addr, len, rx_total_size, tx)
+   local buf = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
 
    local addr = self:map_from_guest(addr)
-   b.pointer = ffi.cast(char_ptr_t, addr)
-   b.physical = self:translate_physical_addr(addr)
-   b.size = len
-
-   -- The total size will be added to the first buffer virtio info
-   self.rx.total_size = self.rx.total_size + b.size
+   buf.pointer = ffi.cast(char_ptr_t, addr)
+   buf.physical = self:translate_physical_addr(addr)
+   buf.size = len
 
    -- Fill buffer origin info
-   b.origin.type = C.BUFFER_ORIGIN_VIRTIO
+   buf.origin.type = C.BUFFER_ORIGIN_VIRTIO
    -- Set invalid header_id for all buffers. The first will contain
    -- the real header_id, set after the loop
-   b.origin.info.virtio.header_id = invalid_header_id
+   buf.origin.info.virtio.header_id = invalid_header_id
 
-   packet.add_iovec(self.rx.p, b, b.size)
+   packet.add_iovec(rx_p, buf, buf.size)
+
+   -- The total size will be added to the first buffer virtio info
+   local new_total_size = rx_total_size + buf.size
+
+   return nil, new_total_size
 end
 
-function VirtioNetDevice:rx_packet_end()
+function VirtioNetDevice:rx_packet_end(rx_header_id, rx_header_pointer, rx_total_size, rx_p, buf)
    -- Fill in the first buffer with header info
-   local p = self.rx.p
-   local v = p.iovecs[0].buffer.origin.info.virtio
-   v.device_id     = self.virtio_device_id
-   v.ring_id       = self.ring_id
-   v.header_id = self.rx.header_id
-   v.header_pointer = self.rx.header_pointer
-   v.total_size = self.rx.total_size
-   ffi.copy(p.info, self.rx.header_pointer, packet_info_size)
+   local v = rx_p.iovecs[0].buffer.origin.info.virtio
+   v.device_id      = self.virtio_device_id
+   v.ring_id        = self.ring_id
+   v.header_id      = rx_header_id
+   v.header_pointer = rx_header_pointer
+   v.total_size     = rx_total_size
+   ffi.copy(rx_p.info, rx_header_pointer, packet_info_size)
 
    local l = self.owner.output.tx
    if l then
-      link.transmit(l, p)
+      link.transmit(l, rx_p)
    else
-      debug("droprx", "len", p.length, "niovecs", p.niovecs)
-      packet.deref(p)
+      debug("droprx", "len", rx_p.length, "niovecs", rx_p.niovecs)
+      packet.deref(rx_p)
    end
 end
 
@@ -174,44 +176,37 @@ function VirtioNetDevice:receive_packets_from_vm ()
 end
 
 function VirtioNetDevice:tx_packet_start(header_id, addr, len)
-   self.tx.header_id = header_id
-   self.tx.header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(addr))
-   self.tx.total_size = virtio_net_hdr_size
-
-   return virtio_net_hdr_size
+   local tx_header_pointer = ffi.cast(char_ptr_t, self:map_from_guest(addr))
+   return header_id, tx_header_pointer, virtio_net_hdr_size, virtio_net_hdr_size, nil
 end
 
-function VirtioNetDevice:tx_buffer_add(addr, len)
-
-   assert(self.tx.b == nil)
-   local b = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
+function VirtioNetDevice:tx_buffer_add(tx_p, addr, len, tx_total_size, tx)
+   local buf = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
 
    local addr = self:map_from_guest(addr)
-   b.pointer = ffi.cast(char_ptr_t, addr)
-   b.physical = self:translate_physical_addr(addr)
-   b.size = len
-
-   self.tx.total_size = self.tx.total_size + b.size
+   buf.pointer = ffi.cast(char_ptr_t, addr)
+   buf.physical = self:translate_physical_addr(addr)
+   buf.size = len
 
    -- Fill buffer origin info
-   b.origin.type = C.BUFFER_ORIGIN_VIRTIO
+   buf.origin.type = C.BUFFER_ORIGIN_VIRTIO
 
+   local new_total_size = tx_total_size + buf.size
    -- TODO: supports single buffer now!
-   self.tx.b = b
+   return buf, new_total_size
 end
 
-function VirtioNetDevice:tx_packet_end()
+function VirtioNetDevice:tx_packet_end(tx_header_id, tx_header_pointer,
+   tx_total_size, _p, buf)
    -- TODO: supports single buffer now!
-   assert(self.tx.b)
-   local v = self.tx.b.origin.info.virtio
-   v.device_id     = self.virtio_device_id
-   v.ring_id       = self.ring_id
-   v.header_id = self.tx.header_id
-   v.header_pointer = self.tx.header_pointer
-   v.total_size = self.tx.total_size
+   local v = buf.origin.info.virtio
+   v.device_id      = self.virtio_device_id
+   v.ring_id        = self.ring_id
+   v.header_id      = tx_header_id
+   v.header_pointer = tx_header_pointer
+   v.total_size     = tx_total_size
 
-   freelist.add(self.vring_transmit_buffers, self.tx.b)
-   self.tx.b = nil
+   freelist.add(self.vring_transmit_buffers, buf)
 end
 
 -- Populate the `self.vring_transmit_buffers` freelist with buffers from the VM.
