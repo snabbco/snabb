@@ -23,6 +23,7 @@ require("lib.virtio.virtio_vring_h")
 local char_ptr_t = ffi.typeof("char *")
 local virtio_net_hdr_size = ffi.sizeof("struct virtio_net_hdr")
 local virtio_net_hdr_mrg_rxbuf_size = ffi.sizeof("struct virtio_net_hdr_mrg_rxbuf")
+local virtio_net_hdr_mrg_rxbuf_type = ffi.typeof("struct virtio_net_hdr_mrg_rxbuf *")
 local packet_info_size = ffi.sizeof("struct packet_info")
 local buffer_t = ffi.typeof("struct buffer")
 
@@ -52,10 +53,11 @@ local invalid_header_id = 0xffff
       Requires VIRTIO_NET_F_CTRL_VQ
 
 --]]
-local supported_features = C.VIRTIO_F_ANY_LAYOUT + 
-                           C.VIRTIO_RING_F_INDIRECT_DESC + 
-                           C.VIRTIO_NET_F_CTRL_VQ + 
-                           C.VIRTIO_NET_F_MQ
+local supported_features = C.VIRTIO_F_ANY_LAYOUT +
+                           C.VIRTIO_RING_F_INDIRECT_DESC +
+                           C.VIRTIO_NET_F_CTRL_VQ +
+                           C.VIRTIO_NET_F_MQ +
+                           C.VIRTIO_NET_F_MRG_RXBUF
 --[[
    The following offloading flags are also available:
    VIRTIO_NET_F_CSUM
@@ -230,6 +232,7 @@ function VirtioNetDevice:more_vm_buffers ()
 end
 
 -- return the buffer from a iovec, ensuring it originates from the vm
+local last_size = nil
 function VirtioNetDevice:vm_buffer (iovec)
    local should_continue = true
    local b = iovec.buffer
@@ -256,6 +259,7 @@ function VirtioNetDevice:vm_buffer (iovec)
          iovec.offset = 0
       end
    end
+   if last_size ~= b.size then print("size=", b.size) last_size=b.size end
    return should_continue, b
 end
 
@@ -268,21 +272,44 @@ function VirtioNetDevice:transmit_packets_to_vm ()
    while (not link.empty(l)) and should_continue do
       local p = link.receive(l)
 
-      -- ensure all data is in a single buffer
       if p.niovecs > 1 then
-         packet.coalesce(p)
+         assert(self.mrg_rxbuf)
       end
 
-      local iovec = p.iovecs[0]
-      local should_continue, b = self:vm_buffer(iovec)
+      -- Iterate over all iovecs
+      for i = 0, p.niovecs - 1 do
 
-      -- fill in the virtio header
-      do 
-         local virtio_hdr = b.origin.info.virtio.header_pointer
-         ffi.copy(virtio_hdr, p.info, packet_info_size)
+         local iovec = p.iovecs[i]
+         local should_continue, b = self:vm_buffer(iovec)
+         local size = iovec.length
+
+         -- fill in the virtio header
+         if b then
+            local v = b.origin.info.virtio
+            local virtio_hdr = v.header_pointer
+            -- the first buffer always contains the header
+            if i == 0 then
+               ffi.copy(virtio_hdr, p.info, packet_info_size)
+               size = size + self.hdr_size
+               -- when using mergeable buffers, set the num_buffers field
+               if self.mrg_rxbuf then
+                  local hdr = ffi.cast(virtio_net_hdr_mrg_rxbuf_type, virtio_hdr)
+                  hdr.num_buffers = p.niovecs
+               end
+            else
+               -- the other buffer need to left shift the data over the header
+               -- here we assume that the header precedes the buffer
+               -- which is the common case when mergeable buffers are used
+
+               --assert(virto_hdr+virtio_net_hdr_mrg_rxbuf_size == b.pointer)
+               C.memmove(virtio_hdr, b.pointer, iovec.length)
+            end
+
+            self.virtq[v.ring_id]:put_buffer(v.header_id, size)
+         end
+         if not should_continue then break end
       end
 
-      self.virtq[b.origin.info.virtio.ring_id]:put_buffer(b.origin.info.virtio.header_id, self.hdr_size + iovec.length)
       packet.deref(p)
    end
 
@@ -381,6 +408,7 @@ function VirtioNetDevice:set_features(features)
    self.features = features
    if band(self.features, C.VIRTIO_NET_F_MRG_RXBUF) == C.VIRTIO_NET_F_MRG_RXBUF then
       self.hdr_size = virtio_net_hdr_mrg_rxbuf_size
+      self.mrg_rxbuf = true
    end
 end
 
