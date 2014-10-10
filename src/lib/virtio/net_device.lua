@@ -50,7 +50,19 @@ local invalid_header_id = 0xffff
       Requires VIRTIO_NET_F_CTRL_VQ
 
 --]]
-local supported_features = C.VIRTIO_F_ANY_LAYOUT + C.VIRTIO_RING_F_INDIRECT_DESC
+local supported_features = C.VIRTIO_F_ANY_LAYOUT + 
+                           C.VIRTIO_RING_F_INDIRECT_DESC + 
+                           C.VIRTIO_NET_F_CTRL_VQ + 
+                           C.VIRTIO_NET_F_MQ
+--[[
+   The following offloading flags are also available:
+   VIRTIO_NET_F_CSUM
+   VIRTIO_NET_F_GUEST_CSUM
+   VIRTIO_NET_F_GUEST_TSO4 + VIRTIO_NET_F_GUEST_TSO6 + VIRTIO_NET_F_GUEST_ECN + VIRTIO_NET_F_GUEST_UFO
+   VIRTIO_NET_F_HOST_TSO4 + VIRTIO_NET_F_HOST_TSO6 + VIRTIO_NET_F_HOST_ECN + VIRTIO_NET_F_HOST_UFO
+]]--
+
+local max_virtq_pairs = 16
 
 VirtioNetDevice = {}
 
@@ -71,12 +83,16 @@ function VirtioNetDevice:new(owner)
 
    o = setmetatable(o, {__index = VirtioNetDevice})
 
-   -- TXQ
-   o.virtq[0] = vq.VirtioVirtq:new()
-   o.virtq[0].device = o
-   -- RXQ
-   o.virtq[1] = vq.VirtioVirtq:new()
-   o.virtq[1].device = o
+   for i = 0, max_virtq_pairs-1 do
+      -- TXQ
+      o.virtq[2*i] = vq.VirtioVirtq:new()
+      o.virtq[2*i].device = o
+      -- RXQ
+      o.virtq[2*i+1] = vq.VirtioVirtq:new()
+      o.virtq[2*i+1].device = o
+   end
+
+   self.virtq_pairs = 1
 
    return o
 end
@@ -127,7 +143,7 @@ function VirtioNetDevice:rx_packet_end()
    local p = self.rx.p
    local v = p.iovecs[0].buffer.origin.info.virtio
    v.device_id     = self.virtio_device_id
-   v.ring_id       = 1 -- rx ring
+   v.ring_id       = self.ring_id
    v.header_id = self.rx.header_id
    v.header_pointer = self.rx.header_pointer
    v.total_size = self.rx.total_size
@@ -144,8 +160,11 @@ end
 
 -- Receive all available packets from the virtual machine.
 function VirtioNetDevice:receive_packets_from_vm ()
-   local virtq = self.virtq[1]
-   virtq:get_buffers(self.rx_packet_start, self.rx_buffer_add, self.rx_packet_end)
+   for i = 0, self.virtq_pairs-1 do
+      self.ring_id = 2*i+1
+      local virtq = self.virtq[self.ring_id]
+      virtq:get_buffers(self.rx_packet_start, self.rx_buffer_add, self.rx_packet_end)
+   end
 end
 
 function VirtioNetDevice:tx_packet_start(header_id, addr, len)
@@ -180,7 +199,7 @@ function VirtioNetDevice:tx_packet_end()
    assert(self.tx.b)
    local v = self.tx.b.origin.info.virtio
    v.device_id     = self.virtio_device_id
-   v.ring_id       = 0 -- tx ring
+   v.ring_id       = self.ring_id
    v.header_id = self.tx.header_id
    v.header_pointer = self.tx.header_pointer
    v.total_size = self.tx.total_size
@@ -191,8 +210,11 @@ end
 
 -- Populate the `self.vring_transmit_buffers` freelist with buffers from the VM.
 function VirtioNetDevice:get_transmit_buffers_from_vm ()
-   local virtq = self.virtq[0]
-   virtq:get_buffers(self.tx_packet_start, self.tx_buffer_add, self.tx_packet_end)
+   for i = 0, self.virtq_pairs-1 do
+      self.ring_id = 2*i
+      local virtq = self.virtq[self.ring_id]
+      virtq:get_buffers(self.tx_packet_start, self.tx_buffer_add, self.tx_packet_end)
+   end
 end
 
 function VirtioNetDevice:more_vm_buffers ()
@@ -247,11 +269,12 @@ function VirtioNetDevice:transmit_packets_to_vm ()
       local should_continue, b = self:vm_buffer(iovec)
 
       -- fill in the virtio header
-      do local virtio_hdr = b.origin.info.virtio.header_pointer
-	 ffi.copy(virtio_hdr, p.info, packet_info_size)
+      do 
+         local virtio_hdr = b.origin.info.virtio.header_pointer
+         ffi.copy(virtio_hdr, p.info, packet_info_size)
       end
 
-      self.virtq[0]:put_buffer(b.origin.info.virtio.header_id, virtio_net_hdr_size + iovec.length)
+      self.virtq[b.origin.info.virtio.ring_id]:put_buffer(b.origin.info.virtio.header_id, virtio_net_hdr_size + iovec.length)
       packet.deref(p)
    end
 
@@ -260,7 +283,9 @@ function VirtioNetDevice:transmit_packets_to_vm ()
       self.not_enough_vm_bufers = not self:more_vm_buffers()
    end
 
-   self.virtq[0]:signal_used()
+   for i = 0, self.virtq_pairs-1 do
+      self.virtq[2*i]:signal_used()
+   end
 end
 
 -- Return a buffer to the virtual machine.
@@ -274,14 +299,16 @@ function VirtioNetDevice:return_virtio_buffer (b)
       -- rx_signal_used() is not called. So be sure to free
       -- all of them at one poll.
       if b.origin.info.virtio.header_id ~= invalid_header_id then
-         self.virtq[1]:put_buffer(b.origin.info.virtio.header_id, b.origin.info.virtio.total_size)
+         self.virtq[b.origin.info.virtio.ring_id]:put_buffer(b.origin.info.virtio.header_id, b.origin.info.virtio.total_size)
       end
    end
 end
 
 -- Advance the rx used ring and signal up
 function VirtioNetDevice:rx_signal_used()
-   self.virtq[1]:signal_used()
+   for i = 0, self.virtq_pairs-1 do
+      self.virtq[2*i+1]:signal_used()
+   end
 end
 
 local pagebits = memory.huge_page_bits
@@ -352,6 +379,8 @@ function VirtioNetDevice:set_vring_num(idx, num)
    end
 
    self.virtq[idx].vring_num = n
+   -- update the curent virtq pairs
+   self.virtq_pairs = math.max(self.virtq_pairs, math.floor(idx/2)+1)
 end
 
 function VirtioNetDevice:set_vring_call(idx, fd)
