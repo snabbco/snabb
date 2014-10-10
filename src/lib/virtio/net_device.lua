@@ -22,6 +22,7 @@ require("lib.virtio.virtio_vring_h")
 
 local char_ptr_t = ffi.typeof("char *")
 local virtio_net_hdr_size = ffi.sizeof("struct virtio_net_hdr")
+local virtio_net_hdr_mrg_rxbuf_size = ffi.sizeof("struct virtio_net_hdr_mrg_rxbuf")
 local packet_info_size = ffi.sizeof("struct packet_info")
 local buffer_t = ffi.typeof("struct buffer")
 
@@ -94,6 +95,7 @@ function VirtioNetDevice:new(owner)
    end
 
    self.virtq_pairs = 1
+   self.hdr_size = virtio_net_hdr_size
 
    return o
 end
@@ -114,8 +116,8 @@ function VirtioNetDevice:rx_packet_start(header_id, addr, len)
    local rx_p = packet.allocate()
    local header_id = header_id
    local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(addr))
-   local total_size = virtio_net_hdr_size
-   local header_len = virtio_net_hdr_size
+   local total_size = self.hdr_size
+   local header_len = self.hdr_size
 
    return header_id, header_pointer, total_size, header_len, rx_p
 end
@@ -177,7 +179,7 @@ end
 
 function VirtioNetDevice:tx_packet_start(header_id, addr, len)
    local tx_header_pointer = ffi.cast(char_ptr_t, self:map_from_guest(addr))
-   return header_id, tx_header_pointer, virtio_net_hdr_size, virtio_net_hdr_size, nil
+   return header_id, tx_header_pointer, self.hdr_size, self.hdr_size, nil
 end
 
 function VirtioNetDevice:tx_buffer_add(tx_p, addr, len, tx_total_size, tx)
@@ -280,7 +282,7 @@ function VirtioNetDevice:transmit_packets_to_vm ()
          ffi.copy(virtio_hdr, p.info, packet_info_size)
       end
 
-      self.virtq[b.origin.info.virtio.ring_id]:put_buffer(b.origin.info.virtio.header_id, virtio_net_hdr_size + iovec.length)
+      self.virtq[b.origin.info.virtio.ring_id]:put_buffer(b.origin.info.virtio.header_id, self.hdr_size + iovec.length)
       packet.deref(p)
    end
 
@@ -376,6 +378,10 @@ end
 
 function VirtioNetDevice:set_features(features)
    print(string.format("Set features 0x%x\n%s", tonumber(features), get_feature_names(features)))
+   self.features = features
+   if band(self.features, C.VIRTIO_NET_F_MRG_RXBUF) == C.VIRTIO_NET_F_MRG_RXBUF then
+      self.hdr_size = virtio_net_hdr_mrg_rxbuf_size
+   end
 end
 
 function VirtioNetDevice:set_vring_num(idx, num)
