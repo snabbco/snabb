@@ -92,7 +92,12 @@ function Intel82599:add_receive_buffers ()
       -- Buffers from a special freelist
       local fl = self.rx_buffer_freelist
       while self.dev:can_add_receive_buffer() and freelist.nfree(fl) > 0 do
-         self.dev:add_receive_buffer(freelist.remove(fl))
+         local b = freelist.remove(fl)
+         if b.size < 1024 then
+            buffer.free(b)
+            b = buffer.allocate()
+         end
+         self.dev:add_receive_buffer(b)
       end
    end
 end
@@ -146,6 +151,20 @@ function selftest ()
    end
 
    zone('buffer') buffer.preallocate(100000) zone()
+
+   mq_sw(pcideva)
+   engine.main({duration = 1, report={showlinks=true, showapps=false}})
+   do
+      local a0Sends = engine.app_table.nicAm0.input.rx.stats.txpackets
+      local a1Gets = engine.app_table.nicAm1.output.tx.stats.rxpackets
+      if a1Gets < a0Sends/4
+         or a1Gets > a0Sends*3/4
+      then
+         print ('wrong proportion of packets passed/discarded')
+         os.exit(1)
+      end
+   end
+
    sq_sq(pcideva, pcidevb)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
@@ -187,6 +206,8 @@ end
 function sq_sq(pcidevA, pcidevB)
    engine.configure(config.new())
    local c = config.new()
+   print ('-------')
+   print ('just send a lot of packets through the wire')
    config.app(c, 'source1', basic_apps.Source)
    config.app(c, 'source2', basic_apps.Source)
    config.app(c, 'nicA', Intel82599, ([[{pciaddr='%s'}]]):format(pcidevA))
@@ -201,7 +222,7 @@ end
 
 -- one singlequeue driver and a multiqueue at the other end
 function mq_sq(pcidevA, pcidevB)
-   d1 = lib.hexundump ([[
+   local d1 = lib.hexundump ([[
       52:54:00:02:02:02 52:54:00:01:01:01 08 00 45 00
       00 54 c3 cd 40 00 40 01 f3 23 c0 a8 01 66 c0 a8
       01 01 08 00 57 ea 61 1a 00 06 5c ba 16 53 00 00
@@ -210,7 +231,7 @@ function mq_sq(pcidevA, pcidevB)
       26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
       36 37
    ]], 98)                  -- src: As    dst: Bm0
-   d2 = lib.hexundump ([[
+   local d2 = lib.hexundump ([[
       52:54:00:03:03:03 52:54:00:01:01:01 08 00 45 00
       00 54 c3 cd 40 00 40 01 f3 23 c0 a8 01 66 c0 a8
       01 01 08 00 57 ea 61 1a 00 06 5c ba 16 53 00 00
@@ -240,6 +261,7 @@ function mq_sq(pcidevA, pcidevB)
       vmdq = true,
       macaddr = '52:54:00:03:03:03',
    }]]):format(pcidevB))
+   print ('-------')
    print ("Send a bunch of from the SF on NIC A to the VFs on NIC B")
    print ("half of them go to nicBm0 and nicBm0")
    config.app(c, 'sink_ms', basic_apps.Sink)
@@ -248,6 +270,55 @@ function mq_sq(pcidevA, pcidevB)
    config.link(c, 'nicAs.tx -> sink_ms.in1')
    config.link(c, 'nicBm0.tx -> sink_ms.in2')
    config.link(c, 'nicBm1.tx -> sink_ms.in3')
+   engine.configure(c)
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+end
+
+-- one multiqueue driver with two apps and do switch stuff
+function mq_sw(pcidevA)
+   local d1 = lib.hexundump ([[
+      52:54:00:02:02:02 52:54:00:01:01:01 08 00 45 00
+      00 54 c3 cd 40 00 40 01 f3 23 c0 a8 01 66 c0 a8
+      01 01 08 00 57 ea 61 1a 00 06 5c ba 16 53 00 00
+      00 00 04 15 09 00 00 00 00 00 10 11 12 13 14 15
+      16 17 18 19 1a 1b 1c 1d 1e 1f 20 21 22 23 24 25
+      26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
+      36 37
+   ]], 98)                  -- src: Am0    dst: Am1
+   local d2 = lib.hexundump ([[
+      52:54:00:03:03:03 52:54:00:01:01:01 08 00 45 00
+      00 54 c3 cd 40 00 40 01 f3 23 c0 a8 01 66 c0 a8
+      01 01 08 00 57 ea 61 1a 00 06 5c ba 16 53 00 00
+      00 00 04 15 09 00 00 00 00 00 10 11 12 13 14 15
+      16 17 18 19 1a 1b 1c 1d 1e 1f 20 21 22 23 24 25
+      26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
+      36 37
+   ]], 98)                  -- src: Am0    dst: ---
+   engine.configure(config.new())
+   local c = config.new()
+   config.app(c, 'source_ms', basic_apps.Join)
+   config.app(c, 'repeater_ms', basic_apps.Repeater)
+   config.app(c, 'nicAm0', Intel82599, ([[{
+   -- first VF on NIC A
+      pciaddr = '%s',
+      vmdq = true,
+      macaddr = '52:54:00:01:01:01',
+   }]]):format(pcidevA))
+   config.app(c, 'nicAm1', Intel82599, ([[{
+   -- second VF on NIC A
+      pciaddr = '%s',
+      vmdq = true,
+      macaddr = '52:54:00:02:02:02',
+   }]]):format(pcidevA))
+   print ('-------')
+   print ("Send a bunch of packets from Am0")
+   print ("half of them go to nicAm1 and half go nowhere")
+   config.app(c, 'sink_ms', basic_apps.Sink)
+   config.link(c, 'source_ms.out -> repeater_ms.input')
+   config.link(c, 'repeater_ms.output -> nicAm0.rx')
+   config.link(c, 'nicAm0.tx -> sink_ms.in1')
+   config.link(c, 'nicAm1.tx -> sink_ms.in2')
    engine.configure(c)
    link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
    link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
