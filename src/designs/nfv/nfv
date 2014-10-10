@@ -8,7 +8,6 @@ local lib        = require("core.lib")
 local pcap       = require("apps.pcap.pcap")
 local timer      = require("core.timer")
 local pci        = require("lib.hardware.pci")
-local vfio       = require("lib.hardware.vfio")
 local vhost_user = require("apps.vhost.vhost_user")
 local C = require("ffi").C
 
