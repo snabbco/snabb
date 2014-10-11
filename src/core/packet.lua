@@ -97,7 +97,7 @@ end
 function clone (p)
    local new_p = allocate()
    local b = buffer.allocate()
-   assert(p.length <= b.size, "packet too big to coalesce")
+   assert(p.length <= b.size, "packet too big to clone")
 
    local length = 0
    for i = 0, p.niovecs - 1 do
