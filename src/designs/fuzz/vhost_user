@@ -1,0 +1,29 @@
+#!/usr/bin/env snabb
+
+-- Simple fuzz<==>vm design
+-- Ensure that VM is returning the packets
+
+local app         = require("core.app")
+local fuzz        = require("apps.fuzz.fuzz")
+local vhost_user  = require("apps.vhost.vhost_user")
+local C           = require("ffi").C
+
+function run ()
+   buffer.preallocate(100000)
+
+   local socket  = os.getenv("FUZZ_SOCKET") or error("No $FUZZ_SOCKET set.")
+   local c = config.new()
+
+   config.app(c, 'fuzz', fuzz.fuzz)
+   config.app(c, "vm", vhost_user.VhostUser, {socket_path=socket, is_server=false})
+   config.link(c, "vm.tx -> fuzz.rx")
+   config.link(c, "fuzz.tx -> vm.rx")
+   engine.configure(c)
+
+   timer.init()
+   local fuzz = app.app_table.fuzz
+   engine.main({duration = 10, report={showlinks=true, showapps=false}})
+   fuzz:report()
+end
+
+run()

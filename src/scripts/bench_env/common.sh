@@ -98,6 +98,24 @@ run_nfv () {
     SNABBPIDS="$SNABBPIDS $!"
 }
 
+run_fuzz () {
+    NUMANODE=$1
+    export FUZZ_SOCKET=$2
+    LOG=$3
+    CPU=$4
+
+    if [ -n "$CPU" ]; then
+        NUMA="--membind=$NUMANODE --physcpubind=$CPU"
+    else
+        NUMA="--cpunodebind=$NUMANODE --membind=$NUMANODE"
+    fi
+
+    numactl $NUMA \
+        $SNABB $FUZZ $FUZZ_SOCKET > $LOG 2>&1 &
+
+    SNABBPIDS="$SNABBPIDS $!"
+}
+
 import_env () {
     # Check if configuration file is present on etc directory
     ENV_FILE="$1/bench_conf.sh"
@@ -203,6 +221,13 @@ if [ -f $SNABB_PATH/designs/loadgen/loadgen ]; then
     export LOADGEN=$SNABB_PATH/designs/loadgen/loadgen
 else
     printf "LOADGEN design not found\n"
+    exit 1
+fi
+
+if [ -f $SNABB_PATH/designs/fuzz/vhost_user ]; then
+    export FUZZ=$SNABB_PATH/designs/fuzz/vhost_user
+else
+    printf "FUZZ design not found\n"
     exit 1
 fi
 
