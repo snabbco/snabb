@@ -93,6 +93,8 @@ HUGETLBFS: Path to where hugetlbfs is mounted
 KERNEL: Linux kernel image of the guests
 QEMU: Location of the QEMU binary
 
+QUEUES: number of queues to use for the virtio-net driver, implies multiqueue and SMP enabled
+
 TAP: Name of the tap interface under ifconfig
 TELNET_PORT: Telnet port that the user needs to access the guest terminal
 GUEST_IP: The preferred IP of the guest (can be "dhcp" if there is a server)

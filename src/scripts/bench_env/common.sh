@@ -16,7 +16,7 @@ run_qemu () {
     CPU=$7
 
     MEM="-m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on"
-    NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC"
+    NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC,mq=$MQ,vectors=$VECTORS"
     if [ -n "$CPU" ]; then
         NUMA="--membind=$NUMANODE --physcpubind=$CPU"
     else
@@ -28,7 +28,7 @@ run_qemu () {
         $QEMU \
             -kernel $KERNEL -append "$ARGS" \
             $MEM $NET \
-            -M pc -smp 1 -cpu host --enable-kvm \
+            -M pc -smp $SMP -cpu host --enable-kvm \
             -serial telnet:localhost:$TELNETPORT,server,nowait \
             -drive if=virtio,file=$IMG \
             -nographic > /dev/null 2>&1 &
@@ -45,7 +45,7 @@ run_qemu () {
 # - optional CPU to execute on
 run_qemu_vhost_user () {
     SOCKET=$6
-    NETDEV="-netdev type=vhost-user,id=net0,chardev=char0 -chardev socket,id=char0,path=$SOCKET,server"
+    NETDEV="-netdev type=vhost-user,id=net0,chardev=char0,queues=$QUEUES -chardev socket,id=char0,path=$SOCKET,server"
     run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7"
     QEMUSOCKS="$QEMUSOCKS $SOCKET"
 }
@@ -60,7 +60,7 @@ run_qemu_vhost_user () {
 # - optional CPU to execute on
 run_qemu_tap () {
     TAP=$6
-    NETDEV="-netdev type=tap,id=net0,script=no,downscript=no,vhost=on,ifname=$TAP"
+    NETDEV="-netdev type=tap,id=net0,script=no,downscript=no,vhost=on,ifname=$TAP,queues=$QUEUES"
     run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7"
 }
 
@@ -205,6 +205,16 @@ else
     printf "LOADGEN design not found\n"
     exit 1
 fi
+
+#calculate and set MQ related variables
+if [ -n "$QUEUES" ]; then
+    export MQ=on
+else
+    export MQ=off
+    export QUEUES=1
+fi
+export SMP=$QUEUES
+export VECTORS=$((2*$QUEUES + 1))
 
 # Check if the guest memory will fit in hugetlbfs
 PAGES=`cat /proc/meminfo | grep HugePages_Free | awk  '{ print $2; }'`
