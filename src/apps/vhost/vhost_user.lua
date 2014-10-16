@@ -8,8 +8,10 @@ local pcap      = require("apps.pcap.pcap")
 local app       = require("core.app")
 local buffer    = require("core.buffer")
 local config    = require("core.config")
+local lib       = require("core.lib")
 local link      = require("core.link")
 local main      = require("core.main")
+local memory    = require("core.memory")
 local pci       = require("lib.hardware.pci")
 local net_device= require("lib.virtio.net_device")
 local timer     = require("core.timer")
@@ -30,6 +32,7 @@ function VhostUser:new (args)
       nfds = ffi.new("int[1]"),
       fds = ffi.new("int[?]", C.VHOST_USER_MEMORY_MAX_NREGIONS),
       socket_path = args.socket_path,
+      mem_table = {},
       -- process qemu messages timer
       process_qemu_timer = timer.new(
          "process qemu timer",
@@ -220,8 +223,11 @@ function VhostUser:get_vring_base (msg)
 end
 
 function VhostUser:set_mem_table (msg, fds, nfds)
-   mem_table = {}
    assert(nfds == msg.memory.nregions)
+
+   -- ensure the mem table is empty before we start
+   self:free_mem_table()
+
    for i = 0, msg.memory.nregions - 1 do
       assert(fds[i] > 0)
 
@@ -230,16 +236,37 @@ function VhostUser:set_mem_table (msg, fds, nfds)
       local qemu = msg.memory.regions[i].userspace_addr
       local offset = msg.memory.regions[i].mmap_offset
 
-      local pointer = C.vhost_user_map_guest_memory(fds[i], offset + size)
-      pointer = ffi.cast("char *", pointer)
+      local mmap_fd = fds[i]
+      local mmap_size = offset + size
+      local mmap_pointer = C.vhost_user_map_guest_memory(mmap_fd, mmap_size)
+      local pointer = ffi.cast("char *", mmap_pointer)
       pointer = pointer + offset -- advance to the offset
 
-      mem_table[i] = { guest = guest,
+      self.mem_table[i] = {
+         mmap_pointer = mmap_pointer,
+         mmap_size = mmap_size,
+         guest = guest,
          qemu  = qemu,
          snabb = ffi.cast("int64_t", pointer),
          size  = tonumber(size) }
+
+      C.close(mmap_fd)
    end
-   self.dev:set_mem_table(mem_table)
+   self.dev:set_mem_table(self.mem_table)
+end
+
+function VhostUser:free_mem_table ()
+   if table.getn(self.mem_table) == 0 then
+      return
+   end
+
+   for i = 0, table.getn(self.mem_table) do
+      local mmap_pointer = self.mem_table[i].mmap_pointer
+      local mmap_size = lib.align(self.mem_table[i].mmap_size, memory.huge_page_size)
+      C.vhost_user_unmap_guest_memory(mmap_pointer, mmap_size)
+   end
+
+   self.mem_table = {}
 end
 
 function VhostUser:reply (req)
