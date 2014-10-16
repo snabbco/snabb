@@ -53,6 +53,19 @@ function VhostUser:new (args)
    return self
 end
 
+function VhostUser:stop()
+   -- set state
+   self.connected = false
+   self.vhost_ready = false
+   -- close the socket
+   C.close(self.socket)
+   self.socket = -1
+   -- clear the mmap-ed memory
+   self:free_mem_table()
+
+   if self.link_down_proc then self.link_down_proc() end
+end
+
 function VhostUser:pull ()
    if not self.connected then
       self:connect()
@@ -114,6 +127,8 @@ function VhostUser:process_qemu_requests ()
    local msg = self.msg
    local stop = false
 
+   if not self.connected then return end
+
    repeat
       local ret = C.vhost_user_receive(self.socket, msg, self.fds, self.nfds)
 
@@ -131,10 +146,7 @@ function VhostUser:process_qemu_requests ()
          stop = true
          if ret == 0 then
             print ("Connection went down")
-            self.socket = -1
-            self.connected = false
-            self.vhost_ready = false
-            if self.link_down_proc then self.link_down_proc() end
+            self:stop()
          end
       end
    until stop
