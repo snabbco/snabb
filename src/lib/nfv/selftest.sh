@@ -94,8 +94,8 @@ function test_ping {
 # <telnet_port1>. Assert successful jumbo ping from VM listening on
 # <telnet_port0> to <dest_ip>.
 function test_jumboping {
-    run_telnet $1 "ip link set dev eth0 mtu 9100"
-    run_telnet $2 "ip link set dev eth0 mtu 9100"
+    run_telnet $1 "ip link set dev eth0 mtu 9100" >/dev/null
+    run_telnet $2 "ip link set dev eth0 mtu 9100" >/dev/null
     run_telnet $1 "ping6 -s 9000 -c 1 $3" \
         | grep "1 packets transmitted, 1 received"
     assert JUMBOPING $?
@@ -146,7 +146,7 @@ function same_vlan_tests {
 
     test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
     test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
-#    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
 #    test_checksum $TELNET_PORT0
 #    test_checksum $TELNET_PORT1
 
