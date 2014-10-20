@@ -21,11 +21,6 @@ local floor, min = math.floor, math.min
 
 RateLimiter = {}
 
--- one tick per ms is too expensive
--- 100 ms tick is good enough
-local TICKS_PER_SECOND = 10
-local NS_PER_TICK = 1e9 / TICKS_PER_SECOND
-
 -- Source produces synthetic packets of such size
 local PACKET_SIZE = 60
 
@@ -36,7 +31,6 @@ function RateLimiter:new (arg)
    conf.initial_capacity = conf.initial_capacity or conf.bucket_capacity
    local o =
    {
-      tokens_on_tick = conf.rate / TICKS_PER_SECOND,
       rate = conf.rate,
       bucket_capacity = conf.bucket_capacity,
       bucket_content = conf.initial_capacity
@@ -47,21 +41,9 @@ end
 function RateLimiter:reset(rate, bucket_capacity, initial_capacity)
    assert(rate)
    assert(bucket_capacity)
-   self.tokens_on_tick = rate / TICKS_PER_SECOND
    self.rate = rate
    self.bucket_capacity = bucket_capacity
    self.bucket_content = initial_capacity or bucket_capacity
-end
-
-function RateLimiter:init_timer()
-   do return end
-   -- activate timer to place tokens to bucket every tick
-   timer.activate(timer.new(
-         "tick",
-         function () self:tick() end,
-         NS_PER_TICK,
-         'repeating'
-      ))
 end
 
 -- return statistics snapshot
@@ -72,14 +54,6 @@ function RateLimiter:get_stat_snapshot ()
       tx = self.output.output.stats.txpackets,
       time = tonumber(C.get_time_ns()),
    }
-end
-
-function RateLimiter:tick ()
-   do return end
-   self.bucket_content = min(
-         self.bucket_content + self.tokens_on_tick,
-         self.bucket_capacity
-      )
 end
 
 function RateLimiter:push ()
@@ -160,7 +134,6 @@ function selftest ()
    
    -- XXX do this in new () ?
    local rl = app.app_table.ratelimiter
-   rl:init_timer()
 
    local seconds_to_run = 5
    -- print packets statistics every second
