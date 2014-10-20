@@ -93,7 +93,8 @@ run_nfv () {
     fi
 
     numactl $NUMA \
-        $SNABB $NFV $NFV_PACKETS > $LOG 2>&1 &
+        $SNABB $NFV $NFV_PCI $NFV_CONFIG $NFV_SOCKET $NFV_PACKETS \
+        > $LOG 2>&1 &
 
     SNABBPIDS="$SNABBPIDS $!"
 }
@@ -192,8 +193,8 @@ fi
 # detect designs
 printf "SNABB=$SNABB\n"
 SNABB_PATH=$(dirname $SNABB)
-if [ -f $SNABB_PATH/designs/nfv/nfv ]; then
-    export NFV=$SNABB_PATH/designs/nfv/nfv
+if [ -f $SNABB_PATH/designs/neutron/snabbnfv-bench ]; then
+    export NFV=$SNABB_PATH/designs/neutron/snabbnfv-bench
 else
     printf "NFV design not found\n"
     exit 1
