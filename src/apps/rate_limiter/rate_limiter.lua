@@ -71,25 +71,13 @@ function RateLimiter:push ()
    end
 
 
-   local tx_packets = 0
-   local max_packets_to_send = link.nwritable(o)
-   if max_packets_to_send == 0 then
-      return
-   end
-
-   local nreadable = link.nreadable(i)
-   for _ = 1, nreadable do
+   while not link.empty(i) and not link.full(o) do
       local p = link.receive(i)
       local length = p.length
 
       if length <= self.bucket_content then
          self.bucket_content = self.bucket_content - length
          link.transmit(o, p)
-         tx_packets = tx_packets + 1
-
-         if tx_packets == max_packets_to_send then
-            break
-         end
       else
          -- discard packet
          packet.deref(p)
@@ -200,7 +188,7 @@ function selftest ()
       rl:reset(rate_busy_loop, bucket_size)
 
       local snapshot = rl:get_stat_snapshot()
-      for i = 1, 10000 do
+      for i = 1, 100000 do
          app.breathe()
          timer.run()
       end
