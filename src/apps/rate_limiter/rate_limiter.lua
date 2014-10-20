@@ -37,6 +37,7 @@ function RateLimiter:new (arg)
    local o =
    {
       tokens_on_tick = conf.rate / TICKS_PER_SECOND,
+      rate = conf.rate,
       bucket_capacity = conf.bucket_capacity,
       bucket_content = conf.initial_capacity
     }
@@ -47,11 +48,13 @@ function RateLimiter:reset(rate, bucket_capacity, initial_capacity)
    assert(rate)
    assert(bucket_capacity)
    self.tokens_on_tick = rate / TICKS_PER_SECOND
+   self.rate = rate
    self.bucket_capacity = bucket_capacity
    self.bucket_content = initial_capacity or bucket_capacity
 end
 
 function RateLimiter:init_timer()
+   do return end
    -- activate timer to place tokens to bucket every tick
    timer.activate(timer.new(
          "tick",
@@ -72,6 +75,7 @@ function RateLimiter:get_stat_snapshot ()
 end
 
 function RateLimiter:tick ()
+   do return end
    self.bucket_content = min(
          self.bucket_content + self.tokens_on_tick,
          self.bucket_capacity
@@ -81,6 +85,17 @@ end
 function RateLimiter:push ()
    local i = assert(self.input.input, "input port not found")
    local o = assert(self.output.output, "output port not found")
+
+   do
+      local cur_now = tonumber(app.now())
+      local last_time = self.last_time or cur_now
+      self.bucket_content = min(
+            self.bucket_content + self.rate * (cur_now - last_time),
+            self.bucket_capacity
+         )
+      self.last_time = cur_now
+   end
+
 
    local tx_packets = 0
    local max_packets_to_send = link.nwritable(o)
@@ -212,7 +227,7 @@ function selftest ()
       rl:reset(rate_busy_loop, bucket_size)
 
       local snapshot = rl:get_stat_snapshot()
-      for i = 1, 100000 do
+      for i = 1, 10000 do
          app.breathe()
          timer.run()
       end
