@@ -24,20 +24,20 @@ end
 
 
 -- Create an Intel82599 App for the device with 'pciaddress'.
-function Intel82599:new (args)
-   args = config.parse_app_arg(args)
+function Intel82599:new (arg)
+   local conf = config.parse_app_arg(arg)
 
-   if args.vmdq then
-      if devices[args.pciaddr] == nil then
-         devices[args.pciaddr] = {pf=intel10g.new_pf(args.pciaddr):open(), vflist={}}
+   if conf.vmdq then
+      if devices[conf.pciaddr] == nil then
+         devices[conf.pciaddr] = {pf=intel10g.new_pf(conf.pciaddr):open(), vflist={}}
       end
-      local dev = devices[args.pciaddr]
+      local dev = devices[conf.pciaddr]
       local poolnum = firsthole(dev.vflist)-1
       local vf = dev.pf:new_vf(poolnum)
       dev.vflist[poolnum+1] = vf
-      return setmetatable({dev=vf:open(args)}, Intel82599)
+      return setmetatable({dev=vf:open(conf)}, Intel82599)
    else
-      local dev = intel10g.new_sf(args.pciaddr)
+      local dev = intel10g.new_sf(conf.pciaddr)
          :open()
          :autonegotiate_sfi()
          :wait_linkup()

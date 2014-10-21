@@ -102,8 +102,8 @@ end
 
 SimpleKeyedTunnel = {}
 
-function SimpleKeyedTunnel:new (confstring)
-   local config = confstring and loadstring("return " .. confstring)() or {}
+function SimpleKeyedTunnel:new (arg)
+   local conf = arg and config.parse_app_arg(arg) or {}
    -- required fields:
    --   local_address, string, ipv6 address
    --   remote_address, string, ipv6 address
@@ -114,54 +114,53 @@ function SimpleKeyedTunnel:new (confstring)
    --   default_gateway_MAC, useful for testing
    --   hop_limit, override default hop limit 64
    assert(
-         type(config.local_cookie) == "string"
-         and #config.local_cookie <= 16,
+         type(conf.local_cookie) == "string"
+         and #conf.local_cookie <= 16,
          "local_cookie should be 8 bytes hex string"
       )
-   config.local_cookie = lib.hexundump(config.local_cookie, 8)
    assert(
-         type(config.remote_cookie) == "string"
-         and #config.remote_cookie <= 16,
+         type(conf.remote_cookie) == "string"
+         and #conf.remote_cookie <= 16,
          "remote_cookie should be 8 bytes hex string"
       )
-   config.remote_cookie = lib.hexundump(config.remote_cookie, 8)
    local header = header_array_ctype(HEADER_SIZE)
    ffi.copy(header, header_template, HEADER_SIZE)
+   local local_cookie = lib.hexundump(conf.local_cookie, 8)
    ffi.copy(
          header + COOKIE_OFFSET,
-         config.local_cookie,
-         #config.local_cookie
+         local_cookie,
+         #local_cookie
       )
 
    -- convert dest, sorce ipv6 addressed to network order binary
    local result =
-      C.inet_pton(AF_INET6, config.local_address, header + SRC_IP_OFFSET)
-   assert(result == 1,"malformed IPv6 address: " .. config.local_address)
+      ffi.C.inet_pton(AF_INET6, conf.local_address, header + SRC_IP_OFFSET)
+   assert(result == 1,"malformed IPv6 address: " .. conf.local_address)
 
    result =
-      C.inet_pton(AF_INET6, config.remote_address, header + DST_IP_OFFSET)
-   assert(result == 1,"malformed IPv6 address: " .. config.remote_address)
+      ffi.C.inet_pton(AF_INET6, conf.remote_address, header + DST_IP_OFFSET)
+   assert(result == 1,"malformed IPv6 address: " .. conf.remote_address)
 
    -- store casted pointers for fast matching
    local remote_address = ffi.cast(paddress_ctype, header + DST_IP_OFFSET)
    local local_address = ffi.cast(paddress_ctype, header + SRC_IP_OFFSET)
 
-   local remote_cookie = ffi.cast(pcookie_ctype, config.remote_cookie)
+   local remote_cookie = ffi.cast(pcookie_ctype, lib.hexundump(conf.remote_cookie, 8))
 
-   if config.local_session then
+   if conf.local_session then
       local psession = ffi.cast(psession_id_ctype, header + SESSION_ID_OFFSET)
-      psession[0] = lib.htonl(config.local_session)
+      psession[0] = lib.htonl(conf.local_session)
    end
    
-   if config.default_gateway_MAC then
-      local mac = assert(macaddress:new(config.default_gateway_MAC))
+   if conf.default_gateway_MAC then
+      local mac = assert(macaddress:new(conf.default_gateway_MAC))
       ffi.copy(header + DST_MAC_OFFSET, mac.bytes, 6)
    end
 
-   if config.hop_limit then
-      assert(type(config.hop_limit) == 'number' and
-	  config.hop_limit <= 255, "invalid hop limit")
-      header[HOP_LIMIT_OFFSET] = config.hop_limit
+   if conf.hop_limit then
+      assert(type(conf.hop_limit) == 'number' and
+	  conf.hop_limit <= 255, "invalid hop limit")
+      header[HOP_LIMIT_OFFSET] = conf.hop_limit
    end
 
    local o =
