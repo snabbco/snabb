@@ -273,15 +273,13 @@ function selftest ()
 
    local input_file = "apps/keyed_ipv6_tunnel/selftest.cap.input"
    local output_file = "apps/keyed_ipv6_tunnel/selftest.cap.output"
-   local tunnel_config =
-      [[{
+   local tunnel_config = {
       local_address = "00::2:1",
       remote_address = "00::2:1",
       local_cookie = "12345678",
       remote_cookie = "12345678",
       default_gateway_MAC = "a1:b2:c3:d4:e5:f6"
-      }
-      ]] -- should be symmetric for local "loop-back" test
+   } -- should be symmetric for local "loop-back" test
 
    buffer.preallocate(10000)
    local c = config.new()

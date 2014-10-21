@@ -210,8 +210,8 @@ function sq_sq(pcidevA, pcidevB)
    print ('just send a lot of packets through the wire')
    config.app(c, 'source1', basic_apps.Source)
    config.app(c, 'source2', basic_apps.Source)
-   config.app(c, 'nicA', Intel82599, ([[{pciaddr='%s'}]]):format(pcidevA))
-   config.app(c, 'nicB', Intel82599, ([[{pciaddr='%s'}]]):format(pcidevB))
+   config.app(c, 'nicA', Intel82599, {pciaddr=pcidevA})
+   config.app(c, 'nicB', Intel82599, {pciaddr=pcidevB})
    config.app(c, 'sink', basic_apps.Sink)
    config.link(c, 'source1.out -> nicA.rx')
    config.link(c, 'source2.out -> nicB.rx')
@@ -244,23 +244,20 @@ function mq_sq(pcidevA, pcidevB)
    local c = config.new()
    config.app(c, 'source_ms', basic_apps.Join)
    config.app(c, 'repeater_ms', basic_apps.Repeater)
-   config.app(c, 'nicAs', Intel82599, ([[{
-   -- Single App on NIC A
-      pciaddr = '%s',
-      macaddr = '52:54:00:01:01:01',
-   }]]):format(pcidevA))
-   config.app(c, 'nicBm0', Intel82599, ([[{
-   -- first VF on NIC B
-      pciaddr = '%s',
-      vmdq = true,
-      macaddr = '52:54:00:02:02:02',
-   }]]):format(pcidevB))
-   config.app(c, 'nicBm1', Intel82599, ([[{
-   -- second VF on NIC B
-      pciaddr = '%s',
-      vmdq = true,
-      macaddr = '52:54:00:03:03:03',
-   }]]):format(pcidevB))
+   config.app(c, 'nicAs', Intel82599,
+              {-- Single App on NIC A
+               pciaddr = pcidevA,
+               macaddr = '52:54:00:01:01:01'})
+   config.app(c, 'nicBm0', Intel82599,
+              {-- first VF on NIC B
+               pciaddr = pcidevB,
+               vmdq = true,
+               macaddr = '52:54:00:02:02:02'})
+   config.app(c, 'nicBm1', Intel82599,
+              {-- second VF on NIC B
+               pciaddr = pcidevB,
+               vmdq = true,
+               macaddr = '52:54:00:03:03:03'})
    print ('-------')
    print ("Send a bunch of from the SF on NIC A to the VFs on NIC B")
    print ("half of them go to nicBm0 and nicBm0")
@@ -299,18 +296,16 @@ function mq_sw(pcidevA)
    local c = config.new()
    config.app(c, 'source_ms', basic_apps.Join)
    config.app(c, 'repeater_ms', basic_apps.Repeater)
-   config.app(c, 'nicAm0', Intel82599, ([[{
-   -- first VF on NIC A
-      pciaddr = '%s',
-      vmdq = true,
-      macaddr = '52:54:00:01:01:01',
-   }]]):format(pcidevA))
-   config.app(c, 'nicAm1', Intel82599, ([[{
-   -- second VF on NIC A
-      pciaddr = '%s',
-      vmdq = true,
-      macaddr = '52:54:00:02:02:02',
-   }]]):format(pcidevA))
+   config.app(c, 'nicAm0', Intel82599,
+              {-- first VF on NIC A
+               pciaddr = pcidevA,
+               vmdq = true,
+               macaddr = '52:54:00:01:01:01'})
+   config.app(c, 'nicAm1', Intel82599,
+              {-- second VF on NIC A
+               pciaddr = pcidevA,
+               vmdq = true,
+               macaddr = '52:54:00:02:02:02'})
    print ('-------')
    print ("Send a bunch of packets from Am0")
    print ("half of them go to nicAm1 and half go nowhere")
