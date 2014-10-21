@@ -19,7 +19,7 @@ end
 --   class is the Lua object with a class:new(arg) method to create the app.
 --   arg is the app's configuration (as a string to be passed to new()).
 --
--- Example: config.app(c, "nic", Intel82599, [[{pciaddr = "0000:00:01.00"}]])
+-- Example: config.app(c, "nic", Intel82599, {pciaddr = "0000:00:01.00"})
 function app (config, name, class, arg)
    arg = arg or "nil"
    assert(type(name) == "string", "name must be a string")

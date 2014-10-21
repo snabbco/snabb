@@ -20,7 +20,7 @@ function run (npackets)
    pci.unbind_device_from_linux(pciaddr)
    local c = config.new()
    config.app(c, "vm", vhost_user.VhostUser, {socket_path=socket, is_server=server})
-   config.app(c, "nic", intel_app.Intel82599, ([[{pciaddr='%s'}]]):format(pciaddr))
+   config.app(c, "nic", intel_app.Intel82599, {pciaddr=pciaddr})
    if not trace then
       print("No trace file ($NFV_TRACE) configured.")
       config.link(c, "vm.tx -> nic.rx")
