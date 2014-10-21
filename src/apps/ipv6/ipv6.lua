@@ -60,9 +60,8 @@ struct {
 
 SimpleIPv6 = {}
 
-function SimpleIPv6:new (confstring)
-   print("confstring", confstring)
-   local conf = confstring and loadstring("return " .. confstring)() or {}
+function SimpleIPv6:new (arg)
+   local conf = config and config.parse_app_arg(arg) or {}
    own_mac = conf.own_mac or "\x52\x54\x00\x12\x34\x57"
    own_ip = conf.own_ip or "\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
    local o = {own_mac = own_mac, own_ip = own_ip}
