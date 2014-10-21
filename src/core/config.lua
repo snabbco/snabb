@@ -59,9 +59,11 @@ end
 -- Return a Lua object for the arg to an app.
 -- Example:
 --   parse_app_arg("{ timeout = 5 * 10 }") => { timeout = 50 }
-function parse_app_arg (s)
-   assert(type(s) == 'string')
-   return loadstring("return " .. s)()
+--   parse_app_arg(<table>) => <table> (NOOP)
+function parse_app_arg (arg)
+   if     type(arg) == 'string' then return loadstring("return " .. arg)()
+   elseif type(arg) == 'table'  then return arg
+   else   error("<arg> is not a string or table.") end
 end
 
 function graphviz (c)
