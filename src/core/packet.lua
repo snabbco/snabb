@@ -43,19 +43,24 @@ function add_iovec (p, b, length,  offset)
 end
 
 -- Prepend data to a packet.
-function prepend_iovec (p, b, length,  offset)
+function insert_iovec (idx, p, b, length,  offset)
    if debug then assert(p.niovecs < C.PACKET_IOVEC_MAX, "packet iovec overflow") end
    offset = offset or 0
    if debug then assert(length + offset <= b.size) end
-   for i = p.niovecs, 1, -1 do
+   for i = p.niovecs, idx + 1, -1 do
       ffi.copy(p.iovecs[i], p.iovecs[i-1], ffi.sizeof("struct packet_iovec"))
    end
-   local iovec = p.iovecs[0]
+   local iovec = p.iovecs[idx]
    iovec.buffer = b
    iovec.length = length
    iovec.offset = offset
    p.niovecs = p.niovecs + 1
    p.length = p.length + length
+end
+
+-- Prepend data to a packet.
+function prepend_iovec (p, b, length,  offset)
+   insert_iovec (0, p, b, length,  offset)
 end
 
 function niovecs (p)
@@ -92,7 +97,7 @@ end
 function clone (p)
    local new_p = allocate()
    local b = buffer.allocate()
-   assert(p.length <= b.size, "packet too big to coalesce")
+   assert(p.length <= b.size, "packet too big to clone")
 
    local length = 0
    for i = 0, p.niovecs - 1 do
