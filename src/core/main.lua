@@ -32,6 +32,7 @@ Available options are:
 -d           Debug unhandled errors with the Lua interactive debugger.
 -S           Print enhanced stack traces with more debug information.
 -jdump file  Trace JIT decisions to 'file'. (Requires LuaJIT jit.* library.)
+-jv file     Prints verbose information about the the JIT compiler to 'file'.
 -jp          Profile with the LuaJIT statistical profiler.
 -jp=args[,.output]
 ]]
@@ -81,6 +82,10 @@ function main ()
       elseif args[i] == '-jdump' and i < #args then
          local jit_dump = require "jit.dump"
          jit_dump.start("", args[i+1])
+         i = i + 2
+      elseif args[i] == '-jv' and i < #args then
+         local jit_verbose = require 'jit.v'
+         jit_verbose.start(args[i+1])
          i = i + 2
       elseif i <= #args then
          -- Syntax: <script> [args...]
