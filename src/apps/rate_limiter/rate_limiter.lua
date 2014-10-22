@@ -21,11 +21,6 @@ local floor, min = math.floor, math.min
 
 RateLimiter = {}
 
--- one tick per ms is too expensive
--- 100 ms tick is good enough
-local TICKS_PER_SECOND = 10
-local NS_PER_TICK = 1e9 / TICKS_PER_SECOND
-
 -- Source produces synthetic packets of such size
 local PACKET_SIZE = 60
 
@@ -36,7 +31,7 @@ function RateLimiter:new (arg)
    conf.initial_capacity = conf.initial_capacity or conf.bucket_capacity
    local o =
    {
-      tokens_on_tick = conf.rate / TICKS_PER_SECOND,
+      rate = conf.rate,
       bucket_capacity = conf.bucket_capacity,
       bucket_content = conf.initial_capacity
     }
@@ -46,19 +41,9 @@ end
 function RateLimiter:reset(rate, bucket_capacity, initial_capacity)
    assert(rate)
    assert(bucket_capacity)
-   self.tokens_on_tick = rate / TICKS_PER_SECOND
+   self.rate = rate
    self.bucket_capacity = bucket_capacity
    self.bucket_content = initial_capacity or bucket_capacity
-end
-
-function RateLimiter:init_timer()
-   -- activate timer to place tokens to bucket every tick
-   timer.activate(timer.new(
-         "tick",
-         function () self:tick() end,
-         NS_PER_TICK,
-         'repeating'
-      ))
 end
 
 -- return statistics snapshot
@@ -71,36 +56,28 @@ function RateLimiter:get_stat_snapshot ()
    }
 end
 
-function RateLimiter:tick ()
-   self.bucket_content = min(
-         self.bucket_content + self.tokens_on_tick,
-         self.bucket_capacity
-      )
-end
-
 function RateLimiter:push ()
    local i = assert(self.input.input, "input port not found")
    local o = assert(self.output.output, "output port not found")
 
-   local tx_packets = 0
-   local max_packets_to_send = link.nwritable(o)
-   if max_packets_to_send == 0 then
-      return
+   do
+      local cur_now = tonumber(app.now())
+      local last_time = self.last_time or cur_now
+      self.bucket_content = min(
+            self.bucket_content + self.rate * (cur_now - last_time),
+            self.bucket_capacity
+         )
+      self.last_time = cur_now
    end
 
-   local nreadable = link.nreadable(i)
-   for _ = 1, nreadable do
+
+   while not link.empty(i) and not link.full(o) do
       local p = link.receive(i)
       local length = p.length
 
       if length <= self.bucket_content then
          self.bucket_content = self.bucket_content - length
          link.transmit(o, p)
-         tx_packets = tx_packets + 1
-
-         if tx_packets == max_packets_to_send then
-            break
-         end
       else
          -- discard packet
          packet.deref(p)
@@ -145,7 +122,6 @@ function selftest ()
    
    -- XXX do this in new () ?
    local rl = app.app_table.ratelimiter
-   rl:init_timer()
 
    local seconds_to_run = 5
    -- print packets statistics every second
