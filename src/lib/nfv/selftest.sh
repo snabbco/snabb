@@ -124,7 +124,7 @@ function test_checksum {
 # Assert successful (whatever that means) iperf run with <telnet_port1>
 # listening and <telnet_port0> sending to <dest_ip>.
 function test_iperf {
-    run_telnet $2 "nohup iperf -s -V &" >/dev/null
+    run_telnet $2 "nohup iperf -d -s -V &" >/dev/null
     sleep 2
     run_telnet $1 "iperf -c $3 -V" 20 \
         | grep "s/sec"
@@ -147,6 +147,8 @@ function same_vlan_tests {
     test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
     test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
     test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    # Repeat iperf test now that jumbo frames are enabled
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
 #    test_checksum $TELNET_PORT0
 #    test_checksum $TELNET_PORT1
 
@@ -162,6 +164,10 @@ function tunnel_tests {
     assert ND $?
 
     test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    # Repeat iperf test now that jumbo frames are enabled
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
 
     stop_bench_env
 }
