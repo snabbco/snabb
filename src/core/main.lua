@@ -32,6 +32,7 @@ Available options are:
 -d           Debug unhandled errors with the Lua interactive debugger.
 -S           Print enhanced stack traces with more debug information.
 -jdump file  Trace JIT decisions to 'file'. (Requires LuaJIT jit.* library.)
+-jv file     Prints verbose information about the the JIT compiler to 'file'.
 -jp          Profile with the LuaJIT statistical profiler.
 -jp=args[,.output]
 ]]
@@ -57,31 +58,35 @@ function main ()
          package.path = args[i+1]
          i = i + 2
       elseif args[i] == '-l' and i < #args then
-	 require(args[i+1])
-	 i = i + 2
+         require(args[i+1])
+         i = i + 2
       elseif args[i] == '-t' and i < #args then
          zone("selftest")  require(args[i+1]).selftest()  zone()
          i = i + 2
       elseif args[i] == '-e' and i < #args then
-	 local thunk, error = loadstring(args[i+1])
-	 if thunk then thunk() else print(error) end
-	 i = i + 2
+         local thunk, error = loadstring(args[i+1])
+         if thunk then thunk() else print(error) end
+         i = i + 2
       elseif args[i] == '-d' then
-	 debug_on_error = true
-	 i = i + 1
+         debug_on_error = true
+         i = i + 1
       elseif args[i] == '-S' then
          debug.traceback = STP.stacktrace
-        i = i + 1
+         i = i + 1
       elseif (args[i]):match("-jp") then
-	 local pargs, poutput = (args[i]):gmatch("-jp=([^,]*),?(.*)")()
-	 if poutput == '' then poutput = nil end
-	 require("jit.p").start(pargs, poutput)
-	 profiling = true
-	 i = i + 1
+         local pargs, poutput = (args[i]):gmatch("-jp=([^,]*),?(.*)")()
+         if poutput == '' then poutput = nil end
+         require("jit.p").start(pargs, poutput)
+         profiling = true
+         i = i + 1
       elseif args[i] == '-jdump' and i < #args then
-	 local jit_dump = require "jit.dump"
-	 jit_dump.start("", args[i+1])
-	 i = i + 2
+         local jit_dump = require "jit.dump"
+         jit_dump.start("", args[i+1])
+         i = i + 2
+      elseif args[i] == '-jv' and i < #args then
+         local jit_verbose = require 'jit.v'
+         jit_verbose.start(args[i+1])
+         i = i + 2
       elseif i <= #args then
          -- Syntax: <script> [args...]
          local module = args[i]
@@ -94,8 +99,8 @@ function main ()
          dofile(module)
          exit(0)
       else
-	 print(usage)
-	 os.exit(1)
+         print(usage)
+         os.exit(1)
       end
    end
    exit(0)
