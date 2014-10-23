@@ -25,7 +25,6 @@ local virtio_net_hdr_size = ffi.sizeof("struct virtio_net_hdr")
 local virtio_net_hdr_mrg_rxbuf_size = ffi.sizeof("struct virtio_net_hdr_mrg_rxbuf")
 local virtio_net_hdr_mrg_rxbuf_type = ffi.typeof("struct virtio_net_hdr_mrg_rxbuf *")
 local packet_info_size = ffi.sizeof("struct packet_info")
-local buffer_t = ffi.typeof("struct buffer")
 
 local invalid_header_id = 0xffff
 
@@ -125,7 +124,7 @@ function VirtioNetDevice:rx_packet_start(header_id, addr, len)
 end
 
 function VirtioNetDevice:rx_buffer_add(rx_p, addr, len, rx_total_size, tx)
-   local buf = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
+   local buf = freelist.remove(self.buffer_recs) or lib.malloc(buffer.buffer_t, buffer.buffer_ptr_t)
 
    local addr = self:map_from_guest(addr)
    buf.pointer = ffi.cast(char_ptr_t, addr)
@@ -185,7 +184,7 @@ function VirtioNetDevice:tx_packet_start(header_id, addr, len)
 end
 
 function VirtioNetDevice:tx_buffer_add(tx_p, addr, len, tx_total_size, tx)
-   local buf = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
+   local buf = freelist.remove(self.buffer_recs) or lib.malloc(buffer.buffer_t, buffer.buffer_ptr_t)
 
    local addr = self:map_from_guest(addr)
    buf.pointer = ffi.cast(char_ptr_t, addr)

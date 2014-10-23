@@ -266,14 +266,18 @@ function finish_csum (sum)
    return bit.band(bit.bnot(sum), 0xffff)
 end
 
-
-function malloc (etype)
+-- NOTE: ffi.typeof() will cause NYI in many cases.
+-- avoid using just malloc("struct foo") on loops.
+function malloc (etype, etype_ptr)
    if type(etype) == 'string' then
       etype = ffi.typeof(etype)
    end
    local size = ffi.sizeof(etype)
    local ptr = memory.dma_alloc(size)
-   return ffi.cast(ffi.typeof("$*", etype), ptr)
+   if etype_ptr == nil then
+      etype_ptr = ffi.typeof("$*", etype)
+   end
+   return ffi.cast(etype_ptr, ptr)
 end
 
 
