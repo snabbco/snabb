@@ -297,6 +297,15 @@ function deepcopy(orig)
    return copy
 end
 
+-- 'orig' must be an array, not a sparse array (hash)
+function array_copy(orig)
+   local result = {}
+   for i=1,#orig do
+      result[i] = orig[i]
+   end
+   return result
+end
+
 -- endian conversion helpers written in Lua
 -- avoid C function call overhead while using C.xxxx counterparts
 if ffi.abi("be") then
