@@ -33,10 +33,16 @@ function load (file, pciaddr, sockpath)
       config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(port_id)})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
       if t.ingress_filter then
-         local Filter = "Filter_"..name
+         local Filter = "Filter_in_"..name
          config.app(c, Filter, PacketFilter, t.ingress_filter)
          config.link(c, Filter..".tx -> " .. VM_rx)
          VM_rx = Filter..".rx"
+      end
+      if t.egress_filter then
+         local Filter = 'Filter_out_'..name
+         config.app(c, Filter, PacketFilter, t.egress_filter)
+         config.link(c, VM_tx..' -> '..Filter..'.rx')
+         VM_tx = Filter..'.tx'
       end
       if t.tunnel and t.tunnel.type == "L2TPv3" then
          local Tunnel = "Tunnel_"..name

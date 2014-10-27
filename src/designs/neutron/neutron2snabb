@@ -69,13 +69,20 @@ function create_config (input_dir, output_dir, hostname)
             if port.admin_state_up ~= '0' then
                local vlan = segments[port.network_id].segmentation_id
                local mac = port.mac_address
-               -- Skipping filter for now.
-               print("Warning: Ignoring security group configuration.")
-               local ingressfilter = nil --filter(port, secbindings, secrules)
+               local ingressfilter = filter(port, secbindings, secrules, 'ingress')
+               local egressfilter = filter(port, secbindings, secrules, 'egress')
                local gbps = vif_details.zone_gbps
                local tunnel = tunnel(port, vif_details)
-               outputs[port_id]:write(('  { vlan = %d,\n    mac_address = %q,\n    port_id = %q,\n    ingress_filter = %s,\n    gbps = %s,\n    tunnel = %s\n  },\n')
-                                      :format(vlan, mac, port.id, ingressfilter, gbps, tunnel))
+               outputs[port_id]:write((
+[[  { vlan = %d,
+    mac_address = %q,
+    port_id = %q,
+    ingress_filter = %s,
+    egress_filter = %s,
+    gbps = %s,
+    tunnel = %s
+  },
+]]):format(vlan, mac, port.id, ingressfilter, egressfilter, gbps, tunnel))
             end
             port_count = port_count + 1
          end
@@ -89,12 +96,12 @@ function create_config (input_dir, output_dir, hostname)
 end
 
 -- Return the packet filter expression.
--- XXX This is assumed to be ingress-only. Egress is simply NYI.
-function filter (port, secbindings, secrules)
-   local rules
+function filter (port, secbindings, secrules, direction)
+   local rules = ''
+   direction = direction:lower()
    if secbindings[port.id] then
       for _,r in ipairs(secrules[secbindings[port.id].security_group_id]) do
-         if r.direction:lower() == "ingress" then
+         if r.direction:lower() == direction then
             local NULL = "\\N" -- SQL null
             local rule = ""
             if r.ethertype ~= NULL then rule = rule .. " ethertype='"..(r.ethertype:lower()).."'," end
@@ -102,13 +109,13 @@ function filter (port, secbindings, secrules)
             if r.port_range_min ~= NULL and r.port_range_max ~= NULL then
                rule = rule .. " dest_port_min=" .. r.port_range_min .. ", dest_port_max=" .. r.port_range_max..","
             end
-            if r.remote_ip_prefix ~= NULL then rule = rule .. " source_cidr='"..rule.remote_ip_prefix.."'," end
+            if r.remote_ip_prefix ~= NULL then rule = rule .. " source_cidr='"..r.remote_ip_prefix.."'," end
             print("direction", r.direction)
-            rules = "{" .. rule .. " },"
+            rules = rules .. "{" .. rule .. " },"
          end
       end
    end
-   if rules then return "[[{ " .. rules .. " }]]" else return nil end
+   if #rules > 0 then return "[[{ " .. rules .. " }]]" else return nil end
 end
 
 -- Return the L2TPv3 tunnel expresion.
@@ -164,8 +171,8 @@ end
 -- Return an array of line's tab-delimited tokens.
 function splitline (line)
    local words = {}
-   for w in (line .. "\t"):gmatch("([^\t]*)\t") do 
-      table.insert(words, w) 
+   for w in (line .. "\t"):gmatch("([^\t]*)\t") do
+      table.insert(words, w)
    end
    return words
 end
