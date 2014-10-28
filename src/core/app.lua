@@ -269,10 +269,16 @@ function breathe ()
 end
 
 function report (options)
+   local function loss_rate(drop, sent)
+      sent = tonumber(sent)
+      if not sent or sent == 0 then return 0 end
+      return tonumber(drop) * 100 / sent
+   end
    if not options or options.showlinks then
       print("link report")
       for name, l in pairs(link_table) do
-         print(lib.comma_value(tostring(tonumber(l.stats.txpackets))), "sent on", name, "(loss rate: " .. (tonumber(l.stats.txdrop) * 100 / tonumber(l.stats.txpackets)) .. "%)")
+         print(("%s sent on %s (loss rate: %d%%))"):format(l.stats.txpackets,
+            name, loss_rate(l.stats.txdrop, l.stats.txpackets)))
       end
    end
    if options and options.showapps then
