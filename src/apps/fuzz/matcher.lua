@@ -105,7 +105,7 @@ end
 
 function matcher:report()
    local sent, received = 0,0
-   for _,match in pairs(self.data_list) do
+   for _,match in ipairs(self.data_list) do
       if match.received ~= #match.sg then
          print(string.format("Mismatch for packet %s. Generated %d, received %d.",
             match.desc, #match.sg, match.received))
