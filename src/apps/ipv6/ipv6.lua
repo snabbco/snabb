@@ -183,8 +183,8 @@ function selftest ()
    local c = config.new()
    config.app(c, "source", pcap.PcapReader, "apps/ipv6/selftest.cap.input")
    config.app(c, "ipv6", SimpleIPv6,
-              [[ { own_ip  = "\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
-                   own_mac = "\x52\x54\x00\x12\x34\x57" } ]])
+              { own_ip  = "\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
+                own_mac = "\x52\x54\x00\x12\x34\x57" })
    config.app(c, "sink", pcap.PcapWriter, "apps/ipv6/selftest.cap.output")
    config.link(c, "source.output -> ipv6.eth0")
    config.link(c, "ipv6.eth0 -> sink.input")

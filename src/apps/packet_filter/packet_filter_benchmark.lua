@@ -13,8 +13,7 @@ local packet_filter = require("apps.packet_filter.packet_filter")
 function selftest ()
    buffer.preallocate(100000)
 
-   local v6_rules = [[
-{
+   local v6_rules = {
    {
       ethertype = "ipv6",
       protocol = "icmp",
@@ -31,9 +30,7 @@ function selftest ()
       source_port_max = 2399, -- both borders and in the middle
       dest_port_min = 53,     -- single port match
       dest_port_max = 53,
-   }
-}
-]]
+   }}
 
    local c = config.new()
    config.app(

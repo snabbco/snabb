@@ -100,6 +100,48 @@ function files_in_directory (dir)
    return files
 end
 
+-- Load Lua value from string.
+function load_string (string)
+   return loadstring("return "..string)
+end
+
+-- Read a Lua conf from file and return value.
+function load_conf (file)
+   return dofile(file)
+end
+
+-- Store Lua representation of value in file.
+function store_conf (file, value)
+   local function print_value (value, stream)
+      local  type = type(value)
+      if     type == 'table'  then
+         stream:write("{ ")
+         if #value == 0 then
+            for key, value in pairs(value) do
+               stream:write(key, " = ")
+               print_value(value, stream)
+               stream:write(", ")
+            end
+         else
+            for _, value in ipairs(value) do
+               print_value(value, stream)
+               stream:write(", ")
+            end
+         end
+         stream:write("}")
+      elseif type == 'string' then
+         stream:write(("%q"):format(value))
+      else
+         stream:write(value)
+      end
+   end
+   local stream = assert(io.open(file, "w"))
+   stream:write("return ")
+   print_value(value, stream)
+   stream:write("\n")
+   stream:close()
+end
+
 -- Return a bitmask using the values of `bitset' as indexes.
 -- The keys of bitset are ignored (and can be used as comments).
 -- Example: bits({RESET=0,ENABLE=4}, 123) => 1<<0 | 1<<4 | 123
@@ -341,6 +383,11 @@ function selftest ()
    assert(true == equal({foo="bar"}, {foo="bar"}))
    assert(false == equal({foo="bar"}, {foo="bar", baz="foo"}))
    assert(false == equal({foo="bar", baz="foo"}, {foo="bar"}))
+   print("Testing load/store_conf")
+   local conf = { foo="1", bar=42, arr={2,"foo",4}}
+   local testpath = "/tmp/snabb_lib_test_conf"
+   store_conf(testpath, conf)
+   assert(equal(conf, load_conf(testpath)), "Either `store_conf' or `load_conf' failed.")
    print("Testing csum")
    local data = "\x45\x00\x00\x73\x00\x00\x40\x00\x40\x11\xc0\xa8\x00\x01\xc0\xa8\x00\xc7"
    local cs = csum(data, string.len(data))
