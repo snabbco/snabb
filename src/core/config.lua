@@ -17,15 +17,13 @@ end
 --   c is a config object.
 --   name is the name of this app in the network (a string).
 --   class is the Lua object with a class:new(arg) method to create the app.
---   arg is the app's configuration (as a string to be passed to new()).
+--   arg is the app's configuration (to be passed to new()).
 --
 -- Example: config.app(c, "nic", Intel82599, {pciaddr = "0000:00:01.00"})
 function app (config, name, class, arg)
    arg = arg or "nil"
    assert(type(name) == "string", "name must be a string")
    assert(type(class) == "table", "class must be a table")
-   assert(type(arg)   == "string" or type(arg) == "table",
-	  "arg must be a string or a table")
    config.apps[name] = { class = class, arg = arg}
 end
 
