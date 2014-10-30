@@ -17,7 +17,7 @@ function CSV:new (directory)
    o.appfile:flush()
    o.linkfile:write("time,from_app,from_port,to_app,to_port,txbytes,txpackets,rxbytes,rxpackets,dropbytes,droppackets\n")
    o.linkfile:flush()
-   timer.new('CSV',
+   timer.new(o, 'CSV',
              function () o:output() end,
              1e9,
              'repeating')

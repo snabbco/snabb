@@ -4,6 +4,7 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local lib = require("core.lib")
+local restarts = require("core.restarts")
 
 debug = false     -- verbose printouts?
 
@@ -31,8 +32,11 @@ function run_to_time (ns)
          if debug then
             print(string.format("running timer %s at tick %s", timer.name, ticks))
          end
-         timer.fn(timer)
-         if timer.repeating then activate(timer) end
+         -- Only run timer if it is "loose" or its app is alive.
+         if not timer.app or not timer.app.dead then
+            local status = restarts.with_restart_timer(timer)
+            if timer.repeating and status then activate(timer) end
+         end
       end
    end
    local new_ticks = math.floor(tonumber(ns) / ns_per_tick)
@@ -58,8 +62,9 @@ function activate (t)
    end
 end
 
-function new (name, fn, nanos, mode)
-   return { name = name,
+function new (app, name, fn, nanos, mode)
+   return { app = app,
+            name = name,
             fn = fn,
             ticks = math.ceil(nanos / ns_per_tick),
             repeating = (mode == 'repeating') }
@@ -74,7 +79,7 @@ function selftest ()
    local start = C.get_monotonic_time()
    -- Start timers, each counting at a different frequency
    for freq = 1, ntimers do
-      local t = new("timer"..freq, fn, ns_per_tick * freq, 'repeating')
+      local t = new(nil, "timer"..freq, fn, ns_per_tick * freq, 'repeating')
       activate(t)
       expected_count = expected_count + math.floor(runtime / freq)
    end

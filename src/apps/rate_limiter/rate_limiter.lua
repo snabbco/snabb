@@ -126,7 +126,7 @@ function selftest ()
    local seconds_to_run = 5
    -- print packets statistics every second
    timer.activate(timer.new(
-         "report",
+         nil, "report",
          function ()
             app.report()
             seconds_to_run = seconds_to_run - 1

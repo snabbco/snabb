@@ -95,8 +95,9 @@ end
 -- Update the active app network by applying the necessary actions.
 function apply_config_actions (actions, conf)
    -- The purpose of this function is to populate these tables:
-   local new_app_table,  new_app_array  = {}, {}, {}
-   local new_link_table, new_link_array = {}, {}, {}
+   local new_app_table,  new_app_array  = {}, {}
+   local new_link_table, new_link_array = {}, {}
+   local new_timers = {}
    -- Temporary name->index table for use in link renumbering
    local app_name_to_index = {}
    -- Table of functions that execute config actions
@@ -108,6 +109,12 @@ function apply_config_actions (actions, conf)
       new_app_table[name] = app_table[name]
       table.insert(new_app_array, app_table[name])
       app_name_to_index[name] = #new_app_array
+      -- Keep timers owned by app.
+      for _, timer in ipairs(timer.timers) do
+         if timer.app == app_table[name] then
+            table.insert(new_timers, timer)
+         end
+      end
    end
    function ops.start (name)
       local class = conf.apps[name].class
@@ -160,9 +167,14 @@ function apply_config_actions (actions, conf)
    for _, app in ipairs(new_app_array) do
       if app.relink then app:relink() end
    end
+   -- keep loose timers.
+   for _, timer in ipairs(timer.timers) do
+      if not timer.app then table.insert(new_timers, timer) end
+   end
    -- commit changes
    app_table, link_table = new_app_table, new_link_table
    app_array, link_array = new_app_array, new_link_array
+   timer.timers = new_timers
 end
 
 -- Call this to "run snabb switch".
