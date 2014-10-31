@@ -70,7 +70,7 @@ end
 
 function ipv4:pton (p)
    local in_addr  = ffi.new("uint8_t[4]")
-   local result = ffi.C.inet_pton(AF_INET, p, in_addr)
+   local result = C.inet_pton(AF_INET, p, in_addr)
    if result ~= 1 then
       return false, "malformed IPv4 address: " .. address
    end

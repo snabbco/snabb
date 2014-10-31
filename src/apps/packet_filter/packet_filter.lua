@@ -1,6 +1,7 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
+local C = ffi.C
 local bit = require("bit")
 
 local app = require("core.app")
@@ -133,7 +134,7 @@ local function parse_cidr_ipv4 (cidr)
    end
 
    local in_addr  = ffi.new("int32_t[1]")
-   local result = ffi.C.inet_pton(AF_INET, address, in_addr)
+   local result = C.inet_pton(AF_INET, address, in_addr)
    if result ~= 1 then
       return false, "malformed IPv4 address: " .. address
    end
@@ -164,7 +165,7 @@ local function parse_cidr_ipv6 (cidr)
    end
 
    local in6_addr  = ffi.new("uint64_t[2]")
-   local result = ffi.C.inet_pton(AF_INET6, address, in6_addr)
+   local result = C.inet_pton(AF_INET6, address, in6_addr)
    if result ~= 1 then
       return false, "malformed IPv6 address: " .. address
    end
