@@ -363,11 +363,14 @@ c.MAP = multiflags {
   PRIVATE    = 0x0002,
   FILE       = 0x0000,
   FIXED      = 0x0010,
-  RENAME     = 0x0020,
-  NORESERVE  = 0x0040,
-  HASSEMAPHORE = 0x0200,
   ANON       = 0x1000,
 }
+
+if version < 201411 then -- defined in 5.6 but as zero so no effect
+  c.MAP.RENAME       = 0x0020
+  c.MAP.NORESERVE    = 0x0040
+  c.MAP.HASSEMAPHORE = 0x0200
+end
 
 c.MCL = strflag {
   CURRENT    = 0x01,
