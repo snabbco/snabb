@@ -41,8 +41,9 @@ c.CHFLAGS.IMMUTABLE = nil -- alias
 c.CHFLAGS.APPEND = nil -- alias
 c.CHFLAGS.OPAQUE = nil -- alias
 
-c.W.WCLONE = nil -- underscore in name, changed
-c.W.WALL   = nil -- underscore in name, changed
+c.W.WCLONE  = nil -- underscore in name, changed
+c.W.WALL    = nil -- underscore in name, changed
+c.W.STOPPED = nil -- underscore in name, changed
 
 -- these are Linux names TODO are there actually BSD names?
 ctypes["struct ethhdr"] = nil
