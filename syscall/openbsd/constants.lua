@@ -983,12 +983,15 @@ c.KERN = strflag {
   NETLIVELOCKS      = 76,
   POOL_DEBUG        = 77,
   PROC_CWD          = 78,
-  MAXID             = 79,
 }
 
 if version < 201405 then
   c.KERN.FILE = 15
   c.KERN.FILE2 = 73
+end
+
+if version >= 201411 then
+  c.KERN.PROC_NOBROADCASTKILL = 79
 end
 
 return c
