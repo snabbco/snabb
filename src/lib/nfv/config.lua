@@ -12,7 +12,7 @@ local AF_INET6 = 10
 local lib = require("core.lib")
 
 -- Set to true to enable traffic policing via the rate limiter app
-policing = false
+policing = true
 
 -- Compile app configuration from <file> for <pciaddr> and vhost_user
 -- <socket>. Returns configuration and zerocopy pairs.
@@ -72,10 +72,10 @@ function load (file, pciaddr, sockpath)
       end
       if policing and t.gbps then
          local QoS = "QoS_"..name
-         local rate = t.gbps * 1000000 / 8
+         local rate = t.gbps * 1000000000 / 8
          config.app(c, QoS, RateLimiter, ([[{rate = %d, bucket_capacity = %d}]]):format(rate, rate))
-         config.link(c, VM_tx.." -> "..QoS..".rx")
-         VM_tx = QoS..".tx"
+         config.link(c, VM_tx.." -> "..QoS..".input")
+         VM_tx = QoS..".output"
       end
       config.link(c, NIC..".tx -> "..VM_rx)
       config.link(c, VM_tx.." -> "..NIC..".rx")
