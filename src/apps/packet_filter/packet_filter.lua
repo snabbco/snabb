@@ -379,8 +379,8 @@ end
 
 PacketFilter = {}
 
-function PacketFilter:new (confstring)
-   local rules = confstring and loadstring("return " .. confstring)() or {}
+function PacketFilter:new (arg)
+   local rules = arg and config.parse_app_arg(arg) or {}
    assert(rules)
    assert(#rules > 0)
 

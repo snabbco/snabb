@@ -14,6 +14,11 @@ local lib = require("core.lib")
 -- Set to true to enable traffic policing via the rate limiter app
 policing = false
 
+-- Return name of port in <port_config>.
+function port_name (port_config)
+   return port_config.port_id:gsub("-", "_")
+end
+
 -- Compile app configuration from <file> for <pciaddr> and vhost_user
 -- <socket>. Returns configuration and zerocopy pairs.
 function load (file, pciaddr, sockpath)
@@ -21,16 +26,15 @@ function load (file, pciaddr, sockpath)
    local c = config.new()
    local zerocopy = {} -- {NIC->Virtio} app names to zerocopy link
    for _,t in ipairs(ports) do
-      local vlan, mac_address, port_id = t.vlan, t.mac_address, t.port_id
-      local name = port_id:gsub("-", "_")
+      local vlan, mac_address = t.vlan, t.mac_address
+      local name = port_name(t)
       local NIC = "NIC_"..name
       local Virtio = "Virtio_"..name
-      config.app(c, NIC, Intel82599,
-		 ([[{pciaddr = %q,
-		     vmdq=true,
-		     macaddr = %q,
-		     vlan=%d}]]):format(pciaddr, mac_address, vlan))
-      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(port_id)})
+      config.app(c, NIC, Intel82599, {pciaddr = pciaddr,
+                                      vmdq = true,
+                                      macaddr = mac_address,
+                                      vlan = vlan})
+      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(name)})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
       if t.ingress_filter then
          local Filter = "Filter_in_"..name
@@ -46,14 +50,11 @@ function load (file, pciaddr, sockpath)
       end
       if t.tunnel and t.tunnel.type == "L2TPv3" then
          local Tunnel = "Tunnel_"..name
-         local conf = (([[{local_address  = %q,
-                           remote_address  = %q,
-                           local_cookie = %q,
-                           remote_cookie = %q,
-                           local_session  = %q,}]])
-                       :format(t.tunnel.local_ip, t.tunnel.remote_ip,
-                               t.tunnel.local_cookie, t.tunnel.remote_cookie,
-                               t.tunnel.session))
+         local conf = {local_address = t.tunnel.local_ip,
+                       remote_address = t.tunnel.remote_ip,
+                       local_cookie = t.tunnel.local_cookie,
+                       remote_cookie = t.tunnel.remote_cookie,
+                       local_session = t.tunnel.session}
          config.app(c, Tunnel, L2TPv3, conf)
          -- Setup IPv6 neighbor discovery/solicitation responder.
          -- This will talk to our local gateway.
@@ -73,7 +74,7 @@ function load (file, pciaddr, sockpath)
       if policing and t.gbps then
          local QoS = "QoS_"..name
          local rate = t.gbps * 1000000 / 8
-         config.app(c, QoS, RateLimiter, ([[{rate = %d, bucket_capacity = %d}]]):format(rate, rate))
+         config.app(c, QoS, RateLimiter, {rate = rate, bucket_capacity = rate})
          config.link(c, VM_tx.." -> "..QoS..".rx")
          VM_tx = QoS..".tx"
       end
