@@ -56,6 +56,10 @@ function create_config (input_dir, output_dir, hostname)
       -- then we compile its configuration.
       if binding.driver == "snabb" then
          local vif_details = json.decode(binding.vif_details)
+         print("vif_details", vif_details)
+         -- pcall incase the field is missing
+         local status, profile = pcall(json.decode, binding.profile)
+         profile = profile or {}
          if vif_details.zone_host == hostname then
             local zone_port = vif_details.zone_port
             -- Each zone can have multiple port configurtions.
@@ -68,7 +72,8 @@ function create_config (input_dir, output_dir, hostname)
                               ingress_filter = filter(port, secbindings, secrules, 'ingress'),
                               egress_filter = filter(port, secbindings, secrules, 'egress'),
                               gbps = vif_details.zone_gbps,
-                              tunnel = tunnel(port, vif_details) })
+                              rx_police_gbps = profile.rx_police_gbps,
+                              tunnel = tunnel(port, vif_details, profile) })
             end
          end
       end
@@ -103,15 +108,15 @@ function filter (port, secbindings, secrules, direction)
 end
 
 -- Return the L2TPv3 tunnel expresion.
-function tunnel (port, vif_details)
-   if vif_details.tunnel_type == "L2TPv3" then
+function tunnel (port, vif_details, profile)
+   if profile.tunnel_type == "L2TPv3" then
       return { type = "L2TPv3",
                local_ip = vif_details.zone_ip,
-               remote_ip = vif_details.l2tpv3_remote_ip,
-               session = vif_details.l2tpv3_session,
-               local_cookie = vif_details.l2tpv3_local_cookie,
-               remote_cookie = vif_details.l2tpv3_remote_cookie,
-               next_hop = vif_details.l2tpv3_next_hop }
+               remote_ip = profile.l2tpv3_remote_ip,
+               session = profile.l2tpv3_session,
+               local_cookie = profile.l2tpv3_local_cookie,
+               remote_cookie = profile.l2tpv3_remote_cookie,
+               next_hop = profile.l2tpv3_next_hop }
    else return nil end
 end
 
