@@ -134,12 +134,12 @@ function SimpleKeyedTunnel:new (arg)
 
    -- convert dest, sorce ipv6 addressed to network order binary
    local result =
-      C.inet_pton(AF_INET6, config.local_address, header + SRC_IP_OFFSET)
-   assert(result == 1,"malformed IPv6 address: " .. config.local_address)
+      C.inet_pton(AF_INET6, conf.local_address, header + SRC_IP_OFFSET)
+   assert(result == 1,"malformed IPv6 address: " .. conf.local_address)
 
    result =
-      C.inet_pton(AF_INET6, config.remote_address, header + DST_IP_OFFSET)
-   assert(result == 1,"malformed IPv6 address: " .. config.remote_address)
+      C.inet_pton(AF_INET6, conf.remote_address, header + DST_IP_OFFSET)
+   assert(result == 1,"malformed IPv6 address: " .. conf.remote_address)
 
    -- store casted pointers for fast matching
    local remote_address = ffi.cast(paddress_ctype, header + DST_IP_OFFSET)
