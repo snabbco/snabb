@@ -126,8 +126,8 @@ function test_checksum {
 function test_iperf {
     run_telnet $2 "nohup iperf -d -s -V &" >/dev/null
     sleep 2
-    run_telnet $1 "iperf -c $3 -V" 20 \
-        | grep "s/sec"
+    run_telnet $1 "iperf -c $3 -P8 -V" 20 \
+        | grep "SUM.*s/sec"
     assert IPERF $?
 }
 
