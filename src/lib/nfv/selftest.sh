@@ -157,6 +157,21 @@ function same_vlan_tests {
     test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
     test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
     # Repeat iperf test now that jumbo frames are enabled
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+#    test_checksum $TELNET_PORT0
+#    test_checksum $TELNET_PORT1
+
+    stop_bench_env
+}
+
+function rate_limited_tests {
+    start_bench_env test_fixtures/nfvconfig/test_functions/rate_limit.ports
+    echo "TESTING rate_limit.ports"
+
+    test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    # Repeat iperf test now that jumbo frames are enabled
     test_iperf $TELNET_PORT1 $TELNET_PORT0 "$GUEST_IP0%eth0"
 #    test_checksum $TELNET_PORT0
 #    test_checksum $TELNET_PORT1
@@ -217,5 +232,6 @@ function filter_tests {
 # Run test configs.
 
 same_vlan_tests
+rate_limited_tests
 tunnel_tests
 filter_tests
