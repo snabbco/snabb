@@ -52,6 +52,9 @@ char *basename(char *path);
 // inet_pton(3) - convert IPv4 and IPv6 addresses from text to binary form
 int inet_pton(int af, const char *src, void *dst);
 
+// inet_ntop(3) - convert IPv4 and IPv6 addresses from binary to text form
+const char *inet_ntop(int af, const void *src, char *dst, size_t size);
+
 // Conversions between host and network byte order
 uint16_t htons(uint16_t);
 uint16_t ntohs(uint16_t);
