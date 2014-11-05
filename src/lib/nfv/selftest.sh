@@ -36,17 +36,6 @@ function run_telnet {
         | telnet localhost $1 2>&1
 }
 
-# Usage: wait_vm_up <port>
-# Blocks until ping to 0::0 suceeds.
-function wait_vm_up {
-    echo -n "Waiting for VM listening on telnet port $1 to get ready..."
-    while ( ! (run_telnet $1 "ping6 -c 1 0::0" | grep "1 received" \
-        >/dev/null) ); do
-        sleep 2
-    done
-    echo " [OK]"
-}
-
 function start_bench_env {
     scripts/bench_env/host-nic-snabbnfv-guests.sh $1 &
     BENCH_ENV_PID=$!
@@ -64,6 +53,26 @@ function stop_bench_env {
 
     # Give VMs and snabbnfv-traffic time to shut down.
     sleep 5
+}
+
+# Usage: wait_vm_up <port>
+# Blocks until ping to 0::0 suceeds.
+function wait_vm_up {
+    local timeout_counter=0
+    local timeout_max=50
+    echo -n "Waiting for VM listening on telnet port $1 to get ready..."
+    while ( ! (run_telnet $1 "ping6 -c 1 0::0" | grep "1 received" \
+        >/dev/null) ); do
+        # Time out eventually.
+        if [ $timeout_counter -gt $timeout_max ]; then
+            echo " [TIMEOUT]"
+            stop_bench_env
+            exit 1
+        fi
+        timeout_counter=$(expr $timeout_counter + 1)
+        sleep 2
+    done
+    echo " [OK]"
 }
 
 function assert {
