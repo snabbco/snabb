@@ -79,22 +79,6 @@ function configure (new_config)
    configuration = new_config
 end
 
--- Returns true if x and y are structurally similar (isomorphic).
-function equal (x, y)
-   if type(x) ~= type(y) then return false end
-   if type(x) == 'table' then
-      for k, v in pairs(x) do
-         if not equal(v, y[k]) then return false end
-      end
-      for k, _ in pairs(y) do
-         if x[k] == nil then return false end
-      end
-      return true
-   else
-      return x == y
-   end
-end
-
 -- Return the configuration actions needed to migrate from old config to new.
 --
 -- Here is an example return value for a case where two apps must
@@ -112,7 +96,7 @@ function compute_config_actions (old, new)
       local action = nil
       if not old.apps[appname]                then action = 'start'
       elseif old.apps[appname].class ~= class then action = 'restart'
-      elseif not equal(old.apps[appname].arg, arg)
+      elseif not lib.equal(old.apps[appname].arg, arg)
                                               then action = 'reconfig'
       else                                         action = 'keep'  end
       table.insert(actions[action], appname)
@@ -345,10 +329,6 @@ function selftest ()
    configure(config.new())
    assert(#app_array == 0)
    assert(#link_array == 0)
-   print("Testing equal")
-   assert(true == equal({foo="bar"}, {foo="bar"}))
-   assert(false == equal({foo="bar"}, {foo="bar", baz="foo"}))
-   assert(false == equal({foo="bar", baz="foo"}, {foo="bar"}))
    -- Test app restarts on failure.
    print("c_fail")
    local App1 = {zone="test"}

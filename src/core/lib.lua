@@ -4,6 +4,22 @@ local ffi = require("ffi")
 local C = ffi.C
 require("core.clib_h")
 
+-- Returns true if x and y are structurally similar (isomorphic).
+function equal (x, y)
+   if type(x) ~= type(y) then return false end
+   if type(x) == 'table' then
+      for k, v in pairs(x) do
+         if not equal(v, y[k]) then return false end
+      end
+      for k, _ in pairs(y) do
+         if x[k] == nil then return false end
+      end
+      return true
+   else
+      return x == y
+   end
+end
+
 function can_open(filename, mode)
     mode = mode or 'r'
     local f = io.open(filename, mode)
@@ -82,6 +98,48 @@ function files_in_directory (dir)
       table.insert(files, line)
    end
    return files
+end
+
+-- Load Lua value from string.
+function load_string (string)
+   return loadstring("return "..string)
+end
+
+-- Read a Lua conf from file and return value.
+function load_conf (file)
+   return dofile(file)
+end
+
+-- Store Lua representation of value in file.
+function store_conf (file, value)
+   local function print_value (value, stream)
+      local  type = type(value)
+      if     type == 'table'  then
+         stream:write("{ ")
+         if #value == 0 then
+            for key, value in pairs(value) do
+               stream:write(key, " = ")
+               print_value(value, stream)
+               stream:write(", ")
+            end
+         else
+            for _, value in ipairs(value) do
+               print_value(value, stream)
+               stream:write(", ")
+            end
+         end
+         stream:write("}")
+      elseif type == 'string' then
+         stream:write(("%q"):format(value))
+      else
+         stream:write(value)
+      end
+   end
+   local stream = assert(io.open(file, "w"))
+   stream:write("return ")
+   print_value(value, stream)
+   stream:write("\n")
+   stream:close()
 end
 
 -- Return a bitmask using the values of `bitset' as indexes.
@@ -321,6 +379,16 @@ ntohs = htons
 
 function selftest ()
    print("selftest: lib")
+   print("Testing equal")
+   assert(true == equal({foo="bar"}, {foo="bar"}))
+   assert(false == equal({foo="bar"}, {foo="bar", baz="foo"}))
+   assert(false == equal({foo="bar", baz="foo"}, {foo="bar"}))
+   print("Testing load/store_conf")
+   local conf = { foo="1", bar=42, arr={2,"foo",4}}
+   local testpath = "/tmp/snabb_lib_test_conf"
+   store_conf(testpath, conf)
+   assert(equal(conf, load_conf(testpath)), "Either `store_conf' or `load_conf' failed.")
+   print("Testing csum")
    local data = "\x45\x00\x00\x73\x00\x00\x40\x00\x40\x11\xc0\xa8\x00\x01\xc0\xa8\x00\xc7"
    local cs = csum(data, string.len(data))
    assert(cs == 0xb861, "bad checksum: " .. bit.tohex(cs, 4))
@@ -328,6 +396,7 @@ function selftest ()
 --    assert(readlink('/etc/rc2.d/S99rc.local') == '../init.d/rc.local', "bad readlink")
 --    assert(dirname('/etc/rc2.d/S99rc.local') == '/etc/rc2.d', "wrong dirname")
 --    assert(basename('/etc/rc2.d/S99rc.local') == 'S99rc.local', "wrong basename")
+   print("Testing hex(un)dump")
    assert(hexdump('\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11'):upper()
          :match('^45.00.B6.7D.00.FA.40.00.40.11$'), "wrong hex dump")
    assert(hexundump('4500 B67D 00FA400040 11', 10)

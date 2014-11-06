@@ -8,7 +8,6 @@ local nd_light = require("apps.ipv6.nd_light")
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
 local ffi = require("ffi")
 local C = ffi.C
-local AF_INET6 = 10
 local lib = require("core.lib")
 
 -- Set to true to enable traffic policing via the rate limiter app
@@ -17,7 +16,7 @@ policing = false
 -- Compile app configuration from <file> for <pciaddr> and vhost_user
 -- <socket>. Returns configuration and zerocopy pairs.
 function load (file, pciaddr, sockpath)
-   local ports = dofile(file)
+   local ports = lib.load_conf(file)
    local c = config.new()
    local zerocopy = {} -- {NIC->Virtio} app names to zerocopy link
    for _,t in ipairs(ports) do

@@ -109,8 +109,8 @@ function selftest ()
    -- during 100 ms - internal RateLimiter timer resolution
    -- small value may limit effective rate
 
-   local arg = ([[ {rate = %d, bucket_capacity = %d} ]]):format(rate_non_busy_loop,
-                                                                rate_non_busy_loop / 4)
+   local arg = { rate = rate_non_busy_loop,
+                 bucket_capacity = rate_non_busy_loop / 4 }
    config.app(c, "ratelimiter", RateLimiter, arg)
    config.app(c, "sink", basic_apps.Sink)
 

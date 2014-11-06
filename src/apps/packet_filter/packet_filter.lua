@@ -431,8 +431,7 @@ function selftest ()
    local V6_RULE_ICMP_PACKETS = 3 -- packets within v6.pcap
    local V6_RULE_DNS_PACKETS =  3 -- packets within v6.pcap
       
-   local v6_rules = [[
-{
+   local v6_rules = {
    {
       ethertype = "ipv6",
       protocol = "icmp",
@@ -449,9 +448,7 @@ function selftest ()
       source_port_max = 2399, -- both borders and in the middle
       dest_port_min = 53,     -- single port match
       dest_port_max = 53,
-   }
-}
-]]
+   }}
 
    local c = config.new()
    config.app(
@@ -472,8 +469,7 @@ function selftest ()
    local V4_RULE_DNS_PACKETS = 1 -- packets within v4.pcap
    local V4_RULE_TCP_PACKETS = 18 -- packets within v4.pcap
 
-   local v4_rules = [[
-{
+   local v4_rules = {
    {
       ethertype = "ipv4",
       protocol = "udp",
@@ -489,9 +485,7 @@ function selftest ()
       source_port_max = 81,
       dest_port_min = 3371, -- our port (3372) is in the middle of range
       dest_port_max = 3373,
-   }
-}
-]]
+   }}
 
    config.app(
          c,

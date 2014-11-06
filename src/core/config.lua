@@ -2,6 +2,8 @@
 
 module(..., package.seeall)
 
+local lib = require("core.lib")
+
 -- API: Create a new configuration.
 -- Initially there are no apps or links.
 function new ()
@@ -54,12 +56,13 @@ function canonical_link (spec)
    return format_link(parse_link(spec))
 end
 
--- Return a Lua object for the arg to an app.
+-- Return a Lua object for the arg to an app. Arg may be a table or a
+-- string encoded Lua object.
 -- Example:
---   parse_app_arg("{ timeout = 5 * 10 }") => { timeout = 50 }
+--   parse_app_arg('{ timeout= 5*10 }') => { timeout = 50 }
 --   parse_app_arg(<table>) => <table> (NOOP)
 function parse_app_arg (arg)
-   if     type(arg) == 'string' then return loadstring("return " .. arg)()
+   if     type(arg) == 'string' then return lib.load_string(arg)
    elseif type(arg) == 'table'  then return arg
    else   error("<arg> is not a string or table.") end
 end
