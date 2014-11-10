@@ -280,7 +280,8 @@ function VirtioNetDevice:transmit_packets_to_vm ()
       for i = 0, p.niovecs - 1 do
 
          local iovec = p.iovecs[i]
-         local should_continue, b = self:vm_buffer(iovec)
+         local b
+         should_continue, b = self:vm_buffer(iovec)
          local size = iovec.length
 
          -- fill in the virtio header
