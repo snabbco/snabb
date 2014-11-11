@@ -112,22 +112,31 @@ end
 
 -- Store Lua representation of value in file.
 function store_conf (file, value)
+   local indent = 0
+   local function print_indent (stream)
+      for i = 1, indent do stream:write(" ") end
+   end
    local function print_value (value, stream)
       local  type = type(value)
       if     type == 'table'  then
-         stream:write("{ ")
+         indent = indent + 2
+         stream:write("{\n")
          if #value == 0 then
             for key, value in pairs(value) do
+               print_indent(stream)
                stream:write(key, " = ")
                print_value(value, stream)
-               stream:write(", ")
+               stream:write(",\n")
             end
          else
             for _, value in ipairs(value) do
+               print_indent(stream)
                print_value(value, stream)
-               stream:write(", ")
+               stream:write(",\n")
             end
          end
+         indent = indent - 2
+         print_indent(stream)
          stream:write("}")
       elseif type == 'string' then
          stream:write(("%q"):format(value))
