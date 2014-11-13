@@ -37,7 +37,7 @@ function run (args)
                  print("Transmissions (last 1 sec):")
                  app.report_each_app()
               end
-   local t = timer.new("report", fn, 1e9, 'repeating')
+   local t = timer.new(nil, "report", fn, 1e9, 'repeating')
    timer.activate(t)
    buffer.preallocate(100000)
    app.main()

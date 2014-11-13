@@ -1,14 +1,15 @@
 module(...,package.seeall)
 
-local buffer = require("core.buffer")
-local packet = require("core.packet")
-local lib    = require("core.lib")
-local link   = require("core.link")
-local config = require("core.config")
-local timer  = require("core.timer")
-local zone   = require("jit.zone")
-local ffi    = require("ffi")
-local C      = ffi.C
+local buffer   = require("core.buffer")
+local packet   = require("core.packet")
+local lib      = require("core.lib")
+local link     = require("core.link")
+local config   = require("core.config")
+local restarts = require("core.restarts")
+local timer    = require("core.timer")
+local zone     = require("jit.zone")
+local ffi      = require("ffi")
+local C        = ffi.C
 require("core.packet_h")
 
 -- Set to true to enable logging
@@ -33,40 +34,6 @@ Hz = 10000
 monotonic_now = false
 function now ()
    return monotonic_now
-end
-
--- Run app:methodname() in protected mode (pcall). If it throws an
--- error app will be marked as dead and restarted eventually.
-local function with_restart (app, methodname)
-   -- Run fn in protected mode using pcall.
-   local status, err = pcall(app[methodname], app)
-
-   -- If pcall caught an error mark app as "dead" (record time and cause
-   -- of death).
-   if not status then app.dead = { error = err, time = now() } end
-end
-
--- Restart dead apps.
-function restart_dead_apps ()
-   local restart_delay = 2 -- seconds
-   local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
-   local restart = false
-
-   -- Collect 'restart' actions for dead apps and log their errors.
-   for i = 1, #app_array do
-      local app = app_array[i]
-      if app.dead and (now() - app.dead.time) >= restart_delay then
-         restart = true
-         io.stderr:write(("Restarting %s (died at %f: %s)\n")
-                         :format(app.name, app.dead.time, app.dead.error))
-         table.insert(actions.restart, app.name)
-      else
-         table.insert(actions.keep, app.name)
-      end
-   end
-
-   -- Restart dead apps if necessary.
-   if restart then apply_config_actions(actions, configuration) end
 end
 
 -- Configure the running app network to match new_configuration.
@@ -112,8 +79,9 @@ end
 -- Update the active app network by applying the necessary actions.
 function apply_config_actions (actions, conf)
    -- The purpose of this function is to populate these tables:
-   local new_app_table,  new_app_array  = {}, {}, {}
-   local new_link_table, new_link_array = {}, {}, {}
+   local new_app_table,  new_app_array  = {}, {}
+   local new_link_table, new_link_array = {}, {}
+   local new_timers = {}
    -- Temporary name->index table for use in link renumbering
    local app_name_to_index = {}
    -- Table of functions that execute config actions
@@ -125,6 +93,12 @@ function apply_config_actions (actions, conf)
       new_app_table[name] = app_table[name]
       table.insert(new_app_array, app_table[name])
       app_name_to_index[name] = #new_app_array
+      -- Keep timers owned by app.
+      for _, timer in ipairs(timer.timers) do
+         if timer.app == app_table[name] then
+            table.insert(new_timers, timer)
+         end
+      end
    end
    function ops.start (name)
       local class = conf.apps[name].class
@@ -177,9 +151,14 @@ function apply_config_actions (actions, conf)
    for _, app in ipairs(new_app_array) do
       if app.relink then app:relink() end
    end
+   -- keep loose timers.
+   for _, timer in ipairs(timer.timers) do
+      if not timer.app then table.insert(new_timers, timer) end
+   end
    -- commit changes
    app_table, link_table = new_app_table, new_link_table
    app_array, link_array = new_app_array, new_link_array
+   timer.timers = new_timers
 end
 
 -- Call this to "run snabb switch".
@@ -217,15 +196,16 @@ end
 function breathe ()
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
-   restart_dead_apps()
+   local restart_actions = restarts.compute_restart_actions(app_array)
+   if restart_actions then
+      apply_config_actions(restart_actions, configuration)
+   end
    -- Inhale: pull work into the app network
    for i = 1, #app_array do
       local app = app_array[i]
---      if app.pull then
---         zone(app.zone) app:pull() zone()
       if app.pull and not app.dead then
 	 zone(app.zone)
-	 with_restart(app, 'pull')
+	 restarts.with_restart(app, 'pull')
 	 zone()
       end
    end
@@ -241,7 +221,7 @@ function breathe ()
             local receiver = app_array[link.receiving_app]
             if receiver.push and not receiver.dead then
                zone(receiver.zone)
-               with_restart(receiver, 'push')
+               restarts.with_restart(receiver, 'push')
                zone()
                progress = true
             end
@@ -272,7 +252,7 @@ function report (options)
             print (name, ("[dead: %s]"):format(app.dead.error))
          elseif app.report then
             print (name)
-            with_restart(app, 'report')
+            restarts.with_restart(app, 'report')
          end
       end
    end

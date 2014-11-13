@@ -27,20 +27,18 @@ VhostUser = {}
 
 function VhostUser:new (args)
    local o = { state = 'init',
-      dev = nil,
-      msg = ffi.new("struct vhost_user_msg"),
-      nfds = ffi.new("int[1]"),
-      fds = ffi.new("int[?]", C.VHOST_USER_MEMORY_MAX_NREGIONS),
-      socket_path = args.socket_path,
-      mem_table = {},
-      -- process qemu messages timer
-      process_qemu_timer = timer.new(
-         "process qemu timer",
-         function () self:process_qemu_requests() end,
-         5e8,-- 500 ms
-         'non-repeating'
-      )
-   }
+               dev = nil,
+               msg = ffi.new("struct vhost_user_msg"),
+               nfds = ffi.new("int[1]"),
+               fds = ffi.new("int[?]", C.VHOST_USER_MEMORY_MAX_NREGIONS),
+               socket_path = args.socket_path,
+               mem_table = {} }
+   -- process qemu messages timer
+   o.process_qemu_timer = timer.new(
+      o, "process qemu timer",
+      function () self:process_qemu_requests() end,
+      5e8,-- 500 ms
+      'non-repeating')
    self = setmetatable(o, {__index = VhostUser})
    self.dev = net_device.VirtioNetDevice:new(self)
    if args.is_server then
@@ -345,7 +343,7 @@ function selftest ()
          vhost_user:report()
       end
    end
-   timer.activate(timer.new("report", fn, 10e9, 'repeating'))
+   timer.activate(timer.new(nil, "report", fn, 10e9, 'repeating'))
 
    app.main()
 end

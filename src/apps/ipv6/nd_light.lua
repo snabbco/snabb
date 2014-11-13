@@ -146,7 +146,7 @@ function nd_light:new (config)
 					   ipv6:ntop(config.next_hop)))
 		    end
 		 end
-   nh.timer = timer.new("ns retransmit", nh.timer_cb, 1e6 * config.delay)
+   nh.timer = timer.new(o, "ns retransmit", nh.timer_cb, 1e6 * config.delay)
    o._next_hop = nh
 
    -- Prepare packet for solicited neighbor advertisement
