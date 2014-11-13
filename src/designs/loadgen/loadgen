@@ -3,7 +3,6 @@
 local app       = require("core.app")
 local buffer    = require("core.buffer")
 local config    = require("core.config")
-local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
 local intel_app = require("apps.intel.intel_app")
 local basic_apps = require("apps.basic.basic_apps")
@@ -33,12 +32,6 @@ function run (args)
       end
    end
    app.configure(c)
-   local fn = function ()
-                 print("Transmissions (last 1 sec):")
-                 app.report_each_app()
-              end
-   local t = timer.new("report", fn, 1e9, 'repeating')
-   timer.activate(t)
    buffer.preallocate(100000)
    app.main()
 end

@@ -4,7 +4,7 @@ local app = require("core.app")
 local link = require("core.link")
 local config = require("core.config")
 local packet = require("core.packet")
-local timer = require("core.timer")
+local timers = require("lib.timer").TimerTable.new()
 local basic_apps = require("apps.basic.basic_apps")
 local buffer = require("core.buffer")
 local ffi = require("ffi")
@@ -125,16 +125,13 @@ function selftest ()
 
    local seconds_to_run = 5
    -- print packets statistics every second
-   timer.activate(timer.new(
-         "report",
-         function ()
-            app.report()
-            seconds_to_run = seconds_to_run - 1
-         end,
-         1e9, -- every second
-         'repeating'
-      ))
-
+   timers:activate(timers:timer("report",
+                                function ()
+                                   app.report()
+                                   seconds_to_run = seconds_to_run - 1
+                                end,
+                                1000, -- every second
+                                'repeating'))
    -- bytes per second
    do
       print("\ntest effective rate, non-busy loop")
@@ -144,7 +141,7 @@ function selftest ()
       -- push some packets through it
       while seconds_to_run > 0 do
          app.breathe()
-         timer.run()
+         timers:run()
          C.usleep(10) -- avoid busy loop
       end
       -- print final report
@@ -190,7 +187,7 @@ function selftest ()
       local snapshot = rl:get_stat_snapshot()
       for i = 1, 100000 do
          app.breathe()
-         timer.run()
+         timers:run()
       end
       local elapsed_time =
          (tonumber(C.get_time_ns()) - snapshot.time) / 1e9

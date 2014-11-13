@@ -3,9 +3,8 @@
 -- Benchmark using only basic functions:
 --   Basic apps (Source, Sink, Tee).
 --   Repeated calls to engine.main() for short intervals.
---   Timers.
 -- Intended to exercise a small amount of core code paths: breathe,
--- timers, packet and buffer allocation/refcount/free, and so on.
+-- packet and buffer allocation/refcount/free, and so on.
 
 local basic_apps = require("apps.basic.basic_apps")
 local C = require("ffi").C
@@ -38,7 +37,6 @@ function run (npackets)
    config.link(c, "Tee.tx2 -> Sink.rx2")
    engine.configure(c)
    local start = C.get_monotonic_time()
-   timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
    while engine.app_table.Source.output.tx.stats.txpackets < npackets do
       engine.main({duration = 0.01, no_report = true})
    end

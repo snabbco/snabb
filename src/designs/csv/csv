@@ -52,8 +52,6 @@ config.link(c, "filter.output -> sink2.in")
 
 engine.configure(c)
 
-engine.app_table.limit:init_timer()
-
 while true do
    engine.main({duration = 1})
 end
