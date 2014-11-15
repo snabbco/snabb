@@ -12,6 +12,7 @@ local long_opts = {
    debug = "d",
    jit = "j",
    help = "h",
+   pflua = "p",
 }
 
 function run (parameters)
@@ -24,6 +25,11 @@ function run (parameters)
    function opt.l (arg) require(arg)            noop = false end
    function opt.t (arg) require(arg).selftest() noop = false end
    function opt.d (arg) _G.developer_debug = true            end
+   function opt.p (arg) 
+      _G["pflua"] = {
+         
+      }
+   end
    function opt.i (arg) start_repl = true       noop = false end
    function opt.j (arg)
       if arg:match("^v") then
@@ -51,7 +57,7 @@ function run (parameters)
    end
 
    -- Execute command line arguments
-   parameters = lib.dogetopt(parameters, opt, "hl:t:die:j:P:", long_opts)
+   parameters = lib.dogetopt(parameters, opt, "hl:t:die:j:P:p:", long_opts)
 
    if #parameters > 0 then
       run_script(parameters)
