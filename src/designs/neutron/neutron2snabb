@@ -66,7 +66,7 @@ function create_config (input_dir, output_dir, hostname)
             if not zones[zone_port] then zones[zone_port] = {} end
             if port.admin_state_up ~= '0' then
                table.insert(zones[zone_port],
-                            { vlan = tonumber(segments[port.network_id].segmentation_id),
+                            { vlan = vif_details.zone_vlan,
                               mac_address = port.mac_address,
                               port_id = port.id,
                               ingress_filter = filter(port, secbindings, secrules, 'ingress'),
