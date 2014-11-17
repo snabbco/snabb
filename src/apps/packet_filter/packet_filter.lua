@@ -278,7 +278,7 @@ local function generateRule(
       error("unknown ethertype")
    end
    local min_header_size = assert(
-         min_packet_sizes[rule.ethertype][rule.protocol],
+         min_packet_sizes[rule.ethertype][rule.protocol or 'icmp'],
          "unknown min packet size"
       )
    T("if size < ",min_header_size," then break end")
