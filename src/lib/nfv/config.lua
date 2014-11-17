@@ -10,6 +10,11 @@ local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
 
+-- Return name of port in <port_config>.
+function port_name (port_config)
+   return port_config.port_id:gsub("-", "_")
+end
+
 -- Compile app configuration from <file> for <pciaddr> and vhost_user
 -- <socket>. Returns configuration and zerocopy pairs.
 function load (file, pciaddr, sockpath)
@@ -17,15 +22,15 @@ function load (file, pciaddr, sockpath)
    local c = config.new()
    local zerocopy = {} -- {NIC->Virtio} app names to zerocopy link
    for _,t in ipairs(ports) do
-      local vlan, mac_address, port_id = t.vlan, t.mac_address, t.port_id
-      local name = port_id:gsub("-", "_")
+      local vlan, mac_address = t.vlan, t.mac_address
+      local name = port_name(t)
       local NIC = "NIC_"..name
       local Virtio = "Virtio_"..name
       config.app(c, NIC, Intel82599, {pciaddr = pciaddr,
                                       vmdq = true,
                                       macaddr = mac_address,
                                       vlan = vlan})
-      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(port_id)})
+      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(name)})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
       if t.ingress_filter then
          local Filter = "Filter_in_"..name
