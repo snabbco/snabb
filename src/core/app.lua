@@ -5,7 +5,6 @@ local packet = require("core.packet")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local config = require("core.config")
-local timer  = require("core.timer")
 local zone   = require("jit.zone")
 local ffi    = require("ffi")
 local C      = ffi.C
@@ -30,7 +29,7 @@ Hz = 10000
 
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
-monotonic_now = false
+monotonic_now = C.get_monotonic_time()
 function now ()
    return monotonic_now
 end
@@ -186,7 +185,6 @@ end
 function main (options)
    options = options or {}
    local done = options.done
-   local no_timers = options.no_timers
    if options.duration then
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
@@ -194,7 +192,6 @@ function main (options)
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
-      if not no_timers then timer.run() end
       pace_breathing()
    until done and done()
    if not options.no_report then report(options.report) end

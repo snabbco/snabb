@@ -14,7 +14,7 @@ local main      = require("core.main")
 local memory    = require("core.memory")
 local pci       = require("lib.hardware.pci")
 local net_device= require("lib.virtio.net_device")
-local timer     = require("core.timer")
+local timers    = require("lib.timer").TimerTable.new()
 local ffi       = require("ffi")
 local C         = ffi.C
 
@@ -34,12 +34,11 @@ function VhostUser:new (args)
       socket_path = args.socket_path,
       mem_table = {},
       -- process qemu messages timer
-      process_qemu_timer = timer.new(
-         "process qemu timer",
-         function () self:process_qemu_requests() end,
-         5e8,-- 500 ms
-         'non-repeating'
-      )
+      process_qemu_timer =
+         timers:timer("process qemu timer",
+                      function () self:process_qemu_requests() end,
+                      500,-- 500 ms
+                      'non-repeating')
    }
    self = setmetatable(o, {__index = VhostUser})
    self.dev = net_device.VirtioNetDevice:new(self)
@@ -70,6 +69,7 @@ function VhostUser:pull ()
    if not self.connected then
       self:connect()
    else
+      timers:run()
       if self.vhost_ready then
          self.dev:poll_vring_receive()
       end
@@ -97,7 +97,7 @@ function VhostUser:connect ()
       self.socket = res
       self.connected = true
       -- activate the process timer once
-      timer.activate(self.process_qemu_timer)
+      timers:activate(self.process_qemu_timer)
    end
 end
 
@@ -152,7 +152,9 @@ function VhostUser:process_qemu_requests ()
    until stop
 
    -- if we're still connected activate the timer once again
-   if self.connected then timer.activate(self.process_qemu_timer) end
+   if self.connected then
+      timers:activate(self.process_qemu_timer)
+   end
 end
 
 function VhostUser:none (msg)
@@ -337,15 +339,6 @@ function selftest ()
    end
    local source = app.app_table.source
    source:set_rx_buffer_freelist(vhost_user:rx_buffers())
-
-   local fn = function ()
-      local vu = app.apps.vhost_user
-      app.report()
-      if vhost_user.vhost_ready then
-         vhost_user:report()
-      end
-   end
-   timer.activate(timer.new("report", fn, 10e9, 'repeating'))
 
    app.main()
 end

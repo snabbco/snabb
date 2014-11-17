@@ -41,7 +41,7 @@ local ns = require("lib.protocol.icmp.nd.ns")
 local na = require("lib.protocol.icmp.nd.na")
 local tlv = require("lib.protocol.icmp.nd.options.tlv")
 local filter = require("lib.pcap.filter")
-local timer = require("core.timer")
+local timers = require("lib.timer").TimerTable.new()
 
 local nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
@@ -139,14 +139,14 @@ function nd_light:new (config)
 		    link.transmit(o.output.south, nh.packet)
 		    nh.nsent = nh.nsent + 1
 		    if nh.nsent <= o._config.retrans and not o._eth_header then
-		       timer.activate(nh.timer)
+		       timers:activate(nh.timer)
 		    end
 		    if nh.nsent > o._config.retrans then
 		       error(string.format("ND for next hop %s has failed",
 					   ipv6:ntop(config.next_hop)))
 		    end
 		 end
-   nh.timer = timer.new("ns retransmit", nh.timer_cb, 1e6 * config.delay)
+   nh.timer = timers:timer("ns retransmit", nh.timer_cb, config.delay)
    o._next_hop = nh
 
    -- Prepare packet for solicited neighbor advertisement
@@ -263,6 +263,9 @@ function nd_light:push ()
    if self._next_hop.nsent == 0 then
       -- Kick off address resolution
       self._next_hop.timer_cb()
+   end
+   if not self._eth_header then
+      timers:run()
    end
 
    local l_in = self.input.south
