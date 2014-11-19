@@ -232,7 +232,6 @@ function VirtioNetDevice:more_vm_buffers ()
 end
 
 -- return the buffer from a iovec, ensuring it originates from the vm
-local last_size = nil
 function VirtioNetDevice:vm_buffer (iovec)
    local should_continue = true
    local b = iovec.buffer
@@ -259,7 +258,6 @@ function VirtioNetDevice:vm_buffer (iovec)
          iovec.offset = 0
       end
    end
-   if last_size ~= b.size then print("size=", b.size) last_size=b.size end
    return should_continue, b
 end
 
