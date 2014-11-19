@@ -1,6 +1,6 @@
 module(...,package.seeall)
 
-local debug = false
+local debug = _G.developer_debug
 
 local ffi = require("ffi")
 local C = ffi.C

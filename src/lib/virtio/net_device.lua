@@ -511,5 +511,5 @@ local string = ""
 end
 
 function debug (...)
-   print(...)
+   if _G.developer_debug then print(...) end
 end
