@@ -259,7 +259,7 @@ function VirtioNetDevice:vm_buffer (iovec)
          iovec.offset = 0
       end
    end
-   if last_size ~= b.size then print("size=", b.size) last_size=b.size end
+   if last_size ~= b.size then debug("size=", b.size) last_size=b.size end
    return should_continue, b
 end
 
