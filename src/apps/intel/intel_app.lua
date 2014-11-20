@@ -66,6 +66,14 @@ function Intel82599:stop()
    end
 end
 
+
+function Intel82599:reconfig(arg)
+   local conf = config.parse_app_arg(arg)
+   assert((not not self.dev.pf) == (not not conf.vmdq), "Can't reconfig from VMDQ to single-port or viceversa")
+
+   self.dev:reconfig(conf)
+end
+
 -- Allocate receive buffers from the given freelist.
 function Intel82599:set_rx_buffer_freelist (fl)
    self.rx_buffer_freelist = fl

@@ -556,6 +556,41 @@ function M_vf:close()
    return M_sf.close(self)
 end
 
+function M_vf:reconfig(opts)
+--    self:disable_transmit()
+--       :disable_receive()
+
+   local poolnum = self.poolnum or 0
+   local pf = self.pf
+
+   do
+      pf.r.PFVFSPOOF[math.floor(poolnum/8)]:clr(bits{MACAS=poolnum%8, VLANAS=poolnum%8+8})
+      pf.r.PFVMVIR[poolnum](0x00)
+      local msk = bits{PoolEna=poolnum%32}
+      for vlan_index = 0, 63 do
+         pf.r.PFVLVFB[2*vlan_index + math.floor(poolnum/32)]:clr(msk)
+      end
+   end
+   -- TODO: unset mirror
+   -- unset MAC
+   do
+      local msk = bits{Ena=self.poolnum%32}
+      for mac_index = 0, 127 do
+         pf.r.MPSAR[2*mac_index + math.floor(poolnum/32)]:set(msk)
+      end
+   end
+
+   return self
+      :set_MAC(opts.macaddr)
+      :set_mirror(opts.mirror)
+      :set_VLAN(opts.vlan)
+      :set_rx_stats(opts.rxcounter)
+      :set_tx_stats(opts.txcounter)
+      :set_tx_rate(opts.rate_limit, opts.priority)
+      :enable_receive()
+      :enable_transmit()
+end
+
 function M_vf:init (opts)
    return self
       :init_dma_memory()
@@ -602,15 +637,17 @@ function M_vf:enable_receive()
    return self
 end
 
-function M_vf:disable_receive()
+function M_vf:disable_receive(reenable)
    self.r.RXDCTL:clr(bits{Enable=25})
    self.r.RXDCTL:wait(bits{Enable=25}, 0)
    C.usleep(100)
    -- TODO free packet buffers
    self.pf.r.PFVFRE[math.floor(self.poolnum/32)]:clr(bits{VFRE=self.poolnum%32})
 
-   self.r.RXDCTL(bits{Enable=25, VME=30})
---    self.r.RXDCTL:wait(bits{enable=25})
+   if reenable then
+      self.r.RXDCTL(bits{Enable=25, VME=30})
+   --    self.r.RXDCTL:wait(bits{enable=25})
+   end
    return self
 end
 
@@ -633,7 +670,7 @@ function M_vf:enable_transmit()
    return self
 end
 
-function M_vf:disable_transmit()
+function M_vf:disable_transmit(reenable)
    -- TODO: wait TDH==TDT
    -- TODO: wait all is written back: DD bit or Head_WB
    self.r.TXDCTL:clr(bits{Enable=25})
@@ -641,8 +678,10 @@ function M_vf:disable_transmit()
    self.r.TXDCTL:wait(bits{Enable=25}, 0)
    self.pf.r.PFVFTE[math.floor(self.poolnum/32)]:clr(bits{VFTE=self.poolnum%32})
 
-   self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26})
---    self.r.TXDCTL:wait(bits{Enable=25})
+   if reenable then
+      self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26})
+   --    self.r.TXDCTL:wait(bits{Enable=25})
+   end
    return self
 end
 
