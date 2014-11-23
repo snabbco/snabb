@@ -22,7 +22,7 @@ run_qemu () {
     fi
 
     MEM="-m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on"
-    NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC"
+    NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC,mq=$MQ,vectors=$VECTORS"
     if [ -n "$CPU" ]; then
         NUMA="--membind=$NUMANODE --physcpubind=$CPU"
     else
@@ -35,7 +35,7 @@ run_qemu () {
         $QEMU \
             -kernel $KERNEL -append "$ARGS" \
             $MEM $NET \
-            -M pc -smp 1 -cpu host --enable-kvm \
+            -M pc -smp $SMP -cpu host --enable-kvm \
             -serial telnet:localhost:$TELNETPORT,server,nowait \
             -drive if=virtio,file=$IMG \
             -nographic > $LOG 2>&1 &
@@ -54,7 +54,7 @@ run_qemu () {
 # - Log file
 run_qemu_vhost_user () {
     SOCKET=$6
-    NETDEV="-netdev type=vhost-user,id=net0,chardev=char0 -chardev socket,id=char0,path=$SOCKET,server"
+    NETDEV="-netdev type=vhost-user,id=net0,chardev=char0,queues=$QUEUES -chardev socket,id=char0,path=$SOCKET,server"
     run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7" "$8"
     QEMUSOCKS="$QEMUSOCKS $SOCKET"
 }
@@ -70,7 +70,7 @@ run_qemu_vhost_user () {
 # - Log file
 run_qemu_tap () {
     TAP=$6
-    NETDEV="-netdev type=tap,id=net0,script=no,downscript=no,vhost=on,ifname=$TAP"
+    NETDEV="-netdev type=tap,id=net0,script=no,downscript=no,vhost=on,ifname=$TAP,queues=$QUEUES"
     run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7" "$8"
 }
 
@@ -110,8 +110,8 @@ run_nfv () {
 
     echo -n "starting snabb on $NFV_PCI with socket $NFV_SOCKET: "
     numactl $NUMA \
-        $SNABB $NFV $NFV_PACKETS > $LOG 2>&1 &
-    echo done
+        $SNABB $NFV $NFV_PCI $NFV_CONFIG $NFV_SOCKET $NFV_PACKETS \
+        > $LOG 2>&1 &
 
     SNABBPIDS="$SNABBPIDS $!"
 }
@@ -232,8 +232,8 @@ fi
 # detect designs
 printf "SNABB=$SNABB\n"
 SNABB_PATH=$(dirname $SNABB)
-if [ -f $SNABB_PATH/designs/nfv/nfv ]; then
-    export NFV=$SNABB_PATH/designs/nfv/nfv
+if [ -f $SNABB_PATH/designs/neutron/snabbnfv-bench ]; then
+    export NFV=$SNABB_PATH/designs/neutron/snabbnfv-bench
 else
     printf "NFV design not found\n"
     exit 1
@@ -253,6 +253,16 @@ else
     printf "NEUTRONNFV design not found\n"
     exit 1
 fi
+
+#calculate and set MQ related variables
+if [ -n "$QUEUES" ]; then
+    export MQ=on
+else
+    export MQ=off
+    export QUEUES=1
+fi
+export SMP=$QUEUES
+export VECTORS=$((2*$QUEUES + 1))
 
 # Check if the guest memory will fit in hugetlbfs
 PAGES=`cat /proc/meminfo | grep HugePages_Free | awk  '{ print $2; }'`

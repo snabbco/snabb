@@ -1,9 +1,9 @@
 -- This app implements a small subset of IPv6 neighbor discovery
 -- (RFC4861).  It has two ports, north and south.  The south port
 -- attaches to a port on which ND must be performed.  The north port
--- attaches to any app that transmits IPv6 packets and receives
--- Ethernet packets (in a future version, the app should strip the
--- Ethernet header to behave more like a true Ethernet layer).
+-- attaches to an app that processes IPv6 packets.  Packets
+-- transmitted to and received from the north port contain full
+-- Ethernet frames.
 --
 -- The app replies to neighbor solicitations for which it is
 -- configured as target and performs rudimentary address resolution
@@ -14,14 +14,18 @@
 -- advertisements.
 --
 -- If address resolution succeeds, the app constructs an Ethernet
--- header and attaches it to all frames received from the north port.
--- The resulting packets are transmitted to the south port.  All
--- packets from the north port are discarded as long as ND has not yet
--- succeeded.
+-- header with the discovered destination address, configured source
+-- address and ethertype 0x86dd and overwrites the headers of all
+-- packets received from the north port with it.  The resulting
+-- packets are transmitted to the south port.  All packets from the
+-- north port are discarded as long as ND has not yet succeeded.
 --
 -- Address resolution is not repeated for the lifetime of the app.
 -- The app terminates if address resolution has not succeeded after
 -- all retransmits have been performed.
+--
+-- Packets received from the south port are transmitted to the north
+-- port unaltered, i.e. including the Ethernet header.
 
 module(..., package.seeall)
 local ffi = require("ffi")
@@ -35,6 +39,7 @@ local ipv6 = require("lib.protocol.ipv6")
 local icmp = require("lib.protocol.icmp.header")
 local ns = require("lib.protocol.icmp.nd.ns")
 local na = require("lib.protocol.icmp.nd.na")
+local tlv = require("lib.protocol.icmp.nd.options.tlv")
 local filter = require("lib.pcap.filter")
 local timer = require("core.timer")
 
@@ -42,15 +47,48 @@ local nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
 
 -- config:
---   local_mac  MAC address of the interface attached to "south"
---   local_ip   IPv6 address of the interface
---   next_hop   IPv6 address of next-hop for all packets to south
+--   local_mac  MAC address of the interface attached to "south".
+--              Accepted formats:
+--                6-byte on-the-wire representaion, either as a cdata
+--                object (e.g. as returned by lib.protocol.ethernet:pton())
+--                or a Lua string of lengh 6.
+--
+--                String with regular colon-notation.
+--   local_ip   IPv6 address of the interface. Accepted formats:
+--                16-byte on-the-wire representation, either as a cdata
+--                object (e.g as returned by lib.protocol.ipv6:pton()) or
+--                a Lus string of length 16.
+--   next_hop   IPv6 address of next-hop for all packets to south.  Accepted
+--              formats as for local_ip.
 --   delay      NS retransmit delay in ms (default 1000ms)
 --   retrans    Number of NS retransmits (default 10)
+local function check_ip_address(ip, desc)
+   assert(ip, "nd_light: missing "..desc.." IP address")
+   if type(ip) == "string" and string.len(ip) ~= 16 then
+      ip = ipv6:pton(ip)
+   else
+      assert(type(ip) == "cdata",
+	     "nd_light: invalid type of "..desc.." IP address, expected cdata, got "
+		..type(ip))
+   end
+   return ip
+end
+
 function nd_light:new (config)
    local o = nd_light:superClass().new(self)
    config.delay = config.delay or 1000
    config.retrans = config.retrans or 10
+   assert(config.local_mac, "nd_light: missing local MAC address")
+   if type(config.local_mac) == "string" and string.len(config.local_mac) ~= 6 then
+      config.local_mac = ethernet:pton(config.local_mac)
+   else
+      assert(type(config.local_mac) == "cdata",
+	     "nd_light: invalid type for local MAC address, expected cdata, got "
+		..type(config.local_mac))
+   end
+   config.local_ip = check_ip_address(config.local_ip, "local")
+   config.next_hop = check_ip_address(config.next_hop, "next-hop")
+
    o._config = config
    o._match_ns = function(ns)
 		    return(ns:target_eq(config.local_ip))
@@ -73,14 +111,20 @@ function nd_light:new (config)
 	 src = config.local_ip,
 	 dst = sol_node_mcast })
    local icmp = icmp:new(135, 0)
+
+   -- Construct a neighbor solicitation with a source link-layer
+   -- option.
    local ns = ns:new(config.next_hop)
-   -- Note: we should include a source link-layer option here,
-   -- but the current ND stuff from lib/protocol doesn't provide a
-   -- simple enough mechanism to do this yet.
-   dgram:push(ns)
-   icmp:checksum(ns:header(), ns:sizeof(), ipv6)
+   local src_lladdr_tlv = tlv:new(1, config.local_mac):tlv()
+   local src_lladdr_tlv_len = ffi.sizeof(src_lladdr_tlv)
+   -- We add both chunks to the payload rather than using push() for
+   -- the ns header to have everything in a contiguous block for
+   -- checksum calculation.
+   dgram:payload(ns:header(), ns:sizeof())
+   local mem, length = dgram:payload(src_lladdr_tlv, src_lladdr_tlv_len)
+   icmp:checksum(mem, length, ipv6)
    dgram:push(icmp)
-   ipv6:payload_length(icmp:sizeof() + ns:sizeof())
+   ipv6:payload_length(icmp:sizeof() + ns:sizeof() + src_lladdr_tlv_len)
    dgram:push(ipv6)
    dgram:push(ethernet:new({ src = config.local_mac,
 			     dst = ethernet:ipv6_mcast(sol_node_mcast),
@@ -103,9 +147,41 @@ function nd_light:new (config)
 		    end
 		 end
    nh.timer = timer.new("ns retransmit", nh.timer_cb, 1e6 * config.delay)
-   self._next_hop = nh
-   self._dgram = datagram:new()
-   packet.deref(self._dgram:packet())
+   o._next_hop = nh
+
+   -- Prepare packet for solicited neighbor advertisement
+   local sna = {}
+   dgram = datagram:new()
+   sna.packet = dgram:packet()
+   packet.tenure(sna.packet)
+   -- Leave dst address unspecified.  It will be set to the source of
+   -- the incoming solicitation
+   ipv6 = ipv6:new({ next_header = 58, -- ICMP6
+	 hop_limit = 255,
+	 src = config.local_ip })
+   icmp = icmp:new(136, 0)
+   -- Construct a neighbor solicitation with a target link-layer
+   -- option.
+   local na = na:new(config.local_ip, nil, 1, nil)
+   local tgt_lladdr_tlv = tlv:new(2, config.local_mac):tlv()
+   local tgt_lladdr_tlv_len = ffi.sizeof(tgt_lladdr_tlv)
+   dgram:payload(na:header(), na:sizeof())
+   local mem, length = dgram:payload(tgt_lladdr_tlv, tgt_lladdr_tlv_len)
+   icmp:checksum(mem, length, ipv6)
+   dgram:push(icmp, true)
+   ipv6:payload_length(icmp:sizeof() + na:sizeof() + tgt_lladdr_tlv_len)
+   dgram:push(ipv6, true)
+   -- Leave dst address unspecified.
+   local eth = ethernet:new({ src = config.local_mac,
+			      type = 0x86dd })
+   dgram:push(eth, true)
+   -- These headers are relocated to the packet buffer in order to be
+   -- able to set the destination addresses and ICMP checksum later on.
+   sna.eth = eth
+   sna.ipv6 = ipv6
+   sna.icmp = icmp
+   sna.dgram = dgram
+   o._sna = sna
    return o
 end
 
@@ -122,33 +198,18 @@ local function ns (self, dgram, eth, ipv6, icmp)
    if not ns then
       return nil
    end
-   local option = ns:options(dgram:payload())
-   if not (#option == 1 and option[1]:type() == 1) then
-      -- Invalid NS, ignore
-      return nil
-   end
-   -- Turn this message into a solicited neighbor
-   -- advertisement with target ll addr option
+   -- Ignore options as long as we don't implement a proper neighbor
+   -- cache.
 
-   -- Ethernet
-   eth:swap()
-   eth:src(self._config.local_mac)
-
-   -- IPv6
-   ipv6:dst(ipv6:src())
-   ipv6:src(self._config.local_ip)
-
-   -- ICMP
-   option[1]:type(2)
-   option[1]:option():addr(self._config.local_mac)
-   icmp:type(136)
-   -- Undo/redo icmp and ns headers to get
-   -- payload and set solicited flag
-   dgram:unparse(2)
-   dgram:parse() -- icmp
-   local payload, length = dgram:payload()
-   dgram:parse():solicited(1)
-   icmp:checksum(payload, length, ipv6)
+   -- Set Ethernet and IPv6 destination addresses and re-compute the
+   -- ICMP checksum
+   local sna = self._sna
+   sna.eth:dst(eth:src())
+   sna.ipv6:dst(ipv6:src())
+   -- The payload of the pre-fabricated packet consists of the NA and
+   -- target ll-option
+   local mem, length = sna.dgram:payload()
+   sna.icmp:checksum(mem, length, sna.ipv6)
    return true
 end
 
@@ -215,12 +276,10 @@ function nd_light:push ()
 	 packet.deref(p)
       elseif status == true then
 	 -- Send NA back south
-	 link.transmit(l_reply, p)
+	 packet.deref(p)
+	 link.transmit(l_reply, self._sna.packet)
       else
 	 -- Send transit traffic up north
-	 -- XXX We should remove the Ethernet header here
-	 --     to make this app behave more like a true
-	 --     Ethernet layer.
 	 link.transmit(l_out, p)
       end
    end
@@ -234,8 +293,8 @@ function nd_light:push ()
 	 packet.deref(link.receive(l_in))
       else
 	 local p = link.receive(l_in)
-	 self._dgram:reuse(p)
-	 self._dgram:push(self._eth_header)
+	 local iov = p.iovecs[0]
+	 self._eth_header:copy(iov.buffer.pointer + iov.offset)
 	 link.transmit(l_out, p)
       end
    end

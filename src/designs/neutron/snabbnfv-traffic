@@ -22,7 +22,12 @@ function run (pciaddr, confpath, sockpath)
          config.apply(config.load(confpath, pciaddr, sockpath))
          mtime = mtime2
       end
-      engine.main({duration=1})
+      for i = 1, 60 do
+         engine.main({duration=1})
+         -- Flush buffered log messages every 1s
+         io.flush()
+      end
+      -- Report each minute
       engine.report()
    end
 end

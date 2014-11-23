@@ -10,8 +10,7 @@ local pcap = require("apps.pcap.pcap")
 local c = config.new()
 
 -- Packet filter rules, see below.
-local v6_rules = [[
-{
+local v6_rules = {
    {
       ethertype = "ipv6",
       protocol = "icmp",
@@ -30,13 +29,12 @@ local v6_rules = [[
       dest_port_max = 53,
    }
 }
-]]
 
 config.app(c, "pcap", pcap.PcapReader, "apps/packet_filter/samples/v6.pcap")
 config.app(c, "repeat", basic_apps.Repeater)
-config.app(c, "limit", rate_limiter.RateLimiter, [[ {rate = 1e8, bucket_capacity = 1e9} ]])
-config.app(c, "nic1", Intel82599, [[{pciaddr = "0000:05:00.1"}]])
-config.app(c, "nic2", Intel82599, [[{pciaddr = "0000:8a:00.1"}]])
+config.app(c, "limit", rate_limiter.RateLimiter, {rate = 1e8, bucket_capacity = 1e9})
+config.app(c, "nic1", Intel82599, {pciaddr = "0000:05:00.1"})
+config.app(c, "nic2", Intel82599, {pciaddr = "0000:8a:00.1"})
 config.app(c, "filter", packet_filter.PacketFilter, v6_rules)
 config.app(c, "tee", basic_apps.Tee)
 config.app(c, "sink1", basic_apps.Sink)

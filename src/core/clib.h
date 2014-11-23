@@ -19,6 +19,9 @@ void *memset(void *s, int c, size_t n);
 // memcmp(3)
 int memcmp(const void *s1, const void *s2, int n);
 
+// memmove(3)
+void *memmove(void *dest, const void *src, int n);
+
 // strncpy(3) - copy a string
 char *strncpy(char *dest, const char *src, size_t n);
 
@@ -48,6 +51,9 @@ char *basename(char *path);
 
 // inet_pton(3) - convert IPv4 and IPv6 addresses from text to binary form
 int inet_pton(int af, const char *src, void *dst);
+
+// inet_ntop(3) - convert IPv4 and IPv6 addresses from binary to text form
+const char *inet_ntop(int af, const void *src, char *dst, size_t size);
 
 // Conversions between host and network byte order
 uint16_t htons(uint16_t);

@@ -25,17 +25,21 @@ end
 
 -- Run all timers up to the given new time.
 function run_to_time (ns)
+   local function call_timers (l)
+      for i=1,#l do
+         local timer = l[i]
+         if debug then
+            print(string.format("running timer %s at tick %s", timer.name, ticks))
+         end
+         timer.fn(timer)
+         if timer.repeating then activate(timer) end
+      end
+   end
    local new_ticks = math.floor(tonumber(ns) / ns_per_tick)
    for tick = ticks, new_ticks do
       ticks = tick
       if timers[ticks] then
-         for _,t in pairs(timers[ticks]) do
-            if debug then
-               print("running timer " .. t.name .. " at tick " .. ticks)
-            end
-            t.fn(t)
-            if t.repeating then activate(t) end
-         end
+         call_timers(timers[ticks])
          timers[ticks] = nil
       end
    end
@@ -67,6 +71,7 @@ function selftest ()
    local ntimers, runtime = 10000, 100000
    local count, expected_count = 0, 0
    local fn = function (t) count = count + 1 end
+   local start = C.get_monotonic_time()
    -- Start timers, each counting at a different frequency
    for freq = 1, ntimers do
       local t = new("timer"..freq, fn, ns_per_tick * freq, 'repeating')
@@ -82,6 +87,9 @@ function selftest ()
       assert(count > old_count, "count increasing")
    end
    assert(count == expected_count, "final count correct")
-   print("ok ("..lib.comma_value(count).." callbacks)")
+   local finish = C.get_monotonic_time()
+   local elapsed_time = finish - start
+   print(("ok (%s callbacks in %.4f seconds)"):format(
+      lib.comma_value(count), elapsed_time))
 end
 

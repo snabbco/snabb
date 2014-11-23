@@ -5,15 +5,15 @@ local PacketFilter = require("apps.packet_filter.packet_filter").PacketFilter
 local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
 local nd_light = require("apps.ipv6.nd_light")
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
-local ns_responder = require("apps.ipv6.ns_responder")
 local pci = require("lib.hardware.pci")
 local ffi = require("ffi")
 local C = ffi.C
-local AF_INET6 = 10
 local lib = require("core.lib")
 
--- Set to true to enable traffic policing via the rate limiter app
-policing = false
+-- Return name of port in <port_config>.
+function port_name (port_config)
+   return port_config.port_id:gsub("-", "_")
+end
 
 -- Compile app configuration from <file> for <pciaddr> and vhost_user
 -- <socket>. Returns configuration and zerocopy pairs.
@@ -24,12 +24,12 @@ function load (file, pciaddr, sockpath)
       main.exit(1)
    end
 
-   local ports = dofile(file)
+   local ports = lib.load_conf(file)
    local c = config.new()
    local zerocopy = {} -- {NIC->Virtio} app names to zerocopy link
    for _,t in ipairs(ports) do
-      local vlan, mac_address, port_id = t.vlan, t.mac_address, t.port_id
-      local name = port_id:gsub("-", "_")
+      local vlan, mac_address = t.vlan, t.mac_address
+      local name = port_name(t)
       local NIC = "NIC_"..name
       local Virtio = "Virtio_"..name
       config.app(c, NIC, require(device_info.driver).driver,
@@ -37,44 +37,49 @@ function load (file, pciaddr, sockpath)
 		     vmdq=true,
 		     macaddr = %q,
 		     vlan=%d}]]):format(pciaddr, mac_address, vlan))
-      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(port_id)})
+      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(name)})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
       if t.ingress_filter then
-         local Filter = "Filter_"..name
+         local Filter = "Filter_in_"..name
          config.app(c, Filter, PacketFilter, t.ingress_filter)
          config.link(c, Filter..".tx -> " .. VM_rx)
          VM_rx = Filter..".rx"
       end
+      if t.egress_filter then
+         local Filter = 'Filter_out_'..name
+         config.app(c, Filter, PacketFilter, t.egress_filter)
+         config.link(c, VM_tx..' -> '..Filter..'.rx')
+         VM_tx = Filter..'.tx'
+      end
       if t.tunnel and t.tunnel.type == "L2TPv3" then
          local Tunnel = "Tunnel_"..name
-         local conf = (([[{local_address  = %q,
-                           remote_address  = %q,
-                           local_cookie = %q,
-                           remote_cookie = %q,
-                           local_session  = %q,}]])
-                       :format(t.tunnel.local_ip, t.tunnel.remote_ip,
-                               t.tunnel.local_cookie, t.tunnel.remote_cookie,
-                               t.tunnel.session))
+         local conf = {local_address = t.tunnel.local_ip,
+                       remote_address = t.tunnel.remote_ip,
+                       local_cookie = t.tunnel.local_cookie,
+                       remote_cookie = t.tunnel.remote_cookie,
+                       local_session = t.tunnel.session}
          config.app(c, Tunnel, L2TPv3, conf)
          -- Setup IPv6 neighbor discovery/solicitation responder.
          -- This will talk to our local gateway.
          local ND = "ND_"..name
-         config.app(c, ND, nd_light, {local_mac = mac_address,
-                                      local_ip = t.tunnel.local_ip,
-                                      next_hop = t.tunnel.next_hop})
-         -- VM -> Tunnel -> Network
+         config.app(c, ND, nd_light,
+                    {local_mac = mac_address,
+                     local_ip = t.tunnel.local_ip,
+                     next_hop = t.tunnel.next_hop})
+         -- VM -> Tunnel -> ND <-> Network
          config.link(c, VM_tx.." -> "..Tunnel..".decapsulated")
-         -- Network -> ND -> Tunnel -> VM
+         config.link(c, Tunnel..".encapsulated -> "..ND..".north")
+         -- Network <-> ND -> Tunnel -> VM
          config.link(c, ND..".north -> "..Tunnel..".encapsulated")
          config.link(c, Tunnel..".decapsulated -> "..VM_rx)
-         VM_rx, VM_tx = ND..".south", Tunnel..".encapsulated"
+         VM_rx, VM_tx = ND..".south", ND..".south"
       end
-      if policing and t.gbps then
+      if t.rx_police_gbps then
          local QoS = "QoS_"..name
-         local rate = t.gbps * 1000000 / 8
-         config.app(c, QoS, RateLimiter, ([[{rate = %d, bucket_capacity = %d}]]):format(rate, rate))
-         config.link(c, VM_tx.." -> "..QoS..".rx")
-         VM_tx = QoS..".tx"
+         local rate = t.rx_police_gbps * 1e9 / 8
+         config.app(c, QoS, RateLimiter, {rate = rate, bucket_capacity = rate})
+         config.link(c, VM_tx.." -> "..QoS..".input")
+         VM_tx = QoS..".output"
       end
       config.link(c, NIC..".tx -> "..VM_rx)
       config.link(c, VM_tx.." -> "..NIC..".rx")
@@ -116,5 +121,6 @@ function selftest ()
    do
       print("testing:", confpath)
       apply(load(confpath, pcideva, "/dev/null"))
+      engine.main({duration = 0.25})
    end
 end

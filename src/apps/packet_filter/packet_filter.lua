@@ -1,6 +1,7 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
+local C = ffi.C
 local bit = require("bit")
 
 local app = require("core.app")
@@ -133,7 +134,7 @@ local function parse_cidr_ipv4 (cidr)
    end
 
    local in_addr  = ffi.new("int32_t[1]")
-   local result = ffi.C.inet_pton(AF_INET, address, in_addr)
+   local result = C.inet_pton(AF_INET, address, in_addr)
    if result ~= 1 then
       return false, "malformed IPv4 address: " .. address
    end
@@ -164,7 +165,7 @@ local function parse_cidr_ipv6 (cidr)
    end
 
    local in6_addr  = ffi.new("uint64_t[2]")
-   local result = ffi.C.inet_pton(AF_INET6, address, in6_addr)
+   local result = C.inet_pton(AF_INET6, address, in6_addr)
    if result ~= 1 then
       return false, "malformed IPv6 address: " .. address
    end
@@ -277,7 +278,7 @@ local function generateRule(
       error("unknown ethertype")
    end
    local min_header_size = assert(
-         min_packet_sizes[rule.ethertype][rule.protocol],
+         min_packet_sizes[rule.ethertype][rule.protocol or 'icmp'],
          "unknown min packet size"
       )
    T("if size < ",min_header_size," then break end")
@@ -378,8 +379,8 @@ end
 
 PacketFilter = {}
 
-function PacketFilter:new (confstring)
-   local rules = confstring and loadstring("return " .. confstring)() or {}
+function PacketFilter:new (arg)
+   local rules = arg and config.parse_app_arg(arg) or {}
    assert(rules)
    assert(#rules > 0)
 
@@ -430,8 +431,7 @@ function selftest ()
    local V6_RULE_ICMP_PACKETS = 3 -- packets within v6.pcap
    local V6_RULE_DNS_PACKETS =  3 -- packets within v6.pcap
       
-   local v6_rules = [[
-{
+   local v6_rules = {
    {
       ethertype = "ipv6",
       protocol = "icmp",
@@ -448,9 +448,7 @@ function selftest ()
       source_port_max = 2399, -- both borders and in the middle
       dest_port_min = 53,     -- single port match
       dest_port_max = 53,
-   }
-}
-]]
+   }}
 
    local c = config.new()
    config.app(
@@ -471,8 +469,7 @@ function selftest ()
    local V4_RULE_DNS_PACKETS = 1 -- packets within v4.pcap
    local V4_RULE_TCP_PACKETS = 18 -- packets within v4.pcap
 
-   local v4_rules = [[
-{
+   local v4_rules = {
    {
       ethertype = "ipv4",
       protocol = "udp",
@@ -488,9 +485,7 @@ function selftest ()
       source_port_max = 81,
       dest_port_min = 3371, -- our port (3372) is in the middle of range
       dest_port_max = 3373,
-   }
-}
-]]
+   }}
 
    config.app(
          c,

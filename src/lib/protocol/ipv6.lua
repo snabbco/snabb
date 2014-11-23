@@ -4,6 +4,9 @@ local C = ffi.C
 local lib = require("core.lib")
 local header = require("lib.protocol.header")
 
+local AF_INET6 = 10
+local INET6_ADDRSTRLEN = 48
+
 local ipv6hdr_t = ffi.typeof[[
       struct {
 	 uint32_t v_tc_fl; // version, tc, flow_label
@@ -67,30 +70,19 @@ function ipv6:new_from_mem(mem, size)
    return o
 end
 
--- XXX should probably use inet_pton(3)
 function ipv6:pton (p)
-   local result = ipv6_addr_t()
-   local i = 0
-   for v in p:split(":") do
-      if string.match(v:lower(), '^[0-9a-f]?[0-9a-f]?[0-9a-f]?[0-9a-f]$') then
-	 result[i] = C.htons(tonumber("0x"..v))
-      else
-	 error("invalid ipv6 address "..p.." "..v)
-      end
-      i = i+1
+   local in_addr  = ffi.new("uint8_t[16]")
+   local result = C.inet_pton(AF_INET6, p, in_addr)
+   if result ~= 1 then
+      return false, "malformed IPv6 address: " .. address
    end
-   assert(i == 8, "invalid ipv6 address "..p.." "..i)
-   return result
+   return in_addr
 end
 
--- XXX should probably use inet_ntop(3)
 function ipv6:ntop (n)
-   local p = {}
-   local n = ffi.cast("uint8_t *", n)
-   for i = 0, 14, 2 do
-      table.insert(p, string.format("%02x%02x", n[i], n[i+1]))
-   end
-   return table.concat(p, ":")
+   local p = ffi.new("char[?]", INET6_ADDRSTRLEN)
+   local c_str = C.inet_ntop(AF_INET6, n, p, INET6_ADDRSTRLEN)
+   return ffi.string(c_str)
 end
 
 -- Construct the solicited-node multicast address from the given
@@ -186,5 +178,13 @@ function ipv6:pseudo_header (plen, nh)
    ph.next_header = nh
    return(ph)
 end
+
+function selftest()
+   local ipv6_address = "2001:620:0:c101::2"
+   assert(ipv6_address == ipv6:ntop(ipv6:pton(ipv6_address)),
+      'ipv6 text to binary conversion failed.')
+end
+
+ipv6.selftest = selftest
 
 return ipv6

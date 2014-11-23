@@ -135,8 +135,17 @@ function M_sf:init_receive ()
    return self
 end
 
+function M_sf:set_rx_buffersize(rx_buffersize)
+   rx_buffersize = math.min(16, math.floor((rx_buffersize or 16384) / 1024))  -- size in KB, max 16KB
+   assert (rx_buffersize > 0, "rx_buffersize must be more than 1024")
+   self.rx_buffersize = rx_buffersize * 1024
+   self.r.SRRCTL(bits({DesctypeLSB=25}, rx_buffersize))
+   return self
+end
+
 function M_sf:set_receive_descriptors ()
-   self.r.SRRCTL(bits({DesctypeLSB=25}, 4))
+   self:set_rx_buffersize(16384)        -- start at max
+
    self.r.RDBAL(self.rxdesc_phy % 2^32)
    self.r.RDBAH(self.rxdesc_phy / 2^32)
    self.r.RDLEN(num_descriptors * ffi.sizeof(rxdesc_t))
@@ -256,6 +265,9 @@ end
 
 function M_sf:add_receive_buffer (b)
    assert(self:can_add_receive_buffer())
+   if b.size < self.rx_buffersize then
+      self:set_rx_buffersize(b.size)
+   end
    local desc = self.rxdesc[self.rdt].data
    desc.address, desc.dd = b.physical, 0
    self.rxbuffers[self.rdt] = b
@@ -538,6 +550,7 @@ M_vf.sync_transmit = M_sf.sync_transmit
 M_vf.can_receive = M_sf.can_receive
 M_vf.receive = M_sf.receive
 M_vf.can_add_receive_buffer = M_sf.can_add_receive_buffer
+M_vf.set_rx_buffersize = M_sf.set_rx_buffersize
 M_vf.add_receive_buffer = M_sf.add_receive_buffer
 M_vf.sync_receive = M_sf.sync_receive
 

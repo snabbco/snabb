@@ -1,5 +1,6 @@
 #!/usr/bin/env snabb
 
+local lib  = require("core.lib")
 local json = require("lib.json")
 
 if #main.parameters < 2 or #main.parameters > 3 then
@@ -47,89 +48,76 @@ function create_config (input_dir, output_dir, hostname)
    local secbindings = parse_csv(input_dir.."/securitygroupportbindings.txt",
                                  {'port_id', 'security_group_id'},
                                  'port_id')
-   local port_count = 0
-   local outputs = {}
+   -- Compile zone configurations.
+   local zones = {}
    for _, port in pairs(ports) do
       local binding = port_bindings[port.id]
+      -- If the port is a 'snabb' port, lives on our host and is online
+      -- then we compile its configuration.
       if binding.driver == "snabb" then
          local vif_details = json.decode(binding.vif_details)
+         print("vif_details", vif_details)
+         -- pcall incase the field is missing
+         local status, profile = pcall(json.decode, binding.profile)
+         profile = profile or {}
          if vif_details.zone_host == hostname then
-            local port_id = vif_details.zone_port
-            if not outputs[port_id] then
-               local output_path = output_dir.."/"..port_id
-               local output = io.open(output_path, 'w')
-               if output then
-                  print("Created " .. output_path)
-                  outputs[port_id] = io.open(output_path, 'w')
-                  outputs[port_id]:write("return {\n")
-               else
-                  error("Failed to create " .. output_path)
-               end
-            end
+            local zone_port = vif_details.zone_port
+            -- Each zone can have multiple port configurtions.
+            if not zones[zone_port] then zones[zone_port] = {} end
             if port.admin_state_up ~= '0' then
-               local vlan = segments[port.network_id].segmentation_id
-               local mac = port.mac_address
-               -- Skipping filter for now.
-               print("Warning: Ignoring security group configuration.")
-               local ingressfilter = nil --filter(port, secbindings, secrules)
-               local gbps = vif_details.zone_gbps
-               local tunnel = tunnel(port, vif_details)
-               outputs[port_id]:write(('  { vlan = %d,\n    mac_address = %q,\n    port_id = %q,\n    ingress_filter = %s,\n    gbps = %s,\n    tunnel = %s\n  },\n')
-                                      :format(vlan, mac, port.id, ingressfilter, gbps, tunnel))
+               table.insert(zones[zone_port],
+                            { vlan = vif_details.zone_vlan,
+                              mac_address = port.mac_address,
+                              port_id = port.id,
+                              ingress_filter = filter(port, secbindings, secrules, 'ingress'),
+                              egress_filter = filter(port, secbindings, secrules, 'egress'),
+                              gbps = vif_details.zone_gbps,
+                              rx_police_gbps = profile.rx_police_gbps,
+                              tunnel = tunnel(port, vif_details, profile) })
             end
-            port_count = port_count + 1
          end
       end
    end
-   for _, file in pairs(outputs) do
-      file:write("}\n")
-      file:close()
+   -- Save the compiled zone configurations to output_dir.
+   for id, ports in pairs(zones) do
+      local output_path = output_dir.."/"..id
+      lib.store_conf(output_path, ports)
+      print("Created " .. output_path)
    end
-   print("Done. Wrote " .. port_count .. " record(s).")
 end
 
 -- Return the packet filter expression.
--- XXX This is assumed to be ingress-only. Egress is simply NYI.
-function filter (port, secbindings, secrules)
-   local rules
+function filter (port, secbindings, secrules, direction)
+   local rules = {}
+   direction = direction:lower()
    if secbindings[port.id] then
       for _,r in ipairs(secrules[secbindings[port.id].security_group_id]) do
-         if r.direction:lower() == "ingress" then
+         if r.direction:lower() == direction then
             local NULL = "\\N" -- SQL null
-            local rule = ""
-            if r.ethertype ~= NULL then rule = rule .. " ethertype='"..(r.ethertype:lower()).."'," end
-            if r.protocol ~= NULL then rule = rule .. " protocol='"..r.protocol.."'," end
-            if r.port_range_min ~= NULL and r.port_range_max ~= NULL then
-               rule = rule .. " dest_port_min=" .. r.port_range_min .. ", dest_port_max=" .. r.port_range_max..","
-            end
-            if r.remote_ip_prefix ~= NULL then rule = rule .. " source_cidr='"..rule.remote_ip_prefix.."'," end
-            print("direction", r.direction)
-            rules = "{" .. rule .. " },"
+            local rule = {}
+            if r.ethertype        ~= NULL then rule.ethertype        = r.ethertype:lower() end
+            if r.protocol         ~= NULL then rule.protocol         = r.protocol:lower()  end
+            if r.port_range_min   ~= NULL then rule.dest_port_min    = r.port_range_min    end
+            if r.port_range_max   ~= NULL then rule.dest_port_max    = r.port_range_max    end
+            if r.remote_ip_prefix ~= NULL then rule.remote_ip_prefix = r.remote_ip_prefix  end
+            table.insert(rules, rule)
          end
       end
    end
-   if rules then return "[[{ " .. rules .. " }]]" else return nil end
+   return rules
 end
 
 -- Return the L2TPv3 tunnel expresion.
-function tunnel (port, vif_details)
-   if vif_details.tunnel_type == "L2TPv3" then
-      return ([[{type = "L2TPv3",
-              remote_ip = %q,
-              local_ip = %q,
-              session = %d,
-              local_cookie = %q,
-              remote_cookie = %q,
-              next_hop = %q }]])
-      :format(vif_details.l2tpv3_remote_ip,
-              vif_details.l2tpv3_local_ip,
-              vif_details.l2tpv3_session,
-              vif_details.l2tpv3_local_cookie,
-              vif_details.l2tpv3_remote_cookie,
-              vif_details.l2tpv3_next_hop)
-   else
-      return nil
-   end
+function tunnel (port, vif_details, profile)
+   if profile.tunnel_type == "L2TPv3" then
+      return { type = "L2TPv3",
+               local_ip = vif_details.zone_ip,
+               remote_ip = profile.l2tpv3_remote_ip,
+               session = profile.l2tpv3_session,
+               local_cookie = profile.l2tpv3_local_cookie,
+               remote_cookie = profile.l2tpv3_remote_cookie,
+               next_hop = profile.l2tpv3_next_hop }
+   else return nil end
 end
 
 -- Parse FILENAME as a .csv file containing FIELDS.
@@ -164,21 +152,18 @@ end
 -- Return an array of line's tab-delimited tokens.
 function splitline (line)
    local words = {}
-   for w in (line .. "\t"):gmatch("([^\t]*)\t") do 
-      table.insert(words, w) 
+   for w in (line .. "\t"):gmatch("([^\t]*)\t") do
+      table.insert(words, w)
    end
    return words
 end
 
 -- Get hostname.
 function gethostname ()
-   local f = io.popen("hostname", "r")
-   local hostname = f:read()
-   f:close()
+   local hostname = lib.readcmd("hostname", "*l")
    if hostname then return hostname
    else error("Could not get hostname.") end
 end
 
 -- Run as main()
 create_config(unpack(main.parameters))
-

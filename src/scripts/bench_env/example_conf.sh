@@ -22,6 +22,8 @@ HUGETLBFS=/hugetlbfs
 KERNEL=/opt/bench/bzImage
 QEMU=/opt/bench/qemu/obj/x86_64-softmmu/qemu-system-x86_64
 
+QUEUES=4
+
 # Guest instance #0
 TAP0=tap0
 TELNET_PORT0=5000

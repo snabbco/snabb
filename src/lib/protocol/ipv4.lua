@@ -6,6 +6,7 @@ local header = require("lib.protocol.header")
 
 -- TODO: generalize
 local AF_INET = 2
+local INET_ADDRSTRLEN = 16
 
 local ipv4hdr_t = ffi.typeof[[
       struct {
@@ -70,20 +71,17 @@ end
 
 function ipv4:pton (p)
    local in_addr  = ffi.new("uint8_t[4]")
-   local result = ffi.C.inet_pton(AF_INET, p, in_addr)
+   local result = C.inet_pton(AF_INET, p, in_addr)
    if result ~= 1 then
       return false, "malformed IPv4 address: " .. address
    end
    return in_addr
 end
 
--- XXX should probably use inet_ntop(3)
 function ipv4:ntop (n)
-   local p = {}
-   for i = 0, 3, 1 do
-      table.insert(p, string.format("%d", C.ntohs(n[i])))
-   end
-   return table.concat(p, ".")
+   local p = ffi.new("char[?]", INET_ADDRSTRLEN)
+   local c_str = C.inet_ntop(AF_INET, n, p, INET_ADDRSTRLEN)
+   return ffi.string(c_str)
 end
 
 -- Instance methods
@@ -196,5 +194,13 @@ function ipv4:pseudo_header (ulplen, proto)
    ph.ulp_proto = C.htons(proto)
    return(ph)
 end
+
+function selftest()
+   local ipv4_address = "192.168.1.1"
+   assert(ipv4_address == ipv4:ntop(ipv4:pton(ipv4_address)),
+      'ipv4 text to binary conversion failed.')
+end
+
+ipv4.selftest = selftest
 
 return ipv4

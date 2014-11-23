@@ -2,6 +2,8 @@
 
 module(..., package.seeall)
 
+local lib = require("core.lib")
+
 -- API: Create a new configuration.
 -- Initially there are no apps or links.
 function new ()
@@ -17,15 +19,13 @@ end
 --   c is a config object.
 --   name is the name of this app in the network (a string).
 --   class is the Lua object with a class:new(arg) method to create the app.
---   arg is the app's configuration (as a string to be passed to new()).
+--   arg is the app's configuration (to be passed to new()).
 --
--- Example: config.app(c, "nic", Intel82599, [[{pciaddr = "0000:00:01.00"}]])
+-- Example: config.app(c, "nic", Intel82599, {pciaddr = "0000:00:01.00"})
 function app (config, name, class, arg)
    arg = arg or "nil"
    assert(type(name) == "string", "name must be a string")
    assert(type(class) == "table", "class must be a table")
-   assert(type(arg)   == "string" or type(arg) == "table",
-	  "arg must be a string or a table")
    config.apps[name] = { class = class, arg = arg}
 end
 
@@ -56,12 +56,15 @@ function canonical_link (spec)
    return format_link(parse_link(spec))
 end
 
--- Return a Lua object for the arg to an app.
+-- Return a Lua object for the arg to an app. Arg may be a table or a
+-- string encoded Lua object.
 -- Example:
---   parse_app_arg("{ timeout = 5 * 10 }") => { timeout = 50 }
-function parse_app_arg (s)
-   assert(type(s) == 'string')
-   return loadstring("return " .. s)()
+--   parse_app_arg('{ timeout= 5*10 }') => { timeout = 50 }
+--   parse_app_arg(<table>) => <table> (NOOP)
+function parse_app_arg (arg)
+   if     type(arg) == 'string' then return lib.load_string(arg)
+   elseif type(arg) == 'table'  then return arg
+   else   error("<arg> is not a string or table.") end
 end
 
 function graphviz (c)

@@ -15,6 +15,13 @@ local lladdr_ptr_t = ffi.typeof("$ *", lladdr_t)
 lladdr._name = 'll_addr'
 
 -- Class methods
+function lladdr:new (addr)
+   local o = lladdr:superClass().new(self)
+   o._lladdr = lladdr_t()
+   ffi.copy(o._lladdr.lladdr, addr, 6)
+   return o
+end
+
 function lladdr:new_from_mem (mem, size)
    local o = lladdr:superClass().new(self)
    assert(size >= ffi.sizeof(lladdr_t))

@@ -102,64 +102,65 @@ end
 
 SimpleKeyedTunnel = {}
 
-function SimpleKeyedTunnel:new (confstring)
-   local config = confstring and loadstring("return " .. confstring)() or {}
+function SimpleKeyedTunnel:new (arg)
+   local conf = arg and config.parse_app_arg(arg) or {}
    -- required fields:
    --   local_address, string, ipv6 address
    --   remote_address, string, ipv6 address
-   --   local_cookie, 8 bytes string
-   --   remote_cookie, 8 bytes string
+   --   local_cookie, 8 bytes hex string
+   --   remote_cookie, 8 bytes hex string
    -- optional fields:
    --   local_session, unsigned number, must fit to uint32_t
    --   default_gateway_MAC, useful for testing
    --   hop_limit, override default hop limit 64
    assert(
-         type(config.local_cookie) == "string"
-         and #config.local_cookie == 8,
-         "local_cookie should be 8 bytes string"
+         type(conf.local_cookie) == "string"
+         and #conf.local_cookie <= 16,
+         "local_cookie should be 8 bytes hex string"
       )
    assert(
-         type(config.remote_cookie) == "string"
-         and #config.remote_cookie == 8,
-         "remote_cookie should be 8 bytes string"
+         type(conf.remote_cookie) == "string"
+         and #conf.remote_cookie <= 16,
+         "remote_cookie should be 8 bytes hex string"
       )
    local header = header_array_ctype(HEADER_SIZE)
    ffi.copy(header, header_template, HEADER_SIZE)
+   local local_cookie = lib.hexundump(conf.local_cookie, 8)
    ffi.copy(
          header + COOKIE_OFFSET,
-         config.local_cookie,
-         #config.local_cookie
+         local_cookie,
+         #local_cookie
       )
 
    -- convert dest, sorce ipv6 addressed to network order binary
    local result =
-      ffi.C.inet_pton(AF_INET6, config.local_address, header + SRC_IP_OFFSET)
-   assert(result == 1,"malformed IPv6 address: " .. config.local_address)
+      C.inet_pton(AF_INET6, conf.local_address, header + SRC_IP_OFFSET)
+   assert(result == 1,"malformed IPv6 address: " .. conf.local_address)
 
    result =
-      ffi.C.inet_pton(AF_INET6, config.remote_address, header + DST_IP_OFFSET)
-   assert(result == 1,"malformed IPv6 address: " .. config.remote_address)
+      C.inet_pton(AF_INET6, conf.remote_address, header + DST_IP_OFFSET)
+   assert(result == 1,"malformed IPv6 address: " .. conf.remote_address)
 
    -- store casted pointers for fast matching
    local remote_address = ffi.cast(paddress_ctype, header + DST_IP_OFFSET)
    local local_address = ffi.cast(paddress_ctype, header + SRC_IP_OFFSET)
 
-   local remote_cookie = ffi.cast(pcookie_ctype, config.remote_cookie)
+   local remote_cookie = ffi.cast(pcookie_ctype, lib.hexundump(conf.remote_cookie, 8))
 
-   if config.local_session then
+   if conf.local_session then
       local psession = ffi.cast(psession_id_ctype, header + SESSION_ID_OFFSET)
-      psession[0] = lib.htonl(config.local_session)
+      psession[0] = lib.htonl(conf.local_session)
    end
    
-   if config.default_gateway_MAC then
-      local mac = assert(macaddress:new(config.default_gateway_MAC))
+   if conf.default_gateway_MAC then
+      local mac = assert(macaddress:new(conf.default_gateway_MAC))
       ffi.copy(header + DST_MAC_OFFSET, mac.bytes, 6)
    end
 
-   if config.hop_limit then
-      assert(type(config.hop_limit) == 'number' and
-	  config.hop_limit <= 255, "invalid hop limit")
-      header[HOP_LIMIT_OFFSET] = config.hop_limit
+   if conf.hop_limit then
+      assert(type(conf.hop_limit) == 'number' and
+	  conf.hop_limit <= 255, "invalid hop limit")
+      header[HOP_LIMIT_OFFSET] = conf.hop_limit
    end
 
    local o =
@@ -272,15 +273,13 @@ function selftest ()
 
    local input_file = "apps/keyed_ipv6_tunnel/selftest.cap.input"
    local output_file = "apps/keyed_ipv6_tunnel/selftest.cap.output"
-   local tunnel_config =
-      [[{
+   local tunnel_config = {
       local_address = "00::2:1",
       remote_address = "00::2:1",
       local_cookie = "12345678",
       remote_cookie = "12345678",
       default_gateway_MAC = "a1:b2:c3:d4:e5:f6"
-      }
-      ]] -- should be symmetric for local "loop-back" test
+   } -- should be symmetric for local "loop-back" test
 
    buffer.preallocate(10000)
    local c = config.new()

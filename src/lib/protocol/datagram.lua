@@ -136,6 +136,7 @@ function datagram:push (proto, relocate)
       -- Header doesn't fit, allocate a new buffer
       local b = buffer.allocate()
       packet.prepend_iovec(self._packet[0], b, 0, b.size)
+      self._parse.iovec = self._parse.iovec+1
    end
    proto:copy(iov.buffer.pointer + iov.offset - sizeof, relocate)
    iov.offset = iov.offset - sizeof
