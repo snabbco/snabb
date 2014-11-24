@@ -29,6 +29,7 @@ Available options are:
 -e chunk     Execute string 'chunk'.
 -l name      Require library 'name'.
 -t name      Test module 'name' with selftest().
+-dm          Enable developer mode. Enables debug prints and asserts.
 -d           Debug unhandled errors with the Lua interactive debugger.
 -S           Print enhanced stack traces with more debug information.
 -jdump file  Trace JIT decisions to 'file'. (Requires LuaJIT jit.* library.)
@@ -37,6 +38,7 @@ Available options are:
 -jp=args[,.output]
 ]]
 
+_G.developer_debug = false
 debug_on_error = false
 profiling = false
 
@@ -67,6 +69,9 @@ function main ()
          local thunk, error = loadstring(args[i+1])
          if thunk then thunk() else print(error) end
          i = i + 2
+      elseif args[i] == '-dm' then
+         _G.developer_debug = true
+         i = i + 1
       elseif args[i] == '-d' then
          debug_on_error = true
          i = i + 1

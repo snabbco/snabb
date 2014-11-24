@@ -5,7 +5,7 @@ local C = ffi.C
 
 local lib = require("core.lib")
 
-debug = false     -- verbose printouts?
+debug = _G.developer_debug
 
 ticks = false     -- current time, in ticks
 ns_per_tick = 1e6 -- tick resolution (millisecond)
