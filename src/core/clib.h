@@ -64,3 +64,5 @@ uint32_t ntohl(uint32_t);
 // geteuid(2) - get effective user identity
 int geteuid();
 
+// getpid(2) - get calling process identification
+int getpid();
