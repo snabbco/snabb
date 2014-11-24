@@ -15,13 +15,13 @@ function run (pciaddr, confpath, sockpath)
    engine.log = true
    local mtime = 0
    while true do
-      local mtime2 = C.stat_mtime(confpath)
-      if mtime2 ~= mtime then
-         print("Loading " .. confpath)
-         config.apply(config.load(confpath, pciaddr, sockpath))
-         mtime = mtime2
-      end
       for i = 1, 60 do
+         local mtime2 = C.stat_mtime(confpath)
+         if mtime2 ~= mtime then
+            print("Loading " .. confpath)
+            config.apply(config.load(confpath, pciaddr, sockpath))
+            mtime = mtime2
+         end
          engine.main({duration=1})
          -- Flush buffered log messages every 1s
          io.flush()
