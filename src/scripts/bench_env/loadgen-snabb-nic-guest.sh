@@ -79,7 +79,7 @@ for pci in $VMPCIS; do
     fi
 
     # Execute snabbswitch and pin it to a proper node (CPU and memory)
-    run_nfv "$node" "$pci" "$socket" "$log" "$cpu"
+    run_nfv "$node" "$pci" "$socket" ${NFV_CONFIG?} "$log" "$cpu"
 
     count=$((count+1))
 done

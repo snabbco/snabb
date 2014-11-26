@@ -83,8 +83,9 @@ run_nfv () {
     NUMANODE=$1
     export NFV_PCI=$2
     export NFV_SOCKET=$3
-    LOG=$4
-    CPU=$5
+    CONFIG=$4
+    LOG=$5
+    CPU=$6
 
     if [ -n "$CPU" ]; then
         NUMA="--membind=$NUMANODE --physcpubind=$CPU"
@@ -93,7 +94,7 @@ run_nfv () {
     fi
 
     numactl $NUMA \
-        $SNABB ${NFV?} $NFV_PCI ${NFV_CONFIG?} $NFV_SOCKET ${NFV_PACKETS?} \
+        $SNABB ${NFV?} $NFV_PCI ${CONFIG?} $NFV_SOCKET ${NFV_PACKETS?} \
         > $LOG 2>&1 &
 
     SNABBPIDS="$SNABBPIDS $!"
