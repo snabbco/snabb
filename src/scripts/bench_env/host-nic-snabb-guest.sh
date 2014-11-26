@@ -14,9 +14,9 @@ GUESTS="1"
 . $(dirname $0)/common.sh
 
 # Execute snabbswitch and pin it to the proper node (CPU and memory)
-run_nfv $NODE_BIND0 $NFV_PCI0 $NFV_SOCKET0 $SNABB_LOG0
+run_nfv ${NODE_BIND0?} ${NFV_PCI0?} ${NFV_SOCKET0?} ${SNABB_LOG0?}
 
 # Execute QEMU on the same node
-run_qemu_vhost_user "$NODE_BIND0" "$BOOTARGS0" "$IMAGE0" "$GUEST_MAC0" "$TELNET_PORT0" "$NFV_SOCKET0"
+run_qemu_vhost_user "${NODE_BIND0?}" "${BOOTARGS0?}" "${IMAGE0?}" "${GUEST_MAC0?}" "${TELNET_PORT0?}" "${NFV_SOCKET0?}"
 
 wait_qemus

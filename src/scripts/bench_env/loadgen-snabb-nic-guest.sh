@@ -13,19 +13,19 @@
 GUESTS="1"
 . $(dirname $0)/common.sh
 
-LOADGENPCIS=$NFV_PCI1
-LOADGENNODE=$NODE_BIND1
-LOADGENLOG=$SNABB_LOG1
+LOADGENPCIS=${NFV_PCI1?}
+LOADGENNODE=${NODE_BIND1?}
+LOADGENLOG=${SNABB_LOG1?}
 
-VMPCIS=$NFV_PCI0
-VMNODE=$NODE_BIND0
-VMARGS=$BOOTARGS0
+VMPCIS=${NFV_PCI0?}
+VMNODE=${NODE_BIND0?}
+VMARGS=${BOOTARGS0?}
 #All VMs same MAC - fix that if important!
-VMMAC=$GUEST_MAC0
-VMPORT=$TELNET_PORT0
-VMIMAGE=$IMAGE0
-VMNFVLOG=$SNABB_LOG0
-VMNFVSOCK=$NFV_SOCKET0
+VMMAC=${GUEST_MAC0?}
+VMPORT=${TELNET_PORT0?}
+VMIMAGE=${IMAGE0?}
+VMNFVLOG=${SNABB_LOG0?}
+VMNFVSOCK=${NFV_SOCKET0?}
 
 # Execute snabbswitch loadgen instance
 if [ -n "$RUN_LOADGEN" ]; then
@@ -47,6 +47,9 @@ if [ -n "$RUN_LOADGEN" ]; then
             run_loadgen "$n" "$ports" "$log"
         fi
     done
+else
+    # RUN_LOADGEN not set, not running loadgen. Let's let the user know.
+    echo "RUN_LOADGEN is unset. Not running loadgen."
 fi
 
 printf "Connect to guests with:\n"
