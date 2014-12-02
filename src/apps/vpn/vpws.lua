@@ -12,6 +12,7 @@ local C = ffi.C
 local lib = require("core.lib")
 local app = require("core.app")
 local link = require("core.link")
+local config = require("core.config")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
@@ -23,26 +24,39 @@ local pcap = require("apps.pcap.pcap")
 local vpws = subClass(nil)
 local in_to_out = { customer = 'uplink', uplink = 'customer' }
 
-function vpws:new(config)
+function vpws:new(arg)
+   local conf = arg and config.parse_app_arg(arg) or {}
+   -- Parse MAC and IP addresses if necessary.
+   for _, key in ipairs({'local_mac', 'remote_mac'}) do
+      if type(conf[key]) == "string" then
+         conf[key] = ethernet:pton(conf[key])
+      end
+   end
+   for _, key in ipairs({'local_vpn_ip', 'remote_vpn_ip'}) do
+      if type(conf[key]) == "string" then
+         conf[key] = ipv6:pton(conf[key])
+      end
+   end
+
    local o = vpws:superClass().new(self)
-   o._config = config
-   o._name = config.name
+   o._config = conf
+   o._name = conf.name
    o._encap = {
-      ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = config.local_vpn_ip,
-			 dst = config.remote_vpn_ip}),
-      gre   = gre:new({ protocol = 0x6558, checksum = config.checksum, key = config.label })
+      ipv6  = ipv6:new({ next_header = 47, hop_limit = 64, src = conf.local_vpn_ip,
+			 dst = conf.remote_vpn_ip}),
+      gre   = gre:new({ protocol = 0x6558, checksum = conf.checksum, key = conf.label })
    }
    -- Use a dummy value for the destination MAC address in case it is
    -- omitted from the configuration.  In this case, the app needs to
    -- be connected to something that performs address resolution and
    -- overwrites the Ethernet header (e.g. the nd_light app)
    -- accordinly.
-   o._encap.ether = ethernet:new({ src = config.local_mac,
-				   dst = config.remote_mac or ethernet:pton('00:00:00:00:00:00'),
+   o._encap.ether = ethernet:new({ src = conf.local_mac,
+				   dst = conf.remote_mac or ethernet:pton('00:00:00:00:00:00'),
 				   type = 0x86dd })
    -- Pre-computed size of combined Ethernet and IPv6 header
    o._eth_ipv6_size = ethernet:sizeof() + ipv6:sizeof()
-   local program = "ip6 and dst host "..ipv6:ntop(config.local_vpn_ip) .." and ip6 proto 47"
+   local program = "ip6 and dst host "..ipv6:ntop(conf.local_vpn_ip) .." and ip6 proto 47"
    local filter, errmsg = filter:new(program)
    assert(filter, errmsg and ffi.string(errmsg))
    o._filter = filter
