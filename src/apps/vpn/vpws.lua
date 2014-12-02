@@ -151,7 +151,3 @@ function selftest()
       os.exit(1)
    end
 end
-
-vpws.selftest = selftest
-
-return vpws

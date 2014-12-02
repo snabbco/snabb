@@ -299,5 +299,3 @@ function nd_light:push ()
       end
    end
 end
-
-return nd_light
