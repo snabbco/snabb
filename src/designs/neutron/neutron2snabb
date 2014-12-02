@@ -56,7 +56,6 @@ function create_config (input_dir, output_dir, hostname)
       -- then we compile its configuration.
       if binding.driver == "snabb" then
          local vif_details = json.decode(binding.vif_details)
-         print("vif_details", vif_details)
          -- pcall incase the field is missing
          local status, profile = pcall(json.decode, binding.profile)
          profile = profile or {}
