@@ -8,7 +8,7 @@ local C = ffi.C
 
 require("core.packet_h")
 
-max        = 10e5
+max        = math.pow(2,17) -- about 1e5
 allocated  = 0
 buffersize = 4096
 
