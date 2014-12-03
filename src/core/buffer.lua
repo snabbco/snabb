@@ -45,6 +45,7 @@ local return_virtio_buffer = net_device.VirtioNetDevice.return_virtio_buffer
 function free (b)
    if b.origin.type == C.BUFFER_ORIGIN_VIRTIO then
       local dev = virtio_devices[b.origin.info.virtio.device_id]
+      assert(dev)
       return_virtio_buffer(dev, b)
    else
       freelist.add(buffers, b)
