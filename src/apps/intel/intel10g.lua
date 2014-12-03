@@ -522,6 +522,12 @@ end
 function M_vf:open (opts)
    register.define(transmit_registers_desc, self.r, self.base, self.txqn)
    register.define(receive_registers_desc, self.r, self.base, self.rxqn)
+   self.tdh, self.tdt = self.r.TDH(), self.r.TDT()
+   self.rdh, self.rdt = self.r.RDH(), self.r.RDT()
+   if self.tdh ~= 0 or self.tdt ~= 0 or self.rdh ~= 0 or self.rdt ~= 0 then
+      print("Surprising initial TX/RX register values:")
+      print(self.tdh, self.tdt, self.rdh, self.rdt)
+   end
    self.txpackets = ffi.new("struct packet *[?]", num_descriptors)
    self.rxbuffers = ffi.new("struct buffer *[?]", num_descriptors)
    return self:init(opts)
