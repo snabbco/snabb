@@ -8,7 +8,7 @@ local C = ffi.C
 
 require("core.packet_h")
 
-max        = 10e5
+max        = math.pow(2,17) -- about 1e5
 allocated  = 0
 buffersize = 4096
 
@@ -45,6 +45,7 @@ local return_virtio_buffer = net_device.VirtioNetDevice.return_virtio_buffer
 function free (b)
    if b.origin.type == C.BUFFER_ORIGIN_VIRTIO then
       local dev = virtio_devices[b.origin.info.virtio.device_id]
+      assert(dev)
       return_virtio_buffer(dev, b)
    else
       freelist.add(buffers, b)

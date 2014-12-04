@@ -91,7 +91,7 @@ function Intel82599:add_receive_buffers ()
    else
       -- Buffers from a special freelist
       local fl = self.rx_buffer_freelist
-      while self.dev:can_add_receive_buffer() and freelist.nfree(fl) > 0 do
+      while self.dev:can_add_receive_buffer() and not freelist.empty(fl) do
          local b = freelist.remove(fl)
          if b.size < 1024 then
             buffer.free(b)

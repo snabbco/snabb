@@ -15,7 +15,7 @@ struct buffer_origin {
     struct buffer_origin_info_virtio {
       int16_t device_id;
       int16_t ring_id;
-      int16_t header_id;
+      uint16_t header_id;
       char    *header_pointer;  // virtual address in this process
       uint32_t total_size;      // how many bytes in all buffers
     } virtio;

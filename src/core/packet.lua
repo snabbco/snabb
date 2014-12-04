@@ -13,7 +13,7 @@ local freelist_add, freelist_remove = freelist.add, freelist.remove
 
 require("core.packet_h")
 
-local max_packets = 1e6
+local max_packets = math.pow(2,20) -- about 1e6
 packets_fl = freelist.new("struct packet *", max_packets)
 local packet_size = ffi.sizeof("struct packet")
 

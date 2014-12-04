@@ -137,6 +137,8 @@ function VirtioNetDevice:rx_buffer_add(rx_p, addr, len, rx_total_size, tx)
    -- Set invalid header_id for all buffers. The first will contain
    -- the real header_id, set after the loop
    buf.origin.info.virtio.header_id = invalid_header_id
+   buf.origin.info.virtio.device_id = self.virtio_device_id
+   buf.origin.info.virtio.ring_id = self.ring_id
 
    packet.add_iovec(rx_p, buf, buf.size)
 
@@ -302,7 +304,7 @@ function VirtioNetDevice:transmit_packets_to_vm ()
                -- here we assume that the header precedes the buffer
                -- which is the common case when mergeable buffers are used
 
-               --assert(virto_hdr+virtio_net_hdr_mrg_rxbuf_size == b.pointer)
+               --assert(virtio_hdr+virtio_net_hdr_mrg_rxbuf_size == b.pointer)
                C.memmove(virtio_hdr, b.pointer, iovec.length)
             end
 
