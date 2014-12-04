@@ -1,14 +1,6 @@
 return {
   {
-    vlan = 42,
-    ingress_filter = {
-      {
-        ethertype = "ipv4",
-      },
-      {
-        ethertype = "ipv6",
-      },
-    },
+    vlan = 442,
     egress_filter = {
       {
         ethertype = "ipv6",
