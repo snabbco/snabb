@@ -541,7 +541,10 @@ function M_vf:close()
          pf.r.PFVLVFB[2*vlan_index + math.floor(poolnum/32)]:clr(msk)
       end
    end
-   -- TODO: unset mirror
+   -- unset any mirror rule
+   self
+      :unset_mirror()
+      :unset_VLAN()
    -- unset MAC
    do
       local msk = bits{Ena=self.poolnum%32}
@@ -571,7 +574,10 @@ function M_vf:reconfig(opts)
          pf.r.PFVLVFB[2*vlan_index + math.floor(poolnum/32)]:clr(msk)
       end
    end
-   -- TODO: unset mirror
+   -- unset any mirror rule
+   self
+      :unset_mirror()
+      :unset_VLAN()
    -- unset MAC
    do
       local msk = bits{Ena=self.poolnum%32}
@@ -767,6 +773,23 @@ function M_vf:set_mirror (want_mirror)
    return self
 end
 
+function M_vf:unset_mirror()
+   for rule_i = 0, 3 do
+      -- check if any mirror rule points here
+      local rule_dest = band(bit.rshift(self.pf.r.PFMRCTL[rule_i](), 8), 63)
+      local bits = band(self.pf.r.PFMRCTL[rule_i](), 0x07)
+      if bits ~= 0 and rule_dest == self.poolnum then
+         self.pf.r.PFMRCTL[rule_i](0x0)     -- clear rule
+         self.pf.r.PFMRVLAN[rule_i](0x0)    -- clear VLANs mirrored
+         self.pf.r.PFMRVLAN[rule_i+4](0x0)
+         self.pf.r.PFMRVM[rule_i](0x0)      -- clear pools mirrored
+         self.pf.r.PFMRVM[rule_i+4](0x0)
+      end
+   end
+   self.pf.mirror_set:pop(self.poolnum)
+   return self
+end
+
 function M_vf:set_VLAN (vlan)
    if not vlan then return self end
    assert(vlan>=0 and vlan<4096, "bad VLAN number")
@@ -787,11 +810,37 @@ function M_vf:add_receive_VLAN (vlan)
       :set(bits{PoolEna=self.poolnum%32})
    return self
 end
-
 function M_vf:set_tag_VLAN(vlan)
    local poolnum = self.poolnum or 0
    self.pf.r.PFVFSPOOF[math.floor(poolnum/8)]:set(bits{VLANAS=poolnum%8+8})
    self.pf.r.PFVMVIR[poolnum](bits({VLANA=30}, vlan))  -- always add VLAN tag
+   return self
+end
+
+
+function M_vf:unset_VLAN()
+   local r = self.pf.r
+   local offs, mask = math.floor(self.poolnum/32), bits{PoolEna=self.poolnum%32}
+   print ('unset vlan')
+   print ('poolnum', self.poolnum, 'offs',offs, 'mask',mask)
+
+   for vln_ndx = 0, 63 do
+      print ('vln_ndx', vln_ndx, 'reg bits', r.PFVLVFB[2*vln_ndx+offs]())
+      if band(r.PFVLVFB[2*vln_ndx+offs](), mask) ~= 0 then
+         print ('vln_ndx', vln_ndx)
+         -- found a vlan this pool belongs to
+         print ('PFVLVFB prev', r.PFVLVFB())
+         r.PFVLVFB:clr(mask)
+         print ('PFVLVFB post', r.PFVLVFB())
+         if r.PFVLVFB() == 0 then
+            -- it was the last pool of the vlan
+            local vlan = tonumber(band(r.PFVLFV[vln_ndx](), 0xFFF))
+            r.PFVLFV[vln_ndx](0x0)
+            r.VFTA[math.floor(vlan/32)]:clr(bits{Ena=vlan%32})
+            self.pf.vlan_set:pop(vlan)
+         end
+      end
+   end
    return self
 end
 

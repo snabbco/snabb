@@ -160,6 +160,8 @@ function selftest ()
 
    zone('buffer') buffer.preallocate(100000) zone()
 
+   manyreconf(pcideva)
+
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
    do
@@ -325,4 +327,24 @@ function mq_sw(pcidevA)
    engine.configure(c)
    link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
    link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+end
+
+function manyreconf(pcidevA)
+   engine.configure(config.new())
+   for i = 0, 100 do
+      print (('config #%d'):format(i))
+      local c = config.new()
+      config.app(c, 'source', basic_apps.Source)
+      config.app(c, 'nic', Intel82599, {
+         vmdq = true,
+         pciaddr=pcidevA,
+         macaddr = ('52:54:00:02:02:%02X'):format(i),
+         vlan = 2048+i,
+      })
+      config.app(c, 'sink', basic_apps.Sink)
+      config.link(c, 'source.out -> nic.rx')
+      config.link(c, 'nic.tx -> sink.in')
+      engine.configure(c)
+      engine.main({duration = 0.25})
+   end
 end
