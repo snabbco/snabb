@@ -109,6 +109,38 @@ function clone (p)
    return new_p
 end
 
+-- Clone a packet by sharing all buffers with the original packet with
+-- copy-on-write semantics.  Individual buffers are copied only when
+-- they need to be modified by a call to cow_iovec()
+function cow_clone (p)
+   local new_p = allocate()
+   for i = 0, p.niovecs -1 do
+      local iovec = p.iovecs[i]
+      local new_iovec = new_p.iovecs[i]
+      new_iovec.buffer = iovec.buffer
+      new_iovec.offset = iovec.offset
+      new_iovec.length = iovec.length
+      iovec.buffer.refcount = iovec.buffer.refcount + 1
+   end
+   new_p.niovecs = p.niovecs
+   new_p.length  = p.length
+   ffi.copy(new_p.info, p.info, ffi.sizeof(p.info))
+   return new_p
+end
+
+-- Create a copy of the buffer associated with the given iovec index
+-- if the buffer is shared with another packet.
+function cow_iovec (p, i)
+   local iovec = p.iovecs[i]
+   if iovec.buffer.refcount > 1 then
+      local b = buffer.allocate()
+      ffi.copy(b.pointer + iovec.offset, iovec.buffer.pointer + iovec.offset,
+	       iovec.length)
+      iovec.buffer.refcount = iovec.buffer.refcount - 1
+      iovec.buffer = b
+   end
+end
+
 -- The opposite of coalesce
 -- Scatters the data through chunks
 function scatter (p, sg_list)

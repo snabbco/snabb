@@ -3,6 +3,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
 local ipv6 = require("lib.protocol.ipv6")
+local band = require("bit").band
 
 local ether_header_t = ffi.typeof[[
 struct {
@@ -69,6 +70,11 @@ function ethernet:ipv6_mcast(ip)
    assert(n[0] == 0xff, "invalid multiast address: "..ipv6:ntop(ip))
    ffi.copy(ffi.cast("uint8_t *", result)+2, n+12, 4)
    return result
+end
+
+-- Check whether a MAC address has its group bit set
+function ethernet:is_mcast (addr)
+   return band(addr[0], 0x01) ~= 0
 end
 
 -- Instance methods

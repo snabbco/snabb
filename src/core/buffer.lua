@@ -33,6 +33,7 @@ function new_buffer ()
    local b = lib.malloc("struct buffer")
    b.pointer, b.physical, b.size = pointer, physical, buffersize
    b.origin.type = C.BUFFER_ORIGIN_UNKNOWN
+   b.refcount = 1;
    return b
 end
 
@@ -43,11 +44,15 @@ local return_virtio_buffer = net_device.VirtioNetDevice.return_virtio_buffer
 
 -- Free a buffer that is no longer in use.
 function free (b)
-   if b.origin.type == C.BUFFER_ORIGIN_VIRTIO then
-      local dev = virtio_devices[b.origin.info.virtio.device_id]
-      return_virtio_buffer(dev, b)
+   if b.refcount > 1 then
+      b.refcount = b.refcount - 1
    else
-      freelist.add(buffers, b)
+      if b.origin.type == C.BUFFER_ORIGIN_VIRTIO then
+	 local dev = virtio_devices[b.origin.info.virtio.device_id]
+	 return_virtio_buffer(dev, b)
+      else
+	 freelist.add(buffers, b)
+      end
    end
 end
 
