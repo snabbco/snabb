@@ -67,6 +67,10 @@ function M_sf:close()
    if self.free_receive_buffers then
       self:free_receive_buffers()
    end
+   if self.discard_unsent_packets then
+      self:discard_unsent_packets()
+      C.usleep(1000)
+   end
    if self.fd then 
       pci.close_pci_resource(self.fd) 
       self.fd = false
@@ -232,7 +236,19 @@ function M_sf:can_transmit ()
    return band(self.tdt + 1, num_descriptors - 1) ~= self.tdh
 end
 
---- ### Receive
+function M_sf:discard_unsent_packets()
+   local old_tdt = self.tdt
+   self.tdt = self.r.TDT()
+   self.tdh = self.r.TDH()
+   self.r.TDT(self.tdh)
+   while old_tdt ~= self.tdh do
+      old_tdt = band(old_tdt - 1, num_descriptors - 1)
+      packet.deref(self.txpackets[old_tdt])
+      self.txdesc[old_tdt].address = 0
+      self.txdesc[old_tdt].options = 0
+   end
+   self.tdt = self.tdh
+end
 
 --- See datasheet section 7.1 "Inline Functions -- Receive Functionality."
 
@@ -613,6 +629,7 @@ M_vf.set_transmit_descriptors = M_sf.set_transmit_descriptors
 M_vf.can_transmit = M_sf.can_transmit
 M_vf.transmit = M_sf.transmit
 M_vf.sync_transmit = M_sf.sync_transmit
+M_vf.discard_unsent_packets = M_sf.discard_unsent_packets
 M_vf.can_receive = M_sf.can_receive
 M_vf.receive = M_sf.receive
 M_vf.can_add_receive_buffer = M_sf.can_add_receive_buffer

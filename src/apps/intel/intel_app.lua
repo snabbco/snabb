@@ -330,9 +330,9 @@ function mq_sw(pcidevA)
 end
 
 function manyreconf(pcidevA)
+   engine.configure(config.new())
    for i = 0, 100 do
       print (('config #%d'):format(i))
-      engine.configure(config.new())
       local c = config.new()
       config.app(c, 'source', basic_apps.Source)
       config.app(c, 'nic', Intel82599, {
