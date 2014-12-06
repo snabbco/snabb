@@ -64,6 +64,9 @@ function M_sf:open ()
 end
 
 function M_sf:close()
+   if self.free_receive_buffers then
+      self:free_receive_buffers()
+   end
    if self.fd then 
       pci.close_pci_resource(self.fd) 
       self.fd = false
@@ -272,6 +275,16 @@ function M_sf:add_receive_buffer (b)
    desc.address, desc.dd = b.physical, 0
    self.rxbuffers[self.rdt] = b
    self.rdt = band(self.rdt + 1, num_descriptors - 1)
+end
+
+function M_sf:free_receive_buffers ()
+   while self.rdt ~= self.rdh do
+      self.rdt = band(self.rdt - 1, num_descriptors - 1)
+      local desc = self.rxdesc[self.rdt].data
+      desc.address, desc.dd = 0, 0
+      buffer.free(self.rxbuffers[self.rdt])
+      self.rxbuffers[self.rdt] = nil
+   end
 end
 
 function M_sf:sync_receive ()
@@ -605,6 +618,7 @@ M_vf.receive = M_sf.receive
 M_vf.can_add_receive_buffer = M_sf.can_add_receive_buffer
 M_vf.set_rx_buffersize = M_sf.set_rx_buffersize
 M_vf.add_receive_buffer = M_sf.add_receive_buffer
+M_vf.free_receive_buffers = M_sf.free_receive_buffers
 M_vf.sync_receive = M_sf.sync_receive
 
 function M_vf:init_receive ()
