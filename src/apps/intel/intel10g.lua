@@ -532,16 +532,6 @@ function M_vf:close()
    local pf = self.pf
    -- unset_tx_rate
    self:set_tx_rate(0, 0)
-   -- unset VLAN/MAC spoofing
-   do
-      pf.r.PFVFSPOOF[math.floor(poolnum/8)]:clr(bits{MACAS=poolnum%8, VLANAS=poolnum%8+8})
-      pf.r.PFVMVIR[poolnum](0x00)
-      local msk = bits{PoolEna=poolnum%32}
-      for vlan_index = 0, 63 do
-         pf.r.PFVLVFB[2*vlan_index + math.floor(poolnum/32)]:clr(msk)
-      end
-   end
-   -- unset any mirror rule
    self
       :unset_mirror()
       :unset_VLAN()
@@ -566,15 +556,6 @@ function M_vf:reconfig(opts)
    local poolnum = self.poolnum or 0
    local pf = self.pf
 
-   do
-      pf.r.PFVFSPOOF[math.floor(poolnum/8)]:clr(bits{MACAS=poolnum%8, VLANAS=poolnum%8+8})
-      pf.r.PFVMVIR[poolnum](0x00)
-      local msk = bits{PoolEna=poolnum%32}
-      for vlan_index = 0, 63 do
-         pf.r.PFVLVFB[2*vlan_index + math.floor(poolnum/32)]:clr(msk)
-      end
-   end
-   -- unset any mirror rule
    self
       :unset_mirror()
       :unset_VLAN()
@@ -821,21 +802,15 @@ end
 function M_vf:unset_VLAN()
    local r = self.pf.r
    local offs, mask = math.floor(self.poolnum/32), bits{PoolEna=self.poolnum%32}
-   print ('unset vlan')
-   print ('poolnum', self.poolnum, 'offs',offs, 'mask',mask)
 
    for vln_ndx = 0, 63 do
-      print ('vln_ndx', vln_ndx, 'reg bits', r.PFVLVFB[2*vln_ndx+offs]())
       if band(r.PFVLVFB[2*vln_ndx+offs](), mask) ~= 0 then
-         print ('vln_ndx', vln_ndx)
          -- found a vlan this pool belongs to
-         print ('PFVLVFB prev', r.PFVLVFB())
-         r.PFVLVFB:clr(mask)
-         print ('PFVLVFB post', r.PFVLVFB())
-         if r.PFVLVFB() == 0 then
+         r.PFVLVFB[2*vln_ndx+offs]:clr(mask)
+         if r.PFVLVFB[2*vln_ndx+offs]() == 0 then
             -- it was the last pool of the vlan
-            local vlan = tonumber(band(r.PFVLFV[vln_ndx](), 0xFFF))
-            r.PFVLFV[vln_ndx](0x0)
+            local vlan = tonumber(band(r.PFVLVF[vln_ndx](), 0xFFF))
+            r.PFVLVF[vln_ndx](0x0)
             r.VFTA[math.floor(vlan/32)]:clr(bits{Ena=vlan%32})
             self.pf.vlan_set:pop(vlan)
          end
