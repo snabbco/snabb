@@ -184,7 +184,18 @@ end
 
 -- Call this to "run snabb switch".
 function main (options)
-   options = options or {}
+   local default_options = {
+      dead_app_detection = true,
+   }
+   if options then
+      for k, v in pairs(default_options) do
+	 if options[k] == nil then
+	    options[k] = v
+	 end
+      end
+   else
+      options = default_options
+   end
    local done = options.done
    local no_timers = options.no_timers
    if options.duration then
@@ -193,7 +204,7 @@ function main (options)
    end
    monotonic_now = C.get_monotonic_time()
    repeat
-      breathe()
+      breathe(options)
       if not no_timers then timer.run() end
       pace_breathing()
    until done and done()
@@ -214,10 +225,12 @@ function pace_breathing ()
    end
 end
 
-function breathe ()
+function breathe (options)
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
-   restart_dead_apps()
+   if options.detectd_dead_apps then
+      restart_dead_apps()
+   end
    -- Inhale: pull work into the app network
    for i = 1, #app_array do
       local app = app_array[i]
@@ -225,7 +238,11 @@ function breathe ()
 --         zone(app.zone) app:pull() zone()
       if app.pull and not app.dead then
 	 zone(app.zone)
-	 with_restart(app, 'pull')
+	 if options.detectd_dead_apps then
+	    with_restart(app, 'pull')
+	 else
+	    app:pull()
+	 end
 	 zone()
       end
    end
@@ -241,7 +258,11 @@ function breathe ()
             local receiver = app_array[link.receiving_app]
             if receiver.push and not receiver.dead then
                zone(receiver.zone)
-               with_restart(receiver, 'push')
+	       if options.detectd_dead_apps then
+		  with_restart(receiver, 'push')
+	       else
+		  receiver:push()
+	       end
                zone()
                progress = true
             end
@@ -272,7 +293,11 @@ function report (options)
             print (name, ("[dead: %s]"):format(app.dead.error))
          elseif app.report then
             print (name)
-            with_restart(app, 'report')
+	    if options.detectd_dead_apps then
+	       with_restart(app, 'report')
+	    else
+	       app:report()
+	    end
          end
       end
    end
