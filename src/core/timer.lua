@@ -24,17 +24,17 @@ function run ()
 end
 
 -- Run all timers up to the given new time.
-function run_to_time (ns)
-   local function call_timers (l)
-      for i=1,#l do
-         local timer = l[i]
-         if debug then
-            print(string.format("running timer %s at tick %s", timer.name, ticks))
-         end
-         timer.fn(timer)
-         if timer.repeating then activate(timer) end
+local function call_timers (l)
+   for i=1,#l do
+      local timer = l[i]
+      if debug then
+	 print(string.format("running timer %s at tick %s", timer.name, ticks))
       end
+      timer.fn(timer)
+      if timer.repeating then activate(timer) end
    end
+end
+function run_to_time (ns)
    local new_ticks = math.floor(tonumber(ns) / ns_per_tick)
    for tick = ticks, new_ticks do
       ticks = tick
