@@ -15,7 +15,7 @@ run_qemu () {
     NETDEV=$6
     CPU=$7
 
-    MEM="-m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on"
+    MEM="-m ${GUEST_MEM?} -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM?}M,mem-path=${HUGETLBFS?},share=on"
     NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC,mq=$MQ,vectors=$VECTORS"
     if [ -n "$CPU" ]; then
         NUMA="--membind=$NUMANODE --physcpubind=$CPU"
@@ -25,8 +25,8 @@ run_qemu () {
 
     # Execute QEMU on the designated node
     numactl $NUMA \
-        $QEMU \
-            -kernel $KERNEL -append "$ARGS" \
+        ${QEMU?} \
+            -kernel ${KERNEL?} -append "$ARGS" \
             $MEM $NET \
             -M pc -smp $SMP -cpu host --enable-kvm \
             -serial telnet:localhost:$TELNETPORT,server,nowait \
@@ -74,7 +74,7 @@ run_loadgen () {
     LOG=$3
     CPU=$4
     numactl --cpunodebind=$NUMANODE --membind=$NUMANODE \
-        $SNABB $LOADGEN $PCAP $PCI > $LOG 2>&1 &
+        $SNABB ${LOADGEN?} ${PCAP?} $PCI > $LOG 2>&1 &
 
     LOADGENPIDS="$LOADGENPIDS $!"
 }
@@ -83,8 +83,9 @@ run_nfv () {
     NUMANODE=$1
     export NFV_PCI=$2
     export NFV_SOCKET=$3
-    LOG=$4
-    CPU=$5
+    CONFIG=$4
+    LOG=$5
+    CPU=$6
 
     if [ -n "$CPU" ]; then
         NUMA="--membind=$NUMANODE --physcpubind=$CPU"
@@ -93,7 +94,7 @@ run_nfv () {
     fi
 
     numactl $NUMA \
-        $SNABB $NFV $NFV_PCI $NFV_CONFIG $NFV_SOCKET $NFV_PACKETS \
+        $SNABB ${NFV?} $NFV_PCI ${CONFIG?} $NFV_SOCKET ${NFV_PACKETS?} \
         > $LOG 2>&1 &
 
     SNABBPIDS="$SNABBPIDS $!"
