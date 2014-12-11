@@ -173,11 +173,11 @@ function datagram:parse_match (class, check)
    local class = class or parse.ulp
    local iovec = self._packet[0].iovecs[parse.iovec]
 
-   if not parse.ulp or (class and class ~= parse.ulp) then
+   if not class then
       return nil
    end
-   local proto = parse.ulp:new_from_mem(iovec.buffer.pointer + iovec.offset
-					+ parse.offset, iovec.length - parse.offset)
+   local proto = class:new_from_mem(iovec.buffer.pointer + iovec.offset
+                                    + parse.offset, iovec.length - parse.offset)
    if proto == nil or (check and not check(proto)) then
       if proto then proto:free() end
       return nil
