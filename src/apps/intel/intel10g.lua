@@ -568,7 +568,7 @@ function M_vf:close()
    do
       local msk = bits{Ena=self.poolnum%32}
       for mac_index = 0, 127 do
-         pf.r.MPSAR[2*mac_index + math.floor(poolnum/32)]:set(msk)
+         pf.r.MPSAR[2*mac_index + math.floor(poolnum/32)]:clr(msk)
       end
    end
 
@@ -588,11 +588,11 @@ function M_vf:reconfig(opts)
    self
       :unset_mirror()
       :unset_VLAN()
-   -- unset MAC
+      :unset_MAC()
    do
       local msk = bits{Ena=self.poolnum%32}
       for mac_index = 0, 127 do
-         pf.r.MPSAR[2*mac_index + math.floor(poolnum/32)]:set(msk)
+         pf.r.MPSAR[2*mac_index + math.floor(poolnum/32)]:clr(msk)
       end
    end
 
@@ -709,6 +709,9 @@ function M_vf:set_MAC (mac)
    return self
       :add_receive_MAC(mac)
       :set_transmit_MAC(mac)
+end
+
+function M_vf:unset_MAC()
 end
 
 function M_vf:add_receive_MAC (mac)
