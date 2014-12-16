@@ -22,6 +22,13 @@ cat <<EOF
              END { print("") }')
 % Version $(git log -n1 --format="format:%h, %ad%n")
 
+***Note:** This reference manual is a draft. The API defined in this
+document is not guaranteed to be stable or complete and future versions
+of Snabb Switch will introduce backwards incompatible changes. With that
+being said, discrepancies between this document and the actual Snabb
+Switch implementation are considered to be bugs. Please report them in
+order to help improve this document.*
+
 $(cat ../README.md)
 
 $(cat ../apps/README.md)
@@ -32,19 +39,27 @@ $(cat ../apps/rate_limiter/README.md)
 
 $(cat ../apps/packet_filter/README.md)
 
-# Operating System and Hardware Integration
+$(cat ../apps/ipv6/README.md)
 
-## Memory Management
+$(cat ../apps/vhost/README.md)
 
-$(cat memory.md)
+$(cat ../apps/pcap/README.md)
 
-## Virtio (Bridge to Virtualized Guests)
+$(cat ../apps/vpn/README.md)
 
-$(cat virtio.md)
+$(cat ../apps/socket/README.md)
 
-# Extra Modules, Designs and Scripts
+# Libraries
 
-## \`lib.watchdog\`: Process Watchdog
+## Protocols
+
+$(cat ../lib/protocol/README.md)
+
+## NFV Config (lib.nfv.config)
+
+$(cat ../lib/nfv/README.md)
+
+## Watchdog (lib.watchdog.watchdog)
 
 $(cat ../lib/watchdog/README.md)
 
