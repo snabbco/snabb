@@ -7,6 +7,13 @@ local header = require("lib.protocol.header")
 local AF_INET6 = 10
 local INET6_ADDRSTRLEN = 48
 
+local defaults = {
+   traffic_class = 0,
+   flow_label = 0,
+   next_header = 59, -- no next header
+   hop_limit = 64,
+}
+
 local ipv6hdr_t = ffi.typeof[[
       struct {
 	 uint32_t v_tc_fl; // version, tc, flow_label
@@ -53,10 +60,10 @@ function ipv6:new (config)
       o._ph = ipv6hdr_pseudo_t()
    end
    o:version(6)
-   o:traffic_class(config.traffic_class)
-   o:flow_label(config.flow_label)
-   o:next_header(config.next_header)
-   o:hop_limit(config.hop_limit)
+   o:traffic_class(config.traffic_class or defaults.traffic_class)
+   o:flow_label(config.flow_label or defaults.flow_label)
+   o:next_header(config.next_header or defaults.next_header)
+   o:hop_limit(config.hop_limit or defaults.hop_limit)
    o:src(config.src)
    o:dst(config.dst)
    return o
