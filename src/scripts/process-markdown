@@ -24,7 +24,7 @@ awk '/^    DIAGRAM:/ { diagram = $2;
                        printf("![%s](.images/%s.png)\n", diagram, diagram);
                        next }
      diagram == 0    { print; next }
-     /^    /         { print $0 >> diagram; next }
+     /^    /         { print $0 "    " >> diagram; next }
      # end of diagram
                      { print;
                        system("mkdir .images 2>/dev/null || true")

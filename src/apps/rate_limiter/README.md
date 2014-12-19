@@ -1,40 +1,43 @@
-# Rate Limiter App
+# RateLimiter App (apps.rate_limiter.rate_limiter)
 
-## `RateLimiter` app: enforce a bytes per second limit
+The `RateLimiter` app implements a
+[Token bucket](http://en.wikipedia.org/wiki/Token_bucket) algorithm with a
+single bucket dropping non-conforming packets.  It receives packets on
+the `input` port and transmits conforming packets to the `output` port.
 
 ![RateLimiter](.images/RateLimiter.png)
 
-The `RateLimiter` implements [Token bucket](http://en.wikipedia.org/wiki/Token_bucket "Token bucket")
-algorithm with single bucket, dropping non-conformant packetes.
-It recieves packets on the `input` port and transmit conformant packets
-to the `output` port.
+— Method **RateLimiter:snapshot**
 
-Bucket size should be big enough to process packets received
-during 100 ms (the `RateLimiter` uses 100 ms timer internally).
-Otherwise it may limit effective rate.
+Returns throughput statistics in form of a table with the following
+fields:
 
-### Usage
+* `rx` - Number of packets received
+* `tx` - Number of packets transmitted
+* `time` - Current time in nanoseconds
 
-Use following pattern to create and init Rate Limiter instance:
 
-    app.apps.rate_limiter = app.new(RateLimiter.new(rate, bucket_size))
-    app.apps.rate_limiter:init_timer()
+## Configuration
 
-The `rate_limiter:snapshot()` method returns statistics snapshot,
-a table with next fields:
-- `rx` - number of packets received
-- `tx` - number of packets transmitted
-- `time` - current time, ns
+The `RateLimiter` app accepts a table as its configuration argument. The
+following keys are defined:
 
-Having two snapshots it is easy to calculate app statistics.
+— Key **rate**
 
-See selftest for complete example.
+*Required*. Rate in bytes per second to which throughput should be
+limited.
 
-### Performance
+— Key **bucket_capacity**
 
-The `Rate limiter` is able to process more then 20 Mpps / core
-using simple Source -> RateLimiter -> Sink pipeline.
+*Required*. Bucket capacity in bytes. Should be equal or greater than
+*rate*. Otherwise the effective rate may be limted.
 
-Run selftest to see the numbers:
+— Key **initial_capacity**
 
-    sudo src/snabbswitch -t apps.rate_limiter.rate_limiter
+*Optional*. Initial bucket capacity in bytes. Defaults to
+*bucket_capacity*.
+
+## Performance
+
+The `RateLimiter` app is able to process more than 20 Mpps per CPU
+core. Refer to its selftest for details.

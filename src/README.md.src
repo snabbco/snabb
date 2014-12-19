@@ -7,7 +7,18 @@ quickly realize your network designs and its really fast too!
 Furthermore, Snabb Switch is extensible and encourages you to grow the
 ecosystem to match your requirements.
 
-![Architecture](.images/Architecture.png)
+    DIAGRAM: Architecture
+            +---------------------+
+            | Your Network Design |
+            +----*-----*-----*----+
+                 |     |     |
+    
+    (Built in and custom Apps and Libraries)
+    
+                 |     |     |
+           +-----*-----*-----*-----+
+           |   Snabb Switch Core   |
+           +-----------------------+
 
 The Snabb Switch Core forms a runtime environment (*engine*) which
 executes your *design*. A design is simply a Lua script used to drive the
@@ -22,7 +33,12 @@ you might expect. Apps, on the other hand, are code objects that
 implement a specific interface, which is used by the Snabb Switch engine
 to organize an *App Network*.
 
-![Network](.images/Network.png)
+    DIAGRAM: Network
+    +-------+            +-------+
+    |       |            |       |
+    | App 1 *------------* App 2 |
+    |       |   (Link)   |       |
+    +-------+            +-------+
 
 Usually, a Snabb Switch design will create a series of apps, interconnect
 these in a desired way using *links* and finally pass the resulting app
