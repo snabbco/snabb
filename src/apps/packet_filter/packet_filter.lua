@@ -262,7 +262,8 @@ local function generateRule(
       protocol_offset,
       icmp_type,
       source_port_offset,
-      dest_port_offset
+      dest_port_offset,
+      conntrack
    )
    T"repeat"
    T:indent()
@@ -327,17 +328,34 @@ local function generateRule(
          end
       end
    end
+   if conntrack then
+      T'track(buffer)'
+   end
    T"return true"
    T:unindent()
    T"until false"
 end
 
-local function generateConformFunctionString(rules)
+
+local function generateConformFunctionString(conf)
+   local rules = conf.rules or {}
    local T = make_code_concatter()
    T"local ffi = require(\"ffi\")"
    T"local bit = require(\"bit\")"
+
+   if conf.track_connections then
+      T(([[local track = require('apps.packet_filter.conntrack')(%q).track]]):format(conf.track_connections))
+   end
+   if conf.pass_connections then
+      T(([[local pass = require('apps.packet_filter.conntrack')(%q).check]]):format(conf.pass_connections))
+   end
+
    T"return function(buffer, size)"
    T:indent()
+
+   if conf.pass_connections then
+      T'if pass(buffer) then return true end'
+   end
 
    for i = 1, #rules do
       if rules[i].ethertype == "ipv4" then
@@ -350,7 +368,8 @@ local function generateConformFunctionString(rules)
                IPV4_PROTOCOL_OFFSET,
                IP_ICMP,
                IPV4_SOURCE_PORT_OFFSET,
-               IPV4_DEST_PORT_OFFSET
+               IPV4_DEST_PORT_OFFSET,
+               conf.track_connections
             )
 
       elseif rules[i].ethertype == "ipv6" then
@@ -363,7 +382,8 @@ local function generateConformFunctionString(rules)
                IPV6_NEXT_HEADER_OFFSET,
                IPV6_ICMP,
                IPV6_SOURCE_PORT_OFFSET,
-               IPV6_DEST_PORT_OFFSET
+               IPV6_DEST_PORT_OFFSET,
+               conf.track_connections
             )
       else
          error("unknown ethertype")
@@ -378,16 +398,17 @@ local function generateConformFunctionString(rules)
 end
 
 PacketFilter = {}
+local conntrack = require('apps.packet_filter.conntrack')('*')
 
 function PacketFilter:new (arg)
-   local rules = arg and config.parse_app_arg(arg) or {}
-   assert(rules)
-   assert(#rules > 0)
+   local conf = arg and config.parse_app_arg(arg) or {}
+   assert(conf.rules)
+   assert(#conf.rules > 0)
 
    local o =
    {
       conform = assert(loadstring(
-            generateConformFunctionString(rules)
+            generateConformFunctionString(conf)
          ))()
    }
    return setmetatable(o, {__index = PacketFilter})
@@ -432,23 +453,25 @@ function selftest ()
    local V6_RULE_DNS_PACKETS =  3 -- packets within v6.pcap
       
    local v6_rules = {
-   {
-      ethertype = "ipv6",
-      protocol = "icmp",
-      source_cidr = "3ffe:501:0:1001::2/128", -- single IP, match 128bit
-      dest_cidr =
-         "3ffe:507:0:1:200:86ff:fe05:8000/116", -- match first 64bit and mask next 52 bit
-   },
-   {
-      ethertype = "ipv6",
-      protocol = "udp",
-      source_cidr = "3ffe:507:0:1:200:86ff::/28", -- mask first 28 bit
-      dest_cidr = "3ffe:501:4819::/64",           -- match first 64bit
-      source_port_min = 2397, -- port range, in v6.pcap there are values on
-      source_port_max = 2399, -- both borders and in the middle
-      dest_port_min = 53,     -- single port match
-      dest_port_max = 53,
-   }}
+      {
+         ethertype = "ipv6",
+         protocol = "icmp",
+         source_cidr = "3ffe:501:0:1001::2/128", -- single IP, match 128bit
+         dest_cidr =
+            "3ffe:507:0:1:200:86ff:fe05:8000/116", -- match first 64bit and mask next 52 bit
+      },
+      {
+         ethertype = "ipv6",
+         protocol = "udp",
+         source_cidr = "3ffe:507:0:1:200:86ff::/28", -- mask first 28 bit
+         dest_cidr = "3ffe:501:4819::/64",           -- match first 64bit
+         source_port_min = 2397, -- port range, in v6.pcap there are values on
+         source_port_max = 2399, -- both borders and in the middle
+         dest_port_min = 53,     -- single port match
+         dest_port_max = 53,
+         stateful = true,
+      }
+   }
 
    local c = config.new()
    config.app(
@@ -462,6 +485,7 @@ function selftest ()
          PacketFilter,
          v6_rules
       )
+   config.app(c, "statefull_pass1", PacketFilter, [[ { pass_connections = 'app_v6' } ]])
    config.app(c, "sink1", basic_apps.Sink )
    config.link(c, "source1.output -> packet_filter1.input")
    config.link(c, "packet_filter1.output -> sink1.input")
@@ -470,22 +494,24 @@ function selftest ()
    local V4_RULE_TCP_PACKETS = 18 -- packets within v4.pcap
 
    local v4_rules = {
-   {
-      ethertype = "ipv4",
-      protocol = "udp",
-      dest_port_min = 53,     -- single port match, DNS
-      dest_port_max = 53,
-   },
-   {
-      ethertype = "ipv4",
-      protocol = "tcp",
-      source_cidr = "65.208.228.223/32", -- match 32bit
-      dest_cidr = "145.240.0.0/12",      -- mask 12bit
-      source_port_min = 80, -- our port (80) is on the border of range
-      source_port_max = 81,
-      dest_port_min = 3371, -- our port (3372) is in the middle of range
-      dest_port_max = 3373,
-   }}
+      {
+         ethertype = "ipv4",
+         protocol = "udp",
+         dest_port_min = 53,     -- single port match, DNS
+         dest_port_max = 53,
+      },
+      {
+         ethertype = "ipv4",
+         protocol = "tcp",
+         source_cidr = "65.208.228.223/32", -- match 32bit
+         dest_cidr = "145.240.0.0/12",      -- mask 12bit
+         source_port_min = 80, -- our port (80) is on the border of range
+         source_port_max = 81,
+         dest_port_min = 3371, -- our port (3372) is in the middle of range
+         dest_port_max = 3373,
+         stateful = true,
+      }
+   }
 
    config.app(
          c,
@@ -510,6 +536,7 @@ function selftest ()
    app.breathe()
 
    app.report()
+   print (conntrack.dump())
 
    local packet_filter1_passed =
       app.app_table.packet_filter1.output.output.stats.txpackets

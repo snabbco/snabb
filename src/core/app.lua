@@ -39,7 +39,7 @@ end
 -- error app will be marked as dead and restarted eventually.
 local function with_restart (app, methodname)
    -- Run fn in protected mode using pcall.
-   local status, err = pcall(app[methodname], app)
+   local status, err = xpcall(app[methodname], function(...) print(debug.traceback(...)) end, app)
 
    -- If pcall caught an error mark app as "dead" (record time and cause
    -- of death).
