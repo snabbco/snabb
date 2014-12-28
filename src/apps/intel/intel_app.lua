@@ -1,5 +1,7 @@
 module(...,package.seeall)
 
+local ffi      = require "ffi"
+local C        = ffi.C
 local zone = require("jit.zone")
 local basic_apps = require("apps.basic.basic_apps")
 local lib      = require("core.lib")
@@ -148,6 +150,8 @@ function selftest ()
    manyreconf(pcideva, pcidevb, 100, false)
    print ("100 PF full cycles")
    manyreconf(pcideva, pcidevb, 100, true)
+
+   ck(pcideva, pcidevb)
 
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
@@ -380,4 +384,101 @@ function manyreconf(pcidevA, pcidevB, n, do_pf)
       end
    end
    io.write (pcidevA, ": avg wait_lu: ", waits/cycles, ", max redos: ", maxredos, ", avg: ", redos/cycles, '\n')
+end
+
+
+function ck(pcidevA, pcidevB)
+   local _num_pkts = 0
+   local _num_need_cksum, _num_valid_cksum = '', ''
+   local _good_ip_csum, _good_udp_csum = '', ''
+   local function get_csum(p, offset)
+      local b = p.data
+      return b[offset] * 256 + b[offset+1]
+   end
+   local function clear_csum(p, offset)
+      local b = p.data
+      b[offset] = 0
+      b[offset+1] = 0
+   end
+   local function verify_pkt(p)
+      _num_pkts = _num_pkts + 1
+      io.write(string.format('# %d: flags: %02X, ip_chk: %04X, udp_chk: %04X\n',
+         _num_pkts, tonumber(p.flags), get_csum(p, 24), get_csum(p, 40)))
+      if bit.band(p.flags, C.PACKET_NEEDS_CSUM) ~= 0 then
+         _num_need_cksum = _num_need_cksum .. ',' .. _num_pkts
+      end
+      if bit.band(p.flags, C.PACKET_CSUM_VALID) ~= 0 then
+         _num_valid_cksum = _num_valid_cksum .. ',' .. _num_pkts
+      end
+      if get_csum(p, 24) == 0x7375 then
+         _good_ip_csum = _good_ip_csum .. ',' .. _num_pkts
+      end
+      if get_csum(p, 40) == 0xA590 then
+         _good_udp_csum = _good_udp_csum .. ',' .. _num_pkts
+      end
+   end
+
+   -- IPv4, UDP, all checksums
+   local d = lib.hexundump([[
+      5254 0002 0202 5254 0001 0101 0800 4500
+      0046 f917 4000 4011 7375 c0a8 0166 0808
+      0404 9503 0035 0032 A590 a910 0100 0001
+      0000 0000 0000 0237 3601 3603 3137 3001
+      3833 0769 6e2d 6164 6472 0461 7270 6100
+      000c 0001
+   ]], 84)
+   local p1 = packet.from_string (d)
+   local p2 = packet.clone (p1)
+   p2.flags = bit.bor(p2.flags, C.PACKET_NEEDS_CSUM)
+
+   -- remove L4 checksum
+   local p3 = packet.clone (p1)
+   clear_csum(p3, 40)
+   local p4 = packet.clone (p3)
+   p4.flags = bit.bor(p4.flags, C.PACKET_NEEDS_CSUM)
+
+   -- remove IP checksum
+   local p5 = packet.clone (p3)
+   clear_csum(p5, 24)
+   local p6 = packet.clone (p5)
+   p6.flags = bit.bor(p6.flags, C.PACKET_NEEDS_CSUM)
+
+   engine.configure(config.new())
+   local c = config.new()
+   config.app(c, 'source_ms', basic_apps.Join)
+   config.app(c, 'nicAm0', Intel82599, {
+   -- first VF on NIC A
+      pciaddr = pcidevA,
+      vmdq = true,
+      macaddr = '52:54:00:01:01:01',
+   })
+   config.app(c, 'nicAm1', Intel82599, {
+   -- second VF on NIC A
+      pciaddr = pcidevB,
+      vmdq = true,
+      macaddr = '52:54:00:02:02:02',
+   })
+   config.app(c, 'sink_ms', basic_apps.Sink, {callback = verify_pkt})
+   config.link(c, 'source_ms.out -> nicAm0.rx')
+   config.link(c, 'nicAm0.tx -> sink_ms.in1')
+   config.link(c, 'nicAm1.tx -> sink_ms.in2')
+   engine.configure(c)
+   print ('------')
+   print ('send packets with and without asking for checksum, see what happens')
+   local src_out = engine.app_table.source_ms.output.out
+   link.transmit(src_out, p1)
+   link.transmit(src_out, p2)
+   link.transmit(src_out, p3)
+   link.transmit(src_out, p4)
+   link.transmit(src_out, p5)
+   link.transmit(src_out, p6)
+
+   engine.main({duration = 1, report={showlinks=true, showapps=false}})
+   print (string.format('_num_pkts %s, _num_need_cksum %s, _num_valid_cksum %s',
+      _num_pkts, _num_need_cksum, _num_valid_cksum))
+   print (string.format('_good_ip_csum %s, _good_udp_csum %s',
+      _good_ip_csum, _good_udp_csum))
+   if engine.app_table.source_ms.missing then
+      os.exit(1)
+   end
 end
