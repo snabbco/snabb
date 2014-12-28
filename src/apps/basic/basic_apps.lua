@@ -53,7 +53,7 @@ function Join:new()
    return setmetatable({}, {__index=Join})
 end
 
-function Join:push () 
+function Join:push ()
    for _, inport in ipairs(self.inputi) do
       for n = 1,math.min(link.nreadable(inport), link.nwritable(self.output.out)) do
          transmit(self.output.out, receive(inport))
@@ -85,14 +85,15 @@ end
 
 Sink = setmetatable({zone = "Sink"}, {__index = Basic})
 
-function Sink:new ()
-   return setmetatable({}, {__index=Sink})
+function Sink:new (conf)
+   return setmetatable(conf or {}, {__index=Sink})
 end
 
 function Sink:push ()
    for _, i in ipairs(self.inputi) do
       for _ = 1, link.nreadable(i) do
         local p = receive(i)
+        if self.callback then self.callback(p) end
         packet.free(p)
       end
    end

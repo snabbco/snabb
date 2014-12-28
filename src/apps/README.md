@@ -32,6 +32,8 @@ the input links to the output links.
 The `Sink` app receives all packets from any number of input links and
 discards them. This can be handy in combination with a `Source`.
 
+It accepts an optional `callback` parameter: a function that will be called for each packet received.
+
 ![Sink](.images/Sink.png)
 
 ## Buzz
