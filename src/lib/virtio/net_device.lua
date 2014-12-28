@@ -54,7 +54,8 @@ local supported_features = C.VIRTIO_F_ANY_LAYOUT +
                            C.VIRTIO_RING_F_INDIRECT_DESC +
                            C.VIRTIO_NET_F_CTRL_VQ +
                            C.VIRTIO_NET_F_MQ +
-                           C.VIRTIO_NET_F_MRG_RXBUF
+                           C.VIRTIO_NET_F_MRG_RXBUF +
+                           C.VIRTIO_NET_F_CSUM
 --[[
    The following offloading flags are also available:
    VIRTIO_NET_F_CSUM
