@@ -28,6 +28,7 @@ struct buffer {
   uint64_t physical; // stable physical address
   uint32_t size;     // how many bytes in the buffer?
   struct buffer_origin origin;
+  uint16_t refcount;  // Counter for references from packets
 };
 
 // A packet_iovec describes a portion of a buffer.

@@ -17,14 +17,14 @@ GUESTS="2"
 . $(dirname $0)/common.sh
 
 # Execute snabbswitch and pin it to the proper node (CPU and memory)
-export NFV_PCI=$NFV_PCI0
-numactl --cpunodebind=$NODE_BIND0 --membind=$NODE_BIND0 \
-    $SNABB designs/neutron/snabbnfv-traffic $NFV_PCI0 $1 vhost_%s.sock \
-    > $SNABB_LOG0 2>&1 &
+export NFV_PCI=${NFV_PCI0?}
+numactl --cpunodebind=${NODE_BIND0?} --membind=${NODE_BIND0?} \
+    $SNABB designs/neutron/snabbnfv-traffic ${NFV_PCI0?} ${1?} vhost_%s.sock \
+    > ${SNABB_LOG0?} 2>&1 &
 SNABB_PID0=$!
 
 # Execute QEMU on the same node
-run_qemu_vhost_user "$NODE_BIND0" "$BOOTARGS0" "$IMAGE0" "$GUEST_MAC0" "$TELNET_PORT0" "$NFV_SOCKET0"
-run_qemu_vhost_user "$NODE_BIND0" "$BOOTARGS1" "$IMAGE1" "$GUEST_MAC1" "$TELNET_PORT1" "$NFV_SOCKET1"
+run_qemu_vhost_user "${NODE_BIND0?}" "${BOOTARGS0?}" "${IMAGE0?}" "${GUEST_MAC0?}" "${TELNET_PORT0?}" "${NFV_SOCKET0?}"
+run_qemu_vhost_user "${NODE_BIND0?}" "${BOOTARGS1?}" "${IMAGE1?}" "${GUEST_MAC1?}" "${TELNET_PORT1?}" "${NFV_SOCKET1?}"
 
 wait_qemus

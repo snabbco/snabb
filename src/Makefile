@@ -22,7 +22,6 @@ ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
-MDOBJS := $(patsubst %, doc/obj/%.md, $(LUASRC) $(CSRC) $(CHDR)) $(wildcard *.md)
 
 # TESTMODS expands to:
 #   core.memory core.lib ...
@@ -136,30 +135,24 @@ obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
 	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
-
-doc/obj/%.lua.md : %.lua Makefile
-	awk '/^ *[^-]{3}/ {if (last~/^ *---/) printf("\n")} {print} {last=$$0}' < $< | sed -E -e 's/^/    /g' -e 's/^    --- ?//g' > $@
-
-doc/obj/%.c.md : %.c Makefile
-	awk '/^ *[^\/]{3}/ {if (last~/^ *\/\/\//) printf("\n")} {print} {last=$$0}' < $< | sed -E -e 's/^/    /g' -e 's|^    /// ?||g' > $@
-
-doc/obj/%.h.md : %.h Makefile
-	awk '/^ *[^\/]{3}/ {if (last~/^ *\/\/\//) printf("\n")} {print} {last=$$0}' < $< | sed -E -e 's/^/    /g' -e 's|^    /// ?||g' > $@
-
 book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
 
-doc/snabbswitch.md: $(MDOBJS) Makefile doc/genbook.sh
+doc/snabbswitch.md: markdown Makefile doc/genbook.sh
 	(cd doc; ./genbook.sh) > $@
 
 doc/snabbswitch.pdf: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
-	$(Q) pandoc --template=doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o $@ $<
+	$(Q) (cd doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o snabbswitch.pdf snabbswitch.md)
 
-doc/snabbswitch.html doc/snabbswitch.epub: doc/snabbswitch.md
+doc/snabbswitch.html: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
-	$(Q) pandoc -S --toc --chapters -o $@ $<
+	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.html snabbswitch.md)
 
-CLEAN = snabb snabbswitch obj doc/snabbswitch.* doc/obj/*.md testlog
+doc/snabbswitch.epub: doc/snabbswitch.md
+	$(E) "PANDOC    $@"
+	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
+
+CLEAN = snabb snabbswitch obj doc/snabbswitch.* doc/.images/* testlog
 
 clean:
 	$(E) "RM        $(CLEAN)"

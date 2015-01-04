@@ -5,7 +5,7 @@ local C = ffi.C
 
 local lib = require("core.lib")
 
-debug = false     -- verbose printouts?
+debug = _G.developer_debug
 
 ticks = false     -- current time, in ticks
 ns_per_tick = 1e6 -- tick resolution (millisecond)
@@ -20,21 +20,21 @@ end
 
 -- Run all timers that have expired.
 function run ()
-   if ticks then run_to_time(C.get_time_ns()) end
+   if ticks then run_to_time(tonumber(C.get_time_ns())) end
 end
 
 -- Run all timers up to the given new time.
-function run_to_time (ns)
-   local function call_timers (l)
-      for i=1,#l do
-         local timer = l[i]
-         if debug then
-            print(string.format("running timer %s at tick %s", timer.name, ticks))
-         end
-         timer.fn(timer)
-         if timer.repeating then activate(timer) end
+local function call_timers (l)
+   for i=1,#l do
+      local timer = l[i]
+      if debug then
+	 print(string.format("running timer %s at tick %s", timer.name, ticks))
       end
+      timer.fn(timer)
+      if timer.repeating then activate(timer) end
    end
+end
+function run_to_time (ns)
    local new_ticks = math.floor(tonumber(ns) / ns_per_tick)
    for tick = ticks, new_ticks do
       ticks = tick

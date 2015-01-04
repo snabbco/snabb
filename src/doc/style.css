@@ -1,0 +1,107 @@
+/* Rudimentary CSS for SnabbSwitch HTML documentation. */
+
+body {
+    max-width: 40em;
+    margin:auto;
+    font-family: sans-serif;
+}
+
+code, pre {
+    color: #333;
+    background: #f7f7f7;
+}
+
+pre {
+    padding: 0.6em;
+}
+
+pre > code {
+    padding: 0;
+    background: none;
+}
+
+code {
+    padding: 0 0.2em 0.1em 0.2em;
+    
+}
+
+p, li {
+    line-height: 1.5;
+}
+
+p.caption {
+    display: none;
+}
+
+h1.title {
+    font-size: 2em;
+}
+
+h2.author {
+    display: inline;
+    font-size: small;
+    font-weight: normal;
+    white-space: nowrap;
+}
+
+h2.author:after {
+  content: ', ';
+  white-space: normal;
+}
+
+h2.author:nth-last-child(-n+2):after {
+  content: '';
+}
+
+h3.date {
+    font-family: monospace;
+    font-size: medium;
+    font-weight: normal;
+}
+
+div#TOC a {
+    text-decoration: none;
+}
+
+div#TOC ul {
+    padding-left: 2em;
+}
+
+div#TOC li {
+    list-style-type: none;
+}
+
+div#TOC {
+    margin-bottom: 3em;
+}
+
+h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
+    text-decoration: none;
+    color: black;
+}
+
+h1 {
+    font-size: 1.8em;
+}
+h2 {
+    font-size: 1.6em;
+}
+h3 {
+    font-size: 1.4em;
+}
+h4 {
+    font-size: 1.2em;
+}
+h5 {
+    font-size: 1.0em;
+}
+h6 {
+    font-weight: normal;
+    font-size: 1.0em;
+    text-decoration: underline;
+}
+
+div.figure > img {
+    display: block;
+    margin: auto;
+}

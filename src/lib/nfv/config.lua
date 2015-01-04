@@ -33,19 +33,19 @@ function load (file, pciaddr, sockpath)
       local NIC = "NIC_"..name
       local Virtio = "Virtio_"..name
       config.app(c, NIC, require(device_info.driver).driver,
-		 ([[{pciaddr = %q,
-		     vmdq=true,
-		     macaddr = %q,
-		     vlan=%d}]]):format(pciaddr, mac_address, vlan))
-      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(name)})
+                 {pciaddr = pciaddr,
+                  vmdq = true,
+                  macaddr = mac_address,
+                  vlan = vlan})
+      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(t.port_id)})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
-      if t.ingress_filter then
+      if t.ingress_filter and #t.ingress_filter > 0 then
          local Filter = "Filter_in_"..name
          config.app(c, Filter, PacketFilter, t.ingress_filter)
          config.link(c, Filter..".tx -> " .. VM_rx)
          VM_rx = Filter..".rx"
       end
-      if t.egress_filter then
+      if t.egress_filter and #t.egress_filter > 0 then
          local Filter = 'Filter_out_'..name
          config.app(c, Filter, PacketFilter, t.egress_filter)
          config.link(c, VM_tx..' -> '..Filter..'.rx')

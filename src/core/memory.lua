@@ -1,5 +1,11 @@
 module(...,package.seeall)
 
+-- For more information about huge pages checkout:
+-- * HugeTLB - Large Page Support in the Linux kernel
+--   http://linuxgazette.net/155/krishnakumar.html)
+-- * linux/Documentation/vm/hugetlbpage.txt
+--  https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt)
+
 local ffi = require("ffi")
 local C = ffi.C
 

@@ -259,7 +259,7 @@ function VirtioNetDevice:vm_buffer (iovec)
          iovec.offset = 0
       end
    end
-   if last_size ~= b.size then print("size=", b.size) last_size=b.size end
+   if last_size ~= b.size then debug("size=", b.size) last_size=b.size end
    return should_continue, b
 end
 
@@ -280,7 +280,8 @@ function VirtioNetDevice:transmit_packets_to_vm ()
       for i = 0, p.niovecs - 1 do
 
          local iovec = p.iovecs[i]
-         local should_continue, b = self:vm_buffer(iovec)
+         local b
+         should_continue, b = self:vm_buffer(iovec)
          local size = iovec.length
 
          -- fill in the virtio header
@@ -511,5 +512,5 @@ local string = ""
 end
 
 function debug (...)
-   print(...)
+   if _G.developer_debug then print(...) end
 end

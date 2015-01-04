@@ -29,6 +29,8 @@ Available options are:
 -e chunk     Execute string 'chunk'.
 -l name      Require library 'name'.
 -t name      Test module 'name' with selftest().
+-R           Start interactive Snabb REPL.
+-dm          Enable developer mode. Enables debug prints and asserts.
 -d           Debug unhandled errors with the Lua interactive debugger.
 -S           Print enhanced stack traces with more debug information.
 -jdump file  Trace JIT decisions to 'file'. (Requires LuaJIT jit.* library.)
@@ -37,8 +39,10 @@ Available options are:
 -jp=args[,.output]
 ]]
 
+_G.developer_debug = false
 debug_on_error = false
 profiling = false
+start_repl = false
 
 -- List of parameters passed on the command line.
 parameters = {}
@@ -67,6 +71,9 @@ function main ()
          local thunk, error = loadstring(args[i+1])
          if thunk then thunk() else print(error) end
          i = i + 2
+      elseif args[i] == '-dm' then
+         _G.developer_debug = true
+         i = i + 1
       elseif args[i] == '-d' then
          debug_on_error = true
          i = i + 1
@@ -87,6 +94,9 @@ function main ()
          local jit_verbose = require 'jit.v'
          jit_verbose.start(args[i+1])
          i = i + 2
+      elseif args[i] == '-R' then
+         start_repl = true
+         i = i + 1
       elseif i <= #args then
          -- Syntax: <script> [args...]
          local module = args[i]
@@ -103,12 +113,44 @@ function main ()
          os.exit(1)
       end
    end
+   if start_repl then
+      zone("REPL")
+      repl()
+   end
    exit(0)
 end
 
 function exit (status)
    if profiling then require("jit.p").stop() end
    os.exit(status)
+end
+
+-- This is a simple REPL similar to LuaJIT's built-in REPL. It can only
+-- read single-line statements but does support the `=<expr>' syntax.
+function repl ()
+   local line = nil
+   local function eval_line ()
+      if line:sub(0,1) == "=" then
+         -- Evaluate line as expression.
+         print(loadstring("return "..line:sub(2))())
+      else
+         -- Evaluate line as statement
+         local load = loadstring(line)
+         if load then load() end
+      end
+   end
+   repeat
+      io.stdout:write("Snabb> ")
+      io.stdout:flush()
+      line = io.stdin:read("*l")
+      if line then
+         local status, err = pcall(eval_line)
+         if not status then
+            io.stdout:write(("Error in %s\n"):format(err))
+         end
+         io.stdout:flush()
+      end
+   until not line
 end
 
 --- Globally initialize some things. Module can depend on this being done.
