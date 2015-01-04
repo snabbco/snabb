@@ -210,6 +210,7 @@ typedef struct ef_vi {
   int                           vi_io_mmap_bytes;
   int                           vi_clustered;
   int                           vi_is_packed_stream;
+  unsigned                      vi_ps_buf_size;
 
   ef_vi_ioaddr_t                io;
 
@@ -240,8 +241,11 @@ typedef struct ef_vi {
     int (*transmitv_init)(struct ef_vi*, const ef_iovec*,
                           int iov_len, ef_request_id);
     void (*transmit_push)(struct ef_vi*);
-    int (*transmit_pio)(struct ef_vi*, ef_addr offset, int len,
+    int (*transmit_pio)(struct ef_vi*, int offset, int len,
                         ef_request_id dma_id);
+    int (*transmit_copy_pio)(struct ef_vi*, int pio_offset,
+                             const void* src_buf, int len,
+                             ef_request_id dma_id);
     int (*receive_init)(struct ef_vi*, ef_addr, ef_request_id);
     void (*receive_push)(struct ef_vi*);
     int (*eventq_poll)(struct ef_vi*, ef_event*, int evs_len);
@@ -313,6 +317,10 @@ extern int ef_pd_alloc(ef_pd*, ef_driver_handle, int ifindex,
 extern int ef_pd_alloc_by_name(ef_pd*, ef_driver_handle,
                                const char* cluster_or_intf_name,
                                enum ef_pd_flags flags);
+
+extern int ef_pd_alloc_with_vport(ef_pd*, ef_driver_handle,
+                                  const char* intf_name,
+                                  enum ef_pd_flags flags, int vlan_id);
 
 /*! Unregister a memory region. */
 extern int ef_pd_free(ef_pd*, ef_driver_handle);
@@ -460,7 +468,7 @@ typedef struct ef_memreg {
 
 extern int ef_memreg_alloc(ef_memreg*, ef_driver_handle,
 			   struct ef_pd*, ef_driver_handle pd_dh,
-			   void* p_mem, int len_bytes);
+			   void* p_mem, size_t len_bytes);
 
 extern int ef_memreg_free(ef_memreg*, ef_driver_handle);
 
