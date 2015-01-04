@@ -294,9 +294,10 @@ enum ef_pd_flags {
 	EF_PD_DEFAULT          = 0x0,
 	EF_PD_VF               = 0x1,
 	EF_PD_PHYS_MODE        = 0x2,
-	EF_PD_RX_PACKED_STREAM = 0x4,  /* ef10 only */
-	EF_PD_VPORT            = 0x8   /* ef10 only */
+	EF_PD_RX_PACKED_STREAM = 0x4
 };
+
+static const int EF_PD_VLAN_NONE = -1;
 
 typedef struct ef_pd {
 	enum ef_pd_flags pd_flags;
