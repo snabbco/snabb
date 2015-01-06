@@ -173,11 +173,11 @@ function datagram:parse_match (class, check)
    local class = class or parse.ulp
    local iovec = self._packet[0].iovecs[parse.iovec]
 
-   if not parse.ulp or (class and class ~= parse.ulp) then
+   if not class then
       return nil
    end
-   local proto = parse.ulp:new_from_mem(iovec.buffer.pointer + iovec.offset
-					+ parse.offset, iovec.length - parse.offset)
+   local proto = class:new_from_mem(iovec.buffer.pointer + iovec.offset
+                                    + parse.offset, iovec.length - parse.offset)
    if proto == nil or (check and not check(proto)) then
       if proto then proto:free() end
       return nil
@@ -302,16 +302,19 @@ function datagram:payload (mem, size)
    local parse = self._parse
    local iovec = self._packet[0].iovecs[parse.iovec]
    local payload = iovec.buffer.pointer + iovec.offset + parse.offset
+   local multi_buffer_p = parse.iovec ~= self._packet[0].niovecs - 1
    if mem ~= nil then
       assert(size <= iovec.buffer.size - (iovec.offset + iovec.length),
-	     "not enough space in buffer to add payload of size "..size)
+             "not enough space in buffer to add payload")
+      assert(not multi_buffer_p,
+             "can not add payload to multi-buffer packet")
       ffi.copy(iovec.buffer.pointer + iovec.offset + iovec.length,
-	      mem, size)
+               mem, size)
       iovec.length = iovec.length + size
       self._packet[0].length = self._packet[0].length + size
    end
    local p_size = iovec.length - parse.offset
-   return payload, p_size, (parse.iovec == self._packet[0].niovecs - 1)
+   return payload, p_size, (multi_buffer_p and parse.iovec + 1) or nil
 end
 
 return datagram

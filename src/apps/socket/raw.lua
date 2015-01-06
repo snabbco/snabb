@@ -70,5 +70,3 @@ function RawSocket.selftest ()
    -- pings to 127.0.0.1 and ::1 into lo and capture/compare
    -- the responses with a pre-recorded pcap.
 end
-
-return RawSocket

@@ -14,5 +14,3 @@ end
 function RawVhost.selftest ()
    print("lib.vhost.raw selftest not implemented")
 end
-
-return RawVhost

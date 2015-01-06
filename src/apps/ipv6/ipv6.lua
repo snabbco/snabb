@@ -9,6 +9,8 @@ local config = require("core.config")
 local lib = require("core.lib")
 local packet = require("core.packet")
 local buffer = require("core.buffer")
+local ethernet = require("lib.protocol.ethernet")
+local ipv6 = require("lib.protocol.ipv6")
 local pcap = require("apps.pcap.pcap")
 local Buzz = require("apps.basic.basic_apps").Buzz
 
@@ -61,9 +63,15 @@ struct {
 SimpleIPv6 = {}
 
 function SimpleIPv6:new (arg)
-   local conf = config and config.parse_app_arg(arg) or {}
-   own_mac = conf.own_mac or "\x52\x54\x00\x12\x34\x57"
-   own_ip = conf.own_ip or "\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+   local conf = arg and config.parse_app_arg(arg) or {}
+   if type(conf.own_mac) == "string" then
+      conf.own_mac = ethernet:pton(conf.own_mac)
+   end
+   own_mac = conf.own_mac or "52:54:00:12:34:57"
+   if type(conf.own_ip) == "string" then
+      conf.own_ip = ipv6:pton(conf.own_ip)
+   end
+   own_ip = conf.own_ip or "2::1"
    local o = {own_mac = own_mac, own_ip = own_ip}
    return setmetatable(o, {__index = SimpleIPv6})
 end
@@ -178,13 +186,13 @@ end
 
 function selftest ()
    print("selftest: ipv6")
-   local own_ip = "\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
-   local own_mac = "\x52\x54\x00\x12\x34\x57"
+   local own_ip = "2::1"
+   local own_mac = "52:54:00:12:34:57"
    local c = config.new()
    config.app(c, "source", pcap.PcapReader, "apps/ipv6/selftest.cap.input")
    config.app(c, "ipv6", SimpleIPv6,
-              { own_ip  = "\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01",
-                own_mac = "\x52\x54\x00\x12\x34\x57" })
+              { own_ip  = "2::1",
+                own_mac = "52:54:00:12:34:57" })
    config.app(c, "sink", pcap.PcapWriter, "apps/ipv6/selftest.cap.output")
    config.link(c, "source.output -> ipv6.eth0")
    config.link(c, "ipv6.eth0 -> sink.input")
