@@ -267,7 +267,6 @@ local nr = {
   renameat2 = 276,
   seccomp = 277,
 }
-end
 }
 
 return nr
