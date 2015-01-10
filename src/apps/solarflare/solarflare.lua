@@ -61,6 +61,10 @@ function SolarFlareNic:new(args)
       self.mac_address = ethernet:pton(args.macaddr)
    end
 
+   if args.vlan then
+      self.vlan = args.vlan
+   end
+
    args.receives_enqueued = 0
    local dev = setmetatable(args, { __index = SolarFlareNic })
    return dev:open()
@@ -122,11 +126,16 @@ function SolarFlareNic:open()
    try(ciul.ef_driver_open(handle_p), "ef_driver_open")
    self.driver_handle = handle_p[0]
    self.pd_p = ffi.new("ef_pd[1]")
+
+   if not self.vlan then
+      self.vlan = C.EF_PD_VLAN_NONE
+   end
+
    try(ciul.ef_pd_alloc_with_vport(self.pd_p,
                                    self.driver_handle,
                                    self.ifname,
                                    C.EF_PD_DEFAULT + C.EF_PD_PHYS_MODE,
-                                   C.EF_PD_VLAN_NONE),
+                                   self.vlan),
        "ef_pd_alloc_by_name")
    self.ef_vi_p = ffi.new("ef_vi[1]")
    try(ciul.ef_vi_alloc_from_pd(self.ef_vi_p,
