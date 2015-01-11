@@ -1479,6 +1479,28 @@ test_sockets_pipes = {
     assert(as:close())
     assert(ss:close())
   end,
+  test_inet6_only_inet_conn_socket2 = function()
+    local ss, err = S.socket("inet6", "stream")
+    if not ss and err.AFNOSUPPORT then error "skipped" end
+    assert(ss, err)
+    assert(ss:nonblock())
+    assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 1))
+    local sa = assert(t.sockaddr_in6(0, "loopback"))
+    assert_equal(sa.family, c.AF.INET6)
+    assert(ss:bind(sa))
+    local ba = assert(ss:getsockname())
+    assert_equal(ba.family, c.AF.INET6)
+    assert(ss:listen()) -- will fail if we did not bind
+    local cs, err = S.socket("inet", "stream") -- ipv4 client socket, will fail to connect
+    if not cs and err.AFNOSUPPORT then error "skipped" end
+    assert(cs, err)
+    local ba4 = t.sockaddr_in(ba.port, "loopback") -- TODO add function to convert sockaddr in6 to in4
+    local ok, err = cs:connect(ba4)
+    assert(not ok, "expect connect to fail with ipv4 connection when set to ipv6 only")
+    assert(err.CONNREFUSED, err)
+    assert(cs:close())
+    assert(ss:close())
+  end,
   test_udp_socket = function()
     local ss, err = S.socket("inet", "dgram")
     if not ss and err.AFNOSUPPORT then error "skipped" end
