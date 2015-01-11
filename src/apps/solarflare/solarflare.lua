@@ -11,7 +11,6 @@ local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
 local C = ffi.C
 
-local EVENTS_PER_POLL = 256
 local RECEIVE_BUFFER_COUNT = 256
 local FLUSH_RECEIVE_QUEUE_THRESHOLD = 32
 local TX_BUFFER_COUNT = 256
@@ -34,9 +33,6 @@ local function try (rc, message)
    end
    return rc
 end
-
-events = ffi.new("ef_event[" .. EVENTS_PER_POLL .. "]")
-tx_request_ids = ffi.new("ef_request_id[" .. C.EF_VI_TRANSMIT_BATCH .. "]")
 
 SolarFlareNic = {}
 SolarFlareNic.__index = SolarFlareNic
@@ -192,10 +188,16 @@ function SolarFlareNic:open()
    self.memregs = {}
 
    -- cache ops
-   self.ef_vi_eventq_poll = self.ef_vi_p[0].ops.eventq_poll
    self.ef_vi_receive_init = self.ef_vi_p[0].ops.receive_init
    self.ef_vi_receive_push = self.ef_vi_p[0].ops.receive_push
    self.ef_vi_transmit_push = self.ef_vi_p[0].ops.transmit_push
+
+   -- set up poll exchange structures
+   self.poll_structure = ffi.new("struct device")
+   self.poll_structure.vi = self.ef_vi_p
+
+   -- register device with poller
+   C.add_device(self.poll_structure, ciul.ef_vi_transmit_unbundle)
 
    -- initialize statistics
    self.stats = {}
@@ -227,6 +229,7 @@ function SolarFlareNic:open()
 end
 
 function SolarFlareNic:stop()
+   C.drop_device(self.poll_structure);
    try(ciul.ef_vi_free(self.ef_vi_p, self.driver_handle),
        "ef_vi_free")
    try(ciul.ef_pd_free(self.pd_p, self.driver_handle),
@@ -235,16 +238,21 @@ function SolarFlareNic:stop()
        "ef_driver_close")
 end
 
+local need_poll = 1
+
 local band = bit.band
 
 function SolarFlareNic:pull()
+   if need_poll == 1 then
+      C.poll_devices()
+      need_poll = 0
+   end
    self.stats.pull = (self.stats.pull or 0) + 1
    repeat
-      local n_ev = self.ef_vi_eventq_poll(self.ef_vi_p, events, EVENTS_PER_POLL)
---      self.stats.max_n_ev = math.max(n_ev, self.stats.max_n_ev or 0)
+      local n_ev = self.poll_structure.n_ev
       if n_ev > 0 then
          for i = 0, n_ev - 1 do
-            local event = events[i]
+            local event = self.poll_structure.events[i]
             local event_type = event.generic.type
             if event_type == C.EF_EVENT_TYPE_RX then
                self.stats.rx = (self.stats.rx or 0) + 1
@@ -267,10 +275,8 @@ function SolarFlareNic:pull()
                end
                self.enqueue_receive(self, event.rx.rq_id)
             elseif event_type == C.EF_EVENT_TYPE_TX then
-               local n_tx_done = ciul.ef_vi_transmit_unbundle(self.ef_vi_p,
-                                                              event,
-                                                              tx_request_ids)
---               self.stats.max_n_tx_done = math.max(n_tx_done, self.stats.max_n_tx_done or 0)
+               local n_tx_done = self.poll_structure.unbundled_tx_request_ids[i].n_tx_done
+               local tx_request_ids = self.poll_structure.unbundled_tx_request_ids[i].tx_request_ids
                self.stats.txpackets = (self.stats.txpackets or 0) + n_tx_done
                for i = 0, (n_tx_done - 1) do
                   packet.deref(self.tx_packets[tx_request_ids[i]])
@@ -288,10 +294,11 @@ function SolarFlareNic:pull()
          self.stats.rx_flushes = (self.stats.rx_flushes or 0) + 1
          self.flush_receives(self)
       end
-   until n_ev < EVENTS_PER_POLL
+   until n_ev < C.EVENTS_PER_POLL
 end
 
 function SolarFlareNic:push()
+   need_poll = 1
    self.stats.push = (self.stats.push or 0) + 1
    local l = self.input.rx
    local push = false
@@ -305,8 +312,6 @@ function SolarFlareNic:push()
       -- transmission of the last buffer has been confirmed.  Thus, it
       -- can be dereferenced here.
       packet.deref(p)
---      self.stats.max_tx_space = math.max(self.tx_space, self.stats.max_tx_space or 0)
---      self.stats.min_tx_space = math.min(self.tx_space, self.stats.min_tx_space or TX_BUFFER_COUNT)
    end
    if link.empty(l) then
       self.stats.link_empty = (self.stats.link_empty or 0) + 1

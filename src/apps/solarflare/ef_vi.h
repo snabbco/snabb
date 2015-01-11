@@ -15,6 +15,8 @@ typedef char*                   ef_vi_ioaddr_t;
 static const int EF_VI_MAX_QS              = 32;
 static const int EF_VI_EVENT_POLL_MIN_EVS  = 2;
 
+static const int EVENTS_PER_POLL = 256;
+
 typedef int			ef_request_id;
 
 typedef union {
@@ -228,7 +230,7 @@ typedef struct ef_vi {
   enum ef_vi_flags              vi_flags;
   ef_vi_stats*		        vi_stats;
 
-  struct ef_vi*		        vi_qs[EF_VI_MAX_QS];
+  struct ef_vi*		        vi_qs[32 /* EF_VI_MAX_QS */];
   int                           vi_qs_n;
 
   struct ef_vi_nic_type	        nic_type;
@@ -476,3 +478,21 @@ extern int ef_memreg_free(ef_memreg*, ef_driver_handle);
 static const int EF_VI_NIC_PAGE_SIZE = 0x1000;
 static const int EF_VI_NIC_PAGE_MASK = 0x0FFF;
 static const int CI_PAGE_SIZE = 0x1000;
+
+/* Declarations for the batch polling mechanism */
+
+struct unbundled_tx_request_ids {
+  int n_tx_done;
+  ef_request_id tx_request_ids[64 /* EF_VI_TRANSMIT_BATCH */];
+};
+
+struct device {
+  ef_vi* vi;
+  int n_ev;
+  ef_event events[256 /* EVENTS_PER_POLL */];
+  struct unbundled_tx_request_ids unbundled_tx_request_ids[256 /* EVENTS_PER_POLL */];
+};
+
+extern void add_device(struct device* device, void* unbundle_function);
+extern void drop_device(struct device* device);
+extern void poll_devices();
