@@ -25,22 +25,28 @@ function VirtioVirtq:new()
    return setmetatable(o, {__index = VirtioVirtq})
 end
 
--- support indirect descriptors
-function VirtioVirtq:get_desc(header_id)
-   local ring_desc = self.virtq.desc
+-- Support indirect descriptors.
+function VirtioVirtq:get_desc()
    local device = self.device
-   local desc, id
-   -- Indirect desriptors
-   if band(ring_desc[header_id].flags, C.VIRTIO_DESC_F_INDIRECT) == 0 then
-      desc = ring_desc
-      id = header_id
-   else
-      local addr = device.map_from_guest(device,ring_desc[header_id].addr)
-      desc = ffi.cast(vring_desc_ptr_t, addr)
-      id = 0
+   local ring_desc = self.virtq.desc
+   local function indirect_descriptors_negotiated()
+      return band(device.features, C.VIRTIO_RING_F_INDIRECT_DESC) == 
+                     C.VIRTIO_RING_F_INDIRECT_DESC
    end
-
-   return desc, id
+   if (indirect_descriptors_negotiated()) then
+      return function(id)
+         if band(ring_desc[id].flags, C.VIRTIO_DESC_F_INDIRECT) == 0 then
+            return ring_desc, id
+         else
+            local addr = device.map_from_guest(device, ring_desc[id].addr)
+            return ffi.cast(vring_desc_ptr_t, addr), 0
+         end
+      end
+   else
+      return function(id)
+         return ring_desc, id 
+      end
+   end
 end
 
 -- Receive all available packets from the virtual machine.
@@ -51,11 +57,14 @@ function VirtioVirtq:get_buffers (kind, ops, header_len)
    local idx = self.virtq.avail.idx
    local avail, vring_mask = self.avail, self.vring_num-1
 
+   -- Cache function for obtaining ring descriptor.
+   local get_desc = self:get_desc()
+
    while idx ~= avail do
 
       -- Header
       local v_header_id = ring[band(avail,vring_mask)]
-      local desc, id = self:get_desc(v_header_id)
+      local desc, id = get_desc(v_header_id)
 
       local data_desc = desc[id]
 
