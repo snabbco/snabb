@@ -241,7 +241,7 @@ test.kqueue = {
     local kevs = t.kevents{{ident = 0, filter = "timer", flags = "add, oneshot", data = 10}}
     assert(kfd:kevent(kevs, nil))
     local count = 0
-    for k, v in assert(kfd:kevent(nil, kevs, 1)) do -- 1s timeout, longer than 10ms timer interval
+    for k, v in assert(kfd:kevent(nil, kevs)) do
       assert_equal(v.size, 1) -- count of expiries is 1 as oneshot
       count = count + 1
     end
