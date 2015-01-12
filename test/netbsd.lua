@@ -236,12 +236,15 @@ test.ktrace = {
     local kfd = assert(S.kqueue())
     local kevs = t.kevents{{fd = fd, filter = "vnode", flags = "add, enable, clear", fflags = "extend"}}
     assert(kfd:kevent(kevs, nil))
+    collectgarbage()
+    collectgarbage("stop")
     assert(S.ktrace(tmpfile, "set", "syscall, sysret", pid))
     -- now do something that should be in trace
     assert_equal(pid, S.getpid())
     assert(S.ktrace(tmpfile, "clear", "syscall, sysret", pid))
-    S.nanosleep(0.05) -- can be flaky and only get one event otherwise, TODO non racy fix
-    assert(kfd:kevent(nil, kevs, 1)) -- block until extend
+    S.nanosleep(0.05) -- can be flaky and only get one event otherwise, TODO not clear needed?
+    assert(kfd:kevent(nil, kevs)) -- block until extend
+    collectgarbage("restart")
     local buf = t.buffer(4096)
     local n = assert(fd:read(buf, 4096))
     local syscall, sysret = {}, {} -- on real OS luajit may do some memory allocations so may be extra calls occasionally
