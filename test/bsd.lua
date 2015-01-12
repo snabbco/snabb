@@ -144,6 +144,20 @@ test.filesystem_bsd = {
     assert(S.unlink(tmpfile))
     assert(fd:close())
   end,
+  test_utimensat = function()
+    -- BSD utimensat as same specification as Linux, but some functionality missing, so test simpler
+    if not S.utimensat then error "skipped" end
+    local fd = assert(S.creat(tmpfile, "RWXU"))
+    local dfd = assert(S.open("."))
+    assert(S.utimensat(nil, tmpfile))
+    local st1 = fd:stat()
+    assert(S.utimensat("fdcwd", tmpfile, {"omit", "omit"}))
+    local st2 = fd:stat()
+    assert(st1.mtime == st2.mtime, "mtime unchanged") -- cannot test atime as stat touches it
+    assert(S.unlink(tmpfile))
+    assert(fd:close())
+    assert(dfd:close())
+  end,
 }
 
 test.kqueue = {
