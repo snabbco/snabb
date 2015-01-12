@@ -211,7 +211,7 @@ test.misc_netbsd = {
     local st1 = fd:stat()
     assert(S.utimensat("fdcwd", tmpfile, {"omit", "omit"}))
     local st2 = fd:stat()
-    assert(st1.atime == st2.atime and st1.mtime == st2.mtime, "atime and mtime unchanged")
+    assert(st1.mtime == st2.mtime, "mtime unchanged") -- cannot test atime as stat touches it
     assert(S.unlink(tmpfile))
     assert(fd:close())
     assert(dfd:close())
