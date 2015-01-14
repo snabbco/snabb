@@ -37,8 +37,10 @@ function PacketFilter:new (filters)
    assert(filters)
    assert(#filters > 0)
 
+   local compiled_filters = compile_filters(filters)
+
    local function conform (buffer, length)
-      for _, func in ipairs(compile_filters(filters)) do
+      for _, func in ipairs(compiled_filters) do
          if func(buffer, length) then
             return true
          end
