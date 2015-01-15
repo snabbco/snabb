@@ -66,9 +66,9 @@ function load (file, pciaddr, sockpath)
          config.link(c, Tunnel..".decapsulated -> "..VM_rx)
          VM_rx, VM_tx = ND..".south", ND..".south"
       end
-      if t.rx_police_gbps then
+      if t.tx_police_gbps then
          local QoS = "QoS_"..name
-         local rate = t.rx_police_gbps * 1e9 / 8
+         local rate = t.tx_police_gbps * 1e9 / 8
          config.app(c, QoS, RateLimiter, {rate = rate, bucket_capacity = rate})
          config.link(c, VM_tx.." -> "..QoS..".input")
          VM_tx = QoS..".output"
