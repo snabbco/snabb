@@ -4,7 +4,7 @@ local ffi = require("ffi")
 local bit = require("bit")
 local band = bit.band
 
-verbose = os.getenv("PF_VERBOSE");
+local verbose = os.getenv("PF_VERBOSE");
 
 local function BPF_CLASS(code) return band(code, 0x07) end
 local BPF_LD   = 0x00
@@ -83,6 +83,15 @@ local function runtime_div(a, b)
    -- The code generator already asserted b is a non-zero constant.
    return bit.tobit(math.floor(runtime_u32(a) / runtime_u32(b)))
 end
+
+local env = {
+   bit = require('bit'),
+   runtime_u32 = runtime_u32,
+   runtime_add = runtime_add,
+   runtime_sub = runtime_sub,
+   runtime_mul = runtime_mul,
+   runtime_div = runtime_div,
+}
 
 local function is_power_of_2(k)
    if k == 0 then return false end
@@ -192,12 +201,12 @@ function compile_lua(bpf)
       end
       if     mode == BPF_ABS then
          assert(k >= 0, "packet size >= 2G???")
-         write('if ' .. k + bytes .. ' > length then return 0 end')
+         write('if ' .. k + bytes .. ' > length then return false end')
          rhs = P_ref(size, k)
       elseif mode == BPF_IND then
          write(assign(declare('T'), add(X(), k)))
          -- Assuming packet can't be 2GB in length
-         write('if T < 0 or T + ' .. bytes .. ' > length then return 0 end')
+         write('if T < 0 or T + ' .. bytes .. ' > length then return false end')
          rhs = P_ref(size, 'T')
       elseif mode == BPF_LEN then rhs = 'bit.tobit(length)'
       elseif mode == BPF_IMM then rhs = k
@@ -214,7 +223,7 @@ function compile_lua(bpf)
       elseif mode == BPF_MEM then rhs = M(k)
       elseif mode == BPF_MSH then
          assert(k >= 0, "packet size >= 2G???")
-         write('if ' .. k .. ' >= length then return 0 end')
+         write('if ' .. k .. ' >= length then return false end')
          rhs = lsh(band(P_ref(BPF_B, k), 0xf), 2)
       else
          error('bad mode ' .. mode)
@@ -247,7 +256,7 @@ function compile_lua(bpf)
          assert(src == BPF_K, "division by non-constant value is unsupported")
          assert(k ~= 0, "program contains division by constant zero")
          local bits = is_power_of_2(k)
-         if bits then rhs = shr(A(), bits) else rhs = div(A(), k) end
+         if bits then rhs = rsh(A(), bits) else rhs = div(A(), k) end
       elseif op == BPF_OR  then rhs = bor(A(), b)
       elseif op == BPF_AND then rhs = band(A(), b)
       elseif op == BPF_LSH then rhs = lsh(A(), b)
@@ -292,7 +301,8 @@ function compile_lua(bpf)
       elseif src == BPF_A then rhs = A()
       else error('bad src ' .. src)
       end
-      write('do return ' .. u32(rhs) .. ' end')
+      local result = u32(rhs) ~= 0 and "true" or "false"
+      write('do return '..result..' end')
    end
 
    local function misc(op)
@@ -414,15 +424,16 @@ function disassemble(bpf)
       local inst = bpf[i]
       local code = inst.code
       local class = BPF_CLASS(code)
+      local k = runtime_u32(inst.k)
       write(string.format('%03d: ', i))
-      if     class == BPF_LD  then ld(BPF_SIZE(code), BPF_MODE(code), inst.k)
-      elseif class == BPF_LDX then ldx(BPF_SIZE(code), BPF_MODE(code), inst.k)
-      elseif class == BPF_ST  then st(inst.k)
-      elseif class == BPF_STX then stx(inst.k)
-      elseif class == BPF_ALU then alu(BPF_OP(code), BPF_SRC(code), inst.k)
-      elseif class == BPF_JMP then jmp(i, BPF_OP(code), BPF_SRC(code), inst.k,
+      if     class == BPF_LD  then ld(BPF_SIZE(code), BPF_MODE(code), k)
+      elseif class == BPF_LDX then ldx(BPF_SIZE(code), BPF_MODE(code), k)
+      elseif class == BPF_ST  then st(k)
+      elseif class == BPF_STX then stx(k)
+      elseif class == BPF_ALU then alu(BPF_OP(code), BPF_SRC(code), k)
+      elseif class == BPF_JMP then jmp(i, BPF_OP(code), BPF_SRC(code), k,
                                        inst.jt, inst.jf)
-      elseif class == BPF_RET then ret(BPF_SRC(code), inst.k)
+      elseif class == BPF_RET then ret(BPF_SRC(code), k)
       elseif class == BPF_MISC then misc(BPF_MISCOP(code))
       else error('bad class ' .. class) end
    end
@@ -430,15 +441,9 @@ function disassemble(bpf)
 end
 
 function compile(bpf)
-   -- Oddly, sometimes pflua-bench:src/bench.lua doesn't pick these up
-   -- sometimes.  Perhaps we should constructively create an
-   -- environment.
-   if not getfenv(0).runtime_u32 then getfenv(0).runtime_u32 = runtime_u32 end
-   if not getfenv(0).runtime_add then getfenv(0).runtime_add = runtime_add end
-   if not getfenv(0).runtime_sub then getfenv(0).runtime_sub = runtime_sub end
-   if not getfenv(0).runtime_mul then getfenv(0).runtime_mul = runtime_mul end
-   if not getfenv(0).runtime_div then getfenv(0).runtime_div = runtime_div end
-   return assert(loadstring(compile_lua(bpf)))()
+   local func = assert(loadstring(compile_lua(bpf)))
+   setfenv(func, env)
+   return func()
 end
 
 function dump(bpf)

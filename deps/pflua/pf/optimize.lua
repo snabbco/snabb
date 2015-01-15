@@ -3,23 +3,37 @@ module(...,package.seeall)
 local bit = require('bit')
 local utils = require('pf.utils')
 
-verbose = os.getenv("PF_VERBOSE");
+local verbose = os.getenv("PF_VERBOSE");
 
 local expand_arith, expand_relop, expand_bool
 
 local set, concat, dup, pp = utils.set, utils.concat, utils.dup, utils.pp
 
+-- Pflang's numbers are unsigned 32-bit integers, but sometimes we use
+-- negative numbers because the bitops module prefers them.
+local UINT32_MAX = 2^32-1
+local INT32_MAX = 2^31-1
+local INT32_MIN = -2^31
+local UINT16_MAX = 2^16-1
+
+-- We use use Lua arithmetic to implement pflang operations, so
+-- intermediate results can exceed the int32|uint32 range.  Those
+-- intermediate results are then clamped back to the range with the
+-- 'int32' or 'uint32' operations.  Multiplication is clamped internally
+-- by the '*64' operation.  We'll never see a value outside this range.
+local INT_MAX = UINT32_MAX + UINT32_MAX
+local INT_MIN = INT32_MIN + INT32_MIN
+
 local relops = set('<', '<=', '=', '!=', '>=', '>')
 
 local binops = set(
-   '+', '-', '*', '/', '&', '|', '^', '<<', '>>'
+   '+', '-', '*', '*64', '/', '&', '|', '^', '<<', '>>'
 )
 local associative_binops = set(
-   '+', '*', '&', '|', '^'
+   '+', '*', '*64', '&', '|', '^'
 )
 local bitops = set('&', '|', '^')
 local unops = set('ntohs', 'ntohl', 'uint32', 'int32')
-local bswap_ops = set('ntohs', 'ntohl')
 -- ops that produce results of known types
 local int32ops = set('&', '|', '^', 'ntohs', 'ntohl', '<<', '>>', 'int32')
 local uint32ops = set('uint32', '[]')
@@ -31,7 +45,13 @@ local folders = {
    ['+'] = function(a, b) return a + b end,
    ['-'] = function(a, b) return a - b end,
    ['*'] = function(a, b) return a * b end,
-   ['/'] = function(a, b) return math.floor(a / b) end,
+   ['*64'] = function(a, b) return tonumber((a * 1LL * b) % 2^32) end,
+   ['/'] = function(a, b)
+      -- If the denominator is zero, the code is unreachable, so it
+      -- doesn't matter what we return.
+      if b == 0 then return 0 end
+      return math.floor(a / b)
+   end,
    ['&'] = function(a, b) return bit.band(a, b) end,
    ['^'] = function(a, b) return bit.bxor(a, b) end,
    ['|'] = function(a, b) return bit.bor(a, b) end,
@@ -49,21 +69,24 @@ local folders = {
    ['>'] = function(a, b) return a > b end
 }
 
+local cfkey_cache, cfkey = {}, nil
+
 local function memoize(f)
-   local cache = { }
-   return cache, function (arg)
-      local result = cache[arg]
+   return function (arg)
+      local result = cfkey_cache[arg]
       if result == nil then
          result = f(arg)
-         cache[arg] = result
+         cfkey_cache[arg] = result
       end
       return result
    end
 end
 
-local cfkey_cache, cfkey
+local function clear_cache()
+   cfkey_cache = {}
+end
 
-cfkey_cache, cfkey = memoize(function (expr)
+cfkey = memoize(function (expr)
    if type(expr) == 'table' then
       local ret = 'table('..cfkey(expr[1])
       for i=2,#expr do ret = ret..' '..cfkey(expr[i]) end
@@ -79,18 +102,26 @@ local commute = {
    ['<']='>', ['<=']='>=', ['=']='=', ['!=']='!=', ['>=']='<=', ['>']='<'
 }
 
-function try_invert(relop, expr, C)
+local function try_invert(relop, expr, C)
    assert(type(C) == 'number' and type(expr) ~= 'number')
    local op = expr[1]
    local is_eq = relop == '=' or relop == '!='
-   if bswap_ops[op] and is_eq then
+   if op == 'ntohl' and is_eq then
       local rhs = expr[2]
       if int32ops[rhs[1]] then
-         -- htonl(INT32) = C => INT32 = htonl(C)
+         assert(INT32_MIN <= C and C <= INT32_MAX)
+         -- ntohl(INT32) = C => INT32 = ntohl(C)
          return relop, rhs, assert(folders[op])(C)
       elseif uint32ops[rhs[1]] then
-         -- htonl(UINT32) = C => UINT32 = uint32(htonl(C))
+         -- ntohl(UINT32) = C => UINT32 = uint32(ntohl(C))
          return relop, rhs, assert(folders[op])(C) % 2^32
+      end
+   elseif op == 'ntohs' and is_eq then
+      local rhs = expr[2]
+      if ((rhs[1] == 'ntohs' or (rhs[1] == '[]' and rhs[3] <= 2))
+           and 0 <= C and C <= UINT16_MAX) then
+         -- ntohs(UINT16) = C => UINT16 = ntohs(C)
+         return relop, rhs, assert(folders[op])(C)
       end
    elseif op == 'uint32' and is_eq then
       local rhs = expr[2]
@@ -106,14 +137,22 @@ function try_invert(relop, expr, C)
       end
    elseif bitops[op] and is_eq then
       local lhs, rhs = expr[2], expr[3]
-      if type(lhs) == 'number' and bswap_ops[rhs[1]] then
-         -- bitop(C, SWAP(X)) = C => bitop(SWAP(C), X) = SWAP(C)
+      if type(lhs) == 'number' and rhs[1] == 'ntohl' then
+         -- bitop(C, ntohl(X)) = C => bitop(ntohl(C), X) = ntohl(C)
          local swap = assert(folders[rhs[1]])
          return relop, { op, swap(lhs), rhs[2] }, swap(C)
-      elseif type(rhs) == 'number' and bswap_ops[lhs[1]] then
-         -- bitop(SWAP(X), C) = C => bitop(X, SWAP(C)) = SWAP(C)
+      elseif type(rhs) == 'number' and lhs[1] == 'ntohl' then
+         -- bitop(ntohl(X), C) = C => bitop(X, ntohl(C)) = ntohl(C)
          local swap = assert(folders[lhs[1]])
          return relop, { op, lhs[2], swap(rhs) }, swap(C)
+      elseif op == '&' then
+         if type(lhs) == 'number' then lhs, rhs = rhs, lhs end
+         if (type(lhs) == 'table' and lhs[1] == 'ntohs'
+             and type(rhs) == 'number' and 0 <= C and C <= UINT16_MAX) then
+            -- ntohs(X) & C = C => X & ntohs(C) = ntohs(C)
+            local swap = assert(folders[lhs[1]])
+            return relop, { op, lhs[2], swap(rhs) }, swap(C)
+         end
       end
    end
    return relop, expr, C
@@ -224,7 +263,7 @@ function simplify_if(test, t, f)
       -- if A B (if C B D) -> if (if A true C) B D
       return simplify_if(simplify_if(test, { 'true' }, f[2]), t, f[4])
    end
-   if t[1] == 'if' and cfkey(f) == cfkey(t[3]) and not simple[f[1]] then
+   if t[1] == 'if' and cfkey(f) == cfkey(t[4]) and not simple[f[1]] then
       -- if A (if B C D) D -> if (if A B false) C D
       return simplify_if(simplify_if(test, t[2], { 'false' }), t[3], f)
    end
@@ -264,6 +303,8 @@ end
 
 -- Range inference.
 local function Range(min, max)
+   assert(min == min, 'min is NaN')
+   assert(max == max, 'max is NaN')
    -- if min is less than max, we have unreachable code.  still, let's
    -- not violate assumptions (e.g. about wacky bitshift semantics)
    if min > max then min, max = min, min end
@@ -273,7 +314,6 @@ local function Range(min, max)
    function ret:range() return self:min(), self:max() end
    function ret:fold()
       if self:min() == self:max() then
-         assert(self:min() ~= Inf)
          return self:min()
       end
    end
@@ -292,7 +332,7 @@ local function Range(min, max)
           and bit.tobit(self:min()) <= bit.tobit(self:max())) then
          return Range(bit.tobit(self:min()), bit.tobit(self:max()))
       end
-      return Range(-2^31, 2^31-1)
+      return Range(INT32_MIN, INT32_MAX)
    end
    function ret.binary(lhs, rhs, op) -- for monotonic functions
       local fold = assert(folders[op])
@@ -305,15 +345,35 @@ local function Range(min, max)
    function ret.add(lhs, rhs) return lhs:binary(rhs, '+') end
    function ret.sub(lhs, rhs) return lhs:binary(rhs, '-') end
    function ret.mul(lhs, rhs) return lhs:binary(rhs, '*') end
+   function ret.mul64(lhs, rhs) return Range(0, UINT32_MAX) end
    function ret.div(lhs, rhs)
-      if rhs:min() > 0 or rhs:max() < 0 then return lhs:binary(rhs, '/') end
-      -- 0 is prohibited by assertions.
-      local low, high = Range(rhs:min(), -1), Range(1, rhs:max())
+      local rhs_min, rhs_max = rhs:min(), rhs:max()
+      -- 0 is prohibited by assertions, so we won't hit it at runtime,
+      -- but we could still see { '/', 0, 0 } in the IR when it is
+      -- dominated by an assertion that { '!=', 0, 0 }.  The resulting
+      -- range won't include the rhs-is-zero case.
+      if rhs_min == 0 then
+         -- If the RHS is (or folds to) literal 0, we certainly won't
+         -- reach here so we can make up whatever value we want.
+         if rhs_max == 0 then return Range(0, 0) end
+         rhs_min = 1
+      elseif rhs_max == 0 then
+         rhs_max = -1
+      end
+      -- Now that we have removed 0 from the limits,
+      -- if the RHS can't change sign, we can use binary() on its range.
+      if rhs_min > 0 or rhs_max < 0 then
+         return lhs:binary(Range(rhs_min, rhs_max), '/')
+      end
+      -- Otherwise we can use binary() on the two semi-ranges.
+      local low, high = Range(rhs_min, -1), Range(1, rhs_max)
       return lhs:binary(low, '/'):union(lhs:binary(high, '/'))
    end
    function ret.band(lhs, rhs)
       lhs, rhs = lhs:tobit(), rhs:tobit()
-      if lhs:min() < 0 and rhs:min() < 0 then return Range(-2^31, 2^31-1) end
+      if lhs:min() < 0 and rhs:min() < 0 then
+         return Range(INT32_MIN, INT32_MAX)
+      end
       return Range(0, math.max(math.min(lhs:max(), rhs:max()), 0))
    end
    function ret.bor(lhs, rhs)
@@ -323,7 +383,7 @@ local function Range(min, max)
          while y < x do y = y * 2 end
          return y - 1
       end
-      if lhs:min() < 0 or rhs:min() < 0 then return Range(-2^31, -1) end
+      if lhs:min() < 0 or rhs:min() < 0 then return Range(INT32_MIN, -1) end
       return Range(bit.bor(lhs:min(), rhs:min()),
                    saturate(bit.bor(lhs:max(), rhs:max())))
    end
@@ -349,7 +409,7 @@ local function Range(min, max)
                          bit.lshift(max_lhs, max_shift))
          end
       end
-      return Range(-2^31, 2^31-1)
+      return Range(INT32_MIN, INT32_MAX)
    end
    function ret.rshift(lhs, rhs)
       lhs, rhs = lhs:tobit(), rhs:tobit()
@@ -375,14 +435,13 @@ local function Range(min, max)
                       bit.rshift(max_lhs, min_shift))
       else
          -- Otherwise punt.
-         return Range(-2^31, 2^31-1)
+         return Range(INT32_MIN, INT32_MAX)
       end
    end
    return ret
 end
 
 local function infer_ranges(expr)
-   local Inf = 1/0
    local function cons(car, cdr) return { car, cdr } end
    local function car(pair) return pair[1] end
    local function cdr(pair) return pair[2] end
@@ -390,14 +449,14 @@ local function infer_ranges(expr)
    local function push(db) return cons({}, db) end
    local function lookup(db, expr)
       if type(expr) == 'number' then return Range(expr, expr) end
-      if expr == 'len' then return Range(0, 2^16-1) end
+      if expr == 'len' then return Range(0, UINT16_MAX) end
       local key = cfkey(expr)
       while db do
          local range = car(db)[key]
          if range then return range end
          db = cdr(db)
       end
-      return Range(-Inf, Inf)
+      return Range(INT_MIN, INT_MAX)
    end
    local function define(db, expr, range)
       if type(expr) == 'number' then return expr end
@@ -461,7 +520,7 @@ local function infer_ranges(expr)
    end
    local function unop_range(op, rhs)
       if op == 'ntohs' then return Range(0, 0xffff) end
-      if op == 'ntohl' then return Range(-2^31, 2^31-1) end
+      if op == 'ntohl' then return Range(INT32_MIN, INT32_MAX) end
       if op == 'uint32' then return Range(0, 2^32) end
       if op == 'int32' then return rhs:tobit() end
       error('unexpected op '..op)
@@ -470,6 +529,7 @@ local function infer_ranges(expr)
       if op == '+' then return lhs:add(rhs) end
       if op == '-' then return lhs:sub(rhs) end
       if op == '*' then return lhs:mul(rhs) end
+      if op == '*64' then return lhs:mul64(rhs) end
       if op == '/' then return lhs:div(rhs) end
       if op == '&' then return lhs:band(rhs) end
       if op == '|' then return lhs:bor(rhs) end
@@ -569,10 +629,10 @@ local function infer_ranges(expr)
                return assert(folders[op])(rhs_range:fold())
             end
             if (op == 'uint32' and 0 <= rhs_range:min()
-                and rhs_range:max() <= 2^32) then
+                and rhs_range:max() <= UINT32_MAX) then
                return rhs
-            elseif (op == 'int32' and -2^31 <= rhs_range:min()
-                and rhs_range:max() <= 2^31-1) then
+            elseif (op == 'int32' and INT32_MIN <= rhs_range:min()
+                and rhs_range:max() <= INT32_MAX) then
                return rhs
             end
             local range = unop_range(op, rhs_range)
@@ -663,23 +723,17 @@ local function lhoist(expr, db)
    return reduce(annotate(expr, 'ACCEPT', 'REJECT'), 0)
 end
 
-function fixpoint(f, expr)
-   local prev
-   repeat expr, prev = f(expr), expr until utils.equals(expr, prev)
-   return expr
-end
-
 function optimize_inner(expr)
    expr = simplify(expr)
    expr = simplify(cfold(expr, {}))
    expr = simplify(infer_ranges(expr))
    expr = simplify(lhoist(expr))
-   cfkey_cache = { }
+   clear_cache()
    return expr
 end
 
 function optimize(expr)
-   expr = fixpoint(optimize_inner, expr)
+   expr = utils.fixpoint(optimize_inner, expr)
    if verbose then pp(expr) end
    return expr
 end
@@ -694,6 +748,8 @@ function selftest ()
       opt("1 = 2"))
    assert_equals({ '=', "len", 1 },
       opt("1 = len"))
+   assert_equals({ 'true' },
+      opt("1 = 2/2"))
    assert_equals({ 'if', { '>=', 'len', 1},
                    { '=', { '[]', 0, 1 }, 2 },
                    { 'fail' }},

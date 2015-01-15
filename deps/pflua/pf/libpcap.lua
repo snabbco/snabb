@@ -4,7 +4,7 @@ local ffi = require("ffi")
 local types = require("pf.types") -- Load FFI declarations.
 local pcap -- The pcap library, lazily loaded.
 
-verbose = os.getenv("PF_VERBOSE");
+local verbose = os.getenv("PF_VERBOSE");
 
 local MAX_UINT32 = 0xffffffff
 

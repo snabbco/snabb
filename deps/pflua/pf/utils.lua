@@ -1,6 +1,7 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
+local C = ffi.C
 
 ffi.cdef[[
 typedef long time_t;
@@ -18,7 +19,7 @@ int gettimeofday(struct timeval *tv, struct timezone *tz);
 local zero_sec, zero_usec
 function now()
    local tv = ffi.new("struct timeval")
-   assert(ffi.C.gettimeofday(tv, nil) == 0)
+   assert(C.gettimeofday(tv, nil) == 0)
    if not zero_sec then
       zero_sec = tv.tv_sec
       zero_usec = tv.tv_usec
@@ -30,7 +31,7 @@ end
 
 function gmtime()
    local tv = ffi.new("struct timeval")
-   assert(ffi.C.gettimeofday(tv, nil) == 0)
+   assert(C.gettimeofday(tv, nil) == 0)
    local secs = tonumber(tv.tv_sec)
    secs = secs + tonumber(tv.tv_usec) * 1e-6
    return secs
@@ -70,6 +71,21 @@ function equals(expected, actual)
    end
 end
 
+function is_array(x)
+   if type(x) ~= 'table' then return false end
+   if #x == 0 then return false end
+   for k,v in pairs(x) do
+      if type(k) ~= 'number' then return false end
+      -- Restrict to unsigned 32-bit integer keys.
+      if k < 0 or k >= 2^32 then return false end
+      -- Array indices are integers.
+      if k - math.floor(k) ~= 0 then return false end
+      -- Negative zero is not a valid array index.
+      if 1 / k < 0 then return false end
+   end
+   return true
+end
+
 function pp(expr, indent, suffix)
    indent = indent or ''
    suffix = suffix or ''
@@ -79,15 +95,28 @@ function pp(expr, indent, suffix)
       print(indent..'"'..expr..'"'..suffix)
    elseif type(expr) == 'boolean' then
       print(indent..(expr and 'true' or 'false')..suffix)
-   elseif type(expr) == 'table' then
+   elseif is_array(expr) then
+      assert(#expr > 0)
       if #expr == 1 then
-         print(indent..'{ "'..expr[1]..'" }'..suffix)
+         if type(expr[1]) == 'table' then
+            print(indent..'{')
+            pp(expr[1], indent..'  ', ' }'..suffix)
+         else
+            print(indent..'{ "'..expr[1]..'" }'..suffix)
+         end
       else
-         print(indent..'{ "'..expr[1]..'",')
+         if type(expr[1]) == 'table' then
+            print(indent..'{')
+            pp(expr[1], indent..'  ', ',')
+         else
+            print(indent..'{ "'..expr[1]..'",')
+         end
          indent = indent..'  '
          for i=2,#expr-1 do pp(expr[i], indent, ',') end
          pp(expr[#expr], indent, ' }'..suffix)
       end
+   elseif type(expr) == 'table' then
+      error('unimplemented')
    else
       error("unsupported type "..type(expr))
    end
@@ -120,6 +149,22 @@ end
 function ipv6_as_4x32(addr)
    local function c(i, j) return addr[i] * 2^16 + addr[j] end
    return { c(2,3), c(4,5), c(6,7), c(8,9) }
+end
+
+function fixpoint(f, expr)
+   local prev
+   repeat expr, prev = f(expr), expr until equals(expr, prev)
+   return expr
+end
+
+function choose(choices)
+   local idx = math.random(#choices)
+   return choices[idx]
+end
+
+function choose_with_index(choices)
+   local idx = math.random(#choices)
+   return choices[idx], idx
 end
 
 function selftest ()
