@@ -26,7 +26,7 @@ function load (file, pciaddr, sockpath)
       local NIC = "NIC_"..name
       local Virtio = "Virtio_"..name
       config.app(c, NIC, Intel82599, {pciaddr = pciaddr,
-                                      vmdq = true,
+                                      vmdq = false,
                                       macaddr = mac_address,
                                       vlan = vlan})
       config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(t.port_id)})
