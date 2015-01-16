@@ -32,6 +32,7 @@ function transmit (r, p)
 --   assert(p)
    if full(r) then
       r.stats.txdrop = r.stats.txdrop + 1
+      packet.free(p)
    else
       r.packets[r.write] = p
       r.write = band(r.write + 1, size - 1)

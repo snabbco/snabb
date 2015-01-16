@@ -1,10 +1,14 @@
-enum { LINK_RING_SIZE    = 8192,
-       LINK_MAX_PACKETS  = 8191
+enum { LINK_RING_SIZE    = 256,
+       LINK_MAX_PACKETS  = LINK_RING_SIZE - 1
 };
 
 struct link {
   // this is a circular ring buffer, as described at:
   //   http://en.wikipedia.org/wiki/Circular_buffer
+  struct packet* packets[LINK_RING_SIZE];
+  struct {
+    double txbytes, rxbytes, txpackets, rxpackets, txdrop;
+  } stats;
   // Two cursors:
   //   read:  the next element to be read
   //   write: the next element to be written
@@ -16,9 +20,5 @@ struct link {
   // Set when a new packet is added to the ring and cleared after
   // 'receiving_app' runs.
   bool has_new_data;
-  struct packet* packets[LINK_RING_SIZE];
-  struct {
-    double txbytes, rxbytes, txpackets, rxpackets, txdrop;
-  } stats;
 };
 
