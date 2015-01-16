@@ -1,7 +1,6 @@
 module(...,package.seeall)
 
 local app = require("core.app")
-local buffer = require("core.buffer")
 local freelist = require("core.freelist")
 local packet = require("core.packet")
 local link = require("core.link")
@@ -28,36 +27,22 @@ end
 Source = setmetatable({zone = "Source"}, {__index = Basic})
 
 function Source:new(size)
-   return setmetatable({size=tonumber(size) or 60}, {__index=Source})
-end
-
--- Allocate receive buffers from the given freelist.
-function Source:set_rx_buffer_freelist (fl)
-   assert(fl)
-   self.rx_buffer_freelist = fl
+   size = tonumber(size) or 60
+   local data = ffi.new("char[?]", size)
+   data[12] = 0x08
+   data[13] = 0x00
+   local p = packet.from_pointer(data, size)
+   return setmetatable({size=size, packet=p}, {__index=Source})
 end
 
 function Source:pull ()
-   local fl = self.rx_buffer_freelist
    for _, o in ipairs(self.outputi) do
       for i = 1, link.nwritable(o) do
-         local len, p, b = 0, nil, nil
-         while len < self.size do
-            if fl then
-               if freelist.nfree(fl) > 0 then
-                  b = freelist.remove(fl)
-               else
-                  break
-               end
-            else
-               b = buffer.allocate()
-            end
-            if not p then p = packet.allocate() end
-            local size = math.min(b.size, self.size - len)
-            packet.add_iovec(p, b, size)
-            len = len + size
-         end
-         if p then transmit(o, p) end
+         transmit(o, packet.clone(self.packet))
+         -- To repeatedly resend the same packet requires a
+         -- corresponding change in intel10g.lua sync_transmit() to
+         -- skip the call to packet.free()
+         --transmit(o, self.packet)
       end
    end
 end
@@ -110,7 +95,7 @@ function Sink:push ()
    for _, i in ipairs(self.inputi) do
       for _ = 1, link.nreadable(i) do
         local p = receive(i)
-        packet.deref(p)
+        packet.free(p)
       end
    end
 end
@@ -153,7 +138,6 @@ function Tee:push ()
       for _, i in ipairs(self.inputi) do
          for _ = 1, math.min(link.nreadable(i), maxoutput) do
             local p = receive(i)
-            packet.ref(p, noutputs - 1)
             maxoutput = maxoutput - 1
 	    do local outputi = self.outputi
 	       for k = 1, #outputi do
@@ -178,14 +162,14 @@ function Repeater:push ()
    local i, o = self.input.input, self.output.output
    for _ = 1, link.nreadable(i) do
       local p = receive(i)
-      packet.tenure(p)
+--      packet.tenure(p)
       table.insert(self.packets, p)
    end
    local npackets = #self.packets
    if npackets > 0 then
       for i = 1, link.nwritable(o) do
          assert(self.packets[self.index])
-         transmit(o, self.packets[self.index])
+         transmit(o, packet.clone(self.packets[self.index]))
          self.index = (self.index % npackets) + 1
       end
    end
