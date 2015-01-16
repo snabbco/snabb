@@ -74,31 +74,20 @@ end
 -- Pull in packets from the network and queue them on our 'tx' link.
 function Intel82599:pull ()
    local l = self.output.tx
+   local n = 128
    if l == nil then return end
    self.dev:sync_receive()
-   while not full(l) and self.dev:can_receive() do
+   while not full(l) and self.dev:can_receive() and n>0 do
       transmit(l, self.dev:receive())
+      n = n - 1
    end
    self:add_receive_buffers()
 end
 
 function Intel82599:add_receive_buffers ()
-   if self.rx_buffer_freelist == nil then
-      -- Generic buffers
-      while self.dev:can_add_receive_buffer() do
-         self.dev:add_receive_buffer(buffer.allocate())
-      end
-   else
-      -- Buffers from a special freelist
-      local fl = self.rx_buffer_freelist
-      while self.dev:can_add_receive_buffer() and freelist.nfree(fl) > 0 do
-         local b = freelist.remove(fl)
-         if b.size < 1024 then
-            buffer.free(b)
-            b = buffer.allocate()
-         end
-         self.dev:add_receive_buffer(b)
-      end
+   -- Generic buffers
+   while self.dev:can_add_receive_buffer() do
+      self.dev:add_receive_buffer(packet.allocate())
    end
 end
 
@@ -109,7 +98,7 @@ function Intel82599:push ()
    while not empty(l) and self.dev:can_transmit() do
       do local p = receive(l)
 	 self.dev:transmit(p)
-	 packet.deref(p)
+	 --packet.deref(p)
       end
    end
    self.dev:sync_transmit()
@@ -150,10 +139,19 @@ function selftest ()
       os.exit(engine.test_skipped_code)
    end
 
-   zone('buffer') buffer.preallocate(100000) zone()
+--   zone('buffer') buffer.preallocate(100000) zone()
+
+   sq_sq(pcideva, pcidevb)
+   local done = function ()
+      return engine.app_table['nicA'].input.rx.stats.rxpackets >= 100e6
+   end
+   engine.main({done=done, report={showlinks=true, showapps=false}})
+   engine.report({showapps=true})
+   if true then return end
 
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
+--   engine.report({showapps=true})
    do
       local a0Sends = engine.app_table.nicAm0.input.rx.stats.txpackets
       local a1Gets = engine.app_table.nicAm1.output.tx.stats.rxpackets
@@ -164,9 +162,6 @@ function selftest ()
          os.exit(1)
       end
    end
-
-   sq_sq(pcideva, pcidevb)
-   engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    do
       local aSends = engine.app_table.nicA.input.rx.stats.txpackets
@@ -186,6 +181,7 @@ function selftest ()
 
    mq_sq(pcideva, pcidevb)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
+--   engine.report({showapps=true})
 
    do
       local aSends = engine.app_table.nicAs.input.rx.stats.txpackets
@@ -268,8 +264,9 @@ function mq_sq(pcidevA, pcidevB)
    config.link(c, 'nicBm0.tx -> sink_ms.in2')
    config.link(c, 'nicBm1.tx -> sink_ms.in3')
    engine.configure(c)
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
+--   engine.report({showapps=true})
 end
 
 -- one multiqueue driver with two apps and do switch stuff
@@ -315,6 +312,7 @@ function mq_sw(pcidevA)
    config.link(c, 'nicAm0.tx -> sink_ms.in1')
    config.link(c, 'nicAm1.tx -> sink_ms.in2')
    engine.configure(c)
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
+--   engine.report({showapps=true})
 end

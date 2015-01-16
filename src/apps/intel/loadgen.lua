@@ -38,10 +38,10 @@ end
 
 function zero_descriptors (dev)
    -- Clear unused descriptors
-   local b = buffer.allocate()
+   local b = memory.dma_alloc(4096)
    for i = 0, intel10g.num_descriptors-1 do
       -- Make each descriptors point to valid DMA memory but be 0 bytes long.
-      dev.txdesc[i].address = b.physical
+      dev.txdesc[i].address = memory.virtual_to_physical(b)
       dev.txdesc[i].options = bit.lshift(1, 24) -- End of Packet flag
    end
 end
