@@ -256,7 +256,7 @@ function report (options)
    local function loss_rate(drop, sent)
       sent = tonumber(sent)
       if not sent or sent == 0 then return 0 end
-      return tonumber(drop) * 100 / sent
+      return tonumber(drop) * 100 / (tonumber(drop)+sent)
    end
    if not options or options.showlinks then
       print("link report")
