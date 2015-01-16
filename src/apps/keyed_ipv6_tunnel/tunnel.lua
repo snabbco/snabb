@@ -13,7 +13,6 @@ local app = require("core.app")
 local link = require("core.link")
 local lib = require("core.lib")
 local packet = require("core.packet")
-local buffer = require("core.buffer")
 local config = require("core.config")
 
 local macaddress = require("lib.macaddress")

@@ -1,6 +1,5 @@
 module(...,package.seeall)
 
-local buffer = require("core.buffer")
 local packet = require("core.packet")
 local lib    = require("core.lib")
 local link   = require("core.link")

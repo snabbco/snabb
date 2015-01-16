@@ -1,7 +1,6 @@
 #!/usr/bin/env snabb
 
 local app       = require("core.app")
-local buffer    = require("core.buffer")
 local config    = require("core.config")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")

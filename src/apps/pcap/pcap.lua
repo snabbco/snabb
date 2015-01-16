@@ -4,7 +4,6 @@ local ffi = require("ffi")
 
 local app  = require("core.app")
 local link = require("core.link")
-local buffer = require("core.buffer")
 local packet = require("core.packet")
 local pcap = require("lib.pcap.pcap")
 

@@ -3,7 +3,6 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 
-local buffer = require("core.buffer")
 local packet = require("core.packet")
 require("lib.raw.raw_h")
 require("apps.socket.io_h")

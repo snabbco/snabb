@@ -3,7 +3,6 @@
 
 module(...,package.seeall)
 
-local buffer    = require("core.buffer")
 local freelist  = require("core.freelist")
 local lib       = require("core.lib")
 local link      = require("core.link")

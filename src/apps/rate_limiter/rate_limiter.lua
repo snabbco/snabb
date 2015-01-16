@@ -6,7 +6,6 @@ local config = require("core.config")
 local packet = require("core.packet")
 local timer = require("core.timer")
 local basic_apps = require("apps.basic.basic_apps")
-local buffer = require("core.buffer")
 local ffi = require("ffi")
 local C = ffi.C
 local floor, min = math.floor, math.min

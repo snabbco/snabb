@@ -5,7 +5,6 @@ local debug = _G.developer_debug
 local ffi = require("ffi")
 local C = ffi.C
 
-local buffer   = require("core.buffer")
 local freelist = require("core.freelist")
 local lib      = require("core.lib")
 local memory   = require("core.memory")

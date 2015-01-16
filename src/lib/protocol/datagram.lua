@@ -72,7 +72,6 @@
 
 module(..., package.seeall)
 local packet = require("core.packet")
-local buffer = require("core.buffer")
 local ffi    = require("ffi")
 
 local datagram = subClass(nil)
