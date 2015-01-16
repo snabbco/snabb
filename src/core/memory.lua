@@ -55,7 +55,7 @@ end
 
 function allocate_hugetlb_chunk ()
    for i =1, 3 do
-      local page = C.allocate_huge_page(huge_page_size)
+      local page = C.allocate_huge_page(huge_page_size, false)
       if page ~= nil then return page else reserve_new_page() end
    end
 end
@@ -87,15 +87,9 @@ huge_page_bits = math.log(huge_page_size, 2)
 
 --- ### Physical address translation
 
+local uint64_t = ffi.typeof("uint64_t")
 function virtual_to_physical (virt_addr)
-   virt_addr = ffi.cast("uint64_t", virt_addr)
-   local virt_page = tonumber(virt_addr / base_page_size)
-   local phys_page = C.phys_page(virt_page) * base_page_size
-   if phys_page == 0 then
-      error("Failed to resolve physical address of "..tostring(virt_addr))
-   end
-   local phys_addr = ffi.cast("uint64_t", phys_page + virt_addr % base_page_size)
-   return phys_addr
+   return bit.band(ffi.cast(uint64_t, virt_addr), 0x0FFFFFFFFFFFULL);
 end
 
 --- ### selftest
