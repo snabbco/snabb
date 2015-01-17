@@ -52,7 +52,6 @@ add_device(struct device* device, void* unbundle_function)
   devices[n_devices++] = device;
 
   transmit_unbundle = unbundle_function;
-  printf("added device 0x%p\n", device);
 }
 
 void
@@ -73,6 +72,5 @@ drop_device(struct device* device)
     devices[i] = devices[i + 1];
   }
   devices[i] = 0;
-  printf("dropped device 0x%p\n", device);
 }
 
