@@ -25,7 +25,6 @@ end
 
 function Sprayer:process_packet(i, o)
    local p = link.receive(i)
-   local iov = p.iovecs[0]
 
    -- drop every other packet
    if self.packet_counter % 2 == 0 then
