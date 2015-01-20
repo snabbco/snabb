@@ -4,14 +4,12 @@ local app = require("core.app")
 local link = require("core.link")
 local lib = require("core.lib")
 local config = require("core.config")
-local buffer = require("core.buffer")
 
 local pcap = require("apps.pcap.pcap")
 local basic_apps = require("apps.basic.basic_apps")
 local packet_filter = require("apps.packet_filter.packet_filter")
 
 function selftest ()
-   buffer.preallocate(100000)
 
    local v6_rules = {
    {
