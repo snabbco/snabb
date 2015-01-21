@@ -197,6 +197,7 @@ function selftest ()
    config.link(c, "source.output -> ipv6.eth0")
    config.link(c, "ipv6.eth0 -> sink.input")
    app.configure(c)
+   app.trace("apps/ipv6/trace.pcapng")
    app.main({duration = 0.25}) -- should be long enough...
    -- Check results
    if io.open("apps/ipv6/selftest.cap.output"):read('*a') ~=

@@ -237,6 +237,7 @@ function breathe ()
       for i = 1, #link_array do
          local link = link_array[i]
          if firstloop or link.has_new_data then
+            trace_link(link)
             link.has_new_data = false
             local receiver = app_array[link.receiving_app]
             if receiver.push and not receiver.dead then
@@ -250,6 +251,26 @@ function breathe ()
       firstloop = false
    until not progress  -- Stop after no link had new data
    breaths = breaths + 1
+end
+
+tracefile = false
+
+-- Enable tracing to FILENAME for all links whose name matches PATTERN.
+-- If NPACKETS is given then stop recording after this many packets.
+function trace (filename, pattern,  npackets)
+   tracefile = pcapng.open_trace_for_write (filename)
+   for name, l in pairs(link_table) do
+      if (<link name matches pattern>) then
+         pcapng.write_interface_description(trace, name, l)
+         -- Enable tracing future packets
+         l.trace = l.write
+   end
+end
+
+function trace_link (l)
+   while link.traceable(l) do
+      pcapng.write_packet(tracefile, l.tracenext(), monotonic_now)
+   end
 end
 
 function report (options)

@@ -15,7 +15,7 @@ local size = C.LINK_RING_SIZE         -- NB: Huge slow-down if this is not local
 max        = C.LINK_MAX_PACKETS
 
 function new (receiving_app)
-   return ffi.new("struct link", {receiving_app = receiving_app})
+   return ffi.new("struct link", {receiving_app = receiving_app, trace = -1})
 end
 
 function receive (r)
@@ -49,6 +49,15 @@ end
 -- Return true if the ring is full.
 function full (r)
    return band(r.write + 1, size - 1) == r.read
+end
+
+-- Return the next packet to trace, or nil if none is ready.
+function tracenext (r)
+   if r.trace ~= -1 and r.trace ~= r.write then
+      local p = r.packets[r.trace]
+      r.trace = band(r.trace + 1, size - 1)
+      return p
+   end
 end
 
 -- Return the number of packets that are ready for read.

@@ -5,10 +5,11 @@ enum { LINK_RING_SIZE    = 8192,
 struct link {
   // this is a circular ring buffer, as described at:
   //   http://en.wikipedia.org/wiki/Circular_buffer
-  // Two cursors:
+  // Three cursors:
   //   read:  the next element to be read
   //   write: the next element to be written
-  int read, write;
+  //   trace: the next element to be traced (-1 means tracing is disabled)
+  int read, write, trace;
   // Index (into the Lua app.active_apps array) of the app that
   // receives from this link.
   int receiving_app;
