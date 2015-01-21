@@ -60,6 +60,13 @@ function prepend (p, ptr, len)
    return p
 end
 
+-- Move packet data to the left. This shortens the packet by dropping
+-- the header bytes at the front.
+function shiftleft (p, bytes)
+   C.memmove(p.data, p.data+bytes, p.length-bytes)
+   p.length = p.length - bytes
+end
+
 -- Conveniently create a packet by copying some existing data.
 function from_pointer (ptr, len) return append(allocate(), ptr, len) end
 function from_string (d)         return from_pointer(d, #d) end
