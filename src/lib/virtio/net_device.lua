@@ -21,6 +21,7 @@ require("lib.virtio.virtio_vring_h")
 
 local char_ptr_t = ffi.typeof("char *")
 local virtio_net_hdr_size = ffi.sizeof("struct virtio_net_hdr")
+local virtio_net_hdr_type = ffi.typeof("struct virtio_net_hdr *")
 local virtio_net_hdr_mrg_rxbuf_size = ffi.sizeof("struct virtio_net_hdr_mrg_rxbuf")
 local virtio_net_hdr_mrg_rxbuf_type = ffi.typeof("struct virtio_net_hdr_mrg_rxbuf *")
 
@@ -117,6 +118,11 @@ end
 function VirtioNetDevice:rx_packet_start(addr, len)
    local rx_p = packet.allocate()
 
+   local rx_header = ffi.cast(virtio_net_hdr_type, self:map_from_guest(addr))
+   rx_p.flags = rx_header.flags
+   rx_p.csum_start = rx_header.csum_start
+   rx_p.csum_offset = rx_header.csum_offset
+
    return rx_p
 end
 
@@ -147,7 +153,6 @@ function VirtioNetDevice:rx_signal_used()
    end
 end
 
-
 function VirtioNetDevice:poll_vring_transmit ()
    -- RX
    self:transmit_packets_to_vm()
@@ -173,9 +178,11 @@ function VirtioNetDevice:tx_packet_start(addr, len)
    if link.empty(l) then return nil, nil end
    local tx_p = link.receive(l)
 
-   local tx_header_pointer = ffi.cast(char_ptr_t, self:map_from_guest(addr))
-   ffi.fill(tx_header_pointer, self.hdr_size, 0)
+   local tx_header = ffi.cast(virtio_net_hdr_type, self:map_from_guest(addr))
 
+   tx_header.flags = tx_p.flags
+   tx_header.csum_start = tx_p.csum_start
+   tx_header.csum_offset = tx_p.csum_offset
    return tx_p
 end
 

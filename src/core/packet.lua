@@ -32,6 +32,9 @@ end
 function new_packet ()
    local p = ffi.cast(packet_ptr_t, memory.dma_alloc(packet_size))
    p.length = 0
+   p.flags = 0
+   p.csum_start = 0
+   p.csum_offset = 0
    return p
 end
 
@@ -40,6 +43,9 @@ function clone (p)
    local p2 = allocate()
    ffi.copy(p2, p, p.length)
    p2.length = p.length
+   p2.flags = p.flags
+   p2.csum_start = p.csum_start
+   p2.csum_offset = p.csum_offset
    return p2
 end
 
