@@ -139,29 +139,20 @@ function selftest ()
       os.exit(engine.test_skipped_code)
    end
 
---   zone('buffer') buffer.preallocate(100000) zone()
-
-   sq_sq(pcideva, pcidevb)
-   local done = function ()
-      return engine.app_table['nicA'].input.rx.stats.rxpackets >= 100e6
-   end
-   engine.main({done=done, report={showlinks=true, showapps=false}})
-   engine.report({showapps=true})
-   if true then return end
-
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
---   engine.report({showapps=true})
    do
       local a0Sends = engine.app_table.nicAm0.input.rx.stats.txpackets
       local a1Gets = engine.app_table.nicAm1.output.tx.stats.rxpackets
-      if a1Gets < a0Sends/4
-         or a1Gets > a0Sends*3/4
-      then
-         print ('wrong proportion of packets passed/discarded')
+      -- Check propertions with some modest margin for error
+      if a1Gets < a0Sends * 0.45 or a1Gets > a0Sends * 0.55 then
+         print("mq_sw: wrong proportion of packets passed/discarded")
          os.exit(1)
       end
    end
+
+   sq_sq(pcideva, pcidevb)
+   engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    do
       local aSends = engine.app_table.nicA.input.rx.stats.txpackets
@@ -174,14 +165,13 @@ function selftest ()
          or bGets < aGets/2
          or aGets < bGets/2
       then
-         print ('not enought packets somewhere')
+         print("sq_sq: missing packets")
          os.exit (1)
       end
    end
 
    mq_sq(pcideva, pcidevb)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
---   engine.report({showapps=true})
 
    do
       local aSends = engine.app_table.nicAs.input.rx.stats.txpackets
@@ -192,18 +182,19 @@ function selftest ()
          b1Gets < b0Gets/2 or
          b0Gets+b1Gets < aSends/2
       then
-         print ('not enought packets somewhere')
+         print("mq_sq: missing packets")
          os.exit (1)
       end
    end
+   print("selftest: ok")
 end
 
 -- open two singlequeue drivers on both ends of the wire
 function sq_sq(pcidevA, pcidevB)
    engine.configure(config.new())
    local c = config.new()
-   print ('-------')
-   print ('just send a lot of packets through the wire')
+   print("-------")
+   print("Transmitting bidirectionally between nicA and nicB")
    config.app(c, 'source1', basic_apps.Source)
    config.app(c, 'source2', basic_apps.Source)
    config.app(c, 'nicA', Intel82599, {pciaddr=pcidevA})
@@ -254,9 +245,9 @@ function mq_sq(pcidevA, pcidevB)
                pciaddr = pcidevB,
                vmdq = true,
                macaddr = '52:54:00:03:03:03'})
-   print ('-------')
-   print ("Send a bunch of from the SF on NIC A to the VFs on NIC B")
-   print ("half of them go to nicBm0 and nicBm0")
+   print("-------")
+   print("Send traffic from a nicA (SF) to nicB (two VFs)")
+   print("The packets should arrive evenly split between the VFs")
    config.app(c, 'sink_ms', basic_apps.Sink)
    config.link(c, 'source_ms.out -> repeater_ms.input')
    config.link(c, 'repeater_ms.output -> nicAs.rx')
@@ -266,7 +257,6 @@ function mq_sq(pcidevA, pcidevB)
    engine.configure(c)
    link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
    link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
---   engine.report({showapps=true})
 end
 
 -- one multiqueue driver with two apps and do switch stuff
@@ -314,5 +304,4 @@ function mq_sw(pcidevA)
    engine.configure(c)
    link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
    link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
---   engine.report({showapps=true})
 end
