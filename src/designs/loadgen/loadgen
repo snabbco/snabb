@@ -38,7 +38,6 @@ function run (args)
               end
    local t = timer.new("report", fn, 1e9, 'repeating')
    timer.activate(t)
-   buffer.preallocate(100000)
    app.main()
 end
 
