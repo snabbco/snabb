@@ -18,7 +18,7 @@ end
 
 function remove (freelist)
    if freelist.nfree == 0 then
-      return nil
+      error("no free packets")
    else
       freelist.nfree = freelist.nfree - 1
       return freelist.list[freelist.nfree]

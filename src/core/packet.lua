@@ -19,7 +19,7 @@ local header_size = 8
 local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
 -- Freelist containing empty packets ready for use.
-local max_packets = 1024
+local max_packets = 10240
 local packets_fl = freelist.new("struct packet *", max_packets)
 
 -- Return an empty packet.
@@ -58,6 +58,13 @@ function prepend (p, ptr, len)
    ffi.copy(p.data, ptr, len)                -- Fill the gap
    p.length = p.length + len
    return p
+end
+
+-- Move packet data to the left. This shortens the packet by dropping
+-- the header bytes at the front.
+function shiftleft (p, bytes)
+   C.memmove(p.data, p.data+bytes, p.length-bytes)
+   p.length = p.length - bytes
 end
 
 -- Conveniently create a packet by copying some existing data.

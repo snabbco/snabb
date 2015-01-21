@@ -29,8 +29,6 @@ Source = setmetatable({zone = "Source"}, {__index = Basic})
 function Source:new(size)
    size = tonumber(size) or 60
    local data = ffi.new("char[?]", size)
-   data[12] = 0x08
-   data[13] = 0x00
    local p = packet.from_pointer(data, size)
    return setmetatable({size=size, packet=p}, {__index=Source})
 end
@@ -39,12 +37,12 @@ function Source:pull ()
    for _, o in ipairs(self.outputi) do
       for i = 1, link.nwritable(o) do
          transmit(o, packet.clone(self.packet))
-         -- To repeatedly resend the same packet requires a
-         -- corresponding change in intel10g.lua sync_transmit() to
-         -- skip the call to packet.free()
-         --transmit(o, self.packet)
       end
    end
+end
+
+function Source:stop ()
+   packet.free(self.packet)
 end
 
 --- # `Join` app: Merge multiple inputs onto one output
@@ -100,26 +98,6 @@ function Sink:push ()
    end
 end
 
---- ### `FastSink` app: Receive and discard packets
-
--- It is hacked Sink with very low packet processing overhead
--- Only for test purpose, never use it in real world application
--- Assumed to be used in pair with FastRepeater
--- FastSink doesn't calculate rx statistics
-
-FastSink = setmetatable({zone = "FastSink"}, {__index = Basic})
-
-function FastSink:new ()
-   return setmetatable({}, {__index=Sink})
-end
-
-function FastSink:push ()
-   local i = self.input.input
-   -- make link empty
-   i.read = 0
-   i.write = 0
-end
-
 --- ### `Tee` app: Send inputs to all outputs
 
 Tee = setmetatable({zone = "Tee"}, {__index = Basic})
@@ -141,7 +119,7 @@ function Tee:push ()
             maxoutput = maxoutput - 1
 	    do local outputi = self.outputi
 	       for k = 1, #outputi do
-		  transmit(outputi[k], p)
+		  transmit(outputi[k], k == #outputi and p or packet.clone(p))
 	       end
 	    end
          end
@@ -162,7 +140,6 @@ function Repeater:push ()
    local i, o = self.input.input, self.output.output
    for _ = 1, link.nreadable(i) do
       local p = receive(i)
---      packet.tenure(p)
       table.insert(self.packets, p)
    end
    local npackets = #self.packets
@@ -175,59 +152,9 @@ function Repeater:push ()
    end
 end
 
---- ### `FastRepeater` app: Send all received packets in a loop
-
--- It is hacked Repeater with very low packet processing overhead
--- Only for test purpose, never use it in real world application
--- Assumed to be used in pair with FastSink
-
-FastRepeater = setmetatable({zone = "FastRepeater"}, {__index = Basic})
-
-function FastRepeater:new ()
-   return setmetatable({init = true},
-                       {__index=FastRepeater})
-end
-
-do
-   local ring_size = C.LINK_RING_SIZE
-   local max_packets = C.LINK_MAX_PACKETS
-
-   function FastRepeater:push ()
-      local o = self.output.output
-      -- on first call read all packets
-      if self.init then
-         local i = self.input.input
-         local npackets = link.nreadable(i)
-         for index = 1, npackets do
-            local p = receive(i)
-            packet.tenure(p)
-            o.packets[index - 1] = p
-         end
-         --  and fullfil output link buffer
-         for index = npackets, max_packets do
-            o.packets[index] = o.packets[index % npackets]
-         end
-         o.stats.txpackets = ring_size
-         self.init = false
-         return
-      end
-      -- reset output link, make it full again
-      o.write = (o.write + link.nwritable(o)) % ring_size
-      -- assert(link.full(o)) -- hint how to debug
-      o.stats.txpackets = o.stats.txpackets + ring_size
-      -- intentionally don't calculate txbytes
+function Repeater:stop ()
+   for i = 1, #self.packets do
+      packet.free(self.packets[i])
    end
 end
-
---- ### `Buzz` app: Print a debug message when called
-
-Buzz = setmetatable({zone = "Buzz"}, {__index = Basic})
-
-function Buzz:new ()
-   return setmetatable({}, {__index=Buzz})
-end
-
-function Buzz:pull () print "bzzz pull" end
-function Buzz:push () print "bzzz push" end
-
 
