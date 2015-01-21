@@ -19,7 +19,7 @@ local header_size = 8
 local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
 -- Freelist containing empty packets ready for use.
-local max_packets = 1024
+local max_packets = 10240
 local packets_fl = freelist.new("struct packet *", max_packets)
 
 -- Return an empty packet.
