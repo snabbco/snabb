@@ -29,8 +29,6 @@ Source = setmetatable({zone = "Source"}, {__index = Basic})
 function Source:new(size)
    size = tonumber(size) or 60
    local data = ffi.new("char[?]", size)
-   data[12] = 0x08
-   data[13] = 0x00
    local p = packet.from_pointer(data, size)
    return setmetatable({size=size, packet=p}, {__index=Source})
 end

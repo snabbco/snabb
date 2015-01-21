@@ -131,7 +131,6 @@ function M_sf:init_receive ()
    self.r.HLREG0(bits{
       TXCRCEN=0, RXCRCSTRP=1, JUMBOEN=2, rsv2=3, TXPADEN=10,
       rsvd3=11, rsvd4=13, MDCSPD=16
-      -- Temporarily disabled: RXLNGTHERREN=27
    })
    self.r.MAXFRS(lshift(9000+18, 16))
    self:set_receive_descriptors()
