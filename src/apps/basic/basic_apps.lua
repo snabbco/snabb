@@ -217,15 +217,3 @@ do
    end
 end
 
---- ### `Buzz` app: Print a debug message when called
-
-Buzz = setmetatable({zone = "Buzz"}, {__index = Basic})
-
-function Buzz:new ()
-   return setmetatable({}, {__index=Buzz})
-end
-
-function Buzz:pull () print "bzzz pull" end
-function Buzz:push () print "bzzz push" end
-
-
