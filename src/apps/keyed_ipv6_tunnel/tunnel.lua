@@ -180,18 +180,10 @@ function SimpleKeyedTunnel:push()
    assert(l_in and l_out)
 
    while not link.empty(l_in) and not link.full(l_out) do
-      local p = packet.want_modify(link.receive(l_in))
-
-      local iovec = p.iovecs[0]
-
-      local new_b = buffer.allocate()
-      ffi.copy(new_b.pointer, self.header, HEADER_SIZE)
-
-      -- set payload size
-      local plength = ffi.cast(plength_ctype, new_b.pointer + LENGTH_OFFSET)
-      plength[0] = lib.htons(SESSION_COOKIE_SIZE + p.length)
-
-      packet.prepend_iovec(p, new_b, HEADER_SIZE)
+      local p = link.receive(l_in)
+      packet.prepend(p, self.header, HEADER_SIZE)
+      local plength = ffi.cast(plength_ctype, p.data + LENGTH_OFFSET)
+      plength[0] = lib.htons(SESSION_COOKIE_SIZE + p.length - HEADER_SIZE)
       link.transmit(l_out, p)
    end
 
@@ -200,48 +192,31 @@ function SimpleKeyedTunnel:push()
    l_out = self.output.decapsulated
    assert(l_in and l_out)
    while not link.empty(l_in) and not link.full(l_out) do
-      local p = packet.want_modify(link.receive(l_in))
-
-      local iovec = p.iovecs[0]
-
+      local p = link.receive(l_in)
       -- match next header, cookie, src/dst addresses
       local drop = true
       repeat
-         -- support only a whole tunnel header in first iovec at the moment
-         if iovec.length < HEADER_SIZE then
+         if p.length < HEADER_SIZE then
             break
          end
-
-         local next_header = ffi.cast(
-               next_header_ctype,
-               iovec.buffer.pointer + iovec.offset + NEXT_HEADER_OFFSET
-            )
+         local next_header = ffi.cast(next_header_ctype, p.data + NEXT_HEADER_OFFSET)
          if next_header[0] ~= L2TPV3_NEXT_HEADER then
             break
          end
 
-         local cookie = ffi.cast(
-               pcookie_ctype,
-               iovec.buffer.pointer + iovec.offset + COOKIE_OFFSET
-            )
+         local cookie = ffi.cast(pcookie_ctype, p.data + COOKIE_OFFSET)
          if cookie[0] ~= self.remote_cookie then
             break
          end
 
-         local remote_address = ffi.cast(
-               paddress_ctype,
-               iovec.buffer.pointer + iovec.offset + SRC_IP_OFFSET
-            )
+         local remote_address = ffi.cast(paddress_ctype, p.data + SRC_IP_OFFSET)
          if remote_address[0] ~= self.remote_address[0] or
             remote_address[1] ~= self.remote_address[1]
          then
             break
          end
 
-         local local_address = ffi.cast(
-               paddress_ctype,
-               iovec.buffer.pointer + iovec.offset + DST_IP_OFFSET
-            )
+         local local_address = ffi.cast(paddress_ctype, p.data + DST_IP_OFFSET)
          if local_address[0] ~= self.local_address[0] or
             local_address[1] ~= self.local_address[1]
          then
@@ -253,11 +228,9 @@ function SimpleKeyedTunnel:push()
 
       if drop then
          -- discard packet
-         packet.deref(p)
+         packet.free(p)
       else
-         iovec.offset = iovec.offset + HEADER_SIZE
-         iovec.length = iovec.length - HEADER_SIZE
-         p.length = p.length - HEADER_SIZE
+         packet.shiftleft(p, HEADER_SIZE)
          link.transmit(l_out, p)
       end
    end
@@ -280,7 +253,6 @@ function selftest ()
       default_gateway_MAC = "a1:b2:c3:d4:e5:f6"
    } -- should be symmetric for local "loop-back" test
 
-   buffer.preallocate(10000)
    local c = config.new()
    config.app(c, "source", pcap.PcapReader, input_file)
    config.app(c, "tunnel", SimpleKeyedTunnel, tunnel_config)
