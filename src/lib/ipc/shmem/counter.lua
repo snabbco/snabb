@@ -7,7 +7,8 @@
 --
 -- The procedural interface can be used to avoid method-call overhead.
 -- The set of counters may also be accessed by treating the entire
--- segment as an array of doubles
+-- segment as an array of doubles (instead of using the more generic
+-- dictionary() base method)
 --
 --  local array = ffi.cast("uint64_t *", counter:base())
 --  array[i] = ...
@@ -30,20 +31,20 @@ function counter:register (name, value)
 end
 
 function counter:add (name, value)
-   add(self:ptr(name), value)
+   counter.p_add(self:ptr(name), value)
 end
 
 -- Procedural interface
 
-function add (counter, value)
+function counter.p_add (counter, value)
    counter[0] = counter[0] + value
 end
 
-function get (counter)
+function counter.p_get (counter)
    return counter[0]
 end
 
-function set (counter, value)
+function counter.p_set (counter, value)
    counter[0] = value
 end
 
