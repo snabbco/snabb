@@ -54,7 +54,8 @@ local invalid_header_id = 0xffff
 local supported_features = C.VIRTIO_F_ANY_LAYOUT +
                            C.VIRTIO_RING_F_INDIRECT_DESC +
                            C.VIRTIO_NET_F_CTRL_VQ +
-                           C.VIRTIO_NET_F_MQ
+                           C.VIRTIO_NET_F_MQ +
+                           C.VIRTIO_NET_F_MRG_RXBUF
 --[[
    The following offloading flags are also available:
    VIRTIO_NET_F_CSUM
@@ -90,7 +91,9 @@ function VirtioNetDevice:new(owner)
    end
 
    self.virtq_pairs = 1
+   self.hdr_type = virtio_net_hdr_type
    self.hdr_size = virtio_net_hdr_size
+   self.tx = {}
 
    return o
 end
@@ -103,14 +106,14 @@ end
 
 -- Receive all available packets from the virtual machine.
 function VirtioNetDevice:receive_packets_from_vm ()
+   local ops = {
+      packet_start = self.rx_packet_start,
+      buffer_add   = self.rx_buffer_add,
+      packet_end   = self.rx_packet_end
+   }
    for i = 0, self.virtq_pairs-1 do
       self.ring_id = 2*i+1
       local virtq = self.virtq[self.ring_id]
-      local ops = {
-         packet_start = self.rx_packet_start,
-         buffer_add   = self.rx_buffer_add,
-         packet_end   = self.rx_packet_end
-      }
       get_buffers(virtq, 'rx', ops, self.hdr_size)
    end
 end
@@ -118,10 +121,10 @@ end
 function VirtioNetDevice:rx_packet_start(addr, len)
    local rx_p = packet.allocate()
 
-   local rx_header = ffi.cast(virtio_net_hdr_type, self:map_from_guest(addr))
-   rx_p.flags = rx_header.flags
-   rx_p.csum_start = rx_header.csum_start
-   rx_p.csum_offset = rx_header.csum_offset
+   local rx_hdr = ffi.cast(virtio_net_hdr_type, self:map_from_guest(addr))
+   rx_p.flags = rx_hdr.flags
+   rx_p.csum_start = rx_hdr.csum_start
+   rx_p.csum_offset = rx_hdr.csum_offset
 
    return rx_p
 end
@@ -161,14 +164,23 @@ end
 
 -- Receive all available packets from the virtual machine.
 function VirtioNetDevice:transmit_packets_to_vm ()
-   for i = 0, self.virtq_pairs-1 do
-      self.ring_id = 2*i
-      local virtq = self.virtq[self.ring_id]
-      local ops = {
+   local ops = {}
+   if not self.mrg_rxbuf then
+      ops = {
          packet_start = self.tx_packet_start,
          buffer_add   = self.tx_buffer_add,
          packet_end   = self.tx_packet_end
       }
+   else
+      ops = {
+         packet_start = self.tx_packet_start_mrg_rxbuf,
+         buffer_add   = self.tx_buffer_add_mrg_rxbuf,
+         packet_end   = self.tx_packet_end_mrg_rxbuf
+      }
+   end
+   for i = 0, self.virtq_pairs-1 do
+      self.ring_id = 2*i
+      local virtq = self.virtq[self.ring_id]
       get_buffers(virtq, 'tx', ops, self.hdr_size)
    end
 end
@@ -178,11 +190,11 @@ function VirtioNetDevice:tx_packet_start(addr, len)
    if link.empty(l) then return nil, nil end
    local tx_p = link.receive(l)
 
-   local tx_header = ffi.cast(virtio_net_hdr_type, self:map_from_guest(addr))
+   local tx_hdr = ffi.cast(virtio_net_hdr_type, self:map_from_guest(addr))
 
-   tx_header.flags = tx_p.flags
-   tx_header.csum_start = tx_p.csum_start
-   tx_header.csum_offset = tx_p.csum_offset
+   -- TODO: copy the relevnat fields from the packet
+   ffi.fill(tx_hdr, virtio_net_hdr_size)
+
    return tx_p
 end
 
@@ -191,13 +203,76 @@ function VirtioNetDevice:tx_buffer_add(tx_p, addr, len)
    local addr = self:map_from_guest(addr)
    local pointer = ffi.cast(char_ptr_t, addr)
 
-   assert(tx_p.length<=len)
+   assert(tx_p.length <= len)
    ffi.copy(pointer, tx_p.data, tx_p.length)
+
    return tx_p.length
 end
 
 function VirtioNetDevice:tx_packet_end(header_id, total_size, tx_p)
    packet.free(tx_p)
+   self.virtq[self.ring_id]:put_buffer(header_id, total_size)
+end
+
+function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
+   local tx_mrg_hdr = ffi.cast(virtio_net_hdr_mrg_rxbuf_type, self:map_from_guest(addr))
+   local l = self.owner.input.rx
+   local tx_p = self.tx.p
+   -- TODO: copy the relevnat fields from the packet
+   ffi.fill(tx_mrg_hdr, virtio_net_hdr_mrg_rxbuf_size)
+
+   -- for the first buffer receive a packet and save its header pointer
+   if not tx_p then
+      if link.empty(l) then return end
+      tx_p = link.receive(l)
+      self.tx.tx_mrg_hdr = tx_mrg_hdr
+      self.tx.data_sent = 0
+   end
+
+   return tx_p
+end
+
+function VirtioNetDevice:tx_buffer_add_mrg_rxbuf(tx_p, addr, len)
+
+   local addr = self:map_from_guest(addr)
+   local pointer = ffi.cast(char_ptr_t, addr)
+
+   -- The first buffer is HDR|DATA. All subsequent buffers are DATA only
+   -- virtq passes us the pointer to the DATA so we need to adjust
+   -- the number fo copied data and the pointer
+   local adjust = 0
+   if self.tx.tx_mrg_hdr.num_buffers ~= 0 then
+      adjust = virtio_net_hdr_mrg_rxbuf_size
+   end
+
+   -- calculate the amont of data to copy on this pass
+   -- take the minimum of the datat left in the packet
+   -- and the adjusted buffer len
+   local to_copy = math.min(tx_p.length - self.tx.data_sent, len + adjust)
+
+   -- copy the data to the adjusted pointer
+   ffi.copy(pointer - adjust, tx_p.data + self.tx.data_sent, to_copy)
+
+   -- update the num_buffers in the first virtio header
+   self.tx.tx_mrg_hdr.num_buffers = self.tx.tx_mrg_hdr.num_buffers + 1
+   self.tx.data_sent = self.tx.data_sent + to_copy
+
+   -- have we sent all the data in the packet?
+   if self.tx.data_sent == tx_p.length then
+      self.tx.finished = true
+   end
+
+   return to_copy
+end
+
+function VirtioNetDevice:tx_packet_end_mrg_rxbuf(header_id, total_size, tx_p)
+   -- free the packet only when all its data is processed
+   if self.tx.finished then
+      packet.free(tx_p)
+      self.tx = {}
+   elseif not self.tx.p then
+      self.tx.p = tx_p
+   end
    self.virtq[self.ring_id]:put_buffer(header_id, total_size)
 end
 
@@ -269,6 +344,7 @@ function VirtioNetDevice:set_features(features)
    print(string.format("Set features 0x%x\n%s", tonumber(features), get_feature_names(features)))
    self.features = features
    if band(self.features, C.VIRTIO_NET_F_MRG_RXBUF) == C.VIRTIO_NET_F_MRG_RXBUF then
+      self.hdr_type = virtio_net_hdr_mrg_rxbuf_type
       self.hdr_size = virtio_net_hdr_mrg_rxbuf_size
       self.mrg_rxbuf = true
    end

@@ -50,7 +50,7 @@ function VirtioVirtq:get_desc()
 end
 
 -- Receive all available packets from the virtual machine.
-function VirtioVirtq:get_buffers (kind, ops, header_len)
+function VirtioVirtq:get_buffers (kind, ops, hdr_len)
 
    local ring = self.virtq.avail.ring
    local device = self.device
@@ -70,14 +70,14 @@ function VirtioVirtq:get_buffers (kind, ops, header_len)
 
       local packet =
          ops.packet_start(device, data_desc.addr, data_desc.len)
-      local total_size = header_len
+      local total_size = hdr_len
 
       if not packet then break end
 
       -- support ANY_LAYOUT
-      if header_len < data_desc.len then
-         local addr = data_desc.addr + header_len
-         local len = data_desc.len - header_len
+      if hdr_len < data_desc.len then
+         local addr = data_desc.addr + hdr_len
+         local len = data_desc.len - hdr_len
          local added_len = ops.buffer_add(device, packet, addr, len)
          total_size = total_size + added_len
       end
