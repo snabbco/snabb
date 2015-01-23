@@ -126,7 +126,6 @@ end
 -- Report on relevant status and statistics.
 function Intel82599:report ()
    print("report on intel device", self.dev.pciaddress or self.dev.pf.pciaddress)
-   --register.dump(self.dev.r)
    register.dump(self.dev.s, true)
    if self.dev.rxstats then
       for name,v in pairs(self.dev:get_rxstats()) do
@@ -145,15 +144,7 @@ function Intel82599:report ()
       r'TDH', r'TDT',
       r'RDH', r'RDT',
       r'AUTOC',
---       r'AUTOC2',
       r'LINKS',
---       self.dev.r.LINKS2 or self.dev.pf.r.LINKS2,
---       r'PFVMTXSW', r'PFVFTE',
---       r'MPSAR',
-
---       r'PFVLVFB',
---       r'PFVLVF',
---       r'VFTA',
    })
 end
 
@@ -394,44 +385,8 @@ function manyreconf(pcidevA, pcidevB)
       engine.main({duration = 0.25, report={showlinks=true, showapps=true}})
       local sent = engine.app_table.nicAm0.input.rx.stats.txpackets
       if sent == prevsent then
---          engine.app_table.nicAm0:report()
          os.exit(2)
       end
       prevsent = sent
    end
 end
-
-   --[[
-
-
-
-
-
-
-
-   engine.configure(config.new())
-   for i = 1, 4 do
-      print (('config #%d'):format(i))
-      local c = config.new()
-      config.app(c, 'source', basic_apps.Source)
-      config.app(c, 'nic', Intel82599, {
-         vmdq = true,
-         pciaddr=pcidevA,
-         macaddr = ('52:54:00:02:02:%02X'):format(i),
-         vlan = 2048+i,
-      })
-      config.app(c, 'nicB', Intel82599, {
-         vmdq = true,
-         pciaddr=pcidevA,
-         mirror={port='in'},
-         macaddr = ('52:54:00:03:03:%02X'):format(i),
-         vlan = 2048+i,
-      })
-      config.app(c, 'sink', basic_apps.Sink)
-      config.link(c, 'source.out -> nic.rx')
-      config.link(c, 'nic.tx -> sink.in')
-      config.link(c, 'nicB.tx -> sink.inB')
-      engine.configure(c)
-      engine.main({duration = 0.25})
-   end
-end]]

@@ -579,9 +579,6 @@ function M_vf:close()
 end
 
 function M_vf:reconfig(opts)
---    self:disable_transmit()
---       :disable_receive()
-
    local poolnum = self.poolnum or 0
    local pf = self.pf
 
@@ -622,7 +619,6 @@ function M_vf:init (opts)
       :enable_transmit()
 end
 
--- M_vf.close = M_sf.close
 M_vf.init_dma_memory = M_sf.init_dma_memory
 M_vf.set_receive_descriptors = M_sf.set_receive_descriptors
 M_vf.set_transmit_descriptors = M_sf.set_transmit_descriptors
