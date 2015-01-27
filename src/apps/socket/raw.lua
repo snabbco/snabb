@@ -31,7 +31,7 @@ function RawSocket:push ()
    end
 end
 
-function RawSocket.selftest ()
+function selftest ()
    -- Send a packet over the loopback device and check
    -- that it is received correctly.
    -- XXX beware of a race condition with unrelated traffic over the
