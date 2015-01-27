@@ -16,9 +16,10 @@ fi
 
 # Check if called properly and rebind the PCI device if so
 if [ -n "$1" ] && [ -f "/sys/bus/pci/devices/$1/remove" ] ; then
+    eth=$(ls /sys/bus/pci/devices/$1/net)
     echo 1 > /sys/bus/pci/devices/$1/remove
     echo 1 > /sys/bus/pci/rescan
-    printf "Re-bind successfull\n"
+    printf "Re-bind $1 as $eth successfull\n"
 else
     printf "Usage: sudo ./rebind-nic.sh <PCI address>\n"
     printf "Check if PCI device exists: /sys/bus/pci/devices/$1/remove\n"
