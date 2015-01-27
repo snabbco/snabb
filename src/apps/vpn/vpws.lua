@@ -102,7 +102,7 @@ function vpws:push()
 		     local key = gre:key()
 		     if ((self._config.label and key and key == self._config.label) or
 		      not (self._config.label or key)) then
-			datagram:pop()
+			datagram:pop(1)
 		     else
 			print(self:name()..": GRE key mismatch: local "
 			   ..(self._config.label or 'none')..", remote "..(gre:key() or 'none'))
