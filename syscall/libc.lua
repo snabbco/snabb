@@ -45,7 +45,9 @@ if not S.exit then
   function S.exit(status) return retbool(ffi.C.exit(c.EXIT[status or 0])) end
 end
 
-S._exit = S.exit -- provide syscall exit if possible
+if not S._exit then
+  S._exit = S.exit -- provide syscall exit if possible
+end
 
 ffi.cdef [[
 int __cxa_atexit(void (*func) (void *), void * arg, void * dso_handle);
