@@ -27,7 +27,7 @@ function RawSocket:push ()
    while not link.empty(l) and self.dev:can_transmit() do
       local p = link.receive(l)
       self.dev:transmit(p)
-      packet.deref(p)
+      packet.free(p)
    end
 end
 
