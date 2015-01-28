@@ -49,7 +49,7 @@ local function process (self, p)
    end
    -- Parse the neighbor solicitation and check if it contains our own
    -- address as target
-   local ns = dgram:parse(nil, self._match_ns)
+   local ns = dgram:parse_match(nil, self._match_ns)
    if not ns then
       return nil
    end
