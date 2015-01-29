@@ -343,7 +343,7 @@ local function generateRule(
 end
 
 
-local function generateConformFunctionString(rules)
+local function generateConformFunctionString(options)
    local T = make_code_concatter()
    T"local ffi = require(\"ffi\")"
    T"local bit = require(\"bit\")"
@@ -354,17 +354,18 @@ local function generateConformFunctionString(rules)
    T"return function(buffer, size)"
    T:indent()
 
-   if rules.state_track then
-      conntrack.define(rules.state_track)
+   if options.state_track then
+      conntrack.define(options.state_track)
       T"if (function(buffer, size)"
       T:indent()
    end
-   
-   if rules.state_check then
-      conntrack.define (rules.state_check)
-      T('if state_pass("', rules.state_check, '", buffer) then return true end')
+
+   if options.state_check then
+      conntrack.define (options.state_check)
+      T('if state_pass("', options.state_check, '", buffer) then return true end')
    end
 
+   local rules = options.rules or {}
    for i = 1, #rules do
       if rules[i].ethertype == "ipv4" then
          generateRule(
@@ -395,11 +396,11 @@ local function generateConformFunctionString(rules)
          error("unknown ethertype")
       end
    end
-   if rules.state_track then
+   if options.state_track then
       T:unindent()
       T"end)(buffer, size) then"
       T:indent()
-      T("track(\"", rules.state_track, "\", buffer)")
+      T("track(\"", options.state_track, "\", buffer)")
       T"return true"
       T:unindent()
       T"end"
@@ -414,15 +415,13 @@ end
 
 PacketFilter = {}
 
-function PacketFilter:new (arg)
-   local rules = arg and config.parse_app_arg(arg) or {}
-   assert(rules)
---    assert(#rules > 0)
+function PacketFilter:new (options)
+   options = config.parse_app_arg(options)
 
    local o =
    {
       conform = assert(loadstring(
-            generateConformFunctionString(rules)
+            generateConformFunctionString(options)
          ))()
    }
    return setmetatable(o, {__index = PacketFilter})
@@ -460,26 +459,28 @@ function selftest ()
 
    local V6_RULE_ICMP_PACKETS = 3 -- packets within v6.pcap
    local V6_RULE_DNS_PACKETS =  3 -- packets within v6.pcap
-      
+
    local v6_rules = {
-      {
-         ethertype = "ipv6",
-         protocol = "icmp",
-         source_cidr = "3ffe:501:0:1001::2/128", -- single IP, match 128bit
-         dest_cidr =
-            "3ffe:507:0:1:200:86ff:fe05:8000/116", -- match first 64bit and mask next 52 bit
-         state_track = 'icmp6',
-      },
-      {
-         ethertype = "ipv6",
-         protocol = "udp",
-         source_cidr = "3ffe:507:0:1:200:86ff::/28", -- mask first 28 bit
-         dest_cidr = "3ffe:501:4819::/64",           -- match first 64bit
-         source_port_min = 2397, -- port range, in v6.pcap there are values on
-         source_port_max = 2399, -- both borders and in the middle
-         dest_port_min = 53,     -- single port match
-         dest_port_max = 53,
-         state_track = 'dns_v6',
+      rules = {
+         {
+            ethertype = "ipv6",
+            protocol = "icmp",
+            source_cidr = "3ffe:501:0:1001::2/128", -- single IP, match 128bit
+            dest_cidr =
+               "3ffe:507:0:1:200:86ff:fe05:8000/116", -- match first 64bit and mask next 52 bit
+            state_track = 'icmp6',
+         },
+         {
+            ethertype = "ipv6",
+            protocol = "udp",
+            source_cidr = "3ffe:507:0:1:200:86ff::/28", -- mask first 28 bit
+            dest_cidr = "3ffe:501:4819::/64",           -- match first 64bit
+            source_port_min = 2397, -- port range, in v6.pcap there are values on
+            source_port_max = 2399, -- both borders and in the middle
+            dest_port_min = 53,     -- single port match
+            dest_port_max = 53,
+            state_track = 'dns_v6',
+         },
       },
       state_track = 'app_v6',
    }
@@ -504,23 +505,25 @@ function selftest ()
    local V4_RULE_TCP_PACKETS = 18 -- packets within v4.pcap
 
    local v4_rules = {
-      {
-         ethertype = "ipv4",
-         protocol = "udp",
-         dest_port_min = 53,     -- single port match, DNS
-         dest_port_max = 53,
-         state_track = 'dns',
-      },
-      {
-         ethertype = "ipv4",
-         protocol = "tcp",
-         source_cidr = "65.208.228.223/32", -- match 32bit
-         dest_cidr = "145.240.0.0/12",      -- mask 12bit
-         source_port_min = 80, -- our port (80) is on the border of range
-         source_port_max = 81,
-         dest_port_min = 3371, -- our port (3372) is in the middle of range
-         dest_port_max = 3373,
-         state_track = 'web',
+      rules = {
+         {
+            ethertype = "ipv4",
+            protocol = "udp",
+            dest_port_min = 53,     -- single port match, DNS
+            dest_port_max = 53,
+            state_track = 'dns',
+         },
+         {
+            ethertype = "ipv4",
+            protocol = "tcp",
+            source_cidr = "65.208.228.223/32", -- match 32bit
+            dest_cidr = "145.240.0.0/12",      -- mask 12bit
+            source_port_min = 80, -- our port (80) is on the border of range
+            source_port_max = 81,
+            dest_port_min = 3371, -- our port (3372) is in the middle of range
+            dest_port_max = 3373,
+            state_track = 'web',
+         },
       },
       state_track = 'app_v4',
    }
@@ -575,10 +578,12 @@ function selftest ()
    --- check a rule's tracked state
    config.app(c, "source1", pcap.PcapReader, "apps/packet_filter/samples/v6.pcap")
    config.app(c, "statefull_pass1", PacketFilter, {
-      {
-         ethertype = "ipv6",
-         state_check = 'dns_v6',
-         protocol = "udp",
+      rules = {
+         {
+            ethertype = "ipv6",
+            state_check = 'dns_v6',
+            protocol = "udp",
+         },
       },
    })
    config.app(c, "sink1", basic_apps.Sink )
