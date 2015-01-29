@@ -3,6 +3,7 @@ module(...,package.seeall)
 local zone = require("jit.zone")
 local basic_apps = require("apps.basic.basic_apps")
 local lib      = require("core.lib")
+local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
 local freelist = require("core.freelist")
@@ -26,6 +27,9 @@ end
 -- Create an Intel82599 App for the device with 'pciaddress'.
 function Intel82599:new (arg)
    local conf = config.parse_app_arg(arg)
+
+   -- Unbind PCI device form linux.
+   pci.unbind_device_from_linux(conf.pciaddr)
 
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
