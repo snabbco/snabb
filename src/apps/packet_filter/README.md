@@ -3,16 +3,36 @@
 The `PacketFilter` app receives packets on the `input` port and transmits
 conforming packets to the `output` port. In order to conform, a packet
 must match at least one of the *filter rules* of the `PacketFilter`
-instance.
+instance and/or belong to a sanctioned connection.
 
 ![PacketFilter](.images/PacketFilter.png)
 
 ## Configuration
 
-The `PacketFilter` app accepts a list of filter rules as its
-configuration argument. A filter rule is a table in which each key/value
-pair specifies a pattern to match against incoming packets. The following
-keys are available:
+The `PacketFilter` app accepts a table as its configuration argument. The
+following keys are available:
+
+— Key **rules**
+
+*Required*. A list of filter rules as described in the *Filter Rules*
+section below.
+
+— Key **state_track**
+
+*Optional*. A string naming a connection table. If set, packets passing
+_any_ rule will be tracked in the specified connection table.
+
+— Key **state_check**
+
+*Optional*. A string denoting a connection table. If set, any packet that
+belongs to a tracked connection in the specified connection table will
+be let pass.
+
+### Filter Rules
+
+A filter rule is a table in which each key/value pair specifies a pattern
+to match or track incoming packets against. The following keys are
+defined:
 
 — Key **ethertype**
 
@@ -49,15 +69,11 @@ is allowed.
 
 — Key **state_track**
 
-*Optional*. Tracks connections state in a named connection table.  If used
-inside a rule, every packet that passes this specific rule is tracked.
-If used 'outside' any rule, packets passing _any_ rule on this app will be
-tracked.
+*Optional*. A string naming a connection table. If set, packets passing
+the rule are tracked in the specified connection table.
 
 — Key **state_check**
 
-*Optional*. Checks if a packet belongs to a connection in a named
-connection table.  If used inside a rule, a packet must belong to an
-existing connection in addition to any other condition in the rule to pass.
-If used 'outside' any rule, if a packet belongs to an existing connection
-it's enough to pass the app.
+*Optional*. A string denoting a connection table. If set, packets must
+belong to a tracked connection in the specified connection table in
+addition to any other condition in the rule to pass.
