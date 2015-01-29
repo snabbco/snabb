@@ -31,6 +31,13 @@ function load (file, pciaddr, sockpath)
                                       vlan = vlan})
       config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(t.port_id)})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
+      if t.tx_police_gbps then
+         local TxLimit = "TxLimit_"..name
+         local rate = t.tx_police_gbps * 1e9 / 8
+         config.app(c, TxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
+         config.link(c, VM_tx.." -> "..TxLimit..".input")
+         VM_tx = TxLimit..".output"
+      end
       if t.ingress_filter and #t.ingress_filter > 0 then
          local Filter = "Filter_in_"..name
          config.app(c, Filter, PacketFilter, t.ingress_filter)
@@ -66,12 +73,12 @@ function load (file, pciaddr, sockpath)
          config.link(c, Tunnel..".decapsulated -> "..VM_rx)
          VM_rx, VM_tx = ND..".south", ND..".south"
       end
-      if t.tx_police_gbps then
-         local QoS = "QoS_"..name
-         local rate = t.tx_police_gbps * 1e9 / 8
-         config.app(c, QoS, RateLimiter, {rate = rate, bucket_capacity = rate})
-         config.link(c, VM_tx.." -> "..QoS..".input")
-         VM_tx = QoS..".output"
+      if t.rx_police_gbps then
+         local RxLimit = "RxLimit_"..name
+         local rate = t.rx_police_gbps * 1e9 / 8
+         config.app(c, RxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
+         config.link(c, RxLimit..".output -> "..VM_rx)
+         VM_rx = RxLimit..".input"
       end
       config.link(c, NIC..".tx -> "..VM_rx)
       config.link(c, VM_tx.." -> "..NIC..".rx")
