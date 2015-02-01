@@ -54,9 +54,14 @@ uint32_t volatile *map_pci_resource(int fd)
   }
 }
 
-void close_pci_resource(int fd)
+void close_pci_resource(int fd, uint32_t volatile *addr)
 {
   flock(fd, LOCK_UN);
+  if (addr != NULL) {
+    struct stat st;
+    assert( fstat(fd, &st) == 0 );
+    assert( munmap((void *)addr, st.st_size) == 0 );
+  }
   close(fd);
 }
 
