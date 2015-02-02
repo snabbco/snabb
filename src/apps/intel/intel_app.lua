@@ -39,7 +39,6 @@ function Intel82599:new (arg)
    else
       local dev = intel10g.new_sf(conf.pciaddr)
          :open()
-         :autonegotiate_sfi()
          :wait_linkup()
       if not dev then return null end
       return setmetatable({dev=dev, zone="intel"}, Intel82599)
@@ -160,7 +159,7 @@ function selftest ()
 
    zone('buffer') buffer.preallocate(1000) zone()
 
-   manyreconf(pcideva, pcidevb)
+--    manyreconf(pcideva, pcidevb)
 
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
@@ -350,7 +349,7 @@ function manyreconf(pcidevA, pcidevB)
       26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
       36 37
    ]], 98)                  -- src: Am0    dst: ---
-   engine.configure(config.new())
+--    engine.configure(config.new())
    local prevsent = 0
    for i = 1, 100 do
       print (('config #%d'):format(i))
@@ -382,7 +381,7 @@ function manyreconf(pcidevA, pcidevB)
       engine.configure(c)
       link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
       link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
-      engine.main({duration = 0.25, report={showlinks=true, showapps=true}})
+      engine.main({duration = 0.25, report={showlinks=true, showapps=false}})
       local sent = engine.app_table.nicAm0.input.rx.stats.txpackets
       if sent == prevsent then
          os.exit(2)
