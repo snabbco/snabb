@@ -71,8 +71,8 @@ function M_sf:close()
       self:discard_unsent_packets()
       C.usleep(1000)
    end
-   if self.fd then 
-      pci.close_pci_resource(self.fd) 
+   if self.fd then
+      pci.close_pci_resource(self.fd, self.base)
       self.fd = false
    end
 end
@@ -313,7 +313,6 @@ function M_sf:sync_receive ()
 end
 
 function M_sf:wait_linkup ()
-   io.write('waiting...\n')
    local mask = bits{Link_up=30}
    for count = 1, 500 do
       if band(self.r.LINKS(), mask) == mask then
@@ -321,6 +320,7 @@ function M_sf:wait_linkup ()
       end
       C.usleep(1000)
    end
+   io.write ('never got link up: ', self.pciaddress, '\n')
    return self
 end
 
@@ -428,8 +428,8 @@ function M_pf:open ()
 end
 
 function M_pf:close()
-   if self.fd then 
-      pci.close_pci_resource(self.fd) 
+   if self.fd then
+      pci.close_pci_resource(self.fd, self.base)
       self.fd = false
    end
 end
@@ -559,6 +559,15 @@ end
 function M_vf:close()
    local poolnum = self.poolnum or 0
    local pf = self.pf
+
+   if self.free_receive_buffers then
+      self:free_receive_buffers()
+   end
+   if self.discard_unsent_packets then
+      self:discard_unsent_packets()
+      C.usleep(1000)
+   end
+
    -- unset_tx_rate
    self:set_tx_rate(0, 0)
    self
@@ -575,7 +584,7 @@ function M_vf:close()
    self:disable_transmit()
       :disable_receive()
 
-   return M_sf.close(self)
+   return self
 end
 
 function M_vf:reconfig(opts)
@@ -951,7 +960,10 @@ MANC      0x05820 -            RW Management Control Register
 MAXFRS    0x04268 -            RW Max Frame Size
 MNGTXMAP  0x0CD10 -            RW Mangeability Tranxmit TC Mapping
 MFLCN     0x04294 -            RW MAC Flow Control Register
+MTQC      0x08120 -            RW Multiple Transmit Queues Command Register
+MRQC      0x0EC80 -            RW Multiple Receive Queues Command Register
 PFQDE     0x02F04 -            RW PF Queue Drop Enable Register
+PFVTCTL   0x051B0 -             RW PF Virtual Control Register
 RDRXCTL   0x02F00 -            RW Receive DMA Control
 RTRUP2TC  0x03020 -            RW DCB Receive Use rPriority to Traffic Class
 RTTBCNRC  0x04984 -            RW DCB Transmit Rate-Scheduler Config
@@ -1029,7 +1041,6 @@ MCSTCTRL  0x05090 -             RW Multicast Control Register
 PSRTYPE   0x0EA00 +0x04*0..63   RW Packet Split Receive Type Register
 RXCSUM    0x05000 -             RW Receive Checksum Control
 RFCTL     0x05008 -             RW Receive Filter Control Register
-PFVTCTL   0x051B0 -             RW PF Virtual Control Register
 PFVFRE    0x051E0 +0x04*0..1    RW PF VF Receive Enable
 PFVFTE    0x08110 +0x04*0..1    RW PF VF Transmit Enable
 MTA       0x05200 +0x04*0..127  RW Multicast Table Array
@@ -1037,8 +1048,6 @@ RAL       0x0A200 +0x08*0..127  RW Receive Address Low
 RAH       0x0A204 +0x08*0..127  RW Receive Address High
 MPSAR     0x0A600 +0x04*0..255  RW MAC Pool Select Array
 VFTA      0x0A000 +0x04*0..127  RW VLAN Filter Table Array
-MTQC      0x08120 -             RW Multiple Transmit Queues Command Register
-MRQC      0x0EC80 -             RW Multiple Receive Queues Command Register
 RQTC      0x0EC70 -             RW RSS Queues Per Traffic Class Register
 RSSRK     0x0EB80 +0x04*0..9    RW RSS Random Key Register
 RETA      0x0EB00 +0x04*0..31   RW Redirection Rable
