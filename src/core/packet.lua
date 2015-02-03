@@ -84,6 +84,12 @@ function free (p)
    freelist_add(packets_fl, p)
 end
 
+-- Return pointer to packet data.
+function data (p) return p.data end
+
+-- Return packet data length.
+function length (p) return p.length end
+
 --preallocate packets freelist
 if freelist_nfree(packets_fl) == 0 then
    for i=1, max_packets do

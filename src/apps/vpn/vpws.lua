@@ -61,7 +61,7 @@ function vpws:new(arg)
    assert(filter, errmsg and ffi.string(errmsg))
    o._filter = filter
    o._dgram = datagram:new()
-   packet.deref(o._dgram:packet())
+   packet.free(o._dgram:packet())
    return o
 end
 
@@ -102,7 +102,7 @@ function vpws:push()
 		     local key = gre:key()
 		     if ((self._config.label and key and key == self._config.label) or
 		      not (self._config.label or key)) then
-			datagram:pop()
+			datagram:pop(1)
 		     else
 			print(self:name()..": GRE key mismatch: local "
 			   ..(self._config.label or 'none')..", remote "..(gre:key() or 'none'))
@@ -114,12 +114,12 @@ function vpws:push()
 		  valid = false
 	       end
 	       if not valid then
-		  packet.deref(p)
+		  packet.free(p)
 		  p = nil
 	       end
 	    else
 	       -- Packet doesn't belong to VPN, discard
-	       packet.deref(p)
+	       packet.free(p)
 	       p = nil
 	    end
 	 end
