@@ -40,6 +40,7 @@ function Intel82599:new (arg)
       local dev = intel10g.new_sf(conf.pciaddr)
          :open()
          :wait_linkup()
+         :recheck()
       if not dev then return null end
       return setmetatable({dev=dev, zone="intel"}, Intel82599)
    end
@@ -159,7 +160,7 @@ function selftest ()
 
    zone('buffer') buffer.preallocate(1000) zone()
 
---    manyreconf(pcideva, pcidevb)
+   manyreconf(pcideva, pcidevb)
 
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
