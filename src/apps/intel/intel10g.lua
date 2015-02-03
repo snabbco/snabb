@@ -93,6 +93,25 @@ function M_sf:init ()
 end
 
 
+function M_sf:recheck()
+   local mask = bits{Link_up=30}
+   if band(self.r.LINKS(), mask) == mask then
+      return self
+   else
+      return self
+         :disable_interrupts()
+         :global_reset()
+         :wait_eeprom_autoread()
+         :wait_dma()
+         :init_statistics()
+         :init_receive()
+         :init_transmit()
+         :wait_enable()
+         :wait_linkup()
+   end
+end
+
+
 function M_sf:init_dma_memory ()
    self.rxdesc, self.rxdesc_phy =
       memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
@@ -321,7 +340,7 @@ function M_sf:wait_linkup ()
       C.usleep(1000)
    end
    io.write ('never got link up: ', self.pciaddress, '\n')
-   return self
+   return self:recheck()
 end
 
 --- ### Status and diagnostics
@@ -446,6 +465,25 @@ function M_pf:init ()
       :init_receive()
       :init_transmit()
       :wait_linkup()
+end
+
+function M_pf:recheck()
+   local mask = bits{Link_up=30}
+   if band(self.r.LINKS(), mask) == mask then
+      return self
+   else
+      return self
+         :disable_interrupts()
+         :global_reset()
+         :autonegotiate_sfi()
+         :wait_eeprom_autoread()
+         :wait_dma()
+         :set_vmdq_mode()
+         :init_statistics()
+         :init_receive()
+         :init_transmit()
+         :wait_linkup()
+   end
 end
 
 M_pf.close = M_sf.close
