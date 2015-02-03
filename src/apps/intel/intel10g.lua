@@ -340,7 +340,7 @@ function M_sf:wait_linkup ()
       C.usleep(1000)
    end
    io.write ('never got link up: ', self.pciaddress, '\n')
-   return self:recheck()
+   return self
 end
 
 --- ### Status and diagnostics
@@ -465,6 +465,7 @@ function M_pf:init ()
       :init_receive()
       :init_transmit()
       :wait_linkup()
+      :recheck()
 end
 
 function M_pf:recheck()
