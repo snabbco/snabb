@@ -74,12 +74,11 @@ end
 -- Pull in packets from the network and queue them on our 'tx' link.
 function Intel82599:pull ()
    local l = self.output.tx
-   local n = 128
    if l == nil then return end
    self.dev:sync_receive()
-   while not full(l) and self.dev:can_receive() and n>0 do
+   for i=1,128 do
+      if full(l) or not self.dev:can_receive() then break end
       transmit(l, self.dev:receive())
-      n = n - 1
    end
    self:add_receive_buffers()
 end
