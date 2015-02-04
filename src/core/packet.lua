@@ -19,12 +19,16 @@ local header_size = 8
 local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
 -- Freelist containing empty packets ready for use.
-local max_packets = 10240
+local max_packets = 1e5
+local packet_allocation_step = 1000
+local packets_allocated = 0
 local packets_fl = freelist.new("struct packet *", max_packets)
 
 -- Return an empty packet.
 function allocate ()
-   if _G.developer_debug then assert( freelist_nfree(packets_fl) ~= 0) end
+   if freelist_nfree(packets_fl) == 0 then
+      preallocate_step()
+   end
    return freelist_remove(packets_fl)
 end
 
@@ -90,9 +94,19 @@ function data (p) return p.data end
 -- Return packet data length.
 function length (p) return p.length end
 
---preallocate packets freelist
-if freelist_nfree(packets_fl) == 0 then
-   for i=1, max_packets do
+function preallocate_step()
+   if _G.developer_debug then
+      assert(packets_allocated + packet_allocation_step <= max_packets)
+   end
+
+   for i=1, packet_allocation_step do
       free(new_packet())
    end
+   packets_allocated = packets_allocated + packet_allocation_step
+   packet_allocation_step = 2 * packet_allocation_step
+end
+
+--preallocate packets freelist
+if freelist_nfree(packets_fl) == 0 then
+   preallocate_step()
 end
