@@ -21,7 +21,7 @@
 
 local type, pairs, ipairs, io, os = type, pairs, ipairs, io, os
 
-module ("alt_getopt")
+module (...)
 
 local function convert_short2long (opts)
    local i = 1
