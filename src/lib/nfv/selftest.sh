@@ -228,6 +228,18 @@ function filter_tests {
     assert FILTER $?
 }
 
+# Usage: fuzz_tests <n>
+# Generate and test (IPERF) <n> semi-random NFV configurations.
+function fuzz_tests {
+    for ((n=0;n<$1;n++)); do
+        $SNABB designs/neutron/snabbnfv-fuzz \
+            test_fixtures/nfvconfig/fuzz/filter2-tunnel-txrate10-ports.spec \
+            /tmp/snabb_nfv_selftest_fuzz.ports
+        load_config /tmp/snabb_nfv_selftest_fuzz.ports
+        test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    done
+}
+
 load_config test_fixtures/nfvconfig/test_functions/other_vlan.ports
 start_bench_env
 
@@ -235,5 +247,6 @@ same_vlan_tests
 rate_limited_tests
 tunnel_tests
 filter_tests
+#fuzz_tests 100
 
 stop_bench_env
