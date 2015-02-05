@@ -1,26 +1,31 @@
+// memory.c -- allocate dma-friendly memory
+//
+// Allocate HugeTLB memory pages for DMA. HugeTLB memory is always
+// mapped to a virtual address with a specific scheme:
+//
+//   virtual_address = physical_address | 0x500000000000ULL
+//
+// This makes it possible to resolve physical addresses directly from
+// virtual addresses (remove the tag bits) and to test addresses for
+// validity (check the tag bits).
+
 #define _GNU_SOURCE
 
-#include <stdlib.h>
 #include <assert.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ipc.h>
 #include <sys/mman.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <string.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 #include "memory.h"
-#define MEMORY_HUGETLB_TAG       0x500000000000ULL
-#define MEMORY_HUGETLB_TAG_MASK  0xFF0000000000ULL
-#define MEMORY_HUGETLB_ADDR_MASK 0x00FFFFFFFFFFULL
-
-/// ### HugeTLB page allocation
 
 // Convert from virtual addresses in our own process address space to
 // physical addresses in the RAM chips.
@@ -49,67 +54,52 @@ uint64_t virtual_to_physical(void *ptr)
   return (data & ((1ULL << 55) - 1)) * 4096;
 }
 
-// Allocate a HugeTLB memory page of 'size' bytes.
-// Optionally make the page persistent in /hugetlbfs/snabb/
+// Map a new HugeTLB page to an appropriate virtual address.
 //
-// Return a pointer to the start of the page, or NULL on failure.
-void *allocate_huge_page(int size, bool persistent)
+// The HugeTLB page is allocated and mapped using the shm (shared
+// memory) API. This API makes it easy to remap the page to a new
+// virtual address after we resolve the physical address.
+//
+// There are two other APIs for allocating HugeTLB pages but they do
+// not work as well:
+//
+//   mmap() anonymous page with MAP_HUGETLB: cannot remap the address
+//   after allocation because Linux mremap() does not seem to work on
+//   HugeTLB pages.
+//
+//   mmap() with file-backed MAP_HUGETLB: the file has to be on a
+//   hugetlbfs mounted filesystem and that is not necessarily
+//   available.
+//
+// Happily the shm API is happy to remap a HugeTLB page with an
+// additional call to shmat() and does not depend on hugetlbfs.
+//
+// Further reading:
+//   https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt
+//   http://stackoverflow.com/questions/27997934/mremap2-with-hugetlb-to-change-virtual-address
+void *allocate_huge_page(int size)
 {
-  int fd = -1;
-  char tmpfilename[256], realfilename[256];
+  int shmid = -1;
   uint64_t physical_address, virtual_address;
-  void *tmpptr, *realptr;
-  strncpy(tmpfilename, "/hugetlbfs/snabb/new.XXXXXX", sizeof(tmpfilename));
-  mkdir("/hugetlbfs/snabb", 0700);
-  if ((fd = mkostemp(tmpfilename, O_RDWR|O_CREAT)) == -1) {
-    perror("create new hugetlb file");
-    goto fail;
-  }
-  if (ftruncate(fd, size) == -1) {
-    perror("ftruncate");
-    goto fail;
-  }
-  tmpptr = mmap(NULL, size, PROT_READ | PROT_WRITE,
-		MAP_SHARED | MAP_HUGETLB, fd, 0);
-  if (tmpptr == MAP_FAILED) {
-    perror("tmp mmap");
-    goto fail;
-  }
-  if ((physical_address = virtual_to_physical(tmpptr)) == 0) {
-    goto fail;
-  }
-  virtual_address = physical_address | MEMORY_HUGETLB_TAG;
-  realptr = mmap((void*)virtual_address, size, PROT_READ | PROT_WRITE,
-		 MAP_SHARED | MAP_HUGETLB | MAP_FIXED, fd, 0);
-  if (realptr == MAP_FAILED) {
-    perror("real mmap");
-    return NULL;
-  }
-  munmap(tmpptr, size);
-  if (persistent) {
-    snprintf(realfilename, sizeof(realfilename),
-	     "/hugetlbfs/snabb/page.%012lx", physical_address);
-    if (rename(tmpfilename, realfilename) == -1) {
-      perror("rename");
-      goto fail;
-    }
-  } else {
-    if (unlink(tmpfilename) == -1) {
-      perror("unlink");
-      goto fail;
-    }
-  }
+  void *tmpptr = MAP_FAILED;  // initial kernel assigned virtual address
+  void *realptr = MAP_FAILED; // remapped virtual address
+  shmid = shmget(IPC_PRIVATE, size, SHM_HUGETLB | IPC_CREAT | SHM_R | SHM_W);
+  tmpptr = shmat(shmid, NULL, 0);
+  if (tmpptr == MAP_FAILED) { goto fail; }
+  physical_address = virtual_to_physical(tmpptr);
+  if (physical_address == 0) { goto fail; }
+  virtual_address = physical_address | 0x500000000000ULL;
+  realptr = shmat(shmid, (void*)virtual_address, 0);
+  if (realptr == MAP_FAILED) { goto fail; }
+  shmdt(tmpptr);
+  shmctl(shmid, IPC_RMID, 0);
   return realptr;
  fail:
-  if (fd != -1) { close(fd); }
+  if (tmpptr  != MAP_FAILED) { shmdt(tmpptr); }
+  if (realptr != MAP_FAILED) { shmdt(realptr); }
+  if (shmid   != -1)         { shmctl(shmid, IPC_RMID, 0); }
   return NULL;
 }
-
-/// ### Stable physical memory access
-
-/// Physical addresses are resolved using the Linux
-/// [pagemap](https://www.kernel.org/doc/Documentation/vm/pagemap.txt)
-/// `procfs` file.
 
 // Lock all current and future virtual memory in a stable physical location.
 int lock_memory()

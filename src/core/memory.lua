@@ -55,7 +55,7 @@ end
 
 function allocate_hugetlb_chunk ()
    for i =1, 3 do
-      local page = C.allocate_huge_page(huge_page_size, false)
+      local page = C.allocate_huge_page(huge_page_size)
       if page ~= nil then return page else reserve_new_page() end
    end
 end
@@ -89,7 +89,12 @@ huge_page_bits = math.log(huge_page_size, 2)
 
 local uint64_t = ffi.typeof("uint64_t")
 function virtual_to_physical (virt_addr)
-   return bit.band(ffi.cast(uint64_t, virt_addr), 0x0FFFFFFFFFFFULL);
+   local u64 = ffi.cast(uint64_t, virt_addr)
+   if bit.band(u64, 0x500000000000ULL) ~= 0x500000000000ULL then
+      print("Invalid DMA address: 0x"..bit.tohex(u64,12))
+      error("DMA address tag check failed")
+   end
+   return bit.bxor(u64, 0x500000000000ULL)
 end
 
 --- ### selftest
@@ -101,8 +106,9 @@ function selftest (options)
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
       io.flush()
       local dmaptr, physptr, dmalen = dma_alloc(huge_page_size)
-      print("Got "..(dmalen/1024^2).."MB "..
-         "at 0x"..tostring(ffi.cast("void*",tonumber(physptr))))
+      print("Got "..(dmalen/1024^2).."MB")
+      print("    Physical address: 0x" .. bit.tohex(virtual_to_physical(dmaptr), 12))
+      print("    Virtual address:  0x" .. bit.tohex(ffi.cast(uint64_t, dmaptr), 12))
       ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- try a write
       assert(dmaptr ~= nil and dmalen == huge_page_size)
    end
