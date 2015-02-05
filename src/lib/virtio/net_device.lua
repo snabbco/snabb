@@ -298,8 +298,6 @@ function VirtioNetDevice:translate_physical_addr (addr)
 end
 
 function VirtioNetDevice:map_from_guest (addr)
-   local page = bit.rshift(addr, pagebits)
-   if page == self.last_guest_page then return addr + self.last_guest_offset end
    local result
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
@@ -309,8 +307,6 @@ function VirtioNetDevice:map_from_guest (addr)
             self.mem_table[0] = m
          end
          result = addr + m.snabb - m.guest
-         self.last_guest_page = page
-         self.last_guest_offset = m.snabb - m.guest
          break
       end
    end
