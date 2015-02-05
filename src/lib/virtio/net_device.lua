@@ -344,6 +344,14 @@ function VirtioNetDevice:set_features(features)
       self.hdr_size = virtio_net_hdr_mrg_rxbuf_size
       self.mrg_rxbuf = true
    end
+   if band(self.features, C.VIRTIO_RING_F_INDIRECT_DESC) == C.VIRTIO_RING_F_INDIRECT_DESC then
+      for i = 0, max_virtq_pairs-1 do
+         -- TXQ
+         self.virtq[2*i]:enable_indirect_descriptors()
+         -- RXQ
+         self.virtq[2*i+1]:enable_indirect_descriptors()
+      end
+   end
 end
 
 function VirtioNetDevice:set_vring_num(idx, num)

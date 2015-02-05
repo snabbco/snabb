@@ -25,46 +25,41 @@ function VirtioVirtq:new()
    return setmetatable(o, {__index = VirtioVirtq})
 end
 
--- Support indirect descriptors.
-function VirtioVirtq:get_desc()
+function VirtioVirtq:enable_indirect_descriptors ()
+   self.get_desc = self.get_desc_indirect
+end
+
+function VirtioVirtq:get_desc_indirect (id)
    local device = self.device
    local ring_desc = self.virtq.desc
-   local function indirect_descriptors_negotiated()
-      return band(device.features, C.VIRTIO_RING_F_INDIRECT_DESC) == 
-                     C.VIRTIO_RING_F_INDIRECT_DESC
-   end
-   if (indirect_descriptors_negotiated()) then
-      return function(id)
-         if band(ring_desc[id].flags, C.VIRTIO_DESC_F_INDIRECT) == 0 then
-            return ring_desc, id
-         else
-            local addr = device.map_from_guest(device, ring_desc[id].addr)
-            return ffi.cast(vring_desc_ptr_t, addr), 0
-         end
-      end
+   if band(ring_desc[id].flags, C.VIRTIO_DESC_F_INDIRECT) == 0 then
+      return ring_desc, id
    else
-      return function(id)
-         return ring_desc, id 
-      end
+      local addr = device.map_from_guest(device, ring_desc[id].addr)
+      return ffi.cast(vring_desc_ptr_t, addr), 0
    end
 end
+
+function VirtioVirtq:get_desc_direct (id)
+   return self.virtq.desc, id
+end
+
+-- Default: don't support indirect descriptors unless
+-- enable_indirect_descriptors is called to replace this binding.
+VirtioVirtq.get_desc = VirtioVirtq.get_desc_direct
 
 -- Receive all available packets from the virtual machine.
 function VirtioVirtq:get_buffers (kind, ops, hdr_len)
 
-   local ring = self.virtq.avail.ring
    local device = self.device
    local idx = self.virtq.avail.idx
    local avail, vring_mask = self.avail, self.vring_num-1
 
-   -- Cache function for obtaining ring descriptor.
-   local get_desc = self:get_desc()
-
    while idx ~= avail do
 
       -- Header
-      local v_header_id = ring[band(avail,vring_mask)]
-      local desc, id = get_desc(v_header_id)
+      local v_header_id = self.virtq.avail.ring[band(avail,vring_mask)]
+      local desc, id = self:get_desc(v_header_id)
 
       local data_desc = desc[id]
 
