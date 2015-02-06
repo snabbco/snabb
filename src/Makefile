@@ -14,6 +14,7 @@ CSRC   = $(shell find . -regex '[^\#]*\.c'   -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h'   -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
 RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
+PROGRAM = $(shell find program -type d -printf '%P ')
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
@@ -22,6 +23,7 @@ ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
+EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
 # TESTMODS expands to:
 #   core.memory core.lib ...
@@ -37,7 +39,11 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-all: snabb
+install: $(EXE)
+
+$(EXE): snabb
+	$(E) "PROGRAM   $@"
+	$(Q) install -D snabb $@
 
 markdown: $(RMOBJS)
 
@@ -46,7 +52,7 @@ snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
 	$(Q) gcc -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
 	    -lc -ldl -lm -lrt -lpthread
-	@echo -n "Firmware: "
+	@echo -n "BINARY    "
 	@ln -fs snabb snabbswitch
 	@ls -sh snabb
 
@@ -89,7 +95,7 @@ $(TESTSCRIPTS): testlog snabb
 		) \
 	)
 
-$(OBJDIR) testlog:
+$(OBJDIR) bin testlog:
 	$(E) "DIR       $@"
 	$(Q) mkdir -p $@
 
@@ -152,7 +158,7 @@ doc/snabbswitch.epub: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
 	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
 
-CLEAN = snabb snabbswitch obj doc/snabbswitch.* doc/.images/* testlog
+CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog
 
 clean:
 	$(E) "RM        $(CLEAN)"
