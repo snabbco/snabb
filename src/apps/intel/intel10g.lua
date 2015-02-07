@@ -75,6 +75,7 @@ function M_sf:close()
       pci.close_pci_resource(self.fd, self.base)
       self.fd = false
    end
+   self:free_dma_memory()
 end
 
 --- See data sheet section 4.6.3 "Initialization Sequence."
@@ -111,16 +112,33 @@ function M_sf:recheck()
    end
 end
 
+do
+   local _rx_pool = {}
+   local _tx_pool = {}
 
-function M_sf:init_dma_memory ()
-   self.rxdesc, self.rxdesc_phy =
-      memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
-   self.txdesc, self.txdesc_phy =
-      memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
-   -- Add bounds checking
-   self.rxdesc = lib.bounds_checked(rxdesc_t, self.rxdesc, 0, num_descriptors)
-   self.txdesc = lib.bounds_checked(txdesc_t, self.txdesc, 0, num_descriptors)
-   return self
+   local function get_ring(ct, pool)
+      local spot, v = next(pool)
+      if spot and v then
+         pool[spot] = nil
+         return v.ptr, v.phy
+      end
+      local ptr, phy =
+         memory.dma_alloc(num_descriptors * ffi.sizeof(ct))
+      ptr = lib.bounds_checked(ct, ptr, 0, num_descriptors)
+      return ptr, phy
+   end
+
+   function M_sf:init_dma_memory ()
+      self.rxdesc, self.rxdesc_phy = get_ring(rxdesc_t, _rx_pool)
+      self.txdesc, self.txdesc_phy = get_ring(txdesc_t, _tx_pool)
+      return self
+   end
+
+   function M_sf:free_dma_memory()
+      _rx_pool[#_rx_pool+1] = {ptr = self.rxdesc, phy = self.rxdesc_phy}
+      _tx_pool[#_tx_pool+1] = {ptr = self.txdesc, phy = self.txdesc_phy}
+      return self
+   end
 end
 
 function M_sf:global_reset ()
@@ -487,7 +505,6 @@ function M_pf:recheck()
    end
 end
 
-M_pf.close = M_sf.close
 M_pf.global_reset = M_sf.global_reset
 M_pf.disable_interrupts = M_sf.disable_interrupts
 M_pf.set_receive_descriptors = pass
@@ -622,6 +639,7 @@ function M_vf:close()
 
    self:disable_transmit()
       :disable_receive()
+      :free_dma_memory()
 
    return self
 end
@@ -668,6 +686,7 @@ function M_vf:init (opts)
 end
 
 M_vf.init_dma_memory = M_sf.init_dma_memory
+M_vf.free_dma_memory = M_sf.free_dma_memory
 M_vf.set_receive_descriptors = M_sf.set_receive_descriptors
 M_vf.set_transmit_descriptors = M_sf.set_transmit_descriptors
 M_vf.can_transmit = M_sf.can_transmit
