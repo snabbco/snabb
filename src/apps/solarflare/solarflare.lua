@@ -74,17 +74,22 @@ end
 
 function SolarFlareNic:enqueue_receive(id)
    local fl = self.rx_buffer_freelist
+   local buf
    if fl then
       if freelist.nfree(fl) > 0 then
-         self.rxbuffers[id] = freelist.remove(fl)
+         buf = freelist.remove(fl)
       else
          return
       end
    else
-      self.rxbuffers[id] = buffer.allocate()
+      buf = buffer.allocate()
    end
+   if buf.size < self.ef_vi_p[0].rx_buffer_len then
+      self.ef_vi_p[0].rx_buffer_len = b.size
+   end
+   self.rxbuffers[id] = buf
    try(self.ef_vi_receive_init(self.ef_vi_p,
-                               buffer.physical(self.rxbuffers[id]),
+                               buffer.physical(buf),
                                id),
        "ef_vi_receive_init")
    self.receives_enqueued = self.receives_enqueued + 1
