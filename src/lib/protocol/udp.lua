@@ -24,9 +24,9 @@ udp._ulp = { method = nil }
 
 function udp:new (config)
    local o = udp:superClass().new(self)
-   o:src_por(tconfig.src_port)
+   o:src_port(config.src_port)
    o:dst_port(config.dst_port)
-   o:length(0)
+   o:length(8)
    o:header().checksum = 0
    return o
 end

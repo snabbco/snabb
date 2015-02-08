@@ -14,6 +14,8 @@ local config = require("core.config")
 local pcap = require("apps.pcap.pcap")
 local basic_apps = require("apps.basic.basic_apps")
 
+local conntrack = require('apps.packet_filter.conntrack')
+
 local verbose = false
 
 assert(ffi.abi("le"), "support only little endian architecture at the moment")
@@ -284,6 +286,11 @@ local function generateRule(
    T("if size < ",min_header_size," then break end")
    T("if ethertype[0] ~= ",ethertype," then break end")
 
+   if rule.state_check then
+      conntrack.define (rule.state_check)
+      T('if not state_pass("', rule.state_check, '", buffer) then break end')
+   end
+
    if rule.source_cidr then
       generateIpMatch(T, rule.source_cidr, source_ip_offset, "source_ip")
    end
@@ -327,17 +334,37 @@ local function generateRule(
          end
       end
    end
+   if rule.state_track then
+      conntrack.define (rule.state_track)
+      T('track("', rule.state_track, '", buffer)')
+   end
    T"return true"
    T:unindent()
    T"until false"
 end
 
+
 local function generateConformFunctionString(rules)
    local T = make_code_concatter()
    T"local ffi = require(\"ffi\")"
    T"local bit = require(\"bit\")"
+   T"local conntrack = require('apps.packet_filter.conntrack')"
+   T"local track = conntrack.track"
+   T"local state_pass = conntrack.check"
+
    T"return function(buffer, size)"
    T:indent()
+
+   if rules.state_track then
+      conntrack.define(rules.state_track)
+      T"if (function(buffer, size)"
+      T:indent()
+   end
+   
+   if rules.state_check then
+      conntrack.define (rules.state_check)
+      T('if state_pass("', rules.state_check, '", buffer) then return true end')
+   end
 
    for i = 1, #rules do
       if rules[i].ethertype == "ipv4" then
@@ -369,6 +396,15 @@ local function generateConformFunctionString(rules)
          error("unknown ethertype")
       end
    end
+   if rules.state_track then
+      T:unindent()
+      T"end)(buffer, size) then"
+      T:indent()
+      T("track(\"", rules.state_track, "\", buffer)")
+      T"return true"
+      T:unindent()
+      T"end"
+   end
    T"return false"
    T:unindent()
    T"end"
@@ -382,7 +418,7 @@ PacketFilter = {}
 function PacketFilter:new (arg)
    local rules = arg and config.parse_app_arg(arg) or {}
    assert(rules)
-   assert(#rules > 0)
+--    assert(#rules > 0)
 
    local o =
    {
@@ -425,30 +461,34 @@ function selftest ()
    -- Temporarily disabled:
    --   Packet filter selftest is failing in.
    -- enable verbose logging for selftest
-   verbose = true
+   verbose = false
    buffer.preallocate(10000)
 
    local V6_RULE_ICMP_PACKETS = 3 -- packets within v6.pcap
    local V6_RULE_DNS_PACKETS =  3 -- packets within v6.pcap
       
    local v6_rules = {
-   {
-      ethertype = "ipv6",
-      protocol = "icmp",
-      source_cidr = "3ffe:501:0:1001::2/128", -- single IP, match 128bit
-      dest_cidr =
-         "3ffe:507:0:1:200:86ff:fe05:8000/116", -- match first 64bit and mask next 52 bit
-   },
-   {
-      ethertype = "ipv6",
-      protocol = "udp",
-      source_cidr = "3ffe:507:0:1:200:86ff::/28", -- mask first 28 bit
-      dest_cidr = "3ffe:501:4819::/64",           -- match first 64bit
-      source_port_min = 2397, -- port range, in v6.pcap there are values on
-      source_port_max = 2399, -- both borders and in the middle
-      dest_port_min = 53,     -- single port match
-      dest_port_max = 53,
-   }}
+      {
+         ethertype = "ipv6",
+         protocol = "icmp",
+         source_cidr = "3ffe:501:0:1001::2/128", -- single IP, match 128bit
+         dest_cidr =
+            "3ffe:507:0:1:200:86ff:fe05:8000/116", -- match first 64bit and mask next 52 bit
+         state_track = 'icmp6',
+      },
+      {
+         ethertype = "ipv6",
+         protocol = "udp",
+         source_cidr = "3ffe:507:0:1:200:86ff::/28", -- mask first 28 bit
+         dest_cidr = "3ffe:501:4819::/64",           -- match first 64bit
+         source_port_min = 2397, -- port range, in v6.pcap there are values on
+         source_port_max = 2399, -- both borders and in the middle
+         dest_port_min = 53,     -- single port match
+         dest_port_max = 53,
+         state_track = 'dns_v6',
+      },
+      state_track = 'app_v6',
+   }
 
    local c = config.new()
    config.app(
@@ -470,22 +510,26 @@ function selftest ()
    local V4_RULE_TCP_PACKETS = 18 -- packets within v4.pcap
 
    local v4_rules = {
-   {
-      ethertype = "ipv4",
-      protocol = "udp",
-      dest_port_min = 53,     -- single port match, DNS
-      dest_port_max = 53,
-   },
-   {
-      ethertype = "ipv4",
-      protocol = "tcp",
-      source_cidr = "65.208.228.223/32", -- match 32bit
-      dest_cidr = "145.240.0.0/12",      -- mask 12bit
-      source_port_min = 80, -- our port (80) is on the border of range
-      source_port_max = 81,
-      dest_port_min = 3371, -- our port (3372) is in the middle of range
-      dest_port_max = 3373,
-   }}
+      {
+         ethertype = "ipv4",
+         protocol = "udp",
+         dest_port_min = 53,     -- single port match, DNS
+         dest_port_max = 53,
+         state_track = 'dns',
+      },
+      {
+         ethertype = "ipv4",
+         protocol = "tcp",
+         source_cidr = "65.208.228.223/32", -- match 32bit
+         dest_cidr = "145.240.0.0/12",      -- mask 12bit
+         source_port_min = 80, -- our port (80) is on the border of range
+         source_port_max = 81,
+         dest_port_min = 3371, -- our port (3372) is in the middle of range
+         dest_port_max = 3373,
+         state_track = 'web',
+      },
+      state_track = 'app_v4',
+   }
 
    config.app(
          c,
@@ -510,6 +554,7 @@ function selftest ()
    app.breathe()
 
    app.report()
+   if verbose then print (conntrack.dump()) end
 
    local packet_filter1_passed =
       app.app_table.packet_filter1.output.output.stats.txpackets
@@ -527,6 +572,46 @@ function selftest ()
       ok = false
       print("IPv4 test failed")
    end
+
+
+   --- second part:
+   app.configure(config.new())
+
+   c = config.new()
+   --- check a rule's tracked state
+   config.app(c, "source1", pcap.PcapReader, "apps/packet_filter/samples/v6.pcap")
+   config.app(c, "statefull_pass1", PacketFilter, {
+      {
+         ethertype = "ipv6",
+         state_check = 'dns_v6',
+         protocol = "udp",
+      },
+   })
+   config.app(c, "sink1", basic_apps.Sink )
+   config.link(c, "source1.output -> statefull_pass1.input")
+   config.link(c, "statefull_pass1.output -> sink1.input")
+
+   -- checks a whole app's tracked state
+   config.app(c, "source2", pcap.PcapReader, "apps/packet_filter/samples/v4.pcap")
+   config.app(c, "statefull_pass2", PacketFilter, { state_check = 'app_v4' })
+   config.app(c, "sink2", basic_apps.Sink )
+   config.link(c, "source2.output -> statefull_pass2.input")
+   config.link(c, "statefull_pass2.output -> sink2.input")
+   app.configure(c)
+
+   app.breathe()
+   app.report()
+--    print (conntrack.dump())
+
+   if app.app_table.statefull_pass1.output.output.stats.txpackets ~= 6 then
+      ok = false
+      print ("state dns_v6 failed")
+   end
+   if app.app_table.statefull_pass2.output.output.stats.txpackets ~= 36 then
+      ok = false
+      print ("state app_v4 failed")
+   end
+
    if not ok then
       print("selftest failed")
       os.exit(1)

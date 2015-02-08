@@ -110,5 +110,3 @@ function ns_responder:push()
       end
    end
 end
-
-return ns_responder

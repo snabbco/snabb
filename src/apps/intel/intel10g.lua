@@ -64,6 +64,13 @@ function M_sf:open ()
 end
 
 function M_sf:close()
+   if self.free_receive_buffers then
+      self:free_receive_buffers()
+   end
+   if self.discard_unsent_packets then
+      self:discard_unsent_packets()
+      C.usleep(1000)
+   end
    if self.fd then 
       pci.close_pci_resource(self.fd) 
       self.fd = false
@@ -229,7 +236,19 @@ function M_sf:can_transmit ()
    return band(self.tdt + 1, num_descriptors - 1) ~= self.tdh
 end
 
---- ### Receive
+function M_sf:discard_unsent_packets()
+   local old_tdt = self.tdt
+   self.tdt = self.r.TDT()
+   self.tdh = self.r.TDH()
+   self.r.TDT(self.tdh)
+   while old_tdt ~= self.tdh do
+      old_tdt = band(old_tdt - 1, num_descriptors - 1)
+      packet.deref(self.txpackets[old_tdt])
+      self.txdesc[old_tdt].address = 0
+      self.txdesc[old_tdt].options = 0
+   end
+   self.tdt = self.tdh
+end
 
 --- See datasheet section 7.1 "Inline Functions -- Receive Functionality."
 
@@ -272,6 +291,16 @@ function M_sf:add_receive_buffer (b)
    desc.address, desc.dd = b.physical, 0
    self.rxbuffers[self.rdt] = b
    self.rdt = band(self.rdt + 1, num_descriptors - 1)
+end
+
+function M_sf:free_receive_buffers ()
+   while self.rdt ~= self.rdh do
+      self.rdt = band(self.rdt - 1, num_descriptors - 1)
+      local desc = self.rxdesc[self.rdt].data
+      desc.address, desc.dd = 0, 0
+      buffer.free(self.rxbuffers[self.rdt])
+      self.rxbuffers[self.rdt] = nil
+   end
 end
 
 function M_sf:sync_receive ()
@@ -527,6 +556,54 @@ function M_vf:open (opts)
    return self:init(opts)
 end
 
+function M_vf:close()
+   local poolnum = self.poolnum or 0
+   local pf = self.pf
+   -- unset_tx_rate
+   self:set_tx_rate(0, 0)
+   self
+      :unset_mirror()
+      :unset_VLAN()
+   -- unset MAC
+   do
+      local msk = bits{Ena=self.poolnum%32}
+      for mac_index = 0, 127 do
+         pf.r.MPSAR[2*mac_index + math.floor(poolnum/32)]:clr(msk)
+      end
+   end
+
+   self:disable_transmit()
+      :disable_receive()
+
+   return M_sf.close(self)
+end
+
+function M_vf:reconfig(opts)
+   local poolnum = self.poolnum or 0
+   local pf = self.pf
+
+   self
+      :unset_mirror()
+      :unset_VLAN()
+      :unset_MAC()
+   do
+      local msk = bits{Ena=self.poolnum%32}
+      for mac_index = 0, 127 do
+         pf.r.MPSAR[2*mac_index + math.floor(poolnum/32)]:clr(msk)
+      end
+   end
+
+   return self
+      :set_MAC(opts.macaddr)
+      :set_mirror(opts.mirror)
+      :set_VLAN(opts.vlan)
+      :set_rx_stats(opts.rxcounter)
+      :set_tx_stats(opts.txcounter)
+      :set_tx_rate(opts.rate_limit, opts.priority)
+      :enable_receive()
+      :enable_transmit()
+end
+
 function M_vf:init (opts)
    return self
       :init_dma_memory()
@@ -538,20 +615,23 @@ function M_vf:init (opts)
       :set_rx_stats(opts.rxcounter)
       :set_tx_stats(opts.txcounter)
       :set_tx_rate(opts.rate_limit, opts.priority)
+      :enable_receive()
+      :enable_transmit()
 end
 
-M_vf.close = M_sf.close
 M_vf.init_dma_memory = M_sf.init_dma_memory
 M_vf.set_receive_descriptors = M_sf.set_receive_descriptors
 M_vf.set_transmit_descriptors = M_sf.set_transmit_descriptors
 M_vf.can_transmit = M_sf.can_transmit
 M_vf.transmit = M_sf.transmit
 M_vf.sync_transmit = M_sf.sync_transmit
+M_vf.discard_unsent_packets = M_sf.discard_unsent_packets
 M_vf.can_receive = M_sf.can_receive
 M_vf.receive = M_sf.receive
 M_vf.can_add_receive_buffer = M_sf.can_add_receive_buffer
 M_vf.set_rx_buffersize = M_sf.set_rx_buffersize
 M_vf.add_receive_buffer = M_sf.add_receive_buffer
+M_vf.free_receive_buffers = M_sf.free_receive_buffers
 M_vf.sync_receive = M_sf.sync_receive
 
 function M_vf:init_receive ()
@@ -560,10 +640,28 @@ function M_vf:init_receive ()
    self.r.RSCCTL(0x0)                   -- no RSC
    self:set_receive_descriptors()
    self.pf.r.PFVML2FLT[poolnum]:set(bits{MPE=28, BAM=27, AUPE=24})
+   return self
+end
+
+function M_vf:enable_receive()
    self.r.RXDCTL(bits{Enable=25, VME=30})
    self.r.RXDCTL:wait(bits{enable=25})
    self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
-   self.pf.r.PFVFRE[math.floor(poolnum/32)]:set(bits{VFRE=poolnum%32})
+   self.pf.r.PFVFRE[math.floor(self.poolnum/32)]:set(bits{VFRE=self.poolnum%32})
+   return self
+end
+
+function M_vf:disable_receive(reenable)
+   self.r.RXDCTL:clr(bits{Enable=25})
+   self.r.RXDCTL:wait(bits{Enable=25}, 0)
+   C.usleep(100)
+   -- TODO free packet buffers
+   self.pf.r.PFVFRE[math.floor(self.poolnum/32)]:clr(bits{VFRE=self.poolnum%32})
+
+   if reenable then
+      self.r.RXDCTL(bits{Enable=25, VME=30})
+   --    self.r.RXDCTL:wait(bits{enable=25})
+   end
    return self
 end
 
@@ -576,9 +674,28 @@ function M_vf:init_transmit ()
    self.pf.r.RTTDQSEL(poolnum)
    self.pf.r.RTTDT1C(0x80)
    self.pf.r.RTTBCNRC(0x00)         -- no rate limiting
+   return self
+end
+
+function M_vf:enable_transmit()
    self.pf.r.DMATXCTL:set(bits{TE=0})
    self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26})
    self.r.TXDCTL:wait(bits{Enable=25})
+   return self
+end
+
+function M_vf:disable_transmit(reenable)
+   -- TODO: wait TDH==TDT
+   -- TODO: wait all is written back: DD bit or Head_WB
+   self.r.TXDCTL:clr(bits{Enable=25})
+   self.r.TXDCTL:set(bits{SWFLSH=26})
+   self.r.TXDCTL:wait(bits{Enable=25}, 0)
+   self.pf.r.PFVFTE[math.floor(self.poolnum/32)]:clr(bits{VFTE=self.poolnum%32})
+
+   if reenable then
+      self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26})
+   --    self.r.TXDCTL:wait(bits{Enable=25})
+   end
    return self
 end
 
@@ -588,6 +705,9 @@ function M_vf:set_MAC (mac)
    return self
       :add_receive_MAC(mac)
       :set_transmit_MAC(mac)
+end
+
+function M_vf:unset_MAC()
 end
 
 function M_vf:add_receive_MAC (mac)
@@ -664,10 +784,26 @@ function M_vf:set_mirror (want_mirror)
    return self
 end
 
+function M_vf:unset_mirror()
+   for rule_i = 0, 3 do
+      -- check if any mirror rule points here
+      local rule_dest = band(bit.rshift(self.pf.r.PFMRCTL[rule_i](), 8), 63)
+      local bits = band(self.pf.r.PFMRCTL[rule_i](), 0x07)
+      if bits ~= 0 and rule_dest == self.poolnum then
+         self.pf.r.PFMRCTL[rule_i](0x0)     -- clear rule
+         self.pf.r.PFMRVLAN[rule_i](0x0)    -- clear VLANs mirrored
+         self.pf.r.PFMRVLAN[rule_i+4](0x0)
+         self.pf.r.PFMRVM[rule_i](0x0)      -- clear pools mirrored
+         self.pf.r.PFMRVM[rule_i+4](0x0)
+      end
+   end
+   self.pf.mirror_set:pop(self.poolnum)
+   return self
+end
+
 function M_vf:set_VLAN (vlan)
    if not vlan then return self end
    assert(vlan>=0 and vlan<4096, "bad VLAN number")
-   if not vlan then return self end
    return self
       :add_receive_VLAN(vlan)
       :set_tag_VLAN(vlan)
@@ -685,11 +821,31 @@ function M_vf:add_receive_VLAN (vlan)
       :set(bits{PoolEna=self.poolnum%32})
    return self
 end
-
 function M_vf:set_tag_VLAN(vlan)
    local poolnum = self.poolnum or 0
    self.pf.r.PFVFSPOOF[math.floor(poolnum/8)]:set(bits{VLANAS=poolnum%8+8})
    self.pf.r.PFVMVIR[poolnum](bits({VLANA=30}, vlan))  -- always add VLAN tag
+   return self
+end
+
+
+function M_vf:unset_VLAN()
+   local r = self.pf.r
+   local offs, mask = math.floor(self.poolnum/32), bits{PoolEna=self.poolnum%32}
+
+   for vln_ndx = 0, 63 do
+      if band(r.PFVLVFB[2*vln_ndx+offs](), mask) ~= 0 then
+         -- found a vlan this pool belongs to
+         r.PFVLVFB[2*vln_ndx+offs]:clr(mask)
+         if r.PFVLVFB[2*vln_ndx+offs]() == 0 then
+            -- it was the last pool of the vlan
+            local vlan = tonumber(band(r.PFVLVF[vln_ndx](), 0xFFF))
+            r.PFVLVF[vln_ndx](0x0)
+            r.VFTA[math.floor(vlan/32)]:clr(bits{Ena=vlan%32})
+            self.pf.vlan_set:pop(vlan)
+         end
+      end
+   end
    return self
 end
 

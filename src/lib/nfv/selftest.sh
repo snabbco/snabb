@@ -28,6 +28,8 @@ fi
 
 export BENCH_ENV_PID
 
+TESTCONFPATH=/tmp/snabb_nfv_selftest_ports
+
 # Usage: run_telnet <port> <command> [<sleep>]
 # Runs <command> on VM listening on telnet <port>. Waits <sleep> seconds
 # for before closing connection. The default of <sleep> is 2.
@@ -36,8 +38,16 @@ function run_telnet {
         | telnet localhost $1 2>&1
 }
 
+# Usage: load_config <path>
+# Copies <path> to TESTCONFPATH and sleeps for a bit.
+function load_config {
+    echo "USING $1"
+    cp "$1" "$TESTCONFPATH"
+    sleep 2
+}
+
 function start_bench_env {
-    scripts/bench_env/host-nic-snabbnfv-guests.sh $1 &
+    scripts/bench_env/host-nic-snabbnfv-guests.sh $TESTCONFPATH &
     BENCH_ENV_PID=$!
 
     # Give bench_env time to print its stuff.
@@ -150,8 +160,7 @@ function port_probe {
 }
 
 function same_vlan_tests {
-    start_bench_env test_fixtures/nfvconfig/test_functions/same_vlan.ports
-    echo "TESTING same_vlan.ports"
+    load_config test_fixtures/nfvconfig/test_functions/same_vlan.ports
 
     test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
     test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
@@ -160,13 +169,10 @@ function same_vlan_tests {
     test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
 #    test_checksum $TELNET_PORT0
 #    test_checksum $TELNET_PORT1
-
-    stop_bench_env
 }
 
 function rate_limited_tests {
-    start_bench_env test_fixtures/nfvconfig/test_functions/rate_limit.ports
-    echo "TESTING rate_limit.ports"
+    load_config test_fixtures/nfvconfig/test_functions/rate_limit.ports
 
     test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
     test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
@@ -176,12 +182,10 @@ function rate_limited_tests {
 #    test_checksum $TELNET_PORT0
 #    test_checksum $TELNET_PORT1
 
-    stop_bench_env
 }
 
 function tunnel_tests {
-    start_bench_env test_fixtures/nfvconfig/test_functions/tunnel.ports
-    echo "TESTING tunnel.ports"
+    load_config test_fixtures/nfvconfig/test_functions/tunnel.ports
 
     # Assert ND was successful.
     grep "Resolved next-hop" $SNABB_LOG0
@@ -192,13 +196,10 @@ function tunnel_tests {
     test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
     # Repeat iperf test now that jumbo frames are enabled
     test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
-
-    stop_bench_env
 }
 
 function filter_tests {
-    start_bench_env test_fixtures/nfvconfig/test_functions/filter.ports
-    echo "TESTING filter.ports"
+    load_config test_fixtures/nfvconfig/test_functions/filter.ports
 
     # port B allows ICMP and TCP/12345
     # The test cases were more involved at first but I found it quite
@@ -225,13 +226,27 @@ function filter_tests {
     port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12345 -u
     test 0 -ne $?
     assert FILTER $?
-
-    stop_bench_env
 }
 
-# Run test configs.
+# Usage: fuzz_tests <n>
+# Generate and test (IPERF) <n> semi-random NFV configurations.
+function fuzz_tests {
+    for ((n=0;n<$1;n++)); do
+        $SNABB designs/neutron/snabbnfv-fuzz \
+            test_fixtures/nfvconfig/fuzz/filter2-tunnel-txrate10-ports.spec \
+            /tmp/snabb_nfv_selftest_fuzz.ports
+        load_config /tmp/snabb_nfv_selftest_fuzz.ports
+        test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    done
+}
+
+load_config test_fixtures/nfvconfig/test_functions/other_vlan.ports
+start_bench_env
 
 same_vlan_tests
 rate_limited_tests
 tunnel_tests
 filter_tests
+#fuzz_tests 100
+
+stop_bench_env

@@ -145,7 +145,12 @@ function apply_config_actions (actions, conf)
    end
    function ops.reconfig (name)
       if app_table[name].reconfig then
-         app_table[name]:reconfig(config)
+         local arg = conf.apps[name].arg
+         local app = app_table[name]
+         app:reconfig(arg)
+         new_app_table[name] = app
+         table.insert(new_app_array, app)
+         app_name_to_index[name] = #new_app_array
       else
          ops.restart(name)
       end

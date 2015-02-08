@@ -72,6 +72,14 @@ function Intel82599:stop()
    end
 end
 
+
+function Intel82599:reconfig(arg)
+   local conf = config.parse_app_arg(arg)
+   assert((not not self.dev.pf) == (not not conf.vmdq), "Can't reconfig from VMDQ to single-port or viceversa")
+
+   self.dev:reconfig(conf)
+end
+
 -- Allocate receive buffers from the given freelist.
 function Intel82599:set_rx_buffer_freelist (fl)
    self.rx_buffer_freelist = fl
@@ -124,7 +132,6 @@ end
 -- Report on relevant status and statistics.
 function Intel82599:report ()
    print("report on intel device", self.dev.pciaddress or self.dev.pf.pciaddress)
-   --register.dump(self.dev.r)
    register.dump(self.dev.s, true)
    if self.dev.rxstats then
       for name,v in pairs(self.dev:get_rxstats()) do
@@ -136,13 +143,14 @@ function Intel82599:report ()
          io.write(string.format('%30s: %d\n', 'tx '..name, v))
       end
    end
+   local function r(n)
+      return self.dev.r[n] or self.dev.pf.r[n]
+   end
    register.dump({
-      self.dev.r.TDH, self.dev.r.TDT,
-      self.dev.r.RDH, self.dev.r.RDT,
-      self.dev.r.AUTOC or self.dev.pf.r.AUTOC,
-      self.dev.r.AUTOC2 or self.dev.pf.r.AUTOC2,
-      self.dev.r.LINKS or self.dev.pf.r.LINKS,
-      self.dev.r.LINKS2 or self.dev.pf.r.LINKS2,
+      r'TDH', r'TDT',
+      r'RDH', r'RDT',
+      r'AUTOC',
+      r'LINKS',
    })
 end
 
@@ -156,7 +164,9 @@ function selftest ()
       os.exit(engine.test_skipped_code)
    end
 
-   zone('buffer') buffer.preallocate(100000) zone()
+   zone('buffer') buffer.preallocate(1000) zone()
+
+   manyreconf(pcideva, pcidevb)
 
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
@@ -206,6 +216,7 @@ function selftest ()
          os.exit (1)
       end
    end
+   print ('all ok')
 end
 
 -- open two singlequeue drivers on both ends of the wire
@@ -323,4 +334,65 @@ function mq_sw(pcidevA)
    engine.configure(c)
    link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
    link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+end
+
+function manyreconf(pcidevA, pcidevB)
+   print ('')
+   local d1 = lib.hexundump ([[
+      52:54:00:02:02:02 52:54:00:01:01:01 08 00 45 00
+      00 54 c3 cd 40 00 40 01 f3 23 c0 a8 01 66 c0 a8
+      01 01 08 00 57 ea 61 1a 00 06 5c ba 16 53 00 00
+      00 00 04 15 09 00 00 00 00 00 10 11 12 13 14 15
+      16 17 18 19 1a 1b 1c 1d 1e 1f 20 21 22 23 24 25
+      26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
+      36 37
+   ]], 98)                  -- src: Am0    dst: Am1
+   local d2 = lib.hexundump ([[
+      52:54:00:03:03:03 52:54:00:01:01:01 08 00 45 00
+      00 54 c3 cd 40 00 40 01 f3 23 c0 a8 01 66 c0 a8
+      01 01 08 00 57 ea 61 1a 00 06 5c ba 16 53 00 00
+      00 00 04 15 09 00 00 00 00 00 10 11 12 13 14 15
+      16 17 18 19 1a 1b 1c 1d 1e 1f 20 21 22 23 24 25
+      26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
+      36 37
+   ]], 98)                  -- src: Am0    dst: ---
+   engine.configure(config.new())
+   local prevsent = 0
+   for i = 1, 100 do
+      print (('config #%d'):format(i))
+      local c = config.new()
+      config.app(c, 'source_ms', basic_apps.Join)
+      config.app(c, 'repeater_ms', basic_apps.Repeater)
+      config.app(c, 'nicAm0', Intel82599, {
+         -- first VF on NIC A
+         pciaddr = pcidevA,
+         vmdq = true,
+         macaddr = '52:54:00:01:01:01',
+         vlan = 100+i,
+      })
+      config.app(c, 'nicAm1', Intel82599, {
+         -- second VF on NIC A
+         pciaddr = pcidevA,
+         vmdq = true,
+         macaddr = '52:54:00:02:02:02',
+         vlan = 100+i,
+      })
+      print ('-------')
+      print ("Send a bunch of packets from Am0")
+      print ("half of them go to nicAm1 and half go nowhere")
+      config.app(c, 'sink_ms', basic_apps.Sink)
+      config.link(c, 'source_ms.out -> repeater_ms.input')
+      config.link(c, 'repeater_ms.output -> nicAm0.rx')
+      config.link(c, 'nicAm0.tx -> sink_ms.in1')
+      config.link(c, 'nicAm1.tx -> sink_ms.in2')
+      engine.configure(c)
+      link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
+      link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+      engine.main({duration = 0.25, report={showlinks=true, showapps=true}})
+      local sent = engine.app_table.nicAm0.input.rx.stats.txpackets
+      if sent == prevsent then
+         os.exit(2)
+      end
+      prevsent = sent
+   end
 end

@@ -3,7 +3,7 @@ module(...,package.seeall)
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local PacketFilter = require("apps.packet_filter.packet_filter").PacketFilter
 local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
-local nd_light = require("apps.ipv6.nd_light")
+local nd_light = require("apps.ipv6.nd_light").nd_light
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
 local pci = require("lib.hardware.pci")
 local ffi = require("ffi")
