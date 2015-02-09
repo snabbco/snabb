@@ -6,7 +6,6 @@ local C = ffi.C
 local lib    = require("core.lib")
 local freelist = require("core.freelist")
 local memory   = require("core.memory")
-local buffer   = require("core.buffer")
 local packet   = require("core.packet")
                  require("lib.virtio.virtio_vring_h")
                  require("lib.tuntap.tuntap_h")

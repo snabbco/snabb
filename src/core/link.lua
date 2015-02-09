@@ -32,6 +32,7 @@ function transmit (r, p)
 --   assert(p)
    if full(r) then
       r.stats.txdrop = r.stats.txdrop + 1
+      packet.free(p)
    else
       r.packets[r.write] = p
       r.write = band(r.write + 1, size - 1)
@@ -72,7 +73,6 @@ function selftest ()
    print("selftest: link")
    local r = new()
    local p = packet.allocate()
-   packet.tenure(p)
    assert(r.stats.txpackets == 0 and empty(r) == true  and full(r) == false)
    assert(nreadable(r) == 0)
    transmit(r, p)

@@ -5,301 +5,108 @@ local debug = _G.developer_debug
 local ffi = require("ffi")
 local C = ffi.C
 
-local buffer   = require("core.buffer")
 local freelist = require("core.freelist")
 local lib      = require("core.lib")
 local memory   = require("core.memory")
-local freelist_add, freelist_remove = freelist.add, freelist.remove
+local freelist_add, freelist_remove, freelist_nfree = freelist.add, freelist.remove, freelist.nfree
 
 require("core.packet_h")
 
-local max_packets = 1e6
-packets_fl = freelist.new("struct packet *", max_packets)
-local packet_size = ffi.sizeof("struct packet")
+local packet_t = ffi.typeof("struct packet")
+local packet_ptr_t = ffi.typeof("struct packet *")
+local packet_size = ffi.sizeof(packet_t)
+local header_size = 8
+local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
+-- Freelist containing empty packets ready for use.
+local max_packets = 1e5
+local packet_allocation_step = 1000
+local packets_allocated = 0
+local packets_fl = freelist.new("struct packet *", max_packets)
 
-function module_init ()
-   for i = 0, max_packets-1 do
-      free(ffi.cast("struct packet *", memory.dma_alloc(packet_size)))
-   end
-end
-
--- Return a packet, or nil if none is available.
+-- Return an empty packet.
 function allocate ()
-   return freelist_remove(packets_fl) or error("out of packets")
-end
-
--- Append data to a packet.
-function add_iovec (p, b, length,  offset)
-   if debug then assert(p.niovecs < C.PACKET_IOVEC_MAX, "packet iovec overflow") end
-   offset = offset or 0
-   if debug then assert(length + offset <= b.size) end
-   local iovec = p.iovecs[p.niovecs]
-   iovec.buffer = b
-   iovec.length = length
-   iovec.offset = offset
-   p.niovecs = p.niovecs + 1
-   p.length = p.length + length
-end
-
--- Prepend data to a packet.
-function insert_iovec (idx, p, b, length,  offset)
-   if debug then assert(p.niovecs < C.PACKET_IOVEC_MAX, "packet iovec overflow") end
-   offset = offset or 0
-   if debug then assert(length + offset <= b.size) end
-   for i = p.niovecs, idx + 1, -1 do
-      ffi.copy(p.iovecs[i], p.iovecs[i-1], ffi.sizeof("struct packet_iovec"))
+   if freelist_nfree(packets_fl) == 0 then
+      preallocate_step()
    end
-   local iovec = p.iovecs[idx]
-   iovec.buffer = b
-   iovec.length = length
-   iovec.offset = offset
-   p.niovecs = p.niovecs + 1
-   p.length = p.length + length
+   return freelist_remove(packets_fl)
 end
 
--- Prepend data to a packet.
-function prepend_iovec (p, b, length,  offset)
-   insert_iovec (0, p, b, length,  offset)
+-- Create a new empty packet.
+function new_packet ()
+   local p = ffi.cast(packet_ptr_t, memory.dma_alloc(packet_size))
+   p.length = 0
+   p.flags = 0
+   p.csum_start = 0
+   p.csum_offset = 0
+   return p
 end
 
-function niovecs (p)
-   return p.niovecs
-end
-
-function iovec (p, n)
-   return p.iovecs[n]
-end
-
--- Merge all buffers into one. Throws an exception if a single buffer
--- cannot hold the entire packet.
---
--- XXX Should work also with packets that are bigger than a single
--- buffer, i.e. reduce the number of buffers to the minimal set
--- required to hold the entire packet.
-function coalesce (p)
-   if p.niovecs == 1 then return end
-   local b = buffer.allocate()
-   assert(p.length <= b.size, "packet too big to coalesce")
-   local length = 0
-   for i = 0, p.niovecs-1, 1 do
-      local iovec = p.iovecs[i]
-      ffi.copy(b.pointer + length, iovec.buffer.pointer + iovec.offset, iovec.length)
-      buffer.free(iovec.buffer)
-      length = length + iovec.length
-   end
-   p.niovecs, p.length = 0, 0
-   add_iovec(p, b, length)
-end
-
--- The same as coalesce(), but allocate new packet
--- while leaving original packet unchanged
+-- Create an exact copy of a packet.
 function clone (p)
-   local new_p = allocate()
-   local b = buffer.allocate()
-   assert(p.length <= b.size, "packet too big to clone")
-
-   local length = 0
-   for i = 0, p.niovecs - 1 do
-      local iovec = p.iovecs[i]
-      ffi.copy(b.pointer + length, iovec.buffer.pointer + iovec.offset, iovec.length)
-      length = length + iovec.length
-   end
-   add_iovec(new_p, b, length)
-   return new_p
+   local p2 = allocate()
+   ffi.copy(p2, p, p.length)
+   p2.length = p.length
+   p2.flags = p.flags
+   p2.csum_start = p.csum_start
+   p2.csum_offset = p.csum_offset
+   return p2
 end
 
--- Clone a packet by sharing all buffers with the original packet with
--- copy-on-write semantics.  Individual buffers are copied only when
--- they need to be modified by a call to cow_iovec()
-function cow_clone (p)
-   local new_p = allocate()
-   for i = 0, p.niovecs -1 do
-      local iovec = p.iovecs[i]
-      local new_iovec = new_p.iovecs[i]
-      new_iovec.buffer = iovec.buffer
-      new_iovec.offset = iovec.offset
-      new_iovec.length = iovec.length
-      iovec.buffer.refcount = iovec.buffer.refcount + 1
-   end
-   new_p.niovecs = p.niovecs
-   new_p.length  = p.length
-   ffi.copy(new_p.info, p.info, ffi.sizeof(p.info))
-   return new_p
-end
-
--- Create a copy of the buffer associated with the given iovec index
--- if the buffer is shared with another packet.
-function cow_iovec (p, i)
-   local iovec = p.iovecs[i]
-   if iovec.buffer.refcount > 1 then
-      local b = buffer.allocate()
-      ffi.copy(b.pointer + iovec.offset, iovec.buffer.pointer + iovec.offset,
-	       iovec.length)
-      iovec.buffer.refcount = iovec.buffer.refcount - 1
-      iovec.buffer = b
-   end
-end
-
--- The opposite of coalesce
--- Scatters the data through chunks
-function scatter (p, sg_list)
-   assert(#sg_list + 1 <= C.PACKET_IOVEC_MAX)
-   local cloned = clone(p) -- provide coalesced copy
-   local result = allocate()
-   local iovec = cloned.iovecs[0]
-   local offset = 0 -- the offset in the cloned buffer
-
-   -- always append one big chunk in the end, to cover the case
-   -- where the supplied sgs are not sufficient to hold all the data
-   -- also if we get an empty sg_list this will make a single iovec packet
-   local pattern_list = lib.deepcopy(sg_list)
-   pattern_list[#pattern_list + 1] = {4096}
-
-   for _,sg in ipairs(pattern_list) do
-      local sg_len = sg[1]
-      local sg_offset = sg[2] or 0
-      local b = buffer.allocate()
-
-      assert(sg_len + sg_offset <= b.size)
-      local to_copy = math.min(sg_len, iovec.length - offset)
-      ffi.copy(b.pointer + sg_offset, iovec.buffer.pointer + iovec.offset + offset, to_copy)
-      add_iovec(result, b, to_copy, sg_offset)
-
-      -- advance the offset in the source buffer
-      offset = offset + to_copy
-      assert(offset <= iovec.length)
-      if offset == iovec.length then
-         -- we don't have more data to copy
-         break
-      end
-   end
-   packet.deref(cloned)
-   return result
-end
-
--- use this function if you want to modify a packet received by an app
--- you cannot modify a packet if it is owned more then one app
--- it will create a copy for you as needed
-function want_modify (p)
-   if p.refcount == 1 then
-      return p
-   end
-   local new_p = clone(p)
-   packet.deref(p)
-   return new_p
-end
-
--- fill's an allocated packet with data from a string
-function fill_data (p, d, offset)
-   offset = offset or 0
-   local iovec = p.iovecs[0]
-   assert (offset+#d <= iovec.length, "can't fit on first iovec")       -- TODO: handle more iovecs
-   ffi.copy (iovec.buffer.pointer + iovec.offset + offset, d, #d)
-end
-
--- creates a packet from a given binary string
-function from_data (d)
-   local p = allocate()
-   local b = buffer.allocate()
-   local size = math.min(#d, b.size)
-   add_iovec(p, b, size)
-   fill_data(p, d)
+-- Append data to the end of a packet.
+function append (p, ptr, len)
+   assert(p.length + len <= max_payload, "packet payload overflow")
+   ffi.copy(p.data + p.length, ptr, len)
+   p.length = p.length + len
    return p
 end
 
--- Increase the reference count for packet p by n (default n=1).
-function ref (p,  n)
-   if p.refcount > 0 then
-      p.refcount = p.refcount + (n or 1)
-   end
+-- Prepend data to the start of a packet.
+function prepend (p, ptr, len)
+   assert(p.length + len <= max_payload, "packet payload overflow")
+   C.memmove(p.data + len, p.data, p.length) -- Move the existing payload
+   ffi.copy(p.data, ptr, len)                -- Fill the gap
+   p.length = p.length + len
    return p
 end
 
--- Decrease the reference count for packet p.
--- The packet will be recycled if the reference count reaches 0.
-function deref (p,  n)
-   n = n or 1
-   if p.refcount > 0 then
-      -- assert(p.refcount >= n)
-      if n == p.refcount then
-         free(p)
-      else
-         p.refcount = p.refcount - n
-      end
-   end
+-- Move packet data to the left. This shortens the packet by dropping
+-- the header bytes at the front.
+function shiftleft (p, bytes)
+   C.memmove(p.data, p.data+bytes, p.length-bytes)
+   p.length = p.length - bytes
 end
 
--- Tenured packets are not reused by defref().
-function tenure (p)
-   p.refcount = 0
-end
+-- Conveniently create a packet by copying some existing data.
+function from_pointer (ptr, len) return append(allocate(), ptr, len) end
+function from_string (d)         return from_pointer(d, #d) end
 
--- Free a packet and all of its buffers.
-
-local function free_aux(p, i)
-   buffer.free(p.iovecs[i].buffer)
-end
-
+-- Free a packet that is no longer in use.
 function free (p)
-   local niovecs = p.niovecs
-   if niovecs > 0 then
-      free_aux(p, 0)
-   end
-   if niovecs > 1 then
-      free_aux(p, 1)
-   end
-   if niovecs > 2 then
-      for i = 2, p.niovecs-1 do
-	 free_aux(p, i)
-      end
-   end
-   p.length         = 0
-   p.niovecs        = 0
-   p.refcount       = 1
+   --ffi.fill(p, header_size, 0)
+   p.length = 0
    freelist_add(packets_fl, p)
 end
 
-function iovec_dump (iovec)
-   local b = iovec.buffer
-   local l = math.min(iovec.length, b.size-iovec.offset)
-   if l < 1 then return '' end
-   o={[-1]=string.format([[
-         offset: %d
-         length: %d
-         buffer.pointer: %s
-         buffer.physical: %X
-         buffer.size: %d
-      ]], iovec.offset, iovec.length, b.pointer, tonumber(b.physical), b.size)}
-   for i = 0, l-1 do
-      o[i] = bit.tohex(b.pointer[i+iovec.offset], -2)
-   end
-   return table.concat(o, ' ', -1, l-1)
-end
+-- Return pointer to packet data.
+function data (p) return p.data end
 
-function report (p)
-   local result = string.format([[
-         refcount: %d
-         info.flags: %X
-         info.gso_flags: %X
-         info.hdr_len: %d
-         info.gso_size: %d
-         info.csum_start: %d
-         info.csum_offset: %d
-         niovecs: %d
-         length: %d
-      ]],
-      p.refcount, p.info.flags, p.info.gso_flags,
-      p.info.hdr_len, p.info.gso_size, p.info.csum_start,
-      p.info.csum_offset, p.niovecs, p.length
-   )
-   for i = 0, p.niovecs-1 do
-      result = result .. string.format([[
-            iovec #%d: %s
-         ]], i, iovec_dump(p.iovecs[i]))
+-- Return packet data length.
+function length (p) return p.length end
+
+function preallocate_step()
+   if _G.developer_debug then
+      assert(packets_allocated + packet_allocation_step <= max_packets)
    end
 
-   return result
+   for i=1, packet_allocation_step do
+      free(new_packet())
+   end
+   packets_allocated = packets_allocated + packet_allocation_step
+   packet_allocation_step = 2 * packet_allocation_step
 end
 
-module_init()
+--preallocate packets freelist
+if freelist_nfree(packets_fl) == 0 then
+   preallocate_step()
+end

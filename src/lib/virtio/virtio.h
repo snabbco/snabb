@@ -90,7 +90,8 @@ struct virtio_net_hdr_mrg_rxbuf {
 } __attribute__((packed));
 
 enum { // virtio_net_hdr.flags
-  VIO_NET_HDR_F_NEEDS_CSUM = 1 // use csum_start, csum_offset
+  VIO_NET_HDR_F_NEEDS_CSUM = 1, // use csum_start, csum_offset
+  VIO_NET_HDR_F_DATA_VALID = 2
 };
 
 enum { // virtio_net_hdr.gso_type

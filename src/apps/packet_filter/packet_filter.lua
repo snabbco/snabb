@@ -8,7 +8,6 @@ local app = require("core.app")
 local link = require("core.link")
 local lib = require("core.lib")
 local packet = require("core.packet")
-local buffer = require("core.buffer")
 local config = require("core.config")
 
 local pcap = require("apps.pcap.pcap")
@@ -444,15 +443,11 @@ function PacketFilter:push ()
       local p = link.receive(i)
       -- support the whole IP header in one iovec at the moment
 
-      if self.conform(
-            p.iovecs[0].buffer.pointer + p.iovecs[0].offset,
-            p.iovecs[0].length
-         )
-      then
+      if self.conform(p.data, p.length) then
          link.transmit(o, p)
       else
          -- discard packet
-         packet.deref(p)
+         packet.free(p)
       end
    end
 end
@@ -462,7 +457,6 @@ function selftest ()
    --   Packet filter selftest is failing in.
    -- enable verbose logging for selftest
    verbose = false
-   buffer.preallocate(10000)
 
    local V6_RULE_ICMP_PACKETS = 3 -- packets within v6.pcap
    local V6_RULE_DNS_PACKETS =  3 -- packets within v6.pcap

@@ -84,29 +84,17 @@ function Intel82599:pull ()
    local l = self.output.tx
    if l == nil then return end
    self.dev:sync_receive()
-   while not full(l) and self.dev:can_receive() do
+   for i=1,128 do
+      if full(l) or not self.dev:can_receive() then break end
       transmit(l, self.dev:receive())
    end
    self:add_receive_buffers()
 end
 
 function Intel82599:add_receive_buffers ()
-   if self.rx_buffer_freelist == nil then
-      -- Generic buffers
-      while self.dev:can_add_receive_buffer() do
-         self.dev:add_receive_buffer(buffer.allocate())
-      end
-   else
-      -- Buffers from a special freelist
-      local fl = self.rx_buffer_freelist
-      while self.dev:can_add_receive_buffer() and freelist.nfree(fl) > 0 do
-         local b = freelist.remove(fl)
-         if b.size < 1024 then
-            buffer.free(b)
-            b = buffer.allocate()
-         end
-         self.dev:add_receive_buffer(b)
-      end
+   -- Generic buffers
+   while self.dev:can_add_receive_buffer() do
+      self.dev:add_receive_buffer(packet.allocate())
    end
 end
 
@@ -117,7 +105,7 @@ function Intel82599:push ()
    while not empty(l) and self.dev:can_transmit() do
       do local p = receive(l)
 	 self.dev:transmit(p)
-	 packet.deref(p)
+	 --packet.deref(p)
       end
    end
    self.dev:sync_transmit()
@@ -158,8 +146,6 @@ function selftest ()
       os.exit(engine.test_skipped_code)
    end
 
-   zone('buffer') buffer.preallocate(1000) zone()
-
    manyreconf(pcideva, pcidevb)
 
    mq_sw(pcideva)
@@ -167,10 +153,9 @@ function selftest ()
    do
       local a0Sends = engine.app_table.nicAm0.input.rx.stats.txpackets
       local a1Gets = engine.app_table.nicAm1.output.tx.stats.rxpackets
-      if a1Gets < a0Sends/4
-         or a1Gets > a0Sends*3/4
-      then
-         print ('wrong proportion of packets passed/discarded')
+      -- Check propertions with some modest margin for error
+      if a1Gets < a0Sends * 0.45 or a1Gets > a0Sends * 0.55 then
+         print("mq_sw: wrong proportion of packets passed/discarded")
          os.exit(1)
       end
    end
@@ -189,7 +174,7 @@ function selftest ()
          or bGets < aGets/2
          or aGets < bGets/2
       then
-         print ('not enought packets somewhere')
+         print("sq_sq: missing packets")
          os.exit (1)
       end
    end
@@ -206,19 +191,19 @@ function selftest ()
          b1Gets < b0Gets/2 or
          b0Gets+b1Gets < aSends/2
       then
-         print ('not enought packets somewhere')
+         print("mq_sq: missing packets")
          os.exit (1)
       end
    end
-   print ('all ok')
+   print("selftest: ok")
 end
 
 -- open two singlequeue drivers on both ends of the wire
 function sq_sq(pcidevA, pcidevB)
    engine.configure(config.new())
    local c = config.new()
-   print ('-------')
-   print ('just send a lot of packets through the wire')
+   print("-------")
+   print("Transmitting bidirectionally between nicA and nicB")
    config.app(c, 'source1', basic_apps.Source)
    config.app(c, 'source2', basic_apps.Source)
    config.app(c, 'nicA', Intel82599, {pciaddr=pcidevA})
@@ -269,9 +254,9 @@ function mq_sq(pcidevA, pcidevB)
                pciaddr = pcidevB,
                vmdq = true,
                macaddr = '52:54:00:03:03:03'})
-   print ('-------')
-   print ("Send a bunch of from the SF on NIC A to the VFs on NIC B")
-   print ("half of them go to nicBm0 and nicBm0")
+   print("-------")
+   print("Send traffic from a nicA (SF) to nicB (two VFs)")
+   print("The packets should arrive evenly split between the VFs")
    config.app(c, 'sink_ms', basic_apps.Sink)
    config.link(c, 'source_ms.out -> repeater_ms.input')
    config.link(c, 'repeater_ms.output -> nicAs.rx')
@@ -279,8 +264,8 @@ function mq_sq(pcidevA, pcidevB)
    config.link(c, 'nicBm0.tx -> sink_ms.in2')
    config.link(c, 'nicBm1.tx -> sink_ms.in3')
    engine.configure(c)
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
 end
 
 -- one multiqueue driver with two apps and do switch stuff
@@ -326,8 +311,8 @@ function mq_sw(pcidevA)
    config.link(c, 'nicAm0.tx -> sink_ms.in1')
    config.link(c, 'nicAm1.tx -> sink_ms.in2')
    engine.configure(c)
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
 end
 
 function manyreconf(pcidevA, pcidevB)
@@ -380,11 +365,12 @@ function manyreconf(pcidevA, pcidevB)
       config.link(c, 'nicAm0.tx -> sink_ms.in1')
       config.link(c, 'nicAm1.tx -> sink_ms.in2')
       engine.configure(c)
-      link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
-      link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+      link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
+      link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
       engine.main({duration = 0.25, report={showlinks=true, showapps=true}})
       local sent = engine.app_table.nicAm0.input.rx.stats.txpackets
       if sent == prevsent then
+	 print("error: NIC transmit counter did not increase")
          os.exit(2)
       end
       prevsent = sent

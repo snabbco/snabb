@@ -1,6 +1,5 @@
 module(...,package.seeall)
 
-local buffer = require("core.buffer")
 local packet = require("core.packet")
 local lib    = require("core.lib")
 local link   = require("core.link")
@@ -13,6 +12,7 @@ require("core.packet_h")
 
 -- Set to true to enable logging
 log = false
+local use_restart = false
 
 test_skipped_code = 43
 
@@ -37,13 +37,17 @@ end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
-local function with_restart (app, methodname)
-   -- Run fn in protected mode using pcall.
-   local status, err = pcall(app[methodname], app)
+local function with_restart (app, method)
+   if use_restart then
+      -- Run fn in protected mode using pcall.
+      local status, err = pcall(method, app)
 
-   -- If pcall caught an error mark app as "dead" (record time and cause
-   -- of death).
-   if not status then app.dead = { error = err, time = now() } end
+      -- If pcall caught an error mark app as "dead" (record time and cause
+      -- of death).
+      if not status then app.dead = { error = err, time = now() } end
+   else
+      method(app)
+   end
 end
 
 -- Restart dead apps.
@@ -230,7 +234,7 @@ function breathe ()
 --         zone(app.zone) app:pull() zone()
       if app.pull and not app.dead then
 	 zone(app.zone)
-	 with_restart(app, 'pull')
+	 with_restart(app, app.pull)
 	 zone()
       end
    end
@@ -246,7 +250,7 @@ function breathe ()
             local receiver = app_array[link.receiving_app]
             if receiver.push and not receiver.dead then
                zone(receiver.zone)
-               with_restart(receiver, 'push')
+               with_restart(receiver, receiver.push)
                zone()
                progress = true
             end
@@ -261,7 +265,7 @@ function report (options)
    local function loss_rate(drop, sent)
       sent = tonumber(sent)
       if not sent or sent == 0 then return 0 end
-      return tonumber(drop) * 100 / sent
+      return tonumber(drop) * 100 / (tonumber(drop)+sent)
    end
    if not options or options.showlinks then
       print("link report")
@@ -277,7 +281,7 @@ function report (options)
             print (name, ("[dead: %s]"):format(app.dead.error))
          elseif app.report then
             print (name)
-            with_restart(app, 'report')
+            with_restart(app, app.report)
          end
       end
    end
@@ -292,6 +296,10 @@ function report_each_app ()
 end
 
 function selftest ()
+   if not use_restart then
+      print("with_restart disabled\nTest skipped")
+      os.exit(test_skipped_code)
+   end
    print("selftest: app")
    local App = {}
    function App:new () return setmetatable({}, {__index = App}) end

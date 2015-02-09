@@ -11,30 +11,17 @@
 --
 --   Creation of a new packet
 --
--- This functionality is provided by keeping track of two separate
--- header stacks, called the "parse stack" and the "push stack".  The
--- parse stack is built from the data contained in an existing packet
--- while the push stack is built from newly created protocol headers.
-
--- The datagram object keeps track of the start of the yet unparsed
--- portion of a packet by storing the index of the iovec and the
--- offset relative to the iovec's offset into the buffer.  By
--- definition, the unparsed portion of a packet is called the payload
--- at any point in time, i.e. once a header is parsed, it is no longer
--- part of the payload.
+-- It keeps track of a "parse stack" consisting of an (indexed) stack of
+-- header objects and an offset into the packet.
 --
--- When a new datagram is created, the index and offset are both
--- initialized to zero, such that parsing starts at the beginning of
--- the packet and the entire packet is considered as payload.
+-- When a new datagram is created, the parse stack index and the offset
+-- are both initialized to zero, such that parsing starts at the
+-- beginning of the packet and the entire packet is considered as
+-- payload.
 --
 -- When one of the parser methods is called, the offset is advanced by
 -- the size of the parsed header (and the payload reduced
 -- correspondingly).
---
--- It is important to note that parsing is currently restricted to a
--- single buffer.  If the total size of a multi-buffer packet is not
--- larger than a single buffer, the buffers can be coalesced into one
--- by passing the "coalesce" option to the datagram constructor.
 --
 -- Also note that parsing does not change the packet itself.  However,
 -- the header at the bottom of the parse stack (which is located at
@@ -42,28 +29,10 @@
 -- packet by calling the pop() method, which advances the iovec's
 -- offset accordingly.
 --
--- The push stack works differently.  First of all, it is important to
--- note that it grows downwards, i.e. inner headers must be pushed
--- onto the packet before outer headers.  The push mechanism always
--- works on iovec #0.  When this iovec has no room to store the new
--- header adjacent to the beginning of the buffer's valid data, a new
--- buffer is prepended to the packet.  The offset of the new iovec is
--- then set to the size of the buffer to allow downward growth.  When
--- this happens, the iovec index of the parse stack is increased by
--- one to account for the new buffer.
---
--- This on-demand allocation minimizes the number of newly created
--- buffers even if different apps push headers to the same packet.
---
--- By default, when a header is pushed onto a packet, the header data
--- is only copied into the packet, i.e. changes to the header object
--- after the fact are not represented in the packet.  It is also
--- possible to relocate the header object's data to the packet buffer,
--- such that changes to the object are reflected in the packet.  This
--- is useful if certain header fields need to be updated after the
--- header has been pushed.  However, the application must then make
--- sure that the header object is discarded when the packet buffer is
--- released.
+-- The push() method can be used to prepend headers in front of the
+-- packet. IMPORTANT: Both pop() and push() destructively modify the
+-- packet and headers previously obtained by calls to parse_*() will be
+-- corrupted.
 --
 -- To construct a packet from scratch, the constructor is called
 -- without a reference to a packet.  In this case, a new packet is
@@ -72,7 +41,6 @@
 
 module(..., package.seeall)
 local packet = require("core.packet")
-local buffer = require("core.buffer")
 local ffi    = require("ffi")
 
 local datagram = subClass(nil)
@@ -82,11 +50,9 @@ local datagram = subClass(nil)
 -- Create a datagram from a packet or from scratch (if p == nil).  The
 -- class argument is only relevant for parsing and can be set to the
 -- header class of the the outermost packet header.  
-local function init (o, p, class, options)
+local function init (o, p, class)
    if not o._recycled then
       o._parse = { stack = {}, index = 0 }
-      o._packet = ffi.new("struct packet *[1]")
-      o._opt_default = { coalesce = false }
    elseif o._parse.stack[1] then
       for i, _ in ipairs(o._parse.stack) do
 	 o._parse.stack[i]:free()
@@ -94,54 +60,29 @@ local function init (o, p, class, options)
       end
       o._parse.index = 0
    end
-   o._opt = options or o._opt_default
-   o._parse.ulp = class
-   if p then
-      if o._opt.coalesce then
-	 packet.coalesce(p)
-      end
-      o._packet[0] = p
-   else
-      o._packet[0] = packet.allocate()
-      local b = buffer.allocate()
-      packet.add_iovec(o._packet[0], b, 0)
-   end
-   o._parse.iovec = 0
    o._parse.offset = 0
+   o._parse.ulp = class
+   o._packet = p or packet.allocate()
    return o
 end
 
-function datagram:new (p, class, options)
-   return(init(datagram:superClass().new(self), p, class, options))
+function datagram:new (p, class)
+   return(init(datagram:superClass().new(self), p, class))
 end
 
--- Reuse an existing object to avoid putting it on the freelist
-function datagram:reuse (p, class, options)
+-- Reuse an existing object to avoid putting it on the freelist.
+-- Caution: This will free the datagram's current packet.
+function datagram:reuse (p, class)
    self._recycled = true
-   return(init(self, p, class, options))
+   return(init(self, p, class))
 end
 
 -- Instance methods
 
--- Push a new protocol header to the front of the packet, i.e. the
--- buffer of iovec #0.  If there is no room for the header, a new
--- buffer is prepended to the packet first.  If relocate is a false
--- value, the protocol's header is copied to the packet.  If it is a
--- true value, the protocol's header is relocated to the buffer
--- instead.
-function datagram:push (proto, relocate)
-   local iov = self._packet[0].iovecs[0]
-   local sizeof = proto:sizeof()
-   if sizeof > iov.offset then
-      -- Header doesn't fit, allocate a new buffer
-      local b = buffer.allocate()
-      packet.prepend_iovec(self._packet[0], b, 0, b.size)
-      self._parse.iovec = self._parse.iovec+1
-   end
-   proto:copy(iov.buffer.pointer + iov.offset - sizeof, relocate)
-   iov.offset = iov.offset - sizeof
-   iov.length = iov.length + sizeof
-   self._packet[0].length = self._packet[0].length + sizeof
+-- Push a new protocol header to the front of the packet.
+function datagram:push (proto)
+   packet.prepend(self._packet, proto:header(), proto:sizeof())
+   self._parse.offset = self._parse.offset + proto:sizeof()
 end
 
 -- The following methods create protocol header objects from the
@@ -171,13 +112,9 @@ end
 function datagram:parse_match (class, check)
    local parse = self._parse
    local class = class or parse.ulp
-   local iovec = self._packet[0].iovecs[parse.iovec]
-
-   if not class then
-      return nil
-   end
-   local proto = class:new_from_mem(iovec.buffer.pointer + iovec.offset
-                                    + parse.offset, iovec.length - parse.offset)
+   if not class then return nil end
+   local proto = class:new_from_mem(packet.data(self._packet) + parse.offset,
+                                    packet.length(self._packet) - parse.offset)
    if proto == nil or (check and not check(proto)) then
       if proto then proto:free() end
       return nil
@@ -238,24 +175,17 @@ function datagram:unparse (n)
    end
 end
 
--- Remove the bottom n elements from the parse stack by adjusting the
--- offset of the relevant iovec.
+-- Remove the bytes of the bottom <n> headers from the parse stack from
+-- the start of the packet.
 function datagram:pop (n)
-   local n = n or 1
    local parse = self._parse
+   local n_bytes = 0
    assert(n <= parse.index)
-   local proto
-   local iovec = self._packet[0].iovecs[parse.iovec]
-   -- Don't use table.remove to avoid garbage
    for i = 1, parse.index do
       if i <= n then
-	 proto = parse.stack[i]
-	 local sizeof = proto:sizeof()
+	 local proto = parse.stack[i]
+         n_bytes = n_bytes + proto:sizeof()
 	 proto:free()
-	 iovec.offset = iovec.offset + sizeof
-	 iovec.length = iovec.length - sizeof
-	 self._packet[0].length = self._packet[0].length - sizeof
-	 parse.offset = parse.offset - sizeof
       end
       if i+n <= parse.index then
 	 parse.stack[i] = parse.stack[i+n]
@@ -264,22 +194,15 @@ function datagram:pop (n)
       end
    end
    parse.index = parse.index - n
+   self:pop_raw(n_bytes)
+   self._parse.offset = self._parse.offset - n_bytes
 end
 
--- Remove <length> bytes from the start of the packet.  It is intended
--- as an efficient version of pop() if the caller already knows what
--- type of header is at the start of the packet, for example after a
--- successful match of matcher:compare().  If the caller also knows
--- the type of the subsequent header, it can pass the corresponding
--- protocol class as second argument to pop_raw().  This will set the
--- datagram's upper-layer protocol to this class such that the parse()
--- method can be used to process the datagram further.
+-- Remove <length> bytes from the start of the packet and set upper-layer
+-- protocol to <ulp> if <ulp> is supplied.
 function datagram:pop_raw (length, ulp)
-   local iovec = self._packet[0].iovecs[self._parse.iovec]
-   iovec.offset = iovec.offset + length
-   iovec.length = iovec.length - length
-   self._packet[0].length = self._packet[0].length - length
-   self._parse.ulp = ulp
+   packet.shiftleft(self._packet, length)
+   if ulp then self._parse.ulp = ulp end
 end
 
 function datagram:stack ()
@@ -287,34 +210,16 @@ function datagram:stack ()
 end
 
 function datagram:packet ()
-   return(self._packet[0])
+   return(self._packet)
 end
 
 -- Return the location and size of the packet's payload.  If mem is
 -- non-nil, the memory region at the given address and size is
--- appended to the packet's payload first.  Because parsing is
--- restricted to a single buffer, it is possible that additional
--- buffers exist beyond the parse buffer.  In this case, the payload
--- is not complete.  This is communicated to the caller by a third
--- return value, which is a true value if the payload is complete and
--- a false value if not.
+-- appended to the packet's payload first.
 function datagram:payload (mem, size)
-   local parse = self._parse
-   local iovec = self._packet[0].iovecs[parse.iovec]
-   local payload = iovec.buffer.pointer + iovec.offset + parse.offset
-   local multi_buffer_p = parse.iovec ~= self._packet[0].niovecs - 1
-   if mem ~= nil then
-      assert(size <= iovec.buffer.size - (iovec.offset + iovec.length),
-             "not enough space in buffer to add payload")
-      assert(not multi_buffer_p,
-             "can not add payload to multi-buffer packet")
-      ffi.copy(iovec.buffer.pointer + iovec.offset + iovec.length,
-               mem, size)
-      iovec.length = iovec.length + size
-      self._packet[0].length = self._packet[0].length + size
-   end
-   local p_size = iovec.length - parse.offset
-   return payload, p_size, (multi_buffer_p and parse.iovec + 1) or nil
+   if mem then packet.append(self._packet, mem, size) end
+   return packet.data(self._packet) + self._parse.offset,
+          packet.length(self._packet) - self._parse.offset
 end
 
 return datagram
