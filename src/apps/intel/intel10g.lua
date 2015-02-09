@@ -268,8 +268,8 @@ function M_sf:free_receive_buffers ()
       self.rdt = band(self.rdt - 1, num_descriptors - 1)
       local desc = self.rxdesc[self.rdt].data
       desc.address, desc.dd = 0, 0
-      buffer.free(self.rxbuffers[self.rdt])
-      self.rxbuffers[self.rdt] = nil
+      packet.free(self.rxpackets[self.rdt])
+      self.rxpackets[self.rdt] = nil
    end
 end
 

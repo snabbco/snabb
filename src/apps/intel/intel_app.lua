@@ -195,11 +195,7 @@ function selftest ()
          os.exit (1)
       end
    end
-<<<<<<< HEAD
-   print ('all ok')
-=======
    print("selftest: ok")
->>>>>>> vosys/straightline
 end
 
 -- open two singlequeue drivers on both ends of the wire
@@ -369,11 +365,12 @@ function manyreconf(pcidevA, pcidevB)
       config.link(c, 'nicAm0.tx -> sink_ms.in1')
       config.link(c, 'nicAm1.tx -> sink_ms.in2')
       engine.configure(c)
-      link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
-      link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+      link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
+      link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
       engine.main({duration = 0.25, report={showlinks=true, showapps=true}})
       local sent = engine.app_table.nicAm0.input.rx.stats.txpackets
       if sent == prevsent then
+	 print("error: NIC transmit counter did not increase")
          os.exit(2)
       end
       prevsent = sent
