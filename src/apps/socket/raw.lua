@@ -27,11 +27,11 @@ function RawSocket:push ()
    while not link.empty(l) and self.dev:can_transmit() do
       local p = link.receive(l)
       self.dev:transmit(p)
-      packet.deref(p)
+      packet.free(p)
    end
 end
 
-function RawSocket.selftest ()
+function selftest ()
    -- Send a packet over the loopback device and check
    -- that it is received correctly.
    -- XXX beware of a race condition with unrelated traffic over the

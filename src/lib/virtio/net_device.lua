@@ -3,7 +3,6 @@
 
 module(...,package.seeall)
 
-local buffer    = require("core.buffer")
 local freelist  = require("core.freelist")
 local lib       = require("core.lib")
 local link      = require("core.link")
@@ -22,10 +21,9 @@ require("lib.virtio.virtio_vring_h")
 
 local char_ptr_t = ffi.typeof("char *")
 local virtio_net_hdr_size = ffi.sizeof("struct virtio_net_hdr")
+local virtio_net_hdr_type = ffi.typeof("struct virtio_net_hdr *")
 local virtio_net_hdr_mrg_rxbuf_size = ffi.sizeof("struct virtio_net_hdr_mrg_rxbuf")
 local virtio_net_hdr_mrg_rxbuf_type = ffi.typeof("struct virtio_net_hdr_mrg_rxbuf *")
-local packet_info_size = ffi.sizeof("struct packet_info")
-local buffer_t = ffi.typeof("struct buffer")
 
 local invalid_header_id = 0xffff
 
@@ -78,11 +76,7 @@ function VirtioNetDevice:new(owner)
       kickfd = {},
       virtq = {},
       rx = {},
-      tx = {},
-      -- buffer records that are not currently in use
-      buffer_recs = freelist.new("struct buffer *", 32*1024),
-      -- buffer records populated with available VM memory
-      vring_transmit_buffers = freelist.new("struct buffer *", 32*1024),
+      tx = {}
    }
 
    o = setmetatable(o, {__index = VirtioNetDevice})
@@ -97,7 +91,9 @@ function VirtioNetDevice:new(owner)
    end
 
    self.virtq_pairs = 1
+   self.hdr_type = virtio_net_hdr_type
    self.hdr_size = virtio_net_hdr_size
+   self.tx = {}
 
    return o
 end
@@ -108,242 +104,182 @@ function VirtioNetDevice:poll_vring_receive ()
    self:rx_signal_used()
 end
 
-function VirtioNetDevice:poll_vring_transmit ()
-   -- TX
-   self:get_transmit_buffers_from_vm()
-   self:transmit_packets_to_vm()
+-- Receive all available packets from the virtual machine.
+function VirtioNetDevice:receive_packets_from_vm ()
+   local ops = {
+      packet_start = self.rx_packet_start,
+      buffer_add   = self.rx_buffer_add,
+      packet_end   = self.rx_packet_end
+   }
+   for i = 0, self.virtq_pairs-1 do
+      self.ring_id = 2*i+1
+      local virtq = self.virtq[self.ring_id]
+      get_buffers(virtq, 'rx', ops, self.hdr_size)
+   end
 end
 
-function VirtioNetDevice:rx_packet_start(header_id, addr, len)
+function VirtioNetDevice:rx_packet_start(addr, len)
    local rx_p = packet.allocate()
-   local header_id = header_id
-   local header_pointer = ffi.cast(char_ptr_t,self:map_from_guest(addr))
-   local total_size = self.hdr_size
-   local header_len = self.hdr_size
 
-   return header_id, header_pointer, total_size, header_len, rx_p
+   local rx_hdr = ffi.cast(virtio_net_hdr_type, self:map_from_guest(addr))
+   rx_p.flags = rx_hdr.flags
+   rx_p.csum_start = rx_hdr.csum_start
+   rx_p.csum_offset = rx_hdr.csum_offset
+
+   return rx_p
 end
 
-function VirtioNetDevice:rx_buffer_add(rx_p, addr, len, rx_total_size, tx)
-   local buf = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
+function VirtioNetDevice:rx_buffer_add(rx_p, addr, len)
 
    local addr = self:map_from_guest(addr)
-   buf.pointer = ffi.cast(char_ptr_t, addr)
-   buf.physical = self:translate_physical_addr(addr)
-   buf.size = len
+   local pointer = ffi.cast(char_ptr_t, addr)
 
-   -- Fill buffer origin info
-   buf.origin.type = C.BUFFER_ORIGIN_VIRTIO
-   -- Set invalid header_id for all buffers. The first will contain
-   -- the real header_id, set after the loop
-   buf.origin.info.virtio.header_id = invalid_header_id
-
-   packet.add_iovec(rx_p, buf, buf.size)
-
-   -- The total size will be added to the first buffer virtio info
-   local new_total_size = rx_total_size + buf.size
-
-   return nil, new_total_size
+   packet.append(rx_p, pointer, len)
+   return len
 end
 
-function VirtioNetDevice:rx_packet_end(rx_header_id, rx_header_pointer, rx_total_size, rx_p, buf)
-   -- Fill in the first buffer with header info
-   local v = rx_p.iovecs[0].buffer.origin.info.virtio
-   v.device_id      = self.virtio_device_id
-   v.ring_id        = self.ring_id
-   v.header_id      = rx_header_id
-   v.header_pointer = rx_header_pointer
-   v.total_size     = rx_total_size
-   ffi.copy(rx_p.info, rx_header_pointer, packet_info_size)
-
+function VirtioNetDevice:rx_packet_end(header_id, total_size, rx_p)
    local l = self.owner.output.tx
    if l then
       link.transmit(l, rx_p)
    else
-      debug("droprx", "len", rx_p.length, "niovecs", rx_p.niovecs)
-      packet.deref(rx_p)
+      debug("droprx", "len", rx_p.length)
+      packet.free(rx_p)
    end
-end
-
--- Receive all available packets from the virtual machine.
-function VirtioNetDevice:receive_packets_from_vm ()
-   for i = 0, self.virtq_pairs-1 do
-      self.ring_id = 2*i+1
-      local virtq = self.virtq[self.ring_id]
-      local ops = {
-         packet_start = self.rx_packet_start,
-         buffer_add   = self.rx_buffer_add,
-         packet_end   = self.rx_packet_end
-      }
-      get_buffers(virtq, 'rx', ops)
-   end
-end
-
-function VirtioNetDevice:tx_packet_start(header_id, addr, len)
-   local tx_header_pointer = ffi.cast(char_ptr_t, self:map_from_guest(addr))
-   return header_id, tx_header_pointer, self.hdr_size, self.hdr_size, nil
-end
-
-function VirtioNetDevice:tx_buffer_add(tx_p, addr, len, tx_total_size, tx)
-   local buf = freelist.remove(self.buffer_recs) or lib.malloc(buffer_t)
-
-   local addr = self:map_from_guest(addr)
-   buf.pointer = ffi.cast(char_ptr_t, addr)
-   buf.physical = self:translate_physical_addr(addr)
-   buf.size = len
-
-   -- Fill buffer origin info
-   buf.origin.type = C.BUFFER_ORIGIN_VIRTIO
-
-   local new_total_size = tx_total_size + buf.size
-   -- TODO: supports single buffer now!
-   return buf, new_total_size
-end
-
-function VirtioNetDevice:tx_packet_end(tx_header_id, tx_header_pointer,
-   tx_total_size, _p, buf)
-   -- TODO: supports single buffer now!
-   local v = buf.origin.info.virtio
-   v.device_id      = self.virtio_device_id
-   v.ring_id        = self.ring_id
-   v.header_id      = tx_header_id
-   v.header_pointer = tx_header_pointer
-   v.total_size     = tx_total_size
-
-   freelist.add(self.vring_transmit_buffers, buf)
-end
-
--- Populate the `self.vring_transmit_buffers` freelist with buffers from the VM.
-function VirtioNetDevice:get_transmit_buffers_from_vm ()
-   for i = 0, self.virtq_pairs-1 do
-      self.ring_id = 2*i
-      local virtq = self.virtq[self.ring_id]
-      local ops = {
-         packet_start = self.tx_packet_start,
-         buffer_add   = self.tx_buffer_add,
-         packet_end   = self.tx_packet_end
-      }
-      get_buffers(virtq, 'tx', ops)
-   end
-end
-
-function VirtioNetDevice:more_vm_buffers ()
-   return freelist.nfree(self.vring_transmit_buffers) > 2
-end
-
--- return the buffer from a iovec, ensuring it originates from the vm
-local last_size = nil
-function VirtioNetDevice:vm_buffer (iovec)
-   local should_continue = true
-   local b = iovec.buffer
-   -- check if this is a zero-copy packet
-   if b.origin.type ~= C.BUFFER_ORIGIN_VIRTIO then
-      -- get buffer from the once supplied by the VM
-      local old_b = b
-      b = freelist.remove(self.vring_transmit_buffers)
-      --assert(iovec.offset + iovec.length <= b.size)
-
-      -- copy the whole buffer data, including offset
-      ffi.copy(b.pointer, old_b.pointer, iovec.offset + iovec.length)
-      buffer.free(old_b)
-      iovec.buffer = b
-
-      if not self:more_vm_buffers() then
-         -- no more buffers, stop the loop
-         should_continue = false
-      end
-   else
-      if iovec.offset ~= 0 then
-         -- Virtio requires the offset to be 0. Move the memory to make it so.
-         C.memmove(b.pointer, b.pointer + iovec.offset, iovec.length)
-         iovec.offset = 0
-      end
-   end
-   if last_size ~= b.size then debug("size=", b.size) last_size=b.size end
-   return should_continue, b
-end
-
--- Transmit packets from the app input queue to the VM.
-function VirtioNetDevice:transmit_packets_to_vm ()
-   local l = self.owner.input.rx
-   if not l then return end
-   local should_continue = not self.not_enough_vm_bufers
-
-   while (not link.empty(l)) and should_continue do
-      local p = link.receive(l)
-
-      if p.niovecs > 1 then
-         assert(self.mrg_rxbuf)
-      end
-
-      -- Iterate over all iovecs
-      for i = 0, p.niovecs - 1 do
-
-         local iovec = p.iovecs[i]
-         local b
-         should_continue, b = self:vm_buffer(iovec)
-         local size = iovec.length
-
-         -- fill in the virtio header
-         if b then
-            local v = b.origin.info.virtio
-            local virtio_hdr = v.header_pointer
-            -- the first buffer always contains the header
-            if i == 0 then
-               ffi.copy(virtio_hdr, p.info, packet_info_size)
-               size = size + self.hdr_size
-               -- when using mergeable buffers, set the num_buffers field
-               if self.mrg_rxbuf then
-                  local hdr = ffi.cast(virtio_net_hdr_mrg_rxbuf_type, virtio_hdr)
-                  hdr.num_buffers = p.niovecs
-               end
-            else
-               -- the other buffer need to left shift the data over the header
-               -- here we assume that the header precedes the buffer
-               -- which is the common case when mergeable buffers are used
-
-               --assert(virto_hdr+virtio_net_hdr_mrg_rxbuf_size == b.pointer)
-               C.memmove(virtio_hdr, b.pointer, iovec.length)
-            end
-
-            self.virtq[v.ring_id]:put_buffer(v.header_id, size)
-         end
-         if not should_continue then break end
-      end
-
-      packet.deref(p)
-   end
-
-   if not should_continue then
-      -- not enough buffers detected, verify once again
-      self.not_enough_vm_bufers = not self:more_vm_buffers()
-   end
-
-   for i = 0, self.virtq_pairs-1 do
-      self.virtq[2*i]:signal_used()
-   end
-end
-
--- Return a buffer to the virtual machine.
-function VirtioNetDevice:return_virtio_buffer (b)
-   freelist.add(self.buffer_recs, b)
-   if b.origin.info.virtio.ring_id == 1 then -- Receive buffer?
-
-      -- Only do this for the first buffer in the chain.
-      -- Distiguish it by the valid header_id
-      -- Other buffers in the chain are safe as long as
-      -- rx_signal_used() is not called. So be sure to free
-      -- all of them at one poll.
-      if b.origin.info.virtio.header_id ~= invalid_header_id then
-         self.virtq[b.origin.info.virtio.ring_id]:put_buffer(b.origin.info.virtio.header_id, b.origin.info.virtio.total_size)
-      end
-   end
+   self.virtq[self.ring_id]:put_buffer(header_id, total_size)
 end
 
 -- Advance the rx used ring and signal up
 function VirtioNetDevice:rx_signal_used()
    for i = 0, self.virtq_pairs-1 do
       self.virtq[2*i+1]:signal_used()
+   end
+end
+
+function VirtioNetDevice:poll_vring_transmit ()
+   -- RX
+   self:transmit_packets_to_vm()
+   self:tx_signal_used()
+end
+
+-- Receive all available packets from the virtual machine.
+function VirtioNetDevice:transmit_packets_to_vm ()
+   local ops = {}
+   if not self.mrg_rxbuf then
+      ops = {
+         packet_start = self.tx_packet_start,
+         buffer_add   = self.tx_buffer_add,
+         packet_end   = self.tx_packet_end
+      }
+   else
+      ops = {
+         packet_start = self.tx_packet_start_mrg_rxbuf,
+         buffer_add   = self.tx_buffer_add_mrg_rxbuf,
+         packet_end   = self.tx_packet_end_mrg_rxbuf
+      }
+   end
+   for i = 0, self.virtq_pairs-1 do
+      self.ring_id = 2*i
+      local virtq = self.virtq[self.ring_id]
+      get_buffers(virtq, 'tx', ops, self.hdr_size)
+   end
+end
+
+function VirtioNetDevice:tx_packet_start(addr, len)
+   local l = self.owner.input.rx
+   if link.empty(l) then return nil, nil end
+   local tx_p = link.receive(l)
+
+   local tx_hdr = ffi.cast(virtio_net_hdr_type, self:map_from_guest(addr))
+
+   -- TODO: copy the relevnat fields from the packet
+   ffi.fill(tx_hdr, virtio_net_hdr_size)
+
+   return tx_p
+end
+
+function VirtioNetDevice:tx_buffer_add(tx_p, addr, len)
+
+   local addr = self:map_from_guest(addr)
+   local pointer = ffi.cast(char_ptr_t, addr)
+
+   assert(tx_p.length <= len)
+   ffi.copy(pointer, tx_p.data, tx_p.length)
+
+   return tx_p.length
+end
+
+function VirtioNetDevice:tx_packet_end(header_id, total_size, tx_p)
+   packet.free(tx_p)
+   self.virtq[self.ring_id]:put_buffer(header_id, total_size)
+end
+
+function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
+   local tx_mrg_hdr = ffi.cast(virtio_net_hdr_mrg_rxbuf_type, self:map_from_guest(addr))
+   local l = self.owner.input.rx
+   local tx_p = self.tx.p
+   -- TODO: copy the relevnat fields from the packet
+   ffi.fill(tx_mrg_hdr, virtio_net_hdr_mrg_rxbuf_size)
+
+   -- for the first buffer receive a packet and save its header pointer
+   if not tx_p then
+      if link.empty(l) then return end
+      tx_p = link.receive(l)
+      self.tx.tx_mrg_hdr = tx_mrg_hdr
+      self.tx.data_sent = 0
+   end
+
+   return tx_p
+end
+
+function VirtioNetDevice:tx_buffer_add_mrg_rxbuf(tx_p, addr, len)
+
+   local addr = self:map_from_guest(addr)
+   local pointer = ffi.cast(char_ptr_t, addr)
+
+   -- The first buffer is HDR|DATA. All subsequent buffers are DATA only
+   -- virtq passes us the pointer to the DATA so we need to adjust
+   -- the number fo copied data and the pointer
+   local adjust = 0
+   if self.tx.tx_mrg_hdr.num_buffers ~= 0 then
+      adjust = virtio_net_hdr_mrg_rxbuf_size
+   end
+
+   -- calculate the amont of data to copy on this pass
+   -- take the minimum of the datat left in the packet
+   -- and the adjusted buffer len
+   local to_copy = math.min(tx_p.length - self.tx.data_sent, len + adjust)
+
+   -- copy the data to the adjusted pointer
+   ffi.copy(pointer - adjust, tx_p.data + self.tx.data_sent, to_copy)
+
+   -- update the num_buffers in the first virtio header
+   self.tx.tx_mrg_hdr.num_buffers = self.tx.tx_mrg_hdr.num_buffers + 1
+   self.tx.data_sent = self.tx.data_sent + to_copy
+
+   -- have we sent all the data in the packet?
+   if self.tx.data_sent == tx_p.length then
+      self.tx.finished = true
+   end
+
+   return to_copy
+end
+
+function VirtioNetDevice:tx_packet_end_mrg_rxbuf(header_id, total_size, tx_p)
+   -- free the packet only when all its data is processed
+   if self.tx.finished then
+      packet.free(tx_p)
+      self.tx = {}
+   elseif not self.tx.p then
+      self.tx.p = tx_p
+   end
+   self.virtq[self.ring_id]:put_buffer(header_id, total_size)
+end
+
+-- Advance the rx used ring and signal up
+function VirtioNetDevice:tx_signal_used()
+   for i = 0, self.virtq_pairs-1 do
+      self.virtq[2*i]:signal_used()
    end
 end
 
@@ -362,8 +298,6 @@ function VirtioNetDevice:translate_physical_addr (addr)
 end
 
 function VirtioNetDevice:map_from_guest (addr)
-   local page = bit.rshift(addr, pagebits)
-   if page == self.last_guest_page then return addr + self.last_guest_offset end
    local result
    for i = 0, table.getn(self.mem_table) do
       local m = self.mem_table[i]
@@ -373,8 +307,6 @@ function VirtioNetDevice:map_from_guest (addr)
             self.mem_table[0] = m
          end
          result = addr + m.snabb - m.guest
-         self.last_guest_page = page
-         self.last_guest_offset = m.snabb - m.guest
          break
       end
    end
@@ -408,8 +340,17 @@ function VirtioNetDevice:set_features(features)
    print(string.format("Set features 0x%x\n%s", tonumber(features), get_feature_names(features)))
    self.features = features
    if band(self.features, C.VIRTIO_NET_F_MRG_RXBUF) == C.VIRTIO_NET_F_MRG_RXBUF then
+      self.hdr_type = virtio_net_hdr_mrg_rxbuf_type
       self.hdr_size = virtio_net_hdr_mrg_rxbuf_size
       self.mrg_rxbuf = true
+   end
+   if band(self.features, C.VIRTIO_RING_F_INDIRECT_DESC) == C.VIRTIO_RING_F_INDIRECT_DESC then
+      for i = 0, max_virtq_pairs-1 do
+         -- TXQ
+         self.virtq[2*i]:enable_indirect_descriptors()
+         -- RXQ
+         self.virtq[2*i+1]:enable_indirect_descriptors()
+      end
    end
 end
 
@@ -466,10 +407,6 @@ end
 
 function VirtioNetDevice:rx_buffers()
    return self.vring_transmit_buffers
-end
-
-function VirtioNetDevice:set_virtio_device_id(virtio_device_id)
-   self.virtio_device_id = virtio_device_id
 end
 
 feature_names = {

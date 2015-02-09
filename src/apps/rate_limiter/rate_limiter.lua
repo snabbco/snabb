@@ -6,7 +6,6 @@ local config = require("core.config")
 local packet = require("core.packet")
 local timer = require("core.timer")
 local basic_apps = require("apps.basic.basic_apps")
-local buffer = require("core.buffer")
 local ffi = require("ffi")
 local C = ffi.C
 local floor, min = math.floor, math.min
@@ -80,7 +79,7 @@ function RateLimiter:push ()
          link.transmit(o, p)
       else
          -- discard packet
-         packet.deref(p)
+         packet.free(p)
       end
    end
 end
@@ -94,7 +93,6 @@ end
 
 function selftest ()
    print("Rate limiter selftest")
-   buffer.preallocate(10000)
    
    local c = config.new()
    config.app(c, "source", basic_apps.Source)

@@ -56,6 +56,12 @@ function start_bench_env {
     # Wait until VMs are ready.
     wait_vm_up $TELNET_PORT0
     wait_vm_up $TELNET_PORT1
+
+    run_telnet $TELNET_PORT0 "ifconfig eth0 up"
+    run_telnet $TELNET_PORT1 "ifconfig eth0 up"
+    run_telnet $TELNET_PORT0 "ip -6 addr add $GUEST_IP0 dev eth0"
+    run_telnet $TELNET_PORT1 "ip -6 addr add $GUEST_IP1 dev eth0"
+
 }
 
 function stop_bench_env {

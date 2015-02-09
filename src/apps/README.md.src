@@ -70,17 +70,3 @@ discards them. This can be handy in combination with a `Source`.
               |        |
               +--------+
 
-## Buzz
-
-The `Buzz` app simply prints a message to standard output each time a
-callback runs. This can be useful for observing the execution of the app
-framework in a primitive way.
-
-    DIAGRAM: Buzz
-    +--------+
-    |        |
-    |        |
-    |  Buzz  |
-    |        |
-    |        |
-    +--------+
