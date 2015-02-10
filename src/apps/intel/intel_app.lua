@@ -37,10 +37,7 @@ function Intel82599:new (arg)
       dev.vflist[poolnum+1] = vf
       return setmetatable({dev=vf:open(conf)}, Intel82599)
    else
-      local dev = intel10g.new_sf(conf.pciaddr)
-         :open()
-         :wait_linkup()
-         :recheck()
+      local dev = intel10g.new_sf(conf.pciaddr):open()
       if not dev then return null end
       return setmetatable({dev=dev, zone="intel"}, Intel82599)
    end
@@ -316,7 +313,7 @@ function mq_sw(pcidevA)
 end
 
 function manyreconf(pcidevA, pcidevB)
-   print ('')
+   io.write ('\n')
    local d1 = lib.hexundump ([[
       52:54:00:02:02:02 52:54:00:01:01:01 08 00 45 00
       00 54 c3 cd 40 00 40 01 f3 23 c0 a8 01 66 c0 a8
@@ -337,7 +334,8 @@ function manyreconf(pcidevA, pcidevB)
    ]], 98)                  -- src: Am0    dst: ---
 --    engine.configure(config.new())
    local prevsent = 0
-   print("Running iterated VMDq test...")
+   local cycles, redos, maxredos, waits = 0, 0, 0, 0
+   io.write("Running iterated VMDq test...\n")
    for i = 1, 100 do
       local c = config.new()
       config.app(c, 'source_ms', basic_apps.Join)
@@ -361,16 +359,21 @@ function manyreconf(pcidevA, pcidevB)
       config.link(c, 'repeater_ms.output -> nicAm0.rx')
       config.link(c, 'nicAm0.tx -> sink_ms.in1')
       config.link(c, 'nicAm1.tx -> sink_ms.in2')
+      engine.configure(config.new())
       engine.configure(c)
       link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
       link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
       engine.main({duration = 0.1, no_report=true})
+      cycles = cycles + 1
+      redos = redos + engine.app_table.nicAm1.dev.pf.redos
+      maxredos = math.max(maxredos, engine.app_table.nicAm1.dev.pf.redos)
+      waits = waits + engine.app_table.nicAm1.dev.pf.waitlu_ms
       local sent = engine.app_table.nicAm0.input.rx.stats.txpackets
-      print (('test #%3d: VMDq VLAN=%d; 100ms burst. packet sent: %s'):format(i, 100+i, lib.comma_value(sent-prevsent)))
+      io.write (('test #%3d: VMDq VLAN=%d; 100ms burst. packet sent: %s\n'):format(i, 100+i, lib.comma_value(sent-prevsent)))
       if sent == prevsent then
-	 print("error: NIC transmit counter did not increase")
+         io.write("error: NIC transmit counter did not increase\n")
          os.exit(2)
       end
-      prevsent = sent
    end
+   io.write (pcidevA, ": avg wait_lu: ", waits/cycles, ", max redos: ", maxredos, ", avg: ", redos/cycles, '\n')
 end
