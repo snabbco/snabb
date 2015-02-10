@@ -92,8 +92,8 @@ end
 
 -- Close a file descriptor opened by map_pci_memory().
 -- XXX should also unmap the memory.
-function close_pci_resource (fd)
-   C.close_pci_resource(fd)
+function close_pci_resource (fd, base)
+   C.close_pci_resource(fd, base)
 end
 
 --- Enable or disable PCI bus mastering. DMA only works when bus
