@@ -337,8 +337,8 @@ function manyreconf(pcidevA, pcidevB)
    ]], 98)                  -- src: Am0    dst: ---
 --    engine.configure(config.new())
    local prevsent = 0
+   print("Running iterated VMDq test...")
    for i = 1, 100 do
-      print (('config #%d'):format(i))
       local c = config.new()
       config.app(c, 'source_ms', basic_apps.Join)
       config.app(c, 'repeater_ms', basic_apps.Repeater)
@@ -356,9 +356,6 @@ function manyreconf(pcidevA, pcidevB)
          macaddr = '52:54:00:02:02:02',
          vlan = 100+i,
       })
-      print ('-------')
-      print ("Send a bunch of packets from Am0")
-      print ("half of them go to nicAm1 and half go nowhere")
       config.app(c, 'sink_ms', basic_apps.Sink)
       config.link(c, 'source_ms.out -> repeater_ms.input')
       config.link(c, 'repeater_ms.output -> nicAm0.rx')
@@ -367,8 +364,9 @@ function manyreconf(pcidevA, pcidevB)
       engine.configure(c)
       link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
       link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
-      engine.main({duration = 0.25, report={showlinks=true, showapps=true}})
+      engine.main({duration = 0.1, no_report=true})
       local sent = engine.app_table.nicAm0.input.rx.stats.txpackets
+      print (('test #%3d: VMDq VLAN=%d; 100ms burst. packet sent: %s'):format(i, 100+i, lib.comma_value(sent-prevsent)))
       if sent == prevsent then
 	 print("error: NIC transmit counter did not increase")
          os.exit(2)
