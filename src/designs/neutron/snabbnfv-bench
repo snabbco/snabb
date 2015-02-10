@@ -33,10 +33,16 @@ function run (pciaddr, confpath, sockpath, npackets)
          bytes = app.app_table[nic].input.rx.stats.rxbytes
          start = C.get_monotonic_time()
          if os.getenv("NFV_PROF") then
-            require("jit.p").start(os.getenv("NFV_PROF"))
+            require("jit.p").start(os.getenv("NFV_PROF"), os.getenv("NFV_PROF_FILE"))
             main.profiling = true
          else
             print("No LuaJIT profiling enabled ($NFV_PROF unset).")
+         end
+         if os.getenv("NFV_DUMP") then
+            require("jit.dump").start(os.getenv("NFV_DUMP"), os.getenv("NFV_DUMP_FILE"))
+            main.dumping = true
+         else
+            print("No LuaJIT dump enabled ($NFV_DUMP unset).")
          end
       end
       return app.app_table[nic].input.rx.stats.rxpackets - packets >= npackets
