@@ -93,6 +93,13 @@
 --  c[0] = 42
 --  print(test:get("counter")) --> 42
 --
+-- When an object is added with register(), the shared memory region
+-- is grown by first unmapping the region and then re-mapping it.  The
+-- new mapping ist not guaranteed to be at the same virtual address.
+-- Therefore, using the address of an object across calls to
+-- register() is unsafe.  The dictionary() method can be used to
+-- obtain a table of pointers to all currently registered objects for
+-- efficient access.
 module(..., package.seeall)
 
 local ffi = require("ffi")
@@ -140,6 +147,10 @@ function shmem:new (options)
    o._size = 0
    o._base = nil
    o._objs = {}
+   o._objs_t = {}
+   o._h_to_n = {} -- Maps handle to name
+   o._n_to_h = {} -- Maps name to handle
+   o._nobjs = 0
    return o
 end
 
@@ -149,7 +160,13 @@ end
 -- region and add its description to the index file.  If a value is
 -- supplied, the object is initialized with it via the set() method.
 --
--- The method returns a pointer to the object via the ptr() method.
+-- The objects are stored in the order in which they are registered.
+-- The method returns the position of the object within this sequence,
+-- starting with 1 for the first object.  This number can be used with
+-- the tables obtained from the dictionary() method for more efficient
+-- access to the objects once registration is completed.  The number
+-- is also referred to as the "handle" of the object.
+--
 -- The method aborts if the memeory region can't be grown via
 -- munmap()/mmap() or if the updating of the index file fails.
 function shmem:register (name, ctype, value)
@@ -160,10 +177,18 @@ function shmem:register (name, ctype, value)
    local length = ffi.sizeof(ctype)
    -- Store the location of the object as an offset relative to the
    -- base, because the base may change across calls to shmem_grow()
-   self._objs[name] = { offset    = self._size,
-			ctype     = ctype,
-			ctype_ptr = ffi.typeof("$*", ctype),
-			length    = length }
+   -- The object's description is stored in two tables by name and by
+   -- handle.
+   local obj = { offset    = self._size,
+		 ctype     = ctype,
+		 ctype_ptr = ffi.typeof("$*", ctype),
+		 length    = length }
+   self._objs[name] = obj
+   local handle = self._nobjs+1
+   self._nobjs = handle
+   self._objs_t[handle] = obj
+   self._h_to_n[handle] = name
+   self._n_to_h[name] = handle
    local new_size = self._size + length
    self._base = C.shmem_grow(self._data_fh, self._base,
 			    self._size, new_size)
@@ -176,7 +201,7 @@ function shmem:register (name, ctype, value)
    end
    assert(self._index_fh:write(line, '\n'))
    assert(self._index_fh:flush())
-   return self:ptr(name)
+   return handle
 end
 
 -- Return the base address of the mapped memory region.  It is unsafe
@@ -186,10 +211,30 @@ function shmem:base ()
    return self._base
 end
 
+-- Return a table of pointers to all currently registered objects as
+-- per the ptr() method, together with a table that contains the
+-- mapping from handles to object names and a table that contains the
+-- reverse mappings (from names to handles).  An object can then be
+-- accessed by dereferencing the pointer at the given slot, e.g.
+--
+--  register:shmem('foo', ffi.typeof("uint64_t"))
+--  local objs, h_to_n, n_to_h = shmem:dictionary()
+--  objs[n_to_h.foo][0] = 0xFFULL
+--
+-- The intended usage is to first register() all objects, then use
+-- this method to pre-compute all pointers for efficient access.
+function shmem:dictionary()
+   local table = {}
+   for i = 1, self._nobjs do
+      table[i] = self:ptr(self._h_to_n[i])
+   end
+   return table, self._h_to_n, self._n_to_h
+end
+
 local function get_obj(self, name)
    local obj = self._objs[name]
    if obj == nil then
-      error("unkown object: "..name)
+      error("unkown object: "..(name or '<no name>'))
    end
    return obj
 end
@@ -257,6 +302,16 @@ function selftest ()
    name, len = fields(ifile)
    assert(name == 'bar' and tonumber(len) == 11)
 
+   -- Check dictionary
+   local t, h_to_n, n_to_h = test:dictionary()
+   assert(#t == 2)
+   assert(h_to_n[1] == 'counter' and n_to_h['counter'] == 1)
+   assert(h_to_n[2] == 'bar' and n_to_h['bar'] == 2)
+   t[1][0] = 0xdeadbeef
+   t[2][0] = bar_t({ x = 2, string = 'bar'})
+   assert(test:get('counter') == 0xdeadbeef)
+   assert(test:get('bar').x == 2)
+   assert(ffi.string(test:get('bar').string) == 'bar')
    os.remove('selftest')
    os.remove('selftest.index')
    print("ok")
