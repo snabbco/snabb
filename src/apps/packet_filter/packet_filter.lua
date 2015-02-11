@@ -457,6 +457,11 @@ function PacketFilter:push ()
 end
 
 function selftest ()
+   do
+--       microbench()
+      simplebench()
+      return
+   end
    -- Temporarily disabled:
    --   Packet filter selftest is failing in.
    -- enable verbose logging for selftest
@@ -675,4 +680,69 @@ function selftest ()
       os.exit(1)
    end
    print("selftest passed")
+end
+
+
+function microbench()
+   math.randomseed(os.time())
+   local tab = {}
+   local count = 0
+   local function set(spec)
+      if count > 1e6 then return end
+      local k = conntrack.spec_tostring(spec)
+      if tab[k] == nil then count = count+1 end
+      tab[k] = true
+   end
+   local function work(n)
+      local spec = conntrack.randspec()
+      local t = C.get_time_ns()
+      for i = 1, n do
+         set(spec)
+         spec = conntrack.randspec(spec)
+      end
+--       collectgarbage('step')
+      t = C.get_time_ns() - t
+      return 1000*n/tonumber(t)
+   end
+
+   for i=1,100 do
+      print (string.format('base time %d: %g M/s (n=%d)', i, work(1e5), count))
+   end
+end
+
+function simplebench()
+   math.randomseed(os.time())
+   local p1 = packet.from_string(lib.hexundump ([[
+      52:54:00:02:02:02 52:54:00:01:01:01 08 00 45 00
+      00 54 c3 cd 40 00 40 17 f3 23 c0 a8 01 66 c0 a8
+      01 01 00 35 00 35 61 1a 00 06 5c ba 16 53 00 00
+      00 00 04 15 09 00 00 00 00 00 10 11 12 13 14 15
+      16 17 18 19 1a 1b 1c 1d 1e 1f 20 21 22 23 24 25
+      26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
+      36 37
+   ]], 98))
+
+   local function randpackt(p1)
+      local ips = ffi.cast('uint32_t*', p1.data+IPV4_SOURCE_OFFSET)
+      ips[0] = math.random(2000) --2^32)
+      ips[1] = math.random(2000) --2^32)
+      local ports = ffi.cast('uint16_t*', p1.data+IPV4_SOURCE_PORT_OFFSET)
+      ports[0] = math.random(2^16)
+      ports[1] = math.random(2^16)
+      return ffi.string(p1.data, p1.length)
+   end
+   conntrack.define('bench')
+   local function work(n)
+      local t = C.get_time_ns()
+      for i = 1, n do
+         randpackt(p1)
+         conntrack.track('bench', p1.data)
+      end
+--       collectgarbage('step')
+      t = C.get_time_ns() - t
+      return 1000*n/tonumber(t)
+   end
+   for i=1,100 do
+      print (string.format('packet base time %d: %g M/s (n=%d)', i, work(1e5), conntrack.count('bench')))
+   end
 end
