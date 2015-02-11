@@ -39,7 +39,14 @@ function run()
             -P ${DB_PORT} -T ${DB_DUMP_PATH} ${DB_NEUTRON} ${DB_NEUTRON_TABLES}
         rm -f *.sql
         git add *.txt >/dev/null
-        git commit -m "Configuration update" >/dev/null
+        if [ $initial = true ]; then
+            git commit -m "Configuration update" >/dev/null
+            initial=false
+        else
+            git commit --amend -m "Configuration update" >/dev/null
+            git reflog expire --expire-unreachable=0 --all
+            git prune --expire 0
+        fi
         sleep "$SYNC_INTERVAL"
         #check that the daemon is still running
         GITPID=$(cat /tmp/neutron-sync-master.pid)
@@ -62,5 +69,6 @@ echo "DBG: \$DB_DUMP_PATH = $DB_DUMP_PATH"
 [ -d "$DB_DUMP_PATH/.git" ] || git init "$DB_DUMP_PATH" || error 'MAIN: error initializing repo'
 
 #sudo chmod 777 "$DB_DUMP_PATH"
+initial=true
 run "$DB_DUMP_PATH"
 
