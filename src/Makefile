@@ -39,7 +39,9 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-install: $(EXE)
+default: bin/snabb
+
+all: $(EXE)
 
 $(EXE): snabb
 	$(E) "PROGRAM   $@"
