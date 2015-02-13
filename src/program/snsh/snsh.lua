@@ -35,11 +35,12 @@ local long_opts = {
    test = "t",
    interactive = "i",
    debug = "d",
-   jv = "v",
+   jit = "j",
    help = "h",
 }
 
 function run (parameters)
+   local profiling = false
    local start_repl = false
    local noop = true -- are we doing nothing?
    -- Table of functions implementing command-line arguments
@@ -49,16 +50,39 @@ function run (parameters)
    function opt.t (arg) require(arg).selftest() noop = false end
    function opt.d (arg) _G.developer_debug = true            end
    function opt.i (arg) start_repl = true       noop = false end
+   function opt.j (arg)
+      if arg:match("^v") then
+	 local file = arg:match("^v=(.*)")
+	 if file == '' then file = nil end
+	 require("jit.v").start(file)
+      elseif arg:match("^p") then 
+	 local opts, file = arg:match("^p=([^,]*),?(.*)")
+	 if file == '' then file = nil end
+	 require("jit.p").start(opts, file)
+	 profiling = true
+      elseif arg:match("^dump") then
+	 local opts, file = arg:match("^dump=([^,]*),?(.*)")
+	 if file == '' then file = nil end
+	 require("jit.dump").on(opts, file)
+      end
+   end
    function opt.e (arg)
       local thunk, error = loadstring(arg)
       if thunk then thunk() else print(error) end
       noop = false
    end
+   function opt.P (arg)
+      package.path = arg
+   end
 
    -- Execute command line arguments
-   local opts,optind,optarg = getopt.get_ordered_opts(parameters, "hl:t:die:", long_opts)
+   local opts,optind,optarg = getopt.get_ordered_opts(parameters, "hl:t:die:j:P:", long_opts)
    for i,v in ipairs(opts) do
-      opt[v](optarg[i])
+      if opt[v] then 
+	 opt[v](optarg[i]) 
+      else
+	 error("unimplemented option: " .. v) 
+      end
    end
 
    -- Drop arguments that are alraedy processed.
@@ -72,6 +96,7 @@ function run (parameters)
    end
    
    if start_repl then repl() end
+   if profiling then require("jit.p").stop() end
 end
 
 function run_script (parameters)
