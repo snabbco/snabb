@@ -24,42 +24,36 @@ ffi.cdef[[
 
 _G.developer_debug = false
 debug_on_error = false
-profiling = false
-
-program = false
-parameters = false
 
 function main ()
    zone("startup")
    require "lib.lua.strict"
    initialize()
-   program, parameters = parse_command_line()
+   local program, args = parse_command_line()
+   parameters = args
    if not program then
       print("Usage: snabb <PROGRAM> [ARGS]...")
       os.exit(1)
    end
    local ok, mod = pcall(require, modulename(program))
    if not ok then
-      print("Usage: snabb <PROGRAM> [ARGS]...")
-      print()
-      print("Unknown program: " .. longname(program), modulename(program))
+      print(programname(program) .. ": unrecognized program name")
       os.exit(1)
+   end
+   if not type(mod) == 'table' then
+      print(programname(program) .. ": broken module", mod)
    end
    mod.run(parameters)
 end
 
--- shortname("nfv-sync-master.2.0") => "nfv'
-function shortname (program) 
-   return string.match(program, "(%w+)[^/]*$")
-end
--- shortname("nfv-sync-master.2.0") => "nfv-sync-master"
-function longname  (program) 
+-- programname("nfv-sync-master.2.0") => "nfv-sync-master"
+function programname (program) 
    return string.match(program, "([^/]+)$")
 end
 -- modulename("nfv-sync-master.2.0") => "program.nfv.nfv_sync_master")
 function modulename (program) 
-   program = string.gsub(program, "-", "_")
-   return ("program.%s.%s"):format(shortname(program), longname(program))
+   program = programname(string.gsub(program, "-", "_"))
+   return ("program.%s.%s"):format(program, program)
 end
 
 -- Return two values: program and parameters.
@@ -72,14 +66,13 @@ function parse_command_line ()
       table.insert(commandline, ffi.string(C.argv[i]))
    end
    local program = table.remove(commandline, 1)
-   if shortname(program) == 'snabb' then
+   if programname(program) == 'snabb' then
       program = table.remove(commandline, 1)      
    end
    return program, commandline
 end
 
 function exit (status)
-   if profiling then require("jit.p").stop() end
    os.exit(status)
 end
 
