@@ -1,20 +1,53 @@
-#!/usr/bin/env snabb
+module(..., package.seeall)
 
-local app = require("core.app")
 local ffi = require("ffi")
 local C = ffi.C
-local lib = require("core.lib")
 local config = require("lib.nfv.config")
 
-if #main.parameters ~= 4 then
-   print([[Usage: snabbnfv-bench <pci-address> <config-file> <socket-path> <npackets>
+local usage = [[
+Usage:
+  snabbnfv traffic <pci-address> <config-file> <socket-path>
+  snabbnfv bench   <pci-address> <config-file> <socket-path> <npackets>
 
-Process <npackets> between Neutron port and a physical NIC and calculate
-performance in millions of packets per second (Mpps).]])
-   main.exit(1)
+Process traffic between Neutron ports and a physical NIC.
+
+In benchmark mode, measure the throughput for the first <npackets> and
+then report and terminate.
+]]
+
+function run (args)
+   local command = table.remove(args, 1)
+   if command == 'traffic' and #args == 3 then
+      traffic(unpack(args))
+   elseif command == 'bench' and #args == 4 then
+      bench(unpack(args))
+   else
+      print(usage) 
+      main.exit(1)
+   end
 end
 
-function run (pciaddr, confpath, sockpath, npackets)
+function traffic (pciaddr, confpath, sockpath)
+   engine.log = true
+   local mtime = 0
+   while true do
+      for i = 1, 60 do
+         local mtime2 = C.stat_mtime(confpath)
+         if mtime2 ~= mtime then
+            print("Loading " .. confpath)
+            config.apply(config.load(confpath, pciaddr, sockpath))
+            mtime = mtime2
+         end
+         engine.main({duration=1})
+         -- Flush buffered log messages every 1s
+         io.flush()
+      end
+      -- Report each minute
+      engine.report()
+   end
+end
+
+function bench (pciaddr, confpath, sockpath, npackets)
    npackets = tonumber(npackets)
    local ports = dofile(confpath)
    local virtio = "Virtio_"..(config.port_name(ports[1]))
@@ -53,5 +86,3 @@ function run (pciaddr, confpath, sockpath, npackets)
    print(("Made %s breaths: %.2f packets per breath; %.2fus per breath"):format(lib.comma_value(engine.breaths), packets / engine.breaths, runtime / engine.breaths * 1e6))
    print(("Rate(Mpps):\t%.3f"):format(packets / runtime / 1e6))
 end
-
-run(unpack(main.parameters))
