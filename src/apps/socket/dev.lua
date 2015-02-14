@@ -3,7 +3,6 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 
-local buffer = require("core.buffer")
 local packet = require("core.packet")
 require("lib.raw.raw_h")
 require("apps.socket.io_h")
@@ -28,15 +27,7 @@ end
 
 function dev:receive ()
    assert(self.fd)
-   local size = C.msg_size(self.fd)
-   assert(size ~= -1)
    local p = packet.allocate()
-   local nbuffers = math.ceil(size/buffer.buffersize)
-   assert(nbuffers <= C.PACKET_IOVEC_MAX)
-   for i = 1, nbuffers do
-      local b = buffer.allocate()
-      packet.add_iovec(p, b, 0)
-   end
    local s = C.receive_packet(self.fd, p)
    assert(s ~= -1)
    return p

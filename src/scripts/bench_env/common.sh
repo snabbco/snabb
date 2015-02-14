@@ -54,7 +54,10 @@ run_qemu () {
 # - Log file
 run_qemu_vhost_user () {
     SOCKET=$6
-    NETDEV="-netdev type=vhost-user,id=net0,chardev=char0,queues=$QUEUES -chardev socket,id=char0,path=$SOCKET,server"
+    if [ ! -n $QUEUES ]; then
+        MQUEUES=",queues=$QUEUES"
+    fi
+    NETDEV="-netdev type=vhost-user,id=net0,chardev=char0${MQUEUES} -chardev socket,id=char0,path=$SOCKET,server"
     run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7" "$8"
     QEMUSOCKS="$QEMUSOCKS $SOCKET"
 }

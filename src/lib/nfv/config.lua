@@ -26,7 +26,6 @@ function load (file, pciaddr, sockpath)
 
    local ports = lib.load_conf(file)
    local c = config.new()
-   local zerocopy = {} -- {NIC->Virtio} app names to zerocopy link
    for _,t in ipairs(ports) do
       local vlan, mac_address = t.vlan, t.mac_address
       local name = port_name(t)
@@ -83,11 +82,10 @@ function load (file, pciaddr, sockpath)
       end
       config.link(c, NIC..".tx -> "..VM_rx)
       config.link(c, VM_tx.." -> "..NIC..".rx")
-      zerocopy[NIC] = Virtio
    end
 
    -- Return configuration c, and zerocopy pairs.
-   return c, zerocopy
+   return c
 end
 
 -- Apply configuration <c> to engine and reset <zerocopy> buffers.
@@ -95,11 +93,6 @@ function apply (c, zerocopy)
 --   print(config.graphviz(c))
 --   main.exit(0)
    engine.configure(c)
-   for nic, virtio in pairs(zerocopy) do
-      local n = engine.app_table[nic]
-      local v = engine.app_table[virtio]
-      n:set_rx_buffer_freelist(v:rx_buffers())
-   end
 end
 
 function selftest ()

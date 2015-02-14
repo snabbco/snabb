@@ -14,7 +14,7 @@ require("lib.lua.class")
 
 -- Reserve names that we want to use for global module.
 -- (This way we avoid errors from the 'strict' module.)
-_G.config, _G.engine, _G.memory, _G.link, _G.buffer, _G.packet, _G.timer,
+_G.config, _G.engine, _G.memory, _G.link, _G.packet, _G.timer,
    _G.main = nil
 
 ffi.cdef[[
@@ -25,18 +25,19 @@ ffi.cdef[[
 local usage = [[
 Usage: snabb [options] <module> [args...]
 Available options are:
--P pathspec  Set library load path (Lua 'package.path').
--e chunk     Execute string 'chunk'.
--l name      Require library 'name'.
--t name      Test module 'name' with selftest().
--R           Start interactive Snabb REPL.
--dm          Enable developer mode. Enables debug prints and asserts.
--d           Debug unhandled errors with the Lua interactive debugger.
--S           Print enhanced stack traces with more debug information.
--jdump file  Trace JIT decisions to 'file'. (Requires LuaJIT jit.* library.)
--jv file     Prints verbose information about the the JIT compiler to 'file'.
--jp          Profile with the LuaJIT statistical profiler.
--jp=args[,.output]
+-P pathspec           Set library load path (Lua 'package.path').
+-e chunk              Execute string 'chunk'.
+-l name               Require library 'name'.
+-t name               Test module 'name' with selftest().
+-R                    Start interactive Snabb REPL.
+-dm                   Enable developer mode. Enables debug prints and asserts.
+-d                    Debug unhandled errors with the Lua interactive debugger.
+-S                    Print enhanced stack traces with more debug information.
+-jv file              Prints verbose information about the the JIT compiler to 'file'.
+-jp                   Profile with the LuaJIT statistical profiler.
+-jp=args[,.output]    Profile to 'file'. 
+-jdump                Trace JIT decisions (Requires LuaJIT jit.* library).
+-jdump=args[,.output] Trace JIT decisions to 'file'.
 ]]
 
 _G.developer_debug = false
@@ -86,10 +87,11 @@ function main ()
          require("jit.p").start(pargs, poutput)
          profiling = true
          i = i + 1
-      elseif args[i] == '-jdump' and i < #args then
-         local jit_dump = require "jit.dump"
-         jit_dump.start("", args[i+1])
-         i = i + 2
+      elseif (args[i]):match("-jdump") then
+         local args, output = (args[i]):gmatch("-jdump=([^,]*),?(.*)")()
+         if output == '' then output = nil end
+         require("jit.dump").start(args, output)
+         i = i + 1
       elseif args[i] == '-jv' and i < #args then
          local jit_verbose = require 'jit.v'
          jit_verbose.start(args[i+1])
@@ -167,7 +169,6 @@ function initialize ()
    _G.engine = require("core.app")
    _G.memory = require("core.memory")
    _G.link   = require("core.link")
-   _G.buffer = require("core.buffer")
    _G.packet = require("core.packet")
    _G.timer  = require("core.timer")
    _G.main   = getfenv()

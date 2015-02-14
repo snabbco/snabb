@@ -3,7 +3,6 @@
 
 module(...,package.seeall)
 
-local buffer    = require("core.buffer")
 local freelist  = require("core.freelist")
 local lib       = require("core.lib")
 local memory    = require("core.memory")
@@ -26,28 +25,32 @@ function VirtioVirtq:new()
    return setmetatable(o, {__index = VirtioVirtq})
 end
 
--- support indirect descriptors
-function VirtioVirtq:get_desc(header_id)
-   local ring_desc = self.virtq.desc
-   local device = self.device
-   local desc, id
-   -- Indirect desriptors
-   if band(ring_desc[header_id].flags, C.VIRTIO_DESC_F_INDIRECT) == 0 then
-      desc = ring_desc
-      id = header_id
-   else
-      local addr = device.map_from_guest(device,ring_desc[header_id].addr)
-      desc = ffi.cast(vring_desc_ptr_t, addr)
-      id = 0
-   end
-
-   return desc, id
+function VirtioVirtq:enable_indirect_descriptors ()
+   self.get_desc = self.get_desc_indirect
 end
 
--- Receive all available packets from the virtual machine.
-function VirtioVirtq:get_buffers (kind, ops)
+function VirtioVirtq:get_desc_indirect (id)
+   local device = self.device
+   local ring_desc = self.virtq.desc
+   if band(ring_desc[id].flags, C.VIRTIO_DESC_F_INDIRECT) == 0 then
+      return ring_desc, id
+   else
+      local addr = device.map_from_guest(device, ring_desc[id].addr)
+      return ffi.cast(vring_desc_ptr_t, addr), 0
+   end
+end
 
-   local ring = self.virtq.avail.ring
+function VirtioVirtq:get_desc_direct (id)
+   return self.virtq.desc, id
+end
+
+-- Default: don't support indirect descriptors unless
+-- enable_indirect_descriptors is called to replace this binding.
+VirtioVirtq.get_desc = VirtioVirtq.get_desc_direct
+
+-- Receive all available packets from the virtual machine.
+function VirtioVirtq:get_buffers (kind, ops, hdr_len)
+
    local device = self.device
    local idx = self.virtq.avail.idx
    local avail, vring_mask = self.avail, self.vring_num-1
@@ -55,38 +58,35 @@ function VirtioVirtq:get_buffers (kind, ops)
    while idx ~= avail do
 
       -- Header
-      local v_header_id = ring[band(avail,vring_mask)]
+      local v_header_id = self.virtq.avail.ring[band(avail,vring_mask)]
       local desc, id = self:get_desc(v_header_id)
 
       local data_desc = desc[id]
 
-      local header_id, header_pointer, header_len, total_size, packet =
-         ops.packet_start(device, v_header_id, data_desc.addr, data_desc.len)
+      local packet =
+         ops.packet_start(device, data_desc.addr, data_desc.len)
+      local total_size = hdr_len
 
-      local buf
+      if not packet then break end
 
       -- support ANY_LAYOUT
-      if header_len < data_desc.len then
-         local addr = data_desc.addr + header_len
-         local len = data_desc.len - header_len
-         buf, total_size = ops.buffer_add(device, packet,
-            addr, len,
-            total_size)
+      if hdr_len < data_desc.len then
+         local addr = data_desc.addr + hdr_len
+         local len = data_desc.len - hdr_len
+         local added_len = ops.buffer_add(device, packet, addr, len)
+         total_size = total_size + added_len
       end
 
       -- Data buffer
       while band(data_desc.flags, C.VIRTIO_DESC_F_NEXT) ~= 0 do
          data_desc  = desc[data_desc.next]
-         buf, total_size = ops.buffer_add(device, packet,
-            data_desc.addr,
-            data_desc.len,
-            total_size)
+         local added_len = ops.buffer_add(device, packet, data_desc.addr, data_desc.len)
+         total_size = total_size + added_len
       end
 
-      ops.packet_end(device, header_id, header_pointer, total_size, packet, buf)
+      ops.packet_end(device, v_header_id, total_size, packet)
 
       avail = band(avail + 1, 65535)
-
    end
    self.avail = avail
 end
