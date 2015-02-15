@@ -11,8 +11,8 @@ local freelist      = require("core.freelist")
 local ffi = require("ffi")
 local C = ffi.C
 
-if #main.parameters ~= 1 then
-   print([[Usage: solarflare <npackets>
+if #main.parameters ~= 2 then
+   print([[Usage: solarflare <npackets> <packet-size>
 
 Send the given number of packets through a Solarflare NIC.  The test
 assumes that the first two Solarflare NICs are connected back-to-back.
@@ -37,10 +37,8 @@ end
 
 Source = setmetatable({zone = "Source"}, {__index = basic_apps.Basic});
 
-function Source:new(from_mac, to_mac, size)
-   return setmetatable({from_mac=from_mac,
-                        to_mac=to_mac,
-                        size=tonumber(size) or 60}, {__index=Source})
+function Source:new(size)
+   return setmetatable({}, {__index=Source})
 end
 
 function Source:pull()
@@ -72,8 +70,13 @@ function Source:set_packet_addresses(from_mac_address, to_mac_address)
                        self.to_mac_address[5]))
 end
 
-function run (npackets)
+function Source:set_packet_size(size)
+   self.size = size
+end
+
+function run (npackets, packet_size)
    npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
+   packet_size = tonumber(packet_size) or error("Invalid packet size: " .. packet_size)
 
    local sf_devices = get_sf_devices()
    if #sf_devices < 2 then
@@ -105,6 +108,7 @@ function run (npackets)
 
    engine.app_table.source:set_packet_addresses(engine.app_table[send_device.interface].mac_address,
                                                 engine.app_table[receive_device.interface].mac_address)
+   engine.app_table.source:set_packet_size(packet_size)
 
    engine.Hz = false
    
