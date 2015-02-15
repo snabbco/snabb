@@ -275,11 +275,9 @@ function SolarFlareNic:push()
    need_poll = 1
    self.stats.push = (self.stats.push or 0) + 1
    local l = self.input.rx
-   local push = false
+   local push = not link.empty(l)
    while not link.empty(l) and self.tx_space >= 1 do
-      local p = link.receive(l)
-      self.enqueue_transmit(self, p)
-      push = true
+      self.enqueue_transmit(self, link.receive(l))
    end
    if push then
       self.ef_vi_transmit_push(self.ef_vi_p)
