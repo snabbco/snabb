@@ -437,10 +437,13 @@ end
 function M_pf:init ()
    self.redos = 0
    local mask = bits{Link_up=30}
-   for i = 1, 5 do
+   for i = 1, 10 do
+      io.write (self.pciaddress, 'init #', i, '\n')
       self
          :disable_interrupts()
          :global_reset()
+      if i == 5 then self:autonegotiate_sfi() end
+      self
          :wait_eeprom_autoread()
          :wait_dma()
          :set_vmdq_mode()
