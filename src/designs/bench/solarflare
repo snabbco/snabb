@@ -46,11 +46,10 @@ end
 function Source:pull()
    for _, o in ipairs(self.outputi) do
       for i = 1, link.nwritable(o) do
-         local b = buffer.allocate()
-         ffi.copy(buffer.pointer(b), self.to_mac_address, 6)
-         ffi.copy(buffer.pointer(b) + 6, self.from_mac_address, 6)
          local p = packet.allocate()
-         packet.add_iovec(p, b, self.size)
+         ffi.copy(p.data, self.to_mac_address, 6)
+         ffi.copy(p.data + 6, self.from_mac_address, 6)
+         p.length = self.size
          link.transmit(o, p)
       end
    end
