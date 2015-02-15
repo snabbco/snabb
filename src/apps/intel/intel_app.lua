@@ -143,7 +143,10 @@ function selftest ()
       os.exit(engine.test_skipped_code)
    end
 
-   manyreconf(pcideva, pcidevb)
+   print ("100 VF initializations:")
+   manyreconf(pcideva, pcidevb, 100, false)
+   print ("100 PF full cycles")
+   manyreconf(pcideva, pcidevb, 100, true)
 
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
@@ -312,7 +315,7 @@ function mq_sw(pcidevA)
    link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
 end
 
-function manyreconf(pcidevA, pcidevB)
+function manyreconf(pcidevA, pcidevB, n, do_pf)
    io.write ('\n')
    local d1 = lib.hexundump ([[
       52:54:00:02:02:02 52:54:00:01:01:01 08 00 45 00
@@ -336,7 +339,7 @@ function manyreconf(pcidevA, pcidevB)
    local prevsent = 0
    local cycles, redos, maxredos, waits = 0, 0, 0, 0
    io.write("Running iterated VMDq test...\n")
-   for i = 1, 100 do
+   for i = 1, (n or 100) do
       local c = config.new()
       config.app(c, 'source_ms', basic_apps.Join)
       config.app(c, 'repeater_ms', basic_apps.Repeater)
@@ -359,7 +362,7 @@ function manyreconf(pcidevA, pcidevB)
       config.link(c, 'repeater_ms.output -> nicAm0.rx')
       config.link(c, 'nicAm0.tx -> sink_ms.in1')
       config.link(c, 'nicAm1.tx -> sink_ms.in2')
-      engine.configure(config.new())
+      if do_pf then engine.configure(config.new()) end
       engine.configure(c)
       link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
       link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
