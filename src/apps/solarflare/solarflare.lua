@@ -260,7 +260,7 @@ function SolarFlareNic:pull()
             elseif event_type == C.EF_EVENT_TYPE_TX_ERROR then
                self.stats.tx_error = (self.stats.tx_error or 0) + 1
             else
-               print("Unexpected event, type " .. event_type)
+               error("Unexpected event, type " .. event_type)
             end
          end
       end
@@ -281,14 +281,14 @@ function SolarFlareNic:push()
       self.enqueue_transmit(self, p)
       push = true
    end
+   if push then
+      self.ef_vi_transmit_push(self.ef_vi_p)
+   end
    if link.empty(l) then
       self.stats.link_empty = (self.stats.link_empty or 0) + 1
    end
    if not link.empty(l) and self.tx_space < 1 then
       self.stats.no_tx_space = (self.stats.no_tx_space or 0) + 1
-   end
-   if push then
-      self.ef_vi_transmit_push(self.ef_vi_p)
    end
 end
 
