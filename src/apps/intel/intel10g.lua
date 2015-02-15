@@ -84,10 +84,12 @@ function M_sf:init ()
 
    self.redos = 0
    local mask = bits{Link_up=30}
-   for i = 1, 5 do
+   for i = 1, 100 do
       self
          :disable_interrupts()
          :global_reset()
+      if i%5 == 0 then self:autonegotiate_sfi() end
+      self
          :wait_eeprom_autoread()
          :wait_dma()
          :init_statistics()
@@ -101,7 +103,8 @@ function M_sf:init ()
          return self
       end
    end
-   io.write ('never got link up: ', self.pciaddress)
+   io.write ('never got link up: ', self.pciaddress, '\n')
+   os.exit(2)
    return self
 end
 
@@ -437,12 +440,11 @@ end
 function M_pf:init ()
    self.redos = 0
    local mask = bits{Link_up=30}
-   for i = 1, 10 do
-      io.write (self.pciaddress, 'init #', i, '\n')
+   for i = 1, 100 do
       self
          :disable_interrupts()
          :global_reset()
-      if i == 5 then self:autonegotiate_sfi() end
+      if i%5 == 0 then self:autonegotiate_sfi() end
       self
          :wait_eeprom_autoread()
          :wait_dma()
@@ -456,7 +458,8 @@ function M_pf:init ()
       end
       self.redos = i
    end
-   io.write ('gave up\n')
+   io.write ('never got link up: ', self.pciaddress, '\n')
+   os.exit(2)
    return self
 end
 
