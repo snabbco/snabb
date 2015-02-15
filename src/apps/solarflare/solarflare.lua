@@ -2,7 +2,6 @@ module(...,package.seeall)
 
 local lib      = require("core.lib")
 local freelist = require("core.freelist")
-local buffer   = require("core.buffer")
 local packet   = require("core.packet")
                  require("apps.solarflare.ef_vi_h")
 local pci      = require("lib.hardware.pci")
@@ -66,30 +65,10 @@ function SolarFlareNic:new(args)
    return dev:open()
 end
 
--- Allocate receive buffers from the given freelist.
-function SolarFlareNic:set_rx_buffer_freelist (fl)
-   assert(fl)
-   self.rx_buffer_freelist = fl
-end
-
 function SolarFlareNic:enqueue_receive(id)
-   local fl = self.rx_buffer_freelist
-   local buf
-   if fl then
-      if freelist.nfree(fl) > 0 then
-         buf = freelist.remove(fl)
-      else
-         return
-      end
-   else
-      buf = buffer.allocate()
-   end
-   if buf.size < self.ef_vi_p[0].rx_buffer_len then
-      self.ef_vi_p[0].rx_buffer_len = b.size
-   end
-   self.rxbuffers[id] = buf
+   self.rxpackets[id] = packet.allocate()
    try(self.ef_vi_receive_init(self.ef_vi_p,
-                               buffer.physical(buf),
+                               memory.virtual_to_physical(self.rxpackets[id].data),
                                id),
        "ef_vi_receive_init")
    self.receives_enqueued = self.receives_enqueued + 1
@@ -103,18 +82,15 @@ function SolarFlareNic:flush_receives(id)
 end
 
 function SolarFlareNic:enqueue_transmit(p)
-   for i = 0, packet.niovecs(p) - 1 do
-      assert(not self.tx_packets[self.tx_id], "tx buffer overrun")
-      self.tx_packets[self.tx_id] = packet.ref(p)
-      local iov = packet.iovec(p, i)
-      try(ciul.ef_vi_transmit_init(self.ef_vi_p,
-                                   buffer.physical(iov.buffer) + iov.offset,
-                                   iov.length,
-                                   self.tx_id),
-          "ef_vi_transmit_init")
-      self.tx_id = (self.tx_id + 1) % TX_BUFFER_COUNT
-   end
-   self.tx_space = self.tx_space - packet.niovecs(p)
+   assert(not self.tx_packets[self.tx_id], "tx buffer overrun")
+   self.tx_packets[self.tx_id] = p
+   try(ciul.ef_vi_transmit_init(self.ef_vi_p,
+                                memory.virtual_to_physical(p.data),
+                                p.length,
+                                self.tx_id),
+       "ef_vi_transmit_init")
+   self.tx_id = (self.tx_id + 1) % TX_BUFFER_COUNT
+   self.tx_space = self.tx_space - 1
 end
 
 function SolarFlareNic:open()
@@ -150,6 +126,8 @@ function SolarFlareNic:open()
                                 -1,
                                 C.EF_VI_TX_PUSH_DISABLE),
        "ef_vi_alloc_from_pd")
+
+   self.ef_vi_p[0].rx_buffer_len = C.PACKET_PAYLOAD_SIZE
 
    local env_mac = os.getenv("SF_MAC")
 
@@ -208,7 +186,7 @@ function SolarFlareNic:open()
    self.stats = {}
 
    -- set up receive buffers
-   self.rxbuffers = {}
+   self.rxpackets = {}
    for id = 1, RECEIVE_BUFFER_COUNT do
       self.enqueue_receive(self, id)
    end
@@ -260,23 +238,14 @@ function SolarFlareNic:pull()
             local event = self.poll_structure.events[i]
             local event_type = event.generic.type
             if event_type == C.EF_EVENT_TYPE_RX then
+               local rxpacket = self.rxpackets[event.rx.rq_id]
+               rxpacket.length = event.rx.len
                self.stats.rx = (self.stats.rx or 0) + 1
-               if band(event.rx.flags, C.EF_EVENT_FLAG_SOP) == 1 then
-                  self.rxpacket = packet.allocate()
+               if not link.full(self.output.tx) then
+                  link.transmit(self.output.tx, rxpacket)
                else
-                  assert(self.rxpacket, "no rxpacket in device, non-SOP buffer received")
-               end
-               packet.add_iovec(self.rxpacket,
-                                self.rxbuffers[event.rx.rq_id],
-                                event.rx.len)
-               if band(event.rx.flags, C.EF_EVENT_FLAG_CONT) == 0 then
-                  if not link.full(self.output.tx) then
-                     link.transmit(self.output.tx, self.rxpacket)
-                  else
-                     self.stats.link_full = (self.stats.link_full or 0) + 1
-                     packet.deref(self.rxpacket)
-                  end
-                  self.rxpacket = nil
+                  self.stats.link_full = (self.stats.link_full or 0) + 1
+                  packet.free(rxpacket)
                end
                self.enqueue_receive(self, event.rx.rq_id)
             elseif event_type == C.EF_EVENT_TYPE_TX then
@@ -284,7 +253,7 @@ function SolarFlareNic:pull()
                local tx_request_ids = self.poll_structure.unbundled_tx_request_ids[i].tx_request_ids
                self.stats.txpackets = (self.stats.txpackets or 0) + n_tx_done
                for i = 0, (n_tx_done - 1) do
-                  packet.deref(self.tx_packets[tx_request_ids[i]])
+                  packet.free(self.tx_packets[tx_request_ids[i]])
                   self.tx_packets[tx_request_ids[i]] = nil
                end
                self.tx_space = self.tx_space + n_tx_done
@@ -307,21 +276,15 @@ function SolarFlareNic:push()
    self.stats.push = (self.stats.push or 0) + 1
    local l = self.input.rx
    local push = false
-   while not link.empty(l) and self.tx_space >= packet.niovecs(link.front(l)) do
+   while not link.empty(l) and self.tx_space >= 1 do
       local p = link.receive(l)
       self.enqueue_transmit(self, p)
       push = true
-      -- enqueue_transmit references the packet once for each buffer
-      -- that it contains.  Whenever a DMA fishes, the packet is
-      -- dereferenced once so that it will be freed when the
-      -- transmission of the last buffer has been confirmed.  Thus, it
-      -- can be dereferenced here.
-      packet.deref(p)
    end
    if link.empty(l) then
       self.stats.link_empty = (self.stats.link_empty or 0) + 1
    end
-   if not link.empty(l) and self.tx_space < packet.niovecs(link.front(l)) then
+   if not link.empty(l) and self.tx_space < 1 then
       self.stats.no_tx_space = (self.stats.no_tx_space or 0) + 1
    end
    if push then
