@@ -82,7 +82,7 @@ function SolarFlareNic:flush_receives(id)
 end
 
 function SolarFlareNic:enqueue_transmit(p)
-   assert(not self.tx_packets[self.tx_id], "tx buffer overrun")
+   assert(self.tx_packets[self.tx_id] == nil, "tx buffer overrun")
    self.tx_packets[self.tx_id] = p
    try(ciul.ef_vi_transmit_init(self.ef_vi_p,
                                 memory.virtual_to_physical(p.data),
@@ -186,14 +186,15 @@ function SolarFlareNic:open()
    self.stats = {}
 
    -- set up receive buffers
-   self.rxpackets = {}
+   self.rxpackets = ffi.new("struct packet *[?]", RECEIVE_BUFFER_COUNT + 1)
    for id = 1, RECEIVE_BUFFER_COUNT do
       self.enqueue_receive(self, id)
    end
    self.flush_receives(self)
 
    -- set up transmit variables
-   self.tx_packets = {}
+   self.tx_packets = ffi.new("struct packet *[?]", TX_BUFFER_COUNT + 1)
+   ffi.fill(self.tx_packets, ffi.sizeof(self.tx_packets), 0)
    self.tx_id = 0
    self.tx_space = TX_BUFFER_COUNT
 
