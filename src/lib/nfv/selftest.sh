@@ -28,7 +28,7 @@ fi
 
 export BENCH_ENV_PID
 
-TESTCONFPATH=/tmp/snabb_nfv_selftest_ports
+TESTCONFPATH="/tmp/snabb_nfv_selftest_ports.$$"
 
 # Usage: run_telnet <port> <command> [<sleep>]
 # Runs <command> on VM listening on telnet <port>. Waits <sleep> seconds
@@ -70,6 +70,9 @@ function stop_bench_env {
 
     # Give VMs and snabbnfv-traffic time to shut down.
     sleep 5
+
+    # Clean up temporary config location.
+    rm -f "$TESTCONFPATH"
 }
 
 # Usage: wait_vm_up <port>
