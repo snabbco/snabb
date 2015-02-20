@@ -2,11 +2,13 @@ return {
   {
     vlan = 243,
     egress_filter = {
-      {
-        ethertype = "ipv6",
-      },
-      {
-        ethertype = "ipv4",
+      rules = {
+        {
+          ethertype = "ipv6",
+        },
+        {
+          ethertype = "ipv4",
+        },
       },
     },
     mac_address = "fa:16:3e:1e:b0:20",
