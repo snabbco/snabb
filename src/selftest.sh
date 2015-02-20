@@ -1,9 +1,11 @@
 #!/bin/bash
 echo "selftest: ./snabb binary portability"
-glibc=$(objdump -T snabb | grep GLIBC | sed -e 's/^.*GLIBC_//' -e 's/ .*//' | sort -nr | head -1)
-if [ "$glibc" == "2.7" ]; then
-    echo "ok: links with glibc >= 2.7"
-else
-    echo "error: requires glibc $glibc (> 2.7)"
+echo "Scanning for symbols requiring GLIBC > 2.7"
+if objdump -T snabb | \
+   awk '/GLIBC/ { print $(NF-1), $NF }' | \
+   grep -v 'GLIBC_2\.[0-7][\. ]'; then
+    echo "^^^ Error ^^^" >&2
+    echo "(You might just need to 'make clean; make' at the top level.)"
     exit 1
 fi
+echo "selftest: ok"
