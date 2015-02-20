@@ -28,7 +28,7 @@ fi
 
 export BENCH_ENV_PID
 
-TESTCONFPATH=/tmp/snabb_nfv_selftest_ports
+TESTCONFPATH="/tmp/snabb_nfv_selftest_ports.$$"
 
 # Usage: run_telnet <port> <command> [<sleep>]
 # Runs <command> on VM listening on telnet <port>. Waits <sleep> seconds
@@ -57,10 +57,11 @@ function start_bench_env {
     wait_vm_up $TELNET_PORT0
     wait_vm_up $TELNET_PORT1
 
-    run_telnet $TELNET_PORT0 "ifconfig eth0 up"
-    run_telnet $TELNET_PORT1 "ifconfig eth0 up"
-    run_telnet $TELNET_PORT0 "ip -6 addr add $GUEST_IP0 dev eth0"
-    run_telnet $TELNET_PORT1 "ip -6 addr add $GUEST_IP1 dev eth0"
+    # Manually set ip addresses.
+    run_telnet $TELNET_PORT0 "ifconfig eth0 up" >/dev/null
+    run_telnet $TELNET_PORT1 "ifconfig eth0 up" >/dev/null
+    run_telnet $TELNET_PORT0 "ip -6 addr add $GUEST_IP0 dev eth0" >/dev/null
+    run_telnet $TELNET_PORT1 "ip -6 addr add $GUEST_IP1 dev eth0" >/dev/null
 
 }
 
@@ -69,6 +70,9 @@ function stop_bench_env {
 
     # Give VMs and snabbnfv-traffic time to shut down.
     sleep 5
+
+    # Clean up temporary config location.
+    rm -f "$TESTCONFPATH"
 }
 
 # Usage: wait_vm_up <port>
@@ -156,6 +160,21 @@ function test_iperf {
     assert IPERF $?
 }
 
+# Usage: test_rate_limited <telnet_port0> <telnet_port1> <dest_ip> <rate> <bandwidth>
+# Same as `test_iperf' but run iperf in UDP mode at <bandwidth> (in Mbps)
+# and assert that iperf will not exceed <rate> (in Mbps).
+function test_rate_limited {
+    run_telnet $2 "nohup iperf -d -s -V &" >/dev/null
+    sleep 2
+    iperf=$(run_telnet $1 "iperf -c $3 -u -b $5M -f m -V" 20 \
+        | egrep -o '[0-9]+ Mbits/sec')
+    assert "IPERF (RATE_LIMITED)" $?
+    mbps_rate=$(echo "$iperf" | cut -d " " -f 1)
+    echo "IPERF rate is $mbps_rate Mbits/sec ($4 Mbits/sec allowed)."
+    test $mbps_rate -lt $4
+    assert RATE_LIMITED $?
+}
+
 # Usage: port_probe <telnet_port0> <telnet_port1> <dest_ip> <port> [-u]
 # Returns `true' if VM listening on <telnet_port0> can connect to
 # <dest_ip>/<port> on VM listening on <telnet_port1>. If `-u' is appended
@@ -178,13 +197,23 @@ function same_vlan_tests {
 }
 
 function rate_limited_tests {
-    load_config test_fixtures/nfvconfig/test_functions/rate_limit.ports
+    load_config test_fixtures/nfvconfig/test_functions/tx_rate_limit.ports
 
     test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
-    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 900 1000
     test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
     # Repeat iperf test now that jumbo frames are enabled
-    test_iperf $TELNET_PORT1 $TELNET_PORT0 "$GUEST_IP0%eth0"
+    test_rate_limited $TELNET_PORT1 $TELNET_PORT0 "$GUEST_IP0%eth0" 900 1000
+#    test_checksum $TELNET_PORT0
+#    test_checksum $TELNET_PORT1
+
+    load_config test_fixtures/nfvconfig/test_functions/rx_rate_limit.ports
+
+    test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
+    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 1200 1000
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    # Repeat iperf test now that jumbo frames are enabled
+    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 1200 1000
 #    test_checksum $TELNET_PORT0
 #    test_checksum $TELNET_PORT1
 

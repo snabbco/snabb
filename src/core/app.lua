@@ -62,10 +62,10 @@ function restart_dead_apps ()
       if app.dead and (now() - app.dead.time) >= restart_delay then
          restart = true
          io.stderr:write(("Restarting %s (died at %f: %s)\n")
-                         :format(app.name, app.dead.time, app.dead.error))
-         table.insert(actions.restart, app.name)
+                         :format(app.appname, app.dead.time, app.dead.error))
+         table.insert(actions.restart, app.appname)
       else
-         table.insert(actions.keep, app.name)
+         table.insert(actions.keep, app.appname)
       end
    end
 
@@ -135,7 +135,7 @@ function apply_config_actions (actions, conf)
       local arg = conf.apps[name].arg
       local app = class:new(arg)
       local zone = app.zone or getfenv(class.new)._NAME or name
-      app.name = name
+      app.appname = name
       app.output = {}
       app.input = {}
       new_app_table[name] = app
