@@ -4,10 +4,11 @@ CSRC   = $(wildcard src/c/*.c)
 COBJ   = $(CSRC:.c=.o)
 
 LUAJIT_O := deps/luajit/src/libluajit.a
+SYSCALL  := src/syscall.lua
 
 LUAJIT_CFLAGS := -DLUAJIT_USE_PERFTOOLS -DLUAJIT_USE_GDBJIT -DLUAJIT_NUMMODE=3
 
-all: $(LUAJIT_O)
+all: $(LUAJIT_O) $(SYSCALL)
 	cd src && $(MAKE)
 
 install: all
@@ -34,8 +35,22 @@ check_luajit:
 	    echo "Can't find deps/luajit/. You might need to: git submodule update --init"; exit 1; \
 	fi
 
+$(SYSCALL): check_syscall
+	echo 'Copying ljsyscall components'
+	mkdir -p src/syscall/linux
+	cp -p deps/ljsyscall/syscall.lua   src/
+	cp -p deps/ljsyscall/syscall/*.lua src/syscall/
+	cp -p  deps/ljsyscall/syscall/linux/*.lua src/syscall/linux/
+	cp -pr deps/ljsyscall/syscall/linux/x64   src/syscall/linux/
+	cp -pr deps/ljsyscall/syscall/shared      src/syscall/
+
+check_syscall:
+	@if [ ! -f deps/ljsyscall/syscall.lua ]; then \
+	    echo "Can't find deps/ljsyscall/. You might need to: git submodule update --init"; exit 1; \
+	fi
+
 clean:
 	(cd deps/luajit && $(MAKE) clean)
-	(cd src; $(MAKE) clean)
+	(cd src; $(MAKE) clean; rm -rf syscall.lua syscall)
 
 .SERIAL: all

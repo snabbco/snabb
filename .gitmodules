@@ -2,3 +2,6 @@
 	path = deps/luajit
 	url = http://luajit.org/git/luajit-2.0.git
         ignore = dirty
+[submodule "deps/ljsyscall"]
+	path = deps/ljsyscall
+	url = https://github.com/justincormack/ljsyscall.git
