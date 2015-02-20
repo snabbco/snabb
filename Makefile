@@ -6,7 +6,7 @@ COBJ   = $(CSRC:.c=.o)
 LUAJIT_O := deps/luajit/src/libluajit.a
 SYSCALL  := src/syscall.lua
 
-LUAJIT_CFLAGS := -DLUAJIT_USE_PERFTOOLS -DLUAJIT_USE_GDBJIT -DLUAJIT_NUMMODE=3
+LUAJIT_CFLAGS := -DLUAJIT_USE_PERFTOOLS -DLUAJIT_USE_GDBJIT -DLUAJIT_NUMMODE=3 -include $(CURDIR)/gcc-preinclude.h
 
 all: $(LUAJIT_O) $(SYSCALL)
 	cd src && $(MAKE)
