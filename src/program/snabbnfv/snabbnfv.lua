@@ -3,11 +3,14 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local config = require("lib.nfv.config")
+local getopt = require("lib.lua.alt_getopt")
 
 local usage = [[
 Usage:
-  snabbnfv traffic <pci-address> <config-file> <socket-path>
-  snabbnfv bench   <pci-address> <config-file> <socket-path> <npackets>
+  snabbnfv [OPTIONS] <pci-address> <config-file> <socket-path>
+
+  -B NPACKETS, --benchmark NPACKETS
+                             Benchmark processing NPACKETS.
 
 Process traffic between Neutron ports and a physical NIC.
 
@@ -15,18 +18,44 @@ In benchmark mode, measure the throughput for the first <npackets> and
 then report and terminate.
 ]]
 
+local long_opts = {
+   benchmark = "B"
+}
+
 function run (args)
-   local command = table.remove(args, 1)
-   if command == 'traffic' and #args == 3 then
-      traffic(unpack(args))
-   elseif command == 'bench' and #args == 4 then
-      bench(unpack(args))
+   local opt = {}
+   local benchpackets
+   function opt.B (arg) benchpackets = tonumber(arg) end
+   local opts,optind,optarg = getopt.get_ordered_opts(args, "B:", long_opts)
+   for i,v in ipairs(opts) do
+      if opt[v] then 
+	 opt[v](optarg[i]) 
+      else
+	 error("unimplemented option: " .. v) 
+      end
+   end
+
+   -- Drop arguments that are alraedy processed.
+   print("optind", optind, #args)
+   for i = 1, optind-1 do table.remove(args, 1) end
+
+   if #args == 3 then
+      local pciaddr, confpath, sockpath = unpack(args)
+      if benchpackets then
+	 print("snabbnfv traffic starting (benchmark mode)")
+	 bench(pciaddr, confpath, sockpath, benchpackets)
+      else
+	 print("snabbnfv traffic starting")
+	 traffic(pciaddr, confpath, sockpath)
+      end
    else
-      print(usage) 
+      print("Wrong number of arguments", #args)
+      print(usage)
       main.exit(1)
    end
 end
 
+-- Run in real traffic mode.
 function traffic (pciaddr, confpath, sockpath)
    engine.log = true
    local mtime = 0
@@ -47,6 +76,7 @@ function traffic (pciaddr, confpath, sockpath)
    end
 end
 
+-- Run in benchmark mode.
 function bench (pciaddr, confpath, sockpath, npackets)
    npackets = tonumber(npackets)
    local ports = dofile(confpath)
