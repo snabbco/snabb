@@ -28,9 +28,6 @@ end
 function Intel82599:new (arg)
    local conf = config.parse_app_arg(arg)
 
-   -- Unbind PCI device form linux.
-   pci.unbind_device_from_linux(conf.pciaddr)
-
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
          devices[conf.pciaddr] = {pf=intel10g.new_pf(conf.pciaddr):open(), vflist={}}

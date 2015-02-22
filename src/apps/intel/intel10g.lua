@@ -51,6 +51,7 @@ end
 
 
 function M_sf:open ()
+   pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
    self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, self.base)
@@ -420,6 +421,7 @@ function new_pf (pciaddress)
 end
 
 function M_pf:open ()
+   pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
    self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, self.base)
