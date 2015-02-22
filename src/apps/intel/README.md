@@ -121,6 +121,11 @@ dropped.
 
 ![LoadGen](.images/LoadGen.png)
 
+### Configuration
+
+The `LoadGen` app accepts a string as its configuration argument. The
+given string denotes the PCI address of the NIC to use.
+
 ### Performance
 
 The `LoadGen` app can transmit at line-rate (14 Mpps) without significant
