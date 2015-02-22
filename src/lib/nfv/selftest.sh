@@ -75,6 +75,9 @@ function stop_bench_env {
     rm -f "$TESTCONFPATH"
 }
 
+# Set up graceful `exit'.
+trap stop_bench_env EXIT HUP INT QUIT TERM
+
 # Usage: wait_vm_up <port>
 # Blocks until ping to 0::0 suceeds.
 function wait_vm_up {
@@ -86,7 +89,6 @@ function wait_vm_up {
         # Time out eventually.
         if [ $timeout_counter -gt $timeout_max ]; then
             echo " [TIMEOUT]"
-            stop_bench_env
             exit 1
         fi
         timeout_counter=$(expr $timeout_counter + 1)
@@ -98,7 +100,6 @@ function wait_vm_up {
 function assert {
     if [ $2 == "0" ]; then echo "$1 succeded."
     else echo "$1 failed."
-         stop_bench_env
          exit 1
     fi
 }
@@ -284,4 +285,4 @@ tunnel_tests
 filter_tests
 #fuzz_tests 100
 
-stop_bench_env
+exit 0
