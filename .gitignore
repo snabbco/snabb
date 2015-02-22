@@ -9,10 +9,7 @@ obj
 /src/testlog
 /src/apps/ipv6/selftest.cap.output
 /src/apps/keyed_ipv6_tunnel/selftest.cap.output
-<<<<<<< HEAD
 /src/apps/vpn/vpws-selftest-customer.cap.output
 /src/apps/vpn/vpws-selftest-uplink.cap.output
-=======
 /src/syscall.lua
 /src/syscall
->>>>>>> master
