@@ -17,6 +17,7 @@ local net_device= require("lib.virtio.net_device")
 local timer     = require("core.timer")
 local ffi       = require("ffi")
 local C         = ffi.C
+local syscall   = require("syscall") -- for FFI vhost structs
 
 require("apps.vhost.vhost_h")
 require("apps.vhost.vhost_user_h")
