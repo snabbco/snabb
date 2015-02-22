@@ -1,7 +1,6 @@
 module(..., package.seeall)
 
 local app       = require("core.app")
-local buffer    = require("core.buffer")
 local config    = require("core.config")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
@@ -43,7 +42,6 @@ function run (args)
               end
    local t = timer.new("report", fn, 1e9, 'repeating')
    timer.activate(t)
-   buffer.preallocate(100000)
    app.main()
 end
 

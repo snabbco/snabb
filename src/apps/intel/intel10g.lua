@@ -18,9 +18,8 @@ local macaddress = require("lib.macaddress")
 
 local bits, bitset = lib.bits, lib.bitset
 local band, bor, lshift = bit.band, bit.bor, bit.lshift
-local packet_ref = packet.ref
 
-num_descriptors = 32 * 1024
+num_descriptors = 512
 --num_descriptors = 32
 
 
@@ -42,7 +41,7 @@ function new_sf (pciaddress)
                  tdt = 0,          -- Cache of transmit tail (TDT) register
                  rxdesc = 0,     -- Receive descriptors (pointer)
                  rxdesc_phy = 0, -- Receive descriptors (physical address)
-                 rxbuffers = {},   -- Rx descriptor index -> buffer mapping
+                 rxpackets = {},   -- Rx descriptor index -> packet mapping
                  rdh = 0,          -- Cache of receive head (RDH) register
                  rdt = 0,          -- Cache of receive tail (RDT) register
                  rxnext = 0        -- Index of next buffer to receive
@@ -59,7 +58,7 @@ function M_sf:open ()
    register.define(receive_registers_desc, self.r, self.base)
    register.define(statistics_registers_desc, self.s, self.base)
    self.txpackets = ffi.new("struct packet *[?]", num_descriptors)
-   self.rxbuffers = ffi.new("struct buffer *[?]", num_descriptors)
+   self.rxpackets = ffi.new("struct packet *[?]", num_descriptors)
    return self:init()
 end
 
@@ -71,37 +70,72 @@ function M_sf:close()
       self:discard_unsent_packets()
       C.usleep(1000)
    end
-   if self.fd then 
-      pci.close_pci_resource(self.fd) 
+   if self.fd then
+      pci.close_pci_resource(self.fd, self.base)
       self.fd = false
    end
+   self:free_dma_memory()
 end
 
 --- See data sheet section 4.6.3 "Initialization Sequence."
 
 function M_sf:init ()
+   self :init_dma_memory()
+
+   self.redos = 0
+   local mask = bits{Link_up=30}
+   for i = 1, 100 do
+      self
+         :disable_interrupts()
+         :global_reset()
+      if i%5 == 0 then self:autonegotiate_sfi() end
+      self
+         :wait_eeprom_autoread()
+         :wait_dma()
+         :init_statistics()
+         :init_receive()
+         :init_transmit()
+         :wait_enable()
+         :wait_linkup()
+
+      if band(self.r.LINKS(), mask) == mask then
+         self.redos = i
+         return self
+      end
+   end
+   io.write ('never got link up: ', self.pciaddress, '\n')
+   os.exit(2)
    return self
-      :init_dma_memory()
-      :disable_interrupts()
-      :global_reset()
-      :wait_eeprom_autoread()
-      :wait_dma()
-      :init_statistics()
-      :init_receive()
-      :init_transmit()
-      :wait_enable()
 end
 
 
-function M_sf:init_dma_memory ()
-   self.rxdesc, self.rxdesc_phy =
-      memory.dma_alloc(num_descriptors * ffi.sizeof(rxdesc_t))
-   self.txdesc, self.txdesc_phy =
-      memory.dma_alloc(num_descriptors * ffi.sizeof(txdesc_t))
-   -- Add bounds checking
-   self.rxdesc = lib.bounds_checked(rxdesc_t, self.rxdesc, 0, num_descriptors)
-   self.txdesc = lib.bounds_checked(txdesc_t, self.txdesc, 0, num_descriptors)
-   return self
+do
+   local _rx_pool = {}
+   local _tx_pool = {}
+
+   local function get_ring(ct, pool)
+      local spot, v = next(pool)
+      if spot and v then
+         pool[spot] = nil
+         return v.ptr, v.phy
+      end
+      local ptr, phy =
+         memory.dma_alloc(num_descriptors * ffi.sizeof(ct))
+      ptr = lib.bounds_checked(ct, ptr, 0, num_descriptors)
+      return ptr, phy
+   end
+
+   function M_sf:init_dma_memory ()
+      self.rxdesc, self.rxdesc_phy = get_ring(rxdesc_t, _rx_pool)
+      self.txdesc, self.txdesc_phy = get_ring(txdesc_t, _tx_pool)
+      return self
+   end
+
+   function M_sf:free_dma_memory()
+      _rx_pool[#_rx_pool+1] = {ptr = self.rxdesc, phy = self.rxdesc_phy}
+      _tx_pool[#_tx_pool+1] = {ptr = self.txdesc, phy = self.txdesc_phy}
+      return self
+   end
 end
 
 function M_sf:global_reset ()
@@ -134,7 +168,7 @@ function M_sf:init_receive ()
    self:set_promiscuous_mode() -- NB: don't need to program MAC address filter
    self.r.HLREG0(bits{
       TXCRCEN=0, RXCRCSTRP=1, JUMBOEN=2, rsv2=3, TXPADEN=10,
-      rsvd3=11, rsvd4=13, MDCSPD=16, RXLNGTHERREN=27,
+      rsvd3=11, rsvd4=13, MDCSPD=16
    })
    self.r.MAXFRS(lshift(9000+18, 16))
    self:set_receive_descriptors()
@@ -190,31 +224,13 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
-local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21}
-local txdesc_flags_last = bits({eop=24}, txdesc_flags)
-
-local function transmit_aux (self, p, i, niovecs)
-   local iov = p.iovecs[i]
-   local flags = (i + 1 < niovecs) and txdesc_flags or txdesc_flags_last
-   self.txdesc[self.tdt].address = iov.buffer.physical + iov.offset
-   self.txdesc[self.tdt].options = bor(iov.length, flags, lshift(p.length+0ULL, 46))
-   self.txpackets[self.tdt] = packet_ref(p)
-   self.tdt = band(self.tdt + 1, num_descriptors - 1)
-end
+local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21, eop=24}
 
 function M_sf:transmit (p)
-   local niovecs = p.niovecs
-   if niovecs > 0 then
-      transmit_aux(self, p, 0, niovecs)
-   end
-   if niovecs > 1 then
-      transmit_aux(self, p, 1, niovecs)
-   end
-   if niovecs > 2 then
-      for i = 2, niovecs - 1 do
-         transmit_aux(self, p, i, niovecs)
-      end
-   end
+   self.txdesc[self.tdt].address = memory.virtual_to_physical(p.data)
+   self.txdesc[self.tdt].options = bor(p.length, txdesc_flags, lshift(p.length+0ULL, 46))
+   self.txpackets[self.tdt] = p
+   self.tdt = band(self.tdt + 1, num_descriptors - 1)
 end
 
 function M_sf:sync_transmit ()
@@ -224,7 +240,7 @@ function M_sf:sync_transmit ()
    -- Release processed buffers
    if old_tdh ~= self.tdh then
       while old_tdh ~= self.tdh do
-         packet.deref(self.txpackets[old_tdh])
+         packet.free(self.txpackets[old_tdh])
          self.txpackets[old_tdh] = nil
          old_tdh = band(old_tdh + 1, num_descriptors - 1)
       end
@@ -243,7 +259,7 @@ function M_sf:discard_unsent_packets()
    self.r.TDT(self.tdh)
    while old_tdt ~= self.tdh do
       old_tdt = band(old_tdt - 1, num_descriptors - 1)
-      packet.deref(self.txpackets[old_tdt])
+      packet.free(self.txpackets[old_tdt])
       self.txdesc[old_tdt].address = 0
       self.txdesc[old_tdt].options = 0
    end
@@ -252,25 +268,13 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Receive Functionality."
 
-local function receive_aux(self, p)
-   local wb = self.rxdesc[self.rxnext].wb
-   if band(wb.xstatus_xerror, 1) == 1 then -- Descriptor Done
-      local b = self.rxbuffers[self.rxnext]
-      packet.add_iovec(p, b, wb.pkt_len)
-      self.rxnext = band(self.rxnext + 1, num_descriptors - 1)
-   end
-   return band(wb.xstatus_xerror, 2) == 2  -- End Of Packet
-end
-
 function M_sf:receive ()
-   assert(self.rdh ~= self.rxnext)
-   local p = packet.allocate()
-   if not receive_aux(self, p) then
-      if not receive_aux(self, p) then
-         repeat
-         until receive_aux(self, p)
-      end
-   end
+   assert(self:can_receive())
+   local wb = self.rxdesc[self.rxnext].wb
+   local p = self.rxpackets[self.rxnext]
+   p.length = wb.pkt_len
+   self.rxpackets[self.rxnext] = nil
+   self.rxnext = band(self.rxnext + 1, num_descriptors - 1)
    return p
 end
 
@@ -282,14 +286,11 @@ function M_sf:can_add_receive_buffer ()
    return band(self.rdt + 1, num_descriptors - 1) ~= self.rxnext
 end
 
-function M_sf:add_receive_buffer (b)
+function M_sf:add_receive_buffer (p)
    assert(self:can_add_receive_buffer())
-   if b.size < self.rx_buffersize then
-      self:set_rx_buffersize(b.size)
-   end
    local desc = self.rxdesc[self.rdt].data
-   desc.address, desc.dd = b.physical, 0
-   self.rxbuffers[self.rdt] = b
+   desc.address, desc.dd = memory.virtual_to_physical(p.data), 0
+   self.rxpackets[self.rdt] = p
    self.rdt = band(self.rdt + 1, num_descriptors - 1)
 end
 
@@ -298,8 +299,8 @@ function M_sf:free_receive_buffers ()
       self.rdt = band(self.rdt - 1, num_descriptors - 1)
       local desc = self.rxdesc[self.rdt].data
       desc.address, desc.dd = 0, 0
-      buffer.free(self.rxbuffers[self.rdt])
-      self.rxbuffers[self.rdt] = nil
+      packet.free(self.rxpackets[self.rdt])
+      self.rxpackets[self.rdt] = nil
    end
 end
 
@@ -313,14 +314,16 @@ function M_sf:sync_receive ()
 end
 
 function M_sf:wait_linkup ()
-   io.write('waiting...\n')
+   self.waitlu_ms = 0
    local mask = bits{Link_up=30}
-   for count = 1, 500 do
+   for count = 1, 250 do
       if band(self.r.LINKS(), mask) == mask then
+         self.waitlu_ms = count
          return self
       end
       C.usleep(1000)
    end
+   self.waitlu_ms = 250
    return self
 end
 
@@ -428,27 +431,38 @@ function M_pf:open ()
 end
 
 function M_pf:close()
-   if self.fd then 
-      pci.close_pci_resource(self.fd) 
+   if self.fd then
+      pci.close_pci_resource(self.fd, self.base)
       self.fd = false
    end
 end
 
 function M_pf:init ()
+   self.redos = 0
+   local mask = bits{Link_up=30}
+   for i = 1, 100 do
+      self
+         :disable_interrupts()
+         :global_reset()
+      if i%5 == 0 then self:autonegotiate_sfi() end
+      self
+         :wait_eeprom_autoread()
+         :wait_dma()
+         :set_vmdq_mode()
+         :init_statistics()
+         :init_receive()
+         :init_transmit()
+         :wait_linkup()
+      if band(self.r.LINKS(), mask) == mask then
+         return self
+      end
+      self.redos = i
+   end
+   io.write ('never got link up: ', self.pciaddress, '\n')
+   os.exit(2)
    return self
-      :disable_interrupts()
-      :global_reset()
-      :autonegotiate_sfi()
-      :wait_eeprom_autoread()
-      :wait_dma()
-      :set_vmdq_mode()
-      :init_statistics()
-      :init_receive()
-      :init_transmit()
-      :wait_linkup()
 end
 
-M_pf.close = M_sf.close
 M_pf.global_reset = M_sf.global_reset
 M_pf.disable_interrupts = M_sf.disable_interrupts
 M_pf.set_receive_descriptors = pass
@@ -540,7 +554,7 @@ function M_pf:new_vf (poolnum)
       rxqn = rxqn,                   -- receive queue number
       rxdesc = 0,                   -- Receive descriptors (pointer)
       rxdesc_phy = 0,               -- Receive descriptors (physical address)
-      rxbuffers = {},               -- Rx descriptor index -> buffer mapping
+      rxpackets = {},               -- Rx descriptor index -> packet mapping
       rdh = 0,                      -- Cache of receive head (RDH) register
       rdt = 0,                      -- Cache of receive tail (RDT) register
       rxnext = 0,                   -- Index of next buffer to receive
@@ -552,13 +566,22 @@ function M_vf:open (opts)
    register.define(transmit_registers_desc, self.r, self.base, self.txqn)
    register.define(receive_registers_desc, self.r, self.base, self.rxqn)
    self.txpackets = ffi.new("struct packet *[?]", num_descriptors)
-   self.rxbuffers = ffi.new("struct buffer *[?]", num_descriptors)
+   self.rxpackets = ffi.new("struct packet *[?]", num_descriptors)
    return self:init(opts)
 end
 
 function M_vf:close()
    local poolnum = self.poolnum or 0
    local pf = self.pf
+
+   if self.free_receive_buffers then
+      self:free_receive_buffers()
+   end
+   if self.discard_unsent_packets then
+      self:discard_unsent_packets()
+      C.usleep(1000)
+   end
+
    -- unset_tx_rate
    self:set_tx_rate(0, 0)
    self
@@ -574,8 +597,9 @@ function M_vf:close()
 
    self:disable_transmit()
       :disable_receive()
+      :free_dma_memory()
 
-   return M_sf.close(self)
+   return self
 end
 
 function M_vf:reconfig(opts)
@@ -620,6 +644,7 @@ function M_vf:init (opts)
 end
 
 M_vf.init_dma_memory = M_sf.init_dma_memory
+M_vf.free_dma_memory = M_sf.free_dma_memory
 M_vf.set_receive_descriptors = M_sf.set_receive_descriptors
 M_vf.set_transmit_descriptors = M_sf.set_transmit_descriptors
 M_vf.can_transmit = M_sf.can_transmit
@@ -951,7 +976,10 @@ MANC      0x05820 -            RW Management Control Register
 MAXFRS    0x04268 -            RW Max Frame Size
 MNGTXMAP  0x0CD10 -            RW Mangeability Tranxmit TC Mapping
 MFLCN     0x04294 -            RW MAC Flow Control Register
+MTQC      0x08120 -            RW Multiple Transmit Queues Command Register
+MRQC      0x0EC80 -            RW Multiple Receive Queues Command Register
 PFQDE     0x02F04 -            RW PF Queue Drop Enable Register
+PFVTCTL   0x051B0 -             RW PF Virtual Control Register
 RDRXCTL   0x02F00 -            RW Receive DMA Control
 RTRUP2TC  0x03020 -            RW DCB Receive Use rPriority to Traffic Class
 RTTBCNRC  0x04984 -            RW DCB Transmit Rate-Scheduler Config
@@ -1029,7 +1057,6 @@ MCSTCTRL  0x05090 -             RW Multicast Control Register
 PSRTYPE   0x0EA00 +0x04*0..63   RW Packet Split Receive Type Register
 RXCSUM    0x05000 -             RW Receive Checksum Control
 RFCTL     0x05008 -             RW Receive Filter Control Register
-PFVTCTL   0x051B0 -             RW PF Virtual Control Register
 PFVFRE    0x051E0 +0x04*0..1    RW PF VF Receive Enable
 PFVFTE    0x08110 +0x04*0..1    RW PF VF Transmit Enable
 MTA       0x05200 +0x04*0..127  RW Multicast Table Array
@@ -1037,8 +1064,6 @@ RAL       0x0A200 +0x08*0..127  RW Receive Address Low
 RAH       0x0A204 +0x08*0..127  RW Receive Address High
 MPSAR     0x0A600 +0x04*0..255  RW MAC Pool Select Array
 VFTA      0x0A000 +0x04*0..127  RW VLAN Filter Table Array
-MTQC      0x08120 -             RW Multiple Transmit Queues Command Register
-MRQC      0x0EC80 -             RW Multiple Receive Queues Command Register
 RQTC      0x0EC70 -             RW RSS Queues Per Traffic Class Register
 RSSRK     0x0EB80 +0x04*0..9    RW RSS Random Key Register
 RETA      0x0EB00 +0x04*0..31   RW Redirection Rable

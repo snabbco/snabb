@@ -72,11 +72,11 @@ is given the current value is returned.
 Example:
 
 ```
-local eth = ethernet:new({src = ethernet:ntop("00:00:00:00"),
-                          dst = ethernet:ntop("00:00:00:00"),
+local eth = ethernet:new({src = ethernet:pton("00:00:00:00"),
+                          dst = ethernet:pton("00:00:00:00"),
                           type = 0x86dd})
-eth:dst(ethernet:ntop("54:52:00:01"))
-ethernet:pton(eth:dst()) => "54:52:00:01"
+eth:dst(ethernet:pton("54:52:00:01"))
+ethernet:ntop(eth:dst()) => "54:52:00:01"
 ```
 
 — Method **ethernet:src_eq** *mac*

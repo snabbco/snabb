@@ -4,7 +4,6 @@ local ffi = require("ffi")
 
 local app  = require("core.app")
 local link = require("core.link")
-local buffer = require("core.buffer")
 local packet = require("core.packet")
 local pcap = require("lib.pcap.pcap")
 
@@ -21,10 +20,7 @@ function PcapReader:pull ()
    while not self.done and not link.full(self.output.output) do
       local data, record, extra = self.iterator()
       if data then
-         local p = packet.allocate()
-         local b = buffer.allocate()
-         ffi.copy(b.pointer, data)
-         packet.add_iovec(p, b, string.len(data))
+         local p = packet.from_string(data)
          link.transmit(self.output.output, p)
       else
          self.done = true
@@ -44,13 +40,10 @@ function PcapWriter:push ()
    while not link.empty(self.input.input) do
       local p = link.receive(self.input.input)
       pcap.write_record_header(self.file, p.length)
-      for i = 0, p.niovecs-1 do
-         local iov = p.iovecs[i]
-         -- XXX expensive to create interned Lua string.
-         self.file:write(ffi.string(iov.buffer.pointer + iov.offset, iov.length))
-      end
+      -- XXX expensive to create interned Lua string.
+      self.file:write(ffi.string(p.data, p.length))
       self.file:flush()
-      packet.deref(p)
+      packet.free(p)
    end
 end
 

@@ -37,13 +37,15 @@ initial=true
 # Loop pulling/cloning the repo.
 while true; do
     if [ ! -d $NEUTRON_DIR ]; then
-    git clone --depth 1 git://$SYNC_HOST/$SYNC_PATH $NEUTRON_DIR
+    git clone git://$SYNC_HOST/$SYNC_PATH $NEUTRON_DIR
     fi
     cd $NEUTRON_DIR
     git fetch
     git diff --quiet origin/master
     if [ $? != 0 -o $initial = true ]; then
         git pull --rebase origin master
+        git reflog expire --expire-unreachable=0 --all
+        git prune --expire 0
         echo "Generating new configuration"
         sudo $NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR
         # Only (atomically) replace configurations that have changed.

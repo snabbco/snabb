@@ -244,86 +244,64 @@ Returns a structure holding ring statistics for the *link*:
  * `txdrop`: Count of packets dropped due to ring overflow.
 
 
-
-## Buffer (core.buffer)
-
-A *buffer* is a block of memory containing packet data and suitable for
-[DMA I/O](https://en.wikipedia.org/wiki/Direct_memory_access).
-
-— Function **buffer.allocate**
-
-Returns a new uninitialized buffer.
-
-
-— Function **buffer.free** *buffer*
-
-Free the memory allocated for *buffer*. This is usually done
-automatically when freeing a packet, also see the packet API.
-
-
-— Function **buffer.pointer** *buffer*
-
-Returns a pointer to the underlying memory block (`char *`) of *buffer*.
-
-
-— Function **buffer.physical** *buffer*
-
-Returns the physical address of the memory block (`uint64_t`) of
-*buffer*. This address is suitable for use in DMA.
-
-
-— Function **buffer.size** *buffer*
-
-Returns the size of *buffer* in bytes (`uint32_t`).
-
-
-
 ## Packet (core.packet)
-
+   
 A *packet* is a data structure describing one of the network packets that
-is currently being processed. The packet is used to access the payload
-data, the meta data used during processing, and to explicitly manage the
-life cycle of the packet. Packets are explicitly reference-counted at the
-application level instead of being garbage collected, because there can
-be very many of them and they should be reused quickly.
+is currently being processed. The packet is used to explicitly manage the
+life cycle of the packet. Packets are explicitly allocated and freed by
+using `packet.allocate` and `packet.free`. When a packet is received
+using `link.receive` its ownership is acquired by the calling app. The
+app must then ensure to either transfer the packet ownership to another
+app by calling `link.transmit` on the packet or free the packet using
+`packet.free`. Apps may only use packets they own, e.g. packets that have
+not been transmitted or freed. The number of allocatable packets is
+limited by the size of the underlying "freelist", e.g. a pool of unused
+packet objects from and to which packets are allocated and freed.
 
 — Function **packet.allocate**
 
-Returns a new empty packet.
+Returns a new empty packet. An an error is raised if there are no packets
+left on the freelist.
 
+— Function **packet.free** *packet*
 
-— Function **packet.add_iovec** *packet*, *buffer*, *length*, *offset*
+Frees *packet* and puts in back onto the freelist.
 
-Create an *iovec* for *length* bytes of *buffer* starting at *offset* and
-append it to *packet*. *Offset* is optional and defaults to 0.
+— Function **packet.data** *packet*
 
+Returns a pointer to the payload of *packet*.
 
-— Function **packet.niovecs** *packet*
+— Function **packet.length** *packet*
 
-Returns the number of iovecs in *packet*.
+Returns the payload length of *packet*.
 
+— Function **packet.clone** *packet*
 
-— Function **packet.iovec** *packet*, *position*
+Returns an exact copy of *packet*.
 
-Returns the iovec of *packet* at *position* (starting from 0).
+— Function **packet.append** *packet*, *pointer*, *length*
 
+Appends *length* bytes starting at *pointer* to the end of *packet*. An
+error is raised if there is not enough space in *packet* to accomodate
+*length* additional bytes.
 
-— Function **packet.ref** *packet*, *n*
+— Function **packet.prepend** *packet*, *pointer*, *length*
 
-Increases the reference count of *packet* by *n*. *N* is optional and
-defaults to 1.
+Prepends *length* bytes starting at *pointer* to the front of
+*packet*. An error is raised if there is not enough space in *packet* to
+accomodate *length* additional bytes.
 
+— Function **packet.shiftleft** *packet*, *length*
 
-— Function **packet.deref** *packet*, *n*
+Truncates *packet* by *length* bytes from the front.
 
-Decreases the reference count of *packet* by *n*. *N* is optional and
-defaults to 1. If the reference count reaches zero then *packet* is
-automatically recycled.
+— Function **packet.from_pointer** *pointer*, *length*
 
+Allocate packet and fill it with *length* bytes from *pointer*.
 
-— Function **packet.tenure** *packet*
+— Function **packet.from_string** *string*
 
-Gives *packet* "unlimited refs" so that `deref` will have no effect.
+Allocate packet and fill it with the contents of *string*.
 
 
 ## Memory (core.memory)

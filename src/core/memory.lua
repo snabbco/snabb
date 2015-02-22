@@ -87,15 +87,14 @@ huge_page_bits = math.log(huge_page_size, 2)
 
 --- ### Physical address translation
 
+local uint64_t = ffi.typeof("uint64_t")
 function virtual_to_physical (virt_addr)
-   virt_addr = ffi.cast("uint64_t", virt_addr)
-   local virt_page = tonumber(virt_addr / base_page_size)
-   local phys_page = C.phys_page(virt_page) * base_page_size
-   if phys_page == 0 then
-      error("Failed to resolve physical address of "..tostring(virt_addr))
+   local u64 = ffi.cast(uint64_t, virt_addr)
+   if bit.band(u64, 0x500000000000ULL) ~= 0x500000000000ULL then
+      print("Invalid DMA address: 0x"..bit.tohex(u64,12))
+      error("DMA address tag check failed")
    end
-   local phys_addr = ffi.cast("uint64_t", phys_page + virt_addr % base_page_size)
-   return phys_addr
+   return bit.bxor(u64, 0x500000000000ULL)
 end
 
 --- ### selftest
@@ -107,8 +106,9 @@ function selftest (options)
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
       io.flush()
       local dmaptr, physptr, dmalen = dma_alloc(huge_page_size)
-      print("Got "..(dmalen/1024^2).."MB "..
-         "at 0x"..tostring(ffi.cast("void*",tonumber(physptr))))
+      print("Got "..(dmalen/1024^2).."MB")
+      print("    Physical address: 0x" .. bit.tohex(virtual_to_physical(dmaptr), 12))
+      print("    Virtual address:  0x" .. bit.tohex(ffi.cast(uint64_t, dmaptr), 12))
       ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- try a write
       assert(dmaptr ~= nil and dmalen == huge_page_size)
    end

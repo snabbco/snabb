@@ -3,6 +3,7 @@ module(...,package.seeall)
 local zone = require("jit.zone")
 local basic_apps = require("apps.basic.basic_apps")
 local lib      = require("core.lib")
+local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
 local freelist = require("core.freelist")
@@ -27,6 +28,9 @@ end
 function Intel82599:new (arg)
    local conf = config.parse_app_arg(arg)
 
+   -- Unbind PCI device form linux.
+   pci.unbind_device_from_linux(conf.pciaddr)
+
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
          devices[conf.pciaddr] = {pf=intel10g.new_pf(conf.pciaddr):open(), vflist={}}
@@ -37,10 +41,7 @@ function Intel82599:new (arg)
       dev.vflist[poolnum+1] = vf
       return setmetatable({dev=vf:open(conf)}, Intel82599)
    else
-      local dev = intel10g.new_sf(conf.pciaddr)
-         :open()
-         :autonegotiate_sfi()
-         :wait_linkup()
+      local dev = intel10g.new_sf(conf.pciaddr):open()
       if not dev then return null end
       return setmetatable({dev=dev, zone="intel"}, Intel82599)
    end
@@ -84,29 +85,17 @@ function Intel82599:pull ()
    local l = self.output.tx
    if l == nil then return end
    self.dev:sync_receive()
-   while not full(l) and self.dev:can_receive() do
+   for i=1,128 do
+      if full(l) or not self.dev:can_receive() then break end
       transmit(l, self.dev:receive())
    end
    self:add_receive_buffers()
 end
 
 function Intel82599:add_receive_buffers ()
-   if self.rx_buffer_freelist == nil then
-      -- Generic buffers
-      while self.dev:can_add_receive_buffer() do
-         self.dev:add_receive_buffer(buffer.allocate())
-      end
-   else
-      -- Buffers from a special freelist
-      local fl = self.rx_buffer_freelist
-      while self.dev:can_add_receive_buffer() and freelist.nfree(fl) > 0 do
-         local b = freelist.remove(fl)
-         if b.size < 1024 then
-            buffer.free(b)
-            b = buffer.allocate()
-         end
-         self.dev:add_receive_buffer(b)
-      end
+   -- Generic buffers
+   while self.dev:can_add_receive_buffer() do
+      self.dev:add_receive_buffer(packet.allocate())
    end
 end
 
@@ -117,7 +106,7 @@ function Intel82599:push ()
    while not empty(l) and self.dev:can_transmit() do
       do local p = receive(l)
 	 self.dev:transmit(p)
-	 packet.deref(p)
+	 --packet.deref(p)
       end
    end
    self.dev:sync_transmit()
@@ -158,19 +147,19 @@ function selftest ()
       os.exit(engine.test_skipped_code)
    end
 
-   zone('buffer') buffer.preallocate(1000) zone()
-
-   manyreconf(pcideva, pcidevb)
+   print ("100 VF initializations:")
+   manyreconf(pcideva, pcidevb, 100, false)
+   print ("100 PF full cycles")
+   manyreconf(pcideva, pcidevb, 100, true)
 
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
    do
       local a0Sends = engine.app_table.nicAm0.input.rx.stats.txpackets
       local a1Gets = engine.app_table.nicAm1.output.tx.stats.rxpackets
-      if a1Gets < a0Sends/4
-         or a1Gets > a0Sends*3/4
-      then
-         print ('wrong proportion of packets passed/discarded')
+      -- Check propertions with some modest margin for error
+      if a1Gets < a0Sends * 0.45 or a1Gets > a0Sends * 0.55 then
+         print("mq_sw: wrong proportion of packets passed/discarded")
          os.exit(1)
       end
    end
@@ -189,7 +178,7 @@ function selftest ()
          or bGets < aGets/2
          or aGets < bGets/2
       then
-         print ('not enought packets somewhere')
+         print("sq_sq: missing packets")
          os.exit (1)
       end
    end
@@ -206,19 +195,19 @@ function selftest ()
          b1Gets < b0Gets/2 or
          b0Gets+b1Gets < aSends/2
       then
-         print ('not enought packets somewhere')
+         print("mq_sq: missing packets")
          os.exit (1)
       end
    end
-   print ('all ok')
+   print("selftest: ok")
 end
 
 -- open two singlequeue drivers on both ends of the wire
 function sq_sq(pcidevA, pcidevB)
    engine.configure(config.new())
    local c = config.new()
-   print ('-------')
-   print ('just send a lot of packets through the wire')
+   print("-------")
+   print("Transmitting bidirectionally between nicA and nicB")
    config.app(c, 'source1', basic_apps.Source)
    config.app(c, 'source2', basic_apps.Source)
    config.app(c, 'nicA', Intel82599, {pciaddr=pcidevA})
@@ -269,9 +258,9 @@ function mq_sq(pcidevA, pcidevB)
                pciaddr = pcidevB,
                vmdq = true,
                macaddr = '52:54:00:03:03:03'})
-   print ('-------')
-   print ("Send a bunch of from the SF on NIC A to the VFs on NIC B")
-   print ("half of them go to nicBm0 and nicBm0")
+   print("-------")
+   print("Send traffic from a nicA (SF) to nicB (two VFs)")
+   print("The packets should arrive evenly split between the VFs")
    config.app(c, 'sink_ms', basic_apps.Sink)
    config.link(c, 'source_ms.out -> repeater_ms.input')
    config.link(c, 'repeater_ms.output -> nicAs.rx')
@@ -279,8 +268,8 @@ function mq_sq(pcidevA, pcidevB)
    config.link(c, 'nicBm0.tx -> sink_ms.in2')
    config.link(c, 'nicBm1.tx -> sink_ms.in3')
    engine.configure(c)
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
 end
 
 -- one multiqueue driver with two apps and do switch stuff
@@ -326,12 +315,12 @@ function mq_sw(pcidevA)
    config.link(c, 'nicAm0.tx -> sink_ms.in1')
    config.link(c, 'nicAm1.tx -> sink_ms.in2')
    engine.configure(c)
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
+   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
 end
 
-function manyreconf(pcidevA, pcidevB)
-   print ('')
+function manyreconf(pcidevA, pcidevB, n, do_pf)
+   io.write ('\n')
    local d1 = lib.hexundump ([[
       52:54:00:02:02:02 52:54:00:01:01:01 08 00 45 00
       00 54 c3 cd 40 00 40 01 f3 23 c0 a8 01 66 c0 a8
@@ -350,10 +339,11 @@ function manyreconf(pcidevA, pcidevB)
       26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
       36 37
    ]], 98)                  -- src: Am0    dst: ---
-   engine.configure(config.new())
+--    engine.configure(config.new())
    local prevsent = 0
-   for i = 1, 100 do
-      print (('config #%d'):format(i))
+   local cycles, redos, maxredos, waits = 0, 0, 0, 0
+   io.write("Running iterated VMDq test...\n")
+   for i = 1, (n or 100) do
       local c = config.new()
       config.app(c, 'source_ms', basic_apps.Join)
       config.app(c, 'repeater_ms', basic_apps.Repeater)
@@ -371,22 +361,26 @@ function manyreconf(pcidevA, pcidevB)
          macaddr = '52:54:00:02:02:02',
          vlan = 100+i,
       })
-      print ('-------')
-      print ("Send a bunch of packets from Am0")
-      print ("half of them go to nicAm1 and half go nowhere")
       config.app(c, 'sink_ms', basic_apps.Sink)
       config.link(c, 'source_ms.out -> repeater_ms.input')
       config.link(c, 'repeater_ms.output -> nicAm0.rx')
       config.link(c, 'nicAm0.tx -> sink_ms.in1')
       config.link(c, 'nicAm1.tx -> sink_ms.in2')
+      if do_pf then engine.configure(config.new()) end
       engine.configure(c)
-      link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d1))
-      link.transmit(engine.app_table.source_ms.output.out, packet.from_data(d2))
-      engine.main({duration = 0.25, report={showlinks=true, showapps=true}})
+      link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
+      link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
+      engine.main({duration = 0.1, no_report=true})
+      cycles = cycles + 1
+      redos = redos + engine.app_table.nicAm1.dev.pf.redos
+      maxredos = math.max(maxredos, engine.app_table.nicAm1.dev.pf.redos)
+      waits = waits + engine.app_table.nicAm1.dev.pf.waitlu_ms
       local sent = engine.app_table.nicAm0.input.rx.stats.txpackets
+      io.write (('test #%3d: VMDq VLAN=%d; 100ms burst. packet sent: %s\n'):format(i, 100+i, lib.comma_value(sent-prevsent)))
       if sent == prevsent then
+         io.write("error: NIC transmit counter did not increase\n")
          os.exit(2)
       end
-      prevsent = sent
    end
+   io.write (pcidevA, ": avg wait_lu: ", waits/cycles, ", max redos: ", maxredos, ", avg: ", redos/cycles, '\n')
 end

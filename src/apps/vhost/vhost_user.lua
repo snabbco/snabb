@@ -6,7 +6,6 @@ module(...,package.seeall)
 local basic_apps= require("apps.basic.basic_apps")
 local pcap      = require("apps.pcap.pcap")
 local app       = require("core.app")
-local buffer    = require("core.buffer")
 local config    = require("core.config")
 local lib       = require("core.lib")
 local link      = require("core.link")
@@ -219,7 +218,6 @@ function VhostUser:set_vring_addr (msg)
 
    if self.dev:ready() then
       self.vhost_ready = true
-      self.dev:set_virtio_device_id(buffer.add_virtio_device(self.dev))
       debug("Connected and initialized vhost_user.")
    end
 end
@@ -337,7 +335,6 @@ function selftest ()
       main.exit(0)
    end
    local source = app.app_table.source
-   source:set_rx_buffer_freelist(vhost_user:rx_buffers())
 
    local fn = function ()
       local vu = app.apps.vhost_user

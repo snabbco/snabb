@@ -106,7 +106,6 @@ function nd_light:new (arg)
    local nh = { nsent = 0 }
    local dgram = datagram:new()
    nh.packet = dgram:packet()
-   packet.tenure(nh.packet)
    local sol_node_mcast = ipv6:solicited_node_mcast(conf.next_hop)
    local ipv6 = ipv6:new({ next_header = 58, -- ICMP6
 	 hop_limit = 255,
@@ -138,7 +137,7 @@ function nd_light:new (arg)
 		    local nh = o._next_hop
 		    print(string.format("Sending neighbor solicitation for next-hop %s",
 					ipv6:ntop(conf.next_hop)))
-		    link.transmit(o.output.south, nh.packet)
+		    link.transmit(o.output.south, packet.clone(nh.packet))
 		    nh.nsent = nh.nsent + 1
 		    if nh.nsent <= o._config.retrans and not o._eth_header then
 		       timer.activate(nh.timer)
@@ -155,7 +154,6 @@ function nd_light:new (arg)
    local sna = {}
    dgram = datagram:new()
    sna.packet = dgram:packet()
-   packet.tenure(sna.packet)
    -- Leave dst address unspecified.  It will be set to the source of
    -- the incoming solicitation
    ipv6 = ipv6:new({ next_header = 58, -- ICMP6
@@ -170,18 +168,17 @@ function nd_light:new (arg)
    dgram:payload(na:header(), na:sizeof())
    local mem, length = dgram:payload(tgt_lladdr_tlv, tgt_lladdr_tlv_len)
    icmp:checksum(mem, length, ipv6)
-   dgram:push(icmp, true)
+   dgram:push(icmp)
    ipv6:payload_length(icmp:sizeof() + na:sizeof() + tgt_lladdr_tlv_len)
-   dgram:push(ipv6, true)
+   dgram:push(ipv6)
    -- Leave dst address unspecified.
-   local eth = ethernet:new({ src = conf.local_mac,
-			      type = 0x86dd })
-   dgram:push(eth, true)
-   -- These headers are relocated to the packet buffer in order to be
-   -- able to set the destination addresses and ICMP checksum later on.
-   sna.eth = eth
-   sna.ipv6 = ipv6
-   sna.icmp = icmp
+   dgram:push(ethernet:new({ src = conf.local_mac,
+                             type = 0x86dd }))
+   -- Parse the headers we want to modify later on from our template
+   -- packet.
+   dgram = dgram:reuse(sna.packet, ethernet)
+   dgram:parse_n(3)
+   sna.eth, sna.ipv6, sna.icmp = unpack(dgram:stack())
    sna.dgram = dgram
    o._sna = sna
    return o
@@ -196,7 +193,7 @@ local function ns (self, dgram, eth, ipv6, icmp)
    end
    -- Parse the neighbor solicitation and check if it contains our own
    -- address as target
-   local ns = dgram:parse(nil, self._match_ns)
+   local ns = dgram:parse_match(nil, self._match_ns)
    if not ns then
       return nil
    end
@@ -220,7 +217,7 @@ local function na (self, dgram, eth, ipv6, icmp)
    if self._eth_header then
       return nil
    end
-   local na = dgram:parse(nil, self._match_na)
+   local na = dgram:parse_match(nil, self._match_na)
    if not na then
       return nil
    end
@@ -238,9 +235,7 @@ local function na (self, dgram, eth, ipv6, icmp)
 end
 
 local function from_south (self, p)
-   local iov = p.iovecs[0]
-   if not self._filter:match(iov.buffer.pointer + iov.offset,
-			     iov.length) then
+   if not self._filter:match(packet.data(p), packet.length(p)) then
       return false
    end
    local dgram = datagram:new(p, ethernet)
@@ -275,11 +270,11 @@ function nd_light:push ()
       local status = from_south(self, p)
       if status == nil then
 	 -- Discard
-	 packet.deref(p)
+	 packet.free(p)
       elseif status == true then
 	 -- Send NA back south
-	 packet.deref(p)
-	 link.transmit(l_reply, self._sna.packet)
+	 packet.free(p)
+	 link.transmit(l_reply, packet.clone(self._sna.packet))
       else
 	 -- Send transit traffic up north
 	 link.transmit(l_out, p)
@@ -292,12 +287,19 @@ function nd_light:push ()
       if not self._eth_header then
 	 -- Drop packets until ND for the next-hop
 	 -- has completed.
-	 packet.deref(link.receive(l_in))
+	 packet.free(link.receive(l_in))
       else
 	 local p = link.receive(l_in)
-	 local iov = p.iovecs[0]
-	 self._eth_header:copy(iov.buffer.pointer + iov.offset)
-	 link.transmit(l_out, p)
+         if packet.length(p) >= self._eth_header:sizeof() then
+            self._eth_header:copy(packet.data(p))
+            link.transmit(l_out, p)
+         else packet.free(p) end
       end
    end
+end
+
+-- Free static packets on `stop'.
+function nd_light:stop ()
+   packet.free(self._next_hop.packet)
+   packet.free(self._sna.packet)
 end

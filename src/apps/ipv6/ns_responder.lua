@@ -29,7 +29,7 @@ function ns_responder:new(config)
    assert(filter, errmsg and ffi.string(errmsg))
    o._filter = filter
    o._dgram = datagram:new()
-   packet.deref(o._dgram:packet())
+   packet.free(o._dgram:packet())
    return o
 end
 
@@ -49,7 +49,7 @@ local function process (self, p)
    end
    -- Parse the neighbor solicitation and check if it contains our own
    -- address as target
-   local ns = dgram:parse(nil, self._match_ns)
+   local ns = dgram:parse_match(nil, self._match_ns)
    if not ns then
       return nil
    end
@@ -96,11 +96,11 @@ function ns_responder:push()
    l_out = self.output.north
    local l_reply = self.output.south
    while not link.empty(l_in) and not link.full(l_out) do
-      local p = packet.want_modify(link.receive(l_in))
+      local p = link.receive(l_in)
       local status = process(self, p)
       if status == nil then
 	 -- Discard
-	 packet.deref(p)
+	 packet.free(p)
       elseif status == true then
 	 -- Send NA back south
 	 link.transmit(l_reply, p)

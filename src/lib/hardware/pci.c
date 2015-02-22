@@ -41,7 +41,7 @@ int open_pci_resource(const char *path)
 }
 
 // Return a point to the mapped memory, or NULL on failure.
-uint32_t volatile *map_pci_resource(int fd)
+uint32_t *map_pci_resource(int fd)
 {
   void *ptr;
   struct stat st;
@@ -50,13 +50,18 @@ uint32_t volatile *map_pci_resource(int fd)
   if (ptr == MAP_FAILED) {
     return NULL;
   } else {
-    return (uint32_t volatile *)ptr;
+    return (uint32_t *)ptr;
   }
 }
 
-void close_pci_resource(int fd)
+void close_pci_resource(int fd, uint32_t *addr)
 {
   flock(fd, LOCK_UN);
+  if (addr != NULL) {
+    struct stat st;
+    assert( fstat(fd, &st) == 0 );
+    assert( munmap((void *)addr, st.st_size) == 0 );
+  }
   close(fd);
 }
 

@@ -20,7 +20,6 @@ end
 function load (file, pciaddr, sockpath)
    local ports = lib.load_conf(file)
    local c = config.new()
-   local zerocopy = {} -- {NIC->Virtio} app names to zerocopy link
    for _,t in ipairs(ports) do
       local vlan, mac_address = t.vlan, t.mac_address
       local name = port_name(t)
@@ -32,13 +31,20 @@ function load (file, pciaddr, sockpath)
                                       vlan = vlan})
       config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(t.port_id)})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
-      if t.ingress_filter and #t.ingress_filter > 0 then
+      if t.tx_police_gbps then
+         local TxLimit = "TxLimit_"..name
+         local rate = t.tx_police_gbps * 1e9 / 8
+         config.app(c, TxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
+         config.link(c, VM_tx.." -> "..TxLimit..".input")
+         VM_tx = TxLimit..".output"
+      end
+      if t.ingress_filter then
          local Filter = "Filter_in_"..name
          config.app(c, Filter, PacketFilter, t.ingress_filter)
          config.link(c, Filter..".tx -> " .. VM_rx)
          VM_rx = Filter..".rx"
       end
-      if t.egress_filter and #t.egress_filter > 0 then
+      if t.egress_filter then
          local Filter = 'Filter_out_'..name
          config.app(c, Filter, PacketFilter, t.egress_filter)
          config.link(c, VM_tx..' -> '..Filter..'.rx')
@@ -68,19 +74,18 @@ function load (file, pciaddr, sockpath)
          VM_rx, VM_tx = ND..".south", ND..".south"
       end
       if t.rx_police_gbps then
-         local QoS = "QoS_"..name
+         local RxLimit = "RxLimit_"..name
          local rate = t.rx_police_gbps * 1e9 / 8
-         config.app(c, QoS, RateLimiter, {rate = rate, bucket_capacity = rate})
-         config.link(c, VM_tx.." -> "..QoS..".input")
-         VM_tx = QoS..".output"
+         config.app(c, RxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
+         config.link(c, RxLimit..".output -> "..VM_rx)
+         VM_rx = RxLimit..".input"
       end
       config.link(c, NIC..".tx -> "..VM_rx)
       config.link(c, VM_tx.." -> "..NIC..".rx")
-      zerocopy[NIC] = Virtio
    end
 
    -- Return configuration c, and zerocopy pairs.
-   return c, zerocopy
+   return c
 end
 
 -- Apply configuration <c> to engine and reset <zerocopy> buffers.
@@ -88,11 +93,6 @@ function apply (c, zerocopy)
 --   print(config.graphviz(c))
 --   main.exit(0)
    engine.configure(c)
-   for nic, virtio in pairs(zerocopy) do
-      local n = engine.app_table[nic]
-      local v = engine.app_table[virtio]
-      n:set_rx_buffer_freelist(v:rx_buffers())
-   end
 end
 
 function selftest ()
