@@ -14,7 +14,9 @@ CSRC   = $(shell find . -regex '[^\#]*\.c'   -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h'   -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
 RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
-PROGRAM = $(shell find program -type d -printf '%P ')
+# regexp is to include program/foo but not program/foo/bar
+PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
+INCSRC = $(shell find . -regex '[^\#]*\.inc' -printf '%P ')
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
@@ -23,6 +25,7 @@ ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
+INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
 # TESTMODS expands to:
@@ -39,7 +42,14 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-default: bin/snabb
+snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ)
+	$(E) "LINK      $@"
+	$(Q) gcc -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
+	    ../deps/luajit/src/libluajit.a \
+	    -lc -ldl -lm -lrt -lpthread
+	@echo -n "BINARY    "
+	@ln -fs snabb snabbswitch
+	@ls -sh snabb
 
 all: $(EXE)
 
@@ -48,15 +58,6 @@ $(EXE): snabb
 	$(Q) install -D snabb $@
 
 markdown: $(RMOBJS)
-
-snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
-	$(E) "LINK      $@"
-	$(Q) gcc -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
-	    ../deps/luajit/src/libluajit.a \
-	    -lc -ldl -lm -lrt -lpthread
-	@echo -n "BINARY    "
-	@ln -fs snabb snabbswitch
-	@ls -sh snabb
 
 test: $(TESTMODS) $(TESTSCRIPTS)
 
@@ -129,6 +130,13 @@ $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
 $(RMOBJS): %: %.src
 	$(E) "MARKDOWN  $@"
 	$(Q) scripts/process-markdown $< > $@
+
+$(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
+	$(E) "INC       $@"
+	@(echo -n "return [=============["; \
+	 cat $<; \
+	 echo "]=============]") > $(basename $@).luainc
+	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
 
 # extra/ third party bits and pieces
 obj/strict.o: extra/strict.lua | $(OBJDIR)
