@@ -40,13 +40,13 @@ so (assuming your `snabbswitch` repository is located at
 
 ```
 $ cd ~/snabbswitch/src
-$ sudo lib/nfv/selftest.sh
+$ sudo program/snabbnfv/selftest.sh
 [...]
 ```
 
 #### Customizing Your Setup
 
 Consult `src/scripts/bench_env/README` on how to create custom guest
-images. In order for `src/lib/nfv/selftest.sh` to run the following
-packages must be present on the guest: `ethtool`, `iperf`, `tcpdump` and
-`netcat`.
+images. In order for `src/program/snabbnfv/selftest.sh` to run the
+following packages must be present on the guest: `ethtool`, `iperf`,
+`tcpdump` and `netcat`.

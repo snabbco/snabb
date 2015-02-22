@@ -1,0 +1,9 @@
+snabbnfv traffic [OPTIONS] <pci-address> <config-file> <socket-path>
+
+  -B NPACKETS, --benchmark NPACKETS
+                             Benchmark processing NPACKETS.
+
+Process traffic between Neutron ports and a physical NIC.
+
+In benchmark mode, measure the throughput for the first <npackets> and
+then report and terminate.

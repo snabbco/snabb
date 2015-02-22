@@ -7,7 +7,6 @@ local C = require("ffi").C
 
 function run (args)
    local command = table.remove(args, 1)
-   print(command, #args)
    if command == 'basic1' and #args == 1 then
       basic1(unpack(args))
    elseif command == 'nfvconfig' and #args == 4 then
@@ -48,7 +47,7 @@ function basic1 (npackets)
 end
 
 function nfvconfig (pciaddr, confpath_x, confpath_y, nloads)
-   local config = require("lib.nfv.config")
+   local nfvconfig = require("program.snabbnfv.nfvconfig")
    nloads = tonumber(nloads)
       or error("Invalid number of iterations: " .. nloads)
 

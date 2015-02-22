@@ -1,5 +1,15 @@
 module(...,package.seeall)
 
+local lib  = require("core.lib")
+local usage = require("program.snabbnfv.fuzz.README_inc")
+
+function run (args)
+   if #args ~= 2 then print(usage) main.exit(1) end
+   local spec_path, output_path = unpack(args)
+   local conf = fuzz_connective_ports(lib.load_conf(spec_path))
+   lib.store_conf(output_path, conf)
+end
+
 -- Produces a random config with ports A and B which can communicate with
 -- each other over IPv6/TCP based on spec.
 function fuzz_connective_ports (spec)
