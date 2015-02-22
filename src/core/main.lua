@@ -7,11 +7,12 @@ package.path = ''
 local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
 local zone = require("jit.zone")
+local lib = require("core.lib")
 local C   = ffi.C
-
 -- Load ljsyscall early to help detect conflicts
 -- (e.g. FFI type name conflict between Snabb and ljsyscall)
 require("syscall")
+
 require("lib.lua.strict")
 require("lib.lua.class")
 
@@ -38,15 +39,11 @@ function main ()
       print("Usage: snabb <PROGRAM> [ARGS]...")
       os.exit(1)
    end
-   local ok, mod = pcall(require, modulename(program))
-   if not ok then
+   if not lib.have_module(modulename(program)) then
       print(programname(program) .. ": unrecognized program name")
       os.exit(1)
    end
-   if not type(mod) == 'table' then
-      print(programname(program) .. ": broken module", mod)
-   end
-   mod.run(parameters)
+   require(modulename(program)).run(parameters)
 end
 
 -- programname("nfv-sync-master.2.0") => "nfv-sync-master"
