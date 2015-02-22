@@ -1,14 +1,6 @@
 module(..., package.seeall)
 
-local usage = [[
-Usage:
-  snabbmark basic1    <npackets>
-    Benchmark basic app network packet flow.
-
-  snabbmark nfvconfig  <pci-address> <config-file-x> <config-file-y> <n>
-    Benchmark loading <config-file-y> and transitioning from <config-file-x>
-    to <config-file-y> <n> times.
-]]
+local usage = require("program.snabbmark.README_inc")
 
 local basic_apps = require("apps.basic.basic_apps")
 local C = require("ffi").C
