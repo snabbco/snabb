@@ -1,32 +1,7 @@
 module(..., package.seeall)
 
-local getopt = require("lib.lua.alt_getopt")
-
-local usage = [[
-Usage: snsh [OPTION]... [SCRIPT] [PARAMETER]...
-
-Snabb Shell: Load the Snabb Switch core and execute Lua source code.
-
-Execute SCRIPT if specified and then exit.
-
-  -i,        --interactive   Start an interactive Read-Eval-Print Loop.
-  -e EXPR,   --eval EXPR     Evaluate the Lua expression EXPR.
-  -l MODULE, --load MODULE   Load (require) the Lua module MODULE.
-  -t MODULE, --test MODULE   Test (selftest) the Lua module MODULE.
-  -d,        --debug         Enable additional debugging checks.
-  -j CMD,    --jit CMD       Control LuaJIT behavior. Available commands:
-                               -jv=FILE, --jit v=FILE
-                                 Write verbose JIT trace output to FILE.
-                               -jdump=OPTS[,FILE] --jit dump=OPTS[,FILE]
-                                 Output JIT traces, optionally to a file.
-                               -jp=OPTS[,FILE] --jit p=OPTS[,FILE]
-                                 Profile execution with low-overhead sampling.
-                             See luajit documentation for more information:
-                               http://luajit.org/running.html
-  -P PATH,   --package-path PATH
-                             Use PATH as the Lua 'package.path'.
-  -h,        --help          Print this usage message.
-]]
+local lib = require("core.lib")
+local usage = require("program.snsh.README_inc")
 
 local long_opts = {
    ["package-path"] = "P",
@@ -76,17 +51,7 @@ function run (parameters)
    end
 
    -- Execute command line arguments
-   local opts,optind,optarg = getopt.get_ordered_opts(parameters, "hl:t:die:j:P:", long_opts)
-   for i,v in ipairs(opts) do
-      if opt[v] then 
-	 opt[v](optarg[i]) 
-      else
-	 error("unimplemented option: " .. v) 
-      end
-   end
-
-   -- Drop arguments that are alraedy processed.
-   for i = 1, optind-1 do table.remove(parameters, 1) end
+   parameters = lib.dogetopt(parameters, opt, "hl:t:die:j:P:", long_opts)
 
    if #parameters > 0 then
       run_script(parameters)
