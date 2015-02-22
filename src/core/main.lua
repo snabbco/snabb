@@ -9,6 +9,9 @@ local ffi = require("ffi")
 local zone = require("jit.zone")
 local C   = ffi.C
 
+-- Load ljsyscall early to help detect conflicts
+-- (e.g. FFI type name conflict between Snabb and ljsyscall)
+require("syscall")
 require("lib.lua.strict")
 require("lib.lua.class")
 
