@@ -15,15 +15,7 @@ local C = ffi.C
 
 function run (args)
    if #args < 2 then
-      print([[Usage: packetblaster <PCAP-FILE> <PCI>...
-
-Transmit packets from PCAP-FILE continuously to one or more network
-adapters. The PCI arguments are Lua pattern strings that are used to
-match the network adapters to use.
-
-Examples:
-  packetblaster myfile.cap 0000:01:00.0
-  packetblaster myfile.cap 01:00]])
+      print(require("program.packetblaster.README_inc"))
       os.exit(1)
    end
    local filename = table.remove(args, 1)
