@@ -59,8 +59,8 @@ function create_config (input_dir, output_dir, hostname)
                             { vlan = vif_details.zone_vlan,
                               mac_address = port.mac_address,
                               port_id = port.id,
-                              ingress_filter = filter(port, secbindings, secrules, 'ingress'),
-                              egress_filter = filter(port, secbindings, secrules, 'egress'),
+                              ingress_filter = filter(port, secbindings, secrules, 'ingress', profile.packetfilter),
+                              egress_filter = filter(port, secbindings, secrules, 'egress', profile.packetfilter),
                               gbps = vif_details.zone_gbps,
                               rx_police_gbps = profile.rx_police_gbps,
                               tunnel = tunnel(port, vif_details, profile) })
@@ -77,7 +77,7 @@ function create_config (input_dir, output_dir, hostname)
 end
 
 -- Return the packet filter expression.
-function filter (port, secbindings, secrules, direction)
+function filter (port, secbindings, secrules, direction, type)
    local rules = {}
    direction = direction:lower()
    if secbindings[port.id] then
@@ -96,8 +96,15 @@ function filter (port, secbindings, secrules, direction)
          end
       end
    end
-   if #rules > 0 then return { rules = rules }
-                 else return nil end
+   if #rules > 0 then
+      if type == "stateless" then
+         return { rules = rules }
+      else
+         return { rules = rules,
+                  state_track = port.id,
+                  state_check = port.id }
+      end
+   else return nil end
 end
 
 -- Return the L2TPv3 tunnel expresion.
