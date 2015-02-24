@@ -1,8 +1,8 @@
 ### Protocol Header (lib.protocol.header)
 
-The `lib.protocol.header` contains the base class from which the supported
-protocol classes are derived. It defines generic methods on all protocol
-subclasses.
+The `lib.protocol.header` module contains the base class from which the
+supported protocol classes are derived. It defines generic methods on all
+protocol subclasses.
 
 — Method **header:new_from_mem** *memory*, *length*
 
