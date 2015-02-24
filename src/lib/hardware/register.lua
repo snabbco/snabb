@@ -131,7 +131,7 @@ end
 --- The register objects become named entries in `table`.
 ---
 --- This is an example line for a register description:
----     TXDCTL    0x06028 +0x40*0..127 (RW) Transmit Descriptor Control
+---     TXDCTL    0x06028 +0x40*0..127 RW Transmit Descriptor Control
 ---
 --- and this is the grammar:
 ---     Register   ::= Name Offset Indexing Mode Longname
