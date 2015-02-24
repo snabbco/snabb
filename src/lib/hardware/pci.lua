@@ -91,7 +91,6 @@ function map_pci_memory (device, n)
 end
 
 -- Close a file descriptor opened by map_pci_memory().
--- XXX should also unmap the memory.
 function close_pci_resource (fd, base)
    C.close_pci_resource(fd, base)
 end
