@@ -96,15 +96,13 @@ function filter (port, secbindings, secrules, direction, type)
          end
       end
    end
-   if #rules > 0 then
-      if type == "stateless" then
-         return { rules = rules }
-      else
-         return { rules = rules,
-                  state_track = port.id,
-                  state_check = port.id }
-      end
-   else return nil end
+   if type == "stateless" then
+      return { rules = rules }
+   else
+      return { rules = rules,
+               state_track = port.id,
+               state_check = port.id }
+   end
 end
 
 -- Return the L2TPv3 tunnel expresion.
