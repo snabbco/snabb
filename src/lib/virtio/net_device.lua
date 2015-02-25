@@ -220,6 +220,9 @@ function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
    local tx_p = self.tx.p
    -- TODO: copy the relevnat fields from the packet
    ffi.fill(tx_mrg_hdr, virtio_net_hdr_mrg_rxbuf_size)
+   if tx_p then
+      tx_mrg_hdr.hdr.flags = tx_p.flags
+   end
 
    -- for the first buffer receive a packet and save its header pointer
    if not tx_p then
@@ -227,6 +230,7 @@ function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
       tx_p = link.receive(l)
       self.tx.tx_mrg_hdr = tx_mrg_hdr
       self.tx.data_sent = 0
+      tx_mrg_hdr.hdr.flags = tx_p.flags
    end
 
    return tx_p
