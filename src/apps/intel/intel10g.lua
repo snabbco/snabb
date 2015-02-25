@@ -64,6 +64,7 @@ function M_sf:open ()
 end
 
 function M_sf:close()
+   pci.set_bus_master(self.pciaddress, false)
    if self.free_receive_buffers then
       self:free_receive_buffers()
    end
@@ -433,6 +434,7 @@ function M_pf:open ()
 end
 
 function M_pf:close()
+   pci.set_bus_master(self.pciaddress, false)
    if self.fd then
       pci.close_pci_resource(self.fd, self.base)
       self.fd = false
