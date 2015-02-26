@@ -91,6 +91,7 @@ void *allocate_huge_page(int size)
   virtual_address = physical_address | 0x500000000000ULL;
   realptr = shmat(shmid, (void*)virtual_address, 0);
   if (realptr == MAP_FAILED) { goto fail; }
+  memset(realptr, 0, size); // zero memory to avoid potential surprises
   shmdt(tmpptr);
   shmctl(shmid, IPC_RMID, 0);
   return realptr;
