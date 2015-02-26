@@ -121,6 +121,11 @@ do
       end
       local ptr, phy =
          memory.dma_alloc(num_descriptors * ffi.sizeof(ct))
+      -- Initialize unused DMA memory with -1. This is so that
+      -- accidental premature use of DMA memory will cause a DMA error
+      -- (write to illegal address) instead of overwriting physical
+      -- memory near address 0.
+      ffi.fill(ptr, 0xff, num_descriptors * ffi.sizeof(ct))
       ptr = lib.bounds_checked(ct, ptr, 0, num_descriptors)
       return ptr, phy
    end
@@ -260,7 +265,7 @@ function M_sf:discard_unsent_packets()
    while old_tdt ~= self.tdh do
       old_tdt = band(old_tdt - 1, num_descriptors - 1)
       packet.free(self.txpackets[old_tdt])
-      self.txdesc[old_tdt].address = 0
+      self.txdesc[old_tdt].address = -1
       self.txdesc[old_tdt].options = 0
    end
    self.tdt = self.tdh
@@ -298,7 +303,7 @@ function M_sf:free_receive_buffers ()
    while self.rdt ~= self.rdh do
       self.rdt = band(self.rdt - 1, num_descriptors - 1)
       local desc = self.rxdesc[self.rdt].data
-      desc.address, desc.dd = 0, 0
+      desc.address, desc.dd = -1, 0
       packet.free(self.rxpackets[self.rdt])
       self.rxpackets[self.rdt] = nil
    end
