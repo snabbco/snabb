@@ -112,7 +112,7 @@ end
 -- Report on relevant status and statistics.
 function Intel82599:report ()
    print("report on intel device", self.dev.pciaddress or self.dev.pf.pciaddress)
-   register.dump(self.dev.s, true)
+   register.dump(self.dev.s)
    if self.dev.rxstats then
       for name,v in pairs(self.dev:get_rxstats()) do
          io.write(string.format('%30s: %d\n', 'rx '..name, v))
