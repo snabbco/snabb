@@ -51,6 +51,10 @@ $(cat ../apps/socket/README.md)
 
 # Libraries
 
+## Hardware
+
+$(cat ../lib/hardware/README.md)
+
 ## Protocols
 
 $(cat ../lib/protocol/README.md)

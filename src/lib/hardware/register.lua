@@ -51,6 +51,18 @@ function Register:reset () self.acc = 0 end
 --- For other registers provide a noop
 function Register:noop () end
 
+--- Print a standard register
+function Register:print ()
+   io.write(("%40s %s\n"):format(self, self.longname))
+end
+
+--- Print a counter register unless its accumulator value is 0.
+function Register:printrc ()
+   if self() > 0 then
+      io.write(("%40s (%16s) %s\n"):format(self, lib.comma_value(self()), self.longname))
+   end
+end
+
 --- Register objects are "callable" as functions for convenience:
 ---     reg()      <=> reg:read()
 ---     reg(value) <=> reg:write(value)
@@ -65,12 +77,15 @@ end
 
 --- Metatables for the three different types of register
 local mt = {
-  RO = {__index = { read=Register.read, wait=Register.wait, reset=Register.noop},
+  RO = {__index = { read=Register.read, wait=Register.wait,
+                    reset=Register.noop, print=Register.print},
         __call = Register.read, __tostring = Register.__tostring},
   RW = {__index = { read=Register.read, write=Register.write, wait=Register.wait,
-                    set=Register.set, clr=Register.clr, reset=Register.noop},
+                    set=Register.set, clr=Register.clr, reset=Register.noop,
+                    print=Register.print},
         __call = Register.__call, __tostring = Register.__tostring},
-  RC = {__index = { read=Register.readrc, reset=Register.reset},
+  RC = {__index = { read=Register.readrc, reset=Register.reset,
+                    print=Register.printrc},
         __call = Register.readrc, __tostring = Register.__tostring},
 }
 
@@ -131,7 +146,7 @@ end
 --- The register objects become named entries in `table`.
 ---
 --- This is an example line for a register description:
----     TXDCTL    0x06028 +0x40*0..127 (RW) Transmit Descriptor Control
+---     TXDCTL    0x06028 +0x40*0..127 RW Transmit Descriptor Control
 ---
 --- and this is the grammar:
 ---     Register   ::= Name Offset Indexing Mode Longname
@@ -180,24 +195,20 @@ end
 
 
 -- Print a pretty-printed register dump for a table of register objects.
-function dump (tab, iscounters)
+function dump (tab)
 --   print "Register dump:"
    local strings = {}
    for _,reg in pairs(tab) do
-      if type(reg)=='table' and (iscounters == nil or is_array(reg) or reg() > 0) then
+      if type(reg)=='table' then
          table.insert(strings, reg)
       end
    end
    table.sort(strings, function(a,b) return a.name < b.name end)
    for _,reg in ipairs(strings) do
       if is_array(reg) then
-         dump(reg, iscounters)
+         dump(reg)
       else
-         if iscounters then
-            io.write(("%40s %16s %s\n"):format(reg.name, lib.comma_value(reg()), reg.longname))
-         else
-            io.write(("%40s %s\n"):format(reg, reg.longname))
-         end
+         reg:print()
       end
    end
 end

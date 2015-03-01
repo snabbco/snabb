@@ -28,9 +28,6 @@ end
 function Intel82599:new (arg)
    local conf = config.parse_app_arg(arg)
 
-   -- Unbind PCI device form linux.
-   pci.unbind_device_from_linux(conf.pciaddr)
-
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
          devices[conf.pciaddr] = {pf=intel10g.new_pf(conf.pciaddr):open(), vflist={}}
@@ -115,7 +112,7 @@ end
 -- Report on relevant status and statistics.
 function Intel82599:report ()
    print("report on intel device", self.dev.pciaddress or self.dev.pf.pciaddress)
-   register.dump(self.dev.s, true)
+   register.dump(self.dev.s)
    if self.dev.rxstats then
       for name,v in pairs(self.dev:get_rxstats()) do
          io.write(string.format('%30s: %d\n', 'rx '..name, v))
