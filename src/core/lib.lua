@@ -2,6 +2,7 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
+local getopt = require("lib.lua.alt_getopt")
 require("core.clib_h")
 
 -- Returns true if x and y are structurally similar (isomorphic).
@@ -385,6 +386,38 @@ else
 end
 ntohl = htonl
 ntohs = htons
+
+-- Process ARGS using ACTIONS with getopt OPTS/LONG_OPTS.
+-- Return the remaining unprocessed arguments.
+function dogetopt (args, actions, opts, long_opts)
+   local opts,optind,optarg = getopt.get_ordered_opts(args, opts, long_opts)
+   for i, v in ipairs(opts) do
+      if actions[v] then 
+	 actions[v](optarg[i]) 
+      else
+	 error("unimplemented option: " .. v) 
+      end
+   end
+   local rest = {}
+   for i = optind, #args do table.insert(rest, args[i]) end
+   return rest
+end
+
+-- based on http://stackoverflow.com/a/15434737/1523491
+function have_module (name)
+   if package.loaded[name] then
+      return true
+   else
+      for _, searcher in ipairs(package.loaders) do
+	 local loader = searcher(name)
+	 if type(loader) == 'function' then
+	    package.preload[name] = loader
+	    return true
+	 end
+      end
+      return false
+   end
+end
 
 function selftest ()
    print("selftest: lib")

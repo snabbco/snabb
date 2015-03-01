@@ -7,7 +7,11 @@ package.path = ''
 local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
 local zone = require("jit.zone")
+local lib = require("core.lib")
 local C   = ffi.C
+-- Load ljsyscall early to help detect conflicts
+-- (e.g. FFI type name conflict between Snabb and ljsyscall)
+require("syscall")
 
 require("lib.lua.strict")
 require("lib.lua.class")
@@ -22,137 +26,54 @@ ffi.cdef[[
       extern char** argv;
 ]]
 
-local usage = [[
-Usage: snabb [options] <module> [args...]
-Available options are:
--P pathspec           Set library load path (Lua 'package.path').
--e chunk              Execute string 'chunk'.
--l name               Require library 'name'.
--t name               Test module 'name' with selftest().
--R                    Start interactive Snabb REPL.
--dm                   Enable developer mode. Enables debug prints and asserts.
--d                    Debug unhandled errors with the Lua interactive debugger.
--S                    Print enhanced stack traces with more debug information.
--jv file              Prints verbose information about the the JIT compiler to 'file'.
--jp                   Profile with the LuaJIT statistical profiler.
--jp=args[,.output]    Profile to 'file'. 
--jdump                Trace JIT decisions (Requires LuaJIT jit.* library).
--jdump=args[,.output] Trace JIT decisions to 'file'.
-]]
-
 _G.developer_debug = false
 debug_on_error = false
-profiling = false
-start_repl = false
-
--- List of parameters passed on the command line.
-parameters = {}
 
 function main ()
    zone("startup")
    require "lib.lua.strict"
    initialize()
-   local args = command_line_args()
-   if #args == 0 then
-      print(usage)
+   local program, args = parse_command_line()
+   parameters = args
+   if not program then
+      print("Usage: snabb <PROGRAM> [ARGS]...")
       os.exit(1)
    end
-   local i = 1
-   while i <= #args do
-      if args[i] == '-P' and i < #args then
-         package.path = args[i+1]
-         i = i + 2
-      elseif args[i] == '-l' and i < #args then
-         require(args[i+1])
-         i = i + 2
-      elseif args[i] == '-t' and i < #args then
-         zone("selftest")  require(args[i+1]).selftest()  zone()
-         i = i + 2
-      elseif args[i] == '-e' and i < #args then
-         local thunk, error = loadstring(args[i+1])
-         if thunk then thunk() else print(error) end
-         i = i + 2
-      elseif args[i] == '-dm' then
-         _G.developer_debug = true
-         i = i + 1
-      elseif args[i] == '-d' then
-         debug_on_error = true
-         i = i + 1
-      elseif args[i] == '-S' then
-         debug.traceback = STP.stacktrace
-         i = i + 1
-      elseif (args[i]):match("-jp") then
-         local pargs, poutput = (args[i]):gmatch("-jp=([^,]*),?(.*)")()
-         if poutput == '' then poutput = nil end
-         require("jit.p").start(pargs, poutput)
-         profiling = true
-         i = i + 1
-      elseif (args[i]):match("-jdump") then
-         local args, output = (args[i]):gmatch("-jdump=([^,]*),?(.*)")()
-         if output == '' then output = nil end
-         require("jit.dump").start(args, output)
-         i = i + 1
-      elseif args[i] == '-jv' and i < #args then
-         local jit_verbose = require 'jit.v'
-         jit_verbose.start(args[i+1])
-         i = i + 2
-      elseif args[i] == '-R' then
-         start_repl = true
-         i = i + 1
-      elseif i <= #args then
-         -- Syntax: <script> [args...]
-         local module = args[i]
-         i = i + 1
-         while i <= #args do
-            table.insert(parameters, args[i])
-            i = i + 1
-         end
-         zone("module "..module)
-         dofile(module)
-         exit(0)
-      else
-         print(usage)
-         os.exit(1)
-      end
+   if not lib.have_module(modulename(program)) then
+      print(programname(program) .. ": unrecognized program name")
+      os.exit(1)
    end
-   if start_repl then
-      zone("REPL")
-      repl()
+   require(modulename(program)).run(parameters)
+end
+
+-- programname("nfv-sync-master.2.0") => "nfv-sync-master"
+function programname (program) 
+   return string.match(program, "([^/]+)$")
+end
+-- modulename("nfv-sync-master.2.0") => "program.nfv.nfv_sync_master")
+function modulename (program) 
+   program = programname(string.gsub(program, "-", "_"))
+   return ("program.%s.%s"):format(program, program)
+end
+
+-- Return two values: program and parameters.
+--
+-- Program is the name of the program to run. For example 'snsh' or
+-- 'packetblaster'.
+function parse_command_line ()
+   local commandline = {}
+   for i = 0, C.argc - 1 do 
+      table.insert(commandline, ffi.string(C.argv[i]))
    end
-   exit(0)
+   local program = table.remove(commandline, 1)
+   if programname(program) == 'snabb' then
+      program = table.remove(commandline, 1)      
+   end
+   return program, commandline
 end
 
 function exit (status)
-   if profiling then require("jit.p").stop() end
    os.exit(status)
-end
-
--- This is a simple REPL similar to LuaJIT's built-in REPL. It can only
--- read single-line statements but does support the `=<expr>' syntax.
-function repl ()
-   local line = nil
-   local function eval_line ()
-      if line:sub(0,1) == "=" then
-         -- Evaluate line as expression.
-         print(loadstring("return "..line:sub(2))())
-      else
-         -- Evaluate line as statement
-         local load = loadstring(line)
-         if load then load() end
-      end
-   end
-   repeat
-      io.stdout:write("Snabb> ")
-      io.stdout:flush()
-      line = io.stdin:read("*l")
-      if line then
-         local status, err = pcall(eval_line)
-         if not status then
-            io.stdout:write(("Error in %s\n"):format(err))
-         end
-         io.stdout:flush()
-      end
-   until not line
 end
 
 --- Globally initialize some things. Module can depend on this being done.
@@ -172,14 +93,6 @@ function initialize ()
    _G.packet = require("core.packet")
    _G.timer  = require("core.timer")
    _G.main   = getfenv()
-end
-
-function command_line_args()
-   local args = {}
-   for i = 1, C.argc - 1 do
-      args[i] = ffi.string(C.argv[i])
-   end
-   return args
 end
 
 function handler (reason)
