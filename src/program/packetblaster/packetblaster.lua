@@ -13,7 +13,7 @@ local ffi = require("ffi")
 local C = ffi.C
 
 function run (args)
-   if #args < 2 then
+   if #args < 3 or table.remove(args, 1) ~= 'replay' then
       print(require("program.packetblaster.README_inc"))
       os.exit(1)
    end

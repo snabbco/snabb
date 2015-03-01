@@ -1,9 +1,9 @@
-Usage: packetblaster <PCAP-FILE> <PCI>...
+Usage: packetblaster replay <PCAP-FILE> <PCI>...
 
 Transmit packets from PCAP-FILE continuously to one or more network
 adapters. The PCI arguments are Lua pattern strings that are used to
 match the network adapters to use.
 
 Examples:
-  packetblaster myfile.cap 0000:01:00.0
-  packetblaster myfile.cap 01:00
+  packetblaster replay myfile.cap 0000:01:00.0
+  packetblaster replay myfile.cap 01:00
