@@ -4,6 +4,11 @@ E= @echo
 #Q=
 #E= @:
 
+# Required submodule versions.
+# Defined here to detect version mismatches at build time.
+LUAJIT_VSN    := "v2.0.3-328-g04dc64b"
+LJSYSCALL_VSN := "v0.10-65-g7081d97"
+
 TEST_SKIPPED="43"
 
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
@@ -42,7 +47,27 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ)
+snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
+	$(E) "SUBMODULES"
+	@if grep -vqF $(LUAJIT_VSN)    ../deps/luajit.vsn || \
+	    grep -vqF $(LJSYSCALL_VSN) ../deps/ljsyscall.vsn; then \
+	    echo "Error: Submodule version mismatch"			>&2; \
+	    echo "luajit:"						>&2; \
+	    echo "  require: $(LUAJIT_VSN)"				>&2; \
+	    echo "  found:   $(shell cat ../deps/luajit.vsn)"		>&2; \
+	    echo "ljsyscall:"						>&2; \
+	    echo "  require: $(LJSYSCALL_VSN)"				>&2; \
+	    echo "  found:   $(shell cat ../deps/ljsyscall.vsn) "	>&2; \
+	    echo "Please update and rebuild submodules."		>&2; \
+	    echo ""							>&2; \
+	    echo "Cheat sheet:"						>&2; \
+	    echo "  cd snabbswitch"					>&2; \
+	    echo "  git submodule update"				>&2; \
+	    echo "  make clean"						>&2; \
+	    echo "  make -j"						>&2; \
+	    echo ""							>&2; \
+	    exit 1; \
+	 fi
 	$(E) "LINK      $@"
 	$(Q) gcc -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
