@@ -59,7 +59,7 @@ end
 -- Return two values: program and parameters.
 --
 -- Program is the name of the program to run. For example 'snsh' or
--- 'loadgen'.
+-- 'packetblaster'.
 function parse_command_line ()
    local commandline = {}
    for i = 0, C.argc - 1 do 

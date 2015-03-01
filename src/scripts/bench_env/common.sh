@@ -204,8 +204,8 @@ else
     exit 1
 fi
 
-if [ -f $SNABB_PATH/designs/loadgen/loadgen ]; then
-    export LOADGEN=$SNABB_PATH/designs/loadgen/loadgen
+if [ -f $SNABB_PATH/snabb ]; then
+    export LOADGEN="$SNABB_PATH/snabb packetblaster replay"
 else
     printf "LOADGEN design not found\n"
     exit 1
