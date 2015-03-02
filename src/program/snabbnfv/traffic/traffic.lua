@@ -3,6 +3,8 @@ module(..., package.seeall)
 local lib = require("core.lib")
 local nfvconfig = require("program.snabbnfv.nfvconfig")
 local usage = require("program.snabbnfv.traffic.README_inc")
+local ffi = require("ffi")
+local C = ffi.C
 
 local long_opts = {
    benchmark = "B"
