@@ -9,7 +9,6 @@ local link      = require("core.link")
 local memory    = require("core.memory")
 local packet    = require("core.packet")
 local timer     = require("core.timer")
-local tlb       = require("lib.tlb")
 local vq        = require("lib.virtio.virtq")
 local ffi       = require("ffi")
 local C         = ffi.C
