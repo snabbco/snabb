@@ -73,6 +73,8 @@ function stop_bench_env {
 
     # Clean up temporary config location.
     rm -f "$TESTCONFPATH"
+
+    exit
 }
 
 # Set up graceful `exit'.
