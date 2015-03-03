@@ -43,14 +43,17 @@
 -- ports to limit the scope of flooding.
 
 module(..., package.seeall)
+local config = require("core.config")
 
-local bridge = subClass(nil)
+bridge = subClass(nil)
 bridge._name = "base bridge"
 
-function bridge:new (config)
+function bridge:new (arg)
    assert(self ~= bridge, "Can't instantiate abstract class "..self:name())
    local o = bridge:superClass().new(self)
-   assert(config and config.ports, self:name()..": invalid configuration")
+   local conf = arg and config.parse_app_arg(arg) or {}
+   assert(conf.ports, self._name..": invalid configuration")
+   o._conf = conf
 
    -- Create a list of forwarding ports for all ports connected to the
    -- bridge, taking split horizon groups into account
@@ -60,11 +63,11 @@ function bridge:new (config)
 	     self:name()..": duplicate definition of port "..port)
       ports[port] = group
    end
-   for _, port in ipairs(config.ports) do
+   for _, port in ipairs(conf.ports) do
       add_port(port, '')
    end
-   if config.split_horizon_groups then
-      for group, ports in pairs(config.split_horizon_groups) do
+   if conf.split_horizon_groups then
+      for group, ports in pairs(conf.split_horizon_groups) do
 	 for _, port in ipairs(ports) do
 	    add_port(port, group)
 	 end
@@ -84,5 +87,3 @@ function bridge:new (config)
    o._dst_ports = dst_ports
    return o
 end
-
-return bridge

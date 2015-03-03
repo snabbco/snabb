@@ -16,7 +16,7 @@ local icmp = require("lib.protocol.icmp.header")
 local ns = require("lib.protocol.icmp.nd.ns")
 local filter = require("lib.pcap.filter")
 
-local ns_responder = subClass(nil)
+ns_responder = subClass(nil)
 ns_responder._name = "ipv6 neighbor solicitation responder"
 
 function ns_responder:new(config)
@@ -34,8 +34,7 @@ function ns_responder:new(config)
 end
 
 local function process (self, p)
-   local iov = p.iovecs[0]
-   if not self._filter:match(iov.buffer.pointer + iov.offset, iov.length) then
+   if not self._filter:match(packet.data(p), packet.length(p)) then
       return false
    end
    local dgram = self._dgram:reuse(p, ethernet)
