@@ -203,5 +203,5 @@ mrproper: clean
 	$(E) "RM        $(RMOBJS)"
 	$(Q)-rm -rf $(RMOBJS)
 
-.PHONY: clean $(TESTMODS)
+.PHONY: clean $(TESTMODS) $(TESTSCRIPTS)
 

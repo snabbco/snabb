@@ -26,7 +26,7 @@ PacketFilter, RateLimiter, nd_light and SimpleKeyedTunnel):
 	      rx_police_gbps = <n>,           -- Allowed input rate in Gbps
 	      tx_police_gbps = <n> }          -- Allowed output rate in Gbps
 
-The `tunnel` section deviates a little from `SimpleKeyedTunnel`'s
+The tunnel section deviates a little from SimpleKeyedTunnel's
 terminology:
 
     tunnel := { type          = "L2TPv3",     -- The only type (for now)

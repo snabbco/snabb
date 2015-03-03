@@ -73,6 +73,8 @@ function stop_bench_env {
 
     # Clean up temporary config location.
     rm -f "$TESTCONFPATH"
+
+    exit
 }
 
 # Set up graceful `exit'.
@@ -198,7 +200,7 @@ function same_vlan_tests {
 }
 
 function rate_limited_tests {
-    load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/rate_limit.ports
+    load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/tx_rate_limit.ports
 
     test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
     test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 900 1000
@@ -208,7 +210,7 @@ function rate_limited_tests {
 #    test_checksum $TELNET_PORT0
 #    test_checksum $TELNET_PORT1
 
-    load_config test_fixtures/nfvconfig/test_functions/rx_rate_limit.ports
+    load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/rx_rate_limit.ports
 
     test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
     test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 1200 1000

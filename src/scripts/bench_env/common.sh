@@ -97,7 +97,7 @@ run_nfv () {
     fi
 
     numactl $NUMA \
-        $SNABB ${NFV?} $NFV_PCI ${CONFIG?} $NFV_SOCKET ${NFV_PACKETS?} \
+        $SNABB ${NFV?} ${NFV_PACKETS?} $NFV_PCI ${CONFIG?} $NFV_SOCKET \
         > $LOG 2>&1 &
 
     SNABBPIDS="$SNABBPIDS $!"
@@ -197,15 +197,15 @@ fi
 # detect designs
 printf "SNABB=$SNABB\n"
 SNABB_PATH=$(dirname $SNABB)
-if [ -f $SNABB_PATH/designs/neutron/snabbnfv-bench ]; then
-    export NFV=$SNABB_PATH/designs/neutron/snabbnfv-bench
+if [ -f $SNABB_PATH/snabb ]; then
+    export NFV="snabbnfv traffic -B"
 else
     printf "NFV design not found\n"
     exit 1
 fi
 
 if [ -f $SNABB_PATH/snabb ]; then
-    export LOADGEN="$SNABB_PATH/snabb packetblaster replay"
+    export LOADGEN="packetblaster replay"
 else
     printf "LOADGEN design not found\n"
     exit 1

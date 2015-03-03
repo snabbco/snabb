@@ -1,23 +1,13 @@
-The `lib.nfv.config` module implements a
-[Network Functions Virtualization](https://en.wikipedia.org/wiki/Network_Functions_Virtualization)
-component based on Snabb Switch. It introduces a simple configuration file
-format to describe NFV configurations which it then compiles to app
-networks. This NFV component is compatible with
-[OpenStack Neutron](https://wiki.openstack.org/wiki/Neutron).
+### NFV config (program.snabbnfv.nfvconfig)
 
-    DIAGRAM: NFV
-    +------+
-    |{d}   |
-    | NFV  |         /---------\
-    | conf |         | App     |
-    +------+    /--->| network |
-       |        |    \-=-------/
-       :        :
-       v        |
-    +----------------+
-    |{io}            |
-    | lib.nfv.config |
-    +----------------+
+The `program.snabbnfv.nfvconfig` module implements a [Network Functions
+Virtualization](https://en.wikipedia.org/wiki/Network_Functions_Virtualization)
+component based on Snabb Switch. It introduces a simple configuration
+file format to describe NFV configurations which it then compiles to app
+networks. This NFV component is compatible with [OpenStack
+Neutron](https://wiki.openstack.org/wiki/Neutron).
+
+![NFV](.images/NFV.png)
 
 — Function **nfvconfig.load** *file*, *pci_address*, *socket_path*
 
@@ -31,10 +21,11 @@ Loads the NFV configuration from *file* and compiles an app network using
 Configures the engine to use *config* and assign *zerocopy* pairs. Uses
 `engine.configure()` internally.
 
-### NFV Configuration Format
+#### NFV Configuration Format
 
-The configuration file format understood by `lib.nfv.config` is based on
-*Lua expressions*. Initially, it contains a list of NFV *ports*:
+The configuration file format understood by `program.snabbnfv.nfvconfig`
+is based on *Lua expressions*. Initially, it contains a list of NFV
+*ports*:
 
 ```
 return { <port-1>, ..., <port-n> }
@@ -68,31 +59,31 @@ tunnel := { type          = "L2TPv3",     -- The only type (for now)
             session       = <32bit-int>   -- ~ `session_id' }
 ```
 
-### snabbnfv-traffic
+### snabbnfv traffic
 
-The `snabbnfv-traffic` design (in `designs/neutron`) loads and runs a
-NFV configuration using `lib.nfv.config`. It can be invoked like so:
+The `snabbnfv traffic` program loads and runs a NFV configuration using
+`program.snabbnfv.nfvconfig`. It can be invoked like so:
 
 ```
-snabbnfv-traffic <file> <pci-address> <socket-path>
+./snabb snabbnfv traffic <file> <pci-address> <socket-path>
 ```
 
-`snabbnfv-traffic` runs the loaded configuration indefinitely and
+`snabbnfv traffic` runs the loaded configuration indefinitely and
 automatically reloads the configuration file if it changes (at most once
 every second).
 
-### neutron2snabb
+### snabbnfv neutron2snabb
 
-The `neutron2snabb` design (in `designs/neutron`) converts Neutron
-database CSV dumps to the format used by `lib.nfv.config`. For more info
-see [Snabb NFV Architecture](https://github.com/SnabbCo/snabb-nfv/wiki/Architecture).
+The `snabbnfv neutron2snabb` program converts Neutron database CSV dumps
+to the format used by `program.snabbnfv.nfvconfig`. For more info see
+[Snabb NFV Architecture](https://github.com/SnabbCo/snabb-nfv/wiki/Architecture).
 It can be invoked like so:
 
 ```
-neutron2snabb <csv-directory> <output-directory> [<hostname>]
+./snabb snabbnfv neutron2snabb <csv-directory> <output-directory> [<hostname>]
 ```
 
-`neutron2snabb` reads the Neutron configuration *csv-directory* and
-translates them to one `lib.nfv.conig` configuration file per physical
-network. If *hostname* is given, it overrides the hostname provided by
-`hostname.1`.
+`snabbnfv neutron2snabb` reads the Neutron configuration *csv-directory*
+and translates them to one `lib.nfv.conig` configuration file per
+physical network. If *hostname* is given, it overrides the hostname
+provided by `hostname.1`.
