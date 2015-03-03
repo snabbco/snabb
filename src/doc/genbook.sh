@@ -59,9 +59,9 @@ $(cat ../lib/hardware/README.md)
 
 $(cat ../lib/protocol/README.md)
 
-## NFV Config (lib.nfv.config)
+## Snabb NFV
 
-$(cat ../lib/nfv/README.md)
+$(cat ../program/snabbnfv/README.md)
 
 ## Watchdog (lib.watchdog.watchdog)
 
