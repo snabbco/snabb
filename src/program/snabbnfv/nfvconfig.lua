@@ -103,14 +103,14 @@ function selftest ()
       os.exit(engine.test_skipped_code)
    end
    engine.log = true
-   for i, confpath in ipairs({"test_fixtures/nfvconfig/switch_nic/x",
-                              "test_fixtures/nfvconfig/switch_filter/x",
-                              "test_fixtures/nfvconfig/switch_qos/x",
-                              "test_fixtures/nfvconfig/switch_tunnel/x",
-                              "test_fixtures/nfvconfig/scale_up/y",
-                              "test_fixtures/nfvconfig/scale_up/x",
-                              "test_fixtures/nfvconfig/scale_change/x",
-                              "test_fixtures/nfvconfig/scale_change/y"})
+   for i, confpath in ipairs({"program/snabbnfv/test_fixtures/nfvconfig/switch_nic/x",
+                              "program/snabbnfv/test_fixtures/nfvconfig/switch_filter/x",
+                              "program/snabbnfv/test_fixtures/nfvconfig/switch_qos/x",
+                              "program/snabbnfv/test_fixtures/nfvconfig/switch_tunnel/x",
+                              "program/snabbnfv/test_fixtures/nfvconfig/scale_up/y",
+                              "program/snabbnfv/test_fixtures/nfvconfig/scale_up/x",
+                              "program/snabbnfv/test_fixtures/nfvconfig/scale_change/x",
+                              "program/snabbnfv/test_fixtures/nfvconfig/scale_change/y"})
    do
       print("testing:", confpath)
       apply(load(confpath, pcideva, "/dev/null"))
