@@ -51,10 +51,13 @@ local function with_restart (app, method)
 end
 
 -- Restart dead apps.
+local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
 function restart_dead_apps ()
+   if not use_restart then return end
    local restart_delay = 2 -- seconds
-   local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
    local restart = false
+   actions.restart[1] = nil
+   actions.keep[1] = nil
 
    -- Collect 'restart' actions for dead apps and log their errors.
    for i = 1, #app_array do
