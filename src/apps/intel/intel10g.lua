@@ -323,7 +323,7 @@ local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21, eop=24}
 function M_sf:transmit (p)
    keep_offload_ctx(self, p)
    self.txdesc[self.tdt].address = memory.virtual_to_physical(p.data)
-   self.txdesc[self.tdt].options = bor(p.length, txdesc_flags, lshift(p.length+0ULL, 46))
+   self.txdesc[self.tdt].options = bor(p.length, txdesc_flags, self.offloadflags, lshift(p.length+0ULL, 46))
    self.txpackets[self.tdt] = p
    self.tdt = band(self.tdt + 1, num_descriptors - 1)
 end
@@ -335,7 +335,9 @@ function M_sf:sync_transmit ()
    -- Release processed buffers
    if old_tdh ~= self.tdh then
       while old_tdh ~= self.tdh do
-         packet.free(self.txpackets[old_tdh])
+         if self.txpackets[old_tdh] ~= nil then
+            packet.free(self.txpackets[old_tdh])
+         end
          self.txpackets[old_tdh] = nil
          old_tdh = band(old_tdh + 1, num_descriptors - 1)
       end
