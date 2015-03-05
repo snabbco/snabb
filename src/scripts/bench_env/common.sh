@@ -31,7 +31,7 @@ run_qemu () {
             -M pc -smp $SMP -cpu host --enable-kvm \
             -serial telnet:localhost:$TELNETPORT,server,nowait \
             -drive if=virtio,file=$IMG \
-            -nographic > /dev/null 2>&1 &
+            -nographic > /tmp/bench-env-qemu.${TELNETPORT} 2>&1 &
     QEMUPIDS="$QEMUPIDS $!"
 }
 
