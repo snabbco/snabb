@@ -20,7 +20,7 @@ GUESTS="2"
 export NFV_PCI=${NFV_PCI0?}
 numactl --cpunodebind=${NODE_BIND0?} --membind=${NODE_BIND0?} \
     $SNABB snabbnfv traffic ${NFV_PCI0?} ${1?} vhost_%s.sock \
-    > ${SNABB_LOG0?} 2>&1 &
+    > /tmp/bench-env-traffic.${NFV_PCI0?} 2>&1 &
 SNABB_PID0=$!
 
 # Execute QEMU on the same node
