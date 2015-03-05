@@ -372,6 +372,15 @@ function M_sf:receive ()
    p.length = wb.pkt_len
    self.rxpackets[self.rxnext] = nil
    self.rxnext = band(self.rxnext + 1, num_descriptors - 1)
+
+   p.flags = 0
+   local checksdone = band(wb.xstatus_xerror, 0x60)  -- which checks have been done? (IPv4, L4)
+   if checksdone ~= 0 then
+      checksdone = lshift(checksdone, 24)            -- shift to errors area
+      if band(wb.xstatus_xerror, checksdone) == 0 then
+         p.flags = bor(p.flags, C.PACKET_CSUM_VALID)
+      end
+   end
    return p
 end
 
