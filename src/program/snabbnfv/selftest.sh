@@ -158,7 +158,7 @@ function test_checksum {
 function test_iperf {
     run_telnet $2 "nohup iperf -d -s -V &" >/dev/null
     sleep 2
-    run_telnet $1 "iperf -c $3 -V" 20 \
+    run_telnet $1 "iperf -c $3 -f g -V" 20 \
         | grep "s/sec"
     assert IPERF $?
 }
@@ -266,6 +266,18 @@ function filter_tests {
     assert FILTER $?
 }
 
+# Usage: iperf_bench
+# Run iperf benchmark.
+function iperf_bench {
+    load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports    
+
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" \
+        2>&1 >/dev/null
+    Gbits=$(test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" \
+        | egrep -o '[0-9\.]+ Gbits/sec' | cut -d " " -f 1)
+    echo IPERF-JUMBO "$Gbits"
+}
+
 # Usage: fuzz_tests <n>
 # Generate and test (IPERF) <n> semi-random NFV configurations.
 function fuzz_tests {
@@ -281,10 +293,19 @@ function fuzz_tests {
 load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/other_vlan.ports
 start_bench_env
 
-same_vlan_tests
-rate_limited_tests
-tunnel_tests
-filter_tests
-#fuzz_tests 100
+# Decide which mode to run (`test', `bench' or `fuzz').
+case $1 in
+    bench)
+        iperf_bench
+        ;;
+    fuzz)
+        fuzz_tests "$2"
+        ;;
+    *)
+        same_vlan_tests
+        rate_limited_tests
+        tunnel_tests
+        filter_tests
+esac
 
 exit 0
