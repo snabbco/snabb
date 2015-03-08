@@ -82,7 +82,7 @@ function SolarFlareNic:flush_receives(id)
 end
 
 function SolarFlareNic:enqueue_transmit(p)
-   assert(not self.tx_packets[self.tx_id], "tx buffer overrun")
+   assert(self.tx_packets[self.tx_id] == nil, "tx buffer overrun")
    self.tx_packets[self.tx_id] = p
    try(ciul.ef_vi_transmit_init(self.ef_vi_p,
                                 memory.virtual_to_physical(p.data),
@@ -186,14 +186,15 @@ function SolarFlareNic:open()
    self.stats = {}
 
    -- set up receive buffers
-   self.rxpackets = {}
+   self.rxpackets = ffi.new("struct packet *[?]", RECEIVE_BUFFER_COUNT + 1)
    for id = 1, RECEIVE_BUFFER_COUNT do
       self.enqueue_receive(self, id)
    end
    self.flush_receives(self)
 
    -- set up transmit variables
-   self.tx_packets = {}
+   self.tx_packets = ffi.new("struct packet *[?]", TX_BUFFER_COUNT + 1)
+   ffi.fill(self.tx_packets, ffi.sizeof(self.tx_packets), 0)
    self.tx_id = 0
    self.tx_space = TX_BUFFER_COUNT
 
@@ -235,11 +236,10 @@ function SolarFlareNic:pull()
       local n_ev = self.poll_structure.n_ev
       if n_ev > 0 then
          for i = 0, n_ev - 1 do
-            local event = self.poll_structure.events[i]
-            local event_type = event.generic.type
+            local event_type = self.poll_structure.events[i].generic.type
             if event_type == C.EF_EVENT_TYPE_RX then
-               local rxpacket = self.rxpackets[event.rx.rq_id]
-               rxpacket.length = event.rx.len
+               local rxpacket = self.rxpackets[self.poll_structure.events[i].rx.rq_id]
+               rxpacket.length = self.poll_structure.events[i].rx.len
                self.stats.rx = (self.stats.rx or 0) + 1
                if not link.full(self.output.tx) then
                   link.transmit(self.output.tx, rxpacket)
@@ -247,14 +247,14 @@ function SolarFlareNic:pull()
                   self.stats.link_full = (self.stats.link_full or 0) + 1
                   packet.free(rxpacket)
                end
-               self.enqueue_receive(self, event.rx.rq_id)
+               self.enqueue_receive(self, self.poll_structure.events[i].rx.rq_id)
             elseif event_type == C.EF_EVENT_TYPE_TX then
                local n_tx_done = self.poll_structure.unbundled_tx_request_ids[i].n_tx_done
-               local tx_request_ids = self.poll_structure.unbundled_tx_request_ids[i].tx_request_ids
                self.stats.txpackets = (self.stats.txpackets or 0) + n_tx_done
-               for i = 0, (n_tx_done - 1) do
-                  packet.free(self.tx_packets[tx_request_ids[i]])
-                  self.tx_packets[tx_request_ids[i]] = nil
+               for j = 0, (n_tx_done - 1) do
+                  local id = self.poll_structure.unbundled_tx_request_ids[i].tx_request_ids[j]
+                  packet.free(self.tx_packets[id])
+                  self.tx_packets[id] = nil
                end
                self.tx_space = self.tx_space + n_tx_done
             elseif event_type == C.EF_EVENT_TYPE_TX_ERROR then
