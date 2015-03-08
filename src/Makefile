@@ -4,6 +4,11 @@ E= @echo
 #Q=
 #E= @:
 
+# Required submodule versions.
+# Defined here to detect version mismatches at build time.
+LUAJIT_VSN    := "v2.0.3-328-g04dc64b"
+LJSYSCALL_VSN := "v0.10-65-g7081d97"
+
 TEST_SKIPPED="43"
 
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
@@ -14,6 +19,9 @@ CSRC   = $(shell find . -regex '[^\#]*\.c'   -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h'   -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
 RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
+# regexp is to include program/foo but not program/foo/bar
+PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
+INCSRC = $(shell find . -regex '[^\#]*\.inc' -printf '%P ')
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
@@ -22,6 +30,8 @@ ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
+INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
+EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
 # TESTMODS expands to:
 #   core.memory core.lib ...
@@ -37,18 +47,42 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-all: snabb
-
-markdown: $(RMOBJS)
-
-snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ)
+snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
+	$(E) "SUBMODULES"
+	@if grep -vqF $(LUAJIT_VSN)    ../deps/luajit.vsn || \
+	    grep -vqF $(LJSYSCALL_VSN) ../deps/ljsyscall.vsn; then \
+	    echo "Error: Submodule version mismatch"			>&2; \
+	    echo "luajit:"						>&2; \
+	    echo "  require: $(LUAJIT_VSN)"				>&2; \
+	    echo "  found:   $(shell cat ../deps/luajit.vsn)"		>&2; \
+	    echo "ljsyscall:"						>&2; \
+	    echo "  require: $(LJSYSCALL_VSN)"				>&2; \
+	    echo "  found:   $(shell cat ../deps/ljsyscall.vsn) "	>&2; \
+	    echo "Please update and rebuild submodules."		>&2; \
+	    echo ""							>&2; \
+	    echo "Cheat sheet:"						>&2; \
+	    echo "  cd snabbswitch"					>&2; \
+	    echo "  git submodule update"				>&2; \
+	    echo "  make clean"						>&2; \
+	    echo "  make -j"						>&2; \
+	    echo ""							>&2; \
+	    exit 1; \
+	 fi
 	$(E) "LINK      $@"
 	$(Q) gcc $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
-	    -lc -ldl -lm -lrt -lpthread
-	@echo -n "Firmware: "
+	    -lrt -lc -ldl -lm -lpthread
+	@echo -n "BINARY    "
 	@ln -fs snabb snabbswitch
 	@ls -sh snabb
+
+all: $(EXE)
+
+$(EXE): snabb
+	$(E) "PROGRAM   $@"
+	$(Q) install -D snabb $@
+
+markdown: $(RMOBJS)
 
 test: $(TESTMODS) $(TESTSCRIPTS)
 
@@ -58,7 +92,7 @@ test_ci: $(TESTMODS) $(TESTSCRIPTS)
 
 $(TESTMODS): testlog snabb
 	$(E) "TEST      $@"
-	$(Q) ./snabb -t $@ > testlog/$@ 2>&1 || ( \
+	$(Q) ./snabb snsh -t $@ > testlog/$@ 2>&1 || ( \
 		EXITCODE="$$?"; \
 		[ "$$EXITCODE" -eq $(TEST_SKIPPED) ] \
 		&& ( \
@@ -89,7 +123,7 @@ $(TESTSCRIPTS): testlog snabb
 		) \
 	)
 
-$(OBJDIR) testlog:
+$(OBJDIR) bin testlog:
 	$(E) "DIR       $@"
 	$(Q) mkdir -p $@
 
@@ -99,7 +133,7 @@ $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -c -Wall -Werror -o $@ $<
+	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"
@@ -121,6 +155,13 @@ $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
 $(RMOBJS): %: %.src
 	$(E) "MARKDOWN  $@"
 	$(Q) scripts/process-markdown $< > $@
+
+$(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
+	$(E) "INC       $@"
+	@(echo -n "return [=============["; \
+	 cat $<; \
+	 echo "]=============]") > $(basename $@).luainc
+	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
 
 # extra/ third party bits and pieces
 obj/strict.o: extra/strict.lua | $(OBJDIR)
@@ -152,7 +193,7 @@ doc/snabbswitch.epub: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
 	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
 
-CLEAN = snabb snabbswitch obj doc/snabbswitch.* doc/.images/* testlog
+CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog
 
 clean:
 	$(E) "RM        $(CLEAN)"
@@ -162,5 +203,5 @@ mrproper: clean
 	$(E) "RM        $(RMOBJS)"
 	$(Q)-rm -rf $(RMOBJS)
 
-.PHONY: clean $(TESTMODS)
+.PHONY: clean $(TESTMODS) $(TESTSCRIPTS)
 

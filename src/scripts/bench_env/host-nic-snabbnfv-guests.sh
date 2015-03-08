@@ -19,7 +19,7 @@ GUESTS="2"
 # Execute snabbswitch and pin it to the proper node (CPU and memory)
 export NFV_PCI=${NFV_PCI0?}
 numactl --cpunodebind=${NODE_BIND0?} --membind=${NODE_BIND0?} \
-    $SNABB designs/neutron/snabbnfv-traffic ${NFV_PCI0?} ${1?} vhost_%s.sock \
+    $SNABB snabbnfv traffic ${NFV_PCI0?} ${1?} vhost_%s.sock \
     > ${SNABB_LOG0?} 2>&1 &
 SNABB_PID0=$!
 

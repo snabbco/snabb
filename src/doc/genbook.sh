@@ -51,13 +51,17 @@ $(cat ../apps/socket/README.md)
 
 # Libraries
 
+## Hardware
+
+$(cat ../lib/hardware/README.md)
+
 ## Protocols
 
 $(cat ../lib/protocol/README.md)
 
-## NFV Config (lib.nfv.config)
+## Snabb NFV
 
-$(cat ../lib/nfv/README.md)
+$(cat ../program/snabbnfv/README.md)
 
 ## Watchdog (lib.watchdog.watchdog)
 

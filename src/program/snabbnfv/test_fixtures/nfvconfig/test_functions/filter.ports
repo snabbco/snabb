@@ -1,0 +1,20 @@
+return {
+  { vlan = 0,
+    mac_address = "52:54:00:00:00:00",
+    port_id = "A",
+    ingress_filter = nil,
+    gbps = nil,
+    tunnel = nil
+  },
+  { vlan = 0,
+    mac_address = "52:54:00:00:00:01",
+    port_id = "B",
+    ingress_filter = { rules = { { ethertype='ipv6',
+                                   protocol='icmp' },
+                                 { ethertype='ipv6',
+                                   protocol='tcp',
+                                   dest_port_min=12345 } } },
+    gbps = nil,
+    tunnel = nil
+  },
+}

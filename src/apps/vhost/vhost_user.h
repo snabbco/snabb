@@ -49,8 +49,8 @@ struct vhost_user_msg {
     union {
         uint64_t u64;
         // defined in vhost.h
-        struct vhost_vring_state state;
-        struct vhost_vring_addr addr;
+        struct vhostu_vring_state state;
+        struct vhostu_vring_addr addr;
         struct vhost_user_memory memory;
     };
 }__attribute__((packed));

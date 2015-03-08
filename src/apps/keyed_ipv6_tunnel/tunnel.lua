@@ -40,7 +40,6 @@ struct {
 ]]
 
 local HEADER_SIZE = ffi.sizeof(header_struct_ctype)
-print("HEADER_SIZE", HEADER_SIZE)
 
 local header_array_ctype = ffi.typeof("uint8_t[?]")
 local next_header_ctype = ffi.typeof("uint8_t*")

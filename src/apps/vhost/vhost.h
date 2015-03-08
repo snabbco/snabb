@@ -2,20 +2,24 @@
 // ranges we want to use for DMA. The kernel uses this to create a
 // shared memory mapping.
 
-struct vhost_memory_region {
+/*
+struct vhostu_memory_region {
   uint64_t guest_phys_addr;
   uint64_t memory_size;
   uint64_t userspace_addr;
   uint64_t flags_padding; // no flags currently specified
 };
+*/
 
 enum { VHOST_MEMORY_MAX_NREGIONS = 8 };
 
+/*
 struct vhost_memory {
   uint32_t nregions;
   uint32_t padding;
-  struct vhost_memory_region regions[VHOST_MEMORY_MAX_NREGIONS];
+  struct vhostu_memory_region regions[VHOST_MEMORY_MAX_NREGIONS];
 };
+*/
 
 // vhost is the top-level structure that the application allocates and
 // initializes to open a virtio/vhost network device.
@@ -41,9 +45,9 @@ struct vhost {
 // Below are structures imported from Linux headers.
 // This is purely to avoid a compile-time dependency on those headers,
 // which has been an problem on certain development machines.
-struct vhost_vring_state { unsigned int index, num; };
-struct vhost_vring_file { unsigned int index; int fd; };
-struct vhost_vring_addr {
+struct vhostu_vring_state { unsigned int index, num; };
+struct vhostu_vring_file { unsigned int index; int fd; };
+struct vhostu_vring_addr {
   unsigned int index, flags;
   uint64_t desc_user_addr, used_user_addr, avail_user_addr, log_guest_addr;
 };

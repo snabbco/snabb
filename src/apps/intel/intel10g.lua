@@ -51,6 +51,7 @@ end
 
 
 function M_sf:open ()
+   pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
    self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, self.base)
@@ -63,6 +64,7 @@ function M_sf:open ()
 end
 
 function M_sf:close()
+   pci.set_bus_master(self.pciaddress, false)
    if self.free_receive_buffers then
       self:free_receive_buffers()
    end
@@ -80,27 +82,16 @@ end
 --- See data sheet section 4.6.3 "Initialization Sequence."
 
 function M_sf:init ()
-   return self
-      :init_dma_memory()
-      :disable_interrupts()
-      :global_reset()
-      :wait_eeprom_autoread()
-      :wait_dma()
-      :init_statistics()
-      :init_receive()
-      :init_transmit()
-      :wait_enable()
-end
+   self :init_dma_memory()
 
-
-function M_sf:recheck()
+   self.redos = 0
    local mask = bits{Link_up=30}
-   if band(self.r.LINKS(), mask) == mask then
-      return self
-   else
-      return self
+   for i = 1, 100 do
+      self
          :disable_interrupts()
          :global_reset()
+      if i%5 == 0 then self:autonegotiate_sfi() end
+      self
          :wait_eeprom_autoread()
          :wait_dma()
          :init_statistics()
@@ -108,8 +99,17 @@ function M_sf:recheck()
          :init_transmit()
          :wait_enable()
          :wait_linkup()
+
+      if band(self.r.LINKS(), mask) == mask then
+         self.redos = i
+         return self
+      end
    end
+   io.write ('never got link up: ', self.pciaddress, '\n')
+   os.exit(2)
+   return self
 end
+
 
 do
    local _rx_pool = {}
@@ -123,6 +123,11 @@ do
       end
       local ptr, phy =
          memory.dma_alloc(num_descriptors * ffi.sizeof(ct))
+      -- Initialize unused DMA memory with -1. This is so that
+      -- accidental premature use of DMA memory will cause a DMA error
+      -- (write to illegal address) instead of overwriting physical
+      -- memory near address 0.
+      ffi.fill(ptr, 0xff, num_descriptors * ffi.sizeof(ct))
       ptr = lib.bounds_checked(ct, ptr, 0, num_descriptors)
       return ptr, phy
    end
@@ -261,8 +266,8 @@ function M_sf:discard_unsent_packets()
    self.r.TDT(self.tdh)
    while old_tdt ~= self.tdh do
       old_tdt = band(old_tdt - 1, num_descriptors - 1)
-      packet.deref(self.txpackets[old_tdt])
-      self.txdesc[old_tdt].address = 0
+      packet.free(self.txpackets[old_tdt])
+      self.txdesc[old_tdt].address = -1
       self.txdesc[old_tdt].options = 0
    end
    self.tdt = self.tdh
@@ -300,7 +305,7 @@ function M_sf:free_receive_buffers ()
    while self.rdt ~= self.rdh do
       self.rdt = band(self.rdt - 1, num_descriptors - 1)
       local desc = self.rxdesc[self.rdt].data
-      desc.address, desc.dd = 0, 0
+      desc.address, desc.dd = -1, 0
       packet.free(self.rxpackets[self.rdt])
       self.rxpackets[self.rdt] = nil
    end
@@ -316,14 +321,16 @@ function M_sf:sync_receive ()
 end
 
 function M_sf:wait_linkup ()
+   self.waitlu_ms = 0
    local mask = bits{Link_up=30}
-   for count = 1, 500 do
+   for count = 1, 250 do
       if band(self.r.LINKS(), mask) == mask then
+         self.waitlu_ms = count
          return self
       end
       C.usleep(1000)
    end
-   io.write ('never got link up: ', self.pciaddress, '\n')
+   self.waitlu_ms = 250
    return self
 end
 
@@ -420,6 +427,7 @@ function new_pf (pciaddress)
 end
 
 function M_pf:open ()
+   pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
    self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, self.base)
@@ -431,6 +439,7 @@ function M_pf:open ()
 end
 
 function M_pf:close()
+   pci.set_bus_master(self.pciaddress, false)
    if self.fd then
       pci.close_pci_resource(self.fd, self.base)
       self.fd = false
@@ -438,29 +447,14 @@ function M_pf:close()
 end
 
 function M_pf:init ()
-   return self
-      :disable_interrupts()
-      :global_reset()
-      :autonegotiate_sfi()
-      :wait_eeprom_autoread()
-      :wait_dma()
-      :set_vmdq_mode()
-      :init_statistics()
-      :init_receive()
-      :init_transmit()
-      :wait_linkup()
-      :recheck()
-end
-
-function M_pf:recheck()
+   self.redos = 0
    local mask = bits{Link_up=30}
-   if band(self.r.LINKS(), mask) == mask then
-      return self
-   else
-      return self
+   for i = 1, 100 do
+      self
          :disable_interrupts()
          :global_reset()
-         :autonegotiate_sfi()
+      if i%5 == 0 then self:autonegotiate_sfi() end
+      self
          :wait_eeprom_autoread()
          :wait_dma()
          :set_vmdq_mode()
@@ -468,7 +462,14 @@ function M_pf:recheck()
          :init_receive()
          :init_transmit()
          :wait_linkup()
+      if band(self.r.LINKS(), mask) == mask then
+         return self
+      end
+      self.redos = i
    end
+   io.write ('never got link up: ', self.pciaddress, '\n')
+   os.exit(2)
+   return self
 end
 
 M_pf.global_reset = M_sf.global_reset

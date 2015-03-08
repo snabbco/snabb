@@ -54,10 +54,6 @@ for number in $("$JQ" ".[].number" "$tmpdir/pulls"); do
         base="$(echo "$pull" | "$JQ" -r ".base.sha")"
         git clone "$repo" "$tmpdir/repo" \
             || continue
-
-        # Prepare submodules.
-        (cd "$tmpdir/repo"
-            git submodule update --init > /dev/null 2>&1)
             
         # If buid was successful run tasks.
         if [ "$?" = "0" ]; then
@@ -68,9 +64,10 @@ for number in $("$JQ" ".[].number" "$tmpdir/pulls"); do
                 printf "\n$task" >> "$log"
 
                 # Ensure `head' is checked out and (re)built.
-                out=$(cd "$tmpdir/repo"
-                    git checkout "$head"
-                    make 2>&1)
+                out=$((cd "$tmpdir/repo"
+                        git checkout "$head"
+                        git submodule update --init
+                        make) 2>&1)
 
                 # If build failed, fail the task.
                 if [ "$?" != "0" ]; then
