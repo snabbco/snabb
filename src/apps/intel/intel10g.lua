@@ -380,6 +380,8 @@ function M_sf:receive ()
       if band(wb.xstatus_xerror, checksdone) == 0 then
          p.flags = bor(p.flags, C.PACKET_CSUM_VALID)
       end
+   else
+      p.flags = bor(p.flags, C.PACKET_NEEDS_CSUM)
    end
    return p
 end
