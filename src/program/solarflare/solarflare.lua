@@ -1,4 +1,4 @@
-#!/usr/bin/env snabb
+module(..., package.seeall)
 
 -- Benchmark Solarflare send & receive
 
@@ -10,17 +10,6 @@ local freelist      = require("core.freelist")
 
 local ffi = require("ffi")
 local C = ffi.C
-
-if #main.parameters ~= 2 then
-   print([[Usage: solarflare <npackets> <packet-size>
-
-Send the given number of packets through a Solarflare NIC.  The test
-assumes that the first two Solarflare NICs are connected back-to-back.
-
-Example usage with 10 million packets:
-  solarflare 10e6]])
-      main.exit(1)
-end
 
 function get_sf_devices()
    pci.scan_devices()
@@ -74,7 +63,16 @@ function Source:set_packet_size(size)
    self.size = size
 end
 
-function run (npackets, packet_size)
+function run (args)
+
+   if #args < 2 then
+      print(require("program.solarflare.README_inc"))
+      os.exit(1)
+   end
+
+   local npackets = table.remove(args, 1)
+   local packet_size = table.remove(args, 1)
+
    npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
    packet_size = tonumber(packet_size) or error("Invalid packet size: " .. packet_size)
 
@@ -128,7 +126,4 @@ function run (npackets, packet_size)
                                                                                                    runtime, packets / runtime / 1e6,
                                                                                                    ((packets * packet_size * 8) / runtime) / (1024*1024*1024)))
 end
-
-run(unpack(main.parameters))
-
 
