@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# Usage: cperf.sh plot <commit-range>
+# Usage: cperf.sh plot [<commit-range>]
 #        cperf.sh check <sha-x> <sha-y>
 #
 # In `plot' mode: Runs benchmarks for each merge commit in that range and
 # records their results unless a record for that run already exists and
-# plots the resulting records.
+# plots the resulting records. If commit-range is omitted the already
+# persisted results are plotted instead.
 #
 # In `check' mode: Compares benchmark results of commits <sha-x> and
 # <sha-y> and prints the results. Runs benchmarks for commits unless a
@@ -132,11 +133,21 @@ function plot_records {
     rm -rf $graph_tmp
 }
 
-# Plot mode: Plot benchmarking results for commit range `$1'.
+# Plot mode: Plot benchmarking results for commit range `$1'. If `$1' is
+# omitted create plot for persisted results.
 function plot_mode {
 
-    # Get commits in <commit-range> ($1).
-    commits="$(git log --format=format:%H --merges --reverse "$1")"
+    if [ "$1" != "" ]; then
+
+        # Get commits in <commit-range> ($1).
+        commits="$(git log --format=format:%H --merges --reverse "$1")"
+
+    else
+
+        # Just use persisted results.
+        commits="$(ls "$graph_data/")"
+
+    fi
 
     # Run benchmarks and record their results in `graph_data'.
     for benchmark in "$benchmarks"/*; do
