@@ -79,7 +79,7 @@ set terminal png size 1600,800
 set output "$2"
 set offset graph 0.02, 0.2, 0.02, 0.02
 #set yrange [0:50]
-set ylabel "Mpps (mean of $SAMPLESIZE runs with standard deviation)"
+set ylabel "Score (mean of $SAMPLESIZE runs with standard deviation)"
 set xlabel "Git ref (abbreviated)"
 plot $(compile_plot_args "$1")
 EOF
