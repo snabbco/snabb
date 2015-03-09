@@ -29,6 +29,7 @@ fi
 export BENCH_ENV_PID
 
 TESTCONFPATH="/tmp/snabb_nfv_selftest_ports.$$"
+FUZZCONFPATH="/tmp/snabb_nfv_selftest_fuzz$$.ports"
 
 # Usage: run_telnet <port> <command> [<sleep>]
 # Runs <command> on VM listening on telnet <port>. Waits <sleep> seconds
@@ -284,8 +285,8 @@ function fuzz_tests {
     for ((n=0;n<$1;n++)); do
         $SNABB snabbnfv fuzz \
             program/snabbnfv/test_fixtures/nfvconfig/fuzz/filter2-tunnel-txrate10-ports.spec \
-            /tmp/snabb_nfv_selftest_fuzz.ports
-        load_config /tmp/snabb_nfv_selftest_fuzz.ports
+            $FUZZCONFPATH
+        load_config $FUZZCONFPATH
         test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
     done
 }
