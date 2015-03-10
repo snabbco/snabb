@@ -28,6 +28,7 @@ local IP_UDP = 0x11
 local IP_TCP = 6
 local IP_ICMP = 1
 local IP_SCTP = 132
+local IP_L2TPV3 = 0x73
 local IPV6_ICMP = 0x3a
 
 local IPV4_IHL_OFFSET = 14
@@ -270,9 +271,19 @@ local function keep_offload_ctx(self, p)
    local b = p.data
    local ctx_desc_a = 0ULL
    local ctx_desc_b = 0x0000000fe0200000ULL -- DTYP=2, DEXT=1, BCNTLEN=0x3F
-   local iplen, maclen, ctx_l4t = 0ULL, 14ULL, 3ULL
+   local wraplen, maclen, iplen, ctx_l4t = 0ULL, 14ULL, 0ULL, 3ULL
    local ethtype, proto = ffi.cast('uint16_t *', b+ETHERTYPE_OFFSET)[0], 0ULL
    local offloadflags = 0ULL
+
+   if ethtype == ETHERTYPE_IPV6 then
+      iplen = 40ULL
+      proto = b[IPV6_NEXT_HEADER_OFFSET]
+      if proto == IP_L2TPV3 then
+         wraplen = 66     -- IP_L2TPV3 header size: 14 + 40 + 12
+         b = b + wraplen
+         ethtype = ffi.cast('uint16_t *', b+ETHERTYPE_OFFSET)[0]
+      end
+   end
 
    if ethtype == ETHERTYPE_IPV4 then
       ctx_desc_b = bor(ctx_desc_b, 0x0400ULL)     -- TUCMD.IPV4
@@ -304,7 +315,7 @@ local function keep_offload_ctx(self, p)
       b[maclen + iplen + SCTP_CSUM_OFFSET+1] = 0
    end
 
-   ctx_desc_a = bor(ctx_desc_a, lshift(band(maclen, 0x7F), 9), band(iplen, 0x1FF))
+   ctx_desc_a = bor(ctx_desc_a, lshift(band(maclen+wraplen, 0x7F), 9), band(iplen, 0x1FF))
    ctx_desc_b = bor(ctx_desc_b, lshift(ctx_l4t, 11))
    if ctx_desc_a ~= self.prev_ctx_desc_a or ctx_desc_b ~= self.prev_ctx_desc_b then
       self.txdesc[self.tdt].address = ctx_desc_a
