@@ -180,10 +180,9 @@ function SimpleKeyedTunnel:push()
 
    while not link.empty(l_in) and not link.full(l_out) do
       local p = link.receive(l_in)
-      packet.prepend(p, self.header, HEADER_SIZE)
+      packet.prepend(p, self.header, HEADER_SIZE, true)
       local plength = ffi.cast(plength_ctype, p.data + LENGTH_OFFSET)
       plength[0] = lib.htons(SESSION_COOKIE_SIZE + p.length - HEADER_SIZE)
-      p.flags = bit.bor(p.flags, C.PACKET_NEEDS_CSUM)
       link.transmit(l_out, p)
    end
 
@@ -230,7 +229,7 @@ function SimpleKeyedTunnel:push()
          -- discard packet
          packet.free(p)
       else
-         packet.shiftleft(p, HEADER_SIZE)
+         packet.shiftleft(p, HEADER_SIZE, true)
          link.transmit(l_out, p)
       end
    end
