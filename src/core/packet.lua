@@ -61,25 +61,50 @@ function append (p, ptr, len)
    return p
 end
 
+function shift_csum (p, len)
+   if p.csum_start > 0 and p.csum_start < p.length then
+      p.csum_start = math.max(0, p.csum_start + len)
+   end
+end
+
 -- Prepend data to the start of a packet.
-function prepend (p, ptr, len)
+function prepend (p, ptr, len, do_shift)
    assert(p.length + len <= max_payload, "packet payload overflow")
    C.memmove(p.data + len, p.data, p.length) -- Move the existing payload
    ffi.copy(p.data, ptr, len)                -- Fill the gap
+   if do_shift then
+      shift_csum(p, len)
+   end
    p.length = p.length + len
    return p
 end
 
 -- Move packet data to the left. This shortens the packet by dropping
 -- the header bytes at the front.
-function shiftleft (p, bytes)
+function shiftleft (p, bytes, do_shift)
    C.memmove(p.data, p.data+bytes, p.length-bytes)
+   if do_shift then
+      shift_csum(p, -bytes)
+   end
    p.length = p.length - bytes
 end
 
 -- Conveniently create a packet by copying some existing data.
 function from_pointer (ptr, len) return append(allocate(), ptr, len) end
 function from_string (d)         return from_pointer(d, #d) end
+
+function dump(p, w)
+   w = w or io.write
+   w(('packet at %s(%d): flags 0x%X, csum_start 0x%X, csum_offset 0x%X'):format(
+      p.data, p.length, p.flags, p.csum_start, p.csum_offset))
+   for i = 0, p.length-1 do
+      if i % 16 == 0 then
+         w(('\n%04X: '):format(i))
+      end
+      w(bit.tohex(p.data[i], -2)..' ')
+   end
+   w('\n')
+end
 
 -- Free a packet that is no longer in use.
 function free (p)
