@@ -19,6 +19,27 @@ local macaddress = require("lib.macaddress")
 local bits, bitset = lib.bits, lib.bitset
 local band, bor, lshift = bit.band, bit.bor, bit.lshift
 
+local ETHERTYPE_OFFSET = 12
+-- network order
+local ETHERTYPE_IPV6 = 0xDD86
+local ETHERTYPE_IPV4 = 0x0008
+
+local IP_UDP = 0x11
+local IP_TCP = 6
+local IP_ICMP = 1
+local IP_SCTP = 132
+local IP_L2TPV3 = 0x73
+local IPV6_ICMP = 0x3a
+
+local IPV4_IHL_OFFSET = 14
+local IPV4_PROTOCOL_OFFSET = 23
+local IPV6_NEXT_HEADER_OFFSET = 20 -- protocol
+
+local IPV4_CSUM_OFFSET = 24
+local TCP_CSUM_OFFSET = 16 --50
+local UDP_CSUM_OFFSET = 6 --40
+local SCTP_CSUM_OFFSET = 8 --42
+
 num_descriptors = 512
 --num_descriptors = 32
 
@@ -44,7 +65,10 @@ function new_sf (pciaddress)
                  rxpackets = {},   -- Rx descriptor index -> packet mapping
                  rdh = 0,          -- Cache of receive head (RDH) register
                  rdt = 0,          -- Cache of receive tail (RDT) register
-                 rxnext = 0        -- Index of next buffer to receive
+                 rxnext = 0,        -- Index of next buffer to receive
+                 prev_ctx_desc_a = 0,
+                 prev_ctx_desc_b = 0,
+                 offloadflags = 0ULL,
               }
    return setmetatable(dev, M_sf)
 end
@@ -179,6 +203,7 @@ function M_sf:init_receive ()
    })
    self.r.MAXFRS(lshift(9000+18, 16))
    self:set_receive_descriptors()
+   self.r.RXCSUM(bits{IPPCSE=12})
    self.r.RXCTRL:set(bits{RXEN=0})
    return self
 end
@@ -231,11 +256,85 @@ end
 
 --- See datasheet section 7.1 "Inline Functions -- Transmit Functionality."
 
+--- "Keeps offload context"
+--- if the packet requests checksums to be performed,
+--- this function makes sure the current offload context
+--- correctly describes the packet type.  if needed
+--- it sends a new context descriptor.
+local function keep_offload_ctx(self, p)
+   if band(p.flags, C.PACKET_NEEDS_CSUM) == 0 then
+      self.prev_ctx_desc_a = 0ULL
+      self.prev_ctx_desc_b = 0ULL
+      self.offloadflags = 0ULL
+      return
+   end
+   local b = p.data
+   local ctx_desc_a = 0ULL
+   local ctx_desc_b = 0x0000000fe0200000ULL -- DTYP=2, DEXT=1, BCNTLEN=0x3F
+   local wraplen, maclen, iplen, ctx_l4t = 0ULL, 14ULL, 0ULL, 3ULL
+   local ethtype, proto = ffi.cast('uint16_t *', b+ETHERTYPE_OFFSET)[0], 0ULL
+   local offloadflags = 0ULL
+
+   if ethtype == ETHERTYPE_IPV6 then
+      iplen = 40ULL
+      proto = b[IPV6_NEXT_HEADER_OFFSET]
+      if proto == IP_L2TPV3 then
+         wraplen = 66     -- IP_L2TPV3 header size: 14 + 40 + 12
+         b = b + wraplen
+         ethtype = ffi.cast('uint16_t *', b+ETHERTYPE_OFFSET)[0]
+      end
+   end
+
+   if ethtype == ETHERTYPE_IPV4 then
+      ctx_desc_b = bor(ctx_desc_b, 0x0400ULL)     -- TUCMD.IPV4
+      iplen = lshift(band(b[IPV4_IHL_OFFSET], 0xF), 2)
+      offloadflags = bor(offloadflags, lshift(1ULL, 40))      -- IXSM
+      proto = b[IPV4_PROTOCOL_OFFSET]
+      b[IPV4_CSUM_OFFSET] = 0
+      b[IPV4_CSUM_OFFSET+1] = 0
+
+   elseif ethtype == ETHERTYPE_IPV6 then
+      iplen = 40ULL
+      proto = b[IPV6_NEXT_HEADER_OFFSET]
+   end
+
+   if proto == IP_TCP then
+      ctx_l4t = 0x01ULL
+      offloadflags = bor(offloadflags, lshift(1ULL, 41))      -- TXSM
+      b[maclen + iplen + TCP_CSUM_OFFSET] = 0
+      b[maclen + iplen + TCP_CSUM_OFFSET+1] = 0
+   elseif proto == IP_UDP then
+      ctx_l4t = 0x00ULL
+      offloadflags = bor(offloadflags, lshift(1ULL, 41))      -- TXSM
+      b[maclen + iplen + UDP_CSUM_OFFSET] = 0
+      b[maclen + iplen + UDP_CSUM_OFFSET+1] = 0
+   elseif proto == IP_SCTP then
+      ctx_l4t = 0x02ULL
+      offloadflags = bor(offloadflags, lshift(1ULL, 41))      -- TXSM
+      b[maclen + iplen + SCTP_CSUM_OFFSET] = 0
+      b[maclen + iplen + SCTP_CSUM_OFFSET+1] = 0
+   end
+
+   ctx_desc_a = bor(ctx_desc_a, lshift(band(maclen+wraplen, 0x7F), 9), band(iplen, 0x1FF))
+   ctx_desc_b = bor(ctx_desc_b, lshift(ctx_l4t, 11))
+   if ctx_desc_a ~= self.prev_ctx_desc_a or ctx_desc_b ~= self.prev_ctx_desc_b then
+      self.txdesc[self.tdt].address = ctx_desc_a
+      self.txdesc[self.tdt].options = ctx_desc_b
+      self.txpackets[self.tdt] = nil
+      self.tdt = band(self.tdt + 1, num_descriptors - 1)
+      self.prev_ctx_desc_a = ctx_desc_a
+      self.prev_ctx_desc_b = ctx_desc_b
+      self.offloadflags = offloadflags
+   end
+end
+
+
 local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21, eop=24}
 
 function M_sf:transmit (p)
+   keep_offload_ctx(self, p)
    self.txdesc[self.tdt].address = memory.virtual_to_physical(p.data)
-   self.txdesc[self.tdt].options = bor(p.length, txdesc_flags, lshift(p.length+0ULL, 46))
+   self.txdesc[self.tdt].options = bor(p.length, txdesc_flags, self.offloadflags, lshift(p.length+0ULL, 46))
    self.txpackets[self.tdt] = p
    self.tdt = band(self.tdt + 1, num_descriptors - 1)
 end
@@ -247,7 +346,9 @@ function M_sf:sync_transmit ()
    -- Release processed buffers
    if old_tdh ~= self.tdh then
       while old_tdh ~= self.tdh do
-         packet.free(self.txpackets[old_tdh])
+         if self.txpackets[old_tdh] ~= nil then
+            packet.free(self.txpackets[old_tdh])
+         end
          self.txpackets[old_tdh] = nil
          old_tdh = band(old_tdh + 1, num_descriptors - 1)
       end
@@ -282,6 +383,17 @@ function M_sf:receive ()
    p.length = wb.pkt_len
    self.rxpackets[self.rxnext] = nil
    self.rxnext = band(self.rxnext + 1, num_descriptors - 1)
+
+   p.flags = 0
+   local checksdone = band(wb.xstatus_xerror, 0x60)  -- which checks have been done? (IPv4, L4)
+   if checksdone ~= 0 then
+      checksdone = lshift(checksdone, 24)            -- shift to errors area
+      if band(wb.xstatus_xerror, checksdone) == 0 then
+         p.flags = bor(p.flags, C.PACKET_CSUM_VALID)
+      end
+   else
+      p.flags = bor(p.flags, C.PACKET_NEEDS_CSUM)
+   end
    return p
 end
 
@@ -567,6 +679,9 @@ function M_pf:new_vf (poolnum)
       rdh = 0,                      -- Cache of receive head (RDH) register
       rdt = 0,                      -- Cache of receive tail (RDT) register
       rxnext = 0,                   -- Index of next buffer to receive
+      prev_ctx_desc_a = 0,
+      prev_ctx_desc_b = 0,
+      offloadflags = 0ULL,
    }
    return setmetatable(vf, M_vf)
 end
@@ -679,6 +794,7 @@ end
 
 function M_vf:enable_receive()
    self.r.RXDCTL(bits{Enable=25, VME=30})
+   self.pf.r.RXCSUM(bits{IPPCSE=12})
    self.r.RXDCTL:wait(bits{enable=25})
    self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
    self.pf.r.PFVFRE[math.floor(self.poolnum/32)]:set(bits{VFRE=self.poolnum%32})
@@ -997,6 +1113,7 @@ RTTDQSEL  0x04904 -            RW DCB Transmit Descriptor Plane Queue Select
 RTTDT1C   0x04908 -            RW DCB Transmit Descriptor Plane T1 Config
 RTTUP2TC  0x0C800 -            RW DCB Transmit User Priority to Traffic Class
 RXCTRL    0x03000 -            RW Receive Control
+RXCSUM    0x05000 -             RW Receive Checksum Control
 RXDSTATCTRL 0x02F40 -          RW Rx DMA Statistic Counter Control
 SECRXCTRL 0x08D00 -            RW Security RX Control
 SECRXSTAT 0x08D04 -            RO Security Rx Status
@@ -1064,7 +1181,6 @@ FCRTH     0x03260 +0x04*0..7    RW Flow Control Receive Threshold High
 VLNCTRL   0x05088 -             RW VLAN Control Register
 MCSTCTRL  0x05090 -             RW Multicast Control Register
 PSRTYPE   0x0EA00 +0x04*0..63   RW Packet Split Receive Type Register
-RXCSUM    0x05000 -             RW Receive Checksum Control
 RFCTL     0x05008 -             RW Receive Filter Control Register
 PFVFRE    0x051E0 +0x04*0..1    RW PF VF Receive Enable
 PFVFTE    0x08110 +0x04*0..1    RW PF VF Transmit Enable

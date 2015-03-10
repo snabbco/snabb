@@ -149,7 +149,7 @@ function SimpleKeyedTunnel:new (arg)
       local psession = ffi.cast(psession_id_ctype, header + SESSION_ID_OFFSET)
       psession[0] = lib.htonl(conf.local_session)
    end
-   
+
    if conf.default_gateway_MAC then
       local mac = assert(macaddress:new(conf.default_gateway_MAC))
       ffi.copy(header + DST_MAC_OFFSET, mac.bytes, 6)
@@ -180,7 +180,7 @@ function SimpleKeyedTunnel:push()
 
    while not link.empty(l_in) and not link.full(l_out) do
       local p = link.receive(l_in)
-      packet.prepend(p, self.header, HEADER_SIZE)
+      packet.prepend(p, self.header, HEADER_SIZE, true)
       local plength = ffi.cast(plength_ctype, p.data + LENGTH_OFFSET)
       plength[0] = lib.htons(SESSION_COOKIE_SIZE + p.length - HEADER_SIZE)
       link.transmit(l_out, p)
@@ -229,7 +229,7 @@ function SimpleKeyedTunnel:push()
          -- discard packet
          packet.free(p)
       else
-         packet.shiftleft(p, HEADER_SIZE)
+         packet.shiftleft(p, HEADER_SIZE, true)
          link.transmit(l_out, p)
       end
    end
@@ -280,7 +280,7 @@ function selftest ()
 
    print("run simple one second benchmark ...")
    app.main({duration = 1})
- 
+
    if not ok then
       print("selftest failed")
       os.exit(1)
