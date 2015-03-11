@@ -39,6 +39,18 @@ function run_telnet {
         | telnet localhost $1 2>&1
 }
 
+# Usage: agrep <pattern>
+# Like grep from standard input except that if <pattern> doesn't match
+# the whole output is printed and status code 1 is returned.
+function agrep {
+    input=$(cat);
+    if ! echo "$input" | grep "$1"
+    then
+        echo "$input"
+        return 1
+    fi
+}
+
 # Usage: load_config <path>
 # Copies <path> to TESTCONFPATH and sleeps for a bit.
 function load_config {
@@ -130,7 +142,7 @@ function debug_tcpdump {
 # Assert successful ping from VM listening on <telnet_port> to <dest_ip>.
 function test_ping {
     run_telnet $1 "ping6 -c 1 $2" \
-        | grep "1 packets transmitted, 1 received"
+        | agrep "1 packets transmitted, 1 received"
     assert PING $?
 }
 
@@ -142,7 +154,7 @@ function test_jumboping {
     run_telnet $1 "ip link set dev eth0 mtu 9100" >/dev/null
     run_telnet $2 "ip link set dev eth0 mtu 9100" >/dev/null
     run_telnet $1 "ping6 -s 9000 -c 1 $3" \
-        | grep "1 packets transmitted, 1 received"
+        | agrep "1 packets transmitted, 1 received"
     assert JUMBOPING $?
 }
 
@@ -152,16 +164,16 @@ function test_jumboping {
 function test_checksum {
     local out=$(run_telnet $1 "ethtool -k eth0")
 
-    echo "$out" | grep 'rx-checksumming: on'
+    echo "$out" | agrep 'rx-checksumming: on'
     assert RX-CHECKSUMMING  $?
 
-    echo "$out" | grep 'tx-checksumming: on'
+    echo "$out" | agrep 'tx-checksumming: on'
     assert TX-CHECKSUMMING  $?
 
-    echo "$out" | grep 'tx-checksum-ipv4: on'
+    echo "$out" | agrep 'tx-checksum-ipv4: on'
     assert TX-CHECKSUM-IPV4 $?
 
-    echo "$out" | grep 'rx-checksum-ipv6: on'
+    echo "$out" | agrep 'rx-checksum-ipv6: on'
     assert TX-CHECKSUM-IPV6 $?
 }
 
@@ -172,7 +184,7 @@ function test_iperf {
     run_telnet $2 "nohup iperf -d -s -V &" >/dev/null
     sleep 2
     run_telnet $1 "iperf -c $3 -f g -V" 20 \
-        | grep "s/sec"
+        | agrep "s/sec"
     assert IPERF $?
 }
 
@@ -197,7 +209,7 @@ function test_rate_limited {
 # UDP is used instead of TCP.
 function port_probe {
     run_telnet $2 "nohup echo | nc $5 -l $3 $4 &" 2>&1 >/dev/null
-    run_telnet $1 "nc -v $5 $3 $4" 5 | grep succeeded
+    run_telnet $1 "nc -v $5 $3 $4" 5 | agrep succeeded
 }
 
 function same_vlan_tests {
