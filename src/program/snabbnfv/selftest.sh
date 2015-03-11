@@ -102,8 +102,20 @@ function wait_vm_up {
 
 function assert {
     if [ $2 == "0" ]; then echo "$1 succeded."
-    else echo "$1 failed."
-         exit 1
+    else
+        echo "$1 failed."
+        echo
+        echo "qemu ($IMAGE0) log:"
+        cat "$(basename "$IMAGE0").log"
+        echo
+        echo
+        echo "qemu ($IMAGE1) log:"
+        cat "$(basename "$IMAGE1").log"
+        echo
+        echo
+        echo "snabbnfv log:"
+        cat "$SNABB_LOG0"
+        exit 1
     fi
 }
 
