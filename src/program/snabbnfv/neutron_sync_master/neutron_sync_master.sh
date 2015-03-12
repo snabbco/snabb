@@ -19,7 +19,7 @@ function check_env_vars()
     [ ! -z "$DB_NEUTRON" ] || export DB_NEUTRON=neutron_ml2
     [ ! -z "$DB_NEUTRON_TABLES" ] || export DB_NEUTRON_TABLES="networks \
         ports ml2_network_segments securitygroups securitygrouprules \
-        securitygroupportbindings qos_policies qoses portqosmappings"
+        securitygroupportbindings"
     [ ! -z "$SYNC_LISTEN_HOST" ] || export SYNC_LISTEN_HOST=127.0.0.1
     [ ! -z "$SYNC_LISTEN_PORT" ] || export SYNC_LISTEN_PORT=9418
     [ ! -z "$SYNC_INTERVAL" ] || export SYNC_INTERVAL=1
