@@ -5,17 +5,17 @@
 
 module(..., package.seeall)
 
-local bridge_base = require("apps.bridge.base")
+local bridge_base = require("apps.bridge.base").bridge
 local packet = require("core.packet")
 local link = require("core.link")
 local empty, receive, transmit = link.empty, link.receive, link.transmit
-local cow_clone = packet.cow_clone
+local clone = packet.clone
 
-local bridge = subClass(bridge_base)
+bridge = subClass(bridge_base)
 bridge._name = "flooding bridge"
 
-function bridge:new (config)
-   return bridge:superClass().new(self, config)
+function bridge:new (arg)
+   return bridge:superClass().new(self, arg)
 end
 
 function bridge:push()
@@ -32,12 +32,10 @@ function bridge:push()
 	 transmit(output[ports[1]], p)
 	 local j = 2
 	 while ports[j] do
-	    transmit(output[ports[j]], cow_clone(p))
+	    transmit(output[ports[j]], clone(p))
 	    j = j + 1
 	 end
       end
       i = i + 1
    end
 end
-
-return bridge
