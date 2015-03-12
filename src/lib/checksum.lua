@@ -36,7 +36,7 @@ function selftest ()
       if have_avx2 and C.cksum_avx2(array+i*2, i*10+i, 0) == ref then
 	 avx2ok = avx2ok + 1
       end
-      if have_sse2 and C.cksum_avx2(array+i*2, i*10+i, 0) == ref then
+      if have_sse2 and C.cksum_sse2(array+i*2, i*10+i, 0) == ref then
 	 sse2ok = sse2ok + 1
       end
       assert(ipsum(array+i*2, i*10+i, 0) == ref, "API function check")
