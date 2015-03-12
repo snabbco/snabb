@@ -1,14 +1,16 @@
 #!/bin/bash
 
-# Usage: cperf.sh plot <commit-range>
+# Usage: cperf.sh plot [<commit-range>]
 #        cperf.sh check <sha-x> <sha-y>
 #
 # In `plot' mode: Runs benchmarks for each merge commit in that range and
 # records their results unless a record for that run already exists and
-# plots the resulting records.
+# plots the resulting records. If commit-range is omitted the already
+# persisted results are plotted instead.
 #
 # In `check' mode: Compares benchmark results of commits <sha-x> and
-# <sha-y> and prints the results.
+# <sha-y> and prints the results. Runs benchmarks for commits unless a
+# record for that run already exists.
 #
 # CPERFDIR must be an absolute path that designates a directory with a
 # `benchmarks/' subdirectory containing the benchmark scripts to be run.
@@ -29,6 +31,13 @@ graph_data="$results/dat"         # Directory for results data.
 graph_tmp="$results/tmp"          # Directory for temporary data.
 graph="$results/benchmarks.png"   # Path to the resulting plot rendering.
 
+
+# Build SnabbSwitch at refhash ($1).
+function checkout_and_build {
+    git checkout "$1"
+    git submodule update --init
+    make
+}
 
 # Run benchmark $1 SAMPLESIZE times and print median and standard
 # deviation as two space separated columns.
@@ -70,7 +79,7 @@ set terminal png size 1600,800
 set output "$2"
 set offset graph 0.02, 0.2, 0.02, 0.02
 #set yrange [0:50]
-set ylabel "Mpps (mean of $SAMPLESIZE runs with standard deviation)"
+set ylabel "Score (mean of $SAMPLESIZE runs with standard deviation)"
 set xlabel "Git ref (abbreviated)"
 plot $(compile_plot_args "$1")
 EOF
@@ -79,6 +88,28 @@ EOF
 # Abbreviate rehash $1.
 function shorthash {
     echo "${1:0:7}"
+}
+
+# Print path of persisted benchmark ($2) result for refhash ($1).
+function persisted_path {
+    echo "$graph_data/$1/$(basename $2)"
+}
+
+# Persist benchmark ($2) result ($3) for refhash ($1).
+function persist_result {
+    mkdir -p "$graph_data/$1"
+    echo "$3" >> "$(persisted_path $1 $2)"
+}
+
+# Predicate to test if benchmark ($2) result for refhash ($1) is
+# persisted.
+function result_persisted_p {
+    test -f "$(persisted_path $1 $2)"
+}
+
+# Print persisted benchmark ($2) result for refhash ($1).
+function print_persisted_result {
+    cat "$(persisted_path $1 $2)"
 }
 
 # Plot records for commits in $1.
@@ -102,34 +133,35 @@ function plot_records {
     rm -rf $graph_tmp
 }
 
-# Plot mode: Plot benchmarking results for commit range `$1'.
+# Plot mode: Plot benchmarking results for commit range `$1'. If `$1' is
+# omitted create plot for persisted results.
 function plot_mode {
 
-    # Ensure `results' and `graph_data' directories exists.
-    mkdir -p "$results" "$graph_data"
+    if [ "$1" != "" ]; then
 
-    # Get commits in <commit-range> ($1).
-    commits="$(git log --format=format:%H --merges --reverse "$1")"
+        # Get commits in <commit-range> ($1).
+        commits="$(git log --format=format:%H --merges --reverse "$1")"
 
-    # Traverse merge commits in <commit-range> ($1).
-    for refhash in $commits; do
+    else
 
-        # If record already exists, skip this refhash.
-        if [ -d "$graph_data/$refhash" ]; then
-            continue
-        fi
+        # Just use persisted results.
+        commits="$(ls "$graph_data/")"
 
-        # Checkout refhash.
-        git checkout $refhash
+    fi
 
-        # Rebuild.
-        make
+    # Run benchmarks and record their results in `graph_data'.
+    for benchmark in "$benchmarks"/*; do
 
-        # Ensure directory for record exists.
-        mkdir -p "$graph_data/$refhash"
+        # Traverse merge commits in <commit-range> ($1).
+        for refhash in $commits; do
 
-        # Run benchmarks and record their results in `graph_data'.
-        for benchmark in "$benchmarks"/*; do
+            # If record already exists, skip this refhash.
+            if result_persisted_p "$refhash" "$benchmark"; then
+                continue
+            fi
+
+            # Checkout refhash and rebuild.
+            checkout_and_build $refhash
 
             # Try to run benchmark.
             result=$(run_benchmark "$benchmark")
@@ -140,9 +172,7 @@ function plot_mode {
             fi
 
             # Record results.
-            echo "$result" \
-                >> "$graph_data/$refhash/$(basename $benchmark)"
-
+            persist_result "$refhash" "$benchmark" "$result"
         done
 
     done
@@ -168,16 +198,25 @@ function check_mode {
         echo # Seperarate benchmark results with a newline.
         for commit in $@; do
 
-            # Checkout `commit'.
-            git checkout "$commit" >/dev/null 2>&1
+            if result_persisted_p "$commit" "$benchmark"; then
 
-            # Rebuild.
-            make >/dev/null 2>&1
+                # Just use persisted result.
+                result=$(print_persisted_result "$commit" "$benchmark")
 
-            # Run benchmark.
-            result=$(run_benchmark "$benchmark")
-            if [ "$?" != "0" ]; then
-                result="failed";
+            else
+
+                # Checkout `commit' and rebuild.
+                checkout_and_build "$commit" >/dev/null 2>&1
+
+                # Run benchmark.
+                result=$(run_benchmark "$benchmark")
+                if [ "$?" != "0" ]; then
+                    result="failed";
+                else
+                    # If successful persist result.
+                    persist_result "$commit" "$benchmark" "$result"
+                fi
+
             fi
 
             # Print result.
