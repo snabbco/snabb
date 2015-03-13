@@ -3,15 +3,30 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 
+function def(var)
+   return _G["pflua"] and _G["pflua"][var]
+end
+
+function define(var)
+   local namespace = _G["pflua"]
+   if not namespace then _G["pflua"] = {} end
+   _G["pflua"][var] = true
+end
+
 ffi.cdef[[
 typedef long time_t;
 typedef long suseconds_t;
+int gettimeofday(struct timeval *tv, struct timezone *tz);
+]]
+
+--[=[
+ffi.cdef[[
 struct timeval {
   time_t      tv_sec;     /* seconds */
   suseconds_t tv_usec;    /* microseconds */
 };
-int gettimeofday(struct timeval *tv, struct timezone *tz);
 ]]
+--]=]
 
 -- now() returns the current time.  The first time it is called, the
 -- return value will be zero.  This is to preserve precision, regardless
