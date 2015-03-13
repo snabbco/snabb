@@ -611,6 +611,60 @@ function selftest ()
       print ("state app_v4 failed")
    end
 
+   -- part 3:
+   app.configure(config.new())
+   c = config.new()
+
+   config.app(c, "source1", pcap.PcapReader, "apps/packet_filter/samples/v4-tcp-udp.pcap")
+   config.app(c, "stateless_pass1", PacketFilter, {
+      rules = {
+         {
+            ethertype = "ipv4",
+            dest_port_min = 12345,
+            protocol = "tcp",
+         },
+      },
+   })
+   config.app(c, "sink1", basic_apps.Sink )
+   config.link(c, "source1.output -> stateless_pass1.input")
+   config.link(c, "stateless_pass1.output -> sink1.input")
+
+   app.configure(c)
+   app.breathe()
+   app.report()
+
+   if app.app_table.stateless_pass1.output.output.stats.txpackets ~= 1 then
+      ok = false
+      print ("stateless tcp failed")
+   end
+
+   app.configure(config.new())
+   c = config.new()
+
+   config.app(c, "source1", pcap.PcapReader, "apps/packet_filter/samples/v6-tcp-udp.pcap")
+   config.app(c, "stateless_pass1", PacketFilter, {
+      rules = {
+         {
+            ethertype = "ipv6",
+            dest_port_min = 1022,
+            protocol = "tcp",
+         },
+      },
+   })
+   config.app(c, "sink1", basic_apps.Sink )
+   config.link(c, "source1.output -> stateless_pass1.input")
+   config.link(c, "stateless_pass1.output -> sink1.input")
+
+   app.configure(c)
+   app.breathe()
+   app.report()
+
+   if app.app_table.stateless_pass1.output.output.stats.txpackets ~= 1 then
+      ok = false
+      print ("stateless v6 tcp failed")
+   end
+
+
    if not ok then
       print("selftest failed")
       os.exit(1)
