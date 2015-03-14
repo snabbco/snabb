@@ -14,12 +14,7 @@ run_qemu () {
     TELNETPORT=$5
     NETDEV=$6
     CPU=$7
-    LOG=$8
-
-    if [ "$LOG" = "" ]
-    then
-        LOG=/dev/null
-    fi
+    LOG=${8:-$(basename "${IMG?}").log}
 
     MEM="-m ${GUEST_MEM?} -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM?}M,mem-path=${HUGETLBFS?},share=on"
     NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC,mq=$MQ,vectors=$VECTORS"
@@ -30,7 +25,6 @@ run_qemu () {
     fi
 
     # Execute QEMU on the designated node
-    echo -n "starting qemu on network device $NETDEV: "
     numactl $NUMA \
         ${QEMU?} \
             -kernel ${KERNEL?} -append "$ARGS" \
@@ -38,7 +32,7 @@ run_qemu () {
             -M pc -smp $SMP -cpu host --enable-kvm \
             -serial telnet:localhost:$TELNETPORT,server,nowait \
             -drive if=virtio,file=$IMG \
-        -nographic > "$(basename "${IMG?}").log" 2>&1 &
+            -nographic > $LOG 2>&1 &
     QEMUPIDS="$QEMUPIDS $!"
 }
 
@@ -111,32 +105,9 @@ run_nfv () {
         NUMA="--cpunodebind=$NUMANODE --membind=$NUMANODE"
     fi
 
-    echo -n "starting snabb on $NFV_PCI with socket $NFV_SOCKET: "
     numactl $NUMA \
         $SNABB ${NFV?} ${NFV_PACKETS?} $NFV_PCI ${CONFIG?} $NFV_SOCKET \
         > $LOG 2>&1 &
-
-    SNABBPIDS="$SNABBPIDS $!"
-}
-
-run_neutron_nfv () {
-    NUMANODE=$1
-    PCI=$2
-    SOCKET_TEMPLATE=$3
-    LOG=$4
-    CPU=$5
-    export NFV_TRACE=$6
-
-    if [ -n "$CPU" ]; then
-        NUMA="--membind=$NUMANODE --physcpubind=$CPU"
-    else
-        NUMA="--cpunodebind=$NUMANODE --membind=$NUMANODE"
-    fi
-
-    echo -n "starting neutron NFV on $PCI with socket $SOCKET_TEMPLATE: "
-    numactl $NUMA \
-        $SNABB $NEUTRON_NFV $PCI $NEUTRON_NFV_CONFIG $CONFIG $SOCKET_TEMPLATE > $LOG 2>&1 &
-    echo done
 
     SNABBPIDS="$SNABBPIDS $!"
 }
@@ -246,14 +217,6 @@ if [ -f $SNABB_PATH/snabb ]; then
     export LOADGEN="packetblaster replay"
 else
     printf "LOADGEN design not found\n"
-    exit 1
-fi
-
-if [ -f $SNABB_PATH/designs/neutron/snabbnfv-traffic ]; then
-    export NEUTRON_NFV=$SNABB_PATH/designs/neutron/snabbnfv-traffic
-    export NEUTRON_NFV_CONFIG=$SNABB_PATH/scripts/bench_env/neutron.config
-else
-    printf "NEUTRONNFV design not found\n"
     exit 1
 fi
 
