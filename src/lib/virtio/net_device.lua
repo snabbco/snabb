@@ -10,6 +10,7 @@ local memory    = require("core.memory")
 local packet    = require("core.packet")
 local timer     = require("core.timer")
 local vq        = require("lib.virtio.virtq")
+local checksum  = require("lib.checksum")
 local ffi       = require("ffi")
 local C         = ffi.C
 local band      = bit.band
@@ -54,7 +55,8 @@ local supported_features = C.VIRTIO_F_ANY_LAYOUT +
                            C.VIRTIO_RING_F_INDIRECT_DESC +
                            C.VIRTIO_NET_F_CTRL_VQ +
                            C.VIRTIO_NET_F_MQ +
-                           C.VIRTIO_NET_F_MRG_RXBUF
+                           C.VIRTIO_NET_F_MRG_RXBUF +
+                           C.VIRTIO_NET_F_CSUM
 --[[
    The following offloading flags are also available:
    VIRTIO_NET_F_CSUM
@@ -121,9 +123,9 @@ function VirtioNetDevice:rx_packet_start(addr, len)
    local rx_p = packet.allocate()
 
    local rx_hdr = ffi.cast(virtio_net_hdr_type, self:map_from_guest(addr))
-   rx_p.flags = rx_hdr.flags
-   rx_p.csum_start = rx_hdr.csum_start
-   rx_p.csum_offset = rx_hdr.csum_offset
+   self.rx_hdr_flags = rx_hdr.flags
+   self.rx_hdr_csum_start = rx_hdr.csum_start
+   self.rx_hdr_csum_offset = rx_hdr.csum_offset
 
    return rx_p
 end
@@ -140,6 +142,12 @@ end
 function VirtioNetDevice:rx_packet_end(header_id, total_size, rx_p)
    local l = self.owner.output.tx
    if l then
+      if band(self.rx_hdr_flags, C.VIO_NET_HDR_F_NEEDS_CSUM) ~= 0 then
+         checksum.finish_packet(
+            rx_p.data + self.rx_hdr_csum_start,
+            rx_p.length - self.rx_hdr_csum_start,
+            self.rx_hdr_csum_offset)
+      end
       link.transmit(l, rx_p)
    else
       debug("droprx", "len", rx_p.length)
