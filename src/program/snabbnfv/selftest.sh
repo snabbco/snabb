@@ -29,6 +29,7 @@ fi
 export BENCH_ENV_PID
 
 TESTCONFPATH="/tmp/snabb_nfv_selftest_ports.$$"
+FUZZCONFPATH="/tmp/snabb_nfv_selftest_fuzz$$.ports"
 
 # Usage: run_telnet <port> <command> [<sleep>]
 # Runs <command> on VM listening on telnet <port>. Waits <sleep> seconds
@@ -36,6 +37,18 @@ TESTCONFPATH="/tmp/snabb_nfv_selftest_ports.$$"
 function run_telnet {
     (echo "$2"; sleep ${3:-2}) \
         | telnet localhost $1 2>&1
+}
+
+# Usage: agrep <pattern>
+# Like grep from standard input except that if <pattern> doesn't match
+# the whole output is printed and status code 1 is returned.
+function agrep {
+    input=$(cat);
+    if ! echo "$input" | grep "$1"
+    then
+        echo "$input"
+        return 1
+    fi
 }
 
 # Usage: load_config <path>
@@ -101,8 +114,20 @@ function wait_vm_up {
 
 function assert {
     if [ $2 == "0" ]; then echo "$1 succeded."
-    else echo "$1 failed."
-         exit 1
+    else
+        echo "$1 failed."
+        echo
+        echo "qemu ($IMAGE0) log:"
+        cat "$(basename "$IMAGE0").log"
+        echo
+        echo
+        echo "qemu ($IMAGE1) log:"
+        cat "$(basename "$IMAGE1").log"
+        echo
+        echo
+        echo "snabbnfv log:"
+        cat "$SNABB_LOG0"
+        exit 1
     fi
 }
 
@@ -117,7 +142,7 @@ function debug_tcpdump {
 # Assert successful ping from VM listening on <telnet_port> to <dest_ip>.
 function test_ping {
     run_telnet $1 "ping6 -c 1 $2" \
-        | grep "1 packets transmitted, 1 received"
+        | agrep "1 packets transmitted, 1 received"
     assert PING $?
 }
 
@@ -129,7 +154,7 @@ function test_jumboping {
     run_telnet $1 "ip link set dev eth0 mtu 9100" >/dev/null
     run_telnet $2 "ip link set dev eth0 mtu 9100" >/dev/null
     run_telnet $1 "ping6 -s 9000 -c 1 $3" \
-        | grep "1 packets transmitted, 1 received"
+        | agrep "1 packets transmitted, 1 received"
     assert JUMBOPING $?
 }
 
@@ -139,16 +164,16 @@ function test_jumboping {
 function test_checksum {
     local out=$(run_telnet $1 "ethtool -k eth0")
 
-    echo "$out" | grep 'rx-checksumming: on'
+    echo "$out" | agrep 'rx-checksumming: on'
     assert RX-CHECKSUMMING  $?
 
-    echo "$out" | grep 'tx-checksumming: on'
+    echo "$out" | agrep 'tx-checksumming: on'
     assert TX-CHECKSUMMING  $?
 
-    echo "$out" | grep 'tx-checksum-ipv4: on'
+    echo "$out" | agrep 'tx-checksum-ipv4: on'
     assert TX-CHECKSUM-IPV4 $?
 
-    echo "$out" | grep 'rx-checksum-ipv6: on'
+    echo "$out" | agrep 'rx-checksum-ipv6: on'
     assert TX-CHECKSUM-IPV6 $?
 }
 
@@ -158,8 +183,8 @@ function test_checksum {
 function test_iperf {
     run_telnet $2 "nohup iperf -d -s -V &" >/dev/null
     sleep 2
-    run_telnet $1 "iperf -c $3 -V" 20 \
-        | grep "s/sec"
+    run_telnet $1 "iperf -c $3 -f g -V" 20 \
+        | agrep "s/sec"
     assert IPERF $?
 }
 
@@ -184,7 +209,7 @@ function test_rate_limited {
 # UDP is used instead of TCP.
 function port_probe {
     run_telnet $2 "nohup echo | nc $5 -l $3 $4 &" 2>&1 >/dev/null
-    run_telnet $1 "nc -v $5 $3 $4" 5 | grep succeeded
+    run_telnet $1 "nc -v $5 $3 $4" 5 | agrep succeeded
 }
 
 function same_vlan_tests {
@@ -266,14 +291,26 @@ function filter_tests {
     assert FILTER $?
 }
 
+# Usage: iperf_bench
+# Run iperf benchmark.
+function iperf_bench {
+    load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports    
+
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" \
+        2>&1 >/dev/null
+    Gbits=$(test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" \
+        | egrep -o '[0-9\.]+ Gbits/sec' | cut -d " " -f 1)
+    echo IPERF-JUMBO "$Gbits"
+}
+
 # Usage: fuzz_tests <n>
 # Generate and test (IPERF) <n> semi-random NFV configurations.
 function fuzz_tests {
     for ((n=0;n<$1;n++)); do
         $SNABB snabbnfv fuzz \
             program/snabbnfv/test_fixtures/nfvconfig/fuzz/filter2-tunnel-txrate10-ports.spec \
-            /tmp/snabb_nfv_selftest_fuzz.ports
-        load_config /tmp/snabb_nfv_selftest_fuzz.ports
+            $FUZZCONFPATH
+        load_config $FUZZCONFPATH
         test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
     done
 }
@@ -281,10 +318,19 @@ function fuzz_tests {
 load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/other_vlan.ports
 start_bench_env
 
-same_vlan_tests
-rate_limited_tests
-tunnel_tests
-filter_tests
-#fuzz_tests 100
+# Decide which mode to run (`test', `bench' or `fuzz').
+case $1 in
+    bench)
+        iperf_bench
+        ;;
+    fuzz)
+        fuzz_tests "$2"
+        ;;
+    *)
+        same_vlan_tests
+        rate_limited_tests
+        tunnel_tests
+        filter_tests
+esac
 
 exit 0

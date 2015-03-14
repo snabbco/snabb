@@ -13,3 +13,4 @@ obj
 /src/apps/vpn/vpws-selftest-uplink.cap.output
 /src/syscall.lua
 /src/syscall
+/deps/*.vsn

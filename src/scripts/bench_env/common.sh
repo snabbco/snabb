@@ -38,8 +38,7 @@ run_qemu () {
             -M pc -smp $SMP -cpu host --enable-kvm \
             -serial telnet:localhost:$TELNETPORT,server,nowait \
             -drive if=virtio,file=$IMG \
-            -nographic > $LOG 2>&1 &
-    echo done
+        -nographic > "$(basename "${IMG?}").log" 2>&1 &
     QEMUPIDS="$QEMUPIDS $!"
 }
 
