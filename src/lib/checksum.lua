@@ -22,6 +22,12 @@ if     have_avx2 then ipsum = C.cksum_avx2
 elseif have_sse2 then ipsum = C.cksum_sse2
 else                  ipsum = C.cksum_generic end
 
+
+function finish_packet (buf, len, offset)
+   ffi.cast('uint16_t *', buf+offset)[0] = lib.htons(ipsum(buf, len, 0))
+end
+
+
 -- See checksum.h for more utility functions that can be added.
 
 function selftest ()
@@ -40,7 +46,7 @@ function selftest ()
 	 sse2ok = sse2ok + 1
       end
       assert(ipsum(array+i*2, i*10+i, 0) == ref, "API function check")
-   end      
+   end
    if have_avx2 then print("avx2: "..avx2ok.."/"..tests) else print("no avx2") end
    if have_sse2 then print("sse2: "..sse2ok.."/"..tests) else print("no sse2") end
    assert(not have_avx2 or avx2ok == tests, "AVX2 test failed")
