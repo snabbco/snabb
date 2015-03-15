@@ -17,7 +17,12 @@ local TX_BUFFER_COUNT = 256
 local ciul = ffi.load("ciul")
 
 local ef_vi_version = ffi.string(ciul.ef_vi_version_str())
-print("ef_vi loaded, version " .. ef_vi_version)
+local required_ef_vi_version = "201502"
+
+if ef_vi_version ~= required_ef_vi_version then
+   error(string.format("ef_vi library does not have the correct version identified, need %s, got %s",
+                       required_ef_vi_version, ef_vi_version))
+end
 
 -- common utility functions
 
