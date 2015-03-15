@@ -7,8 +7,6 @@ local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
 local freelist = require("core.freelist")
-local pci      = require("lib.hardware.pci")
-
 local receive, transmit, full, empty = link.receive, link.transmit, link.full, link.empty
 Intel82599 = {}
 Intel82599.__index = Intel82599
@@ -31,8 +29,6 @@ end
 -- Create an Intel82599 App for the device with 'pciaddress'.
 function Intel82599:new (arg)
    local conf = config.parse_app_arg(arg)
-
-   pci.unbind_device_from_linux(conf.pciaddr)
 
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
