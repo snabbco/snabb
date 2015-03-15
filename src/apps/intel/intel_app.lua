@@ -32,7 +32,7 @@ end
 function Intel82599:new (arg)
    local conf = config.parse_app_arg(arg)
 
-   pci.unbind_device_from_linux(args.pciaddr)
+   pci.unbind_device_from_linux(conf.pciaddr)
 
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
