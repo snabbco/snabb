@@ -229,13 +229,28 @@ function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
    local tx_mrg_hdr = ffi.cast(virtio_net_hdr_mrg_rxbuf_type, self:map_from_guest(addr))
    local l = self.owner.input.rx
    local tx_p = self.tx.p
-   -- TODO: copy the relevnat fields from the packet
    ffi.fill(tx_mrg_hdr, virtio_net_hdr_mrg_rxbuf_size)
 
    -- for the first buffer receive a packet and save its header pointer
    if not tx_p then
       if link.empty(l) then return end
       tx_p = link.receive(l)
+
+      -- XXX: We should validate the checksum and report the result to
+      -- the VM. -lukego
+      --
+      -- If checksum successful then set C.VIO_NET_HDR_F_DATA_VALID.
+      --
+      -- If checksum failed then set C.VIO_NET_HDR_F_NEEDS_CSUM and
+      -- let the guest do its own check to detect the error.
+      --
+      -- The call to ipsum here should be replaced with a real
+      -- IP/TCP/UDP checksum check. The current call exists only to
+      -- make the CPU do the checksumming work so that we can measure
+      -- preliminary performance.
+      checksum.ipsum(tx_p.data, tx_p.length, 0)
+      tx_mrg_hdr.hdr.flags = C.VIO_NET_HDR_F_DATA_VALID
+
       self.tx.tx_mrg_hdr[0] = tx_mrg_hdr
       self.tx.data_sent = 0
    end
