@@ -5,7 +5,6 @@ local usage = require("program.snabbmark.README_inc")
 local basic_apps = require("apps.basic.basic_apps")
 local pci           = require("lib.hardware.pci")
 local ethernet      = require("lib.protocol.ethernet")
-local SolarFlareNic = require("apps.solarflare.solarflare").SolarFlareNic;
 local freelist      = require("core.freelist")
 local ffi = require("ffi")
 local C = ffi.C
@@ -16,7 +15,7 @@ function run (args)
       basic1(unpack(args))
    elseif command == 'nfvconfig' and #args == 4 then
       nfvconfig(unpack(args))
-   elseif command == 'solarflare' and #args == 2 then
+   elseif command == 'solarflare' and #args >= 2 and #args <= 3 then
       solarflare(unpack(args))
    else
       print(usage) 
@@ -149,14 +148,27 @@ function Source:set_packet_size(size)
    self.size = size
 end
 
-function solarflare (npackets, packet_size)
+function solarflare (npackets, packet_size, timeout)
    npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
    packet_size = tonumber(packet_size) or error("Invalid packet size: " .. packet_size)
+   if timeout then
+      timeout = tonumber(timeout) or error("Invalid timeout: " .. timeout)
+   end
+
+   local function load_driver ()
+      return require("apps.solarflare.solarflare").SolarFlareNic
+   end
+
+   local status, SolarFlareNic = pcall(load_driver)
+   if not status then
+      print(SolarFlareNic)
+      main.exit(43)
+   end
 
    local sf_devices = get_sf_devices()
    if #sf_devices < 2 then
       print([[did not find two Solarflare NICs in system, can't continue]])
-      main.exit(1)
+      main.exit(43)
    end
 
    local send_device = sf_devices[1]
@@ -189,8 +201,16 @@ function solarflare (npackets, packet_size)
 
    local start = C.get_monotonic_time()
    timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
-   while engine.app_table.source.output.tx.stats.txpackets < npackets do
+   local n = 0
+   local n_max
+   if timeout then
+      n_max = timeout * 100
+   end
+   while engine.app_table.source.output.tx.stats.txpackets < npackets
+      and (not timeout or n < n_max)
+   do
       engine.main({duration = 0.01, no_report = true})
+      n = n + 1
    end
    local finish = C.get_monotonic_time()
    local runtime = finish - start
@@ -202,4 +222,8 @@ function solarflare (npackets, packet_size)
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s)."):format(packets / 1e6,
                                                                                                    runtime, packets / runtime / 1e6,
                                                                                                    ((packets * packet_size * 8) / runtime) / (1024*1024*1024)))
+   if engine.app_table.source.output.tx.stats.txpackets < npackets then
+      print("Packets lost. Test failed!")
+      main.exit(1)
+   end
 end
