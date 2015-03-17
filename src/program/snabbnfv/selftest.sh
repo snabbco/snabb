@@ -139,17 +139,9 @@ function test_jumboping {
 function test_checksum {
     local out=$(run_telnet $1 "ethtool -k eth0")
 
-#     echo "$out" | grep 'rx-checksumming: on'
-#     assert RX-CHECKSUMMING  $?
-
     echo "$out" | grep 'tx-checksumming: on'
     assert TX-CHECKSUMMING  $?
 
-#     echo "$out" | grep 'tx-checksum-ipv4: on'
-#     assert TX-CHECKSUM-IPV4 $?
-
-#     echo "$out" | grep 'rx-checksum-ipv6: on'
-#     assert TX-CHECKSUM-IPV6 $?
 }
 
 # Usage: test_iperf <telnet_port0> <telnet_port1> <dest_ip>
@@ -207,8 +199,6 @@ function rate_limited_tests {
     test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
     # Repeat iperf test now that jumbo frames are enabled
     test_rate_limited $TELNET_PORT1 $TELNET_PORT0 "$GUEST_IP0%eth0" 900 1000
-#    test_checksum $TELNET_PORT0
-#    test_checksum $TELNET_PORT1
 
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/rx_rate_limit.ports
 
@@ -217,8 +207,6 @@ function rate_limited_tests {
     test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
     # Repeat iperf test now that jumbo frames are enabled
     test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 1200 1000
-#    test_checksum $TELNET_PORT0
-#    test_checksum $TELNET_PORT1
 
 }
 
