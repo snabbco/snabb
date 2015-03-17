@@ -53,30 +53,30 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
-local bridge_base = require("apps.bridge.base")
+local bridge_base = require("apps.bridge.base").bridge
 local packet = require("core.packet")
 local link = require("core.link")
 local bloom = require("lib.bloom_filter")
 local ethernet = require("lib.protocol.ethernet")
 
 local empty, receive, transmit = link.empty, link.receive, link.transmit
-local cow_clone = packet.cow_clone
+local clone = packet.clone
 
-local bridge = subClass(bridge_base)
+bridge = subClass(bridge_base)
 bridge._name = "learning bridge"
 
 local default_config = { mac_table_size = 1000, fp_rate = 0.001,
 			 timeout = 60, verbose = false }
 
-function bridge:new (config)
-   local o = bridge:superClass().new(self, config)
-   local config = config.config or {}
+function bridge:new (arg)
+   local o = bridge:superClass().new(self, arg)
+   local conf = o._conf
    for k, v in pairs(default_config) do
-      if not config[k] then
-	 config[k] = v
+      if not conf[k] then
+	 conf[k] = v
       end
    end
-   local bf = bloom:new(config.mac_table_size, config.fp_rate)
+   local bf = bloom:new(conf.mac_table_size, conf.fp_rate)
    o._bf = bf
    o._nsrc_ports = #o._src_ports
    o._port_index = 1
@@ -93,27 +93,26 @@ function bridge:new (config)
 
    timer.activate(timer.new("mac_learn_timeout",
    			    function (t)
-			       if config.verbose then
+			       if conf.verbose then
 				  print("MAC learning timeout")
 				  print("Table usage per port:")
 			       end
    			       for port, filter in pairs(o._filters) do
    				  bf:cell_copy(filter.mac_shadow, filter.mac_table)
    				  bf:cell_clear(filter.mac_shadow)
-				  if config.verbose then
+				  if conf.verbose then
 				     print(string.format("\t%s: %02.2f%%", port,
 							 100*bf:cell_usage(filter.mac_table)))
 				  end
    			       end
    			    end,
-   			    config.timeout *1e9, 'repeating')
+			    conf.timeout *1e9, 'repeating')
    	       )
 
    -- Caches for various cdata pointer objects to avoid boxing in the
    -- push() loop
    o._cache = {
       p = ffi.new("struct packet *[1]"),
-      iov = ffi.new("struct packet_iovec *[1]"),
       mem = ffi.new("uint8_t *[1]")
    }
    return o
@@ -130,7 +129,6 @@ function bridge:push()
       local cache = self._cache
       local dst_ports = self._dst_ports
       local p = cache.p
-      local iov = cache.iov
       local mem = cache.mem
       local filters = self._filters
       local eth_dst = self._eth_dst
@@ -140,8 +138,7 @@ function bridge:push()
       -- Create a storage item from the destination MAC address
       -- for matching with the source addresses learned on the
       -- outbound ports, unless it is a multicast address.
-      iov[0] = p[0].iovecs[0]
-      mem[0] = iov[0].buffer.pointer + iov[0].offset
+      mem[0] = packet.data(p[0])
       local is_mcast = ethernet:is_mcast(mem[0])
       if not is_mcast then
 	 bf:store_value(mem, 6, eth_dst)
@@ -165,7 +162,7 @@ function bridge:push()
 	       transmit(self.output[dst_port], p[0])
 	       copy = true
 	    else
-	       transmit(self.output[dst_port], cow_clone(p[0]))
+	       transmit(self.output[dst_port], clone(p[0]))
 	    end
 	 end
 	 j = j + 1
@@ -177,7 +174,7 @@ function bridge:push()
 	 transmit(output[ports[1]], p[0])
 	 local j = 2
 	 while ports[j] do
-	    transmit(output[ports[j]], cow_clone(p[0]))
+	    transmit(output[ports[j]], clone(p[0]))
 	    j = j + 1
 	 end
       end
@@ -188,5 +185,3 @@ function bridge:push()
       self._port_index = self._port_index + 1
    end
 end
-
-return bridge

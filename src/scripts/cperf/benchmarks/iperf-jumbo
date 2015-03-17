@@ -12,7 +12,7 @@
 set -e
 
 # The actual benchmark.
-out=$(sudo src/snabb snabbmark basic1 10e6)
+out=$(cd src; sudo program/snabbnfv/selftest.sh bench)
 
-# Extract floating point Mpps number from output.
-echo "$out" | tail -n 1 | cut -d " " -f 9
+# Extract floating point Gbits number from output.
+echo "$out" | grep IPERF-JUMBO | cut -d " " -f 2

@@ -103,3 +103,7 @@ Use the
 mailing list for general technical discussions. Submit code with
 Github pull requests. Report bugs with Github issues.
 
+
+### Benchmark Results
+
+[![Benchmark Results](http://lab1.snabb.co:2008/~max/benchmarks.png)](https://travis-ci.org/SnabbCo/snabbswitch.svg?branch=master)

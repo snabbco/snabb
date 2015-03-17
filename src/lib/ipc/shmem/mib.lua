@@ -189,7 +189,7 @@ end
 function mib:get (name, ...)
    local octet = mib:superClass().get(self, name)
    local obj = self._objs[name]
-   if obj.smi_type == 'OctetSttr' then
+   if obj.smi_type == 'OctetStr' then
       return ffi.string(octet.data, octet.length)
    elseif obj.smi_type == 'Bits' then
       local result = ... or {}
