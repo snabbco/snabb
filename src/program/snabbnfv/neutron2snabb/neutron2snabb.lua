@@ -95,13 +95,13 @@ function filter (port, secbindings, secrules, direction, type)
             end
          end
       end
-   end
-   if type == "stateless" then
-      return { rules = rules }
-   else
-      return { rules = rules,
-               state_track = port.id,
-               state_check = port.id }
+      if type == "stateless" then
+         return { rules = rules }
+      else
+         return { rules = rules,
+                  state_track = port.id,
+                  state_check = port.id }
+      end
    end
 end
 
