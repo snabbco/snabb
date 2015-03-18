@@ -135,6 +135,10 @@ $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
 	$(Q) gcc -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
+obj/lib/checksum_c.o: lib/checksum.c
+	$(E) "C(O2)     $@"
+	$(Q) gcc -O2 -mavx2 -msse2 -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"
 	@(echo -n "module(...,package.seeall); require(\"ffi\").cdef[=============["; \
