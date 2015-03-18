@@ -35,6 +35,7 @@ local AF_INET6 = 10
 -- in network order already
 local ETHERTYPE_IPV6 = "0xDD86"
 local ETHERTYPE_IPV4 = "0x0008"
+local ETHERTYPE_ARP  = "0x0608"
 
 local IP_UDP = 0x11
 local IP_TCP = 6
@@ -283,6 +284,10 @@ local function generateRule(
          "unknown min packet size"
       )
    T("if size < ",min_header_size," then break end")
+   if ethertype == ETHERTYPE_IPV4 then
+      T("-- IPv4 implies ARP")
+      T("if ethertype[0] == ",ETHERTYPE_ARP," then return true end")
+   end
    T("if ethertype[0] ~= ",ethertype," then break end")
 
    if rule.state_check then
