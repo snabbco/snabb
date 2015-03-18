@@ -63,6 +63,7 @@ function create_config (input_dir, output_dir, hostname)
                               egress_filter = filter(port, secbindings, secrules, 'egress'),
                               gbps = vif_details.zone_gbps,
                               rx_police_gbps = profile.rx_police_gbps,
+                              tx_police_gbps = profile.tx_police_gbps,
                               tunnel = tunnel(port, vif_details, profile) })
             end
          end
