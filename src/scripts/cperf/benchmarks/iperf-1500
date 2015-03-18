@@ -12,7 +12,7 @@
 set -e
 
 # The actual benchmark.
-out=$(cd src; sudo program/snabbnfv/selftest.sh bench jumbo)
+out=$(cd src; sudo program/snabbnfv/selftest.sh bench)
 
 # Extract floating point Gbits number from output.
-echo "$out" | grep IPERF-JUMBO | cut -d " " -f 2
+echo "$out" | grep IPERF-1500 | cut -d " " -f 2
