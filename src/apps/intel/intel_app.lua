@@ -11,6 +11,8 @@ local receive, transmit, full, empty = link.receive, link.transmit, link.full, l
 Intel82599 = {}
 Intel82599.__index = Intel82599
 
+driver = Intel82599
+
 -- table pciaddr => {pf, vflist}
 local devices = {}
 

@@ -54,9 +54,12 @@ function path(pcidev) return "/sys/bus/pci/devices/"..pcidev end
 -- Return the name of the Lua module that implements support for this device.
 function which_driver (vendor, device)
    if vendor == '0x8086' then
-      if device == '0x10fb' then return 'apps.intel.intel10g' end -- Intel 82599
-      if device == '0x10d3' then return 'apps.intel.intel' end    -- Intel 82574L
-      if device == '0x105e' then return 'apps.intel.intel' end    -- Intel 82571
+      if device == '0x10fb' then return 'apps.intel.intel_app' end -- Intel 82599
+      if device == '0x10d3' then return 'apps.intel.intel_app' end -- Intel 82574L
+      if device == '0x105e' then return 'apps.intel.intel_app' end -- Intel 82571
+   elseif vendor == '0x1924' then
+      if device == '0x0903' then return 'apps.solarflare.solarflare' end
+--      if device == '0x0803' then return 'apps.solarflare.solarflare' end
    end
 end
 
@@ -110,6 +113,24 @@ function set_bus_master (device, enable)
    C.close(fd)
 end
 
+--- ### Open a device
+---
+--- Load a device driver for a device. A fresh copy of the device
+--- driver's Lua module is loaded for each device and the module is
+--- told at load-time the PCI address of the device it is controlling.
+--- This makes the driver source code short because it can assume that
+--- it's always talking to the same device.
+---
+--- This is achieved with our own require()-like function that loads a
+--- fresh copy and passes the PCI address as an argument.
+
+open_devices = {}
+
+-- Load a new instance of the 'driver' module for 'pciaddress'.
+function open_device(pciaddress, driver)
+   return require(driver).new(pciaddress)
+end
+
 --- ### Selftest
 ---
 --- PCI selftest scans for available devices and performs our driver's
@@ -133,4 +154,22 @@ function print_device_summary ()
       end
       print(fmt:format(unpack(values)))
    end
+end
+
+function open_usable_devices (options)
+   local drivers = {}
+   for _,device in ipairs(devices) do
+      if #drivers == 0 then
+         if device.usable == 'yes' then
+            print("Opening device "..device.pciaddress)
+            local driver = open_device(device.pciaddress, device.driver)
+            driver:open_for_loopback_test()
+            table.insert(drivers, driver)
+         end
+      end
+   end
+   local options = {devices=drivers,
+                    program=port.Port.loopback_test,
+                    report=true}
+   port.selftest(options)
 end

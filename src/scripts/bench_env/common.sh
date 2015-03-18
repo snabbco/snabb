@@ -14,6 +14,7 @@ run_qemu () {
     TELNETPORT=$5
     NETDEV=$6
     CPU=$7
+    LOG=${8:-$(basename "${IMG?}").log}
 
     MEM="-m ${GUEST_MEM?} -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM?}M,mem-path=${HUGETLBFS?},share=on"
     NET="$NETDEV -device virtio-net-pci,netdev=net0,mac=$MAC,mq=$MQ,vectors=$VECTORS"
@@ -31,7 +32,7 @@ run_qemu () {
             -M pc -smp $SMP -cpu host --enable-kvm \
             -serial telnet:localhost:$TELNETPORT,server,nowait \
             -drive if=virtio,file=$IMG \
-        -nographic > "$(basename "${IMG?}").log" 2>&1 &
+            -nographic > $LOG 2>&1 &
     QEMUPIDS="$QEMUPIDS $!"
 }
 
@@ -43,13 +44,14 @@ run_qemu () {
 # - PORT for telnet serial
 # - vhost-user SOCKET
 # - optional CPU to execute on
+# - Log file
 run_qemu_vhost_user () {
     SOCKET=$6
     if [ ! -n $QUEUES ]; then
         MQUEUES=",queues=$QUEUES"
     fi
     NETDEV="-netdev type=vhost-user,id=net0,chardev=char0${MQUEUES} -chardev socket,id=char0,path=$SOCKET,server"
-    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7"
+    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7" "$8"
     QEMUSOCKS="$QEMUSOCKS $SOCKET"
 }
 
@@ -61,10 +63,11 @@ run_qemu_vhost_user () {
 # - PORT for telnet serial
 # - tap name
 # - optional CPU to execute on
+# - Log file
 run_qemu_tap () {
     TAP=$6
     NETDEV="-netdev type=tap,id=net0,script=no,downscript=no,vhost=on,ifname=$TAP,queues=$QUEUES"
-    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7"
+    run_qemu "$1" "$2" "$3" "$4" "$5" "$NETDEV" "$7" "$8"
 }
 
 run_loadgen () {
@@ -89,6 +92,12 @@ run_nfv () {
     CONFIG=$4
     LOG=$5
     CPU=$6
+    export NFV_TRACE=$7
+    if [ "$8" != "" ]
+    then
+        # special intermediate hack to set Solarflare MAC address
+        export SF_MAC=$8
+    fi
 
     if [ -n "$CPU" ]; then
         NUMA="--membind=$NUMANODE --physcpubind=$CPU"
@@ -249,4 +258,8 @@ do_lock () {
     done
 }
 
-do_lock $NFV_PCI0 $NFV_PCI1
+do_lock $NFV_PCI0
+if [ "$NFV_PCI0" != "$NFV_PCI1" ]
+then
+    do_lock $NFV_PCI1
+fi
