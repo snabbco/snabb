@@ -77,7 +77,7 @@ function VirtioNetDevice:new(owner)
       kickfd = {},
       virtq = {},
       rx = {},
-      tx = { 
+      tx = {
 	 p = nil,
 	 tx_mrg_hdr = ffi.new("struct virtio_net_hdr_mrg_rxbuf*[1]") ,
 	 data_sent = nil,
@@ -205,6 +205,11 @@ function VirtioNetDevice:tx_packet_start(addr, len)
 
    -- TODO: copy the relevnat fields from the packet
    ffi.fill(tx_hdr, virtio_net_hdr_size)
+   if checksum.verify_packet(tx_p.data+14, tc_p.length-14) then
+      tx_hdr.flags = C.VIO_NET_HDR_F_DATA_VALID
+   else
+      tx_hdr.flags = C.VIO_NET_HDR_F_NEEDS_CSUM
+   end
 
    return tx_p
 end
@@ -248,8 +253,11 @@ function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
       -- IP/TCP/UDP checksum check. The current call exists only to
       -- make the CPU do the checksumming work so that we can measure
       -- preliminary performance.
-      checksum.ipsum(tx_p.data, tx_p.length, 0)
-      tx_mrg_hdr.hdr.flags = C.VIO_NET_HDR_F_DATA_VALID
+      if checksum.verify_packet(tx_p.data+14, tx_p.length-14) then
+         tx_mrg_hdr.hdr.flags = C.VIO_NET_HDR_F_DATA_VALID
+      else
+         tx_mrg_hdr.hdr.flags = C.VIO_NET_HDR_F_NEEDS_CSUM
+      end
 
       self.tx.tx_mrg_hdr[0] = tx_mrg_hdr
       self.tx.data_sent = 0
