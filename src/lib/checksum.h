@@ -23,3 +23,9 @@ void checksum_update_incremental_32(uint16_t* checksum_cell,
 uint32_t tcp_pseudo_checksum(uint16_t *sip, uint16_t *dip,
                              int addr_halfwords, int len);
 
+typedef struct {
+  uint32_t initial;
+  int headersize;
+} pseudoheader;
+
+pseudoheader pseudo_header_initial(const int8_t *buf, size_t len);

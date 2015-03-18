@@ -27,6 +27,12 @@ function finish_packet (buf, len, offset)
    ffi.cast('uint16_t *', buf+offset)[0] = lib.htons(ipsum(buf, len, 0))
 end
 
+function verify_packet (buf, len)
+   local phead = C.pseudo_header_initial(buf, len)
+   if phead.initial == 0 then return false end
+
+   return ipsum(buf+phead.headersize, len-phead.headersize, phead.initial) == 0
+end
 
 -- See checksum.h for more utility functions that can be added.
 

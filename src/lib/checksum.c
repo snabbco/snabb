@@ -62,7 +62,7 @@ uint16_t cksum_generic(const void *buf, size_t len, uint16_t initial)
 
 //
 // A unaligned version of the cksum,
-// n is number of 16-bit values to sum over, n in it self is a 
+// n is number of 16-bit values to sum over, n in it self is a
 // 16 bit number in order to avoid overflow in the loop
 //
 static inline uint32_t cksum_ua_loop(unsigned char *p, uint16_t n)
@@ -294,3 +294,53 @@ uint32_t tcp_pseudo_checksum(uint16_t *sip, uint16_t *dip,
   return result;
 }
 
+typedef struct {
+  uint32_t initial;
+  int headersize;
+} pseudoheader;
+
+pseudoheader pseudo_header_initial(const int8_t *buf, size_t len)
+{
+  const uint16_t const *hwbuf = (const uint16_t *)buf;
+  pseudoheader retval = {0, 0};
+  int8_t ipv = (buf[0] & 0xF0) >> 4;
+  int8_t proto = 0;
+
+  if (ipv == 4) {           // IPv4
+    proto = buf[9];
+    retval.headersize = (buf[0] & 0x0F) * 4;
+  } else if (ipv == 6) {    // IPv6
+    proto = buf[6];
+    retval.headersize = 40;
+  } else {
+    return retval;
+  }
+
+  if (proto == 6 || proto == 17) {     // TCP || UDP
+    if (ipv == 4) {                         // IPv4
+      if (cksum_generic_reduce(cksum_generic_loop(buf, retval.headersize, 0)) != 0) {
+        return retval;
+      }
+      retval.initial = proto + ((len-retval.headersize) & 0xFFFF)
+              + ntohs(hwbuf[6])
+              + ntohs(hwbuf[7])
+              + ntohs(hwbuf[8])
+              + ntohs(hwbuf[9]);
+      return retval;
+
+    } else {                                // IPv6
+      retval.initial = proto + (len-retval.headersize);
+      int i;
+      for (i = 4; i < 20; i+=4) {
+        retval.initial +=
+            ntohs(hwbuf[i]) +
+            ntohs(hwbuf[i+1]) +
+            ntohs(hwbuf[i+2]) +
+            ntohs(hwbuf[i+3]);
+      }
+      return retval;
+    }
+  } else {
+    return retval;
+  }
+}
