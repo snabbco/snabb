@@ -55,14 +55,17 @@ function create_config (input_dir, output_dir, hostname)
             -- Each zone can have multiple port configurtions.
             if not zones[zone_port] then zones[zone_port] = {} end
             if port.admin_state_up ~= '0' then
+               -- Note: Currently we don't use `vif_details.zone_gbps'
+               -- because its "not needed by the traffic process in the
+               -- current implementation".
                table.insert(zones[zone_port],
                             { vlan = vif_details.zone_vlan,
                               mac_address = port.mac_address,
                               port_id = port.id,
                               ingress_filter = filter(port, secbindings, secrules, 'ingress'),
                               egress_filter = filter(port, secbindings, secrules, 'egress'),
-                              gbps = vif_details.zone_gbps,
                               rx_police_gbps = profile.rx_police_gbps,
+                              tx_police_gbps = profile.tx_police_gbps,
                               tunnel = tunnel(port, vif_details, profile) })
             end
          end
