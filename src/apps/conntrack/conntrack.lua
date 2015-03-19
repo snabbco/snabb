@@ -61,6 +61,12 @@ local function uint16(a, b)
    return a * 2^8 + b
 end
 
+-- IP
+
+local function length(p)
+   return uint16(p[16], p[17])   
+end
+
 local function ip_src(p)
    return uint32(p[26], p[27], p[28], p[29])
 end
@@ -81,8 +87,6 @@ local function ip_dst_str(p)
    return ip_str(p[30], p[31], p[32], p[33])
 end
 
-local conn = {}
-
 local function key(src, dst, offset)
    local result = tostring(src).."-"..tostring(dst)
    if offset then
@@ -99,23 +103,9 @@ local function is_proto(p, proto)
    return bit.band(p[23], proto)
 end
 
+-- TCP
+
 local TCP = 0x06
-
-local function tcpflags(p, flag)
-   return bit.band(p[47], 0x3F) == flag
-end
-
-local function is_syn(p)
-   return tcpflags(p, 0x02)
-end
-
-local function is_syn_ack(p)
-   return tcpflags(p, bit.bor(0x02, 0x10))
-end
-
-local function is_ack(p)
-   return tcpflags(p, 0x10)
-end
 
 local function src_port(p)
    return uint16(p[34], p[35])
@@ -136,6 +126,28 @@ end
 local function reserved(p)
    local w = uint16(p[46], p[47])
    return bit.band(w, 0x0FC0)
+end
+
+-- TCP_FLAGS
+
+local TCP_SYN     =  0x02
+local TCP_ACK     =  0x10
+local TCP_SYN_ACK =  0x12
+
+local function tcpflags(p, flag)
+   return bit.band(p[47], 0x3F) == flag
+end
+
+local function is_syn(p)
+   return tcpflags(p, TCP_SYN)
+end
+
+local function is_ack(p)
+   return tcpflags(p, TCP_ACK)
+end
+
+local function is_syn_ack(p)
+   return tcpflags(p, TCP_SYN_ACK)
 end
 
 function Conntrack:process_packet(i, o)
@@ -161,19 +173,19 @@ function Conntrack:process_packet(i, o)
       local ack = ack(p)
 
       -- print("src: "..src.."; dst: "..dst.."; src_port: "..src_port(p).."; dst_port: "..dst_port(p).."; proto: "..protocol(p))
-      print("src: "..src.."; dst: "..dst.."; src_port: "..src_port(p).."; dst_port: "..dst_port(p).."; reserved: "..reserved(p))
+      -- print("src: "..src.."; dst: "..dst.."; src_port: "..src_port(p).."; dst_port: "..dst_port(p).."; reserved: "..reserved(p))
 
       -- print("src: "..src.."; dst: "..dst.."; reserved: "..reserved(p))
 
-      --[[
       if is_syn(p) then
          print("Is SYN! - src: "..src.."; dst: "..dst.."; seq: "..seq.."; ack: "..ack)
       end
-
       if is_ack(p) then
-         print("Is SYN! - src: "..src.."; dst: "..dst.."; seq: "..seq.."; ack: "..ack)
+         print("Is ACK! - src: "..src.."; dst: "..dst.."; seq: "..seq.."; ack: "..ack)
       end
-      --]]
+      if is_syn_ack(p) then
+         print("Is SYN_ACK! - src: "..src.."; dst: "..dst.."; seq: "..seq.."; ack: "..ack)
+      end
 
       -- print("src: "..src.."; dst: "..dst.."; seq: "..seq.."; ack: "..ack)
 
