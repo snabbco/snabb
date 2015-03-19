@@ -42,6 +42,8 @@ SolarFlareNic = {}
 SolarFlareNic.__index = SolarFlareNic
 SolarFlareNic.version = ef_vi_version
 
+-- The `driver' variable is used as a reference to the driver class in
+-- order to interchangably use NIC drivers.
 driver = SolarFlareNic
 
 function SolarFlareNic:new(args)
