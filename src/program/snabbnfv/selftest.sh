@@ -279,16 +279,22 @@ function filter_tests {
     assert FILTER $?
 }
 
-# Usage: iperf_bench
-# Run iperf benchmark.
+# Usage: iperf_bench [<mode>]
+# Run iperf benchmark. If <mode> is "jumbo", jumboframes will be enabled.
 function iperf_bench {
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports    
 
-    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" \
-        2>&1 >/dev/null
+    if [ "$1" = "jumbo" ]; then
+        test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" \
+            2>&1 >/dev/null
+    fi
     Gbits=$(test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" \
         | egrep -o '[0-9\.]+ Gbits/sec' | cut -d " " -f 1)
-    echo IPERF-JUMBO "$Gbits"
+    if [ "$1" = "jumbo" ]; then
+        echo IPERF-JUMBO "$Gbits"
+    else
+        echo IPERF-1500 "$Gbits"
+    fi
 }
 
 # Usage: fuzz_tests <n>
@@ -309,7 +315,7 @@ start_bench_env
 # Decide which mode to run (`test', `bench' or `fuzz').
 case $1 in
     bench)
-        iperf_bench
+        iperf_bench "$2"
         ;;
     fuzz)
         fuzz_tests "$2"
