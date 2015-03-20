@@ -31,7 +31,7 @@ function fuzz_connective_ports (spec)
       for i = 1, n_rules do
          rules[i+2] = random_filter_rule()
       end
-      return rules
+      return { rules = rules }
    end
    local function fuzz_tunnel ()
       local cookies = { random_cookie(), random_cookie() }

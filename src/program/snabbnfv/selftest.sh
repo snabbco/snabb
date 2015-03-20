@@ -200,8 +200,8 @@ function test_rate_limited {
 # <dest_ip>/<port> on VM listening on <telnet_port1>. If `-u' is appended
 # UDP is used instead of TCP.
 function port_probe {
-    run_telnet $2 "nohup echo | nc $5 -l $3 $4 &" 2>&1 >/dev/null
-    run_telnet $1 "nc -v $5 $3 $4" 5 | agrep succeeded
+    run_telnet $2 "nohup echo | nc -q 1 $5 -l $3 $4 &" 2>&1 >/dev/null
+    run_telnet $1 "nc -w 1 -q 1 -v $5 $3 $4" 5 | agrep succeeded
 }
 
 function same_vlan_tests {
@@ -273,8 +273,24 @@ function filter_tests {
     test 0 -ne $?
     assert FILTER $?
 
-    # Assert UDP/12345 is filtered.
-    port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12345 -u
+
+    load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/stateful-filter.ports
+
+    # port B allows ICMP and TCP/12345 ingress and established egress
+    # traffic.
+
+    test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
+
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12345
+    assert PORTPROBE $?
+
+    # Assert TCP/12346 is filtered.
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12348
+    test 0 -ne $?
+    assert FILTER $?
+
+    # Assert non-established egress connections are filtered.
+    port_probe $TELNET_PORT1 $TELNET_PORT0 "$GUEST_IP0%eth0" 12340
     test 0 -ne $?
     assert FILTER $?
 }
