@@ -317,30 +317,32 @@ pseudoheader pseudo_header_initial(const int8_t *buf, size_t len)
   }
 
   if (proto == 6 || proto == 17) {     // TCP || UDP
+    uint32_t sum = 0;
     if (ipv == 4) {                         // IPv4
       if (cksum_generic_reduce(cksum_generic_loop(buf, retval.headersize, 0)) != 0) {
         return retval;
       }
-      retval.initial = proto + ((len-retval.headersize) & 0xFFFF)
-              + ntohs(hwbuf[6])
-              + ntohs(hwbuf[7])
-              + ntohs(hwbuf[8])
-              + ntohs(hwbuf[9]);
-      return retval;
+      sum = htons((len-retval.headersize) & 0xFFFF) + (proto << 8)
+              + hwbuf[6]
+              + hwbuf[7]
+              + hwbuf[8]
+              + hwbuf[9];
 
     } else {                                // IPv6
-      retval.initial = proto + (len-retval.headersize);
+      len -= retval.headersize;
+      sum = htons(len >> 16) + htons(len & 0xFFFF) + (proto << 8);
       int i;
       for (i = 4; i < 20; i+=4) {
-        retval.initial +=
-            ntohs(hwbuf[i]) +
-            ntohs(hwbuf[i+1]) +
-            ntohs(hwbuf[i+2]) +
-            ntohs(hwbuf[i+3]);
+        sum += hwbuf[i] +
+               hwbuf[i+1] +
+               hwbuf[i+2] +
+               hwbuf[i+3];
       }
-      return retval;
     }
-  } else {
-    return retval;
+    sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
+    sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
+    sum = ntohs(sum);
+    retval.initial = sum;
   }
+  return retval;
 }
