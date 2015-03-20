@@ -294,43 +294,39 @@ uint32_t tcp_pseudo_checksum(uint16_t *sip, uint16_t *dip,
   return result;
 }
 
-typedef struct {
-  uint32_t initial;
-  int headersize;
-} pseudoheader;
-
-pseudoheader pseudo_header_initial(const int8_t *buf, size_t len)
+uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
 {
   const uint16_t const *hwbuf = (const uint16_t *)buf;
-  pseudoheader retval = {0, 0};
   int8_t ipv = (buf[0] & 0xF0) >> 4;
   int8_t proto = 0;
+  int headersize = 0;
 
   if (ipv == 4) {           // IPv4
     proto = buf[9];
-    retval.headersize = (buf[0] & 0x0F) * 4;
+    headersize = (buf[0] & 0x0F) * 4;
   } else if (ipv == 6) {    // IPv6
     proto = buf[6];
-    retval.headersize = 40;
+    headersize = 40;
   } else {
-    return retval;
+    return 0;
   }
 
   if (proto == 6 || proto == 17) {     // TCP || UDP
     uint32_t sum = 0;
+    len -= headersize;
     if (ipv == 4) {                         // IPv4
-      if (cksum_generic_reduce(cksum_generic_loop(buf, retval.headersize, 0)) != 0) {
-        return retval;
+      if (cksum_generic_reduce(cksum_generic_loop(buf, headersize, 0)) != 0) {
+        return 0;
       }
-      sum = htons((len-retval.headersize) & 0xFFFF) + (proto << 8)
+      sum = htons(len & 0x0000FFFF) + (proto << 8)
               + hwbuf[6]
               + hwbuf[7]
               + hwbuf[8]
               + hwbuf[9];
 
     } else {                                // IPv6
-      len -= retval.headersize;
-      sum = htons(len >> 16) + htons(len & 0xFFFF) + (proto << 8);
+      sum = htons((len & 0xFFFF0000) >> 16) + htons(len & 0x0000FFFF) + (proto << 8);
+      sum += hwbuf[2] + (proto << 8);
       int i;
       for (i = 4; i < 20; i+=4) {
         sum += hwbuf[i] +
@@ -341,8 +337,7 @@ pseudoheader pseudo_header_initial(const int8_t *buf, size_t len)
     }
     sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
     sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
-    sum = ntohs(sum);
-    retval.initial = sum;
+    return ntohs(sum);
   }
-  return retval;
+  return 0;
 }

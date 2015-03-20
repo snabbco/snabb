@@ -10,6 +10,7 @@ require("lib.checksum_h")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
+local band = bit.band
 
 -- Select ipsum(pointer, len, initial) function based on hardware
 -- capability.
@@ -28,10 +29,18 @@ function finish_packet (buf, len, offset)
 end
 
 function verify_packet (buf, len)
-   local phead = C.pseudo_header_initial(buf, len)
-   if phead.initial == 0 then return false end
+   local initial = C.pseudo_header_initial(buf, len)
+   if initial == 0 then return false end
 
-   return ipsum(buf+phead.headersize, len-phead.headersize, phead.initial) == 0
+   local headersize = 0
+   local ipv = band(buf[0], 0xF0)
+   if ipv == 0x60 then
+      headersize = 40
+   elseif ipv == 0x40 then
+      headersize = band(buf[0], 0x0F) * 4;
+   end
+
+   return ipsum(buf+headersize, len-headersize, initial) == 0
 end
 
 -- See checksum.h for more utility functions that can be added.
