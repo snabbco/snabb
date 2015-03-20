@@ -167,6 +167,65 @@ local function is_fin(p)
    return tcpflags(p, TCP_FIN)
 end
 
+
+
+--[[
+
+Source NAT:
+
+* Source NAT changes the source address in IP header of a packet. 
+* It may also change the source port in the TCP/UDP headers. 
+* The typical usage is to change the a private (rfc1918) address/port into a public address/port for packets leaving your network.
+
+Destination NAT:
+
+* Destination NAT changes the destination address in IP header of a packet. 
+* It may also change the destination port in the TCP/UDP headers.
+* The typical usage of this is to redirect incoming packets with a destination of a public address/port to a private IP address/port inside your network.
+
+When a computer in a LAN uses a gateway, the gateway is providing SNAT and DNAT for the computer in the LAN.
+
+--]]
+
+local host = {
+   ip   = "192.168.1.1",
+   mask = "255.255.255.0",
+   port = "80"
+}
+
+local function parts(ip_address)
+   local result = {}
+   for part in ip_address:gmatch("([^%.]+)%.?") do
+      table.insert(result, part)
+   end
+   return result
+end
+
+local function network_address(ip, mask)
+   local function u32(a)
+      return uint32(a[1], a[2], a[3], a[4])
+   end
+   local function uint32_to_str(ip)
+      local a = bit.band(bit.rshift(ip, 24), 0xFF)
+      local b = bit.band(bit.rshift(ip, 16), 0xFF)
+      local c = bit.band(bit.rshift(ip, 8), 0xFF)
+      local d = bit.band(ip, 0xFF)
+      return ("%d.%d.%d.%d"):format(a, b, c, d)
+   end
+   local ip = u32(parts(ip))
+   local mask = u32(parts(mask))
+   return uint32_to_str(bit.band(ip, mask))
+end
+
+local function same_network(h1, h2, mask)
+   local n1 = parts(network_address(h1, mask))
+   local n2 = parts(network_address(h2, mask))
+   for i=1,#n1 do
+      if not n1[i] == n2[i] then return false end
+   end
+   return true
+end
+
 function Conntrack:process_packet(i, o)
    local p = link.receive(i)
    link.transmit(o, p)
