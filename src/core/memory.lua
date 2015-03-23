@@ -116,12 +116,3 @@ function selftest (options)
    print("HugeTLB page allocation OK.")
 end
 
---- ### module init: `mlock()` at load time
-
---- This module requires a stable physical-virtual mapping so this is
---- enforced automatically at load-time.
-function module_init ()
-   assert(C.lock_memory() == 0)
-end
-
-module_init()
