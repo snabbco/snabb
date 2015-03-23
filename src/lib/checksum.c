@@ -183,7 +183,7 @@ static inline uint32_t cksum_avx2_loop(unsigned char *p, size_t n)
         __m256i s1 = zero;
         n -= k;
         while (k) {
-            __m256i src = _mm256_load_si256((__m256i const*) p);
+            __m256i src = _mm256_loadu_si256((__m256i const*) p);
             __m256i t;
 
             t = _mm256_unpacklo_epi8(src, zero);
@@ -220,13 +220,6 @@ uint16_t cksum_avx2(unsigned char *p, size_t n, uint32_t initial)
     uint32_t sum = initial;
 
     if (n < 128) { return cksum_generic(p, n, initial); }
-    int unaligned = (unsigned long) p & 31;
-    if (unaligned) {
-        size_t k = (32 - unaligned) >> 1;
-        sum += cksum_ua_loop(p, k);
-        n -= (2*k);
-        p += (2*k);
-    }
     if (n >= 64) {
         size_t k = (n >> 5);
         sum += cksum_avx2_loop(p, k);
