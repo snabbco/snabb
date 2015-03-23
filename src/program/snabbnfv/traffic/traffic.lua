@@ -7,14 +7,18 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local long_opts = {
-   benchmark = "B"
+   benchmark     = "B",
+   help          = "h",
+   ["long-help"] = "H"
 }
 
 function run (args)
    local opt = {}
    local benchpackets
-   function opt.B (arg) benchpackets = tonumber(arg) end
-   lib.dogetopt(args, opt, "B:", long_opts)
+   function opt.B (arg) benchpackets = tonumber(arg)      end
+   function opt.h (arg) print(short_usage()) main.exit(1) end
+   function opt.H (arg) print(long_usage())  main.exit(1) end
+   lib.dogetopt(args, opt, "hHB:", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
       if benchpackets then
@@ -27,10 +31,13 @@ function run (args)
    else
       print("Wrong number of arguments: " .. tonumber(#args))
       print()
-      print(usage)
+      print(short_usage())
       main.exit(1)
    end
 end
+
+function short_usage () return (usage:gsub("%s*CONFIG FILE FORMAT:.*", "")) end
+function long_usage () return usage end
 
 -- Run in real traffic mode.
 function traffic (pciaddr, confpath, sockpath)

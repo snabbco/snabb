@@ -1,1 +1,25 @@
-snabbnfv neutron-sync-master 
+snabbnfv neutron-sync-master [OPTIONS]
+
+Poll the Neutron database for configuration updates and make these
+available to snabbnfv-sync-agent processes running on other hosts.
+
+  -u USER, --user USER
+                             MySQL username for Neutron DB.
+			     Default: $DB_USER
+  -p PASS, --password PASS
+                             MySQL password for Neutron DB.
+			     Default: $DB_PASSWORD
+  -D DB, --neutron-database DB
+                             MySQL database name for Neutron DB.
+                             Default: $DB_NEUTRON or "neutron_ml2"
+  -m HOST, --mysql-host HOST
+                             MySQL hostname.
+                             Default: $DB_HOST or "localhost"
+  -l ADDRESS, --listen-address ADDRESS
+                             Listen on ADDRESS for sync-agent connections.
+                             Default: $SYNC_LISTEN_HOST or "127.0.0.1"
+  -i SECONDS, --interval SECONDS
+                             Sleep for SECONDS between database snapshots.
+                             Default: $SYNC_INTERVAL or "1"  
+  -h, --help
+                             Print this help message and exit.

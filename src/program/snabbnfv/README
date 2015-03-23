@@ -6,3 +6,5 @@ Usage:
   snabbnfv fuzz
 
 Use --help for per-command usage.
+Example: 
+    snabbnfv traffic --help
