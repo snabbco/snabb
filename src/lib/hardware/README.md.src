@@ -20,7 +20,17 @@ The correct ordering of these steps is absolutely critical.
 — Variable **pci.devices**
 
 An array of supported hardware devices. Must be populated by calling
-`pci.scan_devices`. Each entry is a table with the following keys:
+`pci.scan_devices`. Each entry is a table as returned by
+`pci.device_info`.
+
+— Function **pci.scan_devices**
+
+Scans for available PCI devices and populates the `pci.devices` table.
+
+— Function **pci.device_info** *pciaddress*
+
+Returns a table containing information about the PCI device by
+*pciaddress*. The table has the following keys:
 
 * `pciaddress`—String denoting the PCI address of the
   device. E.g. `"0000:83:00.1"`.
@@ -34,9 +44,10 @@ An array of supported hardware devices. Must be populated by calling
 * `usable`—String denoting if the device was suitable to use when
   scanned. One of `"yes"` or `"no"`.
 
-— Function **pci.scan_devices**
+— Function **pci.which_driver** *vendor*, *model*
 
-Scans for available PCI devices and populates the `pci.devices` table.
+Returns the module name for a suitable device driver (if available) for a
+device of *model* from *vendor*.
 
 — Function **pci.unbind_device_from_linux** *pciaddress*
 

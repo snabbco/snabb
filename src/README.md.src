@@ -123,6 +123,11 @@ implemented the app instance is discarded and a new instance is created.
 *Optional*. Print a report of the current app status.
 
 
+— Method **myapp:stop**
+
+*Optional*. Stop the app and release associated external resources.
+
+
 — Field **myapp.zone**
 
 *Optional*. Name of the LuaJIT *profiling zone* used for this app
@@ -243,6 +248,12 @@ and false otherwise.
 
 Returns the next available packet (and advances the read cursor) on
 *link*. If the link is empty an error is signaled.
+
+
+— Function **link.front** *link*
+
+Return the next available packet without advancing the read cursor on
+*link*. If the link is empty, `nil` is returned.
 
 
 — Function **link.transmit** *link*, *packet*
