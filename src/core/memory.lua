@@ -61,6 +61,7 @@ function allocate_hugetlb_chunk ()
 end
 
 function reserve_new_page ()
+   lib.root_check("error: must run as root to allocate memory for DMA")
    set_hugepages(get_hugepages() + 1)
 end
 

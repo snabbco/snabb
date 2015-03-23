@@ -71,6 +71,7 @@ end
 --- Force Linux to release the device with `pciaddress`.
 --- The corresponding network interface (e.g. `eth0`) will disappear.
 function unbind_device_from_linux (pciaddress)
+   root_check()
     local p = path(pciaddress).."/driver/unbind"
     if lib.can_write(p) then
         lib.writefile(path(pciaddress).."/driver/unbind", pciaddress)
@@ -82,6 +83,7 @@ end
 --   Pointer for memory-mapped access.
 --   File descriptor for the open sysfs resource file.
 function map_pci_memory (device, n)
+   root_check()
    local filepath = path(device).."/resource"..n
    local fd = C.open_pci_resource(filepath)
    assert(fd >= 0)
@@ -98,6 +100,7 @@ end
 --- Enable or disable PCI bus mastering. DMA only works when bus
 --- mastering is enabled.
 function set_bus_master (device, enable)
+   root_check()
    local fd = C.open_pcie_config(path(device).."/config")
    local value = ffi.new("uint16_t[1]")
    assert(C.pread(fd, value, 2, 0x4) == 2)
@@ -108,6 +111,10 @@ function set_bus_master (device, enable)
    end
    assert(C.pwrite(fd, value, 2, 0x4) == 2)
    C.close(fd)
+end
+
+function root_check ()
+   lib.root_check("error: must run as root to access PCI devices")
 end
 
 --- ### Selftest
