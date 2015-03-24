@@ -79,7 +79,7 @@ function nd_light:new (arg)
    local conf = arg and config.parse_app_arg(arg) or {}
    local o = nd_light:superClass().new(self)
    conf.delay = conf.delay or 1000
-   conf.retrans = conf.retrans or 10
+   conf.retrans = conf.retrans
    assert(conf.local_mac, "nd_light: missing local MAC address")
    if type(conf.local_mac) == "string" and string.len(conf.local_mac) ~= 6 then
       conf.local_mac = ethernet:pton(conf.local_mac)
@@ -139,10 +139,12 @@ function nd_light:new (arg)
 					ipv6:ntop(conf.next_hop)))
 		    link.transmit(o.output.south, packet.clone(nh.packet))
 		    nh.nsent = nh.nsent + 1
-		    if nh.nsent <= o._config.retrans and not o._eth_header then
-		       timer.activate(nh.timer)
+		    if (not o._config.retrans or nh.nsent <= o._config.retrans)
+                       and not o._eth_header
+                    then
+                       timer.activate(nh.timer)
 		    end
-		    if nh.nsent > o._config.retrans then
+		    if o._config.retrans and nh.nsent > o._config.retrans then
 		       error(string.format("ND for next hop %s has failed",
 					   ipv6:ntop(conf.next_hop)))
 		    end
