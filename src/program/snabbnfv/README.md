@@ -12,7 +12,7 @@ Neutron](https://wiki.openstack.org/wiki/Neutron).
 — Function **nfvconfig.load** *file*, *pci_address*, *socket_path*
 
 Loads the NFV configuration from *file* and compiles an app network using
-*pci_address* and *socket_path* for the underlying `Intel10G` and
+*pci_address* and *socket_path* for the underlying NIC driver and
 `VhostUser` apps. Returns the resulting engine configuration.
 
 
@@ -27,12 +27,12 @@ return { <port-1>, ..., <port-n> }
 ```
 
 Each port is defined by a range of properties which correspond to the
-configuration parameters of the underlying apps (`Intel10G`, `VhostUser`,
+configuration parameters of the underlying apps (NIC driver, `VhostUser`,
 `PacketFilter`, `RateLimiter`, `nd_light` and `SimpleKeyedTunnel`):
 
 ```
 port := { port_id        = <id>,          -- A unique string
-          mac_address    = <mac-address>, -- As for Intel10G
+          mac_address    = <mac-address>, -- MAC address as a string
           vlan           = <vlan-id>,     -- ..
           ingress_filter = <rules>,       -- As for PacketFilter
           egress_filter  = <rules>,       -- ..
