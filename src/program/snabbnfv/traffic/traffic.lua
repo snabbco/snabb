@@ -14,7 +14,7 @@ function run (args)
    local opt = {}
    local benchpackets
    function opt.B (arg) benchpackets = tonumber(arg) end
-   lib.dogetopt(args, opt, "B:", long_opts)
+   args = lib.dogetopt(args, opt, "B:", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
       if benchpackets then
