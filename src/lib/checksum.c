@@ -325,8 +325,7 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
               + hwbuf[9];
 
     } else {                                // IPv6
-      sum = htons((len & 0xFFFF0000) >> 16) + htons(len & 0x0000FFFF) + (proto << 8);
-      sum += hwbuf[2] + (proto << 8);
+      sum = hwbuf[2] + (proto << 8);
       int i;
       for (i = 4; i < 20; i+=4) {
         sum += hwbuf[i] +
@@ -337,7 +336,10 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
     }
     sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
     sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
-    return ntohs(sum);
+	if (len >= 128) {
+		sum = ntohs(sum);
+	}
+    return sum; // ntohs(sum);
   }
   return 0;
 }
