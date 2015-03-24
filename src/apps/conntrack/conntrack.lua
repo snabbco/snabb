@@ -7,6 +7,12 @@ local link = require("core.link")
 local packet = require("core.packet")
 local bit = require("bit")
 
+local ip_helper = require("apps.conntrack.ip_helper")
+
+local as_ip_table, as_ip_string, as_ip_number = 
+   ip_helper.as_ip_table, ip_helper.as_ip_string, ip_helper.as_ip_number
+local same_network = ip_helper.same_network
+
 Conntrack = {}
 
 local new_conn_id = (function()
@@ -26,6 +32,7 @@ function Conntrack:new(arg)
       __gc = function() print("__gc") end })
 end
 
+-- FIXME: Not working
 function Conntrack:destroy()
    print("Destroy!!")
 end
@@ -71,20 +78,37 @@ local function length(p)
    return uint16(p[16], p[17])   
 end
 
-local function src_ip(p)
-   return uint32(p[26], p[27], p[28], p[29])
-end
-
 local function ip_str(a, b, c, d)
    return ("%d.%d.%d.%d"):format(a, b, c, d)
+end
+
+local function get_ip(p, arr)
+   local a, b, c, d = arr[1], arr[2], arr[3], arr[4]
+   return uint32(p[a], p[b], p[c], p[d])
+end
+
+local function set_ip(p, arr, val)
+   val = as_ip_table(val)
+   local a, b, c, d = arr[1], arr[2], arr[3], arr[4]
+   p[a], p[b], p[c], p[d] = val[1], val[2], val[3], val[4]
+end
+
+local function src_ip(p, val)
+   if not val then
+      return get_ip(p, { 26, 27, 28, 29 })
+   end
+   set_ip(p, { 26, 27, 28, 29 }, val)
 end
 
 local function src_ip_str(p)
    return ip_str(p[26], p[27], p[28], p[29])
 end
 
-local function dst_ip(p)
-   return uint32(p[30], p[31], p[32], p[33])
+local function dst_ip(p, val)
+   if not val then
+      return get_ip(p, { 30, 31, 32, 33 })
+   end
+   set_ip(p, { 30, 31, 32, 33 }, val)
 end
 
 local function dst_ip_str(p)
@@ -145,10 +169,25 @@ end
 
 -- TCP connection negotiation
 
-local function packet_id(p)
+local function packet_id(p, opts)
+   opts = opts or {}
    local src = src_ip_str(p)..":"..src_port(p)
    local dst = dst_ip_str(p)..":"..dst_port(p)
+   if opts.dst_src then
+      return dst.."-"..src
+   end
    return src.."-"..dst
+end
+
+function Conntrack:has_connection(p)
+   local p_id = packet_id(p)
+   if self.conns[p_id] then return true end
+   p_id = packet_id(p, { dst_src = true })
+   return self.conns[p_id]
+end
+
+function Conntrack:cancel_connection(p)
+
 end
 
 local function is_syn(p)
@@ -166,8 +205,6 @@ end
 local function is_fin(p)
    return tcpflags(p, TCP_FIN)
 end
-
-
 
 --[[
 
@@ -187,58 +224,28 @@ When a computer in a LAN uses a gateway, the gateway is providing SNAT and DNAT 
 
 --]]
 
-local host = {
+local proxy = {
    ip   = "192.168.1.1",
    mask = "255.255.255.0",
    port = "80"
 }
 
-local function parts(ip_address)
-   local result = {}
-   for part in ip_address:gmatch("([^%.]+)%.?") do
-      table.insert(result, part)
-   end
-   return result
-end
-
-local function network_address(ip, mask)
-   local function u32(a)
-      return uint32(a[1], a[2], a[3], a[4])
-   end
-   local function uint32_to_str(ip)
-      local a = bit.band(bit.rshift(ip, 24), 0xFF)
-      local b = bit.band(bit.rshift(ip, 16), 0xFF)
-      local c = bit.band(bit.rshift(ip, 8), 0xFF)
-      local d = bit.band(ip, 0xFF)
-      return ("%d.%d.%d.%d"):format(a, b, c, d)
-   end
-   local ip = u32(parts(ip))
-   local mask = u32(parts(mask))
-   return uint32_to_str(bit.band(ip, mask))
-end
-
-local function same_network(h1, h2, mask)
-   local n1 = parts(network_address(h1, mask))
-   local n2 = parts(network_address(h2, mask))
-   for i=1,#n1 do
-      if not n1[i] == n2[i] then return false end
-   end
-   return true
-end
+-- Convert
 
 function Conntrack:process_packet(i, o)
-   local p = link.receive(i)
-   link.transmit(o, p)
+   local pak = link.receive(i)
 
-   local p = p.data
+   local p = pak.data
 
    -- A packet id is defined by the tuple { src_ip; src_port; dst_ip; dst_port }
    local p_id = packet_id(p) 
+   assert(p_id ~= nil, "Packet id is nil")
 
    if self.three_way_handshake[p_id] then
       if is_syn_ack(p) then
          if (self.three_way_handshake[p_id] == ack(p)) then
             self.three_way_handshake[p_id] = seq(p) + 1
+            link.transmit(o, pak)
             return
          end
       end
@@ -249,27 +256,27 @@ function Conntrack:process_packet(i, o)
             self.conns[p_id] = conn_id
             self.conn_packs[conn_id] = 0
 
+            -- print("Created connection for: "..p_id)
             self.three_way_handshake[p_id] = nil
+            link.transmit(o, pak)
             return
          end
       end
-      if is_fin(p) then
-         self.three_way_handshake[p_id] = nil
-         print("Destroyed connection: "..p_id)
-         return
+   elseif is_syn(p) then
+      self.three_way_handshake[p_id] = seq(p) + 1
+   elseif self:has_connection(p) then
+      -- Substitute original source address for proxy address
+      local src = as_ip_string(src_ip(p))
+      if same_network(src, proxy.ip, proxy.mask) then
+         src_ip(p, proxy.ip)
+      end
+      -- Substitute original destination address for proxy address
+      local dst = as_ip_string(dst_ip(p))
+      if same_network(dst, proxy.ip, proxy.mask) then
+         dst_ip(p, proxy.ip)
       end
    end
 
-   -- Is SYN
-   if is_syn(p) then
-      self.three_way_handshake[p_id] = seq(p) + 1
-      return
-   end
-
-   if self.conns[p_id] then
-      conn_id = self.conns[p_id]
-      self.conn_packs[conn_id] = self.conn_packs[conn_id] + 1
-      -- print(conn_id..": "..self.conn_packs[conn_id])
-   end
+   link.transmit(o, pak)
 
 end
