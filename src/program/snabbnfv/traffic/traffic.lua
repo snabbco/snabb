@@ -74,7 +74,6 @@ function bench (pciaddr, confpath, sockpath, npackets)
          start = C.get_monotonic_time()
          if os.getenv("NFV_PROF") then
             require("jit.p").start(os.getenv("NFV_PROF"), os.getenv("NFV_PROF_FILE"))
-            main.profiling = true
          else
             print("No LuaJIT profiling enabled ($NFV_PROF unset).")
          end
@@ -99,5 +98,6 @@ function bench (pciaddr, confpath, sockpath, npackets)
    print(("Processed %.1f million packets in %.2f seconds (%d bytes; %.2f Gbps)"):format(packets / 1e6, runtime, bytes, bytes * 8.0 / 1e9 / runtime))
    print(("Made %s breaths: %.2f packets per breath; %.2fus per breath"):format(lib.comma_value(engine.breaths), packets / engine.breaths, runtime / engine.breaths * 1e6))
    print(("Rate(Mpps):\t%.3f"):format(packets / runtime / 1e6))
+   require("jit.p").stop()
 end
 
