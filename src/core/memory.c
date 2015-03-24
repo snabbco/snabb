@@ -86,11 +86,13 @@ void *allocate_huge_page(int size)
   shmid = shmget(IPC_PRIVATE, size, SHM_HUGETLB | IPC_CREAT | SHM_R | SHM_W);
   tmpptr = shmat(shmid, NULL, 0);
   if (tmpptr == MAP_FAILED) { goto fail; }
+  if (mlock(tmpptr, size) != 0) { goto fail; }
   physical_address = virtual_to_physical(tmpptr);
   if (physical_address == 0) { goto fail; }
   virtual_address = physical_address | 0x500000000000ULL;
   realptr = shmat(shmid, (void*)virtual_address, 0);
   if (realptr == MAP_FAILED) { goto fail; }
+  if (mlock(realptr, size) != 0) { goto fail; }
   memset(realptr, 0, size); // zero memory to avoid potential surprises
   shmdt(tmpptr);
   shmctl(shmid, IPC_RMID, 0);
@@ -100,11 +102,5 @@ void *allocate_huge_page(int size)
   if (realptr != MAP_FAILED) { shmdt(realptr); }
   if (shmid   != -1)         { shmctl(shmid, IPC_RMID, 0); }
   return NULL;
-}
-
-// Lock all current and future virtual memory in a stable physical location.
-int lock_memory()
-{
-  return mlockall(MCL_CURRENT | MCL_FUTURE);
 }
 

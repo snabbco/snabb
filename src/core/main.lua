@@ -81,10 +81,6 @@ function initialize ()
    require("core.lib")
    require("core.clib_h")
    require("core.lib_h")
-   if C.geteuid() ~= 0 then
-      print("error: snabb has to run as root.")
-      os.exit(1)
-   end
    -- Global API
    _G.config = require("core.config")
    _G.engine = require("core.app")

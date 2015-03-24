@@ -61,6 +61,7 @@ function allocate_hugetlb_chunk ()
 end
 
 function reserve_new_page ()
+   lib.root_check("error: must run as root to allocate memory for DMA")
    set_hugepages(get_hugepages() + 1)
 end
 
@@ -116,12 +117,3 @@ function selftest (options)
    print("HugeTLB page allocation OK.")
 end
 
---- ### module init: `mlock()` at load time
-
---- This module requires a stable physical-virtual mapping so this is
---- enforced automatically at load-time.
-function module_init ()
-   assert(C.lock_memory() == 0)
-end
-
-module_init()
