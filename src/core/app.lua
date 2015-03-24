@@ -26,7 +26,7 @@ configuration = config.new()
 -- Count of the number of breaths taken
 breaths = 0
 -- Ideal number of breaths per second
-Hz = 10000
+Hz = false
 
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
