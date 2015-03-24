@@ -57,7 +57,7 @@ end
 function bench (pciaddr, confpath, sockpath, npackets)
    npackets = tonumber(npackets)
    local ports = dofile(confpath)
-   local nic = "NIC_"..(config.port_name(ports[1]))
+   local nic = "NIC_"..(nfvconfig.port_name(ports[1]))
    engine.log = true
    engine.Hz = false
 
@@ -67,10 +67,10 @@ function bench (pciaddr, confpath, sockpath, npackets)
    -- From designs/nfv
    local start, packets, bytes = 0, 0, 0
    local done = function ()
-      if start == 0 and app.app_table[nic].input.rx.stats.rxpackets > 0 then
+      if start == 0 and engine.app_table[nic].input.rx.stats.rxpackets > 0 then
          -- started receiving, record time and packet count
-         packets = app.app_table[nic].input.rx.stats.rxpackets
-         bytes = app.app_table[nic].input.rx.stats.rxbytes
+         packets = engine.app_table[nic].input.rx.stats.rxpackets
+         bytes = engine.app_table[nic].input.rx.stats.rxbytes
          start = C.get_monotonic_time()
          if os.getenv("NFV_PROF") then
             require("jit.p").start(os.getenv("NFV_PROF"), os.getenv("NFV_PROF_FILE"))
@@ -85,15 +85,15 @@ function bench (pciaddr, confpath, sockpath, npackets)
             print("No LuaJIT dump enabled ($NFV_DUMP unset).")
          end
       end
-      return app.app_table[nic].input.rx.stats.rxpackets - packets >= npackets
+      return engine.app_table[nic].input.rx.stats.rxpackets - packets >= npackets
    end
 
-   app.main({done = done, no_report = true})
+   engine.main({done = done, no_report = true})
    local finish = C.get_monotonic_time()
 
    local runtime = finish - start
-   packets = app.app_table[nic].input.rx.stats.rxpackets - packets
-   bytes = app.app_table[nic].input.rx.stats.rxbytes - bytes
+   packets = engine.app_table[nic].input.rx.stats.rxpackets - packets
+   bytes = engine.app_table[nic].input.rx.stats.rxbytes - bytes
    engine.report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (%d bytes; %.2f Gbps)"):format(packets / 1e6, runtime, bytes, bytes * 8.0 / 1e9 / runtime))
