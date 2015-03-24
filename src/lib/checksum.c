@@ -294,6 +294,12 @@ uint32_t tcp_pseudo_checksum(uint16_t *sip, uint16_t *dip,
   return result;
 }
 
+// calculates the initial checksum value resulting from
+// the pseudo header.
+// return values:
+// 0x0000 - 0xFFFF : initial checksum.
+// 0xFFFF0001 : unknown packet (non IPv4/6 or non TCP/UDP)
+// 0xFFFF0002 : bad header
 uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
 {
   const uint16_t const *hwbuf = (const uint16_t *)buf;
@@ -308,7 +314,7 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
     proto = buf[6];
     headersize = 40;
   } else {
-    return 0;
+    return 0xFFFF0001;
   }
 
   if (proto == 6 || proto == 17) {     // TCP || UDP
@@ -316,7 +322,7 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
     len -= headersize;
     if (ipv == 4) {                         // IPv4
       if (cksum_generic_reduce(cksum_generic_loop(buf, headersize, 0)) != 0) {
-        return 0;
+        return 0xFFFF0002;
       }
       sum = htons(len & 0x0000FFFF) + (proto << 8)
               + hwbuf[6]
@@ -341,5 +347,5 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
 	}
     return sum; // ntohs(sum);
   }
-  return 0;
+  return 0xFFFF0001;
 }

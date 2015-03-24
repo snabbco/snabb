@@ -30,7 +30,9 @@ end
 
 function verify_packet (buf, len)
    local initial = C.pseudo_header_initial(buf, len)
-   if initial == 0 then return false end
+   if     initial == 0xFFFF0001 then return nil
+   elseif initial == 0xFFFF0002 then return false
+   end
 
    local headersize = 0
    local ipv = band(buf[0], 0xF0)
