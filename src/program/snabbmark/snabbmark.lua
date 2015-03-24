@@ -61,16 +61,16 @@ function nfvconfig (pciaddr, confpath_x, confpath_y, nloads)
 
    for i=1, nloads do
       -- Load and apply confpath_x.
-      config.apply(config.load(confpath_x, pciaddr, "/dev/null"))
+      engine.configure(nfvconfig.load(confpath_x, pciaddr, "/dev/null"))
 
       -- Measure loading y.
       local start_load = C.get_monotonic_time()
-      local c, zerocopy = config.load(confpath_y, pciaddr, "/dev/null")
+      local c = nfvconfig.load(confpath_y, pciaddr, "/dev/null")
       local end_load = C.get_monotonic_time()
 
       -- Measure apply x -> y.
       local start_apply = C.get_monotonic_time()
-      config.apply(c, zerocopy)
+      engine.configure(c)
       local end_apply = C.get_monotonic_time()
 
       -- Push results.

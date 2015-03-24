@@ -16,7 +16,7 @@ function port_name (port_config)
 end
 
 -- Compile app configuration from <file> for <pciaddr> and vhost_user
--- <socket>. Returns configuration and zerocopy pairs.
+-- <socket>. Returns configuration.
 function load (file, pciaddr, sockpath)
    local device_info = pci.device_info(pciaddr)
    if not device_info then
@@ -91,15 +91,8 @@ function load (file, pciaddr, sockpath)
       config.link(c, VM_tx.." -> "..NIC..".rx")
    end
 
-   -- Return configuration c, and zerocopy pairs.
+   -- Return configuration c.
    return c
-end
-
--- Apply configuration <c> to engine and reset <zerocopy> buffers.
-function apply (c, zerocopy)
---   print(config.graphviz(c))
---   main.exit(0)
-   engine.configure(c)
 end
 
 function selftest ()
@@ -120,7 +113,7 @@ function selftest ()
                               "program/snabbnfv/test_fixtures/nfvconfig/scale_change/y"})
    do
       print("testing:", confpath)
-      apply(load(confpath, pcideva, "/dev/null"))
+      engine.configure(load(confpath, pcideva, "/dev/null"))
       engine.main({duration = 0.25})
    end
 end
