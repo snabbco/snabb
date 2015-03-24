@@ -54,7 +54,7 @@ milliseconds. Default is 1,000ms.
 — Key **retrans**
 
 *Optional*. Number of neighbor solicitation retransmissions. Default is
- 10.
+unlimited retransmissions.
 
 ## SimpleKeyedTunnel (apps.keyed_ipv6_tunnel.tunnel)
 
