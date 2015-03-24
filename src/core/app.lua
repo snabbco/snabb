@@ -268,10 +268,15 @@ function report (options)
       return tonumber(drop) * 100 / (tonumber(drop)+sent)
    end
    if not options or options.showlinks then
-      print("link report")
-      for name, l in pairs(link_table) do
-         print(("%s sent on %s (loss rate: %d%%))"):format(l.stats.txpackets,
-            name, loss_rate(l.stats.txdrop, l.stats.txpackets)))
+      print("link report:")
+      local names = {}
+      for name in pairs(link_table) do table.insert(names, name) end
+      table.sort(names)
+      for i, name in ipairs(names) do
+	 l = link_table[name]
+         print(("%20s sent on %s (loss rate: %d%%)"):format(
+		  lib.comma_value(l.stats.txpackets),
+		  name, loss_rate(l.stats.txdrop, l.stats.txpackets)))
       end
    end
    if options and options.showapps then
