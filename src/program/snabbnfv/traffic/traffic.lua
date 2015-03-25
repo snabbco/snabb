@@ -7,14 +7,18 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local long_opts = {
-   benchmark = "B"
+   benchmark     = "B",
+   help          = "h",
+   ["long-help"] = "H"
 }
 
 function run (args)
    local opt = {}
    local benchpackets
-   function opt.B (arg) benchpackets = tonumber(arg) end
-   lib.dogetopt(args, opt, "B:", long_opts)
+   function opt.B (arg) benchpackets = tonumber(arg)      end
+   function opt.h (arg) print(short_usage()) main.exit(1) end
+   function opt.H (arg) print(long_usage())  main.exit(1) end
+   args = lib.dogetopt(args, opt, "hHB:", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
       if benchpackets then
@@ -27,10 +31,13 @@ function run (args)
    else
       print("Wrong number of arguments: " .. tonumber(#args))
       print()
-      print(usage)
+      print(short_usage())
       main.exit(1)
    end
 end
+
+function short_usage () return (usage:gsub("%s*CONFIG FILE FORMAT:.*", "")) end
+function long_usage () return usage end
 
 -- Run in real traffic mode.
 function traffic (pciaddr, confpath, sockpath)
@@ -57,7 +64,7 @@ end
 function bench (pciaddr, confpath, sockpath, npackets)
    npackets = tonumber(npackets)
    local ports = dofile(confpath)
-   local nic = "NIC_"..(config.port_name(ports[1]))
+   local nic = "NIC_"..(nfvconfig.port_name(ports[1]))
    engine.log = true
    engine.Hz = false
 
@@ -67,14 +74,13 @@ function bench (pciaddr, confpath, sockpath, npackets)
    -- From designs/nfv
    local start, packets, bytes = 0, 0, 0
    local done = function ()
-      if start == 0 and app.app_table[nic].input.rx.stats.rxpackets > 0 then
+      if start == 0 and engine.app_table[nic].input.rx.stats.rxpackets > 0 then
          -- started receiving, record time and packet count
-         packets = app.app_table[nic].input.rx.stats.rxpackets
-         bytes = app.app_table[nic].input.rx.stats.rxbytes
+         packets = engine.app_table[nic].input.rx.stats.rxpackets
+         bytes = engine.app_table[nic].input.rx.stats.rxbytes
          start = C.get_monotonic_time()
          if os.getenv("NFV_PROF") then
             require("jit.p").start(os.getenv("NFV_PROF"), os.getenv("NFV_PROF_FILE"))
-            main.profiling = true
          else
             print("No LuaJIT profiling enabled ($NFV_PROF unset).")
          end
@@ -85,19 +91,20 @@ function bench (pciaddr, confpath, sockpath, npackets)
             print("No LuaJIT dump enabled ($NFV_DUMP unset).")
          end
       end
-      return app.app_table[nic].input.rx.stats.rxpackets - packets >= npackets
+      return engine.app_table[nic].input.rx.stats.rxpackets - packets >= npackets
    end
 
-   app.main({done = done, no_report = true})
+   engine.main({done = done, no_report = true})
    local finish = C.get_monotonic_time()
 
    local runtime = finish - start
-   packets = app.app_table[nic].input.rx.stats.rxpackets - packets
-   bytes = app.app_table[nic].input.rx.stats.rxbytes - bytes
+   packets = engine.app_table[nic].input.rx.stats.rxpackets - packets
+   bytes = engine.app_table[nic].input.rx.stats.rxbytes - bytes
    engine.report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (%d bytes; %.2f Gbps)"):format(packets / 1e6, runtime, bytes, bytes * 8.0 / 1e9 / runtime))
    print(("Made %s breaths: %.2f packets per breath; %.2fus per breath"):format(lib.comma_value(engine.breaths), packets / engine.breaths, runtime / engine.breaths * 1e6))
    print(("Rate(Mpps):\t%.3f"):format(packets / runtime / 1e6))
+   require("jit.p").stop()
 end
 

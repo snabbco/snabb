@@ -77,7 +77,7 @@ function VirtioNetDevice:new(owner)
       kickfd = {},
       virtq = {},
       rx = {},
-      tx = { 
+      tx = {
 	 p = nil,
 	 tx_mrg_hdr = ffi.new("struct virtio_net_hdr_mrg_rxbuf*[1]") ,
 	 data_sent = nil,
@@ -196,6 +196,21 @@ function VirtioNetDevice:transmit_packets_to_vm ()
    end
 end
 
+local function validflags(buf, len)
+   local valid = checksum.verify_packet(buf, len)
+
+   if valid == true then
+      return C.VIO_NET_HDR_F_DATA_VALID
+   elseif valid == false then
+      return 0
+   else
+      return C.VIO_NET_HDR_F_NEEDS_CSUM
+   end
+end
+
+
+
+
 function VirtioNetDevice:tx_packet_start(addr, len)
    local l = self.owner.input.rx
    if link.empty(l) then return nil, nil end
@@ -205,6 +220,7 @@ function VirtioNetDevice:tx_packet_start(addr, len)
 
    -- TODO: copy the relevnat fields from the packet
    ffi.fill(tx_hdr, virtio_net_hdr_size)
+   tx_hdr.flags = validflags(tx_p.data+14, tx_p.length-14)
 
    return tx_p
 end
@@ -236,20 +252,7 @@ function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
       if link.empty(l) then return end
       tx_p = link.receive(l)
 
-      -- XXX: We should validate the checksum and report the result to
-      -- the VM. -lukego
-      --
-      -- If checksum successful then set C.VIO_NET_HDR_F_DATA_VALID.
-      --
-      -- If checksum failed then set C.VIO_NET_HDR_F_NEEDS_CSUM and
-      -- let the guest do its own check to detect the error.
-      --
-      -- The call to ipsum here should be replaced with a real
-      -- IP/TCP/UDP checksum check. The current call exists only to
-      -- make the CPU do the checksumming work so that we can measure
-      -- preliminary performance.
-      checksum.ipsum(tx_p.data, tx_p.length, 0)
-      tx_mrg_hdr.hdr.flags = C.VIO_NET_HDR_F_DATA_VALID
+      tx_mrg_hdr.hdr.flags = validflags(tx_p.data+14, tx_p.length-14)
 
       self.tx.tx_mrg_hdr[0] = tx_mrg_hdr
       self.tx.data_sent = 0

@@ -100,7 +100,3 @@ function preallocate_step()
    packet_allocation_step = 2 * packet_allocation_step
 end
 
---preallocate packets freelist
-if freelist_nfree(packets_fl) == 0 then
-   preallocate_step()
-end

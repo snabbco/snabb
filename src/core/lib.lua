@@ -3,6 +3,7 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local getopt = require("lib.lua.alt_getopt")
+local syscall = require("syscall")
 require("core.clib_h")
 
 -- Returns true if x and y are structurally similar (isomorphic).
@@ -416,6 +417,14 @@ function have_module (name)
 	 end
       end
       return false
+   end
+end
+
+-- Exit with an error if we are not running as root.
+function root_check (message)
+   if syscall.geteuid() ~= 0 then
+      print(message or "error: must run as root")
+      main.exit(1)
    end
 end
 

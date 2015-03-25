@@ -1,1 +1,22 @@
-neutron-sync-agent
+snabbnfv neutron-sync-agent [OPTIONS]
+
+Poll the neutron-sync-master for new database configurations and
+translate them into snabbnfv traffic process configuration files.
+
+  -s DIR, --snabb-dir DIR
+                             Output snabbnfv traffic config files to DIR.
+                             Default: $SNABB_DIR
+  -h HOST, --sync-host HOST
+                             Connect to snabbnfv-sync-master on HOST.
+                             Default: $SYNC_HOST
+  -p PATH, --sync-path PATH
+                             Use PATH on snabbnfv-sync-master.
+                             Default: $SYNC_PATH
+  -d DIR, --neutron-dir DIR
+                             Store temporary Neutron database dumps in DIR.
+			     Default: $NEUTRON_DIR
+  -i SECONDS, --interval SECONDS
+                             Sleep for SECONDS between sync requests.
+                             Default: $SYNC_INTERVAL or 1
+  -h, --help
+                             Print this help message and exit.
