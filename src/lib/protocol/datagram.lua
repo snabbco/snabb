@@ -24,20 +24,20 @@
 -- correspondingly).
 --
 -- Also note that parsing does not change the packet itself.  However,
--- the header at the bottom of the parse stack (which is located at
--- the beginning of the buffer's valid data) can be removed from the
--- packet by calling the pop() method, which advances the iovec's
--- offset accordingly.
+-- the header at the bottom of the parse stack (which is located at the
+-- beginning of the buffer's valid data) can be removed from the packet
+-- by calling the pop() method, which truncates the underlying packet
+-- accordingly.
 --
 -- The push() method can be used to prepend headers in front of the
--- packet. IMPORTANT: Both pop() and push() destructively modify the
--- packet and headers previously obtained by calls to parse_*() will be
--- corrupted.
+-- packet.
 --
--- To construct a packet from scratch, the constructor is called
--- without a reference to a packet.  In this case, a new packet is
--- allocated with a single empty buffer.  All methods are applicable
--- to such a datagram.
+-- IMPORTANT: Both pop() and push() destructively modify the packet and
+-- headers previously obtained by calls to parse_*() will be corrupted.
+--
+-- To construct a packet from scratch, the constructor is called without
+-- a reference to a packet.  In this case, a new empty packet is
+-- allocated.  All methods are applicable to such a datagram.
 
 module(..., package.seeall)
 local packet = require("core.packet")
