@@ -62,7 +62,7 @@ uint16_t cksum_generic(const void *buf, size_t len, uint16_t initial)
 
 //
 // A unaligned version of the cksum,
-// n is number of 16-bit values to sum over, n in it self is a 
+// n is number of 16-bit values to sum over, n in it self is a
 // 16 bit number in order to avoid overflow in the loop
 //
 static inline uint32_t cksum_ua_loop(unsigned char *p, uint16_t n)
@@ -135,7 +135,7 @@ static inline uint32_t cksum_sse2_loop(unsigned char *p, size_t n)
 
 uint16_t cksum_sse2(unsigned char *p, size_t n, uint32_t initial)
 {
-  uint32_t sum = initial;
+  uint32_t sum = ntohs(initial);
 
   if (n < 128) { return cksum_generic(p, n, initial); }
   int unaligned = (unsigned long) p & 0xf;
@@ -217,7 +217,7 @@ static inline uint32_t cksum_avx2_loop(unsigned char *p, size_t n)
 
 uint16_t cksum_avx2(unsigned char *p, size_t n, uint32_t initial)
 {
-    uint32_t sum = initial;
+    uint32_t sum = ntohs(initial);
 
     if (n < 128) { return cksum_generic(p, n, initial); }
     if (n >= 64) {
@@ -287,3 +287,55 @@ uint32_t tcp_pseudo_checksum(uint16_t *sip, uint16_t *dip,
   return result;
 }
 
+// calculates the initial checksum value resulting from
+// the pseudo header.
+// return values:
+// 0x0000 - 0xFFFF : initial checksum (in network order).
+// 0xFFFF0001 : unknown packet (non IPv4/6 or non TCP/UDP)
+// 0xFFFF0002 : bad header
+uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
+{
+  const uint16_t const *hwbuf = (const uint16_t *)buf;
+  int8_t ipv = (buf[0] & 0xF0) >> 4;
+  int8_t proto = 0;
+  int headersize = 0;
+
+  if (ipv == 4) {           // IPv4
+    proto = buf[9];
+    headersize = (buf[0] & 0x0F) * 4;
+  } else if (ipv == 6) {    // IPv6
+    proto = buf[6];
+    headersize = 40;
+  } else {
+    return 0xFFFF0001;
+  }
+
+  if (proto == 6 || proto == 17) {     // TCP || UDP
+    uint32_t sum = 0;
+    len -= headersize;
+    if (ipv == 4) {                         // IPv4
+      if (cksum_generic_reduce(cksum_generic_loop(buf, headersize, 0)) != 0) {
+        return 0xFFFF0002;
+      }
+      sum = htons(len & 0x0000FFFF) + (proto << 8)
+              + hwbuf[6]
+              + hwbuf[7]
+              + hwbuf[8]
+              + hwbuf[9];
+
+    } else {                                // IPv6
+      sum = hwbuf[2] + (proto << 8);
+      int i;
+      for (i = 4; i < 20; i+=4) {
+        sum += hwbuf[i] +
+               hwbuf[i+1] +
+               hwbuf[i+2] +
+               hwbuf[i+3];
+      }
+    }
+    sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
+    sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
+    return sum;
+  }
+  return 0xFFFF0001;
+}
