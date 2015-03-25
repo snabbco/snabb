@@ -55,14 +55,15 @@ function selftest ()
    for i = 0, n-1 do  array[i] = i  end
    local avx2ok, sse2ok = 0, 0
    for i = 1, tests do
-      local ref =   C.cksum_generic(array+i*2, i*10+i, 0)
-      if have_avx2 and C.cksum_avx2(array+i*2, i*10+i, 0) == ref then
-	 avx2ok = avx2ok + 1
+      local initial = math.random(0, 0xFFFF)
+      local ref =   C.cksum_generic(array+i*2, i*10+i, initial)
+      if have_avx2 and C.cksum_avx2(array+i*2, i*10+i, initial) == ref then
+         avx2ok = avx2ok + 1
       end
-      if have_sse2 and C.cksum_sse2(array+i*2, i*10+i, 0) == ref then
-	 sse2ok = sse2ok + 1
+      if have_sse2 and C.cksum_sse2(array+i*2, i*10+i, initial) == ref then
+         sse2ok = sse2ok + 1
       end
-      assert(ipsum(array+i*2, i*10+i, 0) == ref, "API function check")
+      assert(ipsum(array+i*2, i*10+i, initial) == ref, "API function check")
    end
    if have_avx2 then print("avx2: "..avx2ok.."/"..tests) else print("no avx2") end
    if have_sse2 then print("sse2: "..sse2ok.."/"..tests) else print("no sse2") end
