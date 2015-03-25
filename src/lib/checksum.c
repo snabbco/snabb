@@ -135,7 +135,7 @@ static inline uint32_t cksum_sse2_loop(unsigned char *p, size_t n)
 
 uint16_t cksum_sse2(unsigned char *p, size_t n, uint32_t initial)
 {
-  uint32_t sum = initial;
+  uint32_t sum = ntohs(initial);
 
   if (n < 128) { return cksum_generic(p, n, initial); }
   int unaligned = (unsigned long) p & 0xf;
@@ -217,7 +217,7 @@ static inline uint32_t cksum_avx2_loop(unsigned char *p, size_t n)
 
 uint16_t cksum_avx2(unsigned char *p, size_t n, uint32_t initial)
 {
-    uint32_t sum = initial;
+    uint32_t sum = ntohs(initial);
 
     if (n < 128) { return cksum_generic(p, n, initial); }
     int unaligned = (unsigned long) p & 31;
@@ -297,7 +297,7 @@ uint32_t tcp_pseudo_checksum(uint16_t *sip, uint16_t *dip,
 // calculates the initial checksum value resulting from
 // the pseudo header.
 // return values:
-// 0x0000 - 0xFFFF : initial checksum.
+// 0x0000 - 0xFFFF : initial checksum (in network order).
 // 0xFFFF0001 : unknown packet (non IPv4/6 or non TCP/UDP)
 // 0xFFFF0002 : bad header
 uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
@@ -342,10 +342,7 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
     }
     sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
     sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
-	if (len >= 128) {
-		sum = ntohs(sum);
-	}
-    return sum; // ntohs(sum);
+    return sum;
   }
   return 0xFFFF0001;
 }
