@@ -1,3 +1,26 @@
+-- conntrack.lua -- Connection tracking for IPv4/IPv6 TCP/UDP sessions
+--
+-- This module exposes the following API:
+--
+--  define(tablename, agestep)
+--    define a named connection tracking table.
+--    agestep is the duration in seconds before a connection ages from
+--    states new to old, old to deleted. The default is 7200 (2 hours).
+--
+--  track(tablename, buffer)
+--    Insert an entry into a connection table based on the packet
+--    headers in the buffer.
+--
+--  check(tablename, buffer) => flag
+--    Return true if the buffer contains a packet for a connection
+--    that is already tracked in the table.
+--
+--  ageall()
+--    Age all connection tables (based on wall-clock time) to remove
+--    timed-out connections.
+--
+--  clear()
+--    Remove all connection entries.
 
 local ffi = require 'ffi'
 local lib = require 'core.lib'
@@ -100,6 +123,11 @@ local function conn_spec_from_ipv6_header(b)
 end
 
 
+-- Return an FFI struct containing the session ID for a buffer
+-- containing packet data.
+--
+-- Returns nil if the session cannot be determined due to an
+-- unsupported protocol.
 local function spec_from_header(b)
    local ethertype = ffi.cast('uint16_t*', b+ETHERTYPE_OFFSET)[0]
    if ethertype == ETHERTYPE_IPV4 then
@@ -189,13 +217,16 @@ return {
    track = function (name, buffer)
       local p = conntracks[name]
       local spec, flags = spec_from_header(buffer)
-      put(p, spec_tostring(spec), flags)
-      reverse_spec(spec)
-      put(p, spec_tostring(spec), flags)
+      if spec then
+	 put(p, spec_tostring(spec), flags)
+	 reverse_spec(spec)
+	 put(p, spec_tostring(spec), flags)
+      end
    end,
 
    check = function (name, buffer)
-      return get(conntracks[name], spec_tostring(spec_from_header(buffer)))
+      local spec = spec_from_header(buffer)
+      return spec and get(conntracks[name], spec_tostring(spec))
    end,
 
    age = age,
