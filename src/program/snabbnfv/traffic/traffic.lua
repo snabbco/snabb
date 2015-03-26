@@ -48,7 +48,7 @@ function traffic (pciaddr, confpath, sockpath)
          local mtime2 = C.stat_mtime(confpath)
          if mtime2 ~= mtime then
             print("Loading " .. confpath)
-            nfvconfig.apply(nfvconfig.load(confpath, pciaddr, sockpath))
+            engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
             mtime = mtime2
          end
          engine.main({duration=1})
@@ -69,7 +69,7 @@ function bench (pciaddr, confpath, sockpath, npackets)
    engine.Hz = false
 
    print("Loading " .. confpath)
-   nfvconfig.apply(nfvconfig.load(confpath, pciaddr, sockpath))
+   engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
 
    -- From designs/nfv
    local start, packets, bytes = 0, 0, 0
