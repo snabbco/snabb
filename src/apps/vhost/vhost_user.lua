@@ -58,8 +58,10 @@ function VhostUser:stop()
    self.connected = false
    self.vhost_ready = false
    -- close the socket
-   C.close(self.socket)
-   self.socket = -1
+   if self.socket then
+      C.close(self.socket)
+      self.socket = nil
+   end
    -- clear the mmap-ed memory
    self:free_mem_table()
 
