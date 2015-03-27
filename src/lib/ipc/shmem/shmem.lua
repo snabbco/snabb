@@ -120,7 +120,7 @@ shmem._namespace = "default:1"
 shmem._fs = ':'
 
 local defaults =  {
-   directory = '/tmp/snabb-shmem',
+   directory = '/tmp',
 }
 
 ---- Class methods
