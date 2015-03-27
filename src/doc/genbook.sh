@@ -35,6 +35,8 @@ $(cat ../apps/README.md)
 
 $(cat ../apps/intel/README.md)
 
+$(cat ../apps/solarflare/README.md)
+
 $(cat ../apps/rate_limiter/README.md)
 
 $(cat ../apps/packet_filter/README.md)

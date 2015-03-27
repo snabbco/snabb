@@ -1,8 +1,8 @@
 ### Protocol Header (lib.protocol.header)
 
-The `lib.protocol.header` contains the base class from which the supported
-protocol classes are derived. It defines generic methods on all protocol
-subclasses.
+The `lib.protocol.header` module contains the base class from which the
+supported protocol classes are derived. It defines generic methods on all
+protocol subclasses.
 
 — Method **header:new_from_mem** *memory*, *length*
 
@@ -607,8 +607,9 @@ field is returned.
 ### Datagram (lib.protocol.datagram)
 
 The `lib.protocol.datagram` module provides basic mechanisms for parsing,
-building and manipulating a hierarchy of protocol headers and associated
-payload contained in a data packet.  In particular, it supports:
+building and manipulating a hierarchy of protocol headers and the
+associated payload contained in a data packet.  In particular, it
+supports:
 
 * Parsing and in-place manipulation of protocol headers in a received
   packet
@@ -621,7 +622,7 @@ classes* which are defined as classes derived from the protocol header
 base class in the `lib.protocol.header` module.
 
 The contents of a datagram instance are logically divided into three
-areas: The payload, parsed headers and synthetic headers. The datagram
+areas: The payload, parsed headers and pushed headers. The datagram
 payload is a sequence of bytes either inherited from the packet given to
 `datagram:new` or appended using `datagram:payload`. The headers in the
 payload can be parsed using `datagram:parse_match`, which will shrink the
@@ -629,64 +630,42 @@ payload by the header. Finally, synthetic headers can be prepended to the
 datagram using `datagram:push`.  To get the whole datagram as a packet
 use `datagram:packet`.
 
-**Important Note:** The datagram class only operates on the first buffer
-of a packet. If a packet can not be coalesced to a single buffer
-the additional buffers will be ignored by `lib.protocol.datagram`.
+**Important Note:** Both `datagram:pop` and `datagram:pop` destructively
+modify the packet and thus corrupt headers previously obtained by calls
+to `datagram:parse_match`.
 
     DIAGRAM: Datagram
     datagram packet
     +------------------+
-    |buffer0..N        |
+    |packet            |
     |                  |
     |+------=---------+|
     || Pushed headers ||
     |+----------------+|
-    +------------------+
-    |bufferN+1         | <---Beginning of initial packet
-    |+------=---------+|
+    |+------=---------+|<---Beginning of initial packet
     || Parsed headers ||
     ||------=---------||
     ||    Payload     ||
     |+----------------+|
     +------------------+
-    |bufferN+2         |
-    |               {d}|
-    +------------------+
 
-— Method **datagram:new** *packet*, *protocol*, *options*
+— Method **datagram:new** *packet*, *protocol*
 
 Creates a datagram for *packet* or from scratch if *packet* is `nil`.
 *Protocol* will be used by `parse_match` to parse the packet payload. If
 *protocol* is not `nil` it is set as the initial upper layer
-protocol. *Options* may be a table with the following keys:
+protocol.
 
-* `coalesce` - If set to `true`, *packet* will be coalesced.
-
-— Method **datagram:reuse** *packet*, *protocol*, *options*
+— Method **datagram:reuse** *packet*, *protocol*
 
 Recycling version of `datagram:new`. Reuses the instance to create a
 datagram.
 
-— Method **datagram:push** *header*, *relocate*
+— Method **datagram:push** *header*
 
-Pushes *header* to the front of the datagram. By default *header* is
-copied to the datagram.  If *relocate* is a true value, *header* is
-relocated to the datagram instead.  E.g. header and datagram will share
-the same buffer so that the datagram will reflect future changes to the
-header. Note that in case of *relocate* being true, the caller must
-ensure the *header* object to be discarded when the datagram is released.
-
-    DIAGRAM: Relocation
-        without relocate             with relocate
-    +--------+  +----------+   +--------+  +----------+
-    | header |  | datagram |   | header |  | datagram |
-    +---*----+  +-----*----+   +---*----+  +-----*----+
-        :             :            :             :
-        |             |            |             |
-        v             v            |             v
-    +=-------+   +=-------+        |        +=-------+
-    | buffer |   | buffer'|        \------->| buffer |
-    +--------+   +--------+                 +--------+
+Prepends *header* to the front of the datagram. This method destructively
+modifies the underlying packet and calling it will corrupt headers
+previously obtained by `datagram:parse_match`.
 
 — Method **datagram:parse_match** *protocol*, *check*
 
@@ -709,9 +688,6 @@ If *check* returns a false value, the parsing has failed and
 If *check* is not supplied or if it returned a true value, the parsing
 has succeeded and the current upper layer protocol of the datagram is set
 to the value returned by `header:upper_layer`.
-
-Note that `parse_match` can only parse the first buffer of the underlying
-packet.
 
 — Method **datagram:parse** *protocols_and_checks*
 
@@ -745,7 +721,9 @@ Removes the leading *n* parsed headers from the datagram. Note that
 headers added via `push` can not be removed using `pop`. The caller has
 to ensure that the datagram contains at least *n* headers that were
 parsed using `parse_match`.  The sequence of parsed headers can be
-obtained by calling `stack`.
+obtained by calling `stack`. This method destructively modifies the
+underlying packet and calling it will corrupt headers previously obtained
+by `datagram:parse_match`.
 
 For instance let *d* be an datagram with an Ethernet header followed by
 an IPv6 header. Assuming we have parsed both headers using
@@ -754,8 +732,12 @@ from its Ethernet header.
 
 — Method **datagram:pop_raw** *length*, *ulp*
 
-Remove *length* bytes from the beginning of the datagram. If *ulp* is
-given it is set as the current upper layer protocol.
+Removes *length* bytes from the beginning of the datagram. If *ulp* is
+given it is set as the current upper layer protocol. This method
+destructively modifies the underlying packet and calling it will corrupt
+headers previously obtained by `datagram:parse_match`. Additionally it
+does **not** update the pointer to the payload area of the underlying
+packet, effectively clobbering the parse and push stacks.
 
 — Method **datagram:stack**
 
@@ -769,14 +751,9 @@ pushed headers).
 — Method **datagram:payload** *pointer*, *length*
 
 Combined payload accessor and setter method. Returns a pointer to the
-datagram payload, its byte size and the `packet.iovec` index of the next
-buffer if the payload is incomplete or `nil`.
-
-The payload is incomplete if the underlying packet consists of more than
-one buffer. The caller has to access the remainder of the payload,
-e.g. any additional packet buffers, by his own.
+datagram payload and its byte size.
 
 If *pointer* and *length* are supplied then *length* bytes starting from
-*pointer* are appended to the datagram's payload. If there is not enough
-free space in the buffer to append *length* bytes or if the payload is
-incomplete an error will be raised.
+*pointer* are appended to the datagram's payload. The caller has to
+ensure that the underlying packet has enough free space to accommodate
+for *length* additional bytes.

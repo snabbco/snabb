@@ -106,4 +106,4 @@ Github pull requests. Report bugs with Github issues.
 
 ### Benchmark Results
 
-[![Benchmark Results](http://lab1.snabb.co:2008/~max/benchmarks.png)](https://travis-ci.org/SnabbCo/snabbswitch.svg?branch=master)
+[![Benchmark Results](http://lab1.snabb.co:2008/~max/benchmarks.png)](http://lab1.snabb.co:2008/~max/benchmarks.png)

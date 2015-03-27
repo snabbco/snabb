@@ -24,20 +24,20 @@
 -- correspondingly).
 --
 -- Also note that parsing does not change the packet itself.  However,
--- the header at the bottom of the parse stack (which is located at
--- the beginning of the buffer's valid data) can be removed from the
--- packet by calling the pop() method, which advances the iovec's
--- offset accordingly.
+-- the header at the bottom of the parse stack (which is located at the
+-- beginning of the buffer's valid data) can be removed from the packet
+-- by calling the pop() method, which truncates the underlying packet
+-- accordingly.
 --
 -- The push() method can be used to prepend headers in front of the
--- packet. IMPORTANT: Both pop() and push() destructively modify the
--- packet and headers previously obtained by calls to parse_*() will be
--- corrupted.
+-- packet.
 --
--- To construct a packet from scratch, the constructor is called
--- without a reference to a packet.  In this case, a new packet is
--- allocated with a single empty buffer.  All methods are applicable
--- to such a datagram.
+-- IMPORTANT: Both pop() and push() destructively modify the packet and
+-- headers previously obtained by calls to parse_*() will be corrupted.
+--
+-- To construct a packet from scratch, the constructor is called without
+-- a reference to a packet.  In this case, a new empty packet is
+-- allocated.  All methods are applicable to such a datagram.
 
 module(..., package.seeall)
 local packet = require("core.packet")
@@ -53,6 +53,7 @@ local datagram = subClass(nil)
 local function init (o, p, class)
    if not o._recycled then
       o._parse = { stack = {}, index = 0 }
+      o._packet = ffi.new("struct packet *[1]")
    elseif o._parse.stack[1] then
       for i, _ in ipairs(o._parse.stack) do
 	 o._parse.stack[i]:free()
@@ -62,7 +63,7 @@ local function init (o, p, class)
    end
    o._parse.offset = 0
    o._parse.ulp = class
-   o._packet = p or packet.allocate()
+   o._packet[0] = p or packet.allocate()
    return o
 end
 
@@ -81,7 +82,7 @@ end
 
 -- Push a new protocol header to the front of the packet.
 function datagram:push (proto)
-   packet.prepend(self._packet, proto:header(), proto:sizeof())
+   packet.prepend(self._packet[0], proto:header(), proto:sizeof())
    self._parse.offset = self._parse.offset + proto:sizeof()
 end
 
@@ -113,8 +114,8 @@ function datagram:parse_match (class, check)
    local parse = self._parse
    local class = class or parse.ulp
    if not class then return nil end
-   local proto = class:new_from_mem(packet.data(self._packet) + parse.offset,
-                                    packet.length(self._packet) - parse.offset)
+   local proto = class:new_from_mem(packet.data(self._packet[0]) + parse.offset,
+                                    packet.length(self._packet[0]) - parse.offset)
    if proto == nil or (check and not check(proto)) then
       if proto then proto:free() end
       return nil
@@ -201,7 +202,7 @@ end
 -- Remove <length> bytes from the start of the packet and set upper-layer
 -- protocol to <ulp> if <ulp> is supplied.
 function datagram:pop_raw (length, ulp)
-   packet.shiftleft(self._packet, length)
+   packet.shiftleft(self._packet[0], length)
    if ulp then self._parse.ulp = ulp end
 end
 
@@ -210,16 +211,16 @@ function datagram:stack ()
 end
 
 function datagram:packet ()
-   return(self._packet)
+   return(self._packet[0])
 end
 
 -- Return the location and size of the packet's payload.  If mem is
 -- non-nil, the memory region at the given address and size is
 -- appended to the packet's payload first.
 function datagram:payload (mem, size)
-   if mem then packet.append(self._packet, mem, size) end
-   return packet.data(self._packet) + self._parse.offset,
-          packet.length(self._packet) - self._parse.offset
+   if mem then packet.append(self._packet[0], mem, size) end
+   return packet.data(self._packet[0]) + self._parse.offset,
+          packet.length(self._packet[0]) - self._parse.offset
 end
 
 return datagram

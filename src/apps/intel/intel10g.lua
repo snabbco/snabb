@@ -15,6 +15,8 @@ local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local index_set = require("lib.index_set")
 local macaddress = require("lib.macaddress")
+local mib = require("lib.ipc.shmem.mib")
+local timer = require("core.timer")
 
 local bits, bitset = lib.bits, lib.bitset
 local band, bor, lshift = bit.band, bit.bor, bit.lshift
@@ -22,6 +24,11 @@ local band, bor, lshift = bit.band, bit.bor, bit.lshift
 num_descriptors = 512
 --num_descriptors = 32
 
+-- Set to true to enable IF-MIB support via the ipc/shmem mechanism
+enable_snmp = false
+-- Timer for interface status check in seconds (only active when
+-- enable_snmp=true)
+status_timer = 5
 
 local function pass (...) return ... end
 
@@ -48,7 +55,6 @@ function new_sf (pciaddress)
               }
    return setmetatable(dev, M_sf)
 end
-
 
 function M_sf:open ()
    pci.unbind_device_from_linux(self.pciaddress)
@@ -82,7 +88,10 @@ end
 --- See data sheet section 4.6.3 "Initialization Sequence."
 
 function M_sf:init ()
-   self :init_dma_memory()
+   if enable_snmp then
+      self:init_snmp()
+   end
+   self:init_dma_memory()
 
    self.redos = 0
    local mask = bits{Link_up=30}
@@ -143,6 +152,45 @@ do
       _tx_pool[#_tx_pool+1] = {ptr = self.txdesc, phy = self.txdesc_phy}
       return self
    end
+end
+
+function M_sf:init_snmp ()
+   -- Rudimentary population of a row in the ifTable MIB.  Allocation
+   -- of the ifIndex is delegated to the SNMP agent via the name of
+   -- the interface in ifDescr (currently the PCI address).
+   local ifTable = mib:new({ filename = self.pciaddress })
+   ifTable:register('ifDescr', 'OctetStr', self.pciaddress)
+   ifTable:register('ifAdminStatus', 'Integer32', 1) -- up
+   ifTable:register('ifOperStatus', 'Integer32', 2) -- down
+   ifTable:register('ifLastChange', 'TimeTicks', 0)
+   ifTable:register('_X_ifLastChange_TicksBase', 'Counter64', C.get_unix_time())
+   ifTable:register('ifType', 'Integer32', 6) -- ethernetCsmacd
+   ifTable:register('ifSpeed', 'Gauge32', 10000000)
+
+   -- Create a timer to periodically check the interface status.  The
+   -- default interval is 5 seconds, defined by the status_timer
+   -- variable.
+   local status = { [1] = 'up', [2] = 'down' }
+   local mask = bits{Link_up=30}
+   local t = timer.new("Interface "..self.pciaddress.." status checker",
+		       function(t)
+			  local old = ifTable:get('ifOperStatus')
+			  local new = 1
+			  if band(self.r.LINKS(), mask) ~= mask then
+			     new = 2
+			  end
+			  if old ~= new then
+			     print("Interface "..self.pciaddress..
+				   " status change: "..status[old]..
+				   " => "..status[new])
+			     ifTable:set('ifOperStatus', new)
+			     ifTable:set('ifLastChange', 0)
+			     ifTable:set('_X_ifLastChange_TicksBase',
+				     C.get_unix_time())
+			  end
+		       end, 1e9 * status_timer, 'repeating')
+   timer.activate(t)
+   return self
 end
 
 function M_sf:global_reset ()
@@ -447,6 +495,9 @@ function M_pf:close()
 end
 
 function M_pf:init ()
+   if enable_snmp then
+      self:init_snmp()
+   end
    self.redos = 0
    local mask = bits{Link_up=30}
    for i = 1, 100 do
@@ -472,6 +523,7 @@ function M_pf:init ()
    return self
 end
 
+M_pf.init_snmp = M_sf.init_snmp
 M_pf.global_reset = M_sf.global_reset
 M_pf.disable_interrupts = M_sf.disable_interrupts
 M_pf.set_receive_descriptors = pass

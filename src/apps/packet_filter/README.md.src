@@ -3,7 +3,12 @@
 The `PacketFilter` app receives packets on the `input` port and transmits
 conforming packets to the `output` port. In order to conform, a packet
 must match at least one of the *filter rules* of the `PacketFilter`
-instance and/or belong to a sanctioned connection.
+instance and/or belong to a *sanctioned connection*. For a connection to
+be sanctioned it must be tracked in a *connection table* by a
+`PacketFilter` app using the `state_track` operators. All `PacketFilter`
+apps share a global namespace of *connection table identifiers*. Multiple
+`PacketFilter` apps—e.g. for inbound and outbound traffic—can refer to
+the same connection by sharing a connection table identifer.
 
     DIAGRAM: PacketFilter
                +--------------+
@@ -19,13 +24,13 @@ following keys are available:
 
 — Key **rules**
 
-*Required*. A list of filter rules as described in the *Filter Rules*
+*Required*. An array of filter rules as described in the *Filter Rules*
 section below.
 
 — Key **state_track**
 
 *Optional*. A string naming a connection table. If set, packets passing
-_any_ rule will be tracked in the specified connection table.
+*any* rule will be tracked in the specified connection table.
 
 — Key **state_check**
 

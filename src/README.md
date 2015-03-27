@@ -67,7 +67,7 @@ to parse *arg*.
 
 — Field **myapp.input**
 
-— Field **app.output**
+— Field **myapp.output**
 
 Tables of named input and output links.  These tables are initialized by
 the engine for use in processing and are *read-only*.
