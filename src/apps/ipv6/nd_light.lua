@@ -183,13 +183,21 @@ function nd_light:new (arg)
    sna.eth, sna.ipv6, sna.icmp = unpack(dgram:stack())
    sna.dgram = dgram
    o._sna = sna
+
+   -- Caches for for various cdata pointer objects to avoid boxing in
+   -- the push() loop
+   o._cache = {
+      p = ffi.new("struct packet *[1]"),
+      mem = ffi.new("uint8_t *[1]")
+   }
    return o
 end
 
 -- Process neighbor solicitation
 local function ns (self, dgram, eth, ipv6, icmp)
-   local payload, length = dgram:payload()
-   if not icmp:checksum_check(payload, length, ipv6) then
+   local mem, length = self._cache.mem
+   mem[0], length = dgram:payload()
+   if not icmp:checksum_check(mem[0], length, ipv6) then
       print(self:name()..": bad icmp checksum")
       return nil
    end
@@ -209,8 +217,8 @@ local function ns (self, dgram, eth, ipv6, icmp)
    sna.ipv6:dst(ipv6:src())
    -- The payload of the pre-fabricated packet consists of the NA and
    -- target ll-option
-   local mem, length = sna.dgram:payload()
-   sna.icmp:checksum(mem, length, sna.ipv6)
+   mem[0], length = sna.dgram:payload()
+   sna.icmp:checksum(mem[0], length, sna.ipv6)
    return true
 end
 
@@ -237,10 +245,10 @@ local function na (self, dgram, eth, ipv6, icmp)
 end
 
 local function from_south (self, p)
-   if not self._filter:match(packet.data(p), packet.length(p)) then
+   if not self._filter:match(packet.data(p[0]), packet.length(p[0])) then
       return false
    end
-   local dgram = datagram:new(p, ethernet)
+   local dgram = datagram:new(p[0], ethernet)
    -- Parse the ethernet, ipv6 amd icmp headers
    dgram:parse_n(3)
    local eth, ipv6, icmp = unpack(dgram:stack())
@@ -264,22 +272,24 @@ function nd_light:push ()
       self._next_hop.timer_cb()
    end
 
+   local cache = self._cache
    local l_in = self.input.south
    local l_out = self.output.north
    local l_reply = self.output.south
    while not link.empty(l_in) and not link.full(l_out) do
-      local p = link.receive(l_in)
+      local p = cache.p
+      p[0] = link.receive(l_in)
       local status = from_south(self, p)
       if status == nil then
 	 -- Discard
-	 packet.free(p)
+	 packet.free(p[0])
       elseif status == true then
 	 -- Send NA back south
-	 packet.free(p)
+	 packet.free(p[0])
 	 link.transmit(l_reply, packet.clone(self._sna.packet))
       else
 	 -- Send transit traffic up north
-	 link.transmit(l_out, p)
+	 link.transmit(l_out, p[0])
       end
    end
 
@@ -291,11 +301,12 @@ function nd_light:push ()
 	 -- has completed.
 	 packet.free(link.receive(l_in))
       else
-	 local p = link.receive(l_in)
-         if packet.length(p) >= self._eth_header:sizeof() then
-            self._eth_header:copy(packet.data(p))
-            link.transmit(l_out, p)
-         else packet.free(p) end
+	 local p = cache.p
+	 p[0] = link.receive(l_in)
+         if packet.length(p[0]) >= self._eth_header:sizeof() then
+            self._eth_header:copy(packet.data(p[0]))
+            link.transmit(l_out, p[0])
+         else packet.free(p[0]) end
       end
    end
 end
