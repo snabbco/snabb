@@ -52,6 +52,7 @@ end
 
 -- Restart dead apps.
 function restart_dead_apps ()
+   if not use_restart then return end
    local restart_delay = 2 -- seconds
    local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
    local restart = false
