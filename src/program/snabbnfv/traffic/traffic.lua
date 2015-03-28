@@ -64,7 +64,7 @@ end
 function bench (pciaddr, confpath, sockpath, npackets)
    npackets = tonumber(npackets)
    local ports = dofile(confpath)
-   local nic = "NIC_"..(nfvconfig.port_name(ports[1]))
+   local nic = (nfvconfig.port_name(ports[1])).."_NIC"
    engine.log = true
    engine.Hz = false
 

@@ -29,8 +29,8 @@ function load (file, pciaddr, sockpath)
    for _,t in ipairs(ports) do
       local vlan, mac_address = t.vlan, t.mac_address
       local name = port_name(t)
-      local NIC = "NIC_"..name
-      local Virtio = "Virtio_"..name
+      local NIC = name.."_NIC"
+      local Virtio = name.."_Virtio"
       config.app(c, NIC, require(device_info.driver).driver,
                  {pciaddr = pciaddr,
                   vmdq = true,
@@ -39,26 +39,26 @@ function load (file, pciaddr, sockpath)
       config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(t.port_id)})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
       if t.tx_police_gbps then
-         local TxLimit = "TxLimit_"..name
+         local TxLimit = name.."_TxLimit"
          local rate = t.tx_police_gbps * 1e9 / 8
          config.app(c, TxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
          config.link(c, VM_tx.." -> "..TxLimit..".input")
          VM_tx = TxLimit..".output"
       end
       if t.ingress_filter then
-         local Filter = "Filter_in_"..name
+         local Filter = name.."_Filter_in"
          config.app(c, Filter, PacketFilter, t.ingress_filter)
          config.link(c, Filter..".tx -> " .. VM_rx)
          VM_rx = Filter..".rx"
       end
       if t.egress_filter then
-         local Filter = 'Filter_out_'..name
+         local Filter = name..'_Filter_out'
          config.app(c, Filter, PacketFilter, t.egress_filter)
          config.link(c, VM_tx..' -> '..Filter..'.rx')
          VM_tx = Filter..'.tx'
       end
       if t.tunnel and t.tunnel.type == "L2TPv3" then
-         local Tunnel = "Tunnel_"..name
+         local Tunnel = name.."_Tunnel"
          local conf = {local_address = t.tunnel.local_ip,
                        remote_address = t.tunnel.remote_ip,
                        local_cookie = t.tunnel.local_cookie,
@@ -67,7 +67,7 @@ function load (file, pciaddr, sockpath)
          config.app(c, Tunnel, L2TPv3, conf)
          -- Setup IPv6 neighbor discovery/solicitation responder.
          -- This will talk to our local gateway.
-         local ND = "ND_"..name
+         local ND = name.."_ND"
          config.app(c, ND, nd_light,
                     {local_mac = mac_address,
                      local_ip = t.tunnel.local_ip,
@@ -81,7 +81,7 @@ function load (file, pciaddr, sockpath)
          VM_rx, VM_tx = ND..".south", ND..".south"
       end
       if t.rx_police_gbps then
-         local RxLimit = "RxLimit_"..name
+         local RxLimit = name.."_RxLimit"
          local rate = t.rx_police_gbps * 1e9 / 8
          config.app(c, RxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
          config.link(c, RxLimit..".output -> "..VM_rx)
