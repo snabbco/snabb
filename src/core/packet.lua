@@ -76,10 +76,15 @@ function from_pointer (ptr, len) return append(allocate(), ptr, len) end
 function from_string (d)         return from_pointer(d, #d) end
 
 -- Free a packet that is no longer in use.
-function free (p)
-   --ffi.fill(p, header_size, 0)
+local function free_internal (p)
    p.length = 0
    freelist_add(packets_fl, p)
+end   
+
+function free (p)
+   engine.frees = engine.frees + 1
+   engine.freebytes = engine.freebytes + p.length
+   free_internal(p)
 end
 
 -- Return pointer to packet data.
@@ -94,7 +99,7 @@ function preallocate_step()
    end
 
    for i=1, packet_allocation_step do
-      free(new_packet())
+      free_internal(new_packet(), true)
    end
    packets_allocated = packets_allocated + packet_allocation_step
    packet_allocation_step = 2 * packet_allocation_step

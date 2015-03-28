@@ -238,6 +238,7 @@ function hexundump(h, n)
 end
 
 function comma_value(n) -- credit http://richard.warburton.it
+   if n ~= n then return "NaN" end
    local left,num,right = string.match(n,'^([^%d]*%d)(%d*)(.-)$')
    return left..(num:reverse():gsub('(%d%d%d)','%1,'):reverse())..right
 end
