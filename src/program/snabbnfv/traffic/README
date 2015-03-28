@@ -1,5 +1,11 @@
 snabbnfv traffic [OPTIONS] <pci-address> <config-file> <socket-path>
 
+  -k SECONDS, --link-report-interval SECONDS
+                             Print an link status report every SECONDS.
+			     Default: 60s
+  -l SECONDS, --load-report-interval SECONDS
+                             Print a processing load report every SECONDS.
+			     Default: 1s
   -B NPACKETS, --benchmark NPACKETS
                              Benchmark processing NPACKETS.
   -h, --help

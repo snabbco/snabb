@@ -5,22 +5,37 @@ local nfvconfig = require("program.snabbnfv.nfvconfig")
 local usage = require("program.snabbnfv.traffic.README_inc")
 local ffi = require("ffi")
 local C = ffi.C
+local timer = require("core.timer")
 
 local long_opts = {
    benchmark     = "B",
    help          = "h",
+   ["link-report-interval"] = "k",
+   ["load-report-interval"] = "l",
    ["long-help"] = "H"
 }
 
 function run (args)
    local opt = {}
    local benchpackets
+   local linkreportinterval = 60
+   local loadreportinterval = 1
    function opt.B (arg) benchpackets = tonumber(arg)      end
    function opt.h (arg) print(short_usage()) main.exit(1) end
    function opt.H (arg) print(long_usage())  main.exit(1) end
-   args = lib.dogetopt(args, opt, "hHB:", long_opts)
+   function opt.k (arg) linkreportinterval = tonumber(arg) end
+   function opt.l (arg) loadreportinterval = tonumber(arg) end
+   args = lib.dogetopt(args, opt, "hHB:k:l:", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
+      if loadreportinterval > 0 then
+	 local t = timer.new("nfvloadreport", engine.report_load, loadreportinterval*1e9, 'repeating')
+	 timer.activate(t)
+      end
+      if linkreportinterval > 0 then
+	 local t = timer.new("nfvlinkreport", engine.report_links, linkreportinterval*1e9, 'repeating')
+	 timer.activate(t)
+      end
       if benchpackets then
 	 print("snabbnfv traffic starting (benchmark mode)")
 	 bench(pciaddr, confpath, sockpath, benchpackets)
@@ -44,19 +59,15 @@ function traffic (pciaddr, confpath, sockpath)
    engine.log = true
    local mtime = 0
    while true do
-      for i = 1, 60 do
-         local mtime2 = C.stat_mtime(confpath)
-         if mtime2 ~= mtime then
-            print("Loading " .. confpath)
-            engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
-            mtime = mtime2
-         end
-         engine.main({duration=1})
-         -- Flush buffered log messages every 1s
-         io.flush()
+      local mtime2 = C.stat_mtime(confpath)
+      if mtime2 ~= mtime then
+	 print("Loading " .. confpath)
+	 engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
+	 mtime = mtime2
       end
-      -- Report each minute
-      engine.report()
+      engine.main({duration=1, no_report=true})
+      -- Flush buffered log messages every 1s
+      io.flush()
    end
 end
 
