@@ -84,6 +84,9 @@ end
 function free (p)
    engine.frees = engine.frees + 1
    engine.freebytes = engine.freebytes + p.length
+   -- Calculate bits of physical capacity required for packet on 10GbE
+   -- Account for minimum data size and overhead of CRC and inter-packet gap
+   engine.freebits = engine.freebits + (math.max(p.length, 46) + 4 + 5) * 8
    free_internal(p)
 end
 

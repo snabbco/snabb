@@ -27,6 +27,7 @@ configuration = config.new()
 -- TODO: Move these over to the counters framework
 breaths = 0			-- Total breaths taken
 frees   = 0			-- Total packets freed
+freebits = 0			-- Total packet bits freed (for 10GbE)
 freebytes = 0			-- Total packet bytes freed
 
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
@@ -233,6 +234,7 @@ end
 
 local nextbreath
 local lastfrees = 0
+local lastfreebits = 0
 local lastfreebytes = 0
 -- Wait between breaths to keep frequency with Hz.
 function pace_breathing ()
@@ -253,6 +255,7 @@ function pace_breathing ()
       end
       lastfrees = frees
       lastfreebytes = freebytes
+      lastfreebits = freebits
    end
 end
 
@@ -319,19 +322,23 @@ function report_load ()
       local interval = now() - lastloadreport
       local newfrees   = frees - reportedfrees
       local newbytes   = freebytes - reportedfreebytes
+      local newbits    = freebits - reportedfreebits
       local newbreaths = breaths - reportedbreaths
       local fps = math.floor(newfrees/interval)
+      local fbps = math.floor(newbits/interval)
       local fpb = math.floor(newfrees/newbreaths)
       local bpp = math.floor(newbytes/newfrees)
-      print(("load: time: %-2.2fs  fps: %-11s fpb: %-4s bpp: %-4s sleep: %-4dus"):format(
+      print(("load: time: %-2.2fs  fps: %-9s fpGbps: %-3.3f fpb: %-3s bpp: %-4s sleep: %-4dus"):format(
 	    interval,
 	    lib.comma_value(fps),
+	    fbps / 1e9,
 	    lib.comma_value(fpb),
 	    (bpp ~= bpp) and "-" or tostring(bpp), -- handle NaN
 	    sleep))
    end
    lastloadreport = now()
    reportedfrees = frees
+   reportedfreebits = freebits
    reportedfreebytes = freebytes
    reportedbreaths = breaths
 end
