@@ -754,6 +754,4 @@ Combined payload accessor and setter method. Returns a pointer to the
 datagram payload and its byte size.
 
 If *pointer* and *length* are supplied then *length* bytes starting from
-*pointer* are appended to the datagram's payload. The caller has to
-ensure that the underlying packet has enough free space to accommodate
-for *length* additional bytes.
+*pointer* are appended to the datagram's payload.
