@@ -1,6 +1,6 @@
 [submodule "deps/luajit"]
 	path = deps/luajit
-	url = http://luajit.org/git/luajit-2.0.git
+	url = http://github.com/SnabbCo/luajit.git
         ignore = dirty
 [submodule "deps/ljsyscall"]
 	path = deps/ljsyscall
