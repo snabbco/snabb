@@ -23,10 +23,32 @@ link_table, link_array = {}, {}
 
 configuration = config.new()
 
--- Count of the number of breaths taken
-breaths = 0
--- Ideal number of breaths per second
+-- Counters for statistics.
+-- TODO: Move these over to the counters framework
+breaths = 0			-- Total breaths taken
+frees   = 0			-- Total packets freed
+freebits = 0			-- Total packet bits freed (for 10GbE)
+freebytes = 0			-- Total packet bytes freed
+
+-- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
+--
+-- There are two modes available:
+--
+--   Hz = <n> means to aim for an exact <n> breaths per second rhythm
+--   Hz = false means dynamic adjustment of the breathing interval
+--
+-- Dynamic adjustment automatically scales the time to sleep between
+-- breaths from nothing up to maxsleep (default: 100us). If packets
+-- are processed during a breath then the sleep period is halved, and
+-- if no packets are processed during a breath then the sleep interval
+-- is increased by one microsecond.
+--
+-- The default is dynamic adjustment which should work well for the
+-- majority of cases.
+
 Hz = false
+sleep = 0
+maxsleep = 100
 
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
@@ -211,6 +233,9 @@ function main (options)
 end
 
 local nextbreath
+local lastfrees = 0
+local lastfreebits = 0
+local lastfreebytes = 0
 -- Wait between breaths to keep frequency with Hz.
 function pace_breathing ()
    if Hz then
@@ -221,6 +246,16 @@ function pace_breathing ()
          monotonic_now = C.get_monotonic_time()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
+   else
+      if lastfrees == frees then
+	 sleep = math.min(sleep + 1, maxsleep)
+	 C.usleep(sleep)
+      else
+	 sleep = math.floor(sleep/2)
+      end
+      lastfrees = frees
+      lastfreebytes = freebytes
+      lastfreebits = freebits
    end
 end
 
@@ -263,32 +298,77 @@ function breathe ()
 end
 
 function report (options)
+   if not options or options.showload then
+      report_load()
+   end
+   if options and options.showlinks then
+      report_links()
+   end
+   if options and options.showapps then
+      report_apps()
+   end
+end
+
+-- Load reporting prints several metrics:
+--   time - period of time that the metrics were collected over
+--   fps  - frees per second (how many calls to packet.free())
+--   fpb  - frees per breath
+--   bpp  - bytes per packet (average packet size)
+local lastloadreport = nil
+local reportedfrees = nil
+local reportedbreaths = nil
+function report_load ()
+   if lastloadreport then
+      local interval = now() - lastloadreport
+      local newfrees   = frees - reportedfrees
+      local newbytes   = freebytes - reportedfreebytes
+      local newbits    = freebits - reportedfreebits
+      local newbreaths = breaths - reportedbreaths
+      local fps = math.floor(newfrees/interval)
+      local fbps = math.floor(newbits/interval)
+      local fpb = math.floor(newfrees/newbreaths)
+      local bpp = math.floor(newbytes/newfrees)
+      print(("load: time: %-2.2fs  fps: %-9s fpGbps: %-3.3f fpb: %-3s bpp: %-4s sleep: %-4dus"):format(
+	    interval,
+	    lib.comma_value(fps),
+	    fbps / 1e9,
+	    lib.comma_value(fpb),
+	    (bpp ~= bpp) and "-" or tostring(bpp), -- handle NaN
+	    sleep))
+   end
+   lastloadreport = now()
+   reportedfrees = frees
+   reportedfreebits = freebits
+   reportedfreebytes = freebytes
+   reportedbreaths = breaths
+end
+
+function report_links ()
+   print("link report:")
    local function loss_rate(drop, sent)
       sent = tonumber(sent)
       if not sent or sent == 0 then return 0 end
       return tonumber(drop) * 100 / (tonumber(drop)+sent)
    end
-   if not options or options.showlinks then
-      print("link report:")
-      local names = {}
-      for name in pairs(link_table) do table.insert(names, name) end
-      table.sort(names)
-      for i, name in ipairs(names) do
-	 l = link_table[name]
-         print(("%20s sent on %s (loss rate: %d%%)"):format(
-		  lib.comma_value(l.stats.txpackets),
-		  name, loss_rate(l.stats.txdrop, l.stats.txpackets)))
-      end
+   local names = {}
+   for name in pairs(link_table) do table.insert(names, name) end
+   table.sort(names)
+   for i, name in ipairs(names) do
+      l = link_table[name]
+      print(("%20s sent on %s (loss rate: %d%%)"):format(
+	    lib.comma_value(l.stats.txpackets),
+	    name, loss_rate(l.stats.txdrop, l.stats.txpackets)))
    end
-   if options and options.showapps then
-      print ("apps report")
-      for name, app in pairs(app_table) do
-         if app.dead then
-            print (name, ("[dead: %s]"):format(app.dead.error))
-         elseif app.report then
-            print (name)
-            with_restart(app, app.report)
-         end
+end
+
+function report_apps ()
+   print ("apps report:")
+   for name, app in pairs(app_table) do
+      if app.dead then
+	 print(name, ("[dead: %s]"):format(app.dead.error))
+      elseif app.report then
+	 print(name)
+	 with_restart(app, app.report)
       end
    end
 end
