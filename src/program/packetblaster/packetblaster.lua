@@ -46,7 +46,7 @@ function run (args)
 end
 
 function is_device_suitable (pcidev, patterns)
-   if not pcidev.usable or pcidev.driver ~= 'apps.intel.intel10g' then
+   if not pcidev.usable or pcidev.driver ~= 'apps.intel.intel_app' then
       return false
    end
    if #patterns == 0 then
