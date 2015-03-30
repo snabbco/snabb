@@ -221,8 +221,9 @@ return {
       counts[name] = counts[name] or 0
    end,
 
-   track = function (name, buffer)
-      if counts[name] > 1e6 then return end
+   track = function (name, buffer, limit)
+      limit = limit or 2000
+      if counts[name] > limit then return end
       local p = conntracks[name]
       local spec, flags = spec_from_header(buffer)
       if spec then
