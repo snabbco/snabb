@@ -201,26 +201,37 @@ end
 local conntracks = {}
 local time = engine.now
 local function new(t) return {{}, {}, (time() or 0)+t} end
-local function put(p, k, v) p[1][k] = v end
+local function put(p, k, v)
+   local isnew = p[1][k] == nil
+   p[1][k] = v
+   return isnew
+end
 local function get(p, k) return p[1][k] or p[2][k] end
 local function age(p, t)
    if time() > p[3] then
       p[1], p[2], p[3] = {}, p[1], time()+t
+      return true
    end
 end
 
+local counts = {}
 return {
    define = function (name, agestep)
       conntracks[name] = conntracks[name] or new(agestep or 7200)
+      counts[name] = counts[name] or 0
    end,
 
-   track = function (name, buffer)
+   track = function (name, buffer, limit)
+      limit = limit or 2000
+      if counts[name] > limit then return end
       local p = conntracks[name]
       local spec, flags = spec_from_header(buffer)
       if spec then
-	 put(p, spec_tostring(spec), flags)
-	 reverse_spec(spec)
-	 put(p, spec_tostring(spec), flags)
+         if put(p, spec_tostring(spec), flags) then
+            counts[name] = counts[name] + 1
+         end
+         reverse_spec(spec)
+         put(p, spec_tostring(spec), flags)
       end
    end,
 
@@ -229,7 +240,15 @@ return {
       return spec and get(conntracks[name], spec_tostring(spec))
    end,
 
-   age = age,
+   count = function(name)
+      return counts[name]
+   end,
+
+   age = function(name, t)
+      if age(conntracks[name], t) then
+         counts[name] = 0
+      end
+   end,
 
    clear = function ()
       for name, p in pairs(conntracks) do
@@ -238,9 +257,11 @@ return {
       conntracks = {}
    end,
 
-   ageall = function ()
+   ageall = function (t)
       for name, p in pairs(conntracks) do
-         age(p, 7200)
+         if age(p, t) then
+            counts[name] = 0
+         end
       end
    end,
 
@@ -261,4 +282,19 @@ return {
          print ('-----------')
       end
    end,
+
+   randspec = function (spec)
+      local proto = IP_TCP
+      if math.random() > 0.5 then
+         proto = IP_UDP
+      end
+      spec = spec or conn_spec_ipv4()
+      spec.src_ip = math.random(2^32)
+      spec.dst_ip = math.random(2^32)
+      spec.src_port = math.random(2^16)
+      spec.dst_port = math.random(2^16)
+      spec.protocol = proto
+      return spec
+   end,
+   spec_tostring = spec_tostring,
 }
