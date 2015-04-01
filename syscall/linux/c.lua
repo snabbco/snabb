@@ -524,6 +524,8 @@ function C.kill(pid, sig) return syscall(sys.kill, int(pid), int(sig)) end
 function C.mkdir(pathname, mode) return syscall(sys.mkdir, void(pathname), uint(mode)) end
 function C.fsync(fd) return syscall(sys.fsync, int(fd)) end
 function C.fdatasync(fd) return syscall(sys.fdatasync, int(fd)) end
+function C.sync() return syscall(sys.sync) end
+function C.syncfs(fd) return syscall(sys.syncfs, int(fd)) end
 function C.link(oldpath, newpath) return syscall(sys.link, void(oldpath), void(newpath)) end
 function C.symlink(oldpath, newpath) return syscall(sys.symlink, void(oldpath), void(newpath)) end
 function C.epoll_ctl(epfd, op, fd, event) return syscall(sys.epoll_ctl, int(epfd), int(op), int(fd), void(event)) end

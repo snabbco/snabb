@@ -620,6 +620,12 @@ test_file_operations = {
   test_sync = function()
     S.sync() -- cannot fail...
   end,
+  test_syncfs = function()
+    if not S.syncfs then error "skipped" end
+    local fd = S.open("/dev/null")
+    assert(fd:syncfs())
+    assert(fd:close())
+  end, 
   test_fchmod = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:fchmod("RUSR, WUSR"))
@@ -667,7 +673,7 @@ test_file_operations = {
     assert_equal(stat.gid, 55, "expect gid changed")
     assert(S.unlink(tmpfile))
   end,
-  test_sync = function()
+  test_fsync = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:fsync())
     assert(fd:sync()) -- synonym

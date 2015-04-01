@@ -92,7 +92,7 @@ function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 function S.chroot(path) return retbool(C.chroot(path)) end
 function S.umask(mask) return C.umask(c.MODE[mask]) end
-function S.sync() return C.sync() end
+function S.sync() C.sync() end
 function S.mknod(pathname, mode, dev) return retbool(C.mknod(pathname, c.S_I[mode], getdev(dev) or 0)) end
 function S.flock(fd, operation) return retbool(C.flock(getfd(fd), c.LOCK[operation])) end
 -- TODO read should have consistent return type but then will differ from other calls.
@@ -756,6 +756,10 @@ end
 -- getpagesize might be a syscall, or in libc, or may not exist
 if C.getpagesize then
   function S.getpagesize() return retnum(C.getpagesize()) end
+end
+
+if C.syncfs then
+  function S.syncfs(fd) return retbool(C.syncfs(getfd(fd))) end
 end
 
 -- although the pty functions are not syscalls, we include here, like eg shm functions, as easier to provide as methods on fds
