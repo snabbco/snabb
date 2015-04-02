@@ -270,7 +270,7 @@ local function generateRule(
    T:indent()
 
    assert(rule.ethertype)
-   T("local ethertype = ffi.cast(\"uint16_t*\", buffer + ",ETHERTYPE_OFFSET,")")
+--    T("local ethertype = ffi_cast(\"uint16_t*\", buffer + ",ETHERTYPE_OFFSET,")")
    local ethertype
    if rule.ethertype == "ipv4" then
       ethertype = ETHERTYPE_IPV4
@@ -286,9 +286,9 @@ local function generateRule(
    T("if size < ",min_header_size," then break end")
    if ethertype == ETHERTYPE_IPV4 then
       T("-- IPv4 implies ARP")
-      T("if ethertype[0] == ",ETHERTYPE_ARP," then return true end")
+      T("if ethertype == ",ETHERTYPE_ARP," then return true end")
    end
-   T("if ethertype[0] ~= ",ethertype," then break end")
+   T("if ethertype ~= ",ethertype," then break end")
 
    if rule.state_check then
       conntrack.define (rule.state_check)
@@ -355,6 +355,7 @@ local function generateConformFunctionString(options)
    T"local conntrack = require('apps.packet_filter.conntrack')"
    T"local track = conntrack.track"
    T"local state_pass = conntrack.check"
+   T"local ffi_cast = ffi.cast"
 
    T"return function(buffer, size)"
    T:indent()
@@ -369,6 +370,8 @@ local function generateConformFunctionString(options)
       conntrack.define (options.state_check)
       T('if state_pass("', options.state_check, '", buffer) then return true end')
    end
+
+   T"local ethertype = ffi_cast('uint16_t*', buffer)[6]"
 
    local rules = options.rules or {}
    for i = 1, #rules do
