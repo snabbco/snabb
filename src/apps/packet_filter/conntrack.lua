@@ -75,8 +75,8 @@ ffi.cdef [[
 local conn_spec_ipv4 = ffi.typeof 'conn_spec_ipv4'
 
 
-local function conn_spec_from_ipv4_header(b)
-   local spec = conn_spec_ipv4()
+local function conn_spec_from_ipv4_header(b, spec)
+   spec = spec or conn_spec_ipv4()
    local flags = 0
    do
       local hdr_ips = ffi.cast('uint32_t*', b+IPV4_SOURCE_OFFSET)
@@ -100,8 +100,8 @@ end
 
 local conn_spec_ipv6 = ffi.typeof 'conn_spec_ipv6'
 
-local function conn_spec_from_ipv6_header(b)
-   local spec = conn_spec_ipv6()
+local function conn_spec_from_ipv6_header(b, spec)
+   spec = spec or conn_spec_ipv6()
    local flags = 0
    do
       local hdr_ips = ffi.cast('ipv6_addr*', b+IPV6_SOURCE_OFFSET)
@@ -128,15 +128,21 @@ end
 --
 -- Returns nil if the session cannot be determined due to an
 -- unsupported protocol.
-local function spec_from_header(b)
-   local ethertype = ffi.cast('uint16_t*', b+ETHERTYPE_OFFSET)[0]
-   if ethertype == ETHERTYPE_IPV4 then
-      return conn_spec_from_ipv4_header(b)
-   end
-   if ethertype == ETHERTYPE_IPV6 then
-      return conn_spec_from_ipv6_header(b)
+local spec_from_header=nil
+do
+   local specv4 = conn_spec_ipv4()
+   local specv6 = conn_spec_ipv6()
+   spec_from_header = function (b)
+      local ethertype = ffi.cast('uint16_t*', b+ETHERTYPE_OFFSET)[0]
+      if ethertype == ETHERTYPE_IPV4 then
+         return conn_spec_from_ipv4_header(b, specv4)
+      end
+      if ethertype == ETHERTYPE_IPV6 then
+         return conn_spec_from_ipv6_header(b, specv6)
+      end
    end
 end
+
 
 
 -- reverses a conntrack spec in-site
