@@ -227,14 +227,13 @@ function M_sf:init_snmp ()
    ifTable:register('ifOutMulticastPkts', 'Counter32', 0)
    ifTable:register('ifOutBroadcastPkts', 'Counter32', 0)
    ifTable:register('ifHCInOctets', 'Counter64', 0)
-   -- Note: Only the Octets counter is available as HC
-   -- ifTable:register('ifHCInUcastPkts', 'Counter64', 0)
-   -- ifTable:register('ifHCInMulticastPkts', 'Counter64', 0)
-   -- ifTable:register('ifHCInBroadcastPkts', 'Counter64', 0)
+   ifTable:register('ifHCInUcastPkts', 'Counter64', 0)
+   ifTable:register('ifHCInMulticastPkts', 'Counter64', 0)
+   ifTable:register('ifHCInBroadcastPkts', 'Counter64', 0)
    ifTable:register('ifHCOutOctets', 'Counter64', 0)
-   -- ifTable:register('ifHCOutUcastPkts', 'Counter64', 0)
-   -- ifTable:register('ifHCOutMulticastPkts', 'Counter64', 0)
-   -- ifTable:register('ifHCOutBroadcastPkts', 'Counter64', 0)
+   ifTable:register('ifHCOutUcastPkts', 'Counter64', 0)
+   ifTable:register('ifHCOutMulticastPkts', 'Counter64', 0)
+   ifTable:register('ifHCOutBroadcastPkts', 'Counter64', 0)
    ifTable:register('ifLinkUpDownTrapEnable', 'Integer32', 2) -- disabled
    ifTable:register('ifHighSpeed', 'Gauge32', 10000)
    ifTable:register('ifPromiscuousMode', 'Integer32', 2) -- false
@@ -244,11 +243,34 @@ function M_sf:init_snmp ()
    ifTable:register('ifCounterDiscontinuityTime', 'TimeTicks', 0) -- TBD
    ifTable:register('_X_ifCounterDiscontinuityTime', 'Counter64', 0) -- TBD
 
-   -- Create a timer to periodically check the interface status.  The
-   -- default interval is 5 seconds, defined by the status_timer
-   -- variable.
+   --- Create a timer to periodically check the interface status.
+   --- Static variables are used in the timer function to avoid
+   --- garbage.
    local status = { [1] = 'up', [2] = 'down' }
    local mask = bits{Link_up=30}
+   local promisc = bits({UPE = 9})
+   -- Pre-allocate storage for the results of register-reads
+   local r = {
+      in_mcast_pkts = { r = self.s.MPRC },
+      in_bcast_pkts = { r = self.s.BPRC },
+      in_pkts       = { r = self.s.GPRC },
+      in_octets64   = { r = self.s.GORC64 },
+
+      out_mcast_pkts = { r = self.s.MPTC },
+      out_bcast_pkts = { r = self.s.BPTC },
+      out_pkts       = { r = self.s.GPTC },
+      out_octets64   = { r = self.s.GOTC64 },
+   }
+   local r_keys = {}
+   for k, _ in pairs(r) do
+      table.insert(r_keys, k)
+      r[k].v = ffi.new("uint64_t [1]")
+   end
+   local function read_registers()
+      for _, k in ipairs(r_keys) do
+	 r[k].v[0] = r[k].r()
+      end
+   end
    local t = timer.new("Interface "..self.pciaddress.." status checker",
 		       function(t)
 			  local old = ifTable:get('ifOperStatus')
@@ -267,40 +289,37 @@ function M_sf:init_snmp ()
 			  end
 
 			  ifTable:set('ifPromiscuousMode',
-				      (bit.band(self.r.FCTRL(), bits({UPE = 9})) ~= 0ULL
+				      (bit.band(self.r.FCTRL(), promisc) ~= 0ULL
 				    and 1) or 2)
 			  -- Update counters
-			  local in_mcast_pkts = self.s.MPRC()
-			  local in_bcast_pkts = self.s.BPRC()
-			  local in_pkts = self.s.GPRC()
-			  local in_octets_lo = self.s.GORCL()
-			  local in_octets_hi = self.s.GORCH()
-			  ifTable:set('ifInMulticastPkts', in_mcast_pkts)
-			  ifTable:set('ifInBroadcastPkts', in_bcast_pkts)
-			  ifTable:set('ifInOctets', in_octets_lo)
-			  ifTable:set('ifHCInOctets', in_octets_lo +
-				      bit.lshift(in_octets_hi, 32))
-			  ifTable:set('ifInUcastPkts', in_pkts - in_bcast_pkts
-				      - in_mcast_pkts)
+			  read_registers()
+			  ifTable:set('ifHCInMulticastPkts', r.in_mcast_pkts.v[0])
+			  ifTable:set('ifInMulticastPkts', r.in_mcast_pkts.v[0])
+			  ifTable:set('ifHCInBroadcastPkts', r.in_bcast_pkts.v[0])
+			  ifTable:set('ifInBroadcastPkts', r.in_bcast_pkts.v[0])
+			  local in_ucast_pkts = r.in_pkts.v[0] - r.in_bcast_pkts.v[0]
+			     - r.in_mcast_pkts.v[0]
+			  ifTable:set('ifHCInUcastPkts', in_ucast_pkts)
+			  ifTable:set('ifInUcastPkts', in_ucast_pkts)
+			  ifTable:set('ifHCInOctets', r.in_octets64.v[0])
+			  ifTable:set('ifInOctets', r.in_octets64.v[0])
+
+			  ifTable:set('ifHCOutMulticastPkts', r.out_mcast_pkts.v[0])
+			  ifTable:set('ifOutMulticastPkts', r.out_mcast_pkts.v[0])
+			  ifTable:set('ifHCOutBroadcastPkts', r.out_bcast_pkts.v[0])
+			  ifTable:set('ifOutBroadcastPkts', r.out_bcast_pkts.v[0])
+			  local out_ucast_pkts = r.out_pkts.v[0] - r.out_bcast_pkts.v[0]
+			     - r.out_mcast_pkts.v[0]
+			  ifTable:set('ifHCOutUcastPkts', out_ucast_pkts)
+			  ifTable:set('ifOutUcastPkts', out_ucast_pkts)
+			  ifTable:set('ifHCOutOctets', r.out_octets64.v[0])
+			  ifTable:set('ifOutOctets', r.out_octets64.v[0])
 
 			  -- The RX receive drop counts are only
 			  -- available through the RX stats register.
 			  -- We only read stats register #0 here.  See comment
 			  -- in init_statistics()
-			  ifTable:set('ifInDiscards', tonumber(self.qs.QPRDC[0]()))
-
-			  local out_mcast_pkts = self.s.MPTC()
-			  local out_bcast_pkts = self.s.BPTC()
-			  local out_pkts = self.s.GPTC()
-			  local out_octets_lo = self.s.GOTCL()
-			  local out_octets_hi = self.s.GOTCH()
-			  ifTable:set('ifOutMulticastPkts', out_mcast_pkts)
-			  ifTable:set('ifOutBroadcastPkts', out_bcast_pkts)
-			  ifTable:set('ifOutOctets', out_octets_lo)
-			  ifTable:set('ifHCOutOctets', out_octets_lo +
-				      bit.lshift(out_octets_hi, 32))
-			  ifTable:set('ifOutUcastPkts', out_pkts - out_bcast_pkts
-				   - out_mcast_pkts)
+			  ifTable:set('ifInDiscards', self.qs.QPRDC[0]())
 
 			  ifTable:set('ifInErrors', self.s.CRCERRS() +
 				   self.s.ILLERRC() + self.s.ERRBC() +
@@ -1312,6 +1331,7 @@ PRC1522       0x04070 -           RC Packets Received [1024 to Max Bytes] Count
 BPRC          0x04078 -           RC Broadcast Packets Received Count
 MPRC          0x0407C -           RC Multicast Packets Received Count
 GPRC          0x04074 -           RC Good Packets Received Count
+GORC64        0x04088 -           RC64 Good Octets Received Count 64-bit
 GORCL         0x04088 -           RC Good Octets Received Count Low
 GORCH         0x0408C -           RC Good Octets Received Count High
 RXNFGPC       0x041B0 -           RC Good Rx Non-Filtered Packet Counter
@@ -1330,6 +1350,7 @@ RXDLPBKPC     0x02F74 -           RC DMA Duplicated Good Rx LPBK Packet Counter
 RXDLPBKBCL    0x02F78 -           RC DMA Duplicated Good Rx LPBK Byte Counter Low
 RXDLPBKBCH    0x02F7C -           RC DMA Duplicated Good Rx LPBK Byte Counter High
 GPTC          0x04080 -           RC Good Packets Transmitted Count
+GOTC64        0x04090 -           RC64 Good Octets Transmitted Count 64-bit
 GOTCL         0x04090 -           RC Good Octets Transmitted Count Low
 GOTCH         0x04094 -           RC Good Octets Transmitted Count High
 TXDGPC        0x087A0 -           RC DMA Good Tx Packet Counter
