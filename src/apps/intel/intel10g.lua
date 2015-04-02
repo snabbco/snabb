@@ -66,6 +66,7 @@ function new_sf (conf)
                  fd = false,       -- File descriptor for PCI memory
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
+                 qs = {},          -- queue statistic registers
                  txdesc = 0,     -- Transmit descriptors (pointer)
                  txdesc_phy = 0, -- Transmit descriptors (physical address)
                  txpackets = {},   -- Tx descriptor index -> packet mapping
@@ -89,7 +90,9 @@ function M_sf:open ()
    register.define(config_registers_desc, self.r, self.base)
    register.define(transmit_registers_desc, self.r, self.base)
    register.define(receive_registers_desc, self.r, self.base)
+   register.define_array(packet_filter_desc, self.r, self.base)
    register.define(statistics_registers_desc, self.s, self.base)
+   register.define_array(queue_statistics_registers_desc, self.qs, self.base)
    self.txpackets = ffi.new("struct packet *[?]", num_descriptors)
    self.rxpackets = ffi.new("struct packet *[?]", num_descriptors)
    return self:init()
@@ -184,14 +187,62 @@ function M_sf:init_snmp ()
    -- Rudimentary population of a row in the ifTable MIB.  Allocation
    -- of the ifIndex is delegated to the SNMP agent via the name of
    -- the interface in ifDescr (currently the PCI address).
-   local ifTable = mib:new({ filename = self.pciaddress })
+   local ifTable = mib:new({ directory = self.snmp.directory or nil,
+			     filename = self.pciaddress })
+   self.snmp.ifTable = ifTable
+   -- ifTable
    ifTable:register('ifDescr', 'OctetStr', self.pciaddress)
+   ifTable:register('ifType', 'Integer32', 6) -- ethernetCsmacd
+   ifTable:register('ifMtu', 'Integer32', self.mtu)
+   ifTable:register('ifSpeed', 'Gauge32', 10000000)
+
+   -- After a reset of the NIC, the "native" MAC address is copied to
+   -- the receive address register #0 from the EEPROM
+   local ral, rah = self.r.RAL[0](), self.r.RAH[0]()
+   assert(bit.band(rah, bits({ AV = 31 })) == bits({ AV = 31 }),
+	  "MAC address on "..self.pciaddress.." is not valid ")
+   local mac = ffi.new("struct { uint32_t lo; uint16_t hi; }")
+   mac.lo = ral
+   mac.hi = bit.band(rah, 0xFFFF)
+   ifTable:register('ifPhysAddress', { type = 'OctetStr', length = 6 },
+		    ffi.string(mac, 6))
    ifTable:register('ifAdminStatus', 'Integer32', 1) -- up
    ifTable:register('ifOperStatus', 'Integer32', 2) -- down
    ifTable:register('ifLastChange', 'TimeTicks', 0)
    ifTable:register('_X_ifLastChange_TicksBase', 'Counter64', C.get_unix_time())
-   ifTable:register('ifType', 'Integer32', 6) -- ethernetCsmacd
-   ifTable:register('ifSpeed', 'Gauge32', 10000000)
+   ifTable:register('ifInOctets', 'Counter32', 0)
+   ifTable:register('ifInUcastPkts', 'Counter32', 0)
+   ifTable:register('ifInDiscards', 'Counter32', 0)
+   ifTable:register('ifInErrors', 'Counter32', 0) -- TBD
+   ifTable:register('ifInUnknownProtos', 'Counter32', 0) -- TBD
+   ifTable:register('ifOutOctets', 'Counter32', 0)
+   ifTable:register('ifOutUcastPkts', 'Counter32', 0)
+   ifTable:register('ifOutDiscards', 'Counter32', 0)
+   ifTable:register('ifOutErrors', 'Counter32', 0) -- TBD
+   -- ifXTable
+   ifTable:register('ifName', { type = 'OctetStr', length = 255 },
+		    self.pciaddress)
+   ifTable:register('ifInMulticastPkts', 'Counter32', 0)
+   ifTable:register('ifInBroadcastPkts', 'Counter32', 0)
+   ifTable:register('ifOutMulticastPkts', 'Counter32', 0)
+   ifTable:register('ifOutBroadcastPkts', 'Counter32', 0)
+   ifTable:register('ifHCInOctets', 'Counter64', 0)
+   -- Note: Only the Octets counter is available as HC
+   -- ifTable:register('ifHCInUcastPkts', 'Counter64', 0)
+   -- ifTable:register('ifHCInMulticastPkts', 'Counter64', 0)
+   -- ifTable:register('ifHCInBroadcastPkts', 'Counter64', 0)
+   ifTable:register('ifHCOutOctets', 'Counter64', 0)
+   -- ifTable:register('ifHCOutUcastPkts', 'Counter64', 0)
+   -- ifTable:register('ifHCOutMulticastPkts', 'Counter64', 0)
+   -- ifTable:register('ifHCOutBroadcastPkts', 'Counter64', 0)
+   ifTable:register('ifLinkUpDownTrapEnable', 'Integer32', 2) -- disabled
+   ifTable:register('ifHighSpeed', 'Gauge32', 10000)
+   ifTable:register('ifPromiscuousMode', 'Integer32', 2) -- false
+   ifTable:register('ifConnectorPresent', 'Integer32', 1) -- true
+   ifTable:register('ifAlias', { type = 'OctetStr', length = 64 },
+		    self.pciaddress) -- TBD add description
+   ifTable:register('ifCounterDiscontinuityTime', 'TimeTicks', 0) -- TBD
+   ifTable:register('_X_ifCounterDiscontinuityTime', 'Counter64', 0) -- TBD
 
    -- Create a timer to periodically check the interface status.  The
    -- default interval is 5 seconds, defined by the status_timer
@@ -214,6 +265,47 @@ function M_sf:init_snmp ()
 			     ifTable:set('_X_ifLastChange_TicksBase',
 				     C.get_unix_time())
 			  end
+
+			  ifTable:set('ifPromiscuousMode',
+				      (bit.band(self.r.FCTRL(), bits({UPE = 9})) ~= 0ULL
+				    and 1) or 2)
+			  -- Update counters
+			  local in_mcast_pkts = self.s.MPRC()
+			  local in_bcast_pkts = self.s.BPRC()
+			  local in_pkts = self.s.GPRC()
+			  local in_octets_lo = self.s.GORCL()
+			  local in_octets_hi = self.s.GORCH()
+			  ifTable:set('ifInMulticastPkts', in_mcast_pkts)
+			  ifTable:set('ifInBroadcastPkts', in_bcast_pkts)
+			  ifTable:set('ifInOctets', in_octets_lo)
+			  ifTable:set('ifHCInOctets', in_octets_lo +
+				      bit.lshift(in_octets_hi, 32))
+			  ifTable:set('ifInUcastPkts', in_pkts - in_bcast_pkts
+				      - in_mcast_pkts)
+
+			  -- The RX receive drop counts are only
+			  -- available through the RX stats register.
+			  -- We only read stats register #0 here.  See comment
+			  -- in init_statistics()
+			  ifTable:set('ifInDiscards', tonumber(self.qs.QPRDC[0]()))
+
+			  local out_mcast_pkts = self.s.MPTC()
+			  local out_bcast_pkts = self.s.BPTC()
+			  local out_pkts = self.s.GPTC()
+			  local out_octets_lo = self.s.GOTCL()
+			  local out_octets_hi = self.s.GOTCH()
+			  ifTable:set('ifOutMulticastPkts', out_mcast_pkts)
+			  ifTable:set('ifOutBroadcastPkts', out_bcast_pkts)
+			  ifTable:set('ifOutOctets', out_octets_lo)
+			  ifTable:set('ifHCOutOctets', out_octets_lo +
+				      bit.lshift(out_octets_hi, 32))
+			  ifTable:set('ifOutUcastPkts', out_pkts - out_bcast_pkts
+				   - out_mcast_pkts)
+
+			  ifTable:set('ifInErrors', self.s.CRCERRS() +
+				   self.s.ILLERRC() + self.s.ERRBC() +
+			           self.s.RUC() + self.s.RFC() +
+			           self.s.ROC() + self.s.RJC())
 		       end,
 		       1e9 * (self.snmp.status_timer or
 			      default.snmp.status_timer), 'repeating')
@@ -243,6 +335,11 @@ end
 function M_sf:init_statistics ()
    -- Read and then zero each statistic register
    for _,reg in pairs(self.s) do reg:read() reg:reset() end
+   -- Make sure RX Queue #0 is mapped to the stats register #0.  In
+   -- the default configuration, all 128 RX queues are mapped to this
+   -- stats register.  In non-virtualized mode, only queue #0 is
+   -- actually used.
+   self.qs.RQSMR[0]:set(0)
    return self
 end
 
@@ -271,6 +368,7 @@ function M_sf:set_rx_buffersize(rx_buffersize)
    assert (rx_buffersize > 0, "rx_buffersize must be more than 1024")
    self.rx_buffersize = rx_buffersize * 1024
    self.r.SRRCTL(bits({DesctypeLSB=25}, rx_buffersize))
+   self.r.SRRCTL:set(bits({Drop_En=28})) -- Enable RX queue drop counter
    return self
 end
 
@@ -318,6 +416,10 @@ local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21, eop=24}
 
 function M_sf:transmit (p)
    if p.length > self.mtu then
+      if self.snmp then
+	 local errors = self.snmp.ifTable:ptr('ifOutDiscards')
+	 errors[0] = errors[0] + 1
+      end
       packet.free(p)
    else
       self.txdesc[self.tdt].address = memory.virtual_to_physical(p.data)
