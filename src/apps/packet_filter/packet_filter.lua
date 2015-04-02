@@ -264,7 +264,8 @@ local function generateRule(
       protocol_offset,
       icmp_type,
       source_port_offset,
-      dest_port_offset
+      dest_port_offset,
+      global_state_track
    )
    T"repeat"
    T:indent()
@@ -342,6 +343,9 @@ local function generateRule(
       conntrack.define (rule.state_track)
       T('track("', rule.state_track, '", buffer)')
    end
+   if global_state_track then
+      T('track("', global_state_track, '", buffer)')
+   end
    T"return true"
    T:unindent()
    T"until false"
@@ -362,8 +366,6 @@ local function generateConformFunctionString(options)
 
    if options.state_track then
       conntrack.define(options.state_track)
-      T"if (function(buffer, size)"
-      T:indent()
    end
 
    if options.state_check then
@@ -385,7 +387,8 @@ local function generateConformFunctionString(options)
                IPV4_PROTOCOL_OFFSET,
                IP_ICMP,
                IPV4_SOURCE_PORT_OFFSET,
-               IPV4_DEST_PORT_OFFSET
+               IPV4_DEST_PORT_OFFSET,
+               options.state_track
             )
 
       elseif rules[i].ethertype == "ipv6" then
@@ -398,20 +401,12 @@ local function generateConformFunctionString(options)
                IPV6_NEXT_HEADER_OFFSET,
                IPV6_ICMP,
                IPV6_SOURCE_PORT_OFFSET,
-               IPV6_DEST_PORT_OFFSET
+               IPV6_DEST_PORT_OFFSET,
+               options.state_track
             )
       else
          error("unknown ethertype")
       end
-   end
-   if options.state_track then
-      T:unindent()
-      T"end)(buffer, size) then"
-      T:indent()
-      T("track(\"", options.state_track, "\", buffer)")
-      T"return true"
-      T:unindent()
-      T"end"
    end
    T"return false"
    T:unindent()
