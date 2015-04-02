@@ -25,10 +25,34 @@ num_descriptors = 512
 --num_descriptors = 32
 
 -- Defaults for configurable items
-local default = { snmp = {
-		     status_timer = 5, -- Interval for IF status check and MIB update
-		  }
-	       }
+local default = {
+   -- The MTU configured through the MAXFRS.MFS register includes the
+   -- Ethernet header and CRC. It is limited to 65535 bytes.  We use
+   -- the convention that the configurable MTU includes the Ethernet
+   -- header but not the CRC.  This is "natural" in the sense that the
+   -- unit of data handed to the driver contains a complete Ethernet
+   -- packet.
+   --
+   -- For untagged packets, the Ethernet overhead is 14 bytes.  If
+   -- 802.1q tagging is used, the Ethernet overhead is increased by 4
+   -- bytes per tag.  This overhead must be included in the MTU if
+   -- tags are handled by the software.  However, the NIC always
+   -- accepts packets of size MAXFRS.MFS+4 and MAXFRS.MFS+8 if single-
+   -- or double tagged packets are received (see section 8.2.3.22.13).
+   -- In this case, we will actually accept packets which exceed the
+   -- MTU.
+   --
+   -- XXX If hardware support for VLAN tag adding or stripping is
+   -- enabled, one should probably not include the tags in the MTU.
+   --
+   -- The default MTU allows for an IP packet of a total size of 9000
+   -- bytes without VLAN tagging.
+   mtu = 9014,
+
+   snmp = {
+      status_timer = 5, -- Interval for IF status check and MIB update
+   }
+}
 
 local function pass (...) return ... end
 
@@ -38,6 +62,7 @@ local M_sf = {}; M_sf.__index = M_sf
 
 function new_sf (conf)
    local dev = { pciaddress = conf.pciaddr, -- PCI device address
+                 mtu = (conf.mtu or default.mtu),
                  fd = false,       -- File descriptor for PCI memory
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
@@ -225,16 +250,23 @@ function M_sf:init_receive ()
    self.r.RXCTRL:clr(bits{RXEN=0})
    self:set_promiscuous_mode() -- NB: don't need to program MAC address filter
    self.r.HLREG0(bits{
-      TXCRCEN=0, RXCRCSTRP=1, JUMBOEN=2, rsv2=3, TXPADEN=10,
+      TXCRCEN=0, RXCRCSTRP=1, rsv2=3, TXPADEN=10,
       rsvd3=11, rsvd4=13, MDCSPD=16
    })
-   self.r.MAXFRS(lshift(9000+18, 16))
+   if self.mtu > 1514 then
+      self.r.HLREG0:set(bits{ JUMBOEN=2 })
+      -- MAXFRS is set to a hard-wired default of 1518 if JUMBOEN is
+      -- not set.  The MTU does *not* include the 4-byte CRC, but
+      -- MAXFRS does.
+      self.r.MAXFRS(lshift(self.mtu+4, 16))
+   end
    self:set_receive_descriptors()
    self.r.RXCTRL:set(bits{RXEN=0})
    return self
 end
 
 function M_sf:set_rx_buffersize(rx_buffersize)
+   assert(rx_buffersize >= self.mtu)
    rx_buffersize = math.min(16, math.floor((rx_buffersize or 16384) / 1024))  -- size in KB, max 16KB
    assert (rx_buffersize > 0, "rx_buffersize must be more than 1024")
    self.rx_buffersize = rx_buffersize * 1024
@@ -285,10 +317,14 @@ end
 local txdesc_flags = bits{ifcs=25, dext=29, dtyp0=20, dtyp1=21, eop=24}
 
 function M_sf:transmit (p)
-   self.txdesc[self.tdt].address = memory.virtual_to_physical(p.data)
-   self.txdesc[self.tdt].options = bor(p.length, txdesc_flags, lshift(p.length+0ULL, 46))
-   self.txpackets[self.tdt] = p
-   self.tdt = band(self.tdt + 1, num_descriptors - 1)
+   if p.length > self.mtu then
+      packet.free(p)
+   else
+      self.txdesc[self.tdt].address = memory.virtual_to_physical(p.data)
+      self.txdesc[self.tdt].options = bor(p.length, txdesc_flags, lshift(p.length+0ULL, 46))
+      self.txpackets[self.tdt] = p
+      self.tdt = band(self.tdt + 1, num_descriptors - 1)
+   end
 end
 
 function M_sf:sync_transmit ()
@@ -467,6 +503,7 @@ local M_pf = {}; M_pf.__index = M_pf
 
 function new_pf (conf)
    local dev = { pciaddress = conf.pciaddr, -- PCI device address
+                 mtu = (conf.mtu or default.mtu),
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
                  qs = {},          -- queue statistic registers
