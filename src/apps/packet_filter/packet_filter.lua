@@ -440,16 +440,19 @@ function PacketFilter:push ()
       return
    end
 
+   local lreceive, ltransmit = link.receive, link.transmit
+   local conform = self.conform
+   local pfree = packet.free
    local nreadable = link.nreadable(i)
    for n = 1, nreadable do
-      local p = link.receive(i)
+      local p = lreceive(i)
       -- support the whole IP header in one iovec at the moment
 
-      if self.conform(p.data, p.length) then
-         link.transmit(o, p)
+      if conform(p.data, p.length) then
+         ltransmit(o, p)
       else
          -- discard packet
-         packet.free(p)
+         pfree(p)
       end
    end
 end
