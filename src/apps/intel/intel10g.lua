@@ -24,11 +24,11 @@ local band, bor, lshift = bit.band, bit.bor, bit.lshift
 num_descriptors = 512
 --num_descriptors = 32
 
--- Set to true to enable IF-MIB support via the ipc/shmem mechanism
-enable_snmp = false
--- Timer for interface status check in seconds (only active when
--- enable_snmp=true)
-status_timer = 5
+-- Defaults for configurable items
+local default = { snmp = {
+		     status_timer = 5, -- Interval for IF status check and MIB update
+		  }
+	       }
 
 local function pass (...) return ... end
 
@@ -36,8 +36,8 @@ local function pass (...) return ... end
 --- ### SF: single function: non-virtualized device
 local M_sf = {}; M_sf.__index = M_sf
 
-function new_sf (pciaddress)
-   local dev = { pciaddress = pciaddress, -- PCI device address
+function new_sf (conf)
+   local dev = { pciaddress = conf.pciaddr, -- PCI device address
                  fd = false,       -- File descriptor for PCI memory
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
@@ -51,7 +51,8 @@ function new_sf (pciaddress)
                  rxpackets = {},   -- Rx descriptor index -> packet mapping
                  rdh = 0,          -- Cache of receive head (RDH) register
                  rdt = 0,          -- Cache of receive tail (RDT) register
-                 rxnext = 0        -- Index of next buffer to receive
+                 rxnext = 0,       -- Index of next buffer to receive
+                 snmp = conf.snmp,
               }
    return setmetatable(dev, M_sf)
 end
@@ -88,7 +89,7 @@ end
 --- See data sheet section 4.6.3 "Initialization Sequence."
 
 function M_sf:init ()
-   if enable_snmp then
+   if self.snmp then
       self:init_snmp()
    end
    self:init_dma_memory()
@@ -188,7 +189,9 @@ function M_sf:init_snmp ()
 			     ifTable:set('_X_ifLastChange_TicksBase',
 				     C.get_unix_time())
 			  end
-		       end, 1e9 * status_timer, 'repeating')
+		       end,
+		       1e9 * (self.snmp.status_timer or
+			      default.snmp.status_timer), 'repeating')
    timer.activate(t)
    return self
 end
@@ -462,14 +465,15 @@ end
 --- ### PF: the physiscal device in a virtualized setup
 local M_pf = {}; M_pf.__index = M_pf
 
-function new_pf (pciaddress)
-   local dev = { pciaddress = pciaddress, -- PCI device address
+function new_pf (conf)
+   local dev = { pciaddress = conf.pciaddr, -- PCI device address
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers
                  qs = {},          -- queue statistic registers
                  mac_set = index_set:new(127, "MAC address table"),
                  vlan_set = index_set:new(64, "VLAN Filter table"),
                  mirror_set = index_set:new(4, "Mirror pool table"),
+                 snmp = conf.snmp,
               }
    return setmetatable(dev, M_pf)
 end
@@ -495,7 +499,7 @@ function M_pf:close()
 end
 
 function M_pf:init ()
-   if enable_snmp then
+   if self.snmp then
       self:init_snmp()
    end
    self.redos = 0

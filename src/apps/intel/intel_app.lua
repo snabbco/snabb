@@ -34,7 +34,7 @@ function Intel82599:new (arg)
 
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
-         devices[conf.pciaddr] = {pf=intel10g.new_pf(conf.pciaddr):open(), vflist={}}
+         devices[conf.pciaddr] = {pf=intel10g.new_pf(conf):open(), vflist={}}
       end
       local dev = devices[conf.pciaddr]
       local poolnum = firsthole(dev.vflist)-1
@@ -42,7 +42,7 @@ function Intel82599:new (arg)
       dev.vflist[poolnum+1] = vf
       return setmetatable({dev=vf:open(conf)}, Intel82599)
    else
-      local dev = intel10g.new_sf(conf.pciaddr):open()
+      local dev = intel10g.new_sf(conf):open()
       if not dev then return null end
       return setmetatable({dev=dev, zone="intel"}, Intel82599)
    end
