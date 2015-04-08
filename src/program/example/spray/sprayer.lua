@@ -1,7 +1,5 @@
 module(..., package.seeall)
 
-local app = require("core.app")
-local config = require("core.config")
 local pcap = require("apps.pcap.pcap")
 local link = require("core.link")
 local packet = require("core.packet")
@@ -30,6 +28,6 @@ function Sprayer:process_packet(i, o)
    if self.packet_counter % 2 == 0 then
       link.transmit(o, p)
    else
-      packet.deref(p)
+      packet.free(p)
    end
 end

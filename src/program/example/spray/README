@@ -1,0 +1,3 @@
+Usage: spray <INPUTFILE> <OUTPUTFILE>
+
+Write every odd packet from INPUTFILE to OUTFILE.

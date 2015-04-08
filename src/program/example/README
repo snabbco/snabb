@@ -1,0 +1,10 @@
+Usage:
+  example replay
+  example spray
+
+Use --help for per-command usage.
+Example: 
+    example replay --help
+
+See Also:
+  Getting Stared Guide
