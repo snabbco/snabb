@@ -136,18 +136,18 @@ function VhostUser:process_qemu_requests ()
 
       if ret > 0 then
          assert(msg.request >= 0 and msg.request <= C.VHOST_USER_MAX)
-         debug("Got vhost_user request", handler_names[msg.request], msg.request)
+         debug("vhost_user: request", handler_names[msg.request], msg.request)
          local method = self[handler_names[msg.request]]
          if method then
             method(self, msg, self.fds, self.nfds[0])
          else
-            error(string.format("vhost_user unrecognized request: %d", msg.request))
+            error(string.format("vhost_user: unrecognized request: %d", msg.request))
          end
          msg.request = -1;
       else
          stop = true
          if ret == 0 then
-            print ("Connection went down")
+            print("vhost_user: Connection went down: "..self.socket_path)
             self:stop()
          end
       end
@@ -158,7 +158,7 @@ function VhostUser:process_qemu_requests ()
 end
 
 function VhostUser:none (msg)
-   error(string.format("vhost_user unrecognized request: %d", msg.request))
+   error(string.format("vhost_user: unrecognized request: %d", msg.request))
 end
 
 function VhostUser:get_features (msg)
@@ -205,11 +205,9 @@ function VhostUser:update_features (features)
 end
 
 function VhostUser:set_owner (msg)
-   debug("set_owner")
 end
 
 function VhostUser:reset_owner (msg)
-   debug("reset_owner")
    -- Disable vhost processing until the guest reattaches.
    self.vhost_ready = false
 end
@@ -238,7 +236,7 @@ function VhostUser:set_vring_kick (msg, fds, nfds)
       assert(nfds == 1)
       self.dev:set_vring_kick(idx, fds[0])
    else
-      print("Should start polling on virtq "..tonumber(idx))
+      print("vhost_user: Should start polling on virtq "..tonumber(idx))
    end
 end
 
@@ -253,13 +251,15 @@ function VhostUser:set_vring_addr (msg)
    self.dev:set_vring_addr(msg.addr.index, ring)
 
    if self.dev:ready() then
+      if not self.vhost_ready then
+	 print("vhost_user: Connected and initialized: "..self.socket_path)
+      end
       self.vhost_ready = true
-      debug("Connected and initialized vhost_user.")
    end
 end
 
 function VhostUser:set_vring_base (msg)
-   debug("set_vring_base", msg.state.index, msg.state.num)
+   debug("vhost_user: set_vring_base", msg.state.index, msg.state.num)
    self.dev:set_vring_base(msg.state.index, msg.state.num)
 end
 
