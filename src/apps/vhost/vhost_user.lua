@@ -210,6 +210,8 @@ end
 
 function VhostUser:reset_owner (msg)
    debug("reset_owner")
+   -- Disable vhost processing until the guest reattaches.
+   self.vhost_ready = false
 end
 
 function VhostUser:set_vring_num (msg)
