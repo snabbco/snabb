@@ -94,9 +94,6 @@ int vhost_user_send(int sock, struct vhost_user_msg *msg)
     msgh.msg_control = 0;
     msgh.msg_controllen = 0;
 
-    printf("vhost_user_send %d %d %d %d\n", msg->request, msg->flags, msg->size,
-            (int) iov[0].iov_len);
-
     do {
         ret = sendmsg(sock, &msgh, 0);
     } while (ret < 0 && errno == EINTR);
