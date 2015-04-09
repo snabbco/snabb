@@ -15,6 +15,8 @@ SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 
 LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
+PFLUASRC = $(shell cd ../deps/pflua && \
+	         find . -regex '[^\#]*\.lua' -printf '%P ')
 CSRC   = $(shell find . -regex '[^\#]*\.c'   -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h'   -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
@@ -24,6 +26,7 @@ PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 INCSRC = $(shell find . -regex '[^\#]*\.inc' -printf '%P ')
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
+PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
 ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
@@ -47,7 +50,7 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
+snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
 	$(E) "SUBMODULES"
 	@if grep -vqF $(LUAJIT_VSN)    ../deps/luajit.vsn || \
 	    grep -vqF $(LJSYSCALL_VSN) ../deps/ljsyscall.vsn; then \
@@ -129,6 +132,11 @@ $(OBJDIR) bin testlog:
 
 $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 	$(E) "LUA       $@"
+	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
+
+$(PFLUAOBJ): obj/%_lua.o: ../deps/pflua/%.lua Makefile
+	$(E) "LUA       $@"
+	$(Q) mkdir -p $(dir $@)
 	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)

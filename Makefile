@@ -54,6 +54,9 @@ check_syscall:
 	    git submodule update --init deps/ljsyscall; \
 	fi
 
+test_pflua: check_luajit
+	PATH=`pwd`/deps/luajit/usr/local/bin:$$PATH make -C deps/pflua check
+
 clean:
 	(cd deps/luajit && $(MAKE) clean)
 	(cd src; $(MAKE) clean; rm -rf syscall.lua syscall)
