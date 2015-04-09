@@ -146,11 +146,15 @@ end
 function VirtioNetDevice:rx_packet_end(header_id, total_size, rx_p)
    local l = self.owner.output.tx
    if l then
-      if band(self.rx_hdr_flags, C.VIO_NET_HDR_F_NEEDS_CSUM) ~= 0 then
-         checksum.finish_packet(
-            rx_p.data + self.rx_hdr_csum_start,
-            rx_p.length - self.rx_hdr_csum_start,
-            self.rx_hdr_csum_offset)
+      if band(self.rx_hdr_flags, C.VIO_NET_HDR_F_NEEDS_CSUM) ~= 0 and
+	 -- Bounds-check the checksum area
+	 self.rx_hdr_csum_start  <= rx_p.length - 2 and
+	 self.rx_hdr_csum_offset <= rx_p.length - 2
+      then
+	 checksum.finish_packet(
+	    rx_p.data + self.rx_hdr_csum_start,
+	    rx_p.length - self.rx_hdr_csum_start,
+	    self.rx_hdr_csum_offset)
       end
       link.transmit(l, rx_p)
    else
