@@ -101,9 +101,10 @@ end
 -- Prepared argument for writing a 1 to an eventfd.
 local eventfd_one = ffi.new("uint64_t[1]", {1})
 
-function VirtioVirtq:signal_used()
+function VirtioVirtq:signal_used ()
    if self.virtq.used.idx ~= self.used then
       self.virtq.used.idx = self.used
+      C.full_memory_barrier()
       if band(self.virtq.avail.flags, C.VRING_F_NO_INTERRUPT) == 0 then
          C.write(self.callfd, eventfd_one, 8)
       end
