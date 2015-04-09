@@ -69,7 +69,7 @@ snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
 	    exit 1; \
 	 fi
 	$(E) "LINK      $@"
-	$(Q) gcc $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
+	$(Q) gcc -g -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
@@ -133,11 +133,7 @@ $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
-
-obj/lib/checksum_c.o: lib/checksum.c
-	$(E) "C(O2)     $@"
-	$(Q) gcc -O2 -mavx2 -msse2 -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) gcc -mavx2 -msse2 -O2 -g -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"
@@ -149,7 +145,7 @@ $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 $(ASMOBJ): obj/%_dasc.o: %.dasc $(CHDR) Makefile | $(OBJDIR)
 	$(E) "ASM       $@"
 	$(Q) luajit ../deps/luajit/dynasm/dynasm.lua -o $@.gen $<
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -I ../deps/luajit -c -Wall -Werror -x c -o $@ $@.gen
+	$(Q) gcc -g -Wl,-E -I ../deps/luajit/src -I . -I ../deps/luajit -c -Wall -Werror -x c -o $@ $@.gen
 
 $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"
@@ -178,7 +174,7 @@ obj/jit_tprof.o: extra/tprof.lua | $(OBJDIR)
 
 obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
+	$(Q) gcc -g -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
 book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
 
