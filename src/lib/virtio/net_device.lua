@@ -338,21 +338,23 @@ end
 
 function VirtioNetDevice:map_from_guest (addr)
    local result
+   local m = self.mem_table[0]
+   -- Check cache first (on-trace fastpath)
+   if addr >= m.guest and addr < m.guest + m.size then
+      return addr + m.snabb - m.guest
+   end
+   -- Looping case
    for i = 0, table.getn(self.mem_table) do
-      local m = self.mem_table[i]
+      m = self.mem_table[i]
       if addr >= m.guest and addr < m.guest + m.size then
          if i ~= 0 then
             self.mem_table[i] = self.mem_table[0]
             self.mem_table[0] = m
          end
-         result = addr + m.snabb - m.guest
-         break
+         return addr + m.snabb - m.guest
       end
    end
-   if not result then
-      error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
-   end
-   return result
+   error("mapping to host address failed" .. tostring(ffi.cast("void*",addr)))
 end
 
 function VirtioNetDevice:map_from_qemu (addr)
