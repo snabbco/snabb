@@ -224,7 +224,11 @@ function VirtioNetDevice:tx_packet_start(addr, len)
 
    -- TODO: copy the relevnat fields from the packet
    ffi.fill(tx_hdr, virtio_net_hdr_size)
-   tx_hdr.flags = validflags(tx_p.data+14, tx_p.length-14)
+   if band(self.features, C.VIRTIO_NET_F_CSUM) == 0 then
+      tx_hdr.flags = 0
+   else
+      tx_hdr.flags = validflags(tx_p.data+14, tx_p.length-14)
+   end
 
    return tx_p
 end
