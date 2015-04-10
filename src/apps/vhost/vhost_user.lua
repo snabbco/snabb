@@ -136,18 +136,18 @@ function VhostUser:process_qemu_requests ()
 
       if ret > 0 then
          assert(msg.request >= 0 and msg.request <= C.VHOST_USER_MAX)
-         debug("Got vhost_user request", handler_names[msg.request], msg.request)
+         debug("vhost_user: request", handler_names[msg.request], msg.request)
          local method = self[handler_names[msg.request]]
          if method then
             method(self, msg, self.fds, self.nfds[0])
          else
-            error(string.format("vhost_user unrecognized request: %d", msg.request))
+            error(string.format("vhost_user: unrecognized request: %d", msg.request))
          end
          msg.request = -1;
       else
          stop = true
          if ret == 0 then
-            print ("Connection went down")
+            print("vhost_user: Connection went down: "..self.socket_path)
             self:stop()
          end
       end
@@ -158,7 +158,7 @@ function VhostUser:process_qemu_requests ()
 end
 
 function VhostUser:none (msg)
-   error(string.format("vhost_user unrecognized request: %d", msg.request))
+   error(string.format("vhost_user: unrecognized request: %d", msg.request))
 end
 
 function VhostUser:get_features (msg)
@@ -169,15 +169,47 @@ function VhostUser:get_features (msg)
 end
 
 function VhostUser:set_features (msg)
-   self.dev:set_features(msg.u64)
+   -- Check if we have an up-to-date feature to override with
+   local features = self:update_features(tonumber(msg.u64))
+   self.dev:set_features(features)
+end
+
+function VhostUser:update_features (features)
+   local stat = syscall.stat(self.socket_path)
+   local mtime = ("%d.%d"):format(tonumber(stat.st_mtime),
+				  tonumber(stat.st_mtime_nsec))
+   local cachepath = "/tmp/vhost_features_"..string.gsub(self.socket_path, "/", "__")
+   local f = io.open(cachepath, 'r')
+   if f then
+      local file_features, file_mtime = f:read('*a'):match("features:(.*) mtime:(.*)\n")
+      f:close()
+      if file_mtime == mtime then
+	 print(("vhost_user: Read cached features (0x%s) from %s"):format(
+	       bit.tohex(file_features), cachepath))
+	 return tonumber(file_features)
+      else
+	 print(("vhost_user: Skipped old feature cache in %s"):format(cachepath))
+      end
+   end
+   f = io.open(cachepath, 'w')
+   if f then
+      print(("vhost_user: Caching features (0x%s) in %s"):format(
+	    bit.tohex(features), cachepath))
+      f:write(("features:%s mtime:%s\n"):format("0x"..bit.tohex(features), mtime))
+      f:close()
+   else
+      print(("vhost_user: Failed to open cache file - %s"):format(cachepath))
+   end
+   io.flush()
+   return features
 end
 
 function VhostUser:set_owner (msg)
-   debug("set_owner")
 end
 
 function VhostUser:reset_owner (msg)
-   debug("reset_owner")
+   -- Disable vhost processing until the guest reattaches.
+   self.vhost_ready = false
 end
 
 function VhostUser:set_vring_num (msg)
@@ -204,7 +236,7 @@ function VhostUser:set_vring_kick (msg, fds, nfds)
       assert(nfds == 1)
       self.dev:set_vring_kick(idx, fds[0])
    else
-      print("Should start polling on virtq "..tonumber(idx))
+      print("vhost_user: Should start polling on virtq "..tonumber(idx))
    end
 end
 
@@ -219,13 +251,15 @@ function VhostUser:set_vring_addr (msg)
    self.dev:set_vring_addr(msg.addr.index, ring)
 
    if self.dev:ready() then
+      if not self.vhost_ready then
+	 print("vhost_user: Connected and initialized: "..self.socket_path)
+      end
       self.vhost_ready = true
-      debug("Connected and initialized vhost_user.")
    end
 end
 
 function VhostUser:set_vring_base (msg)
-   debug("set_vring_base", msg.state.index, msg.state.num)
+   debug("vhost_user: set_vring_base", msg.state.index, msg.state.num)
    self.dev:set_vring_base(msg.state.index, msg.state.num)
 end
 
