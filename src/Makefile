@@ -8,6 +8,7 @@ E= @echo
 # Defined here to detect version mismatches at build time.
 LUAJIT_VSN    := "v2.0.3-328-g04dc64b"
 LJSYSCALL_VSN := "v0.10-65-g7081d97"
+PFLUA_VSN     := "c0c854b3307c2eba0586c98880718f1fd02b95fa"
 
 TEST_SKIPPED="43"
 
@@ -52,8 +53,12 @@ PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
 snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
 	$(E) "SUBMODULES"
-	@if grep -vqF $(LUAJIT_VSN)    ../deps/luajit.vsn || \
-	    grep -vqF $(LJSYSCALL_VSN) ../deps/ljsyscall.vsn; then \
+	@if test ! -f ../deps/luajit.vsn			|| \
+	    test ! -f ../deps/ljsyscall.vsn			|| \
+	    test ! -f ../deps/pflua.vsn				|| \
+	    grep -vqF $(LJSYSCALL_VSN) ../deps/ljsyscall.vsn	|| \
+	    grep -vqF $(LUAJIT_VSN)    ../deps/luajit.vsn	|| \
+	    grep -vqF $(PFLUA_VSN)     ../deps/pflua.vsn; then \
 	    echo "Error: Submodule version mismatch"			>&2; \
 	    echo "luajit:"						>&2; \
 	    echo "  require: $(LUAJIT_VSN)"				>&2; \
@@ -61,6 +66,9 @@ snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
 	    echo "ljsyscall:"						>&2; \
 	    echo "  require: $(LJSYSCALL_VSN)"				>&2; \
 	    echo "  found:   $(shell cat ../deps/ljsyscall.vsn) "	>&2; \
+	    echo "pflua:"						>&2; \
+	    echo "  require: $(PFLUA_VSN)"				>&2; \
+	    echo "  found:   $(shell cat ../deps/pflua.vsn) "		>&2; \
 	    echo "Please update and rebuild submodules."		>&2; \
 	    echo ""							>&2; \
 	    echo "Cheat sheet:"						>&2; \
@@ -205,7 +213,7 @@ doc/snabbswitch.epub: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
 	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
 
-CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog
+CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog deps/*.vsn
 
 clean:
 	$(E) "RM        $(CLEAN)"
