@@ -1,63 +1,119 @@
 module(...,package.seeall)
 
-package.path = package.path .. ";../deps/pflua/src/?.lua"
-
-local ffi = require("ffi")
-local C = ffi.C
-local bit = require("bit")
-
 local app = require("core.app")
 local link = require("core.link")
 local lib = require("core.lib")
 local packet = require("core.packet")
 local config = require("core.config")
+local conntrack = require("apps.packet_filter.conntrack")
 
-local pcap = require("apps.pcap.pcap")
-local basic_apps = require("apps.basic.basic_apps")
+local pf = require("pf")        -- pflua
 
-local pflua = require("pf")
+PcapFilter = {}
 
-local verbose = false
+-- PcapFilter is an app that drops all packets that don't match a
+-- specified filter expression.
+--
+-- Optionally, connections can be statefully tracked, so that if one
+-- packet for a TCP/UDP session is accepted then future packets
+-- matching this session are also accepted.
+--
+-- conf:
+--   filter      = string expression specifying which packets to accept
+--                 syntax: http://www.tcpdump.org/manpages/pcap-filter.7.html
+--   state_table = optional string name to use for stateful-tracking table
+function PcapFilter:new (conf)
+   assert(conf.filter, "PcapFilter conf.filter parameter missing")
 
-assert(ffi.abi("le"), "support only little endian architecture at the moment")
-assert(ffi.abi("64bit"), "support only 64 bit architecture at the moment")
-
-PacketFilter = {}
-
--- TODO: Since compilation process is relatively expensive, we could fork to 
--- compile in a subprocess, implement a cache, etc
-function PacketFilter:new (filters)
-   assert(filters)
-   assert(#filters > 0)
-
-   for i,filter in ipairs(filters) do
-      filters[i] = "("..filter..")"
-   end
-   local filter = table.concat(filters, " or ")
    local o = {
-      conform = pflua.compile_filter(filter)
+      -- XXX Investigate the latency impact of filter compilation.
+      accept_fn = pf.compile_filter(conf.filter),
+      state_table = conf.state_table or false
    }
-   return setmetatable(o, { __index = PacketFilter })
+   if conf.state_table then conntrack.define(conf.state_table) end
+   return setmetatable(o, { __index = PcapFilter })
 end
 
-function PacketFilter:push ()
+function PcapFilter:push ()
    local i = assert(self.input.input or self.input.rx, "input port not found")
    local o = assert(self.output.output or self.output.tx, "output port not found")
 
-   local packets_tx = 0
-   local max_packets_to_send = link.nwritable(o)
-   if max_packets_to_send == 0 then
-      return
-   end
-
-   local nreadable = link.nreadable(i)
-   for n = 1, nreadable do
+   while not link.empty(i) do
       local p = link.receive(i)
 
-      if self.conform(p.data, p.length) then
+      if self.state_table and conntrack.check(self.state_table, p.data) then
+         link.transmit(o, p)
+      elseif self.accept_fn(p.data, p.length) then
+         if self.state_table then conntrack.track(self.state_table, p.data) end
          link.transmit(o, p)
       else
          packet.free(p)
       end
    end
 end
+
+-- Testing
+
+local pcap = require("apps.pcap.pcap")
+local basic_apps = require("apps.basic.basic_apps")
+
+-- This is a simple blind regression test to detect unexpected changes
+-- in filtering behavior.
+--
+-- The PcapFilter app is glue. Instead of having major unit tests of
+-- its own it depends on separate testing of pflua and conntrack.
+function selftest ()
+   print("selftest: pcap_filter")
+   selftest_run(false, 3.726, 0.0009)
+   selftest_run(true,  3.800, 0.1)
+   print("selftest: ok")
+end
+
+-- Run a selftest in stateful or non-stateful mode and expect a
+-- specific rate of acceptance from the test trace file.
+function selftest_run (stateful, expected, tolerance)
+   local pcap_filter = require("apps.packet_filter.pcap_filter")
+   local v6_rules =
+      [[
+         (icmp6 and
+          src net 3ffe:501:0:1001::2/128 and
+          dst net 3ffe:507:0:1:200:86ff:fe05:8000/116)
+         or
+         (ip6 and udp and
+          src net 3ffe:500::/28 and
+          dst net 3ffe:0501:4819::/64 and
+          src portrange 2397-2399 and
+          dst port 53)
+      ]]
+
+   local c = config.new()
+   local state_table = stateful and "selftest"
+   config.app(c, "source", pcap.PcapReader, "apps/packet_filter/samples/v6.pcap")
+   config.app(c, "repeater", basic_apps.Repeater )
+   config.app(c,"pcap_filter", pcap_filter.PcapFilter,
+              {filter=v6_rules, state_table = state_table})
+   config.app(c, "sink", basic_apps.Sink )
+
+   config.link(c, "source.output -> repeater.input")
+   config.link(c, "repeater.output -> pcap_filter.input")
+   config.link(c, "pcap_filter.output -> sink.input")
+   app.configure(c)
+
+   print(("Run for 1 second (stateful = %s)..."):format(stateful))
+
+   local deadline = lib.timer(1e9)
+   repeat app.breathe() until deadline()
+   
+   app.report({showlinks=true})
+   local sent     = app.app_table.pcap_filter.input.input.stats.rxpackets
+   local accepted = app.app_table.pcap_filter.output.output.stats.txpackets
+   local acceptrate = accepted * 100 / sent
+   if acceptrate >= expected and acceptrate <= expected+tolerance then
+      print(("ok: accepted %.4f%% of inputs (within tolerance)"):format(acceptrate))
+   else
+      print(("error: accepted %.4f%% (expected %.3f%% +/- %.5f)"):format(
+            acceptrate, expected, tolerance))
+      error("selftest failed")
+   end
+end
+
