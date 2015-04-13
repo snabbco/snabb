@@ -746,6 +746,8 @@ function M_pf:new_vf (poolnum)
       -- some things are shared with the main device...
       base = self.base,             -- mmap()ed register file
       s = self.s,                   -- Statistics registers
+      mtu = self.mtu,
+      snmp = self.snmp,
       -- and others are our own
       r = {},                       -- Configuration registers
       poolnum = poolnum,
