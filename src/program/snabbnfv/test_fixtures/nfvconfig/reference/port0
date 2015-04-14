@@ -1,16 +1,7 @@
 return {
   {
     vlan = 243,
-    egress_filter = {
-      rules = {
-        {
-          ethertype = "ipv6",
-        },
-        {
-          ethertype = "ipv4",
-        },
-      },
-    },
+    egress_filter = "ip or ip6",
     mac_address = "fa:16:3e:1e:b0:20",
     tunnel = {
       next_hop = "2:2:2:2:2:2:2:2",

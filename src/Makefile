@@ -16,7 +16,7 @@ SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 
 LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
-PFLUASRC = $(shell cd ../deps/pflua && \
+PFLUASRC = $(shell cd ../deps/pflua/src && \
 	         find . -regex '[^\#]*\.lua' -printf '%P ')
 CSRC   = $(shell find . -regex '[^\#]*\.c'   -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h'   -printf '%P ')
@@ -142,7 +142,7 @@ $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 	$(E) "LUA       $@"
 	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
 
-$(PFLUAOBJ): obj/%_lua.o: ../deps/pflua/%.lua Makefile
+$(PFLUAOBJ): obj/%_lua.o: ../deps/pflua/src/%.lua Makefile
 	$(E) "LUA       $@"
 	$(Q) mkdir -p $(dir $@)
 	$(Q) luajit -bg -n $(subst /,.,$*) $< $@

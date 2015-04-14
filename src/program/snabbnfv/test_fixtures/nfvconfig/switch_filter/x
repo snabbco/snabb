@@ -2,10 +2,7 @@ return {
   { vlan = 0,
     mac_address = "00:90:f5:ef:aa:67",
     port_id = "id0",
-    ingress_filter = { rules = { { ethertype='ipv6',
-                                   protocol='udp',
-                                   dest_port_min=1024,
-                                   dest_port_max=1025 } } },
+    ingress_filter = "ip6 and udp and dst portrange 1024-1025",
     gbps = nil,
     tunnel = nil
   },

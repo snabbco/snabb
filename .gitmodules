@@ -7,4 +7,4 @@
 	url = https://github.com/justincormack/ljsyscall.git
 [submodule "deps/pflua"]
 	path = deps/pflua
-	url = https://github.com/Igalia/pflua.git
+	url = https://github.com/SnabbCo/pflua.git

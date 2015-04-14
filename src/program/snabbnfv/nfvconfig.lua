@@ -1,7 +1,7 @@
 module(...,package.seeall)
 
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
-local PacketFilter = require("apps.packet_filter.packet_filter").PacketFilter
+local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
 local nd_light = require("apps.ipv6.nd_light").nd_light
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
@@ -45,15 +45,20 @@ function load (file, pciaddr, sockpath)
          config.link(c, VM_tx.." -> "..TxLimit..".input")
          VM_tx = TxLimit..".output"
       end
+      -- If enabled, track allowed connections statefully on a per-port basis.
+      -- (The table tracking connection state is named after the port ID.)
+      local pf_state_table = t.stateful_filter and name
       if t.ingress_filter then
          local Filter = name.."_Filter_in"
-         config.app(c, Filter, PacketFilter, t.ingress_filter)
+         config.app(c, Filter, PcapFilter, { filter = t.ingress_filter,
+                                             state_table = pf_state_table })
          config.link(c, Filter..".tx -> " .. VM_rx)
          VM_rx = Filter..".rx"
       end
       if t.egress_filter then
          local Filter = name..'_Filter_out'
-         config.app(c, Filter, PacketFilter, t.egress_filter)
+         config.app(c, Filter, PcapFilter, { filter = t.egress_filter,
+                                             state_table = pf_state_table })
          config.link(c, VM_tx..' -> '..Filter..'.rx')
          VM_tx = Filter..'.tx'
       end
