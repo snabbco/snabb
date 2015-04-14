@@ -21,13 +21,14 @@ local shmem = require("lib.ipc.shmem.shmem")
 
 local counter = subClass(shmem)
 counter._name = "Counter shared memory"
-counter._namespace = "Counter:1"
+counter._namespace = "Counter"
+counter._version = 1
 -- Suppress the length field in the index file
 counter._fs = ''
+counter._ctype = ffi.typeof("uint64_t")
 
-local uint64_t = ffi.typeof("uint64_t")
 function counter:register (name, value)
-   return counter:superClass().register(self, name, uint64_t, value)
+   return counter:superClass().register(self, name, self._ctype, value)
 end
 
 function counter:add (name, value)

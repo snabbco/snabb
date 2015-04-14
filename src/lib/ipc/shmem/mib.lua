@@ -41,7 +41,8 @@ local shmem = require("lib.ipc.shmem.shmem")
 
 local mib = subClass(shmem)
 mib._name = "MIB shared memory"
-mib._namespace = "MIB:1"
+mib._namespace = "MIB"
+mib._version = 1
 
 local int32_t = ffi.typeof("int32_t")
 local uint32_t = ffi.typeof("uint32_t")
