@@ -28,12 +28,12 @@ CONFIG FILE FORMAT:
 
   Each port is defined by a range of properties which correspond to the
   configuration parameters of the underlying apps (NIC driver, VhostUser,
-  PacketFilter, RateLimiter, nd_light and SimpleKeyedTunnel):
+  PcapFilter, RateLimiter, nd_light and SimpleKeyedTunnel):
 
       port := { port_id        = <id>,          -- A unique string
                 mac_address    = <mac-address>, -- MAC address as a string
                 vlan           = <vlan-id>,     -- ..
-                ingress_filter = <rules>,       -- As for PacketFilter
+                ingress_filter = <rules>,       -- A pcap-filter(7) expression
                 egress_filter  = <rules>,       -- ..
                 tunnel         = <tunnel-conf>,
                 rx_police_gbps = <n>,           -- Allowed input rate in Gbps

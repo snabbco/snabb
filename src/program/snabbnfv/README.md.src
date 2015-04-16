@@ -41,14 +41,14 @@ return { <port-1>, ..., <port-n> }
 
 Each port is defined by a range of properties which correspond to the
 configuration parameters of the underlying apps (NIC driver, `VhostUser`,
-`PacketFilter`, `RateLimiter`, `nd_light` and `SimpleKeyedTunnel`):
+`PcapFilter`, `RateLimiter`, `nd_light` and `SimpleKeyedTunnel`):
 
 ```
 port := { port_id        = <id>,          -- A unique string
           mac_address    = <mac-address>, -- MAC address as a string
           vlan           = <vlan-id>,     -- ..
-          ingress_filter = <rules>,       -- As for PacketFilter
-          egress_filter  = <rules>,       -- ..
+          ingress_filter = <filter>,       -- A pcap-filter(7) expression
+          egress_filter  = <filter>,       -- ..
           tunnel         = <tunnel-conf>,
           rx_police_gbps = <n>,           -- Allowed input rate in Gbps
           tx_police_gbps = <n> }          -- Allowed output rate in Gbps
