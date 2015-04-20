@@ -23,15 +23,12 @@ function fuzz_connective_ports (spec)
                      mac_address = "52:54:00:00:00:01",
                      vlan = vlan } }
    local function fuzz_filter (n_rules)
-      local rules = {}
-      rules[1] = { ethertype="ipv6",
-                   protocol="tcp" }
-      rules[2] = { ethertype="ipv6",
-                   protocol="icmp" }
+      local filter = "(ip6 and tcp) or (icmp6)"
+
       for i = 1, n_rules do
-         rules[i+2] = random_filter_rule()
+         filter = filter.." or "..(random_filter_rule())
       end
-      return { rules = rules }
+      return filter
    end
    local function fuzz_tunnel ()
       local cookies = { random_cookie(), random_cookie() }
@@ -82,25 +79,39 @@ function random_vlan ()
 end
 
 function random_ip (version)
-   local version = version or "ipv6"
+   local version = version or "ip6"
    local function b4 () return random_uint(8) end
    local function b6 () return ("%X"):format(random_uint(16)) end
-   if version == "ipv4" then
+   if version == "ip" then
       return b4().."."..b4().."."..b4().."."..b4()
-   elseif version == "ipv6" then
+   elseif version == "ip6" then
       return b6()..":"..b6()..":"..b6()..":"..b6()..":"..b6()..":"..b6()..":"..b6()..":"..b6()
    end
 end
 
 function random_cidr (version)
-   local version = version or "ipv6"
-   local max_prefix
-   if version == "ipv4" then
-      max_prefix = 32
-   elseif version == "ipv6" then
-      max_prefix = 128
+   -- This is just lame, should be a "smart" random valid CIDR generator.
+   local random_cidr_ip4 = {
+      "109.0.0.0/8",
+      "109.145.0.0/16",
+      "109.145.29.0/24",
+--      "109.145.29.1"
+   }
+   local random_cidr_ip6 = {
+      "CB51::0/16",
+      "CB51:B2E7::0/32",
+      "CB51:B2E7:9711::0/48",
+      "CB51:B2E7:9711:C0D3::0/64",
+      "CB51:B2E7:9711:C0D3:14BA::0/80",
+      "CB51:B2E7:9711:C0D3:14BA:A93E::0/96",
+      "CB51:B2E7:9711:C0D3:14BA:A93E:56DE:0/112",
+--      "CB51:B2E7:9711:C0D3:14BA:A93E:56DE:1"
+   }
+   if version == "ip" then
+      return random_item(random_cidr_ip4)
+   elseif version == "ip6" then
+      return random_item(random_cidr_ip6)
    end
-   return random_ip(version).."/"..math.random(0, max_prefix)
 end
 
 function random_port (min)
@@ -113,20 +124,21 @@ function random_item (array)
 end
 
 function random_filter_rule ()
-   local options = { ethertype = { "ipv4", "ipv6" },
-                     protocol = { "icmp", "udp", "tcp" } }
+   local options = { ethertype = { "ip", "ip6" },
+                     protocol = { "udp", "tcp" } }
    local ethertype = random_item(options.ethertype)
    local source_port_min = random_port()
    local dest_port_min = random_port()
-   -- See PacketFilter (apps.packet_filter.packet_filter)
-   return { ethertype = ethertype,
-            protocol = random_item(options.protocol),
-            source_cidr = random_cidr(ethertype),
-            dest_cidr = random_cidr(ethertype),
-            source_port_min = source_port_min,
-            source_port_max = random_port(source_port_min),
-            dest_port_min = dest_port_min,
-            source_port_max = random_port(dest_port_min) }
+   -- See PcapFilter (apps.packet_filter.pcap_filter)
+   return ("(%s and %s and src net %s and dst net %s and src portrange %d-%d and dst portrange %d-%d)"):format(
+      ethertype,
+      random_item(options.protocol),
+      random_cidr(ethertype),
+      random_cidr(ethertype),
+      source_port_min,
+      random_port(source_port_min),
+      dest_port_min,
+      random_port(dest_port_min))
 end
 
 function random_cookie ()

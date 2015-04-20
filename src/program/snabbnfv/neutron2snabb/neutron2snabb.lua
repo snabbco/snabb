@@ -181,8 +181,8 @@ function ruletofilter (r, direction)
    elseif r.protocol == "udp" then matches[#matches+1] = "udp" end
    
    if r.port_range_min or r.port_range_max then
-      local min = r.port_range_min or 0
-      local max = r.port_range_max or 65535
+      local min = r.port_range_min or r.port_range_max
+      local max = r.port_range_max or r.port_range_min
       matches[#matches+1] = ("portrange %d-%d"):format(min, max)
    end
    
@@ -222,9 +222,9 @@ function selftest ()
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp'}}", 
              '(arp or (ip and udp))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp', port_range_min=1000}}",
-             '(arp or (ip and udp and portrange 1000-65535))')
+             '(arp or (ip and udp and portrange 1000-1000))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp', port_range_max=2000}}",
-             '(arp or (ip and udp and portrange 0-2000))')
+             '(arp or (ip and udp and portrange 2000-2000))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='tcp', port_range_min=1000, port_range_max=2000}}",
              '(arp or (ip and tcp and portrange 1000-2000))')
    checkrule("{{direction='ingress', ethertype='IPv6', protocol='tcp'}, {direction='ingress', ethertype='IPv4', protocol='udp', remote_ip_prefix='10.0.0.0/8'}}",
