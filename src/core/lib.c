@@ -16,7 +16,7 @@ uint64_t get_time_ns()
 static double get_time(int clock)
 {
   struct timespec ts;
-  clock_gettime(CLOCK_REALTIME, &ts);
+  clock_gettime(clock, &ts);
   return ts.tv_sec + (ts.tv_nsec / 1000000000.0);
 }
 
