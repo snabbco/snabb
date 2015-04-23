@@ -1,19 +1,8 @@
-module(...,package.seeall)
-
 local ffi = require("ffi")
 local C = ffi.C
-local bit = require("bit")
-
-local app = require("core.app")
-local link = require("core.link")
 local lib = require("core.lib")
-local packet = require("core.packet")
-local config = require("core.config")
 
-local pcap = require("apps.pcap.pcap")
-local basic_apps = require("apps.basic.basic_apps")
-
-local conntrack = require('apps.packet_filter.conntrack')
+local ntohs = lib.ntohs
 
 local verbose = false
 
@@ -24,18 +13,9 @@ assert(ffi.abi("64bit"), "support only 64 bit architecture at the moment")
 local AF_INET = 2
 local AF_INET6 = 10
 
--- http://en.wikipedia.org/wiki/EtherType
--- http://en.wikipedia.org/wiki/IPv6_packet
--- http://en.wikipedia.org/wiki/IPv4_packet#Packet_structure
--- http://en.wikipedia.org/wiki/List_of_IP_protocol_numbers
--- http://en.wikipedia.org/wiki/User_Datagram_Protocol
--- http://en.wikipedia.org/wiki/Tcp_protocol
--- http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
-
--- in network order already
-local ETHERTYPE_IPV6 = "0xDD86"
-local ETHERTYPE_IPV4 = "0x0008"
-local ETHERTYPE_ARP  = "0x0608"
+local ETHERTYPE_IPV6 = 0xDD86
+local ETHERTYPE_IPV4 = 0x0008
+local ETHERTYPE_ARP  = 0x0608
 
 local IP_UDP = 0x11
 local IP_TCP = 6
@@ -45,36 +25,230 @@ local IPV6_ICMP = 0x3a
 local ETHERTYPE_OFFSET = 12
 
 local IPV4_SOURCE_OFFSET = 26
-local IPV4_DEST_OFFSET = 30
 local IPV4_PROTOCOL_OFFSET = 23
 local IPV4_SOURCE_PORT_OFFSET = 34
-local IPV4_DEST_PORT_OFFSET = 36
 
 local IPV6_SOURCE_OFFSET = 22
-local IPV6_DEST_OFFSET = 38
 local IPV6_NEXT_HEADER_OFFSET = 20 -- protocol
 local IPV6_SOURCE_PORT_OFFSET = 54
-local IPV6_DEST_PORT_OFFSET = 56
 
-local PORT_LEN = 2
-local IPV4_ADDRESS_LEN = 4
-local IPV6_ADDRESS_LEN = 16
 
-local min_packet_sizes =
-{
-   ipv4 =
-   {
-      icmp = IPV4_DEST_OFFSET + IPV4_ADDRESS_LEN, -- IPv4 header is enough
-      tcp  = IPV4_DEST_PORT_OFFSET + PORT_LEN, -- at least ports must be there
-      udp  = IPV4_DEST_PORT_OFFSET + PORT_LEN, -- at least ports must be there
-   },
-   ipv6 =
-   {
-      icmp = IPV6_DEST_OFFSET + IPV6_ADDRESS_LEN, -- IPv6 header is enough
-      tcp  = IPV6_DEST_PORT_OFFSET + PORT_LEN, -- at least ports must be there
-      udp  = IPV6_DEST_PORT_OFFSET + PORT_LEN, -- at least ports must be there
+ffi.cdef [[
+   typedef struct {
+      uint32_t src_ip, dst_ip;
+      uint16_t src_port, dst_port;
+      uint8_t protocol;
+   } __attribute__((packed)) conn_spec_ipv4;
+
+   typedef struct {
+      uint64_t a, b;
+   } __attribute__((packed)) ipv6_addr;
+
+   typedef struct {
+      ipv6_addr src_ip, dst_ip;
+      uint16_t src_port, dst_port;
+      uint8_t protocol;
+   } __attribute__((packed)) conn_spec_ipv6;
+]]
+
+
+----
+local conntrack
+do
+   local conntracks = {}
+   local counts = {}
+   local time = engine.now
+   local function new(t) return {{}, {}, (time() or 0)+t} end
+   local function put(p, k, v)
+      local isnew = p[1][k] == nil
+      p[1][k] = v
+      return isnew
+   end
+   local function get(p, k) return p[1][k] or p[2][k] end
+   local function age(p, t)
+      if time() > p[3] then
+         p[1], p[2], p[3] = {}, p[1], time()+t
+         return true
+      end
+   end
+
+   conntrack = {
+      define = function (name, agestep)
+         conntracks[name] = conntracks[name] or new(agestep or 7200)
+         counts[name] = counts[name] or 0
+      end,
+
+      track = function (name, key, revkey, limit)
+         limit = limit or 1000
+         if counts[name] > limit then return end
+         local p = conntracks[name]
+         if put(p, key, true) then
+            counts[name] = counts[name] + 1
+         end
+         put(p, revkey, true)
+      end,
+
+      check = function (name, key)
+         return key and get(conntracks[name], key)
+      end,
+
+      age = function(name, t)
+         if age(conntracks[name], t) then
+            counts[name] = 0
+         end
+      end,
+
+      clear = function ()
+         for name, p in pairs(conntracks) do
+            p[1], p[2], p[3] = {}, {}, time()+7200
+         end
+         conntracks = {}
+      end,
    }
-}
+end
+
+----
+
+
+local spec_v4 = ffi.typeof('conn_spec_ipv4')
+local ipv4 = {}
+ipv4.__index = ipv4
+
+
+function ipv4:fill(b)
+   do
+      local hdr_ips = ffi.cast('uint32_t*', b+IPV4_SOURCE_OFFSET)
+      self.src_ip = hdr_ips[0]
+      self.dst_ip = hdr_ips[1]
+   end
+   self.protocol = b[IPV4_PROTOCOL_OFFSET]
+   if self.protocol == IP_TCP or self.protocol == IP_UDP then
+      local hdr_ports = ffi.cast('uint16_t*', b+IPV4_SOURCE_PORT_OFFSET)
+      self.src_port = ntohs(hdr_ports[0])
+      self.dst_port = ntohs(hdr_ports[1])
+   else
+      self.src_port, self.dst_port = 0, 0
+   end
+   return self
+end
+
+
+function ipv4:reverse(o)
+   if o then
+      o.protocol = self.protocol
+   else
+      o = self
+   end
+   o.src_ip, o.dst_ip = self.dst_ip, self.src_ip
+   o.src_port, o.dst_port = self.dst_port, self.src_port
+   return o
+end
+
+
+function ipv4:__tostring()
+   return ffi.string(self, ffi.sizeof(spec_v4))
+end
+
+
+do
+   local s2 = nil
+   function ipv4:track(trackname)
+      if s2 == nil then s2 = spec_v4() end
+      return conntrack.track(trackname, self:__tostring(), self:reverse(s2):__tostring())
+   end
+end
+
+
+function ipv4:check(trackname)
+   return conntrack.check(trackname, self:__tostring())
+end
+
+
+spec_v4 = ffi.metatype(spec_v4, ipv4)
+
+-------
+
+local spec_v6 = ffi.typeof('conn_spec_ipv6')
+local ipv6 = {}
+ipv6.__index = ipv6
+
+function ipv6:fill(b)
+   do
+      local hdr_ips = ffi.cast('ipv6_addr*', b+IPV6_SOURCE_OFFSET)
+      self.src_ip = hdr_ips[0]
+      self.dst_ip = hdr_ips[1]
+   end
+   self.protocol = b[IPV6_NEXT_HEADER_OFFSET]
+   if self.protocol == IP_TCP or self.protocol == IP_UDP then
+      local hdr_ports = ffi.cast('uint16_t*', b+IPV6_SOURCE_PORT_OFFSET)
+      self.src_port = ntohs(hdr_ports[0])
+      self.dst_port = ntohs(hdr_ports[1])
+   else
+      self.src_port, self.dst_port = 0, 0
+   end
+   return self
+end
+
+
+function ipv6:reverse(o)
+   if o then
+      o.protocol = self.protocol
+   else
+      o = self
+   end
+   o.src_ip.a, o.dst_ip.a = self.dst_ip.a, self.src_ip.a
+   o.src_ip.b, o.dst_ip.b = self.dst_ip.b, self.src_ip.b
+   o.src_port, o.dst_port = self.dst_port, self.src_port
+   return o
+end
+
+
+function ipv6:__tostring()
+   return ffi.string(self, ffi.sizeof(spec_v6))
+end
+
+
+do
+   local s2 = nil
+   function ipv6:track(trackname)
+      if s2 == nil then s2 = spec_v6() end
+      return conntrack.track(trackname, self:__tostring(), self:reverse(s2):__tostring())
+   end
+end
+
+
+function ipv6:check(trackname)
+   return conntrack.check(trackname, self:__tostring())
+end
+
+
+spec_v6 = ffi.metatype(spec_v6, ipv6)
+
+------
+
+local new_spec=nil
+do
+   local specv4 = spec_v4()
+   local specv6 = spec_v6()
+   new_spec = function (b)
+      if not b then return nil end
+      local ethertype = ffi.cast('uint16_t*', b+ETHERTYPE_OFFSET)[0]
+      if ethertype == ETHERTYPE_IPV4 then
+         return specv4:fill(b), ethertype
+      end
+      if ethertype == ETHERTYPE_IPV6 then
+         return specv6:fill(b), ethertype
+      end
+   end
+end
+
+------
+
+
+local function hex64(x)
+   return '0x'..bit.tohex(x, -16)..'ULL'
+end
+
 
 local make_code_concatter
 do
@@ -189,283 +363,329 @@ local function parse_cidr_ipv6 (cidr)
    return true, in6_addr[0], in6_addr[1]
 end
 
--- used for source/destination adresses matching
-local function generateIpv4CidrMatch(T, cidr, offset, name)
-   local ok, prefix, mask = assert(parse_cidr_ipv4(cidr))
 
-   if not prefix then
-      -- any address
-      return
-   end
+local function preprocess_rules(options)
+   if not options.rules then return end
+   for _, in_rule in ipairs(options.rules) do
 
-   prefix = bit.tohex(prefix)
-   T("local ",name," = ffi.cast(\"uint32_t*\", buffer + ",offset,")")
-   if mask then
-      T("if bit.band(",mask,", ",name,"[0]) ~= 0x",prefix," then break end")
-   else
-      -- single IP address
-      T("if ",name,"[0] ~= 0x",prefix," then break end")
+      if in_rule.ethertype == 'ipv4' then
+         options.rules_ipv4 = options.rules_ipv4 or {}
+         local out_rule = {}
+
+         if in_rule.protocol == 'icmp' then
+            out_rule.protocol = IP_ICMP
+         elseif in_rule.protocol == 'udp' then
+            out_rule.protocol = IP_UDP
+         elseif in_rule.protocol == 'tcp' then
+            out_rule.protocol = IP_TCP
+         end
+
+         if in_rule.source_cidr then
+            local ok, prefix, mask = assert(parse_cidr_ipv4(in_rule.source_cidr))
+            if ok then
+               out_rule.source_prefix = prefix and '0x'..bit.tohex(prefix, -8)
+               out_rule.source_mask = mask and '0x'..bit.tohex(mask, -8)
+            end
+         end
+
+         if in_rule.dest_cidr then
+            local ok, prefix, mask = assert(parse_cidr_ipv4(in_rule.dest_cidr))
+            if ok then
+               out_rule.dest_prefix = prefix and '0x'..bit.tohex(prefix, -8)
+               out_rule.dest_mask = mask and '0x'..bit.tohex(mask, -8)
+            end
+         end
+
+         out_rule.source_port_min = in_rule.source_port_min and tostring(in_rule.source_port_min)
+         out_rule.source_port_max = in_rule.source_port_max and tostring(in_rule.source_port_max)
+         out_rule.dest_port_min = in_rule.dest_port_min and tostring(in_rule.dest_port_min)
+         out_rule.dest_port_max = in_rule.dest_port_max and tostring(in_rule.dest_port_max)
+         out_rule.state_check = in_rule.state_check
+         out_rule.state_track = in_rule.state_track
+
+         options.rules_ipv4[#options.rules_ipv4+1] = out_rule
+      end
+
+      if in_rule.ethertype == 'ipv6' then
+         options.rules_ipv6 = options.rules_ipv6 or {}
+         local out_rule = {}
+
+         if in_rule.protocol == 'icmp' then
+            out_rule.protocol = IPV6_ICMP
+         elseif in_rule.protocol == 'udp' then
+            out_rule.protocol = IP_UDP
+         elseif in_rule.protocol == 'tcp' then
+            out_rule.protocol = IP_TCP
+         end
+
+         if in_rule.source_cidr then
+            local ok, prefix1, prefix2, mask = assert(parse_cidr_ipv6(in_rule.source_cidr))
+            if ok then
+               out_rule.source_cidr = {
+                  prefix1 = prefix1,
+                  prefix2 = prefix2,
+                  mask = mask,
+               }
+            end
+         end
+
+         if in_rule.dest_cidr then
+            local ok, prefix1, prefix2, mask = assert(parse_cidr_ipv6(in_rule.dest_cidr))
+            if ok then
+               out_rule.dest_cidr = {
+                  prefix1 = prefix1,
+                  prefix2 = prefix2,
+                  mask = mask,
+               }
+            end
+         end
+
+         out_rule.source_port_min = in_rule.source_port_min and tostring(in_rule.source_port_min)
+         out_rule.source_port_max = in_rule.source_port_max and tostring(in_rule.source_port_max)
+         out_rule.dest_port_min = in_rule.dest_port_min and tostring(in_rule.dest_port_min)
+         out_rule.dest_port_max = in_rule.dest_port_max and tostring(in_rule.dest_port_max)
+         out_rule.state_check = in_rule.state_check
+         out_rule.state_track = in_rule.state_track
+
+         options.rules_ipv6[#options.rules_ipv6+1] = out_rule
+      end
    end
 end
 
-local function generateIpv6CidrMatch(T, cidr, offset, name)
-   local ok, prefix1, prefix2, mask = assert(parse_cidr_ipv6(cidr))
+------
 
-   if not prefix1 then
-      -- any address
-      return
-   end
-
-   T("local ",name," = ffi.cast(\"uint64_t*\", buffer + ",offset,")")
-
-   if not prefix2 and mask then
-      T("if 0x", bit.tohex(prefix1),"ULL ~= bit.band(0x",bit.tohex(mask),"ULL, ",name,"[0]) then break end")
-      return
-   end
-
-   T("if ",name,"[0] ~= 0x",bit.tohex(prefix1),"ULL then break end")
-   if not prefix2 and not mask then
-      return
-   end
-
-   if prefix2 and not mask then
-      T("if ",name,"[1] ~= 0x", bit.tohex(prefix2),"ULL  then break end")
-      return
-   end
-
-   -- prefix1 and prefix2 and mask
-   T("if 0x", bit.tohex(prefix2),"ULL ~= bit.band(0x",bit.tohex(mask),"ULL, ",name,"[1]) then break end")
-end
-
-local function generateProtocolMatch(T, protocol, offset)
-   T("if buffer[",offset,"] ~= ",protocol," then break end")
-end
-
-local function generatePortMatch(T, offset, port_min, port_max, name)
-   if port_min == port_max then
-      -- specialization for single port matching
-      -- avoid conversion to host order on runtime
-      local port_network_order = lib.htons(port_min)
-
-      T("local ",name," = ffi.cast(\"uint16_t*\", buffer + ",offset,")")
-      T("if ",name,"[0] ~= ",port_network_order," then break end")
-      return
-   end
-   T("local ",name," = buffer[",offset,"] * 0x100 + buffer[",offset+1,"]")
-   T("if ",name," < ",port_min," or ",name," > ",port_max," then break end")
-end
-
-local function generateRule(
-      T,
-      rule,
-      generateIpMatch,
-      source_ip_offset,
-      dest_ip_offset,
-      protocol_offset,
-      icmp_type,
-      source_port_offset,
-      dest_port_offset
-   )
-   T"repeat"
-   T:indent()
-
-   assert(rule.ethertype)
-   T("local ethertype = ffi.cast(\"uint16_t*\", buffer + ",ETHERTYPE_OFFSET,")")
-   local ethertype
-   if rule.ethertype == "ipv4" then
-      ethertype = ETHERTYPE_IPV4
-   elseif rule.ethertype == "ipv6" then
-      ethertype = ETHERTYPE_IPV6
-   else
-      error("unknown ethertype")
-   end
-   local min_header_size = assert(
-         min_packet_sizes[rule.ethertype][rule.protocol or 'icmp'],
-         "unknown min packet size"
-      )
-   T("if size < ",min_header_size," then break end")
-   if ethertype == ETHERTYPE_IPV4 then
-      T("-- IPv4 implies ARP")
-      T("if ethertype[0] == ",ETHERTYPE_ARP," then return true end")
-   end
-   T("if ethertype[0] ~= ",ethertype," then break end")
-
-   if rule.state_check then
-      conntrack.define (rule.state_check)
-      T('if not state_pass("', rule.state_check, '", buffer) then break end')
-   end
-
-   if rule.source_cidr then
-      generateIpMatch(T, rule.source_cidr, source_ip_offset, "source_ip")
-   end
-   if rule.dest_cidr then
-      generateIpMatch(T, rule.dest_cidr, dest_ip_offset, "dest_ip")
-   end
+local function protocol_and_ports(rule, conds)
    if rule.protocol then
-      if rule.protocol == "tcp" then
-         generateProtocolMatch(T, IP_TCP, protocol_offset)
-      elseif rule.protocol == "udp" then
-         generateProtocolMatch(T, IP_UDP, protocol_offset)
-      elseif rule.protocol == "icmp" then
-         generateProtocolMatch(T, icmp_type, protocol_offset)
+      conds[#conds+1] = 'spec.protocol == '..rule.protocol
+
+      if rule.source_port_min then
+         if rule.source_port_max and rule.source_port_max ~= rule.source_port_min then
+            conds[#conds+1] = 'spec.src_port >= '..rule.source_port_min
+            conds[#conds+1] = 'spec.src_port <= '..rule.source_port_max
+         else
+            conds[#conds+1] = 'spec.src_port == '..rule.source_port_min
+         end
+      end
+
+      if rule.dest_port_min then
+         if rule.dest_port_max and rule.dest_port_max ~= rule.dest_port_min then
+            conds[#conds+1] = 'spec.dst_port >= '..rule.dest_port_min
+            conds[#conds+1] = 'spec.dst_port <= '..rule.dest_port_max
+         else
+            conds[#conds+1] = 'spec.dst_port == '..rule.dest_port_min
+         end
+      end
+   end
+end
+
+local function ipv4_conds(rule, conds)
+   conds = conds or {}
+   if rule.state_check then
+      conds[#conds+1] = string.format('spec:check(%q)', rule.state_check)
+   end
+
+   if rule.source_prefix then
+      if rule.source_mask then
+         conds[#conds+1] = 'band(spec.src_ip, '..rule.source_mask..') == '..rule.source_prefix
       else
-         error("unknown protocol")
-      end
-      if rule.protocol == "tcp" or rule.protocol == "udp" then
-         if rule.source_port_min then
-            if not rule.source_port_max then
-               rule.source_port_max = rule.source_port_min
-            end
-            generatePortMatch(
-                  T,
-                  source_port_offset,
-                  rule.source_port_min,
-                  rule.source_port_max,
-                  "source_port"
-               )
-         end
-         if rule.dest_port_min then
-            if not rule.dest_port_max then
-               rule.dest_port_max = rule.dest_port_min
-            end
-            generatePortMatch(
-                  T,
-                  dest_port_offset,
-                  rule.dest_port_min,
-                  rule.dest_port_max,
-                  "dest_port"
-               )
-         end
+         conds[#conds+1] = 'spec.src_ip == '..rule.source_prefix
       end
    end
-   if rule.state_track then
-      conntrack.define (rule.state_track)
-      T('track("', rule.state_track, '", buffer)')
+
+   if rule.dest_prefix then
+      if rule.dest_mask then
+         conds[#conds+1] = 'band(spec.dst_ip, '..rule.dest_mask..') == '..rule.dest_prefix
+      else
+         conds[#conds+1] = 'spec.dst_ip == '..rule.dest_prefix
+      end
    end
-   T"return true"
-   T:unindent()
-   T"until false"
+
+   protocol_and_ports(rule, conds)
+   return conds
 end
 
 
-local function generateConformFunctionString(options)
-   local T = make_code_concatter()
-   T"local ffi = require(\"ffi\")"
-   T"local bit = require(\"bit\")"
-   T"local conntrack = require('apps.packet_filter.conntrack')"
-   T"local track = conntrack.track"
-   T"local state_pass = conntrack.check"
+local function ipv6_ip_match(cidr, fldn, conds)
+   if not cidr then return end
+   local prefix1, prefix2, mask = cidr.prefix1, cidr.prefix2, cidr.mask
+   if prefix1 then
+      -- size > 0
+      if mask and not prefix2 then
+         -- size < 64
+         conds[#conds+1] = 'band('..fldn..'.a, '..hex64(mask)..') == '..hex64(prefix1)
+      else
+         -- size >= 64
+         conds[#conds+1] = fldn..'.a == '..hex64(prefix1)
+         if prefix2 then
+            -- size > 64
+            if mask then
+               -- size < 128
+               conds[#conds+1] = 'band('..fldn..'.b, '..hex64(mask)..') == '..hex64(prefix2)
+            else
+               -- size == 128
+               conds[#conds+1] = fldn..'.b == '..hex64(prefix2)
+            end
+         end
+      end
+   end
+end
 
+
+local function ipv6_conds(rule, conds)
+   conds = conds or {}
+   if rule.state_check then
+      conds[#conds+1] = string.format('spec:check(%q)', rule.state_check)
+   end
+
+   ipv6_ip_match(rule.source_cidr, 'spec.src_ip', conds)
+   ipv6_ip_match(rule.dest_cidr, 'spec.dst_ip', conds)
+
+   protocol_and_ports(rule, conds)
+   return conds
+end
+
+
+local function build_test(T, conds, ...)
+   if #conds > 0 then
+      T("if ", table.concat(conds, ' and '), " then")
+      T:indent()
+         for i = 1, select("#", ...) do
+            local tracktable = select(i, ...)
+            if tracktable then
+               conntrack.define(tracktable)
+               T(string.format('spec:track(%q)', tracktable))
+            end
+         end
+         T'return true'
+      T:unindent()
+      T'end'
+   end
+end
+
+
+local function generate_conform(options, T)
    T"return function(buffer, size)"
    T:indent()
 
-   if options.state_track then
-      conntrack.define(options.state_track)
-      T"if (function(buffer, size)"
-      T:indent()
-   end
+   T"local spec, ethertype = new_spec(buffer)"
+   T"if not spec then return false end"
 
    if options.state_check then
-      conntrack.define (options.state_check)
-      T('if state_pass("', options.state_check, '", buffer) then return true end')
-   end
-
-   local rules = options.rules or {}
-   for i = 1, #rules do
-      if rules[i].ethertype == "ipv4" then
-         generateRule(
-               T,
-               rules[i],
-               generateIpv4CidrMatch,
-               IPV4_SOURCE_OFFSET,
-               IPV4_DEST_OFFSET,
-               IPV4_PROTOCOL_OFFSET,
-               IP_ICMP,
-               IPV4_SOURCE_PORT_OFFSET,
-               IPV4_DEST_PORT_OFFSET
-            )
-
-      elseif rules[i].ethertype == "ipv6" then
-         generateRule(
-               T,
-               rules[i],
-               generateIpv6CidrMatch,
-               IPV6_SOURCE_OFFSET,
-               IPV6_DEST_OFFSET,
-               IPV6_NEXT_HEADER_OFFSET,
-               IPV6_ICMP,
-               IPV6_SOURCE_PORT_OFFSET,
-               IPV6_DEST_PORT_OFFSET
-            )
-      else
-         error("unknown ethertype")
-      end
-   end
-   if options.state_track then
-      T:unindent()
-      T"end)(buffer, size) then"
+      T(string.format("if spec:check(%q) then", options.state_check))
       T:indent()
-      T("track(\"", options.state_track, "\", buffer)")
-      T"return true"
+      if options.state_track then
+         T(string.format('spec:track(%q)', options.state_track))
+      end
+      T'return true'
+      T:unindent()
+      T'end'
+   end
+
+   if options.rules_ipv4 then
+      T('-- pass ARP packets')
+      T("if ethertype == 0x", bit.tohex(ETHERTYPE_ARP, -4)," then return true end")
+      T('-- IPv4 rules')
+      T("if ethertype == 0x", bit.tohex(ETHERTYPE_IPV4, -4), " then")
+      T:indent()
+
+      for _, rule in ipairs(options.rules_ipv4) do
+         local conds = ipv4_conds(rule)
+         build_test(T, conds, rule.state_track, options.state_track)
+      end
       T:unindent()
       T"end"
    end
-   T"return false"
+
+   if options.rules_ipv6 then
+      T('-- IPv6 rules')
+      T("if ethertype == 0x", bit.tohex(ETHERTYPE_IPV6, -4), " then")
+      T:indent()
+
+      for _, rule in ipairs(options.rules_ipv6) do
+         local conds = ipv6_conds(rule)
+         build_test(T, conds, rule.state_track, options.state_track)
+      end
+
+      T:unindent()
+      T"end"
+   end
+
+   T'return false'
    T:unindent()
-   T"end"
-   local ret = T:concat()
-   if verbose then print(ret) end
-   return ret
+   T'end'
 end
 
-PacketFilter = {}
+
+local function conform_function(options)
+   preprocess_rules(options)
+
+   local T = make_code_concatter()
+   T"local ffi = require('ffi')"
+   T"local bit = require('bit')"
+   T"local band = bit.band"
+--    T"local conntrack = require('apps.packet_filter.conntrack')"
+   T"local PacketFilter = require('apps.packet_filter.packet_filter')"
+   T"local new_spec = PacketFilter.new_spec"
+--    T"local track = conntrack.track"
+--    T"local state_pass = conntrack.check"
+--    T"local ffi_cast = ffi.cast"
+   T""
+
+   generate_conform(options, T)
+
+   local ret = T:concat()
+   if verbose then print(ret) end
+   return assert(loadstring(ret))()
+end
+
+------
+
+local PacketFilter = { zone = 'PacketFilter' }
+PacketFilter.__index = PacketFilter
+
 
 function PacketFilter:new (options)
    options = config.parse_app_arg(options)
 
-   local o =
-   {
-      conform = assert(loadstring(
-            generateConformFunctionString(options)
-         ))()
-   }
-   return setmetatable(o, {__index = PacketFilter})
+   return setmetatable({
+      conform = conform_function(options),
+   }, self)
 end
 
+
 function PacketFilter:push ()
-   local i = assert(self.input.input or self.input.rx, "input port not found")
-   local o = assert(self.output.output or self.output.tx, "output port not found")
+   local lreceive, ltransmit = link.receive, link.transmit
+   local pfree = packet.free
+   local l_in = assert(self.input.input or self.input.rx, "input port not found")
+   local l_out = assert(self.output.output or self.output.tx, "output port not found")
 
-   local packets_tx = 0
-   local max_packets_to_send = link.nwritable(o)
-   if max_packets_to_send == 0 then
-      return
-   end
-
-   local nreadable = link.nreadable(i)
-   for n = 1, nreadable do
-      local p = link.receive(i)
-      -- support the whole IP header in one iovec at the moment
+   while not link.empty(l_in) and not link.full(l_out) do
+      local p = lreceive(l_in)
 
       if self.conform(p.data, p.length) then
-         link.transmit(o, p)
+         ltransmit(l_out, p)
       else
          -- discard packet
-         packet.free(p)
+         pfree(p)
       end
    end
 end
 
+
+
+local pcap = require("apps.pcap.pcap")
+local basic_apps = require("apps.basic.basic_apps")
+
 function selftest ()
-   do
+--    do
 --       microbench()
-      simplebench()
-      return
-   end
+--       simplebench()
+--       return
+--    end
    -- Temporarily disabled:
    --   Packet filter selftest is failing in.
    -- enable verbose logging for selftest
-   verbose = false
+--    verbose = false
 
    local V6_RULE_ICMP_PACKETS = 3 -- packets within v6.pcap
    local V6_RULE_DNS_PACKETS =  3 -- packets within v6.pcap
@@ -553,20 +773,20 @@ function selftest ()
    config.link(c, "source2.output -> packet_filter2.input")
    config.link(c, "packet_filter2.output -> sink2.input")
 
-   app.configure(c)
+   engine.configure(c)
 
    -- v4.pcap contains 43 packets
    -- v6.pcap contains 161 packets
    -- one breathe is enough
-   app.breathe()
+   engine.breathe()
 
-   app.report()
-   if verbose then print (conntrack.dump()) end
+   engine.report()
+--    if verbose then print (conntrack.dump()) end
 
    local packet_filter1_passed =
-      app.app_table.packet_filter1.output.output.stats.txpackets
+      engine.app_table.packet_filter1.output.output.stats.txpackets
    local packet_filter2_passed =
-      app.app_table.packet_filter2.output.output.stats.txpackets
+      engine.app_table.packet_filter2.output.output.stats.txpackets
    local ok = true
 
    if packet_filter1_passed ~= V6_RULE_ICMP_PACKETS + V6_RULE_DNS_PACKETS
@@ -582,7 +802,7 @@ function selftest ()
 
 
    --- second part:
-   app.configure(config.new())
+   engine.configure(config.new())
 
    c = config.new()
    --- check a rule's tracked state
@@ -606,23 +826,23 @@ function selftest ()
    config.app(c, "sink2", basic_apps.Sink )
    config.link(c, "source2.output -> statefull_pass2.input")
    config.link(c, "statefull_pass2.output -> sink2.input")
-   app.configure(c)
+   engine.configure(c)
 
-   app.breathe()
-   app.report()
+   engine.breathe()
+   engine.report()
 --    print (conntrack.dump())
 
-   if app.app_table.statefull_pass1.output.output.stats.txpackets ~= 6 then
+   if engine.app_table.statefull_pass1.output.output.stats.txpackets ~= 6 then
       ok = false
       print ("state dns_v6 failed")
    end
-   if app.app_table.statefull_pass2.output.output.stats.txpackets ~= 36 then
+   if engine.app_table.statefull_pass2.output.output.stats.txpackets ~= 36 then
       ok = false
       print ("state app_v4 failed")
    end
 
    -- part 3:
-   app.configure(config.new())
+   engine.configure(config.new())
    c = config.new()
 
    config.app(c, "source1", pcap.PcapReader, "apps/packet_filter/samples/v4-tcp-udp.pcap")
@@ -639,16 +859,16 @@ function selftest ()
    config.link(c, "source1.output -> stateless_pass1.input")
    config.link(c, "stateless_pass1.output -> sink1.input")
 
-   app.configure(c)
-   app.breathe()
-   app.report()
+   engine.configure(c)
+   engine.breathe()
+   engine.report()
 
-   if app.app_table.stateless_pass1.output.output.stats.txpackets ~= 1 then
+   if engine.app_table.stateless_pass1.output.output.stats.txpackets ~= 1 then
       ok = false
       print ("stateless tcp failed")
    end
 
-   app.configure(config.new())
+   engine.configure(config.new())
    c = config.new()
 
    config.app(c, "source1", pcap.PcapReader, "apps/packet_filter/samples/v6-tcp-udp.pcap")
@@ -665,11 +885,11 @@ function selftest ()
    config.link(c, "source1.output -> stateless_pass1.input")
    config.link(c, "stateless_pass1.output -> sink1.input")
 
-   app.configure(c)
-   app.breathe()
-   app.report()
+   engine.configure(c)
+   engine.breathe()
+   engine.report()
 
-   if app.app_table.stateless_pass1.output.output.stats.txpackets ~= 1 then
+   if engine.app_table.stateless_pass1.output.output.stats.txpackets ~= 1 then
       ok = false
       print ("stateless v6 tcp failed")
    end
@@ -746,3 +966,10 @@ function simplebench()
       print (string.format('packet base time %d: %g M/s (n=%d)', i, work(1e5), conntrack.count('bench')))
    end
 end
+
+
+return {
+   PacketFilter = PacketFilter,
+   new_spec = new_spec,
+   selftest = selftest,
+}
