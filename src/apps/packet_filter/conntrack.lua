@@ -72,229 +72,195 @@ ffi.cdef [[
    } __attribute__((packed)) conn_spec_ipv6;
 ]]
 
-local conn_spec_ipv4 = ffi.typeof 'conn_spec_ipv4'
+----
 
-
-local function conn_spec_from_ipv4_header(b)
-   local spec = conn_spec_ipv4()
-   local flags = 0
-   do
-      local hdr_ips = ffi.cast('uint32_t*', b+IPV4_SOURCE_OFFSET)
-      spec.src_ip = hdr_ips[0]
-      spec.dst_ip = hdr_ips[1]
+local conntrack
+do
+   local conntracks = {}
+   local counts = {}
+   local time = engine.now
+   local function new() return {{}, {}, time()} end
+   local function put(p, k, v)
+      local isnew = p[1][k] == nil
+      p[1][k] = v
+      return isnew
    end
-   spec.protocol = b[IPV4_PROTOCOL_OFFSET]
-   if spec.protocol == IP_TCP or spec.protocol == IP_UDP then
-      local hdr_ports = ffi.cast('uint16_t*', b+IPV4_SOURCE_PORT_OFFSET)
-      spec.src_port = hdr_ports[0]
-      spec.dst_port = hdr_ports[1]
-      if spec.protocol == IP_TCP then
-         flags = b[IPV4_TCP_FLAGS]
+   local function get(p, k) return p[1][k] or p[2][k] end
+   local function age(p, t)
+      if time() > p[3]+t then
+         p[1], p[2], p[3] = {}, p[1], time()
+         return true
       end
-   else
-      spec.src_port, spec.dst_port = 0, 0
-   end
-   return spec, flags
-end
-
-
-local conn_spec_ipv6 = ffi.typeof 'conn_spec_ipv6'
-
-local function conn_spec_from_ipv6_header(b)
-   local spec = conn_spec_ipv6()
-   local flags = 0
-   do
-      local hdr_ips = ffi.cast('ipv6_addr*', b+IPV6_SOURCE_OFFSET)
-      spec.src_ip = hdr_ips[0]
-      spec.dst_ip = hdr_ips[1]
-   end
-   spec.protocol = b[IPV6_NEXT_HEADER_OFFSET]
-   if spec.protocol == IP_TCP or spec.protocol == IP_UDP then
-      local hdr_ports = ffi.cast('uint16_t*', b+IPV6_SOURCE_PORT_OFFSET)
-      spec.src_port = hdr_ports[0]
-      spec.dst_port = hdr_ports[1]
-      if spec.protocol == IP_TCP then
-         flags = b[IPV6_TCP_FLAGS]
-      end
-   else
-      spec.src_port, spec.dst_port = 0, 0
-   end
-   return spec, flags
-end
-
-
--- Return an FFI struct containing the session ID for a buffer
--- containing packet data.
---
--- Returns nil if the session cannot be determined due to an
--- unsupported protocol.
-local function spec_from_header(b)
-   local ethertype = ffi.cast('uint16_t*', b+ETHERTYPE_OFFSET)[0]
-   if ethertype == ETHERTYPE_IPV4 then
-      return conn_spec_from_ipv4_header(b)
-   end
-   if ethertype == ETHERTYPE_IPV6 then
-      return conn_spec_from_ipv6_header(b)
-   end
-end
-
-
--- reverses a conntrack spec in-site
-local function reverse_spec(spec)
-   if ffi.istype(conn_spec_ipv6, spec) then
-      spec.src_ip.a, spec.dst_ip.a = spec.dst_ip.a, spec.src_ip.a
-      spec.src_ip.b, spec.dst_ip.b = spec.dst_ip.b, spec.src_ip.b
-   else
-      spec.src_ip, spec.dst_ip = spec.dst_ip, spec.src_ip
-   end
-   spec.src_port, spec.dst_port = spec.dst_port, spec.src_port
-   return spec
-end
-
-local function spec_tostring(spec)
-   return ffi.string(spec, ffi.sizeof(spec))
-end
-
-
--- show a spec from a binary string
-local function dump_from_string(k, v)
-   local ptr = ffi.cast('char *', k)
-   local af_inet, strmaxlen = 0, 0
-   local spec = nil, nil
-
-   if #k == ffi.sizeof(conn_spec_ipv6) then
-      af_inet, strmaxlen = 10, 46
-      spec = conn_spec_ipv6()
-
-   elseif #k == ffi.sizeof(conn_spec_ipv4) then
-      af_inet, strmaxlen = 2, 16
-      spec = conn_spec_ipv4()
    end
 
-   local function ip_tostring (offset)
-      local buf = ffi.new('char[?]', strmaxlen)
-      local r = ffi.C.inet_ntop(af_inet, ptr+offset, buf, strmaxlen)
-      if r == nil then return nil end
-      return ffi.string(buf)
-   end
+   conntrack = {
+      define = function (name)
+         if not name then return end
+         conntracks[name] = conntracks[name] or new()
+         counts[name] = counts[name] or 0
+      end,
 
-   ffi.copy(spec, k, ffi.sizeof(spec))
-   return string.format(
-      '[%d/%X] %s/%d - %s/%d',
-      spec.protocol, v,
-      ip_tostring(ffi.offsetof(spec, 'src_ip')), lib.ntohs(spec.src_port),
-      ip_tostring(ffi.offsetof(spec, 'dst_ip')), lib.ntohs(spec.dst_port))
-end
-
----
---- named connection track tables
----
-
--- conntracks is the global named directory of connection track tables.
--- each track table is a three-element Lua array, 'p' in these functions.
--- p[1] is the 'current' set of connections.  all new tracks go there.
--- p[2] is the 'previous' set of connections. a connection is considered
---      active if it's on either the current or previous set.
--- p[3] is the next expiration time. after that time, the age() function
---      expires all connections on p[2] but not on p[1] when time p[3]
-
-local conntracks = {}
-local time = engine.now
-local function new(t) return {{}, {}, (time() or 0)+t} end
-local function put(p, k, v)
-   local isnew = p[1][k] == nil
-   p[1][k] = v
-   return isnew
-end
-local function get(p, k) return p[1][k] or p[2][k] end
-local function age(p, t)
-   if time() > p[3] then
-      p[1], p[2], p[3] = {}, p[1], time()+t
-      return true
-   end
-end
-
-local counts = {}
-return {
-   define = function (name, agestep)
-      conntracks[name] = conntracks[name] or new(agestep or 7200)
-      counts[name] = counts[name] or 0
-   end,
-
-   track = function (name, buffer, limit)
-      limit = limit or 2000
-      if counts[name] > limit then return end
-      local p = conntracks[name]
-      local spec, flags = spec_from_header(buffer)
-      if spec then
-         if put(p, spec_tostring(spec), flags) then
-            counts[name] = counts[name] + 1
-         end
-         reverse_spec(spec)
-         put(p, spec_tostring(spec), flags)
-      end
-   end,
-
-   check = function (name, buffer)
-      local spec = spec_from_header(buffer)
-      return spec and get(conntracks[name], spec_tostring(spec))
-   end,
-
-   count = function(name)
-      return counts[name]
-   end,
-
-   age = function(name, t)
-      if age(conntracks[name], t) then
-         counts[name] = 0
-      end
-   end,
-
-   clear = function ()
-      for name, p in pairs(conntracks) do
-         p[1], p[2], p[3] = {}, {}, time()+7200
-      end
-      conntracks = {}
-   end,
-
-   ageall = function (t)
-      for name, p in pairs(conntracks) do
-         if age(p, t) then
-            counts[name] = 0
-         end
-      end
-   end,
-
-   dump = function ()
-      for name, p in pairs(conntracks) do
-         print (string.format('---- %s -----', name))
-         local rem_time = p[3] - time()
-         print ('current connections')
-         for k,v in pairs(p[1]) do
-            print (dump_from_string(k, v))
-         end
-         print (string.format('to expire in %g seconds', rem_time))
-         for k,v in pairs(p[2]) do
-            if not p[1][k] then
-               print (dump_from_string(k))
+      track = function (name, key, revkey, limit)
+         limit = limit or 1000
+         local p = conntracks[name]
+         if counts[name] > limit then
+            if age(p, 0.01) then
+               counts[name] = 0
             end
          end
-         print ('-----------')
-      end
-   end,
+         if put(p, key, true) then
+            counts[name] = counts[name] + 1
+         end
+         put(p, revkey, true)
+      end,
 
-   randspec = function (spec)
-      local proto = IP_TCP
-      if math.random() > 0.5 then
-         proto = IP_UDP
-      end
-      spec = spec or conn_spec_ipv4()
-      spec.src_ip = math.random(2^32)
-      spec.dst_ip = math.random(2^32)
-      spec.src_port = math.random(2^16)
-      spec.dst_port = math.random(2^16)
-      spec.protocol = proto
-      return spec
-   end,
-   spec_tostring = spec_tostring,
+      check = function (name, key)
+         return key and get(conntracks[name], key)
+      end,
+
+      age = function(name, t)
+         if name and age(conntracks[name], t or 7200) then
+            counts[name] = 0
+         end
+      end,
+
+      clear = function ()
+         for name, p in pairs(conntracks) do
+            p[1], p[2], p[3] = {}, {}, time()
+         end
+         conntracks = {}
+      end,
+   }
+end
+
+-----------------
+
+local genspec = {}
+
+function genspec:reverse(o)
+   if o then
+      o.protocol = self.protocol
+   else
+      o = self
+   end
+   o.src_ip, o.dst_ip = self.dst_ip, self.src_ip
+   o.src_port, o.dst_port = self.dst_port, self.src_port
+   return o
+end
+
+
+function genspec:__tostring()
+   return ffi.string(self, ffi.sizeof(self))
+end
+
+function genspec:check(trackname)
+   return conntrack.check(trackname, self:__tostring())
+end
+
+
+----
+
+
+local spec_v4 = ffi.typeof('conn_spec_ipv4')
+local ipv4 = {
+   __tostring  = genspec.__tostring,
+   reverse = genspec.reverse,
+   check = genspec.check
 }
+ipv4.__index = ipv4
+
+
+function ipv4:fill(b)
+   do
+      local hdr_ips = ffi.cast('uint32_t*', b+IPV4_SOURCE_OFFSET)
+      self.src_ip = hdr_ips[0]
+      self.dst_ip = hdr_ips[1]
+   end
+   self.protocol = b[IPV4_PROTOCOL_OFFSET]
+   if self.protocol == IP_TCP or self.protocol == IP_UDP then
+      local hdr_ports = ffi.cast('uint16_t*', b+IPV4_SOURCE_PORT_OFFSET)
+      self.src_port = hdr_ports[0]
+      self.dst_port = hdr_ports[1]
+   else
+      self.src_port, self.dst_port = 0, 0
+   end
+   return self
+end
+
+
+do
+   local s2 = nil
+   function ipv4:track(trackname)
+      s2 = s2 or spec_v4()
+      return conntrack.track(trackname, self:__tostring(), self:reverse(s2):__tostring())
+   end
+end
+
+
+spec_v4 = ffi.metatype(spec_v4, ipv4)
+
+-------
+
+
+local spec_v6 = ffi.typeof('conn_spec_ipv6')
+local ipv6 = {
+   __tostring  = genspec.__tostring,
+   reverse = genspec.reverse,
+   check = genspec.check
+}
+ipv6.__index = ipv6
+
+function ipv6:fill(b)
+   do
+      local hdr_ips = ffi.cast('ipv6_addr*', b+IPV6_SOURCE_OFFSET)
+      self.src_ip = hdr_ips[0]
+      self.dst_ip = hdr_ips[1]
+   end
+   self.protocol = b[IPV6_NEXT_HEADER_OFFSET]
+   if self.protocol == IP_TCP or self.protocol == IP_UDP then
+      local hdr_ports = ffi.cast('uint16_t*', b+IPV6_SOURCE_PORT_OFFSET)
+      self.src_port = hdr_ports[0]
+      self.dst_port = hdr_ports[1]
+   else
+      self.src_port, self.dst_port = 0, 0
+   end
+   return self
+end
+
+
+do
+   local s2 = nil
+   function ipv6:track(trackname)
+      s2 = s2 or spec_v6()
+      return conntrack.track(trackname, self:__tostring(), self:reverse(s2):__tostring())
+   end
+end
+
+
+spec_v6 = ffi.metatype(spec_v6, ipv6)
+
+------
+
+local new_spec=nil
+do
+   local specv4 = spec_v4()
+   local specv6 = spec_v6()
+   new_spec = function (b)
+      if not b then return nil end
+      local ethertype = ffi.cast('uint16_t*', b+ETHERTYPE_OFFSET)[0]
+      if ethertype == ETHERTYPE_IPV4 then
+         return specv4:fill(b)
+      end
+      if ethertype == ETHERTYPE_IPV6 then
+         return specv6:fill(b)
+      end
+   end
+end
+
+return {
+   define = conntrack.define,
+   spec = new_spec,
+   age = conntrack.age,
+   clear = conntrack.clear,
+}
+
