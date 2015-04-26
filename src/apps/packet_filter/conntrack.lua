@@ -25,30 +25,27 @@
 local ffi = require 'ffi'
 local lib = require 'core.lib'
 
-local ETHERTYPE_IPV6 = 0xDD86
-local ETHERTYPE_IPV4 = 0x0008
+ffi.cdef [[
+   struct _conststruct {
+      static const int ETHERTYPE_IPV4 = 0x0008;
+      static const int ETHERTYPE_IPV6 = 0xDD86;
 
-local IP_UDP = 0x11
-local IP_TCP = 6
-local IP_ICMP = 1
-local IPV6_ICMP = 0x3a
+      static const int IP_UDP = 0x11;
+      static const int IP_TCP = 6;
 
-local ETHERTYPE_OFFSET = 12
+      static const int ETHERTYPE_OFFSET = 12;
 
-local IPV4_SOURCE_OFFSET = 26
-local IPV4_DEST_OFFSET = 30
-local IPV4_PROTOCOL_OFFSET = 23
-local IPV4_SOURCE_PORT_OFFSET = 34
-local IPV4_DEST_PORT_OFFSET = 36
-local IPV4_TCP_FLAGS = 47
+      static const int IPV4_SOURCE_OFFSET = 26;
+      static const int IPV4_PROTOCOL_OFFSET = 23;
+      static const int IPV4_SOURCE_PORT_OFFSET = 34;
 
-local IPV6_SOURCE_OFFSET = 22
-local IPV6_DEST_OFFSET = 38
-local IPV6_NEXT_HEADER_OFFSET = 20 -- protocol
-local IPV6_SOURCE_PORT_OFFSET = 54
-local IPV6_DEST_PORT_OFFSET = 56
-local IPV6_TCP_FLAGS = 67
+      static const int IPV6_SOURCE_OFFSET = 22;
+      static const int IPV6_NEXT_HEADER_OFFSET = 20; // protocol
+      static const int IPV6_SOURCE_PORT_OFFSET = 54;
+   };
+]]
 
+local const = ffi.new('struct _conststruct')
 
 ---
 --- connection spec structures
@@ -172,13 +169,13 @@ ipv4.__index = ipv4
 
 function ipv4:fill(b)
    do
-      local hdr_ips = ffi.cast('uint32_t*', b+IPV4_SOURCE_OFFSET)
+      local hdr_ips = ffi.cast('uint32_t*', b+const.IPV4_SOURCE_OFFSET)
       self.src_ip = hdr_ips[0]
       self.dst_ip = hdr_ips[1]
    end
-   self.protocol = b[IPV4_PROTOCOL_OFFSET]
-   if self.protocol == IP_TCP or self.protocol == IP_UDP then
-      local hdr_ports = ffi.cast('uint16_t*', b+IPV4_SOURCE_PORT_OFFSET)
+   self.protocol = b[const.IPV4_PROTOCOL_OFFSET]
+   if self.protocol == const.IP_TCP or self.protocol == const.IP_UDP then
+      local hdr_ports = ffi.cast('uint16_t*', b+const.IPV4_SOURCE_PORT_OFFSET)
       self.src_port = hdr_ports[0]
       self.dst_port = hdr_ports[1]
    else
@@ -212,13 +209,13 @@ ipv6.__index = ipv6
 
 function ipv6:fill(b)
    do
-      local hdr_ips = ffi.cast('ipv6_addr*', b+IPV6_SOURCE_OFFSET)
+      local hdr_ips = ffi.cast('ipv6_addr*', b+const.IPV6_SOURCE_OFFSET)
       self.src_ip = hdr_ips[0]
       self.dst_ip = hdr_ips[1]
    end
-   self.protocol = b[IPV6_NEXT_HEADER_OFFSET]
-   if self.protocol == IP_TCP or self.protocol == IP_UDP then
-      local hdr_ports = ffi.cast('uint16_t*', b+IPV6_SOURCE_PORT_OFFSET)
+   self.protocol = b[const.IPV6_NEXT_HEADER_OFFSET]
+   if self.protocol == const.IP_TCP or self.protocol == const.IP_UDP then
+      local hdr_ports = ffi.cast('uint16_t*', b+const.IPV6_SOURCE_PORT_OFFSET)
       self.src_port = hdr_ports[0]
       self.dst_port = hdr_ports[1]
    else
@@ -247,11 +244,11 @@ do
    local specv6 = spec_v6()
    new_spec = function (b)
       if not b then return nil end
-      local ethertype = ffi.cast('uint16_t*', b+ETHERTYPE_OFFSET)[0]
-      if ethertype == ETHERTYPE_IPV4 then
+      local ethertype = ffi.cast('uint16_t*', b+const.ETHERTYPE_OFFSET)[0]
+      if ethertype == const.ETHERTYPE_IPV4 then
          return specv4:fill(b)
       end
-      if ethertype == ETHERTYPE_IPV6 then
+      if ethertype == const.ETHERTYPE_IPV6 then
          return specv6:fill(b)
       end
    end
