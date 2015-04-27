@@ -51,7 +51,6 @@ function PcapFilter:push ()
          packet.free(p)
       end
    end
-   conntrack.age(self.state_table)
 end
 
 -- Testing
@@ -107,7 +106,7 @@ function selftest_run (stateful, expected, tolerance)
 
    local deadline = lib.timer(1e9)
    repeat app.breathe() until deadline()
-   
+
    app.report({showlinks=true})
    local sent     = app.app_table.pcap_filter.input.input.stats.rxpackets
    local accepted = app.app_table.pcap_filter.output.output.stats.txpackets

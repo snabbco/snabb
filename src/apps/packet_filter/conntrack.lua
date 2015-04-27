@@ -100,11 +100,10 @@ do
       track = function (name, key, revkey, limit)
          limit = limit or 1000
          local p = conntracks[name]
-         if counts[name] > limit then
-            if age(p, 0.01) then
-               counts[name] = 0
-            end
+         if age(p, 7200) or counts[name] > limit and age(p, 0.01) then
+            counts[name] = 0
          end
+
          if put(p, key, true) then
             counts[name] = counts[name] + 1
          end
@@ -113,12 +112,6 @@ do
 
       check = function (name, key)
          return key and get(conntracks[name], key)
-      end,
-
-      age = function(name, t)
-         if name and age(conntracks[name], t or 7200) then
-            counts[name] = 0
-         end
       end,
 
       clear = function ()
