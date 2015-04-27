@@ -47,7 +47,7 @@ while true; do
         git reflog expire --expire-unreachable=0 --all
         git prune --expire 0
         echo "Generating new configuration"
-        sudo $NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR
+        $NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR
         # Only (atomically) replace configurations that have changed.
         for conf in $TMP_DIR/*; do
             dest=$SNABB_DIR/$(basename $conf)
