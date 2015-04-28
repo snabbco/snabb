@@ -36,3 +36,14 @@ char *shmem_grow(void *fh, void *old_mem, size_t old_size, size_t new_size) {
   return((char *)mem);
 }
 
+char *shmem_attach(void *fh, size_t length) {
+  int fd;
+  void *mem;
+
+  fd = fileno(fh);
+  if ((mem = mmap(NULL, length, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0)) == MAP_FAILED) {
+    perror("mmap");
+    return(NULL);
+  }
+  return((char *)mem);
+}
