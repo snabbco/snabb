@@ -1,7 +1,7 @@
 module(...,package.seeall)
 
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
-local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
+local BPF = require("apps.packet_filter.bpf").BPF
 local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
 local nd_light = require("apps.ipv6.nd_light").nd_light
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
@@ -50,15 +50,15 @@ function load (file, pciaddr, sockpath)
       local pf_state_table = t.stateful_filter and name
       if t.ingress_filter then
          local Filter = name.."_Filter_in"
-         config.app(c, Filter, PcapFilter, { filter = t.ingress_filter,
-                                             state_table = pf_state_table })
+         config.app(c, Filter, BPF, { filter = t.ingress_filter,
+                                      state_table = pf_state_table })
          config.link(c, Filter..".tx -> " .. VM_rx)
          VM_rx = Filter..".rx"
       end
       if t.egress_filter then
          local Filter = name..'_Filter_out'
-         config.app(c, Filter, PcapFilter, { filter = t.egress_filter,
-                                             state_table = pf_state_table })
+         config.app(c, Filter, BPF, { filter = t.egress_filter,
+                                      state_table = pf_state_table })
          config.link(c, VM_tx..' -> '..Filter..'.rx')
          VM_tx = Filter..'.tx'
       end
