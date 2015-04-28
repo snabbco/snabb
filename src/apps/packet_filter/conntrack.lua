@@ -76,54 +76,45 @@ ffi.cdef [[
 ---
 --- these are the only functions that have access
 --- to the connection tracking tables.
+--- each named table is a 4-tuple of the form:
+--- ( current set, old set, time of last rotation, number of entries)
 ---
-local define, track, check, clear
+local define, clear     -- part of the exported API
+local track, check      -- internal functions, used by spec objects
 do
-   local conntracks = {}
-   local counts = {}
+   local MAX_AGE = 7200             -- two hours
+   local MAX_CONNECTIONS = 1000     -- overflow threshold
+   local conntracks = {}            -- named tracking tables
    local time = engine.now
-   local function new() return {{}, {}, time()} end
-   local function put(p, k, v)
-      local isnew = p[1][k] == nil
-      p[1][k] = v
-      return isnew
-   end
-   local function get(p, k) return p[1][k] or p[2][k] end
-   local function age(p, t)
-      if time() > p[3]+t then
-         p[1], p[2], p[3] = {}, p[1], time()
-         return true
-      end
-   end
+   local function init(old)   return {}, old, time(), 0 end
+   local function put(t, key) t[1][key] = true end
+   local function get(t, key) return t[1][key] or t[2][key] end
+   local function swap(t)     t[1], t[2], t[3], t[4] = init(t[1]) end
 
    function define (name)
       if not name then return end
-      conntracks[name] = conntracks[name] or new()
-      counts[name] = counts[name] or 0
-   end
-
-   function track (name, key, revkey, limit)
-      limit = limit or 1000
-      local p = conntracks[name]
-      if age(p, 7200) or counts[name] > limit and age(p, 0.01) then
-         counts[name] = 0
-      end
-
-      if put(p, key, true) then
-         counts[name] = counts[name] + 1
-      end
-      put(p, revkey, true)
-   end
-
-   function check (name, key)
-      return key and get(conntracks[name], key)
+      conntracks[name] = conntracks[name] or { init({}) }
    end
 
    function clear()
-      for name, p in pairs(conntracks) do
-         p[1], p[2], p[3] = {}, {}, time()
+      for name, t in pairs(conntracks) do
+         t[1], t[2], t[3], t[4] = init ({})
       end
       conntracks = {}
+   end
+
+   function track (name, key, revkey)
+      local t = conntracks[name]
+      if time() > t[3]+MAX_AGE or t[4] > MAX_CONNECTIONS then
+         swap(t)
+      end
+      t[4] = t[4] + 1
+      put(t, key)
+      put(t, revkey)
+   end
+
+   function check (name, key)
+      return get(conntracks[name], key)
    end
 end
 
