@@ -9,9 +9,9 @@ local conntrack = require("apps.packet_filter.conntrack")
 
 local pf = require("pf")        -- pflua
 
-PcapFilter = {}
+BPF = {}
 
--- PcapFilter is an app that drops all packets that don't match a
+-- BPF is an app that drops all packets that don't match a
 -- specified filter expression.
 --
 -- Optionally, connections can be statefully tracked, so that if one
@@ -22,8 +22,8 @@ PcapFilter = {}
 --   filter      = string expression specifying which packets to accept
 --                 syntax: http://www.tcpdump.org/manpages/pcap-filter.7.html
 --   state_table = optional string name to use for stateful-tracking table
-function PcapFilter:new (conf)
-   assert(conf.filter, "PcapFilter conf.filter parameter missing")
+function BPF:new (conf)
+   assert(conf.filter, "BPF conf.filter parameter missing")
 
    local o = {
       -- XXX Investigate the latency impact of filter compilation.
@@ -31,10 +31,10 @@ function PcapFilter:new (conf)
       state_table = conf.state_table or false
    }
    if conf.state_table then conntrack.define(conf.state_table) end
-   return setmetatable(o, { __index = PcapFilter })
+   return setmetatable(o, { __index = BPF })
 end
 
-function PcapFilter:push ()
+function BPF:push ()
    local i = assert(self.input.input or self.input.rx, "input port not found")
    local o = assert(self.output.output or self.output.tx, "output port not found")
 
@@ -60,10 +60,10 @@ local basic_apps = require("apps.basic.basic_apps")
 -- This is a simple blind regression test to detect unexpected changes
 -- in filtering behavior.
 --
--- The PcapFilter app is glue. Instead of having major unit tests of
+-- The BPF app is glue. Instead of having major unit tests of
 -- its own it depends on separate testing of pflua and conntrack.
 function selftest ()
-   print("selftest: pcap_filter")
+   print("selftest: bpf")
    selftest_run(false, 3.726, 0.0009)
    selftest_run(true,  3.800, 0.1)
    print("selftest: ok")
@@ -72,7 +72,7 @@ end
 -- Run a selftest in stateful or non-stateful mode and expect a
 -- specific rate of acceptance from the test trace file.
 function selftest_run (stateful, expected, tolerance)
-   local pcap_filter = require("apps.packet_filter.pcap_filter")
+   local bpf = require("apps.packet_filter.bpf")
    local v6_rules =
       [[
          (icmp6 and
@@ -90,13 +90,13 @@ function selftest_run (stateful, expected, tolerance)
    local state_table = stateful and "selftest"
    config.app(c, "source", pcap.PcapReader, "apps/packet_filter/samples/v6.pcap")
    config.app(c, "repeater", basic_apps.Repeater )
-   config.app(c,"pcap_filter", pcap_filter.PcapFilter,
+   config.app(c, "bpf", bpf.BPF,
               {filter=v6_rules, state_table = state_table})
    config.app(c, "sink", basic_apps.Sink )
 
    config.link(c, "source.output -> repeater.input")
-   config.link(c, "repeater.output -> pcap_filter.input")
-   config.link(c, "pcap_filter.output -> sink.input")
+   config.link(c, "repeater.output -> bpf.input")
+   config.link(c, "bpf.output -> sink.input")
    app.configure(c)
 
    print(("Run for 1 second (stateful = %s)..."):format(stateful))
@@ -105,8 +105,8 @@ function selftest_run (stateful, expected, tolerance)
    repeat app.breathe() until deadline()
    
    app.report({showlinks=true})
-   local sent     = app.app_table.pcap_filter.input.input.stats.rxpackets
-   local accepted = app.app_table.pcap_filter.output.output.stats.txpackets
+   local sent     = app.app_table.bpf.input.input.stats.rxpackets
+   local accepted = app.app_table.bpf.output.output.stats.txpackets
    local acceptrate = accepted * 100 / sent
    if acceptrate >= expected and acceptrate <= expected+tolerance then
       print(("ok: accepted %.4f%% of inputs (within tolerance)"):format(acceptrate))

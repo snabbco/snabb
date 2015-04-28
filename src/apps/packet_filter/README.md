@@ -1,20 +1,20 @@
-# PcapFilter App (apps.packet_filter.pcap_filter)
+# BPF App (apps.packet_filter.bpf.BPF)
 
-The `PcapFilter` app receives packets on the `input` port and transmits
+The `BPF` app receives packets on the `input` port and transmits
 conforming packets to the `output` port. In order to conform, a packet
 must match the *[pcap-filter](http://www.tcpdump.org/manpages/pcap-filter.7.html)
-expression* of the `PcapFilter` instance and/or belong to a *sanctioned
+expression* of the `BPF` instance and/or belong to a *sanctioned
 connection*. For a connection to be sanctioned it must be tracked in a
-*state table* by a `PcapFilter` app using the same state table. All
-`PcapFilter` apps share a global namespace of *state table identifiers*.
-Multiple `PcapFilter` apps—e.g. for inbound and outbound traffic—can
+*state table* by a `BPF` app using the same state table. All
+`BPF` apps share a global namespace of *state table identifiers*.
+Multiple `BPF` apps—e.g. for inbound and outbound traffic—can
 refer to the same connection by sharing a state table identifer.
 
-![PcapFilter](.images/PcapFilter.png)
+![BPF](.images/BPF.png)
 
 ## Configuration
 
-The `PcapFilter` app accepts a table as its configuration argument. The
+The `BPF` app accepts a table as its configuration argument. The
 following keys are available:
 
 — Key **filter**

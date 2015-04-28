@@ -129,7 +129,7 @@ function random_filter_rule ()
    local ethertype = random_item(options.ethertype)
    local source_port_min = random_port()
    local dest_port_min = random_port()
-   -- See PcapFilter (apps.packet_filter.pcap_filter)
+   -- See BPF (apps.packet_filter.BPF)
    return ("(%s and %s and src net %s and dst net %s and src portrange %d-%d and dst portrange %d-%d)"):format(
       ethertype,
       random_item(options.protocol),

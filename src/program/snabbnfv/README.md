@@ -28,7 +28,7 @@ return { <port-1>, ..., <port-n> }
 
 Each port is defined by a range of properties which correspond to the
 configuration parameters of the underlying apps (NIC driver, `VhostUser`,
-`PcapFilter`, `RateLimiter`, `nd_light` and `SimpleKeyedTunnel`):
+`BPF`, `RateLimiter`, `nd_light` and `SimpleKeyedTunnel`):
 
 ```
 port := { port_id        = <id>,          -- A unique string
