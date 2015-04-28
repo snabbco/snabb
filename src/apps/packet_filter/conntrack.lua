@@ -2,50 +2,50 @@
 --
 -- This module exposes the following API:
 --
---  define(tablename, agestep)
+--  define(tablename)
 --    define a named connection tracking table.
---    agestep is the duration in seconds before a connection ages from
---    states new to old, old to deleted. The default is 7200 (2 hours).
---
---  track(tablename, buffer)
---    Insert an entry into a connection table based on the packet
---    headers in the buffer.
---
---  check(tablename, buffer) => flag
---    Return true if the buffer contains a packet for a connection
---    that is already tracked in the table.
---
---  ageall()
---    Age all connection tables (based on wall-clock time) to remove
---    timed-out connections.
 --
 --  clear()
---    Remove all connection entries.
+--    clears all tracking tables.
+--
+--  spec(buffer)
+--    returns a spec object, encapsulating the connection
+--    specifications if the packet in `buffer`.
+--
+--  spec:track(trackname)
+--    tracks the connection in the named tracking table.
+--    internally handles any ageing and table rotation.
+--
+--  spec:check(trackname)
+--    checks if an equivalent (or revese) spec is registered
+--    in the named tracking table.
+--
+--  NOTE: the spec() function doesn't allocate new spec objects,
+--  the returned objects are to be used and for tracking and
+--  checking but not stored, because they might be overwritten
+--  by the next call to spec().
+
 
 local ffi = require 'ffi'
 local lib = require 'core.lib'
 
-ffi.cdef [[
-   struct _conststruct {
-      static const int ETHERTYPE_IPV4 = 0x0008;
-      static const int ETHERTYPE_IPV6 = 0xDD86;
+local const = ffi.new([[struct {
+   static const int ETHERTYPE_IPV4 = 0x0008;
+   static const int ETHERTYPE_IPV6 = 0xDD86;
 
-      static const int IP_UDP = 0x11;
-      static const int IP_TCP = 6;
+   static const int IP_UDP = 0x11;
+   static const int IP_TCP = 6;
 
-      static const int ETHERTYPE_OFFSET = 12;
+   static const int ETHERTYPE_OFFSET = 12;
 
-      static const int IPV4_SOURCE_OFFSET = 26;
-      static const int IPV4_PROTOCOL_OFFSET = 23;
-      static const int IPV4_SOURCE_PORT_OFFSET = 34;
+   static const int IPV4_SOURCE_OFFSET = 26;
+   static const int IPV4_PROTOCOL_OFFSET = 23;
+   static const int IPV4_SOURCE_PORT_OFFSET = 34;
 
-      static const int IPV6_SOURCE_OFFSET = 22;
-      static const int IPV6_NEXT_HEADER_OFFSET = 20; // protocol
-      static const int IPV6_SOURCE_PORT_OFFSET = 54;
-   };
-]]
-
-local const = ffi.new('struct _conststruct')
+   static const int IPV6_SOURCE_OFFSET = 22;
+   static const int IPV6_NEXT_HEADER_OFFSET = 20; // protocol
+   static const int IPV6_SOURCE_PORT_OFFSET = 54;
+}]])
 
 ---
 --- connection spec structures
@@ -71,7 +71,13 @@ ffi.cdef [[
 
 ----
 
-local conntrack
+---
+--- connection tracking
+---
+--- these are the only functions that have access
+--- to the connection tracking tables.
+---
+local define, track, check, clear
 do
    local conntracks = {}
    local counts = {}
@@ -90,43 +96,45 @@ do
       end
    end
 
-   conntrack = {
-      define = function (name)
-         if not name then return end
-         conntracks[name] = conntracks[name] or new()
-         counts[name] = counts[name] or 0
-      end,
+   function define (name)
+      if not name then return end
+      conntracks[name] = conntracks[name] or new()
+      counts[name] = counts[name] or 0
+   end
 
-      track = function (name, key, revkey, limit)
-         limit = limit or 1000
-         local p = conntracks[name]
-         if age(p, 7200) or counts[name] > limit and age(p, 0.01) then
-            counts[name] = 0
-         end
+   function track (name, key, revkey, limit)
+      limit = limit or 1000
+      local p = conntracks[name]
+      if age(p, 7200) or counts[name] > limit and age(p, 0.01) then
+         counts[name] = 0
+      end
 
-         if put(p, key, true) then
-            counts[name] = counts[name] + 1
-         end
-         put(p, revkey, true)
-      end,
+      if put(p, key, true) then
+         counts[name] = counts[name] + 1
+      end
+      put(p, revkey, true)
+   end
 
-      check = function (name, key)
-         return key and get(conntracks[name], key)
-      end,
+   function check (name, key)
+      return key and get(conntracks[name], key)
+   end
 
-      clear = function ()
-         for name, p in pairs(conntracks) do
-            p[1], p[2], p[3] = {}, {}, time()
-         end
-         conntracks = {}
-      end,
-   }
+   function clear()
+      for name, p in pairs(conntracks) do
+         p[1], p[2], p[3] = {}, {}, time()
+      end
+      conntracks = {}
+   end
 end
 
 -----------------
-
+--- generic connection spec functions, work for either IPv4 or IPv6
 local genspec = {}
 
+--- reverses a spec
+--- o: (optional) if given, a spec to be filled with
+--- the reverse of the original
+--- if omitted, the spec is reversed in place.
 function genspec:reverse(o)
    if o then
       o.protocol = self.protocol
@@ -138,18 +146,19 @@ function genspec:reverse(o)
    return o
 end
 
-
+--- returns a binary string, usable as a table key
 function genspec:__tostring()
    return ffi.string(self, ffi.sizeof(self))
 end
 
+--- checks if the spec is present in the named tracking table
 function genspec:check(trackname)
-   return conntrack.check(trackname, self:__tostring())
+   return check(trackname, self:__tostring())
 end
 
 
 ----
-
+--- IPv4 spec
 
 local spec_v4 = ffi.typeof('conn_spec_ipv4')
 local ipv4 = {
@@ -160,6 +169,8 @@ local ipv4 = {
 ipv4.__index = ipv4
 
 
+--- fills `self` with the specifications of
+--- the packet in `b` (a byte buffer)
 function ipv4:fill(b)
    do
       local hdr_ips = ffi.cast('uint32_t*', b+const.IPV4_SOURCE_OFFSET)
@@ -177,20 +188,21 @@ function ipv4:fill(b)
    return self
 end
 
-
+--- inserts `self` in the named tracking table.
+--- it's iserted twice: directly and reversed
 do
-   local s2 = nil
+   local rev = nil      -- to hold the reversed spec
    function ipv4:track(trackname)
-      s2 = s2 or spec_v4()
-      return conntrack.track(trackname, self:__tostring(), self:reverse(s2):__tostring())
+      rev = rev or spec_v4()
+      return track(trackname, self:__tostring(), self:reverse(rev):__tostring())
    end
 end
 
-
 spec_v4 = ffi.metatype(spec_v4, ipv4)
 
--------
 
+-------
+--- IPv6 spec
 
 local spec_v6 = ffi.typeof('conn_spec_ipv6')
 local ipv6 = {
@@ -200,6 +212,9 @@ local ipv6 = {
 }
 ipv6.__index = ipv6
 
+
+--- fills `self` with the specifications of
+--- the packet in `b` (a byte buffer)
 function ipv6:fill(b)
    do
       local hdr_ips = ffi.cast('ipv6_addr*', b+const.IPV6_SOURCE_OFFSET)
@@ -218,11 +233,13 @@ function ipv6:fill(b)
 end
 
 
+--- inserts `self` in the named tracking table.
+--- it's iserted twice: directly and reversed
 do
-   local s2 = nil
+   local rev = nil
    function ipv6:track(trackname)
-      s2 = s2 or spec_v6()
-      return conntrack.track(trackname, self:__tostring(), self:reverse(s2):__tostring())
+      rev = rev or spec_v6()
+      return track(trackname, self:__tostring(), self:reverse(rev):__tostring())
    end
 end
 
@@ -248,9 +265,8 @@ do
 end
 
 return {
-   define = conntrack.define,
+   define = define,
    spec = new_spec,
-   age = conntrack.age,
-   clear = conntrack.clear,
+   clear = clear,
 }
 
