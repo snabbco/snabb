@@ -3,12 +3,13 @@ LUAOBJ = $(LUASRC:.lua=.o)
 CSRC   = $(wildcard src/c/*.c)
 COBJ   = $(CSRC:.c=.o)
 
-LUAJIT_O := deps/luajit/src/libluajit.a
-SYSCALL  := src/syscall.lua
+LUAJIT   := deps/luajit.vsn
+SYSCALL  := deps/syscall.vsn
+PFLUA    := deps/pflua.vsn
 
 LUAJIT_CFLAGS := -include $(CURDIR)/gcc-preinclude.h
 
-all: $(LUAJIT_O) $(SYSCALL)
+all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	@echo "Building snabbswitch"
 	cd src && $(MAKE)
 
@@ -23,7 +24,7 @@ install_compute_node: install
 	install -D src/scripts/sysv/init.d/snabb-nfv-sync-agent ${PREFIX}/etc/init.d/snabb-nfv-sync-agent
 	install -D src/scripts/sysv/default/snabb-nfv-sync-agent ${PREFIX}/etc/default/snabb-nfv-sync-agent
 
-$(LUAJIT_O): check_luajit deps/luajit/Makefile
+$(LUAJIT): check_luajit deps/luajit/Makefile
 	@echo 'Building LuaJIT'
 	@(cd deps/luajit && \
 	 $(MAKE) PREFIX=`pwd`/usr/local \
@@ -37,6 +38,17 @@ check_luajit:
 	    echo "Initializing LuaJIT submodule.."; \
 	    git submodule update --init deps/luajit; \
 	fi
+
+$(PFLUA): check_pflua
+#       pflua has no tags at time of writing, so use raw commit id
+	@(cd deps/pflua && git rev-parse HEAD > ../pflua.vsn)
+
+check_pflua:
+	@if [ ! -f deps/pflua/src/pf.lua ]; then \
+	    echo "Initializing pflua submodule.."; \
+	    git submodule update --init deps/pflua; \
+	fi
+
 
 $(SYSCALL): check_syscall
 	@echo 'Copying ljsyscall components'

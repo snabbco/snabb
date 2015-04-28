@@ -8,6 +8,7 @@ E= @echo
 # Defined here to detect version mismatches at build time.
 LUAJIT_VSN    := "v2.0.3-328-g04dc64b"
 LJSYSCALL_VSN := "v0.10-65-g7081d97"
+PFLUA_VSN     := "af132e77feede98dce0f2efcdc8dd9206a28c2e3"
 
 TEST_SKIPPED="43"
 
@@ -15,6 +16,8 @@ SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 
 LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
+PFLUASRC = $(shell cd ../deps/pflua/src && \
+	         find . -regex '[^\#]*\.lua' -printf '%P ')
 CSRC   = $(shell find . -regex '[^\#]*\.c'   -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h'   -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
@@ -24,6 +27,7 @@ PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 INCSRC = $(shell find . -regex '[^\#]*\.inc' -printf '%P ')
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
+PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
 ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
@@ -47,10 +51,14 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
+snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
 	$(E) "SUBMODULES"
-	@if grep -vqF $(LUAJIT_VSN)    ../deps/luajit.vsn || \
-	    grep -vqF $(LJSYSCALL_VSN) ../deps/ljsyscall.vsn; then \
+	@if test ! -f ../deps/luajit.vsn			|| \
+	    test ! -f ../deps/ljsyscall.vsn			|| \
+	    test ! -f ../deps/pflua.vsn				|| \
+	    grep -vqF $(LJSYSCALL_VSN) ../deps/ljsyscall.vsn	|| \
+	    grep -vqF $(LUAJIT_VSN)    ../deps/luajit.vsn	|| \
+	    grep -vqF $(PFLUA_VSN)     ../deps/pflua.vsn; then \
 	    echo "Error: Submodule version mismatch"			>&2; \
 	    echo "luajit:"						>&2; \
 	    echo "  require: $(LUAJIT_VSN)"				>&2; \
@@ -58,6 +66,9 @@ snabb: $(LUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
 	    echo "ljsyscall:"						>&2; \
 	    echo "  require: $(LJSYSCALL_VSN)"				>&2; \
 	    echo "  found:   $(shell cat ../deps/ljsyscall.vsn) "	>&2; \
+	    echo "pflua:"						>&2; \
+	    echo "  require: $(PFLUA_VSN)"				>&2; \
+	    echo "  found:   $(shell cat ../deps/pflua.vsn) "		>&2; \
 	    echo "Please update and rebuild submodules."		>&2; \
 	    echo ""							>&2; \
 	    echo "Cheat sheet:"						>&2; \
@@ -131,6 +142,11 @@ $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 	$(E) "LUA       $@"
 	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
 
+$(PFLUAOBJ): obj/%_lua.o: ../deps/pflua/src/%.lua Makefile
+	$(E) "LUA       $@"
+	$(Q) mkdir -p $(dir $@)
+	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
+
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
 	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
@@ -197,7 +213,7 @@ doc/snabbswitch.epub: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
 	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
 
-CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog
+CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog deps/*.vsn
 
 clean:
 	$(E) "RM        $(CLEAN)"

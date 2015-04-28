@@ -1,84 +1,30 @@
-# PacketFilter App (apps.packet_filter.packet_filter)
+# PcapFilter App (apps.packet_filter.pcap_filter)
 
-The `PacketFilter` app receives packets on the `input` port and transmits
+The `PcapFilter` app receives packets on the `input` port and transmits
 conforming packets to the `output` port. In order to conform, a packet
-must match at least one of the *filter rules* of the `PacketFilter`
-instance and/or belong to a *sanctioned connection*. For a connection to
-be sanctioned it must be tracked in a *connection table* by a
-`PacketFilter` app using the `state_track` operators. All `PacketFilter`
-apps share a global namespace of *connection table identifiers*. Multiple
-`PacketFilter` apps—e.g. for inbound and outbound traffic—can refer to
-the same connection by sharing a connection table identifer.
+must match the *[pcap-filter](http://www.tcpdump.org/manpages/pcap-filter.7.html)
+expression* of the `PcapFilter` instance and/or belong to a *sanctioned
+connection*. For a connection to be sanctioned it must be tracked in a
+*state table* by a `PcapFilter` app using the same state table. All
+`PcapFilter` apps share a global namespace of *state table identifiers*.
+Multiple `PcapFilter` apps—e.g. for inbound and outbound traffic—can
+refer to the same connection by sharing a state table identifer.
 
-![PacketFilter](.images/PacketFilter.png)
+![PcapFilter](.images/PcapFilter.png)
 
 ## Configuration
 
-The `PacketFilter` app accepts a table as its configuration argument. The
+The `PcapFilter` app accepts a table as its configuration argument. The
 following keys are available:
 
-— Key **rules**
+— Key **filter**
 
-*Required*. An array of filter rules as described in the *Filter Rules*
-section below.
+*Required*. A string containing a [pcap-filter](http://www.tcpdump.org/manpages/pcap-filter.7.html)
+expression.
 
-— Key **state_track**
+— Key **state_table**
 
-*Optional*. A string naming a connection table. If set, packets passing
-*any* rule will be tracked in the specified connection table.
-
-— Key **state_check**
-
-*Optional*. A string denoting a connection table. If set, any packet that
-belongs to a tracked connection in the specified connection table will
-be let pass.
-
-### Filter Rules
-
-A filter rule is a table in which each key/value pair specifies a pattern
-to match or track incoming packets against. The following keys are
-defined:
-
-— Key **ethertype**
-
-*Required*. The ethernet type in use (IPv4 or IPv6). A string identifier,
-either "ipv4" or "ipv6".
-
-— Key **protocol**
-
-*Optional*. The protocol is use (ICMP, UDP or TCP). A string identifier,
-may be one of "icmp", "udp" or "tcp".
-
-— Key **source_cidr**
-
-— Key **dest_cidr**
-
-*Optional*. Source and destination addresses. IP ranges in CIDR notation
-as strings.
-
-— Key **source_port_min**
-
-— Key **source_port_max**
-
-*Optional*. The source port range. Integers denoting the minimum and
-maximum source port numbers. If only one is set then only that port is
-allowed.
-
-— Key **dest_port_min**
-
-— Key **dest_port_max**
-
-*Optional*. The destination port range. Integers denoting the minimum and
-maximum destination port numbers. If only one is set then only that port
-is allowed.
-
-— Key **state_track**
-
-*Optional*. A string naming a connection table. If set, packets passing
-the rule are tracked in the specified connection table.
-
-— Key **state_check**
-
-*Optional*. A string denoting a connection table. If set, packets must
-belong to a tracked connection in the specified connection table in
-addition to any other condition in the rule to pass.
+*Optional*. A string naming a state table. If set, packets passing any*
+*rule will be tracked in the specified state table and any packet that
+*belongs to a tracked connection in the specified state table will be let
+*pass.

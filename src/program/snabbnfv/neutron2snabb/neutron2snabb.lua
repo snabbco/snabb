@@ -4,6 +4,8 @@ local lib  = require("core.lib")
 local json = require("lib.json")
 local usage = require("program.snabbnfv.neutron2snabb.README_inc")
 
+local NULL = "\\N"
+
 function run (args)
    if #args ~= 2 and #args ~= 3 then
       print(usage) main.exit(1)
@@ -62,8 +64,9 @@ function create_config (input_dir, output_dir, hostname)
                             { vlan = vif_details.zone_vlan,
                               mac_address = port.mac_address,
                               port_id = port.id,
-                              ingress_filter = filter(port, secbindings, secrules, 'ingress', profile.packetfilter),
-                              egress_filter = filter(port, secbindings, secrules, 'egress', profile.packetfilter),
+                              ingress_filter = filter(port, secbindings, secrules, 'ingress'),
+                              egress_filter = filter(port, secbindings, secrules, 'egress'),
+                              stateful_filter = (profile.packetfilter ~= 'stateless'),
                               rx_police_gbps = profile.rx_police_gbps,
                               tx_police_gbps = profile.tx_police_gbps,
                               tunnel = tunnel(port, vif_details, profile) })
@@ -79,35 +82,7 @@ function create_config (input_dir, output_dir, hostname)
    end
 end
 
--- Return the packet filter expression.
-function filter (port, secbindings, secrules, direction, type)
-   local rules = {}
-   direction = direction:lower()
-   if secbindings[port.id] then
-      for _,r in ipairs(secrules[secbindings[port.id].security_group_id]) do
-         if r.remote_group_id == "\\N" then
-            if r.direction:lower() == direction then
-               local NULL = "\\N" -- SQL null
-               local rule = {}
-               if r.ethertype        ~= NULL then rule.ethertype        = r.ethertype:lower() end
-               if r.protocol         ~= NULL then rule.protocol         = r.protocol:lower()  end
-               if r.port_range_min   ~= NULL then rule.dest_port_min    = r.port_range_min    end
-               if r.port_range_max   ~= NULL then rule.dest_port_max    = r.port_range_max    end
-               if r.remote_ip_prefix ~= NULL then rule.remote_ip_prefix = r.remote_ip_prefix  end
-               table.insert(rules, rule)
-            end
-         end
-      end
-      if type == "stateless" then
-         return { rules = rules }
-      else
-         return { rules = rules,
-                  state_track = port.id,
-                  state_check = port.id }
-      end
-   end
-end
-
+  
 -- Return the L2TPv3 tunnel expresion.
 function tunnel (port, vif_details, profile)
    if profile.tunnel_type == "L2TPv3" then
@@ -165,4 +140,96 @@ function gethostname ()
    if hostname then return hostname
    else error("Could not get hostname.") end
 end
+
+
+-- Translation of Security Groups into pflua filter expressions.
+-- See selftest() below for examples of how this works.
+
+-- Return the pcap filter expression to implement a security group.
+function filter (port, secbindings, secrules, direction)
+   direction = direction:lower()
+   if secbindings[port.id] then
+      local rules = secrules[secbindings[port.id].security_group_id]
+      return rulestofilter(rules, direction)
+   end
+end
+
+function rulestofilter (rules, direction)
+   local t = {}
+   for i = 1, #rules do
+      local r = rules[i]
+      for key, value in pairs(r) do
+         if value == NULL then r[key] = nil end
+         if type(value) == 'string' then r[key] = value:lower() end
+      end
+      if r.remote_group_id == nil then
+         if r.direction == direction then
+            t[i] = ruletofilter(r, direction)
+         end
+      end
+   end
+   return parenconcat(t, " or ")
+end
+
+function ruletofilter (r, direction)
+   local matches = {}           -- match rules to be combined
+   if     r.ethertype == "ipv4" then matches[#matches+1] = "ip"
+   elseif r.ethertype == "ipv6" then matches[#matches+1] = "ip6"
+   else   error("unknown ethertype: " .. r.ethertype) end
+   
+   if     r.protocol == "tcp" then matches[#matches+1] = "tcp"
+   elseif r.protocol == "udp" then matches[#matches+1] = "udp" end
+   
+   if r.port_range_min or r.port_range_max then
+      local min = r.port_range_min or r.port_range_max
+      local max = r.port_range_max or r.port_range_min
+      matches[#matches+1] = ("portrange %d-%d"):format(min, max)
+   end
+   
+   if r.remote_ip_prefix then
+      local direction = ({ingress = "src", egress = "dst"})[direction]
+      matches[#matches+1] = (direction.." net "..r.remote_ip_prefix)
+   end
+
+   local filter = parenconcat(matches, " and ")
+   if r.ethertype == "ipv4" then filter = "(arp or "..filter..")" end
+   return filter
+end
+
+-- Parenthesize and concatenate
+function parenconcat (t, sep)
+   if #t == 1 then return t[1] else return "("..table.concat(t, sep)..")" end
+end
+
+function selftest ()
+   print("selftest: neutron2snabb")
+   local function checkrule (rule, filter)
+      local got = rulestofilter(lib.load_string(rule)(), 'ingress')
+      if got ~= filter then
+         print(([[Unexpected translation of %s"
+  Expected: %q
+    Actual: %q]]):format(
+               rule, filter, got))
+         error("selftest failed")
+      else
+         print(("ok: %s\n => %s"):format(rule, got))
+      end
+   end
+   checkrule("{{direction='ingress', ethertype='IPv6'}}", 'ip6')
+   checkrule("{{direction='ingress', ethertype='IPv4'}}", '(arp or ip)')
+   checkrule("{{direction='ingress', ethertype='IPv4', protocol='tcp'}}",
+             '(arp or (ip and tcp))')
+   checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp'}}", 
+             '(arp or (ip and udp))')
+   checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp', port_range_min=1000}}",
+             '(arp or (ip and udp and portrange 1000-1000))')
+   checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp', port_range_max=2000}}",
+             '(arp or (ip and udp and portrange 2000-2000))')
+   checkrule("{{direction='ingress', ethertype='IPv4', protocol='tcp', port_range_min=1000, port_range_max=2000}}",
+             '(arp or (ip and tcp and portrange 1000-2000))')
+   checkrule("{{direction='ingress', ethertype='IPv6', protocol='tcp'}, {direction='ingress', ethertype='IPv4', protocol='udp', remote_ip_prefix='10.0.0.0/8'}}",
+             '((ip6 and tcp) or (arp or (ip and udp and src net 10.0.0.0/8)))')
+   print("selftest ok")
+end
+
 
