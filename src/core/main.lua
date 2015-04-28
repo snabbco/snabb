@@ -93,7 +93,9 @@ end
 
 function handler (reason)
    print(reason)
-   print(debug.traceback())
+   if debug_on_error or os.getenv("SNABB_BACKTRACE") then
+      print(debug.traceback())
+   end
    if debug_on_error then debug.debug() end
    os.exit(1)
 end
