@@ -10,11 +10,9 @@ function error() {
 [ ! -z "$NEUTRON_DIR" ]      || export NEUTRON_DIR=/var/snabbswitch/neutron
 [ ! -z "$SNABB_DIR"   ]      || export SNABB_DIR=/var/snabbswitch/networks
 [ ! -z "$TMP_DIR"   ]        || export TMP_DIR=/tmp/snabbswitch
-[ ! -z "$NEUTRON2SNABB" ]    || error "check_env_vars: \$NEUTRON2SNABB not set"
-#[ -x "$NEUTRON2SNABB" ]      || error "check_env_vars: \$NEUTRON2SNABB not an executable"
+[ ! -z "$NEUTRON2SNABB" ]    || export NEUTRON2SNABB="snabb snabbnfv neutron2snabb"
 [ ! -z "$SYNC_PATH" ]        || error "check_env_vars: \$SYNC_PATH not set"
 [ ! -z "$SYNC_HOST" ]        || error "check_env_vars: \$SYNC_HOST not set"
-#[ ! -z "$SYNC_LISTEN_PORT" ] || error "check_env_vars: \$SYNC_LISTEN_PORT not set"
 [ ! -z "$SYNC_INTERVAL" ]    || export SYNC_INTERVAL=1
 
 # Remove old repository if it exists

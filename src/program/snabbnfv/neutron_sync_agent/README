@@ -1,7 +1,10 @@
 snabbnfv neutron-sync-agent [OPTIONS]
 
 Poll the neutron-sync-master for new database configurations and
-translate them into snabbnfv traffic process configuration files.
+translate them into snabbnfv traffic process configuration files. Uses
+neutron2snabb to perform the translations. $NEUTRON2SNABB can be set to
+point to the location of the neutron2snabb command. The default is
+"snabb snabbnfv neutron2snabb".
 
   -s DIR, --snabb-dir DIR
                              Output snabbnfv traffic config files to DIR.
