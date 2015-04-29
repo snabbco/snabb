@@ -49,7 +49,7 @@ function create_config (input_dir, output_dir, hostname)
       -- then we compile its configuration.
       if binding.driver == "snabb" then
          local vif_details = json.decode(binding.vif_details)
-         -- pcall incase the field is missing
+         -- See https://github.com/SnabbCo/snabbswitch/pull/423
          local profile = vif_details["binding:profile"]
          profile = profile or {}
          if vif_details.zone_host == hostname then
@@ -159,16 +159,14 @@ function rulestofilter (rules, direction)
    for i = 1, #rules do
       local r = rules[i]
       for key, value in pairs(r) do
-         if value == NULL then r[key] = nil end
-         if type(value) == 'string' then r[key] = value:lower() end
+         if value == NULL then r[key] = nil
+         elseif type(value) == 'string' then r[key] = value:lower() end
       end
-      if r.remote_group_id == nil then
-         if r.direction == direction then
-            t[i] = ruletofilter(r, direction)
-         end
+      if r.direction == direction then
+         t[#t+1] = ruletofilter(r, direction)
       end
    end
-   return parenconcat(t, " or ")
+   if #t > 0 then return parenconcat(t, " or ") end
 end
 
 function ruletofilter (r, direction)
