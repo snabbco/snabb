@@ -143,7 +143,7 @@ function store_conf (file, value)
       elseif type == 'string' then
          stream:write(("%q"):format(value))
       else
-         stream:write(value)
+         stream:write(("%s"):format(value))
       end
    end
    local stream = assert(io.open(file, "w"))
