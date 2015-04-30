@@ -6,6 +6,10 @@ snabbnfv traffic [OPTIONS] <pci-address> <config-file> <socket-path>
   -l SECONDS, --load-report-interval SECONDS
                              Print a processing load report every SECONDS.
 			     Default: 1s
+  -D SECONDS, --debug-report-interval SECONDS
+                             Print a debug report every SECONDS.
+			     The debug report includes a NIC register dump.
+			     Default: 600s (10 minutes)
   -B NPACKETS, --benchmark NPACKETS
                              Benchmark processing NPACKETS.
   -h, --help
