@@ -12,6 +12,7 @@ local long_opts = {
    help          = "h",
    ["link-report-interval"] = "k",
    ["load-report-interval"] = "l",
+   ["debug-report-interval"] = "D",
    ["long-help"] = "H"
 }
 
@@ -20,12 +21,14 @@ function run (args)
    local benchpackets
    local linkreportinterval = 60
    local loadreportinterval = 1
+   local debugreportinterval = 600
    function opt.B (arg) benchpackets = tonumber(arg)      end
    function opt.h (arg) print(short_usage()) main.exit(1) end
    function opt.H (arg) print(long_usage())  main.exit(1) end
    function opt.k (arg) linkreportinterval = tonumber(arg) end
    function opt.l (arg) loadreportinterval = tonumber(arg) end
-   args = lib.dogetopt(args, opt, "hHB:k:l:", long_opts)
+   function opt.D (arg) debugreportinterval = tonumber(arg) end
+   args = lib.dogetopt(args, opt, "hHB:k:l:D:", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
       if loadreportinterval > 0 then
@@ -34,6 +37,10 @@ function run (args)
       end
       if linkreportinterval > 0 then
 	 local t = timer.new("nfvlinkreport", engine.report_links, linkreportinterval*1e9, 'repeating')
+	 timer.activate(t)
+      end
+      if debugreportinterval > 0 then
+	 local t = timer.new("nfvdebugreport", engine.report_apps, debugreportinterval*1e9, 'repeating')
 	 timer.activate(t)
       end
       if benchpackets then
