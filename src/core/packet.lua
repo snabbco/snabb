@@ -79,7 +79,7 @@ function from_string (d)         return from_pointer(d, #d) end
 local function free_internal (p)
    p.length = 0
    freelist_add(packets_fl, p)
-end   
+end
 
 function free (p)
    engine.frees = engine.frees + 1
@@ -108,3 +108,12 @@ function preallocate_step()
    packet_allocation_step = 2 * packet_allocation_step
 end
 
+ffi.metatype(packet_t, {__index = {
+   clone = clone,
+   append = append,
+   prepend = prepend,
+   shiftleft = shiftleft,
+   free = free,
+   data = data,
+   length = length,
+}})

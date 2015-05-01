@@ -98,3 +98,13 @@ function selftest ()
    print("selftest OK")
 end
 
+ffi.metatype('struct link', {__index = {
+   receive = receive,
+   front = front,
+   transmit = transmit,
+   empty = empty,
+   full = full,
+   nreadable = nreadable,
+   nwritable = nwritable,
+   stats = stats,
+}})
