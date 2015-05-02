@@ -93,7 +93,6 @@ print [[
 #include <netinet/tcp.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
-#include <miscfs/procfs/procfs.h>
 #include <unistd.h>
 
 int ret = 0;

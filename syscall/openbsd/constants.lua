@@ -289,6 +289,8 @@ c.SOCK = multiflags {
   RAW       = 3,
   RDM       = 4,
   SEQPACKET = 5,
+  NONBLOCK  = 0x4000,
+  CLOEXEC   = 0x8000,
 }
 
 c.SOL = strflag {
@@ -883,11 +885,18 @@ end
 
 c.CLOCK = strflag {
   REALTIME                 = 0,
-  VIRTUAL                  = 1,
   PROCESS_CPUTIME_ID       = 2,
   MONOTONIC                = 3,
   THREAD_CPUTIME_ID        = 4,
 }
+
+if version < 201505 then
+  c.CLOCK.VIRTUAL = 1
+end
+
+if version >= 201505 then
+  c.CLOCK.UPTIME = 5
+end
 
 c.UTIME = strflag {
   NOW      = -2,
@@ -923,7 +932,6 @@ c.KERN = strflag {
   HOSTNAME          = 10,
   HOSTID            = 11,
   CLOCKRATE         = 12,
-  VNODE             = 13,
   PROF              = 16,
   POSIX1            = 17,
   NGROUPS           = 18,
@@ -960,15 +968,12 @@ c.KERN = strflag {
   POOL              = 49,
   STACKGAPRANDOM    = 50,
   SYSVIPC_INFO      = 51,
-  USERCRYPTO        = 52,
-  CRYPTODEVALLOWSOFT= 53,
   SPLASSERT         = 54,
   PROC_ARGS         = 55,
   NFILES            = 56,
   TTYCOUNT          = 57,
   NUMVNODES         = 58,
   MBSTAT            = 59,
-  USERASYMCRYPTO    = 60,
   SEMINFO           = 61,
   SHMINFO           = 62,
   INTRCNT           = 63,
@@ -995,6 +1000,13 @@ end
 
 if version >= 201411 then
   c.KERN.PROC_NOBROADCASTKILL = 79
+end
+
+if version < 201505 then
+  c.KERN.VNODE = 13
+  c.KERN.USERCRYPTO = 52
+  c.KERN.CRYPTODEVALLOWSOFT = 53
+  c.KERN.USERASYMCRYPTO = 60
 end
 
 return c

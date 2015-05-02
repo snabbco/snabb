@@ -13,13 +13,14 @@ ffi.cdef [[
 int sysctl(const int *name, unsigned int namelen, void *oldp, size_t *oldlenp, const void *newp, size_t newlen);
 ]]
 
--- Note has only been tested on 5.4, 5.5, 5.6
+-- Note has been tested on 5.4, 5.5, 5.6, 5.7
 
 -- 201211 = 5.2
 -- 201305 = 5.3
 -- 201311 = 5.4
 -- 201405 = 5.5
 -- 201411 = 5.6
+-- 201505 = 5.7
 
 local sc = ffi.new("int[2]", 1, 3) -- kern.osrev
 local osrevision = ffi.new("int[1]")
