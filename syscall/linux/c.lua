@@ -20,6 +20,8 @@ local ffi = require "ffi"
 
 local bit = require "syscall.bit"
 
+require "syscall.linux.ffi"
+
 local voidp = ffi.typeof("void *")
 
 local function void(x)
