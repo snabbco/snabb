@@ -8,6 +8,8 @@ require "syscall.ffitypes"
 
 local version, major, minor
 
+local function inlibc_fn(k) return ffi.C[k] end
+
 -- NetBSD ABI version
 -- TODO if running rump on NetBSD the version detection is a bit flaky if the host and rump differ
 -- normally this is ok if you init netbsd first and have compat installed for rump, or do not use both...
@@ -25,7 +27,7 @@ if abi.host == "netbsd" then
   ok, res = pcall(ffi.C.sysctl, sc, 2, osrevision, lenp, nil, 0)
   osrevision = osrevision[0]
 end
-if not ok or res == -1 then ok, osrevision = pcall(ffi.C.rump_getversion) end
+if not ok or res == -1 then if pcall(inlibc_fn, "rump_getversion") then ok, osrevision = pcall(ffi.C.rump_getversion) end end
 if not ok then 
   version = 7
 else
