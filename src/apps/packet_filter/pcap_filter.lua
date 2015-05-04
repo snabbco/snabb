@@ -40,11 +40,12 @@ function PcapFilter:push ()
 
    while not link.empty(i) do
       local p = link.receive(i)
+      local spec = self.state_table and conntrack.spec(p.data)
 
-      if self.state_table and conntrack.check(self.state_table, p.data) then
+      if spec and spec:check(self.state_table) then
          link.transmit(o, p)
       elseif self.accept_fn(p.data, p.length) then
-         if self.state_table then conntrack.track(self.state_table, p.data) end
+         if spec then spec:track(self.state_table) end
          link.transmit(o, p)
       else
          packet.free(p)
@@ -65,13 +66,15 @@ local basic_apps = require("apps.basic.basic_apps")
 function selftest ()
    print("selftest: pcap_filter")
    selftest_run(false, 3.726, 0.0009)
-   selftest_run(true,  3.800, 0.1)
+   selftest_run(true,  7.453, 0.001)
    print("selftest: ok")
 end
 
 -- Run a selftest in stateful or non-stateful mode and expect a
 -- specific rate of acceptance from the test trace file.
 function selftest_run (stateful, expected, tolerance)
+   app.configure(config.new())
+   conntrack.clear()
    local pcap_filter = require("apps.packet_filter.pcap_filter")
    local v6_rules =
       [[
@@ -103,7 +106,7 @@ function selftest_run (stateful, expected, tolerance)
 
    local deadline = lib.timer(1e9)
    repeat app.breathe() until deadline()
-   
+
    app.report({showlinks=true})
    local sent     = app.app_table.pcap_filter.input.input.stats.rxpackets
    local accepted = app.app_table.pcap_filter.output.output.stats.txpackets
