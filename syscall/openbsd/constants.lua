@@ -289,9 +289,12 @@ c.SOCK = multiflags {
   RAW       = 3,
   RDM       = 4,
   SEQPACKET = 5,
-  NONBLOCK  = 0x4000,
-  CLOEXEC   = 0x8000,
 }
+
+if version >= 201505 then
+  c.SOCK.NONBLOCK  = 0x4000
+  c.SOCK.CLOEXEC   = 0x8000
+end
 
 c.SOL = strflag {
   SOCKET    = 0xffff,
