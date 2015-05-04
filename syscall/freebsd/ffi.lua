@@ -309,7 +309,6 @@ local s = table.concat(defs, "")
 
 ffi.cdef(s)
 
--- TODO these should return strings?
-require "syscall.ffifunctions"
+-- TODO should return strings?
 require "syscall.bsd.ffi"
 
