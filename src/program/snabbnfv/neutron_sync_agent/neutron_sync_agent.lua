@@ -11,7 +11,7 @@ local long_opts = {
    ["sync-host"]   = "h",
    ["sync-path"]   = "p",
    ["interval"]    = "i",
-   ["help"]        = "h"
+   ["help"]        = "H"
 }
 
 function run (args)
@@ -29,8 +29,8 @@ function run (args)
    function opt.h (arg) conf["SYNC_HOST"]     = arg end
    function opt.p (arg) conf["SYNC_PATH"]     = arg end
    function opt.i (arg) conf["SYNC_INTERVAL"] = arg end
-   function opt.h (arg) print(usage) main.exit(1)   end
-   args = lib.dogetopt(args, opt, "d:s:h:p:i:h", long_opts)
+   function opt.H (arg) print(usage) main.exit(1)   end
+   args = lib.dogetopt(args, opt, "d:s:h:p:i:H", long_opts)
    local env = {}
    for key, value in pairs(conf) do
       table.insert(env, key.."="..value) 
