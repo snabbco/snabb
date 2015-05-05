@@ -9,10 +9,12 @@ local long_opts = {
    user                 = "u",
    password             = "p",
    ["mysql-host"]       = "m",
+   ["mysql-port"]       = "M",
    ["neutron-database"] = "D",
    ["dump-path"]        = "d",
    tables               = "t",
    ["listen-address"]   = "l",
+   ["listen-port"]      = "L",
    interval             = "i",
    help                 = "h"
 }
@@ -37,10 +39,12 @@ function run (args)
    function opt.t (arg) conf["DB_NEUTRON_TABLES"] = arg end
    function opt.D (arg) conf["DB_NEUTRON"]        = arg end
    function opt.m (arg) conf["DB_HOST"]           = arg end
+   function opt.M (arg) conf["DB_PORT"]           = arg end
    function opt.l (arg) conf["SYNC_LISTEN_HOST"]  = arg end
+   function opt.L (arg) conf["SYNC_LISTEN_PORT"]  = arg end
    function opt.i (arg) conf["SYNC_INTERVAL"]     = arg end
    function opt.h (arg) print(usage) main.exit(1)       end
-   args = lib.dogetopt(args, opt, "u:p:t:i:d:m:l:D:h", long_opts)
+   args = lib.dogetopt(args, opt, "u:p:t:i:d:m:M:l:L:D:h", long_opts)
    local env = {}
    for key, value in pairs(conf) do
       table.insert(env, key.."="..value) 
