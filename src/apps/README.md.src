@@ -70,3 +70,35 @@ discards them. This can be handy in combination with a `Source`.
               |        |
               +--------+
 
+## Tee
+
+The `Tee` app receives all packets from any number of input links and
+transfers each received packet to all output links. It can be used to
+merge and/or duplicate packet streams
+
+    DIAGRAM: Tee
+              +--------+
+              |        |
+    (any) ----*        *----- (any)
+              |        |
+    (any) ----*  Tee   *----- (any)
+              |        |
+    (any) ----*        *----- (any)
+              |        |
+              +--------+
+
+## Repeater
+
+The `Repeater` app collects all packets received from the `input` link
+and repeatedly transfers the accumulated packets to the `output`
+link. The packets are transmitted in the order they were received.
+
+    DIAGRAM: Repeater
+              +----------+
+              |          |
+              |          |
+    input ----* Repeater *----- output
+              |          |
+              |          |
+              +----------+
+

@@ -34,10 +34,19 @@ discards them. This can be handy in combination with a `Source`.
 
 ![Sink](.images/Sink.png)
 
-## Buzz
+## Tee
 
-The `Buzz` app simply prints a message to standard output each time a
-callback runs. This can be useful for observing the execution of the app
-framework in a primitive way.
+The `Tee` app receives all packets from any number of input links and
+transfers each received packet to all output links. It can be used to
+merge and/or duplicate packet streams
 
-![Buzz](.images/Buzz.png)
+![Tee](.images/Tee.png)
+
+## Repeater
+
+The `Repeater` app collects all packets received from the `input` link
+and repeatedly transfers the accumulated packets to the `output`
+link. The packets are transmitted in the order they were received.
+
+![Repeater](.images/Repeater.png)
+
