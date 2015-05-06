@@ -54,7 +54,7 @@ maxsleep = 100
 -- Can be used to drive timers in apps.
 monotonic_now = false
 function now ()
-   return monotonic_now
+   return monotonic_now or C.get_monotonic_time()
 end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
