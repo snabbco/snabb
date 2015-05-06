@@ -20,8 +20,7 @@ available to snabbnfv-sync-agent processes running on other hosts.
                              Default: $DB_NEUTRON_TABLES or
                              "networks ports ml2_network_segments \
                              securitygroups securitygrouprules \
-                             securitygroupportbindings qos_policies \
-                             qoses portqosmappings"
+                             securitygroupportbindings"
   -m HOST, --mysql-host HOST
                              MySQL hostname.
                              Default: $DB_HOST or "localhost"
