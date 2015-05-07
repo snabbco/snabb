@@ -1,109 +1,103 @@
 # Snabb Switch
 
-[![Build Status](https://travis-ci.org/SnabbCo/snabbswitch.svg?branch=master)](https://travis-ci.org/SnabbCo/snabbswitch)
+Snabb Switch is a simple and fast packet networking toolkit.
 
-Check out the [Snabb Switch
-wiki](https://github.com/SnabbCo/snabbswitch/wiki) to learn about the
-project.
+We are also a grassroots community of programmers and network
+engineers who help each other to build and deploy new network
+elements. We care about practical applications and finding simpler
+ways to do things.
 
-The information below is for making technical contributions.
+The Snabb Switch community are active in
+[applying modern programming techniques](http://blog.ipspace.net/2014/09/snabb-switch-deep-dive-on-software-gone.html),
+[do-it-yourself operator networking](http://blog.ipspace.net/2014/12/l2vpn-over-ipv6-with-snabb-switch-on.html),
+[high-level device drivers](https://github.com/SnabbCo/snabbswitch/blob/master/src/apps/intel/intel10g.lua),
+[fast userspace virtio networking](http://www.virtualopensystems.com/en/solutions/guides/snabbswitch-qemu/),
+[universal SIMD protocol offloads](https://groups.google.com/d/msg/snabb-devel/aez4pEnd4ow/WrXi5N7nxfkJ), and
+[applying compiler technology to networking](https://fosdem.org/2015/schedule/event/packet_filtering_pflua/).
 
-## Goal
+You are welcome to join our community. If you have an application that
+you want to build, or you want to use one that we are already
+developing, or you want to contribute in some other way, then please
+join the [snabb-devel mailing
+list](https://groups.google.com/forum/#!forum/snabb-devel) and read
+on.
 
-> *If a system is to serve the creative spirit, it must be entirely
-> comprehensible to a single individual.* -- [Dan
-> Ingalls](http://ftp.squeak.org/docs/OOPSLA.Squeak.html)
+## How does it work?
 
-Snabb Switch lowers the barrier of entry to create new
-production-ready network functions. This used to be the realm of
-professional system programmers, but now network engineers can do it
-for themselves too.
+Snabb Switch is written using these main techniques:
 
-To become a success the software needs to be quick to comprehend.
-Imagine the typical Snabb Switch hacker is someone with a networking
-problem to solve, a rusty understanding of C, and a copy of
-[Programming in Lua](http://www.lua.org/pil/) open on their
-desk. Our mission is to help this person solve their problem by
-scripting Snabb Switch.
+- Lua, a high-level programming langauge that is easy to learn.
+- LuaJIT, a just-in-time compiler that is competitive with C.
+- Ethernet I/O with no kernel overhead ("kernel bypass" mode).
 
-The code needs to be surprisingly simple. The first reaction should
-be: "Is that really all there is to it?"
+Snabb Switch compiles into a stand-alone executable called
+`snabb`. This single binary includes many applications ([like
+busybox](http://en.wikipedia.org/wiki/BusyBox#Single_binary)) and runs
+on any modern Linux distribution.
 
-### Tactics
+## How is it being used?
 
-> *A well-written program is its own heaven; a poorly-written program
-> is its own hell.* -- [Tao of Programming](http://www.canonical.org/~kragen/tao-of-programming.html)
+The first generation of Snabb Switch applications include:
 
-1. Keep it short. Make every line count.
-2. Do the simplest thing that could possibly work.
-3. You aren't gonna need it.
-4. Kill your darlings.
-5. Start with slow code. Later, profile and optimize it.
+### snabbnfv
 
-### Budget
+[Snabb NFV](src/program/snabbnfv/) makes QEMU/KVM networking
+performance practical for applications that require high packet rates,
+such as ISP core routers. This is intended for people who want to
+process up to 100 Gbps or 50 Mpps of Virtio-net network traffic per
+server. We originally developed Snabb NFV to support Deutsche
+Telekom's [TeraStream](https://ripe67.ripe.net/archives/video/3/)
+network.
 
-> *If I look back at my own life and try to pick out the parts that
-> were most creative, I can't help but notice that they occurred when
-> I was forced to work under the toughest constraints.* -- Donald Knuth
+You can deploy Snabb NFV stand-alone with QEMU or you can integrate it
+with a cloud computing platform such as OpenStack.
 
-Snabb Switch has adopted these limits:
+### VPWS
 
-* 10,000 lines of source.
-* 1 MB executable size.
-* 1 second to compile snabbswitch.
-* 1 minute to compile with dependencies (LuaJIT, etc).
-* 0.1% of source lines wider than 80 columns.
+VPWS (Virtual Private Wire Service) is a Layer-2 VPN application being
+developed by Alexander Gall at [SWITCH](http://switch.ch). His Github
+[`vpn` branch](https://github.com/alexandergall/snabbswitch/tree/vpn)
+is the master line of development.
 
-### Rules
+### packetblaster
 
-Be conservative and follow the rules below when you are working on the
-core modules, but feel welcome to indulge your creativity when you are
-writing new apps.
+[packetblaster](src/program/packetblaster/) generates load by
+replaying a [pcap format](http://en.wikipedia.org/wiki/Pcap) trace
+file onto any number of Intel 82599 10-Gigabit network
+interfaces. This is very efficient: only a small % of one core per CPU
+is required even for hundreds of Gbps of traffic. Because so little
+CPU resources are required you can run packetblaster on a small server
+or even directly on a Device Under Test.
 
-Imitate the style of [Programming in Lua (5.1
-Edition)](http://www.lua.org/pil/) and of the code we already have.
+### snsh
 
-Indent code the same way that Emacs would with default settings.
-(That's three spaces for Lua and four spaces for C.) Use spaces
-instead of tabs.
+[snsh](src/program/snsh/) (Snabb Shell) is a tool for interactively
+experimenting with Snabb Switch. It provides direct access to all APIs
+using a Lua shell. You can operate snsh either from script files or
+from an interactive shell.
 
-Thoughtfully rewrite code when you can achieve the same goal in a
-simpler way. Simpler means less code and/or fewer concepts. (Make sure
-you understand code before you rewrite it.)
+## How do I get started?
 
-Appreciate it when someone makes the effort to understand and improve
-code you have written. This is a fine compliment between programmers.
-Everybody's code can be improved. (So can everybody's improvements.)
+Setting up a Snabb Switch development environment takes around one
+minute:
 
-Use `module()`.
+```
+$ git clone https://github.com/SnabbCo/snabbswitch
+$ cd snabbswitch
+$ make -j
+$ src/snabb --help
+```
 
-### Github workflow
+The `snabb` binary is stand-alone, includes all of the applications,
+and can be copied between machines.
 
-Create a topic branch for each change you make: a new feature, a bug
-fix, an experimental idea.
+For example, to install on the local machine and use as a load generator:
 
-Send a Github "pull request" as soon as you are ready for feedback on
-your code. Iterate by considering the feedback, making any changes
-that you feel are justified, and resubmitting the pull request.
+```
+$ cp src/snabb /usr/local/bin/
+$ sudo snabb packetblaster capture.pcap 0000:01:00.0
+```
 
-Learn to love [Git interactive
-rebase](https://help.github.com/articles/interactive-rebase) for
-managing the commits on your topic branch. Rebase to clean up your
-commits before sending a pull request. (The easy way to do this is to
-squash them into one commit.)
+## How do I get involved?
 
-Refer to the [OpenShift Github
-Workflow](https://www.openshift.com/wiki/github-workflow-for-submitting-pull-requests)
-when in doubt.
-
-### Communication
-
-Use the
-[snabb-devel](https://groups.google.com/forum/#!forum/snabb-devel)
-mailing list for general technical discussions. Submit code with
-Github pull requests. Report bugs with Github issues.
-
-
-### Benchmark Results
-
-[![Benchmark Results](http://lab1.snabb.co:2008/~max/benchmarks.png)](http://lab1.snabb.co:2008/~max/benchmarks.png)
+*To be written*
