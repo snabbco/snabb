@@ -1,7 +1,5 @@
 module(..., package.seeall)
 
-local app = require("core.app")
-local config = require("core.config")
 local pcap = require("apps.pcap.pcap")
 local raw = require("apps.socket.raw")
 local usage = require("program.example.replay.README_inc")
@@ -17,6 +15,6 @@ function run (parameters)
 
    config.link(c, "capture.output -> playback.rx")
 
-   app.configure(c)
-   app.main({duration=1, report = {showlinks=true}})
+   engine.configure(c)
+   engine.main({duration=1, report = {showlinks=true}})
 end

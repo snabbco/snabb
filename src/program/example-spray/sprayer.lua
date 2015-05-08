@@ -1,9 +1,5 @@
 module(..., package.seeall)
 
-local pcap = require("apps.pcap.pcap")
-local link = require("core.link")
-local packet = require("core.packet")
-
 Sprayer = {}
 
 function Sprayer:new(arg)

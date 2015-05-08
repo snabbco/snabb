@@ -1,7 +1,5 @@
 module(..., package.seeall)
 
-local app = require("core.app")
-local config = require("core.config")
 local pcap = require("apps.pcap.pcap")
 local sprayer = require("program.example.spray.sprayer")
 local usage = require("program.example.spray.README_inc")
@@ -19,6 +17,6 @@ function run (parameters)
    config.link(c, "capture.output -> spray_app.input")
    config.link(c, "spray_app.output -> output_file.input")
 
-   app.configure(c)
-   app.main({duration=1, report = {showlinks=true}})
+   engine.configure(c)
+   engine.main({duration=1, report = {showlinks=true}})
 end
