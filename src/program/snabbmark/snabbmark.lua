@@ -109,14 +109,14 @@ function get_sf_devices()
    return sf_devices
 end
 
-Source = setmetatable({zone = "Source"}, {__index = basic_apps.Basic});
+Source = {}
 
 function Source:new(size)
    return setmetatable({}, {__index=Source})
 end
 
 function Source:pull()
-   for _, o in ipairs(self.outputi) do
+   for _, o in ipairs(self.output) do
       for i = 1, link.nwritable(o) do
          local p = packet.allocate()
          ffi.copy(p.data, self.to_mac_address, 6)

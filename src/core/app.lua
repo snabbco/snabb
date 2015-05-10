@@ -201,13 +201,12 @@ function apply_config_actions (actions, conf)
       link.receiving_app = app_name_to_index[ta]
       -- Add link to apps
       new_app_table[fa].output[fl] = link
+      table.insert(new_app_table[fa].output, link)
       new_app_table[ta].input[tl] = link
+      table.insert(new_app_table[ta].input, link)
       -- Remember link
       new_link_table[linkspec] = link
       table.insert(new_link_array, link)
-   end
-   for _, app in ipairs(new_app_array) do
-      if app.relink then app:relink() end
    end
    -- commit changes
    app_table, link_table = new_app_table, new_link_table
