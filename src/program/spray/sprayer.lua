@@ -19,14 +19,14 @@ end
 function push ()
    local input = inputs.input
    local output = outputs.output
-   while not input:is_empty() do
-      local packet = input:receive()
+   while not input:link_is_empty() do
+      local packet = input:link_receive()
       if toggle() then
          -- Forward the packet
-         output:transmit(packet)
+         output:link_transmit(packet)
       else
          -- Drop the packet
-         packet:free()
+         packet:packet_free()
       end
    end
 end

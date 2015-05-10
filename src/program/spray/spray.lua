@@ -11,19 +11,19 @@ end
 local inputfile, outputfile = unpack(arg)
 
 -- Setup
-local config = snabb.config()
-config:set_app('reader', 'pcap_reader', inputfile)
-config:set_app('sprayer', 'sprayer')
-config:set_app('writer',  'pcap_writer', outputfile)
-config:set_link('reader.output -> sprayer.input')
-config:set_link('sprayer.output -> writer.input')
+local conf = snabb.config()
+conf:config_set_app('reader', 'pcap_reader', inputfile)
+conf:config_set_app('sprayer', 'sprayer')
+conf:config_set_app('writer',  'pcap_writer', outputfile)
+conf:config_set_link('reader.output -> sprayer.input')
+conf:config_set_link('sprayer.output -> writer.input')
 
 -- Execute
 local engine = snabb.engine()
-engine:configure(config)
+engine:engine_configure(config)
 print(("Spraying packets from %s to %s"):format(inputfile, outputfile))
-engine:run({duration = 'toidle'})
+engine:engine_run({duration = 'toidle'})
 
 -- Report
-print(("Processed %d packets"):format(engine:packet()))
+print(("Processed %d packets"):format(engine:engine_processed_packets()))
 
