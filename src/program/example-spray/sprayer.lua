@@ -2,9 +2,9 @@ module(..., package.seeall)
 
 Sprayer = {}
 
-function Sprayer:new(arg)
-   self.packet_counter = 1
-   return setmetatable({}, {__index = Sprayer})
+function Sprayer:new ()
+   local o = { packet_counter = 1 }
+   return setmetatable(o, {__index = Sprayer})
 end
 
 function Sprayer:push()

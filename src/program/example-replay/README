@@ -1,3 +1,0 @@
-Usage: replay <PCAPFILE> <INTERFACE>
-
-Playback packets from PCAPFILE to INTERFACE (e.g. eth0).

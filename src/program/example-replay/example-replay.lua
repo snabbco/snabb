@@ -2,10 +2,12 @@ module(..., package.seeall)
 
 local pcap = require("apps.pcap.pcap")
 local raw = require("apps.socket.raw")
-local usage = require("program.example.replay.README_inc")
 
 function run (parameters)
-   if not (#parameters == 2) then print(usage) main.exit(1) end
+   if not (#parameters == 2) then
+      print("Usage: example-replay <pcap-file> <interface>")
+      main.exit(1)
+   end
    local pcap_file = parameters[1]
    local interface = parameters[2]
 

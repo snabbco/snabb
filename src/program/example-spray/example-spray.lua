@@ -1,11 +1,13 @@
 module(..., package.seeall)
 
 local pcap = require("apps.pcap.pcap")
-local sprayer = require("program.example.spray.sprayer")
-local usage = require("program.example.spray.README_inc")
+local sprayer = require("program.example-spray.sprayer")
 
 function run (parameters)
-   if not (#parameters == 2) then print(usage) main.exit(1) end
+   if not (#parameters == 2) then
+      print("Usage: example-spray <input> <output>")
+      main.exit(1)
+   end
    local input = parameters[1]
    local output = parameters[2]
 
