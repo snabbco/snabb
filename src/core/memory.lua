@@ -8,6 +8,7 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
+local syscall = require("syscall")
 
 local lib = require("core.lib")
 require("core.memory_h")
@@ -61,16 +62,21 @@ function allocate_hugetlb_chunk ()
 end
 
 function reserve_new_page ()
+   -- Check that we have permission
    lib.root_check("error: must run as root to allocate memory for DMA")
-   set_hugepages(get_hugepages() + 1)
-end
-
-function get_hugepages ()
-   return lib.readfile("/proc/sys/vm/nr_hugepages", "*n")
-end
-
-function set_hugepages (n)
-   lib.writefile("/proc/sys/vm/nr_hugepages", tostring(n))
+   -- Is the kernel shm limit too low for huge pages?
+   if huge_page_size > tonumber(syscall.sysctl("kernel.shmmax")) then
+      -- Yes: fix that
+      local old = syscall.sysctl("kernel.shmmax", tostring(huge_page_size))
+      io.write("[memory: Enabling huge pages for shm: ",
+               "sysctl kernel.shmmax ", old, " -> ", huge_page_size, "]\n")
+   else
+      -- No: try provisioning an additional page
+      local have = tonumber(syscall.sysctl("vm.nr_hugepages"))
+      local want = have + 1
+      syscall.sysctl("vm.nr_hugepages", tostring(want))
+      io.write("[memory: Provisioned a huge page: sysctl vm.nr_hugepages ", have, " -> ", want, "]\n")
+   end
 end
 
 function get_huge_page_size ()
