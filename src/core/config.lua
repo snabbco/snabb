@@ -3,6 +3,7 @@
 module(..., package.seeall)
 
 local lib = require("core.lib")
+local load_app = require('core.app_loader')
 
 -- API: Create a new configuration.
 -- Initially there are no apps or links.
@@ -23,9 +24,12 @@ end
 --
 -- Example: config.app(c, "nic", Intel82599, {pciaddr = "0000:00:01.00"})
 function app (config, name, class, arg)
-   arg = arg or "nil"
+--    arg = arg or "nil"
    assert(type(name) == "string", "name must be a string")
-   assert(type(class) == "table", "class must be a table")
+   if type(class) == 'string' then
+      class = assert(load_app(class))
+   end
+   assert(type(class) == "table", ("class %q must be a table, got [%s]"):format(name, tostring(class)))
    config.apps[name] = { class = class, arg = arg}
 end
 
