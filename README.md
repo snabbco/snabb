@@ -26,14 +26,15 @@ on.
 
 Snabb Switch is written using these main techniques:
 
-- Lua, a high-level programming langauge that is easy to learn.
+- Lua, a high-level programming language that is easy to learn.
 - LuaJIT, a just-in-time compiler that is competitive with C.
 - Ethernet I/O with no kernel overhead ("kernel bypass" mode).
 
 Snabb Switch compiles into a stand-alone executable called
-`snabb`. This single binary includes many applications ([like
-busybox](http://en.wikipedia.org/wiki/BusyBox#Single_binary)) and runs
-on any modern Linux distribution.
+`snabb`. This single binary includes multiple applications and runs on
+any modern Linux distribution. (You could think of it as a
+[busybox](http://en.wikipedia.org/wiki/BusyBox#Single_binary) for
+networking.)
 
 ## How is it being used?
 
@@ -100,4 +101,10 @@ $ sudo snabb packetblaster capture.pcap 0000:01:00.0
 
 ## How do I get involved?
 
-*To be written*
+Here are the ways you can get involved:
+
+- Use the Snabb Switch applications in your network.
+- Join the [snabb-devel mailing list](https://groups.google.com/forum/#!forum/snabb-devel).
+- Send a mail to [introduce yourself](https://groups.google.com/forum/#!searchin/snabb-devel/introduce/snabb-devel/d8t6hGClnQY/flztyLiIGzoJ) to the community (don't be shy!).
+- Create your very own application: [Getting Started](https://github.com/eugeneia/snabbswitch/blob/fix-getting-started/src/doc/getting-started.md).
+
