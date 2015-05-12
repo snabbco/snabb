@@ -108,7 +108,7 @@ end
 
 function selftest (options)
    print("selftest: memory")
-   print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
+   print("Kernel vm.nr_hugepages: " .. syscall.sysctl("vm.nr_hugepages"))
    for i = 1, 4 do
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
       io.flush()
@@ -119,7 +119,7 @@ function selftest (options)
       ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- try a write
       assert(dmaptr ~= nil and dmalen == huge_page_size)
    end
-   print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
+   print("Kernel vm.nr_hugepages: " .. syscall.sysctl("vm.nr_hugepages"))
    print("HugeTLB page allocation OK.")
 end
 
