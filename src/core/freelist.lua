@@ -3,10 +3,13 @@ module(...,package.seeall)
 local ffi = require("ffi")
 
 function new (type, size)
-   return { nfree = 0,
-            max = size,
-            -- XXX Better LuaJIT idiom for specifying the array type?
-            list = ffi.new(type.."[?]", size) }
+   local typ = ffi.typeof([[
+      struct {
+         int nfree, max;
+         $ list[?];
+      }
+   ]], ffi.typeof(type))
+   return typ(size, {nfree=0, max=size})
 end
 
 function add (freelist, element)
