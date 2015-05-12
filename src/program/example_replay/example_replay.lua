@@ -5,7 +5,7 @@ local raw = require("apps.socket.raw")
 
 function run (parameters)
    if not (#parameters == 2) then
-      print("Usage: example-replay <pcap-file> <interface>")
+      print("Usage: example_replay <pcap-file> <interface>")
       main.exit(1)
    end
    local pcap_file = parameters[1]

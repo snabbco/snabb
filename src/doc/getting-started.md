@@ -52,8 +52,8 @@ the input of `RawSocket`.
 Our example will implement a packet replay program that reads a PCAP file
 and then plays back the packets to an arbitrary ethernet interface.
 
-You can find the `example-replay.lua` program in the
-`src/program/example-replay` directory. Let us go over it and explain it
+You can find the `example_replay.lua` program in the
+`src/program/example_replay` directory. Let us go over it and explain it
 step by step:
 
 ```
@@ -71,7 +71,7 @@ use `require` to load other modules we want to use: `apps.pcap.pcap` and
 ```
 function run (parameters)
    if not (#parameters == 2) then
-      print("Usage: example-replay <pcap-file> <interface>")
+      print("Usage: example_replay <pcap-file> <interface>")
       main.exit(1)
    end
    local pcap_file = parameters[1]
@@ -82,7 +82,7 @@ Snabb Switch treats modules under `src/program` specially: if a module
 exposes a top-level `run` function it can be invoked from the `snabb`
 executable. E.g. to execute `run` you would invoke `snabb` like so:
 
-`src/snabb example-replay <args...>`
+`src/snabb example_replay <args...>`
 
 Since this is a command line program we need to verify and parse the
 arguments we want to accept. The first argument to `run` will be an array
@@ -128,7 +128,7 @@ Finally we will load our configuration `c` into the engine by calling
 that will be more than enough time for the PCAP file to be processed.
 
 
-## Running The `example-replay` Program
+## Running The `example_replay` Program
 
 We'll use a virtual interface as testing yields strange results when the
 sample program runs on "real" network interfaces in some IaaS
@@ -144,7 +144,7 @@ sudo ip link set dev veth0 up
 sudo ip link set dev veth1 up
 ```
 
-An `input.pcap` file is included in the `src/program/example-replay`
+An `input.pcap` file is included in the `src/program/example_replay`
 directory but you can just as well use any other PCAP file.
 
 Open a second terminal window and run `tcpdump` on `veth0`:
@@ -157,7 +157,7 @@ From Snabb Switch directory, run the following invocation of our example
 program:
 
 ```
-sudo src/snabb example-replay src/program/example-replay/input.pcap veth0
+sudo src/snabb example_replay src/program/example_replay/input.pcap veth0
 ```
 
 You should see the following output:
@@ -202,7 +202,7 @@ purpose is to show the anatomy of a Snabb Switch *app*.
 Snabb Switch apps are required to implement one method: new. The `new`
 method returns an instance of your app. An optional method we'll use is
 `push`, which moves packets from the input to output ports. Let's examine
-the example app defined in `src/program/example-spray/sprayer.lua`.
+the example app defined in `src/program/example_spray/sprayer.lua`.
 
 ```lua
 module(..., package.seeall)
@@ -271,22 +271,22 @@ using `link.receive`. We then decide wether `p` should be transmitted to
 `self.packet_counter` is even or odd. Note that packets which are not
 transmitted to another link must be freed using `packet.free`.
 
-We'll use the `example-spray` program defined in
-`src/program/example-spray/example-spray.lua` to run our example app. We
+We'll use the `example_spray` program defined in
+`src/program/example_spray/example_spray.lua` to run our example app. We
 will not go over it in detail because it is very similar to the
-`example-replay` program explained before. Note though how we require the
-newly defined `program.example-spray.sprayer` module and use it when
+`example_replay` program explained before. Note though how we require the
+newly defined `program.example_spray.sprayer` module and use it when
 creating the app network.
 
 ```lua
 module(..., package.seeall)
 
 local pcap = require("apps.pcap.pcap")
-local sprayer = require("program.example-spray.sprayer")
+local sprayer = require("program.example_spray.sprayer")
 
 function run (parameters)
    if not (#parameters == 2) then
-      print("Usage: example-spray <input> <output>")
+      print("Usage: example_spray <input> <output>")
       main.exit(1)
    end
    local input = parameters[1]
@@ -306,10 +306,10 @@ end
 ```
 
 Here is the expected output if you use the provided `input.pcap` file to
-run the `example-spray` program:
+run the `example_spray` program:
 
 ```
-src/snabb example-spray src/program/example-replay/input.pcap /tmp/out.cap
+src/snabb example_spray src/program/example_replay/input.pcap /tmp/out.cap
 
 link report:
                    5 sent on capture.output -> spray_app.input (loss rate: 0%)
