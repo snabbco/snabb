@@ -1,6 +1,6 @@
 
 local statebox = require ('lib.lua.statebox')
-
+local freelist = require ('core.freelist')
 
 -- to wrap pcall()-like functions
 -- with return form (bool, ...)
@@ -55,6 +55,7 @@ function new_app(class, args)
    local appbox = assert(statebox[[
       -- minimal libraries
       ffi = require ('ffi')
+      freelist = require ('core.freelist')
       engine = require ('core.app')
       packet = require ('core.packet')
       link = require ('core.link')
@@ -103,8 +104,18 @@ function new_app(class, args)
       end
    ]])
 
-   -- loads initial chunk and app
+   -- load initial chunk
    assert(appbox:pcall())
+   -- insert shared freelists
+   require('core.packet').init()
+   freelist.share_lists(function(t)
+      assert(appbox:load "freelist.receive_shared(...)":pcall(nil, t))
+   end)
+
+   -- jumpstart packet module
+   assert(appbox:load "packet.init()": pcall())
+
+   -- load app module
    local prevglobals = get_global_functions(appbox)
    assert(appbox:pcall('loadapp', class.appname, args, '4vl'))
 

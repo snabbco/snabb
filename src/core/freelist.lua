@@ -2,14 +2,42 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 
-function new (type, size)
+local named_lists = {}
+
+function share_lists(f)
+   f(named_lists)
+end
+
+function receive_shared(t)
+   for k,v in pairs(t) do
+      local typ = ffi.typeof([[
+         struct {
+            int nfree, max;
+            $ list[?];
+         }*
+      ]], ffi.typeof(v[1]))
+      local list = ffi.cast(typ, v[2])
+      named_lists[k] = {v[1], list}
+   end
+end
+
+
+function new (type, size, name)
+   if name and named_lists[name] then
+      return named_lists[name][2]
+   end
+
    local typ = ffi.typeof([[
       struct {
          int nfree, max;
          $ list[?];
       }
    ]], ffi.typeof(type))
-   return typ(size, {nfree=0, max=size})
+   local list = typ(size, {nfree=0, max=size})
+   if name then
+      named_lists[name] = {type, list}
+   end
+   return list
 end
 
 function add (freelist, element)

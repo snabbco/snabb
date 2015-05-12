@@ -7,6 +7,6 @@ function selftest()
    config.link(c, 'source.output -> sink.input')
    engine.configure(c)
 
-   engine.main{duration=0.1, report={showlinks=true}}
+   engine.main{duration=1, report={showlinks=true}}
    engine.closeapps()
 end
