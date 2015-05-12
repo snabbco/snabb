@@ -33,43 +33,63 @@ function main ()
    zone("startup")
    require "lib.lua.strict"
    initialize()
-   local program, args = parse_command_line()
-   parameters = args
-   if not program then
-      print("Usage: snabb <PROGRAM> [ARGS]...")
-      os.exit(1)
+   local program
+   local args = parse_command_line()
+   if programname(args[1]) == 'snabb' then
+      -- Print usage when no arguments or -h/--help
+      if #args == 1 or args[2] == '-h' or args[2] == '--help' then
+         usage()
+         os.exit(1)
+      else
+         -- Strip 'snabb' and use next argument as program name
+         table.remove(args, 1)
+      end
    end
+   local program = table.remove(args, 1)
    if not lib.have_module(modulename(program)) then
-      print(programname(program) .. ": unrecognized program name")
+      print("unsupported program: "..programname(program))
+      print()
+      print("Rename this executable (cp, mv, ln) to choose a supported program:")
+      print("  snabb "..(require("program.programs_inc"):gsub("\n", " ")))
       os.exit(1)
+   else
+      require(modulename(program)).run(args)
    end
-   require(modulename(program)).run(parameters)
 end
 
--- programname("nfv-sync-master.2.0") => "nfv-sync-master"
+function usage ()
+   print("Usage: "..ffi.string(C.argv[0]).." <program> ...")
+   local programs = require("program.programs_inc"):gsub("[a-z]+", "  %1")
+   print()
+   print("This snabb executable has the following programs built in:")
+   print(programs)
+   print("For detailed usage of any program run:")
+   print("  snabb <program> --help")
+   print()
+   print("If you rename (or copy or symlink) this executable with one of")
+   print("the names above then that program will be chosen automatically.")
+end
+
+
+-- programname("snabbnfv-1.0") => "snabbnfv"
 function programname (program) 
-   return string.match(program, "([^/]+)$")
+   program = program:gsub("^.*/", "") -- /bin/snabb-1.0 => snabb-1.0
+   program = program:gsub("[-.].*$", "") -- snabb-1.0   => snabb
+   return program
 end
 -- modulename("nfv-sync-master.2.0") => "program.nfv.nfv_sync_master")
 function modulename (program) 
-   program = programname(string.gsub(program, "-", "_"))
+   program = programname(program)
    return ("program.%s.%s"):format(program, program)
 end
 
--- Return two values: program and parameters.
---
--- Program is the name of the program to run. For example 'snsh' or
--- 'packetblaster'.
+-- Return all command-line paramters (argv) in an array.
 function parse_command_line ()
-   local commandline = {}
+   local array = {}
    for i = 0, C.argc - 1 do 
-      table.insert(commandline, ffi.string(C.argv[i]))
+      table.insert(array, ffi.string(C.argv[i]))
    end
-   local program = table.remove(commandline, 1)
-   if programname(program) == 'snabb' then
-      program = table.remove(commandline, 1)      
-   end
-   return program, commandline
+   return array
 end
 
 function exit (status)
