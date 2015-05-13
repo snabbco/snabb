@@ -2,6 +2,7 @@
 
 module(...,package.seeall)
 
+local ffi = require("ffi")
 local lib = require("core.lib")
 
 --- ### Register object
@@ -22,9 +23,8 @@ end
 function Register:readrc ()
    -- XXX JIT of this function is causing register value to be misread.
    jit.off(true,true)
-   local value = self.ptr[0]
-   self.acc = (self.acc or 0) + value
-   return self.acc
+   self.acc[0] = self.acc[0] + self.ptr[0]
+   return self.acc[0]
 end
 
 --- Write a register
@@ -46,7 +46,7 @@ function Register:wait (bitmask, value)
 end
 
 --- For type `RC`: Reset the accumulator to 0.
-function Register:reset () self.acc = 0 end
+function Register:reset () self.acc[0] = 0ULL end
 
 --- For other registers provide a noop
 function Register:noop () end
@@ -87,6 +87,9 @@ local mt = {
   RC = {__index = { read=Register.readrc, reset=Register.reset,
                     print=Register.printrc},
         __call = Register.readrc, __tostring = Register.__tostring},
+  RC64 = {__index = { read=Register.readrc, reset=Register.reset,
+		      print=Register.printrc},
+	  __call = Register.readrc, __tostring = Register.__tostring},
 }
 
 --- Create a register `offset` bytes from `base_ptr`.
@@ -98,6 +101,12 @@ function new (name, longname, offset, base_ptr, mode)
                ptr=base_ptr + offset/4 }
    local mt = mt[mode]
    assert(mt)
+   if mode == 'RC' or mode == 'RC64' then
+      o.acc = ffi.new("uint64_t[1]")
+      if mode == 'RC64' then
+	 o.ptr = ffi.cast("uint64_t*", o.ptr)
+      end
+   end
    return setmetatable(o, mt)
 end
 
