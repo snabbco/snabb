@@ -10,21 +10,9 @@ local transmit, receive = link.transmit, link.receive
 local ffi = require("ffi")
 local C = ffi.C
 
-Basic = {}
-
-function Basic:relink ()
-   self.inputi, self.outputi = {}, {}
-   for _,l in pairs(self.output) do
-      table.insert(self.outputi, l)
-   end
-   for _,l in pairs(self.input) do
-      table.insert(self.inputi, l)
-   end
-end
-
 --- # `Source` app: generate synthetic packets
 
-Source = setmetatable({zone = "Source"}, {__index = Basic})
+Source = {}
 
 function Source:new(size)
    size = tonumber(size) or 60
@@ -34,7 +22,7 @@ function Source:new(size)
 end
 
 function Source:pull ()
-   for _, o in ipairs(self.outputi) do
+   for _, o in ipairs(self.output) do
       for i = 1, link.nwritable(o) do
          transmit(o, packet.clone(self.packet))
       end
@@ -47,14 +35,14 @@ end
 
 --- # `Join` app: Merge multiple inputs onto one output
 
-Join = setmetatable({zone = "Join"}, {__index = Basic})
+Join = {}
 
 function Join:new()
    return setmetatable({}, {__index=Join})
 end
 
 function Join:push () 
-   for _, inport in ipairs(self.inputi) do
+   for _, inport in ipairs(self.input) do
       for n = 1,math.min(link.nreadable(inport), link.nwritable(self.output.out)) do
          transmit(self.output.out, receive(inport))
       end
@@ -65,15 +53,15 @@ end
 
 -- For each input port, push packets onto outputs. When one output
 -- becomes full then continue with the next.
-Split = setmetatable({zone = "Split"}, {__index = Basic})
+Split = {}
 
 function Split:new ()
    return setmetatable({}, {__index=Split})
 end
 
 function Split:push ()
-   for _, i in ipairs(self.inputi) do
-      for _, o in ipairs(self.outputi) do
+   for _, i in ipairs(self.input) do
+      for _, o in ipairs(self.output) do
          for _ = 1, math.min(link.nreadable(i), link.nwritable(o)) do
             transmit(o, receive(i))
          end
@@ -83,14 +71,14 @@ end
 
 --- ### `Sink` app: Receive and discard packets
 
-Sink = setmetatable({zone = "Sink"}, {__index = Basic})
+Sink = {}
 
 function Sink:new ()
    return setmetatable({}, {__index=Sink})
 end
 
 function Sink:push ()
-   for _, i in ipairs(self.inputi) do
+   for _, i in ipairs(self.input) do
       for _ = 1, link.nreadable(i) do
         local p = receive(i)
         packet.free(p)
@@ -100,26 +88,26 @@ end
 
 --- ### `Tee` app: Send inputs to all outputs
 
-Tee = setmetatable({zone = "Tee"}, {__index = Basic})
+Tee = {}
 
 function Tee:new ()
    return setmetatable({}, {__index=Tee})
 end
 
 function Tee:push ()
-   noutputs = #self.outputi
+   noutputs = #self.output
    if noutputs > 0 then
       local maxoutput = link.max
-      for _, o in ipairs(self.outputi) do
+      for _, o in ipairs(self.output) do
          maxoutput = math.min(maxoutput, link.nwritable(o))
       end
-      for _, i in ipairs(self.inputi) do
+      for _, i in ipairs(self.input) do
          for _ = 1, math.min(link.nreadable(i), maxoutput) do
             local p = receive(i)
             maxoutput = maxoutput - 1
-	    do local outputi = self.outputi
-	       for k = 1, #outputi do
-		  transmit(outputi[k], k == #outputi and p or packet.clone(p))
+	    do local output = self.output
+	       for k = 1, #output do
+		  transmit(output[k], k == #output and p or packet.clone(p))
 	       end
 	    end
          end
@@ -129,7 +117,7 @@ end
 
 --- ### `Repeater` app: Send all received packets in a loop
 
-Repeater = setmetatable({zone = "Repeater"}, {__index = Basic})
+Repeater = {}
 
 function Repeater:new ()
    return setmetatable({index = 1, packets = {}},
