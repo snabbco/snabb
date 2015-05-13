@@ -1,16 +1,10 @@
 module(..., package.seeall)
 
-local app = require("core.app")
-local config = require("core.config")
-local pcap = require("apps.pcap.pcap")
-local link = require("core.link")
-local packet = require("core.packet")
-
 Sprayer = {}
 
-function Sprayer:new(arg)
-   self.packet_counter = 1
-   return setmetatable({}, {__index = Sprayer})
+function Sprayer:new ()
+   local o = { packet_counter = 1 }
+   return setmetatable(o, {__index = Sprayer})
 end
 
 function Sprayer:push()
@@ -30,6 +24,6 @@ function Sprayer:process_packet(i, o)
    if self.packet_counter % 2 == 0 then
       link.transmit(o, p)
    else
-      packet.deref(p)
+      packet.free(p)
    end
 end
