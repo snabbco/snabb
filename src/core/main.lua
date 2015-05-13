@@ -59,7 +59,7 @@ end
 
 function usage ()
    print("Usage: "..ffi.string(C.argv[0]).." <program> ...")
-   local programs = require("program.programs_inc"):gsub("[a-z]+", "  %1")
+   local programs = require("program.programs_inc"):gsub("%S+", "  %1")
    print()
    print("This snabb executable has the following programs built in:")
    print(programs)
