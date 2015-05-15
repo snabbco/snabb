@@ -12,20 +12,20 @@ PFLUA_VSN     := "13b194e7a214faae5c3d2916a998418fc841dbc2"
 
 TEST_SKIPPED="43"
 
-SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
+SRCDIR = $(shell find . -type d -not -regex './obj.*' -print | xargs)
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 
-LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
+LUASRC = $(shell find . -regex '[^\#]*\.lua' -print | xargs)
 PFLUASRC = $(shell cd ../deps/pflua/src && \
-	         find . -regex '[^\#]*\.lua' -printf '%P ')
-CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P ')
-CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
-ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
-ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
-RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
+	         find . -regex '[^\#]*\.lua' -print | xargs)
+CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -print | xargs | sed 's,\./,,g')
+CHDR   = $(shell find . -regex '[^\#]*\.h' -print | xargs)
+ASM    = $(shell find . -regex '[^\#]*\.dasc' -print | xargs)
+ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -print | xargs | sed 's,\./,,g')
+RMSRC  = $(shell find . -name  README.md.src -print | xargs)
 # regexp is to include program/foo but not program/foo/bar
-PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
-INCSRC = $(shell find . -regex '[^\#]*\.inc' -printf '%P ')
+PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -print | xargs)
+INCSRC = $(shell find . -regex '[^\#]*\.inc' -print | xargs)
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
@@ -42,14 +42,14 @@ EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 # TESTMODS expands to:
 #   core.memory core.lib ...
 # for each module that has a top-level selftest () function.
-TESTMODS = $(shell find . -regex '[^\#]*\.lua' -printf '%P ' | \
+TESTMODS = $(shell find . -regex '[^\#]*\.lua' -print | xargs | \
              xargs grep -l '^function selftest *[[:punct:]]' | \
              sed -e 's_\.lua__' -e 's_/_._g')
 
 # TESTSCRIPTS expands to:
 #   lib/watchdog/selftest.sh ...
 # for each executable selftext.sh script in src.
-TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
+TESTSCRIPTS = $(shell find . -name "selftest.sh" -perm +1 | xargs)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
