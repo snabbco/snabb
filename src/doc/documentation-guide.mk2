@@ -1,8 +1,5 @@
 # Contributing Documentation in SnabbSwitch
 
-*XXX - TODO: Document different documentation targets: Casual users,
- power users, contributors.*
-
 ## README.md, README.md.src and README(.inc)
 
 The SnabbSwitch documentation is organized in README's spread across the
@@ -11,7 +8,8 @@ file related to the modules you changed and update these. There are three
 different kinds of README files:
 
 * `README.md` — A portion of the SnabbSwitch manual, embedded by GitHub
-  too. These are often artifacts built from a `.src` file.
+  too. These are often (but not always) artifacts built from a `.src`
+  file. Edit these if no `.src` is available (see below).
 * `README.md.src` — A build recipe. If available, this is the one you
   must edit. These are formatted in [GitHub Flavored
   Markdown](https://help.github.com/articles/github-flavored-markdown/).
@@ -19,11 +17,26 @@ different kinds of README files:
   SnabbSwitch programs. These should be using only the ASCII character
   set to ensure compatibility with older terminals.
 
-E.g. if you had changed the API of `lib.protocol.ethernet` you'd need to
-update the documentation in `lib/protocol/README.md.src`. It is important
-that you use the correct header level (e.g. `##`, `###`, ...). Which
-level you are at can be seen in `doc/genbook.sh` (see *Building A
-Standalone Documentation*).
+For instance if you had changed the API of `lib.protocol.ethernet` you'd
+need to update the documentation in `lib/protocol/README.md.src`. It is
+important that you use the correct header level (e.g. `##`, `###`,
+...). Which level you are at can be seen in `doc/genbook.sh` (see
+*Building A Standalone Documentation*).
+
+Be sure to know who your target audience is. We recognize three different
+groups:
+
+* **Casual users:** Some programs are targeting *anyone* using Snabb
+  Switch, make sure that their `--help` message (`README.inc`) does not
+  require prior knowledge.
+* **Power users:** Public APIs like `core.packet` or
+  `lib.protocol.ethernet` are there for app designers to use. These
+  should be well documented but may require knowledge of Lua and other
+  parts of the Snabb Switch system.
+* **Contributors:** Some documents (like the one you are reading now) are
+  facing towards Snabb Switch contributors. They can be frequently
+  updating and even contain open questions. We should ensure that these
+  always reflect the current state of affairs.
 
 ### Building README.md Files
 
