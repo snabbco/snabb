@@ -42,7 +42,7 @@ void* asm_make_push()
                 PROT_READ | PROT_WRITE,
                 MAP_ANON | MAP_PRIVATE, -1, 0);
   assert(memory != MAP_FAILED);
-  printf("memory = %p code_size = %ld \n", memory, code_size);
+  printf("memory = %p code_size = %ld \n", memory, (long int)code_size);
   dasm_encode(&state, memory);
   // Switch memory to executable and read-only
   assert(mprotect(memory, code_size, PROT_EXEC | PROT_READ) == 0);

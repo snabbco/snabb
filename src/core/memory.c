@@ -48,7 +48,7 @@ intptr_t virtual_to_physical(intptr_t *ptr)
     return 0;
   }
   if ((data & (1ULL<<63)) == 0) {
-    fprintf(stderr, "page %lx not present: %lx", virt_page, data);
+    fprintf(stderr, "page %p not present: %p", (void*) virt_page,(void*) data);
     return 0;
   }
   return (data & ((1ULL << 55) - 1)) * 4096;
