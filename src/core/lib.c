@@ -2,7 +2,7 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/unistd.h>
+#include <unistd.h>
 
 /* Return the current wall-clock time in nanoseconds. */
 uint64_t get_time_ns()
