@@ -171,17 +171,19 @@ end
 
 function ruletofilter (r, direction)
    local matches = {}           -- match rules to be combined
-   if     r.ethertype == "ipv4" then matches[#matches+1] = "ip"
-   elseif r.ethertype == "ipv6" then matches[#matches+1] = "ip6"
+   local icmp
+   if     r.ethertype == "ipv4" then matches[#matches+1] = "ip"  icmp = 'icmp'
+   elseif r.ethertype == "ipv6" then matches[#matches+1] = "ip6" icmp = 'icmp6'
    else   error("unknown ethertype: " .. r.ethertype) end
    
    if     r.protocol == "tcp" then matches[#matches+1] = "tcp"
-   elseif r.protocol == "udp" then matches[#matches+1] = "udp" end
-   
+   elseif r.protocol == "udp" then matches[#matches+1] = "udp"
+   elseif r.protocol == "icmp" then matches[#matches+1] = icmp end
+
    if r.port_range_min or r.port_range_max then
       local min = r.port_range_min or r.port_range_max
       local max = r.port_range_max or r.port_range_min
-      matches[#matches+1] = ("portrange %d-%d"):format(min, max)
+      matches[#matches+1] = ("dst portrange %d-%d"):format(min, max)
    end
    
    if r.remote_ip_prefix then
