@@ -50,13 +50,15 @@ function run()
             -P ${DB_PORT} -T ${DB_DUMP_PATH} ${DB_NEUTRON} ${DB_NEUTRON_TABLES}
         rm -f *.sql
         git add *.txt >/dev/null
-        if [ $initial = true ]; then
-            git commit -m "Configuration update" >/dev/null
-            initial=false
-        else
-            git commit --amend -m "Configuration update" >/dev/null
-            git reflog expire --expire-unreachable=0 --all
-            git prune --expire 0
+        if git diff --quiet --cached; then
+            if [ $initial = true ]; then
+                git commit -m "Configuration update" >/dev/null
+                initial=false
+            else
+                git commit --amend -m "Configuration update" >/dev/null
+                git reflog expire --expire-unreachable=0 --all
+                git prune --expire 0
+            fi
         fi
         sleep "$SYNC_INTERVAL"
         #check that the daemon is still running
