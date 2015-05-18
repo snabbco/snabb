@@ -13,6 +13,7 @@ function error() {
 [ ! -z "$NEUTRON2SNABB" ]    || export NEUTRON2SNABB="snabb snabbnfv neutron2snabb"
 [ ! -z "$SYNC_PATH" ]        || error "check_env_vars: \$SYNC_PATH not set"
 [ ! -z "$SYNC_HOST" ]        || error "check_env_vars: \$SYNC_HOST not set"
+[ ! -z "$SYNC_PORT" ]        || export SYNC_PORT=9418
 [ ! -z "$SYNC_INTERVAL" ]    || export SYNC_INTERVAL=1
 
 # Remove old repository if it exists
@@ -38,7 +39,7 @@ function log { echo "[$(date +"%F %T %Z")]" "$1"; }
 while true; do
     if [ ! -d $NEUTRON_DIR ]; then
         log "Initializing $NEUTRON_DIR"
-        git clone git://$SYNC_HOST/$SYNC_PATH $NEUTRON_DIR >/dev/null
+        git clone git://$SYNC_HOST:$SYNC_PORT/$SYNC_PATH $NEUTRON_DIR >/dev/null
     fi
     if [ -d $NEUTRON_DIR ]; then
         cd $NEUTRON_DIR
