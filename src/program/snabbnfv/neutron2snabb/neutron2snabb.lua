@@ -3,6 +3,7 @@ module(..., package.seeall)
 local lib  = require("core.lib")
 local json = require("lib.json")
 local usage = require("program.snabbnfv.neutron2snabb.README_inc")
+local neutron2snabb_schema = require("program.snabbnfv.neutron2snabb.neutron2snabb_schema")
 
 local NULL = "\\N"
 
@@ -13,6 +14,31 @@ function run (args)
    create_config(unpack(args))
 end
 
+-- The Neutron database tables that we need schema information to process.
+schema_tables = {
+   'ml2_network_segments', 'networks', 'ports', 'ml2_port_bindings',
+   'securitygrouprules', 'securitygroupportbindings'
+}
+
+-- The default schema below is assumed if the database snapshot does
+-- not include parsable table definitions.
+default_schemas = {
+   ml2_network_segments = {'id', 'network_id', 'network_type',
+                           'physical_network', 'segmentation_id'},
+   networks             = {'tenant_id', 'id', 'name', 'status',
+                           'admin_state_up', 'shared'},
+   ports                = {'tenant_id', 'id', 'name', 'network_id',
+                           'mac_address', 'admin_state_up', 'status',
+                           'device_id', 'device_owner'},
+   ml2_port_bindings    = {'port_id', 'host', 'vif_type', 'driver', 'segment',
+                           'vnic_type', 'vif_details', 'profile'},
+   securitygrouprules   = {'tenant_id', 'id', 'security_group_id',
+                           'remote_group_id', 'direction', 'ethertype',
+                           'protocol', 'port_range_min', 'port_range_max',
+                           'remote_ip_prefix'},
+   securitygroupportbindings = {'port_id', 'security_group_id'}
+}
+
 -- Create a Snabb Switch traffic process configuration.
 --
 -- INPUT_DIR contains the Neutron database dump.
@@ -22,24 +48,30 @@ end
 --
 -- HOSTNAME is optional and defaults to the local hostname.
 function create_config (input_dir, output_dir, hostname)
+   local ok, schema = pcall(neutron2snabb_schema.read, input_dir, schema_tables)
+   if not ok then
+      print("Warning - falling back to default schema because none found:")
+      print("  "..schema)
+      schema = default_schemas
+   end
    local hostname = hostname or gethostname()
    local segments = parse_csv(input_dir.."/ml2_network_segments.txt",
-                              {'id', 'network_id', 'network_type', 'physical_network', 'segmentation_id'},
-                              'network_id')
+                              schema.ml2_network_segments,
+                              'id')
    local networks = parse_csv(input_dir.."/networks.txt",
-                              {'tenant_id', 'id', 'name', 'status', 'admin_state_up', 'shared'},
+                              schema.networks,
                               'id')
    local ports = parse_csv(input_dir.."/ports.txt",
-                           {'tenant_id', 'id', 'name', 'network_id', 'mac_address', 'admin_state_up', 'status', 'device_id', 'device_owner'},
+                           schema.ports,
                            'id')
    local port_bindings = parse_csv(input_dir.."/ml2_port_bindings.txt",
-                                   {'id', 'host', 'vif_type', 'driver', 'segment', 'vnic_type', 'vif_details', 'profile'},
-                                   'id')
+                                   schema.ml2_port_bindings,
+                                   'port_id')
    local secrules = parse_csv(input_dir.."/securitygrouprules.txt",
-                              {'tenant_id', 'id', 'security_group_id', 'remote_group_id', 'direction', 'ethertype', 'protocol', 'port_range_min', 'port_range_max', 'remote_ip_prefix'},
+                              schema.securitygrouprules,
                               'security_group_id', true)
    local secbindings = parse_csv(input_dir.."/securitygroupportbindings.txt",
-                                 {'port_id', 'security_group_id'},
+                                 schema.securitygroupportbindings,
                                  'port_id')
    -- Compile zone configurations.
    local zones = {}
@@ -230,4 +262,16 @@ function selftest ()
    print("selftest ok")
 end
 
+function selftest_schema ()
+   local dir = "program/snabbnfv/test_fixtures/neutron_csv/db2"
+   local schema = neutron2snabb_schema.read(dir, schema_tables)
+   for tab, cols in pairs(default) do
+      for i, col in ipairs(cols) do
+         if schema[tab][i] ~= col then
+            error(("Column mismatch: %s[%d] is %s (expected %s)"):format(
+                  tab, i, schema[tab][i], col))
+         end
+      end
+   end
+end
 
