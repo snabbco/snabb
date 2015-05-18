@@ -50,7 +50,7 @@ while true; do
             git pull --rebase origin master >/dev/null 2>&1
             git reflog expire --expire-unreachable=0 --all
             git prune --expire 0
-            $NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR >/dev/null
+            $NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR
             # Only (atomically) replace configurations that have changed.
             for conf in $(ls $TMP_DIR); do
                 dest=$SNABB_DIR/$(basename $conf)
