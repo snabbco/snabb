@@ -56,7 +56,7 @@ while true; do
             for conf in $(ls $TMP_DIR); do
                 dest=$SNABB_DIR/$(basename $conf)
                 echo "$dest"
-                if ! diff $conf $dest; then mv -f $conf $dest;
+                if ! diff $TMP_DIR/$conf $dest; then mv -f $TMP_DIR/$conf $dest;
                 else echo "Unchanged."; fi
             done
             initial=false
