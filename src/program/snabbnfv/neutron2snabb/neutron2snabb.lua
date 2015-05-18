@@ -222,11 +222,11 @@ function selftest ()
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp'}}", 
              '(arp or (ip and udp))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp', port_range_min=1000}}",
-             '(arp or (ip and udp and portrange 1000-1000))')
+             '(arp or (ip and udp and dst portrange 1000-1000))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp', port_range_max=2000}}",
-             '(arp or (ip and udp and portrange 2000-2000))')
+             '(arp or (ip and udp and dst portrange 2000-2000))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='tcp', port_range_min=1000, port_range_max=2000}}",
-             '(arp or (ip and tcp and portrange 1000-2000))')
+             '(arp or (ip and tcp and dst portrange 1000-2000))')
    checkrule("{{direction='ingress', ethertype='IPv6', protocol='tcp'}, {direction='ingress', ethertype='IPv4', protocol='udp', remote_ip_prefix='10.0.0.0/8'}}",
              '((ip6 and tcp) or (arp or (ip and udp and src net 10.0.0.0/8)))')
    print("selftest ok")
