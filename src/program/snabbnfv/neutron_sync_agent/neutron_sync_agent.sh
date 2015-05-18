@@ -45,7 +45,7 @@ while true; do
         cd $NEUTRON_DIR
         git fetch >/dev/null
         git diff --quiet origin/master >/dev/null 2>&1
-        if [ $? != 0 -o $initial = true ]; then
+        if [ $? = 1 -o $initial = true ]; then
             log "Generating new configuration"
             git pull --rebase origin master >/dev/null 2>&1
             git reflog expire --expire-unreachable=0 --all
