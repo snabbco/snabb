@@ -51,8 +51,7 @@ function run()
         mysqldump -n -y -q -u${DB_USER} -p${DB_PASSWORD} -h ${DB_HOST} \
             -P ${DB_PORT} -T ${DB_DUMP_PATH} --skip-dump-date \
             ${DB_NEUTRON} ${DB_NEUTRON_TABLES}
-        rm -f *.sql
-        git add *.txt >/dev/null 2>&1
+        git add *.txt *.sql >/dev/null 2>&1
         if ! git diff --quiet --cached; then
             log "Pushing configuration changes."
             if [ $initial = true ]; then
