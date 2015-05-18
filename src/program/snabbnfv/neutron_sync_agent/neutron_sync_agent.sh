@@ -52,7 +52,7 @@ while true; do
             git prune --expire 0
             $NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR >/dev/null
             # Only (atomically) replace configurations that have changed.
-            for conf in $TMP_DIR/*; do
+            for conf in $(ls $TMP_DIR); do
                 dest=$SNABB_DIR/$(basename $conf)
                 echo "$dest"
                 if ! diff $conf $dest; then mv -f $conf $dest;
