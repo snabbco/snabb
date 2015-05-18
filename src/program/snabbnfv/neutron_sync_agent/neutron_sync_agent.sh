@@ -40,23 +40,25 @@ while true; do
         log "Initializing $NEUTRON_DIR"
         git clone git://$SYNC_HOST/$SYNC_PATH $NEUTRON_DIR >/dev/null
     fi
-    cd $NEUTRON_DIR
-    git fetch >/dev/null
-    git diff --quiet origin/master >/dev/null 2>&1
-    if [ $? != 0 -o $initial = true ]; then
-        log "Generating new configuration"
-        git pull --rebase origin master >/dev/null 2>&1
-        git reflog expire --expire-unreachable=0 --all
-        git prune --expire 0
-        $NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR >/dev/null
-        # Only (atomically) replace configurations that have changed.
-        for conf in $TMP_DIR/*; do
-            dest=$SNABB_DIR/$(basename $conf)
-            echo "$dest"
-            if ! diff $conf $dest; then mv -f $conf $dest;
-            else echo "Unchanged."; fi
-        done
-        initial=false
+    if [ -d $NEUTRON_DIR ]; then
+        cd $NEUTRON_DIR
+        git fetch >/dev/null
+        git diff --quiet origin/master >/dev/null 2>&1
+        if [ $? != 0 -o $initial = true ]; then
+            log "Generating new configuration"
+            git pull --rebase origin master >/dev/null 2>&1
+            git reflog expire --expire-unreachable=0 --all
+            git prune --expire 0
+            $NEUTRON2SNABB $NEUTRON_DIR $TMP_DIR >/dev/null
+            # Only (atomically) replace configurations that have changed.
+            for conf in $TMP_DIR/*; do
+                dest=$SNABB_DIR/$(basename $conf)
+                echo "$dest"
+                if ! diff $conf $dest; then mv -f $conf $dest;
+                else echo "Unchanged."; fi
+            done
+            initial=false
+        fi
     fi
     sleep $SYNC_INTERVAL
 done
