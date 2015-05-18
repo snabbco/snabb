@@ -73,22 +73,28 @@ function create_config (input_dir, output_dir, hostname)
    local secbindings = parse_csv(input_dir.."/securitygroupportbindings.txt",
                                  schema.securitygroupportbindings,
                                  'port_id')
+   print("Parsing neutron db tables")
    -- Compile zone configurations.
    local zones = {}
    for _, port in pairs(ports) do
+      print("PortID: ", port.id)
       local binding = port_bindings[port.id]
       -- If the port is a 'snabb' port, lives on our host and is online
       -- then we compile its configuration.
+      print("BindingID ", binding.id, " has driver ", binding.driver)
       if binding.driver == "snabb" then
          local vif_details = json.decode(binding.vif_details)
          -- See https://github.com/SnabbCo/snabbswitch/pull/423
          local profile = vif_details["binding:profile"]
          profile = profile or {}
+         print("vif_details has hostname ", vif_details.zone_host, "(we want ", hostname, ")")
          if vif_details.zone_host == hostname then
             local zone_port = vif_details.zone_port
             -- Each zone can have multiple port configurtions.
             if not zones[zone_port] then zones[zone_port] = {} end
+            print("admin_state_ip is ", port.admin_state_up)
             if port.admin_state_up ~= '0' then
+               print("Adding zone port '", zone_port, "' to list")
                -- Note: Currently we don't use `vif_details.zone_gbps'
                -- because its "not needed by the traffic process in the
                -- current implementation".
