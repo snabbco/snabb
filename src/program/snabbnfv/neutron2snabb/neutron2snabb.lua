@@ -171,17 +171,19 @@ end
 
 function ruletofilter (r, direction)
    local matches = {}           -- match rules to be combined
-   if     r.ethertype == "ipv4" then matches[#matches+1] = "ip"
-   elseif r.ethertype == "ipv6" then matches[#matches+1] = "ip6"
+   local icmp
+   if     r.ethertype == "ipv4" then matches[#matches+1] = "ip"  icmp = 'icmp'
+   elseif r.ethertype == "ipv6" then matches[#matches+1] = "ip6" icmp = 'icmp6'
    else   error("unknown ethertype: " .. r.ethertype) end
    
    if     r.protocol == "tcp" then matches[#matches+1] = "tcp"
-   elseif r.protocol == "udp" then matches[#matches+1] = "udp" end
-   
+   elseif r.protocol == "udp" then matches[#matches+1] = "udp"
+   elseif r.protocol == "icmp" then matches[#matches+1] = icmp end
+
    if r.port_range_min or r.port_range_max then
       local min = r.port_range_min or r.port_range_max
       local max = r.port_range_max or r.port_range_min
-      matches[#matches+1] = ("portrange %d-%d"):format(min, max)
+      matches[#matches+1] = ("dst portrange %d-%d"):format(min, max)
    end
    
    if r.remote_ip_prefix then
@@ -220,11 +222,11 @@ function selftest ()
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp'}}", 
              '(arp or (ip and udp))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp', port_range_min=1000}}",
-             '(arp or (ip and udp and portrange 1000-1000))')
+             '(arp or (ip and udp and dst portrange 1000-1000))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp', port_range_max=2000}}",
-             '(arp or (ip and udp and portrange 2000-2000))')
+             '(arp or (ip and udp and dst portrange 2000-2000))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='tcp', port_range_min=1000, port_range_max=2000}}",
-             '(arp or (ip and tcp and portrange 1000-2000))')
+             '(arp or (ip and tcp and dst portrange 1000-2000))')
    checkrule("{{direction='ingress', ethertype='IPv6', protocol='tcp'}, {direction='ingress', ethertype='IPv4', protocol='udp', remote_ip_prefix='10.0.0.0/8'}}",
              '((ip6 and tcp) or (arp or (ip and udp and src net 10.0.0.0/8)))')
    print("selftest ok")
