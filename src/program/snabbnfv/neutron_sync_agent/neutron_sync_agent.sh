@@ -39,11 +39,12 @@ function log { echo "[$(date +"%F %T %Z")]" "$1"; }
 while true; do
     if [ ! -d $NEUTRON_DIR ]; then
         log "Initializing $NEUTRON_DIR"
-        git clone git://$SYNC_HOST:$SYNC_PORT/$SYNC_PATH $NEUTRON_DIR >/dev/null
+        git clone git://$SYNC_HOST:$SYNC_PORT/$SYNC_PATH $NEUTRON_DIR \
+            >/dev/null 2>&1
     fi
     if [ -d $NEUTRON_DIR ]; then
         cd $NEUTRON_DIR
-        git fetch >/dev/null
+        git fetch >/dev/null 2>&1 || log "Failed to fetch from master."
         git diff --quiet origin/master >/dev/null 2>&1
         if [ $? = 1 -o $initial = true ]; then
             log "Generating new configuration"
