@@ -66,7 +66,7 @@ static inline uint32_t cksum_sse2_loop(unsigned char *p, size_t n)
 
 uint16_t cksum_sse2(unsigned char *p, size_t n, uint32_t initial)
 {
-  uint32_t sum = ntohs(initial);
+  uint32_t sum = initial;
 
   if (n < 128) { return cksum_generic(p, n, initial); }
   int unaligned = (unsigned long) p & 0xf;
