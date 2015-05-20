@@ -432,6 +432,74 @@ function root_check (message)
    end
 end
 
+-- Simple rate-limited logging facility.  Usage:
+--
+--   local logger = lib.logger_new({ rate = <rate>,
+--                                   fh = <fh>,
+--                                   flush = true|false,
+--                                   module = <module>,
+--                                   date = true|false })
+--   logger:log(message)
+--
+-- <rate> maximum rate of messages per second.  Additional
+--        messages are discarded. Default: 10
+-- <fh>   file handle to log to.  Default: io.stdout
+-- flush  flush <fh> after each message if true
+-- <module> name of the module to include in the message
+-- date   include date in messages if true
+--
+-- The output format is
+-- <date> <module>: message
+--
+local logger = {}
+-- Default configuration
+logger.config = { rate = 10,
+		  fh = io.stdout,
+		  flush = true,
+		  module = '',
+		  date = true }
+
+function logger_new (config)
+   local config = config or {}
+   local l = { config = {} }
+   setmetatable(l.config, { __index = logger.config })
+   for k, v in pairs(config) do
+      assert(logger.config[k], "Unkown logger configuration "..k)
+      l.config[k] = v
+   end
+   l.tstamp = C.get_unix_time()
+   l.token_bucket = l.config.rate
+   l.discard = 0
+   return setmetatable(l, { __index = logger })
+end
+
+function logger:log (msg)
+   local rate = self.config.rate
+   local fh = self.config.fh
+   local flush = self.config.flush
+   local date = ''
+   if self.config.date then
+      date = os.date("%b %Y %H:%M:%S ")
+   end
+   local now = C.get_unix_time()
+   local new_tokens = rate*(now-self.tstamp)
+   self.token_bucket = math.min(rate, self.token_bucket+new_tokens)
+   if self.token_bucket >= 1 then
+      if self.discard > 0 then
+	 fh:write(date..self.discard.." messages discarded\n")
+	 self.discard = 0
+      end
+      msg = date..(self.config.module and self.config.module..': '
+			     or '')..msg..'\n'
+      fh:write(msg)
+      if flush then fh:flush() end
+      self.token_bucket = self.token_bucket-1
+   else
+      self.discard = self.discard+1
+   end
+   self.tstamp = now
+end
+
 function selftest ()
    print("selftest: lib")
    print("Testing equal")
