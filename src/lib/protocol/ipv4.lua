@@ -3,6 +3,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
 local header = require("lib.protocol.header")
+local ipsum = require("lib.checksum").ipsum
 
 -- TODO: generalize
 local AF_INET = 2
@@ -143,8 +144,8 @@ function ipv4:protocol (protocol)
 end
 
 function ipv4:checksum ()
-   local csum = lib.update_csum(self:header(), self:sizeof())
-   self:header().checksum = C.htons(lib.finish_csum(csum))
+   self:header().checksum = C.htons(ipsum(ffi.cast("uint8_t *", self:header()),
+					  self:sizeof(), 0))
    return C.ntohs(self:header().checksum)
 end
 

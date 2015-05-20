@@ -14,11 +14,10 @@
 #include <stdint.h>
 #include <sys/time.h>
 
-static inline uint32_t cksum_generic_loop(const void *buf, size_t len, uint32_t sum)
+uint16_t cksum_generic(unsigned char *p, size_t len, uint16_t initial)
 {
-  /* workaround gcc strict-aliasing warning */
-  uintptr_t ptr = (uintptr_t)buf;
-  const uint16_t *u16 = (const uint16_t *)ptr;
+  uint32_t sum = htons(initial);
+  const uint16_t *u16 = (const uint16_t *)p;
 
   while (len >= (sizeof(*u16) * 4)) {
     sum += u16[0];
@@ -38,22 +37,9 @@ static inline uint32_t cksum_generic_loop(const void *buf, size_t len, uint32_t 
   if (len == 1)
     sum += *((const uint8_t *)u16);
 
-  return sum;
-}
-
-static inline uint16_t cksum_generic_reduce(uint32_t sum)
-{
-  sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
-  sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
-  return (uint16_t)~sum;
-}
-
-uint16_t cksum_generic(const void *buf, size_t len, uint16_t initial)
-{
-  uint32_t sum;
-
-  sum = cksum_generic_loop(buf, len, initial);
-  return htons(cksum_generic_reduce(sum));
+  while(sum>>16)
+    sum = (sum & 0xFFFF) + (sum>>16);
+  return ntohs((uint16_t)~sum);
 }
 
 // SIMD versions
@@ -152,7 +138,7 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
     uint32_t sum = 0;
     len -= headersize;
     if (ipv == 4) {                         // IPv4
-      if (cksum_generic_reduce(cksum_generic_loop(buf, headersize, 0)) != 0) {
+      if (cksum_generic((unsigned char *)buf, headersize, 0) != 0) {
         return 0xFFFF0002;
       }
       sum = htons(len & 0x0000FFFF) + (proto << 8)

@@ -3,6 +3,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
 local header = require("lib.protocol.header")
+local ipsum = require("lib.checksum").ipsum
 
 local tcp_header_t = ffi.typeof[[
 struct {
@@ -146,14 +147,14 @@ function tcp:checksum (payload, length, ip)
       if ip then
          -- Checksum IP pseudo-header
          local ph = ip:pseudo_header(length + self:sizeof(), 6)
-         csum = lib.update_csum(ph, ffi.sizeof(ph), csum)
+         csum = ipsum(ffi.cast("uint8_t *", ph), ffi.sizeof(ph), 0)
       end
       -- Add TCP header
       h.checksum = 0
-      csum = lib.update_csum(h, self:sizeof(), csum)
+      csum = ipsum(ffi.cast("uint8_t *", h),
+		   self:sizeof(), bit.bnot(csum))
       -- Add TCP payload
-      csum = lib.update_csum(payload, length, csum)
-      h.checksum = C.htons(lib.finish_csum(csum))
+      h.checksum = C.htons(ipsum(payload, length, bit.bnot(csum)))
    end
    return C.ntohs(h.checksum)
 end
