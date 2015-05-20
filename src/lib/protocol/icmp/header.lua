@@ -60,12 +60,13 @@ local function checksum(header, payload, length, ipv6)
    if ipv6 then
       -- Checksum IPv6 pseudo-header
       local ph = ipv6:pseudo_header(length + ffi.sizeof(header), 58)
-      csum = ipsum(ph, ffi.sizeof(ph), 0)
+      csum = ipsum(ffi.cast("uint8_t *", ph), ffi.sizeof(ph), 0)
    end
    -- Add ICMP header
    local csum_rcv = header.checksum
    header.checksum = 0
-   csum = ipsum(header, ffi.sizeof(header), bit.bnot(csum))
+   csum = ipsum(ffi.cast("uint8_t *", header),
+		ffi.sizeof(header), bit.bnot(csum))
    header.checksum = csum_rcv
    -- Add ICMP payload
    return ipsum(payload, length, bit.bnot(csum))

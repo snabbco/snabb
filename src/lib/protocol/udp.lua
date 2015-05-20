@@ -65,11 +65,12 @@ function udp:checksum (payload, length, ip)
       if ip then
          -- Checksum IP pseudo-header
          local ph = ip:pseudo_header(length + self:sizeof(), 17)
-         csum = ipsum(ph, ffi.sizeof(ph), 0)
+         csum = ipsum(ffi.cast("uint8_t *", ph), ffi.sizeof(ph), 0)
       end
       -- Add UDP header
       h.checksum = 0
-      csum = ipsum(h, self:sizeof(), bit.bnot(csum))
+      csum = ipsum(ffi.cast("uint8_t *", h),
+		   self:sizeof(), bit.bnot(csum))
       -- Add UDP payload
       h.checksum = C.htons(ipsum(payload, length, bit.bnot(csum)))
    end
