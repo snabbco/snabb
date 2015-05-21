@@ -2,6 +2,7 @@ module(..., package.seeall)
 
 local lib = require("core.lib")
 local nfvconfig = require("program.snabbnfv.nfvconfig")
+local pci = require("lib.hardware.pci")
 local usage = require("program.snabbnfv.traffic.README_inc")
 local ffi = require("ffi")
 local C = ffi.C
@@ -31,6 +32,7 @@ function run (args)
    args = lib.dogetopt(args, opt, "hHB:k:l:D:", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
+      verify_device(pciaddr)
       if loadreportinterval > 0 then
 	 local t = timer.new("nfvloadreport", engine.report_load, loadreportinterval*1e9, 'repeating')
 	 timer.activate(t)
@@ -126,3 +128,12 @@ function bench (pciaddr, confpath, sockpath, npackets)
    require("jit.p").stop()
 end
 
+function verify_device (pciaddr)
+   pci.scan_devices()
+   local device
+   for _, dev in ipairs(pci.devices) do
+      if dev.pciaddress == pciaddr then device = dev end
+   end
+   assert(device, "No such device (or unsupported): "..pciaddr)
+   assert(device.usable == 'yes', "Device not usable: "..pciaddr)
+end
