@@ -44,6 +44,8 @@ function main ()
       os.exit(1)
    end
    require(modulename(program)).run(parameters)
+   -- Delete instance fs.
+   if _G.engine.instance_fs then _G.engine.instance_fs:delete() end
 end
 
 -- programname("nfv-sync-master.2.0") => "nfv-sync-master"
@@ -95,6 +97,8 @@ function handler (reason)
    print(reason)
    print(debug.traceback())
    if debug_on_error then debug.debug() end
+   -- Delete instance fs.
+   if _G.engine.instance_fs then _G.engine.instance_fs:delete() end
    os.exit(1)
 end
 

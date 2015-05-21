@@ -1,5 +1,6 @@
 Usage:
-  top
+  top [<pid>]
 
 Display realtime performance statistics for a running Snabb Switch
-instance.
+instance with <pid>. If <pid> is not supplied and there is only one Snabb
+Switch instance, top will connect to that instance.

@@ -3,14 +3,17 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local top = require("lib.ipc.shmem.top")
+local fs = require("lib.ipc.fs")
 local usage = require("program.top.README_inc")
 
 function clearterm () io.write('\027[2J') end
 
 function run (args)
-   if not #args == 0 then print(usage) main.exit(1) end
+   if #args > 1 then print(usage) main.exit(1) end
+   local target_pid = args[1]
 
-   local shmem_stats = shmem_connect()
+   local instance_fs = fs:new(select_snabb_instance(target_pid))
+   local shmem_stats = shmem_connect(instance_fs:resource("core-stats"))
 
    local last_stats = nil
    while (true) do
@@ -27,11 +30,25 @@ function run (args)
    end
 end
 
-function shmem_connect ()
+function select_snabb_instance (pid)
+   if pid then
+      -- Try to use given pid
+      if fs:exists(pid) then return pid
+      else error("No such Snabb Switch instance: "..pid) end
+   else
+      -- Try to automatically select pid
+      local instances = fs:instances()
+      if #instances == 1 then return instances[1]
+      elseif #instances == 0 then error("No Snabb Switch instance found.")
+      else error("Multple Snabb Switch instances found. Select one.") end
+   end
+end
+
+function shmem_connect (location)
    local connected, shmem_stats
    print("Connecting...")
    while not connected do
-      connected, shmem_stats = pcall(top.attach, top)
+      connected, shmem_stats = pcall(top.attach, top, location)
       if not connected then C.sleep(1) end
    end
    return shmem_stats
