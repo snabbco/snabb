@@ -458,6 +458,12 @@ end
 
 addtype(types, "stat", "struct stat", mt.stat)
 
+local signames = {}
+local duplicates = {IOT = true, CLD = true, POLL = true}
+for k, v in pairs(c.SIG) do
+  if not duplicates[k] then signames[v] = k end
+end
+
 -- TODO this is broken, need to use fields from the correct union technically
 -- ie check which of the unions we should be using and get all fields from that
 -- (note as per Musl list the standard kernel,glibc definitions are wrong too...)
@@ -479,6 +485,7 @@ mt.siginfo = {
     addr    = function(s) return s._sifields.sigfault.si_addr end,
     band    = function(s) return s._sifields.sigpoll.si_band end,
     fd      = function(s) return s._sifields.sigpoll.si_fd end,
+    signame = function(s) return signames[s.signo] end,
   },
   newindex = {
     signo   = function(s, v) s.si_signo = v end,

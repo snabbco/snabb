@@ -2344,6 +2344,7 @@ test_processes = {
     else -- parent
       local infop = assert(S.waitid("all", 0, "exited, stopped, continued"))
       assert_equal(infop.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
+      assert_equal(infop.signame, "CHLD", "name of signal is CHLD")
       assert_equal(infop.status, 23, "exit should be 23")
       assert_equal(infop.code, c.SIGCLD.EXITED, "normal exit expected")
     end

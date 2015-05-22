@@ -200,6 +200,12 @@ function t.waitstatus(status)
   return setmetatable({status = status}, mt.wait)
 end
 
+local signames = {}
+local duplicates = {LWT = true}
+for k, v in pairs(c.SIG) do
+  if not duplicates[k] then signames[v] = k end
+end
+
 mt.siginfo = {
   index = {
     signo   = function(s) return s.si_signo end,
@@ -215,6 +221,7 @@ mt.siginfo = {
     overrun = function(s) return s._timer._overrun end,
     mqd     = function(s) return s._mesgq._mqd end,
     band    = function(s) return s._poll._band end,
+    signame = function(s) return signames[s.signo] end,
   },
   newindex = {
     signo   = function(s, v) s.si_signo = v end,

@@ -148,6 +148,12 @@ end
 
 addtype(types, "stat", "struct stat", mt.stat)
 
+local signames = {}
+local duplicates = {IOT = true}
+for k, v in pairs(c.SIG) do
+  if not duplicates[k] then signames[v] = k end
+end
+
 -- TODO see note in Linux, we should be consistently using the correct union
 mt.siginfo = {
   index = {
@@ -163,6 +169,7 @@ mt.siginfo = {
     addr    = function(s) return s._info._reason._fault._addr end,
     band    = function(s) return s._info._reason._poll._band end,
     fd      = function(s) return s._info._reason._poll._fd end,
+    signame = function(s) return signames[s.signo] end,
   },
   newindex = {
     signo   = function(s, v) s._info._signo = v end,
