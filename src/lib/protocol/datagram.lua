@@ -124,17 +124,6 @@ function datagram:new (p, class, options)
    return o
 end
 
-function datagram:new (p, class)
-   return(init(datagram:superClass().new(self), p, class))
-end
-
--- Reuse an existing object to avoid putting it on the freelist.
--- Caution: This will free the datagram's current packet.
-function datagram:reuse (p, class)
-   self._recycled = true
-   return(init(self, p, class))
-end
-
 -- Instance methods
 
 -- Push a new protocol header to the front of the packet.

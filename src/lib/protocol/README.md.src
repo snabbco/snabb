@@ -695,11 +695,6 @@ option is the selection of immediate or delayed commit mode by setting
 the key `delayed_commit` to `false` or `true`, respectively.  The
 default is immediate commit mode.
 
-— Method **datagram:reuse** *packet*, *protocol*
-
-Recycling version of `datagram:new`. Reuses the instance to create a
-datagram.
-
 — Method **datagram:push** *header*
 
 Prepends *header* to the front of the datagram. This method
