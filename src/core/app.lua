@@ -211,6 +211,11 @@ function apply_config_actions (actions, conf)
    -- commit changes
    app_table, link_table = new_app_table, new_link_table
    app_array, link_array = new_app_array, new_link_array
+   for _, app in pairs(app_table) do
+      if app.inject_links then
+         app:inject_links()
+      end
+   end
 end
 
 -- Call this to "run snabb switch".

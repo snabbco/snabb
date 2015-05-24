@@ -2,11 +2,21 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 
+function maketype(type, sfx)
+   return ffi.typeof([[
+      struct {
+         int nfree, max;
+         $ list[?];
+      }
+   ]]..(sfx or ''), ffi.typeof(type))
+end
+
 function new (type, size)
-   return { nfree = 0,
-            max = size,
-            -- XXX Better LuaJIT idiom for specifying the array type?
-            list = ffi.new(type.."[?]", size) }
+   return maketype(type)(size, {nfree=0, max=size})
+end
+
+function receive(type, ptr)
+   return ffi.cast(maketype(type, '*'), ptr)
 end
 
 function add (freelist, element)
@@ -28,4 +38,3 @@ end
 function nfree (freelist)
    return freelist.nfree
 end
-

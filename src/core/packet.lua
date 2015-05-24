@@ -22,7 +22,13 @@ local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 local max_packets = 1e5
 local packet_allocation_step = 1000
 local packets_allocated = 0
-local packets_fl = freelist.new("struct packet *", max_packets)
+if rawget(_G, '_shared_packets_fl') then
+   packets_fl = freelist.receive('struct packet *', _shared_packets_fl)
+else
+   packets_fl = freelist.new("struct packet *", max_packets)
+   _G._shared_packets_fl = packets_fl
+end
+local packets_fl = packets_fl
 
 -- Return an empty packet.
 function allocate ()
@@ -79,7 +85,7 @@ function from_string (d)         return from_pointer(d, #d) end
 local function free_internal (p)
    p.length = 0
    freelist_add(packets_fl, p)
-end   
+end
 
 function free (p)
    engine.frees = engine.frees + 1
