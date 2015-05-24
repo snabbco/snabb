@@ -45,7 +45,7 @@ function selftest ()
    -- Check that the schema we extract from the test database is
    -- compaible with the default schema. (That is expected for this
    -- particular data set.)
-   local dir = "program/snabbnfv/test_fixtures/neutron_csv/db2"
+   local dir = "program/snabbnfv/test_fixtures/neutron_csv"
    local schema = read(dir, neutron2snabb.schema_tables)
    for tab, cols in pairs(neutron2snabb.default_schemas) do
       assert(schema[tab], "missing schema table: " .. tab)
