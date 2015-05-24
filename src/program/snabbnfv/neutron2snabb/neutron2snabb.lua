@@ -270,16 +270,3 @@ function selftest ()
    print("selftest ok")
 end
 
-function selftest_schema ()
-   local dir = "program/snabbnfv/test_fixtures/neutron_csv/db2"
-   local schema = neutron2snabb_schema.read(dir, schema_tables)
-   for tab, cols in pairs(default) do
-      for i, col in ipairs(cols) do
-         if schema[tab][i] ~= col then
-            error(("Column mismatch: %s[%d] is %s (expected %s)"):format(
-                  tab, i, schema[tab][i], col))
-         end
-      end
-   end
-end
-
