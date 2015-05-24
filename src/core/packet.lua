@@ -22,7 +22,11 @@ local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 local max_packets = 1e5
 local packet_allocation_step = 1000
 local packets_allocated = 0
-local packets_fl = freelist.new("struct packet *", max_packets)
+local packets_fl = nil
+
+function init()
+   packets_fl = packets_fl or freelist.new("struct packet *", max_packets, 'packets_fl')
+end
 
 -- Return an empty packet.
 function allocate ()
@@ -79,7 +83,7 @@ function from_string (d)         return from_pointer(d, #d) end
 local function free_internal (p)
    p.length = 0
    freelist_add(packets_fl, p)
-end   
+end
 
 function free (p)
    engine.frees = engine.frees + 1

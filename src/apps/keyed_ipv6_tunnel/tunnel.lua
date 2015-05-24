@@ -1,5 +1,3 @@
-module(...,package.seeall)
-
 -- http://tools.ietf.org/html/draft-mkonstan-keyed-ipv6-tunnel-01
 
 -- TODO: generalize
@@ -9,16 +7,11 @@ local ffi = require("ffi")
 local C = ffi.C
 local bit = require("bit")
 
-local app = require("core.app")
-local link = require("core.link")
 local lib = require("core.lib")
-local packet = require("core.packet")
 local config = require("core.config")
 
 local macaddress = require("lib.macaddress")
 
-local pcap = require("apps.pcap.pcap")
-local basic_apps = require("apps.basic.basic_apps")
 
 local header_struct_ctype = ffi.typeof[[
 struct {
@@ -73,7 +66,7 @@ local L2TPV3_NEXT_HEADER = 0x73
 local header_template = header_array_ctype(HEADER_SIZE)
 
 -- fill header template with const values
-local function prepare_header_template ()
+do
    -- all bytes are zeroed after allocation
 
    -- IPv6
@@ -98,10 +91,13 @@ local function prepare_header_template ()
    header_template[SESSION_ID_OFFSET + 3] = 0xFF
 end
 
-SimpleKeyedTunnel = {}
+-- local variables that become the 'object'
+local header
+local remote_address = remote_address
+local local_address = local_address
+local remote_cookie = remote_cookie
 
-function SimpleKeyedTunnel:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
+do -- initialize things
    -- required fields:
    --   local_address, string, ipv6 address
    --   remote_address, string, ipv6 address
@@ -112,18 +108,18 @@ function SimpleKeyedTunnel:new (arg)
    --   default_gateway_MAC, useful for testing
    --   hop_limit, override default hop limit 64
    assert(
-         type(conf.local_cookie) == "string"
-         and #conf.local_cookie <= 16,
+         type(local_cookie) == "string"
+         and #local_cookie <= 16,
          "local_cookie should be 8 bytes hex string"
       )
    assert(
-         type(conf.remote_cookie) == "string"
-         and #conf.remote_cookie <= 16,
+         type(remote_cookie) == "string"
+         and #remote_cookie <= 16,
          "remote_cookie should be 8 bytes hex string"
       )
-   local header = header_array_ctype(HEADER_SIZE)
+   header = header_array_ctype(HEADER_SIZE)
    ffi.copy(header, header_template, HEADER_SIZE)
-   local local_cookie = lib.hexundump(conf.local_cookie, 8)
+   local local_cookie = lib.hexundump(local_cookie, 8)
    ffi.copy(
          header + COOKIE_OFFSET,
          local_cookie,
@@ -132,63 +128,53 @@ function SimpleKeyedTunnel:new (arg)
 
    -- convert dest, sorce ipv6 addressed to network order binary
    local result =
-      C.inet_pton(AF_INET6, conf.local_address, header + SRC_IP_OFFSET)
-   assert(result == 1,"malformed IPv6 address: " .. conf.local_address)
+      C.inet_pton(AF_INET6, local_address, header + SRC_IP_OFFSET)
+   assert(result == 1,"malformed IPv6 address: " .. local_address)
 
    result =
-      C.inet_pton(AF_INET6, conf.remote_address, header + DST_IP_OFFSET)
-   assert(result == 1,"malformed IPv6 address: " .. conf.remote_address)
+      C.inet_pton(AF_INET6, remote_address, header + DST_IP_OFFSET)
+   assert(result == 1,"malformed IPv6 address: " .. remote_address)
 
    -- store casted pointers for fast matching
-   local remote_address = ffi.cast(paddress_ctype, header + DST_IP_OFFSET)
-   local local_address = ffi.cast(paddress_ctype, header + SRC_IP_OFFSET)
+   remote_address = ffi.cast(paddress_ctype, header + DST_IP_OFFSET)
+   local_address = ffi.cast(paddress_ctype, header + SRC_IP_OFFSET)
 
-   local remote_cookie = ffi.cast(pcookie_ctype, lib.hexundump(conf.remote_cookie, 8))
+   remote_cookie = ffi.cast(pcookie_ctype, lib.hexundump(remote_cookie, 8))[0]
 
-   if conf.local_session then
+   if local_session then
       local psession = ffi.cast(psession_id_ctype, header + SESSION_ID_OFFSET)
-      psession[0] = lib.htonl(conf.local_session)
+      psession[0] = lib.htonl(local_session)
    end
-   
-   if conf.default_gateway_MAC then
-      local mac = assert(macaddress:new(conf.default_gateway_MAC))
+
+   if default_gateway_MAC then
+      local mac = assert(macaddress:new(default_gateway_MAC))
       ffi.copy(header + DST_MAC_OFFSET, mac.bytes, 6)
    end
 
-   if conf.hop_limit then
-      assert(type(conf.hop_limit) == 'number' and
-	  conf.hop_limit <= 255, "invalid hop limit")
-      header[HOP_LIMIT_OFFSET] = conf.hop_limit
+   if hop_limit then
+      assert(type(hop_limit) == 'number' and
+         hop_limit <= 255, "invalid hop limit")
+      header[HOP_LIMIT_OFFSET] = hop_limit
    end
-
-   local o =
-   {
-      header = header,
-      remote_address = remote_address,
-      local_address = local_address,
-      remote_cookie = remote_cookie[0]
-   }
-
-   return setmetatable(o, {__index = SimpleKeyedTunnel})
 end
 
-function SimpleKeyedTunnel:push()
+function push()
    -- encapsulation path
-   local l_in = self.input.decapsulated
-   local l_out = self.output.encapsulated
+   local l_in = input.decapsulated
+   local l_out = output.encapsulated
    assert(l_in and l_out)
 
    while not link.empty(l_in) and not link.full(l_out) do
       local p = link.receive(l_in)
-      packet.prepend(p, self.header, HEADER_SIZE)
+      packet.prepend(p, header, HEADER_SIZE)
       local plength = ffi.cast(plength_ctype, p.data + LENGTH_OFFSET)
       plength[0] = lib.htons(SESSION_COOKIE_SIZE + p.length - HEADER_SIZE)
       link.transmit(l_out, p)
    end
 
    -- decapsulation path
-   l_in = self.input.encapsulated
-   l_out = self.output.decapsulated
+   l_in = input.encapsulated
+   l_out = output.decapsulated
    assert(l_in and l_out)
    while not link.empty(l_in) and not link.full(l_out) do
       local p = link.receive(l_in)
@@ -204,20 +190,20 @@ function SimpleKeyedTunnel:push()
          end
 
          local cookie = ffi.cast(pcookie_ctype, p.data + COOKIE_OFFSET)
-         if cookie[0] ~= self.remote_cookie then
+         if cookie[0] ~= remote_cookie then
             break
          end
 
-         local remote_address = ffi.cast(paddress_ctype, p.data + SRC_IP_OFFSET)
-         if remote_address[0] ~= self.remote_address[0] or
-            remote_address[1] ~= self.remote_address[1]
+         local p_remote_address = ffi.cast(paddress_ctype, p.data + SRC_IP_OFFSET)
+         if p_remote_address[0] ~= remote_address[0] or
+            p_remote_address[1] ~= remote_address[1]
          then
             break
          end
 
-         local local_address = ffi.cast(paddress_ctype, p.data + DST_IP_OFFSET)
-         if local_address[0] ~= self.local_address[0] or
-            local_address[1] ~= self.local_address[1]
+         local p_local_address = ffi.cast(paddress_ctype, p.data + DST_IP_OFFSET)
+         if p_local_address[0] ~= local_address[0] or
+            p_local_address[1] ~= local_address[1]
          then
             break
          end
@@ -233,58 +219,4 @@ function SimpleKeyedTunnel:push()
          link.transmit(l_out, p)
       end
    end
-end
-
--- prepare header template to be used by all apps
-prepare_header_template()
-
-function selftest ()
-   print("Keyed IPv6 tunnel selftest")
-   local ok = true
-
-   local input_file = "apps/keyed_ipv6_tunnel/selftest.cap.input"
-   local output_file = "apps/keyed_ipv6_tunnel/selftest.cap.output"
-   local tunnel_config = {
-      local_address = "00::2:1",
-      remote_address = "00::2:1",
-      local_cookie = "12345678",
-      remote_cookie = "12345678",
-      default_gateway_MAC = "a1:b2:c3:d4:e5:f6"
-   } -- should be symmetric for local "loop-back" test
-
-   local c = config.new()
-   config.app(c, "source", pcap.PcapReader, input_file)
-   config.app(c, "tunnel", SimpleKeyedTunnel, tunnel_config)
-   config.app(c, "sink", pcap.PcapWriter, output_file)
-   config.link(c, "source.output -> tunnel.decapsulated")
-   config.link(c, "tunnel.encapsulated -> tunnel.encapsulated")
-   config.link(c, "tunnel.decapsulated -> sink.input")
-   app.configure(c)
-
-   app.main({duration = 0.25}) -- should be long enough...
-   -- Check results
-   if io.open(input_file):read('*a') ~=
-      io.open(output_file):read('*a')
-   then
-      ok = false
-   end
-
-   local c = config.new()
-   config.app(c, "source", basic_apps.Source)
-   config.app(c, "tunnel", SimpleKeyedTunnel, tunnel_config)
-   config.app(c, "sink", basic_apps.Sink)
-   config.link(c, "source.output -> tunnel.decapsulated")
-   config.link(c, "tunnel.encapsulated -> tunnel.encapsulated")
-   config.link(c, "tunnel.decapsulated -> sink.input")
-   app.configure(c)
-
-   print("run simple one second benchmark ...")
-   app.main({duration = 1})
- 
-   if not ok then
-      print("selftest failed")
-      os.exit(1)
-   end
-   print("selftest passed")
-
 end

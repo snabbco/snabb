@@ -97,7 +97,7 @@ function restart_dead_apps ()
 end
 
 -- Configure the running app network to match new_configuration.
--- 
+--
 -- Successive calls to configure() will migrate from the old to the
 -- new app network by making the changes needed.
 function configure (new_config)
@@ -186,7 +186,7 @@ function apply_config_actions (actions, conf)
    for _, action in ipairs({'stop', 'restart', 'keep', 'reconfig', 'start'}) do
       for _, name in ipairs(actions[action]) do
 	 if log and action ~= 'keep' then
-            io.write("engine: ", action, " app ", name, "\n") 
+            io.write("engine: ", action, " app ", name, "\n")
          end
 	 ops[action](name)
       end
@@ -229,6 +229,12 @@ function main (options)
       pace_breathing()
    until done and done()
    if not options.no_report then report(options.report) end
+end
+
+function closeapps()
+   for name, app in pairs(app_table) do
+      if app.stop then app:stop() end
+   end
 end
 
 local nextbreath
