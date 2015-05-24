@@ -43,6 +43,7 @@ local na = require("lib.protocol.icmp.nd.na")
 local tlv = require("lib.protocol.icmp.nd.options.tlv")
 local filter = require("lib.pcap.filter")
 local timer = require("core.timer")
+local lib = require("core.lib")
 
 nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
@@ -135,8 +136,8 @@ function nd_light:new (arg)
    -- Timer for retransmits of neighbor solicitations
    nh.timer_cb = function (t)
                     local nh = o._next_hop
-                    print(string.format("Sending neighbor solicitation for next-hop %s",
-                                        ipv6:ntop(conf.next_hop)))
+                    o._logger:log(string.format("Sending neighbor solicitation for next-hop %s",
+                                                ipv6:ntop(conf.next_hop)))
                     link.transmit(o.output.south, packet.clone(nh.packet))
                     nh.nsent = nh.nsent + 1
                     if (not o._config.retrans or nh.nsent <= o._config.retrans)
@@ -190,6 +191,7 @@ function nd_light:new (arg)
       p = ffi.new("struct packet *[1]"),
       mem = ffi.new("uint8_t *[1]")
    }
+   o._logger = lib.logger_new({ module = 'nd_light' })
    return o
 end
 
@@ -198,7 +200,7 @@ local function ns (self, dgram, eth, ipv6, icmp)
    local mem, length = self._cache.mem
    mem[0], length = dgram:payload()
    if not icmp:checksum_check(mem[0], length, ipv6) then
-      print(self:name()..": bad icmp checksum")
+      self._logger:log("bad icmp checksum")
       return nil
    end
    -- Parse the neighbor solicitation and check if it contains our own
@@ -239,8 +241,8 @@ local function na (self, dgram, eth, ipv6, icmp)
    self._eth_header = ethernet:new({ src = self._config.local_mac,
                                      dst = option[1]:option():addr(),
                                      type = 0x86dd })
-   print(string.format("Resolved next-hop %s to %s", ipv6:ntop(self._config.next_hop),
-                       ethernet:ntop(option[1]:option():addr())))
+   self._logger:log(string.format("Resolved next-hop %s to %s", ipv6:ntop(self._config.next_hop),
+                                  ethernet:ntop(option[1]:option():addr())))
    return nil
 end
 

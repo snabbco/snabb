@@ -271,6 +271,7 @@ function M_sf:init_snmp ()
          r[k].v[0] = r[k].r()
       end
    end
+   self.logger = lib.logger_new({ module = 'intel10g' })
    local t = timer.new("Interface "..self.pciaddress.." status checker",
                        function(t)
                           local old = ifTable:get('ifOperStatus')
@@ -279,9 +280,9 @@ function M_sf:init_snmp ()
                              new = 2
                           end
                           if old ~= new then
-                             print("Interface "..self.pciaddress..
-                                   " status change: "..status[old]..
-                                   " => "..status[new])
+                             self.logger:log("Interface "..self.pciaddress..
+                                             " status change: "..status[old]..
+                                             " => "..status[new])
                              ifTable:set('ifOperStatus', new)
                              ifTable:set('ifLastChange', 0)
                              ifTable:set('_X_ifLastChange_TicksBase',
