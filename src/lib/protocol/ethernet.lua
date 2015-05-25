@@ -5,27 +5,27 @@ local header = require("lib.protocol.header")
 local ipv6 = require("lib.protocol.ipv6")
 local band = require("bit").band
 
-local ether_header_t = ffi.typeof[[
-struct {
-   uint8_t  ether_dhost[6];
-   uint8_t  ether_shost[6];
-   uint16_t ether_type;
-} __attribute__((packed))
-]]
-
 local mac_addr_t = ffi.typeof("uint8_t[6]")
 local ethernet = subClass(header)
 
 -- Class variables
 ethernet._name = "ethernet"
-ethernet._header_type = ether_header_t
-ethernet._header_ptr_type = ffi.typeof("$*", ether_header_t)
 ethernet._ulp = {
    class_map = {
                   [0x0800] = "lib.protocol.ipv4",
                   [0x86dd] = "lib.protocol.ipv6",
                 },
    method    = 'type' }
+ethernet:init(
+   {
+      [1] = ffi.typeof[[
+            struct {
+               uint8_t  ether_dhost[6];
+               uint8_t  ether_shost[6];
+               uint16_t ether_type;
+            } __attribute__((packed))
+      ]]
+   })
 
 -- Class methods
 

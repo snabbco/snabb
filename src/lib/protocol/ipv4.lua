@@ -9,20 +9,6 @@ local ipsum = require("lib.checksum").ipsum
 local AF_INET = 2
 local INET_ADDRSTRLEN = 16
 
-local ipv4hdr_t = ffi.typeof[[
-      struct {
-      uint16_t ihl_v_tos; // ihl:4, version:4, tos(dscp:6 + ecn:2)
-      uint16_t total_length;
-      uint16_t id;
-      uint16_t frag_off; // flags:3, fragmen_offset:13
-      uint8_t  ttl;
-      uint8_t  protocol;
-      uint16_t checksum;
-      uint8_t  src_ip[4];
-      uint8_t  dst_ip[4];
-      } __attribute__((packed))
-]]
-
 local ipv4hdr_pseudo_t = ffi.typeof[[
       struct {
       uint8_t  src_ip[4];
@@ -39,8 +25,6 @@ local ipv4 = subClass(header)
 
 -- Class variables
 ipv4._name = "ipv4"
-ipv4._header_type = ipv4hdr_t
-ipv4._header_ptr_type = ffi.typeof("$*", ipv4hdr_t)
 ipv4._ulp = {
    class_map = {
        [6] = "lib.protocol.tcp",
@@ -49,6 +33,22 @@ ipv4._ulp = {
       [58] = "lib.protocol.icmp.header",
    },
    method    = 'protocol' }
+ipv4:init(
+   {
+      [1] = ffi.typeof[[
+	    struct {
+	       uint16_t ihl_v_tos; // ihl:4, version:4, tos(dscp:6 + ecn:2)
+	       uint16_t total_length;
+	       uint16_t id;
+	       uint16_t frag_off; // flags:3, fragmen_offset:13
+	       uint8_t  ttl;
+	       uint8_t  protocol;
+	       uint16_t checksum;
+	       uint8_t  src_ip[4];
+	       uint8_t  dst_ip[4];
+	    } __attribute__((packed))
+      ]],
+   })
 
 -- Class methods
 

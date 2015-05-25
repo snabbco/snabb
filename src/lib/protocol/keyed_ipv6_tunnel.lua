@@ -24,13 +24,6 @@ ffi.cdef[[
       } cookie_t;
 ]]
 
-local tunnel_header_t = ffi.typeof[[
-      struct {
-         uint32_t session_id;
-         cookie_t cookie;
-      } __attribute__((packed))
-]]
-
 local tunnel = subClass(header)
 local cookie_t =
    ffi.metatype(ffi.typeof("cookie_t"),
@@ -51,18 +44,36 @@ local cookie_t =
 
 -- Class variables
 tunnel._name = "keyed ipv6 tunnel"
-tunnel._header_type = tunnel_header_t
-tunnel._header_ptr_type = ffi.typeof("$*", tunnel_header_t)
 tunnel._ulp = {}
+header.init(tunnel,
+            {
+               [1] = ffi.typeof[[
+                     struct {
+                        uint32_t session_id;
+                        cookie_t cookie;
+                     } __attribute__((packed))
+               ]]
+            })
 
 -- Class methods
 
+function tunnel:new_cookie (s)
+   assert(type(s) == 'string' and string.len(s) == 8,
+          'invalid cookie')
+   local c = cookie_t()
+   ffi.copy(c.cookie, s, 8)
+   return c
+end
+
+local default = { session_id = 0xffffffff,
+                  cookie = tunnel:new_cookie('\x00\x00\x00\x00\x00\x00\x00\x00') }
 function tunnel:new (config)
    local o = tunnel:superClass().new(self)
+   local config = config or default
    -- The spec for L2TPv3 over IPv6 recommends to set the session ID
    -- to 0xffffffff for the "static 1:1 mapping" scenario.
-   o:session_id(config.session_id or 0xffffffff)
-   o:cookie(config.cookie or '\x00\x00\x00\x00\x00\x00\x00\x00')
+   o:session_id(config.session_id or default.session_id)
+   o:cookie(config.cookie or default.cookie)
    return o
 end
 
@@ -74,14 +85,6 @@ function tunnel:new_from_mem (mem, size)
       return nil
    end
    return o
-end
-
-function tunnel:new_cookie (s)
-   assert(type(s) == 'string' and string.len(s) == 8,
-          'invalid cookie')
-   local c = cookie_t()
-   ffi.copy(c.cookie, s, 8)
-   return c
 end
 
 -- Instance methods
