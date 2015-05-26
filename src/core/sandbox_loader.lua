@@ -214,6 +214,7 @@ local function new_app_vm()
    vm:add_globals({_shared_packets_fl = _shared_packets_fl})
    assert(vm:load([[
       ffi = require('ffi')
+      require('lib.lua.class')
       engine = require('core.app')
       packet = require('core.packet')
       link = require('core.link')
