@@ -616,6 +616,7 @@ supports:
 * In-place decapsulation by removing leading protocol headers
 * Adding headers to an existing packet
 * Creation of a new packet
+* Appending payload to a packet
 
 It mediates between packets as defined in `core.packet` and *protocol
 classes* which are defined as classes derived from the protocol header
@@ -630,18 +631,56 @@ payload by the header. Finally, synthetic headers can be prepended to the
 datagram using `datagram:push`.  To get the whole datagram as a packet
 use `datagram:packet`.
 
-**Important Note:** Both `datagram:pop` and `datagram:pop` destructively
-modify the packet and thus corrupt headers previously obtained by calls
-to `datagram:parse_match`.
-
 ![Datagram](.images/Datagram.png)
 
-— Method **datagram:new** *packet*, *protocol*
+A datagram can be used in two modes of operation, called "immediate
+commit" and "delayed commit".  In immediate commit mode, the `push`
+and `pop` methods immediately modify the underlying packet.  However,
+this can be undesireable.
+
+Even though the manipulations are relatively fast by using SIMD
+instructions to move and copy data when possible, performance-aware
+applications usually try to avoid as much of them as possible.
+This creates a conflict if the caller performs operations to push
+or parse a sequence of protocol headers in immediate commit mode.
+
+This problem can be avoided by using delayed commit mode.  In this
+mode, the `push` methods add the data to a separate buffer as
+intermediate storage.  The buffer is prepended to the actual packet in
+a single operation by calling `datagram:commit`.
+
+The `pop` methods are made light-weight in delayed commit mode as well
+by keeping track of an additional offset that indicates where the
+actual packet starts in the packet buffer.  Each call to one of the
+`pop` methods simply increases the offset by the size of the popped
+piece of data.  The accumulated actions will be applied as a single
+operation by `datagram:commit`.
+
+The `push` and `pop` methods can be freely mixed in delayed commit
+mode.
+
+Due to the destructive nature of these methods in immediate commit
+mode, they cannot be applied when the parse stack is not empty,
+because moving the data in the packet buffer will invalidate the
+parsed headers.  The `push` and `pop` methods will raise an error in
+that case.
+
+The buffer used in delayed commit mode has a fixed size of 512
+bytes.  This limits the size of data that can be pushed in a single
+operation.  A sequence of push/commit operations can be used to
+push an arbitrary amount of data in chunks of up to 512 bytes.
+
+
+— Method **datagram:new** *packet*, *protocol*, *options*
 
 Creates a datagram for *packet* or from scratch if *packet* is `nil`.
-*Protocol* will be used by `parse_match` to parse the packet payload. If
-*protocol* is not `nil` it is set as the initial upper layer
-protocol.
+*Protocol* will be used by `parse_match` to parse the packet
+payload. If *protocol* is not `nil` it is set as the initial upper
+layer protocol.  If *options* is not `nil` it must be a table that
+selects configurable properties of the class.  Currently, the only
+option is the selection of immediate or delayed commit mode by setting
+the key `delayed_commit` to `false` or `true`, respectively.  The
+default is immediate commit mode.
 
 — Method **datagram:reuse** *packet*, *protocol*
 
@@ -650,9 +689,17 @@ datagram.
 
 — Method **datagram:push** *header*
 
-Prepends *header* to the front of the datagram. This method destructively
-modifies the underlying packet and calling it will corrupt headers
-previously obtained by `datagram:parse_match`.
+Prepends *header* to the front of the datagram. This method
+destructively modifies the underlying packet in immediate commit mode
+and raises an error if the parse stack is not empty.
+
+In delayed commit mode, *header* is prepended to an intermediate buffer.
+
+— Method **datagram:push_raw** *data*, *length*
+
+This method behaves like the *datagram:push* method for an arbitrary
+chunk of memory of length *length* located at the address pointed to
+by *data*.
 
 — Method **datagram:parse_match** *protocol*, *check*
 
@@ -705,12 +752,15 @@ can be obtained by calling `stack`.
 — Method **datagram:pop** *n*
 
 Removes the leading *n* parsed headers from the datagram. Note that
-headers added via `push` can not be removed using `pop`. The caller has
-to ensure that the datagram contains at least *n* headers that were
-parsed using `parse_match`.  The sequence of parsed headers can be
-obtained by calling `stack`. This method destructively modifies the
-underlying packet and calling it will corrupt headers previously obtained
-by `datagram:parse_match`.
+headers added via `push` can not be removed using `pop`. The caller
+has to ensure that the datagram contains at least *n* headers that
+were parsed using `parse_match`.  The sequence of parsed headers can
+be obtained by calling `stack`. This method destructively modifies the
+underlying packet in immediate commit mode and raises an error if the
+parse stack is not empty.
+
+In delayed commit mode, the packet is not modified and the parse stack
+remains valid.
 
 For instance let *d* be an datagram with an Ethernet header followed by
 an IPv6 header. Assuming we have parsed both headers using
@@ -721,10 +771,11 @@ from its Ethernet header.
 
 Removes *length* bytes from the beginning of the datagram. If *ulp* is
 given it is set as the current upper layer protocol. This method
-destructively modifies the underlying packet and calling it will corrupt
-headers previously obtained by `datagram:parse_match`. Additionally it
-does **not** update the pointer to the payload area of the underlying
-packet, effectively clobbering the parse and push stacks.
+destructively modifies the underlying packet in immediate commit mode
+and raises an error if the parse stack is not empty.
+
+In delayed commit mode, the packet is not modified and the parse stack
+remains valid.
 
 — Method **datagram:stack**
 
@@ -742,3 +793,18 @@ datagram payload and its byte size.
 
 If *pointer* and *length* are supplied then *length* bytes starting from
 *pointer* are appended to the datagram's payload.
+
+— Method **datagram:data**
+
+Returns the location and size of the buffer of the underlying packet.
+This is a shortcut to *datagram:packet* followed by calls to
+*packet.data* and *pakcet.length*.
+
+- Method **datagram:commit**
+
+If called in delayed commit mode, the operations accumulated by the
+`push` and `pop` methods since the creation of the datagram or the
+last invocation of *datagram:commit* are commited to the underlying
+packet.  An error is raised if the parse stack is not empty.
+
+The method can be safely called in immediate commit mode.
