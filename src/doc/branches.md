@@ -11,13 +11,35 @@ The current state of each branch with respect to master is visible here:
 #### master
 
     BRANCH: master git://github.com/lukego/snabbswitch
-    Synchronization point with changes recommended for all users.
+    Stable branch suitable for development and deployment.
     
-    - Makes monthly releases.
-    - Changes are gated by the SnabbBot CI
-    - Currently Linux/x86-64 with GNU tools (more in the future)
+    - Always contains a stable release that is safe to pull from.
+    - Updated monthly with new features and weekly with new bug fixes.
+    - Changes are gated by the SnabbBot CI.
     
     Maintainer: Luke Gorrie <luke@snabb.co> and Max Rottenkolber <max@mr.gy>
+
+#### next
+
+    BRANCH: next git://github.com/lukego/snabbswitch
+    Test and integration branch for new development.
+    
+    - Contains the changes for the next monthly feature release.
+    - Merges Pull Requests that pass code review on Github.
+    - Cycles between unstable and stable with the release schedule.
+
+    Maintainer: Luke Gorrie <luke@snabb.co>
+
+#### fixes
+
+    BRANCH: fixes git://github.com/lukego/snabbswitch
+    Test and integration branch for bug fixes.
+
+    - Contains the changes for the next weekly maintenance release.
+    - Merges Pull Requests that fix bugs in the latest release.
+    - Generally stable.
+
+    Maintainer: Luke Gorrie <luke@snabb.co>
 
 #### documenation-fixups
 
