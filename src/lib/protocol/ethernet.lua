@@ -1,9 +1,11 @@
 module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
+local lib = require("core.lib")
 local header = require("lib.protocol.header")
 local ipv6 = require("lib.protocol.ipv6")
 local band = require("bit").band
+local ntohs, htons = lib.ntohs, lib.htons
 
 local ether_header_t = ffi.typeof[[
 struct {
@@ -116,9 +118,9 @@ end
 function ethernet:type (t)
    local h = self:header()
    if t ~= nil then
-      h.ether_type = C.htons(t)
+      h.ether_type = htons(t)
    else
-      return(C.ntohs(h.ether_type))
+      return(ntohs(h.ether_type))
    end
 end
 

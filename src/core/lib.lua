@@ -171,41 +171,6 @@ function bitset (value, n)
    return band(value, lshift(1, n)) ~= 0
 end
 
--- Manipulation of bit fields in uint{8,16,32)_t stored in network
--- byte order.  Using bit fields in C structs is compiler-dependent
--- and a little awkward for handling endianness and fields that cross
--- byte boundaries.  We're bound to the LuaJIT compiler, so I guess
--- this would be save, but masking and shifting is guaranteed to be
--- portable.  Performance could be an issue, though.
-
-local bitfield_endian_conversion =
-   { [16] = { ntoh = C.ntohs, hton = C.htons },
-     [32] = { ntoh = C.ntohl, hton = C.htonl }
-  }
-
-function bitfield(size, struct, member, offset, nbits, value)
-   local conv = bitfield_endian_conversion[size]
-   local field
-   if conv then
-      field = conv.ntoh(struct[member])
-   else
-      field = struct[member]
-   end
-   local shift = size-(nbits+offset)
-   local mask = lshift(2^nbits-1, shift)
-   local imask = bnot(mask)
-   if value then
-      field = bor(band(field, imask), lshift(value, shift))
-      if conv then
-         struct[member] = conv.hton(field)
-      else
-         struct[member] = field
-      end
-   else
-      return rshift(band(field, mask), shift)
-   end
-end
-
 -- Iterator factory for splitting a string by pattern
 -- (http://lua-users.org/lists/lua-l/2006-12/msg00414.html)
 function string:split(pat)
@@ -408,6 +373,42 @@ ntohs = htons
 -- The followig utility can be used for that purpose.
 function eq32 (a, b)
    return band(a, 0xFFFFFFFF) == band(b, 0xFFFFFFFF)
+end
+
+-- Manipulation of bit fields in uint{8,16,32)_t stored in network
+-- byte order.  Using bit fields in C structs is compiler-dependent
+-- and a little awkward for handling endianness and fields that cross
+-- byte boundaries.  We're bound to the LuaJIT compiler, so I guess
+-- this would be save, but masking and shifting is guaranteed to be
+-- portable.
+
+local bitfield_endian_conversion = 
+   { [16] = { ntoh = ntohs, hton = htons },
+     [32] = { ntoh = ntohl, hton = htonl }
+  }
+
+function bitfield(size, struct, member, offset, nbits, value)
+   local conv = bitfield_endian_conversion[size]
+   local field
+   if conv then
+      field = conv.ntoh(struct[member])
+   else
+      field = struct[member]
+   end
+   local shift = size-(nbits+offset)
+   local mask = lshift(2^nbits-1, shift)
+   local imask = bnot(mask)
+   if value then
+      field = bor(band(field, imask),
+                  band(lshift(value, shift), mask))
+      if conv then
+         struct[member] = conv.hton(field)
+      else
+         struct[member] = field
+      end
+   else
+      return rshift(band(field, mask), shift)
+   end
 end
 
 -- Process ARGS using ACTIONS with getopt OPTS/LONG_OPTS.

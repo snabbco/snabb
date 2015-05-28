@@ -16,6 +16,8 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
+local lib = require("core.lib")
+local htonl, ntohl = lib.htonl, lib.ntohl
 
 ffi.cdef[[
       typedef union {
@@ -90,9 +92,9 @@ function tunnel:session_id (id)
    local h = self:header()
    if id ~= nil then
       assert(id ~= 0, "invalid session id 0")
-      h.session_id = C.htonl(id)
+      h.session_id = htonl(id)
    else
-      return C.ntohl(h.session_id)
+      return ntohl(h.session_id)
    end
 end
 

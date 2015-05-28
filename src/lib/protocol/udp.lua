@@ -3,6 +3,8 @@ local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
 local ipsum = require("lib.checksum").ipsum
+local lib = require("core.lib")
+local htons, ntohs = lib.htons, lib.ntohs
 
 local udp_header_t = ffi.typeof[[
 struct {
@@ -37,25 +39,25 @@ end
 function udp:src_port (port)
    local h = self:header()
    if port ~= nil then
-      h.src_port = C.htons(port)
+      h.src_port = htons(port)
    end
-   return C.ntohs(h.src_port)
+   return ntohs(h.src_port)
 end
 
 function udp:dst_port (port)
    local h = self:header()
    if port ~= nil then
-      h.dst_port = C.htons(port)
+      h.dst_port = htons(port)
    end
-   return C.ntohs(h.dst_port)
+   return ntohs(h.dst_port)
 end
 
 function udp:length (len)
    local h = self:header()
    if len ~= nil then
-      h.len = C.htons(len)
+      h.len = htons(len)
    end
-   return C.ntohs(h.len)
+   return ntohs(h.len)
 end
 
 function udp:checksum (payload, length, ip)
@@ -72,9 +74,9 @@ function udp:checksum (payload, length, ip)
       csum = ipsum(ffi.cast("uint8_t *", h),
                    self:sizeof(), bit.bnot(csum))
       -- Add UDP payload
-      h.checksum = C.htons(ipsum(payload, length, bit.bnot(csum)))
+      h.checksum = htons(ipsum(payload, length, bit.bnot(csum)))
    end
-   return C.ntohs(h.checksum)
+   return ntohs(h.checksum)
 end
 
 -- override the default equality method
