@@ -13,7 +13,7 @@ function run (args)
    local target_pid = args[1]
 
    local instance_fs = fs:new(select_snabb_instance(target_pid))
-   local shmem_stats = shmem_connect(instance_fs:resource("core-stats"))
+   local shmem_stats = top:attach(instance_fs:resource("core-stats"))
 
    local last_stats = nil
    while (true) do
@@ -42,16 +42,6 @@ function select_snabb_instance (pid)
       elseif #instances == 0 then error("No Snabb Switch instance found.")
       else error("Multple Snabb Switch instances found. Select one.") end
    end
-end
-
-function shmem_connect (location)
-   local connected, shmem_stats
-   print("Connecting...")
-   while not connected do
-      connected, shmem_stats = pcall(top.attach, top, location)
-      if not connected then C.sleep(1) end
-   end
-   return shmem_stats
 end
 
 function get_stats (shmem_stats)
