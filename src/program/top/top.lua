@@ -2,13 +2,22 @@ module(..., package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
+local lib = require("core.lib")
 local top = require("lib.ipc.shmem.top")
 local fs = require("lib.ipc.fs")
 local usage = require("program.top.README_inc")
 
+local long_opts = {
+   help = "h"
+}
+
 function clearterm () io.write('\027[2J') end
 
 function run (args)
+   local opt = {}
+   function opt.h (arg) print(usage) main.exit(1) end
+   args = lib.dogetopt(args, opt, "h", long_opts)
+
    if #args > 1 then print(usage) main.exit(1) end
    local target_pid = args[1]
 
