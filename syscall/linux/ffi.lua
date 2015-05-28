@@ -903,6 +903,8 @@ long syscall(int number, ...);
 
 int gettimeofday(struct timeval *tv, void *tz);
 int clock_gettime(clockid_t clk_id, struct timespec *tp);
+
+void exit(int status);
 ]]
 
 ffi.cdef(table.concat(defs, ""))
