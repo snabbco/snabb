@@ -5,6 +5,8 @@ local C = ffi.C
 local getopt = require("lib.lua.alt_getopt")
 local syscall = require("syscall")
 require("core.clib_h")
+local band, bor, bnot, lshift, rshift, bswap =
+   bit.band, bit.bor, bit.bnot, bit.lshift, bit.rshift, bit.bswap
 
 -- Returns true if x and y are structurally similar (isomorphic).
 function equal (x, y)
@@ -159,14 +161,14 @@ end
 function bits (bitset, basevalue)
    local sum = basevalue or 0
    for _,n in pairs(bitset) do
-      sum = bit.bor(sum, bit.lshift(1, n))
+      sum = bor(sum, lshift(1, n))
    end
    return sum
 end
 
 -- Return true if bit number 'n' of 'value' is set.
 function bitset (value, n)
-   return bit.band(value, bit.lshift(1, n)) ~= 0
+   return band(value, lshift(1, n)) ~= 0
 end
 
 -- Manipulation of bit fields in uint{8,16,32)_t stored in network
@@ -190,17 +192,17 @@ function bitfield(size, struct, member, offset, nbits, value)
       field = struct[member]
    end
    local shift = size-(nbits+offset)
-   local mask = bit.lshift(2^nbits-1, shift)
-   local imask = bit.bnot(mask)
+   local mask = lshift(2^nbits-1, shift)
+   local imask = bnot(mask)
    if value then
-      field = bit.bor(bit.band(field, imask), bit.lshift(value, shift))
+      field = bor(band(field, imask), lshift(value, shift))
       if conv then
          struct[member] = conv.hton(field)
       else
          struct[member] = field
       end
    else
-      return bit.rshift(bit.band(field, mask), shift)
+      return rshift(band(field, mask), shift)
    end
 end
 
@@ -326,17 +328,17 @@ function update_csum (ptr, len,  csum0)
    ptr = ffi.cast("uint8_t*", ptr)
    local sum = csum0 or 0LL
    for i = 0, len-2, 2 do
-      sum = sum + bit.lshift(ptr[i], 8) + ptr[i+1]
+      sum = sum + lshift(ptr[i], 8) + ptr[i+1]
    end
-   if len % 2 == 1 then sum = sum + bit.lshift(ptr[len-1], 1) end
+   if len % 2 == 1 then sum = sum + lshift(ptr[len-1], 1) end
    return sum
 end
 
 function finish_csum (sum)
-   while bit.band(sum, 0xffff) ~= sum do
-      sum = bit.band(sum + bit.rshift(sum, 16), 0xffff)
+   while band(sum, 0xffff) ~= sum do
+      sum = band(sum + rshift(sum, 16), 0xffff)
    end
-   return bit.band(bit.bnot(sum), 0xffff)
+   return band(bnot(sum), 0xffff)
 end
 
 
@@ -386,11 +388,27 @@ if ffi.abi("be") then
    function htonl(b) return b end
    function htons(b) return b end
 else
-   function htonl(b) return bit.bswap(b) end
-   function htons(b) return bit.rshift(bit.bswap(b), 16) end
+   function htonl(b) return bswap(b) end
+   function htons(b) return rshift(bswap(b), 16) end
 end
 ntohl = htonl
 ntohs = htons
+
+-- The fact that BitOps return signed integers is irritating, to say
+-- the least.  One counter-intuitive consequence is that, for example,
+--
+--   bit.bswap(bit.bswap(0x80000000)) == 0x80000000
+--
+-- is false, because the lhs is a negative number.  To compare a
+-- 32-bit quantity with the result of ntohl() or htonl(), one needs to
+-- use the equivalent of
+--
+--   bit.band(number, 0xFFFFFFFF) == ntohl(other_number)
+--
+-- The followig utility can be used for that purpose.
+function eq32 (a, b)
+   return band(a, 0xFFFFFFFF) == band(b, 0xFFFFFFFF)
+end
 
 -- Process ARGS using ACTIONS with getopt OPTS/LONG_OPTS.
 -- Return the remaining unprocessed arguments.
