@@ -190,8 +190,8 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile program/programs.inc | $(OBJDIR)
 	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
 
 # Create list of programs that exist
-program/programs.inc: FORCE
-	@ls -1d program/*/ | xargs basename -a > $@
+program/programs.inc:
+	@(for d in program/*/; do basename $$d; done) > $@
 
 FORCE:
 

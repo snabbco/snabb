@@ -27,7 +27,7 @@ function run (args)
       ["DB_HOST"]           = os.getenv("DB_HOST") or "localhost",
       ["DB_PORT"]           = os.getenv("DB_PORT") or "3306",
       ["DB_NEUTRON"]        = os.getenv("DB_NEUTRON") or "neutron_ml2",
-      ["DB_NEUTRON_TABLES"] = os.getenv("DB_NEUTRON_TABLES") or "networks ports ml2_network_segments securitygroups securitygrouprules securitygroupportbindings",
+      ["DB_NEUTRON_TABLES"] = os.getenv("DB_NEUTRON_TABLES") or "networks ports ml2_network_segments ml2_port_bindings securitygroups securitygrouprules securitygroupportbindings",
       ["SYNC_LISTEN_HOST"]  = os.getenv("SYNC_LISTEN_HOST") or "127.0.0.1",
       ["SYNC_LISTEN_PORT"]  = os.getenv("SYNC_LISTEN_PORT") or "9418",
       ["SYNC_INTERVAL"]     = os.getenv("SYNC_INTERVAL") or "1"

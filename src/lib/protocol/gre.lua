@@ -3,7 +3,8 @@ local ffi = require("ffi")
 local C = ffi.C
 local header = require("lib.protocol.header")
 local lib = require("core.lib")
-local bitfield, update_csum, finish_csum = lib.bitfield, lib.update_csum, lib.finish_csum
+local bitfield = lib.bitfield
+local ipsum = require("lib.checksum").ipsum
 
 -- GRE uses a variable-length header as specified by RFCs 2784 and
 -- 2890.  The actual size is determined by flag bits in the base
@@ -106,8 +107,9 @@ local function checksum(header, payload, length)
    local csum_in = header.csum;
    header.csum = 0;
    header.reserved1 = 0;
-   local csum = finish_csum(update_csum(payload, length,
-					update_csum(header, ffi.sizeof(header), 0)))
+   local csum = ipsum(payload, length,
+		      bit.bnot(ipsum(ffi.cast("uint8_t *", header),
+				     ffi.sizeof(header), 0)))
    header.csum = csum_in
    return csum
 end
