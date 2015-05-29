@@ -71,14 +71,15 @@ end
 
 
 -- compiles a chunk of code and leaves the resultant function in the stack.
--- returns self or false and an error message
+-- returns self or raises an error message if compilation fails
 function lua_State_mt:load(code, name)
    if not code then return self end
+   name = name or code:match('%s*([^\n]*)')
 
-   if C.luaL_loadbuffer(self, code, #code, '@'..(name or code:match('[^\n]*'))) ~= 0 then
+   if C.luaL_loadbuffer(self, code, #code, '@'..name) ~= 0 then
       local err = ffi.string(C.lua_tolstring(self, -1, nil))
       self:close()
-      return false, string.format("Error loading %q: %s", name, err)
+      error (string.format("Error loading %q: %s", name, err))
    end
    return self
 end
@@ -88,6 +89,7 @@ end
 -- handles only simple values: nil, boolean, numbers (double floats),
 -- strings, tables (only key/values of known types, non-cyclic)
 -- userdata and cdata are pushed as lightuserdata values
+-- returns number of values actually pushed
 function lua_State_mt:push_values(...)
    local narg = select('#', ...)
    local prevtop = C.lua_gettop(self)
@@ -168,8 +170,7 @@ function lua_State_mt:pcall(fname, ...)
    end
    local prevtop = C.lua_gettop(self)-1
 
-   local nargs, err = self:push_values(...)
-   if not nargs then return nargs, err end
+   local nargs = self:push_values(...)
 
    if C.lua_pcall(self, nargs, C.LUA_MULTRET, 0) ~= 0 then
       local err = ffi.string(C.lua_tolstring(self, -1, nil))
@@ -232,8 +233,7 @@ local function new_app_vm()
       engine = require('core.app')
       packet = require('core.packet')
       link = require('core.link')
-   ]], '[app frame]'))
-   assert(vm:pcall())
+   ]], '[app frame]'):pcall())
    return vm
 end
 
@@ -289,7 +289,7 @@ end
 local function inject_links(app)
    local vm = app.vm
    vm:load[[
-      -- setffitable
+      -- setffitable (name, ctype, table)
       local name, ct, t = ...
       if type(ct) == 'string' then
          ct = ffi.typeof(ct)
