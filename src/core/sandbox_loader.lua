@@ -181,6 +181,20 @@ function lua_State_mt:pcall(fname, ...)
 end
 
 
+-- calls a nullary function in the Lua State
+-- fname is the name of a function in the global environment
+-- it's called without any arguments, discarding any returned value
+function lua_State_mt:pcall_null(fname)
+   C.lua_getfield(self, C.LUA_GLOBALSINDEX, fname)
+   if C.lua_pcall(self, 0, 0, 0) ~= 0 then
+      local err = ffi.string(C.lua_tolstring(self, -1, nil))
+      C.lua_settop(self, C.lua_gettop(self)-2)
+      return false, err
+   end
+   return true
+end
+
+
 -- copy the given table into the global space of the vm
 function lua_State_mt:add_globals(t)
    for k, v in pairs(t) do
@@ -239,6 +253,15 @@ local function get_global_functions(vm)
    ]]:pcall())
 end
 
+-- function names that are known to be called as nullary
+local known_nullary = {
+   pull = true,
+   push = true,
+   reconfig = false,
+   report = true,
+   stop = true,
+}
+
 -- adds function proxies to the app
 local function make_proxies(app, prevglobals)
    prevglobals = prevglobals or {}
@@ -247,8 +270,15 @@ local function make_proxies(app, prevglobals)
    end
    for _, fname in ipairs(get_global_functions(app.vm)) do
       if not prevglobals[fname] then
-         app[fname] = function(self, ...)
-            return stripassert(self.vm:pcall(fname, ...))
+         if known_nullary[fname] then
+            -- optimized, no arguments, pcall()
+            app[fname] = function(self)
+               assert (self.vm:pcall_null(fname))
+            end
+         else
+            app[fname] = function(self, ...)
+               return stripassert(self.vm:pcall(fname, ...))
+            end
          end
       end
    end
