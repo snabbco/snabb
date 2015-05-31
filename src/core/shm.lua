@@ -1,26 +1,40 @@
 -- shm.lua -- shared memory alternative to ffi.new()
 
--- Provide a simple API for allocating FFI objects in shared
--- memory. Each object is created with a name and a C type. Objects
--- can be mapped any number of times by any process. The objects are
--- named and allocated using POSIX shared memory (shm_open(3)) so they
--- can be easily accessed from other software too.
---
--- Objects are backed by files on ramdisk. They are freed when they
--- are unlinked from their names and when all mappings have been
--- closed, or at reboot.
---
 -- API:
---   create(name, type) -- allocate a shared object
---   unlink(name)       -- unlink an object for automatic deallocation
---   map(name) => ptr   -- map an object into memory for access
---   unmap(ptr)         -- delete a memory mapping (NYI)
+--   shm.map(name, type[, readonly]) => ptr
+--     Map a shared object into memory via a heirarchical name.
+--   shm.unmap(ptr)
+--     Delete a memory mapping.
+--   shm.unlink(path)
+--     Unlink a subtree of objects from the filesystem.
+-- 
+-- Example:
+--   local freelist = shm.map("engine/freelist/packet", "struct freelist")
+-- 
+-- This is like ffi.new() except that separate calls to map() for the
+-- same name will each return a new mapping of the same shared
+-- memory. Different processes can share memory by mapping an object
+-- with the same name (and type). Each process can map any object any
+-- number of times.
 --
--- See selftest() method for an example.
+-- Mappings are deleted on process termination or with an explicit unmap:
+--   shm.unmap(freelist)
 --
--- This is intended to support up to thousands of mappings per
--- process. Linux default limits on the number of memory mappings per
--- process is 65530:
+-- Names are unlinked from objects that are no longer needed:
+--   shm.unlink("engine/freelist/packet")
+--   shm.unlink("engine")
+--
+-- Object memory is freed when the name is unlinked and all mappings
+-- have been deleted.
+--
+-- Behind the scenes the objects are backed by files on ram disk:
+--   /var/run/engine/freelist/packet
+--
+-- and accessed with the equivalent of POSIX shared memory (shm_overview(7)).
+--
+-- The practical limit on the number of objects that can be mapped
+-- will depend on the operating system limit for memory mappings.
+-- On Linux the default limit is 65,530 mappings:
 --     $ sysctl vm.max_map_count
 --     vm.max_map_count = 65530
 
@@ -30,94 +44,82 @@ local ffi = require("ffi")
 local lib = require("core.lib")
 local S = require("syscall")
 
--- Create a new named object with a given type.
---
--- create("test.foo", "uint64_t[1]") creates two files on ram disk:
---   /dev/shm/test.foo.T: contains string "uint64_t[1]\n"
---   /dev/shm/test.foo:   contains the 8-byte value
---
--- Return true on success or otherwise nil and an error.
-function create (name, type)
+-- Root directory where the object tree is created.
+local prefix = "/var/run"
+
+-- Table (address->size) of all currently mapped objects.
+mappings = {}
+
+-- Map an object into memory.
+function map (name, type,  readonly)
+   local mapmode = readonly and 'read' or 'read, write'
    local ctype = ffi.typeof(type)
    local size = ffi.sizeof(ctype)
-   -- Create shared memory object for value
-   local fd, err = S.shm_open(name, 'wronly, creat', 'rwxu')
-   if not fd then return nil, err end
-   assert(fd:ftruncate(size), "ftruncate failed")
-   assert(fd:close(), "close failed")
-   -- Create shared memory object for type
-   local fd, err = S.shm_open(name..".T", 'wronly, creat, trunc', 'rwxu')
-   if not fd then return nil, err end
-   assert(fd:write(type), "write failed")
-   assert(fd:write("\n"), "write failed")
-   assert(fd:close(), "close failed")
-   return name
-end
-
--- Unlink a shared memory object. The memory for the value will be
--- freed when all mappings are deleted.
---
--- unlink("test.foo") deletes two files:
---   /dev/shm/test.foo.T
---   /dev/shm/test.foo
-function unlink (name)
-   S.shm_unlink(name)
-   S.shm_unlink(name..".T")
-end
-
--- Map the named shared memory object.
--- Return a pointer to the mapped value.
-function map (name)
-   -- Read type
-   local fd, err = S.shm_open(name..".T", 'rdonly')
-   if fd == nil then error("shm_open " .. name .. ".T:" .. tostring(err)) end
-   local type = fd:read(nil, 10240)
-   fd:close()
-   local ok, ctype = pcall(ffi.typeof, type)
-   if not ok then error("bad type: " .. tostring(type)) end
-   -- Map value
-   local fd, err = S.shm_open(name, 'rdwr')
-   if not fd then error("shm_open " .. name .. ": " .. tostring(err)) end
-   local stat = assert(fd:stat(), "stat failed")
-   local mem, err = S.mmap(nil, stat.size, "read, write", "shared", fd, 0)
+   local stat = S.stat(prefix.."/"..name)
+   if stat and stat.size ~= size then
+      print(("shm warning: resizing %s from %d to %d bytes")
+            :format(name, stat.size, size))
+   end
+   -- Create the parent directories. If this fails then so will the open().
+   mkdir(name)
+   local fd, err = S.open(prefix.."/"..name, "creat, rdwr", "rwxu")
+   if not fd then error("shm open error ("..name.."):"..tostring(err)) end
+   assert(fd:ftruncate(size), "shm: ftruncate failed")
+   local mem, err = S.mmap(nil, size, mapmode, "shared", fd, 0)
    if mem == nil then error("mmap failed: " .. tostring(err)) end
+   mappings[pointer_to_number(mem)] = size
    return ffi.cast(ffi.typeof("$&", ctype), mem)
 end
 
--- Delete a shared memory mapping.
-function unmap (pointer)
-   -- Consider implementing this directly in ljsyscall i.e. for mmap()
-   -- to return a pointer with an unmap() FFI metamethod that already
-   -- knows the correct size (stored in a closure). This could also be
-   -- automatically called on GC. 
-   --
-   -- This idea is already considered in a TODO comment in ljsyscall.
-   error("NYI")
+-- Make directories needed for a named object.
+-- Given the name "foo/bar/baz" create /var/run/foo and /var/run/foo/bar.
+function mkdir (name)
+   local dir = prefix
+   name:gsub("([^/]+)/",
+             function (x) dir = dir.."/"..x  S.mkdir(dir, "rwxu") end)
+end
+
+-- Delete a shared object memory mapping.
+-- The pointer must have been returned by map().
+function unmap (ptr)
+   local size = mappings[pointer_to_number(ptr)]
+   assert(size, "shm mapping not found")
+   S.munmap(ptr, size)
+   mappings[pointer_to_number(ptr)] = nil
+end
+
+function pointer_to_number (ptr)
+   return tonumber(ffi.cast("uint64_t", ffi.cast("void*", ptr)))
+end
+
+-- Unlink names from their objects.
+function unlink (name)
+   return S.util.rm(prefix.."/"..name) -- recursive rm of file or directory
 end
 
 function selftest ()
    print("selftest: shm")
-   print("create shm.selftest")
-   create("shm.selftest", "struct { int x, y, z; }")
-   local p1 = map("shm.selftest")
-   local p2 = map("shm.selftest")
+   local name = "snabb/selftest/obj"
+   print("create "..name)
+   local p1 = map(name, "struct { int x, y, z; }")
+   local p2 = map(name, "struct { int x, y, z; }")
    assert(p1 ~= p2)
    assert(p1.x == p2.x)
    p1.x = 42
    assert(p1.x == p2.x)
-   unlink("shm.selftest")
-   local ok, err = pcall(map, "shm.selftest")
-   assert(not ok, "map() of unlinked object should fail")
-   selftest_many_objects(10000)
-   print("selftest ok")
-end
-
-function selftest_many_objects (n)
-   for i = 0, n do create("shm.selftest."..i, "uint64_t[1]") end
+   assert(unlink(name))
+   unmap(p1)
+   unmap(p2)
+   -- Test that we can open and cleanup many objects
+   local n = 10000
+   local objs = {}
+   for i = 1, n do
+      table.insert(objs, map("snabb/selftest/obj."..i, "uint64_t[1]"))
+   end
    print(n.." objects created")
-   for i = 0, n do map("shm.selftest."..i) end
-   print(n.." objects mapped")
-   for i = 0, n do unlink("shm.selftest."..i) end
-   print(n.." objects unlinked")
+   for i = 1, n do unmap(objs[i]) end
+   print(n.." objects unmapped")
+   assert(unlink("snabb/selftest"))
+   print("selftest ok")
 end
 
