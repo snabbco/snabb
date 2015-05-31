@@ -66,6 +66,7 @@ function map (name, type,  readonly)
    if not fd then error("shm open error ("..name.."):"..tostring(err)) end
    assert(fd:ftruncate(size), "shm: ftruncate failed")
    local mem, err = S.mmap(nil, size, mapmode, "shared", fd, 0)
+   fd:close()
    if mem == nil then error("mmap failed: " .. tostring(err)) end
    mappings[pointer_to_number(mem)] = size
    return ffi.cast(ffi.typeof("$&", ctype), mem)
