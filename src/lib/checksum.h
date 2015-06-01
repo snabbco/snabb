@@ -1,14 +1,14 @@
 // Calculate IP checksum using SSE2 instructions.
 // (This will crash if you call it on a CPU that does not support SSE.)
-uint16_t cksum_sse2(unsigned char *p, size_t n, uint32_t initial);
+uint16_t cksum_sse2(unsigned char *p, size_t n, uint16_t initial);
 
 // Calculate IP checksum using AVX2 instructions.
 // (This will crash if you call it on a CPU that does not support AVX2.)
-uint16_t cksum_avx2(unsigned char *p, size_t n, uint32_t initial);
+uint16_t cksum_avx2(unsigned char *p, size_t n, uint16_t initial);
 
 // Calculate IP checksum using portable C code.
 // This works on all hardware.
-uint16_t cksum_generic(unsigned char *p, size_t n, uint32_t initial);
+uint16_t cksum_generic(unsigned char *p, size_t n, uint16_t initial);
 
 // Incrementally update checksum when modifying a 16-bit value.
 void checksum_update_incremental_16(uint16_t* checksum_cell,

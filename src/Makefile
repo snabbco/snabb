@@ -193,7 +193,7 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile program/programs.inc | $(OBJDIR)
 program/programs.inc:
 	@(for d in program/*/; do basename $$d; done) > $@
 
-.FORCE: program/programs.inc
+FORCE:
 
 # extra/ third party bits and pieces
 obj/strict.o: extra/strict.lua | $(OBJDIR)

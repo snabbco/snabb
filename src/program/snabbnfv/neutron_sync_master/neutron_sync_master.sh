@@ -31,32 +31,37 @@ function check_deps()
     (which mysqldump > /dev/null) || error "missing dependency: mysqldump"
 }
 
+function log { echo "[$(date +"%F %T %Z")]" "$1"; }
 
 function run()
 {
     cd "$DB_DUMP_PATH"
     [ -f /tmp/neutron-sync-master.pid ] && kill $(cat /tmp/neutron-sync-master.pid)
-    echo "DBG: Running git daemon"
     export GIT_AUTHOR_NAME="Snabb NFV sync master"
     export GIT_AUTHOR_EMAIL="snabbnfv-sync-master"
     export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
     export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+    log "Starting Git daemon"
     git daemon --reuseaddr --listen="$SYNC_LISTEN_HOST" \
         --port="$SYNC_LISTEN_PORT" --base-path="$DB_DUMP_PATH/.." --export-all \
-        --verbose --pid-file=/tmp/neutron-sync-master.pid --detach "$DB_DUMP_PATH"
+        --verbose --pid-file=/tmp/neutron-sync-master.pid --detach "$DB_DUMP_PATH" \
+        >/dev/null 2>&1
     while true
     do
-        mysqldump -n -t -y -q -u${DB_USER} -p${DB_PASSWORD} -h ${DB_HOST} \
-            -P ${DB_PORT} -T ${DB_DUMP_PATH} ${DB_NEUTRON} ${DB_NEUTRON_TABLES}
-        rm -f *.sql
-        git add *.txt >/dev/null
-        if [ $initial = true ]; then
-            git commit -m "Configuration update" >/dev/null
-            initial=false
-        else
-            git commit --amend -m "Configuration update" >/dev/null
-            git reflog expire --expire-unreachable=0 --all
-            git prune --expire 0
+        mysqldump -n -y -q -u${DB_USER} -p${DB_PASSWORD} -h ${DB_HOST} \
+            -P ${DB_PORT} -T ${DB_DUMP_PATH} --skip-dump-date \
+            ${DB_NEUTRON} ${DB_NEUTRON_TABLES}
+        git add *.txt *.sql >/dev/null 2>&1
+        if ! git diff --quiet --cached; then
+            log "Pushing configuration changes."
+            if [ $initial = true ]; then
+                git commit -m "Configuration update" >/dev/null
+                initial=false
+            else
+                git commit --amend -m "Configuration update" >/dev/null
+                git reflog expire --expire-unreachable=0 --all >/dev/null
+                git prune --expire 0 >/dev/null
+            fi
         fi
         sleep "$SYNC_INTERVAL"
         #check that the daemon is still running

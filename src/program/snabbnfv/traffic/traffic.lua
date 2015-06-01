@@ -6,6 +6,7 @@ local usage = require("program.snabbnfv.traffic.README_inc")
 local ffi = require("ffi")
 local C = ffi.C
 local timer = require("core.timer")
+local pci = require("lib.hardware.pci")
 
 local long_opts = {
    benchmark     = "B",
@@ -31,6 +32,15 @@ function run (args)
    args = lib.dogetopt(args, opt, "hHB:k:l:D:", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
+      local ok, info = pcall(pci.device_info, pciaddr)
+      if not ok then
+         print("Error: device not found " .. pciaddr)
+         os.exit(1)
+      end
+      if not info.driver then
+         print("Error: no driver for device " .. pciaddr)
+         os.exit(1)
+      end
       if loadreportinterval > 0 then
 	 local t = timer.new("nfvloadreport", engine.report_load, loadreportinterval*1e9, 'repeating')
 	 timer.activate(t)
