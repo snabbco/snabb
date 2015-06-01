@@ -191,9 +191,9 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile program/programs.inc | $(OBJDIR)
 
 # Create list of programs that exist
 program/programs.inc:
-	@ls -1d program/*/ | xargs basename -a > $@
+	@(for d in program/*/; do basename $$d; done) > $@
 
-.FORCE: program/programs.inc
+FORCE:
 
 # extra/ third party bits and pieces
 obj/strict.o: extra/strict.lua | $(OBJDIR)

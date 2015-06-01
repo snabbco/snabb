@@ -14,6 +14,6 @@ int main(int snabb_argc, char **snabb_argv)
   argv = snabb_argv;
   lua_State* L = luaL_newstate();
   luaL_openlibs(L);
-  return luaL_dostring(L, "require \"core.main\"");
+  return luaL_dostring(L, "require \"core.startup\"");
 }
 

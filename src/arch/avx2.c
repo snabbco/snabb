@@ -63,7 +63,7 @@ static inline uint32_t cksum_avx2_loop(unsigned char *p, size_t n)
 
 uint16_t cksum_avx2(unsigned char *p, size_t n, uint32_t initial)
 {
-    uint32_t sum = ntohs(initial);
+    uint32_t sum = initial;
 
     if (n < 128) { return cksum_generic(p, n, initial); }
     if (n >= 64) {
