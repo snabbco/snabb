@@ -7,6 +7,8 @@
 --     Delete a memory mapping.
 --   shm.unlink(path)
 --     Unlink a subtree of objects from the filesystem.
+--
+-- (See NAME SYNTAX below for recognized name formats.)
 -- 
 -- Example:
 --   local freelist = shm.map("engine/freelist/packet", "struct freelist")
@@ -28,7 +30,7 @@
 -- have been deleted.
 --
 -- Behind the scenes the objects are backed by files on ram disk:
---   /var/run/engine/freelist/packet
+--   /var/run/snabb/$pid/engine/freelist/packet
 --
 -- and accessed with the equivalent of POSIX shared memory (shm_overview(7)).
 --
@@ -38,6 +40,22 @@
 --     $ sysctl vm.max_map_count
 --     vm.max_map_count = 65530
 
+-- NAME SYNTAX:
+-- 
+-- Names can be fully qualified, abbreviated to be within the current
+-- process, or further abbreviated to be relative to the current value
+-- of the 'path' variable. Here are examples of names and how they are
+-- resolved:
+--   Fully qualified:
+--     //snabb/1234/foo/bar => /var/run/snabb/1234/foo/bar
+--   Path qualified:
+--     /foo/bar             => /var/run/snabb/$pid/foo/bar
+--   Local:
+--     bar                  => /var/run/snabb/$pid/$path/bar
+-- .. where $pid is the PID of this process and $path is the current
+-- value of the 'path' variable in this module.
+
+
 module(..., package.seeall)
 
 local ffi = require("ffi")
@@ -45,25 +63,27 @@ local lib = require("core.lib")
 local S = require("syscall")
 
 -- Root directory where the object tree is created.
-local prefix = "/var/run"
+root = "/var/run/snabb"
+path = ""
 
 -- Table (address->size) of all currently mapped objects.
 mappings = {}
 
 -- Map an object into memory.
 function map (name, type,  readonly)
+   local path = resolve(name)
    local mapmode = readonly and 'read' or 'read, write'
    local ctype = ffi.typeof(type)
    local size = ffi.sizeof(ctype)
-   local stat = S.stat(prefix.."/"..name)
+   local stat = S.stat(root..'/'..path)
    if stat and stat.size ~= size then
       print(("shm warning: resizing %s from %d to %d bytes")
-            :format(name, stat.size, size))
+            :format(path, stat.size, size))
    end
    -- Create the parent directories. If this fails then so will the open().
-   mkdir(name)
-   local fd, err = S.open(prefix.."/"..name, "creat, rdwr", "rwxu")
-   if not fd then error("shm open error ("..name.."):"..tostring(err)) end
+   mkdir(path)
+   local fd, err = S.open(root..'/'..path, "creat, rdwr", "rwxu")
+   if not fd then error("shm open error ("..path.."):"..tostring(err)) end
    assert(fd:ftruncate(size), "shm: ftruncate failed")
    local mem, err = S.mmap(nil, size, mapmode, "shared", fd, 0)
    fd:close()
@@ -72,12 +92,21 @@ function map (name, type,  readonly)
    return ffi.cast(ffi.typeof("$&", ctype), mem)
 end
 
+function resolve (name)
+   local x = {} -- elements to be included in the path
+   local q, p = name:match("(^/*)(.*)")
+   if     q == "//" then x = {p}
+   elseif q == "/"  then x = {tostring(S.getpid()), p}
+   else                  x = {tostring(S.getpid()), path, p} end
+   return table.concat(x, "/")
+end
+
 -- Make directories needed for a named object.
 -- Given the name "foo/bar/baz" create /var/run/foo and /var/run/foo/bar.
 function mkdir (name)
-   local dir = prefix
-   name:gsub("([^/]+)/",
-             function (x) dir = dir.."/"..x  S.mkdir(dir, "rwxu") end)
+   local dir = root
+   name:gsub("([^/]+)",
+             function (x) S.mkdir(dir, "rwxu")  dir = dir.."/"..x end)
 end
 
 -- Delete a shared object memory mapping.
@@ -95,12 +124,25 @@ end
 
 -- Unlink names from their objects.
 function unlink (name)
-   return S.util.rm(prefix.."/"..name) -- recursive rm of file or directory
+   local path = resolve(name)
+   -- Note: Recursive delete is dangerous, important it is under $root!
+   return S.util.rm(root..'/'..path) -- recursive rm of file or directory
 end
 
 function selftest ()
    print("selftest: shm")
-   local name = "snabb/selftest/obj"
+   print("checking paths..")
+   path = 'foo/bar'
+   pid = tostring(S.getpid())
+   local p1 = resolve("//"..pid.."/foo/bar/baz/beer")
+   local p2 = resolve("/foo/bar/baz/beer")
+   local p3 = resolve("baz/beer")
+   assert(p1 == p2, p1.." ~= "..p2)
+   assert(p1 == p3, p1.." ~= "..p3)
+
+   print("checking shared memory..")
+   path = 'shm/selftest'
+   local name = "obj"
    print("create "..name)
    local p1 = map(name, "struct { int x, y, z; }")
    local p2 = map(name, "struct { int x, y, z; }")
@@ -111,16 +153,19 @@ function selftest ()
    assert(unlink(name))
    unmap(p1)
    unmap(p2)
+
    -- Test that we can open and cleanup many objects
+   print("checking many objects..")
+   path = 'shm/selftest/manyobj'
    local n = 10000
    local objs = {}
    for i = 1, n do
-      table.insert(objs, map("snabb/selftest/obj."..i, "uint64_t[1]"))
+      table.insert(objs, map("obj/"..i, "uint64_t[1]"))
    end
    print(n.." objects created")
    for i = 1, n do unmap(objs[i]) end
    print(n.." objects unmapped")
-   assert(unlink("snabb/selftest"))
+   assert(unlink("/"))
    print("selftest ok")
 end
 
