@@ -5,6 +5,7 @@ local lib    = require("core.lib")
 local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
+local top    = require("lib.ipc.shmem.top")
 local zone   = require("jit.zone")
 local ffi    = require("ffi")
 local C      = ffi.C
@@ -222,6 +223,7 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
+   init_realtime_stats()
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
@@ -241,12 +243,14 @@ function pace_breathing ()
       nextbreath = nextbreath or monotonic_now
       local sleep = tonumber(nextbreath - monotonic_now)
       if sleep > 1e-6 then
+         update_realtime_stats()
          C.usleep(sleep * 1e6)
          monotonic_now = C.get_monotonic_time()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
    else
       if lastfrees == frees then
+         update_realtime_stats()
 	 sleep = math.min(sleep + 1, maxsleep)
 	 C.usleep(sleep)
       else
@@ -294,6 +298,44 @@ function breathe ()
       firstloop = false
    until not progress  -- Stop after no link had new data
    breaths = breaths + 1
+end
+
+local shmem_stats = nil
+function init_realtime_stats ()
+   if not shmem_stats then
+      shmem_stats = top:new()
+   end
+   shmem_stats:set_n_links(#link_array)
+   for i, link in ipairs(link_array) do
+      local name = nil
+      for spec, spec_link in pairs(link_table) do
+         if link == spec_link then
+            name = spec
+            break
+         end
+      end
+      shmem_stats:set_link_name(i - 1, name)
+      shmem_stats:set_link(i - 1,
+                           link.stats.rxpackets,
+                           link.stats.txpackets,
+                           link.stats.rxbytes,
+                           link.stats.txbytes,
+                           link.stats.txdrop)
+   end
+end
+
+function update_realtime_stats ()
+   shmem_stats:set("frees", frees)
+   shmem_stats:set("bytes", freebytes)
+   shmem_stats:set("breaths", breaths)
+   for i, link in ipairs(link_array) do
+      shmem_stats:set_link(i - 1,
+                           link.stats.rxpackets,
+                           link.stats.txpackets,
+                           link.stats.rxbytes,
+                           link.stats.txbytes,
+                           link.stats.txdrop)
+   end
 end
 
 function report (options)
