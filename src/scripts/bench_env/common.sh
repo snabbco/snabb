@@ -157,9 +157,11 @@ on_exit () {
     printf "Waiting QEMU processes to terminate...\n"
     wait_pid $QEMUPIDS
 
-    # Kill qemu and snabbswitch instances and clean left over socket files
+    # Kill qemu and snabbswitch instances, clean left over socket files
+    # and remove stale runtime files.
     kill_pid $QEMUPIDS $SNABBPIDS $LOADGENPIDS $SNABB_PID0 $SNABB_PID1
     rm_file $QEMUSOCKS $NFV_SOCKET0 $NFV_SOCKET1
+    $SNABB gc
     printf "Finished.\n"
 }
 
