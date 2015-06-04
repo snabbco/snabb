@@ -54,6 +54,8 @@ function main ()
       os.exit(1)
    else
       require(modulename(program)).run(args)
+      -- Delete instance fs.
+      if _G.engine.instance_fs then _G.engine.instance_fs:delete() end
    end
 end
 
@@ -115,6 +117,8 @@ function handler (reason)
    print(reason)
    print(debug.traceback())
    if debug_on_error then debug.debug() end
+   -- Delete instance fs.
+   if _G.engine.instance_fs then _G.engine.instance_fs:delete() end
    os.exit(1)
 end
 

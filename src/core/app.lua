@@ -6,6 +6,7 @@ local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
 local top    = require("lib.ipc.shmem.top")
+local fs     = require("lib.ipc.fs")
 local zone   = require("jit.zone")
 local ffi    = require("ffi")
 local C      = ffi.C
@@ -16,6 +17,9 @@ log = false
 local use_restart = false
 
 test_skipped_code = 43
+
+-- Bound to instance of lib.ipc.fs for on first call to main.
+instance_fs = false
 
 -- The set of all active apps and links in the system.
 -- Indexed both by name (in a table) and by number (in an array).
@@ -223,6 +227,7 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
+   if not instance_fs then instance_fs = fs:new() end
    init_realtime_stats()
    monotonic_now = C.get_monotonic_time()
    repeat
@@ -303,7 +308,7 @@ end
 local shmem_stats = nil
 function init_realtime_stats ()
    if not shmem_stats then
-      shmem_stats = top:new()
+      shmem_stats = top:new(instance_fs:resource("core-stats"))
    end
    shmem_stats:set_n_links(#link_array)
    for i, link in ipairs(link_array) do
