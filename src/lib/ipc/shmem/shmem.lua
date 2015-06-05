@@ -278,7 +278,7 @@ function shmem:attach (options)
 	 length = tonumber(length)
 	 if o._ctype then
 	    ctype = o._ctype
-	    assert(ffi.sizeof(ctype == length))
+	    assert(ffi.sizeof(ctype) == length)
 	 else
 	    ctype = ffi.typeof("uint8_t [$]", length)
 	 end

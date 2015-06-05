@@ -3,6 +3,7 @@
 module(..., package.seeall)
 
 local lib = require("core.lib")
+local sandbox_loader = require('core.sandbox_loader')
 
 -- API: Create a new configuration.
 -- Initially there are no apps or links.
@@ -23,8 +24,11 @@ end
 --
 -- Example: config.app(c, "nic", Intel82599, {pciaddr = "0000:00:01.00"})
 function app (config, name, class, arg)
-   arg = arg or "nil"
+--    arg = arg or "nil"
    assert(type(name) == "string", "name must be a string")
+   if type(class) == 'string' then
+      class = sandbox_loader(class)
+   end
    assert(type(class) == "table", "class must be a table")
    config.apps[name] = { class = class, arg = arg}
 end

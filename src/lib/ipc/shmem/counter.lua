@@ -24,7 +24,7 @@ counter._name = "Counter shared memory"
 counter._namespace = "Counter"
 counter._version = 1
 -- Suppress the length field in the index file
-counter._fs = ''
+-- counter._fs = ''
 counter._ctype = ffi.typeof("uint64_t")
 
 function counter:register (name, value)

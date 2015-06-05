@@ -5,6 +5,7 @@ local lib    = require("core.lib")
 local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
+local stats  = require('core.stats')
 local zone   = require("jit.zone")
 local ffi    = require("ffi")
 local C      = ffi.C
@@ -26,9 +27,7 @@ configuration = config.new()
 -- Counters for statistics.
 -- TODO: Move these over to the counters framework
 breaths = 0			-- Total breaths taken
-frees   = 0			-- Total packets freed
-freebits = 0			-- Total packet bits freed (for 10GbE)
-freebytes = 0			-- Total packet bytes freed
+stats.new()
 
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
 --
@@ -97,7 +96,7 @@ function restart_dead_apps ()
 end
 
 -- Configure the running app network to match new_configuration.
--- 
+--
 -- Successive calls to configure() will migrate from the old to the
 -- new app network by making the changes needed.
 function configure (new_config)
@@ -186,7 +185,7 @@ function apply_config_actions (actions, conf)
    for _, action in ipairs({'stop', 'restart', 'keep', 'reconfig', 'start'}) do
       for _, name in ipairs(actions[action]) do
 	 if log and action ~= 'keep' then
-            io.write("engine: ", action, " app ", name, "\n") 
+            io.write("engine: ", action, " app ", name, "\n")
          end
 	 ops[action](name)
       end
@@ -211,6 +210,11 @@ function apply_config_actions (actions, conf)
    -- commit changes
    app_table, link_table = new_app_table, new_link_table
    app_array, link_array = new_app_array, new_link_array
+   for _, app in pairs(app_table) do
+      if app.inject_links then
+         app:inject_links()
+      end
+   end
 end
 
 -- Call this to "run snabb switch".
@@ -232,9 +236,6 @@ function main (options)
 end
 
 local nextbreath
-local lastfrees = 0
-local lastfreebits = 0
-local lastfreebytes = 0
 -- Wait between breaths to keep frequency with Hz.
 function pace_breathing ()
    if Hz then
@@ -246,15 +247,12 @@ function pace_breathing ()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
    else
-      if lastfrees == frees then
-	 sleep = math.min(sleep + 1, maxsleep)
-	 C.usleep(sleep)
+      if stats.breathe() > 0 then
+         sleep = math.min(sleep + 1, maxsleep)
+         C.usleep(sleep)
       else
-	 sleep = math.floor(sleep/2)
+         sleep = math.floor(sleep/2)
       end
-      lastfrees = frees
-      lastfreebytes = freebytes
-      lastfreebits = freebits
    end
 end
 
@@ -314,14 +312,11 @@ end
 --   fpb  - frees per breath
 --   bpp  - bytes per packet (average packet size)
 local lastloadreport = nil
-local reportedfrees = nil
 local reportedbreaths = nil
 function report_load ()
    if lastloadreport then
       local interval = now() - lastloadreport
-      local newfrees   = frees - reportedfrees
-      local newbytes   = freebytes - reportedfreebytes
-      local newbits    = freebits - reportedfreebits
+      local newfrees, newbytes, newbits = stats.report()
       local newbreaths = breaths - reportedbreaths
       local fps = math.floor(newfrees/interval)
       local fbps = math.floor(newbits/interval)
@@ -336,9 +331,6 @@ function report_load ()
 	    sleep))
    end
    lastloadreport = now()
-   reportedfrees = frees
-   reportedfreebits = freebits
-   reportedfreebytes = freebytes
    reportedbreaths = breaths
 end
 
