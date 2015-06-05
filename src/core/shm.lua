@@ -93,12 +93,14 @@ function map (name, type,  readonly)
 end
 
 function resolve (name)
-   local x = {} -- elements to be included in the path
-   local q, p = name:match("(^/*)(.*)")
-   if     q == "//" then x = {p}
-   elseif q == "/"  then x = {tostring(S.getpid()), p}
-   else                  x = {tostring(S.getpid()), path, p} end
-   return table.concat(x, "/")
+   local result = name
+   -- q is qualifier ("", "/", "//")
+   local q, p = name:match("^(/*)(.*)")
+   -- Add path, if name is related and path is defined
+   if q == '' and path ~= '' then result = path.."/"..result end
+   -- Add process qualifier, unless name is fully qualified
+   if q ~= '//'              then result = tostring(S.getpid()).."/"..result end
+   return result
 end
 
 -- Make directories needed for a named object.
