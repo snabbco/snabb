@@ -93,12 +93,9 @@ function map (name, type,  readonly)
 end
 
 function resolve (name)
-   local result = name
-   -- q is qualifier ("", "/", "//")
-   local q, p = name:match("^(/*)(.*)")
-   -- Add path, if name is related and path is defined
+   local q, p = name:match("^(/*)(.*)") -- split qualifier (/ or //)
+   local result = p
    if q == '' and path ~= '' then result = path.."/"..result end
-   -- Add process qualifier, unless name is fully qualified
    if q ~= '//'              then result = tostring(S.getpid()).."/"..result end
    return result
 end
