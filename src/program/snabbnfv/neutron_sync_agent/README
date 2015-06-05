@@ -12,6 +12,10 @@ point to the location of the neutron2snabb command. The default is
   -h HOST, --sync-host HOST
                              Connect to snabbnfv-sync-master on HOST.
                              Default: $SYNC_HOST
+
+  -P PORT, --sync-port PORT
+                             Connect to snabbnfv-sync-master on PORT.
+                             Default: $SYNC_PORT or 9418
   -p PATH, --sync-path PATH
                              Use PATH on snabbnfv-sync-master.
                              Default: $SYNC_PATH
@@ -21,5 +25,8 @@ point to the location of the neutron2snabb command. The default is
   -i SECONDS, --interval SECONDS
                              Sleep for SECONDS between sync requests.
                              Default: $SYNC_INTERVAL or 1
+  -t DIR, --tmp-dir DIR
+                             Store temporary files in DIR.
+			     Default: $TMP_DIR or /tmp/snabbswitch
   -h, --help
                              Print this help message and exit.
