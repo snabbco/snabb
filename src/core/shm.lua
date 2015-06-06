@@ -128,6 +128,20 @@ function unlink (name)
    return S.util.rm(root..'/'..path) -- recursive rm of file or directory
 end
 
+-- Return an array of objects under the prefix name.
+-- The names are returned unqualified e.g. 'x' and not 'foo/bar/x'.
+function children (name)
+   -- XXX dirtable returns an array but with a special tostring metamethod.
+   --     Potentially confusing? (Copy into plain array instead?)
+   return S.util.dirtable(root.."/"..resolve(name), true) or {}
+end
+
+-- Create an additional name for an existing object.
+function alias (toname, fromname)
+   assert(S.symlink(root.."/"..resolve(toname), root.."/"..resolve(fromname)),
+          "alias symlink failed")
+end
+
 function selftest ()
    print("selftest: shm")
    print("checking paths..")
@@ -145,10 +159,13 @@ function selftest ()
    print("create "..name)
    local p1 = map(name, "struct { int x, y, z; }")
    local p2 = map(name, "struct { int x, y, z; }")
+   alias(name, name..".alias")
+   local p3 = map(name..".alias", "struct { int x, y, z; }")
    assert(p1 ~= p2)
    assert(p1.x == p2.x)
    p1.x = 42
    assert(p1.x == p2.x)
+   assert(p1.x == p3.x)
    assert(unlink(name))
    unmap(p1)
    unmap(p2)
@@ -164,6 +181,7 @@ function selftest ()
    print(n.." objects created")
    for i = 1, n do unmap(objs[i]) end
    print(n.." objects unmapped")
+   assert((#children("/shm/selftest/manyobj/obj")) == n, "child count mismatch")
    assert(unlink("/"))
    print("selftest ok")
 end
