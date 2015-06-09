@@ -8,6 +8,7 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
+local syscall = require("syscall")
 
 local lib = require("core.lib")
 require("core.memory_h")
@@ -61,16 +62,21 @@ function allocate_hugetlb_chunk ()
 end
 
 function reserve_new_page ()
+   -- Check that we have permission
    lib.root_check("error: must run as root to allocate memory for DMA")
-   set_hugepages(get_hugepages() + 1)
-end
-
-function get_hugepages ()
-   return lib.readfile("/proc/sys/vm/nr_hugepages", "*n")
-end
-
-function set_hugepages (n)
-   lib.writefile("/proc/sys/vm/nr_hugepages", tostring(n))
+   -- Is the kernel shm limit too low for huge pages?
+   if huge_page_size > tonumber(syscall.sysctl("kernel.shmmax")) then
+      -- Yes: fix that
+      local old = syscall.sysctl("kernel.shmmax", tostring(huge_page_size))
+      io.write("[memory: Enabling huge pages for shm: ",
+               "sysctl kernel.shmmax ", old, " -> ", huge_page_size, "]\n")
+   else
+      -- No: try provisioning an additional page
+      local have = tonumber(syscall.sysctl("vm.nr_hugepages"))
+      local want = have + 1
+      syscall.sysctl("vm.nr_hugepages", tostring(want))
+      io.write("[memory: Provisioned a huge page: sysctl vm.nr_hugepages ", have, " -> ", want, "]\n")
+   end
 end
 
 function get_huge_page_size ()
@@ -102,7 +108,7 @@ end
 
 function selftest (options)
    print("selftest: memory")
-   print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
+   print("Kernel vm.nr_hugepages: " .. syscall.sysctl("vm.nr_hugepages"))
    for i = 1, 4 do
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
       io.flush()
@@ -113,7 +119,7 @@ function selftest (options)
       ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- try a write
       assert(dmaptr ~= nil and dmalen == huge_page_size)
    end
-   print("HugeTLB pages (/proc/sys/vm/nr_hugepages): " .. get_hugepages())
+   print("Kernel vm.nr_hugepages: " .. syscall.sysctl("vm.nr_hugepages"))
    print("HugeTLB page allocation OK.")
 end
 

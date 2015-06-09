@@ -182,12 +182,18 @@ $(RMOBJS): %: %.src
 	$(E) "MARKDOWN  $@"
 	$(Q) scripts/process-markdown $< > $@
 
-$(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
+$(INCOBJ): obj/%_inc.o: %.inc Makefile program/programs.inc | $(OBJDIR)
 	$(E) "INC       $@"
 	@(echo -n "return [=============["; \
 	 cat $<; \
 	 echo "]=============]") > $(basename $@).luainc
 	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
+
+# Create list of programs that exist
+program/programs.inc:
+	@(for d in program/*/; do basename $$d; done) > $@
+
+FORCE:
 
 # extra/ third party bits and pieces
 obj/strict.o: extra/strict.lua | $(OBJDIR)

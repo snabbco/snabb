@@ -14,3 +14,4 @@ obj
 /src/syscall.lua
 /src/syscall
 /deps/*.vsn
+/src/program/programs.inc

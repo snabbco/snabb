@@ -3,6 +3,7 @@ module(..., package.seeall)
 local lib  = require("core.lib")
 local json = require("lib.json")
 local usage = require("program.snabbnfv.neutron2snabb.README_inc")
+local neutron2snabb_schema = require("program.snabbnfv.neutron2snabb.neutron2snabb_schema")
 
 local NULL = "\\N"
 
@@ -13,6 +14,31 @@ function run (args)
    create_config(unpack(args))
 end
 
+-- The Neutron database tables that we need schema information to process.
+schema_tables = {
+   'ml2_network_segments', 'networks', 'ports', 'ml2_port_bindings',
+   'securitygrouprules', 'securitygroupportbindings'
+}
+
+-- The default schema below is assumed if the database snapshot does
+-- not include parsable table definitions.
+default_schemas = {
+   ml2_network_segments = {'id', 'network_id', 'network_type',
+                           'physical_network', 'segmentation_id'},
+   networks             = {'tenant_id', 'id', 'name', 'status',
+                           'admin_state_up', 'shared'},
+   ports                = {'tenant_id', 'id', 'name', 'network_id',
+                           'mac_address', 'admin_state_up', 'status',
+                           'device_id', 'device_owner'},
+   ml2_port_bindings    = {'port_id', 'host', 'vif_type', 'driver', 'segment',
+                           'vnic_type', 'vif_details', 'profile'},
+   securitygrouprules   = {'tenant_id', 'id', 'security_group_id',
+                           'remote_group_id', 'direction', 'ethertype',
+                           'protocol', 'port_range_min', 'port_range_max',
+                           'remote_ip_prefix'},
+   securitygroupportbindings = {'port_id', 'security_group_id'}
+}
+
 -- Create a Snabb Switch traffic process configuration.
 --
 -- INPUT_DIR contains the Neutron database dump.
@@ -22,41 +48,53 @@ end
 --
 -- HOSTNAME is optional and defaults to the local hostname.
 function create_config (input_dir, output_dir, hostname)
+   local ok, schema = pcall(neutron2snabb_schema.read, input_dir, schema_tables)
+   if not ok then
+      print("Warning - falling back to default schema because none found:")
+      print("  "..schema)
+      schema = default_schemas
+   end
    local hostname = hostname or gethostname()
    local segments = parse_csv(input_dir.."/ml2_network_segments.txt",
-                              {'id', 'network_id', 'network_type', 'physical_network', 'segmentation_id'},
-                              'network_id')
+                              schema.ml2_network_segments,
+                              'id')
    local networks = parse_csv(input_dir.."/networks.txt",
-                              {'tenant_id', 'id', 'name', 'status', 'admin_state_up', 'shared'},
+                              schema.networks,
                               'id')
    local ports = parse_csv(input_dir.."/ports.txt",
-                           {'tenant_id', 'id', 'name', 'network_id', 'mac_address', 'admin_state_up', 'status', 'device_id', 'device_owner'},
+                           schema.ports,
                            'id')
    local port_bindings = parse_csv(input_dir.."/ml2_port_bindings.txt",
-                                   {'id', 'host', 'vif_type', 'driver', 'segment', 'vnic_type', 'vif_details', 'profile'},
-                                   'id')
+                                   schema.ml2_port_bindings,
+                                   'port_id')
    local secrules = parse_csv(input_dir.."/securitygrouprules.txt",
-                              {'tenant_id', 'id', 'security_group_id', 'remote_group_id', 'direction', 'ethertype', 'protocol', 'port_range_min', 'port_range_max', 'remote_ip_prefix'},
+                              schema.securitygrouprules,
                               'security_group_id', true)
    local secbindings = parse_csv(input_dir.."/securitygroupportbindings.txt",
-                                 {'port_id', 'security_group_id'},
+                                 schema.securitygroupportbindings,
                                  'port_id')
+   print("Parsing neutron db tables")
    -- Compile zone configurations.
    local zones = {}
    for _, port in pairs(ports) do
+      print("PortID: ", port.id)
       local binding = port_bindings[port.id]
       -- If the port is a 'snabb' port, lives on our host and is online
       -- then we compile its configuration.
+      print("BindingID ", binding.id, " has driver ", binding.driver)
       if binding.driver == "snabb" then
          local vif_details = json.decode(binding.vif_details)
          -- See https://github.com/SnabbCo/snabbswitch/pull/423
          local profile = vif_details["binding:profile"]
          profile = profile or {}
+         print("vif_details has hostname ", vif_details.zone_host, "(we want ", hostname, ")")
          if vif_details.zone_host == hostname then
             local zone_port = vif_details.zone_port
             -- Each zone can have multiple port configurtions.
             if not zones[zone_port] then zones[zone_port] = {} end
+            print("admin_state_ip is ", port.admin_state_up)
             if port.admin_state_up ~= '0' then
+               print("Adding zone port '", zone_port, "' to list")
                -- Note: Currently we don't use `vif_details.zone_gbps'
                -- because its "not needed by the traffic process in the
                -- current implementation".
@@ -171,17 +209,19 @@ end
 
 function ruletofilter (r, direction)
    local matches = {}           -- match rules to be combined
-   if     r.ethertype == "ipv4" then matches[#matches+1] = "ip"
-   elseif r.ethertype == "ipv6" then matches[#matches+1] = "ip6"
+   local icmp
+   if     r.ethertype == "ipv4" then matches[#matches+1] = "ip"  icmp = 'icmp'
+   elseif r.ethertype == "ipv6" then matches[#matches+1] = "ip6" icmp = 'icmp6'
    else   error("unknown ethertype: " .. r.ethertype) end
    
    if     r.protocol == "tcp" then matches[#matches+1] = "tcp"
-   elseif r.protocol == "udp" then matches[#matches+1] = "udp" end
-   
+   elseif r.protocol == "udp" then matches[#matches+1] = "udp"
+   elseif r.protocol == "icmp" then matches[#matches+1] = icmp end
+
    if r.port_range_min or r.port_range_max then
       local min = r.port_range_min or r.port_range_max
       local max = r.port_range_max or r.port_range_min
-      matches[#matches+1] = ("portrange %d-%d"):format(min, max)
+      matches[#matches+1] = ("dst portrange %d-%d"):format(min, max)
    end
    
    if r.remote_ip_prefix then
@@ -220,14 +260,13 @@ function selftest ()
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp'}}", 
              '(arp or (ip and udp))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp', port_range_min=1000}}",
-             '(arp or (ip and udp and portrange 1000-1000))')
+             '(arp or (ip and udp and dst portrange 1000-1000))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='udp', port_range_max=2000}}",
-             '(arp or (ip and udp and portrange 2000-2000))')
+             '(arp or (ip and udp and dst portrange 2000-2000))')
    checkrule("{{direction='ingress', ethertype='IPv4', protocol='tcp', port_range_min=1000, port_range_max=2000}}",
-             '(arp or (ip and tcp and portrange 1000-2000))')
+             '(arp or (ip and tcp and dst portrange 1000-2000))')
    checkrule("{{direction='ingress', ethertype='IPv6', protocol='tcp'}, {direction='ingress', ethertype='IPv4', protocol='udp', remote_ip_prefix='10.0.0.0/8'}}",
              '((ip6 and tcp) or (arp or (ip and udp and src net 10.0.0.0/8)))')
    print("selftest ok")
 end
-
 
