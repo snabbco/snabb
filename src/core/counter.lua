@@ -29,10 +29,10 @@ require("core.counter_h")
 
 local counter_t = ffi.typeof("struct counter")
 
-function open (name)          return shm.map(name, counter_t) end
-function set (counter, value) counter.c = value               end
-function add (counter, value) counter.c = counter.c + value   end
-function read (counter)       return counter.c                end
+function open (name, readonly) return shm.map(name, counter_t, readonly) end
+function set  (counter, value) counter.c = value                         end
+function add  (counter, value) counter.c = counter.c + value             end
+function read (counter)        return counter.c                          end
 
 function selftest ()
    print("selftest: core.counter")
