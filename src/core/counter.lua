@@ -25,7 +25,9 @@ module(..., package.seeall)
 
 local shm = require("core.shm")
 local ffi = require("ffi")
-local counter_t = ffi.typeof("struct { uint64_t c; }")
+require("core.counter_h")
+
+local counter_t = ffi.typeof("struct counter")
 
 function open (name)          return shm.map(name, counter_t) end
 function set (counter, value) counter.c = value               end
