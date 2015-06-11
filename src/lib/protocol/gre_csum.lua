@@ -11,10 +11,10 @@ local gre_csum = subClass(gre)
 
 local gre_csum_t = ffi.typeof[[
       struct {
-	 uint16_t bits; // Flags, version
-	 uint16_t protocol;
-	 uint16_t csum;
-	 uint16_t reserved1;
+         uint16_t bits; // Flags, version
+         uint16_t protocol;
+         uint16_t csum;
+         uint16_t reserved1;
       }
 ]]
 

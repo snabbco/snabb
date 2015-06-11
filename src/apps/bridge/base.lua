@@ -12,7 +12,7 @@
 --
 -- config = { ports = { <free-port1>, <free-port2>, ... },
 --            split_horizon_groups = {
---              <sh_group1> = { <shg1-port1>, <shg1-port2>, ...}, 
+--              <sh_group1> = { <shg1-port1>, <shg1-port2>, ...},
 --              ...},
 --            config = { <bridge-specific-config> } }
 --
@@ -60,7 +60,7 @@ function bridge:new (arg)
    local ports = {}
    local function add_port(port, group)
       assert(not ports[port],
-	     self:name()..": duplicate definition of port "..port)
+             self:name()..": duplicate definition of port "..port)
       ports[port] = group
    end
    for _, port in ipairs(conf.ports) do
@@ -68,9 +68,9 @@ function bridge:new (arg)
    end
    if conf.split_horizon_groups then
       for group, ports in pairs(conf.split_horizon_groups) do
-	 for _, port in ipairs(ports) do
-	    add_port(port, group)
-	 end
+         for _, port in ipairs(ports) do
+            add_port(port, group)
+         end
       end
    end
    local src_ports, dst_ports = {}, {}
@@ -78,9 +78,9 @@ function bridge:new (arg)
       table.insert(src_ports, sport)
       dst_ports[sport] = {}
       for dport, dgroup in pairs(ports) do
-	 if not (sport == dport or (sgroup ~= '' and sgroup == dgroup)) then
-	    table.insert(dst_ports[sport], dport)
-	 end
+         if not (sport == dport or (sgroup ~= '' and sgroup == dgroup)) then
+            table.insert(dst_ports[sport], dport)
+         end
       end
    end
    o._src_ports = src_ports

@@ -42,7 +42,7 @@
 -- ethernet._name = "ethernet"
 -- ethernet._header_type = ether_header_t
 -- ethernet._header_ptr_type = ffi.typeof("$*", ether_header_t)
--- ethernet._ulp = { 
+-- ethernet._ulp = {
 --    class_map = { [0x86dd] = "lib.protocol.ipv6" },
 --    method    = 'type' }
 --
@@ -147,7 +147,7 @@ end
 -- default equality method, can be overriden in the ancestors
 function header:eq (other)
    return (ffi.string(self._header[0], self:sizeof()) ==
-	ffi.string(other._header[0],self:sizeof()))
+        ffi.string(other._header[0],self:sizeof()))
 end
 
 -- Copy the header to some location in memory (usually a packet
@@ -179,9 +179,9 @@ function header:upper_layer ()
    local class = self._ulp.class_map[self[method](self)]
    if class then
       if package.loaded[class] then
-	 return package.loaded[class]
+         return package.loaded[class]
       else
-	 return require(class)
+         return require(class)
       end
    else
       return nil

@@ -49,8 +49,8 @@ function LoadGen:push ()
    if self.input.input then
       while not link.empty(self.input.input) and can_transmit(self.dev) do
          do local p = receive(self.input.input)
-	    transmit(self.dev, p)
-	 end
+            transmit(self.dev, p)
+         end
       end
    end
 end

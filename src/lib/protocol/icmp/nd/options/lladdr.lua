@@ -5,7 +5,7 @@ local lladdr = subClass(nil)
 
 local lladdr_t = ffi.typeof[[
       struct {
-	 uint8_t lladdr[6];
+         uint8_t lladdr[6];
       }
 ]]
 

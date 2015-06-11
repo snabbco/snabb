@@ -2,7 +2,7 @@
 -- bridge" using a Bloom filter (provided by lib.bloom_filter) to
 -- store the set of MAC source addresses of packets arriving on each
 -- port.
--- 
+--
 -- Two Bloom storage cells called mac_table and mac_shadow are
 -- allocated for each port connected to the bridge.  For each packet
 -- arriving on a port, the MAC source address is stored in both cells.
@@ -66,14 +66,14 @@ bridge = subClass(bridge_base)
 bridge._name = "learning bridge"
 
 local default_config = { mac_table_size = 1000, fp_rate = 0.001,
-			 timeout = 60, verbose = false }
+                         timeout = 60, verbose = false }
 
 function bridge:new (arg)
    local o = bridge:superClass().new(self, arg)
    local conf = o._conf
    for k, v in pairs(default_config) do
       if not conf[k] then
-	 conf[k] = v
+         conf[k] = v
       end
    end
    local bf = bloom:new(conf.mac_table_size, conf.fp_rate)
@@ -84,30 +84,30 @@ function bridge:new (arg)
    o._filters = {}
    for _, port in ipairs(o._src_ports) do
       o._filters[port] = { mac_table = bf:cell_new(),
-			   mac_shadow = bf:cell_new(),
-			   mac_address = bf:item_new()
-			}
+                           mac_shadow = bf:cell_new(),
+                           mac_address = bf:item_new()
+                        }
 
    end
    o._eth_dst = bf:item_new()
 
    timer.activate(timer.new("mac_learn_timeout",
-   			    function (t)
-			       if conf.verbose then
-				  print("MAC learning timeout")
-				  print("Table usage per port:")
-			       end
-   			       for port, filter in pairs(o._filters) do
-   				  bf:cell_copy(filter.mac_shadow, filter.mac_table)
-   				  bf:cell_clear(filter.mac_shadow)
-				  if conf.verbose then
-				     print(string.format("\t%s: %02.2f%%", port,
-							 100*bf:cell_usage(filter.mac_table)))
-				  end
-   			       end
-   			    end,
-			    conf.timeout *1e9, 'repeating')
-   	       )
+                               function (t)
+                               if conf.verbose then
+                                  print("MAC learning timeout")
+                                  print("Table usage per port:")
+                               end
+                                  for port, filter in pairs(o._filters) do
+                                     bf:cell_copy(filter.mac_shadow, filter.mac_table)
+                                     bf:cell_clear(filter.mac_shadow)
+                                  if conf.verbose then
+                                     print(string.format("\t%s: %02.2f%%", port,
+                                                         100*bf:cell_usage(filter.mac_table)))
+                                  end
+                                  end
+                               end,
+                            conf.timeout *1e9, 'repeating')
+                  )
 
    -- Caches for various cdata pointer objects to avoid boxing in the
    -- push() loop
@@ -141,7 +141,7 @@ function bridge:push()
       mem[0] = packet.data(p[0])
       local is_mcast = ethernet:is_mcast(mem[0])
       if not is_mcast then
-	 bf:store_value(mem, 6, eth_dst)
+         bf:store_value(mem, 6, eth_dst)
       end
 
       -- Store the source MAC address in the active and shadow
@@ -151,32 +151,32 @@ function bridge:push()
       mem[0] = mem[0] + 6
       bf:store_value(mem, 6, mac_address, filter.mac_table)
       bf:store_item(mac_address, filter.mac_shadow)
-      
+
       local ports = dst_ports[src_port]
       local copy = false
       local j = 1
       while ports[j] do
-	 local dst_port = ports[j]
-	 if is_mcast or bf:check_item(eth_dst, filters[dst_port].mac_table) then
-	    if not copy then
-	       transmit(self.output[dst_port], p[0])
-	       copy = true
-	    else
-	       transmit(self.output[dst_port], clone(p[0]))
-	    end
-	 end
-	 j = j + 1
+         local dst_port = ports[j]
+         if is_mcast or bf:check_item(eth_dst, filters[dst_port].mac_table) then
+            if not copy then
+               transmit(self.output[dst_port], p[0])
+               copy = true
+            else
+               transmit(self.output[dst_port], clone(p[0]))
+            end
+         end
+         j = j + 1
       end
       if not copy then
-	 -- The source MAC address is unknown, flood the packet to
-	 -- all ports
-	 local output = self.output
-	 transmit(output[ports[1]], p[0])
-	 local j = 2
-	 while ports[j] do
-	    transmit(output[ports[j]], clone(p[0]))
-	    j = j + 1
-	 end
+         -- The source MAC address is unknown, flood the packet to
+         -- all ports
+         local output = self.output
+         transmit(output[ports[1]], p[0])
+         local j = 2
+         while ports[j] do
+            transmit(output[ports[j]], clone(p[0]))
+            j = j + 1
+         end
       end
    end -- of while not empty(l_in)
    if self._port_index == self._nsrc_ports then
