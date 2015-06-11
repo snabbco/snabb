@@ -27,14 +27,14 @@ function bridge:push()
       local src_port = src_ports[i]
       local l_in = self.input[src_port]
       while not empty(l_in) do
-	 local ports = dst_ports[src_port]
-	 local p = receive(l_in)
-	 transmit(output[ports[1]], p)
-	 local j = 2
-	 while ports[j] do
-	    transmit(output[ports[j]], clone(p))
-	    j = j + 1
-	 end
+         local ports = dst_ports[src_port]
+         local p = receive(l_in)
+         transmit(output[ports[1]], p)
+         local j = 2
+         while ports[j] do
+            transmit(output[ports[j]], clone(p))
+            j = j + 1
+         end
       end
       i = i + 1
    end

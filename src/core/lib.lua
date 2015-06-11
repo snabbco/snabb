@@ -71,7 +71,7 @@ end
 
 function dirname(path)
     if not path then return path end
-    
+
     local buf = ffi.new("char[?]", #path+1)
     ffi.copy(buf, path)
     local ptr = C.dirname(buf)
@@ -80,7 +80,7 @@ end
 
 function basename(path)
     if not path then return path end
-    
+
     local buf = ffi.new("char[?]", #path+1)
     ffi.copy(buf, path)
     local ptr = C.basename(buf)
@@ -159,7 +159,7 @@ end
 function bits (bitset, basevalue)
    local sum = basevalue or 0
    for _,n in pairs(bitset) do
-	 sum = bit.bor(sum, bit.lshift(1, n))
+      sum = bit.bor(sum, bit.lshift(1, n))
    end
    return sum
 end
@@ -176,7 +176,7 @@ end
 -- this would be save, but masking and shifting is guaranteed to be
 -- portable.  Performance could be an issue, though.
 
-local bitfield_endian_conversion = 
+local bitfield_endian_conversion =
    { [16] = { ntoh = C.ntohs, hton = C.htons },
      [32] = { ntoh = C.ntohl, hton = C.htonl }
   }
@@ -195,9 +195,9 @@ function bitfield(size, struct, member, offset, nbits, value)
    if value then
       field = bit.bor(bit.band(field, imask), bit.lshift(value, shift))
       if conv then
-	 struct[member] = conv.hton(field)
+         struct[member] = conv.hton(field)
       else
-	 struct[member] = field
+         struct[member] = field
       end
    else
       return bit.rshift(bit.band(field, mask), shift)
@@ -260,15 +260,15 @@ function bounds_checked (type, base, offset, size)
    type = ffi.typeof(type)
    local tptr = ffi.typeof("$ *", type)
    local wrap = ffi.metatype(ffi.typeof("struct { $ _ptr; }", tptr), {
-				__index = function(w, idx)
-					     assert(idx < size)
-					     return w._ptr[idx]
-					  end,
-				__newindex = function(w, idx, val)
-						assert(idx < size)
-						w._ptr[idx] = val
-					     end,
-			     })
+                                __index = function(w, idx)
+                                             assert(idx < size)
+                                             return w._ptr[idx]
+                                          end,
+                                __newindex = function(w, idx, val)
+                                                assert(idx < size)
+                                                w._ptr[idx] = val
+                                             end,
+                             })
    return wrap(ffi.cast(tptr, ffi.cast("uint8_t *", base) + offset))
 end
 
@@ -397,10 +397,10 @@ ntohs = htons
 function dogetopt (args, actions, opts, long_opts)
    local opts,optind,optarg = getopt.get_ordered_opts(args, opts, long_opts)
    for i, v in ipairs(opts) do
-      if actions[v] then 
-	 actions[v](optarg[i]) 
+      if actions[v] then
+         actions[v](optarg[i])
       else
-	 error("unimplemented option: " .. v) 
+         error("unimplemented option: " .. v)
       end
    end
    local rest = {}
@@ -414,11 +414,11 @@ function have_module (name)
       return true
    else
       for _, searcher in ipairs(package.loaders) do
-	 local loader = searcher(name)
-	 if type(loader) == 'function' then
-	    package.preload[name] = loader
-	    return true
-	 end
+         local loader = searcher(name)
+         if type(loader) == 'function' then
+            package.preload[name] = loader
+            return true
+         end
       end
       return false
    end
@@ -447,7 +447,7 @@ function selftest ()
    local data = "\x45\x00\x00\x73\x00\x00\x40\x00\x40\x11\xc0\xa8\x00\x01\xc0\xa8\x00\xc7"
    local cs = csum(data, string.len(data))
    assert(cs == 0xb861, "bad checksum: " .. bit.tohex(cs, 4))
-   
+
 --    assert(readlink('/etc/rc2.d/S99rc.local') == '../init.d/rc.local', "bad readlink")
 --    assert(dirname('/etc/rc2.d/S99rc.local') == '/etc/rc2.d', "wrong dirname")
 --    assert(basename('/etc/rc2.d/S99rc.local') == 'S99rc.local', "wrong basename")

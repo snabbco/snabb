@@ -5,11 +5,11 @@ local nd_header = require("lib.protocol.icmp.nd.header")
 
 local ns_t = ffi.typeof[[
       struct {
-	 uint32_t reserved;
-	 uint8_t  target[16];
+         uint32_t reserved;
+         uint8_t  target[16];
       }
 ]]
-   
+
 local ns = subClass(nd_header)
 
 -- Class variables

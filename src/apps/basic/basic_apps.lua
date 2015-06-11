@@ -41,7 +41,7 @@ function Join:new()
    return setmetatable({}, {__index=Join})
 end
 
-function Join:push () 
+function Join:push ()
    for _, inport in ipairs(self.input) do
       for n = 1,math.min(link.nreadable(inport), link.nwritable(self.output.out)) do
          transmit(self.output.out, receive(inport))
@@ -105,11 +105,11 @@ function Tee:push ()
          for _ = 1, math.min(link.nreadable(i), maxoutput) do
             local p = receive(i)
             maxoutput = maxoutput - 1
-	    do local output = self.output
-	       for k = 1, #output do
-		  transmit(output[k], k == #output and p or packet.clone(p))
-	       end
-	    end
+            do local output = self.output
+               for k = 1, #output do
+                  transmit(output[k], k == #output and p or packet.clone(p))
+               end
+            end
          end
       end
    end

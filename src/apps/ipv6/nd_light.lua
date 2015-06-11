@@ -69,8 +69,8 @@ local function check_ip_address(ip, desc)
       ip = ipv6:pton(ip)
    else
       assert(type(ip) == "cdata",
-	     "nd_light: invalid type of "..desc.." IP address, expected cdata, got "
-		..type(ip))
+             "nd_light: invalid type of "..desc.." IP address, expected cdata, got "
+                ..type(ip))
    end
    return ip
 end
@@ -85,19 +85,19 @@ function nd_light:new (arg)
       conf.local_mac = ethernet:pton(conf.local_mac)
    else
       assert(type(conf.local_mac) == "cdata",
-	     "nd_light: invalid type for local MAC address, expected cdata, got "
-		..type(conf.local_mac))
+             "nd_light: invalid type for local MAC address, expected cdata, got "
+                ..type(conf.local_mac))
    end
    conf.local_ip = check_ip_address(conf.local_ip, "local")
    conf.next_hop = check_ip_address(conf.next_hop, "next-hop")
 
    o._config = conf
    o._match_ns = function(ns)
-		    return(ns:target_eq(conf.local_ip))
-		 end
+                    return(ns:target_eq(conf.local_ip))
+                 end
    o._match_na = function(na)
-		    return(na:target_eq(conf.next_hop) and na:solicited())
-		 end
+                    return(na:target_eq(conf.next_hop) and na:solicited())
+                 end
    local errmsg
    o._filter, errmsg = filter:new("icmp6 and ( ip6[40] = 135 or ip6[40] = 136 )")
    assert(o._filter, errmsg and ffi.string(errmsg))
@@ -108,9 +108,9 @@ function nd_light:new (arg)
    nh.packet = dgram:packet()
    local sol_node_mcast = ipv6:solicited_node_mcast(conf.next_hop)
    local ipv6 = ipv6:new({ next_header = 58, -- ICMP6
-	 hop_limit = 255,
-	 src = conf.local_ip,
-	 dst = sol_node_mcast })
+         hop_limit = 255,
+         src = conf.local_ip,
+         dst = sol_node_mcast })
    local icmp = icmp:new(135, 0)
 
    -- Construct a neighbor solicitation with a source link-layer
@@ -128,27 +128,27 @@ function nd_light:new (arg)
    ipv6:payload_length(icmp:sizeof() + ns:sizeof() + src_lladdr_tlv_len)
    dgram:push(ipv6)
    dgram:push(ethernet:new({ src = conf.local_mac,
-			     dst = ethernet:ipv6_mcast(sol_node_mcast),
-			     type = 0x86dd }))
+                             dst = ethernet:ipv6_mcast(sol_node_mcast),
+                             type = 0x86dd }))
    dgram:free()
 
    -- Timer for retransmits of neighbor solicitations
    nh.timer_cb = function (t)
-		    local nh = o._next_hop
-		    print(string.format("Sending neighbor solicitation for next-hop %s",
-					ipv6:ntop(conf.next_hop)))
-		    link.transmit(o.output.south, packet.clone(nh.packet))
-		    nh.nsent = nh.nsent + 1
-		    if (not o._config.retrans or nh.nsent <= o._config.retrans)
+                    local nh = o._next_hop
+                    print(string.format("Sending neighbor solicitation for next-hop %s",
+                                        ipv6:ntop(conf.next_hop)))
+                    link.transmit(o.output.south, packet.clone(nh.packet))
+                    nh.nsent = nh.nsent + 1
+                    if (not o._config.retrans or nh.nsent <= o._config.retrans)
                        and not o._eth_header
                     then
                        timer.activate(nh.timer)
-		    end
-		    if o._config.retrans and nh.nsent > o._config.retrans then
-		       error(string.format("ND for next hop %s has failed",
-					   ipv6:ntop(conf.next_hop)))
-		    end
-		 end
+                    end
+                    if o._config.retrans and nh.nsent > o._config.retrans then
+                       error(string.format("ND for next hop %s has failed",
+                                           ipv6:ntop(conf.next_hop)))
+                    end
+                 end
    nh.timer = timer.new("ns retransmit", nh.timer_cb, 1e6 * conf.delay)
    o._next_hop = nh
 
@@ -159,8 +159,8 @@ function nd_light:new (arg)
    -- Leave dst address unspecified.  It will be set to the source of
    -- the incoming solicitation
    ipv6 = ipv6:new({ next_header = 58, -- ICMP6
-	 hop_limit = 255,
-	 src = conf.local_ip })
+         hop_limit = 255,
+         src = conf.local_ip })
    icmp = icmp:new(136, 0)
    -- Construct a neighbor solicitation with a target link-layer
    -- option.
@@ -237,10 +237,10 @@ local function na (self, dgram, eth, ipv6, icmp)
       return nil
    end
    self._eth_header = ethernet:new({ src = self._config.local_mac,
-				     dst = option[1]:option():addr(),
-				     type = 0x86dd })
+                                     dst = option[1]:option():addr(),
+                                     type = 0x86dd })
    print(string.format("Resolved next-hop %s to %s", ipv6:ntop(self._config.next_hop),
-		       ethernet:ntop(option[1]:option():addr())))
+                       ethernet:ntop(option[1]:option():addr())))
    return nil
 end
 
@@ -281,15 +281,15 @@ function nd_light:push ()
       p[0] = link.receive(l_in)
       local status = from_south(self, p)
       if status == nil then
-	 -- Discard
-	 packet.free(p[0])
+         -- Discard
+         packet.free(p[0])
       elseif status == true then
-	 -- Send NA back south
-	 packet.free(p[0])
-	 link.transmit(l_reply, packet.clone(self._sna.packet))
+         -- Send NA back south
+         packet.free(p[0])
+         link.transmit(l_reply, packet.clone(self._sna.packet))
       else
-	 -- Send transit traffic up north
-	 link.transmit(l_out, p[0])
+         -- Send transit traffic up north
+         link.transmit(l_out, p[0])
       end
    end
 
@@ -297,12 +297,12 @@ function nd_light:push ()
    l_out = self.output.south
    while not link.empty(l_in) and not link.full(l_out) do
       if not self._eth_header then
-	 -- Drop packets until ND for the next-hop
-	 -- has completed.
-	 packet.free(link.receive(l_in))
+         -- Drop packets until ND for the next-hop
+         -- has completed.
+         packet.free(link.receive(l_in))
       else
-	 local p = cache.p
-	 p[0] = link.receive(l_in)
+         local p = cache.p
+         p[0] = link.receive(l_in)
          if packet.length(p[0]) >= self._eth_header:sizeof() then
             self._eth_header:copy(packet.data(p[0]))
             link.transmit(l_out, p[0])

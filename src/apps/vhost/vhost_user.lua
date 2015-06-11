@@ -177,24 +177,24 @@ end
 function VhostUser:update_features (features)
    local stat = syscall.stat(self.socket_path)
    local mtime = ("%d.%d"):format(tonumber(stat.st_mtime),
-				  tonumber(stat.st_mtime_nsec))
+                                  tonumber(stat.st_mtime_nsec))
    local cachepath = "/tmp/vhost_features_"..string.gsub(self.socket_path, "/", "__")
    local f = io.open(cachepath, 'r')
    if f then
       local file_features, file_mtime = f:read('*a'):match("features:(.*) mtime:(.*)\n")
       f:close()
       if file_mtime == mtime then
-	 print(("vhost_user: Read cached features (0x%s) from %s"):format(
-	       bit.tohex(file_features), cachepath))
-	 return tonumber(file_features)
+         print(("vhost_user: Read cached features (0x%s) from %s"):format(
+               bit.tohex(file_features), cachepath))
+         return tonumber(file_features)
       else
-	 print(("vhost_user: Skipped old feature cache in %s"):format(cachepath))
+         print(("vhost_user: Skipped old feature cache in %s"):format(cachepath))
       end
    end
    f = io.open(cachepath, 'w')
    if f then
       print(("vhost_user: Caching features (0x%s) in %s"):format(
-	    bit.tohex(features), cachepath))
+            bit.tohex(features), cachepath))
       f:write(("features:%s mtime:%s\n"):format("0x"..bit.tohex(features), mtime))
       f:close()
    else
@@ -252,7 +252,7 @@ function VhostUser:set_vring_addr (msg)
 
    if self.dev:ready() then
       if not self.vhost_ready then
-	 print("vhost_user: Connected and initialized: "..self.socket_path)
+         print("vhost_user: Connected and initialized: "..self.socket_path)
       end
       self.vhost_ready = true
    end

@@ -19,35 +19,35 @@ local header = require("lib.protocol.header")
 
 ffi.cdef[[
       typedef union {
-	 uint8_t  cookie[8];
-	 uint64_t cookie_64bit;
+         uint8_t  cookie[8];
+         uint64_t cookie_64bit;
       } cookie_t;
 ]]
 
 local tunnel_header_t = ffi.typeof[[
       struct {
-	 uint32_t session_id;
-	 cookie_t cookie;
+         uint32_t session_id;
+         cookie_t cookie;
       } __attribute__((packed))
 ]]
 
 local tunnel = subClass(header)
 local cookie_t =
    ffi.metatype(ffi.typeof("cookie_t"),
-		{
-		   __tostring =
-		      function (c)
-			 local s = { "0x" }
-			 for i = 0, 7 do
-			    table.insert(s, string.format("%02x", c.cookie[i]))
-			 end
-			 return table.concat(s)
-		      end,
-		   __eq =
-		      function(lhs, rhs)
-			 return rhs and lhs.cookie_64bit == rhs.cookie_64bit
-		      end
-		})
+                {
+                   __tostring =
+                      function (c)
+                         local s = { "0x" }
+                         for i = 0, 7 do
+                            table.insert(s, string.format("%02x", c.cookie[i]))
+                         end
+                         return table.concat(s)
+                      end,
+                   __eq =
+                      function(lhs, rhs)
+                         return rhs and lhs.cookie_64bit == rhs.cookie_64bit
+                      end
+                })
 
 -- Class variables
 tunnel._name = "keyed ipv6 tunnel"
@@ -78,7 +78,7 @@ end
 
 function tunnel:new_cookie (s)
    assert(type(s) == 'string' and string.len(s) == 8,
-	  'invalid cookie')
+          'invalid cookie')
    local c = cookie_t()
    ffi.copy(c.cookie, s, 8)
    return c
