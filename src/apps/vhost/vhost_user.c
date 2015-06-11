@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "lib/virtio/virtio_vring.h"
 #include "vhost.h"
