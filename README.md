@@ -65,6 +65,7 @@ This project is being used in a variety of places, such as for testing the Linux
 * [lua-mmapfile](https://github.com/geoffleyland/lua-mmapfile) a simple Lua interface to mmap.
 * [buildroot](http://buildroot.uclibc.org/) has an ljsyscall package.
 * [luatz](https://github.com/daurnimator/luatz) uses ljsyscall when available
+* [Snabb switch](https://github.com/SnabbCo/snabbswitch) a high performance networking toolkit.
 
 ## Testing
 
