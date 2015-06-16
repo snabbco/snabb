@@ -347,10 +347,6 @@ c.SYS.kexec_file_load = nil
 -- constants for new syscalls
 c.GRND = nil
 
--- only added to headers recently
-c.TFD.TIMER_ABSTIME = nil
-c.TFD.TIMER_CANCEL_ON_SET = nil
-
 if abi.arch == "mips" then
   c.RLIM.INFINITY = nil -- incorrect in all but very recent glibc
 end

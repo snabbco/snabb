@@ -155,8 +155,6 @@ local function fixup_constants(abi, c)
   c.SECCOMP_MODE = nil
   c.SECCOMP_RET = nil
   c.MFD = nil
-  c.TFD.TIMER_ABSTIME = nil
-  c.TFD.TIMER_CANCEL_ON_SET = nil
 
   -- these are not even in linux git head headers or names wrong
   c.O.ASYNC = nil
@@ -178,6 +176,7 @@ local function fixup_constants(abi, c)
   c.SI.ASYNCNL = nil
   c.RLIMIT.OFILE = nil
   c.TFD_TIMER.ABSTIME = nil
+  c.TFD_TIMER.CANCEL_ON_SET = nil
   c.AT.EMPTY_PATH = nil
 
   -- renamed it seems, TODO sort out

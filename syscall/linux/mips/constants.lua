@@ -104,8 +104,6 @@ arch.O = {
 arch.O_SYNC = __O_SYNC + arch.O.DSYNC -- compatibility, see notes in header, we do not expose __O_SYNC TODO check if this is best way
 
 arch.TFD = {
-  TIMER_ABSTIME = 1,
-  TIMER_CANCEL_ON_SET = 2,
   CLOEXEC = octal '02000000',
   NONBLOCK = octal '00000200',
 }
