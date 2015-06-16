@@ -24,17 +24,16 @@ build =
     {
       ["syscall"] = "syscall.lua";
       ["syscall.abi"] = "syscall/abi.lua";
+      ["syscall.bit"] = "syscall/bit.lua";
+      ["syscall.compat"] = "syscall/compat.lua";
+      ["syscall.ffitypes"] = "syscall/ffitypes.lua";
       ["syscall.helpers"] = "syscall/helpers.lua";
-      ["syscall.syscalls"] = "syscall/syscalls.lua";
-      ["syscall.ffifunctions"] = "syscall/ffifunctions.lua";
+      ["syscall.lfs"] = "syscall/lfs.lua";
       ["syscall.libc"] = "syscall/libc.lua";
       ["syscall.methods"] = "syscall/methods.lua";
-      ["syscall.ffitypes"] = "syscall/ffitypes.lua";
-      ["syscall.util"] = "syscall/util.lua";
-      ["syscall.compat"] = "syscall/compat.lua";
-      ["syscall.bit"] = "syscall/bit.lua";
+      ["syscall.syscalls"] = "syscall/syscalls.lua";
       ["syscall.types"] = "syscall/types.lua";
-      ["syscall.lfs"] = "syscall/lfs.lua";
+      ["syscall.util"] = "syscall/util.lua";
 
       ["syscall.shared.types"] = "syscall/shared/types.lua";
 
