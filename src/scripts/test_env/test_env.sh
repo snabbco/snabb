@@ -107,6 +107,14 @@ function provide_assets {
     [ -f $assets/qemu.img ] || provide_img
 }
 
+function mac {
+    printf "$MAC%02X\n" $1
+}
+
+function ip {
+    printf "$IP%04X\n" $1
+}
+
 function qemu {
     provide_assets
     if [ ! -n $QUEUES ]; then
@@ -115,10 +123,10 @@ function qemu {
     numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
         $assets/$qemu \
         -kernel $assets/bzImage \
-        -append "earlyprintk root=/dev/vda rw console=ttyS0 ip=$IP$(printf "%04X\n" $qemu_n)" \
+        -append "earlyprintk root=/dev/vda rw console=ttyS0 ip=$(ip $qemu_n)" \
         -m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on \
         -netdev type=vhost-user,id=net0,chardev=char0${MQUEUES} -chardev socket,id=char0,path=$2,server \
-        -device virtio-net-pci,netdev=net0,mac=$MAC$(printf "%02X\n" $qemu_n),mq=$MQ,vectors=$VECTORS \
+        -device virtio-net-pci,netdev=net0,mac=$(mac $qemu_n),mq=$MQ,vectors=$VECTORS \
         -M pc -smp $SMP -cpu host --enable-kvm \
         -serial telnet:localhost:$3,server,nowait \
         -drive if=virtio,file=$(qemu_image) \

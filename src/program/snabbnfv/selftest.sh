@@ -59,8 +59,8 @@ function start_test_env {
     # Manually set ip addresses.
     run_telnet $TELNET_PORT0 "ifconfig eth0 up" >/dev/null
     run_telnet $TELNET_PORT1 "ifconfig eth0 up" >/dev/null
-    run_telnet $TELNET_PORT0 "ip -6 addr add ${IP}0 dev eth0" >/dev/null
-    run_telnet $TELNET_PORT1 "ip -6 addr add ${IP}1 dev eth0" >/dev/null
+    run_telnet $TELNET_PORT0 "ip -6 addr add $(ip 0) dev eth0" >/dev/null
+    run_telnet $TELNET_PORT1 "ip -6 addr add $(ip 1) dev eth0" >/dev/null
 }
 
 function cleanup {
@@ -186,11 +186,11 @@ function port_probe {
 function same_vlan_tests {
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports
 
-    test_ping $TELNET_PORT0 "${IP}1%eth0"
-    test_iperf $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0"
-    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     # Repeat iperf test now that jumbo frames are enabled
-    test_iperf $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0"
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     test_checksum $TELNET_PORT0
     test_checksum $TELNET_PORT1
 }
@@ -198,19 +198,19 @@ function same_vlan_tests {
 function rate_limited_tests {
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/tx_rate_limit.ports
 
-    test_ping $TELNET_PORT0 "${IP}1%eth0"
-    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0" 900 1000
-    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
+    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 900 1000
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     # Repeat iperf test now that jumbo frames are enabled
-    test_rate_limited $TELNET_PORT1 $TELNET_PORT0 "${IP}0%eth0" 900 1000
+    test_rate_limited $TELNET_PORT1 $TELNET_PORT0 "$(ip 0)%eth0" 900 1000
 
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/rx_rate_limit.ports
 
-    test_ping $TELNET_PORT0 "${IP}1%eth0"
-    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0" 1200 1000
-    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
+    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 1200 1000
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     # Repeat iperf test now that jumbo frames are enabled
-    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0" 1200 1000
+    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 1200 1000
 
 }
 
@@ -221,11 +221,11 @@ function tunnel_tests {
     grep "Resolved next-hop" snabb0.log
     assert ND $?
 
-    test_ping $TELNET_PORT0 "${IP}1%eth0"
-    test_iperf $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0"
-    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     # Repeat iperf test now that jumbo frames are enabled
-    test_iperf $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0"
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
 }
 
 function filter_tests {
@@ -242,13 +242,13 @@ function filter_tests {
     #
     # Regards, Max Rottenkolber <max@mr.gy>
 
-    test_ping $TELNET_PORT0 "${IP}1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
 
-    port_probe $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0" 12345
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 12345
     assert PORTPROBE $?
 
     # Assert TCP/12346 is filtered.
-    port_probe $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0" 12346
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 12346
     test 0 -ne $?
     assert FILTER $?
 
@@ -258,18 +258,18 @@ function filter_tests {
     # port B allows ICMP and TCP/12345 ingress and established egress
     # traffic.
 
-    test_ping $TELNET_PORT0 "${IP}1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
 
-    port_probe $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0" 12345
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 12345
     assert PORTPROBE $?
 
     # Assert TCP/12346 is filtered.
-    port_probe $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0" 12348
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 12348
     test 0 -ne $?
     assert FILTER $?
 
     # Assert non-established egress connections are filtered.
-    port_probe $TELNET_PORT1 $TELNET_PORT0 "${IP}0%eth0" 12340
+    port_probe $TELNET_PORT1 $TELNET_PORT0 "$(ip 0)%eth0" 12340
     test 0 -ne $?
     assert FILTER $?
 }
@@ -280,10 +280,10 @@ function iperf_bench {
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports    
 
     if [ "$1" = "jumbo" ]; then
-        test_jumboping $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0" \
+        test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" \
             2>&1 >/dev/null
     fi
-    Gbits=$(test_iperf $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0" \
+    Gbits=$(test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" \
         | egrep -o '[0-9\.]+ Gbits/sec' | cut -d " " -f 1)
     if [ "$1" = "jumbo" ]; then
         echo IPERF-JUMBO "$Gbits"
@@ -300,7 +300,7 @@ function fuzz_tests {
             program/snabbnfv/test_fixtures/nfvconfig/fuzz/filter2-tunnel-txrate10-ports.spec \
             $FUZZCONFPATH
         load_config $FUZZCONFPATH
-        test_iperf $TELNET_PORT0 $TELNET_PORT1 "${IP}1%eth0"
+        test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     done
 }
 
