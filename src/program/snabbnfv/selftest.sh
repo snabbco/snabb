@@ -296,7 +296,7 @@ function iperf_bench {
 # Generate and test (IPERF) <n> semi-random NFV configurations.
 function fuzz_tests {
     for ((n=0;n<$1;n++)); do
-        $SNABB snabbnfv fuzz \
+        ./snabb snabbnfv fuzz \
             program/snabbnfv/test_fixtures/nfvconfig/fuzz/filter2-tunnel-txrate10-ports.spec \
             $FUZZCONFPATH
         load_config $FUZZCONFPATH
