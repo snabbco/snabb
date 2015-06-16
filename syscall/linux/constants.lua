@@ -723,6 +723,8 @@ c.RLIM = strflag {
 
 -- timerfd
 c.TFD = multiflags(arch.TFD or {
+  TIMER_ABSTIME = 1,
+  TIMER_CANCEL_ON_SET = 2,
   CLOEXEC  = octal("02000000"),
   NONBLOCK = octal("04000"),
 })
