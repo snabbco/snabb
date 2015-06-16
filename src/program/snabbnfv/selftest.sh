@@ -1,8 +1,8 @@
 #!/bin/bash
 
-[ ! -z "$TESTPCI" ] || (echo "Need TESTPCI" && exit 1)
-[ ! -z "$TELNET_PORT0" ] || (echo "Need TELNET_PORT0" && exit 1)
-[ ! -z "$TELNET_PORT1" ] || (echo "Need TELNET_PORT1" && exit 1)
+if [ -z "$TESTPCI" ];      then echo "Need TESTPCI";      exit 1; fi
+if [ -z "$TELNET_PORT0" ]; then echo "Need TELNET_PORT0"; exit 1; fi
+if [ -z "$TELNET_PORT1" ]; then echo "Need TELNET_PORT1"; exit 1; fi
 
 TESTCONFPATH="/tmp/snabb_nfv_selftest_ports.$$"
 FUZZCONFPATH="/tmp/snabb_nfv_selftest_fuzz$$.ports"
@@ -36,18 +36,21 @@ function load_config {
 }
 
 function start_test_env {
-    source scripts/test_env/test_env.sh \
-        || (echo "Could not load test_env." && exit 1)
+    if ! source scripts/test_env/test_env.sh; then
+        echo "Could not load test_env."; exit 1
+    fi
 
-    snabb $TESTPCI "snabbnfv traffic $TESTPCI $TESTCONFPATH vhost_%s.sock" \
-        || (echo "Could not start snabb." && exit 1)
-    qemu $TESTPCI vhost_A.sock $TELNET_PORT0 \
-        || (echo "Could not start qemu 0." && exit 1)
-    qemu $TESTPCI vhost_B.sock $TELNET_PORT1 \
-        || (echo "Could not start qemu 1." && exit 1)
+    if ! snabb $TESTPCI "snabbnfv traffic $TESTPCI $TESTCONFPATH vhost_%s.sock"; then
+        echo "Could not start snabb."; exit 1
+    fi
 
-    # Give bench_env time to print its stuff.
-    sleep 0.25
+    if ! qemu $TESTPCI vhost_A.sock $TELNET_PORT0; then
+        echo "Could not start qemu 0."; exit 1
+    fi
+
+    if ! qemu $TESTPCI vhost_B.sock $TELNET_PORT1; then
+        echo "Could not start qemu 1."; exit 1
+    fi
 
     # Wait until VMs are ready.
     wait_vm_up $TELNET_PORT0
