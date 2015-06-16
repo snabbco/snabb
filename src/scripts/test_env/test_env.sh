@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ -z "$ASSETSOURCE" ]; then
-    export ASSETSOURCE="cp -v /home/max/public_html/test_env"
+    export ASSETSOURCE="http://lab1.snabb.co:2008/~max/test_env"
     echo "Defaulting to ASSETSOURCE=$ASSETSOURCE"
 fi
 
@@ -76,35 +76,34 @@ function provide_qemu {
     if ! [ -d $assets/qemu ]; then
         echo "Fetching qemu source code:"
         (cd $assets
-            $ASSETSOURCE/qemu.tar.gz .
-            tar xzf qemu.tar.gz
-            rm qemu.tar.gz)
+            wget "$ASSETSOURCE/qemu.tar.gz" \
+                && tar xzf qemu.tar.gz \
+                && rm qemu.tar.gz
+        ) || return 1
     fi
     echo "Building qemu:"
     (cd $assets/qemu
-        mkdir obj
-        cd obj
-        ../configure --target-list=x86_64-softmmu
-        make -j4)
+        mkdir obj; cd obj
+        ../configure --target-list=x86_64-softmmu && make -j4)
 }
 
 function provide_bzImage {
     echo "Fetching bzImage:"
     (cd $assets
-        $ASSETSOURCE/bzImage .)
+        wget "$ASSETSOURCE/bzImage")
 }
 
 function provide_img {
     echo "Fetching qemu.img:"
     (cd $assets
-        $ASSETSOURCE/qemu.img .)
+        wget "$ASSETSOURCE/qemu.img")
 }
 
 function provide_assets {
     mkdir -p $assets
-    [ -f $assets/$qemu ]    || provide_qemu
-    [ -f $assets/bzImage ]  || provide_bzImage
-    [ -f $assets/qemu.img ] || provide_img
+    [ -f $assets/$qemu ]    || provide_qemu    || return 1
+    [ -f $assets/bzImage ]  || provide_bzImage || return 1
+    [ -f $assets/qemu.img ] || provide_img     || return 1
 }
 
 function mac {
@@ -116,7 +115,7 @@ function ip {
 }
 
 function qemu {
-    provide_assets
+    provide_assets || return 1
     if [ ! -n $QUEUES ]; then
         MQUEUES=",queues=$QUEUES"
     fi
