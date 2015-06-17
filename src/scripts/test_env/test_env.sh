@@ -96,7 +96,7 @@ function provide_bzImage {
 function provide_img {
     echo "Fetching qemu.img:"
     (cd $assets
-        wget "$ASSETSOURCE/qemu.img")
+        wget "$ASSETSOURCE/qemu.img.gz" && gunzip qemu.img.gz)
 }
 
 function provide_assets {

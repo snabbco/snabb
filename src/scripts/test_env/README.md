@@ -57,7 +57,7 @@ default value so that you know which variables you did not set and what
 their defaults are. The variables in question are:
 
 * `ASSETSOURCE` - A `wget(1)` compatible URI prefix,
-  `$ASSETSOURCE/{qemu.tar.gz,bzImage,qemu.img}` must point to a qemu
+  `$ASSETSOURCE/{qemu.tar.gz,bzImage,qemu.img.gz}` must point to a qemu
   tarball, a kernel image and a disk image respectively.
 * `MAC` - MAC address prefix for virtual machines, must include
   everything but the last segment. E.g.: `52:54:00:00:00:`
