@@ -25,16 +25,16 @@ if [ -z "$HUGETLBFS" ]; then
     echo "Defaulting to HUGETLBFS=$HUGETLBFS"
 fi
 
-#calculate and set MQ related variables
+#calculate and set qemu_mq related variables
 if [ -n "$QUEUES" ]; then
-    export MQ=on
+    export qemu_mq=on
 else
-    export MQ=off
+    export qemu_mq=off
     export QUEUES=1
     echo "Defaulting to QUEUES=$QUEUES"
 fi
-export SMP=$QUEUES
-export VECTORS=$((2*$QUEUES + 1))
+export qemu_smp=$QUEUES
+export qemu_vectors=$((2*$QUEUES + 1))
 
 export pids=""
 export sockets=""
@@ -117,16 +117,16 @@ function ip {
 function qemu {
     provide_assets || return 1
     if [ ! -n $QUEUES ]; then
-        MQUEUES=",queues=$QUEUES"
+        export mqueues=",queues=$QUEUES"
     fi
     numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
         $assets/$qemu \
         -kernel $assets/bzImage \
         -append "earlyprintk root=/dev/vda rw console=ttyS0 ip=$(ip $qemu_n)" \
         -m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on \
-        -netdev type=vhost-user,id=net0,chardev=char0${MQUEUES} -chardev socket,id=char0,path=$2,server \
-        -device virtio-net-pci,netdev=net0,mac=$(mac $qemu_n),mq=$MQ,vectors=$VECTORS \
-        -M pc -smp $SMP -cpu host --enable-kvm \
+        -netdev type=vhost-user,id=net0,chardev=char0${mqueues} -chardev socket,id=char0,path=$2,server \
+        -device virtio-net-pci,netdev=net0,mac=$(mac $qemu_n),mq=$qemu_mq,vectors=$qemu_vectors \
+        -M pc -smp $qemu_smp -cpu host --enable-kvm \
         -serial telnet:localhost:$3,server,nowait \
         -drive if=virtio,file=$(qemu_image) \
         -nographic > $(qemu_log) 2>&1 &
