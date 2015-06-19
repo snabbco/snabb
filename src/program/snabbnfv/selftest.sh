@@ -38,7 +38,7 @@ function load_config {
 }
 
 function start_test_env {
-    if ! source scripts/test_env/test_env.sh; then
+    if ! source program/snabbnfv/test_env/test_env.sh; then
         echo "Could not load test_env."; exit 1
     fi
 

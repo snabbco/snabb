@@ -11,7 +11,7 @@ Load `test_env`:
 
 ```
 cd snabbswitch/src
-source scripts/test_env/test_env.sh
+source program/snabbnfv/test_env/test_env.sh
 ```
 
 To start a Snabb Switch instance using `<pciaddr>`:
