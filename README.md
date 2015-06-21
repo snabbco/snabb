@@ -22,7 +22,7 @@ For simple uses, you just need to put the ```.lua``` files somewhere that LuaJIT
 
 You can also install the head version using luarocks: ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` .
 
-It is also available as a package in [buildroot](http://buildroot.uclibc.org/), a build system for embedded systems.
+It is also available as a package in [buildroot](http://buildroot.uclibc.org/), a build system for embedded systems, and in [pkgsrc](http://www.pkgsrc.org] the portable packaging system for many systems.
 
 If you are using Lua rather than LuaJIT you need to install [luaffi](https://github.com/jmckaskill/luaffi) first; this is largely working now, but there will be more support for standard Lua coming soon.
 
