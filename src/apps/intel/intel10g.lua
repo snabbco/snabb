@@ -378,6 +378,7 @@ function M_sf:init_receive ()
    end
    self:set_receive_descriptors()
    self.r.RXCTRL:set(bits{RXEN=0})
+   self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
    return self
 end
 
