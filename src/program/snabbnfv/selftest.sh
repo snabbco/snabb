@@ -2,9 +2,9 @@
 
 SKIPPED_CODE=43
 
-if [ -z "$TESTPCI" ];      then echo "Need TESTPCI";      exit SKIPPED_CODE; fi
-if [ -z "$TELNET_PORT0" ]; then echo "Need TELNET_PORT0"; exit SKIPPED_CODE; fi
-if [ -z "$TELNET_PORT1" ]; then echo "Need TELNET_PORT1"; exit SKIPPED_CODE; fi
+if [ -z "$TESTPCI" ];      then echo "Need TESTPCI";      exit $SKIPPED_CODE; fi
+if [ -z "$TELNET_PORT0" ]; then echo "Need TELNET_PORT0"; exit $SKIPPED_CODE; fi
+if [ -z "$TELNET_PORT1" ]; then echo "Need TELNET_PORT1"; exit $SKIPPED_CODE; fi
 
 TESTCONFPATH="/tmp/snabb_nfv_selftest_ports.$$"
 FUZZCONFPATH="/tmp/snabb_nfv_selftest_fuzz$$.ports"
