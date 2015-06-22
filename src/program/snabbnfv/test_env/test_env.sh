@@ -43,12 +43,12 @@ export qemu=qemu/obj/x86_64-softmmu/qemu-system-x86_64
 export tmux_session=""
 
 function tmux_launch {
-    command="$1 2>&1 | tee $2"
+    command="$2 2>&1 | tee $3"
     if [ -z "$tmux_session" ]; then
         tmux_session=test_env-$$
-        tmux new-session -d -s $tmux_session "$command"
+        tmux new-session -d -n "$1" -s $tmux_session "$command"
     else
-        tmux new-window -a -t $tmux_session:0 "$command"
+        tmux new-window -a -n "$1" -t $tmux_session:0 "$command"
     fi
 }
 
@@ -65,6 +65,7 @@ function snabb_log {
 
 function snabb {
     tmux_launch \
+        "snabb$snabb_n" \
         "numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) ./snabb $2" \
         $(snabb_log)
     snabb_n=$(expr $snabb_n + 1)
@@ -130,6 +131,7 @@ function qemu {
         export mqueues=",queues=$QUEUES"
     fi
     tmux_launch \
+        "qemu$qemu_n" \
         "numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
         $assets/$qemu \
         -kernel $assets/bzImage \
@@ -148,7 +150,7 @@ function qemu {
 
 
 function on_exit {
-    [ -n "$tmux_session" ] && tmux kill-session -t $tmux_session
+    [ -n "$tmux_session" ] && tmux kill-session -t $tmux_session 2>&1 >/dev/null
     rm -f $sockets
     exit
 }
