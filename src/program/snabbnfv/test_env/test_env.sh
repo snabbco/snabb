@@ -36,10 +36,21 @@ fi
 export qemu_smp=$QUEUES
 export qemu_vectors=$((2*$QUEUES + 1))
 
-export pids=""
 export sockets=""
 export assets=$HOME/.test_env
 export qemu=qemu/obj/x86_64-softmmu/qemu-system-x86_64
+
+export tmux_session=""
+
+function tmux_launch {
+    command="$1 2>&1 | tee $2"
+    if [ -z "$tmux_session" ]; then
+        tmux_session=test_env-$$
+        tmux new-session -d -s $tmux_session "$command"
+    else
+        tmux new-window -a -t $tmux_session:0 "$command"
+    fi
+}
 
 export snabb_n=0
 
@@ -53,10 +64,9 @@ function snabb_log {
 }
 
 function snabb {
-    numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
-        ./snabb $2 \
-        > $(snabb_log) 2>&1 &
-    pids="$pids $!"
+    tmux_launch \
+        "numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) ./snabb $2" \
+        $(snabb_log)
     snabb_n=$(expr $snabb_n + 1)
 }
 
@@ -119,27 +129,26 @@ function qemu {
     if [ ! -n $QUEUES ]; then
         export mqueues=",queues=$QUEUES"
     fi
-    numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
+    tmux_launch \
+        "numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
         $assets/$qemu \
         -kernel $assets/bzImage \
-        -append "earlyprintk root=/dev/vda rw console=ttyS0 ip=$(ip $qemu_n)" \
+        -append \"earlyprintk root=/dev/vda rw console=ttyS0 ip=$(ip $qemu_n)\" \
         -m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on \
         -netdev type=vhost-user,id=net0,chardev=char0${mqueues} -chardev socket,id=char0,path=$2,server \
         -device virtio-net-pci,netdev=net0,mac=$(mac $qemu_n),mq=$qemu_mq,vectors=$qemu_vectors \
         -M pc -smp $qemu_smp -cpu host --enable-kvm \
         -serial telnet:localhost:$3,server,nowait \
         -drive if=virtio,file=$(qemu_image) \
-        -nographic > $(qemu_log) 2>&1 &
-    pids="$pids $!"
+        -nographic" \
+        $(qemu_log)
     qemu_n=$(expr $qemu_n + 1)
     sockets="$sockets $2"
 }
 
 
 function on_exit {
-    for pid in "$pids"; do
-        kill -9 $pid > /dev/null 2>&1
-    done
+    [ -n "$tmux_session" ] && tmux kill-session -t $tmux_session
     rm -f $sockets
     exit
 }
