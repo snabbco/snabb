@@ -2,7 +2,7 @@ Installation instructions
 
 Make sure you have LuaJIT, at least version 2.0.2, installed.
 
-You need to put the file syscall.lua and the directory syscall and its contents in the ame directory where they will be found by LuaJIT. This can vary by system, but you can find out with `luajit -e 'print(package.path)'` for your system. You do not need all the files, you can delete operating system and architecture files you do not require.
+You need to put the file syscall.lua and the directory syscall and its contents in the same directory where they will be found by LuaJIT. This can vary by system, but you can find out with `luajit -e 'print(package.path)'` for your system. You do not need all the files, you can delete operating system and architecture files you do not require.
 
 You can use the stable versions in the luarocks repository, or you can install the head version using ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` or one of the other versions in that directory, which will pull the version from github and install in the right place.
 
