@@ -452,7 +452,7 @@ function root_check (message)
 end
 
 -- Simple token bucket for rate-limiting of events.  A token bucket is
--- create through
+-- created through
 --
 --  local tb = token_bucket_new({ rate = <rate> })
 --
@@ -531,25 +531,28 @@ end
 -- Simple rate-limited logging facility.  Usage:
 --
 --   local logger = lib.logger_new({ rate = <rate>,
+--                                   discard_rate = <drate>,
 --                                   fh = <fh>,
 --                                   flush = true|false,
 --                                   module = <module>,
 --                                   date = true|false })
 --   logger:log(message)
 --
--- <rate> maximum rate of messages per second.  Additional
---        messages are discarded. Default: 10
--- <fh>   file handle to log to.  Default: io.stdout
--- flush  flush <fh> after each message if true
+-- <rate>   maximum rate of messages per second.  Additional
+--          messages are discarded. Default: 10
+-- <drate>  maximum rate of logging of the number of discarded
+--          messages.  Default: 0.5
+-- <fh>     file handle to log to.  Default: io.stdout
+-- flush    flush <fh> after each message if true
 -- <module> name of the module to include in the message
--- date   include date in messages if true
+-- date     include date in messages if true
 --
 -- The output format is
 -- <date> <module>: message
 --
 -- The logger uses an automatic throttling mechanism to dynamically
 -- lower the logging rate when the rate of discarded messages exceeds
--- the maximum log rate by a factor of 5 over one or multiple adacent
+-- the maximum log rate by a factor of 5 over one or multiple adjacent
 -- intervals of 10 seconds.  For each such interval, the logging rate
 -- is reduced by a factor of 2 with a lower bound of 0.1 Hz (i.e. one
 -- message per 10 seconds).  For each 10-second interval for which the
@@ -561,6 +564,7 @@ local logger = {}
 -- Default configuration
 logger.default = {
    rate = 10,
+   discard_rate = 0.5,
    fh = io.stdout,
    flush = true,
    module = '',
@@ -586,6 +590,8 @@ function logger_new (config)
    end
    l._config = _config
    l._tb = token_bucket_new({ rate = _config.rate })
+   l._discard_tb = token_bucket_new({ rate = _config.discard_rate })
+   l._discards = 0
    local _throttle = {
       discards = 0,
       tstamp = C.get_monotonic_time(),
@@ -616,30 +622,34 @@ function logger:log (msg)
    if self._tb:take(1) then
       local config = self._config
       local throttle  = self._throttle
+      throttle.discards = throttle.discards + self._discards
       local date = ''
       if config.date then
          date = os.date(config.date_fmt)
       end
       local preamble = date..self._preamble
       local fh = config.fh
-      now = C.get_monotonic_time()
+      local now = C.get_monotonic_time()
       local interval = now-throttle.tstamp
       local samples = interval/throttle.interval
       local drate = throttle.discards/interval
       local current_rate = self._tb:rate()
+      if self._discards > 0 and self._discard_tb:take(1) then
+         fh:write(string.format(preamble.."%d messages discarded\n",
+                                self._discards))
+         throttle.discards = self._discards
+         self._discards = 0
+      end
       if samples >= 1 then
-         if throttle.discards > 0 then
-            fh:write(string.format(preamble.."%d messages discarded in %d seconds\n",
-                                   throttle.discards, now-throttle.tstamp))
-         end
          if drate > throttle.rate then
             local min_rate = throttle.min_rate
             if current_rate > min_rate then
                local throttle_rate = math.max(min_rate,
                                               current_rate/2^samples)
-               fh:write(string.format(preamble.."throttling logging rate to "
+               fh:write(string.format(preamble.."message discard rate %.2f exceeds "
+                                      .."threshold (%.2f), throttling logging rate to "
                                       .."%.2f Hz%s\n",
-                                   throttle_rate,
+                                   drate, throttle.rate, throttle_rate,
                                    (throttle_rate == min_rate and ' (minimum)') or ''))
                self._tb:rate(throttle_rate)
             end
@@ -661,7 +671,7 @@ function logger:log (msg)
       fh:write(preamble..msg..'\n')
       if config.flush then fh:flush() end
    else
-      self._throttle.discards = self._throttle.discards + 1
+      self._discards = self._discards + 1
    end
 end
 
@@ -674,7 +684,7 @@ function logger:can_log ()
    if self._tb:can_take(1) then
       return true
    end
-   self._throttle.discards = self._throttle.discards + 1
+   self._discards = self._discards + 1
    return false
 end
 
