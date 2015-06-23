@@ -378,6 +378,11 @@ function M_sf:init_receive ()
    end
    self:set_receive_descriptors()
    self.r.RXCTRL:set(bits{RXEN=0})
+   if self.r.DCA_RXCTRL then -- Register may be undefined in subclass (PF)
+      -- Datasheet 4.6.7 says to clear this bit.
+      -- Have observed payload corruption when this is not done.
+      self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
+   end
    return self
 end
 
