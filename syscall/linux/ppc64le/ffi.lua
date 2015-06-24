@@ -35,37 +35,30 @@ typedef struct ucontext {
   unsigned long int uc_flags;
   struct ucontext *uc_link;
   stack_t uc_stack;
-  int uc_pad[7];
-  union uc_regs_ptr {
-    struct pt_regs *regs;
-    mcontext_t *uc_regs;
-  } uc_mcontext;
-  sigset_t    uc_sigmask;
-  char uc_reg_space[sizeof(mcontext_t) + 12];  /* last for extensibility */
+  sigset_t uc_sigmask;
+  mcontext_t uc_mcontext;
 } ucontext_t;
 ]],
   stat = [[
 struct stat {
-  unsigned long long st_dev;
-  unsigned long long st_ino;
+  unsigned long   st_dev;
+  unsigned long   st_ino;
+  unsigned long   st_nlink;
   unsigned int    st_mode;
-  unsigned int    st_nlink;
   unsigned int    st_uid;
   unsigned int    st_gid;
-  unsigned long long st_rdev;
-  unsigned long long __pad1;
-  long long       st_size;
-  int             st_blksize;
-  int             __pad2;
-  long long       st_blocks;
-  int             st_atime;
-  unsigned int    st_atime_nsec;
-  int             st_mtime;
-  unsigned int    st_mtime_nsec;
-  int             st_ctime;
-  unsigned int    st_ctime_nsec;
-  unsigned int    __unused4;
-  unsigned int    __unused5;
+  unsigned int    __pad0;
+  unsigned long   st_rdev;
+  long            st_size;
+  long            st_blksize;
+  long            st_blocks;
+  unsigned long   st_atime;
+  unsigned long   st_atime_nsec;
+  unsigned long   st_mtime;
+  unsigned long   st_mtime_nsec;
+  unsigned long   st_ctime;
+  unsigned long   st_ctime_nsec;
+  long            __unused[3];
 };
 ]],
 }
