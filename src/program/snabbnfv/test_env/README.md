@@ -14,10 +14,10 @@ cd snabbswitch/src
 source program/snabbnfv/test_env/test_env.sh
 ```
 
-To start a Snabb Switch instance using `<pciaddr>`:
+To start a Snabb Switch instance using `<pciaddr>` or NUMA `<node>`:
 
 ```
-snabb <pciaddr> <args>
+snabb <pciaddr|node> <args>
 ```
 
 The output of the instance will be logged to `snabb<n>.log` where `<n>`
@@ -33,11 +33,11 @@ snabb 0000:86:00.0 "snabbnfv traffic 0000:86:00.0 nfv.ports vhost.sock"
 To run a qemu instance to connect to a vhost user app:
 
 ```
-qemu <pciaddr> <socket> <port>
+qemu <pciaddr|node> <socket> <port>
 ```
 
-`<pciaddr>` must be the same as the snabb instance running the vhost user
-app and `<socket>` must be the vhost user socket to use. The virtual
+`<pciaddr|node>` must be the same as the snabb instance running the vhost
+user app and `<socket>` must be the vhost user socket to use. The virtual
 machine will be assigned `$(mac <n>)` and `$(ip <n>)` as its MAC and IPv6
 adresses and the output of qemu will be logged to `qemu<n>.log`, where
 `<n>` starts at 0 and increments for every new instance. The qemu

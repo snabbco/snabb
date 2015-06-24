@@ -55,8 +55,15 @@ function tmux_launch {
 export snabb_n=0
 
 function pci_node {
-    cpu=$(cat /sys/class/pci_bus/${1:0:7}/cpulistaffinity | cut -d "-" -f 1)
-    numactl -H | grep "cpus: $cpu" | cut -d " " -f 2
+    case "$1" in
+        *:*:*.*)
+            cpu=$(cat /sys/class/pci_bus/${1%:*}/cpulistaffinity | cut -d "-" -f 1)
+            numactl -H | grep "cpus: $cpu" | cut -d " " -f 2
+            ;;
+        *)
+            echo $1
+            ;;
+    esac
 }
 
 function snabb_log {
