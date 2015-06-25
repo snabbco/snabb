@@ -151,7 +151,10 @@ local clean = function()
 end
 
 -- type tests use reflection TODO move to seperate test file
-local ok, reflect = pcall(require, "include.ffi-reflect.reflect")
+local ok, reflect = nil, nil
+if not ffi.abi("64bit") then -- ffi-reflect does not support the new 64bit abi
+  ok, reflect = pcall(require, "include.ffi-reflect.reflect")
+end
 if ok then
 test_types_reflect = {
   test_allocate = function() -- create an element of every ctype
