@@ -16,7 +16,7 @@ LoadGen = {}
 
 function LoadGen:new (pciaddress)
    local o = { pciaddress = pciaddress,
-               dev = intel10g.new_sf(pciaddress) }
+               dev = intel10g.new_sf({pciaddr=pciaddress}) }
    o.dev:open()
    o.dev:wait_linkup()
    disable_tx_descriptor_writeback(o.dev)
