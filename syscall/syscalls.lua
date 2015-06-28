@@ -80,8 +80,6 @@ function S.close(fd) return retbool(C.close(getfd(fd))) end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, c.MODE[mode])) end
-function S.rmdir(path) return retbool(C.rmdir(path)) end
-function S.unlink(pathname) return retbool(C.unlink(pathname)) end
 function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
 function S.chmod(path, mode) return retbool(C.chmod(path, c.MODE[mode])) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), c.MODE[mode])) end
@@ -157,7 +155,17 @@ function S.fstat(fd, buf)
 end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
-
+-- revent Linux does not have rmdir, unlink any more as a syscall
+if C.rmdir then
+  function S.rmdir(path) return retbool(C.rmdir(path)) end
+else
+  function S.rmdir(path) return retbool(C.unlinkat(c.AT_FDCWD.FDCWD, path, c.AT.REMOVEDIR)) end
+end
+if C.unlink then
+  function S.unlink(pathname) return retbool(C.unlink(pathname)) end
+else
+  function S.unlink(path) return retbool(C.unlinkat(c.AT_FDCWD.FDCWD, path, 0)) end
+end
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
   protocol = protocol or 0
   if domain == c.AF.NETLINK then return c.NETLINK[protocol] end

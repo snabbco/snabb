@@ -486,7 +486,7 @@ function C.setreuid(uid, euid) return syscall(sys.setreuid, uint(uid), uint(euid
 function C.setregid(gid, egid) return syscall(sys.setregid, uint(gid), uint(egid)) end
 function C.flock(fd, operation) return syscall(sys.flock, int(fd), int(operation)) end
 function C.getrusage(who, usage) return syscall(sys.getrusage, int(who), void(usage)) end
-function C.rmdir(path) return syscall(sys.rmdir, void(path)) end
+if sys.rmdir then function C.rmdir(path) return syscall(sys.rmdir, void(path)) end end
 function C.chdir(path) return syscall(sys.chdir, void(path)) end
 function C.fchdir(fd) return syscall(sys.fchdir, int(fd)) end
 function C.chown(path, owner, group) return syscall(sys.chown, void(path), uint(owner), uint(group)) end
@@ -505,7 +505,7 @@ function C.rename(oldpath, newpath) return syscall(sys.rename, void(oldpath), vo
 function C.renameat(olddirfd, oldpath, newdirfd, newpath)
   return syscall(sys.renameat, int(olddirfd), void(oldpath), int(newdirfd), void(newpath))
 end
-function C.unlink(pathname) return syscall(sys.unlink, void(pathname)) end
+if sys.unlink then function C.unlink(pathname) return syscall(sys.unlink, void(pathname)) end end
 function C.unlinkat(dirfd, pathname, flags) return syscall(sys.unlinkat, int(dirfd), void(pathname), int(flags)) end
 function C.prctl(option, arg2, arg3, arg4, arg5)
   return syscall(sys.prctl, int(option), ulong(arg2), ulong(arg3), ulong(arg4), ulong(arg5))
