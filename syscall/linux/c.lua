@@ -506,6 +506,11 @@ if sys.rename then function C.rename(oldpath, newpath) return syscall(sys.rename
 function C.renameat(olddirfd, oldpath, newdirfd, newpath)
   return syscall(sys.renameat, int(olddirfd), void(oldpath), int(newdirfd), void(newpath))
 end
+if sys.renameat2 then
+  function C.renameat2(olddirfd, oldpath, newdirfd, newpath, flags)
+    return syscall(sys.renameat2, int(olddirfd), void(oldpath), int(newdirfd), void(newpath), int(flags))
+  end
+end
 if sys.unlink then function C.unlink(pathname) return syscall(sys.unlink, void(pathname)) end end
 function C.unlinkat(dirfd, pathname, flags) return syscall(sys.unlinkat, int(dirfd), void(pathname), int(flags)) end
 function C.prctl(option, arg2, arg3, arg4, arg5)
