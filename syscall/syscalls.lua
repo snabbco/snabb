@@ -546,7 +546,12 @@ function S.getrusage(who, ru)
   return ru
 end
 
-function S.fork() return retnum(C.fork()) end
+if C.fork then
+  function S.fork() return retnum(C.fork()) end
+else
+  function S.fork() return retnum(C.clone(c.SIG.CHLD, 0)) end
+end
+
 function S.execve(filename, argv, envp)
   local cargv = t.string_array(#argv + 1, argv or {})
   cargv[#argv] = nil -- LuaJIT does not zero rest of a VLA
