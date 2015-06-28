@@ -121,7 +121,6 @@ if C.preadv and C.pwritev then -- these are missing in eg OSX
     return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
   end
 end
-function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
 function S.lseek(fd, offset, whence)
   return ret64(C.lseek(getfd(fd), offset or 0, c.SEEK[whence or c.SEEK.SET]))
 end
@@ -153,6 +152,7 @@ function S.fstat(fd, buf)
 end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
+
 -- recent Linux does not have open, rmdir, unlink etc any more as syscalls
 if C.open then
   function S.open(pathname, flags, mode) return retfd(C.open(pathname, c.O[flags], c.MODE[mode])) end
@@ -173,6 +173,11 @@ if C.chmod then
   function S.chmod(path, mode) return retbool(C.chmod(path, c.MODE[mode])) end
 else
   function S.chmod(path, mode) return retbool(C.fchmodat(c.AT_FDCWD.FDCWD, path, c.MODE[mode], 0)) end
+end
+if C.access then
+  function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
+else
+  function S.access(pathname, mode) return retbool(C.faccessat(c.AT_FDCWD.FDCWD, pathname, c.OK[mode], 0)) end
 end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?

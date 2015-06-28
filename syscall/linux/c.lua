@@ -470,7 +470,7 @@ function C.dup3(oldfd, newfd, flags) return syscall(sys.dup3, int(oldfd), int(ne
 if sys.chmod then function C.chmod(path, mode) return syscall(sys.chmod, void(path), uint(mode)) end end
 function C.fchmod(fd, mode) return syscall(sys.fchmod, int(fd), uint(mode)) end
 function C.umask(mode) return syscall(sys.umask, uint(mode)) end
-function C.access(path, mode) return syscall(sys.access, void(path), uint(mode)) end
+if sys.access then function C.access(path, mode) return syscall(sys.access, void(path), uint(mode)) end end
 function C.getppid() return syscall(sys.getppid) end
 function C.getuid() return syscall(sys.getuid) end
 function C.geteuid() return syscall(sys.geteuid) end
