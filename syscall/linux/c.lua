@@ -313,9 +313,8 @@ function C.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   return syscall(sys.mq_timedreceive, int(mqd), void(msg_ptr), ulong(msg_len), void(msg_prio), void(abs_timeout))
 end
 
--- note kernel dev_t is 32 bits, use syscall so we can ignore glibc using 64 bit dev_t
-function C.mknod(pathname, mode, dev)
-  return syscall(sys.mknod, pathname, uint(mode), uint(dev))
+if sys.mknod then
+  function C.mknod(pathname, mode, dev) return syscall(sys.mknod, pathname, uint(mode), uint(dev)) end
 end
 function C.mknodat(fd, pathname, mode, dev)
   return syscall(sys.mknodat, int(fd), pathname, uint(mode), uint(dev))
@@ -522,7 +521,6 @@ if abi.arch ~= "mips" and sys.pipe then -- mips uses old style dual register ret
   function C.pipe(pipefd) return syscall(sys.pipe, void(pipefd)) end
 end
 function C.pipe2(pipefd, flags) return syscall(sys.pipe2, void(pipefd), int(flags)) end
-function C.mknod(path, mode, dev) return syscall(sys.mknod, void(path), uint(mode), uint(dev)) end
 function C.pause() return syscall(sys.pause) end
 function C.remap_file_pages(addr, size, prot, pgoff, flags)
   return syscall(sys.remap_file_pages, void(addr), ulong(size), int(prot), long(pgoff), int(flags))

@@ -84,7 +84,6 @@ function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1,
 function S.chroot(path) return retbool(C.chroot(path)) end
 function S.umask(mask) return C.umask(c.MODE[mask]) end
 function S.sync() C.sync() end
-function S.mknod(pathname, mode, dev) return retbool(C.mknod(pathname, c.S_I[mode], getdev(dev) or 0)) end
 function S.flock(fd, operation) return retbool(C.flock(getfd(fd), c.LOCK[operation])) end
 -- TODO read should have consistent return type but then will differ from other calls.
 function S.read(fd, buf, count)
@@ -226,6 +225,11 @@ if C.rename then
   function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
 else
   function S.rename(oldpath, newpath) return retbool(C.renameat(c.AT_FDCWD.FDCWD, oldpath, c.AT_FDCWD.FDCWD, newpath)) end
+end
+if C.mknod then
+  function S.mknod(pathname, mode, dev) return retbool(C.mknod(pathname, c.S_I[mode], getdev(dev) or 0)) end
+else
+  function S.mknod(pathname, mode, dev) return retbool(C.mknodat(c.AT_FDCWD.FDCWD, pathname, c.S_I[mode], getdev(dev) or 0)) end
 end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
