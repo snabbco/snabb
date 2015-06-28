@@ -130,11 +130,20 @@ function S.readlink(path, buffer, size)
   return ffi.string(buffer, ret)
 end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
-function S.stat(path, buf)
-  if not buf then buf = t.stat() end
-  local ret = C.stat(path, buf)
-  if ret == -1 then return nil, t.error() end
-  return buf
+if C.stat then
+  function S.stat(path, buf)
+    if not buf then buf = t.stat() end
+    local ret = C.stat(path, buf)
+    if ret == -1 then return nil, t.error() end
+    return buf
+  end
+else
+  function S.stat(path, buf)
+    if not buf then buf = t.stat() end
+    local ret = C.fstatat(c.AT_FDCWD.FDCWD, path, buf, 0)
+    if ret == -1 then return nil, t.error() end
+    return buf
+  end
 end
 function S.lstat(path, buf)
   if not buf then buf = t.stat() end

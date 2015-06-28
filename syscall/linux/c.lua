@@ -224,13 +224,12 @@ function C.sched_setscheduler(pid, policy, param)
   return syscall(sys.sched_setscheduler, int(pid), int(policy), void(param))
 end
 
--- for stat we use the syscall as libc might have a different struct stat for compatibility
--- similarly fadvise64 is not provided, and posix_fadvise may not have 64 bit args on 32 bit
--- and fallocate seems to have issues in uClibc
 local sys_fadvise64 = sys.fadvise64_64 or sys.fadvise64
 if abi.abi64 then
-  function C.stat(path, buf)
-    return syscall(sys.stat, path, void(buf))
+  if sys.stat then
+    function C.stat(path, buf)
+      return syscall(sys.stat, path, void(buf))
+    end
   end
   function C.lstat(path, buf)
     return syscall(sys.lstat, path, void(buf))
