@@ -489,7 +489,7 @@ function C.getrusage(who, usage) return syscall(sys.getrusage, int(who), void(us
 if sys.rmdir then function C.rmdir(path) return syscall(sys.rmdir, void(path)) end end
 function C.chdir(path) return syscall(sys.chdir, void(path)) end
 function C.fchdir(fd) return syscall(sys.fchdir, int(fd)) end
-function C.chown(path, owner, group) return syscall(sys.chown, void(path), uint(owner), uint(group)) end
+if sys.chown then function C.chown(path, owner, group) return syscall(sys.chown, void(path), uint(owner), uint(group)) end end
 function C.fchown(fd, owner, group) return syscall(sys.fchown, int(fd), uint(owner), uint(group)) end
 function C.lchown(path, owner, group) return syscall(sys.lchown, void(path), uint(owner), uint(group)) end
 if sys.open then

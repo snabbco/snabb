@@ -81,7 +81,6 @@ function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, c.MODE[mode])) end
 function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), c.MODE[mode])) end
-function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
 function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
 function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
@@ -178,6 +177,11 @@ if C.access then
   function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
 else
   function S.access(pathname, mode) return retbool(C.faccessat(c.AT_FDCWD.FDCWD, pathname, c.OK[mode], 0)) end
+end
+if C.chown then
+  function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
+else
+  function S.chown(path, owner, group) return retbool(C.fchownat(c.AT_FDCWD.FDCWD, path, owner or -1, group or -1, 0)) end
 end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
