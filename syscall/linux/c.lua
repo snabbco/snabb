@@ -592,7 +592,7 @@ function C.setpriority(which, who, prio) return syscall(sys.setpriority, int(whi
 function C.sched_get_priority_min(policy) return syscall(sys.sched_get_priority_min, int(policy)) end
 function C.sched_get_priority_max(policy) return syscall(sys.sched_get_priority_max, int(policy)) end
 function C.sched_rr_get_interval(pid, tp) return syscall(sys.sched_rr_get_interval, int(pid), void(tp)) end
-function C.poll(fds, nfds, timeout) return syscall(sys.poll, void(fds), int(nfds), int(timeout)) end
+if sys.poll then function C.poll(fds, nfds, timeout) return syscall(sys.poll, void(fds), int(nfds), int(timeout)) end end
 function C.msync(addr, length, flags) return syscall(sys.msync, void(addr), ulong(length), int(flags)) end
 function C.madvise(addr, length, advice) return syscall(sys.madvise, void(addr), ulong(length), int(advice)) end
 function C.mlock(addr, len) return syscall(sys.mlock, void(addr), ulong(len)) end

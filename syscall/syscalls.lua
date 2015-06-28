@@ -354,8 +354,9 @@ function S.getpeername(sockfd, addr, addrlen)
   return t.sa(addr, addrlen[0])
 end
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), c.SHUT[how])) end
-function S.poll(fds, timeout) return retnum(C.poll(fds.pfd, #fds, timeout or -1)) end
-
+if C.poll then
+  function S.poll(fds, timeout) return retnum(C.poll(fds.pfd, #fds, timeout or -1)) end
+end
 -- TODO rework fdset interface, see issue #71
 -- fdset handlers
 local function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size

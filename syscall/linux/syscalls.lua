@@ -154,7 +154,12 @@ function S.ppoll(fds, timeout, set)
   if set then set = mktype(t.sigset, set) end
   return retnum(C.ppoll(fds.pfd, #fds, timeout, set))
 end
-
+if not S.poll then
+  function S.poll(fd, timeout)
+    if timeout then timeout = mktype(t.timespec, timeout / 1000) end
+    return S.ppoll(fd, timeout)
+  end
+end
 function S.mount(source, target, fstype, mountflags, data)
   return retbool(C.mount(source or "none", target, fstype, c.MS[mountflags], data))
 end
