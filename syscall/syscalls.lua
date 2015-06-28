@@ -83,7 +83,6 @@ function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), c.MODE[mode])) en
 function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
 function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
 function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
-function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 function S.chroot(path) return retbool(C.chroot(path)) end
 function S.umask(mask) return C.umask(c.MODE[mask]) end
 function S.sync() C.sync() end
@@ -122,12 +121,22 @@ end
 function S.lseek(fd, offset, whence)
   return ret64(C.lseek(getfd(fd), offset or 0, c.SEEK[whence or c.SEEK.SET]))
 end
-function S.readlink(path, buffer, size)
-  size = size or c.PATH_MAX
-  buffer = buffer or t.buffer(size)
-  local ret, err = tonumber(C.readlink(path, buffer, size))
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return ffi.string(buffer, ret)
+if C.readlink then
+  function S.readlink(path, buffer, size)
+    size = size or c.PATH_MAX
+    buffer = buffer or t.buffer(size)
+    local ret, err = tonumber(C.readlink(path, buffer, size))
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return ffi.string(buffer, ret)
+  end
+else
+  function S.readlink(path, buffer, size)
+    size = size or c.PATH_MAX
+    buffer = buffer or t.buffer(size)
+    local ret, err = tonumber(C.readlinkat(c.AT_FDCWD.FDCWD, path, buffer, size))
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return ffi.string(buffer, ret)
+  end
 end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
 if C.stat then
@@ -195,6 +204,11 @@ if C.mkdir then
   function S.mkdir(path, mode) return retbool(C.mkdir(path, c.MODE[mode])) end
 else
   function S.mkdir(path, mode) return retbool(C.mkdirat(c.AT_FDCWD.FDCWD, path, c.MODE[mode])) end
+end
+if C.symlink then
+  function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
+else
+  function S.symlink(oldpath, newpath) return retbool(C.symlinkat(oldpath, c.AT_FDCWD.FDCWD, newpath)) end
 end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?

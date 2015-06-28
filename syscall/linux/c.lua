@@ -501,7 +501,7 @@ function C.read(fd, buf, count) return syscall_long(sys.read, int(fd), void(buf)
 function C.write(fd, buf, count) return syscall_long(sys.write, int(fd), void(buf), ulong(count)) end
 function C.readv(fd, iov, iovcnt) return syscall_long(sys.readv, int(fd), void(iov), long(iovcnt)) end
 function C.writev(fd, iov, iovcnt) return syscall_long(sys.writev, int(fd), void(iov), long(iovcnt)) end
-function C.readlink(path, buf, bufsiz) return syscall_long(sys.readlink, void(path), void(buf), ulong(bufsiz)) end
+if sys.readlink then function C.readlink(path, buf, bufsiz) return syscall_long(sys.readlink, void(path), void(buf), ulong(bufsiz)) end end
 function C.rename(oldpath, newpath) return syscall(sys.rename, void(oldpath), void(newpath)) end
 function C.renameat(olddirfd, oldpath, newdirfd, newpath)
   return syscall(sys.renameat, int(olddirfd), void(oldpath), int(newdirfd), void(newpath))
@@ -530,7 +530,7 @@ function C.fdatasync(fd) return syscall(sys.fdatasync, int(fd)) end
 function C.sync() return syscall(sys.sync) end
 function C.syncfs(fd) return syscall(sys.syncfs, int(fd)) end
 function C.link(oldpath, newpath) return syscall(sys.link, void(oldpath), void(newpath)) end
-function C.symlink(oldpath, newpath) return syscall(sys.symlink, void(oldpath), void(newpath)) end
+if sys.symlink then function C.symlink(oldpath, newpath) return syscall(sys.symlink, void(oldpath), void(newpath)) end end
 function C.epoll_ctl(epfd, op, fd, event) return syscall(sys.epoll_ctl, int(epfd), int(op), int(fd), void(event)) end
 function C.uname(buf) return syscall(sys.uname, void(buf)) end
 function C.getsid(pid) return syscall(sys.getsid, int(pid)) end
