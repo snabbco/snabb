@@ -525,7 +525,7 @@ function C.remap_file_pages(addr, size, prot, pgoff, flags)
 end
 function C.fork() return syscall(sys.fork) end
 function C.kill(pid, sig) return syscall(sys.kill, int(pid), int(sig)) end
-function C.mkdir(pathname, mode) return syscall(sys.mkdir, void(pathname), uint(mode)) end
+if sys.mkdir then function C.mkdir(pathname, mode) return syscall(sys.mkdir, void(pathname), uint(mode)) end end
 function C.fsync(fd) return syscall(sys.fsync, int(fd)) end
 function C.fdatasync(fd) return syscall(sys.fdatasync, int(fd)) end
 function C.sync() return syscall(sys.sync) end
