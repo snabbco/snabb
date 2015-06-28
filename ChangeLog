@@ -1,6 +1,8 @@
     unreleased
 + OSX time functions
 + OSX Mach types
++ arm64 support
++ OpenBSD 5.6 and 5.7 support
 
     0.10 release
 
