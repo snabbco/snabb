@@ -422,7 +422,11 @@ function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
 function S.setsid() return retnum(C.setsid()) end
 function S.setpgid(pid, pgid) return retbool(C.setpgid(pid or 0, pgid or 0)) end
 function S.getpgid(pid) return retnum(C.getpgid(pid or 0)) end
-function S.getpgrp() return retnum(C.getpgrp()) end
+if C.getpgrp then
+  function S.getpgrp() return retnum(C.getpgrp()) end
+else
+  function S.getpgrp() return retnum(C.getpgid(0)) end
+end
 function S.getgroups()
   local size = C.getgroups(0, nil) -- note for BSD could use NGROUPS_MAX instead
   if size == -1 then return nil, t.error() end

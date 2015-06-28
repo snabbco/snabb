@@ -539,7 +539,7 @@ function C.uname(buf) return syscall(sys.uname, void(buf)) end
 function C.getsid(pid) return syscall(sys.getsid, int(pid)) end
 function C.getpgid(pid) return syscall(sys.getpgid, int(pid)) end
 function C.setpgid(pid, pgid) return syscall(sys.setpgid, int(pid), int(pgid)) end
-function C.getpgrp() return syscall(sys.getpgrp) end
+if sys.getpgrp then function C.getpgrp() return syscall(sys.getpgrp) end end
 function C.setsid() return syscall(sys.setsid) end
 function C.chroot(path) return syscall(sys.chroot, void(path)) end
 function C.mount(source, target, filesystemtype, mountflags, data)
