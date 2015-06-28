@@ -646,9 +646,11 @@ function C.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask)
 end
 
 -- need _newselect syscall on some platforms
-local select = sys._newselect or sys.select
-function C.select(nfds, readfds, writefds, exceptfds, timeout)
-  return syscall(select, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout))
+local sysselect = sys._newselect or sys.select
+if sysselect then
+  function C.select(nfds, readfds, writefds, exceptfds, timeout)
+    return syscall(sysselect, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout))
+  end
 end
 
 -- missing on some platforms eg ARM

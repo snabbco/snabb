@@ -381,6 +381,7 @@ local function fdisset(fds, set)
 end
 
 -- TODO convert to metatype. Problem is how to deal with nfds
+if C.select then
 function S.select(sel, timeout) -- note same structure as returned
   local r, w, e
   local nfds = 0
@@ -392,6 +393,12 @@ function S.select(sel, timeout) -- note same structure as returned
   if ret == -1 then return nil, t.error(err or errno()) end
   return {readfds = fdisset(sel.readfds or {}, r), writefds = fdisset(sel.writefds or {}, w),
           exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret)}
+end
+else
+  function S.select(sel, timeout)
+    if timeout then timeout = mktype(t.timespec, timeout / 1000) end
+    return S.pselect(sel, timeout)
+  end
 end
 
 -- TODO note that in Linux syscall modifies timeout, which is non standard, like ppoll
