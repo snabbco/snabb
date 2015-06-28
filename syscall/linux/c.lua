@@ -496,7 +496,7 @@ if sys.open then
   function C.open(pathname, flags, mode) return syscall(sys.open, void(pathname), int(flags), uint(mode)) end
 end
 function C.openat(dirfd, pathname, flags, mode) return syscall(sys.openat, int(dirfd), void(pathname), int(flags), uint(mode)) end
-function C.creat(pathname, mode) return syscall(sys.creat, void(pathname), uint(mode)) end
+if sys.creat then function C.creat(pathname, mode) return syscall(sys.creat, void(pathname), uint(mode)) end end
 function C.close(fd) return syscall(sys.close, int(fd)) end
 function C.read(fd, buf, count) return syscall_long(sys.read, int(fd), void(buf), ulong(count)) end
 function C.write(fd, buf, count) return syscall_long(sys.write, int(fd), void(buf), ulong(count)) end
