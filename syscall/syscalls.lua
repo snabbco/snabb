@@ -75,7 +75,6 @@ local function retiter(ret, err, array)
 end
 
 -- generic system calls
-function S.open(pathname, flags, mode) return retfd(C.open(pathname, c.O[flags], c.MODE[mode])) end
 function S.close(fd) return retbool(C.close(getfd(fd))) end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
@@ -155,7 +154,12 @@ function S.fstat(fd, buf)
 end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
--- revent Linux does not have rmdir, unlink any more as a syscall
+-- recent Linux does not have open, rmdir, unlink any more as a syscall
+if C.open then
+  function S.open(pathname, flags, mode) return retfd(C.open(pathname, c.O[flags], c.MODE[mode])) end
+else
+  function S.open(pathname, flags, mode) return retfd(C.openat(c.AT_FDCWD.FDCWD, pathname, c.O[flags], c.MODE[mode])) end
+end
 if C.rmdir then
   function S.rmdir(path) return retbool(C.rmdir(path)) end
 else

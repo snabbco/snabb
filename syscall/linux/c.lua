@@ -492,7 +492,9 @@ function C.fchdir(fd) return syscall(sys.fchdir, int(fd)) end
 function C.chown(path, owner, group) return syscall(sys.chown, void(path), uint(owner), uint(group)) end
 function C.fchown(fd, owner, group) return syscall(sys.fchown, int(fd), uint(owner), uint(group)) end
 function C.lchown(path, owner, group) return syscall(sys.lchown, void(path), uint(owner), uint(group)) end
-function C.open(pathname, flags, mode) return syscall(sys.open, void(pathname), int(flags), uint(mode)) end
+if sys.open then
+  function C.open(pathname, flags, mode) return syscall(sys.open, void(pathname), int(flags), uint(mode)) end
+end
 function C.openat(dirfd, pathname, flags, mode) return syscall(sys.openat, int(dirfd), void(pathname), int(flags), uint(mode)) end
 function C.creat(pathname, mode) return syscall(sys.creat, void(pathname), uint(mode)) end
 function C.close(fd) return syscall(sys.close, int(fd)) end
