@@ -251,7 +251,7 @@ function S.socketpair(domain, stype, protocol, sv2)
 end
 
 function S.dup(oldfd) return retfd(C.dup(getfd(oldfd))) end
-function S.dup2(oldfd, newfd) return retfd(C.dup2(getfd(oldfd), getfd(newfd))) end
+if C.dup2 then function S.dup2(oldfd, newfd) return retfd(C.dup2(getfd(oldfd), getfd(newfd))) end end
 if C.dup3 then function S.dup3(oldfd, newfd, flags) return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags or 0)) end end
 
 function S.sendto(fd, buf, count, flags, addr, addrlen)

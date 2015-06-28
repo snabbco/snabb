@@ -587,6 +587,7 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_dup2 = function()
+    if not S.dup2 then error "skipped" end
     local fd = assert(S.open("/dev/zero"))
     local fd2 = assert(fd:dup2(17))
     assert_equal(fd2:getfd(), 17, "dup2 should set file id as specified")

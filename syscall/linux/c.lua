@@ -465,7 +465,7 @@ end
 
 -- adding more
 function C.dup(oldfd) return syscall(sys.dup, int(oldfd)) end
-function C.dup2(oldfd, newfd) return syscall(sys.dup2, int(oldfd), int(newfd)) end
+if sys.dup2 then function C.dup2(oldfd, newfd) return syscall(sys.dup2, int(oldfd), int(newfd)) end end
 function C.dup3(oldfd, newfd, flags) return syscall(sys.dup3, int(oldfd), int(newfd), int(flags)) end
 if sys.chmod then function C.chmod(path, mode) return syscall(sys.chmod, void(path), uint(mode)) end end
 function C.fchmod(fd, mode) return syscall(sys.fchmod, int(fd), uint(mode)) end
