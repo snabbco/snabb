@@ -506,11 +506,20 @@ function S.ioctl(d, request, argp)
   return true -- will need override for few linux ones that return numbers
 end
 
-function S.pipe(fd2)
-  fd2 = fd2 or t.int2()
-  local ret, err = C.pipe(fd2)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
+if C.pipe then
+  function S.pipe(fd2)
+    fd2 = fd2 or t.int2()
+    local ret, err = C.pipe(fd2)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
+  end
+else
+  function S.pipe(fd2)
+    fd2 = fd2 or t.int2()
+    local ret, err = C.pipe2(fd2, 0)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
+  end
 end
 
 if C.gettimeofday then
