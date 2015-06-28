@@ -382,8 +382,10 @@ end
 function C.epoll_create1(flags)
   return syscall(sys.epoll_create1, int(flags))
 end
-function C.epoll_wait(epfd, events, maxevents, timeout)
-  return syscall(sys.epoll_wait, int(epfd), void(events), int(maxevents), int(timeout))
+if sys.epoll_wait then
+  function C.epoll_wait(epfd, events, maxevents, timeout)
+    return syscall(sys.epoll_wait, int(epfd), void(events), int(maxevents), int(timeout))
+  end
 end
 function C.swapon(path, swapflags)
   return syscall(sys.swapon, void(path), int(swapflags))

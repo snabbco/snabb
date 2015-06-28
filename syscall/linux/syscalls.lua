@@ -186,9 +186,16 @@ function S.epoll_ctl(epfd, op, fd, event)
   return retbool(C.epoll_ctl(getfd(epfd), c.EPOLL_CTL[op], getfd(fd), event))
 end
 
-function S.epoll_wait(epfd, events, timeout)
-  local ret, err = C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1)
-  return retiter(ret, err, events.ep)
+if C.epoll_wait then
+  function S.epoll_wait(epfd, events, timeout)
+    local ret, err = C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1)
+    return retiter(ret, err, events.ep)
+  end
+else
+  function S.epoll_wait(epfd, events, timeout)
+    local ret, err = C.epoll_pwait(getfd(epfd), events.ep, #events, timeout or -1, nil)
+    return retiter(ret, err, events.ep)
+  end
 end
 
 function S.epoll_pwait(epfd, events, timeout, sigmask)
