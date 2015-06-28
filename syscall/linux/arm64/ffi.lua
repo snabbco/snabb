@@ -38,9 +38,9 @@ struct stat {
   blksize_t st_blksize;
   int __pad2;
   blkcnt_t st_blocks;
-  struct timespec st_atim;
-  struct timespec st_mtim;
-  struct timespec st_ctim;
+  struct timespec st_atime;
+  struct timespec st_mtime;
+  struct timespec st_ctime;
   unsigned __unused[2];
 };
 ]],
