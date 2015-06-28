@@ -172,7 +172,7 @@ end
 if C.chmod then
   function S.chmod(path, mode) return retbool(C.chmod(path, c.MODE[mode])) end
 else
-  function S.chmod(path, mode) return retbool(C.chmodat(c.AT_FDCWD.FDCWD, path, c.MODE[mode])) end
+  function S.chmod(path, mode) return retbool(C.fchmodat(c.AT_FDCWD.FDCWD, path, c.MODE[mode], 0)) end
 end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
