@@ -266,6 +266,10 @@ local nr = {
   sched_getattr = 275,
   renameat2 = 276,
   seccomp = 277,
+  getrandom = 278,
+  memfd_create = 279,
+  bpf = 280,
+  execveat = 281,
 }
 }
 
