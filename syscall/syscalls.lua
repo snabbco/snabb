@@ -80,7 +80,6 @@ function S.chdir(path) return retbool(C.chdir(path)) end
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.mkdir(path, mode) return retbool(C.mkdir(path, c.MODE[mode])) end
 function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
-function S.chmod(path, mode) return retbool(C.chmod(path, c.MODE[mode])) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), c.MODE[mode])) end
 function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
 function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
@@ -154,7 +153,7 @@ function S.fstat(fd, buf)
 end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
--- recent Linux does not have open, rmdir, unlink any more as a syscall
+-- recent Linux does not have open, rmdir, unlink etc any more as syscalls
 if C.open then
   function S.open(pathname, flags, mode) return retfd(C.open(pathname, c.O[flags], c.MODE[mode])) end
 else
@@ -170,6 +169,12 @@ if C.unlink then
 else
   function S.unlink(path) return retbool(C.unlinkat(c.AT_FDCWD.FDCWD, path, 0)) end
 end
+if C.chmod then
+  function S.chmod(path, mode) return retbool(C.chmod(path, c.MODE[mode])) end
+else
+  function S.chmod(path, mode) return retbool(C.chmodat(c.AT_FDCWD.FDCWD, path, c.MODE[mode])) end
+end
+
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
   protocol = protocol or 0
   if domain == c.AF.NETLINK then return c.NETLINK[protocol] end
