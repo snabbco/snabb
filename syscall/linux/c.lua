@@ -536,7 +536,7 @@ function C.fsync(fd) return syscall(sys.fsync, int(fd)) end
 function C.fdatasync(fd) return syscall(sys.fdatasync, int(fd)) end
 function C.sync() return syscall(sys.sync) end
 function C.syncfs(fd) return syscall(sys.syncfs, int(fd)) end
-function C.link(oldpath, newpath) return syscall(sys.link, void(oldpath), void(newpath)) end
+if sys.link then function C.link(oldpath, newpath) return syscall(sys.link, void(oldpath), void(newpath)) end end
 if sys.symlink then function C.symlink(oldpath, newpath) return syscall(sys.symlink, void(oldpath), void(newpath)) end end
 function C.epoll_ctl(epfd, op, fd, event) return syscall(sys.epoll_ctl, int(epfd), int(op), int(fd), void(event)) end
 function C.uname(buf) return syscall(sys.uname, void(buf)) end

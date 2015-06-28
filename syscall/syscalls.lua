@@ -81,7 +81,6 @@ function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), c.MODE[mode])) end
 function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
 function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
-function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
 function S.chroot(path) return retbool(C.chroot(path)) end
 function S.umask(mask) return C.umask(c.MODE[mask]) end
 function S.sync() C.sync() end
@@ -217,6 +216,11 @@ if C.symlink then
   function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 else
   function S.symlink(oldpath, newpath) return retbool(C.symlinkat(oldpath, c.AT_FDCWD.FDCWD, newpath)) end
+end
+if C.link then
+  function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
+else
+  function S.link(oldpath, newpath) return retbool(C.linkat(c.AT_FDCWD.FDCWD, oldpath, c.AT_FDCWD.FDCWD, newpath, 0)) end
 end
 if C.rename then
   function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
