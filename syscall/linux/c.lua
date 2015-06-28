@@ -502,7 +502,7 @@ function C.write(fd, buf, count) return syscall_long(sys.write, int(fd), void(bu
 function C.readv(fd, iov, iovcnt) return syscall_long(sys.readv, int(fd), void(iov), long(iovcnt)) end
 function C.writev(fd, iov, iovcnt) return syscall_long(sys.writev, int(fd), void(iov), long(iovcnt)) end
 if sys.readlink then function C.readlink(path, buf, bufsiz) return syscall_long(sys.readlink, void(path), void(buf), ulong(bufsiz)) end end
-function C.rename(oldpath, newpath) return syscall(sys.rename, void(oldpath), void(newpath)) end
+if sys.rename then function C.rename(oldpath, newpath) return syscall(sys.rename, void(oldpath), void(newpath)) end end
 function C.renameat(olddirfd, oldpath, newdirfd, newpath)
   return syscall(sys.renameat, int(olddirfd), void(oldpath), int(newdirfd), void(newpath))
 end
