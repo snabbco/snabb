@@ -153,11 +153,20 @@ else
     return buf
   end
 end
-function S.lstat(path, buf)
-  if not buf then buf = t.stat() end
-  local ret, err = C.lstat(path, buf)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return buf
+if C.lstat then
+  function S.lstat(path, buf)
+    if not buf then buf = t.stat() end
+    local ret, err = C.lstat(path, buf)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return buf
+  end
+else
+  function S.lstat(path, buf)
+    if not buf then buf = t.stat() end
+    local ret, err = C.fstatat(c.AT_FDCWD.FDCWD, path, buf, c.AT.SYMLINK_NOFOLLOW)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return buf
+  end
 end
 function S.fstat(fd, buf)
   if not buf then buf = t.stat() end

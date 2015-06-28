@@ -231,8 +231,10 @@ if abi.abi64 then
       return syscall(sys.stat, path, void(buf))
     end
   end
-  function C.lstat(path, buf)
-    return syscall(sys.lstat, path, void(buf))
+  if sys.lstat then
+    function C.lstat(path, buf)
+      return syscall(sys.lstat, path, void(buf))
+    end
   end
   function C.fstat(fd, buf)
     return syscall(sys.fstat, int(fd), void(buf))
