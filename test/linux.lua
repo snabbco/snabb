@@ -1342,7 +1342,9 @@ test.seccomp = {
       }
       local pp = t.sock_filters(#program, program)
       local p = t.sock_fprog1{{#program, pp}}
-      fork_assert(S.prctl("set_seccomp", "filter", p))
+      local ok, err = S.prctl("set_seccomp", "filter", p)
+      if err and err.INVAL then S.exit() end -- may not be supported
+      fork_assert(ok)
       local pid = S.getpid()
       S._exit()
     else
@@ -1384,7 +1386,9 @@ test.seccomp = {
       }
       local pp = t.sock_filters(#program, program)
       local p = t.sock_fprog1{{#program, pp}}
-      fork_assert(S.prctl("set_seccomp", "filter", p))
+      local ok, err = S.prctl("set_seccomp", "filter", p)
+      if err and err.INVAL then S.exit() end -- may not be supported
+      fork_assert(ok)
       local pid = S.getpid()
       S._exit() -- use _exit as normal exit might call syscalls
     else
@@ -1420,13 +1424,15 @@ test.seccomp = {
       }
       local pp = t.sock_filters(#program, program)
       local p = t.sock_fprog1{{#program, pp}}
-      fork_assert(S.prctl("set_seccomp", "filter", p))
+      local ok, err = S.prctl("set_seccomp", "filter", p)
+      if err and err.INVAL then S.exit() end -- may not be supported
+      fork_assert(ok)
       local pid = S.getpid()
       local fd = fork_assert(S.open("/dev/null", "rdonly")) -- not allowed
       S._exit()
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
-      assert(status.EXITSTATUS == 42 or status.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp (or not implemented)")
+      assert(status.EXITSTATUS == 0 or status.EXITSTATUS == 42 or status.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp (or not implemented)")
     end
   end,
   test_seccomp_fail_errno = function()
@@ -1467,7 +1473,9 @@ test.seccomp = {
       }
       local pp = t.sock_filters(#program, program)
       local p = t.sock_fprog1{{#program, pp}}
-      fork_assert(S.prctl("set_seccomp", "filter", p))
+      local ok, err = S.prctl("set_seccomp", "filter", p)
+      if err and err.INVAL then S.exit() end -- may not be supported
+      fork_assert(ok)
       local pid = S.getpid()
       local ofd, err = S.open("/dev/null", "rdonly") -- not allowed
       fork_assert(not ofd, "should not run open")
