@@ -1648,7 +1648,8 @@ test.remap_file_pages = {
     assert(S.unlink(tmpfile))
     local size = S.getpagesize()
     local mem = assert(fd:mmap(nil, size, "read", "shared", 0))
-    assert(S.remap_file_pages(mem, size, 0, 0, 0))
+    local ok, err = S.remap_file_pages(mem, size, 0, 0, 0)
+    if not ok and err.NOSYS then error "skipped" end
     assert(S.munmap(mem, size))
     assert(fd:close())
   end,
