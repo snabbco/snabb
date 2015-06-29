@@ -117,7 +117,9 @@ test.file_operations_linux = {
   test_sync_file_range = function()
     local fd = assert(S.creat(tmpfile, "0666"))
     assert(S.unlink(tmpfile))
-    assert(fd:sync_file_range(0, 0, 0)) -- nop
+    local ok, err = fd:sync_file_range(0, 0, 0) -- nop
+    if not ok and err.NOSYS then error "skipped" end
+    assert(ok, err)
     assert(fd:sync_file_range(0, 4096, 0)) -- nop
     assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
     assert(fd:sync_file_range(4096, 0, "wait_before, write, wait_after"))
@@ -1650,6 +1652,7 @@ test.remap_file_pages = {
     local mem = assert(fd:mmap(nil, size, "read", "shared", 0))
     local ok, err = S.remap_file_pages(mem, size, 0, 0, 0)
     if not ok and err.NOSYS then error "skipped" end
+    assert(ok, err)
     assert(S.munmap(mem, size))
     assert(fd:close())
   end,
