@@ -1751,7 +1751,9 @@ test_sockets_pipes = {
     local sa = t.sockaddr_storage()
     local sv1, sv2 = assert(S.socketpair("unix", "stream"))
     local msg = t.mmsghdrs{{iov = iov}}
-    assert(sv1:sendmmsg(msg))
+    local ok, err = sv1:sendmmsg(msg)
+    if not ok and err.NOSYS then error "skipped" end
+    assert(ok, err)
     local msg = t.mmsghdrs{{name = sa, iov = iov}}
     assert(sv2:recvmmsg(msg))
     assert_equal(msg.msg[0].len, #"test")
