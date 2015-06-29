@@ -48,7 +48,7 @@ function tmux_launch {
         tmux_session=test_env-$$
         tmux new-session -d -n "$1" -s $tmux_session "$command"
     else
-        tmux new-window -a -n "$1" -t $tmux_session:0 "$command"
+        tmux new-window -a -d -n "$1" -t $tmux_session "$command"
     fi
 }
 
