@@ -220,8 +220,14 @@ function tunnel_tests {
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/tunnel.ports
 
     # Assert ND was successful.
-    grep "Resolved next-hop" snabb0.log
-    assert ND $?
+    retries=0
+    while true; do
+        if grep "Resolved next-hop" snabb0.log; then
+            assert ND 0 && break
+        elif [ $retries -gt 5 ]; then assert ND 1
+        else sleep 1; retries=$(expr $retries + 1)
+        fi
+    done
 
     test_ping $TELNET_PORT0 "$(ip 1)%eth0"
     test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
