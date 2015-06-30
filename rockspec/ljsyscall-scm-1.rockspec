@@ -77,6 +77,11 @@ build =
       ["syscall.linux.x86.ffi"] = "syscall/linux/x86/ffi.lua";
       ["syscall.linux.x86.ioctl"] = "syscall/linux/x86/ioctl.lua";
       ["syscall.linux.x86.nr"] = "syscall/linux/x86/nr.lua";
+      ["syscall.linux.ppc64le.constants"] = "syscall/linux/ppc64le/constants.lua";
+      ["syscall.linux.ppc64le.ffi"] = "syscall/linux/ppc64le/ffi.lua";
+      ["syscall.linux.ppc64le.ioctl"] = "syscall/linux/ppc64le/ioctl.lua";
+      ["syscall.linux.ppc64le.nr"] = "syscall/linux/ppc64le/nr.lua";
+
 
       ["syscall.netbsd.syscalls"] = "syscall/netbsd/syscalls.lua";
       ["syscall.netbsd.c"] = "syscall/netbsd/c.lua";
