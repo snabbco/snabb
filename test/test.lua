@@ -152,7 +152,7 @@ end
 
 -- type tests use reflection TODO move to seperate test file
 local ok, reflect = nil, nil
-if not ffi.abi("64bit") then -- ffi-reflect does not support the new 64bit abi
+if not ffi.abi("64bit") or "x64" == ffi.arch then -- ffi-reflect does not support the new 64bit abi (LuaJIT's LJ_GC64 mode)
   ok, reflect = pcall(require, "include.ffi-reflect.reflect")
 end
 if ok then
