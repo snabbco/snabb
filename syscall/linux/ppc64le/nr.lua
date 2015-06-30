@@ -1,4 +1,4 @@
--- ppc syscall numbers
+-- ppc64le syscall numbers
 
 local nr = {
   zeropad = true,
@@ -195,19 +195,12 @@ local nr = {
   vfork                 = 189,
   ugetrlimit            = 190,
   readahead             = 191,
-  mmap2                 = 192,
-  truncate64            = 193,
-  ftruncate64           = 194,
-  stat64                = 195,
-  lstat64               = 196,
-  fstat64               = 197,
   pciconfig_read        = 198,
   pciconfig_write       = 199,
   pciconfig_iobase      = 200,
   multiplexer           = 201,
   getdents64            = 202,
   pivot_root            = 203,
-  fcntl64               = 204,
   madvise               = 205,
   mincore               = 206,
   gettid                = 207,
@@ -228,7 +221,6 @@ local nr = {
   sched_setaffinity     = 222,
   sched_getaffinity     = 223,
   tuxcall               = 225,
-  sendfile64            = 226,
   io_setup              = 227,
   io_destroy            = 228,
   io_getevents          = 229,
@@ -256,7 +248,6 @@ local nr = {
   utimes                = 251,
   statfs64              = 252,
   fstatfs64             = 253,
-  fadvise64_64          = 254,
   rtas                  = 255,
   sys_debug_setcontext  = 256,
   migrate_pages         = 258,
@@ -292,7 +283,7 @@ local nr = {
   mknodat               = 288,
   fchownat              = 289,
   futimesat             = 290,
-  fstatat64             = 291,
+  newfstatat            = 291,
   unlinkat              = 292,
   renameat              = 293,
   linkat                = 294,
@@ -354,8 +345,14 @@ local nr = {
   setns                 = 350,
   process_vm_readv      = 351,
   process_vm_writev     = 352,
+  finit_module          = 353,
+  kcmp                  = 354,
+  sched_setattr         = 355,
+  sched_getattr         = 356,
 }
 }
+
+nr.SYS.fstatat = nr.SYS.newfstatat
 
 return nr
 
