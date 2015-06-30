@@ -444,7 +444,7 @@ end
 -- TODO this should be got from somewhere more generic
 -- started moving into linux/syscall.lua som explicit (see signalfd) but needs some more cleanups
 local sigset_size = 8
-if abi.arch == "mips" then
+if abi.arch == "mips" or abi.arch == "mipsel" then
   sigset_size = 16
 end
 
@@ -519,7 +519,7 @@ function C.unlinkat(dirfd, pathname, flags) return syscall(sys.unlinkat, int(dir
 function C.prctl(option, arg2, arg3, arg4, arg5)
   return syscall(sys.prctl, int(option), ulong(arg2), ulong(arg3), ulong(arg4), ulong(arg5))
 end
-if abi.arch ~= "mips" and sys.pipe then -- mips uses old style dual register return calling convention that we cannot use
+if abi.arch ~= "mips" and abi.arch ~= "mipsel" and sys.pipe then -- mips uses old style dual register return calling convention that we cannot use
   function C.pipe(pipefd) return syscall(sys.pipe, void(pipefd)) end
 end
 function C.pipe2(pipefd, flags) return syscall(sys.pipe2, void(pipefd), int(flags)) end

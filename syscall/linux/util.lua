@@ -194,12 +194,15 @@ local auditarch_le = {
   x86 = "I386",
   x64 = "X86_64",
   arm = "ARM",
-  mips = "MIPSEL",
+  arm64 = "AARCH64",
+  mipsel = "MIPSEL",
+  ppc64le = "PPC64LE",
 }
 
 local auditarch_be = {
   ppc = "PPC",
   arm = "ARMEB",
+  arm64 = "AARCH64",
   mips = "MIPS",
 }
 

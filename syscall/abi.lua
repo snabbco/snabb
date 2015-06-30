@@ -26,7 +26,7 @@ if abi.arch == "ppcspe" then abi.arch = "ppc" end
 
 if abi.arch == "arm" and not ffi.abi("eabi") then error("only support eabi for arm") end
 
-if abi.arch == "mips" then abi.mipsabi = "o32" end -- only one supported now
+if (abi.arch == "mips" or abi.arch == "mipsel") then abi.mipsabi = "o32" end -- only one supported now
 
 if abi.os == "bsd" or abi.os == "osx" then abi.bsd = true end -- some shared BSD functionality
 
@@ -63,4 +63,3 @@ abi.host = abi.os -- real OS, used for rump at present may change this
 abi.types = "netbsd" -- you can set to linux, or monkeypatch (see tests) to use Linux types
 
 return abi
-

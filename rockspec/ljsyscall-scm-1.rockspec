@@ -82,7 +82,6 @@ build =
       ["syscall.linux.ppc64le.ioctl"] = "syscall/linux/ppc64le/ioctl.lua";
       ["syscall.linux.ppc64le.nr"] = "syscall/linux/ppc64le/nr.lua";
 
-
       ["syscall.netbsd.syscalls"] = "syscall/netbsd/syscalls.lua";
       ["syscall.netbsd.c"] = "syscall/netbsd/c.lua";
       ["syscall.netbsd.constants"] = "syscall/netbsd/constants.lua";
