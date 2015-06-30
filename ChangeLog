@@ -3,6 +3,8 @@
 + OSX Mach types
 + arm64 support
 + OpenBSD 5.6 and 5.7 support
++ ppc64le support, by Gustavo Serra Scalet
++ mipsel support
 
     0.10 release
 
