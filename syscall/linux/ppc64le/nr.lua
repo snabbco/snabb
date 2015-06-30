@@ -352,5 +352,7 @@ local nr = {
 }
 }
 
+nr.SYS.fstatat = nr.SYS.newfstatat
+
 return nr
 
