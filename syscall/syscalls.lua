@@ -75,25 +75,15 @@ local function retiter(ret, err, array)
 end
 
 -- generic system calls
-function S.open(pathname, flags, mode) return retfd(C.open(pathname, c.O[flags], c.MODE[mode])) end
 function S.close(fd) return retbool(C.close(getfd(fd))) end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
-function S.mkdir(path, mode) return retbool(C.mkdir(path, c.MODE[mode])) end
-function S.rmdir(path) return retbool(C.rmdir(path)) end
-function S.unlink(pathname) return retbool(C.unlink(pathname)) end
-function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
-function S.chmod(path, mode) return retbool(C.chmod(path, c.MODE[mode])) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), c.MODE[mode])) end
-function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
 function S.fchown(fd, owner, group) return retbool(C.fchown(getfd(fd), owner or -1, group or -1)) end
 function S.lchown(path, owner, group) return retbool(C.lchown(path, owner or -1, group or -1)) end
-function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
-function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
 function S.chroot(path) return retbool(C.chroot(path)) end
 function S.umask(mask) return C.umask(c.MODE[mask]) end
 function S.sync() C.sync() end
-function S.mknod(pathname, mode, dev) return retbool(C.mknod(pathname, c.S_I[mode], getdev(dev) or 0)) end
 function S.flock(fd, operation) return retbool(C.flock(getfd(fd), c.LOCK[operation])) end
 -- TODO read should have consistent return type but then will differ from other calls.
 function S.read(fd, buf, count)
@@ -125,29 +115,56 @@ if C.preadv and C.pwritev then -- these are missing in eg OSX
     return retnum(C.pwritev(getfd(fd), iov.iov, #iov, offset))
   end
 end
-function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
 function S.lseek(fd, offset, whence)
   return ret64(C.lseek(getfd(fd), offset or 0, c.SEEK[whence or c.SEEK.SET]))
 end
-function S.readlink(path, buffer, size)
-  size = size or c.PATH_MAX
-  buffer = buffer or t.buffer(size)
-  local ret, err = tonumber(C.readlink(path, buffer, size))
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return ffi.string(buffer, ret)
+if C.readlink then
+  function S.readlink(path, buffer, size)
+    size = size or c.PATH_MAX
+    buffer = buffer or t.buffer(size)
+    local ret, err = tonumber(C.readlink(path, buffer, size))
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return ffi.string(buffer, ret)
+  end
+else
+  function S.readlink(path, buffer, size)
+    size = size or c.PATH_MAX
+    buffer = buffer or t.buffer(size)
+    local ret, err = tonumber(C.readlinkat(c.AT_FDCWD.FDCWD, path, buffer, size))
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return ffi.string(buffer, ret)
+  end
 end
 function S.fsync(fd) return retbool(C.fsync(getfd(fd))) end
-function S.stat(path, buf)
-  if not buf then buf = t.stat() end
-  local ret = C.stat(path, buf)
-  if ret == -1 then return nil, t.error() end
-  return buf
+if C.stat then
+  function S.stat(path, buf)
+    if not buf then buf = t.stat() end
+    local ret = C.stat(path, buf)
+    if ret == -1 then return nil, t.error() end
+    return buf
+  end
+else
+  function S.stat(path, buf)
+    if not buf then buf = t.stat() end
+    local ret = C.fstatat(c.AT_FDCWD.FDCWD, path, buf, 0)
+    if ret == -1 then return nil, t.error() end
+    return buf
+  end
 end
-function S.lstat(path, buf)
-  if not buf then buf = t.stat() end
-  local ret, err = C.lstat(path, buf)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return buf
+if C.lstat then
+  function S.lstat(path, buf)
+    if not buf then buf = t.stat() end
+    local ret, err = C.lstat(path, buf)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return buf
+  end
+else
+  function S.lstat(path, buf)
+    if not buf then buf = t.stat() end
+    local ret, err = C.fstatat(c.AT_FDCWD.FDCWD, path, buf, c.AT.SYMLINK_NOFOLLOW)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return buf
+  end
 end
 function S.fstat(fd, buf)
   if not buf then buf = t.stat() end
@@ -157,6 +174,63 @@ function S.fstat(fd, buf)
 end
 function S.truncate(path, length) return retbool(C.truncate(path, length)) end
 function S.ftruncate(fd, length) return retbool(C.ftruncate(getfd(fd), length)) end
+
+-- recent Linux does not have open, rmdir, unlink etc any more as syscalls
+if C.open then
+  function S.open(pathname, flags, mode) return retfd(C.open(pathname, c.O[flags], c.MODE[mode])) end
+else
+  function S.open(pathname, flags, mode) return retfd(C.openat(c.AT_FDCWD.FDCWD, pathname, c.O[flags], c.MODE[mode])) end
+end
+if C.rmdir then
+  function S.rmdir(path) return retbool(C.rmdir(path)) end
+else
+  function S.rmdir(path) return retbool(C.unlinkat(c.AT_FDCWD.FDCWD, path, c.AT.REMOVEDIR)) end
+end
+if C.unlink then
+  function S.unlink(pathname) return retbool(C.unlink(pathname)) end
+else
+  function S.unlink(path) return retbool(C.unlinkat(c.AT_FDCWD.FDCWD, path, 0)) end
+end
+if C.chmod then
+  function S.chmod(path, mode) return retbool(C.chmod(path, c.MODE[mode])) end
+else
+  function S.chmod(path, mode) return retbool(C.fchmodat(c.AT_FDCWD.FDCWD, path, c.MODE[mode], 0)) end
+end
+if C.access then
+  function S.access(pathname, mode) return retbool(C.access(pathname, c.OK[mode])) end
+else
+  function S.access(pathname, mode) return retbool(C.faccessat(c.AT_FDCWD.FDCWD, pathname, c.OK[mode], 0)) end
+end
+if C.chown then
+  function S.chown(path, owner, group) return retbool(C.chown(path, owner or -1, group or -1)) end
+else
+  function S.chown(path, owner, group) return retbool(C.fchownat(c.AT_FDCWD.FDCWD, path, owner or -1, group or -1, 0)) end
+end
+if C.mkdir then
+  function S.mkdir(path, mode) return retbool(C.mkdir(path, c.MODE[mode])) end
+else
+  function S.mkdir(path, mode) return retbool(C.mkdirat(c.AT_FDCWD.FDCWD, path, c.MODE[mode])) end
+end
+if C.symlink then
+  function S.symlink(oldpath, newpath) return retbool(C.symlink(oldpath, newpath)) end
+else
+  function S.symlink(oldpath, newpath) return retbool(C.symlinkat(oldpath, c.AT_FDCWD.FDCWD, newpath)) end
+end
+if C.link then
+  function S.link(oldpath, newpath) return retbool(C.link(oldpath, newpath)) end
+else
+  function S.link(oldpath, newpath) return retbool(C.linkat(c.AT_FDCWD.FDCWD, oldpath, c.AT_FDCWD.FDCWD, newpath, 0)) end
+end
+if C.rename then
+  function S.rename(oldpath, newpath) return retbool(C.rename(oldpath, newpath)) end
+else
+  function S.rename(oldpath, newpath) return retbool(C.renameat(c.AT_FDCWD.FDCWD, oldpath, c.AT_FDCWD.FDCWD, newpath)) end
+end
+if C.mknod then
+  function S.mknod(pathname, mode, dev) return retbool(C.mknod(pathname, c.S_I[mode], getdev(dev) or 0)) end
+else
+  function S.mknod(pathname, mode, dev) return retbool(C.mknodat(c.AT_FDCWD.FDCWD, pathname, c.S_I[mode], getdev(dev) or 0)) end
+end
 
 local function sproto(domain, protocol) -- helper function to lookup protocol type depending on domain TODO table?
   protocol = protocol or 0
@@ -177,7 +251,7 @@ function S.socketpair(domain, stype, protocol, sv2)
 end
 
 function S.dup(oldfd) return retfd(C.dup(getfd(oldfd))) end
-function S.dup2(oldfd, newfd) return retfd(C.dup2(getfd(oldfd), getfd(newfd))) end
+if C.dup2 then function S.dup2(oldfd, newfd) return retfd(C.dup2(getfd(oldfd), getfd(newfd))) end end
 if C.dup3 then function S.dup3(oldfd, newfd, flags) return retfd(C.dup3(getfd(oldfd), getfd(newfd), flags or 0)) end end
 
 function S.sendto(fd, buf, count, flags, addr, addrlen)
@@ -280,8 +354,9 @@ function S.getpeername(sockfd, addr, addrlen)
   return t.sa(addr, addrlen[0])
 end
 function S.shutdown(sockfd, how) return retbool(C.shutdown(getfd(sockfd), c.SHUT[how])) end
-function S.poll(fds, timeout) return retnum(C.poll(fds.pfd, #fds, timeout or -1)) end
-
+if C.poll then
+  function S.poll(fds, timeout) return retnum(C.poll(fds.pfd, #fds, timeout or -1)) end
+end
 -- TODO rework fdset interface, see issue #71
 -- fdset handlers
 local function mkfdset(fds, nfds) -- should probably check fd is within range (1024), or just expand structure size
@@ -306,6 +381,7 @@ local function fdisset(fds, set)
 end
 
 -- TODO convert to metatype. Problem is how to deal with nfds
+if C.select then
 function S.select(sel, timeout) -- note same structure as returned
   local r, w, e
   local nfds = 0
@@ -317,6 +393,12 @@ function S.select(sel, timeout) -- note same structure as returned
   if ret == -1 then return nil, t.error(err or errno()) end
   return {readfds = fdisset(sel.readfds or {}, r), writefds = fdisset(sel.writefds or {}, w),
           exceptfds = fdisset(sel.exceptfds or {}, e), count = tonumber(ret)}
+end
+else
+  function S.select(sel, timeout)
+    if timeout then timeout = mktype(t.timespec, timeout / 1000) end
+    return S.pselect(sel, timeout)
+  end
 end
 
 -- TODO note that in Linux syscall modifies timeout, which is non standard, like ppoll
@@ -348,7 +430,11 @@ function S.getsid(pid) return retnum(C.getsid(pid or 0)) end
 function S.setsid() return retnum(C.setsid()) end
 function S.setpgid(pid, pgid) return retbool(C.setpgid(pid or 0, pgid or 0)) end
 function S.getpgid(pid) return retnum(C.getpgid(pid or 0)) end
-function S.getpgrp() return retnum(C.getpgrp()) end
+if C.getpgrp then
+  function S.getpgrp() return retnum(C.getpgrp()) end
+else
+  function S.getpgrp() return retnum(C.getpgid(0)) end
+end
 function S.getgroups()
   local size = C.getgroups(0, nil) -- note for BSD could use NGROUPS_MAX instead
   if size == -1 then return nil, t.error() end
@@ -436,11 +522,20 @@ function S.ioctl(d, request, argp)
   return true -- will need override for few linux ones that return numbers
 end
 
-function S.pipe(fd2)
-  fd2 = fd2 or t.int2()
-  local ret, err = C.pipe(fd2)
-  if ret == -1 then return nil, t.error(err or errno()) end
-  return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
+if C.pipe then
+  function S.pipe(fd2)
+    fd2 = fd2 or t.int2()
+    local ret, err = C.pipe(fd2)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
+  end
+else
+  function S.pipe(fd2)
+    fd2 = fd2 or t.int2()
+    local ret, err = C.pipe2(fd2, 0)
+    if ret == -1 then return nil, t.error(err or errno()) end
+    return true, nil, t.fd(fd2[0]), t.fd(fd2[1])
+  end
 end
 
 if C.gettimeofday then
@@ -463,7 +558,12 @@ function S.getrusage(who, ru)
   return ru
 end
 
-function S.fork() return retnum(C.fork()) end
+if C.fork then
+  function S.fork() return retnum(C.fork()) end
+else
+  function S.fork() return retnum(C.clone(c.SIG.CHLD, 0)) end
+end
+
 function S.execve(filename, argv, envp)
   local cargv = t.string_array(#argv + 1, argv or {})
   cargv[#argv] = nil -- LuaJIT does not zero rest of a VLA

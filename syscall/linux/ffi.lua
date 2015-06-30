@@ -37,6 +37,8 @@ typedef uint32_t id_t;
 typedef unsigned int tcflag_t;
 typedef unsigned int speed_t;
 typedef int timer_t;
+typedef uint64_t fsblkcnt_t;
+typedef uint64_t fsfilcnt_t;
 
 /* despite glibc, Linux uses 32 bit dev_t */
 typedef uint32_t dev_t;
@@ -78,6 +80,9 @@ struct itimerval {
   struct timeval it_interval;
   struct timeval it_value;
 };
+typedef struct __fsid_t {
+  int __val[2];
+} fsid_t;
 //static const int UTSNAME_LENGTH = 65;
 struct utsname {
   char sysname[65];

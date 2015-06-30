@@ -587,6 +587,7 @@ test_file_operations = {
     assert(fd:close())
   end,
   test_dup2 = function()
+    if not S.dup2 then error "skipped" end
     local fd = assert(S.open("/dev/zero"))
     local fd2 = assert(fd:dup2(17))
     assert_equal(fd2:getfd(), 17, "dup2 should set file id as specified")
@@ -1750,7 +1751,9 @@ test_sockets_pipes = {
     local sa = t.sockaddr_storage()
     local sv1, sv2 = assert(S.socketpair("unix", "stream"))
     local msg = t.mmsghdrs{{iov = iov}}
-    assert(sv1:sendmmsg(msg))
+    local ok, err = sv1:sendmmsg(msg)
+    if not ok and err.NOSYS then error "skipped" end
+    assert(ok, err)
     local msg = t.mmsghdrs{{name = sa, iov = iov}}
     assert(sv2:recvmmsg(msg))
     assert_equal(msg.msg[0].len, #"test")

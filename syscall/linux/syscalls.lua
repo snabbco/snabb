@@ -154,7 +154,12 @@ function S.ppoll(fds, timeout, set)
   if set then set = mktype(t.sigset, set) end
   return retnum(C.ppoll(fds.pfd, #fds, timeout, set))
 end
-
+if not S.poll then
+  function S.poll(fd, timeout)
+    if timeout then timeout = mktype(t.timespec, timeout / 1000) end
+    return S.ppoll(fd, timeout)
+  end
+end
 function S.mount(source, target, fstype, mountflags, data)
   return retbool(C.mount(source or "none", target, fstype, c.MS[mountflags], data))
 end
@@ -181,9 +186,16 @@ function S.epoll_ctl(epfd, op, fd, event)
   return retbool(C.epoll_ctl(getfd(epfd), c.EPOLL_CTL[op], getfd(fd), event))
 end
 
-function S.epoll_wait(epfd, events, timeout)
-  local ret, err = C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1)
-  return retiter(ret, err, events.ep)
+if C.epoll_wait then
+  function S.epoll_wait(epfd, events, timeout)
+    local ret, err = C.epoll_wait(getfd(epfd), events.ep, #events, timeout or -1)
+    return retiter(ret, err, events.ep)
+  end
+else
+  function S.epoll_wait(epfd, events, timeout)
+    local ret, err = C.epoll_pwait(getfd(epfd), events.ep, #events, timeout or -1, nil)
+    return retiter(ret, err, events.ep)
+  end
 end
 
 function S.epoll_pwait(epfd, events, timeout, sigmask)

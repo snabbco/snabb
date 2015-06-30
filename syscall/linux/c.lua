@@ -224,16 +224,17 @@ function C.sched_setscheduler(pid, policy, param)
   return syscall(sys.sched_setscheduler, int(pid), int(policy), void(param))
 end
 
--- for stat we use the syscall as libc might have a different struct stat for compatibility
--- similarly fadvise64 is not provided, and posix_fadvise may not have 64 bit args on 32 bit
--- and fallocate seems to have issues in uClibc
 local sys_fadvise64 = sys.fadvise64_64 or sys.fadvise64
 if abi.abi64 then
-  function C.stat(path, buf)
-    return syscall(sys.stat, path, void(buf))
+  if sys.stat then
+    function C.stat(path, buf)
+      return syscall(sys.stat, path, void(buf))
+    end
   end
-  function C.lstat(path, buf)
-    return syscall(sys.lstat, path, void(buf))
+  if sys.lstat then
+    function C.lstat(path, buf)
+      return syscall(sys.lstat, path, void(buf))
+    end
   end
   function C.fstat(fd, buf)
     return syscall(sys.fstat, int(fd), void(buf))
@@ -312,9 +313,8 @@ function C.mq_timedreceive(mqd, msg_ptr, msg_len, msg_prio, abs_timeout)
   return syscall(sys.mq_timedreceive, int(mqd), void(msg_ptr), ulong(msg_len), void(msg_prio), void(abs_timeout))
 end
 
--- note kernel dev_t is 32 bits, use syscall so we can ignore glibc using 64 bit dev_t
-function C.mknod(pathname, mode, dev)
-  return syscall(sys.mknod, pathname, uint(mode), uint(dev))
+if sys.mknod then
+  function C.mknod(pathname, mode, dev) return syscall(sys.mknod, pathname, uint(mode), uint(dev)) end
 end
 function C.mknodat(fd, pathname, mode, dev)
   return syscall(sys.mknodat, int(fd), pathname, uint(mode), uint(dev))
@@ -382,8 +382,10 @@ end
 function C.epoll_create1(flags)
   return syscall(sys.epoll_create1, int(flags))
 end
-function C.epoll_wait(epfd, events, maxevents, timeout)
-  return syscall(sys.epoll_wait, int(epfd), void(events), int(maxevents), int(timeout))
+if sys.epoll_wait then
+  function C.epoll_wait(epfd, events, maxevents, timeout)
+    return syscall(sys.epoll_wait, int(epfd), void(events), int(maxevents), int(timeout))
+  end
 end
 function C.swapon(path, swapflags)
   return syscall(sys.swapon, void(path), int(swapflags))
@@ -465,12 +467,12 @@ end
 
 -- adding more
 function C.dup(oldfd) return syscall(sys.dup, int(oldfd)) end
-function C.dup2(oldfd, newfd) return syscall(sys.dup2, int(oldfd), int(newfd)) end
+if sys.dup2 then function C.dup2(oldfd, newfd) return syscall(sys.dup2, int(oldfd), int(newfd)) end end
 function C.dup3(oldfd, newfd, flags) return syscall(sys.dup3, int(oldfd), int(newfd), int(flags)) end
-function C.chmod(path, mode) return syscall(sys.chmod, void(path), uint(mode)) end
+if sys.chmod then function C.chmod(path, mode) return syscall(sys.chmod, void(path), uint(mode)) end end
 function C.fchmod(fd, mode) return syscall(sys.fchmod, int(fd), uint(mode)) end
 function C.umask(mode) return syscall(sys.umask, uint(mode)) end
-function C.access(path, mode) return syscall(sys.access, void(path), uint(mode)) end
+if sys.access then function C.access(path, mode) return syscall(sys.access, void(path), uint(mode)) end end
 function C.getppid() return syscall(sys.getppid) end
 function C.getuid() return syscall(sys.getuid) end
 function C.geteuid() return syscall(sys.geteuid) end
@@ -486,56 +488,60 @@ function C.setreuid(uid, euid) return syscall(sys.setreuid, uint(uid), uint(euid
 function C.setregid(gid, egid) return syscall(sys.setregid, uint(gid), uint(egid)) end
 function C.flock(fd, operation) return syscall(sys.flock, int(fd), int(operation)) end
 function C.getrusage(who, usage) return syscall(sys.getrusage, int(who), void(usage)) end
-function C.rmdir(path) return syscall(sys.rmdir, void(path)) end
+if sys.rmdir then function C.rmdir(path) return syscall(sys.rmdir, void(path)) end end
 function C.chdir(path) return syscall(sys.chdir, void(path)) end
 function C.fchdir(fd) return syscall(sys.fchdir, int(fd)) end
-function C.chown(path, owner, group) return syscall(sys.chown, void(path), uint(owner), uint(group)) end
+if sys.chown then function C.chown(path, owner, group) return syscall(sys.chown, void(path), uint(owner), uint(group)) end end
 function C.fchown(fd, owner, group) return syscall(sys.fchown, int(fd), uint(owner), uint(group)) end
 function C.lchown(path, owner, group) return syscall(sys.lchown, void(path), uint(owner), uint(group)) end
-function C.open(pathname, flags, mode) return syscall(sys.open, void(pathname), int(flags), uint(mode)) end
+if sys.open then
+  function C.open(pathname, flags, mode) return syscall(sys.open, void(pathname), int(flags), uint(mode)) end
+end
 function C.openat(dirfd, pathname, flags, mode) return syscall(sys.openat, int(dirfd), void(pathname), int(flags), uint(mode)) end
-function C.creat(pathname, mode) return syscall(sys.creat, void(pathname), uint(mode)) end
+if sys.creat then function C.creat(pathname, mode) return syscall(sys.creat, void(pathname), uint(mode)) end end
 function C.close(fd) return syscall(sys.close, int(fd)) end
 function C.read(fd, buf, count) return syscall_long(sys.read, int(fd), void(buf), ulong(count)) end
 function C.write(fd, buf, count) return syscall_long(sys.write, int(fd), void(buf), ulong(count)) end
 function C.readv(fd, iov, iovcnt) return syscall_long(sys.readv, int(fd), void(iov), long(iovcnt)) end
 function C.writev(fd, iov, iovcnt) return syscall_long(sys.writev, int(fd), void(iov), long(iovcnt)) end
-function C.readlink(path, buf, bufsiz) return syscall_long(sys.readlink, void(path), void(buf), ulong(bufsiz)) end
-function C.rename(oldpath, newpath) return syscall(sys.rename, void(oldpath), void(newpath)) end
+if sys.readlink then function C.readlink(path, buf, bufsiz) return syscall_long(sys.readlink, void(path), void(buf), ulong(bufsiz)) end end
+if sys.rename then function C.rename(oldpath, newpath) return syscall(sys.rename, void(oldpath), void(newpath)) end end
 function C.renameat(olddirfd, oldpath, newdirfd, newpath)
   return syscall(sys.renameat, int(olddirfd), void(oldpath), int(newdirfd), void(newpath))
 end
-function C.unlink(pathname) return syscall(sys.unlink, void(pathname)) end
+if sys.renameat2 then
+  function C.renameat2(olddirfd, oldpath, newdirfd, newpath, flags)
+    return syscall(sys.renameat2, int(olddirfd), void(oldpath), int(newdirfd), void(newpath), int(flags))
+  end
+end
+if sys.unlink then function C.unlink(pathname) return syscall(sys.unlink, void(pathname)) end end
 function C.unlinkat(dirfd, pathname, flags) return syscall(sys.unlinkat, int(dirfd), void(pathname), int(flags)) end
 function C.prctl(option, arg2, arg3, arg4, arg5)
   return syscall(sys.prctl, int(option), ulong(arg2), ulong(arg3), ulong(arg4), ulong(arg5))
 end
-if abi.arch == "mips" then -- mips uses old style dual register return calling convention that we caanot use
-  function C.pipe(pipefd) return syscall(sys.pipe2, void(pipefd), 0) end
-else
+if abi.arch ~= "mips" and sys.pipe then -- mips uses old style dual register return calling convention that we cannot use
   function C.pipe(pipefd) return syscall(sys.pipe, void(pipefd)) end
 end
 function C.pipe2(pipefd, flags) return syscall(sys.pipe2, void(pipefd), int(flags)) end
-function C.mknod(path, mode, dev) return syscall(sys.mknod, void(path), uint(mode), uint(dev)) end
 function C.pause() return syscall(sys.pause) end
 function C.remap_file_pages(addr, size, prot, pgoff, flags)
   return syscall(sys.remap_file_pages, void(addr), ulong(size), int(prot), long(pgoff), int(flags))
 end
-function C.fork() return syscall(sys.fork) end
+if sys.fork then function C.fork() return syscall(sys.fork) end end
 function C.kill(pid, sig) return syscall(sys.kill, int(pid), int(sig)) end
-function C.mkdir(pathname, mode) return syscall(sys.mkdir, void(pathname), uint(mode)) end
+if sys.mkdir then function C.mkdir(pathname, mode) return syscall(sys.mkdir, void(pathname), uint(mode)) end end
 function C.fsync(fd) return syscall(sys.fsync, int(fd)) end
 function C.fdatasync(fd) return syscall(sys.fdatasync, int(fd)) end
 function C.sync() return syscall(sys.sync) end
 function C.syncfs(fd) return syscall(sys.syncfs, int(fd)) end
-function C.link(oldpath, newpath) return syscall(sys.link, void(oldpath), void(newpath)) end
-function C.symlink(oldpath, newpath) return syscall(sys.symlink, void(oldpath), void(newpath)) end
+if sys.link then function C.link(oldpath, newpath) return syscall(sys.link, void(oldpath), void(newpath)) end end
+if sys.symlink then function C.symlink(oldpath, newpath) return syscall(sys.symlink, void(oldpath), void(newpath)) end end
 function C.epoll_ctl(epfd, op, fd, event) return syscall(sys.epoll_ctl, int(epfd), int(op), int(fd), void(event)) end
 function C.uname(buf) return syscall(sys.uname, void(buf)) end
 function C.getsid(pid) return syscall(sys.getsid, int(pid)) end
 function C.getpgid(pid) return syscall(sys.getpgid, int(pid)) end
 function C.setpgid(pid, pgid) return syscall(sys.setpgid, int(pid), int(pgid)) end
-function C.getpgrp() return syscall(sys.getpgrp) end
+if sys.getpgrp then function C.getpgrp() return syscall(sys.getpgrp) end end
 function C.setsid() return syscall(sys.setsid) end
 function C.chroot(path) return syscall(sys.chroot, void(path)) end
 function C.mount(source, target, filesystemtype, mountflags, data)
@@ -588,7 +594,7 @@ function C.setpriority(which, who, prio) return syscall(sys.setpriority, int(whi
 function C.sched_get_priority_min(policy) return syscall(sys.sched_get_priority_min, int(policy)) end
 function C.sched_get_priority_max(policy) return syscall(sys.sched_get_priority_max, int(policy)) end
 function C.sched_rr_get_interval(pid, tp) return syscall(sys.sched_rr_get_interval, int(pid), void(tp)) end
-function C.poll(fds, nfds, timeout) return syscall(sys.poll, void(fds), int(nfds), int(timeout)) end
+if sys.poll then function C.poll(fds, nfds, timeout) return syscall(sys.poll, void(fds), int(nfds), int(timeout)) end end
 function C.msync(addr, length, flags) return syscall(sys.msync, void(addr), ulong(length), int(flags)) end
 function C.madvise(addr, length, advice) return syscall(sys.madvise, void(addr), ulong(length), int(advice)) end
 function C.mlock(addr, len) return syscall(sys.mlock, void(addr), ulong(len)) end
@@ -642,9 +648,11 @@ function C.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask)
 end
 
 -- need _newselect syscall on some platforms
-local select = sys._newselect or sys.select
-function C.select(nfds, readfds, writefds, exceptfds, timeout)
-  return syscall(select, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout))
+local sysselect = sys._newselect or sys.select
+if sysselect then
+  function C.select(nfds, readfds, writefds, exceptfds, timeout)
+    return syscall(sysselect, int(nfds), void(readfds), void(writefds), void(exceptfds), void(timeout))
+  end
 end
 
 -- missing on some platforms eg ARM

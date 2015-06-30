@@ -117,7 +117,9 @@ test.file_operations_linux = {
   test_sync_file_range = function()
     local fd = assert(S.creat(tmpfile, "0666"))
     assert(S.unlink(tmpfile))
-    assert(fd:sync_file_range(0, 0, 0)) -- nop
+    local ok, err = fd:sync_file_range(0, 0, 0) -- nop
+    if not ok and err.NOSYS then error "skipped" end
+    assert(ok, err)
     assert(fd:sync_file_range(0, 4096, 0)) -- nop
     assert(fd:sync_file_range(0, 4096, "wait_before, write, wait_after"))
     assert(fd:sync_file_range(4096, 0, "wait_before, write, wait_after"))
@@ -1342,7 +1344,9 @@ test.seccomp = {
       }
       local pp = t.sock_filters(#program, program)
       local p = t.sock_fprog1{{#program, pp}}
-      fork_assert(S.prctl("set_seccomp", "filter", p))
+      local ok, err = S.prctl("set_seccomp", "filter", p)
+      if err and err.INVAL then S.exit() end -- may not be supported
+      fork_assert(ok)
       local pid = S.getpid()
       S._exit()
     else
@@ -1384,7 +1388,9 @@ test.seccomp = {
       }
       local pp = t.sock_filters(#program, program)
       local p = t.sock_fprog1{{#program, pp}}
-      fork_assert(S.prctl("set_seccomp", "filter", p))
+      local ok, err = S.prctl("set_seccomp", "filter", p)
+      if err and err.INVAL then S.exit() end -- may not be supported
+      fork_assert(ok)
       local pid = S.getpid()
       S._exit() -- use _exit as normal exit might call syscalls
     else
@@ -1420,13 +1426,15 @@ test.seccomp = {
       }
       local pp = t.sock_filters(#program, program)
       local p = t.sock_fprog1{{#program, pp}}
-      fork_assert(S.prctl("set_seccomp", "filter", p))
+      local ok, err = S.prctl("set_seccomp", "filter", p)
+      if err and err.INVAL then S.exit() end -- may not be supported
+      fork_assert(ok)
       local pid = S.getpid()
       local fd = fork_assert(S.open("/dev/null", "rdonly")) -- not allowed
       S._exit()
     else
       local rpid, status = assert(S.waitpid(-1, "clone"))
-      assert(status.EXITSTATUS == 42 or status.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp (or not implemented)")
+      assert(status.EXITSTATUS == 0 or status.EXITSTATUS == 42 or status.TERMSIG == c.SIG.SYS, "expect SIGSYS from failed seccomp (or not implemented)")
     end
   end,
   test_seccomp_fail_errno = function()
@@ -1467,7 +1475,9 @@ test.seccomp = {
       }
       local pp = t.sock_filters(#program, program)
       local p = t.sock_fprog1{{#program, pp}}
-      fork_assert(S.prctl("set_seccomp", "filter", p))
+      local ok, err = S.prctl("set_seccomp", "filter", p)
+      if err and err.INVAL then S.exit() end -- may not be supported
+      fork_assert(ok)
       local pid = S.getpid()
       local ofd, err = S.open("/dev/null", "rdonly") -- not allowed
       fork_assert(not ofd, "should not run open")
@@ -1640,7 +1650,9 @@ test.remap_file_pages = {
     assert(S.unlink(tmpfile))
     local size = S.getpagesize()
     local mem = assert(fd:mmap(nil, size, "read", "shared", 0))
-    assert(S.remap_file_pages(mem, size, 0, 0, 0))
+    local ok, err = S.remap_file_pages(mem, size, 0, 0, 0)
+    if not ok and err.NOSYS then error "skipped" end
+    assert(ok, err)
     assert(S.munmap(mem, size))
     assert(fd:close())
   end,

@@ -6,7 +6,7 @@ What? An FFI implementation of the Linux, NetBSD, FreeBSD and OSX kernel ABIs fo
 
 Why? First it provides a comprehensive set of system call APIs for programming sockets, files and so on, including the more obscure things (eg file change notifications). Second it provides higher level interfaces such as network interface configuration, so your application can control its entire runtime interface including IP addresses routing and so on. Third it provides tools for added security, such as support for Linux namespaces (containers), system call filtering (seccomp type 2), capabilities and so on, all with a script language interface that is much simpler to use than the C interface. As it is Lua based it can easily be embedded in another language; in the future ports to other scripting languages are planned. It also serves as a way of learning how the operating system interfaces work in a more forgiving environment than C.
 
-There is support for the [NetBSD rump kernel](http://www.netbsd.org/docs/rump/) under other operating systems and [natively without an operating system under Xen](https://github.com/justincormack/rumpuser-xen).
+There is support for the [NetBSD rump kernel](http://www.rumpkernel.org) under other operating systems and [natively without an operating system under Xen](https://github.com/rumpkernel/rumprun).
 
 This code is beta. Interfaces will change in future. The code is riddled with TODOs. On the other hand it does work, and the changes at this stage will be smaller than in the past.
 
@@ -34,13 +34,13 @@ Requirements: Needs [LuaJIT 2.0.2](http://www.luajit.org/) or later.
 
 The code now runs again with [luaffi](https://github.com/jmckaskill/luaffi) under standard Lua 5.2 (and probably 5.1, untested). Because the function calls in luaffi use dynasm they are not fully portable, so I will be adding support for Lua C interface function calls as well shortly. This is not yet integrated into the test suite so there may be regressions and issues still.
 
-On Linux ARM (soft or hard float), x86, AMD64, and PPC32 and MIPS32 (o32 ABI) architectures are supported; this is the complete set of architectures that LuaJIT supports. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly; tests should be skipped if unsupported, raise an issue if not. Other architectures will require a LuaJIT port or the in-progress pure Lua port.
+On Linux ARM (soft or hard float), ARM64, x86, AMD64, and PPC32 and MIPS32 (o32 ABI) architectures are supported; this is the complete set of architectures that LuaJIT supports. For full testing (as root) a recent kernel is recommended, eg Linux 3.5 or Ubuntu 12.04 is fine, as we use many recent features such as network namespaces to test thoroughly; tests should be skipped if unsupported, raise an issue if not. Other architectures will require a LuaJIT port or the in-progress pure Lua port.
 
 Android (ARM tested so far) currently passes all the non root tests now; some tests are be skipped as the kernel does not ship with some functionality (aio, mq). Generally much functionality is available even though it is not in Bionic libc.
 
-For the NetBSD support all platforms should work in principle; more test targets will be added soon, currently tests being run on x86 and amd64, an ARM test target will be added. The port currently targets NetBSD 6, although some NetBSD current (7) differences are there too.
+For the NetBSD support all platforms should work in principle; more test targets will be added soon, currently tests being run on x86 and amd64, an ARM test target will be added. The port currently targets NetBSD 6 and 7.
 
-FreeBSD support is currently for FreeBSD 9 and 10, and only tested on amd64. Other architectures should work, but are currently untested.
+FreeBSD support is currently for FreeBSD 9 and 10, and only tested on amd64 and i386. Other architectures should work, but are currently untested.
 
 OpenBSD support is tested under 5.4 and 5.5, on amd64. Other architectures should work, but are currently untested. Versions before 5.4 should be easy to add support for, as the ABI does not have significant differences.
 
