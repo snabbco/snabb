@@ -2,11 +2,16 @@ module(...,package.seeall)
 
 local debug = _G.developer_debug
 
+local shm = require("core.shm")
 local ffi = require("ffi")
 local C = ffi.C
 
 local packet = require("core.packet")
 require("core.packet_h")
+
+local counter = require("core.counter")
+require("core.counter_h")
+
 require("core.link_h")
 
 local band = require("bit").band
@@ -18,13 +23,28 @@ function new (receiving_app)
    return ffi.new("struct link", {receiving_app = receiving_app})
 end
 
+function map (r, name)
+   for _, c
+   in ipairs({"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop"}) do
+      r.stats[c] = counter.open("links/"..name.."/"..c)
+   end
+end
+
+function unmap (r, name)
+   for _, c
+   in ipairs({"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop"}) do
+      shm.unmap(r.stats[c])
+      shm.unlink("links/"..name.."/"..c)
+   end
+end
+
 function receive (r)
 --   if debug then assert(not empty(r), "receive on empty link") end
    local p = r.packets[r.read]
    r.read = band(r.read + 1, size - 1)
 
-   r.stats.rxpackets = r.stats.rxpackets + 1
-   r.stats.rxbytes   = r.stats.rxbytes + p.length
+   counter.add(r.stats.rxpackets)
+   counter.add(r.stats.rxbytes, p.length)
    return p
 end
 
@@ -35,13 +55,13 @@ end
 function transmit (r, p)
 --   assert(p)
    if full(r) then
-      r.stats.txdrop = r.stats.txdrop + 1
+      counter.add(r.stats.txdrop)
       packet.free(p)
    else
       r.packets[r.write] = p
       r.write = band(r.write + 1, size - 1)
-      r.stats.txpackets = r.stats.txpackets + 1
-      r.stats.txbytes   = r.stats.txbytes + p.length
+      counter.add(r.stats.txpackets)
+      counter.add(r.stats.txbytes, p.length)
       r.has_new_data = true
    end
 end

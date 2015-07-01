@@ -1,13 +1,14 @@
 module(...,package.seeall)
 
-local packet = require("core.packet")
-local lib    = require("core.lib")
-local link   = require("core.link")
-local config = require("core.config")
-local timer  = require("core.timer")
-local zone   = require("jit.zone")
-local ffi    = require("ffi")
-local C      = ffi.C
+local packet  = require("core.packet")
+local lib     = require("core.lib")
+local link    = require("core.link")
+local config  = require("core.config")
+local timer   = require("core.timer")
+local counter = require("core.counter")
+local zone    = require("jit.zone")
+local ffi     = require("ffi")
+local C       = ffi.C
 require("core.packet_h")
 
 -- Set to true to enable logging
@@ -24,11 +25,11 @@ link_table, link_array = {}, {}
 configuration = config.new()
 
 -- Counters for statistics.
--- TODO: Move these over to the counters framework
-breaths = 0			-- Total breaths taken
-frees   = 0			-- Total packets freed
-freebits = 0			-- Total packet bits freed (for 10GbE)
-freebytes = 0			-- Total packet bytes freed
+breaths   = counter.open("engine/breaths")   -- Total breaths taken
+frees     = counter.open("engine/frees")     -- Total packets freed
+freebits  = counter.open("engine/freebits")  -- Total packet bits freed (for 10GbE)
+freebytes = counter.open("engine/freebytes") -- Total packet bytes freed
+configs   = counter.open("engine/configs")   -- Total configurations loaded
 
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
 --
@@ -104,6 +105,7 @@ function configure (new_config)
    local actions = compute_config_actions(configuration, new_config)
    apply_config_actions(actions, new_config)
    configuration = new_config
+   counter.add(configs)
 end
 
 -- Return the configuration actions needed to migrate from old config to new.
@@ -197,16 +199,27 @@ function apply_config_actions (actions, conf)
       if not new_app_table[fa] then error("no such app: " .. fa) end
       if not new_app_table[ta] then error("no such app: " .. ta) end
       -- Create or reuse a link and assign/update receiving app index
-      local link = link_table[linkspec] or link.new()
-      link.receiving_app = app_name_to_index[ta]
+      local r
+      if link_table[linkspec] then
+         r = link_table[linkspec]
+      else
+         r = link.new()
+         link.map(r, linkspec)
+      end
+      r.receiving_app = app_name_to_index[ta]
       -- Add link to apps
-      new_app_table[fa].output[fl] = link
-      table.insert(new_app_table[fa].output, link)
-      new_app_table[ta].input[tl] = link
-      table.insert(new_app_table[ta].input, link)
+      new_app_table[fa].output[fl] = r
+      new_app_table[ta].input[tl] = r
       -- Remember link
-      new_link_table[linkspec] = link
-      table.insert(new_link_array, link)
+      new_link_table[linkspec] = r
+      table.insert(new_link_array, r)
+   end
+   for _, app in ipairs(new_app_array) do
+      if app.relink then app:relink() end
+   end
+   -- Unlink obsolete links.
+   for linkspec, r in pairs(link_table) do
+      if not new_link_table[linkspec] then link.unmap(r, linkspec) end
    end
    -- commit changes
    app_table, link_table = new_app_table, new_link_table
@@ -246,15 +259,15 @@ function pace_breathing ()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
    else
-      if lastfrees == frees then
+      if lastfrees == counter.read(frees) then
 	 sleep = math.min(sleep + 1, maxsleep)
 	 C.usleep(sleep)
       else
 	 sleep = math.floor(sleep/2)
       end
-      lastfrees = frees
-      lastfreebytes = freebytes
-      lastfreebits = freebits
+      lastfrees = counter.read(frees)
+      lastfreebytes = counter.read(freebytes)
+      lastfreebits = counter.read(freebits)
    end
 end
 
@@ -293,7 +306,7 @@ function breathe ()
       end
       firstloop = false
    until not progress  -- Stop after no link had new data
-   breaths = breaths + 1
+   counter.add(breaths)
 end
 
 function report (options)
@@ -319,10 +332,10 @@ local reportedbreaths = nil
 function report_load ()
    if lastloadreport then
       local interval = now() - lastloadreport
-      local newfrees   = frees - reportedfrees
-      local newbytes   = freebytes - reportedfreebytes
-      local newbits    = freebits - reportedfreebits
-      local newbreaths = breaths - reportedbreaths
+      local newfrees   = tonumber(counter.read(frees) - reportedfrees)
+      local newbytes   = tonumber(counter.read(freebytes) - reportedfreebytes)
+      local newbits    = tonumber(counter.read(freebits) - reportedfreebits)
+      local newbreaths = tonumber(counter.read(breaths) - reportedbreaths)
       local fps = math.floor(newfrees/interval)
       local fbps = math.floor(newbits/interval)
       local fpb = math.floor(newfrees/newbreaths)
@@ -336,10 +349,10 @@ function report_load ()
 	    sleep))
    end
    lastloadreport = now()
-   reportedfrees = frees
-   reportedfreebits = freebits
-   reportedfreebytes = freebytes
-   reportedbreaths = breaths
+   reportedfrees = counter.read(frees)
+   reportedfreebits = counter.read(freebits)
+   reportedfreebytes = counter.read(freebytes)
+   reportedbreaths = counter.read(breaths)
 end
 
 function report_links ()
@@ -354,9 +367,10 @@ function report_links ()
    table.sort(names)
    for i, name in ipairs(names) do
       l = link_table[name]
+      local txpackets = counter.read(l.stats.txpackets)
+      local txdrop = counter.read(l.stats.txdrop)
       print(("%20s sent on %s (loss rate: %d%%)"):format(
-	    lib.comma_value(l.stats.txpackets),
-	    name, loss_rate(l.stats.txdrop, l.stats.txpackets)))
+            lib.comma_value(txpackets), name, loss_rate(txdrop, txpackets)))
    end
 end
 
