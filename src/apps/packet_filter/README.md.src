@@ -29,7 +29,7 @@ expression.
 
 — Key **state_table**
 
-*Optional*. A string naming a state table. If set, packets passing any*
-*rule will be tracked in the specified state table and any packet that
-*belongs to a tracked connection in the specified state table will be let
-*pass.
+*Optional*. A string naming a state table. If set, packets passing any
+*rule* will be tracked in the specified state table and any packet that
+belongs to a tracked connection in the specified state table will be let
+pass.
