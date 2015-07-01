@@ -28,7 +28,7 @@ local function call_timers (l)
    for i=1,#l do
       local timer = l[i]
       if debug then
-	 print(string.format("running timer %s at tick %s", timer.name, ticks))
+         print(string.format("running timer %s at tick %s", timer.name, ticks))
       end
       timer.fn(timer)
       if timer.repeating then activate(timer) end

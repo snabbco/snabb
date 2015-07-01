@@ -54,11 +54,11 @@ local function octetstr_t (length)
       return octetstr_types[length]
    else
       local type = ffi.typeof(
-	 [[
-	       struct { uint16_t length; 
-			uint8_t data[$]; 
-		     } __attribute__((packed))
-	 ]], length)
+         [[
+               struct { uint16_t length;
+                        uint8_t data[$];
+                     } __attribute__((packed))
+         ]], length)
       octetstr_types[length] = type
       return type
    end
@@ -69,14 +69,14 @@ end
 -- them in the context of the shmem system. The default 'OctetStr'
 -- supports octet strings up to 255 bytes.
 local types = { Integer32 = int32_t,
-		Unsigned32 = uint32_t,
-		OctetStr = octetstr_t(255),
-		Counter32 = uint32_t,
-		Counter64 = uint64_t,
-		Gauge32 = uint32_t,
-		TimeTicks = uint32_t,
-		Bits = octetstr_t(16),
-	     }
+                Unsigned32 = uint32_t,
+                OctetStr = octetstr_t(255),
+                Counter32 = uint32_t,
+                Counter64 = uint64_t,
+                Gauge32 = uint32_t,
+                TimeTicks = uint32_t,
+                Bits = octetstr_t(16),
+             }
 
 -- The 'type' argument of the constructor must either be a string that
 -- identifies one of the supported types
@@ -120,11 +120,11 @@ function mib:register (name, type, value)
       assert(type.type)
       smi_type = type.type
       if type.type == 'OctetStr' then
-	 assert(type.length and type.length <= 65535)
-	 ctype = octetstr_t(type.length)
+         assert(type.length and type.length <= 65535)
+         ctype = octetstr_t(type.length)
       else
-	 -- Accept all other legal types
-	 type = type.type
+         -- Accept all other legal types
+         type = type.type
       end
    end
    ctype = ctype or types[type]
@@ -153,24 +153,24 @@ function mib:set (name, value)
    if value ~= nil then
       local obj = self._objs[name]
       if obj and obj.smi_type == 'OctetStr' then
-	 local length = math.min(string.len(value), obj.length - 2)
-	 local octet = mib:superClass().get(self, name)
-	 octet.length = length
-	 ffi.copy(octet.data, value, length)
+         local length = math.min(string.len(value), obj.length - 2)
+         local octet = mib:superClass().get(self, name)
+         octet.length = length
+         ffi.copy(octet.data, value, length)
       elseif obj and obj.smi_type == 'Bits' then
-	 local octet = mib:superClass().get(self, name)
-	 octet.length = 16
-	 ffi.fill(octet.data, 16)
-	 local i = 1
-	 while value[i] do
-	    local bit_n = value[i]
-	    local byte = rshift(bit_n, 3)
-	    octet.data[byte] = bor(octet.data[byte],
-				   lshift(1, 7-band(bit_n, 7)))
-	    i = i+1
-	 end
+         local octet = mib:superClass().get(self, name)
+         octet.length = 16
+         ffi.fill(octet.data, 16)
+         local i = 1
+         while value[i] do
+            local bit_n = value[i]
+            local byte = rshift(bit_n, 3)
+            octet.data[byte] = bor(octet.data[byte],
+                                   lshift(1, 7-band(bit_n, 7)))
+            i = i+1
+         end
       else
-	 mib:superClass().set(self, name, value)
+         mib:superClass().set(self, name, value)
       end
    end
 end
@@ -196,13 +196,13 @@ function mib:get (name, ...)
       local result = ... or {}
       local index = 1
       for i = 0, 15 do
-	 local byte = octet.data[i]
-	 for j = 0, 7 do
-	    if band(byte, lshift(1, 7-j)) ~= 0 then
-	       result[index] = i*8+j
-	       index = index+1
-	    end
-	 end
+         local byte = octet.data[i]
+         for j = 0, 7 do
+            if band(byte, lshift(1, 7-j)) ~= 0 then
+               result[index] = i*8+j
+               index = index+1
+            end
+         end
       end
       result[index] = nil
       return result

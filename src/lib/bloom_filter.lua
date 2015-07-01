@@ -112,7 +112,7 @@ function filter:cell_usage (cell)
    local width = self._m
    for i = 0, width-1 do
       if band(cell[rshift(i, 6)], lshift(1ULL, band(i, 0x3FULL))) ~= 0ULL then
-	 set = set+1
+         set = set+1
       end
    end
    return set/width
@@ -194,7 +194,7 @@ function filter:check_value (v, l, cell)
    for i = 1, self._k do
       local index = band(h1.u64[0] + i*h2.u64[0], self._mod)
       if band(cell[rshift(index, 6)], lshift(1ULL, band(index, 0x3FULL))) == 0ULL then
-	 return false
+         return false
       end
    end
    return true
@@ -214,7 +214,7 @@ end
 local function check_buckets(filter, item, expected)
    for k, i in ipairs(filter:item_dump(item)) do
       assert(i == expected[k], "wrong bucket index "..k
-	     .." (expected "..expected[k]..", got "..tostring(i)..")")
+            .." (expected "..expected[k]..", got "..tostring(i)..")")
    end
 end
 
@@ -233,8 +233,8 @@ function selftest()
    dptr1[0] = data1
    dptr2[0] = data2
    local expected_buckets = { 149, 986, 1823, 612, 1449, 238, 1075,
-   			      1912, 701, 1538, 327, 1164, 2001, 790,
-   			      1627 }
+                              1912, 701, 1538, 327, 1164, 2001, 790,
+                              1627 }
 
    f:store_value(dptr1, s1, item, nil)
    check_buckets(f, item, expected_buckets)
@@ -253,7 +253,7 @@ function selftest()
    data2 = ffi.new("union { uint32_t i; uint8_t b[4]; }")
    dptr2[0] = data2.b
    s1, s2 = ffi.sizeof(data1), ffi.sizeof(data2)
-   
+
    local min, max, step, samples = 50, 150, 10, 20000
    data1 = ffi.new("uint32_t [?]", max)
    data2 = ffi.new("uint32_t [?]", samples)
@@ -267,40 +267,40 @@ function selftest()
       f:cell_clear(cell)
       local fail = 0
       for i = 0, j-1 do
-   	 dptr1[0] = ffi.cast("uint8_t *", data1 + i)
-   	 f:store_value(dptr1, ffi.sizeof("uint32_t"), item, cell)
-   	 assert(f:check_item(item, cell))
-   	 assert(f:check_value(dptr1, s1, cell))
+         dptr1[0] = ffi.cast("uint8_t *", data1 + i)
+         f:store_value(dptr1, ffi.sizeof("uint32_t"), item, cell)
+         assert(f:check_item(item, cell))
+         assert(f:check_value(dptr1, s1, cell))
       end
 
       local fp = 0
       for i = 0, samples-1 do
-   	 dptr1[0] = ffi.cast("uint8_t *", data2 + i)
-   	 if f:check_value(dptr1, ffi.sizeof("uint32_t"), cell) then
-   	    fp = fp+1
-   	 end
+         dptr1[0] = ffi.cast("uint8_t *", data2 + i)
+         if f:check_value(dptr1, ffi.sizeof("uint32_t"), cell) then
+            fp = fp+1
+         end
       end
       if selftest_config.verbose then
-   	 print(string.format("False-positive rate @%d (occupancy %02.2f%%): %.4f, %d",
-   			     j, 100*f:cell_usage(cell), fp/samples, fp))
+         print(string.format("False-positive rate @%d (occupancy %02.2f%%): %.4f, %d",
+                           j, 100*f:cell_usage(cell), fp/samples, fp))
       end
       if j == 100 then
-   	 assert(fp/samples <= 0.001,
-   		"Maximum false-positives rate exceeded, expected 0.1%, got "..fp/samples)
+         assert(fp/samples <= 0.001,
+               "Maximum false-positives rate exceeded, expected 0.1%, got "..fp/samples)
       end
    end
 
    if selftest_config.performance then
 
       local function perfloop (iter, desc, call, ...)
-	 jit.flush()
-	 local start = ffi.C.get_time_ns()
-	 for i = 1, iter do
-	    call(...)
-	 end
-	 local stop = ffi.C.get_time_ns()
-	 print(desc..": "..math.floor(iter/(tonumber(stop-start)/1e9))
-	    .." iterations per second")
+         jit.flush()
+         local start = ffi.C.get_time_ns()
+         for i = 1, iter do
+            call(...)
+         end
+         local stop = ffi.C.get_time_ns()
+         print(desc..": "..math.floor(iter/(tonumber(stop-start)/1e9))
+            .." iterations per second")
       end
 
       print("Bloom filter performance tests")

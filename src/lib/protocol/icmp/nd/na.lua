@@ -8,8 +8,8 @@ local na = subClass(nd_header)
 
 local na_t = ffi.typeof[[
       struct {
-	 uint32_t flags;
-	 uint8_t  target[16];
+         uint32_t flags;
+         uint8_t  target[16];
       } __attribute__((packed))
 ]]
 
