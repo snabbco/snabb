@@ -1,7 +1,7 @@
 module(..., package.seeall)
 
 local lib = require("core.lib")
-local fs = require("lib.ipc.fs")
+local shm = require("core.shm")
 local syscall = require("syscall")
 local usage = require("program.gc.README_inc")
 
@@ -17,9 +17,12 @@ function run (args)
    if #args > 1 then print(usage) main.exit(1) end
    local root = args[1]
 
-   for _, pid in ipairs(fs:instances(root)) do
+   -- Unlink stale snabb resources.
+   for _, pid in ipairs(shm.children("//")) do
       if not syscall.kill(tonumber(pid), 0) then
-         fs:new(pid, root):delete()
+         shm.unlink("//"..pid)
       end
    end
+   -- Unlink own resource
+   shm.unlink("//"..syscall.getpid())
 end
