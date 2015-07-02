@@ -419,14 +419,6 @@ function report_apps ()
    end
 end
 
-function report_each_app ()
-   for i = 1, #app_array do
-      if app_array[i].report then
-         app_array[i]:report()
-      end
-   end
-end
-
 function selftest ()
    if not use_restart then
       print("with_restart disabled\nTest skipped")
