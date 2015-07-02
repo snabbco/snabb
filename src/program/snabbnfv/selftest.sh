@@ -2,31 +2,9 @@
 
 SKIPPED_CODE=43
 
-if [ ! -f ~/bench_conf.sh ]; then
-    cat <<EOF
-~/bench_conf.sh does not exist, skipping test.
-
-For this test to run you need to configure the following variables:
-SNABB_LOG0=<path_to_logfile>
-NFV_PCI0=<pciaddr>
-NFV_SOCKET0=vhost_A.sock
-NFV_SOCKET1=vhost_B.sock
-GUEST_IP0=fe80::5054:ff:fe00:0
-GUEST_MAC0=52:54:00:00:00:00
-IMAGE0=<ubuntu-image-a>
-GUEST_IP1=fe80::5054:ff:fe00:1
-GUEST_MAC1=52:54:00:00:00:01
-IMAGE1=<ubuntu-image-b>
-BOOTARGS0="earlyprintk root=/dev/vda rw console=ttyS0 ip=$GUEST_IP0"
-BOOTARGS1="earlyprintk root=/dev/vda rw console=ttyS0 ip=$GUEST_IP1"
-EOF
-    exit $SKIPPED_CODE
-fi
-
-. /etc/bench_conf.sh
-. ~/bench_conf.sh
-
-export BENCH_ENV_PID
+if [ -z "$TESTPCI" ];      then echo "Need TESTPCI";      exit $SKIPPED_CODE; fi
+if [ -z "$TELNET_PORT0" ]; then echo "Need TELNET_PORT0"; exit $SKIPPED_CODE; fi
+if [ -z "$TELNET_PORT1" ]; then echo "Need TELNET_PORT1"; exit $SKIPPED_CODE; fi
 
 TESTCONFPATH="/tmp/snabb_nfv_selftest_ports.$$"
 FUZZCONFPATH="/tmp/snabb_nfv_selftest_fuzz$$.ports"
@@ -59,12 +37,22 @@ function load_config {
     sleep 2
 }
 
-function start_bench_env {
-    scripts/bench_env/host-nic-snabbnfv-guests.sh $TESTCONFPATH &
-    BENCH_ENV_PID=$!
+function start_test_env {
+    if ! source program/snabbnfv/test_env/test_env.sh; then
+        echo "Could not load test_env."; exit 1
+    fi
 
-    # Give bench_env time to print its stuff.
-    sleep 0.25
+    if ! snabb $TESTPCI "snabbnfv traffic $TESTPCI $TESTCONFPATH vhost_%s.sock"; then
+        echo "Could not start snabb."; exit 1
+    fi
+
+    if ! qemu $TESTPCI vhost_A.sock $TELNET_PORT0; then
+        echo "Could not start qemu 0."; exit 1
+    fi
+
+    if ! qemu $TESTPCI vhost_B.sock $TELNET_PORT1; then
+        echo "Could not start qemu 1."; exit 1
+    fi
 
     # Wait until VMs are ready.
     wait_vm_up $TELNET_PORT0
@@ -73,25 +61,18 @@ function start_bench_env {
     # Manually set ip addresses.
     run_telnet $TELNET_PORT0 "ifconfig eth0 up" >/dev/null
     run_telnet $TELNET_PORT1 "ifconfig eth0 up" >/dev/null
-    run_telnet $TELNET_PORT0 "ip -6 addr add $GUEST_IP0 dev eth0" >/dev/null
-    run_telnet $TELNET_PORT1 "ip -6 addr add $GUEST_IP1 dev eth0" >/dev/null
-
+    run_telnet $TELNET_PORT0 "ip -6 addr add $(ip 0) dev eth0" >/dev/null
+    run_telnet $TELNET_PORT1 "ip -6 addr add $(ip 1) dev eth0" >/dev/null
 }
 
-function stop_bench_env {
-    kill $BENCH_ENV_PID
-
-    # Give VMs and snabbnfv-traffic time to shut down.
-    sleep 5
-
+function cleanup {
     # Clean up temporary config location.
-    rm -f "$TESTCONFPATH"
-
+    rm -f "$TESTCONFPATH" "$FUZZCONFPATH"
     exit
 }
 
 # Set up graceful `exit'.
-trap stop_bench_env EXIT HUP INT QUIT TERM
+trap cleanup EXIT HUP INT QUIT TERM
 
 # Usage: wait_vm_up <port>
 # Blocks until ping to 0::0 suceeds.
@@ -117,16 +98,16 @@ function assert {
     else
         echo "$1 failed."
         echo
-        echo "qemu ($IMAGE0) log:"
-        cat "$(basename "$IMAGE0").log"
+        echo "qemu0.log:"
+        cat "qemu0.log"
         echo
         echo
-        echo "qemu ($IMAGE1) log:"
-        cat "$(basename "$IMAGE1").log"
+        echo "qemu1.log:"
+        cat "qemu1.log"
         echo
         echo
-        echo "snabbnfv log:"
-        cat "$SNABB_LOG0"
+        echo "snabb0.log:"
+        cat "snabb0.log"
         exit 1
     fi
 }
@@ -207,11 +188,11 @@ function port_probe {
 function same_vlan_tests {
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports
 
-    test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
-    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
-    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     # Repeat iperf test now that jumbo frames are enabled
-    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     test_checksum $TELNET_PORT0
     test_checksum $TELNET_PORT1
 }
@@ -219,19 +200,19 @@ function same_vlan_tests {
 function rate_limited_tests {
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/tx_rate_limit.ports
 
-    test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
-    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 900 1000
-    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
+    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 900 1000
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     # Repeat iperf test now that jumbo frames are enabled
-    test_rate_limited $TELNET_PORT1 $TELNET_PORT0 "$GUEST_IP0%eth0" 900 1000
+    test_rate_limited $TELNET_PORT1 $TELNET_PORT0 "$(ip 0)%eth0" 900 1000
 
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/rx_rate_limit.ports
 
-    test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
-    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 1200 1000
-    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
+    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 1200 1000
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     # Repeat iperf test now that jumbo frames are enabled
-    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 1200 1000
+    test_rate_limited $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 1200 1000
 
 }
 
@@ -239,14 +220,20 @@ function tunnel_tests {
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/tunnel.ports
 
     # Assert ND was successful.
-    grep "Resolved next-hop" $SNABB_LOG0
-    assert ND $?
+    retries=0
+    while true; do
+        if grep "Resolved next-hop" snabb0.log; then
+            assert ND 0 && break
+        elif [ $retries -gt 5 ]; then assert ND 1
+        else sleep 1; retries=$(expr $retries + 1)
+        fi
+    done
 
-    test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
-    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
-    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
+    test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     # Repeat iperf test now that jumbo frames are enabled
-    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+    test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
 }
 
 function filter_tests {
@@ -263,13 +250,13 @@ function filter_tests {
     #
     # Regards, Max Rottenkolber <max@mr.gy>
 
-    test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
 
-    port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12345
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 12345
     assert PORTPROBE $?
 
     # Assert TCP/12346 is filtered.
-    port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12346
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 12346
     test 0 -ne $?
     assert FILTER $?
 
@@ -279,18 +266,18 @@ function filter_tests {
     # port B allows ICMP and TCP/12345 ingress and established egress
     # traffic.
 
-    test_ping $TELNET_PORT0 "$GUEST_IP1%eth0"
+    test_ping $TELNET_PORT0 "$(ip 1)%eth0"
 
-    port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12345
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 12345
     assert PORTPROBE $?
 
     # Assert TCP/12346 is filtered.
-    port_probe $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" 12348
+    port_probe $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" 12348
     test 0 -ne $?
     assert FILTER $?
 
     # Assert non-established egress connections are filtered.
-    port_probe $TELNET_PORT1 $TELNET_PORT0 "$GUEST_IP0%eth0" 12340
+    port_probe $TELNET_PORT1 $TELNET_PORT0 "$(ip 0)%eth0" 12340
     test 0 -ne $?
     assert FILTER $?
 }
@@ -301,10 +288,10 @@ function iperf_bench {
     load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports    
 
     if [ "$1" = "jumbo" ]; then
-        test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" \
+        test_jumboping $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" \
             2>&1 >/dev/null
     fi
-    Gbits=$(test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0" \
+    Gbits=$(test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0" \
         | egrep -o '[0-9\.]+ Gbits/sec' | cut -d " " -f 1)
     if [ "$1" = "jumbo" ]; then
         echo IPERF-JUMBO "$Gbits"
@@ -317,16 +304,16 @@ function iperf_bench {
 # Generate and test (IPERF) <n> semi-random NFV configurations.
 function fuzz_tests {
     for ((n=0;n<$1;n++)); do
-        $SNABB snabbnfv fuzz \
+        ./snabb snabbnfv fuzz \
             program/snabbnfv/test_fixtures/nfvconfig/fuzz/filter2-tunnel-txrate10-ports.spec \
             $FUZZCONFPATH
         load_config $FUZZCONFPATH
-        test_iperf $TELNET_PORT0 $TELNET_PORT1 "$GUEST_IP1%eth0"
+        test_iperf $TELNET_PORT0 $TELNET_PORT1 "$(ip 1)%eth0"
     done
 }
 
 load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/other_vlan.ports
-start_bench_env
+start_test_env
 
 # Decide which mode to run (`test', `bench' or `fuzz').
 case $1 in

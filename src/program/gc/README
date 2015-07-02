@@ -1,0 +1,8 @@
+Usage:
+  gc [OPTIONS] [<root>]
+
+  -h, --help
+                             Print usage information.
+
+Remove stale runtime files created by Snabb Switch instances under
+<root>. <root> defaults to "/var/run/snabb".

@@ -152,7 +152,7 @@ function tcp:checksum (payload, length, ip)
       -- Add TCP header
       h.checksum = 0
       csum = ipsum(ffi.cast("uint8_t *", h),
-		   self:sizeof(), bit.bnot(csum))
+                   self:sizeof(), bit.bnot(csum))
       -- Add TCP payload
       h.checksum = C.htons(ipsum(payload, length, bit.bnot(csum)))
    end

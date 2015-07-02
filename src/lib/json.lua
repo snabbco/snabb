@@ -77,7 +77,7 @@ end
 -- @param startPos The starting position for the scan.
 -- @return table, int The scanned array as a table, and the position of the next character to scan.
 function decode_scanArray(s,startPos)
-  local array = {}	-- The return value
+  local array = {}        -- The return value
   local stringLen = string.len(s)
   base.assert(string.sub(s,startPos,startPos)=='[','decode_scanArray called but array does not start at position ' .. startPos .. ' in string:\n'..s )
   startPos = startPos + 1
@@ -106,14 +106,14 @@ function decode_scanComment(s, startPos)
   base.assert( string.sub(s,startPos,startPos+1)=='/*', "decode_scanComment called but comment does not start at position " .. startPos)
   local endPos = string.find(s,'*/',startPos+2)
   base.assert(endPos~=nil, "Unterminated comment in string at " .. startPos)
-  return endPos+2  
+  return endPos+2
 end
 
 --- Scans for given constants: true, false or null
 -- Returns the appropriate Lua type, and the position of the next character to read.
 -- @param s The string being scanned.
 -- @param startPos The position in the string at which to start scanning.
--- @return object, int The object (true, false or nil) and the position at which the next character should be 
+-- @return object, int The object (true, false or nil) and the position at which the next character should be
 -- scanned.
 function decode_scanConstant(s, startPos)
   local consts = { ["true"] = true, ["false"] = false, ["null"] = nil }
@@ -141,8 +141,8 @@ function decode_scanNumber(s,startPos)
   local stringLen = string.len(s)
   local acceptableChars = "+-0123456789.e"
   while (string.find(acceptableChars, string.sub(s,endPos,endPos), 1, true)
-	and endPos<=stringLen
-	) do
+        and endPos<=stringLen
+        ) do
     endPos = endPos + 1
   end
   local stringValue = 'return ' .. string.sub(s,startPos, endPos-1)
@@ -184,7 +184,7 @@ function decode_scanObject(s,startPos)
     base.assert(startPos<=stringLen, 'JSON string ended unexpectedly searching for value of key ' .. key)
     value, startPos = decode(s,startPos)
     object[key]=value
-  until false	-- infinite loop while key-value pairs are found
+  until false        -- infinite loop while key-value pairs are found
 end
 
 --- Scans a JSON string from the opening inverted comma or single quote to the
@@ -206,7 +206,7 @@ function decode_scanString(s,startPos)
   repeat
     local curChar = string.sub(s,endPos,endPos)
     -- Character escaping is only used to escape the string delimiters
-    if not escaped then	
+    if not escaped then
       if curChar==[[\]] then
         escaped = true
       else
@@ -222,7 +222,7 @@ function decode_scanString(s,startPos)
   local stringValue = 'return ' .. string.sub(s, startPos, endPos-1)
   local stringEval = base.loadstring(stringValue)
   base.assert(stringEval, 'Failed to load string [ ' .. stringValue .. '] in JSON4Lua.decode_scanString at position ' .. startPos .. ' : ' .. endPos)
-  return stringEval(), endPos  
+  return stringEval(), endPos
 end
 
 --- Scans a JSON string skipping all whitespace from the current start position.

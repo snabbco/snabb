@@ -11,9 +11,9 @@ local ipsum = require("lib.checksum").ipsum
 
 local icmp_t = ffi.typeof[[
       struct {
-	 uint8_t type;
-	 uint8_t code;
-	 int16_t checksum;
+         uint8_t type;
+         uint8_t code;
+         int16_t checksum;
       } __attribute__((packed))
 ]]
 
@@ -23,9 +23,9 @@ local icmp = subClass(header)
 icmp._name = "icmp"
 icmp._header_type = icmp_t
 icmp._header_ptr_type = ffi.typeof("$*", icmp_t)
-icmp._ulp = { 
+icmp._ulp = {
    class_map = { [135] = "lib.protocol.icmp.nd.ns",
-		 [136] = "lib.protocol.icmp.nd.na" },
+                 [136] = "lib.protocol.icmp.nd.na" },
    method    = "type" }
 
 -- Class methods
@@ -66,7 +66,7 @@ local function checksum(header, payload, length, ipv6)
    local csum_rcv = header.checksum
    header.checksum = 0
    csum = ipsum(ffi.cast("uint8_t *", header),
-		ffi.sizeof(header), bit.bnot(csum))
+                ffi.sizeof(header), bit.bnot(csum))
    header.checksum = csum_rcv
    -- Add ICMP payload
    return ipsum(payload, length, bit.bnot(csum))

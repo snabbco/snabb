@@ -71,8 +71,8 @@ every second).
 
 The `snabbnfv neutron2snabb` program converts Neutron database CSV dumps
 to the format used by `program.snabbnfv.nfvconfig`. For more info see
-[Snabb NFV Architecture](https://github.com/SnabbCo/snabb-nfv/wiki/Architecture).
-It can be invoked like so:
+[Snabb NFV Architecture](doc/architecture.md).  It can be invoked like
+so:
 
 ```
 ./snabb snabbnfv neutron2snabb <csv-directory> <output-directory> [<hostname>]
@@ -81,4 +81,4 @@ It can be invoked like so:
 `snabbnfv neutron2snabb` reads the Neutron configuration *csv-directory*
 and translates them to one `lib.nfv.conig` configuration file per
 physical network. If *hostname* is given, it overrides the hostname
-provided by `hostname.1`.
+provided by `hostname(1)`.

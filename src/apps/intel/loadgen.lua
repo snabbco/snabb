@@ -16,7 +16,7 @@ LoadGen = {}
 
 function LoadGen:new (pciaddress)
    local o = { pciaddress = pciaddress,
-               dev = intel10g.new_sf(pciaddress) }
+               dev = intel10g.new_sf({pciaddr=pciaddress}) }
    o.dev:open()
    o.dev:wait_linkup()
    disable_tx_descriptor_writeback(o.dev)
@@ -49,8 +49,8 @@ function LoadGen:push ()
    if self.input.input then
       while not link.empty(self.input.input) and can_transmit(self.dev) do
          do local p = receive(self.input.input)
-	    transmit(self.dev, p)
-	 end
+            transmit(self.dev, p)
+         end
       end
    end
 end

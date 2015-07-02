@@ -10,9 +10,9 @@ local gre_key = subClass(gre)
 
 local gre_key_t = ffi.typeof[[
       struct {
-	 uint16_t bits; // Flags, version
-	 uint16_t protocol;
-	 uint32_t key;
+         uint16_t bits; // Flags, version
+         uint16_t protocol;
+         uint32_t key;
       }
 ]]
 

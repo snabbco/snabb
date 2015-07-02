@@ -44,9 +44,9 @@ function selftest ()
    local dst = ethernet:pton("00:00:00:00:00:02")
    local localhost = ipv6:pton("0:0:0:0:0:0:0:1")
    dg_tx:push(ipv6:new({src = localhost,
-			dst = localhost,
-			next_header = 59, -- no next header
-			hop_limit = 1}))
+                        dst = localhost,
+                        next_header = 59, -- no next header
+                        hop_limit = 1}))
    dg_tx:push(ethernet:new({src = src, dst = dst, type = 0x86dd}))
 
    local link = require("core.link")
@@ -58,13 +58,13 @@ function selftest ()
    lo:pull()
    local dg_rx = datagram:new(link.receive(lo.output.tx), ethernet)
    assert(dg_rx:parse({ { ethernet, function(eth)
-				       return(eth:src_eq(src) and eth:dst_eq(dst)
-					and eth:type() == 0x86dd)
-				    end },
-			{ ipv6, function(ipv6)
-				   return(ipv6:src_eq(localhost) and
-				       ipv6:dst_eq(localhost))
-				end } }), "loopback test failed")
+                                       return(eth:src_eq(src) and eth:dst_eq(dst)
+                                        and eth:type() == 0x86dd)
+                                    end },
+                        { ipv6, function(ipv6)
+                                   return(ipv6:src_eq(localhost) and
+                                       ipv6:dst_eq(localhost))
+                                end } }), "loopback test failed")
 
    -- Another useful test would be to feed a pcap file with
    -- pings to 127.0.0.1 and ::1 into lo and capture/compare

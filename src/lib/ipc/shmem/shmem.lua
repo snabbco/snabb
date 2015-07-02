@@ -184,7 +184,7 @@ local defaults =  {
 ---- Class methods
 
 local function init (self, options, data_mode, index_mode)
-   assert(options and options.filename) 
+   assert(options and options.filename)
    local o = shmem:superClass().new(self)
    local dir = options.directory or defaults.directory
    if dir ~= '' then
@@ -228,10 +228,10 @@ end
 -- description is stored in two tables by name and by handle.
 local function add_obj(self, name, offset, ctype, length, fields)
    local obj = { offset    = offset,
-		 ctype     = ctype,
-		 ctype_ptr = ffi.typeof("$*", ctype),
-		 length    = length,
-		 fields = fields }
+                 ctype     = ctype,
+                 ctype_ptr = ffi.typeof("$*", ctype),
+                 length    = length,
+                 fields = fields }
    self._objs[name] = obj
    local handle = self._nobjs+1
    self._nobjs = handle
@@ -259,51 +259,51 @@ function shmem:attach (options)
    local next, s =  preamble:split(':')
    local namespace, version = next(s), next(s)
    assert(namespace and namespace == o._namespace,
-	  "Namespace mismatch: expected "..o._namespace
-	     ..", got "..namespace)
-   assert(version and tonumber(version) <= o._version,
-	  "Version mismatch: expected <= "..o._version
-	     ..", got "..version)
-   assert(next(s) == nil)
-   local  handle = 0
-   while true do
-      local spec = o._index_fh:read('*line')
-      if spec == nil then break end
-      local name, length, ctype
-      local fields = {}
-      if (o._fs) then
-	 local next, s = spec:split(o._fs)
-	 name, length = next(s), next(s)
-	 assert(name, length)
-	 length = tonumber(length)
-	 if o._ctype then
-	    ctype = o._ctype
-	    assert(ffi.sizeof(ctype == length))
-	 else
-	    ctype = ffi.typeof("uint8_t [$]", length)
-	 end
-	 -- Read any additional fields
-	 for f in next, s do
-	    table.insert(fields, f)
-	    print("add field", f)
-	 end
-	 -- Bail out if additional fields are present but the class
-	 -- does not support an extended index.
-	 assert(self._extended or #fields == 0,
-		"Found extra fields in standard index")
-      else
-	 name = spec
-	 ctype = o._ctype
-	 assert(ctype)
-	 length = ffi.sizeof(ctype)
+      "Namespace mismatch: expected "..o._namespace
+      ..", got "..namespace)
+      assert(version and tonumber(version) <= o._version,
+      "Version mismatch: expected <= "..o._version
+      ..", got "..version)
+      assert(next(s) == nil)
+      local  handle = 0
+      while true do
+         local spec = o._index_fh:read('*line')
+         if spec == nil then break end
+         local name, length, ctype
+         local fields = {}
+         if (o._fs) then
+            local next, s = spec:split(o._fs)
+            name, length = next(s), next(s)
+            assert(name, length)
+            length = tonumber(length)
+            if o._ctype then
+               ctype = o._ctype
+               assert(ffi.sizeof(ctype == length))
+            else
+               ctype = ffi.typeof("uint8_t [$]", length)
+            end
+            -- Read any additional fields
+            for f in next, s do
+               table.insert(fields, f)
+               print("add field", f)
+            end
+            -- Bail out if additional fields are present but the class
+            -- does not support an extended index.
+            assert(self._extended or #fields == 0,
+               "Found extra fields in standard index")
+            else
+               name = spec
+               ctype = o._ctype
+               assert(ctype)
+               length = ffi.sizeof(ctype)
+            end
+            add_obj(o, name, o._size, ctype, length, fields)
+         end
+         o._base = C.shmem_attach(o._data_fh, o._size)
+         assert(o._base ~= nil, "mmap failed")
+         o._attach = true
+         return o
       end
-      add_obj(o, name, o._size, ctype, length, fields)
-   end
-   o._base = C.shmem_attach(o._data_fh, o._size)
-   assert(o._base ~= nil, "mmap failed")
-   o._attach = true
-   return o
-end
 
 ---- Instance methods
 
@@ -348,32 +348,32 @@ end
 function shmem:_register (name, ctype, value, fields)
    assert(name and ctype)
    assert(self._extended or fields == nil,
-	  "Attempting to add extra fields to standard index")
+          "Attempting to add extra fields to standard index")
    local handle
    if self._attach then
       local obj = get_obj(self, name)
       assert(ffi.sizeof(ctype) == obj.length,
-	     "invalid length of overriding ctype")
+               "invalid length of overriding ctype")
       obj.ctype = ctype
       obj.ctype_ptr = ffi.typeof("$*", ctype)
       handle = self._n_to_h[name]
    else
       assert(not self._objs[name], "object already exists: "..name)
       assert(self._fs == '' or not string.find(name, self._fs),
-	     "illegal object name: "..name)
+             "illegal object name: "..name)
       local length = ffi.sizeof(ctype)
       local old_size = self._size
       handle = add_obj(self, name, self._size, ctype, length, fields)
       self._base = C.shmem_grow(self._data_fh, self._base,
-				old_size, self._size)
+                                 old_size, self._size)
       assert(self._base ~= nil, "mmap failed")
       local line = name
       if self._fs and self._fs ~= '' then
-	 line = line..self._fs..length
-	 if fields then
-	    assert(type(fields) == 'table')
-	    line = line..self._fs..table.concat(fields, self._fs)
-	 end
+         line = line..self._fs..length
+         if fields then
+            assert(type(fields) == 'table')
+            line = line..self._fs..table.concat(fields, self._fs)
+         end
       end
       assert(self._index_fh:write(line, '\n'))
       assert(self._index_fh:flush())
@@ -414,7 +414,7 @@ function shmem:dictionary()
    return table, self._h_to_n, self._n_to_h
 end
 
--- Set a named object to the given value.  
+-- Set a named object to the given value.
 function shmem:set (name, value)
    if value ~= nil then
       local obj = get_obj(self, name)

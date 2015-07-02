@@ -24,7 +24,7 @@ install_compute_node: install
 	install -D src/scripts/sysv/init.d/snabb-nfv-sync-agent ${PREFIX}/etc/init.d/snabb-nfv-sync-agent
 	install -D src/scripts/sysv/default/snabb-nfv-sync-agent ${PREFIX}/etc/default/snabb-nfv-sync-agent
 
-$(LUAJIT): check_luajit deps/luajit/Makefile
+$(LUAJIT): check_luajit
 	@echo 'Building LuaJIT'
 	@(cd deps/luajit && \
 	 $(MAKE) PREFIX=`pwd`/usr/local \

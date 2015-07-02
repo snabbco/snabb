@@ -78,10 +78,10 @@ function VirtioNetDevice:new(owner)
       virtq = {},
       rx = {},
       tx = {
-	 p = nil,
-	 tx_mrg_hdr = ffi.new("struct virtio_net_hdr_mrg_rxbuf*[1]") ,
-	 data_sent = nil,
-	 finished = nil
+         p = nil,
+         tx_mrg_hdr = ffi.new("struct virtio_net_hdr_mrg_rxbuf*[1]") ,
+         data_sent = nil,
+         finished = nil
       }
    }
 
@@ -147,14 +147,14 @@ function VirtioNetDevice:rx_packet_end(header_id, total_size, rx_p)
    local l = self.owner.output.tx
    if l then
       if band(self.rx_hdr_flags, C.VIO_NET_HDR_F_NEEDS_CSUM) ~= 0 and
-	 -- Bounds-check the checksum area
-	 self.rx_hdr_csum_start  <= rx_p.length - 2 and
-	 self.rx_hdr_csum_offset <= rx_p.length - 2
+         -- Bounds-check the checksum area
+         self.rx_hdr_csum_start  <= rx_p.length - 2 and
+         self.rx_hdr_csum_offset <= rx_p.length - 2
       then
-	 checksum.finish_packet(
-	    rx_p.data + self.rx_hdr_csum_start,
-	    rx_p.length - self.rx_hdr_csum_start,
-	    self.rx_hdr_csum_offset)
+         checksum.finish_packet(
+            rx_p.data + self.rx_hdr_csum_start,
+            rx_p.length - self.rx_hdr_csum_start,
+            self.rx_hdr_csum_offset)
       end
       link.transmit(l, rx_p)
    else
