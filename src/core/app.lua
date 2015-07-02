@@ -414,7 +414,13 @@ function report_apps ()
          print(name, ("[dead: %s]"):format(app.dead.error))
       elseif app.report then
          print(name)
-         with_restart(app, app.report)
+         -- Restarts are currently disabled, still we want to not die on
+         -- errors during app reports, thus this workaround:
+         -- with_restart(app, app.report)
+         local status, err = pcall(app.report)
+         if not status then
+            print("Warning: "..name.." threw an error during report: "..err)
+         end
       end
    end
 end
