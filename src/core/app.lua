@@ -417,7 +417,7 @@ function report_apps ()
          -- Restarts are currently disabled, still we want to not die on
          -- errors during app reports, thus this workaround:
          -- with_restart(app, app.report)
-         local status, err = pcall(app.report)
+         local status, err = pcall(app.report, app)
          if not status then
             print("Warning: "..name.." threw an error during report: "..err)
          end
