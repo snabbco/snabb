@@ -48,7 +48,7 @@ function run (args)
    app.configure(c)
    local fn = function ()
                  print("Transmissions (last 1 sec):")
-                 app.report_each_app()
+                 app.report_apps()
               end
    local t = timer.new("report", fn, 1e9, 'repeating')
    timer.activate(t)
