@@ -8,7 +8,7 @@ E= @echo
 # Defined here to detect version mismatches at build time.
 LUAJIT_VSN    := "v2.0.4-306-gfe56522"
 LJSYSCALL_VSN := "v0.10-65-g7081d97"
-PFLUA_VSN     := "27523953c03745d4c4fbbcf81f676bc774e4329e"
+PFLUA_VSN     := "5e2c56baa0cf1ec471719bac83e2a99c4e2d5495"
 
 TEST_SKIPPED="43"
 
