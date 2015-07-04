@@ -18,7 +18,7 @@ Use the direct attach SFP+ cable to create a loop between both 10Gbps Ethernet p
 
 IOMMU must be disabled on the server as documented under [Compute Node Requirements](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md).
 
-Disable intel_iommu and set hugepages for 24MB (each page has 2MB -> 12288 pages):
+Disable intel_iommu and set hugepages for 24GB (each page has 2MB -> 12288 pages):
 
 edit /etc/default/grub:
 
@@ -547,19 +547,8 @@ The difference in packet counters is a result of me stopping and starting one of
 
 Here are some suggested steps to continue learning about Snabb Switch.
 
-1. Read the source documentation. Start with the
-[README.md](https://github.com/SnabbCo/snabbswitch/blob/master/src/README.md)
-in the [src](https://github.com/SnabbCo/snabbswitch/blob/master/src)
-directory.
-2. Read the code for the example apps in
-[basic_apps.lua](https://github.com/SnabbCo/snabbswitch/blob/master/src/apps/basic/basic_apps.lua).
-3. Continue reading the source for other apps in the
-[apps](https://github.com/SnabbCo/snabbswitch/tree/master/src/apps)
-directory.
-4. Modify the sprayer.lua program to make decisions based on the contents
-of the packet's Layer 3 header. Hint: The `snabb` executable must be
-rebuilt (using `make`) any time you make changes to apps and/or programs
-in order to include your changes.
+1. Read more on snabbnfv
+[README.md](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/README.md) at [https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv)
 
 Don't hesitate to contact the Snabb community on the
 [snabb-devel@googlegroups.com](https://groups.google.com/forum/#!forum/snabb-devel)
