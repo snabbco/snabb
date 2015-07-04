@@ -548,7 +548,7 @@ The difference in packet counters is a result of me stopping and starting one of
 Here are some suggested steps to continue learning about Snabb Switch.
 
 1. Read more on snabbnfv
-[README.md](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/README.md) at [https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv)
+[README.md](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/README.md) and the other documents in the doc folder [https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc)
 
 Don't hesitate to contact the Snabb community on the
 [snabb-devel@googlegroups.com](https://groups.google.com/forum/#!forum/snabb-devel)
