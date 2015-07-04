@@ -456,6 +456,7 @@ Port 1:
 ```
 $ sudo ./snabbswitch/src/snabb snabbnfv traffic -k 10 -D 0 \
   0000:04:00.0 ./port1.cfg ./vhost-sockets/vm1.socket
+```
 
 Port 2:
 
