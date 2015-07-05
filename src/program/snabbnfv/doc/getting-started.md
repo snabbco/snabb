@@ -459,7 +459,7 @@ $ cp ubuntu.qcow2 ubuntu1.qcow2
 $ cp ubuntu.qcow2 ubuntu2.qcow2
 ```
 	
-Before we can launch the VM's, we need to prepare snabb to work as virtio interface for the VM's. Snabb offers snabnfv traffic app for this, which is built-into the snabb binary that we built earlier. Source and documentation can be found at [https://github.com/SnabbCo/snabbswitch/tree/next/src/program/snabbnfv](https://github.com/SnabbCo/snabbswitch/tree/next/src/program/snabbnfv)
+Before launching the VM's, we need to prepare snabb to work as virtio interface for the VM's. Snabb offers snabnfv traffic app for this, which is built-into the snabb binary that was built earlier. Source and documentation can be found at [https://github.com/SnabbCo/snabbswitch/tree/next/src/program/snabbnfv](https://github.com/SnabbCo/snabbswitch/tree/next/src/program/snabbnfv)
 
 One Snabbnfv traffic process is required per 10 Gigabit port and uses a configuration file with port information for every vhost interface:
 
