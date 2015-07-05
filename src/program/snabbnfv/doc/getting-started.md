@@ -1,24 +1,26 @@
-# Snabbnfv Getting Started Guide
+# Snabb NFV Getting Started Guide
 
 ## Introduction
 
-This guide documents the minimal steps required to connect two virtual machines over Snabb Switch using the Snabbnfv Traffic application. A single compute node with at least 2 10GbE ports is sufficient to launch two VMs and pass traffic between them. 
+[Snabb NFV](http://snabb.co/nfv.html) is typically deployed for OpenStack with
+components on the Network Node, the Database Node, and the Compute
+Nodes. 
+This guide however documents the minimal steps required to connect two virtual machines over Snabb Switch using the Snabbnfv Traffic application. No need to install OpenStack or even virsh. A single compute node with at least 2 10GbE ports is sufficient to launch two VMs and pass traffic between them. 
 
 ## Prerequisites
 
-* Compute node running a fresh [Ubuntu 14.04.2 LTS](http://releases.ubuntu.com/14.04/)
-* 2 10Gbps Ethernet SFP+ ports based on [Intel 82599](http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf) 10GbE controller
-* Direct Attach/Twinaxial SFP+ cable
+* Compute node with a suitable PCIe slot for the NIC card (PCIe 2.0/3.0 x8)
+* [Ubuntu 14.04.2 LTS](http://releases.ubuntu.com/14.04/) installed on the compute node
+* 2 10GbE Ethernet SFP+ ports based on [Intel 82599](http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf) controller
+* Direct Attach/Twinaxial SFP+ loopback cable
 
 ## Hardware setup
 
-Use the direct attach SFP+ cable to create a loop between both 10Gbps Ethernet ports. 
+Use the direct attach SFP+ cable to create a loop between both 10GbE Ethernet ports. 
 
 ## Compute node Kernel settings
-
-IOMMU must be disabled on the server as documented under [Compute Node Requirements](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md).
-
-Disable intel_iommu and set hugepages for 24GB (each page has 2MB -> 12288 pages):
+ 
+IOMMU must be disabled on the server as documented under [Compute Node Requirements](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md). Disable intel_iommu and set hugepages for 24GB (each page has 2MB -> 12288 pages). Allocating persistent huge pages on the kernel boot command line is the most reliable method as memory has not yet become fragmented.
 
 edit /etc/default/grub:
 
@@ -48,6 +50,18 @@ $ sudo dmesg |grep -i iommu
 [    0.000000] Intel-IOMMU: disabled
 ```
 
+Verify the successful allocation of persistent huge pages:
+
+```
+$ cat /proc/meminfo |grep -i huge
+AnonHugePages:      6144 kB
+HugePages_Total:   12288
+HugePages_Free:    12288
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+```
+
 Mounting huge page (This is required for VM): 
 
 ```
@@ -64,14 +78,16 @@ EOF
 # mount -a
 ```
 
-## Install git and developer tools
+## Install developer tools
 
 ```
 $ sudo apt-get install git build-essential pkg-config zlib1g-dev
 $ sudo apt-get --no-install-recommends -y build-dep qemu
 ```
 
-## Download, compile and install Qemu:
+## Download, compile and install QEMU
+
+We use here the v2.1.0-vhostuser branch from the QEMU fork on SnabbCo to reduce the risk of running in any incompatibilities with current versions. This branch is maintained by snabb developers. 
 
 ```
 $ git clone -b v2.1.0-vhostuser --depth 50 https://github.com/SnabbCo/qemu
@@ -125,15 +141,42 @@ If you rename (or copy or symlink) this executable with one of
 the names above then that program will be chosen automatically.
 ```
 
-Install numactl to control NUMA policy for processes or shared memory (while important to get the best network performance, its not used in this initial setup). 
+Install numactl to control [NUMA](https://en.wikipedia.org/wiki/Non-uniform_memory_access) policy for processes or shared memory. We won't use numactl in this getting started guide, but its use will be essential to run any performance tests. Numactl runs processes with a specific NUMA scheduling or memory placement policy.
 
 ```
 $ sudo apt-get install numactl
+$ numactl
+usage: numactl [--all | -a] [--interleave= | -i <nodes>] [--preferred= | -p <node>]
+               [--physcpubind= | -C <cpus>] [--cpunodebind= | -N <nodes>]
+               [--membind= | -m <nodes>] [--localalloc | -l] command args ...
+       numactl [--show | -s]
+       numactl [--hardware | -H]
+       numactl [--length | -l <length>] [--offset | -o <offset>] [--shmmode | -M <shmmode>]
+               [--strict | -t]
+               [--shmid | -I <id>] --shm | -S <shmkeyfile>
+               [--shmid | -I <id>] --file | -f <tmpfsfile>
+               [--huge | -u] [--touch | -T]
+               memory policy | --dump | -d | --dump-nodes | -D
+
+memory policy is --interleave | -i, --preferred | -p, --membind | -m, --localalloc | -l
+<nodes> is a comma delimited list of node numbers or A-B ranges or all.
+Instead of a number a node can also be:
+  netdev:DEV the node connected to network device DEV
+  file:PATH  the node the block device of path is connected to
+  ip:HOST    the node of the network device host routes through
+  block:PATH the node of block device path
+  pci:[seg:]bus:dev[:func] The node of a PCI device
+<cpus> is a comma delimited list of cpu numbers or A-B ranges or all
+all ranges can be inverted with !
+all numbers and ranges can be made cpuset-relative with +
+the old --cpubind argument is deprecated.
+use --cpunodebind or --physcpubind instead
+<length> can have g (GB), m (MB) or k (KB) suffixes
 ```
 
 ## Run the Snabb selftest app
 	
-Snabb Find out the PCI addresses of the available 10-Gigabit Intel 82599 ports in the system:
+Find the PCI addresses of the available 10-Gigabit Intel 82599 ports in the system:
 
 ```
 $ lspci|grep 82599
@@ -141,7 +184,7 @@ $ lspci|grep 82599
 04:00.1 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network Connection (rev 01)
 ```
 
-Run some Intel tests with snabb snsh using a loopback cable between the two 10G ports:
+Now run some Intel tests with snabb snsh using a loopback cable between the two 10GbE ports. The application will unbind the specified 10GbE ports (PCI address) from the Linux kernel, but won't "return" them. So don't be surprised when 'ifconfig -a' won't show these ports anymore. 
 
 ```
 $ cd ~/snabbswitch/src
@@ -382,9 +425,9 @@ link report:
 selftest: ok
 ```
 
-## Create and launch VM's
+## Create and launch two VM's
 
-Now that snabbswitch can talk to both 10GbE ports successfully, lets build and launch 2 test VM's and connect each of them to one 10G port each.
+Now that snabbswitch can talk to both 10GbE ports successfully, lets build and launch 2 test VM's and connect each of them to one of the 10GbE port. First, we have to build an empty disk, download and install Ubuntu in it:
 
 Create a disk for the VM:
 
@@ -398,7 +441,7 @@ Download ubuntu server 14.04.2:
 $ wget http://releases.ubuntu.com/14.04.2/ubuntu-14.04.2-server-amd64.iso
 ```
 	
-Launch the ubuntu installer via qemu and connect to its VNC console running at <host>:5901. This can be done from a remote using a VNC client.
+Launch the ubuntu installer via qemu and connect to its VNC console running at <host>:5901. This can be done via a suitable VNC client.
 
 ```
 $ sudo qemu-system-x86_64 -m 1024 -enable-kvm \
@@ -424,7 +467,7 @@ One Snabbnfv traffic process is required per 10 Gigabit port and uses a configur
 * MAC address of the VM
 * Id, which is used to identify a socket name
 
-VLAN and MAC are used to pass ethernet frames based on destination address to the correct vhost interface. I created a separate config file per 10G port.
+VLAN and MAC are used to pass ethernet frames based on destination address to the correct vhost interface. I created a separate config file per 10GbE port.
 
 ```
 $ cat port1.cfg
@@ -465,7 +508,7 @@ $ sudo ./snabbswitch/src/snabb snabbnfv traffic -k 10 -D 0 \
   0000:04:00.1 ./port2.cfg ./vhost-sockets/vm2.socket
 ```
 
-Launch now the two VM's either in different terminals or putting them into the background. As shown here, they will listen to VNC ports 5901 and 5902 to access and configure them.
+Finally launch now the two VM's, either in different terminals or putting them into the background. You can access their consoles via VNC ports 5901 and 5902 after launch.
 
 ubuntu1:
 
@@ -503,7 +546,18 @@ vhost_user: Caching features (0x18028001) in /tmp/vhost_features_.__vhost-socket
 VIRTIO_F_ANY_LAYOUT VIRTIO_NET_F_CTRL_VQ VIRTIO_NET_F_MRG_RXBUF VIRTIO_RING_F_INDIRECT_DESC VIRTIO_NET_F_CSUM
 ```
  
-If all went well so far, you can finally ping between both VM's.
+If all went well so far, you can finally ping between both VM's. If you used non-Linux virtual machines for this test, e.g. [OpenBSD](http://www.openbsd.org), you might not be able to send or receive packets within the guest OS. This issue can be solved (for OpenBSD 5.7 at least) by forcing qemu to use vhost (vhostforce=on):
+
+```
+$ sudo /usr/local/bin/qemu-system-x86_64 \
+  -drive if=virtio,file=/home/mwiget/openbsd1.qcow2 -M pc -smp 1 \
+  --enable-kvm -cpu host -m 1024 -numa node,memdev=mem \
+  -object memory-backend-file,id=mem,size=1024M,mem-path=/mnt/huge,share=on \
+  -chardev socket,id=char0,path=/home/mwiget/vhost-sockets/vm1.socket,server \
+  -netdev type=vhost-user,id=net0,chardev=char0,vhostforce=on  \
+  -device virtio-net-pci,netdev=net0,mac=52:54:00:00:00:01 \
+  -vnc :1
+```
 
 The snabbnfv terminals will show counter output similar to:
 
@@ -549,6 +603,7 @@ Here are some suggested steps to continue learning about Snabb Switch.
 
 1. Read more on snabbnfv
 [README.md](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/README.md) and the other documents in the doc folder [https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc)
+2. Before running any performance tests, familiarize userself with numactl and how it affects snabbswitch. (TODO: is there a good intro page to this topics I can link to?)
 
 Don't hesitate to contact the Snabb community on the
 [snabb-devel@googlegroups.com](https://groups.google.com/forum/#!forum/snabb-devel)
