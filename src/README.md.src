@@ -34,11 +34,21 @@ implement a specific interface, which is used by the Snabb Switch engine
 to organize an *App Network*.
 
     DIAGRAM: Network
-    +-------+            +-------+
-    |       |            |       |
-    | App 1 *------------* App 2 |
-    |       |   (Link)   |       |
-    +-------+            +-------+
+                   +---------+
+                   |         |
+                +->* Filter0 *--+
+                |  |         |  |
+                |  +---------+  |
+    +---+----+  |               |  +----+---+
+    |        *--+               +->*        |
+    |  NIC0  |                     |  NIC1  |
+    |        *<-+               +--*        |
+    +---+----+  |               |  +----+---+
+                |  +---------+  |
+                |  |         |  |
+                +--* Filter1 *<-+
+                   |         |
+                   +---------+
 
 Usually, a Snabb Switch design will create a series of apps, interconnect
 these in a desired way using *links* and finally pass the resulting app

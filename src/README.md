@@ -89,13 +89,6 @@ For example: Move packets from input ports to output ports or to a
 network adapter.
 
 
-— Method **myapp:relink**
-
-*Optional*. React to a changes in input/output links (`app.input` and
-`app.output`). This method is called after a link reconfiguration but
-before the next packets are processed.
-
-
 — Method **myapp:reconfig** *arg*
 
 *Optional*. Reconfigure the app with a new *arg*. If this method is not
