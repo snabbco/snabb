@@ -4,6 +4,7 @@ local engine    = require("core.app")
 local config    = require("core.config")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
+local intel10g  = require("apps.intel.intel10g")
 local intel_app = require("apps.intel.intel_app")
 local basic_apps = require("apps.basic.basic_apps")
 local main      = require("core.main")
@@ -45,6 +46,8 @@ function run (args)
          config.link(c, "tee."..tostring(nics).."->"..name..".input")
       end
    end
+   engine.busywait = true
+   intel10g.num_descriptors = 32*1024
    engine.configure(c)
    local fn = function ()
                  print("Transmissions (last 1 sec):")
