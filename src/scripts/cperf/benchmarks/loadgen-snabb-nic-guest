@@ -10,15 +10,13 @@
 # output. (Last time I checked, even with `set -e ', a plain pipe will
 # exit with status 0 even if one of the commands does not).
 
-# Commented out for now because loadgen-snabb-nic-guest.sh exists with
-# status 1.
-#set -e 
-
-# Path to bench_env scripts.
-BENCH_ENV=${BENCH_ENV:-"./src/scripts/bench_env"}
+set -e
 
 # The actual benchmark.
-out=$(sudo $BENCH_ENV/loadgen-snabb-nic-guest.sh)
+out=$(sudo TESTPCI0="" \
+           TESTPCI1="" \
+           TELNET_PORT="" \
+    program/snabbnfv/packetblaster_bench.sh)
 
 # Extract floating point Mpps number from output.
-echo "$out" | tail -n 3 | head -n 1 | cut -f 2
+echo "$out" | tail -n 1 | cut -f 2
