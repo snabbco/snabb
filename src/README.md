@@ -335,13 +335,6 @@ represented by a table with the following keys:
 * `size` -  Size in bytes
 * `used` - Bytes used
 
-— Variable **memory.dma_min_addr**
-
-— Variable **memory.dma_max_addr**
-
-Lowest and highest addresses of valid DMA memory. Useful information for
-creating memory maps. Read-only.
-
 — Variable **memory.huge_page_size**
 
 Size of a single huge page in bytes. Read-only.
