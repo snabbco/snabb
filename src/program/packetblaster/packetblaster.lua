@@ -1,6 +1,6 @@
 module(..., package.seeall)
 
-local app       = require("core.app")
+local engine    = require("core.app")
 local config    = require("core.config")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
@@ -45,15 +45,15 @@ function run (args)
          config.link(c, "tee."..tostring(nics).."->"..name..".input")
       end
    end
-   app.configure(c)
+   engine.configure(c)
    local fn = function ()
                  print("Transmissions (last 1 sec):")
-                 app.report_each_app()
+                 engine.report_each_app()
               end
    local t = timer.new("report", fn, 1e9, 'repeating')
    timer.activate(t)
-   if duration then app.main({duration=duration})
-   else             app.main() end
+   if duration then engine.main({duration=duration})
+   else             engine.main() end
 end
 
 function is_device_suitable (pcidev, patterns)
