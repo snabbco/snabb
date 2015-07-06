@@ -21,10 +21,10 @@
 --
 -- A subclass must implement the method hash(), which must accept at
 -- least two arguments:
--- 
+--
 --   data   Pointer to a region of memory where the input is stored
 --   length Size of input in bytes
--- 
+--
 -- The hash() method must store the result in the 'h' instance
 -- variable. For convenience of the caller, the method must return
 -- 'h', allowing for direct access like
@@ -45,29 +45,29 @@ function hash:new ()
    local h_t
    if o._size >= 64 and o._size%64 == 0 then
       h_t = ffi.typeof([[
-			     union {
-				uint8_t  u8[$];
-				int8_t   u8[$];
-				uint32_t u32[$];
-				int32_t  i32[$];
-				uint64_t u64[$];
-				int64_t  i64[$];
-			     }
-		       ]], 
-		       o._size/8, o._size/8,
-		       o._size/32, o._size/32,
-		       o._size/64, o._size/64)
+         union {
+            uint8_t  u8[$];
+            int8_t   u8[$];
+            uint32_t u32[$];
+            int32_t  i32[$];
+            uint64_t u64[$];
+            int64_t  i64[$];
+         }
+      ]],
+      o._size/8, o._size/8,
+      o._size/32, o._size/32,
+      o._size/64, o._size/64)
    else
       h_t = ffi.typeof([[
-			     union {
-				uint8_t  u8[$];
-				int8_t  u8[$];
-				uint32_t u32[$];
-				int32_t  i32[$];
-			     }
-		       ]],
-		       o._size/8, o._size/8,
-		       o._size/32, o._size/32)
+         union {
+            uint8_t  u8[$];
+            int8_t  u8[$];
+            uint32_t u32[$];
+            int32_t  i32[$];
+         }
+      ]],
+      o._size/8, o._size/8,
+      o._size/32, o._size/32)
    end
    o.h = h_t()
    return o

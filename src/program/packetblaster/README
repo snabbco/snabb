@@ -1,4 +1,9 @@
-Usage: packetblaster replay <PCAP-FILE> <PCI>...
+Usage: packetblaster replay [OPTIONS] <PCAP-FILE> <PCI>... 
+
+  -D DURATION, --duration DURATION
+                             Run for DURATION seconds.
+  -h, --help
+                             Print usage information.
 
 Transmit packets from PCAP-FILE continuously to one or more network
 adapters. The PCI arguments are Lua pattern strings that are used to

@@ -86,8 +86,8 @@ local mt = {
                     print=Register.printrc},
         __call = Register.readrc, __tostring = Register.__tostring},
   RC64 = {__index = { read=Register.readrc, reset=Register.reset,
-		      print=Register.printrc},
-	  __call = Register.readrc, __tostring = Register.__tostring},
+                     print=Register.printrc},
+         __call = Register.readrc, __tostring = Register.__tostring},
 }
 
 --- Create a register `offset` bytes from `base_ptr`.
@@ -102,7 +102,7 @@ function new (name, longname, offset, base_ptr, mode)
    if mode == 'RC' or mode == 'RC64' then
       o.acc = ffi.new("uint64_t[1]")
       if mode == 'RC64' then
-	 o.ptr = ffi.cast("uint64_t*", o.ptr)
+         o.ptr = ffi.cast("uint64_t*", o.ptr)
       end
    end
    return setmetatable(o, mt)

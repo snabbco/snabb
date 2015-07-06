@@ -23,8 +23,8 @@ function ns_responder:new(config)
    local o = ns_responder:superClass().new(self)
    o._config = config
    o._match_ns = function(ns)
-		    return(ns:target_eq(config.local_ip))
-		 end
+                    return(ns:target_eq(config.local_ip))
+                 end
    local filter, errmsg = filter:new("icmp6 and ip6[40] = 135")
    assert(filter, errmsg and ffi.string(errmsg))
    o._filter = filter
@@ -87,8 +87,8 @@ function ns_responder:push()
    local l_out = self.output.south
    if l_in and l_out then
       while not link.empty(l_in) and not link.full(l_out) do
-	 -- Pass everything on north -> south
-	 link.transmit(l_out, link.receive(l_in))
+         -- Pass everything on north -> south
+         link.transmit(l_out, link.receive(l_in))
       end
    end
    l_in = self.input.south
@@ -98,14 +98,14 @@ function ns_responder:push()
       local p = link.receive(l_in)
       local status = process(self, p)
       if status == nil then
-	 -- Discard
-	 packet.free(p)
+         -- Discard
+         packet.free(p)
       elseif status == true then
-	 -- Send NA back south
-	 link.transmit(l_reply, p)
+         -- Send NA back south
+         link.transmit(l_reply, p)
       else
-	 -- Send transit traffic up north
-	 link.transmit(l_out, p)
+         -- Send transit traffic up north
+         link.transmit(l_out, p)
       end
    end
 end

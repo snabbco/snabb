@@ -20,7 +20,7 @@ local ethernet = subClass(header)
 ethernet._name = "ethernet"
 ethernet._header_type = ether_header_t
 ethernet._header_ptr_type = ffi.typeof("$*", ether_header_t)
-ethernet._ulp = { 
+ethernet._ulp = {
    class_map = {
                   [0x0800] = "lib.protocol.ipv4",
                   [0x86dd] = "lib.protocol.ipv6",
@@ -43,9 +43,9 @@ function ethernet:pton (p)
    local i = 0
    for v in p:split(":") do
       if string.match(v:lower(), '^[0-9a-f][0-9a-f]$') then
-	 result[i] = tonumber("0x"..v)
+         result[i] = tonumber("0x"..v)
       else
-	 error("invalid mac address "..p)
+         error("invalid mac address "..p)
       end
       i = i+1
    end

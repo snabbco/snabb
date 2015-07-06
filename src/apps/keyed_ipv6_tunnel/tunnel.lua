@@ -149,7 +149,7 @@ function SimpleKeyedTunnel:new (arg)
       local psession = ffi.cast(psession_id_ctype, header + SESSION_ID_OFFSET)
       psession[0] = lib.htonl(conf.local_session)
    end
-   
+
    if conf.default_gateway_MAC then
       local mac = assert(macaddress:new(conf.default_gateway_MAC))
       ffi.copy(header + DST_MAC_OFFSET, mac.bytes, 6)
@@ -157,7 +157,7 @@ function SimpleKeyedTunnel:new (arg)
 
    if conf.hop_limit then
       assert(type(conf.hop_limit) == 'number' and
-	  conf.hop_limit <= 255, "invalid hop limit")
+          conf.hop_limit <= 255, "invalid hop limit")
       header[HOP_LIMIT_OFFSET] = conf.hop_limit
    end
 
@@ -280,7 +280,7 @@ function selftest ()
 
    print("run simple one second benchmark ...")
    app.main({duration = 1})
- 
+
    if not ok then
       print("selftest failed")
       os.exit(1)

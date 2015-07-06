@@ -42,23 +42,23 @@ function run (args)
          os.exit(1)
       end
       if loadreportinterval > 0 then
-	 local t = timer.new("nfvloadreport", engine.report_load, loadreportinterval*1e9, 'repeating')
-	 timer.activate(t)
+         local t = timer.new("nfvloadreport", engine.report_load, loadreportinterval*1e9, 'repeating')
+         timer.activate(t)
       end
       if linkreportinterval > 0 then
-	 local t = timer.new("nfvlinkreport", engine.report_links, linkreportinterval*1e9, 'repeating')
-	 timer.activate(t)
+         local t = timer.new("nfvlinkreport", engine.report_links, linkreportinterval*1e9, 'repeating')
+         timer.activate(t)
       end
       if debugreportinterval > 0 then
-	 local t = timer.new("nfvdebugreport", engine.report_apps, debugreportinterval*1e9, 'repeating')
-	 timer.activate(t)
+         local t = timer.new("nfvdebugreport", engine.report_apps, debugreportinterval*1e9, 'repeating')
+         timer.activate(t)
       end
       if benchpackets then
-	 print("snabbnfv traffic starting (benchmark mode)")
-	 bench(pciaddr, confpath, sockpath, benchpackets)
+         print("snabbnfv traffic starting (benchmark mode)")
+         bench(pciaddr, confpath, sockpath, benchpackets)
       else
-	 print("snabbnfv traffic starting")
-	 traffic(pciaddr, confpath, sockpath)
+         print("snabbnfv traffic starting")
+         traffic(pciaddr, confpath, sockpath)
       end
    else
       print("Wrong number of arguments: " .. tonumber(#args))
@@ -78,9 +78,9 @@ function traffic (pciaddr, confpath, sockpath)
    while true do
       local mtime2 = C.stat_mtime(confpath)
       if mtime2 ~= mtime then
-	 print("Loading " .. confpath)
-	 engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
-	 mtime = mtime2
+         print("Loading " .. confpath)
+         engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
+         mtime = mtime2
       end
       engine.main({duration=1, no_report=true})
       -- Flush buffered log messages every 1s

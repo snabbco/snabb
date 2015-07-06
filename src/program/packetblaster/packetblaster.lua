@@ -9,14 +9,24 @@ local basic_apps = require("apps.basic.basic_apps")
 local main      = require("core.main")
 local PcapReader= require("apps.pcap.pcap").PcapReader
 local LoadGen   = require("apps.intel.loadgen").LoadGen
+local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
 
+local usage = require("program.packetblaster.README_inc")
+
+local long_opts = {
+   duration     = "D",
+   help         = "h"
+}
+
 function run (args)
-   if #args < 3 or table.remove(args, 1) ~= 'replay' then
-      print(require("program.packetblaster.README_inc"))
-      os.exit(1)
-   end
+   local opt = {}
+   local duration
+   function opt.D (arg) duration = tonumber(arg)  end
+   function opt.h (arg) print(usage) main.exit(1) end
+   if #args < 3 or table.remove(args, 1) ~= 'replay' then opt.h() end
+   args = lib.dogetopt(args, opt, "hD:", long_opts)
    local filename = table.remove(args, 1)
    local patterns = args
    local c = config.new()
@@ -42,7 +52,8 @@ function run (args)
               end
    local t = timer.new("report", fn, 1e9, 'repeating')
    timer.activate(t)
-   app.main()
+   if duration then app.main({duration=duration})
+   else             app.main() end
 end
 
 function is_device_suitable (pcidev, patterns)

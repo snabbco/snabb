@@ -31,7 +31,7 @@ order to help improve this document.*
 
 $(cat ../README.md)
 
-$(cat ../apps/README.md)
+$(cat ../apps/basic/README.md)
 
 $(cat ../apps/intel/README.md)
 

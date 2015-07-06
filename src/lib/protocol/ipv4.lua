@@ -145,7 +145,7 @@ end
 
 function ipv4:checksum ()
    self:header().checksum = C.htons(ipsum(ffi.cast("uint8_t *", self:header()),
-					  self:sizeof(), 0))
+                                          self:sizeof(), 0))
    return C.ntohs(self:header().checksum)
 end
 

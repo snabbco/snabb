@@ -49,15 +49,15 @@ local datagram = subClass(nil)
 
 -- Create a datagram from a packet or from scratch (if p == nil).  The
 -- class argument is only relevant for parsing and can be set to the
--- header class of the the outermost packet header.  
+-- header class of the the outermost packet header.
 local function init (o, p, class)
    if not o._recycled then
       o._parse = { stack = {}, index = 0 }
       o._packet = ffi.new("struct packet *[1]")
    elseif o._parse.stack[1] then
       for i, _ in ipairs(o._parse.stack) do
-	 o._parse.stack[i]:free()
-	 o._parse.stack[i] = nil
+         o._parse.stack[i]:free()
+         o._parse.stack[i] = nil
       end
       o._parse.index = 0
    end
@@ -184,14 +184,14 @@ function datagram:pop (n)
    assert(n <= parse.index)
    for i = 1, parse.index do
       if i <= n then
-	 local proto = parse.stack[i]
+         local proto = parse.stack[i]
          n_bytes = n_bytes + proto:sizeof()
-	 proto:free()
+         proto:free()
       end
       if i+n <= parse.index then
-	 parse.stack[i] = parse.stack[i+n]
+         parse.stack[i] = parse.stack[i+n]
       else
-	 parse.stack[i] = nil
+         parse.stack[i] = nil
       end
    end
    parse.index = parse.index - n
