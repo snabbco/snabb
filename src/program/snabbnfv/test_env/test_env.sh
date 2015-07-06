@@ -166,6 +166,13 @@ function qemu_dpdk {
     launch_qemu $1 $2 $3 bzImage-no-virtio-net qemu-dpdk
 }
 
+function snabbnfv_bench {
+    numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
+        ./snabb snabbnfv traffic -B $2 $1 \
+        program/snabbnfv/test_fixtures/nfvconfig/test_functions/snabbnfv-bench1.port \
+        vhost_%s.sock
+}
+
 function on_exit {
     [ -n "$tmux_session" ] && tmux kill-session -t $tmux_session 2>&1 >/dev/null
     rm -f $sockets
