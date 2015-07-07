@@ -55,6 +55,10 @@ Hz = false
 sleep = 0
 maxsleep = 100
 
+-- busywait: If true then the engine will poll for new data in a tight
+-- loop (100% CPU) instead of sleeping according to the Hz setting.
+busywait = false
+
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
 monotonic_now = false
@@ -233,7 +237,7 @@ function main (options)
    repeat
       breathe()
       if not no_timers then timer.run() end
-      pace_breathing()
+      if not busywait then pace_breathing() end
    until done and done()
    if not options.no_report then report(options.report) end
 end

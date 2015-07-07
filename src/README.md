@@ -89,13 +89,6 @@ For example: Move packets from input ports to output ports or to a
 network adapter.
 
 
-— Method **myapp:relink**
-
-*Optional*. React to a changes in input/output links (`app.input` and
-`app.output`). This method is called after a link reconfiguration but
-before the next packets are processed.
-
-
 — Method **myapp:reconfig** *arg*
 
 *Optional*. Reconfigure the app with a new *arg*. If this method is not
@@ -207,7 +200,23 @@ following keys are recognized:
 Returns monotonic time in seconds as a floating point number. Suitable
 for timers.
 
+— Variable **engine.busywait**
 
+If set to true then the engine polls continuously for new packets to
+process. This consumes 100% CPU and makes processing latency less
+vulnerable to kernel scheduling behavior which can cause pauses of
+more than one millisecond.
+
+Default: false
+
+— Variable **engine.Hz**
+
+Frequency at which to poll for new input packets. The default value is
+'false' which means to adjust dynamically up to 100us during low
+traffic. The value can be overridden with a constant integer saying
+how many times per second to poll.
+
+This setting is not used when engine.busywait is true.
 
 ## Link (core.link)
 
