@@ -20,9 +20,9 @@ local long_opts = {
 function run (args)
    local opt = {}
    local benchpackets
-   local linkreportinterval = 60
+   local linkreportinterval = 0
    local loadreportinterval = 1
-   local debugreportinterval = 600
+   local debugreportinterval = 0
    function opt.B (arg) benchpackets = tonumber(arg)      end
    function opt.h (arg) print(short_usage()) main.exit(1) end
    function opt.H (arg) print(long_usage())  main.exit(1) end
