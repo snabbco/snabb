@@ -21,6 +21,7 @@ function fs:new (pid, root)
    local root = root or default_root
    local pid = pid or syscall.getpid()
    local o = { directory = fs_directory(root, pid) }
+   syscall.mkdir(root, "RWXU")
    syscall.mkdir(o.directory, "RWXU")
    return setmetatable(o, {__index = fs})
 end
