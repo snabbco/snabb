@@ -10,6 +10,8 @@ local fs     = require("lib.ipc.fs")
 local zone   = require("jit.zone")
 local ffi    = require("ffi")
 local C      = ffi.C
+local fork   = require("core.fork")
+local inter_link = require("core.inter_link")
 require("core.packet_h")
 
 -- Set to true to enable logging
@@ -106,9 +108,13 @@ end
 -- Successive calls to configure() will migrate from the old to the
 -- new app network by making the changes needed.
 function configure (new_config)
-   local actions = compute_config_actions(configuration, new_config)
-   apply_config_actions(actions, new_config)
-   configuration = new_config
+   for procname, procarg in pairs(new_config.cpus) do
+      fork.spawn(procname, function()
+         local actions = compute_config_actions(configuration, new_config)
+         apply_config_actions(actions, new_config)
+         configuration = new_config
+      end)
+   end
 end
 
 -- Return the configuration actions needed to migrate from old config to new.
@@ -123,22 +129,25 @@ end
 --   }
 function compute_config_actions (old, new)
    local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
+   local procname = fork.get_procname()
    for appname, info in pairs(new.apps) do
-      local class, arg = info.class, info.arg
-      local action = nil
-      if not old.apps[appname]                then action = 'start'
-      elseif old.apps[appname].class ~= class then action = 'restart'
-      elseif not lib.equal(old.apps[appname].arg, arg)
-                                              then action = 'reconfig'
-      else                                         action = 'keep'  end
-      table.insert(actions[action], appname)
-   end
-   for appname in pairs(old.apps) do
-      if not new.apps[appname] then
-         table.insert(actions['stop'], appname)
+      if info.arg.cpu == procname then
+         local class, arg = info.class, info.arg
+         local action = nil
+         if not old.apps[appname]                then action = 'start'
+         elseif old.apps[appname].class ~= class then action = 'restart'
+         elseif not lib.equal(old.apps[appname].arg, arg)
+                                                then action = 'reconfig'
+         else                                         action = 'keep'  end
+         table.insert(actions[action], appname)
       end
+      for appname in pairs(old.apps) do
+         if not new.apps[appname] then
+            table.insert(actions['stop'], appname)
+         end
+      end
+      return actions
    end
-   return actions
 end
 
 -- Update the active app network by applying the necessary actions.
@@ -199,19 +208,27 @@ function apply_config_actions (actions, conf)
    -- Setup links: create (or reuse) and renumber.
    for linkspec in pairs(conf.links) do
       local fa, fl, ta, tl = config.parse_link(linkspec)
-      if not new_app_table[fa] then error("no such app: " .. fa) end
-      if not new_app_table[ta] then error("no such app: " .. ta) end
-      -- Create or reuse a link and assign/update receiving app index
-      local link = link_table[linkspec] or link.new()
-      link.receiving_app = app_name_to_index[ta]
-      -- Add link to apps
-      new_app_table[fa].output[fl] = link
-      table.insert(new_app_table[fa].output, link)
-      new_app_table[ta].input[tl] = link
-      table.insert(new_app_table[ta].input, link)
-      -- Remember link
-      new_link_table[linkspec] = link
-      table.insert(new_link_array, link)
+      local fa_app = new_app_table[fa]
+      local ta_app = new_app_table[ta]
+      local link = nil
+      if fa_app and ta_app then
+         link = link_table[linkspec] or link.new()
+         link.receiving_app = app_name_to_index[ta]
+      elseif fa_app or ta_app then
+         link = inter_link(linkspec)
+      end
+      if link then
+         if fa_app then
+            fa_app.output[fl] = link
+            table.insert(fa_app.output, link)
+         end
+         if ta_app then
+            ta_app.input[tl] = link
+            table.insert(ta.input, link)
+         end
+         new_link_table[linkspec] = link
+         table.insert(new_link_array, link)
+      end
    end
    -- commit changes
    app_table, link_table = new_app_table, new_link_table
