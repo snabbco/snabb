@@ -52,7 +52,7 @@ function LwAftr:binding_lookup_ipv4_from_pkt(pkt)
    return self:binding_lookup_ipv4(ip, port)
 end
 
-function LwAftr:ipv6_encapsulate(pkt, dgram, ipv6_src, ipv6_dst,
+function LwAftr:ipv6_encapsulate(pkt, dgram, next_hdr_type, ipv6_src, ipv6_dst,
                                        ether_src, ether_dst)
    -- TODO: decrement the IPv4 ttl as this is part of forwarding
    -- TODO: do not encapsulate if ttl was already 0; send icmp
@@ -62,8 +62,8 @@ function LwAftr:ipv6_encapsulate(pkt, dgram, ipv6_src, ipv6_dst,
       print("Original packet, minus ethernet:")
       print_pkt(pkt)
    end
-   local next_header_type = 4 -- IPv4
-   local ipv6_hdr = ipv6:new({next_header = next_header_type,
+
+   local ipv6_hdr = ipv6:new({next_header = next_hdr_type,
                               hop_limit = 255,
                               src = ipv6_src,
                               dst = ipv6_dst}) 
@@ -73,10 +73,10 @@ function LwAftr:ipv6_encapsulate(pkt, dgram, ipv6_src, ipv6_dst,
    local eth_hdr = ethernet:new({src = ether_src,
                                  dst = ether_dst,
                                  type = ipv6_ethertype})
-   
    dgram:push(ipv6_hdr)
    -- The API makes setting the payload length awkward; set it manually
-   pkt.data[4] = bit.band(payload_len, 0xff00)
+   -- Todo: less awkward way to write 16 bits of a number into cdata
+   pkt.data[4] = bit.rshift(bit.band(payload_len, 0xff00), 8)
    pkt.data[5] = bit.band(payload_len, 0xff)
    dgram:push(eth_hdr)
    if debug then
@@ -110,7 +110,33 @@ function LwAftr:ipv6_or_drop(pkt)
 
    local ether_src = ethernet:pton("55:55:55:55:55:55")
    local ether_dst = ethernet:pton("44:44:44:44:44:44")
-   return self:ipv6_encapsulate(pkt, dgram, ipv6_src, ipv6_dst, ether_src, ether_dst)
+
+   -- IPv4 specific handling
+   local ttl_offset = 8
+   local ttl = pkt.data[ttl_offset]
+   print('ttl', ttl, pkt.data[ttl_offset])
+   if ttl == 0 then
+      -- Do not encapsulate packets that already had a ttl of zero
+      return nil
+   else
+      pkt.data[ttl_offset] = ttl - 1
+      local csum_offset = 10
+      local csum = C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0])
+      print("old csum", string.format("%x", csum))
+      csum = csum + 0x100 -- Compensate for the decremented ttl
+      -- TODO: *test* the following loop
+      while csum > 0xffff do -- process the carry nibbles
+         local carry = bit.rshift(csum, 16)
+         csum = bit.band(csum, 0xffff) + carry
+      end
+      print("new csum", string.format("%x", csum))
+      pkt.data[csum_offset] = bit.rshift(bit.band(csum, 0xff00), 8)
+      pkt.data[csum_offset + 1] = bit.band(csum, 0xff)
+   end
+   local next_hdr = 4 -- IPv4
+
+   return self:ipv6_encapsulate(pkt, dgram, next_hdr, ipv6_src, ipv6_dst,
+                                ether_src, ether_dst)
 end
 
 -- TODO: revisit this and check on performance idioms
