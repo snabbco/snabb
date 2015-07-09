@@ -5,9 +5,9 @@ enum { LINK_RING_SIZE    = 256,
 struct link {
   // this is a circular ring buffer, as described at:
   //   http://en.wikipedia.org/wiki/Circular_buffer
-  struct packet* packets[LINK_RING_SIZE];
+  struct packet *packets[LINK_RING_SIZE];
   struct {
-    double txbytes, rxbytes, txpackets, rxpackets, txdrop;
+    struct counter *txbytes, *rxbytes, *txpackets, *rxpackets, *txdrop;
   } stats;
   // Two cursors:
   //   read:  the next element to be read
