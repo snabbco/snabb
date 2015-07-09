@@ -315,6 +315,8 @@ end
 --   bpp  - bytes per packet (average packet size)
 local lastloadreport = nil
 local reportedfrees = nil
+local reportedfreebits = nil
+local reportedfreebytes = nil
 local reportedbreaths = nil
 function report_load ()
    if lastloadreport then
