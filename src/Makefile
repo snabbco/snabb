@@ -25,7 +25,8 @@ ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
 RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
-INCSRC = $(shell find . -regex '[^\#]*\.inc' -printf '%P ')
+# sort to eliminate potential duplicate of programs.inc
+INCSRC = $(sort $(shell find . -regex '[^\#]*\.inc' -printf '%P ') programs.inc)
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
@@ -182,7 +183,7 @@ $(RMOBJS): %: %.src
 	$(E) "MARKDOWN  $@"
 	$(Q) scripts/process-markdown $< > $@
 
-$(INCOBJ): obj/%_inc.o: %.inc Makefile program/programs.inc | $(OBJDIR)
+$(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	$(E) "INC       $@"
 	@(echo -n "return [=============["; \
 	 cat $<; \
@@ -190,7 +191,7 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile program/programs.inc | $(OBJDIR)
 	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
 
 # Create list of programs that exist
-program/programs.inc:
+programs.inc: program
 	@(for d in program/*/; do basename $$d; done) > $@
 
 FORCE:
@@ -225,7 +226,7 @@ doc/snabbswitch.epub: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
 	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
 
-CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog deps/*.vsn
+CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog deps/*.vsn programs.inc
 
 clean:
 	$(E) "RM        $(CLEAN)"
