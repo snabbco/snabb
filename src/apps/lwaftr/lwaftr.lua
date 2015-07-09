@@ -12,6 +12,14 @@ LwAftr = {}
 
 local function pp(t) for k,v in pairs(t) do print(k,v) end end
 
+-- http://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
+local proto_icmp = 1
+local proto_tcp = 6
+
+-- http://www.iana.org/assignments/ieee-802-numbers/ieee-802-numbers.xhtml
+local ethertype_ipv4 = 0x0800
+local ethertype_ipv6 = 0x86DD
+
 local debug = true
 
 function LwAftr:new(conf)
@@ -21,15 +29,18 @@ end
 
 local function print_pkt(pkt)
    local fbytes = {}
-   for i=0,pkt.length - 1 do table.insert(fbytes, string.format("0x%x", pkt.data[i])) end
+   for i=0,pkt.length - 1 do
+      table.insert(fbytes, string.format("0x%x", pkt.data[i]))
+   end
    print(string.format("Len: %i: ", pkt.length) .. table.concat(fbytes, " "))
 end
+
 
 function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
    print(ipv4_ip, 'port: ', port)
    pp(self.binding_table)
    for _, bind in ipairs(self.binding_table) do
-      print("CHECK", string.format("%x, %x", bind[2], ipv4_ip))
+      if debug then print("CHECK", string.format("%x, %x", bind[2], ipv4_ip)) end
       if bind[2] == ipv4_ip then
          if port >= bind[3] and port <= bind[4] then
             return bind[1]
@@ -50,6 +61,20 @@ function LwAftr:binding_lookup_ipv4_from_pkt(pkt)
    local dst_port_start = ipv4_header_len + 2
    local port = C.ntohs(ffi.cast("uint16_t*", pkt.data + dst_port_start)[0])
    return self:binding_lookup_ipv4(ip, port)
+end
+
+local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
+   local csum = C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0])
+   print("old csum", string.format("%x", csum))
+   csum = csum + fixup_val
+   -- TODO: *test* the following loop
+   while csum > 0xffff do -- process the carry nibbles
+      local carry = bit.rshift(csum, 16)
+      csum = bit.band(csum, 0xffff) + carry
+   end
+   print("new csum", string.format("%x", csum))
+   pkt.data[csum_offset] = bit.rshift(bit.band(csum, 0xff00), 8)
+   pkt.data[csum_offset + 1] = bit.band(csum, 0xff)
 end
 
 function LwAftr:ipv6_encapsulate(pkt, dgram, next_hdr_type, ipv6_src, ipv6_dst,
@@ -86,6 +111,42 @@ function LwAftr:ipv6_encapsulate(pkt, dgram, next_hdr_type, ipv6_src, ipv6_dst,
    return pkt
 end
 
+-- TODO: correctly handle fragmented IPv4 packets
+-- TODO: correctly deal with IPv6 packets that need to be fragmented
+function LwAftr:_encapsulate_ipv4(pkt, dgram)
+   local ipv6_src = self.aftr_ipv6_ip
+   local ipv6_dst = self:binding_lookup_ipv4_from_pkt(pkt)
+   -- Not found => icmpv6 type 1 code 5, or discard
+   if not ipv6_dst then return nil end -- TODO: configurable policy 
+
+   local ether_src = self.aftr_mac
+   -- FIXME: set the real destination ethernet value
+   local ether_dst = ethernet:pton("44:44:44:44:44:44")
+
+   local ttl_offset = 8
+   local ttl = pkt.data[ttl_offset]
+   print('ttl', ttl, pkt.data[ttl_offset])
+   -- Do not encapsulate packets that already had a ttl of zero
+   if ttl == 0 then return nil end
+ 
+   local proto_offset = 9
+   local proto = pkt.data[proto_offset]
+
+   if proto == proto_icmp and self.icmp_policy == conf.DROP_POLICY then return nil end
+
+   pkt.data[ttl_offset] = ttl - 1
+   if proto == proto_tcp then
+      local csum_offset = 10
+      -- ttl_offset is even, so multiply the ttl change by 0x100.
+      -- It's added, because the checksum is is ones-complement.
+      fixup_tcp_checksum(pkt, csum_offset, 0x100)
+   end
+   local next_hdr = 4 -- IPv4
+
+   return self:ipv6_encapsulate(pkt, dgram, next_hdr, ipv6_src, ipv6_dst,
+                                ether_src, ether_dst)
+end
+
 -- Modify the given packet
 -- TODO: modifiable policy
 function LwAftr:ipv6_or_drop(pkt)
@@ -93,50 +154,16 @@ function LwAftr:ipv6_or_drop(pkt)
    local ethernet_header_size = 14 -- TODO: deal with 802.1Q tags?
    local ethertype_offset = 12
    local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + ethertype_offset)[0])
-   local ethertype_ipv4 = 0x800
-   if ethertype ~= ethertype_ipv4 then return nil end
-
-   -- TODO: correctly handle fragmented IPv4 packets
-   -- TODO: correctly deal with IPv6 packets that need to be fragmented
-
    dgram:pop_raw(ethernet_header_size)
-   -- FIXME: set ethernet addresses to real values, not ones easy to see in
-   -- packet dumps
 
-   local ipv6_src = self.aftr_ipv6_ip
-   local ipv6_dst = self:binding_lookup_ipv4_from_pkt(pkt)
-   -- Not found => icmpv6 type 1 code 5, or discard
-   if not ipv6_dst then return nil end -- TODO: configurable policy 
-
-   local ether_src = ethernet:pton("55:55:55:55:55:55")
-   local ether_dst = ethernet:pton("44:44:44:44:44:44")
-
-   -- IPv4 specific handling
-   local ttl_offset = 8
-   local ttl = pkt.data[ttl_offset]
-   print('ttl', ttl, pkt.data[ttl_offset])
-   if ttl == 0 then
-      -- Do not encapsulate packets that already had a ttl of zero
+   if ethertype == ethertype_ipv4 then
+      return self:_encapsulate_ipv4(pkt, dgram)
+   elseif ethertype == ethertype_ipv6 then
+      -- TODO: handle ICMPv6 as per RFC 2473
+      -- TODO: decapsulate if the source was a b4, and forward/hairpin
+   else -- silently drop other types: TODO: is this the right thing to do?
       return nil
-   else
-      pkt.data[ttl_offset] = ttl - 1
-      local csum_offset = 10
-      local csum = C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0])
-      print("old csum", string.format("%x", csum))
-      csum = csum + 0x100 -- Compensate for the decremented ttl
-      -- TODO: *test* the following loop
-      while csum > 0xffff do -- process the carry nibbles
-         local carry = bit.rshift(csum, 16)
-         csum = bit.band(csum, 0xffff) + carry
-      end
-      print("new csum", string.format("%x", csum))
-      pkt.data[csum_offset] = bit.rshift(bit.band(csum, 0xff00), 8)
-      pkt.data[csum_offset + 1] = bit.band(csum, 0xff)
    end
-   local next_hdr = 4 -- IPv4
-
-   return self:ipv6_encapsulate(pkt, dgram, next_hdr, ipv6_src, ipv6_dst,
-                                ether_src, ether_dst)
 end
 
 -- TODO: revisit this and check on performance idioms
