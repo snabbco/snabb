@@ -16,14 +16,6 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 install: all
 	install -D src/snabb ${PREFIX}/usr/local/bin/snabb
 
-install_db_node:
-	install -D src/scripts/sysv/init.d/snabb-nfv-sync-master ${PREFIX}/etc/init.d/snabb-nfv-sync-master
-	install -D src/scripts/sysv/default/snabb-nfv-sync-master ${PREFIX}/etc/default/snabb-nfv-sync-master
-
-install_compute_node: install
-	install -D src/scripts/sysv/init.d/snabb-nfv-sync-agent ${PREFIX}/etc/init.d/snabb-nfv-sync-agent
-	install -D src/scripts/sysv/default/snabb-nfv-sync-agent ${PREFIX}/etc/default/snabb-nfv-sync-agent
-
 $(LUAJIT): check_luajit
 	@echo 'Building LuaJIT'
 	@(cd deps/luajit && \
