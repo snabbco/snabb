@@ -1,8 +1,11 @@
 module(..., package.seeall)
 
+local lwconf = require("apps.lwaftr.conf")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
+local icmp = require("lib.protocol.icmp.header")
+local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local packet = require("core.packet")
 
@@ -20,6 +23,7 @@ local proto_tcp = 6
 local ethertype_ipv4 = 0x0800
 local ethertype_ipv6 = 0x86DD
 
+local ethernet_header_size = 14 -- TODO: deal with 802.1Q tags?
 local debug = true
 
 function LwAftr:new(conf)
@@ -35,7 +39,6 @@ local function print_pkt(pkt)
    print(string.format("Len: %i: ", pkt.length) .. table.concat(fbytes, " "))
 end
 
-
 function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
    print(ipv4_ip, 'port: ', port)
    pp(self.binding_table)
@@ -47,13 +50,10 @@ function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
          end
       end
    end
-   return nil -- lookup failed
 end
 
--- Note: this expects the packet to already have its ethernet data stripped, and
--- start as an IPv4 packet
 function LwAftr:binding_lookup_ipv4_from_pkt(pkt)
-   local dst_ip_start = 16
+   local dst_ip_start = ethernet_header_size + 16
    -- Note: ip is kept in network byte order, regardless of host byte order
    local ip = ffi.cast("uint32_t*", pkt.data + dst_ip_start)[0]
    -- TODO: don't assume the length of the IPv4 header; check IHL
@@ -77,10 +77,31 @@ local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
    pkt.data[csum_offset + 1] = bit.band(csum, 0xff)
 end
 
-function LwAftr:ipv6_encapsulate(pkt, dgram, next_hdr_type, ipv6_src, ipv6_dst,
-                                       ether_src, ether_dst)
+-- ICMPv4 type 3 code 1, as per the internet draft.
+-- The target IPv4 address + port is not in the table.
+function LwAftr:_icmp_after_discard(to_ip)
+   local new_pkt = packet.new() -- TODO: recycle
+   local dgram = datagram:new(new_pkt) -- TODO: recycle this
+   local icmp_header = icmp:new(3, 1) -- TODO: make symbolic
+   local ipv4_header = ipv4:new({ttl = 255, protocol = proto_icmp,
+                                 src = self.aftr_ipv4_ip, dst = to_ip})
+   local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
+                                        dst = self.inet_mac,
+                                        ethertype_ipv4})
+   dgram:push(icmp_header)
+   dgram:push(ipv4_header)
+   dgram:push(ethernet_header)
+   return new_pkt
+end
+
+-- Given a payload, encapsulate it.
+-- A plausible payload is a packet with IPv4 and TCP headers, but no ethernet.
+function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
+                                 ether_src, ether_dst)
    -- TODO: decrement the IPv4 ttl as this is part of forwarding
    -- TODO: do not encapsulate if ttl was already 0; send icmp
+   local dgram = datagram:new(pkt, ethernet) -- TODO: recycle this
+   dgram:pop_raw(ethernet_header_size)
    print("ipv6", ipv6_src, ipv6_dst)
    local payload_len = pkt.length
    if debug then
@@ -94,10 +115,9 @@ function LwAftr:ipv6_encapsulate(pkt, dgram, next_hdr_type, ipv6_src, ipv6_dst,
                               dst = ipv6_dst}) 
    pp(ipv6_hdr)
 
-   local ipv6_ethertype = 0x86dd
    local eth_hdr = ethernet:new({src = ether_src,
                                  dst = ether_dst,
-                                 type = ipv6_ethertype})
+                                 type = ethertype_ipv6})
    dgram:push(ipv6_hdr)
    -- The API makes setting the payload length awkward; set it manually
    -- Todo: less awkward way to write 16 bits of a number into cdata
@@ -113,51 +133,57 @@ end
 
 -- TODO: correctly handle fragmented IPv4 packets
 -- TODO: correctly deal with IPv6 packets that need to be fragmented
-function LwAftr:_encapsulate_ipv4(pkt, dgram)
-   local ipv6_src = self.aftr_ipv6_ip
+function LwAftr:_encapsulate_ipv4(pkt)
    local ipv6_dst = self:binding_lookup_ipv4_from_pkt(pkt)
-   -- Not found => icmpv6 type 1 code 5, or discard
-   if not ipv6_dst then return nil end -- TODO: configurable policy 
+   if not ipv6_dst then
+      if debug then print("lookup failed") end
+      if self.ipv4_lookup_failed_policy == lwconf.DROP_POLICY then
+         return nil -- lookup failed
+      elseif self.ipv4_lookup_failed_policy == lwconf.DISCARD_PLUS_ICMP_POLICY then
+         local src_ip_start = ethernet_header_size + 12
+         local to_ip = ffi.cast("uint32_t*", pkt.data + src_ip_start)[0]
+         return LwAftr:_icmp_after_discard(to_ip)-- ICMPv4 type 3 code 1
+      else
+         error("LwAftr: unknown policy" .. self.ipv4_lookup_failed_policy)
+      end
+   end
+   local ipv6_src = self.aftr_ipv6_ip
 
-   local ether_src = self.aftr_mac
-   -- FIXME: set the real destination ethernet value
-   local ether_dst = ethernet:pton("44:44:44:44:44:44")
+   local ether_src = self.aftr_mac_b4_side 
+   local ether_dst = self.b4_mac -- FIXME: this should probaby use NDP
 
-   local ttl_offset = 8
+   local ttl_offset = ethernet_header_size + 8
    local ttl = pkt.data[ttl_offset]
    print('ttl', ttl, pkt.data[ttl_offset])
    -- Do not encapsulate packets that already had a ttl of zero
    if ttl == 0 then return nil end
  
-   local proto_offset = 9
+   local proto_offset = ethernet_header_size + 9
    local proto = pkt.data[proto_offset]
 
    if proto == proto_icmp and self.icmp_policy == conf.DROP_POLICY then return nil end
 
    pkt.data[ttl_offset] = ttl - 1
    if proto == proto_tcp then
-      local csum_offset = 10
+      local csum_offset = ethernet_header_size + 10
       -- ttl_offset is even, so multiply the ttl change by 0x100.
       -- It's added, because the checksum is is ones-complement.
       fixup_tcp_checksum(pkt, csum_offset, 0x100)
    end
    local next_hdr = 4 -- IPv4
 
-   return self:ipv6_encapsulate(pkt, dgram, next_hdr, ipv6_src, ipv6_dst,
+   return self:ipv6_encapsulate(pkt, next_hdr, ipv6_src, ipv6_dst,
                                 ether_src, ether_dst)
 end
 
 -- Modify the given packet
 -- TODO: modifiable policy
 function LwAftr:ipv6_or_drop(pkt)
-   local dgram = datagram:new(pkt, ethernet)
-   local ethernet_header_size = 14 -- TODO: deal with 802.1Q tags?
    local ethertype_offset = 12
    local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + ethertype_offset)[0])
-   dgram:pop_raw(ethernet_header_size)
 
    if ethertype == ethertype_ipv4 then
-      return self:_encapsulate_ipv4(pkt, dgram)
+      return self:_encapsulate_ipv4(pkt)
    elseif ethertype == ethertype_ipv6 then
       -- TODO: handle ICMPv6 as per RFC 2473
       -- TODO: decapsulate if the source was a b4, and forward/hairpin
