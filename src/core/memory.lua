@@ -53,7 +53,10 @@ function prefork()
 end
 
 function postfork()
-   lock_fd = assert(syscall.open(shm.resolve('/dma_heap', syscall.getpgid(), true), 'rdonly'))
+   local err
+   -- to abritrate between processes, each process needs a different fd to the same file
+   lock_fd, err = syscall.open(shm.resolve('/dma_heap', syscall.getpgid(), true), 'rdonly')
+   if not lock_fd then error(err) end
 end
 
 -- Allocate DMA-friendly memory.
@@ -86,6 +89,7 @@ end
 -- Add a new chunk.
 function allocate_next_chunk ()
    assert (lock_fd == nil, "allocating after forks!")
+   assert (_h.num_chunks < C.MAX_NUM_CHUNKS-1, "chunk array overflow!")
    local ptr = assert(allocate_hugetlb_chunk(huge_page_size),
                       "Failed to allocate a huge page for DMA")
    local mem_phy = assert(virtual_to_physical(ptr, huge_page_size),
