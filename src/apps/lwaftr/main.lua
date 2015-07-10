@@ -9,7 +9,7 @@ local conf = require("apps.lwaftr.conf")
 local usage="thisapp in.pcap out.pcap"
 
 function run (parameters)
-   if not (#parameters == 4) then print(usage) main.exit(1) end
+   if not (#parameters == 2) then print(usage) main.exit(1) end
    local in_pcap = parameters[1]
    local out_pcap = parameters[2]
 
