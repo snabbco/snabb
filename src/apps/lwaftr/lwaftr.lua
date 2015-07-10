@@ -18,12 +18,15 @@ local function pp(t) for k,v in pairs(t) do print(k,v) end end
 -- http://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
 local proto_icmp = 1
 local proto_tcp = 6
+local proto_icmpv6 = 58
 
 -- http://www.iana.org/assignments/ieee-802-numbers/ieee-802-numbers.xhtml
 local ethertype_ipv4 = 0x0800
 local ethertype_ipv6 = 0x86DD
 
 local ethernet_header_size = 14 -- TODO: deal with 802.1Q tags?
+local ipv6_header_size = 40
+local ipv4_header_size = 20
 local debug = true
 
 function LwAftr:new(conf)
@@ -78,6 +81,7 @@ local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
 end
 
 -- ICMPv4 type 3 code 1, as per the internet draft.
+-- That is: "Destination unreachable: destination host unreachable"
 -- The target IPv4 address + port is not in the table.
 function LwAftr:_icmp_after_discard(to_ip)
    local new_pkt = packet.new() -- TODO: recycle
@@ -87,15 +91,41 @@ function LwAftr:_icmp_after_discard(to_ip)
                                  src = self.aftr_ipv4_ip, dst = to_ip})
    local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
                                         dst = self.inet_mac,
-                                        ethertype_ipv4})
+                                        type = ethertype_ipv4})
    dgram:push(icmp_header)
    dgram:push(ipv4_header)
    dgram:push(ethernet_header)
    return new_pkt
 end
 
--- Given a payload, encapsulate it.
--- A plausible payload is a packet with IPv4 and TCP headers, but no ethernet.
+-- ICMPv6 type 1 code 5, as per the internet draft.
+-- 'Destination unreachable: source address failed ingress/egress policy'
+-- The source (ipv6, ipv4, port) tuple is not in the table.
+function LwAftr:_icmp_b4_lookup_failed(to_ip)
+   local new_pkt = packet.new() -- TODO: recycle
+   local dgram = datagram:new(new_pkt) -- TODO: recycle this
+   local icmp_header = icmp:new(1, 5) -- TODO: make symbolic
+   local ipv6_header = ipv6:new({ttl = 255, protocol = proto_icmpv6,
+                                 src = self.aftr_ipv6_ip, dst = to_ip})
+   local ethernet_header = ethernet:new({src = self.aftr_mac_b4_side,
+                                        dst = self.b4_mac,
+                                        type = ethertype_ipv6})
+   dgram:push(icmp_header)
+   dgram:push(ipv6_header)
+   dgram:push(ethernet_header)
+   return new_pkt
+end
+
+function LwAftr:_add_inet_ethernet(pkt)
+   local dgram = datagram:new(pkt, ipv4) -- TODO: recycle this
+   local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
+                                         dst = self.inet_mac,
+                                         type = ethertype_ipv4})
+   dgram:push(ethernet_header)
+   return new_pkt
+end
+
+-- Given a packet containing IPv4 and Ethernet, encapsulate the IPv4 portion.
 function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                                  ether_src, ether_dst)
    -- TODO: decrement the IPv4 ttl as this is part of forwarding
@@ -176,29 +206,52 @@ function LwAftr:_encapsulate_ipv4(pkt)
                                 ether_src, ether_dst)
 end
 
--- Modify the given packet
--- TODO: modifiable policy
-function LwAftr:ipv6_or_drop(pkt)
-   local ethertype_offset = 12
-   local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + ethertype_offset)[0])
 
-   if ethertype == ethertype_ipv4 then
-      return self:_encapsulate_ipv4(pkt)
-   elseif ethertype == ethertype_ipv6 then
-      -- TODO: handle ICMPv6 as per RFC 2473
-      -- TODO: decapsulate if the source was a b4, and forward/hairpin
-   else -- silently drop other types: TODO: is this the right thing to do?
+-- TODO: rewrite this to use parse
+function LwAftr:from_b4(pkt)
+   -- check src ipv4, ipv6, and port against the binding table
+   local ipv6_src_ip_offset = ethernet_header_size + 8
+   -- FIXME: deal with multiple IPv6 headers
+   local ipv4_src_ip_offset = ethernet_header_size + ipv6_header_size + 12
+   -- FIXME: as above + varlen ipv4 + non-tcp/non-udp payloads
+   local ipv4_src_port_offset = ethernet_header_size + ipv6_header_size +
+                                ipv4_header_size
+   local ipv6_src_ip = pkt.data + ipv6_src_ip_offset
+   local ipv4_src_ip = ffi.cast("uint32_t*", pkt.data + ipv4_src_ip_offset)
+   local ipv4_src_port = C.ntohs(ffi.cast("uint16_t*", pkt.data + ipv4_src_port_offset)[0])
+   if LwAftr:in_binding_table(ipv6_src_ip, ipv4_src_ip, ipv4_src_port) then
+      LwAftr:decapsulate(pkt)
+      if lwconf.hairpinning and binding_lookup_ipv4_from_pkt(pkt) then
+         return self:_encapsulate_ipv4(packet)
+      else
+         return LwAftr:_add_inet_ethernet(pkt)
+      end
+   elseif self.from_b4_lookup_failed_policy == lwconf.DISCARD_PLUS_IPv6_policy then
+      return self:_icmp_b4_lookup_failed(ipv6_src_port)
+   else
       return nil
    end
 end
 
+-- Modify the given packet in-place, and forward it, drop it, or reply with
+-- an ICMP or ICMPv6 packet as per the internet draft and configuration policy.
+-- TODO: handle ICMPv6 as per RFC 2473
 -- TODO: revisit this and check on performance idioms
 function LwAftr:push ()
    local i, o = self.input.input, self.output.output
    local pkt = link.receive(i)
    if debug then print("got a pkt") end
-   local encap_pkt = self:ipv6_or_drop(pkt)
+   local ethertype_offset = 12
+   local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + ethertype_offset)[0])
+   local out_pkt = nil
+
+   if ethertype == ethertype_ipv4 then -- Incoming packet from the internet
+      out_pkt = self:_encapsulate_ipv4(pkt)
+   elseif ethertype == etherype_ipv6 then
+      -- decapsulate iff the source was a b4, and forward/hairpin
+      out_pkt = self:from_b4(pkt)
+   end -- FIXME: silently drop other types; is this the right thing to do?
    if debug then print("encapsulated") end
-   if encap_pkt then link.transmit(o, encap_pkt) end
+   if out_pkt then link.transmit(o, out_pkt) end
    if debug then print("tx'd") end
 end
