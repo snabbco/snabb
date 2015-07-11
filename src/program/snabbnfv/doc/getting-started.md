@@ -184,7 +184,7 @@ $ lspci|grep 82599
 04:00.1 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network Connection (rev 01)
 ```
 
-Now run some Intel tests with snabb snsh using a loopback cable between the two 10GbE ports. The application will unbind the specified 10GbE ports (PCI address) from the Linux kernel, but won't "return" them. So don't be surprised when 'ifconfig -a' won't show these ports anymore. 
+Now run some Intel tests with snabb snsh using a loopback cable between the two 10GbE ports. The application will unbind the specified 10GbE ports (PCI address) from the Linux kernel, but won't "return" them. So don't be surprised when 'ifconfig -a' won't show these ports anymore.
 
 ```
 $ cd ~/snabbswitch/src
@@ -423,6 +423,24 @@ link report:
            1,121,745 sent on repeater_ms.output -> nicAs.rx (loss rate: 0%)
                    2 sent on source_ms.out -> repeater_ms.input (loss rate: 0%)
 selftest: ok
+```
+
+## Re-attach the 10GbE ports back to the host (optional)
+
+If you need to re-attach a 10GbE ports back to the host OS, send its PCI address to the ixgbe driver. 
+
+```
+# ifconfig p2p1
+p2p1: error fetching interface information: Device not found
+# echo -n  "0000:04:00.0" > /sys/bus/pci/drivers/ixgbe/bind
+# ifconfig p2p1
+p2p1      Link encap:Ethernet  HWaddr 0c:c4:7a:1f:7e:60
+          BROADCAST MULTICAST  MTU:1500  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
 ```
 
 ## Create and launch two VM's
