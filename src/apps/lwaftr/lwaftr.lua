@@ -239,19 +239,21 @@ end
 -- TODO: revisit this and check on performance idioms
 function LwAftr:push ()
    local i, o = self.input.input, self.output.output
-   local pkt = link.receive(i)
-   if debug then print("got a pkt") end
-   local ethertype_offset = 12
-   local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + ethertype_offset)[0])
-   local out_pkt = nil
+   while not link.empty(i) and not link.full(o) do
+      local pkt = link.receive(i)
+      if debug then print("got a pkt") end
+      local ethertype_offset = 12
+      local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + ethertype_offset)[0])
+      local out_pkt = nil
 
-   if ethertype == ethertype_ipv4 then -- Incoming packet from the internet
-      out_pkt = self:_encapsulate_ipv4(pkt)
-   elseif ethertype == etherype_ipv6 then
-      -- decapsulate iff the source was a b4, and forward/hairpin
-      out_pkt = self:from_b4(pkt)
-   end -- FIXME: silently drop other types; is this the right thing to do?
-   if debug then print("encapsulated") end
-   if out_pkt then link.transmit(o, out_pkt) end
-   if debug then print("tx'd") end
+      if ethertype == ethertype_ipv4 then -- Incoming packet from the internet
+         out_pkt = self:_encapsulate_ipv4(pkt)
+      elseif ethertype == etherype_ipv6 then
+         -- decapsulate iff the source was a b4, and forward/hairpin
+         out_pkt = self:from_b4(pkt)
+      end -- FIXME: silently drop other types; is this the right thing to do?
+      if debug then print("encapsulated") end
+      if out_pkt then link.transmit(o, out_pkt) end
+      if debug then print("tx'd") end
+   end
 end
