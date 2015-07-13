@@ -55,7 +55,7 @@ end
 function postfork()
    local err
    -- to abritrate between processes, each process needs a different fd to the same file
-   lock_fd, err = syscall.open(shm.resolve('/dma_heap', syscall.getpgid(), true), 'rdonly')
+   lock_fd, err = syscall.open(shm.root..'/'..shm.resolve('/dma_heap', syscall.getpgid()), 'rdonly')
    if not lock_fd then error(err) end
 end
 
