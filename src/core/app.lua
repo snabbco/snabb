@@ -9,6 +9,8 @@ local zone   = require("jit.zone")
 local ffi    = require("ffi")
 local C      = ffi.C
 local fork   = require("core.fork")
+local shm    = require('core.shm')
+local S      = require('syscall')
 local inter_link = require("core.inter_link")
 require("core.packet_h")
 
@@ -51,6 +53,30 @@ freebytes = 0			-- Total packet bytes freed
 Hz = false
 sleep = 0
 maxsleep = 100
+
+
+ffi.cdef [[
+   typedef struct {
+      enum {
+         stopped,
+         running,
+         paused,
+         finished,
+      } state;
+   } engine_state;
+]]
+
+local engine_state = nil
+function prefork()
+   engine_state = shm.map('/engine_state', 'engine_state', false, S.getpgid())
+   engine_state.state = 'stopped'
+end
+
+function postfork()
+   engine_state = shm.map('/engine_state', 'engine_state', true, S.getpgid())
+end
+
+
 
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
@@ -108,6 +134,12 @@ function configure (new_config)
          local actions = compute_config_actions(configuration, new_config)
          apply_config_actions(actions, new_config)
          configuration = new_config
+         repeat
+            while engine_state.state ~= 'running' do
+               C.usleep(1000)
+            end
+            main{duration=1}
+         until engine_state.state == 'finished'
       end)
    end
 end
@@ -239,12 +271,14 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
+   if fork.get_procname() == '_master_' then engine_state.state = 'running' end
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
       if not no_timers then timer.run() end
       pace_breathing()
    until done and done()
+   if fork.get_procname() == '_master_' then engine_state.state = 'finished' end
    if not options.no_report then report(options.report) end
 end
 
