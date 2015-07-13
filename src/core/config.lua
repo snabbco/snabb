@@ -9,8 +9,8 @@ local lib = require("core.lib")
 function new ()
    return {
       apps = {},         -- list of {name, class, args}
-      links = {}         -- table with keys like "a.out -> b.in"
-      cpus = {}          -- table of name=args
+      links = {},        -- table with keys like "a.out -> b.in"
+      cpus = {},         -- table of name=args
    }
 end
 
