@@ -27,7 +27,7 @@ split-horizon group. There are two `bridge` implementations available:
 A `bridge` app accepts a table as its configuration argument. The
 following keys are defined:
 
-— Key **pciaddr**
+— Key **ports**
 
 *Optional*. An array of free port names. The default is no free ports.
 
