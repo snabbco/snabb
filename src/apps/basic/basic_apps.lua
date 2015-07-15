@@ -22,9 +22,10 @@ function Source:new(size)
 end
 
 function Source:pull ()
+   local p = self.packet
    for _, o in ipairs(self.output) do
-      for i = 1, link.nwritable(o) do
-         transmit(o, packet.clone(self.packet))
+      while not o:full() do
+         o:transmit(p:clone())
       end
    end
 end
@@ -78,10 +79,9 @@ function Sink:new ()
 end
 
 function Sink:push ()
-   for _, i in ipairs(self.input) do
-      for _ = 1, link.nreadable(i) do
-        local p = receive(i)
-        packet.free(p)
+   for _, l in ipairs(self.input) do
+      while not l:empty() do
+         l:receive():free()
       end
    end
 end
