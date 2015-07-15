@@ -5,7 +5,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C   = ffi.C
 local pci = require("lib.hardware.pci")
-local band, bor, lshift = bit.band, bit.bor, bit.lshift
+local band, bor, bnot, lshift = bit.band, bit.bor, bit.bnot, bit.lshift
 local bits = require("core.lib").bits
 local tophysical = core.memory.virtual_to_physical
 
@@ -19,6 +19,7 @@ function intel1g:new (conf)
    local txq = conf.txqueue or 0
    local rxq = conf.rxqueue or 0
    local ndesc = conf.ndescriptors or 512
+   local rxburst = conf.rxburst or 128
    -- Setup device access
    pci.unbind_device_from_linux(pciaddress)
    local regs, mmiofd = pci.map_pci_memory(pciaddress, 0)
@@ -40,6 +41,10 @@ function intel1g:new (conf)
       value = bitvalue(value)
       poke32(offset, bor(peek32(offset), value))
    end
+   local function clear32 (offset, value)
+      value = bitvalue(value)
+      poke32(offset, band(peek32(offset), bnot(value)))
+   end
    local function wait32 (offset, mask, value)
       mask = bitvalue(mask)
       value = bitvalue(value)
@@ -50,6 +55,10 @@ function intel1g:new (conf)
    local function ringnext (index)
       return band(index+1, ndesc-1)
    end
+
+   -- Shutdown functions.
+   local stop_nic, stop_transmit, stop_receive
+
    -- Device setup and initialization
    r.CTRL = 0x0000
    r.EIMC = 0x1528
@@ -67,7 +76,15 @@ function intel1g:new (conf)
          set32(r.RCTL, {loopbackmode0 = 6})
       end
       pci.set_bus_master(pciaddress, true)
+
+      -- Define shutdown function for the NIC itself
+      stop_nic = function ()
+         -- XXX Are these the right actions?
+         clear32(r.CTRL, {setlinkup = 6})        -- take the link down
+         pci.set_bus_master(pciaddress, false) -- disable DMA
+      end
    end
+
    -- Transmit support
    if txq then
       -- Define registers for the transmit queue that we are using
@@ -78,15 +95,11 @@ function intel1g:new (conf)
       r.TDH    = 0xe010 + txq*0x40
       r.TDT    = 0xe018 + txq*0x40
 
+      -- Setup transmit descriptor memory
       local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
       local txdesc_ring_t = ffi.typeof("$[$]", txdesc_t, ndesc)
       local txdesc = ffi.cast(ffi.typeof("$&", txdesc_ring_t),
                               memory.dma_alloc(ffi.sizeof(txdesc_ring_t)))
-      
-      -- Initialize transmit state
-      local txdesc = ffi.cast(ffi.typeof("$&", txdesc_ring_t),
-                              memory.dma_alloc(ffi.sizeof(txdesc_ring_t)))
-
 
       -- Transmit state variables
       local txpackets = {}      -- packets currently queued
@@ -109,7 +122,7 @@ function intel1g:new (conf)
 
       -- Synchronize DMA ring state with hardware.
       -- Free packets that have  been transmitted.
-      local function sync ()
+      local function sync_transmit ()
          local cursor = tdh
          tdh = regs[r.TDH]
          while cursor ~= tdh do
@@ -127,20 +140,40 @@ function intel1g:new (conf)
          while not link.empty(l) and can_transmit() do
             transmit(link.receive(l))
          end
-         sync()
+         sync_transmit()
+      end
+
+      -- Define shutdown function for transmit
+      stop_transmit = function ()
+         poke32(r.TXDCTL, 0)
+         wait32(r.TXDCTL, {enable = 25}, 0)
+         for i = 0, ndesc-1 do
+            if txpackets[i] then
+               packet.free(txpackets[i])
+               txpackets[i] = nil
+            end
+         end
       end
    end
    -- Receive support
    if rxq then
-      r.RDBAL  = 0xc000
-      r.RDBAH  = 0xc004
-      r.RDLEN  = 0xc008
-      r.RDH    = 0xc010
-      r.RDT    = 0xc018
-      r.RXDCTL = 0xc028
+      r.RDBAL  = 0xc000 + rxq*0x40
+      r.RDBAH  = 0xc004 + rxq*0x40
+      r.RDLEN  = 0xc008 + rxq*0x40
+      r.RDH    = 0xc010 + rxq*0x40
+      r.RDT    = 0xc018 + rxq*0x40
+      r.RXDCTL = 0xc028 + rxq*0x40
 
-      local rxdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
+      local rxdesc_t = ffi.typeof("
+        struct { 
+          uint64_t address;
+          uint16_t length, cksum;
+          uint8_t status, errors;
+          uint16_t vlan;
+        } __attribute__((packed))")
       local rxdesc_ring_t = ffi.typeof("$[$]", rxdesc_t, ndesc)
+      local rxdesc = ffi.cast(ffi.typeof("$&", rxdesc_ring_t),
+                              memory.dma_alloc(ffi.sizeof(rxdesc_ring_t)))
       
       -- Receive state
       local rxpackets = {}
@@ -155,12 +188,64 @@ function intel1g:new (conf)
       local function add_receive_buffer (p)
          local desc = rxdesc[rdt]
          desc.address = tophysical(p.data)
-         desc.flags = ...
+         desc.flags = 0
          rxpackets[rdt] = p
          rdt = ringnext(rdt)
       end
 
+      -- Return true if there is a DMA-completed packet ready to be received.
+      local function can_receive ()
+         return rxnext ~= rdh and band(rxdesc[rxnext].status, 0x1) ~= 0
+      end
+
+      -- Receive a packet.
+      -- Precondition: can_receive() => true
+      local function receive ()
+         local desc = rxdesc[rxnext]
+         local p = rxpackets[rxnext]
+         p.length = desc.length
+         rxpackets[rxnext] = nil
+         rxnext = ringnext(rxnext)
+         return p
+      end
+
+      -- Synchronize receive registers with hardware.
+      local function sync_receive ()
+         rdh = band(peek32(r.RDH), ndesc-1)
+         poke32(r.RDT, rdt)
+      end
+      
+      -- Define pull() method for app instance.
+      function self:pull ()
+         local l = self.output[1]
+         assert(l, "intel1g: no output link")
+         local limit = rxburst
+         while limit > 0 and can_receive() do
+            link.transmit(l, receive())
+            limit = limit - 1
+         end
+         sync_receive()
+      end
+
+      -- Define shutdown function for receive
+      stop_receive = function ()
+         poke32(r.RXDCTL, 0)
+         wait32(r.RXDCTL, {enable = 25}, 0)
+         for i = 0, ndesc-1 do
+            if rxpackets[i] then
+               packet.free(rxpackets[i])
+               rxpackets[i] = nil
+            end
+         end
+         -- XXX return dma memory
+      end
    end
-   
+
+   -- Stop all functions that are running.
+   function self:stop ()
+      if stop_receive  then stop_receive()  end
+      if stop_transmit then stop_transmit() end
+      if stop_nic      then stop_nic()      end
+   end
 end
 

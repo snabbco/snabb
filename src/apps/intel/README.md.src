@@ -162,6 +162,11 @@ Features:
 transmit and receive queues. Default is not specified but assumed to
 be broadly applicable.
 
+— Key **rxburst**
+
+*Optional*. Maximum number of packets to receive on one
+breath. Default is not specified but assumed to be broadly applicable.
+
 ## LoadGen (apps.intel.loadgen)
 
 `LoadGen` is a *load generator* app based on the Intel 82599 Ethernet

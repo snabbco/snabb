@@ -128,7 +128,6 @@ Features:
 
 ![Intel1G](.images/Intel1G.png)
 
-
 ### Configuration
 
 — Key **pciaddr**
@@ -152,6 +151,11 @@ Features:
 *Optional*. Number of DMA descriptors to use i.e. size of the DMA
 transmit and receive queues. Default is not specified but assumed to
 be broadly applicable.
+
+— Key **rxburst**
+
+*Optional*. Maximum number of packets to receive on one
+breath. Default is not specified but assumed to be broadly applicable.
 
 ## LoadGen (apps.intel.loadgen)
 
