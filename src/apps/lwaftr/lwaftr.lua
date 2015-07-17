@@ -15,6 +15,14 @@ LwAftr = {}
 
 local function pp(t) for k,v in pairs(t) do print(k,v) end end
 
+local function print_ipv6(addr)
+   chunks = {}
+   for i = 0,7 do
+      table.insert(chunks, string.format("%x%x", addr[2*i], addr[2*i+1]))
+   end
+   print(table.concat(chunks, ':'))
+end
+
 -- http://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
 local proto_icmp = 1
 local proto_tcp = 6
@@ -42,6 +50,7 @@ local function print_pkt(pkt)
    print(string.format("Len: %i: ", pkt.length) .. table.concat(fbytes, " "))
 end
 
+-- TODO: make this O(1)
 function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
    print(ipv4_ip, 'port: ', port)
    pp(self.binding_table)
@@ -55,8 +64,8 @@ function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
    end
 end
 
-function LwAftr:binding_lookup_ipv4_from_pkt(pkt)
-   local dst_ip_start = ethernet_header_size + 16
+function LwAftr:binding_lookup_ipv4_from_pkt(pkt, pre_ipv4_bytes)
+   local dst_ip_start = pre_ipv4_bytes + 16
    -- Note: ip is kept in network byte order, regardless of host byte order
    local ip = ffi.cast("uint32_t*", pkt.data + dst_ip_start)[0]
    -- TODO: don't assume the length of the IPv4 header; check IHL
@@ -64,6 +73,26 @@ function LwAftr:binding_lookup_ipv4_from_pkt(pkt)
    local dst_port_start = ipv4_header_len + 2
    local port = C.ntohs(ffi.cast("uint16_t*", pkt.data + dst_port_start)[0])
    return self:binding_lookup_ipv4(ip, port)
+end
+
+-- Todo: make this O(1)
+function LwAftr:in_binding_table(ipv6_src_ip, ipv4_src_ip, ipv4_src_port)
+   for _, bind in ipairs(self.binding_table) do
+      if debug then
+         print("CHECKB4", string.format("%x, %x", bind[2], ipv4_src_ip))
+      end
+      if bind[2] == ipv4_src_ip then
+         if ipv4_src_port >= bind[3] and ipv4_src_port <= bind[4] then
+            print("ipv6bind")
+            print_ipv6(bind[1])
+            print_ipv6(ipv6_src_ip)
+            if C.memcmp(bind[1], ipv6_src_ip, 16) == 0 then
+               return true
+            end
+         end
+      end
+   end
+   return false
 end
 
 local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
@@ -84,10 +113,10 @@ end
 -- That is: "Destination unreachable: destination host unreachable"
 -- The target IPv4 address + port is not in the table.
 function LwAftr:_icmp_after_discard(to_ip)
-   local new_pkt = packet.new() -- TODO: recycle
+   local new_pkt = packet.new_packet() -- TODO: recycle
    local dgram = datagram:new(new_pkt) -- TODO: recycle this
    local icmp_header = icmp:new(3, 1) -- TODO: make symbolic
-   local ipv4_header = ipv4:new({ttl = 255, protocol = proto_icmp,
+   local ipv4_header = ipv4:new({ttl = 255, next_header = proto_icmp,
                                  src = self.aftr_ipv4_ip, dst = to_ip})
    local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
                                         dst = self.inet_mac,
@@ -102,10 +131,10 @@ end
 -- 'Destination unreachable: source address failed ingress/egress policy'
 -- The source (ipv6, ipv4, port) tuple is not in the table.
 function LwAftr:_icmp_b4_lookup_failed(to_ip)
-   local new_pkt = packet.new() -- TODO: recycle
+   local new_pkt = packet.new_packet() -- TODO: recycle
    local dgram = datagram:new(new_pkt) -- TODO: recycle this
-   local icmp_header = icmp:new(1, 5) -- TODO: make symbolic
-   local ipv6_header = ipv6:new({ttl = 255, protocol = proto_icmpv6,
+   local icmp_header = icmp:new(1, 5) -- TODO: make symbolic, FIXME make ICMPv6
+   local ipv6_header = ipv6:new({ttl = 255, next_header = proto_icmpv6,
                                  src = self.aftr_ipv6_ip, dst = to_ip})
    local ethernet_header = ethernet:new({src = self.aftr_mac_b4_side,
                                         dst = self.b4_mac,
@@ -122,7 +151,7 @@ function LwAftr:_add_inet_ethernet(pkt)
                                          dst = self.inet_mac,
                                          type = ethertype_ipv4})
    dgram:push(ethernet_header)
-   return new_pkt
+   return pkt
 end
 
 -- Given a packet containing IPv4 and Ethernet, encapsulate the IPv4 portion.
@@ -163,8 +192,9 @@ end
 
 -- TODO: correctly handle fragmented IPv4 packets
 -- TODO: correctly deal with IPv6 packets that need to be fragmented
+-- The incoming packet is a complete one with ethernet headers.
 function LwAftr:_encapsulate_ipv4(pkt)
-   local ipv6_dst = self:binding_lookup_ipv4_from_pkt(pkt)
+   local ipv6_dst = self:binding_lookup_ipv4_from_pkt(pkt, ethernet_header_size)
    if not ipv6_dst then
       if debug then print("lookup failed") end
       if self.ipv4_lookup_failed_policy == lwconf.DROP_POLICY then
@@ -206,6 +236,14 @@ function LwAftr:_encapsulate_ipv4(pkt)
                                 ether_src, ether_dst)
 end
 
+-- Return a packet without ethernet or IPv6 headers.
+function LwAftr:decapsulate(pkt)
+   local dgram = datagram:new(pkt) -- TODO: recycle this
+   -- FIXME: don't hardcode the values like this
+   dgram:pop_raw(ethernet_header_size + ipv6_header_size)
+   return pkt
+end
+
 
 -- TODO: rewrite this to use parse
 function LwAftr:from_b4(pkt)
@@ -217,17 +255,24 @@ function LwAftr:from_b4(pkt)
    local ipv4_src_port_offset = ethernet_header_size + ipv6_header_size +
                                 ipv4_header_size
    local ipv6_src_ip = pkt.data + ipv6_src_ip_offset
-   local ipv4_src_ip = ffi.cast("uint32_t*", pkt.data + ipv4_src_ip_offset)
+   local ipv4_src_ip = ffi.cast("uint32_t*", pkt.data + ipv4_src_ip_offset)[0]
    local ipv4_src_port = C.ntohs(ffi.cast("uint16_t*", pkt.data + ipv4_src_port_offset)[0])
-   if LwAftr:in_binding_table(ipv6_src_ip, ipv4_src_ip, ipv4_src_port) then
-      LwAftr:decapsulate(pkt)
-      if lwconf.hairpinning and binding_lookup_ipv4_from_pkt(pkt) then
-         return self:_encapsulate_ipv4(packet)
+   if self:in_binding_table(ipv6_src_ip, ipv4_src_ip, ipv4_src_port) then
+      self:decapsulate(pkt)
+      if self.hairpinning and self:binding_lookup_ipv4_from_pkt(pkt, 0) then
+         -- FIXME: shifting the packet ethernet_header_size right would suffice here
+         -- The ethernet data is thrown away by _encapsulate_ipv4 anyhow.
+         local dgram = datagram:new(pkt) -- TODO: recycle this
+         local ethernet_header = ethernet:new({src = self.b4_mac,
+                                               dst = self.aftr_mac_b4_side,
+                                               type = ethertype_ipv4})
+         dgram:push(ethernet_header)
+         return self:_encapsulate_ipv4(pkt)
       else
-         return LwAftr:_add_inet_ethernet(pkt)
+         return self:_add_inet_ethernet(pkt)
       end
-   elseif self.from_b4_lookup_failed_policy == lwconf.DISCARD_PLUS_IPv6_policy then
-      return self:_icmp_b4_lookup_failed(ipv6_src_port)
+   elseif self.from_b4_lookup_failed_policy == lwconf.DISCARD_PLUS_ICMPv6_POLICY then
+      return self:_icmp_b4_lookup_failed(ipv6_src_ip)
    else
       return nil
    end
@@ -248,7 +293,7 @@ function LwAftr:push ()
 
       if ethertype == ethertype_ipv4 then -- Incoming packet from the internet
          out_pkt = self:_encapsulate_ipv4(pkt)
-      elseif ethertype == etherype_ipv6 then
+      elseif ethertype == ethertype_ipv6 then
          -- decapsulate iff the source was a b4, and forward/hairpin
          out_pkt = self:from_b4(pkt)
       end -- FIXME: silently drop other types; is this the right thing to do?
