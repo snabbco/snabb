@@ -13,6 +13,7 @@ end
 
 local hasForked = false
 local procname = '_master_'
+local childnames = {}
 
 function spawn(name, f, ...)
    if not hasForked then
@@ -29,6 +30,7 @@ function spawn(name, f, ...)
       os.exit()
    end
 
+   childnames[childpid] = name
    return childpid
 end
 
@@ -40,6 +42,14 @@ end
 
 function wait()
    local pid = assert(S.waitpid(-1, 0))
-   eachmodule('reapfork', pid)
+   eachmodule('reapfork', pid, childnames[pid])
    return pid
+end
+
+
+function wait_all()
+   while next(childnames) do
+      local childpid = wait()
+      childnames[childpid] = nil
+   end
 end

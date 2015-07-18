@@ -5,6 +5,7 @@ local lib    = require("core.lib")
 local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
+local stats  = require('core.stats')
 local zone   = require("jit.zone")
 local ffi    = require("ffi")
 local C      = ffi.C
@@ -30,9 +31,7 @@ configuration = config.new()
 -- Counters for statistics.
 -- TODO: Move these over to the counters framework
 breaths = 0			-- Total breaths taken
-frees   = 0			-- Total packets freed
-freebits = 0			-- Total packet bits freed (for 10GbE)
-freebytes = 0			-- Total packet bytes freed
+local stats_count = nil
 
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
 --
@@ -68,11 +67,13 @@ ffi.cdef [[
 
 local engine_state = nil
 function prefork()
+   stats_count = stats()
    engine_state = shm.map('/engine_state', 'engine_state', false, S.getpgid())
    engine_state.state = 'stopped'
 end
 
 function postfork()
+   stats_count = stats()
    engine_state = shm.map('/engine_state', 'engine_state', true, S.getpgid())
 end
 
@@ -138,11 +139,24 @@ function configure (new_config)
             while engine_state.state ~= 'running' do
                C.usleep(1000)
             end
-            main{duration=1}
+            main{duration=1, report={}}
          until engine_state.state == 'finished'
       end)
    end
 end
+
+function reapfork(pid)
+   print ('reaping from ', pid)
+   local glob = stats()
+   print ('glob:', glob)
+   local dying = stats(pid)
+   print ('dying', dying, '/', pid)
+   glob:accumulate(dying)
+   print ('total:', glob)
+   shm.unmap(glob)
+   shm.unmap(dying)
+end
+
 
 -- Return the configuration actions needed to migrate from old config to new.
 --
@@ -240,7 +254,6 @@ function apply_config_actions (actions, conf)
       local link = nil
       if fa_app and ta_app then
          link = link_table[linkspec] or link.new()
-         link.receiving_app = app_name_to_index[ta]
       elseif fa_app or ta_app then
          link = inter_link(linkspec)
       end
@@ -250,6 +263,7 @@ function apply_config_actions (actions, conf)
             table.insert(fa_app.output, link)
          end
          if ta_app then
+            link.receiving_app = app_name_to_index[ta]
             ta_app.input[tl] = link
             table.insert(ta.input, link)
          end
@@ -278,14 +292,15 @@ function main (options)
       if not no_timers then timer.run() end
       pace_breathing()
    until done and done()
-   if fork.get_procname() == '_master_' then engine_state.state = 'finished' end
+   if fork.get_procname() == '_master_' then
+      engine_state.state = 'finished'
+      fork.wait_all()
+   end
    if not options.no_report then report(options.report) end
 end
 
 local nextbreath
 local lastfrees = 0
-local lastfreebits = 0
-local lastfreebytes = 0
 -- Wait between breaths to keep frequency with Hz.
 function pace_breathing ()
    if Hz then
@@ -297,15 +312,13 @@ function pace_breathing ()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
    else
-      if lastfrees == frees then
+      if lastfrees == stats_count.frees then
          sleep = math.min(sleep + 1, maxsleep)
          C.usleep(sleep)
       else
          sleep = math.floor(sleep/2)
       end
-      lastfrees = frees
-      lastfreebytes = freebytes
-      lastfreebits = freebits
+      lastfrees = stats_count.frees
    end
 end
 
@@ -334,7 +347,7 @@ function breathe ()
          if firstloop or link.has_new_data then
             link.has_new_data = false
             local receiver = app_array[link.receiving_app]
-            if receiver.push and not receiver.dead then
+            if receiver and receiver.push and not receiver.dead then
                zone(receiver.zone)
                with_restart(receiver, receiver.push)
                zone()
@@ -357,6 +370,9 @@ function report (options)
    if options and options.showapps then
       report_apps()
    end
+   if options and options.showaccum then
+      report_accum()
+   end
 end
 
 -- Load reporting prints several metrics:
@@ -368,6 +384,7 @@ local lastloadreport = nil
 local reportedfrees = nil
 local reportedbreaths = nil
 function report_load ()
+   print ('load report')
    if lastloadreport then
       local interval = now() - lastloadreport
       local newfrees   = frees - reportedfrees
@@ -427,6 +444,10 @@ function report_apps ()
          end
       end
    end
+end
+
+function report_accum()
+   print (stats_count)
 end
 
 function selftest ()
