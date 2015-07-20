@@ -52,7 +52,7 @@ function selftest ()
    local link = require("core.link")
    local lo = RawSocket:new("lo")
    lo.input, lo.output = {}, {}
-   lo.input.rx, lo.output.tx = link.new(), link.new()
+   lo.input.rx, lo.output.tx = link.new("test1"), link.new("test2")
    link.transmit(lo.input.rx, dg_tx:packet())
    lo:push()
    lo:pull()
