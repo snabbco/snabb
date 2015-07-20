@@ -5,6 +5,7 @@ local lib    = require("core.lib")
 local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
+local counter = require("core.counter")
 local top    = require("lib.ipc.shmem.top")
 local fs     = require("lib.ipc.fs")
 local zone   = require("jit.zone")
@@ -302,6 +303,7 @@ function breathe ()
       end
       firstloop = false
    until not progress  -- Stop after no link had new data
+   counter.publish()
    breaths = breaths + 1
 end
 
