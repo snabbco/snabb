@@ -238,6 +238,7 @@ function main (options)
       if not no_timers then timer.run() end
       if not busywait then pace_breathing() end
    until done and done()
+   counter.publish()
    if not options.no_report then report(options.report) end
 end
 
@@ -304,6 +305,8 @@ function breathe ()
       firstloop = false
    until not progress  -- Stop after no link had new data
    counter.add(breaths)
+   -- Publish counters at a reasonable frequency
+   if counter.read(breaths) % 100 == 0 then counter.publish() end
 end
 
 function report (options)

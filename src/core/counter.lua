@@ -29,7 +29,34 @@ require("core.counter_h")
 
 local counter_t = ffi.typeof("struct counter")
 
-function open (name, readonly) return shm.map(name, counter_t, readonly) end
+-- Double buffering:
+-- For each counter we have a private copy to update directly and then
+-- a public copy in shared memory that we periodically publish to.
+--
+-- This is important for a subtle performance reason: the shared
+-- memory counters all have page-aligned addresses (thanks to mmap)
+-- and accessing many of them can lead to expensive cache misses (due
+-- to set-associative CPU cache). See SnabbCo/snabbswitch#558.
+local public  = {}
+local private = {}
+
+function open (name, readonly)
+   public[#public+1] = shm.map(name, counter_t, readonly)
+   if readonly then
+      private[#private+1] = public[#public] -- use counter directly
+   else
+      private[#private+1] = ffi.new(counter_t)
+   end
+   return private[#private]
+end
+
+-- Copy counter private counter values to public shared memory.
+function publish ()
+   for i = 1, #public do
+      if public[i] ~= private[i] then public[i].c = private[i].c end
+   end
+end
+
 function set  (counter, value) counter.c = value                         end
 function add  (counter, value) counter.c = counter.c + (value or 1)      end
 function read (counter)        return counter.c                          end
