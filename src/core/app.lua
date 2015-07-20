@@ -78,7 +78,6 @@ function postfork()
 end
 
 
-
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
 monotonic_now = false
@@ -146,14 +145,8 @@ function configure (new_config)
 end
 
 function reapfork(pid)
-   print ('reaping from ', pid)
-   local glob = stats()
-   print ('glob:', glob)
    local dying = stats(pid)
-   print ('dying', dying, '/', pid)
-   glob:accumulate(dying)
-   print ('total:', glob)
-   shm.unmap(glob)
+   stats_count:accumulate(dying)
    shm.unmap(dying)
 end
 
@@ -187,8 +180,8 @@ function compute_config_actions (old, new)
             table.insert(actions['stop'], appname)
          end
       end
-      return actions
    end
+   return actions
 end
 
 -- Update the active app network by applying the necessary actions.
@@ -265,7 +258,7 @@ function apply_config_actions (actions, conf)
          if ta_app then
             link.receiving_app = app_name_to_index[ta]
             ta_app.input[tl] = link
-            table.insert(ta.input, link)
+            table.insert(ta_app.input, link)
          end
          new_link_table[linkspec] = link
          table.insert(new_link_array, link)
