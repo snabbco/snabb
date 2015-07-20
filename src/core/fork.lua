@@ -43,13 +43,13 @@ end
 function wait()
    local pid = assert(S.waitpid(-1, 0))
    eachmodule('reapfork', pid, childnames[pid])
+   childnames[pid] = nil
    return pid
 end
 
 
 function wait_all()
    while next(childnames) do
-      local childpid = wait()
-      childnames[childpid] = nil
+      wait()
    end
 end
