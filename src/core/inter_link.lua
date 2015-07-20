@@ -17,7 +17,7 @@ ffi.cdef [[
    typedef struct {
       struct ring src, dst;
       double txbytes, rxbytes, txpackets, rxpackets, txdrop;
-      int receiving_app;
+      int receiving_app, receiving_pid;
       bool has_new_data;
    } inter_link_t;
 ]]

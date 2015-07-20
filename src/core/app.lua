@@ -257,6 +257,7 @@ function apply_config_actions (actions, conf)
          end
          if ta_app then
             link.receiving_app = app_name_to_index[ta]
+            link.receiving_pid = S.getpid()
             ta_app.input[tl] = link
             table.insert(ta_app.input, link)
          end
@@ -317,6 +318,7 @@ end
 
 function breathe ()
    monotonic_now = C.get_monotonic_time()
+   local pid = S.getpid()
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
@@ -338,13 +340,15 @@ function breathe ()
       for i = 1, #link_array do
          local link = link_array[i]
          if firstloop or link.has_new_data then
-            link.has_new_data = false
-            local receiver = app_array[link.receiving_app]
-            if receiver and receiver.push and not receiver.dead then
-               zone(receiver.zone)
-               with_restart(receiver, receiver.push)
-               zone()
-               progress = true
+            if link.receiving_pid == pid then
+               link.has_new_data = false
+               local receiver = app_array[link.receiving_app]
+               if receiver.push and not receiver.dead then
+                  zone(receiver.zone)
+                  with_restart(receiver, receiver.push)
+                  zone()
+                  progress = true
+               end
             end
          end
       end
@@ -377,7 +381,6 @@ local lastloadreport = nil
 local reportedfrees = nil
 local reportedbreaths = nil
 function report_load ()
-   print ('load report')
    if lastloadreport then
       local interval = now() - lastloadreport
       local newfrees   = frees - reportedfrees
