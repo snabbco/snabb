@@ -108,7 +108,7 @@ inter_link.__index = inter_link
 
 function inter_link:__new(name)
    if ffi.istype(self, name) then return name end
-   return shm.map(name, self, false, S.getpgid())
+   return shm.map(('//%d/links/%s'):format(S.getpgid(),name), self)
 end
 
 

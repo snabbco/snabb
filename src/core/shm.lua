@@ -9,10 +9,10 @@
 --     Unlink a subtree of objects from the filesystem.
 --
 -- (See NAME SYNTAX below for recognized name formats.)
---
+-- 
 -- Example:
 --   local freelist = shm.map("engine/freelist/packet", "struct freelist")
---
+-- 
 -- This is like ffi.new() except that separate calls to map() for the
 -- same name will each return a new mapping of the same shared
 -- memory. Different processes can share memory by mapping an object
@@ -41,7 +41,7 @@
 --     vm.max_map_count = 65530
 
 -- NAME SYNTAX:
---
+-- 
 -- Names can be fully qualified, abbreviated to be within the current
 -- process, or further abbreviated to be relative to the current value
 -- of the 'path' variable. Here are examples of names and how they are
@@ -70,8 +70,8 @@ path = ""
 mappings = {}
 
 -- Map an object into memory.
-function map (name, type,  readonly, pid)
-   local path = resolve(name, pid)
+function map (name, type,  readonly)
+   local path = resolve(name)
    local mapmode = readonly and 'read' or 'read, write'
    local ctype = ffi.typeof(type)
    local size = ffi.sizeof(ctype)
@@ -92,11 +92,11 @@ function map (name, type,  readonly, pid)
    return ffi.cast(ffi.typeof("$&", ctype), mem)
 end
 
-function resolve (name, pid)
+function resolve (name)
    local q, p = name:match("^(/*)(.*)") -- split qualifier (/ or //)
    local result = p
    if q == '' and path ~= '' then result = path.."/"..result end
-   if q ~= '//'              then result = tostring(pid or S.getpid()).."/"..result end
+   if q ~= '//'              then result = tostring(S.getpid()).."/"..result end
    return result
 end
 

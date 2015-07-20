@@ -66,15 +66,16 @@ ffi.cdef [[
 ]]
 
 local engine_state = nil
+local state_mapname = ('//%d/engine_state'):format(S.getpgid())
 function prefork()
    stats_count = stats()
-   engine_state = shm.map('/engine_state', 'engine_state', false, S.getpgid())
+   engine_state = shm.map(state_mapname, 'engine_state', false)
    engine_state.state = 'stopped'
 end
 
 function postfork()
    stats_count = stats()
-   engine_state = shm.map('/engine_state', 'engine_state', true, S.getpgid())
+   engine_state = shm.map(state_mapname, 'engine_state', true)
 end
 
 

@@ -45,7 +45,7 @@ local lock_fd = nil
 
 function prefork()
    if not _h then
-      _h = shm.map('/dma_heap', 'dma_heap', false, syscall.getpgid())
+      _h = shm.map(('//%d/dma_heap'):format(syscall.getpgid()), 'dma_heap')
       for i = 1, 10 do
          allocate_next_chunk()
       end
@@ -55,7 +55,7 @@ end
 function postfork()
    local err
    -- to abritrate between processes, each process needs a different fd to the same file
-   lock_fd, err = syscall.open(shm.root..'/'..shm.resolve('/dma_heap', syscall.getpgid()), 'rdonly')
+   lock_fd, err = syscall.open(('%s/%d/dma_heap'):format(shm.root, syscall.getpgid()), 'rdonly')
    if not lock_fd then error(err) end
 end
 

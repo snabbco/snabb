@@ -20,7 +20,7 @@ function stats:__new(pid)
       ffi.fill(o, ffi.sizeof(stats_t))
       return o
    else
-      return shm.map('/core.stats', stats_t, true, pid)
+      return shm.map(('//%d/core.stats'):format(pid), stats_t, true)
    end
 end
 
