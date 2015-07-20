@@ -11,12 +11,15 @@ local function maketype(elmtype, size)
       } ]], elmtype, size)
 end
 
-function new (elmtype, size)
-   elmtype = ffi.typeof(elmtype)
-   local name = tostring(elmtype)
+local function type_to_name(elmtype)
+   return tostring(elmtype)
       :gsub('^ctype<(.*)>$', '%1')
       :gsub('[^%w*]+', '_'):gsub('*', '#')
-   return shm.map('/freelists/'..name, maketype(elmtype, size))
+end
+
+function new (elmtype, size)
+   elmtype = ffi.typeof(elmtype)
+   return shm.map('/freelists/'..type_to_name(elmtype), maketype(elmtype, size))
 end
 
 function add (freelist, element)
