@@ -108,8 +108,8 @@ function selftest_run (stateful, expected, tolerance)
    repeat app.breathe() until deadline()
 
    app.report({showlinks=true})
-   local sent     = app.app_table.pcap_filter.input.input.stats.rxpackets
-   local accepted = app.app_table.pcap_filter.output.output.stats.txpackets
+   local sent     = link.stats(app.app_table.pcap_filter.input.input).rxpackets
+   local accepted = link.stats(app.app_table.pcap_filter.output.output).txpackets
    local acceptrate = accepted * 100 / sent
    if acceptrate >= expected and acceptrate <= expected+tolerance then
       print(("ok: accepted %.4f%% of inputs (within tolerance)"):format(acceptrate))

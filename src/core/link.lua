@@ -2,11 +2,16 @@ module(...,package.seeall)
 
 local debug = _G.developer_debug
 
+local shm = require("core.shm")
 local ffi = require("ffi")
 local C = ffi.C
 
 local packet = require("core.packet")
 require("core.packet_h")
+
+local counter = require("core.counter")
+require("core.counter_h")
+
 require("core.link_h")
 
 local band = require("bit").band
@@ -14,8 +19,23 @@ local band = require("bit").band
 local size = C.LINK_RING_SIZE         -- NB: Huge slow-down if this is not local
 max        = C.LINK_MAX_PACKETS
 
-function new (receiving_app)
-   return ffi.new("struct link", {receiving_app = receiving_app})
+function new (name)
+   local r = shm.map("links/"..name, "struct link")
+   for _, c
+   in ipairs({"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop"}) do
+      r.stats[c] = counter.open("counters/"..name.."/"..c)
+   end
+   return r
+end
+
+function free (r, name)
+   for _, c
+   in ipairs({"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop"}) do
+      shm.unmap(r.stats[c])
+   end
+   shm.unlink("counters/"..name)
+   shm.unmap(r)
+   shm.unlink("links/"..name)
 end
 
 function receive (r)
@@ -23,8 +43,8 @@ function receive (r)
    local p = r.packets[r.read]
    r.read = band(r.read + 1, size - 1)
 
-   r.stats.rxpackets = r.stats.rxpackets + 1
-   r.stats.rxbytes   = r.stats.rxbytes + p.length
+   counter.add(r.stats.rxpackets)
+   counter.add(r.stats.rxbytes, p.length)
    return p
 end
 
@@ -35,13 +55,13 @@ end
 function transmit (r, p)
 --   assert(p)
    if full(r) then
-      r.stats.txdrop = r.stats.txdrop + 1
+      counter.add(r.stats.txdrop)
       packet.free(p)
    else
       r.packets[r.write] = p
       r.write = band(r.write + 1, size - 1)
-      r.stats.txpackets = r.stats.txpackets + 1
-      r.stats.txbytes   = r.stats.txbytes + p.length
+      counter.add(r.stats.txpackets)
+      counter.add(r.stats.txbytes, p.length)
       r.has_new_data = true
    end
 end
@@ -70,31 +90,37 @@ function nwritable (r)
 end
 
 function stats (r)
-   return r.stats
+   local stats = {}
+   for _, c
+   in ipairs({"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop"}) do
+      stats[c] = tonumber(counter.read(r.stats[c]))
+   end
+   return stats
 end
 
 function selftest ()
    print("selftest: link")
-   local r = new()
+   local r = new("test")
    local p = packet.allocate()
-   assert(r.stats.txpackets == 0 and empty(r) == true  and full(r) == false)
+   assert(counter.read(r.stats.txpackets) == 0 and empty(r) == true  and full(r) == false)
    assert(nreadable(r) == 0)
    transmit(r, p)
-   assert(r.stats.txpackets == 1 and empty(r) == false and full(r) == false)
+   assert(counter.read(r.stats.txpackets) == 1 and empty(r) == false and full(r) == false)
    for i = 1, max-2 do
       transmit(r, p)
    end
-   assert(r.stats.txpackets == max-1 and empty(r) == false and full(r) == false)
-   assert(nreadable(r) == r.stats.txpackets)
+   assert(counter.read(r.stats.txpackets) == max-1 and empty(r) == false and full(r) == false)
+   assert(nreadable(r) == counter.read(r.stats.txpackets))
    transmit(r, p)
-   assert(r.stats.txpackets == max   and empty(r) == false and full(r) == true)
+   assert(counter.read(r.stats.txpackets) == max   and empty(r) == false and full(r) == true)
    transmit(r, p)
-   assert(r.stats.txpackets == max and r.stats.txdrop == 1)
+   assert(counter.read(r.stats.txpackets) == max and counter.read(r.stats.txdrop) == 1)
    assert(not empty(r) and full(r))
    while not empty(r) do
       receive(r)
    end
-   assert(r.stats.rxpackets == max)
+   assert(counter.read(r.stats.rxpackets) == max)
+   link.free(r, "test")
    print("selftest OK")
 end
 

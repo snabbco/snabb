@@ -25,12 +25,14 @@ module(..., package.seeall)
 
 local shm = require("core.shm")
 local ffi = require("ffi")
-local counter_t = ffi.typeof("struct { uint64_t c; }")
+require("core.counter_h")
 
-function open (name)          return shm.map(name, counter_t) end
-function set (counter, value) counter.c = value               end
-function add (counter, value) counter.c = counter.c + value   end
-function read (counter)       return counter.c                end
+local counter_t = ffi.typeof("struct counter")
+
+function open (name, readonly) return shm.map(name, counter_t, readonly) end
+function set  (counter, value) counter.c = value                         end
+function add  (counter, value) counter.c = counter.c + (value or 1)      end
+function read (counter)        return counter.c                          end
 
 function selftest ()
    print("selftest: core.counter")
