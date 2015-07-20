@@ -51,16 +51,36 @@ end
 --- Return the path to the sysfs directory for `pcidev`.
 function path(pcidev) return "/sys/bus/pci/devices/"..pcidev end
 
+-- Supported drivers indexed by vendor and device id.
+local drivers = {
+   ["0x8086"] =  {
+      ["0x10fb"] = 'apps.intel.intel_app', -- Intel 82599 SFP
+      ["0x10d3"] = 'apps.intel.intel_app', -- Intel 82574L
+      ["0x105e"] = 'apps.intel.intel_app', -- Intel 82571
+   },
+   ["0x1924"] =  {
+      ["0x0903"] = 'apps.solarflare.solarflare'
+   },
+}
+
+-- Not fully supportted drivers indexed by vendor and device id.
+local experimental_drivers = {
+   ["0x8086"] = {
+      ["0x151c"] = 'apps.intel.intel_app', -- Intel 82599 T3
+   }
+}
+
 -- Return the name of the Lua module that implements support for this device.
 function which_driver (vendor, device)
-   if vendor == '0x8086' then
-      if device == '0x10fb' then return 'apps.intel.intel_app' end -- Intel 82599
-      if device == '0x10d3' then return 'apps.intel.intel_app' end -- Intel 82574L
-      if device == '0x105e' then return 'apps.intel.intel_app' end -- Intel 82571
-   elseif vendor == '0x1924' then
-      if device == '0x0903' then return 'apps.solarflare.solarflare' end
---      if device == '0x0803' then return 'apps.solarflare.solarflare' end
+   local driver = drivers[vendor] and drivers[vendor][device] or nil
+   if not driver then
+      driver = experimental_drivers[vendor] and experimental_drivers[vendor][device] or nil
+      if driver then
+         print(("Warning: Support for device (%s-%s) is not reliable. "):format(vendor, device)..
+            "Use it at your own risk.")
+      end
    end
+   return driver
 end
 
 --- ### Device manipulation.
