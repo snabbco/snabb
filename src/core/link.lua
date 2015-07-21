@@ -20,11 +20,8 @@ end
 
 function receive (r)
 --   if debug then assert(not empty(r), "receive on empty link") end
-   local p = r.packets[r.read]
-   r.read = band(r.read + 1, size - 1)
-
-   r.stats.rxpackets = r.stats.rxpackets + 1
-   r.stats.rxbytes   = r.stats.rxbytes + p.length
+   local p = r.packets[band(r.read, size-1)]
+   r.read = r.read + 1
    return p
 end
 
@@ -38,10 +35,8 @@ function transmit (r, p)
       r.stats.txdrop = r.stats.txdrop + 1
       packet.free(p)
    else
-      r.packets[r.write] = p
-      r.write = band(r.write + 1, size - 1)
-      r.stats.txpackets = r.stats.txpackets + 1
-      r.stats.txbytes   = r.stats.txbytes + p.length
+      r.packets[band(r.write, size-1)] = p
+      r.write = r.write + 1
       r.has_new_data = true
    end
 end
@@ -58,11 +53,7 @@ end
 
 -- Return the number of packets that are ready for read.
 function nreadable (r)
-   if r.read > r.write then
-      return r.write + size - r.read
-   else
-      return r.write - r.read
-   end
+   return r.write - r.read
 end
 
 function nwritable (r)
@@ -70,7 +61,9 @@ function nwritable (r)
 end
 
 function stats (r)
-   return r.stats
+   return { rxpackets = tonumber(r.read),
+            txpackets = tonumber(r.write),
+            txdropped = tonumber(r.dropped) }
 end
 
 function selftest ()
