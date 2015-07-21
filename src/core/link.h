@@ -12,7 +12,9 @@ struct link {
   // Two cursors:
   //   read:  the next element to be read
   //   write: the next element to be written
-  int read, write;
+  int64_t read, write;
+  // How many packets have been dropped due to ring overflow?
+  int64_t dropped;
   // Index (into the Lua app.active_apps array) of the app that
   // receives from this link.
   int receiving_app;
