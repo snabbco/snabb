@@ -6,24 +6,29 @@ local ipv6 = require("lib.protocol.ipv6")
 
 local bt = require("apps.lwaftr.binding_table")
 
-DROP_POLICY = 1
-DISCARD_PLUS_ICMP_POLICY = 2
-DISCARD_PLUS_ICMPv6_POLICY = 3
-
-local aftrconf = {
-   aftr_ipv4_ip = ipv4:pton("10.10.10.10"),
-   aftr_ipv6_ip = ipv6:pton('8:9:a:b:c:d:e:f'),
-   aftr_mac_b4_side = ethernet:pton("22:22:22:22:22:22"),
-   aftr_mac_inet_side = ethernet:pton("22:22:22:22:22:22"),
-   b4_mac = ethernet:pton("44:44:44:44:44:44"),
-   binding_table = bt.get_binding_table(),
-   from_b4_lookup_failed_policy = DISCARD_PLUS_ICMPv6_POLICY,
-   hairpinning = true,
-   icmp_policy = DROP_POLICY,
-   inet_mac = ethernet:pton("68:68:68:68:68:68"),
-   ipv4_lookup_failed_policy = DISCARD_PLUS_ICMP_POLICY
+policies = {
+   DROP = 1,
+   DISCARD_PLUS_ICMP = 2,
+   DISCARD_PLUS_ICMPv6 = 3
 }
 
-function get_aftrconf()
+local aftrconf
+
+-- TODO: rewrite this after netconf integration
+local function read_conf(conf_file)
+  local input = io.open(conf_file)
+  local conf_vars = input:read('*a')
+  local conf_prolog = "function blah(policies, ipv4, ipv6, ethernet, bt)\n return {"
+  local conf_epilog = "   }\nend\nreturn blah\n"
+  local full_config = conf_prolog .. conf_vars .. conf_epilog
+  local conf = assert(loadstring(full_config))()
+  return conf(policies, ipv4, ipv6, ethernet, bt)
+end
+
+function get_aftrconf(conf_file)
+   if not aftrconf then
+      aftrconf = read_conf(conf_file)
+   end
    return aftrconf
 end
+module(..., package.seeall)
