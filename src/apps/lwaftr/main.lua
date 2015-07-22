@@ -6,14 +6,15 @@ local ipv6 = require("lib.protocol.ipv6")
 
 local conf = require("apps.lwaftr.conf")
 
-local usage="thisapp in.pcap out.pcap"
+local usage="thisapp conf_file in.pcap out.pcap"
 
 function run (parameters)
-   if not (#parameters == 2) then print(usage) main.exit(1) end
-   local in_pcap = parameters[1]
-   local out_pcap = parameters[2]
+   if not (#parameters == 3) then print(usage) main.exit(1) end
+   local conf_file = parameters[1]
+   local in_pcap = parameters[2]
+   local out_pcap = parameters[3]
 
-   local aftrconf = conf.get_aftrconf()
+   local aftrconf = conf.get_aftrconf(conf_file)
 
    local c = config.new()
    config.app(c, "capture", pcap.PcapReader, in_pcap)

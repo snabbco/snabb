@@ -197,9 +197,9 @@ function LwAftr:_encapsulate_ipv4(pkt)
    local ipv6_dst = self:binding_lookup_ipv4_from_pkt(pkt, ethernet_header_size)
    if not ipv6_dst then
       if debug then print("lookup failed") end
-      if self.ipv4_lookup_failed_policy == lwconf.DROP_POLICY then
+      if self.ipv4_lookup_failed_policy == lwconf.policies['DROP'] then
          return nil -- lookup failed
-      elseif self.ipv4_lookup_failed_policy == lwconf.DISCARD_PLUS_ICMP_POLICY then
+      elseif self.ipv4_lookup_failed_policy == lwconf.policies['DISCARD_PLUS_ICMP'] then
          local src_ip_start = ethernet_header_size + 12
          local to_ip = ffi.cast("uint32_t*", pkt.data + src_ip_start)[0]
          return LwAftr:_icmp_after_discard(to_ip)-- ICMPv4 type 3 code 1
@@ -221,7 +221,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
    local proto_offset = ethernet_header_size + 9
    local proto = pkt.data[proto_offset]
 
-   if proto == proto_icmp and self.icmp_policy == conf.DROP_POLICY then return nil end
+   if proto == proto_icmp and self.icmp_policy == conf.policies['DROP'] then return nil end
 
    pkt.data[ttl_offset] = ttl - 1
    if proto == proto_tcp then
@@ -271,7 +271,7 @@ function LwAftr:from_b4(pkt)
       else
          return self:_add_inet_ethernet(pkt)
       end
-   elseif self.from_b4_lookup_failed_policy == lwconf.DISCARD_PLUS_ICMPv6_POLICY then
+   elseif self.from_b4_lookup_failed_policy == lwconf.policies['DISCARD_PLUS_ICMPv6'] then
       return self:_icmp_b4_lookup_failed(ipv6_src_ip)
    else
       return nil
