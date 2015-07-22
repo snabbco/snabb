@@ -39,15 +39,31 @@ local counter_t = ffi.typeof("struct counter")
 -- to set-associative CPU cache). See SnabbCo/snabbswitch#558.
 local public  = {}
 local private = {}
+local numbers = {} -- name -> number
 
 function open (name, readonly)
-   public[#public+1] = shm.map(name, counter_t, readonly)
+   if numbers[name] then error("counter already opened: " .. name) end
+   local n = #public+1
+   numbers[name] = n
+   public[n] = shm.map(name, counter_t, readonly)
    if readonly then
-      private[#private+1] = public[#public] -- use counter directly
+      private[n] = public[#public] -- use counter directly
    else
-      private[#private+1] = ffi.new(counter_t)
+      private[n] = ffi.new(counter_t)
    end
-   return private[#private]
+   return private[n]
+end
+
+function delete (name)
+   local ptr = public[numbers[name]]
+   if not ptr then error("counter not found for deletion: " .. name) end
+   -- Free shm object
+   shm.unmap(ptr)
+   shm.unlink(name)
+   -- Free local state
+   numbers[name] = false
+   public[ptr] = false
+   private[ptr] = false
 end
 
 -- Copy counter private counter values to public shared memory.
