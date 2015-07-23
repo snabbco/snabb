@@ -56,7 +56,7 @@ function hash:new ()
          h_t = ffi.typeof([[
            union {
               uint8_t  u8[$];
-              int8_t   u8[$];
+              int8_t   i8[$];
               uint32_t u32[$];
               int32_t  i32[$];
               uint64_t u64[$];
@@ -70,7 +70,7 @@ function hash:new ()
          h_t = ffi.typeof([[
            union {
              uint8_t  u8[$];
-             int8_t  u8[$];
+             int8_t   i8[$];
              uint32_t u32[$];
              int32_t  i32[$];
            }
