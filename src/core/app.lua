@@ -256,7 +256,11 @@ function apply_config_actions (actions, conf)
          end
          if ta_app then
             l.receiving_app = app_name_to_index[ta]
-            l.receiving_pid = S.getpid()
+            if fa_app then
+               l.receiving_pid = 0
+            else
+               l.receiving_pid = S.getpid()
+            end
             ta_app.input[tl] = l
             table.insert(ta_app.input, l)
          end
@@ -339,7 +343,7 @@ function breathe ()
       for i = 1, #link_array do
          local link = link_array[i]
          if firstloop or link.has_new_data then
-            if link.receiving_pid == pid then
+            if link.receiving_pid == 0 or link.receiving_pid == pid then
                link.has_new_data = false
                local receiver = app_array[link.receiving_app]
                if receiver.push and not receiver.dead then
