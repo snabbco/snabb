@@ -139,7 +139,7 @@ function configure (new_config)
             while engine_state.state ~= 'running' do
                C.usleep(1000)
             end
-            main{duration=1, report={}}
+            main{duration=1, report={showlinks=true, showapps=true}}
          until engine_state.state == 'finished'
       end)
    end
@@ -408,7 +408,7 @@ function report_load ()
 end
 
 function report_links ()
-   print("link report:")
+   print("link report:", fork.get_procname())
    local function loss_rate(drop, sent)
       sent = tonumber(sent)
       if not sent or sent == 0 then return 0 end
@@ -426,7 +426,7 @@ function report_links ()
 end
 
 function report_apps ()
-   print ("apps report:")
+   print ("apps report:", fork.get_procname())
    for name, app in pairs(app_table) do
       if app.dead then
          print(name, ("[dead: %s]"):format(app.dead.error))

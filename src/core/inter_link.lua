@@ -11,7 +11,9 @@ ffi.cdef [[
       struct packet *packets[LINK_RING_SIZE];
       int write, read;
 
-      double txbytes, rxbytes, txpackets, rxpackets, txdrop;
+      struct {
+         double txbytes, rxbytes, txpackets, rxpackets, txdrop;
+      } stats;
       int receiving_app, receiving_pid;
       bool has_new_data;
    } inter_link_t;
@@ -44,8 +46,8 @@ function inter_link:transmit(p)
       if prevPkt ~= nil then prevPkt:free() end
       self.packets[self.write] = p
       self.write = step(self.write)
-      self.txpackets = self.txpackets + 1
-      self.txbytes   = self.txbytes + p.length
+      self.stats.txpackets = self.stats.txpackets + 1
+      self.stats.txbytes   = self.stats.txbytes + p.length
       self.has_new_data = true
    end
 end
@@ -61,8 +63,8 @@ function inter_link:receive()
    self.packets[self.read] = packet.allocate()
    self.read = step(self.read)
 
-   self.rxpackets = self.rxpackets + 1
-   self.rxbytes   = self.rxbytes + p.length
+   self.stats.rxpackets = self.stats.rxpackets + 1
+   self.stats.rxbytes   = self.stats.rxbytes + p.length
    return p
 end
 
