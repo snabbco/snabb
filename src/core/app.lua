@@ -5,7 +5,6 @@ local lib    = require("core.lib")
 local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
-local stats  = require('core.stats')
 local zone   = require("jit.zone")
 local ffi    = require("ffi")
 local C      = ffi.C
@@ -31,7 +30,6 @@ configuration = config.new()
 -- Counters for statistics.
 -- TODO: Move these over to the counters framework
 breaths = 0			-- Total breaths taken
-local stats_count = nil
 
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
 --
@@ -68,13 +66,11 @@ ffi.cdef [[
 local engine_state = nil
 local state_mapname = ('//%d/engine_state'):format(S.getpgid())
 function prefork()
-   stats_count = stats()
    engine_state = shm.map(state_mapname, 'engine_state', false)
    engine_state.state = 'stopped'
 end
 
 function postfork()
-   stats_count = stats()
    engine_state = shm.map(state_mapname, 'engine_state', true)
 end
 
@@ -133,6 +129,7 @@ function configure (new_config)
    for procname, procarg in pairs(new_config.cpus) do
       fork.spawn(procname, function()
          local actions = compute_config_actions(configuration, new_config)
+         if procarg.profile then require("jit.p").start(procarg.profile) end
          apply_config_actions(actions, new_config)
          configuration = new_config
          repeat
@@ -141,14 +138,9 @@ function configure (new_config)
             end
             main{duration=1, report={showlinks=true, showapps=true}}
          until engine_state.state == 'finished'
+         if procarg.profile then require("jit.p").stop() end
       end)
    end
-end
-
-function reapfork(pid)
-   local dying = stats(pid)
-   stats_count:accumulate(dying)
-   shm.unmap(dying)
 end
 
 
@@ -256,11 +248,7 @@ function apply_config_actions (actions, conf)
          end
          if ta_app then
             l.receiving_app = app_name_to_index[ta]
-            if fa_app then
-               l.receiving_pid = 0
-            else
-               l.receiving_pid = S.getpid()
-            end
+            l.receiving_pid = fa_app and 0 or S.getpid()
             ta_app.input[tl] = l
             table.insert(ta_app.input, l)
          end
@@ -274,7 +262,9 @@ function apply_config_actions (actions, conf)
 end
 
 -- Call this to "run snabb switch".
+local pid = nil
 function main (options)
+   pid = S.getpid()
    options = options or {}
    local done = options.done
    local no_timers = options.no_timers
@@ -298,6 +288,7 @@ end
 
 local nextbreath
 local lastfrees = 0
+freedanypacket = false
 -- Wait between breaths to keep frequency with Hz.
 function pace_breathing ()
    if Hz then
@@ -309,19 +300,18 @@ function pace_breathing ()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
    else
-      if lastfrees == stats_count.frees then
+      if not freedanypacket then
          sleep = math.min(sleep + 1, maxsleep)
          C.usleep(sleep)
       else
          sleep = math.floor(sleep/2)
       end
-      lastfrees = stats_count.frees
+      freedanypacket = false
    end
 end
 
 function breathe ()
    monotonic_now = C.get_monotonic_time()
-   local pid = S.getpid()
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
@@ -369,9 +359,6 @@ function report (options)
    end
    if options and options.showapps then
       report_apps()
-   end
-   if options and options.showaccum then
-      report_accum()
    end
 end
 
@@ -443,10 +430,6 @@ function report_apps ()
          end
       end
    end
-end
-
-function report_accum()
-   print (stats_count)
 end
 
 function selftest ()

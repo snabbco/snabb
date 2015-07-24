@@ -60,11 +60,7 @@ end
 
 function inter_link:receive()
    local p = self.packets[self.read]
-   if self.receiving_pid == 0 then
-      self.packets[self.read] = nil
-   else
-      self.packets[self.read] = packet.allocate()
-   end
+   self.packets[self.read] = (self.receiving_pid ~= 0) and packet.allocate() or nil
    self.read = step(self.read)
 
    self.stats.rxpackets = self.stats.rxpackets + 1
