@@ -7,9 +7,11 @@ function selftest()
    config.cpu(c, 'proc1')
    config.cpu(c, 'proc2')
    config.app(c, 'source', basic_apps.Source, {size=120, cpu='proc1'})
+   config.app(c, 'localsink', basic_apps.Sink, {cpu='proc1'})
    config.app(c, 'sink', basic_apps.Sink, {cpu='proc2'})
    config.link(c, 'source.output -> sink.input')
+   config.link(c, 'source.output2 -> localsink.input')
    engine.configure(c)
 
-   engine.main{duration=10, report={showlinks=true, showapps=true, showaccum=true}}
+   engine.main{duration=1, report={showlinks=true, showapps=true, showaccum=true}}
 end

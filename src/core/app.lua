@@ -245,25 +245,23 @@ function apply_config_actions (actions, conf)
       local fa, fl, ta, tl = config.parse_link(linkspec)
       local fa_app = new_app_table[fa]
       local ta_app = new_app_table[ta]
-      local link = nil
-      if fa_app and ta_app then
-         link = link_table[linkspec] or link.new()
-      elseif fa_app or ta_app then
-         link = inter_link(linkspec)
+      local l = nil
+      if fa_app or ta_app then
+         l = inter_link(linkspec)
       end
-      if link then
+      if l then
          if fa_app then
-            fa_app.output[fl] = link
-            table.insert(fa_app.output, link)
+            fa_app.output[fl] = l
+            table.insert(fa_app.output, l)
          end
          if ta_app then
-            link.receiving_app = app_name_to_index[ta]
-            link.receiving_pid = S.getpid()
-            ta_app.input[tl] = link
-            table.insert(ta_app.input, link)
+            l.receiving_app = app_name_to_index[ta]
+            l.receiving_pid = S.getpid()
+            ta_app.input[tl] = l
+            table.insert(ta_app.input, l)
          end
-         new_link_table[linkspec] = link
-         table.insert(new_link_array, link)
+         new_link_table[linkspec] = l
+         table.insert(new_link_array, l)
       end
    end
    -- commit changes
