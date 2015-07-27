@@ -23,8 +23,8 @@ end
 
 function Source:pull ()
    local p = self.packet
-   for _, o in ipairs(self.output) do
-      while not o:full() do
+   for i, o in ipairs(self.output) do
+      for j = 1, o:nwritable() do
          o:transmit(p:clone())
       end
    end
@@ -79,8 +79,8 @@ function Sink:new ()
 end
 
 function Sink:push ()
-   for _, l in ipairs(self.input) do
-      while not l:empty() do
+   for i, l in ipairs(self.input) do
+      for j = 1, l:nreadable() do
          l:receive():free()
       end
    end

@@ -36,6 +36,10 @@ function inter_link:full()
    return step(self.write) == self.read
 end
 
+function inter_link:nwritable()
+   return band(self.read - self.write - 1, mask)
+end
+
 
 function inter_link:transmit(p)
    if self:full() then
@@ -55,6 +59,10 @@ end
 
 function inter_link:empty()
    return self.read == self.write
+end
+
+function inter_link:nreadable()
+   return band(self.write - self.read, mask)
 end
 
 
