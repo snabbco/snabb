@@ -69,5 +69,6 @@ check_syscall:
 clean:
 	(cd deps/luajit && $(MAKE) clean)
 	(cd src; $(MAKE) clean; rm -rf syscall.lua syscall)
+	(rm deps/*.vsn)
 
 .SERIAL: all
