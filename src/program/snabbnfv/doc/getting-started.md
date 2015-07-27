@@ -2,25 +2,37 @@
 
 ## Introduction
 
-[Snabb NFV](http://snabb.co/nfv.html) is typically deployed for OpenStack with
-components on the Network Node, the Database Node, and the Compute
-Nodes. 
-This guide however documents the minimal steps required to connect two virtual machines over Snabb Switch using the Snabbnfv Traffic application. No need to install OpenStack or even virsh. A single compute node with at least 2 10GbE ports is sufficient to launch two VMs and pass traffic between them. 
+[Snabb NFV](http://snabb.co/nfv.html) is typically deployed for OpenStack
+with components on the Network Node, the Database Node, and the Compute
+Nodes.  This guide however documents the minimal steps required to
+connect two virtual machines over Snabb Switch using the Snabbnfv Traffic
+application. No need to install OpenStack or even virsh. A single compute
+node with at least 2 10GbE ports is sufficient to launch two VMs and pass
+traffic between them.
 
 ## Prerequisites
 
-* Compute node with a suitable PCIe slot for the NIC card (PCIe 2.0/3.0 x8)
-* [Ubuntu 14.04.2 LTS](http://releases.ubuntu.com/14.04/) installed on the compute node
-* 2 10GbE Ethernet SFP+ ports based on [Intel 82599](http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf) controller
+* Compute node with a suitable PCIe slot for the NIC card (PCIe 2.0/3.0
+  x8)
+* [Ubuntu 14.04.2 LTS](http://releases.ubuntu.com/14.04/) installed on
+  the compute node
+* 2 10GbE Ethernet SFP+ ports based on [Intel
+  82599](http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf)
+  controller
 * Direct Attach/Twinaxial SFP+ loopback cable
 
 ## Hardware setup
 
-Use the direct attach SFP+ cable to create a loop between both 10GbE Ethernet ports. 
+Use the direct attach SFP+ cable to create a loop between both 10GbE
+Ethernet ports.
 
 ## Compute node Kernel settings
  
-IOMMU must be disabled on the server as documented under [Compute Node Requirements](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md). Disable intel_iommu and set hugepages for 24GB (each page has 2MB -> 12288 pages). Allocating persistent huge pages on the kernel boot command line is the most reliable method as memory has not yet become fragmented.
+IOMMU must be disabled on the server as documented under [Compute Node
+Requirements](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md). Disable
+intel_iommu and set hugepages for 24GB (each page has 2MB -> 12288
+pages). Allocating persistent huge pages on the kernel boot command line
+is the most reliable method as memory has not yet become fragmented.
 
 edit /etc/default/grub:
 
@@ -87,7 +99,9 @@ $ sudo apt-get --no-install-recommends -y build-dep qemu
 
 ## Download, compile and install QEMU
 
-We use here the v2.1.0-vhostuser branch from the QEMU fork on SnabbCo to reduce the risk of running in any incompatibilities with current versions. This branch is maintained by snabb developers. 
+We use here the v2.1.0-vhostuser branch from the QEMU fork on SnabbCo to
+reduce the risk of running in any incompatibilities with current
+versions. This branch is maintained by snabb developers.
 
 ```
 $ git clone -b v2.1.0-vhostuser --depth 50 https://github.com/SnabbCo/qemu
@@ -120,7 +134,8 @@ $ cd snabbswitch; make
 $ make -j
 ```
  
-If all goes well, you will find the snabb executable in the src directory:
+If all goes well, you will find the snabb executable in the src
+directory:
 
 ```
 $ src/snabb
@@ -141,7 +156,12 @@ If you rename (or copy or symlink) this executable with one of
 the names above then that program will be chosen automatically.
 ```
 
-Install numactl to control [NUMA](https://en.wikipedia.org/wiki/Non-uniform_memory_access) policy for processes or shared memory. We won't use numactl in this getting started guide, but its use will be essential to run any performance tests. Numactl runs processes with a specific NUMA scheduling or memory placement policy.
+Install numactl to control
+[NUMA](https://en.wikipedia.org/wiki/Non-uniform_memory_access) policy
+for processes or shared memory. We won't use numactl in this getting
+started guide, but its use will be essential to run any performance
+tests. Numactl runs processes with a specific NUMA scheduling or memory
+placement policy.
 
 ```
 $ sudo apt-get install numactl
@@ -176,7 +196,8 @@ use --cpunodebind or --physcpubind instead
 
 ## Run the Snabb selftest app
 	
-Find the PCI addresses of the available 10-Gigabit Intel 82599 ports in the system:
+Find the PCI addresses of the available 10-Gigabit Intel 82599 ports in
+the system:
 
 ```
 $ lspci|grep 82599
@@ -184,7 +205,10 @@ $ lspci|grep 82599
 04:00.1 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network Connection (rev 01)
 ```
 
-Now run some Intel tests with snabb snsh using a loopback cable between the two 10GbE ports. The application will unbind the specified 10GbE ports (PCI address) from the Linux kernel, but won't "return" them. So don't be surprised when 'ifconfig -a' won't show these ports anymore.
+Now run some Intel tests with snabb snsh using a loopback cable between
+the two 10GbE ports. The application will unbind the specified 10GbE
+ports (PCI address) from the Linux kernel, but won't "return" them. So
+don't be surprised when 'ifconfig -a' won't show these ports anymore.
 
 ```
 $ cd ~/snabbswitch/src
@@ -427,7 +451,8 @@ selftest: ok
 
 ## Re-attach the 10GbE ports back to the host (optional)
 
-If you need to re-attach a 10GbE ports back to the host OS, send its PCI address to the ixgbe driver. 
+If you need to re-attach a 10GbE ports back to the host OS, send its PCI
+address to the ixgbe driver.
 
 ```
 # ifconfig p2p1
@@ -445,7 +470,10 @@ p2p1      Link encap:Ethernet  HWaddr 0c:c4:7a:1f:7e:60
 
 ## Create and launch two VM's
 
-Now that snabbswitch can talk to both 10GbE ports successfully, lets build and launch 2 test VM's and connect each of them to one of the 10GbE port. First, we have to build an empty disk, download and install Ubuntu in it:
+Now that snabbswitch can talk to both 10GbE ports successfully, lets
+build and launch 2 test VM's and connect each of them to one of the 10GbE
+port. First, we have to build an empty disk, download and install Ubuntu
+in it:
 
 Create a disk for the VM:
 
@@ -459,7 +487,8 @@ Download ubuntu server 14.04.2:
 $ wget http://releases.ubuntu.com/14.04.2/ubuntu-14.04.2-server-amd64.iso
 ```
 	
-Launch the ubuntu installer via qemu and connect to its VNC console running at <host>:5901. This can be done via a suitable VNC client.
+Launch the ubuntu installer via qemu and connect to its VNC console
+running at <host>:5901. This can be done via a suitable VNC client.
 
 ```
 $ sudo qemu-system-x86_64 -m 1024 -enable-kvm \
@@ -467,25 +496,35 @@ $ sudo qemu-system-x86_64 -m 1024 -enable-kvm \
 -cdrom ubuntu-14.04.2-server-amd64.iso -vnc :1
 ```
 
-The installer guides you thru the setup of ubuntu. I picked username ubuntu with password ubuntu and use the whole disk without LVM, no automatic updates and selected openssh as the only optional package to install.
-Kill qemu after the reboot. 
+The installer guides you thru the setup of ubuntu. I picked username
+ubuntu with password ubuntu and use the whole disk without LVM, no
+automatic updates and selected openssh as the only optional package to
+install.  Kill qemu after the reboot.
 
-We have now a master VM ubuntu virtual disk to create two VM's from and launch them individually. Create first two copies:
+We have now a master VM ubuntu virtual disk to create two VM's from and
+launch them individually. Create first two copies:
 
 ```
 $ cp ubuntu.qcow2 ubuntu1.qcow2
 $ cp ubuntu.qcow2 ubuntu2.qcow2
 ```
 	
-Before launching the VM's, we need to prepare snabb to work as virtio interface for the VM's. Snabb offers snabnfv traffic app for this, which is built-into the snabb binary that was built earlier. Source and documentation can be found at [https://github.com/SnabbCo/snabbswitch/tree/next/src/program/snabbnfv](https://github.com/SnabbCo/snabbswitch/tree/next/src/program/snabbnfv)
+Before launching the VM's, we need to prepare snabb to work as virtio
+interface for the VM's. Snabb offers snabnfv traffic app for this, which
+is built-into the snabb binary that was built earlier. Source and
+documentation can be found at
+[https://github.com/SnabbCo/snabbswitch/tree/next/src/program/snabbnfv](https://github.com/SnabbCo/snabbswitch/tree/next/src/program/snabbnfv)
 
-One Snabbnfv traffic process is required per 10 Gigabit port and uses a configuration file with port information for every vhost interface:
+One Snabbnfv traffic process is required per 10 Gigabit port and uses a
+configuration file with port information for every vhost interface:
 
 * VLAN
 * MAC address of the VM
 * Id, which is used to identify a socket name
 
-VLAN and MAC are used to pass ethernet frames based on destination address to the correct vhost interface. I created a separate config file per 10GbE port.
+VLAN and MAC are used to pass ethernet frames based on destination
+address to the correct vhost interface. I created a separate config file
+per 10GbE port.
 
 ```
 $ cat port1.cfg
@@ -504,13 +543,16 @@ return {
 }
 ```
 	
-Create a directory, where the vhost sockets will be created by qemu and connected to by snabbnfv:
+Create a directory, where the vhost sockets will be created by qemu and
+connected to by snabbnfv:
 
 ```
 $ mkdir ~/vhost-sockets
 ```
 	
-Launch snabbnfv in different terminals. For production and performance testing, it is advised to pin the processes to CPU core's using numactl, but for basic connectivity testing I left this complexity out for now.
+Launch snabbnfv in different terminals. For production and performance
+testing, it is advised to pin the processes to CPU core's using numactl,
+but for basic connectivity testing I left this complexity out for now.
 
 Port 1:
 
@@ -526,7 +568,9 @@ $ sudo ./snabbswitch/src/snabb snabbnfv traffic -k 10 -D 0 \
   0000:04:00.1 ./port2.cfg ./vhost-sockets/vm2.socket
 ```
 
-Finally launch now the two VM's, either in different terminals or putting them into the background. You can access their consoles via VNC ports 5901 and 5902 after launch.
+Finally launch now the two VM's, either in different terminals or putting
+them into the background. You can access their consoles via VNC ports
+5901 and 5902 after launch.
 
 ubuntu1:
 
@@ -554,9 +598,12 @@ $ sudo /usr/local/bin/qemu-system-x86_64 \
   -vnc :2
 ```
 	
-Connect via VNC to ports 5901 and 5902, set a hostname and statically assign an IP address to the eth0 interfaces (edit /etc/network/interfaces; ifdown eth0; ifup eth0).
+Connect via VNC to ports 5901 and 5902, set a hostname and statically
+assign an IP address to the eth0 interfaces (edit
+/etc/network/interfaces; ifdown eth0; ifup eth0).
 
-Have a peek at the terminals running both snabbnfv traffic commands. You will see messages when it connects to the vhost sockets created by qemu:
+Have a peek at the terminals running both snabbnfv traffic commands. You
+will see messages when it connects to the vhost sockets created by qemu:
 
 ```
 VIRTIO_F_ANY_LAYOUT VIRTIO_NET_F_MQ VIRTIO_NET_F_CTRL_VQ VIRTIO_NET_F_MRG_RXBUF VIRTIO_RING_F_INDIRECT_DESC VIRTIO_NET_F_CSUM
@@ -564,7 +611,11 @@ vhost_user: Caching features (0x18028001) in /tmp/vhost_features_.__vhost-socket
 VIRTIO_F_ANY_LAYOUT VIRTIO_NET_F_CTRL_VQ VIRTIO_NET_F_MRG_RXBUF VIRTIO_RING_F_INDIRECT_DESC VIRTIO_NET_F_CSUM
 ```
  
-If all went well so far, you can finally ping between both VM's. If you used non-Linux virtual machines for this test, e.g. [OpenBSD](http://www.openbsd.org), you might not be able to send or receive packets within the guest OS. This issue can be solved (for OpenBSD 5.7 at least) by forcing qemu to use vhost (vhostforce=on):
+If all went well so far, you can finally ping between both VM's. If you
+used non-Linux virtual machines for this test,
+e.g. [OpenBSD](http://www.openbsd.org), you might not be able to send or
+receive packets within the guest OS. This issue can be solved (for
+OpenBSD 5.7 at least) by forcing qemu to use vhost (vhostforce=on):
 
 ```
 $ sudo /usr/local/bin/qemu-system-x86_64 \
@@ -613,7 +664,9 @@ load: time: 1.00s  fps: 3         fpGbps: 0.000 fpb: 0   bpp: 98   sleep: 100 us
 load: time: 1.00s  fps: 3         fpGbps: 0.000 fpb: 0   bpp: 98   sleep: 100 us
 ```
 
-The difference in packet counters is a result of me stopping and starting one of the snabbnfv processes mid-flight. According to the documentation thats ok and it does indeed work just fine. 
+The difference in packet counters is a result of me stopping and starting
+one of the snabbnfv processes mid-flight. According to the documentation
+thats ok and it does indeed work just fine.
 
 ## Next Steps
 
