@@ -20,7 +20,7 @@ PFLUASRC = $(shell cd ../deps/pflua/src && \
 	         find . -regex '[^\#]*\.lua' -printf '%P ')
 CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
-ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
+ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
 ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
 RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
@@ -33,7 +33,7 @@ PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
 ARCHOBJ:= $(patsubst %.c,obj/%_c.o,    $(ARCHSRC))
-ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
+ASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
@@ -169,10 +169,10 @@ $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	 echo "]=============]") > $(basename $@).luah
 	$(Q) luajit -bg -n $(subst /,.,$*)_h $(basename $@).luah $@
 
-$(ASMOBJ): obj/%_dasc.o: %.dasc $(CHDR) Makefile | $(OBJDIR)
+$(ASMOBJ): obj/%_dasl.o: %.dasl $(CHDR) Makefile | $(OBJDIR)
 	$(E) "ASM       $@"
-	$(Q) luajit ../deps/luajit/dynasm/dynasm.lua -o $@.gen $<
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -I ../deps/luajit -c -Wall -Werror -x c -o $@ $@.gen
+	$(Q) luajit dynasm.lua -o $@.gen $<
+	$(Q) luajit -bg -n $(subst /,.,$*) $@.gen $@
 
 $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"
