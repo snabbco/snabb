@@ -50,18 +50,16 @@ function main ()
       print("unsupported program: "..programname(program))
       print()
       print("Rename this executable (cp, mv, ln) to choose a supported program:")
-      print("  snabb "..(require("program.programs_inc"):gsub("\n", " ")))
+      print("  snabb "..(require("programs_inc"):gsub("\n", " ")))
       os.exit(1)
    else
       require(modulename(program)).run(args)
-      -- Delete instance fs.
-      if _G.engine.instance_fs then _G.engine.instance_fs:delete() end
    end
 end
 
 function usage ()
    print("Usage: "..ffi.string(C.argv[0]).." <program> ...")
-   local programs = require("program.programs_inc"):gsub("%S+", "  %1")
+   local programs = require("programs_inc"):gsub("%S+", "  %1")
    print()
    print("This snabb executable has the following programs built in:")
    print(programs)
@@ -117,8 +115,6 @@ function handler (reason)
    print(reason)
    print(debug.traceback())
    if debug_on_error then debug.debug() end
-   -- Delete instance fs.
-   if _G.engine.instance_fs then _G.engine.instance_fs:delete() end
    os.exit(1)
 end
 

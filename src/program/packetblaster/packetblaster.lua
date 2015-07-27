@@ -1,9 +1,10 @@
 module(..., package.seeall)
 
-local app       = require("core.app")
+local engine    = require("core.app")
 local config    = require("core.config")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
+local intel10g  = require("apps.intel.intel10g")
 local intel_app = require("apps.intel.intel_app")
 local basic_apps = require("apps.basic.basic_apps")
 local main      = require("core.main")
@@ -45,15 +46,17 @@ function run (args)
          config.link(c, "tee."..tostring(nics).."->"..name..".input")
       end
    end
-   app.configure(c)
+   engine.busywait = true
+   intel10g.num_descriptors = 32*1024
+   engine.configure(c)
    local fn = function ()
                  print("Transmissions (last 1 sec):")
-                 app.report_each_app()
+                 engine.report_apps()
               end
    local t = timer.new("report", fn, 1e9, 'repeating')
    timer.activate(t)
-   if duration then app.main({duration=duration})
-   else             app.main() end
+   if duration then engine.main({duration=duration})
+   else             engine.main() end
 end
 
 function is_device_suitable (pcidev, patterns)

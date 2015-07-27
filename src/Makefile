@@ -8,7 +8,7 @@ E= @echo
 # Defined here to detect version mismatches at build time.
 LUAJIT_VSN    := "v2.0.4-306-gfe56522"
 LJSYSCALL_VSN := "v0.10-65-g7081d97"
-PFLUA_VSN     := "27523953c03745d4c4fbbcf81f676bc774e4329e"
+PFLUA_VSN     := "5e2c56baa0cf1ec471719bac83e2a99c4e2d5495"
 
 TEST_SKIPPED="43"
 
@@ -20,19 +20,20 @@ PFLUASRC = $(shell cd ../deps/pflua/src && \
 	         find . -regex '[^\#]*\.lua' -printf '%P ')
 CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
-ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
+ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
 ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
 RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
-INCSRC = $(shell find . -regex '[^\#]*\.inc' -printf '%P ')
+# sort to eliminate potential duplicate of programs.inc
+INCSRC = $(sort $(shell find . -regex '[^\#]*\.inc' -printf '%P ') programs.inc)
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
 ARCHOBJ:= $(patsubst %.c,obj/%_c.o,    $(ARCHSRC))
-ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
+ASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
@@ -168,10 +169,10 @@ $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	 echo "]=============]") > $(basename $@).luah
 	$(Q) luajit -bg -n $(subst /,.,$*)_h $(basename $@).luah $@
 
-$(ASMOBJ): obj/%_dasc.o: %.dasc $(CHDR) Makefile | $(OBJDIR)
+$(ASMOBJ): obj/%_dasl.o: %.dasl $(CHDR) Makefile | $(OBJDIR)
 	$(E) "ASM       $@"
-	$(Q) luajit ../deps/luajit/dynasm/dynasm.lua -o $@.gen $<
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -I ../deps/luajit -c -Wall -Werror -x c -o $@ $@.gen
+	$(Q) luajit dynasm.lua -o $@.gen $<
+	$(Q) luajit -bg -n $(subst /,.,$*) $@.gen $@
 
 $(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"
@@ -182,7 +183,7 @@ $(RMOBJS): %: %.src
 	$(E) "MARKDOWN  $@"
 	$(Q) scripts/process-markdown $< > $@
 
-$(INCOBJ): obj/%_inc.o: %.inc Makefile program/programs.inc | $(OBJDIR)
+$(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	$(E) "INC       $@"
 	@(echo -n "return [=============["; \
 	 cat $<; \
@@ -190,7 +191,7 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile program/programs.inc | $(OBJDIR)
 	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
 
 # Create list of programs that exist
-program/programs.inc:
+programs.inc: program
 	@(for d in program/*/; do basename $$d; done) > $@
 
 FORCE:
@@ -225,7 +226,7 @@ doc/snabbswitch.epub: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
 	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
 
-CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog deps/*.vsn
+CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog deps/*.vsn programs.inc
 
 clean:
 	$(E) "RM        $(CLEAN)"

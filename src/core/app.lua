@@ -5,8 +5,6 @@ local lib    = require("core.lib")
 local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
-local top    = require("lib.ipc.shmem.top")
-local fs     = require("lib.ipc.fs")
 local zone   = require("jit.zone")
 local ffi    = require("ffi")
 local C      = ffi.C
@@ -17,9 +15,6 @@ log = false
 local use_restart = false
 
 test_skipped_code = 43
-
--- Bound to instance of lib.ipc.fs for on first call to main.
-instance_fs = false
 
 -- The set of all active apps and links in the system.
 -- Indexed both by name (in a table) and by number (in an array).
@@ -54,6 +49,10 @@ freebytes = 0			-- Total packet bytes freed
 Hz = false
 sleep = 0
 maxsleep = 100
+
+-- busywait: If true then the engine will poll for new data in a tight
+-- loop (100% CPU) instead of sleeping according to the Hz setting.
+busywait = false
 
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
@@ -227,13 +226,11 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
-   if not instance_fs then instance_fs = fs:new() end
-   init_realtime_stats()
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
       if not no_timers then timer.run() end
-      pace_breathing()
+      if not busywait then pace_breathing() end
    until done and done()
    if not options.no_report then report(options.report) end
 end
@@ -248,14 +245,12 @@ function pace_breathing ()
       nextbreath = nextbreath or monotonic_now
       local sleep = tonumber(nextbreath - monotonic_now)
       if sleep > 1e-6 then
-         update_realtime_stats()
          C.usleep(sleep * 1e6)
          monotonic_now = C.get_monotonic_time()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
    else
       if lastfrees == frees then
-         update_realtime_stats()
          sleep = math.min(sleep + 1, maxsleep)
          C.usleep(sleep)
       else
@@ -303,44 +298,6 @@ function breathe ()
       firstloop = false
    until not progress  -- Stop after no link had new data
    breaths = breaths + 1
-end
-
-local shmem_stats = nil
-function init_realtime_stats ()
-   if not shmem_stats then
-      shmem_stats = top:new(instance_fs:resource("core-stats"))
-   end
-   shmem_stats:set_n_links(#link_array)
-   for i, link in ipairs(link_array) do
-      local name = nil
-      for spec, spec_link in pairs(link_table) do
-         if link == spec_link then
-            name = spec
-            break
-         end
-      end
-      shmem_stats:set_link_name(i - 1, name)
-      shmem_stats:set_link(i - 1,
-                           link.stats.rxpackets,
-                           link.stats.txpackets,
-                           link.stats.rxbytes,
-                           link.stats.txbytes,
-                           link.stats.txdrop)
-   end
-end
-
-function update_realtime_stats ()
-   shmem_stats:set("frees", frees)
-   shmem_stats:set("bytes", freebytes)
-   shmem_stats:set("breaths", breaths)
-   for i, link in ipairs(link_array) do
-      shmem_stats:set_link(i - 1,
-                           link.stats.rxpackets,
-                           link.stats.txpackets,
-                           link.stats.rxbytes,
-                           link.stats.txbytes,
-                           link.stats.txdrop)
-   end
 end
 
 function report (options)
@@ -414,15 +371,13 @@ function report_apps ()
          print(name, ("[dead: %s]"):format(app.dead.error))
       elseif app.report then
          print(name)
-         with_restart(app, app.report)
-      end
-   end
-end
-
-function report_each_app ()
-   for i = 1, #app_array do
-      if app_array[i].report then
-         app_array[i]:report()
+         -- Restarts are currently disabled, still we want to not die on
+         -- errors during app reports, thus this workaround:
+         -- with_restart(app, app.report)
+         local status, err = pcall(app.report, app)
+         if not status then
+            print("Warning: "..name.." threw an error during report: "..err)
+         end
       end
    end
 end

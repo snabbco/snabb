@@ -82,7 +82,7 @@ function ipv6:pton (p)
    local in_addr  = ffi.new("uint8_t[16]")
    local result = C.inet_pton(AF_INET6, p, in_addr)
    if result ~= 1 then
-      return false, "malformed IPv6 address: " .. address
+      return false, "malformed IPv6 address: " .. p
    end
    return in_addr
 end
