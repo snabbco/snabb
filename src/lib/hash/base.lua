@@ -38,36 +38,47 @@ local ffi = require("ffi")
 local hash = subClass(nil)
 hash._name = "hash function"
 
+-- Cache for ctypes that store the result of a hash function, keyed by
+-- the size of the result in bytes.  Note: this is not just to save
+-- space but make sure that each instance of the same hash function
+-- uses the exact same ctype (i.e. same internal ctype ID).
+-- Otherwise, it may happen that a trace takes a side exit due to a
+-- ctype mismatch.
+local hash_types = {}
+
 function hash:new ()
    assert(self ~= hash, "Can't instantiate abstract class hash")
    local o = hash:superClass().new(self)
    assert(o._size and o._size >= 32 and o._size%32 == 0)
-   local h_t
-   if o._size >= 64 and o._size%64 == 0 then
-      h_t = ffi.typeof([[
-         union {
-            uint8_t  u8[$];
-            int8_t   u8[$];
-            uint32_t u32[$];
-            int32_t  i32[$];
-            uint64_t u64[$];
-            int64_t  i64[$];
-         }
-      ]],
-      o._size/8, o._size/8,
-      o._size/32, o._size/32,
-      o._size/64, o._size/64)
-   else
-      h_t = ffi.typeof([[
-         union {
-            uint8_t  u8[$];
-            int8_t  u8[$];
-            uint32_t u32[$];
-            int32_t  i32[$];
-         }
-      ]],
-      o._size/8, o._size/8,
-      o._size/32, o._size/32)
+   local h_t = hash_types[o._size]
+   if not h_t then
+      if o._size >= 64 and o._size%64 == 0 then
+         h_t = ffi.typeof([[
+           union {
+              uint8_t  u8[$];
+              int8_t   i8[$];
+              uint32_t u32[$];
+              int32_t  i32[$];
+              uint64_t u64[$];
+              int64_t  i64[$];
+           }
+         ]],
+            o._size/8, o._size/8,
+            o._size/32, o._size/32,
+            o._size/64, o._size/64)
+      else
+         h_t = ffi.typeof([[
+           union {
+             uint8_t  u8[$];
+             int8_t   i8[$];
+             uint32_t u32[$];
+             int32_t  i32[$];
+           }
+         ]],
+            o._size/8, o._size/8,
+            o._size/32, o._size/32)
+      end
+      hash_types[o._size] = h_t
    end
    o.h = h_t()
    return o

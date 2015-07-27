@@ -39,7 +39,6 @@ _h = false
 
 -- Lowest and highest addresses of valid DMA memory.
 -- (Useful information for creating memory maps.)
-dma_min_addr, dma_max_addr = false, false
 
 local lock_fd = nil
 
@@ -102,8 +101,6 @@ function allocate_next_chunk ()
    }
    _h.num_chunks = _h.num_chunks + 1
    local addr = tonumber(ffi.cast("uint64_t",ptr))
-   dma_min_addr = math.min(dma_min_addr or addr, addr)
-   dma_max_addr = math.max(dma_max_addr or 0, addr + huge_page_size)
 end
 
 --- ### HugeTLB: Allocate contiguous memory in bulk from Linux

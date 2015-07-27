@@ -51,7 +51,6 @@ Hz = false
 sleep = 0
 maxsleep = 100
 
-
 ffi.cdef [[
    typedef struct {
       enum {
@@ -74,6 +73,9 @@ function postfork()
    engine_state = shm.map(state_mapname, 'engine_state', true)
 end
 
+-- busywait: If true then the engine will poll for new data in a tight
+-- loop (100% CPU) instead of sleeping according to the Hz setting.
+busywait = false
 
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
@@ -277,7 +279,7 @@ function main (options)
    repeat
       breathe()
       if not no_timers then timer.run() end
-      pace_breathing()
+      if not busywait then pace_breathing() end
    until done and done()
    if fork.get_procname() == '_master_' then
       engine_state.state = 'finished'

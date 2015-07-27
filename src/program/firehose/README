@@ -19,3 +19,5 @@ Options:
   -e, --example        Print instructions for compiling an example library.
   -i PCI, --input PCI  Receive packets from port with PCI address.
   -t SECONDS, --time SECONDS
+  -r N, --ring-size N  Set the number of packets in the NIC DMA receive queue.
+                       The ring size must be a power of two up to 32768.
