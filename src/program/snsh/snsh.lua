@@ -27,18 +27,18 @@ function run (parameters)
    function opt.i (arg) start_repl = true       noop = false end
    function opt.j (arg)
       if arg:match("^v") then
-	 local file = arg:match("^v=(.*)")
-	 if file == '' then file = nil end
-	 require("jit.v").start(file)
-      elseif arg:match("^p") then 
-	 local opts, file = arg:match("^p=([^,]*),?(.*)")
-	 if file == '' then file = nil end
-	 require("jit.p").start(opts, file)
-	 profiling = true
+         local file = arg:match("^v=(.*)")
+         if file == '' then file = nil end
+         require("jit.v").start(file)
+      elseif arg:match("^p") then
+         local opts, file = arg:match("^p=([^,]*),?(.*)")
+         if file == '' then file = nil end
+         require("jit.p").start(opts, file)
+         profiling = true
       elseif arg:match("^dump") then
-	 local opts, file = arg:match("^dump=([^,]*),?(.*)")
-	 if file == '' then file = nil end
-	 require("jit.dump").on(opts, file)
+         local opts, file = arg:match("^dump=([^,]*),?(.*)")
+         if file == '' then file = nil end
+         require("jit.dump").on(opts, file)
       end
    end
    function opt.e (arg)
@@ -56,10 +56,10 @@ function run (parameters)
    if #parameters > 0 then
       run_script(parameters)
    elseif noop then
-      print(usage) 
+      print(usage)
       main.exit(1)
    end
-   
+
    if start_repl then repl() end
    if profiling then require("jit.p").stop() end
 end

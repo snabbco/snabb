@@ -12,7 +12,7 @@ PcapReader = {}
 function PcapReader:new (filename)
    local records = pcap.records(filename)
    return setmetatable({iterator = records, done = false},
-		       {__index = PcapReader})
+                       {__index = PcapReader})
 end
 
 function PcapReader:pull ()

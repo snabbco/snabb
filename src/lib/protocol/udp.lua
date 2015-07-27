@@ -70,7 +70,7 @@ function udp:checksum (payload, length, ip)
       -- Add UDP header
       h.checksum = 0
       csum = ipsum(ffi.cast("uint8_t *", h),
-		   self:sizeof(), bit.bnot(csum))
+                   self:sizeof(), bit.bnot(csum))
       -- Add UDP payload
       h.checksum = C.htons(ipsum(payload, length, bit.bnot(csum)))
    end

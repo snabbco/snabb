@@ -6,9 +6,9 @@ E= @echo
 
 # Required submodule versions.
 # Defined here to detect version mismatches at build time.
-LUAJIT_VSN    := "v2.0.3-328-g04dc64b"
+LUAJIT_VSN    := "v2.0.4-306-gfe56522"
 LJSYSCALL_VSN := "v0.10-65-g7081d97"
-PFLUA_VSN     := "13b194e7a214faae5c3d2916a998418fc841dbc2"
+PFLUA_VSN     := "27523953c03745d4c4fbbcf81f676bc774e4329e"
 
 TEST_SKIPPED="43"
 

@@ -188,7 +188,7 @@ function M_sf:init_snmp ()
    -- of the ifIndex is delegated to the SNMP agent via the name of
    -- the interface in ifDescr (currently the PCI address).
    local ifTable = mib:new({ directory = self.snmp.directory or nil,
-			     filename = self.pciaddress })
+                             filename = self.pciaddress })
    self.snmp.ifTable = ifTable
    -- ifTable
    ifTable:register('ifDescr', 'OctetStr', self.pciaddress)
@@ -200,12 +200,12 @@ function M_sf:init_snmp ()
    -- the receive address register #0 from the EEPROM
    local ral, rah = self.r.RAL[0](), self.r.RAH[0]()
    assert(bit.band(rah, bits({ AV = 31 })) == bits({ AV = 31 }),
-	  "MAC address on "..self.pciaddress.." is not valid ")
+          "MAC address on "..self.pciaddress.." is not valid ")
    local mac = ffi.new("struct { uint32_t lo; uint16_t hi; }")
    mac.lo = ral
    mac.hi = bit.band(rah, 0xFFFF)
    ifTable:register('ifPhysAddress', { type = 'OctetStr', length = 6 },
-		    ffi.string(mac, 6))
+                    ffi.string(mac, 6))
    ifTable:register('ifAdminStatus', 'Integer32', 1) -- up
    ifTable:register('ifOperStatus', 'Integer32', 2) -- down
    ifTable:register('ifLastChange', 'TimeTicks', 0)
@@ -221,7 +221,7 @@ function M_sf:init_snmp ()
    ifTable:register('ifOutErrors', 'Counter32', 0) -- TBD
    -- ifXTable
    ifTable:register('ifName', { type = 'OctetStr', length = 255 },
-		    self.pciaddress)
+                    self.pciaddress)
    ifTable:register('ifInMulticastPkts', 'Counter32', 0)
    ifTable:register('ifInBroadcastPkts', 'Counter32', 0)
    ifTable:register('ifOutMulticastPkts', 'Counter32', 0)
@@ -239,7 +239,7 @@ function M_sf:init_snmp ()
    ifTable:register('ifPromiscuousMode', 'Integer32', 2) -- false
    ifTable:register('ifConnectorPresent', 'Integer32', 1) -- true
    ifTable:register('ifAlias', { type = 'OctetStr', length = 64 },
-		    self.pciaddress) -- TBD add description
+                    self.pciaddress) -- TBD add description
    ifTable:register('ifCounterDiscontinuityTime', 'TimeTicks', 0) -- TBD
    ifTable:register('_X_ifCounterDiscontinuityTime', 'Counter64', 0) -- TBD
 
@@ -268,66 +268,66 @@ function M_sf:init_snmp ()
    end
    local function read_registers()
       for _, k in ipairs(r_keys) do
-	 r[k].v[0] = r[k].r()
+         r[k].v[0] = r[k].r()
       end
    end
    local t = timer.new("Interface "..self.pciaddress.." status checker",
-		       function(t)
-			  local old = ifTable:get('ifOperStatus')
-			  local new = 1
-			  if band(self.r.LINKS(), mask) ~= mask then
-			     new = 2
-			  end
-			  if old ~= new then
-			     print("Interface "..self.pciaddress..
-				   " status change: "..status[old]..
-				   " => "..status[new])
-			     ifTable:set('ifOperStatus', new)
-			     ifTable:set('ifLastChange', 0)
-			     ifTable:set('_X_ifLastChange_TicksBase',
-				     C.get_unix_time())
-			  end
+                       function(t)
+                          local old = ifTable:get('ifOperStatus')
+                          local new = 1
+                          if band(self.r.LINKS(), mask) ~= mask then
+                             new = 2
+                          end
+                          if old ~= new then
+                             print("Interface "..self.pciaddress..
+                                   " status change: "..status[old]..
+                                   " => "..status[new])
+                             ifTable:set('ifOperStatus', new)
+                             ifTable:set('ifLastChange', 0)
+                             ifTable:set('_X_ifLastChange_TicksBase',
+                                     C.get_unix_time())
+                          end
 
-			  ifTable:set('ifPromiscuousMode',
-				      (bit.band(self.r.FCTRL(), promisc) ~= 0ULL
-				    and 1) or 2)
-			  -- Update counters
-			  read_registers()
-			  ifTable:set('ifHCInMulticastPkts', r.in_mcast_pkts.v[0])
-			  ifTable:set('ifInMulticastPkts', r.in_mcast_pkts.v[0])
-			  ifTable:set('ifHCInBroadcastPkts', r.in_bcast_pkts.v[0])
-			  ifTable:set('ifInBroadcastPkts', r.in_bcast_pkts.v[0])
-			  local in_ucast_pkts = r.in_pkts.v[0] - r.in_bcast_pkts.v[0]
-			     - r.in_mcast_pkts.v[0]
-			  ifTable:set('ifHCInUcastPkts', in_ucast_pkts)
-			  ifTable:set('ifInUcastPkts', in_ucast_pkts)
-			  ifTable:set('ifHCInOctets', r.in_octets64.v[0])
-			  ifTable:set('ifInOctets', r.in_octets64.v[0])
+                          ifTable:set('ifPromiscuousMode',
+                                      (bit.band(self.r.FCTRL(), promisc) ~= 0ULL
+                                    and 1) or 2)
+                          -- Update counters
+                          read_registers()
+                          ifTable:set('ifHCInMulticastPkts', r.in_mcast_pkts.v[0])
+                          ifTable:set('ifInMulticastPkts', r.in_mcast_pkts.v[0])
+                          ifTable:set('ifHCInBroadcastPkts', r.in_bcast_pkts.v[0])
+                          ifTable:set('ifInBroadcastPkts', r.in_bcast_pkts.v[0])
+                          local in_ucast_pkts = r.in_pkts.v[0] - r.in_bcast_pkts.v[0]
+                             - r.in_mcast_pkts.v[0]
+                          ifTable:set('ifHCInUcastPkts', in_ucast_pkts)
+                          ifTable:set('ifInUcastPkts', in_ucast_pkts)
+                          ifTable:set('ifHCInOctets', r.in_octets64.v[0])
+                          ifTable:set('ifInOctets', r.in_octets64.v[0])
 
-			  ifTable:set('ifHCOutMulticastPkts', r.out_mcast_pkts.v[0])
-			  ifTable:set('ifOutMulticastPkts', r.out_mcast_pkts.v[0])
-			  ifTable:set('ifHCOutBroadcastPkts', r.out_bcast_pkts.v[0])
-			  ifTable:set('ifOutBroadcastPkts', r.out_bcast_pkts.v[0])
-			  local out_ucast_pkts = r.out_pkts.v[0] - r.out_bcast_pkts.v[0]
-			     - r.out_mcast_pkts.v[0]
-			  ifTable:set('ifHCOutUcastPkts', out_ucast_pkts)
-			  ifTable:set('ifOutUcastPkts', out_ucast_pkts)
-			  ifTable:set('ifHCOutOctets', r.out_octets64.v[0])
-			  ifTable:set('ifOutOctets', r.out_octets64.v[0])
+                          ifTable:set('ifHCOutMulticastPkts', r.out_mcast_pkts.v[0])
+                          ifTable:set('ifOutMulticastPkts', r.out_mcast_pkts.v[0])
+                          ifTable:set('ifHCOutBroadcastPkts', r.out_bcast_pkts.v[0])
+                          ifTable:set('ifOutBroadcastPkts', r.out_bcast_pkts.v[0])
+                          local out_ucast_pkts = r.out_pkts.v[0] - r.out_bcast_pkts.v[0]
+                             - r.out_mcast_pkts.v[0]
+                          ifTable:set('ifHCOutUcastPkts', out_ucast_pkts)
+                          ifTable:set('ifOutUcastPkts', out_ucast_pkts)
+                          ifTable:set('ifHCOutOctets', r.out_octets64.v[0])
+                          ifTable:set('ifOutOctets', r.out_octets64.v[0])
 
-			  -- The RX receive drop counts are only
-			  -- available through the RX stats register.
-			  -- We only read stats register #0 here.  See comment
-			  -- in init_statistics()
-			  ifTable:set('ifInDiscards', self.qs.QPRDC[0]())
+                          -- The RX receive drop counts are only
+                          -- available through the RX stats register.
+                          -- We only read stats register #0 here.  See comment
+                          -- in init_statistics()
+                          ifTable:set('ifInDiscards', self.qs.QPRDC[0]())
 
-			  ifTable:set('ifInErrors', self.s.CRCERRS() +
-				   self.s.ILLERRC() + self.s.ERRBC() +
-			           self.s.RUC() + self.s.RFC() +
-			           self.s.ROC() + self.s.RJC())
-		       end,
-		       1e9 * (self.snmp.status_timer or
-			      default.snmp.status_timer), 'repeating')
+                          ifTable:set('ifInErrors', self.s.CRCERRS() +
+                                   self.s.ILLERRC() + self.s.ERRBC() +
+                                   self.s.RUC() + self.s.RFC() +
+                                   self.s.ROC() + self.s.RJC())
+                       end,
+                       1e9 * (self.snmp.status_timer or
+                              default.snmp.status_timer), 'repeating')
    timer.activate(t)
    return self
 end
@@ -378,6 +378,11 @@ function M_sf:init_receive ()
    end
    self:set_receive_descriptors()
    self.r.RXCTRL:set(bits{RXEN=0})
+   if self.r.DCA_RXCTRL then -- Register may be undefined in subclass (PF)
+      -- Datasheet 4.6.7 says to clear this bit.
+      -- Have observed payload corruption when this is not done.
+      self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
+   end
    return self
 end
 
@@ -439,8 +444,8 @@ function M_sf:transmit (p)
    -- agreement on this strategy is reached.
    -- if p.length > self.mtu then
    --    if self.snmp then
-   -- 	 local errors = self.snmp.ifTable:ptr('ifOutDiscards')
-   -- 	 errors[0] = errors[0] + 1
+   --          local errors = self.snmp.ifTable:ptr('ifOutDiscards')
+   --          errors[0] = errors[0] + 1
    --    end
    --    packet.free(p)
    -- else

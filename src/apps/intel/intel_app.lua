@@ -106,8 +106,8 @@ function Intel82599:push ()
    if l == nil then return end
    while not empty(l) and self.dev:can_transmit() do
       do local p = receive(l)
-	 self.dev:transmit(p)
-	 --packet.deref(p)
+         self.dev:transmit(p)
+         --packet.deref(p)
       end
    end
    self.dev:sync_transmit()

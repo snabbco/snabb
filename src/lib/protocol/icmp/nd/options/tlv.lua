@@ -5,8 +5,8 @@ local tlv = subClass(nil)
 
 ffi.cdef[[
       typedef struct {
-	 uint8_t type;
-	 uint8_t length;
+         uint8_t type;
+         uint8_t length;
       } tlv_t __attribute__((packed))
 ]]
 
@@ -45,12 +45,12 @@ function tlv:new_from_mem (mem, size)
    local o = tlv:superClass().new(self)
    local tlv_t_size = ffi.sizeof(tlv_t)
    assert(tlv_t_size <= size)
-   local tlv = ffi.cast(tlv_ptr_t, mem) 
+   local tlv = ffi.cast(tlv_ptr_t, mem)
    assert(o._types[tlv.type], "tlv: unsupported type")
    o._name = o._types[tlv.type].name
    local class = o._types[tlv.type].class
    o._option = require(class):new_from_mem(mem + tlv_t_size,
-					   size - tlv_t_size)
+                                           size - tlv_t_size)
    local t = ffi.typeof("struct { tlv_t tlv; uint8_t data[$]; }", size-tlv_t_size)
    o._tlv = ffi.cast(ffi.typeof("$*", t), mem)
    return o

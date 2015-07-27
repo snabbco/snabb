@@ -6,6 +6,7 @@ local link   = require("core.link")
 local config = require("core.config")
 local timer  = require("core.timer")
 local top    = require("lib.ipc.shmem.top")
+local fs     = require("lib.ipc.fs")
 local zone   = require("jit.zone")
 local ffi    = require("ffi")
 local C      = ffi.C
@@ -16,6 +17,9 @@ log = false
 local use_restart = false
 
 test_skipped_code = 43
+
+-- Bound to instance of lib.ipc.fs for on first call to main.
+instance_fs = false
 
 -- The set of all active apps and links in the system.
 -- Indexed both by name (in a table) and by number (in an array).
@@ -98,7 +102,7 @@ function restart_dead_apps ()
 end
 
 -- Configure the running app network to match new_configuration.
--- 
+--
 -- Successive calls to configure() will migrate from the old to the
 -- new app network by making the changes needed.
 function configure (new_config)
@@ -131,7 +135,7 @@ function compute_config_actions (old, new)
    end
    for appname in pairs(old.apps) do
       if not new.apps[appname] then
-	 table.insert(actions['stop'], appname)
+         table.insert(actions['stop'], appname)
       end
    end
    return actions
@@ -186,10 +190,10 @@ function apply_config_actions (actions, conf)
    -- Dispatch actions in a suitable sequence.
    for _, action in ipairs({'stop', 'restart', 'keep', 'reconfig', 'start'}) do
       for _, name in ipairs(actions[action]) do
-	 if log and action ~= 'keep' then
-            io.write("engine: ", action, " app ", name, "\n") 
+         if log and action ~= 'keep' then
+            io.write("engine: ", action, " app ", name, "\n")
          end
-	 ops[action](name)
+         ops[action](name)
       end
    end
    -- Setup links: create (or reuse) and renumber.
@@ -223,6 +227,7 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
+   if not instance_fs then instance_fs = fs:new() end
    init_realtime_stats()
    monotonic_now = C.get_monotonic_time()
    repeat
@@ -251,10 +256,10 @@ function pace_breathing ()
    else
       if lastfrees == frees then
          update_realtime_stats()
-	 sleep = math.min(sleep + 1, maxsleep)
-	 C.usleep(sleep)
+         sleep = math.min(sleep + 1, maxsleep)
+         C.usleep(sleep)
       else
-	 sleep = math.floor(sleep/2)
+         sleep = math.floor(sleep/2)
       end
       lastfrees = frees
       lastfreebytes = freebytes
@@ -272,9 +277,9 @@ function breathe ()
 --      if app.pull then
 --         zone(app.zone) app:pull() zone()
       if app.pull and not app.dead then
-	 zone(app.zone)
-	 with_restart(app, app.pull)
-	 zone()
+         zone(app.zone)
+         with_restart(app, app.pull)
+         zone()
       end
    end
    -- Exhale: push work out through the app network
@@ -303,7 +308,7 @@ end
 local shmem_stats = nil
 function init_realtime_stats ()
    if not shmem_stats then
-      shmem_stats = top:new()
+      shmem_stats = top:new(instance_fs:resource("core-stats"))
    end
    shmem_stats:set_n_links(#link_array)
    for i, link in ipairs(link_array) do
@@ -370,12 +375,12 @@ function report_load ()
       local fpb = math.floor(newfrees/newbreaths)
       local bpp = math.floor(newbytes/newfrees)
       print(("load: time: %-2.2fs  fps: %-9s fpGbps: %-3.3f fpb: %-3s bpp: %-4s sleep: %-4dus"):format(
-	    interval,
-	    lib.comma_value(fps),
-	    fbps / 1e9,
-	    lib.comma_value(fpb),
-	    (bpp ~= bpp) and "-" or tostring(bpp), -- handle NaN
-	    sleep))
+         interval,
+         lib.comma_value(fps),
+         fbps / 1e9,
+         lib.comma_value(fpb),
+         (bpp ~= bpp) and "-" or tostring(bpp), -- handle NaN
+         sleep))
    end
    lastloadreport = now()
    reportedfrees = frees
@@ -397,8 +402,8 @@ function report_links ()
    for i, name in ipairs(names) do
       l = link_table[name]
       print(("%20s sent on %s (loss rate: %d%%)"):format(
-	    lib.comma_value(l.stats.txpackets),
-	    name, loss_rate(l.stats.txdrop, l.stats.txpackets)))
+         lib.comma_value(l.stats.txpackets),
+         name, loss_rate(l.stats.txdrop, l.stats.txpackets)))
    end
 end
 
@@ -406,10 +411,10 @@ function report_apps ()
    print ("apps report:")
    for name, app in pairs(app_table) do
       if app.dead then
-	 print(name, ("[dead: %s]"):format(app.dead.error))
+         print(name, ("[dead: %s]"):format(app.dead.error))
       elseif app.report then
-	 print(name)
-	 with_restart(app, app.report)
+         print(name)
+         with_restart(app, app.report)
       end
    end
 end
