@@ -253,9 +253,9 @@ function apply_config_actions (actions, conf)
             l.receiving_pid = fa_app and 0 or S.getpid()
             ta_app.input[tl] = l
             table.insert(ta_app.input, l)
+            new_link_table[linkspec] = l
+            table.insert(new_link_array, l)
          end
-         new_link_table[linkspec] = l
-         table.insert(new_link_array, l)
       end
    end
    -- commit changes
@@ -335,15 +335,13 @@ function breathe ()
       for i = 1, #link_array do
          local link = link_array[i]
          if firstloop or link.has_new_data then
-            if link.receiving_pid == 0 or link.receiving_pid == pid then
-               link.has_new_data = false
-               local receiver = app_array[link.receiving_app]
-               if receiver.push and not receiver.dead then
-                  zone(receiver.zone)
-                  with_restart(receiver, receiver.push)
-                  zone()
-                  progress = true
-               end
+            link.has_new_data = false
+            local receiver = app_array[link.receiving_app]
+            if receiver.push and not receiver.dead then
+               zone(receiver.zone)
+               with_restart(receiver, receiver.push)
+               zone()
+               progress = true
             end
          end
       end
