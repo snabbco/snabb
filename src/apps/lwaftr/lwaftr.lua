@@ -241,6 +241,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
 end
 
 -- Return a packet without ethernet or IPv6 headers.
+-- TODO: this does not decrement TTL; is this correct?
 function LwAftr:decapsulate(pkt)
    local dgram = datagram:new(pkt) -- TODO: recycle this
    -- FIXME: don't hardcode the values like this
