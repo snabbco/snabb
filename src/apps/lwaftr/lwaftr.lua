@@ -50,6 +50,15 @@ local function print_pkt(pkt)
    print(string.format("Len: %i: ", pkt.length) .. table.concat(fbytes, " "))
 end
 
+local function format_ipv4(uint32)
+   return string.format("%i.%i.%i.%i",
+      bit.rshift(bit.band(uint32, 0xff000000), 24),
+      bit.rshift(bit.band(uint32, 0xff0000), 16),
+      bit.rshift(bit.band(uint32, 0xff00), 8),
+      bit.band(uint32, 0xff))
+end
+
+
 -- TODO: make this O(1)
 function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
    print(ipv4_ip, 'port: ', port)
@@ -62,6 +71,8 @@ function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
          end
       end
    end
+   print("Nothing found for ipv4:port", format_ipv4(ipv4_ip),
+      string.format("%i (0x%x)", port, port))
 end
 
 function LwAftr:binding_lookup_ipv4_from_pkt(pkt, pre_ipv4_bytes)
@@ -70,7 +81,7 @@ function LwAftr:binding_lookup_ipv4_from_pkt(pkt, pre_ipv4_bytes)
    local ip = ffi.cast("uint32_t*", pkt.data + dst_ip_start)[0]
    -- TODO: don't assume the length of the IPv4 header; check IHL
    local ipv4_header_len = 20
-   local dst_port_start = ipv4_header_len + 2
+   local dst_port_start = pre_ipv4_bytes + ipv4_header_len + 2
    local port = C.ntohs(ffi.cast("uint16_t*", pkt.data + dst_port_start)[0])
    return self:binding_lookup_ipv4(ip, port)
 end
@@ -79,7 +90,7 @@ end
 function LwAftr:in_binding_table(ipv6_src_ip, ipv4_src_ip, ipv4_src_port)
    for _, bind in ipairs(self.binding_table) do
       if debug then
-         print("CHECKB4", string.format("%x, %x", bind[2], ipv4_src_ip))
+         print("CHECKB4", string.format("%x, %x", bind[2], ipv4_src_ip), ipv4_src_port)
       end
       if bind[2] == ipv4_src_ip then
          if ipv4_src_port >= bind[3] and ipv4_src_port <= bind[4] then
@@ -263,7 +274,11 @@ function LwAftr:from_b4(pkt)
    local ipv4_src_ip = ffi.cast("uint32_t*", pkt.data + ipv4_src_ip_offset)[0]
    local ipv4_src_port = C.ntohs(ffi.cast("uint16_t*", pkt.data + ipv4_src_port_offset)[0])
    if self:in_binding_table(ipv6_src_ip, ipv4_src_ip, ipv4_src_port) then
+      -- Is it worth optimizing this to change src_eth, src_ipv6, ttl, checksum,
+      -- rather than decapsulating + re-encapsulating? It would be faster, but more code.
       self:decapsulate(pkt)
+      print("self.hairpinning is", self.hairpinning)
+      print("binding_lookup...", self:binding_lookup_ipv4_from_pkt(pkt, 0))
       if self.hairpinning and self:binding_lookup_ipv4_from_pkt(pkt, 0) then
          -- FIXME: shifting the packet ethernet_header_size right would suffice here
          -- The ethernet data is thrown away by _encapsulate_ipv4 anyhow.
@@ -302,8 +317,12 @@ function LwAftr:push ()
          -- decapsulate iff the source was a b4, and forward/hairpin
          out_pkt = self:from_b4(pkt)
       end -- FIXME: silently drop other types; is this the right thing to do?
-      if debug then print("encapsulated") end
-      if out_pkt then link.transmit(o, out_pkt) end
-      if debug then print("tx'd") end
+      --if debug then print("encapsulated") end
+      if out_pkt then
+         link.transmit(o, out_pkt)
+         if debug then print("tx'd") end
+      else 
+         if debug then print ("Nothing transmitted") end
+      end
    end
 end
