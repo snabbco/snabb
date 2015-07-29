@@ -99,7 +99,7 @@ local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
    local csum = C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0])
    print("old csum", string.format("%x", csum))
    csum = csum + fixup_val
-   -- TODO: *test* the following loop
+   -- TODO/FIXME: *test* the following loop
    while csum > 0xffff do -- process the carry nibbles
       local carry = bit.rshift(csum, 16)
       csum = bit.band(csum, 0xffff) + carry
@@ -115,9 +115,12 @@ end
 function LwAftr:_icmp_after_discard(to_ip)
    local new_pkt = packet.new_packet() -- TODO: recycle
    local dgram = datagram:new(new_pkt) -- TODO: recycle this
+   print("gothere1")
    local icmp_header = icmp:new(3, 1) -- TODO: make symbolic
-   local ipv4_header = ipv4:new({ttl = 255, next_header = proto_icmp,
+   print(self.aftr_ipv4_ip, to_ip)
+   local ipv4_header = ipv4:new({ttl = 255, protocol = proto_icmp,
                                  src = self.aftr_ipv4_ip, dst = to_ip})
+   print("got here 2")
    local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
                                         dst = self.inet_mac,
                                         type = ethertype_ipv4})
@@ -201,8 +204,9 @@ function LwAftr:_encapsulate_ipv4(pkt)
          return nil -- lookup failed
       elseif self.ipv4_lookup_failed_policy == lwconf.policies['DISCARD_PLUS_ICMP'] then
          local src_ip_start = ethernet_header_size + 12
-         local to_ip = ffi.cast("uint32_t*", pkt.data + src_ip_start)[0]
-         return LwAftr:_icmp_after_discard(to_ip)-- ICMPv4 type 3 code 1
+         --local to_ip = ffi.cast("uint32_t*", pkt.data + src_ip_start)[0]
+         local to_ip = pkt.data + src_ip_start
+         return self:_icmp_after_discard(to_ip)-- ICMPv4 type 3 code 1
       else
          error("LwAftr: unknown policy" .. self.ipv4_lookup_failed_policy)
       end
