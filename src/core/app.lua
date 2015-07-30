@@ -134,6 +134,7 @@ function configure (new_config)
          if procarg.profile then require("jit.p").start(procarg.profile) end
          apply_config_actions(actions, new_config)
          configuration = new_config
+         engine.busywait = procarg.busywait or false
          repeat
             while engine_state.state ~= 'running' do
                C.usleep(1000)
@@ -419,14 +420,16 @@ function report_apps ()
    for name, app in pairs(app_table) do
       if app.dead then
          print(name, ("[dead: %s]"):format(app.dead.error))
-      elseif app.report then
+      else
          print(name)
-         -- Restarts are currently disabled, still we want to not die on
-         -- errors during app reports, thus this workaround:
-         -- with_restart(app, app.report)
-         local status, err = pcall(app.report, app)
-         if not status then
-            print("Warning: "..name.." threw an error during report: "..err)
+         if app.report then
+            -- Restarts are currently disabled, still we want to not die on
+            -- errors during app reports, thus this workaround:
+            -- with_restart(app, app.report)
+            local status, err = pcall(app.report, app)
+            if not status then
+               print("Warning: "..name.." threw an error during report: "..err)
+            end
          end
       end
    end

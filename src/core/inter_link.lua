@@ -18,8 +18,15 @@ ffi.cdef [[
       int receiving_app, receiving_pid;
       bool has_new_data;
    } inter_link_t;
+
+   typedef struct {
+      struct packet *packets[LINK_RING_SIZE];
+      inter_link_t *link;
+      int head, tail;
+   } front_buf;
 ]]
 
+local size = ffi.C.LINK_RING_SIZE
 local mask = ffi.C.LINK_RING_SIZE-1
 local function step(n) return band(n+1, mask) end
 
@@ -43,17 +50,27 @@ end
 
 
 function inter_link:transmit(p)
-   if self:full() then
-      self.txdrop = self.txdrop + 1
-      p:free()
-   else
-      if self.ret_pks[self.write] ~= nil then self.ret_pks[self.write]:free() end
+--    if self:full() then
+--       self.txdrop = self.txdrop + 1
+--       p:free()
+--    else
+      if self.ret_pks[self.write] ~= nil then
+         self.ret_pks[self.write]:free()
+      end
       self.packets[self.write] = p
       self.write = step(self.write)
       self.stats.txpackets = self.stats.txpackets + 1
       self.stats.txbytes   = self.stats.txbytes + p.length
       self.has_new_data = true
-   end
+--    end
+end
+
+
+function inter_link:front_buf()
+   return ffi.new('front_buf', {
+      link = self,
+      head = 0, tail = 0;
+   })
 end
 
 
@@ -76,5 +93,28 @@ function inter_link:receive()
    return p
 end
 
+
+local front_buf = {}
+front_buf.__index = front_buf
+
+function front_buf:add(p)
+   if step(self.head) == self.tail then
+      local l = self.link
+      local lw = l.write
+      local n = math.min(band(self.head-self.tail, mask), l:nwritable())
+      for i = 1, n do
+         if l.ret_pks[lw] ~= nil then l.ret_pks[lw]:free() end
+         l.packets[lw] = self.packets[self.tail]
+         lw = step(lw)
+         self.tail = step(self.tail)
+      end
+      l.write = lw
+      l.stats.txpackets = l.stats.txpackets + n
+   end
+   self.packets[self.head] = p
+   self.head = step(self.head)
+end
+
+ffi.metatype('front_buf', front_buf)
 
 return ffi.metatype('inter_link_t', inter_link)

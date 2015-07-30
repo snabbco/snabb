@@ -31,6 +31,7 @@ end
 
 -- Return an empty packet.
 function allocate ()
+   engine.freedanypacket = true
    if freelist_nfree(packets_fl) == 0 then
       preallocate_step()
    end

@@ -45,7 +45,7 @@ local lock_fd = nil
 function prefork()
    if not _h then
       _h = shm.map(('//%d/dma_heap'):format(syscall.getpgid()), 'dma_heap')
-      for i = 1, 10 do
+      for i = 1, 100 do
          allocate_next_chunk()
       end
    end

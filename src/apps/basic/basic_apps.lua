@@ -4,6 +4,7 @@ local app = require("core.app")
 local freelist = require("core.freelist")
 local packet = require("core.packet")
 local link = require("core.link")
+local lib = require("core.lib")
 local transmit, receive = link.transmit, link.receive
 
 
@@ -18,14 +19,21 @@ function Source:new(size)
    size = tonumber(size) or 60
    local data = ffi.new("char[?]", size)
    local p = packet.from_pointer(data, size)
-   return setmetatable({size=size, packet=p}, {__index=Source})
+   return setmetatable({size=size, packet=p, fronts={}}, {__index=Source})
 end
 
 function Source:pull ()
+   if self.fronts[1] == nil and self.output[1] ~= nil then
+      for i, l in ipairs(self.output) do
+         self.fronts[i] = l:front_buf()
+      end
+   end
    local p = self.packet
    for i, o in ipairs(self.output) do
+      local front = self.fronts[i]
       for j = 1, o:nwritable() do
-         o:transmit(p:clone())
+         front:add(p:clone())
+--          o:transmit(p:clone())
       end
    end
 end
