@@ -55,15 +55,15 @@ function open (name, readonly)
 end
 
 function delete (name)
-   local ptr = public[numbers[name]]
-   if not ptr then error("counter not found for deletion: " .. name) end
+   local number = numbers[name]
+   if not number then error("counter not found for deletion: " .. name) end
    -- Free shm object
-   shm.unmap(ptr)
+   shm.unmap(public[number])
    shm.unlink(name)
    -- Free local state
    numbers[name] = false
-   public[ptr] = false
-   private[ptr] = false
+   public[number] = false
+   private[number] = false
 end
 
 -- Copy counter private counter values to public shared memory.
