@@ -9,6 +9,7 @@ local packet = require('core.packet')
 ffi.cdef [[
    typedef struct {
       struct packet *packets[LINK_RING_SIZE];
+      struct packet *ret_pks[LINK_RING_SIZE];
       int write, read;
 
       struct {
@@ -46,8 +47,7 @@ function inter_link:transmit(p)
       self.txdrop = self.txdrop + 1
       p:free()
    else
-      local prevPkt = self.packets[self.write]
-      if prevPkt ~= nil then prevPkt:free() end
+      if self.ret_pks[self.write] ~= nil then self.ret_pks[self.write]:free() end
       self.packets[self.write] = p
       self.write = step(self.write)
       self.stats.txpackets = self.stats.txpackets + 1
@@ -68,7 +68,7 @@ end
 
 function inter_link:receive()
    local p = self.packets[self.read]
-   self.packets[self.read] = (self.receiving_pid ~= 0) and packet.allocate() or nil
+   self.ret_pks[self.read] = (self.receiving_pid ~= 0) and packet.allocate() or nil
    self.read = step(self.read)
 
    self.stats.rxpackets = self.stats.rxpackets + 1
