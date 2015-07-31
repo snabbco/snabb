@@ -98,19 +98,6 @@ void checksum_update_incremental_32(uint16_t* checksum_cell,
   *value_cell = htonl(new_value);
 }
 
-// Calculate the TCP Pseudo Header Checksum.
-uint32_t tcp_pseudo_checksum(uint16_t *sip, uint16_t *dip,
-                             int addr_halfwords, int len)
-{
-  uint32_t result = 6 /* PKT_IP_PROTO_TCP */ + len;
-  int i;
-  for(i = 0; i < addr_halfwords; i++) {
-    result += ntohs(sip[i]);
-    result += ntohs(dip[i]);
-  }
-  return result;
-}
-
 // calculates the initial checksum value resulting from
 // the pseudo header.
 // return values:
