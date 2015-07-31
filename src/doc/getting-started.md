@@ -50,7 +50,7 @@ network*. In our first example the output of `PcapReader` will be sent to
 the input of `RawSocket`.
 
 Our example will implement a packet replay program that reads a PCAP file
-and then plays back the packets to an arbitrary ethernet interface.
+and then plays back the packets to an arbitrary Ethernet interface.
 
 You can find the `example_replay.lua` program in the
 `src/program/example_replay` directory. Let us go over it and explain it
@@ -100,7 +100,7 @@ arguments, namely the PCAP file and interface to use.
 Now we get to the meat of this program: building the app network. First
 we get ourselves an an empty configuration `c` by calling
 `config.new`. We then add two app instances to our nework by calling
-`config.app` on our configurration:
+`config.app` on our configuration:
 
 * `capture` - an instance of the `PcapReader` app which will read
   `pcap_file`
@@ -111,7 +111,7 @@ Then we use `config.link` to define a connection between our apps:
 `capture` will transmit packets from its `output` port to `playback`'s
 `rx` port. Since `capture` is a `PcapReader` it will transmit packets
 from a PCAP capture file to its `output` port. `playback` is a
-`RawSocket` and thus will transfer packtes received on the `rx` port to
+`RawSocket` and thus will transfer packets received on the `rx` port to
 the interface. In case you are curious, we could receive incoming packets
 from `playback`'s underlying network interface by connecting its `tx`
 port to another app, e.g. a [PcapWriter](../apps/pcap/README.md) app.
@@ -266,8 +266,8 @@ end
 ```
 
 In the `process_packet` method we first receive a packet `p` from `i`
-using `link.receive`. We then decide wether `p` should be transmitted to
-`o` using `link.transmit` or dropped, depending on wether
+using `link.receive`. We then decide whether `p` should be transmitted to
+`o` using `link.transmit` or dropped, depending on whether
 `self.packet_counter` is even or odd. Note that packets which are not
 transmitted to another link must be freed using `packet.free`.
 
