@@ -192,7 +192,7 @@ function ipv4:pseudo_header (ulplen, proto)
    local h = self:header()
    ffi.copy(ph, h.src_ip, 2*ipv4_addr_t_size)  -- Copy source and destination
    ph.ulp_length = C.htons(ulplen)
-   ph.ulp_proto = C.htons(proto)
+   ph.ulp_protocol = proto
    return(ph)
 end
 
