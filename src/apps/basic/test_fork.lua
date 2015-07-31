@@ -1,6 +1,7 @@
 module(..., package.seeall)
 
-basic_apps = require ('apps.basic.basic_apps')
+local basic_apps = require ('apps.basic.basic_apps')
+local inter_proc = require ('apps.inter_proc.app')
 
 function selftest()
    local c = config.new()
