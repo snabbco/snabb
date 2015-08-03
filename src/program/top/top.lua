@@ -73,10 +73,10 @@ end
 
 function open_link_counters (counters, tree)
    -- Unmap and clear existing link counters.
-   for _, link in ipairs(counters.links) do
-      for _, counter
+   for linkspec, _ in pairs(counters.links) do
+      for _, name
       in ipairs({"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop"}) do
-         shm.unmap(counters.links[counter])
+         counter.delete(tree.."/counters/"..linkspec.."/"..name)
       end
    end
    counters.links = {}
