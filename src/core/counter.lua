@@ -25,26 +25,73 @@ module(..., package.seeall)
 
 local shm = require("core.shm")
 local ffi = require("ffi")
-local counter_t = ffi.typeof("struct { uint64_t c; }")
+require("core.counter_h")
 
-function open (name)          return shm.map(name, counter_t) end
-function set (counter, value) counter.c = value               end
-function add (counter, value) counter.c = counter.c + value   end
-function read (counter)       return counter.c                end
+local counter_t = ffi.typeof("struct counter")
+
+-- Double buffering:
+-- For each counter we have a private copy to update directly and then
+-- a public copy in shared memory that we periodically commit to.
+--
+-- This is important for a subtle performance reason: the shared
+-- memory counters all have page-aligned addresses (thanks to mmap)
+-- and accessing many of them can lead to expensive cache misses (due
+-- to set-associative CPU cache). See SnabbCo/snabbswitch#558.
+local public  = {}
+local private = {}
+local numbers = {} -- name -> number
+
+function open (name, readonly)
+   if numbers[name] then error("counter already opened: " .. name) end
+   local n = #public+1
+   numbers[name] = n
+   public[n] = shm.map(name, counter_t, readonly)
+   if readonly then
+      private[n] = public[#public] -- use counter directly
+   else
+      private[n] = ffi.new(counter_t)
+   end
+   return private[n]
+end
+
+function delete (name)
+   local number = numbers[name]
+   if not number then error("counter not found for deletion: " .. name) end
+   -- Free shm object
+   shm.unmap(public[number])
+   shm.unlink(name)
+   -- Free local state
+   numbers[name] = false
+   public[number] = false
+   private[number] = false
+end
+
+-- Copy counter private counter values to public shared memory.
+function commit ()
+   for i = 1, #public do
+      if public[i] ~= private[i] then public[i].c = private[i].c end
+   end
+end
+
+function set  (counter, value) counter.c = value                         end
+function add  (counter, value) counter.c = counter.c + (value or 1)      end
+function read (counter)        return counter.c                          end
 
 function selftest ()
    print("selftest: core.counter")
    local a  = open("core.counter/counter/a")
    local b  = open("core.counter/counter/b")
-   local a2 = open("core.counter/counter/a")
+   local a2 = shm.map("core.counter/counter/a", counter_t, true)
    set(a, 42)
    set(b, 43)
    assert(read(a) == 42)
    assert(read(b) == 43)
-   assert(read(a) == read(a2))
+   commit()
+   assert(read(a) == a2.c)
    add(a, 1)
    assert(read(a) == 43)
-   assert(read(a) == read(a2))
+   commit()
+   assert(read(a) == a2.c)
    shm.unlink("core.counter")
    print("selftest ok")
 end
